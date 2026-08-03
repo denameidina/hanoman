@@ -176,3 +176,35 @@ export function makeSetting(over: Partial<Setting> = {}) {
   const data = { ...DEFAULT_SETTING, ...over } as unknown as Prisma.InputJsonValue;
   return prisma.setting.upsert({ where: { id: 1 }, update: { data }, create: { id: 1, data } });
 }
+
+// SPEC-516 · repo dengan commit + tag berurutan. Kunci = nama tag, nilai = subject commit yang
+// masuk ke tag itu. Tag dibuat annotated supaya `--sort=creatordate` punya tanggal sungguhan.
+//
+// Tanggal commit & tag dimajukan SATU MENIT tiap langkah, dan itu bukan hiasan: tanggal tag
+// beresolusi detik, jadi tanpa ini seluruh tag fixture lahir di detik yang sama, `-creatordate`
+// jadi seri, dan git jatuh ke urutan NAMA — `v1.0.0` mendahului `v1.1.0`, kebalikan dari yang
+// dijanjikan "terbaru lebih dulu". Repo sungguhan tak punya masalah itu; fixture-nya yang harus
+// menyusul.
+export function makeRepoWithTags(commitsPerTag: Record<string, string[]>): string {
+  const dir = mkdtempSync(join(tmpdir(), "hanoman-tag-"));
+  let minute = 0;
+  const stamp = () => {
+    const d = new Date(Date.UTC(2026, 0, 1, 12, minute++, 0)).toISOString();
+    return { GIT_AUTHOR_DATE: d, GIT_COMMITTER_DATE: d };
+  };
+  const g = (...a: string[]) =>
+    spawnSync("git", a, { cwd: dir, encoding: "utf8", env: { ...process.env, ...stamp() } });
+  g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");
+  g("config", "commit.gpgsign", "false"); g("config", "tag.gpgsign", "false");
+  writeFileSync(join(dir, "README.md"), "awal"); g("add", "-A"); g("commit", "-qm", "awal");
+  g("branch", "-M", "main");
+  let n = 0;
+  for (const [tag, subjects] of Object.entries(commitsPerTag)) {
+    for (const s of subjects) {
+      writeFileSync(join(dir, "README.md"), `${s}\n${n++}`);
+      g("add", "-A"); g("commit", "-qm", s);
+    }
+    g("tag", "-a", tag, "-m", tag);
+  }
+  return dir;
+}
