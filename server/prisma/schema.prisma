@@ -28,6 +28,7 @@ model Project {
   tickets      Ticket[]
   customAgents CustomAgent[] // SPEC-450 · ADR-0094 · custom agent milik project ini
   githubIssues GithubIssue[] // SPEC-471 · ADR-0095 · cermin issue repo GitHub project ini
+  changelogs   Changelog[]   // SPEC-516 · ADR-0105 · changelog tersimpan project ini
 }
 
 model Spec {
@@ -68,6 +69,29 @@ model Spec {
   autoMerge  Json?
   updatedAt  DateTime @updatedAt
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// SPEC-516 · ADR-0105 · changelog naratif per project yang sudah dibangkitkan.
+//
+// LOCAL-only: TANPA kolom `version`, jadi ia tak pernah masuk changefeed sync (cermin LeadFlow,
+// WebhookEndpoint, dan Project.autoMerge). Dua dari tiga modenya diturunkan dari checkout git di
+// MESIN INI, jadi barisnya fakta lokal; yang portabel adalah keluarannya, dan jalannya sudah ada
+// — unduh .md.
+model Changelog {
+  id         String   @id @default(cuid())
+  projectId  String
+  mode       String   // "backlog" | "commit" | "version" (zChangelogMode di @hanoman/shared)
+  title      String   // judul di daftar: rentang tanggal / nama tag / rentang tag
+  params     Json     // parameter pembangkitan apa adanya (zChangelogRequest)
+  body       String   // markdown hasil akhir, sudah lewat scrubOutput
+  generator  String   // "agent" | "fallback"
+  warning    String?  // alasan fallback + catatan cakupan; null = mulus
+  itemCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
 }
 
 // SPEC-450 · ADR-0094 · custom agent: persona yang bisa dipilih ulang & dibagi.

@@ -16,6 +16,9 @@ import { distDir, applyMigrations, ensurePrismaClient } from "./start";
 export const PG_ORDER = [
   // SPEC-450 · ADR-0094 · CustomAgent sesudah Project (FK projectId nullable → cascade).
   "Project", "Spec", "CustomAgent", "Setting", "Notification",
+  // SPEC-516 · ADR-0105 · Changelog sesudah Project (FK projectId). Tabel ini LOCAL-only dan
+  // lazimnya TIDAK ada di sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris.
+  "Changelog",
   "User", "Session", "DeviceToken", "AgentToken",
   "Vps", "VpsAuditSnapshot", "VpsItemState",
   "SessionResult", "SessionHistory",
