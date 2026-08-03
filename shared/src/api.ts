@@ -186,6 +186,11 @@ export const paths = {
   // SPEC-471 · ADR-0095 · tarik & triase issue GitHub (di belakang gate cookie, capability `support`).
   // hanoman TIDAK PERNAH menulis ke GitHub — tak ada path komentar/close di sini, dan itu disengaja.
   githubPull: (id: string) => `${API}/projects/${encodeURIComponent(id)}/github/pull`,
+  // SPEC-516 · ADR-0105 · changelog per project
+  changelog: (id: string) => `${API}/projects/${encodeURIComponent(id)}/changelog`,
+  changelogSources: (id: string) => `${API}/projects/${encodeURIComponent(id)}/changelog/sources`,
+  changelogItem: (id: string, cid: string) =>
+    `${API}/projects/${encodeURIComponent(id)}/changelog/${encodeURIComponent(cid)}`,
   githubIssues: (id: string) => `${API}/projects/${encodeURIComponent(id)}/github/issues`,
   githubIssuesAccept: `${API}/github-issues/accept`,
   githubIssueAccept: (id: string) => `${API}/github-issues/${encodeURIComponent(id)}/accept`,

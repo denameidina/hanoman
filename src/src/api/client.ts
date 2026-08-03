@@ -1,4 +1,4 @@
-import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge } from "@hanoman/shared";
+import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -406,6 +406,15 @@ export const api = {
     j<{ id: string; status: string }>(paths.githubIssueReject(id), { method: "POST", ...body({}) }),
   unlinkGithubIssue: (id: string) =>
     j<{ id: string; status: string; specId: string | null }>(paths.githubIssueUnlink(id), { method: "POST", ...body({}) }),
+  // SPEC-516 · ADR-0105 · changelog per project (capability `docs`).
+  changelogSources: (projectId: string) =>
+    j<ChangelogSources>(paths.changelogSources(projectId)),
+  listChangelogs: (projectId: string, p: { page?: number; limit?: number } = {}) =>
+    j<Paginated<ChangelogView>>(paths.changelog(projectId) + qs({ page: p.page, limit: p.limit })),
+  generateChangelog: (projectId: string, req: ChangelogRequest) =>
+    j<ChangelogView>(paths.changelog(projectId), { method: "POST", ...body(req) }),
+  deleteChangelog: (projectId: string, id: string) =>
+    j<void>(paths.changelogItem(projectId, id), { method: "DELETE" }),
   // SPEC-299 · ADR-0072 · panel scheduler (daun #6) — konsumen read-only fondasi.
   getSchedulerConfig: () => j<Scheduler>(paths.schedulerConfig),
   putSchedulerConfig: (cfg: Scheduler) => j<Scheduler>(paths.schedulerConfig, { method: "PUT", ...body(cfg) }),
