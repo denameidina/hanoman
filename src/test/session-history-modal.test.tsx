@@ -42,21 +42,25 @@ describe("SessionHistoryModal (SPEC-362)", () => {
     expect(await screen.findByText("berjalan")).toBeTruthy();
   });
 
-  it("Muat lebih MENAMBAH halaman berikutnya, bukan menggantinya", async () => {
+  // SPEC-523 · muat-lebih (append) DICABUT: halaman MENGGANTI isi, sama seperti backlog/project/
+  // tiket. Test lama mengunci perilaku append sebagai kontrak — pola SPEC-433.
+  it("halaman berikutnya MENGGANTI isi, bukan menambahnya", async () => {
     listSessionHistory
-      .mockResolvedValueOnce({ items: [row({ id: "h1", title: "Pertama" })], total: 2, page: 1, pageSize: 1 })
-      .mockResolvedValueOnce({ items: [row({ id: "h2", title: "Kedua" })], total: 2, page: 2, pageSize: 1 });
+      // `total` harus melampaui satu halaman (PAGE = 20) supaya halaman kedua benar-benar ada:
+      // pager menurunkan jumlah halaman dari ukuran halaman yang DIMINTA, bukan dari panjang items.
+      .mockResolvedValueOnce({ items: [row({ id: "h1", title: "Pertama" })], total: 25, page: 1, pageSize: 20 })
+      .mockResolvedValueOnce({ items: [row({ id: "h2", title: "Kedua" })], total: 25, page: 2, pageSize: 20 });
     render(<SessionHistoryModal projects={projects} onClose={() => {}} onRestart={() => {}} />);
     expect(await screen.findByText("Pertama")).toBeTruthy();
-    fireEvent.click(screen.getByText("Muat lebih"));
+    fireEvent.click(screen.getByLabelText("Berikutnya"));
     await waitFor(() => expect(screen.getByText("Kedua")).toBeTruthy());
-    expect(screen.getByText("Pertama")).toBeTruthy();   // yang lama tetap ada
+    expect(screen.queryByText("Pertama")).toBeNull();   // yang lama diganti
   });
 
-  it("baris penutup membedakan 'masih ada' dari 'seluruh riwayat'", async () => {
+  it("kontrol halaman menyatakan rentang & total, tanpa tombol muat lebih", async () => {
     listSessionHistory.mockResolvedValue({ items: [row()], total: 1, page: 1, pageSize: 20 });
     render(<SessionHistoryModal projects={projects} onClose={() => {}} onRestart={() => {}} />);
-    expect(await screen.findByText(/seluruh riwayat/)).toBeTruthy();
+    expect(await screen.findByText("1–1 dari 1 sesi")).toBeTruthy();
     expect(screen.queryByText("Muat lebih")).toBeNull();
   });
 

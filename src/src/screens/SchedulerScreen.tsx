@@ -4,13 +4,14 @@
    knob (PUT /api/scheduler/config), opt-in per project (pola helpEnabled → PATCH /projects/:id),
    dan rem darurat Pause/Stop. Konsumen API read-only GET /api/scheduler/state — tanpa endpoint baru. */
 import React from "react";
-import { Card, Button, Badge, Select, Switch, Input, StateBlock, Icon } from "../ds";
+import { Card, Button, Badge, Select, Switch, Input, StateBlock, Icon, Pager, serverPage } from "../ds";
 import { api } from "../api/client";
 import type { SchedulerStateView, SchedulerQueueItemView, SchedulerSessionView, SchedulerSourceView, Scheduler } from "@hanoman/shared";
 import type { ProjectVM, Spec } from "./types";
 import { specDeepLink } from "./deeplink";
 
 const POLL_MS = 5000;
+const QUEUE_PAGE = 10;
 
 // Waktu relatif ringkas. null → "—".
 function ago(iso: string | null, now = Date.now()): string {
@@ -163,6 +164,39 @@ function Section({ title, count, empty, children }: { title: string; count: numb
   );
 }
 
+/* SPEC-523 · satu bagian antrean = satu daftar berhalaman yang memuat datanya sendiri.
+   Sebelumnya ketiganya `filter()` di klien atas array `state.queue` yang tak berbatas — dan
+   array itu ikut di setiap poll 5 detik, tumbuh seiring umur instalasi. */
+function QueueSection({ title, status, count, empty, nonce, render }: {
+  title: string; status: string; count: number; empty: string; nonce: number;
+  render: (q: SchedulerQueueItemView) => React.ReactNode;
+}) {
+  const [items, setItems] = React.useState<SchedulerQueueItemView[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [page, setPage] = React.useState(1);
+
+  React.useEffect(() => {
+    let alive = true;
+    api.getSchedulerQueue({ status, page, limit: QUEUE_PAGE })
+      .then((r) => { if (alive) { setItems(r.items); setTotal(r.total); } })
+      .catch(() => { if (alive) { setItems([]); setTotal(0); } });
+    return () => { alive = false; };
+  }, [status, page, nonce]);
+
+  const sp = serverPage(total, page, QUEUE_PAGE);
+  return (
+    <Card eyebrow="scheduler" title={`${title}${count ? ` · ${count}` : ""}`}>
+      {count === 0
+        ? <div style={{ fontSize: "var(--text-sm)", color: "var(--text-subtle)" }}>{empty}</div>
+        : <>
+          {items.map((q) => render(q))}
+          <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to}
+            onPage={setPage} unit="item" />
+        </>}
+    </Card>
+  );
+}
+
 // Rem darurat: master enable (Stop/Aktifkan) + Pause/Lanjutkan. Menulis blok config penuh.
 function ControlBar({ cfg, cap, liveCount, onWrite, busy }:
   { cfg: Scheduler; cap: number; liveCount: number; onWrite: (next: Scheduler) => void; busy: boolean }) {
@@ -260,11 +294,14 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
   const [phase, setPhase] = React.useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = React.useState(false);
   const [busyId, setBusyId] = React.useState<string | null>(null);
+  // SPEC-523 · penanda muat-ulang untuk QueueSection. Poll state 5 detik ikut menyegarkan halaman
+  // antrean yang sedang tampil TANPA memindahkan operator dari halaman yang sedang dilihatnya.
+  const [nonce, setNonce] = React.useState(0);
 
   const load = React.useCallback((silent = false) => {
     if (!silent) setPhase("loading");
     api.getSchedulerState()
-      .then((s) => { setState(s); setPhase("ready"); })
+      .then((s) => { setState(s); setPhase("ready"); setNonce((n) => n + 1); })
       .catch(() => { if (!silent) setPhase("error"); });   // silent poll tak pernah mem-blank
   }, []);
   React.useEffect(() => { load(); }, [load]);
@@ -306,12 +343,6 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
   if (phase === "loading") return <StateBlock kind="loading" />;
   if (phase === "error" || !state) return <StateBlock kind="error" hint="Gagal memuat state scheduler." action={() => load()} actionLabel="Coba lagi" />;
 
-  const queued = state.queue.filter((q) => q.status === "queued");
-  const done = state.queue.filter((q) => q.status === "done")
-    .sort((a, b) => (b.launchedAt ?? "").localeCompare(a.launchedAt ?? ""));
-  const failed = state.queue.filter((q) => q.status === "failed");
-  const canceled = state.queue.filter((q) => q.status === "canceled");
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
       <ControlBar cfg={state.config} cap={state.cap} liveCount={state.liveCount} onWrite={writeConfig} busy={busy} />
@@ -322,27 +353,26 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
         </div>
       </Card>
 
-      <Section title="Antrean" count={queued.length} empty="Antrean kosong.">
-        {queued.map((q) => <QueueRow key={q.id} q={q} backlog={backlog}
-          onCancel={(id) => void rowAction(id, "cancel")} busy={busyId === q.id} />)}
-      </Section>
+      <QueueSection title="Antrean" status="queued" count={state.queueCounts.queued} empty="Antrean kosong."
+        nonce={nonce} render={(q) => <QueueRow key={q.id} q={q} backlog={backlog}
+          onCancel={(id) => void rowAction(id, "cancel")} busy={busyId === q.id} />} />
 
-      <Section title="Dibatalkan" count={canceled.length} empty="Tak ada item yang dibatalkan.">
-        {canceled.map((q) => <CanceledRow key={q.id} q={q} backlog={backlog}
-          onRequeue={(id) => void rowAction(id, "requeue")} busy={busyId === q.id} />)}
-      </Section>
+      {/* SPEC-522 · tombstone punya seksinya sendiri; SPEC-523 · dibaca berhalaman lewat
+          `GET /scheduler/queue?status=canceled`, bukan dari `state`. */}
+      <QueueSection title="Dibatalkan" status="canceled" count={state.queueCounts.canceled}
+        empty="Tak ada item yang dibatalkan." nonce={nonce}
+        render={(q) => <CanceledRow key={q.id} q={q} backlog={backlog}
+          onRequeue={(id) => void rowAction(id, "requeue")} busy={busyId === q.id} />} />
 
       <Section title="Sesi berjalan" count={state.sessions.length} empty="Tak ada sesi scheduler berjalan.">
         {state.sessions.map((s) => <SessionRow key={s.id} s={s} backlog={backlog} onGotoTerminal={onGotoTerminal} />)}
       </Section>
 
-      <Section title="Selesai (done)" count={done.length} empty="Belum ada hasil selesai.">
-        {done.map((q) => <DoneRow key={q.id} q={q} backlog={backlog} onToast={onToast} />)}
-      </Section>
+      <QueueSection title="Selesai (done)" status="done" count={state.queueCounts.done} empty="Belum ada hasil selesai."
+        nonce={nonce} render={(q) => <DoneRow key={q.id} q={q} backlog={backlog} onToast={onToast} />} />
 
-      <Section title="Gagal" count={failed.length} empty="Tak ada sesi gagal.">
-        {failed.map((q) => <FailedRow key={q.id} q={q} backlog={backlog} />)}
-      </Section>
+      <QueueSection title="Gagal" status="failed" count={state.queueCounts.failed} empty="Tak ada sesi gagal."
+        nonce={nonce} render={(q) => <FailedRow key={q.id} q={q} backlog={backlog} />} />
 
       <SettingsPanel cfg={state.config} onWrite={writeConfig} busy={busy} />
       <OptInPanel projects={projects} onToggle={toggleOptIn} busyId={busyId} />

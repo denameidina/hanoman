@@ -160,6 +160,8 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
   // SPEC-351 · jendela commit berhalaman: `hasMore` = halaman terakhir balas penuh, `paging` = halaman
   // berikutnya sedang diambil, `moreRef` = baris penutup yang jadi sentinel auto-load.
   const [hasMore, setHasMore] = React.useState(false);
+  // SPEC-523 · jumlah commit terjangkau dari ref yang sedang digambar (git rev-list --count).
+  const [total, setTotal] = React.useState(0);
   const [paging, setPaging] = React.useState(false);
   const moreRef = React.useRef<HTMLDivElement | null>(null);
   const [current, setCurrent] = React.useState("");
@@ -260,7 +262,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
       // SPEC-351 · git memotong tepat di `--max-count`, jadi "balasan sepenuh yang diminta" =
       // "kemungkinan masih ada lanjutannya". Halaman berikutnya yang balas lebih sedikit
       // menutup sendiri penandanya — tak perlu hitungan total yang mahal.
-      .then((g) => { setRows(computeLanes(g.commits)); setCurrent(g.current); setHasMore(g.commits.length >= gopts.limit); setState("ready"); })
+      .then((g) => { setRows(computeLanes(g.commits)); setCurrent(g.current); setTotal(g.total ?? 0); setHasMore(g.commits.length >= gopts.limit); setState("ready"); })
       .catch(() => { if (!silent) setState("error"); })
       .finally(() => setPaging(false));
     api.ideStatus(projectId).then(setStatus).catch(() => { if (!silent) setStatus(null); });
@@ -465,7 +467,10 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
         <div ref={moreRef} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
           padding: "9px 12px", borderTop: "1px solid var(--border-hair)" }}>
           <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>
-            {rows.length} commit dimuat{hasMore ? "" : " · seluruh history"}
+            {/* SPEC-523 · sisa dinyatakan. "200 commit dimuat" tak memberi tahu apakah tersisa
+                3 atau 30.000 — dan itulah yang membuat plafonnya terbaca sebagai bug. */}
+            {total > 0 ? `${rows.length} dari ${total} commit` : `${rows.length} commit dimuat`}
+            {hasMore ? "" : " · seluruh history"}
           </span>
           {hasMore && (
             <Button size="sm" variant="ghost" leftIcon="chevron-down" disabled={paging} onClick={more}>

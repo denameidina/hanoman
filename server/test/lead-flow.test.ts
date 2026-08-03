@@ -65,8 +65,9 @@ describe("SPEC-485 · ADR-0102 · daur hidup rantai keputusan", () => {
     const a = await openFlow(base);
     const b = await openFlow(base);
     await closeFlow(b.id, "submit");
-    expect((await listFlows({ projectId: "p485", status: "selesai" })).map((f) => f.id)).toEqual([b.id]);
-    expect((await listFlows({ projectId: "p485" })).map((f) => f.id)).toContain(a.id);
+    // SPEC-523 · listFlows kini beramplop: barisnya di `.rows`, `total` di sampingnya.
+    expect((await listFlows({ projectId: "p485", status: "selesai" })).rows.map((f) => f.id)).toEqual([b.id]);
+    expect((await listFlows({ projectId: "p485" })).rows.map((f) => f.id)).toContain(a.id);
   });
 
   it("toFlowView memancarkan tanggal sebagai string ISO", async () => {

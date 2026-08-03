@@ -180,7 +180,10 @@ export const api = {
   resolveConflict: (entity: string, recordId: string, choice: "local" | "server") =>
     j<{ ok: boolean; reason?: string }>(paths.syncConflictResolve(entity, recordId), { method: "POST", ...body({ choice }) }),
   // SPEC-180 · notifikasi backlog selesai
-  listNotifications: () => j<{ items: Notification[]; unread: number }>(paths.notifications),
+  // SPEC-523 · tanpa params → 50 teratas (perilaku bell yang didorong WS). Dengan page/limit →
+  // halaman arsip. `total` selalu ada di kedua bentuk.
+  listNotifications: (p: { page?: number; limit?: number } = {}) =>
+    j<Paginated<Notification> & { unread: number }>(paths.notifications + qs(p)),
   markNotificationsRead: () => j<void>(paths.notifications + "/read", { method: "POST" }),
   clearNotifications: () => j<void>(paths.notifications, { method: "DELETE" }),
   getLimits: () => j<LimitsDTO>(paths.limits),
@@ -225,7 +228,9 @@ export const api = {
   putIdeFile: (id: string, path: string, content: string) =>
     j<{ path: string; content: string }>(paths.ideFile(id), { method: "PUT", ...body({ path, content }) }),
   ideGraph: (id: string, limit = 200, opts?: { branches?: string[]; showRemote?: boolean; showTags?: boolean }) =>
-    j<{ commits: GraphCommit[]; current: string }>(paths.ideGraph(id, limit, opts)),
+    // SPEC-523 · `total` = commit terjangkau dari ref yang digambar. Graph tetap JENDELA
+    // tumbuh (SPEC-351), bukan halaman diskrit — lane butuh commit kontigu (ADR-0107).
+    j<{ commits: GraphCommit[]; current: string; total: number }>(paths.ideGraph(id, limit, opts)),
   // SPEC-233 · status working tree (baris uncommitted changes)
   ideStatus: (id: string) => j<RepoStatus>(paths.ideStatus(id)),
   ideSearch: (id: string, q: string, by = "all") => j<{ shas: string[] }>(paths.ideSearch(id, q, by)), // SPEC-233
@@ -394,8 +399,9 @@ export const api = {
     j<TicketDetail & { spec: Spec | null }>(paths.ticket(id), { method: "PATCH", ...body(input) }),
   deleteTicket: (id: string) => j<{ ok: boolean }>(paths.ticket(id), { method: "DELETE" }),
   // SPEC-471 · ADR-0095 · tarik & triase issue GitHub. hanoman tak pernah menulis ke GitHub.
-  listGithubIssues: (projectId: string, status?: string) =>
-    j<{ items: GithubIssueView[] }>(paths.githubIssues(projectId) + qs({ status })),
+  // SPEC-523 · amplop Paginated (cermin listTickets).
+  listGithubIssues: (projectId: string, p: { status?: string; page?: number; limit?: number } = {}) =>
+    j<Paginated<GithubIssueView>>(paths.githubIssues(projectId) + qs(p)),
   pullGithubIssues: (projectId: string, p: { state?: "open" | "all"; limit?: number } = {}) =>
     j<{ repo: string; pulled: number; created: number; updated: number; via: "gh" | "rest"; skippedPullRequests: number }>(
       paths.githubPull(projectId), { method: "POST", ...body(p) }),
@@ -433,12 +439,16 @@ export const api = {
     j<SchedulerQueueItemView>(paths.schedulerQueueCancel(id), { method: "POST", ...body(reason ? { reason } : {}) }),
   requeueSchedulerQueueItem: (id: string) =>
     j<SchedulerQueueItemView>(paths.schedulerQueueRequeue(id), { method: "POST", ...body({}) }),
+  // SPEC-523 · antrean scheduler sebagai daftar berhalaman (lepas dari `state`).
+  getSchedulerQueue: (p: { status?: string; page?: number; limit?: number } = {}) =>
+    j<Paginated<SchedulerQueueItemView>>(paths.schedulerQueue + qs(p)),
   // SPEC-409 · ADR-0091 · hanoman-lead. Semua HTTP polling — tak ada kanal WS baru (AC-26).
   getLeadConfig: () => j<Lead>(paths.leadConfig),
   putLeadConfig: (cfg: Lead) => j<Lead>(paths.leadConfig, { method: "PUT", ...body(cfg) }),
   getLeadStatus: () => j<LeadStatusView>(paths.leadStatus),
-  getLeadDecisions: (params: { projectId?: string; specId?: string; sessionId?: string; status?: string; take?: number } = {}) =>
-    j<{ items: LeadDecisionView[] }>(paths.leadDecisions + qs(params)),
+  // SPEC-523 · amplop Paginated. `take` lama masih diterima server, tapi klien memakai page/limit.
+  getLeadDecisions: (params: { projectId?: string; specId?: string; sessionId?: string; status?: string; page?: number; limit?: number } = {}) =>
+    j<Paginated<LeadDecisionView>>(paths.leadDecisions + qs(params)),
   // SPEC-485 · ADR-0102 · centang operator ikut sebagai DATA: ia disimpan dalam bentuk yang sama
   // dengan pilihan lead DAN diketikkan ke pane sebagai centang, bukan sebagai prosa.
   overrideLeadDecision: (id: string, answer: string, reason = "", choices: string[] = []) =>
@@ -447,8 +457,8 @@ export const api = {
   cancelLeadDecision: (id: string) =>
     j<LeadDecisionView>(paths.leadDecisionCancel(id), { method: "POST", ...body({}) }),
   // SPEC-485 · rantai keputusan. Tetap polling HTTP — tak ada kanal WS baru (ADR-0039).
-  getLeadFlows: (params: { projectId?: string; status?: string; take?: number } = {}) =>
-    j<{ items: LeadFlowView[] }>(paths.leadFlows + qs(params)),
+  getLeadFlows: (params: { projectId?: string; status?: string; page?: number; limit?: number } = {}) =>
+    j<Paginated<LeadFlowView>>(paths.leadFlows + qs(params)),
   submitLeadFlow: (id: string) => j<LeadFlowView>(paths.leadFlowSubmit(id), { method: "POST", ...body({}) }),
   cancelLeadFlow: (id: string) => j<LeadFlowView>(paths.leadFlowCancel(id), { method: "POST", ...body({}) }),
   // SPEC-450 · ADR-0094 · katalog custom agent. Tanpa projectId → global saja; dengan projectId →

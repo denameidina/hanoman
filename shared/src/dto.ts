@@ -142,11 +142,22 @@ export const zSchedulerSessionView = z.object({
 });
 export type SchedulerSessionView = z.infer<typeof zSchedulerSessionView>;
 
+// SPEC-523 · `queue` DICABUT dari state: ia daftar tanpa batas dan kini punya endpoint sendiri
+// (`GET /scheduler/queue`, amplop Paginated). State membawa hitungannya saja.
+export const zSchedulerQueueCounts = z.object({
+  queued: z.number().int(), launched: z.number().int(),
+  done: z.number().int(), failed: z.number().int(),
+  // SPEC-522 · `canceled` adalah nilai kelima `status`; hitungannya ikut supaya panel bisa
+  // menampilkan seksi "Dibatalkan" tanpa memuat daftarnya.
+  canceled: z.number().int(),
+});
+export type SchedulerQueueCounts = z.infer<typeof zSchedulerQueueCounts>;
+
 export const zSchedulerState = z.object({
   config: zScheduler,
   cap: z.number(), liveCount: z.number(),
   sources: z.array(zSchedulerSourceView),
-  queue: z.array(zSchedulerQueueItem),
+  queueCounts: zSchedulerQueueCounts,
   sessions: z.array(zSchedulerSessionView),
 });
 export type SchedulerStateView = z.infer<typeof zSchedulerState>;
@@ -532,7 +543,9 @@ export type SessionDTO = {
 export type EventMsg =
   | { t: "specs"; specs: Spec[] }
   | { t: "sessions"; sessions: SessionDTO[] }
-  | { t: "notifications"; items: Notification[]; unread: number }
+  // SPEC-523 · `total` ikut disiarkan: bell menampilkan 50 teratas, dan tanpa angka ini 50 itu
+  // terbaca sebagai "semuanya". Bentuk daftar frame tak berubah (tetap 50 teratas).
+  | { t: "notifications"; items: Notification[]; unread: number; total: number; page: number; pageSize: number }
   | { t: "limits"; limits: LimitsDTO }
   | { t: "codexLimits"; limits: CodexLimitsDTO }   // SPEC-338 · ADR-0074 · grup terpisah dari `limits`
   | { t: "vps"; vps: VpsView[] }

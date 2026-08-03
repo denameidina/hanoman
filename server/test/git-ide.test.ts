@@ -54,7 +54,8 @@ describe("git-ide graph", () => {
     expect(g.commits.some((c) => c.refs.includes("main"))).toBe(true);
   });
   it("listGraph: repoDir null → kosong", async () => {
-    expect(await listGraph(null)).toEqual({ commits: [], current: "" });
+    // SPEC-523 · balasan graph kini membawa `total` (jumlah commit terjangkau); repo tak ada → 0.
+    expect(await listGraph(null)).toEqual({ commits: [], current: "", total: 0 });
   });
   it("commitDetail: file berubah + pesan", async () => {
     const dir = makeRepoWithSpecCommits({ "a.txt": "1" }, [{ msg: "ubah", changes: { "a.txt": "2\n" } }]);

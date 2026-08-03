@@ -5,12 +5,23 @@
    dilayani (menunggu / sedang diputuskan), dan jejak keputusan — pertanyaan → jawaban → alasan →
    rujukan — dengan tombol Timpa & Batalkan per baris (AC-27/28, US-2/3/4). */
 import React from "react";
-import { Card, Button, Badge, Input, Select, StateBlock, Icon, Checkbox, Radio } from "../ds";
+import { Card, Button, Badge, Input, Select, StateBlock, Icon, Checkbox, Radio, Pager, serverPage } from "../ds";
 import { api } from "../api/client";
 import type { Lead, LeadStatusView, LeadDecisionView, LeadFlowView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 
 const POLL_MS = 5000;
+// SPEC-523 · ukuran halaman kedua daftar lead. 393 baris jejak di instalasi hidup dulu dibalas
+// tanpa `total` dan berplafon `take` 50 — data lama tak terjangkau dari layar.
+const LIST_PAGE = 20;
+
+/* Pembungkus tipis Pager DS supaya kedua daftar lead memakai ukuran halaman yang sama dan
+   perhitungan `serverPage` tak diduplikasi. */
+function LeadPager({ total, page, onPage, unit }:
+  { total: number; page: number; onPage: (n: number) => void; unit: string }) {
+  const sp = serverPage(total, page, LIST_PAGE);
+  return <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to} onPage={onPage} unit={unit} />;
+}
 
 function ago(iso: string | null, now = Date.now()): string {
   if (!iso) return "—";
@@ -262,6 +273,10 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
   const [state, setState] = React.useState<LeadStatusView | null>(null);
   const [decisions, setDecisions] = React.useState<LeadDecisionView[]>([]);
   const [flows, setFlows] = React.useState<LeadFlowView[]>([]);
+  const [decTotal, setDecTotal] = React.useState(0);
+  const [decPage, setDecPage] = React.useState(1);
+  const [flowTotal, setFlowTotal] = React.useState(0);
+  const [flowPage, setFlowPage] = React.useState(1);
   const [phase, setPhase] = React.useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = React.useState(false);
   const [busyId, setBusyId] = React.useState<string | null>(null);
@@ -271,18 +286,24 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
     if (!silent) setPhase("loading");
     Promise.all([
       api.getLeadStatus(),
-      api.getLeadDecisions({ projectId: filter === "all" ? undefined : filter, take: 50 }),
+      api.getLeadDecisions({ projectId: filter === "all" ? undefined : filter, page: decPage, limit: LIST_PAGE }),
       // SPEC-485 · rantai. Instance lama tak punya endpoint ini; kegagalannya tak boleh menjatuhkan
       // seluruh panel (ADR-0087: dashboard bisa lebih baru daripada server yang dilayaninya).
-      api.getLeadFlows({ projectId: filter === "all" ? undefined : filter, take: 50 })
-        .catch(() => ({ items: [] as LeadFlowView[] })),
+      api.getLeadFlows({ projectId: filter === "all" ? undefined : filter, page: flowPage, limit: LIST_PAGE })
+        .catch(() => ({ items: [] as LeadFlowView[], total: 0, page: 1, pageSize: LIST_PAGE })),
     ])
       .then(([s, d, f]) => {
-        setState(s); setDecisions(d.items ?? []); setFlows(f.items ?? []); setPhase("ready");
+        setState(s);
+        setDecisions(d.items ?? []); setDecTotal(d.total ?? 0);
+        setFlows(f.items ?? []); setFlowTotal(f.total ?? 0);
+        setPhase("ready");
       })
       .catch(() => { if (!silent) setPhase("error"); });   // silent poll tak pernah mem-blank layar
-  }, [filter]);
+  }, [filter, decPage, flowPage]);
   React.useEffect(() => { load(); }, [load]);
+  // AC-15 · ganti penyaring = kembali ke halaman 1. Tanpa ini, halaman 5 dari filter lama
+  // menjawab daftar filter baru yang cuma punya 2 halaman → daftar kosong tanpa sebab.
+  React.useEffect(() => { setDecPage(1); setFlowPage(1); }, [filter]);
   React.useEffect(() => {
     const t = setInterval(() => { if (!document.hidden) load(true); }, POLL_MS);
     return () => clearInterval(t);
@@ -413,7 +434,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
 
       {/* SPEC-485 · ADR-0102 · satu rantai = satu urusan, dari pertanyaan pertama sampai submit.
           Statusnya dijawab satu kolom, bukan disimpulkan ulang dari kumpulan baris jejak. */}
-      <Card eyebrow="lead · rantai keputusan" title={`Rantai (${flows.length})`}>
+      <Card eyebrow="lead · rantai keputusan" title={`Rantai (${flowTotal})`}>
         {flows.length === 0
           ? <div style={{ fontSize: "var(--text-sm)", color: "var(--text-subtle)" }}>
               Belum ada rantai. Satu rantai adalah satu urusan — beberapa pertanyaan berurutan sampai di-submit.
@@ -434,9 +455,10 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
               </>}
             </RowShell>
           ))}
+        <LeadPager total={flowTotal} page={flowPage} onPage={setFlowPage} unit="rantai" />
       </Card>
 
-      <Card eyebrow="lead · jejak keputusan" title={`Keputusan (${decisions.length})`}
+      <Card eyebrow="lead · jejak keputusan" title={`Keputusan (${decTotal})`}
         actions={
           <Select size="sm" value={filter} aria-label="saring project"
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilter(e.target.value)}
@@ -450,6 +472,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
           : decisions.map((d) => (
             <DecisionRow key={d.id} d={d} onOverride={override} onCancel={cancel} busyId={busyId} />
           ))}
+        <LeadPager total={decTotal} page={decPage} onPage={setDecPage} unit="keputusan" />
       </Card>
     </div>
   );

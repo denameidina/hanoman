@@ -5,6 +5,7 @@ import { prisma } from "../db";
 import { pullIssues } from "../services/github-issues";
 import { acceptGithubIssue } from "../services/github-accept";
 import { notifySynced } from "../services/sync-notify";
+import { paginate } from "../services/paginate";
 
 // SPEC-471 · ADR-0095 · permukaan HTTP tarik & triase issue GitHub. Cermin routes/tickets.ts.
 // hanoman TIDAK PERNAH menulis ke GitHub (keputusan 3): tak ada endpoint komentar/close.
@@ -53,14 +54,16 @@ export default async function githubIssues(app: FastifyInstance): Promise<void> 
 
   app.get("/projects/:id/github/issues", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const { status } = req.query as { status?: string };
+    const { status, page, limit } = req.query as Record<string, string | undefined>;
     const project = await prisma.project.findUnique({ where: { id }, select: { id: true } });
     if (!project) return reply.code(404).send({ error: "not found" });
     const items = await prisma.githubIssue.findMany({
       where: { projectId: id, ...(status ? { status } : {}) },
       orderBy: [{ number: "desc" }],
     });
-    return reply.send({ items: items.map(view) });
+    // SPEC-523 · amplop Paginated. Cermin routes/tickets.ts; issue adalah baris mati tanpa overlay,
+    // jadi memotong di layer response (paginate) memadai dan menjaga satu bentuk.
+    return reply.send(paginate(items.map(view), page, limit));
   });
 
   // Massal DULU: Fastify mencocokkan segmen literal sebelum parameter, tapi menulisnya lebih

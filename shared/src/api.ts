@@ -130,6 +130,8 @@ export const paths = {
   // supaya capability-nya turunan peta yang sudah ada (settings, MENURUT METHOD) — tanpa baris peta baru.
   schedulerQueueCancel: (id: string) => `${API}/scheduler/queue/${encodeURIComponent(id)}/cancel`,
   schedulerQueueRequeue: (id: string) => `${API}/scheduler/queue/${encodeURIComponent(id)}/requeue`,
+  // SPEC-523 · antrean sebagai daftar berhalaman (page/limit + status), lepas dari `state`.
+  schedulerQueue: `${API}/scheduler/queue`,
   // SPEC-409 · ADR-0091 · hanoman-lead. Semua HTTP (polling) — tak ada kanal WS baru (AC-26).
   leadConfig: `${API}/lead/config`,
   leadStatus: `${API}/lead/status`,

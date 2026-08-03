@@ -11,6 +11,10 @@ import { api } from "../api/client";
 import type { ChangelogView, ChangelogSources, ChangelogRequest } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 
+// SPEC-523 · daftar tersimpan yang berhalaman TIDAK hidup di sini: sejak SPEC-519 panel ini
+// generator murni dan daftarnya dirender `ChangelogScreen` (`listChangelogs` dengan `page` +
+// `Pager` di sana). Menambah paginator kedua di panel = dua daftar yang sama di satu layar.
+
 type Mode = "backlog" | "commit" | "version";
 const MODE_TABS: Array<{ mode: Mode; label: string; hint: string }> = [
   { mode: "backlog", label: "Rentang tanggal", hint: "backlog yang selesai di rentang itu" },

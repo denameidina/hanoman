@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, Input, Select, Button, Badge, StateBlock, Icon } from "../ds";
+import { Modal, Input, Select, Button, Badge, StateBlock, Icon, Pager, serverPage } from "../ds";
 import { api } from "../api/client";
 import { SESSION_KINDS, SESSION_KIND_LABEL, restartableKind, type SessionHistoryView } from "@hanoman/shared";
 
@@ -46,9 +46,9 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
   const [selected, setSelected] = React.useState<SessionHistoryView | null>(null);
 
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
-  // Ganti penyaring = jendela riwayat dimulai ulang dari halaman 1; tanpa reset, item halaman lama
-  // dari filter sebelumnya akan menempel di bawah hasil baru.
-  React.useEffect(() => { setItems([]); setPage(1); }, [project, kind, dq]);
+  // AC-15 · ganti penyaring = kembali ke halaman 1. Halaman 5 dari filter lama menjawab daftar
+  // filter baru yang cuma punya 2 halaman → daftar kosong tanpa sebab.
+  React.useEffect(() => { setPage(1); }, [project, kind, dq]);
 
   React.useEffect(() => {
     let alive = true;
@@ -59,25 +59,16 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
       .then((r) => {
         if (!alive) return;
         setTotal(r.total);
-        // page 1 = ganti (filter baru), page > 1 = tambah (muat lebih).
-        setItems((prev) => (r.page > 1 ? [...prev, ...r.items] : r.items));
+        // SPEC-523 · halaman MENGGANTI isi. Muat-lebih (append) dicabut demi satu pola paginasi
+        // yang sama dengan backlog/project/tiket — objective SPEC-523.
+        setItems(r.items);
       })
       .catch(() => { if (alive) { setItems([]); setTotal(0); } })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [project, kind, dq, page]);
 
-  const hasMore = items.length < total;
-  const sentinel = React.useRef<HTMLDivElement | null>(null);
-  // Auto-load saat penutup daftar terlihat; tombol manual tetap ada sebagai fallback (jsdom &
-  // browser tanpa IntersectionObserver tak boleh kehilangan aksesnya) — pola SPEC-351.
-  React.useEffect(() => {
-    const el = sentinel.current;
-    if (!el || !hasMore || loading || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) setPage((p) => p + 1); });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [hasMore, loading, items.length]);
+  const sp = serverPage(total, page, PAGE);
 
   const nameOf = (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid;
 
@@ -122,16 +113,15 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
               </button>
             );
           })}
-          {/* Baris penutup: daftar yang HABIS harus terbaca berbeda dari daftar yang terpotong —
-              pelajaran SPEC-351, di mana keduanya tak terbedakan dan terbaca sebagai bug. */}
-          <div ref={sentinel} style={{ padding: "10px 8px", textAlign: "center", fontSize: 11, color: "var(--text-subtle)" }}>
-            {loading ? "memuat…"
-              : hasMore
-                ? <Button size="sm" variant="ghost" onClick={() => setPage((p) => p + 1)}>Muat lebih</Button>
-                : `${items.length} dari ${total} — seluruh riwayat`}
-          </div>
+          {loading && (
+            <div style={{ padding: "10px 8px", textAlign: "center", fontSize: 11, color: "var(--text-subtle)" }}>memuat…</div>
+          )}
         </div>
       )}
+      {/* SPEC-523 · kontrol halaman DS, sama dengan backlog/project/tiket. Ia sendiri yang
+          menyatakan "N–M dari T", jadi baris penutup SPEC-351 tak lagi perlu. */}
+      <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to}
+        onPage={setPage} unit="sesi" />
 
       {selected && <SessionHistoryDetail row={selected} projectName={nameOf(selected.projectId)}
         onBack={() => setSelected(null)} onRestart={onRestart} />}

@@ -112,8 +112,8 @@ export async function listStashes(repoDir: string | null): Promise<Stash[]> {
 // SPEC-233 · opts: `branches` batasi ke ref tertentu (bukan --all); `showRemote`/`showTags` false →
 // exclude glob ref dari walk (default = perilaku lama).
 export type GraphOpts = { branches?: string[]; showRemote?: boolean; showTags?: boolean };
-export async function listGraph(repoDir: string | null, limit = 200, opts: GraphOpts = {}): Promise<{ commits: GraphCommit[]; current: string }> {
-  if (!repoDir || !existsSync(repoDir)) return { commits: [], current: "" };
+export async function listGraph(repoDir: string | null, limit = 200, opts: GraphOpts = {}): Promise<{ commits: GraphCommit[]; current: string; total: number }> {
+  if (!repoDir || !existsSync(repoDir)) return { commits: [], current: "", total: 0 };
   try {
     const fmt = ["%H", "%P", "%an", "%aI", "%s", "%D"].join(US);
     // ref selector: branch spesifik (--end-of-options cegah flag-injection) atau --all + exclude glob.
@@ -138,8 +138,20 @@ export async function listGraph(repoDir: string | null, limit = 200, opts: Graph
         subject: subject ?? "", refs: branchRefs, tags,
       };
     });
-    return { commits, current: await currentBranch(repoDir) };
-  } catch { return { commits: [], current: "" }; }
+    // SPEC-523 · graph SENGAJA tetap jendela tumbuh (SPEC-351), bukan halaman diskrit: lane
+    // dihitung dari daftar commit KONTIGU, jadi memenggalnya per halaman memutus tautan
+    // induk–anak di batas halaman. Yang kurang selama ini bukan halamannya melainkan angkanya —
+    // "200 dimuat" tak memberi tahu apakah tersisa 3 atau 30.000. `rev-list --count` menjawabnya
+    // dengan ref selector yang SAMA, jadi ia tak pernah menghitung ref yang tak digambar.
+    let total = commits.length;
+    try {
+      const c = await exec("git", ["rev-list", "--count", ...refArgs], { cwd: repoDir, ...GIT });
+      const n = Number(c.stdout.trim());
+      if (Number.isFinite(n)) total = n;
+    } catch { /* repo tanpa commit / ref aneh: jatuh ke jumlah yang benar-benar dimuat */ }
+
+    return { commits, current: await currentBranch(repoDir), total };
+  } catch { return { commits: [], current: "", total: 0 }; }
 }
 
 export type CommitDetail = {

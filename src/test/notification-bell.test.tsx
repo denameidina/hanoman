@@ -4,7 +4,7 @@ import { NotificationBell } from "../src/notifications/NotificationBell";
 import { NotificationsContext } from "../src/notifications/NotificationsContext";
 
 function Harness({ items, onOpen }: { items: any[]; onOpen?: (n: any) => void }) {
-  const ctx = { items, unread: items.filter((n) => !n.readAt).length, markAllRead: () => {}, clear: () => {}, onOpen };
+  const ctx = { items, unread: items.filter((n) => !n.readAt).length, total: items.length, markAllRead: () => {}, clear: () => {}, onOpen };
   return <NotificationsContext.Provider value={ctx}><NotificationBell /></NotificationsContext.Provider>;
 }
 const now = () => new Date().toISOString();

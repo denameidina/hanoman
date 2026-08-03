@@ -54,6 +54,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0107 — Paginasi seragam seluruh daftar dashboard: amplop tunggal, `skip`/`take` sah tanpa overlay, tiga pengecualian dinyatakan](adr/0107-paginasi-seragam-daftar-dashboard.md)
 - [0106 — Pembatalan antrean scheduler: status `canceled` sebagai tombstone, dua endpoint CAS](adr/0106-batalkan-antrean-scheduler.md)
 - [0105 — Changelog per project: `Spec.doneAt` berkolom, hasil tersimpan LOCAL-only, narasi agen ber-fallback](adr/0105-changelog-per-project.md)
 - [0104 — Kehadiran gateway Telegram adalah indikator typing, dan long-poll adaptif yang jadi denyutnya](adr/0104-telegram-typing-indicator-long-poll-adaptif.md)
