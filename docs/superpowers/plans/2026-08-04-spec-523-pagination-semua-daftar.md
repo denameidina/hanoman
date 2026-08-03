@@ -1343,7 +1343,7 @@ Server sudah beramplop sejak SPEC-253; UI memanggilnya tanpa `page`/`limit` sehi
 **Interfaces:**
 - Consumes: `GET /tickets` (sudah ada, `routes/tickets.ts:33`). `unreviewed` dihitung server dari set penuh → tetap benar berapa pun halamannya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/triage-pager.test.tsx`:
 
@@ -1388,14 +1388,14 @@ describe("TriageScreen paginasi tiket (SPEC-523)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/triage-pager.test.tsx
 ```
 Diharapkan: GAGAL — tak ada kontrol halaman, `listTickets` dipanggil tanpa `page`.
 
-- [ ] **Step 3: Tambah state halaman & kirim ke API**
+- [x] **Step 3: Tambah state halaman & kirim ke API**
 
 Di `src/src/screens/TriageScreen.tsx`, tambahkan konstanta di dekat `POLL_MS`:
 ```tsx
@@ -1427,7 +1427,7 @@ Tambahkan reset halaman saat penyaring berubah, tepat di bawah `React.useEffect(
   React.useEffect(() => { setPage(1); }, [project, status, q]);
 ```
 
-- [ ] **Step 4: Render `Pager`**
+- [x] **Step 4: Render `Pager`**
 
 Ganti cabang daftar tiket (baris ~371-374):
 ```tsx
@@ -1451,21 +1451,21 @@ function TicketPager({ total, page, onPage }: { total: number; page: number; onP
 
 Tambahkan `Pager, serverPage` ke impor DS di berkas ini.
 
-- [ ] **Step 5: Jalankan test, pastikan HIJAU**
+- [x] **Step 5: Jalankan test, pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/triage-pager.test.tsx
 ```
 Diharapkan: 2 test lulus.
 
-- [ ] **Step 6: Jalankan test triase lain**
+- [x] **Step 6: Jalankan test triase lain**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run $(ls src/test/*triage* src/test/*ticket* 2>/dev/null | tr '\n' ' ')
 ```
 Diharapkan: lulus. Mock `listTickets` yang mengembalikan `{items, unreviewed}` tanpa `total` perlu ditambahi `total`.
 
-- [ ] **Step 7: Typecheck + commit**
+- [x] **Step 7: Typecheck + commit**
 
 ```bash
 pnpm --filter ./src typecheck

@@ -6,7 +6,7 @@
    tombol buka/salin link backlog (deep-link #spec=, ADR-0071) + buka/salin link publik status
    tiket (shareToken) untuk dibagikan ke pelapor. */
 import React from "react";
-import { Button, Badge, Select, StateBlock, Icon, Input, Field, HnTextarea, ConfirmDialog } from "../ds";
+import { Button, Badge, Select, StateBlock, Icon, Input, Field, HnTextarea, ConfirmDialog, Pager, serverPage } from "../ds";
 import { paths, publicStatus, type TicketView, type TicketDetail, type Spec, type GithubIssueView } from "@hanoman/shared";
 import { api } from "../api/client";
 import { specDeepLink } from "./deeplink";
@@ -14,6 +14,16 @@ import { SyncButton } from "./SyncButton";
 import type { ProjectVM } from "./types";
 
 const POLL_MS = 5000;
+// SPEC-523 · ukuran halaman daftar triase (tiket & issue). Sebelumnya keduanya memuat SELURUH baris.
+const TICKET_PAGE = 20;
+
+/* SPEC-523 · Pager DS untuk daftar triase. `unreviewed` tetap datang dari server yang
+   menghitungnya atas SET PENUH, jadi lencana "belum ditinjau" tak ikut mengecil per halaman. */
+function TicketPager({ total, page, onPage, unit = "tiket" }:
+  { total: number; page: number; onPage: (n: number) => void; unit?: string }) {
+  const sp = serverPage(total, page, TICKET_PAGE);
+  return <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to} onPage={onPage} unit={unit} />;
+}
 
 function ago(iso: string, now = Date.now()): string {
   const d = Math.max(0, now - new Date(iso).getTime());
@@ -310,6 +320,8 @@ export function TriageScreen({ projects, onAccepted, onToast }:
   { projects: ProjectVM[]; onAccepted: (spec: Spec, already: boolean) => void;
     onToast: (msg: string, kind?: string, icon?: string) => void }) {
   const [list, setList] = React.useState<TicketView[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [page, setPage] = React.useState(1);
   const [unreviewed, setUnreviewed] = React.useState(0);
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
   const [openId, setOpenId] = React.useState<string | null>(null);
@@ -322,12 +334,18 @@ export function TriageScreen({ projects, onAccepted, onToast }:
 
   const load = React.useCallback((silent = false) => {
     if (!silent) setState("loading");
-    api.listTickets({ project: project || undefined, status: status || undefined, q: q || undefined })
-      .then((r) => { setList(r.items); setUnreviewed(r.unreviewed); setState("ready"); })
+    api.listTickets({
+      project: project || undefined, status: status || undefined, q: q || undefined,
+      page: String(page), limit: String(TICKET_PAGE),
+    })
+      .then((r) => { setList(r.items); setTotal(r.total); setUnreviewed(r.unreviewed); setState("ready"); })
       .catch(() => { if (!silent) setState("error"); });
-  }, [project, status, q]);
+  }, [project, status, q, page]);
 
   React.useEffect(() => { load(); }, [load]);
+  // AC-15 · ganti penyaring = kembali ke halaman 1. Tanpa ini, halaman 5 dari penyaring lama
+  // menjawab daftar penyaring baru yang cuma punya 2 halaman → daftar kosong tanpa sebab.
+  React.useEffect(() => { setPage(1); }, [project, status, q]);
   React.useEffect(() => {
     const t = setInterval(() => { if (!document.hidden) load(true); }, POLL_MS);
     return () => clearInterval(t);
@@ -369,9 +387,12 @@ export function TriageScreen({ projects, onAccepted, onToast }:
         : state === "error" ? <StateBlock kind="error" hint="Gagal memuat tiket." action={() => load()} actionLabel="Coba lagi" />
         : list.length === 0 ? <StateBlock kind="empty" icon="inbox" title="Belum ada keluhan"
             hint="Aktifkan Help Center di detail project, lalu sebar link publiknya agar keluhan mulai masuk." />
-        : <div style={{ overflowY: "auto", minHeight: 0 }}>
-            {list.map((t) => <TicketRow key={t.id} t={t} onOpen={setOpenId} />)}
-          </div>}
+        : <>
+            <div style={{ overflowY: "auto", minHeight: 0 }}>
+              {list.map((t) => <TicketRow key={t.id} t={t} onOpen={setOpenId} />)}
+            </div>
+            <TicketPager total={total} page={page} onPage={setPage} />
+          </>}
     </div>
   );
 }
