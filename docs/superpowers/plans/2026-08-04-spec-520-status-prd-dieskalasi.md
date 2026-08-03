@@ -1,6 +1,6 @@
 # SPEC-520 — Status PRD turunan (draft · dieskalasi · terwujud) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Status `draft` hanya melekat pada PRD yang belum menurunkan backlog; PRD yang sudah
 menurunkan backlog memakai `dieskalasi` (belum semua turunannya selesai) atau `terwujud` (semua
@@ -68,7 +68,7 @@ React 18 + Vite (`src`) · vitest.
   - `specDerivesFromPrd(spec: PrdSpecTrace, prdPath: string): boolean`
   - `prdStatusOf(prdPath: string, specs: readonly PrdSpecTrace[]): { status: PrdStatus; specCount: number; doneCount: number }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/prd-status.test.ts`:
 
@@ -157,12 +157,12 @@ describe("prdStatusOf", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 Run: `pnpm vitest --run shared/src/prd-status.test.ts`
 Expected: FAIL — `Failed to resolve import "./prd-status"`.
 
-- [ ] **Step 3: Tulis `shared/src/prd-status.ts`**
+- [x] **Step 3: Tulis `shared/src/prd-status.ts`**
 
 ```ts
 import { z } from "zod";
@@ -231,7 +231,7 @@ export function prdStatusOf(prdPath: string, specs: readonly PrdSpecTrace[]): Pr
 }
 ```
 
-- [ ] **Step 4: Ekspor dari barrel**
+- [x] **Step 4: Ekspor dari barrel**
 
 Di `shared/src/index.ts`, tambahkan satu baris **setelah** `export * from "./ticket-status";`:
 
@@ -239,17 +239,17 @@ Di `shared/src/index.ts`, tambahkan satu baris **setelah** `export * from "./tic
 export * from "./prd-status";
 ```
 
-- [ ] **Step 5: Jalankan test — pastikan HIJAU**
+- [x] **Step 5: Jalankan test — pastikan HIJAU**
 
 Run: `pnpm vitest --run shared/src/prd-status.test.ts`
 Expected: PASS — 18 test hijau, 0 gagal.
 
-- [ ] **Step 6: Typecheck paket shared**
+- [x] **Step 6: Typecheck paket shared**
 
 Run: `pnpm --filter ./shared typecheck`
 Expected: keluar 0, tanpa output error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/prd-status.ts shared/src/prd-status.test.ts shared/src/index.ts
@@ -279,7 +279,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     (parameter ketiga baru, opsional)
   - `listAllPrds(sessions?): Promise<PrdDoc[]>` (tanda tangan tak berubah)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `server/test/project-prds.test.ts` (impor `makeSpec` dari factory —
 ubah baris impor teratas jadi `import { resetDb, makeProject, makeTempRepo, makeSpec } from "./factory";`):
@@ -353,7 +353,7 @@ describe("status PRD turunan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 Run:
 ```bash
@@ -362,7 +362,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run \
 ```
 Expected: FAIL — `expected undefined to be "draft"` (field `status` belum ada).
 
-- [ ] **Step 3: Tambahkan tiga field di `zPrdDoc`**
+- [x] **Step 3: Tambahkan tiga field di `zPrdDoc`**
 
 Di `shared/src/dto.ts`, ganti blok `zPrdDoc`:
 
@@ -391,7 +391,7 @@ Tambahkan `zPrdStatus` ke impor `shared/src/dto.ts` — sisipkan baris baru sete
 import { zPrdStatus } from "./prd-status";
 ```
 
-- [ ] **Step 4: Hitung status di `project-prds.ts`**
+- [x] **Step 4: Hitung status di `project-prds.ts`**
 
 Di `server/src/services/project-prds.ts`, ganti baris impor teratas dan tambahkan pemuat trace.
 
@@ -465,7 +465,7 @@ export async function listAllPrds(
 }
 ```
 
-- [ ] **Step 5: Jalankan test — pastikan HIJAU**
+- [x] **Step 5: Jalankan test — pastikan HIJAU**
 
 Run:
 ```bash
@@ -474,7 +474,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run \
 ```
 Expected: PASS — seluruh berkas hijau (7 test lama + 6 test baru).
 
-- [ ] **Step 6: Test tetangga yang menyentuh PRD masih hijau**
+- [x] **Step 6: Test tetangga yang menyentuh PRD masih hijau**
 
 Run:
 ```bash
@@ -484,12 +484,12 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run \
 ```
 Expected: PASS, tak ada regresi.
 
-- [ ] **Step 7: Typecheck shared + server**
+- [x] **Step 7: Typecheck shared + server**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add shared/src/dto.ts server/src/services/project-prds.ts server/test/project-prds.test.ts
@@ -515,7 +515,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   `PrdDoc.status` / `.specCount` / `.doneCount`.
 - Produces: tak ada API baru untuk task lain — ini daun.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `src/test/prd-screen.test.tsx`, lengkapi **kedua** mock daftar dengan field baru
 (tanpa ini TypeScript & assertion baru tak punya data), lalu tambahkan blok test.
@@ -577,20 +577,20 @@ Tambahkan blok test baru di dalam `describe("PrdScreen", …)`:
   });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/prd-screen.test.tsx`
 Expected: FAIL — `Unable to find a label with the text of: Status PRD`, dan
 `getByText("dieskalasi 1/3")` tak ketemu.
 
-- [ ] **Step 3: Impor kosakata status di `PrdScreen.tsx`**
+- [x] **Step 3: Impor kosakata status di `PrdScreen.tsx`**
 
 Ganti baris impor `@hanoman/shared` (baris 11):
 ```ts
 import { PRD_STATUSES, type BreakdownItem, type PrdStatus } from "@hanoman/shared";
 ```
 
-- [ ] **Step 4: Tambahkan komponen lencana status**
+- [x] **Step 4: Tambahkan komponen lencana status**
 
 Sisipkan tepat di atas `function PrdPreviewPane`:
 
@@ -609,7 +609,7 @@ function PrdStatusBadge({ prd }: { prd: PrdDoc }) {
 }
 ```
 
-- [ ] **Step 5: Pasang lencana di sidebar & header preview, ganti kata lencana live**
+- [x] **Step 5: Pasang lencana di sidebar & header preview, ganti kata lencana live**
 
 Di `PrdSidebarItem`, ganti baris lencana:
 ```tsx
@@ -627,7 +627,7 @@ Di header `PrdPreviewPane`, ganti blok judul:
           </div>
 ```
 
-- [ ] **Step 6: Tambahkan state + Select filter status**
+- [x] **Step 6: Tambahkan state + Select filter status**
 
 Di `PrdScreen`, tepat setelah `const [creating, setCreating] = React.useState(false);`:
 ```tsx
@@ -661,7 +661,7 @@ Di baris header, sisipkan Select kedua — bungkus kedua Select dalam satu div:
         </div>
 ```
 
-- [ ] **Step 7: Empty state yang membedakan "belum ada" dari "tersaring habis"**
+- [x] **Step 7: Empty state yang membedakan "belum ada" dari "tersaring habis"**
 
 Ganti cabang daftar kosong di `<aside>`:
 ```tsx
@@ -679,17 +679,17 @@ Ganti cabang daftar kosong di `<aside>`:
           ) : groups.map((g) => (
 ```
 
-- [ ] **Step 8: Jalankan test — pastikan HIJAU**
+- [x] **Step 8: Jalankan test — pastikan HIJAU**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/prd-screen.test.tsx`
 Expected: PASS — seluruh berkas hijau (test lama + 4 test baru).
 
-- [ ] **Step 9: Typecheck paket web**
+- [x] **Step 9: Typecheck paket web**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/src/screens/PrdScreen.tsx src/test/prd-screen.test.tsx
@@ -714,7 +714,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: seluruh perilaku dari Task 1-3. Tak menghasilkan kode.
 
-- [ ] **Step 1: Perbarui `data-model.md`**
+- [x] **Step 1: Perbarui `data-model.md`**
 
 Di `internal/docs/architecture/data-model.md`, tepat **sebelum** paragraf
 `**Breakdown PRD (SPEC-273 …**`, sisipkan:
@@ -739,7 +739,7 @@ sumbernya: ia ditulis agen sekali saat PRD lahir dan tak punya penulis kedua. Fi
 karena itu berbunyi **`sesi hidup`**, bukan lagi `draft hidup`.
 ```
 
-- [ ] **Step 2: Perbarui `api-contract.md`**
+- [x] **Step 2: Perbarui `api-contract.md`**
 
 Di blok `## Docs (project SoT)`, ganti dua baris PRD:
 
@@ -751,7 +751,7 @@ GET    /projects/:id/prds               # SPEC-210 · { items:[PrdDoc] } dokumen
 #   + specCount/doneCount. Bukan kolom — dihitung prdStatusOf() atas Spec project yang sama.
 ```
 
-- [ ] **Step 3: Perbarui `internal/skills/hanoman/SKILL.md`**
+- [x] **Step 3: Perbarui `internal/skills/hanoman/SKILL.md`**
 
 Tambahkan butir baru di bagian **Aturan Arsitektur**, tepat setelah butir SPEC-489
 ("Panduan AI agent punya URL"):
@@ -771,7 +771,7 @@ Tambahkan butir baru di bagian **Aturan Arsitektur**, tepat setelah butir SPEC-4
   penulis kedua) dan lencana `live` karena itu berganti kata jadi **`sesi hidup`**.
 ```
 
-- [ ] **Step 4: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 4: Jalankan seluruh test yang tersentuh perubahan ini**
 
 Run:
 ```bash
@@ -782,12 +782,36 @@ Expected: PASS. **Pastikan test-nya memang berjalan** — `--changed` menyalakan
 `passWithNoTests`, jadi "no test files" bukan bukti. Minimal `shared/src/prd-status.test.ts`,
 `server/test/project-prds.test.ts`, dan `src/test/prd-screen.test.tsx` harus terlihat di daftar.
 
-- [ ] **Step 5: Typecheck ketiga paket yang tersentuh**
+**Hasil nyata (dicatat saat eksekusi):** perintah di atas **habis waktu di 10 menit** dan
+dibatalkan. Sebabnya bukan kegagalan melainkan cakupan: `shared/src/index.ts` (barrel) dan
+`shared/src/dto.ts` diimpor hampir seluruh repo, jadi `--changed` di sini setara **suite penuh**
+— yang menurut ADR-0080 memang tugas manusia sebelum merge, bukan tugas sesi. Diganti set
+terarah, semuanya HIJAU:
+
+| set | hasil |
+|---|---|
+| `--project '@hanoman/shared'` (paket yang permukaannya berubah) | **374/375** — satu gagal **pra-ada** |
+| `server/test/{project-prds,docs.route,doc-download.route,project-breakdowns,specs-batch.route,prd-from-audit.route}.test.ts` | **53/53** |
+| `src/test/{prd-screen.test.tsx,api-client.test.ts}` | **27/27** |
+
+Satu kegagalan `shared/test/agent.test.ts` (`zSetting defaults agentAccessEnabled to false` —
+`telegram` kini punya sub-objek `engine`) **bukan regresi SPEC-520**: `telegram.engine` lahir di
+commit `eb5b2955` (SPEC-492) dan `git merge-base --is-ancestor eb5b2955 "$HANOMAN_BASE_SHA"`
+memastikan commit itu **sudah ada di basis** worktree ini. Tak ada berkas telegram/agent yang
+disentuh SPEC-520.
+
+Risiko sisa dari perubahan barrel/DTO ditutup dua arah: **(a)** keempat paket yang mengimpor
+`@hanoman/shared` typecheck bersih (`shared`, `server`, `src`, `runner`, `cli`) sehingga tabrakan
+nama re-export maupun field kurang tak mungkin lolos; **(b)** `zPrdDoc` **tak dipakai sebagai
+validator runtime** di mana pun (`grep zPrdDoc` → hanya `dto.ts`), jadi tiga field aditif tak bisa
+menolak payload yang tadinya sah.
+
+- [x] **Step 5: Typecheck ketiga paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck`
 Expected: keluar 0 untuk ketiganya. (Bukan `pnpm -r typecheck` — ADR-0080.)
 
-- [ ] **Step 6: Smoke endpoint nyata (task ini menyentuh `GET /prds`)**
+- [x] **Step 6: Smoke endpoint nyata (task ini menyentuh `GET /prds`)**
 
 Boot server dengan DB khusus supaya run tetangga tak menghapusnya di tengah jalan, lalu curl:
 
@@ -803,7 +827,20 @@ menunjuk checkout ini lalu ulangi agar kelima PRD `docs/prd/*.md` terlihat beser
 Matikan server **per-PID** (`kill <pid>` dari `lsof -ti:8799`) — jangan `pkill -f node`
 (SPEC-402).
 
-- [ ] **Step 7: Commit**
+**Hasil nyata (dicatat saat eksekusi)** — DB & `HANOMAN_HOME` khusus (`mktemp -d`), project
+`hanoman` di-bind ke checkout ini, ketiga status terbukti berganti lewat HTTP sungguhan:
+
+| langkah | `GET /api/prds` |
+|---|---|
+| nol backlog | kelima PRD `draft 0/0` |
+| 2 backlog `Dari PRD (breakdown): …scheduler….md` dibuat lewat `POST /api/specs` | `dieskalasi 0/2` |
+| satu di-`stage='done'` | `dieskalasi 1/2` |
+| keduanya `done` | `terwujud 2/2` |
+| `POST /api/specs` source `goal`, `payload.goal` = `Wujudkan PRD docs/prd/orchestrator-hanoman.md` | `orchestrator-hanoman` → `dieskalasi 0/1` |
+
+`GET /api/projects/hanoman/prds` memberi angka yang sama. Server dimatikan `kill $(lsof -ti:8799)`.
+
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs/architecture/data-model.md internal/docs/architecture/api-contract.md \
@@ -813,7 +850,7 @@ git commit -m "docs(spec-520): status PRD turunan di data-model, api-contract, S
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 8: Centang plan & push**
+- [x] **Step 8: Centang plan & push**
 
 Centang seluruh kotak plan ini, commit, lalu:
 ```bash
