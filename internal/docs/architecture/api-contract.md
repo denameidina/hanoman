@@ -243,6 +243,53 @@ terpisah — pola sama dengan `GET /projects/:id/archive` (SPEC-233).
 > kategori di luarnya bertanda `scored: false`. SoT coverage = % kategori berskor yang seluruh
 > Markdown-nya **transitif reachable** dari `docsDir/README.md` (ADR-0013).
 
+## Changelog per project (SPEC-516 · [ADR-0105](../adr/0105-changelog-per-project.md))
+
+Capability domain **`docs`** (bukan `projects`): changelog adalah dokumen, sejajar `docs`/`prds`.
+Tanpa entri eksplisit di `capabilityForRoute` ia jatuh ke `rw("projects")` — artinya agen harus
+dipercaya menyunting & menghapus project hanya untuk membacanya.
+
+```
+GET    /projects/:id/changelog/sources     -> ChangelogSources                        # docs:read · 404 project
+GET    /projects/:id/changelog?page&limit  -> Paginated<ChangelogView>                # docs:read · 404 project
+POST   /projects/:id/changelog             -> 201 ChangelogView                       # docs:write · 400 · 404 · 422
+GET    /projects/:id/changelog/:cid        -> ChangelogView | berkas (?download=md|pdf) # docs:read · 404
+DELETE /projects/:id/changelog/:cid        -> 204 | 404                               # docs:write
+```
+
+**Body `POST`** = `zChangelogRequest`, discriminated union ber-`mode`:
+
+```jsonc
+{ "mode": "backlog", "from": "2026-07-01", "to": "2026-07-31" }  // keduanya opsional → 30 hari terakhir
+{ "mode": "commit",  "fromSha": "4f2a1c9", "toSha": "HEAD" }     // keduanya wajib (≥4 karakter)
+{ "mode": "version", "fromTag": "v1.0.0", "toTag": "v1.2.0" }    // fromTag opsional → versi sebelumnya
+```
+
+**`ChangelogView`** = `{id, projectId, mode, title, params, body, generator:"agent"|"fallback",
+warning, itemCount, createdAt}`. `body` adalah markdown final yang sudah di-scrub;
+`warning` terisi saat narasi agen tak tersedia atau saat ada catatan cakupan.
+
+**`ChangelogSources`** = `{hasRepo, tags[], head, reason, backlog:{doneCount,earliest,latest},
+defaultRange:{from,to}}` — dipakai form untuk mengisi pilihan **sebelum** operator menekan tombol.
+
+**Kode status yang mengikat.** Keadaan sah yang bukan galat **tidak pernah 500**:
+
+| Keadaan | Jawaban |
+| --- | --- |
+| `from > to`, tanggal bukan `YYYY-MM-DD`, field mode kurang | **400** (zod, sebelum menyentuh repo) |
+| project tak ada | **404** |
+| repo belum ditautkan (mode commit & versi) | **422** `"project ini belum ditautkan ke repo di mesin ini"` |
+| repo tanpa tag (mode versi) | **422** `"repo project ini belum punya tag rilis"` |
+| revisi/tag tak dikenal | **422**, pesan menyebut revisi/tag-nya |
+| rentang tanpa isi | **422**, bukan changelog kosong |
+| agen gagal / CLI tak terpasang | **201** dengan `generator:"fallback"` + `warning` |
+
+`GET …/changelog/sources` sengaja menjawab **200 dengan `reason`** (bukan 4xx) saat repo belum
+ditautkan atau tanpa tag: ia menjawab "apa yang tersedia", dan "tidak ada, ini sebabnya" adalah
+jawaban yang sah. Unduh memakai helper yang sama dengan dokumen lain
+([ADR-0078](../adr/0078-unduh-dokumen-md-pdf.md)) — `?download=md` adalah bentuk yang dijanjikan,
+`pdf` ikut karena helper-nya satu.
+
 ## IDE Visual (SPEC-182 · ADR-0034)
 ```
 GET    /projects/:id/tree?ref=          # { ref, files:string[] }  ref kosong=working tree (ls-files), isi=ls-tree <ref>; 404 project tak ada

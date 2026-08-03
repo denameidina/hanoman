@@ -168,11 +168,51 @@ dan tak memakai agent token.
 | `GET /api/specs/:id/review` | `backlog:read` | diff hasil kerja sesi. |
 | `GET /api/projects/:id/docs` | `docs:read` | index Source of Truth project. |
 | `GET /api/projects/:id/docs/<path>` | `docs:read` | isi satu dokumen. |
+| `GET /api/projects/:id/changelog` | `docs:read` | changelog yang sudah dibangkitkan (paginated). |
+| `POST /api/projects/:id/changelog` | `docs:write` | bangkitkan changelog baru — bentuknya di **§6a**. |
 | `GET /api/terminal/sessions` | `sessions:read` | sesi yang sedang hidup. |
 | `GET /api/notifications` | `notifications:read` | notifikasi. |
 | `GET /api/tickets` | `support:read` | tiket Help Center. |
 | `GET /api/lead/decisions` | `lead:read` | jejak keputusan hanoman-lead. |
 | `POST /api/lead/decisions` | `lead:write` | minta putusan — baca **§8** dan **§11** dulu. |
+
+## 6a. Changelog per project
+
+Ringkasan perubahan **berorientasi pemakai** — bukan daftar commit. Tiga mode, satu endpoint;
+`mode` menentukan field lainnya:
+
+```bash
+# 1) backlog yang selesai di rentang tanggal (dua field opsional → 30 hari terakhir)
+curl -sS -X POST "$HANOMAN_HOST/api/projects/<id>/changelog" \
+  -H "Authorization: Bearer $HANOMAN_AGENT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"mode":"backlog","from":"2026-07-01","to":"2026-07-31"}'
+
+# 2) rentang commit di repo project
+  -d '{"mode":"commit","fromSha":"4f2a1c9","toSha":"HEAD"}'
+
+# 3) versi/tag rilis (fromTag opsional → sejak versi sebelumnya)
+  -d '{"mode":"version","toTag":"v1.2.0"}'
+```
+
+Jawaban **201** berisi `body` (markdown siap pakai), `title`, `itemCount`, `generator`, dan
+`warning`. Ambil ulang atau unduh kapan saja:
+
+```bash
+curl -sS "$HANOMAN_HOST/api/projects/<id>/changelog/<cid>?download=md" \
+  -H "Authorization: Bearer $HANOMAN_AGENT_TOKEN"
+```
+
+Tiga hal yang perlu kamu tahu sebelum memanggilnya:
+
+- **Panggil `GET /api/projects/:id/changelog/sources` dulu.** Ia memberi tag yang tersedia, HEAD
+  singkat, rentang default, dan — bila repo belum ditautkan di mesin itu atau belum punya tag — satu
+  `reason` yang menjelaskan sebabnya. Ia menjawab **200**, bukan galat, jadi jangan perlakukan
+  `reason` sebagai kegagalan.
+- **422 berarti permintaanmu sah tapi tak ada isinya** (rentang kosong, repo tanpa tag, revisi tak
+  dikenal) — pesannya bisa langsung diteruskan ke manusia. **400** berarti bentuknya salah
+  (mis. `from` lebih baru dari `to`).
+- **`generator:"fallback"` bukan kegagalan.** Artinya narasi otomatis tak tersedia dan yang kamu
+  terima adalah draf ringkas deterministik; alasannya ada di `warning`.
 
 ## 7. `POST /api/specs` — bentuk payload per `source`
 

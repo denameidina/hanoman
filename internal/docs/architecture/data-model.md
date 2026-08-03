@@ -130,6 +130,20 @@ tiap berkas.
   Keduanya menyeberang record-sync (`FIELDS.spec` **dan** `DATE_FIELDS.spec` — tanpa itu spec asal-hub
   mendapat `createdAt` lokal palsu di tiap client, karena `upsert` yang tak menyebut kolom ber-default
   tetap berhasil). Baris pra-migration di-backfill dari `updatedAt` — aproksimasi yang disengaja.
+- `doneAt` (SPEC-516/[ADR-0105](../adr/0105-changelog-per-project.md)) — nullable; kapan item
+  **pertama** kali masuk stage `done`. Melanjutkan arah ADR-0090 dengan alasan yang sama: waktu
+  selesai sebuah baris tak bisa dihitung ulang dari sumber lain, dan `updatedAt` bergerak tanpa ada
+  manusia. **Penulisnya SATU** — bukan di ketiga jalur yang mempersist `stage="done"`
+  (`advanceStage` · `scheduler/reconcile` · `live-specs`) melainkan **di dalam
+  `recordCompletion()`** (`services/notifications.ts`), satu-satunya fungsi yang sudah dipanggil
+  ketiganya; menyalin efek samping ke banyak call site adalah kelas bug SPEC-431/448/475.
+  **Tulis-sekali** (`updateMany` ber-guard `doneAt: null`) sehingga maknanya "selesai pertama",
+  cermin `startedAt` dan cermin idempotensi ADR-0033 — dan **revert stage tidak mengosongkannya**.
+  Ikut `FIELDS.spec` **dan** `DATE_FIELDS.spec` (kelas gagal-senyap yang sama seperti
+  `createdAt`/`startedAt`). Baris pra-migration di-backfill dari `Notification` ber-key
+  `done:<specId>` — stempel yang sudah ada sejak SPEC-180 dan sumber yang sama dengan sweep
+  auto-merge ADR-0103; item yang selesai sebelum itu tetap `null` dan **dilaporkan sebagai catatan**
+  di hasil changelog, bukan disamarkan.
 - `dependsOn` (Json?, SPEC-447/[ADR-0093](../adr/0093-dependency-antar-backlog.md)) — **array id spec**
   yang harus **selesai (`stage=done`) DAN commit-nya sudah ada di branch basis item ini** sebelum
   sesinya boleh diluncurkan. `null`/`[]` = berdiri sendiri; pembaca menormalkannya (`dependsOnOf`,
@@ -550,6 +564,28 @@ Cermin lokal issue GitHub sebuah project — **pola `Ticket`** (ADR-0062): siste
 - **Keduanya ikut `FIELDS.githubIssue`** justru supaya keputusan triase terlihat sama di semua
   mesin. Kolom yang terlewat di `FIELDS` mendarat sebagai **default palsu** tanpa satu pun error
   (kelas ADR-0090/0093/0094).
+
+## Changelog (SPEC-516 · [ADR-0105](../adr/0105-changelog-per-project.md))
+Changelog naratif per project yang **sudah dibangkitkan** — teks pendek berorientasi pemakai, hasil
+dari salah satu tiga mode: rentang tanggal atas backlog `done` (`Spec.doneAt`), rentang SHA commit,
+atau versi/tag rilis.
+
+- Kolom: `id` (cuid), `projectId` (FK → `Project`, **cascade**), `mode` (`backlog|commit|version`),
+  `title`, `params` (Json — permintaan apa adanya, `zChangelogRequest`), `body` (markdown final,
+  sudah lewat `scrubOutput`), `generator` (`agent|fallback`), `warning?`, `itemCount`,
+  `createdAt`/`updatedAt`. Index `(projectId, createdAt)`.
+- **LOCAL-only — TANPA kolom `version`**, jadi ia tak pernah masuk changefeed sync (cermin
+  `LeadFlow`, `WebhookEndpoint`, `Project.autoMerge`): dua dari tiga modenya diturunkan dari
+  **checkout git di mesin ini**, jadi barisnya fakta lokal. Yang portabel adalah keluarannya, dan
+  jalannya sudah ada — unduh `.md` lewat `?download=` ([ADR-0078](../adr/0078-unduh-dokumen-md-pdf.md)).
+- **Disimpan, bukan diturunkan** — berlawanan dengan ADR-0018 dan disengaja: tiap pembangkitan ulang
+  membakar satu panggilan agen. `generator: "fallback"` menandai baris yang lahir dari draf
+  deterministik karena agen gagal/tak terpasang; `warning` menyimpan alasannya + catatan cakupan.
+- **Wajib ada di `PG_ORDER`** (`cli/src/commands/migrate-pg.ts`), **sesudah `Project`** —
+  `cli/test/migrate-pg.test.ts` menuntut daftar itu sama persis dengan model DMMF, dan itulah
+  satu-satunya gerbang yang menangkap model baru yang lupa didaftarkan.
+- **Sengaja BUKAN `WEBHOOK_ENTITIES`** (ADR-0100): artefak yang dibangkitkan atas permintaan, bukan
+  perubahan keadaan yang perlu disiarkan.
 
 ## Docs (Source of Truth) — TIDAK dipersist
 Docs bukan entitas DB. Tabel `DocFile` sudah di-drop (ADR-0011). Docs dibaca **live dari path

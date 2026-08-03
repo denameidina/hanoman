@@ -170,6 +170,32 @@ Pakai skill lebih sempit saat task cocok:
   (rebase = force-push, dilarang) dan branch kerja tak pernah dihapus sebelum hasil `clean`
   (`deleteBranch` opt-in, default mati). Konflik **tidak** melahirkan sesi agen — notifikasi + branch
   utuh, lalu tombol Rebase/Merge ADR-0031 tetap memberi jalur konflik yang lengkap.
+- **Changelog per project — `Spec.doneAt` berkolom, hasil tersimpan LOCAL-only, narasi agen
+  ber-fallback** (SPEC-516/**ADR-0105**, melanjutkan arah ADR-0090; ADR-0018/0019, 0033, 0078, 0091,
+  0099, 0100 utuh): tiga mode (rentang tanggal backlog · rentang SHA · versi/tag) di bawah
+  `/projects/:id/changelog`, semuanya menghasilkan teks pendek **berorientasi pemakai**.
+  **`Spec.doneAt`** ditambahkan karena `updatedAt` bergerak tanpa ada manusia (ADR-0090) — dan
+  penulisnya **SATU**: bukan di ketiga jalur yang mempersist `stage="done"` melainkan **di dalam
+  `recordCompletion()`**, satu-satunya fungsi yang sudah dipanggil ketiganya (menyalin efek samping
+  ke call site = kelas bug SPEC-431/448/475, dan efek samping tak punya tipe yang memaksanya
+  konsisten). **Tulis-sekali** ber-guard `doneAt: null` → maknanya *selesai pertama*, cermin
+  `startedAt`; revert stage tak mengosongkannya. Backfill sekali-jalan dari notifikasi
+  `done:<specId>` (sumber yang sama dengan sweep ADR-0103). Narasi lewat **`think()` yang DIIMPOR**
+  dari `lead/brain.ts` — titik spawn agen ketiga akan mengulang SPEC-448 — dengan **anggaran waktu
+  disebut di dalam prompt** (SPEC-432: 306 → 101 dtk); agen gagal/kosong **bukan galat**, baris
+  tetap lahir ber-`generator:"fallback"` + `warning`. Scrub dijalankan **dua kali** dan yang
+  menentukan sisi **INPUT** (SHA bahkan tak pernah dikumpulkan dari `git log`). Model `Changelog`
+  **LOCAL-only** (tanpa kolom `version`), capability **domain `docs`** bukan `projects`, dan keadaan
+  sah yang bukan galat dijawab **422 + pesan** — `…/changelog/sources` bahkan **200 dengan `reason`**.
+  **Lima gotcha wajib:** (1) `PG_ORDER` wajib memuat model baru **sesudah `Project`** —
+  `cli/test/migrate-pg.test.ts` menuntutnya sama persis dengan DMMF, satu-satunya gerbangnya;
+  (2) `doneAt` wajib di `FIELDS.spec` **dan** `DATE_FIELDS.spec` (`upsert` yang tak menyebut sebuah
+  kolom tetap berhasil — kelas gagal-senyap ADR-0090/0093/0094); (3) batas hari wajib **LOKAL**
+  (`new Date("2026-07-31")` = tengah malam UTC); (4) regex scrub camelCase wajib menuntut ≥2 huruf
+  kecil di **kedua** sisi kapital (kalau tidak `macOS`/`iOS` ikut terbuang) dan regex hash wajib
+  menuntut satu digit **dan** satu huruf a–f (kalau tidak `1000000` terbaca sebagai sha);
+  (5) "versi sebelumnya" diturunkan `git describe --abbrev=0 <tag>^` (**riwayat**), bukan urutan
+  tanggal — tanggal tag anotasi beresolusi DETIK dan git jatuh ke urutan NAMA saat seri.
 - **Panduan AI agent punya URL** (SPEC-489, tanpa ADR — ADR-0065 & ADR-0099 **ditegakkan**):
   `docs/agent-integration.md` adalah **naskah tunggal**, disajikan mentah di
   **`GET /api/agent-integration.md`** (`text/markdown`, masuk daftar `PUBLIC` `app.ts` bersama
