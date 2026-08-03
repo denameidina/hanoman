@@ -83,7 +83,7 @@ Vitest + Testing Library.
   — diekspor dari `@hanoman/shared` (barrel `shared/src/index.ts` sudah `export * from "./changelog"`,
   jadi tak ada perubahan barrel).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan di akhir `shared/src/changelog.test.ts` (impor di baris atas berkas ikut ditambah
 `changelogMatches`):
@@ -117,12 +117,12 @@ describe("changelogMatches (SPEC-519)", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm --filter ./shared exec vitest run src/changelog.test.ts`
 Expected: FAIL — `changelogMatches is not a function` / error impor.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Tambahkan di akhir `shared/src/changelog.ts`:
 
@@ -140,12 +140,12 @@ export function changelogMatches(row: { title: string; body: string; mode: strin
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm --filter ./shared exec vitest run src/changelog.test.ts`
 Expected: PASS — seluruh berkas hijau (test SPEC-516 lama ikut hijau).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/changelog.ts shared/src/changelog.test.ts
@@ -165,7 +165,7 @@ git commit -m "feat(spec-519): predikat cari changelogMatches di shared"
 - Produces: endpoint yang sama, kini menerima `?q=<teks>`; envelope `Paginated<ChangelogView>`
   dengan `total` = jumlah baris yang **cocok** (bukan jumlah seluruh baris).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Ganti isi blok `describe("GET /projects/:id/changelog", …)` di `server/test/changelog.route.test.ts`
 menjadi (test lama dipertahankan, dua test baru ditambahkan):
@@ -209,12 +209,12 @@ describe("GET /projects/:id/changelog", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm --filter ./server exec vitest run test/changelog.route.test.ts --no-file-parallelism`
 Expected: FAIL pada test `q menyaring…` — `total` = 2 (bukan 1), karena `q` masih diabaikan.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `server/src/routes/changelog.ts`, ubah impor `@hanoman/shared` di baris 2 dan route daftar:
 
@@ -234,12 +234,12 @@ import { zChangelogRequest, defaultRange, changelogMatches } from "@hanoman/shar
   });
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm --filter ./server exec vitest run test/changelog.route.test.ts --no-file-parallelism`
 Expected: PASS — seluruh berkas hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/changelog.ts server/test/changelog.route.test.ts
@@ -261,7 +261,7 @@ git commit -m "feat(spec-519): GET changelog menerima ?q= (saring sebelum pagina
   - `api.listChangelogs(projectId: string, p?: { page?: number; limit?: number; q?: string }): Promise<Paginated<ChangelogView>>`
   - `api.getChangelog(projectId: string, id: string): Promise<ChangelogView>`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan di `src/test/client.test.ts`, di dalam `describe("api client", …)`:
 
@@ -293,12 +293,12 @@ Tambahkan di `src/test/client.test.ts`, di dalam `describe("api client", …)`:
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/client.test.ts`
 Expected: FAIL — `api.getChangelog is not a function`, dan URL `listChangelogs` tak memuat `q=laporan`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `src/src/api/client.ts`, ganti blok changelog:
 
@@ -318,12 +318,12 @@ Di `src/src/api/client.ts`, ganti blok changelog:
     j<void>(paths.changelogItem(projectId, id), { method: "DELETE" }),
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/client.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/client.ts src/test/client.test.ts
@@ -344,7 +344,7 @@ git commit -m "feat(spec-519): klien listChangelogs(q) + getChangelog"
   - `parseChangelogHash(hash: string): { projectId: string; changelogId: string | null } | null`
   - `changelogDeepLink(projectId: string, changelogId?: string | null, loc?: { origin: string; pathname: string }): string`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Buat `src/test/changelog-deeplink.test.ts`:
 
@@ -391,12 +391,12 @@ describe("SPEC-519 · deep-link changelog", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/changelog-deeplink.test.ts`
 Expected: FAIL — `parseChangelogHash is not a function`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Tambahkan di akhir `src/src/screens/deeplink.ts`:
 
@@ -419,12 +419,12 @@ export function changelogDeepLink(projectId: string, changelogId?: string | null
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/changelog-deeplink.test.ts test/backlog-deeplink.test.tsx`
 Expected: PASS keduanya (deep-link spec lama tak terganggu).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/deeplink.ts src/test/changelog-deeplink.test.ts
@@ -446,7 +446,7 @@ git commit -m "feat(spec-519): deep-link #changelog=<projectId>[&cl=<id>]"
   generate diserahkan ke pemanggil lewat `onGenerated` (Task 6 merendernya di kartu detail, satu
   jalur render untuk semua rilis).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Ganti `src/src/screens/ChangelogPanel.test.tsx` seluruhnya:
 
@@ -527,14 +527,14 @@ describe("ChangelogPanel", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run src/screens/ChangelogPanel.test.tsx`
 Expected: FAIL — mock klien tak lagi menyediakan `listChangelogs`/`deleteChangelog` yang masih
 dipanggil panel (`TypeError: api.listChangelogs is not a function`), dan `onGenerated` tak pernah
 dipanggil.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Ganti `src/src/screens/ChangelogPanel.tsx` seluruhnya:
 
@@ -671,12 +671,12 @@ export function ChangelogPanel({ p, onToast, onGenerated }:
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run src/screens/ChangelogPanel.test.tsx`
 Expected: PASS (5 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/ChangelogPanel.tsx src/src/screens/ChangelogPanel.test.tsx
@@ -700,7 +700,7 @@ git commit -m "refactor(spec-519): ChangelogPanel jadi generator murni + onGener
   `@hanoman/shared`.
 - Produces: `ChangelogScreen({ p, onToast, initialChangelogId }: { p: ProjectVM; onToast: (msg: string, kind?: string, icon?: string) => void; initialChangelogId?: string | null })`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Buat `src/src/screens/ChangelogScreen.test.tsx`:
 
@@ -789,12 +789,12 @@ describe("ChangelogScreen (SPEC-519)", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run src/screens/ChangelogScreen.test.tsx`
 Expected: FAIL — `Failed to resolve import "./ChangelogScreen"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Buat `src/src/screens/ChangelogScreen.tsx`:
 
@@ -954,17 +954,17 @@ export function ChangelogScreen({ p, onToast, initialChangelogId }:
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run src/screens/ChangelogScreen.test.tsx`
 Expected: PASS (6 test).
 
-- [ ] **Step 5: Typecheck paket web**
+- [x] **Step 5: Typecheck paket web**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0, tanpa error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/ChangelogScreen.tsx src/src/screens/ChangelogScreen.test.tsx
@@ -985,7 +985,7 @@ git commit -m "feat(spec-519): ChangelogScreen — daftar rilis bergulir, dicari
 - Produces: `export type NavItem = { key: string; label: string; icon: string }` dan
   `export const HN_NAV: NavItem[]` dari `src/src/ds/shell.tsx`; section `"changelog"` di App.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Buat `src/test/changelog-nav.test.tsx`:
 
@@ -1022,12 +1022,12 @@ describe("Shell nav · Changelog (SPEC-519)", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/changelog-nav.test.tsx`
 Expected: FAIL — `HN_NAV` belum diekspor / teks "Changelog" tak ditemukan.
 
-- [ ] **Step 3a: Ekspor `HN_NAV` + tambahkan entrinya**
+- [x] **Step 3a: Ekspor `HN_NAV` + tambahkan entrinya**
 
 Di `src/src/ds/shell.tsx`, ubah deklarasi nav (baris 16-30):
 
@@ -1054,7 +1054,7 @@ export const HN_NAV: NavItem[] = [
 apa adanya; tambahkan satu kalimat di akhirnya: `Kontraknya kini dijaga test:
 src/test/changelog-nav.test.tsx.`)
 
-- [ ] **Step 3b: Tambahkan cabang section + state + efek deep-link di `App.tsx`**
+- [x] **Step 3b: Tambahkan cabang section + state + efek deep-link di `App.tsx`**
 
 1. Impor (dekat impor screen lain, mis. setelah impor `DocsWorkspace`):
 
@@ -1133,22 +1133,22 @@ import { parseSpecHash, parseChangelogHash } from "./screens/deeplink";
 import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/changelog-nav.test.tsx`
 Expected: PASS (2 test).
 
-- [ ] **Step 5: Pastikan layar App yang sudah ada tak tergores**
+- [x] **Step 5: Pastikan layar App yang sudah ada tak tergores**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/app-flows.test.tsx test/app-states.test.tsx test/backlog-deeplink.test.tsx test/scheduler-nav.test.tsx test/settings-nav.test.tsx`
 Expected: PASS semuanya.
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/ds/shell.tsx src/src/App.tsx src/test/changelog-nav.test.tsx
@@ -1168,7 +1168,7 @@ git commit -m "feat(spec-519): entri sidebar Changelog + section + deep-link mou
 - Consumes: section `"changelog"` (Task 7)
 - Produces: prop baru `onGotoChangelog: () => void` pada `ProjectDetailScreen`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Buat `src/test/project-detail-changelog.test.tsx`:
 
@@ -1211,12 +1211,12 @@ describe("ProjectDetailScreen · pintu Changelog (SPEC-519)", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/project-detail-changelog.test.tsx`
 Expected: FAIL — tak ada elemen bertulisan "Changelog" sebagai pintu (yang ada kartu generator).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `src/src/screens/ProjectDetailScreen.tsx`:
 
@@ -1264,12 +1264,12 @@ Di `src/src/App.tsx`, cabang `section === "project"`, tambahkan prop pada call s
               onGotoChangelog={() => setSection("changelog")}
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/project-detail-changelog.test.tsx`
 Expected: PASS (2 test).
 
-- [ ] **Step 5: Typecheck + test tetangga yang menyentuh ProjectDetail**
+- [x] **Step 5: Typecheck + test tetangga yang menyentuh ProjectDetail**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0 (call site App wajib mengirim `onGotoChangelog` — prop-nya sengaja WAJIB, bukan
@@ -1278,7 +1278,7 @@ opsional, supaya pintu tak bisa hilang diam-diam).
 Run: `env -u NODE_ENV pnpm --filter ./src exec vitest run test/app-flows.test.tsx test/app-states.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/ProjectDetailScreen.tsx src/src/App.tsx src/test/project-detail-changelog.test.tsx
@@ -1298,7 +1298,7 @@ git commit -m "feat(spec-519): project detail menunjuk ke halaman Changelog lewa
 - Consumes: perilaku final dari Task 1-8
 - Produces: docs yang menyatakan `?q=`, section `changelog`, dan bentuk deep-link.
 
-- [ ] **Step 1: Perbarui `api-contract.md`**
+- [x] **Step 1: Perbarui `api-contract.md`**
 
 Cari baris `GET /projects/:id/changelog` di `internal/docs/architecture/api-contract.md` dan
 tambahkan parameter `q` pada deskripsinya, mis.:
@@ -1311,7 +1311,7 @@ tambahkan parameter `q` pada deskripsinya, mis.:
 
 Sesuaikan bentuk kalimatnya dengan gaya baris tetangganya; jangan mengubah baris endpoint lain.
 
-- [ ] **Step 2: Perbarui `frontend-implementation.md`**
+- [x] **Step 2: Perbarui `frontend-implementation.md`**
 
 Tambahkan section `changelog` ke daftar section/nav yang ada di dokumen itu, dengan isi:
 
@@ -1326,7 +1326,7 @@ Tambahkan section `changelog` ke daftar section/nav yang ada di dokumen itu, den
 
 Sesuaikan penempatannya dengan struktur dokumen (bila dokumen memakai tabel, tambahkan barisnya).
 
-- [ ] **Step 3: Perbarui `internal/skills/hanoman/SKILL.md`**
+- [x] **Step 3: Perbarui `internal/skills/hanoman/SKILL.md`**
 
 Pada butir "**Changelog per project — `Spec.doneAt` berkolom…**" (SPEC-516/ADR-0105), tambahkan satu
 kalimat di akhir butir:
@@ -1341,7 +1341,7 @@ kalimat di akhir butir:
   (`src/test/changelog-nav.test.tsx`), bukan hanya komentar.
 ```
 
-- [ ] **Step 4: Verifikasi index docs tetap utuh**
+- [x] **Step 4: Verifikasi index docs tetap utuh**
 
 Run: `node cli/dist/hanoman.js docs index --check 2>/dev/null || echo "cli belum ter-build — lewati"`
 Expected: `ok` atau pesan "cli belum ter-build". Tak ada berkas doc BARU di spec ini, jadi
@@ -1350,7 +1350,7 @@ Expected: `ok` atau pesan "cli belum ter-build". Tak ada berkas doc BARU di spec
 Run: `git diff --stat internal/docs/README.md`
 Expected: kosong (README tak berubah).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs/architecture/api-contract.md internal/docs/frontend/frontend-implementation.md internal/skills/hanoman/SKILL.md
@@ -1366,7 +1366,7 @@ git commit -m "docs(spec-519): ?q= di api-contract, section changelog di fronten
 **Interfaces:**
 - Consumes: seluruh Task 1-9
 
-- [ ] **Step 1: Jalankan test yang tersentuh perubahan (server + shared, serial & DB terisolasi)**
+- [x] **Step 1: Jalankan test yang tersentuh perubahan (server + shared, serial & DB terisolasi)**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1378,7 +1378,7 @@ Expected: semua hijau. **Jebakan:** `--changed` menyalakan `passWithNoTests`, ja
 client, deeplink, panel, screen, nav, project-detail). Bila 0 berkas berjalan, sebut path test-nya
 langsung.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh saja**
+- [x] **Step 2: Typecheck paket yang tersentuh saja**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
@@ -1386,7 +1386,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --f
 
 Expected: keluar 0 untuk ketiganya. **Jangan** `pnpm -r typecheck`.
 
-- [ ] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
+- [x] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
 
 Task ini menyentuh endpoint, jadi boot server dan curl-nya sungguhan dengan DB khusus supaya sesi
 tetangga tak terganggu:
@@ -1410,7 +1410,7 @@ kill $(lsof -ti:8799)
 **JANGAN** `pkill -f node` / `pkill -f vitest` — prompt tiap sesi hidup di ARGV agennya dan pola itu
 mematikan sesi tetangga (SPEC-402).
 
-- [ ] **Step 4: Diff bersih & centang plan**
+- [x] **Step 4: Diff bersih & centang plan**
 
 ```bash
 git status --porcelain
@@ -1418,7 +1418,7 @@ git status --porcelain
 
 Expected: kosong selain berkas plan ini (yang kotaknya dicentang seiring jalan).
 
-- [ ] **Step 5: Commit terakhir + push**
+- [x] **Step 5: Commit terakhir + push**
 
 ```bash
 git add docs/superpowers/plans/2026-08-04-spec-519-changelog-terekspos.md
