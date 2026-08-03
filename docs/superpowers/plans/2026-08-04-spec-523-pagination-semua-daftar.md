@@ -1797,7 +1797,7 @@ Servernya sudah beramplop penuh (`services/session-history.ts:82-87`); perubahan
 - Modify: `src/src/screens/SessionHistoryModal.tsx:39-76,124-133`
 - Test: `src/test/session-history-pager.test.tsx` (atau tambah ke test riwayat yang ada)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/session-history-pager.test.tsx`:
 
@@ -1836,14 +1836,14 @@ describe("SessionHistoryModal berhalaman (SPEC-523)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/session-history-pager.test.tsx
 ```
 Diharapkan: GAGAL — "sesi 1" masih ada (append) dan tombol "Muat lebih" masih terender.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/screens/SessionHistoryModal.tsx`:
 
@@ -1885,20 +1885,20 @@ Di `src/src/screens/SessionHistoryModal.tsx`:
 - tambahkan `Pager, serverPage` ke impor DS di berkas ini.
 - efek reset filter (baris 52) cukup jadi `React.useEffect(() => { setPage(1); }, [project, kind, dq]);` — `setItems([])` tak lagi perlu karena halaman selalu mengganti isi.
 
-- [ ] **Step 4: Jalankan test, pastikan HIJAU**
+- [x] **Step 4: Jalankan test, pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/session-history-pager.test.tsx
 ```
 
-- [ ] **Step 5: Jalankan test riwayat sesi lain**
+- [x] **Step 5: Jalankan test riwayat sesi lain**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run $(ls src/test/*history* src/test/*session* 2>/dev/null | tr '\n' ' ')
 ```
 Diharapkan: lulus. Test lama yang menegakkan "Muat lebih" harus diperbarui — pola SPEC-433: test yang mengunci perilaku lama sebagai kontrak.
 
-- [ ] **Step 6: Typecheck + commit**
+- [x] **Step 6: Typecheck + commit**
 
 ```bash
 pnpm --filter ./src typecheck
