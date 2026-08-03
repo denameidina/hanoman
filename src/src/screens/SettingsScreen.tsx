@@ -812,6 +812,18 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
           onToast?.("Gagal menyimpan setelan operator Telegram", "err", "alert-triangle");
         }
       };
+      // SPEC-518 · blok `Setting.changelog` — runtime/model/effort agen PEMBUAT CHANGELOG.
+      // `?? CHANGELOG_ENGINE_DEFAULTS` sama alasannya dengan `?? CONFLICT_DEFAULTS`: respons
+      // GET /settings dari instance lama belum punya kuncinya, dan layar tak boleh mati
+      // `undefined.enabled`.
+      const changelog = s.changelog ?? CHANGELOG_ENGINE_DEFAULTS;
+      // Menulis lewat `save()` (PUT /settings), BUKAN endpoint khusus seperti kartu lead dan bukan
+      // baca-ulang seperti kartu Telegram. Keduanya melakukannya karena bloknya punya PENULIS
+      // KEDUA — `LeadScreen` untuk lead, command `/runtime|/model|/effort` dari chat untuk
+      // telegram — sehingga menulis dari snapshot mount akan mengembalikan nilai yang baru saja
+      // diubah di tempat lain. Blok `changelog` tak punya penulis kedua: kartu ini satu-satunya.
+      const saveChangelog = (patch: Partial<Setting["changelog"]>, msg: string) =>
+        save({ changelog: { ...changelog, ...patch } }, msg);
       return (
       <>
       {/* SPEC-338 · ADR-0074 · mesin sesi default. Berlaku untuk SEMUA sesi yang men-spawn agen
@@ -1046,6 +1058,65 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
                   ? codexEfforts(tgEngine.model).map((v) => ({ value: v, label: v }))
                   : S_EFFORT}
                 onChange={(e) => saveTgEngine({ effort: e.target.value }, "Effort operator Telegram → " + e.target.value)} />
+            </SettingRow>
+          </>
+        )}
+      </Card>
+      {/* SPEC-518 · agen pembuat changelog (SPEC-516/ADR-0105) boleh punya runtime/model/effort
+          sendiri. Pekerjaannya merangkum judul backlog/commit jadi prosa rilis pendek — jauh lebih
+          ringan dari sesi kerja, dan tak selalu pantas memakai model termahal. Opt-in seperti
+          kartu konflik/lead/Telegram: mati = mewarisi. */}
+      <Card eyebrow="changelog" title="Agen changelog">
+        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
+          Mesin yang menulis narasi changelog per project — panggilan sekali-jalan non-interaktif
+          yang merangkum backlog selesai, rentang commit, atau isi sebuah rilis menjadi teks pendek
+          berorientasi pemakai. Berlaku pada pembangkitan <b>berikutnya</b>, tanpa restart. Agen yang
+          gagal tak menggagalkan changelog: barisnya tetap lahir sebagai draf ringkas ber-catatan.
+        </div>
+        <SettingRow title="Pakai setelan sendiri"
+          desc="Mati = ikut default global di atas. Hidup = pembuat changelog memakai pilihan di bawah.">
+          <Switch aria-label="Override agen changelog" checked={changelog.enabled}
+            onChange={(v: boolean) => saveChangelog({ enabled: v },
+              "Setelan changelog" + (v ? " · aktif" : " · ikut default global"))} />
+        </SettingRow>
+        {!changelog.enabled ? (
+          <div data-testid="changelog-engine-inherited" style={{ fontSize: 12.5, color: "var(--text-muted)", padding: "12px 0 2px", lineHeight: 1.5 }}>
+            Pembuat changelog memakai default global: <b>{AGENT_LABEL[inherited.agent]}</b> ·{" "}
+            <code>{inherited.model}</code> · <code>{inherited.effort}</code>.
+          </div>
+        ) : (
+          <>
+            <SettingRow title="Runtime" desc="Mesin yang menulis changelog. Bisa beda dari agen sesi kerja.">
+              <Select size="sm" aria-label="Runtime changelog" value={changelog.agent} style={{ width: 190 }}
+                options={[{ value: "claude", label: AGENT_LABEL.claude }, { value: "codex", label: AGENT_LABEL.codex }]}
+                onChange={(e) => {
+                  // Cermin `pickAgent`/kartu konflik/lead/Telegram: menukar runtime HARUS menukar
+                  // model+effort sekalian, kalau tidak changelog lahir `codex -m claude-opus-5`.
+                  const a = e.target.value as "claude" | "codex";
+                  const d = a === "codex" ? codex : { model: s.model, effort: s.effort };
+                  saveChangelog({ agent: a, model: d.model,
+                    effort: a === "codex" ? coerceCodexEffort(d.model, d.effort) : d.effort },
+                    "Runtime changelog → " + a);
+                }} />
+            </SettingRow>
+            {changelog.agent === "codex" && codexNote(changelog.model)}
+            <SettingRow title="Model">
+              <Select size="sm" aria-label="Model changelog" value={changelog.model} style={{ width: 190 }}
+                options={changelog.agent === "codex" ? codexOptions(changelog.model) : S_MODELS}
+                onChange={(e) => {
+                  const model = e.target.value;
+                  saveChangelog({ model, ...(changelog.agent === "codex"
+                    ? { effort: coerceCodexEffort(model, changelog.effort) } : {}) },
+                    "Model changelog → " + model);
+                }} />
+            </SettingRow>
+            <SettingRow title="Effort" last
+              desc="Merangkum judul jadi prosa pendek — effort rendah biasanya cukup dan memangkas ongkos setiap pembangkitan.">
+              <Select size="sm" aria-label="Effort changelog" value={changelog.effort} style={{ width: 130 }}
+                options={changelog.agent === "codex"
+                  ? codexEfforts(changelog.model).map((v) => ({ value: v, label: v }))
+                  : S_EFFORT}
+                onChange={(e) => saveChangelog({ effort: e.target.value }, "Effort changelog → " + e.target.value)} />
             </SettingRow>
           </>
         )}
