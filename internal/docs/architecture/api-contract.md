@@ -186,6 +186,9 @@ PUT    /projects/:id/docs/*path         { content }   # tulis file .md asli; 400
 DELETE /projects/:id/docs/*path         # hapus file .md asli di disk; 204 sukses, 404 tak ada, 400 guard
 GET    /prds                            # SPEC-210 · { items:[PrdDoc] } daftar PRD LINTAS-project (filter "Semua project")
 GET    /projects/:id/prds               # SPEC-210 · { items:[PrdDoc] } dokumen docs/prd/*.md project itu
+#   SPEC-520 · PrdDoc membawa status TURUNAN dari backlog yang lahir dari PRD itu (ADR-0018/0019):
+#   status: "draft" (nol turunan) | "dieskalasi" (ada, belum semua done) | "terwujud" (semua done),
+#   + specCount/doneCount. Bukan kolom — dihitung prdStatusOf() atas Spec project yang sama.
 GET    /projects/:id/prds/*path         # SPEC-210 · isi PRD; 404 bila path bukan docs/prd/*.md
 GET    /projects/:id/breakdown?prd=<path> # SPEC-273 · ADR-0069 · { items:[BreakdownItem], live } dari
 #   manifest docs/prd/<slug>.breakdown.md (freshest-wins). Manifest belum ada / prd non-PRD → { items:[] }.
