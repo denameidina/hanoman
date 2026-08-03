@@ -1,10 +1,13 @@
-/* ChangelogPanel (SPEC-516 · ADR-0105) — bangkitkan changelog naratif per project lewat tiga
-   mode. Panggilan agen bisa puluhan detik, jadi statusnya eksplisit: tombol berubah teks dan
-   nonaktif, bukan spinner bisu. */
+/* ChangelogPanel (SPEC-516 · ADR-0105 · letak & jangkauan: SPEC-519) — generator changelog naratif
+   per project lewat tiga mode. Panggilan agen bisa puluhan detik, jadi statusnya eksplisit: tombol
+   berubah teks dan nonaktif, bukan spinner bisu.
+
+   Sejak SPEC-519 panel ini generator MURNI: hasilnya diserahkan lewat `onGenerated` dan dirender
+   ChangelogScreen di kartu detail yang sama dengan rilis lama. Satu jalur render untuk semua rilis
+   — kalau panel ikut merender, hasil yang sama muncul dua kali begitu ia dipilih dari daftar. */
 import React from "react";
-import { Card, Button, Badge, Input, Select, Field, MarkdownView, Callout } from "../ds";
+import { Card, Button, Input, Select, Field, Callout } from "../ds";
 import { api } from "../api/client";
-import { paths } from "@hanoman/shared";
 import type { ChangelogView, ChangelogSources, ChangelogRequest } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 
@@ -15,20 +18,15 @@ const MODE_TABS: Array<{ mode: Mode; label: string; hint: string }> = [
   { mode: "version", label: "Versi rilis", hint: "perubahan yang masuk ke sebuah versi" },
 ];
 
-export function ChangelogPanel({ p, onToast }:
-  { p: ProjectVM; onToast: (msg: string, kind?: string, icon?: string) => void }) {
+export function ChangelogPanel({ p, onToast, onGenerated }:
+  { p: ProjectVM; onToast: (msg: string, kind?: string, icon?: string) => void;
+    onGenerated?: (v: ChangelogView) => void }) {
   const [mode, setMode] = React.useState<Mode>("backlog");
   const [src, setSrc] = React.useState<ChangelogSources | null>(null);
   const [from, setFrom] = React.useState(""); const [to, setTo] = React.useState("");
   const [fromSha, setFromSha] = React.useState(""); const [toSha, setToSha] = React.useState("");
   const [fromTag, setFromTag] = React.useState(""); const [toTag, setToTag] = React.useState("");
   const [busy, setBusy] = React.useState(false);
-  const [result, setResult] = React.useState<ChangelogView | null>(null);
-  const [saved, setSaved] = React.useState<ChangelogView[]>([]);
-
-  const reloadSaved = React.useCallback(async () => {
-    try { setSaved((await api.listChangelogs(p.id, { limit: 10 })).items); } catch { /* daftar opsional */ }
-  }, [p.id]);
 
   React.useEffect(() => {
     let alive = true;
@@ -42,9 +40,8 @@ export function ChangelogPanel({ p, onToast }:
         if (s.head) setToSha(s.head);
       } catch { /* form tetap bisa diisi manual */ }
     })();
-    void reloadSaved();
     return () => { alive = false; };
-  }, [p.id, reloadSaved]);
+  }, [p.id]);
 
   const request = (): ChangelogRequest =>
     mode === "backlog" ? { mode, from: from || undefined, to: to || undefined }
@@ -59,40 +56,19 @@ export function ChangelogPanel({ p, onToast }:
     setBusy(true);
     try {
       const r = await api.generateChangelog(p.id, request());
-      setResult(r);
       onToast(r.generator === "agent" ? "Changelog dibangkitkan" : "Changelog dibangkitkan (draf ringkas)",
         r.generator === "agent" ? "ok" : "warn", "file-text");
-      await reloadSaved();
+      onGenerated?.(r);
     } catch (e) {
       onToast((e as Error).message || "Gagal membangkitkan changelog", "err", "x-circle");
     } finally { setBusy(false); }
-  }
-
-  async function remove(id: string) {
-    if (!window.confirm("Hapus changelog ini?")) return;
-    try {
-      await api.deleteChangelog(p.id, id);
-      if (result?.id === id) setResult(null);
-      await reloadSaved();
-      onToast("Changelog dihapus", "ok", "trash-2");
-    } catch { onToast("Gagal menghapus changelog", "err", "x-circle"); }
   }
 
   const tagsMissing = mode === "version" && src !== null && src.tags.length === 0;
   const repoMissing = mode === "commit" && src !== null && !!src.reason && src.tags.length === 0;
 
   return (
-    <Card eyebrow="changelog" title="Ringkasan perubahan untuk pemakai"
-      actions={result && (
-        <div style={{ display: "flex", gap: 6 }}>
-          <Button size="sm" variant="ghost" leftIcon="copy" onClick={() => {
-            void navigator.clipboard?.writeText(result.body); onToast("Changelog disalin", "ok", "copy");
-          }}>Salin</Button>
-          <Button as="a" size="sm" variant="ghost" leftIcon="download" download
-            href={`${paths.changelogItem(p.id, result.id)}?download=md`}
-            aria-label="Unduh .md">Unduh .md</Button>
-        </div>
-      )}>
+    <Card eyebrow="changelog" title="Ringkasan perubahan untuk pemakai">
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
         Teks pendek berorientasi pemakai — apa yang berubah bagi mereka, bukan apa yang disentuh di dalam kode.
       </div>
@@ -149,34 +125,6 @@ export function ChangelogPanel({ p, onToast }:
       </div>
 
       {(tagsMissing || repoMissing) && <Callout tone="warn">{src?.reason}</Callout>}
-
-      {result && (
-        <div style={{ marginTop: 8 }}>
-          {result.warning && <Callout tone="warn">{result.warning}</Callout>}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }}>
-            <Badge tone={result.generator === "agent" ? "ok" : "warn"} size="sm">
-              {result.generator === "agent" ? "naratif" : "draf ringkas"}
-            </Badge>
-            <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{result.itemCount} perubahan</span>
-          </div>
-          <MarkdownView text={result.body} name="changelog.md" />
-        </div>
-      )}
-
-      {saved.length > 0 && (
-        <div style={{ marginTop: 16 }}>
-          <div className="hn-eyebrow" style={{ marginBottom: 6 }}>Tersimpan</div>
-          {saved.map((c) => (
-            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
-              <Button size="sm" variant="ghost" onClick={() => setResult(c)}>{c.title}</Button>
-              <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{c.mode}</span>
-              <div style={{ flex: 1 }} />
-              <Button size="sm" variant="ghost" leftIcon="trash-2" aria-label={`Hapus ${c.title}`}
-                onClick={() => void remove(c.id)} />
-            </div>
-          ))}
-        </div>
-      )}
     </Card>
   );
 }
