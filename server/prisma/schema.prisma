@@ -399,7 +399,7 @@ model SchedulerQueueItem {
   projectId  String
   source     String    // backlog | triase (asal checker) — SPEC-384 · `errors` dicabut (ADR-0092)
   priority   String    // tinggi | sedang | rendah (urutan drain)
-  status     String    @default("queued") // queued | launched | done | failed
+  status     String    @default("queued") // queued | launched | done | failed | canceled (SPEC-522 · tombstone operator)
   sessionId  String?
   note       String?   // alasan gagal (diisi daun #5)
   enqueuedAt DateTime  @default(now())
