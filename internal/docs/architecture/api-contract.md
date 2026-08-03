@@ -251,7 +251,7 @@ dipercaya menyunting & menghapus project hanya untuk membacanya.
 
 ```
 GET    /projects/:id/changelog/sources     -> ChangelogSources                        # docs:read · 404 project
-GET    /projects/:id/changelog?page&limit  -> Paginated<ChangelogView>                # docs:read · 404 project
+GET    /projects/:id/changelog?page&limit&q -> Paginated<ChangelogView>               # docs:read · 404 project
 POST   /projects/:id/changelog             -> 201 ChangelogView                       # docs:write · 400 · 404 · 422
 GET    /projects/:id/changelog/:cid        -> ChangelogView | berkas (?download=md|pdf) # docs:read · 404
 DELETE /projects/:id/changelog/:cid        -> 204 | 404                               # docs:write
@@ -271,6 +271,14 @@ warning, itemCount, createdAt}`. `body` adalah markdown final yang sudah di-scru
 
 **`ChangelogSources`** = `{hasRepo, tags[], head, reason, backlog:{doneCount,earliest,latest},
 defaultRange:{from,to}}` — dipakai form untuk mengisi pilihan **sebelum** operator menekan tombol.
+
+**`q` (SPEC-519)** mencocokkan **judul, isi, dan mode** (case-insensitive, `trim`) lewat predikat
+murni `changelogMatches()` di `@hanoman/shared` — satu definisi, bukan salinan di route. Ia disaring
+**sebelum** `paginate` (pola [ADR-0038](../adr/0038-paginasi-di-response-layer.md)), jadi `total`
+menghitung hasil cari; menyaring sesudahnya membuat Pager menjanjikan halaman yang isinya tak pernah
+ada. `q` kosong/spasi = tanpa filter, identik dengan tanpa parameter. Halaman Changelog memakainya
+untuk kotak cari daftar rilis — pencarian **server-side**, karena menyaring di klien hanya menjangkau
+halaman yang kebetulan termuat.
 
 **Kode status yang mengikat.** Keadaan sah yang bukan galat **tidak pernah 500**:
 
