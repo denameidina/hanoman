@@ -32,6 +32,9 @@ const createShell = vi.fn();
 const deleteTerminal = vi.fn();
 const startSession = vi.fn();
 const listSpecs = vi.fn();   // SPEC-198 · picker startable via API
+// SPEC-517 · "Sesi baru" membuka form runtime yang membaca setelan global + versi codex CLI.
+const getSettings = vi.fn();
+const getCodexVersion = vi.fn();
 vi.mock("../src/api/client", () => ({
   ApiError: class ApiError extends Error { constructor(public status: number, msg: string) { super(msg); } },
   api: {
@@ -42,6 +45,8 @@ vi.mock("../src/api/client", () => ({
     listBranches: vi.fn(async () => ({ branches: [], remotes: [] })),
     startSession: (...a: unknown[]) => startSession(...a),
     listSpecs: (...a: unknown[]) => listSpecs(...a),
+    getSettings: (...a: unknown[]) => getSettings(...a),
+    getCodexVersion: (...a: unknown[]) => getCodexVersion(...a),
   },
 }));
 // SPEC-199 · daftar sesi kini didorong lewat WS siar; tangkap handler subscribe untuk mempush frame.
@@ -75,6 +80,12 @@ beforeEach(() => {
   listTerminals.mockReset(); createTerminal.mockReset(); createShell.mockReset(); deleteTerminal.mockReset();
   startSession.mockReset(); listSpecs.mockReset();
   deleteTerminal.mockResolvedValue(undefined);
+  // SPEC-517 · form "Sesi baru": default global + versi codex. Keduanya gagal-diam di modal,
+  // tapi mock-nya tetap dipasang supaya test tak bergantung pada jalur galat.
+  getSettings.mockReset(); getCodexVersion.mockReset();
+  getSettings.mockResolvedValue({ model: "claude-opus-5", effort: "xhigh", agent: "claude",
+    codex: { model: "gpt-5.6-sol", effort: "xhigh" } });
+  getCodexVersion.mockResolvedValue({ version: "0.145.0", minRequired: "0.144.0", ok: true });
 });
 
 describe("TerminalScreen (grid)", () => {
@@ -113,12 +124,14 @@ describe("TerminalScreen (grid)", () => {
     await waitFor(() => expect(screen.getAllByTestId("pane")).toHaveLength(1));
   });
 
+  // SPEC-517 · "Sesi baru" membuka form runtime dulu; sesinya lahir saat "Buka sesi" ditekan.
   it("Sesi baru menaruh sesi di sel kosong pertama", async () => {
     listTerminals.mockResolvedValue([]);
     createTerminal.mockResolvedValue({ id: "newsesi1" });
     render(<TerminalScreen projects={projects} />);
     await screen.findByText("Belum ada sesi terminal");
     fireEvent.click(screen.getByRole("button", { name: "Sesi baru" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Buka sesi" }));
     await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("newsesi1"));
   });
 

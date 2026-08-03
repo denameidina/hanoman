@@ -700,7 +700,7 @@ git commit -m "feat(spec-517): createTerminal menerima runtime opsional"
   }): JSX.Element | null
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/new-terminal-runtime.test.tsx`:
 
@@ -819,7 +819,7 @@ describe("Sesi baru · pemilih runtime (SPEC-517)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/new-terminal-runtime.test.tsx
@@ -827,7 +827,7 @@ env -u NODE_ENV pnpm vitest --run src/test/new-terminal-runtime.test.tsx
 
 Expected: FAIL — tak ada `Agen` di layar; `createTerminal` terpanggil langsung.
 
-- [ ] **Step 3: Buat modal**
+- [x] **Step 3: Buat modal**
 
 Buat `src/src/screens/NewTerminalModal.tsx`:
 
@@ -941,7 +941,7 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
 > (`rtk proxy grep -n "export function Field" src/src/ds/kit.tsx` → ada di baris 100) dan bahwa
 > `ds/index` me-re-export-nya; kalau tidak, impor dari `../ds/kit`.
 
-- [ ] **Step 4: Sambungkan ke TerminalScreen**
+- [x] **Step 4: Sambungkan ke TerminalScreen**
 
 Di `src/src/screens/TerminalScreen.tsx`:
 
@@ -983,7 +983,7 @@ Render modalnya di samping `BacklogPicker`:
       )}
 ```
 
-- [ ] **Step 5: Jalankan test baru — harus lulus**
+- [x] **Step 5: Jalankan test baru — harus lulus**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/new-terminal-runtime.test.tsx
@@ -991,7 +991,7 @@ env -u NODE_ENV pnpm vitest --run src/test/new-terminal-runtime.test.tsx
 
 Expected: PASS (6 test).
 
-- [ ] **Step 6: Perbaiki test lama yang mengencode klik-langsung**
+- [x] **Step 6: Perbaiki test lama yang mengencode klik-langsung**
 
 `src/test/terminal-screen.test.tsx` — tambahkan dua mock ke objek `api` di `vi.mock` (baris 37-45):
 
@@ -1031,7 +1031,7 @@ lalu perbarui test baris 116:
   });
 ```
 
-- [ ] **Step 7: Jalankan seluruh test layar Terminal**
+- [x] **Step 7: Jalankan seluruh test layar Terminal**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/terminal-screen.test.tsx src/test/new-terminal-runtime.test.tsx src/test/terminal-history-button.test.tsx
@@ -1039,7 +1039,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-screen.test.tsx src/test/new
 
 Expected: PASS semua.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/screens/NewTerminalModal.tsx src/src/screens/TerminalScreen.tsx \

@@ -5,6 +5,7 @@ import { subscribe } from "../api/events";
 import { flowForSource, type SessionHistoryView } from "@hanoman/shared";
 import { TerminalPane } from "./TerminalPane";
 import { SessionHistoryModal } from "./SessionHistoryModal";
+import { NewTerminalModal } from "./NewTerminalModal";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { IntegrateDialog } from "./IntegrateDialog";
 import { B_STAGES } from "./BacklogScreen";
@@ -30,6 +31,9 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
   const [fullId, setFullId] = React.useState<string | null>(null);
   const [picking, setPicking] = React.useState(false);
   const [pickError, setPickError] = React.useState<string | null>(null);
+  // SPEC-517 · form runtime sebelum sesi agen biasa lahir. Modal, bukan panel: grid di belakangnya
+  // tak berubah ukuran — pola yang sama dengan "Ambil backlog" & "Riwayat".
+  const [newOpen, setNewOpen] = React.useState(false);
   // SPEC-362 · riwayat sesi. State-nya sekadar boolean: modal baru dirender saat diminta, jadi
   // tak ada request riwayat maupun elemen tambahan selama operator tak membukanya.
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -75,10 +79,12 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
   const byId = (id: string) => sessions.find((s) => s.id === id) ?? null;
   const nameOf = (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid;
 
-  async function openNew() {
-    if (!project) return;
-    const { id } = await api.createTerminal(project);
-    setSessions((s) => [...s, { id, projectId: project, cwd: "", exited: false }]);
+  // SPEC-517 · sesi agen biasa lahir DI DALAM NewTerminalModal (ia yang memegang pilihan
+  // runtime); di sini tinggal menaruhnya di grid — persis jalur lama sesudah createTerminal.
+  function placeNew(id: string) {
+    setSessions((s) => (s.some((x) => x.id === id)
+      ? s
+      : [...s, { id, projectId: project, cwd: "", exited: false }]));
     setWs((w) => W.placeFirstEmptyInActive(w, id));
   }
 
@@ -203,7 +209,9 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
           <Button size="sm" variant="secondary" leftIcon="terminal"
             title="Buka shell tmux tanpa Claude di project terpilih — jalankan command di project"
             onClick={() => void openShell()}>Terminal biasa</Button>
-          <Button size="sm" leftIcon="plus" onClick={() => void openNew()}>Sesi baru</Button>
+          {/* SPEC-517 · membuka form runtime dulu (agen · model · effort); sesinya lahir saat
+              "Buka sesi" ditekan, dengan pilihan itu sebagai argv pane tmux. */}
+          <Button size="sm" leftIcon="plus" onClick={() => setNewOpen(true)}>Sesi baru</Button>
           <IconButton size="sm" icon={maxed ? "minimize-2" : "maximize-2"}
             label={maxed ? "Keluar layar penuh" : "Layar penuh"}
             aria-pressed={maxed} onClick={() => setMaxed((m) => !m)} />
@@ -277,6 +285,11 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
       {picking && (
         <BacklogPicker seed={startable} activeIds={activeSpecIds} error={pickError}
           onPick={(s) => void pickBacklog(s)} onClose={() => setPicking(false)} />
+      )}
+
+      {newOpen && (
+        <NewTerminalModal open projectId={project} projectName={nameOf(project)}
+          onClose={() => setNewOpen(false)} onCreated={placeNew} />
       )}
 
       {historyOpen && (
