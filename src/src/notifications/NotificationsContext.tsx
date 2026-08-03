@@ -40,15 +40,18 @@ function notifyOS(msg: string, n: Notification, onOpen?: (n: Notification) => vo
   } catch { /* sebagian browser melempar bila dipanggil tanpa service worker; abaikan */ }
 }
 
-type Ctx = { items: Notification[]; unread: number; markAllRead: () => void; clear: () => void; onOpen?: (n: Notification) => void };
+type Ctx = { items: Notification[]; unread: number; total: number; markAllRead: () => void; clear: () => void; onOpen?: (n: Notification) => void };
 // Nilai default aman: komponen yang merender <Shell> tanpa provider (mis. test) tak error.
 // Di-export agar test bell bisa membungkus dengan value palsu (Task 6).
-export const NotificationsContext = React.createContext<Ctx>({ items: [], unread: 0, markAllRead: () => { }, clear: () => { } });
+export const NotificationsContext = React.createContext<Ctx>({ items: [], unread: 0, total: 0, markAllRead: () => { }, clear: () => { } });
 export const useNotifications = () => React.useContext(NotificationsContext);
 
 export function NotificationsProvider({ showToast, onOpen, children }: { showToast: ShowToast; onOpen?: (n: Notification) => void; children: React.ReactNode }) {
   const [items, setItems] = React.useState<Notification[]>([]);
   const [unread, setUnread] = React.useState(0);
+  // SPEC-523 · jumlah SELURUH notifikasi. Bell menampilkan 50 teratas; tanpa angka ini 50 itu
+  // terbaca sebagai "semuanya" — persis salah baca yang melahirkan SPEC-523.
+  const [total, setTotal] = React.useState(0);
   // baseline = createdAt terbesar yang sudah "dilihat". undefined = belum di-seed (mount pertama
   // TIDAK men-toast riwayat lama). Ref, bukan state: tak perlu memicu render.
   const baseline = React.useRef<string | undefined>(undefined);
@@ -68,8 +71,8 @@ export function NotificationsProvider({ showToast, onOpen, children }: { showToa
 
   // SPEC-199 · data notif didorong lewat WS siar (grup "notifications"), bukan poll 10s.
   // Argumen = payload frame yang sudah di-fetch server.
-  const handle = React.useCallback((data: { items: Notification[]; unread: number }) => {
-    setItems(data.items); setUnread(data.unread);
+  const handle = React.useCallback((data: { items: Notification[]; unread: number; total?: number }) => {
+    setItems(data.items); setUnread(data.unread); setTotal(data.total ?? data.items.length);
     if (baseline.current === undefined) { baseline.current = maxAt(data.items); return; } // seed, no toast
     const fresh = newSince(data.items, baseline.current);
     const top = maxAt(data.items);
@@ -83,7 +86,7 @@ export function NotificationsProvider({ showToast, onOpen, children }: { showToa
 
   React.useEffect(() => {
     void loadPrefs();
-    const unsub = subscribe((m) => { if (m.t === "notifications") handle({ items: m.items, unread: m.unread }); });
+    const unsub = subscribe((m) => { if (m.t === "notifications") handle({ items: m.items, unread: m.unread, total: m.total }); });
     // SPEC-192 · autoplay diblokir sampai user berinteraksi; unlock audio pada gestur pertama.
     const unlock = () => {
       unlockNotifySound();
@@ -101,12 +104,12 @@ export function NotificationsProvider({ showToast, onOpen, children }: { showToa
     api.markNotificationsRead().catch(() => { });
   }, []);
   const clear = React.useCallback(() => {
-    setItems([]); setUnread(0);
+    setItems([]); setUnread(0); setTotal(0);
     api.clearNotifications().catch(() => { });
   }, []);
 
   return (
-    <NotificationsContext.Provider value={{ items, unread, markAllRead, clear, onOpen }}>
+    <NotificationsContext.Provider value={{ items, unread, total, markAllRead, clear, onOpen }}>
       {children}
     </NotificationsContext.Provider>
   );

@@ -215,7 +215,7 @@ Bell datanya **didorong WebSocket**, bukan HTTP, jadi Task 1 sendirian tak membe
 - Produces: `NotificationsArchiveModal({ onClose, onOpen })`.
 - Impor DS **wajib** dari `../ds/kit` (bukan `../ds`): `ds/index.ts` mengekspor `shell.tsx` yang mengimpor `NotificationBell` → impor dari barrel melahirkan siklus. `kit.tsx` hanya mengimpor `./icon`, jadi aman.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/notifications-archive.test.tsx`:
 
@@ -259,14 +259,14 @@ describe("NotificationsArchiveModal (SPEC-523)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/notifications-archive.test.tsx
 ```
 Diharapkan: GAGAL — modul `NotificationsArchiveModal` tak ada.
 
-- [ ] **Step 3: Longgarkan `listNotifications` di api client**
+- [x] **Step 3: Longgarkan `listNotifications` di api client**
 
 Di `src/src/api/client.ts` baris 183, ganti:
 
@@ -277,7 +277,7 @@ Di `src/src/api/client.ts` baris 183, ganti:
     j<Paginated<Notification> & { unread: number }>(paths.notifications + qs(p)),
 ```
 
-- [ ] **Step 4: Buat modal arsip**
+- [x] **Step 4: Buat modal arsip**
 
 Buat `src/src/notifications/NotificationsArchiveModal.tsx`:
 
@@ -354,14 +354,14 @@ export function NotificationsArchiveModal({ onClose, onOpen }:
 }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan HIJAU**
+- [x] **Step 5: Jalankan test, pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/notifications-archive.test.tsx
 ```
 Diharapkan: 2 test lulus.
 
-- [ ] **Step 6: Sambungkan `total` dan tautannya ke bell**
+- [x] **Step 6: Sambungkan `total` dan tautannya ke bell**
 
 Di `src/src/notifications/NotificationsContext.tsx`:
 
@@ -434,7 +434,7 @@ Di `src/src/notifications/NotificationBell.tsx`:
 import { NotificationsArchiveModal } from "./NotificationsArchiveModal";
 ```
 
-- [ ] **Step 7: Jalankan test bell + arsip, pastikan HIJAU**
+- [x] **Step 7: Jalankan test bell + arsip, pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/notifications-archive.test.tsx src/test/notifications.test.tsx
@@ -444,14 +444,14 @@ Diharapkan: seluruh test lulus. Bila `src/test/notifications.test.tsx` tak ada, 
 env -u NODE_ENV pnpm vitest --run src/test/notifications-archive.test.tsx
 ```
 
-- [ ] **Step 8: Typecheck web**
+- [x] **Step 8: Typecheck web**
 
 ```bash
 pnpm --filter ./src typecheck
 ```
 Diharapkan: nol error.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/src/notifications/ src/src/api/client.ts src/test/notifications-archive.test.tsx

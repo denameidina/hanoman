@@ -180,7 +180,10 @@ export const api = {
   resolveConflict: (entity: string, recordId: string, choice: "local" | "server") =>
     j<{ ok: boolean; reason?: string }>(paths.syncConflictResolve(entity, recordId), { method: "POST", ...body({ choice }) }),
   // SPEC-180 · notifikasi backlog selesai
-  listNotifications: () => j<{ items: Notification[]; unread: number }>(paths.notifications),
+  // SPEC-523 · tanpa params → 50 teratas (perilaku bell yang didorong WS). Dengan page/limit →
+  // halaman arsip. `total` selalu ada di kedua bentuk.
+  listNotifications: (p: { page?: number; limit?: number } = {}) =>
+    j<Paginated<Notification> & { unread: number }>(paths.notifications + qs(p)),
   markNotificationsRead: () => j<void>(paths.notifications + "/read", { method: "POST" }),
   clearNotifications: () => j<void>(paths.notifications, { method: "DELETE" }),
   getLimits: () => j<LimitsDTO>(paths.limits),

@@ -1,6 +1,7 @@
 import React from "react";
 import { Icon } from "../ds/icon";
 import { useNotifications } from "./NotificationsContext";
+import { NotificationsArchiveModal } from "./NotificationsArchiveModal";
 
 function timeAgo(iso: string): string {
   const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
@@ -11,8 +12,9 @@ function timeAgo(iso: string): string {
 }
 
 export function NotificationBell() {
-  const { items, unread, markAllRead, clear, onOpen } = useNotifications();
+  const { items, unread, total, markAllRead, clear, onOpen } = useNotifications();
   const [open, setOpen] = React.useState(false);
+  const [archive, setArchive] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -94,12 +96,22 @@ export function NotificationBell() {
             );
           })}
           {items.length > 0 && (
-            <button onClick={markAllRead} style={{ width: "100%", marginTop: 4, padding: "8px", border: "none",
-              borderTop: "1px solid var(--border-hair)", background: "transparent", cursor: "pointer",
-              color: "var(--text-muted)", fontSize: 12.5, fontFamily: "var(--font-ui)" }}>Tandai semua dibaca</button>
+            <div style={{ display: "flex", marginTop: 4, borderTop: "1px solid var(--border-hair)" }}>
+              <button onClick={markAllRead} style={{ flex: 1, padding: "8px", border: "none",
+                background: "transparent", cursor: "pointer",
+                color: "var(--text-muted)", fontSize: 12.5, fontFamily: "var(--font-ui)" }}>Tandai semua dibaca</button>
+              {/* SPEC-523 · bell menampilkan 50 teratas. Tanpa angka ini, 50 terbaca sebagai
+                  "semuanya" — persis salah baca yang melahirkan backlog ini. */}
+              <button onClick={() => { setArchive(true); setOpen(false); }} style={{ flex: 1, padding: "8px", border: "none",
+                borderLeft: "1px solid var(--border-hair)", background: "transparent", cursor: "pointer",
+                color: "var(--brass-600)", fontSize: 12.5, fontFamily: "var(--font-ui)" }}>
+                Lihat semua{total > items.length ? ` (${total})` : ""}
+              </button>
+            </div>
           )}
         </div>
       )}
+      {archive && <NotificationsArchiveModal onClose={() => setArchive(false)} onOpen={onOpen} />}
     </div>
   );
 }
