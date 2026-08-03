@@ -1209,7 +1209,7 @@ git commit -m "docs(spec-517): runtime per sesi terminal di api-contract, SKILL,
 
 ### Task 9: Verifikasi akhir (scope: hanya yang berubah)
 
-- [ ] **Step 1: Test yang tersentuh — shared + server**
+- [x] **Step 1: Test yang tersentuh — shared + server**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -1221,7 +1221,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 Expected: PASS. **Pastikan jumlah test > 0** — `--changed` menyalakan `passWithNoTests`, jadi
 “no test files” TERLIHAT hijau; di sini path-nya disebut eksplisit, jadi nol berkas = salah ketik.
 
-- [ ] **Step 2: Test yang tersentuh — web**
+- [x] **Step 2: Test yang tersentuh — web**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run \
@@ -1235,7 +1235,7 @@ env -u NODE_ENV pnpm vitest --run \
 Expected: PASS. `placeholder-contract.test.ts` ikut karena SPEC-490 menegakkan aturan placeholder
 pada berkas sumber — modal baru punya `<Select>`, jadi jalankan untuk memastikan ia tak melanggar.
 
-- [ ] **Step 3: Typecheck paket yang tersentuh saja**
+- [x] **Step 3: Typecheck paket yang tersentuh saja**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
@@ -1243,7 +1243,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --f
 
 Expected: bersih. **Jangan** `pnpm -r typecheck` — mesin ini menjalankan beberapa sesi sekaligus.
 
-- [ ] **Step 4: Smoke endpoint sungguhan (sekali, di akhir)**
+- [x] **Step 4: Smoke endpoint sungguhan (sekali, di akhir)**
 
 Task ini menyentuh endpoint, jadi wajib diuji nyata — dengan DB khusus, bukan DB test bersama:
 
@@ -1277,14 +1277,14 @@ kill "$(cat /tmp/spec517-dev.pid)"
 tmux -L hanoman kill-session -t <nama-sesi-yang-dibuat>   # hanya sesi yang lahir dari smoke ini
 ```
 
-- [ ] **Step 5: Centang seluruh kotak plan ini & commit**
+- [x] **Step 5: Centang seluruh kotak plan ini & commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-04-spec-517-runtime-picker-sesi-terminal.md
 git commit -m "docs(spec-517): centang plan"
 ```
 
-- [ ] **Step 6: Push**
+- [x] **Step 6: Push**
 
 ```bash
 git push origin HEAD:refs/heads/hanoman/spec-517
