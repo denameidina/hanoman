@@ -57,7 +57,7 @@ Tak ada berkas doc baru → `internal/docs/README.md` tak bertambah entri.
   - `export const CHANGELOG_ENGINE_DEFAULTS: AgentEngine` — `{ enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh" }`
   - `Setting["changelog"]` bertipe `AgentEngine` (wajib ada di objek `Setting`, diisi `.default()` saat parse).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `shared/src/agent-engine.test.ts`, di dalam berkas yang sama (blok `describe` baru), dan tambahkan `CHANGELOG_ENGINE_DEFAULTS` + `zSetting` ke daftar import di baris 2:
 
@@ -108,7 +108,7 @@ describe("Setting.changelog (SPEC-518)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 pnpm vitest --run shared/src/agent-engine.test.ts
@@ -116,7 +116,7 @@ pnpm vitest --run shared/src/agent-engine.test.ts
 
 Expected: FAIL — `CHANGELOG_ENGINE_DEFAULTS` tidak diekspor dari `./index` (`SyntaxError`/`undefined`).
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `shared/src/entities.ts`, **sesudah** blok `CONFLICT_DEFAULTS` (baris ~230) dan **sebelum** blok `zLead`, tambahkan:
 
@@ -141,7 +141,7 @@ Lalu tambahkan kunci di `zSetting` (sesudah baris `telegram:`):
   changelog: zAgentEngine.default(CHANGELOG_ENGINE_DEFAULTS),                 // SPEC-518 · agen pembuat changelog (opt-in, mati)
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan HIJAU**
+- [x] **Step 4: Jalankan test, pastikan HIJAU**
 
 ```bash
 pnpm vitest --run shared/src/agent-engine.test.ts
@@ -149,7 +149,7 @@ pnpm vitest --run shared/src/agent-engine.test.ts
 
 Expected: PASS, seluruh test di berkas itu (lama + 4 baru) hijau.
 
-- [ ] **Step 5: Isi `DEFAULT_SETTING` & `S_DEFAULTS` yang kini kurang satu kunci**
+- [x] **Step 5: Isi `DEFAULT_SETTING` & `S_DEFAULTS` yang kini kurang satu kunci**
 
 `Setting` adalah tipe hasil `z.infer`, jadi kunci ber-`.default()` **wajib ada** di objek bertipe `Setting`. Dua objek literal seperti itu ada di repo dan `tsc` akan menolak keduanya.
 
@@ -165,7 +165,7 @@ Di `src/src/screens/SettingsScreen.tsx`, tambahkan ke `S_DEFAULTS` (sesudah bari
   changelog: CHANGELOG_ENGINE_DEFAULTS, // SPEC-518 · agen pembuat changelog (opt-in, mati)
 ```
 
-- [ ] **Step 6: Typecheck paket yang tersentuh**
+- [x] **Step 6: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
@@ -173,7 +173,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 
 Expected: keduanya keluar tanpa galat.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/entities.ts shared/src/agent-engine.test.ts \
@@ -194,7 +194,7 @@ git commit -m "feat(spec-518): blok Setting.changelog memakai zAgentEngine bersa
 - Consumes: `CHANGELOG_ENGINE_DEFAULTS` (Task 1) · `getSetting()`, `sessionAgentDefaults()` dari `../settings` · `coerceCodexEffort`, `type Agent` dari `@hanoman/shared`.
 - Produces: `changelogAgentDefaults(): Promise<{ agent: Agent; model: string; effort: string }>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/changelog-engine.test.ts`:
 
@@ -309,7 +309,7 @@ describe("generateChangelog memakai setelan changelog (SPEC-518)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -318,7 +318,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: FAIL — `Failed to resolve import "../src/services/changelog/config"`.
 
-- [ ] **Step 3: Tulis resolver**
+- [x] **Step 3: Tulis resolver**
 
 Buat `server/src/services/changelog/config.ts`:
 
@@ -351,7 +351,7 @@ export async function changelogAgentDefaults(): Promise<{ agent: Agent; model: s
 }
 ```
 
-- [ ] **Step 4: Pakai resolver di satu-satunya call site**
+- [x] **Step 4: Pakai resolver di satu-satunya call site**
 
 Di `server/src/services/changelog/generate.ts`, ganti baris import `sessionAgentDefaults`:
 
@@ -375,7 +375,7 @@ Tambahkan komentar di atasnya:
   // Ini SATU-SATUNYA tempat changelog men-spawn agen — tak ada call site kedua untuk didivergensikan.
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan HIJAU**
+- [x] **Step 5: Jalankan test, pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -384,7 +384,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: PASS — 8 test baru **dan** 9 test SPEC-516 yang sudah ada (tak boleh ada yang berubah verdict-nya).
 
-- [ ] **Step 6: Typecheck server**
+- [x] **Step 6: Typecheck server**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -392,7 +392,7 @@ pnpm --filter ./server typecheck
 
 Expected: keluar tanpa galat.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/changelog/config.ts server/src/services/changelog/generate.ts \
@@ -412,7 +412,7 @@ git commit -m "feat(spec-518): changelogAgentDefaults dipakai saat generate chan
 - Consumes: `CHANGELOG_ENGINE_DEFAULTS` (Task 1) · helper yang sudah ada di dalam cabang `tab === "model"`: `save()`, `inherited`, `codexNote()`, `codexOptions()`, `AGENT_LABEL`, `S_MODELS`, `S_EFFORT`, `codexEfforts`, `coerceCodexEffort`.
 - Produces: kontrol ber-`aria-label` **"Override agen changelog"**, **"Runtime changelog"**, **"Model changelog"**, **"Effort changelog"**, dan `data-testid="changelog-engine-inherited"`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/settings-changelog-engine.test.tsx`:
 
@@ -526,7 +526,7 @@ describe("SPEC-518 · kartu agen changelog", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/settings-changelog-engine.test.tsx
@@ -536,7 +536,7 @@ Expected: FAIL — `Unable to find an element with the text: Agen changelog`.
 
 > `env -u NODE_ENV` wajib: shell sesi ini menyetel `NODE_ENV=production`, dan React di mode itu membuat `act()` RTL gagal massal (gagal palsu, bukan regresi).
 
-- [ ] **Step 3: Tambahkan state kartu**
+- [x] **Step 3: Tambahkan state kartu**
 
 Di `src/src/screens/SettingsScreen.tsx`, di dalam cabang `if (tab === "model") {`, **sesudah** `saveTgEngine` (berakhir ~baris 813) dan **sebelum** `return (`, tambahkan:
 
@@ -557,7 +557,7 @@ Di `src/src/screens/SettingsScreen.tsx`, di dalam cabang `if (tab === "model") {
 
 Tambahkan `CHANGELOG_ENGINE_DEFAULTS` ke import `@hanoman/shared` di baris 6 bila Task 1 belum melakukannya.
 
-- [ ] **Step 4: Tambahkan kartunya**
+- [x] **Step 4: Tambahkan kartunya**
 
 Sisipkan **sesudah** `</Card>` penutup kartu "Agen operator Telegram" (~baris 1051) dan **sebelum** `</>`:
 
@@ -623,7 +623,7 @@ Sisipkan **sesudah** `</Card>` penutup kartu "Agen operator Telegram" (~baris 10
       </Card>
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan HIJAU**
+- [x] **Step 5: Jalankan test, pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/settings-changelog-engine.test.tsx \
@@ -633,7 +633,7 @@ env -u NODE_ENV pnpm vitest --run src/test/settings-changelog-engine.test.tsx \
 
 Expected: PASS — 6 test baru, dan tiga berkas kartu tetangga tak berubah verdict-nya (kartu baru tak boleh membuat `getByRole("switch")`/`findByText` mereka cocok ganda).
 
-- [ ] **Step 6: Typecheck web**
+- [x] **Step 6: Typecheck web**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -641,7 +641,7 @@ pnpm --filter ./src typecheck
 
 Expected: keluar tanpa galat.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/SettingsScreen.tsx src/test/settings-changelog-engine.test.tsx
@@ -662,7 +662,7 @@ git commit -m "feat(spec-518): kartu Agen changelog di Settings - Model sesi"
 - Consumes: nama & bentuk final dari Task 1-3 (`Setting.changelog`, `changelogAgentDefaults()`).
 - Produces: tak ada kode.
 
-- [ ] **Step 1: `data-model.md` — butir `changelog` pada daftar field `Setting`**
+- [x] **Step 1: `data-model.md` — butir `changelog` pada daftar field `Setting`**
 
 Sisipkan sesudah butir `lead` (yang berakhir dengan kalimat tentang `lead-engine-argv.test.ts`), sebelum heading `## User / Session`:
 
@@ -683,7 +683,7 @@ Sisipkan sesudah butir `lead` (yang berakhir dengan kalimat tentang `lead-engine
   seperti kartu Telegram): blok ini **tak punya penulis kedua**.
 ```
 
-- [ ] **Step 2: `api-contract.md` — blok `GET/PUT /settings`**
+- [x] **Step 2: `api-contract.md` — blok `GET/PUT /settings`**
 
 Sisipkan sesudah baris komentar blok `conflict { … }` di dalam blok kode `GET/PUT /settings`:
 
@@ -696,7 +696,7 @@ Sisipkan sesudah baris komentar blok `conflict { … }` di dalam blok kode `GET/
 #                                           jadi baris Setting lama tetap parse tanpa migration.
 ```
 
-- [ ] **Step 3: `adr/0105-changelog-per-project.md` — catatan setelan agen**
+- [x] **Step 3: `adr/0105-changelog-per-project.md` — catatan setelan agen**
 
 Tambahkan satu paragraf di bagian Konsekuensi/Catatan (di akhir dokumen), tanpa mengubah keputusan yang sudah ada:
 
@@ -712,7 +712,7 @@ berubah: satu call site, `think()` tetap diimpor dari `lead/brain.ts`, anggaran 
 (`generator:"fallback"` + `warning`). Yang berubah hanya dari mana triple-nya datang.
 ```
 
-- [ ] **Step 4: `internal/skills/hanoman/SKILL.md` — butir changelog**
+- [x] **Step 4: `internal/skills/hanoman/SKILL.md` — butir changelog**
 
 Di butir "**Changelog per project …**" (bagian Aturan Arsitektur), sesudah kalimat tentang `think()`
 yang DIIMPOR & anggaran waktu, sisipkan:
@@ -726,7 +726,7 @@ yang DIIMPOR & anggaran waktu, sisipkan:
   karena blok itu **tak punya penulis kedua**.
 ```
 
-- [ ] **Step 5: Verifikasi integritas index docs**
+- [x] **Step 5: Verifikasi integritas index docs**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || echo "cli belum dibangun — lewati; tak ada berkas doc BARU di task ini, jadi index tak bertambah entri"
@@ -734,7 +734,7 @@ node cli/dist/index.js docs index --check 2>/dev/null || echo "cli belum dibangu
 
 Expected: lolos, atau pesan lewati. Tak ada berkas doc baru → `internal/docs/README.md` memang tak perlu berubah.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs/architecture/data-model.md internal/docs/architecture/api-contract.md \
@@ -752,7 +752,7 @@ git commit -m "docs(spec-518): Setting.changelog di data-model, api-contract, AD
 - Consumes: seluruh Task 1-4.
 - Produces: bukti terekam bahwa `POST /projects/:id/changelog` benar-benar memakai setelan.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV \
@@ -761,7 +761,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV \
 
 Expected: PASS. **Jebakan yang wajib diperiksa:** `--changed` menyalakan `passWithNoTests`, jadi nol berkas test **terlihat hijau**. Baca ringkasannya dan pastikan `shared/src/agent-engine.test.ts`, `server/test/changelog-engine.test.ts`, `server/test/changelog-generate.test.ts`, dan `src/test/settings-changelog-engine.test.tsx` benar-benar **berjalan**. Bila tidak muncul, sebut path-nya langsung.
 
-- [ ] **Step 2: Typecheck ketiga paket yang tersentuh**
+- [x] **Step 2: Typecheck ketiga paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
@@ -769,7 +769,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --f
 
 Expected: ketiganya keluar tanpa galat. (Bukan `pnpm -r typecheck` — itu menyalakan satu tsc per paket sekaligus di mesin yang menjalankan beberapa sesi.)
 
-- [ ] **Step 3: Boot server & smoke endpoint yang tersentuh**
+- [x] **Step 3: Boot server & smoke endpoint yang tersentuh**
 
 Task ini menyentuh perilaku runtime `POST /projects/:id/changelog`, jadi endpoint-nya diuji nyata **sekali di akhir**. Pakai `HANOMAN_HOME` khusus supaya smoke tak menyentuh DB test bersama maupun DB kerja:
 
@@ -782,7 +782,7 @@ SRV=$!
 sleep 3
 ```
 
-- [ ] **Step 4: Buktikan setelan benar-benar berlaku, lalu matikan server per-PID**
+- [x] **Step 4: Buktikan setelan benar-benar berlaku, lalu matikan server per-PID**
 
 Ambil cookie sesi sesuai cara berkas smoke yang sudah ada di repo (register/login lewat `/api/auth`), lalu:
 
@@ -805,7 +805,7 @@ Matikan server **per-PID** — jangan pernah `pkill -f node`/`pkill -f vitest` (
 kill $SRV
 ```
 
-- [ ] **Step 5: Centang plan & commit**
+- [x] **Step 5: Centang plan & commit**
 
 Centang seluruh kotak `- [ ]` di berkas plan ini menjadi `- [x]`, lalu:
 
