@@ -32,6 +32,7 @@ import help from "./routes/help";
 import tickets from "./routes/tickets";
 import scheduler from "./routes/scheduler";
 import lead from "./routes/lead";
+import changelog from "./routes/changelog";
 import customAgents from "./routes/custom-agents";
 import githubIssues from "./routes/github-issues";
 import telegram from "./routes/telegram";
@@ -177,6 +178,7 @@ export function buildApp(
     await api.register(githubIssues); // SPEC-471 · ADR-0095 · tarik & triase issue GitHub (capability `support`)
     await api.register(telegram);     // SPEC-476 · ADR-0096 · context/memory/reply/audit Telegram
     await api.register(webhooks);     // SPEC-481 · ADR-0100 · webhook keluar (cookie-only)
+    await api.register(changelog);    // SPEC-516 · ADR-0105 · changelog per project (capability `docs`)
   }, { prefix: "/api" });
 
   // Prod: serve the built dashboard from one process; SPA-fallback to

@@ -59,7 +59,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   }
   if (top === "projects") {
     const sub = seg[2]; // seg[1] = :id
-    if (sub === "docs" || sub === "prds") return rw("docs");
+    // SPEC-516 · ADR-0105 · changelog adalah DOKUMEN, sejajar docs/prds. Tanpa baris ini ia jatuh
+    // ke `rw("projects")` di bawah — artinya agen harus dipercaya menyunting & menghapus project
+    // hanya untuk membaca changelog-nya.
+    if (sub === "docs" || sub === "prds" || sub === "changelog") return rw("docs");
     if (sub === "github") return rw("support");   // SPEC-471 · ADR-0095 · tarik/daftar issue
     if (sub && IDE_SUBS.has(sub)) return rw("ide");
     return rw("projects");
