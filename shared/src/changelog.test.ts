@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { zChangelogRequest, defaultRange, dayString, DEFAULT_RANGE_DAYS } from "./changelog";
+import { zChangelogRequest, defaultRange, dayString, DEFAULT_RANGE_DAYS, changelogMatches } from "./changelog";
 
 describe("zChangelogRequest", () => {
   it("mode backlog boleh tanpa rentang (server mengisi default)", () => {
@@ -48,5 +48,30 @@ describe("defaultRange", () => {
   it("dayString memakai komponen LOKAL, bukan toISOString", () => {
     // 23:30 lokal 31 Des — toISOString() di zona timur akan melompat ke tahun berikutnya.
     expect(dayString(new Date(2026, 11, 31, 23, 30))).toBe("2026-12-31");
+  });
+});
+
+describe("changelogMatches (SPEC-519)", () => {
+  const row = { title: "v1.2.0", body: "- **Unduh laporan** — sekarang bisa PDF.", mode: "version" };
+
+  it("cocok pada judul, tanpa peduli besar-kecil huruf", () => {
+    expect(changelogMatches(row, "V1.2")).toBe(true);
+  });
+
+  it("cocok pada isi rilis, bukan cuma judulnya", () => {
+    expect(changelogMatches(row, "laporan")).toBe(true);
+  });
+
+  it("cocok pada mode", () => {
+    expect(changelogMatches(row, "version")).toBe(true);
+  });
+
+  it("q kosong atau spasi doang meloloskan semua — kotak cari yang belum diketik tak mengosongkan daftar", () => {
+    expect(changelogMatches(row, "")).toBe(true);
+    expect(changelogMatches(row, "   ")).toBe(true);
+  });
+
+  it("tak cocok = false", () => {
+    expect(changelogMatches(row, "telegram")).toBe(false);
   });
 });
