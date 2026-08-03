@@ -68,16 +68,19 @@ export default async function (app: FastifyInstance) {
   });
 
   // AC-24 · jejak urut waktu, disaring per project & per backlog.
+  // SPEC-523 · amplop `Paginated`. `take`/`skip` lama tetap diterima; `page`/`limit` menang.
   app.get("/lead/decisions", async (req) => {
     const q = req.query as Record<string, string | undefined>;
-    const rows = await listDecisions({
+    const r = await listDecisions({
       projectId: q.projectId, specId: q.specId, sessionId: q.sessionId, status: q.status,
       // SPEC-485 · satu rantai dibaca lewat filter ini, urut NAIK (lihat `listDecisions`).
       flowId: q.flowId,
       take: q.take ? Number(q.take) : undefined,
       skip: q.skip ? Number(q.skip) : undefined,
+      page: q.page ? Number(q.page) : undefined,
+      limit: q.limit ? Number(q.limit) : undefined,
     });
-    return { items: rows.map(toDecisionView) };
+    return { items: r.rows.map(toDecisionView), total: r.total, page: r.page, pageSize: r.pageSize };
   });
 
   // SPEC-485 · ADR-0102 · daftar RANTAI. Langkahnya dibaca lewat `GET /lead/decisions?flowId=`,
@@ -85,12 +88,14 @@ export default async function (app: FastifyInstance) {
   // serializer kedua berarti dua bentuk yang bisa berselisih diam-diam.
   app.get("/lead/flows", async (req) => {
     const q = req.query as Record<string, string | undefined>;
-    const rows = await listFlows({
+    const r = await listFlows({
       projectId: q.projectId, status: q.status,
       take: q.take ? Number(q.take) : undefined,
       skip: q.skip ? Number(q.skip) : undefined,
+      page: q.page ? Number(q.page) : undefined,
+      limit: q.limit ? Number(q.limit) : undefined,
     });
-    return { items: rows.map(toFlowView) };
+    return { items: r.rows.map(toFlowView), total: r.total, page: r.page, pageSize: r.pageSize };
   });
 
   // Submit akhir: rantai ditutup dan tak menerima pertanyaan lanjutan lagi. 409 (bukan 404) saat ia

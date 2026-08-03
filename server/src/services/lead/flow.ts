@@ -1,6 +1,7 @@
 import type { LeadFlow } from "@prisma/client";
 import { LEAD_FLOW_OPEN, type LeadFlowStatus, type LeadFlowView, type LeadGate } from "@hanoman/shared";
 import { prisma } from "../../db";
+import { leadWindow } from "./page";
 
 // SPEC-485 · ADR-0102 · satu RANTAI keputusan sebagai objek berstatus.
 //
@@ -83,18 +84,20 @@ export async function closeFlow(id: string, reason: FlowCloseReason): Promise<Le
   });
 }
 
+// SPEC-523 · amplop, bukan array telanjang. `total` menghormati penyaring.
 export async function listFlows(f: {
-  projectId?: string; status?: string; take?: number; skip?: number;
-} = {}): Promise<LeadFlow[]> {
-  return prisma.leadFlow.findMany({
-    where: {
-      ...(f.projectId ? { projectId: f.projectId } : {}),
-      ...(f.status ? { status: f.status } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    take: Math.min(f.take ?? 50, 200),
-    skip: f.skip ?? 0,
+  projectId?: string; status?: string; take?: number; skip?: number; page?: number; limit?: number;
+} = {}): Promise<{ rows: LeadFlow[]; total: number; page: number; pageSize: number }> {
+  const where = {
+    ...(f.projectId ? { projectId: f.projectId } : {}),
+    ...(f.status ? { status: f.status } : {}),
+  };
+  const w = leadWindow(f);
+  const total = await prisma.leadFlow.count({ where });
+  const rows = await prisma.leadFlow.findMany({
+    where, orderBy: { createdAt: "desc" }, take: w.take, skip: w.skip,
   });
+  return { rows, total, page: w.page, pageSize: w.pageSize };
 }
 
 /**

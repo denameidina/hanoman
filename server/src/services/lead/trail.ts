@@ -4,6 +4,7 @@ import type {
   LeadAction, LeadChoice, LeadConfidence, LeadGate, LeadKind, LeadStatus, LeadDecisionView,
 } from "@hanoman/shared";
 import { resolveChoices } from "@hanoman/shared";
+import { leadWindow } from "./page";
 
 // SPEC-409 · ADR-0091 · jejak keputusan (AC-23/24). Append-mostly: baris hanya berubah status
 // (berlaku → ditimpa/dibatalkan). TIDAK ADA fungsi hapus di modul ini, dan tak ada endpoint yang
@@ -69,25 +70,31 @@ export async function recordDecision(i: TrailInput): Promise<LeadDecision> {
 
 export type TrailFilter = {
   projectId?: string; specId?: string; sessionId?: string; flowId?: string;
-  status?: string; take?: number; skip?: number;
+  // SPEC-523 · `page`/`limit` aditif; `take`/`skip` tetap diterima demi pemanggil lama.
+  status?: string; take?: number; skip?: number; page?: number; limit?: number;
 };
 
-/** AC-24 · urut waktu (terbaru dulu), disaring per project & per backlog. */
-export async function listDecisions(f: TrailFilter = {}): Promise<LeadDecision[]> {
-  return prisma.leadDecision.findMany({
-    where: {
-      ...(f.projectId ? { projectId: f.projectId } : {}),
-      ...(f.specId ? { specId: f.specId } : {}),
-      ...(f.sessionId ? { sessionId: f.sessionId } : {}),
-      ...(f.flowId ? { flowId: f.flowId } : {}),
-      ...(f.status ? { status: f.status } : {}),
-    },
+/** AC-24 · urut waktu (terbaru dulu), disaring per project & per backlog.
+ *  SPEC-523 · mengembalikan amplop: `total` adalah hitungan SELURUH baris tersaring, bukan halaman. */
+export async function listDecisions(f: TrailFilter = {}):
+  Promise<{ rows: LeadDecision[]; total: number; page: number; pageSize: number }> {
+  const where = {
+    ...(f.projectId ? { projectId: f.projectId } : {}),
+    ...(f.specId ? { specId: f.specId } : {}),
+    ...(f.sessionId ? { sessionId: f.sessionId } : {}),
+    ...(f.flowId ? { flowId: f.flowId } : {}),
+    ...(f.status ? { status: f.status } : {}),
+  };
+  const w = leadWindow(f);
+  const total = await prisma.leadDecision.count({ where });
+  const rows = await prisma.leadDecision.findMany({
+    where,
     // SPEC-485 · satu RANTAI dibaca dari awal: urutan pertanyaannya adalah isi jejaknya. Daftar
     // umum tetap terbaru-dulu (AC-24) — dua pertanyaan yang berbeda, dua urutan yang berbeda.
     orderBy: { createdAt: f.flowId ? "asc" : "desc" },
-    take: Math.min(f.take ?? 50, 200),
-    skip: f.skip ?? 0,
+    take: w.take, skip: w.skip,
   });
+  return { rows, total, page: w.page, pageSize: w.pageSize };
 }
 
 /**

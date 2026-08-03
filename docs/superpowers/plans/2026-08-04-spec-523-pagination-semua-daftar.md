@@ -908,7 +908,7 @@ EOF
 - Produces: `listFlows(f): Promise<{ rows: LeadFlow[]; total: number; page: number; pageSize: number }>`
 - Keduanya menerima `page?: string | number` dan `limit?: string | number` **selain** `take`/`skip`. Bila keduanya dikirim, `page`/`limit` menang.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/lead-list-pagination.test.ts`:
 
@@ -973,14 +973,14 @@ describe("GET /lead/decisions & /lead/flows — paginasi (SPEC-523)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/lead-list-pagination.test.ts
 ```
 Diharapkan: GAGAL — `total` `undefined`.
 
-- [ ] **Step 3: Helper bersama untuk kedua daftar lead**
+- [x] **Step 3: Helper bersama untuk kedua daftar lead**
 
 Buat `server/src/services/lead/page.ts`:
 
@@ -1008,7 +1008,7 @@ export function leadWindow(f: { take?: number; skip?: number; page?: number; lim
 }
 ```
 
-- [ ] **Step 4: Pakai helper di `trail.ts`**
+- [x] **Step 4: Pakai helper di `trail.ts`**
 
 Di `server/src/services/lead/trail.ts`, ganti `listDecisions` (baris ~76-92):
 
@@ -1039,7 +1039,7 @@ export async function listDecisions(f: TrailFilter = {}):
 
 Tambah impor `import { leadWindow } from "./page";` dan perluas tipe `TrailFilter` dengan `page?: number; limit?: number;`.
 
-- [ ] **Step 5: Pakai helper di `flow.ts`**
+- [x] **Step 5: Pakai helper di `flow.ts`**
 
 Di `server/src/services/lead/flow.ts`, ganti `listFlows` (baris ~86-98):
 
@@ -1063,7 +1063,7 @@ export async function listFlows(f: {
 
 Tambah impor `import { leadWindow } from "./page";`.
 
-- [ ] **Step 6: Ubah route lead**
+- [x] **Step 6: Ubah route lead**
 
 Di `server/src/routes/lead.ts`, ganti handler baris 71-94:
 
@@ -1100,21 +1100,21 @@ Di `server/src/routes/lead.ts`, ganti handler baris 71-94:
   });
 ```
 
-- [ ] **Step 7: Jalankan test, pastikan HIJAU**
+- [x] **Step 7: Jalankan test, pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/lead-list-pagination.test.ts
 ```
 Diharapkan: 5 test lulus.
 
-- [ ] **Step 8: Jalankan test lead lain yang bisa tersentuh**
+- [x] **Step 8: Jalankan test lead lain yang bisa tersentuh**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism $(ls server/test/*lead* | tr '\n' ' ')
 ```
 Diharapkan: lulus. Bila ada yang memanggil `listDecisions()`/`listFlows()` langsung dan mengharapkan array, perbarui ke `.rows`.
 
-- [ ] **Step 9: Typecheck + commit**
+- [x] **Step 9: Typecheck + commit**
 
 ```bash
 pnpm --filter ./server typecheck
