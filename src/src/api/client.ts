@@ -429,8 +429,9 @@ export const api = {
   getLeadConfig: () => j<Lead>(paths.leadConfig),
   putLeadConfig: (cfg: Lead) => j<Lead>(paths.leadConfig, { method: "PUT", ...body(cfg) }),
   getLeadStatus: () => j<LeadStatusView>(paths.leadStatus),
-  getLeadDecisions: (params: { projectId?: string; specId?: string; sessionId?: string; status?: string; take?: number } = {}) =>
-    j<{ items: LeadDecisionView[] }>(paths.leadDecisions + qs(params)),
+  // SPEC-523 · amplop Paginated. `take` lama masih diterima server, tapi klien memakai page/limit.
+  getLeadDecisions: (params: { projectId?: string; specId?: string; sessionId?: string; status?: string; page?: number; limit?: number } = {}) =>
+    j<Paginated<LeadDecisionView>>(paths.leadDecisions + qs(params)),
   // SPEC-485 · ADR-0102 · centang operator ikut sebagai DATA: ia disimpan dalam bentuk yang sama
   // dengan pilihan lead DAN diketikkan ke pane sebagai centang, bukan sebagai prosa.
   overrideLeadDecision: (id: string, answer: string, reason = "", choices: string[] = []) =>
@@ -439,8 +440,8 @@ export const api = {
   cancelLeadDecision: (id: string) =>
     j<LeadDecisionView>(paths.leadDecisionCancel(id), { method: "POST", ...body({}) }),
   // SPEC-485 · rantai keputusan. Tetap polling HTTP — tak ada kanal WS baru (ADR-0039).
-  getLeadFlows: (params: { projectId?: string; status?: string; take?: number } = {}) =>
-    j<{ items: LeadFlowView[] }>(paths.leadFlows + qs(params)),
+  getLeadFlows: (params: { projectId?: string; status?: string; page?: number; limit?: number } = {}) =>
+    j<Paginated<LeadFlowView>>(paths.leadFlows + qs(params)),
   submitLeadFlow: (id: string) => j<LeadFlowView>(paths.leadFlowSubmit(id), { method: "POST", ...body({}) }),
   cancelLeadFlow: (id: string) => j<LeadFlowView>(paths.leadFlowCancel(id), { method: "POST", ...body({}) }),
   // SPEC-450 · ADR-0094 · katalog custom agent. Tanpa projectId → global saja; dengan projectId →

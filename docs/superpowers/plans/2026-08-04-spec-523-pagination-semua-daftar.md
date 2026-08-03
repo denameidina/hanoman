@@ -1144,7 +1144,7 @@ EOF
 - Consumes: amplop dari Task 5.
 - Produces: `api.getLeadDecisions(p)` / `api.getLeadFlows(p)` mengembalikan `Paginated<...>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/lead-pager.test.tsx`:
 
@@ -1200,14 +1200,14 @@ describe("LeadScreen paginasi jejak keputusan (SPEC-523)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/lead-pager.test.tsx
 ```
 Diharapkan: GAGAL — `getLeadDecisions` dipanggil dengan `take: 50`, tak ada kontrol halaman.
 
-- [ ] **Step 3: Perbarui tipe api client**
+- [x] **Step 3: Perbarui tipe api client**
 
 Di `src/src/api/client.ts`, ganti dua metode (baris 427 & 437):
 
@@ -1221,7 +1221,7 @@ Di `src/src/api/client.ts`, ganti dua metode (baris 427 & 437):
     j<Paginated<LeadFlowView>>(paths.leadFlows + qs(params)),
 ```
 
-- [ ] **Step 4: Tambah state halaman di `LeadScreen`**
+- [x] **Step 4: Tambah state halaman di `LeadScreen`**
 
 Di `src/src/screens/LeadScreen.tsx`, setelah baris 264 tambahkan:
 
@@ -1268,7 +1268,7 @@ Ganti filter agar reset ke halaman 1 — tambahkan efek di bawah `React.useEffec
   React.useEffect(() => { setDecPage(1); setFlowPage(1); }, [filter]);
 ```
 
-- [ ] **Step 5: Render `Pager` di kedua Card**
+- [x] **Step 5: Render `Pager` di kedua Card**
 
 Di Card rantai (baris ~416), ganti judul dan tambahkan pager sebelum `</Card>`:
 
@@ -1303,21 +1303,21 @@ function LeadPager({ total, page, onPage, unit }:
 
 Tambahkan `Pager, serverPage` ke impor DS di berkas ini.
 
-- [ ] **Step 6: Jalankan test, pastikan HIJAU**
+- [x] **Step 6: Jalankan test, pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/lead-pager.test.tsx
 ```
 Diharapkan: 2 test lulus.
 
-- [ ] **Step 7: Jalankan test lead UI lain**
+- [x] **Step 7: Jalankan test lead UI lain**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run $(ls src/test/*lead* | tr '\n' ' ')
 ```
 Diharapkan: lulus. Bila ada mock yang mengembalikan `{ items }` tanpa `total`, tambahkan `total`.
 
-- [ ] **Step 8: Typecheck + commit**
+- [x] **Step 8: Typecheck + commit**
 
 ```bash
 pnpm --filter ./src typecheck
