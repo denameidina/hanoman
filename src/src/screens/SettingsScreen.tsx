@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog } from "../ds";
 import { api, ApiError } from "../api/client";
-import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
+import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
@@ -44,6 +44,7 @@ const S_DEFAULTS: Setting = {
   conflict: CONFLICT_DEFAULTS,     // SPEC-383 · ADR-0081 · default sesi konflik (opt-in, mati)
   lead: LEAD_DEFAULTS,             // SPEC-409 · ADR-0091 · hanoman-lead (master switch mati)
   telegram: TELEGRAM_DEFAULTS,     // SPEC-476 · ADR-0096 · gateway Telegram opt-in
+  changelog: CHANGELOG_ENGINE_DEFAULTS, // SPEC-518 · agen pembuat changelog (opt-in, mati)
 };
 
 // SPEC-383 · label agen dipakai di judul grup model DAN di baris warisan kartu konflik — satu
