@@ -168,8 +168,18 @@ Mulai/Lanjutkan di halaman Backlog — lalu menaruh sesinya di sel kosong pertam
 
 Toolbar juga punya **Terminal biasa** (SPEC-236): membuka **shell tmux polos tanpa Claude** di
 repoDir project terpilih (`POST {project, shell:true}`) untuk sekadar menjalankan command —
-di sebelah **Sesi baru** yang men-spawn `claude`. Sesi shell tak punya flow/spec, tampil seperti
+di sebelah **Sesi baru** yang men-spawn agen. Sesi shell tak punya flow/spec, tampil seperti
 sesi biasa; menutupnya hanya kill pane (cwd = repoDir, bukan worktree). Lihat ADR-0056.
+
+**Sesi baru** (SPEC-517) tak lagi men-spawn seketika: ia membuka `NewTerminalModal` — Agen ·
+Model · Effort, prefill dari `GET /settings` (gagal-diam ke default bawaan), katalog dari
+`@hanoman/shared` lewat `screens/session-runtime.ts` (`runtimeModels`/`runtimeEfforts`/
+`runtimeFor`) — berkas yang sama yang dipakai picker Start backlog, supaya dua picker itu tak bisa
+berselisih pendapat. Pilihannya dikirim sebagai `POST {project, agent?, model?, effort?}` dan jadi
+argv pane tmux; tanpa mengubah apa pun, body-nya `{project}` polos dan perilakunya persis seperti
+sebelumnya. Catatan versi codex (`codexClientTooOld`) muncul di sini juga dan **tak** memblokir
+tombolnya. "Mulai lagi" pada baris riwayat ber-`kind: "terminal"` mengirim runtime baris itu —
+agen/model/effort sudah tercatat di `SessionHistory` sejak ADR-0079.
 
 Toolbar juga punya **Riwayat** (SPEC-362 · [ADR-0079](../adr/0079-history-sesi-terminal-store-lokal-plus-transkrip.md)):
 membuka `SessionHistoryModal` — **modal**, bukan panel tetap, persis seperti picker "Ambil backlog".

@@ -1130,7 +1130,7 @@ git commit -m "feat(spec-517): Mulai lagi terminal memakai runtime baris riwayat
 - Modify: `internal/skills/hanoman/SKILL.md` (butir ADR-0074, cari `terminal-agen`)
 - Modify: `internal/docs/frontend/frontend-implementation.md:169-172`
 
-- [ ] **Step 1: `api-contract.md` — varian request**
+- [x] **Step 1: `api-contract.md` — varian request**
 
 Sesudah baris `POST   /terminal/sessions  {project, flow?} …` dan blok `{project, shell:true}`,
 tambahkan:
@@ -1148,7 +1148,7 @@ tambahkan:
 #     brief) akan lolos ke sini dan membuka terminal biasa secara SENYAP alih-alih dijawab 400.
 ```
 
-- [ ] **Step 2: `api-contract.md` — amandemen klausa “tak punya override”**
+- [x] **Step 2: `api-contract.md` — amandemen klausa “tak punya override”**
 
 Baris 594 berbunyi:
 
@@ -1164,7 +1164,7 @@ ganti menjadi:
 #       DIKECUALIKAN sejak SPEC-517: ia punya form pemilih runtime sendiri (lihat varian di atas).
 ```
 
-- [ ] **Step 3: `SKILL.md` — butir ADR-0074**
+- [x] **Step 3: `SKILL.md` — butir ADR-0074**
 
 Cari kalimat `Setting.agent` = default global untuk SEMUA sesi yang men-spawn agen (…, terminal-agen, …)`
 dan sesuaikan:
@@ -1182,7 +1182,7 @@ dan sesuaikan:
 > Sunting kalimatnya di tempat — jangan menambah butir baru; butir ADR-0074 sudah panjang dan
 > index ini dibaca setiap sesi agen (SPEC-386).
 
-- [ ] **Step 4: `frontend-implementation.md`**
+- [x] **Step 4: `frontend-implementation.md`**
 
 Sesudah paragraf “Terminal biasa” (baris 169-172), tambahkan:
 
@@ -1197,7 +1197,7 @@ Catatan versi codex (`codexClientTooOld`) muncul di sini juga, dan **tak** membl
 "Mulai lagi" pada baris riwayat ber-`kind: "terminal"` mengirim runtime baris itu.
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs/architecture/api-contract.md internal/skills/hanoman/SKILL.md \

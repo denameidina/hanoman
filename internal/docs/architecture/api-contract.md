@@ -558,6 +558,17 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #   {project, shell:true} (SPEC-236, ADR-0056): terminal biasa NON-agen — shell mentah
 #     (HANOMAN_SHELL ?? $SHELL ?? /bin/bash) di repoDir project, tanpa flow (tak menggerakkan stage,
 #     tak buat worktree). 201 { id } · 404 project · 400 tanpa repoDir (needsBind).
+#   {project, agent?, model?, effort?} (SPEC-517): TERMINAL AGEN BIASA dengan runtime PER SESI —
+#     form "Sesi baru" di halaman Terminal. Kosong → default global (Setting), jadi body {project}
+#     polos berperilaku persis seperti sebelum SPEC-517. `agent` memilih BLOK Setting yang dibaca
+#     (claude → model/effort, codex → codex.model/codex.effort), bukan sekadar menukar biner —
+#     membaca blok yang salah melahirkan `codex -m claude-opus-5` (SPEC-377). Effort codex dikoersi
+#     ke katalog modelnya (SPEC-339, `terminalAgentDefaults` di services/settings.ts), dan
+#     `ensureCodexTrust` diturunkan dari agen HASIL resolusi — bukan Setting.agent, karena di jalur
+#     ini keduanya kini bisa berbeda. agent di luar claude|codex → 400.
+#     Varian ini dijaga `flow: z.undefined()` di zod: ia permisif dan duduk SESUDAH semua varian
+#     ber-flow, jadi tanpa gerbang itu body flow yang CACAT (mis. {project, flow:"prd"} tanpa
+#     brief) akan lolos ke sini dan membuka terminal biasa secara SENYAP alih-alih dijawab 400.
 #   {spec, flow, model?, effort?, goal?, goalCondition?, agent?, verifyScope?, force?} (SPEC-162; model/effort SPEC-252/ADR-0061;
 #     goal SPEC-332/ADR-0073; agent SPEC-338/ADR-0074; verifyScope SPEC-376/ADR-0080; force SPEC-447/ADR-0093):
 #     sesi backlog di worktree .worktrees/<spec>, prompt pipeline penuh.
@@ -591,7 +602,9 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #     agent?: "claude"|"codex" — override PER SESI; kosong → Setting.agent. Agen menentukan katalog
 #       model/effort default (claude → Setting.model/effort, codex → Setting.codex.model/effort) dan
 #       bentuk argv: claude `--model/--effort/--settings`, codex `-m / -c model_reasoning_effort / -c hooks.*`.
-#       Sesi project-level (reverse/prd/scaffold/breakdown/terminal/konflik) TAK punya override — ikut Setting.agent.
+#       Sesi project-level (reverse/prd/scaffold/breakdown) & sesi konflik TAK punya override — ikut
+#       Setting.agent (konflik: blok Setting.conflict bila dinyalakan, ADR-0081). Terminal agen biasa
+#       DIKECUALIKAN sejak SPEC-517: ia punya form pemilih runtime sendiri (lihat varian di atas).
 #     model/effort opsional = override PER SESI (kosong → default global);
 #     jadi argv --model/--effort saat sesi lahir (andal, tak bergantung agen).
 #     goal?: boolean — mode goal PER SESI. undefined → ikut Setting.goal.enabled; false → MATI walau
