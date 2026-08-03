@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 vi.mock("../src/api/client", () => ({
-  api: { listBranches: vi.fn(async () => ({ branches: ["main"], remotes: [] })) },
+  api: {
+    listBranches: vi.fn(async () => ({ branches: ["main"], remotes: [] })),
+    // SPEC-521 · `vi.fn()` polos memulangkan undefined, dan BacklogScreen memanggilnya sebagai
+    // `api.listSpecs?.(…)` lalu `p?.then(…)` — rantainya putus, jadi test lama di berkas ini
+    // tetap membaca prop `backlog` apa adanya. Hanya describe tab Goal yang memberinya nilai.
+    listSpecs: vi.fn(),
+  },
   ApiError: class extends Error {},
 }));
 
@@ -55,6 +61,7 @@ describe("NewSpecModal · tab Goal (SPEC-407)", () => {
 });
 
 import { BacklogScreen } from "../src/screens/BacklogScreen";
+import { api } from "../src/api/client";
 
 const goalSpec: any = {
   id: "SPEC-407", projectId: "p1", title: "Turunkan latensi", source: "goal", stage: "executing",
@@ -69,7 +76,9 @@ describe("BacklogScreen · item goal (SPEC-407)", () => {
   it("badge Goal muncul dan detail mengeja goal, selesai bila, batasan", async () => {
     render(<BacklogScreen backlog={[goalSpec]} projects={[{ id: "p1", name: "P1" }] as never}
       projectFilter="all" onProjectFilter={() => {}} />);
-    expect(await screen.findByText("Goal")).toBeTruthy();
+    // SPEC-521 · "Goal" kini muncul di tab filter DAN badge kartu → findByText cocok ganda
+    // dan melempar. Pola yang sama dipakai untuk "Audit" di backlog-board.test.tsx.
+    await waitFor(() => expect(screen.getAllByText("Goal").length).toBeGreaterThan(1));
     fireEvent.click(screen.getByText("Turunkan latensi"));
     await waitFor(() => expect(screen.getByText("Selesai bila")).toBeTruthy());
     expect(screen.getByText("benchmark < 200 ms")).toBeTruthy();
@@ -88,5 +97,51 @@ describe("BacklogScreen · item goal (SPEC-407)", () => {
     await waitFor(() => expect(onEditSpec).toHaveBeenCalledWith(
       expect.objectContaining({ id: "SPEC-407" }),
       expect.objectContaining({ payload: expect.objectContaining({ goal: "p95 < 200 ms" }) })));
+  });
+});
+
+// SPEC-521 · filter goal = tab kelima di deret tab sumber, ditopang GET /specs?source=goal.
+// Penyaringan hidup di SERVER (ADR-0038), jadi yang diuji adalah PARAM yang menyeberang —
+// menghitung baris yang dirender klien hanya akan menguji mock, bukan produk.
+describe("BacklogScreen · tab Goal (SPEC-521)", () => {
+  const briefSpec: any = {
+    id: "SPEC-1", projectId: "p1", title: "form invoice", source: "brief", stage: "planned",
+    priority: "sedang", author: "a", objective: "o", payload: {}, branchFrom: null, baseSha: null,
+  };
+  const mount = () => {
+    vi.mocked(api.listSpecs).mockResolvedValue(
+      { items: [briefSpec], total: 1, page: 1, pageSize: 20 } as never);
+    render(<BacklogScreen backlog={[briefSpec]} projects={[{ id: "p1", name: "P1" }] as never}
+      projectFilter="all" onProjectFilter={() => {}} />);
+  };
+  // getByRole("tab") — BUKAN getByText: badge kartu item goal berlabel "Goal" juga
+  // (SOURCE_META.goal), jadi pencarian berbasis teks cocok ganda begitu ada item goal di layar.
+  const tab = (name: string) => screen.getByRole("tab", { name });
+  const lastCall = () => vi.mocked(api.listSpecs).mock.calls.at(-1)![0]!;
+
+  it("tab Goal ada di deret tab sumber", () => {
+    mount();
+    expect(tab("Goal")).toBeTruthy();
+    // Tab lama tak boleh hilang.
+    expect(tab("Semua spec")).toBeTruthy();
+    expect(tab("Dari brief")).toBeTruthy();
+    expect(tab("Dari QA")).toBeTruthy();
+    expect(tab("Audit")).toBeTruthy();
+  });
+
+  it("mengklik tab Goal mengirim source=goal ke server", async () => {
+    mount();
+    await waitFor(() => expect(api.listSpecs).toHaveBeenCalled());
+    expect(lastCall().source).toBeUndefined();
+    fireEvent.click(tab("Goal"));
+    await waitFor(() => expect(lastCall().source).toBe("goal"));
+  });
+
+  it("kembali ke Semua spec mengirim source undefined, bukan sentinel \"all\"", async () => {
+    mount();
+    fireEvent.click(tab("Goal"));
+    await waitFor(() => expect(lastCall().source).toBe("goal"));
+    fireEvent.click(tab("Semua spec"));
+    await waitFor(() => expect(lastCall().source).toBeUndefined());
   });
 });
