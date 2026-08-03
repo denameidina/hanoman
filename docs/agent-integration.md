@@ -171,9 +171,10 @@ dan tak memakai agent token.
 | `GET /api/projects/:id/changelog` | `docs:read` | changelog yang sudah dibangkitkan (paginated). |
 | `POST /api/projects/:id/changelog` | `docs:write` | bangkitkan changelog baru — bentuknya di **§6a**. |
 | `GET /api/terminal/sessions` | `sessions:read` | sesi yang sedang hidup. |
-| `GET /api/notifications` | `notifications:read` | notifikasi. |
+| `GET /api/notifications` | `notifications:read` | notifikasi. **Tanpa `limit` → 50 teratas**, bukan seluruhnya (lihat jebakan di §10). |
 | `GET /api/tickets` | `support:read` | tiket Help Center. |
-| `GET /api/lead/decisions` | `lead:read` | jejak keputusan hanoman-lead. |
+| `GET /api/lead/decisions` | `lead:read` | jejak keputusan hanoman-lead. Menerima `page`/`limit`; `take`/`skip` lama tetap jalan. |
+| `GET /api/scheduler/queue` | `settings:read` | antrean scheduler (`?status=queued\|launched\|done\|failed`). `GET /api/scheduler/state` **tak lagi** memuat `queue` — ia memuat `queueCounts`. |
 | `POST /api/lead/decisions` | `lead:write` | minta putusan — baca **§8** dan **§11** dulu. |
 
 ## 6a. Changelog per project
@@ -283,6 +284,8 @@ memanggilnya; jangan lakukan tanpa manusia.
 | **`GET /api/specs/:id` tidak ada** | `GET /api/specs?q=SPEC-489` lalu cocokkan `id` **persis** — `q` itu substring, jadi ia bisa mengembalikan lebih dari satu |
 | daftar mengembalikan amplop `{ items, total, page, pageSize }` | jangan perlakukan responsnya sebagai array |
 | tanpa `limit`, daftar mengembalikan **seluruh** item dalam satu halaman | kirim `limit` untuk backlog besar |
+| **`GET /api/notifications` adalah pengecualiannya**: tanpa `limit` ia mengembalikan **50 teratas**, bukan seluruhnya — angka penuhnya ada di `total` | kirim `page`/`limit` bila kamu butuh riwayat lama; jangan simpulkan `items.length` = seluruh notifikasi |
+| `GET /api/scheduler/state` **tidak lagi** memuat `queue` (SPEC-523/ADR-0107) | baca `queueCounts` untuk hitungan, `GET /api/scheduler/queue?status=…&page&limit` untuk barisnya |
 | `PATCH /api/specs/:id` menolak edit konten begitu item pernah dimulai | ubah `title`/`payload` hanya selagi item belum punya sesi |
 | `branchFrom` yang tak ada di repo project → **400**, bukan diterima lalu gagal di tengah sesi | ambil kandidatnya dari `GET /api/projects/:id/branches` |
 | **401 telanjang** tak memisahkan "host salah" dari "token salah" dari "master switch mati" | probe `GET /api/health` sekali: 200 = host benar → masalahnya token atau master switch |

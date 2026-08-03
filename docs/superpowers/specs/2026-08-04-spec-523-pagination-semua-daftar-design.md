@@ -1,7 +1,7 @@
 # SPEC-523 — Pagination pada semua daftar
 
 **Tanggal:** 2026-08-04 · **Sumber:** brief · **Prioritas:** sedang
-**ADR baru:** ADR-0106 (memperluas [ADR-0038](../../../internal/docs/adr/0038-paginasi-di-response-layer.md))
+**ADR baru:** ADR-0107 (memperluas [ADR-0038](../../../internal/docs/adr/0038-paginasi-di-response-layer.md))
 
 ## Masalah
 
@@ -126,7 +126,7 @@ Yang ditambahkan: `total` (`git rev-list --count` atas ref yang sama dengan `lis
 UI menuliskan "N dari T commit" di baris muat-lebih, sehingga plafon yang tak terlihat
 tak lagi terbaca sebagai "riwayat habis".
 
-Ini **pengecualian sadar** dari K1, dinyatakan di ADR-0106 berikut alasannya — bukan daftar
+Ini **pengecualian sadar** dari K1, dinyatakan di ADR-0107 berikut alasannya — bukan daftar
 yang kelewat.
 
 ### K6 — Sesi/history: muat-lebih → `Pager`
@@ -137,7 +137,7 @@ yang kelewat.
 ### K7 — Daftar yang tak berlaku dinyatakan, bukan didiamkan
 
 Error (dicabut ADR-0092), PRD/docs (pohon, bukan daftar rata), dan git graph (pengecualian K5)
-ditulis eksplisit di ADR-0106. Objective menyebut sepuluh daftar; tiga di antaranya tak bisa
+ditulis eksplisit di ADR-0107. Objective menyebut sepuluh daftar; tiga di antaranya tak bisa
 dipenuhi apa adanya, dan alasannya harus terbaca supaya audit berikutnya tak "memperbaikinya".
 
 ## Acceptance criteria (EARS)
@@ -252,9 +252,9 @@ karena `page` tak pernah dikirim — bukan sekadar test yang lulus di kedua sisi
 
 ## Docs yang tersentuh (commit yang sama)
 
-- `internal/docs/adr/0106-paginasi-seragam-daftar-dashboard.md` — **baru**
+- `internal/docs/adr/0107-paginasi-seragam-daftar-dashboard.md` — **baru**
 - `internal/docs/architecture/api-contract.md` — notifications, scheduler, lead, github issues, graph
-- `internal/docs/README.md` + `internal/docs/adr/README.md` — tautan ADR-0106
+- `internal/docs/README.md` + `internal/docs/adr/README.md` — tautan ADR-0107
 - `docs/agent-integration.md` — bila menyebut bentuk daftar yang berubah
 
 ## Non-goal

@@ -297,10 +297,14 @@ GET    /projects/:id/file?path=&ref=    # { path, content, binary, truncated }  
 GET    /projects/:id/working-status      # (SPEC-234) { branch, staged:ChangedFile[], unstaged:ChangedFile[] }  staged=index vs HEAD, unstaged=working tree vs index+untracked (temp-index); read-only, TAK digerbang sesi; repoDir kosong → {branch:"",staged:[],unstaged:[]}; 404 project tak ada. Path /working-status dibedakan dari /status milik SPEC-233 (repoStatus, baris di bawah) yang beda bentuk respons.
 GET    /projects/:id/file-diff?path=&staged=  # (SPEC-234) ReviewFile diff satu file working tree; staged=1 → index vs HEAD, else working tree vs index; 400 path buruk/kosong; 404 file tak dalam changeset
 PUT    /projects/:id/file               { path, content }   # tulis file ke working tree; 400 guard path. TAK digerbang sesi.
-GET    /projects/:id/graph?limit=200    # { commits:{sha,parents,author,at,subject,refs[],tags[]}[], current }  git log --date-order
+GET    /projects/:id/graph?limit=200    # { commits:{sha,parents,author,at,subject,refs[],tags[]}[], current, total }  git log --date-order
 #   SPEC-233: tag dipisah dari refs (tags[]). Filter opsional ?branches=a,b (bukan --all) & showRemote=/showTags=false.
 #   SPEC-351: limit = HALAMAN, bukan plafon. Tak ada cap server; client menaikkannya kelipatan 200 saat
 #   operator menggulir ke kaki daftar. commits.length < limit = history habis (satu-satunya penanda akhir).
+#   SPEC-523 · ADR-0107: graph SENGAJA TETAP jendela tumbuh, BUKAN halaman page/limit — lane dihitung dari
+#   commit KONTIGU, jadi halaman diskrit memutus tautan induk–anak di batas halaman. `total` =
+#   `git rev-list --count` dengan ref selector YANG SAMA dengan `git log`-nya (kalau berbeda, angkanya
+#   menghitung ref yang tak digambar) → UI menuliskan "N dari T commit". Repo tak ada/galat → total 0.
 GET    /projects/:id/commit/:sha        # { sha,parents,author,at,subject,body,changed[], signed,committer,committedAt,authorEmail }  404 sha bukan hex / tak ada (SPEC-233)
 POST   /projects/:id/git                { op, ...args, force? }   # { ok, stdout, stderr, current }
 #   op ∈ checkout|branch|merge|cherry-pick|revert|delete-branch (+ SPEC-233 di blok Git graph parity). 400 op/field cacat; 400 tanpa repoDir.
@@ -430,7 +434,14 @@ GET      /limits/codex                  # CodexLimitsDTO { status, windows[], fe
 #   status: ok = snapshot ≤12 jam; stale = lebih tua (tetap ditampilkan, ditandai); unavailable = belum
 #   pernah ada sesi codex yang melaporkan kuota → badge disembunyikan di UI.
 #   `fetchedAt` = waktu SNAPSHOT (bukan waktu baca) — beda semantik dari /limits milik claude.
-GET      /notifications                 # { items:Notification[] (≤50 terbaru dulu), unread:int }  (SPEC-180)
+GET      /notifications  ?page&limit    # { items:Notification[], unread:int, total:int, page:int, pageSize:int }
+#                                         SPEC-180 · SPEC-523/ADR-0107. TANPA `limit` → 50 teratas persis
+#                                         seperti sebelum SPEC-523: fungsi yang sama memberi makan frame siar
+#                                         WebSocket `notifications` tiap 3 dtk (ADR-0039), dan menyiarkan
+#                                         seluruh riwayat tiap 3 dtk adalah regresi biaya. Yang ditambahkan
+#                                         `total` — supaya 50 berhenti berpura-pura jadi semuanya.
+#                                         `unread` SELALU dari seluruh baris, tak pernah dari halaman diminta.
+#                                         Arsip berhalaman ada di modal "Semua notifikasi" (bell tetap live).
 #   Notification dibuat server-side saat backlog masuk `done` (advanceStage + write-through GET /specs).
 #   type ∈ done|decision|drift|error|ticket|fail|lead|webhook|automerge (fail SPEC-298 = sesi scheduler gagal/limit,
 #   rekonsil akhir sesi). SPEC-486 · ADR-0103 · `automerge` (key `automerge:<specId>`) merangkap DUA peran:
@@ -806,7 +817,8 @@ POST /api/projects/:id/github/pull  { state?:"open"|"all", limit?:1..1000 }
 #   Upsert id deterministik "<projectId>:<slug>#<n>"; update TAK PERNAH menyentuh status/specId.
 #   400 no-remote | not-github (pesan menyebut hostnya) | issues-disabled · 404 project/repo tak ada
 #   401 kredensial ditolak · 502 GitHub menjawab lain-lain.
-GET  /api/projects/:id/github/issues?status=  -> { items: GithubIssueView[] }   # urut number desc · 404
+GET  /api/projects/:id/github/issues?status=&page&limit -> Paginated<GithubIssueView>   # urut number desc · 404
+#   SPEC-523 · ADR-0107 · amplop { items, total, page, pageSize }; tanpa `limit` → seluruh item.
 POST /api/github-issues/accept  { ids:[…≤100], priority?, source? }
 #   -> 201 { created: Spec[], failed:[{id,error}] } — SATU Spec per issue (ADR-0015). Satu issue gagal
 #   tak menghentikan sisanya (cermin checkTriase).
@@ -838,7 +850,11 @@ POST /api/github-issues/:id/unlink  -> 200 { id, status:"new", specId:null } · 
 GET  /api/scheduler/config   -> Scheduler (zScheduler: enabled, paused, maxConcurrent, autonomy, sources.{backlog,triase})
 PUT  /api/scheduler/config   { Scheduler }  -> Scheduler   # ganti blok penuh (pola PUT /settings). Pause = { paused:true }. 400 invalid.
 GET  /api/scheduler/state    -> { config, cap, liveCount, sources:[{id,enabled,everyMin,minCount?,lastRunAt,nextRunAt}],
-#                                  queue: SchedulerQueueItem[], sessions:[sesi live ber-item 'launched'] }
+#                                  queueCounts:{queued,launched,done,failed}, sessions:[sesi live ber-item 'launched'] }
+# SPEC-523 · ADR-0107 · `queue` DICABUT dari state (daftar tanpa batas); state membawa hitungannya saja.
+GET  /api/scheduler/queue    ?status=queued|launched|done|failed&page&limit
+#                            -> Paginated<SchedulerQueueItemView>   # { items, total, page, pageSize }
+#                               `status` disaring di query DB, bukan di klien. Tanpa `limit` → seluruh item.
 ```
 > Engine in-process (di-start dari `server.ts`, timer `.unref`; `app.ts` bebas-timer — **membalik sebagian
 > ADR-0024**): per source enable+cadence → checker terdaftar (`registerSchedulerSource`) enqueue kandidat;
@@ -870,6 +886,11 @@ GET  /api/scheduler/state    -> { config, cap, liveCount, sources:[{id,enabled,e
 > `Notification` **`fail`** (tipe baru) + `markFailed(note)`, **tanpa retry**. Item `done`/`failed` tampil di
 > `GET /api/scheduler/state.queue`; ringkasan di `GET /api/session-results`.
 >
+> **SPEC-523 · ADR-0107 ·** ketiga daftar antrean (antrean/selesai/gagal) tak lagi diturunkan dari
+> `state.queue` dengan `filter()` di klien: masing-masing memuat halamannya sendiri lewat
+> `GET /api/scheduler/queue?status=…&page&limit` dan memakai `Pager` design system. Hitungan judulnya
+> datang dari `state.queueCounts`.
+>
 > **Panel Scheduler (SPEC-299, daun #6):** screen mandiri `SchedulerScreen.tsx` + nav item `ds/shell.tsx`
 > (`key:"scheduler"`), **murni konsumen read-only** — tak menambah endpoint/skema/ADR. Self-poll `GET
 > /api/scheduler/state` (5 dtk, pola GitGraph) merender: status per source (enable/last-run/next-run),
@@ -891,7 +912,10 @@ PUT  /api/lead/config      { Lead } -> Lead          # ganti blok penuh (pola PU
 GET  /api/lead/status      -> { config, projects:[{projectId,name,optIn,paused,decisions24h,openSessions}],
 #                               queue: SchedulerQueueItem[], deciding:[sessionId], queued:[sessionId],
 #                               waiting:[sessionId], lastPulseAt, gate:{inFlight,queued,capacity} }
-GET  /api/lead/decisions?projectId&specId&sessionId&flowId&status&take&skip -> { items: LeadDecisionView[] }
+GET  /api/lead/decisions?projectId&specId&sessionId&flowId&status&page&limit (juga take&skip)
+#                        -> Paginated<LeadDecisionView>   # { items, total, page, pageSize }
+#    SPEC-523 · ADR-0107 · `page`/`limit` ADITIF; `take`/`skip` lama tetap diterima. Bila keduanya
+#    dikirim, `page`/`limit` MENANG. `total` menghormati penyaring, bukan seluruh tabel.
 #    LeadDecisionView: { id, projectId, specId, sessionId, gate, kind, question, answer, reason, refs[],
 #                        confidence, action, choice, choiceIndex, options[], missing[],
 #                        choices[{index,option}], select{mode,min,max}|null, flowId, step,
@@ -909,7 +933,7 @@ POST /api/lead/decisions   { projectId, specId?, sessionId?, question, options?[
 POST /api/lead/decisions/:id/override { answer, reason?, choices?[] } -> { old, next, delivered }
 POST /api/lead/decisions/:id/cancel                       -> LeadDecisionView
 # SPEC-485 · ADR-0102 · RANTAI keputusan
-GET  /api/lead/flows?projectId&status&take&skip -> { items: LeadFlowView[] }
+GET  /api/lead/flows?projectId&status&page&limit (juga take&skip) -> Paginated<LeadFlowView>   # SPEC-523
 #    LeadFlowView: { id, projectId, specId, sessionId, gate, status, title, steps, closeReason,
 #                    openedAt, closedAt, expiresAt }   # status: menunggu|sebagian|selesai|dibatalkan
 POST /api/lead/flows/:id/submit -> LeadFlowView   # 409 bila tak ada / sudah tertutup

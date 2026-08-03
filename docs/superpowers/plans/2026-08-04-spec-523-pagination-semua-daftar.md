@@ -4,7 +4,7 @@
 
 **Goal:** Meratakan pola paginasi yang sudah ada (ADR-0038) ke seluruh daftar utama dashboard, sehingga tak ada lagi daftar yang memuat seluruh baris sekaligus atau menyembunyikan data lama di balik plafon hardcode.
 
-**Architecture:** Amplop `Paginated<T>` = `{items,total,page,pageSize}` + query `page`/`limit` di server (`services/paginate.ts` atau `skip`/`take` DB bila daftarnya tanpa overlay), `serverPage()` + `<Pager>` design system di UI. Tak ada komponen paginator baru dan tak ada pola kedua. Tiga pengecualian dinyatakan eksplisit di ADR-0106: git graph tetap jendela tumbuh (lane butuh commit kontigu), docs tetap pohon, error sudah dicabut ADR-0092.
+**Architecture:** Amplop `Paginated<T>` = `{items,total,page,pageSize}` + query `page`/`limit` di server (`services/paginate.ts` atau `skip`/`take` DB bila daftarnya tanpa overlay), `serverPage()` + `<Pager>` design system di UI. Tak ada komponen paginator baru dan tak ada pola kedua. Tiga pengecualian dinyatakan eksplisit di ADR-0107: git graph tetap jendela tumbuh (lane butuh commit kontigu), docs tetap pohon, error sudah dicabut ADR-0092.
 
 **Tech Stack:** Fastify + Prisma 6 (SQLite) di server, React 18 + TS strict di web, Zod DTO di `shared`, vitest.
 
@@ -2054,18 +2054,18 @@ EOF
 
 ---
 
-### Task 12: Test kontrak lintas-daftar + docs (ADR-0106)
+### Task 12: Test kontrak lintas-daftar + docs (ADR-0107)
 
 Kunci hasilnya supaya daftar baru tak diam-diam lahir tanpa halaman, lalu perbarui Source of Truth.
 
 **Files:**
 - Create: `server/test/pagination-contract.test.ts`
-- Create: `internal/docs/adr/0106-paginasi-seragam-daftar-dashboard.md`
+- Create: `internal/docs/adr/0107-paginasi-seragam-daftar-dashboard.md`
 - Modify: `internal/docs/README.md:57` (tautan ADR)
 - Modify: `internal/docs/adr/README.md` (narasi ADR)
 - Modify: `internal/docs/architecture/api-contract.md` (notifications, scheduler, lead, github issues, graph)
 
-- [ ] **Step 1: Tulis test kontrak**
+- [x] **Step 1: Tulis test kontrak**
 
 Buat `server/test/pagination-contract.test.ts`:
 
@@ -2078,7 +2078,7 @@ const app = buildApp({ requireAuth: false });
 
 // SPEC-523 · daftar utama dashboard. Konstanta di sini bukan hiasan: daftar BARU yang lahir tanpa
 // halaman harus punya satu tempat yang menolaknya. Yang SENGAJA tak ada di sini:
-//   · `/projects/:id/graph` — jendela tumbuh, bukan halaman (ADR-0106, lane butuh commit kontigu)
+//   · `/projects/:id/graph` — jendela tumbuh, bukan halaman (ADR-0107, lane butuh commit kontigu)
 //   · `/projects/:id/docs`  — pohon kategori→file, bukan daftar rata
 //   · error monitoring      — dicabut ADR-0092
 const LIST_ENDPOINTS = [
@@ -2101,7 +2101,7 @@ beforeAll(async () => {
 });
 afterAll(async () => { await prisma.project.deleteMany({ where: { id: "p-pagination" } }); });
 
-describe("kontrak paginasi daftar utama (SPEC-523 · ADR-0106)", () => {
+describe("kontrak paginasi daftar utama (SPEC-523 · ADR-0107)", () => {
   for (const url of LIST_ENDPOINTS) {
     it(`${url} menerima page/limit dan membalas amplop Paginated`, async () => {
       const r = await app.inject({ method: "GET", url: `${url}${url.includes("?") ? "&" : "?"}page=1&limit=1` });
@@ -2117,14 +2117,14 @@ describe("kontrak paginasi daftar utama (SPEC-523 · ADR-0106)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test kontrak**
+- [x] **Step 2: Jalankan test kontrak**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/pagination-contract.test.ts
 ```
 Diharapkan: 10 test lulus. Bila ada yang merah, perbaiki endpointnya — bukan test-nya.
 
-- [ ] **Step 3: Tulis ADR-0106**
+- [x] **Step 3: Tulis ADR-0107**
 
 Sebelum menulis, **verifikasi nomornya belum diklaim** worktree/branch tetangga:
 ```bash
@@ -2134,10 +2134,10 @@ git ls-remote --heads origin
 ```
 Bila 0106 sudah dipakai, naikkan ke nomor bebas berikutnya dan sesuaikan seluruh rujukan di task ini.
 
-Buat `internal/docs/adr/0106-paginasi-seragam-daftar-dashboard.md`:
+Buat `internal/docs/adr/0107-paginasi-seragam-daftar-dashboard.md`:
 
 ```markdown
-# ADR-0106 — Paginasi seragam seluruh daftar dashboard, berikut pengecualian yang dinyatakan
+# ADR-0107 — Paginasi seragam seluruh daftar dashboard, berikut pengecualian yang dinyatakan
 
 **Status:** aktif (SPEC-523). Memperluas [ADR-0038](0038-paginasi-di-response-layer.md) dari dua daftar ke seluruh daftar utama.
 
@@ -2197,11 +2197,11 @@ bila keduanya dikirim, `page`/`limit` menang.
   hidup di modal terpisah. Menyiarkan seluruh riwayat tiap 3 detik adalah regresi biaya.
 ```
 
-- [ ] **Step 4: Tautkan ADR di kedua index**
+- [x] **Step 4: Tautkan ADR di kedua index**
 
 Di `internal/docs/README.md`, tepat di atas baris 0105 (baris 57):
 ```markdown
-- [0106 — Paginasi seragam seluruh daftar dashboard: amplop tunggal, `skip`/`take` sah tanpa overlay, tiga pengecualian dinyatakan](adr/0106-paginasi-seragam-daftar-dashboard.md)
+- [0106 — Paginasi seragam seluruh daftar dashboard: amplop tunggal, `skip`/`take` sah tanpa overlay, tiga pengecualian dinyatakan](adr/0107-paginasi-seragam-daftar-dashboard.md)
 ```
 
 Di `internal/docs/adr/README.md`, tambahkan entri narasi di posisi yang sama (paling atas daftar),
@@ -2209,7 +2209,7 @@ mengikuti gaya entri 0105 di berkas itu: apa yang diperluas (ADR-0038), apa yang
 (`queue` dari `/scheduler/state`), dan gotcha-nya (git graph sengaja bukan halaman; `limit` tanpa
 `page` adalah plafon, bukan halaman).
 
-- [ ] **Step 5: Perbarui `api-contract.md`**
+- [x] **Step 5: Perbarui `api-contract.md`**
 
 Di `internal/docs/architecture/api-contract.md`, perbarui bagian yang tersentuh:
 - **Settings / notifications / limits** (baris 361): `GET /notifications` menerima `page`/`limit`,
@@ -2219,9 +2219,9 @@ Di `internal/docs/architecture/api-contract.md`, perbarui bagian yang tersentuh:
 - **hanoman-lead** (baris 883): `decisions`/`flows` beramplop; `take`/`skip` kompatibilitas.
 - **Issue GitHub** (baris 794): beramplop.
 - **Git graph parity** (baris 317): balasan `graph` membawa `total`; jendela, bukan halaman
-  (rujuk ADR-0106).
+  (rujuk ADR-0107).
 
-- [ ] **Step 6: Jalankan seluruh test yang tersentuh plan ini**
+- [x] **Step 6: Jalankan seluruh test yang tersentuh plan ini**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -2234,13 +2234,13 @@ pnpm vitest --run shared/src/scheduler-state.test.ts
 Diharapkan: seluruhnya hijau. **Jangan menerima "no test files" sebagai bukti** — pastikan
 jumlah test yang berjalan masuk akal.
 
-- [ ] **Step 7: Typecheck ketiga paket yang tersentuh**
+- [x] **Step 7: Typecheck ketiga paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
 ```
 
-- [ ] **Step 8: Smoke nyata endpoint yang tersentuh (sekali, di akhir)**
+- [x] **Step 8: Smoke nyata endpoint yang tersentuh (sekali, di akhir)**
 
 ```bash
 HANOMAN_HOME="$(mktemp -d)" HANOMAN_PORT=8799 node server/dist/server.js &
@@ -2258,12 +2258,12 @@ memuat `queueCounts` dan tidak memuat `queue`. Bila server butuh auth, tambahkan
 `-H "Authorization: Bearer $HANOMAN_AGENT_TOKEN"` atau boot dengan auth mati sesuai
 `internal/docs/operations/production.md`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/test/pagination-contract.test.ts internal/docs/
 git commit -m "$(cat <<'EOF'
-docs(spec-523): ADR-0106 paginasi seragam + test kontrak lintas-daftar
+docs(spec-523): ADR-0107 paginasi seragam + test kontrak lintas-daftar
 
 Satu daftar konstanta endpoint yang wajib beramplop, sehingga daftar baru yang
 lahir tanpa halaman punya satu tempat yang menolaknya. Tiga pengecualian —
@@ -2289,7 +2289,7 @@ EOF
 | K4 lead: `page`/`limit` tanpa mencabut `take`/`skip` | 5, 6 |
 | K5 git graph: jendela + `total` | 11 |
 | K6 sesi/history: muat-lebih → `Pager` | 10 |
-| K7 pengecualian dinyatakan | 12 (ADR-0106) |
+| K7 pengecualian dinyatakan | 12 (ADR-0107) |
 | Tiket | 7 |
 | Changelog | 9 |
 | GitHub issues | 8 |
@@ -2307,4 +2307,4 @@ EOF
 `leadWindow` (Task 5) dipakai `trail.ts` dan `flow.ts`; `TicketPager` (Task 7) dipakai ulang
 Task 8 dengan prop `unit`.
 
-**Ponytail yang sengaja tak dikerjakan:** plafon `limit` di `paginate()` — dicatat di ADR-0106.
+**Ponytail yang sengaja tak dikerjakan:** plafon `limit` di `paginate()` — dicatat di ADR-0107.
