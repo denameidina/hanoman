@@ -1,12 +1,18 @@
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
-const { getSchedulerState, putSchedulerConfig, updateProject } = vi.hoisted(() => ({
+const { getSchedulerState, putSchedulerConfig, updateProject,
+  cancelSchedulerQueueItem, requeueSchedulerQueueItem } = vi.hoisted(() => ({
   getSchedulerState: vi.fn(),
   putSchedulerConfig: vi.fn(),
   updateProject: vi.fn(),
+  cancelSchedulerQueueItem: vi.fn(),
+  requeueSchedulerQueueItem: vi.fn(),
 }));
-vi.mock("../src/api/client", () => ({ api: { getSchedulerState, putSchedulerConfig, updateProject }, ApiError: class extends Error {} }));
+vi.mock("../src/api/client", () => ({
+  api: { getSchedulerState, putSchedulerConfig, updateProject, cancelSchedulerQueueItem, requeueSchedulerQueueItem },
+  ApiError: class extends Error {},
+}));
 
 import { SchedulerScreen } from "../src/screens/SchedulerScreen";
 
@@ -121,5 +127,49 @@ describe("SchedulerScreen kontrol (SPEC-299)", () => {
     await act(async () => { fireEvent.click(btn); });
     await waitFor(() => expect(updateProject).toHaveBeenCalledWith("a", { schedulerOptIn: true }));
     await waitFor(() => expect(onProjectChanged).toHaveBeenCalledWith("a"));
+  });
+});
+
+describe("SchedulerScreen pembatalan antrean (SPEC-522)", () => {
+  const canceledRow = {
+    id: "q5", specId: "SPEC-5", projectId: "a", source: "backlog", priority: "sedang",
+    status: "canceled", sessionId: null, note: "dibatalkan operator: salah project",
+    enqueuedAt: "2026-07-22T00:00:00.000Z", launchedAt: null,
+  };
+
+  it("tombol Batalkan pada baris antrean memanggil cancelSchedulerQueueItem", async () => {
+    getSchedulerState.mockResolvedValue(STATE);
+    cancelSchedulerQueueItem.mockResolvedValue({ ...STATE.queue[0], status: "canceled" });
+    renderScreen();
+    const btn = await screen.findByRole("button", { name: /batalkan/i });
+    await act(async () => { fireEvent.click(btn); });
+    await waitFor(() => expect(cancelSchedulerQueueItem).toHaveBeenCalledWith("q1"));
+  });
+
+  it("seksi Dibatalkan merender alasannya dan tombol Antre lagi mengembalikannya", async () => {
+    getSchedulerState.mockResolvedValue({ ...STATE, queue: [...STATE.queue, canceledRow] });
+    requeueSchedulerQueueItem.mockResolvedValue({ ...canceledRow, status: "queued", note: null });
+    renderScreen();
+    expect(await screen.findByText("Dibatalkan · 1")).toBeInTheDocument();
+    expect(screen.getByText(/dibatalkan operator: salah project/)).toBeInTheDocument();
+    const btn = screen.getByRole("button", { name: /antre lagi/i });
+    await act(async () => { fireEvent.click(btn); });
+    await waitFor(() => expect(requeueSchedulerQueueItem).toHaveBeenCalledWith("q5"));
+  });
+
+  // Kendala spec: item bersesi aktif tak dibunuh. Penolakan 409 membawa satu-satunya kalimat yang
+  // berguna ("sesinya sudah berjalan — tutup dari Terminal"); menampilkan "gagal" saja
+  // menyembunyikannya dan operator tak tahu harus ke mana.
+  it("penolakan 409 menampilkan pesan server apa adanya", async () => {
+    getSchedulerState.mockResolvedValue(STATE);
+    cancelSchedulerQueueItem.mockRejectedValue(Object.assign(new Error("409"), {
+      detail: { error: "tak bisa membatalkan: sesinya sudah berjalan — tutup dari Terminal bila memang tak diperlukan", status: "launched" },
+    }));
+    const onToast = vi.fn();
+    renderScreen({ onToast });
+    const btn = await screen.findByRole("button", { name: /batalkan/i });
+    await act(async () => { fireEvent.click(btn); });
+    await waitFor(() => expect(onToast).toHaveBeenCalledWith(
+      expect.stringContaining("sesinya sudah berjalan"), "err", "x-circle"));
   });
 });

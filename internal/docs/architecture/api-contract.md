@@ -870,6 +870,9 @@ GET  /api/scheduler/config   -> Scheduler (zScheduler: enabled, paused, maxConcu
 PUT  /api/scheduler/config   { Scheduler }  -> Scheduler   # ganti blok penuh (pola PUT /settings). Pause = { paused:true }. 400 invalid.
 GET  /api/scheduler/state    -> { config, cap, liveCount, sources:[{id,enabled,everyMin,minCount?,lastRunAt,nextRunAt}],
 #                                  queue: SchedulerQueueItem[], sessions:[sesi live ber-item 'launched'] }
+POST /api/scheduler/queue/:id/cancel  { reason? } -> SchedulerQueueItem   # SPEC-522 · queued→canceled (CAS). 404 baris tak ada;
+#                                     409 { error, status } bila statusnya bukan `queued` (launched → "tutup dari Terminal"); 400 reason >200 char.
+POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # canceled→queued, note dikosongkan. 404 / 409 { error, status }.
 ```
 > Engine in-process (di-start dari `server.ts`, timer `.unref`; `app.ts` bebas-timer — **membalik sebagian
 > ADR-0024**): per source enable+cadence → checker terdaftar (`registerSchedulerSource`) enqueue kandidat;
@@ -910,6 +913,22 @@ GET  /api/scheduler/state    -> { config, cap, liveCount, sources:[{id,enabled,e
 > (enable+cadence per source, cap, autonomy, ambang errors); **rem darurat** Pause (`{paused:true}`) / Stop
 > (`{enabled:false}`) via endpoint yang sama; **opt-in per project** (pola helpEnabled) via `PATCH
 > /api/projects/:id { schedulerOptIn }`. Judul spec di baris antrean/sesi di-resolve dari daftar backlog klien.
+>
+> **Pembatalan antrean (SPEC-522 · [ADR-0106](../adr/0106-batalkan-antrean-scheduler.md)):** `status`
+> mendapat nilai kelima **`canceled`** (kolom `String` → **tanpa migration**), dan barisnya adalah
+> **tombstone**: `enqueue()` memakai `upsert` ber-`update:{}`, jadi checker `backlog` tak bisa
+> menghidupkannya lagi — menghapus barisnya justru akan membuat pembatalan membatalkan dirinya sendiri
+> dalam ≤1 cadence (spec-nya masih cocok `UNSTARTED_SPEC_WHERE`). Kedua transisi **CAS** (`updateMany`
+> ber-`where` status), bukan baca-lalu-tulis: di antara dua pernyataan itu governor bisa meluncurkan
+> barisnya, dan kendala "item bersesi aktif tak dibunuh diam-diam" akan jadi sekadar niat baik. Alasan
+> penolakan disusun **sesudah** CAS gagal. Capability **turunan peta yang sudah ada** (`scheduler` →
+> `settings` menurut method) — tak ada baris peta baru. Governor mendapat **dua gerbang**: `isQueued`
+> dibaca ulang dari DB di puncak badan loop `drain` (snapshot `queued()` bisa berumur puluhan detik
+> karena tiap spawn hitungan detik; ditaruh paling atas supaya gerbang SPEC-431 & cabang `isLive` tak
+> menimpa baris `canceled`) dan `markLaunched` yang jadi CAS (sisa jendela = durasi satu spawn). Sesi
+> yang telanjur lahir **tidak dibunuh** — id-nya dicatat di `note` dan slot tetap terpakai. UI: tombol
+> **Batalkan** per baris antrean (tanpa konfirmasi — reversibel) + seksi **Dibatalkan** ber-tombol
+> **Antre lagi**.
 
 ## hanoman-lead (SPEC-409 · ADR-0091) — LOCAL per-instance
 ```

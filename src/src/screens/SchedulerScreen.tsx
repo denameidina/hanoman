@@ -72,14 +72,39 @@ function RowShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function QueueRow({ q, backlog }: { q: SchedulerQueueItemView; backlog: Spec[] }) {
+function QueueRow({ q, backlog, onCancel, busy }:
+  { q: SchedulerQueueItemView; backlog: Spec[]; onCancel: (id: string) => void; busy: boolean }) {
   return (
     <RowShell>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, backlog)}</span>
-        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>{q.projectId} · {q.source}</span>
+        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
+          {q.projectId} · {q.source}{q.note ? ` · ${q.note}` : ""}
+        </span>
       </span>
       <Badge tone={(PRIO_TONE[q.priority] ?? "neutral") as never} size="sm">{q.priority}</Badge>
+      {/* SPEC-522 · tanpa dialog konfirmasi: tindakannya reversibel lewat "Antre lagi", dan
+          konfirmasi untuk tindakan reversibel adalah gesekan tanpa hasil. */}
+      <Button size="sm" variant="ghost" leftIcon="ban" disabled={busy} onClick={() => onCancel(q.id)}>Batalkan</Button>
+    </RowShell>
+  );
+}
+
+// SPEC-522 · ADR-0106 · baris tombstone: ia sengaja TIDAK dihapus — `enqueue` (`upsert`
+// ber-`update:{}`) karena itu tak bisa menghidupkannya lagi saat checker `backlog` menjumpai spec
+// yang sama pada cadence berikutnya.
+function CanceledRow({ q, backlog, onRequeue, busy }:
+  { q: SchedulerQueueItemView; backlog: Spec[]; onRequeue: (id: string) => void; busy: boolean }) {
+  return (
+    <RowShell>
+      <Icon name="ban" size={16} color="var(--text-subtle)" />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, backlog)}</span>
+        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
+          {q.projectId} · {q.source} · {q.note ?? "dibatalkan"}
+        </span>
+      </span>
+      <Button size="sm" variant="ghost" leftIcon="rotate-ccw" disabled={busy} onClick={() => onRequeue(q.id)}>Antre lagi</Button>
     </RowShell>
   );
 }
@@ -262,6 +287,22 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
     finally { setBusyId(null); }
   }, [onProjectChanged, onToast]);
 
+  // SPEC-522 · satu handler untuk kedua arah. `load(true)` dijalankan pada sukses MAUPUN gagal:
+  // penolakan 409 berarti keadaan sebenarnya berbeda dari yang dilihat operator, jadi memuat ulang
+  // adalah bagian dari jawabannya.
+  const rowAction = React.useCallback(async (id: string, kind: "cancel" | "requeue") => {
+    setBusyId(id);
+    try {
+      if (kind === "cancel") { await api.cancelSchedulerQueueItem(id); onToast("Item antrean dibatalkan", "ok", "ban"); }
+      else { await api.requeueSchedulerQueueItem(id); onToast("Item dikembalikan ke antrean", "ok", "rotate-ccw"); }
+    } catch (e) {
+      // 409 membawa kalimatnya sendiri ("sesinya sudah berjalan — tutup dari Terminal"); toast
+      // "gagal" saja menyembunyikan satu-satunya keterangan yang bisa ditindaklanjuti.
+      const detail = (e as { detail?: { error?: string } }).detail;
+      onToast(detail?.error ?? "Gagal mengubah item antrean", "err", "x-circle");
+    } finally { setBusyId(null); load(true); }
+  }, [load, onToast]);
+
   if (phase === "loading") return <StateBlock kind="loading" />;
   if (phase === "error" || !state) return <StateBlock kind="error" hint="Gagal memuat state scheduler." action={() => load()} actionLabel="Coba lagi" />;
 
@@ -269,6 +310,7 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
   const done = state.queue.filter((q) => q.status === "done")
     .sort((a, b) => (b.launchedAt ?? "").localeCompare(a.launchedAt ?? ""));
   const failed = state.queue.filter((q) => q.status === "failed");
+  const canceled = state.queue.filter((q) => q.status === "canceled");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
@@ -281,7 +323,13 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
       </Card>
 
       <Section title="Antrean" count={queued.length} empty="Antrean kosong.">
-        {queued.map((q) => <QueueRow key={q.id} q={q} backlog={backlog} />)}
+        {queued.map((q) => <QueueRow key={q.id} q={q} backlog={backlog}
+          onCancel={(id) => void rowAction(id, "cancel")} busy={busyId === q.id} />)}
+      </Section>
+
+      <Section title="Dibatalkan" count={canceled.length} empty="Tak ada item yang dibatalkan.">
+        {canceled.map((q) => <CanceledRow key={q.id} q={q} backlog={backlog}
+          onRequeue={(id) => void rowAction(id, "requeue")} busy={busyId === q.id} />)}
       </Section>
 
       <Section title="Sesi berjalan" count={state.sessions.length} empty="Tak ada sesi scheduler berjalan.">

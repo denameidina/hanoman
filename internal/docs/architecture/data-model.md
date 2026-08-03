@@ -382,7 +382,7 @@ overlay sesi live — status live (running/done/failed) tetap diturunkan dari `p
 `Spec.stage` + `Notification`.
 - `id` (cuid), `specId` (**@unique**), `projectId` (tanpa FK — cermin `SyncOutbox`), `source`
   (`backlog|errors|triase`, asal checker), `priority` (`tinggi|sedang|rendah`, urutan drain),
-  `status` (`queued|launched|done|failed`, default `queued`), `sessionId?` (id sesi tmux saat diluncurkan),
+  `status` (`queued|launched|done|failed|canceled`, default `queued`), `sessionId?` (id sesi tmux saat diluncurkan),
   `note?` (alasan gagal — **diisi rekonsiliasi akhir sesi SPEC-298** saat sesi gagal/limit), `enqueuedAt`
   (FIFO dalam prioritas), `launchedAt?`. Index `(status)`.
 - Governor men-drain item `queued` (urut prioritas→FIFO) selagi sesi hidup `< cap` (`Setting.scheduler.maxConcurrent`),
@@ -414,6 +414,20 @@ overlay sesi live — status live (running/done/failed) tetap diturunkan dari `p
   **`failed`** (pane sesi mati/gone sebelum `done` = gagal/limit): `Notification fail` + `markFailed(note)` —
   **tanpa retry** (PRD non-goal); atau **biarkan `launched`** (pane hidup, stage<done — masih kerja / menunggu
   keputusan → `scanDecisions` menerbitkan `Notification decision`, sesi tetap **memegang slot** governor `liveCount`).
+- **Pembatalan operator (SPEC-522 · [ADR-0106](../adr/0106-batalkan-antrean-scheduler.md)):** `canceled`
+  adalah **tombstone**, bukan penghapusan — `enqueue()` memakai `upsert` ber-`update:{}`, jadi checker
+  `backlog` yang menjumpai spec yang sama pada cadence berikutnya **tak bisa menghidupkannya**; menghapus
+  barisnya justru membuat pembatalan membatalkan dirinya sendiri dalam ≤1 cadence (spec-nya masih cocok
+  `UNSTARTED_SPEC_WHERE`). Mekanisme yang sama dipakai SPEC-431 (`markDone` + `ALREADY_DONE_NOTE`).
+  Transisinya `queued → canceled` (`POST /api/scheduler/queue/:id/cancel`, `note` = `dibatalkan operator`
+  ± `: <reason>`) dan `canceled → queued` (`…/requeue`, `note` dikosongkan), keduanya **CAS**
+  (`updateMany` ber-`where` status) — itulah yang membuat "item yang sudah punya sesi aktif tak boleh
+  dibunuh diam-diam" tak bisa dilanggar balapan. Governor punya **dua gerbang** sepasang: `isQueued`
+  di puncak badan loop `drain` (snapshot `queued()` bisa berumur puluhan detik, dan posisi paling atas
+  itulah yang menjaga gerbang SPEC-431 & cabang `isLive` tak menimpa baris `canceled`) dan `markLaunched`
+  yang jadi **CAS** (sisa jendela = durasi satu spawn); sesi yang telanjur lahir **tidak dibunuh** —
+  id-nya dicatat di `note` dan slotnya tetap terpakai. `reconcile()` tak tersentuh: ia hanya memindai
+  `launched`, jadi tak ada `Notification fail` palsu untuk item yang sengaja dibatalkan.
 
 ## SessionHistory (SPEC-362 · [ADR-0079](../adr/0079-history-sesi-terminal-store-lokal-plus-transkrip.md))
 Riwayat **setiap** sesi terminal — **LOCAL-ONLY, tak disync** (cermin `LocalBinding`/`SchedulerQueueItem`:
