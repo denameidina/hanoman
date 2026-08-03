@@ -95,11 +95,12 @@ item-itemnya berurutan, dan tiap `deps.launch()` men-spawn worktree + sesi tmux 
 detik). Item di posisi ke-5 karena itu bisa duduk **puluhan detik** di dalam loop sesudah
 snapshot-nya diambil. Jendelanya nyata, bukan teoretis.
 
-**Gerbang A — periksa ulang tepat sebelum spawn.** `if (!(await isQueued(item.id))) continue;`
-ditempatkan sesudah gerbang `isDone`/`blockers`/`isLive` dan tepat sebelum `deps.launch()`, pola
-yang sama dengan `isDone` (SPEC-431) & `blockers` (SPEC-447): **dibaca ulang dari DB tepat sebelum
-peluncuran, bukan dari baris antrean di snapshot**. Slot tak terpakai, drain lanjut ke item
-berikutnya.
+**Gerbang A — periksa ulang dari DB di puncak badan loop.** `if (!(await isQueued(item.id))) continue;`
+mengikuti pola `isDone` (SPEC-431) & `blockers` (SPEC-447): **dibaca ulang dari DB, bukan dari baris
+antrean di snapshot**. Ia ditaruh **paling atas**, bukan tepat sebelum `deps.launch()`, supaya ia
+melindungi **semua** mutasi di badan loop: tanpa itu gerbang "spec sudah selesai" (SPEC-431) bisa
+menimpa baris `canceled` jadi `done`, dan cabang idempoten `isLive` bisa menimpanya jadi `launched`.
+Slot tak terpakai, drain lanjut ke item berikutnya.
 
 **Gerbang B — `markLaunched` jadi CAS.** Sisa jendelanya adalah durasi satu spawn: operator menekan
 Batalkan selagi `deps.launch()` untuk item itu sedang berjalan. CAS-nya membuat `markLaunched`
