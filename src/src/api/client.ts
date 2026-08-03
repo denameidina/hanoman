@@ -409,8 +409,12 @@ export const api = {
   // SPEC-516 · ADR-0105 · changelog per project (capability `docs`).
   changelogSources: (projectId: string) =>
     j<ChangelogSources>(paths.changelogSources(projectId)),
-  listChangelogs: (projectId: string, p: { page?: number; limit?: number } = {}) =>
-    j<Paginated<ChangelogView>>(paths.changelog(projectId) + qs({ page: p.page, limit: p.limit })),
+  // SPEC-519 · `q` = cari judul/isi/mode; disaring server sebelum paginate.
+  listChangelogs: (projectId: string, p: { page?: number; limit?: number; q?: string } = {}) =>
+    j<Paginated<ChangelogView>>(paths.changelog(projectId) + qs({ page: p.page, limit: p.limit, q: p.q })),
+  // SPEC-519 · satu rilis lewat id — deep-link bisa menunjuk rilis di luar halaman pertama.
+  getChangelog: (projectId: string, id: string) =>
+    j<ChangelogView>(paths.changelogItem(projectId, id)),
   generateChangelog: (projectId: string, req: ChangelogRequest) =>
     j<ChangelogView>(paths.changelog(projectId), { method: "POST", ...body(req) }),
   deleteChangelog: (projectId: string, id: string) =>
