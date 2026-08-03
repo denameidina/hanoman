@@ -159,3 +159,20 @@ bisa menjelaskan alasannya sebelum operator menekan tombol.
    satu digit **dan** satu huruf a–f, kalau tidak `1000000` terbaca sebagai sha.
 5. **`sources` menjawab 200, bukan 4xx, saat repo belum ditautkan.** Ia adalah pertanyaan "apa yang
    tersedia", dan jawaban "tidak ada, ini sebabnya" adalah jawaban yang sah.
+
+## Catatan — SPEC-518: agen penarasi bersetelan sendiri
+
+Keputusan ini menyebut `think()` sebagai mesin narasi tapi tidak menentukan **runtime/model/effort
+mana** yang menjalankannya; implementasi pertamanya memakai `sessionAgentDefaults()`, yakni default
+sesi kerja — jadi menulis prosa rilis 20 baris selalu memakai model yang dipakai menulis kode.
+SPEC-518 memberinya setelan sendiri lewat blok **`Setting.changelog`** (`zAgentEngine`, **opt-in,
+default mati** → mewarisi) yang dibaca **`changelogAgentDefaults()`** di
+`services/changelog/config.ts`, dengan kartu "Agen changelog" di Settings → Model sesi.
+
+Mekanisme ADR ini **tak berubah**: satu call site, `think()` tetap **diimpor** dari `lead/brain.ts`
+(titik spawn agen ketiga akan mengulang SPEC-448), anggaran waktu tetap konstanta
+`CHANGELOG_TIMEOUT_MS` yang disebut di dalam prompt — sengaja **bukan** setelan, karena angka yang
+bisa digeser diam-diam akan berbohong kepada agennya (SPEC-432) — dan agen gagal tetap **bukan
+galat** (`generator:"fallback"` + `warning`). Yang berubah hanya dari mana triple-nya datang.
+Tanpa skema, tanpa migration, tanpa endpoint baru: kolom `Setting.data` bertipe `Json` dan bloknya
+dipasang `.default()` pada `zSetting`.

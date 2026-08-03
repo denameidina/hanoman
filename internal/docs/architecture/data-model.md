@@ -255,6 +255,23 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   panggilan** (tanpa cache) dari dalam `decide()` → ganti setelan **berlaku tanpa restart**, dikunci
   `server/test/lead-engine-argv.test.ts` yang memanggil `decide()` dua kali dalam satu proses
   dengan baris `Setting` berbeda di antaranya.
+- `changelog` (SPEC-518, `zAgentEngine`, **default MATI**) — runtime/model/effort **khusus agen
+  pembuat changelog** ([ADR-0105](../adr/0105-changelog-per-project.md)):
+  `{ enabled:false, agent:"claude", model:"claude-opus-5", effort:"xhigh" }`. Dibaca
+  `changelogAgentDefaults()` (`services/changelog/config.ts`) dan dipakai di **satu** call site —
+  `generateChangelog()`, satu-satunya tempat changelog men-spawn agen. **Opt-in**: selama `enabled`
+  mati helper mendelegasikan penuh ke `sessionAgentDefaults()`, jadi instalasi yang ada tak berubah
+  satu argv pun. Skemanya **`zAgentEngine` yang sama** dengan `lead.engine` & `telegram.engine`
+  (SPEC-492) — bukan definisi kelima; **flat**, bukan `changelog.engine`, karena bloknya hanya
+  override agen dan tak punya knob tetangga (cermin `conflict`). Effort codex dikoersi **di dalam
+  resolver**, bukan hanya di picker: `PUT /settings` ber-`AgentToken` tak melewati UI mana pun.
+  Ditambahkan sebagai `.default(CHANGELOG_ENGINE_DEFAULTS)` → baris Setting lama tetap parse,
+  **tanpa migration**. Permukaan operatornya kartu **"Agen changelog"** di Settings → Model sesi,
+  yang menulis lewat **`PUT /settings`** (bukan endpoint khusus seperti kartu lead, dan bukan
+  baca-ulang seperti kartu Telegram): blok ini **tak punya penulis kedua**. Nilainya dibaca
+  `getSetting()` tiap panggilan → ganti setelan berlaku pada pembangkitan berikutnya **tanpa
+  restart**, dikunci `server/test/changelog-engine.test.ts` yang memanggil `generateChangelog()`
+  dua kali dalam satu proses dengan baris `Setting` berbeda di antaranya.
 
 ## User / Session (auth — SPEC-169, [ADR-0028](../adr/0028-auth-sesi-opaque-di-db.md))
 - **User**: `id` (cuid), `email` (unique), `passwordHash` (`scrypt` "saltHex:hashHex"), `createdAt`.

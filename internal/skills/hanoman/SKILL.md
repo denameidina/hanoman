@@ -196,6 +196,18 @@ Pakai skill lebih sempit saat task cocok:
   menuntut satu digit **dan** satu huruf a–f (kalau tidak `1000000` terbaca sebagai sha);
   (5) "versi sebelumnya" diturunkan `git describe --abbrev=0 <tag>^` (**riwayat**), bukan urutan
   tanggal — tanggal tag anotasi beresolusi DETIK dan git jatuh ke urutan NAMA saat seri.
+  **Runtime/model/effort penarasinya punya setelan sendiri sejak SPEC-518** (tanpa ADR — ADR-0105
+  ditegakkan, hanya *dari mana triple-nya datang* yang berubah): blok **`Setting.changelog`**
+  bertipe **`zAgentEngine` yang SAMA** dengan `lead.engine`/`telegram.engine` (SPEC-492 — bukan
+  bentuk kelima), **flat** seperti `conflict` karena bloknya tak punya knob tetangga, dibaca
+  `changelogAgentDefaults()` di `services/changelog/config.ts`. **Opt-in**: mati = mendelegasikan
+  penuh ke `sessionAgentDefaults()`, persis perilaku pra-SPEC-518. Tanpa migration (kolom `Json` +
+  `.default()`), tanpa endpoint baru; kartu "Agen changelog" di Settings → Model sesi menulis lewat
+  **`PUT /settings`** — bukan endpoint khusus seperti kartu lead maupun baca-ulang seperti kartu
+  Telegram — karena blok itu **tak punya penulis kedua**. Effort codex dikoersi **di resolver**,
+  bukan hanya di picker (`PUT` ber-`AgentToken` tak lewat UI). `CHANGELOG_TIMEOUT_MS` sengaja
+  **tetap konstanta**: ia disebut di dalam prompt, dan anggaran yang bisa digeser diam-diam
+  berbohong kepada agennya (SPEC-432).
 - **Panduan AI agent punya URL** (SPEC-489, tanpa ADR — ADR-0065 & ADR-0099 **ditegakkan**):
   `docs/agent-integration.md` adalah **naskah tunggal**, disajikan mentah di
   **`GET /api/agent-integration.md`** (`text/markdown`, masuk daftar `PUBLIC` `app.ts` bersama
