@@ -2,8 +2,8 @@ import type { Changelog, Prisma } from "@prisma/client";
 import { type ChangelogRequest, defaultRange } from "@hanoman/shared";
 import { prisma } from "../../db";
 import { resolveRepoDir } from "../local-binding";
-import { sessionAgentDefaults } from "../settings";
 import { think, type ThinkOpts } from "../lead/brain";
+import { changelogAgentDefaults } from "./config";
 import { collectBacklog, collectCommits, collectVersions, type CollectResult } from "./collect";
 import { changelogPrompt, fallbackMarkdown } from "./render";
 import { scrubOutput } from "./scrub";
@@ -43,7 +43,11 @@ export async function generateChangelog(
   const input = got.input;
 
   const prompt = changelogPrompt(input, CHANGELOG_TIMEOUT_MS);
-  const { agent, model, effort } = await sessionAgentDefaults();
+  // SPEC-518 · runtime/model/effort punya setelan SENDIRI (opt-in; mati = mewarisi). Sebelumnya
+  // baris ini `sessionAgentDefaults()`, yang berarti menulis prosa rilis pendek selalu memakai
+  // model sesi kerja. Ini SATU-SATUNYA tempat changelog men-spawn agen — tak ada call site kedua
+  // untuk didivergensikan (kelas bug SPEC-431/448/475/481 tak berlaku di sini).
+  const { agent, model, effort } = await changelogAgentDefaults();
   const run = deps.think ?? think;
 
   let body = "";

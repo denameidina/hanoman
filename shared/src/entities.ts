@@ -229,6 +229,19 @@ export const zConflict = z.object({
 export type Conflict = z.infer<typeof zConflict>;
 export const CONFLICT_DEFAULTS: Conflict = zConflict.parse({});
 
+// SPEC-518 · runtime/model/effort KHUSUS agen pembuat changelog (SPEC-516/ADR-0105). Bentuknya
+// `zAgentEngine` yang sudah dipakai `lead.engine` & `telegram.engine` — bukan definisi kelima,
+// justru itu alasan bentuk bersama itu lahir di SPEC-492.
+//
+// FLAT, bukan `changelog.engine`: `lead`/`telegram` menyarangkan `engine` karena bloknya sudah
+// memuat knob lain (rem darurat, denyut, allowlist). Blok ini HANYA override agen — persis kasus
+// `zConflict` di atas, yang juga flat. Menyarangkan berarti satu tingkat kosong tanpa tetangga.
+//
+// Opt-in: `enabled` mati → `changelogAgentDefaults()` mendelegasikan penuh ke
+// `sessionAgentDefaults()`. Dipasang ke `zSetting` lewat `.default()` seperti conflict/goal/codex →
+// baris Setting lama tetap parse, TANPA migration.
+export const CHANGELOG_ENGINE_DEFAULTS: AgentEngine = zAgentEngine.parse({});
+
 // SPEC-409 · ADR-0091 · hanoman-lead. Master switch default MATI (AC-30): selama mati hanoman
 // berperilaku persis seperti sebelum PRD orchestrator. Kolom `Setting.data` bertipe Json →
 // blok ini TANPA migration, cermin scheduler/goal/conflict.
@@ -298,6 +311,7 @@ export const zSetting = z.object({
   conflict: zConflict.default(CONFLICT_DEFAULTS),                         // SPEC-383 · ADR-0081 · default sesi konflik rebase/merge
   lead: zLead.default(LEAD_DEFAULTS),                                     // SPEC-409 · ADR-0091 · hanoman-lead (default mati)
   telegram: zTelegramSettings.default(TELEGRAM_DEFAULTS),                 // SPEC-476 · ADR-0096 · gateway Telegram (default mati)
+  changelog: zAgentEngine.default(CHANGELOG_ENGINE_DEFAULTS),             // SPEC-518 · agen pembuat changelog (opt-in, mati)
 });
 export type Setting = z.infer<typeof zSetting>;
 

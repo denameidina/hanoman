@@ -389,6 +389,16 @@ GET/PUT  /settings                      # Setting blob (zSetting): model, effort
 #                                           dikoersi saat dibaca (coerceCodexEffort). Blok selalu ADA di
 #                                           response (zod .default()) → baris Setting lama tetap parse,
 #                                           TANPA migration. Tak ada override per-request di body integrate.
+#                                         changelog { enabled:false, agent:"claude", model:"claude-opus-5",
+#                                           effort:"xhigh" } — SPEC-518 · runtime/model/effort KHUSUS agen
+#                                           PEMBUAT CHANGELOG (ADR-0105). Skema = zAgentEngine yang SAMA dengan
+#                                           lead.engine & telegram.engine (SPEC-492), flat seperti `conflict`
+#                                           karena bloknya hanya override agen. OPT-IN: enabled:false →
+#                                           changelogAgentDefaults() mendelegasikan penuh ke
+#                                           sessionAgentDefaults(). Effort codex dikoersi di RESOLVER, bukan
+#                                           hanya di picker (PUT ber-AgentToken tak lewat UI). Blok selalu ADA
+#                                           di response (zod .default()) → baris Setting lama tetap parse,
+#                                           TANPA migration. Tak ada override per-request di body POST changelog.
 #                                         verifyScope: "changed"|"full" (default "changed") — SPEC-376/ADR-0080 ·
 #                                           scope verifikasi default sesi backlog; per sesi di-override saat Start.
 #                                           Kunci selalu ADA di response (zod .default()), jadi baris Setting lama
