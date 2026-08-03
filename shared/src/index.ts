@@ -11,6 +11,7 @@ export * from "./dto";
 export * from "./api";
 export * from "./coverage";
 export * from "./ticket-status";
+export * from "./prd-status";
 export * from "./session-kind";
 export * from "./config";
 export * from "./config-registry";

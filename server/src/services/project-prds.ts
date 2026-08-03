@@ -1,4 +1,4 @@
-import type { PrdDoc } from "@hanoman/shared";
+import { prdStatusOf, type PrdDoc, type PrdSpecTrace } from "@hanoman/shared";
 import { prisma } from "../db";
 import { listRepoDocs, readDocFile } from "./scan";
 import { resolveRepoDir } from "./local-binding";
@@ -32,20 +32,43 @@ async function resolveDir(
   return { dir: await resolveRepoDir(projectId), live: false };
 }
 
+// SPEC-520 · trace backlog untuk menghitung status PRD. Empat kolom saja dan TANPA filter di
+// SQL: `payload` bertipe `Json` sehingga `string_contains` Prisma tak seragam di SQLite,
+// sementara tabelnya kecil (337 baris / 294 KB payload di instalasi hidup terbesar) — menyaring
+// di JS lebih jujur dan sudah cukup.
+async function loadTraces(projectIds: string[]): Promise<Map<string, PrdSpecTrace[]>> {
+  const map = new Map<string, PrdSpecTrace[]>(projectIds.map((id) => [id, []]));
+  if (!projectIds.length) return map;
+  const rows = await prisma.spec.findMany({
+    where: { projectId: { in: projectIds } },
+    select: { projectId: true, stage: true, payload: true, branchFrom: true },
+  });
+  for (const r of rows)
+    map.get(r.projectId)?.push({ stage: r.stage, payload: r.payload, branchFrom: r.branchFrom });
+  return map;
+}
+
 export async function listPrds(
   projectId: string, sessions: ReturnType<typeof listSessions> = listSessions(),
+  // SPEC-520 · trace boleh disuntik pemanggil supaya daftar lintas-project tak jadi N+1.
+  traces?: readonly PrdSpecTrace[],
 ): Promise<PrdDoc[]> {
   const { dir, live } = await resolveDir(projectId, sessions);
   if (!dir) return [];
   const project = await prisma.project.findUnique({ where: { id: projectId }, select: { name: true } });
   const projectName = project?.name ?? projectId;
+  // Dihitung SESUDAH gerbang repoDir: project tanpa repoDir tak menyumbang PRD sama sekali,
+  // jadi tak perlu query trace-nya.
+  const specs = traces ?? (await loadTraces([projectId])).get(projectId) ?? [];
   return (await listRepoDocs(dir))
     .filter(isPrd)
     .map((rel) => {
       const slug = slugOf(rel);
+      const { status, specCount, doneCount } = prdStatusOf(rel, specs);
       return {
         slug, name: rel.slice(rel.lastIndexOf("/") + 1), path: rel,
         title: titleOf(readDocFile(dir, rel), slug), live, projectId, projectName,
+        status, specCount, doneCount,
       };
     })
     .sort((a, b) => a.slug.localeCompare(b.slug));
@@ -59,7 +82,11 @@ export async function listAllPrds(
   const projects = await prisma.project.findMany({
     orderBy: { createdAt: "desc" }, select: { id: true },
   });
-  const nested = await Promise.all(projects.map((p) => listPrds(p.id, sessions)));
+  // SPEC-520 · SATU query trace untuk semua project sekaligus; tanpa ini daftar lintas-project
+  // menembak `loadTraces` sekali per project.
+  const traces = await loadTraces(projects.map((p) => p.id));
+  const nested = await Promise.all(
+    projects.map((p) => listPrds(p.id, sessions, traces.get(p.id) ?? [])));
   return nested.flat();
 }
 

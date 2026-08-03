@@ -4,12 +4,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../src/api/client", () => ({
   api: {
     listPrds: vi.fn(async () => ({ items: [
-      { slug: "jadwal-invoice", name: "jadwal-invoice.md", path: "docs/prd/jadwal-invoice.md", title: "Jadwal Invoice", live: false, projectId: "p1", projectName: "P1" },
-      { slug: "notifikasi", name: "notifikasi.md", path: "docs/prd/notifikasi.md", title: "Notifikasi Realtime", live: true, projectId: "p1", projectName: "P1" },
+      { slug: "jadwal-invoice", name: "jadwal-invoice.md", path: "docs/prd/jadwal-invoice.md", title: "Jadwal Invoice", live: false, projectId: "p1", projectName: "P1", status: "draft", specCount: 0, doneCount: 0 },
+      { slug: "notifikasi", name: "notifikasi.md", path: "docs/prd/notifikasi.md", title: "Notifikasi Realtime", live: true, projectId: "p1", projectName: "P1", status: "dieskalasi", specCount: 3, doneCount: 1 },
+      { slug: "arsip", name: "arsip.md", path: "docs/prd/arsip.md", title: "Arsip Dokumen", live: false, projectId: "p1", projectName: "P1", status: "terwujud", specCount: 2, doneCount: 2 },
     ] })),
     listAllPrds: vi.fn(async () => ({ items: [
-      { slug: "jadwal-invoice", name: "jadwal-invoice.md", path: "docs/prd/jadwal-invoice.md", title: "Jadwal Invoice", live: false, projectId: "p1", projectName: "P1" },
-      { slug: "auth", name: "auth.md", path: "docs/prd/auth.md", title: "Auth Device", live: false, projectId: "p2", projectName: "Proyek B" },
+      { slug: "jadwal-invoice", name: "jadwal-invoice.md", path: "docs/prd/jadwal-invoice.md", title: "Jadwal Invoice", live: false, projectId: "p1", projectName: "P1", status: "draft", specCount: 0, doneCount: 0 },
+      { slug: "auth", name: "auth.md", path: "docs/prd/auth.md", title: "Auth Device", live: false, projectId: "p2", projectName: "Proyek B", status: "terwujud", specCount: 1, doneCount: 1 },
     ] })),
     getPrd: vi.fn(async () => ({ path: "docs/prd/jadwal-invoice.md", content: "# Jadwal Invoice\n\nRingkasan PRD" })),
     startPrd: vi.fn(),
@@ -35,7 +36,7 @@ describe("PrdScreen", () => {
     render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
     await waitFor(() => expect(screen.getByText("Jadwal Invoice")).toBeTruthy());
     expect(screen.getByText("Notifikasi Realtime")).toBeTruthy();
-    expect(screen.getByText("draft hidup")).toBeTruthy(); // notifikasi.live
+    expect(screen.getByText("sesi hidup")).toBeTruthy(); // notifikasi.live (SPEC-520 · ganti kata)
     expect(api.listPrds).toHaveBeenCalledWith("p1");
   });
 
@@ -127,6 +128,45 @@ describe("PrdScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /buat 2 backlog/i }));
     await waitFor(() => expect(onMat).toHaveBeenCalledWith("p1", "docs/prd/jadwal-invoice.md",
       expect.arrayContaining([expect.objectContaining({ title: "Endpoint jadwal" })])));
+  });
+
+  // SPEC-520 · status PRD terlihat di daftar, dan kata "draft" tak lagi dipakai lencana live.
+  // Assertion di-scope ke <aside aria-label="Daftar PRD">: Select filter merender
+  // <option>draft</option> dkk, jadi getByText polos akan cocok GANDA.
+  it("lencana status muncul dengan hitungan turunannya", async () => {
+    render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Jadwal Invoice")).toBeTruthy());
+    const list = within(screen.getByLabelText("Daftar PRD"));
+    expect(list.getByText("draft")).toBeTruthy();          // specCount 0 → tanpa hitungan
+    expect(list.getByText("dieskalasi 1/3")).toBeTruthy();
+    expect(list.getByText("terwujud 2/2")).toBeTruthy();
+  });
+
+  it("lencana sesi hidup tak lagi berbunyi 'draft hidup'", async () => {
+    render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Notifikasi Realtime")).toBeTruthy());
+    expect(screen.getByText("sesi hidup")).toBeTruthy();
+    expect(screen.queryByText("draft hidup")).toBeNull();
+  });
+
+  it("filter status menyempitkan daftar", async () => {
+    render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Jadwal Invoice")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Status PRD"), { target: { value: "draft" } });
+    await waitFor(() => expect(screen.queryByText("Notifikasi Realtime")).toBeNull());
+    expect(screen.getByText("Jadwal Invoice")).toBeTruthy();
+    expect(screen.queryByText("Arsip Dokumen")).toBeNull();
+  });
+
+  it("filter tanpa hasil memberi empty state yang menyebut statusnya", async () => {
+    (api.listPrds as any).mockResolvedValueOnce({ items: [
+      { slug: "jadwal-invoice", name: "jadwal-invoice.md", path: "docs/prd/jadwal-invoice.md", title: "Jadwal Invoice", live: false, projectId: "p1", projectName: "P1", status: "draft", specCount: 0, doneCount: 0 },
+    ] });
+    render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Jadwal Invoice")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Status PRD"), { target: { value: "terwujud" } });
+    await waitFor(() => expect(screen.getByText(/berstatus .terwujud./i)).toBeTruthy());
+    expect(screen.queryByText("Jadwal Invoice")).toBeNull();
   });
 });
 

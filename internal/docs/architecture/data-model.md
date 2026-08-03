@@ -608,6 +608,24 @@ ter-prefill dari PRD, tautan balik dibawa teks Konteks ("Dari PRD: <path>") buka
 SPEC-237/ADR-0057; breakdown = SPEC-273/ADR-0069; goal = SPEC-407/ADR-0089). Sesi shell "terminal biasa" (SPEC-236/ADR-0056) **tanpa flow** — bukan pipeline,
 tak menggerakkan stage; ditandai wire `{project, shell:true}`.
 
+**Status PRD (SPEC-520)** — **nilai turunan, bukan kolom** (ADR-0018/0019; PRD memang bukan
+entitas DB sehingga tak ada tempat menyimpannya). `PrdDoc` membawa `status` (`draft` ·
+`dieskalasi` · `terwujud`) + `specCount`/`doneCount`, dihitung `prdStatusOf()`
+(`shared/src/prd-status.ts`, murni) atas baris `Spec` project itu: nol turunan → `draft`;
+ada turunan tapi belum semuanya `done` → `dieskalasi`; semuanya `done` → `terwujud`.
+Kandidat **wajib** disaring `projectId` lebih dulu — dua project boleh punya
+`docs/prd/<slug>.md` bernama sama. Dua kunci jejak: **K1** path PRD **utuh** muncul di
+`payload.context` (`Dari PRD: <path>` / `Dari PRD (breakdown): <path>`) atau `payload.goal`
+(`Wujudkan PRD <path>`) — menanggung 25 dari 25 baris berjejak di instalasi hidup; **K2**
+`branchFrom === "prd/<slug>"` (SPEC-244) — nol tambahan hari ini, dipasang untuk backlog yang
+dibuat manual dari branch PRD. **Gotcha:** cocokkan **path utuh, bukan kata "PRD"** — SPEC-244,
+SPEC-273, dan SPEC-407 memuat kata itu di prosanya tanpa path apa pun, dan akhiran `.md`
+sekaligus yang membuat slug berawalan sama tak saling cocok (`docs/prd/auth.md` bukan substring
+`docs/prd/auth-device.md`). Baris prosa `> Status: Draft …` di dalam dokumen PRD **bukan**
+sumbernya: ia ditulis agen sekali saat PRD lahir dan tak punya penulis kedua. Field `live`
+(freshest-wins worktree sesi `prd`) menjawab pertanyaan lain dan tetap ortogonal — lencananya
+karena itu berbunyi **`sesi hidup`**, bukan lagi `draft hidup`.
+
 **Breakdown PRD (SPEC-273 · [ADR-0069](../adr/0069-breakdown-prd-ke-backlog-paralel.md))** — juga **bukan
 model DB**. Manifest = dokumen `docs/prd/<slug>.breakdown.md` (sibling PRD, dikecualikan dari daftar PRD);
 backlog hasil = baris `Spec` biasa (`source:"brief"`) dibuat lewat `POST /specs/batch`. Provenance PRD di

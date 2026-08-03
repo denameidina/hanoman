@@ -5,6 +5,7 @@ import {
   zLeadFlowStatus, zLeadSelect,
 } from "./lead";
 import { zAutoMerge } from "./auto-merge";
+import { zPrdStatus } from "./prd-status";
 import type { Spec, Notification } from "./entities";
 import { zProjectKind, zSpecSource, zPriority, zStage, zTicketCategory, zTicketStatus, zVerifyScope } from "./enums";
 
@@ -269,6 +270,12 @@ export const zPrdDoc = z.object({
   live: z.boolean(),
   projectId: z.string(),
   projectName: z.string(),
+  // SPEC-520 · status TURUNAN dari backlog yang lahir dari PRD ini (ADR-0018/0019) — bukan
+  // kolom, bukan prosa di dalam dokumennya. `live` di atas menjawab pertanyaan LAIN
+  // (freshest-wins dari worktree sesi prd hidup) dan sengaja tetap ortogonal.
+  status: zPrdStatus,
+  specCount: z.number().int().nonnegative(),
+  doneCount: z.number().int().nonnegative(),
 });
 export type PrdDoc = z.infer<typeof zPrdDoc>;
 

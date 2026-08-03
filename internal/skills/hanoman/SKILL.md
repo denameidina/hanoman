@@ -215,6 +215,18 @@ Pakai skill lebih sempit saat task cocok:
   render-dari-katalog (ADR-0100) karena sumbernya markdown; gantinya `agent-doc-contract.test.ts`
   mengikat naskah ke `CAPABILITY_DOMAINS`, daftar `COOKIE_ONLY`, `zSpecSource`, dan larangan token
   nyata — katalog bertambah → test merah → naskah ikut diperbarui.
+- **Status PRD adalah nilai turunan, bukan kolom** (SPEC-520, tanpa ADR — ADR-0018/0019 &
+  ADR-0041 & ADR-0069 **ditegakkan**): `PrdDoc.status` = `draft` (nol backlog turunan) ·
+  `dieskalasi` (ada, belum semua `done`) · `terwujud` (semua `done`), + `specCount`/`doneCount`,
+  dihitung `prdStatusOf()` (`shared/src/prd-status.ts`, murni) atas baris `Spec` **project yang
+  sama**. Dua kunci jejak yang sudah ada: path PRD **utuh** di `payload.context`/`payload.goal`
+  (25/25 baris berjejak di instalasi hidup) dan `branchFrom === "prd/<slug>"` (nol tambahan hari
+  ini, dipasang untuk backlog manual dari branch PRD). **Tiga gotcha:** (1) cocokkan **path utuh,
+  bukan kata "PRD"** — SPEC-244/273/407 menyebut kata itu tanpa path, dan akhiran `.md` yang
+  membuat slug berawalan sama tak saling cocok; (2) `listAllPrds` menarik trace **semua** project
+  dalam SATU query — memanggil `listPrds` polos per project mengubahnya jadi N+1; (3) baris prosa
+  `> Status: Draft …` di dalam dokumen PRD bukan sumbernya (ditulis agen sekali, tak punya
+  penulis kedua) dan lencana `live` karena itu berganti kata jadi **`sesi hidup`**.
 - **MCP server = `hanoman mcp`, KLIEN REST, bukan permukaan kedua** (SPEC-482/ADR-0099, memperluas
   ADR-0065): subcommand stdio di CLI yang memanggil `/api` dengan agent token yang sama, sehingga
   gate `onRequest` tetap satu-satunya otorisasi dan route cookie-only tak terjangkau **secara

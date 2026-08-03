@@ -8,7 +8,7 @@ import {
   DocDownload, LIST_SCREEN_STYLE, FIXED_ROW_STYLE,
 } from "../ds";
 import { api, type PrdDoc } from "../api/client";
-import type { BreakdownItem } from "@hanoman/shared";
+import { PRD_STATUSES, type BreakdownItem, type PrdStatus } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 import { prdBranchOf } from "./branch";
 
@@ -67,6 +67,19 @@ export function NewPrdModal({ projects, defaultProject, onClose, onCreate, prefi
   );
 }
 
+// SPEC-520 · lencana status turunan (draft · dieskalasi · terwujud). Yang punya backlog turunan
+// membawa hitungannya supaya "dieskalasi" tak perlu diklik untuk tahu seberapa jauh.
+const PRD_STATUS_TONE: Record<PrdStatus, "neutral" | "info" | "ok"> = {
+  draft: "neutral", dieskalasi: "info", terwujud: "ok",
+};
+function PrdStatusBadge({ prd }: { prd: PrdDoc }) {
+  return (
+    <Badge tone={PRD_STATUS_TONE[prd.status]} size="sm">
+      {prd.specCount > 0 ? `${prd.status} ${prd.doneCount}/${prd.specCount}` : prd.status}
+    </Badge>
+  );
+}
+
 // Preview inline (pane kanan) — baca isi PRD, take single ATAU breakdown ke banyak backlog (SPEC-273).
 function PrdPreviewPane({ prd, projectId, onTake, onStartBreakdown, onMaterialize }:
   { prd: PrdDoc; projectId: string; onTake: (p: PrdPrefill) => void;
@@ -112,7 +125,10 @@ function PrdPreviewPane({ prd, projectId, onTake, onStartBreakdown, onMaterializ
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
         <div style={{ minWidth: 0 }}>
           <div className="hn-eyebrow" style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", marginBottom: 4 }}>{prd.path}</div>
-          <div style={{ fontFamily: "var(--font-sans)", fontSize: 18, fontWeight: 700, color: "var(--text-strong)" }}>{prd.title}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ fontFamily: "var(--font-sans)", fontSize: 18, fontWeight: 700, color: "var(--text-strong)" }}>{prd.title}</div>
+            <PrdStatusBadge prd={prd} />
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
           {/* SPEC-361 · unduh PRD sebagai .md / .pdf untuk dibagikan ke tim */}
@@ -216,7 +232,10 @@ function PrdSidebarItem({ prd, active, onSelect }:
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3, flexWrap: "wrap" }}>
         <Icon name="scroll-text" size={13} color={active ? "var(--brass-700)" : "var(--brass-500)"} />
         <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: active ? "var(--brass-700)" : "var(--text-strong)" }}>{prd.title}</span>
-        {prd.live && <Badge tone="brass" size="sm">draft hidup</Badge>}
+        <PrdStatusBadge prd={prd} />
+        {/* SPEC-520 · dulu berbunyi "draft hidup"; kata "draft" kini milik status, dan PRD yang
+            hidup SEKALIGUS sudah dieskalasi akan memakai dua lencana yang saling membantah. */}
+        {prd.live && <Badge tone="brass" size="sm">sesi hidup</Badge>}
       </div>
       <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-subtle)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{prd.path}</div>
     </button>
@@ -236,11 +255,15 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
   const [items, setItems] = React.useState<PrdDoc[]>([]);
   const [sel, setSel] = React.useState<PrdDoc | null>(null);
   const [creating, setCreating] = React.useState(false);
+  // SPEC-520 · filter status disaring di KLIEN: daftar PRD tak berpaginasi server (pola yang
+  // sama dengan filter project di sebelahnya).
+  const [statusFilter, setStatusFilter] = React.useState<"all" | PrdStatus>("all");
   const all = projectFilter === "all";
   const activeProject = all ? "" : projectFilter; // project target untuk "PRD baru" (perlu satu project)
 
-  // Ganti project → buang seleksi. Refresh data (dataVersion) tak membuang seleksi agar preview stabil.
-  React.useEffect(() => { setSel(null); }, [projectFilter]);
+  // Ganti project / status → buang seleksi (item terpilih bisa tak ada lagi di daftar).
+  // Refresh data (dataVersion) tak membuangnya agar preview stabil.
+  React.useEffect(() => { setSel(null); }, [projectFilter, statusFilter]);
 
   React.useEffect(() => {
     let alive = true;
@@ -251,15 +274,23 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
     return () => { alive = false; };
   }, [projectFilter, dataVersion]);
 
-  const groups = groupByProject(items);
+  const visible = statusFilter === "all" ? items : items.filter((p) => p.status === statusFilter);
+  const groups = groupByProject(visible);
   const selProject = sel ? (sel.projectId || activeProject) : "";
   const selOpts = [{ value: "all", label: "Semua project" }].concat(projects.map((p) => ({ value: p.id, label: p.name })));
 
   return (
     <div style={LIST_SCREEN_STYLE}>
       <div style={{ ...FIXED_ROW_STYLE, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-        <Select size="sm" value={projectFilter} aria-label="Project"
-          onChange={(e) => onProjectFilter(e.target.value)} options={selOpts} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Select size="sm" value={projectFilter} aria-label="Project"
+            onChange={(e) => onProjectFilter(e.target.value)} options={selOpts} />
+          {/* SPEC-520 · memilah mana PRD yang masih perlu ditindaklanjuti tanpa membaca satu per satu. */}
+          <Select size="sm" value={statusFilter} aria-label="Status PRD"
+            onChange={(e) => setStatusFilter(e.target.value as "all" | PrdStatus)}
+            options={[{ value: "all", label: "Semua status" }]
+              .concat(PRD_STATUSES.map((s) => ({ value: s, label: s })))} />
+        </div>
         <Button size="sm" leftIcon="plus"
           onClick={() => setCreating(true)}>PRD baru</Button>
       </div>
@@ -272,6 +303,13 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
             <StateBlock kind="empty" icon="scroll-text" title="Belum ada PRD"
               hint="Buat PRD dari brief + brainstorm; hanoman menulisnya ke docs/prd/ lalu bisa di-take jadi backlog."
               action={() => setCreating(true)} actionLabel="PRD baru" />
+          ) : visible.length === 0 ? (
+            /* SPEC-520 · tersaring habis ≠ belum ada PRD — menyebut statusnya supaya operator
+               tahu filter mana yang harus dilonggarkan. */
+            <StateBlock kind="empty" icon="filter" compact
+              title={`Tak ada PRD berstatus "${statusFilter}"`}
+              hint="Longgarkan filter status untuk melihat PRD lainnya."
+              action={() => setStatusFilter("all")} actionLabel="Semua status" />
           ) : groups.map((g) => (
             <div key={g.projectId} style={{ marginBottom: 10 }}>
               {all && (
