@@ -228,7 +228,9 @@ export const api = {
   putIdeFile: (id: string, path: string, content: string) =>
     j<{ path: string; content: string }>(paths.ideFile(id), { method: "PUT", ...body({ path, content }) }),
   ideGraph: (id: string, limit = 200, opts?: { branches?: string[]; showRemote?: boolean; showTags?: boolean }) =>
-    j<{ commits: GraphCommit[]; current: string }>(paths.ideGraph(id, limit, opts)),
+    // SPEC-523 · `total` = commit terjangkau dari ref yang digambar. Graph tetap JENDELA
+    // tumbuh (SPEC-351), bukan halaman diskrit — lane butuh commit kontigu (ADR-0106).
+    j<{ commits: GraphCommit[]; current: string; total: number }>(paths.ideGraph(id, limit, opts)),
   // SPEC-233 · status working tree (baris uncommitted changes)
   ideStatus: (id: string) => j<RepoStatus>(paths.ideStatus(id)),
   ideSearch: (id: string, q: string, by = "all") => j<{ shas: string[] }>(paths.ideSearch(id, q, by)), // SPEC-233

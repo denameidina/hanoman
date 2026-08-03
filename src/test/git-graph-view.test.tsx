@@ -10,7 +10,7 @@ const commits = [
 
 beforeEach(() => {
   vi.restoreAllMocks();
-  vi.spyOn(api, "ideGraph").mockResolvedValue({ commits, current: "main" });
+  vi.spyOn(api, "ideGraph").mockResolvedValue({ commits, current: "main", total: 250 });
   vi.spyOn(api, "ideCommit").mockResolvedValue({ sha: "aaaa111", parents: ["bbbb222"], author: "t", at: "",
     subject: "kedua", body: "", changed: [{ path: "a.ts", add: 1, del: 0, status: "M", binary: false }],
     signed: false, committer: "t", committedAt: "", authorEmail: "t@t" });
@@ -42,7 +42,7 @@ describe("GitGraph", () => {
     const onRunGit = vi.fn().mockResolvedValue({});
     vi.spyOn(api, "ideGraph").mockResolvedValue({
       commits: [{ sha: "aaaa111", parents: [], author: "t", at: "2026-01-02T00:00:00Z", subject: "kedua", refs: ["feat", "origin/feat"], tags: [] }],
-      current: "main",
+      current: "main", total: 99,
     });
     render(<GitGraph projectId="p1" onRunGit={onRunGit} onMerge={vi.fn()} onRebase={vi.fn()} onPull={vi.fn()} onDrop={vi.fn()} onOpenFile={vi.fn()} />);
     fireEvent.contextMenu(await screen.findByText("kedua"));
@@ -63,7 +63,7 @@ describe("GitGraph", () => {
     const onRunGit = vi.fn().mockResolvedValue({});
     vi.spyOn(api, "ideGraph").mockResolvedValue({
       commits: [{ sha: "aaaa111", parents: [], author: "t", at: "2026-01-02T00:00:00Z", subject: "kedua", refs: ["origin/gone"], tags: [] }],
-      current: "main",
+      current: "main", total: 99,
     });
     render(<GitGraph projectId="p1" onRunGit={onRunGit} onMerge={vi.fn()} onRebase={vi.fn()} onPull={vi.fn()} onDrop={vi.fn()} onOpenFile={vi.fn()} />);
     fireEvent.contextMenu(await screen.findByText("kedua"));
@@ -77,7 +77,7 @@ describe("GitGraph", () => {
     const onRunGit = vi.fn().mockResolvedValue({}), onMerge = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(api, "ideGraph").mockResolvedValue({
       commits: [{ sha: "aaaa111", parents: [], author: "t", at: "2026-01-02T00:00:00Z", subject: "kedua", refs: ["origin/feat"], tags: [] }],
-      current: "main",
+      current: "main", total: 99,
     });
     render(<GitGraph projectId="p1" onRunGit={onRunGit} onMerge={onMerge} onRebase={vi.fn()} onPull={vi.fn()} onDrop={vi.fn()} onOpenFile={vi.fn()} />);
     fireEvent.contextMenu(await screen.findByText("kedua"));
@@ -92,7 +92,7 @@ describe("GitGraph", () => {
   it("mem-poll ideGraph ulang secara live tanpa aksi manual (SPEC-245)", async () => {
     vi.useFakeTimers();
     try {
-      const graph = vi.spyOn(api, "ideGraph").mockResolvedValue({ commits, current: "main" });
+      const graph = vi.spyOn(api, "ideGraph").mockResolvedValue({ commits, current: "main", total: 250 });
       vi.spyOn(api, "ideStatus").mockResolvedValue({ clean: true, branch: "main", ahead: 0, behind: 0, staged: [], unstaged: [], untracked: [] });
       vi.spyOn(api, "ideStashes").mockResolvedValue([]);
       render(<GitGraph projectId="p1" onRunGit={vi.fn()} onMerge={vi.fn()} onRebase={vi.fn()} onPull={vi.fn()} onDrop={vi.fn()} onOpenFile={vi.fn()} />);
@@ -110,7 +110,7 @@ describe("GitGraph", () => {
     const onMerge = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(api, "ideGraph").mockResolvedValue({
       commits: [{ sha: "aaaa111", parents: [], author: "t", at: "2026-01-02T00:00:00Z", subject: "kedua", refs: ["feat"], tags: [] }],
-      current: "main",
+      current: "main", total: 99,
     });
     render(<GitGraph projectId="p1" onRunGit={vi.fn()} onMerge={onMerge} onRebase={vi.fn()} onPull={vi.fn()} onDrop={vi.fn()} onOpenFile={vi.fn()} />);
     fireEvent.contextMenu(await screen.findByText("kedua"));
@@ -137,28 +137,28 @@ const render351 = () => render(<GitGraph projectId="p1" onRunGit={vi.fn()} onMer
 
 describe("GitGraph — jendela commit berhalaman (SPEC-351)", () => {
   it("halaman penuh: tampilkan hitungan + tombol muat lebih, bukan berhenti senyap", async () => {
-    vi.spyOn(api, "ideGraph").mockResolvedValue({ commits: page(200), current: "main" });
+    vi.spyOn(api, "ideGraph").mockResolvedValue({ commits: page(200), current: "main", total: 250 });
     render351();
-    expect(await screen.findByText(/200 commit dimuat/)).toBeInTheDocument();
+    expect(await screen.findByText(/200 dari 250 commit/)).toBeInTheDocument();
     expect(screen.getByText("Muat 200 lagi")).toBeInTheDocument();
     expect(screen.queryByText(/seluruh history/)).toBeNull();
   });
 
   it("history habis (halaman tak penuh): tandai seluruh history, tanpa tombol", async () => {
     render351(); // beforeEach: 2 commit
-    expect(await screen.findByText(/2 commit dimuat/)).toBeInTheDocument();
+    expect(await screen.findByText(/2 dari 250 commit/)).toBeInTheDocument();
     expect(screen.getByText(/seluruh history/)).toBeInTheDocument();
     expect(screen.queryByText(/Muat \d+ lagi/)).toBeNull();
   });
 
   it("muat lebih meminta halaman berikutnya (limit 400) dan merender commit lama", async () => {
     const graph = vi.spyOn(api, "ideGraph").mockImplementation(
-      async (_id: string, limit = 200) => ({ commits: page(Math.min(250, limit)), current: "main" }));
+      async (_id: string, limit = 200) => ({ commits: page(Math.min(250, limit)), current: "main", total: 250 }));
     render351();
     fireEvent.click(await screen.findByText("Muat 200 lagi"));
     await waitFor(() => expect(graph).toHaveBeenCalledWith("p1", 400, expect.anything()));
     expect(await screen.findByText("commit 249")).toBeInTheDocument();
-    expect(await screen.findByText(/250 commit dimuat/)).toBeInTheDocument();
+    expect(await screen.findByText(/250 dari 250 commit/)).toBeInTheDocument();
     expect(screen.queryByText(/Muat \d+ lagi/)).toBeNull(); // 250 < 400 → habis
   });
 
@@ -170,7 +170,7 @@ describe("GitGraph — jendela commit berhalaman (SPEC-351)", () => {
     });
     try {
       const graph = vi.spyOn(api, "ideGraph").mockImplementation(
-        async (_id: string, limit = 200) => ({ commits: page(Math.min(250, limit)), current: "main" }));
+        async (_id: string, limit = 200) => ({ commits: page(Math.min(250, limit)), current: "main", total: 250 }));
       render351();
       await screen.findByText("Muat 200 lagi");
       await act(async () => { fire!(); });
@@ -180,7 +180,7 @@ describe("GitGraph — jendela commit berhalaman (SPEC-351)", () => {
 
   it("ganti filter branch me-reset jendela ke halaman pertama", async () => {
     const graph = vi.spyOn(api, "ideGraph").mockImplementation(
-      async (_id: string, limit = 200) => ({ commits: page(Math.min(250, limit)), current: "main" }));
+      async (_id: string, limit = 200) => ({ commits: page(Math.min(250, limit)), current: "main", total: 250 }));
     render351();
     fireEvent.click(await screen.findByText("Muat 200 lagi"));
     await waitFor(() => expect(graph).toHaveBeenCalledWith("p1", 400, expect.anything()));

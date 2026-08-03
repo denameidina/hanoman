@@ -1925,7 +1925,7 @@ Graph **tidak** dikonversi ke halaman diskrit (lane butuh commit kontigu; SPEC-3
 **Interfaces:**
 - Produces: `listGraph(...)` → `{ commits: GraphCommit[]; current: string; total: number }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/ide-graph-total.test.ts`:
 
@@ -1968,14 +1968,14 @@ describe("listGraph total (SPEC-523)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/ide-graph-total.test.ts
 ```
 Diharapkan: GAGAL — `g.total` `undefined`.
 
-- [ ] **Step 3: Implementasi di `listGraph`**
+- [x] **Step 3: Implementasi di `listGraph`**
 
 Di `server/src/services/git-ide.ts`, ubah tanda tangan & badan `listGraph`:
 
@@ -2004,13 +2004,13 @@ export async function listGraph(repoDir: string | null, limit = 200, opts: Graph
 
 Catatan: `rev-list --count` dengan `--all` menghitung commit unik seluruh ref; dengan `--end-of-options <branch>` menghitung yang terjangkau dari branch itu. Ini persis himpunan yang digambar `git log`, jadi kedua angka sebanding.
 
-- [ ] **Step 4: Jalankan test, pastikan HIJAU**
+- [x] **Step 4: Jalankan test, pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/ide-graph-total.test.ts
 ```
 
-- [ ] **Step 5: Tampilkan sisanya di UI**
+- [x] **Step 5: Tampilkan sisanya di UI**
 
 Di `src/src/screens/GitGraph.tsx`:
 - tambah state di dekat `hasMore`:
@@ -2028,14 +2028,14 @@ Di `src/src/screens/GitGraph.tsx`:
           </span>
 ```
 
-- [ ] **Step 6: Jalankan test git graph UI bila ada**
+- [x] **Step 6: Jalankan test git graph UI bila ada**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run $(ls src/test/*graph* 2>/dev/null | tr '\n' ' ')
 ```
 Diharapkan: lulus. Mock `ideGraph` yang mengembalikan `{commits, current}` tanpa `total` tetap aman (`?? 0`).
 
-- [ ] **Step 7: Typecheck + commit**
+- [x] **Step 7: Typecheck + commit**
 
 ```bash
 pnpm --filter ./server typecheck && pnpm --filter ./src typecheck

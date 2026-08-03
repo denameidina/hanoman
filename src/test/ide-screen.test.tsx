@@ -55,7 +55,7 @@ describe("IdeScreen Explorer", () => {
 // SPEC-229 · merge via git graph: konflik → pindah Terminal (sesi claude); bersih → toast; error → toast.
 describe("IdeScreen merge git graph", () => {
   beforeEach(() => {
-    vi.spyOn(api, "ideGraph").mockResolvedValue({ current: "main", commits: [
+    vi.spyOn(api, "ideGraph").mockResolvedValue({ current: "main", total: 1, commits: [
       { sha: "aaaaaaa", parents: [], author: "t", at: new Date(0).toISOString(), subject: "c1", refs: ["origin/feat"], tags: [] },
     ] });
   });
