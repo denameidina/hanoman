@@ -12,9 +12,9 @@ import { AccountMenu } from "../auth/AccountMenu";
 // Setiap key WAJIB punya cabang `section === …` di App.tsx. Bila tidak, `screen` tetap
 // null dan App merender kosong — sidebar ikut hilang, pengguna terjebak sampai reload.
 // `runs` dan `triggers` pernah begitu: screen-nya lenyap bersama subsistem run (SPEC-162),
-// entri navnya tertinggal.
-type NavItem = { key: string; label: string; icon: string };
-const HN_NAV: NavItem[] = [
+// entri navnya tertinggal. Kontraknya kini dijaga test: `src/test/changelog-nav.test.tsx`.
+export type NavItem = { key: string; label: string; icon: string };
+export const HN_NAV: NavItem[] = [
   { key: "overview", label: "Overview", icon: "layout-dashboard" },
   { key: "projects", label: "Projects", icon: "layout-grid" },
   { key: "prd", label: "PRD", icon: "scroll-text" },
@@ -26,6 +26,7 @@ const HN_NAV: NavItem[] = [
   { key: "ide", label: "IDE", icon: "code-2" },
   { key: "vps", label: "VPS", icon: "server" },
   { key: "docs", label: "Docs · SoT", icon: "book-open" },
+  { key: "changelog", label: "Changelog", icon: "megaphone" },   // SPEC-519 · rilis untuk pemakai
   { key: "settings", label: "Settings", icon: "settings" },
 ];
 

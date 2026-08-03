@@ -13,7 +13,7 @@ import { AuthScreen } from "./screens/AuthScreen";
 import { AuthProvider } from "./auth/AuthContext";
 import type { ProjectVM } from "./screens/types";
 import { branchOptions } from "./screens/branch";
-import { parseSpecHash } from "./screens/deeplink";
+import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
 import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
@@ -27,6 +27,7 @@ import { VpsScreen } from "./screens/VpsScreen";
 import { SchedulerScreen } from "./screens/SchedulerScreen";
 import { LeadScreen } from "./screens/LeadScreen";
 import { DocsWorkspace } from "./screens/DocsWorkspace";
+import { ChangelogScreen } from "./screens/ChangelogScreen";
 import { ReviewScreen } from "./screens/ReviewScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 
@@ -595,6 +596,8 @@ export default function App() {
   const [section, setSection] = React.useState("overview");
   // SPEC-293 · deep-link #spec=<id> (buka backlog + SpecDetail saat mount). Diteruskan ke BacklogScreen.
   const [openSpecId, setOpenSpecId] = React.useState<string | null>(null);
+  // SPEC-519 · deep-link #changelog=<projectId>[&cl=<id>] — rilis yang harus terbuka saat mount.
+  const [openChangelogId, setOpenChangelogId] = React.useState<string | null>(null);
   const [projects, setProjects] = React.useState<ProjectView[]>([]);
   const [backlog, setBacklog] = React.useState<Spec[]>([]);
   // SPEC-198 · dinaikkan tiap backlog/sessions berubah (load + poll). Layar daftar yang
@@ -630,11 +633,23 @@ export default function App() {
   // "Buka backlog" di Triase) → langsung ke section backlog + SpecDetail. Hash dibersihkan
   // agar tak memicu ulang. Sekali-mount (ADR-0071); bukan router SPA umum.
   React.useEffect(() => {
+    const clean = () => window.history.replaceState(null, "", window.location.pathname + window.location.search);
     const id = parseSpecHash(window.location.hash);
     if (id) {
       setSection("backlog");
       setOpenSpecId(id);
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      clean();
+      return;
+    }
+    // SPEC-519 · `#changelog=<projectId>[&cl=<id>]`, saling eksklusif dengan `#spec=`: satu hash,
+    // satu section. `setProjectId` di sini menang atas default `load()` — load memakai
+    // `(cur) => cur || items[0]`, jadi nilai dari hash tak ditimpa.
+    const cl = parseChangelogHash(window.location.hash);
+    if (cl) {
+      setSection("changelog");
+      setProjectId(cl.projectId);
+      setOpenChangelogId(cl.changelogId);
+      clean();
     }
   }, []);
 
@@ -1206,6 +1221,28 @@ export default function App() {
           ? <DocsWorkspace projectId={proj.id} projectName={proj.name} docStatus={proj.docStatus} />
           : <StateBlock kind="empty" icon="book-open" title="Belum ada project"
               hint="Source of Truth muncul setelah ada project yang dipantau."
+              action={() => setModal("project")} actionLabel="Project baru" />)}
+      </Shell>
+    );
+  } else if (section === "changelog") {
+    // SPEC-519 · halaman changelog: entri sidebar sendiri + deep-link `#changelog=<projectId>`.
+    // Pemilih project di `actions` mengikuti pola section "docs" — satu sumber "project yang
+    // sedang dibuka" (projectId), bukan `projectFilter` yang bermakna "daftar disaring ke mana".
+    screen = (
+      <Shell active="changelog" title="Changelog"
+        breadcrumb={proj ? proj.name + " · rilis untuk pemakai" : "workspace"} onNavigate={setSection}
+        actions={proj && <>
+          <Select size="sm" aria-label="Project" value={proj.id} onChange={(e) => setProjectId(e.target.value)}
+            options={projectsView.map((x) => ({ value: x.id, label: x.name }))} />
+          <Button size="sm" variant="ghost" leftIcon="link" onClick={() => {
+            void navigator.clipboard?.writeText(changelogDeepLink(proj.id));
+            showToast("Link halaman changelog disalin", "ok", "link");
+          }}>Salin link</Button>
+        </>}>
+        {gate(proj
+          ? <ChangelogScreen p={proj} onToast={showToast} initialChangelogId={openChangelogId} />
+          : <StateBlock kind="empty" icon="megaphone" title="Belum ada project"
+              hint="Changelog muncul setelah ada project yang dipantau."
               action={() => setModal("project")} actionLabel="Project baru" />)}
       </Shell>
     );
