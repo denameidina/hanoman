@@ -99,3 +99,32 @@ export async function conflictSessionDefaults(): Promise<{ agent: Agent; model: 
     ? { agent: "codex", model: c.model, effort: coerceCodexEffort(c.model, c.effort) }
     : { agent: "claude", model: c.model, effort: c.effort };
 }
+
+/**
+ * SPEC-517 · default untuk TERMINAL AGEN BIASA (`POST /terminal/sessions {project}`), dengan
+ * override per-request. Cermin `conflictSessionDefaults()`, tapi sumber override-nya request —
+ * bukan blok Setting — karena pilihannya dibuat operator di form saat sesi dibuat.
+ *
+ * Aturan mengikat: `o.agent` yang terisi memilih BLOK Setting agen itu, bukan sekadar menukar
+ * nama biner. Membaca `Setting.model` untuk sesi codex melahirkan `codex -m claude-opus-5` —
+ * persis bug SPEC-377. Pemanggil WAJIB menurunkan `ensureCodexTrust` dari `agent` HASIL fungsi
+ * ini, bukan dari `Setting.agent`: sejak SPEC-517 keduanya bisa berbeda di jalur ini.
+ *
+ * Effort codex dikoersi di sini (cermin `normalizeCodex`/`conflictSessionDefaults`) supaya picker
+ * dan argv tak pernah berselisih; `createSession` tetap titik cekik terakhirnya (SPEC-339).
+ */
+export async function terminalAgentDefaults(
+  o: { agent?: Agent; model?: string; effort?: string },
+): Promise<{ agent: Agent; model: string; effort: string }> {
+  const s = await getSetting();
+  const base = o.agent
+    ? (o.agent === "codex"
+      ? { agent: "codex" as const, model: s.codex.model, effort: s.codex.effort }
+      : { agent: "claude" as const, model: s.model, effort: s.effort })
+    : agentDefaultsOf(s);
+  const model = o.model ?? base.model;
+  const effort = o.effort ?? base.effort;
+  return base.agent === "codex"
+    ? { agent: "codex", model, effort: coerceCodexEffort(model, effort) }
+    : { agent: "claude", model, effort };
+}

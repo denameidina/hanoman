@@ -188,7 +188,7 @@ git commit -m "feat(spec-517): varian terminal agen biasa menerima override runt
   ): Promise<{ agent: Agent; model: string; effort: string }>
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/terminal-agent-defaults.test.ts`:
 
@@ -251,7 +251,7 @@ describe("terminalAgentDefaults", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/terminal-agent-defaults.test.ts
@@ -259,7 +259,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `terminalAgentDefaults` belum diekspor.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Tambahkan di `server/src/services/settings.ts`, sesudah `conflictSessionDefaults`:
 
@@ -294,7 +294,7 @@ export async function terminalAgentDefaults(
 }
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/terminal-agent-defaults.test.ts
@@ -302,7 +302,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS (7 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/settings.ts server/test/terminal-agent-defaults.test.ts
