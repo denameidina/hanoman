@@ -9,10 +9,21 @@ const sources = {
   defaultRange: { from: "2026-07-05", to: "2026-08-03" },
 };
 
+// SPEC-523 · daftar tersimpan berhalaman. Halaman 2 mengembalikan judul lain supaya "mengganti"
+// dan "menambah" tak bisa tertukar.
+const changelog = (i: number) => ({
+  id: `c${i}`, projectId: "p1", mode: "backlog", title: `changelog ${i}`, params: {},
+  body: "# x", generator: "agent", warning: null, itemCount: 1,
+  createdAt: "2026-08-03T00:00:00.000Z",
+});
+const listChangelogs = vi.fn(async (_id: string, p: { page?: number; limit?: number } = {}) => ({
+  items: [changelog((p.page ?? 1) === 1 ? 1 : 99)], total: 25, page: p.page ?? 1, pageSize: 10,
+}));
+
 vi.mock("../api/client", () => ({
   api: {
     changelogSources: vi.fn(async () => sources),
-    listChangelogs: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 0 })),
+    listChangelogs: (id: string, p?: never) => listChangelogs(id, p ?? {}),
     generateChangelog: vi.fn(async () => ({
       id: "c1", projectId: "p1", mode: "backlog", title: "Juli", params: {},
       body: "# Changelog — Juli\n\n- **Butir** — manfaatnya.\n",
@@ -25,6 +36,22 @@ vi.mock("../api/client", () => ({
 const props = { p: { id: "p1", name: "p1" } as never, onToast: vi.fn() };
 
 beforeEach(() => vi.clearAllMocks());
+
+describe("ChangelogPanel paginasi tersimpan (SPEC-523)", () => {
+  it("mengirim page saat meminta daftar tersimpan", async () => {
+    render(<ChangelogPanel {...props} />);
+    await waitFor(() => expect(screen.getByText("changelog 1")).toBeInTheDocument());
+    expect(listChangelogs).toHaveBeenCalledWith("p1", { page: 1, limit: 10 });
+  });
+
+  it("Berikutnya mengganti daftar tersimpan dengan halaman 2", async () => {
+    render(<ChangelogPanel {...props} />);
+    await waitFor(() => expect(screen.getByText("changelog 1")).toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText("Berikutnya"));
+    await waitFor(() => expect(screen.getByText("changelog 99")).toBeInTheDocument());
+    expect(screen.queryByText("changelog 1")).not.toBeInTheDocument();
+  });
+});
 
 describe("ChangelogPanel", () => {
   it("mode backlog terpilih awal, rentang terisi default dari sources", async () => {

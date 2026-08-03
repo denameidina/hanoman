@@ -1685,7 +1685,7 @@ EOF
 - Modify: `src/src/screens/ChangelogPanel.tsx:27-31,166-178`
 - Test: `src/src/screens/ChangelogPanel.test.tsx` (tambah kasus)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/src/screens/ChangelogPanel.test.tsx`, dan ubah mock `listChangelogs` di kepala berkas jadi:
 
@@ -1720,14 +1720,14 @@ Tambahkan test:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/src/screens/ChangelogPanel.test.tsx
 ```
 Diharapkan: dua test baru GAGAL — `listChangelogs` dipanggil tanpa `page` (kontrol negatif atas cacat hari ini).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/screens/ChangelogPanel.tsx`:
 - tambahkan konstanta di atas komponen:
@@ -1764,14 +1764,14 @@ function SavedPager({ total, page, onPage }: { total: number; page: number; onPa
 ```
 - tambahkan `Pager, serverPage` ke impor `../ds`.
 
-- [ ] **Step 4: Jalankan test, pastikan HIJAU**
+- [x] **Step 4: Jalankan test, pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/src/screens/ChangelogPanel.test.tsx
 ```
 Diharapkan: seluruh test lulus (termasuk yang lama).
 
-- [ ] **Step 5: Typecheck + commit**
+- [x] **Step 5: Typecheck + commit**
 
 ```bash
 pnpm --filter ./src typecheck

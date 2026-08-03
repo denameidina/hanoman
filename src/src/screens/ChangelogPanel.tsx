@@ -2,11 +2,21 @@
    mode. Panggilan agen bisa puluhan detik, jadi statusnya eksplisit: tombol berubah teks dan
    nonaktif, bukan spinner bisu. */
 import React from "react";
-import { Card, Button, Badge, Input, Select, Field, MarkdownView, Callout } from "../ds";
+import { Card, Button, Badge, Input, Select, Field, MarkdownView, Callout, Pager, serverPage } from "../ds";
 import { api } from "../api/client";
 import { paths } from "@hanoman/shared";
 import type { ChangelogView, ChangelogSources, ChangelogRequest } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
+
+// SPEC-523 · ukuran halaman daftar tersimpan. Sebelumnya `limit: 10` dikirim TANPA `page`, jadi
+// angka itu bukan halaman melainkan PLAFON: changelog ke-11 dst permanen tak terjangkau dari UI.
+const SAVED_PAGE = 10;
+
+/* Pager DS untuk daftar changelog tersimpan. */
+function SavedPager({ total, page, onPage }: { total: number; page: number; onPage: (n: number) => void }) {
+  const sp = serverPage(total, page, SAVED_PAGE);
+  return <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to} onPage={onPage} unit="changelog" />;
+}
 
 type Mode = "backlog" | "commit" | "version";
 const MODE_TABS: Array<{ mode: Mode; label: string; hint: string }> = [
@@ -25,10 +35,16 @@ export function ChangelogPanel({ p, onToast }:
   const [busy, setBusy] = React.useState(false);
   const [result, setResult] = React.useState<ChangelogView | null>(null);
   const [saved, setSaved] = React.useState<ChangelogView[]>([]);
+  const [savedTotal, setSavedTotal] = React.useState(0);
+  const [savedPage, setSavedPage] = React.useState(1);
 
+  // SPEC-523 · `page` ikut dikirim. Tanpa itu, `limit: 10` bukan halaman melainkan plafon.
   const reloadSaved = React.useCallback(async () => {
-    try { setSaved((await api.listChangelogs(p.id, { limit: 10 })).items); } catch { /* daftar opsional */ }
-  }, [p.id]);
+    try {
+      const r = await api.listChangelogs(p.id, { page: savedPage, limit: SAVED_PAGE });
+      setSaved(r.items); setSavedTotal(r.total);
+    } catch { /* daftar opsional */ }
+  }, [p.id, savedPage]);
 
   React.useEffect(() => {
     let alive = true;
@@ -163,7 +179,7 @@ export function ChangelogPanel({ p, onToast }:
         </div>
       )}
 
-      {saved.length > 0 && (
+      {savedTotal > 0 && (
         <div style={{ marginTop: 16 }}>
           <div className="hn-eyebrow" style={{ marginBottom: 6 }}>Tersimpan</div>
           {saved.map((c) => (
@@ -175,6 +191,7 @@ export function ChangelogPanel({ p, onToast }:
                 onClick={() => void remove(c.id)} />
             </div>
           ))}
+          <SavedPager total={savedTotal} page={savedPage} onPage={setSavedPage} />
         </div>
       )}
     </Card>
