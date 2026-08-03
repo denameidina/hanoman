@@ -140,6 +140,52 @@ Error (dicabut ADR-0092), PRD/docs (pohon, bukan daftar rata), dan git graph (pe
 ditulis eksplisit di ADR-0106. Objective menyebut sepuluh daftar; tiga di antaranya tak bisa
 dipenuhi apa adanya, dan alasannya harus terbaca supaya audit berikutnya tak "memperbaikinya".
 
+## Acceptance criteria (EARS)
+
+**Kontrak amplop**
+- AC-1 — THE SYSTEM SHALL menjawab setiap endpoint daftar utama (`/specs`, `/projects`,
+  `/tickets`, `/notifications`, `/terminal/history`, `/scheduler/queue`, `/lead/decisions`,
+  `/lead/flows`, `/projects/:id/changelog`, `/projects/:id/github/issues`) dengan amplop
+  `{ items, total, page, pageSize }`.
+- AC-2 — WHEN permintaan membawa `page` dan `limit`, THE SYSTEM SHALL mengembalikan paling
+  banyak `limit` item dan `total` yang menghitung **seluruh** baris tersaring, bukan halaman itu.
+- AC-3 — IF `page` melampaui halaman terakhir, THEN THE SYSTEM SHALL mengembalikan `items: []`
+  dengan `total` yang tetap benar (bukan galat).
+
+**Notifikasi**
+- AC-4 — WHEN `GET /notifications` dipanggil **tanpa** `limit`, THE SYSTEM SHALL mengembalikan
+  50 notifikasi terbaru — persis seperti sebelum perubahan ini.
+- AC-5 — THE SYSTEM SHALL menyertakan `total` (hitungan penuh) pada frame siar WebSocket
+  `notifications` maupun pada balasan HTTP.
+- AC-6 — THE SYSTEM SHALL menghitung `unread` dari seluruh baris belum terbaca, tak pernah
+  dari halaman yang sedang ditampilkan.
+- AC-7 — WHEN operator membuka "Semua notifikasi" dan menekan halaman berikutnya, THE SYSTEM
+  SHALL **mengganti** isi daftar dengan halaman itu.
+
+**Scheduler**
+- AC-8 — THE SYSTEM SHALL mengembalikan `queueCounts` per status pada `GET /scheduler/state`
+  dan tidak lagi mengembalikan `queue`.
+- AC-9 — WHEN `GET /scheduler/queue` dipanggil dengan `status`, THE SYSTEM SHALL menyaring
+  di query DB, bukan di klien.
+
+**Lead**
+- AC-10 — WHEN permintaan `GET /lead/decisions` atau `/lead/flows` membawa `take`/`skip` saja,
+  THE SYSTEM SHALL berperilaku persis seperti sebelum perubahan ini.
+- AC-11 — IF permintaan membawa `page`/`limit` **dan** `take`/`skip`, THEN THE SYSTEM SHALL
+  memakai `page`/`limit`.
+
+**Git graph — pengecualian yang dinyatakan**
+- AC-12 — THE SYSTEM SHALL mempertahankan jendela tumbuh SPEC-351 pada git graph dan tidak
+  memecahnya jadi halaman diskrit.
+- AC-13 — THE SYSTEM SHALL menyertakan `total` commit terjangkau pada balasan graph, dan UI
+  SHALL menampilkan "N dari T commit" di baris muat-lebih.
+
+**Perilaku UI bersama**
+- AC-14 — WHILE `total ≤ pageSize`, THE SYSTEM SHALL tidak merender kontrol halaman.
+- AC-15 — WHEN operator mengubah filter sebuah daftar, THE SYSTEM SHALL kembali ke halaman 1.
+- AC-16 — THE SYSTEM SHALL memakai komponen `Pager` design system pada setiap daftar berhalaman —
+  tak ada paginator kedua.
+
 ## Bentuk perubahan
 
 ### Server
