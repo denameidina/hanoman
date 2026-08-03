@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { zChangelogRequest, defaultRange } from "@hanoman/shared";
+import { zChangelogRequest, defaultRange, changelogMatches } from "@hanoman/shared";
 import { prisma } from "../db";
 import { resolveRepoDir } from "../services/local-binding";
 import { paginate } from "../services/paginate";
@@ -47,9 +47,11 @@ export default async function (app: FastifyInstance) {
   app.get("/projects/:id/changelog", async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!await prisma.project.findUnique({ where: { id } })) return reply.code(404).send({ error: "not found" });
-    const { page, limit } = req.query as { page?: string; limit?: string };
+    // SPEC-519 · `q` disaring di layer response SEBELUM `paginate` (ADR-0038) — kalau sesudah,
+    // `total` menghitung seluruh baris dan Pager menjanjikan halaman yang isinya tak pernah ada.
+    const { page, limit, q } = req.query as { page?: string; limit?: string; q?: string };
     const rows = await prisma.changelog.findMany({ where: { projectId: id }, orderBy: { createdAt: "desc" } });
-    return paginate(rows.map(view), page, limit);
+    return paginate(rows.filter((r) => changelogMatches(r, q ?? "")).map(view), page, limit);
   });
 
   app.get("/projects/:id/changelog/:cid", async (req, reply) => {

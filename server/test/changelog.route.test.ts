@@ -76,6 +76,31 @@ describe("GET /projects/:id/changelog", () => {
     expect(j.total).toBe(2);
     expect(j.items).toHaveLength(1);
   });
+
+  // SPEC-519 · cari dijalankan SEBELUM paginate, jadi `total` ikut menyusut — kalau tidak,
+  // Pager menjanjikan halaman yang isinya tak pernah ada.
+  it("q menyaring dan total ikut hasil cari", async () => {
+    await gen({ mode: "backlog", from: "2026-07-01", to: "2026-07-31" });
+    await prisma.changelog.create({ data: {
+      projectId: "p1", mode: "version", title: "v9.9.9", params: {},
+      body: "- **Telegram** — notifikasi masuk.", generator: "agent", itemCount: 1 } });
+
+    const hit = await app.inject({ url: "/api/projects/p1/changelog?q=telegram" });
+    expect(hit.json().total).toBe(1);
+    expect(hit.json().items[0].title).toBe("v9.9.9");
+
+    const miss = await app.inject({ url: "/api/projects/p1/changelog?q=zzzz" });
+    expect(miss.json().total).toBe(0);
+    expect(miss.json().items).toEqual([]);
+  });
+
+  it("q kosong berperilaku persis seperti tanpa q", async () => {
+    await gen({ mode: "backlog", from: "2026-07-01", to: "2026-07-31" });
+    const withQ = await app.inject({ url: "/api/projects/p1/changelog?q=" });
+    const without = await app.inject({ url: "/api/projects/p1/changelog" });
+    expect(withQ.json().total).toBe(without.json().total);
+    expect(withQ.json().total).toBe(1);
+  });
 });
 
 describe("GET /projects/:id/changelog/sources", () => {
