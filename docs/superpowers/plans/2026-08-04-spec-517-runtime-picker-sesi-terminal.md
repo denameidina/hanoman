@@ -453,7 +453,7 @@ git commit -m "feat(spec-517): POST /terminal/sessions menghormati runtime pilih
   export function runtimeFor(defs: RuntimeDefs, agent: Agent): { model: string; effort: string };
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/session-runtime.test.ts`:
 
@@ -500,7 +500,7 @@ describe("session-runtime", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/session-runtime.test.ts
@@ -508,7 +508,7 @@ env -u NODE_ENV pnpm vitest --run src/test/session-runtime.test.ts
 
 Expected: FAIL — modul `../src/screens/session-runtime` belum ada.
 
-- [ ] **Step 3: Implementasi helper**
+- [x] **Step 3: Implementasi helper**
 
 Buat `src/src/screens/session-runtime.ts`:
 
@@ -548,7 +548,7 @@ export function runtimeFor(defs: RuntimeDefs, agent: Agent): { model: string; ef
 }
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/session-runtime.test.ts
@@ -556,7 +556,7 @@ env -u NODE_ENV pnpm vitest --run src/test/session-runtime.test.ts
 
 Expected: PASS (5 test).
 
-- [ ] **Step 5: Pakai helper di `StartSessionModal` (perilaku identik)**
+- [x] **Step 5: Pakai helper di `StartSessionModal` (perilaku identik)**
 
 Di `src/src/App.tsx`, tambahkan import:
 
@@ -590,7 +590,7 @@ Hapus import `MODELS`, `EFFORTS`, `CODEX_MODELS`, `codexEfforts` dari `App.tsx` 
 tak ada pemakai lain di berkas itu (`rtk proxy grep -n "MODELS\|EFFORTS\|codexEfforts" src/src/App.tsx`).
 `coerceCodexEffort` tetap dipakai `pickModel`.
 
-- [ ] **Step 6: Test StartSessionModal tak berubah perilaku**
+- [x] **Step 6: Test StartSessionModal tak berubah perilaku**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/start-session-agent.test.tsx src/test/start-session-model.test.tsx
@@ -599,7 +599,7 @@ env -u NODE_ENV pnpm vitest --run src/test/start-session-agent.test.tsx src/test
 Expected: PASS — semuanya, tanpa satu pun test diubah. Kalau ada yang merah, refactor-nya tidak
 setara; kembalikan dan perbaiki, jangan menyunting testnya.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/session-runtime.ts src/test/session-runtime.test.ts src/src/App.tsx

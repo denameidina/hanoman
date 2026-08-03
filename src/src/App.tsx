@@ -8,7 +8,10 @@ import { Shell, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Swi
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem } from "@hanoman/shared";
-import { flowForSource, MODELS, EFFORTS, CODEX_MODELS, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, type Agent, type VerifyScope, type AutoMerge } from "@hanoman/shared";
+import { flowForSource, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, type Agent, type VerifyScope, type AutoMerge } from "@hanoman/shared";
+// SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
+// di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
+import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
 import { AuthScreen } from "./screens/AuthScreen";
 import { AuthProvider } from "./auth/AuthContext";
 import type { ProjectVM } from "./screens/types";
@@ -60,7 +63,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // agen HARUS menukar keduanya, kalau tidak sesi lahir dengan `codex -m claude-opus-5`.
   const [agent, setAgent] = React.useState<Agent>("claude");
   // Default per agen dari setelan global, dipakai saat picker agen berpindah.
-  const [defs, setDefs] = React.useState<Record<Agent, { model: string; effort: string }>>({
+  const [defs, setDefs] = React.useState<RuntimeDefs>({
     claude: { model: "claude-opus-5", effort: "xhigh" },
     codex: { ...CODEX_DEFAULTS },
   });
@@ -79,7 +82,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     api.getSettings().then((s) => {
       // `?? `: server selalu mengirim keduanya (zod .default()), tapi respons yang di-cache
       // sebelum SPEC-338 belum punya — jangan sampai picker-nya kosong.
-      const d: Record<Agent, { model: string; effort: string }> = {
+      const d: RuntimeDefs = {
         claude: { model: s.model, effort: s.effort },
         codex: { ...CODEX_DEFAULTS, ...(s.codex ?? {}) },
       };
@@ -100,9 +103,12 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   }, [open, spec]);
   const pickAgent = (a: Agent) => {
     setAgent(a);
-    setModel(defs[a].model);
     // SPEC-339 · default global bisa saja pasangan lama yang kini tak sah — koreksi saat dipasang.
-    setEffort(a === "codex" ? coerceCodexEffort(defs[a].model, defs[a].effort) : defs[a].effort);
+    // SPEC-517 · aturannya (blok agen terpilih + koersi effort codex) hidup di session-runtime.ts,
+    // sumber yang sama dengan picker "Sesi baru" di Terminal.
+    const r = runtimeFor(defs, a);
+    setModel(r.model);
+    setEffort(r.effort);
   };
   // SPEC-339 · menukar model bisa membuat effort terpilih jadi tak sah (Luna tak punya `ultra`).
   // Turunkan SEKARANG supaya perubahannya terlihat di picker, bukan diam-diam saat sesi lahir.
@@ -110,9 +116,9 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     setModel(id);
     if (agent === "codex") setEffort((e) => coerceCodexEffort(id, e));
   };
-  const models: readonly { id: string; label: string }[] = agent === "codex" ? CODEX_MODELS : MODELS;
+  const models = runtimeModels(agent);
   // SPEC-339 · effort adalah properti MODEL untuk codex — daftarnya menyempit mengikuti pilihan.
-  const efforts: readonly string[] = agent === "codex" ? codexEfforts(model) : EFFORTS;
+  const efforts = runtimeEfforts(agent, model);
   if (!spec) return null;
   const s = spec;
   const flow = flowForSource(s.source);
