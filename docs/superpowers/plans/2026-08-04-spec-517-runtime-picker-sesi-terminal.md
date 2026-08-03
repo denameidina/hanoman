@@ -621,7 +621,7 @@ git commit -m "refactor(spec-517): satu definisi katalog runtime untuk kedua pic
   ```
   `opts` absen ⇒ body persis `{ project }` seperti sebelum SPEC-517.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buka `src/test/api-client.test.ts`, lihat pola mock `fetch` yang sudah dipakai di sana, lalu
 tambahkan di dalam `describe` utamanya:
@@ -646,7 +646,7 @@ tambahkan di dalam `describe` utamanya:
 > Sesuaikan nama variabel mock (`fetchMock`) dengan yang sudah dipakai berkas itu — jangan
 > membuat mock kedua.
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/api-client.test.ts
@@ -654,7 +654,7 @@ env -u NODE_ENV pnpm vitest --run src/test/api-client.test.ts
 
 Expected: FAIL pada test kedua — `opts` diabaikan.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `src/src/api/client.ts`:
 
@@ -665,7 +665,7 @@ Expected: FAIL pada test kedua — `opts` diabaikan.
     j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, ...(opts ?? {}) }) }),
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/api-client.test.ts
@@ -673,7 +673,7 @@ env -u NODE_ENV pnpm vitest --run src/test/api-client.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/client.ts src/test/api-client.test.ts

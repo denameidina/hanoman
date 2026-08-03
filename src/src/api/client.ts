@@ -259,7 +259,10 @@ export const api = {
   browseFs: (path?: string) =>
     j<{ path: string; parent: string | null; entries: { name: string; path: string }[] }>(paths.fsBrowse(path)),
   listTerminals: () => j<TerminalSession[]>(paths.terminalSessions),
-  createTerminal: (project: string) => j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project }) }),
+  // SPEC-517 · runtime PER SESI untuk terminal agen biasa (opsional; kosong → default global di
+  // server). Tanpa `opts`, body byte-identik dengan sebelum SPEC-517.
+  createTerminal: (project: string, opts?: { agent?: Agent; model?: string; effort?: string }) =>
+    j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, ...(opts ?? {}) }) }),
   // SPEC-236 · terminal biasa non-claude: shell mentah di repoDir project (tanpa flow).
   createShell: (project: string) => j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, shell: true }) }),
   // SPEC-162 · sesi claude interaktif untuk sebuah backlog item, di worktree-nya sendiri.

@@ -45,6 +45,27 @@ describe("api client · sesi backlog", () => {
       method: "POST", body: JSON.stringify({ project: "p1", flow: "breakdown", prdPath: "docs/prd/x.md" }),
     }));
   });
+  // SPEC-517 · runtime opsional untuk terminal agen biasa. Tanpa opts body HARUS tetap {project}:
+  // pemanggil lama (restart riwayat, tombol lama) tak boleh berubah artinya.
+  it("createTerminal tanpa opts mengirim body {project} apa adanya", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "t1" }), { status: 201, headers: { "content-type": "application/json" } }));
+    await api.createTerminal("p1");
+    expect(fetchMock).toHaveBeenCalledWith(paths.terminalSessions, expect.objectContaining({
+      method: "POST", body: JSON.stringify({ project: "p1" }),
+    }));
+  });
+
+  it("createTerminal meneruskan agent/model/effort saat diberikan", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "t2" }), { status: 201, headers: { "content-type": "application/json" } }));
+    await api.createTerminal("p1", { agent: "codex", model: "gpt-5.6-sol", effort: "high" });
+    expect(fetchMock).toHaveBeenCalledWith(paths.terminalSessions, expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ project: "p1", agent: "codex", model: "gpt-5.6-sol", effort: "high" }),
+    }));
+  });
+
   it("createSpecsBatch mem-POST ke /api/specs/batch", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ created: [] }), { status: 201, headers: { "content-type": "application/json" } }));
