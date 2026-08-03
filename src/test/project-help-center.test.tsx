@@ -14,6 +14,11 @@ vi.mock("../src/api/client", () => ({
   api: { enableHelpCenter, disableHelpCenter },
   ApiError: class extends Error {},
 }));
+// Kartu tetangga di layar yang sama self-fetch (AutoMergeCard → `listBranches`, CustomAgentsPanel
+// → katalog agen) dan bukan subjek berkas ini; tanpa di-noop, keempat test mati di render pertama
+// dengan "api.listBranches is not a function" — merah yang tak ada hubungannya dengan Help Center.
+vi.mock("../src/screens/AutoMergeCard", () => ({ AutoMergeCard: () => null }));
+vi.mock("../src/screens/CustomAgentsPanel", () => ({ CustomAgentsPanel: () => null }));
 
 import { ProjectDetailScreen } from "../src/screens/ProjectDetailScreen";
 
@@ -26,7 +31,8 @@ const base = {
 const vm = (over: Record<string, unknown>) => ({ ...base, ...over }) as unknown as Parameters<typeof ProjectDetailScreen>[0]["p"];
 
 const noop = vi.fn();
-const props = { onEdit: noop, onGotoDocs: noop, onGotoTerminal: noop, onGotoBacklog: noop, onDelete: noop, onToast: noop };
+const props = { onEdit: noop, onGotoDocs: noop, onGotoTerminal: noop, onGotoBacklog: noop,
+  onGotoChangelog: noop, onDelete: noop, onToast: noop };   // SPEC-519 · pintu Changelog
 
 beforeEach(() => { enableHelpCenter.mockClear(); disableHelpCenter.mockClear(); });
 

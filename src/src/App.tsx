@@ -1108,6 +1108,7 @@ export default function App() {
               onGotoDocs={() => setSection("docs")}
               onGotoTerminal={() => { setProjectFilter(proj.id); setSection("terminal"); }}
               onGotoBacklog={() => { setProjectFilter(proj.id); setSection("backlog"); }}
+              onGotoChangelog={() => setSection("changelog")}
               onReverse={proj.kind === "existing" && proj.repoDir ? () => reverseDocs(proj) : undefined}
               onScaffold={proj.kind === "from-scratch" && proj.repoDir ? () => scaffoldDocs(proj) : undefined}
               onDelete={() => deleteProject(proj)} />
