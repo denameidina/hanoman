@@ -51,6 +51,12 @@ model Spec {
   // sama dengan `baseSha` (services/session-launch.ts); jalur RESUME (ADR-0084) sengaja tidak
   // menimpanya — melanjutkan sesi bukan "mulai lagi". null = belum pernah dikerjakan.
   startedAt  DateTime?
+  // SPEC-516 · ADR-0105 · kapan item PERTAMA kali masuk stage `done`. Ditulis HANYA di dalam
+  // `recordCompletion()` — satu-satunya fungsi yang sudah dipanggil oleh KETIGA jalur persist
+  // `done` (advanceStage, scheduler/reconcile, live-specs). Menyalin bookkeeping ini ke call
+  // site adalah kelas bug SPEC-431/448/475. Tulis-sekali: reopen lalu selesai lagi tak
+  // memindahkannya, cermin `startedAt` = mulai pertama (ADR-0090).
+  doneAt     DateTime?
   // SPEC-447 · ADR-0093 · id spec lain yang harus SELESAI & commit-nya sudah ada di branch basis
   // sebelum item ini boleh diluncurkan. Array JSON of string; null/[] = tak bergantung apa pun.
   // Sengaja kolom, bukan tabel join: SQLite melarang scalar list, `Json` sudah dipakai `payload`,

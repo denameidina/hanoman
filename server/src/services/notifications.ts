@@ -22,6 +22,14 @@ export async function recordDrift(
 // ponytail: reopen backlog (SPEC-167/172) lalu selesai lagi TIDAK menotifikasi ulang karena
 // barisnya sudah ada. Upgrade bila perlu: drop @unique + guard transisi via updateMany count.
 export async function recordCompletion(specId: string, title: string, projectId: string | null): Promise<void> {
+  // SPEC-516 · ADR-0105 · stempel selesai. Ditulis DI SINI, bukan di ketiga call site yang
+  // mempersist `stage = "done"` (advanceStage · scheduler/reconcile · live-specs): efek samping
+  // yang disalin ke banyak call site adalah kelas bug yang sudah menggigit repo ini tiga kali
+  // (SPEC-431 `baseSha`, SPEC-448 `rootBypassEnv`, SPEC-475 `headSha`), dan efek samping tak
+  // punya tipe yang memaksanya konsisten. `updateMany` ber-guard `doneAt: null` membuatnya
+  // TULIS-SEKALI sekaligus tak melempar bila spec-nya sudah dihapus operator.
+  await prisma.spec.updateMany({ where: { id: specId, doneAt: null }, data: { doneAt: new Date() } })
+    .catch(() => { /* spec bisa saja sudah dihapus */ });
   // SPEC-184 · dedup pindah ke `key` (specId tak lagi @unique — kini menampung juga notif decision).
   // sessionId turunan = idFor(specId) (pty.ts): id sesi tmux backlog dapat ditebak dari spec-nya,
   // jadi aksi "Buka" pada notif bisa mengecek apakah sesinya masih hidup.
