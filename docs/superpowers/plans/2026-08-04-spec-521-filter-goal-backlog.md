@@ -42,7 +42,7 @@ Param `source` adalah satu-satunya penopang filter goal, dan `grep "source=" ser
 - Consumes: `app` (`buildApp({ requireAuth: false })`), `makeProject`, `makeSpec`, `makeTempRepo` — semuanya sudah di-import di baris 1-7 berkas test itu.
 - Produces: jaminan bahwa `GET /specs?source=goal` memulangkan **hanya** item goal dengan `total` envelope ikut menyusut. Task 2 bersandar pada jaminan ini.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di **akhir** `server/test/specs.route.test.ts` (sesudah `describe("filter rentang tanggal (SPEC-408)", …)` ditutup, boleh ditaruh setelah blok terakhir berkas):
 
@@ -107,7 +107,7 @@ describe("filter source (SPEC-521)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan ia benar-benar BERJALAN**
+- [x] **Step 2: Jalankan test — pastikan ia benar-benar BERJALAN**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-521
@@ -115,13 +115,13 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
   pnpm vitest --run server/test/specs.route.test.ts --no-file-parallelism -t "filter source"
 ```
 
-Expected: **6 test berjalan** di bawah `filter source (SPEC-521)`. Karena param `source` sudah bekerja, seluruhnya diharap **PASS** sejak awal — ini test karakterisasi yang mengunci perilaku, bukan TDD merah-dulu.
+Expected: **5 test berjalan** di bawah `filter source (SPEC-521)`. Karena param `source` sudah bekerja, seluruhnya diharap **PASS** sejak awal — ini test karakterisasi yang mengunci perilaku, bukan TDD merah-dulu.
 
 **Gerbang yang wajib dicek:** kalau outputnya `No test files found` atau `0 passed`, test-nya **tidak berjalan** — jangan diterima sebagai hijau (jebakan `passWithNoTests`, AGENTS.md). Perbaiki path/`-t` dulu.
 
 Kalau ada yang **gagal**, itu temuan sungguhan: `source` tidak berperilaku seperti yang diasumsikan tab Goal. Hentikan dan laporkan sebelum menyentuh UI.
 
-- [ ] **Step 3: Perbarui `internal/docs/architecture/api-contract.md`**
+- [x] **Step 3: Perbarui `internal/docs/architecture/api-contract.md`**
 
 Di blok `GET /specs` (baris 91-95), sesudah baris yang berbunyi
 `#   & paginasi diterapkan DI MEMORI SETELAH overlay — filter stage cocok ke stage LIVE, bukan DB.`,
@@ -135,7 +135,7 @@ sisipkan:
 #   Pemakainya: deret tab sumber daftar backlog — Semua spec · Dari brief · Dari QA · Audit · Goal.
 ```
 
-- [ ] **Step 4: Jalankan lagi test yang tersentuh**
+- [x] **Step 4: Jalankan lagi test yang tersentuh**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-521
@@ -145,7 +145,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: seluruh berkas PASS (test lama + 6 test baru). Berkas ini menyentuh DB, jadi `TEST_DATABASE_URL` terisolasi + `--no-file-parallelism` **wajib** — suite yang gagal ramai dengan 404/P2022 hampir selalu isolasi DB, bukan regresi (SPEC-479).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-521
@@ -168,7 +168,7 @@ git commit -m "test(spec-521): kontrak param source di GET /specs (nol coverage 
 
 **Jebakan yang wajib ditutup lebih dulu:** `src/test/backlog-goal.test.tsx` sudah memakai `await screen.findByText("Goal")` untuk **badge kartu**. Label tab baru juga `"Goal"`, jadi `findByText` akan menemukan **dua** elemen dan melempar `Found multiple elements` — test hijau berubah merah tanpa satu pun regresi produk. Preseden repo: `src/test/backlog-board.test.tsx:134` untuk "Audit". Test baru memakai `getByRole("tab", { name: "Goal" })` yang kebal tabrakan itu.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 **1a.** Di `src/test/backlog-goal.test.tsx`, tambahkan `listSpecs` ke mock modul di baris 4-7 sehingga berbunyi:
 
@@ -250,7 +250,7 @@ menjadi
     await waitFor(() => expect(screen.getAllByText("Goal").length).toBeGreaterThan(1));
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL karena alasan yang benar**
+- [x] **Step 2: Jalankan test — pastikan GAGAL karena alasan yang benar**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-521
@@ -261,7 +261,7 @@ Expected: **FAIL**. Ketiga test `tab Goal (SPEC-521)` gagal dengan `Unable to fi
 
 `env -u NODE_ENV` **wajib**: shell mesin ini menyetel `NODE_ENV=production`, yang membuat React membuang peringatan `act()` dan test RTL gagal massal tanpa sebab (SPEC-293).
 
-- [ ] **Step 3: Tambahkan tab Goal**
+- [x] **Step 3: Tambahkan tab Goal**
 
 Di `src/src/screens/BacklogScreen.tsx`, pada `<Tabs variant="pill" value={tab} onChange={setTab} tabs={[…]} />` di deret tab sumber, ubah daftarnya menjadi:
 
@@ -278,7 +278,7 @@ Di `src/src/screens/BacklogScreen.tsx`, pada `<Tabs variant="pill" value={tab} o
 
 Tak ada perubahan lain: `tab` sudah dikirim sebagai `source: tab === "all" ? undefined : tab`, sudah ada di dependency array efek fetch, sudah mereset `page` ke 1, dan sudah dikembalikan ke `"all"` oleh tombol **Reset filter**.
 
-- [ ] **Step 4: Jalankan test — pastikan PASS**
+- [x] **Step 4: Jalankan test — pastikan PASS**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-521
@@ -287,7 +287,7 @@ env -u NODE_ENV pnpm vitest --run src/test/backlog-goal.test.tsx
 
 Expected: **PASS**, seluruh test di berkas itu (7 lama + 3 baru).
 
-- [ ] **Step 5: Jalankan test backlog tetangga yang menghitung teks**
+- [x] **Step 5: Jalankan test backlog tetangga yang menghitung teks**
 
 Tab baru menambah satu simpul teks di layar yang sama; berkas-berkas ini merender `BacklogScreen` dan sebagian menghitung kemunculan teks.
 
@@ -301,7 +301,7 @@ env -u NODE_ENV pnpm vitest --run \
 
 Expected: **PASS** semua. Bila ada yang gagal dengan `Found multiple elements with the text: Goal`, terapkan perbaikan yang sama seperti Step 1d (`getAllByText(...).length`) — itu tabrakan label, bukan regresi produk.
 
-- [ ] **Step 6: Typecheck paket yang tersentuh**
+- [x] **Step 6: Typecheck paket yang tersentuh**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-521
@@ -310,7 +310,7 @@ pnpm --filter ./src typecheck
 
 Expected: exit 0, nol error. Hanya paket `src` — `pnpm -r typecheck` menyalakan satu proses tsc per paket dan mencekik sesi lain di mesin ini (ADR-0080).
 
-- [ ] **Step 7: Perbarui `internal/docs/frontend/frontend-implementation.md`**
+- [x] **Step 7: Perbarui `internal/docs/frontend/frontend-implementation.md`**
 
 Di bagian "Backlog: tiga mode tampilan, dan board yang tidak boleh berbohong", **sesudah** paragraf
 toolbar (yang berakhir dengan kalimat `Search/stage/prioritas view-local; project tetap
@@ -326,7 +326,7 @@ disaring di layer response (ADR-0038). `help` sengaja tak bertab: item tiket sud
 brief/qa/audit oleh jalur triase (ADR-0062).
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-521
@@ -344,47 +344,57 @@ Task ini menyentuh perilaku endpoint yang menopang filter baru, jadi AGENTS.md m
 **Files:**
 - Modify: `docs/superpowers/plans/2026-08-04-spec-521-filter-goal-backlog.md` (centang seluruh kotak)
 
-- [ ] **Step 1: Boot server dengan DB khusus**
+- [x] **Step 1: Boot server dengan DB khusus**
 
-DB khusus, **bukan** DB test bersama: run tetangga di mesin ini menghapus `~/.hanoman/hanoman.test.db` di tengah jalan (SPEC-479).
+DB khusus, **bukan** DB test bersama: run tetangga di mesin ini menghapus `~/.hanoman/hanoman.test.db` di tengah jalan (SPEC-479). **Port khusus juga** — 8787 hampir selalu sudah dipakai dashboard/sesi tetangga di mesin ini (terukur saat SPEC-521 dikerjakan: `lsof -ti:8787` memulangkan dua PID milik orang lain). `HANOMAN_DATABASE_URL` mendahului `DATABASE_URL` di `runner/src/paths.ts`, dan itulah yang dipakai server; `prisma` CLI sendiri membaca `DATABASE_URL` (`schema.prisma` `env("DATABASE_URL")`), jadi keduanya perlu disetel — ke berkas yang sama.
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-521
-export HANOMAN_HOME="$(mktemp -d)"
-pnpm --filter ./server exec prisma migrate deploy
-pnpm --filter ./server exec tsx src/server.ts &
+SMOKE_DIR=$(mktemp -d)
+DATABASE_URL="file:$SMOKE_DIR/smoke.db" pnpm --filter ./server exec prisma migrate deploy
+HANOMAN_DATABASE_URL="file:$SMOKE_DIR/smoke.db" HANOMAN_HOME="$SMOKE_DIR" PORT=8899 \
+  pnpm --filter ./server exec tsx src/server.ts > "$SMOKE_DIR/server.log" 2>&1 &
 ```
 
 Tunggu sampai server siap:
 
 ```bash
-until curl -sf http://127.0.0.1:8787/api/health >/dev/null; do sleep 1; done; echo siap
+for i in $(seq 1 40); do curl -sf http://127.0.0.1:8899/api/health >/dev/null && { echo siap; break; }; sleep 1; done
 ```
 
-- [ ] **Step 2: Seed satu project + dua spec, lalu curl endpointnya**
+- [x] **Step 2: Seed satu project + dua spec, lalu curl endpointnya**
+
+`/api` digerbangi sesi cookie (ADR-0028) — tanpa cookie seluruh seed memulangkan `{"error":"unauthorized"}`. DB kosong berarti `POST /auth/setup` masih terbuka; simpan cookie-nya lalu pakai di tiap permintaan.
 
 ```bash
-curl -s -X POST http://127.0.0.1:8787/api/projects -H 'content-type: application/json' \
+B=http://127.0.0.1:8899/api; J=$(mktemp)
+curl -s -c $J -X POST $B/auth/setup -H 'content-type: application/json' \
+  -d '{"email":"smoke@example.com","password":"SmokePass123!"}'
+curl -s -b $J -X POST $B/projects -H 'content-type: application/json' \
   -d '{"id":"psmoke","name":"psmoke","desc":"smoke","kind":"existing","stack":""}'
-curl -s -X POST http://127.0.0.1:8787/api/specs -H 'content-type: application/json' \
+curl -s -b $J -X POST $B/specs -H 'content-type: application/json' \
   -d '{"project":"psmoke","source":"goal","title":"turunkan latensi","priority":"sedang","payload":{"goal":"p95 < 200 ms","done":"benchmark hijau","constraints":"","priority":"sedang"}}'
-curl -s -X POST http://127.0.0.1:8787/api/specs -H 'content-type: application/json' \
+curl -s -b $J -X POST $B/specs -H 'content-type: application/json' \
   -d '{"project":"psmoke","source":"brief","title":"form invoice","priority":"sedang","payload":{"context":"c","outcome":"o","constraints":"","priority":"sedang"}}'
-echo "--- semua:"; curl -s 'http://127.0.0.1:8787/api/specs?project=psmoke' | head -c 400
-echo; echo "--- goal:"; curl -s 'http://127.0.0.1:8787/api/specs?project=psmoke&source=goal' | head -c 400
+for qs in "" "&source=goal" "&source=brief" "&source=ngawur"; do
+  curl -s -b $J -o /tmp/spec521-out.json "$B/specs?project=psmoke$qs"
+  echo -n "[$qs] "; python3 -c 'import json;d=json.load(open("/tmp/spec521-out.json"));print("total=",d["total"],[(i["id"],i["source"]) for i in d["items"]])'
+done
 ```
 
-Expected: respons "semua" ber-`total: 2`; respons "goal" ber-`total: 1` dan satu-satunya item ber-`"source":"goal"` dengan judul `turunkan latensi`.
+Expected: `[]` → `total= 2`; `[&source=goal]` → `total= 1` berisi item ber-`source` `goal`; `[&source=brief]` → `total= 1` brief; `[&source=ngawur]` → `total= 0` dan `items` kosong (bukan 400).
 
-- [ ] **Step 3: Matikan server per-PID**
+Terukur saat SPEC-521 dikerjakan: `total=2 [('SPEC-142','brief'),('SPEC-141','goal')]` · `goal → total=1 [('SPEC-141','goal')]` · `brief → total=1 [('SPEC-142','brief')]` · `ngawur → total=0 []`.
+
+- [x] **Step 3: Matikan server per-PID**
 
 ```bash
-lsof -ti:8787 | xargs -r kill
+for p in $(lsof -ti:8899); do kill $p; done
 ```
 
 **JANGAN** `pkill -f node` / `pkill -f tsx`: prompt tiap sesi hidup di ARGV proses agennya dan `pkill` mengecualikan leluhurnya sendiri, jadi yang mati selalu sesi tetangga (SPEC-402).
 
-- [ ] **Step 4: Centang seluruh kotak plan ini dan commit**
+- [x] **Step 4: Centang seluruh kotak plan ini dan commit**
 
 Ubah setiap `- [ ]` di berkas plan ini menjadi `- [x]`. hanoman menahan backlog di `executing` selama masih ada kotak kosong.
 
