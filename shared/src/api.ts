@@ -126,6 +126,10 @@ export const paths = {
   // SPEC-299 · panel scheduler (daun #6) — konsumen read-only fondasi SPEC-294/ADR-0072.
   schedulerConfig: `${API}/scheduler/config`,
   schedulerState: `${API}/scheduler/state`,
+  // SPEC-522 · ADR-0106 · batalkan / antre lagi SATU baris antrean. Di bawah prefix `scheduler`
+  // supaya capability-nya turunan peta yang sudah ada (settings, MENURUT METHOD) — tanpa baris peta baru.
+  schedulerQueueCancel: (id: string) => `${API}/scheduler/queue/${encodeURIComponent(id)}/cancel`,
+  schedulerQueueRequeue: (id: string) => `${API}/scheduler/queue/${encodeURIComponent(id)}/requeue`,
   // SPEC-409 · ADR-0091 · hanoman-lead. Semua HTTP (polling) — tak ada kanal WS baru (AC-26).
   leadConfig: `${API}/lead/config`,
   leadStatus: `${API}/lead/status`,
