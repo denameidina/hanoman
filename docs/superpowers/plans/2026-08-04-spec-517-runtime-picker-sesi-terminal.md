@@ -321,7 +321,7 @@ git commit -m "feat(spec-517): terminalAgentDefaults untuk override runtime per 
 - Consumes: `terminalAgentDefaults` dari Task 2; varian DTO dari Task 1.
 - Produces: `POST /terminal/sessions {project, agent?, model?, effort?}` → 201 `{ id }` dengan pane ber-argv sesuai pilihan.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `server/test/terminal.route.test.ts` (di dalam `describe("terminal routes", …)`, dekat test argv yang sudah ada):
 
@@ -376,7 +376,7 @@ Tambahkan di `server/test/terminal.route.test.ts` (di dalam `describe("terminal 
   });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/terminal.route.test.ts
@@ -384,7 +384,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — argv memakai default global, dan body prd cacat menjawab 201.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `server/src/routes/terminal.ts` baris 10 — tambahkan import:
 
@@ -412,7 +412,7 @@ Ganti blok baris 286-291:
 > Bila `tsc` mengeluh, **jangan** meng-cast: pindahkan cabang `if ("shell" in parsed.data)`
 > tetap di tempatnya dan pastikan cabang `flow` di atasnya memakai `return`, bukan `else`.
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/terminal.route.test.ts server/test/terminal-agent-defaults.test.ts
@@ -420,7 +420,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS.
 
-- [ ] **Step 5: Typecheck paket server**
+- [x] **Step 5: Typecheck paket server**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -428,7 +428,7 @@ pnpm --filter ./server typecheck
 
 Expected: keluar tanpa error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/terminal.ts server/test/terminal.route.test.ts

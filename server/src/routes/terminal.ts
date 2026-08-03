@@ -7,7 +7,7 @@ import { phaseFilePath, decisionFilePath, readPhases, stageForRun } from "../ser
 import { specReview, reviewFile } from "../services/spec-review";
 import { downloadFormat, sendReviewDownload } from "../services/doc-export";
 import { integrateBranch } from "../services/integrate";
-import { sessionAgentDefaults, conflictSessionDefaults } from "../services/settings";
+import { sessionAgentDefaults, conflictSessionDefaults, terminalAgentDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { startSpecSession, LaunchError } from "../services/session-launch";
 import { resolveRepoDir } from "../services/local-binding";
@@ -285,7 +285,12 @@ export default async function (app: FastifyInstance) {
 
     // SPEC-338 · ADR-0074 · terminal agen biasa (bukan shell mentah) ikut agen default global,
     // termasuk model/effort-nya — sebelumnya jalur ini lahir tanpa argv model sama sekali.
-    const { agent, model, effort } = await sessionAgentDefaults();
+    // SPEC-517 · …kecuali bila operator memilihnya di form "Sesi baru": `agent`/`model`/`effort`
+    // per-request menang, dan agen terpilih menentukan blok Setting mana yang dibaca. Body
+    // `{project}` polos tetap berperilaku persis seperti sebelumnya.
+    // `ensureCodexTrust` diturunkan dari agen HASIL resolusi — sejak sekarang ia bisa berbeda dari
+    // `Setting.agent`, dan membaca yang salah membuat sesi mentok di layar trust codex (SPEC-377).
+    const { agent, model, effort } = await terminalAgentDefaults(parsed.data);
     if (agent === "codex") ensureCodexTrust(repoDir);
     const s = createSession(project.id, repoDir, { agent, model, effort });
     return reply.code(201).send({ id: s.id });

@@ -138,6 +138,55 @@ describe("terminal routes", () => {
     expect(ok.statusCode).toBe(404);   // bentuk body sah; spec-nya yang tak ada
   });
 
+  // SPEC-517 · runtime dipilih saat sesi terminal dibuat. `/bin/echo` mencetak argv-nya ke pane,
+  // jadi frame WS adalah bukti langsung argv yang benar-benar lahir.
+  it("override model/effort claude ikut ke argv pane", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const res = await app.inject({ method: "POST", url: "/api/terminal/sessions",
+      payload: { project: "p1", agent: "claude", model: "claude-haiku-4-5", effort: "low" } });
+    expect(res.statusCode).toBe(201);
+    const id = res.json().id as string;
+    const c = connect(id);
+    await c.opened;
+    await waitFor(() => c.frames.some((f) => f.t === "exit"));
+    expect(c.data()).toContain("--model claude-haiku-4-5");
+    expect(c.data()).toContain("--effort low");
+    c.ws.close();
+    killSession(id);
+  });
+
+  it("override agen codex memakai biner & bentuk flag codex", async () => {
+    process.env.HANOMAN_CODEX_BIN = "/bin/echo";
+    const res = await app.inject({ method: "POST", url: "/api/terminal/sessions",
+      payload: { project: "p1", agent: "codex", model: "gpt-5.6-sol", effort: "high" } });
+    expect(res.statusCode).toBe(201);
+    const id = res.json().id as string;
+    const c = connect(id);
+    await c.opened;
+    await waitFor(() => c.frames.some((f) => f.t === "exit"));
+    expect(c.data()).toContain("-m gpt-5.6-sol");
+    expect(c.data()).toContain("model_reasoning_effort");
+    c.ws.close();
+    killSession(id);
+    delete process.env.HANOMAN_CODEX_BIN;
+  });
+
+  it("agen di luar katalog → 400, tak ada sesi yang lahir", async () => {
+    const before = listSessions().length;
+    const res = await app.inject({ method: "POST", url: "/api/terminal/sessions",
+      payload: { project: "p1", agent: "gemini" } });
+    expect(res.statusCode).toBe(400);
+    expect(listSessions().length).toBe(before);
+  });
+
+  // Gerbang `flow: z.undefined()` pada varian plain, dilihat dari sisi route: body prd yang cacat
+  // harus ditolak, bukan diam-diam membuka terminal biasa.
+  it("flow prd tanpa brief → 400, bukan terminal biasa", async () => {
+    const res = await app.inject({ method: "POST", url: "/api/terminal/sessions",
+      payload: { project: "p1", flow: "prd" } });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("closes the socket for an unknown session id", async () => {
     const c = connect("tidakada");
     c.opened.catch(() => {}); // socket ini memang ditutup; jangan biarkan rejection-nya menganggur
