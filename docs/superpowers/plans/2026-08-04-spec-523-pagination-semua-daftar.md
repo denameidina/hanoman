@@ -684,7 +684,7 @@ EOF
 - Consumes: `GET /scheduler/queue` (Task 3), `state.queueCounts` (Task 3).
 - Produces: `api.getSchedulerQueue(p: { status?: string; page?: number; limit?: number }): Promise<Paginated<SchedulerQueueItemView>>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/scheduler-queue-pager.test.tsx`:
 
@@ -742,14 +742,14 @@ describe("SchedulerScreen antrean berhalaman (SPEC-523)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/scheduler-queue-pager.test.tsx
 ```
 Diharapkan: GAGAL — `state.queue` `undefined` / `getSchedulerQueue` bukan fungsi.
 
-- [ ] **Step 3: Tambah metode api client**
+- [x] **Step 3: Tambah metode api client**
 
 Di `src/src/api/client.ts` setelah baris `getSchedulerState` (baris 421):
 
@@ -761,7 +761,7 @@ Di `src/src/api/client.ts` setelah baris `getSchedulerState` (baris 421):
 
 Pastikan `SchedulerQueueItemView` ada di daftar impor tipe dari `@hanoman/shared` di berkas itu.
 
-- [ ] **Step 4: Ganti `Section` jadi berhalaman**
+- [x] **Step 4: Ganti `Section` jadi berhalaman**
 
 Di `src/src/screens/SchedulerScreen.tsx`, ganti fungsi `Section` (baris 133-139) dengan komponen baru yang memuat datanya sendiri:
 
@@ -812,7 +812,7 @@ function Section({ title, count, empty, children }: { title: string; count: numb
 
 Tambahkan `Pager, serverPage` ke impor DS di berkas ini, dan `SchedulerQueueItemView` ke impor tipe `@hanoman/shared`.
 
-- [ ] **Step 5: Ganti pemakaiannya di badan `SchedulerScreen`**
+- [x] **Step 5: Ganti pemakaiannya di badan `SchedulerScreen`**
 
 Ganti baris 268-297 (`const queued = ...` sampai `</Section>` terakhir untuk "Gagal") dengan:
 
@@ -855,14 +855,14 @@ Tambahkan `nonce` di badan `SchedulerScreen` (di dekat state lain, baris ~229) a
 ```
 dan di dalam `load`, pada cabang sukses, tambahkan `setNonce((n) => n + 1);`.
 
-- [ ] **Step 6: Jalankan test, pastikan HIJAU**
+- [x] **Step 6: Jalankan test, pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/scheduler-queue-pager.test.tsx
 ```
 Diharapkan: 2 test lulus.
 
-- [ ] **Step 7: Jalankan test scheduler UI lama bila ada**
+- [x] **Step 7: Jalankan test scheduler UI lama bila ada**
 
 ```bash
 ls src/test | grep -i scheduler
@@ -870,13 +870,13 @@ env -u NODE_ENV pnpm vitest --run $(ls src/test/*scheduler* 2>/dev/null | tr '\n
 ```
 Diharapkan: lulus. Bila ada yang menegakkan `state.queue`, perbarui ke `queueCounts` + mock `getSchedulerQueue`.
 
-- [ ] **Step 8: Typecheck web**
+- [x] **Step 8: Typecheck web**
 
 ```bash
 pnpm --filter ./src typecheck
 ```
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/src/screens/SchedulerScreen.tsx src/src/api/client.ts src/test/

@@ -1,12 +1,13 @@
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { getSchedulerState, putSchedulerConfig, updateProject } = vi.hoisted(() => ({
+const { getSchedulerState, getSchedulerQueue, putSchedulerConfig, updateProject } = vi.hoisted(() => ({
   getSchedulerState: vi.fn(),
+  getSchedulerQueue: vi.fn(),
   putSchedulerConfig: vi.fn(),
   updateProject: vi.fn(),
 }));
-vi.mock("../src/api/client", () => ({ api: { getSchedulerState, putSchedulerConfig, updateProject }, ApiError: class extends Error {} }));
+vi.mock("../src/api/client", () => ({ api: { getSchedulerState, getSchedulerQueue, putSchedulerConfig, updateProject }, ApiError: class extends Error {} }));
 
 import { SchedulerScreen } from "../src/screens/SchedulerScreen";
 
@@ -18,15 +19,24 @@ const STATE = {
     { id: "backlog", enabled: true, everyMin: 15, lastRunAt: "2026-07-22T00:00:00.000Z", nextRunAt: "2026-07-22T00:15:00.000Z" },
     { id: "triase", enabled: false, everyMin: 30, lastRunAt: null, nextRunAt: null },
   ],
-  queue: [
-    { id: "q1", specId: "SPEC-1", projectId: "a", source: "backlog", priority: "tinggi", status: "queued", sessionId: null, note: null, enqueuedAt: "2026-07-22T00:00:00.000Z", launchedAt: null },
-    { id: "q2", specId: "SPEC-2", projectId: "a", source: "triase", priority: "tinggi", status: "done", sessionId: "spec-2", note: null, enqueuedAt: "2026-07-22T00:00:00.000Z", launchedAt: "2026-07-22T00:01:00.000Z" },
-    { id: "q3", specId: "SPEC-3", projectId: "a", source: "triase", priority: "sedang", status: "failed", sessionId: "spec-3", note: "sesi berakhir sebelum done", enqueuedAt: "2026-07-22T00:00:00.000Z", launchedAt: "2026-07-22T00:01:00.000Z" },
-  ],
+  // SPEC-523 · state hanya membawa hitungan; barisnya datang dari GET /scheduler/queue.
+  queueCounts: { queued: 1, launched: 0, done: 1, failed: 1 },
   sessions: [
     { id: "spec-4", projectId: "a", specId: "SPEC-4", flow: "feature", branch: "hanoman/spec-4", decision: true, exited: false },
   ],
 };
+// SPEC-523 · baris antrean per status, dilayani endpoint daftar berhalaman.
+const QUEUE_ROWS: Record<string, Array<Record<string, unknown>>> = {
+  queued: [{ id: "q1", specId: "SPEC-1", projectId: "a", source: "backlog", priority: "tinggi", status: "queued", sessionId: null, note: null, enqueuedAt: "2026-07-22T00:00:00.000Z", launchedAt: null }],
+  done: [{ id: "q2", specId: "SPEC-2", projectId: "a", source: "triase", priority: "tinggi", status: "done", sessionId: "spec-2", note: null, enqueuedAt: "2026-07-22T00:00:00.000Z", launchedAt: "2026-07-22T00:01:00.000Z" }],
+  failed: [{ id: "q3", specId: "SPEC-3", projectId: "a", source: "triase", priority: "sedang", status: "failed", sessionId: "spec-3", note: "sesi berakhir sebelum done", enqueuedAt: "2026-07-22T00:00:00.000Z", launchedAt: "2026-07-22T00:01:00.000Z" }],
+};
+const queueFrom = (rows: Record<string, Array<Record<string, unknown>>>) =>
+  async (p: { status?: string } = {}) => {
+    const items = rows[p.status ?? ""] ?? [];
+    return { items, total: items.length, page: 1, pageSize: 10 };
+  };
+
 const projects = [{ id: "a", name: "Alpha", schedulerOptIn: false }] as unknown as Parameters<typeof SchedulerScreen>[0]["projects"];
 const backlog = [
   { id: "SPEC-1", title: "Judul satu" }, { id: "SPEC-2", title: "Judul dua" },
@@ -41,19 +51,21 @@ function renderScreen(overrides: Partial<Parameters<typeof SchedulerScreen>[0]> 
 describe("SchedulerScreen observabilitas (SPEC-299)", () => {
   it("menampilkan status per-source, antrean, sesi berjalan, done, dan gagal+alasan", async () => {
     getSchedulerState.mockResolvedValue(STATE);
+    getSchedulerQueue.mockImplementation(queueFrom(QUEUE_ROWS));
     renderScreen();
     // status per-source (id source muncul ≥1×)
     expect(await screen.findByText("Status per source")).toBeInTheDocument();
     expect(screen.getAllByText("backlog").length).toBeGreaterThan(0);
     expect(screen.getAllByText("triase").length).toBeGreaterThan(0);
-    // antrean (queued) → judul spec ter-resolve
-    expect(screen.getByText("Judul satu")).toBeInTheDocument();
+    // antrean (queued) → judul spec ter-resolve. SPEC-523 · barisnya datang dari permintaan
+    // KEDUA (GET /scheduler/queue), jadi ditunggu — bukan dibaca sinkron sesudah state mendarat.
+    expect(await screen.findByText("Judul satu")).toBeInTheDocument();
     // sesi berjalan + indikator menunggu keputusan
     expect(screen.getByText("Judul empat")).toBeInTheDocument();
     expect(screen.getByText(/menunggu keputusan/i)).toBeInTheDocument();
     // done + gagal + alasan
-    expect(screen.getByText("Judul dua")).toBeInTheDocument();
-    expect(screen.getByText("Judul tiga")).toBeInTheDocument();
+    expect(await screen.findByText("Judul dua")).toBeInTheDocument();
+    expect(await screen.findByText("Judul tiga")).toBeInTheDocument();
     expect(screen.getByText(/sesi berakhir sebelum done/i)).toBeInTheDocument();
   });
 
@@ -61,11 +73,12 @@ describe("SchedulerScreen observabilitas (SPEC-299)", () => {
   // dulu terbaca "selesai —" seolah scheduler-lah yang menyelesaikannya — salah baca yang persis
   // searah dengan bug yang sedang diperbaiki.
   it("baris done tanpa launchedAt menampilkan alasannya, bukan 'selesai —'", async () => {
-    getSchedulerState.mockResolvedValue({ ...STATE, queue: [
+    getSchedulerState.mockResolvedValue({ ...STATE, queueCounts: { queued: 0, launched: 0, done: 1, failed: 0 } });
+    getSchedulerQueue.mockImplementation(queueFrom({ done: [
       { id: "q4", specId: "SPEC-2", projectId: "a", source: "backlog", priority: "sedang", status: "done",
         sessionId: null, note: "spec sudah selesai — tak diluncurkan",
         enqueuedAt: "2026-07-22T00:00:00.000Z", launchedAt: null },
-    ] });
+    ] }));
     renderScreen();
     expect(await screen.findByText(/spec sudah selesai — tak diluncurkan/)).toBeInTheDocument();
     expect(screen.queryByText(/· selesai —/)).not.toBeInTheDocument();
@@ -73,6 +86,7 @@ describe("SchedulerScreen observabilitas (SPEC-299)", () => {
 
   it("done item punya tombol Buka review deep-link #spec=", async () => {
     getSchedulerState.mockResolvedValue(STATE);
+    getSchedulerQueue.mockImplementation(queueFrom(QUEUE_ROWS));
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
     renderScreen();
     const btn = await screen.findByRole("button", { name: /buka review/i });
@@ -83,6 +97,7 @@ describe("SchedulerScreen observabilitas (SPEC-299)", () => {
 });
 
 describe("SchedulerScreen kontrol (SPEC-299)", () => {
+  beforeEach(() => { getSchedulerQueue.mockImplementation(queueFrom(QUEUE_ROWS)); });
   it("tombol Pause menulis paused:true via putSchedulerConfig", async () => {
     getSchedulerState.mockResolvedValue(STATE);
     putSchedulerConfig.mockResolvedValue(STATE.config);
