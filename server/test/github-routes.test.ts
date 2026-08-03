@@ -60,6 +60,27 @@ describe("SPEC-471 · endpoint tarik & triase issue", () => {
     expect(none.json().items).toHaveLength(0);
   });
 
+  // SPEC-523 · amplop Paginated (cermin GET /tickets). `total` menghitung seluruh baris tersaring.
+  it("GET issue beramplop Paginated dan menghormati page/limit", async () => {
+    for (let i = 1; i <= 5; i++) {
+      await prisma.githubIssue.create({
+        data: {
+          id: `r-p:denameidina/hanoman#${i}`, projectId: "r-p", repoSlug: "denameidina/hanoman",
+          number: i, title: `issue ${i}`, body: "", authorLogin: "rekan", labels: [],
+          url: `https://github.com/denameidina/hanoman/issues/${i}`, issueState: "open",
+          issueCreatedAt: new Date(), issueUpdatedAt: new Date(), pulledAt: new Date(),
+        },
+      });
+    }
+    const r = await app.inject({ method: "GET", url: "/api/projects/r-p/github/issues?page=1&limit=2" });
+    expect(r.statusCode).toBe(200);
+    const b = r.json();
+    expect(b.items.length).toBe(2);
+    expect(b.total).toBe(5);
+    expect(b.page).toBe(1);
+    expect(b.pageSize).toBe(2);
+  });
+
   it("POST accept satu → 201 + Spec, accept ulang → 200 alreadyPromoted", async () => {
     await pull();
     const id = "r-p:denameidina/hanoman#9";

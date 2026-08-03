@@ -394,8 +394,9 @@ export const api = {
     j<TicketDetail & { spec: Spec | null }>(paths.ticket(id), { method: "PATCH", ...body(input) }),
   deleteTicket: (id: string) => j<{ ok: boolean }>(paths.ticket(id), { method: "DELETE" }),
   // SPEC-471 · ADR-0095 · tarik & triase issue GitHub. hanoman tak pernah menulis ke GitHub.
-  listGithubIssues: (projectId: string, status?: string) =>
-    j<{ items: GithubIssueView[] }>(paths.githubIssues(projectId) + qs({ status })),
+  // SPEC-523 · amplop Paginated (cermin listTickets).
+  listGithubIssues: (projectId: string, p: { status?: string; page?: number; limit?: number } = {}) =>
+    j<Paginated<GithubIssueView>>(paths.githubIssues(projectId) + qs(p)),
   pullGithubIssues: (projectId: string, p: { state?: "open" | "all"; limit?: number } = {}) =>
     j<{ repo: string; pulled: number; created: number; updated: number; via: "gh" | "rest"; skippedPullRequests: number }>(
       paths.githubPull(projectId), { method: "POST", ...body(p) }),

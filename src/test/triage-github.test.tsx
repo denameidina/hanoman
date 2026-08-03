@@ -31,7 +31,7 @@ const m = api as unknown as {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  m.listGithubIssues.mockResolvedValue({ items: [issue()] });
+  m.listGithubIssues.mockResolvedValue({ items: [issue()], total: 1, page: 1, pageSize: 20 });
   m.pullGithubIssues.mockResolvedValue({
     repo: "o/r", pulled: 1, created: 1, updated: 0, via: "gh", skippedPullRequests: 3 });
   m.acceptGithubIssues.mockResolvedValue({ created: [{ id: "SPEC-472" }], failed: [] });
@@ -74,7 +74,7 @@ describe("SPEC-471 · panel issue GitHub", () => {
   });
 
   it("issue yang sudah diterima menampilkan tautan Spec-nya, tanpa checkbox pilih", async () => {
-    m.listGithubIssues.mockResolvedValue({ items: [issue({ status: "accepted", specId: "SPEC-472" })] });
+    m.listGithubIssues.mockResolvedValue({ items: [issue({ status: "accepted", specId: "SPEC-472" })], total: 1, page: 1, pageSize: 20 });
     render(<GithubIssuesPanel projectId="p" />);
     expect(await screen.findByText("SPEC-472")).toBeTruthy();
     expect(screen.queryByRole("checkbox", { name: /pilih issue 9/i })).toBeNull();
@@ -98,6 +98,7 @@ describe("SPEC-471 · tab Issue GitHub terpasang di layar Triase", () => {
     fireEvent.click(screen.getByRole("button", { name: /issue github/i }));
     fireEvent.change(screen.getByDisplayValue("Semua project"), { target: { value: "p" } });
     expect(await screen.findByText(/History purge/)).toBeTruthy();
-    await waitFor(() => expect(m.listGithubIssues).toHaveBeenCalledWith("p"));
+    // SPEC-523 · panggilannya kini membawa halaman (page/limit), bukan projectId telanjang.
+    await waitFor(() => expect(m.listGithubIssues).toHaveBeenCalledWith("p", { page: 1, limit: 20 }));
   });
 });

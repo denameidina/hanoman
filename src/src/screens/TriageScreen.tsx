@@ -232,11 +232,15 @@ export function GithubIssuesPanel({ projectId, onAccepted }:
   const [note, setNote] = React.useState<string | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
   const [picked, setPicked] = React.useState<string[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [page, setPage] = React.useState(1);
 
   const load = React.useCallback(async () => {
-    try { setItems((await api.listGithubIssues(projectId)).items); setState("ready"); }
-    catch { setState("error"); }
-  }, [projectId]);
+    try {
+      const r = await api.listGithubIssues(projectId, { page, limit: TICKET_PAGE });
+      setItems(r.items); setTotal(r.total); setState("ready");
+    } catch { setState("error"); }
+  }, [projectId, page]);
   React.useEffect(() => { void load(); }, [load]);
 
   // Sebab kegagalan SELALU ditampilkan. Daftar kosong tanpa penjelasan adalah gejala yang
@@ -292,7 +296,8 @@ export function GithubIssuesPanel({ projectId, onAccepted }:
         : state === "error" ? <StateBlock kind="error" hint="Gagal memuat daftar issue." action={() => void load()} actionLabel="Coba lagi" />
         : items.length === 0 ? <StateBlock kind="empty" icon="inbox" title="Belum ada issue tertarik"
             hint="Tekan “Tarik issue” untuk menariknya dari repo GitHub project ini." />
-        : <div style={{ overflowY: "auto", minHeight: 0 }}>
+        : <>
+            <div style={{ overflowY: "auto", minHeight: 0 }}>
             {items.map((i) => (
               <div key={i.id} style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "8px 0",
                 borderBottom: "1px solid var(--border-hair)" }}>
@@ -311,7 +316,9 @@ export function GithubIssuesPanel({ projectId, onAccepted }:
                 )}
               </div>
             ))}
-          </div>}
+            </div>
+            <TicketPager total={total} page={page} onPage={setPage} unit="issue" />
+          </>}
     </div>
   );
 }

@@ -1495,7 +1495,7 @@ EOF
 - Produces: `GET /projects/:id/github/issues?status&page&limit` → `Paginated<GithubIssueView>`
 - Produces: `api.listGithubIssues(projectId, p: { status?: string; page?: number; limit?: number })`
 
-- [ ] **Step 1: Tulis test server yang gagal**
+- [x] **Step 1: Tulis test server yang gagal**
 
 Tambahkan di `server/test/github-issues.route.test.ts` (buat berkas dengan pola `buildApp` bila belum ada):
 
@@ -1534,14 +1534,14 @@ describe("GET /projects/:id/github/issues", () => {
 ```
 Sesuaikan field `githubIssue.create` dengan kolom wajib di `server/prisma/schema.prisma` bila berbeda (cek dengan `grep -A 20 "model GithubIssue" server/prisma/schema.prisma`).
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/github-issues.route.test.ts
 ```
 Diharapkan: GAGAL — `total` `undefined`, 5 item dikembalikan.
 
-- [ ] **Step 3: Implementasi di route**
+- [x] **Step 3: Implementasi di route**
 
 Di `server/src/routes/github-issues.ts`, ganti handler baris 54-64:
 
@@ -1562,13 +1562,13 @@ Di `server/src/routes/github-issues.ts`, ganti handler baris 54-64:
 ```
 Tambah impor `import { paginate } from "../services/paginate";`.
 
-- [ ] **Step 4: Jalankan test, pastikan HIJAU**
+- [x] **Step 4: Jalankan test, pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/github-issues.route.test.ts
 ```
 
-- [ ] **Step 5: Tulis test UI yang gagal**
+- [x] **Step 5: Tulis test UI yang gagal**
 
 Buat `src/test/github-issues-pager.test.tsx`:
 
@@ -1605,13 +1605,13 @@ describe("GithubIssuesPanel paginasi (SPEC-523)", () => {
 });
 ```
 
-- [ ] **Step 6: Jalankan test UI, pastikan MERAH**
+- [x] **Step 6: Jalankan test UI, pastikan MERAH**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/github-issues-pager.test.tsx
 ```
 
-- [ ] **Step 7: Implementasi UI**
+- [x] **Step 7: Implementasi UI**
 
 Di `src/src/api/client.ts` baris 394:
 ```ts
@@ -1656,13 +1656,13 @@ function TicketPager({ total, page, onPage, unit = "tiket" }:
 ```
 dan panggil dengan `unit="issue"` di panel issue.)
 
-- [ ] **Step 8: Jalankan kedua test, pastikan HIJAU**
+- [x] **Step 8: Jalankan kedua test, pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/github-issues-pager.test.tsx src/test/triage-pager.test.tsx
 ```
 
-- [ ] **Step 9: Typecheck + commit**
+- [x] **Step 9: Typecheck + commit**
 
 ```bash
 pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
