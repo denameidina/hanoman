@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { prisma } from "../src/db";
-import { enqueue, queueItemForSpec, listQueue } from "../src/services/scheduler/queue";
-import { drain, type GovernorDeps } from "../src/services/scheduler/governor";
+import { enqueue, queueItemForSpec, listQueue, markCanceled } from "../src/services/scheduler/queue";
+import { drain, canceledRaceNote, type GovernorDeps } from "../src/services/scheduler/governor";
 import { SCHEDULER_DEFAULTS } from "@hanoman/shared";
 
 const clean = () => prisma.schedulerQueueItem.deleteMany();
@@ -121,10 +121,82 @@ describe("governor.drain", () => {
       launch: async () => "s",
     };
     await drain(cfg({ maxConcurrent: 5 }), deps);
+    // `mockRestore()` MENGHAPUS metodenya alih-alih mengembalikannya: delegate Prisma menyajikan
+    // `update` lewat proxy, jadi begitu vitest membuang own-property yang dipasangnya tak ada yang
+    // mengambil alih — dan SETIAP test sesudahnya di berkas ini kehilangan `prisma
+    // .schedulerQueueItem.update` (terukur: `typeof` → "undefined"). Simpan & pasang balik sendiri.
+    const orig = prisma.schedulerQueueItem.update;
     const spy = vi.spyOn(prisma.schedulerQueueItem, "update");
     await drain(cfg({ maxConcurrent: 5 }), deps);
     expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
+    prisma.schedulerQueueItem.update = orig;
+    expect(typeof prisma.schedulerQueueItem.update).toBe("function");
     expect((await queueItemForSpec("SPEC-blk2"))!.note).toBe("menunggu SPEC-dep (belum selesai)");
+  });
+
+  // SPEC-522 · gerbang PERTAMA. `queued()` sudah menyaring `canceled`, tapi itu snapshot: drain
+  // memproses item berurutan dan tiap spawn hitungan detik, jadi baris di ekor daftar bisa
+  // dibatalkan SESUDAH snapshotnya diambil. Dibatalkan dari dalam `launch` item pertama =
+  // simulasi tepat dari operator yang menekan Batalkan selagi drain bekerja.
+  it("tak meluncurkan baris yang dibatalkan sesudah snapshot antrean diambil", async () => {
+    await enqueue({ specId: "SPEC-first", projectId: "p1", source: "backlog", priority: "tinggi" });
+    await enqueue({ specId: "SPEC-late", projectId: "p1", source: "backlog", priority: "sedang" });
+    const late = (await queueItemForSpec("SPEC-late"))!;
+    const launched: string[] = [];
+    const deps: GovernorDeps = {
+      liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [],
+      launch: async (item) => {
+        launched.push(item.specId);
+        if (item.specId === "SPEC-first") await markCanceled(late.id, "dibatalkan operator");
+        return `s_${item.specId}`;
+      },
+    };
+    await drain(cfg({ maxConcurrent: 5 }), deps);
+    expect(launched).toEqual(["SPEC-first"]);                  // SPEC-late tak pernah di-spawn
+    const row = (await queueItemForSpec("SPEC-late"))!;
+    expect(row.status).toBe("canceled");                       // statusnya bertahan
+    expect(row.sessionId).toBeNull();
+  });
+
+  // SPEC-522 · gerbang PERTAMA melindungi SEMUA mutasi di badan loop, bukan hanya `launch`:
+  // tanpa itu gerbang "spec sudah selesai" (SPEC-431) menimpa baris canceled jadi `done`.
+  it("gerbang spec-sudah-selesai tak menimpa baris yang dibatalkan", async () => {
+    await enqueue({ specId: "SPEC-cd", projectId: "p1", source: "backlog", priority: "tinggi" });
+    const row = (await queueItemForSpec("SPEC-cd"))!;
+    await markCanceled(row.id, "dibatalkan operator");
+    const deps: GovernorDeps = {
+      liveCount: () => 0, isLive: () => null, isDone: async () => true, blockers: async () => [],
+      launch: async () => "s",
+    };
+    await drain(cfg({ maxConcurrent: 5 }), deps);
+    expect((await queueItemForSpec("SPEC-cd"))!.status).toBe("canceled");
+    expect((await queueItemForSpec("SPEC-cd"))!.note).toBe("dibatalkan operator");
+  });
+
+  // SPEC-522 · gerbang KEDUA: sisa jendelanya adalah durasi satu spawn. CAS `markLaunched` yang
+  // gagal TIDAK ditelan — sesinya nyata, jadi ia tetap memakan slot dan operator diberi id-nya.
+  // Sesi TIDAK dibunuh (kendala: sesi hidup tak pernah dimatikan diam-diam).
+  it("pembatalan selama launch menang; sesi yang telanjur lahir dicatat, bukan dibunuh", async () => {
+    await enqueue({ specId: "SPEC-race", projectId: "p1", source: "backlog", priority: "tinggi" });
+    await enqueue({ specId: "SPEC-next", projectId: "p1", source: "backlog", priority: "rendah" });
+    const race = (await queueItemForSpec("SPEC-race"))!;
+    const launched: string[] = [];
+    const deps: GovernorDeps = {
+      liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [],
+      launch: async (item) => {
+        // dibatalkan DI TENGAH spawn: barisnya masih `queued` saat gerbang pertama lewat
+        if (item.specId === "SPEC-race") await markCanceled(race.id, "dibatalkan operator");
+        launched.push(item.specId);
+        return `s_${item.specId}`;
+      },
+    };
+    await drain(cfg({ maxConcurrent: 1 }), deps);              // satu slot: dipakai sesi SPEC-race
+    expect(launched).toEqual(["SPEC-race"]);
+    const row = (await queueItemForSpec("SPEC-race"))!;
+    expect(row.status).toBe("canceled");                       // TIDAK berbalik jadi launched
+    expect(row.sessionId).toBeNull();
+    expect(row.note).toBe(canceledRaceNote("s_SPEC-race"));    // operator tahu ada sesi yatim
+    expect((await queueItemForSpec("SPEC-next"))!.status).toBe("queued");  // slotnya memang terpakai
+    expect((await listQueue("launched")).length).toBe(0);
   });
 });
