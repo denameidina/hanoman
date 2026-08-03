@@ -38,7 +38,7 @@
   - `markLaunched(id: string, sessionId: string): Promise<boolean>` — **berubah tanda tangan** dari `Promise<void>`.
   - `noteRow(id: string, note: string): Promise<void>` — **rename** dari `noteQueued` (perilaku sama: tulis `note` tanpa menyentuh `status`, hanya bila berubah).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `describe("scheduler queue", …)` pada `server/test/scheduler-queue.service.test.ts`, dan perbarui baris import di atas berkas menjadi:
 
@@ -118,7 +118,7 @@ import { enqueue, listQueue, queued, markLaunched, markFailed, queueItemForSpec,
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/scheduler-queue.service.test.ts
@@ -126,7 +126,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `markCanceled is not a function` / `markRequeued is not a function` / `isQueued is not a function` (kegagalan import saat modul dimuat).
 
-- [ ] **Step 3: Implementasi minimal di `server/src/services/scheduler/queue.ts`**
+- [x] **Step 3: Implementasi minimal di `server/src/services/scheduler/queue.ts`**
 
 Ganti `markLaunched` yang ada (baris 48–50) dengan versi CAS:
 
@@ -201,7 +201,7 @@ Perbarui komentar kosakata di `server/prisma/schema.prisma` baris 402:
   status     String    @default("queued") // queued | launched | done | failed | canceled (SPEC-522 · tombstone operator)
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/scheduler-queue.service.test.ts
@@ -211,7 +211,7 @@ Expected: PASS, dan jumlah test bertambah 6 (11 total). **Jangan** terima "no te
 
 Berkas ini belum bisa di-typecheck sendirian: `governor.ts` masih mengimpor `noteQueued`. Itu diperbaiki di Task 2.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/scheduler/queue.ts server/prisma/schema.prisma server/test/scheduler-queue.service.test.ts
@@ -230,7 +230,7 @@ git commit -m "feat(spec-522): status canceled + CAS batal/antre-ulang di antrea
 - Consumes: `markCanceled`, `isQueued`, `noteRow`, `markLaunched` (kini `Promise<boolean>`) dari Task 1.
 - Produces: `canceledRaceNote(sessionId: string): string` diekspor dari `governor.ts` (dipakai test; UI hanya merender `note` apa adanya).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `describe("governor.drain", …)` pada `server/test/scheduler-governor.test.ts`, dan perbarui dua baris import di atas berkas menjadi:
 
@@ -307,7 +307,7 @@ import { drain, canceledRaceNote, type GovernorDeps } from "../src/services/sche
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/scheduler-governor.test.ts
@@ -315,7 +315,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `canceledRaceNote is not exported` (kegagalan import saat modul dimuat).
 
-- [ ] **Step 3: Implementasi di `server/src/services/scheduler/governor.ts`**
+- [x] **Step 3: Implementasi di `server/src/services/scheduler/governor.ts`**
 
 Ganti baris import (baris 3):
 
@@ -367,7 +367,7 @@ Ganti blok `try` peluncuran (baris 50–53) jadi:
       } catch (e) {
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/scheduler-governor.test.ts server/test/scheduler-queue.service.test.ts server/test/scheduler-engine.test.ts server/test/scheduler-reconcile.test.ts
@@ -375,7 +375,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS semua (governor 11 test, queue 11 test, engine & reconcile tak berubah).
 
-- [ ] **Step 5: Typecheck server**
+- [x] **Step 5: Typecheck server**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -383,7 +383,7 @@ pnpm --filter ./server typecheck
 
 Expected: keluar tanpa error. (Ini yang menangkap sisa pemanggil `noteQueued`/`markLaunched` bila ada.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/scheduler/governor.ts server/test/scheduler-governor.test.ts
@@ -406,7 +406,7 @@ git commit -m "feat(spec-522): dua gerbang governor agar pembatalan tak kalah ba
   - `POST /api/scheduler/queue/:id/requeue` (tanpa body) → 200 · 404 · 409
   - `paths.schedulerQueueCancel(id: string): string` · `paths.schedulerQueueRequeue(id: string): string`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `describe("scheduler routes", …)` pada `server/test/scheduler.route.test.ts`, dan perbarui baris import di atas berkas menjadi:
 
@@ -481,7 +481,7 @@ import { enqueue, queueItemForSpec, markLaunched } from "../src/services/schedul
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/scheduler.route.test.ts
@@ -489,7 +489,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — enam test baru menerima **404** dari Fastify (route belum terdaftar).
 
-- [ ] **Step 3: Implementasi route**
+- [x] **Step 3: Implementasi route**
 
 Ganti seluruh isi `server/src/routes/scheduler.ts` dengan:
 
@@ -585,7 +585,7 @@ Tambahkan di `shared/src/api.ts` tepat sesudah baris `schedulerState:` (baris 12
   schedulerQueueRequeue: (id: string) => `${API}/scheduler/queue/${encodeURIComponent(id)}/requeue`,
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/scheduler.route.test.ts
@@ -593,7 +593,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS 10 test (4 lama + 6 baru).
 
-- [ ] **Step 5: Typecheck paket yang tersentuh**
+- [x] **Step 5: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
@@ -601,7 +601,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 
 Expected: keduanya keluar tanpa error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/scheduler.ts shared/src/api.ts server/test/scheduler.route.test.ts
@@ -623,7 +623,7 @@ git commit -m "feat(spec-522): endpoint cancel & requeue baris antrean scheduler
   - `api.cancelSchedulerQueueItem(id: string, reason?: string): Promise<SchedulerQueueItemView>`
   - `api.requeueSchedulerQueueItem(id: string): Promise<SchedulerQueueItemView>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Pada `src/test/scheduler-screen.test.tsx`, ganti blok `vi.hoisted` + `vi.mock` di atas berkas dengan:
 
@@ -690,7 +690,7 @@ describe("SchedulerScreen pembatalan antrean (SPEC-522)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/scheduler-screen.test.tsx
@@ -698,7 +698,7 @@ env -u NODE_ENV pnpm vitest --run src/test/scheduler-screen.test.tsx
 
 Expected: FAIL — `Unable to find an accessible element with the role "button" and name /batalkan/i`.
 
-- [ ] **Step 3a: Tambahkan dua metode di `src/src/api/client.ts`**
+- [x] **Step 3a: Tambahkan dua metode di `src/src/api/client.ts`**
 
 Tepat sesudah baris `getSchedulerState: …` (baris 421):
 
@@ -714,7 +714,7 @@ Tepat sesudah baris `getSchedulerState: …` (baris 421):
 
 Dan tambahkan `type SchedulerQueueItemView` ke daftar import `@hanoman/shared` di baris 1 (tepat sesudah `type SchedulerStateView`).
 
-- [ ] **Step 3b: Ubah `src/src/screens/SchedulerScreen.tsx`**
+- [x] **Step 3b: Ubah `src/src/screens/SchedulerScreen.tsx`**
 
 Ganti `QueueRow` (baris 75–85) dengan versi ber-tombol:
 
@@ -796,7 +796,7 @@ Ganti pemanggilan seksi Antrean (baris 283–285) dan sisipkan seksi Dibatalkan 
       </Section>
 ```
 
-- [ ] **Step 4: Jalankan test web, pastikan LULUS**
+- [x] **Step 4: Jalankan test web, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/scheduler-screen.test.tsx src/test/scheduler-nav.test.tsx
@@ -804,7 +804,7 @@ env -u NODE_ENV pnpm vitest --run src/test/scheduler-screen.test.tsx src/test/sc
 
 Expected: PASS 10 test (7 lama + 3 baru) di `scheduler-screen`, `scheduler-nav` tak berubah.
 
-- [ ] **Step 5: Typecheck web + shared**
+- [x] **Step 5: Typecheck web + shared**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -812,7 +812,7 @@ pnpm --filter ./src typecheck
 
 Expected: keluar tanpa error. (Bila nama paket web bukan `./src`, pakai nama dari `pnpm-workspace.yaml`.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/api/client.ts src/src/screens/SchedulerScreen.tsx src/test/scheduler-screen.test.tsx
@@ -834,7 +834,7 @@ git commit -m "feat(spec-522): tombol Batalkan & seksi Dibatalkan di panel sched
 - Consumes: keputusan & kosakata dari Task 1–4 (nama status `canceled`, dua endpoint, dua gerbang).
 - Produces: nomor ADR **0106** terpakai; keduanya tertaut (SPEC-386 menuntut tautan di `README.md` **dan** `adr/README.md`).
 
-- [ ] **Step 1: Pastikan nomor 0106 masih bebas**
+- [x] **Step 1: Pastikan nomor 0106 masih bebas**
 
 ```bash
 ls internal/docs/adr/ | tail -4
@@ -843,7 +843,7 @@ for w in /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/*/internal/do
 
 Expected: `0105-changelog-per-project.md` yang terakhir, dan `0` untuk setiap worktree. Bila ada yang `1`, pakai nomor bebas berikutnya dan sesuaikan seluruh rujukan di task ini.
 
-- [ ] **Step 2: Tulis `internal/docs/adr/0106-batalkan-antrean-scheduler.md`**
+- [x] **Step 2: Tulis `internal/docs/adr/0106-batalkan-antrean-scheduler.md`**
 
 ```markdown
 # ADR-0106 — Pembatalan antrean scheduler: status `canceled` sebagai tombstone, dua endpoint CAS
@@ -928,7 +928,7 @@ bisa dimatikan adalah kerusakan yang tak perlu.
   yang persis perilaku yang diinginkan.
 ```
 
-- [ ] **Step 3: Tautkan ADR di kedua index**
+- [x] **Step 3: Tautkan ADR di kedua index**
 
 Di `internal/docs/README.md`, tepat sebelum baris `- [0105 — Changelog per project…`:
 
@@ -943,7 +943,7 @@ Di `internal/docs/adr/README.md`, sisipkan entri narasi berikut **tepat sebelum*
 - [0106 — Pembatalan antrean scheduler: status `canceled` sebagai tombstone, dua endpoint CAS](0106-batalkan-antrean-scheduler.md) — **mengamandemen keputusan #2 dari 0072**, **menegakkan 0015/0016/0065**, memperluas pola tombstone SPEC-431 (SPEC-522): panel scheduler menampilkan antrean tapi tak punya satu pun tombol yang menyentuh sebuah baris, jadi jalan keluar dari antrean cuma dua dan keduanya kasar — **menunggu** item meluncur lalu menutup sesinya, atau menarik **rem global** Pause/Stop yang menghentikan seluruh antrean demi satu baris. Menunggu bukan sekadar tak nyaman: peluncuran membuat worktree + branch `hanoman/<sessionId>` dan menulis `Spec.baseSha`/`startedAt` — stempel *mulai pertama* yang menurut 0090 sengaja **tak pernah** ditulis ulang — lalu membakar kuota agen; membiarkan item meluncur hanya supaya bisa dimatikan adalah kerusakan yang tak perlu. **(1) `canceled` sebagai nilai kelima `status`.** 0072 #2 mengeja kosakatanya (`queued|launched|done|failed`), jadi menambahnya adalah amandemen — bukan sekadar detail implementasi. Kolomnya `String` → **tanpa migration**; tabelnya LOCAL-ONLY sehingga nilai baru ini tak menyeberang antar-instance, dan itu benar (antrean = state operasional mesin ini). **(2) Tombstone, bukan `DELETE`.** Barisnya sengaja ditinggalkan: `enqueue()` memakai `upsert` ber-`update:{}`, jadi checker `backlog` yang menjumpai spec yang sama pada cadence berikutnya tak bisa menghidupkannya. Menghapusnya justru membuat pembatalan **membatalkan dirinya sendiri** dalam ≤1 cadence, karena spec-nya masih cocok `UNSTARTED_SPEC_WHERE` — mekanisme yang sama sudah dipakai SPEC-431 (`markDone` + `ALREADY_DONE_NOTE`). **(3) CAS, bukan baca-lalu-tulis.** Kedua transisi ditulis `updateMany({ where: { id, status: <asal> } })` dan dinilai dari `count`; di antara `findUnique` dan `update` governor bisa meluncurkan barisnya, sehingga kendala "item yang sudah punya sesi aktif tak boleh dibunuh diam-diam" hanya bisa ditegakkan **struktur**, bukan niat. Alasan penolakan disusun **sesudah** CAS gagal (404 bila barisnya hilang, 409 + `status` saat ini bila transisinya haram) — memeriksa lebih dulu adalah persis balapan yang dihindari. **(4) Reversibel.** `requeue` ada karena tombstone-nya permanen secara mekanis: tanpa jalan pulang, "Batalkan" diam-diam berarti "jangan pernah dijadwalkan lagi"; konsekuensinya UI tak perlu dialog konfirmasi. **(5) Dua gerbang governor.** `queued()` memang menyaring `canceled`, tapi daftar itu **snapshot** — `drain()` memprosesnya berurutan dan tiap `launch` men-spawn worktree + sesi tmux (hitungan detik), jadi item di ekor daftar bisa duduk puluhan detik di dalam loop. Gerbang A (`isQueued`, dibaca ulang dari DB, pola `isDone` SPEC-431 & `blockers` SPEC-447) ditaruh di **puncak badan loop** — bukan tepat sebelum `launch` — supaya ia melindungi semua mutasi di sana: baris `canceled` tak boleh ditimpa jadi `done` oleh gerbang SPEC-431 maupun jadi `launched` oleh cabang idempoten `isLive`. Gerbang B = `markLaunched` jadi CAS, menutup sisa jendela seluas satu spawn. **(6) Sesi yang telanjur lahir tak dibunuh.** Saat gerbang B menyala sesinya sudah nyata: governor mencatat id-nya di `note` (operator menutupnya dari Terminal) dan **tetap** `slots--`, karena cap concurrency tak boleh dilanggar hanya karena barisnya dibatalkan. `reconcile()` tak tersentuh — ia hanya memindai `launched`, jadi tak ada `Notification fail` palsu untuk item yang sengaja dibatalkan
 ```
 
-- [ ] **Step 4: Perbarui `internal/docs/architecture/api-contract.md`**
+- [x] **Step 4: Perbarui `internal/docs/architecture/api-contract.md`**
 
 Di blok kode Scheduler (baris 836–842), tambahkan dua baris tepat sesudah `GET /api/scheduler/state`:
 
@@ -973,7 +973,7 @@ Dan tambahkan paragraf `>` baru di akhir bagian Scheduler (sesudah paragraf Pane
 > reversibel) + seksi **Dibatalkan** ber-tombol **Antre lagi**.
 ```
 
-- [ ] **Step 5: Perbarui `internal/docs/architecture/data-model.md`**
+- [x] **Step 5: Perbarui `internal/docs/architecture/data-model.md`**
 
 Pada bagian `## SchedulerQueueItem`, ubah butir `status` (baris 368) menjadi:
 
@@ -999,7 +999,7 @@ dan tambahkan satu butir baru di akhir bagian itu (sesudah butir Rekonsiliasi ak
   `launched`, jadi tak ada `Notification fail` palsu untuk item yang sengaja dibatalkan.
 ```
 
-- [ ] **Step 6: Verifikasi integritas index docs**
+- [x] **Step 6: Verifikasi integritas index docs**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli exec tsx src/index.ts docs index --check
@@ -1008,7 +1008,7 @@ node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli exe
 Expected: laporan tanpa entri hilang. Bila CLI belum ter-build, cukup pastikan secara manual bahwa
 `0106-batalkan-antrean-scheduler.md` tertaut di `internal/docs/README.md` **dan** `internal/docs/adr/README.md`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs/
@@ -1021,7 +1021,7 @@ git commit -m "docs(spec-522): ADR-0106 pembatalan antrean scheduler + api-contr
 
 **Files:** tak ada perubahan kode; hanya verifikasi.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -1040,7 +1040,7 @@ env -u NODE_ENV pnpm vitest --run src/test/scheduler-screen.test.tsx src/test/sc
 
 Expected: PASS.
 
-- [ ] **Step 2: Typecheck ketiga paket yang tersentuh**
+- [x] **Step 2: Typecheck ketiga paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
@@ -1048,7 +1048,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --f
 
 Expected: ketiganya keluar tanpa error.
 
-- [ ] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint — wajib, sekali di akhir)**
+- [x] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint — wajib, sekali di akhir)**
 
 DB **khusus smoke** (jangan pernah pakai DB test bersama — run tetangga menghapusnya di tengah
 jalan) dan **port non-default** supaya tak bertabrakan dengan instance dev yang mungkin hidup.
@@ -1107,7 +1107,7 @@ kill $(lsof -ti:$SMOKE_PORT)
 rm -rf "$SMOKE_DIR"
 ```
 
-- [ ] **Step 4: Diff bersih & commit sisa (bila ada)**
+- [x] **Step 4: Diff bersih & commit sisa (bila ada)**
 
 ```bash
 git status --porcelain
