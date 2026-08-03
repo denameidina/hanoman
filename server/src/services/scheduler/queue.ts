@@ -37,6 +37,32 @@ export function listQueue(status?: string): Promise<SchedulerQueueItem[]> {
   return prisma.schedulerQueueItem.findMany({ where: status ? { status } : undefined });
 }
 
+// SPEC-523 · antrean sebagai DAFTAR berhalaman. `skip`/`take` di query DB sah: baris antrean tak
+// punya overlay apa pun (larangan ADR-0038 mengikat GET /specs, yang stage live-nya butuh set penuh).
+export async function listQueuePage(f: { status?: string; page?: string; limit?: string } = {}):
+  Promise<{ items: SchedulerQueueItem[]; total: number; page: number; pageSize: number }> {
+  const where = f.status ? { status: f.status } : undefined;
+  const total = await prisma.schedulerQueueItem.count({ where });
+  const pageSize = f.limit ? Math.max(1, Math.floor(+f.limit) || 1) : (total || 1);
+  const page = f.page ? Math.max(1, Math.floor(+f.page) || 1) : 1;
+  const items = await prisma.schedulerQueueItem.findMany({
+    where, orderBy: { enqueuedAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize,
+  });
+  return { items, total, page, pageSize };
+}
+
+// SPEC-523 · hitungan per status untuk `GET /scheduler/state`. Kunci ditulis apa adanya (bukan
+// index dinamis) agar tetap tertype di bawah noUncheckedIndexedAccess — pola `srcView` di route.
+export async function queueCounts(): Promise<{ queued: number; launched: number; done: number; failed: number }> {
+  const [queued, launched, done, failed] = await Promise.all([
+    prisma.schedulerQueueItem.count({ where: { status: "queued" } }),
+    prisma.schedulerQueueItem.count({ where: { status: "launched" } }),
+    prisma.schedulerQueueItem.count({ where: { status: "done" } }),
+    prisma.schedulerQueueItem.count({ where: { status: "failed" } }),
+  ]);
+  return { queued, launched, done, failed };
+}
+
 // Item siap-drain, urut prioritas lalu FIFO (enqueuedAt). Sort di memori: himpunan kecil.
 export async function queued(): Promise<SchedulerQueueItem[]> {
   const items = await prisma.schedulerQueueItem.findMany({ where: { status: "queued" } });

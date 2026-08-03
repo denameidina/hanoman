@@ -10,11 +10,8 @@ describe("zSchedulerState (SPEC-299)", () => {
         { id: "backlog", enabled: true, everyMin: 15, lastRunAt: "2026-07-22T00:00:00.000Z", nextRunAt: "2026-07-22T00:15:00.000Z" },
         { id: "triase", enabled: false, everyMin: 30, lastRunAt: null, nextRunAt: null },
       ],
-      queue: [
-        { id: "q1", specId: "SPEC-1", projectId: "a", source: "backlog", priority: "sedang",
-          status: "done", sessionId: "spec-1", note: null,
-          enqueuedAt: "2026-07-22T00:00:00.000Z", launchedAt: "2026-07-22T00:01:00.000Z" },
-      ],
+      // SPEC-523 · antrean pindah ke GET /scheduler/queue; state membawa hitungannya saja.
+      queueCounts: { queued: 1, launched: 0, done: 1, failed: 0 },
       sessions: [
         { id: "spec-2", projectId: "a", specId: "SPEC-2", flow: "feature", branch: "hanoman/spec-2",
           decision: false, exited: false, cwd: "/tmp/wt" },   // cwd ekstra harus diabaikan
@@ -23,7 +20,7 @@ describe("zSchedulerState (SPEC-299)", () => {
     const parsed = zSchedulerState.parse(sample);
     expect(parsed.sources[0]!.id).toBe("backlog");
     expect(parsed.sources[1]!.id).toBe("triase");
-    expect(parsed.queue[0]!.status).toBe("done");
+    expect(parsed.queueCounts.done).toBe(1);
     expect(parsed.sessions[0]!.specId).toBe("SPEC-2");
   });
 });

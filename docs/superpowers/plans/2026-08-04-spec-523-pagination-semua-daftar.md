@@ -487,7 +487,7 @@ EOF
 - Produces: path `paths.schedulerQueue` → `/api/scheduler/queue`
 - Produces: `zSchedulerState` tanpa `queue`, dengan `queueCounts`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `server/test/scheduler.route.test.ts`, **ganti** test `GET /state exposes cap, queue contents, ...` dengan dua test berikut (pertahankan test lain apa adanya):
 
@@ -522,14 +522,14 @@ Di `server/test/scheduler.route.test.ts`, **ganti** test `GET /state exposes cap
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/scheduler.route.test.ts
 ```
 Diharapkan: GAGAL — `queueCounts` `undefined` dan `/api/scheduler/queue` 404.
 
-- [ ] **Step 3: Tambah helper di `server/src/services/scheduler/queue.ts`**
+- [x] **Step 3: Tambah helper di `server/src/services/scheduler/queue.ts`**
 
 Tambahkan setelah `listQueue` (baris ~35):
 
@@ -561,7 +561,7 @@ export async function queueCounts(): Promise<{ queued: number; launched: number;
 }
 ```
 
-- [ ] **Step 4: Ubah route scheduler**
+- [x] **Step 4: Ubah route scheduler**
 
 Di `server/src/routes/scheduler.ts`:
 
@@ -600,7 +600,7 @@ import { listQueue, listQueuePage, queueCounts } from "../services/scheduler/que
   });
 ```
 
-- [ ] **Step 5: Perbarui DTO & path di `shared`**
+- [x] **Step 5: Perbarui DTO & path di `shared`**
 
 Di `shared/src/dto.ts` baris 144-150, ganti `zSchedulerState`:
 
@@ -628,7 +628,7 @@ Di `shared/src/api.ts` baris 127 (setelah `schedulerState`):
   schedulerQueue: `${API}/scheduler/queue`,
 ```
 
-- [ ] **Step 6: Perbarui test kontrak DTO**
+- [x] **Step 6: Perbarui test kontrak DTO**
 
 Di `shared/src/scheduler-state.test.ts`, ganti blok `queue: [...]` (baris 13-17) dengan:
 ```ts
@@ -639,7 +639,7 @@ dan ganti assert baris 26:
     expect(parsed.queueCounts.done).toBe(1);
 ```
 
-- [ ] **Step 7: Jalankan test, pastikan HIJAU**
+- [x] **Step 7: Jalankan test, pastikan HIJAU**
 
 ```bash
 pnpm vitest --run shared/src/scheduler-state.test.ts
@@ -647,14 +647,14 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Diharapkan: keduanya lulus.
 
-- [ ] **Step 8: Typecheck**
+- [x] **Step 8: Typecheck**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 ```
 Diharapkan: nol error.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/src/services/scheduler/queue.ts server/src/routes/scheduler.ts shared/src/dto.ts shared/src/api.ts shared/src/scheduler-state.test.ts server/test/scheduler.route.test.ts

@@ -126,6 +126,8 @@ export const paths = {
   // SPEC-299 · panel scheduler (daun #6) — konsumen read-only fondasi SPEC-294/ADR-0072.
   schedulerConfig: `${API}/scheduler/config`,
   schedulerState: `${API}/scheduler/state`,
+  // SPEC-523 · antrean sebagai daftar berhalaman (page/limit + status), lepas dari `state`.
+  schedulerQueue: `${API}/scheduler/queue`,
   // SPEC-409 · ADR-0091 · hanoman-lead. Semua HTTP (polling) — tak ada kanal WS baru (AC-26).
   leadConfig: `${API}/lead/config`,
   leadStatus: `${API}/lead/status`,

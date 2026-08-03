@@ -31,14 +31,34 @@ describe("scheduler routes", () => {
     const r = await app.inject({ method: "PUT", url: "/api/scheduler/config", payload: { maxConcurrent: 0 } });
     expect(r.statusCode).toBe(400);
   });
-  it("GET /state exposes cap, queue contents, and per-source next/last-run shape", async () => {
+  // SPEC-523 · `queue` DICABUT dari state (daftar tanpa batas); state membawa hitungannya saja.
+  it("GET /state membawa queueCounts, tak lagi membawa queue penuh (SPEC-523)", async () => {
     await enqueue({ specId: "SPEC-1", projectId: "p1", source: "backlog", priority: "tinggi" });
+    await enqueue({ specId: "SPEC-2", projectId: "p1", source: "backlog", priority: "sedang" });
     const r = await app.inject({ method: "GET", url: "/api/scheduler/state" });
     expect(r.statusCode).toBe(200);
     const b = r.json();
     expect(b.cap).toBe(2);
-    expect(b.queue.length).toBe(1);
-    expect(b.queue[0].specId).toBe("SPEC-1");
+    expect(b.queue).toBeUndefined();
+    expect(b.queueCounts).toEqual({ queued: 2, launched: 0, done: 0, failed: 0 });
     expect(b.sources.map((s: any) => s.id).sort()).toEqual(["backlog", "triase"]);
+  });
+
+  it("GET /scheduler/queue berhalaman & tersaring status (SPEC-523)", async () => {
+    for (let i = 0; i < 5; i++) {
+      await enqueue({ specId: `SPEC-${i}`, projectId: "p1", source: "backlog", priority: "sedang" });
+    }
+    const all = await app.inject({ method: "GET", url: "/api/scheduler/queue?page=1&limit=2" });
+    expect(all.statusCode).toBe(200);
+    const b = all.json();
+    expect(b.items.length).toBe(2);
+    expect(b.total).toBe(5);
+    expect(b.page).toBe(1);
+    expect(b.pageSize).toBe(2);
+    expect(typeof b.items[0].enqueuedAt).toBe("string");
+
+    const none = await app.inject({ method: "GET", url: "/api/scheduler/queue?status=failed" });
+    expect(none.json().total).toBe(0);
+    expect(none.json().items).toEqual([]);
   });
 });
