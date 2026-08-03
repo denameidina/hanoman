@@ -64,6 +64,22 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
     await waitFor(() => expect(startSession).toHaveBeenCalledWith({ spec: "SPEC-362", flow: "feature" }));
   });
 
+  // SPEC-517 · "Mulai lagi" = sesi BARU dengan konteks yang sama. Sejak runtime bisa dipilih,
+  // "konteks yang sama" termasuk agen/model/effort yang tercatat di baris riwayat itu.
+  it("Mulai lagi terminal agen membawa runtime baris riwayatnya", async () => {
+    listSessionHistory.mockResolvedValue({
+      items: [row({ kind: "terminal", specId: null, title: null, flow: null,
+        agent: "codex", model: "gpt-5.6-terra", effort: "low" })],
+      total: 1, page: 1, pageSize: 20 });
+    render(<TerminalScreen projects={projects} backlog={[]} />);
+    fireEvent.click(await screen.findByText("Riwayat"));
+    await waitFor(() => expect(screen.getAllByText("hanoman").some((el) => el.closest("button"))).toBe(true));
+    fireEvent.click(screen.getAllByText("hanoman").find((el) => el.closest("button"))!);
+    fireEvent.click(await screen.findByText("Mulai lagi"));
+    await waitFor(() => expect(createTerminal).toHaveBeenCalledWith(
+      "p1", { agent: "codex", model: "gpt-5.6-terra", effort: "low" }));
+  });
+
   it("Mulai lagi terminal biasa memanggil createShell dengan projectnya", async () => {
     listSessionHistory.mockResolvedValue({
       items: [row({ kind: "shell", specId: null, title: null, flow: null })], total: 1, page: 1, pageSize: 20 });

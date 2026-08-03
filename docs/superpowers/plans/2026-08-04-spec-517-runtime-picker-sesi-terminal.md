@@ -1058,7 +1058,7 @@ git commit -m "feat(spec-517): form pemilih runtime saat membuat sesi terminal b
 **Interfaces:**
 - Consumes: `SessionHistoryView` (`agent: string`, `model: string | null`, `effort: string | null`) — kolomnya sudah ada sejak ADR-0079.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/terminal-history-button.test.tsx`:
 
@@ -1080,7 +1080,7 @@ Tambahkan di `src/test/terminal-history-button.test.tsx`:
   });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/terminal-history-button.test.tsx
@@ -1088,7 +1088,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-history-button.test.tsx
 
 Expected: FAIL — `createTerminal` dipanggil dengan `"p1"` saja.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `restartFromHistory` (`TerminalScreen.tsx`), ganti cabang `r.kind === "terminal"`:
 
@@ -1106,7 +1106,7 @@ Di `restartFromHistory` (`TerminalScreen.tsx`), ganti cabang `r.kind === "termin
             : await api.createTerminalFlow(r.projectId, r.kind as Flow)
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/terminal-history-button.test.tsx
@@ -1114,7 +1114,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-history-button.test.tsx
 
 Expected: PASS (5 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalScreen.tsx src/test/terminal-history-button.test.tsx

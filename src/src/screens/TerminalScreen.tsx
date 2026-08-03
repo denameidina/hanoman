@@ -124,7 +124,15 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
         : r.kind === "shell"
           ? await api.createShell(r.projectId)
           : r.kind === "terminal"
-            ? await api.createTerminal(r.projectId)
+            // SPEC-517 · runtime baris riwayat ikut, bukan default global: "Mulai lagi" berjanji
+            // konteks yang sama, dan sejak runtime bisa dipilih ia bagian dari konteks itu.
+            // `agent` kolomnya `String` (bukan enum) — nilai asing jatuh ke claude, cermin
+            // pembacaan @hanoman_agent di pty.ts.
+            ? await api.createTerminal(r.projectId, {
+                agent: r.agent === "codex" ? "codex" : "claude",
+                ...(r.model ? { model: r.model } : {}),
+                ...(r.effort ? { effort: r.effort } : {}),
+              })
             : await api.createTerminalFlow(r.projectId, r.kind as Flow);
       setSessions((s) => (s.some((x) => x.id === born.id)
         ? s
