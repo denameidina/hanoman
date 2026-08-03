@@ -7,7 +7,6 @@ import { api } from "../api/client";
 import type { ProjectVM } from "./types";
 import { CustomAgentsPanel } from "./CustomAgentsPanel";
 import { AutoMergeCard } from "./AutoMergeCard";
-import { ChangelogPanel } from "./ChangelogPanel";
 
 const COV_TONE = (s: string) => (s === "broken" ? "err" : s === "drift" ? "warn" : "ok");
 
@@ -90,9 +89,13 @@ function Door({ icon, title, hint, onClick }:
   );
 }
 
-export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onGotoBacklog, onDelete, onReverse, onScaffold, onToast, onProjectChanged }:
+export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onGotoBacklog, onGotoChangelog, onDelete, onReverse, onScaffold, onToast, onProjectChanged }:
   { p: ProjectVM; onEdit: () => void; onGotoDocs: () => void; onGotoTerminal: () => void;
-    onGotoBacklog: () => void; onDelete: () => void; onReverse?: () => void; onScaffold?: () => void;
+    onGotoBacklog: () => void;
+    // SPEC-519 · changelog punya halamannya sendiri (entri sidebar + deep-link); di sini ia pintu,
+    // bukan panel — dua salinan generator berarti dua tempat yang bisa berbeda perilaku.
+    onGotoChangelog: () => void;
+    onDelete: () => void; onReverse?: () => void; onScaffold?: () => void;
     onToast: (msg: string, kind?: string, icon?: string) => void;
     // SPEC-258 · dipanggil sesudah mutasi in-card (Help Center) agar App refetch VM & status persist.
     onProjectChanged?: (id: string) => void | Promise<void> }) {
@@ -137,9 +140,6 @@ export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onG
       {/* SPEC-486 · ADR-0103 · kebijakan auto-merge per project (override per item di Backlog). */}
       <AutoMergeCard p={p} onToast={onToast} onProjectChanged={onProjectChanged} />
 
-      {/* SPEC-516 · ADR-0105 · changelog naratif per project (tiga mode). */}
-      <ChangelogPanel p={p} onToast={onToast} />
-
       {/* SPEC-450 · ADR-0094 · permukaan PER-PROJECT katalog custom agent. Komponen yang sama
           dipakai Settings dengan projectId=null; di sini agen global tampil read-only bertanda
           "warisan global" supaya tak ada pertanyaan "lalu yang global mana". */}
@@ -151,10 +151,13 @@ export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onG
         <CustomAgentsPanel projectId={p.id} onToast={onToast} />
       </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${onReverse || onScaffold ? 4 : 3}, 1fr)`, gap: 12 }}>
+      {/* SPEC-519 · jumlah pintu tak lagi dihitung tangan (`repeat(4|3, 1fr)`): auto-fit menampung
+          pintu baru tanpa ada yang perlu ingat memperbarui angkanya. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
         <Door icon="book-open" title="Source of Truth" hint="baca & sunting docs" onClick={onGotoDocs} />
         <Door icon="terminal" title="Buka terminal" hint="sesi claude project ini" onClick={onGotoTerminal} />
         <Door icon="list-checks" title="Lihat backlog" hint={`${p.backlog} spec terbuka`} onClick={onGotoBacklog} />
+        <Door icon="megaphone" title="Changelog" hint="ringkasan rilis untuk pemakai" onClick={onGotoChangelog} />
         {onReverse && <Door icon="radar" title="Reverse docs" hint="susun Source of Truth dari kode" onClick={onReverse} />}
         {onScaffold && <Door icon="sparkles" title="Scaffold docs" hint="susun Source of Truth dari ide" onClick={onScaffold} />}
       </div>

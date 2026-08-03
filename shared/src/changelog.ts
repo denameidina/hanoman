@@ -62,3 +62,15 @@ export function defaultRange(today: Date): { from: string; to: string } {
   const from = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (DEFAULT_RANGE_DAYS - 1));
   return { from: dayString(from), to: dayString(today) };
 }
+
+/** SPEC-519 · predikat cari daftar rilis. Case-insensitive atas judul, isi, dan mode.
+ *  `q` kosong / spasi doang → semua lolos: kotak cari yang belum diketik tak boleh mengosongkan
+ *  daftar. Dipakai `GET /projects/:id/changelog?q=` — saring dulu, baru `paginate`, supaya
+ *  `total` menghitung hasil cari (ADR-0038). */
+export function changelogMatches(row: { title: string; body: string; mode: string }, q: string): boolean {
+  const needle = (q ?? "").trim().toLowerCase();
+  if (!needle) return true;
+  return row.title.toLowerCase().includes(needle)
+    || row.body.toLowerCase().includes(needle)
+    || row.mode.toLowerCase().includes(needle);
+}

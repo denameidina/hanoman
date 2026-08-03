@@ -9,16 +9,16 @@ const sources = {
   defaultRange: { from: "2026-07-05", to: "2026-08-03" },
 };
 
+const made = {
+  id: "c1", projectId: "p1", mode: "backlog", title: "Juli", params: {},
+  body: "# Changelog — Juli\n\n- **Butir** — manfaatnya.\n",
+  generator: "agent", warning: null, itemCount: 1, createdAt: "2026-08-03T00:00:00.000Z",
+};
+
 vi.mock("../api/client", () => ({
   api: {
     changelogSources: vi.fn(async () => sources),
-    listChangelogs: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 0 })),
-    generateChangelog: vi.fn(async () => ({
-      id: "c1", projectId: "p1", mode: "backlog", title: "Juli", params: {},
-      body: "# Changelog — Juli\n\n- **Butir** — manfaatnya.\n",
-      generator: "agent", warning: null, itemCount: 1, createdAt: "2026-08-03T00:00:00.000Z",
-    })),
-    deleteChangelog: vi.fn(async () => undefined),
+    generateChangelog: vi.fn(async () => made),
   },
 }));
 
@@ -49,31 +49,6 @@ describe("ChangelogPanel", () => {
     expect(screen.getAllByRole("option", { name: "v1.1.0" }).length).toBeGreaterThan(0);
   });
 
-  it("Bangkitkan merender hasil beserta tombol salin & unduh", async () => {
-    const { api } = await import("../api/client");
-    render(<ChangelogPanel {...props} />);
-    await waitFor(() => screen.getByRole("button", { name: /Bangkitkan/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Bangkitkan/ }));
-    await waitFor(() => expect(api.generateChangelog).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByText("Butir")).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Salin" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Unduh .md" })).toBeInTheDocument();
-  });
-
-  it("warning dari server tampil ke operator", async () => {
-    const { api } = await import("../api/client");
-    (api.generateChangelog as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      id: "c2", projectId: "p1", mode: "backlog", title: "Juli", params: {},
-      body: "# Changelog — Juli\n", generator: "fallback",
-      warning: "Narasi otomatis tak tersedia — agen kehabisan waktu.",
-      itemCount: 1, createdAt: "2026-08-03T00:00:00.000Z",
-    });
-    render(<ChangelogPanel {...props} />);
-    await waitFor(() => screen.getByRole("button", { name: /Bangkitkan/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Bangkitkan/ }));
-    await waitFor(() => expect(screen.getByText(/Narasi otomatis tak tersedia/)).toBeInTheDocument());
-  });
-
   it("repo tanpa tag: mode versi menjelaskan alasannya, tanpa tombol mati tanpa sebab", async () => {
     const { api } = await import("../api/client");
     (api.changelogSources as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -83,5 +58,17 @@ describe("ChangelogPanel", () => {
     await waitFor(() => screen.getByRole("button", { name: "Versi rilis" }));
     fireEvent.click(screen.getByRole("button", { name: "Versi rilis" }));
     await waitFor(() => expect(screen.getByText(/belum punya tag rilis/)).toBeInTheDocument());
+  });
+
+  // SPEC-519 · panel tak lagi merender hasil; ia menyerahkannya supaya SATU kartu merender
+  // badan rilis, entah rilis baru atau rilis lama yang dipilih dari daftar.
+  it("Bangkitkan menyerahkan hasil lewat onGenerated", async () => {
+    const { api } = await import("../api/client");
+    const onGenerated = vi.fn();
+    render(<ChangelogPanel {...props} onGenerated={onGenerated} />);
+    await waitFor(() => screen.getByRole("button", { name: /Bangkitkan/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Bangkitkan/ }));
+    await waitFor(() => expect(api.generateChangelog).toHaveBeenCalled());
+    await waitFor(() => expect(onGenerated).toHaveBeenCalledWith(made));
   });
 });

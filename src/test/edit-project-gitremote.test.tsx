@@ -8,6 +8,10 @@ const PROJECT = {
   commit: "belum ada commit", session: { status: "idle", phase: null, flow: null },
 };
 
+// AutoMergeCard (SPEC-486) self-fetch `listBranches` saat detail project di-mount dan
+// membawa tombol "Simpan"-nya sendiri — dua alasan berbeda kenapa berkas ini merah tanpa
+// ada hubungannya dengan subjeknya. Ia bukan subjek di sini, jadi di-noop.
+vi.mock("../src/screens/AutoMergeCard", () => ({ AutoMergeCard: () => null }));
 vi.mock("../src/api/client", () => ({
   api: {
     authStatus: vi.fn(async () => ({ needsSetup: false, user: { id: "u1", email: "a@b.co", createdAt: "" } })),

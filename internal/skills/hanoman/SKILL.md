@@ -208,6 +208,21 @@ Pakai skill lebih sempit saat task cocok:
   bukan hanya di picker (`PUT` ber-`AgentToken` tak lewat UI). `CHANGELOG_TIMEOUT_MS` sengaja
   **tetap konstanta**: ia disebut di dalam prompt, dan anggaran yang bisa digeser diam-diam
   berbohong kepada agennya (SPEC-432).
+  **Letak & jangkauan (SPEC-519, tanpa ADR):** changelog punya **entri sidebar sendiri**
+  (`changelog`, ikon `megaphone`) dan halaman yang bisa dibuka langsung lewat
+  **`#changelog=<projectId>[&cl=<changelogId>]`** (pola hash ADR-0071 yang sama dengan `#spec=`,
+  di-parse sekali saat mount lalu dibersihkan; kedua parser saling eksklusif). Daftar rilisnya
+  bergulir dengan **tinggi berbatas** (rantai flex yang menembus `Card` putus tanpa prop `fill` —
+  audit SPEC-393) dan dicari lewat **satu parameter aditif `?q=`** pada `GET /projects/:id/changelog`
+  yang sudah ada — predikat murni `changelogMatches()` di `@hanoman/shared`, disaring **sebelum**
+  `paginate` supaya `total` menghitung hasil cari (ADR-0038); menyaring di klien hanya menjangkau
+  halaman yang kebetulan termuat. `ChangelogPanel` jadi **generator murni** (hasil diserahkan lewat
+  `onGenerated`, satu jalur render untuk rilis baru maupun lama) dan detail project menunjuk ke
+  halaman itu lewat **pintu**, bukan menyalin generatornya. **Gotcha keenam:** setiap key `HN_NAV`
+  wajib punya cabang `section === …` di `App.tsx` — tanpa itu App merender kosong dan sidebar ikut
+  hilang (`runs`/`triggers`, SPEC-162); kini dijaga test kontrak `src/test/changelog-nav.test.tsx`
+  yang membaca sumber `App.tsx` **dari cwd**, sebab `import.meta.url` di bawah transform Vite bukan
+  URL ber-skema `file:`.
 - **Panduan AI agent punya URL** (SPEC-489, tanpa ADR — ADR-0065 & ADR-0099 **ditegakkan**):
   `docs/agent-integration.md` adalah **naskah tunggal**, disajikan mentah di
   **`GET /api/agent-integration.md`** (`text/markdown`, masuk daftar `PUBLIC` `app.ts` bersama

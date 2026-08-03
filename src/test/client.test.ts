@@ -54,4 +54,27 @@ describe("api client", () => {
     expect(url).toBe("/api/projects/p1/docs/internal/docs/x.md");
     expect(init.method).toBe("DELETE");
   });
+  // SPEC-519 · kotak cari halaman Changelog mengirim `q` ke endpoint yang sudah ada.
+  it("listChangelogs mengirim q/page/limit ke query string", async () => {
+    globalThis.fetch = vi.fn(async () => envelope([])) as any;
+    await api.listChangelogs("p1", { q: "laporan", page: 2, limit: 12 });
+    const url = (globalThis.fetch as any).mock.calls[0][0] as string;
+    expect(url).toContain("/api/projects/p1/changelog?");
+    expect(url).toContain("q=laporan");
+    expect(url).toContain("page=2");
+    expect(url).toContain("limit=12");
+  });
+  it("listChangelogs membuang q kosong", async () => {
+    globalThis.fetch = vi.fn(async () => envelope([])) as any;
+    await api.listChangelogs("p1", { q: "" });
+    expect((globalThis.fetch as any).mock.calls[0][0]).toBe("/api/projects/p1/changelog");
+  });
+  // SPEC-519 · deep-link `#changelog=<p>&cl=<id>` bisa menunjuk rilis yang tak ada di halaman 1.
+  it("getChangelog mengambil satu rilis lewat endpoint item", async () => {
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ id: "c1" }),
+      { status: 200, headers: { "content-type": "application/json" } })) as any;
+    const r = await api.getChangelog("p1", "c1");
+    expect((globalThis.fetch as any).mock.calls[0][0]).toBe("/api/projects/p1/changelog/c1");
+    expect(r.id).toBe("c1");
+  });
 });
