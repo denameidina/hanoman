@@ -57,7 +57,7 @@
 - Consumes: —
 - Produces: kolom `Spec.doneAt: Date | null`; `recordCompletion(specId, title, projectId)` (tanda tangan **tidak berubah**) kini juga menstempel `doneAt` sekali.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/spec-done-at.test.ts`:
 
@@ -106,7 +106,7 @@ describe("Spec.doneAt (SPEC-516 · ADR-0105)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-done-at.test.ts
@@ -114,7 +114,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: GAGAL — `doneAt` tak ada di tipe/tabel.
 
-- [ ] **Step 3: Tambahkan kolom di skema**
+- [x] **Step 3: Tambahkan kolom di skema**
 
 Di `server/prisma/schema.prisma`, model `Spec`, tepat sesudah blok `startedAt`:
 
@@ -127,7 +127,7 @@ Di `server/prisma/schema.prisma`, model `Spec`, tepat sesudah blok `startedAt`:
   doneAt     DateTime?
 ```
 
-- [ ] **Step 4: Tulis migration**
+- [x] **Step 4: Tulis migration**
 
 Buat `server/prisma/migrations/20260803000000_spec_done_at/migration.sql`:
 
@@ -150,7 +150,7 @@ UPDATE "Spec" SET "doneAt" = (
 ) WHERE "doneAt" IS NULL;
 ```
 
-- [ ] **Step 5: Terapkan migration + regenerate client**
+- [x] **Step 5: Terapkan migration + regenerate client**
 
 ```bash
 cd server && pnpm prisma generate && pnpm prisma migrate deploy && cd ..
@@ -158,7 +158,7 @@ cd server && pnpm prisma generate && pnpm prisma migrate deploy && cd ..
 
 Diharapkan: `generate` sukses; `migrate deploy` melaporkan 1 migration diterapkan (atau "No pending migrations" bila DB dev-mu sudah terisi — DB test dimigrasi ulang otomatis oleh `global-setup.ts`).
 
-- [ ] **Step 6: Tulis `doneAt` di dalam `recordCompletion`**
+- [x] **Step 6: Tulis `doneAt` di dalam `recordCompletion`**
 
 Di `server/src/services/notifications.ts`, ganti badan `recordCompletion` (baris 24–32) menjadi:
 
@@ -182,7 +182,7 @@ export async function recordCompletion(specId: string, title: string, projectId:
 }
 ```
 
-- [ ] **Step 7: Daftarkan `doneAt` di sync**
+- [x] **Step 7: Daftarkan `doneAt` di sync**
 
 Di `server/src/services/sync.ts` baris 44, tambahkan `"doneAt"` sesudah `"startedAt"`:
 
@@ -204,7 +204,7 @@ Tambahkan satu baris komentar di atas blok `spec:` dalam `FIELDS`:
   // mode backlog di client itu selamanya kosong.
 ```
 
-- [ ] **Step 8: Jalankan test — pastikan HIJAU**
+- [x] **Step 8: Jalankan test — pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-done-at.test.ts
@@ -212,7 +212,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: 4 test lulus.
 
-- [ ] **Step 9: Test tetangga yang menyentuh sync spec masih hijau**
+- [x] **Step 9: Test tetangga yang menyentuh sync spec masih hijau**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync.service.test.ts server/test/sync-exclusions.test.ts server/test/sync-hub-origin-writes.test.ts server/test/spec-deps.test.ts
@@ -220,7 +220,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: semua lulus.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations/20260803000000_spec_done_at \
@@ -243,7 +243,7 @@ git commit -m "feat(spec-516): Spec.doneAt sebagai stempel selesai, ditulis di r
 - Consumes: —
 - Produces: `prisma.changelog` dengan kolom `id, projectId, mode, title, params, body, generator, warning, itemCount, createdAt, updatedAt`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/changelog-schema.test.ts`:
 
@@ -279,7 +279,7 @@ describe("model Changelog (SPEC-516 · ADR-0105)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-schema.test.ts
@@ -287,7 +287,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: GAGAL — `prisma.changelog` undefined / model tak ada di DMMF.
 
-- [ ] **Step 3: Tambahkan model di skema**
+- [x] **Step 3: Tambahkan model di skema**
 
 Di `server/prisma/schema.prisma`, tambahkan relasi ke model `Project` (sesudah baris `githubIssues GithubIssue[]`):
 
@@ -322,7 +322,7 @@ model Changelog {
 }
 ```
 
-- [ ] **Step 4: Tulis migration**
+- [x] **Step 4: Tulis migration**
 
 Buat `server/prisma/migrations/20260803001000_changelog/migration.sql`:
 
@@ -350,7 +350,7 @@ CREATE TABLE "Changelog" (
 CREATE INDEX "Changelog_projectId_createdAt_idx" ON "Changelog"("projectId", "createdAt");
 ```
 
-- [ ] **Step 5: Daftarkan di `PG_ORDER`**
+- [x] **Step 5: Daftarkan di `PG_ORDER`**
 
 Di `cli/src/commands/migrate-pg.ts`, ubah baris 18 dari:
 
@@ -367,7 +367,7 @@ menjadi:
   "Changelog",
 ```
 
-- [ ] **Step 6: Bersihkan tabel di `resetDb`**
+- [x] **Step 6: Bersihkan tabel di `resetDb`**
 
 Di `server/test/factory.ts`, dalam `resetDb()`, tambahkan `prisma.changelog.deleteMany(),` sebagai entri **pertama** di dalam `$transaction([...])` (sebelum `prisma.notification.deleteMany()`) — cascade lewat project sudah mengurusnya, tapi urutan eksplisit membuat test yang tak menyentuh project tetap bersih:
 
@@ -380,7 +380,7 @@ Di `server/test/factory.ts`, dalam `resetDb()`, tambahkan `prisma.changelog.dele
   ]);
 ```
 
-- [ ] **Step 7: Regenerate + migrate, jalankan test**
+- [x] **Step 7: Regenerate + migrate, jalankan test**
 
 ```bash
 cd server && pnpm prisma generate && pnpm prisma migrate deploy && cd ..
@@ -389,7 +389,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: 3 test lulus.
 
-- [ ] **Step 8: Test katalog yang menuntut kelengkapan model**
+- [x] **Step 8: Test katalog yang menuntut kelengkapan model**
 
 ```bash
 pnpm vitest --run cli/test/migrate-pg.test.ts
@@ -398,7 +398,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: keduanya lulus. (`cli/test/migrate-pg.test.ts` menuntut `PG_ORDER` **sama persis** dengan daftar model DMMF — inilah gerbang yang menangkap model baru yang lupa didaftarkan.)
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations/20260803001000_changelog \
@@ -424,7 +424,7 @@ git commit -m "feat(spec-516): model Changelog LOCAL-only + entri PG_ORDER"
   - `ChangelogSources`
   - `DEFAULT_RANGE_DAYS = 30`, `defaultRange(today: Date): { from: string; to: string }`, `dayString(d: Date): string`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/changelog.test.ts`:
 
@@ -483,7 +483,7 @@ describe("defaultRange", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 pnpm vitest --run shared/src/changelog.test.ts
@@ -491,7 +491,7 @@ pnpm vitest --run shared/src/changelog.test.ts
 
 Diharapkan: GAGAL — modul `./changelog` tak ada.
 
-- [ ] **Step 3: Tulis modulnya**
+- [x] **Step 3: Tulis modulnya**
 
 Buat `shared/src/changelog.ts`:
 
@@ -562,7 +562,7 @@ export function defaultRange(today: Date): { from: string; to: string } {
 }
 ```
 
-- [ ] **Step 4: Ekspor dari barrel**
+- [x] **Step 4: Ekspor dari barrel**
 
 Di `shared/src/index.ts`, tambahkan sesudah baris `export * from "./auto-merge";`:
 
@@ -570,7 +570,7 @@ Di `shared/src/index.ts`, tambahkan sesudah baris `export * from "./auto-merge";
 export * from "./changelog";
 ```
 
-- [ ] **Step 5: Jalankan test — pastikan HIJAU**
+- [x] **Step 5: Jalankan test — pastikan HIJAU**
 
 ```bash
 pnpm vitest --run shared/src/changelog.test.ts
@@ -579,7 +579,7 @@ pnpm --filter ./shared typecheck
 
 Diharapkan: 10 test lulus; typecheck bersih.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/changelog.ts shared/src/changelog.test.ts shared/src/index.ts
@@ -598,7 +598,7 @@ git commit -m "feat(spec-516): kontrak changelog bersama (mode, request, view, d
 - Consumes: —
 - Produces: `scrubSubject(s: string): string` · `scrubBody(s: string): string` · `scrubOutput(md: string): string`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/changelog-scrub.test.ts`:
 
@@ -687,7 +687,7 @@ describe("scrubOutput", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-scrub.test.ts
@@ -695,7 +695,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: GAGAL — modul tak ada.
 
-- [ ] **Step 3: Tulis implementasinya**
+- [x] **Step 3: Tulis implementasinya**
 
 Buat `server/src/services/changelog/scrub.ts`:
 
@@ -780,7 +780,7 @@ export function scrubOutput(md: string): string {
 }
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan HIJAU**
+- [x] **Step 4: Jalankan test — pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-scrub.test.ts
@@ -788,7 +788,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: 14 test lulus. Bila ada yang merah, perbaiki **regex**-nya (bukan test-nya) — kontrol negatif ada justru untuk mencegah scrub yang terlalu rakus.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/changelog/scrub.ts server/test/changelog-scrub.test.ts
@@ -812,7 +812,7 @@ git commit -m "feat(spec-516): scrub jejak teknis untuk changelog (murni, dua ja
   - `changelogPrompt(input: ChangelogInput, budgetMs: number): string`
   - `MODE_LABEL: Record<ChangelogMode, string>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/changelog-render.test.ts`:
 
@@ -885,7 +885,7 @@ describe("changelogPrompt", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-render.test.ts
@@ -893,7 +893,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: GAGAL — modul tak ada.
 
-- [ ] **Step 3: Tulis implementasinya**
+- [x] **Step 3: Tulis implementasinya**
 
 Buat `server/src/services/changelog/render.ts`:
 
@@ -992,7 +992,7 @@ export function changelogPrompt(input: ChangelogInput, budgetMs: number): string
 }
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan HIJAU**
+- [x] **Step 4: Jalankan test — pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-render.test.ts
@@ -1000,7 +1000,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: 9 test lulus.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/changelog/render.ts server/test/changelog-render.test.ts
@@ -1021,7 +1021,7 @@ git commit -m "feat(spec-516): draf deterministik + prompt changelog beranggaran
   - `type CollectResult = { ok: true; input: ChangelogInput } | { ok: false; reason: string }`
   - `collectBacklog(projectId: string, from: string, to: string): Promise<CollectResult>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/changelog-collect-backlog.test.ts`:
 
@@ -1093,7 +1093,7 @@ describe("collectBacklog", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-collect-backlog.test.ts
@@ -1101,7 +1101,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: GAGAL — `collectBacklog` tak ada.
 
-- [ ] **Step 3: Tulis implementasinya**
+- [x] **Step 3: Tulis implementasinya**
 
 Buat `server/src/services/changelog/collect.ts`:
 
@@ -1144,7 +1144,7 @@ export async function collectBacklog(projectId: string, from: string, to: string
 }
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan HIJAU**
+- [x] **Step 4: Jalankan test — pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-collect-backlog.test.ts
@@ -1152,7 +1152,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: 6 test lulus.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/changelog/collect.ts server/test/changelog-collect-backlog.test.ts
@@ -1176,7 +1176,7 @@ git commit -m "feat(spec-516): kumpulkan backlog selesai per rentang tanggal"
   - `collectVersions(repoDir: string | null, fromTag: string | undefined, toTag: string): Promise<CollectResult>`
   - `makeRepoWithTags(commitsPerTag: Record<string, string[]>): string` (factory)
 
-- [ ] **Step 1: Tambahkan helper repo bertag di factory**
+- [x] **Step 1: Tambahkan helper repo bertag di factory**
 
 Di akhir `server/test/factory.ts`, tambahkan:
 
@@ -1201,7 +1201,7 @@ export function makeRepoWithTags(commitsPerTag: Record<string, string[]>): strin
 }
 ```
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 Buat `server/test/changelog-collect-git.test.ts`:
 
@@ -1313,7 +1313,7 @@ describe("collectVersions", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test — pastikan MERAH**
+- [x] **Step 3: Jalankan test — pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-collect-git.test.ts
@@ -1321,7 +1321,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: GAGAL — `listTags`/`collectCommits`/`collectVersions` tak ada.
 
-- [ ] **Step 4: Tambahkan bagian git di `collect.ts`**
+- [x] **Step 4: Tambahkan bagian git di `collect.ts`**
 
 Di `server/src/services/changelog/collect.ts`, tambahkan import di atas:
 
@@ -1413,7 +1413,7 @@ export async function collectVersions(
 }
 ```
 
-- [ ] **Step 5: Jalankan test — pastikan HIJAU**
+- [x] **Step 5: Jalankan test — pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-collect-git.test.ts server/test/changelog-collect-backlog.test.ts
@@ -1421,7 +1421,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: 6 + 12 test lulus.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/changelog/collect.ts server/test/changelog-collect-git.test.ts server/test/factory.ts
@@ -1443,7 +1443,7 @@ git commit -m "feat(spec-516): kumpulkan changelog dari rentang SHA & tag rilis"
   - `CHANGELOG_TIMEOUT_MS = 180_000`
   - `generateChangelog(projectId, req, deps?): Promise<{ ok: true; row: Changelog } | { ok: false; reason: string }>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/changelog-generate.test.ts`:
 
@@ -1548,7 +1548,7 @@ describe("generateChangelog", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-generate.test.ts
@@ -1556,7 +1556,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: GAGAL — modul tak ada.
 
-- [ ] **Step 3: Tulis implementasinya**
+- [x] **Step 3: Tulis implementasinya**
 
 Buat `server/src/services/changelog/generate.ts`:
 
@@ -1635,7 +1635,7 @@ export async function generateChangelog(
 }
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan HIJAU**
+- [x] **Step 4: Jalankan test — pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog-generate.test.ts
@@ -1643,7 +1643,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: 9 test lulus.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/changelog/generate.ts server/test/changelog-generate.test.ts
@@ -1665,7 +1665,7 @@ git commit -m "feat(spec-516): pembangkit changelog (agen one-shot + fallback de
 - Consumes: `generateChangelog` (Task 8) · `listTags` (Task 7) · `zChangelogRequest`/`defaultRange` (Task 3) · `paginate` · `downloadFormat`/`sendDocDownload`
 - Produces: lima endpoint (lihat tabel di spec).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/changelog.route.test.ts`:
 
@@ -1810,7 +1810,7 @@ Tambahkan juga di `server/test/agent-capabilities.test.ts` (di dalam `describe` 
   });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog.route.test.ts server/test/agent-capabilities.test.ts
@@ -1818,7 +1818,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: GAGAL — route 404 dan capability masih `projects:read`.
 
-- [ ] **Step 3: Petakan capability ke domain `docs`**
+- [x] **Step 3: Petakan capability ke domain `docs`**
 
 Di `server/src/services/agent-capabilities.ts`, ubah baris 66 dari:
 
@@ -1835,7 +1835,7 @@ menjadi:
     if (sub === "docs" || sub === "prds" || sub === "changelog") return rw("docs");
 ```
 
-- [ ] **Step 4: Tulis route-nya**
+- [x] **Step 4: Tulis route-nya**
 
 Buat `server/src/routes/changelog.ts`:
 
@@ -1921,7 +1921,7 @@ export default async function (app: FastifyInstance) {
 }
 ```
 
-- [ ] **Step 5: Daftarkan di `app.ts`**
+- [x] **Step 5: Daftarkan di `app.ts`**
 
 Di `server/src/app.ts`, tambahkan import setelah baris `import lead from "./routes/lead";`:
 
@@ -1935,7 +1935,7 @@ dan register setelah baris `await api.register(webhooks);`:
     await api.register(changelog);    // SPEC-516 · ADR-0105 · changelog per project (capability `docs`)
 ```
 
-- [ ] **Step 6: Jalankan test — pastikan HIJAU**
+- [x] **Step 6: Jalankan test — pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/changelog.route.test.ts server/test/agent-capabilities.test.ts
@@ -1944,7 +1944,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: 14 test route + seluruh test capability lulus; typecheck bersih.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/routes/changelog.ts server/src/app.ts server/src/services/agent-capabilities.ts \
@@ -1967,7 +1967,7 @@ git commit -m "feat(spec-516): endpoint changelog per project (capability docs)"
 - Consumes: `ChangelogView`/`ChangelogSources`/`ChangelogRequest` (Task 3); endpoint Task 9
 - Produces: `api.listChangelogs` · `api.changelogSources` · `api.generateChangelog` · `api.deleteChangelog` · `paths.changelog(id)` · `paths.changelogItem(id, cid)` · `paths.changelogSources(id)` · komponen `<ChangelogPanel p={...} onToast={...} />`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/src/screens/ChangelogPanel.test.tsx`:
 
@@ -2061,7 +2061,7 @@ describe("ChangelogPanel", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/src/screens/ChangelogPanel.test.tsx
@@ -2069,7 +2069,7 @@ env -u NODE_ENV pnpm vitest --run src/src/screens/ChangelogPanel.test.tsx
 
 Diharapkan: GAGAL — komponen tak ada.
 
-- [ ] **Step 3: Tambahkan path & metode klien**
+- [x] **Step 3: Tambahkan path & metode klien**
 
 Di `shared/src/api.ts`, di dalam objek `paths`, sesudah baris `githubIssues:`:
 
@@ -2095,7 +2095,7 @@ Di `src/src/api/client.ts`, tambahkan `ChangelogView`, `ChangelogSources`, `Chan
     j<void>(paths.changelogItem(projectId, id), { method: "DELETE" }),
 ```
 
-- [ ] **Step 4: Tulis komponennya**
+- [x] **Step 4: Tulis komponennya**
 
 Buat `src/src/screens/ChangelogPanel.tsx`:
 
@@ -2286,7 +2286,7 @@ export function ChangelogPanel({ p, onToast }:
 }
 ```
 
-- [ ] **Step 5: Pasang di detail project**
+- [x] **Step 5: Pasang di detail project**
 
 Di `src/src/screens/ProjectDetailScreen.tsx`, tambahkan import di dekat import `AutoMergeCard`:
 
@@ -2301,7 +2301,7 @@ dan sisipkan komponen tepat sesudah `<AutoMergeCard … />`:
       <ChangelogPanel p={p} onToast={onToast} />
 ```
 
-- [ ] **Step 6: Jalankan test — pastikan HIJAU**
+- [x] **Step 6: Jalankan test — pastikan HIJAU**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/src/screens/ChangelogPanel.test.tsx
@@ -2310,7 +2310,7 @@ pnpm --filter ./src typecheck
 
 Diharapkan: 6 test lulus; typecheck bersih.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/api.ts src/src/api/client.ts src/src/screens/ChangelogPanel.tsx \
@@ -2335,7 +2335,7 @@ git commit -m "feat(spec-516): panel Changelog di detail project"
 - Consumes: seluruh keputusan Task 1–10
 - Produces: dokumentasi Source of Truth yang tertaut di index
 
-- [ ] **Step 1: Pastikan nomor ADR belum diklaim branch/worktree lain**
+- [x] **Step 1: Pastikan nomor ADR belum diklaim branch/worktree lain**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman
@@ -2346,7 +2346,7 @@ cd -
 
 Diharapkan: nomor tertinggi `0104`. Bila sudah ada `0105` di branch lain, **pakai nomor berikutnya yang bebas** dan ganti semua rujukan `0105` di seluruh berkas (`rtk proxy grep -rn "0105" .`).
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Buat `internal/docs/adr/0105-changelog-per-project.md` dengan bagian: Status (Diterima, 2026-08-03) · Konteks · Keputusan · Konsekuensi · Alternatif yang ditolak · Gotcha. Isi wajib memuat, masing-masing satu paragraf:
 
@@ -2361,7 +2361,7 @@ Buat `internal/docs/adr/0105-changelog-per-project.md` dengan bagian: Status (Di
 9. **Non-goal:** tanpa tool MCP (ADR-0099), tanpa peristiwa webhook (ADR-0100), tanpa sync, tanpa penjadwalan, tanpa terbit ke luar.
 10. **Gotcha wajib:** (a) `PG_ORDER` harus memuat model baru — `cli/test/migrate-pg.test.ts` menuntutnya sama persis dengan DMMF, dan pelanggarannya adalah satu-satunya gerbang; (b) `doneAt` wajib di `FIELDS.spec` **dan** `DATE_FIELDS.spec`, sebab `upsert` yang tak menyebut sebuah kolom tetap berhasil; (c) batas hari harus LOKAL, bukan UTC (`new Date("2026-07-31")` = tengah malam UTC); (d) regex scrub camelCase wajib menuntut ≥2 huruf kecil di kedua sisi kapital, tanpa itu `macOS`/`iOS` ikut terbuang.
 
-- [ ] **Step 3: Taut di kedua index**
+- [x] **Step 3: Taut di kedua index**
 
 Di `internal/docs/README.md`, di bawah `## adr`, tambahkan sebagai baris **pertama** daftar:
 
@@ -2371,19 +2371,19 @@ Di `internal/docs/README.md`, di bawah `## adr`, tambahkan sebagai baris **perta
 
 Di `internal/docs/adr/README.md`, tambahkan entri narasi mengikuti format entri 0104 yang sudah ada di berkas itu.
 
-- [ ] **Step 4: Perbarui data-model & api-contract**
+- [x] **Step 4: Perbarui data-model & api-contract**
 
 Di `internal/docs/architecture/data-model.md`, bagian `## Spec`, tambahkan butir `doneAt`; tambahkan sub-bagian `## Changelog` baru yang menyebut LOCAL-only + FK cascade + index.
 
 Di `internal/docs/architecture/api-contract.md`, tambahkan bagian changelog dengan kelima endpoint, kode status (201/400/404/422), dan capability `docs:read`/`docs:write`.
 
-- [ ] **Step 5: Perbarui panduan agen & skill**
+- [x] **Step 5: Perbarui panduan agen & skill**
 
 Di `docs/agent-integration.md`, tambahkan satu bagian singkat "Changelog project" berisi contoh `POST /api/projects/<id>/changelog` untuk ketiga mode + catatan bahwa hasilnya bisa diunduh `?download=md`. **Jangan** memuat token nyata (dijaga `agent-doc-contract.test.ts`).
 
 Di `internal/skills/hanoman/SKILL.md`, di bawah "Aturan Arsitektur", tambahkan satu butir ringkas SPEC-516/ADR-0105 yang menyebut: `doneAt` satu penulis, `Changelog` LOCAL-only, `think()` diimpor, scrub dua sisi, capability `docs`, dan keempat gotcha.
 
-- [ ] **Step 6: Verifikasi integritas index + test kontrak dokumen**
+- [x] **Step 6: Verifikasi integritas index + test kontrak dokumen**
 
 ```bash
 pnpm --filter ./cli exec node -e "0" 2>/dev/null || true
@@ -2398,7 +2398,7 @@ node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli bui
 
 Diharapkan: index bersih (bila perintah ini tak tersedia di worktree tanpa build, lewati dan pastikan tautan manual sudah benar).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs/adr/0105-changelog-per-project.md internal/docs/README.md \
@@ -2418,7 +2418,7 @@ git commit -m "docs(spec-516): ADR-0105 changelog per project + data-model/api-c
 - Consumes: seluruh task
 - Produces: bukti bahwa perubahan ini hijau di scope yang tersentuh
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism
@@ -2426,7 +2426,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --changed "$HA
 
 Diharapkan: semua lulus. **Pastikan berkas test-nya memang berjalan** — `--changed` menyalakan `passWithNoTests`, jadi "no test files" bukan bukti hijau. Hitung jumlah berkas yang dijalankan dan bandingkan dengan test yang ditulis plan ini (minimal: `changelog-*.test.ts` × 7, `spec-done-at`, `agent-capabilities`, `ChangelogPanel`, `migrate-pg`, `shared/src/changelog`).
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck
@@ -2437,7 +2437,7 @@ pnpm --filter ./cli typecheck
 
 Diharapkan: keempatnya bersih. (Perluasan ke empat paket disengaja: `shared/src/changelog.ts` diimpor server **dan** web, dan `PG_ORDER` hidup di `cli`.)
 
-- [ ] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
+- [x] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
 
 ```bash
 export HANOMAN_HOME="$(mktemp -d)"
@@ -2461,11 +2461,11 @@ lsof -ti:8787 | xargs -r kill
 
 Jangan pernah `pkill -f node` / `pkill -f vitest`: prompt tiap sesi hidup di ARGV agennya dan pola itu membunuh agen sesi TETANGGA (SPEC-402).
 
-- [ ] **Step 4: Centang seluruh kotak plan ini**
+- [x] **Step 4: Centang seluruh kotak plan ini**
 
 Pastikan tak ada `- [ ]` tersisa di berkas ini — hanoman menahan backlog di `executing` selama masih ada satu pun.
 
-- [ ] **Step 5: Commit akhir & push**
+- [x] **Step 5: Commit akhir & push**
 
 ```bash
 git add -A docs/superpowers/plans
