@@ -103,6 +103,19 @@ kotak **Cari backlog** (substring case-insensitive pada `id + title + objective`
 dan berlaku di ketiga view; kuncinya masuk `usePaged` agar halaman reset saat filter berubah.
 Search/stage/prioritas view-local; project tetap `App.projectFilter` (SPEC-146).
 
+Tab sumbernya lima (SPEC-521): `Semua spec · Dari brief · Dari QA · Audit · Goal`. Nilainya
+menyeberang apa adanya sebagai `source` ke `GET /specs` (`all` → param di-omit), dan **Goal**
+adalah backlog bermode goal — alur dua fase tanpa perencanaan (ADR-0089) yang tanpa tab ini hanya
+muncul tercampur di "Semua spec". `source` disaring di DB sebelum overlay stage-live, jadi ia pula
+yang menentukan scope overlay/write-through — beda lapis dari stage/prioritas/tanggal yang
+disaring di layer response (ADR-0038). `help` sengaja tak bertab: item tiket sudah dinaikkan ke
+brief/qa/audit oleh jalur triase (ADR-0062).
+
+Label tab **"Goal"** sengaja sama persis dengan label badge kartu (`SOURCE_META.goal`), jadi
+pencarian berbasis teks di test akan cocok **ganda** begitu ada item goal di layar — pakai
+`getByRole("tab", { name })`, atau `getAllByText(...).length` seperti yang sudah dilakukan untuk
+"Audit" di `backlog-board.test.tsx`.
+
 Ketiganya memakai rantai flex di atas. Board sedikit berbeda: barisnya menggulir **mendatar**
 (`overflow-x:auto`, `overflow-y:hidden`) dan tiap **kolom** menggulir tegak sendiri, jadi judul
 kolom tak pernah tergulir keluar dan kolom terpanjang tak menyeret yang lain. Kartu board

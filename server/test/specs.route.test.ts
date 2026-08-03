@@ -531,3 +531,62 @@ describe("POST/PATCH/DELETE /specs · dependsOn (SPEC-447)", () => {
     }
   });
 });
+
+// SPEC-521 · filter goal daftar backlog = `source=goal`. Beda LAPIS dari filter lain: `source`
+// disaring di DB oleh liveSpecs (`where: { projectId, source }`) SEBELUM overlay stage-live,
+// sementara q/stage/priority/startable/dateField disaring filterSpecs SESUDAHNYA (ADR-0038).
+// Konsekuensinya nyata: saat tab Goal aktif, overlay + write-through + notifikasi `done` berjalan
+// atas himpunan goal saja. Param ini nol coverage sampai SPEC-521 — ia menopang tab Goal, jadi
+// diikat di sini sebelum UI bersandar padanya.
+describe("filter source (SPEC-521)", () => {
+  beforeAll(async () => {
+    await makeProject({ id: "psrc", repoDir: makeTempRepo({ "a.txt": "a" }) });
+    await makeSpec({ id: "SPEC-G01", projectId: "psrc", source: "goal", title: "turunkan latensi",
+      stage: "planned", priority: "tinggi" });
+    await makeSpec({ id: "SPEC-G02", projectId: "psrc", source: "goal", title: "rapikan log",
+      stage: "done", priority: "sedang" });
+    await makeSpec({ id: "SPEC-B01", projectId: "psrc", source: "brief", title: "form invoice",
+      stage: "planned", priority: "tinggi" });
+    await makeSpec({ id: "SPEC-Q01", projectId: "psrc", source: "qa", title: "tombol mati",
+      stage: "planned", priority: "tinggi" });
+  });
+  const ids = async (qs: string) => {
+    const res = await app.inject({ url: `/api/specs?project=psrc&${qs}` });
+    expect(res.statusCode).toBe(200);
+    return res.json().items.map((s: any) => s.id).sort();
+  };
+
+  it("source=goal hanya memulangkan item bersumber goal", async () => {
+    expect(await ids("source=goal")).toEqual(["SPEC-G01", "SPEC-G02"]);
+  });
+
+  it("total di envelope ikut menyusut, bukan hanya items", async () => {
+    const all = (await app.inject({ url: "/api/specs?project=psrc" })).json();
+    const goal = (await app.inject({ url: "/api/specs?project=psrc&source=goal" })).json();
+    expect(all.total).toBe(4);
+    expect(goal.total).toBe(2);
+  });
+
+  it("source absen memulangkan seluruh sumber (tab \"Semua spec\" tak berubah)", async () => {
+    expect(await ids("")).toEqual(["SPEC-B01", "SPEC-G01", "SPEC-G02", "SPEC-Q01"]);
+  });
+
+  // Lapisnya berbeda (DB vs response layer) tapi hasilnya wajib berkomposisi: tab Goal + Select
+  // stage/prioritas + kotak cari dipakai berbarengan di layar yang sama.
+  it("source berkomposisi dengan filter layer-response", async () => {
+    expect(await ids("source=goal&startable=true")).toEqual(["SPEC-G01"]);
+    expect(await ids("source=goal&priority=tinggi")).toEqual(["SPEC-G01"]);
+    expect(await ids("source=goal&q=latensi")).toEqual(["SPEC-G01"]);
+    // Filter response layer TIDAK boleh bocor melewati batas source.
+    expect(await ids("source=goal&q=invoice")).toEqual([]);
+  });
+
+  // Konsisten dengan stage/priority/dateField yang juga lenient (bukan 400) — nilai ngawur
+  // menyaring habis, bukan melempar.
+  it("source tak dikenal memulangkan himpunan kosong, bukan 400", async () => {
+    const res = await app.inject({ url: "/api/specs?project=psrc&source=ngawur" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().items).toEqual([]);
+    expect(res.json().total).toBe(0);
+  });
+});

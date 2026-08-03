@@ -779,6 +779,10 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
           <Tabs variant="pill" value={tab} onChange={setTab} tabs={[
             { value: "all", label: "Semua spec" }, { value: "brief", label: "Dari brief" },
             { value: "qa", label: "Dari QA" }, { value: "audit", label: "Audit" },
+            // SPEC-521 · ADR-0089 · backlog goal punya alur sendiri (dua fase, tanpa perencanaan),
+            // jadi ia butuh pintunya sendiri — tanpa tab ini item goal hanya muncul tercampur di
+            // "Semua spec". `tab` menyeberang apa adanya sebagai `source` ke GET /specs.
+            { value: "goal", label: "Goal" },
           ]} />
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Tabs variant="pill" value={view} onChange={setView} tabs={VIEWS} aria-label="Mode tampilan" />

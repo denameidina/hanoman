@@ -94,6 +94,11 @@ GET  /specs?project=&source=&q=&stage=&priority=&startable=&dateField=&from=&to=
 #   (scope project/source). Search/filter (q atas id+title+objective, stage, priority, startable=live≠done)
 #   & paginasi diterapkan DI MEMORI SETELAH overlay — filter stage cocok ke stage LIVE, bukan DB.
 #   Tanpa page/limit → seluruh item terfilter (page 1, pageSize=total). Lihat ADR-0038.
+#   SPEC-521 · `source` beda LAPIS dari filter lain: ia disaring di DB (`liveSpecs` where) SEBELUM
+#   overlay, jadi ia yang menentukan scope overlay/write-through/notifikasi — sementara sisanya
+#   disaring di memori sesudahnya. Nilai sah = `zSpecSource` (brief|qa|audit|help|goal); nilai tak
+#   dikenal → himpunan KOSONG (bukan 400, dan bukan "diabaikan" seperti stage/priority/dateField).
+#   Pemakainya: deret tab sumber daftar backlog — Semua spec · Dari brief · Dari QA · Audit · Goal.
 #   SPEC-408 · ADR-0090 · rentang tanggal: `dateField` = created (default) | started — sumbu
 #   `Spec.createdAt` atau `Spec.startedAt`; `from`/`to` = `YYYY-MM-DD` INKLUSIF (boleh sendirian),
 #   di-parse di zona waktu LOKAL SERVER (`from` 00:00:00.000, `to` 23:59:59.999) — `new Date("…")`
