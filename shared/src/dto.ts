@@ -336,9 +336,10 @@ export const zTerminalSession = z.union([
   // pipeline claude). DIDAHULUKAN: z.object non-strict membuang key asing, jadi bila varian
   // longgar {project,flow?} lebih dulu, {project,shell:true} akan lolos sbg plain (shell dibuang).
   z.object({ project: z.string(), shell: z.literal(true) }),
-  // flow opsional (SPEC-166): "reverse" = sesi project-level di worktree-nya sendiri,
-  // menyusun Source of Truth dari kode. Tanpa flow = terminal biasa (claude) di repoDir.
-  z.object({ project: z.string(), flow: z.literal("reverse").optional() }),
+  // SPEC-166 · "reverse" = sesi project-level di worktree-nya sendiri, menyusun Source of Truth
+  // dari kode. TANPA override runtime: sesi project-level mengikuti Setting.agent (ADR-0074).
+  // Terminal biasa (tanpa flow) kini punya variannya SENDIRI di bawah — lihat SPEC-517.
+  z.object({ project: z.string(), flow: z.literal("reverse") }),
   // SPEC-210 · sesi prd project-level di worktree sendiri; menghasilkan dokumen PRD dari brief.
   // SPEC-340 · ADR-0076 · eskalasi audit → PRD: branchFrom = branch audit (worktree lahir dari sana,
   // resolveCommit + fallback origin/<rev>), fromAudit = id spec audit (isi dokumennya disematkan ke
@@ -350,6 +351,15 @@ export const zTerminalSession = z.union([
   // SPEC-222 · scaffold: sesi project-level from-scratch, menyusun SoT dari ide. Tanpa brief
   // (diseed dari Project.desc), tanpa Spec — cermin reverse.
   z.object({ project: z.string(), flow: z.literal("scaffold") }),
+  // SPEC-517 · terminal agen biasa: agen (claude|codex) + model + effort boleh dipilih PER SESI,
+  // seperti picker Start backlog (ADR-0061/0074). Kosong → default global (Setting).
+  // `flow: z.undefined()` BUKAN hiasan: varian ini permisif dan diletakkan SESUDAH semua varian
+  // ber-flow, jadi tanpa gerbang itu body flow yang CACAT ({project, flow:"prd"} tanpa brief)
+  // akan lolos ke sini dan melahirkan terminal biasa secara senyap alih-alih dijawab 400.
+  z.object({
+    project: z.string(), flow: z.undefined(),
+    agent: zAgent.optional(), model: z.string().optional(), effort: z.string().optional(),
+  }),
   // SPEC-252 · ADR-0061 — model & effort per SESI: override opsional saat Start; kosong → global.
   // SPEC-332 · ADR-0073 — mode goal per SESI: `goal` undefined → ikut Setting.goal.enabled,
   // false → mati walau global nyala; `goalCondition` kosong → template global → default bawaan.

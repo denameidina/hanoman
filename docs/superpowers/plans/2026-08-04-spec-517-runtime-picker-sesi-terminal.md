@@ -55,7 +55,7 @@
 - Consumes: `zAgent` (sudah diimpor di `dto.ts`).
 - Produces: `zTerminalSession` menerima `{ project, agent?, model?, effort? }`; varian `reverse` jadi `{ project, flow: "reverse" }` terpisah.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/terminal-session-runtime.test.ts`:
 
@@ -108,7 +108,7 @@ describe("zTerminalSession · varian terminal agen biasa (SPEC-517)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 pnpm vitest --run shared/src/terminal-session-runtime.test.ts
@@ -116,7 +116,7 @@ pnpm vitest --run shared/src/terminal-session-runtime.test.ts
 
 Expected: FAIL — `{project, agent:"codex"}` lolos tapi `agent` dibuang (varian lama non-strict), dan `{project, flow:"prd"}` **lolos** sebagai terminal biasa.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `shared/src/dto.ts`, ganti varian ini:
 
@@ -148,7 +148,7 @@ dan tambahkan varian baru **sesudah** varian `scaffold` (sebelum varian `spec`):
   }),
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 ```bash
 pnpm vitest --run shared/src/terminal-session-runtime.test.ts
@@ -156,7 +156,7 @@ pnpm vitest --run shared/src/terminal-session-runtime.test.ts
 
 Expected: PASS (7 test).
 
-- [ ] **Step 5: Test kontrak tetangga tak regresi**
+- [x] **Step 5: Test kontrak tetangga tak regresi**
 
 ```bash
 pnpm vitest --run shared/src/agent-session.test.ts shared/src/goal.test.ts shared/src/spec-deps-contract.test.ts
@@ -164,7 +164,7 @@ pnpm vitest --run shared/src/agent-session.test.ts shared/src/goal.test.ts share
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/dto.ts shared/src/terminal-session-runtime.test.ts
