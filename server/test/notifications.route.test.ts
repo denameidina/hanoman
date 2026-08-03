@@ -33,3 +33,55 @@ describe("notifications routes", () => {
     expect(res.json().items).toHaveLength(0);
   });
 });
+
+// SPEC-523 · 60 baris melampaui plafon 50 lama, jadi "tanpa limit" dan "total" tak bisa tertukar.
+async function seed(n: number): Promise<void> {
+  await prisma.notification.deleteMany();
+  for (let i = 0; i < n; i++) {
+    await prisma.notification.create({
+      data: {
+        specId: `SPEC-${i}`, title: `judul ${i}`, projectId: "p1",
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, i)),
+      },
+    });
+  }
+}
+
+describe("GET /notifications — paginasi (SPEC-523)", () => {
+  it("tanpa limit: 50 teratas seperti sebelum SPEC-523, tapi total menyatakan seluruhnya", async () => {
+    await seed(60);
+    const r = await app.inject({ method: "GET", url: "/api/notifications" });
+    expect(r.statusCode).toBe(200);
+    const b = r.json();
+    expect(b.items.length).toBe(50);
+    expect(b.total).toBe(60);
+    expect(b.page).toBe(1);
+    expect(b.pageSize).toBe(50);
+    // terbaru dulu: detik ke-59 adalah yang paling baru
+    expect(b.items[0].specId).toBe("SPEC-59");
+  });
+
+  it("page/limit memotong dengan benar dan total tetap penuh", async () => {
+    await seed(60);
+    const b = (await app.inject({ method: "GET", url: "/api/notifications?page=2&limit=10" })).json();
+    expect(b.items.length).toBe(10);
+    expect(b.total).toBe(60);
+    expect(b.page).toBe(2);
+    expect(b.pageSize).toBe(10);
+    expect(b.items[0].specId).toBe("SPEC-49");   // halaman 1 = 59..50
+  });
+
+  it("page melampaui halaman terakhir: items kosong, total tetap benar", async () => {
+    await seed(60);
+    const b = (await app.inject({ method: "GET", url: "/api/notifications?page=99&limit=10" })).json();
+    expect(b.items).toEqual([]);
+    expect(b.total).toBe(60);
+  });
+
+  it("unread dihitung dari seluruh baris, bukan dari halaman yang diminta", async () => {
+    await seed(60);
+    const b = (await app.inject({ method: "GET", url: "/api/notifications?page=1&limit=5" })).json();
+    expect(b.items.length).toBe(5);
+    expect(b.unread).toBe(60);
+  });
+});

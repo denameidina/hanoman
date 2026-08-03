@@ -515,7 +515,9 @@ export type SessionDTO = {
 export type EventMsg =
   | { t: "specs"; specs: Spec[] }
   | { t: "sessions"; sessions: SessionDTO[] }
-  | { t: "notifications"; items: Notification[]; unread: number }
+  // SPEC-523 · `total` ikut disiarkan: bell menampilkan 50 teratas, dan tanpa angka ini 50 itu
+  // terbaca sebagai "semuanya". Bentuk daftar frame tak berubah (tetap 50 teratas).
+  | { t: "notifications"; items: Notification[]; unread: number; total: number; page: number; pageSize: number }
   | { t: "limits"; limits: LimitsDTO }
   | { t: "codexLimits"; limits: CodexLimitsDTO }   // SPEC-338 · ADR-0074 · grup terpisah dari `limits`
   | { t: "vps"; vps: VpsView[] }

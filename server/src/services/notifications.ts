@@ -116,12 +116,27 @@ export async function scanDecisions(read: () => DecisionSession[] = liveDecision
   }
 }
 
+// SPEC-523 · plafon feed siar. Frame WebSocket `notifications` (services/events.ts) lahir tiap 3
+// detik; menyiarkan seluruh riwayat tiap kali adalah regresi biaya, bukan perbaikan. Jadi
+// "tanpa limit" TETAP 50 di sini — berbeda dari paginate() (ADR-0038) yang tanpa limit berarti
+// seluruh item. Yang ditambahkan SPEC-523 adalah `total`: 50 tak lagi berpura-pura jadi semuanya.
+export const DEFAULT_FEED_TAKE = 50;
+
 // SPEC-199 · cermin GET /notifications: scan marker dulu, lalu daftar + hitungan unread.
 // Dipakai route HTTP dan hub siar (services/events.ts). Tipe di-infer (baris Prisma, tanggal
 // Date) — sama seperti route lain; JSON serialize Date→string sesuai wire type shared.
-export async function notificationsFeed() {
+// SPEC-523 · `skip`/`take` di query DB SAH di sini: larangan ADR-0038 mengikat GET /specs yang
+// overlay stage live-nya bergantung set penuh. Notifikasi adalah baris mati tanpa overlay.
+export async function notificationsFeed(p: { page?: string; limit?: string } = {}) {
   await scanDecisions();
-  const items = await prisma.notification.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
+  const pageSize = p.limit ? Math.max(1, Math.floor(+p.limit) || 1) : DEFAULT_FEED_TAKE;
+  const page = p.page ? Math.max(1, Math.floor(+p.page) || 1) : 1;
+  const total = await prisma.notification.count();
+  const items = await prisma.notification.findMany({
+    orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize,
+  });
+  // `unread` selalu dihitung dari SELURUH baris, tak pernah dari halaman yang diminta —
+  // lencana bell yang mengecil saat operator membuka halaman 2 adalah kebohongan.
   const unread = await prisma.notification.count({ where: { readAt: null } });
-  return { items, unread };
+  return { items, unread, total, page, pageSize };
 }

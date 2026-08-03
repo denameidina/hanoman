@@ -44,7 +44,7 @@
 - Produces: `notificationsFeed(p?: { page?: string; limit?: string }): Promise<{ items: Notification[]; unread: number; total: number; page: number; pageSize: number }>` — dipakai Task 2 (UI) dan Task 12 (test kontrak).
 - Produces: `DEFAULT_FEED_TAKE = 50` (diekspor untuk test).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/notifications.route.test.ts`:
 
@@ -110,14 +110,14 @@ describe("GET /notifications (SPEC-523)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan MERAH**
+- [x] **Step 2: Jalankan test, pastikan MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/notifications.route.test.ts
 ```
 Diharapkan: GAGAL — `b.total` `undefined` (`expected undefined to be 60`).
 
-- [ ] **Step 3: Implementasi di `server/src/services/notifications.ts`**
+- [x] **Step 3: Implementasi di `server/src/services/notifications.ts`**
 
 Ganti `notificationsFeed` yang ada dengan:
 
@@ -148,7 +148,7 @@ export async function notificationsFeed(p: { page?: string; limit?: string } = {
 }
 ```
 
-- [ ] **Step 4: Teruskan query di route**
+- [x] **Step 4: Teruskan query di route**
 
 Di `server/src/routes/notifications.ts`, ganti baris 8:
 
@@ -157,7 +157,7 @@ Di `server/src/routes/notifications.ts`, ganti baris 8:
     notificationsFeed(req.query as { page?: string; limit?: string }));
 ```
 
-- [ ] **Step 5: Perluas wire type frame siar**
+- [x] **Step 5: Perluas wire type frame siar**
 
 Di `shared/src/dto.ts` baris 518, ganti varian `notifications`:
 
@@ -167,21 +167,21 @@ Di `shared/src/dto.ts` baris 518, ganti varian `notifications`:
   | { t: "notifications"; items: Notification[]; unread: number; total: number; page: number; pageSize: number }
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan HIJAU**
+- [x] **Step 6: Jalankan test, pastikan HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/notifications.route.test.ts
 ```
 Diharapkan: 4 test lulus.
 
-- [ ] **Step 7: Typecheck paket yang tersentuh**
+- [x] **Step 7: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 ```
 Diharapkan: nol error.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/notifications.ts server/src/routes/notifications.ts shared/src/dto.ts server/test/notifications.route.test.ts
