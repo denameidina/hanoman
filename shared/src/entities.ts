@@ -44,6 +44,15 @@ export const zSpecBlocker = z.object({
 });
 export type SpecBlocker = z.infer<typeof zSpecBlocker>;
 
+// SPEC-546 · ADR-0109 · satu baris jejak konversi type. `payload` = bentuk LAMA utuh — itulah
+// yang membuat field tanpa padanan di bentuk baru (`convertPayload().dropped`) tidak pernah
+// benar-benar hilang.
+export const zSourceChange = z.object({
+  at: z.string(), from: z.string(), to: z.string(), by: z.string(),
+  payload: z.unknown().optional(),
+});
+export type SourceChange = z.infer<typeof zSourceChange>;
+
 export const zSpec = z.object({
   id: z.string(), projectId: z.string(), title: z.string(), source: zSpecSource,
   stage: zStage, priority: zPriority, author: z.string(), objective: z.string(),
