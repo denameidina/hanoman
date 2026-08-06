@@ -8,6 +8,7 @@ import { zAutoMerge } from "./auto-merge";
 import { zPrdStatus } from "./prd-status";
 import type { Spec, Notification } from "./entities";
 import { zProjectKind, zSpecSource, zPriority, zStage, zTicketCategory, zTicketStatus, zVerifyScope } from "./enums";
+import { payloadMatchesSource } from "./spec-source";
 
 // SPEC-198 · amplop daftar via API: search/filter/paginasi dilakukan server-side.
 export type Paginated<T> = { items: T[]; total: number; page: number; pageSize: number };
@@ -69,10 +70,10 @@ export const zCreateSpec = z.object({
   // menurunkan objective/priority dari bentuk yang salah. superRefine menegakkannya di boundary.
   // SPEC-407 · kini TIGA-arah: `qa` ↔ `severity`, `goal` ↔ `goal`, selain itu → brief. Payload
   // goal yang menyelinap ke source brief akan melahirkan spec ber-objective kosong.
+  // SPEC-546 · ADR-0109 · predikatnya kini hidup di `spec-source.ts` dan dipakai jalur konversi
+  // (`zChangeSpecSource`, `checkSourceChange`) juga — satu definisi, bukan dua yang bisa melenceng.
   .superRefine((o, ctx) => {
-    const shape = "severity" in o.payload ? "qa" : "goal" in o.payload ? "goal" : "brief";
-    const want = o.source === "qa" ? "qa" : o.source === "goal" ? "goal" : "brief";
-    if (shape !== want)
+    if (!payloadMatchesSource(o.source, o.payload))
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["payload"], message: "bentuk payload tak cocok dengan source" });
   });
 // nullable, bukan optional: `null` berarti "kosongkan, kembali ke default project",
@@ -96,6 +97,19 @@ export const zPatchSpec = z.object({
   // SENGAJA di luar gerbang `editingContent` (SPEC-186), sama seperti dependsOn: ia menggerbangi
   // apa yang terjadi SESUDAH kerja, bukan konten yang sedang dikerjakan sesi hidup.
   autoMerge: zAutoMerge.nullable().optional(),
+});
+// SPEC-546 · ADR-0109 · ubah type/source item IN-PLACE. Operasi khusus, bukan field `zPatchSpec`:
+// gerbangnya berbeda dari `editingContent` (SPEC-186) — ia mengunci FLOW, bukan label — dan
+// preseden ADR-0064 (rename project) sudah menetapkan bentuk "operasi khusus" untuk perubahan
+// yang punya gerbang & efek sampingnya sendiri.
+// `payload` OPSIONAL: tak dikirim = server memakai `convertPayload` (jalur agen lewat REST tetap
+// menghasilkan baris yang sah alih-alih 400).
+export const zChangeSpecSource = z.object({
+  source: zSpecSource,
+  payload: z.union([zBriefPayload, zQaPayload, zGoalPayload]).optional(),
+}).superRefine((o, ctx) => {
+  if (o.payload !== undefined && !payloadMatchesSource(o.source, o.payload))
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["payload"], message: "bentuk payload tak cocok dengan source" });
 });
 // SPEC-175 · rebase/merge branch hasil done spec. target = "local:<b>" | "origin:<b>".
 export const zIntegrate = z.object({
