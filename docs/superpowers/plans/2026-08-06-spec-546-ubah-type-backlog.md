@@ -93,7 +93,7 @@ sehingga konversi beda-bentuk tak pernah kehilangan prosa.
   - `payloadMatchesSource(source: string, payload: unknown): boolean`
   - `zChangeSpecSource` (di `dto.ts`) — `{ source: SpecSource; payload?: BriefPayload|QaPayload|GoalPayload }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/spec-source.test.ts`:
 
@@ -146,7 +146,7 @@ describe("SPEC-546 · bentuk payload per source (satu predikat)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-546
@@ -155,7 +155,7 @@ export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
 ```
 Expected: FAIL — `Failed to resolve import "./spec-source"`.
 
-- [ ] **Step 3: Buat `shared/src/spec-source.ts`**
+- [x] **Step 3: Buat `shared/src/spec-source.ts`**
 
 ```ts
 import { z } from "zod";
@@ -193,7 +193,7 @@ export function payloadMatchesSource(source: string, payload: unknown): boolean 
 }
 ```
 
-- [ ] **Step 4: Ekspor dari barrel**
+- [x] **Step 4: Ekspor dari barrel**
 
 Di `shared/src/index.ts`, sisipkan setelah baris `export * from "./enums";`:
 
@@ -201,7 +201,7 @@ Di `shared/src/index.ts`, sisipkan setelah baris `export * from "./enums";`:
 export * from "./spec-source";
 ```
 
-- [ ] **Step 5: `zCreateSpec` memanggil predikat bersama + tambah `zChangeSpecSource`**
+- [x] **Step 5: `zCreateSpec` memanggil predikat bersama + tambah `zChangeSpecSource`**
 
 Di `shared/src/dto.ts`, tambahkan import (setelah baris 10):
 
@@ -238,21 +238,21 @@ export const zChangeSpecSource = z.object({
 });
 ```
 
-- [ ] **Step 6: Jalankan test — harus lulus**
+- [x] **Step 6: Jalankan test — harus lulus**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism shared/src/spec-source.test.ts
 ```
 Expected: PASS, 5 test.
 
-- [ ] **Step 7: Typecheck shared**
+- [x] **Step 7: Typecheck shared**
 
 ```bash
 pnpm --filter ./shared typecheck
 ```
 Expected: keluar tanpa error.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add shared/src/spec-source.ts shared/src/spec-source.test.ts shared/src/dto.ts shared/src/index.ts
@@ -276,7 +276,7 @@ git commit -m "feat(spec-546): predikat bentuk payload per source jadi satu defi
   - `convertPayload(to: string, payload: unknown): PayloadConversion`
   - `SHAPE_REQUIRED: Record<PayloadShape, readonly string[]>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/spec-source-convert.test.ts`:
 
@@ -397,14 +397,14 @@ describe("SPEC-546 · convertPayload", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism shared/src/spec-source-convert.test.ts
 ```
 Expected: FAIL — `convertPayload is not a function`.
 
-- [ ] **Step 3: Implementasi di `shared/src/spec-source.ts`**
+- [x] **Step 3: Implementasi di `shared/src/spec-source.ts`**
 
 Tambahkan di akhir berkas:
 
@@ -521,21 +521,21 @@ export interface SourceChange {
 }
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism shared/src/spec-source-convert.test.ts shared/src/spec-source.test.ts
 ```
 Expected: PASS, 16 test.
 
-- [ ] **Step 5: Typecheck shared**
+- [x] **Step 5: Typecheck shared**
 
 ```bash
 pnpm --filter ./shared typecheck
 ```
 Expected: keluar tanpa error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/spec-source.ts shared/src/spec-source-convert.test.ts
@@ -559,7 +559,7 @@ git commit -m "feat(spec-546): convertPayload — peta konversi payload antar be
 - Produces: kolom `Spec.sourceHistory` (Json?), `zSourceChange`, `zSpec.sourceHistory`,
   event webhook `spec.source_changed`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/spec-source-contract.test.ts`:
 
@@ -608,7 +608,7 @@ describe("SPEC-546 · ADR-0109 · kontrak kolom sourceHistory", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
@@ -616,7 +616,7 @@ export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
 ```
 Expected: FAIL — `expected [...] to contain 'sourceHistory'`.
 
-- [ ] **Step 3: Tambah kolom di `server/prisma/schema.prisma`**
+- [x] **Step 3: Tambah kolom di `server/prisma/schema.prisma`**
 
 Di model `Spec`, tepat sesudah blok komentar+kolom `autoMerge` (sebelum `updatedAt`), sisipkan:
 
@@ -630,7 +630,7 @@ Di model `Spec`, tepat sesudah blok komentar+kolom `autoMerge` (sebelum `updated
   sourceHistory Json?
 ```
 
-- [ ] **Step 4: Tulis migration tangan**
+- [x] **Step 4: Tulis migration tangan**
 
 Buat `server/prisma/migrations/20260806000000_spec_source_history/migration.sql`:
 
@@ -647,7 +647,7 @@ Buat `server/prisma/migrations/20260806000000_spec_source_history/migration.sql`
 ALTER TABLE "Spec" ADD COLUMN "sourceHistory" JSONB;
 ```
 
-- [ ] **Step 5: Terapkan migration + regenerate client**
+- [x] **Step 5: Terapkan migration + regenerate client**
 
 ```bash
 export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
@@ -656,7 +656,7 @@ DATABASE_URL="$TEST_DATABASE_URL" ./node_modules/.bin/prisma migrate deploy --sc
 ```
 Expected: `All migrations have been successfully applied.` lalu `Generated Prisma Client`.
 
-- [ ] **Step 6: Masukkan kolom ke whitelist sync**
+- [x] **Step 6: Masukkan kolom ke whitelist sync**
 
 Di `server/src/services/sync.ts`, ganti baris 47 (array `spec`) menjadi:
 
@@ -669,7 +669,7 @@ Di `server/src/services/sync.ts`, ganti baris 47 (array `spec`) menjadi:
   spec: ["projectId", "title", "source", "stage", "priority", "author", "objective", "payload", "branchFrom", "baseSha", "headSha", "dependsOn", "sourceHistory", "createdAt", "startedAt", "doneAt", "updatedAt"],
 ```
 
-- [ ] **Step 7: Tambah `zSourceChange` + field di `zSpec`**
+- [x] **Step 7: Tambah `zSourceChange` + field di `zSpec`**
 
 Di `shared/src/entities.ts`, tepat sebelum `export const zSpec = z.object({` (baris 47), sisipkan:
 
@@ -702,7 +702,7 @@ dengan re-export supaya tetap satu tipe:
 export type { SourceChange } from "./entities";
 ```
 
-- [ ] **Step 8: Tambah event webhook turunan**
+- [x] **Step 8: Tambah event webhook turunan**
 
 Di `shared/src/webhook.ts`, ganti array `derived` entitas `spec` (baris 97-101) menjadi:
 
@@ -728,7 +728,7 @@ Di fungsi `sampleEnvelope` (baris 327), ganti baris `const changed = …` menjad
       : created || deleted ? [] : ["title"];
 ```
 
-- [ ] **Step 9: Jalankan test — harus lulus**
+- [x] **Step 9: Jalankan test — harus lulus**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism server/test/spec-source-contract.test.ts shared/src/webhook.test.ts
@@ -736,14 +736,14 @@ Di fungsi `sampleEnvelope` (baris 327), ganti baris `const changed = …` menjad
 Expected: PASS. Bila `shared/src/webhook.test.ts` gagal karena jumlah event, perbarui angka yang
 diharapkan di test itu — event baru memang bertambah satu.
 
-- [ ] **Step 10: Typecheck shared + server**
+- [x] **Step 10: Typecheck shared + server**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 ```
 Expected: keduanya keluar tanpa error.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations shared/src/entities.ts shared/src/spec-source.ts shared/src/webhook.ts server/src/services/sync.ts server/test/spec-source-contract.test.ts
@@ -772,7 +772,7 @@ git commit -m "feat(spec-546): kolom Spec.sourceHistory + kontrak sync & webhook
   - `appendSourceHistory(current: unknown, entry: SourceChange): SourceChange[]`
   - `recordSourceChange(specId, projectId, title, from, to, seq): Promise<void>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/spec-source-gate.test.ts`:
 
@@ -850,7 +850,7 @@ describe("SPEC-546 · ADR-0109 · gerbang konversi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
@@ -858,7 +858,7 @@ export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
 ```
 Expected: FAIL — `Cannot find module '../src/services/spec-source'`.
 
-- [ ] **Step 3: Pindahkan `deriveSpecFields` ke service**
+- [x] **Step 3: Pindahkan `deriveSpecFields` ke service**
 
 Buat `server/src/services/spec-fields.ts`:
 
@@ -899,7 +899,7 @@ komentarnya) dan tambahkan import di antara import service lain:
 import { deriveSpecFields } from "../services/spec-fields";
 ```
 
-- [ ] **Step 4: Buat `server/src/services/spec-source.ts`**
+- [x] **Step 4: Buat `server/src/services/spec-source.ts`**
 
 ```ts
 import { flowForSource, convertPayload, payloadMatchesSource, type SourceChange } from "@hanoman/shared";
@@ -962,7 +962,7 @@ export function appendSourceHistory(current: unknown, entry: SourceChange): Sour
 }
 ```
 
-- [ ] **Step 5: Tambah `recordSourceChange`**
+- [x] **Step 5: Tambah `recordSourceChange`**
 
 Di akhir `server/src/services/notifications.ts`, tambahkan:
 
@@ -984,21 +984,21 @@ export async function recordSourceChange(
 }
 ```
 
-- [ ] **Step 6: Jalankan test — harus lulus**
+- [x] **Step 6: Jalankan test — harus lulus**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism server/test/spec-source-gate.test.ts
 ```
 Expected: PASS, 9 test.
 
-- [ ] **Step 7: Pastikan pemindahan `deriveSpecFields` tak merusak jalur lama**
+- [x] **Step 7: Pastikan pemindahan `deriveSpecFields` tak merusak jalur lama**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism server/test/specs.route.test.ts server/test/specs-batch.route.test.ts
 ```
 Expected: PASS (tak ada perubahan perilaku — fungsi yang sama, letak baru).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/spec-source.ts server/src/services/spec-fields.ts server/src/services/notifications.ts server/src/routes/specs.ts server/test/spec-source-gate.test.ts
@@ -1020,7 +1020,7 @@ git commit -m "feat(spec-546): gerbang konversi source (mengunci flow, bukan lab
   `notifySynced`
 - Produces: `POST /api/specs/:id/source` → `Spec`; `paths.specSource(id)`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/spec-source.route.test.ts`:
 
@@ -1131,7 +1131,7 @@ describe("SPEC-546 · ADR-0109 · POST /specs/:id/source", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
@@ -1139,7 +1139,7 @@ export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
 ```
 Expected: FAIL — semua request menjawab 404 (route belum ada).
 
-- [ ] **Step 3: Tambah `paths.specSource`**
+- [x] **Step 3: Tambah `paths.specSource`**
 
 Di `shared/src/api.ts`, tepat sesudah baris `specIntegrate:` (baris 21):
 
@@ -1148,7 +1148,7 @@ Di `shared/src/api.ts`, tepat sesudah baris `specIntegrate:` (baris 21):
   specSource: (id: string) => `${API}/specs/${id}/source`,
 ```
 
-- [ ] **Step 4: Tambah route**
+- [x] **Step 4: Tambah route**
 
 Di `server/src/routes/specs.ts`, perbarui import dari `@hanoman/shared` menjadi:
 
@@ -1208,14 +1208,14 @@ Sisipkan route tepat sesudah blok `app.patch("/specs/:id", …)` berakhir (sebel
   });
 ```
 
-- [ ] **Step 5: Jalankan test — harus lulus**
+- [x] **Step 5: Jalankan test — harus lulus**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism server/test/spec-source.route.test.ts
 ```
 Expected: PASS, 8 test.
 
-- [ ] **Step 6: Regresi route specs + capability**
+- [x] **Step 6: Regresi route specs + capability**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism server/test/specs.route.test.ts server/test/agent-capabilities.test.ts server/test/mcp-capability.test.ts
@@ -1223,14 +1223,14 @@ Expected: PASS, 8 test.
 Expected: PASS. `/specs/*` sudah dipetakan `backlog:read|write` per method
 (`agent-capabilities.ts:48`), jadi tak ada perubahan gate.
 
-- [ ] **Step 7: Typecheck server**
+- [x] **Step 7: Typecheck server**
 
 ```bash
 pnpm --filter ./server typecheck
 ```
 Expected: keluar tanpa error.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/routes/specs.ts shared/src/api.ts server/test/spec-source.route.test.ts
@@ -1255,7 +1255,7 @@ git commit -m "feat(spec-546): endpoint POST /specs/:id/source — konversi type
   - `ChangeSourceDialog({ spec, onClose, onSubmit })`
   - `api.changeSpecSource(id, { source, payload? }): Promise<Spec>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/change-source.test.tsx`:
 
@@ -1329,14 +1329,14 @@ describe("SPEC-546 · ChangeSourceDialog", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/change-source.test.tsx
 ```
 Expected: FAIL — `Failed to resolve import "../src/screens/source-meta"`.
 
-- [ ] **Step 3: Buat katalog UI `src/src/screens/source-meta.ts`**
+- [x] **Step 3: Buat katalog UI `src/src/screens/source-meta.ts`**
 
 ```ts
 // SPEC-546 · ADR-0109 · SATU katalog UI untuk source backlog: lencana, opsi dialog, dan daftar
@@ -1396,7 +1396,7 @@ export const SEV_OPTS = [
   { value: "critical", label: "Critical" }, { value: "major", label: "Major" }, { value: "minor", label: "Minor" }];
 ```
 
-- [ ] **Step 4: `BacklogScreen.tsx` memakai katalog itu**
+- [x] **Step 4: `BacklogScreen.tsx` memakai katalog itu**
 
 Hapus dari `src/src/screens/BacklogScreen.tsx`: blok `SOURCE_META` + `sourceMeta` (baris 30-40),
 `PRIO_OPTS` + `SEV_OPTS` (baris 56-57), dan `BRIEF_FIELDS`/`GOAL_FIELDS`/`QA_FIELDS`
@@ -1415,7 +1415,7 @@ Tambahkan re-export supaya pemakai lama (`TerminalScreen`, test) tak putus:
 export { SOURCE_META, sourceMeta };
 ```
 
-- [ ] **Step 5: Buat `src/src/screens/ChangeSourceDialog.tsx`**
+- [x] **Step 5: Buat `src/src/screens/ChangeSourceDialog.tsx`**
 
 ```tsx
 import React from "react";
@@ -1516,7 +1516,7 @@ tulis persis:
     (SHAPE_FIELDS[fromShape] ?? []).find(([k]) => k === key)?.[1] ?? key;
 ```
 
-- [ ] **Step 6: Tambah `changeSpecSource` ke api client**
+- [x] **Step 6: Tambah `changeSpecSource` ke api client**
 
 Di `src/src/api/client.ts`, tepat sesudah `patchSpec` (baris 149-152):
 
@@ -1527,28 +1527,28 @@ Di `src/src/api/client.ts`, tepat sesudah `patchSpec` (baris 149-152):
     j<Spec>(paths.specSource(id), { method: "POST", ...body(b) }),
 ```
 
-- [ ] **Step 7: Jalankan test — harus lulus**
+- [x] **Step 7: Jalankan test — harus lulus**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/change-source.test.tsx
 ```
 Expected: PASS, 6 test.
 
-- [ ] **Step 8: Regresi layar backlog (katalog dipindah)**
+- [x] **Step 8: Regresi layar backlog (katalog dipindah)**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/backlog-board.test.tsx src/test/backlog-dependency.test.tsx src/test/backlog-deeplink.test.tsx
 ```
 Expected: PASS.
 
-- [ ] **Step 9: Typecheck web**
+- [x] **Step 9: Typecheck web**
 
 ```bash
 pnpm --filter ./src typecheck
 ```
 Expected: keluar tanpa error.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/src/screens/source-meta.ts src/src/screens/ChangeSourceDialog.tsx src/src/screens/BacklogScreen.tsx src/src/api/client.ts src/test/change-source.test.tsx
@@ -1569,7 +1569,7 @@ git commit -m "feat(spec-546): katalog UI source + dialog Ubah type"
 - Produces: prop `onChangeSource?: (s: Spec, source: string, payload?: unknown) => void` pada
   `BacklogScreen`/`SpecDetail`
 
-- [ ] **Step 1: Tambah test yang gagal**
+- [x] **Step 1: Tambah test yang gagal**
 
 Tambahkan di akhir `src/test/change-source.test.tsx`:
 
@@ -1593,14 +1593,14 @@ describe("SPEC-546 · backlog: tab help & jejak konversi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/change-source.test.tsx
 ```
 Expected: FAIL — `Unable to find role="tab" and name "Help Center"`.
 
-- [ ] **Step 3: Tab `help` di daftar backlog**
+- [x] **Step 3: Tab `help` di daftar backlog**
 
 Di `src/src/screens/BacklogScreen.tsx`, tambahkan di array `tabs` (baris 779-786) sesudah entri
 `goal`:
@@ -1611,7 +1611,7 @@ Di `src/src/screens/BacklogScreen.tsx`, tambahkan di array `tabs` (baris 779-786
             { value: "help", label: "Help Center" },
 ```
 
-- [ ] **Step 4: Tombol "Ubah type" + dialog + blok jejak di `SpecDetail`**
+- [x] **Step 4: Tombol "Ubah type" + dialog + blok jejak di `SpecDetail`**
 
 Tambahkan prop pada tanda tangan `SpecDetail` (baris 133-154) — parameter dan tipenya:
 
@@ -1676,7 +1676,7 @@ Tambahkan import di atas:
 import { ChangeSourceDialog } from "./ChangeSourceDialog";
 ```
 
-- [ ] **Step 5: Teruskan prop dari `BacklogScreen` ke `SpecDetail`**
+- [x] **Step 5: Teruskan prop dari `BacklogScreen` ke `SpecDetail`**
 
 Tambahkan `onChangeSource` ke daftar parameter `BacklogScreen` (baris 700) dan ke blok tipenya
 (baris 702-721):
@@ -1689,7 +1689,7 @@ Tambahkan `onChangeSource` ke daftar parameter `BacklogScreen` (baris 700) dan k
 Lalu teruskan ke `<SpecDetail … />` (cari elemen itu di bagian bawah berkas dan tambahkan
 `onChangeSource={onChangeSource}` di antara prop lain).
 
-- [ ] **Step 6: Handler di `App.tsx`**
+- [x] **Step 6: Handler di `App.tsx`**
 
 Di `src/src/App.tsx`, tambahkan tepat sesudah `editSpec` (baris 990):
 
@@ -1717,28 +1717,28 @@ Teruskan ke `<BacklogScreen …>` di baris yang sama dengan `onEditSpec` (baris 
               onChangeSource={changeSourceOfSpec}
 ```
 
-- [ ] **Step 7: Jalankan test — harus lulus**
+- [x] **Step 7: Jalankan test — harus lulus**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/change-source.test.tsx
 ```
 Expected: PASS, 8 test.
 
-- [ ] **Step 8: Regresi App + backlog**
+- [x] **Step 8: Regresi App + backlog**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/app-flows.test.tsx src/test/app-states.test.tsx src/test/backlog-board.test.tsx src/test/backlog-dependency.test.tsx src/test/backlog-deeplink.test.tsx
 ```
 Expected: PASS.
 
-- [ ] **Step 9: Typecheck web**
+- [x] **Step 9: Typecheck web**
 
 ```bash
 pnpm --filter ./src typecheck
 ```
 Expected: keluar tanpa error.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/src/screens/BacklogScreen.tsx src/src/App.tsx src/test/change-source.test.tsx
@@ -1761,7 +1761,7 @@ git commit -m "feat(spec-546): aksi Ubah type di detail backlog, tab Help Center
 - Consumes: seluruh keputusan Task 1–7
 - Produces: —
 
-- [ ] **Step 1: Pastikan nomor ADR belum direbut sesi lain**
+- [x] **Step 1: Pastikan nomor ADR belum direbut sesi lain**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman
@@ -1774,7 +1774,7 @@ cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-546
 Expected: `0109-` **tidak** muncul. Bila muncul, pakai nomor bebas berikutnya dan ganti seluruh
 rujukan `ADR-0109` di kode & docs.
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Buat `internal/docs/adr/0109-ubah-source-backlog-item.md`:
 
@@ -1918,7 +1918,7 @@ pola `spec.stage_changed` (ADR-0100).
   diurai lagi; `dropped` + `sourceHistory` menjawab kebutuhan yang sama tanpa merusak bentuk.
 ```
 
-- [ ] **Step 3: Link ADR di kedua index**
+- [x] **Step 3: Link ADR di kedua index**
 
 Di `internal/docs/README.md`, tambahkan sebagai baris pertama daftar ADR (di atas `0108`):
 
@@ -1931,7 +1931,7 @@ itu (paling atas daftar), memuat: apa yang diputuskan, apa yang **ditegakkan** (
 operasi khusus, ADR-0090 kolom vs turunan, ADR-0100 peristiwa turunan), dan enam gotcha di atas
 dalam bentuk ringkas.
 
-- [ ] **Step 4: Perbarui kontrak API**
+- [x] **Step 4: Perbarui kontrak API**
 
 Di `internal/docs/architecture/api-contract.md`, di bagian endpoint `/specs`, tambahkan:
 
@@ -1957,7 +1957,7 @@ Setiap konversi menulis satu `Notification` (`type: "spec-source"`) dan memancar
 `spec.source_changed`.
 ```
 
-- [ ] **Step 5: Perbarui data model**
+- [x] **Step 5: Perbarui data model**
 
 Di `internal/docs/architecture/data-model.md`, di bagian model `Spec`, tambahkan baris kolom:
 
@@ -1965,7 +1965,7 @@ Di `internal/docs/architecture/data-model.md`, di bagian model `Spec`, tambahkan
 | `sourceHistory` | `Json?` | SPEC-546 · ADR-0109 · jejak konversi type: `[{at, from, to, by, payload}]`, append-only, `payload` = bentuk LAMA utuh. Ikut `FIELDS.spec` sync; **tidak** masuk allowlist webhook. `null` = belum pernah dikonversi. |
 ```
 
-- [ ] **Step 6: Perbarui SKILL project**
+- [x] **Step 6: Perbarui SKILL project**
 
 Di `internal/skills/hanoman/SKILL.md`, bagian **Aturan Arsitektur**, tambahkan butir baru sesudah
 butir "Status PRD adalah nilai turunan":
@@ -1997,7 +1997,7 @@ butir "Status PRD adalah nilai turunan":
   (`QA ·`/`Audit ·`/`Goal ·`) **sengaja tak disentuh**: ia fakta historis, cermin `createdAt`.
 ```
 
-- [ ] **Step 7: Verifikasi integritas index docs**
+- [x] **Step 7: Verifikasi integritas index docs**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism server/test/agent-doc-contract.test.ts
@@ -2005,7 +2005,7 @@ git status --porcelain internal/docs
 ```
 Expected: test PASS; `git status` menampilkan berkas ADR baru + tiga docs yang disunting.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add internal/docs internal/skills
@@ -2018,7 +2018,7 @@ git commit -m "docs(spec-546): ADR-0109 ubah type backlog + kontrak API, data mo
 
 **Files:** —
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-546
@@ -2043,14 +2043,14 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism \
 ```
 Expected: seluruh berkas PASS.
 
-- [ ] **Step 2: Typecheck ketiga paket yang tersentuh**
+- [x] **Step 2: Typecheck ketiga paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
 ```
 Expected: ketiganya keluar tanpa error. (Tiga paket, bukan `-r`: memang ketiganya yang disunting.)
 
-- [ ] **Step 3: Smoke endpoint nyata (boot server + curl, sekali di akhir)**
+- [x] **Step 3: Smoke endpoint nyata (boot server + curl, sekali di akhir)**
 
 ```bash
 export HANOMAN_HOME="$(mktemp -d)"
@@ -2077,7 +2077,7 @@ Matikan server **per-PID** (JANGAN `pkill -f`):
 kill $(lsof -ti:8799)
 ```
 
-- [ ] **Step 4: Diff bersih & commit sisa**
+- [x] **Step 4: Diff bersih & commit sisa**
 
 ```bash
 git status --porcelain
@@ -2085,7 +2085,7 @@ git diff --stat "$HANOMAN_BASE_SHA"...HEAD
 ```
 Expected: `git status` kosong; diff memuat seluruh berkas di tabel File Structure.
 
-- [ ] **Step 5: Push**
+- [x] **Step 5: Push**
 
 ```bash
 git push origin HEAD:refs/heads/hanoman/spec-546
@@ -2119,6 +2119,28 @@ Task 2 (definisi), Task 4 (`checkSourceChange`), Task 6 (dialog). `SourceChange`
 sekali di `entities.ts` dan di-re-export `spec-source.ts` (Task 3 Step 7). `SourceGate` hanya
 dipakai Task 4 & 5. `deriveSpecFields` pindah di Task 4 dan dipakai Task 5 dengan tanda tangan
 yang sama.
+
+## Catatan pelaksanaan (diisi saat Execute)
+
+Empat penyimpangan dari plan, semuanya dicatat apa adanya:
+
+1. **Biner prisma ada di `server/node_modules/.bin/prisma`**, bukan `node_modules/.bin/prisma`
+   (root hanya punya `tsc`/`tsserver`/`vitest`). Worktree juga butuh `pnpm install` +
+   `prisma generate` lebih dulu.
+2. **`zSourceChange` ditarik maju** dari Task 3 Step 7 ke Task 2, supaya `spec-source.ts` bisa
+   me-re-export tipenya tanpa melewati satu commit yang sengaja tak bisa di-typecheck.
+3. **Test outbox sync diperbaiki di tempat**: env test tak punya `SYNC_SERVER_URL` ⇒ berperan
+   **hub** ⇒ `notifySynced` menulis `SyncLog`, bukan `syncOutbox`. Assertion-nya diganti memeriksa
+   **isi snapshot feed** (`source` baru + `sourceHistory`), yang justru bukti yang diminta konstrain.
+4. **`src/test/terminal-screen.test.tsx` ikut disunting**: `sourceHistory` masuk `zSpec` ber-
+   `.default([])`, jadi literal `Spec` di fixture wajib menyebutnya. Itu efek yang diinginkan —
+   fixture harus mencerminkan wire (cermin `dependsOn`/`blockedBy`).
+
+Smoke end-to-end (server sungguhan, DB khusus, port 8799) memverifikasi: konversi brief→qa tanpa
+payload (id tetap, payload terkonversi, jejak membawa bentuk lama utuh, `by` = user login),
+no-op → 400, bentuk payload salah → 400, `cross-audit` → 400, qa→help lalu `?source=help` total 1 &
+`?source=qa` total 0, dua notifikasi ber-key berurutan, dan pada item yang sudah dimulai:
+help→qa **409**, help→brief+payload **409**, help→brief **200** dengan payload tak tersentuh.
 
 **Selaras dengan dokumen desain:** `docs/superpowers/specs/2026-08-06-spec-546-ubah-type-backlog-design.md`
 sudah diperbarui ke tanda tangan yang sama (`convertPayload(to, payload)`, `missing` dihitung dari
