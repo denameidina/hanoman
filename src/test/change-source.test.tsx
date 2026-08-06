@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ChangeSourceDialog } from "../src/screens/ChangeSourceDialog";
 import { SOURCE_META } from "../src/screens/source-meta";
+import { BacklogScreen } from "../src/screens/BacklogScreen";
 import type { Spec } from "../src/screens/types";
 
 const base = {
@@ -63,5 +64,21 @@ describe("SPEC-546 · ChangeSourceDialog", () => {
     expect(screen.queryByLabelText("Konteks")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Ubah type/i }));
     expect(onSubmit).toHaveBeenCalledWith("help", undefined);
+  });
+});
+
+describe("SPEC-546 · backlog: tab help & jejak konversi", () => {
+  it("tab filter punya pintu Help Center", () => {
+    render(<BacklogScreen backlog={[]} projects={[]} projectFilter="all" onProjectFilter={() => {}} />);
+    expect(screen.getByRole("tab", { name: "Help Center" })).toBeTruthy();
+  });
+
+  it("detail menampilkan tombol Ubah type dan blok jejak konversi", () => {
+    const withTrail = { ...briefSpec,
+      sourceHistory: [{ at: "2026-08-06T04:00:00.000Z", from: "qa", to: "brief", by: "dena@x" }] } as Spec;
+    render(<BacklogScreen backlog={[withTrail]} projects={[]} projectFilter="all"
+      onProjectFilter={() => {}} initialDetailId="SPEC-800" onChangeSource={() => {}} />);
+    expect(screen.getByRole("button", { name: /Ubah type/i })).toBeTruthy();
+    expect(screen.getByTestId("source-trail").textContent).toContain("qa → brief");
   });
 });

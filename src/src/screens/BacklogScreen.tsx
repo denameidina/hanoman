@@ -103,7 +103,7 @@ const escVariant = (e: AuditEscalation | null, target: string): "primary" | "sec
 // Source yang berujung dokumen audit — berhak atas ketiga pintu eskalasi.
 const isAuditSource = (source: string) => source === "audit";
 
-function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, projectPolicy, allSpecs }:
+function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, projectPolicy, allSpecs }:
   {
     spec: Spec | null; onClose: () => void; onEditBranch?: (s: Spec, b: string | null) => void;
     onRevertStage?: (s: Spec, target: string, confirmDelete?: boolean) => Promise<any>;
@@ -122,6 +122,9 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
     // SPEC-486 · ADR-0103 · override kebijakan auto-merge item ini (null = kembali ikut project).
     // Alasan yang sama dengan onEditDeps: ia menggerbangi apa yang terjadi SESUDAH kerja.
     onEditAutoMerge?: (s: Spec, v: AutoMerge | null) => void;
+    // SPEC-546 · ADR-0109 · ubah type/source item in-place. Boleh ditawarkan kapan saja:
+    // gerbangnya (flow, bukan label) ditegakkan server, dan dialog mencerminkannya.
+    onChangeSource?: (s: Spec, source: string, payload?: unknown) => void;
     projectPolicy?: unknown;   // Project.autoMerge — untuk label "Ikut project (…)"
     allSpecs?: Spec[];
   }) {
@@ -130,6 +133,8 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
   const [remoteOnly, setRemoteOnly] = React.useState<Set<string>>(new Set());   // SPEC-244 · branch origin-only
   const [confirm, setConfirm] = React.useState<{ target: string; files: string[] } | null>(null);
   const [showIntegrate, setShowIntegrate] = React.useState(false);
+  // SPEC-546 · ADR-0109 · dialog "Ubah type".
+  const [showSource, setShowSource] = React.useState(false);
   // SPEC-186 · konten hanya boleh diubah selagi item masih di backlog & belum pernah dimulai.
   const [editing, setEditing] = React.useState(false);
   const [form, setForm] = React.useState<Record<string, string>>({});
@@ -210,6 +215,12 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
         {editable && !editing && (
           <Button size="sm" variant="secondary" leftIcon="pencil" onClick={startEdit}>Edit</Button>
         )}
+        {/* SPEC-546 · ADR-0109 · ubah type/source in-place. Tak digerbangi `editable`: item yang
+            sudah dimulai tetap boleh berpindah ke source ber-flow sama (dialog yang menyaring). */}
+        {onChangeSource && (
+          <Button size="sm" variant="secondary" leftIcon="shuffle"
+            onClick={() => setShowSource(true)}>Ubah type</Button>
+        )}
         {/* SPEC-171 · buka layar review all files + file changed dari worktree. */}
         {onOpenReview && (
           <Button size="sm" variant="secondary" leftIcon="git-compare"
@@ -276,6 +287,23 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
           </div>
         )}
       </div>
+      {/* SPEC-546 · ADR-0109 · jejak konversi type. Hanya muncul bila item pernah dikonversi —
+          item yang tak pernah berpindah tak perlu barisnya. */}
+      {(spec.sourceHistory ?? []).length > 0 && (
+        <div style={{ marginBottom: 14 }} data-testid="source-trail">
+          <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Jejak konversi type</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {(spec.sourceHistory ?? []).map((h, i) => (
+              <div key={`${h.at}-${i}`} style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-strong)" }}>
+                  {h.from} → {h.to}
+                </span>
+                {" · "}{new Date(h.at).toLocaleString("id-ID")}{" · "}{h.by}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* SPEC-486 · ADR-0103 · override kebijakan auto-merge untuk item ini. Pilihan pertama
           menyebut kebijakan project apa adanya supaya tak pernah ada pertanyaan "lalu ini pakai apa". */}
       {onEditAutoMerge && (
@@ -405,6 +433,14 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
           ownBranch={`hanoman/${spec.id.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`} eyebrow={spec.id}
           onClose={() => setShowIntegrate(false)}
           onIntegrate={(op, target) => { setShowIntegrate(false); onIntegrate(spec, op, target); }} />
+      )}
+      {/* SPEC-546 · ADR-0109 · dialog pilih source tujuan + form field bentuk barunya. */}
+      {showSource && onChangeSource && (
+        <ChangeSourceDialog spec={spec} onClose={() => setShowSource(false)}
+          onSubmit={(source, payload) => {
+            setShowSource(false);
+            onChangeSource(spec, source, payload);
+          }} />
       )}
     </Modal>
   );
@@ -670,7 +706,7 @@ const VIEWS = [
   { value: "board", label: "Board", icon: "kanban" },
 ];
 
-export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
+export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
   {
     backlog: Spec[]; projects: ProjectVM[]; pageSize?: number;
     onStart?: (s: Spec) => void; activeSpecs?: Set<string>;
@@ -683,6 +719,8 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     onEditDeps?: (s: Spec, ids: string[]) => void;
     // SPEC-486 · ADR-0103 · ubah kebijakan auto-merge item (null = kembali ikut project).
     onEditAutoMerge?: (s: Spec, v: AutoMerge | null) => void;
+    // SPEC-546 · ADR-0109 · ubah type/source item in-place (id/riwayat/dependency tetap).
+    onChangeSource?: (s: Spec, source: string, payload?: unknown) => void;
     // SPEC-237 · naikkan audit → Finding QA. SPEC-340 · ADR-0076 · + feature brief & PRD;
     // argumen kedua = rekomendasi hanoman yang terbaca dari dokumen audit (bisa null).
     onPromoteToQa?: (s: Spec, e: AuditEscalation | null) => void;
@@ -756,6 +794,9 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             // jadi ia butuh pintunya sendiri — tanpa tab ini item goal hanya muncul tercampur di
             // "Semua spec". `tab` menyeberang apa adanya sebagai `source` ke GET /specs.
             { value: "goal", label: "Goal" },
+            // SPEC-546 · ADR-0109 · `help` kini tujuan konversi yang sah, jadi ia butuh pintunya
+            // sendiri — tanpa tab ini item Help Center hanya muncul tercampur di "Semua spec".
+            { value: "help", label: "Help Center" },
           ]} />
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Tabs variant="pill" value={view} onChange={setView} tabs={VIEWS} aria-label="Mode tampilan" />
@@ -832,7 +873,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
       <SpecDetail spec={backlog.find((s) => s.id === detailId) || null} onClose={() => setDetailId(null)}
         onEditBranch={onEditBranch} onRevertStage={onRevertStage} onOpenReview={onOpenReview} onStart={onStart} onIntegrate={onIntegrate} onEditSpec={onEditSpec} onPromoteToQa={onPromoteToQa}
         onPromoteToBrief={onPromoteToBrief} onPromoteToPrd={onPromoteToPrd}
-        onEditDeps={onEditDeps} onEditAutoMerge={onEditAutoMerge}
+        onEditDeps={onEditDeps} onEditAutoMerge={onEditAutoMerge} onChangeSource={onChangeSource}
         projectPolicy={(projects.find((x) => x.id === backlog.find((s) => s.id === detailId)?.projectId) as { autoMerge?: unknown } | undefined)?.autoMerge}
         allSpecs={backlog} />
     </div>

@@ -989,6 +989,22 @@ export default function App() {
     }
   }
 
+  // SPEC-546 · ADR-0109 · ubah type/source item in-place — id SPEC-nnn, riwayat, dan dependency
+  // tetap. 409 = gerbang flow (item sudah dimulai, tujuannya beda alur kerja); 400 = bentuk
+  // payload tak cocok source tujuan.
+  async function changeSourceOfSpec(spec: Spec, source: string, payload?: unknown) {
+    try {
+      const updated = await api.changeSpecSource(spec.id, { source, payload });
+      setBacklog((b) => b.map((s) => (s.id === updated.id ? updated : s)));
+      showToast(`${spec.id} · type ${spec.source} → ${source}`, "ok", "shuffle");
+    } catch (e) {
+      const locked = e instanceof ApiError && e.status === 409;
+      showToast(locked
+        ? `${spec.id} sudah dimulai — type hanya bisa pindah ke alur kerja yang sama`
+        : `Gagal mengubah type ${spec.id}`, "warn", "x-circle");
+    }
+  }
+
   // SPEC-447 · ADR-0093 · dependency bisa diubah kapan saja — ia menggerbangi peluncuran
   // BERIKUTNYA, bukan konten sesi berjalan (karena itu di luar gerbang SPEC-186). 400 = validasi
   // server (id asing, lintas project, siklus).
@@ -1131,6 +1147,7 @@ export default function App() {
           onStart={startSession} activeSpecs={activeSpecs} onNew={() => setModal("brief")}
           onDelete={deleteSpec} onOpenRun={() => setSection("terminal")} onOpenReview={openReview}
           onEditBranch={editBranch} onRevertStage={revertStage} onIntegrate={integrateSpec} onEditSpec={editSpec} onEditDeps={editDeps} onEditAutoMerge={editAutoMerge}
+          onChangeSource={changeSourceOfSpec}
           onPromoteToQa={promoteToQa} onPromoteToBrief={promoteToBrief} onPromoteToPrd={promoteToPrd}
           onToast={showToast} initialDetailId={openSpecId}
           projectFilter={projectFilter} onProjectFilter={setProjectFilter} dataVersion={dataVersion} />)}
