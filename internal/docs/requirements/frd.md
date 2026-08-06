@@ -110,6 +110,10 @@ tanpa penopang tidak ditulis.
 - WHERE `verifyScope` bernilai `changed`, THE SYSTEM SHALL menyuruh sesi menguji berkas yang berubah saja
   lewat klausa prompt + env, dan SHALL tetap membiarkan agen memperluas scope untuk perubahan berdampak
   luas ([ADR-0080](../adr/0080-scope-verifikasi-per-sesi.md)).
+- THE SYSTEM SHALL menyertakan klausa gaya kode yang sama — satu konstanta, tanpa knob dan tanpa override
+  per sesi — di setiap prompt agen yang dilahirkannya: sesi backlog & goal (digerbangi `writesCode`),
+  ketiga pintu konflik rebase/merge, prompt custom agent `claude --agents`, prompt lead, dan prompt
+  narator changelog ([ADR-0108](../adr/0108-klausa-gaya-kode-prompt-agen.md)).
 
 ## Review & integrate
 

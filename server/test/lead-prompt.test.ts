@@ -133,3 +133,20 @@ describe("leadPrompt · pilihan jamak & rantai (SPEC-485)", () => {
     expect(leadPrompt(q, ctx())).not.toContain("Rantai keputusan ini");
   });
 });
+
+// SPEC-543 · ADR-0108 · `lead/brain.ts` adalah titik spawn agen KEDUA — yang terlewat SPEC-448
+// selama berbulan-bulan karena `rootBypassEnv` hanya dipasang di `pty.ts`. Keluaran lead adalah
+// blok JSON, bukan kode; yang menanganinya adalah gerbang di baris pertama klausa ("berlaku setiap
+// kali kamu menulis atau mengubah kode"), bukan percabangan di pemanggil.
+describe("leadPrompt · klausa gaya kode (SPEC-543)", () => {
+  it("membawanya", () => {
+    expect(leadPrompt(q, ctx())).toContain("Gaya kode —");
+  });
+
+  it("kontrak jawaban ringkas (ADR-0098) tetap utuh di prompt yang sama", () => {
+    const p = leadPrompt(q, ctx());
+    expect(p).toContain("Sepanjang apa (WAJIB)");
+    expect(p).toContain("Bentuk jawaban (WAJIB)");
+    expect(p).toContain(String(LEAD_DECISION_MAX));
+  });
+});

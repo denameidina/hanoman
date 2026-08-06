@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, type Stage } from "@hanoman/shared";
+import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { integrate, sourceBranch } from "../services/integrate";
 import { createSession } from "../services/pty";
 import { conflictSessionDefaults } from "../services/settings";
@@ -319,6 +320,9 @@ export default async function (app: FastifyInstance) {
       `hanoman · selesaikan konflik ${r.op} branch \`${sourceBranch(spec.id)}\` ${r.op === "merge" ? "ke" : "di atas"} \`${r.target}\`.`,
       `Kamu berada di worktree yang tertinggal di tengah operasi ${r.op} dengan konflik. Resolve konflik pada file bertanda, jaga kedua sisi perubahan sesuai maksudnya.`,
       r.finalize,
+      // SPEC-543 · ADR-0108 · menyelesaikan konflik selalu berarti menyunting kode, dan prompt ini
+      // dirakit inline di route — gerbang `writesCode` di runner/src/prompt.ts tak menjangkaunya.
+      CODE_STYLE_CLAUSE,
       `Backlog item ${spec.id} — ${spec.title}.`,
     ].join("\n\n");
     const s = createSession(spec.projectId, r.worktree, {

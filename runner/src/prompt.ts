@@ -1,6 +1,7 @@
 import type { Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx } from "./types";
 import { REVERSE_STANDARD } from "./reverse-standard";
 import { verifyScopeClause } from "./verify-scope";
+import { CODE_STYLE_CLAUSE } from "./code-style";
 import { readGoalPayload } from "./goal-spec";
 
 export const PIPELINES: Record<Flow, readonly string[]> = {
@@ -195,6 +196,12 @@ const writesCode = (flow: Flow): boolean =>
 const scopeClause = (flow: Flow, scope?: VerifyScope): string =>
   scope && writesCode(flow) ? verifyScopeClause(scope) : "";
 
+// SPEC-543 · ADR-0108 — klausa gaya kode. Gerbangnya `writesCode` yang SAMA dengan scopeClause;
+// menyalin daftar flow-nya berarti dua definisi "sesi ini menulis kode" yang bisa berselisih saat
+// flow baru lahir. Tak ber-knob, sengaja berbeda dari verifyScope: tak ada keadaan di mana
+// "sesi ini boleh menulis komentar yang mengulang kode" masuk akal untuk ditawarkan.
+const codeStyleClause = (flow: Flow): string => writesCode(flow) ? CODE_STYLE_CLAUSE : "";
+
 export function startPrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, autonomy?: Autonomy, verifyScope?: VerifyScope,
 ): string {
@@ -208,6 +215,7 @@ export function startPrompt(
     auditOnlyInstruction(flow),
     autonomyClause(autonomy),
     scopeClause(flow, verifyScope),
+    codeStyleClause(flow),
     skillInstruction(PIPELINES[flow]),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
@@ -234,6 +242,7 @@ export function continuePrompt(
       + `dan selesaikan yang masih \`[ ]\`. Verifikasi nyata sebelum klaim selesai.`,
     autonomyClause(autonomy),
     scopeClause(flow, verifyScope),
+    codeStyleClause(flow),
     skillInstruction(["Execute"]),
     `Setelah selesai: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Worktree `
       + `ini detached HEAD — itu memang disengaja.`,
@@ -298,6 +307,7 @@ export function resumePrompt(
     auditDecided ? "" : auditDecisionInstruction(flow),
     autonomyClause(autonomy),
     scopeClause(flow, verifyScope),
+    codeStyleClause(flow),
     skillInstruction(PIPELINES[flow]),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
@@ -335,6 +345,7 @@ export function startGoalPrompt(
       + "bukan bukti.",
     autonomyClause(opts.autonomy),
     scopeClause("goal", opts.verifyScope),
+    codeStyleClause("goal"),
     skillInstruction(PIPELINES.goal),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,

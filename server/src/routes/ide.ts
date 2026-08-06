@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { basename } from "node:path";
 import { spawn } from "node:child_process";
+import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { listRemotes, addRemote, setRemoteUrl, removeRemote, prUrl } from "../services/git-remotes";
 import { downloadFormat, sendDocDownload, sendReviewDownload } from "../services/doc-export";
 import { prisma } from "../db";
@@ -376,6 +377,8 @@ async function finishGraphOp(
     `hanoman · selesaikan konflik ${verb} \`${r.source}\` → \`${r.target}\`.`,
     `Kamu berada di worktree yang tertinggal di tengah ${verb} dengan konflik. Resolve konflik pada file bertanda, jaga kedua sisi perubahan sesuai maksudnya.`,
     r.finalize,
+    // SPEC-543 · ADR-0108 · cermin pintu konflik backlog di routes/specs.ts.
+    CODE_STYLE_CLAUSE,
     `${verb} via git graph project ${id}.`,
   ].join("\n\n");
   const s = createSession(id, r.worktree, { id: basename(r.worktree), model, effort, agent, prompt });

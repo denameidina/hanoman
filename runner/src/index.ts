@@ -9,5 +9,6 @@ export * from "./codex-settings";
 export * from "./agent-cli";
 export * from "./custom-agents";
 export * from "./verify-scope";
+export * from "./code-style";
 export * from "./paths";
 export * from "./telegram-operator";

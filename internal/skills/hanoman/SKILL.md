@@ -829,6 +829,25 @@ Pakai skill lebih sempit saat task cocok:
   terbukti **non-deterministik** (gagal 2× di run campur-project, lulus sendirian, lulus bersama
   tetangga server, lulus saat set yang sama diulang) — jalankan ulang terisolasi DAN ulangi
   set yang sama sebelum menyalahkan perubahanmu.
+- **Klausa gaya kode di setiap prompt agen** (SPEC-543/**ADR-0108**, memperluas POLA ADR-0080;
+  ADR-0037 & ADR-0098 utuh): satu konstanta **`CODE_STYLE_CLAUSE`** (`runner/src/code-style.ts`,
+  tetangga `verify-scope.ts`) — rapi & mengikuti idiom sekitarnya · jangan komentar yang **mengulang**
+  kode · komentar hanya untuk yang tak terbaca dari kode (alasan/why, trade-off, workaround
+  ber-rujukan SPEC/ADR, invariant) · tanpa pembatas seksi/header berhias/narasi langkah demi langkah ·
+  tanpa kode mati. **Tanpa `Setting`, tanpa skema, tanpa override per sesi** — beda sadar dari
+  ADR-0080, yang punya knob karena ada keadaan di mana `full` benar; di sini tak ada. Dipasang di
+  **enam** permukaan: empat builder prompt backlog/goal (digerbangi **`writesCode(flow)` yang sudah
+  ada**, bukan daftar flow yang disalin), **tiga pintu konflik** yang merakit prompt-nya *inline di
+  route* sehingga tak terjangkau gerbang itu, `agentPromptOf`, `leadPrompt`, dan `changelogPrompt`.
+  **Empat hal yang mudah dirusak:** (1) gerbangnya hidup **di dalam teks** klausa (baris pertama
+  "berlaku setiap kali kamu menulis atau mengubah kode") — itulah yang membuat SATU konstanta bisa
+  dipakai prompt yang keluarannya bukan kode; varian kedua = kelas bug SPEC-431/448/475/481 dalam
+  bentuk teks; (2) **`agentRosterBlock` codex sengaja tak menerimanya** (roster ditempel ke prompt
+  sesi yang sudah membawanya), sementara subagent `claude --agents` punya konteks **terpisah** dan
+  harus membawanya sendiri; (3) klausa **tak boleh memuat nama perintah** — prompt hidup di ARGV,
+  jadi ia jadi muatan `pkill -f` sesi tetangga (SPEC-402), dijaga test; (4) bukti "terkirim" dibaca
+  dari **pane tmux sesi sungguhan** (`session-launch.test.ts`, claude & codex), bukan dari
+  `startPrompt()` — yang dijaga spec ini justru call site yang lupa memanggil builder-nya.
 - **"Belum mulai" ≠ `baseSha IS NULL`** (SPEC-431, tanpa ADR — QA, mempersempit ADR-0072): checker
   `backlog` (SPEC-295) dan denyut lead (SPEC-409) memilih pekerjaan lewat **satu** predikat bersama
   `UNSTARTED_SPEC_WHERE` (`services/scheduler/queue.ts`) = **`baseSha: null` DAN `stage: not "done"`**.

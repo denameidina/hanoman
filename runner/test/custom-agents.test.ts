@@ -94,3 +94,29 @@ describe("agentRosterBlock — jalur codex", () => {
     expect(agentRosterBlock([def({ name: "a" })]).startsWith("\n")).toBe(true);
   });
 });
+
+// SPEC-543 · ADR-0108 · subagent claude punya konteks TERPISAH: prompt sesi (yang membawa klausa
+// gaya kode) tak pernah sampai ke sana, jadi klausanya harus ikut di prompt perannya sendiri.
+describe("klausa gaya kode di custom agent (SPEC-543)", () => {
+  const MARK = "Gaya kode —";
+
+  it("agen daun membawanya", () => {
+    expect(agentPromptOf(def({ name: "b" }), [])).toContain(MARK);
+  });
+
+  it("agen ber-mentions membawanya juga (kedua cabang)", () => {
+    const a = def({ name: "a", mentions: ["b"] });
+    expect(agentPromptOf(a, [a, def({ name: "b" })])).toContain(MARK);
+  });
+
+  it("ikut terbawa ke JSON --agents", () => {
+    const j = JSON.parse(renderAgentsJson([def({ name: "rev" })]));
+    expect(j.rev.prompt).toContain(MARK);
+  });
+
+  // Roster codex ditempel ke AKHIR prompt sesi yang sudah membawa klausa; memasangnya lagi di sini
+  // menggandakan teks yang sama sekali per peran.
+  it("roster codex TIDAK mengulanginya", () => {
+    expect(agentRosterBlock([def({ name: "a" }), def({ name: "b" })])).not.toContain(MARK);
+  });
+});

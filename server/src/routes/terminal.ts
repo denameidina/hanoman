@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { prisma } from "../db";
 import { zTerminalSession, zIntegrate, zTerminalSteerInput, type Stage } from "@hanoman/shared";
-import { realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, type Flow } from "@hanoman/runner";
+import { realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, type Flow } from "@hanoman/runner";
 import { phaseFilePath, decisionFilePath, readPhases, stageForRun } from "../services/session-phases";
 import { specReview, reviewFile } from "../services/spec-review";
 import { downloadFormat, sendReviewDownload } from "../services/doc-export";
@@ -375,6 +375,8 @@ export default async function (app: FastifyInstance) {
       `hanoman · selesaikan konflik ${r.op} branch \`${s.branch}\` ${r.op === "merge" ? "ke" : "di atas"} \`${r.target}\`.`,
       `Kamu berada di worktree yang tertinggal di tengah operasi ${r.op} dengan konflik. Resolve konflik pada file bertanda, jaga kedua sisi perubahan sesuai maksudnya.`,
       r.finalize,
+      // SPEC-543 · ADR-0108 · cermin pintu konflik backlog di routes/specs.ts.
+      CODE_STYLE_CLAUSE,
       `Sesi PRD ${s.id}.`,
     ].join("\n\n");
     const cs = createSession(s.projectId, r.worktree, {

@@ -1,4 +1,5 @@
 import { resolveTools, MENTION_MAX_HOPS, MENTION_TOOL } from "@hanoman/shared";
+import { CODE_STYLE_CLAUSE } from "./code-style";
 
 // SPEC-450 · ADR-0094 · render custom agent ke dua permukaan: JSON `--agents` (claude, native)
 // dan blok roster prosa (codex). Murni & tanpa I/O — pemanggil (pty.ts) yang menulis berkas.
@@ -25,8 +26,19 @@ const liveMentions = (def: AgentDef, roster: AgentDef[]): string[] => {
  */
 export function agentPromptOf(def: AgentDef, roster: AgentDef[]): string {
   const can = liveMentions(def, roster);
+  // SPEC-543 · ADR-0108 · subagent claude lahir dengan konteks TERPISAH — prompt sesi tak
+  // menjangkaunya, jadi klausa gaya kode harus ikut di sini atau ia tak pernah sampai. Jalur codex
+  // (`agentRosterBlock`) sengaja tak mengulanginya: roster itu ditempel ke prompt sesi yang sudah
+  // membawa klausa.
   if (can.length === 0) {
-    return `${def.instructions}\n\n---\nKamu TIDAK boleh mendelegasikan ke agen lain. Selesaikan sendiri lalu laporkan hasilnya.`;
+    return [
+      def.instructions,
+      "",
+      "---",
+      "Kamu TIDAK boleh mendelegasikan ke agen lain. Selesaikan sendiri lalu laporkan hasilnya.",
+      "",
+      CODE_STYLE_CLAUSE,
+    ].join("\n");
   }
   const list = can.map((m) => `@${m}`).join(", ");
   return [
@@ -36,6 +48,8 @@ export function agentPromptOf(def: AgentDef, roster: AgentDef[]): string {
     `Kamu boleh mendelegasikan HANYA ke: ${list}. Panggil lewat ${MENTION_TOOL} dengan nama agennya.`,
     `Anggaran rantai delegasi seluruh sesi ini ${MENTION_MAX_HOPS} hop. Bila kamu sudah berada di hop ke-${MENTION_MAX_HOPS}, JANGAN mendelegasikan lagi — selesaikan sendiri lalu laporkan.`,
     "Sebutkan hop keberapa kamu berada saat mendelegasikan, dan jangan pernah memanggil agen yang sudah ada di rantai yang membawamu ke sini.",
+    "",
+    CODE_STYLE_CLAUSE,
   ].join("\n");
 }
 

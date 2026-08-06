@@ -533,3 +533,47 @@ describe("startGoalPrompt (SPEC-407)", () => {
     expect(p).toContain("docs/superpowers/plans/**");
   });
 });
+
+// SPEC-543 · ADR-0108 · klausa gaya kode. Gerbangnya `writesCode(flow)` — sumber kebenaran yang
+// SAMA dengan klausa scope (ADR-0080 keputusan 4), jadi flow dokumen tetap tak membayar token
+// untuk instruksi yang tak punya kode untuk diterapkan.
+describe("klausa gaya kode (SPEC-543)", () => {
+  const MARK = "Gaya kode —";
+  const project = { id: "p", name: "P", desc: "d", stack: "s" };
+
+  it("startPrompt flow feature & qa membawanya", () => {
+    expect(startPrompt("feature", spec, "b")).toContain(MARK);
+    expect(startPrompt("qa", spec, "b")).toContain(MARK);
+  });
+
+  it("continuePrompt & resumePrompt membawanya", () => {
+    expect(continuePrompt("feature", spec, "b")).toContain(MARK);
+    expect(resumePrompt("feature", spec, "b", { recorded: [], next: "Execute", worktreeKept: true }))
+      .toContain(MARK);
+  });
+
+  it("startGoalPrompt membawanya (flow goal menulis kode walau tanpa fase Execute)", () => {
+    expect(startGoalPrompt({ ...spec, source: "goal" }, "b")).toContain(MARK);
+  });
+
+  // Tak bergantung pada verifyScope: klausa gaya kode tak punya knob (ADR-0108 keputusan 4).
+  it("hadir tanpa parameter verifyScope maupun dengan verifyScope full", () => {
+    expect(startPrompt("feature", spec, "b")).toContain(MARK);
+    expect(startPrompt("feature", spec, "b", undefined, "full")).toContain(MARK);
+  });
+
+  it("flow dokumen tidak membawanya", () => {
+    expect(startPrompt("audit", spec, "b")).not.toContain(MARK);
+    expect(startProjectPrompt("reverse", project, "b")).not.toContain(MARK);
+    expect(startScaffoldPrompt(project, "b")).not.toContain(MARK);
+    expect(startPrdPrompt(project, { title: "t", context: "c", outcome: "o" }, "prd/x"))
+      .not.toContain(MARK);
+    expect(startBreakdownPrompt(project, { title: "t", path: "docs/prd/x.md", content: "c" }, "prd/x"))
+      .not.toContain(MARK);
+  });
+
+  it("hanya muncul SEKALI dalam satu prompt", () => {
+    const p = startPrompt("feature", spec, "b", undefined, "changed");
+    expect(p.split(MARK).length - 1).toBe(1);
+  });
+});

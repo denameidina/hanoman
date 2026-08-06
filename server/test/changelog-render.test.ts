@@ -64,3 +64,18 @@ describe("changelogPrompt", () => {
     expect(changelogPrompt({ ...INPUT, mode: "version" }, 1000)).toMatch(/versi|rilis/i);
   });
 });
+
+// SPEC-543 · ADR-0108 · konsumen KEDUA `think()` (titik spawn agen kedua). Keluarannya markdown
+// untuk pemakai, jadi klausanya diam karena gerbang baris pertamanya — ia tetap dipasang supaya
+// tak ada titik spawn yang punya perlakuan khusus untuk dilupakan nanti.
+describe("changelogPrompt · klausa gaya kode (SPEC-543)", () => {
+  it("membawanya", () => {
+    expect(changelogPrompt(INPUT, 180_000)).toContain("Gaya kode —");
+  });
+
+  it("anggaran waktu & bentuk keluaran tetap utuh", () => {
+    const p = changelogPrompt(INPUT, 180_000);
+    expect(p).toContain("Anggaran waktumu 180 detik");
+    expect(p).toContain(`# Changelog — ${INPUT.title}`);
+  });
+});

@@ -310,4 +310,43 @@ describe("session-launch", () => {
       killSession(r.id);
     });
   });
+
+  // SPEC-543 · ADR-0108 · klausa gaya kode. Bukti diambil dari PANE, bukan dari builder prompt:
+  // yang dikhawatirkan spec ini justru call site yang LUPA memanggil builder-nya, dan assertion
+  // atas `startPrompt()` tak bisa melihat itu. Prompt sesi diserahkan sebagai argumen positional
+  // agen (SPEC-223), jadi `/bin/echo` sebagai biner agen mencetak seluruh prompt apa adanya.
+  describe("klausa gaya kode sampai ke proses agen (SPEC-543)", () => {
+    const MARK = "Gaya kode";
+
+    it("sesi backlog claude membawanya di argv", async () => {
+      process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+      const spec = await seedRepo("SPEC-543A");
+      const r = await startSpecSession(spec, { flow: "feature" });
+      const pane = await argvOf(r.id);
+      expect(pane).toContain(MARK);
+      expect(pane).toContain("mengulang");            // butir "jangan mengulang apa yang sudah dinyatakan kode"
+      killSession(r.id);
+    });
+
+    it("sesi backlog codex membawanya juga (klausa netral-agen)", async () => {
+      process.env.HANOMAN_CODEX_BIN = "/bin/echo";
+      await setSetting({ agent: "codex" });
+      const spec = await seedRepo("SPEC-543B");
+      const r = await startSpecSession(spec, { flow: "feature" });
+      expect(await argvOf(r.id)).toContain(MARK);
+      killSession(r.id);
+    });
+
+    // Tak ber-knob (ADR-0108 keputusan 4): `verifyScope: "full"` mematikan klausa scope, bukan ini.
+    it("verifyScope full tetap membawanya", async () => {
+      process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+      await setSetting({ verifyScope: "full" });
+      const spec = await seedRepo("SPEC-543C");
+      const r = await startSpecSession(spec, { flow: "feature" });
+      const pane = await argvOf(r.id);
+      expect(pane).not.toContain("Scope verifikasi");
+      expect(pane).toContain(MARK);
+      killSession(r.id);
+    });
+  });
 });

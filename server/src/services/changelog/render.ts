@@ -1,4 +1,5 @@
 import type { ChangelogMode } from "@hanoman/shared";
+import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 
 // SPEC-516 · ADR-0105 · bentuk akhir changelog. MURNI — nol I/O, nol Prisma, nol spawn.
 
@@ -79,6 +80,10 @@ export function changelogPrompt(input: ChangelogInput, budgetMs: number): string
     "  nama branch, atau istilah internal apa pun.",
     "- Gabungkan bahan yang bicara hal yang sama jadi satu butir. 3–10 butir; kurangi bila memang sedikit.",
     "- Jangan mengarang perubahan yang tak ada di bahan.",
+    "",
+    // SPEC-543 · ADR-0108 · dipasang di SEMUA prompt agen, bukan hanya yang menulis kode; gerbang
+    // di baris pertama klausa yang membuatnya diam untuk narator ini.
+    CODE_STYLE_CLAUSE,
     "",
     "Bentuk keluaran — HANYA markdown ini, tanpa kalimat pembuka atau penutup di luarnya,",
     "tanpa blok kode:",

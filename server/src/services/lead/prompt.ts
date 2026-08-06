@@ -1,4 +1,5 @@
 import { LEAD_ACTIONS, LEAD_DECISION_MAX, LEAD_REASON_MAX, type LeadKind } from "@hanoman/shared";
+import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 
 // SPEC-409 · ADR-0091 · prompt hanoman-lead. Murni (string masuk, string keluar) supaya bentuk
 // kontraknya bisa dites tanpa men-spawn agen apa pun — pola `runner/src/prompt.ts`.
@@ -128,6 +129,12 @@ export function leadPrompt(q: LeadQuestion, c: LeadContext): string {
   lines.push("5. Kamu TIDAK mengeksekusi apa pun sendiri. Kamu mengusulkan satu `action`; server yang menjalankannya, dan hanya bila ia ada di daftar tertutup ini:");
   lines.push(`   ${LEAD_ACTIONS.join(" · ")}`);
   lines.push("   Deploy, perintah/konsol VPS, data produksi, dan penghapusan apa pun (project, backlog, branch, worktree, notifikasi, jejak) TERKUNCI dan tidak akan pernah dijalankan.");
+  lines.push("");
+  // SPEC-543 · ADR-0108 · lead tak menulis kode sendiri, tapi `reply`-nya diketikkan ke terminal
+  // agen peminta dan `decision`-nya mengarahkan apa yang ditulis di sana. Yang membuatnya diam saat
+  // lead sekadar memutuskan adalah gerbang di baris pertama klausa, bukan percabangan di sini —
+  // konstanta yang sama dipakai lima permukaan lain dan varian kedua akan berselisih dengannya.
+  lines.push(CODE_STYLE_CLAUSE);
   lines.push("");
   lines.push("## Sepanjang apa (WAJIB)");
   lines.push(`Peminta jawabanmu adalah MESIN yang sedang menunggu, bukan pembaca laporan. \`decision\` paling banyak ${LEAD_DECISION_MAX} karakter (satu kalimat) dan \`reason\` paling banyak ${LEAD_REASON_MAX} karakter (dua-tiga kalimat). Yang lebih panjang dipangkas server sebelum sampai ke peminta.`);
