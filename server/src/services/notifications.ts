@@ -62,6 +62,22 @@ export async function recordAutoMerge(
   }).catch(() => { /* P2002: sudah ada — sweep lain sudah menyelesaikannya */ });
 }
 
+// SPEC-546 · ADR-0109 · konversi type sebuah backlog item. Dedup lewat `key` berurutan
+// `source:<specId>:<n>` (n = panjang `sourceHistory` sesudah append): unik & deterministik, jadi
+// dua permintaan konversi yang balapan hanya menyisakan satu baris — pola `recordCompletion`.
+export async function recordSourceChange(
+  specId: string, projectId: string | null, title: string,
+  from: string, to: string, seq: number,
+): Promise<void> {
+  const sessionId = specId.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+  await prisma.notification.create({
+    data: {
+      type: "spec-source", key: `source:${specId}:${seq}`, specId, sessionId,
+      title: `${specId} · type ${from} → ${to} — ${title}`, projectId,
+    },
+  }).catch(() => { /* P2002: konversi yang sama sudah tercatat */ });
+}
+
 // SPEC-253 · ADR-0062 · notif saat tiket Help Center baru masuk. Dedup `key: ticket:<ticketId>`
 // idempoten (insert kedua kena P2002, diabaikan). Setiap tiket baru menotifikasi — volume
 // manusiawi, dijaga rate-limit di endpoint publik.

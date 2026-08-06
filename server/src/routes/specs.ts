@@ -9,6 +9,9 @@ import { ensureCodexTrust } from "../services/codex-trust";
 import { prisma } from "../db";
 import { specReview, reviewFile, worktreeDir, specCommitRange, specReviewRange, reviewFileRange, shaResolvable } from "../services/spec-review";
 import { nextSpecId } from "../services/id";
+// SPEC-546 · turunan priority/objective dipakai TIGA route sekarang (POST /specs, PATCH, dan
+// POST /specs/:id/source), jadi ia tak lagi fungsi lokal berkas ini.
+import { deriveSpecFields } from "../services/spec-fields";
 import { notifySynced } from "../services/sync-notify";
 import { branchFromCandidates } from "../services/branches";
 import { STAGES } from "../services/stage-machine";
@@ -33,28 +36,6 @@ import { liveSpecs } from "../services/live-specs";
 // saat worktree gagal di dalam run. SPEC-244 · kandidat = lokal ∪ origin (branch PRD/audit remote-only).
 const branchUnknown = async (repoDir: string | null, branch: string) =>
   !(await branchFromCandidates(repoDir)).includes(branch);
-
-// SPEC-186 · derivasi priority + objective dari source+payload. Satu sumber untuk POST & PATCH:
-// qa → priority dari severity, objective dari actual/steps; brief → priority manual, objective dari outcome/context.
-function deriveSpecFields(source: string, payload: any, manualPriority: string) {
-  // SPEC-407 · ADR-0089 · backlog goal: objective ADALAH goal-nya (yang dibaca prompt sesi &
-  // kondisi Stop hook). Prioritas tetap manual — tak ada severity untuk diturunkan, dan operator
-  // yang tahu seberapa mendesak goal itu.
-  if (source === "goal") {
-    const pick = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-    return {
-      priority: manualPriority,
-      objective: pick(payload?.goal) || pick(payload?.done) || "— goal belum diisi.",
-    };
-  }
-  const isQa = source === "qa";
-  const priority = isQa && payload && "severity" in payload
-    ? (payload.severity === "minor" ? "sedang" : "tinggi") : manualPriority;
-  const objective = isQa && payload && "actual" in payload
-    ? (payload.actual || payload.steps || "— audit untuk menelusuri akar masalah.")
-    : (payload && "outcome" in payload ? (payload.outcome || payload.context || "— brainstorm untuk memperjelas objective.") : "");
-  return { priority, objective };
-}
 
 // SPEC-198 · search/filter di layer response, DITERAPKAN SETELAH overlay stage-live —
 // jadi filter `stage`/`startable` mencocokkan stage live, bukan stage DB yang basi.
