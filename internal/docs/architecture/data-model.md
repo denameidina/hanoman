@@ -167,6 +167,19 @@ tiap berkas.
   (jebakan ADR-0090 tak berlaku justru karena nullable).
   **`blockedBy` bukan kolom**: nilai turunan yang dihitung `liveSpecs()` dari `stage` dependency +
   `git merge-base --is-ancestor` (memo 15 dtk), ikut ADR-0018/0019.
+- `sourceHistory` (Json?, SPEC-546 · [ADR-0109](../adr/0109-ubah-source-backlog-item.md)) — **jejak
+  konversi type** item ini: array append-only `[{ at, from, to, by, payload }]` yang ditulis
+  `POST /specs/:id/source`. `null` = belum pernah dikonversi. **Kolom, bukan turunan**, dengan alasan
+  yang sama seperti `createdAt`/`doneAt` (ADR-0090): kapan sebuah baris berganti type tak bisa
+  dihitung ulang dari sumber mana pun. **`payload` di dalam tiap entri = bentuk LAMA UTUH**, dan itu
+  bukan hiasan: konversi antar-bentuk membuang field yang tak punya padanan
+  (`convertPayload().dropped`), jadi jejak inilah yang membuat "tanpa kehilangan riwayat" harfiah.
+  **Tanpa cap** — cap yang diam-diam membuang mematahkan satu-satunya alasan kolomnya ada; konversi
+  adalah tindakan operator manual yang digerbangi flow. **Wajib** ikut `FIELDS.spec` (kelas
+  gagal-senyap yang sama dengan `dependsOn`: `upsert` yang tak menyebut kolom tetap berhasil);
+  **bukan** `DATE_FIELDS` — `at` hidup di dalam JSON-nya. **Tidak** masuk `WEBHOOK_ENTITIES.fields`,
+  karena ia membawa payload dan `payload` memang sudah sengaja dikecualikan dari allowlist itu;
+  perubahan `source`-nya sendiri tetap terpancar sebagai `spec.source_changed`.
   **SPEC-475 · "ujung kerja" dependency = `headSha` ?? tip branch sesinya** (`workTip`,
   `hanoman/<sessionIdForSpec(id)>` — nama deterministik per ADR-0032, memo 15 dtk). Yang berarti
   **siap** adalah **tak ada jejak kerja sama sekali**, bukan sekadar kolom `headSha` yang kosong:

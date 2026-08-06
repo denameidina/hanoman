@@ -149,6 +149,28 @@ PATCH /specs/:id          { branchFrom?: string|null, stage?, confirmDelete?, de
 #   ke WARISAN PROJECT, sedangkan `{mode:"off"}` MEMATIKANNYA untuk item ini saja — dua keadaan
 #   berbeda. Gerbang & kode galat sama persis dengan PATCH /projects/:id. Juga di luar gerbang edit
 #   SPEC-186, alasan yang sama dengan dependsOn.
+POST /specs/:id/source    { source: "brief"|"qa"|"audit"|"help"|"goal", payload? }   -> Spec
+#   SPEC-546 · ADR-0109 · ubah type/source item IN-PLACE: id SPEC-nnn, createdAt, dependsOn,
+#   branchFrom, dan dokumen sesi TAK DISENTUH; tak ada baris baru (bukan clone+delete).
+#   Operasi khusus, BUKAN field PATCH: gerbangnya berbeda dari `editingContent` (SPEC-186), dan
+#   ADR-0064 (rename Project.id) sudah menetapkan bentuk ini untuk perubahan sejenis.
+#   `payload` OPSIONAL — tak dikirim berarti server memakai peta `convertPayload` (@hanoman/shared),
+#   fungsi MURNI yang sama yang dipakai dialog UI untuk prefill, jadi jalur agen lewat REST tetap
+#   menghasilkan baris sah alih-alih 400. Bila dikirim, bentuknya divalidasi dengan skema yang SAMA
+#   dengan POST /specs (`payloadMatchesSource`) — tak ada jalur validasi kedua.
+#   200 = Spec sesudah konversi (`source`, `payload`, `priority`, `objective`, `sourceHistory`
+#         diperbarui; `priority`/`objective` diturunkan ulang oleh deriveSpecFields terhadap bentuk
+#         yang BERLAKU — konversi ke qa memindahkan kendali prioritas ke `severity`).
+#   400 = source tak dikenal · source sama dengan yang sekarang · bentuk payload tak cocok source tujuan
+#   404 = spec tak ada
+#   409 = item sudah dimulai & tujuannya BEDA FLOW · item sudah dimulai tapi `payload` disertakan
+#   Gerbang "sudah dimulai" = `stage !== "brainstorming" || baseSha !== null` dan mengunci **FLOW,
+#   bukan label**: item yang sudah dikerjakan tetap boleh brief ↔ help (flowForSource sama), sebab
+#   berkas fase sesi berisi nama fase PIPELINES[flow lama] yang tak akan pernah memuaskan
+#   phasesComplete flow baru (kelas SPEC-433).
+#   Efek samping: satu Notification (`type:"spec-source"`, key `source:<specId>:<n>`), satu entri
+#   `sourceHistory` berisi payload bentuk LAMA UTUH, webhook `spec.source_changed`, dan notifySynced.
+#   `author` (`QA ·`/`Audit ·`/`Goal ·`) SENGAJA tak disentuh — fakta historis, cermin createdAt.
 DELETE /specs/:id
 #   SPEC-447 · ADR-0093 · id yang dihapus juga DICABUT dari `dependsOn` seluruh spec lain di project
 #   yang sama (+ antre sync per baris yang berubah). Tanpa itu, dependent-nya terkunci selamanya

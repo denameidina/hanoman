@@ -254,6 +254,38 @@ Pakai skill lebih sempit saat task cocok:
   dalam SATU query — memanggil `listPrds` polos per project mengubahnya jadi N+1; (3) baris prosa
   `> Status: Draft …` di dalam dokumen PRD bukan sumbernya (ditulis agen sekali, tak punya
   penulis kedua) dan lencana `live` karena itu berganti kata jadi **`sesi hidup`**.
+- **Type backlog item bisa dipindah — operasi khusus, gerbang mengunci FLOW bukan label**
+  (SPEC-546/**ADR-0109**; ADR-0064 preseden, ADR-0090 & ADR-0100 ditegakkan):
+  `POST /specs/:id/source` `{source, payload?}` mengubah `Spec.source` **in-place** — id SPEC-nnn,
+  `createdAt`, `dependsOn`, dan dokumen sesi tak disentuh, tak ada baris baru. Bukan field
+  `PATCH /specs/:id`: gerbangnya berbeda dari `editingContent` (SPEC-186), dan ADR-0064 sudah
+  menetapkan bentuk "operasi khusus" untuk perubahan sejenis (rename `Project.id`). Daftar source
+  yang sah persis `zSpecSource` — **`cross-audit` sudah tak ada** (dicabut SPEC-384/ADR-0092).
+  **Gerbangnya**: item belum dimulai bebas ke source mana pun; item yang **sudah dimulai** hanya ke
+  source ber-`flowForSource` sama (hari ini `brief ↔ help`) dan **tanpa** payload — karena yang
+  dilindungi SPEC-186 adalah pekerjaan yang sedang berjalan, dan berkas fase sesi berisi nama fase
+  `PIPELINES[flow lama]` yang tak akan pernah memuaskan `phasesComplete` flow baru (kelas SPEC-433).
+  Ikatan source↔bentuk payload kini SATU predikat di `shared/src/spec-source.ts` yang dipakai
+  `zCreateSpec` **dan** `zChangeSpecSource`; peta konversinya `convertPayload(to, payload)` — MURNI,
+  **field-ke-field, tak pernah menyambung prosa**, bentuk asal dibaca dari **payload**-nya bukan dari
+  `source` lama — dipakai dialog UI untuk prefill **dan** server sebagai default saat `payload` tak
+  dikirim. `Spec.sourceHistory Json?` menyimpan jejak `[{at, from, to, by, payload}]` dengan
+  **payload bentuk LAMA utuh**, jadi field tanpa padanan (`dropped`) tak pernah benar-benar hilang.
+  **Tujuh gotcha:** (1) `sourceHistory` wajib di `FIELDS.spec` — kolom yang terlewat mendarat sebagai
+  null palsu tanpa satu pun error; (2) **tak boleh** masuk `WEBHOOK_ENTITIES.fields` (ia membawa
+  payload, yang memang dikecualikan) — yang terpancar `spec.source_changed`; (3) predikat bentuk
+  wajib tetap satu — menyalinnya mengembalikan kelas SPEC-431/448/475/481; (4) tak ada salinan
+  `source` yang perlu ikut diperbarui — `flowForSource` dibaca saat sesi lahir, dan
+  `SchedulerQueueItem.source` itu asal *checker* (`backlog`|`triase`), bukan source Spec;
+  (5) `priority` **tidak** round-trip lewat qa (peta severity hanya dua nilai: `rendah → minor →
+  sedang`) — dinyatakan & diuji, yang round-trip adalah prosanya; (6) `sourceHistory` masuk `zSpec`
+  ber-`.default([])` sehingga tiap literal `Spec` di test wajib menyebutnya, dan UI menulis
+  `?? []` (cermin `blockedBy`); (7) env test berperan **hub**, jadi bukti "konversi merambat sync"
+  ada di **`SyncLog`**, bukan `syncOutbox`. `author` (`QA ·`/`Audit ·`/`Goal ·`) **sengaja tak
+  disentuh**: ia fakta historis, cermin `createdAt`. UI: aksi "Ubah type" di detail backlog + blok
+  "Jejak konversi type"; katalog source (lencana, opsi, field per bentuk) pindah ke satu berkas
+  `src/src/screens/source-meta.ts` — yang sekalian menambal entri **`help`** yang selama ini hilang
+  (item Help Center memakai lencana "feature brief" lewat fallback) berikut tab filternya.
 - **MCP server = `hanoman mcp`, KLIEN REST, bukan permukaan kedua** (SPEC-482/ADR-0099, memperluas
   ADR-0065): subcommand stdio di CLI yang memanggil `/api` dengan agent token yang sama, sehingga
   gate `onRequest` tetap satu-satunya otorisasi dan route cookie-only tak terjangkau **secara
