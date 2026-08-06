@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
-import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, type Stage } from "@hanoman/shared";
+import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, type Stage } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { integrate, sourceBranch } from "../services/integrate";
 import { createSession } from "../services/pty";
@@ -12,6 +12,9 @@ import { nextSpecId } from "../services/id";
 // SPEC-546 · turunan priority/objective dipakai TIGA route sekarang (POST /specs, PATCH, dan
 // POST /specs/:id/source), jadi ia tak lagi fungsi lokal berkas ini.
 import { deriveSpecFields } from "../services/spec-fields";
+// SPEC-546 · ADR-0109 · gerbang & perakit jejak konversi type (murni, teruji tanpa harness).
+import { checkSourceChange, sourceChangeEntry, appendSourceHistory } from "../services/spec-source";
+import { recordSourceChange } from "../services/notifications";
 import { notifySynced } from "../services/sync-notify";
 import { branchFromCandidates } from "../services/branches";
 import { STAGES } from "../services/stage-machine";
@@ -223,6 +226,46 @@ export default async function (app: FastifyInstance) {
     await notifySynced("spec", id); // SPEC-213/330 · sadar-peran: client antre push, hub publish ke feed
     return updated;
   });
+  // SPEC-546 · ADR-0109 · ubah type/source item IN-PLACE — id SPEC-nnn, riwayat, dependency, dan
+  // dokumen sesi tetap. Operasi khusus, bukan field `PATCH /specs/:id`: gerbangnya berbeda dari
+  // `editingContent` (SPEC-186) — ia mengunci FLOW, bukan label — dan preseden ADR-0064 (rename
+  // project) sudah menetapkan bentuk ini untuk perubahan yang punya gerbang & efek sampingnya
+  // sendiri. Menumpuknya ke PATCH berarti setiap kombinasi `{source, stage}` / `{source, title}`
+  // jadi pertanyaan yang harus dijawab pasal per pasal.
+  app.post("/specs/:id/source", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = zChangeSpecSource.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const spec = await prisma.spec.findUnique({ where: { id } });
+    if (!spec) return reply.code(404).send({ error: "not found" });
+    const to = parsed.data.source;
+    // Permintaan no-op adalah bug klien; menerimanya diam-diam berarti menulis baris jejak
+    // "brief → brief" yang mengotori satu-satunya alasan kolom itu ada.
+    if (to === spec.source) return reply.code(400).send({ error: "source tak berubah" });
+    const gate = checkSourceChange(spec, to, parsed.data.payload);
+    if (!gate.ok) return reply.code(gate.code).send({ error: gate.error });
+    const by = req.user?.email ?? "system";
+    const history = appendSourceHistory(
+      spec.sourceHistory, sourceChangeEntry(spec, to, by, new Date()));
+    // Turunan dihitung ulang terhadap bentuk yang BERLAKU: konversi ke qa memindahkan kendali
+    // prioritas ke `severity`, konversi ke goal membuat objective = goal-nya.
+    const { priority, objective } = deriveSpecFields(
+      to, gate.payload, (gate.payload.priority as string) ?? spec.priority);
+    // `author` SENGAJA tak disentuh: prefix `QA ·`/`Audit ·`/`Goal ·` menjawab *siapa yang
+    // memfilekan item ini dan lewat pintu mana* — fakta historis, cermin `createdAt` ADR-0090
+    // yang tak pernah ditulis route. Lencana type yang dilihat operator memang berpindah.
+    const updated = await prisma.spec.update({
+      where: { id },
+      data: {
+        source: to, payload: gate.payload as Prisma.InputJsonValue, priority, objective,
+        sourceHistory: history as unknown as Prisma.InputJsonValue,
+      },
+    });
+    await recordSourceChange(spec.id, spec.projectId, spec.title, spec.source, to, history.length);
+    await notifySynced("spec", id); // SPEC-213/330 · sadar-peran: client antre push, hub publish
+    return updated;
+  });
+
   // SPEC-170 · dokumen sebuah backlog item (audit/objective/spec/plan/brainstorm).
   // Sumber freshest-wins ada di resolveDir: worktree sesi hidup > repoDir.
   app.get("/specs/:id/docs", async (req) =>

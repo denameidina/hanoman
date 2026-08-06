@@ -19,6 +19,8 @@ export const paths = {
   // SPEC-340 · ADR-0076 · rekomendasi tindak lanjut audit (turunan blok json dokumen audit).
   specEscalation: (id: string) => `${API}/specs/${id}/escalation`,
   specIntegrate: (id: string) => `${API}/specs/${id}/integrate`,
+  // SPEC-546 · ADR-0109 · ubah type/source item in-place (operasi khusus, bukan field PATCH).
+  specSource: (id: string) => `${API}/specs/${id}/source`,
   specReview: (id: string) => `${API}/specs/${id}/review`,
   specReviewFile: (id: string, path: string) => `${API}/specs/${id}/review/${path}`,
   settings: `${API}/settings`,
