@@ -97,6 +97,12 @@ export const WEBHOOK_ENTITIES: WebhookEntityDef[] = [
     derived: [{
       type: "spec.stage_changed", label: "Stage backlog berpindah", changed: ["stage"],
       when: "Stage berpindah — baik oleh fase sesi yang tercatat (otomatis) maupun revert manual operator. Menggantikan spec.updated untuk perubahan itu.",
+    }, {
+      // SPEC-546 · ADR-0109 · konversi type item. Pola yang sama dengan stage_changed: peristiwa
+      // turunan MENGGANTIKAN spec.updated, supaya penerima bisa bereaksi pada "type berpindah"
+      // tanpa mendiff dua amplop.
+      type: "spec.source_changed", label: "Type backlog berpindah", changed: ["source"],
+      when: "Type/source item backlog dikonversi lewat POST /specs/:id/source (mis. brief → qa). Menggantikan spec.updated untuk perubahan itu.",
     }],
     sample: {
       id: "SPEC-481", projectId: "hanoman", title: "Webhook keluar untuk setiap perubahan",
@@ -325,6 +331,7 @@ export function sampleEnvelope(type: string): WebhookEnvelope {
     || type === "session.started" || type === WEBHOOK_PING_TYPE;
   const deleted = type.endsWith(".deleted");
   const changed = type === "spec.stage_changed" ? ["stage"]
+    : type === "spec.source_changed" ? ["source"]     // SPEC-546 · ADR-0109
     : type === "session.ended" ? ["endedAt", "exitCode"]
       : created || deleted ? [] : ["title"];
   return {

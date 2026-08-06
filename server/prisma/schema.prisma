@@ -67,6 +67,13 @@ model Spec {
   // SPEC-486 · ADR-0103 · override kebijakan auto-merge untuk item ini. null = warisi project.
   // `Json?` dengan alasan yang sama seperti dependsOn: blok dibaca utuh, tak pernah difilter.
   autoMerge  Json?
+  // SPEC-546 · ADR-0109 · jejak konversi type item ini: array append-only
+  // [{ at, from, to, by, payload }] dengan `payload` = BENTUK LAMA UTUH. Kolom, bukan turunan —
+  // aturan ADR-0090 bukan "selalu turunkan" melainkan *bisakah dihitung ulang dari sumber lain*,
+  // dan kapan sebuah baris berganti type tidak bisa. `payload` lama disimpan di sini justru
+  // supaya field yang tak punya padanan di bentuk baru (`convertPayload().dropped`) tak lenyap.
+  // Ikut FIELDS.spec sync; TIDAK masuk allowlist webhook (ia membawa payload).
+  sourceHistory Json?
   updatedAt  DateTime @updatedAt
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }

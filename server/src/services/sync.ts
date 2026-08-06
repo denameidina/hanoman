@@ -44,7 +44,12 @@ const FIELDS: Record<Entity, string[]> = {
   // SPEC-516 · ADR-0105 · doneAt ikut menyeberang — cermin createdAt/startedAt. Tanpa ini spec
   // asal-hub mendarat di tiap client dengan doneAt null tanpa satu pun error, dan changelog
   // mode backlog di client itu selamanya kosong.
-  spec: ["projectId", "title", "source", "stage", "priority", "author", "objective", "payload", "branchFrom", "baseSha", "headSha", "dependsOn", "createdAt", "startedAt", "doneAt", "updatedAt"],
+  // SPEC-546 · ADR-0109 · sourceHistory ikut menyeberang: jejak konversi type adalah bagian
+  // keadaan yang harus dilihat sama oleh semua mesin. `upsert` yang tak menyebut sebuah kolom
+  // TETAP berhasil, jadi kolom yang terlewat di sini mendarat sebagai null palsu di tiap client
+  // tanpa satu pun error (kelas gagal-senyap ADR-0090/0093/0094/0105). BUKAN DATE_FIELDS —
+  // `at` hidup di dalam JSON-nya, kolomnya sendiri bukan DateTime.
+  spec: ["projectId", "title", "source", "stage", "priority", "author", "objective", "payload", "branchFrom", "baseSha", "headSha", "dependsOn", "sourceHistory", "createdAt", "startedAt", "doneAt", "updatedAt"],
   vps: ["name", "host", "port", "user", "health", "audit", "hardened", "lastSeenAt", "lastAuditAt", "updatedAt"],
   sessionResult: ["projectId", "specId", "oldStage", "newStage", "commitSha", "branch", "prUrl", "status", "deviceId", "author", "createdAt", "updatedAt"],
   // SPEC-268 · ADR-0066 · metadata tiket (lampiran biner tak disync). accessKeyHash wajib

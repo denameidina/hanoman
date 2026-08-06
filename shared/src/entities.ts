@@ -72,6 +72,10 @@ export const zSpec = z.object({
   // SPEC-486 · ADR-0103 · override kebijakan auto-merge item ini; null = warisi project.
   // `.nullable().default(null)` menjaga respons/klien versi lama tetap parse.
   autoMerge: zAutoMerge.nullable().default(null),
+  // SPEC-546 · ADR-0109 · jejak konversi type. `.default([])` menjaga respons/klien versi lama
+  // tetap parse; kolom DB-nya `Json?` sehingga baris yang belum pernah dikonversi mengirim
+  // `null` — pemakai UI menulis `spec.sourceHistory ?? []`, cermin `blockedBy`.
+  sourceHistory: z.array(zSourceChange).default([]),
 });
 export type Spec = z.infer<typeof zSpec>;
 
