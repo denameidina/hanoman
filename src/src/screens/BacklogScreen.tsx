@@ -10,6 +10,11 @@ import { SpecDocsModal } from "./SpecDocsModal";
 import { IntegrateDialog } from "./IntegrateDialog";
 import { SyncButton } from "./SyncButton";
 import { branchOptions } from "./branch";
+import {
+  SOURCE_META, sourceMeta, SHAPE_FIELDS, PRIO_OPTS, SEV_OPTS,
+  BRIEF_FIELDS, GOAL_FIELDS, QA_FIELDS,
+} from "./source-meta";
+import { ChangeSourceDialog } from "./ChangeSourceDialog";
 import type { Spec } from "./types";
 import type { ProjectVM } from "./types";
 import type { AuditEscalation } from "@hanoman/shared";
@@ -27,17 +32,10 @@ const B_PRIO: Record<string, { tone: any; label: string }> = {
   sedang: { tone: "neutral", label: "prioritas sedang" },
   rendah: { tone: "neutral", label: "prioritas rendah" },
 };
-// SPEC-237 · satu peta source → tampilan (menggantikan ternari qa/brief tersebar). audit =
-// audit-only (dokumen). brief adalah fallback untuk source tak dikenal.
-const SOURCE_META: Record<string, { label: string; icon: string; tone: "err" | "brass" | "info"; color: string }> = {
-  qa:    { label: "QA finding",    icon: "bug",       tone: "err",   color: "var(--clay-500)" },
-  audit: { label: "Audit",         icon: "search",    tone: "info",  color: "var(--wind-600)" },
-  // SPEC-337 · audit lintas project (scope: project + tetangga ProjectLink-nya)
-  brief: { label: "feature brief", icon: "lightbulb", tone: "brass", color: "var(--brass-500)" },
-  // SPEC-407 · ADR-0089 · backlog goal: sesi dua fase (Goal → Verifikasi), tanpa perencanaan.
-  goal:  { label: "Goal",          icon: "target",    tone: "brass", color: "var(--brass-600)" },
-};
-const sourceMeta = (s: string) => SOURCE_META[s] ?? SOURCE_META.brief!;
+// SPEC-546 · ADR-0109 · katalog source (lencana, opsi, daftar field per bentuk) pindah ke
+// `source-meta.ts` supaya dialog "Ubah type" memakai katalog yang SAMA — dua katalog pasti
+// berselisih. Re-export menjaga pemakai lama (TerminalScreen, test) tetap tersambung.
+export { SOURCE_META, sourceMeta };
 
 // SPEC-447 · ADR-0093 · alasan sebuah item tertahan. Label hidup di UI (server mengirim slug),
 // pola yang sama dengan B_PRIO/SOURCE_META.
@@ -52,10 +50,6 @@ function BlockedBadge({ spec }: { spec: Spec }) {
       title={bl.map((b) => `${b.id} — ${blockLabel(b.reason)}`).join(" · ")}>Terblokir</Badge>
   );
 }
-// SPEC-186 · opsi enum untuk form edit inline.
-const PRIO_OPTS = [{ value: "tinggi", label: "Tinggi" }, { value: "sedang", label: "Sedang" }, { value: "rendah", label: "Rendah" }];
-const SEV_OPTS = [{ value: "critical", label: "Critical" }, { value: "major", label: "Major" }, { value: "minor", label: "Minor" }];
-
 function StageBar({ stage }: { stage: string }) {
   const idx = bStageIndex(stage);
   return (
@@ -85,27 +79,6 @@ function StageBar({ stage }: { stage: string }) {
     </div>
   );
 }
-
-// SPEC-490 · elemen ketiga = placeholder (contoh nilai). Satu <HnTextarea> merender
-// ketiga daftar ini, jadi contohnya milik katalog fieldnya — bukan call site.
-const BRIEF_FIELDS = [
-  ["context", "Konteks", "mis. operator harus membuka tiga layar untuk tahu sesi mana yang menunggu"],
-  ["outcome", "Outcome", "mis. satu badge di Overview menunjukkan jumlah sesi yang menunggu"],
-  ["constraints", "Constraints", "mis. reuse queue yang ada"],
-] as const;
-// SPEC-407 · ADR-0089 · bentuk payload backlog goal (zGoalPayload) — bukan konteks/outcome.
-const GOAL_FIELDS = [
-  ["goal", "Goal", "mis. p95 GET /api/specs di bawah 200 ms"],
-  ["done", "Selesai bila", "mis. output benchmark menunjukkan < 200 ms"],
-  ["constraints", "Batasan", "mis. tanpa cache eksternal"],
-] as const;
-const QA_FIELDS = [
-  ["severity", "Severity", ""],
-  ["steps", "Langkah reproduksi", "1. Buka …\n2. Lakukan …\n3. Amati …"],
-  ["expected", "Diharapkan", "mis. total funnel sama dengan jumlah baris laporan harian"],
-  ["actual", "Aktual", "mis. total funnel dua kali lipat untuk sesi yang melewati tengah malam"],
-  ["env", "Environment", "prod · web · v0.9.2"],
-] as const;
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (

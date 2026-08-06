@@ -151,6 +151,10 @@ export const api = {
     dependsOn?: string[];   // SPEC-447 · ADR-0093 · divalidasi server (400 bila tak sah)
     autoMerge?: AutoMerge | null }) =>   // SPEC-486 · ADR-0103 · null = kembali ikut project
     j<Spec | RevertPending>(paths.spec(id), { method: "PATCH", ...body(b) }),
+  // SPEC-546 · ADR-0109 · ubah type/source item in-place. `payload` dihilangkan untuk item yang
+  // sudah dimulai (server memakai payload lama apa adanya); 409 = gerbang flow.
+  changeSpecSource: (id: string, b: { source: string; payload?: unknown }) =>
+    j<Spec>(paths.specSource(id), { method: "POST", ...body(b) }),
   // SPEC-171 · all files + file changed dari worktree backlog item.
   specReview: (id: string) => j<SpecReview>(paths.specReview(id)),
   specReviewFile: (id: string, path: string) => j<ReviewFile>(paths.specReviewFile(id, path)),
