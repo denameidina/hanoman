@@ -27,7 +27,7 @@ urang, ulur-ulur, dan ekor panjang sebagai starting anchors. Ini interpretasi pr
 ## Color roles / Peran warna
 
 Bone = ruang/dokumen; ink = struktur/bukti; brass = amanat/tindakan; wind = informasi; leaf/amber/clay
-= state; dark terminal = kerja aktif. Nilai dan contrast mengikuti [design system](../../docs/design-system/design-system.md).
+= state; dark terminal = kerja aktif. Nilai dan contrast mengikuti [design system](../../design-system/design-system.md).
 
 ## Texture
 

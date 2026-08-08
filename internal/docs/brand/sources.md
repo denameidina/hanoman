@@ -40,22 +40,22 @@ name, lakon terminology, and visual language emerge from an Indonesian context.
 
 Brand philosophy harus tetap dapat dibuktikan oleh product Source of Truth:
 
-- [`internal/docs/entrypoints/blueprint.md`](../docs/entrypoints/blueprint.md) menetapkan objective
+- [`internal/docs/entrypoints/blueprint.md`](../entrypoints/blueprint.md) menetapkan objective
   produk dan empat lakon sebagai temperamen awal.
-- [`internal/docs/product/blueprint.md`](../docs/product/blueprint.md) menetapkan bentuk “instrument
+- [`internal/docs/product/blueprint.md`](../product/blueprint.md) menetapkan bentuk “instrument
   panel yang tenang”, docs, kendali manusia, dan isolasi.
-- [`internal/docs/product/scope-principles.md`](../docs/product/scope-principles.md) menjelaskan
+- [`internal/docs/product/scope-principles.md`](../product/scope-principles.md) menjelaskan
   Source of Truth sebagai konvensi dan dua bentuk kendali manusia.
-- [`internal/docs/design-system/design-system.md`](../docs/design-system/design-system.md) menjadi
+- [`internal/docs/design-system/design-system.md`](../design-system/design-system.md) menjadi
   otoritas implementasi visual: editorial instrument-panel, bone paper, ink, brass, IBM Plex, dan
   terminal gelap.
-- [`internal/docs/operations/gtm.md`](../docs/operations/gtm.md) mencatat status internal saat ini
+- [`internal/docs/operations/gtm.md`](../operations/gtm.md) mencatat status internal saat ini
   serta permukaan open-source/public yang sudah ada. Brand book menetapkan aspirasi positioning
   publik sebagai produk open-source; perubahan strategi komersial tetap harus diperbarui di GTM.
-- [`internal/docs/business/brd.md`](../docs/business/brd.md) menyatakan nilai leverage bagi tim,
+- [`internal/docs/business/brd.md`](../business/brd.md) menyatakan nilai leverage bagi tim,
   kualitas output docs-driven, dan kendali terpusat.
-- [`README.md`](../../README.md) memberikan deskripsi publik produk dan bukti alur kerja yang berlaku.
-- [`src/public/favicon.svg`](../../src/public/favicon.svg) mencatat mark Buntut dan hubungannya dengan
+- [`README.md`](../../../README.md) memberikan deskripsi publik produk dan bukti alur kerja yang berlaku.
+- [`src/public/favicon.svg`](../../../src/public/favicon.svg) mencatat mark Buntut dan hubungannya dengan
   design system.
 
 The philosophy must remain provable against the product Source of Truth. If a product fact changes,

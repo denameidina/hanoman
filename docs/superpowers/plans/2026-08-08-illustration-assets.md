@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Deliver one validated WebP master for every one of the 41 illustration IDs defined in `internal/brand/illustration/04-asset-catalog.md`.
+**Goal:** Deliver one validated WebP master for every one of the 41 illustration IDs defined in `internal/docs/brand/illustration/04-asset-catalog.md`.
 
 **Architecture:** Build the character identity before derivatives, then generate each catalog asset with the matching family brief and the approved model image as a visual reference. Store a JSON inventory and QA report beside the outputs so catalog completeness, filenames, formats, ratios, alpha requirements, and human visual review remain auditable.
 
@@ -31,7 +31,7 @@
 - Create: `internal/assets/illustration/verify.mjs`
 
 **Interfaces:**
-- Consumes: the 41 catalog rows in `internal/brand/illustration/04-asset-catalog.md`.
+- Consumes: the 41 catalog rows in `internal/docs/brand/illustration/04-asset-catalog.md`.
 - Produces: an ordered array of `{id, family, subject, ratio, filename, transparent, promptIntent}` and a validator with exit code `0` only when all expected WebPs pass structural checks.
 
 - [x] **Step 1: Encode every catalog row**

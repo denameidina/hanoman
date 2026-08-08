@@ -3,7 +3,7 @@
 ## Objective
 
 Produce the complete 41-item master inventory defined by
-`internal/brand/illustration/04-asset-catalog.md` as project-ready WebP files under
+`internal/docs/brand/illustration/04-asset-catalog.md` as project-ready WebP files under
 `internal/assets/illustration/`.
 
 The request narrows delivery to one WebP per catalog ID. Editable sources, SVG/PDF interchange,

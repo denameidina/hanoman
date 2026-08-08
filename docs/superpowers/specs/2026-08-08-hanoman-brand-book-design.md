@@ -2,7 +2,7 @@
 
 **Tanggal:** 2026-08-08  
 **Status:** disetujui secara konseptual; menunggu review dokumen  
-**Output tujuan:** brand book bilingual di `internal/brand/`
+**Output tujuan:** brand book bilingual di `internal/docs/brand/`
 
 ## Ringkasan
 
@@ -161,7 +161,7 @@ tetapi tidak menggantikan label produk yang harus langsung dipahami.
 ## Struktur deliverable
 
 ```text
-internal/brand/
+internal/docs/brand/
 ├── README.md
 ├── 01-foundation.md
 ├── 02-four-lakons.md
@@ -188,7 +188,7 @@ internal/brand/
 - `sources.md` memuat provenance riset, catatan istilah, variasi tradisi, dan batas antara sumber
   budaya dengan interpretasi brand.
 
-`internal/docs/README.md` memperoleh kategori `brand` yang menautkan `../brand/README.md`. Design
+`internal/docs/README.md` memperoleh kategori `brand` yang menautkan `brand/README.md`. Design
 system yang ada tetap menjadi Source of Truth implementasi UI; brand book menjelaskan alasan dan
 penggunaan komunikasinya.
 
@@ -236,7 +236,7 @@ ada interpretasi budaya yang boleh ditulis sebagai fakta historis tanpa sumber.
 
 Brand book selesai ketika:
 
-1. delapan file di `internal/brand/` tersedia dan saling tertaut;
+1. delapan file di `internal/docs/brand/` tersedia dan saling tertaut;
 2. `internal/docs/README.md` menautkan index brand;
 3. seluruh bagian inti hadir dalam bahasa Indonesia dan Inggris tanpa pergeseran makna material;
 4. empat lakon masing-masing memiliki cerita, interpretasi brand, bukti produk, dan batas tafsir;

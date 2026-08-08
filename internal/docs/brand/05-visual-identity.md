@@ -14,11 +14,11 @@ Javanese/Indonesian wayang. Everyday product surfaces remain calm, editorial, an
 energy appears in the mark, composition, illustration, and moments of action—not as constant noise.
 
 Untuk nilai token, component, spacing, radius, dan state UI, gunakan
-[Hanoman design system](../docs/design-system/design-system.md). Dokumen ini menjelaskan peran dan
+[Hanoman design system](../design-system/design-system.md). Dokumen ini menjelaskan peran dan
 makna; ia tidak mendefinisikan implementasi kedua.
 
 For token values, components, spacing, radii, and UI states, use the
-[Hanoman design system](../docs/design-system/design-system.md). This document governs role and
+[Hanoman design system](../design-system/design-system.md). This document governs role and
 meaning; it does not create a second implementation authority.
 
 ## Buntut mark
@@ -41,8 +41,8 @@ as an outcome rather than spin forever inside an agent.
 
 ### Implementation authority / Otoritas implementasi
 
-- [`src/src/ds/marks.tsx`](../../src/src/ds/marks.tsx) adalah sumber komponen dan geometri mark.
-- [`src/public/favicon.svg`](../../src/public/favicon.svg) berisi path yang di-bake untuk favicon.
+- [`src/src/ds/marks.tsx`](../../../src/src/ds/marks.tsx) adalah sumber komponen dan geometri mark.
+- [`src/public/favicon.svg`](../../../src/public/favicon.svg) berisi path yang di-bake untuk favicon.
 - Jangan mengedit path favicon dengan tangan; regenerate melalui sumber design system.
 - Jaga clear space yang membuat spiral dapat dibaca sebagai satu gestur, bukan ornamen padat.
 - Pada ukuran kecil, pakai mark saja. Pada konteks baru atau eksternal, pasangkan dengan wordmark

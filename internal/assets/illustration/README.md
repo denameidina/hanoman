@@ -1,9 +1,9 @@
 # Hanoman illustration assets
 
 This directory delivers one flattened WebP master for each of the 41 IDs in the authoritative
-[asset catalog](../../brand/illustration/04-asset-catalog.md). The art direction, character rules,
+[asset catalog](../../docs/brand/illustration/04-asset-catalog.md). The art direction, character rules,
 family briefs, prompts, and review criteria remain authoritative in
-[`internal/brand/illustration`](../../brand/illustration/README.md).
+[`internal/docs/brand/illustration`](../../docs/brand/illustration/README.md).
 
 Delivery status: **41/41 catalog masters present and structurally verified**, with eight family
 contact sheets recorded in `qa/` for visual review.

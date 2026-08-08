@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Membuat brand book bilingual lengkap di `internal/brand/` yang menerjemahkan empat lakon Anoman menjadi filosofi, voice, messaging, identitas visual, dan contoh penggunaan yang terbukti oleh perilaku produk Hanoman.
+**Goal:** Membuat brand book bilingual lengkap di `internal/docs/brand/` yang menerjemahkan empat lakon Anoman menjadi filosofi, voice, messaging, identitas visual, dan contoh penggunaan yang terbukti oleh perilaku produk Hanoman.
 
-**Architecture:** Brand book dibagi menjadi delapan dokumen kecil dengan `internal/brand/README.md` sebagai router. Foundation dan empat lakon menjadi sumber konsep; voice, messaging, visual identity, dan practice mengonsumsi konsep tersebut tanpa mendefinisikan ulang. `sources.md` memisahkan fakta tradisi dari interpretasi brand, sedangkan `internal/docs/README.md` menautkan paket brand ke Source of Truth project.
+**Architecture:** Brand book dibagi menjadi delapan dokumen kecil dengan `internal/docs/brand/README.md` sebagai router. Foundation dan empat lakon menjadi sumber konsep; voice, messaging, visual identity, dan practice mengonsumsi konsep tersebut tanpa mendefinisikan ulang. `sources.md` memisahkan fakta tradisi dari interpretasi brand, sedangkan `internal/docs/README.md` menautkan paket brand ke Source of Truth project.
 
 **Tech Stack:** Markdown, link relatif GitHub, CLI docs Hanoman (`node cli/dist/hanoman.js docs index|scan`), Git.
 
@@ -28,10 +28,10 @@
 ### Task 1: Brand Foundation, Four Lakons, and Research Provenance
 
 **Files:**
-- Create: `internal/brand/README.md`
-- Create: `internal/brand/01-foundation.md`
-- Create: `internal/brand/02-four-lakons.md`
-- Create: `internal/brand/sources.md`
+- Create: `internal/docs/brand/README.md`
+- Create: `internal/docs/brand/01-foundation.md`
+- Create: `internal/docs/brand/02-four-lakons.md`
+- Create: `internal/docs/brand/sources.md`
 
 **Interfaces:**
 - Consumes: `docs/superpowers/specs/2026-08-08-hanoman-brand-book-design.md`; `internal/docs/entrypoints/blueprint.md`; `internal/docs/product/blueprint.md`; `internal/docs/product/scope-principles.md`; `internal/docs/business/brd.md`; four external sources listed in the design.
@@ -39,7 +39,7 @@
 
 - [ ] **Step 1: Create the brand router**
 
-Write `internal/brand/README.md` with this exact navigation order:
+Write `internal/docs/brand/README.md` with this exact navigation order:
 
 1. Foundation
 2. Four lakons
@@ -53,7 +53,7 @@ Open with the exact brand idea and a two-sentence bilingual summary. Add “How 
 
 - [ ] **Step 2: Write the foundation in paired languages**
 
-Write `internal/brand/01-foundation.md` with these sections in order:
+Write `internal/docs/brand/01-foundation.md` with these sections in order:
 
 1. `Brand idea / Gagasan brand`
 2. `Why Hanoman exists / Mengapa Hanoman ada`
@@ -69,7 +69,7 @@ Use the exact copy approved in the design. The proof table must map `docs-driven
 
 - [ ] **Step 3: Write the four-lakon system**
 
-Write `internal/brand/02-four-lakons.md`. Each lakon must use the same five-part template:
+Write `internal/docs/brand/02-four-lakons.md`. Each lakon must use the same five-part template:
 
 1. `The story / Kisah`
 2. `Brand interpretation / Tafsir brand`
@@ -90,7 +90,7 @@ End with the exact cycle: `Terima amanat → pahami konteks → kerahkan daya �
 
 - [ ] **Step 4: Document sources and cultural boundaries**
 
-Write `internal/brand/sources.md` with:
+Write `internal/docs/brand/sources.md` with:
 
 - a terminology table for Hanoman/Anoman/Hanuman;
 - a statement that Ramayana has multiple tellings and the brand centers a Javanese/Indonesian lens;
@@ -106,9 +106,9 @@ Use direct links, paraphrase the sources, and do not reproduce long quotations.
 Run:
 
 ```bash
-rg -n "T[B]D|T[O]DO|F[I]XME|lorem ipsum|versi asli" internal/brand
-rg -n "Kekuatan yang mengemban amanat|Power in service of intent" internal/brand/{README,01-foundation}.md
-rg -n "Anoman Duta|Anoman Obong|Gunung Dronagiri|Chiranjivi" internal/brand/02-four-lakons.md
+rg -n "T[B]D|T[O]DO|F[I]XME|lorem ipsum|versi asli" internal/docs/brand
+rg -n "Kekuatan yang mengemban amanat|Power in service of intent" internal/docs/brand/{README,01-foundation}.md
+rg -n "Anoman Duta|Anoman Obong|Gunung Dronagiri|Chiranjivi" internal/docs/brand/02-four-lakons.md
 git diff --check
 ```
 
@@ -117,16 +117,16 @@ Expected: the first command has no output; the second and third show every requi
 - [ ] **Step 6: Commit the foundation**
 
 ```bash
-git add internal/brand/README.md internal/brand/01-foundation.md internal/brand/02-four-lakons.md internal/brand/sources.md
+git add internal/docs/brand/README.md internal/docs/brand/01-foundation.md internal/docs/brand/02-four-lakons.md internal/docs/brand/sources.md
 git commit -m "docs(brand): define hanoman philosophy and four lakons"
 ```
 
 ### Task 2: Personality, Bilingual Voice, and Messaging System
 
 **Files:**
-- Create: `internal/brand/03-personality-voice.md`
-- Create: `internal/brand/04-messaging.md`
-- Modify: `internal/brand/README.md`
+- Create: `internal/docs/brand/03-personality-voice.md`
+- Create: `internal/docs/brand/04-messaging.md`
+- Modify: `internal/docs/brand/README.md`
 
 **Interfaces:**
 - Consumes: canonical brand idea, promise, positioning, lakon meanings, and terminology from Task 1.
@@ -134,7 +134,7 @@ git commit -m "docs(brand): define hanoman philosophy and four lakons"
 
 - [ ] **Step 1: Write personality and voice rules**
 
-Write `internal/brand/03-personality-voice.md` with:
+Write `internal/docs/brand/03-personality-voice.md` with:
 
 - the archetype phrase `duta teknis yang tangguh / a resilient technical envoy`;
 - six approved traits: faithful to intent without blind obedience, powerful without showing off, calm in observation and decisive in action, context-aware and candid about uncertainty, accountable for bringing results home, rooted in Indonesia and open to the world;
@@ -146,7 +146,7 @@ Write `internal/brand/03-personality-voice.md` with:
 
 - [ ] **Step 2: Write the messaging hierarchy**
 
-Write `internal/brand/04-messaging.md` with the exact brand line, category descriptor, one-liner, and three pillars approved in the design. For each pillar—`Grounded in context`, `Visible in motion`, `Durable by default`—include:
+Write `internal/docs/brand/04-messaging.md` with the exact brand line, category descriptor, one-liner, and three pillars approved in the design. For each pillar—`Grounded in context`, `Visible in motion`, `Durable by default`—include:
 
 - a one-sentence Indonesian claim;
 - a one-sentence English claim;
@@ -168,16 +168,16 @@ Mark the brand line, category descriptor, product one-liner, and boilerplate as 
 
 - [ ] **Step 3: Complete router summaries**
 
-Update `internal/brand/README.md` so the personality/voice and messaging links each have a one-sentence purpose in both languages. Confirm every link is relative and points to an existing filename.
+Update `internal/docs/brand/README.md` so the personality/voice and messaging links each have a one-sentence purpose in both languages. Confirm every link is relative and points to an existing filename.
 
 - [ ] **Step 4: Verify bilingual and messaging coverage**
 
 Run:
 
 ```bash
-rg -n "Approved|Adaptable|Avoid" internal/brand/{03-personality-voice,04-messaging}.md
-rg -n "Grounded in context|Visible in motion|Durable by default" internal/brand/04-messaging.md
-rg -n "revolutionary|magical|limitless|fully autonomous" internal/brand
+rg -n "Approved|Adaptable|Avoid" internal/docs/brand/{03-personality-voice,04-messaging}.md
+rg -n "Grounded in context|Visible in motion|Durable by default" internal/docs/brand/04-messaging.md
+rg -n "revolutionary|magical|limitless|fully autonomous" internal/docs/brand
 git diff --check
 ```
 
@@ -186,16 +186,16 @@ Expected: status labels and all three pillars are present; any matches for exagg
 - [ ] **Step 5: Commit voice and messaging**
 
 ```bash
-git add internal/brand/README.md internal/brand/03-personality-voice.md internal/brand/04-messaging.md
+git add internal/docs/brand/README.md internal/docs/brand/03-personality-voice.md internal/docs/brand/04-messaging.md
 git commit -m "docs(brand): define voice and messaging system"
 ```
 
 ### Task 3: Visual Identity and Applied Brand Examples
 
 **Files:**
-- Create: `internal/brand/05-visual-identity.md`
-- Create: `internal/brand/06-brand-in-practice.md`
-- Modify: `internal/brand/README.md`
+- Create: `internal/docs/brand/05-visual-identity.md`
+- Create: `internal/docs/brand/06-brand-in-practice.md`
+- Modify: `internal/docs/brand/README.md`
 
 **Interfaces:**
 - Consumes: design tokens and implementation authority from `internal/docs/design-system/design-system.md`; Buntut implementation note from `src/public/favicon.svg`; voice and approved messages from Tasks 1–2.
@@ -203,7 +203,7 @@ git commit -m "docs(brand): define voice and messaging system"
 
 - [ ] **Step 1: Write visual identity guidance**
 
-Write `internal/brand/05-visual-identity.md` with these sections:
+Write `internal/docs/brand/05-visual-identity.md` with these sections:
 
 1. `Visual idea / Gagasan visual`
 2. `Buntut mark`
@@ -224,7 +224,7 @@ Define the approved motif mapping from the design. For illustration, require Jav
 
 - [ ] **Step 2: Write ready-to-use examples**
 
-Write `internal/brand/06-brand-in-practice.md` with bilingual, labeled examples for:
+Write `internal/docs/brand/06-brand-in-practice.md` with bilingual, labeled examples for:
 
 - homepage hero;
 - README opening;
@@ -243,16 +243,16 @@ Each example must include `Context`, `Approved copy`, `Why it works`, and one `A
 
 - [ ] **Step 3: Complete the router and cross-links**
 
-Update `internal/brand/README.md` with bilingual summaries for visual identity and brand in practice. Add reciprocal links from visual identity to the design system, from practice to voice/messaging, and from all culture-heavy sections to `sources.md`.
+Update `internal/docs/brand/README.md` with bilingual summaries for visual identity and brand in practice. Add reciprocal links from visual identity to the design system, from practice to voice/messaging, and from all culture-heavy sections to `sources.md`.
 
 - [ ] **Step 4: Verify visual authority and example completeness**
 
 Run:
 
 ```bash
-rg -n "#[0-9a-fA-F]{3,8}|rgb\(|hsl\(" internal/brand/05-visual-identity.md
-rg -n "Homepage|README|onboarding|backlog|session|error|confirmation|release|community|social|Anoman Duta|Anoman Obong|Dronagiri|Chiranjivi" internal/brand/06-brand-in-practice.md
-rg -n "design-system.md|sources.md|03-personality-voice.md|04-messaging.md" internal/brand
+rg -n "#[0-9a-fA-F]{3,8}|rgb\(|hsl\(" internal/docs/brand/05-visual-identity.md
+rg -n "Homepage|README|onboarding|backlog|session|error|confirmation|release|community|social|Anoman Duta|Anoman Obong|Dronagiri|Chiranjivi" internal/docs/brand/06-brand-in-practice.md
+rg -n "design-system.md|sources.md|03-personality-voice.md|04-messaging.md" internal/docs/brand
 git diff --check
 ```
 
@@ -261,7 +261,7 @@ Expected: the color-literal command has no output; the completeness and cross-li
 - [ ] **Step 5: Commit visual and applied guidance**
 
 ```bash
-git add internal/brand/README.md internal/brand/05-visual-identity.md internal/brand/06-brand-in-practice.md
+git add internal/docs/brand/README.md internal/docs/brand/05-visual-identity.md internal/docs/brand/06-brand-in-practice.md
 git commit -m "docs(brand): add visual and application guidance"
 ```
 
@@ -269,7 +269,7 @@ git commit -m "docs(brand): add visual and application guidance"
 
 **Files:**
 - Modify: `internal/docs/README.md`
-- Modify if audit finds an inconsistency: `internal/brand/*.md`
+- Modify if audit finds an inconsistency: `internal/docs/brand/*.md`
 
 **Interfaces:**
 - Consumes: all eight completed brand documents.
@@ -281,7 +281,7 @@ Add this section between `business` and `design-system` in `internal/docs/README
 
 ```markdown
 ## brand
-- [Hanoman brand book](../brand/README.md) — filosofi story-led/product-grounded, empat lakon, voice bilingual, messaging, identitas visual, dan contoh penerapan untuk produk open-source
+- [Hanoman brand book](brand/README.md) — filosofi story-led/product-grounded, empat lakon, voice bilingual, messaging, identitas visual, dan contoh penerapan untuk produk open-source
 ```
 
 - [ ] **Step 2: Run the terminology and placeholder audit**
@@ -289,10 +289,10 @@ Add this section between `business` and `design-system` in `internal/docs/README
 Run:
 
 ```bash
-rg -n "T[B]D|T[O]DO|F[I]XME|lorem ipsum|versi asli|one true|the original Ramayana" internal/brand
-rg -n "Hanuman Duta|Hanuman Obong" internal/brand
-rg -n "Hanoman Duta|Hanoman Obong" internal/brand
-rg -n "Anoman Duta|Anoman Obong|Gunung Dronagiri|Chiranjivi" internal/brand
+rg -n "T[B]D|T[O]DO|F[I]XME|lorem ipsum|versi asli|one true|the original Ramayana" internal/docs/brand
+rg -n "Hanuman Duta|Hanuman Obong" internal/docs/brand
+rg -n "Hanoman Duta|Hanoman Obong" internal/docs/brand
+rg -n "Anoman Duta|Anoman Obong|Gunung Dronagiri|Chiranjivi" internal/docs/brand
 ```
 
 Expected: the first three commands have no output; the fourth finds the canonical lakon names where expected. If a prohibited match appears inside a deliberate `Avoid` example, rewrite the example so the prohibited phrase does not need to appear verbatim.
@@ -306,9 +306,9 @@ node --input-type=module <<'NODE'
 import fs from "node:fs";
 import path from "node:path";
 
-const files = fs.readdirSync("internal/brand")
+const files = fs.readdirSync("internal/docs/brand")
   .filter((name) => name.endsWith(".md"))
-  .map((name) => path.join("internal/brand", name));
+  .map((name) => path.join("internal/docs/brand", name));
 const missing = [];
 for (const file of files) {
   const text = fs.readFileSync(file, "utf8");
@@ -348,7 +348,7 @@ Run:
 
 ```bash
 git diff --stat HEAD~3
-git diff HEAD~3 -- internal/brand internal/docs/README.md
+git diff HEAD~3 -- internal/docs/brand internal/docs/README.md
 git status --short
 ```
 
@@ -357,7 +357,7 @@ Confirm all eight acceptance criteria from the design are satisfied, there are n
 - [ ] **Step 6: Commit the index and audit corrections**
 
 ```bash
-git add internal/docs/README.md internal/brand
+git add internal/docs/README.md internal/docs/brand
 git commit -m "docs(brand): link and verify hanoman brand book"
 ```
 

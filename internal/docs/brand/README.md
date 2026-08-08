@@ -53,7 +53,7 @@ outlives the session.
   [Messaging](04-messaging.md) atau [Brand in practice](06-brand-in-practice.md). / For copy, read
   Personality & voice, then choose a pattern from Messaging or Brand in practice.
 - Untuk desain komunikasi, gunakan [Visual identity](05-visual-identity.md). Untuk token dan komponen
-  UI, [design system](../docs/design-system/design-system.md) tetap menjadi Source of Truth. / For
+  UI, [design system](../design-system/design-system.md) tetap menjadi Source of Truth. / For
   communication design, use Visual identity. The design system remains the Source of Truth for UI
   tokens and components.
 - Untuk memesan atau menghasilkan aset, mulai dari [Illustration system](illustration/README.md) dan

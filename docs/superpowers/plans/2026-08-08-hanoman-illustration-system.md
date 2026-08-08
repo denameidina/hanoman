@@ -4,7 +4,7 @@
 
 **Goal:** Membuat 21 dokumen brief produksi yang memungkinkan illustrator manusia dan AI image generator menghasilkan 41 aset ilustrasi Hanoman secara konsisten, berakar pada wayang kulit purwa gaya Surakarta, dan siap untuk delivery static-first.
 
-**Architecture:** `internal/brand/illustration/README.md` menjadi router menuju sembilan dokumen sistem dan sebelas family briefs. Art direction, character model, mascot, serta references menetapkan identitas; asset catalog menetapkan inventory; production template, workflow, prompt library, dan delivery QA mengatur produksi; family briefs menerapkan seluruh aturan tanpa mendefinisikan ulang brand.
+**Architecture:** `internal/docs/brand/illustration/README.md` menjadi router menuju sembilan dokumen sistem dan sebelas family briefs. Art direction, character model, mascot, serta references menetapkan identitas; asset catalog menetapkan inventory; production template, workflow, prompt library, dan delivery QA mengatur produksi; family briefs menerapkan seluruh aturan tanpa mendefinisikan ulang brand.
 
 **Tech Stack:** Markdown, SVG/PNG/WebP/PDF delivery conventions, Figma/Illustrator/Affinity/PSD source conventions, AI image-generation prompt blocks, Hanoman docs CLI, Git.
 
@@ -15,7 +15,7 @@
 - Sistem karakter: satu Anoman dengan tier **Narrative**, **Editorial**, dan **Mascot**.
 - Mascot adalah penyederhanaan karakter yang sama; bukan chibi, hewan realistis, atau generic monkey mascot.
 - Paket inventory harus menghitung tepat **41 deliverable**.
-- Sistem dokumentasi harus memuat tepat **21 file** di bawah `internal/brand/illustration/`.
+- Sistem dokumentasi harus memuat tepat **21 file** di bawah `internal/docs/brand/illustration/`.
 - Produksi hybrid: satu master brief melayani illustrator manusia dan AI-assisted workflow.
 - AI dipakai untuk eksplorasi komposisi; core model sheet dan anatomi kanonik wajib dikurasi/redraw.
 - Static-first dengan minimum layer `bg`, `environment`, `character-base`, `character-gesture`, `buntut-fx`, `foreground`, `text-safe`.
@@ -32,17 +32,17 @@
 ### Task 1: Illustration Router, Art Direction, and References
 
 **Files:**
-- Create: `internal/brand/illustration/README.md`
-- Create: `internal/brand/illustration/01-art-direction.md`
-- Create: `internal/brand/illustration/references.md`
+- Create: `internal/docs/brand/illustration/README.md`
+- Create: `internal/docs/brand/illustration/01-art-direction.md`
+- Create: `internal/docs/brand/illustration/references.md`
 
 **Interfaces:**
-- Consumes: `internal/brand/01-foundation.md`, `02-four-lakons.md`, `03-personality-voice.md`, `05-visual-identity.md`, `06-brand-in-practice.md`, `sources.md`, dan design spec.
+- Consumes: `internal/docs/brand/01-foundation.md`, `02-four-lakons.md`, `03-personality-voice.md`, `05-visual-identity.md`, `06-brand-in-practice.md`, `sources.md`, dan design spec.
 - Produces: navigation, visual language, cultural/reference rules, dan shared vocabulary yang dikonsumsi semua task berikutnya.
 
 - [ ] **Step 1: Create the illustration-system router**
 
-Write `internal/brand/illustration/README.md` with:
+Write `internal/docs/brand/illustration/README.md` with:
 
 - exact purpose: production briefs, not finished artwork;
 - audience routes for product owner, art director, illustrator, AI operator, cultural reviewer, and delivery reviewer;
@@ -87,10 +87,10 @@ Write `references.md` with:
 Run:
 
 ```bash
-rg -n "T[B]D|T[O]DO|F[I]XME|lorem ipsum|fill in lat[e]r" internal/brand/illustration
-rg -n "Narrative|Editorial|Mascot|41|static-first|Surakarta" internal/brand/illustration/README.md
-rg -n "35–55|one third|3200|bg|character-base|buntut-fx|text-safe" internal/brand/illustration/01-art-direction.md
-rg -n "repository.um.ac.id|repository.isi-ska.ac.id|jurnal.isi-ska.ac.id|digilib.isi.ac.id" internal/brand/illustration/references.md
+rg -n "T[B]D|T[O]DO|F[I]XME|lorem ipsum|fill in lat[e]r" internal/docs/brand/illustration
+rg -n "Narrative|Editorial|Mascot|41|static-first|Surakarta" internal/docs/brand/illustration/README.md
+rg -n "35–55|one third|3200|bg|character-base|buntut-fx|text-safe" internal/docs/brand/illustration/01-art-direction.md
+rg -n "repository.um.ac.id|repository.isi-ska.ac.id|jurnal.isi-ska.ac.id|digilib.isi.ac.id" internal/docs/brand/illustration/references.md
 git diff --check
 ```
 
@@ -99,16 +99,16 @@ Expected: placeholder scan has no output; all required concepts and sources are 
 - [ ] **Step 5: Commit foundation docs**
 
 ```bash
-git add internal/brand/illustration/README.md internal/brand/illustration/01-art-direction.md internal/brand/illustration/references.md
+git add internal/docs/brand/illustration/README.md internal/docs/brand/illustration/01-art-direction.md internal/docs/brand/illustration/references.md
 git commit -m "docs(illustration): define art direction and references"
 ```
 
 ### Task 2: Character Model, Mascot System, and 41-Asset Catalog
 
 **Files:**
-- Create: `internal/brand/illustration/02-character-model-sheet.md`
-- Create: `internal/brand/illustration/03-mascot-system.md`
-- Create: `internal/brand/illustration/04-asset-catalog.md`
+- Create: `internal/docs/brand/illustration/02-character-model-sheet.md`
+- Create: `internal/docs/brand/illustration/03-mascot-system.md`
+- Create: `internal/docs/brand/illustration/04-asset-catalog.md`
 
 **Interfaces:**
 - Consumes: art direction and reference protocol from Task 1.
@@ -168,11 +168,11 @@ Add phase order: Phase A model/reference, Phase B hero/lakons, Phase C spot/prod
 Run:
 
 ```bash
-rg -n "GST-(01|12)|EXP-(01|08)|TAL-(01|04)|one-color|Gate 2" internal/brand/illustration/02-character-model-sheet.md
-rg -n "MPS-(01|08)|STK-(01|08)|3.5–4|28%|chibi" internal/brand/illustration/03-mascot-system.md
+rg -n "GST-(01|12)|EXP-(01|08)|TAL-(01|04)|one-color|Gate 2" internal/docs/brand/illustration/02-character-model-sheet.md
+rg -n "MPS-(01|08)|STK-(01|08)|3.5–4|28%|chibi" internal/docs/brand/illustration/03-mascot-system.md
 node --input-type=module <<'NODE'
 import fs from "node:fs";
-const body = fs.readFileSync("internal/brand/illustration/04-asset-catalog.md", "utf8");
+const body = fs.readFileSync("internal/docs/brand/illustration/04-asset-catalog.md", "utf8");
 const ids = [...body.matchAll(/`((?:MOD|MSC|HRO|LKN|SPT|PST|MPS|STK|SOC|DGM|MTF)-\d{3})`/g)].map((m) => m[1]);
 const unique = new Set(ids);
 if (unique.size !== 41) throw new Error(`expected 41 unique IDs, got ${unique.size}`);
@@ -186,17 +186,17 @@ Expected: required model ranges found; catalog script reports 41 unique IDs; dif
 - [ ] **Step 5: Commit character and catalog docs**
 
 ```bash
-git add internal/brand/illustration/02-character-model-sheet.md internal/brand/illustration/03-mascot-system.md internal/brand/illustration/04-asset-catalog.md
+git add internal/docs/brand/illustration/02-character-model-sheet.md internal/docs/brand/illustration/03-mascot-system.md internal/docs/brand/illustration/04-asset-catalog.md
 git commit -m "docs(illustration): specify character mascot and asset catalog"
 ```
 
 ### Task 3: Production Template, Hybrid Workflow, Prompt Library, and Delivery QA
 
 **Files:**
-- Create: `internal/brand/illustration/05-production-brief-template.md`
-- Create: `internal/brand/illustration/06-human-ai-workflow.md`
-- Create: `internal/brand/illustration/07-prompt-library.md`
-- Create: `internal/brand/illustration/08-delivery-qa.md`
+- Create: `internal/docs/brand/illustration/05-production-brief-template.md`
+- Create: `internal/docs/brand/illustration/06-human-ai-workflow.md`
+- Create: `internal/docs/brand/illustration/07-prompt-library.md`
+- Create: `internal/docs/brand/illustration/08-delivery-qa.md`
 
 **Interfaces:**
 - Consumes: stable character/tier rules and catalog IDs from Tasks 1–2.
@@ -261,10 +261,10 @@ Write `08-delivery-qa.md` with:
 Run:
 
 ```bash
-rg -n '^## (Metadata|Objective|Audience and action|Product truth|Approval record|Delivery manifest)' internal/brand/illustration/05-production-brief-template.md
-rg -n "Gate (0|1|2|3|4|5)|RACI|human-first|AI-assisted|hybrid" internal/brand/illustration/06-human-ai-workflow.md
-rg -n "IDENTITY_CORE|TIER_NARRATIVE|TIER_EDITORIAL|TIER_MASCOT|NEGATIVE_CORE|repair|seed/job ID" internal/brand/illustration/07-prompt-library.md
-rg -n "hnm-ill-|SVG|PNG|WebP|PDF|sRGB|3200|manifest.md|Gate 5" internal/brand/illustration/08-delivery-qa.md
+rg -n '^## (Metadata|Objective|Audience and action|Product truth|Approval record|Delivery manifest)' internal/docs/brand/illustration/05-production-brief-template.md
+rg -n "Gate (0|1|2|3|4|5)|RACI|human-first|AI-assisted|hybrid" internal/docs/brand/illustration/06-human-ai-workflow.md
+rg -n "IDENTITY_CORE|TIER_NARRATIVE|TIER_EDITORIAL|TIER_MASCOT|NEGATIVE_CORE|repair|seed/job ID" internal/docs/brand/illustration/07-prompt-library.md
+rg -n "hnm-ill-|SVG|PNG|WebP|PDF|sRGB|3200|manifest.md|Gate 5" internal/docs/brand/illustration/08-delivery-qa.md
 git diff --check
 ```
 
@@ -273,18 +273,18 @@ Expected: every required field/gate/block/format is found; diff check exits 0.
 - [ ] **Step 6: Commit production docs**
 
 ```bash
-git add internal/brand/illustration/05-production-brief-template.md internal/brand/illustration/06-human-ai-workflow.md internal/brand/illustration/07-prompt-library.md internal/brand/illustration/08-delivery-qa.md
+git add internal/docs/brand/illustration/05-production-brief-template.md internal/docs/brand/illustration/06-human-ai-workflow.md internal/docs/brand/illustration/07-prompt-library.md internal/docs/brand/illustration/08-delivery-qa.md
 git commit -m "docs(illustration): add hybrid production and delivery workflow"
 ```
 
 ### Task 4: Hero and Four-Lakon Narrative Briefs
 
 **Files:**
-- Create: `internal/brand/illustration/briefs/00-homepage-hero.md`
-- Create: `internal/brand/illustration/briefs/01-anoman-duta.md`
-- Create: `internal/brand/illustration/briefs/02-anoman-obong.md`
-- Create: `internal/brand/illustration/briefs/03-gunung-dronagiri.md`
-- Create: `internal/brand/illustration/briefs/04-chiranjivi.md`
+- Create: `internal/docs/brand/illustration/briefs/00-homepage-hero.md`
+- Create: `internal/docs/brand/illustration/briefs/01-anoman-duta.md`
+- Create: `internal/docs/brand/illustration/briefs/02-anoman-obong.md`
+- Create: `internal/docs/brand/illustration/briefs/03-gunung-dronagiri.md`
+- Create: `internal/docs/brand/illustration/briefs/04-chiranjivi.md`
 
 **Interfaces:**
 - Consumes: production template, model sheet, prompt blocks, catalog IDs, and four-lakon meanings.
@@ -315,10 +315,10 @@ Use `LKN-004`. Canonical line: `Buat pengetahuan hidup lebih lama daripada pelak
 Run:
 
 ```bash
-for f in internal/brand/illustration/briefs/{00-homepage-hero,01-anoman-duta,02-anoman-obong,03-gunung-dronagiri,04-chiranjivi}.md; do
+for f in internal/docs/brand/illustration/briefs/{00-homepage-hero,01-anoman-duta,02-anoman-obong,03-gunung-dronagiri,04-chiranjivi}.md; do
   rg -q "Asset ID" "$f" && rg -q "Product truth" "$f" && rg -q "Character tier" "$f" && rg -q "Layer map" "$f" && rg -q "Alt-text intent" "$f" && rg -q "Acceptance" "$f" || exit 1
 done
-rg -n "HRO-001|LKN-001|LKN-002|LKN-003|LKN-004" internal/brand/illustration/briefs
+rg -n "HRO-001|LKN-001|LKN-002|LKN-003|LKN-004" internal/docs/brand/illustration/briefs
 git diff --check
 ```
 
@@ -327,19 +327,19 @@ Expected: every brief contains mandatory sections and all five IDs are found; di
 - [ ] **Step 7: Commit narrative briefs**
 
 ```bash
-git add internal/brand/illustration/briefs/00-homepage-hero.md internal/brand/illustration/briefs/01-anoman-duta.md internal/brand/illustration/briefs/02-anoman-obong.md internal/brand/illustration/briefs/03-gunung-dronagiri.md internal/brand/illustration/briefs/04-chiranjivi.md
+git add internal/docs/brand/illustration/briefs/00-homepage-hero.md internal/docs/brand/illustration/briefs/01-anoman-duta.md internal/docs/brand/illustration/briefs/02-anoman-obong.md internal/docs/brand/illustration/briefs/03-gunung-dronagiri.md internal/docs/brand/illustration/briefs/04-chiranjivi.md
 git commit -m "docs(illustration): add hero and four-lakon briefs"
 ```
 
 ### Task 5: Spot, Product, Mascot, Sticker, Social, Diagram, and Motif Briefs
 
 **Files:**
-- Create: `internal/brand/illustration/briefs/05-spot-illustrations.md`
-- Create: `internal/brand/illustration/briefs/06-product-states.md`
-- Create: `internal/brand/illustration/briefs/07-mascot-pose-pack.md`
-- Create: `internal/brand/illustration/briefs/08-sticker-pack.md`
-- Create: `internal/brand/illustration/briefs/09-social-release-templates.md`
-- Create: `internal/brand/illustration/briefs/10-diagram-and-motif-kit.md`
+- Create: `internal/docs/brand/illustration/briefs/05-spot-illustrations.md`
+- Create: `internal/docs/brand/illustration/briefs/06-product-states.md`
+- Create: `internal/docs/brand/illustration/briefs/07-mascot-pose-pack.md`
+- Create: `internal/docs/brand/illustration/briefs/08-sticker-pack.md`
+- Create: `internal/docs/brand/illustration/briefs/09-social-release-templates.md`
+- Create: `internal/docs/brand/illustration/briefs/10-diagram-and-motif-kit.md`
 
 **Interfaces:**
 - Consumes: style bar from Task 4 and system docs from Tasks 1–3.
@@ -374,12 +374,12 @@ For `DGM-001`, define primitives for human, agent, docs, backlog, session, termi
 Run:
 
 ```bash
-rg -n "SPT-00[1-6]" internal/brand/illustration/briefs/05-spot-illustrations.md
-rg -n "PST-00[1-6]" internal/brand/illustration/briefs/06-product-states.md
-rg -n "MPS-00[1-8]" internal/brand/illustration/briefs/07-mascot-pose-pack.md
-rg -n "STK-00[1-8]" internal/brand/illustration/briefs/08-sticker-pack.md
-rg -n "SOC-00[1-4]" internal/brand/illustration/briefs/09-social-release-templates.md
-rg -n "DGM-001|MTF-001" internal/brand/illustration/briefs/10-diagram-and-motif-kit.md
+rg -n "SPT-00[1-6]" internal/docs/brand/illustration/briefs/05-spot-illustrations.md
+rg -n "PST-00[1-6]" internal/docs/brand/illustration/briefs/06-product-states.md
+rg -n "MPS-00[1-8]" internal/docs/brand/illustration/briefs/07-mascot-pose-pack.md
+rg -n "STK-00[1-8]" internal/docs/brand/illustration/briefs/08-sticker-pack.md
+rg -n "SOC-00[1-4]" internal/docs/brand/illustration/briefs/09-social-release-templates.md
+rg -n "DGM-001|MTF-001" internal/docs/brand/illustration/briefs/10-diagram-and-motif-kit.md
 git diff --check
 ```
 
@@ -388,19 +388,19 @@ Expected: all remaining 34 IDs are found and diff check exits 0.
 - [ ] **Step 8: Commit utility briefs**
 
 ```bash
-git add internal/brand/illustration/briefs
+git add internal/docs/brand/illustration/briefs
 git commit -m "docs(illustration): add product mascot and campaign briefs"
 ```
 
 ### Task 6: Cross-Links, Structural Audit, and Final Verification
 
 **Files:**
-- Modify: `internal/brand/README.md`
-- Modify: `internal/brand/05-visual-identity.md`
-- Modify: `internal/brand/06-brand-in-practice.md`
-- Modify: `internal/brand/sources.md`
+- Modify: `internal/docs/brand/README.md`
+- Modify: `internal/docs/brand/05-visual-identity.md`
+- Modify: `internal/docs/brand/06-brand-in-practice.md`
+- Modify: `internal/docs/brand/sources.md`
 - Modify: `internal/docs/README.md`
-- Modify if audit finds inconsistency: `internal/brand/illustration/**/*.md`
+- Modify if audit finds inconsistency: `internal/docs/brand/illustration/**/*.md`
 
 **Interfaces:**
 - Consumes: all 21 completed illustration docs.
@@ -408,11 +408,11 @@ git commit -m "docs(illustration): add product mascot and campaign briefs"
 
 - [ ] **Step 1: Add cross-links without duplicating guidance**
 
-- Add `Illustration system` to `internal/brand/README.md` after Visual identity.
+- Add `Illustration system` to `internal/docs/brand/README.md` after Visual identity.
 - Add a production handoff paragraph to the Illustration section in `05-visual-identity.md` linking to `illustration/README.md`.
 - Replace the four existing illustration-brief examples in `06-brand-in-practice.md` with a short note that they are concept examples and link to the detailed family briefs; retain existing examples.
 - Add the Surakarta sources and production-reference protocol link to `sources.md`.
-- Expand the existing `## brand` entry in `internal/docs/README.md` with a child link to `../brand/illustration/README.md`.
+- Expand the existing `## brand` entry in `internal/docs/README.md` with a child link to `brand/illustration/README.md`.
 
 - [ ] **Step 2: Verify exact structure**
 
@@ -422,7 +422,7 @@ Run:
 node --input-type=module <<'NODE'
 import fs from "node:fs";
 import path from "node:path";
-const root = "internal/brand/illustration";
+const root = "internal/docs/brand/illustration";
 const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
 const files = walk(root).filter((file) => file.endsWith(".md"));
 if (files.length !== 21) throw new Error(`expected 21 markdown files, got ${files.length}`);
@@ -440,14 +440,14 @@ Run a Node script that checks every file in `illustration/briefs/` contains: `Ob
 
 - [ ] **Step 5: Check every local Markdown link**
 
-Run the repository's read-only link script pattern across `internal/brand/illustration/**/*.md` and the five modified index/source docs. Ignore HTTP(S), mailto, and anchors; fail on missing local targets.
+Run the repository's read-only link script pattern across `internal/docs/brand/illustration/**/*.md` and the five modified index/source docs. Ignore HTTP(S), mailto, and anchors; fail on missing local targets.
 
 - [ ] **Step 6: Run terminology and placeholder audit**
 
 ```bash
-rg -n "T[B]D|T[O]DO|F[I]XME|lorem ipsum|fill in lat[e]r|versi asli|one true" internal/brand/illustration
-rg -n "Hanuman Duta|Hanuman Obong|Hanoman Duta|Hanoman Obong" internal/brand/illustration
-rg -n "generic monkey mascot|chibi|extra limbs|mixed Asian ornament" internal/brand/illustration
+rg -n "T[B]D|T[O]DO|F[I]XME|lorem ipsum|fill in lat[e]r|versi asli|one true" internal/docs/brand/illustration
+rg -n "Hanuman Duta|Hanuman Obong|Hanoman Duta|Hanoman Obong" internal/docs/brand/illustration
+rg -n "generic monkey mascot|chibi|extra limbs|mixed Asian ornament" internal/docs/brand/illustration
 git diff --check
 ```
 
@@ -472,7 +472,7 @@ Confirm all 13 acceptance criteria in the design spec map to a file or verificat
 - [ ] **Step 9: Commit integration and audit corrections**
 
 ```bash
-git add internal/brand/README.md internal/brand/05-visual-identity.md internal/brand/06-brand-in-practice.md internal/brand/sources.md internal/brand/illustration internal/docs/README.md
+git add internal/docs/brand/README.md internal/docs/brand/05-visual-identity.md internal/docs/brand/06-brand-in-practice.md internal/docs/brand/sources.md internal/docs/brand/illustration internal/docs/README.md
 git commit -m "docs(illustration): link and verify production brief system"
 ```
 

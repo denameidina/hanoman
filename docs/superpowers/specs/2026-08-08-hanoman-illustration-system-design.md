@@ -2,13 +2,13 @@
 
 **Tanggal:** 2026-08-08  
 **Status:** disetujui secara konseptual; menunggu review dokumen  
-**Output tujuan:** sistem brief ilustrasi hybrid di `internal/brand/illustration/`
+**Output tujuan:** sistem brief ilustrasi hybrid di `internal/docs/brand/illustration/`
 
 ## Ringkasan
 
 Hanoman membutuhkan sistem brief ilustrasi lengkap untuk menghasilkan aset yang konsisten melalui
 illustrator manusia maupun AI image generator. Sistem ini memperluas
-[`internal/brand/05-visual-identity.md`](../../../internal/brand/05-visual-identity.md), bukan
+[`internal/docs/brand/05-visual-identity.md`](../../../internal/docs/brand/05-visual-identity.md), bukan
 menggantikan design system atau membuat artwork final.
 
 Gaya utama adalah **editorial wayang kontemporer**, static-first dan layer-ready. Wayang kulit purwa
@@ -288,7 +288,7 @@ Setiap asset brief wajib mencatat:
 ## Documentation structure
 
 ```text
-internal/brand/illustration/
+internal/docs/brand/illustration/
 ├── README.md
 ├── 01-art-direction.md
 ├── 02-character-model-sheet.md
@@ -337,13 +337,13 @@ ratio, dan output specification identik.
 
 ### Existing Hanoman sources
 
-- [`internal/brand/sources.md`](../../../internal/brand/sources.md) untuk batas tradisi versus tafsir
+- [`internal/docs/brand/sources.md`](../../../internal/docs/brand/sources.md) untuk batas tradisi versus tafsir
   brand.
-- [`internal/brand/02-four-lakons.md`](../../../internal/brand/02-four-lakons.md) untuk makna dan
+- [`internal/docs/brand/02-four-lakons.md`](../../../internal/docs/brand/02-four-lakons.md) untuk makna dan
   guardrail tiap lakon.
-- [`internal/brand/05-visual-identity.md`](../../../internal/brand/05-visual-identity.md) untuk visual
+- [`internal/docs/brand/05-visual-identity.md`](../../../internal/docs/brand/05-visual-identity.md) untuk visual
   roles, Buntut, intensity, accessibility, dan cultural care.
-- [`internal/brand/06-brand-in-practice.md`](../../../internal/brand/06-brand-in-practice.md) untuk
+- [`internal/docs/brand/06-brand-in-practice.md`](../../../internal/docs/brand/06-brand-in-practice.md) untuk
   brief awal hero/lakon dan contoh surface.
 
 ## Cultural and licensing boundaries
@@ -379,8 +379,8 @@ Illustration documentation selesai ketika:
    map, responsive outputs, alt-text intent, do/don't, dan acceptance checklist;
 10. delivery QA memeriksa file format, naming, layers, responsive crop, contrast, silhouette,
     thumbnail, accessibility, cultural provenance, prompt/model record, dan license;
-11. `internal/brand/README.md`, `internal/brand/05-visual-identity.md`,
-    `internal/brand/06-brand-in-practice.md`, `internal/brand/sources.md`, serta
+11. `internal/docs/brand/README.md`, `internal/docs/brand/05-visual-identity.md`,
+    `internal/docs/brand/06-brand-in-practice.md`, `internal/docs/brand/sources.md`, serta
     `internal/docs/README.md` menautkan illustration system tanpa menduplikasi isinya;
 12. seluruh link lokal valid, tidak ada placeholder, dan istilah Hanoman/Anoman/Hanuman mengikuti
     brand convention; dan
