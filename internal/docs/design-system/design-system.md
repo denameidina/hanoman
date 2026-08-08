@@ -4,6 +4,31 @@ Estetika **editorial instrument-panel**: bone paper hangat, ink text, satu aksen
 
 Detail token & komponen ada di paket design system terpisah (Hanoman Design System). Frontend wajib memakai token & komponennya — jangan menciptakan warna/tipografi baru.
 
+## Ilustrasi produk
+
+Katalog authoritative berada di `internal/assets/illustration/inventory.json`: **41 master WebP**
+dalam sepuluh family. Frontend tidak memakai filename secara langsung. Semua artwork dipanggil lewat
+ID katalog (`HRO-001`, `PST-002`, dan seterusnya) pada komponen `Illustration` dari design system;
+registry-nya hidup di `src/src/ds/illustration-registry.ts` dan diuji setara 41/41 dengan inventory.
+
+API komponen:
+
+- `Illustration` menerima seluruh `IllustrationId`, memakai alt default dari intent katalog,
+  lazy-load + decode async, aspect ratio katalog, dan `contain` secara default. `priority` hanya untuk
+  artwork above-the-fold; `fit`, `style`, `className`, dan `sizes` boleh ditentukan caller.
+- `ProductStateIllustration`, `MascotIllustration`, `StickerIllustration`, dan `SpotIllustration`
+  membatasi ID secara type-level ke family-nya. Pakai wrapper ini bila family sudah diketahui.
+- `decorative` wajib untuk artwork yang hanya mengulang title/status yang sudah terbaca. Bentuk ini
+  merender `alt=""` + `aria-hidden="true"`; artwork informatif mempertahankan alt katalog atau alt
+  yang sengaja ditulis caller.
+- `StateBlock` menerima `illustration` opsional sebagai pengganti tile ikon. Keadaan loading tetap
+  memakai spinner; filtered-empty sederhana tak perlu gambar besar.
+
+Penempatan mengikuti kegunaan, bukan kewajiban memajang semuanya. Enam product-state dipakai pada
+onboarding, backlog sungguh kosong, sesi aktif, menunggu keputusan, sukses, dan error yang bisa
+dipulihkan. Model sheet serta template sosial tetap frontend-addressable melalui registry tetapi
+tidak dipaksakan masuk instrument panel operasional. Motif tanpa makna status selalu dekoratif.
+
 ## Placeholder: contoh nilai, bukan pengulangan label (SPEC-490)
 
 Label, hint, dan placeholder menjawab tiga pertanyaan berbeda — jangan salah satu

@@ -28,6 +28,38 @@
   membawa aksi retry; empty state membawa call-to-action ke aksi yang relevan. Settings **tidak** lagi
   jatuh ke nilai default saat GET gagal — toggle berikutnya akan mem-PUT default itu menimpa server.
 
+## Pipeline illustration assets
+
+`internal/assets/illustration/inventory.json` adalah sumber metadata untuk seluruh **41** master.
+`src/src/ds/illustration-registry.ts` memegang tuple `IllustrationId` eksplisit (memberi union type),
+membaca metadata inventory, lalu mengambil semua WebP dengan `import.meta.glob` eager `?url`. Vite
+karena itu meng-hash dan menyalin master ke `src/dist/assets` saat build; tidak ada salinan kedua di
+`src/public` dan tidak ada route server/file-read runtime.
+
+`src/src/ds/Illustration.tsx` adalah satu titik render `<img>`: alt/decorative, lazy/eager,
+`fetchpriority`, aspect ratio, object-fit, serta data attribute debugging. Screen mengimpor
+`Illustration` atau wrapper family dari barrel `src/src/ds/index.ts` dan hanya menyebut ID katalog —
+raw filename di luar registry adalah drift bug.
+
+Pemetaan product-state yang hidup sekarang:
+
+| ID | Keadaan frontend |
+|---|---|
+| `PST-001` | entry akun/setup (`AuthScreen`) |
+| `PST-002` | backlog benar-benar kosong, bukan hasil filter |
+| `PST-003` | cell sesi terminal aktif |
+| `PST-004` | cell sesi menunggu keputusan manusia |
+| `PST-005` | cell sesi sukses + Overview seluruh project on-convention |
+| `PST-006` | initial load server gagal tetapi bisa di-retry |
+
+Artwork kecil di header terminal dekoratif karena pill/teks tetap menjadi sumber makna aksesibel;
+error dan empty state informatif memakai alt katalog. Family model, hero, lakon, spot, mascot,
+sticker, social, diagram, dan motif seluruhnya terdaftar dan dapat dipakai komponen, tetapi hanya
+family yang relevan dengan operasi harian yang ditempatkan di dashboard. Contract
+`src/test/illustration-registry.test.ts` membuat penambahan/penghapusan record inventory gagal sampai
+registry ID ikut diperbarui; `internal/assets/illustration/verify.mjs` tetap memeriksa byte, dimensi,
+orientasi, dan alpha master.
+
 ## Tinggi & scrolling: rantai flex, bukan angka ajaib
 `#root` dikunci `100vh; overflow: hidden`, jadi tinggi yang tersedia sudah pasti sejak akar.
 Layar berdaftar tidak boleh menggulir seluruh halaman — filter bar dan Pager harus tetap
