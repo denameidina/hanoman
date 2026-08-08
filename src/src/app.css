@@ -79,3 +79,11 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 @keyframes hn-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hn-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
 @keyframes hn-toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* SPEC-585 · napas pet Hanoman. Hanya `transform` — ia hidup di compositor, tak menyentuh main
+   thread, dan tak memicu satu pun render React. Apakah ia dipasang diputuskan di JS
+   (`prefers-reduced-motion`), sama seperti animasi kit lainnya yang juga inline. */
+@keyframes hn-pet-breathe {
+  from { transform: translateY(0) scale(1); }
+  to   { transform: translateY(-3px) scale(1.025); }
+}
