@@ -14,6 +14,9 @@ Docs, objective, and spec define the work; the session must return inspectable e
 ## Character tier
 Narrative · `MOD-001` · `GST-03`/`GST-10`, focused `EXP-03`, guide `TAL-02`.
 
+## Locked anchors
+Use every `MOD-001` canonical anchor; the ring/folio and result marker may not replace or deform the hand and tail.
+
 ## Composition
 In a 4:3 field, profile Anoman crosses a clear boundary carrying a ring/mandate folio. A destination
 marker receives it; the curved return path bears a distinct result marker. Sender, destination, and

@@ -77,6 +77,26 @@ the product docs have withdrawn.
   Ramayana. / Supports **Anoman** as the Javanese name and his presence in Ramayana-derived wayang
   repertoire.
 
+### Surakarta visual-production references
+
+- Khoiron Mahfudzi, [perbandingan bentuk tokoh Anoman gaya Surakarta dan
+  Yogyakarta](https://repository.um.ac.id/12589/), mendukung observasi komparatif atas mata, kepala,
+  bahu, supit urang, dan ulur-ulur; perbedaan tidak boleh diratakan menjadi satu pakem generik.
+- Agus Ahmadi, [kriya wayang kulit purwa gaya
+  Surakarta](https://repository.isi-ska.ac.id/id/eprint/2977/1/Ag.%20Ahmadi.pdf), mendukung klasifikasi
+  rewanda serta pembacaan bentuk dan busana sebagai bagian dari sistem wayang.
+- Bambang Suwarno dkk., [kajian wanda wayang kulit purwa gaya
+  Surakarta](https://jurnal.isi-ska.ac.id/index.php/gelar/article/view/1487), mendukung hubungan rupa,
+  wanda, fungsi pertunjukan, dan sanggit; ia bukan lisensi untuk menetapkan satu visual tunggal.
+- ISI Yogyakarta, [ikonografi dan teknik pakeliran gaya
+  Surakarta](https://digilib.isi.ac.id/161/), menjadi rute riset lanjutan untuk ikonografi dan teknik,
+  bukan izin menyalin objek atau scan.
+
+Setiap komisi atau AI-assisted exploration mengikuti [production reference
+protocol](illustration/references.md): catat supported claim, rights/status, allowed use, dan reviewer;
+approved model sheet tetap menjadi otoritas identitas. / Every commission or AI-assisted exploration
+uses the production reference protocol and records claims, rights, allowed use, and review.
+
 ### Messenger, Lanka, and the mountain of herbs
 
 - The Metropolitan Museum of Art,

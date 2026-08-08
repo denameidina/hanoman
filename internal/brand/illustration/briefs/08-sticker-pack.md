@@ -12,6 +12,9 @@ Stickers are social reactions, not official workflow status, approval, or eviden
 ## Character tier
 Mascot · `MSC-001`; derive from approved pose vocabulary and simplify only after small-size testing.
 
+## Locked anchors
+Keep the mascot construction, profile, supit urang, ulur-ulur, one tail, dignified emotion, and shared outer-contour weight.
+
 ## Composition
 Centered 1:1 subject, transparent background, bold outer contour, 12% platform-safe margin, no baked words.
 

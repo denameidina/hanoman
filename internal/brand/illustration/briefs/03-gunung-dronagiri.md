@@ -14,6 +14,9 @@ An agent session can receive objective, docs, history, diff, and questions; it d
 ## Character tier
 Narrative · `MOD-001` · support/lift `GST-09`, thoughtful `EXP-03`, stable `TAL-01`.
 
+## Locked anchors
+Preserve the canonical profile, costume, single tail, and agile wayang-led anatomy; weight may not turn the figure into a bodybuilder.
+
 ## Composition
 In 4:3, Anoman deliberately supports a bounded context-mountain composed of five readable strata:
 objective, docs, history, diff, questions. A grounded human hand selects the final path at the edge.

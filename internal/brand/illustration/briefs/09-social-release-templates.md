@@ -12,6 +12,9 @@ Release claims, dates, metrics, quotes, and feature proof come from approved cop
 ## Character tier
 Editorial · `MOD-001`; use Mascot only for community reactions, never mix tiers in one frame without art-director approval.
 
+## Locked anchors
+Any Anoman uses its approved tier model, canonical profile/costume, one tail, and semantic color roles; ratios do not alter identity.
+
 ## Composition
 Three independent zones: character, product-proof object, and headline-safe field. Logo belongs to layout,
 not illustration; keep the brand-mark exclusion area clear and follow its placement guide.

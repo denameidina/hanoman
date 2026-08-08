@@ -12,6 +12,9 @@ Diagrams must explain actual actors, artifacts, isolation, states, and flows eve
 ## Character tier
 Editorial cameo only. Most primitives are non-character symbols; `MOD-001` governs any Anoman appearance.
 
+## Locked anchors
+Character cameos retain `MOD-001`; Buntut uses one directional line, and the four lakon motifs keep their approved meaning and joins.
+
 ## Composition
 `DGM-001` uses a grid, clear boundaries, external text labels, arrow direction, and shape-plus-label states.
 `MTF-001` uses modular strips/tiles with approved single joins and ample quiet field.

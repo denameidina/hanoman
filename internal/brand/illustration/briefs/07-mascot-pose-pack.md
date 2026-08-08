@@ -12,6 +12,9 @@ Poses support interface meaning; labels and product state remain authoritative.
 ## Character tier
 Mascot · `MSC-001` · 3.5–4 head units, approximately ≤28% head height, canonical one-eye profile.
 
+## Locked anchors
+All eight share the same construction, costume base, profile direction, optical scale, and one Buntut-linked tail.
+
 ## Composition
 Centered 1:1 transparent field with consistent baseline, optical scale, and 12% safe margin.
 

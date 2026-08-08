@@ -276,6 +276,11 @@ ends on an adaptable campaign line.
 
 **Avoid:** `Parallel agents. Infinite speed. Zero risk.`
 
+> Empat bagian berikut adalah contoh konsep yang tetap berguna untuk review copy dan metafora. Brief
+> produksi, asset ID, crop, layer, prompt, dan acceptance terbaru berada di
+> [illustration system](illustration/README.md). / The next
+> four sections remain concept examples; use the linked family briefs as production authority.
+
 ## 12. Illustration brief — Anoman Duta
 
 **Context / Konteks:** Homepage section for `Grounded in context`.  

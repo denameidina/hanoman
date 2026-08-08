@@ -14,6 +14,9 @@ A session works through explicit steps in its isolated branch/worktree and produ
 ## Character tier
 Narrative · `MOD-001` · `GST-09`, calm `EXP-03`, controlled-action `TAL-03`.
 
+## Locked anchors
+Use every `MOD-001` anchor; keep one dignified profile, one tail, and a clear boundary between Buntut and controlled ember.
+
 ## Composition
 In 4:3, a calm Buntut line becomes a contained ember ribbon that crosses a checklist-shaped obstacle
 and cools into a clean branch/diff marker. One forward diagonal, restrained heat, quiet surrounding field.

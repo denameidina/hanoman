@@ -12,6 +12,9 @@ UI copy owns cause, status, and recovery. Illustration never diagnoses, promises
 ## Character tier
 Mascot · `MSC-001`; low mythic intensity, clear profile gesture, product state more prominent than lore.
 
+## Locked anchors
+Retain the approved compact proportion, one-eye profile, supit urang, ulur-ulur, dignified posture, and one readable tail.
+
 ## Composition
 Calm 4:3 empty-state field, centered state cue, one mascot gesture, ample copy region, no imitation UI controls.
 

@@ -12,6 +12,9 @@ Hanoman orchestrates docs-driven agent sessions in isolated worktrees; humans mo
 ## Character tier
 Narrative · `MOD-001` · `GST-03` moving toward `GST-10`, `EXP-03`, `TAL-02`.
 
+## Locked anchors
+White rewanda, one-eye profile, lifted head, supit urang, ulur-ulur, agile body, and one long Buntut-linked tail.
+
 ## Composition
 Wide 16:9 kelir field. Anoman crosses left to center with intent folios; a Buntut path enters a visible
 session lane and returns as evidence toward a calm control-room proof area. Figure 40–50%; reserve the

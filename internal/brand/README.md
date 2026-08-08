@@ -34,10 +34,13 @@ outlives the session.
 5. [Visual identity](05-visual-identity.md) — makna Buntut, peran warna dan tipografi, ilustrasi,
    motion, serta batas budaya. / The Buntut mark, color and type roles, illustration, motion, and
    cultural boundaries.
-6. [Brand in practice](06-brand-in-practice.md) — contoh bilingual untuk website, README, produk,
+6. [Illustration system](illustration/README.md) — art direction, model Anoman/mascot, 41-asset
+   catalog, hybrid production workflow, family briefs, dan delivery QA. / Art direction, Anoman and
+   mascot models, 41-asset catalog, hybrid workflow, family briefs, and delivery QA.
+7. [Brand in practice](06-brand-in-practice.md) — contoh bilingual untuk website, README, produk,
    rilis, dan komunitas. / Bilingual examples for the website, README, product, releases, and
    community.
-7. [Sources & cultural notes](sources.md) — provenance riset, istilah, variasi tradisi, dan batas
+8. [Sources & cultural notes](sources.md) — provenance riset, istilah, variasi tradisi, dan batas
    antara sumber dengan tafsir brand. / Research provenance, terminology, multiple traditions, and
    the boundary between source and brand interpretation.
 
@@ -53,6 +56,9 @@ outlives the session.
   UI, [design system](../docs/design-system/design-system.md) tetap menjadi Source of Truth. / For
   communication design, use Visual identity. The design system remains the Source of Truth for UI
   tokens and components.
+- Untuk memesan atau menghasilkan aset, mulai dari [Illustration system](illustration/README.md) dan
+  pilih brief berdasarkan asset ID. / To commission or generate assets, start with the Illustration
+  system and select the brief by asset ID.
 - Untuk klaim budaya, istilah, atau pengembangan simbol baru, periksa
   [Sources & cultural notes](sources.md) lebih dulu. / For cultural claims, terminology, or new
   symbolic work, consult Sources & cultural notes first.

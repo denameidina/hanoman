@@ -22,8 +22,8 @@ AI is an exploration tool, not the authority for cultural truth, product truth, 
 ## Human-first path — eight steps
 
 1. Read brief, product proof, model sheet, and accepted references.
-2. Produce three composition thumbnails with one focal action.
-3. Select at Gate 3; log why alternatives were rejected.
+2. Produce six composition thumbnails with one focal action.
+3. Shortlist two silhouette directions, then select one at Gate 3; log why alternatives were rejected.
 4. Construct canonical silhouette and gesture from the model sheet.
 5. Refine costume, motif, semantic color, and layer structure.
 6. Draw art-directed responsive crops and write draft alt text.

@@ -21,12 +21,12 @@ wajib lulus Gate 2 sebelum aset turunannya diproduksi.
 | `SPT-004` | Spot | Human control | 1 | Editorial | P1 | Docs/marketing | 1:1 | Hybrid | MOD-001 | [Spot brief](briefs/05-spot-illustrations.md) |
 | `SPT-005` | Spot | Parallel work | 1 | Editorial | P1 | Docs/marketing | 1:1 | Hybrid | MOD-001 | [Spot brief](briefs/05-spot-illustrations.md) |
 | `SPT-006` | Spot | Durable knowledge | 1 | Editorial | P1 | Docs/marketing | 1:1 | Hybrid | MOD-001 | [Spot brief](briefs/05-spot-illustrations.md) |
-| `PST-001` | Product state | Onboarding | 1 | Editorial | P1 | Dashboard | 4:3 | Hybrid | MOD-001 | [Product brief](briefs/06-product-states.md) |
-| `PST-002` | Product state | Empty backlog | 1 | Editorial | P1 | Dashboard | 4:3 | Hybrid | MOD-001 | [Product brief](briefs/06-product-states.md) |
-| `PST-003` | Product state | Session active | 1 | Editorial | P1 | Dashboard | 4:3 | Hybrid | MOD-001 | [Product brief](briefs/06-product-states.md) |
-| `PST-004` | Product state | Awaiting decision | 1 | Editorial | P1 | Dashboard | 4:3 | Hybrid | MOD-001 | [Product brief](briefs/06-product-states.md) |
-| `PST-005` | Product state | Success | 1 | Editorial | P1 | Dashboard | 4:3 | Hybrid | MOD-001 | [Product brief](briefs/06-product-states.md) |
-| `PST-006` | Product state | Recoverable error | 1 | Editorial | P1 | Dashboard | 4:3 | Hybrid | MOD-001 | [Product brief](briefs/06-product-states.md) |
+| `PST-001` | Product state | Onboarding | 1 | Mascot | P1 | Dashboard | 4:3 | Hybrid | MSC-001 | [Product brief](briefs/06-product-states.md) |
+| `PST-002` | Product state | Empty backlog | 1 | Mascot | P1 | Dashboard | 4:3 | Hybrid | MSC-001 | [Product brief](briefs/06-product-states.md) |
+| `PST-003` | Product state | Session active | 1 | Mascot | P1 | Dashboard | 4:3 | Hybrid | MSC-001 | [Product brief](briefs/06-product-states.md) |
+| `PST-004` | Product state | Awaiting decision | 1 | Mascot | P1 | Dashboard | 4:3 | Hybrid | MSC-001 | [Product brief](briefs/06-product-states.md) |
+| `PST-005` | Product state | Success | 1 | Mascot | P1 | Dashboard | 4:3 | Hybrid | MSC-001 | [Product brief](briefs/06-product-states.md) |
+| `PST-006` | Product state | Recoverable error | 1 | Mascot | P1 | Dashboard | 4:3 | Hybrid | MSC-001 | [Product brief](briefs/06-product-states.md) |
 | `MPS-001` | Mascot pose | Neutral | 1 | Mascot | P1 | Product/social | 1:1 | Human-first | MSC-001 | [Pose brief](briefs/07-mascot-pose-pack.md) |
 | `MPS-002` | Mascot pose | Welcome | 1 | Mascot | P1 | Product/social | 1:1 | Human-first | MSC-001 | [Pose brief](briefs/07-mascot-pose-pack.md) |
 | `MPS-003` | Mascot pose | Observe | 1 | Mascot | P1 | Product/social | 1:1 | Human-first | MSC-001 | [Pose brief](briefs/07-mascot-pose-pack.md) |

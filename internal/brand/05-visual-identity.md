@@ -135,6 +135,12 @@ space. Costume and gesture details need references rather than an invented blend
 | Narrative | Homepage, About, release hero, manifesto. | Satu episode jelas, product proof dekat, source dicatat dalam brief. |
 | Technical-editorial | Docs, architecture, case study. | Bentuk wayang mengarahkan alur; label dan hubungan tetap literal. |
 
+Untuk produksi, gunakan [Illustration system](illustration/README.md): model karakter tiga tier,
+katalog 41 aset, brief human/AI, prompt blocks, dan delivery QA. Dokumen ini menetapkan arah;
+illustration system menjadi handoff produksi. / For production, use the Illustration system for the
+three-tier model, 41-asset catalog, human/AI briefs, prompt blocks, and delivery QA. This document
+sets direction; the illustration system is the production handoff.
+
 ### Avoid
 
 - Generic monkey mascot dengan hoodie, laptop, atau ekspresi komikal.

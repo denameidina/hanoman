@@ -14,6 +14,9 @@ Sessions, branches, integrations, and docs are distinct stages; docs evolve thro
 ## Character tier
 Narrative · `MOD-001` · `GST-12`, grateful `EXP-08`, continuity `TAL-04`.
 
+## Locked anchors
+Preserve `MOD-001`; Buntut remains one anatomically connected tail even as its line carries continuity across frames.
+
 ## Composition
 Across a 4:3 sequential field, Buntut passes through session, branch, merge, and docs frames. The line
 settles into ground on which a smaller next-actor marker begins. Time reads forward; no infinity glyph.

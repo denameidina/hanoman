@@ -12,6 +12,9 @@ Hanoman is docs-driven, makes sessions visible, isolates worktrees, keeps humans
 ## Character tier
 Editorial · `MOD-001`; reduced detail, canonical profile, one gesture and one prop per spot.
 
+## Locked anchors
+Retain the one-eye profile, supit urang, ulur-ulur, white-rewanda contour, intelligent gesture, and single Buntut tail across all six.
+
 ## Composition
 One 1:1 focal action, figure 35–55%, quiet field, and a single motif. Family rhythm is consistent but silhouettes differ.
 
