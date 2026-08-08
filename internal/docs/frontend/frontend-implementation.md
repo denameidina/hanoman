@@ -33,8 +33,20 @@
 `internal/assets/illustration/inventory.json` adalah sumber metadata untuk seluruh **41** master.
 `src/src/ds/illustration-registry.ts` memegang tuple `IllustrationId` eksplisit (memberi union type),
 membaca metadata inventory, lalu mengambil semua WebP dengan `import.meta.glob` eager `?url`. Vite
-karena itu meng-hash dan menyalin master ke `src/dist/assets` saat build; tidak ada salinan kedua di
-`src/public` dan tidak ada route server/file-read runtime.
+karena itu meng-hash dan menyalin berkas yang cocok ke `src/dist/assets` saat build; tidak ada
+salinan kedua di `src/public` dan tidak ada route server/file-read runtime.
+
+Yang di-glob adalah **`internal/assets/illustration/web/`, bukan master**. Master sengaja
+near-lossless (~1,5 MB per keping, 38,8 MB total) dan glob eager mengangkut apa pun yang cocok
+sampai ke tarball npm: sekali terukur, paket `hanoman` melonjak **5,5 MB → 46,1 MB** semata karena
+master ikut. Turunan web dirakit `internal/assets/illustration/build-web.mjs` (`cwebp`, maks 768px
+sisi panjang, q78, metadata dibuang) — 38,8 MB → 1,5 MB, paket kembali ke **7,1 MB**.
+
+Turunan itu **di-commit**, bukan dirakit saat build: runner GitHub Actions yang menjalankan
+`pnpm release` tak punya `cwebp`. Setiap master berubah, jalankan ulang skripnya lalu commit
+hasilnya bersama masternya. Kesegaran dilacak lewat hash master di `web/manifest.json`, bukan mtime
+— git tak mengawetkan mtime, jadi checkout segar akan selalu terbaca "usang" kalau memakai stempel
+waktu. `build-web.mjs --check` melaporkan yang hilang/usang tanpa menulis apa pun.
 
 `src/src/ds/Illustration.tsx` adalah satu titik render `<img>`: alt/decorative, lazy/eager,
 `fetchpriority`, aspect ratio, object-fit, serta data attribute debugging. Screen mengimpor
@@ -57,8 +69,10 @@ error dan empty state informatif memakai alt katalog. Family model, hero, lakon,
 sticker, social, diagram, dan motif seluruhnya terdaftar dan dapat dipakai komponen, tetapi hanya
 family yang relevan dengan operasi harian yang ditempatkan di dashboard. Contract
 `src/test/illustration-registry.test.ts` membuat penambahan/penghapusan record inventory gagal sampai
-registry ID ikut diperbarui; `internal/assets/illustration/verify.mjs` tetap memeriksa byte, dimensi,
-orientasi, dan alpha master.
+registry ID ikut diperbarui; `internal/assets/illustration/verify.mjs` memeriksa byte, dimensi,
+orientasi, dan alpha master **berikut** keberadaan, batas 768px, alpha, dan pengecilan tiap turunan
+web-nya — master sehat yang turunannya hilang berarti layar kosong di dashboard, bukan sekadar aset
+besar.
 
 ## Tinggi & scrolling: rantai flex, bukan angka ajaib
 `#root` dikunci `100vh; overflow: hidden`, jadi tinggi yang tersedia sudah pasti sejak akar.

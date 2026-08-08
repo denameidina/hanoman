@@ -187,11 +187,15 @@ Lalu buka **http://localhost:5173**, buat akun pada layar setup pertama, dan tam
 Maskotnya Hanoman sendiri — sang duta yang mengemban amanat: ia menyapa, mengamati, bekerja,
 bertanya, memperingatkan, merayakan, dan membawa pengetahuan pulang. Sistem ilustrasinya berisi
 **41 master WebP** dalam sembilan famili (model · hero · lakon · spot · product-state · pose maskot ·
-sticker · social · diagram/motif), lengkap dengan verifikator strukturalnya:
+sticker · social · diagram/motif), lengkap dengan perakit turunan web dan verifikator strukturalnya:
 
 ```bash
-node internal/assets/illustration/verify.mjs
+node internal/assets/illustration/build-web.mjs   # turunan web yang di-bundle frontend
+node internal/assets/illustration/verify.mjs      # master + turunannya
 ```
+
+Master tetap near-lossless sebagai arsip; yang masuk bundle — dan karenanya paket npm — adalah
+turunan terkompres di `web/`: 38,8 MB → 1,5 MB.
 
 - Aset & inventarisnya: [`internal/assets/illustration/`](internal/assets/illustration/README.md)
 - Art direction, karakter, katalog, dan kriteria review: [`internal/docs/brand/illustration/`](internal/docs/brand/illustration/README.md)
@@ -209,7 +213,7 @@ runner/            library git-worktree + pembangun prompt + resolusi path data 
 cli/               biner `hanoman`: start · doctor · update · mcp · migrate-from-postgres · docs
 shared/            tipe, DTO, katalog agen/MCP dipakai bersama server ↔ web
 internal/docs/     SOURCE OF TRUTH — baca ini lebih dulu
-internal/assets/   master ilustrasi + inventaris + verifikator
+internal/assets/   master ilustrasi + turunan web + inventaris + verifikator
 internal/skills/   skill project untuk agen (hanoman, hanoman-devops)
 docs/              spec & plan kerja (superpowers) + aset README
 .claude/           konfigurasi & hooks Claude Code

@@ -96,7 +96,10 @@ export type IllustrationAsset = {
 };
 
 const inventory = inventoryData as InventoryRecord[];
-const webpModules = import.meta.glob("../../../internal/assets/illustration/*.webp", {
+// Sengaja `web/`, BUKAN direktori master. Glob eager menyalin apa pun yang cocok ke `src/dist/assets`
+// dan dari situ ke tarball npm; master near-lossless sempat membuat paket `hanoman` melonjak
+// 5,5 MB → 46,1 MB. Turunan dirakit `internal/assets/illustration/build-web.mjs` dan di-commit.
+const webpModules = import.meta.glob("../../../internal/assets/illustration/web/*.webp", {
   eager: true,
   query: "?url",
   import: "default",

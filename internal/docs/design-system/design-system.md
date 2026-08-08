@@ -10,6 +10,8 @@ Katalog authoritative berada di `internal/assets/illustration/inventory.json`: *
 dalam sepuluh family. Frontend tidak memakai filename secara langsung. Semua artwork dipanggil lewat
 ID katalog (`HRO-001`, `PST-002`, dan seterusnya) pada komponen `Illustration` dari design system;
 registry-nya hidup di `src/src/ds/illustration-registry.ts` dan diuji setara 41/41 dengan inventory.
+Yang di-bundle registry adalah turunan web terkompres di `internal/assets/illustration/web/`, bukan
+masternya — lihat [frontend-implementation](../frontend/frontend-implementation.md#pipeline-illustration-assets).
 
 API komponen:
 

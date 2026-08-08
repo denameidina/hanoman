@@ -1,49 +1,14 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseWebp } from "./webp-meta.mjs";
+
+const MAX_WEB_EDGE = 768;
 
 const root = dirname(fileURLToPath(import.meta.url));
+const webDir = join(root, "web");
 const inventory = JSON.parse(readFileSync(join(root, "inventory.json"), "utf8"));
 const errors = [];
-
-function parseWebp(buffer) {
-  if (buffer.length < 20 || buffer.toString("ascii", 0, 4) !== "RIFF" || buffer.toString("ascii", 8, 12) !== "WEBP") {
-    throw new Error("invalid RIFF/WEBP signature");
-  }
-
-  let offset = 12;
-  let width = 0;
-  let height = 0;
-  let alpha = false;
-
-  while (offset + 8 <= buffer.length) {
-    const type = buffer.toString("ascii", offset, offset + 4);
-    const size = buffer.readUInt32LE(offset + 4);
-    const data = offset + 8;
-    if (data + size > buffer.length) throw new Error(`truncated ${type} chunk`);
-
-    if (type === "VP8X" && size >= 10) {
-      alpha ||= (buffer[data] & 0x10) !== 0;
-      width = 1 + buffer.readUIntLE(data + 4, 3);
-      height = 1 + buffer.readUIntLE(data + 7, 3);
-    } else if (type === "VP8L" && size >= 5 && buffer[data] === 0x2f) {
-      const bits = buffer.readUInt32LE(data + 1);
-      width ||= 1 + (bits & 0x3fff);
-      height ||= 1 + ((bits >>> 14) & 0x3fff);
-      alpha ||= ((bits >>> 28) & 1) === 1;
-    } else if (type === "VP8 " && size >= 10 && buffer[data + 3] === 0x9d && buffer[data + 4] === 0x01 && buffer[data + 5] === 0x2a) {
-      width ||= buffer.readUInt16LE(data + 6) & 0x3fff;
-      height ||= buffer.readUInt16LE(data + 8) & 0x3fff;
-    } else if (type === "ALPH") {
-      alpha = true;
-    }
-
-    offset = data + size + (size % 2);
-  }
-
-  if (width <= 0 || height <= 0) throw new Error("missing positive dimensions");
-  return { width, height, alpha };
-}
 
 function expectedOrientation(ratio) {
   if (["1x1"].includes(ratio)) return "square";
@@ -68,14 +33,38 @@ for (const asset of inventory) {
     errors.push(`${asset.id}: missing ${asset.filename}`);
     continue;
   }
+  let master;
   try {
-    const metadata = parseWebp(readFileSync(path));
+    master = readFileSync(path);
+    const metadata = parseWebp(master);
     const expected = expectedOrientation(asset.ratio);
     const actual = orientationOf(metadata);
     if (actual !== expected) errors.push(`${asset.id}: ${actual} ${metadata.width}x${metadata.height}, expected ${expected}`);
     if (asset.transparent && !metadata.alpha) errors.push(`${asset.id}: missing alpha channel`);
   } catch (error) {
     errors.push(`${asset.id}: ${error.message}`);
+    continue;
+  }
+
+  // Turunan web — inilah yang benar-benar di-bundle frontend (`build-web.mjs`). Master yang sehat
+  // tapi turunannya hilang = layar kosong di dashboard, bukan cuma aset besar.
+  const derivativePath = join(webDir, asset.filename);
+  if (!existsSync(derivativePath)) {
+    errors.push(`${asset.id}: missing web/${asset.filename} — jalankan build-web.mjs`);
+    continue;
+  }
+  try {
+    const derivative = readFileSync(derivativePath);
+    const metadata = parseWebp(derivative);
+    if (Math.max(metadata.width, metadata.height) > MAX_WEB_EDGE) {
+      errors.push(`${asset.id}: web derivative ${metadata.width}x${metadata.height} exceeds ${MAX_WEB_EDGE}px`);
+    }
+    if (asset.transparent && !metadata.alpha) errors.push(`${asset.id}: web derivative lost its alpha channel`);
+    if (derivative.length >= master.length) {
+      errors.push(`${asset.id}: web derivative is not smaller than its master`);
+    }
+  } catch (error) {
+    errors.push(`${asset.id}: web derivative ${error.message}`);
   }
 }
 
@@ -90,5 +79,5 @@ if (errors.length > 0) {
   for (const error of errors) console.error(`- ${error}`);
   process.exitCode = 1;
 } else {
-  console.log("PASS: 41/41 catalog masters are valid WebP files");
+  console.log(`PASS: ${inventory.length}/${inventory.length} catalog masters are valid WebP files, each with a web derivative`);
 }
