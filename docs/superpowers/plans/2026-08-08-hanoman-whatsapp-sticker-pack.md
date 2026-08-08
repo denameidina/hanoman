@@ -30,10 +30,10 @@ decodes the generated files and enforces the platform and pack constraints.
 - Consumes: eight `hnm-ill-sticker-*-1x1-master-v01.webp` masters and an IBM Plex Sans Bold font.
 - Produces: `export_pack(repo_root: Path, output_root: Path, font_path: Path) -> list[Path]`.
 
-- [ ] **Step 1: Write tests for the copy map, alpha normalization, contour, and output inventory.**
-- [ ] **Step 2: Run `python3 internal/scripts/test-export-whatsapp-stickers.py` and confirm it fails before the exporter exists.**
-- [ ] **Step 3: Implement the exporter with deterministic layout and bounded WebP compression.**
-- [ ] **Step 4: Run the script test and confirm it passes.**
+- [x] **Step 1: Write tests for the copy map, alpha normalization, contour, and output inventory.**
+- [x] **Step 2: Run `python3 internal/scripts/test-export-whatsapp-stickers.py` and confirm it fails before the exporter exists.**
+- [x] **Step 3: Implement the exporter with deterministic layout and bounded WebP compression.**
+- [x] **Step 4: Run the script test and confirm it passes.**
 
 ### Task 2: Generate both packs and delivery metadata
 
@@ -49,9 +49,9 @@ decodes the generated files and enforces the platform and pack constraints.
 - Consumes: `export_pack(...)` from Task 1.
 - Produces: two eight-item static sticker packs plus a shared tray icon and archive.
 
-- [ ] **Step 1: Run the exporter against the approved masters.**
-- [ ] **Step 2: Inspect the generated contact sheets and correct only deterministic layout parameters if needed.**
-- [ ] **Step 3: Generate the manifest, SHA-256 checksums, README, and ZIP archive.**
+- [x] **Step 1: Run the exporter against the approved masters.**
+- [x] **Step 2: Inspect the generated contact sheets and correct only deterministic layout parameters if needed.**
+- [x] **Step 3: Generate the manifest, SHA-256 checksums, README, and ZIP archive.**
 
 ### Task 3: Delivery verification
 
@@ -62,9 +62,8 @@ decodes the generated files and enforces the platform and pack constraints.
 - Consumes: all Task 2 deliverables.
 - Produces: fresh evidence that the packs meet every delivery constraint.
 
-- [ ] **Step 1: Run the script test.**
-- [ ] **Step 2: Decode all 16 WebP files and verify size, alpha, transparent corners, and subject coverage.**
-- [ ] **Step 3: Verify manifest inventory, hashes, tray icon, proof sheets, and ZIP contents.**
-- [ ] **Step 4: Visually inspect both proof sheets at original resolution.**
-- [ ] **Step 5: Mark every completed plan item and review the final diff.**
-
+- [x] **Step 1: Run the script test.**
+- [x] **Step 2: Decode all 16 WebP files and verify size, alpha, transparent corners, and subject coverage.**
+- [x] **Step 3: Verify manifest inventory, hashes, tray icon, proof sheets, and ZIP contents.**
+- [x] **Step 4: Visually inspect both proof sheets at original resolution.**
+- [x] **Step 5: Mark every completed plan item and review the final diff.**
