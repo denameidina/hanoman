@@ -15,7 +15,7 @@
 </div>
 
 <div align="center">
-  <img src="internal/assets/illustration/hnm-ill-hero-workflow-16x9-master-v01.webp" width="900" alt="Hanoman membawa dokumen menyusuri alur kerja, tali kendali tetap di tangan manusia" />
+  <img src="internal/assets/illustration/web/hnm-ill-hero-workflow-16x9-master-v01.webp" width="900" alt="Hanoman membawa dokumen menyusuri alur kerja, tali kendali tetap di tangan manusia" />
 </div>
 
 <div align="center">
@@ -59,27 +59,27 @@ awal sampai selesai.
 
 <table>
 <tr>
-<td width="96"><img src="internal/assets/illustration/hnm-ill-spot-context-1x1-master-v01.webp" width="80" alt="" /></td>
+<td width="96"><img src="internal/assets/illustration/web/hnm-ill-spot-context-1x1-master-v01.webp" width="80" alt="" /></td>
 <td><b>Konteks terbawa.</b> Docs project adalah Source of Truth: <code>internal/docs/**</code> diperbarui pada commit yang menyentuhnya — kebenaran secara konvensi, dijaga alur kerja, bukan gerbang mekanis.</td>
 </tr>
 <tr>
-<td><img src="internal/assets/illustration/hnm-ill-spot-visibility-1x1-master-v01.webp" width="80" alt="" /></td>
+<td><img src="internal/assets/illustration/web/hnm-ill-spot-visibility-1x1-master-v01.webp" width="80" alt="" /></td>
 <td><b>Kerja terlihat.</b> Tiap sesi adalah terminal sungguhan yang bisa ditonton, disetir, dan dilanjutkan — bukan kotak hitam yang cuma melapor di akhir.</td>
 </tr>
 <tr>
-<td><img src="internal/assets/illustration/hnm-ill-spot-human-control-1x1-master-v01.webp" width="80" alt="" /></td>
+<td><img src="internal/assets/illustration/web/hnm-ill-spot-human-control-1x1-master-v01.webp" width="80" alt="" /></td>
 <td><b>Manusia pegang kendali penuh.</b> Bahkan saat berjalan otomatis, tiap sesi bisa dijawab atau diinterupsi. hanoman berhenti dan bertanya hanya saat butuh keputusan manusia yang nyata.</td>
 </tr>
 <tr>
-<td><img src="internal/assets/illustration/hnm-ill-spot-isolation-1x1-master-v01.webp" width="80" alt="" /></td>
+<td><img src="internal/assets/illustration/web/hnm-ill-spot-isolation-1x1-master-v01.webp" width="80" alt="" /></td>
 <td><b>Isolasi via git worktree.</b> Tiap backlog dikerjakan di worktree-nya sendiri (<code>&lt;repo&gt;/.worktrees/&lt;id&gt;</code>), tak pernah di working tree utama. <b>Satu backlog = satu sesi.</b></td>
 </tr>
 <tr>
-<td><img src="internal/assets/illustration/hnm-ill-spot-parallel-work-1x1-master-v01.webp" width="80" alt="" /></td>
+<td><img src="internal/assets/illustration/web/hnm-ill-spot-parallel-work-1x1-master-v01.webp" width="80" alt="" /></td>
 <td><b>Banyak sesi sekaligus.</b> Beberapa backlog di beberapa project berjalan berdampingan, dengan dependency antar-backlog dan auto-merge opsional saat sesi selesai.</td>
 </tr>
 <tr>
-<td><img src="internal/assets/illustration/hnm-ill-spot-durable-knowledge-1x1-master-v01.webp" width="80" alt="" /></td>
+<td><img src="internal/assets/illustration/web/hnm-ill-spot-durable-knowledge-1x1-master-v01.webp" width="80" alt="" /></td>
 <td><b>Pengetahuan bertahan.</b> Spec, plan, ADR, riwayat sesi, dan changelog tetap ada setelah sesinya tutup — project baru di-scaffold dari nol, codebase lama di-<i>reverse-engineer</i> docs-nya lebih dulu.</td>
 </tr>
 </table>
@@ -236,7 +236,7 @@ engine in-process di [ADR-0072](internal/docs/adr/0072-scheduler-fondasi-engine-
 
 <div align="center">
 
-<img src="internal/assets/illustration/hnm-ill-mascot-pose-carry-knowledge-1x1-master-v01.webp" width="110" alt="Maskot Hanoman membawa tumpukan dokumen" />
+<img src="internal/assets/illustration/web/hnm-ill-mascot-pose-carry-knowledge-1x1-master-v01.webp" width="110" alt="Maskot Hanoman membawa tumpukan dokumen" />
 
 <sub>Chiranjivi — docs (Source of Truth) abadi melampaui commit.</sub>
 
