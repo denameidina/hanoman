@@ -3,6 +3,8 @@
    memuat" tidak lagi terlihat sama. */
 import React from "react";
 import { Icon } from "../icon";
+import { Illustration } from "../Illustration";
+import type { IllustrationId } from "../illustration-registry";
 import { Button } from "./forms";
 
 type Kind = "loading" | "empty" | "error";
@@ -22,11 +24,18 @@ type StateBlockProps = {
   action?: () => void;
   actionLabel?: React.ReactNode;
   actionIcon?: string;
+  /** Ilustrasi katalog yang menggantikan tile ikon. */
+  illustration?: IllustrationId;
+  /** Pakai saat artwork hanya mengulang makna title/status yang sudah terbaca. */
+  illustrationDecorative?: boolean;
   /** Padding kecil untuk dipakai di dalam Card. */
   compact?: boolean;
 };
 
-export function StateBlock({ kind, title, hint, icon, action, actionLabel, actionIcon, compact }: StateBlockProps) {
+export function StateBlock({
+  kind, title, hint, icon, action, actionLabel, actionIcon,
+  illustration, illustrationDecorative, compact,
+}: StateBlockProps) {
   const k = KIND[kind];
   const box = compact ? 34 : 44;
   return (
@@ -38,13 +47,19 @@ export function StateBlock({ kind, title, hint, icon, action, actionLabel, actio
         gap: 4, textAlign: "center", padding: compact ? "24px 16px" : "56px 24px",
         fontFamily: "var(--font-sans)",
       }}>
-      <span style={{
-        width: box, height: box, borderRadius: "var(--radius-md)", marginBottom: 6,
-        background: k.bg, color: k.fg, display: "inline-flex", alignItems: "center", justifyContent: "center",
-      }}>
-        <Icon name={icon || k.icon} size={compact ? 17 : 21}
-          style={kind === "loading" ? { animation: "hn-spin 0.7s linear infinite" } : undefined} />
-      </span>
+      {illustration ? (
+        <Illustration id={illustration} decorative={illustrationDecorative}
+          style={{ width: compact ? 132 : 240, maxWidth: "100%", marginBottom: 8,
+            borderRadius: "var(--radius-md)" }} />
+      ) : (
+        <span style={{
+          width: box, height: box, borderRadius: "var(--radius-md)", marginBottom: 6,
+          background: k.bg, color: k.fg, display: "inline-flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Icon name={icon || k.icon} size={compact ? 17 : 21}
+            style={kind === "loading" ? { animation: "hn-spin 0.7s linear infinite" } : undefined} />
+        </span>
+      )}
       <div style={{
         fontSize: compact ? 13.5 : 15, fontWeight: 600, color: "var(--text-strong)", lineHeight: 1.3,
       }}>{title ?? k.title}</div>
