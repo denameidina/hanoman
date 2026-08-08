@@ -99,7 +99,7 @@ behind its behavior. For long-form storytelling, use Duta → Obong → Dronagir
 
 **Indonesia (25 kata)**  
 Hanoman adalah control room open-source yang membantu tim engineering kecil menjalankan coding agent
-lintas project dengan konteks, visibilitas, isolasi, dan kendali manusia tetap utuh.
+lintas project dengan konteks tepat, visibilitas, isolasi, dan kendali manusia tetap utuh.
 
 **English (25 words)**  
 Hanoman is the open-source control room helping small engineering teams run coding agents across
@@ -111,13 +111,13 @@ projects while preserving context, visibility, isolation, and meaningful human c
 Hanoman membantu tim engineering kecil menjalankan banyak coding agent dari satu control room
 open-source. Setiap backlog bergerak di session dan worktree terisolasi, berpijak pada docs, terlihat
 melalui terminal, dan tetap dapat diarahkan manusia. Hasilnya kembali sebagai branch, diff, laporan,
-serta pengetahuan yang dapat dilanjutkan.
+serta pengetahuan yang dapat dilanjutkan tanpa kehilangan keputusan penting di perjalanan.
 
 **English**  
 Hanoman helps small engineering teams run coding agents from one open-source control room. Each
 backlog moves through an isolated session and worktree, grounded in docs, visible through the
 terminal, and steerable by humans. Outcomes return as branches, diffs, reports, and knowledge the
-next contributor or agent can continue.
+next contributor or agent can continue with confidence.
 
 ### 100 words — **Approved boilerplate**
 
@@ -128,7 +128,8 @@ di worktree terisolasi. Tim memantau pekerjaan melalui dashboard dan terminal, l
 interupsi, mengambil alih, atau membatalkan ketika diperlukan. Docs tetap menjadi Source of Truth
 secara konvensi, sehingga keputusan dan hasil tidak hilang bersama berakhirnya session. Hanoman tidak
 menjanjikan engineering tanpa manusia; ia memberi tim leverage untuk menjalankan lebih banyak kerja
-dengan konteks yang benar, paralelisme yang disiplin, serta hasil yang dapat direview dan dilanjutkan.
+dengan konteks yang benar, paralelisme yang disiplin, serta hasil yang dapat direview dan dilanjutkan
+tanpa mengubah agent menjadi kotak hitam.
 
 **English**  
 Hanoman is the open-source control room for small engineering teams running coding agents across
@@ -137,7 +138,7 @@ isolated worktrees. Teams watch work through the dashboard and terminal, then st
 over, or cancel when needed. Docs remain the conventional Source of Truth, so decisions and outcomes
 do not disappear with the session. Hanoman does not promise engineering without humans; it gives
 teams the leverage to run more work with correct context, disciplined parallelism, and outcomes that
-remain reviewable and ready to continue.
+remain reviewable and ready to continue without making agents an invisible black box.
 
 ## Elevator pitch / Pitch singkat — **Approved**
 
