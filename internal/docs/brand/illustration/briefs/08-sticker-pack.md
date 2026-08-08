@@ -49,3 +49,10 @@ Don't bake localized words, use status colors as the only meaning, mirror the pr
 
 ## Acceptance
 Gates 2–4 require mascot consistency, distinct meanings, one-color and 96 px readability, and bilingual layer checks; Gate 5 delivers eight transparent masters with manifests.
+
+## WhatsApp derivatives
+
+Static delivery derivatives live in `internal/assets/illustration/whatsapp/`: one text-free pack and
+one Indonesian-copy pack, each with eight transparent 512 px WebP stickers. Reproduce them from the
+approved masters with `python3 internal/scripts/export-whatsapp-stickers.py --font <IBMPlexSans-Bold.ttf>`;
+the script preserves the masters, enforces the 100 KB sticker limit, and emits 96 px QA previews.

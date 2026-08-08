@@ -1,0 +1,149 @@
+{
+  "name": "Hanoman",
+  "publisher": "Nafanesia",
+  "version": 1,
+  "date": "2026-08-08",
+  "format": {
+    "type": "static-webp",
+    "width": 512,
+    "height": 512,
+    "maxBytes": 100000
+  },
+  "trayIcon": {
+    "file": "tray-icon.png",
+    "width": 96,
+    "height": 96,
+    "bytes": 7550,
+    "sha256": "a6d220638c2a3d8441fc4695d0472a738aa6645275ab2f9d63b1381ec898d9cb"
+  },
+  "stickers": [
+    {
+      "variant": "text-free",
+      "slug": "ready",
+      "label": null,
+      "file": "text-free/hanoman-ready.webp",
+      "bytes": 29252,
+      "sha256": "fc677c779e7d062b83af2b72413c9ca3e6ea221c85bfa748d492d0e03e390dbb"
+    },
+    {
+      "variant": "text-free",
+      "slug": "working",
+      "label": null,
+      "file": "text-free/hanoman-working.webp",
+      "bytes": 41708,
+      "sha256": "bba4b410d616d64293d02499aa28d32b946c8a15e307e47428a9063cc2098897"
+    },
+    {
+      "variant": "text-free",
+      "slug": "waiting",
+      "label": null,
+      "file": "text-free/hanoman-waiting.webp",
+      "bytes": 26658,
+      "sha256": "59dd32d5e3875d4af4b2f2cf76dab05a37cadca3365450a9d2a68d6cee5ab4c4"
+    },
+    {
+      "variant": "text-free",
+      "slug": "blocked",
+      "label": null,
+      "file": "text-free/hanoman-blocked.webp",
+      "bytes": 29822,
+      "sha256": "37f9e4d1d363738f2f39e34e149c88b163cddee5aa8bbd9f33274be8851abb45"
+    },
+    {
+      "variant": "text-free",
+      "slug": "shipped",
+      "label": null,
+      "file": "text-free/hanoman-shipped.webp",
+      "bytes": 30974,
+      "sha256": "4c8f3d13c925a1111ee941a63d91fbde42d08eff7c8b0813840eaae50e52a3ec"
+    },
+    {
+      "variant": "text-free",
+      "slug": "review",
+      "label": null,
+      "file": "text-free/hanoman-review.webp",
+      "bytes": 31280,
+      "sha256": "4459a504cad3eba13bb7e7a792107318904b1e3cb969da120f27050ede348bcb"
+    },
+    {
+      "variant": "text-free",
+      "slug": "thanks",
+      "label": null,
+      "file": "text-free/hanoman-thanks.webp",
+      "bytes": 31236,
+      "sha256": "9e1a8acf33b3bfaa12636421462fae6345874a27cad67ba58ec2aeb5036e9065"
+    },
+    {
+      "variant": "text-free",
+      "slug": "docs-updated",
+      "label": null,
+      "file": "text-free/hanoman-docs-updated.webp",
+      "bytes": 31464,
+      "sha256": "934cd88b81567d1a3f568aa75121c6912f436dd90e14b9bb064114c7727cb62e"
+    },
+    {
+      "variant": "id-text",
+      "slug": "ready",
+      "label": "Siap",
+      "file": "id-text/hanoman-ready.webp",
+      "bytes": 23516,
+      "sha256": "c793c8c6c77259412583778865dddb95eec77e918d37f74ecc52ddaa3fcee0a0"
+    },
+    {
+      "variant": "id-text",
+      "slug": "working",
+      "label": "Dikerjakan",
+      "file": "id-text/hanoman-working.webp",
+      "bytes": 36520,
+      "sha256": "48b6c2a0bdf3335c76ee928d23583fbaf63390a50d699e7ae607213b7afb9b04"
+    },
+    {
+      "variant": "id-text",
+      "slug": "waiting",
+      "label": "Menunggu",
+      "file": "id-text/hanoman-waiting.webp",
+      "bytes": 23180,
+      "sha256": "283ce4063fcde1c11f029f452fb59cfb1927d3353db1a6849e3c528423b8cc9b"
+    },
+    {
+      "variant": "id-text",
+      "slug": "blocked",
+      "label": "Terhambat",
+      "file": "id-text/hanoman-blocked.webp",
+      "bytes": 25254,
+      "sha256": "8490a6563cf64317e9cd235b5fff10d7ac4cf1d3ecdce9421b38200ebe8f8884"
+    },
+    {
+      "variant": "id-text",
+      "slug": "shipped",
+      "label": "Terkirim",
+      "file": "id-text/hanoman-shipped.webp",
+      "bytes": 25212,
+      "sha256": "bc8cff90fb85a8b763a78469643dd0c2f68c7418e9bc2a1facafa33cde75420d"
+    },
+    {
+      "variant": "id-text",
+      "slug": "review",
+      "label": "Tinjau",
+      "file": "id-text/hanoman-review.webp",
+      "bytes": 24596,
+      "sha256": "8d812695a639cfbf141ce934bc27a7a94af7cf73311d0ce0f69c0bc009477067"
+    },
+    {
+      "variant": "id-text",
+      "slug": "thanks",
+      "label": "Terima kasih",
+      "file": "id-text/hanoman-thanks.webp",
+      "bytes": 27550,
+      "sha256": "63043c11ec7123d9a93a012e7d493249ece475322457d8ac7c3ba2d5788e063a"
+    },
+    {
+      "variant": "id-text",
+      "slug": "docs-updated",
+      "label": "Docs diperbarui",
+      "file": "id-text/hanoman-docs-updated.webp",
+      "bytes": 28556,
+      "sha256": "5218e96613197b2beca4f0755512f04e3e7677aeb2f59383170b525f2cf0ead9"
+    }
+  ]
+}
