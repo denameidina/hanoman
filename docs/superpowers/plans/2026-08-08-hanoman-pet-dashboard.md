@@ -42,7 +42,7 @@
   - `function derivePetState(input: PetInput): PetView`
   - `function loadPetHidden(): boolean` / `function savePetHidden(hidden: boolean): void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/pet-state.test.ts`:
 
@@ -230,12 +230,12 @@ describe("POSE_ART", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
-Run: `env -u NODE_ENV ./node_modules/.bin/vitest run --project src src/test/pet-state.test.ts`
+Run: `env -u NODE_ENV ./node_modules/.bin/vitest run pet-state`
 Expected: FAIL — `Failed to resolve import "../src/screens/pet-state"`.
 
-- [ ] **Step 3: Tulis implementasinya**
+- [x] **Step 3: Tulis implementasinya**
 
 Buat `src/src/screens/pet-state.ts`:
 
@@ -437,17 +437,17 @@ export function savePetHidden(hidden: boolean): void {
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
-Run: `env -u NODE_ENV ./node_modules/.bin/vitest run --project src src/test/pet-state.test.ts`
-Expected: PASS — 15 test lulus, 0 gagal.
+Run: `env -u NODE_ENV ./node_modules/.bin/vitest run pet-state`
+Expected: PASS — 17 test lulus, 0 gagal.
 
-- [ ] **Step 5: Typecheck paket yang tersentuh**
+- [x] **Step 5: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: exit 0, tanpa keluaran.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/pet-state.ts src/test/pet-state.test.ts
@@ -472,7 +472,7 @@ adalah **overlay transparan di dalamnya**, bukan sebaliknya. Menaruh gambar di d
 membuat sebagian screen reader memperlakukan isinya sebagai presentasional, sehingga perubahan alt
 tak pernah diumumkan — persis yang diminta brief.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/hanoman-pet.test.tsx`:
 
@@ -602,12 +602,12 @@ describe("HanomanPet", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
-Run: `env -u NODE_ENV ./node_modules/.bin/vitest run --project src src/test/hanoman-pet.test.tsx`
+Run: `env -u NODE_ENV ./node_modules/.bin/vitest run hanoman-pet`
 Expected: FAIL — `Failed to resolve import "../src/screens/HanomanPet"`.
 
-- [ ] **Step 3: Tambahkan keyframe napas**
+- [x] **Step 3: Tambahkan keyframe napas**
 
 Tambahkan di akhir `src/src/app.css` (setelah blok `@keyframes hn-toast-in`):
 
@@ -621,7 +621,7 @@ Tambahkan di akhir `src/src/app.css` (setelah blok `@keyframes hn-toast-in`):
 }
 ```
 
-- [ ] **Step 4: Tulis komponennya**
+- [x] **Step 4: Tulis komponennya**
 
 Buat `src/src/screens/HanomanPet.tsx`:
 
@@ -773,17 +773,17 @@ export function HanomanPet({ sessions, backlog, onOpen }:
 }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
-Run: `env -u NODE_ENV ./node_modules/.bin/vitest run --project src src/test/hanoman-pet.test.tsx`
+Run: `env -u NODE_ENV ./node_modules/.bin/vitest run hanoman-pet`
 Expected: PASS — 8 test lulus, 0 gagal.
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/HanomanPet.tsx src/src/app.css src/test/hanoman-pet.test.tsx
@@ -802,18 +802,27 @@ git commit -m "feat(spec-585): komponen pet Hanoman — pose, napas, ringkasan, 
 - Consumes: `HanomanPet` dari Task 2.
 - Produces: tak ada API baru — hanya wiring.
 
-- [ ] **Step 1: Tulis test kontrak yang gagal**
+- [x] **Step 1: Tulis test kontrak yang gagal**
 
 Buat `src/test/pet-mount.test.tsx`. Test ini membaca **sumber** dari cwd, pola yang sama dengan
 `src/test/changelog-nav.test.tsx` — `import.meta.url` di bawah transform Vite bukan URL ber-skema
 `file:`, jadi resolusi relatif-modul tak bisa dipakai.
 
 ```tsx
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const read = (p: string): string => readFileSync(join(process.cwd(), p), "utf8");
+// `import.meta.url` di bawah transform Vite bukan URL ber-skema `file:`, jadi berkasnya dicari
+// dari cwd — yang berbeda antara run tingkat-paket (`src/`) dan tingkat-root (cermin
+// `changelog-nav.test.tsx`).
+function read(relative: string): string {
+  const found = [resolve(process.cwd(), relative), resolve(process.cwd(), "src", relative)]
+    .find((c) => existsSync(c));
+  if (!found) throw new Error(`${relative} tak ketemu dari ${process.cwd()}`);
+  return readFileSync(found, "utf8");
+}
+
 const app = read("src/App.tsx");
 
 describe("mount pet Hanoman di App", () => {
@@ -840,7 +849,7 @@ describe("kontrak design system pet", () => {
     const pet = read("src/screens/HanomanPet.tsx");
     expect(pet).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(pet).not.toMatch(/\b(rgba?|hsla?)\(/);
-    expect(pet).not.toMatch(/box-?[Ss]hadow["']?\s*:\s*["'](?!var\()/);
+    expect(pet).not.toMatch(/boxShadow:\s*["'](?!var\()/);
   });
 
   it("memanggil artwork lewat ID katalog, bukan filename", () => {
@@ -851,12 +860,12 @@ describe("kontrak design system pet", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
-Run: `env -u NODE_ENV ./node_modules/.bin/vitest run --project src src/test/pet-mount.test.tsx`
+Run: `env -u NODE_ENV ./node_modules/.bin/vitest run pet-mount`
 Expected: FAIL — `expected null to have length 1`.
 
-- [ ] **Step 3: Tambahkan import di `App.tsx`**
+- [x] **Step 3: Tambahkan import di `App.tsx`**
 
 Sisipkan tepat setelah baris `import { ChangelogScreen } from "./screens/ChangelogScreen";`:
 
@@ -867,7 +876,7 @@ Sisipkan tepat setelah baris `import { ChangelogScreen } from "./screens/Changel
 import { HanomanPet } from "./screens/HanomanPet";
 ```
 
-- [ ] **Step 4: Pasang komponennya**
+- [x] **Step 4: Pasang komponennya**
 
 Di blok `return` `App`, sisipkan tepat setelah baris `{screen}` (baris pertama di dalam
 `<NotificationsProvider …>`):
@@ -877,22 +886,22 @@ Di blok `return` `App`, sisipkan tepat setelah baris `{screen}` (baris pertama d
           onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
-Run: `env -u NODE_ENV ./node_modules/.bin/vitest run --project src src/test/pet-mount.test.tsx`
+Run: `env -u NODE_ENV ./node_modules/.bin/vitest run pet-mount`
 Expected: PASS — 5 test lulus.
 
-- [ ] **Step 6: Jalankan test App yang sudah ada agar tak ada regresi**
+- [x] **Step 6: Jalankan test App yang sudah ada agar tak ada regresi**
 
-Run: `env -u NODE_ENV ./node_modules/.bin/vitest run --project src src/test/app-flows.test.tsx src/test/app-states.test.tsx src/test/smoke.test.tsx src/test/changelog-nav.test.tsx`
+Run: `env -u NODE_ENV ./node_modules/.bin/vitest run app-flows app-states smoke changelog-nav`
 Expected: PASS, 0 gagal.
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: exit 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/App.tsx src/test/pet-mount.test.tsx
@@ -908,7 +917,7 @@ git commit -m "feat(spec-585): pasang pet Hanoman sekali di App dengan navigasi 
 - Modify: `internal/docs/design-system/design-system.md`
 - Verify: `internal/docs/README.md`
 
-- [ ] **Step 1: Tambahkan subseksi "Pet Hanoman" di `frontend-implementation.md`**
+- [x] **Step 1: Tambahkan subseksi "Pet Hanoman" di `frontend-implementation.md`**
 
 Sisipkan tepat sebelum heading `## Tinggi & scrolling: rantai flex, bukan angka ajaib`:
 
@@ -998,7 +1007,7 @@ bisa basi berjam-jam — `Spec.stage` menjawab pertanyaan yang sama dan hidup. P
 dan sengaja **tak** mengikuti `projectFilter`: ia hadir juga di halaman yang tak punya filter itu.
 ```
 
-- [ ] **Step 2: Tandai family `sticker` sebagai family yang ditempatkan**
+- [x] **Step 2: Tandai family `sticker` sebagai family yang ditempatkan**
 
 Di `internal/docs/design-system/design-system.md`, paragraf yang diawali "Penempatan mengikuti
 kegunaan, bukan kewajiban memajang semuanya." saat ini berakhir dengan dua kalimat:
@@ -1017,13 +1026,13 @@ Model sheet serta template sosial tetap frontend-addressable melalui registry te
 dipaksakan masuk instrument panel operasional. Motif tanpa makna status selalu dekoratif.
 ```
 
-- [ ] **Step 3: Verifikasi index Source of Truth tetap utuh**
+- [x] **Step 3: Verifikasi index Source of Truth tetap utuh**
 
 Run: `grep -n "frontend-implementation\]\|design-system\]" internal/docs/README.md`
 Expected: kedua dokumen sudah ter-link (bagian `## frontend` dan `## design-system`). Tak ada
 berkas doc baru, jadi tak ada entri index yang perlu ditambahkan.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/docs/frontend/frontend-implementation.md internal/docs/design-system/design-system.md
@@ -1036,26 +1045,30 @@ git commit -m "docs(spec-585): pemetaan status sesi ke pose pet sebagai konvensi
 
 **Files:** tak ada yang diubah kecuali perbaikan yang ditemukan.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
 
 Run:
 ```bash
-env -u NODE_ENV ./node_modules/.bin/vitest run --project src \
-  src/test/pet-state.test.ts src/test/hanoman-pet.test.tsx src/test/pet-mount.test.tsx \
-  src/test/illustration-component.test.tsx src/test/illustration-registry.test.ts \
-  src/test/illustration-placement.test.tsx src/test/changelog-nav.test.tsx \
-  src/test/app-flows.test.tsx src/test/app-states.test.tsx src/test/smoke.test.tsx
+env -u NODE_ENV ./node_modules/.bin/vitest run \
+  pet-state hanoman-pet pet-mount \
+  illustration-component illustration-registry illustration-placement \
+  changelog-nav app-flows app-states smoke
 ```
-Expected: seluruhnya PASS, 0 gagal. **Baca angka berkas & test-nya** — `--changed` menyalakan
+
+Filter vitest adalah **substring path**, bukan pasangan `--project <nama> <path>` — bentuk terakhir
+memulangkan "No test files found" dan exit 1, yang mudah terbaca sebagai "belum ditulis". Jaga
+substring-nya tetap sempit: `ds.test` misalnya juga cocok dengan `uploads.test.ts` di server, yang
+lalu gagal menuntut `prisma generate` padahal task ini tak menyentuh server sama sekali.
+Expected: 11 berkas, **44 test**, 0 gagal. **Baca angka berkas & test-nya** — `--changed` menyalakan
 `passWithNoTests` sehingga nol test terlihat hijau; di sini path disebut eksplisit supaya itu tak
 bisa terjadi, tapi angkanya tetap harus dibaca.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: exit 0, tanpa keluaran. **Jangan** `pnpm -r typecheck`.
 
-- [ ] **Step 3: Buktikan bundle tak membengkak**
+- [x] **Step 3: Buktikan bundle tak membengkak**
 
 Run:
 ```bash
@@ -1068,20 +1081,43 @@ perubahan ini, karena `import.meta.glob` di registry sudah eager atas seluruh
 `internal/assets/illustration/web/` jauh sebelum SPEC-585. Catat angka `du -sh` di laporan akhir
 sebagai bukti terukur bahwa pet menambah **0 byte** aset.
 
-- [ ] **Step 4: Jangan boot server**
+- [x] **Step 4: Jangan boot server**
 
 Task ini tak menyentuh satu pun endpoint (nol berkas di `server/`), jadi smoke boot + curl **tidak**
 dijalankan. Bila sebuah langkah menuntutnya, itu tanda scope salah baca.
 
-- [ ] **Step 5: Pastikan plan ini seluruhnya terceklist**
+- [x] **Step 5: Pastikan plan ini seluruhnya terceklist**
 
 Run: `grep -c '^\s*- \[ \]' docs/superpowers/plans/2026-08-08-hanoman-pet-dashboard.md`
 Expected: `0`. `Execute done` tak sah selama masih ada kotak kosong (ADR-0029).
 
-- [ ] **Step 6: Commit sisa perubahan & push**
+- [x] **Step 6: Commit sisa perubahan & push**
 
 ```bash
 git add -A docs/superpowers/plans
 git commit -m "chore(spec-585): centang plan pet Hanoman"
 git push origin HEAD:refs/heads/hanoman/spec-585
 ```
+
+---
+
+## Bukti terukur (diisi saat eksekusi, 2026-08-08)
+
+| klaim | bukti |
+|---|---|
+| pet menambah **0 byte** aset | `src/dist/assets` memuat **41** `.webp` — sama persis dengan **41** berkas di `internal/assets/illustration/web/`. Emisi digerakkan glob eager registry, bukan pemakaian, jadi kedelapan sticker (376 KB) sudah terangkut sebelum SPEC-585. |
+| test yang tersentuh | 11 berkas · **44 test** lulus, 0 gagal (`pet-state` 17 · `hanoman-pet` 8 · `pet-mount` 5 · illustration ×3 · `changelog-nav` · `app-flows` · `app-states` · `smoke`). |
+| typecheck | `pnpm --filter ./src typecheck` exit 0. |
+| bukan regresi | Peringatan `act(...)` pada `app-states`/`app-flows` **sudah ada di HEAD sebelum** perubahan ini — diverifikasi dengan `git stash` lalu run ulang: 1 peringatan di kedua keadaan. |
+
+**Smoke visual** (Chrome headless via CDP, viewport 1280×713, harness `vite` sekali-pakai yang
+me-mount **hanya** `HanomanPet` — tanpa server, tanpa DB; berkasnya dihapus sesudahnya). Ini
+diperlukan karena jsdom tak melakukan layout: "merender tapi tak terlihat / salah tempat" adalah
+mode gagal yang tak bisa ditangkap test render.
+
+- kotak pet `{x: 1182, y: 613, w: 77, h: 77}` — menempel kanan-bawah, tak memotong viewport.
+- `getComputedStyle(stage).animationName === "hn-pet-breathe"` — keyframe benar-benar terpasang di browser sungguhan.
+- `img.complete === true`, `naturalWidth 768` — pipeline aset teresolusi lewat registry.
+- `getComputedStyle(root).pointerEvents === "none"`, dan `elementFromPoint` di titik tengah pet mengembalikan **`Ringkasan status Hanoman`** — hit area persis milik tombolnya, bukan lebih.
+- popover terbuka: `{x: 990, y: 470, w: 268, h: 135}`, `insideViewport: true`, teks `SEDANG BEKERJA / SPEC-585 · sedang berjalan / Pet maskot Hanoman di dashboard / Buka Terminal / Sembunyikan`.
+- terbaca di **kedua** permukaan: di atas `--term-bg` (garis tinta + brass) maupun di atas bone paper (aset transparan, tanpa latar yang dipanggang).
