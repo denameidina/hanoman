@@ -833,7 +833,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
       </div>
       {data.total === 0 ? (
         backlog.length === 0
-          ? <StateBlock kind="empty" icon="lightbulb" title="Backlog masih kosong"
+          ? <StateBlock kind="empty" illustration="PST-002" title="Backlog masih kosong"
             hint="Filekan feature brief atau QA finding — hanoman menjalankannya dari brainstorm sampai execute."
             action={onNew} actionLabel="Tambah spec" />
           : <StateBlock kind="empty" icon="filter" title="Tidak ada spec untuk filter ini"

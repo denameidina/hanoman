@@ -1,5 +1,6 @@
 import React from "react";
-import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, StatusPill } from "../ds";
+import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, StatusPill,
+  ProductStateIllustration } from "../ds";
 import { api, ApiError, type TerminalSession, type Phase, type Flow } from "../api/client";
 import { subscribe } from "../api/events";
 import { flowForSource, type SessionHistoryView } from "@hanoman/shared";
@@ -549,6 +550,9 @@ function Cell({ session, nameOf, onClose, onDetach, onExit, onReview, onSessionR
   // `exited` tak pernah menjadi true di jalur sukses dan pil hijau tak pernah bisa muncul.
   // `exited` tetap menang (SPEC-402: bisa di-SIGTERM sesudah baris fase terakhir ditulis).
   const finished = !session.exited && complete;
+  const stateIllustration = failed ? null
+    : session.exited || finished ? "PST-005"
+      : awaiting ? "PST-004" : "PST-003";
   return (
     <>
       <div style={{
@@ -559,6 +563,10 @@ function Cell({ session, nameOf, onClose, onDetach, onExit, onReview, onSessionR
         borderBottom: "1px solid var(--border-hair)",
         fontFamily: "var(--font-mono)", fontSize: 11, color: session.exited ? "var(--text-muted)" : "var(--text-body)",
       }}>
+        {stateIllustration && (
+          <ProductStateIllustration id={stateIllustration} decorative
+            style={{ width: 34, flex: "0 0 auto", borderRadius: "var(--radius-sm)" }} />
+        )}
         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {label} · {session.id.slice(0, 6)}
         </span>

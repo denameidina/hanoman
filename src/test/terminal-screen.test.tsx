@@ -183,6 +183,7 @@ describe("TerminalScreen (grid)", () => {
     const { container } = render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
     expect(screen.getByText("Selesai")).toBeInTheDocument();
+    expect(screen.getByTestId("illustration-PST-005")).toHaveAttribute("aria-hidden", "true");
     expect(screen.queryByText(/berakhir/)).toBeNull();
     expect(container.querySelector("[style*='opacity: 0.6']")).not.toBeNull();
   });
@@ -192,6 +193,7 @@ describe("TerminalScreen (grid)", () => {
     listTerminals.mockResolvedValue([{ id: "live1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
+    expect(screen.getByTestId("illustration-PST-003")).toHaveAttribute("aria-hidden", "true");
     expect(screen.queryByText("Selesai")).toBeNull();
   });
 
@@ -245,6 +247,7 @@ describe("TerminalScreen (grid)", () => {
     render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
     expect(screen.getByText("Menunggu keputusan")).toBeInTheDocument();
+    expect(screen.getByTestId("illustration-PST-004")).toHaveAttribute("aria-hidden", "true");
     expect(screen.queryByText("Selesai")).toBeNull();
   });
 

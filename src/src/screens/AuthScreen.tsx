@@ -1,7 +1,7 @@
 /* AuthScreen — login + setup akun pertama (SPEC-169). Layar penuh, bone-paper.
    needsSetup=true → buat akun pertama (password min 8); else → masuk. */
 import React from "react";
-import { Card, Button, Input, Field } from "../ds";
+import { Card, Button, Input, Field, ProductStateIllustration } from "../ds";
 import { Wordmark } from "../ds/marks";
 import { api, ApiError } from "../api/client";
 import type { UserView } from "@hanoman/shared";
@@ -35,6 +35,8 @@ export function AuthScreen({ needsSetup, onDone }: { needsSetup: boolean; onDone
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}><Wordmark /></div>
         <Card eyebrow={needsSetup ? "hanoman · setup" : "hanoman · masuk"}
           title={needsSetup ? "Buat akun pertama" : "Masuk"}>
+          <ProductStateIllustration id="PST-001" priority
+            style={{ width: "100%", maxHeight: 184, marginBottom: 14, borderRadius: "var(--radius-md)" }} />
           <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 16, lineHeight: 1.5 }}>
             {needsSetup
               ? "Belum ada akun. Akun pertama ini yang bisa mengundang user lain."

@@ -23,11 +23,13 @@ describe("app load states", () => {
     render(<App />);
     const retry = await screen.findByText("Coba lagi");
     expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByTestId("illustration-PST-006")).toBeInTheDocument();
 
     failNext = false;
     retry.click();
     // overview with zero projects: every panel falls back to its empty state
     await waitFor(() => expect(screen.getByText("Belum ada project")).toBeInTheDocument());
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByTestId("illustration-PST-005")).toBeInTheDocument();
   });
 });

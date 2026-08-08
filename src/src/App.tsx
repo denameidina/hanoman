@@ -1089,7 +1089,8 @@ export default function App() {
   // digerbangkan satu kali di sini.
   const gate = (body: React.ReactNode) =>
     status === "loading" ? <StateBlock kind="loading" title="Memuat workspace…" />
-      : status === "error" ? <StateBlock kind="error" title="Gagal memuat data dari server"
+      : status === "error" ? <StateBlock kind="error" illustration="PST-006"
+          title="Gagal memuat data dari server"
           hint="Pastikan server hanoman berjalan, lalu coba lagi." action={load} />
       : body;
 

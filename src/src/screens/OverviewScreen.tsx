@@ -131,7 +131,8 @@ export function OverviewScreen({ projects, backlog, onOpenProject, onGoto }:
           <Card eyebrow={"needs attention · " + attention.length} title="Perlu perhatian"
             actions={<Button size="sm" variant="ghost" leftIcon="layout-grid" onClick={() => onGoto("projects")}>Semua project</Button>}>
             {attention.length === 0
-              ? <StateBlock kind="empty" compact icon="check-circle-2" title="Semua project on-convention"
+              ? <StateBlock kind="empty" compact illustration="PST-005" illustrationDecorative
+                  title="Semua project on-convention"
                   hint="Source of Truth utuh — tidak ada yang perlu perhatian." />
               : <div style={{ marginTop: 4 }}>{attention.map((p) => <AttnRow key={p.id} p={p} onOpen={onOpenProject} />)}</div>}
           </Card>
