@@ -74,6 +74,93 @@ orientasi, dan alpha master **berikut** keberadaan, batas 768px, alpha, dan peng
 web-nya — master sehat yang turunannya hilang berarti layar kosong di dashboard, bukan sekadar aset
 besar.
 
+## Pet Hanoman: status sesi sebagai pose (SPEC-585)
+
+Widget maskot di sudut kanan-bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi &
+backlog, bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada
+skema, tak ada channel realtime baru (ADR-0024 & ADR-0039 utuh).
+
+| sumber | frame WS | dipakai untuk |
+|---|---|---|
+| `sessions: TerminalSession[]` | `sessions` | `exited`, `exitCode`, `decision`, `deciding`, `specId` |
+| `backlog: Spec[]` | `specs` | `stage`, `blockedBy`, `source`, `title` |
+| `useNotifications().items` | `notifications` | `type` + `createdAt` keadaan transient |
+
+Kosakata sesinya **identik** dengan sel Terminal (`awaiting` = hidup && `decision`, `deciding`
+menang atasnya, `failed` = `exited` && `exitCode` bukan nol). Pet yang memakai rumus lain akan
+mengatakan hal yang berlawanan dengan sel di layar yang sama.
+
+Pemetaan pose hidup di `src/src/screens/pet-state.ts` (murni & bertest). Urutan tabel **adalah**
+urutan prioritas: kandidat pertama yang menyala menang, dan itu satu-satunya mekanisme anti-kedip —
+tak ada timer dwell.
+
+| # | pose | ID katalog | menyala saat |
+|---|---|---|---|
+| 1 | `blocked` | `STK-004` | ada sesi gagal — atau tak ada sesi hidup **dan** ada backlog ber-`blockedBy` |
+| 2 | `waiting` | `STK-003` | sesi hidup ber-`decision` yang **tidak** sedang dilayani lead |
+| 3 | `shipped` | `STK-005` | notifikasi `done`/`automerge` non-audit, masih di dalam window transient |
+| 4 | `docs-updated` | `STK-008` | notifikasi `done` untuk backlog ber-`source: "audit"`, masih transient |
+| 5 | `working` | `STK-002` | sesi hidup yang backlog-nya belum `done` |
+| 6 | `review` | `STK-006` | sesi terdaftar yang backlog-nya sudah `stage: "done"` |
+| 7 | `ready` | `STK-001` | lantai — selalu benar |
+
+Empat keputusan di dalam tabel itu yang tak terbaca dari kodenya:
+
+- **`blocked` karena dependency digerbangi "tak ada sesi hidup".** `blockedBy` adalah keadaan normal
+  & berumur panjang di project ber-`dependsOn` (ADR-0093). Tanpa gerbang itu pet terkunci di pose
+  peringkat 1 selamanya lalu berhenti memberi tahu apa pun. Backlog yang menunggu giliran tak
+  sedang meminta apa-apa dari manusia; sesi yang gagal meminta.
+- **`waiting` mengecualikan `deciding`.** Sesi yang sedang disusunkan keputusannya oleh hanoman-lead
+  terlihat identik dengan sesi mandek (diam, marker terisi) — membacanya sebagai "butuh kamu"
+  adalah alarm palsu (`TerminalSession.deciding`, ADR-0091).
+- **Transien menang atas keadaan mapan, kalah dari `blocked`/`waiting`.** Kabar baru lebih
+  informatif daripada keadaan mapan, tetapi perayaan tak boleh menutupi permintaan tolong. Window
+  `PET_TRANSIENT_MS` = 45 dtk sejak `createdAt` notifikasinya; komponen menjadwalkan **satu**
+  `setTimeout` tepat pada saat luruhnya, bukan denyut.
+- **`review` memakai `stage === "done"`, bukan `exited`.** Agen adalah TUI interaktif: pada jalur
+  sukses pane **tak pernah** mati (SPEC-433), jadi `exited` sendirian adalah gerbang yang nyaris
+  tak pernah menyala. `Spec.stage` diturunkan server dari bukti yang sama (fase terminal + plan
+  terceklist, ADR-0029) dan memang bergerak. Karena itu pula `working` mengecualikan sesi ber-spec
+  `done`: pane hidup di atas backlog selesai bukan sedang bekerja, ia menunggu dilihat.
+
+`STK-007` (`thanks`) sengaja tak dipakai — ungkapan terima kasih, bukan keadaan mesin. Kedelapan
+turunan web sticker sudah ikut ke bundle sejak sebelum SPEC-585 (glob registry eager atas seluruh
+`web/`), jadi pet menambah **0 byte** aset — terukur: 8 berkas sticker di `src/dist/assets`
+sebelum maupun sesudah.
+
+**Penempatan & mount.** `HanomanPet` dipasang **sekali** di `App.tsx` sebagai saudara `{screen}`,
+bukan di dalam `Shell`: `<Shell>` ditulis ulang di tiap cabang `section`, jadi pet yang tinggal di
+sana lahir kembali tiap navigasi (animasi mulai dari nol, keadaan transient hilang persis saat
+operator pindah layar untuk melihatnya) — dan dari dalam `Shell` ia butuh prop baru di sembilan
+call site untuk menjangkau `sessions`/`setSection`/`setFocusSession`. Overlay `position: fixed`
+kanan-bawah, `z-index: 80` → di bawah header (90), terminal fullscreen (100), Modal (150), Toast
+(200). Pembungkusnya `pointer-events: none` dan hanya tombolnya `auto`, jadi "tak menutupi kontrol"
+ditegakkan struktur, bukan koordinat.
+
+**Animasi.** Napas idle = satu keyframe `hn-pet-breathe` (`app.css`) yang hanya menyentuh
+`transform` → compositor, nol render React. Perpindahan pose = crossfade CSS: pose yang **pernah**
+terjadi dirender bertumpuk dan opasitasnya dipilih `pose === p`, sehingga byte yang diambil browser
+tumbuh mengikuti pemakaian alih-alih memuat kedelapannya di muka. `prefers-reduced-motion: reduce`
+dibaca di JS (`window.matchMedia`, ikut mendengarkan perubahan) dan `animation`/`transition` **tak
+dipasang sama sekali** — bentuk yang bisa diuji, sejalan dengan animasi kit lain yang juga inline.
+
+**Aksesibilitas.** `role="status" aria-live="polite"` membungkus gambarnya, dan tombolnya adalah
+**overlay transparan di dalam** region itu — bukan sebaliknya: gambar di dalam `<button>`
+diperlakukan sebagian screen reader sebagai presentasional sehingga perubahan alt tak pernah
+diumumkan. Pose aktif membawa alt bermakna berisi kalimat statusnya; lapisan pose lain `alt=""` +
+`aria-hidden`. Satu sumber kalimat, tanpa teks tersembunyi kembar. Hover memunculkan ringkasan yang
+sama lewat `title`.
+
+**Sembunyikan** disimpan di `localStorage` `hanoman.pet.hidden` (pola `hanoman.terminal.workspace`)
+— preferensi per-browser, tanpa skema & tanpa endpoint. Disembunyikan berarti **menyusut** jadi
+pegangan bundar 28 px ber-`Mark` buntut, bukan lenyap: tanpa itu operator tak punya jalan kembali
+selain membersihkan `localStorage`.
+
+Yang tak dikerjakan, berikut alasannya: fase sesi tak masuk headline karena
+`ProjectView.session.phase` hanya dimuat sekali saat login (`projects` tak didorong WS) sehingga
+bisa basi berjam-jam — `Spec.stage` menjawab pertanyaan yang sama dan hidup. Pet berskop workspace
+dan sengaja **tak** mengikuti `projectFilter`: ia hadir juga di halaman yang tak punya filter itu.
+
 ## Tinggi & scrolling: rantai flex, bukan angka ajaib
 `#root` dikunci `100vh; overflow: hidden`, jadi tinggi yang tersedia sudah pasti sejak akar.
 Layar berdaftar tidak boleh menggulir seluruh halaman — filter bar dan Pager harus tetap

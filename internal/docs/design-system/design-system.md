@@ -28,7 +28,11 @@ API komponen:
 
 Penempatan mengikuti kegunaan, bukan kewajiban memajang semuanya. Enam product-state dipakai pada
 onboarding, backlog sungguh kosong, sesi aktif, menunggu keputusan, sukses, dan error yang bisa
-dipulihkan. Model sheet serta template sosial tetap frontend-addressable melalui registry tetapi
+dipulihkan. Family **sticker** (`STK-001…008`) ditempatkan sebagai **Pet Hanoman**: maskot
+persisten di sudut dashboard yang pose-nya turunan status sesi & backlog, bukan hiasan — tabel
+status → pose beserta urutan prioritasnya ada di
+[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-pose-spec-585).
+Model sheet serta template sosial tetap frontend-addressable melalui registry tetapi
 tidak dipaksakan masuk instrument panel operasional. Motif tanpa makna status selalu dekoratif.
 
 ## Placeholder: contoh nilai, bukan pengulangan label (SPEC-490)
