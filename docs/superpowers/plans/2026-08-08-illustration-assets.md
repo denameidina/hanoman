@@ -34,25 +34,25 @@
 - Consumes: the 41 catalog rows in `internal/brand/illustration/04-asset-catalog.md`.
 - Produces: an ordered array of `{id, family, subject, ratio, filename, transparent, promptIntent}` and a validator with exit code `0` only when all expected WebPs pass structural checks.
 
-- [ ] **Step 1: Encode every catalog row**
+- [x] **Step 1: Encode every catalog row**
 
 Create `inventory.json` with exactly the IDs and names from the catalog. Use these family slugs and ratio tokens: `model/*/sheet`, `hero/*/16x9`, `lakon/*/4x3`, `spot/*/1x1`, `product-state/*/4x3`, `mascot-pose/*/1x1`, `sticker/*/1x1`, `social/{square,portrait,landscape,story}/{1x1,4x5,16x9,9x16}`, `diagram/*/modular`, and `motif/*/tile-strip`.
 
-- [ ] **Step 2: Write the validator**
+- [x] **Step 2: Write the validator**
 
 The validator must assert: 41 unique inventory IDs; 41 unique filenames; every referenced file exists; every file starts with a WebP `RIFF....WEBP` signature; dimensions are positive; expected landscape/portrait/square orientation is correct; transparent-required files contain an alpha-capable WebP chunk; no `.png`, `.jpg`, or `.jpeg` exists under the output root.
 
-- [ ] **Step 3: Confirm the empty delivery fails**
+- [x] **Step 3: Confirm the empty delivery fails**
 
 Run: `node internal/assets/illustration/verify.mjs`
 
 Expected: non-zero exit listing all 41 missing WebPs.
 
-- [ ] **Step 4: Document scope**
+- [x] **Step 4: Document scope**
 
 Write `README.md` with the 41-master scope, naming convention, generation path, QA commands, known flattened-raster/human-review boundary, and links to the authoritative illustration docs.
 
-- [ ] **Step 5: Commit inventory scaffolding**
+- [x] **Step 5: Commit inventory scaffolding**
 
 ```bash
 git add internal/assets/illustration
@@ -71,23 +71,23 @@ git commit -m "chore(illustration): define raster asset inventory"
 - Consumes: identity, tier, gesture, expression, and tail definitions in `01-art-direction.md`, `02-character-model-sheet.md`, `03-mascot-system.md`, and `07-prompt-library.md`.
 - Produces: `MOD-001` as the identity reference for Narrative/Editorial derivatives and `MSC-001` as the identity reference for Mascot derivatives.
 
-- [ ] **Step 1: Generate `MOD-001`**
+- [x] **Step 1: Generate `MOD-001`**
 
 Use one built-in image-generation call for a text-free wide model board containing presentation profile, back silhouette, three-quarter adaptation, Narrative/Editorial/Mascot tier comparison, neutral/action line, costume detail, and head/hand/foot/tail callouts. Use the complete identity and negative blocks; do not attach restricted cultural scans.
 
-- [ ] **Step 2: Inspect and repair `MOD-001`**
+- [x] **Step 2: Inspect and repair `MOD-001`**
 
 Inspect full-size and thumbnail output. Regenerate once with a targeted prompt if the single-eye profile, costume anchors, anatomy, or one-tail rule fails.
 
-- [ ] **Step 3: Generate `MSC-001` from `MOD-001`**
+- [x] **Step 3: Generate `MSC-001` from `MOD-001`**
 
 Attach `MOD-001` as identity authority and generate a text-free compact mascot scale/pose sheet at 3.5–4 head units, head no more than approximately 28% of height, preserving the same profile and costume identity.
 
-- [ ] **Step 4: Convert and validate model assets**
+- [x] **Step 4: Convert and validate model assets**
 
 Convert selected generated outputs losslessly to the two inventory filenames, inspect with `identify`, and create a two-up contact sheet. Record identity and artifact checks in `qa-report.md`.
 
-- [ ] **Step 5: Commit models**
+- [x] **Step 5: Commit models**
 
 ```bash
 git add internal/assets/illustration
@@ -109,23 +109,23 @@ git commit -m "feat(illustration): add canonical character models"
 - Consumes: `MOD-001` and briefs `00-homepage-hero.md` through `04-chiranjivi.md`.
 - Produces: the five P0 Narrative masters for downstream family-style comparison.
 
-- [ ] **Step 1: Generate the hero**
+- [x] **Step 1: Generate the hero**
 
 Use the `HRO-001` brief verbatim for action order, human-control cue, and right-third text-safe field. Attach `MOD-001`; require 16:9 composition and no text/UI.
 
-- [ ] **Step 2: Generate the four lakons**
+- [x] **Step 2: Generate the four lakons**
 
 Issue one generation call per ID with `MOD-001` attached. Keep each documented motif distinct: mandate-return loop, controlled ember-to-diff, five bounded context strata plus human decision, and finite session-branch-merge-docs continuity.
 
-- [ ] **Step 3: Inspect and repair**
+- [x] **Step 3: Inspect and repair**
 
 At thumbnail and full-size views, check canonical character anchors, one focal action, at least one-third quiet field, truthful product sequence, one tail, hands, and absence of text/UI. Regenerate each failed asset once with only the failing constraint emphasized.
 
-- [ ] **Step 4: Convert, contact-sheet, and record QA**
+- [x] **Step 4: Convert, contact-sheet, and record QA**
 
 Convert all five selected outputs to their inventory WebP paths, create a five-up contact sheet, and add one QA row per ID.
 
-- [ ] **Step 5: Commit Narrative assets**
+- [x] **Step 5: Commit Narrative assets**
 
 ```bash
 git add internal/assets/illustration
@@ -145,23 +145,23 @@ git commit -m "feat(illustration): add hero and four-lakon masters"
 - Consumes: `MOD-001`, `MSC-001`, and briefs `05-spot-illustrations.md` and `06-product-states.md`.
 - Produces: 12 compact product-support masters.
 
-- [ ] **Step 1: Generate six spots**
+- [x] **Step 1: Generate six spots**
 
 Issue one call per spot with `MOD-001` attached. Enforce one gesture, one prop, one focal action, 1:1 field, and the exact row-specific product proof.
 
-- [ ] **Step 2: Generate six product states**
+- [x] **Step 2: Generate six product states**
 
 Issue one call per state with `MSC-001` attached. Start from the documented literal fallback, add one calm mascot gesture, preserve an empty center/copy region, and do not imitate controls.
 
-- [ ] **Step 3: Inspect and repair**
+- [x] **Step 3: Inspect and repair**
 
 Verify the six spots are distinguishable without labels and the six product states communicate their literal state at thumbnail size. Repair character drift, extra objects, fake UI, or ambiguous state.
 
-- [ ] **Step 4: Convert, contact-sheet, and record QA**
+- [x] **Step 4: Convert, contact-sheet, and record QA**
 
 Convert 12 selected outputs, create family contact sheets, and add 12 QA rows.
 
-- [ ] **Step 5: Commit product-support assets**
+- [x] **Step 5: Commit product-support assets**
 
 ```bash
 git add internal/assets/illustration
@@ -181,23 +181,23 @@ git commit -m "feat(illustration): add spot and product-state masters"
 - Consumes: `MSC-001` and briefs `07-mascot-pose-pack.md` and `08-sticker-pack.md`.
 - Produces: 16 transparent mascot assets.
 
-- [ ] **Step 1: Generate eight chroma-key poses**
+- [x] **Step 1: Generate eight chroma-key poses**
 
 Issue one call per pose with `MSC-001` attached and the exact GST/EXP/TAL mapping. Use a flat chroma-key background excluded from the subject palette, 12% margin, no floor/shadow, and no text.
 
-- [ ] **Step 2: Remove chroma key and validate alpha**
+- [x] **Step 2: Remove chroma key and validate alpha**
 
 Run the installed `remove_chroma_key.py` helper to produce transparent WebP files. Validate transparent corners, subject coverage, and absence of key-color fringe; retry once with edge contraction if required.
 
-- [ ] **Step 3: Generate and extract eight stickers**
+- [x] **Step 3: Generate and extract eight stickers**
 
 Issue one call per sticker with `MSC-001` attached, text-free bold contour, and documented reaction mapping. Remove chroma key and validate alpha exactly as for poses.
 
-- [ ] **Step 4: Inspect consistency and repair**
+- [x] **Step 4: Inspect consistency and repair**
 
 Compare all 16 at equal optical height. Reject mirror/profile drift, chibi inflation, inconsistent costume or contour, extra tail/limb, unclear reactions, clipped contours, or baked copy.
 
-- [ ] **Step 5: Contact-sheet, record QA, and commit**
+- [x] **Step 5: Contact-sheet, record QA, and commit**
 
 ```bash
 git add internal/assets/illustration
@@ -218,23 +218,23 @@ git commit -m "feat(illustration): add mascot pose and sticker masters"
 - Consumes: `MOD-001` and briefs `09-social-release-templates.md` and `10-diagram-and-motif-kit.md`.
 - Produces: the final six catalog masters.
 
-- [ ] **Step 1: Generate four social masters**
+- [x] **Step 1: Generate four social masters**
 
 Issue one call per documented ratio, attach `MOD-001`, and preserve independent character, proof-object, and headline-safe zones. Keep all copy/logo/date/metrics outside the image.
 
-- [ ] **Step 2: Generate `DGM-001`**
+- [x] **Step 2: Generate `DGM-001`**
 
 Generate a text-free wide primitive board with distinct human, agent, docs, backlog, session, terminal, branch, worktree, arrow, state, and boundary symbols. Require orthogonal direction, monochrome readability, and no motif-dependent semantics.
 
-- [ ] **Step 3: Generate `MTF-001`**
+- [x] **Step 3: Generate `MTF-001`**
 
 Generate a wide modular strip/tile board with Buntut connector and the four distinct lakon motifs. Require clean joins, no infinity loop, and decoration subordinate to information.
 
-- [ ] **Step 4: Inspect, repair, convert, and record QA**
+- [x] **Step 4: Inspect, repair, convert, and record QA**
 
 Check ratio-specific safe zones, diagram symbol distinction, connector direction, motif joins, and text-free output. Convert selected outputs, create two contact sheets, and add six QA rows.
 
-- [ ] **Step 5: Commit final family assets**
+- [x] **Step 5: Commit final family assets**
 
 ```bash
 git add internal/assets/illustration
@@ -252,17 +252,17 @@ git commit -m "feat(illustration): add social and system-kit masters"
 - Consumes: all 41 inventory records and outputs.
 - Produces: evidence that every requested catalog ID has a valid, inspected WebP and a clear statement of delivery limitations.
 
-- [ ] **Step 1: Run structural verification**
+- [x] **Step 1: Run structural verification**
 
 Run: `node internal/assets/illustration/verify.mjs`
 
 Expected: `PASS: 41/41 catalog masters are valid WebP files` and no missing, duplicate, wrong-format, orientation, or alpha errors.
 
-- [ ] **Step 2: Inspect all contact sheets**
+- [x] **Step 2: Inspect all contact sheets**
 
 Inspect model, Narrative, spot, product-state, mascot-pose, sticker, social, and system-kit contact sheets. Confirm every image has a completed QA row and no family-level identity drift is visible.
 
-- [ ] **Step 3: Verify repository diff**
+- [x] **Step 3: Verify repository diff**
 
 Run:
 
@@ -274,19 +274,19 @@ find internal/assets/illustration -type f -name '*.webp' | sort
 
 Expected: clean whitespace check; exactly 41 master WebPs plus named QA contact sheets; no unexpected raster format.
 
-- [ ] **Step 4: Run docs checks**
+- [x] **Step 4: Run docs checks**
 
 Run: `hanoman docs index --check && hanoman docs scan`
 
 Expected: index integrity passes; coverage output is recorded without introducing a new failure.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git add internal/assets/illustration docs/superpowers
 git commit -m "docs(illustration): record delivery QA"
 ```
 
-- [ ] **Step 6: Re-run completion evidence**
+- [x] **Step 6: Re-run completion evidence**
 
 Re-run the structural validator, inspect `git status --short --branch`, and compare the inventory ID set directly against the catalog. Do not declare completion while any ID, QA row, or required visual repair is missing.

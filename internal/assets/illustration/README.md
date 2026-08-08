@@ -5,6 +5,9 @@ This directory delivers one flattened WebP master for each of the 41 IDs in the 
 family briefs, prompts, and review criteria remain authoritative in
 [`internal/brand/illustration`](../../brand/illustration/README.md).
 
+Delivery status: **41/41 catalog masters present and structurally verified**, with eight family
+contact sheets recorded in `qa/` for visual review.
+
 ## Scope
 
 - 41 catalog masters, one file per `inventory.json` record.
