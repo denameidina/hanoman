@@ -143,4 +143,3 @@ Update the Source of Truth in the same implementation series:
 - a new public gallery/navigation screen;
 - changing server endpoints or database models;
 - forcing model sheets or social templates into operational dashboard screens.
-
