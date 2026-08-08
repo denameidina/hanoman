@@ -13,3 +13,28 @@ export { MarkdownView, hnDocHtml, isMarkdownPath } from "./markdown";
 export { DocDownload } from "./DocDownload";
 export { DocPreviewModal } from "./DocPreviewModal";
 export { Mark, Wordmark, HN_MARKS } from "./marks";
+export {
+  Illustration,
+  MascotIllustration,
+  ProductStateIllustration,
+  SpotIllustration,
+  StickerIllustration,
+} from "./Illustration";
+export type {
+  IllustrationProps,
+  MascotIllustrationProps,
+  ProductStateIllustrationProps,
+  SpotIllustrationProps,
+  StickerIllustrationProps,
+} from "./Illustration";
+export { ILLUSTRATIONS, ILLUSTRATION_IDS, illustrationsByFamily } from "./illustration-registry";
+export type {
+  IllustrationAsset,
+  IllustrationFamily,
+  IllustrationId,
+  IllustrationRatio,
+  MascotIllustrationId,
+  ProductStateIllustrationId,
+  SpotIllustrationId,
+  StickerIllustrationId,
+} from "./illustration-registry";
