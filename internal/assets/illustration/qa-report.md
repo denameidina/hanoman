@@ -44,6 +44,12 @@ the named human cultural, accessibility, art-direction, or delivery approvals in
 | STK-006 | Pass | Pass | Pass | 1254×1254 alpha WebP | Focused point to one blank folio communicates review. |
 | STK-007 | Pass | Pass | Pass | 1254×1254 alpha WebP | Open palm and hand at chest communicate thanks without heart or words. |
 | STK-008 | Pass | Pass | Pass | 1254×1254 alpha WebP | Blank document stack and finite tail spiral communicate docs updated. |
+| SOC-001 | Pass | Pass | Pass | 1254×1254 WebP | Lower-left character and central proof outline preserve a broad upper/right copy-safe field. |
+| SOC-002 | Pass | Pass | Pass | 1122×1402 WebP | Character stays in the lower half, proof platform remains central, and the upper third stays copy-safe. |
+| SOC-003 | Pass | Pass | Pass | 1672×941 WebP | Character occupies the left zone, a restrained proof frame anchors the center, and the right third stays copy-safe. |
+| SOC-004 | Pass | Pass | Pass | 941×1672 WebP | Character and proof frame stay below the midpoint while the upper story field remains copy-safe. |
+| DGM-001 | Pass | Pass | Pass | 1672×941 WebP | Eleven modular primitives and one sample flow remain unlabeled, literal, and legible in monochrome. |
+| MTF-001 | Pass | Pass after repair | Pass | 1672×941 WebP | Generic dividers were rejected; the accepted strip maps Buntut, Duta, Obong, Dronagiri, and Chiranjivi into five tileable motif rows plus one-color variants. |
 
 ## Generation record
 
@@ -84,6 +90,12 @@ the named human cultural, accessibility, art-direction, or delivery approvals in
 | STK-006 | `exec-a3f7a69f-7492-4103-bec1-7088e345b1ad.png` | `MSC-001 + MPS-003 + review + NEGATIVE_CORE`; chroma-key removal with soft matte/despill. |
 | STK-007 | `exec-8ff352de-8290-4285-86bb-9039d53a517f.png` | `MSC-001 + MPS-002 + thanks + NEGATIVE_CORE`; chroma-key removal with soft matte/despill. |
 | STK-008 | `exec-652c9dee-8a24-4eb7-9552-07036201fdd6.png` | `MSC-001 + MPS-008 + docs updated + NEGATIVE_CORE`; chroma-key removal with soft matte/despill. |
+| SOC-001 | `exec-bd63a619-edff-4681-832d-604283ccd83a.png` | `MOD-001 + TIER_EDITORIAL + COMP_SOCIAL_SQUARE + safe-area map + NEGATIVE_CORE`; lossless WebP conversion only. |
+| SOC-002 | `exec-5a1c771c-9d2e-4c24-9c01-1d84b0fe4ec5.png` | `MOD-001 + TIER_EDITORIAL + COMP_SOCIAL_PORTRAIT + safe-area map + NEGATIVE_CORE`; lossless WebP conversion only. |
+| SOC-003 | `exec-5cb24b09-3c01-43bf-bb11-42c257616769.png` | `MOD-001 + TIER_EDITORIAL + COMP_SOCIAL_LANDSCAPE + safe-area map + NEGATIVE_CORE`; lossless WebP conversion only. |
+| SOC-004 | `exec-7926d01e-8028-4fb0-9181-6ed06b49643e.png` | `MOD-001 + TIER_EDITORIAL + COMP_SOCIAL_STORY + safe-area map + NEGATIVE_CORE`; lossless WebP conversion only. |
+| DGM-001 | `exec-34fe8215-458c-4bb7-9b2f-a59814898eec.png` | `MOD-001 + technical primitive inventory + sample workflow + NEGATIVE_CORE`; lossless WebP conversion only. |
+| MTF-001 | `exec-72df53ba-d789-4dc5-8070-edd4bd694c63.png` | `MOD-001 + five lakon-to-pattern mappings + one-color variants + NEGATIVE_CORE`; replaced an initial generic-divider result with literal motif mappings, then converted losslessly. |
 
 ## Known limits
 
