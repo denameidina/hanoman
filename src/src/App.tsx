@@ -31,6 +31,10 @@ import { SchedulerScreen } from "./screens/SchedulerScreen";
 import { LeadScreen } from "./screens/LeadScreen";
 import { DocsWorkspace } from "./screens/DocsWorkspace";
 import { ChangelogScreen } from "./screens/ChangelogScreen";
+// SPEC-585 · pet maskot. Dipasang di App, BUKAN di dalam Shell: <Shell> ditulis ulang di tiap
+// cabang `section`, jadi pet yang tinggal di sana lahir kembali tiap navigasi — animasi idle mulai
+// dari nol dan keadaan transient hilang persis saat operator pindah layar untuk melihatnya.
+import { HanomanPet } from "./screens/HanomanPet";
 import { ReviewScreen } from "./screens/ReviewScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 
@@ -1296,6 +1300,8 @@ export default function App() {
     <AuthProvider user={me} onLoggedOut={onLoggedOut}>
       <NotificationsProvider showToast={showToast} onOpen={openNotification}>
         {screen}
+        <HanomanPet sessions={sessions} backlog={backlog}
+          onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
         <NewSpecModal open={modal === "brief"} onClose={() => { setModal(null); setSpecPrefill(null); }}
           projects={projectsView} defaultProject={proj ? proj.id : ""} onCreate={createSpec}
           prefill={specPrefill ?? undefined} specs={backlog} />   {/* SPEC-447 · kandidat dependency */}
