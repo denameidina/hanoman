@@ -1301,7 +1301,7 @@ git commit -m "feat(spec-626): tombol kirim keluhan di portal klien"
 
 **Interfaces:** —
 
-- [ ] **Step 1: Tulis ADR-0111**
+- [x] **Step 1: Tulis ADR-0111**
 
 Isi wajib: konteks (portal lahir baca-saja; satu-satunya jalur lapor adalah halaman publik) ·
 keputusan (1) satu route tulis `POST /api/portal/projects/:id/tickets` dengan allowlist berbentuk
@@ -1315,12 +1315,12 @@ sudah ada) · gotcha (bentuk path, bukan method; 404 bukan 403; `helpEnabled` se
 Nomor **0111** sudah diverifikasi bebas: `git branch -a` × `git ls-tree` atas `internal/docs/adr`
 di seluruh branch **dan** `git worktree list` (2026-08-10) → tertinggi 0110.
 
-- [ ] **Step 2: Tandai amandemen di ADR-0110**
+- [x] **Step 2: Tandai amandemen di ADR-0110**
 
 Tambahkan di blok metadata ADR-0110: `- Diamandemen oleh: ADR-0111 (satu route tulis: kirim tiket dari portal)`,
 dan di §"Konsekuensi" satu kalimat bahwa "tak ada satu pun aksi tulis" berlaku sampai ADR-0111.
 
-- [ ] **Step 3: Tautkan di kedua index**
+- [x] **Step 3: Tautkan di kedua index**
 
 `internal/docs/README.md`, di puncak daftar `## adr`:
 
@@ -1331,7 +1331,7 @@ dan di §"Konsekuensi" satu kalimat bahwa "tak ada satu pun aksi tulis" berlaku 
 `internal/docs/adr/README.md`: entri naratif dengan gaya yang sama seperti tetangganya (apa yang
 diamandemen, gotcha-nya).
 
-- [ ] **Step 4: api-contract + frontend-implementation**
+- [x] **Step 4: api-contract + frontend-implementation**
 
 `api-contract.md`: tambahkan `POST /api/portal/projects/:id/tickets` (multipart; field
 `category`/`title`/`detail` + `files`; 201 `PortalTicket`; 404 generik; 400; 429) di dekat lima GET
@@ -1341,7 +1341,7 @@ portal.
 (`portal-root` → header `FIXED_ROW_STYLE` → `<main>` `LIST_SCROLL_STYLE`) dan tabel pemetaan
 status→`StatusPill` dari `src/src/portal/status-pill.ts`.
 
-- [ ] **Step 5: Verifikasi index**
+- [x] **Step 5: Verifikasi index**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli exec tsx src/index.ts docs index --check
@@ -1350,7 +1350,7 @@ node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli exe
 Expected: index konsisten (tak ada doc tak ter-link). Bila CLI belum ter-build, cukup pastikan
 manual bahwa berkas ADR baru muncul di kedua README.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs

@@ -28,7 +28,9 @@ WebSocket per-sesi tersendiri. Endpoint HTTP GET tiap sumber tetap ada untuk pai
 >
 > **Peran `client` (SPEC-617 · [ADR-0110](../adr/0110-portal-klien-read-only.md)):** sesi cookie tak
 > lagi setara. `User.role === "client"` ditolak **403** `{ error: "portal klien: baca-saja" }` di
-> **seluruh** `/api` kecuali allowlist `services/client-access.ts` — `GET|HEAD /portal/**`, apa pun di
+> **seluruh** `/api` kecuali allowlist `services/client-access.ts` — `GET|HEAD /portal/**`,
+> `POST /portal/projects/:id/tickets` (SPEC-626 · [ADR-0111](../adr/0111-portal-klien-kirim-tiket.md) —
+> satu-satunya tulis, dibuka sebagai **bentuk path**, bukan sebagai method), apa pun di
 > `/help/**`, `POST /auth/logout`, `POST /auth/change-password`. **Deny-by-default:** endpoint baru
 > tertutup bagi klien sampai sengaja ditaruh di allowlist itu; tak ada daftar larangan yang harus
 > dirawat. Gerbangnya duduk **sebelum** bypass `/sync` & `/help` sehingga allowlist adalah pernyataan
@@ -49,7 +51,7 @@ POST /auth/change-password { currentPassword, newPassword }  # 200 + cookie baru
 #   BUKAN /auth/users — memisahkannya menutup jalan memutar mengubah kredensial admin lewat pintu klien.
 ```
 
-## Portal klien (SPEC-617 · [ADR-0110](../adr/0110-portal-klien-read-only.md)) — **COOKIE_ONLY, baca-saja**
+## Portal klien (SPEC-617 · [ADR-0110](../adr/0110-portal-klien-read-only.md) · SPEC-626 · [ADR-0111](../adr/0111-portal-klien-kirim-tiket.md)) — **COOKIE_ONLY**
 
 Permukaan untuk `User.role === "client"`. Sumber datanya **sama** dengan dashboard operator
 (`liveSpecs()` + `prisma.ticket`) — tak ada pipeline data kedua; yang berbeda hanya proyeksinya.
@@ -69,7 +71,23 @@ GET /portal/projects/:id/tickets/:ticketId  -> PortalTicket & { detail }
 #   404 untuk project yang bukan miliknya — TAK TERBEDAKAN dari project yang tak ada (preseden Help
 #   Center ADR-0062: kalau beda, portal jadi alat enumerasi nama project). Id item juga bukan jalan
 #   pintas: …/p1/backlog/SPEC-2 milik project lain tetap 404.
-#   Tak ada satu pun route tulis di namespace ini — dijaga test terhadap tabel route Fastify.
+#   TEPAT SATU route tulis di namespace ini (di bawah) — dijaga test terhadap tabel route Fastify.
+
+POST /portal/projects/:id/tickets           -> 201 PortalTicket        # multipart/form-data
+#   field: category (bug|fitur|pertanyaan|lainnya) · title ≤200 · detail ≤10 000 · files (≤3, ≤5 MB,
+#   image/png|jpeg|webp — berkas yang ditolak DI-SKIP tanpa membatalkan submit).
+#   reporterEmail diambil dari AKUN (req.user.email), tak pernah dari body. Tak ada honeypot
+#   (`hc_trap` hanya milik jalur publik) dan rate-limit berbasis AKUN, bukan IP:
+#   HANOMAN_PORTAL_TICKET_RATE_PER_MIN (default 5/mnt) lalu bucket per-project yang SAMA dengan
+#   jalur publik → 429 { error }.
+#   `project.helpEnabled` TIDAK berlaku di sini (ADR-0111 §3): knob itu menggerbangi permukaan
+#   ANONIM; portal punya akun + ClientProjectAccess. Jalur publik tetap bergantung padanya.
+#   404 generik untuk project bukan haknya / tak ada. 400 field cacat atau bukan multipart.
+#   Respons memakai proyeksi baca yang sama — kunci opaque pelapor sengaja TIDAK dikembalikan.
+#   Pipeline pembuatan tiketnya SATU dengan jalur publik (services/ticket-intake.ts): notifikasi
+#   operator, feed sync ticket + ticketAttachment, dan retensi identik.
+#   Allowlist klien membukanya sebagai BENTUK PATH (POST + portal/projects/<id>/tickets), bukan
+#   sebagai method — route portal berikutnya tetap tertutup secara default.
 ```
 
 ## Kelola akun klien (SPEC-617 · ADR-0110) — **COOKIE_ONLY, admin**

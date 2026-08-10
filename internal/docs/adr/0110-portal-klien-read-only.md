@@ -7,6 +7,9 @@
 - Menegakkan: ADR-0018/0019 (turunan vs tersimpan) · ADR-0038 (filter di layer response) ·
   ADR-0062 (Help Center sebagai sumber tiket) · ADR-0064 (FK `Project.id` merambat) ·
   ADR-0065 (agent token — tak berubah; klien adalah jalur cookie) · ADR-0086
+- Diamandemen oleh: [ADR-0111](0111-portal-klien-kirim-tiket.md) (SPEC-626) — permukaan klien kini
+  punya **tepat satu** route tulis (`POST /api/portal/projects/:id/tickets`), dibuka sebagai bentuk
+  path. Sifat deny-by-default di bawah tetap berlaku apa adanya untuk semua yang lain.
 - Tidak mencabut apa pun.
 
 ## Konteks
@@ -103,6 +106,8 @@ yang bisa berarti apa pun di sana.
 
 - Sesi cookie tak lagi setara. Setiap penambahan route wajib menganggap dirinya tertutup bagi klien
   sampai sengaja dibuka — itu memang defaultnya.
+- "Tak ada satu pun aksi tulis" berlaku sampai ADR-0111 (SPEC-626), yang menambah **satu** —
+  kirim tiket help desk — dengan membuka bentuk path-nya saja, bukan method-nya.
 - Portal adalah permukaan yang harus tetap kecil. Menambah endpoint di bawah `/api/portal` berarti
   menambah data yang dilihat pihak di luar tim; proyeksi allowlist adalah tempat keputusan itu.
 - Tak ada jalur signup publik, undangan lewat email, atau reset password mandiri oleh klien selain

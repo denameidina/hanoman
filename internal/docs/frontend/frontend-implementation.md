@@ -734,6 +734,66 @@ icon `inbox`; `NotificationBell` per-tipe (icon/warna brass, label "keluhan baru
 `notifTarget` → `{ section: "triage", projectFilter }`. Server menotifikasi **setiap** tiket baru (dedup `key`),
 tersiar lewat grup `notifications` WS existing.
 
+## Portal klien — chrome sendiri, rantai gulir sendiri, warna dari fungsi murni (SPEC-617/626 · ADR-0110/0111)
+
+`ClientPortal` (`portal/ClientPortal.tsx`) di-fork di `App.tsx` **sesudah gerbang auth**, sebelum
+`Shell`: sidebar `HN_NAV` adalah navigasi operator, dan setiap entrinya adalah 403 yang menunggu
+diklik. Konsekuensinya ia tak mewarisi apa pun dari `Shell` — termasuk **scroll**.
+
+**Rantai gulir.** `#root` dikunci `100vh; overflow: hidden` (lihat "Tinggi & scrolling" di atas),
+jadi layar yang tak memasang scroller-nya sendiri tak bisa digulir sama sekali — bukan terpotong
+di ujung, melainkan tak terjangkau sejak baris pertama yang melewati viewport. Portal karena itu
+memakai konstanta DS yang **sama** dengan layar operator, bukan angka baru:
+
+| elemen | style | arti |
+|---|---|---|
+| root (`data-testid="portal-root"`) | `height:100%`, `min-height:0`, kolom flex | sumber batas tinggi |
+| `<header>` | `FIXED_ROW_STYLE` | **di luar scroller** → tetap terbaca saat daftar digulir |
+| `<main>` (`data-testid="portal-scroll"`) | `LIST_SCROLL_STYLE` | satu-satunya yang menggulir |
+
+Di dalam `<main>` ada pembungkus `max-width`/padding biasa: begitu berada **di dalam** scroller,
+pembungkus `display: block` yang tumbuh setinggi isinya justru yang benar. Karena itu test
+`portal-scroll.test.tsx` memeriksa rantai dari **scroller ke atas**, bukan dari daftar ke atas.
+Isi `Modal` tak perlu perlakuan khusus: panelnya sudah `maxHeight: 88vh` + badan `overflow: auto`,
+dan overlay `position: fixed` tak diklip `#root` (yang tak membuat containing block) — test
+mengunci kontrak itu, bukan memperbaikinya.
+
+**Warna badge = fungsi murni, bukan literal.** `portal/status-pill.ts` memetakan keadaan → status
+`StatusPill` yang sudah ada; nol warna baru, nol warna literal di layar. Keduanya **tabel +
+fallback `idle`** sehingga TOTAL: nilai tak dikenal netral, bukan warna yang percaya diri tentang
+keadaan yang tak diketahui. Satu sumber dipakai baris daftar **dan** modal — warna berbeda di dua
+tempat untuk item yang sama adalah bug SPEC-626, bukan variasi.
+
+| yang dilihat klien (`publicStatus()`, SPEC-293) | `StatusPill` | warna |
+|---|---|---|
+| `Sedang ditinjau` (tiket `new`) | `queued` | wind |
+| `Diterima` (`accepted`, belum jalan) | `awaiting` | amber |
+| `Sedang dikerjakan` (`accepted` + stage `executing`) | `running` | brass |
+| `Selesai` (`accepted` + stage `done`) | `done` | leaf |
+| `Ditutup` (tiket `rejected`) | `failed` | clay |
+
+| stage backlog | label (`STAGE_LABEL`) | `StatusPill` |
+|---|---|---|
+| `brainstorming`, `objective` | Dirumuskan | `queued` |
+| `spec-ready` | Disiapkan | `queued` |
+| `planned` | Direncanakan | `queued` |
+| `executing` | Sedang dikerjakan | `running` |
+| `done` | Selesai | `done` |
+| *tak dikenal* | labelnya sendiri | `idle` |
+
+Domain `ticketPill` adalah **kosakata klien**, bukan `Ticket.status` mentah: `toPortalTicket()`
+sudah memetakannya lewat `publicStatus()` sebelum dikirim. Pemetaannya diikat ke sumber itu oleh
+test kontrak yang menyilangkan seluruh status × stage — kosakata yang berubah di `publicStatus()`
+membuat test merah, bukan diam-diam jadi abu-abu.
+
+**Kirim keluhan** (SPEC-626 · ADR-0111). Tombol di baris tab (terlihat dari kedua tab) membuka
+`TicketForm` (`portal/TicketForm.tsx`): Project (hanya yang boleh diakses, default project aktif) ·
+Kategori (`zTicketCategory.options`) · Judul · Detail · lampiran gambar opsional ≤3. **Tak ada
+field email** — server mengambilnya dari akun — dan **tak ada honeypot**: `hc_trap` menebak
+"apakah ini bot", sedangkan portal sudah tahu siapa pengirimnya. Sesudah `201`, modal tertutup,
+tab pindah ke Help desk, dan daftar tiket **dimuat ulang dari server** (bukan disisipkan di klien)
+sehingga yang tampil adalah tiket seperti yang dilihat operator.
+
 ## Changelog — halaman sendiri, bisa ditautkan (SPEC-519 · mesin: SPEC-516/ADR-0105)
 
 **Changelog** (nav `changelog` "Changelog" `megaphone` di `HN_NAV`, tepat di bawah Docs · SoT; cabang

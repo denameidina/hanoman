@@ -58,6 +58,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0111 — Portal klien mengirim tiket help desk: satu route tulis, satu pipeline intake, lepas dari `helpEnabled`](adr/0111-portal-klien-kirim-tiket.md)
 - [0110 — Portal klien read-only: peran `admin|client`, akses per project, gerbang deny-by-default](adr/0110-portal-klien-read-only.md)
 - [0109 — Ubah type/source backlog item: operasi khusus, gerbang mengunci flow, jejak berpayload](adr/0109-ubah-source-backlog-item.md)
 - [0108 — Klausa gaya kode: satu konstanta di setiap prompt agen, tanpa knob](adr/0108-klausa-gaya-kode-prompt-agen.md)
