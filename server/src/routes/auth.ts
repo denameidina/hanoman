@@ -3,8 +3,8 @@ import { zLogin, zSignup, zChangePassword, type UserView } from "@hanoman/shared
 import { prisma } from "../db";
 import * as auth from "../services/auth";
 
-const view = (u: { id: string; email: string; createdAt: Date }): UserView =>
-  ({ id: u.id, email: u.email, createdAt: u.createdAt.toISOString() });
+const view = (u: { id: string; email: string; role: string; createdAt: Date }): UserView =>
+  ({ id: u.id, email: u.email, role: u.role as UserView["role"], createdAt: u.createdAt.toISOString() });
 
 async function issue(reply: FastifyReply, userId: string) {
   const token = await auth.createSession(userId);

@@ -37,7 +37,7 @@
 - Consumes: —
 - Produces: kolom Prisma `User.role: string`, `User.disabled: boolean`, model `ClientProjectAccess { id, userId, projectId, createdAt }` dengan `@@unique([userId, projectId])`; tipe `UserRole = "admin" | "client"` dan `UserView = { id, email, role, createdAt }` di `@hanoman/shared`.
 
-- [ ] **Step 1: Tulis test skema yang gagal**
+- [x] **Step 1: Tulis test skema yang gagal**
 
 Buat `server/test/client-access-schema.test.ts`:
 
@@ -95,14 +95,14 @@ describe("skema portal klien (SPEC-617)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/client-access-schema.test.ts
 ```
 Expected: FAIL — `prisma.clientProjectAccess` undefined / `cols.get("role")` undefined.
 
-- [ ] **Step 3: Ubah `server/prisma/schema.prisma`**
+- [x] **Step 3: Ubah `server/prisma/schema.prisma`**
 
 Pada model `Project`, tambahkan relasi (sesudah baris `changelogs   Changelog[]`):
 
@@ -147,7 +147,7 @@ model ClientProjectAccess {
 }
 ```
 
-- [ ] **Step 4: Tulis migration SQL**
+- [x] **Step 4: Tulis migration SQL**
 
 Buat `server/prisma/migrations/20260810000000_client_portal_access/migration.sql`:
 
@@ -169,7 +169,7 @@ CREATE TABLE "ClientProjectAccess" (
 CREATE UNIQUE INDEX "ClientProjectAccess_userId_projectId_key" ON "ClientProjectAccess"("userId", "projectId");
 ```
 
-- [ ] **Step 5: Tambahkan `ClientProjectAccess` ke `PG_ORDER`**
+- [x] **Step 5: Tambahkan `ClientProjectAccess` ke `PG_ORDER`**
 
 Di `cli/src/commands/migrate-pg.ts`, ganti baris `"User", "Session", "DeviceToken", "AgentToken",` menjadi:
 
@@ -178,7 +178,7 @@ Di `cli/src/commands/migrate-pg.ts`, ganti baris `"User", "Session", "DeviceToke
   "User", "ClientProjectAccess", "Session", "DeviceToken", "AgentToken",
 ```
 
-- [ ] **Step 6: Perluas `UserView` di `shared/src/dto.ts`**
+- [x] **Step 6: Perluas `UserView` di `shared/src/dto.ts`**
 
 Ganti blok auth (`shared/src/dto.ts:438-445`):
 
@@ -198,7 +198,7 @@ export type UserView = { id: string; email: string; role: UserRole; createdAt: s
 export type AuthStatus = { needsSetup: boolean; user: UserView | null };
 ```
 
-- [ ] **Step 7: Regenerate client + terapkan migration + jalankan test**
+- [x] **Step 7: Regenerate client + terapkan migration + jalankan test**
 
 ```bash
 ./node_modules/.bin/prisma generate --schema server/prisma/schema.prisma
@@ -206,7 +206,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 ```
 Expected: PASS semua.
 
-- [ ] **Step 8: Perbaiki call site `UserView` yang kini kurang `role`**
+- [x] **Step 8: Perbaiki call site `UserView` yang kini kurang `role`**
 
 `server/src/routes/auth.ts:6` — `view()` harus menyertakan `role`:
 
@@ -222,14 +222,13 @@ pnpm --filter ./server typecheck && pnpm --filter ./shared typecheck
 ```
 Expected: nol error.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/prisma shared/src/dto.ts cli/src/commands/migrate-pg.ts server/src/routes/auth.ts server/test/client-access-schema.test.ts
 git commit -m "feat(spec-617): peran user + tabel akses klien→project (migration additif)"
 ```
 
----
 
 ### Task 2: `clientRouteAllowed()` — allowlist murni
 

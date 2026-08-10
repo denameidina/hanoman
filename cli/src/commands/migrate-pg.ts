@@ -19,7 +19,8 @@ export const PG_ORDER = [
   // SPEC-516 · ADR-0105 · Changelog sesudah Project (FK projectId). Tabel ini LOCAL-only dan
   // lazimnya TIDAK ada di sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris.
   "Changelog",
-  "User", "Session", "DeviceToken", "AgentToken",
+  // SPEC-617 · ADR-0110 · ClientProjectAccess sesudah User DAN Project (FK ke keduanya).
+  "User", "ClientProjectAccess", "Session", "DeviceToken", "AgentToken",
   "Vps", "VpsAuditSnapshot", "VpsItemState",
   "SessionResult", "SessionHistory",
   "SyncLog", "LocalBinding", "SyncOutbox", "SyncState", "SyncConflict",

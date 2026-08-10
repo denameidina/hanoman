@@ -29,6 +29,7 @@ model Project {
   customAgents CustomAgent[] // SPEC-450 · ADR-0094 · custom agent milik project ini
   githubIssues GithubIssue[] // SPEC-471 · ADR-0095 · cermin issue repo GitHub project ini
   changelogs   Changelog[]   // SPEC-516 · ADR-0105 · changelog tersimpan project ini
+  clientAccess ClientProjectAccess[] // SPEC-617 · ADR-0110 · akun klien yang boleh melihat project ini
 }
 
 model Spec {
@@ -188,14 +189,37 @@ model Notification {
   readAt    DateTime?
 }
 
-// SPEC-169 · auth. passwordHash = scrypt "<saltHex>:<hashHex>". Tak ada RBAC — semua user setara.
+// SPEC-169 · auth. passwordHash = scrypt "<saltHex>:<hashHex>".
+// SPEC-617 · ADR-0110 · dua peran: `admin` (operator, akses penuh seperti sebelumnya) dan
+// `client` (portal baca-saja ber-scope project). Default `"admin"` DISENGAJA: itulah yang
+// membuat migrasi aman untuk instance yang sudah berjalan — setiap baris lama otomatis admin,
+// tak ada akses yang putus dan tak ada backfill manual.
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
   passwordHash String
+  role         String    @default("admin")
+  // SPEC-617 · nonaktif ditolak di login DAN di lookupSession; hanya menutup login berarti
+  // cookie yang sudah terbit tetap hidup sampai 7 hari (pencabutan yang tak mencabut).
+  disabled     Boolean   @default(false)
   createdAt    DateTime  @default(now())
   sessions     Session[]
   deviceTokens DeviceToken[]
+  projectAccess ClientProjectAccess[]
+}
+
+// SPEC-617 · ADR-0110 · project yang boleh dilihat sebuah akun klien. Tabel join, bukan kolom
+// Json: SQLite melarang scalar list, dan relasi memberi cascade delete gratis di kedua sisi.
+// LOCAL-only — cermin User/Session/AgentToken, tak pernah masuk SYNCED (services/sync.ts).
+model ClientProjectAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
 }
 
 // SPEC-169 · sesi opaque revocable. id = sha256(token); token asli hanya ada di cookie httpOnly.

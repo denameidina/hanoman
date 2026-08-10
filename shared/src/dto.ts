@@ -435,14 +435,36 @@ export const zPatchVps = z.object({
   keyPath: z.string().min(1).nullable(), // null = kembali ke key default server
   password: z.string().min(1),           // SPEC-165 · diisi = bootstrap ulang
 }).partial();
-// SPEC-169 · auth. Tanpa RBAC — semua user setara. Password min 8 saat dibuat/diubah;
-// login menerima min 1 (validasi asli lewat verify hash, error selalu generic).
+// SPEC-169 · auth. Password min 8 saat dibuat/diubah; login menerima min 1 (validasi asli lewat
+// verify hash, error selalu generic).
+// SPEC-617 · ADR-0110 · dua peran. `admin` = perilaku lama persis (akses penuh lewat cookie);
+// `client` = portal baca-saja ber-scope project (gerbang di server/src/services/client-access.ts).
+export const USER_ROLES = ["admin", "client"] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+export const zUserRole = z.enum(USER_ROLES);
 export const zLogin = z.object({ email: z.string().email(), password: z.string().min(1) });
 export const zSignup = z.object({ email: z.string().email(), password: z.string().min(8) });
 export const zChangePassword = z.object({
   currentPassword: z.string().min(1), newPassword: z.string().min(8) });
-export type UserView = { id: string; email: string; createdAt: string };
+export type UserView = { id: string; email: string; role: UserRole; createdAt: string };
 export type AuthStatus = { needsSetup: boolean; user: UserView | null };
+
+// SPEC-617 · ADR-0110 · kelola akun klien. Permukaan KREDENSIAL — cookie-only, tak pernah
+// terjangkau agent token (services/agent-capabilities.ts). `projects` = daftar id project yang
+// boleh dilihat; array kosong sah (akun ada, belum melihat apa pun).
+export const zCreateClientAccount = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  projects: z.array(z.string().min(1)).default([]),
+});
+export const zUpdateClientAccount = z.object({
+  projects: z.array(z.string().min(1)),
+  disabled: z.boolean(),
+  password: z.string().min(8),
+}).partial();
+export type ClientAccountView = {
+  id: string; email: string; disabled: boolean; createdAt: string; projects: string[];
+};
 
 export const zVpsCheck = z.object({
   check: z.string(), status: z.enum(["pass", "fail", "warn", "na"]), detail: z.string() });

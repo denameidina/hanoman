@@ -43,7 +43,14 @@ export async function lookupSession(token: string) {
     await prisma.session.delete({ where: { id: s.id } }).catch(() => {});
     return null;
   }
-  return { id: s.user.id, email: s.user.email, createdAt: s.user.createdAt.toISOString() };
+  // SPEC-617 · nonaktif ditegakkan DI SINI, bukan hanya di login: sesi yang sudah terbit hidup
+  // 7 hari, jadi menutup login saja adalah pencabutan yang tak mencabut apa pun hari ini.
+  if (s.user.disabled) return null;
+  return {
+    id: s.user.id, email: s.user.email,
+    role: s.user.role as UserView["role"],
+    createdAt: s.user.createdAt.toISOString(),
+  };
 }
 export async function deleteSession(token: string): Promise<void> {
   await prisma.session.deleteMany({ where: { id: sessionId(token) } });
