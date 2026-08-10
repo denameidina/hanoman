@@ -26,6 +26,11 @@ async function seed() {
   await prisma.spec.create({ data: {
     id: "SPEC-2", projectId: "p2", title: "Bukan punya klien", source: "brief", stage: "done",
     priority: "rendah", author: "op@internal.co", objective: "x" } });
+  // SPEC-647 · baris tambahan supaya paginasi benar-benar punya sesuatu untuk dipenggal.
+  for (const n of [3, 4, 5])
+    await prisma.spec.create({ data: {
+      id: `SPEC-${n}`, projectId: "p1", title: `Punya klien ${n}`, source: "brief", stage: "planned",
+      priority: "sedang", author: "op@internal.co", objective: "hasil" } });
   await prisma.ticket.create({ data: {
     id: "t1", projectId: "p1", number: 1, category: "bug", title: "Tombol mati",
     detail: "repro", reporterEmail: "pelapor@luar.co", status: "accepted",
@@ -33,6 +38,10 @@ async function seed() {
   await prisma.ticket.create({ data: {
     id: "t2", projectId: "p2", number: 1, category: "bug", title: "Tiket project lain",
     detail: "repro", reporterEmail: "pelapor@luar.co", status: "new", accessKeyHash: "h2" } });
+  for (const n of [2, 3])
+    await prisma.ticket.create({ data: {
+      id: `t1${n}`, projectId: "p1", number: n + 1, category: "bug", title: `Tombol mati ${n}`,
+      detail: "repro", reporterEmail: "pelapor@luar.co", status: "new", accessKeyHash: `h1${n}` } });
 
   await prisma.user.create({ data: { email: "admin@x.co", passwordHash: await hashPassword("password1") } });
   const c = await prisma.user.create({ data: {
@@ -72,7 +81,7 @@ describe("GET /api/portal (SPEC-617)", () => {
     const r = await app.inject({ method: "GET", url: "/api/portal/projects/p1/backlog", headers: { cookie } });
     expect(r.statusCode).toBe(200);
     const body = r.json();
-    expect(body.total).toBe(1);
+    expect(body.total).toBe(4);
     expect(Object.keys(body.items[0]).sort()).toEqual([...PORTAL_SPEC_KEYS].sort());
     expect(JSON.stringify(body)).not.toContain("rahasia internal");
     expect(JSON.stringify(body)).not.toContain("op@internal.co");
@@ -83,10 +92,53 @@ describe("GET /api/portal (SPEC-617)", () => {
     const r = await app.inject({ method: "GET", url: "/api/portal/projects/p1/tickets", headers: { cookie } });
     expect(r.statusCode).toBe(200);
     const body = r.json();
-    expect(body.total).toBe(1);
+    expect(body.total).toBe(3);
     expect(Object.keys(body.items[0]).sort()).toEqual([...PORTAL_TICKET_KEYS].sort());
-    expect(body.items[0].status).toBe("Sedang dikerjakan");   // spec tertaut stage=executing
+    // Dicari by-id: `createdAt` ketiga tiket seed jatuh di milidetik yang sama, jadi `orderBy
+    // createdAt desc` tak menjamin siapa yang di baris pertama.
+    expect(body.items.find((t: { id: string }) => t.id === "t1").status).toBe("Sedang dikerjakan");
     expect(JSON.stringify(body)).not.toContain("pelapor@luar.co");
+  });
+
+  // SPEC-647 · ADR-0107 · yang diuji adalah PEMENGGALANNYA, bukan kehadiran parameter: satu
+  // halaman berisi `limit` baris, `total` tetap seluruh baris, halaman terakhir tak penuh, dan
+  // halaman di luar batas kosong TANPA galat (halaman kosong bukan 404).
+  it("backlog portal dipenggal per halaman, total tetap seluruh baris", async () => {
+    const { cookie } = await seed();
+    const at = async (qs: string) => (await app.inject({
+      method: "GET", url: `/api/portal/projects/p1/backlog${qs}`, headers: { cookie } })).json();
+
+    const p1 = await at("?page=1&limit=2");
+    expect(p1).toMatchObject({ total: 4, page: 1, pageSize: 2 });
+    expect(p1.items).toHaveLength(2);
+
+    const p2 = await at("?page=2&limit=2");
+    expect(p2.items).toHaveLength(2);
+    // Halaman 2 bukan ulangan halaman 1 — inilah yang membuktikan `page` dipakai.
+    expect(p2.items.map((s: { id: string }) => s.id)).not.toEqual(p1.items.map((s: { id: string }) => s.id));
+
+    const akhir = await at("?page=2&limit=3");
+    expect(akhir.items).toHaveLength(1);       // 4 baris ÷ 3 → halaman terakhir tak penuh
+
+    const jauh = await at("?page=9&limit=2");
+    expect(jauh.items).toEqual([]);
+    expect(jauh.total).toBe(4);
+  });
+
+  it("tiket portal dipenggal per halaman", async () => {
+    const { cookie } = await seed();
+    const at = async (qs: string) => (await app.inject({
+      method: "GET", url: `/api/portal/projects/p1/tickets${qs}`, headers: { cookie } })).json();
+
+    const p1 = await at("?page=1&limit=2");
+    expect(p1).toMatchObject({ total: 3, page: 1, pageSize: 2 });
+    expect(p1.items).toHaveLength(2);
+
+    const p2 = await at("?page=2&limit=2");
+    expect(p2.items).toHaveLength(1);
+    expect(p2.items[0].id).not.toBe(p1.items[0].id);
+
+    expect((await at("?page=9&limit=2")).items).toEqual([]);
   });
 
   it("detail backlog & tiket bisa dibuka baca-saja", async () => {
