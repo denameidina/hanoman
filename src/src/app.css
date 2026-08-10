@@ -80,10 +80,82 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 @keyframes hn-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
 @keyframes hn-toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-/* SPEC-585 · napas pet Hanoman. Hanya `transform` — ia hidup di compositor, tak menyentuh main
-   thread, dan tak memicu satu pun render React. Apakah ia dipasang diputuskan di JS
-   (`prefers-reduced-motion`), sama seperti animasi kit lainnya yang juga inline. */
-@keyframes hn-pet-breathe {
-  from { transform: translateY(0) scale(1); }
-  to   { transform: translateY(-3px) scale(1.025); }
+/* SPEC-648 · tiap transform punya layer sendiri agar idle, hover, click, dan pergantian pose
+   dapat berjalan bersamaan. Seluruh keyframe hanya transform/opacity → compositor. */
+.hn-pet-reactor {
+  transform-origin: 50% 86%;
+}
+.hn-pet-stage:not([data-reduced-motion="true"]):hover .hn-pet-reactor {
+  transform: translateY(-2px) scale(1.035) rotate(-1deg);
+}
+
+@keyframes hn-pet-idle-ready {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.018); }
+}
+@keyframes hn-pet-idle-working {
+  0%, 100% { transform: translateY(0) rotate(0) scale(1); }
+  20% { transform: translateY(-2px) rotate(-0.8deg) scale(1.018); }
+  40% { transform: translateY(0) rotate(0.6deg) scale(1); }
+  60% { transform: translateY(-3px) rotate(-0.5deg) scale(1.022); }
+  80% { transform: translateY(-1px) rotate(0.4deg) scale(1.008); }
+}
+@keyframes hn-pet-idle-waiting {
+  0%, 64%, 100% { transform: translateY(0) rotate(0); }
+  70% { transform: translateY(-1px) rotate(-2deg); }
+  76% { transform: translateY(-2px) rotate(3deg); }
+  82% { transform: translateY(-1px) rotate(-2deg); }
+  88% { transform: translateY(0) rotate(0); }
+}
+@keyframes hn-pet-idle-blocked {
+  0%, 100% { transform: translateY(1px) scale(1, 0.99); }
+  50% { transform: translateY(3px) scale(0.99, 0.97); }
+}
+@keyframes hn-pet-idle-review {
+  0%, 64%, 100% { transform: translateY(0) rotate(0) scale(1); }
+  74% { transform: translateY(-1px) rotate(-1.6deg) scale(1.012); }
+  84% { transform: translateY(-1px) rotate(0.8deg) scale(1.006); }
+}
+@keyframes hn-pet-idle-shipped {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.015); }
+}
+@keyframes hn-pet-idle-docs {
+  0%, 66%, 100% { transform: translateY(0) rotate(0) scale(1); }
+  72% { transform: translateY(-1px) rotate(-1.8deg) scale(1.01); }
+  78% { transform: translateY(-1px) rotate(1.5deg) scale(1.012); }
+  84% { transform: translateY(0) rotate(-0.7deg) scale(1); }
+}
+@keyframes hn-pet-celebrate {
+  0% { transform: translateY(3px) scale(0.92) rotate(0); }
+  38% { transform: translateY(-5px) scale(1.08) rotate(-3deg); }
+  62% { transform: translateY(-2px) scale(1.03) rotate(3deg); }
+  100% { transform: translateY(0) scale(1) rotate(0); }
+}
+@keyframes hn-pet-pose-in {
+  0% { opacity: 0; transform: translateY(4px) scale(0.76, 0.92); }
+  62% { opacity: 1; transform: translateY(-2px) scale(1.07, 0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes hn-pet-pose-out {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(3px) scale(0.86, 1.04); }
+}
+@keyframes hn-pet-click {
+  0%, 100% { transform: translateY(0) scale(1) rotate(0); }
+  38% { transform: translateY(2px) scale(0.9, 1.06) rotate(-2deg); }
+  72% { transform: translateY(-3px) scale(1.06, 0.96) rotate(1.5deg); }
+}
+@keyframes hn-pet-panel-in {
+  0% { opacity: 0; transform: translateY(6px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes hn-pet-panel-out {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(5px) scale(0.985); }
+}
+@keyframes hn-pet-reveal {
+  0% { opacity: 0; transform: translateY(7px) scale(0.86); }
+  70% { opacity: 1; transform: translateY(-1px) scale(1.035); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }

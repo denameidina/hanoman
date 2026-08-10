@@ -137,19 +137,41 @@ kanan-bawah, `z-index: 80` → di bawah header (90), terminal fullscreen (100), 
 (200). Pembungkusnya `pointer-events: none` dan hanya tombolnya `auto`, jadi "tak menutupi kontrol"
 ditegakkan struktur, bukan koordinat.
 
-**Animasi.** Napas idle = satu keyframe `hn-pet-breathe` (`app.css`) yang hanya menyentuh
-`transform` → compositor, nol render React. Perpindahan pose = crossfade CSS: pose yang **pernah**
-terjadi dirender bertumpuk dan opasitasnya dipilih `pose === p`, sehingga byte yang diambil browser
-tumbuh mengikuti pemakaian alih-alih memuat kedelapannya di muka. `prefers-reduced-motion: reduce`
-dibaca di JS (`window.matchMedia`, ikut mendengarkan perubahan) dan `animation`/`transition` **tak
-dipasang sama sekali** — bentuk yang bisa diuji, sejalan dengan animasi kit lain yang juga inline.
+**Animasi (SPEC-648).** `motionForPose()` di `pet-motion.ts` memberi tujuh pose tujuh identitas idle:
+`ready` tenang, `working` giat berirama, `waiting` memanggil perhatian secara berkala, `blocked`
+berat/lambat, `review` condong memperhatikan, `shipped` flourish satu kali lalu tenang, dan
+`docs-updated` flutter ringan. Fungsi ini murni presentasi; urutan status dan `derivePetState()` di
+atas tidak berubah. Durasi idle dan flourish memakai token semantik `--dur-pet-*`, sedangkan
+one-shot interaksi/transisi dan easing memakai token design system yang sudah ada.
+
+Stage mempunyai empat pemilik `transform` terpisah: `pet-stage` untuk reveal, `pet-reactor` untuk
+hover/klik, `pet-idle` untuk karakter pose, dan image layer untuk enter/exit. Pemisahan ini membuat
+gerak dapat berkomposisi tanpa satu animation menimpa animation lain. Pose yang **pernah** terjadi
+tetap dirender bertumpuk agar layer lama sempat memainkan `hn-pet-pose-out`, tetapi artwork lain
+tidak dimuat sebelum dipakai. Pose baru memainkan kompresi/overshoot `hn-pet-pose-in`, bukan
+crossfade datar. Seluruh keyframe di `app.css` hanya mengubah `transform`/`opacity`; tidak ada
+interval, `requestAnimationFrame`, pengukuran DOM, atau render React per-frame.
+
+Hover memakai transition kecil yang dikecualikan saat reduced-motion. Klik memasang
+`hn-pet-click` sekali dan membersihkan state melalui `animationend` yang difilter menurut nama,
+bukan timer. Ringkasan memisahkan `open` dari `panelMounted`: tutup/Escape/klik-luar membuat panel
+`aria-hidden`, inert, dan tidak menerima pointer selama `hn-pet-panel-out`, lalu unmount pada
+`animationend`. Saat reduced-motion, unmount berlangsung sinkron karena tak ada event animation.
+Memanggil kembali pet dari handle buntut me-mount stage dengan `hn-pet-reveal`.
+
+`prefers-reduced-motion: reduce` dibaca di JS (`window.matchMedia`, ikut mendengarkan perubahan;
+ketiadaannya berarti tidak reduce). Saat aktif, stage, reactor, idle, image, panel, serta transition
+kontrol terkait menulis nilai eksak `none`; hover dikecualikan dan klik tidak memasang reaksi.
+Opacity statis, alt, live region, dan kontrol tetap utuh sehingga motion mati total tanpa membuat
+status hilang.
 
 **Aksesibilitas.** `role="status" aria-live="polite"` membungkus gambarnya, dan tombolnya adalah
 **overlay transparan di dalam** region itu — bukan sebaliknya: gambar di dalam `<button>`
 diperlakukan sebagian screen reader sebagai presentasional sehingga perubahan alt tak pernah
 diumumkan. Pose aktif membawa alt bermakna berisi kalimat statusnya; lapisan pose lain `alt=""` +
-`aria-hidden`. Satu sumber kalimat, tanpa teks tersembunyi kembar. Hover memunculkan ringkasan yang
-sama lewat `title`.
+`aria-hidden`. Satu sumber kalimat, tanpa teks tersembunyi kembar. Hover mengekspos ringkasan yang
+sama lewat `title`; klik membuka kartunya. Panel yang sedang keluar inert agar kontrol tersembunyi
+tidak dapat menerima fokus.
 
 **Sembunyikan** disimpan di `localStorage` `hanoman.pet.hidden` (pola `hanoman.terminal.workspace`)
 — preferensi per-browser, tanpa skema & tanpa endpoint. Disembunyikan berarti **menyusut** jadi

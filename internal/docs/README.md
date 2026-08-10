@@ -177,9 +177,9 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [security-standard](security/security-standard.md)
 
 ## design-system
-- [design-system](design-system/design-system.md)
+- [design-system](design-system/design-system.md) — editorial instrument-panel, ilustrasi, dan grammar motion Pet Hanoman (SPEC-648)
 
 ## frontend
-- [frontend-implementation](frontend/frontend-implementation.md)
+- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk state → pose dan motion Pet Hanoman
 
 > Chiranjivi — docs bertahan lebih lama dari satu commit atau sesi. Jaga index ini tetap sinkron.
