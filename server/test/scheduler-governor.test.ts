@@ -12,7 +12,7 @@ describe("governor.drain", () => {
   it("never launches beyond cap (live count invariant)", async () => {
     for (const p of ["a", "b", "c", "d"]) await enqueue({ specId: `SPEC-${p}`, projectId: "p1", source: "backlog", priority: "sedang" });
     let launched = 0;
-    const deps: GovernorDeps = { liveCount: () => launched, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => { launched++; return `s${launched}`; } };
+    const deps: GovernorDeps = { drainCrons: async (s) => s, liveCount: () => launched, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => { launched++; return `s${launched}`; } };
     await drain(cfg({ maxConcurrent: 2 }), deps);
     expect(launched).toBe(2);                                   // cap dihormati
     expect((await listQueue("launched")).length).toBe(2);
@@ -21,7 +21,7 @@ describe("governor.drain", () => {
   it("does nothing when live already at cap", async () => {
     await enqueue({ specId: "SPEC-x", projectId: "p1", source: "backlog", priority: "tinggi" });
     let launches = 0;
-    const deps: GovernorDeps = { liveCount: () => 3, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => { launches++; return "s"; } };
+    const deps: GovernorDeps = { drainCrons: async (s) => s, liveCount: () => 3, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => { launches++; return "s"; } };
     await drain(cfg({ maxConcurrent: 3 }), deps);
     expect(launches).toBe(0);
     expect((await listQueue("queued")).length).toBe(1);
@@ -30,7 +30,7 @@ describe("governor.drain", () => {
     await enqueue({ specId: "SPEC-live", projectId: "p1", source: "backlog", priority: "tinggi" });
     await enqueue({ specId: "SPEC-new", projectId: "p1", source: "backlog", priority: "sedang" });
     let launches = 0;
-    const deps: GovernorDeps = {
+    const deps: GovernorDeps = { drainCrons: async (s) => s,
       liveCount: () => 1,                                        // SPEC-live sudah dihitung live
       isLive: (specId) => (specId === "SPEC-live" ? "spec_live" : null),
       isDone: async () => false, blockers: async () => [],
@@ -50,7 +50,7 @@ describe("governor.drain", () => {
     await enqueue({ specId: "SPEC-old", projectId: "p1", source: "backlog", priority: "tinggi" });
     await enqueue({ specId: "SPEC-open", projectId: "p1", source: "backlog", priority: "sedang" });
     const launched: string[] = [];
-    const deps: GovernorDeps = {
+    const deps: GovernorDeps = { drainCrons: async (s) => s,
       liveCount: () => 0, isLive: () => null,
       isDone: async (specId) => specId === "SPEC-old", blockers: async () => [],
       launch: async (item) => { launched.push(item.specId); return "s_open"; },
@@ -68,7 +68,7 @@ describe("governor.drain", () => {
       await enqueue({ specId: `SPEC-${p}`, projectId: "p1", source: "backlog", priority: "sedang" });
     }
     let launches = 0;
-    const deps: GovernorDeps = {
+    const deps: GovernorDeps = { drainCrons: async (s) => s,
       liveCount: () => 0, isLive: () => null,
       isDone: async (specId) => specId.startsWith("SPEC-done"), blockers: async () => [],
       launch: async () => { launches++; return `s${launches}`; },
@@ -81,7 +81,7 @@ describe("governor.drain", () => {
   it("marks an item failed when launch throws (no retry, next item still processed)", async () => {
     await enqueue({ specId: "SPEC-bad", projectId: "p1", source: "backlog", priority: "tinggi" });
     await enqueue({ specId: "SPEC-ok", projectId: "p1", source: "backlog", priority: "sedang" });
-    const deps: GovernorDeps = {
+    const deps: GovernorDeps = { drainCrons: async (s) => s,
       liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [],
       launch: async (item) => { if (item.specId === "SPEC-bad") throw new Error("needs-bind"); return "s_ok"; },
     };
@@ -97,7 +97,7 @@ describe("governor.drain", () => {
     await enqueue({ specId: "SPEC-blk", projectId: "p1", source: "backlog", priority: "tinggi" });
     await enqueue({ specId: "SPEC-free", projectId: "p1", source: "backlog", priority: "sedang" });
     const launched: string[] = [];
-    const deps: GovernorDeps = {
+    const deps: GovernorDeps = { drainCrons: async (s) => s,
       liveCount: () => 0, isLive: () => null, isDone: async () => false,
       blockers: async (specId) =>
         (specId === "SPEC-blk" ? [{ id: "SPEC-dep", reason: "unmerged" as const }] : []),
@@ -115,7 +115,7 @@ describe("governor.drain", () => {
   // informasi yang sama. Buktinya dari jumlah panggilan `update`, bukan dari bentuk barisnya.
   it("tak menulis ulang note yang sama", async () => {
     await enqueue({ specId: "SPEC-blk2", projectId: "p1", source: "backlog", priority: "tinggi" });
-    const deps: GovernorDeps = {
+    const deps: GovernorDeps = { drainCrons: async (s) => s,
       liveCount: () => 0, isLive: () => null, isDone: async () => false,
       blockers: async () => [{ id: "SPEC-dep", reason: "unfinished" as const }],
       launch: async () => "s",
@@ -143,7 +143,7 @@ describe("governor.drain", () => {
     await enqueue({ specId: "SPEC-late", projectId: "p1", source: "backlog", priority: "sedang" });
     const late = (await queueItemForSpec("SPEC-late"))!;
     const launched: string[] = [];
-    const deps: GovernorDeps = {
+    const deps: GovernorDeps = { drainCrons: async (s) => s,
       liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [],
       launch: async (item) => {
         launched.push(item.specId);
@@ -164,7 +164,7 @@ describe("governor.drain", () => {
     await enqueue({ specId: "SPEC-cd", projectId: "p1", source: "backlog", priority: "tinggi" });
     const row = (await queueItemForSpec("SPEC-cd"))!;
     await markCanceled(row.id, "dibatalkan operator");
-    const deps: GovernorDeps = {
+    const deps: GovernorDeps = { drainCrons: async (s) => s,
       liveCount: () => 0, isLive: () => null, isDone: async () => true, blockers: async () => [],
       launch: async () => "s",
     };
@@ -181,7 +181,7 @@ describe("governor.drain", () => {
     await enqueue({ specId: "SPEC-next", projectId: "p1", source: "backlog", priority: "rendah" });
     const race = (await queueItemForSpec("SPEC-race"))!;
     const launched: string[] = [];
-    const deps: GovernorDeps = {
+    const deps: GovernorDeps = { drainCrons: async (s) => s,
       liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [],
       launch: async (item) => {
         // dibatalkan DI TENGAH spawn: barisnya masih `queued` saat gerbang pertama lewat

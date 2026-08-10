@@ -1202,7 +1202,7 @@ git commit -m "feat(spec-646): prompt cron + peluncuran sesi di worktree project
   - `type CronDeps = { liveCron: (cronId: string) => string | null; launchCron: (cron: CronLaunchInput) => Promise<string> }`
   - `prodCronDeps: CronDeps` (engine)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/scheduler-cron-drain.test.ts`:
 
@@ -1223,7 +1223,7 @@ const mk = async (over: Record<string, unknown> = {}, projectOver: Record<string
   await prisma.project.upsert({
     where: { id: "p1" },
     update: { schedulerOptIn: true, ...projectOver },
-    create: { id: "p1", name: "P1", kind: "existing", schedulerOptIn: true, ...projectOver },
+    create: { id: "p1", name: "P1", desc: "", kind: "existing", schedulerOptIn: true, ...projectOver },   // `desc` WAJIB di skema
   });
   const cron = await prisma.schedulerCron.create({
     data: { projectId: "p1", name: "Cek pagi", expr: "0 7 * * *", prompt: "x", enabled: true, ...over },
@@ -1323,7 +1323,7 @@ describe("drainCronRuns", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1332,7 +1332,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: FAIL — `drainCronRuns` tak diekspor dari `governor`.
 
-- [ ] **Step 3: Tambahkan `drainCronRuns` + integrasi di `governor.ts`**
+- [x] **Step 3: Tambahkan `drainCronRuns` + integrasi di `governor.ts`**
 
 Di `server/src/services/scheduler/governor.ts`, tambahkan import:
 
@@ -1439,7 +1439,7 @@ menjadi:
     if (slots <= 0) return;
 ```
 
-- [ ] **Step 4: Pasang di `engine.ts`**
+- [x] **Step 4: Pasang di `engine.ts`**
 
 Di `server/src/services/scheduler/engine.ts`, tambahkan import:
 
@@ -1470,18 +1470,22 @@ Tambahkan ke `prodDeps`, sesudah `launch`:
   }),
 ```
 
-- [ ] **Step 5: Perbaiki test governor lama yang kini kurang satu field**
+- [x] **Step 5: Perbaiki test governor lama yang kini kurang satu field**
 
 `server/test/scheduler-governor.test.ts` & `server/test/scheduler-engine.test.ts` merakit
 `GovernorDeps` sebagai literal; field `drainCrons` yang baru wajib ada agar typecheck lolos.
 Tambahkan `drainCrons: async (s) => s,` ke SETIAP literal `GovernorDeps` di kedua berkas
-(pass-through: test itu menguji antrean spec, bukan cron).
+(pass-through: test itu menguji antrean spec, bukan cron). **Termasuk yang TAK ber-anotasi tipe** —
+`scheduler-engine.test.ts` punya satu literal inline di dalam `await tick(1_000_000, { … })`, dan
+vitest tak menjalankan typecheck sehingga yang terlihat bukan error kompilasi melainkan
+`launches === 0`: `deps.drainCrons` yang `undefined` melempar, lalu `catch` di `tick` menelannya.
 
 ```bash
-grep -n "GovernorDeps = {" server/test/scheduler-governor.test.ts server/test/scheduler-engine.test.ts
+grep -n "GovernorDeps" server/test/scheduler-governor.test.ts server/test/scheduler-engine.test.ts
+grep -n "await tick(" server/test/scheduler-engine.test.ts
 ```
 
-- [ ] **Step 6: Jalankan test sampai hijau**
+- [x] **Step 6: Jalankan test sampai hijau**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1491,7 +1495,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: PASS seluruhnya (9 test baru + test lama tetap hijau).
 
-- [ ] **Step 7: Typecheck server**
+- [x] **Step 7: Typecheck server**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1499,7 +1503,7 @@ pnpm --filter ./server typecheck
 
 Expected: keluar 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/scheduler/governor.ts server/src/services/scheduler/engine.ts server/test/scheduler-cron-drain.test.ts server/test/scheduler-governor.test.ts server/test/scheduler-engine.test.ts
