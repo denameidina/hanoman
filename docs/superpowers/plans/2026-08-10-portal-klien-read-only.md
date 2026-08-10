@@ -240,7 +240,7 @@ git commit -m "feat(spec-617): peran user + tabel akses klien→project (migrati
 - Consumes: —
 - Produces: `clientRouteAllowed(method: string, path: string): boolean` — `path` sudah tanpa query, memuat prefix `/api`. Juga `clientProjectIds(userId: string): Promise<string[]>` dan `hasProjectAccess(userId: string, projectId: string): Promise<boolean>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/client-route-allowed.test.ts`:
 
@@ -301,14 +301,14 @@ describe("clientRouteAllowed (SPEC-617)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/client-route-allowed.test.ts
 ```
 Expected: FAIL — modul `client-access` tak ada.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `server/src/services/client-access.ts`:
 
@@ -356,21 +356,20 @@ export async function hasProjectAccess(userId: string, projectId: string): Promi
 }
 ```
 
-- [ ] **Step 4: Jalankan — harus lulus**
+- [x] **Step 4: Jalankan — harus lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/client-route-allowed.test.ts
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/client-access.ts server/test/client-route-allowed.test.ts
 git commit -m "feat(spec-617): allowlist route klien (deny-by-default, fungsi murni)"
 ```
 
----
 
 ### Task 3: Gerbang server — role di sesi, nonaktif mencabut, 403 untuk klien
 
