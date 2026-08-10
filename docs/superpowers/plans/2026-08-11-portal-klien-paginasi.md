@@ -47,7 +47,7 @@ per kali, dengan `Pager` design system yang sama dengan dashboard operator.
 - Produces: `GET /api/portal/projects[?page=&limit=]` → `{ items: PortalProject[], total, page, pageSize }`.
   Tanpa query: seluruh baris (`pageSize === total`) — dipakai pemilih project di UI.
 
-- [ ] **Step 1: Ubah tiga ekspektasi lama + tambah test amplop yang gagal**
+- [x] **Step 1: Ubah tiga ekspektasi lama + tambah test amplop yang gagal**
 
 Di `server/test/portal.route.test.ts`, ganti tiga assertion `toEqual({ items: … })` menjadi
 `toMatchObject` supaya field amplop tambahan tak membuatnya merah, lalu tambahkan satu test baru.
@@ -93,7 +93,7 @@ Test baru, ditaruh tepat sesudah "daftar project hanya yang ditugaskan":
   });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -102,7 +102,7 @@ env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: FAIL — test baru merah karena respons tak punya `total`/`page`/`pageSize`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 `server/src/routes/portal.ts`, ganti handler `GET /portal/projects`:
 
@@ -119,7 +119,7 @@ Expected: FAIL — test baru merah karena respons tak punya `total`/`page`/`page
   });
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 ```bash
 env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -128,7 +128,7 @@ env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: PASS (semua test di berkas itu).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/portal.ts server/test/portal.route.test.ts
@@ -150,7 +150,7 @@ Kontraknya sudah ada di kode; yang belum ada adalah **buktinya**. Task ini tak m
   `GET /api/portal/projects/:id/tickets?page=&limit=` → `Paginated<…>`.
 - Produces: —
 
-- [ ] **Step 1: Tambah baris ekstra di `seed()` lalu tulis dua test yang gagal**
+- [x] **Step 1: Tambah baris ekstra di `seed()` lalu tulis dua test yang gagal**
 
 Di dalam `seed()`, tepat sesudah `SPEC-2` dibuat, tambahkan tiga spec + dua tiket lagi di `p1`
 supaya ada cukup baris untuk dipenggal (`SPEC-1` sudah ada → total 4 spec & 3 tiket di `p1`):
@@ -233,7 +233,7 @@ Dua test baru:
   });
 ```
 
-- [ ] **Step 2: Jalankan test**
+- [x] **Step 2: Jalankan test**
 
 ```bash
 env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -243,7 +243,7 @@ env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 Expected: PASS seluruh berkas. Kalau ada yang merah, itu ekspektasi `total` lama yang belum
 disesuaikan dengan baris seed tambahan — perbaiki angkanya, jangan mengurangi seed-nya.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add server/test/portal.route.test.ts
@@ -268,7 +268,7 @@ git commit -m "test(spec-647): kunci pemenggalan halaman backlog & tiket portal"
   ```
   `listProjects` **tanpa** argumen halaman (pemilih project meminta daftar penuh).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/portal-api-page.test.ts`:
 
@@ -321,7 +321,7 @@ describe("portalApi paginasi (SPEC-647)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest run src/test/portal-api-page.test.ts
@@ -330,7 +330,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest run src/test/portal-api-page.test.ts
 Expected: FAIL — URL yang terkirim masih `/api/portal/projects/p1/backlog` tanpa query
 (dan TypeScript menolak argumen kedua).
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 `src/src/api/portal.ts`, tepat di bawah `const p = …`:
 
@@ -354,7 +354,7 @@ dan `listProjects` ikut beramplop (Task 1):
   listProjects: () => get<Paginated<PortalProject>>("/api/portal/projects"),
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest run src/test/portal-api-page.test.ts
@@ -362,7 +362,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest run src/test/portal-api-page.test.ts
 
 Expected: PASS (5 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/portal.ts src/test/portal-api-page.test.ts
@@ -381,7 +381,7 @@ git commit -m "feat(spec-647): api portal mengirim page+limit sebagai satu argum
 - Consumes: `PortalPage` (Task 3), `Pager` + `serverPage` dari `../ds`.
 - Produces: `data-testid="portal-list"` tetap ada (dipakai `portal-scroll.test.tsx`).
 
-- [ ] **Step 1: Perbarui mock yang sudah ada supaya beramplop halaman**
+- [x] **Step 1: Perbarui mock yang sudah ada supaya beramplop halaman**
 
 `src/test/client-portal.test.tsx` — mock `listProjects` kini mengembalikan amplop, dan
 `listBacklog`/`listTickets` mengembalikan `total` yang benar (halaman 1 dari 1):
@@ -393,7 +393,7 @@ git commit -m "feat(spec-647): api portal mengirim page+limit sebagai satu argum
 
 Ekspektasi lain di berkas itu tak berubah.
 
-- [ ] **Step 2: Tulis test paginasi yang gagal**
+- [x] **Step 2: Tulis test paginasi yang gagal**
 
 Tambahkan di akhir `src/test/client-portal.test.tsx`, sebagai `describe` sendiri:
 
@@ -516,7 +516,7 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test — harus gagal**
+- [x] **Step 3: Jalankan test — harus gagal**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest run src/test/client-portal.test.tsx
@@ -525,7 +525,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest run src/test/client-portal.test.tsx
 Expected: FAIL — `listBacklog` dipanggil tanpa argumen halaman, 25 baris dirender, tak ada
 tombol "Halaman 2".
 
-- [ ] **Step 4: Implementasi di `ClientPortal.tsx`**
+- [x] **Step 4: Implementasi di `ClientPortal.tsx`**
 
 (a) impor `Pager` + `serverPage` dari `../ds`, dan tipe `Paginated` dari shared:
 
@@ -673,7 +673,7 @@ sama supaya `setTPage(1)` + pemuatan jadi **satu** fetch:
           }}
 ```
 
-- [ ] **Step 5: Jalankan test — harus lulus**
+- [x] **Step 5: Jalankan test — harus lulus**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest run src/test/client-portal.test.tsx src/test/portal-scroll.test.tsx src/test/portal-api-page.test.ts
@@ -683,7 +683,7 @@ Expected: PASS ketiganya. `portal-scroll.test.tsx` memakai mock yang mengembalik
 tanpa melihat argumen — ia tetap hijau; kalau merah, penyebabnya rantai gulir yang berubah,
 bukan paginasi (`portal-list` wajib tetap ada dan tetap di dalam `<main>`).
 
-- [ ] **Step 6: Typecheck paket web**
+- [x] **Step 6: Typecheck paket web**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/tsc -p src --noEmit
@@ -692,7 +692,7 @@ env -u NODE_ENV ./node_modules/.bin/tsc -p src --noEmit
 Expected: exit 0. (Paket web = `@hanoman/app`, `tsconfig` di `src/tsconfig.json`; `pnpm` di mesin
 ini diproksi `rtk` sehingga `pnpm vitest`/`pnpm --filter` bisa gagal — pakai biner langsung.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/portal/ClientPortal.tsx src/test/client-portal.test.tsx
@@ -711,7 +711,7 @@ git commit -m "feat(spec-647): portal klien berhalaman dengan Pager design syste
 **Interfaces:**
 - Consumes: keputusan D1–D8 di `docs/superpowers/specs/2026-08-11-portal-klien-paginasi-design.md`.
 
-- [ ] **Step 1: `api-contract.md` — amplop daftar project portal**
+- [x] **Step 1: `api-contract.md` — amplop daftar project portal**
 
 Ganti baris 61 menjadi:
 
@@ -727,7 +727,7 @@ dan tambahkan satu baris catatan di bawah blok endpoint portal (sesudah baris `#
 #   pemilih project sengaja meminta daftar penuh — project terpilih tak boleh jatuh dari halaman.
 ```
 
-- [ ] **Step 2: `frontend-implementation.md` — paginasi portal**
+- [x] **Step 2: `frontend-implementation.md` — paginasi portal**
 
 Tambahkan sub-bagian baru tepat sebelum "**Kirim keluhan** (SPEC-626 · ADR-0111)":
 
@@ -770,7 +770,7 @@ Perbarui juga judul bagiannya supaya SPEC-nya ikut tercatat:
 ## Portal klien — chrome sendiri, rantai gulir sendiri, warna dari fungsi murni (SPEC-617/626/647 · ADR-0110/0111)
 ```
 
-- [ ] **Step 3: `adr/README.md` — catat jangkauan portal di narasi ADR-0107**
+- [x] **Step 3: `adr/README.md` — catat jangkauan portal di narasi ADR-0107**
 
 Tambahkan satu kalimat di akhir entri ADR-0107 (cari `0107` di berkas itu):
 
@@ -781,7 +781,7 @@ Tambahkan satu kalimat di akhir entri ADR-0107 (cari `0107` di berkas itu):
   **pengecualian keempat yang dinyatakan**: beramplop, tapi tanpa kontrol halaman.
 ```
 
-- [ ] **Step 4: Verifikasi integritas index docs**
+- [x] **Step 4: Verifikasi integritas index docs**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || echo "cli belum dibangun — lewati, tak ada doc BARU yang ditambahkan"
@@ -790,7 +790,7 @@ node cli/dist/index.js docs index --check 2>/dev/null || echo "cli belum dibangu
 Expected: tak ada doc baru di task ini (hanya doc yang sudah ter-link yang disunting), jadi index
 `internal/docs/README.md` tak perlu entri baru.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs/architecture/api-contract.md internal/docs/frontend/frontend-implementation.md internal/docs/adr/README.md
@@ -806,7 +806,7 @@ git commit -m "docs(spec-647): paginasi portal klien di api-contract, frontend, 
 **Interfaces:**
 - Consumes: seluruh perubahan Task 1–5.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
 
 ```bash
 env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -818,7 +818,7 @@ env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 Expected: PASS semuanya, dan **jumlah berkas test = 5** (bukan "no test files" — `--changed`
 menyalakan `passWithNoTests`, jadi nol test terlihat hijau).
 
-- [ ] **Step 2: Typecheck dua paket yang tersentuh**
+- [x] **Step 2: Typecheck dua paket yang tersentuh**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/tsc -p server --noEmit && env -u NODE_ENV ./node_modules/.bin/tsc -p src --noEmit
@@ -826,7 +826,7 @@ env -u NODE_ENV ./node_modules/.bin/tsc -p server --noEmit && env -u NODE_ENV ./
 
 Expected: exit 0 keduanya.
 
-- [ ] **Step 3: Boot server + curl endpoint portal yang tersentuh**
+- [x] **Step 3: Boot server + curl endpoint portal yang tersentuh**
 
 Task ini menyentuh endpoint (`GET /portal/projects`), jadi ia diuji nyata sekali di akhir. **DB
 khusus + port khusus**: DB test dibagi antar-worktree dan port 8787 mungkin dipakai sesi lain.
@@ -852,15 +852,48 @@ Expected: ketiganya `{items,total,page,pageSize}`; `backlog?page=2&limit=1` meng
 baris yang **bukan** baris halaman 1, dan `total` = seluruh baris. Matikan server per-PID
 (`lsof -ti:8799` → `kill <pid>`), **jangan** `pkill -f node` (SPEC-402).
 
-- [ ] **Step 4: Centang seluruh kotak plan ini lalu commit**
+- [x] **Step 4: Centang seluruh kotak plan ini lalu commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-11-portal-klien-paginasi.md
 git commit -m "chore(spec-647): centang plan + catat bukti verifikasi"
 ```
 
-- [ ] **Step 5: Push**
+- [x] **Step 5: Push**
 
 ```bash
 git push origin HEAD:refs/heads/hanoman/spec-647
 ```
+
+---
+
+## Bukti verifikasi (2026-08-11)
+
+**Test yang tersentuh** — 5 berkas, **54 test lulus** (bukan "no test files"):
+`server/test/portal.route.test.ts` (15) · `server/test/portal-ticket.route.test.ts` (12) ·
+`src/test/client-portal.test.tsx` (18) · `src/test/portal-scroll.test.tsx` (4) ·
+`src/test/portal-api-page.test.ts` (5).
+
+**Scope diperluas sekali** ke `vitest run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism`
+karena `src/src/api/portal.ts` diimpor `ClientPortal` yang diimpor `App.tsx`: **93 berkas, 784
+lulus, 1 gagal** — `server/test/update.route.test.ts` (`canApply` `false` vs `true`). Gagal palsu
+yang sudah dikenal (SPEC-523): sesi ini diwarisi `HANOMAN_SUPERVISOR=1` dari supervisor
+`hanoman start`, dan `UpdateStatus.canApply` membacanya langsung dari `process.env` (ADR-0088).
+Dibuktikan bukan regresi: `env -u HANOMAN_SUPERVISOR … update.route.test.ts` → **8/8 lulus**,
+dan `server/src/routes/update.ts` tak disentuh SPEC-647.
+
+**Typecheck** `tsc -p src --noEmit` dan `tsc -p server --noEmit` → keduanya exit 0.
+
+**Endpoint diuji nyata** (server `tsx server/src/server.ts`, `HANOMAN_HOME` sementara, port 8799,
+akun klien + `ClientProjectAccess` sungguhan, 5 spec & 5 tiket):
+
+| permintaan | balasan |
+|---|---|
+| `GET /portal/projects` | `{items:[smoke647], total:1, page:1, pageSize:1}` |
+| `…/backlog?page=1&limit=2` | `SPEC-905, SPEC-904` · `total:5, page:1, pageSize:2` |
+| `…/backlog?page=2&limit=2` | `SPEC-903, SPEC-902` — **bukan** ulangan halaman 1 |
+| `…/backlog?page=9&limit=2` | `items: []`, `total: 5` — di luar batas bukan galat |
+| `…/tickets?page=3&limit=2` | 1 baris (halaman terakhir tak penuh), `total: 5` |
+| `…/backlog` tanpa query | 5 baris, `pageSize: 5` — plafon lama, kini hanya dipakai pemilih project |
+
+Server dimatikan per-PID (`lsof -ti:8799` → `kill`), bukan `pkill -f node` (SPEC-402).
