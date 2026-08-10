@@ -568,7 +568,7 @@ git commit -m "refactor(spec-626): satu pipeline intake tiket dipakai dua pintu"
 **Interfaces:**
 - Produces: `portalTicketRateOk(userId: string, projectId: string, now?: number): boolean`; `__resetHelpBuckets()` ikut mengosongkan bucket akun.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/help-ratelimit.test.ts`:
 
@@ -607,7 +607,7 @@ describe("portalTicketRateOk (SPEC-626)", () => {
 
 Sesuaikan baris import berkas itu supaya memuat `portalTicketRateOk` (dan `helpRateOk`, `__resetHelpBuckets` yang sudah ada), serta `describe`/`beforeEach` dari vitest.
 
-- [ ] **Step 2: Jalankan — harus MERAH**
+- [x] **Step 2: Jalankan — harus MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/help-ratelimit.test.ts
@@ -615,7 +615,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: FAIL — `portalTicketRateOk is not a function` / import tak ada.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/help-ratelimit.ts`, tambahkan map akun + fungsinya, dan ikutkan di reset:
 
@@ -639,7 +639,7 @@ export function portalTicketRateOk(userId: string, projectId: string, now = Date
 export function __resetHelpBuckets() { ipBuckets.clear(); projBuckets.clear(); acctBuckets.clear(); }
 ```
 
-- [ ] **Step 4: Jalankan — harus HIJAU**
+- [x] **Step 4: Jalankan — harus HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/help-ratelimit.test.ts
@@ -647,7 +647,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/help-ratelimit.ts server/test/help-ratelimit.test.ts
