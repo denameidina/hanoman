@@ -13,6 +13,7 @@ import { flowForSource, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
 import { AuthScreen } from "./screens/AuthScreen";
+import { ClientPortal } from "./portal/ClientPortal";
 import { AuthProvider } from "./auth/AuthContext";
 import type { ProjectVM } from "./screens/types";
 import { branchOptions } from "./screens/branch";
@@ -1101,6 +1102,11 @@ export default function App() {
   // SPEC-169 · gerbang auth: splash → Setup/Login → app.
   if (!auth) return <StateBlock kind="loading" title="Memuat hanoman…" />;
   if (!auth.user) return <AuthScreen needsSetup={auth.needsSetup} onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
+  // SPEC-617 · ADR-0110 · akun klien mendarat di permukaannya sendiri, bukan dashboard operator.
+  // Percabangan di SINI (bukan di dalam Shell) supaya tak satu pun state/efek dashboard operator
+  // pernah berjalan untuk klien — termasuk poll yang endpointnya memang 403 baginya.
+  if (auth.user.role === "client")
+    return <ClientPortal user={auth.user} onLoggedOut={onLoggedOut} />;
   const me: UserView = auth.user;
 
   let screen: React.ReactNode = null;

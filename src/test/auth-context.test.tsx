@@ -9,7 +9,7 @@ function Probe() {
   const { user, logout } = useAuth();
   return <button onClick={() => void logout()}>{user ? user.email : "no-user"}</button>;
 }
-const me = { id: "u1", email: "a@b.c", createdAt: new Date().toISOString() };
+const me = { id: "u1", email: "a@b.c", role: "admin" as const, createdAt: new Date().toISOString() };
 
 beforeEach(() => { (api.logout as any).mockReset(); });
 

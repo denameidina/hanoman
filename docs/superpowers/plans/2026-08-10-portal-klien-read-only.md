@@ -1342,7 +1342,7 @@ git commit -m "feat(spec-617): endpoint kelola akun klien + pagar admin terakhir
 - Consumes: `PortalProject`/`PortalSpec`/`PortalTicket`/`PortalTicketDetail` (Task 4), `UserView.role` (Task 1)
 - Produces: `portalApi` (`listProjects`, `listBacklog`, `getSpec`, `listTickets`, `getTicket`, `logout`), komponen `<ClientPortal user onLoggedOut />`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/client-portal.test.tsx`:
 
@@ -1422,14 +1422,14 @@ describe("ClientPortal (SPEC-617)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/client-portal.test.tsx
 ```
 Expected: FAIL — modul `ClientPortal` tak ada.
 
-- [ ] **Step 3: Klien API portal**
+- [x] **Step 3: Klien API portal**
 
 Buat `src/src/api/portal.ts`:
 
@@ -1461,7 +1461,7 @@ export const portalApi = {
 };
 ```
 
-- [ ] **Step 4: Komponen portal**
+- [x] **Step 4: Komponen portal**
 
 Buat `src/src/portal/ClientPortal.tsx`:
 
@@ -1639,7 +1639,7 @@ const ddStyle: React.CSSProperties = { margin: 0, fontSize: "var(--text-sm)" };
 
 Catatan: bila prop `Tabs`/`StatusPill`/`Modal`/`StateBlock`/`Button` di `src/src/ds` ternyata bernama lain, **ikuti tanda tangan yang ada di sana** — komponen DS adalah kebenaran, bukan cuplikan ini. `Icon` diimpor bila dipakai; hapus importnya bila tidak.
 
-- [ ] **Step 5: Percabangan di `App.tsx`**
+- [x] **Step 5: Percabangan di `App.tsx`**
 
 Ganti blok gerbang auth (`src/src/App.tsx:1101-1104`):
 
@@ -1661,21 +1661,20 @@ dan tambahkan import di kepala berkas, bersama import screen lain:
 import { ClientPortal } from "./portal/ClientPortal";
 ```
 
-- [ ] **Step 6: Jalankan test**
+- [x] **Step 6: Jalankan test**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/client-portal.test.tsx src/test/app-states.test.tsx src/test/app-flows.test.tsx
 ```
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/api/portal.ts src/src/portal src/src/App.tsx src/test/client-portal.test.tsx
 git commit -m "feat(spec-617): portal klien di dashboard (fork sesudah gerbang auth)"
 ```
 
----
 
 ### Task 8: Layar admin "Akses klien"
 

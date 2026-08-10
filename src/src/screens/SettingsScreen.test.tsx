@@ -50,7 +50,7 @@ function telegramFetch(extra: (path: string, init?: RequestInit) => Promise<Resp
 
 async function openTelegramTab() {
   render(<SettingsScreen
-    me={{ id: "u1", email: "dena@example.test", createdAt: "2026-08-01T00:00:00.000Z" }}
+    me={{ id: "u1", email: "dena@example.test", role: "admin", createdAt: "2026-08-01T00:00:00.000Z" }}
     onLoggedOut={() => {}}
   />);
   fireEvent.click(screen.getByRole("button", { name: "Telegram" }));
