@@ -579,7 +579,7 @@ git commit -m "feat(spec-617): gerbang role client di onRequest + nonaktif menca
   - `toPortalProject`, `toPortalSpec`, `toPortalTicket`, `toPortalTicketDetail`
   - `PORTAL_SPEC_KEYS`, `PORTAL_TICKET_KEYS`, `PORTAL_PROJECT_KEYS` (untuk test kebocoran)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/portal.test.ts`:
 
@@ -659,14 +659,14 @@ describe("proyeksi portal (SPEC-617)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism shared/src/portal.test.ts
 ```
 Expected: FAIL — `./portal` tak ada.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `shared/src/portal.ts`:
 
@@ -729,7 +729,7 @@ export function toPortalTicketDetail(
 }
 ```
 
-- [ ] **Step 4: Ekspor dari barrel**
+- [x] **Step 4: Ekspor dari barrel**
 
 Di `shared/src/index.ts`, tambahkan sesudah `export * from "./ticket-status";`:
 
@@ -737,21 +737,20 @@ Di `shared/src/index.ts`, tambahkan sesudah `export * from "./ticket-status";`:
 export * from "./portal";
 ```
 
-- [ ] **Step 5: Jalankan — harus lulus**
+- [x] **Step 5: Jalankan — harus lulus**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism shared/src/portal.test.ts && pnpm --filter ./shared typecheck
 ```
 Expected: PASS + nol error typecheck.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/portal.ts shared/src/portal.test.ts shared/src/index.ts
 git commit -m "feat(spec-617): DTO & proyeksi allowlist-field portal klien"
 ```
 
----
 
 ### Task 5: Route `/api/portal/*`
 
