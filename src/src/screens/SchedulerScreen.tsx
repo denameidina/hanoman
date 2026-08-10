@@ -9,6 +9,7 @@ import { api } from "../api/client";
 import type { SchedulerStateView, SchedulerQueueItemView, SchedulerSessionView, SchedulerSourceView, Scheduler } from "@hanoman/shared";
 import type { ProjectVM, Spec } from "./types";
 import { specDeepLink } from "./deeplink";
+import { SchedulerCrons } from "./SchedulerCrons";
 
 const POLL_MS = 5000;
 const QUEUE_PAGE = 10;
@@ -352,6 +353,9 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
           {state.sources.map((s) => <SourceCard key={s.id} s={s} />)}
         </div>
       </Card>
+
+      {/* SPEC-646 · ADR-0112 · cronjob per project: jadwal HH:MM yang ditunda ADR-0072. */}
+      <SchedulerCrons projects={projects} onProjectChanged={onProjectChanged} onToast={onToast} />
 
       <QueueSection title="Antrean" status="queued" count={state.queueCounts.queued} empty="Antrean kosong."
         nonce={nonce} render={(q) => <QueueRow key={q.id} q={q} backlog={backlog}

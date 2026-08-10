@@ -1879,7 +1879,7 @@ git commit -m "feat(spec-646): endpoint CRUD cron, jalankan-sekarang, riwayat ru
   - `api.listCrons`, `api.createCron`, `api.patchCron`, `api.deleteCron`, `api.runCronNow`, `api.listCronRuns`
   - `<SchedulerCrons projects onProjectChanged onToast />`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/src/screens/SchedulerCrons.test.tsx`:
 
@@ -1896,26 +1896,26 @@ const cron = (over: Record<string, unknown> = {}) => ({
   createdAt: "2026-08-01T00:00:00.000Z", ...over,
 });
 
-const listCrons = vi.fn(async () => ({ items: [cron()], total: 1, page: 1, pageSize: 10 }));
-const listCronRuns = vi.fn(async () => ({
+const listCrons = vi.fn(async (..._a: unknown[]) => ({ items: [cron()], total: 1, page: 1, pageSize: 10 }));
+const listCronRuns = vi.fn(async (..._a: unknown[]) => ({
   items: [{ id: "r1", cronId: "c1", projectId: "p1", dueAt: "2026-08-11T00:00:00.000Z",
     startedAt: null, status: "skipped", sessionId: null, note: "cap penuh — tak ada slot sesi",
     manual: false, createdAt: "2026-08-11T00:00:00.000Z" }],
   total: 1, page: 1, pageSize: 10,
 }));
-const createCron = vi.fn(async () => cron({ id: "c2" }));
-const runCronNow = vi.fn(async () => ({ id: "r2" }));
-const updateProject = vi.fn(async () => ({}));
+const createCron = vi.fn(async (..._a: unknown[]) => cron({ id: "c2" }));
+const runCronNow = vi.fn(async (..._a: unknown[]) => ({ id: "r2" }));
+const updateProject = vi.fn(async (..._a: unknown[]) => ({}));
 
 vi.mock("../api/client", () => ({
   api: {
-    listCrons: (...a: unknown[]) => listCrons(...(a as [])),
-    listCronRuns: (...a: unknown[]) => listCronRuns(...(a as [])),
-    createCron: (...a: unknown[]) => createCron(...(a as [])),
+    listCrons: (...a: unknown[]) => listCrons(...a),
+    listCronRuns: (...a: unknown[]) => listCronRuns(...a),
+    createCron: (...a: unknown[]) => createCron(...a),
     patchCron: vi.fn(async () => cron()),
     deleteCron: vi.fn(async () => undefined),
-    runCronNow: (...a: unknown[]) => runCronNow(...(a as [])),
-    updateProject: (...a: unknown[]) => updateProject(...(a as [])),
+    runCronNow: (...a: unknown[]) => runCronNow(...a),
+    updateProject: (...a: unknown[]) => updateProject(...a),
   },
 }));
 
@@ -1936,7 +1936,7 @@ describe("SchedulerCrons", () => {
     await screen.findByText("Cek error pagi");
     fireEvent.click(screen.getByRole("button", { name: /Cron baru/i }));
     expect(await screen.findByLabelText("Nama cron")).toBeTruthy();
-    expect(screen.getByTestId("cron-next-preview").textContent).toMatch(/\d{2}:\d{2}/);
+    expect(screen.getByTestId("cron-next-preview").textContent).toMatch(/\d{2}[.:]\d{2}/);
   });
 
   it("mengubah preset ke lanjutan memperlihatkan kolom cron expression", async () => {
@@ -1983,7 +1983,7 @@ describe("SchedulerCrons", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/src/screens/SchedulerCrons.test.tsx
@@ -1991,7 +1991,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run src/src/screens/SchedulerCrons.
 
 Expected: FAIL — `./SchedulerCrons` tak ada.
 
-- [ ] **Step 3: Tambahkan metode klien**
+- [x] **Step 3: Tambahkan metode klien**
 
 Di `src/src/api/client.ts`, tepat sesudah `getSchedulerQueue`, tambahkan (dan tambahkan
 `SchedulerCronView`, `SchedulerCronRunView` ke daftar `import type` dari `@hanoman/shared` di
@@ -2015,7 +2015,7 @@ kepala berkas):
     j<Paginated<SchedulerCronRunView>>(paths.schedulerCronRuns(id) + qs(p)),
 ```
 
-- [ ] **Step 4: Tulis `src/src/screens/SchedulerCrons.tsx`**
+- [x] **Step 4: Tulis `src/src/screens/SchedulerCrons.tsx`**
 
 ```tsx
 /* SchedulerCrons — panel cronjob per project (SPEC-646 · ADR-0112). Dipasang di SchedulerScreen,
@@ -2322,7 +2322,7 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast }: Schedule
 }
 ```
 
-- [ ] **Step 5: Pasang di `SchedulerScreen.tsx`**
+- [x] **Step 5: Pasang di `SchedulerScreen.tsx`**
 
 Tambahkan import:
 
@@ -2337,7 +2337,7 @@ lalu sisipkan tepat sesudah `<Card eyebrow="scheduler · observabilitas" …>…
       <SchedulerCrons projects={projects} onProjectChanged={onProjectChanged} onToast={onToast} />
 ```
 
-- [ ] **Step 6: Jalankan test sampai hijau**
+- [x] **Step 6: Jalankan test sampai hijau**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/src/screens/SchedulerCrons.test.tsx
@@ -2345,11 +2345,16 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run src/src/screens/SchedulerCrons.
 
 Expected: PASS, 7 test.
 
+Dua koreksi yang ditemukan saat Execute, sudah tertulis di atas: spy `vi.fn(async () => …)` membuat
+tsc mengetik `mock.calls` sebagai tuple `[]` (TS2493 di `calls[0]![0]`) — deklarasikan
+`vi.fn(async (..._a: unknown[]) => …)`; dan `toLocaleString("id-ID")` memisah jam dengan **titik**,
+bukan titik dua, jadi regex preview memakai `[.:]`.
+
 Catatan yang sudah diverifikasi sebelum plan ini ditulis: `Field` menerima `label`+`hint`,
 `HnTextarea` meneruskan `aria-label` lewat `...rest` (SPEC-407), dan `Icon` menerjemahkan nama
 kebab-case ke komponen lucide (`alert-triangle` → `AlertTriangle`) dengan fallback bila tak ada.
 
-- [ ] **Step 7: Typecheck web**
+- [x] **Step 7: Typecheck web**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -2357,7 +2362,7 @@ pnpm --filter ./src typecheck
 
 Expected: keluar 0. (Bila nama paket web bukan `./src`, jalankan `pnpm -F "$(node -p "require('./src/package.json').name")" typecheck`.)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/api/client.ts src/src/screens/SchedulerCrons.tsx src/src/screens/SchedulerCrons.test.tsx src/src/screens/SchedulerScreen.tsx
