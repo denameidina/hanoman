@@ -700,7 +700,7 @@ git commit -m "feat(spec-646): kontrak DTO & path API cronjob"
   - `listCronRunsPage(cronId, f): Promise<{ items; total; page; pageSize }>`
   - `recordCronRun(cronId, cronName, projectId, dueAt, status, note)` (di `notifications.ts`)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/scheduler-cron-sweep.test.ts`:
 
@@ -748,14 +748,26 @@ describe("sweepCronDue", () => {
     expect(await prisma.schedulerCronRun.count({ where: { cronId: c.id } })).toBe(1);
   });
 
-  it("jatuh tempo tertunggak jadi SATU baris skipped, bukan burst", async () => {
-    // Cron tiap jam, nextRunAt tertinggal 20 jam.
+  // DEVIASI dari draf plan (dikoreksi saat Execute): draf ini semula satu test yang mengharapkan
+  // `skipped` pada now=08:05, padahal 08:05 masih DI DALAM grace terhadap jatuh tempo 08:00 —
+  // menjalankannya justru perilaku yang benar. "Tertunggak" tak sama dengan "terlambat": yang
+  // dilarang adalah BURST, sementara jatuh tempo TERBARU tetap dinilai dengan grace yang sama.
+  it("jatuh tempo tertunggak: 21 yang lewat jadi SATU baris, bukan burst", async () => {
     const c = await mkCron({ expr: "0 * * * *", nextRunAt: new Date(2026, 7, 10, 12, 0) });
     await sweepCronDue(new Date(2026, 7, 11, 8, 5).getTime());
     const runs = await prisma.schedulerCronRun.findMany({ where: { cronId: c.id } });
     expect(runs).toHaveLength(1);
+    expect(runs[0]!.status).toBe("queued");
+    expect(runs[0]!.dueAt.getTime()).toBe(new Date(2026, 7, 11, 8, 0).getTime());
+  });
+
+  it("jatuh tempo terbaru di LUAR grace → satu baris skipped ber-alasan terlewat", async () => {
+    const c = await mkCron({ expr: "0 * * * *", nextRunAt: new Date(2026, 7, 10, 12, 0) });
+    await sweepCronDue(new Date(2026, 7, 11, 8, 45).getTime());
+    const runs = await prisma.schedulerCronRun.findMany({ where: { cronId: c.id } });
+    expect(runs).toHaveLength(1);
     expect(runs[0]!.status).toBe("skipped");
-    expect(runs[0]!.note).toContain("terlewat");
+    expect(runs[0]!.note).toContain("terlewat 20 jatuh tempo");
     expect(runs[0]!.dueAt.getTime()).toBe(new Date(2026, 7, 11, 8, 0).getTime());
   });
 
@@ -778,7 +790,7 @@ describe("sweepCronDue", () => {
 
   it("baris terminal menerbitkan notifikasi ber-key stabil (tak dobel)", async () => {
     const c = await mkCron({ expr: "0 * * * *", nextRunAt: new Date(2026, 7, 10, 12, 0) });
-    const t = new Date(2026, 7, 11, 8, 5).getTime();
+    const t = new Date(2026, 7, 11, 8, 45).getTime();
     await sweepCronDue(t);
     await sweepCronDue(t + 1000);
     const notifs = await prisma.notification.findMany({ where: { type: "cron" } });
@@ -804,7 +816,7 @@ describe("sweepCronDue", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -813,7 +825,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: FAIL — `services/scheduler/cron` tak ada.
 
-- [ ] **Step 3: Tulis `recordCronRun` di `notifications.ts`**
+- [x] **Step 3: Tulis `recordCronRun` di `notifications.ts`**
 
 Tambahkan di akhir `server/src/services/notifications.ts`, sebelum `export function __resetAwaiting`:
 
@@ -834,7 +846,7 @@ export async function recordCronRun(
 }
 ```
 
-- [ ] **Step 4: Tulis `server/src/services/scheduler/cron.ts`**
+- [x] **Step 4: Tulis `server/src/services/scheduler/cron.ts`**
 
 ```ts
 import { prisma } from "../../db";
@@ -974,16 +986,16 @@ export async function listCronRunsPage(cronId: string, f: { page?: string; limit
 }
 ```
 
-- [ ] **Step 5: Jalankan test sampai hijau**
+- [x] **Step 5: Jalankan test sampai hijau**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
   ./node_modules/.bin/vitest --run --no-file-parallelism server/test/scheduler-cron-sweep.test.ts
 ```
 
-Expected: PASS, 8 test.
+Expected: PASS, 9 test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/scheduler/cron.ts server/src/services/notifications.ts server/test/scheduler-cron-sweep.test.ts
