@@ -501,3 +501,30 @@ export function startScaffoldPrompt(project: ProjectBrief, branchTo: string): st
   ].filter(Boolean).join("\n\n");
 }
 
+
+// SPEC-646 · ADR-0112 · sesi cron. TANPA `flow`: ia tak punya fase, tak punya plan berkotak, dan
+// tak menggerakkan stage backlog mana pun — yang dikerjakannya pemeriksaan rutin, dan temuannya
+// masuk antrean kerja sebagai backlog BARU, bukan sebagai commit di sesi ini.
+//
+// Instruksi operator disisipkan APA ADANYA. Memparafrasekannya berarti hanoman ikut menentukan apa
+// yang diperiksa, dan itu persis yang tak boleh: kolom prompt adalah kontraknya dengan operator.
+//
+// CODE_STYLE_CLAUSE dipasang tanpa gerbang `writesCode` — sesi cron tak punya `Flow` untuk
+// digerbangi, dan klausanya menggerbangi dirinya sendiri di baris pertama ("berlaku setiap kali
+// kamu menulis atau mengubah kode", ADR-0108).
+export function cronPrompt(project: ProjectBrief, cron: { name: string; prompt: string }): string {
+  return [
+    `hanoman cron "${cron.name}". Pemeriksaan rutin terjadwal di project ini — bukan sesi backlog: `
+      + `tak ada fase, tak ada plan, tak ada stage yang harus digerakkan.`,
+    `Bila kamu menemukan masalah yang layak dikerjakan, FILEKAN sebagai backlog item lewat `
+      + `\`POST /api/specs\` (lihat docs/agent-integration.md untuk bentuk payload & auth), jangan `
+      + `hanya melaporkannya ke terminal — temuan yang cuma tertulis di log sesi akan hilang. `
+      + `Satu masalah = satu backlog item, judul spesifik.`,
+    `Jangan mengerjakan sendiri perbaikan besar dalam sesi ini kecuali instruksi di bawah memintanya.`,
+    CODE_STYLE_CLAUSE,
+    `Worktree ini detached HEAD — memang disengaja. Bila kamu memang perlu meninggalkan perubahan `
+      + `berkas, commit dan katakan itu di ringkasan akhir; jangan gagal diam-diam.`,
+    `Project ${project.id} · ${project.name}\nDeskripsi: ${project.desc || "—"}\nStack: ${project.stack || "—"}`,
+    `=== INSTRUKSI OPERATOR ===\n${cron.prompt}`,
+  ].join("\n\n");
+}

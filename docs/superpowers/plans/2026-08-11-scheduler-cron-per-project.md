@@ -1018,7 +1018,7 @@ git commit -m "feat(spec-646): sweep jatuh tempo cron + notifikasi per eksekusi"
   - `cronSessionId(cronId: string): string` (server)
   - `startCronSession(cron: { id: string; projectId: string; name: string; prompt: string; agent: string | null; model: string | null; effort: string | null }): Promise<{ id: string }>` (server)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `runner/test/cron-prompt.test.ts`:
 
@@ -1052,7 +1052,7 @@ describe("cronPrompt", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 ./node_modules/.bin/vitest --run runner/test/cron-prompt.test.ts
@@ -1060,7 +1060,7 @@ describe("cronPrompt", () => {
 
 Expected: FAIL — `cronPrompt` tak diekspor.
 
-- [ ] **Step 3: Tulis `cronPrompt` di `runner/src/prompt.ts`**
+- [x] **Step 3: Tulis `cronPrompt` di `runner/src/prompt.ts`**
 
 Tambahkan di akhir berkas:
 
@@ -1093,7 +1093,7 @@ export function cronPrompt(project: ProjectBrief, cron: { name: string; prompt: 
 }
 ```
 
-- [ ] **Step 4: Jalankan test sampai hijau**
+- [x] **Step 4: Jalankan test sampai hijau**
 
 ```bash
 ./node_modules/.bin/vitest --run runner/test/cron-prompt.test.ts
@@ -1101,7 +1101,7 @@ export function cronPrompt(project: ProjectBrief, cron: { name: string; prompt: 
 
 Expected: PASS, 5 test.
 
-- [ ] **Step 5: Tulis `server/src/services/scheduler/cron-session.ts`**
+- [x] **Step 5: Tulis `server/src/services/scheduler/cron-session.ts`**
 
 ```ts
 import { prisma } from "../../db";
@@ -1170,7 +1170,7 @@ export async function startCronSession(cron: CronLaunchInput): Promise<{ id: str
 }
 ```
 
-- [ ] **Step 6: Typecheck kedua paket**
+- [x] **Step 6: Typecheck kedua paket**
 
 ```bash
 pnpm --filter ./runner typecheck && pnpm --filter ./server typecheck
@@ -1178,7 +1178,7 @@ pnpm --filter ./runner typecheck && pnpm --filter ./server typecheck
 
 Expected: keluar 0, tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add runner/src/prompt.ts runner/test/cron-prompt.test.ts server/src/services/scheduler/cron-session.ts
