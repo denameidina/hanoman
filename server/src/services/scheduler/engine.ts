@@ -3,7 +3,9 @@ import { flowForSource } from "@hanoman/shared";
 import type { Autonomy } from "@hanoman/runner";
 import { getScheduler } from "./config";
 import { listSources, isDue, setLastRun } from "./registry";
-import { drain, type GovernorDeps } from "./governor";
+import { drain, drainCronRuns, type GovernorDeps } from "./governor";
+import { sweepCronDue } from "./cron";
+import { startCronSession, liveCronSession } from "./cron-session";
 import { reconcile as reconcileImpl, reconcileProdDeps } from "./reconcile";
 import { scanDecisions } from "../notifications";
 import { listSessions, getSession, sessionIdForSpec } from "../pty";
@@ -36,6 +38,12 @@ export async function tick(now: number, deps: GovernorDeps, end: EndOfSession = 
   // perlu dashboard terbuka (loop selalu-hidup). Jalan MESKI Pause (Pause hanya memblok launch BARU).
   try { await end.reconcile(); } catch { /* rekonsil gagal tak menghentikan tick */ }
   try { await end.scanDecisions(); } catch { /* notif decision best-effort */ }
+  // SPEC-646 · ADR-0112 · materialisasi jatuh tempo cron → baris run. Dijalankan SEBELUM gerbang
+  // Pause dengan sengaja: Pause adalah rem PELUNCURAN, bukan penghapus antrean (ADR-0072 keputusan
+  // 4) — jatuh tempo yang lewat selama jeda tetap tercatat, dan melanjutkan jeda dalam grace tetap
+  // menjalankannya. Master `enabled=false` sudah memulangkan tick di atas, jadi seluruh fitur cron
+  // ikut mati di sana.
+  try { await sweepCronDue(now); } catch (e) { console.error("scheduler cron sweep:", e); }
   if (cfg.paused) return;                          // rem darurat: tak ada drain → tak ada peluncuran baru
   // SPEC-402 · `prodDeps` membaca tmux, dan bacaan tmux yang GAGAL sekarang melempar — sengaja:
   // dulu ia mengembalikan daftar kosong, jadi `liveCount()` jatuh ke 0 dan governor bisa meluncurkan
@@ -69,6 +77,11 @@ export const prodDeps: GovernorDeps = {
     const r = await startSpecSession(spec, { flow: flowForSource(spec.source), autonomy: autonomy as Autonomy | undefined });
     return r.id;
   },
+  // SPEC-646 · ADR-0112 · cron memakai anggaran slot yang sama dengan antrean spec.
+  drainCrons: (slots) => drainCronRuns(slots, {
+    liveCron: liveCronSession,
+    launchCron: async (cron) => (await startCronSession(cron)).id,
+  }),
 };
 
 const TICK_MS = 10_000;   // governor tick: cukup halus untuk "drain ≤1 tick" saat slot kosong

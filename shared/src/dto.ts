@@ -9,6 +9,7 @@ import { zPrdStatus } from "./prd-status";
 import type { Spec, Notification } from "./entities";
 import { zProjectKind, zSpecSource, zPriority, zStage, zTicketCategory, zTicketStatus, zVerifyScope } from "./enums";
 import { payloadMatchesSource } from "./spec-source";
+import { parseCron } from "./cron-expr";
 
 // SPEC-198 · amplop daftar via API: search/filter/paginasi dilakukan server-side.
 export type Paginated<T> = { items: T[]; total: number; page: number; pageSize: number };
@@ -625,3 +626,47 @@ export const zPublicTicketStatus = z.object({
   status: z.string(), createdAt: z.string(),
 });
 export type PublicTicketStatus = z.infer<typeof zPublicTicketStatus>;
+
+// SPEC-646 · ADR-0112 · cronjob per project. `expr` divalidasi lewat parser yang SAMA dengan yang
+// menghitung jadwalnya (`parseCron`) — validasi ber-regex terpisah akan menerima expr yang kemudian
+// tak pernah punya jatuh tempo, dan cron itu diam selamanya tanpa satu pun error.
+const zCronExpr = z.string().trim().refine((v) => parseCron(v) !== null, "cron expression tak sah");
+
+export const zCreateCron = z.object({
+  project: z.string().min(1),
+  name: z.string().trim().min(1).max(120),
+  expr: zCronExpr,
+  prompt: z.string().trim().min(1).max(8000),
+  agent: zAgent.optional(),
+  model: z.string().optional(),
+  effort: z.string().optional(),
+  enabled: z.boolean().default(false),   // default aman: cron baru lahir nonaktif
+});
+
+// `null` = kosongkan (kembali ke warisan default sesi); `undefined` = jangan sentuh. Bedanya
+// bermakna di ketiga knob sesi — cermin `branchFrom` di zPatchSpec.
+export const zPatchCron = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  expr: zCronExpr.optional(),
+  prompt: z.string().trim().min(1).max(8000).optional(),
+  agent: zAgent.nullable().optional(),
+  model: z.string().nullable().optional(),
+  effort: z.string().nullable().optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const zSchedulerCron = z.object({
+  id: z.string(), projectId: z.string(), name: z.string(), expr: z.string(), prompt: z.string(),
+  agent: z.string().nullable(), model: z.string().nullable(), effort: z.string().nullable(),
+  enabled: z.boolean(),
+  nextRunAt: z.string().nullable(), lastRunAt: z.string().nullable(), createdAt: z.string(),
+});
+export type SchedulerCronView = z.infer<typeof zSchedulerCron>;
+
+export const zSchedulerCronRun = z.object({
+  id: z.string(), cronId: z.string(), projectId: z.string(),
+  dueAt: z.string(), startedAt: z.string().nullable(),
+  status: z.string(), sessionId: z.string().nullable(), note: z.string().nullable(),
+  manual: z.boolean(), createdAt: z.string(),
+});
+export type SchedulerCronRunView = z.infer<typeof zSchedulerCronRun>;

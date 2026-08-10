@@ -103,6 +103,21 @@ export async function recordLeadDecision(
   }).catch(() => { /* P2002: sudah ada untuk keputusan ini */ });
 }
 
+// SPEC-646 · ADR-0112 · hasil satu eksekusi cron. `key` diturunkan dari (cronId, dueAt) — stempel
+// yang STABIL lintas restart, jadi tick berulang tak bisa menduplikasinya (P2002 diabaikan, pola
+// recordCompletion). `skipped` ikut dinotifikasi dengan sengaja: "cek pagi tak jalan karena cap
+// penuh" justru yang paling perlu dibaca operator, dan diam adalah kegagalan yang tak terlihat.
+export async function recordCronRun(
+  cronId: string, cronName: string, projectId: string, dueAt: Date,
+  status: "launched" | "skipped" | "failed", note: string | null,
+): Promise<void> {
+  const verb = status === "launched" ? "berjalan" : status === "skipped" ? "dilewati" : "gagal";
+  const title = `Cron "${cronName}" ${verb}${note ? ` — ${note}` : ""}`;
+  await prisma.notification.create({
+    data: { type: "cron", key: `cron:${cronId}:${dueAt.toISOString()}`, title, projectId },
+  }).catch(() => { /* P2002: sudah ada untuk jatuh tempo ini */ });
+}
+
 type DecisionSession = { id: string; specId?: string; projectId: string; decisionFile: string };
 
 // SPEC-184 · episode per-sesi. Di-rebuild tiap scan dari kondisi marker: sesi mati hilang dari

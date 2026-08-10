@@ -1,4 +1,4 @@
-import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView } from "@hanoman/shared";
+import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -456,6 +456,21 @@ export const api = {
   // SPEC-523 · antrean scheduler sebagai daftar berhalaman (lepas dari `state`).
   getSchedulerQueue: (p: { status?: string; page?: number; limit?: number } = {}) =>
     j<Paginated<SchedulerQueueItemView>>(paths.schedulerQueue + qs(p)),
+  // SPEC-646 · ADR-0112 · cronjob per project. COOKIE_ONLY di server — tak pernah lewat agent token.
+  listCrons: (p: { projectId?: string; page?: number; limit?: number } = {}) =>
+    j<Paginated<SchedulerCronView>>(paths.schedulerCrons + qs(p)),
+  createCron: (b: {
+    project: string; name: string; expr: string; prompt: string;
+    agent?: Agent; model?: string; effort?: string; enabled?: boolean;
+  }) => j<SchedulerCronView>(paths.schedulerCrons, { method: "POST", ...body(b) }),
+  patchCron: (id: string, b: Record<string, unknown>) =>
+    j<SchedulerCronView>(paths.schedulerCron(id), { method: "PATCH", ...body(b) }),
+  deleteCron: (id: string) => j<void>(paths.schedulerCron(id), { method: "DELETE" }),
+  // 409 membawa kalimatnya sendiri ("scheduler sedang dijeda…") di `ApiError.detail`.
+  runCronNow: (id: string) =>
+    j<SchedulerCronRunView>(paths.schedulerCronRunNow(id), { method: "POST", ...body({}) }),
+  listCronRuns: (id: string, p: { page?: number; limit?: number } = {}) =>
+    j<Paginated<SchedulerCronRunView>>(paths.schedulerCronRuns(id) + qs(p)),
   // SPEC-409 · ADR-0091 · hanoman-lead. Semua HTTP polling — tak ada kanal WS baru (AC-26).
   getLeadConfig: () => j<Lead>(paths.leadConfig),
   putLeadConfig: (cfg: Lead) => j<Lead>(paths.leadConfig, { method: "PUT", ...body(cfg) }),

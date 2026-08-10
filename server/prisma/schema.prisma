@@ -439,6 +439,51 @@ model SchedulerQueueItem {
   @@index([status])
 }
 
+// SPEC-646 · ADR-0112 · cronjob per project. LOCAL-ONLY (cermin SchedulerQueueItem): jadwal adalah
+// properti MESIN INI — worktree, tmux, dan cap concurrency-nya lokal. Tak masuk whitelist FIELDS
+// sync, tanpa kolom `version`.
+model SchedulerCron {
+  id        String    @id @default(cuid())
+  projectId String
+  name      String
+  expr      String // cron 5-field, dievaluasi di zona waktu LOKAL SERVER
+  prompt    String
+  // null = warisi default sesi (terminalAgentDefaults). Sengaja BUKAN blok zAgentEngine: blok itu
+  // membawa `enabled` sendiri, dan dua boolean bernama sama di satu bentuk adalah jebakan.
+  agent     String?
+  model     String?
+  effort    String?
+  enabled   Boolean   @default(false) // default aman: cron baru lahir nonaktif
+  nextRunAt DateTime? // jadwal berikutnya, durable lintas restart
+  lastRunAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([enabled])
+}
+
+// SPEC-646 · satu baris = satu JATUH TEMPO yang diklaim. `@@unique([cronId, dueAt])` adalah kunci
+// idempotensinya: tick berulang, dua tick yang balapan, maupun restart di tengah tak bisa
+// melahirkan baris kedua untuk jatuh tempo yang sama (insert kedua kena P2002, diabaikan).
+// Tabel ini merangkap ANTREAN dan RIWAYAT — pola WebhookDelivery (ADR-0100).
+model SchedulerCronRun {
+  id        String    @id @default(cuid())
+  cronId    String
+  projectId String
+  dueAt     DateTime
+  startedAt DateTime?
+  status    String    @default("queued") // queued | launched | skipped | failed
+  sessionId String?
+  note      String? // alasan skipped/failed
+  manual    Boolean   @default(false) // dari tombol "Jalankan sekarang"
+  createdAt DateTime  @default(now())
+
+  @@unique([cronId, dueAt])
+  @@index([cronId, dueAt])
+  @@index([status])
+}
+
 // SPEC-485 · ADR-0102 · satu RANTAI keputusan lead: beberapa pertanyaan berurutan yang satu urusan,
 // dari pertanyaan pertama sampai submit akhir. Sebelum model ini "alur" hanya ada sebagai kebetulan
 // (baris jejak yang berdekatan waktunya), jadi tak ada tempat untuk menegakkan "pertanyaan lanjutan

@@ -11,7 +11,7 @@ const clean = async () => { await prisma.schedulerQueueItem.deleteMany(); await 
 beforeEach(async () => { await clean(); clearSources(); });
 afterAll(clean);
 
-const noLaunch: GovernorDeps = { liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => "s" };
+const noLaunch: GovernorDeps = { drainCrons: async (s) => s, liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => "s" };
 const cfg = (over: Partial<Scheduler> = {}): Scheduler => ({ ...SCHEDULER_DEFAULTS, ...over });
 const withBacklog = (enabled: boolean, everyMin = 15): Scheduler =>
   cfg({ enabled: true, sources: { ...SCHEDULER_DEFAULTS.sources, backlog: { enabled, everyMin } } });
@@ -50,7 +50,7 @@ describe("engine.tick gating", () => {
     await setScheduler(cfg({ enabled: true, paused: true, maxConcurrent: 5 }));
     await enqueue({ specId: "SPEC-1", projectId: "p1", source: "backlog", priority: "tinggi" });
     let launches = 0;
-    await tick(1_000_000, { liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => { launches++; return "s"; } });
+    await tick(1_000_000, { drainCrons: async (s) => s, liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => { launches++; return "s"; } });
     expect(launches).toBe(0);                          // Pause → tak ada peluncuran
     expect((await listQueue("queued")).length).toBe(1); // item tetap di antrean
   });
@@ -58,7 +58,7 @@ describe("engine.tick gating", () => {
     await setScheduler(cfg({ enabled: true, paused: false, maxConcurrent: 5 }));
     await enqueue({ specId: "SPEC-1", projectId: "p1", source: "backlog", priority: "tinggi" });
     let launches = 0;
-    await tick(1_000_000, { liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => { launches++; return "s1"; } });
+    await tick(1_000_000, { drainCrons: async (s) => s, liveCount: () => 0, isLive: () => null, isDone: async () => false, blockers: async () => [], launch: async () => { launches++; return "s1"; } });
     expect(launches).toBe(1);
   });
 });
