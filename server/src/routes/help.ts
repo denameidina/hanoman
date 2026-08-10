@@ -5,10 +5,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { zTicketCategory } from "@hanoman/shared";
 import { prisma } from "../db";
-import { createTicket, hashAccessKey, publicStatus, pruneOldTickets } from "../services/ticket";
-import { recordNewTicket } from "../services/notifications";
-import { notifySynced } from "../services/sync-notify";
-import { saveUpload } from "../services/uploads";
+import { hashAccessKey, publicStatus } from "../services/ticket";
+import { intakeTicket, parseTicketUpload } from "../services/ticket-intake";
 import { helpRateOk } from "../services/help-ratelimit";
 
 const CATEGORIES = ["bug", "fitur", "pertanyaan", "lainnya"];
@@ -18,9 +16,6 @@ const CATEGORIES = ["bug", "fitur", "pertanyaan", "lainnya"];
 // palsu tanpa jejak. `hp` sengaja TIDAK lagi dianggap honeypot: tab lama yang masih memegang
 // bundle basi pun kini menghasilkan tiket, bukan hilang diam-diam.
 const HONEYPOT_FIELD = "hc_trap";
-const OK_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
-const MAX_FILES = 3;
-const MAX_BYTES = 5 * 1024 * 1024;
 
 const zField = z.object({
   category: zTicketCategory,
@@ -28,8 +23,6 @@ const zField = z.object({
   detail: z.string().min(1).max(10_000),
   email: z.string().min(3).max(200),
 });
-
-type ParsedPart = { buf: Buffer; mime: string; name: string };
 
 export default async function (app: FastifyInstance) {
   // Info halaman publik. 404 generik bila project tak ada / helpEnabled=false (tak membocorkan project).
@@ -40,7 +33,7 @@ export default async function (app: FastifyInstance) {
     return { projectName: p.name, categories: CATEGORIES };
   });
 
-  // Submit keluhan (multipart). Honeypot `hp` terisi → sukses palsu tanpa membuat tiket.
+  // Submit keluhan (multipart). Honeypot `hc_trap` terisi → sukses palsu tanpa membuat tiket.
   app.post("/help/:slug/tickets", async (req, reply) => {
     const { slug } = req.params as { slug: string };
     const p = await prisma.project.findUnique({ where: { id: slug } });
@@ -48,23 +41,9 @@ export default async function (app: FastifyInstance) {
     if (!helpRateOk(slug, req.ip)) return reply.code(429).send({ error: "terlalu banyak permintaan" });
     if (!(req as any).isMultipart?.()) return reply.code(400).send({ error: "butuh multipart/form-data" });
 
-    const fields: Record<string, string> = {};
-    const files: ParsedPart[] = [];
-    try {
-      for await (const part of (req as any).parts()) {
-        if (part.type === "file") {
-          const buf = await part.toBuffer(); // menguras stream file
-          // truncated (fileSize terlampaui, throwFileSizeLimit:false) / mime salah / kelebihan → skip,
-          // submit yang sisanya tetap jadi (AC PRD).
-          if (part.file?.truncated || !OK_MIME.has(part.mimetype) || files.length >= MAX_FILES) continue;
-          files.push({ buf, mime: part.mimetype, name: String(part.filename ?? "gambar") });
-        } else {
-          fields[part.fieldname] = String(part.value ?? "");
-        }
-      }
-    } catch {
-      return reply.code(400).send({ error: "unggahan tak valid" });
-    }
+    const upload = await parseTicketUpload(req);
+    if (!upload) return reply.code(400).send({ error: "unggahan tak valid" });
+    const { fields, files } = upload;
 
     // honeypot: bot → sukses palsu, tak buat tiket. Jejak log wajib — tanpa ini sebuah false
     // positive tak meninggalkan bukti apa pun (tak ada tiket, notifikasi, maupun baris feed).
@@ -78,23 +57,10 @@ export default async function (app: FastifyInstance) {
     });
     if (!parsed.success) return reply.code(400).send({ error: "field wajib tak lengkap / tak valid" });
 
-    const { ticket, key } = await createTicket({
-      projectId: slug, category: parsed.data.category, title: parsed.data.title,
-      detail: parsed.data.detail, reporterEmail: parsed.data.email,
+    const { ticket, key } = await intakeTicket({
+      projectId: slug, projectName: p.name, category: parsed.data.category,
+      title: parsed.data.title, detail: parsed.data.detail, reporterEmail: parsed.data.email, files,
     });
-    // SPEC-382 · INDUK dulu, baru ANAK. Feed diterapkan urut seq di client, dan
-    // `TicketAttachment.ticketId` punya FK ke `Ticket.id` — memancarkan lampiran lebih dulu
-    // membuat client menabrak FK, lalu barisnya hilang/menghentikan siklus (audit SPEC-382).
-    await notifySynced("ticket", ticket.id); // SPEC-268 · tiket baru → feed (metadata)
-    for (const f of files) {
-      const { storageKey, size } = await saveUpload(f.buf, f.mime);
-      const att = await prisma.ticketAttachment.create({
-        data: { ticketId: ticket.id, projectId: slug, filename: f.name.slice(0, 200), mimeType: f.mime, size, storageKey },
-      });
-      await notifySynced("ticketAttachment", att.id); // SPEC-272 · metadata lampiran → feed (byte lazy-fetch)
-    }
-    await recordNewTicket(ticket.id, slug, p.name, parsed.data.category, parsed.data.title);
-    void pruneOldTickets(); // retensi opportunistic-on-write (tanpa scheduler global)
 
     const statusPath = `/help/${encodeURIComponent(slug)}/status/${encodeURIComponent(key)}`;
     return reply.code(201).send({ number: ticket.number, key, statusPath });

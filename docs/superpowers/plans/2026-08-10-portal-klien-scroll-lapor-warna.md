@@ -414,7 +414,7 @@ git commit -m "fix(spec-626): warna badge portal mengikuti keadaan yang diwakili
   - `parseTicketUpload(req: FastifyRequest): Promise<{ fields: Record<string,string>; files: TicketUpload[] } | null>` — `null` = unggahan tak valid (pemanggil balas 400).
   - `intakeTicket(input: { projectId: string; projectName: string; category: string; title: string; detail: string; reporterEmail: string; files: TicketUpload[] }): Promise<{ ticket: Ticket; key: string }>`
 
-- [ ] **Step 1: Rekam perilaku publik yang harus tetap sama**
+- [x] **Step 1: Rekam perilaku publik yang harus tetap sama**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-626
@@ -423,7 +423,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: PASS (baseline sebelum kode dipindah). Catat jumlah test yang lulus.
 
-- [ ] **Step 2: Tulis service-nya**
+- [x] **Step 2: Tulis service-nya**
 
 Buat `server/src/services/ticket-intake.ts`:
 
@@ -501,7 +501,7 @@ export async function intakeTicket(input: {
 }
 ```
 
-- [ ] **Step 3: `help.ts` memanggil service**
+- [x] **Step 3: `help.ts` memanggil service**
 
 Ganti `server/src/routes/help.ts` baris 1-101 sehingga: import `parseTicketUpload`/`intakeTicket`, hapus konstanta `OK_MIME`/`MAX_FILES`/`MAX_BYTES` dan `type ParsedPart`, hapus loop parse & loop lampiran. Badan `POST /help/:slug/tickets` jadi:
 
@@ -541,7 +541,7 @@ Ganti `server/src/routes/help.ts` baris 1-101 sehingga: import `parseTicketUploa
 
 Import yang dipakai `help.ts` sesudahnya: `hashAccessKey`, `publicStatus` dari `../services/ticket`; `helpRateOk`; `parseTicketUpload`, `intakeTicket` dari `../services/ticket-intake`. `createTicket`, `pruneOldTickets`, `recordNewTicket`, `notifySynced`, `saveUpload` **tak lagi** diimpor di sini.
 
-- [ ] **Step 4: Jalankan — perilaku publik tak boleh bergeser**
+- [x] **Step 4: Jalankan — perilaku publik tak boleh bergeser**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/help.test.ts
@@ -550,7 +550,7 @@ pnpm --filter ./server typecheck
 
 Expected: PASS dengan jumlah test yang sama seperti Step 1; typecheck bersih.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/ticket-intake.ts server/src/routes/help.ts
