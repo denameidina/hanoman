@@ -538,7 +538,7 @@ git commit -m "feat(spec-646): skema SchedulerCron + SchedulerCronRun (LOCAL-onl
   - `zSchedulerCronRun` → `type SchedulerCronRunView = { id, cronId, projectId, dueAt, startedAt, status, sessionId, note, manual, createdAt }`
   - `paths.schedulerCrons`, `paths.schedulerCron(id)`, `paths.schedulerCronRunNow(id)`, `paths.schedulerCronRuns(id)`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/cron-dto.test.ts`:
 
@@ -591,7 +591,7 @@ describe("paths cron", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 ./node_modules/.bin/vitest --run shared/src/cron-dto.test.ts
@@ -599,7 +599,7 @@ describe("paths cron", () => {
 
 Expected: FAIL — `zCreateCron` tak diekspor.
 
-- [ ] **Step 3: Tulis implementasinya**
+- [x] **Step 3: Tulis implementasinya**
 
 Di `shared/src/dto.ts`, tambahkan `import { parseCron } from "./cron-expr";` ke blok import teratas, lalu tempelkan di akhir berkas:
 
@@ -662,7 +662,7 @@ Di `shared/src/api.ts`, tepat sesudah baris `schedulerQueue: \`${API}/scheduler/
   schedulerCronRuns: (id: string) => `${API}/scheduler/crons/${encodeURIComponent(id)}/runs`,
 ```
 
-- [ ] **Step 4: Jalankan test sampai hijau**
+- [x] **Step 4: Jalankan test sampai hijau**
 
 ```bash
 ./node_modules/.bin/vitest --run shared/src/cron-dto.test.ts
@@ -670,7 +670,7 @@ Di `shared/src/api.ts`, tepat sesudah baris `schedulerQueue: \`${API}/scheduler/
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/dto.ts shared/src/api.ts shared/src/cron-dto.test.ts

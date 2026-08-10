@@ -134,6 +134,13 @@ export const paths = {
   schedulerQueueRequeue: (id: string) => `${API}/scheduler/queue/${encodeURIComponent(id)}/requeue`,
   // SPEC-523 · antrean sebagai daftar berhalaman (page/limit + status), lepas dari `state`.
   schedulerQueue: `${API}/scheduler/queue`,
+  // SPEC-646 · ADR-0112 · cronjob per project. Di bawah prefix `scheduler` seperti tetangganya,
+  // TAPI capability-nya bukan turunan otomatis: `capabilityForRoute` memberi `crons` cabang
+  // COOKIE_ONLY sendiri — sebuah cron adalah `POST /terminal/sessions` yang ditunda.
+  schedulerCrons: `${API}/scheduler/crons`,
+  schedulerCron: (id: string) => `${API}/scheduler/crons/${encodeURIComponent(id)}`,
+  schedulerCronRunNow: (id: string) => `${API}/scheduler/crons/${encodeURIComponent(id)}/run`,
+  schedulerCronRuns: (id: string) => `${API}/scheduler/crons/${encodeURIComponent(id)}/runs`,
   // SPEC-409 · ADR-0091 · hanoman-lead. Semua HTTP (polling) — tak ada kanal WS baru (AC-26).
   leadConfig: `${API}/lead/config`,
   leadStatus: `${API}/lead/status`,
