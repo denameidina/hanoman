@@ -1363,7 +1363,7 @@ git commit -m "docs(spec-626): ADR-0111 kirim tiket dari portal klien + perbarui
 
 **Files:** —
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-626
@@ -1374,7 +1374,7 @@ env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 Expected: PASS. **Pastikan berkas test-nya memang berjalan** — `--changed` menyalakan
 `passWithNoTests`, jadi "no test files" TERLIHAT hijau tapi tak membuktikan apa pun.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1383,7 +1383,7 @@ pnpm --filter ./src typecheck
 
 Expected: bersih. JANGAN `pnpm -r typecheck`.
 
-- [ ] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
+- [x] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
 
 Boot server dengan `HANOMAN_HOME` khusus, buat project + akun klien + akses, lalu:
 
@@ -1402,10 +1402,53 @@ Expected: `201` + amplop `PortalTicket`; daftar memuat tiket itu ber-status `Sed
 Pakai `HANOMAN_HOME` sendiri (`mktemp -d`) — jangan DB test bersama (memori: run tetangga
 menghapusnya di tengah smoke).
 
-- [ ] **Step 4: Commit hasil verifikasi bila ada perbaikan**
+- [x] **Step 4: Commit hasil verifikasi bila ada perbaikan**
 
 ```bash
 git add -u && git commit -m "chore(spec-626): perbaikan dari verifikasi akhir"
 ```
 
 (Lewati bila diff bersih.)
+
+---
+
+## Catatan verifikasi (SPEC-626)
+
+**Deviasi dari plan, beserta alasannya:**
+
+1. **Kontrak rantai gulir diperiksa dari SCROLLER ke atas, bukan dari daftar.** Versi pertama test
+   ikut menuntut setiap pembungkus **di dalam** `<main>` jadi kolom flex ber-`min-height: 0` — dan
+   gagal pada pembungkus `max-width`/padding yang justru benar: begitu berada di dalam scroller,
+   isi yang tumbuh setinggi isinya adalah yang diinginkan. Yang harus dibatasi dari atas hanyalah
+   scroller itu sendiri.
+2. **Modal tidak diperbaiki — memang tak rusak.** Panelnya sudah `maxHeight: 88vh` + badan
+   `overflow: auto`, dan overlay `position: fixed` tak diklip `#root { overflow: hidden }` (yang
+   tak membuat containing block). Test-nya HIJAU sejak sebelum fix; ia dipertahankan sebagai
+   kontrak, bukan sebagai klaim perbaikan.
+3. **Test "bentuk tulis portal lain tetap 403" diganti test tabel route.** ADR-0110 gotcha 7: hook
+   `onRequest` ber-scope tak berjalan untuk path yang tak punya route, jadi `POST …/backlog`
+   dijawab **404** oleh not-found handler di luar scope plugin — 403 mustahil, dan menuntutnya
+   berarti menguji ulang hal yang salah. Lapis keduanya tetap ada sebagai fungsi murni di
+   `client-route-allowed.test.ts`.
+4. **Test lama `portal.route.test.ts` "tak ada route tulis" diperbarui, bukan dihapus** — kini
+   berbunyi "hanya satu route tulis", dengan satu POST yang disebut namanya.
+5. **`form-data` tak jadi dipasang.** Body multipart dirakit dengan idiom yang sudah dipakai
+   `help.test.ts` — nol dependency baru.
+
+**Bukti:**
+
+- `vitest --run --no-file-parallelism --changed <base>` → **791 lulus**, 1 gagal:
+  `update.route.test.ts` (`canApply: true` vs `false`) — **merah palsu `HANOMAN_SUPERVISOR=1`** di
+  env sesi ini, tak tersentuh perubahan SPEC-626. Dijalankan ulang dengan var itu dilepas: **8/8
+  lulus**.
+- `pnpm --filter ./server|./src|./shared typecheck` → ketiganya exit 0.
+- `docs index --check` → `index ok`.
+- **Smoke endpoint nyata** (server `tsx src/server.ts`, `HANOMAN_HOME` + DB khusus, port 8933):
+  login klien 200 · `POST /api/portal/projects/toko-mekar/tickets` → **201** `PortalTicket`
+  (`{id,number,category,title,status:"Sedang ditinjau",createdAt}` — nol field bocor) pada project
+  ber-**`helpEnabled = false`** · daftar portal langsung memuatnya · project bukan haknya →
+  **404 `{"error":"not found"}`** · jalur publik project yang sama → **404** · klien menembak
+  `/api/tickets` & `/api/specs` → **403 `{"error":"portal klien: baca-saja"}`** · operator melihat
+  tiket yang sama di `/api/tickets` (`status: new`, `reporterEmail: klien@x.co`, `unreviewed: 1`).
+  DB smoke memastikan efek sampingnya: `Notification` `ticket:<id>` "Keluhan baru di \"Toko
+  Mekar\": bug: Struk tak keluar" **dan** baris `SyncLog` `entity=ticket` untuk id yang sama.
