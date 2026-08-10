@@ -32,6 +32,12 @@ function mockMatchMedia(reduced: boolean): void {
 const styleOf = (el: HTMLElement): string => el.getAttribute("style") ?? "";
 const hit = () => screen.getByRole("button", { name: "Ringkasan status Hanoman" });
 
+function animationEnd(element: HTMLElement, animationName: string): void {
+  const event = new Event("animationend", { bubbles: true });
+  Object.defineProperty(event, "animationName", { value: animationName });
+  fireEvent(element, event);
+}
+
 beforeEach(() => { localStorage.clear(); mockMatchMedia(false); });
 
 describe("HanomanPet", () => {
@@ -54,27 +60,87 @@ describe("HanomanPet", () => {
       backlog={backlog} onOpen={vi.fn()} />);
 
     const working = screen.getByTestId("illustration-STK-002");
-    expect(working).toHaveStyle({ opacity: "1" });
+    expect(working).toHaveStyle({
+      opacity: "1",
+      animation: "hn-pet-pose-in var(--dur-slow) var(--ease-out) both",
+    });
     expect(working.getAttribute("alt")).toContain("sedang berjalan");
 
     const ready = screen.getByTestId("illustration-STK-001");
-    expect(ready).toHaveStyle({ opacity: "0" });
+    expect(ready).toHaveStyle({
+      opacity: "0",
+      animation: "hn-pet-pose-out var(--dur-slow) var(--ease-out) both",
+    });
+    expect(styleOf(working)).not.toContain("transition: opacity");
     expect(ready).toHaveAttribute("aria-hidden", "true");
     expect(ready).toHaveAttribute("alt", "");
   });
 
-  it("menganimasi napas & transisi pose secara default", () => {
-    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-    expect(styleOf(screen.getByTestId("pet-stage"))).toContain("hn-pet-breathe");
-    expect(styleOf(screen.getByTestId("illustration-STK-001"))).toContain("transition: opacity");
+  it("memilih idle working yang berbeda dari ready", () => {
+    render(<HanomanPet backlog={[spec({ id: "SPEC-1", stage: "executing" })]}
+      sessions={[session({ id: "spec-1", specId: "SPEC-1" })]} onOpen={vi.fn()} />);
+
+    expect(screen.getByTestId("pet-idle")).toHaveStyle({
+      animation: "hn-pet-idle-working var(--dur-pet-active) var(--ease-inout) infinite",
+    });
+    expect(styleOf(screen.getByTestId("pet-idle"))).not.toContain("hn-pet-idle-ready");
   });
 
-  it("mematikan seluruh animasi saat prefers-reduced-motion: reduce", () => {
+  it("bereaksi sekali saat diklik dan selesai lewat animationend", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    fireEvent.click(hit());
+
+    const reactor = screen.getByTestId("pet-reactor");
+    expect(reactor).toHaveStyle({
+      animation: "hn-pet-click var(--dur-slow) var(--ease-out) both",
+    });
+    animationEnd(reactor, "hn-pet-click");
+    expect(reactor).toHaveStyle({ animation: "none" });
+  });
+
+  it("menganimasi panel masuk dan keluar sebelum unmount", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    fireEvent.click(hit());
+
+    const panel = screen.getByTestId("pet-panel");
+    expect(panel).toHaveStyle({
+      animation: "hn-pet-panel-in var(--dur-slow) var(--ease-out) both",
+    });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(panel).toHaveAttribute("aria-hidden", "true");
+    expect(panel).toHaveAttribute("inert");
+    expect(panel).toHaveStyle({
+      pointerEvents: "none",
+      animation: "hn-pet-panel-out var(--dur-slow) var(--ease-out) both",
+    });
+    animationEnd(panel, "hn-pet-panel-out");
+    expect(screen.queryByTestId("pet-panel")).toBeNull();
+  });
+
+  it("mematikan seluruh gerak saat prefers-reduced-motion: reduce", () => {
     mockMatchMedia(true);
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-    expect(styleOf(screen.getByTestId("pet-stage"))).toContain("animation: none");
-    expect(styleOf(screen.getByTestId("pet-stage"))).not.toContain("hn-pet-breathe");
-    expect(styleOf(screen.getByTestId("illustration-STK-001"))).toContain("transition: none");
+
+    expect(screen.getByTestId("pet-stage")).toHaveStyle({ animation: "none" });
+    expect(screen.getByTestId("pet-reactor")).toHaveStyle({
+      animation: "none", transition: "none",
+    });
+    expect(screen.getByTestId("pet-idle")).toHaveStyle({ animation: "none" });
+    expect(screen.getByTestId("illustration-STK-001")).toHaveStyle({
+      animation: "none", transition: "none", opacity: "1",
+    });
+
+    fireEvent.click(hit());
+    expect(screen.getByTestId("pet-panel")).toHaveStyle({ animation: "none" });
+    expect(screen.getByTestId("pet-reactor")).toHaveStyle({ animation: "none" });
+    expect(screen.getByRole("button", { name: "Buka Backlog" })).toHaveStyle({
+      transition: "none", transform: "none",
+    });
+    expect(screen.getByRole("button", { name: "Sembunyikan" })).toHaveStyle({
+      transition: "none", transform: "none",
+    });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByTestId("pet-panel")).toBeNull();
   });
 
   it("membuka ringkasan berisi headline, detail, dan tautan ke tempat kejadian", () => {
@@ -91,14 +157,6 @@ describe("HanomanPet", () => {
     expect(onOpen).toHaveBeenCalledWith({ section: "terminal", sessionId: "spec-1" });
   });
 
-  it("menutup ringkasan dengan Escape", () => {
-    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-    fireEvent.click(hit());
-    expect(screen.getByText("Tidak ada pekerjaan siap")).toBeInTheDocument();
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByText("Tidak ada pekerjaan siap")).toBeNull();
-  });
-
   it("menyembunyikan pet, menyimpan pilihannya, dan tetap bisa dipanggil kembali", () => {
     const { unmount } = render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
     fireEvent.click(hit());
@@ -112,6 +170,9 @@ describe("HanomanPet", () => {
     expect(screen.queryByTestId("illustration-STK-001")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Tampilkan pet Hanoman" }));
     expect(screen.getByTestId("illustration-STK-001")).toBeInTheDocument();
+    expect(screen.getByTestId("pet-stage")).toHaveStyle({
+      animation: "hn-pet-reveal var(--dur-slow) var(--ease-out) both",
+    });
     expect(localStorage.getItem(PET_HIDDEN_KEY)).toBe("0");
   });
 

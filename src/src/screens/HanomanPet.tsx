@@ -7,6 +7,7 @@ import {
   derivePetState, loadPetHidden, savePetHidden,
   POSE_ART, POSE_LABEL, type PetPose, type PetTarget,
 } from "./pet-state";
+import { motionForPose } from "./pet-motion";
 
 const SIZE = 76;
 
@@ -31,15 +32,22 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   const { items } = useNotifications();
   const [hidden, setHidden] = React.useState(loadPetHidden);
   const [open, setOpen] = React.useState(false);
+  const [panelMounted, setPanelMounted] = React.useState(false);
+  const [reacting, setReacting] = React.useState(false);
   // Dinaikkan HANYA oleh peluruhan keadaan transient — satu-satunya perubahan pose yang tak dibawa
   // data baru. Bukan denyut: tak ada interval, hanya satu timeout tepat pada waktunya.
   const [decay, setDecay] = React.useState(0);
   const reduced = usePrefersReducedMotion();
   const ref = React.useRef<HTMLDivElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
 
   const view = React.useMemo(
     () => derivePetState({ sessions, backlog, notifications: items, now: Date.now() }),
     [sessions, backlog, items, decay]);
+  const motion = motionForPose(view.pose);
+  const poseAnimation = (on: boolean) => reduced
+    ? "none"
+    : `hn-pet-pose-${on ? "in" : "out"} var(--dur-slow) var(--ease-out) both`;
 
   React.useEffect(() => {
     if (view.transientUntil === null) return;
@@ -47,8 +55,8 @@ export function HanomanPet({ sessions, backlog, onOpen }:
     return () => clearTimeout(t);
   }, [view.transientUntil]);
 
-  // Hanya pose yang PERNAH terjadi yang masuk DOM: crossfade-nya dikerjakan CSS tanpa timer, dan
-  // byte yang diambil browser tumbuh mengikuti pemakaian alih-alih memuat kedelapannya di muka.
+  // Hanya pose yang PERNAH terjadi yang masuk DOM: layer lama dipertahankan untuk animation keluar,
+  // tanpa memuat kedelapan artwork sebelum benar-benar dipakai.
   const [seen, setSeen] = React.useState<PetPose[]>([view.pose]);
   React.useEffect(() => {
     setSeen((s) => (s.includes(view.pose) ? s : [...s, view.pose]));
@@ -56,17 +64,54 @@ export function HanomanPet({ sessions, backlog, onOpen }:
 
   React.useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) closePanel();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closePanel(); };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
-  }, [open]);
+  }, [open, reduced]);
+
+  React.useEffect(() => {
+    if (!reduced) return;
+    setReacting(false);
+    if (!open) setPanelMounted(false);
+  }, [reduced, open]);
+
+  // React 18 belum mengetik atribut `inert` di HTMLAttributes stabilnya. Menulis atribut DOM
+  // menjaga panel yang sedang keluar tetap tak bisa difokuskan tanpa cast prop yang rapuh.
+  React.useEffect(() => {
+    panelRef.current?.toggleAttribute("inert", !open);
+  }, [open, panelMounted]);
+
+  function showPanel() {
+    setPanelMounted(true);
+    setOpen(true);
+  }
+
+  function closePanel() {
+    setOpen(false);
+    if (reduced) setPanelMounted(false);
+  }
+
+  function togglePanel() {
+    if (open) closePanel();
+    else showPanel();
+  }
+
+  function reactAndToggle() {
+    if (!reduced) setReacting(true);
+    togglePanel();
+  }
 
   function setVisibility(next: boolean) {
     setHidden(next);
     savePetHidden(next);
-    if (next) setOpen(false);
+    if (next) {
+      setOpen(false);
+      setPanelMounted(false);
+    }
   }
 
   // z 80: di bawah header (90), overlay terminal fullscreen (100), Modal (150), Toast (200) — jadi
@@ -96,11 +141,18 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   const alt = `Hanoman ${POSE_LABEL[view.pose]} · ${view.headline}`;
   return (
     <div data-testid="pet-root" ref={ref} style={root}>
-      {open && (
-        <div style={{
-          pointerEvents: "auto", width: 268, padding: 14,
+      {panelMounted && (
+        <div ref={panelRef} data-testid="pet-panel" aria-hidden={!open || undefined}
+          onAnimationEnd={(event) => {
+            if (event.animationName === "hn-pet-panel-out" && !open) setPanelMounted(false);
+          }} style={{
+          pointerEvents: open ? "auto" : "none", width: 268, padding: 14,
           background: "var(--surface-card)", border: "1px solid var(--border-hair)",
           borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-lg)",
+          transformOrigin: "right bottom",
+          animation: reduced
+            ? "none"
+            : `${open ? "hn-pet-panel-in" : "hn-pet-panel-out"} var(--dur-slow) var(--ease-out) both`,
         }}>
           <div className="hn-eyebrow" style={{ marginBottom: 6 }}>{POSE_LABEL[view.pose]}</div>
           <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600,
@@ -109,34 +161,54 @@ export function HanomanPet({ sessions, backlog, onOpen }:
             color: "var(--text-muted)", lineHeight: 1.45 }}>{view.detail}</div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <Button size="sm" leftIcon={view.target.section === "terminal" ? "terminal" : "list-checks"}
-              onClick={() => { setOpen(false); onOpen(view.target); }}>
+              style={reduced ? { transition: "none", transform: "none" } : undefined}
+              onClick={() => { closePanel(); onOpen(view.target); }}>
               {view.target.section === "terminal" ? "Buka Terminal" : "Buka Backlog"}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setVisibility(true)}>Sembunyikan</Button>
+            <Button size="sm" variant="ghost"
+              style={reduced ? { transition: "none", transform: "none" } : undefined}
+              onClick={() => setVisibility(true)}>Sembunyikan</Button>
           </div>
         </div>
       )}
       {/* Live region membungkus gambarnya dan tombol adalah overlay transparan DI DALAMNYA:
           gambar di dalam <button> diperlakukan sebagian screen reader sebagai presentasional,
           sehingga perubahan alt tak pernah diumumkan. */}
-      <div data-testid="pet-stage" role="status" aria-live="polite" style={{
-        position: "relative", width: SIZE, height: SIZE,
-        animation: reduced ? "none" : "hn-pet-breathe 4.5s var(--ease-inout) infinite alternate",
-      }}>
-        {seen.map((pose) => {
-          const on = pose === view.pose;
-          return (
-            <StickerIllustration key={pose} id={POSE_ART[pose]} decorative={!on} alt={on ? alt : undefined}
-              style={{
-                position: "absolute", left: 0, top: 0, width: "100%", height: "100%",
-                opacity: on ? 1 : 0,
-                transition: reduced ? "none" : "opacity var(--dur-slow) var(--ease-out)",
-              }} />
-          );
-        })}
+      <div data-testid="pet-stage" role="status" aria-live="polite"
+        className="hn-pet-stage" data-reduced-motion={reduced ? "true" : undefined} style={{
+          position: "relative", width: SIZE, height: SIZE,
+          animation: reduced ? "none" : "hn-pet-reveal var(--dur-slow) var(--ease-out) both",
+        }}>
+        <div data-testid="pet-reactor" className="hn-pet-reactor" style={{
+          position: "relative", width: "100%", height: "100%",
+          transition: reduced ? "none" : "transform var(--dur-base) var(--ease-out)",
+          animation: reduced || !reacting
+            ? "none"
+            : "hn-pet-click var(--dur-slow) var(--ease-out) both",
+        }} onAnimationEnd={(event) => {
+          if (event.animationName === "hn-pet-click") setReacting(false);
+        }}>
+          <div data-testid="pet-idle" data-motion={motion.id} style={{
+            position: "relative", width: "100%", height: "100%", transformOrigin: "50% 86%",
+            animation: reduced ? "none" : motion.animation,
+          }}>
+            {seen.map((pose) => {
+              const on = pose === view.pose;
+              return (
+                <StickerIllustration key={pose} id={POSE_ART[pose]} decorative={!on}
+                  alt={on ? alt : undefined} style={{
+                    position: "absolute", left: 0, top: 0, width: "100%", height: "100%",
+                    opacity: on ? 1 : 0, zIndex: on ? 2 : 1,
+                    animation: poseAnimation(on), transition: reduced ? "none" : undefined,
+                  }} />
+              );
+            })}
+          </div>
+        </div>
         <button aria-label="Ringkasan status Hanoman" title={`${view.headline} — ${view.detail}`}
-          onClick={() => setOpen((o) => !o)} style={{
-            pointerEvents: "auto", position: "absolute", left: 0, top: 0, width: "100%", height: "100%",
+          onClick={reactAndToggle} style={{
+            pointerEvents: "auto", position: "absolute", zIndex: 3,
+            left: 0, top: 0, width: "100%", height: "100%",
             padding: 0, border: "none", background: "transparent", cursor: "pointer",
           }} />
       </div>
