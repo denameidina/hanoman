@@ -744,7 +744,7 @@ git commit -m "feat(spec-626): allowlist klien membuka satu bentuk path tulis"
 - Consumes: `parseTicketUpload`, `intakeTicket` (Task 3); `portalTicketRateOk` (Task 4); `hasProjectAccess` (sudah ada); `toPortalTicket` (`@hanoman/shared`); `zTicketCategory` (`@hanoman/shared`).
 - Produces: `POST /api/portal/projects/:id/tickets` → `201` berisi `PortalTicket`; `404 { error: "not found" }` bila project bukan haknya/tak ada; `400` field tak valid; `429` rate-limit.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/portal-ticket.route.test.ts`:
 
@@ -952,7 +952,7 @@ describe("POST /api/portal/projects/:id/tickets (SPEC-626)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus MERAH**
+- [x] **Step 2: Jalankan — harus MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/portal-ticket.route.test.ts
@@ -960,7 +960,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: FAIL — route belum ada (404 dari not-found handler pada test pertama).
 
-- [ ] **Step 3: Implementasi route**
+- [x] **Step 3: Implementasi route**
 
 Di `server/src/routes/portal.ts`, tambahkan import:
 
@@ -1016,7 +1016,7 @@ const zPortalTicket = z.object({
   });
 ```
 
-- [ ] **Step 4: Jalankan — harus HIJAU**
+- [x] **Step 4: Jalankan — harus HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -1027,7 +1027,7 @@ pnpm --filter ./server typecheck
 
 Expected: PASS semua; typecheck bersih.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/portal.ts server/test/portal-ticket.route.test.ts

@@ -131,15 +131,18 @@ describe("GET /api/portal (SPEC-617)", () => {
   //     yang berada DI LUAR scope hook `onRequest`, jadi 404-nya tak membuktikan apa pun;
   // (2) allowlist menolak method tulis seandainya route seperti itu suatu hari ditambahkan —
   //     diuji sebagai fungsi murni di client-route-allowed.test.ts.
-  it("tak ada route tulis di namespace portal", async () => {
+  // SPEC-626 · ADR-0111 menambah TEPAT SATU route tulis (kirim tiket). Daftar di bawah karena itu
+  // jadi pernyataan lengkap: satu POST yang disengaja, nol yang lain.
+  it("hanya satu route tulis di namespace portal", async () => {
     await app.ready();
     const urls = ["/api/portal/projects", "/api/portal/projects/:id/backlog",
       "/api/portal/projects/:id/backlog/:specId", "/api/portal/projects/:id/tickets",
       "/api/portal/projects/:id/tickets/:ticketId"];
+    const WRITE_OK = new Set(["POST /api/portal/projects/:id/tickets"]);
     for (const url of urls) {
       expect(app.hasRoute({ method: "GET", url }), `GET ${url}`).toBe(true);
       for (const method of ["POST", "PUT", "PATCH", "DELETE"] as const)
-        expect(app.hasRoute({ method, url }), `${method} ${url}`).toBe(false);
+        expect(app.hasRoute({ method, url }), `${method} ${url}`).toBe(WRITE_OK.has(`${method} ${url}`));
     }
   });
 
