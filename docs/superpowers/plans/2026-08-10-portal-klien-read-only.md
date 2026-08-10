@@ -8,6 +8,33 @@
 
 **Tech Stack:** Fastify + Prisma 6 (SQLite) · React 18 + TypeScript (Vite) · zod (`@hanoman/shared`) · vitest + @testing-library/react.
 
+## Yang berubah dari rencana saat dikerjakan
+
+1. **Gotcha Fastify yang belum diketahui saat plan ditulis:** hook `onRequest` ber-scope **tak
+   berjalan** untuk path yang tak punya route — 404 lahir dari not-found handler di luar scope
+   plugin. Akibatnya tiga assertion di plan salah premis (klien menembak `/api/portal/*` sebelum
+   route-nya ada, atau menembak `POST /api/portal/...` yang memang tak punya route → 404, bukan
+   403). Diganti: pembuktian nonaktif memakai route yang **memang ada** (`/auth/status`,
+   `/auth/change-password`), dan sifat baca-saja portal diuji **dua lapis** — `app.hasRoute()`
+   terhadap tabel route Fastify untuk "tak ada route tulis yang lahir di sini", plus
+   `clientRouteAllowed` sebagai fungsi murni untuk "method tulis ditolak seandainya ada".
+   Gotcha ini dicatat di ADR-0110 (nomor 7) dan di SKILL project.
+2. **`/api/scheduler` → `/api/scheduler/config`** di daftar route internal: prefix telanjang tak
+   punya route, jadi ia menguji not-found handler, bukan gerbang.
+3. **`/api/client-accounts`** dikeluarkan dari test Task 3 (route-nya baru lahir di Task 6) dan
+   diuji di `client-accounts.route.test.ts` sebagai gantinya — di sana route-nya ada, jadi 403-nya
+   benar-benar datang dari gerbang.
+4. **Tanda tangan komponen DS** diambil dari `src/src/ds` yang sebenarnya, bukan dari cuplikan
+   plan: `Tabs` memakai `{tabs:[{value,label,count}], value, onChange}`, `StatusPill` memakai
+   `status` (bukan `tone`), `Checkbox.onChange` menerima **boolean** (bukan event), `Card` punya
+   `eyebrow`/`title` (tanpa `subtitle`).
+5. **`docs/agent-integration.md` ikut diperbarui** (di plan masih "hanya bila dituntut test"):
+   `agent-doc-contract.test.ts` memakai daftar kandidat cookie-only yang **hardcoded**, jadi
+   segmen baru tak otomatis merahkannya — daftarnya ikut ditambah supaya kontraknya benar-benar
+   mengikat, dan naskahnya menyebut `/api/portal*` & `/api/client-accounts*`.
+6. **DTO `zCreateClientAccount`/`zUpdateClientAccount`/`ClientAccountView`** mendarat di
+   `shared/src/dto.ts` pada Task 1 (satu edit berkas yang sama), bukan Task 6.
+
 ## Global Constraints
 
 - **Bahasa:** komentar, pesan galat, dan teks UI dalam **bahasa Indonesia**, mengikuti berkas di sekitarnya.
@@ -2000,7 +2027,7 @@ git commit -m "docs(spec-617): ADR-0110 portal klien read-only + perbarui SoT te
 
 **Files:** tak ada perubahan kode; bila ada temuan, perbaiki di berkas yang bersangkutan.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh SPEC ini**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh SPEC ini**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -2017,14 +2044,14 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism \
 ```
 Expected: semua PASS, dan **jumlah test > 0** di tiap berkas (`--changed` tidak dipakai di sini justru supaya nol-test tak terbaca hijau).
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck && pnpm --filter ./cli typecheck
 ```
 Expected: nol error. (Empat paket memang tersentuh — skema + tipe bersama berdampak luas; ini pengecualian yang dinyatakan, bukan rutinitas.)
 
-- [ ] **Step 3: Smoke endpoint nyata (boot server + curl)**
+- [x] **Step 3: Smoke endpoint nyata (boot server + curl)**
 
 ```bash
 export HANOMAN_HOME="$(mktemp -d)"
@@ -2044,14 +2071,14 @@ Lalu, dengan `curl -c/-b` cookie jar:
 
 Matikan server **per-PID**: `kill <pid>` (JANGAN `pkill -f node` — itu membunuh sesi agen tetangga, SPEC-402).
 
-- [ ] **Step 4: Centang seluruh kotak plan & pastikan tak ada `- [ ]` tersisa**
+- [x] **Step 4: Centang seluruh kotak plan & pastikan tak ada `- [ ]` tersisa**
 
 ```bash
 grep -c "^- \[ \]" docs/superpowers/plans/2026-08-10-portal-klien-read-only.md || true
 ```
 Expected: `0` (grep exit 1 = nol kecocokan). Selama masih ada, hanoman menahan backlog di `executing`.
 
-- [ ] **Step 5: Commit sisa & push**
+- [x] **Step 5: Commit sisa & push**
 
 ```bash
 git add -A && git commit -m "chore(spec-617): centang plan portal klien + bukti verifikasi"
