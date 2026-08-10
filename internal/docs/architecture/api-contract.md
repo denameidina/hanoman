@@ -58,7 +58,7 @@ Permukaan untuk `User.role === "client"`. Sumber datanya **sama** dengan dashboa
 `capabilityForRoute` memetakan `portal` ke **COOKIE_ONLY**: agent token tak pernah menjangkaunya.
 
 ```
-GET /portal/projects                        -> { items: [{ id, name }] }        # HANYA project yang ditugaskan
+GET /portal/projects[?page=&limit=]         -> { items: [{ id, name }], total, page, pageSize }   # HANYA project yang ditugaskan
 GET /portal/projects/:id/backlog?page=&limit=  -> { items: PortalSpec[], total, page, pageSize }
 GET /portal/projects/:id/backlog/:specId    -> PortalSpec
 GET /portal/projects/:id/tickets?page=&limit=  -> { items: PortalTicket[], total, page, pageSize }
@@ -68,6 +68,10 @@ GET /portal/projects/:id/tickets/:ticketId  -> PortalTicket & { detail }
 #   Proyeksi = allowlist field EKSPLISIT di shared/src/portal.ts (bukan Omit<> — kolom Prisma baru
 #   tak boleh ikut senyap). payload/author/baseSha/headSha/branchFrom/dependsOn/sourceHistory dan
 #   reporterEmail/shareToken/accessKeyHash TIDAK pernah menyeberang.
+#   SPEC-647 · ADR-0107 · ketiga daftar portal beramplop `Paginated` dan menerima page+limit. UI
+#   portal mengirim KEDUANYA untuk backlog & tiket (limit tanpa page = plafon, bukan halaman —
+#   jebakan terukur SPEC-523); pemilih project sengaja meminta daftar penuh, karena project
+#   terpilih yang jatuh dari halaman mematahkan "perpindahan halaman mempertahankan konteks".
 #   404 untuk project yang bukan miliknya — TAK TERBEDAKAN dari project yang tak ada (preseden Help
 #   Center ADR-0062: kalau beda, portal jadi alat enumerasi nama project). Id item juga bukan jalan
 #   pintas: …/p1/backlog/SPEC-2 milik project lain tetap 404.

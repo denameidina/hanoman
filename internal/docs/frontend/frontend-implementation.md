@@ -734,7 +734,7 @@ icon `inbox`; `NotificationBell` per-tipe (icon/warna brass, label "keluhan baru
 `notifTarget` → `{ section: "triage", projectFilter }`. Server menotifikasi **setiap** tiket baru (dedup `key`),
 tersiar lewat grup `notifications` WS existing.
 
-## Portal klien — chrome sendiri, rantai gulir sendiri, warna dari fungsi murni (SPEC-617/626 · ADR-0110/0111)
+## Portal klien — chrome sendiri, rantai gulir sendiri, warna dari fungsi murni (SPEC-617/626/647 · ADR-0110/0111)
 
 `ClientPortal` (`portal/ClientPortal.tsx`) di-fork di `App.tsx` **sesudah gerbang auth**, sebelum
 `Shell`: sidebar `HN_NAV` adalah navigasi operator, dan setiap entrinya adalah 403 yang menunggu
@@ -785,6 +785,41 @@ Domain `ticketPill` adalah **kosakata klien**, bukan `Ticket.status` mentah: `to
 sudah memetakannya lewat `publicStatus()` sebelum dikirim. Pemetaannya diikat ke sumber itu oleh
 test kontrak yang menyilangkan seluruh status × stage — kosakata yang berubah di `publicStatus()`
 membuat test merah, bukan diam-diam jadi abu-abu.
+
+**Paginasi** (SPEC-647 · ADR-0107 diterapkan, tanpa ADR baru). Kedua daftar mengambil dan
+merender **satu halaman** (`PORTAL_PAGE = 20`, cermin `TICKET_PAGE` triase) lewat `Pager` design
+system + `serverPage()` — bukan tombol ad-hoc. Endpoint-nya sudah beramplop `Paginated` sejak
+ADR-0110; yang tak pernah ada adalah **kliennya** — `api/portal.ts` memanggil tanpa satu pun
+parameter, dan `paginate()` tanpa `limit` membalas SELURUH baris. Empat hal yang menentukan
+bentuknya:
+
+- **`page` dan `limit` selalu berpasangan.** `api/portal.ts` menerima satu argumen
+  `PortalPage = {page,limit}`; `limit` tanpa `page` bukan halaman melainkan **plafon** (jebakan
+  terukur SPEC-523). Bentuk argumennya yang mencegahnya, bukan disiplin call site.
+- **Angka di tab = `total` dari amplop**, bukan `items.length`. Sesudah paginasi, `items.length`
+  hanya menjawab "berapa baris yang kebetulan tampil" — lencana yang mengecil saat klien membuka
+  halaman 2 adalah kebohongan (ADR-0107). Itu juga satu-satunya alasan **kedua** daftar tetap
+  dimuat bersama meski hanya satu yang tampak.
+- **Satu nomor halaman per daftar, di-reset oleh satu effect `[active, tab]`.** Ganti project atau
+  tab → halaman 1 (idiom `TriageScreen`); klik halaman **tidak** menggeser project maupun tab.
+  `onSent` (kirim keluhan) memaksa halaman tiket ke 1 — tiket baru duduk paling atas
+  (`createdAt desc`), jadi memuat ulang di halaman aktif akan menyembunyikan tiket yang baru saja
+  dikirim. Muat ulang untuk project yang sama dipicu penghitung `reload` supaya reset halaman +
+  pemuatan jadi **satu** fetch.
+- **Respons basi tak menimpa halaman yang lebih baru:** `loadLists` memegang nomor urut di
+  `useRef` dan hanya respons terbaru yang boleh `setState`.
+
+`Pager` portal **tak** memakai `FIXED_ROW_STYLE`: portal hanya punya satu scroller (`<main>`,
+tabel di atas) dan tak memakai rantai flex per-daftar seperti layar operator, jadi ia ikut
+menggulir di ujung daftarnya. Keadaan kosong & ujung daftar bawaan DS: `Pager` mengembalikan
+`null` saat `total === 0` (jadi `StateBlock` kosong tetap sendirian) dan men-disable
+Sebelumnya/Berikutnya di ujung — tak ada tombol yang menggantung aktif.
+
+**Pemilih project sengaja tanpa kontrol halaman** — dinyatakan supaya audit berikutnya tak
+"memperbaikinya". `GET /portal/projects` ikut beramplop `paginate()` (pola yang sama, bukan pola
+sendiri) dan UI memintanya tanpa query: ia pemilih, bukan daftar yang ditelusuri, dan project
+terpilih yang jatuh dari halaman justru mematahkan syarat "perpindahan halaman mempertahankan
+project terpilih".
 
 **Kirim keluhan** (SPEC-626 · ADR-0111). Tombol di baris tab (terlihat dari kedua tab) membuka
 `TicketForm` (`portal/TicketForm.tsx`): Project (hanya yang boleh diakses, default project aktif) ·
