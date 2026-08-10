@@ -69,7 +69,7 @@
   - `describeCron(expr: string): string`
   - `WEEKDAY_LABELS: readonly string[]`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/cron-expr.test.ts`:
 
@@ -165,7 +165,7 @@ describe("describeCron", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-646
@@ -174,7 +174,7 @@ cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-646
 
 Expected: FAIL — `Failed to resolve import "./cron-expr"`.
 
-- [ ] **Step 3: Tulis implementasinya**
+- [x] **Step 3: Tulis implementasinya**
 
 Buat `shared/src/cron-expr.ts`:
 
@@ -352,7 +352,7 @@ Tambahkan ke `shared/src/index.ts`, tepat sesudah baris `export * from "./change
 export * from "./cron-expr";
 ```
 
-- [ ] **Step 4: Jalankan test sampai hijau**
+- [x] **Step 4: Jalankan test sampai hijau**
 
 ```bash
 ./node_modules/.bin/vitest --run shared/src/cron-expr.test.ts
@@ -360,7 +360,7 @@ export * from "./cron-expr";
 
 Expected: PASS, seluruh test di berkas itu.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/cron-expr.ts shared/src/cron-expr.test.ts shared/src/index.ts
