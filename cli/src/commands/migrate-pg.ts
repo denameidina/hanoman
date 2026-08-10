@@ -26,7 +26,11 @@ export const PG_ORDER = [
   "SyncLog", "LocalBinding", "SyncOutbox", "SyncState", "SyncConflict",
   // SPEC-485 · ADR-0102 · LeadFlow SEBELUM LeadDecision: `flowId` menunjuk ke sana. Tanpa FK, tapi
   // urutan tabel harus tetap mencerminkan arah tautannya bagi pembaca berikutnya.
-  "SchedulerQueueItem", "RuntimeConfig", "LeadFlow", "LeadDecision",
+  // SPEC-646 · ADR-0112 · SchedulerCron SEBELUM SchedulerCronRun: `cronId` menunjuk ke sana. Tanpa
+  // FK (cermin SchedulerQueueItem/LeadDecision), tapi urutan tabel harus tetap mencerminkan arah
+  // tautannya bagi pembaca berikutnya.
+  "SchedulerQueueItem", "SchedulerCron", "SchedulerCronRun",
+  "RuntimeConfig", "LeadFlow", "LeadDecision",
   // SPEC-476 · ADR-0096 · tabel gateway LOCAL-only; sumber Postgres lama lazimnya tidak punya
   // tabel ini dan jalur 42P01 di bawah memperlakukannya sebagai nol baris.
   "TelegramGatewayState", "TelegramChat", "TelegramUpdate", "TelegramMemory",

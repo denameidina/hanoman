@@ -380,7 +380,7 @@ git commit -m "feat(spec-646): modul jadwal cron murni di shared"
 - Consumes: tak ada.
 - Produces: model Prisma `SchedulerCron` & `SchedulerCronRun` → `prisma.schedulerCron` / `prisma.schedulerCronRun`.
 
-- [ ] **Step 1: Jalankan test gerbang untuk melihatnya HIJAU dulu (baseline)**
+- [x] **Step 1: Jalankan test gerbang untuk melihatnya HIJAU dulu (baseline)**
 
 ```bash
 ./node_modules/.bin/vitest --run cli/test/migrate-pg.test.ts -t "PG_ORDER"
@@ -388,7 +388,7 @@ git commit -m "feat(spec-646): modul jadwal cron murni di shared"
 
 Expected: PASS (2 test). Ini baseline: sesudah model ditambahkan tanpa memperbarui `PG_ORDER`, test yang sama harus MERAH — itulah gerbangnya.
 
-- [ ] **Step 2: Tambahkan model ke `schema.prisma`**
+- [x] **Step 2: Tambahkan model ke `schema.prisma`**
 
 Sisipkan tepat sesudah blok `model SchedulerQueueItem { … }` (berakhir di sekitar baris 440):
 
@@ -439,7 +439,7 @@ model SchedulerCronRun {
 }
 ```
 
-- [ ] **Step 3: Tulis migration SQL**
+- [x] **Step 3: Tulis migration SQL**
 
 Buat `server/prisma/migrations/20260811000000_scheduler_cron/migration.sql`:
 
@@ -480,7 +480,7 @@ CREATE INDEX "SchedulerCronRun_cronId_dueAt_idx" ON "SchedulerCronRun"("cronId",
 CREATE INDEX "SchedulerCronRun_status_idx" ON "SchedulerCronRun"("status");
 ```
 
-- [ ] **Step 4: Generate klien Prisma & pastikan gerbang `PG_ORDER` MERAH**
+- [x] **Step 4: Generate klien Prisma & pastikan gerbang `PG_ORDER` MERAH**
 
 ```bash
 ./node_modules/.bin/prisma generate --schema server/prisma/schema.prisma
@@ -489,7 +489,7 @@ CREATE INDEX "SchedulerCronRun_status_idx" ON "SchedulerCronRun"("status");
 
 Expected: FAIL pada "memuat setiap model Prisma tepat sekali" — `SchedulerCron`/`SchedulerCronRun` ada di DMMF tapi tak ada di `PG_ORDER`.
 
-- [ ] **Step 5: Perbarui `PG_ORDER`**
+- [x] **Step 5: Perbarui `PG_ORDER`**
 
 Di `cli/src/commands/migrate-pg.ts`, ganti baris
 
@@ -507,7 +507,7 @@ menjadi
   "RuntimeConfig", "LeadFlow", "LeadDecision",
 ```
 
-- [ ] **Step 6: Jalankan gerbang sampai hijau**
+- [x] **Step 6: Jalankan gerbang sampai hijau**
 
 ```bash
 ./node_modules/.bin/vitest --run cli/test/migrate-pg.test.ts
@@ -515,7 +515,7 @@ menjadi
 
 Expected: PASS seluruhnya.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations/20260811000000_scheduler_cron cli/src/commands/migrate-pg.ts
