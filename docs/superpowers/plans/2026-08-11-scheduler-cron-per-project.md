@@ -2385,7 +2385,7 @@ git commit -m "feat(spec-646): panel cronjob per project di scheduler"
 - Consumes: seluruh keputusan Task 1–8.
 - Produces: dokumentasi SoT.
 
-- [ ] **Step 1: Verifikasi nomor ADR masih bebas**
+- [x] **Step 1: Verifikasi nomor ADR masih bebas**
 
 ```bash
 ls internal/docs/adr | sort | tail -3
@@ -2397,7 +2397,7 @@ grep -rn "ADR-0112" internal/docs || echo "0112 bebas"
 Expected: `0111` adalah yang tertinggi dan `0112 bebas`. Bila tidak, pakai nomor bebas berikutnya
 dan ganti seluruh rujukan `0112` di kode & docs.
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Buat `internal/docs/adr/0112-cronjob-per-project-scheduler.md` dengan struktur yang sama seperti
 ADR tetangganya (Status · Tanggal · SPEC · Terkait · Konteks · Keputusan bernomor · Konsekuensi).
@@ -2434,7 +2434,7 @@ dari agen **hasil** `terminalAgentDefaults`, bukan `Setting.agent` (SPEC-377/383
 (5) `sweepCronDue` jalan sebelum gerbang `paused` — memindahkannya ke bawah membuat Pause
 menghapus jatuh tempo alih-alih menahannya.
 
-- [ ] **Step 3: Tautkan ADR di kedua index**
+- [x] **Step 3: Tautkan ADR di kedua index**
 
 Di `internal/docs/README.md`, tambahkan sebagai baris PERTAMA daftar `## adr`:
 
@@ -2445,7 +2445,7 @@ Di `internal/docs/README.md`, tambahkan sebagai baris PERTAMA daftar `## adr`:
 Di `internal/docs/adr/README.md`, tambahkan narasinya mengikuti format entri tetangganya
 (apa yang diperluas/ditegakkan + gotcha-nya).
 
-- [ ] **Step 4: Perbarui api-contract & data-model**
+- [x] **Step 4: Perbarui api-contract & data-model**
 
 `internal/docs/architecture/api-contract.md` — tambahkan blok:
 
@@ -2468,14 +2468,14 @@ Semua **COOKIE_ONLY**: sebuah cron adalah `POST /terminal/sessions` yang ditunda
 `internal/docs/architecture/data-model.md` — tambahkan `SchedulerCron` & `SchedulerCronRun` ke
 daftar model LOCAL-ONLY beserta kolom dan alasan `@@unique([cronId, dueAt])`.
 
-- [ ] **Step 5: Perbarui SKILL project**
+- [x] **Step 5: Perbarui SKILL project**
 
 Di `internal/skills/hanoman/SKILL.md` baris 87 (butir "Tidak ada message queue…"), sesudah
 "engine scheduler (ADR-0072)" tambahkan "— yang sejak **SPEC-646/ADR-0112** juga memiliki
 **cronjob per project** (jadwal HH:MM yang ditunda ADR-0072): jatuh tempo dimaterialisasi jadi baris
 `SchedulerCronRun` di tick yang SAMA, tanpa timer kedua".
 
-- [ ] **Step 6: Verifikasi integritas index**
+- [x] **Step 6: Verifikasi integritas index**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || ./node_modules/.bin/tsx cli/src/index.ts docs index --check
@@ -2484,7 +2484,7 @@ node cli/dist/index.js docs index --check 2>/dev/null || ./node_modules/.bin/tsx
 Expected: index utuh (atau perintahnya tak tersedia di worktree ini — cukup pastikan tautan ADR
 benar-benar ada di kedua README lewat `grep -n "0112" internal/docs/README.md internal/docs/adr/README.md`).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs internal/skills

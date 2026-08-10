@@ -456,6 +456,37 @@ overlay sesi live — status live (running/done/failed) tetap diturunkan dari `p
   id-nya dicatat di `note` dan slotnya tetap terpakai. `reconcile()` tak tersentuh: ia hanya memindai
   `launched`, jadi tak ada `Notification fail` palsu untuk item yang sengaja dibatalkan.
 
+## SchedulerCron & SchedulerCronRun (SPEC-646 · [ADR-0112](../adr/0112-cronjob-per-project-scheduler.md))
+Cronjob per project — jadwal jam tertentu (HH:MM) yang ditunda ADR-0072. Keduanya **LOCAL-ONLY, tak
+disync** (cermin `SchedulerQueueItem`: tak masuk whitelist `FIELDS`, tanpa kolom `version`) karena
+jadwal adalah properti **mesin ini** — worktree, tmux, dan cap concurrency-nya lokal.
+
+`SchedulerCron`
+- `id` (cuid), `projectId` (tanpa FK — cermin `SchedulerQueueItem`), `name`, `expr` (cron 5-field,
+  dievaluasi di zona waktu **lokal server**), `prompt` (instruksi bebas operator),
+  `agent?`/`model?`/`effort?` (**null = warisi** default sesi; diresolusi `terminalAgentDefaults()`,
+  fungsi yang sama dengan form "Sesi baru" SPEC-517 — sengaja BUKAN blok `zAgentEngine`, yang membawa
+  `enabled` sendiri), `enabled` (default **false**), `nextRunAt?` (jadwal berikutnya, durable lintas
+  restart), `lastRunAt?`, `createdAt`, `updatedAt`. Index `(projectId)`, `(enabled)`.
+- Preset UI (setiap hari · hari kerja · mingguan · tiap N jam) **tak disimpan** — ia diturunkan
+  bolak-balik dari `expr` oleh `presetToExpr`/`exprToPreset` (`shared/src/cron-expr.ts`, murni).
+  Menyimpan preset sebagai kolom kedua akan melahirkan drift yang tak punya arbiter.
+
+`SchedulerCronRun` — merangkap **antrean dan riwayat** dalam satu tabel (pola `WebhookDelivery`, ADR-0100)
+- `id` (cuid), `cronId`, `projectId`, `dueAt`, `startedAt?`, `status`
+  (`queued|launched|skipped|failed`, default `queued`), `sessionId?`, `note?` (alasan skipped/failed),
+  `manual` (default false — dari tombol "Jalankan sekarang"), `createdAt`.
+  **`@@unique([cronId, dueAt])`** + index `(cronId, dueAt)` & `(status)`.
+- Kunci unik itu **adalah** idempotensinya: satu jatuh tempo bisa diklaim paling banyak sekali, apa pun
+  yang terjadi pada tick berulang, dua tick yang balapan, atau restart di tengah — P2002 diperlakukan
+  sebagai jalur normal, bukan galat. `nextRunAt` **bukan** kuncinya: ia bisa gagal ditulis sementara
+  run-nya sudah lahir.
+- Jatuh tempo tertunggak **tak pernah** jadi burst: sweep memajukan `nextRunAt` ke jatuh tempo TERBARU
+  yang ≤ now dan membuat SATU baris; yang dilompati jadi angka di dalam `note`
+  (`terlewat N jatuh tempo — scheduler tak berjalan`).
+- Baris dihapus bersama cron-nya (`DELETE /api/scheduler/crons/:id`) — tanpa FK, jadi penghapusannya
+  eksplisit di route.
+
 ## SessionHistory (SPEC-362 · [ADR-0079](../adr/0079-history-sesi-terminal-store-lokal-plus-transkrip.md))
 Riwayat **setiap** sesi terminal — **LOCAL-ONLY, tak disync** (cermin `LocalBinding`/`SchedulerQueueItem`:
 sesi hidup di tmux mesin ini dan transkripnya berkas di disk mesin ini). tmux tetap sumber kebenaran

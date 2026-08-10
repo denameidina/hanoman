@@ -1019,6 +1019,26 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 > `GET /api/scheduler/queue?status=…&page&limit` dan memakai `Pager` design system. Hitungan judulnya
 > datang dari `state.queueCounts`.
 >
+> ### Cronjob per project (SPEC-646 · [ADR-0112](../adr/0112-cronjob-per-project-scheduler.md))
+>
+> Jadwal jam tertentu (HH:MM) yang ditunda ADR-0072, di atas engine yang SAMA — tanpa timer kedua.
+> Seluruhnya **COOKIE_ONLY**: sebuah cron adalah `POST /terminal/sessions` yang DITUNDA, jadi
+> `settings:write` tak pernah cukup untuknya (`capabilityForRoute` punya cabang `seg[1] === "crons"`).
+>
+> | Method | Path | Keterangan |
+> |---|---|---|
+> | GET | `/api/scheduler/crons?projectId=&page=&limit=` | `Paginated<SchedulerCronView>` (ADR-0107) |
+> | POST | `/api/scheduler/crons` | `{project,name,expr,prompt,agent?,model?,effort?,enabled?}` → **201**; **400** expr tak sah, **404** project. `enabled` default **false** |
+> | PATCH | `/api/scheduler/crons/:id` | partial; `expr` berubah (atau `nextRunAt` kosong) → `nextRunAt` dihitung ulang. `agent`/`model`/`effort` `null` = kembali ke warisan |
+> | DELETE | `/api/scheduler/crons/:id` | **204**; riwayat run ikut terhapus (tak ada FK) |
+> | POST | `/api/scheduler/crons/:id/run` | uji coba → baris run `manual`; **409** saat scheduler mati/dijeda atau sudah ada run `queued` |
+> | GET | `/api/scheduler/crons/:id/runs?page=&limit=` | `Paginated<SchedulerCronRunView>`, urut `dueAt` turun |
+>
+> `expr` divalidasi lewat `parseCron` — parser yang SAMA yang menghitung jadwalnya, jadi expr yang
+> diterima pasti punya jatuh tempo. "Jalankan sekarang" **tidak** men-spawn sesi: ia membuat baris
+> `SchedulerCronRun` ber-`manual:true`, dan tick berikutnya (≤10 dtk) yang meluncurkannya lewat
+> governor — satu-satunya cara ia tetap tunduk cap, Pause, dan master switch tanpa menyalin gerbangnya.
+>
 > **Panel Scheduler (SPEC-299, daun #6):** screen mandiri `SchedulerScreen.tsx` + nav item `ds/shell.tsx`
 > (`key:"scheduler"`), **murni konsumen read-only** — tak menambah endpoint/skema/ADR. Self-poll `GET
 > /api/scheduler/state` (5 dtk, pola GitGraph) merender: status per source (enable/last-run/next-run),
