@@ -1523,7 +1523,7 @@ git commit -m "feat(spec-646): drain cron di anggaran slot governor + sweep di t
 - Consumes: `zCreateCron`/`zPatchCron` (Task 3), `computeNextRun`/`listCronRunsPage` (Task 4), `getScheduler` (ada).
 - Produces: enam endpoint di §7 desain.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/scheduler-cron.route.test.ts`:
 
@@ -1666,7 +1666,7 @@ describe("capabilityForRoute", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1675,7 +1675,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: FAIL — 404 dari route yang belum ada dan `settings:read` dari capability yang belum bercabang.
 
-- [ ] **Step 3: Tambahkan cabang capability**
+- [x] **Step 3: Tambahkan cabang capability**
 
 Di `server/src/services/agent-capabilities.ts`, ganti baris
 
@@ -1699,7 +1699,7 @@ menjadi
   }
 ```
 
-- [ ] **Step 4: Tambahkan route**
+- [x] **Step 4: Tambahkan route**
 
 Di `server/src/routes/scheduler.ts`, tambahkan import:
 
@@ -1838,7 +1838,7 @@ lalu tempelkan sebelum penutup `}` fungsi default export:
   });
 ```
 
-- [ ] **Step 5: Jalankan test sampai hijau**
+- [x] **Step 5: Jalankan test sampai hijau**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1847,7 +1847,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: PASS seluruhnya (16 test).
 
-- [ ] **Step 6: Pastikan gerbang capability lama tak rusak**
+- [x] **Step 6: Pastikan gerbang capability lama tak rusak**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1856,7 +1856,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: PASS. (Katalog MCP tak menyebut `/scheduler/crons`, jadi keduanya harus tetap hijau apa adanya.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/routes/scheduler.ts server/src/services/agent-capabilities.ts server/test/scheduler-cron.route.test.ts

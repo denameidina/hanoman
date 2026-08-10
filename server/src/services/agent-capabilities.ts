@@ -26,7 +26,16 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // prefix-nya kebetulan sama dengan endpoint status. Cookie = akses penuh, seperti sebelumnya.
   if (top === "limits" || top === "update" || top === "events" || top === "fs" || top === "health")
     return read ? "GLOBAL_READ" : "COOKIE_ONLY";
-  if (top === "scheduler") return rw("settings");   // SPEC-294 · scheduler = setelan instance
+  if (top === "scheduler") {
+    // SPEC-646 · ADR-0112 · cron BUKAN knob. Ia adalah `POST /terminal/sessions` yang ditunda:
+    // sebuah baris cron membuat hanoman membuka sesi agen di worktree project, berulang, tanpa
+    // manusia di pane. Membiarkannya di `settings` berarti setiap agent token pemegang
+    // `settings:write` bisa menjadwalkan sesi tanpa batas — persis kelas eskalasi yang ditutup
+    // SPEC-405 untuk `/update/apply` dan ADR-0097/0100 untuk permukaan kredensial. ADR-0099 sudah
+    // menetapkan bahwa MCP tak mengekspos tool yang mengeksekusi; cron adalah eksekusi.
+    if (seg[1] === "crons") return "COOKIE_ONLY";
+    return rw("settings");   // SPEC-294 · sisanya = setelan instance
+  }
   // SPEC-409 · ADR-0091 · domain TERSENDIRI. `POST /lead/decisions` adalah endpoint TULIS: ia
   // melahirkan baris jejak permanen dan keputusannya bisa menggerakkan sesi. Capability baca tak
   // pernah cukup untuk memanggilnya (AC-5) — `rw()` sudah menurunkannya dari method, jadi tak ada
