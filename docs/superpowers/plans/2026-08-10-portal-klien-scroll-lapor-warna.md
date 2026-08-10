@@ -665,7 +665,7 @@ git commit -m "feat(spec-626): rate-limit tiket portal berbasis akun"
 **Interfaces:**
 - Produces: `clientRouteAllowed` menerima `POST /api/portal/projects/:id/tickets` dan **hanya** itu untuk method tulis.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/client-route-allowed.test.ts` (dan **ubah** test "portal TIDAK boleh ditulis" yang lama supaya tetap benar — pakai path `…/backlog` yang memang tetap tertutup; test itu sudah memakai path itu, jadi biarkan apa adanya):
 
@@ -691,7 +691,7 @@ Tambahkan ke `server/test/client-route-allowed.test.ts` (dan **ubah** test "port
   });
 ```
 
-- [ ] **Step 2: Jalankan — harus MERAH**
+- [x] **Step 2: Jalankan — harus MERAH**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/client-route-allowed.test.ts
@@ -699,7 +699,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: FAIL pada test pertama (`false` ≠ `true`).
 
-- [ ] **Step 3: Buka satu bentuk saja**
+- [x] **Step 3: Buka satu bentuk saja**
 
 Di `server/src/services/client-access.ts`, ganti baris `if (top === "portal") return read;` jadi:
 
@@ -717,7 +717,7 @@ const isPortalTicketSubmit = (method: string, seg: string[]): boolean =>
   method === "POST" && seg.length === 4 && seg[1] === "projects" && seg[3] === "tickets";
 ```
 
-- [ ] **Step 4: Jalankan — harus HIJAU**
+- [x] **Step 4: Jalankan — harus HIJAU**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/client-route-allowed.test.ts server/test/client-gate.test.ts
@@ -725,7 +725,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: PASS keduanya.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/client-access.ts server/test/client-route-allowed.test.ts

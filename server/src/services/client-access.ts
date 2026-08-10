@@ -9,6 +9,12 @@ import { prisma } from "../db";
 const segments = (path: string) =>
   path.replace(/^\/api\/?/, "").replace(/\/+$/, "").split("/").filter(Boolean);
 
+// SPEC-626 · ADR-0111 · satu-satunya jalur TULIS di permukaan klien, dinyatakan sebagai BENTUK
+// PATH yang persis — bukan "portal boleh POST". Route portal apa pun yang lahir nanti tetap
+// tertutup sampai seseorang sengaja menambahkan bentuknya di sini (deny-by-default, ADR-0110).
+const isPortalTicketSubmit = (method: string, seg: string[]): boolean =>
+  method === "POST" && seg.length === 4 && seg[1] === "projects" && seg[3] === "tickets";
+
 export function clientRouteAllowed(method: string, path: string): boolean {
   const seg = segments(path);
   // `..` tak pernah muncul di route sah; menolaknya di sini menutup normalisasi path yang
@@ -17,7 +23,7 @@ export function clientRouteAllowed(method: string, path: string): boolean {
   const top = seg[0] ?? "";
   const read = method === "GET" || method === "HEAD";
 
-  if (top === "portal") return read;
+  if (top === "portal") return read || isPortalTicketSubmit(method, seg);
   // Help Center sudah publik tanpa login (app.ts mem-bypass gate untuknya). Menolaknya di sini
   // membuat klien yang login justru punya hak LEBIH SEDIKIT daripada pengunjung anonim.
   if (top === "help") return true;

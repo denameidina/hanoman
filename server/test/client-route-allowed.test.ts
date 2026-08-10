@@ -51,4 +51,23 @@ describe("clientRouteAllowed (SPEC-617)", () => {
     expect(clientRouteAllowed("GET", "/api/portal/../specs")).toBe(false);
     expect(clientRouteAllowed("GET", "/api/helpdesk/secrets")).toBe(false);
   });
+  // SPEC-626 · ADR-0111 · SATU pintu tulis, dibuka sebagai BENTUK PATH, bukan sebagai
+  // "portal boleh POST". Semua bentuk tulis lain tetap tertutup — termasuk yang lahir nanti.
+  it("hanya kirim tiket portal yang boleh ditulis", () => {
+    expect(clientRouteAllowed("POST", "/api/portal/projects/p1/tickets")).toBe(true);
+    expect(clientRouteAllowed("POST", "/api/portal/projects/toko-mekar/tickets")).toBe(true);
+  });
+
+  it("bentuk tulis portal lain tetap ditolak", () => {
+    const paths = [
+      "/api/portal/projects/p1/tickets/t1", "/api/portal/projects/p1/backlog",
+      "/api/portal/projects/p1/backlog/SPEC-1", "/api/portal/projects", "/api/portal/tickets",
+      "/api/portal/projects/p1", "/api/portal/projects/p1/tickets/t1/attachments",
+    ];
+    for (const p of paths)
+      for (const m of ["POST", "PATCH", "PUT", "DELETE"])
+        expect(clientRouteAllowed(m, p), `${m} ${p}`).toBe(false);
+    for (const m of ["PATCH", "PUT", "DELETE"])
+      expect(clientRouteAllowed(m, "/api/portal/projects/p1/tickets"), m).toBe(false);
+  });
 });
