@@ -34,7 +34,7 @@
 - Consumes: `LIST_SCROLL_STYLE`, `FIXED_ROW_STYLE` dari `../ds` (`src/src/ds/kit.tsx:142-144`).
 - Produces: `data-testid="portal-root"`, `data-testid="portal-scroll"`, `data-testid="portal-list"` di `ClientPortal` — dipakai test Task 1 saja.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/portal-scroll.test.tsx`:
 
@@ -140,7 +140,7 @@ describe("portal klien bisa digulir (SPEC-626)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus MERAH**
+- [x] **Step 2: Jalankan — harus MERAH**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/portal-scroll.test.tsx
@@ -148,7 +148,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/portal-scroll.test.tsx
 
 Expected: gagal — "tak ada satu pun leluhur ber-overflow auto/scroll" (`scroller` null) pada dua test pertama, dan `portal-list`/`portal-scroll` belum ada.
 
-- [ ] **Step 3: Pasang rantai gulirnya**
+- [x] **Step 3: Pasang rantai gulirnya**
 
 Di `src/src/portal/ClientPortal.tsx`, ubah import DS:
 
@@ -198,7 +198,7 @@ Tambahkan `data-testid="portal-list"` pada `Card padding={0}` daftar backlog **d
                   : <Card padding={0} data-testid="portal-list">
 ```
 
-- [ ] **Step 4: Jalankan — harus HIJAU**
+- [x] **Step 4: Jalankan — harus HIJAU**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/portal-scroll.test.tsx src/test/client-portal.test.tsx
@@ -206,7 +206,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/portal-scroll.test.tsx
 
 Expected: PASS keduanya (test SPEC-617 lama tak boleh ikut merah).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/portal/ClientPortal.tsx src/test/portal-scroll.test.tsx

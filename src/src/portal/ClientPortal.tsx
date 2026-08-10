@@ -1,6 +1,6 @@
 import React from "react";
 import type { PortalProject, PortalSpec, PortalTicket, PortalTicketDetail, UserView } from "@hanoman/shared";
-import { Button, Card, Modal, StateBlock, StatusPill, Tabs } from "../ds";
+import { Button, Card, FIXED_ROW_STYLE, LIST_SCROLL_STYLE, Modal, StateBlock, StatusPill, Tabs } from "../ds";
 import { Mark } from "../ds/marks";
 import { portalApi } from "../api/portal";
 
@@ -49,8 +49,16 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   };
 
   return (
-    <div style={{ minHeight: "100%", background: "var(--surface-page)", color: "var(--text-body)" }}>
+    // SPEC-626 · `#root` (app.css) `height: 100vh; overflow: hidden` — benar untuk Shell operator
+    // yang menggulir di panel dalamnya. Portal tidak memakai Shell, jadi ia harus memasang rantai
+    // gulirnya SENDIRI: header di luar scroller (tetap terbaca), <main> yang menggulir. Konstanta
+    // DS yang sama dengan layar operator — bukan angka baru, dan app.css tak disentuh.
+    <div data-testid="portal-root" style={{
+      height: "100%", minHeight: 0, display: "flex", flexDirection: "column",
+      background: "var(--surface-page)", color: "var(--text-body)",
+    }}>
       <header style={{
+        ...FIXED_ROW_STYLE,
         display: "flex", alignItems: "center", gap: 14, padding: "0 22px",
         height: "var(--topbar-h)", borderBottom: "1px solid var(--border-hair)",
         background: "var(--bone-100)",
@@ -67,7 +75,8 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
         <Button size="sm" variant="ghost" leftIcon="log-out" onClick={logout}>Keluar</Button>
       </header>
 
-      <main style={{ maxWidth: "var(--content-max)", margin: "0 auto", padding: "24px 28px 32px" }}>
+      <main data-testid="portal-scroll" style={LIST_SCROLL_STYLE}>
+        <div style={{ maxWidth: "var(--content-max)", margin: "0 auto", padding: "24px 28px 32px" }}>
         {projects === null ? <StateBlock kind="loading" title="Memuat…" />
           : projects.length === 0 ? (
             <StateBlock kind={failed ? "error" : "empty"} icon="folder"
@@ -92,7 +101,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                 backlog.length === 0
                   ? <StateBlock kind="empty" icon="list-checks" title="Belum ada pekerjaan tercatat"
                       hint="Begitu tim mulai mengerjakan sesuatu di project ini, daftarnya muncul di sini." />
-                  : <Card padding={0}>
+                  : <Card padding={0} data-testid="portal-list">
                       {backlog.map((s) => (
                         <div key={s.id} role="button" tabIndex={0}
                           onClick={() => void portalApi.getSpec(active!, s.id).then(setOpenSpec)}
@@ -110,7 +119,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                 tickets.length === 0
                   ? <StateBlock kind="empty" icon="inbox" title="Belum ada tiket"
                       hint="Keluhan yang dikirim lewat halaman Help Center project ini akan muncul di sini." />
-                  : <Card padding={0}>
+                  : <Card padding={0} data-testid="portal-list">
                       {tickets.map((t) => (
                         <div key={t.id} role="button" tabIndex={0}
                           onClick={() => void portalApi.getTicket(active!, t.id).then(setOpenTicket)}
@@ -127,6 +136,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
               )}
             </>
           )}
+        </div>
       </main>
 
       <Modal open={!!openSpec} title={openSpec?.title ?? ""} eyebrow={openSpec?.id}
