@@ -2,17 +2,19 @@ import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { getSchedulerState, getSchedulerQueue, putSchedulerConfig, updateProject,
-  cancelSchedulerQueueItem, requeueSchedulerQueueItem } = vi.hoisted(() => ({
+  cancelSchedulerQueueItem, requeueSchedulerQueueItem, listCrons } = vi.hoisted(() => ({
   getSchedulerState: vi.fn(),
   getSchedulerQueue: vi.fn(),
   putSchedulerConfig: vi.fn(),
   updateProject: vi.fn(),
   cancelSchedulerQueueItem: vi.fn(),
   requeueSchedulerQueueItem: vi.fn(),
+  // SPEC-646 · panel cron ikut dirender SchedulerScreen dan memuat daftarnya sendiri saat mount.
+  listCrons: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 10 })),
 }));
 vi.mock("../src/api/client", () => ({
   api: { getSchedulerState, getSchedulerQueue, putSchedulerConfig, updateProject,
-    cancelSchedulerQueueItem, requeueSchedulerQueueItem },
+    cancelSchedulerQueueItem, requeueSchedulerQueueItem, listCrons },
   ApiError: class extends Error {},
 }));
 

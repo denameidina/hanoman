@@ -190,7 +190,10 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast }: Schedule
           <span style={{ flex: 1, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
             Project ini belum di-opt-in scheduler — cron-nya tak akan pernah dijalankan.
           </span>
-          <Button size="sm" leftIcon="check" onClick={() => void optIn()}>Opt-in</Button>
+          {/* Label sengaja TIDAK memuat kata "opt-in": `OptInPanel` di layar yang sama sudah punya
+              tombol bernama persis itu, dan dua tombol beraksesibel-nama sama di satu halaman adalah
+              ambiguitas nyata bagi pembaca layar — bukan cuma bagi query test. */}
+          <Button size="sm" leftIcon="check" onClick={() => void optIn()}>Aktifkan scheduler di project ini</Button>
         </div>
       )}
 

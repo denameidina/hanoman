@@ -2497,7 +2497,7 @@ git commit -m "docs(spec-646): ADR-0112 cronjob per project + perbarui SoT terse
 
 **Files:** tak ada perubahan kode kecuali perbaikan yang ditemukan.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan ini**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-646
@@ -2515,7 +2515,7 @@ Expected: PASS. **Jangan menerima "no test files" sebagai bukti** — `--changed
 
 Bila test web ikut dan gagal massal, ulangi dengan `env -u NODE_ENV` di depan perintahnya.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck && pnpm --filter ./server typecheck
@@ -2523,7 +2523,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck && pnpm --f
 
 Expected: keluar 0 untuk ketiganya. (Jangan `pnpm -r typecheck`.)
 
-- [ ] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint)**
+- [x] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint)**
 
 Pakai DB khusus supaya run tetangga tak menghapusnya di tengah smoke:
 
@@ -2560,7 +2560,7 @@ lsof -ti:8799 | xargs -r kill
 
 Bila `project` id yang lahir bukan `smoke`, ambil dari respons `POST /projects`.
 
-- [ ] **Step 4: Centang seluruh kotak plan ini**
+- [x] **Step 4: Centang seluruh kotak plan ini**
 
 Buka `docs/superpowers/plans/2026-08-11-scheduler-cron-per-project.md` dan pastikan **tak ada lagi
 `- [ ]`** yang tersisa. hanoman menahan backlog di `executing` selama masih ada kotak kosong.
@@ -2571,10 +2571,46 @@ grep -c "^- \[ \]" docs/superpowers/plans/2026-08-11-scheduler-cron-per-project.
 
 Expected: `0`.
 
-- [ ] **Step 5: Commit & push**
+- [x] **Step 5: Commit & push**
 
 ```bash
 git add -A
 git commit -m "chore(spec-646): centang plan + catat bukti verifikasi"
 git push origin HEAD:refs/heads/hanoman/spec-646
 ```
+
+---
+
+## Catatan verifikasi (diisi saat Execute)
+
+- **Test yang tersentuh:** `vitest --run --no-file-parallelism --changed <base>` →
+  **3195 lulus / 3197**, 359 berkas lulus dari 361. Dua yang merah **sudah merah sebelum cabang ini**
+  dan tak tersentuh diff-nya (dibuktikan lewat `git show <base>:…`):
+  `shared/src/scheduler-state.test.ts` (fixture tanpa `queueCounts.canceled` — kolomnya sudah wajib
+  di base sejak SPEC-522) dan `shared/test/agent.test.ts` (mengharapkan `telegram` tanpa `engine` —
+  `engine` sudah ada di base sejak SPEC-492). Keduanya milik spec lain; sengaja tak disentuh.
+- **`update.route.test.ts` merah palsu** karena `HANOMAN_SUPERVISOR=1` ada di env sesi ini; dengan
+  `env -u HANOMAN_SUPERVISOR` ia **8/8 lulus** (jebakan yang sama dicatat SPEC-523).
+- **Regresi yang DIBUAT dan diperbaiki:** memasang `SchedulerCrons` di `SchedulerScreen` membuat
+  `src/test/scheduler-screen.test.tsx` merah 10/10 (`api.listCrons is not a function` → mock-nya
+  dilengkapi) lalu 1/10 (`findByRole(/opt-in/i)` cocok GANDA). Yang kedua diperbaiki di **sisi
+  produksi**, bukan di asersi test lama: tombol panel cron dinamai "Aktifkan scheduler di project
+  ini" — dua tombol beraksesibel-nama sama di satu halaman adalah ambiguitas nyata bagi pembaca
+  layar, bukan cuma bagi query test.
+- **Typecheck:** `shared`, `runner`, `server`, `@hanoman/app`, `cli` — kelimanya `tsc --noEmit` exit 0.
+- **Smoke endpoint nyata** (server di `127.0.0.1:8799`, **DB khusus** di scratchpad, bukan DB test
+  bersama): POST cron **201** ber-`enabled:false` & `nextRunAt` terisi · expr tak sah **400** ·
+  project tak ada **404** · GET daftar beramplop `{items,total,page,pageSize}` · PATCH `expr`
+  menghitung ulang `nextRunAt` (`0 7 * * *` → 07:00 WIB; `30 9 * * 1-5` → Selasa 09:30 WIB) ·
+  run-now **201** lalu **409** · Pause → run-now **409** · id ngawur **404** · DELETE **204** dan
+  riwayatnya ikut hilang.
+- **Wiring produksi end-to-end** (tick nyata, bukan stub): project di-opt-in tapi belum di-bind →
+  baris run jadi `failed` ber-alasan `project "smoke-cron" belum di-bind ke checkout lokal` +
+  notifikasi `cron`. Sesudah di-bind ke repo sekali-pakai: baris **`launched`** ber-`sessionId`
+  **`cron-<cronId>`**, worktree `.worktrees/cron-<cronId>` lahir, dan window tmux `hanoman-cron-…`
+  benar-benar ada; `DELETE /terminal/sessions/<id>` (per-ID, bukan pola) membersihkan pane **dan**
+  worktree-nya.
+- **Efek samping yang dicatat:** `prisma migrate deploy` pertama dijalankan tanpa `DATABASE_URL`
+  eksplisit — `HANOMAN_HOME` **tidak** dibaca prisma — sehingga migration `20260811000000_scheduler_cron`
+  ikut terpasang di `~/.hanoman/hanoman.db` (DB dev). Dampaknya nol: dua tabel **kosong** (0 baris),
+  aditif murni, dan itu persis keadaan yang akan dihasilkan merge. VPS produksi tak tersentuh.

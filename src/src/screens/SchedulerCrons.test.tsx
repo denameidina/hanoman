@@ -93,7 +93,7 @@ describe("SchedulerCrons", () => {
     render(<SchedulerCrons {...props} projects={[{ id: "p1", name: "P1", schedulerOptIn: false }] as never} />);
     await screen.findByText("Cek error pagi");
     expect(screen.getByText(/belum di-opt-in/i)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /^Opt-in$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Aktifkan scheduler di project ini/ }));
     await waitFor(() => expect(updateProject).toHaveBeenCalledWith("p1", { schedulerOptIn: true }));
   });
 });
