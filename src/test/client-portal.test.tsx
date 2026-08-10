@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { ClientPortal } from "../src/portal/ClientPortal";
 import type { UserView } from "@hanoman/shared";
 
@@ -77,5 +77,22 @@ describe("ClientPortal (SPEC-617)", () => {
     (portalApi.listProjects as any).mockRejectedValue(new Error("boom"));
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     expect(await screen.findByText(/gagal memuat/i)).toBeTruthy();
+  });
+
+  // Warna berbeda antara baris daftar dan modal untuk tiket yang SAMA adalah bug yang sedang
+  // diperbaiki — dijaga di sini supaya tak direplikasi.
+  it("badge tiket berwarna sama di baris daftar dan di modal detail", async () => {
+    render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    await screen.findByText("Toko Mekar");
+    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    const row = await screen.findByText("Tombol bayar mati");
+    const rowPill = within(row.closest('[role="button"]') as HTMLElement)
+      .getByText("Sedang dikerjakan");
+    fireEvent.click(row);
+    await waitFor(() => expect(screen.getByTestId("modal-body")).toBeInTheDocument());
+    const modalPill = within(screen.getByTestId("modal-body")).getByText("Sedang dikerjakan");
+    expect(modalPill.parentElement!.style.background).toBe(rowPill.parentElement!.style.background);
+    // …dan bukan abu-abu `idle` yang lama.
+    expect(rowPill.parentElement!.style.background).not.toBe("var(--bone-200)");
   });
 });

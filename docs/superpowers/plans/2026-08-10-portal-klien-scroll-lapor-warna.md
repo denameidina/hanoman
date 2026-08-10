@@ -226,7 +226,7 @@ git commit -m "fix(spec-626): portal klien punya rantai gulirnya sendiri"
 - Consumes: `publicStatus` dari `@hanoman/shared` (test saja), `zStage` dari `@hanoman/shared` (test saja).
 - Produces: `stagePill(stage: string): string` dan `ticketPill(status: string): string` di `src/src/portal/status-pill.ts` — dipakai `ClientPortal` (baris daftar + modal).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/portal-status-pill.test.ts`:
 
@@ -292,7 +292,7 @@ describe("stagePill (SPEC-626)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus MERAH**
+- [x] **Step 2: Jalankan — harus MERAH**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/portal-status-pill.test.ts
@@ -300,7 +300,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/portal-status-pill.tes
 
 Expected: FAIL — `Failed to resolve import "../src/portal/status-pill"`.
 
-- [ ] **Step 3: Tulis fungsinya**
+- [x] **Step 3: Tulis fungsinya**
 
 Buat `src/src/portal/status-pill.ts`:
 
@@ -332,7 +332,7 @@ export const ticketPill = (status: string): string => TICKET[status] ?? "idle";
 export const stagePill = (stage: string): string => STAGE[stage] ?? "idle";
 ```
 
-- [ ] **Step 4: Pakai di baris daftar DAN modal**
+- [x] **Step 4: Pakai di baris daftar DAN modal**
 
 Di `src/src/portal/ClientPortal.tsx`: hapus `stageStatus` lokal (baris 20-21), tambahkan import:
 
@@ -353,7 +353,7 @@ Empat call site:
 <StatusPill status={ticketPill(openTicket.status)} size="sm">{openTicket.status}</StatusPill>
 ```
 
-- [ ] **Step 5: Test kontrak "satu sumber, dua tempat"**
+- [x] **Step 5: Test kontrak "satu sumber, dua tempat"**
 
 Tambahkan ke `src/test/client-portal.test.tsx` (di dalam `describe` yang sudah ada):
 
@@ -382,7 +382,7 @@ Tambahkan `within` ke import Testing Library di berkas itu:
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 ```
 
-- [ ] **Step 6: Jalankan — harus HIJAU**
+- [x] **Step 6: Jalankan — harus HIJAU**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/portal-status-pill.test.ts src/test/client-portal.test.tsx src/test/portal-scroll.test.tsx
@@ -390,7 +390,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/portal-status-pill.tes
 
 Expected: PASS semua.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/portal/status-pill.ts src/src/portal/ClientPortal.tsx src/test/portal-status-pill.test.ts src/test/client-portal.test.tsx

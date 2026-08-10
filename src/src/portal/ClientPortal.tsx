@@ -3,6 +3,7 @@ import type { PortalProject, PortalSpec, PortalTicket, PortalTicketDetail, UserV
 import { Button, Card, FIXED_ROW_STYLE, LIST_SCROLL_STYLE, Modal, StateBlock, StatusPill, Tabs } from "../ds";
 import { Mark } from "../ds/marks";
 import { portalApi } from "../api/portal";
+import { stagePill, ticketPill } from "./status-pill";
 
 // SPEC-617 · ADR-0110 · permukaan klien. SENGAJA tidak memakai <Shell>: sidebar HN_NAV adalah
 // navigasi OPERATOR, dan setiap entrinya adalah 403 yang menunggu diklik. Chrome-nya sendiri,
@@ -17,8 +18,6 @@ const STAGE_LABEL: Record<string, string> = {
   brainstorming: "Dirumuskan", objective: "Dirumuskan", "spec-ready": "Disiapkan",
   planned: "Direncanakan", executing: "Sedang dikerjakan", done: "Selesai",
 };
-const stageStatus = (stage: string) =>
-  stage === "done" ? "done" : stage === "executing" ? "running" : "queued";
 
 export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOut: () => void }) {
   const [projects, setProjects] = React.useState<PortalProject[] | null>(null);
@@ -109,7 +108,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                           style={ROW}>
                           <span style={{ ...META, fontFamily: "var(--font-mono)", width: 92 }}>{s.id}</span>
                           <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{s.title}</span>
-                          <StatusPill status={stageStatus(s.stage)} size="sm">{STAGE_LABEL[s.stage] ?? s.stage}</StatusPill>
+                          <StatusPill status={stagePill(s.stage)} size="sm">{STAGE_LABEL[s.stage] ?? s.stage}</StatusPill>
                           <span style={META}>{s.priority}</span>
                           <span style={META}>{tanggal(s.doneAt ?? s.startedAt ?? s.createdAt)}</span>
                         </div>
@@ -128,7 +127,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                           <span style={{ ...META, fontFamily: "var(--font-mono)", width: 48 }}>#{t.number}</span>
                           <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{t.title}</span>
                           <span style={META}>{t.category}</span>
-                          <StatusPill status="idle" size="sm">{t.status}</StatusPill>
+                          <StatusPill status={ticketPill(t.status)} size="sm">{t.status}</StatusPill>
                           <span style={META}>{tanggal(t.createdAt)}</span>
                         </div>
                       ))}
@@ -144,7 +143,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
         {openSpec && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <StatusPill status={stageStatus(openSpec.stage)} size="sm">
+              <StatusPill status={stagePill(openSpec.stage)} size="sm">
                 {STAGE_LABEL[openSpec.stage] ?? openSpec.stage}
               </StatusPill>
               <span style={META}>prioritas {openSpec.priority}</span>
@@ -164,7 +163,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
         onClose={() => setOpenTicket(null)}>
         {openTicket && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div><StatusPill status="idle" size="sm">{openTicket.status}</StatusPill></div>
+            <div><StatusPill status={ticketPill(openTicket.status)} size="sm">{openTicket.status}</StatusPill></div>
             <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{openTicket.detail}</p>
             <span style={META}>Dikirim {tanggal(openTicket.createdAt)}</span>
           </div>
