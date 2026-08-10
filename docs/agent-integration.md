@@ -145,6 +145,10 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
   mengalir keluar (ADR-0100)
 - `/api/telegram/settings`, `/api/telegram/test`, `/api/telegram/credentials` — permukaan
   **kredensial** (bot token & agent token), beda dari sisa `/api/telegram*` (ADR-0097)
+- `/api/portal*` — portal klien: isinya ditentukan **akun yang login** (`ClientProjectAccess`), jadi
+  tak ada capability yang bisa berarti apa pun di sana. Backlog & tiket yang sama tersedia lewat
+  `/api/specs` dan `/api/tickets` dengan capability `backlog`/`support` (ADR-0110)
+- `/api/client-accounts*` — membuat & mencabut akun klien beserta password awalnya (ADR-0110)
 - `POST /api/update/apply` dan tulis lain di bawah prefix status (`/api/limits`, `/api/update`,
   `/api/events`, `/api/fs`, `/api/health`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya
   cookie-only

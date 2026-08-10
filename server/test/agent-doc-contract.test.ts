@@ -19,7 +19,11 @@ describe("naskah panduan AI agent", () => {
 
   it("menyebut SETIAP segmen route cookie-only", () => {
     // Segmen teratas yang gate-nya menjawab COOKIE_ONLY bahkan untuk method BACA (paling ketat).
-    const kandidat = ["auth", "agent-tokens", "device-tokens", "sync", "webhooks"];
+    // SPEC-617 · ADR-0110 · `portal` & `client-accounts` ikut: keduanya permukaan sesi cookie
+    // (portal ber-scope akun, client-accounts memegang kredensial), jadi agen yang mencobanya
+    // selalu 403 dan naskah harus mengatakannya.
+    const kandidat = ["auth", "agent-tokens", "device-tokens", "sync", "webhooks",
+      "portal", "client-accounts"];
     for (const seg of kandidat) expect(capabilityForRoute("GET", `/api/${seg}`)).toBe("COOKIE_ONLY");
     const hilang = kandidat.filter((s) => !doc.includes(`/api/${s}`));
     expect(hilang).toEqual([]);

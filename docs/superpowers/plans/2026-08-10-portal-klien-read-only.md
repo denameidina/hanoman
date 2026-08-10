@@ -1938,7 +1938,7 @@ git commit -m "feat(spec-617): layar admin kelola akses klien"
 - Consumes: seluruh keputusan Task 1-8
 - Produces: jejak permanen keputusan; ADR baru ter-link di **dua** index (README + adr/README).
 
-- [ ] **Step 1: Enumerasi ulang nomor ADR**
+- [x] **Step 1: Enumerasi ulang nomor ADR**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman
@@ -1948,7 +1948,7 @@ git worktree list
 ```
 Expected: `0110-` belum terpakai. Bila sudah, naikkan ke nomor bebas berikutnya **di seluruh berkas** yang menyebutnya.
 
-- [ ] **Step 2: Tulis ADR-0110**
+- [x] **Step 2: Tulis ADR-0110**
 
 `internal/docs/adr/0110-portal-klien-read-only.md` memuat: konteks (tak ada RBAC, `app.ts:120`
 `if (user) return`), keputusan (peran `admin|client` + `ClientProjectAccess` + gerbang
@@ -1963,7 +1963,7 @@ dan gotcha:
 6. Project bukan-miliknya dan project tak-ada dijawab **404 yang sama** (tak jadi alat enumerasi).
 7. `ClientProjectAccess` **LOCAL-only** (tak di `SYNCED`/`FIELDS`) tapi **wajib** di `PG_ORDER`.
 
-- [ ] **Step 3: Tautkan di kedua index**
+- [x] **Step 3: Tautkan di kedua index**
 
 `internal/docs/README.md`, di puncak daftar ADR:
 
@@ -1973,14 +1973,14 @@ dan gotcha:
 
 `internal/docs/adr/README.md`: satu paragraf narasi bergaya entri di sekitarnya (apa yang diperluas/diamandemen: ADR-0028 auth diperluas dengan peran; ADR-0062 Help Center jadi sumber tiket; ADR-0065 tak berubah — klien adalah jalur cookie).
 
-- [ ] **Step 4: Perbarui doc arsitektur & keamanan**
+- [x] **Step 4: Perbarui doc arsitektur & keamanan**
 
 - `architecture/data-model.md`: `User.role`/`User.disabled` + model `ClientProjectAccess` (LOCAL-only, cascade dua sisi, unique gabungan).
 - `architecture/api-contract.md`: lima endpoint `/api/portal/*` (GET, cookie-only, ber-scope akses) dan empat `/api/client-accounts` (cookie-only, admin), plus catatan 403 deny-by-default untuk `role=client`.
 - `security/security-standard.md`: bagian auth — dua peran, allowlist klien, nonaktif dua titik, admin terakhir dijaga.
 - `internal/skills/hanoman/SKILL.md`: baris "Tanpa RBAC — semua user setara" di **Aturan Keamanan** WAJIB diperbarui (kini salah), dan daftar model di **Aturan Data & Skema** ditambah `ClientProjectAccess`.
 
-- [ ] **Step 5: Jalankan test kontrak docs & index**
+- [x] **Step 5: Jalankan test kontrak docs & index**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/agent-doc-contract.test.ts
@@ -1988,14 +1988,13 @@ node --import tsx cli/src/index.ts docs index --check
 ```
 Expected: PASS + index bersih. Bila `agent-doc-contract` menuntut naskah agen menyebut route/COOKIE_ONLY baru, perbarui `docs/agent-integration.md` sampai hijau.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs docs/agent-integration.md internal/skills/hanoman/SKILL.md
 git commit -m "docs(spec-617): ADR-0110 portal klien read-only + perbarui SoT tersentuh"
 ```
 
----
 
 ### Task 10: Verifikasi akhir — smoke endpoint nyata
 

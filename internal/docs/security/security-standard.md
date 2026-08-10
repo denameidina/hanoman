@@ -8,7 +8,21 @@
     Revocable — logout/ganti-password/hapus-user mencabut sesi. Cookie `httpOnly` + `sameSite=strict`
     + `secure` (prod) + `maxAge` 7 hari.
   - Login di-throttle per IP (10 gagal → tunda 60 dtk); error selalu generic ("email atau password salah").
-  - Tanpa RBAC (brief): semua user setara; `DELETE /auth/users/:id` menolak menghapus user terakhir.
+  - **Dua peran** (SPEC-617, [ADR-0110](../adr/0110-portal-klien-read-only.md)): `User.role` =
+    `admin` (operator — cookie = akses penuh, perilaku lama persis) atau `client` (portal baca-saja
+    ber-scope project). `@default("admin")` supaya migrasi tak memutus akun yang sudah ada.
+    - Klien ditolak **403** di seluruh `/api` kecuali allowlist `services/client-access.ts`
+      (`GET|HEAD /portal/**` · `/help/**` · `POST /auth/logout` · `POST /auth/change-password`).
+      **Deny-by-default** — endpoint baru tertutup bagi klien sampai sengaja dibuka; berlaku juga
+      untuk upgrade WebSocket, jadi PTY & feed siar tertutup secara struktural.
+    - Scope project ditegakkan **di server** lewat `ClientProjectAccess`, termasuk saat id project
+      ditebak langsung di URL: bukan-miliknya → **404 yang sama** dengan project yang tak ada.
+    - `User.disabled` ditegakkan di **dua** titik — `POST /auth/login` (pesan generic yang sama
+      dengan password salah) **dan** `lookupSession()`. Hanya menutup login berarti cookie yang
+      sudah terbit hidup sampai 7 hari. Nonaktif/reset password menghapus sesi akun itu.
+    - `DELETE /auth/users/:id` menolak menghapus **admin terakhir** (bukan "user terakhir": sejak ada
+      akun klien, syarat lama bisa terpenuhi oleh akun yang tak boleh melihat apa pun).
+    - Tak ada jalur signup publik; akun klien hanya dibuat admin lewat `POST /client-accounts`.
   - Bootstrap: saat 0 user, `POST /auth/setup` membuat akun pertama, lalu tertutup (409).
 - **TLS / deployment**: cookie `Secure` butuh HTTPS. Pola deploy: bind `127.0.0.1` di belakang reverse
   proxy yang menerminasi TLS. Contoh `Caddyfile` (auto Let's Encrypt):
@@ -61,7 +75,9 @@
 - **Agent token — akses AI agent (SPEC-257, [ADR-0065](../adr/0065-ai-agent-capability-agent-token.md))**:
   **jalur auth kedua** ke seluruh `/api` di samping cookie sesi. Agen eksternal mengirim
   `Authorization: Bearer <token>` (upgrade WebSocket: `?agent_token=`); gate `onRequest` yang sama
-  memverifikasi lalu menegakkan **capability**. Cookie sesi tetap = **akses penuh** (tak ada RBAC).
+  memverifikasi lalu menegakkan **capability**. Cookie sesi **berperan `admin`** tetap = akses penuh;
+  sejak SPEC-617/ADR-0110 cookie berperan `client` tergerbang allowlist tersendiri (lihat Auth di atas),
+  dan `/portal`/`/client-accounts` dipetakan **COOKIE_ONLY** sehingga agent token tak menjangkaunya.
   - **Master switch**: `Setting.agentAccessEnabled` (default **false**). Off → semua agent token ditolak
     **401**, apa pun `enabled`/capability-nya. Human menyalakannya di Settings.
   - **Token hash-at-rest**: `AgentToken.tokenHash = sha256(token)` + `timingSafeEqual` (pola `DeviceToken`).

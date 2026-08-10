@@ -3,7 +3,8 @@
 Entitas inti (**SQLite via Prisma 6** — SPEC-398/[ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md);
 satu berkas di `$HANOMAN_HOME`, default `~/.hanoman/hanoman.db`, tanpa Docker/Postgres).
 **Tujuh model inti**: Project, Spec, Setting, Notification, User,
-Session, Vps — plus model pendukung (VpsAuditSnapshot/VpsItemState, DeviceToken, **AgentToken**, SessionResult, SyncLog,
+Session, Vps — plus model pendukung (VpsAuditSnapshot/VpsItemState, DeviceToken, **AgentToken**,
+**ClientProjectAccess** (SPEC-617), SessionResult, SyncLog,
 LocalBinding, SyncOutbox, SyncState, SyncConflict, RuntimeConfig) dan **model Help Center**
 (`Ticket`, `TicketAttachment`, SPEC-253/[ADR-0062](../adr/0062-help-center-tiket-publik-triase.md)).
 Tidak ada model `Run` maupun `Trigger` — keduanya di-drop saat pindah ke sesi interaktif (ADR-0024; migrasi
@@ -287,12 +288,25 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   dua kali dalam satu proses dengan baris `Setting` berbeda di antaranya.
 
 ## User / Session (auth — SPEC-169, [ADR-0028](../adr/0028-auth-sesi-opaque-di-db.md))
-- **User**: `id` (cuid), `email` (unique), `passwordHash` (`scrypt` "saltHex:hashHex"), `createdAt`.
-  Tanpa RBAC — tak ada kolom role; semua user setara. `passwordHash` tak pernah keluar ke client
-  (`UserView` = `{ id, email, createdAt }`).
+- **User**: `id` (cuid), `email` (unique), `passwordHash` (`scrypt` "saltHex:hashHex"),
+  **`role`** (`"admin" | "client"`, `@default("admin")`), **`disabled`** (`Boolean @default(false)`),
+  `createdAt`. `passwordHash` tak pernah keluar ke client (`UserView` = `{ id, email, role, createdAt }`).
+  **Dua peran sejak SPEC-617/[ADR-0110](../adr/0110-portal-klien-read-only.md)** — `admin` = perilaku
+  lama persis (cookie = akses penuh), `client` = portal baca-saja ber-scope project. Default `"admin"`
+  DISENGAJA: itulah yang membuat migrasi aman untuk instance yang sudah berjalan (setiap baris lama
+  otomatis admin, nol backfill). `disabled` ditegakkan di **dua** titik — `POST /auth/login` **dan**
+  `lookupSession()`; hanya menutup login berarti cookie yang sudah terbit hidup sampai 7 hari.
+- **ClientProjectAccess** (SPEC-617 · ADR-0110): `id` (cuid), `userId`, `projectId`, `createdAt`,
+  `@@unique([userId, projectId])`, `onDelete: Cascade` dari **keduanya** (dan `onUpdate: Cascade`
+  bawaan Prisma membuat rename `Project.id` — ADR-0064 — merambat tanpa baris tambahan). Project yang
+  boleh dilihat sebuah akun klien; user tanpa satu pun baris di sini tak melihat apa pun.
+  **LOCAL-only** — tak masuk `SYNCED`/`FIELDS` (cermin `User`/`Session`/`AgentToken`: akun adalah
+  kredensial per-instance) dan tak masuk `WEBHOOK_ENTITIES`, **tapi wajib** di `PG_ORDER` sesudah
+  `User` dan `Project`.
 - **Session**: `id` = **`sha256(token)`** (token opaque 256-bit hidup hanya di cookie `httpOnly`),
   `userId`, `createdAt`, `expiresAt`. `onDelete: Cascade` dari User. Revocable: logout menghapus
-  baris; ganti password menghapus semua sesi user; hapus user meng-cascade sesinya. Sesi kedaluwarsa
+  baris; ganti password menghapus semua sesi user; hapus user meng-cascade sesinya; menonaktifkan
+  atau me-reset password akun klien juga menghapus sesinya (SPEC-617). Sesi kedaluwarsa
   (`expiresAt < now`) diperlakukan tak valid dan dibersihkan saat di-lookup.
 
 ## AgentToken (SPEC-257 · [ADR-0065](../adr/0065-ai-agent-capability-agent-token.md))

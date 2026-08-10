@@ -22,21 +22,67 @@ WebSocket per-sesi tersendiri. Endpoint HTTP GET tiap sumber tetap ada untuk pai
 >
 > **Agent token (SPEC-257 · ADR-0065):** jalur auth **kedua** untuk AI agent eksternal —
 > `Authorization: Bearer <token>` (upgrade WebSocket: `?agent_token=`) digerbang gate yang sama,
-> lalu ditegakkan **capability per-domain read/write** (write⊇read). Cookie sesi = akses penuh (tak
-> ada RBAC); agen tanpa capability → **403** `{ need }`; master switch `Setting.agentAccessEnabled` off →
+> lalu ditegakkan **capability per-domain read/write** (write⊇read). Cookie sesi berperan `admin` =
+> akses penuh; agen tanpa capability → **403** `{ need }`; master switch `Setting.agentAccessEnabled` off →
 > **401**. Lihat `## Agent tokens` di bawah.
+>
+> **Peran `client` (SPEC-617 · [ADR-0110](../adr/0110-portal-klien-read-only.md)):** sesi cookie tak
+> lagi setara. `User.role === "client"` ditolak **403** `{ error: "portal klien: baca-saja" }` di
+> **seluruh** `/api` kecuali allowlist `services/client-access.ts` — `GET|HEAD /portal/**`, apa pun di
+> `/help/**`, `POST /auth/logout`, `POST /auth/change-password`. **Deny-by-default:** endpoint baru
+> tertutup bagi klien sampai sengaja ditaruh di allowlist itu; tak ada daftar larangan yang harus
+> dirawat. Gerbangnya duduk **sebelum** bypass `/sync` & `/help` sehingga allowlist adalah pernyataan
+> lengkapnya, dan berlaku juga untuk upgrade WebSocket (`/terminal/**/ws`, `/events/ws`).
 
 ## Auth
 ```
-GET  /auth/status         -> { needsSetup: bool, user: {id,email,createdAt}|null }   # publik
+GET  /auth/status         -> { needsSetup: bool, user: {id,email,role,createdAt}|null }   # publik
 POST /auth/setup          { email, password }   # HANYA saat 0 user; set cookie; 409 bila sudah ada; 400 body cacat
 POST /auth/login          { email, password }   # set cookie; 401 generic; 429 throttled; 400 body cacat
 POST /auth/logout         # 204; hapus sesi + clear cookie
 GET  /auth/users          -> UserView[]                          # sesi
-POST /auth/users          { email, password }   -> UserView      # invite (set password langsung); 409 email dipakai
-DELETE /auth/users/:id    # 204; 400 bila user terakhir
+POST /auth/users          { email, password }   -> UserView      # invite OPERATOR (role=admin); 409 email dipakai
+DELETE /auth/users/:id    # 204; 400 bila admin TERAKHIR (SPEC-617 — bukan "user terakhir")
 POST /auth/change-password { currentPassword, newPassword }  # 200 + cookie baru (cabut sesi lain); 400 password lama salah
-#   UserView = { id, email, createdAt } — tak pernah membawa passwordHash. password min 8 saat setup/invite/ganti.
+#   UserView = { id, email, role, createdAt } — tak pernah membawa passwordHash. password min 8 saat setup/invite/ganti.
+#   role: "admin" (operator) | "client" (portal baca-saja). Akun klien dibuat lewat /client-accounts,
+#   BUKAN /auth/users — memisahkannya menutup jalan memutar mengubah kredensial admin lewat pintu klien.
+```
+
+## Portal klien (SPEC-617 · [ADR-0110](../adr/0110-portal-klien-read-only.md)) — **COOKIE_ONLY, baca-saja**
+
+Permukaan untuk `User.role === "client"`. Sumber datanya **sama** dengan dashboard operator
+(`liveSpecs()` + `prisma.ticket`) — tak ada pipeline data kedua; yang berbeda hanya proyeksinya.
+`capabilityForRoute` memetakan `portal` ke **COOKIE_ONLY**: agent token tak pernah menjangkaunya.
+
+```
+GET /portal/projects                        -> { items: [{ id, name }] }        # HANYA project yang ditugaskan
+GET /portal/projects/:id/backlog?page=&limit=  -> { items: PortalSpec[], total, page, pageSize }
+GET /portal/projects/:id/backlog/:specId    -> PortalSpec
+GET /portal/projects/:id/tickets?page=&limit=  -> { items: PortalTicket[], total, page, pageSize }
+GET /portal/projects/:id/tickets/:ticketId  -> PortalTicket & { detail }
+#   PortalSpec   = { id, title, priority, stage, objective, createdAt, startedAt, doneAt }
+#   PortalTicket = { id, number, category, title, status, createdAt }   status = publicStatus() (SPEC-293)
+#   Proyeksi = allowlist field EKSPLISIT di shared/src/portal.ts (bukan Omit<> — kolom Prisma baru
+#   tak boleh ikut senyap). payload/author/baseSha/headSha/branchFrom/dependsOn/sourceHistory dan
+#   reporterEmail/shareToken/accessKeyHash TIDAK pernah menyeberang.
+#   404 untuk project yang bukan miliknya — TAK TERBEDAKAN dari project yang tak ada (preseden Help
+#   Center ADR-0062: kalau beda, portal jadi alat enumerasi nama project). Id item juga bukan jalan
+#   pintas: …/p1/backlog/SPEC-2 milik project lain tetap 404.
+#   Tak ada satu pun route tulis di namespace ini — dijaga test terhadap tabel route Fastify.
+```
+
+## Kelola akun klien (SPEC-617 · ADR-0110) — **COOKIE_ONLY, admin**
+
+```
+GET    /client-accounts        -> { items: ClientAccountView[] }
+POST   /client-accounts        { email, password, projects: string[] } -> 201 ClientAccountView
+                               # 409 email dipakai; 400 project tak dikenal (akun tak tertinggal separuh jadi)
+PATCH  /client-accounts/:id    { projects?, disabled?, password? } -> ClientAccountView
+                               # disabled/password → sesi akun itu DIHAPUS seketika (cookie hidup 7 hari)
+DELETE /client-accounts/:id    # 204; sesi & baris akses ikut cascade
+#   ClientAccountView = { id, email, disabled, createdAt, projects: string[] } — tanpa passwordHash.
+#   Keempatnya HANYA melihat baris role="client"; id akun admin → 404.
 ```
 
 ## Projects
