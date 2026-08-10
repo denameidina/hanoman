@@ -11,11 +11,17 @@ async function get<T>(url: string): Promise<T> {
 
 const p = (id: string) => `/api/portal/projects/${encodeURIComponent(id)}`;
 
+// SPEC-647 · ADR-0107 · satu argumen, dua parameter. `limit` TANPA `page` bukan halaman melainkan
+// PLAFON (jebakan terukur SPEC-523), jadi bentuknya sengaja tak bisa dikirim setengah.
+export type PortalPage = { page: number; limit: number };
+const q = ({ page, limit }: PortalPage) => `?page=${page}&limit=${limit}`;
+
 export const portalApi = {
-  listProjects: () => get<{ items: PortalProject[] }>("/api/portal/projects"),
-  listBacklog: (id: string) => get<Paginated<PortalSpec>>(`${p(id)}/backlog`),
+  // Pemilih project sengaja tanpa halaman — project terpilih tak boleh jatuh dari halaman.
+  listProjects: () => get<Paginated<PortalProject>>("/api/portal/projects"),
+  listBacklog: (id: string, pg: PortalPage) => get<Paginated<PortalSpec>>(`${p(id)}/backlog${q(pg)}`),
   getSpec: (id: string, specId: string) => get<PortalSpec>(`${p(id)}/backlog/${encodeURIComponent(specId)}`),
-  listTickets: (id: string) => get<Paginated<PortalTicket>>(`${p(id)}/tickets`),
+  listTickets: (id: string, pg: PortalPage) => get<Paginated<PortalTicket>>(`${p(id)}/tickets${q(pg)}`),
   getTicket: (id: string, ticketId: string) =>
     get<PortalTicketDetail>(`${p(id)}/tickets/${encodeURIComponent(ticketId)}`),
   // SPEC-626 · ADR-0111 · satu-satunya aksi tulis portal. Multipart (lampiran gambar) — sengaja
