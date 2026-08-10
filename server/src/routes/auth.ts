@@ -61,13 +61,21 @@ export default async function (app: FastifyInstance) {
     if (await prisma.user.findUnique({ where: { email: p.data.email } }))
       return reply.code(409).send({ error: "email dipakai" });
     const user = await prisma.user.create({
-      data: { email: p.data.email, passwordHash: await auth.hashPassword(p.data.password) },
+      // SPEC-617 · pintu ini melahirkan OPERATOR. Akun klien punya pintunya sendiri
+      // (/api/client-accounts) supaya "undang rekan" dan "beri akses klien" tak pernah tertukar.
+      data: { email: p.data.email, passwordHash: await auth.hashPassword(p.data.password), role: "admin" },
     });
     return view(user);
   });
 
   app.delete<{ Params: { id: string } }>("/auth/users/:id", async (req, reply) => {
-    if ((await prisma.user.count()) <= 1) return reply.code(400).send({ error: "tak bisa hapus user terakhir" });
+    // SPEC-617 · yang dijaga adalah admin TERAKHIR, bukan user terakhir: sejak ada akun klien,
+    // "user terakhir" bisa terpenuhi oleh akun yang justru tak boleh melihat apa pun — dan
+    // workspace-nya terkunci tanpa satu pun operator.
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) return reply.code(204).send();
+    if (target.role === "admin" && (await prisma.user.count({ where: { role: "admin" } })) <= 1)
+      return reply.code(400).send({ error: "tak bisa hapus admin terakhir" });
     await prisma.user.deleteMany({ where: { id: req.params.id } });
     return reply.code(204).send();
   });

@@ -1040,7 +1040,7 @@ git commit -m "feat(spec-617): route /api/portal baca-saja ber-scope project"
   - `zUpdateClientAccount = { projects?, disabled?, password? }`
   - `type ClientAccountView = { id, email, disabled, createdAt, projects: string[] }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/client-accounts.route.test.ts`:
 
@@ -1155,14 +1155,14 @@ describe("kelola akun klien (SPEC-617)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/client-accounts.route.test.ts
 ```
 Expected: FAIL — 404 (route belum ada).
 
-- [ ] **Step 3: Tambahkan zod & tipe di `shared/src/dto.ts`**
+- [x] **Step 3: Tambahkan zod & tipe di `shared/src/dto.ts`**
 
 Tepat sesudah blok `AuthStatus` yang diubah di Task 1:
 
@@ -1185,7 +1185,7 @@ export type ClientAccountView = {
 };
 ```
 
-- [ ] **Step 4: Implementasi route**
+- [x] **Step 4: Implementasi route**
 
 Buat `server/src/routes/client-accounts.ts`:
 
@@ -1275,7 +1275,7 @@ export default async function (app: FastifyInstance) {
 }
 ```
 
-- [ ] **Step 5: Daftarkan route**
+- [x] **Step 5: Daftarkan route**
 
 Di `server/src/app.ts`:
 
@@ -1289,7 +1289,7 @@ dan sesudah `await api.register(portal);`:
     await api.register(clientAccounts); // SPEC-617 · ADR-0110 · kelola akun klien (cookie-only)
 ```
 
-- [ ] **Step 6: Pagar admin terakhir di `server/src/routes/auth.ts`**
+- [x] **Step 6: Pagar admin terakhir di `server/src/routes/auth.ts`**
 
 Ganti `POST /auth/users` (bagian `prisma.user.create`) dan `DELETE /auth/users/:id`:
 
@@ -1315,21 +1315,20 @@ Ganti `POST /auth/users` (bagian `prisma.user.create`) dan `DELETE /auth/users/:
   });
 ```
 
-- [ ] **Step 7: Jalankan test**
+- [x] **Step 7: Jalankan test**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/client-accounts.route.test.ts server/test/auth-routes.test.ts server/test/client-gate.test.ts && pnpm --filter ./server typecheck
 ```
 Expected: PASS + nol error typecheck.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/routes/client-accounts.ts server/src/routes/auth.ts server/src/app.ts shared/src/dto.ts server/test/client-accounts.route.test.ts
 git commit -m "feat(spec-617): endpoint kelola akun klien + pagar admin terakhir"
 ```
 
----
 
 ### Task 7: Portal klien di dashboard (frontend)
 
