@@ -764,7 +764,7 @@ git commit -m "feat(spec-617): DTO & proyeksi allowlist-field portal klien"
 - Consumes: `clientProjectIds`, `hasProjectAccess` (Task 2); `toPortalProject`/`toPortalSpec`/`toPortalTicket`/`toPortalTicketDetail` (Task 4); `liveSpecs` (`server/src/services/live-specs.ts`); `paginate` (`server/src/services/paginate.ts`)
 - Produces: lima endpoint GET di bawah `/api/portal`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/portal.route.test.ts`:
 
@@ -902,14 +902,14 @@ describe("GET /api/portal (SPEC-617)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/portal.route.test.ts
 ```
 Expected: FAIL — 404 di mana-mana (route belum ada).
 
-- [ ] **Step 3: Implementasi route**
+- [x] **Step 3: Implementasi route**
 
 Buat `server/src/routes/portal.ts`:
 
@@ -986,7 +986,7 @@ async function specStages(ids: (string | null)[]): Promise<Map<string, string>> 
 }
 ```
 
-- [ ] **Step 4: Daftarkan route + petakan capability**
+- [x] **Step 4: Daftarkan route + petakan capability**
 
 Di `server/src/app.ts`, tambahkan import bersama import route lain:
 
@@ -1009,21 +1009,20 @@ Di `server/src/services/agent-capabilities.ts`, tambahkan pada blok "tak-boleh-d
     || top === "portal" || top === "client-accounts") return "COOKIE_ONLY";
 ```
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/portal.route.test.ts server/test/client-gate.test.ts server/test/agent-capabilities.test.ts server/test/mcp-capability.test.ts
 ```
 Expected: PASS semua.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/portal.ts server/src/app.ts server/src/services/agent-capabilities.ts server/test/portal.route.test.ts
 git commit -m "feat(spec-617): route /api/portal baca-saja ber-scope project"
 ```
 
----
 
 ### Task 6: Kelola akun klien (`/api/client-accounts`) + pagar admin terakhir
 

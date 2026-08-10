@@ -37,6 +37,7 @@ import customAgents from "./routes/custom-agents";
 import githubIssues from "./routes/github-issues";
 import telegram from "./routes/telegram";
 import webhooks from "./routes/webhooks";
+import portal from "./routes/portal";
 import fastifyMultipart from "@fastify/multipart";
 import authRoutes from "./routes/auth";
 import agentTokens from "./routes/agent-tokens";
@@ -187,6 +188,7 @@ export function buildApp(
     await api.register(telegram);     // SPEC-476 · ADR-0096 · context/memory/reply/audit Telegram
     await api.register(webhooks);     // SPEC-481 · ADR-0100 · webhook keluar (cookie-only)
     await api.register(changelog);    // SPEC-516 · ADR-0105 · changelog per project (capability `docs`)
+    await api.register(portal);       // SPEC-617 · ADR-0110 · portal klien baca-saja (cookie-only)
   }, { prefix: "/api" });
 
   // Prod: serve the built dashboard from one process; SPA-fallback to
