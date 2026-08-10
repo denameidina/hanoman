@@ -43,6 +43,7 @@ import agentTokens from "./routes/agent-tokens";
 import { COOKIE_NAME, lookupSession } from "./services/auth";
 import { agentTokenFromReq, authenticateAgent } from "./services/agent-auth";
 import { checkAgentCapability } from "./services/agent-capabilities";
+import { clientRouteAllowed } from "./services/client-access";
 import { detachAll } from "./services/pty";
 import { auditTelegramGatewayResponse, guardTelegramGatewayRequest } from "./services/telegram/security";
 import { stopTelegramRuntime } from "./services/telegram/runtime";
@@ -108,6 +109,13 @@ export function buildApp(
         if (user) req.user = user;
         const path = req.url.split("?")[0] ?? req.url;
         if (PUBLIC.has(`${req.method} ${path}`)) return;
+        // SPEC-617 · ADR-0110 · di bawah ini dulu berdiri satu baris tanpa syarat: "cookie sesi
+        // = akses penuh". Letak gerbang klien paling awal DISENGAJA — dengan begitu allowlist
+        // adalah pernyataan LENGKAP tentang apa yang boleh disentuh klien, tak ada urutan cabang
+        // (sync/help) yang harus diingat pembaca berikutnya. Deny-by-default: route baru
+        // tertutup bagi klien sampai sengaja dibuka.
+        if (user?.role === "client" && !clientRouteAllowed(req.method, path))
+          return reply.code(403).send({ error: "portal klien: baca-saja" });
         // SPEC-213 · ADR-0044/0046 · surface sync mesin-ke-mesin di-bypass gate cookie; tiap
         // route /api/sync di-enforce device token (Bearer / ?token= pada upgrade WS) sendiri.
         // SPEC-268 · KECUALI POST /api/sync/now — pemicu manual = aksi UI, digerbangi cookie gate

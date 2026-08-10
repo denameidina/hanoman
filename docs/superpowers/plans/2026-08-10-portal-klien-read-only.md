@@ -383,7 +383,7 @@ git commit -m "feat(spec-617): allowlist route klien (deny-by-default, fungsi mu
 - Consumes: `clientRouteAllowed` (Task 2), `UserView.role` (Task 1)
 - Produces: `req.user.role` terisi di setiap request ber-cookie; klien menerima `403 { error: "portal klien: baca-saja" }` di luar allowlist.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/client-gate.test.ts`:
 
@@ -483,14 +483,14 @@ describe("gerbang role client (SPEC-617)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/client-gate.test.ts
 ```
 Expected: FAIL — klien masih 200/404 di route operator (belum ada gerbang).
 
-- [ ] **Step 3: `lookupSession` membawa role & menolak akun nonaktif**
+- [x] **Step 3: `lookupSession` membawa role & menolak akun nonaktif**
 
 Di `server/src/services/auth.ts`, ganti isi `lookupSession`:
 
@@ -513,7 +513,7 @@ export async function lookupSession(token: string) {
 }
 ```
 
-- [ ] **Step 4: `POST /auth/login` menolak akun nonaktif**
+- [x] **Step 4: `POST /auth/login` menolak akun nonaktif**
 
 Di `server/src/routes/auth.ts`, ganti cek kredensial:
 
@@ -527,7 +527,7 @@ Di `server/src/routes/auth.ts`, ganti cek kredensial:
     }
 ```
 
-- [ ] **Step 5: Pasang gerbang di `server/src/app.ts`**
+- [x] **Step 5: Pasang gerbang di `server/src/app.ts`**
 
 Tambahkan import:
 
@@ -547,21 +547,20 @@ Di hook `onRequest`, sisipkan tepat SESUDAH `if (PUBLIC.has(...)) return;` dan S
           return reply.code(403).send({ error: "portal klien: baca-saja" });
 ```
 
-- [ ] **Step 6: Jalankan test**
+- [x] **Step 6: Jalankan test**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/client-gate.test.ts server/test/auth-routes.test.ts server/test/agent-gate.test.ts server/test/app.test.ts
 ```
 Expected: PASS. (Test `/api/portal/*` di dalamnya masih 404 — route-nya lahir di Task 5; 404 ≠ 401/403, jadi assert-nya sudah benar sekarang.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/auth.ts server/src/routes/auth.ts server/src/app.ts server/test/client-gate.test.ts
 git commit -m "feat(spec-617): gerbang role client di onRequest + nonaktif mencabut sesi hidup"
 ```
 
----
 
 ### Task 4: DTO & proyeksi portal (murni, di `@hanoman/shared`)
 

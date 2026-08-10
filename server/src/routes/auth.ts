@@ -33,7 +33,9 @@ export default async function (app: FastifyInstance) {
     const p = zLogin.safeParse(req.body);
     if (!p.success) return reply.code(400).send({ error: p.error.flatten() });
     const user = await prisma.user.findUnique({ where: { email: p.data.email } });
-    if (!user || !(await auth.verifyPassword(p.data.password, user.passwordHash))) {
+    // SPEC-617 · akun nonaktif ditolak dengan pesan yang SAMA seperti password salah —
+    // membedakannya membocorkan keberadaan akun (standar keamanan: error selalu generic).
+    if (!user || user.disabled || !(await auth.verifyPassword(p.data.password, user.passwordHash))) {
       auth.noteLoginFail(req.ip);
       return reply.code(401).send({ error: "email atau password salah" });
     }
