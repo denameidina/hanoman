@@ -6,7 +6,7 @@ import type { UserView } from "@hanoman/shared";
 vi.mock("../src/api/portal", () => ({
   portalApi: {
     listProjects: vi.fn(), listBacklog: vi.fn(), listTickets: vi.fn(),
-    getSpec: vi.fn(), getTicket: vi.fn(), logout: vi.fn(),
+    getSpec: vi.fn(), getTicket: vi.fn(), logout: vi.fn(), createTicket: vi.fn(),
   },
 }));
 import { portalApi } from "../src/api/portal";
@@ -94,5 +94,52 @@ describe("ClientPortal (SPEC-617)", () => {
     expect(modalPill.parentElement!.style.background).toBe(rowPill.parentElement!.style.background);
     // …dan bukan abu-abu `idle` yang lama.
     expect(rowPill.parentElement!.style.background).not.toBe("var(--bone-200)");
+  });
+
+  it("klien mengirim keluhan dari dalam portal, tiketnya langsung tampak", async () => {
+    (portalApi.createTicket as any).mockResolvedValue({
+      id: "t9", number: 9, category: "bug", title: "Struk tak keluar",
+      status: "Sedang ditinjau", createdAt: "2026-08-10T00:00:00Z" });
+    render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    await screen.findByText("Toko Mekar");
+
+    fireEvent.click(screen.getByRole("button", { name: /kirim keluhan/i }));
+    fireEvent.change(screen.getByLabelText("Judul"), { target: { value: "Struk tak keluar" } });
+    fireEvent.change(screen.getByLabelText("Detail"), { target: { value: "Setelah bayar, struk kosong" } });
+    fireEvent.click(screen.getByRole("button", { name: /^kirim$/i }));
+
+    await waitFor(() => expect(portalApi.createTicket).toHaveBeenCalled());
+    const [projectId, form] = (portalApi.createTicket as any).mock.calls[0];
+    expect(projectId).toBe("p1");
+    expect(form.get("title")).toBe("Struk tak keluar");
+    expect(form.get("detail")).toBe("Setelah bayar, struk kosong");
+    expect(form.get("category")).toBe("bug");
+    // Email tak pernah diketik ulang — server mengambilnya dari akun.
+    expect(form.get("email")).toBeNull();
+    // Sesudah terkirim: tab pindah ke Help desk dan daftarnya dimuat ulang dari server.
+    await waitFor(() => expect((portalApi.listTickets as any).mock.calls.length).toBeGreaterThan(1));
+    expect(await screen.findByText("Tombol bayar mati")).toBeTruthy();
+  });
+
+  it("hanya project yang boleh diakses yang bisa dipilih sebagai tujuan", async () => {
+    (portalApi.listProjects as any).mockResolvedValue({
+      items: [{ id: "p1", name: "Toko Mekar" }, { id: "p3", name: "Warung Sari" }] });
+    render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    await screen.findByText("Toko Mekar");
+    fireEvent.click(screen.getByRole("button", { name: /kirim keluhan/i }));
+    const opts = Array.from((screen.getByLabelText("Project") as HTMLSelectElement).options).map((o) => o.value);
+    expect(opts).toEqual(["p1", "p3"]);
+  });
+
+  it("gagal kirim menampilkan pesan, tak menutup form", async () => {
+    (portalApi.createTicket as any).mockRejectedValue(new Error("boom"));
+    render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    await screen.findByText("Toko Mekar");
+    fireEvent.click(screen.getByRole("button", { name: /kirim keluhan/i }));
+    fireEvent.change(screen.getByLabelText("Judul"), { target: { value: "x" } });
+    fireEvent.change(screen.getByLabelText("Detail"), { target: { value: "y" } });
+    fireEvent.click(screen.getByRole("button", { name: /^kirim$/i }));
+    expect(await screen.findByText(/gagal mengirim/i)).toBeTruthy();
+    expect(screen.getByLabelText("Judul")).toBeTruthy();
   });
 });

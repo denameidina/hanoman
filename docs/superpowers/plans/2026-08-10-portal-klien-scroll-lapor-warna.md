@@ -1048,7 +1048,7 @@ git commit -m "feat(spec-626): klien kirim tiket help desk dari portal"
 - Consumes: `portalApi.createTicket(projectId, form: FormData): Promise<PortalTicket>`.
 - Produces: `<TicketForm projects={PortalProject[]} activeId={string} onCancel={() => void} onSent={(projectId: string) => void} />`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `src/test/client-portal.test.tsx`:
 
@@ -1103,7 +1103,7 @@ Tambahkan ke `src/test/client-portal.test.tsx`:
 
 Tambahkan `createTicket: vi.fn()` ke mock `portalApi` di puncak berkas itu.
 
-- [ ] **Step 2: Jalankan — harus MERAH**
+- [x] **Step 2: Jalankan — harus MERAH**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/client-portal.test.tsx
@@ -1111,7 +1111,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/client-portal.test.tsx
 
 Expected: FAIL — tombol "Kirim keluhan" tak ada.
 
-- [ ] **Step 3: Klien API**
+- [x] **Step 3: Klien API**
 
 Di `src/src/api/portal.ts`, tambahkan ke objek `portalApi`:
 
@@ -1126,7 +1126,7 @@ Di `src/src/api/portal.ts`, tambahkan ke objek `portalApi`:
   },
 ```
 
-- [ ] **Step 4: Komponen form**
+- [x] **Step 4: Komponen form**
 
 Buat `src/src/portal/TicketForm.tsx`:
 
@@ -1213,7 +1213,7 @@ const INPUT: React.CSSProperties = {
 };
 ```
 
-- [ ] **Step 5: Pasang di `ClientPortal`**
+- [x] **Step 5: Pasang di `ClientPortal`**
 
 Import + state:
 
@@ -1271,7 +1271,7 @@ Perbarui hint keadaan kosong tab Help desk supaya tak lagi menyuruh klien keluar
                       hint="Kirim keluhan lewat tombol Kirim keluhan di atas — atau lewat halaman Help Center project ini." />
 ```
 
-- [ ] **Step 6: Jalankan — harus HIJAU**
+- [x] **Step 6: Jalankan — harus HIJAU**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/client-portal.test.tsx src/test/portal-scroll.test.tsx src/test/portal-status-pill.test.ts
@@ -1280,7 +1280,7 @@ pnpm --filter ./src typecheck
 
 Expected: PASS semua; typecheck bersih. (Bila nama paket web bukan `./src`, pakai path paketnya — cek `pnpm-workspace.yaml`.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/api/portal.ts src/src/portal/TicketForm.tsx src/src/portal/ClientPortal.tsx src/test/client-portal.test.tsx

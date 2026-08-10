@@ -18,6 +18,14 @@ export const portalApi = {
   listTickets: (id: string) => get<Paginated<PortalTicket>>(`${p(id)}/tickets`),
   getTicket: (id: string, ticketId: string) =>
     get<PortalTicketDetail>(`${p(id)}/tickets/${encodeURIComponent(ticketId)}`),
+  // SPEC-626 · ADR-0111 · satu-satunya aksi tulis portal. Multipart (lampiran gambar) — sengaja
+  // TANPA `content-type` manual: browser yang menyusun boundary-nya.
+  createTicket: async (id: string, form: FormData): Promise<PortalTicket> => {
+    const url = `${p(id)}/tickets`;
+    const res = await fetch(url, { method: "POST", body: form });
+    if (!res.ok) throw new ApiError(res.status, `POST ${url} → ${res.status}`);
+    return res.json();
+  },
   logout: async () => {
     const res = await fetch("/api/auth/logout", { method: "POST" });
     if (!res.ok) throw new ApiError(res.status, `POST /api/auth/logout → ${res.status}`);

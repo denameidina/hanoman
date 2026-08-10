@@ -4,6 +4,7 @@ import { Button, Card, FIXED_ROW_STYLE, LIST_SCROLL_STYLE, Modal, StateBlock, St
 import { Mark } from "../ds/marks";
 import { portalApi } from "../api/portal";
 import { stagePill, ticketPill } from "./status-pill";
+import { TicketForm } from "./TicketForm";
 
 // SPEC-617 · ADR-0110 · permukaan klien. SENGAJA tidak memakai <Shell>: sidebar HN_NAV adalah
 // navigasi OPERATOR, dan setiap entrinya adalah 403 yang menunggu diklik. Chrome-nya sendiri,
@@ -28,6 +29,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   const [openSpec, setOpenSpec] = React.useState<PortalSpec | null>(null);
   const [openTicket, setOpenTicket] = React.useState<PortalTicketDetail | null>(null);
   const [failed, setFailed] = React.useState(false);
+  const [composing, setComposing] = React.useState(false);
 
   React.useEffect(() => {
     portalApi.listProjects()
@@ -35,12 +37,13 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
       .catch(() => { setProjects([]); setFailed(true); });
   }, []);
 
-  React.useEffect(() => {
-    if (!active) return;
-    void Promise.all([portalApi.listBacklog(active), portalApi.listTickets(active)])
+  const loadLists = React.useCallback((id: string) => {
+    void Promise.all([portalApi.listBacklog(id), portalApi.listTickets(id)])
       .then(([b, t]) => { setBacklog(b.items); setTickets(t.items); })
       .catch(() => { setBacklog([]); setTickets([]); });
-  }, [active]);
+  }, []);
+
+  React.useEffect(() => { if (active) loadLists(active); }, [active, loadLists]);
 
   const logout = async () => {
     try { await portalApi.logout(); } catch { /* jaringan gagal — klien tetap dibersihkan */ }
@@ -91,10 +94,13 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                 ))}
               </div>
 
-              <Tabs value={tab} onChange={setTab} style={{ marginBottom: 14 }} tabs={[
-                { value: "backlog", label: "Pekerjaan", count: backlog.length },
-                { value: "tickets", label: "Help desk", count: tickets.length },
-              ]} />
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                <Tabs value={tab} onChange={setTab} style={{ flex: 1, minWidth: 0 }} tabs={[
+                  { value: "backlog", label: "Pekerjaan", count: backlog.length },
+                  { value: "tickets", label: "Help desk", count: tickets.length },
+                ]} />
+                <Button size="sm" leftIcon="send" onClick={() => setComposing(true)}>Kirim keluhan</Button>
+              </div>
 
               {tab === "backlog" ? (
                 backlog.length === 0
@@ -117,7 +123,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
               ) : (
                 tickets.length === 0
                   ? <StateBlock kind="empty" icon="inbox" title="Belum ada tiket"
-                      hint="Keluhan yang dikirim lewat halaman Help Center project ini akan muncul di sini." />
+                      hint="Kirim keluhan lewat tombol Kirim keluhan di atas — atau lewat halaman Help Center project ini." />
                   : <Card padding={0} data-testid="portal-list">
                       {tickets.map((t) => (
                         <div key={t.id} role="button" tabIndex={0}
@@ -137,6 +143,17 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
           )}
         </div>
       </main>
+
+      {composing && projects && projects.length > 0 && (
+        <TicketForm projects={projects} activeId={active!} onCancel={() => setComposing(false)}
+          onSent={(id) => {
+            setComposing(false);
+            setTab("tickets");
+            // Dimuat ulang dari server, bukan disisipkan di klien: yang tampil adalah tiket
+            // seperti yang dilihat operator, bukan tebakan bentuk baris.
+            if (id === active) loadLists(id); else setActive(id);
+          }} />
+      )}
 
       <Modal open={!!openSpec} title={openSpec?.title ?? ""} eyebrow={openSpec?.id}
         onClose={() => setOpenSpec(null)}>
