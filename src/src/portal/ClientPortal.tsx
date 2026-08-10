@@ -1,6 +1,9 @@
 import React from "react";
-import type { PortalProject, PortalSpec, PortalTicket, PortalTicketDetail, UserView } from "@hanoman/shared";
-import { Button, Card, FIXED_ROW_STYLE, LIST_SCROLL_STYLE, Modal, StateBlock, StatusPill, Tabs } from "../ds";
+import type { Paginated, PortalProject, PortalSpec, PortalTicket, PortalTicketDetail, UserView } from "@hanoman/shared";
+import {
+  Button, Card, FIXED_ROW_STYLE, LIST_SCROLL_STYLE, Modal, Pager, serverPage, StateBlock,
+  StatusPill, Tabs,
+} from "../ds";
 import { Mark } from "../ds/marks";
 import { portalApi } from "../api/portal";
 import { stagePill, ticketPill } from "./status-pill";
@@ -20,12 +23,36 @@ const STAGE_LABEL: Record<string, string> = {
   planned: "Direncanakan", executing: "Sedang dikerjakan", done: "Selesai",
 };
 
+// SPEC-647 · ADR-0107 · ukuran halaman portal, cermin `TICKET_PAGE` TriageScreen (SPEC-523).
+const PORTAL_PAGE = 20;
+
+const EMPTY: Paginated<never> = { items: [], total: 0, page: 1, pageSize: PORTAL_PAGE };
+
+/* Pager DS, satu bentuk untuk kedua daftar. `total` datang dari amplop server — bukan
+   `items.length`, yang sesudah paginasi hanya menjawab "berapa baris yang kebetulan tampil".
+   Tanpa `FIXED_ROW_STYLE`: portal hanya punya satu scroller (`<main>`, SPEC-626) dan tak memakai
+   rantai flex per-daftar seperti layar operator, jadi Pager ikut menggulir di ujung daftarnya. */
+function PortalPager({ total, page, onPage, unit }:
+  { total: number; page: number; onPage: (n: number) => void; unit: string }) {
+  const sp = serverPage(total, page, PORTAL_PAGE);
+  return (
+    <div style={{ marginTop: 14, border: "1px solid var(--border-hair)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+      <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to} onPage={onPage} unit={unit} />
+    </div>
+  );
+}
+
 export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOut: () => void }) {
   const [projects, setProjects] = React.useState<PortalProject[] | null>(null);
   const [active, setActive] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState("backlog");
-  const [backlog, setBacklog] = React.useState<PortalSpec[]>([]);
-  const [tickets, setTickets] = React.useState<PortalTicket[]>([]);
+  const [backlog, setBacklog] = React.useState<Paginated<PortalSpec>>(EMPTY);
+  const [tickets, setTickets] = React.useState<Paginated<PortalTicket>>(EMPTY);
+  // Satu nomor halaman per daftar: satu nomor bersama akan meminta halaman yang tak dimiliki
+  // daftar tetangga, dan tab yang baru dibuka sempat merender keadaan kosong palsu.
+  const [bPage, setBPage] = React.useState(1);
+  const [tPage, setTPage] = React.useState(1);
+  const [reload, setReload] = React.useState(0);
   const [openSpec, setOpenSpec] = React.useState<PortalSpec | null>(null);
   const [openTicket, setOpenTicket] = React.useState<PortalTicketDetail | null>(null);
   const [failed, setFailed] = React.useState(false);
@@ -37,13 +64,25 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
       .catch(() => { setProjects([]); setFailed(true); });
   }, []);
 
-  const loadLists = React.useCallback((id: string) => {
-    void Promise.all([portalApi.listBacklog(id), portalApi.listTickets(id)])
-      .then(([b, t]) => { setBacklog(b.items); setTickets(t.items); })
-      .catch(() => { setBacklog([]); setTickets([]); });
+  // Respons yang datang terlambat tak boleh menimpa halaman yang lebih baru: klik halaman
+  // beruntun melahirkan dua permintaan yang tak dijamin selesai berurutan.
+  const seqRef = React.useRef(0);
+  const loadLists = React.useCallback((id: string, bp: number, tp: number) => {
+    const seq = ++seqRef.current;
+    // Kedua daftar dimuat bersama karena angka di tab wajib `total` — lencana yang mengecil saat
+    // klien membuka halaman 2 adalah kebohongan (ADR-0107).
+    void Promise.all([
+      portalApi.listBacklog(id, { page: bp, limit: PORTAL_PAGE }),
+      portalApi.listTickets(id, { page: tp, limit: PORTAL_PAGE }),
+    ])
+      .then(([b, t]) => { if (seq === seqRef.current) { setBacklog(b); setTickets(t); } })
+      .catch(() => { if (seq === seqRef.current) { setBacklog(EMPTY); setTickets(EMPTY); } });
   }, []);
 
-  React.useEffect(() => { if (active) loadLists(active); }, [active, loadLists]);
+  React.useEffect(() => { if (active) loadLists(active, bPage, tPage); }, [active, bPage, tPage, reload, loadLists]);
+  // Ganti project atau tab = kembali ke halaman 1 (idiom TriageScreen SPEC-523): halaman 5 dari
+  // konteks lama menjawab daftar konteks baru yang cuma punya 2 halaman → kosong tanpa sebab.
+  React.useEffect(() => { setBPage(1); setTPage(1); }, [active, tab]);
 
   const logout = async () => {
     try { await portalApi.logout(); } catch { /* jaringan gagal — klien tetap dibersihkan */ }
@@ -96,48 +135,54 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
 
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                 <Tabs value={tab} onChange={setTab} style={{ flex: 1, minWidth: 0 }} tabs={[
-                  { value: "backlog", label: "Pekerjaan", count: backlog.length },
-                  { value: "tickets", label: "Help desk", count: tickets.length },
+                  { value: "backlog", label: "Pekerjaan", count: backlog.total },
+                  { value: "tickets", label: "Help desk", count: tickets.total },
                 ]} />
                 <Button size="sm" leftIcon="send" onClick={() => setComposing(true)}>Kirim keluhan</Button>
               </div>
 
               {tab === "backlog" ? (
-                backlog.length === 0
+                backlog.total === 0
                   ? <StateBlock kind="empty" icon="list-checks" title="Belum ada pekerjaan tercatat"
                       hint="Begitu tim mulai mengerjakan sesuatu di project ini, daftarnya muncul di sini." />
-                  : <Card padding={0} data-testid="portal-list">
-                      {backlog.map((s) => (
-                        <div key={s.id} role="button" tabIndex={0}
-                          onClick={() => void portalApi.getSpec(active!, s.id).then(setOpenSpec)}
-                          onKeyDown={(e) => { if (e.key === "Enter") void portalApi.getSpec(active!, s.id).then(setOpenSpec); }}
-                          style={ROW}>
-                          <span style={{ ...META, fontFamily: "var(--font-mono)", width: 92 }}>{s.id}</span>
-                          <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{s.title}</span>
-                          <StatusPill status={stagePill(s.stage)} size="sm">{STAGE_LABEL[s.stage] ?? s.stage}</StatusPill>
-                          <span style={META}>{s.priority}</span>
-                          <span style={META}>{tanggal(s.doneAt ?? s.startedAt ?? s.createdAt)}</span>
-                        </div>
-                      ))}
-                    </Card>
+                  : <>
+                      <Card padding={0} data-testid="portal-list">
+                        {backlog.items.map((s) => (
+                          <div key={s.id} role="button" tabIndex={0}
+                            onClick={() => void portalApi.getSpec(active!, s.id).then(setOpenSpec)}
+                            onKeyDown={(e) => { if (e.key === "Enter") void portalApi.getSpec(active!, s.id).then(setOpenSpec); }}
+                            style={ROW}>
+                            <span style={{ ...META, fontFamily: "var(--font-mono)", width: 92 }}>{s.id}</span>
+                            <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{s.title}</span>
+                            <StatusPill status={stagePill(s.stage)} size="sm">{STAGE_LABEL[s.stage] ?? s.stage}</StatusPill>
+                            <span style={META}>{s.priority}</span>
+                            <span style={META}>{tanggal(s.doneAt ?? s.startedAt ?? s.createdAt)}</span>
+                          </div>
+                        ))}
+                      </Card>
+                      <PortalPager total={backlog.total} page={bPage} onPage={setBPage} unit="pekerjaan" />
+                    </>
               ) : (
-                tickets.length === 0
+                tickets.total === 0
                   ? <StateBlock kind="empty" icon="inbox" title="Belum ada tiket"
                       hint="Kirim keluhan lewat tombol Kirim keluhan di atas — atau lewat halaman Help Center project ini." />
-                  : <Card padding={0} data-testid="portal-list">
-                      {tickets.map((t) => (
-                        <div key={t.id} role="button" tabIndex={0}
-                          onClick={() => void portalApi.getTicket(active!, t.id).then(setOpenTicket)}
-                          onKeyDown={(e) => { if (e.key === "Enter") void portalApi.getTicket(active!, t.id).then(setOpenTicket); }}
-                          style={ROW}>
-                          <span style={{ ...META, fontFamily: "var(--font-mono)", width: 48 }}>#{t.number}</span>
-                          <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{t.title}</span>
-                          <span style={META}>{t.category}</span>
-                          <StatusPill status={ticketPill(t.status)} size="sm">{t.status}</StatusPill>
-                          <span style={META}>{tanggal(t.createdAt)}</span>
-                        </div>
-                      ))}
-                    </Card>
+                  : <>
+                      <Card padding={0} data-testid="portal-list">
+                        {tickets.items.map((t) => (
+                          <div key={t.id} role="button" tabIndex={0}
+                            onClick={() => void portalApi.getTicket(active!, t.id).then(setOpenTicket)}
+                            onKeyDown={(e) => { if (e.key === "Enter") void portalApi.getTicket(active!, t.id).then(setOpenTicket); }}
+                            style={ROW}>
+                            <span style={{ ...META, fontFamily: "var(--font-mono)", width: 48 }}>#{t.number}</span>
+                            <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{t.title}</span>
+                            <span style={META}>{t.category}</span>
+                            <StatusPill status={ticketPill(t.status)} size="sm">{t.status}</StatusPill>
+                            <span style={META}>{tanggal(t.createdAt)}</span>
+                          </div>
+                        ))}
+                      </Card>
+                      <PortalPager total={tickets.total} page={tPage} onPage={setTPage} unit="tiket" />
+                    </>
               )}
             </>
           )}
@@ -149,9 +194,13 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
           onSent={(id) => {
             setComposing(false);
             setTab("tickets");
+            // Tiket baru duduk paling atas (createdAt desc), jadi memuat ulang di halaman yang
+            // sedang aktif akan menyembunyikan tiket yang baru saja dikirim.
+            setTPage(1);
             // Dimuat ulang dari server, bukan disisipkan di klien: yang tampil adalah tiket
-            // seperti yang dilihat operator, bukan tebakan bentuk baris.
-            if (id === active) loadLists(id); else setActive(id);
+            // seperti yang dilihat operator, bukan tebakan bentuk baris. Lewat `reload` supaya
+            // reset halaman + pemuatan jadi SATU fetch, bukan dua.
+            if (id === active) setReload((n) => n + 1); else setActive(id);
           }} />
       )}
 

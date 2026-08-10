@@ -13,7 +13,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-const urlOf = () => String(fetchMock.mock.calls[0][0]);
+const urlOf = () => String(fetchMock.mock.calls[0]![0]);
 
 describe("portalApi paginasi (SPEC-647)", () => {
   it("listBacklog mengirim page dan limit sekaligus", async () => {
