@@ -1,4 +1,4 @@
-import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest } from "@hanoman/shared";
+import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -377,6 +377,16 @@ export const api = {
   patchAgentToken: (id: string, b: { name?: string; capabilities?: string[]; enabled?: boolean }) =>
     j<AgentTokenView>(paths.agentToken(id), { method: "PATCH", ...body(b) }),
   revokeAgentToken: (id: string) => j<void>(paths.agentToken(id), { method: "DELETE" }),
+  // SPEC-617 · ADR-0110 · kelola akun klien (cookie-only, admin). Path ditulis di sini, bukan di
+  // `shared/src/api.ts`: modul itu diimpor hampir seluruh repo, dan menyentuhnya meledakkan
+  // blast radius `vitest --changed` tanpa memberi apa pun (ADR-0080, preseden SPEC-385).
+  listClientAccounts: () => j<{ items: ClientAccountView[] }>("/api/client-accounts"),
+  createClientAccount: (input: { email: string; password: string; projects: string[] }) =>
+    j<ClientAccountView>("/api/client-accounts", { method: "POST", body: JSON.stringify(input) }),
+  updateClientAccount: (id: string, input: { projects?: string[]; disabled?: boolean; password?: string }) =>
+    j<ClientAccountView>(`/api/client-accounts/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  deleteClientAccount: (id: string) =>
+    j<void>(`/api/client-accounts/${encodeURIComponent(id)}`, { method: "DELETE" }),
   // SPEC-213 · activity log (ringkasan hasil sesi)
   listSessionResults: (projectId?: string) => j<SessionResultView[]>(paths.sessionResults(projectId)),
   purgeSessionResults: (projectId: string, before?: string) =>

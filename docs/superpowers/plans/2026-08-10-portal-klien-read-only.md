@@ -1688,7 +1688,7 @@ git commit -m "feat(spec-617): portal klien di dashboard (fork sesudah gerbang a
 - Consumes: `ClientAccountView` (Task 6), `api` (`src/src/api/client.ts`)
 - Produces: `api.listClientAccounts()`, `api.createClientAccount(input)`, `api.updateClientAccount(id, input)`, `api.deleteClientAccount(id)`; komponen `<ClientAccessPanel />`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/client-access-panel.test.tsx`:
 
@@ -1750,14 +1750,14 @@ describe("ClientAccessPanel (SPEC-617)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/client-access-panel.test.tsx
 ```
 Expected: FAIL — modul tak ada.
 
-- [ ] **Step 3: Method API**
+- [x] **Step 3: Method API**
 
 Di `src/src/api/client.ts`, tambahkan `type ClientAccountView` pada daftar import `@hanoman/shared`, lalu tambahkan method di objek `api` (dekat method `agentToken*`):
 
@@ -1772,7 +1772,7 @@ Di `src/src/api/client.ts`, tambahkan `type ClientAccountView` pada daftar impor
     j<void>(`/api/client-accounts/${encodeURIComponent(id)}`, { method: "DELETE" }),
 ```
 
-- [ ] **Step 4: Komponen panel**
+- [x] **Step 4: Komponen panel**
 
 Buat `src/src/screens/ClientAccessPanel.tsx`:
 
@@ -1896,7 +1896,7 @@ export function ClientAccessPanel() {
 
 Catatan: `Card`/`Field`/`Checkbox` di repo ini punya tanda tangan sendiri (`title`/`subtitle`/`label`/`hint` mungkin bernama lain) — **baca `src/src/ds` dan ikuti yang ada di sana**, jangan memaksakan cuplikan ini.
 
-- [ ] **Step 5: Pasang sebagai tab Settings**
+- [x] **Step 5: Pasang sebagai tab Settings**
 
 Di `src/src/screens/SettingsScreen.tsx`, tambahkan import:
 
@@ -1906,7 +1906,7 @@ import { ClientAccessPanel } from "./ClientAccessPanel";
 
 lalu tambahkan satu entri pada daftar tab (mengikuti bentuk entri tab yang sudah ada di berkas itu) dengan key `client-access`, label **"Akses klien"**, dan isi `<ClientAccessPanel />`.
 
-- [ ] **Step 6: Jalankan test**
+- [x] **Step 6: Jalankan test**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/client-access-panel.test.tsx src/test/settings-screen.test.tsx src/test/placeholder-contract.test.ts
@@ -1914,14 +1914,13 @@ pnpm --filter ./src typecheck
 ```
 Expected: PASS + nol error typecheck. (Nama berkas test Settings/placeholder mengikuti yang ada di `src/test`; lewati yang memang tak ada.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/ClientAccessPanel.tsx src/src/screens/SettingsScreen.tsx src/src/api/client.ts src/test/client-access-panel.test.tsx
 git commit -m "feat(spec-617): layar admin kelola akses klien"
 ```
 
----
 
 ### Task 9: Docs Source of Truth — ADR-0110 + index + doc tersentuh
 

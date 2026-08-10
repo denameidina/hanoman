@@ -8,6 +8,7 @@ import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigRespo
 import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
 import { CustomAgentsPanel } from "./CustomAgentsPanel";
+import { ClientAccessPanel } from "./ClientAccessPanel";   // SPEC-617 · ADR-0110 · kelola akses klien
 import { WebhooksPanel } from "./WebhooksPanel";
 import { WebhookDocs } from "./WebhookDocs";
 import { McpPanel } from "./McpPanel";   // SPEC-482 · ADR-0099 · pemasangan MCP siap salin
@@ -478,6 +479,7 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
 const S_SECTIONS = [
   { key: "akun", label: "Akun", icon: "user-round" },
   { key: "users", label: "Users", icon: "users" },
+  { key: "akses-klien", label: "Akses klien", icon: "user-check" }, // SPEC-617 · ADR-0110 · portal klien
   { key: "perangkat", label: "Perangkat", icon: "key-round" },   // SPEC-213 · device tokens
   { key: "agent", label: "Akses AI Agent", icon: "bot" },        // SPEC-257 · agent token + capability
   { key: "custom-agent", label: "Custom agent", icon: "bot" },   // SPEC-450 · ADR-0094 · katalog agen global
@@ -1209,6 +1211,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
 
   const content = tab === "akun" ? <AccountPanel me={me} onLoggedOut={onLoggedOut} onToast={onToast} />
     : tab === "users" ? <UsersPanel me={me} onToast={onToast} />
+    : tab === "akses-klien" ? <ClientAccessPanel />
     : tab === "perangkat" ? <DeviceTokensPanel onToast={onToast} />
     : tab === "agent" ? <AgentAccessPanel onToast={onToast} />
     // SPEC-450 · ADR-0094 · permukaan GLOBAL katalog custom agent. Komponen yang sama dipakai
