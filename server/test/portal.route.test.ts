@@ -46,7 +46,25 @@ describe("GET /api/portal (SPEC-617)", () => {
     const { cookie } = await seed();
     const r = await app.inject({ method: "GET", url: "/api/portal/projects", headers: { cookie } });
     expect(r.statusCode).toBe(200);
-    expect(r.json()).toEqual({ items: [{ id: "p1", name: "P1" }] });
+    expect(r.json()).toMatchObject({ items: [{ id: "p1", name: "P1" }], total: 1 });
+  });
+
+  // SPEC-647 · ADR-0107 · satu amplop untuk SELURUH daftar portal. Pemilih project di UI sengaja
+  // tetap meminta daftar penuh (project terpilih tak boleh jatuh dari halaman), tapi kontraknya
+  // memakai pola paginate() yang sama — bukan pola sendiri.
+  it("daftar project beramplop Paginated dan menghormati page/limit", async () => {
+    const { cookie } = await seed();
+    await prisma.project.create({ data: { id: "p3", name: "P3", desc: "", kind: "existing" } });
+    const u = await prisma.user.findFirstOrThrow({ where: { email: "klien@x.co" } });
+    await prisma.clientProjectAccess.create({ data: { userId: u.id, projectId: "p3" } });
+
+    const full = await app.inject({ method: "GET", url: "/api/portal/projects", headers: { cookie } });
+    expect(full.json()).toMatchObject({ total: 2, page: 1, pageSize: 2 });
+    expect(full.json().items.map((p: { id: string }) => p.id)).toEqual(["p1", "p3"]);
+
+    const page2 = await app.inject({ method: "GET", url: "/api/portal/projects?page=2&limit=1", headers: { cookie } });
+    expect(page2.json()).toMatchObject({ total: 2, page: 2, pageSize: 1 });
+    expect(page2.json().items.map((p: { id: string }) => p.id)).toEqual(["p3"]);
   });
 
   it("backlog project sendiri: hanya field yang diizinkan", async () => {
@@ -107,7 +125,7 @@ describe("GET /api/portal (SPEC-617)", () => {
     await prisma.user.create({ data: { email: "sepi@x.co", passwordHash: await hashPassword("password3"), role: "client" } });
     const cookie = await login("sepi@x.co", "password3");
     expect((await app.inject({ method: "GET", url: "/api/portal/projects", headers: { cookie } })).json())
-      .toEqual({ items: [] });
+      .toMatchObject({ items: [], total: 0 });
     expect((await app.inject({ method: "GET", url: "/api/portal/projects/p1/backlog", headers: { cookie } })).statusCode).toBe(404);
   });
 
@@ -151,7 +169,7 @@ describe("GET /api/portal (SPEC-617)", () => {
   it("admin memakai portal → daftar mengikuti akses miliknya sendiri (kosong)", async () => {
     const { adminCookie: cookie } = await seed();
     expect((await app.inject({ method: "GET", url: "/api/portal/projects", headers: { cookie } })).json())
-      .toEqual({ items: [] });
+      .toMatchObject({ items: [], total: 0 });
   });
 
   it("portal tak bisa disentuh agent token (cookie-only)", async () => {

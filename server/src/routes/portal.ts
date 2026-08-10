@@ -35,10 +35,15 @@ async function specStages(ids: (string | null)[]): Promise<Map<string, string>> 
 }
 
 export default async function (app: FastifyInstance) {
+  // SPEC-647 · ADR-0107 · amplop yang SAMA dengan daftar portal lain. Tanpa query ia membalas
+  // seluruh baris (`paginate` memakai pageSize = total), karena ini PEMILIH project, bukan daftar
+  // yang ditelusuri: project terpilih yang jatuh dari halaman justru mematahkan syarat
+  // "perpindahan halaman mempertahankan project terpilih".
   app.get("/portal/projects", async (req) => {
     const ids = await clientProjectIds(req.user!.id);
+    const { page, limit } = req.query as { page?: string; limit?: string };
     const rows = await prisma.project.findMany({ where: { id: { in: ids } }, orderBy: { name: "asc" } });
-    return { items: rows.map(toPortalProject) };
+    return paginate(rows.map(toPortalProject), page, limit);
   });
 
   app.get("/portal/projects/:id/backlog", async (req, reply) => {
