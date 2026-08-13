@@ -9,7 +9,7 @@
 // sumber lain. Yang tak boleh longgar adalah pencocokannya (lihat `shared/src/method-status.ts`) —
 // vonis optimistis palsu justru kegagalan senyap yang spec ini hapus.
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { Agent } from "./types";
 import type { EnvLike } from "./paths";
@@ -48,6 +48,14 @@ export function agentSkillHome(agent: Agent, env: EnvLike = process.env, osHome:
   return join(osHome, agent === "codex" ? ".codex" : ".claude");
 }
 
+/**
+ * Akar skill LINTAS-AGEN `~/.agents`, tempat `npx skills add` memasang. Ia bukan milik satu agen,
+ * jadi ia punya env sendiri — `HANOMAN_AGENTS_HOME` — dan bukan turunan `agentSkillHome`.
+ */
+export function agentsSkillHome(env: EnvLike = process.env, osHome: string = homedir()): string {
+  return env.HANOMAN_AGENTS_HOME?.trim() || join(osHome, ".agents");
+}
+
 /** Sub-direktori yang bukan dot-dir. Simlink ikut: plugin cache sah memakainya. */
 function dirsIn(dir: string): string[] {
   try {
@@ -62,10 +70,76 @@ function readJson(file: string): unknown {
 }
 
 /** Sebuah direktori adalah skill bila ia memuat SKILL.md — aturan yang sama di kedua agen. */
-function skillsUnder(dir: string, pkg: string | null): InstalledSkill[] {
-  return dirsIn(dir)
-    .filter((name) => existsSync(join(dir, name, "SKILL.md")))
-    .map((name) => ({ id: pkg ? `${pkg}:${name}` : name, name, pkg, dir: join(dir, name) }));
+function isSkillDir(dir: string): boolean { return existsSync(join(dir, "SKILL.md")); }
+
+function asSkill(dir: string, pkg: string | null, name = basename(dir)): InstalledSkill {
+  return { id: pkg ? `${pkg}:${name}` : name, name, pkg, dir };
+}
+
+/**
+ * Skill di bawah satu akar. Layout DATAR (`skills/<n>/`) MAUPUN BERSARANG PER KATEGORI
+ * (`skills/engineering/<n>/`) sama-sama terbaca — `mattpocock-skills` memakai yang kedua, dan
+ * asumsi datar membuat paket yang sungguh-sungguh terpasang dilaporkan hilang SELURUHNYA
+ * (terukur di mesin operator, v1.2.3: yang terlihat cuma `engineering/` & `productivity/`).
+ *
+ * Direktori yang SUDAH menjadi skill tidak ditembus lebih dalam: `skills/<n>/agents/…` adalah
+ * berkas pendukung skill itu, bukan skill bersarang.
+ */
+function skillsUnder(dir: string, pkg: string | null, depth = 2): InstalledSkill[] {
+  const out: InstalledSkill[] = [];
+  for (const name of dirsIn(dir)) {
+    const sub = join(dir, name);
+    if (isSkillDir(sub)) out.push(asSkill(sub, pkg, name));
+    else if (depth > 1) out.push(...skillsUnder(sub, pkg, depth - 1));
+  }
+  return out;
+}
+
+/**
+ * Daftar skill yang DINYATAKAN manifest plugin (`skills[]` di `.claude-plugin/plugin.json` atau
+ * `.codex-plugin/plugin.json`). Ini sumber paling otoritatif — ia menyebut path persis, jadi layout
+ * seaneh apa pun terbaca tanpa menebak. Entri boleh menunjuk direktori atau `SKILL.md`-nya langsung.
+ * Entri yang menunjuk ke berkas yang tak ada dibuang diam-diam: manifest boleh mendahului isi.
+ */
+function manifestSkills(installPath: string, pkg: string): InstalledSkill[] {
+  for (const marker of [".claude-plugin", ".codex-plugin"]) {
+    const j = readJson(join(installPath, marker, "plugin.json")) as { skills?: unknown } | null;
+    const declared = j?.skills;
+    if (!Array.isArray(declared)) continue;
+    const out: InstalledSkill[] = [];
+    for (const rel of declared) {
+      if (typeof rel !== "string" || !rel) continue;
+      const p = resolve(installPath, rel);
+      const dir = basename(p) === "SKILL.md" ? dirname(p) : p;
+      if (isSkillDir(dir)) out.push(asSkill(dir, pkg));
+    }
+    if (out.length) return out;
+  }
+  return [];
+}
+
+/** Skill satu plugin: manifest bila ia menyatakannya, selain itu pemindaian `skills/`. */
+function pluginSkills(installPath: string, pkg: string): InstalledSkill[] {
+  const declared = manifestSkills(installPath, pkg);
+  return declared.length ? declared : skillsUnder(join(installPath, "skills"), pkg);
+}
+
+/**
+ * Asal-usul skill di `~/.agents/skills`, dari `.skill-lock.json` yang ditulis `npx skills add`.
+ * `pluginName` di situ adalah BUKTI paket asal, bukan tebakan — tanpanya skill yang dipasang lewat
+ * jalur itu hanya punya nama polos dan metode yang memanggil `<pkg>:<n>` selamanya merah.
+ */
+function lockPluginNames(agentsHome: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const j = readJson(join(agentsHome, ".skill-lock.json")) as
+    { skills?: Record<string, unknown> } | null;
+  const skills = j?.skills;
+  if (!skills || typeof skills !== "object") return out;
+  for (const [name, entry] of Object.entries(skills)) {
+    const pkg = (entry as { pluginName?: unknown } | null)?.pluginName;
+    if (typeof pkg === "string" && pkg.trim()) out.set(name, pkg.trim());
+  }
+  return out;
 }
 
 interface PluginRoot { pkg: string; marketplace: string; dir: string }
@@ -159,11 +233,31 @@ export function scanAgentSkills(
 
   for (const r of [...manifestRoots(home), ...cacheRoots(home)]) {
     if (disabled.has(`${r.pkg}@${r.marketplace}`)) continue;
-    const dir = join(r.dir, "skills");
-    const found = skillsUnder(dir, r.pkg);
+    const found = pluginSkills(r.dir, r.pkg);
     if (!found.length) continue;
     packages.add(r.pkg);
-    add(dir, found);
+    add(join(r.dir, "skills"), found);
+  }
+
+  // AKAR KETIGA, khusus codex: `~/.agents/skills`. `npx skills add` — jalur pemasangan resmi
+  // mattpocock di codex — memasang ke sini dan TIDAK menyentuh `~/.codex/skills`, sehingga paket
+  // yang sudah terpasang tampak nol. codex membacanya (`codex_skills/src/host_roots.rs` menyebut
+  // `.agents` bersama `.codex/skills`); claude tidak, jadi akar ini tak boleh menghijaukan claude.
+  if (agent === "codex") {
+    const agentsHome = agentsSkillHome(env, osHome);
+    const dir = join(agentsHome, "skills");
+    const names = lockPluginNames(agentsHome);
+    const flat = skillsUnder(dir, null);
+    // DUA alamat untuk berkas yang sama, keduanya benar: prompt metode memanggil `<pkg>:<n>`,
+    // sementara codex melihat direktori datar bernama `<n>`. Menerbitkan satu saja membuat salah
+    // satu sisi berbohong — dan yang berpaket hanya terbit bila lock benar-benar membuktikannya.
+    const withPkg = flat.flatMap((s) => {
+      const pkg = names.get(s.name);
+      if (!pkg) return [s];
+      packages.add(pkg);
+      return [asSkill(s.dir, pkg, s.name), s];
+    });
+    add(dir, withPkg);
   }
   return { agent, home, roots, skills, packages: [...packages] };
 }

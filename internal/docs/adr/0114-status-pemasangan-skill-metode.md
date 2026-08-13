@@ -79,6 +79,35 @@ cache `plugins/cache/<mkt>/<pkg>/<versi>/` (id `<pkg>:<n>`). Manifest menangkap 
 di luar cache; cache menangkap agen yang tak punya manifest (codex). Plugin dilewati **hanya bila
 dinyatakan nonaktif** — absen ⇒ aktif, karena berkas gerbangnya boleh saja tak ada sama sekali.
 
+#### Amandemen 2026-08-13 — dua false negative terukur, keduanya asumsi bentuk
+
+Vonis pertama di mesin operator salah pada **kedua** metode non-superpowers. Bukan kesalahan
+pencocokan (§2 tetap utuh), melainkan pemindai yang tak menemukan berkas yang benar-benar ada.
+
+**(a) Layout plugin tak selalu datar.** `skillsUnder` mengandaikan `skills/<n>/SKILL.md`.
+`mattpocock-skills` (v1.2.3, terpasang lewat `claude plugin install mattpocock-skills` dari
+marketplace `mattpocock` = repo `mattpocock/skills`) menyusunnya **per kategori** —
+`skills/engineering/tdd/`, `skills/productivity/grilling/`. Yang terlihat cuma dua direktori tanpa
+`SKILL.md` → **nol skill, paketnya bahkan tak masuk daftar**, padahal `.claude-plugin/plugin.json`
+menyebut ke-25 path itu eksplisit di `skills[]` dan tak pernah kita baca. Sekarang: **manifest
+`skills[]` lebih dulu** (`.claude-plugin/` ∪ `.codex-plugin/`, entri boleh menunjuk direktori atau
+`SKILL.md`-nya), jatuh ke pemindaian direktori **sedalam dua tingkat** bila plugin tak menyatakannya.
+Direktori yang **sudah** jadi skill tak ditembus: `skills/<n>/agents/` itu berkas pendukung.
+
+**(b) codex punya akar KETIGA: `~/.agents/skills`.** Koreksi 1 di atas ternyata masih kurang satu.
+`npx skills@latest add …` (paket npm `skills`, bin `skills`/`add-skill`) tak menyentuh
+`~/.codex/skills` sama sekali — ia memasang **datar** ke `~/.agents/skills/<n>/`, akar lintas-agen.
+codex membacanya: binary 0.147.0 memuat `codex_skills/src/host_roots.rs` yang menyebut `.agents`
+berdampingan dengan `.codex/skills`. Akar ini **khusus codex** — claude tak membacanya, jadi
+menghitungnya untuk claude akan jadi hijau palsu. Akarnya ber-env sendiri, `HANOMAN_AGENTS_HOME`,
+bukan turunan `agentSkillHome`: ia bukan milik satu agen.
+
+| agen | akar | env |
+|---|---|---|
+| claude | `~/.claude` | `HANOMAN_CLAUDE_HOME` |
+| codex | `~/.codex` | `HANOMAN_CODEX_HOME` → `CODEX_HOME` |
+| codex | `~/.agents` | `HANOMAN_AGENTS_HOME` |
+
 ### 2 · Fail-open adalah sifat GERBANG, bukan sifat VONIS
 
 Ini kebalikan INVARIAN 1 ADR-0113 dan itu disengaja: gerbang plan menjawab "apakah pekerjaan
@@ -89,9 +118,16 @@ Tetapi "jangan blokir" **bukan** "anggap terpasang". Vonis optimistis palsu adal
 senyap yang spec ini ada untuk menghapus, jadi pencocokan skill **ketat & id persis**:
 `superpowers:brainstorming` cocok hanya dengan id yang sama. Skill user bernama `brainstorming`
 beralamat `brainstorming`, bukan `superpowers:brainstorming` — prompt yang memanggil id berprefiks
-tetap akan gagal. Harganya dinyatakan: instalasi **datar** (`npx skills@latest add mattpocock/skills`
-yang menaruh skill langsung di `~/.codex/skills/<n>/`) dilaporkan kurang, karena begitulah prompt
-akan melihatnya.
+tetap akan gagal.
+
+**Amandemen 2026-08-13 — yang bertambah adalah BUKTInya, bukan kelonggarannya.** Semula instalasi
+datar dinyatakan "dilaporkan kurang selamanya", yang berarti metode `matt` tak akan pernah bisa hijau
+di codex. Ternyata `npx skills add` meninggalkan `~/.agents/.skill-lock.json` yang mencatat
+`pluginName` **per skill** (`tdd` → `mattpocock-skills`, beserta `sourceUrl` & `skillPath` asalnya).
+Itu bukti asal-usul, bukan tebakan, jadi pemindai menerbitkan **dua** id untuk berkas yang sama:
+`mattpocock-skills:tdd` (yang dipanggil prompt metode) dan `tdd` (yang dilihat codex di direktori
+datar). Menerbitkan satu saja membuat salah satu sisi berbohong. Tanpa lock → tetap nama polos,
+tetap tanpa paket: **nama tak pernah dinaikkan pangkat dengan menebak.**
 
 Fail-open yang berlaku adalah **per sumber IO**: direktori hilang / JSON rusak / izin ditolak
 membuat satu sumber menyumbang nol skill, tak pernah melempar dan tak pernah mengosongkan sumber lain.

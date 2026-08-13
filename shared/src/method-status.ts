@@ -31,9 +31,13 @@ export function methodSkills(m: MethodDef): string[] {
 /**
  * PENCOCOKAN KETAT & id persis. "Fail-open" spec ini adalah sifat GERBANG (Start tak pernah
  * ditolak), bukan sifat vonis: menganggap sesuatu terpasang tanpa bukti adalah persis kegagalan
- * senyap yang SPEC-739 ada untuk menghapus. Konsekuensinya dinyatakan — instalasi DATAR (mis.
- * `npx skills add` yang menaruh skill langsung di `~/.codex/skills/<n>/`) dilaporkan kurang,
- * karena begitulah prompt yang memanggil `<pkg>:<n>` akan melihatnya.
+ * senyap yang SPEC-739 ada untuk menghapus.
+ *
+ * AMANDEMEN — ketat tetap ketat, yang bertambah adalah BUKTInya. Semula instalasi datar `npx
+ * skills add` dilaporkan kurang selamanya, karena skill-nya hanya bernama `<n>`. Ternyata jalur itu
+ * meninggalkan `~/.agents/.skill-lock.json` yang menyebut `pluginName` tiap skill; `scanAgentSkills`
+ * kini menerbitkan `<pkg>:<n>` DAN `<n>` dari situ. Yang tak berubah: tanpa lock, tak ada paket —
+ * nama polos tak pernah dinaikkan pangkat dengan menebak.
  */
 export function methodStatus(
   m: MethodDef, agent: Agent,
