@@ -8,6 +8,9 @@ import { NotificationBell } from "../notifications/NotificationBell";
 import { LimitBadge, CodexLimitBadge } from "../screens/LimitIndicator";
 import { UpdateBadge } from "../screens/UpdateIndicator";
 import { AccountMenu } from "../auth/AccountMenu";
+// Dari `../ui-state/hooks`, BUKAN barrel `../ui-state`: barrel itu memuat ResetViewButton
+// yang mengimpor komponen DS, dan lewat sana `ds → shell → ui-state → ds` jadi lingkaran impor.
+import { useScrollRestore } from "../ui-state/hooks";
 
 // Setiap key WAJIB punya cabang `section === …` di App.tsx. Bila tidak, `screen` tetap
 // null dan App merender kosong — sidebar ikut hilang, pengguna terjebak sampai reload.
@@ -88,6 +91,10 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
   { active?: string; title?: React.ReactNode; breadcrumb?: React.ReactNode; actions?: React.ReactNode;
     showSearch?: boolean; searchValue?: string; onSearchChange?: (v: string) => void;
     onNavigate?: (key: string) => void; wide?: boolean; children?: React.ReactNode }) {
+  // SPEC-740 · ADR-0115 · scroll tingkat-halaman dipulihkan dari SATU titik: tiap layar —
+  // termasuk yang belum ada — ikut dapat perilakunya tanpa menyentuh kodenya. Kunci per
+  // `active` supaya posisi Backlog tak terbawa ke Triase.
+  const mainRef = useScrollRestore(`page@${active ?? "-"}`, "scroll");
   return (
     <div style={{ display: "flex", height: "100%", minHeight: 0, background: "var(--surface-page)", color: "var(--text-body)" }}>
       {/* Sidebar */}
@@ -157,7 +164,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             rantai ini dengan LIST_SCREEN_STYLE di root-nya; sisanya berperilaku seperti dulu.
             `border-box` wajib: tanpa itu padding menambah tinggi di atas 100% dan menciptakan
             scrollbar kedua. */}
-        <main style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+        <main ref={mainRef} data-testid="shell-main" style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
           <div style={{ maxWidth: wide ? "none" : "var(--content-max)", margin: "0 auto",
             padding: "24px 28px 32px", boxSizing: "border-box", minHeight: "100%",
             display: "flex", flexDirection: "column" }}>
