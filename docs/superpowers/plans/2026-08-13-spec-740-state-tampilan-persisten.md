@@ -46,7 +46,7 @@
   - `onUiReset(fn: (prefix: string) => void): () => void`
   - guard: `isStr`, `isNum`, `isBool`, `nullableStr`, `strList`, `oneOf<T extends string>(...opts: T[]): Accept<T>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/ui-state.test.ts`:
 
@@ -167,12 +167,12 @@ describe("reset", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/ui-state.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/ui-state/store"`.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 Create `src/src/ui-state/store.ts`:
 
@@ -281,12 +281,12 @@ export function pruneUiState(): void {
 }
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/ui-state.test.ts`
 Expected: PASS, 17 test.
 
-- [ ] **Step 5: Isolasi test global**
+- [x] **Step 5: Isolasi test global**
 
 Modify `src/test/setup.ts` menjadi:
 
@@ -304,12 +304,12 @@ beforeEach(() => {
 });
 ```
 
-- [ ] **Step 6: Verifikasi setup tak merusak test yang sudah memakai localStorage**
+- [x] **Step 6: Verifikasi setup tak merusak test yang sudah memakai localStorage**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/terminal-workspace.test.ts test/terminal-screen.test.tsx test/hanoman-pet.test.tsx test/new-terminal-runtime.test.tsx`
 Expected: PASS (semuanya, tanpa kegagalan baru).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/ui-state/store.ts src/test/ui-state.test.ts src/test/setup.ts
@@ -328,7 +328,7 @@ git commit -m "feat(spec-740): store state tampilan berkunci hn.ui.v1 + isolasi 
 - Consumes: `uiKey`, `readUiState`, `writeUiState`, `onUiReset`, `Accept` dari `./store`
 - Produces: `usePersistedState<T>(screen: string, field: string, initial: T, accept?: Accept<T>): [T, React.Dispatch<React.SetStateAction<T>>]`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/ui-state-hooks.test.tsx`:
 
@@ -418,12 +418,12 @@ describe("usePersistedState", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/ui-state-hooks.test.tsx`
 Expected: FAIL — `Failed to resolve import "../src/ui-state/hooks"`.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 Create `src/src/ui-state/hooks.ts`:
 
@@ -464,12 +464,12 @@ export function usePersistedState<T>(
 }
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/ui-state-hooks.test.tsx`
 Expected: PASS, 8 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/ui-state/hooks.ts src/test/ui-state-hooks.test.tsx
@@ -488,7 +488,7 @@ git commit -m "feat(spec-740): hook usePersistedState + pemulihan saat kunci sco
 - Consumes: `uiKey`, `readUiState`, `writeUiState` dari `./store`
 - Produces: `useScrollRestore<E extends HTMLElement = HTMLDivElement>(screen: string, field: string, ready?: boolean): (node: E | null) => void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/ui-state-scroll.test.tsx`:
 
@@ -566,12 +566,12 @@ describe("useScrollRestore", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/ui-state-scroll.test.tsx`
 Expected: FAIL — `useScrollRestore is not a function` / import tak ditemukan.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 Append ke `src/src/ui-state/hooks.ts` (di bawah `usePersistedState`):
 
@@ -630,12 +630,12 @@ export function useScrollRestore<E extends HTMLElement = HTMLDivElement>(
 }
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/ui-state-scroll.test.tsx`
 Expected: PASS, 4 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/ui-state/hooks.ts src/test/ui-state-scroll.test.tsx
@@ -657,7 +657,7 @@ git commit -m "feat(spec-740): useScrollRestore — pulihkan scroll sesudah data
   - `ResetViewButton(props: { screen: string; active: number; onReset?: () => void; label?: string })`
   - barrel `src/src/ui-state/index.ts` yang me-re-export seluruh `store`, `hooks`, dan `ResetViewButton`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/reset-view-button.test.tsx`:
 
@@ -711,12 +711,12 @@ describe("ResetViewButton", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/reset-view-button.test.tsx`
 Expected: FAIL — `Failed to resolve import "../src/ui-state"`.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 Create `src/src/ui-state/ResetViewButton.tsx`:
 
@@ -759,12 +759,12 @@ export { usePersistedState, useScrollRestore } from "./hooks";
 export { ResetViewButton } from "./ResetViewButton";
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/reset-view-button.test.tsx`
 Expected: PASS, 4 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/ui-state/ResetViewButton.tsx src/src/ui-state/index.ts src/test/reset-view-button.test.tsx
@@ -784,7 +784,7 @@ git commit -m "feat(spec-740): ResetViewButton + barrel ui-state"
 - Consumes: `usePersistedState`, `pruneUiState`, `oneOf` dari `../ui-state`; `HN_NAV` dari `./ds/shell`
 - Produces: `NAV_KEYS: string[]` diekspor dari `src/src/ds/shell.tsx`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/app-state-persist.test.tsx`:
 
@@ -856,12 +856,12 @@ describe("state nav App", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/app-state-persist.test.tsx`
 Expected: FAIL — test "memulihkan halaman terakhir" gagal (App selalu mulai di Overview).
 
-- [ ] **Step 3: Ekspor daftar key nav**
+- [x] **Step 3: Ekspor daftar key nav**
 
 Di `src/src/ds/shell.tsx`, tepat di bawah deklarasi `HN_NAV` (setelah baris `];`), tambahkan:
 
@@ -880,7 +880,7 @@ export { Shell, HN_NAV, NAV_KEYS } from "./shell";
 
 Catatan: baris 11 saat ini berbunyi `export { Shell } from "./shell";` — ganti seluruhnya dengan baris di atas.
 
-- [ ] **Step 4: Persist state App**
+- [x] **Step 4: Persist state App**
 
 Di `src/src/App.tsx`, tambahkan impor (di dekat impor `deeplink` baris 20):
 
@@ -938,17 +938,17 @@ Tambahkan prune sekali saat mount, tepat di bawah `React.useEffect(() => { api.a
   React.useEffect(() => { pruneUiState(); }, []);
 ```
 
-- [ ] **Step 5: Jalankan test — pastikan LULUS**
+- [x] **Step 5: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/app-state-persist.test.tsx`
 Expected: PASS, 5 test.
 
-- [ ] **Step 6: Test tetangga App tetap hijau**
+- [x] **Step 6: Test tetangga App tetap hijau**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/app-flows.test.tsx test/app-states.test.tsx test/changelog-nav.test.tsx test/backlog-deeplink.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/App.tsx src/src/ds/shell.tsx src/src/ds/index.ts src/test/app-state-persist.test.tsx
@@ -967,7 +967,7 @@ git commit -m "feat(spec-740): App mengingat halaman terakhir, project, dan filt
 - Consumes: `useScrollRestore` dari `../ui-state`
 - Produces: `<main data-testid="shell-main">` ber-ref pemulih scroll, berkunci `screen = "page@<active>"`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/shell-scroll-restore.test.tsx`:
 
@@ -1041,12 +1041,12 @@ describe("scroll halaman", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/shell-scroll-restore.test.tsx`
 Expected: FAIL — `Unable to find an element by: [data-testid="shell-main"]`.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 Di `src/src/ds/shell.tsx`, tambahkan impor di bawah impor `AccountMenu`. Ambil dari
 `../ui-state/hooks`, **bukan** dari barrel `../ui-state`: barrel itu memuat
@@ -1076,12 +1076,12 @@ menjadi:
         <main ref={mainRef} data-testid="shell-main" style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/shell-scroll-restore.test.tsx`
 Expected: PASS, 2 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/ds/shell.tsx src/test/shell-scroll-restore.test.tsx
@@ -1100,7 +1100,7 @@ git commit -m "feat(spec-740): Shell memulihkan scroll halaman per section"
 - Consumes: `usePersistedState`, `useScrollRestore`, `ResetViewButton`, `oneOf`, `isStr`, `isNum`, `nullableStr` dari `../ui-state`
 - Produces: kunci `hn.ui.v1.backlog.{tab,view,q,stage,prio,dateField,from,to,page,detailId,scroll}`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/backlog-state-persist.test.tsx`:
 
@@ -1177,12 +1177,12 @@ describe("state tampilan Backlog", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/backlog-state-persist.test.tsx`
 Expected: FAIL — nilai tak bertahan sesudah remount; `Reset tampilan` tak ditemukan.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 Tambah impor di `src/src/screens/BacklogScreen.tsx` (di bawah impor `ChangeSourceDialog`):
 
@@ -1308,17 +1308,17 @@ dan:
             }}>
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/backlog-state-persist.test.tsx`
 Expected: PASS, 4 test.
 
-- [ ] **Step 5: Test Backlog yang sudah ada tetap hijau**
+- [x] **Step 5: Test Backlog yang sudah ada tetap hijau**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/backlog-board.test.tsx test/backlog-date-filter.test.tsx test/backlog-deeplink.test.tsx test/backlog-dependency.test.tsx test/backlog-goal.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/BacklogScreen.tsx src/test/backlog-state-persist.test.tsx
@@ -1337,7 +1337,7 @@ git commit -m "feat(spec-740): Backlog mengingat filter, paginasi, seleksi, dan 
 - Consumes: `usePersistedState`, `useScrollRestore`, `ResetViewButton`, `oneOf`, `isStr`, `isNum`, `nullableStr` dari `../ui-state`
 - Produces: kunci `hn.ui.v1.triage.{tab,project,status,q,page,openId,scroll}`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/triage-state-persist.test.tsx`:
 
@@ -1400,12 +1400,12 @@ describe("state tampilan Triase", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/triage-state-persist.test.tsx`
 Expected: FAIL — nilai tak bertahan; `Reset tampilan` tak ditemukan.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 Tambah impor di `src/src/screens/TriageScreen.tsx` (di bawah impor `SyncButton`):
 
@@ -1472,17 +1472,17 @@ Pasang ref pada container daftar. Ganti:
             <div ref={listRef} data-testid="triage-scroll" style={{ overflowY: "auto", minHeight: 0 }}>
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/triage-state-persist.test.tsx`
 Expected: PASS, 3 test.
 
-- [ ] **Step 5: Test Triase yang sudah ada tetap hijau**
+- [x] **Step 5: Test Triase yang sudah ada tetap hijau**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/triage-screen.test.tsx test/github-issues.test.tsx`
 Expected: PASS. (Bila salah satu berkas tak ada, jalankan `ls src/test | grep -i -E "triage|issue"` dan pakai daftar yang benar-benar ada.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/TriageScreen.tsx src/test/triage-state-persist.test.tsx
@@ -1503,7 +1503,7 @@ git commit -m "feat(spec-740): Triase mengingat tab, filter, paginasi, tiket ter
 - Consumes: `usePersistedState`, `useScrollRestore`, `ResetViewButton`, `scoped`, `isStr`, `isNum`, `nullableStr` dari `../ui-state`
 - Produces: kunci `hn.ui.v1.projects.{page,scroll}`, `hn.ui.v1.prd.{status,sel}`, `hn.ui.v1.changelog@<projectId>.{q,page,selectedId}`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/screens-state-persist.test.tsx`:
 
@@ -1568,12 +1568,12 @@ describe("state tampilan Changelog", () => {
 
 Catatan: input pencarian Changelog sudah punya `aria-label="Cari rilis"` (`ChangelogScreen.tsx:105`) — tak perlu ditambahkan.
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/screens-state-persist.test.tsx`
 Expected: FAIL — nilai tak bertahan sesudah remount.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 **ProjectsScreen** — tambah impor:
 
@@ -1669,17 +1669,17 @@ Ganti blok state (baris ±52–56):
 
 Input pencarian layar itu sudah ber-`aria-label="Cari rilis"` — biarkan apa adanya.
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/screens-state-persist.test.tsx`
 Expected: PASS, 3 test.
 
-- [ ] **Step 5: Test tetangga tetap hijau**
+- [x] **Step 5: Test tetangga tetap hijau**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/changelog-screen.test.tsx test/changelog-panel.test.tsx test/prd-status.test.tsx test/projects-screen.test.tsx`
 Expected: PASS. (Sesuaikan daftar dengan `ls src/test | grep -i -E "changelog|prd|project"`.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/ProjectsScreen.tsx src/src/screens/PrdScreen.tsx src/src/screens/ChangelogScreen.tsx src/test/screens-state-persist.test.tsx
@@ -1700,7 +1700,7 @@ git commit -m "feat(spec-740): Projects, PRD, dan Changelog mengingat state tamp
 - Consumes: `usePersistedState`, `ResetViewButton`, `isStr`, `isNum`, `nullableStr` dari `../ui-state`
 - Produces: kunci `hn.ui.v1.scheduler.{queue-<status>-page,cronProject,cronRunsPage,cronOpenRuns}`, `hn.ui.v1.lead.{filter,decPage,flowPage}`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/scheduler-lead-state-persist.test.tsx`:
 
@@ -1750,12 +1750,12 @@ describe("state tampilan Lead", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/scheduler-lead-state-persist.test.tsx`
 Expected: FAIL — penyaring tak bertahan; `Reset tampilan` tak ditemukan.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 **LeadScreen** — tambah impor:
 
@@ -1845,17 +1845,17 @@ Ganti (baris ±108):
   const [openRuns, setOpenRuns] = usePersistedState<string | null>("scheduler", "cronOpenRuns", null, nullableStr);
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/scheduler-lead-state-persist.test.tsx`
 Expected: PASS, 2 test.
 
-- [ ] **Step 5: Test tetangga tetap hijau**
+- [x] **Step 5: Test tetangga tetap hijau**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/SchedulerCrons.test.tsx test/scheduler-panel.test.tsx test/lead-screen.test.tsx`
 Expected: PASS. (Sesuaikan daftar dengan `ls src/test src/src/screens | grep -i -E "scheduler|lead"` — `SchedulerCrons.test.tsx` ada di `src/src/screens/`.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/SchedulerScreen.tsx src/src/screens/SchedulerCrons.tsx src/src/screens/LeadScreen.tsx src/test/scheduler-lead-state-persist.test.tsx
@@ -1878,7 +1878,7 @@ git commit -m "feat(spec-740): Scheduler & Lead mengingat penyaring dan paginasi
 - Consumes: `usePersistedState`, `scoped`, `isStr`, `oneOf`, `nullableStr` dari `../ui-state`
 - Produces: kunci `hn.ui.v1.ide@<projectId>.{tab,viewRef,selected,selKind,mdView,stagedView,changedView,diffTab}`, `hn.ui.v1.docs@<projectId>.selected`, `hn.ui.v1.terminal.project`, `hn.ui.v1.vps.detailId`, `hn.ui.v1.settings.tab`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/workspace-state-persist.test.tsx`:
 
@@ -1927,12 +1927,12 @@ describe("sub-tab Settings", () => {
 
 Catatan: label tab Settings dibaca dari sumbernya saat implementasi — bila label persisnya bukan `"Sesi"`, pakai label yang benar-benar dirender (`rg 'value: "sesi"' -n src/src/screens/SettingsScreen.tsx`).
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/workspace-state-persist.test.tsx`
 Expected: FAIL — `readUiState(uiKey("settings","tab"))` tetap `"akun"`.
 
-- [ ] **Step 3: Tulis implementasi**
+- [x] **Step 3: Tulis implementasi**
 
 **SettingsScreen** — tambah impor `import { usePersistedState, isStr } from "../ui-state";` lalu ganti:
 
@@ -2048,17 +2048,17 @@ Lalu ganti:
 
 `mode` (`view`/`edit`) dan `draft` **sengaja tidak** dipersist: draft editor bukan parameter tampilan, dan memulihkan mode edit tanpa draft-nya menyesatkan.
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/workspace-state-persist.test.tsx`
 Expected: PASS, 1 test.
 
-- [ ] **Step 5: Test tetangga tetap hijau**
+- [x] **Step 5: Test tetangga tetap hijau**
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run test/SettingsScreen.test.tsx test/terminal-screen.test.tsx test/ide-screen.test.tsx test/docs-tree.test.ts test/vps-checklist.test.tsx`
 Expected: PASS. (Sesuaikan daftar dengan `ls src/test src/src/screens | grep -i -E "settings|terminal|ide|docs|vps"`.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/IdeScreen.tsx src/src/screens/DocsWorkspace.tsx src/src/screens/TerminalScreen.tsx src/src/screens/VpsScreen.tsx src/src/screens/SettingsScreen.tsx src/test/workspace-state-persist.test.tsx
@@ -2080,7 +2080,7 @@ git commit -m "feat(spec-740): IDE, Docs, Terminal, VPS, dan Settings mengingat 
 - Consumes: keputusan dari Task 1–11
 - Produces: dokumentasi SoT yang menyebut kunci, guard, gerbang `NAV_KEYS`, dan gotcha
 
-- [ ] **Step 1: Tulis ADR**
+- [x] **Step 1: Tulis ADR**
 
 Create `internal/docs/adr/0115-state-tampilan-dashboard-persisten.md` dengan bagian:
 `# ADR-0115 — State tampilan dashboard persisten di storage, berkunci per layar` ·
@@ -2091,7 +2091,7 @@ Create `internal/docs/adr/0115-state-tampilan-dashboard-persisten.md` dengan bag
 `## Konsekuensi & gotcha` (lima butir di Step 2) ·
 `## Yang tidak berubah` (skema, endpoint, kontrak API, kunci `hanoman.terminal.workspace` & flag Pet).
 
-- [ ] **Step 2: Tulis lima gotcha di ADR**
+- [x] **Step 2: Tulis lima gotcha di ADR**
 
 1. **`usePersistedState` menyimpan nilai BESERTA kuncinya.** Saat scope project berganti, effect penulis akan menyimpan nilai project **lama** di bawah kunci project **baru** bila nilai dan kunci disimpan terpisah — sinkronisasi dilakukan saat render (`if (snap.key !== key) setSnap(…)`), bukan di effect.
 2. **Pemulihan scroll wajib membisukan penulisnya.** Menyetel `scrollTop` memancarkan event `scroll`; percobaan pertama (konten masih pendek) akan menulis balik nilai **terpotong** dan menghapus posisi aslinya sebelum konten sempat tumbuh. Karena itu ada penanda `restoring`, dan loop rAF **berbatas** (`RESTORE_FRAMES = 20`).
@@ -2099,7 +2099,7 @@ Create `internal/docs/adr/0115-state-tampilan-dashboard-persisten.md` dengan bag
 4. **`limit` tak pernah dipulihkan.** Hanya `page`. `limit` tanpa `page` berperilaku sebagai **PLAFON** (SPEC-523 · ADR-0107), jadi memulihkannya diam-diam mengubah ukuran halaman.
 5. **`src/test/setup.ts` wajib mengosongkan `localStorage` tiap test.** vitest memakai satu jsdom per berkas; tanpa itu test pertama yang menyetel filter mewariskannya ke test berikutnya dan kegagalannya terbaca seperti regresi komponen.
 
-- [ ] **Step 3: Tautkan di index**
+- [x] **Step 3: Tautkan di index**
 
 Di `internal/docs/README.md`, di bawah heading `## adr`, sisipkan **sebagai baris pertama** daftar (di atas baris `- [0114 …]`):
 
@@ -2109,11 +2109,11 @@ Di `internal/docs/README.md`, di bawah heading `## adr`, sisipkan **sebagai bari
 
 Di `internal/docs/adr/README.md`, tambahkan narasinya mengikuti format entri 0114 di berkas itu (apa yang diperluas/ditegakkan + gotcha ringkas).
 
-- [ ] **Step 4: Perbarui doc frontend**
+- [x] **Step 4: Perbarui doc frontend**
 
 Di `internal/docs/frontend/frontend-implementation.md`, tambahkan seksi **"State tampilan persisten (SPEC-740 · ADR-0115)"** berisi: bentuk kunci, tabel screen→field (salin dari design doc `docs/superpowers/specs/2026-08-13-spec-740-state-tampilan-persisten-design.md`), aturan "layar baru wajib memakai `usePersistedState`, bukan `useState`, untuk field tampilan", dan aturan "field baru yang nullable wajib menyebut `nullableStr`".
 
-- [ ] **Step 5: Perbarui SKILL project**
+- [x] **Step 5: Perbarui SKILL project**
 
 Di `internal/skills/hanoman/SKILL.md`, seksi **Aturan Arsitektur**, tambahkan satu butir setelah butir "Realtime: WebSocket hanya untuk terminal PTY…":
 
@@ -2130,12 +2130,12 @@ Di `internal/skills/hanoman/SKILL.md`, seksi **Aturan Arsitektur**, tambahkan sa
   wajib mengosongkan `localStorage` tiap test (satu jsdom per berkas → state bocor antar-test).
 ```
 
-- [ ] **Step 6: Verifikasi integritas index**
+- [x] **Step 6: Verifikasi integritas index**
 
 Run: `node cli/dist/index.js docs index --check 2>/dev/null || npx tsx cli/src/index.ts docs index --check`
 Expected: index konsisten (exit 0). Bila CLI belum ter-build di worktree ini, cukup pastikan tautan ADR ada di `internal/docs/README.md` **dan** `internal/docs/adr/README.md` (kelas kegagalan SPEC-386).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs/adr/0115-state-tampilan-dashboard-persisten.md internal/docs/README.md internal/docs/adr/README.md internal/docs/frontend/frontend-implementation.md internal/skills/hanoman/SKILL.md
@@ -2153,35 +2153,35 @@ git commit -m "docs(spec-740): ADR-0115 state tampilan persisten + index, fronte
 - Consumes: seluruh Task 1–12
 - Produces: bukti hijau untuk test web, typecheck paket `src`, dan lint berkas yang berubah
 
-- [ ] **Step 1: Jalankan seluruh test project `src`**
+- [x] **Step 1: Jalankan seluruh test project `src`**
 
 `src/test/setup.ts` dibaca **setiap** test web, jadi scope diperluas dari "berkas yang berubah" ke seluruh project `src` — alasannya disebutkan saat melapor.
 
 Run: `cd src && env -u NODE_ENV ./node_modules/.bin/vitest run`
 Expected: PASS, nol berkas gagal. Bila ada yang merah karena state bocor antar-test, tambahkan `localStorage.clear()` di test itu **atau** perbaiki nilai default yang salah — jangan melemahkan guard.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: exit 0, nol error.
 
-- [ ] **Step 3: Lint berkas yang berubah**
+- [x] **Step 3: Lint berkas yang berubah**
 
 Run: `cd src && ./node_modules/.bin/eslint $(cd .. && git diff --name-only "$HANOMAN_BASE_SHA" -- 'src/**/*.ts' 'src/**/*.tsx' | sed 's|^src/||')`
 Expected: nol error. Bila project ini tak punya konfigurasi eslint, lewati langkah ini dan katakan demikian.
 
-- [ ] **Step 4: Smoke di browser sungguhan**
+- [x] **Step 4: Smoke di browser sungguhan**
 
 Task ini tak menyentuh endpoint, jadi tak perlu boot server + curl. Sebagai gantinya, buktikan perilakunya sekali di aplikasi nyata: `pnpm dev`, buka dashboard, setel filter di Backlog, pindah ke Triase, kembali → filter masih menyala dan lencana "N filter aktif" tampil; refresh browser → mendarat di halaman yang sama dengan filter yang sama; tekan "Reset tampilan" → kembali ke default. Bila `pnpm dev` tak bisa dijalankan di lingkungan ini, katakan itu apa adanya alih-alih mengklaim sudah di-smoke.
 
-- [ ] **Step 5: Centang plan & commit penutup**
+- [x] **Step 5: Centang plan & commit penutup**
 
 ```bash
 git add docs/superpowers/plans/2026-08-13-spec-740-state-tampilan-persisten.md
 git commit -m "chore(spec-740): centang plan + catat bukti verifikasi"
 ```
 
-- [ ] **Step 6: Push**
+- [x] **Step 6: Push**
 
 ```bash
 git push origin HEAD:refs/heads/hanoman/spec-740
