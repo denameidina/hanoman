@@ -273,7 +273,12 @@ export const api = {
   createTerminal: (project: string, opts?: { agent?: Agent; model?: string; effort?: string }) =>
     j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, ...(opts ?? {}) }) }),
   // SPEC-236 · terminal biasa non-claude: shell mentah di repoDir project (tanpa flow).
-  createShell: (project: string) => j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, shell: true }) }),
+  // SPEC-739 · ADR-0114 · `install` opsional membuat pane menjalankan perintah pemasangan metode
+  // yang diturunkan SERVER dari katalog; tanpa argumen itu, body-nya byte-identik dengan sebelumnya.
+  createShell: (project: string, install?: { method: string; agent: Agent }) =>
+    j<{ id: string }>(paths.terminalSessions, {
+      method: "POST", ...body({ project, shell: true, ...(install ? { install } : {}) }),
+    }),
   // SPEC-162 · sesi claude interaktif untuk sebuah backlog item, di worktree-nya sendiri.
   // SPEC-252 · ADR-0061 · model/effort per sesi (opsional; kosong → default global di server).
   // SPEC-332 · ADR-0073 · mode goal per sesi (opsional; kosong → default global di server).

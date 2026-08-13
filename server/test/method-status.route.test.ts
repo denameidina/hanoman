@@ -5,13 +5,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { METHODS, methodSkills } from "@hanoman/shared";
 import { buildApp } from "../src/app";
-import { killAll } from "../src/services/pty";
+import { killAll, killSession, listSessions, capturePane } from "../src/services/pty";
+import { installCommand } from "../src/services/method-status";
 import { resetDb, makeProject } from "./factory";
 
 const app = buildApp({ requireAuth: false });
 let repoDir = "";
 let claudeHome = "";
 let codexHome = "";
+
+const waitFor = async (ok: () => boolean, ms = 5000) => {
+  const deadline = Date.now() + ms;
+  while (!ok()) {
+    if (Date.now() > deadline) throw new Error("timeout menunggu kondisi");
+    await new Promise((r) => setTimeout(r, 20));
+  }
+};
 
 const skill = (dir: string, name: string) => {
   mkdirSync(join(dir, name), { recursive: true });
@@ -92,5 +101,56 @@ describe("GET /api/methods/status (SPEC-739)", () => {
     const dir = join(codexHome, "plugins", "cache", "mkt", "superpowers", "1.0.0", "skills");
     for (const s of methodSkills(METHODS.superpowers!)) skill(dir, s.split(":")[1]!);
     expect(codexSp((await get()).json()).ready).toBe(true);
+  });
+});
+
+// SPEC-739 · ADR-0114 · pemasangan lewat SESI TERMINAL (ADR-0056). Server tak pernah memasang
+// apa pun sendiri — yang menjalankan perintah adalah shell di dalam pane, ditonton operator.
+describe("POST /terminal/sessions · install metode (SPEC-739)", () => {
+  const post = (payload: Record<string, unknown>) =>
+    app.inject({ method: "POST", url: "/api/terminal/sessions", payload });
+
+  it("shell tanpa `install` tetap shell mentah (perilaku SPEC-236 utuh)", async () => {
+    const res = await post({ project: "p1", shell: true });
+    expect(res.statusCode).toBe(201);
+    killSession(res.json().id);
+  });
+
+  // Bukti diambil dari PANE-nya, bukan dari argv yang dirakit helper: helper murninya sudah
+  // diuji sendiri di bawah, dan yang bisa salah justru sambungan route → pane (pola SPEC-543).
+  it("`install` melahirkan pane yang menjalankan perintah katalog", async () => {
+    process.env.HANOMAN_SHELL = "/bin/echo";
+    const res = await post({ project: "p1", shell: true, install: { method: "superpowers", agent: "codex" } });
+    expect(res.statusCode).toBe(201);
+    const id = res.json().id as string;
+    const s = listSessions().find((x) => x.id === id)!;
+    expect(s.flow).toBeUndefined();     // install bukan flow → mesin stage tak tersentuh
+    expect(s.cwd).toBe(repoDir);        // pane lahir di checkout project, bukan .worktrees
+    await waitFor(() => capturePane(id).includes("codex plugin add superpowers@openai-curated"));
+    killSession(id);
+    delete process.env.HANOMAN_SHELL;
+  });
+
+  // Sengaja TIDAK lenient seperti `resolveMethod`: resolusi longgar benar untuk MEMBACA, tapi ini
+  // TINDAKAN — memasang default karena metodenya tak dikenal berarti menjalankan perintah yang
+  // tak diminta siapa pun.
+  it("metode tak dikenal → 400, bukan jatuh ke default", async () => {
+    const res = await post({ project: "p1", shell: true, install: { method: "tak-ada", agent: "claude" } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain("tak-ada");
+  });
+});
+
+describe("installCommand (SPEC-739)", () => {
+  it("merangkai perintah katalog dan menyerahkan pane ke operator", () => {
+    const argv = installCommand(METHODS.superpowers!, "codex", "/bin/zsh");
+    expect(argv[0]).toBe("/bin/zsh");
+    expect(argv[1]).toBe("-lc");
+    expect(argv[2]).toContain("codex plugin add superpowers@openai-curated");
+    expect(argv[2]).toContain("exec '/bin/zsh' -l");
+  });
+  it("perintah jamak dirangkai `&&` — langkah kedua tak jalan bila yang pertama gagal", () => {
+    const argv = installCommand(METHODS.superpowers!, "claude", "/bin/zsh");
+    expect(argv[2]).toContain(" && ");
   });
 });

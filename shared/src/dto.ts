@@ -368,7 +368,12 @@ export const zTerminalSession = z.union([
   // SPEC-236 · terminal biasa NON-claude: shell mentah di repoDir project. Tanpa flow (bukan
   // pipeline claude). DIDAHULUKAN: z.object non-strict membuang key asing, jadi bila varian
   // longgar {project,flow?} lebih dulu, {project,shell:true} akan lolos sbg plain (shell dibuang).
-  z.object({ project: z.string(), shell: z.literal(true) }),
+  // SPEC-739 · ADR-0114 · pemasangan skill metode: klien mengirim METODE + AGEN, bukan teks
+  // perintah — perintahnya diturunkan server dari katalog `METHODS`. Dengan begitu "perintah
+  // instalasi adalah data katalog" berlaku ujung ke ujung, dan endpoint ini tak pernah menjadi
+  // "jalankan shell arbitrer". Tanpa field ini, shell mentah persis seperti SPEC-236.
+  z.object({ project: z.string(), shell: z.literal(true),
+    install: z.object({ method: z.string(), agent: zAgent }).optional() }),
   // SPEC-166 · "reverse" = sesi project-level di worktree-nya sendiri, menyusun Source of Truth
   // dari kode. TANPA override runtime: sesi project-level mengikuti Setting.agent (ADR-0074).
   // Terminal biasa (tanpa flow) kini punya variannya SENDIRI di bawah — lihat SPEC-517.

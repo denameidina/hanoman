@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { prisma } from "../db";
-import { zTerminalSession, zIntegrate, zTerminalSteerInput, type Stage } from "@hanoman/shared";
+import { zTerminalSession, zIntegrate, zTerminalSteerInput, METHODS, type Stage } from "@hanoman/shared";
 import { realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, type Flow } from "@hanoman/runner";
 import { phaseFilePath, decisionFilePath, readPhases, stageForRun } from "../services/session-phases";
 import { specReview, reviewFile } from "../services/spec-review";
@@ -10,6 +10,7 @@ import { integrateBranch } from "../services/integrate";
 import { sessionAgentDefaults, conflictSessionDefaults, terminalAgentDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { startSpecSession, LaunchError } from "../services/session-launch";
+import { installCommand } from "../services/method-status";
 import { resolveRepoDir } from "../services/local-binding";
 import { ownsWorktree } from "../services/session-worktree";
 import { recordHeadSha } from "../services/spec-head";
@@ -121,6 +122,20 @@ export default async function (app: FastifyInstance) {
       const repoDir = await resolveRepoDir(project.id);
       if (!repoDir) return reply.code(400)
         .send({ error: `project "${project.id}" belum di-bind ke checkout lokal`, needsBind: true });
+      // SPEC-739 · ADR-0114 · pemasangan skill metode. Yang menjalankan perintah adalah SHELL di
+      // dalam pane, bukan server: ADR-0087 menolak "server memasang dirinya sendiri" dan ADR-0088
+      // memindahkan pemasangan ke CLI supervisor justru karena itu. Pemasang bukan-server berarti
+      // nol executor baru — ADR-0037 utuh.
+      const inst = parsed.data.install;
+      if (inst) {
+        // Sengaja bukan `resolveMethod` yang lenient: resolusi longgar benar untuk MEMBACA (id
+        // dari hub jatuh diam ke default), tapi ini tindakan — memasang default karena metodenya
+        // tak dikenal berarti menjalankan perintah yang tak diminta siapa pun.
+        const m = METHODS[inst.method];
+        if (!m) return reply.code(400).send({ error: `metode "${inst.method}" tak dikenal` });
+        const s = createSession(project.id, repoDir, { command: installCommand(m, inst.agent) });
+        return reply.code(201).send({ id: s.id });
+      }
       const s = createSession(project.id, repoDir, { command: [shellBin()] });
       return reply.code(201).send({ id: s.id });
     }
