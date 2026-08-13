@@ -11,6 +11,9 @@ import { paths, publicStatus, type TicketView, type TicketDetail, type Spec, typ
 import { api } from "../api/client";
 import { specDeepLink } from "./deeplink";
 import { SyncButton } from "./SyncButton";
+import {
+  usePersistedState, useScrollRestore, ResetViewButton, oneOf, isStr, isNum, nullableStr,
+} from "../ui-state";
 import type { ProjectVM } from "./types";
 
 const POLL_MS = 5000;
@@ -328,16 +331,20 @@ export function TriageScreen({ projects, onAccepted, onToast }:
     onToast: (msg: string, kind?: string, icon?: string) => void }) {
   const [list, setList] = React.useState<TicketView[]>([]);
   const [total, setTotal] = React.useState(0);
-  const [page, setPage] = React.useState(1);
+  const [page, setPage] = usePersistedState("triage", "page", 1, isNum);
   const [unreviewed, setUnreviewed] = React.useState(0);
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
-  const [openId, setOpenId] = React.useState<string | null>(null);
-  const [project, setProject] = React.useState("");
-  const [status, setStatus] = React.useState("");
-  const [q, setQ] = React.useState("");
+  // SPEC-740 · ADR-0115 · seluruh state tampilan layar ini persisten berkunci `triage`.
+  const [openId, setOpenId] = usePersistedState<string | null>("triage", "openId", null, nullableStr);
+  const [project, setProject] = usePersistedState("triage", "project", "", isStr);
+  const [status, setStatus] = usePersistedState("triage", "status", "", isStr);
+  const [q, setQ] = usePersistedState("triage", "q", "", isStr);
   // SPEC-471 · dua kanal masuk, satu layar. Pemilih tab pakai Button, BUKAN Switch —
   // getByLabelText Switch tak terjangkau di test DS (jebakan SPEC-299).
-  const [tab, setTab] = React.useState<"tiket" | "issue">("tiket");
+  const [tab, setTab] = usePersistedState<"tiket" | "issue">("triage", "tab", "tiket", oneOf("tiket", "issue"));
+  const activeFilters = [project !== "", status !== "", q.trim() !== ""].filter(Boolean).length;
+  // Daftar tiket baru punya tinggi final sesudah potongan pertama mendarat.
+  const listRef = useScrollRestore("triage", "scroll", list.length > 0);
 
   const load = React.useCallback((silent = false) => {
     if (!silent) setState("loading");
@@ -387,6 +394,7 @@ export function TriageScreen({ projects, onAccepted, onToast }:
             style={{ flex: 1, minWidth: 160, padding: "6px 10px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", color: "var(--text-body)", fontSize: 13 }} />
           {unreviewed > 0 && <Badge tone="warn">{unreviewed} belum ditinjau</Badge>}
           <SyncButton onDone={() => load(true)} onToast={onToast} />
+          <ResetViewButton screen="triage" active={activeFilters} />
         </>}
       </div>
       {tab === "issue" ? issueTab
@@ -395,7 +403,7 @@ export function TriageScreen({ projects, onAccepted, onToast }:
         : list.length === 0 ? <StateBlock kind="empty" icon="inbox" title="Belum ada keluhan"
             hint="Aktifkan Help Center di detail project, lalu sebar link publiknya agar keluhan mulai masuk." />
         : <>
-            <div style={{ overflowY: "auto", minHeight: 0 }}>
+            <div ref={listRef} data-testid="triage-scroll" style={{ overflowY: "auto", minHeight: 0 }}>
               {list.map((t) => <TicketRow key={t.id} t={t} onOpen={setOpenId} />)}
             </div>
             <TicketPager total={total} page={page} onPage={setPage} />
