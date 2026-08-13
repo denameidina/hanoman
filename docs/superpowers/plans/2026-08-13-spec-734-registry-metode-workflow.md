@@ -1199,7 +1199,7 @@ git commit -m "feat(spec-734): gerbang & artefak server memindai union direktori
 - Consumes: `resolveMethod`, `readSpecMethod`, `stampSpecMethod` (Task 1); prompt builder ber-`method` (Task 3)
 - Produces: `startSpecSession(spec, opts & { method?: string })`; `POST /terminal/sessions` menerima `method?: string` di varian `spec`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `server/test/session-launch.test.ts`:
 
@@ -1281,7 +1281,7 @@ yang memang berspasi tunggal.
 Sisipkan blok itu **di dalam** `describe("session-launch", …)` yang sudah ada, sesudah blok test agen
 (supaya `seedRepo`/`argvOf`/`setSetting` sudah terdefinisi).
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run server/test/session-launch.test.ts --no-file-parallelism
@@ -1289,7 +1289,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: FAIL — prompt tak memuat `mattpocock-skills:grilling`.
 
-- [ ] **Step 3: Ubah `session-launch.ts`**
+- [x] **Step 3: Ubah `session-launch.ts`**
 
 Tambahkan ke import `@hanoman/shared`:
 
@@ -1346,7 +1346,7 @@ Teruskan `method.id` ke keempat builder:
   }
 ```
 
-- [ ] **Step 4: Ubah DTO + route**
+- [x] **Step 4: Ubah DTO + route**
 
 Di `shared/src/dto.ts`, tambahkan satu baris di varian `spec` `zTerminalSession`, setelah `verifyScope`:
 
@@ -1363,7 +1363,7 @@ Di `server/src/routes/terminal.ts`, tambahkan satu baris pada pemanggilan `start
           method: parsed.data.method,                                       // SPEC-734 · ADR-0113
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run server/test/session-launch.test.ts --no-file-parallelism
@@ -1371,7 +1371,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: PASS.
 
-- [ ] **Step 6: Typecheck server**
+- [x] **Step 6: Typecheck server**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1379,7 +1379,7 @@ pnpm --filter ./server typecheck
 
 Expected: keluar tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/session-launch.ts server/src/routes/terminal.ts shared/src/dto.ts server/test/session-launch.test.ts

@@ -196,6 +196,76 @@ describe("session-launch", () => {
     killSession(r.id);
   });
 
+  // SPEC-734 · ADR-0113 · metode workflow. Bukti dari argv pane, sama seperti mode goal & agen —
+  // di situlah prompt benar-benar mewujud. `argvOf` meratakan whitespace, jadi cocokkan potongan
+  // yang memang berspasi tunggal.
+  const withPayload = async (id: string, payload: object) => {
+    const spec = await seedRepo(id);
+    return prisma.spec.update({ where: { id: spec.id }, data: { payload } });
+  };
+
+  // AC-2 · tanpa method eksplisit, sesi memakai Setting.method.
+  it("AC-2 · sesi lahir memakai Setting.method", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    await setSetting({ method: "matt" });
+    const spec = await seedRepo("SPEC-800");
+    const r = await startSpecSession(spec, { flow: "feature" });
+    expect(await argvOf(r.id)).toContain("mattpocock-skills:grilling");
+    killSession(r.id);
+  });
+
+  // Baris Setting yang belum punya kunci itu → "superpowers" (bukan undefined).
+  it("AC-2 · tanpa baris Setting sama sekali → superpowers", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const spec = await seedRepo("SPEC-801");
+    const r = await startSpecSession(spec, { flow: "feature" });
+    expect(await argvOf(r.id)).toContain("superpowers:brainstorming");
+    killSession(r.id);
+  });
+
+  // AC-5 · metode sesi PERTAMA dicatat di payload, tanpa merusak field payload lain.
+  it("AC-5 · metode dicatat di Spec.payload.method saat sesi pertama lahir", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    await setSetting({ method: "matt" });
+    const spec = await withPayload("SPEC-802", { context: "c", outcome: "o" });
+    const r = await startSpecSession(spec, { flow: "feature" });
+    const after = await prisma.spec.findUnique({ where: { id: "SPEC-802" } });
+    const p = after!.payload as Record<string, unknown>;
+    expect(p.method).toBe("matt");
+    expect(p.context).toBe("c");
+    expect(p.outcome).toBe("o");
+    killSession(r.id);
+  });
+
+  // …dan nilai tercatat itu MENANG atas Setting yang sudah berubah sesudahnya.
+  it("AC-5 · peluncuran berikutnya memakai metode tercatat, bukan Setting yang baru", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    await setSetting({ method: "superpowers" });
+    const spec = await withPayload("SPEC-803", { method: "matt", context: "c", outcome: "o" });
+    const r = await startSpecSession(spec, { flow: "feature" });
+    expect(await argvOf(r.id)).toContain("mattpocock-skills:grilling");
+    killSession(r.id);
+  });
+
+  it("opts.method menang atas payload maupun Setting", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    await setSetting({ method: "matt" });
+    const spec = await withPayload("SPEC-804", { method: "matt", context: "c", outcome: "o" });
+    const r = await startSpecSession(spec, { flow: "feature", method: "superpowers" });
+    expect(await argvOf(r.id)).toContain("superpowers:brainstorming");
+    killSession(r.id);
+  });
+
+  // AC-9 · id yang tak dikenal tak boleh melempar; ia jatuh ke default.
+  it("AC-9 · Setting.method tak dikenal jatuh ke superpowers tanpa melempar", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    await setSetting({ method: "tak-ada-metode-ini" });
+    const spec = await seedRepo("SPEC-805");
+    const r = await startSpecSession(spec, { flow: "feature" });
+    expect(await argvOf(r.id)).toContain("superpowers:brainstorming");
+    killSession(r.id);
+  });
+
   it("Setting.agent codex tak menyeret sesi claude eksplisit", async () => {
     process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
     await setSetting({ agent: "codex" });

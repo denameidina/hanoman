@@ -403,6 +403,10 @@ export const zTerminalSession = z.union([
     goal: z.boolean().optional(), goalCondition: z.string().max(4000).optional(),
     agent: zAgent.optional(),
     verifyScope: zVerifyScope.optional(),
+    // SPEC-734 · ADR-0113 — metode workflow per SESI: undefined → Spec.payload.method →
+    // Setting.method → "superpowers". LENIENT (`z.string()`, bukan `z.enum`): id yang tak dikenal
+    // jatuh ke default di `resolveMethod`, bukan ditolak 400 — alasan yang sama dengan zSetting.
+    method: z.string().optional(),
     // SPEC-447 · ADR-0093 — lewati gerbang dependency. Hanya jalur manusia; UI hanya
     // mengirimkannya sesudah operator melihat daftar pemblokirnya.
     force: z.boolean().optional(),

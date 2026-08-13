@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import type { Spec } from "@prisma/client";
 import { realGit, startPrompt, continuePrompt, resumePrompt, startGoalPrompt, resolveGoalCondition, type Flow, type Autonomy, type VerifyScope, type ResumeCtx } from "@hanoman/runner";
-import type { Agent } from "@hanoman/shared";
+import { resolveMethod, readSpecMethod, stampSpecMethod, type Agent } from "@hanoman/shared";
 import { resolveRepoDir } from "./local-binding";
 import { getSetting } from "./settings";
 import { ensureCodexTrust } from "./codex-trust";
@@ -66,6 +66,10 @@ export async function startSpecSession(
     // SPEC-376 · ADR-0080 · scope verifikasi. undefined → ikut Setting.verifyScope (default
     // "changed"). Governor scheduler tak memasoknya → ikut default global, seperti model/effort.
     verifyScope?: VerifyScope;
+    // SPEC-734 · ADR-0113 · metode workflow. undefined → metode yang TERCATAT di
+    // `Spec.payload.method` → `Setting.method` → "superpowers". Governor scheduler tak
+    // memasoknya → ikut rantai itu, seperti model/effort.
+    method?: string;
     // SPEC-447 · ADR-0093 · lewati gerbang dependency. HANYA jalur manusia yang memasoknya
     // (POST /terminal/sessions); governor & denyut lead TAK PERNAH memaksa.
     force?: boolean;
@@ -130,6 +134,12 @@ export async function startSpecSession(
     : undefined;
   // SPEC-376 · ADR-0080 · scope verifikasi: override sesi → Setting global → "changed".
   const verifyScope: VerifyScope = opts.verifyScope ?? setting.verifyScope;
+  // SPEC-734 · ADR-0113 · resolusi metode, cermin verifyScope: override sesi → metode yang TERCATAT
+  // di item → Setting global → default. `recordedMethod` dibaca SEBELUM stempel ditulis; begitu
+  // terisi ia beku, supaya mengganti default global tak memindahkan item yang sedang berjalan ke
+  // direktori plan lain di tengah jalan.
+  const recordedMethod = readSpecMethod(spec.payload);
+  const method = resolveMethod(opts.method ?? recordedMethod ?? setting.method);
 
   // Worktree lahir `--detach` di commit branchFrom (fallback HEAD, SPEC-197): sesi tak pernah jalan
   // di working tree utama. baseSha disimpan agar review men-diff baseSha..headSha (SPEC-176/ADR-0030).
@@ -161,6 +171,15 @@ export async function startSpecSession(
     });
   }
 
+  // SPEC-734 · ADR-0113 · AC-5 · stempel metode item. Ditulis hanya bila belum ada: sesudah itu ia
+  // fakta historis ("metode saat item ini PERTAMA diluncurkan"), cermin `startedAt` (ADR-0090).
+  // Payload yang bukan objek biasa tak distempel — `stampSpecMethod` mengembalikan null di sana,
+  // dan resolusi tetap benar tanpanya.
+  if (!recordedMethod) {
+    const stamped = stampSpecMethod(spec.payload, method.id);
+    if (stamped) await prisma.spec.update({ where: { id: spec.id }, data: { payload: stamped } });
+  }
+
   const brief = {
     id: spec.id, title: spec.title, source: spec.source,
     priority: spec.priority, objective: spec.objective, payload: spec.payload ?? undefined,
@@ -171,14 +190,14 @@ export async function startSpecSession(
     // SPEC-407 · satu builder untuk ketiga keadaan sesi goal: `continuePrompt`/`resumePrompt`
     // bicara plan berkotak & fase perencanaan, dan sesi goal tak punya keduanya.
     prompt = startGoalPrompt(brief, branchTo, {
-      autonomy: opts.autonomy, verifyScope, resume: resumeCtx,
+      autonomy: opts.autonomy, verifyScope, resume: resumeCtx, method: method.id,
     });
   } else if (isContinue) {
-    prompt = continuePrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope);
+    prompt = continuePrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id);
   } else if (resumeCtx) {
-    prompt = resumePrompt(opts.flow, brief, branchTo, resumeCtx, opts.autonomy, verifyScope);
+    prompt = resumePrompt(opts.flow, brief, branchTo, resumeCtx, opts.autonomy, verifyScope, method.id);
   } else {
-    prompt = startPrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope);
+    prompt = startPrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id);
   }
   // SPEC-376 · ADR-0080 · env sesi. baseSha SUDAH dihitung di addWorktree di atas — tanpa
   // meneruskannya, klausa "berkas yang berubah" tak bisa dieksekusi tanpa menebak: worktree

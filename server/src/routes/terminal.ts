@@ -87,6 +87,7 @@ export default async function (app: FastifyInstance) {
           goal: parsed.data.goal, goalCondition: parsed.data.goalCondition,   // SPEC-332 · ADR-0073
           agent: parsed.data.agent,                                           // SPEC-338 · ADR-0074
           verifyScope: parsed.data.verifyScope,                               // SPEC-376 · ADR-0080
+          method: parsed.data.method,                                         // SPEC-734 · ADR-0113
           force: parsed.data.force,                                           // SPEC-447 · ADR-0093
         });
         // SPEC-394 · ADR-0084 · `resumed` hanya muncul saat peluncuran benar-benar MELANJUTKAN
