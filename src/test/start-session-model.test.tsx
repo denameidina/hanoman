@@ -5,7 +5,13 @@ import { api } from "../src/api/client";
 
 // SPEC-252 · ADR-0061 — picker model & effort per SESI saat Start (default = setting global).
 vi.mock("../src/api/client", () => ({
-  api: { getSettings: vi.fn(), startSession: vi.fn(), getCodexVersion: vi.fn().mockResolvedValue({ version: null, minRequired: "0.144.0", ok: true }) },
+  api: {
+    // SPEC-739 · kedua permukaan ini kini ikut menanyakan kesiapan skill metode; dijawab
+    // KOSONG di sini karena checklist & catatannya punya berkas test sendiri.
+    getMethodStatus: vi.fn().mockResolvedValue({ agents: [], methods: [] }),
+    listProjects: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+    getSettings: vi.fn(), startSession: vi.fn(), getCodexVersion: vi.fn().mockResolvedValue({ version: null, minRequired: "0.144.0", ok: true }),
+  },
   ApiError: class extends Error { status = 0 },
 }));
 

@@ -4,6 +4,11 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 const startSession = vi.fn(async (_b: Record<string, unknown>) => ({ id: "spec-9" }));
 vi.mock("../src/api/client", () => ({
   api: {
+    // SPEC-739 · kedua permukaan ini kini ikut menanyakan kesiapan skill metode; dijawab
+    // KOSONG di sini karena checklist & catatannya punya berkas test sendiri.
+    getMethodStatus: vi.fn().mockResolvedValue({ agents: [], methods: [] }),
+    listProjects: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+
     listBranches: vi.fn(async () => ({ branches: ["main"], remotes: [] })),
     getSettings: vi.fn(async () => ({
       model: "claude-opus-5", effort: "xhigh", agent: "claude",

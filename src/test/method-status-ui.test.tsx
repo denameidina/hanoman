@@ -12,6 +12,7 @@ vi.mock("../src/api/client", () => ({
 }));
 
 import { SettingsScreen } from "../src/screens/SettingsScreen";
+import { StartSessionModal } from "../src/App";
 import { api } from "../src/api/client";
 
 const settings = {
@@ -107,5 +108,42 @@ describe("SettingsScreen · checklist kesiapan metode (SPEC-739)", () => {
     openSesi();
     await waitFor(() => expect(screen.getByLabelText("Metode default")).toBeInTheDocument());
     expect(screen.queryByTestId("method-status-superpowers-claude")).toBeNull();
+  });
+});
+
+const spec = { id: "SPEC-739", source: "brief", title: "t", stage: "planned" } as never;
+
+describe("StartSessionModal · catatan kesiapan metode (SPEC-739)", () => {
+  const open = async () => {
+    render(<StartSessionModal open spec={spec} onClose={() => {}} onStarted={() => {}} />);
+    await waitFor(() => expect(screen.getByLabelText("Metode")).toHaveValue("superpowers"));
+  };
+
+  it("metode siap untuk agen terpilih → tanpa peringatan", async () => {
+    await open();
+    expect(screen.queryByTestId("method-status-note")).toBeNull();
+  });
+
+  it("berpindah ke agen yang belum siap memunculkan peringatan yang MENYEBUT agennya", async () => {
+    await open();
+    fireEvent.change(screen.getByLabelText("Agen"), { target: { value: "codex" } });
+    const note = await screen.findByTestId("method-status-note");
+    expect(note).toHaveTextContent("Codex CLI");
+    expect(note).toHaveTextContent("superpowers");
+  });
+
+  // Metode belum siap TIDAK memblokir Start — cermin catatan versi codex SPEC-339.
+  it("peringatan tidak menonaktifkan tombol Mulai", async () => {
+    await open();
+    fireEvent.change(screen.getByLabelText("Agen"), { target: { value: "codex" } });
+    await screen.findByTestId("method-status-note");
+    expect(screen.getByRole("button", { name: "Mulai" })).not.toBeDisabled();
+  });
+
+  it("status gagal dimuat → tak ada peringatan, modal tetap utuh", async () => {
+    vi.mocked(api.getMethodStatus).mockRejectedValue(new Error("boom"));
+    await open();
+    fireEvent.change(screen.getByLabelText("Agen"), { target: { value: "codex" } });
+    expect(screen.queryByTestId("method-status-note")).toBeNull();
   });
 });

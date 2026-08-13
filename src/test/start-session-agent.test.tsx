@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 vi.mock("../src/api/client", () => ({
-  api: { getSettings: vi.fn(), startSession: vi.fn(), getCodexVersion: vi.fn() },
+  api: {
+    // SPEC-739 · kedua permukaan ini kini ikut menanyakan kesiapan skill metode; dijawab
+    // KOSONG di sini karena checklist & catatannya punya berkas test sendiri.
+    getMethodStatus: vi.fn().mockResolvedValue({ agents: [], methods: [] }),
+    listProjects: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+    getSettings: vi.fn(), startSession: vi.fn(), getCodexVersion: vi.fn(),
+  },
   ApiError: class extends Error { status = 0 },
 }));
 

@@ -516,7 +516,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
   React.useEffect(() => {
     if (tab !== "sesi") return;
     api.getMethodStatus().then(setMethodStatuses).catch(() => setMethodStatuses(null));
-    api.listProjects({ pageSize: 100 })
+    api.listProjects({ limit: 100 })
       .then((r) => setInstallProject((p) => p || (r.items.find((x) => x.binding ?? x.repoDir)?.id ?? "")))
       .catch(() => {});
   }, [tab]);

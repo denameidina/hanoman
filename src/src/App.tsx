@@ -8,7 +8,7 @@ import { Shell, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Swi
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem } from "@hanoman/shared";
-import { flowForSource, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge } from "@hanoman/shared";
+import { flowForSource, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
@@ -86,6 +86,9 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   const [busy, setBusy] = React.useState(false);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
+  // SPEC-739 · ADR-0114 · kesiapan skill metode di mesin ini. Gagal-diam dengan alasan yang sama
+  // dengan codexVer: modal harus tetap bisa dipakai, dan ketiadaan bukti bukan bukti ketiadaan.
+  const [methodStatuses, setMethodStatuses] = React.useState<MethodSkillStatus[] | null>(null);
   React.useEffect(() => {
     if (!open) return;
     api.getSettings().then((s) => {
@@ -109,6 +112,8 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     }).catch(() => {});
     // SPEC-339 · versi codex CLI untuk catatan lunak. Gagal-diam: modal harus tetap bisa dipakai.
     api.getCodexVersion().then((v) => setCodexVer(v.version)).catch(() => {});
+    // SPEC-739 · ADR-0114 · kesiapan metode × agen, diturunkan live dari disk oleh server.
+    api.getMethodStatus().then((r) => setMethodStatuses(r.methods)).catch(() => setMethodStatuses(null));
     // SPEC-407 · `spec` ikut jadi dependency: prefill mode goal bergantung source-nya.
   }, [open, spec]);
   const pickAgent = (a: Agent) => {
@@ -139,6 +144,9 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // tahu apa yang ia paksa sebelum menekannya. `force` tak pernah terkirim bila daftar ini kosong.
   const blockers = s.blockedBy ?? [];
   const isBlocked = blockers.length > 0;
+  // SPEC-739 · ADR-0114 · status untuk pasangan (metode, agen) yang SEDANG dipilih — dua-duanya,
+  // karena superpowers bisa siap untuk claude dan kosong untuk codex di mesin yang sama.
+  const methodStat = methodStatuses?.find((m) => m.method === method && m.agent === agent) ?? null;
   async function start() {
     setBusy(true);
     try {
@@ -248,6 +256,23 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
           Butuh terpasang: {METHODS[method]?.requires.join(" · ") ?? "—"}
         </div>
+        {/* SPEC-739 · ADR-0114 · sampai spec ini `requires` cuma teks: hanoman menjanjikan
+            metodologi yang tak pernah ia pastikan ada. Peringatan ini LUNAK — Mulai tetap
+            hidup (ADR-0037, cermin catatan versi codex SPEC-339) — tapi wajib menyebut AGEN:
+            skill yang hilang tak mematikan sesi, ia menghapus gerbang yang disebut prompt. */}
+        {methodStat && !methodStat.ready && (
+          <div data-testid="method-status-note" style={{
+            fontSize: 12, lineHeight: 1.5, marginTop: 8, padding: "8px 10px", overflowWrap: "anywhere",
+            borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-muted)",
+          }}>
+            <b>{methodStat.label}</b> belum siap untuk <b>{agent === "codex" ? "Codex CLI" : "Claude Code"}</b> di
+            mesin ini
+            {methodStat.missingPackages.length > 0 && <> · paket kurang: <code>{methodStat.missingPackages.join(" · ")}</code></>}
+            {methodStat.missingSkills.length > 0 && <> · skill kurang: <code>{methodStat.missingSkills.join(" · ")}</code></>}.
+            {" "}Sesi tetap boleh dijalankan, tapi gerbang yang disebut prompt tak akan ada.
+            Pasang dari Settings → Sesi.
+          </div>
+        )}
       </Field>
     </Modal>
   );

@@ -5,6 +5,11 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 // tapi tak pernah punya satu pun kontrol — satu-satunya jalan menyetelnya adalah curl.
 vi.mock("../src/api/client", () => ({
   api: {
+    // SPEC-739 · kedua permukaan ini kini ikut menanyakan kesiapan skill metode; dijawab
+    // KOSONG di sini karena checklist & catatannya punya berkas test sendiri.
+    getMethodStatus: vi.fn().mockResolvedValue({ agents: [], methods: [] }),
+    listProjects: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+
     getSettings: vi.fn(), putSettings: vi.fn(), getCodexVersion: vi.fn(),
     getLeadConfig: vi.fn(), putLeadConfig: vi.fn(),
   },
