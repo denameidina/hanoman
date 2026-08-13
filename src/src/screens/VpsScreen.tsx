@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import { subscribe } from "../api/events";
 import type { VpsView } from "@hanoman/shared";
 import { VpsChecklistModal } from "./VpsChecklist";
+import { usePersistedState, nullableStr } from "../ui-state";
 
 // reachable = healthcheck terakhir sukses dalam 2× interval 5 menit (SPEC-164 §4).
 export const isReachable = (v: VpsView, now: number = Date.now()): boolean =>
@@ -80,7 +81,11 @@ export function VpsScreen({ onToast, onGotoTerminal }:
   const [modal, setModal] = React.useState<null | "new" | VpsView>(null);
   // VPS yang detail+checklist-nya sedang dibuka di modal (null = tertutup). UI 2026-07-18 ·
   // menggantikan side panel: klik baris membuka satu modal berisi seluruh detail + checklist.
-  const [detailVps, setDetailVps] = React.useState<VpsView | null>(null);
+  // SPEC-740 · ADR-0115 · yang disimpan id-nya; barisnya diresolusi ulang dari daftar hidup
+  // (didorong WS) supaya modal tak pernah merender snapshot basi.
+  const [detailId, setDetailId] = usePersistedState<string | null>("vps", "detailId", null, nullableStr);
+  const detailVps = React.useMemo(() => list.find((v) => v.id === detailId) ?? null, [list, detailId]);
+  const setDetailVps = React.useCallback((v: VpsView | null) => setDetailId(v ? v.id : null), [setDetailId]);
 
   const load = React.useCallback(() => {
     api.listVps().then((l) => { setList(l); setStatus("ready"); })

@@ -11,6 +11,7 @@ import { BranchesPanel } from "./BranchesPanel";
 import { buildFileTree, TreeRow, ChangedSection } from "./file-tree";
 import { DiffView } from "./diff-view";
 import { MarkdownView } from "../ds/markdown";
+import { usePersistedState, scoped, isStr, oneOf } from "../ui-state";
 
 const langOf = (p: string): string => {
   const ext = p.slice(p.lastIndexOf(".") + 1);
@@ -80,24 +81,30 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   { projects: ProjectVM[]; projectId: string; onProject: (id: string) => void;
     onToast?: (msg: string, tone: "ok" | "warn" | "err" | "info", icon?: string) => void;
     onGotoTerminal?: (sessionId?: string) => void }) {
-  const [tab, setTab] = React.useState("explorer");
-  const [viewRef, setViewRef] = React.useState("");         // branch/ref yang dilihat (kosong = working tree)
+  // SPEC-740 · ADR-0115 · seluruh state tampilan IDE ber-scope project: tab, ref yang
+  // dilihat, berkas terpilih, dan mode tiap pane. `mode`/`draft` sengaja TIDAK persisten —
+  // draft editor bukan parameter tampilan, dan memulihkan mode edit tanpa draft-nya menyesatkan.
+  const ui = scoped("ide", projectId);
+  const [tab, setTab] = usePersistedState(ui, "tab", "explorer", isStr);
+  const [viewRef, setViewRef] = usePersistedState(ui, "viewRef", "", isStr);   // kosong = working tree
   const [branches, setBranches] = React.useState<{ branches: string[]; remotes: string[] }>({ branches: [], remotes: [] });
   const [files, setFiles] = React.useState<string[]>([]);
   const [treeState, setTreeState] = React.useState<"loading" | "ready" | "error">("loading");
-  const [selected, setSelected] = React.useState("");
-  const [selKind, setSelKind] = React.useState<"file" | "staged" | "unstaged">("file"); // sumber seleksi → viewer vs diff
+  const [selected, setSelected] = usePersistedState(ui, "selected", "", isStr);
+  const [selKind, setSelKind] = usePersistedState<"file" | "staged" | "unstaged">(
+    ui, "selKind", "file", oneOf("file", "staged", "unstaged"));   // sumber seleksi → viewer vs diff
   const [file, setFile] = React.useState<RepoFile | null>(null);
   const [mode, setMode] = React.useState<"view" | "edit">("view");
   const [draft, setDraft] = React.useState("");
-  const [mdView, setMdView] = React.useState<"preview" | "source">("preview"); // SPEC-240 · .md preview vs source
+  const [mdView, setMdView] = usePersistedState<"preview" | "source">(
+    ui, "mdView", "preview", oneOf("preview", "source"));   // SPEC-240 · .md preview vs source
   const [pendingForce, setPendingForce] = React.useState<{ op: GitOp; msg: string } | null>(null);
   // SPEC-234 · status working tree (staged/unstaged) + diff file terpilih.
   const [status, setStatus] = React.useState<WorkingStatus | null>(null);
-  const [stagedView, setStagedView] = React.useState<"list" | "tree">("list");
-  const [changedView, setChangedView] = React.useState<"list" | "tree">("list");
+  const [stagedView, setStagedView] = usePersistedState<"list" | "tree">(ui, "stagedView", "list", oneOf("list", "tree"));
+  const [changedView, setChangedView] = usePersistedState<"list" | "tree">(ui, "changedView", "list", oneOf("list", "tree"));
   const [diff, setDiff] = React.useState<ReviewFile | null>(null);
-  const [diffTab, setDiffTab] = React.useState<"diff" | "source">("diff");
+  const [diffTab, setDiffTab] = usePersistedState<"diff" | "source">(ui, "diffTab", "diff", oneOf("diff", "source"));
   const [showRemotes, setShowRemotes] = React.useState(false); // SPEC-233 · kelola remote
   // SPEC-385 · ruang baca lebar untuk .md — di mode file toggle SPEC-240 tetap ada (preview
   // sempit di samping tree), di mode diff inilah satu-satunya cara membacanya terender.

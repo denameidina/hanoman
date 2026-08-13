@@ -13,6 +13,7 @@ import { WebhooksPanel } from "./WebhooksPanel";
 import { WebhookDocs } from "./WebhookDocs";
 import { McpPanel } from "./McpPanel";   // SPEC-482 · ADR-0099 · pemasangan MCP siap salin
 import { AgentDocCard } from "./AgentDocCard";   // SPEC-489 · halaman dokumentasi AI Agent
+import { usePersistedState, isStr } from "../ui-state";
 
 // SPEC-383 · katalog claude dibaca dari @hanoman/shared — sumber yang SAMA dengan picker Start
 // (App.tsx). Sebelumnya tab ini menyalinnya (`S_MODELS`/`S_EFFORT` + komentar "keep in sync"),
@@ -497,7 +498,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
   { onToast?: ShowToast; me: UserView; onLoggedOut: () => void }) {
   const [s, setS] = React.useState<Setting | null>(null);
   const [failed, setFailed] = React.useState(false);
-  const [tab, setTab] = React.useState<string>("akun");
+  // SPEC-740 · ADR-0115 · sub-tab aktif bertahan; refresh tak melempar balik ke Akun.
+  const [tab, setTab] = usePersistedState<string>("settings", "tab", "akun", isStr);
   // SPEC-481 · halaman dokumentasi webhook hidup DI DALAM tab-nya (bukan modal): brief
   // meminta "halaman", dan modal di atas Settings membuat Escape ambigu (pola SPEC-385).
   const [webhookDocs, setWebhookDocs] = React.useState(false);

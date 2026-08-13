@@ -4,6 +4,7 @@
 import React from "react";
 import { Card, StatusPill, Badge, Button, ProgressBar, Icon, StateBlock, MarkdownView, DocDownload } from "../ds";
 import { api } from "../api/client";
+import { usePersistedState, scoped, isStr } from "../ui-state";
 
 type DocCat = { cat: string; files: string[]; linked: boolean; scored: boolean; root?: boolean };
 
@@ -95,7 +96,9 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
   { projectId: string; projectName: string; docStatus: string }) {
   const [tree, setTree] = React.useState<DocCat[]>([]);
   const [coverage, setCoverage] = React.useState(0);
-  const [selected, setSelected] = React.useState("");
+  // SPEC-740 · ADR-0115 · ber-scope project: dokumen yang dibuka di project A tak boleh
+  // muncul saat project B dibuka.
+  const [selected, setSelected] = usePersistedState(scoped("docs", projectId), "selected", "", isStr);
   // null = fetch-nya gagal (bukan "isi kosong"), supaya error state bisa dibedakan.
   const [cache, setCache] = React.useState<Record<string, string | null>>({});
   const [mode, setMode] = React.useState<"preview" | "edit">("preview");

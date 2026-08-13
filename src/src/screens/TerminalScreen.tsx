@@ -13,6 +13,7 @@ import { B_STAGES } from "./BacklogScreen";
 import type { Spec } from "./types";
 import * as L from "./terminal-layout";
 import * as W from "./terminal-workspace";
+import { usePersistedState, isStr } from "../ui-state";
 
 export function TerminalScreen({ projects, backlog = [], focusSession, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf }: {
   projects: { id: string; name: string }[]; backlog?: Spec[]; focusSession?: string | null;
@@ -25,7 +26,10 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
 }) {
   const [sessions, setSessions] = React.useState<TerminalSession[]>([]);
   const [ws, setWs] = React.useState<W.Workspace>(() => W.load() ?? W.emptyWorkspace());
-  const [project, setProject] = React.useState(projects[0]?.id ?? "");
+  // SPEC-740 · ADR-0115 · project pemilih sesi baru. Workspace grid TIDAK dipindah ke
+  // namespace ini — ia sudah persisten di kunci `hanoman.terminal.workspace`, dan
+  // memindahkannya membuang state pengguna yang sudah ada dengan imbalan nol.
+  const [project, setProject] = usePersistedState("terminal", "project", projects[0]?.id ?? "", isStr);
   const [maxed, setMaxed] = React.useState(false);
   // SPEC-232 · id sesi yang sedang dilihat layar-penuh (satu terminal, sebagai modal).
   // Tak dipersist, seperti `maxed` (SPEC-163).
