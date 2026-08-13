@@ -15,6 +15,9 @@ import {
   BRIEF_FIELDS, GOAL_FIELDS, QA_FIELDS,
 } from "./source-meta";
 import { ChangeSourceDialog } from "./ChangeSourceDialog";
+import {
+  usePersistedState, useScrollRestore, ResetViewButton, oneOf, isStr, isNum, nullableStr,
+} from "../ui-state";
 import type { Spec } from "./types";
 import type { ProjectVM } from "./types";
 import type { AuditEscalation } from "@hanoman/shared";
@@ -730,25 +733,27 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     onToast?: (msg: string, kind?: string, icon?: string) => void; // SPEC-268 · hasil tombol Sync
     initialDetailId?: string | null;     // SPEC-293 · deep-link #spec= → buka SpecDetail saat mount
   }) {
-  const [tab, setTab] = React.useState("all");
+  // SPEC-740 · ADR-0115 · seluruh state tampilan layar ini persisten berkunci `backlog`.
+  const [tab, setTab] = usePersistedState("backlog", "tab", "all", isStr);
   // SPEC-268 · bump untuk re-fetch daftar sesudah tombol Sync menarik data baru.
   const [syncNonce, setSyncNonce] = React.useState(0);
-  const [view, setView] = React.useState("grid");
+  const [view, setView] = usePersistedState("backlog", "view", "grid", oneOf("grid", "list", "board"));
   // SPEC-178 · search + filter stage/prioritas, semua view-local (tak diangkat ke App).
-  const [q, setQ] = React.useState("");
-  const [stageFilter, setStageFilter] = React.useState("all");
-  const [prioFilter, setPrioFilter] = React.useState("all");
+  const [q, setQ] = usePersistedState("backlog", "q", "", isStr);
+  const [stageFilter, setStageFilter] = usePersistedState("backlog", "stage", "all", isStr);
+  const [prioFilter, setPrioFilter] = usePersistedState("backlog", "prio", "all", isStr);
   // SPEC-408 · ADR-0090 · rentang tanggal. `dateField` memilih sumbunya (dibuat / dikerjakan);
   // `from`/`to` = "YYYY-MM-DD" apa adanya dari <input type="date">, inklusif, boleh sendirian.
   // View-local seperti filter SPEC-178 — tak diangkat ke App.
-  const [dateField, setDateField] = React.useState<"created" | "started">("created");
-  const [from, setFrom] = React.useState("");
-  const [to, setTo] = React.useState("");
+  const [dateField, setDateField] = usePersistedState<"created" | "started">(
+    "backlog", "dateField", "created", oneOf("created", "started"));
+  const [from, setFrom] = usePersistedState("backlog", "from", "", isStr);
+  const [to, setTo] = usePersistedState("backlog", "to", "", isStr);
   // Filter project dimiliki App (SPEC-146): detail project membuka layar ini sudah tersaring.
   const proj = projectFilter;
   const setProj = onProjectFilter;
   // keep the id, not the object: backlog re-polls and the stage bar must stay live
-  const [detailId, setDetailId] = React.useState<string | null>(null);
+  const [detailId, setDetailId] = usePersistedState<string | null>("backlog", "detailId", null, nullableStr);
   // SPEC-293 · deep-link: buka SpecDetail untuk id yang diberikan App (dari hash #spec=).
   React.useEffect(() => { if (initialDetailId) setDetailId(initialDetailId); }, [initialDetailId]);
   const projOptions = projects || [...new Set(backlog.map((s) => s.projectId))].map((id) => ({ id, name: id }));
@@ -757,8 +762,21 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // potongan terfilter/terpaginasi dari server. Board minta set terfilter penuh (tanpa page).
   const [data, setData] = React.useState<{ items: Spec[]; total: number }>(
     () => ({ items: backlog, total: backlog.length }));
-  const [page, setPage] = React.useState(1);
+  // Yang dipulihkan `page`, BUKAN `limit` — `limit` tanpa `page` berperilaku sebagai
+  // PLAFON (SPEC-523 · ADR-0107). `pageSize` tetap prop konstanta.
+  const [page, setPage] = usePersistedState("backlog", "page", 1, isNum);
   const [dq, setDq] = React.useState("");
+  // Filter yang dipulihkan wajib TERLIHAT menyala: daftar yang tampak kosong tak boleh
+  // terbaca sebagai backlog kosong.
+  const activeFilters = [
+    tab !== "all", proj !== "all", q.trim() !== "", stageFilter !== "all",
+    prioFilter !== "all", from !== "", to !== "",
+  ].filter(Boolean).length;
+  // Scroll dipulihkan sesudah potongan pertama dari server mendarat — sebelum itu tinggi
+  // daftar belum final dan posisinya meleset.
+  const listRef = useScrollRestore("backlog", "scroll", data.items.length > 0);
+  // `proj` dimiliki App (SPEC-146) sehingga di luar jangkauan resetUiState("backlog").
+  const resetView = () => setProj("all");
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
   React.useEffect(() => { setPage(1); }, [tab, proj, stageFilter, prioFilter, dq, view, dateField, from, to]);
   React.useEffect(() => {
@@ -801,6 +819,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Tabs variant="pill" value={view} onChange={setView} tabs={VIEWS} aria-label="Mode tampilan" />
             <SyncButton onDone={() => setSyncNonce((n) => n + 1)} onToast={onToast ?? (() => {})} />
+            <ResetViewButton screen="backlog" active={activeFilters} onReset={resetView} />
             <span className="hn-eyebrow">{data.total} spec</span>
           </div>
         </div>
@@ -847,7 +866,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
         <>
           {view === "list" ? (
             // overflowX, bukan `overflow` — `overflow: hidden` akan menimpa overflowY dari spread.
-            <div style={{
+            <div ref={listRef} data-testid="backlog-scroll" style={{
               ...LIST_SCROLL_STYLE, border: "1px solid var(--border-hair)",
               borderRadius: "var(--radius-lg)", overflowX: "hidden"
             }}>
@@ -856,7 +875,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
                 onOpenReview={onOpenReview} onOpenDetail={(x) => setDetailId(x.id)} />)}
             </div>
           ) : (
-            <div style={{
+            <div ref={listRef} data-testid="backlog-scroll" style={{
               ...LIST_SCROLL_STYLE, display: "grid", gap: 12,
               gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))"
             }}>
