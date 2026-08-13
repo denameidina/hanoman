@@ -65,7 +65,7 @@
   - `function agentSkillHome(agent: Agent, env?: EnvLike, osHome?: string): string`
   - `function scanAgentSkills(agent: Agent, env?: EnvLike, osHome?: string): AgentSkills`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `runner/test/skills.test.ts`:
 
@@ -229,14 +229,14 @@ describe("scanAgentSkills · plugin dari manifest", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism runner/test/skills.test.ts
 ```
 Expected: FAIL — `Failed to resolve import "../src/skills"`.
 
-- [ ] **Step 3: Implementasi `runner/src/skills.ts`**
+- [x] **Step 3: Implementasi `runner/src/skills.ts`**
 
 ```ts
 // SPEC-739 · ADR-0114 — deteksi skill yang benar-benar terpasang, PER AGEN.
@@ -408,7 +408,7 @@ export function scanAgentSkills(agent: Agent, env: EnvLike = process.env, osHome
 }
 ```
 
-- [ ] **Step 4: Ekspor dari barrel runner**
+- [x] **Step 4: Ekspor dari barrel runner**
 
 Di `runner/src/index.ts`, tambahkan setelah baris `export * from "./paths";`:
 
@@ -416,21 +416,21 @@ Di `runner/src/index.ts`, tambahkan setelah baris `export * from "./paths";`:
 export * from "./skills";
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism runner/test/skills.test.ts
 ```
 Expected: PASS, seluruh test dari Step 1 hijau (bukan "no test files").
 
-- [ ] **Step 6: Typecheck runner**
+- [x] **Step 6: Typecheck runner**
 
 ```bash
 pnpm --filter ./runner typecheck
 ```
 Expected: keluar 0, tanpa output error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add runner/src/skills.ts runner/test/skills.test.ts runner/src/index.ts
@@ -456,7 +456,7 @@ git commit -m "feat(spec-739): deteksi skill terpasang per agen, akar ber-env"
   - `function methodSkills(m: MethodDef): string[]`
   - `function methodStatus(m: MethodDef, agent: Agent, installed: { skills: readonly string[]; packages: readonly string[] }): MethodSkillStatus`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/method-status.test.ts`:
 
@@ -546,14 +546,14 @@ describe("katalog · MethodDef.install", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism shared/src/method-status.test.ts
 ```
 Expected: FAIL — `Failed to resolve import "./method-status"`.
 
-- [ ] **Step 3: Tambahkan `install` ke katalog**
+- [x] **Step 3: Tambahkan `install` ke katalog**
 
 Di `shared/src/method-catalog.ts`, tambahkan tepat sebelum `export interface MethodDef`:
 
@@ -608,7 +608,7 @@ Di entri `matt`, setelah `requires: ["mattpocock-skills", "superpowers"],`:
     },
 ```
 
-- [ ] **Step 4: Implementasi `shared/src/method-status.ts`**
+- [x] **Step 4: Implementasi `shared/src/method-status.ts`**
 
 ```ts
 // SPEC-739 · ADR-0114 — vonis kesiapan metode: katalog ↔ hasil deteksi.
@@ -663,7 +663,7 @@ export function methodStatus(
 }
 ```
 
-- [ ] **Step 5: Ekspor dari barrel shared**
+- [x] **Step 5: Ekspor dari barrel shared**
 
 Di `shared/src/index.ts`, tambahkan tepat setelah `export * from "./method-catalog";`:
 
@@ -671,21 +671,21 @@ Di `shared/src/index.ts`, tambahkan tepat setelah `export * from "./method-catal
 export * from "./method-status";
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism shared/src/method-status.test.ts shared/src/method-catalog.test.ts
 ```
 Expected: PASS untuk kedua berkas.
 
-- [ ] **Step 7: Typecheck shared**
+- [x] **Step 7: Typecheck shared**
 
 ```bash
 pnpm --filter ./shared typecheck
 ```
 Expected: keluar 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add shared/src/method-catalog.ts shared/src/method-status.ts shared/src/method-status.test.ts shared/src/index.ts
@@ -709,7 +709,7 @@ git commit -m "feat(spec-739): vonis kesiapan metode + perintah instalasi sebaga
   - `function methodStatusReport(env?: NodeJS.ProcessEnv): MethodStatusResponse`
   - Path `paths.methodStatus` = `/api/methods/status`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/method-status.route.test.ts`:
 
@@ -798,14 +798,14 @@ describe("GET /api/methods/status (SPEC-739)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/method-status.route.test.ts
 ```
 Expected: FAIL — respons 404 pada `/api/methods/status`.
 
-- [ ] **Step 3: Implementasi service**
+- [x] **Step 3: Implementasi service**
 
 Buat `server/src/services/method-status.ts`:
 
@@ -840,7 +840,7 @@ export function installCommand(m: MethodDef, agent: Agent, shell = shellBin()): 
 }
 ```
 
-- [ ] **Step 4: Implementasi route**
+- [x] **Step 4: Implementasi route**
 
 Buat `server/src/routes/methods.ts`:
 
@@ -859,7 +859,7 @@ export default async function methods(app: FastifyInstance) {
 }
 ```
 
-- [ ] **Step 5: Daftarkan route**
+- [x] **Step 5: Daftarkan route**
 
 Di `server/src/app.ts`, tambahkan impor di dekat `import codex from "./routes/codex";`:
 
@@ -875,7 +875,7 @@ dan registrasi tepat setelah baris `await api.register(limits);`:
 
 (Jika `codex` sudah terdaftar di dekat situ, letakkan `methods` bersebelahan dengannya.)
 
-- [ ] **Step 6: Tambahkan path API bersama**
+- [x] **Step 6: Tambahkan path API bersama**
 
 Di `shared/src/api.ts`, tepat setelah baris `codexVersion: …`:
 
@@ -883,14 +883,14 @@ Di `shared/src/api.ts`, tepat setelah baris `codexVersion: …`:
   methodStatus: `${API}/methods/status`,   // SPEC-739 · ADR-0114 · kesiapan skill metode per agen
 ```
 
-- [ ] **Step 7: Jalankan test, pastikan LULUS**
+- [x] **Step 7: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/method-status.route.test.ts
 ```
 Expected: PASS, 4 test.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/method-status.ts server/src/routes/methods.ts server/src/app.ts shared/src/api.ts server/test/method-status.route.test.ts
@@ -911,7 +911,7 @@ git commit -m "feat(spec-739): GET /methods/status — kesiapan metode per agen,
 - Consumes: `installCommand` (Task 3), `METHODS` (Task 2).
 - Produces: `POST /api/terminal/sessions` menerima `{ project, shell: true, install?: { method, agent } }`; klien `api.createShell(project, install?)`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `server/test/method-status.route.test.ts`:
 
@@ -970,14 +970,14 @@ describe("installCommand (SPEC-739)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/method-status.route.test.ts
 ```
 Expected: FAIL — `installCommand` belum diekspor / payload `install` diabaikan, dan metode tak dikenal menjawab 201.
 
-- [ ] **Step 3: Perluas DTO**
+- [x] **Step 3: Perluas DTO**
 
 Di `shared/src/dto.ts`, ganti varian shell (baris ~371):
 
@@ -996,7 +996,7 @@ menjadi:
     install: z.object({ method: z.string(), agent: zAgent }).optional() }),
 ```
 
-- [ ] **Step 4: Cabang install di route**
+- [x] **Step 4: Cabang install di route**
 
 Di `server/src/routes/terminal.ts`, ganti isi blok `if ("shell" in parsed.data) { … }` (baris ~120-126) menjadi:
 
@@ -1032,7 +1032,7 @@ import { installCommand } from "../services/method-status";
 
 (Bila `@hanoman/shared` sudah diimpor di berkas itu, cukup tambahkan `METHODS` ke daftar impor yang ada.)
 
-- [ ] **Step 5: Klien API**
+- [x] **Step 5: Klien API**
 
 Di `src/src/api/client.ts`, ganti baris `createShell` (~276):
 
@@ -1046,21 +1046,21 @@ Di `src/src/api/client.ts`, ganti baris `createShell` (~276):
     }),
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/method-status.route.test.ts server/test/terminal.route.test.ts
 ```
 Expected: PASS — termasuk test shell SPEC-236 lama yang tak boleh berubah.
 
-- [ ] **Step 7: Typecheck server**
+- [x] **Step 7: Typecheck server**
 
 ```bash
 pnpm --filter ./server typecheck
 ```
 Expected: keluar 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add shared/src/dto.ts server/src/routes/terminal.ts src/src/api/client.ts server/test/method-status.route.test.ts
@@ -1080,7 +1080,7 @@ git commit -m "feat(spec-739): pasang skill metode lewat sesi terminal, perintah
 - Consumes: `paths.methodStatus`, `MethodStatusResponse`, `MethodSkillStatus` (Task 2/3); `api.createShell(project, install)` (Task 4).
 - Produces: kartu "Metode workflow — sesi backlog" ber-`data-testid="method-status"`; setiap baris ber-`data-testid="method-status-<method>-<agent>"`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/method-status-ui.test.tsx`:
 
@@ -1203,14 +1203,14 @@ Tambahkan `within` ke impor `@testing-library/react` di baris pertama:
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/method-status-ui.test.tsx
 ```
 Expected: FAIL — `getMethodStatus is not a function` / testid tak ditemukan.
 
-- [ ] **Step 3: Tambahkan klien API**
+- [x] **Step 3: Tambahkan klien API**
 
 Di `src/src/api/client.ts`, tepat setelah `getCodexVersion` (~172):
 
@@ -1221,7 +1221,7 @@ Di `src/src/api/client.ts`, tepat setelah `getCodexVersion` (~172):
 
 Tambahkan `MethodStatusResponse` ke impor `type` dari `@hanoman/shared` di berkas itu, dan pastikan `Agent` sudah ada di sana (dipakai `createShell` Task 4).
 
-- [ ] **Step 4: Render checklist di SettingsScreen**
+- [x] **Step 4: Render checklist di SettingsScreen**
 
 Di `src/src/screens/SettingsScreen.tsx`, tambahkan state & fetch di dekat `codexVer` (~508):
 
@@ -1310,14 +1310,14 @@ Tambahkan konstanta di dekat `S_MODELS` (atas berkas):
 const AGENT_LABEL: Record<string, string> = { claude: "Claude Code", codex: "Codex CLI" };
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/method-status-ui.test.tsx src/test/method-picker.test.tsx
 ```
 Expected: PASS — termasuk `method-picker.test.tsx` lama; **hapus** assert `settings-method-requires` di sana bila ia gagal karena baris statisnya diganti (baris itu memang digantikan checklist).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/api/client.ts src/src/screens/SettingsScreen.tsx src/test/method-status-ui.test.tsx src/test/method-picker.test.tsx
@@ -1336,7 +1336,7 @@ git commit -m "feat(spec-739): checklist kesiapan metode per agen + tombol Pasan
 - Consumes: `api.getMethodStatus()` (Task 5), state `method` & `agent` yang sudah ada di `StartSessionModal`.
 - Produces: `data-testid="method-status-note"` (belum siap) dan `data-testid="method-requires"` (tetap ada, kini menyebut agen).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/method-status-ui.test.tsx`:
 
@@ -1380,14 +1380,14 @@ describe("StartSessionModal · catatan kesiapan metode (SPEC-739)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/method-status-ui.test.tsx
 ```
 Expected: FAIL pada blok `StartSessionModal` — `method-status-note` tak pernah muncul.
 
-- [ ] **Step 3: Ambil status di modal**
+- [x] **Step 3: Ambil status di modal**
 
 Di `src/src/App.tsx`, setelah state `codexVer` (~88):
 
@@ -1413,7 +1413,7 @@ Sebelum `return (` (dekat `const blockers = …`):
 
 Tambahkan `MethodSkillStatus` ke impor tipe dari `@hanoman/shared` di atas berkas.
 
-- [ ] **Step 4: Render catatan**
+- [x] **Step 4: Render catatan**
 
 Di `src/src/App.tsx`, ganti blok `data-testid="method-requires"` (baris ~247-250) dengan:
 
@@ -1440,21 +1440,21 @@ Di `src/src/App.tsx`, ganti blok `data-testid="method-requires"` (baris ~247-250
         )}
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism src/test/method-status-ui.test.tsx src/test/method-picker.test.tsx src/test/start-session-model.test.tsx
 ```
 Expected: PASS di ketiganya.
 
-- [ ] **Step 6: Typecheck web**
+- [x] **Step 6: Typecheck web**
 
 ```bash
 pnpm --filter ./src typecheck
 ```
 Expected: keluar 0. (Bila nama paket web bukan `./src`, pakai nama dari `package.json` di direktori itu.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/App.tsx src/test/method-status-ui.test.tsx
@@ -1473,7 +1473,7 @@ git commit -m "feat(spec-739): catatan kesiapan metode × agen di picker Start"
 - Consumes: `methodStatus`, `METHODS`, `DEFAULT_METHOD` (Task 2); `scanAgentSkills` (Task 1).
 - Produces: `Probes.methods: MethodSkillStatus[]` (hanya metode default, hanya agen yang CLI-nya ada).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `cli/test/doctor.test.ts`:
 
@@ -1515,14 +1515,14 @@ describe("doctorReport · metode default (SPEC-739)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism cli/test/doctor.test.ts
 ```
 Expected: FAIL — properti `methods` tak ada di tipe `Probes`, baris metode tak dicetak.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `cli/src/commands/doctor.ts`, tambahkan impor:
 
@@ -1583,21 +1583,21 @@ Di fungsi `doctor()`, hitung probe-nya sesudah `homeWritable` (`claude`/`codex` 
 
 lalu ganti pemanggilan `doctorReport({…})` supaya memakai `claude`, `codex`, dan `methods` itu.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 ./node_modules/.bin/vitest --run --no-file-parallelism cli/test/doctor.test.ts
 ```
 Expected: PASS, termasuk seluruh test doctor lama (yang perlu ditambahi `methods: []` pada literal `Probes`-nya).
 
-- [ ] **Step 5: Typecheck cli**
+- [x] **Step 5: Typecheck cli**
 
 ```bash
 pnpm --filter ./cli typecheck
 ```
 Expected: keluar 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add cli/src/commands/doctor.ts cli/test/doctor.test.ts
@@ -1619,7 +1619,7 @@ git commit -m "feat(spec-739): hanoman doctor melaporkan kesiapan metode default
 - Consumes: seluruh keputusan Task 1-7.
 - Produces: —
 
-- [ ] **Step 1: Tulis ADR-0114**
+- [x] **Step 1: Tulis ADR-0114**
 
 Buat `internal/docs/adr/0114-status-pemasangan-skill-metode.md` dengan bagian: Status (Diterima, 2026-08-13) · Konteks · Keputusan · Alternatif yang ditolak · Konsekuensi · Gotcha. Isi yang WAJIB ada:
 
@@ -1633,7 +1633,7 @@ Buat `internal/docs/adr/0114-status-pemasangan-skill-metode.md` dengan bagian: S
 - Metode tak dikenal pada jalur **install** → 400, sengaja tak lenient seperti `resolveMethod`.
 - `doctor` melaporkan **metode default saja**, hanya untuk agen yang CLI-nya ada, **non-fatal**.
 
-- [ ] **Step 2: Tautkan di kedua index**
+- [x] **Step 2: Tautkan di kedua index**
 
 Di `internal/docs/README.md`, sisipkan sebagai baris pertama daftar `## adr`:
 
@@ -1643,22 +1643,22 @@ Di `internal/docs/README.md`, sisipkan sebagai baris pertama daftar `## adr`:
 
 Di `internal/docs/adr/README.md`, tambahkan entri narasi 0114 mengikuti bentuk entri 0113 di sana.
 
-- [ ] **Step 3: Perbarui SKILL.md**
+- [x] **Step 3: Perbarui SKILL.md**
 
 Di `internal/skills/hanoman/SKILL.md`, tepat setelah butir "Metode workflow adalah data, bukan literal" (SPEC-734), tambahkan butir SPEC-739 yang menyebut: endpoint `GET /api/methods/status`, letak deteksi, dua akar per agen, gerbang enable, pencocokan ketat, pemasangan lewat `POST /terminal/sessions {install}`, dan baris `!` di doctor.
 
-- [ ] **Step 4: Perbarui kontrak API**
+- [x] **Step 4: Perbarui kontrak API**
 
 Di `internal/docs/architecture/api-contract.md`, tambahkan `GET /api/methods/status` (bentuk respons) dan catat perluasan varian shell `POST /api/terminal/sessions` dengan `install?: { method, agent }`.
 
-- [ ] **Step 5: Cek integritas index**
+- [x] **Step 5: Cek integritas index**
 
 ```bash
 node cli/src/index.ts docs index --check || pnpm hanoman docs index --check
 ```
 Expected: index konsisten (semua doc ter-link). Bila perintahnya tak tersedia di worktree ini, verifikasi manual bahwa berkas ADR baru muncul di **kedua** README.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs/adr/0114-status-pemasangan-skill-metode.md internal/docs/README.md internal/docs/adr/README.md internal/skills/hanoman/SKILL.md internal/docs/architecture/api-contract.md
@@ -1675,7 +1675,7 @@ git commit -m "docs(spec-739): ADR-0114 status & pemasangan skill metode + index
 - Consumes: seluruh task sebelumnya.
 - Produces: bukti hijau tercatat.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -1687,14 +1687,14 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV ./node_modules/.
 ```
 Expected: seluruh berkas PASS, dan jumlah test > 0 di **setiap** berkas (nol test bukan bukti — `--changed` menyalakan `passWithNoTests`).
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck && pnpm --filter ./server typecheck && pnpm --filter ./cli typecheck
 ```
 Expected: keluar 0 di keempatnya. (Jalankan berurutan, bukan `-r`.)
 
-- [ ] **Step 3: Smoke endpoint nyata**
+- [x] **Step 3: Smoke endpoint nyata**
 
 ```bash
 HANOMAN_HOME="$(mktemp -d)" node --experimental-strip-types server/src/server.ts &
@@ -1704,7 +1704,7 @@ curl -s localhost:8787/api/methods/status | head -c 800
 
 Bila server dev di worktree ini butuh jalur lain, pakai `pnpm dev` lalu curl endpoint yang sama. Expected: JSON `{"agents":[…],"methods":[…]}` memuat 2 agen × jumlah metode, dan — di mesin dev ini — `superpowers/claude` **dan** `superpowers/codex` keduanya `ready: true`, `matt` keduanya `ready: false`. Matikan server per-PID (`lsof -ti:8787` → `kill <pid>`), **jangan** `pkill -f`.
 
-- [ ] **Step 4: Commit bukti verifikasi**
+- [x] **Step 4: Commit bukti verifikasi**
 
 ```bash
 git add -u
@@ -1712,6 +1712,64 @@ git commit -m "chore(spec-739): centang plan + catat bukti verifikasi"
 ```
 
 ---
+
+## Bukti verifikasi (dijalankan 2026-08-13)
+
+**Test yang tersentuh — 8 berkas, 153 test, semua hijau** (jumlahnya non-nol di tiap berkas; `--changed`
+menyalakan `passWithNoTests`, jadi "no test files" tak pernah diterima sebagai bukti):
+
+```
+✓ server/test/terminal.route.test.ts        (70)   ← 70 test SPEC-236/394/517 lama, tak disunting
+✓ runner/test/skills.test.ts                (17)
+✓ shared/src/method-catalog.test.ts         (17)
+✓ cli/test/doctor.test.ts                   (13)
+✓ src/test/method-status-ui.test.tsx        (10)
+✓ src/test/method-picker.test.tsx            (9)
+✓ server/test/method-status.route.test.ts    (9)
+✓ shared/src/method-status.test.ts           (8)
+Test Files 8 passed · Tests 153 passed
+```
+
+**18 berkas test web ber-mock parsial** (ditambal `getMethodStatus`/`listProjects`): 18 berkas,
+**84 test**, semua hijau.
+
+**Typecheck** lima paket tersentuh, dijalankan berurutan (bukan `-r`): `shared`, `runner`, `server`,
+`cli`, `@hanoman/app` — `tsc --noEmit` keluar 0 di semuanya.
+
+**Smoke `hanoman doctor`** terhadap mesin nyata (`cli/dist/hanoman.js doctor`):
+
+```
+✓ metode superpowers · Claude Code — siap
+✓ metode superpowers · Codex CLI — siap
+```
+
+dan dengan akar disuntik ke direktori kosong (`HANOMAN_CLAUDE_HOME`/`HANOMAN_CODEX_HOME`):
+
+```
+! metode superpowers · Claude Code — belum siap: superpowers, superpowers:brainstorming, …
+      claude plugin marketplace add obra/superpowers-marketplace
+      claude plugin install superpowers@superpowers-marketplace
+! metode superpowers · Codex CLI — belum siap: …
+      codex plugin add superpowers@openai-curated
+```
+
+**exit code 0** di kedua kasus — non-fatal, sesuai butir 5 brief.
+
+**Smoke endpoint** (server dibundel + DB khusus `HANOMAN_DATABASE_URL`, port 8811, cookie sesi):
+
+- `GET /api/methods/status` → 200. claude: 2 akar / 17 skill · codex: **15 akar / 74 skill** (termasuk
+  `plugins/cache/openai-curated/superpowers/11c74d6b/skills`). `superpowers` **`ready: true` untuk KEDUA
+  agen**, `matt` `ready: false` di keduanya dengan 1 paket + 6 id skill yang kurang dan perintah
+  pemasangannya. Ini bukti langsung Koreksi 1: deteksi yang hanya memindai `~/.codex/skills/` akan
+  menjawab `ready: false` untuk codex di mesin yang sehat.
+- `POST /api/terminal/sessions {shell:true, install:{method:"tak-ada",…}}` → **400**
+  `metode "tak-ada" tak dikenal`.
+- `POST … {install:{method:"superpowers",agent:"codex"}}` → **201** `{id}`, sesi tmux lahir
+  (`HANOMAN_SHELL=/bin/echo` supaya smoke tak benar-benar memasang apa pun). Sesi smoke dibunuh
+  **per-nama** (`tmux kill-session -t hanoman-<id>`); lima sesi tetangga selamat, `killAll`/`pkill -f`
+  tak pernah dipakai (SPEC-402).
+
+Suite penuh, lint penuh, dan build penuh tetap tugas manusia sebelum merge (ADR-0080).
 
 ## Self-Review
 
