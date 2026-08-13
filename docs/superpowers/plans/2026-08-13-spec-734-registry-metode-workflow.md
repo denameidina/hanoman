@@ -1657,7 +1657,7 @@ git commit -m "docs(spec-734): ADR-0113 registry metode workflow + index & SKILL
 
 **Files:** —
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV \
@@ -1666,7 +1666,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV \
 
 Expected: PASS. **Jangan menerima "no test files" sebagai bukti** — pastikan jumlah berkas test yang berjalan masuk akal (≥ 10) dan sebutkan angkanya.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck \
@@ -1675,7 +1675,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck \
 
 Expected: keempatnya keluar tanpa error. (Keempat paket memang tersentuh — ini bukan `pnpm -r`.)
 
-- [ ] **Step 3: Smoke endpoint yang tersentuh**
+- [x] **Step 3: Smoke endpoint yang tersentuh**
 
 `POST /terminal/sessions` dan `PUT /settings` berubah bentuknya. Boot server lalu buktikan `method` diterima & tersimpan:
 
@@ -1689,7 +1689,7 @@ curl -s localhost:8787/api/settings | python3 -c 'import sys,json; print(json.lo
 
 Expected: baris terakhir mencetak `matt`. Matikan server per-PID (`lsof -ti:8787` → `kill <pid>`), **jangan** `pkill -f`.
 
-- [ ] **Step 4: Centang plan + commit penutup**
+- [x] **Step 4: Centang plan + commit penutup**
 
 Pastikan seluruh kotak di berkas plan ini `- [x]`, lalu:
 
@@ -1697,3 +1697,46 @@ Pastikan seluruh kotak di berkas plan ini `- [x]`, lalu:
 git add -A && git commit -m "chore(spec-734): centang plan + bukti verifikasi"
 git push origin HEAD:refs/heads/hanoman/spec-734
 ```
+
+---
+
+## Bukti verifikasi (diisi saat Task 9 dijalankan)
+
+**Test ber-skop** — `TEST_DATABASE_URL=… env -u NODE_ENV -u HANOMAN_SUPERVISOR vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism`:
+**368 berkas · 3328 test · 3326 lulus · 2 gagal**. (`--changed` atas barrel `shared` menarik
+suite penuh — pola SPEC-520; jelas bukan "no test files".)
+
+Kedua kegagalan **pre-existing, bukan regresi spec ini** — dibuktikan dengan menjalankan berkas yang
+sama di worktree `$HANOMAN_BASE_SHA`, di mana keduanya gagal identik:
+
+| Berkas | Gejala | Bukti |
+|---|---|---|
+| `shared/src/scheduler-state.test.ts` | `ZodError` `queueCounts.canceled` Required | gagal sama di base; berkas & `scheduler.ts` **tak disentuh** spec ini |
+| `shared/test/agent.test.ts` | `{enabled, progress, …}` ≠ `{enabled, progress}` (blok telegram) | gagal sama di base; berkas **tak disentuh** spec ini |
+
+Kegagalan **ketiga** yang muncul di run pertama, `server/test/update.route.test.ts`
+(`canApply: true` ≠ `false`), adalah **artefak env sesi**, bukan kode: `HANOMAN_SUPERVISOR=1`
+disuntik `hanoman start` ke env sesi ini dan ADR-0088 sengaja membacanya dari `process.env`
+langsung. Terukur, satu variabel: env apa adanya → **1 gagal / 8**; `env -u HANOMAN_SUPERVISOR` →
+**8 lulus / 8**. Kelas yang sama dengan `NODE_ENV=production` (SPEC-293).
+
+**Typecheck** paket yang tersentuh — keempatnya keluar tanpa error:
+`shared OK · runner OK · server OK · src OK` (per paket, bukan `pnpm -r`).
+
+**Smoke endpoint** (server nyata di `127.0.0.1:8799`, **DB terisolasi**): `DATABASE_URL` di env sesi
+menunjuk `~/.hanoman/hanoman.db` dan **menang atas `HANOMAN_HOME`**, jadi boot pertama sempat
+menempel ke DB produksi — tak ada tulisan yang terjadi (setup → 409, settings → 401), proses
+dimatikan **per-PID** lewat `lsof -ti:8799`, lalu diulang dengan `DATABASE_URL` eksplisit ke
+`$(mktemp -d)/smoke.db` (`auth/status` → `needsSetup:true` = bukti isolasi).
+
+- **AC-8** — `PUT /settings` objek utuh `method:"matt"` → **200**, `GET` membacanya **`matt`**.
+  Tanpa migration, tanpa endpoint baru. (`PUT` parsial `{"method":"matt"}` → **400**: kontrak
+  "objek `Setting` utuh" memang sudah begitu sejak dulu, dan UI mengirim hasil merge.)
+- **AC-9** — `PUT` `method:"tak-ada-metode-ini"` → **200**, tersimpan **mentah**, `GET /settings`
+  tetap **200** (layar Settings tak kosong); fallback terjadi di `resolveMethod` saat dipakai.
+- **`POST /terminal/sessions`** — 400 = skema menolak, 404 = skema lolos lalu spec tak ditemukan:
+  tanpa `method` → **404** (kontrak lama utuh) · `"matt"` → **404** · `"superpowers"` → **404** ·
+  `"tak-ada"` → **404** (lenient, bukan 400) · `123` → **400** (tipe salah tetap ditolak).
+
+**Gerbang plan** — cermin `planComplete` dijalankan atas union `PLAN_DIRS` untuk `SPEC-734`:
+0 berkas menahan, `planComplete = true`; 59/59 kotak plan ini `- [x]`.
