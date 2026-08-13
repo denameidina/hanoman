@@ -55,8 +55,9 @@ function BlockedBadge({ spec }: { spec: Spec }) {
 }
 function StageBar({ stage }: { stage: string }) {
   const idx = bStageIndex(stage);
+  const label = B_STAGES[idx]?.label ?? stage;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+    <div aria-label={`Status ${label}`} style={{ display: "flex", alignItems: "center", gap: 4 }}>
       {B_STAGES.map((s, i) => {
         const done = i < idx || stage === "done";
         const active = i === idx && stage !== "done";
@@ -135,6 +136,9 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
   const [branches, setBranches] = React.useState<string[]>([]);
   const [remoteOnly, setRemoteOnly] = React.useState<Set<string>>(new Set());   // SPEC-244 · branch origin-only
   const [confirm, setConfirm] = React.useState<{ target: string; files: string[] } | null>(null);
+  const [stageTarget, setStageTarget] = React.useState("");
+  const [stageBusy, setStageBusy] = React.useState(false);
+  const stageBusyRef = React.useRef(false);
   const [showIntegrate, setShowIntegrate] = React.useState(false);
   // SPEC-546 · ADR-0109 · dialog "Ubah type".
   const [showSource, setShowSource] = React.useState(false);
@@ -184,19 +188,45 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
       .catch(() => { if (alive) { setBranches([]); setRemoteOnly(new Set()); } });
     return () => { alive = false; };
   }, [projectId]);
+  React.useEffect(() => {
+    if (stageTarget) setStageTarget("");
+    if (confirm) setConfirm(null);
+  }, [spec?.id, spec?.stage]);
+  async function runStageChange(change: () => Promise<any>) {
+    if (stageBusyRef.current) return undefined;
+    stageBusyRef.current = true;
+    setStageBusy(true);
+    try {
+      return await change();
+    } finally {
+      stageBusyRef.current = false;
+      setStageBusy(false);
+    }
+  }
   // SPEC-167 · revert backward-only. Dry-run mengembalikan { pending } → tampilkan dialog.
-  async function pickStage(target: string) {
-    if (!spec || !onRevertStage) return;
-    const res = await onRevertStage(spec, target);
-    if (res && res.pending) setConfirm({ target, files: res.wouldDelete });
+  async function saveStage() {
+    if (!spec || !onRevertStage || !stageTarget) return;
+    const res = await runStageChange(() => onRevertStage(spec, stageTarget));
+    if (res && res.pending) setConfirm({ target: stageTarget, files: res.wouldDelete });
+    else if (res) setStageTarget("");
   }
   async function confirmRevert() {
     if (!spec || !onRevertStage || !confirm) return;
-    await onRevertStage(spec, confirm.target, true);
-    setConfirm(null); onClose();
+    const res = await runStageChange(() => onRevertStage(spec, confirm.target, true));
+    if (res) {
+      setConfirm(null);
+      setStageTarget("");
+    }
+  }
+  function closeDetail() {
+    if (confirm || stageBusyRef.current) return;
+    setEditing(false);
+    onClose();
   }
   if (!spec) return null;
   const earlier = B_STAGES.slice(0, bStageIndex(spec.stage));
+  const currentStageLabel = B_STAGES.find((s) => s.key === spec.stage)?.label ?? spec.stage;
+  const targetStageLabel = B_STAGES.find((s) => s.key === stageTarget)?.label ?? stageTarget;
   const qa = spec.source === "qa";
   const isGoal = spec.source === "goal";   // SPEC-407 · payload-nya bentuk ketiga
   const p = (spec.payload || {}) as Record<string, string>;
@@ -206,7 +236,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
   const fields: readonly (readonly [string, string, string])[] = qa ? QA_FIELDS : isGoal ? GOAL_FIELDS : BRIEF_FIELDS;
   return (
     <Modal open title={spec.title} eyebrow={spec.id + " · " + spec.projectId}
-      icon={sourceMeta(spec.source).icon} onClose={() => { setEditing(false); onClose(); }}>
+      icon={sourceMeta(spec.source).icon} onClose={closeDetail}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
         <Badge tone={sourceMeta(spec.source).tone} size="sm">{sourceMeta(spec.source).label}</Badge>
         <Badge tone={(B_PRIO[spec.priority] || B_PRIO.sedang!).tone} size="sm" variant="outline">
@@ -280,13 +310,44 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
             </Button>
           </div>
         )}
-        {onRevertStage && earlier.length > 0 && (
+        {onRevertStage && (
           <div style={{ marginTop: 12 }}>
-            <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Kembalikan stage</div>
-            <Select size="sm" aria-label="Kembalikan stage" value=""
-              onChange={(e) => e.target.value && pickStage(e.target.value)}
-              options={[{ value: "", label: "Pilih stage lebih awal…" }]
-                .concat(earlier.map((s) => ({ value: s.key, label: "← " + s.label })))} />
+            <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Ubah status</div>
+            <div style={{ fontSize: 13, color: "var(--text-strong)", fontWeight: 600, marginBottom: 6 }}>
+              {`Status saat ini: ${currentStageLabel}`}
+            </div>
+            {earlier.length > 0 ? (
+              <>
+                <Select size="sm" aria-label="Kembalikan stage" value={stageTarget}
+                  onChange={(e) => setStageTarget(e.target.value)} disabled={stageBusy}
+                  placeholder="Pilih status lebih awal…"
+                  options={earlier.map((s) => ({ value: s.key, label: "← " + s.label }))} />
+                <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5, marginTop: 6 }}>
+                  Status saat ini dan status berikutnya tidak dapat dipilih. Kemajuan hanya berasal dari fase sesi.
+                </div>
+                {stageTarget && (
+                  <div style={{
+                    border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)",
+                    background: "var(--bone-100)", padding: 10, marginTop: 8, fontSize: 12.5,
+                    color: "var(--text-muted)", lineHeight: 1.5,
+                  }}>
+                    <div style={{ color: "var(--text-strong)", fontWeight: 600 }}>
+                      {currentStageLabel} → {targetStageLabel}
+                    </div>
+                    Fase sesi yang sudah berjalan tidak dibatalkan. Dokumen Spec/Plan di atas target
+                    mungkin perlu dihapus setelah konfirmasi; kode dan commit tidak disentuh.
+                  </div>
+                )}
+                <div style={{ marginTop: 8 }}>
+                  <Button size="sm" variant="secondary" leftIcon="rotate-ccw"
+                    disabled={!stageTarget} loading={stageBusy} onClick={saveStage}>Simpan status</Button>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                {currentStageLabel} adalah status paling awal. Kemajuan hanya berasal dari fase sesi.
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -415,7 +476,8 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
       )}
       {confirm && (
         <Modal open title="Kembalikan stage & hapus artefak" icon="rotate-ccw"
-          eyebrow={spec.id + " → " + confirm.target} onClose={() => setConfirm(null)}>
+          eyebrow={spec.id + " → " + confirm.target}
+          onClose={stageBusy ? undefined : () => setConfirm(null)}>
           <div style={{ fontSize: 13.5, color: "var(--text-strong)", marginBottom: 12 }}>
             {confirm.files.length} berkas docs akan dihapus dari disk (kode & commit tak disentuh):
           </div>
@@ -426,8 +488,10 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
             {confirm.files.map((f) => <li key={f}>{f}</li>)}
           </ul>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button size="sm" variant="secondary" onClick={() => setConfirm(null)}>Batal</Button>
-            <Button size="sm" variant="primary" leftIcon="trash-2" onClick={confirmRevert}>Hapus & kembalikan</Button>
+            <Button size="sm" variant="secondary" disabled={stageBusy}
+              onClick={() => setConfirm(null)}>Batal</Button>
+            <Button size="sm" variant="primary" leftIcon="trash-2" loading={stageBusy}
+              onClick={confirmRevert}>Hapus & kembalikan</Button>
           </div>
         </Modal>
       )}
@@ -801,7 +865,11 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     p?.then((r) => { if (alive) setData({ items: r.items, total: r.total }); }).catch(() => { });
     return () => { alive = false; };
   }, [tab, proj, stageFilter, prioFilter, dq, view, page, pageSize, dataVersion, syncNonce, dateField, from, to]);
-  const items = data.items;
+  const backlogById = React.useMemo(() => new Map(backlog.map((s) => [s.id, s])), [backlog]);
+  const items = React.useMemo(
+    () => data.items.map((s) => backlogById.get(s.id) ?? s),
+    [data.items, backlogById],
+  );
   const sp = serverPage(data.total, page, pageSize);
   return (
     <div style={LIST_SCREEN_STYLE}>

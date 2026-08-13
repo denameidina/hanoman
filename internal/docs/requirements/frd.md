@@ -78,6 +78,15 @@ tanpa penopang tidak ditulis.
 - THE SYSTEM SHALL memajukan stage **hanya** lewat fase yang dilaporkan sesi, dan SHALL memundurkannya
   hanya lewat `PATCH /specs/:id { stage }` eksplisit dari manusia
   ([ADR-0027](../adr/0027-revert-stage-backward-only.md)).
+- WHEN operator membuka detail backlog, THE SYSTEM SHALL menampilkan kontrol status yang hanya
+  menawarkan stage lebih awal, SHALL menjelaskan bahwa stage aktif dan stage ke depan hanya dapat
+  dicapai lewat fase sesi, dan SHALL memperlihatkan konsekuensi target sebelum menyimpan (SPEC-744).
+- IF perubahan stage akan menghapus artefak fase, THEN THE SYSTEM SHALL mempertahankan dry-run
+  `pending` → konfirmasi `confirmDelete:true`; WHILE salah satu request berjalan, THE SYSTEM SHALL
+  mencegah submit ganda (SPEC-744, [ADR-0027](../adr/0027-revert-stage-backward-only.md)).
+- WHEN perubahan stage dari detail berhasil atau gagal, THE SYSTEM SHALL mempertahankan detail
+  terbuka, menampilkan umpan balik, dan — pada keberhasilan — menyinkronkan stage bar detail serta
+  daftar backlog ke nilai `Spec` terbaru (SPEC-744).
 - WHILE plan di `docs/superpowers/plans/**` masih memuat `- [ ]`, THE SYSTEM SHALL menahan stage di
   `executing` dan tidak memajukannya ke `done`
   ([ADR-0029](../adr/0029-execute-done-butuh-plan-terceklist.md)).

@@ -363,6 +363,22 @@ Sesi selalu mulai dari awal pipeline, jadi spec yang baru dijalankan berakhir di
 Brainstorm satu-satunya tujuan yang jujur. Menerima drop di Execute berarti kartunya melompat empat
 kolom ke kiri sesaat setelah dilepas.
 
+**Ubah status dari detail (SPEC-744; menegakkan ADR-0027).** `SpecDetail` menampilkan status aktif
+dan hanya menawarkan stage yang lebih awal. Memilih target menyimpan draft lokal — belum memanggil
+API — lalu menampilkan transisi, fakta bahwa fase sesi tak dibatalkan, kemungkinan penghapusan
+dokumen Spec/Plan, dan jaminan kode/commit tak disentuh. Stage aktif dan stage ke depan tak masuk
+pilihan karena kemajuan hanya berasal dari fase sesi.
+
+**Simpan status** memanggil `onRevertStage(spec, target)` satu kali. Respons `Spec` mengganti item
+yang sama di state backlog milik `App`; `BacklogScreen` lalu memproyeksikan snapshot hasil query
+grid/list/board ke item ber-ID sama dari prop backlog itu. Modal detail yang tetap terbuka dan ketiga
+view daftar karena itu membaca nilai baru tanpa fetch atau state status kedua. Respons
+`{pending,wouldDelete}` membuka langkah kedua existing; hanya **Hapus & kembalikan** yang mengirim
+`confirmDelete:true`. Satu guard in-flight bersama mengunci select dan seluruh jalan keluar kedua
+dialog selama request. Sukses menutup hanya dialog konfirmasi, sedangkan gagal mempertahankan detail
+dan draft target agar bisa dicoba lagi; toast `App` tetap menjadi umpan balik sukses/gagal. Tanpa
+endpoint, skema, migration, atau ADR baru.
+
 Aturannya dua fungsi murni terekspor, `specColumn(spec, hasSession)` dan `canDrop(from, to)`, diuji di
 `src/test/backlog-board.test.tsx` — termasuk render test jsdom yang men-drag kartu sungguhan,
 karena `from`/`to` yang tertukar lolos dari unit test aturannya sendiri.
