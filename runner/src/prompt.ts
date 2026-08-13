@@ -1,4 +1,5 @@
 import type { Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx } from "./types";
+import { resolveMethod, type MethodDef } from "@hanoman/shared";
 import { REVERSE_STANDARD } from "./reverse-standard";
 import { verifyScopeClause } from "./verify-scope";
 import { CODE_STYLE_CLAUSE } from "./code-style";
@@ -59,7 +60,7 @@ const autonomyClause = (mode?: Autonomy): string =>
 // Append, bukan tulis-timpa — keadaan penuh selalu ada di berkasnya, jadi tak ada transisi
 // yang bisa terlewat kalau server sedang tidak menonton. Berkasnya di luar worktree, jadi
 // `git add -A` milik agen tak mungkin men-stage-nya.
-const phaseInstruction = (phases: readonly string[]) => {
+const phaseInstruction = (phases: readonly string[], method: MethodDef) => {
   const base =
     `Kerjakan fase berurutan: ${phases.join(" → ")}.\n`
     + `Setiap kali sebuah fase selesai (atau kamu putuskan dilewati), append satu baris ke berkas `
@@ -69,37 +70,40 @@ const phaseInstruction = (phases: readonly string[]) => {
   // punya kotak `- [ ]`. Cermin server-side gate (SPEC-173, ADR-0029) di prompt-nya.
   if (!phases.includes("Plan") || !phases.includes("Execute")) return base;
   return base
-    + `\nExecute BELUM selesai selama plan (\`docs/superpowers/plans/**\`) masih punya task `
+    + `\nExecute BELUM selesai selama plan (\`${method.planDir}/**\`) masih punya task `
     + `\`- [ ]\`: kerjakan SEMUA PR/task sampai tiap kotak jadi \`- [x]\` sebelum menulis `
     + `\`Execute done\`. hanoman menahan backlog di \`executing\`, bukan \`done\`, selama masih ada \`- [ ]\`.`;
 };
 
-// Peta fase → skill superpowers (SPEC-166). Objective dan Spec adalah keluaran skill
-// brainstorming yang di-invoke di fase Brainstorm — sengaja tak punya entri sendiri.
-// Fase reverse dipandu standar docs di prompt-nya, bukan skill.
-const PHASE_SKILLS: Record<string, readonly string[]> = {
-  Brainstorm: ["superpowers:brainstorming"],
-  Audit: ["superpowers:systematic-debugging"],
-  Plan: ["superpowers:writing-plans"],
-  Execute: [
-    "superpowers:executing-plans",
-    "superpowers:test-driven-development",
-    "superpowers:verification-before-completion",
-  ],
-  // SPEC-407 · fase `Goal` sengaja TANPA skill: seluruh inti flow ini adalah membebaskan sesi
-  // dari proses kaku. Yang tetap dijaga cuma pintu keluarnya.
-  Verifikasi: ["superpowers:verification-before-completion"],
-};
-
-const skillInstruction = (phases: readonly string[]) => {
+// SPEC-734 · ADR-0113 · peta fase → skill datang dari registry metode (`METHODS` di
+// @hanoman/shared), bukan konstanta di sini. Objective dan Spec adalah keluaran skill brainstorming
+// yang di-invoke di fase Brainstorm — sengaja tak punya entri sendiri. Fase reverse dipandu standar
+// docs di prompt-nya, bukan skill.
+//
+// `exitSkills` digabungkan ke fase TERAKHIR pipeline dan hanya untuk flow penulis-kode (gerbang
+// `writesCode` yang SAMA dengan scopeClause/codeStyleClause — menyalin daftar flow-nya berarti dua
+// definisi "sesi ini menulis kode" yang bisa berselisih saat flow baru lahir). Itulah yang membuat
+// INVARIAN 2 struktural: metode boleh mengganti CARA sebuah fase dikerjakan, tapi tak boleh
+// menegosiasikan pintu keluarnya. Untuk `superpowers` gabungan itu di-dedup habis (Execute &
+// Verifikasi memang sudah memuat gerbangnya) → prompt byte-identik dengan sebelum spec ini.
+const skillInstruction = (
+  phases: readonly string[], method: MethodDef, withExit: boolean,
+) => {
+  const last = phases[phases.length - 1];
   const lines = phases
-    .filter((p) => PHASE_SKILLS[p])
-    .map((p) => `- ${p}: ${PHASE_SKILLS[p]!.join(", ")}`);
+    .map((p) => {
+      const own = method.phaseSkills[p] ?? [];
+      const skills = withExit && p === last
+        ? [...new Set([...own, ...method.exitSkills])]
+        : own;
+      return skills.length ? `- ${p}: ${skills.join(", ")}` : "";
+    })
+    .filter(Boolean);
   // SPEC-338 · ADR-0074 · netral-agen: Claude Code meng-invoke skill lewat Skill tool, Codex CLI
   // memuatnya secara native. Prompt menyebut HASIL yang diminta, bukan mekanismenya — satu prompt
   // melayani kedua agen tanpa percabangan.
   return lines.length
-    ? "Skills superpowers WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan "
+    ? `Skills ${method.label} WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan `
       + `mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.\n${lines.join("\n")}`
     : "";
 };
@@ -202,21 +206,34 @@ const scopeClause = (flow: Flow, scope?: VerifyScope): string =>
 // "sesi ini boleh menulis komentar yang mengulang kode" masuk akal untuk ditawarkan.
 const codeStyleClause = (flow: Flow): string => writesCode(flow) ? CODE_STYLE_CLAUSE : "";
 
+// SPEC-734 · ADR-0113 · klausa khas metode (mis. "sesi ini tak berpenunggu"). Metode tanpa
+// `extraClause` menghasilkan string kosong → `filter(Boolean)` membuangnya → prompt tak berubah
+// sedikit pun, yang membuat default `superpowers` byte-identik dengan sebelum spec ini.
+const methodClause = (method: MethodDef): string => method.extraClause ?? "";
+
+// Sesi project-level (reverse/scaffold/prd/breakdown) TAK punya baris `Spec`, jadi tak punya metode
+// tersimpan; ketiganya juga flow dokumen, yang katalog mattpocock tak layani. Mereka tetap di metode
+// default — dinyatakan, bukan kebetulan (ADR-0113).
+const PROJECT_METHOD = resolveMethod();
+
 export function startPrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, autonomy?: Autonomy, verifyScope?: VerifyScope,
+  method?: string,
 ): string {
+  const m = resolveMethod(method);
   const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
   return [
     `hanoman ${flow}. Ikuti internal/docs sebagai Source of Truth; perbarui docs yang tersentuh `
       + `dan link-nya di index, dalam commit yang sama.`,
-    phaseInstruction(PIPELINES[flow]),
+    phaseInstruction(PIPELINES[flow], m),
     auditDecisionInstruction(flow),
     auditContinuationInstruction(flow, spec),
     auditOnlyInstruction(flow),
     autonomyClause(autonomy),
     scopeClause(flow, verifyScope),
     codeStyleClause(flow),
-    skillInstruction(PIPELINES[flow]),
+    methodClause(m),
+    skillInstruction(PIPELINES[flow], m, writesCode(flow)),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
     `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
@@ -231,19 +248,22 @@ export function startPrompt(
 // kerja yang selesai umumnya sudah ter-merge ke branchFrom (worktree lahir dari sana).
 export function continuePrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, autonomy?: Autonomy, verifyScope?: VerifyScope,
+  method?: string,
 ): string {
+  const m = resolveMethod(method);
   const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
   return [
     `hanoman ${flow} — MELANJUTKAN backlog item yang sebelumnya ditandai selesai padahal `
       + `pekerjaannya belum tuntas. Ikuti internal/docs sebagai Source of Truth; perbarui `
       + `docs yang tersentuh dan link-nya di index, dalam commit yang sama.`,
     `JANGAN mengulang fase awal — spec & plan sudah ada. Lanjut di fase Execute: baca plan `
-      + `di docs/superpowers/plans/** untuk backlog item ini, periksa task yang sudah \`[x]\` `
+      + `di ${m.planDir}/** untuk backlog item ini, periksa task yang sudah \`[x]\` `
       + `dan selesaikan yang masih \`[ ]\`. Verifikasi nyata sebelum klaim selesai.`,
     autonomyClause(autonomy),
     scopeClause(flow, verifyScope),
     codeStyleClause(flow),
-    skillInstruction(["Execute"]),
+    methodClause(m),
+    skillInstruction(["Execute"], m, writesCode(flow)),
     `Setelah selesai: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Worktree `
       + `ini detached HEAD — itu memang disengaja.`,
     `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
@@ -258,7 +278,9 @@ export function continuePrompt(
 // menyebutkannya. Sengaja TIDAK menyalin baris fase ke phase file: berkas itu milik agen.
 // SPEC-407 · `hasPlan` = pipeline-nya memang punya fase Plan. Sesi goal tak punya plan berkotak,
 // dan menyuruhnya mencari plan justru mengundangnya membuat satu — persis ritual yang dihapus.
-const resumeClause = (r: ResumeCtx, branchTo: string, hasPlan = true): string => {
+const resumeClause = (
+  r: ResumeCtx, branchTo: string, planDir: string, hasPlan = true,
+): string => {
   const fase = r.recorded.length
     ? `Fase yang SUDAH tercatat di $HANOMAN_PHASE_FILE: ${r.recorded.join(" · ")}. `
       + "JANGAN mengulang fase itu dan JANGAN menulis ulang barisnya."
@@ -267,7 +289,7 @@ const resumeClause = (r: ResumeCtx, branchTo: string, hasPlan = true): string =>
   const lanjut = r.next
     ? `Lanjutkan dari fase: ${r.next}.`
     : hasPlan
-      ? "Semua fase sudah tercatat. Periksa apakah plan di `docs/superpowers/plans/**` masih "
+      ? `Semua fase sudah tercatat. Periksa apakah plan di \`${planDir}/**\` masih `
         + "menyisakan task `- [ ]` dan selesaikan sisanya; bila sudah bersih, tinggal commit & push."
       : "Semua fase sudah tercatat. Buktikan sekali lagi goal-nya benar-benar tercapai, lalu "
         + "commit & push.";
@@ -278,7 +300,7 @@ const resumeClause = (r: ResumeCtx, branchTo: string, hasPlan = true): string =>
       + "ada, tetapi perubahan yang belum sempat di-commit TIDAK ada.";
   const baca = hasPlan
     ? "Sebelum menulis apa pun: baca `git log --oneline` dan `git status`, lalu plan di "
-      + "`docs/superpowers/plans/**` untuk backlog item ini (`- [x]` sudah selesai, `- [ ]` belum). "
+      + `\`${planDir}/**\` untuk backlog item ini (\`- [x]\` sudah selesai, \`- [ ]\` belum). `
       + "Jangan menulis ulang yang sudah ada."
     : "Sebelum menulis apa pun: baca `git log --oneline` dan `git status` untuk melihat apa yang "
       + "sudah dikerjakan. Jangan menulis ulang yang sudah ada.";
@@ -291,8 +313,9 @@ const resumeClause = (r: ResumeCtx, branchTo: string, hasPlan = true): string =>
 
 export function resumePrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, resume: ResumeCtx,
-  autonomy?: Autonomy, verifyScope?: VerifyScope,
+  autonomy?: Autonomy, verifyScope?: VerifyScope, method?: string,
 ): string {
+  const m = resolveMethod(method);
   const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
   // Keputusan pasca-Audit (ADR-0040) hanya relevan selama Audit belum tercatat. Sesudah itu
   // keputusannya SUDAH diambil dan sudah mewujud sebagai baris `Spec skipped`/`Spec done` di
@@ -302,13 +325,14 @@ export function resumePrompt(
   return [
     `hanoman ${flow} — MELANJUTKAN sesi backlog yang sudah berjalan. Ikuti internal/docs sebagai `
       + `Source of Truth; perbarui docs yang tersentuh dan link-nya di index, dalam commit yang sama.`,
-    resumeClause(resume, branchTo, PIPELINES[flow].includes("Plan")),
-    phaseInstruction(PIPELINES[flow]),
+    resumeClause(resume, branchTo, m.planDir, PIPELINES[flow].includes("Plan")),
+    phaseInstruction(PIPELINES[flow], m),
     auditDecided ? "" : auditDecisionInstruction(flow),
     autonomyClause(autonomy),
     scopeClause(flow, verifyScope),
     codeStyleClause(flow),
-    skillInstruction(PIPELINES[flow]),
+    methodClause(m),
+    skillInstruction(PIPELINES[flow], m, writesCode(flow)),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
     `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
@@ -323,8 +347,9 @@ export function resumePrompt(
 // dipasang di sisi server saat sesi lahir, bukan lewat prompt ini.
 export function startGoalPrompt(
   spec: SpecBrief, branchTo: string,
-  opts: { autonomy?: Autonomy; verifyScope?: VerifyScope; resume?: ResumeCtx } = {},
+  opts: { autonomy?: Autonomy; verifyScope?: VerifyScope; resume?: ResumeCtx; method?: string } = {},
 ): string {
+  const m = resolveMethod(opts.method);
   const g = readGoalPayload(spec.payload);
   const detail = [
     `Goal: ${g?.goal ?? spec.objective}`,
@@ -337,16 +362,17 @@ export function startGoalPrompt(
       + "jangan memecah pekerjaan ini jadi backlog baru. Langsung kerjakan goal-nya. Tetap ikuti "
       + "internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di "
       + "index, dalam commit yang sama.",
-    opts.resume ? resumeClause(opts.resume, branchTo, false) : "",
+    opts.resume ? resumeClause(opts.resume, branchTo, m.planDir, false) : "",
     detail,
-    phaseInstruction(PIPELINES.goal),
+    phaseInstruction(PIPELINES.goal, m),
     "Fase Verifikasi bukan formalitas: jalankan perintah yang membuktikan goal-nya tercapai "
       + "(test/typecheck/benchmark/perintah yang relevan) dan baca outputnya. Klaim tanpa output "
       + "bukan bukti.",
     autonomyClause(opts.autonomy),
     scopeClause("goal", opts.verifyScope),
     codeStyleClause("goal"),
-    skillInstruction(PIPELINES.goal),
+    methodClause(m),
+    skillInstruction(PIPELINES.goal, m, writesCode("goal")),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
     `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
@@ -385,7 +411,7 @@ export function startProjectPrompt(flow: Flow, project: ProjectBrief, branchTo: 
   return [
     `hanoman ${flow}. Susun Source of Truth repo ini dari kodenya di internal/docs/**, `
       + `mengikuti STANDAR DOCS di bagian bawah prompt ini.`,
-    phaseInstruction(PIPELINES[flow]),
+    phaseInstruction(PIPELINES[flow], PROJECT_METHOD),
     REVERSE_PHASE_GUIDE,
     `Setiap fase selesai: commit hasilnya, lalu \`git push origin HEAD:refs/heads/${branchTo}\` — `
       + `push per fase, supaya pekerjaan tak hilang bila worktree lenyap. Bila remote origin tidak ada, `
@@ -414,7 +440,7 @@ export function startPrdPrompt(project: ProjectBrief, brief: PrdBrief, branchTo:
   return [
     `hanoman prd. Kamu memandu PM/PO menyusun SATU dokumen PRD untuk project ini dari brief + `
       + `brainstorm. Keluaranmu HANYA dokumen PRD — JANGAN menulis kode fitur.`,
-    phaseInstruction(PIPELINES.prd),
+    phaseInstruction(PIPELINES.prd, PROJECT_METHOD),
     `- Brainstorm: pandu PM secara interaktif. Ajukan SATU pertanyaan per giliran ke manusia di `
       + `terminal ini, tunggu jawabannya, perdalam brief sampai jelas (masalah, pengguna, scope, `
       + `metrik sukses). Jangan mengarang; topik yang PM belum jawab tandai sebagai open question.`,
@@ -422,7 +448,7 @@ export function startPrdPrompt(project: ProjectBrief, brief: PrdBrief, branchTo:
       + `bagian: Ringkasan · Masalah & konteks · Persona/pengguna · Goals & non-goals · Scope `
       + `(in/out) · User stories · Acceptance criteria (gaya EARS) · Metrik sukses · Open questions. `
       + `Isi lengkap dan spesifik dari hasil brainstorm, bukan kerangka kosong.`,
-    skillInstruction(PIPELINES.prd),
+    skillInstruction(PIPELINES.prd, PROJECT_METHOD, false),
     `Setelah PRD ditulis: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Bila remote `
       + `origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree `
       + `ini detached HEAD — memang disengaja. Manusia yang me-review lalu merge branch ${branchTo}.`,
@@ -442,7 +468,7 @@ export function startBreakdownPrompt(project: ProjectBrief, prd: BreakdownPrd, b
     `hanoman breakdown. Kamu memecah SATU PRD kompleks menjadi BEBERAPA backlog kecil yang bisa `
       + `dikerjakan PARALEL tanpa saling bergantung. Keluaranmu HANYA dokumen manifest — `
       + `JANGAN menulis kode fitur.`,
-    phaseInstruction(PIPELINES.breakdown),
+    phaseInstruction(PIPELINES.breakdown, PROJECT_METHOD),
     `- Analisis: baca PRD (di bawah) sampai paham SELURUH scope in-PRD. Petakan pekerjaan menjadi `
       + `unit-unit yang: (a) kecil & terukur — tiap unit tuntas dalam satu sesi; (b) non-overlapping `
       + `— cakupan tak tumpang tindih; (c) TANPA cross-dependency — urutan bebas, bisa jalan bersamaan; `
@@ -489,13 +515,13 @@ export function startScaffoldPrompt(project: ProjectBrief, branchTo: string): st
   return [
     `hanoman scaffold. Susun Source of Truth LENGKAP untuk project from-scratch ini di internal/docs/** `
       + `DARI IDE-nya, mengikuti STANDAR DOCS di bagian bawah prompt ini. Belum ada kode — docs dulu.`,
-    phaseInstruction(PIPELINES.scaffold),
+    phaseInstruction(PIPELINES.scaffold, PROJECT_METHOD),
     SCAFFOLD_PHASE_GUIDE,
     `Setiap fase selesai: commit hasilnya, lalu \`git push origin HEAD:refs/heads/${branchTo}\` — `
       + `push per fase, supaya pekerjaan tak hilang bila worktree lenyap. Bila remote origin tidak ada, `
       + `lewati push dan catat itu di laporan akhir — jangan gagal diam-diam. Worktree ini `
       + `detached HEAD — memang disengaja. Manusia yang me-review dan merge branch ${branchTo}.`,
-    skillInstruction(PIPELINES.scaffold),
+    skillInstruction(PIPELINES.scaffold, PROJECT_METHOD, false),
     `Project ${project.id} · ${project.name}\nIde awal: ${project.desc || "—"}\nStack: ${project.stack || "—"}`,
     `=== STANDAR DOCS ===\n${REVERSE_STANDARD}`,
   ].filter(Boolean).join("\n\n");

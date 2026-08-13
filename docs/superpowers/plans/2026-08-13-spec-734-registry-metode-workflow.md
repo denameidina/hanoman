@@ -489,7 +489,7 @@ git commit -m "feat(spec-734): Setting.method lenient tanpa migration"
 - Consumes: `METHODS`, `resolveMethod`, `MethodDef` dari Task 1
 - Produces: `startPrompt(flow, spec, branchTo, autonomy?, verifyScope?, method?)`, `continuePrompt(...sama)`, `resumePrompt(flow, spec, branchTo, resume, autonomy?, verifyScope?, method?)`, `startGoalPrompt(spec, branchTo, opts & { method?: string })` — `method` adalah **id string**, diresolusi lenient di dalam.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `runner/test/method-phases.test.ts`:
 
@@ -594,7 +594,7 @@ describe("SPEC-734 · metode workflow", () => {
 
 Pastikan `startScaffoldPrompt`, `continuePrompt`, `resumePrompt`, `startGoalPrompt` ada di baris import berkas test itu.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 ./node_modules/.bin/vitest --run runner/test/prompt.test.ts runner/test/method-phases.test.ts
@@ -602,7 +602,7 @@ Pastikan `startScaffoldPrompt`, `continuePrompt`, `resumePrompt`, `startGoalProm
 
 Expected: FAIL — `startPrompt` menolak argumen ke-6 / `docs/matt/plans/**` tak ditemukan.
 
-- [ ] **Step 3: Ubah `runner/src/prompt.ts`**
+- [x] **Step 3: Ubah `runner/src/prompt.ts`**
 
 Tambahkan import di kepala berkas:
 
@@ -837,7 +837,7 @@ const PROJECT_METHOD = resolveMethod(undefined);
 
 lalu di keempat builder itu ganti `phaseInstruction(PIPELINES.x)` → `phaseInstruction(PIPELINES.x, PROJECT_METHOD)` dan `skillInstruction(PIPELINES.x)` → `skillInstruction(PIPELINES.x, PROJECT_METHOD, false)`.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 ./node_modules/.bin/vitest --run runner/test/prompt.test.ts runner/test/method-phases.test.ts
@@ -845,7 +845,7 @@ lalu di keempat builder itu ganti `phaseInstruction(PIPELINES.x)` → `phaseInst
 
 Expected: PASS, termasuk seluruh test prompt lama (bukti byte-identitas).
 
-- [ ] **Step 5: Typecheck runner**
+- [x] **Step 5: Typecheck runner**
 
 ```bash
 pnpm --filter ./runner typecheck
@@ -853,7 +853,7 @@ pnpm --filter ./runner typecheck
 
 Expected: keluar tanpa error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add runner/src/prompt.ts runner/test/prompt.test.ts runner/test/method-phases.test.ts

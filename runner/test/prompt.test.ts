@@ -577,3 +577,78 @@ describe("klausa gaya kode (SPEC-543)", () => {
     expect(p.split(MARK).length - 1).toBe(1);
   });
 });
+
+describe("SPEC-734 · metode workflow", () => {
+  const s = { id: "SPEC-9", title: "T", source: "brief", priority: "sedang", objective: "O" };
+
+  // DEFAULT TETAP superpowers: tanpa argumen `method`, prompt wajib byte-identik.
+  it("tanpa method, keempat builder byte-identik dengan method superpowers eksplisit", () => {
+    const r = { recorded: ["Audit done"], next: "Spec", worktreeKept: true };
+    expect(startPrompt("feature", s, "b"))
+      .toBe(startPrompt("feature", s, "b", undefined, undefined, "superpowers"));
+    expect(continuePrompt("feature", s, "b"))
+      .toBe(continuePrompt("feature", s, "b", undefined, undefined, "superpowers"));
+    expect(resumePrompt("qa", s, "b", r))
+      .toBe(resumePrompt("qa", s, "b", r, undefined, undefined, "superpowers"));
+    expect(startGoalPrompt(s, "b")).toBe(startGoalPrompt(s, "b", { method: "superpowers" }));
+  });
+
+  // AC-3 · instruksi skill disusun dari METHODS[M].phaseSkills untuk fase PIPELINES[flow] SAJA.
+  it("AC-3 · metode matt memakai skill mattpocock, hanya untuk fase flow-nya", () => {
+    const p = startPrompt("feature", s, "b", undefined, undefined, "matt");
+    expect(p).toContain("- Brainstorm: mattpocock-skills:grilling");
+    expect(p).toContain("mattpocock-skills:implement");
+    expect(p).not.toContain("superpowers:brainstorming");
+    // Audit bukan fase flow `feature` → tak boleh muncul.
+    expect(p).not.toContain("diagnosing-bugs");
+  });
+
+  it("AC-3 · flow qa memakai fase Audit metode itu", () => {
+    const p = startPrompt("qa", s, "b", undefined, undefined, "matt");
+    expect(p).toContain("- Audit: mattpocock-skills:diagnosing-bugs");
+    expect(p).not.toContain("grilling");
+  });
+
+  // INVARIAN 2 · gerbang verifikasi digabungkan ke fase TERAKHIR flow penulis-kode.
+  it("INVARIAN 2 · Execute matt tetap membawa gerbang verifikasi", () => {
+    expect(startPrompt("feature", s, "b", undefined, undefined, "matt"))
+      .toContain("superpowers:verification-before-completion");
+  });
+
+  it("INVARIAN 2 · flow goal metode matt tetap bergerbang di fase Verifikasi", () => {
+    expect(startGoalPrompt(s, "b", { method: "matt" }))
+      .toContain("- Verifikasi: superpowers:verification-before-completion");
+  });
+
+  // Flow dokumen tak menulis kode → exitSkills tak ditambahkan → prompt tetap seperti dulu.
+  it("flow dokumen tak kejatuhan exitSkills", () => {
+    expect(startScaffoldPrompt({ id: "p", name: "P", desc: "", stack: "" }, "b"))
+      .not.toContain("verification-before-completion");
+  });
+
+  // AC-4 (prompt) · klausa gerbang plan menyebut planDir metode itu.
+  it("AC-4 · klausa gerbang plan menyebut planDir metodenya", () => {
+    expect(startPrompt("feature", s, "b", undefined, undefined, "matt"))
+      .toContain("docs/matt/plans/**");
+    expect(startPrompt("feature", s, "b")).toContain("docs/superpowers/plans/**");
+  });
+
+  it("AC-4 · continuePrompt & resumePrompt menyebut planDir metodenya", () => {
+    const r = { recorded: [], worktreeKept: false };
+    expect(continuePrompt("feature", s, "b", undefined, undefined, "matt"))
+      .toContain("docs/matt/plans/**");
+    expect(resumePrompt("feature", s, "b", r, undefined, undefined, "matt"))
+      .toContain("docs/matt/plans/**");
+  });
+
+  it("extraClause metode ikut ke prompt; superpowers tak punya sehingga tak menambah apa pun", () => {
+    expect(startPrompt("feature", s, "b", undefined, undefined, "matt"))
+      .toContain("TAK BERPENUNGGU");
+    expect(startPrompt("feature", s, "b")).not.toContain("TAK BERPENUNGGU");
+  });
+
+  it("id metode tak dikenal jatuh ke superpowers, tak melempar", () => {
+    expect(startPrompt("feature", s, "b", undefined, undefined, "tak-ada"))
+      .toBe(startPrompt("feature", s, "b"));
+  });
+});
