@@ -1588,7 +1588,7 @@ git commit -m "feat(spec-734): picker Metode di Start modal & Settings"
 - Consumes: seluruh keputusan Task 1-7
 - Produces: —
 
-- [ ] **Step 1: Enumerasi ulang nomor ADR**
+- [x] **Step 1: Enumerasi ulang nomor ADR**
 
 Nomor 0113 tentatif. Buktikan ia belum dipakai di branch mana pun:
 
@@ -1602,7 +1602,7 @@ ls ../*/internal/docs/adr/ 2>/dev/null | grep -oE '01[0-9]{2}' | sort -u | tail 
 
 Bila 0113 sudah terpakai, naikkan ke nomor bebas berikutnya dan sesuaikan SEMUA rujukan `ADR-0113` di kode + docs (`grep -rn "ADR-0113"`).
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Buat `internal/docs/adr/0113-registry-metode-workflow.md` mengikuti bentuk ADR tetangga (baca `internal/docs/adr/0112-cronjob-per-project-scheduler.md` untuk formatnya). Wajib memuat, masing-masing beserta alasannya:
 
@@ -1620,7 +1620,7 @@ Buat `internal/docs/adr/0113-registry-metode-workflow.md` mengikuti bentuk ADR t
 
 Akhiri dengan `Status: accepted`, tanggal, dan rujukan SPEC-734.
 
-- [ ] **Step 3: Taut di kedua index**
+- [x] **Step 3: Taut di kedua index**
 
 Di `internal/docs/README.md`, di bawah heading `## adr`, sisipkan sebagai baris PERTAMA daftar:
 
@@ -1630,13 +1630,13 @@ Di `internal/docs/README.md`, di bawah heading `## adr`, sisipkan sebagai baris 
 
 Di `internal/docs/adr/README.md`, tambahkan entri narasinya mengikuti bentuk tetangga (ADR-0112).
 
-- [ ] **Step 4: Perbarui `stack.md` & `SKILL.md`**
+- [x] **Step 4: Perbarui `stack.md` & `SKILL.md`**
 
 Di `internal/docs/architecture/stack.md`, tambahkan satu butir di bagian arsitektur/sesi yang menerangkan registry metode, resolusinya, dan INVARIAN 1/2 secara ringkas.
 
 Di `internal/skills/hanoman/SKILL.md`, tambahkan butir sejenis di bagian **Aturan Sesi & Eksekusi**, memuat gotcha yang wajib: (a) gerbang plan memindai union — jangan pernah mengembalikannya ke satu direktori; (b) `exitSkills` ditegakkan test sumber; (c) `PIPELINES` tak boleh berubah; (d) registry di `shared` di-IMPOR runner, bukan dicerminkan.
 
-- [ ] **Step 5: Periksa integritas index**
+- [x] **Step 5: Periksa integritas index**
 
 ```bash
 grep -c "0113" internal/docs/README.md internal/docs/adr/README.md
@@ -1644,7 +1644,7 @@ grep -c "0113" internal/docs/README.md internal/docs/adr/README.md
 
 Expected: keduanya ≥ 1.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs internal/skills

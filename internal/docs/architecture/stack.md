@@ -134,6 +134,25 @@ titik berhenti — dan hanya berhenti untuk bertanya di terminal saat butuh kepu
 di `POST /terminal/sessions`) dan berlaku seumur hidup sesi (satu proses); manusia bisa mengetik `/model`
 di dalam terminal untuk menggesernya. Matrix per-fase (ADR-0058) dicabut — tak andal. Model-per-step (ADR-0003) usang bersama runner headless (ADR-0024).
 
+**Metodologi kerja sebuah sesi adalah data, bukan literal** (SPEC-734/ADR-0113): satu konstanta
+`METHODS` di `shared/src/method-catalog.ts` mendeklarasikan per metode peta fase→skill, direktori
+artefak (`planDir`/`specDir`), klausa prompt tambahan, `exitSkills`, dan prasyarat instalasi —
+menambah metode ketiga = **satu entri**. Katalog awal `superpowers` (default) dan `matt`
+(mattpocock/skills). Registry hidup di `shared` dan **DI-IMPORT** runner alih-alih dicerminkan
+seperti `Flow`/`Agent`/`VerifyScope` di `enums.ts` — deviasi sadar: cermin masuk akal untuk enum
+tiga kata, bukan untuk tabel yang harus identik di tiga paket (SPEC-407 membayarnya dengan EMPAT
+cermin `Flow`); `method-catalog.ts` karena itu bebas zod. Resolusinya mencerminkan `verifyScope`:
+`opts.method` → `Spec.payload.method` (distempel di peluncuran PERTAMA lalu **beku**, cermin
+`startedAt`) → `Setting.method` → `superpowers`, dengan `zMethod` **lenient** supaya id dari hub
+yang belum ada di build ini jadi fallback diam alih-alih baris Setting yang gagal parse. **Dua
+invarian mengikat:** setiap **gerbang** plan (`planComplete`, Stop hook codex, kondisi mode goal,
+pembersihan artefak, klasifikasi doc, prompt lead) memindai **union** seluruh `planDir` dan wajib
+`continue` — bukan `return true` — saat sebuah direktori tak ada, kalau tidak item yang berpindah
+metode lolos ke `done` lewat direktori kosong; dan `exitSkills` wajib memuat gerbang verifikasi,
+digabungkan ke fase terakhir flow penulis-kode, ditegakkan test di sumber. `PIPELINES` **tidak
+berubah** — metode mengganti CARA sebuah fase dikerjakan, bukan fase apa yang ada. Tanpa pilihan
+eksplisit, prompt byte-identik dengan sebelum spec ini.
+
 Sesi memakai `--dangerously-skip-permissions`/padanan codex tanpa hook deny perintah; guardrail itu
 dicabut ADR-0037 dan isolasi worktree adalah batas yang tersisa. Telegram tidak menambah executor:
 session operator memakai API ber-AgentToken/capability, dan confirmation inline menjadi syarat
