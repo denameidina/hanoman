@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog } from "../ds";
 import { api, ApiError } from "../api/client";
-import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, DEFAULT_METHOD, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
+import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
@@ -1205,6 +1205,26 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             onChange={(e) => save({ verifyScope: e.target.value as Setting["verifyScope"] },
               "Scope verifikasi → " + e.target.value)} />
         </SettingRow>
+      </Card>
+      {/* SPEC-734 · ADR-0113 · metode workflow: default global untuk sesi backlog; tiap Start masih
+          bisa meng-override, dan item yang sudah pernah jalan memakai metode tercatatnya. */}
+      <Card eyebrow="metode" title="Metode workflow — sesi backlog">
+        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
+          Metode menentukan <b>skill mana yang dimuat di tiap fase</b> dan <b>di direktori mana plan
+          &amp; spec ditulis</b>. Fase-fasenya sendiri tak berubah. Gerbang plan memindai direktori
+          SEMUA metode, jadi item yang berpindah metode tak pernah lolos lewat direktori kosong.
+        </div>
+        <SettingRow title="Metode default" last
+          desc="Sesi backlog baru lahir dengan metode ini. Masih bisa diubah per sesi saat Start.">
+          <Select size="sm" aria-label="Metode default" style={{ width: 220 }}
+            value={resolveMethod(s.method).id}
+            options={METHOD_IDS.map((id) => ({ value: id, label: METHODS[id]!.label }))}
+            onChange={(e) => save({ method: e.target.value }, "Metode → " + e.target.value)} />
+        </SettingRow>
+        <div data-testid="settings-method-requires"
+          style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+          Butuh terpasang: {resolveMethod(s.method).requires.join(" · ")}
+        </div>
       </Card>
       </>
     );

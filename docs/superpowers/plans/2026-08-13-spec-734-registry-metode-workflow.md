@@ -1400,7 +1400,7 @@ git commit -m "feat(spec-734): resolusi & stempel metode saat sesi backlog lahir
 - Consumes: `METHODS`, `METHOD_IDS`, `resolveMethod`, `DEFAULT_METHOD` (Task 1); `Setting["method"]` (Task 2); `api.startSession({ method })` (Task 6)
 - Produces: —
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/method-picker.test.tsx`:
 
@@ -1467,7 +1467,7 @@ describe("StartSessionModal · picker Metode (SPEC-734)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/method-picker.test.tsx
@@ -1475,7 +1475,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/method-picker.test.tsx
 
 Expected: FAIL — `Unable to find a label with the text of: Metode`.
 
-- [ ] **Step 3: Ubah `client.ts`**
+- [x] **Step 3: Ubah `client.ts`**
 
 Tambahkan `method?: string;` pada tipe body `startSession`:
 
@@ -1487,7 +1487,7 @@ Tambahkan `method?: string;` pada tipe body `startSession`:
     force?: boolean }) =>             // SPEC-447 · ADR-0093 · lewati gerbang dependency (jalur manusia)
 ```
 
-- [ ] **Step 4: Ubah `StartSessionModal`**
+- [x] **Step 4: Ubah `StartSessionModal`**
 
 Tambahkan ke import `@hanoman/shared` di `src/src/App.tsx`: `METHODS, METHOD_IDS, resolveMethod`.
 
@@ -1528,7 +1528,7 @@ Tambahkan `Field` baru tepat setelah `Field` "Scope verifikasi" (sebelum `</Moda
       </Field>
 ```
 
-- [ ] **Step 5: Ubah `SettingsScreen.tsx`**
+- [x] **Step 5: Ubah `SettingsScreen.tsx`**
 
 Tambahkan ke import `@hanoman/shared`: `METHODS, METHOD_IDS, resolveMethod, DEFAULT_METHOD`.
 
@@ -1558,7 +1558,7 @@ Tambahkan kartu baru tepat setelah `</Card>` kartu "Scope verifikasi — sesi ba
 
 Bila `SettingRow` menuntut `last` sebagai baris terakhir, letakkan blok "Butuh terpasang" di dalam `SettingRow` alih-alih sesudahnya — sesuaikan dengan pola kartu tetangga.
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/method-picker.test.tsx src/test/start-session-agent.test.tsx src/src/screens/SettingsScreen.test.tsx
@@ -1566,7 +1566,7 @@ env -u NODE_ENV ./node_modules/.bin/vitest --run src/test/method-picker.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/App.tsx src/src/api/client.ts src/src/screens/SettingsScreen.tsx src/test/method-picker.test.tsx

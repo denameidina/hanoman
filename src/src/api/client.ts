@@ -280,6 +280,7 @@ export const api = {
   startSession: (b: { spec: string; flow: Flow; model?: string; effort?: string; goal?: boolean; goalCondition?: string;
     agent?: Agent;                    // SPEC-338 · ADR-0074 · mesin sesi; kosong → Setting.agent
     verifyScope?: VerifyScope;        // SPEC-376 · ADR-0080 · scope verifikasi; kosong → Setting.verifyScope
+    method?: string;                  // SPEC-734 · ADR-0113 · metode workflow; kosong → payload → Setting.method
     force?: boolean }) =>             // SPEC-447 · ADR-0093 · lewati gerbang dependency (jalur manusia)
     // SPEC-394 · ADR-0084 · `resumed` ada HANYA saat peluncuran melanjutkan artefak sesi sebelumnya
     // (worktree utuh atau tip branch sesi). Absen = sesi baru atau re-attach ke sesi hidup.

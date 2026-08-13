@@ -8,7 +8,7 @@ import { Shell, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Swi
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem } from "@hanoman/shared";
-import { flowForSource, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, type Agent, type VerifyScope, type AutoMerge } from "@hanoman/shared";
+import { flowForSource, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
@@ -80,6 +80,9 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // SPEC-376 · ADR-0080 · scope verifikasi per sesi. Prefill dari default global; `?? "changed"`
   // karena respons GET /settings yang ter-cache sebelum SPEC-376 belum punya kunci ini.
   const [verifyScope, setVerifyScope] = React.useState<VerifyScope>("changed");
+  // SPEC-734 · ADR-0113 · metode workflow per sesi. Prefill dari default global; `resolveMethod`
+  // menjaga id yang tak dikenal (mis. ikut sync dari hub) tak membuat picker-nya kosong.
+  const [method, setMethod] = React.useState<string>(resolveMethod().id);
   const [busy, setBusy] = React.useState(false);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
@@ -102,6 +105,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       setGoalOn(goalLockedNow || s.goal.enabled);
       setGoalCond(goalLockedNow ? "" : s.goal.condition);
       setVerifyScope(s.verifyScope ?? "changed");
+      setMethod(resolveMethod(s.method).id);
     }).catch(() => {});
     // SPEC-339 · versi codex CLI untuk catatan lunak. Gagal-diam: modal harus tetap bisa dipakai.
     api.getCodexVersion().then((v) => setCodexVer(v.version)).catch(() => {});
@@ -141,7 +145,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       const { id, resumed } = await api.startSession({
         spec: s.id, flow, model, effort, agent,
         goal: goalOn, goalCondition: goalOn && goalCond.trim() ? goalCond.trim() : undefined,
-        verifyScope,
+        verifyScope, method,
         ...(isBlocked ? { force: true } : {}),   // SPEC-447 · ADR-0093
       });
       onStarted(id, resumed); onClose();
@@ -231,6 +235,19 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
             { value: "full", label: "Seluruh project" },
           ]}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setVerifyScope(e.target.value as VerifyScope)} />
+      </Field>
+      {/* SPEC-734 · ADR-0113 · metode workflow: skill mana yang dimuat per fase, dan di direktori
+          mana plan & spec ditulis. Opsi datang dari katalog METHODS — metode ketiga muncul di sini
+          tanpa satu pun perubahan di berkas ini. */}
+      <Field label="Metode"
+        hint="Metodologi kerja sesi ini: skill per fase + direktori plan/spec. Fase-fasenya sendiri tak berubah. Item yang sudah pernah dijalankan memakai metode tercatatnya saat dilanjutkan.">
+        <Select aria-label="Metode" value={method} style={{ width: "100%" }}
+          options={METHOD_IDS.map((id) => ({ value: id, label: METHODS[id]!.label }))}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMethod(e.target.value)} />
+        <div data-testid="method-requires"
+          style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+          Butuh terpasang: {METHODS[method]?.requires.join(" · ") ?? "—"}
+        </div>
       </Field>
     </Modal>
   );
