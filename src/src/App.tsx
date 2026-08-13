@@ -4,7 +4,8 @@
 import React from "react";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, Tabs, Toast, useToast, Icon, StateBlock } from "./ds";
+import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, Tabs, Toast, useToast, Icon, StateBlock } from "./ds";
+import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem } from "@hanoman/shared";
@@ -646,7 +647,10 @@ export function EditProjectModal({ open, project, onClose, onSave }:
 }
 
 export default function App() {
-  const [section, setSection] = React.useState("overview");
+  // SPEC-740 · ADR-0115 · halaman terakhir yang dibuka ikut dipulihkan; refresh tak lagi
+  // melempar balik ke Overview. Guard NAV_KEYS menutup section transien (project/review)
+  // dan key yang sudah tak ada (`runs`/`triggers`, SPEC-162).
+  const [section, setSection] = usePersistedState("app", "section", "overview", oneOf(...NAV_KEYS));
   // SPEC-293 · deep-link #spec=<id> (buka backlog + SpecDetail saat mount). Diteruskan ke BacklogScreen.
   const [openSpecId, setOpenSpecId] = React.useState<string | null>(null);
   // SPEC-519 · deep-link #changelog=<projectId>[&cl=<id>] — rilis yang harus terbuka saat mount.
@@ -658,16 +662,18 @@ export default function App() {
   const [dataVersion, setDataVersion] = React.useState(0);
   // Pekerjaan yang berjalan adalah sesi tmux, bukan baris Run (SPEC-162).
   const [sessions, setSessions] = React.useState<TerminalSession[]>([]);
-  const [projectId, setProjectId] = React.useState("");
+  const [projectId, setProjectId] = usePersistedState("app", "projectId", "", isStr);
   // SPEC-171/230 · target review: backlog item (spec) atau sesi project-level PRD (session).
   const [review, setReview] = React.useState<{ id: string; kind: "spec" | "session"; title: string } | null>(null);
   // Pemilik tunggal "daftar disaring ke project mana?" (SPEC-146). Sengaja terpisah dari
   // `projectId` ("project yang sedang dibuka Docs/detail"): menyatukannya membuat klik
   // sidebar Runs diam-diam menyaring ke project terakhir yang dibuka Docs.
-  const [projectFilter, setProjectFilter] = React.useState("all");
+  const [projectFilter, setProjectFilter] = usePersistedState("app", "projectFilter", "all", isStr);
   // SPEC-184 · sesi yang harus difokuskan di Terminal setelah klik aksi notifikasi.
   const [focusSession, setFocusSession] = React.useState<string | null>(null);
-  const [search, setSearch] = React.useState("");
+  // Kotak pencarian di topbar hanya dipakai layar Projects — kuncinya ikut layar itu,
+  // meski state-nya hidup di App.
+  const [search, setSearch] = usePersistedState("projects", "q", "", isStr);
   const [modal, setModal] = React.useState<string | null>(null);
   // SPEC-210 · prefill NewSpecModal saat "Take ke backlog" dari sebuah PRD.
   const [specPrefill, setSpecPrefill] = React.useState<SpecPrefill | null>(null);
@@ -681,6 +687,9 @@ export default function App() {
   const [auth, setAuth] = React.useState<AuthStatus | null>(null);
   const onLoggedOut = React.useCallback(() => setAuth({ needsSetup: false, user: null }), []);
   React.useEffect(() => { api.authStatus().then(setAuth).catch(() => setAuth({ needsSetup: false, user: null })); }, []);
+  // SPEC-740 · ADR-0115 · state dari versi kunci lama tak pernah dibaca lagi (versi hidup
+  // di dalam kunci) — disapu sekali di sini supaya storage tak tumbuh selamanya.
+  React.useEffect(() => { pruneUiState(); }, []);
 
   // SPEC-293 · deep-link backlog: buka `${origin}${pathname}#spec=<id>` (mis. dari tab baru tombol
   // "Buka backlog" di Triase) → langsung ke section backlog + SpecDetail. Hash dibersihkan

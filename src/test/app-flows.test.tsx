@@ -14,6 +14,9 @@ vi.mock("../src/api/client", () => ({
     getSettings: vi.fn(async () => ({ model: "claude-opus-5", effort: "xhigh", agent: "claude",
       codex: { model: "gpt-5.6-sol", effort: "xhigh" }, goal: { enabled: false, condition: "" } })),
     getCodexVersion: vi.fn(async () => ({ version: null, minRequired: "0.144.0", ok: true })),
+    // SPEC-739 · picker Start menurunkan kesiapan metode saat modal terbuka; mock `api`
+    // parsial WAJIB menyebutnya, kalau tidak efeknya melempar dan terbaca seperti regresi.
+    getMethodStatus: vi.fn(async () => ({ methods: [] })),
     startSession: vi.fn(async () => ({ id: "spec-341" })), deleteSpec: vi.fn(), createSpec: vi.fn(),
     listNotifications: vi.fn(async () => ({ items: [], unread: 0 })), // SPEC-180 · provider poll
   },

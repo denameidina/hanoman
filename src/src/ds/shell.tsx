@@ -30,6 +30,12 @@ export const HN_NAV: NavItem[] = [
   { key: "settings", label: "Settings", icon: "settings" },
 ];
 
+// SPEC-740 · ADR-0115 · gerbang bagi `section` yang dipulihkan dari storage: hanya halaman
+// bernavigasi yang boleh jadi titik mendarat. `project`/`review` bergantung pada state
+// transien (`proj`/`review`) yang tak ikut dipulihkan — memulihkannya = mendarat di layar
+// kosong; key mati (`runs`/`triggers`) membuat App merender kosong berikut sidebar-nya.
+export const NAV_KEYS: string[] = HN_NAV.map((n) => n.key);
+
 function HnWordmark() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

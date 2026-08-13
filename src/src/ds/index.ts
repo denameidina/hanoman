@@ -8,7 +8,7 @@ export { Tabs } from "./components/ui";
 export { useToast, Toast, Modal, Field, HnTextarea, serverPage, Pager, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE } from "./kit";
 export type { ToastData, ShowToast } from "./kit";
 export { ConfirmDialog } from "./ConfirmDialog";
-export { Shell } from "./shell";
+export { Shell, HN_NAV, NAV_KEYS } from "./shell";
 export { MarkdownView, hnDocHtml, isMarkdownPath } from "./markdown";
 export { DocDownload } from "./DocDownload";
 export { DocPreviewModal } from "./DocPreviewModal";
