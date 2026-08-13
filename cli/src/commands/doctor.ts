@@ -4,7 +4,8 @@
 import { execFileSync } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
 import { dirname } from "node:path";
-import { resolveHome, resolveDbUrl, dbFilePath, dbUrlNotice } from "@hanoman/runner";
+import { resolveHome, resolveDbUrl, dbFilePath, dbUrlNotice, scanAgentSkills } from "@hanoman/runner";
+import { DEFAULT_METHOD, METHODS, methodStatus, zAgent, type MethodSkillStatus } from "@hanoman/shared";
 import type { Ctx } from "../router";
 import { resolveLayout } from "../layout";
 import { distDir } from "./start";
@@ -14,6 +15,9 @@ export type Probes = {
   claude: string | null; codex: string | null;
   gh: string | null;   // SPEC-471 · opsional: tanpa gh, tarik issue lewat REST + GITHUB_TOKEN
   homeWritable: boolean; web: boolean; db: string;
+  // SPEC-739 · ADR-0114 · kesiapan metode DEFAULT untuk tiap agen yang CLI-nya benar-benar ada.
+  // Kosong = tak ada yang dilaporkan (mis. tak ada CLI agen sama sekali).
+  methods: MethodSkillStatus[];
 };
 
 export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
@@ -32,6 +36,20 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
     { mark: p.web ? "✓" : "!", text: p.web ? "aset dashboard ada" : "aset dashboard tak ada — API jalan, dashboard tidak", fatal: false },
     { mark: "·", text: `db ${p.db}`, fatal: false },
   ];
+  // SPEC-739 · ADR-0114 · NON-FATAL, sejajar dengan cara aset dashboard yang hilang dilaporkan:
+  // skill yang kurang tak mematikan sesi, ia hanya menghapus gerbang yang disebut prompt.
+  for (const m of p.methods) {
+    const agent = m.agent === "codex" ? "Codex CLI" : "Claude Code";
+    rows.push({
+      mark: m.ready ? "✓" : "!",
+      text: m.ready
+        ? `metode ${m.method} · ${agent} — siap`
+        : `metode ${m.method} · ${agent} — belum siap: `
+          + [...m.missingPackages, ...m.missingSkills].join(", ")
+          + m.install.map((c) => `\n      ${c}`).join(""),
+      fatal: false,
+    });
+  }
   if (!p.claude && !p.codex) {
     rows.push({ mark: "✗", text: "tak ada CLI agen (claude ATAU codex wajib ada)", fatal: true });
   }
@@ -56,14 +74,25 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
   try { accessSync(existsSync(home) ? home : dirname(home), constants.W_OK); homeWritable = true; }
   catch { /* tetap false */ }
 
+  const claude = version(ctx.env.HANOMAN_CLAUDE_BIN ?? "claude", ["--version"]);
+  const codex = version(ctx.env.HANOMAN_CODEX_BIN ?? "codex", ["--version"]);
+  // SPEC-739 · ADR-0114 · hanya agen yang CLI-nya ADA yang dilaporkan: kesiapan metode codex di
+  // mesin tanpa codex cuma derau. Metode DEFAULT saja — itu yang dipakai sesi tanpa pilihan.
+  const method = METHODS[DEFAULT_METHOD]!;
+  const methods = zAgent.options
+    .filter((a) => (a === "codex" ? codex : claude) !== null)
+    .map((a) => {
+      const s = scanAgentSkills(a, ctx.env);
+      return methodStatus(method, a, { skills: s.skills.map((k) => k.id), packages: s.packages });
+    });
+
   const r = doctorReport({
     node: process.version,
     git: version("git", ["--version"]),
     tmux: version("tmux", ["-V"]),
-    claude: version(ctx.env.HANOMAN_CLAUDE_BIN ?? "claude", ["--version"]),
-    codex: version(ctx.env.HANOMAN_CODEX_BIN ?? "codex", ["--version"]),
+    claude, codex,
     gh: version(ctx.env.HANOMAN_GH_BIN ?? "gh", ["--version"]),
-    homeWritable, web: layout.web !== null, db,
+    homeWritable, web: layout.web !== null, db, methods,
   });
   ctx.stdout(`hanoman doctor\n${r.lines.join("\n")}\n`);
   // Justru di doctor ini paling berguna: ia menjelaskan kenapa `db …` menunjuk berkas default

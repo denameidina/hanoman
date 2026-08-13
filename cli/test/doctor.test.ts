@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { DEFAULT_METHOD, METHODS, methodSkills, methodStatus } from "@hanoman/shared";
 import { doctorReport } from "../src/commands/doctor";
 
 const ok = {
   node: "v22.0.0", git: "git version 2.44.0", tmux: "tmux 3.4",
   claude: "1.0.0", codex: null, gh: null, homeWritable: true, web: true, db: "/h/.hanoman/hanoman.db",
+  methods: [],   // SPEC-739 · kosong = tak ada metode yang dilaporkan
 };
 
 describe("doctorReport", () => {
@@ -47,5 +49,36 @@ describe("doctorReport", () => {
     const dengan = doctorReport({ ...ok, gh: "gh version 2.96.0" });
     expect(dengan.ok).toBe(true);
     expect(dengan.lines.join("\n")).toContain("gh version 2.96.0");
+  });
+});
+
+// SPEC-739 · ADR-0114 · metode default yang tak siap dilaporkan seperti aset dashboard yang
+// hilang: ditandai `!`, TIDAK fatal. Skill yang kurang tak mematikan sesi — ia menghapus
+// gerbang yang disebut prompt, dan itulah yang perlu terbaca operator.
+describe("doctorReport · metode default (SPEC-739)", () => {
+  const method = METHODS[DEFAULT_METHOD]!;
+
+  it("tak siap → tanda `!` NON-FATAL + perintah pemasangannya", () => {
+    const st = methodStatus(method, "codex", { skills: [], packages: [] });
+    const r = doctorReport({ ...ok, methods: [st] });
+    const text = r.lines.join("\n");
+    expect(text).toContain("!");
+    expect(text).toContain(DEFAULT_METHOD);
+    expect(text).toContain("Codex CLI");
+    expect(text).toContain(method.install.codex[0]!);
+    expect(r.ok).toBe(true);   // hanoman tetap bisa menjalankan sesi
+  });
+
+  it("siap → tanda `✓`, tanpa perintah", () => {
+    const st = methodStatus(method, "claude", { skills: methodSkills(method), packages: [...method.requires] });
+    const r = doctorReport({ ...ok, methods: [st] });
+    const text = r.lines.join("\n");
+    expect(text).toContain(`✓ metode ${DEFAULT_METHOD}`);
+    expect(text).not.toContain(method.install.claude[0]!);
+  });
+
+  it("tanpa metode yang dilaporkan, laporan lama tak berubah", () => {
+    expect(doctorReport(ok).lines.join("\n")).not.toContain("metode ");
+    expect(doctorReport(ok).ok).toBe(true);
   });
 });
