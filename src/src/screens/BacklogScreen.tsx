@@ -737,7 +737,9 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   const [tab, setTab] = usePersistedState("backlog", "tab", "all", isStr);
   // SPEC-268 · bump untuk re-fetch daftar sesudah tombol Sync menarik data baru.
   const [syncNonce, setSyncNonce] = React.useState(0);
-  const [view, setView] = usePersistedState("backlog", "view", "grid", oneOf("grid", "list", "board"));
+  // `string`, bukan union: `Tabs.onChange` memberi string. Guard-nya tetap ketat, jadi
+  // nilai di luar daftar tetap jatuh ke "grid".
+  const [view, setView] = usePersistedState<string>("backlog", "view", "grid", oneOf<string>("grid", "list", "board"));
   // SPEC-178 · search + filter stage/prioritas, semua view-local (tak diangkat ke App).
   const [q, setQ] = usePersistedState("backlog", "q", "", isStr);
   const [stageFilter, setStageFilter] = usePersistedState("backlog", "stage", "all", isStr);

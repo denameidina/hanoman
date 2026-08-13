@@ -260,7 +260,8 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast }: Schedule
           )}
           {draft.kind === "tiap-n-jam" && (
             <Field label="Tiap berapa jam">
-              <Input type="number" min={1} max={23} aria-label="Tiap berapa jam" value={String(draft.everyHours)}
+              <Input type="number" min={1} max={23} aria-label="Tiap berapa jam" placeholder="mis. 6"
+                value={String(draft.everyHours)}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setDraft((d) => ({ ...d, everyHours: Math.min(23, Math.max(1, Number(e.target.value) || 1)) }))} />
             </Field>
@@ -282,7 +283,9 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast }: Schedule
         </div>
 
         <Field label="Prompt" hint="Instruksi bebas untuk agen. Temuan sebaiknya difilekan sebagai backlog lewat POST /api/specs.">
-          <HnTextarea aria-label="Prompt" rows={6} value={draft.prompt}
+          <HnTextarea aria-label="Prompt" rows={6}
+            placeholder="mis. Periksa error 5xx sejak kemarin, lalu filekan temuannya sebagai QA finding."
+            value={draft.prompt}
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDraft((d) => ({ ...d, prompt: e.target.value }))} />
         </Field>
 
