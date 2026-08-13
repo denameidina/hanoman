@@ -32,3 +32,56 @@ export function usePersistedState<T>(
 
   return [snap.value, set];
 }
+
+// Berapa frame pemulihan boleh menunggu tinggi konten jadi final. Daftar yang datanya
+// baru tiba tumbuh beberapa frame; daftar yang memang lebih pendek tak boleh membuat
+// loop abadi.
+const RESTORE_FRAMES = 20;
+
+/** Ref callback untuk elemen bergulir: menyimpan `scrollTop` dan memulihkannya SETELAH
+    `ready` (mis. data selesai dimuat). Ref callback, bukan RefObject — container daftar
+    sering baru muncul sesudah state `loading` selesai. */
+export function useScrollRestore<E extends HTMLElement = HTMLDivElement>(
+  screen: string, field: string, ready = true,
+): (node: E | null) => void {
+  const key = uiKey(screen, field);
+  const [el, setEl] = React.useState<E | null>(null);
+  const ref = React.useCallback((node: E | null) => setEl(node), []);
+  // Pemulihan menyetel scrollTop, yang memancarkan event scroll. Tanpa penanda ini,
+  // percobaan pertama (saat konten masih pendek) menulis balik nilai TERPOTONG dan
+  // posisi aslinya hilang sebelum konten sempat tumbuh.
+  const restoring = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!el) return;
+    let frame = 0;
+    const onScroll = () => {
+      if (restoring.current || frame) return;
+      frame = requestAnimationFrame(() => { frame = 0; writeUiState(key, el.scrollTop); });
+    };
+    el.addEventListener("scroll", onScroll);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [el, key]);
+
+  React.useEffect(() => {
+    if (!el || !ready) return;
+    const saved = readUiState(key, 0);
+    if (saved <= 0) return;
+    let frames = 0;
+    let raf = 0;
+    restoring.current = true;
+    const tick = () => {
+      el.scrollTop = saved;
+      const enough = el.scrollHeight - el.clientHeight >= saved;
+      if (enough || ++frames >= RESTORE_FRAMES) { restoring.current = false; return; }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(raf); restoring.current = false; };
+  }, [el, key, ready]);
+
+  return ref;
+}
