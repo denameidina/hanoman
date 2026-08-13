@@ -9,6 +9,7 @@ import { Card, Button, Badge, Input, Select, StateBlock, Icon, Checkbox, Radio, 
 import { api } from "../api/client";
 import type { Lead, LeadStatusView, LeadDecisionView, LeadFlowView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
+import { usePersistedState, ResetViewButton, isStr, isNum } from "../ui-state";
 
 const POLL_MS = 5000;
 // SPEC-523 · ukuran halaman kedua daftar lead. 393 baris jejak di instalasi hidup dulu dibalas
@@ -274,13 +275,14 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
   const [decisions, setDecisions] = React.useState<LeadDecisionView[]>([]);
   const [flows, setFlows] = React.useState<LeadFlowView[]>([]);
   const [decTotal, setDecTotal] = React.useState(0);
-  const [decPage, setDecPage] = React.useState(1);
+  const [decPage, setDecPage] = usePersistedState("lead", "decPage", 1, isNum);
   const [flowTotal, setFlowTotal] = React.useState(0);
-  const [flowPage, setFlowPage] = React.useState(1);
+  const [flowPage, setFlowPage] = usePersistedState("lead", "flowPage", 1, isNum);
   const [phase, setPhase] = React.useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = React.useState(false);
   const [busyId, setBusyId] = React.useState<string | null>(null);
-  const [filter, setFilter] = React.useState("all");
+  // SPEC-740 · ADR-0115 · penyaring project & nomor halaman kedua daftar bertahan.
+  const [filter, setFilter] = usePersistedState("lead", "filter", "all", isStr);
 
   const load = React.useCallback((silent = false) => {
     if (!silent) setPhase("loading");
@@ -460,10 +462,13 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
 
       <Card eyebrow="lead · jejak keputusan" title={`Keputusan (${decTotal})`}
         actions={
-          <Select size="sm" value={filter} aria-label="saring project"
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilter(e.target.value)}
-            options={[{ value: "all", label: "semua project" },
-              ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Select size="sm" value={filter} aria-label="saring project"
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilter(e.target.value)}
+              options={[{ value: "all", label: "semua project" },
+                ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
+            <ResetViewButton screen="lead" active={filter === "all" ? 0 : 1} />
+          </div>
         }>
         {decisions.length === 0
           ? <div style={{ fontSize: "var(--text-sm)", color: "var(--text-subtle)" }}>

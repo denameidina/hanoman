@@ -13,6 +13,7 @@ import {
   type CronPreset, type SchedulerCronView, type SchedulerCronRunView, type Agent,
 } from "@hanoman/shared";
 import { runtimeModels, runtimeEfforts } from "./session-runtime";
+import { usePersistedState, isNum, isStr, nullableStr } from "../ui-state";
 import type { ProjectVM } from "./types";
 
 const PAGE = 10;
@@ -63,7 +64,7 @@ const STATUS_LABEL: Record<string, string> = { launched: "berjalan", queued: "me
 function RunHistory({ cronId }: { cronId: string }) {
   const [items, setItems] = React.useState<SchedulerCronRunView[]>([]);
   const [total, setTotal] = React.useState(0);
-  const [page, setPage] = React.useState(1);
+  const [page, setPage] = usePersistedState("scheduler", "cronRunsPage", 1, isNum);
   React.useEffect(() => {
     let alive = true;
     api.listCronRuns(cronId, { page, limit: PAGE })
@@ -100,12 +101,13 @@ export type SchedulerCronsProps = {
 };
 
 export function SchedulerCrons({ projects, onProjectChanged, onToast }: SchedulerCronsProps) {
-  const [projectId, setProjectId] = React.useState(projects[0]?.id ?? "");
+  // SPEC-740 · ADR-0115 · project yang dipilih & seksi riwayat yang ter-expand bertahan.
+  const [projectId, setProjectId] = usePersistedState("scheduler", "cronProject", projects[0]?.id ?? "", isStr);
   const [items, setItems] = React.useState<SchedulerCronView[]>([]);
   // `undefined` = modal tertutup; `null` = form cron BARU; objek = sedang mengubah cron itu.
   const [editing, setEditing] = React.useState<SchedulerCronView | null | undefined>(undefined);
   const [draft, setDraft] = React.useState<Draft>(draftFrom());
-  const [openRuns, setOpenRuns] = React.useState<string | null>(null);
+  const [openRuns, setOpenRuns] = usePersistedState<string | null>("scheduler", "cronOpenRuns", null, nullableStr);
   const [busy, setBusy] = React.useState(false);
 
   const project = projects.find((p) => p.id === projectId);

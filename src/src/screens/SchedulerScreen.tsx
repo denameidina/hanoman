@@ -10,6 +10,7 @@ import type { SchedulerStateView, SchedulerQueueItemView, SchedulerSessionView, 
 import type { ProjectVM, Spec } from "./types";
 import { specDeepLink } from "./deeplink";
 import { SchedulerCrons } from "./SchedulerCrons";
+import { usePersistedState, isNum } from "../ui-state";
 
 const POLL_MS = 5000;
 const QUEUE_PAGE = 10;
@@ -174,7 +175,9 @@ function QueueSection({ title, status, count, empty, nonce, render }: {
 }) {
   const [items, setItems] = React.useState<SchedulerQueueItemView[]>([]);
   const [total, setTotal] = React.useState(0);
-  const [page, setPage] = React.useState(1);
+  // SPEC-740 · ADR-0115 · tiga seksi antrean memakai komponen yang SAMA — kuncinya wajib
+  // memuat `status`, kalau tidak ketiganya berbagi satu nomor halaman.
+  const [page, setPage] = usePersistedState("scheduler", `queue-${status}-page`, 1, isNum);
 
   React.useEffect(() => {
     let alive = true;
