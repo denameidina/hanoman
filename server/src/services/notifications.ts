@@ -62,6 +62,21 @@ export async function recordAutoMerge(
   }).catch(() => { /* P2002: sudah ada — sweep lain sudah menyelesaikannya */ });
 }
 
+// SPEC-742 · ADR-0116 · worktree yang gagal dibersihkan penyapu latar. Tanpa baris ini kegagalannya
+// hilang senyap: sesinya sudah lenyap dari daftar, dan yang tersisa cuma direktori yang tak seorang
+// pun cari. `key` berkunci ENTRI trash (unik per pemindahan) → satu baris per sampah, bukan satu per
+// tick; sapuan berikutnya tetap mencoba lagi tanpa menambah kebisingan.
+export async function recordCleanupFailure(
+  sessionId: string, projectId: string | null, entry: string, reason: string,
+): Promise<void> {
+  await prisma.notification.create({
+    data: {
+      type: "cleanup", key: `cleanup:${entry}`, sessionId, projectId,
+      title: `Worktree sesi ${sessionId} gagal dibersihkan — ${reason}`,
+    },
+  }).catch(() => { /* P2002: sudah dilaporkan untuk entri ini */ });
+}
+
 // SPEC-546 · ADR-0109 · konversi type sebuah backlog item. Dedup lewat `key` berurutan
 // `source:<specId>:<n>` (n = panjang `sourceHistory` sesudah append): unik & deterministik, jadi
 // dua permintaan konversi yang balapan hanya menyisakan satu baris — pola `recordCompletion`.

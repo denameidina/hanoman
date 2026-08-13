@@ -6,6 +6,7 @@ import { getLimits } from "./limits";
 import { getCodexLimits } from "./codex-limits";
 import { getUpdateStatus } from "./update";
 import { isDeciding } from "./lead/deciding";
+import { listCleanups } from "./worktree-reaper";
 import { prisma } from "../db";
 import { effectiveInt } from "../config";
 
@@ -35,6 +36,10 @@ const GROUPS: Group[] = [
   }) },
   { everyTicks: 1,  last: "", build: async () => ({ t: "specs", specs: await liveSpecs() }) },
   { everyTicks: 3,  last: "", build: async () => ({ t: "notifications", ...(await notificationsFeed()) }) },
+  // SPEC-742 · ADR-0116 · pembersihan worktree yang masih jalan. `listCleanups()` membaca peta di
+  // memori, bukan disk — nol I/O per tick, dan dedup signature membuat frame lahir hanya saat
+  // daftarnya berubah (nyaris selalu kosong).
+  { everyTicks: 3,  last: "", build: async () => ({ t: "cleanups", cleanups: listCleanups() }) },
   // ponytail: cermin GET /vps (orderBy createdAt asc). Query sepele — tak diekstrak.
   { everyTicks: 15, last: "", build: async () => ({ t: "vps", vps: await prisma.vps.findMany({ orderBy: { createdAt: "asc" } }) }) },
   { everyTicks: 30, last: "", build: async () => ({ t: "limits", limits: await getLimits() }) },

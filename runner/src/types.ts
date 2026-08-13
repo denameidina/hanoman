@@ -52,6 +52,12 @@ export interface GitOps {
   /** Mengembalikan baseSha — commit tempat worktree ini lahir. */
   addWorktree(repo: string, path: string, branchFrom: string): string;
   removeWorktree(repo: string, path: string): void;
+  /** SPEC-742 · ADR-0116 · bebaskan path worktree dalam waktu O(1) dengan MEMINDAHKANNYA ke
+   *  `<repo>/.worktrees/.trash/<basename>.<stempel>`; byte-nya dihapus penyapu latar. Mengembalikan
+   *  path trash-nya, atau `null` bila tak ada yang dipindah (path absen, atau sudah di dalam trash —
+   *  penutupan ganda karena itu idempoten). MELEMPAR bila pemindahannya mustahil: pemanggil jatuh
+   *  ke `removeWorktree` yang sinkron, tak pernah ke penghapusan latar atas path aslinya. */
+  trashWorktree(repo: string, path: string): string | null;
   /** HEAD worktree sekarang — dibaca sebelum removeWorktree untuk simpan headSha (SPEC-176). */
   headSha(worktree: string): string;
   /** Menyiapkan repo siap-worktree untuk project from-scratch: git init + satu commit

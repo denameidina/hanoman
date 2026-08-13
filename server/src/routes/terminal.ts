@@ -13,6 +13,7 @@ import { startSpecSession, LaunchError } from "../services/session-launch";
 import { installCommand } from "../services/method-status";
 import { resolveRepoDir } from "../services/local-binding";
 import { ownsWorktree } from "../services/session-worktree";
+import { listCleanups, releaseWorktree } from "../services/worktree-reaper";
 import { recordHeadSha } from "../services/spec-head";
 import { readPrd } from "../services/project-prds";
 import { readAuditDoc } from "../services/audit-escalation";
@@ -402,6 +403,10 @@ export default async function (app: FastifyInstance) {
     return { status: "conflict", sessionId: cs.id };
   });
 
+  // SPEC-742 · ADR-0116 · pembersihan worktree yang masih tertunda. Sesinya sudah lenyap saat baris
+  // ini lahir, jadi yang diamati adalah pembersihannya: muncul = `closing`, hilang = `closed`.
+  app.get("/terminal/cleanups", async () => ({ items: listCleanups() }));
+
   app.delete("/terminal/sessions/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const s = getSession(id);
@@ -417,25 +422,29 @@ export default async function (app: FastifyInstance) {
       // pada project murni-metadata tetap dibersihkan.
       const repoDir = await resolveRepoDir(s.projectId);
       if (repoDir) {
-        // Bacaan terakhir sebelum worktree-nya lenyap: sesudah ini berkas fasenya tak berarti lagi.
+        // SPEC-742 · ADR-0116 · dua bacaan ini WAJIB tetap di sini, sebelum worktree-nya lepas:
+        // keduanya membaca berkas fase, plan, dan HEAD dari DALAM worktree. Memindahkannya ke latar
+        // berarti stage tak maju dan headSha hilang — dan bersamanya bukti dependency antar-backlog.
+        // Keduanya murah; yang mahal cuma penghapusan byte-nya, dan itulah yang pindah ke latar.
         if (s.specId) {
           if (s.flow) await advanceStage(s.specId, repoDir, id, s.flow, s.cwd);
           // HEAD worktree = ujung range review sesudah item selesai (SPEC-176, ADR-0030).
-          // Dibaca sebelum removeWorktree; gagal-diam agar tak memblok penutupan sesi.
+          // Gagal-diam agar tak memblok penutupan sesi.
           // SPEC-475 · lewat penulis BERSAMA — jalur ini dulu satu-satunya yang menulis kolomnya,
           // dan itulah sebabnya dua jalur otonom lain kehilangan bukti dependency-nya.
           await recordHeadSha(s.specId, s.cwd);
         }
         killSession(id);
-        // SPEC-362 · hanya hapus worktree yang benar-benar milik sesi ini. Tanpa gerbang ini,
+        // SPEC-362 · hanya lepas worktree yang benar-benar milik sesi ini. Tanpa gerbang ini,
         // project yang di-bind ke checkout di bawah `.worktrees/` kehilangan seluruh checkout-nya
-        // saat sebuah terminal biasa ditutup (`cwd === repoDir`).
-        if (ownsWorktree(repoDir, s.cwd)) realGit.removeWorktree(repoDir, s.cwd);
-        return reply.code(204).send();
+        // saat sebuah terminal biasa ditutup (`cwd === repoDir`). `rename` sama merusaknya dengan
+        // `rm`, jadi gerbangnya berdiri di depan KEDUANYA.
+        const cleanup = ownsWorktree(repoDir, s.cwd) ? releaseWorktree(repoDir, s.cwd, s.projectId) : null;
+        return reply.code(202).send({ cleanup });
       }
     }
     killSession(id);
-    return reply.code(204).send();
+    return reply.code(202).send({ cleanup: null });
   });
 
   app.get("/terminal/sessions/:id/ws", { websocket: true }, (socket, req) => {

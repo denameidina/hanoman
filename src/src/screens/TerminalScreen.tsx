@@ -3,7 +3,7 @@ import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, Stat
   ProductStateIllustration } from "../ds";
 import { api, ApiError, type TerminalSession, type Phase, type Flow } from "../api/client";
 import { subscribe } from "../api/events";
-import { flowForSource, type SessionHistoryView } from "@hanoman/shared";
+import { flowForSource, type SessionHistoryView, type WorktreeCleanupView } from "@hanoman/shared";
 import { TerminalPane } from "./TerminalPane";
 import { SessionHistoryModal } from "./SessionHistoryModal";
 import { NewTerminalModal } from "./NewTerminalModal";
@@ -25,6 +25,8 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
   specOf?: (specId: string) => Spec | undefined;
 }) {
   const [sessions, setSessions] = React.useState<TerminalSession[]>([]);
+  // SPEC-742 · ADR-0116 · worktree yang masih disapu di latar. Bukan sesi: sesinya sudah lenyap.
+  const [cleanups, setCleanups] = React.useState<WorktreeCleanupView[]>([]);
   const [ws, setWs] = React.useState<W.Workspace>(() => W.load() ?? W.emptyWorkspace());
   // SPEC-740 · ADR-0115 · project pemilih sesi baru. Workspace grid TIDAK dipindah ke
   // namespace ini — ia sudah persisten di kunci `hanoman.terminal.workspace`, dan
@@ -52,6 +54,10 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
   // (ADR-0039), bukan poll 8s. tmux = source of truth di server; snapshot penuh saat connect.
   React.useEffect(() => subscribe((m) => {
     if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
+    // SPEC-742 · ADR-0116 · tab yang ditutup lepas SEKETIKA (sesinya memang sudah lenyap); yang
+    // masih berjalan cuma penghapusan byte worktree-nya. Tanpa baris ini kerja itu tak kasatmata,
+    // dan "kok disknya belum kembali" jadi pertanyaan tanpa jawaban.
+    else if (m.t === "cleanups") setCleanups(m.cleanups);
   }), []);
 
   // Sesi hidup di tmux dan selamat dari restart server (ADR-0016): workspace ter-load bisa
@@ -81,6 +87,7 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
     if (fullId && !sessions.some((s) => s.id === fullId)) setFullId(null);
   }, [fullId, sessions]);
 
+  const failedCleanups = cleanups.filter((c) => c.error);
   const byId = (id: string) => sessions.find((s) => s.id === id) ?? null;
   const nameOf = (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid;
 
@@ -156,10 +163,13 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
     sessions.filter((s) => s.specId && !s.exited).map((s) => s.specId as string));
   const startable = backlog.filter((s) => s.stage !== "done" && !activeSpecIds.has(s.id));
 
-  // Tutup = perilaku hari ini: kill sesi. Selnya dikosongkan oleh efek rekonsiliasi.
-  async function close(id: string) {
-    await api.deleteTerminal(id).catch(() => {});
+  // Tutup = kill sesi. Selnya dikosongkan oleh efek rekonsiliasi.
+  // SPEC-742 · ADR-0116 · sel dilepas LEBIH DULU, tak menunggu respons: begitu operator menekan
+  // Tutup, sesi itu selesai baginya. Tak ada risiko menyembunyikan sesi yang sebenarnya selamat —
+  // tmux tetap source of truth dan frame siar `sessions` (1 dtk) mengembalikannya bila DELETE gagal.
+  function close(id: string) {
     setSessions((s) => s.filter((x) => x.id !== id));
+    void api.deleteTerminal(id).catch(() => {});
   }
 
   // SPEC-402 · kode keluar dari frame `exit` DISIMPAN, tak lagi dibuang: pane yang mati dengan
@@ -212,6 +222,15 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
           <Button size="sm" variant="ghost" onClick={() => setWs((w) => W.mapActiveLayout(w, L.addColumn))}>+ Kolom</Button>
           <Button size="sm" variant="ghost" onClick={() => setWs((w) => W.mapActiveLayout(w, L.addRow))}>+ Baris</Button>
           <div style={{ flex: 1, minWidth: 0 }} />
+          {cleanups.length > 0 && (
+            <span data-testid="worktree-cleanups"
+              title={cleanups.map((c) => `${c.sessionId}${c.error ? ` — ${c.error}` : ""}`).join("\n")}
+              style={{ fontSize: 12, color: failedCleanups.length ? "var(--status-err)" : "var(--text-muted)" }}>
+              {failedCleanups.length
+                ? `${failedCleanups.length} worktree gagal dibersihkan`
+                : `membersihkan ${cleanups.length} worktree…`}
+            </span>
+          )}
           <Select size="sm" value={project} onChange={(e) => setProject(e.target.value)}
             options={projects.map((p) => ({ value: p.id, label: p.name }))} />
           <Button size="sm" variant="secondary" leftIcon="inbox"

@@ -595,7 +595,21 @@ export type EventMsg =
   | { t: "limits"; limits: LimitsDTO }
   | { t: "codexLimits"; limits: CodexLimitsDTO }   // SPEC-338 · ADR-0074 · grup terpisah dari `limits`
   | { t: "vps"; vps: VpsView[] }
+  | { t: "cleanups"; cleanups: WorktreeCleanupView[] }   // SPEC-742 · ADR-0116
   | { t: "update"; update: UpdateStatus };
+
+// SPEC-742 · ADR-0116 · pembersihan worktree yang masih tertunda sesudah sebuah sesi ditutup.
+// Sesinya SUDAH lenyap saat baris ini lahir — yang bisa diamati adalah pembersihannya, berkunci
+// id sesi yang dipulihkan dari nama entri trash. Muncul = `closing`, hilang = `closed`.
+export type WorktreeCleanupView = {
+  sessionId: string; projectId: string;
+  /** Nama direktori di `<repoDir>/.worktrees/.trash/` — `<sesi>.<stempel>`. */
+  entry: string;
+  since: string;
+  state: "closing" | "failed";
+  /** Alasan percobaan penghapusan TERAKHIR gagal. Hilang sesudah restart: ia milik percobaan itu. */
+  error?: string;
+};
 
 // SPEC-253 · Help Center — DTO triase + halaman publik.
 export const zTicketView = z.object({

@@ -806,11 +806,25 @@ GET    /terminal/sessions/:id/review/*path  # { path, status, binary, truncated,
 POST   /terminal/sessions/:id/integrate  { op:"merge"|"rebase", target:"local:<b>"|"origin:<b>" }
 #   (SPEC-230, ADR-0054) rebase/merge branch sesi (PRD prd/<slug>); { status:"clean", detail } |
 #   { status:"conflict", sessionId } (spawn sesi claude di worktree merge-<id>) | 400 op/target · 409 branch/sesi tanpa branch
-DELETE /terminal/sessions/:id        # 204 · 404; menutup sesi: majukan stage, simpan headSha, removeWorktree
-#   removeWorktree HANYA dijalankan bila cwd sesi benar-benar berada DI DALAM <repoDir>/.worktrees/
+DELETE /terminal/sessions/:id        # 202 { cleanup: string|null } · 404; menutup sesi
+#   Worktree HANYA dilepas bila cwd sesi benar-benar berada DI DALAM <repoDir>/.worktrees/
 #   (`ownsWorktree`, services/session-worktree.ts). Bentuk path saja bukan bukti kepemilikan:
 #   project yang di-bind ke checkout di bawah .worktrees/ (dogfooding hanoman di worktree sendiri)
 #   punya `cwd === repoDir` untuk terminal biasa, dan gerbang lama menghapus checkout itu sendiri.
+#   SPEC-742 · ADR-0116 · ASINKRON. Di dalam request hanya yang murah & wajib-urut: advanceStage()
+#   → recordHeadSha() (keduanya membaca berkas fase/plan/HEAD dari DALAM worktree — memindahkannya
+#   ke latar = stage tak maju & headSha hilang) → killSession() → `rename` worktree ke
+#   <repoDir>/.worktrees/.trash/<sesi>.<stempel> (terukur 1 ms). Byte-nya dihapus penyapu latar
+#   (services/worktree-reaper.ts, fs.promises.rm) — `rmSync` lama memblokir event loop 1 364 ms.
+#   202, bukan 204: pembersihan memang belum tuntas. `cleanup` = nama entri trash, null bila sesi
+#   itu tak punya worktree (terminal biasa/shell). Path aslinya SUDAH bebas saat respons kembali,
+#   jadi sesi baru untuk backlog yang sama langsung bisa lahir.
+GET    /terminal/cleanups            # { items: [{ sessionId, projectId, entry, since, state, error? }] }
+#   SPEC-742 · ADR-0116 · pembersihan worktree yang masih tertunda. Sesinya sudah lenyap saat baris
+#   ini lahir — yang diamati pembersihannya: muncul = `closing`, hilang = `closed`, `state:"failed"`
+#   = percobaan terakhir gagal (entri tetap ada & dicoba lagi; notifikasi `type:"cleanup"` lahir
+#   sekali per entri). Ikut capability `sessions` yang sudah ada, tanpa perubahan gerbang.
+#   Disiarkan juga sebagai frame `{ t:"cleanups", cleanups }` di /events/ws.
 GET    /terminal/sessions/:id/ws     # WebSocket; close 4004 bila sesi tak ada
 #   server->klien: { t:"data", d } · { t:"phase", phases, complete } · { t:"exit", code }
 #   klien->server: { t:"in", d } · { t:"resize", cols, rows }
@@ -850,6 +864,7 @@ GET    /events/ws                    # WebSocket siar dashboard (global). Auth =
 #     { t:"specs", specs } · { t:"sessions", sessions } · { t:"notifications", items, unread }
 #     { t:"limits", limits } · { t:"codexLimits", limits } (SPEC-338, tiap 30s, grup TERPISAH dari
 #       `limits` karena sumber & semantik kesegarannya beda) · { t:"vps", vps } ·
+#       { t:"cleanups", cleanups } (SPEC-742, tiap 3s — dibangun dari peta memori, nol I/O) ·
 #       { t:"update", update } (SPEC-214, tiap 300s)
 #   klien->server: — (read-only feed; frame masuk diabaikan)
 ```

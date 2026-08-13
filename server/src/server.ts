@@ -12,6 +12,7 @@ import { installTelegramGateway } from "./services/telegram/bootstrap";
 import { installWebhooks } from "./services/webhooks/install";
 import { startWebhookEngine } from "./services/webhooks/engine";
 import { startAutoMerge } from "./services/auto-merge";
+import { startWorktreeReaper } from "./services/worktree-reaper";
 import type { AddressInfo } from "node:net";
 
 // SPEC-215 · deteksi update default ON (registry HANOMAN_UPDATE_FETCH="1"), dibaca via resolver
@@ -98,4 +99,9 @@ app.listen({ port, host }).then(async () => {
   // ada backlog selesai dalam 24 jam terakhir: biayanya satu query ringan tiap menit, dan nol
   // sentuhan git selama tak ada project/spec yang meng-opt-in.
   startAutoMerge();
+  // SPEC-742 · ADR-0116 · penyapu worktree yang sudah dilepas ke `.worktrees/.trash` (in-process,
+  // cermin scheduler). Sapuan pertamanya jalan SEKARANG dan itulah pemulihan crash-nya: entri yang
+  // tertinggal karena proses mati di tengah penghapusan dibereskan di sini, bukan menunggu operator
+  // menutup sesi berikutnya.
+  startWorktreeReaper();
 }).catch((err) => { console.error("listen gagal:", err); process.exit(1); });

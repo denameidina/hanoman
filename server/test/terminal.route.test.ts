@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import WebSocket from "ws";
-import { mkdtempSync, appendFileSync, existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, appendFileSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +10,7 @@ import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { killAll, killSession, listSessions, promptFilePath, createSession as createSessionSvc } from "../src/services/pty";
 import { phaseFilePath } from "../src/services/session-phases";
+import { sweepRepo, __resetReaper } from "../src/services/worktree-reaper";
 import { resetDb, makeProject, makeSpec } from "./factory";
 
 // Lihat pty.test.ts: /bin/cat mati karena --dangerously-skip-permissions ilegal baginya.
@@ -107,7 +108,7 @@ describe("terminal routes", () => {
     expect(list.json().map((s: { id: string }) => s.id)).toContain(id);
 
     const del = await app.inject({ method: "DELETE", url: `/api/terminal/sessions/${id}` });
-    expect(del.statusCode).toBe(204);
+    expect(del.statusCode).toBe(202);
     const again = await app.inject({ method: "DELETE", url: `/api/terminal/sessions/${id}` });
     expect(again.statusCode).toBe(404);
 
@@ -250,7 +251,7 @@ describe("terminal routes · shell non-claude (SPEC-236)", () => {
     expect(listSessions().find((x) => x.id === id)!.cwd).toBe(nested);
 
     const del = await app.inject({ method: "DELETE", url: `/api/terminal/sessions/${id}` });
-    expect(del.statusCode).toBe(204);
+    expect(del.statusCode).toBe(202);
     expect(existsSync(nested)).toBe(true);
     expect(existsSync(join(nested, "PENANDA.txt"))).toBe(true);
   });
@@ -269,7 +270,7 @@ describe("terminal routes · shell non-claude (SPEC-236)", () => {
     process.env.HANOMAN_SHELL = FAKE_SHELL;
     const id = (await startShell("p1")).json().id as string;
     expect(existsSync(repoDir)).toBe(true);
-    expect((await app.inject({ method: "DELETE", url: `/api/terminal/sessions/${id}` })).statusCode).toBe(204);
+    expect((await app.inject({ method: "DELETE", url: `/api/terminal/sessions/${id}` })).statusCode).toBe(202);
     expect(existsSync(repoDir)).toBe(true);           // repoDir utuh
     expect(existsSync(join(repoDir, ".git"))).toBe(true);
   });
@@ -413,7 +414,7 @@ describe("terminal routes · sesi backlog", () => {
     await makeSpec({ id: "SPEC-904", projectId: "p1", stage: "brainstorming" });
     await start("SPEC-904");
     appendFileSync(phaseFilePath(repoDir, "spec-904"), "Brainstorm done\nObjective done\nSpec done\n");
-    expect((await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-904" })).statusCode).toBe(204);
+    expect((await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-904" })).statusCode).toBe(202);
     expect(existsSync(join(repoDir, ".worktrees", "spec-904"))).toBe(false);
     const spec = await prisma.spec.findUniqueOrThrow({ where: { id: "SPEC-904" } });
     expect(spec.stage).toBe("spec-ready");
@@ -613,7 +614,7 @@ describe("terminal routes · sesi reverse", () => {
   it("DELETE membuang worktree sesi reverse — meski tanpa spec", async () => {
     process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
     await start("p1");
-    expect((await app.inject({ method: "DELETE", url: "/api/terminal/sessions/reverse-p1" })).statusCode).toBe(204);
+    expect((await app.inject({ method: "DELETE", url: "/api/terminal/sessions/reverse-p1" })).statusCode).toBe(202);
     expect(existsSync(join(repoDir, ".worktrees", "reverse-p1"))).toBe(false);
   });
 
@@ -664,7 +665,7 @@ describe("terminal routes · sesi prd", () => {
   it("DELETE membuang worktree sesi prd — meski tanpa spec", async () => {
     process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
     await start("p1", brief);
-    expect((await app.inject({ method: "DELETE", url: "/api/terminal/sessions/prd-jadwal-invoice" })).statusCode).toBe(204);
+    expect((await app.inject({ method: "DELETE", url: "/api/terminal/sessions/prd-jadwal-invoice" })).statusCode).toBe(202);
     expect(existsSync(join(repoDir, ".worktrees", "prd-jadwal-invoice"))).toBe(false);
   });
 
@@ -739,7 +740,7 @@ describe("terminal routes · sesi scaffold", () => {
   it("DELETE membuang worktree sesi scaffold — meski tanpa spec", async () => {
     process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
     await start("p1");
-    expect((await app.inject({ method: "DELETE", url: "/api/terminal/sessions/scaffold-p1" })).statusCode).toBe(204);
+    expect((await app.inject({ method: "DELETE", url: "/api/terminal/sessions/scaffold-p1" })).statusCode).toBe(202);
     expect(existsSync(join(repoDir, ".worktrees", "scaffold-p1"))).toBe(false);
   });
 
@@ -849,7 +850,7 @@ describe("terminal DELETE — integrate session cleanup (SPEC-175)", () => {
     const s = createSessionSvc("p1", wt, { id: "merge-cleanup", specId: "SPEC-1" });
     expect(existsSync(wt)).toBe(true);
     const res = await app.inject({ method: "DELETE", url: `/api/terminal/sessions/${s.id}` });
-    expect(res.statusCode).toBe(204);
+    expect(res.statusCode).toBe(202);
     expect(existsSync(wt)).toBe(false);
   });
 });
@@ -925,5 +926,94 @@ describe("POST /terminal/sessions · dependency (SPEC-447)", () => {
     expect(res.statusCode).toBe(201);
     expect(res.json().id).toBe("spec-t2");
     killSession("spec-t2");
+  });
+});
+
+// SPEC-742 · ADR-0116 · penutupan sesi asinkron. Yang wajib-urut & murah tetap di dalam request;
+// worktree-nya DIPINDAH ke `.worktrees/.trash` (1 ms) lalu byte-nya dihapus penyapu latar.
+describe("DELETE /terminal/sessions/:id · penutupan asinkron (SPEC-742)", () => {
+  // repoDir baru terisi di beforeAll — badan describe dievaluasi lebih dulu.
+  const trashDir = () => join(repoDir, ".worktrees", ".trash");
+  const trashNames = () => { try { return readdirSync(trashDir()); } catch { return []; } };
+  const start = (spec: string, flow = "feature") =>
+    app.inject({ method: "POST", url: "/api/terminal/sessions", payload: { spec, flow } });
+
+  beforeEach(() => { __resetReaper(); rmSync(trashDir(), { recursive: true, force: true }); });
+
+  it("membalas 202 { cleanup } dan path worktree SUDAH bebas saat respons kembali", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    await makeSpec({ id: "SPEC-742A", projectId: "p1", stage: "planned" });
+    await start("SPEC-742A");
+    const wt = join(repoDir, ".worktrees", "spec-742a");
+    expect(existsSync(wt)).toBe(true);
+
+    const del = await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-742a" });
+
+    expect(del.statusCode).toBe(202);
+    expect(del.json().cleanup).toMatch(/^spec-742a\./);
+    expect(existsSync(wt)).toBe(false);                       // dibebaskan SINKRON, bukan dijanjikan
+  });
+
+  // Constraint yang paling mudah dilanggar: memindahkan bacaan ini ke latar membuat stage tak maju
+  // dan headSha hilang — dan bersamanya bukti dependency antar-backlog (ADR-0093).
+  it("stage & headSha tetap terekam meski penghapusannya ditunda", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    await makeSpec({ id: "SPEC-742B", projectId: "p1", stage: "brainstorming" });
+    await start("SPEC-742B");
+    appendFileSync(phaseFilePath(repoDir, "spec-742b"), "Brainstorm done\nObjective done\nSpec done\n");
+
+    await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-742b" });
+
+    const spec = await prisma.spec.findUniqueOrThrow({ where: { id: "SPEC-742B" } });
+    expect(spec.stage).toBe("spec-ready");
+    expect(spec.headSha).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  // Inti keluhannya: operator tak boleh menunggu apa pun untuk membuka sesi berikutnya, termasuk
+  // sesi untuk backlog yang SAMA — yang memakai path worktree yang persis sama.
+  it("sesi baru untuk backlog yang sama langsung lahir selagi entri trash masih tertahan", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    await makeSpec({ id: "SPEC-742C", projectId: "p1", stage: "planned" });
+    await start("SPEC-742C");
+    writeFileSync(join(repoDir, ".worktrees", "spec-742c", "KERJA-LAMA.txt"), "x");
+    await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-742c" });
+    expect(trashNames()).toHaveLength(1);                     // sengaja belum disapu
+
+    const lagi = await start("SPEC-742C");
+
+    expect(lagi.statusCode).toBe(201);
+    const wt = join(repoDir, ".worktrees", "spec-742c");
+    expect(existsSync(wt)).toBe(true);
+    expect(existsSync(join(wt, "KERJA-LAMA.txt"))).toBe(false);
+    killSession("spec-742c");
+  });
+
+  it("GET /terminal/cleanups menampilkan entri sebagai closing, lalu kosong sesudah disapu", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    await makeSpec({ id: "SPEC-742D", projectId: "p1", stage: "planned" });
+    await start("SPEC-742D");
+    await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-742d" });
+
+    const items = (await app.inject({ url: "/api/terminal/cleanups" })).json().items;
+    expect(items).toEqual([
+      expect.objectContaining({ sessionId: "spec-742d", projectId: "p1", state: "closing" }),
+    ]);
+
+    await sweepRepo(repoDir, "p1");
+    expect(trashNames()).toEqual([]);
+    expect((await app.inject({ url: "/api/terminal/cleanups" })).json().items).toEqual([]);
+  });
+
+  it("sesi tanpa worktree → 202 { cleanup: null }", async () => {
+    process.env.HANOMAN_SHELL = fileURLToPath(new URL("./fixtures/fake-shell.sh", import.meta.url));
+    const id = (await app.inject({
+      method: "POST", url: "/api/terminal/sessions", payload: { project: "p1", shell: true },
+    })).json().id as string;
+
+    const del = await app.inject({ method: "DELETE", url: `/api/terminal/sessions/${id}` });
+
+    expect(del.statusCode).toBe(202);
+    expect(del.json().cleanup).toBeNull();
+    expect(trashNames()).toEqual([]);
   });
 });

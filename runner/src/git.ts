@@ -1,7 +1,33 @@
 import { spawnSync } from "node:child_process";
-import { rmSync, mkdirSync, realpathSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { rmSync, mkdirSync, realpathSync, existsSync, renameSync } from "node:fs";
+import { basename, isAbsolute, resolve, sep } from "node:path";
 import type { GitOps } from "./types";
+
+// SPEC-742 · ADR-0116 · bebaskan path worktree dalam waktu O(1) dengan MEMINDAHKANNYA, bukan
+// menghapusnya: `renameSync` terukur 1 ms sementara `rmSync` atas pohon yang sama 1 370 ms — dan
+// selama itu event loop server terblokir penuh. Penghapusan byte-nya milik penyapu latar
+// (server/src/services/worktree-reaper.ts), yang domainnya `.trash/**` saja dan karena itu tak
+// pernah bisa menyentuh worktree hidup.
+let trashSeq = 0;
+function trashWorktree(repo: string, path: string): string | null {
+  const target = isAbsolute(path) ? resolve(path) : resolve(repo, path);
+  // Cermin jaring pengaman removeWorktree (SPEC-362): `rename` sama merusaknya dengan `rm` bila
+  // targetnya checkout project itu sendiri, dan pemanggil yang sampai ke sini punya bug.
+  if (target === resolve(repo)) {
+    throw new Error(`trashWorktree menolak memindahkan repo itu sendiri: ${target}`);
+  }
+  const trash = resolve(repo, ".worktrees", ".trash");
+  // Sudah di dalam trash = sudah jadi sampah. Memindahkannya lagi hanya membuat entri kedua yang
+  // menunjuk pekerjaan yang sama.
+  if (target === trash || target.startsWith(trash + sep) || !existsSync(target)) return null;
+  mkdirSync(trash, { recursive: true });
+  // Nama entri memuat id sesinya (id sesi disanitasi ke `[a-z0-9_-]` → tak pernah bertitik), jadi
+  // "milik sesi mana" bisa dipulihkan dari disk saja sesudah restart — tanpa tabel (ADR-0116).
+  // `trashSeq` memisahkan dua pemindahan yang jatuh di milidetik yang sama.
+  const dest = resolve(trash, `${basename(target)}.${Date.now().toString(36)}-${(trashSeq++).toString(36)}`);
+  renameSync(target, dest);
+  return dest;
+}
 function git(cwd: string, args: string[]) {
   const r = spawnSync("git", args, { cwd, encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${r.stderr || r.stdout || r.error?.message || "gagal spawn"}`);
@@ -41,11 +67,21 @@ export const realGit: GitOps = {
   // branchTo saat pekerjaannya selesai (SPEC-162).
   addWorktree: (repo, path, branchFrom) => {
     // Rebut kembali .worktrees/<id> yang tertinggal dari sesi yang mati atau dibunuh: id sebuah
-    // backlog item bisa dipakai ulang, dan "already exists" tak boleh memblokirnya. Worktree yang
-    // masih terdaftar → remove+prune; direktori telanjang → rm -rf.
-    tryGit(repo, ["worktree", "remove", "--force", path]);
+    // backlog item bisa dipakai ulang, dan "already exists" tak boleh memblokirnya.
+    //
+    // SPEC-742 · ADR-0116 · perebutannya PEMINDAHAN, bukan penghapusan. Bentuk lama
+    // (`worktree remove --force` + `rmSync`) menghapus pohon penuh secara SINKRON — terukur 1 370 ms
+    // dengan event loop terblokir 1 364 ms di antaranya, dua kali karena git sudah menghapusnya
+    // lebih dulu. Membuka lagi backlog yang sudah `done` (SPEC-172) melewati jalur ini setiap kali,
+    // jadi ia membekukan server persis di titik "buka sesi baru". `prune` di bawah yang membatalkan
+    // registrasi worktree lamanya. Gagal memindah → jalur lama apa adanya.
+    try {
+      trashWorktree(repo, path);
+    } catch {
+      tryGit(repo, ["worktree", "remove", "--force", path]);
+      rmSync(isAbsolute(path) ? path : resolve(repo, path), { recursive: true, force: true });
+    }
     tryGit(repo, ["worktree", "prune"]);
-    rmSync(isAbsolute(path) ? path : resolve(repo, path), { recursive: true, force: true });
     const base = resolveCommit(repo, branchFrom);
     git(repo, ["worktree", "add", "--detach", path, base]);
     return base;
@@ -69,6 +105,7 @@ export const realGit: GitOps = {
     tryGit(repo, ["worktree", "prune"]);
     rmSync(target, { recursive: true, force: true });
   },
+  trashWorktree,
   // Dibaca di worktree sesi (bukan repo utama) tepat sebelum removeWorktree: HEAD-nya =
   // ujung range diff review sesudah item selesai (SPEC-176, ADR-0030).
   headSha: (worktree) => git(worktree, ["rev-parse", "HEAD"]).trim(),

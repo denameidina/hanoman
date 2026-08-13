@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, existsSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, existsSync, rmSync, mkdirSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { realGit } from "../src/git";
 const g = (cwd: string, ...a: string[]) => spawnSync("git", a, { cwd, encoding: "utf8" });
@@ -239,5 +239,76 @@ describe("realGit.isAncestor", () => {
     expect(realGit.isAncestor(dir, featSha, "tak-ada-branch")).toBe(false);
     expect(realGit.isAncestor(dir, "0".repeat(40), "main")).toBe(false);
     expect(realGit.isAncestor(join(dir, "bukan-repo"), featSha, "main")).toBe(false);
+  });
+});
+
+// SPEC-742 · ADR-0116 · path worktree dibebaskan dengan `rename` (1 ms), bukan dihapus (1 370 ms
+// yang memblokir SELURUH event loop). Byte-nya dihapus penyapu latar di server.
+describe("realGit.trashWorktree", () => {
+  const trashDir = (repo: string) => join(repo, ".worktrees", ".trash");
+
+  it("memindahkan worktree keluar dari path-nya, isinya utuh", () => {
+    const { repo } = seedRepo();
+    const wt = join(repo, ".worktrees", "spec-742");
+    realGit.addWorktree(repo, wt, "main");
+    writeFileSync(join(wt, "PENANDA.txt"), "isi");
+
+    const moved = realGit.trashWorktree(repo, wt);
+
+    expect(moved).not.toBeNull();
+    expect(existsSync(wt)).toBe(false);                        // path bebas SEKARANG
+    expect(moved!.startsWith(trashDir(repo) + "/")).toBe(true);
+    expect(existsSync(join(moved!, "PENANDA.txt"))).toBe(true); // dipindah, bukan dihapus
+  });
+
+  // Nama entri memuat id sesinya: satu-satunya cara GET /terminal/cleanups memulihkan
+  // "milik sesi mana" sesudah restart, tanpa tabel (gotcha 5 ADR-0116).
+  it("nama entri berawalan id sesi dan unik antar-pemindahan", () => {
+    const { repo } = seedRepo();
+    const names: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const wt = join(repo, ".worktrees", "spec-742");
+      mkdirSync(wt, { recursive: true });
+      names.push(basename(realGit.trashWorktree(repo, wt)!));
+    }
+    expect(names.every((n) => n.split(".")[0] === "spec-742")).toBe(true);
+    expect(new Set(names).size).toBe(3);
+  });
+
+  it("path yang tak ada → null (penutupan ganda idempoten)", () => {
+    const { repo } = seedRepo();
+    expect(realGit.trashWorktree(repo, join(repo, ".worktrees", "tak-ada"))).toBeNull();
+  });
+
+  // Cermin jaring pengaman removeWorktree (SPEC-362): rename sama merusaknya dengan rm bila
+  // targetnya checkout project itu sendiri.
+  it("menolak memindahkan repo itu sendiri", () => {
+    const { repo } = seedRepo();
+    expect(() => realGit.trashWorktree(repo, repo)).toThrow(/repo itu sendiri/);
+  });
+
+  it("target yang sudah di dalam .trash → null (tak pernah di-trash dua kali)", () => {
+    const { repo } = seedRepo();
+    const wt = join(repo, ".worktrees", "spec-dua-kali");
+    realGit.addWorktree(repo, wt, "main");
+    const moved = realGit.trashWorktree(repo, wt)!;
+    expect(realGit.trashWorktree(repo, moved)).toBeNull();
+    expect(existsSync(moved)).toBe(true);
+  });
+
+  // SPEC-742 · reclaim `addWorktree` dulu `worktree remove --force` + `rmSync` — sinkron, atas
+  // worktree penuh. Membuka lagi backlog `done` (SPEC-172) melewatinya setiap kali.
+  it("addWorktree merebut path lewat .trash, bukan menghapus sinkron", () => {
+    const { repo } = seedRepo();
+    const wt = join(repo, ".worktrees", "spec-rebut");
+    realGit.addWorktree(repo, wt, "main");
+    writeFileSync(join(wt, "LAMA.txt"), "kerja sebelumnya");
+
+    realGit.addWorktree(repo, wt, "main");
+
+    expect(existsSync(wt)).toBe(true);                 // worktree baru lahir di path yang sama
+    expect(existsSync(join(wt, "LAMA.txt"))).toBe(false);
+    const kept = readdirSync(trashDir(repo)).map((n) => join(trashDir(repo), n, "LAMA.txt"));
+    expect(kept.some(existsSync)).toBe(true);          // isi lama mendarat di trash
   });
 });
