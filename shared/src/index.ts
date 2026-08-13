@@ -1,6 +1,7 @@
 export const ping = () => "pong";
 export * from "./enums";
 export * from "./spec-source";
+export * from "./method-catalog";
 export * from "./agent-engine";
 export * from "./entities";
 export * from "./agent";

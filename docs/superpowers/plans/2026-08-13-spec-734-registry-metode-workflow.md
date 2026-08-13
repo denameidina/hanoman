@@ -33,7 +33,7 @@
 - Consumes: —
 - Produces: `MethodDef`, `METHODS`, `METHOD_IDS`, `DEFAULT_METHOD`, `VERIFICATION_GATE`, `PLAN_DIRS`, `SPEC_DIRS`, `resolveMethod(id?: string | null): MethodDef`, `readSpecMethod(payload: unknown): string | null`, `stampSpecMethod(payload: unknown, methodId: string): Record<string, unknown> | null`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/method-catalog.test.ts`:
 
@@ -165,7 +165,7 @@ describe("stampSpecMethod", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 ./node_modules/.bin/vitest --run shared/src/method-catalog.test.ts
@@ -173,7 +173,7 @@ describe("stampSpecMethod", () => {
 
 Expected: FAIL — `Failed to resolve import "./method-catalog"`.
 
-- [ ] **Step 3: Tulis katalognya**
+- [x] **Step 3: Tulis katalognya**
 
 Buat `shared/src/method-catalog.ts`:
 
@@ -324,7 +324,7 @@ export function stampSpecMethod(
 }
 ```
 
-- [ ] **Step 4: Ekspor dari barrel**
+- [x] **Step 4: Ekspor dari barrel**
 
 Di `shared/src/index.ts`, tambahkan setelah baris `export * from "./spec-source";`:
 
@@ -332,7 +332,7 @@ Di `shared/src/index.ts`, tambahkan setelah baris `export * from "./spec-source"
 export * from "./method-catalog";
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 ./node_modules/.bin/vitest --run shared/src/method-catalog.test.ts
@@ -340,7 +340,7 @@ export * from "./method-catalog";
 
 Expected: PASS, ±20 test.
 
-- [ ] **Step 6: Typecheck shared**
+- [x] **Step 6: Typecheck shared**
 
 ```bash
 pnpm --filter ./shared typecheck
@@ -348,7 +348,7 @@ pnpm --filter ./shared typecheck
 
 Expected: keluar tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/method-catalog.ts shared/src/method-catalog.test.ts shared/src/index.ts
