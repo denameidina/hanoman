@@ -3,6 +3,7 @@ import { zStage, zSpecSource, zDocStatus, zPriority, zProjectKind, zAgent, zVeri
 import { TELEGRAM_DEFAULTS, zTelegramSettings } from "./telegram";
 import { zAgentEngine, type AgentEngine } from "./agent-engine";
 import { zAutoMerge } from "./auto-merge";
+import { DEFAULT_METHOD } from "./method-catalog";
 
 export type Stage = z.infer<typeof zStage>;
 // SPEC-338 · ADR-0074 · mesin sesi. Di-re-ekspor dari sini supaya konsumen setelan cukup
@@ -321,6 +322,11 @@ export const zSetting = z.object({
   agent: zAgent.default("claude"),                                        // SPEC-338 · ADR-0074 · mesin sesi default
   codex: zCodex.default(CODEX_DEFAULTS),                                  // SPEC-338 · ADR-0074 · model/effort codex
   verifyScope: zVerifyScope.default("changed"),                           // SPEC-376 · ADR-0080 · scope verifikasi sesi
+  // SPEC-734 · ADR-0113 · metode workflow default. LENIENT (`z.string()`, bukan `z.enum`):
+  // instance yang di-sync dari hub bisa membawa id metode yang belum ada di build ini, dan itu
+  // harus jadi fallback diam di titik pakai (`resolveMethod`) — bukan baris Setting yang gagal
+  // parse lalu mengosongkan layar Settings. Alasan yang sama dengan model/effort di sini.
+  method: z.string().default(DEFAULT_METHOD),                             // SPEC-734 · ADR-0113 · metode workflow default
   conflict: zConflict.default(CONFLICT_DEFAULTS),                         // SPEC-383 · ADR-0081 · default sesi konflik rebase/merge
   lead: zLead.default(LEAD_DEFAULTS),                                     // SPEC-409 · ADR-0091 · hanoman-lead (default mati)
   telegram: zTelegramSettings.default(TELEGRAM_DEFAULTS),                 // SPEC-476 · ADR-0096 · gateway Telegram (default mati)

@@ -2,7 +2,7 @@ import { prisma } from "../db";
 import {
   zSetting, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS,
   RETIRED_CODEX_MODELS, LEAD_DEFAULTS, coerceCodexEffort, type Setting, type Agent, type Codex,
-  TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS,
+  TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, DEFAULT_METHOD,
 } from "@hanoman/shared";
 
 // Model id + effort yang diteruskan apa adanya ke `claude --model` / `--effort`.
@@ -20,6 +20,7 @@ export const DEFAULT_SETTING: Setting = {
   agent: "claude",                 // SPEC-338 · ADR-0074 · mesin sesi default
   codex: CODEX_DEFAULTS,           // SPEC-338 · ADR-0074 · model/effort codex
   verifyScope: "changed",          // SPEC-376 · ADR-0080 · uji hanya yang berubah
+  method: DEFAULT_METHOD,          // SPEC-734 · ADR-0113 · metode workflow default
   conflict: CONFLICT_DEFAULTS,     // SPEC-383 · ADR-0081 · default sesi konflik (opt-in, mati)
   lead: LEAD_DEFAULTS,             // SPEC-409 · ADR-0091 · hanoman-lead (master switch mati)
   telegram: TELEGRAM_DEFAULTS,     // SPEC-476 · ADR-0096 · gateway Telegram opt-in

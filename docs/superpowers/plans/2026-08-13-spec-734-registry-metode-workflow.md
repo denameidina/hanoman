@@ -370,7 +370,7 @@ git commit -m "feat(spec-734): katalog METHODS di shared, bebas zod"
 - Consumes: `DEFAULT_METHOD`, `resolveMethod`, `METHODS` dari Task 1
 - Produces: `Setting["method"]: string` (nilai mentah, TIDAK dikoersi saat dibaca)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `server/test/settings.test.ts`, di dalam `describe("settings", …)`:
 
@@ -409,7 +409,7 @@ Dan tambahkan import di kepala berkas itu:
 import { DEFAULT_METHOD, resolveMethod } from "@hanoman/shared";
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run server/test/settings.test.ts --no-file-parallelism
@@ -417,7 +417,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: FAIL — `expected undefined to be 'superpowers'`.
 
-- [ ] **Step 3: Tambah field ke `zSetting`**
+- [x] **Step 3: Tambah field ke `zSetting`**
 
 Di `shared/src/entities.ts`, tambahkan import di kepala berkas:
 
@@ -435,7 +435,7 @@ lalu tambahkan satu baris di dalam `zSetting`, tepat setelah baris `verifyScope`
   method: z.string().default(DEFAULT_METHOD),                             // SPEC-734 · ADR-0113 · metode workflow default
 ```
 
-- [ ] **Step 4: Tambah ke `DEFAULT_SETTING`**
+- [x] **Step 4: Tambah ke `DEFAULT_SETTING`**
 
 Di `server/src/services/settings.ts`, tambahkan ke import dari `@hanoman/shared`: `DEFAULT_METHOD`. Lalu tambahkan satu baris di `DEFAULT_SETTING`, setelah `verifyScope`:
 
@@ -443,7 +443,7 @@ Di `server/src/services/settings.ts`, tambahkan ke import dari `@hanoman/shared`
   method: DEFAULT_METHOD,          // SPEC-734 · ADR-0113 · metode workflow default
 ```
 
-- [ ] **Step 5: Perbaiki literal `Setting` yang jadi merah**
+- [x] **Step 5: Perbaiki literal `Setting` yang jadi merah**
 
 Cari semua literal bertipe `Setting`:
 
@@ -453,7 +453,7 @@ grep -rln "verifyScope: \"changed\"" src/src src/test server/test shared/src
 
 Untuk tiap berkas yang muncul, tambahkan `method: DEFAULT_METHOD,` (impor `DEFAULT_METHOD` dari `@hanoman/shared`) tepat setelah baris `verifyScope`. Minimal: `src/src/screens/SettingsScreen.tsx` (`S_DEFAULTS`) dan `src/src/screens/SettingsScreen.test.tsx`.
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run server/test/settings.test.ts --no-file-parallelism
@@ -461,7 +461,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: PASS.
 
-- [ ] **Step 7: Typecheck shared + server**
+- [x] **Step 7: Typecheck shared + server**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
@@ -469,7 +469,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 
 Expected: keluar tanpa error.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add shared/src/entities.ts server/src/services/settings.ts server/test/settings.test.ts src/src/screens/SettingsScreen.tsx src/src/screens/SettingsScreen.test.tsx
