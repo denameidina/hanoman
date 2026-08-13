@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { PLAN_DIRS } from "@hanoman/shared";
 import {
   GOAL_MAX, GOAL_CHUNK, GOAL_TUI_PASTE_LIMIT,
   defaultGoalCondition, resolveGoalCondition, goalOneLine, goalChunks,
@@ -125,5 +126,14 @@ describe("kondisi goal untuk flow goal (SPEC-407)", () => {
   it("flow lain tak tersentuh", () => {
     expect(defaultGoalCondition({ flow: "feature", specId: "SPEC-332", branchTo: "b" }))
       .toContain("Brainstorm → Objective → Spec → Plan → Execute");
+  });
+});
+
+describe("SPEC-734 · kondisi mode goal menyebut union planDir", () => {
+  // Gerbang ini menuntut hasil `grep` yang KOSONG sebagai bukti selesai, jadi direktori yang salah
+  // bukan sekadar tak informatif — ia MEMUASKAN gerbangnya. Union wajib.
+  it("defaultGoalCondition menyebut setiap planDir", () => {
+    const c = defaultGoalCondition({ flow: "feature", specId: "SPEC-9", branchTo: "hanoman/x" });
+    for (const d of PLAN_DIRS) expect(c).toContain(`${d}/`);
   });
 });

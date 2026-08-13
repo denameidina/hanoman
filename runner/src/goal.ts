@@ -1,4 +1,5 @@
 import type { Flow } from "./types";
+import { PLAN_DIRS } from "@hanoman/shared";
 import { PIPELINES } from "./prompt";
 import { readGoalPayload } from "./goal-spec";
 
@@ -48,8 +49,11 @@ export function defaultGoalCondition({ flow, specId, branchTo, spec }: GoalArgs)
       + `${phases.join(" → ")}, masing-masing berakhiran \`done\` atau \`skipped\`;`,
   ];
   if (planGate) {
+    // SPEC-734 · INVARIAN 1 · gerbang ini menuntut hasil grep KOSONG sebagai bukti, jadi direktori
+    // yang salah justru MEMUASKANNYA. Seluruh planDir terdaftar disebut.
+    const dirs = PLAN_DIRS.map((d) => `${d}/`).join(" ");
     clauses.push(
-      `2. output \`grep -rn -- "- \\[ \\]" docs/superpowers/plans/\` yang KOSONG untuk plan backlog `
+      `2. output \`grep -rn -- "- \\[ \\]" ${dirs}\` yang KOSONG untuk plan backlog `
       + `ini — tak ada task yang masih \`- [ ]\` (atau bukti bahwa backlog ini memang tak berplan);`,
     );
   }

@@ -1,3 +1,4 @@
+import { PLAN_DIRS } from "@hanoman/shared";
 import { PIPELINES } from "./prompt";
 import type { Flow } from "./types";
 
@@ -74,13 +75,18 @@ export function codexGoalScript(o: {
   }
   if (planGate) {
     // Cermin planComplete() di server: hanya berkas plan yang cocok id spec ini yang digerbang.
-    lines.push(
-      `for f in ${shq(o.worktree)}/docs/superpowers/plans/*${o.specId.toLowerCase()}*; do`,
-      `  [ -f "$f" ] || continue`,
-      `  grep -qE '^[ \t]*- \\[ \\]' "$f" && `
-      + `missing="$missing\\n- plan $f masih punya task - [ ] yang belum selesai"`,
-      "done",
-    );
+    // SPEC-734 · INVARIAN 1 · loop atas UNION seluruh planDir terdaftar, bukan satu direktori:
+    // item yang lahir dengan satu metode lalu dilanjutkan dengan metode lain akan menemukan
+    // direktori metode barunya kosong dan berhenti dengan plan lama yang masih penuh `- [ ]`.
+    for (const dir of PLAN_DIRS) {
+      lines.push(
+        `for f in ${shq(`${o.worktree}/${dir}`)}/*${o.specId.toLowerCase()}*; do`,
+        `  [ -f "$f" ] || continue`,
+        `  grep -qE '^[ \t]*- \\[ \\]' "$f" && `
+        + `missing="$missing\\n- plan $f masih punya task - [ ] yang belum selesai"`,
+        "done",
+      );
+    }
   }
   lines.push(
     'if [ -z "$missing" ]; then exit 0; fi',

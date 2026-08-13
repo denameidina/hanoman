@@ -874,7 +874,7 @@ git commit -m "feat(spec-734): prompt runner bertanya ke registry metode"
 - Consumes: `PLAN_DIRS` dari Task 1
 - Produces: `codexGoalScript` tak berubah tanda tangannya; skripnya kini me-loop **union** direktori plan.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `runner/test/codex-settings.test.ts`:
 
@@ -915,7 +915,7 @@ describe("SPEC-734 · kondisi mode goal menyebut union planDir", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 ./node_modules/.bin/vitest --run runner/test/codex-settings.test.ts runner/test/goal.test.ts
@@ -923,7 +923,7 @@ describe("SPEC-734 · kondisi mode goal menyebut union planDir", () => {
 
 Expected: FAIL — `/w/docs/matt/plans/*spec-9*` tak ada di skrip.
 
-- [ ] **Step 3: Ubah `codex-settings.ts`**
+- [x] **Step 3: Ubah `codex-settings.ts`**
 
 Tambahkan import: `import { PLAN_DIRS } from "@hanoman/shared";`
 
@@ -947,7 +947,7 @@ Ganti blok `if (planGate) { … }` (baris 75-84) dengan:
   }
 ```
 
-- [ ] **Step 4: Ubah `goal.ts`**
+- [x] **Step 4: Ubah `goal.ts`**
 
 Tambahkan import: `import { PLAN_DIRS } from "@hanoman/shared";`
 
@@ -965,7 +965,7 @@ Ganti blok `if (planGate) { clauses.push(...) }` (baris 50-54) dengan:
   }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 ./node_modules/.bin/vitest --run runner/test/codex-settings.test.ts runner/test/goal.test.ts
@@ -973,7 +973,7 @@ Ganti blok `if (planGate) { clauses.push(...) }` (baris 50-54) dengan:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add runner/src/codex-settings.ts runner/src/goal.ts runner/test/codex-settings.test.ts runner/test/goal.test.ts

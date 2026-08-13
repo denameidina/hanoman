@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { codexHookArgs, codexGoalScript, GOAL_MAX_BLOCKS } from "../src/codex-settings";
+import { PLAN_DIRS } from "@hanoman/shared";
 
 let dir = "";
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "hanoman-cx-")); });
@@ -105,5 +106,27 @@ describe("codexGoalScript", () => {
     const s = gate();
     for (let i = 0; i < GOAL_MAX_BLOCKS; i++) expect(runGate(s).code).toBe(2);
     expect(runGate(s).code).toBe(0);   // pagar: berhenti memaksa, serahkan ke manusia
+  });
+});
+
+describe("SPEC-734 · gate plan lintas metode", () => {
+  const base = {
+    flow: "feature" as const, specId: "SPEC-9", phaseFile: "/p/ph",
+    worktree: "/w", condition: "c", stateFile: "/p/st",
+  };
+
+  // Direktori dikutip UTUH (`shq`), globnya tetap di luar kutipan — itulah bentuk yang benar.
+  const loopFor = (d: string) => `for f in '/w/${d}'/*spec-9*; do`;
+
+  // AC-4 (Stop hook) + INVARIAN 1 · union, bukan satu direktori.
+  it("skrip me-loop SETIAP planDir terdaftar", () => {
+    const sh = codexGoalScript(base);
+    for (const d of PLAN_DIRS) expect(sh).toContain(loopFor(d));
+    expect(PLAN_DIRS.length).toBeGreaterThan(1);   // union sungguhan, bukan daftar satu elemen
+  });
+
+  it("flow tanpa Plan+Execute tak punya gate plan sama sekali", () => {
+    const sh = codexGoalScript({ ...base, flow: "audit" });
+    expect(sh).not.toContain("for f in");
   });
 });
