@@ -83,6 +83,32 @@ Pakai skill lebih sempit saat task cocok:
   `health`) ke `GLOBAL_READ` **tanpa melihat method**, jadi menambah endpoint tulis di bawahnya
   berarti setiap agent token bisa me-restart instance — kini `GLOBAL_READ` hanya untuk method baca.
 - Realtime: **WebSocket hanya untuk terminal PTY**; sisanya **HTTP polling** (projects, backlog, notifications, limits, vps). Jaga UI responsif — log sesi streaming, jangan blok main thread.
+- **State tampilan tiap halaman persisten di storage, berkunci per layar** (SPEC-740/**ADR-0115**;
+  ADR-0107 & ADR-0071 **ditegakkan**, tak ada yang dicabut): filter & pencarian, paginasi, posisi
+  scroll, item terpilih & panel terbuka bertahan lintas navigasi **dan** refresh/buka-ulang browser.
+  Sebabnya struktural — dashboard menavigasi lewat state `section` di App, bukan router URL, jadi tiap
+  layar di-unmount dan seluruh `useState`-nya hilang; refresh lebih buruk lagi karena `section` sendiri
+  lahir `"overview"`. Mekanismenya **satu** modul `src/src/ui-state` (`store.ts` bebas React →
+  bisa diuji langsung, `hooks.ts`, `ResetViewButton.tsx`), bukan tambalan per layar: layar baru
+  memakai **`usePersistedState(screen, field, initial, accept?)`** alih-alih `useState` dan otomatis
+  ikut. Kunci **`hn.ui.v1.<screen>[@<scope>].<field>`** — **versi hidup DI DALAM kunci** (menaikkannya
+  membuat state lama tak terlihat tanpa satu baris migrasi; `pruneUiState()` menyapu sisanya saat App
+  mount), `@<scope>` untuk state per-project, nilai rusak/salah bentuk **jatuh ke default, tak pernah
+  melempar**. Cakupannya seluruh `HN_NAV` + `app.section`/`projectId`/`projectFilter`; Overview memang
+  tak punya state tampilan. Reset lewat **pub/sub** (menghapus kunci saja tak mengembalikan komponen
+  yang sedang ter-mount), dan `ResetViewButton` sekaligus merender lencana **"N filter aktif"** supaya
+  daftar yang tampak kosong tak terbaca sebagai data kosong. **Tujuh gotcha:** nilai disimpan
+  **beserta kuncinya** dan disinkronkan **saat render** — kalau terpisah, ganti project menimpa state
+  project lain; pemulihan scroll wajib **membisukan penulisnya** + loop rAF berbatas (percobaan
+  pertama pada konten yang masih pendek menulis balik nilai TERPOTONG); `section` digerbangi
+  **`NAV_KEYS`** (section transien `project`/`review` = mendarat di layar kosong, key mati = App
+  merender kosong berikut sidebar-nya — gotcha SPEC-519); **hanya `page` yang dipulihkan, tak pernah
+  `limit`** (PLAFON, ADR-0107); `src/test/setup.ts` wajib `localStorage.clear()` tiap test (satu jsdom
+  per berkas → state bocor antar-test dan terbaca seperti regresi komponen); `ResetViewButton` &
+  `ds/shell.tsx` mengimpor lewat berkas, **bukan barrel** (`ds → shell → ui-state → ds` = lingkaran
+  impor yang mati saat init); dan state milik App yang dipakai sebuah layar (`projectFilter`) di luar
+  jangkauan reset berskop layar → lewat prop `onReset`. Tanpa migration, endpoint, atau perubahan
+  kontrak API — murni state klien; kunci `hanoman.terminal.workspace` & flag Pet sengaja tak dipindah.
 - Terminal server: **node-pty + tmux** (socket `-L hanoman`, `remain-on-exit on`); terminal web: **xterm.js** merender TUI Claude Code apa adanya. tmux menahan sesi hidup lintas restart API (ADR-0016).
 - **Tidak ada** message queue, Redis, worker terpisah, scheduler cron, maupun webhook GitHub — semua dicabut saat pindah ke sesi interaktif (ADR-0024). Kerja latar semuanya `setInterval` in-process yang di-`start` dari `server.ts` (`app.ts` bebas-timer): monitor VPS (health 5 mnt, audit 24 jam), engine scheduler (ADR-0072) — yang sejak **SPEC-646/ADR-0112** juga memiliki **cronjob per project** (jadwal HH:MM yang ditunda ADR-0072): jatuh tempo dimaterialisasi jadi baris `SchedulerCronRun` di tick yang SAMA, tanpa timer kedua, dan sesinya lahir ber-id deterministik `cron-<cronId>` di worktree isolasi — dan denyut hanoman-lead (ADR-0091).
 - Server **bind `127.0.0.1:8787`** di belakang reverse proxy TLS; `HOST=0.0.0.0` hanya bila ada TLS di depan.

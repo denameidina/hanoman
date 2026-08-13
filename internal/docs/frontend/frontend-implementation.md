@@ -8,6 +8,71 @@
 - Filter project di Backlog **dan PRD** dibaca dari satu state `projectFilter` milik `App`, bukan state
   lokal tiap layar (SPEC-146) — detail project memakainya untuk membuka Backlog dalam keadaan tersaring.
   Sentinel `"all"` = "Semua project" (PRD → `GET /prds` lintas-project; Backlog → `project` di-omit).
+
+## State tampilan persisten (SPEC-740 · ADR-0115)
+
+Tiap halaman mengingat state tampilannya dan memulihkannya saat pengguna kembali — lewat navigasi
+maupun refresh/buka-ulang browser. Mekanismenya **satu** modul, `src/src/ui-state/`; layar tak boleh
+menambal sendiri.
+
+**Aturan untuk layar (dan layar baru):**
+
+- Field tampilan memakai **`usePersistedState(screen, field, initial, accept?)`**, bukan
+  `React.useState`. Yang dihitung field tampilan: nilai filter & kata kunci, nomor halaman, offset
+  scroll, id/path terpilih, tab & sub-tab, seksi yang di-expand.
+- Yang **tidak** dipersist: draft editor (`draft`, `form`, `mode: "edit"`), `busy`/`loading`/`error`,
+  dan data itu sendiri. Storage hanya untuk parameter tampilan — jangan menaruh payload besar atau
+  data sensitif.
+- Field **nullable** wajib menyebut guard `nullableStr` (default guard tak punya informasi tipe saat
+  `initial` bernilai `null`); union/enum menyebut `oneOf(...)`.
+- State per-project memakai `scoped(screen, projectId)` sebagai screen key — tanpa itu filter project
+  A muncul saat project B dibuka.
+- Yang disimpan untuk sebuah objek terpilih adalah **id/slug**-nya, lalu diresolusi ulang dari daftar
+  hidup (pola `sel` PRD, `selectedId` Changelog, `detailId` VPS).
+- Layar berfilter memasang **`<ResetViewButton screen active={n} onReset?>`** di baris penyaringnya.
+  `active` dihitung layar (hanya ia yang tahu default field-nya) dan sekaligus menyalakan lencana
+  "N filter aktif" — syarat SPEC-740: daftar yang tampak kosong tak boleh terbaca sebagai data kosong.
+  `onReset` untuk state yang dipakai layar tapi dimiliki App (`projectFilter`).
+- Daftar panjang memasang **`useScrollRestore(screen, field, ready)`** pada container bergulirnya;
+  `ready` menyala saat data pertama sudah mendarat. Scroll tingkat-halaman sudah ditangani `Shell`
+  untuk semua layar sekaligus — tak perlu diulang.
+- Hanya **`page`** yang dipulihkan, **tak pernah `limit`** — `limit` tanpa `page` berperilaku sebagai
+  plafon (SPEC-523 · ADR-0107). `pageSize` tetap konstanta/prop layar.
+
+**Bentuk kunci:** `hn.ui.v1.<screen>[@<scope>].<field>`. Versi hidup di dalam kunci; menaikkannya
+membuat state lama tak terlihat tanpa migrasi, dan `pruneUiState()` (dipanggil sekali saat App mount)
+menyapu sisanya. Nilai yang gagal di-parse atau salah bentuk jatuh ke default, tak pernah melempar.
+
+**Cakupan hari ini** — semua entri `HN_NAV`; Overview memang tak punya state tampilan:
+
+| screen | scope | field |
+|---|---|---|
+| `app` | — | `section` (guard `NAV_KEYS`), `projectId`, `projectFilter` |
+| projects | — | `q`, `page`, scroll daftar |
+| prd | — | `status`, `sel` |
+| backlog | — | `tab`, `view`, `q`, `stage`, `prio`, `dateField`, `from`, `to`, `page`, `detailId`, scroll |
+| triage | — | `tab`, `project`, `status`, `q`, `page`, `openId`, scroll |
+| scheduler | — | `queue-<status>-page`, `cronRunsPage`, `cronProject`, `cronOpenRuns` |
+| lead | — | `filter`, `decPage`, `flowPage` |
+| terminal | — | `project` (grid tetap di kunci lama `hanoman.terminal.workspace`) |
+| ide | project | `tab`, `viewRef`, `selected`, `selKind`, `mdView`, `stagedView`, `changedView`, `diffTab` |
+| vps | — | `detailId` |
+| docs | project | `selected` |
+| changelog | project | `q`, `page`, `selectedId` |
+| settings | — | `tab` |
+
+`section` yang dipulihkan digerbangi **`NAV_KEYS`** (diekspor `ds/shell.tsx`): section transien
+(`project`/`review`) dan key mati (`runs`/`triggers`) tak boleh jadi titik mendarat. Deep-link hash
+(`#spec=`, `#changelog=`, ADR-0071) berjalan sesudah mount dan karena itu **menang** atas state yang
+dipulihkan.
+
+**Impor:** `ResetViewButton` mengambil `Badge`/`Button` dari `../ds/components/*` dan `ds/shell.tsx`
+mengambil `useScrollRestore` dari `../ui-state/hooks` — lewat barrel, `ds → shell → ui-state → ds`
+jadi lingkaran impor yang mati saat inisialisasi modul.
+
+**Test:** `src/test/setup.ts` mengosongkan `localStorage` sebelum tiap test. vitest memakai satu jsdom
+per berkas, jadi tanpa itu test pertama yang menyetel filter mewariskannya ke test berikutnya dan
+kegagalannya terbaca seperti regresi komponen.
 - Realtime: **WebSocket** untuk semua data live — satu WS siar dashboard `/events/ws`
   (backlog/sesi/notifikasi/limits/vps, SPEC-199/ADR-0039) + WS PTY per terminal
   (`/terminal/sessions/:id/ws`, frame `data`/`phase`/`exit`). Klien punya satu koneksi events
