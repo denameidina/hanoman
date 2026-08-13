@@ -538,6 +538,20 @@ GET      /codex/version                 # { version: string|null, minRequired: "
 #   tak terdeteksi (biner tak ada / keluaran tak dikenal) dan itu TIDAK dianggap gagal → `ok: true`.
 #   Murni observabilitas untuk catatan lunak di Settings & picker Start; TIDAK pernah memblokir Start
 #   (ADR-0037 — agen dipercaya, isolasi lewat worktree).
+GET      /methods/status               # { agents[], methods[] }  (SPEC-739/ADR-0114)
+#   Kesiapan skill tiap METODE × tiap AGEN di MESIN ini. Diturunkan LIVE dari disk tiap request —
+#   nol tabel, nol kolom, nol entri `FIELDS` sync (properti mesin, cermin LocalBinding/repoDir):
+#   kolom status instalasi akan basi persis saat ia paling menyesatkan, yakni sesudah operator
+#   memasang skill yang kurang (ADR-0011/0018).
+#     agents[]  { agent, home, roots[], skills }        — akar yang dipindai + jumlah skill
+#     methods[] { method, label, agent, ready,          — |METHOD_IDS| × 2 agen
+#                 missingPackages[], missingSkills[], install[] }
+#   DUA daftar terpisah dan keduanya wajib: `missingPackages` dari `MethodDef.requires` (nama PAKET),
+#   `missingSkills` dari `phaseSkills ∪ exitSkills` (id SKILL yang benar-benar dipanggil prompt).
+#   `install[]` = perintah dari katalog untuk agen itu. Pencocokan KETAT & id persis — skill polos
+#   `brainstorming` TIDAK memuaskan `superpowers:brainstorming`. Murni observabilitas: metode belum
+#   siap ditandai, TIDAK pernah memblokir Start (ADR-0037), cermin GET /codex/version.
+#   Cookie-only (`capabilityForRoute` tak mengenal prefix `methods`).
 GET      /limits/codex                  # CodexLimitsDTO { status, windows[], fetchedAt, plan }  (SPEC-338/ADR-0074)
 #   Limit langganan CODEX. Sumbernya BUKAN jaringan: codex menulis `rate_limits` (used_percent,
 #   window_minutes, resets_at, plan_type, rate_limit_reached_type) ke rollout sesinya di
@@ -685,6 +699,14 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #   {project, shell:true} (SPEC-236, ADR-0056): terminal biasa NON-agen — shell mentah
 #     (HANOMAN_SHELL ?? $SHELL ?? /bin/bash) di repoDir project, tanpa flow (tak menggerakkan stage,
 #     tak buat worktree). 201 { id } · 404 project · 400 tanpa repoDir (needsBind).
+#   {project, shell:true, install:{method, agent}} (SPEC-739, ADR-0114): shell yang SAMA, tapi
+#     menjalankan perintah pemasangan skill metode lebih dulu lalu menyerahkan pane ke operator.
+#     Klien mengirim METODE + AGEN, bukan teks perintah — server menurunkannya dari `METHODS`
+#     (`MethodDef.install`), jadi endpoint ini tak pernah menjadi "jalankan shell arbitrer" dan
+#     metode ketiga tak menuntut sunting di server/web. Server TIDAK memasang apa pun sendiri:
+#     yang menjalankan adalah shell di dalam pane tmux, ditonton operator (ADR-0087/0088 —
+#     nol executor baru, ADR-0037 utuh). Metode tak dikenal → 400, sengaja TIDAK lenient seperti
+#     `resolveMethod`: resolusi longgar benar untuk MEMBACA, ini TINDAKAN.
 #   {project, agent?, model?, effort?} (SPEC-517): TERMINAL AGEN BIASA dengan runtime PER SESI —
 #     form "Sesi baru" di halaman Terminal. Kosong → default global (Setting), jadi body {project}
 #     polos berperilaku persis seperti sebelum SPEC-517. `agent` memilih BLOK Setting yang dibaca

@@ -58,6 +58,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0114 — Status pemasangan skill metode: deteksi per agen LOCAL-only, pemasangan lewat sesi terminal](adr/0114-status-pemasangan-skill-metode.md)
 - [0113 — Registry metode workflow: katalog `METHODS` di `shared`, gerbang plan memindai union direktori](adr/0113-registry-metode-workflow.md)
 - [0112 — Cronjob per project di scheduler: sesi ber-id deterministik, satu jatuh tempo satu baris, anggaran slot bersama](adr/0112-cronjob-per-project-scheduler.md)
 - [0111 — Portal klien mengirim tiket help desk: satu route tulis, satu pipeline intake, lepas dari `helpEnabled`](adr/0111-portal-klien-kirim-tiket.md)
