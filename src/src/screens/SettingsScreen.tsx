@@ -4,7 +4,7 @@ import React from "react";
 import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog } from "../ds";
 import { api, ApiError } from "../api/client";
 import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
-import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult } from "@hanoman/shared";
+import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
 import { CustomAgentsPanel } from "./CustomAgentsPanel";
@@ -507,6 +507,19 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
   // boleh membuat layar Settings gagal render.
   const [codexVer, setCodexVer] = React.useState<{ version: string | null; minRequired: string } | null>(null);
   React.useEffect(() => { api.getCodexVersion().then(setCodexVer).catch(() => {}); }, []);
+  // SPEC-739 · ADR-0114 · kesiapan skill metode per agen. Gagal-diam seperti codexVer: kartu
+  // Metode harus tetap bisa dipakai walau endpoint statusnya error — ini observabilitas,
+  // bukan gerbang.
+  const [methodStatuses, setMethodStatuses] = React.useState<MethodStatusResponse | null>(null);
+  // Pemasangan butuh project yang ter-bind ke checkout lokal: pane lahir di repoDir-nya.
+  const [installProject, setInstallProject] = React.useState("");
+  React.useEffect(() => {
+    if (tab !== "sesi") return;
+    api.getMethodStatus().then(setMethodStatuses).catch(() => setMethodStatuses(null));
+    api.listProjects({ pageSize: 100 })
+      .then((r) => setInstallProject((p) => p || (r.items.find((x) => x.binding ?? x.repoDir)?.id ?? "")))
+      .catch(() => {});
+  }, [tab]);
   // Jangan fallback ke S_DEFAULTS saat GET gagal: toggle berikutnya akan mem-PUT
   // default itu menimpa pengaturan asli di server.
   const load = React.useCallback(() => {
@@ -541,6 +554,15 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
     };
     const save = (patch: Partial<Setting>, msg: string) => persist({ ...s, ...patch }, msg);
     const sw = (k: keyof Setting, msg: string) => (v: boolean) => save({ [k]: v } as Partial<Setting>, msg + (v ? " · aktif" : " · nonaktif"));
+    // SPEC-739 · ADR-0114 · pemasangan lewat SESI TERMINAL (ADR-0056). Yang dikirim hanya metode
+    // + agen; perintahnya diturunkan SERVER dari katalog, jadi UI tak pernah memegang literalnya.
+    const installMethod = async (m: MethodSkillStatus) => {
+      if (!installProject) return;
+      try {
+        await api.createShell(installProject, { method: m.method, agent: m.agent });
+        onToast?.(`Pemasangan ${m.label} · ${AGENT_LABEL[m.agent]} berjalan di Terminal`, "ok", "terminal");
+      } catch { onToast?.("Gagal membuka sesi terminal pemasangan", "err", "alert-triangle"); }
+    };
     // SPEC-338 · ADR-0074 · server selalu mengirim `agent`/`codex` (zod .default()), TAPI SPA yang
     // masih ter-cache dari sebelum SPEC-338 bisa bicara dengan server lama saat rolling update.
     // Tanpa fallback ini layar Settings mati total (`undefined.model`) alih-alih sekadar
@@ -1221,10 +1243,47 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             options={METHOD_IDS.map((id) => ({ value: id, label: METHODS[id]!.label }))}
             onChange={(e) => save({ method: e.target.value }, "Metode → " + e.target.value)} />
         </SettingRow>
-        <div data-testid="settings-method-requires"
-          style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-          Butuh terpasang: {resolveMethod(s.method).requires.join(" · ")}
-        </div>
+        {/* SPEC-739 · ADR-0114 · checklist kesiapan menggantikan baris statis "Butuh terpasang: …":
+            field itu punya nol pembaca runtime sampai spec ini, jadi hanoman menjanjikan
+            metodologi yang tak pernah ia pastikan ada. Metode yang belum siap DITANDAI, tak
+            pernah diblokir — sesi tetap boleh lahir (ADR-0037). */}
+        {methodStatuses && (
+          <div data-testid="method-status" style={{ marginTop: 4, display: "grid", gap: 10 }}>
+            {METHOD_IDS.map((id) => (
+              <div key={id} style={{ display: "grid", gap: 6 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600 }}>{METHODS[id]!.label}</div>
+                {methodStatuses.methods.filter((m) => m.method === id).map((m) => (
+                  <div key={m.agent} data-testid={`method-status-${m.method}-${m.agent}`}
+                    style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, lineHeight: 1.5 }}>
+                    <Badge tone={m.ready ? "ok" : "warn"}>{m.ready ? "siap" : "belum siap"}</Badge>
+                    <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                      <b>{AGENT_LABEL[m.agent]}</b>
+                      {!m.ready && (
+                        <div style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>
+                          {m.missingPackages.length > 0 && (
+                            <div>paket kurang: <code>{m.missingPackages.join(" · ")}</code></div>)}
+                          {m.missingSkills.length > 0 && (
+                            <div>skill kurang: <code>{m.missingSkills.join(" · ")}</code></div>)}
+                        </div>
+                      )}
+                    </div>
+                    {!m.ready && (
+                      <Button size="sm" variant="ghost" leftIcon="download" disabled={!installProject}
+                        onClick={() => installMethod(m)}>Pasang</Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+              {installProject
+                ? <>Pemasangan berjalan di <b>sesi terminal</b> project <code>{installProject}</code> — outputnya
+                  bisa ditonton di Terminal. hanoman sendiri tak pernah memasang apa pun.</>
+                : <>Pemasangan butuh satu project yang sudah di-bind ke checkout lokal: perintahnya
+                  dijalankan di sesi terminal project itu.</>}
+            </div>
+          </div>
+        )}
       </Card>
       </>
     );

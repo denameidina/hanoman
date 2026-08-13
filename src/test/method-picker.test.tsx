@@ -6,6 +6,11 @@ vi.mock("../src/api/client", () => ({
   api: {
     getSettings: vi.fn(), putSettings: vi.fn(), startSession: vi.fn(),
     getCodexVersion: vi.fn().mockResolvedValue({ version: null, minRequired: "0.144.0", ok: true }),
+    // SPEC-739 · kedua permukaan picker kini ikut menanyakan kesiapan skill metode. Di sini
+    // keduanya sengaja dijawab KOSONG: berkas ini menguji picker-nya, checklist & catatan
+    // kesiapan punya berkasnya sendiri (`method-status-ui.test.tsx`).
+    getMethodStatus: vi.fn().mockResolvedValue({ agents: [], methods: [] }),
+    listProjects: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
   },
   ApiError: class extends Error { status = 0 },
 }));
