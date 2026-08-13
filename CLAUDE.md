@@ -25,3 +25,17 @@ hanoman adalah orchestrator + dashboard workflow docs-driven, didistribusikan se
 - Guardrail Source of Truth telah dicabut (SPEC-160, ADR-0023): `internal/docs/**` tetap Source of Truth secara konvensi — perbarui docs yang tersentuh dalam commit yang sama — tetapi tak ada lagi gate/Stop hook yang memblokir. Jangan menambahkannya kembali tanpa ADR baru. (Guardrail deny perintah berbahaya di `runner/src/safety.ts` juga telah dicabut — SPEC-197, ADR-0037; agen dipercaya penuh, isolasi murni lewat worktree. Jangan hidupkan kembali tanpa ADR baru.)
 - Jangan ubah skema tanpa migration + ADR.
 - Jangan jalankan run di working tree utama — selalu worktree terpisah.
+
+## Agent skills
+
+### Issue tracker
+
+Issue dilacak sebagai GitHub Issues di `denameidina/hanoman`, lewat `gh` CLI. Lihat `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Kosakata label kanonik apa adanya: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Lihat `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: satu `CONTEXT.md` di root, ADR terpusat di `internal/docs/adr/`. Lihat `docs/agents/domain.md`.
