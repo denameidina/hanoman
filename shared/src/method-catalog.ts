@@ -12,6 +12,12 @@
 // cermin masuk akal untuk enum tiga kata, bukan untuk tabel yang harus identik di tiga paket.
 // SPEC-407 sudah membayar konvensi itu dengan EMPAT cermin `Flow`.
 
+// Cermin SEMPIT `Agent` (shared/entities.ts). Disalin, bukan diimpor: `entities.ts` mengimpor
+// DEFAULT_METHOD dari berkas ini, jadi impor balik menutup lingkaran — dan berkas ini sengaja
+// bebas dependensi. Cerminnya tak bisa hanyut: `method-status.test.ts` mengadu kunci `install`
+// dengan `zAgent.options`.
+type MethodAgent = "claude" | "codex";
+
 export interface MethodDef {
   readonly id: string;
   /** Dipakai di judul blok skill prompt DAN sebagai label picker — satu sumber, tak bisa berselisih. */
@@ -25,8 +31,14 @@ export interface MethodDef {
   readonly exitSkills: readonly string[];
   /** Klausa prompt tambahan khas metode ini. Wajib menyebut `planDir`-nya (dijaga test sumber). */
   readonly extraClause?: string;
-  /** Prasyarat instalasi, ditampilkan sebagai catatan di picker. */
+  /** Prasyarat instalasi, ditampilkan sebagai catatan di picker. Nama PAKET, bukan id skill. */
   readonly requires: readonly string[];
+  /**
+   * SPEC-739 · ADR-0114 · perintah pemasangan per agen, dijalankan di SESI TERMINAL (ADR-0056) —
+   * server tak pernah menjalankannya sendiri (ADR-0087/0088). Ia hidup di sini bersama `requires`
+   * supaya metode ketiga tak menuntut sunting di server/web (AC-10 ADR-0113).
+   */
+  readonly install: Readonly<Record<MethodAgent, readonly string[]>>;
 }
 
 export const DEFAULT_METHOD = "superpowers";
@@ -72,6 +84,13 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
     },
     exitSkills: [VERIFICATION_GATE],
     requires: ["superpowers"],
+    install: {
+      claude: [
+        "claude plugin marketplace add obra/superpowers-marketplace",
+        "claude plugin install superpowers@superpowers-marketplace",
+      ],
+      codex: ["codex plugin add superpowers@openai-curated"],
+    },
   },
   // Plugin `mattpocock-skills` (`/plugin install mattpocock-skills`); skill plugin di Claude Code
   // beralamat `plugin:skill`. `superpowers` tetap ikut di `requires` karena gerbang verifikasinya
@@ -95,6 +114,21 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
     exitSkills: [VERIFICATION_GATE],
     extraClause: MATT_CLAUSE,
     requires: ["mattpocock-skills", "superpowers"],
+    // `mattpocock-skills` ada di marketplace resmi Claude Code → tanpa `marketplace add`.
+    // superpowers ikut dipasang karena `requires` menyebutnya: gerbang verifikasinya dipinjam
+    // dari sana (INVARIAN 2). codex belum punya plugin native mattpocock — jalur resminya
+    // `npx skills`, dan ia INTERAKTIF; itu justru alasan pemasangan hidup di pane yang ditonton.
+    install: {
+      claude: [
+        "claude plugin install mattpocock-skills",
+        "claude plugin marketplace add obra/superpowers-marketplace",
+        "claude plugin install superpowers@superpowers-marketplace",
+      ],
+      codex: [
+        "npx skills@latest add mattpocock/skills",
+        "codex plugin add superpowers@openai-curated",
+      ],
+    },
   },
 };
 
