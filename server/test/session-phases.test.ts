@@ -240,3 +240,44 @@ describe("SPEC-407 · stage flow goal", () => {
     expect(stageForRun(goalPhases(), bersih, "SPEC-407")).toBe("done");
   });
 });
+
+// SPEC-734 · AC-6 · INVARIAN 1 — item yang BERPINDAH metode adalah kasus yang menentukan.
+describe("planComplete · lintas metode (SPEC-734)", () => {
+  const wt = () => mkdtempSync(join(tmpdir(), "hn-plan-"));
+  const write = (root: string, rel: string, body: string) => {
+    mkdirSync(join(root, rel.slice(0, rel.lastIndexOf("/"))), { recursive: true });
+    writeFileSync(join(root, rel), body);
+  };
+
+  it("plan superpowers yang masih `- [ ]` menahan item meski metode aktifnya matt", () => {
+    const root = wt();
+    write(root, "docs/superpowers/plans/2026-08-13-spec-9.md", "- [ ] belum\n");
+    mkdirSync(join(root, "docs/matt/plans"), { recursive: true });
+    expect(planComplete(root, "SPEC-9")).toBe(false);
+  });
+
+  it("plan matt yang masih `- [ ]` menahan item meski dir superpowers tak ada", () => {
+    const root = wt();
+    write(root, "docs/matt/plans/2026-08-13-spec-9.md", "- [ ] belum\n");
+    expect(planComplete(root, "SPEC-9")).toBe(false);
+  });
+
+  it("kedua direktori bersih → selesai", () => {
+    const root = wt();
+    write(root, "docs/superpowers/plans/2026-08-13-spec-9.md", "- [x] beres\n");
+    write(root, "docs/matt/plans/2026-08-13-spec-9.md", "- [x] beres\n");
+    expect(planComplete(root, "SPEC-9")).toBe(true);
+  });
+
+  // Direktori metode PERTAMA yang tak ada tak boleh menghentikan pemindaian metode kedua —
+  // inilah bentuk kode yang membuat gerbangnya fail-open sebelum spec ini (`return true`).
+  it("dir metode pertama tak ada tak menghentikan pemindaian metode kedua", () => {
+    const root = wt();
+    write(root, "docs/matt/plans/2026-08-13-spec-9.md", "- [ ] belum\n");
+    expect(planComplete(root, "SPEC-9")).toBe(false);
+  });
+
+  it("tak ada plan cocok sama sekali → true (tak ada checklist untuk digerbang)", () => {
+    expect(planComplete(wt(), "SPEC-9")).toBe(true);
+  });
+});

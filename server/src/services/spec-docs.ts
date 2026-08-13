@@ -1,3 +1,4 @@
+import { PLAN_DIRS, SPEC_DIRS } from "@hanoman/shared";
 import { prisma } from "../db";
 import { listRepoDocs } from "./scan";
 import { resolveRepoDir } from "./local-binding";
@@ -19,8 +20,11 @@ export function kindOf(path: string): DocKind {
   if (p.endsWith("-audit.md") || p.includes("/research/audit-")) return "audit";
   if (p.endsWith("-objective.md")) return "objective";
   if (p.endsWith("-brainstorm.md")) return "brainstorm";
-  if (p.endsWith("-design.md") || p.endsWith("-spec.md") || p.startsWith("docs/superpowers/specs/")) return "spec";
-  if (p.startsWith("docs/superpowers/plans/") || p.endsWith("-plan.md")) return "plan";
+  // SPEC-734 · prefix diperiksa terhadap UNION direktori terdaftar — dokumen metode lain yang
+  // masih ada di worktree tetap terklasifikasi benar di preview docs.
+  if (p.endsWith("-design.md") || p.endsWith("-spec.md")
+    || SPEC_DIRS.some((d) => p.startsWith(`${d}/`))) return "spec";
+  if (PLAN_DIRS.some((d) => p.startsWith(`${d}/`)) || p.endsWith("-plan.md")) return "plan";
   return "other";
 }
 

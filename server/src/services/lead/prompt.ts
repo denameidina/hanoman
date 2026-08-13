@@ -1,4 +1,4 @@
-import { LEAD_ACTIONS, LEAD_DECISION_MAX, LEAD_REASON_MAX, type LeadKind } from "@hanoman/shared";
+import { LEAD_ACTIONS, LEAD_DECISION_MAX, LEAD_REASON_MAX, PLAN_DIRS, type LeadKind } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 
 // SPEC-409 · ADR-0091 · prompt hanoman-lead. Murni (string masuk, string keluar) supaya bentuk
@@ -122,7 +122,9 @@ export function leadPrompt(q: LeadQuestion, c: LeadContext): string {
   lines.push(`Anggarkan begini: pakai paling banyak separuh waktu untuk mengumpulkan bukti, lalu **berhenti membaca** dan tulis jawabannya dengan apa yang sudah kamu punya. Kalau buktinya jadi tipis karena itu, turunkan \`confidence\`-nya — jangan menambah waktu baca.`);
   lines.push("");
   lines.push("## Cara kerja");
-  lines.push("1. KUMPULKAN BUKTI DULU sebelum memutuskan, DI DALAM anggaran waktu di atas: `internal/docs/**` (Source of Truth) dan index-nya, ADR yang relevan, plan `docs/superpowers/plans/**`, kode yang bersangkutan, dan riwayat git. Baca, jangan mengingat — tapi baca seperlunya, bukan sehabisnya.");
+  // SPEC-734 · lead membaca plan backlog MANA PUN, dan tiap item bisa berbeda metode — sebut
+  // seluruh direktori terdaftar, bukan satu (menyebut yang salah = lead melihat direktori kosong).
+  lines.push(`1. KUMPULKAN BUKTI DULU sebelum memutuskan, DI DALAM anggaran waktu di atas: \`internal/docs/**\` (Source of Truth) dan index-nya, ADR yang relevan, plan ${PLAN_DIRS.map((d) => `\`${d}/**\``).join(" / ")}, kode yang bersangkutan, dan riwayat git. Baca, jangan mengingat — tapi baca seperlunya, bukan sehabisnya.`);
   lines.push("2. Putuskan. Kalau setelah membaca kamu masih ragu, TETAP putuskan: pilih opsi yang PALING MUDAH DIBATALKAN, lalu tandai `confidence: \"ragu\"`. \"Tidak tahu\" bukan jawaban, dan meminta manusia memutuskan adalah persis keadaan yang kamu ada untuk menghapusnya. SATU pengecualian: bila jawabannya menuntut fakta konkret yang memang TIDAK ADA di repo maupun di konteks ini, isi `missing` dengan daftar pendek hal yang kurang — hal yang bisa disediakan seseorang, bukan keluhan — dan tetap tulis `decision` sebagai langkah paling aman sementara. `missing` yang terisi memaksa `confidence` jadi `ragu` dan memanggil operator; jangan memakainya untuk bukti yang cuma tipis.");
   lines.push("3. Rujuk bukti yang BENAR-BENAR kamu baca. Rujukan berupa path berkas relatif terhadap checkout, nomor ADR (`ADR-0091`), atau sha commit. Rujukan yang tak ada di repo akan dibuang server dan membuat jawabanmu tampak tanpa dasar.");
   lines.push("4. JANGAN membaca atau mengutip kredensial (isi `.env*`, token, kunci privat). Jejak keputusan disimpan di basis data; rahasia tak boleh mendarat di sana.");

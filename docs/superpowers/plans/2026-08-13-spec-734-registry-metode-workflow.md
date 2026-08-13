@@ -996,7 +996,7 @@ git commit -m "feat(spec-734): gate plan codex & mode goal memindai union planDi
 - Consumes: `PLAN_DIRS`, `SPEC_DIRS` dari Task 1
 - Produces: tanda tangan `planComplete(worktree, specId)`, `artifactsToRemove(...)`, `kindOf(path)` **tak berubah** — hanya perilakunya yang jadi union.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `server/test/session-phases.test.ts`:
 
@@ -1081,7 +1081,7 @@ lalu ubah dua ekspektasi lama dan tambahkan satu test:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run server/test/session-phases.test.ts server/test/stage-artifacts.test.ts --no-file-parallelism
@@ -1089,7 +1089,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: FAIL — `planComplete` mengembalikan `true`, dan `artifactsToRemove` tak memuat berkas matt.
 
-- [ ] **Step 3: Ubah `planComplete`**
+- [x] **Step 3: Ubah `planComplete`**
 
 Di `server/src/services/session-phases.ts`, tambahkan `PLAN_DIRS` ke import `@hanoman/shared`, lalu ganti fungsinya:
 
@@ -1120,7 +1120,7 @@ export function planComplete(worktree: string, specId: string): boolean {
 }
 ```
 
-- [ ] **Step 4: Ubah `stage-artifacts.ts`**
+- [x] **Step 4: Ubah `stage-artifacts.ts`**
 
 ```ts
 import type { Stage } from "@hanoman/shared";
@@ -1150,7 +1150,7 @@ dan di dalam `artifactsToRemove` ganti perakitan `dirs`:
     .flatMap((s) => ARTIFACT_DIR[s] ?? []);
 ```
 
-- [ ] **Step 5: Ubah `spec-docs.ts`**
+- [x] **Step 5: Ubah `spec-docs.ts`**
 
 Tambahkan import `import { PLAN_DIRS, SPEC_DIRS } from "@hanoman/shared";` dan ganti dua baris klasifikasi:
 
@@ -1162,7 +1162,7 @@ Tambahkan import `import { PLAN_DIRS, SPEC_DIRS } from "@hanoman/shared";` dan g
   if (PLAN_DIRS.some((d) => p.startsWith(`${d}/`)) || p.endsWith("-plan.md")) return "plan";
 ```
 
-- [ ] **Step 6: Ubah prompt lead**
+- [x] **Step 6: Ubah prompt lead**
 
 Di `server/src/services/lead/prompt.ts`, tambahkan `PLAN_DIRS` ke import `@hanoman/shared` dan ganti baris 125 supaya menyebut union:
 
@@ -1170,7 +1170,7 @@ Di `server/src/services/lead/prompt.ts`, tambahkan `PLAN_DIRS` ke import `@hanom
   lines.push(`1. KUMPULKAN BUKTI DULU sebelum memutuskan, DI DALAM anggaran waktu di atas: \`internal/docs/**\` (Source of Truth) dan index-nya, ADR yang relevan, plan ${PLAN_DIRS.map((d) => `\`${d}/**\``).join(" / ")}, kode yang bersangkutan, dan riwayat git. Baca, jangan mengingat — tapi baca seperlunya, bukan sehabisnya.`);
 ```
 
-- [ ] **Step 7: Jalankan test, pastikan LULUS**
+- [x] **Step 7: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run server/test/session-phases.test.ts server/test/stage-artifacts.test.ts server/test/spec-docs.test.ts --no-file-parallelism
@@ -1178,7 +1178,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/session-phases.ts server/src/services/stage-artifacts.ts server/src/services/spec-docs.ts server/src/services/lead/prompt.ts server/test/session-phases.test.ts server/test/stage-artifacts.test.ts

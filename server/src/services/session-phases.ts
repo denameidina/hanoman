@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { PIPELINES, type Flow } from "@hanoman/runner";
-import type { Stage } from "@hanoman/shared";
+import { PLAN_DIRS, type Stage } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
 
 export type PhaseState = "done" | "skipped" | "active" | "pending";
@@ -74,20 +74,27 @@ export function stageFor(phases: Phase[]): Stage | null {
   return best < 0 ? null : STAGES[best]!;
 }
 
-// SPEC-173 · ADR-0029 — plan superpowers milik spec ini, dibaca dari worktree run-nya:
-// `false` hanya jika ada file plan yang cocok segmen spec-id DAN masih memuat task `- [ ]`.
-// Tak ada plan yang cocok (fast-path qa yang melewati Plan, atau worktree tanpa docs) →
-// `true`: tak ada checklist untuk digerbang. Cocokkan sama seperti artifactsToRemove —
-// batas kiri non-alnum, kanan non-digit, jadi "spec-16" tak menyerempet "spec-167".
+// SPEC-173 · ADR-0029 — plan milik spec ini, dibaca dari worktree run-nya: `false` hanya jika ada
+// file plan yang cocok segmen spec-id DAN masih memuat task `- [ ]`. Tak ada plan yang cocok
+// (fast-path qa yang melewati Plan, atau worktree tanpa docs) → `true`: tak ada checklist untuk
+// digerbang. Cocokkan sama seperti artifactsToRemove — batas kiri non-alnum, kanan non-digit, jadi
+// "spec-16" tak menyerempet "spec-167".
+//
+// SPEC-734 · ADR-0113 · INVARIAN 1 — pindai UNION seluruh `planDir` terdaftar, bukan direktori
+// metode terpilih. Direktori satu metode yang tak ada wajib `continue`, BUKAN mengakhiri
+// pemindaian: item yang lahir dengan superpowers lalu dilanjutkan dengan metode lain akan melihat
+// direktori kosong → `true` hampa → backlog lompat ke `done` padahal plan lama masih penuh `- [ ]`.
 export function planComplete(worktree: string, specId: string): boolean {
-  const dir = `${worktree}/docs/superpowers/plans`;
   const re = new RegExp(`(^|[^a-z0-9])${specId.toLowerCase()}([^0-9]|$)`);
-  let names: string[];
-  try { names = readdirSync(dir); } catch { return true; }
-  for (const n of names) {
-    if (!re.test(n.toLowerCase())) continue;
-    try { if (/^[ \t]*- \[ \]/m.test(readFileSync(`${dir}/${n}`, "utf8"))) return false; }
-    catch { /* file lenyap saat dibaca — abaikan */ }
+  for (const rel of PLAN_DIRS) {
+    const dir = `${worktree}/${rel}`;
+    let names: string[];
+    try { names = readdirSync(dir); } catch { continue; }
+    for (const n of names) {
+      if (!re.test(n.toLowerCase())) continue;
+      try { if (/^[ \t]*- \[ \]/m.test(readFileSync(`${dir}/${n}`, "utf8"))) return false; }
+      catch { /* file lenyap saat dibaca — abaikan */ }
+    }
   }
   return true;
 }
