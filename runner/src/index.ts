@@ -11,4 +11,5 @@ export * from "./custom-agents";
 export * from "./verify-scope";
 export * from "./code-style";
 export * from "./paths";
+export * from "./skills";
 export * from "./telegram-operator";
