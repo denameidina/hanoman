@@ -4,6 +4,7 @@ import React from "react";
 import { Card, StatusPill, Badge, ProgressBar, Icon, IconButton, StateBlock, serverPage, Pager,
   LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE } from "../ds";
 import { api } from "../api/client";
+import { usePersistedState, useScrollRestore, isNum } from "../ui-state";
 import type { ProjectVM } from "./types";
 
 function hnCovTone(s: string) { return s === "broken" ? "err" : s === "drift" ? "warn" : "ok"; }
@@ -99,7 +100,9 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
   // Baris = potongan server; seed dari prop utk render instan + tahan mock parsial di test.
   const [rows, setRows] = React.useState<ProjectVM[]>(projects);
   const [total, setTotal] = React.useState(projects.length);
-  const [page, setPage] = React.useState(1);
+  // SPEC-740 · ADR-0115 · nomor halaman & posisi scroll bertahan; `pageSize` tetap prop.
+  const [page, setPage] = usePersistedState("projects", "page", 1, isNum);
+  const listRef = useScrollRestore("projects", "scroll", rows.length > 0);
   React.useEffect(() => { setPage(1); }, [search]);
   React.useEffect(() => {
     if (!pageSize) { setRows(projects); setTotal(projects.length); return; }
@@ -121,7 +124,7 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
           <div style={{ ...FIXED_ROW_STYLE, display: "grid", gridTemplateColumns: tmpl, gap: 12, padding: "10px 14px 10px 15px", borderBottom: "1px solid var(--border-hair)" }}>
             {cols.map((c) => <span key={c} className="hn-eyebrow">{c}</span>)}
           </div>
-          <div style={LIST_SCROLL_STYLE}>
+          <div ref={listRef} data-testid="projects-scroll" style={LIST_SCROLL_STYLE}>
             {rows.map((p) => <ProjectRow key={p.id} p={p} onOpen={onOpen} onDelete={onDelete} />)}
           </div>
           {pageSize && <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to} onPage={setPage} unit="project" />}

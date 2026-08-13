@@ -14,6 +14,7 @@ import type { ChangelogView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 import { ChangelogPanel } from "./ChangelogPanel";
 import { changelogDeepLink } from "./deeplink";
+import { usePersistedState, scoped, isStr, isNum, nullableStr } from "../ui-state";
 
 const PAGE_SIZE = 12;
 const MODE_LABEL: Record<string, string> = {
@@ -50,10 +51,24 @@ export function ChangelogScreen({ p, onToast, initialChangelogId }:
     initialChangelogId?: string | null }) {
   const [items, setItems] = React.useState<ChangelogView[]>([]);
   const [total, setTotal] = React.useState(0);
-  const [page, setPage] = React.useState(1);
-  const [q, setQ] = React.useState("");
+  // SPEC-740 · ADR-0115 · ber-scope project: pencarian & halaman project A tak boleh
+  // muncul saat project B dibuka.
+  const ui = scoped("changelog", p.id);
+  const [page, setPage] = usePersistedState(ui, "page", 1, isNum);
+  const [q, setQ] = usePersistedState(ui, "q", "", isStr);
   const [loading, setLoading] = React.useState(true);
-  const [selected, setSelected] = React.useState<ChangelogView | null>(null);
+  const [selectedId, setSelectedId] = usePersistedState<string | null>(ui, "selectedId", null, nullableStr);
+  // Rilis terpilih bisa berada DI LUAR halaman yang termuat — deep-link `&cl=` dan hasil
+  // generator mengambilnya per-id. Barisnya dicache di sini supaya `selected` tetap terisi;
+  // yang persisten cuma id-nya.
+  const [offPage, setOffPage] = React.useState<ChangelogView | null>(null);
+  const selected = React.useMemo(
+    () => items.find((c) => c.id === selectedId) ?? (offPage?.id === selectedId ? offPage : null),
+    [items, selectedId, offPage]);
+  const setSelected = React.useCallback((c: ChangelogView | null) => {
+    setSelectedId(c ? c.id : null);
+    setOffPage(c);
+  }, [setSelectedId]);
   const [reloadKey, setReloadKey] = React.useState(0);
 
   // Debounce ketikan: kotak cari memanggil server, bukan menyaring halaman yang kebetulan termuat
@@ -87,7 +102,7 @@ export function ChangelogScreen({ p, onToast, initialChangelogId }:
     if (!window.confirm(`Hapus changelog "${c.title}"?`)) return;
     try {
       await api.deleteChangelog(p.id, c.id);
-      setSelected((cur) => (cur?.id === c.id ? null : cur));
+      if (selectedId === c.id) setSelected(null);
       setReloadKey((v) => v + 1);
       onToast("Changelog dihapus", "ok", "trash-2");
     } catch { onToast("Gagal menghapus changelog", "err", "x-circle"); }

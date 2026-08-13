@@ -11,6 +11,7 @@ import { api, type PrdDoc } from "../api/client";
 import { PRD_STATUSES, type BreakdownItem, type PrdStatus } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 import { prdBranchOf } from "./branch";
+import { usePersistedState, ResetViewButton, oneOf, nullableStr } from "../ui-state";
 
 export type PrdBriefForm = { title: string; context: string; outcome: string; constraints?: string };
 // SPEC-244 · branchFrom = branch yang dibuat sesi PRD (prd/<slug>) — diteruskan ke brief take-to-backlog.
@@ -253,11 +254,17 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
     dataVersion?: number;
   }) {
   const [items, setItems] = React.useState<PrdDoc[]>([]);
-  const [sel, setSel] = React.useState<PrdDoc | null>(null);
+  // SPEC-740 · ADR-0115 · yang disimpan slug-nya saja, bukan dokumennya: storage hanya
+  // untuk parameter tampilan.
+  const [selSlug, setSelSlug] = usePersistedState<string | null>("prd", "sel", null, nullableStr);
+  const sel = React.useMemo(() => items.find((p) => p.slug === selSlug) ?? null, [items, selSlug]);
+  const setSel = React.useCallback((p: PrdDoc | null) => setSelSlug(p ? p.slug : null), [setSelSlug]);
   const [creating, setCreating] = React.useState(false);
   // SPEC-520 · filter status disaring di KLIEN: daftar PRD tak berpaginasi server (pola yang
-  // sama dengan filter project di sebelahnya).
-  const [statusFilter, setStatusFilter] = React.useState<"all" | PrdStatus>("all");
+  // sama dengan filter project di sebelahnya). Guard ketat dari katalog yang sama — status
+  // yang sudah tak ada di `PRD_STATUSES` jatuh ke "all", bukan menyaring daftar jadi kosong.
+  const [statusFilter, setStatusFilter] = usePersistedState<"all" | PrdStatus>(
+    "prd", "status", "all", oneOf<"all" | PrdStatus>("all", ...PRD_STATUSES));
   const all = projectFilter === "all";
   const activeProject = all ? "" : projectFilter; // project target untuk "PRD baru" (perlu satu project)
 
@@ -290,6 +297,7 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
             onChange={(e) => setStatusFilter(e.target.value as "all" | PrdStatus)}
             options={[{ value: "all", label: "Semua status" }]
               .concat(PRD_STATUSES.map((s) => ({ value: s, label: s })))} />
+          <ResetViewButton screen="prd" active={statusFilter === "all" ? 0 : 1} />
         </div>
         <Button size="sm" leftIcon="plus"
           onClick={() => setCreating(true)}>PRD baru</Button>
