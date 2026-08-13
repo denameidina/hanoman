@@ -28,6 +28,8 @@ export const paths = {
   limits: `${API}/limits`,
   // SPEC-339 · versi codex CLI (peringatan lunak model GPT-5.6).
   codexVersion: `${API}/codex/version`,
+  // SPEC-739 · ADR-0114 · kesiapan skill metode per agen. LOCAL-only, diturunkan live dari disk.
+  methodStatus: `${API}/methods/status`,
   // SPEC-489 · panduan AI agent — markdown MENTAH & PUBLIC (tanpa auth). Satu definisi URL untuk
   // klien web dan untuk tautan yang disalin operator ke agennya.
   agentDoc: `${API}/agent-integration.md`,

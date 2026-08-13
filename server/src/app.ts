@@ -20,6 +20,7 @@ import terminal from "./routes/terminal";
 import vps from "./routes/vps";
 import limits from "./routes/limits";
 import codex from "./routes/codex";
+import methods from "./routes/methods";
 import update from "./routes/update";
 import events from "./routes/events";
 import deviceTokens from "./routes/device-tokens";
@@ -183,6 +184,7 @@ export function buildApp(
     await api.register(tickets);  // SPEC-253 · triase (di belakang gate cookie)
     await api.register(scheduler);  // SPEC-294 · config/state scheduler (di belakang gate cookie)
     await api.register(codex);      // SPEC-339 · versi codex CLI untuk peringatan model 5.6
+    await api.register(methods);    // SPEC-739 · ADR-0114 · kesiapan skill metode per agen
     await api.register(lead);       // SPEC-409 · ADR-0091 · hanoman-lead (cookie + capability `lead`)
     await api.register(customAgents); // SPEC-450 · ADR-0094 · katalog custom agent (capability `agents`)
     await api.register(githubIssues); // SPEC-471 · ADR-0095 · tarik & triase issue GitHub (capability `support`)
