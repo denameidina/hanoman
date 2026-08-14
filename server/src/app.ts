@@ -5,7 +5,7 @@ import cookie from "@fastify/cookie";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { existsSync } from "node:fs";
-import { pickWebDir } from "./web-dir";
+import { pickWebDir, shouldServeWeb } from "./web-dir";
 import { pickGuideFile } from "./guide-file";
 import health from "./routes/health";
 import agentDoc from "./routes/agent-doc";
@@ -207,7 +207,7 @@ export function buildApp(
   // index.html for non-/api routes (api 404s stay JSON, never a fake page).
   // SPEC-398 · ADR-0087 · direktorinya dipilih pickWebDir (paket npm `web/` atau checkout
   // `src/dist`); absen → server tetap jalan sebagai API saja, bukan crash.
-  if (env.NODE_ENV === "production") {
+  if (shouldServeWeb(env)) {
     const dist = pickWebDir(dirname(fileURLToPath(import.meta.url)), env, existsSync);
     if (dist) {
       app.register(fastifyStatic, { root: dist });

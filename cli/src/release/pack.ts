@@ -16,7 +16,7 @@ export const REPO_URL = "git+https://github.com/denameidina/hanoman.git";
 // start`) dan `pg` (`migrate-from-postgres`). Apa pun di luar daftar ini ikut dibundel esbuild.
 export const RUNTIME_DEPS = [
   "fastify", "@fastify/static", "@fastify/websocket", "@fastify/cookie",
-  "@prisma/client", "node-pty", "pdfkit", "prisma", "pg",
+  "@prisma/client", "node-pty", "pdfkit", "sharp", "prisma", "pg",
 ] as const;
 
 export const REQUIRED_ARTIFACTS = [

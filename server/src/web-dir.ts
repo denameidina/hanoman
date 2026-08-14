@@ -5,6 +5,9 @@
 import { resolve } from "node:path";
 import type { EnvLike } from "@hanoman/runner";
 
+export const shouldServeWeb = (env: EnvLike): boolean =>
+  env.NODE_ENV === "production" || Boolean(env.HANOMAN_WEB_DIR?.trim());
+
 export function pickWebDir(distDir: string, env: EnvLike, exists: (p: string) => boolean): string | null {
   const forced = env.HANOMAN_WEB_DIR?.trim();
   if (forced) {
