@@ -66,6 +66,47 @@ describe("SPEC-763 · baris padat memberi teks lebar minimum di mobile", () => {
   });
 });
 
+/* Baris pemilih (Ambil backlog · Riwayat sesi) memikul TIGA cacat sekaligus, ketiganya terukur di
+   390×844 dan ketiganya lahir dari "item boleh menyusut di bawah kontennya" — akar yang sama dengan
+   tab yang tumpah:
+   - `all: "unset"` inline mengalahkan `button { min-height: var(--touch-target) }` → baris 39px;
+   - daftar `flex-direction: column` ber-`maxHeight` memeras baris ke 44px sementara isinya 66px →
+     judul yang membungkus MENIMPA baris berikutnya (terlihat langsung di tangkapan layar);
+   - judul ber-`flex-basis: 0` kalah dari `projectId` yang basis-nya selebar isinya → judul tersisa
+     "Ba…" (konten terpotong 667px) padahal ia satu-satunya pembeda antar-baris. */
+describe("SPEC-763 · baris pemilih tak diperas di bawah kontennya", () => {
+  const rows = [
+    ["TerminalScreen.tsx", "onPick(s)"],
+    ["SessionHistoryModal.tsx", "setSelected(r)"],
+  ] as const;
+
+  it.each(rows)("%s: baris tak memakai `all: unset` dan tak boleh menyusut", (file, anchor) => {
+    const source = readFileSync(resolve(import.meta.dirname, `../src/screens/${file}`), "utf8");
+    const at = source.indexOf(anchor);
+    expect(at).toBeGreaterThan(-1);
+    const row = source.slice(at, at + 420);
+    expect(row).not.toContain('all: "unset"');
+    expect(row).toContain('flex: "0 0 auto"');
+  });
+
+  it.each(rows)("%s: pembungkus flex ada DI DALAM tombol, bukan pada tombolnya", (file, anchor) => {
+    const source = readFileSync(resolve(import.meta.dirname, `../src/screens/${file}`), "utf8");
+    const at = source.indexOf(anchor);
+    const row = source.slice(at, at + 900);
+    // Kotak <button> tak menumbuhkan tingginya untuk baris flex yang membungkus: tombolnya
+    // `block`, dan yang `flex` adalah <span> di dalamnya.
+    expect(row).toContain('display: "block"');
+    expect(row).toMatch(/<span className="hn-dense-row hn-picker-row"/);
+  });
+
+  it("memberi judul barisnya sendiri di mobile lewat aturan yang menang atas nowrap inline", () => {
+    expect(mobile).toMatch(/\.hn-picker-row\s*\{\s*flex-wrap:\s*wrap/);
+    const rule = mobile.slice(mobile.indexOf(".hn-picker-row > .hn-picker-title"));
+    expect(rule).toMatch(/flex:\s*1 1 100%\s*!important/);
+    expect(rule).toMatch(/white-space:\s*normal\s*!important/);
+  });
+});
+
 describe("SPEC-763 · pil update tak sendirian memaksa topbar jadi tiga baris", () => {
   const status = (latestVersion: string | null): UpdateStatus => ({
     currentVersion: "0.1.33", latestVersion, updateAvailable: true,

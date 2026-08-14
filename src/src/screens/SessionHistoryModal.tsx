@@ -93,15 +93,23 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
           {items.map((r) => {
             const st = statusOf(r);
             return (
+              // SPEC-763 · cermin baris "Ambil backlog", tiga cacat yang sama: `all: "unset"`
+              // inline mengalahkan `button { min-height: var(--touch-target) }`; kotak tombol tak
+              // menumbuhkan tinggi untuk baris flex yang membungkus (jadi pembungkusnya <span> di
+              // DALAM tombol); dan daftar flex-column ber-`maxHeight` memeras barisnya di bawah
+              // konten kalau `flex: 0 0 auto` tak dinyatakan.
               <button key={r.id} onClick={() => setSelected(r)} style={{
-                all: "unset", cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
-                padding: "9px 8px", borderBottom: "1px solid var(--border-hair)",
+                cursor: "pointer", display: "block", width: "100%", flex: "0 0 auto",
+                font: "inherit", color: "inherit", textAlign: "left", background: "transparent",
+                padding: "9px 8px", border: "none", borderBottom: "1px solid var(--border-hair)",
               }}>
+                <span className="hn-dense-row hn-picker-row" style={{
+                  display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", flex: "0 0 132px" }}>
                   {new Date(r.startedAt).toLocaleString("id-ID")}
                 </span>
                 <Badge size="sm" tone="neutral">{labelOfKind(r.kind)}</Badge>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
+                <span className="hn-picker-title" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {r.title ?? r.specId ?? nameOf(r.projectId)}
                 </span>
@@ -110,6 +118,7 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
                   {humanDuration(r.startedAt, r.endedAt)}
                 </span>
                 <Badge size="sm" tone={st.tone}>{st.label}</Badge>
+                </span>
               </button>
             );
           })}

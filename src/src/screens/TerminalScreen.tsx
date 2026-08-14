@@ -450,19 +450,34 @@ function BacklogPicker({ seed, activeIds, error, onPick, onClose }: {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", maxHeight: "62vh", overflowY: "auto" }}>
           {shown.map((s) => (
+            // SPEC-763 · `all: "unset"` dulu ada di sini dan memakan DUA aturan sekaligus: ia
+            // inline, jadi ia menang atas `button { min-height: var(--touch-target) }` (baris jadi
+            // 39px, di bawah minimum 44px) DAN atas `flex-wrap` milik `.hn-dense-row`. Reset
+            // eksplisit per properti memulihkan keduanya tanpa `!important` baru.
+            // `flex: 0 0 auto` wajib: daftarnya flex-column ber-`maxHeight`, jadi barisnya boleh
+            // menyusut di bawah kontennya — terukur tombol 44px memuat isi 66px, dan judul yang
+            // membungkus MENIMPA baris di bawahnya. Akar yang sama dengan tab yang tumpah.
             <button key={s.id} onClick={() => onPick(s)} style={{
-              all: "unset", cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
-              padding: "9px 8px", borderBottom: "1px solid var(--border-hair)",
+              cursor: "pointer", display: "block", width: "100%", flex: "0 0 auto",
+              font: "inherit", color: "inherit", textAlign: "left", background: "transparent",
+              padding: "9px 8px", border: "none", borderBottom: "1px solid var(--border-hair)",
             }}>
-              <Icon name={s.source === "qa" ? "bug" : s.source === "audit" ? "search" : "lightbulb"} size={14}
-                color={s.source === "qa" ? "var(--clay-500)" : s.source === "audit" ? "var(--wind-600)" : "var(--brass-500)"} />
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)",
-                flex: "0 0 78px" }}>{s.id}</span>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</span>
-              <Badge tone={s.priority === "tinggi" ? "err" : "neutral"} size="sm">{s.priority}</Badge>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11,
-                color: "var(--text-muted)" }}>{s.projectId}</span>
+              {/* Baris flex-nya hidup di dalam <span>, bukan di <button> itu sendiri: kotak tombol
+                  tidak menumbuhkan tingginya untuk baris flex yang membungkus, sehingga judul yang
+                  turun ke baris kedua menimpa baris berikutnya (terlihat langsung di 390px). */}
+              <span className="hn-dense-row hn-picker-row" style={{
+                display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+                <Icon name={s.source === "qa" ? "bug" : s.source === "audit" ? "search" : "lightbulb"} size={14}
+                  color={s.source === "qa" ? "var(--clay-500)" : s.source === "audit" ? "var(--wind-600)" : "var(--brass-500)"} />
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)",
+                  flex: "0 0 78px" }}>{s.id}</span>
+                <span className="hn-picker-title" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</span>
+                <Badge tone={s.priority === "tinggi" ? "err" : "neutral"} size="sm">{s.priority}</Badge>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, flex: "0 1 auto", minWidth: 0,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  color: "var(--text-muted)" }}>{s.projectId}</span>
+              </span>
             </button>
           ))}
         </div>

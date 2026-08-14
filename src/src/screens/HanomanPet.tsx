@@ -10,6 +10,13 @@ import {
 import { motionForPose } from "./pet-motion";
 
 const SIZE = 76;
+// SPEC-763 · pet melayang `fixed` di pojok, jadi konten yang tergulir lewat di BAWAHNYA — dan
+// tombol tembus-pandangnya dulu selebar seluruh panggung, sehingga tap yang ditujukan ke kontrol
+// di bawahnya mendarat di pet. Terukur di 390×844 lewat `elementFromPoint` atas 9 titik sampel per
+// kontrol: "Hapus spec" 2/9 titik, "Buka project" 3/9, "Pimpin" 4/9, item PRD 2/9. Ukuran target
+// sentuh minimum (44px) sudah memenuhi aksesibilitas, jadi sisa panggung tak perlu ikut menangkap
+// tap — ia cuma seni. Jangkar kanan-bawah mengikuti badan sticker-nya.
+const HIT = 44;
 
 // jsdom tak punya matchMedia; ketiadaannya dibaca sebagai "tak ada preferensi", bukan "reduce".
 function usePrefersReducedMotion(): boolean {
@@ -115,8 +122,11 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   }
 
   // z 80: di bawah header (90), overlay terminal fullscreen (100), Modal (150), Toast (200) — jadi
-  // pet secara struktural tak bisa menutupi kontrol mana pun. `pointerEvents: none` di pembungkus
-  // menyerahkan kembali area kosong di sekitarnya ke konten di bawahnya.
+  // pet tak bisa menutupi lapisan CHROME. Ia TETAP di atas konten halaman (z auto): klaim lama
+  // "secara struktural tak bisa menutupi kontrol mana pun" salah, dan terbantah `elementFromPoint`
+  // di 390×844 — "Hapus spec" kehilangan 2 dari 9 titik sampelnya. `pointerEvents: none` di
+  // pembungkus memang menyerahkan area kosong, tapi tombol di dalamnya `auto`; yang membatasi
+  // kerusakan adalah UKURAN tombol itu (`HIT`), bukan z-index.
   const root: React.CSSProperties = {
     position: "fixed", right: "max(22px, var(--safe-right))", bottom: "max(22px, var(--safe-bottom))", zIndex: 80,
     display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10,
@@ -208,10 +218,10 @@ export function HanomanPet({ sessions, backlog, onOpen }:
             })}
           </div>
         </div>
-        <button aria-label="Ringkasan status Hanoman" title={`${view.headline} — ${view.detail}`}
+        <button data-testid="pet-hit" aria-label="Ringkasan status Hanoman" title={`${view.headline} — ${view.detail}`}
           onClick={reactAndToggle} style={{
             pointerEvents: "auto", position: "absolute", zIndex: 3,
-            left: 0, top: 0, width: "100%", height: "100%",
+            right: 0, bottom: 0, width: HIT, height: HIT,
             padding: 0, border: "none", background: "transparent", cursor: "pointer",
           }} />
       </div>

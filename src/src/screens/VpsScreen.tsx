@@ -172,7 +172,11 @@ export function VpsScreen({ onToast, onGotoTerminal }:
                 border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", marginBottom: 8 }}>
               <button type="button" aria-label={`Buka detail ${v.name}`}
                 onClick={(event) => { event.stopPropagation(); setDetailVps(v); }}
-                style={{ all: "unset", display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}>
+                // SPEC-763 · `all: "unset"` inline mengalahkan aturan target sentuh mobile
+                // (`button { min-height: var(--touch-target) }`); reset eksplisit menyisakannya hidup.
+                style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer",
+                  font: "inherit", color: "inherit", textAlign: "left", background: "transparent",
+                  padding: 0, border: "none" }}>
                 <Icon name="server" size={16} color="var(--brass-700)" />
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 13, fontWeight: 600 }}>{v.name}</span>

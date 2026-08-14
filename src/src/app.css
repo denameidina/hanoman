@@ -216,6 +216,19 @@ textarea:focus-visible,
   .hn-vps-row > div { flex-basis: calc(100% - 32px); }
   .hn-vps-row > button { flex: 1 1 auto; }
   .hn-dense-row > [style*="flex: 1"] { min-width: min(220px, 100%); }
+  /* SPEC-763 · baris pemilih (Ambil backlog, Riwayat sesi): judul adalah satu-satunya pembeda
+     antar-baris, tapi `flex-basis: 0` membuatnya kalah dari tetangga yang basis-nya selebar isi —
+     terukur di 390px judul tersisa "Ba…" (konten terpotong 667px) sementara id project yang
+     identik di semua baris tampil penuh. Di mobile judulnya turun ke barisnya sendiri dan
+     membungkus; `!important` wajib karena `white-space: nowrap`-nya inline. */
+  .hn-picker-row { flex-wrap: wrap; }
+  .hn-picker-row > .hn-picker-title {
+    order: 2;
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+    white-space: normal !important;
+    overflow: visible !important;
+  }
   .hn-card-header { align-items: stretch !important; flex-direction: column; }
   .hn-card-actions { max-width: 100%; }
   .hn-card-actions > * { max-width: 100%; }

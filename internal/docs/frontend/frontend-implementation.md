@@ -89,6 +89,29 @@ dengan memotong atau menjepit, bukan dengan reflow. Ketiganya kini punya aturan:
   lebar berapa pun itu. Terukur di 390px: nama project di Overview jadi **3 baris (4
   karakter/baris)**, kalimat gerbang scheduler jadi **9 baris (8 karakter/baris)**. `.hn-dense-row`
   memberi anak `flex: 1` lebar minimum 220px sehingga tombolnya turun ke baris berikutnya.
+- **Baris di dalam daftar bertinggi terbatas wajib `flex: 0 0 auto`.** Daftar pemilih (Ambil
+  backlog, Riwayat sesi) adalah `flex-direction: column` ber-`maxHeight`, jadi barisnya boleh
+  diperas di bawah kontennya: terukur tombol **44px memuat isi 66px**, dan judul yang membungkus
+  **menimpa baris di bawahnya**. Ini akar yang sama dengan tab yang tumpah.
+- **`all: "unset"` inline adalah racun bagi aturan mobile.** Ia inline, jadi ia menang atas
+  `button { min-height: var(--touch-target) }` **dan** atas `flex-wrap` milik `.hn-dense-row` —
+  terukur baris pemilih 39px, di bawah minimum 44px. `app.css` sudah menambal tiga nama kelas
+  (`.hn-touch-target`, `.hn-project-open`, `.hn-terminal-unplaced-action`) dengan `!important`,
+  tapi tambalan itu hanya menjangkau yang sudah diketahui. Pakai reset eksplisit per properti
+  (`font`/`color`/`background`/`border`/`textAlign`), jangan `all: unset`.
+- **Pembungkus flex tak boleh berupa `<button>` itu sendiri.** Kotak tombol tak menumbuhkan
+  tingginya untuk baris flex yang membungkus; letakkan barisnya di `<span>` di dalam tombol.
+- **Judul adalah yang terakhir mengalah.** Di baris pemilih, judul ber-`flex-basis: 0` kalah dari
+  tetangga yang basis-nya selebar isinya — terukur judul tersisa **"Ba…"** (konten terpotong 667px)
+  sementara id project yang identik di semua baris tampil penuh. Di mobile `.hn-picker-title` turun
+  ke barisnya sendiri dan membungkus; `!important` wajib karena `white-space: nowrap`-nya inline.
+- **Pet melayang mencuri tap, dan z-index bukan yang membatasinya.** Pet `position: fixed` z-80
+  memang di bawah lapisan chrome (header 90, Modal 150), tapi **di atas konten halaman**. Tombol
+  tembus-pandangnya dulu selebar seluruh panggung 76×76, sehingga tap yang ditujukan ke kontrol di
+  bawahnya mendarat di pet — terukur `elementFromPoint` atas 9 titik sampel per kontrol: "Hapus
+  spec" 2/9, "Buka project" 3/9, "Pimpin" 4/9, item PRD 2/9. Area tangkapnya kini dibatasi
+  `HIT = 44` (minimum aksesibilitas) berjangkar kanan-bawah: **6 kontrol di 4 layar → 1 kontrol di
+  1 layar**. Sisa satu itu melekat pada sifat widget melayang; operator bisa menyembunyikan pet.
 - **Label topbar panjang diringkas, bukan dihapus.** Pil update selebar 296px dari ~358px baris
   tools sendirian memaksa topbar jadi tiga baris — terukur **161–211px = 19–25%** viewport 844px.
   Di mobile `.hn-topbar-label` diganti `.hn-topbar-label-short` (versinya saja): header turun ke
