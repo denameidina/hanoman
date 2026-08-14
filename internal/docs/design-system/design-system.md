@@ -4,6 +4,50 @@ Estetika **editorial instrument-panel**: bone paper hangat, ink text, satu aksen
 
 Detail token & komponen ada di paket design system terpisah (Hanoman Design System). Frontend wajib memakai token & komponennya — jangan menciptakan warna/tipografi baru.
 
+## Sistem responsif bersama (SPEC-763)
+
+Hanoman memakai satu struktur komponen untuk seluruh ukuran layar; tidak ada salinan screen mobile.
+Tiga tier presentasinya bersifat kontrak:
+
+| tier | lebar viewport | chrome |
+|---|---:|---|
+| mobile | `<768px` | navigation drawer; konten satu kolom; master/detail dan workspace memakai pemilih panel |
+| tablet | `768–1199px` | navigation rail 72px; split-pane dipakai bila ruangnya memadai |
+| desktop | `≥1200px` | sidebar 248px; perilaku split-pane desktop |
+
+Boundary hidup di `ds/responsive.tsx` (`responsiveTier`/`useResponsiveTier`) dan token layout hidup
+di `ds/tokens/spacing.css`. Media query CSS dan hook JS wajib memakai batas yang sama: mobile
+berakhir di 767px, tablet di 1199px. Lebar viewport adalah state presentasi sementara dan **tidak
+boleh dipersist** bersama state tampilan ADR-0115.
+
+Primitive bersama:
+
+- `ResponsivePanels` mempertahankan instance panel dan selection yang sama: mobile menampilkan satu
+  panel lewat `Tabs`, layar lebar menampilkan panel-panel itu sebagai split-pane. `splitAt` menentukan
+  apakah tablet sudah split atau masih memakai pemilih; pergantian viewport tidak boleh mereset data,
+  editor, pilihan item, atau workspace. Ketika panel aktif berganti pada mode selector, fokus pindah
+  ke region aktif; grid satu panel selalu memakai lebar penuh.
+- `ResponsiveToolbar` membungkus kontrol secara alami; `LocalOverflow` menjadi pemilik overflow
+  mendatar untuk tabel, kode, diff, graph, board, dan terminal. Shell/page sendiri selalu
+  `min-width:0` dan `overflow-x:hidden` — overflow lokal tidak boleh merambat ke halaman.
+- `--page-gutter-x/y`, `--sidebar-w`, `--touch-target`, dan `--safe-*` adalah token lintas-screen.
+  Semua kontrol utama memiliki area sentuh minimum 44×44px pada pointer kasar/mobile, meskipun
+  kepadatan visual desktop boleh tetap lebih kecil.
+
+Root aplikasi memakai fallback `100vh` lalu `100dvh`; permukaan mandiri Auth, Help Center, dan
+portal klien memiliki scroller tegak berbatas `100dvh`. Overlay tetap dijangkau ketika browser
+chrome, notch, atau keyboard virtual mengubah viewport: Modal menjadi sheet pada mobile, menghormati
+`env(safe-area-inset-*)`, badan dialog menggulir, footer membungkus, dan fokus dikurung lalu
+dikembalikan ke pemicu. Pet/Toast/fullscreen juga memakai safe-area. Semua animasi dan transition
+mati melalui query global `prefers-reduced-motion: reduce` tanpa menghilangkan status atau aksi.
+
+Navigation, tab, row, serta action memakai elemen native `button`/`select` atau pola ARIA yang setara.
+Drawer dan Modal wajib punya label, state expanded/open, Escape, focus trap, serta focus restore.
+Konten di belakang drawer menjadi `inert`. Popover topbar memakai `usePopoverFocus`: fokus masuk,
+Escape/outside-click menutup, fokus kembali, dan menu mendukung Arrow/Home/End.
+Target responsif bukan menyederhanakan fitur: data, status, field penting, dan aksi yang tersedia di
+desktop wajib tetap dapat dicapai di tablet/mobile; yang berubah hanya susunan dan cara berpindah panel.
+
 ## Ilustrasi produk
 
 Katalog authoritative berada di `internal/assets/illustration/inventory.json`: **41 master WebP**

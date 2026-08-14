@@ -68,7 +68,7 @@ function SourceCard({ s }: { s: SchedulerSourceView }) {
 
 function RowShell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+    <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
       border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", marginBottom: 6 }}>
       {children}
     </div>
@@ -237,7 +237,7 @@ function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next:
   return (
     <Card eyebrow="scheduler · setelan" title="Konfigurasi"
       actions={<Button size="sm" leftIcon="save" disabled={busy} onClick={() => onWrite(draft)}>Simpan setelan</Button>}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 14 }}>
+      <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 14 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span className="hn-eyebrow">Cap concurrent</span>
           <Input type="number" min={1} value={String(draft.maxConcurrent)} aria-label="Cap concurrent" placeholder="6"

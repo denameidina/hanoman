@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { GitGraph } from "../src/screens/GitGraph";
 import { api } from "../src/api/client";
+import { mockViewport, resetViewport } from "./viewport";
 
 const commits = [
   { sha: "aaaa111", parents: ["bbbb222"], author: "t", at: "2026-01-02T00:00:00Z", subject: "kedua", refs: ["main"], tags: [] },
@@ -15,8 +16,26 @@ beforeEach(() => {
     subject: "kedua", body: "", changed: [{ path: "a.ts", add: 1, del: 0, status: "M", binary: false }],
     signed: false, committer: "t", committedAt: "", authorEmail: "t@t" });
 });
+afterEach(resetViewport);
 
 describe("GitGraph", () => {
+  it("opens a mounted Detail panel and exposes commit actions without right click on mobile", async () => {
+    mockViewport(390);
+    render(<GitGraph projectId="p1" onRunGit={vi.fn()} onMerge={vi.fn()} onRebase={vi.fn()} onPull={vi.fn()} onDrop={vi.fn()} onOpenFile={vi.fn()} />);
+    fireEvent.click(await screen.findByText("kedua"));
+    await screen.findByRole("tablist", { name: "Panel Git Graph" });
+    expect(document.querySelector('[data-panel="detail"]')).toHaveAttribute("aria-hidden", "false");
+    fireEvent.click(screen.getByRole("tab", { name: "Graph" }));
+    const trigger = screen.getByRole("button", { name: "Aksi commit aaaa111" });
+    expect(screen.getByRole("button", { name: "Buka commit aaaa111" }).parentElement?.parentElement).toHaveStyle({ height: "44px" });
+    fireEvent.click(trigger);
+    const first = await screen.findByRole("menuitem", { name: /Checkout aaaa111/i });
+    expect(first).toHaveFocus();
+    expect(screen.getByRole("menu")).toHaveStyle({ overflowY: "auto" });
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
   it("menggambar baris commit dari ideGraph", async () => {
     render(<GitGraph projectId="p1" onRunGit={vi.fn()} onMerge={vi.fn()} onRebase={vi.fn()} onPull={vi.fn()} onDrop={vi.fn()} onOpenFile={vi.fn()} />);
     expect(await screen.findByText("kedua")).toBeInTheDocument();

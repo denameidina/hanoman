@@ -212,3 +212,21 @@ describe("server-driven fetch (SPEC-198)", () => {
     expect(params).toMatchObject({ page: 1, limit: 20 });
   });
 });
+
+describe("responsive backlog controls (SPEC-763)", () => {
+  it("keeps toolbar, filters, view modes, grid, and board overflow reachable", () => {
+    render(<BacklogScreen backlog={[spec({ title: "responsive item" })]} projects={[{ id: "p", name: "P" }] as never}
+      projectFilter="all" onProjectFilter={() => {}} onStart={() => {}} />);
+    const controls = screen.getByRole("region", { name: "Kontrol backlog" });
+    expect(controls).toHaveClass("hn-backlog-controls");
+    expect(screen.getByRole("tablist", { name: "Sumber backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Mode tampilan" })).toBeInTheDocument();
+    for (const label of ["Cari backlog", "Filter project", "Filter stage", "Filter prioritas", "Filter tanggal berdasarkan", "Tanggal dari", "Tanggal sampai"]) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId("backlog-scroll")).toHaveClass("hn-backlog-grid");
+    fireEvent.click(screen.getByRole("tab", { name: "Board" }));
+    expect(screen.getByTestId("backlog-board")).toHaveClass("hn-board-local-overflow");
+    expect(screen.getByText("Mulai")).toBeInTheDocument();
+  });
+});

@@ -30,4 +30,16 @@ describe("NotificationBell", () => {
     fireEvent.click(screen.getByText("Buka terminal"));
     expect(onOpen).toHaveBeenCalledWith(n);
   });
+  it("memberi semantik menu, fokus masuk, dan Escape mengembalikan fokus", () => {
+    const n = { id: "3", type: "done", specId: "SPEC-3", sessionId: "s3", title: "x", projectId: "p", createdAt: now(), readAt: null };
+    render(<Harness items={[n]} onOpen={() => {}} />);
+    const trigger = screen.getByLabelText("Notifikasi");
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menuitem", { name: "Bersihkan" })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowDown" });
+    expect(screen.getByRole("menuitem", { name: "Buka" })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
 });

@@ -90,15 +90,15 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   };
 
   return (
-    // SPEC-626 · `#root` (app.css) `height: 100vh; overflow: hidden` — benar untuk Shell operator
+    // SPEC-626 · `#root` (app.css) mengunci viewport — benar untuk Shell operator
     // yang menggulir di panel dalamnya. Portal tidak memakai Shell, jadi ia harus memasang rantai
     // gulirnya SENDIRI: header di luar scroller (tetap terbaca), <main> yang menggulir. Konstanta
     // DS yang sama dengan layar operator — bukan angka baru, dan app.css tak disentuh.
-    <div data-testid="portal-root" style={{
-      height: "100%", minHeight: 0, display: "flex", flexDirection: "column",
+    <div data-testid="portal-root" className="hn-dynamic-viewport" style={{
+      height: "100dvh", minHeight: 0, display: "flex", flexDirection: "column",
       background: "var(--surface-page)", color: "var(--text-body)",
     }}>
-      <header style={{
+      <header className="hn-portal-header" style={{
         ...FIXED_ROW_STYLE,
         display: "flex", alignItems: "center", gap: 14, padding: "0 22px",
         height: "var(--topbar-h)", borderBottom: "1px solid var(--border-hair)",
@@ -117,7 +117,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
       </header>
 
       <main data-testid="portal-scroll" style={LIST_SCROLL_STYLE}>
-        <div style={{ maxWidth: "var(--content-max)", margin: "0 auto", padding: "24px 28px 32px" }}>
+        <div className="hn-portal-content" style={{ maxWidth: "var(--content-max)", margin: "0 auto", padding: "24px 28px 32px" }}>
         {projects === null ? <StateBlock kind="loading" title="Memuat…" />
           : projects.length === 0 ? (
             <StateBlock kind={failed ? "error" : "empty"} icon="folder"
@@ -133,7 +133,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                 ))}
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+              <div className="hn-portal-toolbar" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                 <Tabs value={tab} onChange={setTab} style={{ flex: 1, minWidth: 0 }} tabs={[
                   { value: "backlog", label: "Pekerjaan", count: backlog.total },
                   { value: "tickets", label: "Help desk", count: tickets.total },
@@ -148,16 +148,15 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                   : <>
                       <Card padding={0} data-testid="portal-list">
                         {backlog.items.map((s) => (
-                          <div key={s.id} role="button" tabIndex={0}
+                          <button key={s.id} type="button" className="hn-portal-row"
                             onClick={() => void portalApi.getSpec(active!, s.id).then(setOpenSpec)}
-                            onKeyDown={(e) => { if (e.key === "Enter") void portalApi.getSpec(active!, s.id).then(setOpenSpec); }}
                             style={ROW}>
                             <span style={{ ...META, fontFamily: "var(--font-mono)", width: 92 }}>{s.id}</span>
                             <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{s.title}</span>
                             <StatusPill status={stagePill(s.stage)} size="sm">{STAGE_LABEL[s.stage] ?? s.stage}</StatusPill>
                             <span style={META}>{s.priority}</span>
                             <span style={META}>{tanggal(s.doneAt ?? s.startedAt ?? s.createdAt)}</span>
-                          </div>
+                          </button>
                         ))}
                       </Card>
                       <PortalPager total={backlog.total} page={bPage} onPage={setBPage} unit="pekerjaan" />
@@ -169,16 +168,15 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                   : <>
                       <Card padding={0} data-testid="portal-list">
                         {tickets.items.map((t) => (
-                          <div key={t.id} role="button" tabIndex={0}
+                          <button key={t.id} type="button" className="hn-portal-row"
                             onClick={() => void portalApi.getTicket(active!, t.id).then(setOpenTicket)}
-                            onKeyDown={(e) => { if (e.key === "Enter") void portalApi.getTicket(active!, t.id).then(setOpenTicket); }}
                             style={ROW}>
                             <span style={{ ...META, fontFamily: "var(--font-mono)", width: 48 }}>#{t.number}</span>
                             <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{t.title}</span>
                             <span style={META}>{t.category}</span>
                             <StatusPill status={ticketPill(t.status)} size="sm">{t.status}</StatusPill>
                             <span style={META}>{tanggal(t.createdAt)}</span>
-                          </div>
+                          </button>
                         ))}
                       </Card>
                       <PortalPager total={tickets.total} page={tPage} onPage={setTPage} unit="tiket" />
@@ -240,8 +238,9 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
 }
 
 const ROW: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
-  borderBottom: "1px solid var(--border-hair)", cursor: "pointer",
+  display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "12px 16px",
+  border: "none", borderBottom: "1px solid var(--border-hair)", cursor: "pointer",
+  background: "transparent", color: "inherit", font: "inherit", textAlign: "left",
 };
 const META: React.CSSProperties = { fontSize: "var(--text-sm)", color: "var(--text-subtle)" };
 const DL: React.CSSProperties = { display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 16px", margin: 0 };

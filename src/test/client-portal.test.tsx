@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { ClientPortal } from "../src/portal/ClientPortal";
 import type { UserView } from "@hanoman/shared";
@@ -10,6 +10,7 @@ vi.mock("../src/api/portal", () => ({
   },
 }));
 import { portalApi } from "../src/api/portal";
+import { mockViewport, resetViewport } from "./viewport";
 
 const USER: UserView = { id: "u1", email: "klien@x.co", role: "client", createdAt: "2026-08-01T00:00:00Z" };
 
@@ -32,8 +33,22 @@ beforeEach(() => {
     createdAt: "2026-08-01T00:00:00Z", detail: "Klik bayar tak terjadi apa-apa" });
   (portalApi.logout as any).mockResolvedValue(undefined);
 });
+afterEach(resetViewport);
 
 describe("ClientPortal (SPEC-617)", () => {
+  it("uses a mobile-safe viewport and native row controls while keeping every row datum", async () => {
+    mockViewport(390);
+    render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    const title = await screen.findByText("Checkout gagal");
+    const row = title.closest("button");
+    expect(row).not.toBeNull();
+    expect(row).toHaveClass("hn-portal-row");
+    expect(row).toHaveTextContent("SPEC-1");
+    expect(row).toHaveTextContent("Sedang dikerjakan");
+    expect(row).toHaveTextContent("tinggi");
+    expect(screen.getByTestId("portal-root")).toHaveStyle({ height: "100dvh" });
+    expect(screen.getByRole("banner")).toHaveClass("hn-portal-header");
+  });
   it("menampilkan project yang ditugaskan, backlog, dan tiketnya", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     expect(await screen.findByText("Toko Mekar")).toBeTruthy();
@@ -87,14 +102,14 @@ describe("ClientPortal (SPEC-617)", () => {
     await screen.findByText("Toko Mekar");
     fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
     const row = await screen.findByText("Tombol bayar mati");
-    const rowPill = within(row.closest('[role="button"]') as HTMLElement)
+    const rowPill = within(row.closest("button") as HTMLElement)
       .getByText("Sedang dikerjakan");
     fireEvent.click(row);
     await waitFor(() => expect(screen.getByTestId("modal-body")).toBeInTheDocument());
     const modalPill = within(screen.getByTestId("modal-body")).getByText("Sedang dikerjakan");
-    expect(modalPill.parentElement!.style.background).toBe(rowPill.parentElement!.style.background);
+    expect(modalPill.style.background).toBe(rowPill.style.background);
     // …dan bukan abu-abu `idle` yang lama.
-    expect(rowPill.parentElement!.style.background).not.toBe("var(--bone-200)");
+    expect(rowPill.style.background).not.toBe("var(--bone-200)");
   });
 
   it("klien mengirim keluhan dari dalam portal, tiketnya langsung tampak", async () => {

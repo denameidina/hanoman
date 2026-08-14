@@ -57,7 +57,7 @@ const FLOW_CLOSE_LABEL: Record<string, string> = {
 
 function RowShell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+    <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
       border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)",
       background: "var(--surface-card)", marginBottom: 6 }}>
       {children}

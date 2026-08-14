@@ -41,6 +41,21 @@ function animationEnd(element: HTMLElement, animationName: string): void {
 beforeEach(() => { localStorage.clear(); mockMatchMedia(false); });
 
 describe("HanomanPet", () => {
+  it("uses safe-area offsets, clamps its panel, and keeps the hidden handle 44px", () => {
+    const { rerender } = render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    expect(screen.getByTestId("pet-root")).toHaveStyle({
+      right: "max(22px, var(--safe-right))",
+      bottom: "max(22px, var(--safe-bottom))",
+    });
+    fireEvent.click(hit());
+    expect(screen.getByTestId("pet-panel")).toHaveStyle({
+      maxWidth: "calc(100vw - var(--safe-left) - var(--safe-right) - 24px)",
+      maxHeight: "calc(100dvh - var(--safe-top) - var(--safe-bottom) - 120px)",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sembunyikan" }));
+    rerender(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Tampilkan pet Hanoman" })).toHaveStyle({ width: "44px", height: "44px" });
+  });
   it("merender pose `ready` sebagai status yang terbaca screen reader", () => {
     render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
 

@@ -1,7 +1,8 @@
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Spec } from "@hanoman/shared";
 import { TerminalScreen, PhaseStrip } from "../src/screens/TerminalScreen";
+import { mockViewport, resetViewport } from "./viewport";
 
 // TerminalPane membuka WebSocket + xterm (butuh canvas). jsdom tak punya keduanya; yang
 // diuji di sini adalah komposisi grid, bukan rendering terminalnya.
@@ -91,8 +92,42 @@ beforeEach(() => {
     codex: { model: "gpt-5.6-sol", effort: "xhigh" } });
   getCodexVersion.mockResolvedValue({ version: "0.145.0", minRequired: "0.144.0", ok: true });
 });
+afterEach(resetViewport);
 
 describe("TerminalScreen (grid)", () => {
+  it("keeps every terminal mounted while the mobile panel selector changes presentation only", async () => {
+    mockViewport(390);
+    localStorage.setItem(WKEY, JSON.stringify({ active: "g1", groups: [
+      { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: ["aaaa1111", "bbbb2222"] } },
+    ] }));
+    const before = localStorage.getItem(WKEY);
+    listTerminals.mockResolvedValue([
+      { id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false },
+      { id: "bbbb2222", projectId: "p1", cwd: "/repo", exited: false },
+    ]);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("tablist", { name: "Panel terminal" });
+    expect(screen.getAllByTestId("pane")).toHaveLength(2);
+    expect(document.querySelector('[data-terminal-cell-index="0"]')).toHaveAttribute("aria-hidden", "false");
+    fireEvent.click(screen.getByRole("tab", { name: /Panel 2/ }));
+    expect(document.querySelector('[data-terminal-cell-index="1"]')).toHaveAttribute("aria-hidden", "false");
+    expect(JSON.parse(localStorage.getItem(WKEY)!)).toEqual(JSON.parse(before!));
+    expect(screen.getByRole("button", { name: "Hapus kolom aktif" })).toBeInTheDocument();
+  });
+  it("reveals the requested session cell on mobile without changing the persisted grid", async () => {
+    mockViewport(390);
+    localStorage.setItem(WKEY, JSON.stringify({ active: "g1", groups: [
+      { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: ["aaaa1111", "bbbb2222"] } },
+    ] }));
+    listTerminals.mockResolvedValue([
+      { id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false },
+      { id: "bbbb2222", projectId: "p1", cwd: "/repo", exited: false },
+    ]);
+    render(<TerminalScreen projects={projects} focusSession="bbbb2222" />);
+    await screen.findByRole("tablist", { name: "Panel terminal" });
+    await waitFor(() => expect(document.querySelector('[data-terminal-cell-index="1"]')).toHaveAttribute("aria-hidden", "false"));
+    expect(document.querySelector('[data-terminal-cell-index="0"]')).toHaveAttribute("aria-hidden", "true");
+  });
   it("empty state saat tak ada sesi & layout default kosong", async () => {
     listTerminals.mockResolvedValue([]);
     render(<TerminalScreen projects={projects} />);
@@ -142,7 +177,8 @@ describe("TerminalScreen (grid)", () => {
   it("menempatkan sesi bebas dari tray ke sel kosong pertama", async () => {
     listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
-    const chip = await screen.findByRole("button", { name: /aaaa11/ }); // chip tray
+    const chip = await screen.findByTitle("Taruh di sel kosong pertama grup ini"); // chip tray
+    expect(chip).toHaveClass("hn-terminal-unplaced-action");
     fireEvent.click(chip);
     await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("aaaa1111"));
   });
@@ -165,7 +201,7 @@ describe("TerminalScreen (grid)", () => {
     await waitFor(() => expect(screen.queryByTestId("pane")).toBeNull());
     expect(deleteTerminal).not.toHaveBeenCalled();
     // sesi masih ada → muncul kembali sebagai chip tray
-    expect(screen.getByRole("button", { name: /aaaa11/ })).toBeInTheDocument();
+    expect(screen.getByTitle("Taruh di sel kosong pertama grup ini")).toBeInTheDocument();
   });
 
   it("Tutup (×) memanggil deleteTerminal", async () => {
@@ -435,7 +471,9 @@ describe("TerminalScreen (grup)", () => {
     localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 1, cells: ["aaaa1111"] }));
     listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
-    expect(await screen.findByRole("tab", { name: "Utama" })).toBeInTheDocument();
+    const tab = await screen.findByRole("tab", { name: "Utama" });
+    expect(tab).toHaveClass("hn-terminal-group-control");
+    expect(tab).toHaveAttribute("tabindex", "0");
     expect(localStorage.getItem(LKEY)).toBeNull();
   });
 
@@ -450,7 +488,7 @@ describe("TerminalScreen (grup)", () => {
     listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
     // taruh sesi di grup "Utama"
-    fireEvent.click(await screen.findByRole("button", { name: /aaaa11/ }));
+    fireEvent.click(await screen.findByTitle("Taruh di sel kosong pertama grup ini"));
     await waitFor(() => expect(screen.getByTestId("pane")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "Grup baru" }));
@@ -465,7 +503,7 @@ describe("TerminalScreen (grup)", () => {
   it("menghapus grup melepas sesinya ke tray tanpa mematikannya", async () => {
     listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
-    fireEvent.click(await screen.findByRole("button", { name: /aaaa11/ }));
+    fireEvent.click(await screen.findByTitle("Taruh di sel kosong pertama grup ini"));
     await waitFor(() => expect(screen.getByTestId("pane")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "Grup baru" }));   // grup 2 aktif
@@ -473,7 +511,7 @@ describe("TerminalScreen (grup)", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Utama" }));          // kembali ke Utama
     fireEvent.click(screen.getByLabelText("Hapus grup Utama"));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: /aaaa11/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTitle("Taruh di sel kosong pertama grup ini")).toBeInTheDocument());
     expect(screen.queryByTestId("pane")).toBeNull();
     expect(deleteTerminal).not.toHaveBeenCalled();
   });
@@ -525,7 +563,7 @@ describe("TerminalScreen (tutup kolom/baris)", () => {
     fireEvent.click(screen.getByLabelText("Tutup kolom 2"));
 
     await waitFor(() => expect(screen.queryByTestId("pane")).toBeNull());
-    expect(screen.getByRole("button", { name: /aaaa11/ })).toBeInTheDocument();  // ada di tray
+    expect(screen.getByTitle("Taruh di sel kosong pertama grup ini")).toBeInTheDocument();  // ada di tray
     expect(deleteTerminal).not.toHaveBeenCalled();                               // sesi tetap hidup
   });
 
@@ -538,7 +576,7 @@ describe("TerminalScreen (tutup kolom/baris)", () => {
     fireEvent.click(screen.getByLabelText("Tutup baris 2"));
 
     await waitFor(() => expect(screen.queryByTestId("pane")).toBeNull());
-    expect(screen.getByRole("button", { name: /aaaa11/ })).toBeInTheDocument();
+    expect(screen.getByTitle("Taruh di sel kosong pertama grup ini")).toBeInTheDocument();
     expect(deleteTerminal).not.toHaveBeenCalled();
   });
 
@@ -597,7 +635,7 @@ describe("TerminalScreen (layar penuh)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Keluar layar penuh" }));
 
     expect(root()).not.toHaveStyle({ position: "fixed" });
-    expect(root()).toHaveStyle({ height: "calc(100vh - 180px)" });
+    expect(root()).toHaveStyle({ height: "calc(100dvh - 180px)" });
     expect(screen.getByRole("button", { name: "Layar penuh" })).toBeInTheDocument();
   });
 

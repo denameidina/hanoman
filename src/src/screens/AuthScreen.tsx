@@ -31,9 +31,10 @@ export function AuthScreen({ needsSetup, onDone }: { needsSetup: boolean; onDone
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "var(--bone-100)", padding: 24 }}>
-      <div style={{ width: "100%", maxWidth: 380 }}>
+    <div data-testid="auth-scroll" className="hn-dynamic-viewport" style={{ minHeight: "100dvh", height: "100dvh", display: "flex",
+      overflowY: "auto", background: "var(--bone-100)", boxSizing: "border-box",
+      padding: "max(24px, var(--safe-top)) max(16px, var(--safe-right)) max(24px, var(--safe-bottom)) max(16px, var(--safe-left))" }}>
+      <div style={{ width: "100%", maxWidth: 380, margin: "auto" }}>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}><Wordmark /></div>
         <Card eyebrow={needsSetup ? "hanoman · setup" : "hanoman · masuk"}
           title={needsSetup ? "Buat akun pertama" : "Masuk"}>

@@ -34,6 +34,7 @@ import { Modal } from "../src/ds";
 import { SpecDocsModal } from "../src/screens/SpecDocsModal";
 import { DocsWorkspace } from "../src/screens/DocsWorkspace";
 import { IdeScreen } from "../src/screens/IdeScreen";
+import { mockViewport, resetViewport } from "./viewport";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -58,7 +59,7 @@ describe("Modal fillHeight (SPEC-363)", () => {
   it("memberi panel tinggi pasti agar isinya bisa mengisi, dan badannya menyerap sisa", () => {
     const { container } = render(<Modal open fillHeight title="X">isi</Modal>);
     const panel = container.querySelector("[data-testid='modal-panel']") as HTMLElement;
-    expect(panel.style.height).toBe("88vh");
+    expect(panel.style.height).toContain("100dvh");
     const body = container.querySelector("[data-testid='modal-body']") as HTMLElement;
     expect(body.style.flex).toBe("1 1 auto");
     expect(body.style.minHeight).toBe("0");
@@ -74,6 +75,15 @@ describe("Modal fillHeight (SPEC-363)", () => {
 });
 
 describe("pane pratinjau menyerap tinggi yang tersedia (SPEC-363)", () => {
+  it("DocsWorkspace exposes mounted tree/viewer panels on mobile", async () => {
+    mockViewport(390);
+    render(<DocsWorkspace projectId="p1" projectName="P1" docStatus="ok" />);
+    await screen.findByRole("tablist", { name: "Panel Docs" });
+    expect(document.querySelector('[data-panel="tree"]')).toHaveAttribute("aria-hidden", "false");
+    fireEvent.click(screen.getByRole("tab", { name: "Dokumen" }));
+    expect(document.querySelector('[data-panel="viewer"]')).toHaveAttribute("aria-hidden", "false");
+    resetViewport();
+  });
   it("SpecDocsModal (Backlog & Terminal) — tanpa 62vh", async () => {
     render(<SpecDocsModal specId="SPEC-363" onClose={() => {}} />);
     await waitFor(() => expect(pane()).toBeInTheDocument());

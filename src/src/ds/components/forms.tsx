@@ -48,7 +48,7 @@ export function Button({ children, variant = "primary", size = "md", leftIcon, r
     ...tagProps,
     onMouseEnter: () => setHover(true),
     onMouseLeave: () => { setHover(false); setActive(false); },
-    onMouseDown: () => setActive(true), onMouseUp: () => setActive(false), className,
+    onMouseDown: () => setActive(true), onMouseUp: () => setActive(false), className: `hn-touch-target ${className}`.trim(),
     style: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: s.gap, height: s.h,
       textDecoration: "none",
       padding: `0 ${s.px}px`, width: fullWidth ? "100%" : "auto", font: `var(--weight-medium) ${s.fs}/1 var(--font-ui)`,
@@ -80,7 +80,7 @@ export function IconButton({ icon, label, variant = "ghost", size = "md", disabl
     : { background: "var(--bone-200)", color: "var(--text-strong)" };
   return React.createElement("button", _extends({
     type: "button", "aria-label": label, title: label, disabled,
-    onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false), className,
+    onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false), className: `hn-touch-target ${className}`.trim(),
     style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: s.box, height: s.box,
       borderRadius: "var(--radius-sm)", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1,
       transition: "var(--transition-fast)", outline: "none", ...base, ...(hover && !disabled ? hoverOverlay : null), ...style },
@@ -99,7 +99,7 @@ export function Input({ size = "md", leftIcon, rightIcon, invalid = false, disab
   const [focus, setFocus] = React.useState(false);
   const borderColor = invalid ? "var(--status-err)" : focus ? "var(--border-focus)" : "var(--border-strong)";
   return React.createElement("div", {
-    className,
+    className: `hn-touch-target ${className}`.trim(),
     style: { display: "flex", alignItems: "center", gap: 8, height: s.h, padding: `0 ${s.px}px`,
       background: disabled ? "var(--bone-200)" : "var(--surface-card)", border: `1px solid ${borderColor}`,
       borderRadius: "var(--radius-sm)", boxShadow: focus ? "var(--ring)" : invalid ? "none" : "var(--shadow-inset)",
@@ -111,7 +111,7 @@ export function Input({ size = "md", leftIcon, rightIcon, invalid = false, disab
       onFocus: (e: React.FocusEvent<HTMLInputElement>) => { setFocus(true); rest.onFocus && rest.onFocus(e); },
       onBlur: (e: React.FocusEvent<HTMLInputElement>) => { setFocus(false); rest.onBlur && rest.onBlur(e); },
     }, rest, {
-      style: { flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent",
+      style: { flex: 1, minWidth: 0, height: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent",
         color: "var(--text-strong)", fontFamily: mono ? "var(--font-mono)" : "var(--font-ui)", fontSize: s.fs, lineHeight: 1.2 },
     })),
     rightIcon && React.createElement(Icon, { name: rightIcon, size: s.icon, color: "var(--text-subtle)" }));
@@ -130,7 +130,7 @@ export function Select({ options = [], value, defaultValue, onChange, size = "md
   const borderColor = invalid ? "var(--status-err)" : focus ? "var(--border-focus)" : "var(--border-strong)";
   const norm = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
   return React.createElement("div", {
-    className,
+    className: `hn-touch-target ${className}`.trim(),
     style: { position: "relative", display: "inline-flex", alignItems: "center", height: s.h,
       background: disabled ? "var(--bone-200)" : "var(--surface-card)", border: `1px solid ${borderColor}`,
       borderRadius: "var(--radius-sm)", boxShadow: focus ? "var(--ring)" : "var(--shadow-inset)",
@@ -149,35 +149,45 @@ export function Select({ options = [], value, defaultValue, onChange, size = "md
       style: { position: "absolute", right: s.px, pointerEvents: "none" } }));
 }
 
-type CheckboxProps = { checked?: boolean; defaultChecked?: boolean; onChange?: (next: boolean, e: React.MouseEvent) => void;
+type CheckboxProps = { checked?: boolean; defaultChecked?: boolean; onChange?: (next: boolean, e: React.MouseEvent | React.KeyboardEvent) => void;
   label?: React.ReactNode; description?: React.ReactNode; disabled?: boolean; style?: React.CSSProperties } & Record<string, any>;
 export function Checkbox({ checked, defaultChecked, onChange, label, description, disabled = false, className = "", style = {}, ...rest }: CheckboxProps) {
+  const textId = React.useId();
+  const { "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy, ...outerProps } = rest;
   const isControlled = checked !== undefined;
   const [inner, setInner] = React.useState(!!defaultChecked);
   const on = isControlled ? checked : inner;
-  const toggle = (e: React.MouseEvent) => {
+  const toggle = (e: React.MouseEvent | React.KeyboardEvent) => {
     if (disabled) return;
     if (!isControlled) setInner((v) => !v);
     onChange && onChange(!on, e);
   };
   return React.createElement("label", _extends({
-    className,
+    className: `hn-choice-target ${className}`.trim(),
     style: { display: "inline-flex", alignItems: description ? "flex-start" : "center", gap: 10,
       cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.55 : 1, ...style },
-  }, rest),
+  }, outerProps),
     React.createElement("span", {
       // SPEC-485 · peran & keadaan dinyatakan eksplisit: pembaca layar (dan test) harus bisa
       // membedakan "centang beberapa" dari "pilih salah satu" tanpa membaca teks di sebelahnya.
       role: "checkbox", "aria-checked": on, "aria-disabled": disabled || undefined,
+      "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy ?? (!ariaLabel && (label || description) ? textId : undefined),
+      className: "hn-choice-control",
       tabIndex: disabled ? -1 : 0,
       onClick: toggle,
-      style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18,
-        marginTop: description ? 2 : 0, borderRadius: "var(--radius-xs)",
-        background: on ? "var(--accent)" : "var(--surface-card)",
-        border: `1.5px solid ${on ? "var(--accent)" : "var(--border-strong)"}`,
-        boxShadow: on ? "none" : "var(--shadow-inset)", transition: "var(--transition-fast)", flex: "0 0 auto" },
-    }, on && React.createElement(Icon, { name: "check", size: 13, stroke: 3, color: "var(--accent-on)" })),
-    (label || description) && React.createElement("span", { onClick: toggle, style: { userSelect: "none" } },
+      onKeyDown: (e: React.KeyboardEvent) => {
+        if (e.key !== " " && e.key !== "Enter") return;
+        e.preventDefault();
+        toggle(e);
+      },
+      style: { display: "inline-grid", placeItems: "center", width: 18, height: 18,
+        marginTop: description ? 2 : 0, flex: "0 0 auto" },
+    }, React.createElement("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18,
+      borderRadius: "var(--radius-xs)", background: on ? "var(--accent)" : "var(--surface-card)",
+      border: `1.5px solid ${on ? "var(--accent)" : "var(--border-strong)"}`,
+      boxShadow: on ? "none" : "var(--shadow-inset)", transition: "var(--transition-fast)" } },
+    on && React.createElement(Icon, { name: "check", size: 13, stroke: 3, color: "var(--accent-on)" }))),
+    (label || description) && React.createElement("span", { id: textId, onClick: toggle, style: { userSelect: "none" } },
       label && React.createElement("span", { style: { display: "block", fontSize: "var(--text-md)",
         color: "var(--text-strong)", lineHeight: 1.4 } }, label),
       description && React.createElement("span", { style: { display: "block", fontSize: "var(--text-sm)",
@@ -188,27 +198,37 @@ export function Checkbox({ checked, defaultChecked, onChange, label, description
 // `Checkbox` di atas — bentuknya saja yang bundar dan `role`-nya `radio`. Sengaja TANPA keadaan
 // internal: "salah satu dari sekumpulan" hanya benar bila yang memegang daftarnya satu pihak, dan
 // itu induknya, bukan tiap tombol.
-type RadioProps = { checked?: boolean; onChange?: (e: React.MouseEvent) => void;
+type RadioProps = { checked?: boolean; onChange?: (e: React.MouseEvent | React.KeyboardEvent) => void;
   label?: React.ReactNode; description?: React.ReactNode; disabled?: boolean;
   style?: React.CSSProperties } & Record<string, any>;
 export function Radio({ checked = false, onChange, label, description, disabled = false, className = "", style = {}, ...rest }: RadioProps) {
-  const pick = (e: React.MouseEvent) => { if (!disabled) onChange && onChange(e); };
+  const textId = React.useId();
+  const { "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy, ...outerProps } = rest;
+  const pick = (e: React.MouseEvent | React.KeyboardEvent) => { if (!disabled) onChange && onChange(e); };
   return React.createElement("label", _extends({
-    className,
+    className: `hn-choice-target ${className}`.trim(),
     style: { display: "inline-flex", alignItems: description ? "flex-start" : "center", gap: 10,
       cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.55 : 1, ...style },
-  }, rest),
+  }, outerProps),
     React.createElement("span", {
       role: "radio", "aria-checked": checked, "aria-disabled": disabled || undefined,
+      "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy ?? (!ariaLabel && (label || description) ? textId : undefined),
+      className: "hn-choice-control",
       tabIndex: disabled ? -1 : 0, onClick: pick,
-      style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18,
-        marginTop: description ? 2 : 0, borderRadius: "var(--radius-pill)",
-        background: "var(--surface-card)",
-        border: `1.5px solid ${checked ? "var(--accent)" : "var(--border-strong)"}`,
-        boxShadow: checked ? "none" : "var(--shadow-inset)", transition: "var(--transition-fast)", flex: "0 0 auto" },
-    }, checked && React.createElement("span", { style: { width: 8, height: 8,
-      borderRadius: "var(--radius-pill)", background: "var(--accent)" } })),
-    (label || description) && React.createElement("span", { onClick: pick, style: { userSelect: "none" } },
+      onKeyDown: (e: React.KeyboardEvent) => {
+        if (e.key !== " " && e.key !== "Enter") return;
+        e.preventDefault();
+        pick(e);
+      },
+      style: { display: "inline-grid", placeItems: "center", width: 18, height: 18,
+        marginTop: description ? 2 : 0, flex: "0 0 auto" },
+    }, React.createElement("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18,
+      borderRadius: "var(--radius-pill)", background: "var(--surface-card)",
+      border: `1.5px solid ${checked ? "var(--accent)" : "var(--border-strong)"}`,
+      boxShadow: checked ? "none" : "var(--shadow-inset)", transition: "var(--transition-fast)" } },
+    checked && React.createElement("span", { style: { width: 8, height: 8,
+      borderRadius: "var(--radius-pill)", background: "var(--accent)" } }))),
+    (label || description) && React.createElement("span", { id: textId, onClick: pick, style: { userSelect: "none" } },
       label && React.createElement("span", { style: { display: "block", fontSize: "var(--text-md)",
         color: "var(--text-strong)", lineHeight: 1.4 } }, label),
       description && React.createElement("span", { style: { display: "block", fontSize: "var(--text-sm)",
@@ -218,35 +238,47 @@ export function Radio({ checked = false, onChange, label, description, disabled 
 const SWITCH_SIZES: Record<string, { w: number; h: number; knob: number }> = {
   sm: { w: 32, h: 18, knob: 14 }, md: { w: 40, h: 22, knob: 18 },
 };
-type SwitchProps = { checked?: boolean; defaultChecked?: boolean; onChange?: (next: boolean, e: React.MouseEvent) => void;
+type SwitchProps = { checked?: boolean; defaultChecked?: boolean; onChange?: (next: boolean, e: React.MouseEvent | React.KeyboardEvent) => void;
   size?: "sm" | "md"; disabled?: boolean; label?: React.ReactNode; style?: React.CSSProperties } & Record<string, any>;
 export function Switch({ checked, defaultChecked, onChange, size = "md", disabled = false, label, className = "", style = {}, ...rest }: SwitchProps) {
+  const textId = React.useId();
+  const { "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy, ...outerProps } = rest;
   const s = SWITCH_SIZES[size] || SWITCH_SIZES.md!;
   const isControlled = checked !== undefined;
   const [inner, setInner] = React.useState(!!defaultChecked);
   const on = isControlled ? checked : inner;
-  const toggle = (e: React.MouseEvent) => {
+  const toggle = (e: React.MouseEvent | React.KeyboardEvent) => {
     if (disabled) return;
     if (!isControlled) setInner((v) => !v);
     onChange && onChange(!on, e);
   };
   const track = React.createElement("span", {
-    role: "switch", "aria-checked": on, onClick: toggle,
-    style: { position: "relative", display: "inline-block", width: s.w, height: s.h, borderRadius: "var(--radius-pill)",
-      background: on ? "var(--accent)" : "var(--ink-300)", border: "1px solid " + (on ? "var(--accent-hover)" : "var(--ink-300)"),
-      transition: "var(--transition-fast)", cursor: disabled ? "not-allowed" : "pointer", flex: "0 0 auto" },
-  }, React.createElement("span", {
+    role: "switch", "aria-checked": on, "aria-disabled": disabled || undefined,
+    "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy ?? (!ariaLabel && label ? textId : undefined),
+    className: "hn-choice-control",
+    tabIndex: disabled ? -1 : 0, onClick: toggle,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key !== " " && e.key !== "Enter") return;
+      e.preventDefault();
+      toggle(e);
+    },
+    style: { display: "inline-grid", placeItems: "center", width: s.w, height: s.h,
+      cursor: disabled ? "not-allowed" : "pointer", flex: "0 0 auto" },
+  }, React.createElement("span", { style: { position: "relative", display: "inline-block", width: s.w, height: s.h,
+    borderRadius: "var(--radius-pill)", background: on ? "var(--accent)" : "var(--ink-300)",
+    border: "1px solid " + (on ? "var(--accent-hover)" : "var(--ink-300)"), transition: "var(--transition-fast)" } },
+  React.createElement("span", {
     style: { position: "absolute", top: "50%", left: on ? s.w - s.knob - 3 : 2, transform: "translateY(-50%)",
       width: s.knob, height: s.knob, borderRadius: "50%", background: "var(--bone-000)", boxShadow: "var(--shadow-sm)",
       transition: "var(--transition-fast)" },
-  }));
+  })));
   if (!label) {
-    return React.createElement("span", _extends({ className, style: { opacity: disabled ? 0.55 : 1, ...style } }, rest), track);
+    return React.createElement("span", _extends({ className: `hn-choice-target ${className}`.trim(), style: { opacity: disabled ? 0.55 : 1, ...style } }, outerProps), track);
   }
   return React.createElement("label", _extends({
-    className, style: { display: "inline-flex", alignItems: "center", gap: 10, cursor: disabled ? "not-allowed" : "pointer",
+    className: `hn-choice-target ${className}`.trim(), style: { display: "inline-flex", alignItems: "center", gap: 10, cursor: disabled ? "not-allowed" : "pointer",
       opacity: disabled ? 0.55 : 1, ...style },
-  }, rest), track, React.createElement("span", { style: { fontSize: "var(--text-md)", color: "var(--text-strong)",
+  }, outerProps), track, React.createElement("span", { id: textId, onClick: toggle, style: { fontSize: "var(--text-md)", color: "var(--text-strong)",
     userSelect: "none" } }, label));
 }
 

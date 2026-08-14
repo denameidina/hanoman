@@ -6,7 +6,7 @@
    tombol buka/salin link backlog (deep-link #spec=, ADR-0071) + buka/salin link publik status
    tiket (shareToken) untuk dibagikan ke pelapor. */
 import React from "react";
-import { Button, Badge, Select, StateBlock, Icon, Input, Field, HnTextarea, ConfirmDialog, Pager, serverPage } from "../ds";
+import { Button, Badge, Select, StateBlock, Icon, Input, Field, HnTextarea, ConfirmDialog, Pager, ResponsivePanels, serverPage } from "../ds";
 import { paths, publicStatus, type TicketView, type TicketDetail, type Spec, type GithubIssueView } from "@hanoman/shared";
 import { api } from "../api/client";
 import { specDeepLink } from "./deeplink";
@@ -46,6 +46,7 @@ function TicketRow({ t, onOpen }: { t: TicketView; onOpen: (id: string) => void 
   return (
     <button
       onClick={() => onOpen(t.id)}
+      className="hn-dense-row"
       style={{
         display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
         padding: "12px 14px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)",
@@ -302,7 +303,7 @@ export function GithubIssuesPanel({ projectId, onAccepted }:
         : <>
             <div style={{ overflowY: "auto", minHeight: 0 }}>
             {items.map((i) => (
-              <div key={i.id} style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "8px 0",
+              <div key={i.id} className="hn-dense-row" style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "8px 0",
                 borderBottom: "1px solid var(--border-hair)" }}>
                 {i.status === "new" && (
                   <input type="checkbox" aria-label={`Pilih issue ${i.number}`}
@@ -365,8 +366,6 @@ export function TriageScreen({ projects, onAccepted, onToast }:
     return () => clearInterval(t);
   }, [load]);
 
-  if (openId) return <TicketDetailView id={openId} onBack={() => { setOpenId(null); load(true); }} onAccepted={onAccepted} onDeleted={() => { setOpenId(null); load(true); }} onToast={onToast} />;
-
   // SPEC-471 · tab issue butuh SATU project (issue milik satu repo). Selama "Semua project"
   // dipilih, jelaskan itu alih-alih menampilkan daftar kosong tanpa sebab.
   const issueTab = (
@@ -378,36 +377,56 @@ export function TriageScreen({ projects, onAccepted, onToast }:
     </div>
   );
 
+  const ticketList = (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      {state === "loading" ? <StateBlock kind="loading" />
+        : state === "error" ? <StateBlock kind="error" hint="Gagal memuat tiket." action={() => load()} actionLabel="Coba lagi" />
+        : list.length === 0 ? <StateBlock kind="empty" icon="inbox" title="Belum ada keluhan"
+            hint="Aktifkan Help Center di detail project, lalu sebar link publiknya agar keluhan mulai masuk." />
+        : <>
+            <div ref={listRef} data-testid="triage-scroll" style={{ overflowY: "auto", minHeight: 0, flex: "1 1 auto" }}>
+              {list.map((t) => <TicketRow key={t.id} t={t} onOpen={setOpenId} />)}
+            </div>
+            <TicketPager total={total} page={page} onPage={setPage} />
+          </>}
+    </div>
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, minHeight: 0, flex: 1 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div className="hn-wrap-mobile" style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <Button size="sm" variant={tab === "tiket" ? "primary" : "ghost"} onClick={() => setTab("tiket")}>Tiket Help Center</Button>
         <Button size="sm" variant={tab === "issue" ? "primary" : "ghost"} onClick={() => setTab("issue")}>Issue GitHub</Button>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <Select size="sm" value={project} onChange={(e) => setProject(e.target.value)}
+        <Select size="sm" value={project} aria-label="Project triase" onChange={(e) => setProject(e.target.value)}
           options={[{ value: "", label: "Semua project" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
         {tab === "tiket" && <>
-          <Select size="sm" value={status} onChange={(e) => setStatus(e.target.value)}
+          <Select size="sm" value={status} aria-label="Status tiket" onChange={(e) => setStatus(e.target.value)}
             options={[{ value: "", label: "Semua status" }, { value: "new", label: "belum ditinjau" }, { value: "accepted", label: "diterima" }, { value: "rejected", label: "ditutup" }]} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="mis. gagal login atau budi@contoh.id"
-            style={{ flex: 1, minWidth: 160, padding: "6px 10px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", color: "var(--text-body)", fontSize: 13 }} />
+          <Input size="sm" value={q} aria-label="Cari tiket" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
+            placeholder="mis. gagal login atau budi@contoh.id" style={{ flex: 1, minWidth: 160 }} />
           {unreviewed > 0 && <Badge tone="warn">{unreviewed} belum ditinjau</Badge>}
           <SyncButton onDone={() => load(true)} onToast={onToast} />
           <ResetViewButton screen="triage" active={activeFilters} />
         </>}
       </div>
-      {tab === "issue" ? issueTab
-        : state === "loading" ? <StateBlock kind="loading" />
-        : state === "error" ? <StateBlock kind="error" hint="Gagal memuat tiket." action={() => load()} actionLabel="Coba lagi" />
-        : list.length === 0 ? <StateBlock kind="empty" icon="inbox" title="Belum ada keluhan"
-            hint="Aktifkan Help Center di detail project, lalu sebar link publiknya agar keluhan mulai masuk." />
-        : <>
-            <div ref={listRef} data-testid="triage-scroll" style={{ overflowY: "auto", minHeight: 0 }}>
-              {list.map((t) => <TicketRow key={t.id} t={t} onOpen={setOpenId} />)}
-            </div>
-            <TicketPager total={total} page={page} onPage={setPage} />
-          </>}
+      {tab === "issue" ? issueTab : (
+        <ResponsivePanels
+          ariaLabel="Panel triase"
+          active={openId ? "detail" : "list"}
+          onActiveChange={(next) => { if (next === "list") setOpenId(null); }}
+          splitAt="tablet"
+          masterWidth={360}
+          panels={[
+            { id: "list", label: "Daftar", content: ticketList, className: "hn-panel-flex" },
+            ...(openId ? [{ id: "detail", label: "Detail", className: "hn-panel-flex", content: (
+              <TicketDetailView id={openId} onBack={() => { setOpenId(null); load(true); }}
+                onAccepted={onAccepted} onDeleted={() => { setOpenId(null); load(true); }} onToast={onToast} />
+            ) }] : []),
+          ]}
+        />
+      )}
     </div>
   );
 }

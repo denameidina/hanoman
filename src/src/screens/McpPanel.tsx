@@ -116,7 +116,7 @@ export function McpPanel(): React.ReactElement {
           Centang capability di bawah pada token yang dipakai. Mode baca-saja menyembunyikan seluruh
           tool bertanda <i>tulis</i>.
         </div>
-        <div style={{ overflowX: "auto" }}>
+        <div className="hn-local-overflow" style={{ overflowX: "auto" }}>
           <table data-testid="mcp-tools" style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead>
               <tr>

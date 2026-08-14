@@ -1,13 +1,72 @@
 # Frontend implementation
 
 - React + TypeScript (Vite). Komponen dari Hanoman Design System.
-- Layout: sidebar 248px + topbar 56px; konten maks 1200px (Docs full-width).
+- Layout responsif (SPEC-763): drawer mobile `<768px`, rail 72px pada tablet `768–1199px`, sidebar
+  248px pada desktop `≥1200px`; topbar minimum 56px dan dapat wrap; konten maks 1200px (Docs full-width).
 - Bagian: Overview, Projects (list + pagination + cari + hapus project per baris) → **detail project** (identitas, coverage, edit `name`/`desc` lewat `PATCH /projects/:id`, dan pintu: Source of Truth, Terminal, Backlog, Changelog, Reverse docs). `id` tak pernah dapat diubah — ia kunci asing spec (SPEC-146). Hapus project ada di detail dan di header Docs — konfirmasi dulu, ditolak bila ada sesi tmux aktif; rename tidak ditolak, karena `id` tak bergerak. **PRD** (SPEC-210 · ADR-0041 — layar nav sebelum Backlog, **two-pane**: sidebar kiri daftar dokumen PRD yang bisa diklik + pane kanan preview `MarkdownView` inline. Filter project punya opsi **"Semua project"** → `GET /prds` lintas-project (item dikelompokkan per project); satu project terpilih → `GET /projects/:id/prds`; keduanya freshest-wins. **PRD baru** membuka sesi `flow:"prd"` project-level; project target dipilih **di dalam modal** (field `Select` project, default ikut filter aktif atau project pertama saat "Semua project") — tombol selalu aktif, tak perlu memfilter daftar dulu (SPEC-212); **Take ke backlog** membuka `NewSpecModal` ter-prefill dengan tautan PRD di teks Konteks, ke project asal PRD), Backlog (cari teks + filter project/stage/prioritas + tab sumber + tiga mode tampilan grid/list/board + aksi per spec + detail spec via modal: judul, stage bar, objective, field brief/QA), Terminal (sesi Claude Code interaktif di tmux), Docs (tree realtime semua `.md` di repo via `GET /docs`, dikelompokkan per direktori; kategori di luar `docsDir` masuk grup **Lainnya (tidak dinilai)** tanpa status linked — hanya kategori berskor yang masuk coverage, lihat ADR-0013; tombol **Muat ulang** membaca ulang tree, **Hapus** menghapus file asli, path ditampilkan repo-relative tanpa prefix `internal/docs`), VPS (daftar + audit/harden + Test connection + Open Console shell ssh + buka sesi Claude, SPEC-211; **klik baris membuka satu modal** berisi detail VPS — last audit + health disk/mem/load — menyatu dengan checklist kepatuhan 232 item, SPEC-220/221; tak ada lagi side panel terpisah), Settings (model & effort sesi — **default global**; model/effort dipilih **per sesi saat Start** lewat picker `StartSessionModal`, matrix per-fase dicabut, SPEC-252/ADR-0061; notifikasi, akun, users).
 - **Start dari Backlog tetap di Backlog** setelah sesi berhasil dibuat; modal tertutup dan toast sukses
   tampil. Operator berpindah ke Terminal hanya lewat aksi eksplisit **Buka sesi** (SPEC-341).
 - Filter project di Backlog **dan PRD** dibaca dari satu state `projectFilter` milik `App`, bukan state
   lokal tiap layar (SPEC-146) — detail project memakainya untuk membuka Backlog dalam keadaan tersaring.
   Sentinel `"all"` = "Semua project" (PRD → `GET /prds` lintas-project; Backlog → `project` di-omit).
+
+## Kontrak responsive seluruh frontend (SPEC-763)
+
+Semua permukaan — seluruh `HN_NAV`, section transien App, Auth/setup, Modal/form, Pet Hanoman, Help
+Center publik, dan portal klien — memakai **komponen/data/state yang sama** di mobile, tablet, dan
+desktop. Tidak ada route atau screen mobile kedua. Breakpoint tunggal ada di `ds/responsive.tsx`:
+mobile `<768px`, tablet `768–1199px`, desktop `≥1200px`; `Shell` menulis tier hidup ke
+`data-layout` untuk kontrak dan diagnosis.
+
+**Chrome.** `Shell` merender satu navigation tree berisi seluruh `HN_NAV`. Pada mobile tree itu
+menjadi drawer ber-backdrop dengan tombol `aria-controls`/`aria-expanded`, focus trap, Escape,
+focus restore, konten belakang `inert`, dan menutup sesudah navigasi. Tablet merender rail 72px (ikon + `title`), desktop
+sidebar 248px. Topbar/search/limit/notifikasi/update/action/account membungkus pada ruang sempit;
+tak satu pun dihilangkan. `<main>` adalah satu-satunya page scroller dan menahan overflow mendatar.
+
+**Vocabulary layout.** Token gutter, safe-area, touch target, sidebar, dan topbar ada di
+`ds/tokens/spacing.css`; aturan viewport dan media query bersama ada di `app.css`. Gunakan
+`ResponsiveToolbar` untuk kelompok kontrol, `ResponsivePanels` untuk master/detail atau workspace,
+dan `LocalOverflow` untuk konten yang memang harus bergulir mendatar. `ResponsivePanels` menjaga
+panel nonaktif tetap mounted: pada mobile operator memilih panel melalui tab, sedangkan
+tablet/desktop menampilkan instance yang sama sebagai split-pane sesuai `splitAt`. Perubahan tier
+tidak ditulis ke localStorage dan tidak memutasi selection/state ADR-0115. Pergantian panel selector
+memindahkan fokus ke region baru agar fokus tidak tertinggal pada panel yang menjadi tersembunyi.
+
+Keluarga yang mengikuti kontrak itu:
+
+- KPI, metadata, form padat, pseudo-table, dan row aksi (Overview, Projects, Project detail,
+  Backlog, Scheduler, Lead, VPS, Changelog, Settings) turun menjadi satu kolom atau wrap. Projects
+  menjadi row/card berlabel; board Backlog tetap horizontal di scroller lokal dan semua aksi punya
+  jalur button non-drag.
+- PRD, Docs, Review, Spec Docs, dan IDE Explorer memakai pemilih master/detail pada mobile lalu
+  split-pane pada layar lebar. Git Graph memakai Graph/Detail; graph, kode, dan diff tetap memiliki
+  scroller lokal serta semua operasi yang dahulu kontekstual memiliki tombol touch/keyboard.
+- Terminal mobile memilih satu cell/panel aktif tanpa mengubah `{rows,cols,cells}` workspace yang
+  dipersist untuk desktop. Semua `TerminalPane` tetap mounted; layar lebar kembali ke grid. Host
+  yang berubah ukuran tetap menjalankan `ResizeObserver → FitAddon.fit() → resize` WebSocket.
+  Initial fit, attach WebSocket, dan observer mengabaikan host `0×0` milik panel tersembunyi agar
+  PTY background tidak direflow ke ukuran minimum palsu; saat panel terlihat lagi observer mengirim ukuran riil. Deep-link sesi
+  memilih grup dan cell target pada mobile.
+- Settings mengganti sidebar section dengan `Select` mobile. Auth/Help/portal memiliki scroller
+  `100dvh`; header, tab, row metadata, dan form membungkus tanpa menghapus field/aksi. Pet memakai
+  safe-area, handle 44px, dan panel yang di-clamp terhadap dynamic viewport.
+
+**Aksesibilitas & viewport.** Target sentuh minimum adalah 44×44px pada mobile/pointer kasar.
+Primitive interaktif memakai semantic button/tab/select serta keyboard; Modal punya
+`role="dialog"`, accessible title, focus trap/restore, Escape, badan scroll, footer wrap, dan bentuk
+bottom sheet mobile. Root memakai `100vh` sebagai fallback lalu `100dvh`; safe-area diterapkan pada
+drawer, dialog, fullscreen, Pet, dan permukaan mandiri supaya browser chrome/notch/keyboard virtual
+tidak menutup kontrol. `prefers-reduced-motion: reduce` mematikan animation/transition global tanpa
+menghilangkan status atau aksi.
+
+Popover topbar yang memakai pola menu/dialog memindahkan fokus saat dibuka, mendukung Escape dan
+outside-click, mengembalikan fokus ke pemicu, serta memberi Arrow/Home/End pada item menu.
+
+**Overflow.** Invariant halaman adalah `scrollWidth <= clientWidth`. Horizontal overflow hanya sah
+bila dimiliki container `.hn-local-overflow` atau seam lokal setara untuk terminal, kode, diff,
+graph, board, dan tabel yang memang membutuhkan lebar intrinsik. `min-width:0` wajib diteruskan di
+rantai flex/grid; jangan memperbaiki overflow halaman dengan menyembunyikan fitur atau metadata.
 
 ## State tampilan persisten (SPEC-740 · ADR-0115)
 
@@ -241,7 +300,7 @@ tidak dapat menerima fokus.
 
 **Sembunyikan** disimpan di `localStorage` `hanoman.pet.hidden` (pola `hanoman.terminal.workspace`)
 — preferensi per-browser, tanpa skema & tanpa endpoint. Disembunyikan berarti **menyusut** jadi
-pegangan bundar 28 px ber-`Mark` buntut, bukan lenyap: tanpa itu operator tak punya jalan kembali
+pegangan bundar 44 px ber-`Mark` buntut, bukan lenyap: tanpa itu operator tak punya jalan kembali
 selain membersihkan `localStorage`.
 
 Yang tak dikerjakan, berikut alasannya: fase sesi tak masuk headline karena
@@ -250,7 +309,8 @@ bisa basi berjam-jam — `Spec.stage` menjawab pertanyaan yang sama dan hidup. P
 dan sengaja **tak** mengikuti `projectFilter`: ia hadir juga di halaman yang tak punya filter itu.
 
 ## Tinggi & scrolling: rantai flex, bukan angka ajaib
-`#root` dikunci `100vh; overflow: hidden`, jadi tinggi yang tersedia sudah pasti sejak akar.
+`#root` memakai `100vh` sebagai fallback lalu dikunci `100dvh; overflow: hidden`, jadi tinggi yang
+tersedia mengikuti dynamic viewport tanpa menyerahkan scroll kepada body.
 Layar berdaftar tidak boleh menggulir seluruh halaman — filter bar dan Pager harus tetap
 terlihat — jadi yang menggulir hanyalah area barisnya.
 
@@ -409,6 +469,18 @@ yang membuka WebSocket ke `/api/terminal/sessions/:id/ws`; sel kosong menampilka
 belum tertempat, dan sesi yang belum di grid duduk di **tray**. Satu sesi menempati **paling banyak
 satu sel** (menjaga resize tmux tak berkedip). Dua aksi per sel: **Lepas** (unbind, sesi tetap
 hidup) dan **Tutup/`×`** (kill lewat `DELETE`).
+
+Pada mobile, workspace persisten itu **tidak** diperkecil menjadi banyak terminal mungil dan tidak
+ditulis ulang: tab panel memilih satu cell untuk ditampilkan, sementara setiap cell/`TerminalPane`
+tetap mounted. Kontrol tambah baris/kolom tetap di toolbar; gutter hapus desktop diganti tombol
+Hapus baris/kolom aktif pada mobile. Tray, pilih sesi, phase/docs, lepas, tutup, dan fullscreen
+tetap tersedia. Kembali ke layar lebar
+merender grid `{rows,cols,cells}` yang sama. `TerminalPane` hanya
+autofocus pada pointer halus agar ponsel tidak memunculkan keyboard virtual tanpa intent; setiap
+perubahan host terlihat tetap ditangkap `ResizeObserver`, diteruskan ke `FitAddon.fit()`, lalu
+mengirim resize PTY melalui WebSocket. Initial fit, `onopen`, dan callback observer mengabaikan ukuran `0×0` ketika panel disembunyikan,
+sehingga perpindahan tab mobile tidak mengecilkan tmux background ke ukuran minimum xterm. Aksi
+`focusSession`/sesi baru/pilih dari tray juga mengaktifkan grup dan cell target pada selector mobile.
 
 Toolbar juga punya **Ambil backlog** (SPEC-179): tombol yang membuka modal picker berisi
 backlog item yang bisa diambil (`stage !== "done"` dan belum punya sesi hidup). Memilih satu
@@ -848,23 +920,23 @@ tersiar lewat grup `notifications` WS existing.
 `Shell`: sidebar `HN_NAV` adalah navigasi operator, dan setiap entrinya adalah 403 yang menunggu
 diklik. Konsekuensinya ia tak mewarisi apa pun dari `Shell` — termasuk **scroll**.
 
-**Rantai gulir.** `#root` dikunci `100vh; overflow: hidden` (lihat "Tinggi & scrolling" di atas),
+**Rantai gulir.** `#root` dikunci dynamic viewport + `overflow: hidden` (lihat "Tinggi & scrolling" di atas),
 jadi layar yang tak memasang scroller-nya sendiri tak bisa digulir sama sekali — bukan terpotong
 di ujung, melainkan tak terjangkau sejak baris pertama yang melewati viewport. Portal karena itu
 memakai konstanta DS yang **sama** dengan layar operator, bukan angka baru:
 
 | elemen | style | arti |
 |---|---|---|
-| root (`data-testid="portal-root"`) | `height:100%`, `min-height:0`, kolom flex | sumber batas tinggi |
+| root (`data-testid="portal-root"`) | `height:100dvh`, `min-height:0`, kolom flex | sumber batas tinggi |
 | `<header>` | `FIXED_ROW_STYLE` | **di luar scroller** → tetap terbaca saat daftar digulir |
 | `<main>` (`data-testid="portal-scroll"`) | `LIST_SCROLL_STYLE` | satu-satunya yang menggulir |
 
 Di dalam `<main>` ada pembungkus `max-width`/padding biasa: begitu berada **di dalam** scroller,
 pembungkus `display: block` yang tumbuh setinggi isinya justru yang benar. Karena itu test
 `portal-scroll.test.tsx` memeriksa rantai dari **scroller ke atas**, bukan dari daftar ke atas.
-Isi `Modal` tak perlu perlakuan khusus: panelnya sudah `maxHeight: 88vh` + badan `overflow: auto`,
-dan overlay `position: fixed` tak diklip `#root` (yang tak membuat containing block) — test
-mengunci kontrak itu, bukan memperbaikinya.
+Isi `Modal` mewarisi kontrak dialog bersama: pada mobile panel menjadi bottom sheet yang di-clamp
+ke `100dvh` + safe-area; badannya `overflow:auto`, footer membungkus, dan fokus dikurung lalu
+dikembalikan. Overlay `position:fixed` tak diklip `#root` (yang tak membuat containing block).
 
 **Warna badge = fungsi murni, bukan literal.** `portal/status-pill.ts` memetakan keadaan → status
 `StatusPill` yang sudah ada; nol warna baru, nol warna literal di layar. Keduanya **tabel +

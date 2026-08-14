@@ -21,7 +21,9 @@ function parseRoute(pathname: string): { slug: string; key?: string } | null {
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bone-100)", padding: "40px 16px" }}>
+    <div data-testid="public-help-scroll" className="hn-dynamic-viewport" style={{ height: "100dvh", minHeight: 0, overflowY: "auto",
+      overscrollBehavior: "contain", boxSizing: "border-box", background: "var(--bone-100)",
+      padding: "max(40px, var(--safe-top)) max(16px, var(--safe-right)) max(40px, var(--safe-bottom)) max(16px, var(--safe-left))" }}>
       <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
         {children}
       </div>
@@ -142,7 +144,7 @@ function ReportForm({ slug }: { slug: string }) {
           </div>
           <div>
             <label htmlFor="hc-files" className="hn-eyebrow">Lampiran gambar (opsional, maks {MAX_FILES})</label>
-            <input id="hc-files" type="file" accept="image/png,image/jpeg,image/webp" multiple
+            <input id="hc-files" className="hn-touch-target" type="file" accept="image/png,image/jpeg,image/webp" multiple
               onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, MAX_FILES))} />
             {files.length > 0 && <div style={{ fontSize: 12, color: "var(--text-subtle)", marginTop: 4 }}>{files.map((f) => f.name).join(", ")}</div>}
           </div>
@@ -170,7 +172,7 @@ function ReportForm({ slug }: { slug: string }) {
 }
 
 const inputStyle: React.CSSProperties = {
-  display: "block", width: "100%", boxSizing: "border-box", marginTop: 4, padding: "8px 10px",
+  display: "block", width: "100%", minHeight: "var(--touch-target)", boxSizing: "border-box", marginTop: 4, padding: "8px 10px",
   border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)",
   background: "var(--surface-card)", color: "var(--text-body)", fontSize: 14, fontFamily: "var(--font-ui)",
 };

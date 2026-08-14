@@ -43,7 +43,11 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
-    fit.fit();
+    const visibleRect = () => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 ? rect : null;
+    };
+    if (visibleRect()) fit.fit();
 
     let ws: WebSocket | undefined;
     let disposed = false;
@@ -54,20 +58,26 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
       const scheme = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${scheme}//${location.host}${paths.terminalWs(sessionId)}`, [`hanoman-ticket.${ticket}`]);
 
-      ws.onopen = () => { term.focus(); send({ t: "resize", cols: term.cols, rows: term.rows }); };
-      ws.onmessage = (ev) => {
-      const f = JSON.parse(ev.data as string) as {
-        t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
+      ws.onopen = () => {
+        if (!visibleRect()) return;
+        const finePointer = typeof window.matchMedia !== "function"
+          || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+        if (finePointer) term.focus();
+        send({ t: "resize", cols: term.cols, rows: term.rows });
       };
-      if (f.t === "data") term.write(f.d ?? "");
-      // Server menyiarkan fase saat attach dan setiap kali agen menutup satu (SPEC-162).
-      // SPEC-433 · sejak sekarang juga saat `complete` berubah tanpa daftar fase berubah —
-      // kotak `- [ ]` terakhir di plan dicentang sesudah `Execute done`.
-      else if (f.t === "phase") phaseRef.current?.(f.phases ?? [], f.complete === true);
-      else if (f.t === "exit") {
-        term.write(`\r\n\x1b[33m— sesi berakhir (exit ${f.code}) —\x1b[0m\r\n`);
-        exitRef.current(f.code ?? 0);
-      }
+      ws.onmessage = (ev) => {
+        const f = JSON.parse(ev.data as string) as {
+          t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
+        };
+        if (f.t === "data") term.write(f.d ?? "");
+        // Server menyiarkan fase saat attach dan setiap kali agen menutup satu (SPEC-162).
+        // SPEC-433 · sejak sekarang juga saat `complete` berubah tanpa daftar fase berubah —
+        // kotak `- [ ]` terakhir di plan dicentang sesudah `Execute done`.
+        else if (f.t === "phase") phaseRef.current?.(f.phases ?? [], f.complete === true);
+        else if (f.t === "exit") {
+          term.write(`\r\n\x1b[33m— sesi berakhir (exit ${f.code}) —\x1b[0m\r\n`);
+          exitRef.current(f.code ?? 0);
+        }
       };
     }).catch(() => { if (!disposed) term.write("\r\n\x1b[31mWebSocket admission gagal\x1b[0m\r\n"); });
     // Salin/tempel: xterm merender seleksi sendiri, jadi Cmd/Ctrl+C tak menyalin apa pun
@@ -86,7 +96,9 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
       return true;
     });
     const typed = term.onData((d) => send({ t: "in", d }));
-    const ro = new ResizeObserver(() => {
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect ?? el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
       fit.fit();
       send({ t: "resize", cols: term.cols, rows: term.rows });
     });

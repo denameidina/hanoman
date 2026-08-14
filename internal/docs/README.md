@@ -188,9 +188,9 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [threat model deployment publik](security/threat-model.md) — asset, aktor, trust boundary, abuse case, kontrol, residual risk, invariant test, dan batas otorisasi DAST SPEC-761
 
 ## design-system
-- [design-system](design-system/design-system.md) — editorial instrument-panel, ilustrasi, dan grammar motion Pet Hanoman (SPEC-648)
+- [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), ilustrasi, dan grammar motion Pet Hanoman (SPEC-648)
 
 ## frontend
-- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk state → pose dan motion Pet Hanoman
+- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan motion Pet Hanoman (SPEC-763)
 
 > Chiranjivi — docs bertahan lebih lama dari satu commit atau sesi. Jaga index ini tetap sinkron.

@@ -292,7 +292,7 @@ export function WebhooksPanel({ onToast, onOpenDocs }:
             <Button size="sm" variant="ghost" onClick={() => setHistoryFor(null)}>Tutup riwayat</Button>
           </div>
           {history.length === 0 ? <div style={muted}>Belum ada pengiriman.</div> : (
-            <div style={{ overflowX: "auto" }}>
+            <div className="hn-local-overflow" style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
                 <thead>
                   <tr style={{ textAlign: "left", color: "var(--text-muted)" }}>

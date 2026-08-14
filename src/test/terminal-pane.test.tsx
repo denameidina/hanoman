@@ -1,5 +1,6 @@
 import { render, cleanup } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { api } from "../src/api/client";
 import { TerminalPane } from "../src/screens/TerminalPane";
 
 // SPEC-511 · xterm butuh canvas + pengukuran font; jsdom tak punya keduanya. Yang diuji di sini
@@ -12,6 +13,9 @@ const xt = vi.hoisted(() => ({
   keyHandler: undefined as ((e: KeyboardEvent) => boolean) | undefined,
   selection: "",
   written: [] as string[],
+  focused: 0,
+  fitCount: 0,
+  resize: undefined as ((entries: ResizeObserverEntry[]) => void) | undefined,
 }));
 
 vi.mock("@xterm/xterm", () => ({
@@ -21,7 +25,7 @@ vi.mock("@xterm/xterm", () => ({
     constructor(options: Record<string, unknown>) { xt.options = options; }
     public loadAddon(): void { }
     public open(): void { }
-    public focus(): void { }
+    public focus(): void { xt.focused += 1; }
     public write(d: string): void { xt.written.push(d); }
     public dispose(): void { }
     public hasSelection(): boolean { return xt.selection.length > 0; }
@@ -30,9 +34,9 @@ vi.mock("@xterm/xterm", () => ({
     public onData(): { dispose: () => void } { return { dispose: () => { } }; }
   },
 }));
-vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { public fit(): void { } } }));
+vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { public fit(): void { xt.fitCount += 1; } } }));
 
-const sockets: { sent: string[]; readyState: number }[] = [];
+const sockets: { sent: string[]; readyState: number; onopen: (() => void) | null }[] = [];
 class FakeWebSocket {
   public static readonly OPEN = 1;
   public readyState = 1;
@@ -49,13 +53,48 @@ const keydown = (over: Partial<KeyboardEvent> & { key: string }): KeyboardEvent 
 
 beforeEach(() => {
   xt.options = undefined; xt.keyHandler = undefined; xt.selection = ""; xt.written = [];
+  xt.focused = 0; xt.fitCount = 0; xt.resize = undefined;
   sockets.length = 0;
+  vi.spyOn(api, "issueWsTicket").mockResolvedValue({ ticket: "ws-once" });
   vi.stubGlobal("WebSocket", FakeWebSocket);
-  vi.stubGlobal("ResizeObserver", class { observe(): void { } disconnect(): void { } });
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(cb: (entries: ResizeObserverEntry[]) => void) { xt.resize = cb; }
+    observe(): void { } disconnect(): void { }
+  });
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
+  it("ResizeObserver fits xterm and sends its resized dimensions over the admitted WS", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    const initialFits = xt.fitCount;
+    xt.resize?.([{ contentRect: { width: 640, height: 360 } } as ResizeObserverEntry]);
+    expect(xt.fitCount).toBe(initialFits + 1);
+    expect(sockets[0]?.sent).toContain(JSON.stringify({ t: "resize", cols: 80, rows: 24 }));
+  });
+
+  it("does not fit or resize the PTY while its mobile panel is hidden", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    const initialFits = xt.fitCount;
+    sockets[0]?.onopen?.();
+    xt.resize?.([{ contentRect: { width: 0, height: 0 } } as ResizeObserverEntry]);
+    expect(xt.fitCount).toBe(initialFits);
+    expect(sockets[0]?.sent).not.toContain(JSON.stringify({ t: "resize", cols: 80, rows: 24 }));
+  });
+
+  it("does not focus xterm on connect for a coarse pointer", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    vi.spyOn(container.firstElementChild!, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 360, top: 0, right: 640, bottom: 360, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+    sockets[0]?.onopen?.();
+    expect(xt.focused).toBe(0);
+  });
+
   it("lahir dengan macOptionClickForcesSelection agar seleksi mungkin di bawah mouse-reporting tmux", () => {
     render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     // tmux `mouse on` (SPEC-209, terukur memancarkan ?1000h ?1002h ?1006h) membuat xterm memanggil

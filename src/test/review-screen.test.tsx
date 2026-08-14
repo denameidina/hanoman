@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { ReviewScreen } from "../src/screens/ReviewScreen";
 import { api } from "../src/api/client";
+import { mockViewport, resetViewport } from "./viewport";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -22,8 +23,18 @@ beforeEach(() => {
     diff: "@@ -1 +1 @@\n-old\n+new", content: "new content",
   });
 });
+afterEach(resetViewport);
 
 describe("ReviewScreen (SPEC-171)", () => {
+  it("offers mounted Files/Viewer panels on mobile", async () => {
+    mockViewport(390);
+    render(<ReviewScreen specId="SPEC-171" title="X" onBack={() => {}} />);
+    await screen.findByRole("tablist", { name: "Panel Review" });
+    expect(document.querySelector('[data-panel="files"]')).toHaveAttribute("aria-hidden", "false");
+    fireEvent.click(screen.getByRole("tab", { name: "Viewer" }));
+    expect(document.querySelector('[data-panel="viewer"]')).toHaveAttribute("aria-hidden", "false");
+    expect(document.querySelector('[data-panel="files"]')).toBeInTheDocument();
+  });
   it("menampilkan changed list + memilih file changed pertama (diff hijau)", async () => {
     render(<ReviewScreen specId="SPEC-171" title="X" onBack={() => {}} />);
     await waitFor(() => expect(screen.getAllByText("src/a.ts").length).toBeGreaterThan(0));

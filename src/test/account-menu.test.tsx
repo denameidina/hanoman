@@ -34,4 +34,14 @@ describe("AccountMenu", () => {
     fireEvent.click(screen.getByText("Keluar"));
     expect(logout).toHaveBeenCalled();
   });
+
+  it("memindahkan fokus ke menu lalu Escape mengembalikannya ke trigger", () => {
+    render(<Harness user={me} />);
+    const trigger = screen.getByLabelText("Akun");
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menuitem", { name: "Keluar" })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
 });

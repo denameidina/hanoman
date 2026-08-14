@@ -1,7 +1,7 @@
 /* SettingsScreen — workspace settings. Ported; persistence moved from
    localStorage to the API (GET/PUT /settings). Model per pipeline step. */
 import React from "react";
-import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog } from "../ds";
+import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useResponsiveTier } from "../ds";
 import { api, ApiError } from "../api/client";
 import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus } from "@hanoman/shared";
@@ -73,12 +73,12 @@ function AgentGroupHeader({ id, label, active }: { id: "claude" | "codex"; label
 
 function SettingRow({ title, desc, children, last }: { title: string; desc?: string; children?: React.ReactNode; last?: boolean }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 0", borderBottom: last ? "none" : "1px solid var(--border-hair)" }}>
+    <div className="hn-setting-row" style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 0", borderBottom: last ? "none" : "1px solid var(--border-hair)" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)" }}>{title}</div>
         {desc && <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.5 }}>{desc}</div>}
       </div>
-      <div style={{ flex: "0 0 auto" }}>{children}</div>
+      <div className="hn-setting-control" style={{ flex: "0 0 auto" }}>{children}</div>
     </div>
   );
 }
@@ -109,7 +109,7 @@ function AccountPanel({ me, onLoggedOut, onToast }: { me: UserView; onLoggedOut:
       </SettingRow>
       <div style={{ paddingTop: 14 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", marginBottom: 10 }}>Ganti password</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
+        <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
           <Field label="Password lama"><Input type="password" autoComplete="current-password" placeholder="••••••••" value={cur}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCur(e.target.value)} style={{ width: "100%" }} /></Field>
           <Field label={<>Password baru <span style={{ fontWeight: 400, color: "var(--text-subtle)" }}>· min 8</span></>}>
@@ -164,7 +164,7 @@ function UsersPanel({ me, onToast }: { me: UserView; onToast?: ShowToast }) {
       ))}
       <div style={{ paddingTop: 14 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", marginBottom: 10 }}>Invite user</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
+        <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
           <Field label="Email"><Input type="email" value={email} placeholder="user@nafanesia.id"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} style={{ width: "100%" }} /></Field>
           <Field label={<>Password <span style={{ fontWeight: 400, color: "var(--text-subtle)" }}>· min 8</span></>}>
@@ -228,7 +228,7 @@ function DeviceTokensPanel({ onToast }: { onToast?: ShowToast }) {
             <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => revoke(t)}>Cabut</Button>
           </SettingRow>
         ))}
-      <div style={{ paddingTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end" }}>
+      <div className="hn-grid-mobile" style={{ paddingTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end" }}>
         <Field label="Nama perangkat"><Input value={name} placeholder="laptop-dena"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} style={{ width: "100%" }} /></Field>
         <Button size="sm" leftIcon="plus" disabled={name.trim().length < 1 || busy} onClick={create} style={{ marginBottom: 14 }}>Buat token</Button>
@@ -254,7 +254,7 @@ function ActivityPanel({ onToast }: { onToast?: ShowToast }) {
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
         Ringkasan hasil sesi lintas device (transisi stage, commit, PR) — append-only. Filter per project.
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end", marginBottom: 12 }}>
+      <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end", marginBottom: 12 }}>
         <Field label="Project id (opsional)"><Input value={projectId} placeholder="mis. hanoman — kosong = semua project"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjectId(e.target.value)} style={{ width: "100%" }} /></Field>
         <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={!projectId} onClick={purge} style={{ marginBottom: 14 }}>Purge</Button>
@@ -444,7 +444,7 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
           <Field label="Nama token"><Input value={name} placeholder="mis. agent-ci"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} style={{ width: "100%" }} /></Field>
           <div style={{ marginTop: 12, fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)" }}>Capability</div>
-          <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr auto auto", gap: "6px 14px", alignItems: "center" }}>
+          <div className="hn-grid-mobile" style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr auto auto", gap: "6px 14px", alignItems: "center" }}>
             <div /><div style={{ fontSize: 11.5, color: "var(--text-subtle)", textAlign: "center" }}>baca</div>
             <div style={{ fontSize: 11.5, color: "var(--text-subtle)", textAlign: "center" }}>tulis</div>
             {domains.map((d) => {
@@ -500,6 +500,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
   const [failed, setFailed] = React.useState(false);
   // SPEC-740 · ADR-0115 · sub-tab aktif bertahan; refresh tak melempar balik ke Akun.
   const [tab, setTab] = usePersistedState<string>("settings", "tab", "akun", isStr);
+  const tier = useResponsiveTier();
+  const mobile = tier === "mobile";
   // SPEC-481 · halaman dokumentasi webhook hidup DI DALAM tab-nya (bukan modal): brief
   // meminta "halaman", dan modal di atas Settings membuat Escape ambigu (pola SPEC-385).
   const [webhookDocs, setWebhookDocs] = React.useState(false);
@@ -1317,8 +1319,11 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
     : prefs();
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "196px 1fr", gap: 24, alignItems: "start", maxWidth: 920 }}>
-      <nav aria-label="Navigasi pengaturan" style={{ display: "flex", flexDirection: "column", gap: 2, position: "sticky", top: 0 }}>
+    <div className="hn-settings-layout" data-layout={tier} style={{ display: "grid", gridTemplateColumns: mobile ? "minmax(0, 1fr)" : tier === "tablet" ? "160px minmax(0, 1fr)" : "196px minmax(0, 1fr)", gap: tier === "tablet" ? 16 : 24, alignItems: "start", maxWidth: 920 }}>
+      {mobile ? (
+        <Select aria-label="Bagian pengaturan" value={tab} onChange={(event) => setTab(event.target.value)}
+          options={S_SECTIONS.map((section) => ({ value: section.key, label: section.label }))} />
+      ) : <nav aria-label="Navigasi pengaturan" style={{ display: "flex", flexDirection: "column", gap: 2, position: "sticky", top: 0 }}>
         {S_SECTIONS.map((sec) => {
           const on = sec.key === tab;
           return (
@@ -1334,7 +1339,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             </button>
           );
         })}
-      </nav>
+      </nav>}
       <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>{content}</div>
     </div>
   );

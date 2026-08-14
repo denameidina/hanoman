@@ -37,6 +37,7 @@ describe("UpdateBadge", () => {
     expect(screen.getByText(/hanoman 0\.2\.0 tersedia/)).toBeTruthy();
     expect(screen.getByText(/npm i -g hanoman@latest/)).toBeTruthy();
     expect(screen.getByText(/terpasang 0\.1\.0 · tersedia 0\.2\.0/)).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Update tersedia" })).toBeInTheDocument();
   });
 
   // SPEC-405 · ADR-0088 · gerbang supervised-only. Tanpa supervisor, menekan tombol akan

@@ -77,7 +77,7 @@ function RunHistory({ cronId }: { cronId: string }) {
   return (
     <>
       {items.map((r) => (
-        <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
+        <div key={r.id} className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
           border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", marginBottom: 6 }}>
           <Badge tone={(STATUS_TONE[r.status] ?? "neutral") as never} size="sm">{STATUS_LABEL[r.status] ?? r.status}</Badge>
           <span style={{ flex: 1, minWidth: 0, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
@@ -233,7 +233,7 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast }: Schedule
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({ ...d, name: e.target.value }))} />
         </Field>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10 }}>
+        <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10 }}>
           <Field label="Preset jadwal">
             <Select aria-label="Preset jadwal" value={draft.kind}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDraft((d) => ({ ...d, kind: e.target.value as PresetKind }))}
@@ -289,7 +289,7 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast }: Schedule
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDraft((d) => ({ ...d, prompt: e.target.value }))} />
         </Field>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10 }}>
+        <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10 }}>
           <Field label="Runtime">
             <Select aria-label="Runtime" value={draft.agent}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>

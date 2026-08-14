@@ -1,7 +1,7 @@
 /* ReviewScreen (SPEC-171) — review file worktree backlog item ala VSCode:
    sidebar CHANGED (SCM) + FILES (tree), viewer Diff|Source. Read-only. */
 import React from "react";
-import { Card, Badge, Button, Icon, StateBlock, DocPreviewModal, isMarkdownPath } from "../ds";
+import { Card, Badge, Button, Icon, StateBlock, DocPreviewModal, isMarkdownPath, ResponsivePanels } from "../ds";
 import { api, type SpecReview, type ReviewFile } from "../api/client";
 import { buildFileTree, TreeRow, ChangedSection } from "./file-tree";
 import { DiffView } from "./diff-view";
@@ -23,6 +23,7 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec" }:
   // SPEC-385 · pratinjau .md sebagai dokumen terbaca; pane ini berorientasi diff, jadi
   // preview-nya sebuah AKSI, bukan tab ketiga (Diff|Source tetap apa adanya).
   const [preview, setPreview] = React.useState(false);
+  const [panel, setPanel] = React.useState<"files" | "viewer">("files");
 
   React.useEffect(() => {
     let alive = true;
@@ -55,27 +56,36 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec" }:
   // Gerbang seragam SPEC-385: .md + tak biner + punya isi (berkas terhapus tak bisa dibaca).
   const canPreview = !!file && !file.binary && file.content !== null && isMarkdownPath(selected);
   const downloadUrl = kind === "session" ? api.sessionReviewFileDownloadUrl : api.specReviewFileDownloadUrl;
+  const selectFile = (path: string) => { setSelected(path); setPanel("viewer"); };
 
   if (state === "loading") return <StateBlock kind="loading" title="Memuat review…" hint={specId} />;
   if (state === "error") return <StateBlock kind="error" title="Gagal memuat review" hint={specId} action={() => setTries((n) => n + 1)} />;
   if (state === "empty") return <StateBlock kind="empty" icon="git-branch" title="Belum ada worktree untuk di-review"
     hint={errMsg || "Jalankan atau lanjutkan sesi backlog item ini dulu."} action={onBack} actionLabel="Kembali ke backlog" />;
 
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 16, alignItems: "start" }}>
+  return <>
+    <ResponsivePanels
+      ariaLabel="Panel Review"
+      active={panel}
+      onActiveChange={(next) => setPanel(next as "files" | "viewer")}
+      masterWidth={300}
+      panels={[
+        { id: "files", label: "Files", content: (
       <Card padding={0}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border-hair)" }}>
           <span className="hn-eyebrow">{specId}</span>
           <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={() => setTries((n) => n + 1)}>Muat ulang</Button>
         </div>
         <div style={{ maxHeight: 640, overflow: "auto", padding: "6px 4px" }}>
-          <ChangedSection label="Changed" changed={changed} selected={selected} onSelect={setSelected}
+          <ChangedSection label="Changed" changed={changed} selected={selected} onSelect={selectFile}
             view={chView} onView={setChView} />
           <div className="hn-eyebrow" style={{ padding: "6px 8px", marginTop: 8, borderTop: "1px solid var(--border-hair)" }}>Files</div>
-          {tree.map((n) => <TreeRow key={n.path} node={n} selected={selected} onSelect={setSelected} />)}
+          {tree.map((n) => <TreeRow key={n.path} node={n} selected={selected} onSelect={selectFile} />)}
         </div>
       </Card>
+        ) },
 
+        { id: "viewer", label: "Viewer", content: (
       <Card padding={0}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-hair)", flexWrap: "wrap" }}>
           <Icon name="file-text" size={15} color="var(--text-muted)" />
@@ -108,11 +118,12 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec" }:
                 lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--text-body)" }}>{file.content}</pre>}
         </div>
       </Card>
-
-      {preview && canPreview && (
-        <DocPreviewModal path={selected} text={file!.content ?? ""} eyebrow={specId}
-          download={(f) => downloadUrl(specId, selected, f)} onClose={() => setPreview(false)} />
-      )}
-    </div>
-  );
+        ) },
+      ]}
+    />
+    {preview && canPreview && (
+      <DocPreviewModal path={selected} text={file!.content ?? ""} eyebrow={specId}
+        download={(f) => downloadUrl(specId, selected, f)} onClose={() => setPreview(false)} />
+    )}
+  </>;
 }

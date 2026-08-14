@@ -21,7 +21,7 @@ const O_ATT: Record<string, { bar: string; tint: string; text: string; label: st
 
 function KpiStrip({ items }: { items: { label: string; value: React.ReactNode; sub?: string; dot: string }[] }) {
   return (
-    <div style={{
+    <div className="hn-stat-grid" style={{
       display: "grid", gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: 1,
       background: "var(--border-hair)", border: "1px solid var(--border-hair)",
       borderRadius: "var(--radius-lg)", overflow: "hidden", marginBottom: 20,
@@ -62,7 +62,9 @@ function AttnRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }
 
 function LiveSessionRow({ p, onGoto }: { p: ProjectVM; onGoto: (s: string) => void }) {
   return (
-    <div onClick={() => onGoto("terminal")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 4px", borderBottom: "1px solid var(--border-hair)", cursor: "pointer" }}>
+    <div className="hn-dense-row" role="button" tabIndex={0} onClick={() => onGoto("terminal")}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGoto("terminal"); } }}
+      style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 4px", borderBottom: "1px solid var(--border-hair)", cursor: "pointer" }}>
       <StatusPill status="running" size="sm">{p.session.phase ?? "—"}</StatusPill>
       <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{p.session.flow ?? ""}</span>
@@ -72,7 +74,9 @@ function LiveSessionRow({ p, onGoto }: { p: ProjectVM; onGoto: (s: string) => vo
 
 function CoverageRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }) {
   return (
-    <div onClick={() => onOpen(p)} style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 1fr) 120px", alignItems: "center", gap: 12, padding: "9px 4px", cursor: "pointer", borderBottom: "1px solid var(--border-hair)" }}>
+    <div className="hn-grid-mobile" role="button" tabIndex={0} onClick={() => onOpen(p)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(p); } }}
+      style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 1fr) 120px", alignItems: "center", gap: 12, padding: "9px 4px", cursor: "pointer", borderBottom: "1px solid var(--border-hair)" }}>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
       <ProgressBar value={p.coverage} tone={oCovTone(p.docStatus)} size="sm" />
       {/* kolom 120px muat label terpanjang "Off convention" (~107px); justifySelf:end bikin
@@ -126,7 +130,7 @@ export function OverviewScreen({ projects, backlog, onOpenProject, onGoto }:
   return (
     <div>
       <KpiStrip items={kpis} />
-      <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 20, alignItems: "start" }}>
+      <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 20, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <Card eyebrow={"needs attention · " + attention.length} title="Perlu perhatian"
             actions={<Button size="sm" variant="ghost" leftIcon="layout-grid" onClick={() => onGoto("projects")}>Semua project</Button>}>
@@ -165,7 +169,7 @@ export function OverviewScreen({ projects, backlog, onOpenProject, onGoto }:
           </Card>
           <Card eyebrow="brainstorm → execute" title="Backlog"
             actions={<Button size="sm" variant="ghost" leftIcon="list-checks" onClick={() => onGoto("backlog")}>Buka</Button>}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 6 }}>
+            <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 6 }}>
               <MiniStat icon="lightbulb" label="dari brief" value={briefN} tone="var(--brass-600)" />
               <MiniStat icon="bug" label="dari QA" value={qaN} tone="var(--clay-500)" />
               <MiniStat icon="flame" label="prioritas tinggi" value={hiPrio} tone="var(--clay-500)" />
@@ -183,7 +187,7 @@ export function OverviewScreen({ projects, backlog, onOpenProject, onGoto }:
             {activity.map((a, i) => {
               const dot = a.status === "running" ? "var(--brass-500)" : "var(--bone-400)";
               return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 4px", borderBottom: "1px solid var(--border-hair)" }}>
+                <div key={i} className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 4px", borderBottom: "1px solid var(--border-hair)" }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, flex: "0 0 auto" }} />
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", width: 120, flex: "0 0 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.project}</span>
                   <span style={{ fontSize: 12.5, color: "var(--text-body)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.text}</span>

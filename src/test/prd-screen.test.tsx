@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mockViewport, resetViewport } from "./viewport";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -30,8 +31,19 @@ const projects = [{ id: "p1", name: "P1" }, { id: "p2", name: "Proyek B" }] as a
 // SPEC-273 · prop breakdown wajib; default no-op untuk test yang tak memakainya.
 const base = { onStartBreakdown: () => {}, onMaterialize: async () => 0 };
 beforeEach(() => vi.clearAllMocks());
+afterEach(resetViewport);
 
 describe("PrdScreen", () => {
+  it("switches the mounted list/detail panels after selecting a PRD on mobile", async () => {
+    mockViewport(390);
+    render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    const switcher = await screen.findByRole("tablist", { name: "Panel PRD" });
+    expect(switcher).toBeInTheDocument();
+    expect(document.querySelector('[data-panel="list"]')).toHaveAttribute("aria-hidden", "false");
+    fireEvent.click(await screen.findByText("Jadwal Invoice"));
+    expect(document.querySelector('[data-panel="detail"]')).toHaveAttribute("aria-hidden", "false");
+    expect(document.querySelector('[data-panel="list"]')).toBeInTheDocument();
+  });
   it("mendaftar PRD dari server", async () => {
     render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
     await waitFor(() => expect(screen.getByText("Jadwal Invoice")).toBeTruthy());
