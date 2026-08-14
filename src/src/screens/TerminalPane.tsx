@@ -52,6 +52,11 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
     let ws: WebSocket | undefined;
     let disposed = false;
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
+    let pendingInput = "";
+    const sendInput = (d: string) => {
+      if (ws?.readyState === WebSocket.OPEN) send({ t: "in", d });
+      else pendingInput += d;
+    };
 
     void api.issueWsTicket(`terminal:${sessionId}`).then(({ ticket }) => {
       if (disposed) return;
@@ -59,6 +64,11 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
       ws = new WebSocket(`${scheme}//${location.host}${paths.terminalWs(sessionId)}`, [`hanoman-ticket.${ticket}`]);
 
       ws.onopen = () => {
+        if (pendingInput) {
+          const d = pendingInput;
+          pendingInput = "";
+          send({ t: "in", d });
+        }
         if (!visibleRect()) return;
         const finePointer = typeof window.matchMedia !== "function"
           || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -90,12 +100,43 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
         return false;
       }
       if (intent === "paste") {
-        void navigator.clipboard?.readText().then((t) => { if (t) send({ t: "in", d: t }); });
+        void navigator.clipboard?.readText().then((t) => { if (t) sendInput(t); });
         return false;
       }
       return true;
     });
-    const typed = term.onData((d) => send({ t: "in", d }));
+    const typed = term.onData(sendInput);
+
+    // SPEC-771 · viewport internal xterm 6 tak memiliki pemilik gesture touch. Tanpa handler
+    // passive-false ini swipe bubble ke page scroller meski scrollback terminal masih tersedia.
+    let touchY: number | null = null;
+    let touchRemainder = 0;
+    const resetTouch = () => { touchY = null; touchRemainder = 0; };
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 1) { resetTouch(); return; }
+      touchY = event.touches[0]!.clientY;
+      touchRemainder = 0;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      if (touchY === null || event.touches.length !== 1) { resetTouch(); return; }
+      const rect = visibleRect();
+      if (!rect || term.rows <= 0) return;
+      const nextY = event.touches[0]!.clientY;
+      touchRemainder += touchY - nextY;
+      touchY = nextY;
+      const lineHeight = rect.height / term.rows;
+      const lines = Math.trunc(touchRemainder / lineHeight);
+      if (lines !== 0) {
+        term.scrollLines(lines);
+        touchRemainder -= lines * lineHeight;
+      }
+      event.preventDefault();
+    };
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", resetTouch, { passive: true });
+    el.addEventListener("touchcancel", resetTouch, { passive: true });
+
     const ro = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect ?? el.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
@@ -104,8 +145,19 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
     });
     ro.observe(el);
 
-    return () => { disposed = true; ro.disconnect(); typed.dispose(); ws?.close(); term.dispose(); };
+    return () => {
+      disposed = true;
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", resetTouch);
+      el.removeEventListener("touchcancel", resetTouch);
+      ro.disconnect();
+      typed.dispose();
+      ws?.close();
+      term.dispose();
+    };
   }, [sessionId]);
 
-  return <div ref={host} style={{ height: "100%", width: "100%", background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)" }} />;
+  return <div ref={host} style={{ height: "100%", width: "100%", background: "var(--term-bg)", padding: 8,
+    borderRadius: "var(--radius-sm)", touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />;
 }

@@ -15,6 +15,8 @@ const xt = vi.hoisted(() => ({
   written: [] as string[],
   focused: 0,
   fitCount: 0,
+  scrolled: [] as number[],
+  dataHandler: undefined as ((data: string) => void) | undefined,
   resize: undefined as ((entries: ResizeObserverEntry[]) => void) | undefined,
 }));
 
@@ -27,11 +29,15 @@ vi.mock("@xterm/xterm", () => ({
     public open(): void { }
     public focus(): void { xt.focused += 1; }
     public write(d: string): void { xt.written.push(d); }
+    public scrollLines(amount: number): void { xt.scrolled.push(amount); }
     public dispose(): void { }
     public hasSelection(): boolean { return xt.selection.length > 0; }
     public getSelection(): string { return xt.selection; }
     public attachCustomKeyEventHandler(fn: (e: KeyboardEvent) => boolean): void { xt.keyHandler = fn; }
-    public onData(): { dispose: () => void } { return { dispose: () => { } }; }
+    public onData(fn: (data: string) => void): { dispose: () => void } {
+      xt.dataHandler = fn;
+      return { dispose: () => { xt.dataHandler = undefined; } };
+    }
   },
 }));
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { public fit(): void { xt.fitCount += 1; } } }));
@@ -53,7 +59,7 @@ const keydown = (over: Partial<KeyboardEvent> & { key: string }): KeyboardEvent 
 
 beforeEach(() => {
   xt.options = undefined; xt.keyHandler = undefined; xt.selection = ""; xt.written = [];
-  xt.focused = 0; xt.fitCount = 0; xt.resize = undefined;
+  xt.focused = 0; xt.fitCount = 0; xt.scrolled = []; xt.dataHandler = undefined; xt.resize = undefined;
   sockets.length = 0;
   vi.spyOn(api, "issueWsTicket").mockResolvedValue({ ticket: "ws-once" });
   vi.stubGlobal("WebSocket", FakeWebSocket);
@@ -93,6 +99,43 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
     });
     sockets[0]?.onopen?.();
     expect(xt.focused).toBe(0);
+  });
+
+  it("retains input typed while the WebSocket is connecting and flushes it in order on open", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    vi.spyOn(container.firstElementChild!, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 360, top: 0, right: 640, bottom: 360, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+    sockets[0]!.readyState = 0;
+
+    xt.dataHandler?.("abc");
+    xt.dataHandler?.("123");
+    expect(sockets[0]?.sent).not.toContain(JSON.stringify({ t: "in", d: "abc123" }));
+
+    sockets[0]!.readyState = FakeWebSocket.OPEN;
+    sockets[0]?.onopen?.();
+    expect(sockets[0]?.sent).toContain(JSON.stringify({ t: "in", d: "abc123" }));
+  });
+
+  it("owns a vertical touch gesture and scrolls xterm scrollback instead of the page", () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    const host = container.firstElementChild!;
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 320, top: 0, right: 640, bottom: 320, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+    const touch = (type: "touchstart" | "touchmove", clientY: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "touches", { value: [{ clientY }] });
+      host.dispatchEvent(event);
+      return event;
+    };
+
+    touch("touchstart", 100);
+    const move = touch("touchmove", 180);
+
+    expect(xt.scrolled.at(-1)).toBeLessThan(0);
+    expect(move.defaultPrevented).toBe(true);
   });
 
   it("lahir dengan macOptionClickForcesSelection agar seleksi mungkin di bawah mouse-reporting tmux", () => {

@@ -1,6 +1,8 @@
 # Non-functional requirements
 
-- **Realtime terminal** — latensi frame terminal ke UI < 1 dtk (WebSocket PTY).
+- **Realtime terminal** — latensi frame terminal ke UI < 1 dtk (WebSocket PTY); input yang diterima
+  selama koneksi dibuka atau saat key-repeat cepat tetap terkirim berurutan tanpa terpotong quota
+  normal pengguna.
 - **Interupsi** — instruksi ke sesi (steer / ctrl-c / tutup) diterapkan ≤ 2 dtk lewat tmux.
 - **Isolasi** — tiap backlog memakai worktree terpisah (boundary Git), sedangkan production menjalankan
   semua agen dalam rootless Podman dengan mount minimum, root read-only, resource limit, dan egress

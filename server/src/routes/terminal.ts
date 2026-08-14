@@ -27,6 +27,10 @@ import {
   attach, detach, writeTo, resize, shellBin, sendToPane, interruptPane, type Client,
 } from "../services/pty";
 
+// SPEC-771 · input xterm berbingkai per keystroke; default 120/menit menutup koneksi pada dua
+// karakter/detik. 100/detik tetap bounded tetapi berada di atas key-repeat browser yang wajar.
+const TERMINAL_WS_MESSAGES_PER_MINUTE = 6_000;
+
 // Sebuah PTY di atas WebSocket adalah remote code execution secara desain — identik
 // dengan menyerahkan shell. hanoman tidak punya autentikasi; satu-satunya yang berdiri
 // di antara endpoint ini dan jaringan adalah server.ts yang bind ke 127.0.0.1.
@@ -469,7 +473,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     let release: () => void;
     try { release = openWsConnection(principal); }
     catch { socket.close(1008, "connection limit"); return; }
-    const guard = new WsMessageGuard();
+    const guard = new WsMessageGuard({ perWindow: TERMINAL_WS_MESSAGES_PER_MINUTE });
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     attach(id, client);
     socket.on("message", async (raw: Buffer) => {

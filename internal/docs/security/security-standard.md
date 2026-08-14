@@ -114,8 +114,10 @@
   **Tanpa `HANOMAN_CONTROL_ORIGINS`, allowlist itu diturunkan dari `Host` request** (same-origin,
   kedua scheme) alih-alih kosong — lihat "Default same-origin" di bawah. Production tak ikut:
   di sana env-nya wajib dan boot gagal tanpanya.
-  Maksimum payload 64 KiB, 120 pesan/menit, dan 8 koneksi/principal. Sesi diverifikasi ulang setiap
-  60 detik dan sebelum input terminal diterapkan. Sync machine-to-machine memakai Bearer header.
+  Maksimum payload 64 KiB dan 8 koneksi/principal. Guard default membatasi 120 pesan/menit;
+  route terminal memakai 6.000 frame/menit karena xterm mengirim satu frame per ketikan — batas
+  default menutup koneksi hanya pada dua karakter/detik. Sesi diverifikasi ulang setiap 60 detik
+  dan sebelum input terminal diterapkan. Sync machine-to-machine memakai Bearer header.
   - **Default same-origin (`wsAllowlistFor`)**: allowlist yang kosong dulu berarti **tolak semua**,
     dan karena instalasi polos (`npm i -g hanoman` → `hanoman`) tak pernah menyetel
     `HANOMAN_CONTROL_ORIGINS`, seluruh WebSocket browser ditolak 401 — `events` **dan**

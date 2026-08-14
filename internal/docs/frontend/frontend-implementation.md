@@ -533,6 +533,13 @@ mengirim resize PTY melalui WebSocket. Initial fit, `onopen`, dan callback obser
 sehingga perpindahan tab mobile tidak mengecilkan tmux background ke ukuran minimum xterm. Aksi
 `focusSession`/sesi baru/pilih dari tray juga mengaktifkan grup dan cell target pada selector mobile.
 
+Input xterm yang lahir saat tiket/upgrade WebSocket masih `CONNECTING` ditahan berurutan oleh
+`TerminalPane` dan dikirim sebagai satu frame segera setelah `open`; jalur ini tidak membuang
+ketikan awal. Pada perangkat sentuh, swipe vertikal satu jari di host terminal dikonversi ke baris
+melalui tinggi host/jumlah row dan `Terminal.scrollLines()` (dengan sisa pecahan disimpan), lalu
+`preventDefault()` menahan scroller halaman. Pan horizontal dan pinch-zoom tetap diserahkan ke
+browser; gesture multi-touch tidak diambil terminal.
+
 Toolbar juga punya **Ambil backlog** (SPEC-179): tombol yang membuka modal picker berisi
 backlog item yang bisa diambil (`stage !== "done"` dan belum punya sesi hidup). Memilih satu
 memanggil `POST /terminal/sessions {spec, flow}` — endpoint idempoten yang sama dengan tombol

@@ -856,8 +856,11 @@ GET    /terminal/sessions/:id/ws     # WebSocket; close 4004 bila sesi tak ada
 #   Browser lebih dulu POST /ws-tickets {target:"terminal:<id>"} lalu mengirim subprotocol
 #   `hanoman-ticket.<token>`. Exact Origin scheme/host/port wajib cocok control allowlist; tiket
 #   target-specific, one-use, hidup 30 dtk, store bounded. `/events/ws` memakai target `events`.
-#   Payload maksimum 64 KiB, 120 pesan/menit, 8 koneksi/principal. Principal diverifikasi ulang
-#   tiap 60 dtk dan SEBELUM input/resize terminal diterapkan; revoke menutup 1008.
+#   Payload maksimum 64 KiB dan 8 koneksi/principal. Guard default = 120 pesan/menit, sedangkan
+#   terminal = 6.000 frame/menit karena tiap ketikan xterm adalah satu frame. Principal diverifikasi
+#   ulang tiap 60 dtk dan SEBELUM input/resize terminal diterapkan; revoke menutup 1008.
+#   Klien menahan input yang lahir selama ticket/upgrade masih CONNECTING, lalu mengirim gabungannya
+#   secara berurutan saat open; ketikan awal tidak boleh hilang hanya karena tunnel belum siap.
 #   SPEC-433 · `complete` = seluruh fase pipeline tercatat (done|skipped) DAN plan spec-nya tak
 #   menyisakan `- [ ]` (gerbang ADR-0029 yang sama dengan stageForRun). Ia BUKAN turunan
 #   `exited`: agen adalah TUI interaktif yang kembali ke prompt-nya sesudah fase terakhir, jadi

@@ -89,6 +89,24 @@ describe("terminal routes", () => {
     second.ws.close();
   });
 
+  it("keeps accepting a normal rapid-typing burst beyond 120 input frames", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    const id = await createSession();
+    const c = connect(id);
+    await c.opened;
+    let closed: { code: number; reason: string } | undefined;
+    c.ws.on("close", (code, reason) => { closed = { code, reason: reason.toString() }; });
+
+    for (let i = 0; i < 120; i += 1) c.ws.send(JSON.stringify({ t: "in", d: "a" }));
+    c.ws.send(JSON.stringify({ t: "in", d: "\nBURST-INPUT-OK\n" }));
+
+    await waitFor(() => c.data().includes("BURST-INPUT-OK") || closed !== undefined, 1_500);
+    expect({ marker: c.data().includes("BURST-INPUT-OK"), closed })
+      .toEqual({ marker: true, closed: undefined });
+    expect(c.ws.readyState).toBe(WebSocket.OPEN);
+    c.ws.close();
+  });
+
   it("accepts a resize without killing the session", async () => {
     process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
     const id = await createSession();
