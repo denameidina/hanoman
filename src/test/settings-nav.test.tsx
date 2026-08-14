@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { SettingsScreen } from "../src/screens/SettingsScreen";
 import { api } from "../src/api/client";
+import { mockViewport, resetViewport } from "./viewport";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -15,14 +16,35 @@ vi.mock("../src/api/client", () => ({
 }));
 
 beforeEach(() => {
+  localStorage.clear();
   (api.getSettings as any).mockResolvedValue({ model: "claude-opus-5", effort: "xhigh", autoDefault: true, autoScaffold: true, notifyFail: true, notifyDone: true, notifySound: "short", goal: { enabled: false, condition: "" } });   // SPEC-332 · blok goal selalu ada (zod default)
   (api.listUsers as any).mockResolvedValue([{ id: "u1", email: "a@b.c", createdAt: new Date().toISOString() }]);
   (api.putSettings as any).mockResolvedValue({});
 });
+afterEach(resetViewport);
 
 const me = { id: "u1", email: "a@b.c" } as any;
 
 describe("SettingsScreen sidebar", () => {
+  it("offers every settings section through a mobile picker without changing persisted tab state", async () => {
+    mockViewport(390);
+    render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
+    const picker = await screen.findByRole("combobox", { name: "Bagian pengaturan" });
+    expect(Array.from((picker as HTMLSelectElement).options).map((option) => option.text))
+      .toEqual(expect.arrayContaining(["Akun", "Users", "Akses klien", "Konfigurasi", "Webhook", "Model sesi", "Sesi"]));
+    fireEvent.change(picker, { target: { value: "model" } });
+    const effort = await screen.findByLabelText("Effort claude");
+    expect(effort).toBeInTheDocument();
+    expect(effort.closest(".hn-setting-row")?.querySelector(".hn-setting-control")).toBeInTheDocument();
+    expect(document.querySelector(".hn-settings-layout")).toHaveAttribute("data-layout", "mobile");
+    expect(JSON.parse(localStorage.getItem("hn.ui.v1.settings.tab")!)).toBe("model");
+  });
+  it("uses the compact settings rail at the tablet breakpoint", async () => {
+    mockViewport(768);
+    render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
+    await screen.findByText("Ganti password");
+    expect(document.querySelector(".hn-settings-layout")).toHaveStyle({ gridTemplateColumns: "160px minmax(0, 1fr)" });
+  });
   it("mulai di Akun (form ganti password) lalu pindah tab lewat sidebar", async () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
     // default tab = Akun

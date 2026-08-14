@@ -76,15 +76,16 @@ function Door({ icon, title, hint, onClick }:
   { icon: string; title: string; hint: string; onClick: () => void }) {
   return (
     <Card padding={0}>
-      <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12,
-        padding: "14px 16px", cursor: "pointer" }}>
+      <button type="button" onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12,
+        width: "100%", padding: "14px 16px", cursor: "pointer", textAlign: "left",
+        border: "none", background: "transparent", color: "inherit" }}>
         <Icon name={icon} size={16} color="var(--text-muted)" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{title}</div>
           <div style={{ fontSize: 11.5, color: "var(--text-subtle)", marginTop: 2 }}>{hint}</div>
         </div>
         <Icon name="chevron-right" size={14} color="var(--text-subtle)" />
-      </div>
+      </button>
     </Card>
   );
 }
@@ -102,9 +103,9 @@ export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onG
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <Card>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+        <div className="hn-stack-mobile" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="hn-wrap-mobile" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Icon name="box" size={15} color="var(--text-muted)" />
               <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600,
                 color: "var(--text-strong)" }}>{p.name}</span>
@@ -113,13 +114,13 @@ export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onG
             </div>
             <div style={{ fontSize: 12.5, color: "var(--text-subtle)", marginTop: 6 }}>{p.desc}</div>
           </div>
-          <div style={{ display: "flex", gap: 8, flex: "0 0 auto" }}>
+          <div className="hn-row-actions" style={{ display: "flex", gap: 8, flex: "0 0 auto" }}>
             <Button size="sm" variant="secondary" leftIcon="pencil" onClick={onEdit}>Edit project</Button>
             <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={onDelete}>Hapus project</Button>
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginTop: 20 }}>
+        <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginTop: 20 }}>
           <Meta label="ID" value={p.id} mono />
           {/* SPEC-217 · path EFEKTIF (binding per-mesin ?? default project). Label menandai override. */}
           <Meta label={p.binding ? "Repo · mesin ini" : "Repo"} value={(p.binding ?? p.repoDir) || "—"} mono />

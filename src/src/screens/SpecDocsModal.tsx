@@ -2,7 +2,7 @@
    (audit/objective/spec/plan/brainstorm). Data dari GET /specs/:id/docs (+ /docs/*);
    sumber freshest-wins (worktree sesi hidup > repoDir) di-resolve server. */
 import React from "react";
-import { Modal, StateBlock, Icon, MarkdownView, DocDownload } from "../ds";
+import { Modal, StateBlock, Icon, MarkdownView, DocDownload, ResponsivePanels } from "../ds";
 import { api, type SpecDoc } from "../api/client";
 
 const KIND_LABEL: Record<string, string> = {
@@ -14,12 +14,13 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
   const [files, setFiles] = React.useState<SpecDoc[] | null>(null);
   const [ixError, setIxError] = React.useState(false);
   const [sel, setSel] = React.useState("");
+  const [panel, setPanel] = React.useState<"files" | "preview">("files");
   // null = fetch gagal (bukan "kosong"), agar error per-berkas bisa dibedakan.
   const [cache, setCache] = React.useState<Record<string, string | null>>({});
 
   React.useEffect(() => {
     let alive = true;
-    setFiles(null); setIxError(false); setSel(""); setCache({});
+    setFiles(null); setIxError(false); setSel(""); setCache({}); setPanel("files");
     api.getSpecDocs(specId).then((r) => {
       if (!alive) return;
       setFiles(r.files);
@@ -58,7 +59,15 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
         : (
           // SPEC-363 · tinggi diwarisi dari panel modal (`fillHeight`), bukan `62vh` — angka
           // tetap itu membuang 18–23% ruang baca di setiap tinggi layar (terukur).
-          <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 16, height: "100%", minHeight: 0 }}>
+          <ResponsivePanels
+            ariaLabel="Panel dokumen backlog"
+            active={panel}
+            onActiveChange={(next) => setPanel(next as "files" | "preview")}
+            masterWidth={240}
+            className="hn-workspace-panels"
+            style={{ height: "100%" }}
+            panels={[
+              { id: "files", label: "Files", className: "hn-panel-flex", content: (
             <div style={{ overflow: "auto", borderRight: "1px solid var(--border-hair)", paddingRight: 8 }}>
               {groups.map((grp) => (
                 <div key={grp.kind} style={{ marginBottom: 10 }}>
@@ -68,7 +77,7 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
                   {grp.items.map((f) => {
                     const on = f.path === sel;
                     return (
-                      <button key={f.path} onClick={() => setSel(f.path)} style={{
+                      <button key={f.path} onClick={() => { setSel(f.path); setPanel("preview"); }} style={{
                         display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 8px",
                         borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", textAlign: "left",
                         background: on ? "var(--brass-100)" : "transparent",
@@ -85,6 +94,8 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
                 </div>
               ))}
             </div>
+              ) },
+              { id: "preview", label: "Preview", className: "hn-panel-flex", content: (
             <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
               {/* SPEC-361 · unduh dokumen yang sedang dibuka sebagai evidence untuk tim */}
               <div style={{ display: "flex", justifyContent: "flex-end", paddingBottom: 6,
@@ -98,7 +109,9 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
                   : <MarkdownView text={cache[sel] ?? ""} name={sel} />}
               </div>
             </div>
-          </div>
+              ) },
+            ]}
+          />
         )}
     </Modal>
   );

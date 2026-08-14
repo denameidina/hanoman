@@ -1,7 +1,7 @@
 /* GitGraph — DAG commit read + aksi (SPEC-182). Lane dihitung computeLanes (nol dep).
    Baris = grid [svg lane | subject | refs | meta]; klik = detail; klik-kanan = context-menu. */
 import React from "react";
-import { Card, Button, StateBlock, Badge, Icon, DocDownload, MarkdownView, isMarkdownPath } from "../ds";
+import { Card, Button, StateBlock, Badge, Icon, DocDownload, MarkdownView, isMarkdownPath, Tabs, LocalOverflow, Modal, useCoarsePointer, useResponsiveTier } from "../ds";
 import { api, type GraphCommit, type CommitDetail, type GitOp, type RepoStatus, type Stash, type ReviewFile } from "../api/client";
 import { computeLanes, rowEdges, type GraphRow, type Edge } from "./git-graph";
 import { buildFileTree, TreeRow } from "./file-tree";
@@ -24,10 +24,10 @@ const rel = (iso: string): string => {
 };
 
 // Segmen edge → path SVG. SPEC-233 · style "rounded" (bezier) atau "angular" (siku) saat pindah lane.
-function edgePath(e: Edge, style: "rounded" | "angular"): string {
+function edgePath(e: Edge, style: "rounded" | "angular", height: number): string {
   const x = (i: number) => LANE_W / 2 + i * LANE_W;
-  const y1 = e.half === "bottom" ? ROW_H / 2 : 0;
-  const y2 = e.half === "top" ? ROW_H / 2 : ROW_H;
+  const y1 = e.half === "bottom" ? height / 2 : 0;
+  const y2 = e.half === "top" ? height / 2 : height;
   const x1 = x(e.fromLane), x2 = x(e.toLane), ym = (y1 + y2) / 2;
   if (x1 === x2) return `M${x1} ${y1}V${y2}`;
   return style === "angular"
@@ -35,26 +35,61 @@ function edgePath(e: Edge, style: "rounded" | "angular"): string {
     : `M${x1} ${y1}C${x1} ${ym},${x2} ${ym},${x2} ${y2}`;
 }
 
-function RowSvg({ row, edges, maxLanes, style, palette }: { row: GraphRow; edges: Edge[]; maxLanes: number; style: "rounded" | "angular"; palette: string[] }) {
+function RowSvg({ row, edges, maxLanes, style, palette, height }: { row: GraphRow; edges: Edge[]; maxLanes: number; style: "rounded" | "angular"; palette: string[]; height: number }) {
   const cx = LANE_W / 2 + row.lane * LANE_W;
   return (
-    <svg width={maxLanes * LANE_W} height={ROW_H} style={{ flex: "0 0 auto" }}>
+    <svg width={maxLanes * LANE_W} height={height} style={{ flex: "0 0 auto" }}>
       {edges.map((e, i) => (
-        <path key={i} d={edgePath(e, style)} fill="none" stroke={laneColor(e.colorLane, palette)} strokeWidth={1.5} />
+        <path key={i} d={edgePath(e, style, height)} fill="none" stroke={laneColor(e.colorLane, palette)} strokeWidth={1.5} />
       ))}
-      <circle cx={cx} cy={ROW_H / 2} r={DOT} fill={laneColor(row.lane, palette)} stroke="var(--surface-card)" strokeWidth={1.5} />
+      <circle cx={cx} cy={height / 2} r={DOT} fill={laneColor(row.lane, palette)} stroke="var(--surface-card)" strokeWidth={1.5} />
     </svg>
   );
 }
 
-function Menu({ x, y, items, onClose }: { x: number; y: number; items: { label: string; run: () => void }[]; onClose: () => void }) {
-  React.useEffect(() => { const h = () => onClose(); window.addEventListener("click", h); return () => window.removeEventListener("click", h); }, [onClose]);
+function Menu({ x, y, items, onClose, returnFocus }: { x: number; y: number; items: { label: string; run: () => void }[]; onClose: () => void; returnFocus?: HTMLElement | null }) {
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const closeRef = React.useRef(onClose);
+  closeRef.current = onClose;
+  React.useLayoutEffect(() => {
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previous = active && active !== document.body ? active : returnFocus;
+    rootRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    return () => previous?.focus();
+  }, []);
+  React.useEffect(() => {
+    const outside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) closeRef.current();
+    };
+    window.addEventListener("pointerdown", outside);
+    return () => window.removeEventListener("pointerdown", outside);
+  }, []);
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    const controls = Array.from(rootRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    const current = Math.max(0, controls.indexOf(document.activeElement as HTMLButtonElement));
+    let next: number | null = null;
+    if (event.key === "Escape") closeRef.current();
+    else if (event.key === "ArrowDown") next = (current + 1) % controls.length;
+    else if (event.key === "ArrowUp") next = (current - 1 + controls.length) % controls.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = controls.length - 1;
+    else return;
+    event.preventDefault();
+    if (next !== null) controls[next]?.focus();
+  };
+  const safe = (name: string) => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+  const safeLeft = safe("--safe-left"), safeRight = safe("--safe-right");
+  const safeTop = safe("--safe-top"), safeBottom = safe("--safe-bottom");
+  const menuHeight = Math.min(360, items.length * 44 + 8, window.innerHeight - safeTop - safeBottom - 16);
+  const left = Math.max(8 + safeLeft, Math.min(x, window.innerWidth - safeRight - 228));
+  const top = Math.max(8 + safeTop, Math.min(y, window.innerHeight - safeBottom - menuHeight - 8));
   return (
-    <div style={{ position: "fixed", left: x, top: y, zIndex: 150, background: "var(--surface-card)",
+    <div ref={rootRef} role="menu" onKeyDown={onKeyDown} style={{ position: "fixed", left, top, zIndex: 150, background: "var(--surface-card)",
       border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", boxShadow: "var(--shadow-pop, 0 6px 24px rgba(0,0,0,.15))",
-      padding: 4, minWidth: 180 }}>
+      padding: 4, minWidth: 180, maxWidth: "calc(100vw - var(--safe-left) - var(--safe-right) - 16px)",
+      maxHeight: "calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px)", overflowY: "auto" }}>
       {items.map((it) => (
-        <button key={it.label} onClick={it.run} style={{ display: "block", width: "100%", textAlign: "left",
+        <button role="menuitem" key={it.label} onClick={() => { it.run(); closeRef.current(); }} style={{ display: "block", width: "100%", textAlign: "left",
           padding: "7px 10px", border: "none", background: "transparent", cursor: "pointer",
           fontFamily: "var(--font-ui)", fontSize: 12.5, color: "var(--text-body)", borderRadius: 4 }}>{it.label}</button>
       ))}
@@ -166,13 +201,16 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
   const moreRef = React.useRef<HTMLDivElement | null>(null);
   const [current, setCurrent] = React.useState("");
   const [detail, setDetail] = React.useState<CommitDetail | null>(null);
-  const [menu, setMenu] = React.useState<{ x: number; y: number; c: GraphCommit } | null>(null);
-  const [tagMenu, setTagMenu] = React.useState<{ x: number; y: number; tag: string } | null>(null);
+  const [panel, setPanel] = React.useState<"graph" | "detail">("graph");
+  const tier = useResponsiveTier();
+  const coarsePointer = useCoarsePointer();
+  const [menu, setMenu] = React.useState<{ x: number; y: number; c: GraphCommit; anchor?: HTMLElement } | null>(null);
+  const [tagMenu, setTagMenu] = React.useState<{ x: number; y: number; tag: string; anchor?: HTMLElement } | null>(null);
   const [status, setStatus] = React.useState<RepoStatus | null>(null);
-  const [uncMenu, setUncMenu] = React.useState<{ x: number; y: number } | null>(null);
+  const [uncMenu, setUncMenu] = React.useState<{ x: number; y: number; anchor?: HTMLElement } | null>(null);
   const [stashes, setStashes] = React.useState<Stash[]>([]);
-  const [stashMenu, setStashMenu] = React.useState<{ x: number; y: number; s: Stash } | null>(null);
-  const [branchMenu, setBranchMenu] = React.useState<{ x: number; y: number; ref: string } | null>(null);
+  const [stashMenu, setStashMenu] = React.useState<{ x: number; y: number; s: Stash; anchor?: HTMLElement } | null>(null);
+  const [branchMenu, setBranchMenu] = React.useState<{ x: number; y: number; ref: string; anchor?: HTMLElement } | null>(null);
   const allRefs = React.useMemo(() => rows.flatMap((r) => r.commit.refs), [rows]);
   // SPEC-233 · detail commit: toggle tree/flat + diff per-file (modal, reuse DiffView).
   const [detailView, setDetailView] = React.useState<"list" | "tree">("list");
@@ -247,10 +285,10 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
   const onRowClick = React.useCallback((e: React.MouseEvent, sha: string) => {
     if (e.metaKey || e.ctrlKey) {
       if (!compareFrom) { setCompareFrom(sha); return; }
-      if (compareFrom !== sha) { api.ideCompare(projectId, compareFrom, sha).then((c) => { setCompare(c); setDetail(null); }).catch(() => {}); }
+      if (compareFrom !== sha) { api.ideCompare(projectId, compareFrom, sha).then((c) => { setCompare(c); setDetail(null); setPanel("detail"); }).catch(() => {}); }
       setCompareFrom(null); return;
     }
-    api.ideCommit(projectId, sha).then(setDetail).catch(() => {});
+    api.ideCommit(projectId, sha).then((next) => { setDetail(next); setPanel("detail"); }).catch(() => {});
   }, [projectId, compareFrom]);
 
   // SPEC-245 · `silent` = live-refresh (poll): jangan flip ke loading/error supaya
@@ -307,7 +345,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
 
   function openMenu(e: React.MouseEvent, c: GraphCommit) {
     e.preventDefault();
-    setMenu({ x: e.clientX, y: e.clientY, c });
+    setMenu({ x: e.clientX, y: e.clientY, c, anchor: e.currentTarget as HTMLElement });
   }
   // SPEC-245 · `() => load()` (bukan `.then(load)`) supaya nilai resolve tak tersalur ke param `silent`.
   async function act(op: GitOp) { setMenu(null); await onRunGit(op).then(() => load()).catch(() => {}); }
@@ -333,8 +371,20 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
   if (state === "error") return <StateBlock kind="error" title="Gagal memuat git graph" action={load} />;
   if (rows.length === 0) return <StateBlock kind="empty" icon="git-commit" title="Belum ada commit" />;
 
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: (detail || compare) ? "1fr 340px" : "1fr", gap: 16, alignItems: "start" }}>
+  const narrow = tier !== "desktop";
+  const graphRowHeight = tier === "mobile" || coarsePointer ? 44 : ROW_H;
+  const hasDetail = !!(detail || compare);
+  return (<>
+    {narrow && hasDetail && (
+      <Tabs aria-label="Panel Git Graph" variant="pill" value={panel} onChange={(next) => setPanel(next as "graph" | "detail")}
+        tabs={[{ value: "graph", label: "Graph" }, { value: "detail", label: "Detail" }]} />
+    )}
+    <div className="hn-git-graph-layout" style={{ display: "grid",
+      gridTemplateColumns: narrow ? "minmax(0, 1fr)" : hasDetail ? "minmax(0, 1fr) 340px" : "minmax(0, 1fr)",
+      gap: 16, alignItems: "start", minWidth: 0 }}>
+      <section data-panel="graph" aria-label="Graph" aria-hidden={narrow && hasDetail && panel !== "graph" ? "true" : "false"}
+        style={{ display: narrow && hasDetail && panel !== "graph" ? "none" : "block", minWidth: 0 }}>
+      <LocalOverflow>
       <Card padding={0}>
         {/* SPEC-233 · find widget (Ctrl/Cmd-F) + center HEAD (Ctrl/Cmd-H) */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border-hair)" }}>
@@ -388,17 +438,21 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           const first = status.unstaged[0] ?? status.untracked[0] ?? status.staged[0];
           return (
             <div onClick={() => { if (first) onOpenFile(first, ""); }}
-              onContextMenu={(e) => { e.preventDefault(); setUncMenu({ x: e.clientX, y: e.clientY }); }}
+              onContextMenu={(e) => { e.preventDefault(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bone-100)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-              style={{ display: "flex", alignItems: "center", gap: 10, height: ROW_H, padding: "0 12px",
+              style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
                 cursor: "pointer", borderBottom: "1px solid var(--border-hair)" }}>
-              <svg width={maxLanes * LANE_W} height={ROW_H} style={{ flex: "0 0 auto" }}>
-                <circle cx={LANE_W / 2} cy={ROW_H / 2} r={DOT} fill="none" stroke={laneColor(0)} strokeWidth={1.5} />
+              <svg width={maxLanes * LANE_W} height={graphRowHeight} style={{ flex: "0 0 auto" }}>
+                <circle cx={LANE_W / 2} cy={graphRowHeight / 2} r={DOT} fill="none" stroke={laneColor(0)} strokeWidth={1.5} />
               </svg>
-              <span style={{ fontSize: 12.5, fontStyle: "italic", color: "var(--text-muted)", flex: 1 }}>
+              <button type="button" onClick={(event) => { event.stopPropagation(); if (first) onOpenFile(first, ""); }}
+                style={{ border: 0, padding: 0, background: "transparent", textAlign: "left", cursor: first ? "pointer" : "default",
+                  fontSize: 12.5, fontStyle: "italic", color: "var(--text-muted)", flex: 1 }}>
                 Uncommitted changes · {n} file
-              </span>
+              </button>
+              <button type="button" className="hn-graph-action" aria-label="Aksi working tree"
+                onClick={(e) => { e.stopPropagation(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}>⋮</button>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", flex: "0 0 auto", width: 88, textAlign: "right" }}>working tree</span>
               <span style={{ width: 40, flex: "0 0 auto" }} />
             </div>
@@ -409,13 +463,13 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "6px 12px", borderBottom: "1px solid var(--border-hair)" }}>
             <span className="hn-eyebrow" style={{ marginRight: 4 }}>stash</span>
             {stashes.map((s) => (
-              <span key={s.ref} title={s.message}
-                onClick={(e) => { e.stopPropagation(); setStashMenu({ x: e.clientX, y: e.clientY, s }); }}
-                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setStashMenu({ x: e.clientX, y: e.clientY, s }); }}
-                style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "2px 8px", borderRadius: 999,
+              <button type="button" key={s.ref} title={s.message} aria-label={`Aksi ${s.ref}`}
+                onClick={(e) => { e.stopPropagation(); setStashMenu({ x: e.clientX, y: e.clientY, s, anchor: e.currentTarget }); }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setStashMenu({ x: e.clientX, y: e.clientY, s, anchor: e.currentTarget }); }}
+                style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "2px 8px", borderRadius: 999, border: "none",
                   cursor: "pointer", background: "var(--ink-100, #e7e6e1)", color: "var(--text-muted)", flex: "0 0 auto" }}>
                 {s.ref}: {s.message.length > 40 ? s.message.slice(0, 40) + "…" : s.message}
-              </span>
+              </button>
             ))}
           </div>
         )}
@@ -433,28 +487,37 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
               title={compareFrom ? "Ctrl/Cmd-klik untuk bandingkan dengan commit pertama" : "Ctrl/Cmd-klik untuk mulai compare"}
               onMouseEnter={(e) => { if (!sel && !activeHit) e.currentTarget.style.background = "var(--bone-100)"; }}
               onMouseLeave={(e) => { if (!sel && !activeHit) e.currentTarget.style.background = hit ? "var(--bone-100)" : "transparent"; }}
-              style={{ display: "flex", alignItems: "center", gap: 10, height: ROW_H, padding: "0 12px",
+              style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
                 cursor: "pointer", borderBottom: "1px solid var(--border-hair)",
                 background: rowBg }}>
-              <RowSvg row={r} edges={allEdges[i] ?? []} maxLanes={maxLanes} style={style} palette={palette} />
+              <RowSvg row={r} edges={allEdges[i] ?? []} maxLanes={maxLanes} style={style} palette={palette} height={graphRowHeight} />
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
                 {c.refs.map((ref) => (
-                  <span key={ref} title="branch — klik-kanan untuk aksi"
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref }); }}
-                    style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px", cursor: "context-menu",
+                  <button type="button" key={ref} title="branch — pilih untuk aksi"
+                    aria-label={`Aksi branch ${ref}`}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
+                    style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px", cursor: "pointer", border: "none",
                     borderRadius: 999, background: isHead && ref === current ? "var(--brass-500)" : "var(--brass-100)",
-                    color: isHead && ref === current ? "#fff" : "var(--brass-700)", flex: "0 0 auto" }}>{ref}</span>
+                    color: isHead && ref === current ? "#fff" : "var(--brass-700)", flex: "0 0 auto" }}>{ref}</button>
                 ))}
                 {/* SPEC-233 · tag = pill terpisah (warna leaf, ikon tag); klik-kanan → menu tag */}
                 {c.tags.map((t) => (
-                  <span key={`tag:${t}`} title="tag — klik-kanan untuk aksi"
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t }); }}
-                    style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px 1px 4px", borderRadius: 999,
+                  <button type="button" key={`tag:${t}`} title="tag — pilih untuk aksi" aria-label={`Aksi tag ${t}`}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
+                    style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px 1px 4px", borderRadius: 999, border: "none",
                       display: "inline-flex", alignItems: "center", gap: 3, background: "var(--leaf-100, #e6efe9)",
-                      color: "var(--leaf-600, #3b7a57)", flex: "0 0 auto" }}>⌂{t}</span>
+                      color: "var(--leaf-600, #3b7a57)", flex: "0 0 auto" }}>⌂{t}</button>
                 ))}
-                <span style={{ fontSize: 12.5, color: muted && c.parents.length > 1 ? "var(--text-subtle)" : "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{msgOpts.emoji ? emojify(c.subject) : c.subject}</span>
+                <button type="button" aria-label={`Buka commit ${c.sha}`} onClick={(event) => { event.stopPropagation(); onRowClick(event, c.sha); }}
+                  style={{ minWidth: 0, padding: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left",
+                    fontSize: 12.5, color: muted && c.parents.length > 1 ? "var(--text-subtle)" : "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {msgOpts.emoji ? emojify(c.subject) : c.subject}
+                </button>
               </div>
+              <button type="button" className="hn-graph-action" aria-label={`Aksi commit ${c.sha}`}
+                onClick={(e) => { e.stopPropagation(); openMenu(e, c); }}>⋮</button>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)",
                 flex: "0 0 auto", width: 88, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{c.author}</span>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)",
@@ -479,15 +542,19 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           )}
         </div>
       </Card>
+      </LocalOverflow>
+      </section>
 
       {detail && (
+        <section data-panel="detail" aria-label="Detail" aria-hidden={narrow && panel !== "detail" ? "true" : "false"}
+          style={{ display: narrow && panel !== "detail" ? "none" : "block", minWidth: 0 }}>
         <Card padding={16}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
             <span className="hn-eyebrow">commit {detail.sha.slice(0, 8)}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               {detail.signed && <Badge tone="ok" size="sm">signed</Badge>}
               <Button size="sm" variant="ghost" leftIcon="copy" onClick={() => void navigator.clipboard?.writeText(detail.sha)}>Hash</Button>
-              <Button size="sm" variant="ghost" leftIcon="x" onClick={() => setDetail(null)}>Tutup</Button>
+              <Button size="sm" variant="ghost" leftIcon="x" onClick={() => { setDetail(null); setPanel("graph"); }}>Tutup</Button>
             </div>
           </div>
           <div style={{ fontSize: 13, color: "var(--text-strong)", fontWeight: 600, marginBottom: 4 }}>{msgOpts.emoji ? emojify(detail.subject) : detail.subject}</div>
@@ -523,13 +590,16 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
               </div>
             ))}
         </Card>
+        </section>
       )}
 
       {compare && (
+        <section data-panel="detail" aria-label="Detail" aria-hidden={narrow && panel !== "detail" ? "true" : "false"}
+          style={{ display: narrow && panel !== "detail" ? "none" : "block", minWidth: 0 }}>
         <Card padding={16}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
             <span className="hn-eyebrow">compare {compare.from.slice(0, 7)} … {compare.to.slice(0, 7)}</span>
-            <Button size="sm" variant="ghost" leftIcon="x" onClick={() => setCompare(null)}>Tutup</Button>
+            <Button size="sm" variant="ghost" leftIcon="x" onClick={() => { setCompare(null); setPanel("graph"); }}>Tutup</Button>
           </div>
           <div className="hn-eyebrow" style={{ marginBottom: 6 }}>{compare.changed.length} file berbeda</div>
           {compare.changed.length === 0 && <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>Tak ada perbedaan.</div>}
@@ -542,10 +612,11 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             </div>
           ))}
         </Card>
+        </section>
       )}
 
       {compareFrom && (
-        <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 140,
+        <div style={{ position: "fixed", bottom: "max(16px, var(--safe-bottom))", left: "50%", transform: "translateX(-50%)", zIndex: 140,
           background: "var(--brass-500)", color: "#fff", padding: "6px 14px", borderRadius: 999, fontSize: 12.5,
           boxShadow: "var(--shadow-pop, 0 6px 24px rgba(0,0,0,.15))", display: "flex", alignItems: "center", gap: 10 }}>
           Compare dari {compareFrom.slice(0, 7)} — Ctrl/Cmd-klik commit kedua
@@ -553,45 +624,35 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
         </div>
       )}
 
-      {menu && <Menu x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={menuItems(menu.c, current, act, mergeAct, rebaseAct, dropAct)} />}
-      {tagMenu && <Menu x={tagMenu.x} y={tagMenu.y} onClose={() => setTagMenu(null)} items={[
+      {menu && <Menu x={menu.x} y={menu.y} returnFocus={menu.anchor} onClose={() => setMenu(null)} items={menuItems(menu.c, current, act, mergeAct, rebaseAct, dropAct)} />}
+      {tagMenu && <Menu x={tagMenu.x} y={tagMenu.y} returnFocus={tagMenu.anchor} onClose={() => setTagMenu(null)} items={[
         { label: `Hapus tag ${tagMenu.tag} (local)`, run: () => { setTagMenu(null); void act({ op: "delete-tag", name: tagMenu.tag }); } },
         { label: `Hapus tag ${tagMenu.tag} (local + origin)`, run: () => { setTagMenu(null); void act({ op: "delete-tag", name: tagMenu.tag, remote: true }); } },
         { label: "Push tag ke origin", run: () => { setTagMenu(null); void act({ op: "push-tag", name: tagMenu.tag }); } },
         { label: "Copy nama tag", run: () => { setTagMenu(null); void navigator.clipboard?.writeText(tagMenu.tag); } },
       ]} />}
-      {uncMenu && <Menu x={uncMenu.x} y={uncMenu.y} onClose={() => setUncMenu(null)} items={[
+      {uncMenu && <Menu x={uncMenu.x} y={uncMenu.y} returnFocus={uncMenu.anchor} onClose={() => setUncMenu(null)} items={[
         // SPEC-233 · aksi baris uncommitted. reset --hard & clean ireversibel → gate force via act.
         { label: "Stash perubahan…", run: () => { setUncMenu(null); const m = window.prompt("Pesan stash (opsional):") || undefined; void act({ op: "stash", message: m, includeUntracked: true }); } },
         { label: "Reset working tree (mixed — unstage)", run: () => { setUncMenu(null); void act({ op: "reset-worktree", mode: "mixed" }); } },
         { label: "Reset working tree (hard — buang semua)", run: () => { setUncMenu(null); void act({ op: "reset-worktree", mode: "hard" }); } },
         { label: "Clean untracked", run: () => { setUncMenu(null); void act({ op: "clean", directories: true }); } },
       ]} />}
-      {stashMenu && <Menu x={stashMenu.x} y={stashMenu.y} onClose={() => setStashMenu(null)} items={[
+      {stashMenu && <Menu x={stashMenu.x} y={stashMenu.y} returnFocus={stashMenu.anchor} onClose={() => setStashMenu(null)} items={[
         { label: "Apply (jaga stash)", run: () => { const s = stashMenu.s; setStashMenu(null); void act({ op: "stash-apply", ref: s.ref }); } },
         { label: "Pop (apply + buang)", run: () => { const s = stashMenu.s; setStashMenu(null); void act({ op: "stash-pop", ref: s.ref }); } },
         { label: "Drop (buang stash)", run: () => { const s = stashMenu.s; setStashMenu(null); void act({ op: "stash-drop", ref: s.ref }); } },
         { label: "Buat branch dari stash…", run: () => { const s = stashMenu.s; setStashMenu(null); const name = window.prompt("Nama branch baru:"); if (name) void act({ op: "stash-branch", ref: s.ref, name }); } },
         { label: "Copy nama stash", run: () => { const s = stashMenu.s; setStashMenu(null); void navigator.clipboard?.writeText(s.ref); } },
       ]} />}
-      {branchMenu && <Menu x={branchMenu.x} y={branchMenu.y} onClose={() => setBranchMenu(null)}
+      {branchMenu && <Menu x={branchMenu.x} y={branchMenu.y} returnFocus={branchMenu.anchor} onClose={() => setBranchMenu(null)}
         items={branchMenuItems(branchMenu.ref, current, allRefs, act, mergeAct, rebaseAct, pullAct, prAct, archiveAct)} />}
 
       {/* SPEC-233 · modal diff satu file di commit (reuse DiffView), tab Diff|Source */}
       {fileDiff && (
-        <div onClick={() => setFileDiff(null)} style={{ position: "fixed", inset: 0, zIndex: 160, background: "rgba(0,0,0,.35)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          {/* SPEC-393 · `fill` meneruskan rantai flex ke pembungkus anak `Card` juga; dengan
-              `style` saja pembungkus itu tetap `display: block` dan badan modal menggantung
-              setinggi isinya lalu terpotong `maxHeight: 86vh` + `overflow: hidden`.
-              `flex: 0 1 auto` mengembalikan default yang ditimpa `fill`: overlay ini flex
-              ber-arah BARIS, jadi `flex-grow: 1` bawaan `fill` melebarkan panel mengisi layar
-              (terukur 900 → 1464 px). Di Docs/IDE hal ini tak terjadi — kartunya grid item. */}
-          <Card padding={0} fill onClick={(e: React.MouseEvent) => e.stopPropagation()} style={{ width: "min(900px, 92vw)", maxHeight: "86vh", flex: "0 1 auto" }}>
-            <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-hair)" }}>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {fileDiff.path} <span style={{ color: "var(--text-subtle)" }}>@ {fileDiff.sha.slice(0, 8)}</span>
-              </span>
+        <Modal open title={`Diff ${fileDiff.path}`} eyebrow={`@ ${fileDiff.sha.slice(0, 8)}`} width={900} fillHeight onClose={() => setFileDiff(null)}>
+          <div className="hn-panel-flex" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 12, paddingBottom: 10, borderBottom: "1px solid var(--border-hair)" }}>
               <div style={{ display: "flex", gap: 2, background: "var(--bone-100)", borderRadius: "var(--radius-pill)", padding: 2 }}>
                 {(isMarkdownPath(fileDiff.path)
                   ? (["diff", "source", "preview"] as const)
@@ -609,7 +670,6 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                   ? api.ideCompareFileDownloadUrl(projectId, fileDiff.from, fileDiff.sha, fileDiff.path, f)
                   : api.ideCommitFileDownloadUrl(projectId, fileDiff.sha, fileDiff.path, f))} />
               )}
-              <Button size="sm" variant="ghost" leftIcon="x" onClick={() => setFileDiff(null)}>Tutup</Button>
             </div>
             <div data-testid="gitgraph-file-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", padding: "10px 0" }}>
               {!fileDiff.data ? <StateBlock kind="loading" title="Memuat diff…" hint={fileDiff.path} />
@@ -622,9 +682,9 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                 : <pre style={{ margin: 0, padding: "0 16px", fontFamily: "var(--font-mono)", fontSize: 12.5, lineHeight: 1.6,
                     whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--text-body)" }}>{fileDiff.data.content ?? "(kosong / dihapus)"}</pre>}
             </div>
-          </Card>
-        </div>
+          </div>
+        </Modal>
       )}
     </div>
-  );
+  </>);
 }

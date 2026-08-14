@@ -522,7 +522,7 @@ function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, running
   }) {
   const [docs, setDocs] = React.useState(false);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <div className="hn-row-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
       {/* SPEC-171 · review all files + file changed dari worktree. Berguna kapan pun
           worktree ada, jadi tampil di semua stage. */}
       {onOpenReview && (
@@ -584,7 +584,7 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
       </div>
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border-hair)" }}>
         <StageBar stage={spec.stage} />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12 }}>
+        <div className="hn-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12 }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{spec.author}</span>
           <SpecActions spec={spec} onStart={onStart} onDelete={onDelete} onOpenRun={onOpenRun} onOpenReview={onOpenReview} running={running} />
         </div>
@@ -602,7 +602,7 @@ function SpecRow({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetai
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
   return (
-    <div style={{
+    <div className="hn-backlog-row" style={{
       display: "flex", alignItems: "center", gap: 14, padding: "12px 16px",
       borderBottom: "1px solid var(--border-hair)", background: "var(--surface-card)"
     }}>
@@ -724,7 +724,7 @@ function Board({ specs, activeSpecs, onStart, onOpenRun, onOpenReview, onOpenDet
   return (
     /* Baris kolom menggulir mendatar; tiap KOLOM menggulir tegak sendiri, jadi judul
        kolom tak pernah tergulir keluar dan kolom terpanjang tak menyeret yang lain. */
-    <div style={{
+    <div data-testid="backlog-board" className="hn-board-local-overflow" style={{
       flex: "1 1 auto", minHeight: 0, display: "flex", gap: 10,
       overflowX: "auto", overflowY: "hidden", alignItems: "stretch", paddingBottom: 4
     }}>
@@ -873,9 +873,9 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   const sp = serverPage(data.total, page, pageSize);
   return (
     <div style={LIST_SCREEN_STYLE}>
-      <div style={{ ...FIXED_ROW_STYLE, marginBottom: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <Tabs variant="pill" value={tab} onChange={setTab} tabs={[
+      <div className="hn-backlog-controls" role="region" aria-label="Kontrol backlog" style={{ ...FIXED_ROW_STYLE, marginBottom: 18 }}>
+        <div className="hn-backlog-topline" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <Tabs aria-label="Sumber backlog" variant="pill" value={tab} onChange={setTab} tabs={[
             { value: "all", label: "Semua spec" }, { value: "brief", label: "Dari brief" },
             { value: "qa", label: "Dari QA" }, { value: "audit", label: "Audit" },
             // SPEC-521 · ADR-0089 · backlog goal punya alur sendiri (dua fase, tanpa perencanaan),
@@ -886,7 +886,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             // sendiri — tanpa tab ini item Help Center hanya muncul tercampur di "Semua spec".
             { value: "help", label: "Help Center" },
           ]} />
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="hn-backlog-view-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Tabs variant="pill" value={view} onChange={setView} tabs={VIEWS} aria-label="Mode tampilan" />
             <SyncButton onDone={() => setSyncNonce((n) => n + 1)} onToast={onToast ?? (() => {})} />
             <ResetViewButton screen="backlog" active={activeFilters} onReset={resetView} />
@@ -894,10 +894,10 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
           </div>
         </div>
         {/* SPEC-178 · baris penyaring: search + project + stage + prioritas. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div className="hn-backlog-filters" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <Input size="sm" leftIcon="search" placeholder="mis. invoice atau SPEC-412" aria-label="Cari backlog"
             value={q} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)} style={{ flex: "1 1 220px" }} />
-          <Select size="sm" value={proj} onChange={(e) => setProj(e.target.value)}
+          <Select size="sm" aria-label="Filter project" value={proj} onChange={(e) => setProj(e.target.value)}
             options={[{ value: "all", label: "Semua project" }].concat(projOptions.map((p) => ({ value: p.id, label: p.name })))} />
           <Select size="sm" aria-label="Filter stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}
             options={[{ value: "all", label: "Semua stage" }].concat(B_STAGES.map((s) => ({ value: s.key, label: s.label })))} />
@@ -936,7 +936,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
         <>
           {view === "list" ? (
             // overflowX, bukan `overflow` — `overflow: hidden` akan menimpa overflowY dari spread.
-            <div ref={listRef} data-testid="backlog-scroll" style={{
+            <div ref={listRef} data-testid="backlog-scroll" className="hn-backlog-list" style={{
               ...LIST_SCROLL_STYLE, border: "1px solid var(--border-hair)",
               borderRadius: "var(--radius-lg)", overflowX: "hidden"
             }}>
@@ -945,7 +945,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
                 onOpenReview={onOpenReview} onOpenDetail={(x) => setDetailId(x.id)} />)}
             </div>
           ) : (
-            <div ref={listRef} data-testid="backlog-scroll" style={{
+            <div ref={listRef} data-testid="backlog-scroll" className="hn-backlog-grid" style={{
               ...LIST_SCROLL_STYLE, display: "grid", gap: 12,
               gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))"
             }}>

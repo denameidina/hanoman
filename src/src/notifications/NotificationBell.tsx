@@ -2,6 +2,7 @@ import React from "react";
 import { Icon } from "../ds/icon";
 import { useNotifications } from "./NotificationsContext";
 import { NotificationsArchiveModal } from "./NotificationsArchiveModal";
+import { usePopoverFocus } from "../ds/popover";
 
 function timeAgo(iso: string): string {
   const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
@@ -16,6 +17,7 @@ export function NotificationBell() {
   const [open, setOpen] = React.useState(false);
   const [archive, setArchive] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
+  const popover = usePopoverFocus(open, () => setOpen(false), "menu");
 
   React.useEffect(() => {
     if (!open) return;
@@ -32,7 +34,7 @@ export function NotificationBell() {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button aria-label="Notifikasi" onClick={toggle} style={{
+      <button ref={popover.triggerRef} aria-label="Notifikasi" aria-haspopup="menu" aria-controls={popover.panelId} aria-expanded={open} onClick={toggle} style={{
         position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center",
         width: 34, height: 34, border: "none", background: open ? "var(--bone-200)" : "transparent",
         borderRadius: "var(--radius-sm)", cursor: "pointer", color: "var(--text-muted)",
@@ -48,7 +50,7 @@ export function NotificationBell() {
         )}
       </button>
       {open && (
-        <div role="menu" style={{
+        <div ref={popover.panelRef} id={popover.panelId} role="menu" tabIndex={-1} onKeyDown={popover.onKeyDown} className="hn-viewport-popover" style={{
           position: "absolute", top: 40, right: 0, width: 320, maxHeight: 420, overflowY: "auto",
           background: "var(--surface-card)", border: "1px solid var(--border-hair)",
           borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-xl)", zIndex: 200, padding: 6,
@@ -56,7 +58,7 @@ export function NotificationBell() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px 6px" }}>
             <span style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 600, color: "var(--text-strong)" }}>Notifikasi</span>
             {items.length > 0 && (
-              <button onClick={clear} style={{ border: "none", background: "transparent", cursor: "pointer",
+              <button role="menuitem" onClick={clear} style={{ border: "none", background: "transparent", cursor: "pointer",
                 color: "var(--text-subtle)", fontSize: 12, fontFamily: "var(--font-ui)" }}>Bersihkan</button>
             )}
           </div>
@@ -85,7 +87,7 @@ export function NotificationBell() {
                 </div>
               </div>
               {onOpen && (
-                <button onClick={() => { onOpen(n); setOpen(false); }} style={{
+                <button role="menuitem" onClick={() => { onOpen(n); setOpen(false); }} style={{
                   flex: "0 0 auto", border: "none", background: "transparent", cursor: "pointer",
                   color: ticket ? "var(--brass-600)" : decision ? "var(--amber-600)" : "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-ui)", whiteSpace: "nowrap" }}>
                   {openLabel}
@@ -97,12 +99,12 @@ export function NotificationBell() {
           })}
           {items.length > 0 && (
             <div style={{ display: "flex", marginTop: 4, borderTop: "1px solid var(--border-hair)" }}>
-              <button onClick={markAllRead} style={{ flex: 1, padding: "8px", border: "none",
+              <button role="menuitem" onClick={markAllRead} style={{ flex: 1, padding: "8px", border: "none",
                 background: "transparent", cursor: "pointer",
                 color: "var(--text-muted)", fontSize: 12.5, fontFamily: "var(--font-ui)" }}>Tandai semua dibaca</button>
               {/* SPEC-523 · bell menampilkan 50 teratas. Tanpa angka ini, 50 terbaca sebagai
                   "semuanya" — persis salah baca yang melahirkan backlog ini. */}
-              <button onClick={() => { setArchive(true); setOpen(false); }} style={{ flex: 1, padding: "8px", border: "none",
+              <button role="menuitem" onClick={() => { setArchive(true); setOpen(false); }} style={{ flex: 1, padding: "8px", border: "none",
                 borderLeft: "1px solid var(--border-hair)", background: "transparent", cursor: "pointer",
                 color: "var(--brass-600)", fontSize: 12.5, fontFamily: "var(--font-ui)" }}>
                 Lihat semua{total > items.length ? ` (${total})` : ""}

@@ -2,7 +2,7 @@
    to the API: tree+coverage from GET /docs, file bodies from GET/PUT
    /docs/*path (server-persisted, replacing the prototype's localStorage). */
 import React from "react";
-import { Card, StatusPill, Badge, Button, ProgressBar, Icon, StateBlock, MarkdownView, DocDownload } from "../ds";
+import { Card, StatusPill, Badge, Button, ProgressBar, Icon, StateBlock, MarkdownView, DocDownload, ResponsivePanels } from "../ds";
 import { api } from "../api/client";
 import { usePersistedState, scoped, isStr } from "../ui-state";
 
@@ -102,6 +102,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
   // null = fetch-nya gagal (bukan "isi kosong"), supaya error state bisa dibedakan.
   const [cache, setCache] = React.useState<Record<string, string | null>>({});
   const [mode, setMode] = React.useState<"preview" | "edit">("preview");
+  const [panel, setPanel] = React.useState<"tree" | "viewer">("tree");
   const [draft, setDraft] = React.useState("");
   const [scanning, setScanning] = React.useState(false);
   const [ixStatus, setIxStatus] = React.useState<"loading" | "ready" | "error">("loading");
@@ -153,7 +154,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
     setCache((c) => ({ ...c, [selected]: draft }));
     setMode("preview");
   }
-  function selectFile(k: string) { setSelected(k); setMode("preview"); }
+  function selectFile(k: string) { setSelected(k); setMode("preview"); setPanel("viewer"); }
 
   async function reloadIndex() {
     const ix = await api.getDocs(projectId);
@@ -185,8 +186,14 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
     // (bukan `height`, SPEK-351), jadi item ber-basis-auto memakai tinggi ISI-nya dan justru
     // menumbuhkan halaman — terukur pane 6000 px + halaman ikut menggulir. Basis 0 membuat
     // tinggi container pasti lebih dulu, lalu item mengisi sisanya.
-    <div style={{ display: "grid", gridTemplateColumns: "288px 1fr", gap: 20, alignItems: "stretch",
-      flex: "1 1 0", minHeight: 0 }}>
+    <ResponsivePanels
+      ariaLabel="Panel Docs"
+      active={panel}
+      onActiveChange={(next) => setPanel(next as "tree" | "viewer")}
+      masterWidth={288}
+      className="hn-workspace-panels"
+      panels={[
+        { id: "tree", label: "Files", className: "hn-panel-flex", content: (
       <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0, overflow: "auto" }}>
         <Card padding={0}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border-hair)" }}>
@@ -224,11 +231,11 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
           <ProgressBar value={coverage} showLabel label="Kategori ter-index" tone={covTone} />
         </Card>
       </div>
+        ) },
 
-      {/* SPEC-393 · `fill`, BUKAN `style`: `Card` menyisipkan satu pembungkus <div> di sekitar
-          `children` yang `display: block` kecuali `fill` dipasang. Rantai flex lewat `style`
-          hanya mengenai div terluar, jadi pembungkus itu memutusnya — pane tumbuh setinggi isi
-          lalu terpotong `overflow: hidden` milik kartu, tanpa scroller mana pun. */}
+        { id: "viewer", label: "Dokumen", className: "hn-panel-flex", content: (
+      /* SPEC-393 · `fill` menyambungkan rantai flex melewati pembungkus internal Card, sehingga
+         viewer memakai scroller lokal dan tidak menumbuhkan halaman. */
       <Card padding={0} fill>
         <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border-hair)", flexWrap: "wrap" }}>
           <Icon name="file-text" size={15} color="var(--text-muted)" />
@@ -263,7 +270,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
               : <MarkdownView text={current} name={selected} />}
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", flex: "1 1 auto", minHeight: 0 }}>
+          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", flex: "1 1 auto", minHeight: 0 }}>
             <div style={{ display: "flex", flexDirection: "column", borderRight: "1px solid var(--border-hair)", minHeight: 0 }}>
               <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--border-hair)", background: "var(--bone-100)" }}>
                 <span className="hn-eyebrow">Markdown</span>
@@ -286,6 +293,8 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
           </div>
         )}
       </Card>
-    </div>
+        ) },
+      ]}
+    />
   );
 }

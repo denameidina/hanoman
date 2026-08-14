@@ -3,6 +3,8 @@
 import React from "react";
 import { Icon } from "./icon";
 
+const modalStack: symbol[] = [];
+
 export type ToastData = { message: React.ReactNode; tone?: string; icon?: string; k: number };
 export type ShowToast = (message: React.ReactNode, tone?: string, icon?: string) => void;
 
@@ -25,12 +27,13 @@ export function Toast({ toast }: { toast: ToastData | null }) {
   const icon = toast.icon || (tone === "err" ? "x-circle" : tone === "warn" ? "alert-triangle"
     : tone === "info" ? "info" : "check-circle-2");
   return (
-    <div key={toast.k} style={{
-      position: "fixed", left: "50%", bottom: 28, transform: "translateX(-50%)", zIndex: 200,
+    <div key={toast.k} className="hn-toast" role="status" aria-live="polite" style={{
+      position: "fixed", left: "50%", bottom: "calc(28px + var(--safe-bottom))", transform: "translateX(-50%)", zIndex: 200,
       display: "flex", alignItems: "center", gap: 10, padding: "11px 16px",
       background: "var(--surface-inverse)", color: "var(--term-fg)",
       borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-xl)",
-      fontFamily: "var(--font-sans)", fontSize: 13.5, maxWidth: 460,
+      fontFamily: "var(--font-sans)", fontSize: 13.5,
+      maxWidth: "min(460px, calc(100vw - var(--safe-left) - var(--safe-right) - 28px))",
       animation: "hn-toast-in 220ms var(--ease-out, ease-out)",
     }}>
       <Icon name={icon} size={16} color={color} />
@@ -43,32 +46,83 @@ export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560
   { open: boolean; title?: React.ReactNode; eyebrow?: React.ReactNode; icon?: string;
     onClose?: () => void; footer?: React.ReactNode; width?: number; closeOnEscape?: boolean;
     fillHeight?: boolean; children?: React.ReactNode }) {
-  // SPEC-232 · Escape adalah tombol tersibuk di TUI Claude Code; modal yang memuat terminal
-  // mengoper closeOnEscape={false} supaya Escape tetap milik terminal (keluar via × / backdrop).
-  React.useEffect(() => {
-    if (!open || !closeOnEscape) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose && onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, closeOnEscape]);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const stackId = React.useRef(Symbol("modal"));
+  const titleId = React.useId();
+  const closeRef = React.useRef(onClose);
+  closeRef.current = onClose;
+
+  React.useLayoutEffect(() => {
+    if (!open || !panelRef.current) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = panelRef.current;
+    const id = stackId.current;
+    modalStack.push(id);
+    const controls = () => Array.from(panel.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ));
+    const initial = panel.querySelector<HTMLElement>("[autofocus]")
+      ?? panel.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled]), select:not([disabled])')
+      ?? panel.querySelector<HTMLElement>('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])');
+    initial?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (modalStack.at(-1) !== id) return;
+      if (event.key === "Escape" && closeOnEscape) {
+        event.preventDefault();
+        closeRef.current?.();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = controls();
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        panel.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      const index = modalStack.lastIndexOf(id);
+      if (index >= 0) modalStack.splice(index, 1);
+      previous?.focus();
+    };
+  }, [closeOnEscape, open]);
+
   if (!open) return null;
   return (
-    <div onMouseDown={(e) => { if (e.target === e.currentTarget) onClose && onClose(); }} style={{
+    <div className="hn-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose && onClose(); }} style={{
       position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center",
-      background: "color-mix(in srgb, var(--ink-900) 42%, transparent)", padding: 24,
+      background: "color-mix(in srgb, var(--ink-900) 42%, transparent)",
       animation: "hn-fade-in 160ms ease-out",
     }}>
       {/* SPEC-363 · `fillHeight` untuk modal yang MEMBACA dokumen: tanpa tinggi pasti di panel,
           isinya cuma bisa memakai tinggi tetap (dulu `62vh`) dan membuang 18–23% ruang di tiap
           layar. Opt-in supaya 20-an modal lain tetap setinggi isinya. */}
-      <div data-testid="modal-panel" style={{
-        width, maxWidth: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column",
-        ...(fillHeight ? { height: "88vh" } : null),
+      <div
+        ref={panelRef}
+        data-testid="modal-panel"
+        className="hn-modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        tabIndex={-1}
+        style={{
+        width, maxWidth: "100%", maxHeight: "calc(100dvh - 48px - var(--safe-top) - var(--safe-bottom))", display: "flex", flexDirection: "column",
+        ...(fillHeight ? { height: "min(88vh, calc(100dvh - 48px - var(--safe-top) - var(--safe-bottom)))" } : null),
         background: "var(--surface-card)", borderRadius: "var(--radius-lg)",
         border: "1px solid var(--border-hair)", boxShadow: "var(--shadow-xl)", overflow: "hidden",
         animation: "hn-modal-in 200ms var(--ease-out, ease-out)",
       }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "18px 20px 14px", borderBottom: "1px solid var(--border-hair)" }}>
+        <div className="hn-modal-header" style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "18px 20px 14px", borderBottom: "1px solid var(--border-hair)" }}>
           {icon && (
             <span style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", flex: "0 0 auto",
               background: "var(--brass-100)", color: "var(--brass-700)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -77,17 +131,18 @@ export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             {eyebrow && <div className="hn-eyebrow" style={{ marginBottom: 3 }}>{eyebrow}</div>}
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-strong)", lineHeight: 1.15 }}>{title}</div>
+            <div id={titleId} style={{ fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-strong)", lineHeight: 1.15 }}>{title}</div>
           </div>
           <button onClick={onClose} aria-label="Tutup" style={{
             border: "none", background: "transparent", cursor: "pointer", color: "var(--text-muted)",
-            padding: 4, borderRadius: "var(--radius-sm)", display: "inline-flex",
+            width: 44, height: 44, alignItems: "center", justifyContent: "center",
+            padding: 0, borderRadius: "var(--radius-sm)", display: "inline-flex", flex: "0 0 auto",
           }}><Icon name="x" size={18} /></button>
         </div>
-        <div data-testid="modal-body" style={{ padding: "18px 20px", overflow: "auto",
+        <div data-testid="modal-body" className="hn-modal-body" style={{ padding: "18px 20px", overflow: "auto",
           ...(fillHeight ? { flex: "1 1 auto", minHeight: 0 } : null) }}>{children}</div>
         {footer && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10,
+          <div className="hn-modal-footer" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10,
             padding: "14px 20px", borderTop: "1px solid var(--border-hair)", background: "var(--bone-100)" }}>
             {footer}
           </div>
@@ -158,7 +213,7 @@ function PagerBtn({ children, onClick, disabled, active, aria }:
   { children?: React.ReactNode; onClick?: () => void; disabled?: boolean; active?: boolean; aria?: string }) {
   const [hover, setHover] = React.useState(false);
   return (
-    <button onClick={disabled ? undefined : onClick} disabled={disabled} aria-label={aria}
+    <button className="hn-touch-target" onClick={disabled ? undefined : onClick} disabled={disabled} aria-label={aria}
       aria-current={active ? "page" : undefined}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{

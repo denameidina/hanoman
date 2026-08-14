@@ -54,7 +54,7 @@ function VpsModal({ open, title, submitLabel, initial, onClose, onSubmit }:
       <Field label="Nama"><Input value={f.name} onChange={set("name")} placeholder="mis. web-1" style={{ width: "100%" }} /></Field>
       <Field label="Host" hint="hostname atau IP — tanpa user@">
         <Input value={f.host} onChange={set("host")} mono placeholder="203.0.113.10" style={{ width: "100%" }} /></Field>
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+      <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
         <Field label="User SSH" hint="root atau user ber-passwordless-sudo">
           <Input value={f.user} onChange={set("user")} mono placeholder="deploy" style={{ width: "100%" }} /></Field>
         <Field label="Port"><Input value={f.port} onChange={set("port")} mono placeholder="22" style={{ width: "100%" }} /></Field>
@@ -166,15 +166,20 @@ export function VpsScreen({ onToast, onGotoTerminal }:
         {list.map((v) => {
           const h = HARDENED_PILL[hardenedLabel(v)];
           return (
-            <div key={v.id} onClick={() => setDetailVps(v)}
+            <div key={v.id} className="hn-vps-row"
+              onClick={() => setDetailVps(v)}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", cursor: "pointer",
                 border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", marginBottom: 8 }}>
-              <Icon name="server" size={16} color="var(--brass-700)" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{v.name}</div>
-                <div style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--text-subtle)" }}>
-                  {v.user}@{v.host}{v.port !== 22 ? `:${v.port}` : ""}</div>
-              </div>
+              <button type="button" aria-label={`Buka detail ${v.name}`}
+                onClick={(event) => { event.stopPropagation(); setDetailVps(v); }}
+                style={{ all: "unset", display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}>
+                <Icon name="server" size={16} color="var(--brass-700)" />
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 13, fontWeight: 600 }}>{v.name}</span>
+                  <span style={{ display: "block", fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--text-subtle)" }}>
+                    {v.user}@{v.host}{v.port !== 22 ? `:${v.port}` : ""}</span>
+                </span>
+              </button>
               <StatusPill size="sm" status={isReachable(v) ? "ok" : "broken"}>
                 {isReachable(v) ? "reachable" : "unreachable"}</StatusPill>
               <StatusPill size="sm" status={h.status}>{h.label}</StatusPill>

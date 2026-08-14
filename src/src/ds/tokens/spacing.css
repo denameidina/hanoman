@@ -36,4 +36,27 @@
   --content-max: 1200px;
   --sidebar-w:   248px;
   --topbar-h:    56px;
+  --page-gutter-x: 28px;
+  --page-gutter-y: 24px;
+  --touch-target: 44px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  :root {
+    --sidebar-w: 72px;
+    --page-gutter-x: 20px;
+    --page-gutter-y: 20px;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --sidebar-w: 0px;
+    --page-gutter-x: 14px;
+    --page-gutter-y: 14px;
+  }
 }

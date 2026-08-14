@@ -157,7 +157,7 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
       </Card>
 
       <Card eyebrow="amplop" title="Anatomi amplop">
-        <div style={{ overflowX: "auto" }}>
+        <div className="hn-local-overflow" style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <tbody>
               {ENVELOPE_FIELDS.map(([k, v]) => (
@@ -216,7 +216,7 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
           hanoman. Pengiriman gagal diulang sampai <b>{WEBHOOK_MAX_ATTEMPTS} percobaan</b> dengan
           jeda berikut:
         </div>
-        <div style={{ overflowX: "auto", marginTop: 8 }}>
+        <div className="hn-local-overflow" style={{ overflowX: "auto", marginTop: 8 }}>
           <table style={{ borderCollapse: "collapse", fontSize: 12.5 }}>
             <tbody>
               <tr>

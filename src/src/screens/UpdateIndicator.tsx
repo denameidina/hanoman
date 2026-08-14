@@ -4,6 +4,7 @@ import {
   useUpdate, updateHeadline, updateBadgeLabel, updateVersionLine,
   applyUpdate, applyConfirmMessage, type ApplyOutcome,
 } from "../api/update";
+import { usePopoverFocus } from "../ds/popover";
 
 // Badge topbar — muncul HANYA saat updateAvailable (up-to-date: tanpa noise). Klik → popover berisi
 // versi baru + perintah update (Salin).
@@ -32,6 +33,7 @@ export function UpdateBadge() {
   const [open, setOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [phase, setPhase] = React.useState<Phase>({ t: "idle" });
+  const popover = usePopoverFocus(open, () => setOpen(false), "dialog");
   if (!u.updateAvailable) return null;
   const copy = () => {
     try { void navigator.clipboard?.writeText(u.command); setCopied(true); setTimeout(() => setCopied(false), 1500); }
@@ -46,7 +48,7 @@ export function UpdateBadge() {
   };
   return (
     <div style={{ position: "relative" }}>
-      <button onClick={() => setOpen((v) => !v)} title="Update tersedia"
+      <button ref={popover.triggerRef} onClick={() => setOpen((v) => !v)} aria-haspopup="dialog" aria-controls={popover.panelId} aria-expanded={open} title="Update tersedia"
         style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
           borderRadius: "var(--radius-pill, 999px)", border: "1px solid var(--brass-300, var(--border-hair))",
           background: "var(--brass-100)", color: "var(--brass-700)", cursor: "pointer",
@@ -55,7 +57,8 @@ export function UpdateBadge() {
         {updateBadgeLabel(u)}
       </button>
       {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40, width: 320,
+        <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label="Update tersedia" tabIndex={-1}
+          onKeyDown={popover.onKeyDown} className="hn-viewport-popover" style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40, width: 320,
           background: "var(--surface-card)", border: "1px solid var(--border-hair)",
           borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pop, 0 8px 24px rgba(0,0,0,.12))", padding: 14 }}>
           <div className="hn-eyebrow" style={{ marginBottom: 8 }}>Update tersedia</div>

@@ -22,7 +22,7 @@ export function Card({ children, title, eyebrow, actions, footer, elevation = "r
       cursor: interactive ? "pointer" : "default", overflow: "hidden",
       ...(fill ? { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: 0 } : null), ...style },
   }, rest),
-    hasHeader && React.createElement("div", {
+    hasHeader && React.createElement("div", { className: "hn-card-header",
       style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12,
         padding: `${padding}px ${padding}px ${title && children ? 0 : padding}px` },
     },
@@ -32,7 +32,7 @@ export function Card({ children, title, eyebrow, actions, footer, elevation = "r
             letterSpacing: "var(--tracking-caps)", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5 } }, eyebrow),
         title && React.createElement("div", { style: { fontFamily: "var(--font-display)", fontSize: "var(--text-xl)",
           fontWeight: "var(--weight-semibold)", letterSpacing: "var(--tracking-tight)", color: "var(--text-strong)", lineHeight: 1.2 } }, title)),
-      actions && React.createElement("div", { style: { flex: "0 0 auto" } }, actions)),
+      actions && React.createElement("div", { className: "hn-card-actions", style: { flex: "0 0 auto" } }, actions)),
     children && React.createElement("div", { style: { padding: hasHeader ? `12px ${padding}px ${padding}px` : padding,
       ...(fill ? { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: 0 } : null) } }, children),
     footer && React.createElement("div", { style: { padding: `12px ${padding}px`, borderTop: "1px solid var(--border-hair)",

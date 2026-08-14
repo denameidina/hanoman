@@ -50,6 +50,10 @@ describe("LimitBadge", () => {
     fireEvent.click(btn);
     expect(screen.getByText("Limit Claude")).toBeTruthy();    // popover terbuka
     expect(screen.getByText(/Mingguan/)).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Limit Claude" })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Limit Claude" }), { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Limit Claude" })).not.toBeInTheDocument();
+    expect(btn).toHaveFocus();
   });
   it("shows an em dash when unavailable", () => {
     hookDto = { status: "unavailable", windows: [], fetchedAt: null };

@@ -5,6 +5,7 @@ import type { LimitsDTO, CodexLimitsDTO } from "@hanoman/shared";
 import { ProgressBar } from "../ds/components/feedback";
 import { useLimits, worstWindow, severityToken, severityTone } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
+import { usePopoverFocus } from "../ds/popover";
 
 // Tanggal+jam absolut reset (waktu lokal browser, id-ID). Weekly reset berhari-hari ke depan —
 // countdown saja tak cukup; tampilkan momen persisnya. SPEC-205.
@@ -67,13 +68,19 @@ export function LimitBadge() {
   const dto = useLimits();
   const worst = worstWindow(dto.windows);
   const [open, setOpen] = React.useState(false);
+  const popover = usePopoverFocus(open, () => setOpen(false), "dialog");
   const label = dto.status === "unavailable" || !worst ? "—" : `${worst.usedPct}%`;
   const tok = worst ? severityToken(worst.severity) : { fg: "var(--text-muted)", bg: "var(--bone-200)" };
   const dim = dto.status === "stale" ? 0.6 : 1;
   return (
     <div style={{ position: "relative" }}>
       <button
+        ref={popover.triggerRef}
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={popover.panelId}
+        aria-label="Limit Claude"
         title="Limit Claude"
         style={{
           display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
@@ -86,7 +93,8 @@ export function LimitBadge() {
         {label}
       </button>
       {open && (
-        <div style={{
+        <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label="Limit Claude" tabIndex={-1}
+          onKeyDown={popover.onKeyDown} className="hn-viewport-popover" style={{
           position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40, width: 280,
           background: "var(--surface-card)", border: "1px solid var(--border-hair)",
           borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pop, 0 8px 24px rgba(0,0,0,.12))",
@@ -111,12 +119,18 @@ export function CodexLimitBadge() {
   const dto = useCodexLimits();
   const worst = worstWindow(dto.windows);
   const [open, setOpen] = React.useState(false);
+  const popover = usePopoverFocus(open, () => setOpen(false), "dialog");
   if (dto.status === "unavailable" || !worst) return null;
   const tok = severityToken(worst.severity);
   return (
     <div style={{ position: "relative" }}>
       <button
+        ref={popover.triggerRef}
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={popover.panelId}
+        aria-label="Limit Codex"
         title="Limit Codex"
         style={{
           display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
@@ -130,7 +144,8 @@ export function CodexLimitBadge() {
         {worst.usedPct}%
       </button>
       {open && (
-        <div style={{
+        <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label="Limit Codex" tabIndex={-1}
+          onKeyDown={popover.onKeyDown} className="hn-viewport-popover" style={{
           position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40, width: 280,
           background: "var(--surface-card)", border: "1px solid var(--border-hair)",
           borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pop, 0 8px 24px rgba(0,0,0,.12))",

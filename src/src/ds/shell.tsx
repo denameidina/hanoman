@@ -8,6 +8,7 @@ import { NotificationBell } from "../notifications/NotificationBell";
 import { LimitBadge, CodexLimitBadge } from "../screens/LimitIndicator";
 import { UpdateBadge } from "../screens/UpdateIndicator";
 import { AccountMenu } from "../auth/AccountMenu";
+import { useResponsiveTier } from "./responsive";
 // Dari `../ui-state/hooks`, BUKAN barrel `../ui-state`: barrel itu memuat ResetViewButton
 // yang mengimpor komponen DS, dan lewat sana `ds → shell → ui-state → ds` jadi lingkaran impor.
 import { useScrollRestore } from "../ui-state/hooks";
@@ -66,14 +67,19 @@ function HnSidebarItem({ item, active, onNavigate }: { item: NavItem; active?: s
   const [hover, setHover] = React.useState(false);
   const interactive = !!onNavigate;
   return (
-    <div
+    <button
+      type="button"
       onClick={interactive ? () => onNavigate!(item.key) : undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      aria-current={on ? "page" : undefined}
+      aria-label={item.label}
+      title={item.label}
       style={{
         display: "flex", alignItems: "center", gap: 10, width: "100%",
-        padding: "8px 10px", cursor: interactive ? "pointer" : "default",
+        minHeight: 44, padding: "8px 10px", cursor: interactive ? "pointer" : "default",
         borderRadius: "var(--radius-sm)", textAlign: "left",
+        border: "none",
         background: on ? "var(--brass-100)" : (hover && interactive ? "var(--bone-200)" : "transparent"),
         color: on ? "var(--brass-700)" : "var(--text-body)",
         fontFamily: "var(--font-ui)", fontSize: "var(--text-md)",
@@ -82,8 +88,8 @@ function HnSidebarItem({ item, active, onNavigate }: { item: NavItem; active?: s
       }}
     >
       <Icon name={item.icon} size={17} color={on ? "var(--accent-hover)" : "var(--text-muted)"} />
-      {item.label}
-    </div>
+      <span className="hn-nav-label">{item.label}</span>
+    </button>
   );
 }
 
@@ -95,36 +101,104 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
   // termasuk yang belum ada — ikut dapat perilakunya tanpa menyentuh kodenya. Kunci per
   // `active` supaya posisi Backlog tak terbawa ke Triase.
   const mainRef = useScrollRestore(`page@${active ?? "-"}`, "scroll");
-  return (
-    <div style={{ display: "flex", height: "100%", minHeight: 0, background: "var(--surface-page)", color: "var(--text-body)" }}>
-      {/* Sidebar */}
-      <aside style={{
-        width: "var(--sidebar-w)", flex: "0 0 auto", display: "flex", flexDirection: "column",
-        borderRight: "1px solid var(--border-hair)", background: "var(--bone-100)",
-        padding: "18px 14px",
-      }}>
-        <div style={{ padding: "2px 4px 20px" }}><HnWordmark /></div>
+  const tier = useResponsiveTier();
+  const mobile = tier === "mobile";
+  const [navOpen, setNavOpen] = React.useState(false);
+  const navRef = React.useRef<HTMLElement>(null);
+  const toggleRef = React.useRef<HTMLButtonElement>(null);
+  const columnRef = React.useRef<HTMLDivElement>(null);
+  const restoreNavFocus = React.useRef(false);
 
-        <div className="hn-eyebrow" style={{ padding: "0 10px 8px" }}>Workspace</div>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {HN_NAV.map((n) => <HnSidebarItem key={n.key} item={n} active={active} onNavigate={onNavigate} />)}
+  const closeNavigation = React.useCallback((restoreFocus = true) => {
+    restoreNavFocus.current = restoreFocus;
+    setNavOpen(false);
+  }, []);
+
+  React.useLayoutEffect(() => {
+    navRef.current?.toggleAttribute("inert", mobile && !navOpen);
+    columnRef.current?.toggleAttribute("inert", mobile && navOpen);
+  }, [mobile, navOpen]);
+
+  React.useLayoutEffect(() => {
+    if (!mobile || !navOpen) return;
+    navRef.current?.querySelector<HTMLButtonElement>("button:not([disabled])")?.focus();
+  }, [mobile, navOpen]);
+
+  React.useLayoutEffect(() => {
+    if (navOpen || !restoreNavFocus.current) return;
+    restoreNavFocus.current = false;
+    toggleRef.current?.focus();
+  }, [navOpen]);
+
+  React.useEffect(() => {
+    if (!mobile || !navOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeNavigation();
+        return;
+      }
+      if (event.key !== "Tab" || !navRef.current) return;
+      const controls = Array.from(navRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeNavigation, mobile, navOpen]);
+
+  React.useEffect(() => {
+    if (!mobile) setNavOpen(false);
+  }, [mobile]);
+
+  return (
+    <div className="hn-shell" data-layout={tier} data-nav-open={navOpen ? "true" : "false"}>
+      {mobile && navOpen && (
+        <button className="hn-shell-backdrop" type="button" aria-label="Tutup navigasi" onClick={() => closeNavigation()} />
+      )}
+      <aside ref={navRef} id="hn-primary-navigation" className="hn-shell-sidebar" aria-hidden={mobile && !navOpen ? "true" : undefined}>
+        <div className="hn-shell-wordmark"><HnWordmark /></div>
+
+        <div className="hn-eyebrow hn-shell-workspace">Workspace</div>
+        <nav className="hn-shell-nav" aria-label="Navigasi utama">
+          {HN_NAV.map((n) => (
+            <HnSidebarItem
+              key={n.key}
+              item={n}
+              active={active}
+              onNavigate={onNavigate ? (key) => {
+                onNavigate(key);
+                if (mobile) closeNavigation();
+              } : undefined}
+            />
+          ))}
         </nav>
       </aside>
 
-      {/* Main column */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        {/* Topbar */}
-        <header style={{
-          height: "var(--topbar-h)", flex: "0 0 auto", display: "flex", alignItems: "center",
-          gap: 16, padding: "0 22px", borderBottom: "1px solid var(--border-hair)",
-          background: "color-mix(in srgb, var(--bone-100) 80%, transparent)",
-          backdropFilter: "blur(8px)",
-          // backdropFilter bikin stacking context: tanpa ini popover Notifikasi/Limit terjebak
-          // di konteks header dan tertimpa konten <main>. z 90: di atas isi halaman, di bawah
-          // overlay terminal fullscreen (100), Modal (150), Toast (200).
-          position: "relative", zIndex: 90,
-        }}>
-          <div style={{ minWidth: 0 }}>
+      <div ref={columnRef} className="hn-shell-column" aria-hidden={mobile && navOpen ? "true" : undefined}>
+        <header className="hn-shell-topbar">
+          <button
+            ref={toggleRef}
+            className="hn-shell-menu"
+            type="button"
+            aria-label="Buka navigasi"
+            aria-controls="hn-primary-navigation"
+            aria-expanded={navOpen}
+            onClick={() => setNavOpen(true)}
+          >
+            <Icon name="menu" size={20} />
+          </button>
+          <div className="hn-shell-heading">
             {breadcrumb && (
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", marginBottom: 1 }}>
                 {breadcrumb}
@@ -137,25 +211,20 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
               {title}
             </div>
           </div>
-          <div style={{ flex: 1 }} />
-          {showSearch && (
-            <Input placeholder="mis. hanoman atau erp" leftIcon="search" size="sm" style={{ width: 220 }}
-              value={searchValue}
-              onChange={onSearchChange ? (e: React.ChangeEvent<HTMLInputElement>) => onSearchChange(e.target.value) : undefined}
-              readOnly={!onSearchChange} />
-          )}
-          {/* Muncul hanya saat ada versi baru; self-fetch via useUpdate (SPEC-214). */}
-          <UpdateBadge />
-          <NotificationBell />
-          {/* Selalu tampil di semua layar; self-fetch via useLimits — 9 call-site <Shell> tak berubah. */}
-          <LimitBadge />
-          {/* SPEC-338 · badge limit codex, self-fetch via useCodexLimits. Merender null sampai ada
-              snapshot codex pertama, jadi operator yang hanya memakai claude tak melihat apa pun. */}
-          <CodexLimitBadge />
-          {actions}
-          {/* SPEC-216 · akun + logout, anchor kanan-jauh. Konsumsi AuthContext (default aman:
-              user null → tak merender), jadi 9 call-site <Shell> tetap tanpa prop baru. */}
-          <AccountMenu />
+          <div className="hn-shell-tools">
+            {showSearch && (
+              <Input className="hn-shell-search" placeholder="mis. hanoman atau erp" leftIcon="search" size="sm"
+                value={searchValue}
+                onChange={onSearchChange ? (e: React.ChangeEvent<HTMLInputElement>) => onSearchChange(e.target.value) : undefined}
+                readOnly={!onSearchChange} />
+            )}
+            <UpdateBadge />
+            <NotificationBell />
+            <LimitBadge />
+            <CodexLimitBadge />
+            {actions}
+            <AccountMenu />
+          </div>
         </header>
 
         {/* Content. `minHeight: 100%` (bukan `height`), supaya layar yang isinya lebih
@@ -164,10 +233,8 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             rantai ini dengan LIST_SCREEN_STYLE di root-nya; sisanya berperilaku seperti dulu.
             `border-box` wajib: tanpa itu padding menambah tinggi di atas 100% dan menciptakan
             scrollbar kedua. */}
-        <main ref={mainRef} data-testid="shell-main" style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-          <div style={{ maxWidth: wide ? "none" : "var(--content-max)", margin: "0 auto",
-            padding: "24px 28px 32px", boxSizing: "border-box", minHeight: "100%",
-            display: "flex", flexDirection: "column" }}>
+        <main ref={mainRef} data-testid="shell-main" className="hn-shell-main">
+          <div className="hn-shell-content" style={{ maxWidth: wide ? "none" : "var(--content-max)" }}>
             {children}
           </div>
         </main>

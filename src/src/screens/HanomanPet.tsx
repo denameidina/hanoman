@@ -118,7 +118,7 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   // pet secara struktural tak bisa menutupi kontrol mana pun. `pointerEvents: none` di pembungkus
   // menyerahkan kembali area kosong di sekitarnya ke konten di bawahnya.
   const root: React.CSSProperties = {
-    position: "fixed", right: 22, bottom: 22, zIndex: 80,
+    position: "fixed", right: "max(22px, var(--safe-right))", bottom: "max(22px, var(--safe-bottom))", zIndex: 80,
     display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10,
     pointerEvents: "none",
   };
@@ -127,7 +127,7 @@ export function HanomanPet({ sessions, backlog, onOpen }:
     return (
       <div data-testid="pet-root" style={root}>
         <button aria-label="Tampilkan pet Hanoman" onClick={() => setVisibility(false)} style={{
-          pointerEvents: "auto", width: 28, height: 28, padding: 0, display: "inline-flex",
+          pointerEvents: "auto", width: 44, height: 44, padding: 0, display: "inline-flex",
           alignItems: "center", justifyContent: "center", cursor: "pointer",
           border: "1px solid var(--border-hair)", borderRadius: "var(--radius-pill)",
           background: "var(--surface-card)", opacity: 0.55, boxShadow: "var(--shadow-sm)",
@@ -146,7 +146,10 @@ export function HanomanPet({ sessions, backlog, onOpen }:
           onAnimationEnd={(event) => {
             if (event.animationName === "hn-pet-panel-out" && !open) setPanelMounted(false);
           }} style={{
-          pointerEvents: open ? "auto" : "none", width: 268, padding: 14,
+          pointerEvents: open ? "auto" : "none", width: 268,
+          maxWidth: "calc(100vw - var(--safe-left) - var(--safe-right) - 24px)",
+          maxHeight: "calc(100dvh - var(--safe-top) - var(--safe-bottom) - 120px)",
+          overflowY: "auto", boxSizing: "border-box", padding: 14,
           background: "var(--surface-card)", border: "1px solid var(--border-hair)",
           borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-lg)",
           transformOrigin: "right bottom",
@@ -159,7 +162,7 @@ export function HanomanPet({ sessions, backlog, onOpen }:
             color: "var(--text-strong)", lineHeight: 1.25 }}>{view.headline}</div>
           <div style={{ marginTop: 4, fontFamily: "var(--font-ui)", fontSize: 12.5,
             color: "var(--text-muted)", lineHeight: 1.45 }}>{view.detail}</div>
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
             <Button size="sm" leftIcon={view.target.section === "terminal" ? "terminal" : "list-checks"}
               style={reduced ? { transition: "none", transform: "none" } : undefined}
               onClick={() => { closePanel(); onOpen(view.target); }}>

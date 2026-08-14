@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { IdeScreen } from "../src/screens/IdeScreen";
 import { api, ApiError } from "../src/api/client";
+import { mockViewport, resetViewport } from "./viewport";
 
 const projects = [{ id: "p1", name: "p1", repoDir: "/r", kind: "existing" }] as any;
 
@@ -12,8 +13,18 @@ beforeEach(() => {
   vi.spyOn(api, "ideFile").mockResolvedValue({ path: "README.md", content: "# hi", binary: false, truncated: false });
   vi.spyOn(api, "ideWorkingStatus").mockResolvedValue({ branch: "main", staged: [], unstaged: [] });
 });
+afterEach(resetViewport);
 
 describe("IdeScreen Explorer", () => {
+  it("keeps Files/Viewer mounted and opens the viewer after a mobile file selection", async () => {
+    mockViewport(390);
+    render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await screen.findByRole("tablist", { name: "Panel IDE" });
+    expect(document.querySelector('[data-panel="files"]')).toHaveAttribute("aria-hidden", "false");
+    fireEvent.click(await screen.findByText("README.md"));
+    expect(document.querySelector('[data-panel="viewer"]')).toHaveAttribute("aria-hidden", "false");
+    expect(document.querySelector('[data-panel="files"]')).toBeInTheDocument();
+  });
   it("menampilkan pohon file dari ideTree", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
     expect(await screen.findByText("README.md")).toBeInTheDocument();

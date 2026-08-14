@@ -5,7 +5,7 @@
 import React from "react";
 import {
   Badge, Button, Select, Modal, Field, Input, HnTextarea, StateBlock, MarkdownView, Icon,
-  DocDownload, LIST_SCREEN_STYLE, FIXED_ROW_STYLE,
+  DocDownload, LIST_SCREEN_STYLE, FIXED_ROW_STYLE, ResponsivePanels,
 } from "../ds";
 import { api, type PrdDoc } from "../api/client";
 import { PRD_STATUSES, type BreakdownItem, type PrdStatus } from "@hanoman/shared";
@@ -257,6 +257,7 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
   // SPEC-740 · ADR-0115 · yang disimpan slug-nya saja, bukan dokumennya: storage hanya
   // untuk parameter tampilan.
   const [selSlug, setSelSlug] = usePersistedState<string | null>("prd", "sel", null, nullableStr);
+  const [panel, setPanel] = React.useState<"list" | "detail">("list");
   const sel = React.useMemo(() => items.find((p) => p.slug === selSlug) ?? null, [items, selSlug]);
   const setSel = React.useCallback((p: PrdDoc | null) => setSelSlug(p ? p.slug : null), [setSelSlug]);
   const [creating, setCreating] = React.useState(false);
@@ -288,8 +289,8 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
 
   return (
     <div style={LIST_SCREEN_STYLE}>
-      <div style={{ ...FIXED_ROW_STYLE, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="hn-stack-mobile" style={{ ...FIXED_ROW_STYLE, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+        <div className="hn-wrap-mobile" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Select size="sm" value={projectFilter} aria-label="Project"
             onChange={(e) => onProjectFilter(e.target.value)} options={selOpts} />
           {/* SPEC-520 · memilah mana PRD yang masih perlu ditindaklanjuti tanpa membaca satu per satu. */}
@@ -302,9 +303,15 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
         <Button size="sm" leftIcon="plus"
           onClick={() => setCreating(true)}>PRD baru</Button>
       </div>
-      <div style={{ flex: "1 1 auto", minHeight: 0, display: "flex", gap: 16 }}>
+      <ResponsivePanels
+        ariaLabel="Panel PRD"
+        active={panel}
+        onActiveChange={(next) => setPanel(next as "list" | "detail")}
+        masterWidth={264}
+        panels={[
+          { id: "list", label: "Daftar", className: "hn-panel-flex", content: (
         <aside aria-label="Daftar PRD" style={{
-          flex: "0 0 264px", minHeight: 0, overflowY: "auto",
+          width: "100%", minHeight: 0, overflowY: "auto",
           borderRight: "1px solid var(--border-hair)", paddingRight: 12,
         }}>
           {items.length === 0 ? (
@@ -329,12 +336,14 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
               {g.items.map((p) => (
                 <PrdSidebarItem key={`${p.projectId}:${p.path}`} prd={p}
                   active={sel?.path === p.path && sel?.projectId === p.projectId}
-                  onSelect={() => setSel(p)} />
+                  onSelect={() => { setSel(p); setPanel("detail"); }} />
               ))}
             </div>
           ))}
         </aside>
-        <section style={{ flex: "1 1 auto", minHeight: 0 }}>
+          ) },
+          { id: "detail", label: "Detail", className: "hn-panel-flex", content: (
+        <div style={{ flex: "1 1 auto", minHeight: 0 }}>
           {sel ? (
             <PrdPreviewPane prd={sel} projectId={selProject}
               onTake={(pf) => onTakeToBacklog(pf)}
@@ -343,8 +352,10 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
             <StateBlock kind="empty" icon="scroll-text" title="Pilih PRD"
               hint="Klik dokumen di daftar kiri untuk melihat isinya, lalu take ke backlog." />
           )}
-        </section>
-      </div>
+        </div>
+          ) },
+        ]}
+      />
       {creating && <NewPrdModal projects={projects} defaultProject={activeProject}
         onClose={() => setCreating(false)}
         onCreate={(project, brief) => { setCreating(false); onNewPrd(project, brief); }} />}

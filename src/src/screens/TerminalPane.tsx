@@ -42,13 +42,23 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
-    fit.fit();
+    const visibleRect = () => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 ? rect : null;
+    };
+    if (visibleRect()) fit.fit();
 
     const scheme = location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${scheme}//${location.host}${paths.terminalWs(sessionId)}`);
     const send = (m: unknown) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
 
-    ws.onopen = () => { term.focus(); send({ t: "resize", cols: term.cols, rows: term.rows }); };
+    ws.onopen = () => {
+      if (!visibleRect()) return;
+      const finePointer = typeof window.matchMedia !== "function"
+        || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+      if (finePointer) term.focus();
+      send({ t: "resize", cols: term.cols, rows: term.rows });
+    };
     ws.onmessage = (ev) => {
       const f = JSON.parse(ev.data as string) as {
         t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
@@ -79,7 +89,9 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
       return true;
     });
     const typed = term.onData((d) => send({ t: "in", d }));
-    const ro = new ResizeObserver(() => {
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect ?? el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
       fit.fit();
       send({ t: "resize", cols: term.cols, rows: term.rows });
     });

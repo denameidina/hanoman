@@ -9,6 +9,21 @@ export { useToast, Toast, Modal, Field, HnTextarea, serverPage, Pager, LIST_SCRO
 export type { ToastData, ShowToast } from "./kit";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { Shell, HN_NAV, NAV_KEYS } from "./shell";
+export {
+  DESKTOP_QUERY,
+  LocalOverflow,
+  MOBILE_MAX,
+  MOBILE_QUERY,
+  ResponsivePanels,
+  ResponsiveToolbar,
+  TABLET_MAX,
+  TABLET_QUERY,
+  responsiveTier,
+  useCoarsePointer,
+  useResponsiveTier,
+} from "./responsive";
+export { usePopoverFocus } from "./popover";
+export type { ResponsivePanel, ResponsiveTier } from "./responsive";
 export { MarkdownView, hnDocHtml, isMarkdownPath } from "./markdown";
 export { DocDownload } from "./DocDownload";
 export { DocPreviewModal } from "./DocPreviewModal";

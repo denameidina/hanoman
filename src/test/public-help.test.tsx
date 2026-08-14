@@ -7,6 +7,15 @@ function setPath(p: string) { window.history.pushState({}, "", p); }
 beforeEach(() => { vi.restoreAllMocks(); });
 
 describe("SPEC-253 · PublicHelpApp routing", () => {
+  it("owns a dynamic-viewport vertical scroller on mobile", async () => {
+    setPath("/help/demo");
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ projectName: "Demo", categories: ["bug"] }), { status: 200 }),
+    );
+    render(<PublicHelpApp />);
+    await screen.findByText(/Demo/);
+    expect(screen.getByTestId("public-help-scroll")).toHaveStyle({ height: "100dvh", overflowY: "auto" });
+  });
   it("render form untuk /help/:slug (dari GET info)", async () => {
     setPath("/help/demo");
     vi.spyOn(global, "fetch").mockResolvedValue(

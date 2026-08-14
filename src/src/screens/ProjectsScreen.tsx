@@ -30,7 +30,7 @@ function StatStrip({ projects }: { projects: ProjectVM[] }) {
     { label: "Perlu perhatian", value: attention, dot: "var(--clay-600)" },
   ];
   return (
-    <div style={{
+    <div className="hn-stat-grid" style={{
       display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1,
       background: "var(--border-hair)", border: "1px solid var(--border-hair)",
       borderRadius: "var(--radius-lg)", overflow: "hidden", marginBottom: 20,
@@ -55,6 +55,7 @@ function ProjectRow({ p, onOpen, onDelete }:
   const [hover, setHover] = React.useState(false);
   return (
     <div
+      className="hn-project-row"
       onClick={onOpen ? () => onOpen(p) : undefined}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
@@ -66,18 +67,22 @@ function ProjectRow({ p, onOpen, onDelete }:
         background: hover && onOpen ? "var(--bone-100)" : "transparent",
         transition: "background 120ms ease",
       }}>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <Icon name="box" size={13} color="var(--text-muted)" />
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</span>
-          <Badge tone={p.kind === "from-scratch" ? "brass" : "neutral"} size="sm">{p.kind}</Badge>
-        </div>
-        <div style={{ fontSize: 11.5, color: "var(--text-subtle)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.desc}</div>
+      <div data-label="Project" style={{ minWidth: 0 }}>
+        <button type="button" className="hn-project-open" aria-label={`Buka project ${p.name}`} disabled={!onOpen}
+          onClick={(event) => { event.stopPropagation(); onOpen?.(p); }}
+          style={{ all: "unset", display: "block", width: "100%", cursor: onOpen ? "pointer" : "default" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <Icon name="box" size={13} color="var(--text-muted)" />
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</span>
+            <Badge tone={p.kind === "from-scratch" ? "brass" : "neutral"} size="sm">{p.kind}</Badge>
+          </span>
+          <span style={{ display: "block", fontSize: 11.5, color: "var(--text-subtle)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.desc}</span>
+        </button>
       </div>
-      <div><StatusPill status={p.session.status} size="sm">{running && p.session.phase ? p.session.phase : undefined}</StatusPill></div>
-      <div style={{ paddingRight: 8 }}><ProgressBar value={p.coverage} showLabel tone={hnCovTone(p.docStatus)} size="sm" /></div>
-      <div style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)" }}>{p.backlog} · {p.topStage}</div>
-      <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}>
+      <div data-label="Status"><StatusPill status={p.session.status} size="sm">{running && p.session.phase ? p.session.phase : undefined}</StatusPill></div>
+      <div data-label="Docs · SoT" style={{ paddingRight: 8 }}><ProgressBar value={p.coverage} showLabel tone={hnCovTone(p.docStatus)} size="sm" /></div>
+      <div data-label="Backlog" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)" }}>{p.backlog} · {p.topStage}</div>
+      <div data-label="Aktivitas" style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.activity}</span>
         {onDelete && (
           <span onClick={(e) => { e.stopPropagation(); onDelete(p); }}>
@@ -121,7 +126,7 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
           action={onClearSearch} actionLabel="Hapus pencarian" actionIcon="x" />
       ) : (
         <Card padding={0} fill>
-          <div style={{ ...FIXED_ROW_STYLE, display: "grid", gridTemplateColumns: tmpl, gap: 12, padding: "10px 14px 10px 15px", borderBottom: "1px solid var(--border-hair)" }}>
+          <div className="hn-project-header" style={{ ...FIXED_ROW_STYLE, display: "grid", gridTemplateColumns: tmpl, gap: 12, padding: "10px 14px 10px 15px", borderBottom: "1px solid var(--border-hair)" }}>
             {cols.map((c) => <span key={c} className="hn-eyebrow">{c}</span>)}
           </div>
           <div ref={listRef} data-testid="projects-scroll" style={LIST_SCROLL_STYLE}>

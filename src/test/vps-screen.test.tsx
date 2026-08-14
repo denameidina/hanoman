@@ -42,6 +42,7 @@ describe("VpsScreen (SPEC-164)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
     expect(await screen.findByText("web-1")).toBeTruthy();
     expect(screen.getByText("deploy@203.0.113.10")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Buka detail web-1" })).toBeInTheDocument();
   });
   it("tombol Console memanggil api.vpsConsole lalu pindah ke terminal (SPEC-211)", async () => {
     const onGotoTerminal = vi.fn();

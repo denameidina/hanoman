@@ -3,7 +3,7 @@
 import React from "react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
-import { Card, Button, Select, Icon, StateBlock, Tabs, Badge, DocDownload, DocPreviewModal, isMarkdownPath } from "../ds";
+import { Card, Button, Select, Icon, StateBlock, Tabs, Badge, DocDownload, DocPreviewModal, isMarkdownPath, ResponsivePanels, Modal, Input } from "../ds";
 import { api, ApiError, type RepoFile, type ReviewFile, type WorkingStatus, type GitOp, type Remote } from "../api/client";
 import type { ProjectVM } from "./types";
 import { GitGraph } from "./GitGraph";
@@ -27,21 +27,16 @@ const langOf = (p: string): string => {
 // Dialog "Paksa": muncul saat mutasi git balas 409. Mengulang op dengan force:true.
 function ForceDialog({ msg, onForce, onCancel }: { msg: string; onForce: () => void; onCancel: () => void }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 150, background: "rgba(0,0,0,.35)",
-      display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card padding={20} style={{ maxWidth: 460 }}>
-        <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--text-strong)" }}>Operasi ditolak</div>
+    <Modal open title="Operasi ditolak" onClose={onCancel} width={460} footer={<>
+      <Button size="sm" variant="ghost" onClick={onCancel}>Batal</Button>
+      <Button size="sm" leftIcon="alert-triangle" onClick={onForce}>Paksa</Button>
+    </>}>
         <pre style={{ fontFamily: "var(--font-mono)", fontSize: 12, whiteSpace: "pre-wrap",
           color: "var(--text-muted)", marginBottom: 12 }}>{msg}</pre>
         <div style={{ fontSize: 12.5, color: "var(--clay-600)", marginBottom: 14 }}>
           Paksa bisa membuang perubahan tak ter-commit &amp; mengganggu sesi Claude yang jalan.
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <Button size="sm" variant="ghost" onClick={onCancel}>Batal</Button>
-          <Button size="sm" leftIcon="alert-triangle" onClick={onForce}>Paksa</Button>
-        </div>
-      </Card>
-    </div>
+    </Modal>
   );
 }
 
@@ -52,28 +47,22 @@ function RemotesModal({ projectId, onClose }: { projectId: string; onClose: () =
   const reload = React.useCallback(() => { api.ideRemotes(projectId).then(setRemotes).catch(() => setRemotes([])); }, [projectId]);
   React.useEffect(() => { reload(); }, [reload]);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 160, background: "rgba(0,0,0,.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <Card padding={20} onClick={(e: React.MouseEvent) => e.stopPropagation()} style={{ width: "min(560px, 92vw)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <span className="hn-eyebrow">remotes</span>
-          <Button size="sm" variant="ghost" leftIcon="x" onClick={onClose}>Tutup</Button>
-        </div>
+    <Modal open title="Remotes" onClose={onClose} width={560}>
         {remotes.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text-subtle)", marginBottom: 10 }}>Belum ada remote.</div>}
         {remotes.map((r) => (
-          <div key={r.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--border-hair)" }}>
+          <div key={r.name} className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--border-hair)" }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 600, width: 90 }}>{r.name}</span>
             <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.fetch}</span>
             <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => api.ideDeleteRemote(projectId, r.name).then(setRemotes).catch(() => {})} />
           </div>
         ))}
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="origin" style={{ width: 100, padding: "5px 8px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", fontSize: 12.5 }} />
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/org/repo.git" style={{ flex: 1, padding: "5px 8px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", fontSize: 12.5 }} />
+        <div className="hn-stack-mobile" style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <Input size="sm" value={name} aria-label="Nama remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="origin" style={{ width: 100 }} />
+          <Input size="sm" value={url} aria-label="URL remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)} placeholder="https://github.com/org/repo.git" style={{ flex: 1 }} />
           <Button size="sm" leftIcon="plus" disabled={!name || !url}
             onClick={() => api.ideAddRemote(projectId, name, url).then((rs) => { setRemotes(rs); setName(""); setUrl(""); }).catch(() => {})}>Tambah</Button>
         </div>
-      </Card>
-    </div>
+    </Modal>
   );
 }
 
@@ -109,6 +98,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   // SPEC-385 · ruang baca lebar untuk .md — di mode file toggle SPEC-240 tetap ada (preview
   // sempit di samping tree), di mode diff inilah satu-satunya cara membacanya terender.
   const [preview, setPreview] = React.useState(false);
+  const [panel, setPanel] = React.useState<"files" | "viewer">("files");
 
   const reloadTree = React.useCallback(() => {
     setTreeState("loading");
@@ -140,9 +130,9 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     return () => { alive = false; };
   }, [selected, selKind, projectId, viewRef]);
 
-  const selectFile = (p: string) => { setSelKind("file"); setSelected(p); };
-  const selectStaged = (p: string) => { setSelKind("staged"); setSelected(p); };
-  const selectChanged = (p: string) => { setSelKind("unstaged"); setSelected(p); };
+  const selectFile = (p: string) => { setSelKind("file"); setSelected(p); setPanel("viewer"); };
+  const selectStaged = (p: string) => { setSelKind("staged"); setSelected(p); setPanel("viewer"); };
+  const selectChanged = (p: string) => { setSelKind("unstaged"); setSelected(p); setPanel("viewer"); };
 
   // Semua ref: local + origin (prefix "origin/") untuk dilihat/checkout.
   const refOptions = [
@@ -251,12 +241,14 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
       </div>
 
       {tab === "explorer" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20, alignItems: "stretch",
-          flex: "1 1 auto", minHeight: 0 }}>
-          {/* SPEC-393 · `fill`, BUKAN `style`: `Card` menyisipkan satu pembungkus <div> di sekitar
-              `children` yang `display: block` kecuali `fill` dipasang. Rantai flex lewat `style`
-              hanya mengenai div terluar, jadi pembungkus itu memutusnya — pane tumbuh setinggi isi
-              lalu terpotong `overflow: hidden` milik kartu, tanpa scroller mana pun. */}
+        <ResponsivePanels
+          ariaLabel="Panel IDE"
+          active={panel}
+          onActiveChange={(next) => setPanel(next as "files" | "viewer")}
+          masterWidth={300}
+          panels={[
+            { id: "files", label: "Files", className: "hn-panel-flex", content: (
+          /* `fill` menjaga rantai flex Card agar pohon memakai scroller lokal. */
           <Card padding={0} fill>
             <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--border-hair)" }}>
               <span className="hn-eyebrow" style={{ flex: 1 }}>changes{status?.branch ? ` · ${status.branch}` : ""}</span>
@@ -281,6 +273,8 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                   ))}
             </div>
           </Card>
+            ) },
+            { id: "viewer", label: "Viewer", className: "hn-panel-flex", content: (
           <Card padding={0} fill>
             <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-hair)", flexWrap: "wrap" }}>
               <Icon name="file-text" size={15} color="var(--text-muted)" />
@@ -365,7 +359,9 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                           </pre>)}
             </div>
           </Card>
-        </div>
+            ) },
+          ]}
+        />
       ) : tab === "graph" ? (
         <GitGraph projectId={projectId} onRunGit={runGit} onMerge={mergeGraph}
           onRebase={(onto) => graphIsolated("rebase", onto)} onPull={(src) => graphIsolated("pull", src)} onDrop={(sha) => graphIsolated("drop", sha)}

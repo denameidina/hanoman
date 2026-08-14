@@ -142,7 +142,7 @@ export function ChangelogScreen({ p, onToast, initialChangelogId }:
       {selected && (
         <Card eyebrow={`rilis · ${MODE_LABEL[selected.mode] ?? selected.mode}`} title={selected.title}
           actions={
-            <div style={{ display: "flex", gap: 6 }}>
+            <div className="hn-row-actions" style={{ display: "flex", gap: 6 }}>
               <Button size="sm" variant="ghost" leftIcon="copy" onClick={() => {
                 void navigator.clipboard?.writeText(selected.body); onToast("Changelog disalin", "ok", "copy");
               }}>Salin</Button>
