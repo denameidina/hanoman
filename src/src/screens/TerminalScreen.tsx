@@ -233,7 +233,7 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
       ? { position: "fixed", inset: 0, zIndex: 100, background: "var(--surface-page)",
           paddingTop: "max(12px, var(--safe-top))", paddingRight: "max(12px, var(--safe-right))",
           paddingBottom: "max(12px, var(--safe-bottom))", paddingLeft: "max(12px, var(--safe-left))" }
-      : { height: "calc(100dvh - 180px)" }),
+      : { flex: "1 1 0", minHeight: 640 }),
   };
 
   return (

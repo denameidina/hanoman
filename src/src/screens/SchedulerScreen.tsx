@@ -41,7 +41,7 @@ export type SchedulerScreenProps = {
   projects: ProjectVM[]; backlog: Spec[];
   onProjectChanged: (id: string) => void | Promise<void>;
   onToast: (msg: string, kind?: string, icon?: string) => void;
-  onGotoTerminal: () => void;
+  onGotoTerminal: (sessionId: string) => void;
 };
 
 function titleFor(specId: string, backlog: Spec[]): string {
@@ -112,7 +112,7 @@ function CanceledRow({ q, backlog, onRequeue, busy }:
   );
 }
 
-function SessionRow({ s, backlog, onGotoTerminal }: { s: SchedulerSessionView; backlog: Spec[]; onGotoTerminal: () => void }) {
+function SessionRow({ s, backlog, onGotoTerminal }: { s: SchedulerSessionView; backlog: Spec[]; onGotoTerminal: (sessionId: string) => void }) {
   return (
     <RowShell>
       <span style={{ flex: 1, minWidth: 0 }}>
@@ -120,7 +120,7 @@ function SessionRow({ s, backlog, onGotoTerminal }: { s: SchedulerSessionView; b
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>{s.projectId}{s.flow ? ` · ${s.flow}` : ""}</span>
       </span>
       {s.decision && <Badge tone="warn" icon="bell" size="sm">menunggu keputusan</Badge>}
-      <Button size="sm" variant="ghost" leftIcon="terminal" onClick={onGotoTerminal}>Buka terminal</Button>
+      <Button size="sm" variant="ghost" leftIcon="terminal" onClick={() => onGotoTerminal(s.id)}>Buka terminal</Button>
     </RowShell>
   );
 }

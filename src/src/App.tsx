@@ -671,6 +671,10 @@ export default function App() {
   const [projectFilter, setProjectFilter] = usePersistedState("app", "projectFilter", "all", isStr);
   // SPEC-184 · sesi yang harus difokuskan di Terminal setelah klik aksi notifikasi.
   const [focusSession, setFocusSession] = React.useState<string | null>(null);
+  const openTerminal = React.useCallback((sessionId?: string | null) => {
+    setFocusSession(sessionId ?? null);
+    setSection("terminal");
+  }, [setSection]);
   // Kotak pencarian di topbar hanya dipakai layar Projects — kuncinya ikut layar itu,
   // meski state-nya hidup di App.
   const [search, setSearch] = usePersistedState("projects", "q", "", isStr);
@@ -854,7 +858,7 @@ export default function App() {
       if (auto) {
         try {
           const { id } = await api.scaffoldDocs(created.id);
-          setProjectId(created.id); setSection("terminal");
+          setProjectId(created.id); openTerminal(id);
           showToast(`Project ${created.id} dibuat · scaffold docs · sesi ${id} dimulai`, "ok", "sparkles");
           return;
         } catch { /* jatuh ke layar project di bawah */ }
@@ -899,7 +903,7 @@ export default function App() {
     try {
       const r = await api.integrateSpec(spec.id, op, target);
       if (r.status === "conflict") {
-        setSection("terminal");
+        openTerminal(r.sessionId);
         showToast(`${spec.id} · konflik ${op} — selesaikan di Terminal`, "warn", "git-merge");
       } else {
         showToast(`${spec.id} · ${op} berhasil · ${r.detail}`, "ok", "git-merge");
@@ -915,7 +919,7 @@ export default function App() {
     try {
       const r = await api.sessionIntegrate(session.id, op, target);
       if (r.status === "conflict") {
-        setSection("terminal");
+        openTerminal(r.sessionId);
         showToast(`${session.id} · konflik ${op} — selesaikan di Terminal`, "warn", "git-merge");
       } else {
         showToast(`${session.id} · ${op} berhasil · ${r.detail}`, "ok", "git-merge");
@@ -931,7 +935,7 @@ export default function App() {
   async function reverseDocs(p: ProjectVM) {
     try {
       const { id } = await api.reverseDocs(p.id);
-      setSection("terminal");
+      openTerminal(id);
       showToast(p.id + " · reverse docs · sesi " + id + " dimulai", "info", "radar");
     } catch (e) {
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
@@ -943,7 +947,7 @@ export default function App() {
   async function scaffoldDocs(p: ProjectVM) {
     try {
       const { id } = await api.scaffoldDocs(p.id);
-      setSection("terminal");
+      openTerminal(id);
       showToast(p.id + " · scaffold docs · sesi " + id + " dimulai", "info", "sparkles");
     } catch (e) {
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
@@ -957,7 +961,7 @@ export default function App() {
                           opts?: { branchFrom?: string; fromAudit?: string }) {
     try {
       const { id } = await api.startPrd(project, brief, opts);
-      setSection("terminal");
+      openTerminal(id);
       showToast(`PRD · sesi ${id} dimulai`, "info", "scroll-text");
     } catch (e) {
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
@@ -970,7 +974,7 @@ export default function App() {
   async function startBreakdown(project: string, prdPath: string) {
     try {
       const { id } = await api.startBreakdown(project, prdPath);
-      setSection("terminal");
+      openTerminal(id);
       showToast(`Breakdown · sesi ${id} dimulai`, "info", "split");
     } catch (e) {
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
@@ -1190,7 +1194,7 @@ export default function App() {
           ? <ProjectDetailScreen p={proj} onEdit={() => setModal("project-edit")} onToast={showToast}
               onProjectChanged={refreshProject}
               onGotoDocs={() => setSection("docs")}
-              onGotoTerminal={() => { setProjectFilter(proj.id); setSection("terminal"); }}
+              onGotoTerminal={() => { setProjectFilter(proj.id); openTerminal(); }}
               onGotoBacklog={() => { setProjectFilter(proj.id); setSection("backlog"); }}
               onGotoChangelog={() => setSection("changelog")}
               onReverse={proj.kind === "existing" && proj.repoDir ? () => reverseDocs(proj) : undefined}
@@ -1207,7 +1211,9 @@ export default function App() {
         actions={<Button size="sm" leftIcon="plus" onClick={() => setModal("brief")}>Tambah</Button>}>
         {gate(<BacklogScreen backlog={backlog} projects={projectsView} pageSize={20}
           onStart={startSession} activeSpecs={activeSpecs} onNew={() => setModal("brief")}
-          onDelete={deleteSpec} onOpenRun={() => setSection("terminal")} onOpenReview={openReview}
+          onDelete={deleteSpec}
+          onOpenRun={(spec) => openTerminal(sessions.find((s) => s.specId === spec.id && !s.exited)?.id)}
+          onOpenReview={openReview}
           onEditBranch={editBranch} onRevertStage={revertStage} onIntegrate={integrateSpec} onEditSpec={editSpec} onEditDeps={editDeps} onEditAutoMerge={editAutoMerge}
           onChangeSource={changeSourceOfSpec}
           onPromoteToQa={promoteToQa} onPromoteToBrief={promoteToBrief} onPromoteToPrd={promoteToPrd}
@@ -1265,14 +1271,14 @@ export default function App() {
               hint="IDE butuh project dengan repoDir." action={() => setModal("project")} actionLabel="Project baru" />
           : <IdeScreen projects={projectsView} projectId={proj ? proj.id : projectsView[0]!.id}
               onProject={(id) => setProjectId(id)} onToast={showToast}
-              onGotoTerminal={(sid) => { if (sid) setFocusSession(sid); setSection("terminal"); }} />)}
+              onGotoTerminal={openTerminal} />)}
       </Shell>
     );
   } else if (section === "vps") {
     // VpsScreen memuat datanya sendiri — tak lewat `gate`, yang menunggu project/backlog.
     screen = (
       <Shell active="vps" title="VPS" breadcrumb="infra · audit → harden" onNavigate={setSection}>
-        <VpsScreen onToast={showToast} onGotoTerminal={() => setSection("terminal")} />
+        <VpsScreen onToast={showToast} onGotoTerminal={openTerminal} />
       </Shell>
     );
   } else if (section === "scheduler") {
@@ -1282,7 +1288,7 @@ export default function App() {
       <Shell active="scheduler" title="Scheduler" breadcrumb="otonom · jadwal → antrean → sesi" onNavigate={setSection}>
         <SchedulerScreen projects={projectsView} backlog={backlog}
           onProjectChanged={refreshProject} onToast={showToast}
-          onGotoTerminal={() => setSection("terminal")} />
+          onGotoTerminal={openTerminal} />
       </Shell>
     );
   } else if (section === "lead") {
@@ -1291,7 +1297,7 @@ export default function App() {
     screen = (
       <Shell active="lead" title="Lead" breadcrumb="otonom · keputusan → jejak → kendali" onNavigate={setSection}>
         <LeadScreen projects={projectsView} onProjectChanged={refreshProject} onToast={showToast}
-          onGotoTerminal={(sid) => { if (sid) setFocusSession(sid); setSection("terminal"); }} />
+          onGotoTerminal={openTerminal} />
       </Shell>
     );
   } else if (section === "docs") {

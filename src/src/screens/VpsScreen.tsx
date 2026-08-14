@@ -73,7 +73,7 @@ const formOf = (v: VpsView): VpsForm => ({
   name: v.name, host: v.host, user: v.user, port: String(v.port), keyPath: v.keyPath ?? "", password: "" });
 
 export function VpsScreen({ onToast, onGotoTerminal }:
-  { onToast: (msg: string, kind?: string, icon?: string) => void; onGotoTerminal: () => void }) {
+  { onToast: (msg: string, kind?: string, icon?: string) => void; onGotoTerminal: (sessionId: string) => void }) {
   const [list, setList] = React.useState<VpsView[]>([]);
   const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = React.useState<string | null>(null); // "<aksi>:<id>"
@@ -114,14 +114,14 @@ export function VpsScreen({ onToast, onGotoTerminal }:
     void run("harden", v.id, () => api.hardenVps(v.id), `${v.name} · harden selesai`);
   }
   const session = (v: VpsView) =>
-    run("sesi", v.id, async () => { await api.vpsSession(v.id); onGotoTerminal(); }, `${v.name} · sesi Claude dibuka`);
+    run("sesi", v.id, async () => { const { id } = await api.vpsSession(v.id); onGotoTerminal(id); }, `${v.name} · sesi Claude dibuka`);
   // SPEC-211 · test connection (transien, tak sentuh state) & open console (shell ssh di tmux).
   const testConn = (v: VpsView) => run("test", v.id, async () => {
     const r = await api.testVps(v.id);
     if (!r.ok) throw new Error(r.out);
   }, `${v.name} · koneksi ok`);
   const openConsole = (v: VpsView) =>
-    run("console", v.id, async () => { await api.vpsConsole(v.id); onGotoTerminal(); }, `${v.name} · console dibuka`);
+    run("console", v.id, async () => { const { id } = await api.vpsConsole(v.id); onGotoTerminal(id); }, `${v.name} · console dibuka`);
   async function remove(v: VpsView) {
     if (!window.confirm(`Hapus registrasi VPS "${v.name}"? Server-nya sendiri tak disentuh.`)) return;
     await api.deleteVps(v.id).then(load).catch(() => onToast("Gagal hapus", "err", "x-circle"));

@@ -627,7 +627,7 @@ describe("TerminalScreen (layar penuh)", () => {
       .toHaveAttribute("aria-pressed", "true");
   });
 
-  it("keluar mengembalikan tinggi normal", async () => {
+  it("keluar mengembalikan root flex dengan tinggi minimum yang dapat digulir Shell", async () => {
     listTerminals.mockResolvedValue([]);
     render(<TerminalScreen projects={projects} />);
     fireEvent.click(await screen.findByRole("button", { name: "Layar penuh" }));
@@ -635,7 +635,8 @@ describe("TerminalScreen (layar penuh)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Keluar layar penuh" }));
 
     expect(root()).not.toHaveStyle({ position: "fixed" });
-    expect(root()).toHaveStyle({ height: "calc(100dvh - 180px)" });
+    expect(root()).not.toHaveStyle({ height: "calc(100dvh - 180px)" });
+    expect(root()).toHaveStyle({ flex: "1 1 0", minHeight: "640px" });
     expect(screen.getByRole("button", { name: "Layar penuh" })).toBeInTheDocument();
   });
 

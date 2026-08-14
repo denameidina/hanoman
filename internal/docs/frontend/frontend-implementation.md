@@ -47,7 +47,12 @@ Keluarga yang mengikuti kontrak itu:
   yang berubah ukuran tetap menjalankan `ResizeObserver → FitAddon.fit() → resize` WebSocket.
   Initial fit, attach WebSocket, dan observer mengabaikan host `0×0` milik panel tersembunyi agar
   PTY background tidak direflow ke ukuran minimum palsu; saat panel terlihat lagi observer mengirim ukuran riil. Deep-link sesi
-  memilih grup dan cell target pada mobile.
+  memilih grup dan cell target pada mobile. Semua pintu yang mengetahui ID sesi—Backlog, hasil
+  pembukaan flow project, konflik integrasi, VPS, Scheduler, IDE, dan Lead—wajib meneruskan ID itu
+  saat membuka Terminal; navigasi tanpa target hanya untuk pintu Terminal generik. Root Terminal
+  mengikuti tinggi flex Shell dengan basis minimum, bukan mengurangi `100dvh` memakai tinggi chrome
+  tetap: pada viewport pendek `<main>` yang menggulir agar toolbar dan pane aktif tetap terjangkau
+  (SPEC-767).
 - Settings mengganti sidebar section dengan `Select` mobile. Auth/Help/portal memiliki scroller
   `100dvh`; header, tab, row metadata, dan form membungkus tanpa menghapus field/aksi. Pet memakai
   safe-area, handle 44px, dan panel yang di-clamp terhadap dynamic viewport.

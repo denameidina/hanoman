@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 const VPS = {
@@ -8,9 +8,10 @@ const VPS = {
 };
 // vi.mock di-hoist ke atas berkas — factory-nya TIDAK boleh merujuk `const` biasa.
 // vi.hoisted menaikkan mock fn-nya bersama vi.mock, jadi test bisa memeriksanya.
-const { updateVps, testVps, vpsConsole, vpsChecklist } = vi.hoisted(() => ({
+const { updateVps, testVps, vpsSession, vpsConsole, vpsChecklist } = vi.hoisted(() => ({
   updateVps: vi.fn(),
   testVps: vi.fn(async () => ({ ok: true, out: "" })),
+  vpsSession: vi.fn(async () => ({ id: "vps-v1" })),
   vpsConsole: vi.fn(async () => ({ id: "vpsc-v1" })),
   vpsChecklist: vi.fn(async () => ({
     vpsId: "v1", scoreTotal: 77, lastAuditAt: null, scoreBySection: { ssh: 77 },
@@ -21,7 +22,7 @@ const { updateVps, testVps, vpsConsole, vpsChecklist } = vi.hoisted(() => ({
   })),
 }));
 vi.mock("../src/api/client", () => ({
-  api: { listVps: vi.fn(async () => [VPS]), updateVps, testVps, vpsConsole, vpsChecklist },
+  api: { listVps: vi.fn(async () => [VPS]), updateVps, testVps, vpsSession, vpsConsole, vpsChecklist },
   ApiError: class extends Error {},
 }));
 import { VpsScreen, isReachable, hardenedLabel, vpsFormToBody } from "../src/screens/VpsScreen";
@@ -48,14 +49,22 @@ describe("VpsScreen (SPEC-164)", () => {
     const onGotoTerminal = vi.fn();
     render(<VpsScreen onToast={() => {}} onGotoTerminal={onGotoTerminal} />);
     await screen.findByText("web-1");
-    fireEvent.click(screen.getByRole("button", { name: /console/i }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /console/i })); });
     await vi.waitFor(() => expect(vpsConsole).toHaveBeenCalledWith("v1"));
-    await vi.waitFor(() => expect(onGotoTerminal).toHaveBeenCalled());
+    await vi.waitFor(() => expect(onGotoTerminal).toHaveBeenCalledWith("vpsc-v1"));
+  });
+  it("tombol Sesi Claude membuka ID sesi yang dikembalikan API", async () => {
+    const onGotoTerminal = vi.fn();
+    render(<VpsScreen onToast={() => {}} onGotoTerminal={onGotoTerminal} />);
+    await screen.findByText("web-1");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Sesi Claude" })); });
+    expect(vpsSession).toHaveBeenCalledWith("v1");
+    expect(onGotoTerminal).toHaveBeenCalledWith("vps-v1");
   });
   it("tombol Test memanggil api.testVps (SPEC-211)", async () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
     await screen.findByText("web-1");
-    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^test$/i })); });
     await vi.waitFor(() => expect(testVps).toHaveBeenCalledWith("v1"));
   });
   it("klik baris VPS membuka modal detail+checklist langsung (UI 2026-07-18)", async () => {
@@ -87,7 +96,7 @@ describe("modal edit (SPEC-165)", () => {
     fireEvent.click(await screen.findByTitle("Edit web-1"));
     expect(await screen.findByDisplayValue("web-1")).toBeTruthy();
     expect(screen.getByDisplayValue("203.0.113.10")).toBeTruthy();
-    fireEvent.click(screen.getByText("Simpan"));
+    await act(async () => { fireEvent.click(screen.getByText("Simpan")); });
     expect(updateVps).toHaveBeenCalled();
     expect(updateVps.mock.calls[0]![0]).toBe("v1");
   });

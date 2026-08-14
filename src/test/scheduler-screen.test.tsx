@@ -103,6 +103,17 @@ describe("SchedulerScreen observabilitas (SPEC-299)", () => {
     expect(openSpy).toHaveBeenCalledWith(expect.stringContaining("#spec=SPEC-2"), "_blank", "noreferrer");
     openSpy.mockRestore();
   });
+
+  it("Buka terminal pada sesi berjalan meneruskan ID sesi", async () => {
+    getSchedulerState.mockResolvedValue(STATE);
+    getSchedulerQueue.mockImplementation(queueFrom(QUEUE_ROWS));
+    const onGotoTerminal = vi.fn();
+    renderScreen({ onGotoTerminal });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Buka terminal" }));
+
+    expect(onGotoTerminal).toHaveBeenCalledWith("spec-4");
+  });
 });
 
 describe("SchedulerScreen kontrol (SPEC-299)", () => {
