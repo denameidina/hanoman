@@ -85,7 +85,8 @@ kegagalannya terbaca seperti regresi komponen.
   window = countdown (`reset 5j 30m`); window **weekly** menambah momen absolut reset (tanggal+jam, waktu
   lokal browser, `id-ID`) — mis. `reset 52j 8m · Rab, 15 Jul, 07.00` — karena reset mingguan berhari-hari
   ke depan (SPEC-205).
-- Markdown render: pustaka marked; file non-.md dirender sebagai blok kode.
+- Markdown render: `marked` → sanitasi allowlist DOMPurify → `MarkdownView`; file non-.md dirender
+  sebagai blok kode. Konten repository tidak pernah langsung dipasang sebagai HTML (SPEC-759).
 - State ringan lewat React; persist preferensi (edit docs, settings) ke server (dan localStorage sebagai draft).
 - **Loading / empty / error** dirender lewat satu komponen `StateBlock` (`ds/components/state.tsx`),
   jadi ketiganya tidak pernah terlihat sama. Fetch awal (`projects+specs`) digerbangkan
@@ -538,7 +539,11 @@ Pemicunya dua, keduanya membuka modal ber-`specId` yang sama:
   `specId`; karena keyed spec-id, ia otomatis membaca worktree sesi yang sedang berjalan.
 
 Renderer Markdown dipakai bersama: `MarkdownView`/`hnDocHtml` (`ds/markdown.tsx`, marked +
-kelas `.hn-md`) — sumber yang sama untuk `SpecDocsModal` dan `DocsWorkspace`.
+DOMPurify + kelas `.hn-md`) — sumber yang sama untuk `SpecDocsModal`, `DocsWorkspace`, PRD,
+Changelog, IDE, Git Graph, Review, dan Dokumentasi AI Agent. SPEC-759 menjadikan titik cekik ini
+batas keamanan: HTML hasil `marked.parse()` disanitasi dengan allowlist tag/atribut HTML-only,
+scheme URL aktif dibuang setelah normalisasi, checkbox GFM dibuat inert, dan kegagalan jatuh ke
+`<pre>` ter-escape. Preview baru wajib memakai renderer ini, bukan memanggil parser sendiri.
 
 **Aksi preview `.md` di IDE & Review** (SPEC-385). Empat permukaan dulu hanya bisa menampilkan
 `.md` sebagai teks mentah dalam `<pre>` — pane diff Explorer, modal berkas Git Graph, dan Review
@@ -726,8 +731,8 @@ dan **Branches** (SPEC-360).
   **highlight.js** (bahasa dari ekstensi, fallback `highlightAuto`); edit = `<textarea>` mono + Simpan
   (`api.putIdeFile`). File biner → placeholder.
   - **Preview `.md` (SPEC-240)**: berkas `.md` **default menampilkan markdown terender** — bukan raw
-    source — lewat `MarkdownView` (`ds/markdown.tsx`, marked + `.hn-md`, renderer **bersama** Docs·SoT
-    & `SpecDocsModal`). Header pane memberi toggle **Preview | Source** di samping **Edit** (pola pill
+    source — lewat `MarkdownView` (`ds/markdown.tsx`, marked + DOMPurify + `.hn-md`, renderer
+    **bersama** Docs·SoT & `SpecDocsModal`). Header pane memberi toggle **Preview | Source** di samping **Edit** (pola pill
     yang sama dengan toggle Diff|Source); **Source** menampilkan raw source highlighted seperti biasa.
     State `mdView` (default `"preview"`) di-reset ke preview tiap `.md` baru dipilih; **Edit** tetap
     mengubah raw source, dan sesudah **Simpan** kembali ke preview. File **non-`.md`** tak punya toggle

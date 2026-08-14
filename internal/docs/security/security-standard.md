@@ -50,6 +50,15 @@
   lebih disukai bila lingkungan memungkinkan.
 - **Isolasi**: sesi di worktree terpisah (`.worktrees/<id>`); tak ada akses ke working tree utama.
   Sejak ADR-0037 ini adalah satu-satunya batas keamanan yang tersisa.
+- **Markdown repository adalah input tidak tepercaya** (SPEC-759): seluruh preview dashboard wajib
+  melewati `MarkdownView`/`hnDocHtml` di `src/src/ds/markdown.tsx`. Hasil `marked.parse()` **selalu**
+  disanitasi DOMPurify dengan allowlist HTML eksplisit sebelum masuk `dangerouslySetInnerHTML`:
+  SVG/MathML, script/style, iframe/object/embed/form, event handler, inline style, `data-*`, dan
+  `aria-*` dibuang. URL hanya boleh relatif atau memakai `http:`/`https:`; `mailto:` juga boleh pada
+  `href`. Pemeriksaan scheme menormalkan case serta whitespace/control sehingga entity/malformed
+  HTML tak dapat menyelundupkan `javascript:`/`data:`/`vbscript:`. Checkbox GFM dipaksa `disabled`;
+  kelas CSS dibatasi ke task-list dan `language-*`. Parse/sanitasi gagal → sumber di-escape ke `<pre>`,
+  bukan dipasang mentah. Jangan membuat pemanggilan `marked.parse()` atau renderer Markdown kedua.
 - **Help Center publik (SPEC-253, [ADR-0062](../adr/0062-help-center-tiket-publik-triase.md))**:
   `/api/help/*` adalah **pengecualian sah** gate `/api` — dipanggil pengguna akhir tanpa sesi login.
   Gate cookie di-bypass untuk prefix `/api/help` (cermin pola `/api/sync`); route mengotorisasi sendiri.

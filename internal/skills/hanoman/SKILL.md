@@ -1157,6 +1157,13 @@ Pakai skill lebih sempit saat task cocok:
 
 ## Aturan Keamanan
 
+- **Markdown repository tidak tepercaya** (SPEC-759): seluruh preview Docs/PRD/backlog/sesi/Review/
+  IDE/Git Graph/changelog/Dokumentasi AI Agent bertemu di `src/src/ds/markdown.tsx`.
+  `marked.parse()` hanya boleh dipanggil di titik cekik itu dan hasilnya wajib melewati DOMPurify
+  ber-allowlist HTML eksplisit sebelum `dangerouslySetInnerHTML`; SVG/MathML, tag aktif, event/style,
+  `data-*`/`aria-*`, serta scheme selain relatif/`http:`/`https:` (`mailto:` khusus `href`) dibuang.
+  Checkbox GFM wajib `disabled`, kelas hanya task-list/`language-*`, dan kegagalan parse/sanitasi
+  jatuh ke `<pre>` ter-escape. Jangan membuat renderer Markdown kedua.
 - Auth (ADR-0028): login email/password menggerbangi **seluruh `/api`** (gate `onRequest`, 401 tanpa sesi, termasuk upgrade WebSocket `/api/terminal`). Publik hanya `GET /health`, `GET /auth/status`, `POST /auth/login`, `POST /auth/setup`.
 - **Agent token — akses AI agent** (SPEC-257/ADR-0065): jalur auth **kedua** ke `/api` untuk AI agent eksternal (`Authorization: Bearer` / `?agent_token=` di WS), ditegakkan **capability per-domain read/write** (write⊇read; katalog `@hanoman/shared`). `AgentToken` server-local (hash-at-rest, cermin DeviceToken); master switch `Setting.agentAccessEnabled` (default off) menolak semua. Tak-boleh-didelegasikan (agent → 403): `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`. Cookie = akses penuh (tak ada RBAC). Bukan perluasan permukaan eksekusi — `sessions:write` RCE tetap dibatasi isolasi worktree.
 - Password: `crypto.scrypt` (stdlib) + salt acak + `timingSafeEqual`; tak pernah dikembalikan ke client. Sesi: token opaque 256-bit di cookie `httpOnly`; DB menyimpan `sha256(token)`, revocable. Login di-throttle per IP; error selalu generic.
