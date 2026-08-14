@@ -29,6 +29,16 @@ describe("ReconcileModal (SPEC-270)", () => {
     expect(screen.getByTestId("default-side").textContent).toContain("Lokal");
   });
 
+  // Cacat C · route membalas HTTP 200 ber-`{ ok: false, reason }` saat hub menolak, dan modal
+  // membuang hasilnya. Operator mengklik, tak ada yang berubah, tak ada pesan apa pun.
+  it("menampilkan alasan saat resolusi ditolak, bukan diam", async () => {
+    resolveConflict.mockResolvedValue({ ok: false, reason: "still-conflict" });
+    render(<ReconcileModal open onClose={() => {}} onResolved={() => {}} />);
+    await waitFor(() => screen.getByText(/judul lokal/));
+    fireEvent.click(screen.getByRole("button", { name: /Pakai Lokal/i }));
+    await waitFor(() => expect(screen.getByTestId("resolve-error").textContent).toMatch(/hub/i));
+  });
+
   it("klik Pakai Server memanggil resolveConflict(server)", async () => {
     const onResolved = vi.fn();
     render(<ReconcileModal open onClose={() => {}} onResolved={onResolved} />);

@@ -14,19 +14,41 @@ export function ReconcileModal({ open, onClose, onResolved }:
   { open: boolean; onClose: () => void; onResolved: () => void }) {
   const [items, setItems] = React.useState<SyncConflictView[]>([]);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
   const load = React.useCallback(async () => {
     try { setItems((await api.listConflicts()).conflicts); } catch { setItems([]); }
   }, []);
   React.useEffect(() => { if (open) void load(); }, [open, load]);
 
+  // Route membalas HTTP 200 ber-`{ ok: false, reason }` saat hub menolak — jadi "berhasil" di
+  // tingkat HTTP tapi keputusannya tidak terjadi. Membuang hasil itu (perilaku lama) membuat
+  // tombolnya tampak mati: operator mengklik, tak ada yang berubah, tak ada pesan apa pun.
+  const REASON: Record<string, string> = {
+    "still-conflict": "Hub bergeser lagi sebelum keputusan ini masuk. Coba lagi — datanya sudah disegarkan.",
+    "not-found": "Konflik ini sudah tak ada di hub (mungkin sudah diselesaikan dari mesin lain).",
+  };
+
   async function resolve(c: SyncConflictView, choice: "local" | "server") {
-    setBusy(`${c.entity}:${c.recordId}`);
-    try { await api.resolveConflict(c.entity, c.recordId, choice); await load(); onResolved(); }
-    finally { setBusy(null); }
+    const id = `${c.entity}:${c.recordId}`;
+    setBusy(id); setError(null);
+    try {
+      const r = await api.resolveConflict(c.entity, c.recordId, choice);
+      if (!r.ok) { setError(REASON[r.reason ?? ""] ?? `Gagal menyimpan keputusan (${r.reason ?? "tak diketahui"}).`); }
+      await load();
+      if (r.ok) onResolved();
+    } catch (e) {
+      setError(`Gagal menghubungi server: ${(e as Error).message}`);
+    } finally { setBusy(null); }
   }
 
   return (
     <Modal open={open} title="Rekonsil konflik sync" eyebrow="SPEC-270" icon="git-merge" width={720} onClose={onClose}>
+      {error && (
+        <div data-testid="resolve-error" role="alert" style={{
+          fontSize: 12.5, color: "var(--danger, #b23b3b)", border: "1px solid var(--danger, #b23b3b)",
+          borderRadius: 6, padding: "8px 10px", marginBottom: 12,
+        }}>{error}</div>
+      )}
       {items.length === 0 && <div style={{ fontSize: 13.5, color: "var(--text-muted)" }}>Tak ada konflik. Semua sinkron.</div>}
       {items.map((c) => {
         const dflt = newerSide(c);

@@ -9,7 +9,8 @@ export type ConflictView = {
   localData: unknown; localVersion: number; localUpdatedAt: string;
   serverData: unknown; serverVersion: number; serverUpdatedAt: string; detectedAt: string;
 };
-type PushFn = (records: unknown[]) => Promise<{ results: { ok?: boolean; version?: number; conflict?: boolean }[] }>;
+type PushResult = { ok?: boolean; version?: number; conflict?: boolean; server?: { version: number } };
+type PushFn = (records: unknown[]) => Promise<{ results: PushResult[] }>;
 
 function stamp(d: Record<string, unknown>): Date {
   const v = d.updatedAt;
@@ -17,16 +18,24 @@ function stamp(d: Record<string, unknown>): Date {
 }
 
 // Catat/segarkan konflik (idempoten per entity+recordId).
+//
+// Sebuah resolusi adalah keputusan manusia atas SEPASANG versi tertentu. Selama pasangan itu tak
+// berubah, tick sync berikutnya (~15 detik) tak boleh membukanya kembali: dulu payload `update`
+// membawa `resolvedAt: null` tanpa syarat, jadi setiap keputusan terhapus sebelum operator sempat
+// melihat efeknya — dari sisi mereka tombolnya sekadar "tak berfungsi". Divergensi BARU (salah satu
+// sisi bergerak sesudah keputusan) tetap membuka konflik lagi; itu memang konflik yang lain.
 export async function recordConflict(entity: string, recordId: string, local: Side, server: Side): Promise<void> {
   const row = {
     entity, recordId,
     localData: local.data as object, localVersion: local.version, localUpdatedAt: stamp(local.data),
     serverData: server.data as object, serverVersion: server.version, serverUpdatedAt: stamp(server.data),
-    resolvedAt: null,
   };
+  const prev = await prisma.syncConflict.findUnique({ where: { entity_recordId: { entity, recordId } } });
+  if (prev?.resolvedAt && prev.localVersion === local.version && prev.serverVersion === server.version) return;
   await prisma.syncConflict.upsert({
     where: { entity_recordId: { entity, recordId } },
-    create: row, update: { ...row, detectedAt: new Date() },
+    create: { ...row, resolvedAt: null },
+    update: { ...row, resolvedAt: null, detectedAt: new Date() },
   });
 }
 
@@ -52,8 +61,16 @@ export async function resolveConflict(
   if (choice === "server") {
     await upsertLocal(entity, recordId, c.serverVersion, c.serverData as Record<string, unknown>);
   } else {
-    const res = await push([{ entity, id: recordId, baseVersion: c.serverVersion, data: c.localData }]);
-    const r = res.results?.[0];
+    // `c.serverVersion` adalah versi hub SAAT konflik terdeteksi. Hub bergerak sendiri (monitor VPS
+    // menulis health-nya tiap beberapa menit), jadi angka itu sering sudah basi begitu operator
+    // sempat mengklik — dan push ditolak selamanya walau tombolnya menjanjikan force-push. Tolakan
+    // hub membawa snapshot terkininya; sekali coba ulang dengan versi itu membuat "Pakai Lokal"
+    // benar-benar menang. Sekali saja: kalau hub bergeser lagi di sela itu, konfliknya memang hidup
+    // dan operator berhak melihatnya lagi, bukan kita loop diam-diam melawan penulis lain.
+    let r = (await push([{ entity, id: recordId, baseVersion: c.serverVersion, data: c.localData }])).results?.[0];
+    if (!r?.ok && r?.conflict && typeof r.server?.version === "number" && r.server.version !== c.serverVersion) {
+      r = (await push([{ entity, id: recordId, baseVersion: r.server.version, data: c.localData }])).results?.[0];
+    }
     if (!r?.ok) {
       if (r?.conflict) return { ok: false, reason: "still-conflict" }; // hub bergeser lagi
       return { ok: false, reason: "not-found" };

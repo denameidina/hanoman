@@ -66,3 +66,28 @@ Prasyarat LWW juga cacat: mayoritas model synced memakai `updatedAt @default(now
   historis; menjalankan dua hub permanen tetap melanggar invariant version-stamp.
 - **LWW bergantung wall-clock** mac vs VPS (asumsi NTP); risiko pemenang-default keliru
   **termitigasi** karena manusia bisa override di modal.
+
+## Amandemen 2026-08-14 — keputusan manusia harus bertahan, dan `local` harus benar-benar menang
+
+Tiga cacat membuat modal rekonsil praktis tak bisa dipakai; ditemukan saat 11 konflik lokal tak
+bisa diputuskan sama sekali. Keputusannya di sini karena ketiganya mengubah **semantik** yang
+dijanjikan di atas, bukan sekadar bug lokal.
+
+- **`recordConflict` tak lagi membuka kembali konflik yang sudah diputuskan.** Payload `update`-nya
+  dulu membawa `resolvedAt: null` tanpa syarat, jadi tick sync berikutnya (~15 detik) menghapus
+  keputusan manusia sebelum operator sempat melihat efeknya — tombolnya tampak sekadar mati.
+  Resolusi kini terikat pada **sepasang versi** `(localVersion, serverVersion)`: selama pasangan itu
+  tak berubah, konflik tetap tuntas. Divergensi baru tetap membukanya lagi — itu konflik yang lain.
+- **`resolve(local)` mencoba ulang sekali dengan versi hub terkini.** `baseVersion=serverVersion`
+  adalah versi hub **saat konflik terdeteksi**; hub bergerak sendiri (monitor VPS menulis `health`
+  tiap beberapa menit), jadi angka itu sering sudah basi begitu operator mengklik dan "force-push"
+  yang dijanjikan ditolak selamanya. Tolakan hub sudah membawa snapshot terkininya — sekali coba
+  ulang dengan versi itu. Hanya sekali: kalau hub bergeser lagi di sela itu, konfliknya memang hidup
+  dan operator berhak melihatnya lagi.
+- **Kegagalan resolusi tak lagi senyap.** Route membalas **HTTP 200** ber-`{ok:false, reason}`;
+  `ReconcileModal` dulu membuang hasil itu, jadi setiap mode gagal terlihat identik dengan "tak
+  terjadi apa-apa". Alasannya kini ditampilkan.
+
+Tidak berubah: **telemetri VPS tetap menyeberang.** `health`/`lastSeenAt` ditulis monitor di kedua
+sisi, jadi record VPS akan terus melahirkan konflik baru berulang kali. Diterima apa adanya atas
+keputusan pemilik repo (2026-08-14); memindahkannya keluar dari `FIELDS` menuntut ADR tersendiri.

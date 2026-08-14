@@ -81,7 +81,9 @@ export default async function (app: FastifyInstance) {
     const push = async (records: unknown[]) => {
       if (!base || !token) return { results: [{ ok: false as const }] };
       const res = await fetchTransport(base, token)("POST", "/api/sync/push", { records });
-      return res.body as { results: { ok?: boolean; version?: number; conflict?: boolean }[] };
+      // `server` (snapshot terkini hub saat menolak) ikut diteruskan apa adanya — itulah yang
+      // dipakai resolveConflict untuk mencoba ulang dengan baseVersion yang tidak basi.
+      return res.body as { results: { ok?: boolean; version?: number; conflict?: boolean; server?: { version: number } }[] };
     };
     return resolveConflict(entity, recordId, p.data.choice, push);
   });
