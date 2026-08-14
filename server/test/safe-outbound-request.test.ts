@@ -37,6 +37,22 @@ describe("safe outbound request", () => {
     expect(connected).toBe("93.184.216.34");
   });
 
+  // SPEC-? · regresi: `pinnedRequest` memanggil callback `lookup` dalam bentuk SKALAR
+  // `(err, address, family)`. Sejak Node 20 `autoSelectFamily` menyala secara default, jadi
+  // socket meminta `all: true` dan Node membaca `addresses[0].address` dari hasilnya →
+  // `undefined` → ERR_INVALID_IP_ADDRESS sebelum satu paket pun keluar. Test lama tak pernah
+  // menangkapnya karena semuanya memakai URL ber-IP literal (`127.0.0.1`), dan untuk itu Node
+  // melewati `lookup` sama sekali. Hostname-lah yang menyalakan jalur ini.
+  it("connects through the pinned lookup when the URL carries a hostname", async () => {
+    const origin = await listen((_req, res) => { res.writeHead(204); res.end(); });
+    const port = new URL(origin).port;
+    const response = await safeRequest({
+      url: new URL(`http://pinned.test:${port}/hook`), method: "GET", headers: {}, allowPrivate: true,
+      connectMs: 2_000, totalMs: 2_000, maxResponseBytes: 1024,
+    }, { lookupAll: async () => [{ address: "127.0.0.1", family: 4 }] });
+    expect(response.status).toBe(204);
+  });
+
   it("rejects the entire DNS answer when any address is private", async () => {
     await expect(safeRequest({
       url: new URL("https://example.test/hook"), method: "GET", headers: {}, allowPrivate: false,

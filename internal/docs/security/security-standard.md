@@ -213,6 +213,14 @@
   lalu koneksi dipin ke alamat yang sudah divalidasi sambil mempertahankan Host dan TLS SNI. DNS gagal
   tertutup. Semua 3xx adalah kegagalan terminal; body, auth, dan signature tidak pernah diteruskan ke
   hop kedua. `allowPrivate` hanya membuka alamat privat eksplisit—tidak menghidupkan redirect.
+  **Pinning-nya wajib menjawab bentuk `all: true`.** Node ≥ 20 menyalakan `autoSelectFamily` secara
+  default, jadi socket memanggil hook `lookup` dengan `all: true` dan membaca `addresses[0].address`
+  dari jawabannya; menjawab dalam bentuk skalar `(err, address, family)` memberi `undefined` →
+  `ERR_INVALID_IP_ADDRESS` **sebelum satu paket pun keluar**. Kegagalannya senyap dan tampak seperti
+  jaringan: pemanggilnya (tick sync, antrean webhook) menelan lemparan itu sebagai "offline", jadi
+  sync mati total tanpa satu baris log pun. Test yang memakai URL ber-**IP literal** tak bisa
+  menangkapnya — untuk itu Node melewati `lookup` sama sekali; hanya URL ber-**hostname** yang
+  menyalakan jalur ini.
 - **Batas laju & ukuran.** Token bucket per endpoint (`maxPerMinute`), antrean per endpoint dibatasi
   1000 kiriman menunggu (kelebihannya tercatat `dropped` — terlihat, bukan hilang diam-diam), dan
   amplop dipangkas bertahap di 64 KiB dengan penanda `truncated`/`truncatedFields`.

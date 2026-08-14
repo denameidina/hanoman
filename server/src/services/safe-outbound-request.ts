@@ -25,7 +25,14 @@ async function pinnedRequest(input: PinnedInput): Promise<SafeResponse> {
       protocol: input.url.protocol, hostname: input.url.hostname, port: input.url.port || undefined,
       method: input.method, path: `${input.url.pathname}${input.url.search}`, headers: input.headers,
       servername: input.url.hostname,
-      lookup: (_host, _opts, callback) => callback(null, input.address, input.family as 4 | 6),
+      // Node >= 20 menyalakan `autoSelectFamily` secara default: socket memanggil `lookup` dengan
+      // `all: true` dan membaca `addresses[0].address` dari hasilnya. Menjawab dalam bentuk skalar
+      // di situ memberi `undefined` → ERR_INVALID_IP_ADDRESS sebelum satu paket pun keluar, dan
+      // pemanggil (sync tick, webhook) menelannya sebagai "offline". Kedua bentuk dijawab supaya
+      // pinning tetap benar apa pun setelan family-nya.
+      lookup: (_host, opts, callback) => (opts as { all?: boolean }).all
+        ? (callback as unknown as (e: null, a: ResolvedAddress[]) => void)(null, [{ address: input.address, family: input.family }])
+        : callback(null, input.address, input.family as 4 | 6),
       timeout: input.connectMs,
     }, (response) => {
       const chunks: Buffer[] = []; let bytes = 0;
