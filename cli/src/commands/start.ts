@@ -4,10 +4,12 @@
 // sinyal, exit code, dan flag node-nya bersih; sesi tmux tetap selamat dari restart (ADR-0016).
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, readdirSync, statSync, chmodSync } from "node:fs";
+import { existsSync, mkdirSync, chmodSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveHome, resolveDbUrl, dbFilePath, prismaCliPath, dbUrlNotice } from "@hanoman/runner";
+import {
+  resolveHome, resolveDbUrl, dbFilePath, prismaCliPath, dbUrlNotice, repairSpawnHelper,
+} from "@hanoman/runner";
 import { UPDATE_RESTART_EXIT } from "@hanoman/shared";
 import type { Ctx } from "../router";
 import { resolveLayout } from "../layout";
@@ -126,64 +128,13 @@ export async function ensurePrismaClient(schema: string, dbUrl: string, ctx: Ctx
 }
 
 /**
- * SPEC-403 · Sesi terminal LAHIR tapi layarnya kosong di instalasi `npm i -g hanoman`.
- *
- * Sesi hidup di tmux (ADR-0016); yang menjembatani pane ke WebSocket adalah klien `tmux attach`
- * di atas node-pty. node-pty meng-exec biner pendamping `spawn-helper` yang duduk di sebelah
- * `pty.node`. Di tarball node-pty@1.1.0 biner itu terbit dengan mode **0644** untuk semua
- * platform unix (`tar tvf node-pty-1.1.0.tgz` → `-rw-r--r--`), jadi `posix_spawnp` gagal dengan
- * EACCES. Kegagalannya SENYAP dari sisi pengguna: pane tmux tetap hidup dan terisi, WebSocket
- * tetap tersambung, hanya tak pernah ada satu byte pun yang mengalir → terminal blank.
- *
- * pnpm memulihkan bit exec saat mengait berkas dari store, npm tidak — itulah kenapa bug ini
- * tak pernah terlihat saat `pnpm dev` dan hanya menghantam orang yang install dari npm.
- *
- * Diperbaiki saat start, bukan lewat `postinstall`: postinstall bisa dilewati (`--ignore-scripts`,
- * sebagian setup npm global) — pola yang sama dipakai `ensurePrismaClient` di atas.
+ * SPEC-403 · terminal blank di instalasi npm karena `spawn-helper` node-pty kehilangan bit exec.
+ * Implementasinya pindah ke `@hanoman/runner` (`runner/src/spawn-helper.ts`) dan dipasang di
+ * `spawnPty` — lihat catatan panjang di sana. Yang di sini tinggal pemanggilan lebih awal supaya
+ * `hanoman start` sempat MELAPORKAN perbaikannya ke operator sebelum server lahir.
  */
-export function spawnHelperPaths(
-  ptyDir: string,
-  listDir: (d: string) => string[],
-  exists: (p: string) => boolean,
-): string[] {
-  const dirs = [join(ptyDir, "build", "Release")];
-  // Semua prebuild disapu, bukan cuma milik platform ini: menebak nama direktori berarti
-  // menduplikasi resolusi node-gyp-build milik node-pty, dan tebakan yang meleset gagal SENYAP —
-  // persis mode kegagalan yang sedang diperbaiki. chmod pada biner platform lain tak berbahaya.
-  for (const name of listDir(join(ptyDir, "prebuilds"))) dirs.push(join(ptyDir, "prebuilds", name));
-  return dirs.map((d) => join(d, "spawn-helper")).filter(exists);
-}
-
-export type ModeOps = { mode: (p: string) => number; chmod: (p: string, m: number) => void };
-
-/** Menambahkan bit exec ke helper yang belum punya. Mengembalikan yang benar-benar diperbaiki. */
-export function ensureSpawnHelpersExecutable(paths: string[], ops: ModeOps): string[] {
-  const fixed: string[] = [];
-  for (const p of paths) {
-    try {
-      const mode = ops.mode(p) & 0o7777;
-      if ((mode & 0o111) === 0o111) continue;
-      // Bit exec DITAMBAHKAN, bukan mode diganti 0o755: instalasi yang sengaja mempersempit
-      // izin baca (mis. 0o640 di home multi-user) tak boleh jadi lebih terbuka gara-gara ini.
-      ops.chmod(p, mode | 0o111);
-      fixed.push(p);
-    } catch { /* EPERM di instalasi milik root: bukan alasan menolak start — lihat pemanggil. */ }
-  }
-  return fixed;
-}
-
-/** Membungkus dua fungsi di atas dengan fs + resolusi paket sungguhan. Tak pernah melempar. */
-export function repairSpawnHelper(ctx: Ctx): void {
-  let ptyDir: string;
-  try {
-    ptyDir = dirname(createRequire(import.meta.url).resolve("node-pty/package.json"));
-  } catch { return; }   // node-pty tak terpasang: server yang akan mengeluh, bukan di sini.
-  const paths = spawnHelperPaths(ptyDir, (d) => { try { return readdirSync(d); } catch { return []; } }, existsSync);
-  const fixed = ensureSpawnHelpersExecutable(paths, {
-    mode: (p) => statSync(p).mode,
-    chmod: (p, m) => chmodSync(p, m),
-  });
-  if (fixed.length) ctx.stdout("hanoman · memperbaiki izin `spawn-helper` node-pty (sekali per instalasi)\n");
+function repairSpawnHelperEarly(ctx: Ctx): void {
+  repairSpawnHelper(createRequire(import.meta.url).resolve, ctx.stdout);
 }
 
 /**
@@ -282,7 +233,7 @@ export default async function start(argv: string[], ctx: Ctx): Promise<number> {
     return 1;
   }
   if (!await ensurePrismaClient(layout.schema, dbUrl, ctx)) return 1;
-  repairSpawnHelper(ctx);
+  repairSpawnHelperEarly(ctx);
   if (opts.migrate) {
     ctx.stdout(`hanoman · menerapkan migrasi ke ${dbFilePath(dbUrl)}\n`);
     try { applyMigrations(layout.schema, dbUrl); }

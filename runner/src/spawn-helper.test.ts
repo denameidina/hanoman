@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { spawnHelperPaths, ensureSpawnHelpersExecutable } from "../src/commands/start";
+import { describe, it, expect, beforeEach } from "vitest";
+import { mkdtempSync, mkdirSync, writeFileSync, statSync, chmodSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  spawnHelperPaths, ensureSpawnHelpersExecutable, repairSpawnHelper,
+  ensureSpawnHelperOnce, resetSpawnHelperMemo,
+} from "./spawn-helper";
 
 // SPEC-403 · terminal sesi BLANK di `npm i -g hanoman`. Sesi tmux-nya hidup dan berisi output,
 // tapi jembatan node-pty gagal spawn (`posix_spawnp failed`) karena `spawn-helper` terpasang
@@ -65,5 +71,54 @@ describe("ensureSpawnHelpersExecutable", () => {
       chmod: (p) => { if (p === "/a/spawn-helper") throw Object.assign(new Error("EPERM"), { code: "EPERM" }); },
     });
     expect(fixed).toEqual(["/b/spawn-helper"]);
+  });
+});
+
+// Pohon node-pty tiruan dengan mode 0644 PERSIS seperti yang dikirim tarball npm.
+function fakePtyTree(): { resolve: (id: string) => string; helper: string } {
+  const root = mkdtempSync(join(tmpdir(), "pty-"));
+  const dir = join(root, "prebuilds", "darwin-arm64");
+  mkdirSync(dir, { recursive: true });
+  const helper = join(dir, "spawn-helper");
+  writeFileSync(helper, "#!/bin/sh\n");
+  chmodSync(helper, 0o644);
+  writeFileSync(join(root, "package.json"), "{}");
+  return { resolve: () => join(root, "package.json"), helper };
+}
+
+describe("repairSpawnHelper", () => {
+  it("memberi bit exec pada helper yang terpasang mode 0644", () => {
+    const { resolve, helper } = fakePtyTree();
+    expect(statSync(helper).mode & 0o111).toBe(0);
+    expect(repairSpawnHelper(resolve)).toEqual([helper]);
+    expect(statSync(helper).mode & 0o111).toBe(0o111);
+  });
+
+  it("node-pty tak teresolusi → tak melempar, dan tak mengklaim memperbaiki apa pun", () => {
+    expect(repairSpawnHelper(() => { throw new Error("MODULE_NOT_FOUND"); })).toEqual([]);
+  });
+
+  it("memberi tahu pemanggil HANYA saat benar-benar ada yang diperbaiki", () => {
+    const { resolve } = fakePtyTree();
+    const seen: string[] = [];
+    repairSpawnHelper(resolve, (m) => seen.push(m));
+    expect(seen).toHaveLength(1);
+    seen.length = 0;
+    repairSpawnHelper(resolve, (m) => seen.push(m));   // sudah executable
+    expect(seen).toEqual([]);
+  });
+});
+
+describe("ensureSpawnHelperOnce", () => {
+  beforeEach(() => resetSpawnHelperMemo());
+
+  // Dipasang di `spawnPty`, yang dipanggil setiap sesi terminal lahir: pemeriksaan boleh murah,
+  // tapi tak boleh mengulang stat seluruh pohon prebuild seumur proses.
+  it("hanya menyentuh disk pada panggilan pertama", () => {
+    const { resolve, helper } = fakePtyTree();
+    expect(ensureSpawnHelperOnce(resolve)).toEqual([helper]);
+    chmodSync(helper, 0o644);                       // rusak lagi di belakang punggung kita
+    expect(ensureSpawnHelperOnce(resolve)).toEqual([]);
+    expect(statSync(helper).mode & 0o111).toBe(0);  // memang tak diperiksa ulang
   });
 });

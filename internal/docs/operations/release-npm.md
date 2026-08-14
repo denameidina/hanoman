@@ -127,6 +127,17 @@ ada di runner, jadi ia akan exit 1 karena alasan yang tak relevan dengan kesehat
   instalasi npm. Kegagalannya senyap total: WebSocket tersambung, pane hidup, nol byte mengalir.
   Sejak `0.1.3` diperbaiki saat start (`repairSpawnHelper`, dipagari test). Bila node-pty naik versi,
   **periksa ulang mode di tarballnya** sebelum menganggap pagar ini usang.
+  **Kambuh 2026-08-14 dan diperbaiki lagi di `0.1.34`:** penawarnya dulu hanya dipanggil
+  `hanoman start` (`cli/src/commands/start.ts`), sementara instalasi nyata bisa menjalankan
+  **`node .../hanoman/dist/server.js` langsung** — pola yang dipakai unit launchd/systemd yang
+  menunjuk bundle server. Jalur itu melewati CLI sepenuhnya, jadi setiap `npm i -g hanoman`
+  mengembalikan `prebuilds/darwin-arm64/spawn-helper` ke `-rw-r--r--` dan terminal kembali hitam
+  total padahal pane tmux berisi belasan KB teks dan REST-nya 200. Sejak `0.1.34` implementasinya
+  hidup di `runner/src/spawn-helper.ts` dan dipasang di **`spawnPty` (`server/src/services/pty.ts`)** —
+  satu-satunya tempat proses ini meng-exec node-pty, jadi tak ada jalur boot yang bisa melewatinya;
+  hasilnya di-memo (`ensureSpawnHelperOnce`) supaya tetap beberapa `stat` sekali seumur proses.
+  `hanoman start` tetap memanggilnya lebih awal, hanya agar operator melihat laporannya sebelum
+  server lahir. **Jangan** memindahkannya kembali ke jalur perintah tertentu.
 - **`npm token create` tak bisa membuat GAT di npm 11.6.2** (hanya token klasik
   `--read-only`/`--cidr`), dan `npm i -g npm@latest` menolak jalan di node `v24.11.1` (menuntut
   `^24.15.0`). Sampai node dinaikkan, GAT harus dibuat dari npmjs.com.

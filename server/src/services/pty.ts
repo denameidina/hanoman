@@ -1,11 +1,12 @@
 import { spawn, type IPty } from "node-pty";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  goalOneLine, goalChunks, agentFlags, codexGoalScript,
+  goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
   renderAgentsJson, agentRosterBlock, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import { coerceCodexEffort, resolveChoices, type SessionKind } from "@hanoman/shared";
@@ -846,7 +847,15 @@ export function detachAll(): void {
 // fork mati dengan "posix_spawnp failed", pesan yang tidak menyebut node-pty sama sekali.
 // `postinstall` di package.json memperbaikinya, tapi pnpm melewati script itu saat tree
 // sudah up-to-date — jadi terjemahkan errornya alih-alih membiarkan orang menebak.
+//
+// SPEC-403 (lanjutan, 2026-08-14) · penawarnya dipasang DI SINI, bukan di jalur boot mana pun.
+// `ensureSpawnHelperOnce` sebelumnya hanya dipanggil `hanoman start`; deployment yang menjalankan
+// `node dist/server.js` langsung melewatinya, jadi setiap `npm i -g hanoman` mengembalikan
+// terminal ke blank hitam sementara REST, tmux, dan WebSocket-nya semua sehat. `spawnPty` adalah
+// satu-satunya tempat proses ini meng-exec node-pty: memasangnya di sini berarti tak ada jalur
+// masuk yang bisa terlewat. Biayanya beberapa `stat` sekali seumur proses (memoized).
 function spawnPty(...args: string[]): IPty {
+  ensureSpawnHelperOnce(createRequire(import.meta.url).resolve, (m) => process.stdout.write(m));
   try {
     return spawn("tmux", ["-L", socket(), "-f", "/dev/null", ...args], {
       name: "xterm-256color", cols: 80, rows: 24,

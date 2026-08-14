@@ -127,7 +127,9 @@ Sesi hanoman hidup di dalam **tmux**; layarnya dialirkan ke browser lewat node-p
 - **tmux belum terpasang** — `brew install tmux` (macOS) atau paket distro Anda.
 - **`spawn-helper` node-pty tak executable** — node-pty menerbitkan biner pendampingnya dengan mode
   `0644`, jadi `posix_spawnp` gagal dan tak satu byte pun mengalir ke terminal walau sesinya hidup.
-  Sejak `0.1.3` `hanoman` memperbaikinya sendiri saat start (sekali per instalasi). Bila instalasi
+  Sejak `0.1.3` `hanoman` memperbaikinya sendiri saat start, dan sejak `0.1.34` perbaikan itu
+  dipasang di jembatan node-pty-nya sendiri — jadi ia tetap jalan walau Anda memanggil bundle
+  server langsung (`node .../hanoman/dist/server.js`) alih-alih lewat `hanoman start`. Bila instalasi
   global itu milik root dan hanoman dijalankan sebagai pengguna biasa, chmod-nya ditolak — perbaiki
   manual: `sudo chmod +x "$(npm root -g)"/hanoman/node_modules/node-pty/prebuilds/*/spawn-helper`.
 

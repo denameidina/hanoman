@@ -13,3 +13,4 @@ export * from "./code-style";
 export * from "./paths";
 export * from "./skills";
 export * from "./telegram-operator";
+export * from "./spawn-helper";
