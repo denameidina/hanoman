@@ -102,6 +102,8 @@ textarea:focus-visible,
 .hn-modal-footer { flex-wrap: wrap; padding-bottom: calc(14px + var(--safe-bottom)); }
 .hn-board-local-overflow { max-width: 100%; overscroll-behavior-inline: contain; }
 .hn-row-actions { flex-wrap: wrap; }
+/* SPEC-763 · pasangan label topbar: bentuk panjang default, bentuk ringkas hanya di mobile. */
+.hn-topbar-label-short { display: none; }
 .hn-grid-mobile,
 .hn-stack-mobile,
 .hn-wrap-mobile,
@@ -144,6 +146,10 @@ textarea:focus-visible,
   .hn-shell-heading { flex: 1 1 calc(100% - 54px); align-self: center; }
   .hn-shell-tools { flex: 1 1 100%; margin-left: 0; justify-content: flex-start; gap: 6px; }
   .hn-shell-search { flex: 1 1 100%; width: 100%; }
+  /* SPEC-763 · label topbar yang panjang (pil update) diringkas di mobile supaya barisan tools muat
+     satu baris; kontrolnya tetap ada, namanya dipikul aria-label/title, dan versinya tetap terbaca. */
+  .hn-topbar-label { display: none; }
+  .hn-topbar-label-short { display: inline; }
   .hn-shell button { min-width: var(--touch-target); min-height: var(--touch-target); }
   .hn-viewport-popover {
     position: fixed !important;

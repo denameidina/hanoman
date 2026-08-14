@@ -36,7 +36,11 @@ export function Tabs({ tabs = [], value, defaultValue, onChange, variant = "unde
     return React.createElement("button", {
       key: t.value, role: "tab", "aria-selected": on, tabIndex: on ? 0 : -1,
       onClick: () => select(t.value), onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => onKeyDown(event, index),
-      style: { display: "inline-flex", alignItems: "center", gap: 6, padding: pill ? "6px 12px" : "9px 14px",
+      // SPEC-763 · `.hn-tabs` sudah `overflow-x: auto`, tapi tanpa `flex: 0 0 auto` tab menyusut
+      // sampai `min-width` target sentuh (44px) dan label `nowrap`-nya TUMPAH ke tab tetangga alih-alih
+      // memicu scroll — terukur di 390px: strip Backlog tumpah 67px total, "Semua spec" menimpa
+      // "Dari brief". Dengan flex-shrink mati: tumpahan 0px, strip menggulir (konten 499 > kotak 362).
+      style: { flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 6, padding: pill ? "6px 12px" : "9px 14px",
         marginBottom: pill ? 0 : -1, border: "none", background: pill && on ? "var(--surface-card)" : "transparent",
         boxShadow: pill && on ? "var(--shadow-xs)" : "none", borderRadius: pill ? "var(--radius-sm)" : 0,
         borderBottom: pill ? "none" : `2px solid ${on ? "var(--accent)" : "transparent"}`,

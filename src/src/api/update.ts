@@ -33,6 +33,12 @@ export function updateHeadline(u: UpdateStatus): string {
 export function updateBadgeLabel(u: UpdateStatus): string {
   return u.latestVersion ? `Update · ${u.latestVersion}` : "Update";
 }
+// SPEC-763 · bentuk ringkas untuk topbar mobile: pil penuh 296px sendirian memaksa topbar jadi tiga
+// baris. Yang dijatuhkan hanya kata "Update" — versinya tetap dirender, karena ikon telanjang tak
+// mengatakan apa pun (lingkaran kosong), sementara "0.1.34" langsung terbaca sebagai versi baru.
+export function updateBadgeLabelShort(u: UpdateStatus): string {
+  return u.latestVersion ?? "Update";
+}
 // Baris kaki popover: versi jalan → versi terbaru. Versi kosong (dev/belum ter-stamp) → "?".
 export function updateVersionLine(u: UpdateStatus): string {
   return `terpasang ${u.currentVersion || "?"} · tersedia ${u.latestVersion ?? "?"}`;

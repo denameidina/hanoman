@@ -73,6 +73,29 @@ bila dimiliki container `.hn-local-overflow` atau seam lokal setara untuk termin
 graph, board, dan tabel yang memang membutuhkan lebar intrinsik. `min-width:0` wajib diteruskan di
 rantai flex/grid; jangan memperbaiki overflow halaman dengan menyembunyikan fitur atau metadata.
 
+**Invariant halaman tidak menjamin layar terbaca.** Diukur di Chrome atas instance hanoman
+terisolasi (390/320/820px, ke-13 layar `HN_NAV`): `scrollWidth <= clientWidth` **lulus di semua
+layar** sementara tiga kelas cacat tetap hidup di baliknya, karena ketiganya membayar overflow
+dengan memotong atau menjepit, bukan dengan reflow. Ketiganya kini punya aturan:
+
+- **Tab wajib `flex: 0 0 auto`.** `.hn-tabs` sudah `overflow-x: auto`, tapi tab yang boleh menyusut
+  akan berhenti di `min-width` target sentuh (44px) dan label `nowrap`-nya **tumpah ke tab
+  tetangga** alih-alih memicu scroll — strip itu lalu tak pernah punya konten lebih lebar untuk
+  digulir. Terukur pada strip sumber Backlog di 390px: tumpahan **67px** (`Semua spec` 22px menimpa
+  `Dari brief`, `Help Center` 20px terpotong di tepi) dan `canScroll: false`; dengan flex-shrink
+  mati: tumpahan **0px**, konten 499px > kotak 362px, strip menggulir. Gerbangnya
+  `src/test/responsive-no-squeeze.test.tsx`.
+- **Baris `[teks][tombol]` wajib `hn-dense-row`.** Tombol tidak menyusut, jadi teks menerima sisa
+  lebar berapa pun itu. Terukur di 390px: nama project di Overview jadi **3 baris (4
+  karakter/baris)**, kalimat gerbang scheduler jadi **9 baris (8 karakter/baris)**. `.hn-dense-row`
+  memberi anak `flex: 1` lebar minimum 220px sehingga tombolnya turun ke baris berikutnya.
+- **Label topbar panjang diringkas, bukan dihapus.** Pil update selebar 296px dari ~358px baris
+  tools sendirian memaksa topbar jadi tiga baris — terukur **161–211px = 19–25%** viewport 844px.
+  Di mobile `.hn-topbar-label` diganti `.hn-topbar-label-short` (versinya saja): header turun ke
+  **111px (13%)** pada layar tanpa search/aksi. Yang diringkas hanya kata-nya — kontrol, versi, dan
+  `aria-label`/`title`-nya tetap ada, sesuai aturan "tak satu pun dihilangkan"; ikon telanjang
+  ditolak karena lingkaran kosong tak mengatakan apa pun.
+
 ## State tampilan persisten (SPEC-740 · ADR-0115)
 
 Tiap halaman mengingat state tampilannya dan memulihkannya saat pengguna kembali — lewat navigasi

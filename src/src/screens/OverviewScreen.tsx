@@ -46,9 +46,11 @@ function AttnRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }
   const reason = p.docStatus === "broken" ? "Docs off-convention"
     : "Docs drift — sebagian kategori belum ter-index";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 4px", borderBottom: "1px solid var(--border-hair)", borderLeft: `3px solid ${meta.bar}`, paddingLeft: 12 }}>
+    // SPEC-763 · tanpa `hn-dense-row` tombol "Buka SoT" menahan lebarnya di 390px dan menyisakan
+    // ~67px untuk nama project — terukur: `crm-tumbuh-ai` pecah jadi 3 baris (4 karakter/baris).
+    <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 4px", borderBottom: "1px solid var(--border-hair)", borderLeft: `3px solid ${meta.bar}`, paddingLeft: 12 }}>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="hn-wrap-mobile" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="box" size={13} color="var(--text-muted)" />
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</span>
           <Badge tone={att === "high" ? "err" : "warn"} size="sm">{meta.label}</Badge>

@@ -1,7 +1,7 @@
 import React from "react";
 import { Icon } from "../ds/icon";
 import {
-  useUpdate, updateHeadline, updateBadgeLabel, updateVersionLine,
+  useUpdate, updateHeadline, updateBadgeLabel, updateBadgeLabelShort, updateVersionLine,
   applyUpdate, applyConfirmMessage, type ApplyOutcome,
 } from "../api/update";
 import { usePopoverFocus } from "../ds/popover";
@@ -48,13 +48,19 @@ export function UpdateBadge() {
   };
   return (
     <div style={{ position: "relative" }}>
+      {/* SPEC-763 · label dibungkus span supaya mobile bisa menjatuhkannya (`.hn-topbar-label`):
+          pil ini 296px dari ~358px lebar tools, jadi ia sendirian yang memaksa topbar jadi tiga baris
+          (terukur 161–211px = 19–25% viewport 844px). Kontrolnya TIDAK hilang — `aria-label` +
+          `title` memikul namanya saat teksnya tak dirender, dan versinya tetap ada di popover. */}
       <button ref={popover.triggerRef} onClick={() => setOpen((v) => !v)} aria-haspopup="dialog" aria-controls={popover.panelId} aria-expanded={open} title="Update tersedia"
+        aria-label={`Update tersedia · ${updateBadgeLabel(u)}`}
         style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
           borderRadius: "var(--radius-pill, 999px)", border: "1px solid var(--brass-300, var(--border-hair))",
           background: "var(--brass-100)", color: "var(--brass-700)", cursor: "pointer",
           fontFamily: "var(--font-mono)", fontSize: 12 }}>
         <Icon name="arrow-up-circle" size={13} color="var(--brass-700)" />
-        {updateBadgeLabel(u)}
+        <span className="hn-topbar-label">{updateBadgeLabel(u)}</span>
+        <span className="hn-topbar-label-short" aria-hidden="true">{updateBadgeLabelShort(u)}</span>
       </button>
       {open && (
         <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label="Update tersedia" tabIndex={-1}

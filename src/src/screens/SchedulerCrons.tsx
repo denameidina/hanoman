@@ -186,7 +186,9 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast }: Schedule
       {/* Gerbang yang tak terlihat terbaca sebagai "cron rusak"; ia dinyatakan di sini DAN dicatat
           sebagai alasan di riwayat run (SPEC-479 memakai jalan yang sama untuk lencana "antre"). */}
       {project && !project.schedulerOptIn && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "10px 12px",
+        // SPEC-763 · tombol "Aktifkan scheduler di project ini" tak menyusut, jadi tanpa `hn-dense-row`
+        // kalimat gerbang ini tersisa ~59px di 390px — terukur 9 baris, 8 karakter/baris.
+        <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "10px 12px",
           border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-sunken)" }}>
           <Icon name="alert-triangle" size={16} color="var(--clay-500)" />
           <span style={{ flex: 1, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
