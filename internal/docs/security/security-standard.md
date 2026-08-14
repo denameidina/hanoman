@@ -111,8 +111,26 @@
 - **WebSocket**: browser meminta tiket target-spesifik lewat `POST /api/ws-tickets`, mengirimnya sekali
   melalui subprotocol `hanoman-ticket.<token>`, dan tidak menaruh credential di URL. Tiket hidup 30
   detik, one-use, serta bounded; exact `Origin` scheme/host/port harus ada di control allowlist.
+  **Tanpa `HANOMAN_CONTROL_ORIGINS`, allowlist itu diturunkan dari `Host` request** (same-origin,
+  kedua scheme) alih-alih kosong — lihat "Default same-origin" di bawah. Production tak ikut:
+  di sana env-nya wajib dan boot gagal tanpanya.
   Maksimum payload 64 KiB, 120 pesan/menit, dan 8 koneksi/principal. Sesi diverifikasi ulang setiap
   60 detik dan sebelum input terminal diterapkan. Sync machine-to-machine memakai Bearer header.
+  - **Default same-origin (`wsAllowlistFor`)**: allowlist yang kosong dulu berarti **tolak semua**,
+    dan karena instalasi polos (`npm i -g hanoman` → `hanoman`) tak pernah menyetel
+    `HANOMAN_CONTROL_ORIGINS`, seluruh WebSocket browser ditolak 401 — `events` **dan**
+    `terminal:<id>` — sehingga terminal kosong sejak paket dipasang walau tmux dan REST sehat.
+    Di luar production allowlist itu kini diturunkan dari `Host` request: `http://<host>` +
+    `https://<host>` (plus bentuk tanpa port bila proxy menulis `:80`/`:443`). Pencocokannya tetap
+    **exact** lewat `assertWsOrigin` — yang berubah hanya sumber daftarnya, bukan ketatnya.
+  - **Kenapa ini tidak melemahkan CSWSH**: halaman lintas-situs tetap ditolak karena Origin-nya tak
+    pernah sama dengan Host dashboard, dan lapis utamanya tetap tiket one-use 30 detik yang hanya
+    bisa diambil lewat `POST /api/ws-tickets` bercookie (`sameSite=strict`) — tak terbaca dari
+    origin lain. Scheme tak dibandingkan karena di belakang proxy TLS server hanya melihat `Host`
+    tanpa scheme; menuntut kecocokan scheme akan menolak tunnel yang sah.
+  - **Production tetap fail-closed** (ADR-0117): `wsAllowlistFor` mengembalikan set kosong apa adanya
+    saat `NODE_ENV=production`, dan `assertRuntimeBoundary` sudah menolak boot tanpa origin split.
+    Deployment publik karena itu tak pernah bergantung pada `Host` yang datang dari luar.
 - **Transkrip sesi tersimpan (SPEC-362, [ADR-0079](../adr/0079-history-sesi-terminal-store-lokal-plus-transkrip.md))**:
   riwayat sesi menyimpan **snapshot layar** tiap sesi yang ditutup — data baru yang sebelumnya tak
   pernah ada di disk hanoman. ADR-0047 dulu **sengaja** melarangnya masuk `SessionResult`; ADR-0079

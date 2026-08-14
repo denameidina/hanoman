@@ -59,6 +59,46 @@ export function assertWsOrigin(origin: string | undefined, allowed: Set<string>)
   if (!origin || !allowed.has(origin)) throw new Error("WebSocket Origin rejected");
 }
 
+// SPEC-761 menutup gerbang Origin secara fail-closed dan mengisi daftarnya HANYA dari
+// `HANOMAN_CONTROL_ORIGINS`. Instalasi polos (`npm i -g hanoman` → `hanoman`) tak pernah menyetel
+// env itu, sehingga SETIAP WebSocket browser ditolak 401: kanal `events` dan `terminal:<id>`
+// sama-sama mati, dan terminal — fitur inti produk — kosong sejak paket dipasang, padahal tmux
+// serta REST-nya sehat. Gejalanya menipu karena tak ada yang gagal selain upgrade WS-nya.
+//
+// Di luar production gerbangnya karena itu turun ke SAME-ORIGIN, bukan terbuka: Origin tetap
+// dicocokkan exact oleh `assertWsOrigin`, hanya acuannya Host request itu sendiri alih-alih daftar
+// env. Halaman lintas-situs tetap ditolak, jadi pertahanan CSWSH tidak berkurang — lapis utamanya
+// pun tetap tiket one-use yang hanya bisa diambil lewat `POST /api/ws-tickets` bercookie.
+//
+// Production TIDAK ikut turun (ADR-0117): `assertRuntimeBoundary` sudah menolak boot tanpa origin
+// split, dan invariant-nya menuntut kebijakan host ditegakkan aplikasi, bukan disimpulkan dari
+// request yang datang.
+export function wsAllowlistFor(
+  configured: Set<string>,
+  host: string | undefined,
+  env: Record<string, string | undefined>,
+): Set<string> {
+  if (configured.size > 0 || env.NODE_ENV === "production") return configured;
+  const value = host?.trim().toLowerCase();
+  if (!value) return configured;
+  // Divalidasi lewat URL, bukan regex: sekali jalan ia menolak path, credential, dan spasi
+  // sementara IPv6 (`[::1]:8787`) tetap utuh — regex host gampang salah di keduanya.
+  let parsed: URL;
+  try { parsed = new URL(`http://${value}`); } catch { return configured; }
+  if (!parsed.host || parsed.username || parsed.password || parsed.pathname !== "/"
+    || parsed.search || parsed.hash) return configured;
+  const hosts = new Set([parsed.host]);
+  // Browser MENGHILANGKAN port default dari Origin (`https://x`, bukan `https://x:443`) sementara
+  // sebagian proxy tetap menuliskannya di Host. Tanpa bentuk telanjangnya, deployment di belakang
+  // proxy semacam itu gagal cocok padahal host-nya sama.
+  if (parsed.port === "80" || parsed.port === "443") hosts.add(parsed.hostname);
+  const allowed = new Set<string>();
+  // Kedua scheme untuk host yang sama: di belakang proxy TLS browser mengirim Origin `https://`
+  // sementara server hanya pernah melihat Host tanpa scheme, jadi scheme tak bisa dibandingkan.
+  for (const candidate of hosts) { allowed.add(`http://${candidate}`); allowed.add(`https://${candidate}`); }
+  return allowed;
+}
+
 export function admitBrowserWs(
   req: FastifyRequest,
   target: Exclude<WsTarget, "sync">,
@@ -67,7 +107,10 @@ export function admitBrowserWs(
   const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
   if (!origin && process.env.NODE_ENV === "test" && allowedOrigins.size === 0)
     return { kind: "test", id: "test" };
-  assertWsOrigin(origin, allowedOrigins);
+  // `process.env` seperti baris di atas: modul ini tak menerima env aplikasi, dan yang dibutuhkan
+  // hanya penanda production yang sama dipakai `assertRuntimeBoundary`.
+  const host = typeof req.headers.host === "string" ? req.headers.host : undefined;
+  assertWsOrigin(origin, wsAllowlistFor(allowedOrigins, host, process.env));
   const token = ticketFromProtocol(req.headers["sec-websocket-protocol"]);
   if (!token) throw new Error("WebSocket ticket required");
   const principal = consumeWsTicket(token, target);

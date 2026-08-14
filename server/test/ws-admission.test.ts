@@ -5,6 +5,7 @@ import {
   assertWsOrigin,
   consumeWsTicket,
   issueWsTicket,
+  wsAllowlistFor,
   wsTicketProtocol,
 } from "../src/services/ws-admission";
 
@@ -14,6 +15,31 @@ describe("WebSocket admission", () => {
     expect(() => assertWsOrigin("https://admin.example:444", new Set(["https://admin.example"]))).toThrow();
     expect(() => assertWsOrigin("https://evil.example", new Set(["https://admin.example"]))).toThrow();
     expect(() => assertWsOrigin(undefined, new Set(["https://admin.example"]))).toThrow();
+  });
+
+  it("falls back to the request's own origin when no control allowlist is configured", () => {
+    const none = new Set<string>();
+    // Instalasi polos (`npm i -g hanoman`) tak menyetel HANOMAN_CONTROL_ORIGINS. Fail-closed di
+    // sini mematikan SELURUH terminal, jadi di luar production gerbangnya turun ke same-origin —
+    // tetap exact-match, cuma acuannya Host request, bukan daftar env.
+    expect(wsAllowlistFor(none, "127.0.0.1:8787", { NODE_ENV: "development" }))
+      .toEqual(new Set(["http://127.0.0.1:8787", "https://127.0.0.1:8787"]));
+    // Kedua scheme: di belakang proxy TLS, browser mengirim Origin https sementara server hanya
+    // pernah melihat Host tanpa scheme — membandingkan scheme di sini akan menolak tunnel yang sah.
+    expect(wsAllowlistFor(none, "hm.example", { NODE_ENV: "development" }).has("https://hm.example")).toBe(true);
+    // IPv6 tetap terbaca utuh, bukan terpotong di titik dua.
+    expect(wsAllowlistFor(none, "[::1]:8787", { NODE_ENV: "development" }).has("http://[::1]:8787")).toBe(true);
+
+    // Allowlist eksplisit selalu menang — Host tak pernah bisa memperlebarnya.
+    const explicit = new Set(["https://admin.example"]);
+    expect(wsAllowlistFor(explicit, "evil.example", { NODE_ENV: "development" })).toBe(explicit);
+
+    // Production tetap fail-closed (ADR-0117): `assertRuntimeBoundary` sudah mewajibkan env-nya.
+    expect(wsAllowlistFor(none, "127.0.0.1:8787", { NODE_ENV: "production" }).size).toBe(0);
+
+    // Host yang tak masuk akal tak pernah jadi allowlist.
+    for (const host of [undefined, "", "evil.example/path", "user@evil.example", "a b", "evil.example:80:80"])
+      expect(wsAllowlistFor(none, host, { NODE_ENV: "development" }).size).toBe(0);
   });
 
   it("consumes a bounded, target-specific ticket exactly once", () => {

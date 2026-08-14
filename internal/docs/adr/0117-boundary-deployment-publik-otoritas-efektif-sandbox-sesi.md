@@ -83,6 +83,28 @@ Detail interface, migration, quota, retensi, dan test berada di design doc SPEC-
   pada jalur IO berisiko, bukan hot path render.
 - Credential yang pernah berada pada service root dianggap terekspos dan wajib dirotasi saat cutover.
 
+## Amandemen — default same-origin untuk WebSocket non-production (2026-08-14)
+
+Choke point "exact-origin WebSocket ticket admission" di atas mengisi allowlist-nya **hanya** dari
+`HANOMAN_CONTROL_ORIGINS`, dan set kosong berarti tolak-semua. Instalasi polos (`npm i -g hanoman` →
+`hanoman`) tak pernah menyetel env itu — `dist/cli.js` tidak menyetelnya dan `hanoman doctor` tak
+memeriksanya — sehingga sejak v0.1.31 **setiap** WebSocket browser ditolak 401 dan terminal, fitur
+inti produk, kosong sejak paket dipasang walau tmux dan REST-nya sehat. Gejalanya menipu: tak ada
+yang gagal selain upgrade WS-nya.
+
+Karena itu `wsAllowlistFor` menurunkan allowlist dari `Host` request bila env-nya tak diisi **dan**
+`NODE_ENV` bukan production. Yang berubah hanya **sumber** daftarnya; pencocokannya tetap exact lewat
+`assertWsOrigin`, jadi origin lintas-situs tetap ditolak dan tiket one-use tetap lapis utamanya.
+Scheme tak dibandingkan (di belakang proxy TLS server hanya melihat `Host` tanpa scheme).
+
+Production **tidak** ikut turun: set kosong tetap tolak-semua di sana, dan `assertRuntimeBoundary`
+sudah menolak boot tanpa origin split — invariant 5 tetap utuh, kebijakan host tak pernah
+disimpulkan dari request yang datang pada deployment publik.
+
+Konsekuensi tambahan yang tetap berlaku: mengisi `HANOMAN_CONTROL_ORIGINS` juga menyalakan `enforce`
+di `loadIngressPolicy`, sehingga Host yang tak terdaftar menjadi `denied`. Deployment yang memakai
+reverse proxy atau tunnel wajib menyebut semua host dashboard-nya sekaligus, bukan hanya satu.
+
 ## Invariant yang tidak boleh dilonggarkan diam-diam
 
 1. Public input tidak dapat memberi launch approval, langsung maupun lewat sync.
