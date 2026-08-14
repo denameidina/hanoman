@@ -9,6 +9,7 @@ import { __resetHelpBuckets } from "../src/services/help-ratelimit";
 import { PORTAL_TICKET_KEYS } from "@hanoman/shared";
 
 const app = buildApp();
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 const clean = async () => {
   await prisma.clientProjectAccess.deleteMany();
   await prisma.session.deleteMany(); await prisma.user.deleteMany();
@@ -163,7 +164,7 @@ describe("POST /api/portal/projects/:id/tickets (SPEC-626)", () => {
   it("lampiran gambar tersimpan; berkas bertipe salah di-SKIP tanpa membatalkan submit", async () => {
     const { cookie } = await seed();
     const b = body(OK, [
-      { name: "bukti.png", mime: "image/png", buf: Buffer.from("gambar-1") },
+      { name: "bukti.png", mime: "image/png", buf: PNG },
       { name: "virus.exe", mime: "application/octet-stream", buf: Buffer.from("nope") },
     ]);
     const r = await app.inject({ method: "POST", url: "/api/portal/projects/p1/tickets",

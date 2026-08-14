@@ -154,12 +154,12 @@ berubah** — metode mengganti CARA sebuah fase dikerjakan, bukan fase apa yang 
 eksplisit, prompt byte-identik dengan sebelum spec ini.
 
 Sesi memakai `--dangerously-skip-permissions`/padanan codex tanpa hook deny perintah; guardrail itu
-dicabut ADR-0037 dan isolasi worktree adalah batas yang tersisa. Telegram tidak menambah executor:
+dicabut ADR-0037. Sejak ADR-0117, worktree hanya boundary Git dan production menjalankan semua agen
+di rootless Podman dengan mount/secret/egress minimum. Telegram tidak menambah executor:
 session operator memakai API ber-AgentToken/capability, dan confirmation inline menjadi syarat
 tambahan khusus action sulit dibatalkan dari identitas token gateway (ADR-0096).
-Saat hanoman sendiri jalan sebagai **root** (kasus lazim di VPS), claude CLI menolak flag itu dan `exit(1)`
-seketika — `createSession` karena itu memasang `IS_SANDBOX=1` di env sesi claude bila `getuid() === 0`
-(`rootBypassEnv`); lihat [security-standard](../security/security-standard.md).
+Production menolak API/worker uid 0. `rootBypassEnv` tersisa hanya untuk kompatibilitas local/test
+legacy; ia bukan konfigurasi deploy. Lihat [security-standard](../security/security-standard.md).
 
 Biaya bersifat **estimasi dan tidak menggerakkan apa pun** (ADR-0012): tidak ada `dailyBudget`, tidak ada
 budget flag. Indikator limit dibaca langsung dari OAuth usage API Anthropic (`services/limits.ts`,

@@ -115,6 +115,8 @@ export type SpecListParams = {
 };
 export type ProjectListParams = { q?: string; page?: number; limit?: number };
 export const api = {
+  issueWsTicket: (target: "events" | `terminal:${string}`) =>
+    j<{ ticket: string }>(paths.wsTickets, { method: "POST", ...body({ target }) }),
   listProjects: (params: ProjectListParams = {}) => j<Paginated<ProjectView>>(paths.projects + qs(params)),
   getProject: (id: string) => j<ProjectView>(paths.project(id)),
   createProject: (b: unknown) => j<ProjectView>(paths.projects, { method: "POST", ...body(b) }),
@@ -369,7 +371,7 @@ export const api = {
   vpsConsole: (id: string) => j<{ id: string }>(paths.vpsConsole(id), { method: "POST" }),
   // SPEC-169 · auth. Cookie sesi ikut otomatis (same-origin). 401 dari mana pun → App balik ke Login.
   authStatus: () => j<AuthStatus>(paths.authStatus),
-  setup: (b: { email: string; password: string }) => j<{ user: UserView }>(paths.authSetup, { method: "POST", ...body(b) }),
+  setup: (b: { email: string; password: string; setupToken?: string }) => j<{ user: UserView }>(paths.authSetup, { method: "POST", ...body(b) }),
   login: (b: { email: string; password: string }) => j<{ user: UserView }>(paths.authLogin, { method: "POST", ...body(b) }),
   logout: () => j<void>(paths.authLogout, { method: "POST" }),
   listUsers: () => j<UserView[]>(paths.authUsers),

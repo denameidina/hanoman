@@ -15,13 +15,16 @@ WebSocket per-sesi tersendiri. Endpoint HTTP GET tiap sumber tetap ada untuk pai
 > `/vps*`) berikut `integrate`, `DELETE /specs/:id`, dan `PATCH /specs/:id {stage}` sengaja **tak
 > punya tool**.
 
-> **Auth (SPEC-169, ADR-0028):** semua endpoint butuh sesi valid (cookie `hn_session`) — gate
-> `onRequest` membalas **401** tanpa sesi. Publik tanpa sesi hanya: `GET /health`,
-> `GET /auth/status`, `POST /auth/login`, `POST /auth/setup`, dan `GET /agent-integration.md`
-> (SPEC-489 · panduan AI agent, lihat bagiannya di bawah).
+> **Host matrix (SPEC-761, ADR-0117):** host di `HANOMAN_PUBLIC_ORIGINS` hanya melayani static UI,
+> `GET /health`, dan `/help/**`; request API lain ditolak sebelum auth. Host di
+> `HANOMAN_CONTROL_ORIGINS` menolak `/help/**` dan berada di belakang SSO/MFA/VPN/access proxy.
+> Host tak dikenal ditolak. Di dalam host control, gate auth membalas **401** tanpa cookie
+> `hn_session`, kecuali `GET /auth/status`, `POST /auth/login`, `POST /auth/setup`, dan
+> `GET /agent-integration.md`. Origin app tetap bind loopback; forwarded IP hanya dipercaya dari
+> hop/CIDR `HANOMAN_TRUST_PROXY`.
 >
 > **Agent token (SPEC-257 · ADR-0065):** jalur auth **kedua** untuk AI agent eksternal —
-> `Authorization: Bearer <token>` (upgrade WebSocket: `?agent_token=`) digerbang gate yang sama,
+> `Authorization: Bearer <token>` digerbang gate yang sama,
 > lalu ditegakkan **capability per-domain read/write** (write⊇read). Cookie sesi berperan `admin` =
 > akses penuh; agen tanpa capability → **403** `{ need }`; master switch `Setting.agentAccessEnabled` off →
 > **401**. Lihat `## Agent tokens` di bawah.
@@ -38,8 +41,9 @@ WebSocket per-sesi tersendiri. Endpoint HTTP GET tiap sumber tetap ada untuk pai
 
 ## Auth
 ```
-GET  /auth/status         -> { needsSetup: bool, user: {id,email,role,createdAt}|null }   # publik
-POST /auth/setup          { email, password }   # HANYA saat 0 user; set cookie; 409 bila sudah ada; 400 body cacat
+GET  /auth/status         -> { needsSetup: bool, user: {id,email,role,createdAt}|null }   # control host
+POST /auth/setup          { email, password, setupToken } # control host; 403 proof salah/expired;
+#   HANYA saat 0 user; tepat satu create atomik menang; set cookie; token one-use 15 mnt; 409 sesudah tertutup
 POST /auth/login          { email, password }   # set cookie; 401 generic; 429 throttled; 400 body cacat
 POST /auth/logout         # 204; hapus sesi + clear cookie
 GET  /auth/users          -> UserView[]                          # sesi
@@ -202,6 +206,8 @@ POST /specs/batch         { project, items:[BreakdownItem], branchFrom?, prdPath
 #   SPEC-447 · ADR-0093 · `dependsOn?: string[]` — backlog yang harus selesai & ter-merge lebih dulu.
 #   Divalidasi di boundary (tak ada FK untuk kolom Json): id harus ADA, berada di PROJECT YANG SAMA,
 #   bukan diri sendiri → 400 dengan alasannya. Siklus mustahil di POST (spec baru belum bisa dirujuk).
+#   SPEC-761 · launchApprovedAt/By hanya diisi bila principal adalah cookie admin atau AgentToken
+#   dengan `sessions:write`; capability backlog/settings/projects sendiri membuat Spec TIDAK approved.
 PATCH /specs/:id          { branchFrom?: string|null, stage?, confirmDelete?, dependsOn?, autoMerge? }   -> Spec
 #   branchFrom null = kembali ke default project (main); menentukan basis sesi BERIKUTNYA. Lihat ADR-0032.
 #   stage = revert backward-only atas perintah human (SPEC-167/ADR-0027): 422 bila maju/sama,
@@ -598,6 +604,18 @@ GET      /fs/browse?path=               # directory picker sisi server (untuk me
 GET      /health                        # publik; liveness
 ```
 
+### Runtime config sensitif (SPEC-215/477/761)
+
+`GET /config` tidak pernah memulangkan secret utuh. `PUT`/`DELETE /config` untuk kategori
+`credential`, termasuk `SYNC_SERVER_URL`, adalah cookie-admin-only. Mengganti sync URL menormalkan
+exact origin dan, dalam transaksi yang sama, menulis tombstone `SYNC_DEVICE_TOKEN`; client aktif
+berhenti dan respons menyatakan token baru diperlukan. Record pull/push dibatasi ukuran dan schema
+entity/field/type/date sebelum apply; field LOCAL-only seperti launch approval ditolak/dibuang.
+
+Transport sync dan attachment fetch memakai Bearer header, address-pinned DNS, timeout/response cap,
+dan no-redirect. Query credential ditolak. `GET /sync/ws` adalah machine-to-machine Bearer, bukan
+browser ticket.
+
 ## Dokumentasi AI Agent (SPEC-489) — **PUBLIC**
 
 ```
@@ -656,8 +674,8 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > (`/health`, `/auth/status`, `/auth/login`, `/auth/setup`, `/agent-integration.md`) yang tak pernah
 > menyentuh gate ini sama sekali.
 
-> **Sync mesin-ke-mesin** (SPEC-213 · ADR-0043/0045/0046): surface `/api/sync/{pull,push,ws}` diotorisasi
-> **device token** (Bearer / `?token=` WS), di-**bypass** gate cookie.
+> **Sync mesin-ke-mesin** (SPEC-213/761 · ADR-0043/0117): surface `/api/sync/{pull,push,ws}` diotorisasi
+> **device token Bearer header**, di-**bypass** gate cookie. Credential query selalu 401.
 > **Byte lampiran** (SPEC-272 · ADR-0068): `GET /api/sync/attachments/:storageKey` — **device-token**
 > (bukan cookie), stream byte biner lampiran (`Content-Type` mime) untuk fetch-through client → `200` |
 > `404` (storageKey bukan milik `TicketAttachment`/file hilang) | `401` (tanpa device token). Metadata
@@ -685,6 +703,9 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 
 ## Terminal
 ```
+POST   /ws-tickets { target:"events"|"terminal:<sessionId>" } -> { ticket }
+#   Cookie user atau AgentToken yang sudah lolos gate; tiket 192-bit base64url, target-specific,
+#   one-use, 30 detik, bounded 2048. Browser mengirimnya sebagai subprotocol, bukan URL.
 GET    /terminal/sessions            # [{ id, projectId, specId?, flow?, cwd, branch?, exited, exitCode?, decision, agent }]
 #   branch? (SPEC-230): branch integrasi sesi project-level (PRD = prd/<slug>) — menyalakan review+merge di sel
 #   agent (SPEC-338/ADR-0074): "claude" | "codex" — mesin sesi, dibaca dari opsi tmux @hanoman_agent.
@@ -739,6 +760,10 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #       tersentuh). `force: true` MELEWATI gerbang ini: hanya jalur manusia yang memilikinya;
 #       governor scheduler & denyut lead tak punya jalan paksa (governor melewati item terblokir,
 #       barisnya tetap `queued` + `note`, slot tak terpakai).
+#     403 { error:"launch approval required" } bila Spec belum punya approval LOCAL-only. Gerbang
+#       final berada di `startSpecSession` sebelum kill/worktree/tmux, jadi semua jalur scheduler,
+#       governor, lead, cron, dan route manual tunduk pada pemeriksaan yang sama. Start manual oleh
+#       cookie admin atau AgentToken `sessions:write` memberi approval atomik terlebih dahulu.
 #     verifyScope?: "changed"|"full" — scope verifikasi PER SESI; kosong → Setting.verifyScope
 #       (default "changed"). "changed" menyisipkan klausa scope ke prompt (uji berkas yang berubah
 #       saja: `vitest --changed "$HANOMAN_BASE_SHA"`/`vitest related`, typecheck per paket, lint per
@@ -828,6 +853,11 @@ GET    /terminal/cleanups            # { items: [{ sessionId, projectId, entry, 
 GET    /terminal/sessions/:id/ws     # WebSocket; close 4004 bila sesi tak ada
 #   server->klien: { t:"data", d } · { t:"phase", phases, complete } · { t:"exit", code }
 #   klien->server: { t:"in", d } · { t:"resize", cols, rows }
+#   Browser lebih dulu POST /ws-tickets {target:"terminal:<id>"} lalu mengirim subprotocol
+#   `hanoman-ticket.<token>`. Exact Origin scheme/host/port wajib cocok control allowlist; tiket
+#   target-specific, one-use, hidup 30 dtk, store bounded. `/events/ws` memakai target `events`.
+#   Payload maksimum 64 KiB, 120 pesan/menit, 8 koneksi/principal. Principal diverifikasi ulang
+#   tiap 60 dtk dan SEBELUM input/resize terminal diterapkan; revoke menutup 1008.
 #   SPEC-433 · `complete` = seluruh fase pipeline tercatat (done|skipped) DAN plan spec-nya tak
 #   menyisakan `- [ ]` (gerbang ADR-0029 yang sama dengan stageForRun). Ia BUKAN turunan
 #   `exited`: agen adalah TUI interaktif yang kembali ke prompt-nya sesudah fase terakhir, jadi
@@ -920,10 +950,13 @@ POST   /vps/:id/remediate            # 200 { steps, audit, scoreTotal, scoreBySe
 GET     /api/help/:slug                  -> { projectName, categories }
 #   Info halaman publik. Otorisasi = helpEnabled. 404 generik bila project tak ada / helpEnabled=false.
 POST    /api/help/:slug/tickets          # multipart/form-data
-#   Field: category, title, detail, email, hc_trap (honeypot) + files[] (≤3 gambar png/jpeg/webp, ≤5MB).
+#   Field: category, title, detail, email, hc_trap + files[] (≤3 gambar, ≤5 MiB/file, ≤10 MiB/tiket).
 #   Otorisasi = helpEnabled. 201 { number, key, statusPath } (key+link ditampilkan SEKALI di layar).
 #   400 field wajib kosong/kategori invalid (tak buat tiket). 404 helpEnabled=false. 429 rate-limit
-#   per IP & per project. Honeypot terisi → 200 { ok:true } palsu (tak buat tiket). Berkas invalid di-skip.
+#   per IP & per project memakai limiter bounded. Honeypot terisi → 200 { ok:true } palsu.
+#   File wajib magic-byte cocok MIME png/jpeg/webp, decode+re-encode ≤12k dimensi/40M pixel,
+#   quota 250 MiB/project dan 1 GiB/global, lalu quarantine+scanner. Production tanpa scanner atau
+#   scanner gagal/timeout = file ditolak tertutup; submit tiket tetap berhasil dengan file sah lain.
 #   SPEC-352 · honeypot bernama `hc_trap`, BUKAN lagi `hp` — `hp` (= "handphone") diisi autofill
 #   browser untuk pelapor sungguhan; kini `hp` field biasa yang diabaikan (bundle basi tetap jadi
 #   tiket). Klien WAJIB memvalidasi bentuk respons: 200 { ok:true } bukan sukses.
@@ -939,14 +972,15 @@ GET   /tickets/:id            -> TicketDetail { ...ticket, detail, attachments:[
 #   SPEC-293 · spec = backlog tertaut (stage → badge status turunan di detail triase). publicStatusUrl =
 #   ${base}/help/<projectId>/status/<shareToken> (link publik dibagikan ke pelapor); shareToken di-generate
 #   lazily bila tiket lama belum punya (idempoten, tanpa sync). Deep-link backlog UI = ${origin}#spec=<id> (ADR-0071).
-GET   /tickets/:id/attachments/:attId    # stream berkas gambar (Content-Type mimeType) ber-auth · 404 (att bukan milik tiket)
+GET   /tickets/:id/attachments/:attId    # attachment ber-auth · 404; Content-Disposition: attachment,
+#   X-Content-Type-Options:nosniff, Content-Security-Policy:sandbox (active content tak inline di admin origin)
       # SPEC-272 · di CLIENT byte ditarik lazy dari hub (readUploadOrFetch → /sync/attachments) bila absen lokal, lalu di-cache
 POST  /tickets/:id/accept  { priority? }  # 201 { spec } — buat Spec source help prefilled + tandai tiket
 #   accepted + specId (tautan dua arah). Idempoten: sudah promoted → 200 { alreadyPromoted:true, spec }. 404.
-#   SPEC-297: inti accept kini di services/ticket-accept.ts (acceptTicket) — dipakai route ini DAN scheduler
-#   source-checker `triase`; kontrak HTTP (201/200/404) & pemetaan kategori→source (SPEC-291) tak berubah.
-#   SPEC-286 · payload.context memuat DIREKTIF periksa lampiran: bila tiket berlampiran → daftar nama+mime+path
-#   upload (agar agen membaca isinya, biasanya screenshot) + cadangan API attachments; tanpa lampiran → "Tanpa lampiran".
+#   SPEC-761: hanya aksi review manusia menerima tiket. Source triase scheduler tidak auto-accept,
+#   tidak membuat Spec/queue/session; ia hanya membuat notifikasi review dedup. Payload accept
+#   membingkai title/detail/lampiran di `UNTRUSTED_TICKET_DATA_BEGIN/END` dan melarang agen mengikuti
+#   instruksi di dalam blok. Path lampiran tidak memberi path host bebas.
 POST  /tickets/:id/unlink                 # 200 { id, status:"new", specId:null } — lepas tautan backlog (kebalikan accept).
 #   Non-destruktif: Spec dibiarkan (hapus manual). Reset status→new → bisa diterima lagi (Spec baru). Idempoten. 404. (SPEC-271)
 POST  /tickets/:id/reject                 # 200 { id, status:"rejected" } — tutup tanpa Spec · 404
@@ -1407,7 +1441,10 @@ menggerbangi tap.
 `POST` ke URL endpoint, `Content-Type: application/json`, badan = amplop `hanoman.webhook/1`.
 Header: `X-Hanoman-Event`, `X-Hanoman-Event-Id`, `X-Hanoman-Delivery`, `X-Hanoman-Attempt`,
 `X-Hanoman-Timestamp`, `X-Hanoman-Signature` (`v1=` + HMAC-SHA256 heksadesimal atas
-`<timestamp>.<raw body>`). Sukses = 2xx. `410 Gone` menonaktifkan endpoint seketika. Retry
+`<timestamp>.<raw body>`). Setiap pengiriman resolve seluruh A/AAAA, menolak alamat privat/metadata,
+mem-pin koneksi ke address yang tervalidasi, dan mempertahankan Host/TLS SNI. Semua 301/302/303/
+307/308 gagal terminal: body, auth, dan signature tidak pernah mengikuti redirect. Sukses = 2xx.
+`410 Gone` menonaktifkan endpoint seketika. Retry
 berbackoff tabel (6 percobaan: 0 · 30 dtk · 2 mnt · 10 mnt · 30 mnt · 2 jam); 5 kegagalan beruntun
 menonaktifkan endpoint otomatis + satu `Notification` bertipe `webhook`. Katalog jenis peristiwa
 hidup di `shared/src/webhook.ts` (`WEBHOOK_ENTITIES`) dan dirender apa adanya oleh halaman

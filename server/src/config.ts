@@ -50,6 +50,13 @@ export async function setConfig(key: string, value: string): Promise<void> {
   await prisma.runtimeConfig.upsert({ where: { key }, create: { key, value: stored }, update: { value: stored } });
   cache.set(key, value);
 }
+export async function setConfigsAtomic(values: Record<string, string>): Promise<void> {
+  await prisma.$transaction(Object.entries(values).map(([key, value]) => {
+    const stored = isSecret(key) ? encryptSecret(value) : value;
+    return prisma.runtimeConfig.upsert({ where: { key }, create: { key, value: stored }, update: { value: stored } });
+  }));
+  for (const [key, value] of Object.entries(values)) cache.set(key, value);
+}
 export async function clearConfig(key: string): Promise<void> {
   await prisma.runtimeConfig.deleteMany({ where: { key } });
   cache.delete(key);

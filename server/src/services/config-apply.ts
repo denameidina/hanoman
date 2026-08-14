@@ -1,5 +1,5 @@
 import { configEntry, CONFIG_REGISTRY } from "@hanoman/shared";
-import { rawDbValue } from "../config";
+import { rawDbValue, setConfigsAtomic } from "../config";
 import { applySyncConfig } from "./sync-client";
 
 // SPEC-215 · ADR-0049 · orkestrasi side-effect saat config berubah / boot.
@@ -30,6 +30,18 @@ export async function applyConfigSideEffect(key: string): Promise<void> {
     return;
   }
   if (configEntry(key)?.inheritEnv) mirrorInheritEnv(key);
+}
+
+export async function rotateSyncOrigin(input: string): Promise<{ needsDeviceToken: true }> {
+  const url = new URL(input);
+  const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1";
+  if (url.username || url.password || url.search || url.hash || url.pathname !== "/")
+    throw new Error("URL hub harus exact origin tanpa credential, path, query, atau fragment");
+  if (url.protocol !== "https:" && !(process.env.NODE_ENV !== "production" && url.protocol === "http:" && loopback))
+    throw new Error("URL hub harus HTTPS (HTTP hanya loopback development)");
+  await setConfigsAtomic({ SYNC_SERVER_URL: url.origin, SYNC_DEVICE_TOKEN: "" });
+  await applySyncConfig();
+  return { needsDeviceToken: true };
 }
 
 // Dipanggil saat boot server: mirror semua kredensial warisan + init sync client.

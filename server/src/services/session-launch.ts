@@ -8,6 +8,7 @@ import { ensureCodexTrust } from "./codex-trust";
 import { createSession, getSession, killSession, sessionIdForSpec } from "./pty";
 import { blockersForSpec, blockedNote, type SpecBlocker } from "./spec-deps";
 import { phaseFilePath, decisionFilePath, readPhases } from "./session-phases";
+import { assertLaunchApproved } from "./launch-authority";
 
 // Re-ekspor supaya pemanggil (governor, test) punya satu titik impor jalur peluncuran.
 export { sessionIdForSpec } from "./pty";
@@ -17,7 +18,7 @@ export { sessionIdForSpec } from "./pty";
 // (route) atau menandai antrean gagal (governor).
 export class LaunchError extends Error {
   // SPEC-447 · `blockers` hanya terisi untuk kind "blocked"; route memetakannya ke body 409.
-  constructor(message: string, readonly kind: "needs-bind" | "worktree" | "blocked",
+  constructor(message: string, readonly kind: "needs-bind" | "worktree" | "blocked" | "not-approved",
               readonly blockers: SpecBlocker[] = []) { super(message); }
 }
 export type StartSpecResult = { id: string; reused?: boolean; resumed?: boolean };
@@ -75,19 +76,21 @@ export async function startSpecSession(
     force?: boolean;
   },
 ): Promise<StartSpecResult> {
+  const id = sessionIdForSpec(spec.id);
+  const pane = getSession(id);
+  if (pane && !pane.exited) return { id: pane.id, reused: true };
+  try { assertLaunchApproved(spec); }
+  catch (error) { throw new LaunchError((error as Error).message, "not-approved"); }
   // SPEC-213 · binding lokal per-device menang atas Project.repoDir (AC-8). Tanpa checkout lokal →
   // minta bind/clone dulu (route: 400 needsBind; governor: markFailed).
   const repoDir = await resolveRepoDir(spec.projectId);
   if (!repoDir) throw new LaunchError(`project "${spec.projectId}" belum di-bind ke checkout lokal`, "needs-bind");
 
-  const id = sessionIdForSpec(spec.id);
   // SPEC-394 · ADR-0084 — pane HIDUP adalah sesinya: re-attach (ADR-0015), jangan sentuh apa pun.
   // Pane MATI bukan sesi: tmux menahannya (`remain-on-exit on`) hanya supaya layar terakhirnya
   // masih terbaca. Mengembalikannya sebagai "sesi" membuat tombol Lanjutkan diam — UI sendiri
   // sudah menghitung `!exited`, jadi tombol itu muncul persis saat pane-nya mati. Dibunuh dulu
   // (SPEC-362: menutup baris SessionHistory + menyimpan transkrip pane) lalu dilahirkan ulang.
-  const pane = getSession(id);
-  if (pane && !pane.exited) return { id: pane.id, reused: true };
   // SPEC-447 · ADR-0093 · gerbang dependency. Berdiri SESUDAH cek pane hidup (re-attach ke sesi
   // yang sedang berjalan tak boleh ikut ditolak — itu menyembunyikan pekerjaan yang justru perlu
   // dilihat operator) dan SEBELUM `killSession`/worktree, supaya penolakan tak meninggalkan efek.

@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { resolve, sep, dirname } from "node:path";
+import { resolve } from "node:path";
 import { changedFiles, withTempIndex, type ChangedFile, type ReviewFile } from "./spec-review";
+import { assertSafeRepoPathSync, readRepoFile as readSafeRepoFile, writeRepoFileAtomic } from "./safe-repo-path";
 
 const exec = promisify(execFile);
 const GIT = { maxBuffer: 1 << 24 } as const;
@@ -13,11 +13,10 @@ const splitZ = (s: string): string[] => s.split("\0").filter(Boolean);
 
 // Path guard umum (bukan hanya .md seperti scan.docAbsPath). Cermin logikanya: resolve,
 // cegah keluar repo, cegah menyentuh .git. Throw → route menerjemahkan ke 400.
-export function repoAbsPath(repoDir: string, rel: string): string {
+export function repoAbsPath(repoDir: string, rel: string, allowMissingFinal = false): string {
   if (rel.split(/[\\/]/).includes(".git")) throw new Error("tidak boleh menyentuh .git");
-  const abs = resolve(repoDir, rel);
-  if (abs !== repoDir && !abs.startsWith(repoDir + sep)) throw new Error("path keluar dari repo");
-  return abs;
+  assertSafeRepoPathSync(repoDir, rel, allowMissingFinal, true);
+  return resolve(repoDir, rel);
 }
 
 // Daftar file: working tree (ref kosong, honor .gitignore) atau snapshot di ref.
@@ -38,12 +37,12 @@ export type RepoFile = { path: string; content: string | null; binary: boolean; 
 // ponytail: deteksi biner via NUL byte; cukup untuk viewer, upgrade ke gitattributes bila perlu.
 export async function readRepoFile(repoDir: string | null, rel: string, ref = ""): Promise<RepoFile | null> {
   if (!repoDir) return null;
-  repoAbsPath(repoDir, rel); // throws → route 400
+  repoAbsPath(repoDir, rel, !!ref); // snapshots may contain a path absent from the working tree
   let raw: string;
   try {
     raw = ref
       ? (await exec("git", ["show", `${ref}:${rel}`], { cwd: repoDir, ...GIT })).stdout
-      : await readFile(repoAbsPath(repoDir, rel), "utf8");
+      : (await readSafeRepoFile(repoDir, rel)).toString("utf8");
   } catch { return null; }
   if (raw.includes("\u0000")) return { path: rel, content: null, binary: true, truncated: false };
   return { path: rel, content: raw.slice(0, MAX), binary: false, truncated: raw.length > MAX };
@@ -221,7 +220,7 @@ export async function searchCommits(repoDir: string | null, q: string, by: "all"
 
 export async function compareFile(repoDir: string | null, from: string, to: string, rel: string): Promise<ReviewFile | null> {
   if (!repoDir) return null;
-  repoAbsPath(repoDir, rel); // throws → route 400
+  repoAbsPath(repoDir, rel, true); // path may exist only in the selected commits
   try {
     const diff = (await exec("git", ["diff", "--no-renames", "--end-of-options", from, to, "--", rel], { cwd: repoDir, ...GIT })).stdout;
     const contentRaw = await exec("git", ["show", `${to}:${rel}`], { cwd: repoDir, ...GIT }).then((r) => r.stdout).catch(() => null);
@@ -252,7 +251,7 @@ export async function commitDetail(repoDir: string | null, sha: string): Promise
 export async function commitFileDiff(repoDir: string | null, sha: string, rel: string): Promise<ReviewFile | null> {
   if (!repoDir) return null;
   if (!/^[0-9a-fA-F]{4,40}$/.test(sha)) return null;
-  repoAbsPath(repoDir, rel); // throws → route 400
+  repoAbsPath(repoDir, rel, true); // deleted files are still valid commit paths
   try {
     const [diffR, nameR] = await Promise.all([
       exec("git", ["show", "--format=", "--no-renames", "--end-of-options", sha, "--", rel], { cwd: repoDir, ...GIT }),
@@ -270,9 +269,7 @@ export async function commitFileDiff(repoDir: string | null, sha: string, rel: s
 
 export async function writeRepoFile(repoDir: string | null, rel: string, content: string): Promise<void> {
   if (!repoDir) throw new Error("project tidak punya repoDir");
-  const abs = repoAbsPath(repoDir, rel);
-  await mkdir(dirname(abs), { recursive: true });
-  await writeFile(abs, content);
+  await writeRepoFileAtomic(repoDir, rel, content);
 }
 
 export type GitOp =
@@ -465,7 +462,7 @@ export async function workingFileDiff(
   repoDir: string | null, path: string, staged: boolean,
 ): Promise<ReviewFile | null> {
   if (!repoDir || !existsSync(repoDir)) return null;
-  repoAbsPath(repoDir, path); // throws → route 400
+  repoAbsPath(repoDir, path, true); // deletion has no final filesystem entry
   const changed = staged
     ? await changedFiles(repoDir, ["--cached"])
     : await withTempIndex(repoDir, (env) => changedFiles(repoDir, [], env));
@@ -481,7 +478,7 @@ export async function workingFileDiff(
     try {
       contentRaw = staged
         ? (await exec("git", ["show", `:${path}`], { cwd: repoDir, ...GIT })).stdout
-        : await readFile(repoAbsPath(repoDir, path), "utf8");
+        : (await readSafeRepoFile(repoDir, path)).toString("utf8");
     } catch { contentRaw = null; }
   }
   return {

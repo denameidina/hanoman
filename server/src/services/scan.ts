@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from "node:fs";
-import { resolve, dirname, sep } from "node:path";
+import { existsSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
 import { coverageOf, linkedSetFrom, zHanomanConfig } from "@hanoman/shared";
+import { assertSafeRepoPathSync, readRepoFileSync, writeRepoFileAtomicSync } from "./safe-repo-path";
 
 const exec = promisify(execFile);
 
@@ -25,7 +26,7 @@ export async function listRepoDocs(repoDir: string): Promise<string[]> {
 // Barrel shared harus bebas node:*, jadi loadConfig tak bisa tinggal di sana.
 function docsDirOf(repoDir: string): string {
   try {
-    const raw = readFileSync(resolve(repoDir, "hanoman.config.json"), "utf8");
+    const raw = readRepoFileSync(repoDir, "hanoman.config.json").toString("utf8");
     return zHanomanConfig.parse(JSON.parse(raw)).docsDir;
   } catch { return zHanomanConfig.parse({}).docsDir; }
 }
@@ -52,7 +53,7 @@ export async function scanRepoDocs(repoDir: string | null): Promise<{ coverage: 
   const docsDir = docsDirOf(repoDir);
   const index = resolveIndex(repoDir, docsDir);
   const read = (rel: string): string | null => {
-    try { return readFileSync(resolve(repoDir, rel), "utf8"); } catch { return null; }
+    try { return readRepoFileSync(repoDir, rel).toString("utf8"); } catch { return null; }
   };
   // README sub-index ikut korpus BFS; hanya index root yang dikeluarkan dari denominator.
   const corpus = files.filter((f) => f.startsWith(docsDir + "/"));
@@ -74,20 +75,21 @@ export async function scanRepoDocs(repoDir: string | null): Promise<{ coverage: 
 // Guarded absolute path for a repo-relative doc. `cat + "/" + name` from the tree
 // round-trips straight to `rel`, so no prefix juggling.
 export function docAbsPath(repoDir: string, rel: string): string {
+  assertDocRel(rel);
+  return assertSafeRepoPathSync(repoDir, rel);
+}
+
+function assertDocRel(rel: string): void {
   if (!rel.endsWith(".md")) throw new Error("hanya file .md yang diizinkan");
   if (rel.split("/").includes(".git")) throw new Error("tidak boleh menyentuh .git");
-  const abs = resolve(repoDir, rel);
-  if (abs !== repoDir && !abs.startsWith(repoDir + sep)) throw new Error("path keluar dari repo");
-  return abs;
 }
 
 export function readDocFile(repoDir: string, rel: string): string | null {
-  try { return readFileSync(docAbsPath(repoDir, rel), "utf8"); } catch { return null; }
+  try { assertDocRel(rel); return readRepoFileSync(repoDir, rel).toString("utf8"); } catch { return null; }
 }
 export function writeDocFile(repoDir: string, rel: string, content: string): void {
-  const abs = docAbsPath(repoDir, rel);
-  mkdirSync(dirname(abs), { recursive: true });
-  writeFileSync(abs, content);
+  assertDocRel(rel);
+  writeRepoFileAtomicSync(repoDir, rel, content);
 }
 export function deleteDocFile(repoDir: string, rel: string): boolean {
   const abs = docAbsPath(repoDir, rel);

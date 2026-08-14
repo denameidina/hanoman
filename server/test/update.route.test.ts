@@ -9,13 +9,20 @@ afterEach(() => _resetUpdateCache());
 
 describe("GET /api/update", () => {
   it("balas 200 + shape valid; fail-safe tanpa jaringan", async () => {
-    const app = buildApp({ requireAuth: false });
-    const res = await app.inject({ method: "GET", url: "/api/update" });
-    expect(res.statusCode).toBe(200);
-    const b = res.json();
-    expect(b).toMatchObject({ updateAvailable: false, command: "", latestVersion: null, canApply: false });
-    expect(b.registry.status).toBe("unavailable");
-    expect(b.currentVersion).toMatch(/^\d+\.\d+\.\d+/);
+    const previous = process.env.HANOMAN_SUPERVISOR;
+    delete process.env.HANOMAN_SUPERVISOR;
+    try {
+      const app = buildApp({ requireAuth: false });
+      const res = await app.inject({ method: "GET", url: "/api/update" });
+      expect(res.statusCode).toBe(200);
+      const b = res.json();
+      expect(b).toMatchObject({ updateAvailable: false, command: "", latestVersion: null, canApply: false });
+      expect(b.registry.status).toBe("unavailable");
+      expect(b.currentVersion).toMatch(/^\d+\.\d+\.\d+/);
+    } finally {
+      if (previous === undefined) delete process.env.HANOMAN_SUPERVISOR;
+      else process.env.HANOMAN_SUPERVISOR = previous;
+    }
   });
   it("401 tanpa cookie saat requireAuth", async () => {
     const app = buildApp({ requireAuth: true });

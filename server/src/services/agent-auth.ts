@@ -8,9 +8,7 @@ declare module "fastify" { interface FastifyRequest { agent?: { id: string; capa
 export function agentTokenFromReq(req: FastifyRequest): string | undefined {
   const h = req.headers["authorization"];
   if (typeof h === "string" && h.startsWith("Bearer ")) return h.slice(7);
-  // WebSocket upgrade tak bisa set header di browser → terima ?agent_token=
-  const q = (req.query as Record<string, unknown> | undefined)?.["agent_token"];
-  return typeof q === "string" && q ? q : undefined;
+  return undefined;
 }
 
 // null bila master switch off / token invalid / disabled / revoked.

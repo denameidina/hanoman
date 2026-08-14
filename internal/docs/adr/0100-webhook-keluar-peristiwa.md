@@ -4,6 +4,11 @@
 **Terkait:** memperluas ADR-0049 (config) & ADR-0097 (secret at-rest) · ADR-0024, ADR-0037,
 ADR-0039, ADR-0065, ADR-0072, ADR-0079, ADR-0096 tetap utuh.
 
+> **Amendment SPEC-761 / [ADR-0117](0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md):**
+> resolve-then-fetch di bawah diganti transport address-pinned. Semua A/AAAA divalidasi, koneksi
+> memakai address yang sama dengan Host/TLS SNI asli, dan seluruh 3xx gagal terminal. Signature,
+> body, atau credential tidak pernah diteruskan ke hop/host redirect.
+
 ## Konteks
 
 Sistem lain tak punya cara mengetahui apa yang terjadi di hanoman selain memanggil `/api` secara
@@ -87,12 +92,13 @@ mengalir keluar — tak ada capability yang cukup untuk itu. Secret 32 byte acak
 lewat `services/secret-box.ts`, ditampilkan **sekali** saat dibuat/dirotasi (pola AgentToken), dan
 `GET` hanya mengembalikan empat karakter terakhir.
 
-SSRF dijaga dua lapis dengan pertanyaan berbeda: `checkUrlShape` saat **simpan** (skema http/https,
+SSRF awalnya dijaga dua lapis dengan pertanyaan berbeda: `checkUrlShape` saat **simpan** (skema http/https,
 tanpa kredensial, tolak IP literal internal & `localhost`) dan `checkDestination` saat **setiap
 percobaan kirim** (resolve DNS, tolak semua alamat privat/loopback/link-local/ULA/multicast).
 Lapis simpan sengaja **tidak** menyentuh DNS: menaruh resolusi jaringan di jalur tulis CRUD membuat
 pendaftaran endpoint gagal saat DNS lambat atau mati, dan gagal-tertutup di sana berarti operator
-tak bisa mendaftarkan apa pun secara offline. Gerbang yang sebenarnya adalah lapis kedua.
+tak bisa mendaftarkan apa pun secara offline. Gerbang yang sebenarnya adalah lapis kedua. ADR-0117
+mempertahankan dua lapis ini tetapi mengganti jalur kirim dengan address pinning dan no-redirect.
 
 ## Konsekuensi
 
@@ -110,7 +116,8 @@ ikut terliput cuma-cuma karena `SessionHistory` sudah ditulis di dua titik cekik
   `webhook-no-raw-writes.test.ts` yang menjaga itu tetap benar, karena pelanggarannya gagal senyap.
 - **Satu pre-read per tulisan** untuk `update`/`upsert`/`delete` model terlacak — **hanya** saat ada
   endpoint aktif. Dengan nol endpoint biayanya satu boolean.
-- **Jendela DNS rebinding tetap ada.** Pemeriksaan per-percobaan mempersempitnya, tak menutupnya.
+- **Pernyataan historis:** jendela DNS rebinding masih ada pada implementasi ADR asli; ADR-0117
+  menutupnya dengan address pinning dan test regresi mixed A/AAAA serta redirect.
 - **Notifikasi bertipe `webhook` tak difan-out.** Nonaktif otomatis melahirkan notifikasi, dan
   meneruskannya berarti kegagalan satu endpoint mengirim lalu lintas ke endpoint lain. Rantainya
   berhenti sendiri (endpoint nonaktif dilewati), tapi kebisingannya tak berguna.

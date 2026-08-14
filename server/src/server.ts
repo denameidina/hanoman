@@ -14,6 +14,13 @@ import { startWebhookEngine } from "./services/webhooks/engine";
 import { startAutoMerge } from "./services/auto-merge";
 import { startWorktreeReaper } from "./services/worktree-reaper";
 import type { AddressInfo } from "node:net";
+import { assertRuntimeBoundary } from "./services/session-sandbox";
+import { dbFilePath, resolveHome } from "@hanoman/runner";
+import { ensureSetupToken } from "./services/bootstrap";
+import { secureHanomanHome } from "./services/secure-home";
+import { startRetentionSweep } from "./services/retention";
+import { uploadDir } from "./services/uploads";
+import { transcriptDir } from "./services/transcript-store";
 
 // SPEC-215 · deteksi update default ON (registry HANOMAN_UPDATE_FETCH="1"), dibaca via resolver
 // di services/update.ts. Test memuat buildApp dari app.ts (tak pernah server.ts) dan vitest.config
@@ -23,8 +30,9 @@ const port = Number(process.env.PORT ?? 8787);
 // Localhost secara default. Sejak SPEC-169 hanoman punya auth (gate 401 di semua /api,
 // termasuk upgrade WebSocket /api/terminal), tapi cookie `Secure` butuh TLS — jadi pola
 // deploy yang direkomendasikan tetap: bind 127.0.0.1 di belakang reverse proxy (Caddy/nginx)
-// yang menerminasi TLS. Set HOST=0.0.0.0 hanya bila ada TLS di depannya (lihat ADR-0028).
+// yang menerminasi TLS. Production fail-closed bila bind bukan loopback (SPEC-761/ADR-0117).
 const host = process.env.HOST ?? "127.0.0.1";
+assertRuntimeBoundary(process.env, { uid: process.getuid?.(), host });
 
 // Jangan biarkan satu promise yatim (mis. sweep monitor saat DB kedip) menjatuhkan orchestrator
 // tanpa jejak (SPEC-197). Log, jangan crash.
@@ -40,7 +48,19 @@ async function shutdown(sig: string): Promise<void> {
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
 
-app.listen({ port, host }).then(async () => {
+const home = resolveHome();
+const bootstrapReady = secureHanomanHome({
+  home,
+  files: [dbFilePath(process.env.DATABASE_URL!), `${home}/secret.key`, `${home}/setup.token`],
+  directories: [uploadDir(), transcriptDir()],
+}).then(() => prisma.user.count()).then(async (count) => {
+  await secureHanomanHome({ home, files: [dbFilePath(process.env.DATABASE_URL!)] });
+  if (count > 0) return;
+  const proof = await ensureSetupToken(resolveHome());
+  console.log(`setup admin memerlukan token di ${proof.path}; kedaluwarsa ${new Date(proof.expiresAt).toISOString()}`);
+});
+
+bootstrapReady.then(() => app.listen({ port, host })).then(async () => {
   console.log(`hanoman api ${host}:${port}`);
   // SPEC-450 · ADR-0094 · muat katalog custom agent & daftarkan sumbernya SEBELUM sesi pertama
   // bisa lahir — governor scheduler & denyut lead sama-sama bisa meluncurkan sesi pada tick
@@ -104,4 +124,5 @@ app.listen({ port, host }).then(async () => {
   // tertinggal karena proses mati di tengah penghapusan dibereskan di sini, bukan menunggu operator
   // menutup sesi berikutnya.
   startWorktreeReaper();
+  startRetentionSweep();
 }).catch((err) => { console.error("listen gagal:", err); process.exit(1); });

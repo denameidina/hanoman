@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { CONFIG_REGISTRY, configEntry, parseConfigValue, maskSecret, type ConfigEntry, type ConfigEntryView } from "@hanoman/shared";
 import { effectiveStr, rawDbValue, sourceOf, setConfig, clearConfig } from "../config";
-import { applyConfigSideEffect } from "../services/config-apply";
+import { applyConfigSideEffect, rotateSyncOrigin } from "../services/config-apply";
 import { syncStatus } from "../services/sync-client";
 
 // SPEC-215 · ADR-0049 · kelola config runtime dari dashboard (cookie-authed). Secret & connection
@@ -22,7 +22,7 @@ function view(e: ConfigEntry): ConfigEntryView {
     apply: e.apply, category: e.category, min: e.min, max: e.max,
     editable: e.category !== "bootstrap", source: sourceOf(e.key),
   };
-  if (isSecret(e)) return { ...base, masked: eff ? maskSecret(eff) : null, hasValue: eff !== undefined };
+  if (isSecret(e)) return { ...base, masked: eff ? maskSecret(eff) : null, hasValue: Boolean(eff) };
   return { ...base, value: eff ?? null };
 }
 
@@ -45,6 +45,11 @@ export default async function (app: FastifyInstance) {
     }
     const parsed = parseConfigValue(entry, raw);
     if (!parsed.ok) return reply.code(400).send({ error: parsed.error });
+    if (entry.key === "SYNC_SERVER_URL") {
+      try { await rotateSyncOrigin(parsed.value); }
+      catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
+      return view(entry);
+    }
     await setConfig(entry.key, parsed.value);
     await applyConfigSideEffect(entry.key);
     return view(entry);

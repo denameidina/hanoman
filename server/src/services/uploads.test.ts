@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { saveUpload, readUpload, deleteUpload, extFor, readUploadOrFetch } from "./uploads";
+import { createServer } from "node:http";
 
 describe("uploads", () => {
   it("extFor memetakan mime gambar", () => {
@@ -33,24 +34,25 @@ describe("uploads", () => {
   });
 
   it("readUploadOrFetch: miss + client sync → tarik dari hub lalu cache", async () => {
-    process.env.SYNC_SERVER_URL = "https://hub.example";
+    let authorization = ""; let requested = "";
+    const server = createServer((req, res) => {
+      authorization = String(req.headers.authorization ?? ""); requested = req.url ?? "";
+      res.writeHead(200, { "content-type": "image/png" }); res.end("REMOTE");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    process.env.SYNC_SERVER_URL = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
     process.env.SYNC_DEVICE_TOKEN = "tok";
     const key = "fetched-abc.png";
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(Buffer.from("REMOTE"), { status: 200, headers: { "content-type": "image/png" } }),
-    );
     const buf = await readUploadOrFetch(key);
     expect(buf.equals(Buffer.from("REMOTE"))).toBe(true);
-    // dipanggil ke endpoint hub dengan Bearer
-    const [url, init] = fetchSpy.mock.calls[0]!;
-    expect(String(url)).toBe("https://hub.example/api/sync/attachments/fetched-abc.png");
-    expect((init as RequestInit).headers).toMatchObject({ authorization: "Bearer tok" });
+    expect(requested).toBe("/api/sync/attachments/fetched-abc.png");
+    expect(authorization).toBe("Bearer tok");
     // ter-cache: baca kedua tak fetch lagi
-    fetchSpy.mockClear();
+    requested = "";
     expect((await readUploadOrFetch(key)).equals(Buffer.from("REMOTE"))).toBe(true);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    fetchSpy.mockRestore();
+    expect(requested).toBe("");
     await deleteUpload(key);
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     delete process.env.SYNC_SERVER_URL; delete process.env.SYNC_DEVICE_TOKEN;
   });
 });

@@ -26,29 +26,24 @@ const mkTicket = (over: { projectId: string; category?: string; status?: string;
   } });
 
 describe("triase source-checker", () => {
-  it("accepts + enqueues only eligible tickets (new, bug/fitur, opt-in)", async () => {
+  it("never promotes public tickets without an explicit human accept", async () => {
     await mkProject("opt", true);
     const t = await mkTicket({ projectId: "opt", category: "bug" });
     await checkTriase();
-    const q = await listQueue();
-    expect(q.length).toBe(1);
-    expect(q[0]!.source).toBe("triase");
-    expect(q[0]!.priority).toBe("sedang");
-    expect(q[0]!.status).toBe("queued");
+    expect(await listQueue()).toHaveLength(0);
+    expect(await prisma.spec.count()).toBe(0);
     const after = await prisma.ticket.findUnique({ where: { id: t.id } });
-    expect(after!.status).toBe("accepted");
-    expect(after!.specId).toBe(q[0]!.specId);
+    expect(after!.status).toBe("new");
+    expect(after!.specId).toBeNull();
   });
 
-  it("maps category→source (SPEC-291): bug→qa, fitur→brief", async () => {
+  it("does not promote either executable category", async () => {
     await mkProject("opt", true);
-    const bug = await mkTicket({ projectId: "opt", category: "bug" });
-    const fitur = await mkTicket({ projectId: "opt", category: "fitur" });
+    await mkTicket({ projectId: "opt", category: "bug" });
+    await mkTicket({ projectId: "opt", category: "fitur" });
     await checkTriase();
-    const sBug = await prisma.spec.findUnique({ where: { id: (await prisma.ticket.findUnique({ where: { id: bug.id } }))!.specId! } });
-    const sFitur = await prisma.spec.findUnique({ where: { id: (await prisma.ticket.findUnique({ where: { id: fitur.id } }))!.specId! } });
-    expect(sBug!.source).toBe("qa");
-    expect(sFitur!.source).toBe("brief");
+    expect(await prisma.spec.count()).toBe(0);
+    expect(await prisma.ticket.count({ where: { status: "new" } })).toBe(2);
   });
 
   it("never auto-accepts pertanyaan/lainnya categories", async () => {
@@ -77,23 +72,23 @@ describe("triase source-checker", () => {
     expect((await listQueue()).length).toBe(0);
   });
 
-  it("processes many eligible tickets in one window (no per-checker cap)", async () => {
+  it("leaves many public tickets pending instead of batch-launching them", async () => {
     await mkProject("opt", true);
     await mkTicket({ projectId: "opt", category: "bug" });
     await mkTicket({ projectId: "opt", category: "fitur" });
     await mkTicket({ projectId: "opt", category: "bug" });
     await checkTriase();
-    expect((await listQueue()).length).toBe(3);
-    expect(await prisma.ticket.count({ where: { status: "accepted" } })).toBe(3);
+    expect((await listQueue()).length).toBe(0);
+    expect(await prisma.ticket.count({ where: { status: "new" } })).toBe(3);
   });
 
-  it("double check → one queue row per spec, tickets accepted once", async () => {
+  it("remains inert across repeated checks", async () => {
     await mkProject("opt", true);
     await mkTicket({ projectId: "opt", category: "bug" });
     await checkTriase();
     await checkTriase();
-    expect((await listQueue()).length).toBe(1);
-    expect(await prisma.spec.count()).toBe(1);
+    expect((await listQueue()).length).toBe(0);
+    expect(await prisma.spec.count()).toBe(0);
   });
 
   it("registerTriaseSource registers a source with id 'triase'", () => {

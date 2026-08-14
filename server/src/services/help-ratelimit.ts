@@ -1,6 +1,7 @@
 // SPEC-253 · ADR-0062 · rate-limit token-bucket in-memory untuk submit keluhan publik — per IP DAN
 // per project (cermin error-ingest.ts). Single-process, patuh "tanpa queue/Redis" (ADR-0024).
 import { effectiveInt } from "../config";
+import { setBounded } from "./bounded-rate-limit";
 
 type Bucket = { tokens: number; ts: number };
 const ipBuckets = new Map<string, Bucket>();
@@ -11,9 +12,9 @@ function take(map: Map<string, Bucket>, k: string, cap: number, now: number): bo
   const b = map.get(k) ?? { tokens: cap, ts: now };
   b.tokens = Math.min(cap, b.tokens + ((now - b.ts) * cap) / 60_000); // isi ulang kontinu cap/menit
   b.ts = now;
-  if (b.tokens < 1) { map.set(k, b); return false; }
+  if (b.tokens < 1) { setBounded(map, k, b, 4_096); return false; }
   b.tokens -= 1;
-  map.set(k, b);
+  setBounded(map, k, b, 4_096);
   return true;
 }
 

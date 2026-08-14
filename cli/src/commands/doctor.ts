@@ -15,6 +15,7 @@ export type Probes = {
   claude: string | null; codex: string | null;
   gh: string | null;   // SPEC-471 · opsional: tanpa gh, tarik issue lewat REST + GITHUB_TOKEN
   homeWritable: boolean; web: boolean; db: string;
+  podman: string | null; sandboxRequired: boolean; sandboxReady: boolean;
   // SPEC-739 · ADR-0114 · kesiapan metode DEFAULT untuk tiap agen yang CLI-nya benar-benar ada.
   // Kosong = tak ada yang dilaporkan (mis. tak ada CLI agen sama sekali).
   methods: MethodSkillStatus[];
@@ -35,6 +36,11 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
     { mark: p.homeWritable ? "✓" : "✗", text: `data dir ${p.homeWritable ? "bisa ditulis" : "TAK bisa ditulis"}`, fatal: !p.homeWritable },
     { mark: p.web ? "✓" : "!", text: p.web ? "aset dashboard ada" : "aset dashboard tak ada — API jalan, dashboard tidak", fatal: false },
     { mark: "·", text: `db ${p.db}`, fatal: false },
+    { mark: p.sandboxReady ? "✓" : p.sandboxRequired ? "✗" : "!",
+      text: p.sandboxReady
+        ? `sandbox sesi rootless siap (${p.podman})`
+        : `sandbox sesi belum siap${p.podman ? ` (${p.podman})` : " — podman tak ada"}`,
+      fatal: p.sandboxRequired && !p.sandboxReady },
   ];
   // SPEC-739 · ADR-0114 · NON-FATAL, sejajar dengan cara aset dashboard yang hilang dilaporkan:
   // skill yang kurang tak mematikan sesi, ia hanya menghapus gerbang yang disebut prompt.
@@ -85,6 +91,18 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
       const s = scanAgentSkills(a, ctx.env);
       return methodStatus(method, a, { skills: s.skills.map((k) => k.id), packages: s.packages });
     });
+  const podman = version("podman", ["--version"]);
+  const sandboxRequired = ctx.env.NODE_ENV === "production" || !!ctx.env.HANOMAN_PUBLIC_ORIGINS;
+  const rootless = podman ? version("podman", ["info", "--format", "{{.Host.Security.Rootless}}"] ) === "true" : false;
+  const credentialDir = ctx.env.HANOMAN_AGENT_CREDENTIAL_DIR;
+  let credentialsReadable = false;
+  if (credentialDir) {
+    try { accessSync(credentialDir, constants.R_OK); credentialsReadable = true; } catch { /* tetap false */ }
+  }
+  const network = ctx.env.HANOMAN_SESSION_NETWORK ?? "hanoman-egress";
+  const networkReady = podman ? version("podman", ["network", "exists", network]) !== null : false;
+  const sandboxReady = ctx.env.HANOMAN_SESSION_SANDBOX === "podman" && rootless
+    && credentialsReadable && !!ctx.env.HANOMAN_EGRESS_PROXY && networkReady;
 
   const r = doctorReport({
     node: process.version,
@@ -93,6 +111,7 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
     claude, codex,
     gh: version(ctx.env.HANOMAN_GH_BIN ?? "gh", ["--version"]),
     homeWritable, web: layout.web !== null, db, methods,
+    podman, sandboxRequired, sandboxReady,
   });
   ctx.stdout(`hanoman doctor\n${r.lines.join("\n")}\n`);
   // Justru di doctor ini paling berguna: ia menjelaskan kenapa `db …` menunjuk berkas default

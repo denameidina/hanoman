@@ -61,6 +61,9 @@ describe("agent capabilities", () => {
       notifyFail: true, notifyDone: true, notifySound: "short", notifyDecision: true, notifyDecisionSound: "alert",
     });
     expect(s.agentAccessEnabled).toBe(false);
-    expect(s.telegram).toEqual({ enabled: false, progress: true });
+    expect(s.telegram).toEqual({
+      enabled: false, progress: true,
+      engine: { enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh" },
+    });
   });
 });

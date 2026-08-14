@@ -6,6 +6,7 @@ const ok = {
   node: "v22.0.0", git: "git version 2.44.0", tmux: "tmux 3.4",
   claude: "1.0.0", codex: null, gh: null, homeWritable: true, web: true, db: "/h/.hanoman/hanoman.db",
   methods: [],   // SPEC-739 · kosong = tak ada metode yang dilaporkan
+  podman: null, sandboxRequired: false, sandboxReady: false,
 };
 
 describe("doctorReport", () => {
@@ -39,6 +40,10 @@ describe("doctorReport", () => {
   });
   it("path db selalu dilaporkan", () => {
     expect(doctorReport(ok).lines.join("\n")).toContain("/h/.hanoman/hanoman.db");
+  });
+  it("public production gagal bila sandbox rootless belum siap", () => {
+    expect(doctorReport({ ...ok, sandboxRequired: true, sandboxReady: false }).ok).toBe(false);
+    expect(doctorReport({ ...ok, sandboxRequired: true, sandboxReady: true, podman: "podman 5" }).ok).toBe(true);
   });
   // SPEC-471 · `gh` opsional (cermin claude/codex): absen TIDAK boleh menggagalkan doctor —
   // jalur REST + GITHUB_TOKEN tetap bekerja tanpa biner itu.

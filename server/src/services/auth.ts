@@ -2,6 +2,7 @@ import { randomBytes, scrypt as scryptCb, timingSafeEqual, createHash } from "no
 import { promisify } from "node:util";
 import type { UserView } from "@hanoman/shared";
 import { prisma } from "../db";
+import { BoundedRateLimiter } from "./bounded-rate-limit";
 
 // Sesi tervalidasi ditempel di request oleh gate onRequest (app.ts).
 declare module "fastify" {
@@ -63,18 +64,18 @@ export async function deleteUserSessions(userId: string, exceptToken?: string): 
 
 // ponytail: throttle in-memory, reset saat restart, per-proses — cukup single VPS;
 // ganti ke store bersama kalau nanti multi-instance.
-const fails = new Map<string, { n: number; until: number }>();
+const fails = new BoundedRateLimiter({ windowMs: 60_000, limit: 9, maxKeys: 4_096 });
 export function loginThrottle(ip: string): { blocked: boolean } {
-  const f = fails.get(ip);
-  return { blocked: !!f && f.until > Date.now() };
+  const state = loginStates.get(ip);
+  return { blocked: !!state && state.until > Date.now() };
 }
+const loginStates = new Map<string, { n: number; until: number }>();
 export function noteLoginFail(ip: string): void {
-  const f = fails.get(ip) ?? { n: 0, until: 0 };
-  f.n += 1;
-  if (f.n >= 10) { f.until = Date.now() + 60_000; f.n = 0; }
-  fails.set(ip, f);
+  const verdict = fails.hit(ip);
+  loginStates.set(ip, { n: 0, until: verdict.blocked ? Date.now() + verdict.retryAfterMs : 0 });
+  while (loginStates.size > 4_096) loginStates.delete(loginStates.keys().next().value!);
 }
-export function clearLoginFails(ip: string): void { fails.delete(ip); }
+export function clearLoginFails(ip: string): void { fails.clear(ip); loginStates.delete(ip); }
 
 export function cookieOpts() {
   return {

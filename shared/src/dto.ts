@@ -454,10 +454,11 @@ export type UserRole = (typeof USER_ROLES)[number];
 export const zUserRole = z.enum(USER_ROLES);
 export const zLogin = z.object({ email: z.string().email(), password: z.string().min(1) });
 export const zSignup = z.object({ email: z.string().email(), password: z.string().min(8) });
+export const zSetup = zSignup.extend({ setupToken: z.string().min(1) });
 export const zChangePassword = z.object({
   currentPassword: z.string().min(1), newPassword: z.string().min(8) });
 export type UserView = { id: string; email: string; role: UserRole; createdAt: string };
-export type AuthStatus = { needsSetup: boolean; user: UserView | null };
+export type AuthStatus = { needsSetup: boolean; user: UserView | null; setupTokenRequired?: boolean; setupTokenPath?: string };
 
 // SPEC-617 · ADR-0110 · kelola akun klien. Permukaan KREDENSIAL — cookie-only, tak pernah
 // terjangkau agent token (services/agent-capabilities.ts). `projects` = daftar id project yang

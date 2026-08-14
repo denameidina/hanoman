@@ -1,7 +1,11 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { zLogin, zSignup, zChangePassword, type UserView } from "@hanoman/shared";
+import { zLogin, zSetup, zSignup, zChangePassword, type UserView } from "@hanoman/shared";
 import { prisma } from "../db";
 import * as auth from "../services/auth";
+import { BootstrapError, consumeSetupToken, ensureSetupToken, verifySetupToken } from "../services/bootstrap";
+import { BoundedRateLimiter } from "../services/bounded-rate-limit";
+
+const BOOTSTRAP_USER_ID = "bootstrap-admin";
 
 const view = (u: { id: string; email: string; role: string; createdAt: Date }): UserView =>
   ({ id: u.id, email: u.email, role: u.role as UserView["role"], createdAt: u.createdAt.toISOString() });
@@ -11,19 +15,40 @@ async function issue(reply: FastifyReply, userId: string) {
   reply.setCookie(auth.COOKIE_NAME, token, auth.cookieOpts());
 }
 
-export default async function (app: FastifyInstance) {
+export default async function (app: FastifyInstance, opts: { bootstrapRequired?: boolean; home?: string }) {
+  const setupAttempts = new BoundedRateLimiter({ windowMs: 60_000, limit: 10, maxKeys: 4_096 });
   app.get("/auth/status", async (req) => {
     const needsSetup = (await prisma.user.count()) === 0;
-    return { needsSetup, user: req.user ?? null };
+    let setupTokenPath: string | undefined;
+    if (needsSetup && opts.bootstrapRequired && opts.home)
+      setupTokenPath = (await ensureSetupToken(opts.home)).path;
+    return { needsSetup, user: req.user ?? null, setupTokenRequired: !!opts.bootstrapRequired, setupTokenPath };
   });
 
   app.post("/auth/setup", async (req, reply) => {
     if ((await prisma.user.count()) > 0) return reply.code(409).send({ error: "already set up" });
-    const p = zSignup.safeParse(req.body);
+    if (setupAttempts.hit(req.ip).blocked) return reply.code(429).send({ error: "too many attempts" });
+    const p = (opts.bootstrapRequired ? zSetup : zSignup).safeParse(req.body);
     if (!p.success) return reply.code(400).send({ error: p.error.flatten() });
-    const user = await prisma.user.create({
-      data: { email: p.data.email, passwordHash: await auth.hashPassword(p.data.password) },
-    });
+    if (opts.bootstrapRequired) {
+      const setupToken = "setupToken" in p.data && typeof p.data.setupToken === "string" ? p.data.setupToken : "";
+      try { await verifySetupToken(setupToken, opts.home!); }
+      catch (error) {
+        if (error instanceof BootstrapError) return reply.code(403).send({ error: "invalid setup proof" });
+        throw error;
+      }
+    }
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: { id: BOOTSTRAP_USER_ID, email: p.data.email, passwordHash: await auth.hashPassword(p.data.password), role: "admin" },
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2002") return reply.code(409).send({ error: "already set up" });
+      throw error;
+    }
+    if (opts.bootstrapRequired) await consumeSetupToken(opts.home!);
+    setupAttempts.clear(req.ip);
     await issue(reply, user.id);
     return { user: view(user) };
   });

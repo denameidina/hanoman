@@ -2,6 +2,12 @@
 
 **Status:** accepted · **Date:** 2026-07-11 · **Spec:** SPEC-169
 
+> **Amendment SPEC-761 / [ADR-0117](0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md):**
+> allowlist auth di bawah hanya berlaku **sesudah** exact ingress role. Host publik kini hanya
+> melayani health/Help; auth/setup hidup di host control ber-access proxy. Bootstrap bukan lagi
+> first-user-wins: token console 0600 one-time/15 menit dan create atomik wajib. Production selalu
+> bind loopback, trusted proxy explicit, limiter bounded, dan WebSocket memakai exact Origin + tiket.
+
 ## Context
 hanoman tidak punya auth apa pun. `server.ts` sengaja bind `127.0.0.1` karena `/api/terminal`
 (dan sejak SPEC-164 `/api/vps`) menyerahkan eksekusi shell sungguhan — mengekspos itu ke jaringan
@@ -30,8 +36,8 @@ email invitation), ganti password. Constraint: **tanpa RBAC — semua user setar
   Karena `Secure` butuh TLS, pola deploy tetap **bind `127.0.0.1` di belakang reverse proxy**
   (Caddy/nginx) yang menerminasi TLS — bukan mengekspos app langsung. `HOST=0.0.0.0` hanya bila
   ada TLS di depannya.
-- **Throttle login**: penghitung gagal in-memory per IP (10 gagal → tunda 60 dtk). Reset saat
-  restart, per-proses — cukup untuk single VPS.
+- **Throttle login (historis):** keputusan awal memakai Map per IP. ADR-0117 menggantinya dengan
+  store bounded TTL/LRU berdasarkan alamat yang hanya berasal dari proxy terpercaya.
 
 ## Consequences
 - Postur keamanan `/terminal` dan `/vps` berubah: sebelumnya "tanpa auth, bergantung bind

@@ -4,6 +4,12 @@
 **Terkait:** [ADR-0028](0028-auth-sesi-opaque-di-db.md) (auth sesi — **diperluas** di sini) · [ADR-0044](0044-device-token-machine-identity.md) (device token — pola dicerminkan) · [ADR-0037](0037-cabut-guardrail-safety.md) (isolasi worktree = batas eksekusi) · **ADR-0060** (dicabut, [ADR-0092](0092-cabut-error-monitoring-sdk-cross-audit.md))/[0062](0062-help-center-tiket-publik-triase.md) (pengecualian gate ber-otorisasi sendiri)
 **Design-of-record:** [`docs/superpowers/specs/2026-07-21-spec-257-ai-agent-capability-design.md`](../../../docs/superpowers/specs/2026-07-21-spec-257-ai-agent-capability-design.md)
 
+> **Amendment SPEC-761 / [ADR-0117](0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md):**
+> credential query WebSocket dicabut; browser memakai tiket one-time di subprotocol dan agent HTTP
+> memakai Bearer header. Capability route tidak lagi cukup untuk efek launch: hanya cookie admin atau
+> `sessions:write` menulis approval LOCAL-only, lalu launcher memeriksa approval pada choke point akhir.
+> `SYNC_SERVER_URL`/credential destination juga cookie-admin-only.
+
 ## Konteks
 
 Brief SPEC-257 meminta **AI agent eksternal** dapat "full control" atas hanoman — setiap fitur bisa
@@ -22,7 +28,8 @@ mesin-ke-mesin sync), kunci **ingest DSN** (hash-at-rest, per-project), dan cook
 1. **Agent Token = jalur auth kedua ke seluruh `/api`.** Model baru `AgentToken` (server-local, TANPA
    `version`/sync — cermin DeviceToken): `tokenHash = sha256(hnm_agt_<hex>)` hash-at-rest (plaintext hanya
    sekali saat create), `tokenPrefix` hint UI, `capabilities` (Json string[]), `enabled`, `createdBy`,
-   `lastUsedAt`, `revokedAt`. Agen mengirim `Authorization: Bearer <token>` (upgrade WebSocket: `?agent_token=`).
+   `lastUsedAt`, `revokedAt`. Agen mengirim `Authorization: Bearer <token>`; bentuk query historis
+   dicabut ADR-0117 agar token tidak masuk access log.
 
 2. **Capability per-domain read/write.** `"<domain>:<access>"`, `access ∈ {read,write}`, **write⊇read**.
    9 domain: `projects, backlog, sessions, docs, ide, vps, settings, support, notifications` (18 capability;
@@ -48,9 +55,9 @@ mesin-ke-mesin sync), kunci **ingest DSN** (hash-at-rest, per-project), dan cook
 
 ## Konsekuensi
 
-- Agent token **memperluas permukaan auth**, bukan permukaan eksekusi: `sessions:write` (spawn
-  `claude --dangerously-skip-permissions` = RCE) dan `vps:write` (remote exec) tetap dibatasi **isolasi
-  worktree** (ADR-0037) — agen hanya membuka pintu API yang sama lewat auth berbeda. Ditandai high-risk di UI.
+- Agent token **memperluas permukaan auth**, bukan hak launch transitif. `sessions:write` adalah
+  capability high-risk yang dapat memberi approval; eksekusi production dibatasi rootless OS sandbox
+  ADR-0117, bukan worktree saja. `vps:write` tetap remote exec high-risk.
 - Tanpa privilege escalation: kelola token cookie-only + capabilities di token (bukan di Setting) → agen dengan
   `settings:write` bisa mematikan master switch (self-DoS, tak berbahaya) tapi tak bisa mencetak/menaikkan token
   atau menyalakan master switch saat off (ia tak bisa auth).

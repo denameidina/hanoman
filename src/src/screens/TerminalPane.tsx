@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
+import { api } from "../api/client";
 import { clipboardIntent } from "./terminal-clipboard";
 
 export function TerminalPane({ sessionId, onExit, onPhases }: {
@@ -44,12 +45,17 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
     term.open(el);
     fit.fit();
 
-    const scheme = location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${scheme}//${location.host}${paths.terminalWs(sessionId)}`);
-    const send = (m: unknown) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
+    let ws: WebSocket | undefined;
+    let disposed = false;
+    const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
 
-    ws.onopen = () => { term.focus(); send({ t: "resize", cols: term.cols, rows: term.rows }); };
-    ws.onmessage = (ev) => {
+    void api.issueWsTicket(`terminal:${sessionId}`).then(({ ticket }) => {
+      if (disposed) return;
+      const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${scheme}//${location.host}${paths.terminalWs(sessionId)}`, [`hanoman-ticket.${ticket}`]);
+
+      ws.onopen = () => { term.focus(); send({ t: "resize", cols: term.cols, rows: term.rows }); };
+      ws.onmessage = (ev) => {
       const f = JSON.parse(ev.data as string) as {
         t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
       };
@@ -62,7 +68,8 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
         term.write(`\r\n\x1b[33m— sesi berakhir (exit ${f.code}) —\x1b[0m\r\n`);
         exitRef.current(f.code ?? 0);
       }
-    };
+      };
+    }).catch(() => { if (!disposed) term.write("\r\n\x1b[31mWebSocket admission gagal\x1b[0m\r\n"); });
     // Salin/tempel: xterm merender seleksi sendiri, jadi Cmd/Ctrl+C tak menyalin apa pun
     // tanpa wiring ini (SPEC-289). Return false = jangan teruskan ke terminal (mis. supaya
     // Cmd+C tak jadi input). Ctrl+C polos dilewatkan agar tetap jadi SIGINT.
@@ -85,7 +92,7 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
     });
     ro.observe(el);
 
-    return () => { ro.disconnect(); typed.dispose(); ws.close(); term.dispose(); };
+    return () => { disposed = true; ro.disconnect(); typed.dispose(); ws?.close(); term.dispose(); };
   }, [sessionId]);
 
   return <div ref={host} style={{ height: "100%", width: "100%", background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)" }} />;

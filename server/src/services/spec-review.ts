@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readFile, mkdtemp, copyFile, rm } from "node:fs/promises";
+import { mkdtemp, copyFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
+import { readRepoFile as readSafeRepoFile } from "./safe-repo-path";
 
 // SPEC-171 · review worktree backlog item: all files (ls-files) + file changed
 // (diff atas merge-base). Diturunkan dari git tiap request, tak disimpan. Mekanik
@@ -184,7 +185,7 @@ export async function reviewFile(
   const diffRaw = await withTempIndex(wt, async (env) =>
     (await exec("git", ["diff", base, "--", path], { cwd: wt, env, ...GIT })).stdout);
   let contentRaw: string | null = null;
-  if (status !== "D") { try { contentRaw = await readFile(join(wt, path), "utf8"); } catch { contentRaw = null; } }
+  if (status !== "D") { try { contentRaw = (await readSafeRepoFile(wt, path)).toString("utf8"); } catch { contentRaw = null; } }
   return {
     path, status, binary: false,
     truncated: diffRaw.length > MAX || (contentRaw?.length ?? 0) > MAX,

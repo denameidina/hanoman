@@ -2,8 +2,9 @@
 
 - **Realtime terminal** — latensi frame terminal ke UI < 1 dtk (WebSocket PTY).
 - **Interupsi** — instruksi ke sesi (steer / ctrl-c / tutup) diterapkan ≤ 2 dtk lewat tmux.
-- **Isolasi** — sebuah sesi tak pernah mengganggu working tree utama atau sesi lain; tiap backlog di
-  worktree terpisah (ADR-0002).
+- **Isolasi** — tiap backlog memakai worktree terpisah (boundary Git), sedangkan production menjalankan
+  semua agen dalam rootless Podman dengan mount minimum, root read-only, resource limit, dan egress
+  allowlist (boundary security, ADR-0117). API/worker adalah user non-root dedicated.
 - **Durabilitas** — state bertahan restart via satu berkas SQLite di `$HANOMAN_HOME`; sesi terminal
   yang berjalan bertahan restart API karena hidup di tmux (ADR-0016); docs
   dibaca live dari disk, tak ada salinan yang bisa basi.
@@ -17,6 +18,9 @@
   berkas yang berubah, typecheck per paket, lint per berkas, build penuh & boot-server hanya bila
   relevan. Tanpa itu, N sesi melipatgandakan suite penuh (di repo ini: 258 berkas test + 6 proses
   `tsc` per sesi). Suite penuh adalah langkah **manusia** sebelum merge, bukan langkah sesi.
-- **Keamanan** — server bind `127.0.0.1` di belakang reverse proxy TLS. Guardrail deny PreToolUse
-  sudah **dicabut sepenuhnya** (SPEC-197/ADR-0037): sesi jalan `--dangerously-skip-permissions`
-  tanpa hook deny apa pun, dan **isolasi worktree adalah satu-satunya batas keamanan yang tersisa**.
+- **Keamanan** — server bind loopback; exact public/control host dipisah, control plane berada di
+  belakang SSO/MFA/VPN/access proxy, trusted proxy dibatasi, dan limiter bounded. Guardrail deny
+  PreToolUse tetap dicabut (ADR-0037); permission bypass hanya hidup di dalam boundary OS ADR-0117.
+- **Lifecycle data** — `$HANOMAN_HOME` private 0700/0600; retention bounded berlaku untuk ticket,
+  attachment, transcript/session, delivery, dan result dengan hold eksplisit serta retry bila delete
+  file gagal.

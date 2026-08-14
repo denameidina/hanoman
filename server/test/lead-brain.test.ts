@@ -1,7 +1,7 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { chmodSync } from "node:fs";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { chmodSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { leadArgv, leadEnv, leadFailureReason, think } from "../src/services/lead/brain";
+import { leadArgv, leadEnv, leadFailureReason, leadProcess, think } from "../src/services/lead/brain";
 
 // SPEC-448 (QA) · `brain.ts` adalah titik spawn agen KEDUA di hanoman — satu-satunya di luar
 // `services/pty.ts` — dan sampai spec ini ia tak punya satu pun test. Dua kegagalan yang membuat
@@ -35,9 +35,11 @@ chmodSync(FAKE_REFUSING, 0o755);
 const withBin = (key: "HANOMAN_CLAUDE_BIN" | "HANOMAN_CODEX_BIN") => {
   process.env[key] = FAKE_AGENT;
 };
+beforeEach(() => { process.env.HANOMAN_SESSION_SANDBOX = "off"; });
 afterEach(() => {
   delete process.env.HANOMAN_CLAUDE_BIN;
   delete process.env.HANOMAN_CODEX_BIN;
+  delete process.env.HANOMAN_SESSION_SANDBOX;
 });
 
 describe("leadEnv · gerbang root claude (SPEC-403 di titik spawn kedua)", () => {
@@ -77,6 +79,29 @@ describe("think · stdin ditutup, env sampai ke proses", () => {
     withBin("HANOMAN_CODEX_BIN");
     const out = await think("halo", { agent: "codex", model: "", effort: "", timeoutMs: 1500 });
     expect(out).toContain("stdin: EOF");
+  });
+});
+
+describe("leadProcess · boundary agen one-shot", () => {
+  it("production memakai Podman, mount repo read-only, dan prompt private lewat berkas", () => {
+    const process = leadProcess("UNTRUSTED secret prompt", {
+      agent: "claude", model: "", effort: "", cwd: "/srv/repo", timeoutMs: 1_500,
+    }, {
+      NODE_ENV: "production",
+      HANOMAN_SESSION_SANDBOX: "podman",
+      HANOMAN_AGENT_CREDENTIAL_DIR: "/srv/agent-credentials",
+      HANOMAN_EGRESS_PROXY: "http://egress.internal:3128",
+    });
+    try {
+      expect(process.file).toBe("podman");
+      expect(process.args).toContain("/srv/repo:/workspace:ro");
+      expect(process.args.join(" ")).not.toContain("UNTRUSTED secret prompt");
+      expect(process.promptFile).toBeTruthy();
+      expect(readFileSync(process.promptFile!, "utf8")).toBe("UNTRUSTED secret prompt");
+      expect(statSync(process.promptFile!).mode & 0o777).toBe(0o600);
+    } finally {
+      process.cleanup();
+    }
   });
 });
 

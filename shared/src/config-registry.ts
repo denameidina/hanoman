@@ -18,7 +18,7 @@ export interface ConfigEntry {
 
 export const CONFIG_REGISTRY: ConfigEntry[] = [
   // sync
-  { key: "SYNC_SERVER_URL", group: "sync", label: "URL hub", kind: "url", apply: "live", category: "knob", example: "https://hanoman.nafanesia.id",
+  { key: "SYNC_SERVER_URL", group: "sync", label: "URL hub", kind: "url", apply: "live", category: "credential", example: "https://hanoman.nafanesia.id",
     help: "Base URL hub tujuan sync (REST + WS). Kosong = instance ini murni HUB." },
   { key: "SYNC_DEVICE_TOKEN", group: "sync", label: "Device token", kind: "secret", apply: "live", category: "credential", example: "43 karakter base64url dari tab Perangkat hub",
     help: "Token yang diterbitkan hub (tab Perangkat di hub). Dikirim sebagai Bearer." },

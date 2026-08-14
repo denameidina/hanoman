@@ -33,6 +33,7 @@ import { dayStart, dayEnd, inDayRange } from "../services/date-range";
 // SPEC-199 · overlay stage-live + write-through + notifikasi kini di liveSpecs (dipakai juga hub
 // siar WS) supaya push & pull tak drift. Rute tinggal filter+paginasi (SPEC-198) di atasnya.
 import { liveSpecs } from "../services/live-specs";
+import { launchPrincipal } from "../services/launch-authority";
 
 // SPEC-143: daftar yang mengisi dropdown adalah daftar yang menjaga gerbang — tak ada validator
 // terpisah yang bisa ikut basi. Branch karangan ditolak di sini, bukan beberapa menit kemudian
@@ -99,6 +100,7 @@ export default async function (app: FastifyInstance) {
     // Author = user yang login (req.user diisi gate auth; dijamin ada di prod, fallback hanya
     // untuk test requireAuth:false). Prefix `QA ·` tetap menandai spec dari alur QA.
     const author = req.user?.email ?? "system";
+    const principal = launchPrincipal(req);
     // SPEC-197 · nextSpecId menurunkan id dari max saat ini (TOCTOU): dua POST /specs konkuren bisa
     // menghitung id yang sama → unique violation P2002. Retry hitung ulang id (maks 3x) — bukan 500.
     let spec: Awaited<ReturnType<typeof prisma.spec.create>> | null = null;
@@ -117,6 +119,8 @@ export default async function (app: FastifyInstance) {
             objective, payload: b.payload,
             branchFrom: b.branchFrom ?? null,
             dependsOn: dep.ids,   // SPEC-447 · ADR-0093
+            launchApprovedAt: principal ? new Date() : null,
+            launchApprovedBy: principal,
           }
         });
       } catch (e) {
@@ -141,6 +145,7 @@ export default async function (app: FastifyInstance) {
     if (b.branchFrom && await branchUnknown(repoDir, b.branchFrom))
       return reply.code(400).send({ error: `branch "${b.branchFrom}" tidak ada di repo project` });
     const author = req.user?.email ?? "system";
+    const principal = launchPrincipal(req);
     const created: Awaited<ReturnType<typeof prisma.spec.create>>[] = [];
     for (const item of b.items) {
       const context = b.prdPath ? `Dari PRD (breakdown): ${b.prdPath}\n\n${item.context}` : item.context;
@@ -154,6 +159,7 @@ export default async function (app: FastifyInstance) {
             data: {
               id, projectId: b.project, title: item.title, source: "brief", stage: "brainstorming",
               priority, author, objective, payload, branchFrom: b.branchFrom ?? null,
+              launchApprovedAt: principal ? new Date() : null, launchApprovedBy: principal,
             },
           });
         } catch (e) {

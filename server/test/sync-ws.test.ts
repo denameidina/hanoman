@@ -30,7 +30,7 @@ describe("sync WS /api/sync/ws (SPEC-213 AC-16)", () => {
   it("broadcasts accepted writes to a token-authed client", async () => {
     const tok = await token();
     await prisma.project.create({ data: { id: "p1", name: "p1", desc: "d", kind: "existing", repoDir: null } });
-    const ws = new WebSocket(`ws://${origin}/api/sync/ws?token=${tok}`);
+    const ws = new WebSocket(`ws://${origin}/api/sync/ws`, { headers: { authorization: `Bearer ${tok}` } });
     const frames: Record<string, unknown>[] = [];
     ws.on("message", (raw: Buffer) => frames.push(JSON.parse(raw.toString())));
     await new Promise<void>((res, rej) => { ws.on("open", () => res()); ws.on("error", rej); });
@@ -44,7 +44,18 @@ describe("sync WS /api/sync/ws (SPEC-213 AC-16)", () => {
 
   it("rejects upgrade without a valid token (socket closes)", async () => {
     // Upgrade bisa 'open' dulu lalu handler menutup — jadi tunggu event 'close', bukan 'open'.
-    const ws = new WebSocket(`ws://${origin}/api/sync/ws?token=nope`);
+    const ws = new WebSocket(`ws://${origin}/api/sync/ws`, { headers: { authorization: "Bearer nope" } });
+    const result = await new Promise<"closed" | "stayed">((res) => {
+      ws.on("close", () => res("closed"));
+      ws.on("error", () => res("closed"));
+      setTimeout(() => res("stayed"), 1000);
+    });
+    expect(result).toBe("closed");
+  });
+
+  it("rejects legacy query credentials", async () => {
+    const tok = await token();
+    const ws = new WebSocket(`ws://${origin}/api/sync/ws?token=${tok}`);
     const result = await new Promise<"closed" | "stayed">((res) => {
       ws.on("close", () => res("closed"));
       ws.on("error", () => res("closed"));

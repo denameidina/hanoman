@@ -1,7 +1,12 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Agent } from "@hanoman/shared";
 import { effectiveStr } from "../../config";
 import { rootBypassEnv } from "../pty";
+import { sandboxArgvFromEnv } from "../session-sandbox";
 
 // SPEC-409 · ADR-0091 · lead adalah AGEN, bukan aturan if/else: pertanyaan yang ia jawab berbentuk
 // prosa dan jawabannya menuntut membaca docs/kode/riwayat. Ia dipanggil SEKALI-JALAN dan
@@ -54,15 +59,15 @@ export function leadArgv(o: { agent: Agent; model: string; effort: string; promp
  * SPEC-448 (QA) · env proses lead. `brain.ts` adalah titik spawn agen KEDUA di hanoman — satu-satunya
  * di luar `pty.ts` — dan gerbang root claude yang dibuka SPEC-403 tak pernah menyeberang ke sini:
  * kedua commit lahir di worktree paralel di hari yang sama (`e5c73ac` bukan leluhur `a16465e`).
- * Akibatnya, di instance yang servernya jalan sebagai root — yaitu `User=root` di deploy-vps.md,
- * konfigurasi deploy RESMI — claude mencetak "--dangerously-skip-permissions cannot be used with
+ * Akibatnya, di deployment lama yang menjalankan server sebagai root, claude mencetak
+ * "--dangerously-skip-permissions cannot be used with
  * root/sudo privileges" lalu `process.exit(1)` sebelum berpikir, dan lead tak pernah sekalipun
  * menghasilkan keputusan.
  *
  * `rootBypassEnv` DIIMPOR dari `pty.ts`, bukan disalin: yang membuat bug ini ada adalah dua titik
  * spawn yang tak sepakat, dan definisi kedua akan mengundangnya kembali. Hanya untuk **claude** —
  * codex (0.146.0) tak punya gerbang root maupun rujukan ke `IS_SANDBOX`, cermin gerbang agen di
- * `pty.ts:324`. Env pemanggil ditumpuk BELAKANGAN supaya `IS_SANDBOX` yang sudah disetel operator
+ * `pty.ts`. Env pemanggil ditumpuk BELAKANGAN supaya `IS_SANDBOX` yang sudah disetel operator
  * tetap menang, urutan yang sama dengan `envPairs` di sana.
  */
 export const leadEnv = (
@@ -75,6 +80,50 @@ export type ThinkOpts = {
   agent: Agent; model: string; effort: string;
   cwd?: string; timeoutMs: number;
 };
+
+export type LeadProcess = {
+  file: string; args: string[]; cwd?: string; promptFile?: string; cleanup(): void;
+};
+
+const shellQuote = (value: string): string => `'${value.replace(/'/g, `'"'"'`)}'`;
+
+export function leadProcess(
+  prompt: string,
+  o: ThinkOpts,
+  env: NodeJS.ProcessEnv = process.env,
+): LeadProcess {
+  const file = binFor(o.agent);
+  const directArgs = leadArgv({ agent: o.agent, model: o.model, effort: o.effort, prompt });
+  const mode = env.HANOMAN_SESSION_SANDBOX ?? (env.NODE_ENV === "production" ? "required" : "off");
+  if (mode === "off") return { file, args: directArgs, cwd: o.cwd, cleanup: () => {} };
+
+  const promptDir = join(tmpdir(), "hanoman-prompts");
+  mkdirSync(promptDir, { recursive: true, mode: 0o700 });
+  const promptFile = join(promptDir, `oneshot-${randomUUID()}`);
+  writeFileSync(promptFile, prompt, { flag: "wx", mode: 0o600 });
+  const workspace = o.cwd ?? join(tmpdir(), `hanoman-oneshot-${randomUUID()}`);
+  if (!o.cwd) mkdirSync(workspace, { recursive: false, mode: 0o700 });
+  try {
+    const argsWithoutPrompt = directArgs.slice(0, -1);
+    const command = [file, ...argsWithoutPrompt].map(shellQuote).join(" ")
+      + ` "$(cat ${shellQuote(promptFile)})"`;
+    const sandbox = sandboxArgvFromEnv({
+      command, worktree: workspace, worktreeMode: "ro", promptFile, env,
+    });
+    if (!sandbox) throw new Error("sandbox one-shot tidak aktif");
+    return {
+      file: sandbox[0]!, args: sandbox.slice(1), promptFile,
+      cleanup: () => {
+        rmSync(promptFile, { force: true });
+        if (!o.cwd) rmSync(workspace, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    rmSync(promptFile, { force: true });
+    if (!o.cwd) rmSync(workspace, { recursive: true, force: true });
+    throw error;
+  }
+}
 
 /** Bentuk galat `execFile` yang benar-benar dibaca — bukan seluruh `ErrnoException`. */
 export type ExecFailure = {
@@ -134,13 +183,13 @@ export function leadFailureReason(
  * ENOBUFS akan terbaca sebagai "lead tak bisa memutuskan" padahal ia sudah selesai.
  */
 export function think(prompt: string, o: ThinkOpts): Promise<string> {
-  const bin = binFor(o.agent);
-  const args = leadArgv({ agent: o.agent, model: o.model, effort: o.effort, prompt });
+  const process = leadProcess(prompt, o);
   return new Promise((resolve, reject) => {
-    const child = execFile(bin, args, {
-      cwd: o.cwd, timeout: o.timeoutMs, maxBuffer: 16 * 1024 * 1024,
+    const child = execFile(process.file, process.args, {
+      cwd: process.cwd, timeout: o.timeoutMs, maxBuffer: 16 * 1024 * 1024,
       env: leadEnv(o.agent), encoding: "utf8", killSignal: "SIGTERM",
     }, (err, stdout, stderr) => {
+      process.cleanup();
       if (err) {
         reject(new Error(leadFailureReason(o.agent, o.timeoutMs, err as unknown as ExecFailure, stdout, stderr)));
         return;

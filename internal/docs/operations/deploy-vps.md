@@ -1,117 +1,100 @@
-# Deploy hanoman ke VPS (single-host, di belakang reverse proxy)
+# Deploy hanoman ke VPS publik
 
-Menjalankan satu instance hanoman publik di sebuah VPS Linux, di belakang reverse proxy
-(Caddy/nginx) yang menerminasi TLS. Melengkapi [production.md](production.md) — yang membahas
-prod **di samping dev pada satu mesin dev**; dokumen ini membahas VPS terpisah yang
-menyajikan hanoman ke internet.
+Runbook normatif untuk instance yang memiliki URL publik. Sejak SPEC-761, "satu instance" tidak
+berarti satu trust boundary: Help/status boleh publik, sedangkan dashboard, terminal, settings,
+scheduler, webhook, IDE, sync administration, dan VPS adalah control plane privat.
 
-Sejak SPEC-398 hanoman dipasang sebagai **paket npm global** dan DB-nya satu berkas SQLite
-([ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md) ·
-[ADR-0087](../adr/0087-distribusi-npm-global-satu-perintah.md)): tidak ada Docker, tidak ada
-Postgres, tidak ada clone repo di VPS. Instance yang **sudah hidup** dengan Postgres wajib dimigrasi
-sekali — lihat §2.
+Hanoman tetap didistribusikan sebagai paket npm global dengan SQLite embedded
+([ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md),
+[ADR-0087](../adr/0087-distribusi-npm-global-satu-perintah.md)). Podman di bawah bukan packaging
+aplikasi; ia adalah boundary wajib untuk proses agen.
 
-> **Repo ini publik/open-source.** Jangan pernah menaruh nilai sensitif (host VPS, token,
-> kredensial DB) di file ter-track. Rahasia hidup di berkas env di VPS (mode `600`), bukan di commit.
-> Placeholder di bawah (`<VPS_HOST>`, `hanoman.<domain>`, dst.) diisi operator di VPS.
+## Topologi wajib
 
-## Arsitektur
-
-```
-Internet ──TLS──> reverse proxy (Caddy) ──127.0.0.1:8787──> hanoman  (npm -g)
-                                                                │
-                                                        $HANOMAN_HOME/hanoman.db  (SQLite, in-process)
+```text
+Internet ──TLS── help.example ─┐
+                              ├─ Caddy ── 127.0.0.1:8787 ── hanoman API (user hanoman)
+operator ─ SSO/MFA/VPN ─ admin.example ┘                         │
+                                                                 ├─ $HANOMAN_HOME (0700)
+                                                                 └─ rootless Podman agent sandbox
+                                                                      └─ internal net → egress proxy allowlist
 ```
 
-Server bind `127.0.0.1` (ADR-0028): `/api/terminal` menyerahkan PTY sungguhan (RCE by design,
-ADR-0014), jadi ia **hanya** boleh dijangkau lewat proxy TLS + auth SPEC-169 — jangan set
-`HOST=0.0.0.0`. Firewall cukup buka `22/80/443`; port app tetap lokal. Tak ada port DB sama sekali.
+- `help.example` hanya boleh mencapai static UI, `/api/health`, dan `/api/help/**`.
+- `admin.example` wajib berada di belakang SSO/MFA, VPN, atau access proxy dan menolak Help publik.
+- Hanoman bind loopback. Firewall hanya membuka SSH dan listener reverse proxy; port 8787 tidak
+  pernah dibuka langsung.
+- Caddy harus menjadi satu-satunya proxy ke origin. `HANOMAN_TRUST_PROXY=1` berarti tepat satu hop;
+  gunakan CIDR bila ada lebih dari satu proxy yang diketahui. Jangan mempercayai semua forwarded IP.
 
-## Prasyarat di VPS
+## 1. User, paket, dan direktori private
 
-Node ≥ 20 · git · tmux · toolchain build (untuk kompilasi native `node-pty`) · CLI agen
-(`claude` dan/atau `codex`). **Docker tidak lagi dibutuhkan.**
+Prasyarat: Node ≥20, git, tmux, toolchain native `node-pty`, Podman rootless, satu CLI agen di image
+sandbox, dan executable malware scanner yang dikelola operator.
 
 ```sh
-apt-get install -y build-essential python3 git tmux   # node-pty dikompilasi dari source di Linux
-npm i -g @anthropic-ai/claude-code                    # `claude` per sesi terminal
-```
-
-## 1 · Pasang
-
-```sh
+apt-get install -y build-essential python3 git tmux podman uidmap
+useradd --system --create-home --home-dir /var/lib/hanoman --shell /usr/sbin/nologin hanoman
+install -d -o hanoman -g hanoman -m 0700 /var/lib/hanoman
+install -d -o hanoman -g hanoman -m 0700 /var/lib/hanoman/agent-credentials
+install -m 0755 /opt/security/bin/scan-upload /opt/security/bin/scan-upload
 npm i -g hanoman
-hanoman doctor            # exit ≠ 0 bila ada prasyarat wajib yang absen
 ```
 
-`doctor` memeriksa node ≥ 20, `git`, `tmux`, `claude`/`codex` (minimal satu), izin tulis direktori
-data, dan keberadaan aset dashboard. Jalankan ini **sebelum** menyalakan systemd — kegagalan
-prasyarat yang lewat akan muncul jauh nanti, di dalam pane tmux yang tak dibaca siapa pun.
+Provision image `hanoman-agent:latest` dari source/pin yang ditinjau. Image harus memuat CLI agen,
+git, dan tool build yang benar-benar dibutuhkan; jangan memasukkan credential. Credential runtime
+khusus agen diletakkan read-only di `/var/lib/hanoman/agent-credentials`, bukan seluruh home host.
 
-## 2 · Migrasi dari Postgres (hanya untuk instance yang sudah hidup)
-
-> **Backup dulu, tanpa pengecualian.** DB produksi memuat akun rekan & tiket nyata.
+Sebagai user `hanoman`, buat rootless internal network dan pasang egress proxy terpisah pada network
+itu. Proxy hanya mengizinkan API model serta host source/dependency yang disetujui dan menolak alamat
+private, loopback, link-local, metadata, serta DNS rebinding.
 
 ```sh
-pg_dump "$OLD_PG_URL" > /root/hanoman-pg-$(date +%F).sql
-
-# 1) lihat-lihat dulu — dry-run tidak menyentuh target sama sekali
-hanoman migrate-from-postgres --from "$OLD_PG_URL" --dry-run
-
-# 2) baru pindahkan
-hanoman migrate-from-postgres --from "$OLD_PG_URL"
+sudo -u hanoman podman network create --internal hanoman-egress
+# Jalankan/provision proxy organisasi pada hanoman-egress, mis. http://egress-proxy:3128.
 ```
 
-Tool ini memindahkan 26 model dalam urutan FK (`createMany` per 200 baris), `--dry-run` hanya
-menghitung baris per tabel. Target yang sudah berisi data **ditolak** kecuali `--force` (yang
-mengosongkannya dulu dalam urutan terbalik).
-
-Dua bentuk ketidakcocokan sumber ditangani sendiri sejak cutover hub produksi 2026-07-31 — keduanya
-dulu menggagalkan migrasi di tengah jalan:
-
-- **Tabel yang tak ada di Postgres dilewati** (`42P01`) dan ditandai `(tak ada di sumber — dilewati)`.
-  Model LOCAL-only seperti `SessionHistory` (SPEC-362) memang tak pernah punya tabel di hub, begitu
-  pula model yang lahir sesudah instance sumber dibuat. Galat Postgres lain tetap menggagalkan.
-- **Kolom `bigint` dikoersi ke `Int`.** Driver `pg` menyerahkan int8 sebagai *string* demi presisi
-  64-bit, dan Prisma menolaknya untuk field `Int` (`SyncLog.seq`). Koersi memakai `dataTypeID` hasil
-  query, dan **melempar** bila nilainya melewati `Number.MAX_SAFE_INTEGER` alih-alih membulatkan
-  diam-diam — kursor sync yang meleset satu digit membuat perangkat melompati baris selamanya.
-
-Ingat bahwa **`--dry-run` tak bisa menangkap ketidakcocokan tipe**: ia tak pernah menulis ke target,
-jadi ia lulus untuk data yang nanti ditolak Prisma. Dry-run hijau ≠ migrasi akan mulus.
-
-Migrator **tidak** idempoten saat gagal separuh jalan. Kalau ia berhenti di tengah, hapus berkas
-target (`rm -f /srv/hanoman-prod/hanoman.db*`) dan ulangi dari nol — jangan lanjutkan di atasnya.
-
-Dua hal yang mudah menjebak:
-
-- **`DATABASE_URL` di environment masih menunjuk Postgres → perintahnya melempar.** Itu disengaja
-  (ADR-0086): ia tak pernah diam-diam jatuh ke default. Kosongkan var itu atau sebut target
-  eksplisit dengan `--to /srv/hanoman-prod/hanoman.db`.
-- **Postgres lama dimatikan HANYA sesudah migrasi diverifikasi** — login ke dashboard, cek jumlah
-  spec/tiket/akun, baru `docker compose down` (atau `systemctl disable --now postgresql`) dan hapus
-  volume-nya. Sebelum itu ia adalah satu-satunya salinan hidup selain dump.
-
-## 3 · Konfigurasi (`/etc/hanoman.env`, mode 600)
+## 2. Konfigurasi private
 
 ```sh
-umask 077 && install -m 600 /dev/null /etc/hanoman.env
+umask 077
+install -o root -g hanoman -m 0640 /dev/null /etc/hanoman.env
 ```
 
 ```ini
-HANOMAN_HOME=/srv/hanoman-prod
+HANOMAN_HOME=/var/lib/hanoman
 PORT=8787
 HOST=127.0.0.1
 NODE_ENV=production
 HANOMAN_TMUX_SOCKET=hanoman-prod
-# VPS tak punya Keychain → token eksplisit (jalankan `claude setup-token` di mesin interaktif).
-CLAUDE_CODE_OAUTH_TOKEN=<token-oauth>       # atau ANTHROPIC_API_KEY=<key>
+
+HANOMAN_PUBLIC_ORIGINS=https://help.example
+HANOMAN_CONTROL_ORIGINS=https://admin.example
+HANOMAN_TRUST_PROXY=1
+
+HANOMAN_SESSION_SANDBOX=podman
+HANOMAN_SESSION_IMAGE=hanoman-agent:latest
+HANOMAN_SESSION_NETWORK=hanoman-egress
+HANOMAN_EGRESS_PROXY=http://egress-proxy:3128
+HANOMAN_AGENT_CREDENTIAL_DIR=/var/lib/hanoman/agent-credentials
+
+HANOMAN_UPLOAD_SCANNER=/opt/security/bin/scan-upload
 ```
 
-`DATABASE_URL` **tidak perlu diisi**: tanpa ia, DB adalah `$HANOMAN_HOME/hanoman.db`. Kalau diisi, ia
-wajib URL `file:` — nilai `postgresql://` melempar saat boot.
+`DATABASE_URL` tidak perlu: default adalah `$HANOMAN_HOME/hanoman.db`. Bila diisi, hanya URL
+SQLite `file:` yang sah. `SYNC_SERVER_URL` dan `SYNC_DEVICE_TOKEN` adalah pairing opsional; perubahan
+origin sync dari Settings menghapus token lama secara atomik dan wajib di-pair ulang.
 
-## 4 · systemd (auto-start, selamat reboot)
+Jalankan pemeriksaan sebagai user service. Production dianggap belum siap bila doctor melaporkan
+sandbox rootless, network, proxy, credential directory, tmux, git, atau CLI agen gagal.
+
+```sh
+sudo -u hanoman sh -c 'set -a; . /etc/hanoman.env; exec hanoman doctor'
+```
+
+Jangan menaruh token langsung pada command line di lingkungan yang mencatat argv.
+
+## 3. systemd
 
 `/etc/systemd/system/hanoman.service`:
 
@@ -123,81 +106,129 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
-Environment=HOME=/root
+User=hanoman
+Group=hanoman
+WorkingDirectory=/var/lib/hanoman
+UMask=0077
+Environment=HOME=/var/lib/hanoman
 EnvironmentFile=/etc/hanoman.env
 ExecStart=/usr/bin/env hanoman
 Restart=on-failure
 RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
 ```
 
 ```sh
-systemctl daemon-reload && systemctl enable --now hanoman
-systemctl status hanoman ; journalctl -u hanoman -f
+systemctl daemon-reload
+systemctl enable --now hanoman
+systemctl status hanoman
+journalctl -u hanoman -f
 ```
 
-Tak ada lagi `Requires=docker.service` maupun `WorkingDirectory`: `hanoman` menemukan skema, migrasi,
-dan aset dashboard dari dalam direktori paketnya sendiri (`resolveLayout`). Migrasi diterapkan setiap
-start, jadi update tak butuh langkah `migrate deploy` terpisah.
+Server menolak boot production bila uid 0, bind bukan loopback, origin split/trusted proxy absen,
+atau sandbox bukan Podman. `WorkingDirectory` tidak dipakai untuk menemukan aset paket, tetapi
+memastikan cwd private dan stabil. Migrasi Prisma tetap diterapkan otomatis setiap start.
 
-`ExecStart=/usr/bin/env hanoman` berarti **supervisornya CLI hanoman itu sendiri**. Tombol
-"Pasang & mulai ulang" di dashboard (SPEC-405 · ADR-0088) karena itu bekerja apa adanya di unit ini:
-server keluar dengan kode 75, CLI memasang versi baru dari npm lalu men-spawn server lagi — systemd
-tak pernah melihat restart itu dan tak perlu diubah. `Restart=on-failure` tetap jadi jaring pengaman
-untuk kegagalan yang sebenarnya.
+## 4. Reverse proxy TLS dan access proxy
 
-## 5 · Reverse proxy + TLS
+Contoh Caddy di bawah menunjukkan pemisahan host. Blok `forward_auth` adalah placeholder kontrak;
+sesuaikan URI/header dengan access proxy organisasi dan pastikan ia mewajibkan MFA.
 
-Contoh block Caddy (auto-HTTPS Let's Encrypt; `reverse_proxy` meneruskan upgrade WebSocket
-`/api/terminal` otomatis):
-
-```
-hanoman.<domain> {
-	encode zstd gzip
+```caddy
+(security_headers) {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "no-referrer"
 	}
+}
+
+help.example {
+	import security_headers
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8787
+}
+
+admin.example {
+	import security_headers
+	forward_auth 127.0.0.1:4180 {
+		uri /oauth2/auth
+		copy_headers X-Auth-Request-User X-Auth-Request-Email
+	}
 	reverse_proxy 127.0.0.1:8787
 }
 ```
 
-Prasyarat cert: A record `hanoman.<domain>` → IP VPS **sebelum** reload, agar tantangan ACME
-HTTP-01 lolos. `caddy validate` lalu `systemctl reload caddy`.
+Set A/AAAA record sebelum reload, lalu `caddy validate` dan `systemctl reload caddy`. Ingress policy
+Hanoman adalah lapis fail-closed kedua: salah route pada host publik tetap ditolak aplikasi.
 
-## 6 · Verifikasi
+## 5. Bootstrap akun pertama
+
+Saat DB belum memiliki user, boot membuat `$HANOMAN_HOME/setup.token` mode 0600, berlaku 15 menit.
+Log hanya menyebut path dan expiry. Baca token dari console/local shell sebagai user service, lalu
+paste di layar Setup pada **host control**:
 
 ```sh
-curl -fsS https://hanoman.<domain>/api/health          # {"ok":true}
-curl -s  https://hanoman.<domain>/api/auth/status      # {"needsSetup":true} saat 0 user
+sudo -u hanoman sed -n '1p' /var/lib/hanoman/setup.token
 ```
 
-Buka `https://hanoman.<domain>`. Instalasi baru: selesaikan layar **Setup** untuk membuat akun
-pertama. Instalasi hasil migrasi §2: login dengan akun yang sudah ada — `needsSetup` yang berbalik
-`true` sesudah migrasi berarti tabel `User` kosong, jadi migrasinya belum benar-benar jalan.
+Hanya satu create atomik yang dapat menang. Sesudah admin pertama dibuat, token dihapus dan
+`POST /api/auth/setup` permanen 409. Jangan mengirim token lewat chat, URL, access log, atau host Help.
+
+## 6. Migrasi Postgres lama
+
+Backup dan dry-run lebih dulu; data produksi memuat akun dan tiket nyata.
+
+```sh
+umask 077
+pg_dump "$OLD_PG_URL" > /var/lib/hanoman/backup-postgres.sql
+sudo -u hanoman hanoman migrate-from-postgres --from "$OLD_PG_URL" --dry-run
+sudo -u hanoman hanoman migrate-from-postgres --from "$OLD_PG_URL"
+```
+
+Target berisi ditolak kecuali `--force`. Jangan memakai `--force` pada instance live. Tabel sumber
+yang memang tidak ada dilewati; integer di luar safe range ditolak. Dry-run tidak membuktikan semua
+tipe dapat ditulis, jadi verifikasi login, jumlah project/spec/tiket/user, dan sync sebelum mematikan
+Postgres lama. Simpan backup sampai cutover dinyatakan selesai.
+
+## 7. Retensi, upload, backup, dan rotasi
+
+- Jalankan retention dry-run pada salinan DB sebelum rollout. Runtime lalu menyapu harian dengan
+  batch bounded: sesi 30 hari; ticket selesai 90 hari; ticket baru 180 hari; webhook delivery 30
+  hari; session result 90 hari. Set `HANOMAN_RETENTION_HOLDS` untuk legal/incident hold eksplisit.
+- Upload production fail-closed bila scanner hilang/gagal/timeout. Pantau quota 250 MiB/project dan
+  1 GiB/global serta direktori quarantine.
+- Backup SQLite secara konsisten (`sqlite3 … '.backup …'`) bersama `secret.key`; backup tanpa key
+  tidak dapat membuka RuntimeConfig/webhook secret. Backup harus dienkripsi dan mode private.
+- Setelah dugaan compromise atau migrasi dari deployment lama, rotasi cookie/session (cabut sesi),
+  device token sync, AgentToken, webhook secret, model/API/Git credential, VPS key, setup token yang
+  belum dipakai, serta credential access proxy. Jangan hanya mengganti password dashboard.
+
+## 8. Verifikasi sebelum membuka Help publik
+
+```sh
+curl -fsS https://help.example/api/health
+curl -i https://help.example/api/auth/status          # harus ditolak ingress
+curl -i https://admin.example/api/help/project         # harus ditolak ingress
+curl -i https://admin.example/api/auth/status          # hanya sesudah access proxy
+```
+
+Uji juga wrong setup token, exact WebSocket Origin, one-time ticket replay, upload EICAR-compatible
+scanner fixture pada staging, webhook redirect 307 ke capture server staging, dan satu sesi agen
+sandbox. Active DAST terhadap produksi membutuhkan otorisasi manusia terpisah.
 
 ## Update
 
 ```sh
-hanoman update              # npm i -g hanoman@latest
+hanoman update
 systemctl restart hanoman
 ```
 
-Badge "Update" di topbar muncul saat versi di registry npm lebih baru dari versi yang jalan
-(perbandingan semver, bukan SHA git). Server hanya **mendeteksi** — ia tak pernah memasang atau
-me-restart dirinya sendiri ([ADR-0048](../adr/0048-auto-update-deteksi-read-only.md)), karena itu
-akan memutus sesi tmux yang sedang berjalan. `hanoman update --check` melaporkan tanpa memasang.
-
-Restart aman untuk sesi: sesi agen hidup di tmux server sendiri (ADR-0016) dan selamat dari restart
-proses API. Yang perlu diperhatikan hanya klien WebSocket yang harus re-attach.
-
-## Deploy dari checkout (jalur lama)
-
-Masih mungkin — `resolveLayout` mengenali layout repo, jadi `node cli/dist/hanoman.js` di dalam
-clone berperilaku sama seperti biner global. Tetapi ia bukan lagi jalur yang didokumentasikan:
-`git clone` + `pnpm install` + `pnpm build` menuntut toolchain penuh di VPS demi hasil yang identik
-dengan satu `npm i -g`.
+Migrasi dijalankan saat start. Sesudah update, ulangi `hanoman doctor`, smoke host matrix, dan satu
+sesi sandbox sebelum membuka kembali traffic control. Jangan rollback ke konfigurasi root, public
+control host, query token, atau sandbox `off`; rollback aman adalah menutup ingress publik sambil
+mempertahankan boundary keamanan.

@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, readFile, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { effectiveStr } from "../config";
+import { safeRequest } from "./safe-outbound-request";
+import { resolveHome } from "@hanoman/runner";
 
 const EXT: Record<string, string> = {
   "image/png": ".png",
@@ -16,14 +18,14 @@ export function extFor(mimeType: string): string {
 }
 
 export function uploadDir(): string {
-  return resolve(effectiveStr("HANOMAN_UPLOAD_DIR") ?? join(process.cwd(), "data", "uploads"));
+  return resolve(effectiveStr("HANOMAN_UPLOAD_DIR") ?? join(resolveHome(), "uploads"));
 }
 
 export async function saveUpload(buf: Buffer, mimeType: string): Promise<{ storageKey: string; size: number }> {
   const dir = uploadDir();
-  await mkdir(dir, { recursive: true });
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   const storageKey = `${randomUUID()}${extFor(mimeType)}`;
-  await writeFile(join(dir, storageKey), buf);
+  await writeFile(join(dir, storageKey), buf, { mode: 0o600 });
   return { storageKey, size: buf.length };
 }
 
@@ -46,13 +48,17 @@ export async function readUploadOrFetch(storageKey: string): Promise<Buffer> {
     const base = effectiveStr("SYNC_SERVER_URL");
     const token = effectiveStr("SYNC_DEVICE_TOKEN");
     if (!base || !token) throw new Error(`lampiran ${safe} tak ada lokal & bukan client sync`);
-    const res = await fetch(`${base.replace(/\/$/, "")}/api/sync/attachments/${encodeURIComponent(safe)}`, {
-      headers: { authorization: `Bearer ${token}` },
+    const url = new URL(`/api/sync/attachments/${encodeURIComponent(safe)}`, `${base.replace(/\/$/, "")}/`);
+    const loopback = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+    const res = await safeRequest({
+      url, method: "GET", headers: { authorization: `Bearer ${token}` },
+      allowPrivate: process.env.NODE_ENV !== "production" && loopback,
+      connectMs: 5_000, totalMs: 15_000, maxResponseBytes: 5 * 1024 * 1024,
     });
-    if (!res.ok) throw new Error(`fetch lampiran hub gagal: ${res.status}`);
-    const buf = Buffer.from(await res.arrayBuffer());
-    await mkdir(uploadDir(), { recursive: true });
-    await writeFile(target, buf); // cache lokal untuk pembukaan berikutnya
+    if (res.status < 200 || res.status >= 300) throw new Error(`fetch lampiran hub gagal: ${res.status}`);
+    const buf = res.body;
+    await mkdir(uploadDir(), { recursive: true, mode: 0o700 });
+    await writeFile(target, buf, { mode: 0o600 }); // cache lokal untuk pembukaan berikutnya
     return buf;
   }
 }

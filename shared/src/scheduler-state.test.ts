@@ -11,7 +11,7 @@ describe("zSchedulerState (SPEC-299)", () => {
         { id: "triase", enabled: false, everyMin: 30, lastRunAt: null, nextRunAt: null },
       ],
       // SPEC-523 · antrean pindah ke GET /scheduler/queue; state membawa hitungannya saja.
-      queueCounts: { queued: 1, launched: 0, done: 1, failed: 0 },
+      queueCounts: { queued: 1, launched: 0, done: 1, failed: 0, canceled: 0 },
       sessions: [
         { id: "spec-2", projectId: "a", specId: "SPEC-2", flow: "feature", branch: "hanoman/spec-2",
           decision: false, exited: false, cwd: "/tmp/wt" },   // cwd ekstra harus diabaikan

@@ -22,7 +22,7 @@ describe("session-launch", () => {
   });
   it("throws LaunchError needs-bind when the project has no local checkout", async () => {
     await prisma.project.create({ data: { id: "p1", name: "P1", desc: "", kind: "existing" } }); // repoDir null
-    const spec = await prisma.spec.create({ data: { id: "SPEC-1", projectId: "p1", title: "t", source: "brief", stage: "planned", author: "a", priority: "sedang", objective: "" } });
+    const spec = await prisma.spec.create({ data: { id: "SPEC-1", projectId: "p1", title: "t", source: "brief", stage: "planned", author: "a", priority: "sedang", objective: "", launchApprovedAt: new Date(), launchApprovedBy: "test" } });
     await expect(startSpecSession(spec, { flow: "feature" })).rejects.toMatchObject({ kind: "needs-bind" });
     expect((await prisma.spec.findUnique({ where: { id: "SPEC-1" } }))!.baseSha).toBeNull(); // tak menyentuh baseSha
   });
@@ -39,8 +39,18 @@ describe("session-launch", () => {
       update: { repoDir: dir },
       create: { id: "pg", name: "PG", desc: "", kind: "existing", repoDir: dir },
     });
-    return prisma.spec.create({ data: { id, projectId: "pg", title: "t", source: "brief", stage: "planned", author: "a", priority: "sedang", objective: "o" } });
+    return prisma.spec.create({ data: { id, projectId: "pg", title: "t", source: "brief", stage: "planned", author: "a", priority: "sedang", objective: "o", launchApprovedAt: new Date(), launchApprovedBy: "test" } });
   }
+
+  it("rejects an unapproved row before binding or worktree side effects", async () => {
+    await prisma.project.create({ data: { id: "locked", name: "Locked", desc: "", kind: "existing" } });
+    const spec = await prisma.spec.create({ data: {
+      id: "SPEC-LOCKED", projectId: "locked", title: "t", source: "brief", stage: "planned",
+      author: "a", priority: "sedang", objective: "",
+    } });
+    await expect(startSpecSession(spec, { flow: "feature" })).rejects.toMatchObject({ kind: "not-approved" });
+    expect((await prisma.spec.findUnique({ where: { id: spec.id } }))!.baseSha).toBeNull();
+  });
   // `#{pane_start_command}` DIPOTONG tmux ("…") untuk argv panjang — kondisi goal bawaan jauh
   // melewatinya. Baca layar pane-nya saja: HANOMAN_CLAUDE_BIN=/bin/echo mencetak argv utuh, dan
   // `remain-on-exit` menahan pane mati tetap terbaca (pola yang sama dipakai pty.attach).

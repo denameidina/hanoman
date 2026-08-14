@@ -19,6 +19,13 @@ const specData = (over: Record<string, unknown> = {}) => ({
 });
 
 describe("sync service (SPEC-213 AC-9..15)", () => {
+  it("rejects fields outside the entity sync contract before applying a push", async () => {
+    await project();
+    await expect(applyPush("spec", "SPEC-1", 0, specData({ launchApprovedAt: new Date().toISOString() })))
+      .rejects.toThrow(/field/);
+    expect(await prisma.spec.findUnique({ where: { id: "SPEC-1" } })).toBeNull();
+  });
+
   it("insert new record → version 1; snapshot reflects it", async () => {
     await project();
     const r = await applyPush("spec", "SPEC-1", 0, specData());

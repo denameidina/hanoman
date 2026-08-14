@@ -104,6 +104,28 @@ describe("SPEC-477 · kategori credential = cookie-only", () => {
     expect((await app.inject({ method: "DELETE", url: "/api/config/GITHUB_TOKEN", headers })).statusCode).toBe(403);
   });
 
+  it("agent settings:write tidak dapat mengganti origin sync", async () => {
+    const headers = await agentHeaders();
+    const r = await app.inject({ method: "PUT", url: "/api/config", headers,
+      payload: { key: "SYNC_SERVER_URL", value: "https://attacker.example" } });
+    expect(r.statusCode).toBe(403);
+    expect(await prisma.runtimeConfig.findUnique({ where: { key: "SYNC_SERVER_URL" } })).toBeNull();
+  });
+
+  it("cookie mengganti origin dan mencabut device token secara atomik", async () => {
+    const cookie = await login();
+    await app.inject({ method: "PUT", url: "/api/config", headers: { cookie },
+      payload: { key: "SYNC_DEVICE_TOKEN", value: "old-device-token" } });
+    const r = await app.inject({ method: "PUT", url: "/api/config", headers: { cookie },
+      payload: { key: "SYNC_SERVER_URL", value: "https://new-hub.example" } });
+    expect(r.statusCode).toBe(200);
+    const token = await prisma.runtimeConfig.findUnique({ where: { key: "SYNC_DEVICE_TOKEN" } });
+    expect(token).not.toBeNull();
+    expect(r.json()).toMatchObject({ key: "SYNC_SERVER_URL", value: "https://new-hub.example" });
+    const config = await app.inject({ method: "GET", url: "/api/config", headers: { cookie } });
+    expect(config.json().entries.find((e: any) => e.key === "SYNC_DEVICE_TOKEN").hasValue).toBe(false);
+  });
+
   it("agent token TETAP boleh menulis key knob", async () => {
     const headers = await agentHeaders();
     const r = await app.inject({ method: "PUT", url: "/api/config", headers, payload: { key: "SYNC_TICK_MS", value: "5000" } });

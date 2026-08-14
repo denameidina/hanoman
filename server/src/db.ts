@@ -12,12 +12,13 @@ import { webhookTap, type TapBase } from "./services/webhooks/tap";
 // amandemen ADR-0086). `../prisma` benar di dev (server/src → server/prisma), di bundle repo
 // (server/dist → server/prisma), dan di paket npm (dist → <pkg>/prisma).
 const schemaDir = resolve(dirname(fileURLToPath(import.meta.url)), "../prisma");
+process.umask(0o077);
 // Dijaga di sini juga untuk jalur `node dist/server.js` langsung, tanpa lewat CLI.
 const notice = dbUrlNotice(process.env);
 if (notice) console.warn(notice);
 const url = resolveDbUrl(process.env, schemaDir);
 process.env.DATABASE_URL = url;
-mkdirSync(dirname(dbFilePath(url)), { recursive: true }); // SQLite tak membuat direktori sendiri
+mkdirSync(dirname(dbFilePath(url)), { recursive: true, mode: 0o700 }); // SQLite tak membuat direktori sendiri
 // SPEC-481 · ADR-0100 · tap webhook dipasang DI SINI, satu-satunya tempat klien Prisma lahir.
 // `base` dipakai tap untuk membaca keadaan sebelum/sesudah TANPA melewati extension lagi
 // (rekursi), sekaligus berbagi engine & koneksi yang sama dengan klien yang diekspor.

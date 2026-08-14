@@ -1,4 +1,6 @@
-packages: [ "shared", "server", "src", "cli", "runner", "!dist-npm" ]   # dist-npm = staging rilis, BUKAN anggota workspace (ADR-0087)
+packages: [ "shared", "server", "src", "cli", "runner", "!dist-npm" ] # dist-npm = staging rilis, BUKAN anggota workspace (ADR-0087)
+overrides:
+  fast-uri@^3.0.0: 3.1.5
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
@@ -8,3 +10,5 @@ allowBuilds:
   # Di linux tidak ada prebuild, jadi ia jatuh ke node-gyp rebuild. `true` benar di keduanya.
   node-pty: true
   prisma: true
+minimumReleaseAgeExclude:
+  - fastify@5.12.0

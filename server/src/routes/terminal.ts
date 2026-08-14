@@ -10,6 +10,8 @@ import { integrateBranch } from "../services/integrate";
 import { sessionAgentDefaults, conflictSessionDefaults, terminalAgentDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { startSpecSession, LaunchError } from "../services/session-launch";
+import { approveLaunch, launchPrincipal } from "../services/launch-authority";
+import { admitBrowserWs, openWsConnection, revalidateWsPrincipal, WsMessageGuard } from "../services/ws-admission";
 import { installCommand } from "../services/method-status";
 import { resolveRepoDir } from "../services/local-binding";
 import { ownsWorktree } from "../services/session-worktree";
@@ -70,7 +72,7 @@ const ensureWorktree = (repoDir: string, wt: string, branchFrom: string): boolea
 };
 const resumeNote = (reused: boolean): string => (reused ? `\n\n${RESUMED_WORKTREE_NOTE}` : "");
 
-export default async function (app: FastifyInstance) {
+export default async function (app: FastifyInstance, opts: { allowedOrigins?: Set<string> }) {
   app.get("/terminal/sessions", async () => listSessions());
 
   app.post("/terminal/sessions", async (req, reply) => {
@@ -84,7 +86,12 @@ export default async function (app: FastifyInstance) {
       const spec = await prisma.spec.findUnique({ where: { id: parsed.data.spec } });
       if (!spec) return reply.code(404).send({ error: "spec not found" });
       try {
-        const r = await startSpecSession(spec, {
+        const principal = launchPrincipal(req);
+        if (principal) await approveLaunch(spec.id, principal);
+        const launchable = principal
+          ? (await prisma.spec.findUnique({ where: { id: spec.id } }))!
+          : spec;
+        const r = await startSpecSession(launchable, {
           flow: parsed.data.flow, model: parsed.data.model, effort: parsed.data.effort,
           goal: parsed.data.goal, goalCondition: parsed.data.goalCondition,   // SPEC-332 · ADR-0073
           agent: parsed.data.agent,                                           // SPEC-338 · ADR-0074
@@ -102,6 +109,7 @@ export default async function (app: FastifyInstance) {
           // bisa menyebut SIAPA yang ditunggu dan menawarkan "Mulai tetap" (force).
           if (e.kind === "blocked")
             return reply.code(409).send({ error: e.message, blocked: true, blockers: e.blockers });
+          if (e.kind === "not-approved") return reply.code(403).send({ error: e.message });
           return e.kind === "needs-bind"
             ? reply.code(400).send({ error: e.message, needsBind: true })
             : reply.code(422).send({ error: e.message });
@@ -447,18 +455,38 @@ export default async function (app: FastifyInstance) {
     return reply.code(202).send({ cleanup: null });
   });
 
-  app.get("/terminal/sessions/:id/ws", { websocket: true }, (socket, req) => {
+  app.get("/terminal/sessions/:id/ws", {
+    websocket: true,
+    preValidation: async (req, reply) => {
+      const { id } = req.params as { id: string };
+      try { req.wsPrincipal = admitBrowserWs(req, `terminal:${id}`, opts.allowedOrigins ?? new Set()); }
+      catch { return reply.code(401).send({ error: "WebSocket admission rejected" }); }
+    },
+  }, (socket, req) => {
     const { id } = req.params as { id: string };
     if (!getSession(id)) return socket.close(4004, "not found");
+    const principal = req.wsPrincipal!;
+    let release: () => void;
+    try { release = openWsConnection(principal); }
+    catch { socket.close(1008, "connection limit"); return; }
+    const guard = new WsMessageGuard();
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     attach(id, client);
-    socket.on("message", (raw: Buffer) => {
+    socket.on("message", async (raw: Buffer) => {
+      const verdict = guard.accept(raw);
+      if (!verdict.ok) { socket.close(verdict.code, verdict.reason); return; }
+      const valid = await revalidateWsPrincipal(req, principal).catch(() => false);
+      if (!valid) { socket.close(1008, "session revoked"); return; }
       let m: { t?: string; d?: string; cols?: number; rows?: number };
       // ponytail: frame rusak dibuang diam-diam — pengirimnya UI kita sendiri.
       try { m = JSON.parse(raw.toString()); } catch { return; }
       if (m.t === "in" && typeof m.d === "string") writeTo(id, m.d);
       else if (m.t === "resize" && m.cols && m.rows) resize(id, m.cols, m.rows);
     });
-    socket.on("close", () => detach(id, client));
+    const revalidate = setInterval(() => {
+      void revalidateWsPrincipal(req, principal).then((ok) => { if (!ok) socket.close(1008, "session revoked"); });
+    }, 60_000);
+    revalidate.unref?.();
+    socket.on("close", () => { clearInterval(revalidate); release(); detach(id, client); });
   });
 }

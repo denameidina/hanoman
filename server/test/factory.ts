@@ -169,7 +169,8 @@ export function makeProject(over: Partial<Prisma.ProjectCreateManyInput> = {}) {
 export function makeSpec(over: Partial<Prisma.SpecCreateManyInput> = {}) {
   return prisma.spec.create({ data: {
     id: "SPEC-1", projectId: "p1", title: "test spec", source: "brief",
-    stage: "planned", author: "Rangga", priority: "sedang", objective: "", ...over } });
+    stage: "planned", author: "Rangga", priority: "sedang", objective: "",
+    launchApprovedAt: new Date(), launchApprovedBy: "test:factory", ...over } });
 }
 
 export function makeSetting(over: Partial<Setting> = {}) {

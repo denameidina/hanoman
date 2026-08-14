@@ -1,13 +1,19 @@
 # Security standard
 
-- **Auth (SPEC-169, ADR-0028)**: login email/password menggerbangi seluruh `/api` (gate `onRequest`,
-  401 tanpa sesi; termasuk upgrade WebSocket `/api/terminal`). Publik hanya `GET /health`,
-  `GET /auth/status`, `POST /auth/login`, `POST /auth/setup`.
+- **Ingress publik dan control plane (SPEC-761, [ADR-0117](../adr/0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md))**:
+  production wajib mengisi exact origin `HANOMAN_PUBLIC_ORIGINS` dan `HANOMAN_CONTROL_ORIGINS` yang
+  berbeda. Host publik hanya melayani dashboard statis, `GET /api/health`, dan `/api/help/**`; seluruh
+  route control-plane ditolak. Host control menolak `/api/help/**` dan wajib berada di belakang
+  SSO/MFA, VPN, atau access proxy. Origin langsung bind loopback dan firewall tidak membuka port app.
+  `HANOMAN_TRUST_PROXY` wajib berupa jumlah hop atau CIDR reverse proxy eksplisit; `true` dilarang.
+- **Auth (SPEC-169, ADR-0028 diamandemen ADR-0117)**: login email/password menggerbangi seluruh
+  control-plane `/api`; upgrade WebSocket memakai admission tersendiri di bawah.
   - Password: `crypto.scrypt` (stdlib) + salt acak + `timingSafeEqual`. Tak pernah dikembalikan ke client.
   - Sesi: token opaque 256-bit di cookie `httpOnly`; DB menyimpan `sha256(token)`, bukan token mentah.
     Revocable — logout/ganti-password/hapus-user mencabut sesi. Cookie `httpOnly` + `sameSite=strict`
     + `secure` (prod) + `maxAge` 7 hari.
-  - Login di-throttle per IP (10 gagal → tunda 60 dtk); error selalu generic ("email atau password salah").
+  - Login dan setup di-throttle per alamat hasil trusted-proxy policy; limiter TTL/LRU dibatasi jumlah
+    key sehingga alamat palsu tidak menumbuhkan memori tanpa batas. Error login selalu generic.
   - **Dua peran** (SPEC-617, [ADR-0110](../adr/0110-portal-klien-read-only.md)): `User.role` =
     `admin` (operator — cookie = akses penuh, perilaku lama persis) atau `client` (portal baca-saja
     ber-scope project). `@default("admin")` supaya migrasi tak memutus akun yang sudah ada.
@@ -23,33 +29,28 @@
     - `DELETE /auth/users/:id` menolak menghapus **admin terakhir** (bukan "user terakhir": sejak ada
       akun klien, syarat lama bisa terpenuhi oleh akun yang tak boleh melihat apa pun).
     - Tak ada jalur signup publik; akun klien hanya dibuat admin lewat `POST /client-accounts`.
-  - Bootstrap: saat 0 user, `POST /auth/setup` membuat akun pertama, lalu tertutup (409).
-- **TLS / deployment**: cookie `Secure` butuh HTTPS. Pola deploy: bind `127.0.0.1` di belakang reverse
-  proxy yang menerminasi TLS. Contoh `Caddyfile` (auto Let's Encrypt):
-  ```
-  hanoman.example.com {
-      reverse_proxy 127.0.0.1:8787
-  }
-  ```
-  `HOST=0.0.0.0` hanya bila ada TLS di depannya. Lakukan `setup` segera pada deploy pertama (jendela
-  0-user terbuka sampai akun pertama dibuat).
+  - Bootstrap akun pertama hanya di host control dan membutuhkan token one-time 32-byte dari
+    `$HANOMAN_HOME/setup.token` (0600), kedaluwarsa 15 menit. Create memakai id unik tetap dalam
+    transaksi; race menghasilkan tepat satu admin, token dihapus sesudah commit, dan route selamanya
+    menjawab 409 sesudah user pertama ada. Nilai token tidak dicetak ke log—hanya path dan expiry.
+- **TLS / deployment**: cookie `Secure` butuh HTTPS. Production selalu bind `127.0.0.1`; tidak ada
+  pengecualian `0.0.0.0`. Topologi normatif dan contoh unit ada di [deploy-vps](../operations/deploy-vps.md).
 - **Kredensial Claude**: sesi memakai auth Claude Code (Keychain macOS / `~/.claude/.credentials.json` /
   env `CLAUDE_CODE_OAUTH_TOKEN`|`ANTHROPIC_API_KEY`); tak pernah ke client. Private key VPS ada sebagai
   file di server (`Vps.keyPath`), tak pernah di DB.
-- **Guardrail perintah**: DICABUT sepenuhnya (SPEC-197, [ADR-0037](../adr/0037-cabut-guardrail-safety.md)).
-  Sesi jalan `--dangerously-skip-permissions` tanpa hook deny apa pun — agen dipercaya penuh, setara
-  developer yang menjalankan `claude` di mesinnya sendiri. Batas kerusakan satu-satunya adalah isolasi worktree.
-- **Sesi sebagai root (VPS)**: claude CLI menolak `--dangerously-skip-permissions` saat `uid 0`
-  (`"cannot be used with root/sudo privileges for security reasons"` lalu `exit(1)`) — di VPS, tempat
-  hanoman lazim jalan sebagai root, akibatnya SETIAP sesi claude lahir lalu mati seketika. `createSession`
-  memasang `IS_SANDBOX=1` di env sesi **hanya** bila `process.getuid() === 0` dan hanya untuk agen claude
-  (`rootBypassEnv`, `server/src/services/pty.ts`) — jalan keluar resmi gerbang itu di CLI. Ini tidak
-  menurunkan batas keamanan apa pun: sikap kepercayaan penuh sudah diputuskan di ADR-0037, dan menolak
-  bypass hanya membuat sesi mati, bukan membuat eksekusi lebih terkurung. Sesi non-claude (Console VPS
-  `ssh`, terminal biasa, codex) tak menyentuh env ini. Menjalankan hanoman sebagai user non-root tetap
-  lebih disukai bila lingkungan memungkinkan.
-- **Isolasi**: sesi di worktree terpisah (`.worktrees/<id>`); tak ada akses ke working tree utama.
-  Sejak ADR-0037 ini adalah satu-satunya batas keamanan yang tersisa.
+- **Boundary eksekusi agen**: API/worker production wajib berjalan sebagai user dedicated non-root.
+  Semua agen—sesi tmux serta lead/changelog one-shot—dibentuk lewat `session-sandbox.ts` dan berjalan
+  di Podman rootless: root filesystem read-only, capability none, no-new-privileges, PID/memory/CPU
+  limit, tmpfs private, credential khusus read-only, dan internal network lewat egress allowlist proxy.
+  Sesi mendapat hanya worktree-nya read-write; agen one-shot mendapat repo read-only dan prompt 0600.
+  Worktree tetap boundary Git, bukan boundary filesystem/process/network/security.
+- **Guardrail perintah**: hook deny tetap dicabut (SPEC-197, ADR-0037 diamandemen ADR-0117). Flag
+  permission-bypass tetap ada **di dalam sandbox OS**; jangan menghidupkan blacklist command sebagai
+  pengganti sandbox.
+- **Otoritas launch efektif**: `Spec.launchApprovedAt/By` adalah state LOCAL-only. Cookie admin atau
+  AgentToken dengan `sessions:write` dapat memberi approval; `settings:write`, `projects:write`, dan
+  `backlog:write` tidak. `startSpecSession()` memeriksa approval tepat sebelum efek worktree/tmux,
+  sehingga scheduler, governor, lead, cron, dan wrapper lain tidak dapat melewati gerbang akhir.
 - **Markdown repository adalah input tidak tepercaya** (SPEC-759): seluruh preview dashboard wajib
   melewati `MarkdownView`/`hnDocHtml` di `src/src/ds/markdown.tsx`. Hasil `marked.parse()` **selalu**
   disanitasi DOMPurify dengan allowlist HTML eksplisit sebelum masuk `dangerouslySetInnerHTML`:
@@ -72,18 +73,24 @@
   - **Lampiran**: berkas di `HANOMAN_UPLOAD_DIR` (server-local, **di luar repoDir, tak disync**), nama
     opaque `uuid+ext` (bukan input user → tanpa path traversal), disajikan **hanya ber-auth**
     (`GET /api/tickets/:id/attachments/:attId` di belakang gate); halaman status publik tak menampilkannya
-    balik. Batas: ≤3 berkas, ≤5MB, mime gambar; invalid di-skip (submit sisanya tetap jadi).
-  - **Ketahanan**: rate-limit token-bucket in-memory **per IP & per project** (429) + **honeypot**
+    balik dan selalu `Content-Disposition: attachment`, `nosniff`, CSP `sandbox`. Batas: ≤3 berkas,
+    5 MiB/file, 10 MiB/tiket, 250 MiB/project, 1 GiB/global. Magic byte wajib cocok MIME, image harus
+    lolos decode serta batas 12k dimensi/40M pixel, lalu di-re-encode sebelum quarantine 0600.
+    Production fail-closed tanpa executable scanner absolut `HANOMAN_UPLOAD_SCANNER`; scanner berjalan
+    tanpa shell, timeout 15 detik, dan hanya hasil bersih yang dipromosikan atomik.
+  - **Ketahanan**: limiter bounded TTL/LRU **per IP & per project** (429) + **honeypot**
     (`hc_trap` terisi → 200 palsu, tak buat tiket) + caps field. **Bukan** anti-spam berat (tanpa
-    CAPTCHA/verifikasi email) — spam disaring saat triase (Non-goal PRD). PII isi/lampiran disimpan apa
-    adanya (scrub pasca-MVP). SPEC-352: nama honeypot WAJIB netral bagi autofill (`hp` = "handphone"
+    CAPTCHA/verifikasi email). Triase otomatis hanya membuat notifikasi review: ia tidak membuat Spec,
+    enqueue, atau launch. Saat admin menerima tiket, semua field dibingkai sebagai
+    `UNTRUSTED_TICKET_DATA`; instruksi di dalam tiket/lampiran bukan instruksi agen. SPEC-352: nama
+    honeypot WAJIB netral bagi autofill (`hp` = "handphone"
     diisi browser untuk pelapor sungguhan) dan atributnya `autocomplete="new-password"`, bukan `off`
     yang diabaikan browser; honeypot yang menyala WAJIB meninggalkan jejak log agar false positive
     teramati. Rate-limit per IP **short-circuit** — IP yang jatahnya habis tak boleh ikut menguras
     bucket per-project bersama (amplifikasi 429 ke pelapor lain).
 - **Agent token — akses AI agent (SPEC-257, [ADR-0065](../adr/0065-ai-agent-capability-agent-token.md))**:
   **jalur auth kedua** ke seluruh `/api` di samping cookie sesi. Agen eksternal mengirim
-  `Authorization: Bearer <token>` (upgrade WebSocket: `?agent_token=`); gate `onRequest` yang sama
+  `Authorization: Bearer <token>`; credential tidak diterima dari query. Gate `onRequest` yang sama
   memverifikasi lalu menegakkan **capability**. Cookie sesi **berperan `admin`** tetap = akses penuh;
   sejak SPEC-617/ADR-0110 cookie berperan `client` tergerbang allowlist tersendiri (lihat Auth di atas),
   dan `/portal`/`/client-accounts` dipetakan **COOKIE_ONLY** sehingga agent token tak menjangkaunya.
@@ -99,9 +106,13 @@
   - **Tak-boleh-didelegasikan** (agent token → **403** apa pun capability): `/auth/*` (kelola user),
     `/agent-tokens*` (**anti privilege-escalation** — agen tak mencetak/menaikkan token), `/device-tokens*`,
     `/sync*`. Kelola token & master switch = **cookie-only**. Route tak dikenal peta → default cookie-only.
-  - **Bukan perluasan permukaan eksekusi**: `sessions:write` = RCE (spawn `claude --dangerously-skip-permissions`)
-    & `vps:write` = remote exec tetap dibatasi **isolasi worktree** (ADR-0037) — agent token hanya membuka
-    pintu API yang sama lewat auth berbeda, bukan menambah kemampuan baru.
+  - **Efek transitif**: capability route bukan bukti launch. Hanya `sessions:write` boleh menulis
+    launch approval; gate final launcher tetap berlaku walau token mengubah scheduler/project/backlog.
+- **WebSocket**: browser meminta tiket target-spesifik lewat `POST /api/ws-tickets`, mengirimnya sekali
+  melalui subprotocol `hanoman-ticket.<token>`, dan tidak menaruh credential di URL. Tiket hidup 30
+  detik, one-use, serta bounded; exact `Origin` scheme/host/port harus ada di control allowlist.
+  Maksimum payload 64 KiB, 120 pesan/menit, dan 8 koneksi/principal. Sesi diverifikasi ulang setiap
+  60 detik dan sebelum input terminal diterapkan. Sync machine-to-machine memakai Bearer header.
 - **Transkrip sesi tersimpan (SPEC-362, [ADR-0079](../adr/0079-history-sesi-terminal-store-lokal-plus-transkrip.md))**:
   riwayat sesi menyimpan **snapshot layar** tiap sesi yang ditutup — data baru yang sebelumnya tak
   pernah ada di disk hanoman. ADR-0047 dulu **sengaja** melarangnya masuk `SessionResult`; ADR-0079
@@ -117,8 +128,14 @@
     (ADR-0028) dan capability `sessions` (ADR-0065) tanpa domain baru.
   - **Isinya sekelas isi repo** (kode, path, output perintah), bukan kredensial: rahasia yang hanoman
     pegang (Keychain, `~/.claude/.credentials.json`, `Vps.keyPath`) tak pernah dicetak ke pane.
-  - **Purge manual ber-scope** (`projectId` dan/atau `before`, minimal satu) adalah satu-satunya
-    penghapusan, dan ia ikut membuang berkas transkripnya — tak ada retensi otomatis.
+  - Retensi otomatis bounded menghapus sesi berakhir >30 hari; purge manual scoped tetap tersedia.
+    Delete file gagal mempertahankan record DB untuk retry; `HANOMAN_RETENTION_HOLDS` mengecualikan
+    `session:<id>`, `ticket:<id>`, `delivery:<id>`, atau `result:<id>` yang wajib dipertahankan.
+- **Permission dan lifecycle data**: process memasang umask 0077. `$HANOMAN_HOME`, uploads,
+  transcripts, quarantine, dan direktori prompt memakai 0700; DB, `secret.key`, setup token, upload,
+  transcript, dan prompt memakai 0600. Symlink final ditolak. Sweep harian/batch 100 menghapus tiket
+  accepted/rejected >90 hari, tiket new >180 hari, SessionHistory >30 hari, WebhookDelivery terminal
+  >30 hari, dan SessionResult >90 hari; dry-run API internal melaporkan row/byte tanpa menghapus.
 - **Telegram gateway (SPEC-476, [ADR-0096](../adr/0096-telegram-gateway-session-operator-persisten.md))**:
   - Bot token tak pernah masuk session, dan tidak ada secret plaintext di
     log/prompt/transkrip/memory/audit/respons. Sejak SPEC-477 ia boleh hidup di DB, **terenkripsi**
@@ -144,6 +161,8 @@
     hanya sesi cookie admin. Demikian pula `/api/telegram/{settings,test,credentials}` yang
     `COOKIE_ONLY`. Ini menutup jalur nyata: AgentToken gateway Telegram wajib memegang
     `settings:write`, sehingga tanpa pagar itu sesi operator bisa menulis ulang kredensialnya sendiri.
+    `SYNC_SERVER_URL` juga termasuk kategori sensitif: perubahan URL dan pengosongan
+    `SYNC_DEVICE_TOKEN` terjadi atomik, client berhenti, lalu pairing/token baru wajib dilakukan.
   - `GET` kredensial tak pernah mengembalikan secret utuh — hanya `masked` (`••••` + 4 karakter
     terakhir) + `hasValue`. Galat Test Connection dilewatkan redaksi token dua lapis.
   - `secret.key` wajib ikut dicadangkan bersama berkas DB; kehilangannya membuat secret tersimpan
@@ -169,13 +188,13 @@
   `WEBHOOK_ENTITIES` — yang tak disebut tak pernah keluar. Test DMMF menjaga nama kolomnya tetap
   nyata; notifikasi bertipe `webhook` sengaja tak difan-out agar kegagalan satu endpoint tak
   mengirim lalu lintas ke endpoint lain.
-- **Pagar SSRF dua lapis, dengan batas yang dinyatakan.** Saat **simpan**: hanya `http`/`https`,
+- **Pagar SSRF address-pinned dan no-redirect.** Saat **simpan**: hanya `http`/`https`,
   tanpa kredensial di URL, tolak IP literal privat/loopback/link-local/ULA/multicast dan
   `localhost` — tanpa menyentuh DNS, supaya pendaftaran endpoint tak bergantung jaringan. Saat
-  **setiap percobaan kirim**: resolve DNS dan tolak bila **satu pun** alamat hasilnya internal;
-  DNS yang tak menjawab dibaca **gagal-tertutup**. Keduanya bisa dibuka per endpoint lewat
-  `allowPrivate` yang eksplisit. **Jendela DNS rebinding tetap ada** (antara resolve dan connect) —
-  dipersempit, tidak ditutup; ini dinyatakan apa adanya di halaman dokumentasi in-app.
+  **setiap percobaan kirim**: resolve seluruh A/AAAA, tolak bila satu pun internal/private/metadata,
+  lalu koneksi dipin ke alamat yang sudah divalidasi sambil mempertahankan Host dan TLS SNI. DNS gagal
+  tertutup. Semua 3xx adalah kegagalan terminal; body, auth, dan signature tidak pernah diteruskan ke
+  hop kedua. `allowPrivate` hanya membuka alamat privat eksplisit—tidak menghidupkan redirect.
 - **Batas laju & ukuran.** Token bucket per endpoint (`maxPerMinute`), antrean per endpoint dibatasi
   1000 kiriman menunggu (kelebihannya tercatat `dropped` — terlihat, bukan hilang diam-diam), dan
   amplop dipangkas bertahap di 64 KiB dengan penanda `truncated`/`truncatedFields`.

@@ -1,9 +1,9 @@
 # Menjalankan hanoman production di samping dev
 
-Dua instance di satu mesin. Yang dipisah hanya **state**: direktori data (`HANOMAN_HOME`) dan port.
-Tidak ada Docker, Postgres, Redis, worker, maupun namespace run id — DB adalah satu berkas SQLite
-([ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md)), antrean & runner headless sudah dicabut
-(ADR-0024), dan eksekusi adalah sesi `claude`/`codex` interaktif di tmux.
+Dua instance di satu mesin. State aplikasi dipisah lewat `HANOMAN_HOME`, port, tmux socket, dan
+credential; eksekusi production juga wajib dipisah lewat rootless Podman network/image. DB tetap
+satu berkas SQLite per instance ([ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md)); Podman
+hanya menjadi boundary agen, bukan packaging server ([ADR-0117](../adr/0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md)).
 
 | | dev (checkout) | prod (paket npm) |
 |---|---|---|
@@ -16,7 +16,7 @@ Tidak ada Docker, Postgres, Redis, worker, maupun namespace run id — DB adalah
 ```sh
 npm i -g hanoman
 hanoman doctor                                        # periksa git · tmux · CLI agen
-HANOMAN_HOME=/srv/hanoman-prod hanoman --port 8788
+sudo -u hanoman sh -c 'set -a; . /etc/hanoman-prod.env; exec hanoman --port 8788'
 ```
 
 Satu perintah, dari keadaan mati total: `hanoman` me-resolve home & DB, memastikan Prisma client ada,
@@ -28,9 +28,10 @@ sehingga ia menyajikan dashboard dari `web/` di dalam paket sekaligus API
 `DATABASE_URL`); `--host` mengubah bind. Untuk instance yang harus selamat reboot, jalankan di bawah
 systemd — lihat [deploy-vps](deploy-vps.md).
 
-Dashboard di <http://127.0.0.1:8788>. Server bind `127.0.0.1`; `/api/terminal` menyerahkan PTY
-sungguhan (RCE by design, ADR-0014), jadi jangan setel `HOST=0.0.0.0` tanpa reverse proxy TLS + auth
-di depannya.
+`/etc/hanoman-prod.env` wajib memuat seluruh boundary dari runbook deploy-vps, bukan hanya home/port.
+`NODE_ENV=production` menolak sandbox off, uid 0, bind non-loopback, origin split/trusted proxy kosong, atau
+sandbox selain Podman. Untuk instance publik, gunakan unit dan env lengkap di
+[deploy-vps](deploy-vps.md); dashboard control tidak boleh langsung dipublikasikan.
 
 ## Prod dari checkout (jalur pengembangan)
 
@@ -58,9 +59,11 @@ token sendiri. `prod` menjalankan `prod:setup` lebih dulu (rantai eksplisit `pro
   di-restart.
 - **`HANOMAN_HOME` yang sama = DB yang sama.** Dua instance yang lupa memisahkannya menulis ke satu
   berkas SQLite; pisahkan `HANOMAN_HOME` (atau `--db`) **dan** `HANOMAN_TMUX_SOCKET`.
-- **`repoDir` yang sama** berarti sesi prod meng-commit ke repo yang sedang Anda edit. Isolasinya cuma
-  per-worktree. Nomor SPEC diklaim dari nama berkas docs, bukan env, jadi dua instance yang berbagi
-  `repoDir` tetap perlu waspada tabrakan nomor — lihat [ADR-0021](../adr/0021-nomor-spec-diklaim-docs-bukan-hanya-database.md).
+- **`repoDir` yang sama** berarti dua instance tetap dapat mengubah repo yang sama walau kontainernya
+  berbeda. Worktree mencegah tabrakan Git, bukan koordinasi nomor/backlog; gunakan clone berbeda dan
+  mount hanya worktree sesi. Lihat [ADR-0021](../adr/0021-nomor-spec-diklaim-docs-bukan-hanya-database.md).
+- **Network/credential sandbox yang sama** memperbesar blast radius. Gunakan network internal,
+  credential directory, image, dan egress policy berbeda untuk prod dan dev.
 
 ## Memeriksa isolasi
 
@@ -85,15 +88,16 @@ Peran ditentukan env, bukan binari berbeda:
 | `SYNC_DEVICE_TOKEN=<token>` | Device token (Bearer) untuk auth sync/WS. Wajib bila `SYNC_SERVER_URL` diset. |
 | `SYNC_TICK_MS` | Opsional; interval drain fallback outbox (default 15000). |
 
-> **SPEC-215 (ADR-0049):** ketiga knob di atas kini juga dapat diatur runtime dari dashboard →
-> **Settings → Konfigurasi** (override DB menang atas env; menyimpan device token dari client
-> menyambungkan sync **live** tanpa restart). Env tetap berlaku sebagai fallback bootstrap.
+> **SPEC-761 (ADR-0117):** `SYNC_SERVER_URL` dan `SYNC_DEVICE_TOKEN` adalah setting cookie-admin-only.
+> Mengganti URL menulis origin baru dan tombstone token secara atomik, menghentikan client, lalu
+> menuntut token device baru; env lama tidak boleh diam-diam menjadi fallback credential.
 
 Langkah pairing device client:
 
 1. Di **hub**, login lalu terbitkan token: `POST /api/device-tokens {"name":"laptop-dev"}` →
    salin `token` (ditampilkan **sekali**).
-2. Di **client**, set `SYNC_SERVER_URL` + `SYNC_DEVICE_TOKEN`, boot. Log menampilkan `sync client → <url>`.
+2. Di **client**, set `SYNC_SERVER_URL` lalu masukkan `SYNC_DEVICE_TOKEN` baru melalui kanal admin
+   private. Transport memakai Bearer header, menolak redirect, dan mem-pin alamat DNS tervalidasi.
 3. Client menarik state hub (pull-before-push), lalu mem-push write lokalnya. Bind project ke
    checkout lokal (`PUT /api/projects/:id/binding` atau `POST /api/projects/:id/clone`) sebelum
    menjalankan sesi Claude — `repoDir`/binding **tak pernah** disync (per-mesin).

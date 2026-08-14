@@ -10,6 +10,7 @@ import { syncNow, fetchTransport } from "../services/sync-client";
 import { listConflicts, resolveConflict } from "../services/conflicts";
 import { readUpload } from "../services/uploads";
 import { effectiveStr } from "../config";
+import { bearerToken, openWsConnection, revalidateWsPrincipal } from "../services/ws-admission";
 
 // SPEC-213 · ADR-0045/0046 · surface sync mesin-ke-mesin (device-token). Isi file dokumen
 // TIDAK lewat sini — hanya record (project/spec/vps/sessionResult).
@@ -85,14 +86,28 @@ export default async function (app: FastifyInstance) {
     return resolveConflict(entity, recordId, p.data.choice, push);
   });
 
-  // SPEC-213 · ADR-0046 · kanal siar changefeed. Auth via ?token= pada upgrade (cookie tak ada
-  // di server-to-server). Token invalid → tutup socket. Read-only: frame masuk diabaikan.
-  app.get("/sync/ws", { websocket: true }, async (socket, req) => {
-    const token = (req.query as { token?: string }).token;
-    const dev = token ? await verifyDeviceToken(token) : null;
-    if (!dev) { socket.close(); return; }
+  // Kanal server-to-server memakai Authorization header. Credential query sengaja ditolak agar
+  // token tidak masuk access log, history, atau telemetry proxy.
+  app.get("/sync/ws", {
+    websocket: true,
+    preValidation: async (req, reply) => {
+      if ((req.query as { token?: string }).token) return reply.code(401).send({ error: "query token rejected" });
+      const token = bearerToken(req);
+      const dev = token ? await verifyDeviceToken(token) : null;
+      if (!dev) return reply.code(401).send({ error: "unauthorized" });
+      req.wsPrincipal = { kind: "device", id: dev.id };
+    },
+  }, async (socket, req) => {
+    const principal = req.wsPrincipal!;
+    let release: () => void;
+    try { release = openWsConnection(principal); }
+    catch { socket.close(1008, "connection limit"); return; }
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     attachSync(client);
-    socket.on("close", () => detachSync(client));
+    const revalidate = setInterval(() => {
+      void revalidateWsPrincipal(req, principal).then((ok) => { if (!ok) socket.close(1008, "token revoked"); });
+    }, 60_000);
+    revalidate.unref?.();
+    socket.on("close", () => { clearInterval(revalidate); release(); detachSync(client); });
   });
 }

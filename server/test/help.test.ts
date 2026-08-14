@@ -4,6 +4,7 @@ import { prisma } from "../src/db";
 import { __resetHelpBuckets } from "../src/services/help-ratelimit";
 
 const app = buildApp({ requireAuth: false });
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 
 const clean = async () => {
   await prisma.ticketAttachment.deleteMany();
@@ -146,7 +147,7 @@ describe("SPEC-253 · Help Center publik", () => {
 
   it("lampiran: gambar valid disimpan, mime invalid di-skip (submit tetap jadi)", async () => {
     __resetHelpBuckets();
-    const png = Buffer.from("89504e470d0a1a0a", "hex"); // header PNG cukup untuk uji
+    const png = PNG;
     const res = await app.inject({
       method: "POST", url: "/api/help/hc-proj/tickets",
       ...formFiles(

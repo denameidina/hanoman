@@ -9,16 +9,18 @@ import type { UserView } from "@hanoman/shared";
 export function AuthScreen({ needsSetup, onDone }: { needsSetup: boolean; onDone: (u: UserView) => void }) {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [setupToken, setSetupToken] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState("");
 
-  const canSubmit = /\S+@\S+\.\S+/.test(email) && password.length >= (needsSetup ? 8 : 1);
+  const canSubmit = /\S+@\S+\.\S+/.test(email) && password.length >= (needsSetup ? 8 : 1)
+    && (!needsSetup || setupToken.trim().length > 0);
 
   async function submit() {
     if (!canSubmit || busy) return;
     setBusy(true); setErr("");
     try {
-      const { user } = await (needsSetup ? api.setup({ email, password }) : api.login({ email, password }));
+      const { user } = await (needsSetup ? api.setup({ email, password, setupToken: setupToken.trim() }) : api.login({ email, password }));
       onDone(user);
     } catch (e) {
       setErr(needsSetup
@@ -52,6 +54,10 @@ export function AuthScreen({ needsSetup, onDone }: { needsSetup: boolean; onDone
                 value={password} placeholder="••••••••"
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} style={{ width: "100%" }} />
             </Field>
+            {needsSetup && <Field label="Setup token" hint="baca setup.token di HANOMAN_HOME pada host server">
+              <Input type="password" autoComplete="off" value={setupToken}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSetupToken(e.target.value)} style={{ width: "100%" }} />
+            </Field>}
             {err && <div style={{ fontSize: 12.5, color: "var(--status-err)", marginBottom: 12 }}>{err}</div>}
             <Button type="submit" leftIcon={needsSetup ? "user-plus" : "log-in"} disabled={!canSubmit || busy}
               style={{ width: "100%", justifyContent: "center" }}>

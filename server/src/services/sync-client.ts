@@ -1,9 +1,10 @@
 import { prisma } from "../db";
-import { pull as _pull, snapshot, upsertLocal, isEntity, type Entity } from "./sync";
+import { pull as _pull, snapshot, upsertLocal, isEntity, validateSyncData, type Entity } from "./sync";
 import { recordConflict } from "./conflicts";
 import { listOutbox, clearOutbox } from "./outbox";
 import { RENAME_SEP } from "./rename-project";
 import { effectiveStr, effectiveInt } from "../config";
+import { safeRequest } from "./safe-outbound-request";
 
 // SPEC-213 · ADR-0043 · sisi CLIENT: instance lokal menyinkron (server-to-server) ke hub.
 // Disiplin pull-before-push (AC-18): tarik dulu (server-authoritative), lalu push antre lokal.
@@ -12,6 +13,21 @@ import { effectiveStr, effectiveInt } from "../config";
 export type Transport = (
   method: "GET" | "POST", path: string, body?: unknown,
 ) => Promise<{ status: number; body: any }>;
+
+const MAX_SYNC_RECORD_BYTES = 1024 * 1024;
+export function validateIncomingRecord(input: unknown): {
+  entity: Entity; recordId: string; version: number; data: Record<string, unknown>;
+} {
+  if (!input || typeof input !== "object") throw new Error("sync record harus object");
+  const row = input as Record<string, unknown>;
+  if (typeof row.entity !== "string" || !isEntity(row.entity)) throw new Error("sync entity tak dikenal");
+  if (typeof row.recordId !== "string" || !row.recordId || row.recordId.length > 256) throw new Error("sync recordId invalid");
+  if (!Number.isSafeInteger(row.version) || Number(row.version) < 0) throw new Error("sync version invalid");
+  if (!row.data || typeof row.data !== "object" || Array.isArray(row.data)) throw new Error("sync data invalid");
+  if (Buffer.byteLength(JSON.stringify(input)) > MAX_SYNC_RECORD_BYTES) throw new Error("sync record terlalu besar");
+  validateSyncData(row.entity, row.data as Record<string, unknown>, { allowProjectRename: true });
+  return { entity: row.entity, recordId: row.recordId, version: Number(row.version), data: row.data as Record<string, unknown> };
+}
 
 // Kursor pull terakhir (SyncState singleton, LOCAL-only).
 export async function getCursor(): Promise<string> {
@@ -41,7 +57,8 @@ export async function applyFeedFrame(msg: {
 }): Promise<boolean> {
   if (!msg.entity || !msg.recordId) return true; // bukan frame record — tak ada yang bisa hilang
   try {
-    await applyRemote(msg.entity, msg.recordId, Number(msg.version ?? 0), msg.data ?? {});
+    const record = validateIncomingRecord({ ...msg, version: Number(msg.version ?? 0), data: msg.data ?? {} });
+    await applyRemote(record.entity, record.recordId, record.version, record.data);
   } catch {
     feedHole = true;
     return false;
@@ -70,7 +87,8 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
   };
 
   const pullRes = await transport("GET", `/api/sync/pull?since=${cursor}`);
-  const records: { entity: string; recordId: string; version: number; data: Record<string, unknown> }[] = pullRes.body?.records ?? [];
+  const rawRecords: unknown[] = Array.isArray(pullRes.body?.records) ? pullRes.body.records : [];
+  const records = rawRecords.map(validateIncomingRecord);
   // SPEC-382 · record yang gagal diterapkan (umumnya anak mendahului induknya → FK) ditunda, bukan
   // dilempar. Dulu satu record bermasalah membatalkan SELURUH siklus: `setCursor` di bawah tak
   // pernah tercapai, jadi client mandek di kursor itu selamanya (bukan cuma lampiran yang hilang).
@@ -160,13 +178,17 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
 // Transport HTTP nyata ke hub remote (server-to-server): Bearer device token.
 export function fetchTransport(base: string, token: string): Transport {
   return async (method, path, body) => {
-    const res = await fetch(base.replace(/\/$/, "") + path, {
-      method,
+    const url = new URL(path, `${base.replace(/\/$/, "")}/`);
+    const loopback = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+    const res = await safeRequest({
+      url, method,
       headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) },
-      ...(body ? { body: JSON.stringify(body) } : {}),
+      ...(body ? { body: Buffer.from(JSON.stringify(body)) } : {}),
+      allowPrivate: process.env.NODE_ENV !== "production" && loopback,
+      connectMs: 5_000, totalMs: 15_000, maxResponseBytes: 2 * 1024 * 1024,
     });
     let parsed: any = null;
-    try { parsed = await res.json(); } catch { /* body kosong */ }
+    try { parsed = JSON.parse(res.body.toString("utf8")); } catch { /* body kosong */ }
     return { status: res.status, body: parsed };
   };
 }
@@ -216,8 +238,8 @@ export async function startSyncClient(base: string, token: string, tickMs?: numb
 
   const connectWs = async () => {
     const { WebSocket } = await import("ws");
-    const wsUrl = base.replace(/^http/, "ws").replace(/\/$/, "") + `/api/sync/ws?token=${encodeURIComponent(token)}`;
-    ws = new WebSocket(wsUrl);
+    const wsUrl = base.replace(/^http/, "ws").replace(/\/$/, "") + "/api/sync/ws";
+    ws = new WebSocket(wsUrl, { headers: { authorization: `Bearer ${token}` } });
     ws.on("open", () => { void tick(); });
     ws.on("message", async (raw: Buffer) => {
       try {

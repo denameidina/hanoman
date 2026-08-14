@@ -100,6 +100,7 @@ export const paths = {
   sessionHistoryItem: (id: string) => `${API}/terminal/history/${encodeURIComponent(id)}`,
   sessionTranscript: (id: string) => `${API}/terminal/history/${encodeURIComponent(id)}/transcript`,
   eventsWs: `${API}/events/ws`,   // SPEC-199 · WebSocket siar dashboard (global, bukan per-sesi)
+  wsTickets: `${API}/ws-tickets`,
   vps: `${API}/vps`,
   vpsOne: (id: string) => `${API}/vps/${id}`,
   vpsAudit: (id: string) => `${API}/vps/${id}/audit`,

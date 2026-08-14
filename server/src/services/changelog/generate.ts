@@ -12,10 +12,8 @@ import { scrubOutput } from "./scrub";
 //
 // `think()` DIIMPOR dari `services/lead/brain.ts`, bukan disalin. Itu bukan kenyamanan melainkan
 // inti keputusannya: hanoman punya DUA titik spawn agen (`pty.ts` dan `lead/brain.ts`), dan titik
-// ketiga akan mengulang SPEC-448 — di sana `rootBypassEnv` ada di `pty.ts` tapi tak pernah
-// menyeberang ke `brain.ts`, dan lead gagal 100 % di setiap instance yang servernya jalan sebagai
-// root (`User=root` adalah konfigurasi deploy RESMI). `think()` sudah membawa gerbang root,
-// `stdin.end()` (SPEC-448), `maxBuffer` 16 MiB, dan `leadFailureReason()` yang membaca KEDUA stream.
+// ketiga akan mengulang SPEC-448. `think()` membawa `stdin.end()`, batas buffer, diagnosis dua
+// stream, dan — sejak SPEC-761/ADR-0117 — rootless sandbox read-only yang sama dengan lead.
 export type ThinkFn = (prompt: string, o: ThinkOpts) => Promise<string>;
 
 /** Anggaran waktu satu pembangkitan. Disebutkan DI DALAM prompt (SPEC-432): agen yang tak tahu

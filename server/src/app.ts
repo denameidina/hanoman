@@ -40,6 +40,7 @@ import telegram from "./routes/telegram";
 import webhooks from "./routes/webhooks";
 import portal from "./routes/portal";
 import clientAccounts from "./routes/client-accounts";
+import wsTickets from "./routes/ws-tickets";
 import fastifyMultipart from "@fastify/multipart";
 import authRoutes from "./routes/auth";
 import agentTokens from "./routes/agent-tokens";
@@ -51,6 +52,9 @@ import { detachAll } from "./services/pty";
 import { auditTelegramGatewayResponse, guardTelegramGatewayRequest } from "./services/telegram/security";
 import { stopTelegramRuntime } from "./services/telegram/runtime";
 import { actorFromRequest, setActor } from "./services/webhooks/actor";
+import { classifyIngress, loadIngressPolicy, trustProxyFromEnv } from "./services/ingress-policy";
+import { MAX_WS_MESSAGE_BYTES, wsControlOrigins } from "./services/ws-admission";
+import { resolveHome } from "@hanoman/runner";
 
 // Endpoint yang boleh diakses tanpa sesi (path lengkap termasuk prefix /api).
 const PUBLIC = new Set([
@@ -68,19 +72,21 @@ const PUBLIC = new Set([
 // requireAuth default true: prod (server.ts) selalu tergerbang. Test route yang tak
 // menguji auth mem-build dgn { requireAuth: false } untuk melewati gate.
 export function buildApp(
-  { requireAuth = true, agentDocFile }:
-  { requireAuth?: boolean; agentDocFile?: string | null } = {},
+  { requireAuth = true, agentDocFile, env = process.env }:
+  { requireAuth?: boolean; agentDocFile?: string | null; env?: Record<string, string | undefined> } = {},
 ): FastifyInstance {
   // SPEC-489 · diresolve DI SINI, bukan di route-nya: `import.meta.url` app.ts sedalam
   // `server/src` (tsx) DAN `server/dist` (esbuild) — satu kedalaman, jadi satu kandidat melayani
   // keduanya. Pola & alasan identik dengan pickWebDir di bawah.
   const docFile = agentDocFile !== undefined
     ? agentDocFile
-    : pickGuideFile(dirname(fileURLToPath(import.meta.url)), process.env, existsSync);
-  // trustProxy: deploy resmi bind 127.0.0.1 di belakang reverse proxy (server.ts), jadi req.ip
-  // default = IP proxy untuk SEMUA request. trustProxy membuat req.ip membaca X-Forwarded-For →
-  // throttle login (services/auth.ts) jadi per-klien, bukan satu bucket global (SPEC-197).
-  const app = Fastify({ logger: false, trustProxy: true });
+    : pickGuideFile(dirname(fileURLToPath(import.meta.url)), env, existsSync);
+  const ingress = loadIngressPolicy(env);
+  const app = Fastify({ logger: false, trustProxy: trustProxyFromEnv(env) });
+  app.addHook("onRequest", async (req, reply) => {
+    const role = classifyIngress({ host: req.headers.host ?? "", method: req.method, url: req.url }, ingress);
+    if (role === "denied") return reply.code(404).send({ error: "not found" });
+  });
   // POST tanpa body masih boleh membawa content-type JSON; parser bawaan Fastify menjawab
   // 400 untuk body kosong. Perlakukan kosong sebagai undefined, sementara body sungguhan
   // tetap diparse.
@@ -90,7 +96,7 @@ export function buildApp(
     catch (err) { (err as Error & { statusCode?: number }).statusCode = 400; done(err as Error, undefined); }
   });
   // fastify-plugin'd, jadi dekoratornya menurun ke scope /api di bawah.
-  app.register(websocket);
+  app.register(websocket, { options: { maxPayload: MAX_WS_MESSAGE_BYTES } });
   // Lepaskan klien tmux (PTY yatim menahan proses tetap hidup), tapi JANGAN bunuh sesinya:
   // claude yang sedang bekerja harus selamat dari restart server (ADR-0016).
   app.addHook("onClose", async () => { await stopTelegramRuntime(); detachAll(); });
@@ -120,7 +126,7 @@ export function buildApp(
         if (user?.role === "client" && !clientRouteAllowed(req.method, path))
           return reply.code(403).send({ error: "portal klien: baca-saja" });
         // SPEC-213 · ADR-0044/0046 · surface sync mesin-ke-mesin di-bypass gate cookie; tiap
-        // route /api/sync di-enforce device token (Bearer / ?token= pada upgrade WS) sendiri.
+        // route /api/sync di-enforce device token Bearer sendiri; credential query ditolak.
         // SPEC-268 · KECUALI POST /api/sync/now — pemicu manual = aksi UI, digerbangi cookie gate
         // (dan agent-deny "cookie-only" untuk /sync), bukan device token.
         // SPEC-270 · KECUALI /api/sync/conflicts* — antrean rekonsil = aksi UI, cookie-only juga.
@@ -129,7 +135,7 @@ export function buildApp(
         // login; route /api/help di-otorisasi helpEnabled + kunci opaque tiket sendiri (pengecualian sah).
         if (path.startsWith("/api/help")) return;
         if (user) return; // cookie sesi = akses penuh (tak ada RBAC, konsisten model sekarang)
-        // SPEC-257 · ADR-0065 · jalur auth kedua: agent token (Bearer / ?agent_token= untuk WS).
+        // SPEC-257 · ADR-0065 · jalur auth kedua: agent token Bearer. WS browser memakai tiket sekali pakai.
         const agentTok = agentTokenFromReq(req);
         if (agentTok) {
           const agent = await authenticateAgent(agentTok);
@@ -158,7 +164,7 @@ export function buildApp(
       setActor(actorFromRequest({ user: req.user ?? null, agent: req.agent ?? null }));
     });
     api.addHook("onResponse", auditTelegramGatewayResponse);
-    await api.register(authRoutes);
+    await api.register(authRoutes, { bootstrapRequired: env.NODE_ENV === "production", home: resolveHome(env) });
     await api.register(health);
     await api.register(agentDoc, { file: docFile });   // SPEC-489 · panduan AI agent (PUBLIC)
     await api.register(projects);
@@ -168,11 +174,13 @@ export function buildApp(
     await api.register(docs);
     await api.register(ide);
     await api.register(fs);
-    await api.register(terminal);
+    const wsOptions = { allowedOrigins: wsControlOrigins(env) };
+    await api.register(terminal, wsOptions);
     await api.register(vps);
     await api.register(limits);
     await api.register(update);
-    await api.register(events);
+    await api.register(events, wsOptions);
+    await api.register(wsTickets, { allowTestPrincipal: !requireAuth && env.NODE_ENV === "test" });
     await api.register(deviceTokens);
     await api.register(agentTokens);   // SPEC-257 · kelola agent token (cookie-only)
     await api.register(bindings);
@@ -199,8 +207,8 @@ export function buildApp(
   // index.html for non-/api routes (api 404s stay JSON, never a fake page).
   // SPEC-398 · ADR-0087 · direktorinya dipilih pickWebDir (paket npm `web/` atau checkout
   // `src/dist`); absen → server tetap jalan sebagai API saja, bukan crash.
-  if (process.env.NODE_ENV === "production") {
-    const dist = pickWebDir(dirname(fileURLToPath(import.meta.url)), process.env, existsSync);
+  if (env.NODE_ENV === "production") {
+    const dist = pickWebDir(dirname(fileURLToPath(import.meta.url)), env, existsSync);
     if (dist) {
       app.register(fastifyStatic, { root: dist });
       app.setNotFoundHandler((req, reply) =>

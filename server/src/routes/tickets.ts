@@ -9,6 +9,7 @@ import { generateShareToken } from "../services/ticket";
 import { acceptTicket } from "../services/ticket-accept";
 import { zTicketEditInput } from "@hanoman/shared";
 import type { Ticket } from "@prisma/client";
+import { launchPrincipal } from "../services/launch-authority";
 
 const view = (t: Ticket & { _count?: { attachments: number } }) => ({
   id: t.id, projectId: t.projectId, number: t.number, category: t.category, title: t.title,
@@ -64,6 +65,9 @@ export default async function (app: FastifyInstance) {
     const buf = await readUploadOrFetch(a.storageKey).catch(() => null);
     if (!buf) return reply.code(404).send({ error: "not found" });
     reply.header("content-type", a.mimeType);
+    reply.header("content-disposition", `attachment; filename="${a.filename.replace(/["\\\r\n]/g, "_")}"`);
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("content-security-policy", "sandbox; default-src 'none'");
     return reply.send(buf);
   });
 
@@ -74,7 +78,9 @@ export default async function (app: FastifyInstance) {
     const t = await prisma.ticket.findUnique({ where: { id }, include: { attachments: true } });
     if (!t) return reply.code(404).send({ error: "not found" });
     const priority = (req.body as { priority?: string } | undefined)?.priority ?? "sedang";
-    const { spec, created } = await acceptTicket(t, { author: req.user?.email ?? "system", priority });
+    const { spec, created } = await acceptTicket(t, {
+      author: req.user?.email ?? "system", priority, launchApprovedBy: launchPrincipal(req),
+    });
     return created
       ? reply.code(201).send({ spec })
       : reply.code(200).send({ alreadyPromoted: true, spec });

@@ -2,6 +2,11 @@
 
 **Status:** aktif (SPEC-197). Memperbarui ADR-0010, ADR-0009; melanjutkan arah ADR-0023 (guardrail SoT dicabut).
 
+> **Amendment SPEC-761 / [ADR-0117](0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md):**
+> keputusan mencabut blacklist command tetap aktif; yang berubah adalah asumsi boundary. Worktree
+> bukan sandbox security. Production kini mewajibkan user non-root dan rootless OS sandbox untuk
+> setiap agen, dengan mount/secret/egress minimum. Permission bypass tetap hidup di dalam boundary itu.
+
 ## Konteks
 
 Di bawah `--dangerously-skip-permissions`, hook `PreToolUse` `hanoman hook pretooluse`
@@ -26,8 +31,9 @@ Yang TETAP: hook `Notification`/`UserPromptSubmit` (marker keputusan SPEC-184) d
 
 ## Konsekuensi
 
-- **Isolasi kini murni worktree + trust**: run tetap jalan di `.worktrees/<id>` terpisah dari
-  working tree utama (ADR-0002). Itu batas kerusakan yang tersisa — bukan lagi deny list.
+- **Pernyataan historis:** pada konteks single-user 2026-07-13, worktree + trust diterima sebagai
+  batas yang tersisa. ADR-0117 menggantikannya untuk deployment publik dengan rootless OS sandbox;
+  worktree tetap memisahkan Git saja.
 - **Agen bisa spawn worktree sendiri** yang tak dibersihkan server, dan commit dari path yang
   tak pernah di-push (persis yang dulu dicegah guard worktree). Bila ini jadi masalah nyata,
   tanganinya lewat pembersihan `.worktrees` periodik, bukan menghidupkan kembali deny hook.
@@ -39,5 +45,5 @@ Yang TETAP: hook `Notification`/`UserPromptSubmit` (marker keputusan SPEC-184) d
 
 - **Perbaiki regex `rm`/push** (normalisasi flag): menambal satu kelas, tak menutup `eval`/alias/
   skrip; tetap memblok kerja sah sesekali. Kompleksitas untuk keamanan semu.
-- **Sandbox sungguhan (container/seccomp)**: di luar scope; worktree + trust cukup untuk
-  konteks single-user saat ini.
+- **Sandbox sungguhan (container/seccomp)**: ditolak untuk scope single-user saat ADR ini ditulis,
+  kemudian diwajibkan untuk deployment publik oleh ADR-0117 setelah trust boundary berubah.

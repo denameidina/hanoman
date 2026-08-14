@@ -16,6 +16,7 @@ import {
   type PaneIO,
 } from "./tui-dialog";
 import { effectiveStr } from "../config";
+import { sandboxCommand } from "./session-sandbox";
 
 // Sesi hidup di dalam tmux server, bukan di proses API (ADR-0016). Restart `pnpm dev`
 // tidak lagi membunuh claude yang sedang bekerja, dan refresh browser hanya menyambung
@@ -81,11 +82,10 @@ const agentBin = (agent: Agent): string => (agent === "codex" ? codexBin() : cla
 
 // Claude CLI menolak `--dangerously-skip-permissions` saat uid 0 ("cannot be used with root/sudo
 // privileges for security reasons") dan langsung `process.exit(1)` — sesi lahir lalu MATI seketika.
-// Ini persis kasus VPS: hanoman dijalankan sebagai root, jadi SEMUA sesi claude mati saat lahir.
+// Ini tersisa untuk local/test legacy; production sejak SPEC-761 menolak service uid 0.
 // Gerbangnya di CLI punya jalan keluar resmi: `IS_SANDBOX=1`. Kita memasangnya hanya bila memang
 // uid 0 — di mesin non-root env ini tak perlu dan tak boleh mengubah perilaku claude apa pun.
-// Sikap ini sejalan ADR-0037: agen dipercaya penuh, isolasi murni lewat worktree; menolak bypass
-// hanya membuat sesi mati, bukan membuat apa pun lebih aman.
+// Permission bypass production berada di dalam rootless sandbox ADR-0117, bukan di host.
 export const rootBypassEnv = (uid = process.getuid?.()): Record<string, string> =>
   uid === 0 ? { IS_SANDBOX: "1" } : {};
 
@@ -317,10 +317,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   const rosterBlock = agentForDefs === "codex" ? agentRosterBlock(customDefs) : "";
 
   let promptArg = "";
+  let promptFile: string | undefined;
   if (!opts.command && opts.prompt) {
-    const promptFile = promptFilePath(id);
-    mkdirSync(dirname(promptFile), { recursive: true });
-    writeFileSync(promptFile, opts.prompt + rosterBlock);
+    promptFile = promptFilePath(id);
+    mkdirSync(dirname(promptFile), { recursive: true, mode: 0o700 });
+    writeFileSync(promptFile, opts.prompt + rosterBlock, { mode: 0o600 });
     promptArg = `"$(cat ${sq(promptFile)})"`;
   }
   // SPEC-338 · ADR-0074 · perbedaan CLI antar agen dirakit `agentFlags`; di sini tinggal
@@ -335,11 +336,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     let goalGate: string | undefined;
     if (agent === "codex" && opts.goal && opts.flow && opts.specId) {
       goalGate = goalGatePath(id);
-      mkdirSync(dirname(goalGate), { recursive: true });
+      mkdirSync(dirname(goalGate), { recursive: true, mode: 0o700 });
       writeFileSync(goalGate, codexGoalScript({
         flow: opts.flow, specId: opts.specId, condition: opts.goal,
         phaseFile: opts.phaseFile ?? "", worktree: cwd, stateFile: goalStatePath(id),
-      }), { mode: 0o755 });
+      }), { mode: 0o700 });
     }
     // SPEC-339 · titik cekik tunggal: effort yang tak didukung model codex diturunkan ke fallback
     // model SEBELUM argv dirakit. Ditaruh di sini, bukan di route, karena SEMUA kelahiran sesi
@@ -357,8 +358,8 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
       const json = renderAgentsJson(customDefs);
       if (json) {
         agentsFile = agentsFilePath(id);
-        mkdirSync(dirname(agentsFile), { recursive: true });
-        writeFileSync(agentsFile, json);
+        mkdirSync(dirname(agentsFile), { recursive: true, mode: 0o700 });
+        writeFileSync(agentsFile, json, { mode: 0o600 });
       }
     }
     // Prompt (bila ada) = argumen positional pertama agen, TANPA sq (sudah dikutip ganda).
@@ -389,7 +390,10 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   }
   // Env tambahan dari pemanggil lewat jalur yang sama.
   for (const [k, v] of Object.entries(opts.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
-  const cmd = envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
+  let cmd = envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
+  if (!opts.command) cmd = sandboxCommand({
+    command: cmd, worktree: cwd, phaseFile: opts.phaseFile, promptFile,
+  });
   // SPEC-184 · direktori marker keputusan; hook Notification menulis absolute path di dalamnya.
   if (opts.decisionFile) mkdirSync(dirname(opts.decisionFile), { recursive: true });
 

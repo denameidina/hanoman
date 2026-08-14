@@ -86,6 +86,53 @@ const DATE_FIELDS: Record<Entity, string[]> = {
 export const __FIELDS = FIELDS;
 export const __DATE_FIELDS = DATE_FIELDS;
 
+const NUMBER_FIELDS = new Set([
+  "vps:port", "ticket:number", "ticketAttachment:size", "githubIssue:number",
+]);
+const BOOLEAN_FIELDS = new Set(["vps:hardened", "customAgent:enabled"]);
+const JSON_FIELDS = new Set([
+  "spec:payload", "spec:dependsOn", "spec:sourceHistory",
+  "vps:health", "vps:audit",
+  "customAgent:tools", "customAgent:mentions",
+  "githubIssue:labels",
+]);
+
+export function validateSyncData(
+  entity: Entity, data: Record<string, unknown>, options: { allowProjectRename?: boolean } = {},
+): void {
+  const allowed = new Set(FIELDS[entity]);
+  if (entity === "project" && options.allowProjectRename) allowed.add("renamedFrom");
+
+  for (const [field, value] of Object.entries(data)) {
+    if (!allowed.has(field)) throw new Error(`sync field tak dikenal: ${entity}.${field}`);
+    const key = `${entity}:${field}`;
+    if (DATE_FIELDS[entity].includes(field)) {
+      if (value !== null && (typeof value !== "string"
+        || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+        || Number.isNaN(Date.parse(value)))) {
+        throw new Error(`sync tanggal invalid: ${entity}.${field}`);
+      }
+      continue;
+    }
+    if (NUMBER_FIELDS.has(key)) {
+      if (!Number.isSafeInteger(value)) throw new Error(`sync tipe invalid: ${entity}.${field}`);
+      continue;
+    }
+    if (BOOLEAN_FIELDS.has(key)) {
+      if (typeof value !== "boolean") throw new Error(`sync tipe invalid: ${entity}.${field}`);
+      continue;
+    }
+    if (JSON_FIELDS.has(key)) {
+      if (value === undefined) throw new Error(`sync tipe invalid: ${entity}.${field}`);
+      try { JSON.stringify(value); } catch { throw new Error(`sync tipe invalid: ${entity}.${field}`); }
+      continue;
+    }
+    if (value !== null && typeof value !== "string") {
+      throw new Error(`sync tipe invalid: ${entity}.${field}`);
+    }
+  }
+}
+
 export function isEntity(e: string): e is Entity {
   return (SYNCED as readonly string[]).includes(e);
 }
@@ -126,6 +173,7 @@ export type PushResult =
 export async function applyPush(
   entity: Entity, id: string, baseVersion: number, data: Record<string, unknown>, deviceId?: string,
 ): Promise<PushResult> {
+  validateSyncData(entity, data, { allowProjectRename: true });
   // SPEC-255 · ADR-0064 · operasi rename project via penanda kontrol data.renamedFrom (bukan kolom;
   // coerce() mengabaikannya). Rename struktural → lewati optimistic-concurrency biasa.
   if (entity === "project" && typeof data.renamedFrom === "string" && data.renamedFrom && data.renamedFrom !== id) {

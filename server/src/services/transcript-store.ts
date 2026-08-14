@@ -5,13 +5,14 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, readFile, unlink } from "node:fs/promises";
 import { join, resolve, basename } from "node:path";
 import { effectiveStr } from "../config";
+import { resolveHome } from "@hanoman/runner";
 
 // Sesi berhari-hari bisa meninggalkan puluhan MB scrollback. 1 MiB menampung ribuan baris —
 // cukup untuk membaca ulang apa yang terjadi, tanpa menjadikan riwayat pengisi disk diam-diam.
 export const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 
 export function transcriptDir(): string {
-  return resolve(effectiveStr("HANOMAN_TRANSCRIPT_DIR") ?? join(process.cwd(), "data", "transcripts"));
+  return resolve(effectiveStr("HANOMAN_TRANSCRIPT_DIR") ?? join(resolveHome(), "transcripts"));
 }
 
 // Memangkas KEPALA, menyimpan EKOR: saat membaca ulang sesi, yang dicari hampir selalu apa yang
@@ -31,9 +32,9 @@ export async function saveTranscript(text: string): Promise<{ key: string; bytes
   if (!text.trim()) return { key: "", bytes: 0, truncated: false };
   const { body, truncated } = clamp(text);
   const dir = transcriptDir();
-  await mkdir(dir, { recursive: true });
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   const key = `${randomUUID()}.log`;
-  await writeFile(join(dir, key), body, "utf8");
+  await writeFile(join(dir, key), body, { encoding: "utf8", mode: 0o600 });
   return { key, bytes: Buffer.byteLength(body, "utf8"), truncated };
 }
 

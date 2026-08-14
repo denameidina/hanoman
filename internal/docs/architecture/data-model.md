@@ -101,6 +101,11 @@ tiap berkas.
   `executing` **tertahan** (tak jadi `done`) selama plan `docs/superpowers/plans/**` masih punya
   `- [ ]` (SPEC-173/ADR-0029, `planComplete`).
 - `priority` ("tinggi" | "sedang" | "rendah"), `author`, `objective`
+- `launchApprovedAt?`/`launchApprovedBy?` (SPEC-761/[ADR-0117](../adr/0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md)) —
+  approval durable untuk efek launch. Keduanya **LOCAL-only**: sengaja tidak ada di `FIELDS.spec`,
+  `DATE_FIELDS.spec`, feed sync, webhook, atau input record remote. Cookie admin dan AgentToken
+  `sessions:write` adalah satu-satunya penulis; scheduler/governor/lead/cron hanya mengonsumsi.
+  Migration memberi baris legacy approval `legacy-admin` agar upgrade tidak mematikan backlog lama.
 - `payload` (Json?) — brief (context/outcome/constraints), qa (severity/steps/expected/actual/env),
   atau **goal** (goal/done/constraints, SPEC-407). Bentuknya **terikat `source`** di boundary
   (`zCreateSpec.superRefine`, tiga-arah): `qa` ↔ `severity`, `goal` ↔ `goal`, selain itu brief —
@@ -218,6 +223,7 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   terpakai), dan `sources.{backlog,errors,triase}`
   (`enabled`+`everyMin` per source; `errors.minCount`). Ditambahkan sebagai `.default(SCHEDULER_DEFAULTS)`
   → baris Setting lama tetap parse (blok hilang diisi default).
+
 - `goal` (SPEC-332/[ADR-0073](../adr/0073-mode-goal-stop-hook-per-sesi.md), `zGoal`, **default MATI**) —
   mode goal untuk **sesi backlog**: `enabled` (default `false`) dan `condition` (string ≤ 4000, default
   `""` = pakai template DoD bawaan `defaultGoalCondition` di runner). Nyala → sesi lahir dengan
@@ -286,6 +292,14 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   `getSetting()` tiap panggilan → ganti setelan berlaku pada pembangkitan berikutnya **tanpa
   restart**, dikunci `server/test/changelog-engine.test.ts` yang memanggil `generateChangelog()`
   dua kali dalam satu proses dengan baris `Setting` berbeda di antaranya.
+
+## RuntimeConfig (LOCAL-only)
+
+Override konfigurasi mesin ini: `key` unik, `value`, `updatedAt`. Secret disimpan sebagai amplop
+AES-256-GCM dan tidak pernah disync. Sejak SPEC-761 `SYNC_SERVER_URL` dikategorikan sensitif walau
+nilainya bukan secret: hanya cookie admin boleh mengubahnya, dan perubahan origin ditransaksikan
+bersama tombstone `SYNC_DEVICE_TOKEN` agar env/credential lama tidak menjadi fallback. Record sync
+tidak boleh menulis `RuntimeConfig` maupun field launch approval.
 
 ## User / Session (auth — SPEC-169, [ADR-0028](../adr/0028-auth-sesi-opaque-di-db.md))
 - **User**: `id` (cuid), `email` (unique), `passwordHash` (`scrypt` "saltHex:hashHex"),
@@ -381,12 +395,16 @@ di-cache lokal. `status`/`category` = `String` + zod (`zTicketStatus`/`zTicketCa
   `HANOMAN_UPLOAD_DIR` — **berkas biner** server-local, di luar repoDir, **tak masuk feed**), `createdAt`,
   `updatedAt`, `version` (sync — SPEC-272). **Metadata** menyeberang lewat entitas `ticketAttachment`
   di `SYNCED`; `storageKey` menyeberang sebagai **pointer opaque** (bukan isi file). Index `(ticketId)`.
+  Byte dipromosikan hanya sesudah magic-byte/MIME cocok, decode+re-encode, dimension/pixel/time cap,
+  quota ticket/project/global, serta scanner quarantine lulus. `filename`, extension, MIME, dan size
+  berasal dari hasil normalisasi server, bukan metadata client.
 - Submit publik `POST /api/help/:slug/tickets` (multipart) diotorisasi **`Project.helpEnabled`**; cek status
   `GET /api/help/:slug/tickets/:key` diotorisasi **kunci opaque** — pengecualian sah gate `/api` (ADR-0062).
   Tiket baru → `Notification` type `ticket`. Promosi (`POST /tickets/:id/accept`) → `Spec` source `help`
   (payload brief-shaped + backlink). Status publik **diturunkan** (`publicStatus`) dari status tiket +
-  `stage` Spec. Rate-limit token-bucket in-memory (per IP & per project, short-circuit per SPEC-352)
-  + honeypot (`hc_trap`) + retensi opportunistic.
+  `stage` Spec. Rate-limit bounded TTL/LRU (per IP & per project, short-circuit per SPEC-352) +
+  honeypot (`hc_trap`). Triase scheduler hanya membuat notification review; promosi selalu aksi
+  manusia dan payloadnya dibingkai sebagai data tidak tepercaya.
 
 ## Sync — konflik & jam LWW (SPEC-270 · [ADR-0067](../adr/0067-sync-lww-reconciliation-manual.md))
 - **`updatedAt` = jam LWW.** Model synced (`Project`, `Spec`, `Vps`, `SessionResult`,
@@ -514,8 +532,17 @@ scaffold, breakdown, dan konsol VPS.
 - **Zombie dibereskan saat boot:** `reconcileHistory()` menutup baris `endedAt: null` yang `sessionId`-nya
   tak ada di `pty.listSessions()` (tmux mati di luar hanoman) dengan `endedAt = updatedAt`, `exitCode`
   tetap null. Cermin `backfillFeed` saat hub boot (ADR-0067).
-- **Purge manual ber-scope** (`projectId` dan/atau `before`) adalah satu-satunya penghapusan; ia ikut
-  menghapus berkas transkripnya. Cermin `DELETE /session-results` (ADR-0047).
+- **Purge manual ber-scope** (`projectId` dan/atau `before`) tetap tersedia. Sweep retention harian
+  juga memilih sesi berakhir >30 hari dalam batch bounded; hold `session:<id>` mengecualikan record.
+  Bila delete transkrip gagal, record DB dipertahankan agar percobaan berikutnya dapat retry.
+
+## Retention lifecycle (SPEC-761)
+
+Tidak ada tabel scheduler baru: `retention.ts` menurunkan eligibility dari timestamp model yang ada.
+Default: `SessionHistory` 30 hari, `Ticket` accepted/rejected 90 hari, Ticket new 180 hari,
+`WebhookDelivery` terminal 30 hari, dan `SessionResult` 90 hari. Satu sweep maksimum 100 record
+(hard cap 1000), mendukung dry-run dan hold id eksplisit. Attachment/transcript dihapus sebelum row;
+kegagalan filesystem mempertahankan row. Home/direktori memakai 0700, file sensitif 0600.
 
 ## LeadDecision (SPEC-409 · [ADR-0091](../adr/0091-hanoman-lead-agen-pemimpin.md))
 Jejak keputusan **hanoman-lead** — **LOCAL-ONLY, tak disync** (cermin `SessionHistory`/

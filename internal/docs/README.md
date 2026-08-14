@@ -23,6 +23,9 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 ## research
 - [market-sizing](research/market-sizing.md) · [competitor-analysis](research/competitor-analysis.md) · [moat](research/moat.md)
 
+- [audit SPEC-761 — hardening public deployment Hanoman](research/audit-spec-761-hardening-public-deployment.md) — dua belas kelompok finding terkonfirmasi pada trust boundary publik→control-plane: input Help Center dapat mencapai sesi agen, tujuan sync dapat mengekfiltrasi credential, sesi root tak punya boundary OS, capability route tidak mencakup efek transitif, containment path leksikal lolos symlink, webhook mengikuti redirect, dependency runtime rentan, WS tanpa Origin/quota/revalidasi, bootstrap first-user-wins, proxy+limiter dapat dipalsukan/ditumbuhkan, permission+retensi lemah, dan upload mempercayai MIME. Keputusan: full Spec → Plan → Execute; SPEC-759 tidak diulang
+- [sumber primer keamanan SPEC-761](research/spec-761-primary-security-sources.md) — dokumentasi dan standar primer untuk redirect/credential, SSRF/DNS pinning, WebSocket Origin, bootstrap, reverse proxy, systemd/Podman, permission, retensi, dan upload
+
 > **Dokumen audit tidak diarsipkan di sini.** Laporan `research/audit-<spec>-<slug>.md` yang ditulis flow
 > audit (ADR-0057) **berumur**: ia hidup sampai eskalasinya diputuskan dan spec turunannya tuntas, lalu
 > dihapus berikut entri indexnya — lihat [ADR-0083](adr/0083-retensi-dokumen-audit.md). Yang permanen
@@ -59,6 +62,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0117 — Boundary deployment publik, otoritas efektif, dan sandbox sesi](adr/0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md)
 - [0116 — Penutupan sesi asinkron: worktree dipindah ke `.trash`, penyapu latar yang menghapus](adr/0116-penutupan-sesi-asinkron-worktree-trash.md)
 - [0115 — State tampilan dashboard persisten: kunci `hn.ui.v1.<screen>.<field>`, satu hook bersama](adr/0115-state-tampilan-dashboard-persisten.md)
 - [0114 — Status pemasangan skill metode: deteksi per agen LOCAL-only, pemasangan lewat sesi terminal](adr/0114-status-pemasangan-skill-metode.md)
@@ -181,6 +185,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 
 ## security
 - [security-standard](security/security-standard.md)
+- [threat model deployment publik](security/threat-model.md) — asset, aktor, trust boundary, abuse case, kontrol, residual risk, invariant test, dan batas otorisasi DAST SPEC-761
 
 ## design-system
 - [design-system](design-system/design-system.md) — editorial instrument-panel, ilustrasi, dan grammar motion Pet Hanoman (SPEC-648)

@@ -43,6 +43,7 @@ async function seed(specId: string, stage = "planned") {
   const spec = await prisma.spec.create({ data: {
     id: specId, projectId: "p", title: "t", source: "qa", stage,
     author: "a", priority: "tinggi", objective: "o",
+    launchApprovedAt: new Date(), launchApprovedBy: "test",
   } });
   return { dir, spec };
 }

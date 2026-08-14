@@ -13,6 +13,11 @@ import { acceptTicket } from "../src/services/ticket-accept";
 import { setConfig, clearConfig } from "../src/config";
 import { __resetHelpBuckets } from "../src/services/help-ratelimit";
 
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
 // SPEC-382 · lampiran triase tak terbawa sync hub → local. Akar: feed hub memancarkan record ANAK
 // (`ticketAttachment`) SEBELUM induknya (`ticket`), sehingga di client `upsertLocal` melanggar FK
 // TicketAttachment.ticketId → Ticket.id. Di jalur WS kegagalan itu ditelan diam-diam lalu frame
@@ -81,7 +86,7 @@ describe("SPEC-382 · lampiran tiket menyeberang sync", () => {
     const res = await app.inject({
       method: "POST", url: "/api/help/p1/tickets",
       ...formFiles({ category: "bug", title: "Tak bisa login", detail: "Error 500", email: "a@b.c" },
-        [{ name: "files", filename: "shot.png", mime: "image/png", data: Buffer.from("PNGBYTES") }]),
+        [{ name: "files", filename: "shot.png", mime: "image/png", data: PNG }]),
     });
     expect(res.statusCode).toBe(201);
 
@@ -197,11 +202,11 @@ describe("SPEC-382 · tarik ulang penuh memulihkan baris yang terlewat", () => {
 // context nya jelas". Direktif SPEC-286 sudah ada, tapi di instance CLIENT byte lampiran baru
 // mendarat di disk saat seseorang membukanya di UI triase (fetch-through ADR-0068) — eskalasi
 // tanpa membuka gambar (termasuk auto-accept scheduler SPEC-297) menyuruh agen membaca path kosong.
-describe("SPEC-382 · eskalasi ke backlog memateralisasi byte lampiran", () => {
+describe("SPEC-761 · eskalasi menjaga lampiran publik sebagai data", () => {
   let hub: Server | undefined;
   afterAll(() => { hub?.close(); });
 
-  it("accept di instance client menarik byte dari hub → path di direktif benar-benar ada", async () => {
+  it("accept tidak menarik byte ke path agen; payload hanya membawa endpoint ber-auth", async () => {
     const dir = mkdtempSync(join(tmpdir(), "hnm382-client-"));
     await setConfig("HANOMAN_UPLOAD_DIR", dir);
     // hub palsu: melayani byte lampiran (GET /api/sync/attachments/:storageKey, device-token).
@@ -210,7 +215,7 @@ describe("SPEC-382 · eskalasi ke backlog memateralisasi byte lampiran", () => {
       served.push(req.url ?? "");
       if (req.url?.startsWith("/api/sync/attachments/")) {
         res.writeHead(200, { "content-type": "image/png" });
-        res.end(Buffer.from("PNGBYTES"));
+        res.end(PNG);
       } else { res.writeHead(404); res.end(); }
     });
     await new Promise<void>((r) => hub!.listen(0, "127.0.0.1", () => r()));
@@ -221,16 +226,16 @@ describe("SPEC-382 · eskalasi ke backlog memateralisasi byte lampiran", () => {
     await prisma.ticket.create({ data: { id: "TCK-1", projectId: "p1", number: 1, category: "bug",
       title: "Tombol simpan mati", detail: "klik tak ada reaksi", reporterEmail: "r@e.co", accessKeyHash: "h382" } });
     await prisma.ticketAttachment.create({ data: { id: "ATT-1", ticketId: "TCK-1", projectId: "p1",
-      filename: "shot.png", mimeType: "image/png", size: 8, storageKey: "uuid-abc.png" } });
+      filename: "shot.png", mimeType: "image/png", size: PNG.length, storageKey: "uuid-abc.png" } });
     const t = await prisma.ticket.findUnique({ where: { id: "TCK-1" }, include: { attachments: true } });
 
     const { spec } = await acceptTicket(t!, { author: "op@x.co", priority: "tinggi" });
 
-    // byte ter-cache lokal → path yang disebutkan direktif nyata ada saat agen mem-Read-nya
-    expect(served.some((u) => u.includes("uuid-abc.png"))).toBe(true);
-    expect(existsSync(join(dir, "uuid-abc.png"))).toBe(true);
+    expect(served).toEqual([]);
+    expect(existsSync(join(dir, "uuid-abc.png"))).toBe(false);
     const detail = (spec.payload as { actual?: string }).actual ?? ""; // kategori bug → source qa
-    expect(detail).toContain("PERIKSA");
-    expect(detail).toContain(join(dir, "uuid-abc.png"));
+    expect(detail).toContain("data tidak tepercaya");
+    expect(detail).toContain("GET /api/tickets/TCK-1/attachments/ATT-1");
+    expect(detail).not.toContain(dir);
   });
 });

@@ -53,6 +53,10 @@ model Spec {
   // sama dengan `baseSha` (services/session-launch.ts); jalur RESUME (ADR-0084) sengaja tidak
   // menimpanya — melanjutkan sesi bukan "mulai lagi". null = belum pernah dikerjakan.
   startedAt  DateTime?
+  // SPEC-761 · LOCAL-only authority to cross the session-launch boundary. These fields are
+  // deliberately absent from sync FIELDS so a peer cannot confer execution authority.
+  launchApprovedAt DateTime?
+  launchApprovedBy String?
   // SPEC-516 · ADR-0105 · kapan item PERTAMA kali masuk stage `done`. Ditulis HANYA di dalam
   // `recordCompletion()` — satu-satunya fungsi yang sudah dipanggil oleh KETIGA jalur persist
   // `done` (advanceStage, scheduler/reconcile, live-specs). Menyalin bookkeeping ini ke call

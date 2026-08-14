@@ -4,7 +4,7 @@ import { prisma } from "../src/db";
 import { issueDeviceToken } from "../src/services/device-token";
 import { pull } from "../src/services/sync";
 import { enqueueOutbox, listOutbox } from "../src/services/outbox";
-import { syncOnce, getCursor, setCursor, syncNow, type Transport } from "../src/services/sync-client";
+import { syncOnce, getCursor, setCursor, syncNow, validateIncomingRecord, type Transport } from "../src/services/sync-client";
 import { clearConfig } from "../src/config";
 
 const app = buildApp();
@@ -29,6 +29,19 @@ const specData = (over: Record<string, unknown> = {}) => ({
 });
 
 describe("sync-client syncOnce (SPEC-213 AC-18/19)", () => {
+  it("rejects malformed and oversized incoming records before apply", () => {
+    expect(() => validateIncomingRecord({ entity: "unknown", recordId: "x", version: 1, data: {} })).toThrow(/entity/);
+    expect(() => validateIncomingRecord({ entity: "spec", recordId: "x", version: 1,
+      data: { payload: "x".repeat(1_100_000) } })).toThrow(/besar/);
+    expect(() => validateIncomingRecord({ entity: "spec", recordId: "x", version: 1,
+      data: { ...specData(), launchApprovedAt: new Date().toISOString() } })).toThrow(/field/);
+    expect(() => validateIncomingRecord({ entity: "spec", recordId: "x", version: 1,
+      data: { ...specData(), createdAt: "bukan-tanggal" } })).toThrow(/tanggal/);
+    expect(() => validateIncomingRecord({ entity: "ticketAttachment", recordId: "x", version: 1,
+      data: { size: "besar" } })).toThrow(/tipe/);
+    expect(() => validateIncomingRecord({ entity: "project", recordId: "baru", version: 1,
+      data: { renamedFrom: "lama" } })).not.toThrow();
+  });
   it("drains outbox: pushes local record to hub", async () => {
     const transport = await realTransport();
     await prisma.project.create({ data: { id: "p1", name: "p1", desc: "d", kind: "existing", repoDir: null } });

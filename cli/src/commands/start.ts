@@ -257,6 +257,7 @@ function runServer(serverJs: string, env: Record<string, string>): Promise<numbe
 }
 
 export default async function start(argv: string[], ctx: Ctx): Promise<number> {
+  process.umask(0o077);
   let opts: StartOpts;
   try { opts = parseStartArgs(argv); } catch (e) { ctx.stderr(`${(e as Error).message}\n`); return 2; }
 
@@ -272,8 +273,9 @@ export default async function start(argv: string[], ctx: Ctx): Promise<number> {
   if (notice) ctx.stderr(`${notice}\n`);
 
   const home = resolveHome(ctx.env);
-  mkdirSync(home, { recursive: true });
-  mkdirSync(dirname(dbFilePath(dbUrl)), { recursive: true });
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  chmodSync(home, 0o700);
+  mkdirSync(dirname(dbFilePath(dbUrl)), { recursive: true, mode: 0o700 });
 
   if (!existsSync(layout.server)) {
     ctx.stderr(`hanoman: bundle server tak ada di ${layout.server} — jalankan \`pnpm build\` dulu\n`);
@@ -290,6 +292,7 @@ export default async function start(argv: string[], ctx: Ctx): Promise<number> {
       return 1;
     }
   }
+  if (existsSync(dbFilePath(dbUrl))) chmodSync(dbFilePath(dbUrl), 0o600);
 
   const port = opts.port ?? Number(ctx.env.PORT ?? 8787);
   const host = opts.host ?? ctx.env.HOST ?? "127.0.0.1";

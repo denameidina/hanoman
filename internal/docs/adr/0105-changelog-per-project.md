@@ -5,6 +5,11 @@
 - **Menegakkan:** ADR-0018/0019 (nilai turunan), ADR-0033 (notifikasi selesai), ADR-0037 (guardrail dicabut), ADR-0078 (unduh dokumen), ADR-0091 (lead sebagai agen one-shot), ADR-0099 (MCP), ADR-0100 (webhook)
 - **Melanjutkan arah:** ADR-0090 (stempel waktu backlog sebagai kolom), ADR-0103 (notifikasi `done:` sebagai stempel selesai)
 
+> **Amendment SPEC-761 / [ADR-0117](0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md):**
+> `think()` kini merutekan lead dan changelog one-shot ke rootless sandbox dengan repo read-only,
+> prompt private 0600, credential minimum, dan egress allowlist. Catatan root di bawah adalah konteks
+> deployment lama, bukan konfigurasi production saat ini.
+
 ## Konteks
 
 hanoman menyimpan seluruh bahan sebuah changelog tapi tak punya permukaan yang menyajikannya
@@ -73,7 +78,7 @@ Narasi dihasilkan satu panggilan agen one-shot lewat `think()` dari `services/le
 bukan kenyamanan melainkan inti keputusannya: hanoman punya **dua** titik spawn agen (`pty.ts` dan
 `lead/brain.ts`), dan titik ketiga akan mengulang SPEC-448 — di sana `rootBypassEnv` ada di
 `pty.ts` tapi tak pernah menyeberang ke `brain.ts`, dan lead gagal **100 %** di setiap instance yang
-servernya jalan sebagai root (`User=root` adalah konfigurasi deploy RESMI). `think()` sudah membawa
+servernya berjalan root (konfigurasi deploy lama). `think()` sudah membawa
 gerbang root, `stdin.end()`, `maxBuffer` 16 MiB, dan `leadFailureReason()` yang membaca kedua stream.
 
 Agen/model/effort dari `sessionAgentDefaults()` — bukan `sessionModel()`, yang sengaja khusus claude

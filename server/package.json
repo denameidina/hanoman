@@ -11,18 +11,20 @@
     "migrate": "prisma migrate dev"
   },
   "dependencies": {
-    "@fastify/cookie": "^9.4.0",
-    "@fastify/multipart": "^8.3.1",
-    "@fastify/static": "^7.0.0",
-    "@fastify/websocket": "^10.0.1",
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/multipart": "^10.1.0",
+    "@fastify/static": "^10.1.3",
+    "@fastify/websocket": "^11.3.0",
     "@hanoman/runner": "workspace:*",
     "@hanoman/shared": "workspace:*",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@prisma/client": "^6.19.0",
-    "fastify": "^4.28.0",
+    "fastify": "^5.12.0",
+    "file-type": "^21.3.4",
     "marked": "^12.0.2",
     "node-pty": "^1.1.0",
     "pdfkit": "^0.19.1",
+    "sharp": "^0.35.3",
     "zod": "^3.23.0"
   },
   "devDependencies": {

@@ -2,15 +2,16 @@ import { WEBHOOK_TIMEOUT_MS } from "@hanoman/shared";
 import { signedHeaders } from "./sign";
 import { checkDestination, validateWebhookUrl, type Lookup } from "./ssrf";
 import { secretOf, type Endpoint } from "./endpoints";
+import { safeRequest, type SafeRequestDeps } from "../safe-outbound-request";
 
 // SPEC-481 · ADR-0100 · satu pengiriman HTTP. Murni terhadap DB — pemanggilnya yang membukukan
 // hasilnya, supaya jalur ini bisa dites tanpa jaringan maupun tabel.
 
 export type Fetcher = (url: string, init: {
-  method: string; headers: Record<string, string>; body: string; signal: AbortSignal;
+  method: string; headers: Record<string, string>; body: string; signal: AbortSignal; redirect: "manual";
 }) => Promise<{ status: number }>;
 
-export type SenderDeps = { fetcher?: Fetcher; lookup?: Lookup };
+export type SenderDeps = { fetcher?: Fetcher; lookup?: Lookup; outbound?: SafeRequestDeps };
 
 export type SendResult = {
   ok: boolean; httpStatus: number | null; durationMs: number; error: string | null;
@@ -46,8 +47,22 @@ export async function sendOnce(o: {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), WEBHOOK_TIMEOUT_MS);
   try {
-    const f: Fetcher = deps.fetcher ?? ((u, init) => fetch(u, init as RequestInit));
-    const res = await f(parsed.url.toString(), { method: "POST", headers, body: o.body, signal: ac.signal });
+    const res = deps.fetcher
+      ? await deps.fetcher(parsed.url.toString(), {
+          method: "POST", headers, body: o.body, signal: ac.signal, redirect: "manual",
+        })
+      : await safeRequest({
+          url: parsed.url, method: "POST", headers, body: Buffer.from(o.body),
+          allowPrivate: o.endpoint.allowPrivate, connectMs: WEBHOOK_TIMEOUT_MS,
+          totalMs: WEBHOOK_TIMEOUT_MS, maxResponseBytes: 64 * 1024,
+        }, {
+          ...deps.outbound,
+          lookupAll: deps.lookup
+            ? async (host) => (await deps.lookup!(host)).map((a) => ({
+                address: a.address, family: a.address.includes(":") ? 6 : 4,
+              }))
+            : deps.outbound?.lookupAll,
+        });
     const durationMs = Date.now() - started;
     if (res.status >= 200 && res.status < 300)
       return { ok: true, httpStatus: res.status, durationMs, error: null, gone: false };
