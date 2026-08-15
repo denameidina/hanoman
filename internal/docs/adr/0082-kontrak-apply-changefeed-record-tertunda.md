@@ -7,6 +7,13 @@
 (backfill feed, LWW), [ADR-0043](0043-sync-arsitektur-hub-client-server-to-server.md) (peran hub/client),
 [ADR-0062](0062-help-center-tiket-publik-triase.md) (Help Center + `TicketAttachment`)
 
+> **Sebagian dicabut oleh [ADR-0119](0119-tombstone-sync-penghapusan-menyeberang.md)** (SPEC-799):
+> batasan "feed append-only tanpa tombstone (delete tak merambat)" tidak lagi berlaku, dan "yatim
+> sejati dilewati diam-diam" kini punya cabang yang dinyatakan — anak dari induk **bertombstone**
+> dibuang SENGAJA dan terhitung, sementara yatim yang benar-benar tak bisa dijelaskan tetap
+> `console.warn`. Keputusan 1–5 (record tertunda, kursor tak melompat, tarik ulang penuh) justru
+> **ditegakkan**: tombstone mengalir lewat kontrak apply yang sama persis.
+
 ## Konteks
 
 ADR-0068 memutuskan lampiran tiket **harus** menyeberang hub → local: metadata lewat feed

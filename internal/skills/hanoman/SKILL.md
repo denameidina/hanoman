@@ -344,6 +344,37 @@ Pakai skill lebih sempit saat task cocok:
   diekspos **boolean** (`false` menghilangkan parameternya — string selain `"true"` diabaikan senyap
   oleh server), token **tak pernah dari flag** (ARGV terbaca `ps`, SPEC-402), redaksi di **satu**
   titik keluar (SPEC-472), dan pemotongan balasan **wajib tetap JSON sah**.
+- **Penghapusan menyeberang sebagai TOMBSTONE, dua arah** (SPEC-799/**ADR-0119**; ADR-0045 diperluas,
+  ADR-0068 & ADR-0082 **sebagian dicabut** — batasan "feed append-only tanpa tombstone"; kontrak apply
+  ADR-0082 & ADR-0043/0046/0067/0064/0100 **ditegakkan**): mesin sync dulu hanya mengenal UPSERT, jadi
+  hapus tak pernah menyeberang dan sisi lain menghidupkannya kembali lewat **dua jalur berlawanan
+  arah** — hapus di client (feed hub memutar ulang record itu lewat edit siapa pun, `backfillFeed`
+  saat boot, atau tombol Tarik ulang) dan hapus di hub (`applyPush` menerima id yang absen sebagai
+  INSERT BARU yang **selalu** diterima). Bentuknya **hard-delete + tabel `SyncTombstone`**
+  (`entity, recordId, version, data, deletedAt, deviceId`), **bukan** soft-delete `deletedAt` per
+  entitas: bentuk itu menyentuh SETIAP query baca delapan entitas SYNCED (satu penyaring terlewat =
+  bug yang sedang diperbaiki, gagal SENYAP), menggugurkan `onDelete: Cascade`, menabrak
+  `@@unique([projectId, number])` saat pembuatan ulang, dan membuat tap Prisma ADR-0100 membaca hapus
+  sebagai `update`. Ide intinya: **tombstone ADALAH versi record itu sendiri, berkeadaan dihapus** —
+  `applyPush` membaca "versi saat ini" dari baris **atau** tombstone, sehingga penolakan kebangkitan
+  jatuh dari optimistic-concurrency yang sudah ada, tanpa cabang khusus. Peristiwanya mengalir lewat
+  kolom **`SyncLog.op`** (`"upsert"|"delete"`, `@default`). Penghapusannya satu panggilan
+  **`deleteSynced()`** (`services/sync-delete.ts`: baca versi+snapshot → hapus → tulis tombstone →
+  terbitkan sadar-peran) yang dipakai **enam** route DELETE; retensi otomatis sengaja **tidak** ikut
+  (ia memang sudah di luar permukaan `notifySynced`). **Delete menang TANPA SYARAT** supaya hasil
+  hapus-vs-edit independen urutan tiba; edit pending yang tergilas melahirkan `Notification`
+  `sync-delete:<entity>:<id>:<version>`. Anak yatim bagi induk bertombstone dibuang **sengaja** lewat
+  peta `PARENTS` ber-gerbang DMMF. Jalan pulang data yang terlanjur bangkit: **hapus ulang sekali di
+  sisi mana pun**, tanpa migrasi data. **Enam gotcha:** (1) `op` wajib **TOP-LEVEL**, tak pernah di
+  dalam `data` — allowlist `validateSyncData` menolaknya di client lama → `feedHole` → kursornya
+  tertahan SELAMANYA; (2) baris feed `op:"delete"` wajib membawa **snapshot yang sah** — objek kosong
+  membuat hub lama 500 (create tanpa kolom required); (3) `SyncTombstone` wajib masuk **`PG_ORDER`**
+  (`cli/test/migrate-pg.test.ts` satu-satunya gerbangnya); (4) `writeTombstone` wajib **monoton** —
+  replay full-pull memutar feed dari awal; (5) konsumsi tombstone saat pembuatan ulang duduk di
+  **`notifySynced`** (kelas bug SPEC-431/448/475/481) **dan** wajib mengangkat `version` baris ke
+  versi tombstone, karena baris baru lahir di `version = 0`; (6) `op` tak dikenal **dilewati**, tak
+  pernah melempar. Rename **bukan** hapus: pintu `renamedFrom` (ADR-0064) memang melewati
+  optimistic-concurrency, jadi ia mendapat gerbang tombstone sendiri.
 - Docs SoT & coverage dipindai **live dari path efektif** tiap request (ADR-0011/0018), bukan tabel DB.
 - Verifikasi doc terkini via Context7 sebelum mengubah keputusan platform/framework.
 

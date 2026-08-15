@@ -5,7 +5,7 @@ satu berkas di `$HANOMAN_HOME`, default `~/.hanoman/hanoman.db`, tanpa Docker/Po
 **Tujuh model inti**: Project, Spec, Setting, Notification, User,
 Session, Vps — plus model pendukung (VpsAuditSnapshot/VpsItemState, DeviceToken, **AgentToken**,
 **ClientProjectAccess** (SPEC-617), SessionResult, SyncLog,
-LocalBinding, SyncOutbox, SyncState, SyncConflict, RuntimeConfig) dan **model Help Center**
+LocalBinding, SyncOutbox, SyncState, SyncConflict, **SyncTombstone** (SPEC-799), RuntimeConfig) dan **model Help Center**
 (`Ticket`, `TicketAttachment`, SPEC-253/[ADR-0062](../adr/0062-help-center-tiket-publik-triase.md)).
 Tidak ada model `Run` maupun `Trigger` — keduanya di-drop saat pindah ke sesi interaktif (ADR-0024; migrasi
 `drop_run_trigger_github`). **Model error monitoring** (`ErrorGroup`, `ErrorEvent`, `SourceMapArtifact`) dan
@@ -421,7 +421,32 @@ di-cache lokal. `status`/`category` = `String` + zod (`zTicketStatus`/`zTicketCa
   `serverData`/`serverVersion`/`serverUpdatedAt`, `detectedAt`, `resolvedAt?`. Unik `(entity,recordId)`
   (idempoten). Diselesaikan via modal side-by-side (default = sisi `updatedAt` terbaru).
 - **Backfill feed:** saat boot HUB, `backfillFeed()` mem-`publishLocal` tiap row SYNCED yang belum
-  ter-feed (mencakup `version=0` pra-entitas-tersync) — idempoten.
+  ter-feed (mencakup `version=0` pra-entitas-tersync) — idempoten. **Sejak SPEC-799** ia juga
+  memastikan tiap `SyncTombstone` punya baris feed pada versinya: instance yang dulu berperan CLIENT
+  memiliki tombstone TANPA baris feed (peran client mengantre outbox, tak menulis `SyncLog`), jadi
+  tanpa sapuan itu promosi jadi hub membuat penghapusannya tak pernah menyeberang.
+
+## Sync — tombstone (SPEC-799 · [ADR-0119](../adr/0119-tombstone-sync-penghapusan-menyeberang.md))
+- **`SyncTombstone`** — keadaan "record ini dihapus". LOCAL-only **sebagai tabel**, tapi maknanya
+  menyeberang lewat feed. Kolom `id` (cuid), `entity`, `recordId`, `version` (versi record SESUDAH
+  dihapus = versi terakhirnya + 1), `data` (snapshot field tersync tepat sebelum dihapus),
+  `deletedAt`, `deviceId?`. Unik `(entity, recordId)`.
+  **Hard-delete dipertahankan** (bukan soft-delete `deletedAt` per entitas): dengan begitu
+  `onDelete: Cascade` tingkat-DB tetap merambat ke anak di kedua sisi dan **tak satu pun query baca
+  yang sudah ada berubah** — penyaring yang terlewat di bentuk soft-delete gagal SENYAP dengan gejala
+  persis bug yang diperbaiki. `data` bukan kenyamanan melainkan prasyarat kompatibilitas: tanpanya,
+  push delete ke hub versi lama berbentuk create tanpa kolom required (P2011 → 500 tiap siklus).
+- **`SyncLog.op`** — `String @default("upsert")`, nilai `"upsert" | "delete"`. Kolom **TOP-LEVEL**,
+  bukan penanda di dalam `data`: `validateSyncData` menegakkan allowlist atas `data`, jadi penanda di
+  sana membuat client versi lama **melempar** → `feedHole` menyala → kursornya tertahan selamanya.
+  Baris `op:"delete"` tetap membawa `data` snapshot terakhir yang sah, sehingga client versi lama
+  sekadar menerapkannya sebagai upsert (delete tak menyeberang ke sana — status quo, bukan kerusakan).
+- **Tombstone = versi record itu sendiri.** `applyPush` membaca "versi saat ini" dari baris **atau**
+  tombstone, jadi penolakan kebangkitan jatuh dari optimistic-concurrency yang sudah ada. Push
+  `op:"delete"` diterima **tanpa** cek `baseVersion` (delete menang tanpa syarat → hasil independen
+  urutan tiba) dan **idempoten** (tombstone yang sudah ada = nol baris feed kedua).
+- **`SyncTombstone` wajib ada di `PG_ORDER`** (`cli/src/commands/migrate-pg.ts`) —
+  `cli/test/migrate-pg.test.ts` menuntutnya sama persis dengan DMMF dan itu satu-satunya gerbangnya.
 
 ## SchedulerQueueItem (SPEC-294 · [ADR-0072](../adr/0072-scheduler-fondasi-engine-antrean-durable-cap.md))
 Antrean durable kandidat peluncuran **scheduler otonom** — **LOCAL-ONLY, tak disync** (cermin
@@ -640,9 +665,12 @@ semua project); terisi = milik satu project, dan agen project **menimpa** agen g
   bertemu di satu objek JSON `--agents` yang **berkunci nama** — salah satunya hilang tanpa jejak.
   Dengan id deterministik keduanya baris yang **sama**, dan rekonsiliasi LWW/`SyncConflict`
   (ADR-0067) yang sudah ada menanganinya.
-- **Kenapa `name` immutable.** `SyncLog` **tak punya operasi hapus**: rename yang mengubah `id`
-  meninggalkan baris yatim di setiap mesin lain. `PATCH` menolak `name`/`projectId` dengan **400**;
-  ganti nama = hapus + buat baru.
+- **Kenapa `name` immutable.** Rename yang mengubah `id` meninggalkan baris yatim di setiap mesin
+  lain. `PATCH` menolak `name`/`projectId` dengan **400**; ganti nama = hapus + buat baru.
+  *(Premis aslinya, "`SyncLog` tak punya operasi hapus", **tak lagi berlaku** sejak SPEC-799/ADR-0119
+  — `DELETE /custom-agents/:id` kini menerbitkan tombstone yang menghapus baris itu di setiap mesin.
+  Keputusan immutable-nya tetap: id deterministik `"<scope>:<name>"` membuat rename = record lain,
+  dan "hapus + buat baru" kini benar-benar bersih di semua instance.)*
 - **Gotcha SQLite:** `@@unique([projectId, name])` **TIDAK** mencegah dua agen global bernama sama —
   pada indeks unik SQLite, **NULL saling berbeda**. Yang benar-benar mencegahnya adalah PK
   deterministik di atas; indeks itu tinggal jaring kedua untuk baris ber-project.

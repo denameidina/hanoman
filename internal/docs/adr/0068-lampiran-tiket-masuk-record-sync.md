@@ -7,6 +7,11 @@ change-feed), [ADR-0043](0043-sync-arsitektur-hub-client-server-to-server.md) (p
 [ADR-0067](0067-sync-lww-reconciliation-manual.md) (`updatedAt` jam LWW, backfill feed),
 [ADR-0062](0062-help-center-tiket-publik-triase.md) (Help Center + `TicketAttachment`)
 
+> **Sebagian dicabut oleh [ADR-0119](0119-tombstone-sync-penghapusan-menyeberang.md)** (SPEC-799):
+> konsekuensi "propagasi delete/tombstone di luar scope" tidak lagi berlaku — penghapusan kini
+> menyeberang dua arah untuk seluruh entitas SYNCED. Sisa keputusan ADR ini (metadata di feed, byte
+> lazy-fetch, tanpa GC cache lampiran lokal) tetap utuh.
+
 ## Konteks
 
 Tiket Help Center dilaporkan di **hub (VPS)** beserta lampiran gambar. Saat instance **local**
