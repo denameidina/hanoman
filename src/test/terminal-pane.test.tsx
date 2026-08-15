@@ -321,3 +321,79 @@ describe("TerminalPane · papan tombol layar (SPEC-800)", () => {
     ]);
   });
 });
+
+describe("TerminalPane · tap memilih opsi dialog (SPEC-800)", () => {
+  const screenLines = (lines: string[]) => {
+    xt.buffer.viewportY = 0;
+    xt.buffer.getLine = (index: number) => {
+      const text = lines[index];
+      return text === undefined ? undefined : { translateToString: () => text };
+    };
+  };
+  const tap = (el: HTMLElement, clientY: number) => {
+    const start = new Event("touchstart", { bubbles: true, cancelable: true });
+    Object.defineProperty(start, "touches", { value: [{ clientY }] });
+    el.dispatchEvent(start);
+    const end = new Event("touchend", { bubbles: true, cancelable: true });
+    Object.defineProperty(end, "touches", { value: [] });
+    Object.defineProperty(end, "changedTouches", { value: [{ clientY }] });
+    el.dispatchEvent(end);
+  };
+
+  it("mengirim satu digit saat baris opsi dialog di-tap", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]?.onopen?.(); });
+    vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 240, top: 0, right: 640, bottom: 240, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+    screenLines([
+      "❯ 1. In-memory", "  2. Redis", "  3. Tanpa cache",
+      ...Array.from({ length: 20 }, () => ""),
+      "Enter to select · ↑/↓ to navigate · Esc to cancel",
+    ]);
+    const before = sockets[0]!.sent.length;
+    tap(paneHost(container), 15); // baris 1 (tinggi baris 240/24 = 10px)
+    expect(sockets[0]!.sent.slice(before)).toEqual([JSON.stringify({ t: "in", d: "2" })]);
+  });
+
+  it("tidak mengirim apa pun pada layar tanpa footer dialog", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]?.onopen?.(); });
+    vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 240, top: 0, right: 640, bottom: 240, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+    screenLines(["  1. langkah pertama", "  2. langkah kedua", "$ "]);
+    const before = sockets[0]!.sent.length;
+    tap(paneHost(container), 5);
+    expect(sockets[0]!.sent.slice(before)).toEqual([]);
+  });
+
+  it("swipe yang menggulir tidak dianggap tap", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]?.onopen?.(); });
+    const host = paneHost(container);
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 240, top: 0, right: 640, bottom: 240, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+    screenLines([
+      "❯ 1. In-memory", "  2. Redis",
+      ...Array.from({ length: 21 }, () => ""),
+      "Enter to select · ↑/↓ to navigate · Esc to cancel",
+    ]);
+    const before = sockets[0]!.sent.length;
+    const start = new Event("touchstart", { bubbles: true, cancelable: true });
+    Object.defineProperty(start, "touches", { value: [{ clientY: 100 }] });
+    host.dispatchEvent(start);
+    const move = new Event("touchmove", { bubbles: true, cancelable: true });
+    Object.defineProperty(move, "touches", { value: [{ clientY: 15 }] });
+    host.dispatchEvent(move);
+    const end = new Event("touchend", { bubbles: true, cancelable: true });
+    Object.defineProperty(end, "touches", { value: [] });
+    Object.defineProperty(end, "changedTouches", { value: [{ clientY: 15 }] });
+    host.dispatchEvent(end);
+    expect(sockets[0]!.sent.slice(before)).toEqual([]);
+  });
+});

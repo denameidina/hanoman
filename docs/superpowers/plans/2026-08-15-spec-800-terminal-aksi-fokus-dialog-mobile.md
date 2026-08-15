@@ -1016,7 +1016,7 @@ git commit -m "feat(spec-800): papan tombol layar mengirim satu keystroke per te
 - Consumes: `dialogChoiceAt` dari `./terminal-chrome`
 - Produces: — (perilaku internal pane)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 describe("TerminalPane · tap memilih opsi dialog (SPEC-800)", () => {
@@ -1072,12 +1072,12 @@ describe("TerminalPane · tap memilih opsi dialog (SPEC-800)", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-pane.test.tsx -t "tap memilih"`
 Expected: FAIL — test pertama menerima array kosong.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `src/src/screens/TerminalPane.tsx`, tambah `dialogChoiceAt` ke import `./terminal-chrome`, lalu
 ganti blok gesture SPEC-771 menjadi (perubahan: jejak `touchScrolled`, `touchendAt` sendiri):
@@ -1134,12 +1134,12 @@ ganti blok gesture SPEC-771 menjadi (perubahan: jejak `touchScrolled`, `touchend
 
 Cleanup: `el.removeEventListener("touchend", onTouchEnd);` menggantikan `resetTouch` untuk touchend.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-pane.test.tsx`
 Expected: PASS — 20 test lulus.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalPane.tsx src/test/terminal-pane.test.tsx

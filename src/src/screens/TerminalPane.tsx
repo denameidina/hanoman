@@ -6,7 +6,7 @@ import { paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { clipboardIntent } from "./terminal-clipboard";
-import { clampFontSize, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
+import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
 // (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
@@ -190,11 +190,13 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     // passive-false ini swipe bubble ke page scroller meski scrollback terminal masih tersedia.
     let touchY: number | null = null;
     let touchRemainder = 0;
-    const resetTouch = () => { touchY = null; touchRemainder = 0; };
+    let touchScrolled = false;
+    const resetTouch = () => { touchY = null; touchRemainder = 0; touchScrolled = false; };
     const onTouchStart = (event: TouchEvent) => {
       if (event.touches.length !== 1) { resetTouch(); return; }
       touchY = event.touches[0]!.clientY;
       touchRemainder = 0;
+      touchScrolled = false;
     };
     const onTouchMove = (event: TouchEvent) => {
       if (touchY === null || event.touches.length !== 1) { resetTouch(); return; }
@@ -208,12 +210,30 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       if (lines !== 0) {
         term.scrollLines(lines);
         touchRemainder -= lines * lineHeight;
+        touchScrolled = true;
       }
       event.preventDefault();
     };
+    // SPEC-800 · xterm tak menerjemahkan sentuhan menjadi laporan mouse, jadi tap tak pernah sampai
+    // ke dialog claude. SPEC-452 mengukur jalur yang sampai: SATU digit memilih baris bernomor itu.
+    // Gerbangnya footer dialog Ink — di layar kerja biasa tap tak mengirim apa pun.
+    const onTouchEnd = (event: TouchEvent) => {
+      const tapped = touchY !== null && !touchScrolled;
+      const clientY = event.changedTouches?.[0]?.clientY ?? touchY;
+      resetTouch();
+      if (!tapped || clientY === null || clientY === undefined) return;
+      const rect = visibleRect();
+      if (!rect || term.rows <= 0) return;
+      const row = Math.floor((clientY - rect.top) / (rect.height / term.rows));
+      const buffer = term.buffer.active;
+      const lines = Array.from({ length: term.rows },
+        (_, i) => buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? "");
+      const choice = dialogChoiceAt(lines, row);
+      if (choice) sendInput(choice);
+    };
     el.addEventListener("touchstart", onTouchStart, { passive: true });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", resetTouch, { passive: true });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
     el.addEventListener("touchcancel", resetTouch, { passive: true });
 
     const ro = new ResizeObserver((entries) => {
@@ -232,7 +252,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       view.current = null;
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", resetTouch);
+      el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", resetTouch);
       ro.disconnect();
       typed.dispose();
