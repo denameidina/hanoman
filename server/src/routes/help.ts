@@ -66,12 +66,17 @@ export default async function (app: FastifyInstance) {
     return reply.code(201).send({ number: ticket.number, key, statusPath });
   });
 
-  // Cek status publik by kunci opaque. Scoped ke slug (isolasi). 404 tanpa membocorkan keberadaan.
+  // Cek status publik by kunci opaque. 404 tanpa membocorkan keberadaan.
   // SPEC-293 · `key` boleh kunci pelapor (accessKeyHash) ATAU shareToken bagikan operator.
+  // SPEC-805 · sengaja TANPA gerbang `helpEnabled` dan TANPA scope slug — keduanya mematikan link
+  // yang sudah tersebar tanpa menambah keamanan: otorisasinya kunci opaque 48 hex yang sudah
+  // dipegang pemanggil. `helpEnabled=false` berarti berhenti menerima keluhan BARU (info + submit
+  // di atas), bukan menutup status tiket yang telanjur masuk; dan `Project.id` dapat di-rename
+  // (SPEC-255) sehingga slug pada link lama basi.
   app.get("/help/:slug/tickets/:key", async (req, reply) => {
-    const { slug, key } = req.params as { slug: string; key: string };
+    const { key } = req.params as { key: string };
     const t = await prisma.ticket.findFirst({
-      where: { projectId: slug, OR: [{ accessKeyHash: hashAccessKey(key) }, { shareToken: key }] },
+      where: { OR: [{ accessKeyHash: hashAccessKey(key) }, { shareToken: key }] },
     });
     if (!t) return reply.code(404).send({ error: "not found" });
     let stage: string | null = null;

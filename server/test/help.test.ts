@@ -139,10 +139,28 @@ describe("SPEC-253 · Help Center publik", () => {
     expect(viaShare.json().title).toBe("share me");
     // kunci pelapor asli tetap valid
     expect((await app.inject({ method: "GET", url: `/api/help/hc-proj/tickets/${key}` })).statusCode).toBe(200);
-    // shareToken milik project lain tak bocor via slug ini
-    expect((await app.inject({ method: "GET", url: `/api/help/hc-off/tickets/${t!.shareToken}` })).statusCode).toBe(404);
     // token asing → 404
     expect((await app.inject({ method: "GET", url: "/api/help/hc-proj/tickets/hnm_shr_bogus" })).statusCode).toBe(404);
+  });
+
+  // SPEC-805 · lihat-status hidup dari kunci opaque saja. Dua sebab konkret: Project.id dapat
+  // di-rename (SPEC-255) sehingga slug pada link yang tersebar jadi basi, dan mematikan helpEnabled
+  // berarti "berhenti menerima keluhan baru", bukan mematikan status tiket yang sudah masuk.
+  it("status publik selamat dari slug basi dan helpEnabled mati (SPEC-805)", async () => {
+    __resetHelpBuckets();
+    const res = await app.inject({ method: "POST", url: "/api/help/hc-proj/tickets", ...form({ category: "bug", title: "tahan rename", detail: "d", email: "r@e.co" }) });
+    const { key } = res.json();
+    const { hashAccessKey } = await import("../src/services/ticket");
+    const t = await prisma.ticket.findUnique({ where: { accessKeyHash: hashAccessKey(key) } });
+
+    const viaStale = await app.inject({ method: "GET", url: `/api/help/slug-lama/tickets/${t!.shareToken}` });
+    expect(viaStale.statusCode).toBe(200);
+    expect(viaStale.json().title).toBe("tahan rename");
+
+    const viaOff = await app.inject({ method: "GET", url: `/api/help/hc-off/tickets/${key}` });
+    expect(viaOff.statusCode).toBe(200);
+    // form-submit tetap tergerbang helpEnabled
+    expect((await app.inject({ method: "GET", url: "/api/help/hc-off" })).statusCode).toBe(404);
   });
 
   it("lampiran: gambar valid disimpan, mime invalid di-skip (submit tetap jadi)", async () => {

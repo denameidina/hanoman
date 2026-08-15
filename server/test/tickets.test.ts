@@ -78,6 +78,25 @@ describe("SPEC-253 · triase tiket", () => {
     expect(res2.json().publicStatusUrl).toBe(body.publicStatusUrl);
   });
 
+  // SPEC-805 · GET /tickets/:id hanya hidup di belakang gate cookie, jadi Host request-nya SELALU
+  // host control — host yang justru menolak /api/help. Link yang dibangun darinya lahir mati.
+  it("publicStatusUrl memakai public origin saat split dikonfigurasi (SPEC-805)", async () => {
+    const split = buildApp({
+      requireAuth: false,
+      env: { ...process.env, HANOMAN_PUBLIC_ORIGINS: "https://help.example", HANOMAN_CONTROL_ORIGINS: "https://admin.example" },
+    });
+    await split.ready();
+    try {
+      const res = await split.inject({ method: "GET", url: `/api/tickets/${tId}`, headers: { host: "admin.example" } });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().publicStatusUrl).toMatch(/^https:\/\/help\.example\/help\/tri-proj\/status\/hnm_shr_/);
+      // link lama yang terlanjur tersebar menunjuk host control → diarahkan, bukan disajikan shell mati
+      const hop = await split.inject({ method: "GET", url: "/help/tri-proj/status/hnm_shr_x", headers: { host: "admin.example" } });
+      expect(hop.statusCode).toBe(302);
+      expect(hop.headers.location).toBe("https://help.example/help/tri-proj/status/hnm_shr_x");
+    } finally { await split.close(); }
+  });
+
   it("serve lampiran ber-auth; att bukan milik tiket → 404", async () => {
     const { storageKey, size } = await saveUpload(Buffer.from("IMG"), "image/png");
     const att = await prisma.ticketAttachment.create({ data: { ticketId: tId, projectId: "tri-proj", filename: "s.png", mimeType: "image/png", size, storageKey } });

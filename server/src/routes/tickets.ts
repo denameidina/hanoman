@@ -18,7 +18,7 @@ const view = (t: Ticket & { _count?: { attachments: number } }) => ({
   attachmentCount: t._count?.attachments ?? 0, createdAt: t.createdAt.toISOString(),
 });
 
-export default async function (app: FastifyInstance) {
+export default async function (app: FastifyInstance, opts: { publicBase?: string | null } = {}) {
   app.get("/tickets", async (req) => {
     const { project, status, q, page, limit } = req.query as Record<string, string | undefined>;
     const where: { projectId?: string; status?: string } = {};
@@ -49,7 +49,10 @@ export default async function (app: FastifyInstance) {
       shareToken = generateShareToken();
       await prisma.ticket.update({ where: { id }, data: { shareToken } });
     }
-    const base = `${req.protocol}://${req.headers.host ?? "localhost"}`;
+    // SPEC-805 · route ini hanya hidup di belakang gate cookie, jadi Host request-nya selalu host
+    // control — host yang justru menolak /api/help saat origin dipisah (ADR-0117). Link yang
+    // dibangun darinya lahir mati; pakai origin publik yang dikonfigurasi bila ada.
+    const base = opts.publicBase ?? `${req.protocol}://${req.headers.host ?? "localhost"}`;
     const publicStatusUrl = `${base}/help/${encodeURIComponent(t.projectId)}/status/${shareToken}`;
     return {
       ...view(t), detail: t.detail,

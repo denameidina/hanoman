@@ -87,6 +87,12 @@ export function buildApp(
   app.addHook("onRequest", async (req, reply) => {
     const role = classifyIngress({ host: req.headers.host ?? "", method: req.method, url: req.url }, ingress);
     if (role === "denied") return reply.code(404).send({ error: "not found" });
+    // SPEC-805 · link status yang terlanjur tersebar menunjuk host control (dibangun dari Host
+    // request, yang untuk route triase selalu host dashboard). Tanpa ini host control menyajikan
+    // shell SPA yang XHR-nya pasti 404 — "halaman tak bisa dibuka". Permukaan API Help tetap tak
+    // pindah ke sini; hanya browsernya yang diarahkan ke origin publik.
+    if (role === "control" && ingress.publicBase && req.url.startsWith("/help/"))
+      return reply.redirect(`${ingress.publicBase}${req.url}`, 302);
   });
   // POST tanpa body masih boleh membawa content-type JSON; parser bawaan Fastify menjawab
   // 400 untuk body kosong. Perlakukan kosong sebagai undefined, sementara body sungguhan
@@ -193,7 +199,7 @@ export function buildApp(
     await api.register(sessionHistory);  // SPEC-362 · riwayat sesi terminal (di belakang gate cookie)
     await api.register(config);
     await api.register(help);     // SPEC-253 · Help Center publik (gate di-bypass di atas)
-    await api.register(tickets);  // SPEC-253 · triase (di belakang gate cookie)
+    await api.register(tickets, { publicBase: ingress.publicBase });  // SPEC-253 · triase (di belakang gate cookie)
     await api.register(scheduler);  // SPEC-294 · config/state scheduler (di belakang gate cookie)
     await api.register(codex);      // SPEC-339 · versi codex CLI untuk peringatan model 5.6
     await api.register(methods);    // SPEC-739 · ADR-0114 · kesiapan skill metode per agen

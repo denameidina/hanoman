@@ -21,6 +21,20 @@ describe("ingress policy", () => {
     expect(classifyIngress(req("unknown.example", "GET", "/api/health"), policy)).toBe("denied");
   });
 
+  it("serves Help on the control origin when no public origin is split off (SPEC-805)", () => {
+    const single = loadIngressPolicy({ HANOMAN_CONTROL_ORIGINS: "https://admin.example" });
+    expect(single.publicBase).toBe(null);
+    expect(classifyIngress(req("admin.example", "GET", "/api/help/p"), single)).toBe("control");
+    expect(classifyIngress(req("admin.example", "GET", "/api/terminal/sessions"), single)).toBe("control");
+    expect(classifyIngress(req("unknown.example", "GET", "/api/help/p"), single)).toBe("denied");
+  });
+
+  it("exposes the first public origin verbatim as the base for share links (SPEC-805)", () => {
+    expect(policy.publicBase).toBe("https://help.example");
+    expect(loadIngressPolicy({ HANOMAN_PUBLIC_ORIGINS: "http://help.example:8080" }).publicBase)
+      .toBe("http://help.example:8080");
+  });
+
   it("parses only explicit hop or CIDR trust", () => {
     expect(trustProxyFromEnv({ HANOMAN_TRUST_PROXY: "127.0.0.1/32, ::1/128" })).toEqual([
       "127.0.0.1/32", "::1/128",
