@@ -69,6 +69,31 @@ node-pty `tmux attach` menjembatani sesi itu ke klien WebSocket, dan satu poll 5
 perubahan phase-file lalu mem-broadcast frame. tmux adalah satu-satunya sumber kebenaran pekerjaan yang
 berjalan — tidak ada baris `Run` di DB.
 
+### Chrome terminal (SPEC-800)
+
+Sisi klien pane (`src/src/screens/TerminalPane.tsx` + `TerminalScreen.tsx`) memikul empat invariant
+yang lahir dari audit SPEC-800:
+
+- **Aksi header sel runtuh berdasarkan lebar KONTAINERNYA**, bukan lebar viewport — sel grid 4 kolom
+  di desktop 1440px lebih sempit daripada satu pane di ponsel 390px, dan selnya `overflow: hidden`
+  sehingga aksi yang tak muat bukan hanya tak terbaca melainkan **tak bisa diklik**. Aritmetikanya
+  murni di `screens/terminal-chrome.ts` (`inlineActionCount`); `Layar penuh` dan `Tutup` tak pernah
+  runtuh. Sisanya masuk `OverflowActions` (DS).
+- **Pane menyambung ulang WebSocket-nya sendiri** (backoff 500 ms→8 s, maksimum 6 percobaan, tiket
+  admission baru tiap percobaan sesuai ADR-0117, berhenti pada close 4004 karena sesi tmux-nya memang
+  lenyap) dan **menguras input yang mengantre pada SETIAP `onopen`**. Sebelum SPEC-800 tak ada satu
+  pun `onclose`, jadi setiap penutupan — revalidasi principal, kuota, restart server saat update,
+  jaringan mobile — membuat ketikan menumpuk di buffer tanpa pembaca dan hilang tanpa tanda.
+  Keadaannya kasatmata di dalam pane; diam adalah cacatnya, bukan bagian perbaikannya.
+- **Papan tombol layar mengirim satu keystroke per tekan** (SPEC-452 — dialog Ink menelan burst >1
+  karakter). `Esc` bukan pelengkap: ia satu-satunya jalan keluar dari copy-mode tmux, dan keyboard
+  virtual ponsel tak menyediakannya. Tap pada baris opsi dialog claude mengirim satu digit, dengan
+  footer dialog Ink sebagai gerbang supaya daftar bernomor di layar kerja biasa tak ikut terkirim.
+- **Wheel polos tetap milik tmux** (SPEC-209: wheel → tmux → copy-mode → riwayat 50 000 baris);
+  `Shift+wheel` menggulir scrollback xterm secara lokal lewat `attachCustomWheelEventHandler`, satu
+  jalur gulir yang tak pernah melewati mouse-mode. Ukuran font terminal adalah state tampilan
+  persisten (SPEC-740 · ADR-0115), bukan bagian workspace kanonik per-user (SPEC-786 · ADR-0118).
+
 **Dua agen didukung** (SPEC-338/ADR-0074): `Agent = "claude" | "codex"`. Default global
 `Setting.agent` berlaku untuk semua sesi yang men-spawn agen; sesi backlog bisa meng-override saat
 Start. Argv dirakit `runner/src/agent-cli.ts` (`agentFlags()`, murni & bertest); agen sesi disimpan di
