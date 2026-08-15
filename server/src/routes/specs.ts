@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
-import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, type Stage } from "@hanoman/shared";
+import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, type Stage } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { integrate, sourceBranch } from "../services/integrate";
-import { createSession } from "../services/pty";
+import { createSession, listSessions } from "../services/pty";
 import { conflictSessionDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { prisma } from "../db";
@@ -17,6 +17,7 @@ import { checkSourceChange, sourceChangeEntry, appendSourceHistory } from "../se
 import { recordSourceChange } from "../services/notifications";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
+import { completeSpecManually } from "../services/spec-complete";
 import { branchFromCandidates } from "../services/branches";
 import { STAGES } from "../services/stage-machine";
 import { artifactsToRemove } from "../services/stage-artifacts";
@@ -271,6 +272,34 @@ export default async function (app: FastifyInstance) {
     await recordSourceChange(spec.id, spec.projectId, spec.title, spec.source, to, history.length);
     await notifySynced("spec", id); // SPEC-213/330 · sadar-peran: client antre push, hub publish
     return updated;
+  });
+
+  // SPEC-804 · ADR-0120 · tandai item selesai MANUAL — item yang beres di luar sesi (dikerjakan
+  // langsung, sudah ter-merge, atau sudah tercakup item lain) tak punya jalan lain untuk keluar
+  // dari daftar siap-kerja selain dihapus, yang membuang id SPEC-nnn beserta riwayatnya.
+  // Operasi khusus, bukan field `PATCH /specs/:id`: `stage` di sana backward-only by construction
+  // (SPEC-167), dan melonggarkannya meruntuhkan premis "kemajuan hanya berasal dari fase sesi"
+  // (ADR-0008) yang menopang ketiga guard CAS persist stage.
+  app.post("/specs/:id/done", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = zMarkSpecDone.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const spec = await prisma.spec.findUnique({ where: { id } });
+    if (!spec) return reply.code(404).send({ error: "not found" });
+    // No-op adalah bug klien; menerimanya diam-diam berarti menulis jejak manual di atas
+    // penyelesaian yang bukan manual (pola `POST /specs/:id/source` menolak "source tak berubah").
+    if (spec.stage === "done") return reply.code(409).send({ error: "backlog item sudah selesai" });
+    // Yang ditanya: adakah pane yang MENGAKU mengerjakan item ini. Itu properti `specId` pane,
+    // bukan tebakan atas nama sesinya. Dua langkah, cermin `POST /update/apply` (ADR-0088).
+    const live = listSessions().find((s) => s.specId === id && !s.exited);
+    if (live && parsed.data.confirm !== true)
+      return reply.code(409).send({ error: "confirm-required", session: { id: live.id, agent: live.agent } });
+    const res = await completeSpecManually(spec, {
+      by: req.user?.email ?? "system", reason: parsed.data.reason || undefined,
+    });
+    // count 0 = sesi/overlay menyelesaikannya di bawah kita antara findUnique dan CAS.
+    if (!res.ok) return reply.code(409).send({ error: "backlog item sudah selesai" });
+    return res.spec;
   });
 
   // SPEC-170 · dokumen sebuah backlog item (audit/objective/spec/plan/brainstorm).
