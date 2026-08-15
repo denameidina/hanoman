@@ -5,6 +5,10 @@
   berbeda. Host publik hanya melayani dashboard statis, `GET /api/health`, dan `/api/help/**`; seluruh
   route control-plane ditolak. Host control menolak `/api/help/**` dan wajib berada di belakang
   SSO/MFA, VPN, atau access proxy. Origin langsung bind loopback dan firewall tidak membuka port app.
+  SPEC-805: deployment boleh memilih **satu** origin dengan `HANOMAN_SINGLE_ORIGIN=1` — pengakuan
+  eksplisit bahwa control plane berbagi host dengan permukaan anonim dan perlindungannya turun ke
+  cookie login + limiter. Tanpa flag itu production tetap gagal boot bila origin tak dipisahkan, dan
+  host control tetap menolak `/api/help/**` selama public origin memang dikonfigurasi.
   `HANOMAN_TRUST_PROXY` wajib berupa jumlah hop atau CIDR reverse proxy eksplisit; `true` dilarang.
 - **Auth (SPEC-169, ADR-0028 diamandemen ADR-0117)**: login email/password menggerbangi seluruh
   control-plane `/api`; upgrade WebSocket memakai admission tersendiri di bawah.

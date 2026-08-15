@@ -115,14 +115,24 @@ tanpanya), permukaan Help tetap **tidak** disajikan di host control.
 Test regresi menutup keempatnya (`server/test/ingress-policy.test.ts`, `server/test/help.route.test.ts`,
 `server/test/tickets.route.test.ts`).
 
-## 7. Sisa kerja operasional (bukan kode)
+## 7. Keputusan operasional: hub jalan single-origin
 
-Agar hub produksi benar-benar melayani Help di host publiknya:
+Caddyfile hub memperlihatkan bahwa split itu tak pernah nyata secara operasional: vhost
+`hanoman.nafanesia.id` **tidak** punya `forward_auth` — dashboard sudah menghadap internet di balik
+cookie login-nya sendiri, dan host publiknya tak pernah ada. Karena itu operator memilih menjadikan
+bentuk env jujur terhadap kenyataan, bukan mendirikan host kedua.
 
-1. Buat record DNS `help-hanoman.nafanesia.id` → VPS.
-2. Tambahkan vhost Caddy `help-hanoman.nafanesia.id` yang mem-proxy ke `127.0.0.1:8787`.
+Konsekuensinya `assertRuntimeBoundary` harus ikut berubah: mengosongkan `HANOMAN_PUBLIC_ORIGINS`
+saja membuat production gagal boot. Perbaikan #5: single-origin sah bila **diakui eksplisit** dengan
+`HANOMAN_SINGLE_ORIGIN=1`; tanpa flag itu syarat split tetap berlaku, sehingga kegagalan lama —
+mengisi env asal agar boot lolos — tak dapat terulang diam-diam.
 
-Sampai itu dikerjakan, perbaikan #2 membuat link lama me-redirect ke host yang belum ada — sehingga
-langkah ini **wajib** menyertai rilis. Alternatif tanpa DNS baru: hapus `HANOMAN_PUBLIC_ORIGINS` dan
-jalankan single-origin, yang setelah perbaikan #1 menyajikan Help di `hanoman.nafanesia.id` — tetapi
-itu membatalkan pemisahan trust boundary ADR-0117 dan hanya boleh diambil sadar.
+Cutover di hub, **sesudah versi ini dirilis dan terpasang** (versi terpasang sekarang masih menuntut
+split, jadi env tak boleh diubah lebih dulu):
+
+1. `/etc/hanoman.env`: hapus `HANOMAN_PUBLIC_ORIGINS`, tambahkan `HANOMAN_SINGLE_ORIGIN=1`.
+2. `systemctl restart hanoman`, lalu verifikasi `curl -i https://hanoman.nafanesia.id/api/help/<slug>`
+   menjawab 200 dan link `hnm_shr_…` terbuka.
+
+Trade-off yang diterima sadar: control plane berbagi origin dengan permukaan anonim; perlindungannya
+cookie login + limiter, bukan pemisahan ingress. Dicatat sebagai amandemen ADR-0117.
