@@ -131,7 +131,9 @@ export function buildApp(
         // SPEC-268 · KECUALI POST /api/sync/now — pemicu manual = aksi UI, digerbangi cookie gate
         // (dan agent-deny "cookie-only" untuk /sync), bukan device token.
         // SPEC-270 · KECUALI /api/sync/conflicts* — antrean rekonsil = aksi UI, cookie-only juga.
-        if (path.startsWith("/api/sync") && path !== "/api/sync/now" && !path.startsWith("/api/sync/conflicts")) return;
+        // SPEC-799 · KECUALI GET /api/sync/pending — umpan balik hapus tertunda = aksi UI, cookie-only.
+        if (path.startsWith("/api/sync") && path !== "/api/sync/now" && path !== "/api/sync/pending"
+          && !path.startsWith("/api/sync/conflicts")) return;
         // SPEC-253 · ADR-0062 · halaman/submit/status Help Center dipanggil pengguna akhir tanpa sesi
         // login; route /api/help di-otorisasi helpEnabled + kunci opaque tiket sendiri (pengecualian sah).
         if (path.startsWith("/api/help")) return;

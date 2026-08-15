@@ -26,6 +26,14 @@ export function SyncButton({ onDone, onToast }:
   const active = useSyncActive();
   const [busy, setBusy] = React.useState<"" | "once" | "full">("");
   const [showModal, setShowModal] = React.useState(false);
+  // SPEC-799 · ADR-0119 · penghapusan yang menunggu jendela online. Tanpa lencana ini operator
+  // membaca "hapusnya gagal" lalu mengulanginya — penghapusan yang tak terlihat efeknya adalah
+  // penghapusan yang dikira gagal.
+  const [pendingDeletes, setPendingDeletes] = React.useState(0);
+  const refreshPending = React.useCallback(() => {
+    api.getSyncPending().then((r) => setPendingDeletes(r.total)).catch(() => setPendingDeletes(0));
+  }, []);
+  React.useEffect(() => { if (active) refreshPending(); }, [active, refreshPending]);
   if (!active) return null;
   async function run(full: boolean) {
     setBusy(full ? "full" : "once");
@@ -33,11 +41,14 @@ export function SyncButton({ onDone, onToast }:
       const r = full ? await api.syncNow({ full: true }) : await api.syncNow();
       if (!r.ok) onToast("Instance ini hub — tak ada sync manual", "info", "info");
       else onToast(
-        `Sinkron: ↓${r.pulled ?? 0} ↑${r.pushed ?? 0}${r.conflicts ? ` · ${r.conflicts} konflik` : ""}`,
+        `Sinkron: ↓${r.pulled ?? 0} ↑${r.pushed ?? 0}`
+        + (r.deleted ? ` ⨯${r.deleted}` : "")
+        + (r.conflicts ? ` · ${r.conflicts} konflik` : ""),
         r.conflicts ? "warn" : "ok", r.conflicts ? "triangle-alert" : "check");
       // SPEC-270 · ADR-0067 · ada konflik → buka modal rekonsil side-by-side.
       if (r.ok && r.conflicts) setShowModal(true);
       onDone();
+      refreshPending();
     } catch { onToast("Gagal sync", "err", "x-circle"); }
     finally { setBusy(""); }
   }
@@ -52,6 +63,14 @@ export function SyncButton({ onDone, onToast }:
         title="Tarik ulang seluruh feed dari awal — untuk data lama yang tak ikut tersinkron">
         {busy === "full" ? "Menarik ulang…" : "Tarik ulang"}
       </Button>
+      {/* SPEC-799 · ADR-0119 · hapus lokal sudah tercatat sebagai tombstone, tinggal menunggu hub
+          terjangkau. Tanpa ini operator tak punya cara membedakannya dari "hapusnya tak terjadi". */}
+      {pendingDeletes > 0 && (
+        <span className="hn-muted" style={{ fontSize: 12 }}
+          title="Penghapusan sudah tercatat di mesin ini dan akan menyeberang ke hub pada sync berikutnya">
+          {pendingDeletes} hapus menunggu
+        </span>
+      )}
       <ReconcileModal open={showModal} onClose={() => setShowModal(false)} onResolved={onDone} />
     </>
   );

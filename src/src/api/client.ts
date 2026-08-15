@@ -180,9 +180,15 @@ export const api = {
   deleteConfig: (key: string) => j<void>(paths.configKey(key), { method: "DELETE" }),
   // SPEC-268 · ADR-0066 · pemicu sync manual (tombol Backlog/Triase)
   // SPEC-382 · opts.full → tarik ulang feed dari awal (pemulihan baris yang terlewat kursor)
+  // SPEC-799 · ADR-0119 · `deleted`/`dropped` ikut: tombstone yang menyeberang & record yang dibuang
+  // sengaja (upsert basi atas id bertombstone, anak bagi induk bertombstone).
   syncNow: (opts?: { full?: boolean }) =>
-    j<{ ok: boolean; reason?: string; full?: boolean; pulled?: number; pushed?: number; conflicts?: number }>(
+    j<{ ok: boolean; reason?: string; full?: boolean; pulled?: number; pushed?: number;
+        conflicts?: number; deleted?: number; dropped?: number }>(
       paths.syncNow, { method: "POST", ...body({ full: opts?.full === true }) }),
+  // SPEC-799 · ADR-0119 · penghapusan yang masih menunggu jendela online (instance client offline).
+  getSyncPending: () => j<{ deletes: { entity: string; recordId: string; deletedAt: string }[]; total: number }>(
+    paths.syncPending),
   // SPEC-270 · ADR-0067 · rekonsil konflik
   listConflicts: () => j<{ conflicts: SyncConflictView[] }>(paths.syncConflicts),
   resolveConflict: (entity: string, recordId: string, choice: "local" | "server") =>

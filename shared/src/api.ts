@@ -186,6 +186,8 @@ export const paths = {
   syncNow: `${API}/sync/now`,
   // SPEC-270 · ADR-0067 · antrean konflik rekonsil (cookie-authed)
   syncConflicts: `${API}/sync/conflicts`,
+  // SPEC-799 · ADR-0119 · penghapusan yang menunggu jendela online (cookie-only, cermin syncNow).
+  syncPending: `${API}/sync/pending`,
   syncConflictResolve: (entity: string, recordId: string) =>
     `${API}/sync/conflicts/${encodeURIComponent(entity)}/${encodeURIComponent(recordId)}/resolve`,
   // SPEC-257 · ADR-0065 · agent token (kelola cookie-only) + katalog capability

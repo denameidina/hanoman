@@ -7,6 +7,7 @@ import { attachSync, detachSync } from "../services/sync-hub";
 import type { Client } from "../services/pty";
 import { applyPush, pull, isEntity, type Entity } from "../services/sync";
 import { syncNow, fetchTransport } from "../services/sync-client";
+import { listPendingDeletes } from "../services/sync-delete";
 import { listConflicts, resolveConflict } from "../services/conflicts";
 import { readUpload } from "../services/uploads";
 import { effectiveStr } from "../config";
@@ -74,6 +75,13 @@ export default async function (app: FastifyInstance) {
 
   // SPEC-270 · ADR-0067 · antrean konflik rekonsil (cookie-authed; dikecualikan dari gate agent-token).
   app.get("/sync/conflicts", async () => ({ conflicts: await listConflicts() }));
+
+  // SPEC-799 · ADR-0119 · penghapusan yang belum sempat menyeberang (client offline). Cookie-authed
+  // seperti /sync/now & /sync/conflicts — ini permukaan UI, bukan kanal mesin-ke-mesin.
+  app.get("/sync/pending", async () => {
+    const deletes = await listPendingDeletes();
+    return { deletes, total: deletes.length };
+  });
 
   const zResolve = z.object({ choice: z.enum(["local", "server"]) });
   app.post("/sync/conflicts/:entity/:recordId/resolve", async (req, reply) => {
