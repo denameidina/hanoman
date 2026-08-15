@@ -16,8 +16,11 @@
 - Kolom baru wajib masuk `FIELDS.spec` + `JSON_FIELDS` di `server/src/services/sync.ts`. **Bukan** `DATE_FIELDS` — `at` hidup di dalam JSON.
 - Migration **ditulis tangan**, aditif murni. Jangan menjalankan `prisma migrate dev` (worktree tetangga membuatnya me-reset DB saat ada drift).
 - Batas panjang alasan: **280 karakter**.
-- Semua test server dijalankan dengan `--no-file-parallelism` **dan** `TEST_DATABASE_URL` terpisah:
-  `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism <path>`
+- Semua test server dijalankan dengan `--no-file-parallelism`, `TEST_DATABASE_URL` terpisah, **dan
+  env sesi yang dibersihkan** — `HANOMAN_CONTROL_ORIGINS` yang diwarisi sesi hanoman membuat
+  SELURUH route `buildApp().inject()` menjawab 404 (gerbang Origin ADR-0117 vs host `localhost:80`
+  milik inject), dan gejalanya terbaca persis seperti "route hilang":
+  `env -u HANOMAN_CONTROL_ORIGINS -u NODE_ENV -u DATABASE_URL -u HANOMAN_SUPERVISOR TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism <path>`
 - Bahasa komentar & string UI: Indonesia, mengikuti berkas sekitarnya. Jangan menulis komentar yang mengulang kode.
 
 ---
@@ -40,7 +43,7 @@
   - `zMarkSpecDone` / `type MarkSpecDone = { reason?: string; confirm?: boolean }` (`@hanoman/shared`)
   - kolom Prisma `Spec.manualDone: Prisma.JsonValue | null`
 
-- [ ] **Step 1: Tulis test kontrak yang gagal**
+- [x] **Step 1: Tulis test kontrak yang gagal**
 
 Create `server/test/spec-manual-done-contract.test.ts`:
 
@@ -97,12 +100,12 @@ describe("SPEC-804 · kontrak kolom Spec.manualDone", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-manual-done-contract.test.ts`
 Expected: FAIL — `zManualDone`/`zMarkSpecDone`/`__JSON_FIELDS` belum diekspor.
 
-- [ ] **Step 3: Tambahkan kolom di `server/prisma/schema.prisma`**
+- [x] **Step 3: Tambahkan kolom di `server/prisma/schema.prisma`**
 
 Sisipkan tepat sesudah baris `doneAt     DateTime?` di model `Spec`:
 
@@ -115,7 +118,7 @@ Sisipkan tepat sesudah baris `doneAt     DateTime?` di model `Spec`:
   manualDone Json?
 ```
 
-- [ ] **Step 4: Tulis migration**
+- [x] **Step 4: Tulis migration**
 
 Create `server/prisma/migrations/20260815130000_spec_manual_done/migration.sql`:
 
@@ -131,7 +134,7 @@ Create `server/prisma/migrations/20260815130000_spec_manual_done/migration.sql`:
 ALTER TABLE "Spec" ADD COLUMN "manualDone" JSONB;
 ```
 
-- [ ] **Step 5: Terapkan migration + regenerate client**
+- [x] **Step 5: Terapkan migration + regenerate client**
 
 Run:
 ```bash
@@ -139,7 +142,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm --filter ./server exec pris
 ```
 Expected: `Generated Prisma Client`. (Migration diterapkan otomatis oleh `server/test/global-setup.ts` saat test dijalankan.)
 
-- [ ] **Step 6: Tambahkan `zManualDone` + field `zSpec` di `shared/src/entities.ts`**
+- [x] **Step 6: Tambahkan `zManualDone` + field `zSpec` di `shared/src/entities.ts`**
 
 Sisipkan tepat sebelum `export const zSpec = z.object({`:
 
@@ -160,7 +163,7 @@ Lalu sisipkan sebagai field terakhir di dalam `zSpec` (sesudah `sourceHistory`):
   manualDone: zManualDone.nullable().default(null),
 ```
 
-- [ ] **Step 7: Tambahkan `zMarkSpecDone` di `shared/src/dto.ts`**
+- [x] **Step 7: Tambahkan `zMarkSpecDone` di `shared/src/dto.ts`**
 
 Sisipkan tepat sesudah blok `zChangeSpecSource` (yang berakhir di baris `});` sebelum komentar `// SPEC-175 · rebase/merge`):
 
@@ -178,7 +181,7 @@ export type MarkSpecDone = z.infer<typeof zMarkSpecDone>;
 
 Verifikasi `zManualDone`/`zMarkSpecDone` ikut terekspor: `shared/src/index.ts` sudah mengekspor `entities.ts` & `dto.ts` secara agregat — cek dengan `rtk proxy grep -n "entities\|dto" shared/src/index.ts`. Bila ekspornya bernama satu per satu, tambahkan kedua nama itu.
 
-- [ ] **Step 8: Daftarkan kolom di `server/src/services/sync.ts`**
+- [x] **Step 8: Daftarkan kolom di `server/src/services/sync.ts`**
 
 Pada `FIELDS.spec` (baris ~54), tambahkan `"manualDone"` tepat sesudah `"sourceHistory"`, dan tambahkan blok komentar di atas `spec:` :
 
@@ -196,7 +199,7 @@ Tepat di bawah `export const __DATE_FIELDS = DATE_FIELDS;` (baris ~105) tambahka
 export const __JSON_FIELDS = JSON_FIELDS;
 ```
 
-- [ ] **Step 9: Tambahkan kolom ke katalog webhook `shared/src/webhook.ts`**
+- [x] **Step 9: Tambahkan kolom ke katalog webhook `shared/src/webhook.ts`**
 
 Pada entri `entity: "spec"`, ubah array `fields` (baris ~89–90) agar memuat `"manualDone"` sesudah `"startedAt"`:
 
@@ -214,17 +217,17 @@ Pada `sample` entri yang sama (baris ~107–115), tambahkan setelah `startedAt`:
       manualDone: null,
 ```
 
-- [ ] **Step 10: Jalankan test kontrak — harus lulus**
+- [x] **Step 10: Jalankan test kontrak — harus lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-manual-done-contract.test.ts server/test/webhook-catalog-dmmf.test.ts server/test/spec-done-at.test.ts`
 Expected: PASS (3 berkas, semua hijau).
 
-- [ ] **Step 11: Typecheck paket yang tersentuh**
+- [x] **Step 11: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck`
 Expected: keluar 0 tanpa error.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations/20260815130000_spec_manual_done \
@@ -251,7 +254,7 @@ git commit -m "feat(spec-804): kolom Spec.manualDone + kontrak sync/webhook/zod"
   ```
   (`Spec` = tipe baris Prisma, `import type { Spec } from "@prisma/client"`.)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/spec-complete.service.test.ts`:
 
@@ -314,12 +317,12 @@ describe("SPEC-804 · completeSpecManually", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-complete.service.test.ts`
 Expected: FAIL — `Cannot find module '../src/services/spec-complete'`.
 
-- [ ] **Step 3: Implementasikan servicenya**
+- [x] **Step 3: Implementasikan servicenya**
 
 Create `server/src/services/spec-complete.ts`:
 
@@ -362,12 +365,12 @@ export async function completeSpecManually(spec: Spec, input: ManualDoneInput): 
 }
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-complete.service.test.ts`
 Expected: PASS (5 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/spec-complete.ts server/test/spec-complete.service.test.ts
@@ -386,7 +389,7 @@ git commit -m "feat(spec-804): completeSpecManually sebagai satu titik cekik"
 - Consumes: `completeSpecManually` (Task 2), `zMarkSpecDone` (Task 1), `listSessions` dari `../services/pty`.
 - Produces: `POST /api/specs/:id/done` `{ reason?, confirm? }` → `Spec` (200) · `{ error: "not found" }` (404) · `{ error: "backlog item sudah selesai" }` (409) · `{ error: "confirm-required", session: { id, agent } }` (409) · `{ error: <zod flatten> }` (400).
 
-- [ ] **Step 1: Tulis test rute yang gagal**
+- [x] **Step 1: Tulis test rute yang gagal**
 
 Create `server/test/spec-done.route.test.ts`:
 
@@ -483,12 +486,12 @@ describe("SPEC-804 · ADR-0120 · POST /specs/:id/done", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-done.route.test.ts`
 Expected: FAIL — 404 pada semua kasus (route belum ada).
 
-- [ ] **Step 3: Tambahkan import di `server/src/routes/specs.ts`**
+- [x] **Step 3: Tambahkan import di `server/src/routes/specs.ts`**
 
 Ubah baris 6 dari:
 
@@ -514,7 +517,7 @@ Tambahkan sesudah baris 19 (`import { deleteSynced } …`):
 import { completeSpecManually } from "../services/spec-complete";
 ```
 
-- [ ] **Step 4: Tambahkan route**
+- [x] **Step 4: Tambahkan route**
 
 Sisipkan tepat sesudah blok `app.post("/specs/:id/source", …)` (baris ~274, sebelum komentar `// SPEC-170 · dokumen sebuah backlog item`):
 
@@ -548,17 +551,17 @@ Sisipkan tepat sesudah blok `app.post("/specs/:id/source", …)` (baris ~274, se
   });
 ```
 
-- [ ] **Step 5: Jalankan test — harus lulus**
+- [x] **Step 5: Jalankan test — harus lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-done.route.test.ts`
 Expected: PASS (8 test).
 
-- [ ] **Step 6: Typecheck server**
+- [x] **Step 6: Typecheck server**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/routes/specs.ts server/test/spec-done.route.test.ts
@@ -578,7 +581,7 @@ git commit -m "feat(spec-804): POST /specs/:id/done dengan gerbang sesi hidup"
 - Consumes: `completeSpecManually` (Task 2), kolom `manualDone` (Task 1), `liveSpecs` (`server/src/services/live-specs.ts`), `sweepAutoMerge` (`server/src/services/auto-merge.ts`).
 - Produces: perilaku — `settleOne` mengabaikan kandidat ber-`manualDone`.
 
-- [ ] **Step 1: Tulis test durabilitas stage-live yang gagal**
+- [x] **Step 1: Tulis test durabilitas stage-live yang gagal**
 
 Create `server/test/spec-manual-done-effects.test.ts`:
 
@@ -623,12 +626,12 @@ describe("SPEC-804 · penandaan manual tak ditimpa overlay stage-live", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus lulus tanpa perubahan kode**
+- [x] **Step 2: Jalankan test — harus lulus tanpa perubahan kode**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-manual-done-effects.test.ts`
 Expected: PASS. Bila FAIL, overlay tidak forward-only seperti yang diasumsikan design — **hentikan dan laporkan**, jangan menambal `liveSpecs`.
 
-- [ ] **Step 3: Tulis test gerbang auto-merge yang gagal**
+- [x] **Step 3: Tulis test gerbang auto-merge yang gagal**
 
 Buka `server/test/auto-merge.service.test.ts`, baca pola `describe`-nya, dan tambahkan test berikut ke dalam `describe` teratas (sesuaikan nama helper fixture/deps dengan yang sudah ada di berkas itu — bila berkas memakai `makeDeps()`/`deps` lokal, pakai nama itu apa adanya):
 
@@ -651,12 +654,12 @@ Buka `server/test/auto-merge.service.test.ts`, baca pola `describe`-nya, dan tam
   });
 ```
 
-- [ ] **Step 4: Jalankan test — harus gagal**
+- [x] **Step 4: Jalankan test — harus gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/auto-merge.service.test.ts`
 Expected: FAIL — `integrate` terpanggil, atau notifikasi `automerge:SPEC-830` lahir.
 
-- [ ] **Step 5: Pasang gerbangnya**
+- [x] **Step 5: Pasang gerbangnya**
 
 Di `server/src/services/auto-merge.ts`, fungsi `settleOne`, sisipkan tepat sesudah baris `if (!spec || spec.stage !== "done") return false;`:
 
@@ -668,12 +671,12 @@ Di `server/src/services/auto-merge.ts`, fungsi `settleOne`, sisipkan tepat sesud
   if (spec.manualDone) return false;
 ```
 
-- [ ] **Step 6: Jalankan test — harus lulus**
+- [x] **Step 6: Jalankan test — harus lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/auto-merge.service.test.ts server/test/spec-manual-done-effects.test.ts`
 Expected: PASS (semua test lama tetap hijau).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/auto-merge.ts server/test/auto-merge.service.test.ts \
@@ -702,7 +705,7 @@ git commit -m "feat(spec-804): auto-merge melewati penyelesaian manual + kunci d
   - `onMarkDone?: (s: Spec, reason: string, confirm?: boolean) => Promise<MarkDoneResult>` — prop `BacklogScreen`, diteruskan ke `SpecActions` & `SpecDetail`.
   - `<MarkDoneDialog spec onClose onSubmit />`
 
-- [ ] **Step 1: Tulis test frontend yang gagal**
+- [x] **Step 1: Tulis test frontend yang gagal**
 
 Create `src/test/backlog-mark-done.test.tsx`:
 
@@ -773,12 +776,12 @@ describe("SPEC-804 · tandai selesai dari dashboard", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 Run: `pnpm vitest --run src/test/backlog-mark-done.test.tsx`
 Expected: FAIL — `Unable to find a label with the text of: Tandai selesai`.
 
-- [ ] **Step 3: Tambahkan path & klien API**
+- [x] **Step 3: Tambahkan path & klien API**
 
 Di `shared/src/api.ts`, sisipkan sesudah baris `specSource: (id: string) => …`:
 
@@ -796,7 +799,7 @@ Di `src/src/api/client.ts`, sisipkan sesudah `changeSpecSource` (baris ~159):
     j<Spec>(paths.specDone(id), { method: "POST", ...body(b) }),
 ```
 
-- [ ] **Step 4: Buat `MarkDoneDialog`**
+- [x] **Step 4: Buat `MarkDoneDialog`**
 
 Create `src/src/screens/MarkDoneDialog.tsx`:
 
@@ -873,7 +876,7 @@ export function MarkDoneDialog({ spec, onClose, onSubmit }: {
 }
 ```
 
-- [ ] **Step 5: Pasang aksi di `SpecActions` (`src/src/screens/BacklogScreen.tsx`)**
+- [x] **Step 5: Pasang aksi di `SpecActions` (`src/src/screens/BacklogScreen.tsx`)**
 
 Tambahkan import di bawah `import { ChangeSourceDialog } from "./ChangeSourceDialog";`:
 
@@ -913,7 +916,7 @@ Sisipkan tepat sebelum `{docs && <SpecDocsModal …>}`:
       )}
 ```
 
-- [ ] **Step 6: Teruskan prop dari `SpecCard`, `SpecRow`, `BoardCard`, dan `BacklogScreen`**
+- [x] **Step 6: Teruskan prop dari `SpecCard`, `SpecRow`, `BoardCard`, dan `BacklogScreen`**
 
 Untuk masing-masing dari `SpecCard` (baris ~561) dan `SpecRow` (baris ~598): tambahkan `onMarkDone` ke daftar destructuring, tambahkan ke tipe props baris berikutnya:
 
@@ -935,7 +938,7 @@ Pada `BacklogScreen` (baris 776): tambahkan `onMarkDone` ke destructuring props 
 
 Lalu teruskan `onMarkDone={onMarkDone}` ke setiap `<SpecCard>`, `<SpecRow>`, dan `<BoardCard>` yang dirender (cari `<SpecCard`, `<SpecRow`, `<BoardCard` di berkas itu), dan ke `<SpecDetail>` (baris 962–967).
 
-- [ ] **Step 7: Pasang aksi & jejak di `SpecDetail`**
+- [x] **Step 7: Pasang aksi & jejak di `SpecDetail`**
 
 Tambahkan `onMarkDone` ke destructuring `SpecDetail` (baris 110) dan ke tipe props-nya (dekat `onRevertStage`, baris 113):
 
@@ -986,12 +989,12 @@ Sisipkan dialognya tepat sebelum `{showSource && onChangeSource && (` (baris ~50
       )}
 ```
 
-- [ ] **Step 8: Jalankan test frontend — harus lulus**
+- [x] **Step 8: Jalankan test frontend — harus lulus**
 
 Run: `pnpm vitest --run src/test/backlog-mark-done.test.tsx`
 Expected: PASS (4 test).
 
-- [ ] **Step 9: Sambungkan handler di `src/src/App.tsx`**
+- [x] **Step 9: Sambungkan handler di `src/src/App.tsx`**
 
 Sisipkan tepat sesudah fungsi `revertStage` (berakhir di baris ~1108):
 
@@ -1017,7 +1020,7 @@ Sisipkan tepat sesudah fungsi `revertStage` (berakhir di baris ~1108):
 
 Cari `<BacklogScreen` di `App.tsx` dan tambahkan prop `onMarkDone={markSpecDone}` di sebelah `onRevertStage={revertStage}`.
 
-- [ ] **Step 10: Jalankan test frontend yang tersentuh + typecheck**
+- [x] **Step 10: Jalankan test frontend yang tersentuh + typecheck**
 
 Run:
 ```bash
@@ -1028,7 +1031,7 @@ pnpm --filter ./src typecheck
 ```
 Expected: semua PASS, typecheck keluar 0.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add shared/src/api.ts src/src/api/client.ts src/src/screens/MarkDoneDialog.tsx \
@@ -1050,7 +1053,7 @@ git commit -m "feat(spec-804): aksi Tandai selesai di daftar & detail backlog"
 - Modify: `docs/agent-integration.md` (endpoint tersering)
 - Test: `server/test/agent-doc-contract.test.ts` (jalankan; jangan diubah kecuali merah)
 
-- [ ] **Step 1: Tulis ADR-0120**
+- [x] **Step 1: Tulis ADR-0120**
 
 Create `internal/docs/adr/0120-tandai-backlog-selesai-manual.md` dengan struktur yang sama seperti `internal/docs/adr/0109-ubah-source-backlog-item.md` (baca dulu untuk menyalin bentuk heading & nada). Isi wajib:
 
@@ -1066,7 +1069,7 @@ Create `internal/docs/adr/0120-tandai-backlog-selesai-manual.md` dengan struktur
 - **Alternatif ditolak**: melonggarkan `PATCH {stage}` jadi dua arah (meruntuhkan ADR-0008 + ketiga guard CAS); tiga kolom skalar (bisa drift); menyimpan alasan hanya di `SessionResult` (whitelist ADR-0047 tak punya field alasan, dan UI butuh join); tool MCP (ADR-0099 sengaja meniadakan tool yang memindahkan stage).
 - **Konsekuensi**: tabel dampak dari design doc (`startable`, checker scheduler, denyut lead, gerbang `dependsOn`, sweep auto-merge, notifikasi, sync, webhook, changelog, revert).
 
-- [ ] **Step 2: Tautkan ADR di index**
+- [x] **Step 2: Tautkan ADR di index**
 
 Di `internal/docs/README.md`, pada bagian `## adr`, sisipkan tepat di atas baris `- [0119 — Tombstone sync…`:
 
@@ -1074,11 +1077,11 @@ Di `internal/docs/README.md`, pada bagian `## adr`, sisipkan tepat di atas baris
 - [0120 — Tandai backlog selesai manual: operasi khusus `POST /specs/:id/done`, jejak `Spec.manualDone`](adr/0120-tandai-backlog-selesai-manual.md)
 ```
 
-- [ ] **Step 3: Tambahkan narasi di `internal/docs/adr/README.md`**
+- [x] **Step 3: Tambahkan narasi di `internal/docs/adr/README.md`**
 
 Baca entri ADR-0119 di berkas itu untuk menyalin bentuknya, lalu tambahkan entri ADR-0120 di posisi yang sama relatifnya (paling atas / paling bawah, ikuti urutan yang berlaku di berkas). Sebutkan: apa yang **ditegakkan** (ADR-0008 stage forward-only, ADR-0105 `doneAt` write-once, ADR-0047 activity log, ADR-0099 batas permukaan MCP), apa yang **diamandemen** (ADR-0103 — kandidat sweep kini disaring `manualDone`), dan kelima gotcha.
 
-- [ ] **Step 4: Perbarui `internal/docs/architecture/api-contract.md`**
+- [x] **Step 4: Perbarui `internal/docs/architecture/api-contract.md`**
 
 Pada bagian `## Backlog / specs`, sisipkan tepat sesudah blok `POST /specs/:id/source …` (baris ~226–234):
 
@@ -1097,7 +1100,7 @@ POST /specs/:id/done      { reason?: string(≤280), confirm?: boolean }   -> Sp
 
 Perbarui juga baris 15 (daftar tindakan berbahaya bagi agen) supaya tak basi: `PATCH /specs/:id {stage}` tetap disebut, tambahkan catatan bahwa `POST /specs/:id/done` **ada** dan berdomain `backlog:write`.
 
-- [ ] **Step 5: Perbarui `internal/docs/architecture/data-model.md`**
+- [x] **Step 5: Perbarui `internal/docs/architecture/data-model.md`**
 
 Cari bagian model `Spec` (grep `doneAt` di berkas itu) dan tambahkan baris kolom baru mengikuti format yang berlaku di sana:
 
@@ -1108,7 +1111,7 @@ manualDone Json?   — SPEC-804 · ADR-0120 · jejak penandaan selesai MANUAL { 
                      sync, BUKAN DATE_FIELDS. Dibaca gerbang sweep auto-merge ADR-0103.
 ```
 
-- [ ] **Step 6: Perbarui `internal/skills/hanoman/SKILL.md`**
+- [x] **Step 6: Perbarui `internal/skills/hanoman/SKILL.md`**
 
 Di bagian `## Aturan Arsitektur`, tambahkan satu butir baru (letakkan sesudah butir "Stempel waktu backlog (SPEC-408/ADR-0090)"):
 
@@ -1135,11 +1138,11 @@ Di bagian `## Aturan Arsitektur`, tambahkan satu butir baru (letakkan sesudah bu
   MCP sengaja **tak** ditambahkan — ADR-0099 meniadakan tool yang memindahkan stage.
 ```
 
-- [ ] **Step 7: Perbarui `docs/agent-integration.md`**
+- [x] **Step 7: Perbarui `docs/agent-integration.md`**
 
 Cari bagian daftar endpoint tersering (grep `POST /specs` di berkas itu) dan tambahkan baris untuk endpoint baru, memakai nada & format yang sudah ada di sana. Sebutkan: butuh `backlog:write`; body `{reason?, confirm?}`; 409 `confirm-required` berikut arti dan cara meneruskannya; dan bahwa ia **tidak** menjalankan atau menghentikan sesi apa pun.
 
-- [ ] **Step 8: Jalankan test kontrak docs**
+- [x] **Step 8: Jalankan test kontrak docs**
 
 Run:
 ```bash
@@ -1149,7 +1152,7 @@ pnpm hanoman docs index --check || node cli/dist/cli.js docs index --check || tr
 ```
 Expected: test PASS. Bila `docs index --check` melaporkan doc tak ter-link, tautkan di `internal/docs/README.md`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add internal/docs/adr/0120-tandai-backlog-selesai-manual.md internal/docs/README.md \
@@ -1165,7 +1168,7 @@ git commit -m "docs(spec-804): ADR-0120 + api-contract, data-model, SKILL, pandu
 
 **Files:** —
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan (server)**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan (server)**
 
 Run:
 ```bash
@@ -1174,12 +1177,12 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: semua PASS. Pastikan jumlah berkas test yang berjalan **> 0** — `--changed` menyalakan `passWithNoTests`, jadi nol test terlihat hijau.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck`
 Expected: ketiganya keluar 0.
 
-- [ ] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint)**
+- [x] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint)**
 
 Boot server di DB khusus lalu curl endpoint baru:
 
@@ -1198,12 +1201,12 @@ Expected: respons pertama `"stage":"done"` + `"manualDone":{…"reason":"smoke"}
 
 Matikan server **per-PID** (`kill <pid>`), jangan `pkill -f`.
 
-- [ ] **Step 4: Pastikan diff bersih & seluruh kotak plan tercentang**
+- [x] **Step 4: Pastikan diff bersih & seluruh kotak plan tercentang**
 
 Run: `git status --porcelain && rtk proxy grep -n "^- \[ \]" docs/superpowers/plans/2026-08-15-spec-804-tandai-backlog-selesai-manual.md`
 Expected: `git status` bersih; grep tak menghasilkan baris apa pun.
 
-- [ ] **Step 5: Push**
+- [x] **Step 5: Push**
 
 ```bash
 git push origin HEAD:refs/heads/hanoman/spec-804
