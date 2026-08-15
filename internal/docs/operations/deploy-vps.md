@@ -22,6 +22,12 @@ operator ─ SSO/MFA/VPN ─ admin.example ┘                         │
 
 - `help.example` hanya boleh mencapai static UI, `/api/health`, dan `/api/help/**`.
 - `admin.example` wajib berada di belakang SSO/MFA, VPN, atau access proxy dan menolak Help publik.
+- **`HANOMAN_PUBLIC_ORIGINS` wajib benar-benar ada**: DNS ter-resolve + vhost proxy-nya berdiri.
+  Nilainya juga menjadi basis link status yang dibagikan operator dan tujuan redirect `/help/*` dari
+  host control (SPEC-805). Mengisinya hanya agar `assertRuntimeBoundary` mengizinkan boot membuat
+  seluruh Help tak terjangkau lewat host mana pun — host control menolaknya secara desain, host
+  publik tak pernah di-resolve. Menjalankan single-origin (tanpa env ini) sah untuk instalasi non-
+  produksi dan menyajikan Help di host control, tetapi membatalkan pemisahan trust boundary ADR-0117.
 - Hanoman bind loopback. Firewall hanya membuka SSH dan listener reverse proxy; port 8787 tidak
   pernah dibuka langsung.
 - Caddy harus menjadi satu-satunya proxy ke origin. `HANOMAN_TRUST_PROXY=1` berarti tepat satu hop;

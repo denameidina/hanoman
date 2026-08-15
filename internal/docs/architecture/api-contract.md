@@ -1011,8 +1011,12 @@ POST    /api/help/:slug/tickets          # multipart/form-data
 #   tiket). Klien WAJIB memvalidasi bentuk respons: 200 { ok:true } bukan sukses.
 GET     /api/help/:slug/tickets/:key     -> { number, category, title, status, createdAt }
 #   Cek status publik by kunci opaque; status terpetakan otomatis (publicStatus), tanpa jargon internal.
-#   Scoped ke slug (isolasi). 404 bila kunci tak dikenal / bukan milik slug (tak membocorkan).
+#   404 bila kunci tak dikenal (tak membocorkan).
 #   SPEC-293 · `:key` boleh kunci pelapor (accessKeyHash) ATAU shareToken bagikan operator (hnm_shr_…).
+#   SPEC-805 · lihat-status TIDAK digerbangi helpEnabled dan TIDAK ber-scope `:slug` — otorisasinya
+#   kunci opaque itu sendiri. helpEnabled=false menutup keluhan BARU (dua route di atas), bukan status
+#   tiket yang sudah masuk; dan Project.id dapat di-rename (SPEC-255) sehingga slug link lama basi.
+#   `:slug` tetap ada di path demi kompatibilitas link yang tersebar, tetapi tak lagi menyaring.
 
 # TRIASE — di belakang gate cookie. Query selalu ber-scope projectId (isolasi antar-project).
 GET   /tickets?project=&status=&q=&page=&limit=  -> { items: TicketView[], total, page, pageSize, unreviewed }
@@ -1020,6 +1024,9 @@ GET   /tickets?project=&status=&q=&page=&limit=  -> { items: TicketView[], total
 GET   /tickets/:id            -> TicketDetail { ...ticket, detail, attachments:[{id,filename,mimeType,size}], spec, publicStatusUrl } · 404
 #   SPEC-293 · spec = backlog tertaut (stage → badge status turunan di detail triase). publicStatusUrl =
 #   ${base}/help/<projectId>/status/<shareToken> (link publik dibagikan ke pelapor); shareToken di-generate
+#   SPEC-805 · ${base} = origin publik pertama (HANOMAN_PUBLIC_ORIGINS) bila split dikonfigurasi, BUKAN Host
+#   request — route ini hanya hidup di host control, yang justru menolak /api/help. Host control me-redirect
+#   302 path SPA /help/* ke origin publik agar link lama tetap hidup. Tanpa split, fallback ke Host request.
 #   lazily bila tiket lama belum punya (idempoten, tanpa sync). Deep-link backlog UI = ${origin}#spec=<id> (ADR-0071).
 GET   /tickets/:id/attachments/:attId    # attachment ber-auth · 404; Content-Disposition: attachment,
 #   X-Content-Type-Options:nosniff, Content-Security-Policy:sandbox (active content tak inline di admin origin)

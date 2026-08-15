@@ -105,6 +105,33 @@ Konsekuensi tambahan yang tetap berlaku: mengisi `HANOMAN_CONTROL_ORIGINS` juga 
 di `loadIngressPolicy`, sehingga Host yang tak terdaftar menjadi `denied`. Deployment yang memakai
 reverse proxy atau tunnel wajib menyebut semua host dashboard-nya sekaligus, bukan hanya satu.
 
+## Amandemen — Help hanya disingkir dari control origin bila split-nya nyata (2026-08-15)
+
+SPEC-805: link status publik `hnm_shr_…` mati di mana-mana. `loadIngressPolicy` menyalakan `enforce`
+begitu **salah satu** dari kedua env origin terisi, sedangkan `classifyIngress` menolak seluruh
+`/api/help*` pada host control tanpa syarat. Deployment yang hanya menyetel `HANOMAN_CONTROL_ORIGINS`
+— yaitu tepat yang dianjurkan amandemen WS di atas untuk tunnel/reverse-proxy — dengan demikian
+kehilangan **seluruh** permukaan Help walau `helpEnabled=1`, tanpa pesan apa pun.
+
+Karena itu deny tersebut kini bersyarat `publicBase` (origin publik pertama, lengkap scheme).
+Tanpa public origin, host control menyajikan Help; dengan public origin, perilakunya persis seperti
+sebelumnya. Produksi tak ikut turun: `assertRuntimeBoundary` menolak boot tanpa split, jadi di sana
+`publicBase` selalu terisi dan invariant 5 tetap ditegakkan aplikasi.
+
+Dua konsekuensi yang menyertainya:
+
+- **Link status dibangun dari `publicBase`, bukan `Host` request.** `GET /api/tickets/:id` hanya
+  hidup di belakang gate cookie, jadi Host-nya selalu host control — host yang menolak `/api/help`.
+  Setiap link yang disalin operator karenanya lahir mati. Bila split dikonfigurasi, host control
+  juga me-redirect 302 path SPA `/help/*` ke public origin, sehingga link yang telanjur tersebar
+  tetap hidup **tanpa** memindahkan permukaan API Help ke host control.
+- **Lihat-status tidak digerbangi `helpEnabled` maupun slug project.** Otorisasinya adalah kunci
+  opaque 48 hex yang sudah dipegang pemanggil; `helpEnabled=false` berarti berhenti menerima keluhan
+  baru (info + submit), bukan menutup status tiket yang sudah masuk, dan `Project.id` dapat
+  di-rename (SPEC-255) sehingga slug pada link lama basi. Submit dan info halaman tak berubah.
+
+Detail bukti di [audit SPEC-805](../research/audit-spec-805-link-status-publik-help-404.md).
+
 ## Invariant yang tidak boleh dilonggarkan diam-diam
 
 1. Public input tidak dapat memberi launch approval, langsung maupun lewat sync.
