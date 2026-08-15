@@ -4,7 +4,8 @@ export { Badge, Callout, ProgressBar, StatusPill, Tooltip } from "./components/f
 export { StateBlock } from "./components/state";
 export { Button, IconButton, Input, Select, Checkbox, Radio, Switch, MultiSelect } from "./components/forms";
 export { Card } from "./components/surfaces";
-export { Tabs } from "./components/ui";
+export { Tabs, OverflowActions } from "./components/ui";
+export type { OverflowItem } from "./components/ui";
 export { useToast, Toast, Modal, Field, HnTextarea, serverPage, Pager, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE } from "./kit";
 export type { ToastData, ShowToast } from "./kit";
 export { ConfirmDialog } from "./ConfirmDialog";

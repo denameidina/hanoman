@@ -1,6 +1,8 @@
 // Ported verbatim from _ds_bundle.js (navigation/Tabs). ESM + typed props. No visual change.
 import React from "react";
 import { Icon } from "../icon";
+import { Modal } from "../kit";
+import { IconButton } from "./forms";
 const _extends = Object.assign;
 
 type Tab = string | { value: string; label?: React.ReactNode; icon?: string; count?: number };
@@ -55,4 +57,47 @@ export function Tabs({ tabs = [], value, defaultValue, onChange, variant = "unde
           color: on ? "var(--accent-hover)" : "var(--text-subtle)", background: on ? "var(--brass-100)" : "var(--bone-300)",
           borderRadius: "var(--radius-pill)", padding: "1px 6px" } }, t.count));
   }));
+}
+
+export type OverflowItem = {
+  key: string; label: string; icon?: string;
+  onSelect: () => void; disabled?: boolean; title?: string;
+};
+
+// SPEC-800 · ember untuk aksi yang tidak muat. Panelnya `Modal` DS — bukan popover terposisi —
+// karena Modal sudah membawa focus trap, Escape, restorasi fokus, dan bentuk bottom-sheet mobile
+// (app.css `.hn-modal-overlay { align-items: flex-end }`) tanpa satu pun hitungan tepi viewport.
+export function OverflowActions({ label, items, icon = "more-horizontal", size = "sm", children }: {
+  label: string; items: readonly OverflowItem[]; icon?: string;
+  size?: "sm" | "md" | "lg"; children?: React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(false);
+  if (!items.length && !children) return null;
+  return (
+    <>
+      <IconButton size={size} icon={icon} label={label} aria-haspopup="dialog"
+        aria-expanded={open} onClick={() => setOpen(true)} />
+      {open && (
+        <Modal open title={label} icon={icon} width={420} onClose={() => setOpen(false)}>
+          {children}
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {items.map((item) => (
+              <button key={item.key} type="button" disabled={item.disabled} title={item.title}
+                onClick={() => { setOpen(false); item.onSelect(); }}
+                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%",
+                  minHeight: "var(--touch-target)", padding: "8px 10px", textAlign: "left",
+                  border: "none", borderRadius: "var(--radius-sm)", background: "transparent",
+                  color: item.disabled ? "var(--text-subtle)" : "var(--text-body)",
+                  font: "var(--weight-medium) var(--text-md)/1.3 var(--font-ui)",
+                  cursor: item.disabled ? "not-allowed" : "pointer",
+                  opacity: item.disabled ? 0.5 : 1 }}>
+                {item.icon && <Icon name={item.icon} size={15} />}
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+    </>
+  );
 }
