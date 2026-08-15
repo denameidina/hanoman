@@ -12,9 +12,18 @@
 
 ## Global Constraints
 
-- **Jalankan test server SELALU** dengan `--no-file-parallelism` **dan** `TEST_DATABASE_URL` tersendiri:
-  `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism <path>`.
+- **Jalankan test server SELALU** dengan `--no-file-parallelism`, `TEST_DATABASE_URL` tersendiri, **dan `env -u HANOMAN_CONTROL_ORIGINS`**:
+  ```bash
+  env -u HANOMAN_CONTROL_ORIGINS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
+    ./node_modules/.bin/vitest --run --no-file-parallelism <path>
+  ```
   Tanpa `TEST_DATABASE_URL`, sesi tetangga di mesin ini menghapus DB test di tengah run (404/P2022 ramai).
+  Tanpa `env -u HANOMAN_CONTROL_ORIGINS`, **setiap test yang memakai `buildApp().inject()` gagal palsu 404**:
+  env sesi mewarisi variabel itu dari instance hanoman yang melahirkannya, `loadIngressPolicy()` karena itu
+  menyetel `enforce: true` (SPEC-761/ADR-0117), dan hook `onRequest` pertama (`app.ts:89`) menolak host
+  `localhost:80` bawaan `inject` dengan `404 {"error":"not found"}` — routenya terdaftar, requestnya yang
+  ditolak. Terukur di **main worktree HEAD bersih**: `projects.route` 18/22 merah + `sync.route` 10/10 merah
+  + `sync-hub-origin-writes` 6/7 merah → **39/39 hijau** hanya dengan `env -u`, nol baris kode berubah.
 - **Jalankan vitest dari root worktree** (`./node_modules/.bin/vitest`). Menjalankannya dari subdirektori membuat `--changed` melihat berkas yang salah.
 - Test web butuh `env -u NODE_ENV` (env sesi ini menunjuk production).
 - **Jangan** `pnpm test`, `vitest run` polos, `pnpm -r typecheck`, atau build penuh. Typecheck hanya paket tersentuh: `pnpm --filter ./server typecheck`.

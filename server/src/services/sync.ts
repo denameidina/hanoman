@@ -1,5 +1,6 @@
 import { prisma } from "../db";
 import { renameProjectCore } from "./rename-project";
+import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
 
 // SPEC-213 · ADR-0045 · mesin sync record: version-stamp optimistic concurrency + change-feed
 // SyncLog (seq = kursor global). Isi file dokumen TIDAK lewat sini (git 3-way merge, ADR-0043).
@@ -20,6 +21,7 @@ type Delegate = {
   findUnique: (args: { where: { id: string }; select?: Record<string, boolean> }) => Promise<Record<string, unknown> | null>;
   upsert: (args: { where: { id: string }; create: Record<string, unknown>; update: Record<string, unknown> }) => Promise<unknown>;
   update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<unknown>;
+  delete: (args: { where: { id: string } }) => Promise<unknown>;
 };
 const DELEGATE: Record<Entity, Delegate> = {
   project: prisma.project as unknown as Delegate,
@@ -79,6 +81,22 @@ const DATE_FIELDS: Record<Entity, string[]> = {
   ticketAttachment: ["createdAt", "updatedAt"],
   customAgent: ["createdAt", "updatedAt"],
   githubIssue: ["issueCreatedAt", "issueUpdatedAt", "pulledAt", "createdAt", "updatedAt"],
+};
+
+// SPEC-799 · ADR-0119 · relasi FK antar entitas SYNCED. Dipakai penerima untuk MEMBUANG record anak
+// yang datang bagi induk yang sudah bertombstone — dulu jatuh ke `console.warn("induk absen?")`,
+// yaitu tebakan, bukan keputusan. Peta ini KONTRAK yang disalin dari skema dan karena itu basi
+// diam-diam begitu FK baru lahir; `sync-parents-dmmf.test.ts` menegakkannya (preseden PG_ORDER).
+//
+// `sessionResult` sengaja ABSEN: `projectId`-nya kolom polos TANPA @relation, jadi menghapus project
+// memang tak merambat ke sana. `ticketAttachment.projectId` juga bukan FK (denormal untuk query
+// murah) — yang FK hanyalah `ticketId`.
+export const PARENTS: Partial<Record<Entity, { field: string; entity: Entity }[]>> = {
+  spec: [{ field: "projectId", entity: "project" }],
+  ticket: [{ field: "projectId", entity: "project" }],
+  ticketAttachment: [{ field: "ticketId", entity: "ticket" }],
+  customAgent: [{ field: "projectId", entity: "project" }],
+  githubIssue: [{ field: "projectId", entity: "project" }],
 };
 
 // Ekspor test-only: kontrak "setiap kolom bermakna ikut menyeberang" hanya bisa diuji dari
@@ -164,20 +182,50 @@ export async function snapshot(entity: Entity, id: string): Promise<Snapshot | n
   return { version: Number(row.version), data };
 }
 
+export type SyncOp = "upsert" | "delete";
+
 export type PushResult =
   | { ok: true; version: number }
-  | { ok: false; conflict: true; server: Snapshot | null };
+  // SPEC-799 · `deleted` menerangkan MENGAPA ia konflik: id-nya sudah bertombstone di hub, dan
+  // `server` karena itu null. Kedua field aditif — client versi lama mengabaikannya dan sekadar
+  // mengulang push tanpa efek (tak ada yang rusak, tak ada yang mandek).
+  | { ok: false; conflict: true; deleted?: boolean; deletedVersion?: number; server: Snapshot | null };
 
-// Terapkan satu push ber-optimistic-concurrency. Insert (id absen) selalu diterima → version 1.
+// Terapkan satu push ber-optimistic-concurrency. Insert (id absen TANPA tombstone) diterima → version 1.
 // Update diterima hanya bila baseVersion === version server; else konflik (server tak ditimpa).
+// SPEC-799 · ADR-0119 · `op:"delete"` = TOMBSTONE, dan ia menang TANPA SYARAT (tak melihat
+// baseVersion sama sekali) — itulah yang membuat hasil hapus-vs-edit independen urutan tiba.
 export async function applyPush(
-  entity: Entity, id: string, baseVersion: number, data: Record<string, unknown>, deviceId?: string,
+  entity: Entity, id: string, baseVersion: number, data: Record<string, unknown>,
+  deviceId?: string, op: SyncOp = "upsert",
 ): Promise<PushResult> {
   validateSyncData(entity, data, { allowProjectRename: true });
+
+  if (op === "delete") {
+    // Idempoten: tombstone yang sudah ada BUKAN error dan BUKAN baris feed kedua. Tanpa gerbang ini
+    // push berulang menaikkan version tanpa ujung dan setiap client berputar menariknya.
+    const already = await findTombstone(entity, id);
+    if (already) return { ok: true, version: already.version };
+    const snap = await snapshot(entity, id);
+    const version = (snap?.version ?? baseVersion) + 1;
+    if (snap) await DELEGATE[entity].delete({ where: { id } }); // cascade DB merambat ke anak
+    await writeTombstone(entity, id, version, snap?.data ?? data, deviceId);
+    await publishDelete(entity, id);
+    return { ok: true, version };
+  }
+
   // SPEC-255 · ADR-0064 · operasi rename project via penanda kontrol data.renamedFrom (bukan kolom;
   // coerce() mengabaikannya). Rename struktural → lewati optimistic-concurrency biasa.
   if (entity === "project" && typeof data.renamedFrom === "string" && data.renamedFrom && data.renamedFrom !== id) {
     const oldId = data.renamedFrom;
+    // SPEC-799 · ADR-0119 · rename BUKAN hapus, dan keduanya tak boleh saling menelan: id tujuan
+    // yang sudah bertombstone tak boleh dihidupkan lewat pintu rename yang memang MELEWATI
+    // optimistic-concurrency biasa. Ditolak dengan alasan yang sama seperti upsert, dan project
+    // asalnya sengaja dibiarkan utuh — rename yang gagal tak boleh menghilangkan apa pun.
+    const destTomb = await findTombstone("project", id);
+    if (destTomb) {
+      return { ok: false, conflict: true, deleted: true, deletedVersion: destTomb.version, server: null };
+    }
     const already = await DELEGATE.project.findUnique({ where: { id }, select: { version: true } });
     if (already) return { ok: true, version: Number(already.version) }; // sudah diterapkan (idempoten)
     const old = await DELEGATE.project.findUnique({ where: { id: oldId }, select: { version: true } });
@@ -191,18 +239,27 @@ export async function applyPush(
       const snap = await snapshot("project", id);
       const logData = { ...(snap?.data ?? {}), renamedFrom: oldId }; // penerima ikut rename
       const log = await prisma.syncLog.create({
-        data: { entity: "project", recordId: id, version: newVersion, data: logData as object, deviceId: deviceId ?? null },
+        data: { entity: "project", recordId: id, version: newVersion, op: "upsert", data: logData as object, deviceId: deviceId ?? null },
       });
-      onAccepted?.({ entity: "project", recordId: id, version: newVersion, data: logData, seq: String(log.seq) });
+      onAccepted?.({ entity: "project", recordId: id, version: newVersion, op: "upsert", data: logData, seq: String(log.seq) });
       return { ok: true, version: newVersion };
     }
     // oldId tak ada → fall-through ke insert normal di bawah (konvergensi).
   }
+  // SPEC-799 · ADR-0119 · "versi record saat ini" kini datang dari BARIS ATAU TOMBSTONE — keduanya
+  // saling eksklusif. Dengan begitu penolakan kebangkitan jatuh dari aturan optimistic-concurrency
+  // yang sudah ada, tanpa cabang khusus: id yang mati di version 6 hanya bisa dihidupkan oleh
+  // tulisan yang TAHU tentang version 6.
+  const tomb = await findTombstone(entity, id);
   const existing = await DELEGATE[entity].findUnique({ where: { id }, select: { version: true } });
-  if (existing && Number(existing.version) !== baseVersion) {
-    return { ok: false, conflict: true, server: await snapshot(entity, id) };
+  const currentVersion = existing ? Number(existing.version) : tomb ? tomb.version : null;
+  if (currentVersion !== null && currentVersion !== baseVersion) {
+    return {
+      ok: false, conflict: true, server: await snapshot(entity, id),
+      ...(tomb && !existing ? { deleted: true, deletedVersion: tomb.version } : {}),
+    };
   }
-  const newVersion = existing ? Number(existing.version) + 1 : 1;
+  const newVersion = (currentVersion ?? 0) + 1;
   const writeData = coerce(entity, data);
   // SPEC-270 · pertahankan updatedAt asal (jam LWW) bila dikirim; else stempel now.
   const stamp = (writeData.updatedAt as Date | undefined) ?? new Date();
@@ -211,15 +268,16 @@ export async function applyPush(
     create: { id, ...writeData, version: newVersion, updatedAt: stamp },
     update: { ...writeData, version: newVersion, updatedAt: stamp },
   });
+  if (tomb) await clearTombstone(entity, id); // pembuatan ulang yang sah menang atas tombstone
   const snap = await snapshot(entity, id);
   const log = await prisma.syncLog.create({
-    data: { entity, recordId: id, version: newVersion, data: (snap?.data ?? {}) as object, deviceId: deviceId ?? null },
+    data: { entity, recordId: id, version: newVersion, op: "upsert", data: (snap?.data ?? {}) as object, deviceId: deviceId ?? null },
   });
-  onAccepted?.({ entity, recordId: id, version: newVersion, data: snap?.data ?? {}, seq: String(log.seq) });
+  onAccepted?.({ entity, recordId: id, version: newVersion, op: "upsert", data: snap?.data ?? {}, seq: String(log.seq) });
   return { ok: true, version: newVersion };
 }
 
-export type PulledRecord = { entity: string; recordId: string; version: number; data: unknown };
+export type PulledRecord = { entity: string; recordId: string; version: number; op: SyncOp; data: unknown };
 
 export async function pull(sinceCursor: string, limit = 500): Promise<{ cursor: string; records: PulledRecord[] }> {
   // SPEC-398 · ADR-0086 · `SyncLog.seq` kini `Int` (SQLite hanya meng-auto-isi alias rowid ber-tipe
@@ -231,7 +289,10 @@ export async function pull(sinceCursor: string, limit = 500): Promise<{ cursor: 
   const cursor = rows.length ? String(rows[rows.length - 1]!.seq) : sinceCursor || "0";
   return {
     cursor,
-    records: rows.map((r) => ({ entity: r.entity, recordId: r.recordId, version: r.version, data: r.data })),
+    records: rows.map((r) => ({
+      entity: r.entity, recordId: r.recordId, version: r.version,
+      op: r.op === "delete" ? "delete" : "upsert", data: r.data,
+    })),
   };
 }
 
@@ -245,9 +306,53 @@ export async function publishLocal(entity: Entity, id: string): Promise<void> {
   const newVersion = snap.version + 1;
   await DELEGATE[entity].update({ where: { id }, data: { version: newVersion } });
   const log = await prisma.syncLog.create({
-    data: { entity, recordId: id, version: newVersion, data: (snap.data ?? {}) as object, deviceId: null },
+    data: { entity, recordId: id, version: newVersion, op: "upsert", data: (snap.data ?? {}) as object, deviceId: null },
   });
-  onAccepted?.({ entity, recordId: id, version: newVersion, data: snap.data ?? {}, seq: String(log.seq) });
+  onAccepted?.({ entity, recordId: id, version: newVersion, op: "upsert", data: snap.data ?? {}, seq: String(log.seq) });
+}
+
+// SPEC-799 · ADR-0119 · penghapusan baris tersync lewat satu pintu, supaya `deleteSynced` (dan hanya
+// ia) tak perlu tahu delegate Prisma mana yang dipakai entitas mana.
+export async function deleteRow(entity: Entity, id: string): Promise<void> {
+  await DELEGATE[entity].delete({ where: { id } });
+}
+
+// SPEC-799 · ADR-0119 · publish TOMBSTONE ke change-feed + siar (peran hub). Cermin publishLocal,
+// bedanya barisnya sudah tak ada — snapshot terakhirnya datang dari tombstone.
+//
+// `data` sengaja tetap snapshot yang SAH, bukan objek kosong atau berpenanda: client versi lama
+// memvalidasinya lalu menerapkannya sebagai upsert biasa, jadi delete "hanya" tak menyeberang ke
+// sana. Bentuk apa pun yang gagal `validateSyncData` di sana justru menyalakan `feedHole` dan
+// menahan kursornya SELAMANYA — mandek total, bukan sekadar melewatkan tombstone.
+export async function publishDelete(entity: Entity, id: string): Promise<void> {
+  const tomb = await findTombstone(entity, id);
+  if (!tomb) return;
+  const log = await prisma.syncLog.create({
+    data: {
+      entity, recordId: id, version: tomb.version, op: "delete",
+      data: tomb.data as object, deviceId: tomb.deviceId,
+    },
+  });
+  onAccepted?.({ entity, recordId: id, version: tomb.version, op: "delete", data: tomb.data, seq: String(log.seq) });
+}
+
+// SPEC-799 · ADR-0119 · id bertombstone yang barisnya ada lagi = seseorang membuatnya ulang. Id
+// `customAgent` ("<scope>:<name>") dan `githubIssue` ("<projectId>:<slug>#<n>") DETERMINISTIK, jadi
+// pemakaian ulang id yang sama persis adalah keadaan nyata, bukan hipotesis.
+//
+// Versi baris diangkat ke versi tombstone karena baris baru lahir di `version = 0`: tanpa itu push
+// berikutnya membawa `baseVersion = 0` melawan tombstone hub di versi jauh lebih tinggi, dan
+// pembuatan ulang yang sah ditolak SELAMANYA tanpa satu pun jalan keluar dari UI.
+export async function consumeTombstoneOnRecreate(entity: Entity, id: string): Promise<boolean> {
+  const tomb = await findTombstone(entity, id);
+  if (!tomb) return false;
+  const row = await DELEGATE[entity].findUnique({ where: { id }, select: { version: true } });
+  if (!row) return false;
+  await clearTombstone(entity, id);
+  if (Number(row.version) < tomb.version) {
+    await DELEGATE[entity].update({ where: { id }, data: { version: tomb.version } });
+  }
+  return true;
 }
 
 // SPEC-270 · ADR-0067 · reconciler boot HUB: publish tiap row SYNCED yang belum terwakili di
@@ -267,6 +372,18 @@ export async function backfillFeed(): Promise<number> {
       await publishLocal(entity, row.id);
       published++;
     }
+  }
+  // SPEC-799 · ADR-0119 · tombstone juga bagian keadaan. Instance yang dulu berperan CLIENT punya
+  // tombstone TANPA baris feed (peran client mengantre outbox, tak pernah menulis SyncLog); tanpa
+  // sapuan ini, promosi jadi hub membuat penghapusan itu tak pernah menyeberang ke siapa pun.
+  for (const t of await prisma.syncTombstone.findMany({ select: { entity: true, recordId: true, version: true } })) {
+    if (!isEntity(t.entity)) continue;
+    const has = await prisma.syncLog.findFirst({
+      where: { entity: t.entity, recordId: t.recordId, version: t.version, op: "delete" }, select: { seq: true },
+    });
+    if (has) continue;
+    await publishDelete(t.entity, t.recordId);
+    published++;
   }
   return published;
 }
@@ -301,7 +418,9 @@ export async function upsertLocal(entity: Entity, id: string, version: number, d
 }
 
 // Hook siar changefeed (di-set oleh sync-hub, Fase 4). Nol dependency di service ini.
-export type AcceptedHook = (row: { entity: string; recordId: string; version: number; data: unknown; seq: string }) => void;
+export type AcceptedHook = (row: {
+  entity: string; recordId: string; version: number; op: SyncOp; data: unknown; seq: string;
+}) => void;
 let onAccepted: AcceptedHook | undefined;
 export function setAcceptedHook(hook: AcceptedHook | undefined): void { onAccepted = hook; }
 
