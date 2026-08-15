@@ -51,7 +51,10 @@ const FIELDS: Record<Entity, string[]> = {
   // TETAP berhasil, jadi kolom yang terlewat di sini mendarat sebagai null palsu di tiap client
   // tanpa satu pun error (kelas gagal-senyap ADR-0090/0093/0094/0105). BUKAN DATE_FIELDS —
   // `at` hidup di dalam JSON-nya, kolomnya sendiri bukan DateTime.
-  spec: ["projectId", "title", "source", "stage", "priority", "author", "objective", "payload", "branchFrom", "baseSha", "headSha", "dependsOn", "sourceHistory", "createdAt", "startedAt", "doneAt", "updatedAt"],
+  // SPEC-804 · ADR-0120 · manualDone ikut menyeberang: "item ini ditandai selesai manusia" adalah
+  // bagian keadaan yang harus dilihat sama oleh semua mesin — di antaranya gerbang auto-merge.
+  // BUKAN DATE_FIELDS, alasan yang sama dengan sourceHistory.
+  spec: ["projectId", "title", "source", "stage", "priority", "author", "objective", "payload", "branchFrom", "baseSha", "headSha", "dependsOn", "sourceHistory", "manualDone", "createdAt", "startedAt", "doneAt", "updatedAt"],
   vps: ["name", "host", "port", "user", "health", "audit", "hardened", "lastSeenAt", "lastAuditAt", "updatedAt"],
   sessionResult: ["projectId", "specId", "oldStage", "newStage", "commitSha", "branch", "prUrl", "status", "deviceId", "author", "createdAt", "updatedAt"],
   // SPEC-268 · ADR-0066 · metadata tiket (lampiran biner tak disync). accessKeyHash wajib
@@ -109,11 +112,12 @@ const NUMBER_FIELDS = new Set([
 ]);
 const BOOLEAN_FIELDS = new Set(["vps:hardened", "customAgent:enabled"]);
 const JSON_FIELDS = new Set([
-  "spec:payload", "spec:dependsOn", "spec:sourceHistory",
+  "spec:payload", "spec:dependsOn", "spec:sourceHistory", "spec:manualDone",
   "vps:health", "vps:audit",
   "customAgent:tools", "customAgent:mentions",
   "githubIssue:labels",
 ]);
+export const __JSON_FIELDS = JSON_FIELDS;
 
 export function validateSyncData(
   entity: Entity, data: Record<string, unknown>, options: { allowProjectRename?: boolean } = {},

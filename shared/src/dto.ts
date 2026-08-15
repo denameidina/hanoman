@@ -112,6 +112,15 @@ export const zChangeSpecSource = z.object({
   if (o.payload !== undefined && !payloadMatchesSource(o.source, o.payload))
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["payload"], message: "bentuk payload tak cocok dengan source" });
 });
+// SPEC-804 · ADR-0120 · tandai backlog selesai MANUAL. Operasi khusus, bukan field `zPatchSpec`:
+// `stage` di sana backward-only by construction (SPEC-167) dan melonggarkannya meruntuhkan
+// seluruh premis "kemajuan hanya berasal dari fase sesi" (ADR-0008).
+// `confirm` hanya dibutuhkan saat ada sesi hidup untuk item ini (dua langkah, cermin ADR-0088).
+export const zMarkSpecDone = z.object({
+  reason: z.string().trim().max(280).optional(),
+  confirm: z.boolean().optional(),
+});
+export type MarkSpecDone = z.infer<typeof zMarkSpecDone>;
 // SPEC-175 · rebase/merge branch hasil done spec. target = "local:<b>" | "origin:<b>".
 export const zIntegrate = z.object({
   op: z.enum(["merge", "rebase"]),

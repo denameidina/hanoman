@@ -54,6 +54,13 @@ export const zSourceChange = z.object({
 });
 export type SourceChange = z.infer<typeof zSourceChange>;
 
+// SPEC-804 · ADR-0120 · jejak penandaan selesai MANUAL. `at` menjawab "kapan operator menandai" —
+// pertanyaan yang BERBEDA dari `doneAt` (ADR-0105, "selesai pertama"), jadi keduanya tak bersaing.
+export const zManualDone = z.object({
+  at: z.string(), by: z.string(), reason: z.string().optional(),
+});
+export type ManualDone = z.infer<typeof zManualDone>;
+
 export const zSpec = z.object({
   id: z.string(), projectId: z.string(), title: z.string(), source: zSpecSource,
   stage: zStage, priority: zPriority, author: z.string(), objective: z.string(),
@@ -77,6 +84,9 @@ export const zSpec = z.object({
   // tetap parse; kolom DB-nya `Json?` sehingga baris yang belum pernah dikonversi mengirim
   // `null` — pemakai UI menulis `spec.sourceHistory ?? []`, cermin `blockedBy`.
   sourceHistory: z.array(zSourceChange).default([]),
+  // SPEC-804 · ADR-0120 · terisi hanya bila item ditandai selesai manual; null = selesai lewat
+  // sesi atau belum selesai. `.nullable().default(null)` menjaga respons/klien versi lama parse.
+  manualDone: zManualDone.nullable().default(null),
 });
 export type Spec = z.infer<typeof zSpec>;
 

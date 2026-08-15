@@ -63,6 +63,12 @@ model Spec {
   // site adalah kelas bug SPEC-431/448/475. Tulis-sekali: reopen lalu selesai lagi tak
   // memindahkannya, cermin `startedAt` = mulai pertama (ADR-0090).
   doneAt     DateTime?
+  // SPEC-804 · ADR-0120 · jejak penandaan selesai MANUAL: { at, by, reason? }. Satu kolom, bukan
+  // tiga skalar — ketiganya satu peristiwa, dan tiga kolom nullable bisa drift tanpa tipe yang
+  // memaksanya konsisten (kelas gagal-senyap ADR-0090/0093/0094/0105). null = item ini tak pernah
+  // ditandai manual. Ditimpa tiap penandaan berikutnya: ia menjelaskan keadaan yang BERLAKU;
+  // riwayat transisi stage tinggal di SessionResult (ADR-0047). Ikut FIELDS.spec sync.
+  manualDone Json?
   // SPEC-447 · ADR-0093 · id spec lain yang harus SELESAI & commit-nya sudah ada di branch basis
   // sebelum item ini boleh diluncurkan. Array JSON of string; null/[] = tak bergantung apa pun.
   // Sengaja kolom, bukan tabel join: SQLite melarang scalar list, `Json` sudah dipakai `payload`,

@@ -87,7 +87,10 @@ export const WEBHOOK_ENTITIES: WebhookEntityDef[] = [
   {
     entity: "spec", model: "Spec", label: "Backlog item",
     fields: ["id", "projectId", "title", "source", "stage", "priority", "author", "objective",
-      "branchFrom", "baseSha", "headSha", "dependsOn", "autoMerge", "createdAt", "startedAt", "updatedAt"],
+      "branchFrom", "baseSha", "headSha", "dependsOn", "autoMerge", "createdAt", "startedAt",
+      // SPEC-804 · ADR-0120 · penerima harus bisa membedakan "selesai lewat sesi" dari "ditandai
+      // manusia" tanpa mendiff dua amplop. Peristiwanya tetap `spec.stage_changed`.
+      "manualDone", "updatedAt"],
     projectIdField: "projectId",
     events: {
       created: { type: "spec.created", label: "Backlog dibuat", when: "Sebuah item backlog difilekan — lewat UI, POST /specs, breakdown PRD, triase tiket, atau tarik issue GitHub." },
@@ -111,6 +114,7 @@ export const WEBHOOK_ENTITIES: WebhookEntityDef[] = [
       branchFrom: null, baseSha: "5117298c5a3e63af76cbadaa46e2edfa50921d7", headSha: null,
       dependsOn: null, autoMerge: null,
       createdAt: "2026-08-01T02:10:00.000Z", startedAt: "2026-08-01T02:12:31.000Z",
+      manualDone: null,
       updatedAt: "2026-08-01T09:41:22.000Z",
     },
   },
