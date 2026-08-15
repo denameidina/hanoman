@@ -1160,7 +1160,7 @@ git commit -m "feat(spec-800): tap memilih opsi dialog claude lewat digit hotkey
   `useCoarsePointer` dari `../ds`; `isBool`, `isNum` dari `../ui-state`
 - Produces: `TerminalPane` dipanggil dengan `fontSize` dan `showKeys` dari state persisten
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambah di `src/test/terminal-screen.test.tsx` (letakkan `stubResizeObserver` di dekat helper lain):
 
@@ -1250,12 +1250,12 @@ panel overflow:
     expect(screen.getByRole("button", { name: "Hapus kolom aktif" })).toBeInTheDocument();
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-screen.test.tsx`
 Expected: FAIL — empat test baru + satu test lama gagal (`Aksi lain sesi …` / `Aksi terminal lain` tak ada).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `src/src/screens/TerminalScreen.tsx`:
 
@@ -1530,12 +1530,12 @@ dan pada `FullscreenTerminal` (tambah props `fontSize: number; showKeys: boolean
           fontSize={fontSize} showKeys={showKeys} />
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-screen.test.tsx`
 Expected: PASS — 65 test lulus (61 lama + 4 baru).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalScreen.tsx src/test/terminal-screen.test.tsx

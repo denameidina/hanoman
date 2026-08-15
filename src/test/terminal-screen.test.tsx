@@ -105,7 +105,17 @@ beforeEach(() => {
     codex: { model: "gpt-5.6-sol", effort: "xhigh" } });
   getCodexVersion.mockResolvedValue({ version: "0.145.0", minRequired: "0.144.0", ok: true });
 });
-afterEach(resetViewport);
+afterEach(() => { resetViewport(); vi.unstubAllGlobals(); });
+
+// SPEC-800 · header sel memutuskan runtuh dari lebar KONTAINERNYA (sel grid 4 kolom di desktop
+// lebih sempit daripada satu pane di ponsel). jsdom tak mengukur apa pun, jadi lebarnya disuntik.
+function stubResizeObserver(width: number) {
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private readonly cb: (entries: ResizeObserverEntry[]) => void) { }
+    observe(): void { this.cb([{ contentRect: { width } } as ResizeObserverEntry]); }
+    disconnect(): void { }
+  });
+}
 
 describe("TerminalScreen (grid)", () => {
   it("memuat state server sebelum render dan tidak menulis ulang snapshot yang sama", async () => {
@@ -199,6 +209,7 @@ describe("TerminalScreen (grid)", () => {
     expect(document.querySelector('[data-terminal-cell-index="1"]')).toHaveAttribute("aria-hidden", "false");
     expect(putTerminalWorkspace).toHaveBeenCalledTimes(1);
     expect(putTerminalWorkspace.mock.calls[0]![0]).toEqual(seeded);
+    fireEvent.click(screen.getByRole("button", { name: "Aksi terminal lain" }));
     expect(screen.getByRole("button", { name: "Hapus kolom aktif" })).toBeInTheDocument();
   });
   it("desktop → tablet → mobile mempertahankan grup dan koordinat sessionId kanonik", async () => {
@@ -901,5 +912,69 @@ describe("PhaseStrip", () => {
   it("tanpa fase, tak menggambar apa pun (sesi project biasa)", () => {
     const { container } = render(<PhaseStrip phases={null} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () => {
+  const oneSession = () => {
+    localStorage.setItem(WKEY, JSON.stringify({ active: "g1", groups: [
+      { id: "g1", name: "Utama", layout: { rows: 1, cols: 1, cells: ["aaaa1111"] } },
+    ] }));
+    listTerminals.mockResolvedValue([
+      { id: "aaaa1111", projectId: "p1", specId: "SPEC-1", cwd: "/repo", exited: false },
+    ]);
+  };
+
+  it("meruntuhkan aksi header sel ke panel overflow pada sel sempit", async () => {
+    stubResizeObserver(240);
+    oneSession();
+    render(<TerminalScreen projects={projects} onOpenReview={() => {}} />);
+    await screen.findByTestId("pane");
+
+    // jalan keluar tak pernah runtuh
+    expect(screen.getByRole("button", { name: "Layar penuh sesi aaaa1111" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tutup sesi aaaa1111" })).toBeInTheDocument();
+    // aksi lain pindah ke overflow, dan tetap dapat dipilih
+    expect(screen.queryByRole("button", { name: "Lihat dokumen sesi aaaa1111" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Aksi lain sesi aaaa1111" }));
+    expect(screen.getByRole("button", { name: "Lihat dokumen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review perubahan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Lepas dari grid" })).toBeInTheDocument();
+  });
+
+  it("membiarkan aksi inline pada sel lebar", async () => {
+    stubResizeObserver(900);
+    oneSession();
+    render(<TerminalScreen projects={projects} onOpenReview={() => {}} />);
+    await screen.findByTestId("pane");
+    expect(screen.getByRole("button", { name: "Lihat dokumen sesi aaaa1111" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Aksi lain sesi aaaa1111" })).toBeNull();
+  });
+
+  it("meringkas toolbar mobile: aksi sekunder pindah ke satu panel", async () => {
+    mockViewport(390);
+    listTerminals.mockResolvedValue([]);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /Sesi baru/ });
+    expect(screen.queryByRole("button", { name: "Ambil backlog" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Aksi terminal lain" }));
+    for (const name of ["Ambil backlog", "Riwayat sesi", "Terminal biasa", "+ Kolom", "+ Baris"]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("menyimpan ukuran font terminal lintas render", async () => {
+    mockViewport(390);
+    listTerminals.mockResolvedValue([]);
+    const view = render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /Sesi baru/ });
+    fireEvent.click(screen.getByRole("button", { name: "Aksi terminal lain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Perbesar teks terminal" }));
+    expect(localStorage.getItem("hn.ui.v1.terminal.fontSize")).toBe("16");
+    view.unmount();
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /Sesi baru/ });
+    fireEvent.click(screen.getByRole("button", { name: "Aksi terminal lain" }));
+    expect(screen.getByText("16px")).toBeInTheDocument();
   });
 });
