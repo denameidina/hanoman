@@ -17,6 +17,7 @@ const POLICY = { mode: "default-branch", dest: "local", branch: null, deleteBran
 
 async function seed(opts: {
   projectPolicy?: unknown; specPolicy?: unknown; headSha?: string | null; doneAt?: Date;
+  manualDone?: unknown;   // SPEC-804 · ADR-0120
 } = {}) {
   await prisma.project.create({
     data: { id: "p", name: "P", desc: "", kind: "existing", repoDir: "/repo",
@@ -28,7 +29,8 @@ async function seed(opts: {
       // akan diam-diam mengembalikannya ke "aaa" sehingga test-nya lulus tanpa menguji apa pun.
       priority: "sedang", author: "a", objective: "",
       headSha: opts.headSha === undefined ? "aaa" : opts.headSha,
-      ...(opts.specPolicy !== undefined ? { autoMerge: opts.specPolicy as object } : {}) },
+      ...(opts.specPolicy !== undefined ? { autoMerge: opts.specPolicy as object } : {}),
+      ...(opts.manualDone !== undefined ? { manualDone: opts.manualDone as object } : {}) },
   });
   await prisma.notification.create({
     data: { type: "done", key: "done:SPEC-1", specId: "SPEC-1", projectId: "p",
@@ -64,6 +66,17 @@ describe("sweepAutoMerge — gerbang kandidat", () => {
     const integrate = vi.fn();
     expect(await sweepAutoMerge(deps({ integrate: integrate as never }), NOW)).toBe(0);
     expect(integrate).not.toHaveBeenCalled();
+  });
+
+  // SPEC-804 · ADR-0120 · kandidat sweep = notifikasi `done:`, yang kini juga ditulis jalur
+  // penandaan manual. Tanpa gerbang ini item yang ditandai manual memicu merge branch sesi lama
+  // yang ditinggalkan — dan untuk item tanpa sesi, notifikasi "belum ter-push" yang salah.
+  it("penyelesaian MANUAL tak pernah di-auto-merge (SPEC-804)", async () => {
+    await seed({ projectPolicy: POLICY, manualDone: { at: NOW.toISOString(), by: "dena@x" } });
+    const integrate = vi.fn();
+    expect(await sweepAutoMerge(deps({ integrate: integrate as never }), NOW)).toBe(0);
+    expect(integrate).not.toHaveBeenCalled();
+    expect(await marker()).toBeNull();
   });
 
   it("spec bisa MENYALAKAN auto-merge di project tanpa kebijakan", async () => {

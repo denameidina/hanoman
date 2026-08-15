@@ -100,6 +100,11 @@ export async function sweepAutoMerge(
 async function settleOne(c: Candidate, deps: AutoMergeDeps, now: Date): Promise<boolean> {
   const spec = await prisma.spec.findUnique({ where: { id: c.specId } });
   if (!spec || spec.stage !== "done") return false;
+  // SPEC-804 · ADR-0120 · "ditandai selesai manual" berarti pekerjaannya beres DI LUAR sesi — tak
+  // ada yang perlu di-merge. Tanpa gerbang ini item tanpa sesi melahirkan notifikasi "branch kerja
+  // belum ter-push" sesudah grace, dan item yang punya branch sesi lama yang DITINGGALKAN akan
+  // di-merge setengah jadi. Diam, bukan `report()`: tak ada yang perlu dilaporkan ke operator.
+  if (spec.manualDone) return false;
   const project = await prisma.project.findUnique({ where: { id: spec.projectId } });
   if (!project) return false;
 
