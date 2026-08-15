@@ -13,7 +13,8 @@ WebSocket per-sesi tersendiri. Endpoint HTTP GET tiap sumber tetap ada untuk pai
 > yang dijanjikan tiap tool ke `capabilityForRoute` — kalau peta route→capability berubah dan
 > katalognya tidak, testnya merah. Tool yang **mengeksekusi** (`POST /terminal/sessions`, seluruh
 > `/vps*`) berikut `integrate`, `DELETE /specs/:id`, dan `PATCH /specs/:id {stage}` sengaja **tak
-> punya tool**.
+> punya tool**. SPEC-804/ADR-0120 menambah `POST /specs/:id/done` (memindahkan stage) — ia **juga
+> tak punya tool MCP**, alasan yang sama; agen memakainya lewat REST dengan `backlog:write`.
 
 > **Host matrix (SPEC-761, ADR-0117):** host di `HANOMAN_PUBLIC_ORIGINS` hanya melayani static UI,
 > `GET /health`, dan `/help/**`; request API lain ditolak sebelum auth. Host di
@@ -245,6 +246,26 @@ POST /specs/:id/source    { source: "brief"|"qa"|"audit"|"help"|"goal", payload?
 #   Efek samping: satu Notification (`type:"spec-source"`, key `source:<specId>:<n>`), satu entri
 #   `sourceHistory` berisi payload bentuk LAMA UTUH, webhook `spec.source_changed`, dan notifySynced.
 #   `author` (`QA ·`/`Audit ·`/`Goal ·`) SENGAJA tak disentuh — fakta historis, cermin createdAt.
+POST /specs/:id/done      { reason?: string(≤280), confirm?: boolean }   -> Spec
+#   SPEC-804 · ADR-0120 · tandai item selesai MANUAL — untuk pekerjaan yang beres DI LUAR sesi
+#   (dikerjakan langsung, sudah ter-merge lewat PR, atau sudah tercakup item lain). Operasi khusus,
+#   BUKAN field PATCH: `stage` di PATCH backward-only by construction (SPEC-167), dan melonggarkannya
+#   meruntuhkan premis "kemajuan hanya berasal dari fase sesi" (ADR-0008) berikut ketiga guard CAS
+#   persist stage. Capability `backlog:write` (turunan prefix /specs per method — tanpa peta baru).
+#   200 = Spec sesudah ditandai (`stage:"done"`, `manualDone:{at,by,reason?}`, `doneAt` terstempel).
+#   400 = alasan > 280 karakter.
+#   404 = spec tak ada.
+#   409 { error:"backlog item sudah selesai" } = stage sudah done (juga saat CAS kalah balapan
+#         dengan sesi/overlay yang menyelesaikannya lebih dulu — no-op tak pernah menulis jejak).
+#   409 { error:"confirm-required", session:{id,agent} } = ada sesi tmux HIDUP untuk item ini
+#         (pane ber-`specId` sama, `exited=false`); kirim ulang dengan confirm:true. Sesinya TIDAK
+#         dibunuh — penutupan sesi punya konsekuensi worktree sendiri (ADR-0116) dan tombolnya
+#         sudah ada di Terminal.
+#   Efek sampingnya IDENTIK dengan selesai lewat sesi (satu titik cekik services/spec-complete.ts):
+#   `recordCompletion` (doneAt tulis-sekali + notifikasi `done:<specId>`), `recordSessionResult`
+#   (activity log ADR-0047, author = pemanggil), `notifySynced`, webhook `spec.stage_changed`.
+#   Sweep auto-merge (ADR-0103) MELEWATI item ber-`manualDone`: "beres di luar sesi" berarti tak ada
+#   yang perlu di-merge, dan branch sesi lama yang ditinggalkan tak boleh ter-merge setengah jadi.
 DELETE /specs/:id
 #   SPEC-447 · ADR-0093 · id yang dihapus juga DICABUT dari `dependsOn` seluruh spec lain di project
 #   yang sama (+ antre sync per baris yang berubah). Tanpa itu, dependent-nya terkunci selamanya

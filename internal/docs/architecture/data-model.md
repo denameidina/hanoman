@@ -150,6 +150,21 @@ tiap berkas.
   `done:<specId>` — stempel yang sudah ada sejak SPEC-180 dan sumber yang sama dengan sweep
   auto-merge ADR-0103; item yang selesai sebelum itu tetap `null` dan **dilaporkan sebagai catatan**
   di hasil changelog, bukan disamarkan.
+- `manualDone` (Json?, SPEC-804 · [ADR-0120](../adr/0120-tandai-backlog-selesai-manual.md)) — **jejak
+  penandaan selesai MANUAL** `{ at, by, reason? }` yang ditulis `POST /specs/:id/done`. `null` = item
+  selesai lewat sesi, atau belum selesai. **Satu kolom, bukan tiga skalar** (`doneBy`/`doneMarkedAt`/
+  `doneNote`): ketiga fakta itu satu peristiwa, dan tiga kolom nullable bisa drift tanpa tipe apa pun
+  yang memaksanya konsisten — kelas gagal-senyap ADR-0090/0093/0094/0105. **`doneAt` tak berubah
+  maknanya**: ia tetap "selesai pertama" dan tetap hanya ditulis `recordCompletion()`, sementara
+  `manualDone.at` menjawab "kapan operator menandai" — pada item yang selesai lewat sesi, dibuka
+  ulang, lalu ditandai manual, keduanya terisi dan keduanya benar. **Ditimpa** tiap penandaan
+  berikutnya (bukan array): ia menjelaskan keadaan yang BERLAKU, dan riwayat transisi stage sudah
+  punya rumahnya di `SessionResult` (ADR-0047). Revert stage **tidak** mengosongkannya, cermin
+  `doneAt`. **Wajib** ikut `FIELDS.spec` + `JSON_FIELDS` (kelas gagal-senyap yang sama dengan
+  `dependsOn`/`sourceHistory`); **bukan** `DATE_FIELDS` — `at` hidup di dalam JSON-nya. **Masuk**
+  `WEBHOOK_ENTITIES.fields`: penerima harus bisa membedakan "selesai lewat sesi" dari "ditandai
+  manusia" tanpa mendiff dua amplop. Dibaca gerbang sweep auto-merge ADR-0103 — item ber-`manualDone`
+  dilewati, karena "beres di luar sesi" berarti tak ada yang perlu di-merge.
 - `dependsOn` (Json?, SPEC-447/[ADR-0093](../adr/0093-dependency-antar-backlog.md)) — **array id spec**
   yang harus **selesai (`stage=done`) DAN commit-nya sudah ada di branch basis item ini** sebelum
   sesinya boleh diluncurkan. `null`/`[]` = berdiri sendiri; pembaca menormalkannya (`dependsOnOf`,

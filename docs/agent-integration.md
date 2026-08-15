@@ -168,6 +168,7 @@ dan tak memakai agent token.
 | `GET /api/specs` | `backlog:read` | backlog. Filter: `project`, `source`, `q`, `stage`, `priority`, `startable=true`, `dateField=created\|started` + `from`/`to` (`YYYY-MM-DD`, inklusif), `page`, `limit`. |
 | `POST /api/specs` | `backlog:write` | buat backlog item — bentuk payload di §7. |
 | `PATCH /api/specs/:id` | `backlog:write` | ubah item; konten hanya selagi belum dimulai. |
+| `POST /api/specs/:id/done` | `backlog:write` | tandai item **selesai** tanpa menjalankan sesi — untuk pekerjaan yang beres di luar hanoman. Body `{ reason?: string (≤280), confirm?: boolean }`, keduanya opsional; balasannya `Spec` yang sudah `stage:"done"`. Tak menjalankan maupun menghentikan sesi apa pun. |
 | `GET /api/specs/:id/docs` | `backlog:read` | dokumen yang ditulis sesi item itu. |
 | `GET /api/specs/:id/review` | `backlog:read` | diff hasil kerja sesi. |
 | `GET /api/projects/:id/docs` | `docs:read` | index Source of Truth project. |
@@ -271,7 +272,9 @@ capability-nya. Capability menjawab "boleh?", bukan "sebaiknya?".
 | `POST /api/lead/decisions` | putusannya bisa **menggerakkan sesi** (integrate ke main, menghentikan sesi) dan selalu melahirkan baris jejak permanen (ADR-0091/0098). |
 
 Perlakukan `POST /api/specs/:id/integrate`, `DELETE /api/specs/:id`, dan perubahan `stage` dengan
-disiplin yang sama: ketiganya mengubah sejarah git atau membuang pekerjaan.
+disiplin yang sama: ketiganya mengubah sejarah git atau membuang pekerjaan. `POST /api/specs/:id/done`
+tak menyentuh git, tetapi ia **menyatakan pekerjaan orang lain selesai** — pakai hanya bila kamu punya
+buktinya, dan tulis buktinya di `reason`.
 
 **Preseden yang mengikat:** MCP server resmi (`hanoman mcp`, §13) sengaja **tak punya tool** untuk
 satu pun dari yang di atas — batasnya ada di katalog tool, bukan di token. Token yang punya
@@ -286,6 +289,7 @@ memanggilnya; jangan lakukan tanpa manusia.
 | `q` mencari di `id`, `title`, dan `objective` saja — ia **tak menyentuh `payload`** | untuk mencari isi brief/QA, ambil itemnya lalu baca `payload` sendiri |
 | `id` dan `stage` yang kamu sertakan di `POST /api/specs` **dibuang diam-diam** — tak ada galat | `id` diterbitkan server (`SPEC-nnn` berikutnya), `stage` selalu mulai `brainstorming`. Untuk mengubah stage pakai `PATCH /api/specs/:id`, dan ia hanya boleh **mundur** (ADR-0027) |
 | **`GET /api/specs/:id` tidak ada** | `GET /api/specs?q=SPEC-489` lalu cocokkan `id` **persis** — `q` itu substring, jadi ia bisa mengembalikan lebih dari satu |
+| `POST /api/specs/:id/done` menjawab **409 `{"error":"confirm-required","session":{...}}`** — itu bukan penolakan, melainkan pemberitahuan bahwa masih ada **sesi hidup** untuk item itu | putuskan dulu apakah sesi itu memang sudah tak relevan; bila ya, kirim ulang dengan `{"confirm": true}`. Sesinya **tidak** ikut dihentikan — tutup sesinya sendiri bila perlu. 409 `{"error":"backlog item sudah selesai"}` berarti item itu memang sudah `done` |
 | daftar mengembalikan amplop `{ items, total, page, pageSize }` | jangan perlakukan responsnya sebagai array |
 | tanpa `limit`, daftar mengembalikan **seluruh** item dalam satu halaman | kirim `limit` untuk backlog besar |
 | **`GET /api/notifications` adalah pengecualiannya**: tanpa `limit` ia mengembalikan **50 teratas**, bukan seluruhnya — angka penuhnya ada di `total` | kirim `page`/`limit` bila kamu butuh riwayat lama; jangan simpulkan `items.length` = seluruh notifikasi |

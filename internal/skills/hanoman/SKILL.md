@@ -135,6 +135,30 @@ Pakai skill lebih sempit saat task cocok:
   dipendekkan git jadi bare `origin` (cermin `services/branches.ts`); dan `--end-of-options` **tak
   berlaku** untuk argumen `--merged` → base wajib di-resolve ke SHA lebih dulu. Ini pagar keselamatan
   data untuk satu endpoint bulk, **bukan** guardrail eksekusi — ADR-0037 tetap utuh.
+- **Backlog bisa ditandai selesai MANUAL** (SPEC-804/**ADR-0120**; ADR-0008 & ADR-0047 & ADR-0099 &
+  ADR-0105 ditegakkan, **ADR-0103 diamandemen**): `POST /specs/:id/done` `{reason?, confirm?}`
+  memajukan satu item ke `done` tanpa sesi — untuk pekerjaan yang beres DI LUAR sesi (dikerjakan
+  langsung, sudah ter-merge, atau sudah tercakup item lain), yang sebelumnya menggantung selamanya
+  dan terus diantrekan checker `UNSTARTED_SPEC_WHERE` (SPEC-431). **Operasi khusus**, bukan field
+  `PATCH /specs/:id`: `stage` di sana **backward-only by construction** (SPEC-167) dan
+  melonggarkannya meruntuhkan premis "kemajuan hanya berasal dari fase sesi" yang menopang ketiga
+  guard CAS persist stage; bentuknya preseden ADR-0064/0109. Jejaknya **satu** kolom
+  `Spec.manualDone Json?` = `{at, by, reason?}` — bukan tiga skalar yang bisa drift — dan `doneAt`
+  (ADR-0105) **tak berubah maknanya** (tetap "selesai pertama", tetap ditulis hanya di dalam
+  `recordCompletion`). Eksekusinya satu titik cekik `completeSpecManually()` (CAS `stage != done` →
+  `recordCompletion` → `recordSessionResult` → `notifySynced`), jadi efek penyelesaian tak pernah
+  disalin ke call site (kelas SPEC-431/448/475). **Lima gotcha:** (1) `manualDone` wajib di
+  `FIELDS.spec` **dan** `JSON_FIELDS`, **bukan** `DATE_FIELDS` (`at` di dalam JSON) — kolom terlewat
+  mendarat sebagai null palsu tanpa satu pun error; (2) kandidat sweep auto-merge = notifikasi
+  `done:` yang kini juga ditulis jalur manual, jadi `settleOne` **melewati** item ber-`manualDone` —
+  tanpa itu item tanpa sesi melahirkan notifikasi "belum ter-push" yang salah, dan item ber-branch
+  sesi lama yang **ditinggalkan** di-merge setengah jadi; (3) durabilitas terhadap overlay stage-live
+  adalah konsekuensi guard forward-only `liveSpecs`, **dikunci test**, bukan diasumsikan; (4) gerbang
+  "sesi hidup" membaca `specId` pane lewat `listSessions()`, bukan `getSession(sessionIdForSpec(id))`,
+  dan pane MATI bukan sesi hidup; (5) `manualDone` **ditimpa** tiap penandaan dan revert stage sengaja
+  **tidak** mengosongkannya (cermin `doneAt`; riwayat transisinya di `SessionResult`). Konfirmasi dua
+  langkah (`409 confirm-required` + `session`) cermin ADR-0088, dan sesinya **tidak** dibunuh. Tool
+  MCP sengaja **tak** ditambahkan — ADR-0099 meniadakan tool yang memindahkan stage.
 - **Stempel waktu backlog** (SPEC-408/ADR-0090): `Spec` punya `createdAt` (NOT NULL, `@default(now())`,
   **tak pernah ditulis route**) dan `startedAt` (nullable). `startedAt` ditulis di **titik cekik yang
   sama dengan `baseSha`** (`session-launch.ts`, cabang `if (!resume)`) → maknanya **mulai pertama**,
