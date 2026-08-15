@@ -1,4 +1,4 @@
-import { render, cleanup, act } from "@testing-library/react";
+import { render, cleanup, act, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { api } from "../src/api/client";
 import { TerminalPane } from "../src/screens/TerminalPane";
@@ -296,5 +296,28 @@ describe("TerminalPane · ukuran font & gulir lokal (SPEC-800)", () => {
     render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     expect(xt.wheelHandler?.({ shiftKey: false, deltaY: 100 } as WheelEvent)).toBe(true);
     expect(xt.scrolled).toHaveLength(0);
+  });
+});
+
+describe("TerminalPane · papan tombol layar (SPEC-800)", () => {
+  it("tak merender papan tombol kecuali diminta", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    expect(screen.queryByRole("button", { name: "Kirim Escape ke terminal" })).toBeNull();
+  });
+
+  it("mengirim TEPAT SATU keystroke per tekan (SPEC-452)", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]?.onopen?.(); });
+    const before = sockets[0]!.sent.length;
+    fireEvent.click(screen.getByRole("button", { name: "Kirim panah bawah ke terminal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kirim Enter ke terminal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kirim Escape ke terminal" }));
+    expect(sockets[0]!.sent.slice(before)).toEqual([
+      JSON.stringify({ t: "in", d: "\x1b[B" }),
+      JSON.stringify({ t: "in", d: "\r" }),
+      JSON.stringify({ t: "in", d: "\x1b" }),
+    ]);
   });
 });

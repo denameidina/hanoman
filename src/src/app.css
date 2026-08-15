@@ -370,6 +370,34 @@ textarea:focus-visible,
 .hn-terminal-action--text { padding-inline: 5px; }
 .hn-terminal-action:hover { background: var(--bone-300); color: var(--text-strong); }
 
+/* SPEC-800 · papan tombol layar: menggulir mendatar saat sempit, bukan menyusut sampai labelnya
+   tumpah — akar yang sama dengan strip tab SPEC-763. */
+.hn-terminal-keys {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 2px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border-top: 1px solid var(--border-hair);
+}
+
+.hn-terminal-key {
+  flex: 0 0 auto;
+  min-width: 40px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-body);
+  font: var(--weight-medium) var(--text-sm)/1 var(--font-mono);
+  cursor: pointer;
+}
+
+.hn-terminal-key:hover { background: var(--bone-200); color: var(--text-strong); }
+
 @media (max-width: 767px) {
   .hn-terminal-cell-header { flex-wrap: wrap; }
 }
@@ -377,6 +405,7 @@ textarea:focus-visible,
 @media (pointer: coarse), (max-width: 767px) {
   .hn-graph-action,
   .hn-terminal-action,
+  .hn-terminal-key,
   .hn-terminal-group-control { min-width: var(--touch-target); min-height: var(--touch-target); }
 }
 

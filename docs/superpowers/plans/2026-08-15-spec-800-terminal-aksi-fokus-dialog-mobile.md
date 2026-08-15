@@ -881,7 +881,7 @@ git commit -m "feat(spec-800): ukuran font terminal & Shift+wheel gulir lokal"
 - Consumes: `TERMINAL_KEYS` dari `./terminal-chrome`
 - Produces: prop baru `showKeys?: boolean` pada `TerminalPane`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 describe("TerminalPane · papan tombol layar (SPEC-800)", () => {
@@ -910,12 +910,12 @@ describe("TerminalPane · papan tombol layar (SPEC-800)", () => {
 
 Tambahkan `screen` dan `fireEvent` ke import `@testing-library/react` di puncak berkas test.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-pane.test.tsx -t "papan tombol"`
 Expected: FAIL — tombol dengan nama aksesibel itu tidak ada.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `src/src/screens/TerminalPane.tsx`:
 
@@ -992,12 +992,12 @@ Di `src/src/app.css`, tepat di bawah blok `.hn-terminal-action--text`:
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-pane.test.tsx`
 Expected: PASS — 18 test lulus.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalPane.tsx src/src/app.css src/test/terminal-pane.test.tsx

@@ -6,7 +6,7 @@ import { paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { clipboardIntent } from "./terminal-clipboard";
-import { clampFontSize, FONT_DEFAULT } from "./terminal-chrome";
+import { clampFontSize, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
 // (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
@@ -19,13 +19,14 @@ type LinkState =
   | { state: "connecting" | "open" | "gone" | "lost" }
   | { state: "retrying"; attempt: number };
 
-export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT }: {
+export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
   // berarti prosesnya mati, dan TUI agen tak pernah mati sendiri sesudah fase terakhir.
   onPhases?: (p: Phase[], complete: boolean) => void;
   fontSize?: number;
+  showKeys?: boolean;
 }) {
   const host = React.useRef<HTMLDivElement>(null);
   // Dipegang di ref supaya effect koneksi tetap hanya bergantung pada `sessionId`: mengubah
@@ -41,6 +42,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   phaseRef.current = onPhases;
   const [link, setLink] = React.useState<LinkState>({ state: "connecting" });
   const retryNow = React.useRef<() => void>(() => {});
+  const sendKey = React.useRef<(d: string) => void>(() => {});
 
   React.useEffect(() => {
     const el = host.current;
@@ -81,6 +83,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       if (ws?.readyState === WebSocket.OPEN) send({ t: "in", d });
       else pendingInput += d;
     };
+    sendKey.current = sendInput;
 
     const connect = () => {
       void api.issueWsTicket(`terminal:${sessionId}`).then(({ ticket }) => {
@@ -225,6 +228,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       disposed = true;
       clearTimeout(timer);
       retryNow.current = () => {};
+      sendKey.current = () => {};
       view.current = null;
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
@@ -277,6 +281,21 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
         background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)",
         touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
+      {showKeys && <TerminalKeys onKey={(seq) => sendKey.current(seq)} />}
+    </div>
+  );
+}
+
+// SPEC-800 · keyboard virtual ponsel tak punya panah/Esc/Tab, dan Esc adalah satu-satunya jalan
+// keluar dari copy-mode tmux. SPEC-452 · tiap tekan mengirim SATU keystroke: dialog AskUserQuestion
+// adalah daftar Ink yang menelan burst >1 karakter bulat-bulat.
+function TerminalKeys({ onKey }: { onKey: (seq: string) => void }) {
+  return (
+    <div className="hn-terminal-keys" role="group" aria-label="Tombol terminal">
+      {TERMINAL_KEYS.map((key) => (
+        <button key={key.id} type="button" className="hn-terminal-key" aria-label={key.aria}
+          title={key.aria} onClick={() => onKey(key.seq)}>{key.label}</button>
+      ))}
     </div>
   );
 }
