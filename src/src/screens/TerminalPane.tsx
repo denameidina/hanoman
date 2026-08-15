@@ -6,6 +6,7 @@ import { paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { clipboardIntent } from "./terminal-clipboard";
+import { clampFontSize, FONT_DEFAULT } from "./terminal-chrome";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
 // (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
@@ -18,14 +19,20 @@ type LinkState =
   | { state: "connecting" | "open" | "gone" | "lost" }
   | { state: "retrying"; attempt: number };
 
-export function TerminalPane({ sessionId, onExit, onPhases }: {
+export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
   // berarti prosesnya mati, dan TUI agen tak pernah mati sendiri sesudah fase terakhir.
   onPhases?: (p: Phase[], complete: boolean) => void;
+  fontSize?: number;
 }) {
   const host = React.useRef<HTMLDivElement>(null);
+  // Dipegang di ref supaya effect koneksi tetap hanya bergantung pada `sessionId`: mengubah
+  // ukuran font tak boleh melahirkan socket baru.
+  const fontSizeRef = React.useRef(fontSize);
+  fontSizeRef.current = fontSize;
+  const view = React.useRef<{ term: Terminal; fit: FitAddon; send: (m: unknown) => void } | null>(null);
   // onExit boleh berubah tiap render; menaruhnya di ref menjaga effect ini
   // hanya bergantung pada sessionId — remount = sesi yang benar-benar berbeda.
   const exitRef = React.useRef(onExit);
@@ -42,7 +49,7 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
     const token = (n: string, fallback: string) => css.getPropertyValue(n).trim() || fallback;
     const term = new Terminal({
       fontFamily: token("--font-mono", "monospace"),
-      fontSize: 13, cursorBlink: true,
+      fontSize: clampFontSize(fontSizeRef.current), cursorBlink: true,
       // SPEC-511 · tmux lahir dengan `mouse on` (SPEC-209) supaya wheel browser menggulir riwayat
       // pane; harganya, tmux menyalakan mouse-reporting di terminal klien (terukur: `?1000h`
       // `?1002h` `?1006h`) — dan xterm memanggil `SelectionService.disable()` begitu ada protokol
@@ -68,6 +75,7 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let finished = false;
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
+    view.current = { term, fit, send };
     let pendingInput = "";
     const sendInput = (d: string) => {
       if (ws?.readyState === WebSocket.OPEN) send({ t: "in", d });
@@ -159,6 +167,20 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
       }
       return true;
     });
+    // SPEC-800 · xterm mematikan wheel-nya sendiri begitu protokol mouse aktif (Viewport.ts) dan
+    // tmux `mouse on` (SPEC-209) memang mengambilnya untuk copy-mode. Wheel polos karena itu
+    // DIBIARKAN lewat — riwayat 50 000 baris ada di tmux, bukan di buffer xterm. Shift+wheel adalah
+    // satu-satunya jalur gulir yang tak pernah melewati mouse-mode, jadi ia tetap hidup saat dialog
+    // claude memegang mouse.
+    term.attachCustomWheelEventHandler((event) => {
+      if (!event.shiftKey) return true;
+      const rect = visibleRect();
+      if (!rect || term.rows <= 0) return true;
+      const lineHeight = rect.height / term.rows;
+      const lines = Math.trunc(event.deltaY / lineHeight) || Math.sign(event.deltaY);
+      if (lines) term.scrollLines(lines);
+      return false;
+    });
     const typed = term.onData(sendInput);
 
     // SPEC-771 · viewport internal xterm 6 tak memiliki pemilik gesture touch. Tanpa handler
@@ -203,6 +225,7 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
       disposed = true;
       clearTimeout(timer);
       retryNow.current = () => {};
+      view.current = null;
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", resetTouch);
@@ -213,6 +236,22 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
       term.dispose();
     };
   }, [sessionId]);
+
+  // Ukuran font diterapkan tanpa me-remount: remount berarti socket baru, tiket baru, dan layar
+  // kosong sampai tmux menggambar ulang. `cols`/`rows` PTY turunan ukuran font, jadi frame resize
+  // wajib menyusul — tanpa itu tmux tetap menggambar untuk geometri lama.
+  React.useEffect(() => {
+    const current = view.current;
+    const el = host.current;
+    if (!current || !el) return;
+    const size = clampFontSize(fontSize);
+    if (current.term.options.fontSize === size) return;
+    current.term.options.fontSize = size;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    current.fit.fit();
+    current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
+  }, [fontSize]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>

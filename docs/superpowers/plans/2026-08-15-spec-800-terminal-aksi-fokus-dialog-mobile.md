@@ -694,7 +694,7 @@ git commit -m "fix(spec-800): pane terminal menyambung ulang dan tak menelan ket
 - Consumes: `clampFontSize`, `FONT_DEFAULT` dari `./terminal-chrome` (Task 1)
 - Produces: prop baru `fontSize?: number` pada `TerminalPane`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Perluas mock xterm di `src/test/terminal-pane.test.tsx` agar menyimpan opsi yang dapat ditulis dan
 menerima handler wheel. Ganti kelas `Terminal` palsu menjadi:
@@ -779,12 +779,12 @@ describe("TerminalPane · ukuran font & gulir lokal (SPEC-800)", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-pane.test.tsx`
 Expected: FAIL — `xt.wheelHandler` undefined dan `fontSize` selalu 13.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `src/src/screens/TerminalPane.tsx`:
 
@@ -856,12 +856,12 @@ Effect ukuran font, sesudah effect utama:
   }, [fontSize]);
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-pane.test.tsx`
 Expected: PASS — 16 test lulus.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalPane.tsx src/test/terminal-pane.test.tsx

@@ -18,13 +18,19 @@ const xt = vi.hoisted(() => ({
   scrolled: [] as number[],
   dataHandler: undefined as ((data: string) => void) | undefined,
   resize: undefined as ((entries: ResizeObserverEntry[]) => void) | undefined,
+  wheelHandler: undefined as ((e: WheelEvent) => boolean) | undefined,
+  buffer: {
+    viewportY: 0,
+    getLine: (_: number) => undefined as undefined | { translateToString: () => string },
+  },
 }));
 
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
     public cols = 80;
     public rows = 24;
-    constructor(options: Record<string, unknown>) { xt.options = options; }
+    public options: Record<string, unknown>;
+    constructor(options: Record<string, unknown>) { xt.options = options; this.options = options; }
     public loadAddon(): void { }
     public open(): void { }
     public focus(): void { xt.focused += 1; }
@@ -34,10 +40,12 @@ vi.mock("@xterm/xterm", () => ({
     public hasSelection(): boolean { return xt.selection.length > 0; }
     public getSelection(): string { return xt.selection; }
     public attachCustomKeyEventHandler(fn: (e: KeyboardEvent) => boolean): void { xt.keyHandler = fn; }
+    public attachCustomWheelEventHandler(fn: (e: WheelEvent) => boolean): void { xt.wheelHandler = fn; }
     public onData(fn: (data: string) => void): { dispose: () => void } {
       xt.dataHandler = fn;
       return { dispose: () => { xt.dataHandler = undefined; } };
     }
+    public get buffer() { return { active: xt.buffer }; }
   },
 }));
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { public fit(): void { xt.fitCount += 1; } } }));
@@ -67,6 +75,8 @@ const keydown = (over: Partial<KeyboardEvent> & { key: string }): KeyboardEvent 
 beforeEach(() => {
   xt.options = undefined; xt.keyHandler = undefined; xt.selection = ""; xt.written = [];
   xt.focused = 0; xt.fitCount = 0; xt.scrolled = []; xt.dataHandler = undefined; xt.resize = undefined;
+  xt.wheelHandler = undefined;
+  xt.buffer = { viewportY: 0, getLine: () => undefined };
   sockets.length = 0;
   vi.spyOn(api, "issueWsTicket").mockResolvedValue({ ticket: "ws-once" });
   vi.stubGlobal("WebSocket", FakeWebSocket);
@@ -247,5 +257,44 @@ describe("TerminalPane · liveness socket (SPEC-800)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("TerminalPane · ukuran font & gulir lokal (SPEC-800)", () => {
+  it("lahir dengan ukuran font yang diminta", () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} fontSize={17} />);
+    expect(xt.options?.fontSize).toBe(17);
+  });
+
+  it("menerapkan ukuran baru dengan fit + frame resize, tanpa socket baru", async () => {
+    const { container, rerender } = render(
+      <TerminalPane sessionId="sesi-1" onExit={() => { }} fontSize={13} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 360, top: 0, right: 640, bottom: 360, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+    act(() => { sockets[0]?.onopen?.(); });
+    const fits = xt.fitCount;
+    const resizes = sockets[0]!.sent.filter((m) => m.includes("resize")).length;
+    rerender(<TerminalPane sessionId="sesi-1" onExit={() => { }} fontSize={18} />);
+    expect(xt.fitCount).toBe(fits + 1);
+    expect(sockets).toHaveLength(1);
+    expect(sockets[0]!.sent.filter((m) => m.includes("resize")).length).toBe(resizes + 1);
+  });
+
+  it("Shift+wheel menggulir scrollback xterm dan tak diteruskan sebagai laporan mouse", () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 240, top: 0, right: 640, bottom: 240, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+    const forwarded = xt.wheelHandler?.({ shiftKey: true, deltaY: 100 } as WheelEvent);
+    expect(forwarded).toBe(false);
+    expect(xt.scrolled.at(-1)).toBeGreaterThan(0);
+  });
+
+  it("wheel polos tetap milik tmux (SPEC-209)", () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    expect(xt.wheelHandler?.({ shiftKey: false, deltaY: 100 } as WheelEvent)).toBe(true);
+    expect(xt.scrolled).toHaveLength(0);
   });
 });
