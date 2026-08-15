@@ -1107,6 +1107,25 @@ export default function App() {
     } catch { showToast("Gagal mengembalikan stage " + spec.id, "err", "x-circle"); return undefined; }
   }
 
+  // SPEC-804 · ADR-0120 · tandai item selesai manual. 409 `confirm-required` bukan kegagalan:
+  // server memberi tahu ada sesi hidup, dan dialog mengirim ulang dengan `confirm: true`.
+  async function markSpecDone(spec: Spec, reason: string, confirm: boolean) {
+    try {
+      const updated = await api.markSpecDone(spec.id, { reason: reason || undefined, confirm });
+      setBacklog((b) => b.map((s) => (s.id === updated.id ? updated : s)));
+      showToast(spec.id + " ditandai selesai", "ok", "circle-check");
+      return updated;
+    } catch (e) {
+      const detail = e instanceof ApiError
+        ? (e.detail as { error?: string; session?: { id?: string } } | null) : null;
+      if (detail?.error === "confirm-required")
+        return { needConfirm: true as const, sessionId: detail.session?.id };
+      showToast(detail?.error === "backlog item sudah selesai"
+        ? spec.id + " sudah selesai" : "Gagal menandai selesai " + spec.id, "warn", "x-circle");
+      return undefined;
+    }
+  }
+
   async function deleteSpec(spec: Spec) {
     await api.deleteSpec(spec.id);
     setBacklog((b) => b.filter((s) => s.id !== spec.id));
@@ -1214,7 +1233,7 @@ export default function App() {
           onDelete={deleteSpec}
           onOpenRun={(spec) => openTerminal(sessions.find((s) => s.specId === spec.id && !s.exited)?.id)}
           onOpenReview={openReview}
-          onEditBranch={editBranch} onRevertStage={revertStage} onIntegrate={integrateSpec} onEditSpec={editSpec} onEditDeps={editDeps} onEditAutoMerge={editAutoMerge}
+          onEditBranch={editBranch} onRevertStage={revertStage} onMarkDone={markSpecDone} onIntegrate={integrateSpec} onEditSpec={editSpec} onEditDeps={editDeps} onEditAutoMerge={editAutoMerge}
           onChangeSource={changeSourceOfSpec}
           onPromoteToQa={promoteToQa} onPromoteToBrief={promoteToBrief} onPromoteToPrd={promoteToPrd}
           onToast={showToast} initialDetailId={openSpecId}

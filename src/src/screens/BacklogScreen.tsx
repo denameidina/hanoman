@@ -15,6 +15,7 @@ import {
   BRIEF_FIELDS, GOAL_FIELDS, QA_FIELDS,
 } from "./source-meta";
 import { ChangeSourceDialog } from "./ChangeSourceDialog";
+import { MarkDoneDialog, type MarkDoneResult } from "./MarkDoneDialog";
 import {
   usePersistedState, useScrollRestore, ResetViewButton, oneOf, isStr, isNum, nullableStr,
 } from "../ui-state";
@@ -107,10 +108,13 @@ const escVariant = (e: AuditEscalation | null, target: string): "primary" | "sec
 // Source yang berujung dokumen audit — berhak atas ketiga pintu eskalasi.
 const isAuditSource = (source: string) => source === "audit";
 
-function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, projectPolicy, allSpecs }:
+function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, projectPolicy, allSpecs }:
   {
     spec: Spec | null; onClose: () => void; onEditBranch?: (s: Spec, b: string | null) => void;
     onRevertStage?: (s: Spec, target: string, confirmDelete?: boolean) => Promise<any>;
+    // SPEC-804 · ADR-0120 · maju ke `done` tanpa sesi. Bersebelahan dengan revert: satu blok,
+    // dua arah.
+    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
     onOpenReview?: (s: Spec) => void;
     onStart?: (s: Spec) => void;
     onIntegrate?: (s: Spec, op: "merge" | "rebase", target: string) => void;
@@ -137,6 +141,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
   const [remoteOnly, setRemoteOnly] = React.useState<Set<string>>(new Set());   // SPEC-244 · branch origin-only
   const [confirm, setConfirm] = React.useState<{ target: string; files: string[] } | null>(null);
   const [stageTarget, setStageTarget] = React.useState("");
+  const [markDone, setMarkDone] = React.useState(false);
   const [stageBusy, setStageBusy] = React.useState(false);
   const stageBusyRef = React.useRef(false);
   const [showIntegrate, setShowIntegrate] = React.useState(false);
@@ -310,13 +315,20 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
             </Button>
           </div>
         )}
-        {onRevertStage && (
+        {(onRevertStage || onMarkDone) && (
           <div style={{ marginTop: 12 }}>
             <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Ubah status</div>
             <div style={{ fontSize: 13, color: "var(--text-strong)", fontWeight: 600, marginBottom: 6 }}>
               {`Status saat ini: ${currentStageLabel}`}
             </div>
-            {earlier.length > 0 ? (
+            {/* SPEC-804 · ADR-0120 · satu blok, dua arah: maju ke selesai di sini, mundur di bawah. */}
+            {spec.stage !== "done" && onMarkDone && (
+              <div style={{ marginBottom: 10 }}>
+                <Button size="sm" variant="secondary" leftIcon="circle-check"
+                  onClick={() => setMarkDone(true)}>Tandai selesai</Button>
+              </div>
+            )}
+            {!onRevertStage ? null : earlier.length > 0 ? (
               <>
                 <Select size="sm" aria-label="Kembalikan stage" value={stageTarget}
                   onChange={(e) => setStageTarget(e.target.value)} disabled={stageBusy}
@@ -351,6 +363,17 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
           </div>
         )}
       </div>
+      {/* SPEC-804 · ADR-0120 · jejak penandaan manual. Hanya muncul bila item memang ditandai
+          manusia — item yang selesai lewat sesi tak punya barisnya. */}
+      {spec.manualDone && (
+        <div style={{ marginBottom: 14 }} data-testid="manual-done-trail">
+          <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Ditandai selesai manual</div>
+          <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            {spec.manualDone.by} · {new Date(spec.manualDone.at).toLocaleString("id-ID")}
+            {spec.manualDone.reason ? <div style={{ marginTop: 4 }}>{spec.manualDone.reason}</div> : null}
+          </div>
+        </div>
+      )}
       {/* SPEC-546 · ADR-0109 · jejak konversi type. Hanya muncul bila item pernah dikonversi —
           item yang tak pernah berpindah tak perlu barisnya. */}
       {(spec.sourceHistory ?? []).length > 0 && (
@@ -501,6 +524,9 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
           onClose={() => setShowIntegrate(false)}
           onIntegrate={(op, target) => { setShowIntegrate(false); onIntegrate(spec, op, target); }} />
       )}
+      {markDone && onMarkDone && (
+        <MarkDoneDialog spec={spec} onClose={() => setMarkDone(false)} onSubmit={onMarkDone} />
+      )}
       {/* SPEC-546 · ADR-0109 · dialog pilih source tujuan + form field bentuk barunya. */}
       {showSource && onChangeSource && (
         <ChangeSourceDialog spec={spec} onClose={() => setShowSource(false)}
@@ -515,12 +541,16 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onOpenReview, 
 
 /* Aksi per-spec. Dipakai grid, list, danZ board — satu-satunya jalan keyboard ke
    "mulai sesi", jadi board tetap bisa dipakai tanpa drag. */
-function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, running }:
+function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkDone, running }:
   {
     spec: Spec; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
-    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; running?: boolean
+    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void;
+    // SPEC-804 · ADR-0120 · tandai selesai manual. Dua langkahnya ditangani MarkDoneDialog.
+    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    running?: boolean
   }) {
   const [docs, setDocs] = React.useState(false);
+  const [markDone, setMarkDone] = React.useState(false);
   return (
     <div className="hn-row-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
       {/* SPEC-171 · review all files + file changed dari worktree. Berguna kapan pun
@@ -539,8 +569,16 @@ function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, running
         </Button>
       )}
       {spec.stage === "done" && <Badge tone="ok" size="sm" icon="check-circle-2">selesai</Badge>}
+      {/* SPEC-804 · ADR-0120 · maju ke `done` tanpa sesi — untuk item yang beres di luar hanoman. */}
+      {spec.stage !== "done" && onMarkDone && (
+        <IconButton size="sm" variant="ghost" icon="circle-check" label="Tandai selesai"
+          onClick={() => setMarkDone(true)} />
+      )}
       <IconButton size="sm" variant="ghost" icon="file-text" label="Lihat dokumen" onClick={() => setDocs(true)} />
       {onDelete && <IconButton size="sm" variant="ghost" icon="trash-2" label="Hapus spec" onClick={() => onDelete(spec)} />}
+      {markDone && onMarkDone && (
+        <MarkDoneDialog spec={spec} onClose={() => setMarkDone(false)} onSubmit={onMarkDone} />
+      )}
       {docs && <SpecDocsModal specId={spec.id} onClose={() => setDocs(false)} />}
     </div>
   );
@@ -558,10 +596,12 @@ function TitleButton({ spec, onOpenDetail, size = 15 }:
   );
 }
 
-function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, running }:
+function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running }:
   {
     spec: Spec; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
-    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void; running?: boolean
+    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
+    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    running?: boolean
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
   return (
@@ -586,7 +626,7 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
         <StageBar stage={spec.stage} />
         <div className="hn-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12 }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{spec.author}</span>
-          <SpecActions spec={spec} onStart={onStart} onDelete={onDelete} onOpenRun={onOpenRun} onOpenReview={onOpenReview} running={running} />
+          <SpecActions spec={spec} onStart={onStart} onDelete={onDelete} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onMarkDone={onMarkDone} running={running} />
         </div>
       </div>
     </Card>
@@ -595,10 +635,12 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
 
 /* ── List view ─────────────────────────────────────────────────────────────
    Baris padat: satu spec per baris, stage bar inline, aksi di kanan. */
-function SpecRow({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, running }:
+function SpecRow({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running }:
   {
     spec: Spec; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
-    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void; running?: boolean
+    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
+    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    running?: boolean
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
   return (
@@ -619,7 +661,7 @@ function SpecRow({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetai
       <BlockedBadge spec={spec} />
       <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"}>{prio.label}</Badge>
       <div style={{ flex: "0 0 auto" }}><StageBar stage={spec.stage} /></div>
-      <SpecActions spec={spec} onStart={onStart} onDelete={onDelete} onOpenRun={onOpenRun} onOpenReview={onOpenReview} running={running} />
+      <SpecActions spec={spec} onStart={onStart} onDelete={onDelete} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onMarkDone={onMarkDone} running={running} />
     </div>
   );
 }
@@ -660,10 +702,12 @@ export function specColumn(spec: Spec, hasSession?: boolean): string {
 export const canDrop = (from: string, to: string): boolean =>
   from === BACKLOG_COL && to === FIRST_STAGE;
 
-function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, running, onDragStart, onDragEnd, dragging }:
+function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, onMarkDone, running, onDragStart, onDragEnd, dragging }:
   {
     spec: Spec; col: string; onOpenDetail?: (s: Spec) => void; onStart?: (s: Spec) => void;
-    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; running?: boolean;
+    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void;
+    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    running?: boolean;
     onDragStart: () => void; onDragEnd: () => void; dragging: boolean
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
@@ -697,16 +741,17 @@ function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, 
       {/* HTML5 drag-and-drop mati di keyboard dan di layar sentuh. Tombol ini jalur
           satu-satunya di sana — termasuk retry spec di kolom Failed. */}
       <div style={{ marginTop: 8 }}>
-        <SpecActions spec={spec} onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview} running={running} />
+        <SpecActions spec={spec} onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onMarkDone={onMarkDone} running={running} />
       </div>
     </div>
   );
 }
 
-function Board({ specs, activeSpecs, onStart, onOpenRun, onOpenReview, onOpenDetail }:
+function Board({ specs, activeSpecs, onStart, onOpenRun, onOpenReview, onOpenDetail, onMarkDone }:
   {
     specs: Spec[]; activeSpecs?: Set<string>;
-    onStart?: (s: Spec) => void; onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void
+    onStart?: (s: Spec) => void; onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
+    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
   }) {
   const [drag, setDrag] = React.useState<{ spec: Spec; from: string } | null>(null);
   const [over, setOver] = React.useState<string | null>(null);
@@ -754,7 +799,8 @@ function Board({ specs, activeSpecs, onStart, onOpenRun, onOpenReview, onOpenDet
             <div style={{ ...LIST_SCROLL_STYLE, display: "flex", flexDirection: "column", gap: 8 }}>
               {items.map((s) => (
                 <BoardCard key={s.id} spec={s} col={c.key} onOpenDetail={onOpenDetail}
-                  onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview} running={activeSpecs?.has(s.id)}
+                  onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview}
+                  onMarkDone={onMarkDone} running={activeSpecs?.has(s.id)}
                   dragging={drag?.spec.id === s.id}
                   onDragStart={() => setDrag({ spec: s, from: c.key })}
                   onDragEnd={() => { setDrag(null); setOver(null); }} />
@@ -773,13 +819,16 @@ const VIEWS = [
   { value: "board", label: "Board", icon: "kanban" },
 ];
 
-export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
+export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onMarkDone, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
   {
     backlog: Spec[]; projects: ProjectVM[]; pageSize?: number;
     onStart?: (s: Spec) => void; activeSpecs?: Set<string>;
     onDelete?: (s: Spec) => void; onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onNew?: () => void;
     onEditBranch?: (s: Spec, b: string | null) => void;
     onRevertStage?: (s: Spec, target: string, confirmDelete?: boolean) => Promise<any>;
+    // SPEC-804 · ADR-0120 · tandai selesai manual; `needConfirm` = server minta konfirmasi karena
+    // ada sesi hidup untuk item ini.
+    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
     onIntegrate?: (s: Spec, op: "merge" | "rebase", target: string) => void;
     onEditSpec?: (s: Spec, patch: { title?: string; priority?: string; payload?: unknown }) => void;
     // SPEC-447 · ADR-0093 · ubah dependency item (di luar gerbang edit SPEC-186).
@@ -930,7 +979,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             action={() => { setTab("all"); setProj("all"); setQ(""); setStageFilter("all"); setPrioFilter("all"); setDateField("created"); setFrom(""); setTo(""); }} actionLabel="Reset filter" actionIcon="rotate-ccw" />
       ) : view === "board" ? (
         // Board tak dipaginasi: minta set terfilter penuh dari server (fetch tanpa page/limit).
-        <Board specs={items} activeSpecs={activeSpecs}
+        <Board specs={items} activeSpecs={activeSpecs} onMarkDone={onMarkDone}
           onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onOpenDetail={(x) => setDetailId(x.id)} />
       ) : (
         <>
@@ -942,7 +991,8 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             }}>
               {items.map((s) => <SpecRow key={s.id} spec={s} onStart={onStart}
                 running={activeSpecs?.has(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
-                onOpenReview={onOpenReview} onOpenDetail={(x) => setDetailId(x.id)} />)}
+                onOpenReview={onOpenReview} onMarkDone={onMarkDone}
+                onOpenDetail={(x) => setDetailId(x.id)} />)}
             </div>
           ) : (
             <div ref={listRef} data-testid="backlog-scroll" className="hn-backlog-grid" style={{
@@ -951,7 +1001,8 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             }}>
               {items.map((s) => <SpecCard key={s.id} spec={s} onStart={onStart}
                 running={activeSpecs?.has(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
-                onOpenReview={onOpenReview} onOpenDetail={(x) => setDetailId(x.id)} />)}
+                onOpenReview={onOpenReview} onMarkDone={onMarkDone}
+                onOpenDetail={(x) => setDetailId(x.id)} />)}
             </div>
           )}
           <div style={{ ...FIXED_ROW_STYLE, marginTop: 14, border: "1px solid var(--border-hair)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
@@ -960,7 +1011,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
         </>
       )}
       <SpecDetail spec={backlog.find((s) => s.id === detailId) || null} onClose={() => setDetailId(null)}
-        onEditBranch={onEditBranch} onRevertStage={onRevertStage} onOpenReview={onOpenReview} onStart={onStart} onIntegrate={onIntegrate} onEditSpec={onEditSpec} onPromoteToQa={onPromoteToQa}
+        onEditBranch={onEditBranch} onRevertStage={onRevertStage} onMarkDone={onMarkDone} onOpenReview={onOpenReview} onStart={onStart} onIntegrate={onIntegrate} onEditSpec={onEditSpec} onPromoteToQa={onPromoteToQa}
         onPromoteToBrief={onPromoteToBrief} onPromoteToPrd={onPromoteToPrd}
         onEditDeps={onEditDeps} onEditAutoMerge={onEditAutoMerge} onChangeSource={onChangeSource}
         projectPolicy={(projects.find((x) => x.id === backlog.find((s) => s.id === detailId)?.projectId) as { autoMerge?: unknown } | undefined)?.autoMerge}

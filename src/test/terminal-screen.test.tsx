@@ -71,19 +71,20 @@ const WKEY = "hanoman.terminal.workspace";
 // SPEC-447 · ADR-0093 · idem `dependsOn`/`blockedBy` — server selalu mengirim keduanya (dinormalkan
 // `liveSpecs`), jadi fixture yang menghilangkannya tak lagi mencerminkan wire.
 // SPEC-546 · ADR-0109 · idem `sourceHistory` (item yang belum pernah dikonversi = daftar kosong).
+// SPEC-804 · ADR-0120 · idem `manualDone` (null = selesai lewat sesi / belum selesai).
 const backlog: Spec[] = [
   { id: "SPEC-100", projectId: "p1", title: "Fitur A", source: "brief", stage: "brainstorming",
     priority: "tinggi", author: "human", objective: "obj A", payload: null, branchFrom: null, baseSha: null,
     createdAt: "2026-07-01T00:00:00.000Z", startedAt: null, dependsOn: [], blockedBy: [], autoMerge: null,
-    sourceHistory: [] },
+    sourceHistory: [], manualDone: null },
   { id: "SPEC-101", projectId: "p1", title: "Bug B", source: "qa", stage: "planned",
     priority: "sedang", author: "human", objective: "obj B", payload: null, branchFrom: null, baseSha: null,
     createdAt: "2026-07-02T00:00:00.000Z", startedAt: null, dependsOn: [], blockedBy: [], autoMerge: null,
-    sourceHistory: [] },
+    sourceHistory: [], manualDone: null },
   { id: "SPEC-102", projectId: "p1", title: "Selesai C", source: "brief", stage: "done",
     priority: "rendah", author: "human", objective: "obj C", payload: null, branchFrom: null, baseSha: null,
     createdAt: "2026-07-03T00:00:00.000Z", startedAt: "2026-07-04T00:00:00.000Z", dependsOn: [], blockedBy: [], autoMerge: null,
-    sourceHistory: [] },
+    sourceHistory: [], manualDone: null },
 ];
 
 beforeEach(() => {

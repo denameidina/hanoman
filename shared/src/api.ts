@@ -21,6 +21,8 @@ export const paths = {
   specIntegrate: (id: string) => `${API}/specs/${id}/integrate`,
   // SPEC-546 · ADR-0109 · ubah type/source item in-place (operasi khusus, bukan field PATCH).
   specSource: (id: string) => `${API}/specs/${id}/source`,
+  // SPEC-804 · ADR-0120 · tandai item selesai manual (operasi khusus, bukan field PATCH).
+  specDone: (id: string) => `${API}/specs/${id}/done`,
   specReview: (id: string) => `${API}/specs/${id}/review`,
   specReviewFile: (id: string, path: string) => `${API}/specs/${id}/review/${path}`,
   settings: `${API}/settings`,

@@ -157,6 +157,10 @@ export const api = {
   // sudah dimulai (server memakai payload lama apa adanya); 409 = gerbang flow.
   changeSpecSource: (id: string, b: { source: string; payload?: unknown }) =>
     j<Spec>(paths.specSource(id), { method: "POST", ...body(b) }),
+  // SPEC-804 · ADR-0120 · tandai item selesai manual. 409 `confirm-required` (detail memuat
+  // `session`) = ada sesi hidup; kirim ulang dengan `confirm: true`.
+  markSpecDone: (id: string, b: { reason?: string; confirm?: boolean }) =>
+    j<Spec>(paths.specDone(id), { method: "POST", ...body(b) }),
   // SPEC-171 · all files + file changed dari worktree backlog item.
   specReview: (id: string) => j<SpecReview>(paths.specReview(id)),
   specReviewFile: (id: string, path: string) => j<ReviewFile>(paths.specReviewFile(id, path)),
