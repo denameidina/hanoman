@@ -429,7 +429,7 @@ Karena itu tiap test lama yang memakai `container.firstElementChild` sebagai hos
 menjadi `container.querySelector('[data-testid="terminal-host"]')!`. Ada empat kejadian di
 `src/test/terminal-pane.test.tsx` (test "hidden panel", "coarse pointer", "CONNECTING", "swipe").
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Di `src/test/terminal-pane.test.tsx`, tambahkan `onclose` pada `FakeWebSocket` dan
 `vi.useFakeTimers` pada test baru. Ganti kelas socket palsu menjadi:
@@ -532,12 +532,12 @@ describe("TerminalPane · liveness socket (SPEC-800)", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-pane.test.tsx`
 Expected: FAIL — empat test baru gagal (`sockets` tetap 1 setelah close; `[data-testid="terminal-link"]` null).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Ubah `src/src/screens/TerminalPane.tsx`. Tambah konstanta di atas komponen:
 
@@ -670,12 +670,12 @@ Ganti JSX return menjadi:
 Terakhir, ubah empat pemakaian `container.firstElementChild` di
 `src/test/terminal-pane.test.tsx` menjadi `container.querySelector('[data-testid="terminal-host"]')!`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run test/terminal-pane.test.tsx`
 Expected: PASS — 12 test lulus (8 lama + 4 baru).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalPane.tsx src/test/terminal-pane.test.tsx

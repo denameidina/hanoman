@@ -7,6 +7,17 @@ import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { clipboardIntent } from "./terminal-clipboard";
 
+// SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
+// (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
+// Sebelum ini tak ada satu pun `onclose`, jadi `pendingInput` menumpuk pada buffer yang tak punya
+// pembaca dan ketikan hilang tanpa satu tanda pun.
+const RECONNECT_BACKOFF_MS = [500, 1_000, 2_000, 4_000, 8_000, 8_000];
+const RECONNECT_MAX = RECONNECT_BACKOFF_MS.length;
+
+type LinkState =
+  | { state: "connecting" | "open" | "gone" | "lost" }
+  | { state: "retrying"; attempt: number };
+
 export function TerminalPane({ sessionId, onExit, onPhases }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
@@ -21,6 +32,8 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
   exitRef.current = onExit;
   const phaseRef = React.useRef(onPhases);
   phaseRef.current = onPhases;
+  const [link, setLink] = React.useState<LinkState>({ state: "connecting" });
+  const retryNow = React.useRef<() => void>(() => {});
 
   React.useEffect(() => {
     const el = host.current;
@@ -51,6 +64,9 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
 
     let ws: WebSocket | undefined;
     let disposed = false;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let finished = false;
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
     let pendingInput = "";
     const sendInput = (d: string) => {
@@ -58,38 +74,76 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
       else pendingInput += d;
     };
 
-    void api.issueWsTicket(`terminal:${sessionId}`).then(({ ticket }) => {
-      if (disposed) return;
-      const scheme = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${scheme}//${location.host}${paths.terminalWs(sessionId)}`, [`hanoman-ticket.${ticket}`]);
+    const connect = () => {
+      void api.issueWsTicket(`terminal:${sessionId}`).then(({ ticket }) => {
+        if (disposed) return;
+        const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+        const socket = new WebSocket(
+          `${scheme}//${location.host}${paths.terminalWs(sessionId)}`, [`hanoman-ticket.${ticket}`]);
+        ws = socket;
 
-      ws.onopen = () => {
-        if (pendingInput) {
-          const d = pendingInput;
-          pendingInput = "";
-          send({ t: "in", d });
-        }
-        if (!visibleRect()) return;
-        const finePointer = typeof window.matchMedia !== "function"
-          || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-        if (finePointer) term.focus();
-        send({ t: "resize", cols: term.cols, rows: term.rows });
-      };
-      ws.onmessage = (ev) => {
-        const f = JSON.parse(ev.data as string) as {
-          t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
+        socket.onopen = () => {
+          attempt = 0;
+          setLink({ state: "open" });
+          // Dikuras di SETIAP open, bukan hanya yang pertama: itu yang mengubah buffer SPEC-771
+          // dari penyembunyi kegagalan menjadi penyelamat ketikan.
+          if (pendingInput) {
+            const d = pendingInput;
+            pendingInput = "";
+            send({ t: "in", d });
+          }
+          if (!visibleRect()) return;
+          const finePointer = typeof window.matchMedia !== "function"
+            || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+          if (finePointer) term.focus();
+          send({ t: "resize", cols: term.cols, rows: term.rows });
         };
-        if (f.t === "data") term.write(f.d ?? "");
-        // Server menyiarkan fase saat attach dan setiap kali agen menutup satu (SPEC-162).
-        // SPEC-433 · sejak sekarang juga saat `complete` berubah tanpa daftar fase berubah —
-        // kotak `- [ ]` terakhir di plan dicentang sesudah `Execute done`.
-        else if (f.t === "phase") phaseRef.current?.(f.phases ?? [], f.complete === true);
-        else if (f.t === "exit") {
-          term.write(`\r\n\x1b[33m— sesi berakhir (exit ${f.code}) —\x1b[0m\r\n`);
-          exitRef.current(f.code ?? 0);
-        }
-      };
-    }).catch(() => { if (!disposed) term.write("\r\n\x1b[31mWebSocket admission gagal\x1b[0m\r\n"); });
+        socket.onmessage = (ev) => {
+          const f = JSON.parse(ev.data as string) as {
+            t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
+          };
+          if (f.t === "data") term.write(f.d ?? "");
+          // Server menyiarkan fase saat attach dan setiap kali agen menutup satu (SPEC-162).
+          // SPEC-433 · sejak sekarang juga saat `complete` berubah tanpa daftar fase berubah —
+          // kotak `- [ ]` terakhir di plan dicentang sesudah `Execute done`.
+          else if (f.t === "phase") phaseRef.current?.(f.phases ?? [], f.complete === true);
+          else if (f.t === "exit") {
+            finished = true;
+            term.write(`\r\n\x1b[33m— sesi berakhir (exit ${f.code}) —\x1b[0m\r\n`);
+            exitRef.current(f.code ?? 0);
+          }
+        };
+        // 4004 = sesi tmux-nya memang sudah lenyap; menyambung ulang hanya menghasilkan badai 404.
+        socket.onclose = (event) => {
+          if (disposed || finished) return;
+          if (event.code === 4004) { setLink({ state: "gone" }); return; }
+          retry();
+        };
+        socket.onerror = () => { /* onclose selalu menyusul; keputusannya cukup di satu tempat */ };
+      }).catch(() => {
+        if (disposed) return;
+        term.write("\r\n\x1b[31mWebSocket admission gagal\x1b[0m\r\n");
+        retry();
+      });
+    };
+
+    const retry = () => {
+      if (attempt >= RECONNECT_MAX) { setLink({ state: "lost" }); return; }
+      const wait = RECONNECT_BACKOFF_MS[attempt]!;
+      attempt += 1;
+      setLink({ state: "retrying", attempt });
+      timer = setTimeout(connect, wait);
+    };
+
+    retryNow.current = () => {
+      if (disposed) return;
+      clearTimeout(timer);
+      attempt = 0;
+      setLink({ state: "retrying", attempt: 1 });
+      connect();
+    };
+
+    connect();
     // Salin/tempel: xterm merender seleksi sendiri, jadi Cmd/Ctrl+C tak menyalin apa pun
     // tanpa wiring ini (SPEC-289). Return false = jangan teruskan ke terminal (mis. supaya
     // Cmd+C tak jadi input). Ctrl+C polos dilewatkan agar tetap jadi SIGINT.
@@ -147,6 +201,8 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
 
     return () => {
       disposed = true;
+      clearTimeout(timer);
+      retryNow.current = () => {};
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", resetTouch);
@@ -158,6 +214,30 @@ export function TerminalPane({ sessionId, onExit, onPhases }: {
     };
   }, [sessionId]);
 
-  return <div ref={host} style={{ height: "100%", width: "100%", background: "var(--term-bg)", padding: 8,
-    borderRadius: "var(--radius-sm)", touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya. */}
+      {link.state !== "open" && link.state !== "connecting" && (
+        <div data-testid="terminal-link" style={{
+          display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto",
+          padding: "3px 8px", fontFamily: "var(--font-mono)", fontSize: 11,
+          background: link.state === "retrying" ? "var(--status-warn-tint)" : "var(--status-err-tint)",
+          color: "var(--text-body)",
+        }}>
+          {link.state === "retrying"
+            ? `menyambung ulang… (${link.attempt}/${RECONNECT_MAX})`
+            : link.state === "gone"
+              ? "sesi tidak ditemukan di tmux"
+              : <>
+                  <span>terputus</span>
+                  <button type="button" className="hn-terminal-action hn-terminal-action--text"
+                    onClick={() => retryNow.current()}>Sambungkan lagi</button>
+                </>}
+        </div>
+      )}
+      <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
+        background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)",
+        touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
+    </div>
+  );
 }

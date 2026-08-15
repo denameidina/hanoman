@@ -1,4 +1,4 @@
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { api } from "../src/api/client";
 import { TerminalPane } from "../src/screens/TerminalPane";
@@ -42,17 +42,24 @@ vi.mock("@xterm/xterm", () => ({
 }));
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { public fit(): void { xt.fitCount += 1; } } }));
 
-const sockets: { sent: string[]; readyState: number; onopen: (() => void) | null }[] = [];
+const sockets: FakeWebSocket[] = [];
 class FakeWebSocket {
   public static readonly OPEN = 1;
   public readyState = 1;
   public sent: string[] = [];
   public onopen: (() => void) | null = null;
   public onmessage: ((ev: { data: string }) => void) | null = null;
+  public onclose: ((ev: { code: number }) => void) | null = null;
+  public onerror: (() => void) | null = null;
   constructor(public url: string) { sockets.push(this); }
   public send(m: string): void { this.sent.push(m); }
   public close(): void { this.readyState = 3; }
 }
+
+// SPEC-800 · pane kini membungkus host xterm dengan strip keadaan koneksi + papan tombol,
+// jadi host bukan lagi `container.firstElementChild`.
+const paneHost = (container: HTMLElement): HTMLElement =>
+  container.querySelector<HTMLElement>('[data-testid="terminal-host"]')!;
 
 const keydown = (over: Partial<KeyboardEvent> & { key: string }): KeyboardEvent =>
   ({ type: "keydown", metaKey: false, ctrlKey: false, shiftKey: false, ...over } as KeyboardEvent);
@@ -84,7 +91,7 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
     render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     const initialFits = xt.fitCount;
-    sockets[0]?.onopen?.();
+    act(() => { sockets[0]?.onopen?.(); });
     xt.resize?.([{ contentRect: { width: 0, height: 0 } } as ResizeObserverEntry]);
     expect(xt.fitCount).toBe(initialFits);
     expect(sockets[0]?.sent).not.toContain(JSON.stringify({ t: "resize", cols: 80, rows: 24 }));
@@ -94,17 +101,17 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
     const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
-    vi.spyOn(container.firstElementChild!, "getBoundingClientRect").mockReturnValue({
+    vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
       width: 640, height: 360, top: 0, right: 640, bottom: 360, left: 0, x: 0, y: 0, toJSON: () => ({}),
     });
-    sockets[0]?.onopen?.();
+    act(() => { sockets[0]?.onopen?.(); });
     expect(xt.focused).toBe(0);
   });
 
   it("retains input typed while the WebSocket is connecting and flushes it in order on open", async () => {
     const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
-    vi.spyOn(container.firstElementChild!, "getBoundingClientRect").mockReturnValue({
+    vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
       width: 640, height: 360, top: 0, right: 640, bottom: 360, left: 0, x: 0, y: 0, toJSON: () => ({}),
     });
     sockets[0]!.readyState = 0;
@@ -114,13 +121,13 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
     expect(sockets[0]?.sent).not.toContain(JSON.stringify({ t: "in", d: "abc123" }));
 
     sockets[0]!.readyState = FakeWebSocket.OPEN;
-    sockets[0]?.onopen?.();
+    act(() => { sockets[0]?.onopen?.(); });
     expect(sockets[0]?.sent).toContain(JSON.stringify({ t: "in", d: "abc123" }));
   });
 
   it("owns a vertical touch gesture and scrolls xterm scrollback instead of the page", () => {
     const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
-    const host = container.firstElementChild!;
+    const host = paneHost(container);
     vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
       width: 640, height: 320, top: 0, right: 640, bottom: 320, left: 0, x: 0, y: 0, toJSON: () => ({}),
     });
@@ -164,5 +171,81 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
     xt.selection = "";
     expect(xt.keyHandler?.(keydown({ key: "c", metaKey: true }))).toBe(true);
     expect(writeText).not.toHaveBeenCalled();
+  });
+});
+
+describe("TerminalPane · liveness socket (SPEC-800)", () => {
+  it("menyambung ulang sesudah socket tertutup dan menguras ketikan yang mengantre", async () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+      await vi.waitFor(() => expect(sockets).toHaveLength(1));
+      vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
+        width: 640, height: 360, top: 0, right: 640, bottom: 360, left: 0, x: 0, y: 0, toJSON: () => ({}),
+      });
+      act(() => { sockets[0]!.onopen?.(); });
+
+      sockets[0]!.readyState = 3;
+      act(() => { sockets[0]!.onclose?.({ code: 1008 }); });
+      xt.dataHandler?.("ha");
+      xt.dataHandler?.("lo");
+      expect(sockets).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(600);
+      await vi.waitFor(() => expect(sockets).toHaveLength(2));
+      act(() => { sockets[1]!.onopen?.(); });
+      expect(sockets[1]?.sent).toContain(JSON.stringify({ t: "in", d: "halo" }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("memperlihatkan keadaan sambung ulang, bukan diam", async () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+      await vi.waitFor(() => expect(sockets).toHaveLength(1));
+      act(() => { sockets[0]!.onopen?.(); });
+      sockets[0]!.readyState = 3;
+      act(() => { sockets[0]!.onclose?.({ code: 1006 }); });
+      expect(container.querySelector('[data-testid="terminal-link"]')?.textContent)
+        .toContain("menyambung ulang");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("tidak menyambung ulang saat sesi tmux-nya memang sudah lenyap (4004)", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+      await vi.waitFor(() => expect(sockets).toHaveLength(1));
+      act(() => { sockets[0]!.onclose?.({ code: 4004 }); });
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(sockets).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("menyerah sesudah enam percobaan dan menawarkan sambung ulang manual", async () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+      await vi.waitFor(() => expect(sockets).toHaveLength(1));
+      for (let i = 0; i < 7; i += 1) {
+        sockets.at(-1)!.readyState = 3;
+        act(() => { sockets.at(-1)!.onclose?.({ code: 1006 }); });
+        await vi.advanceTimersByTimeAsync(10_000);
+      }
+      expect(sockets).toHaveLength(7);
+      const retry = container.querySelector<HTMLButtonElement>('[data-testid="terminal-link"] button')!;
+      expect(retry.textContent).toContain("Sambungkan lagi");
+      act(() => { retry.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+      await vi.advanceTimersByTimeAsync(10);
+      await vi.waitFor(() => expect(sockets).toHaveLength(8));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
