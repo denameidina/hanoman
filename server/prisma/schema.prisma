@@ -385,6 +385,11 @@ model SyncLog {
   recordId  String
   version   Int
   data      Json
+  // SPEC-799 · ADR-0119 · jenis peristiwa. `@default("upsert")` membuat seluruh baris feed lama
+  // terbaca benar tanpa backfill. Kolom TOP-LEVEL, bukan penanda di dalam `data`: `validateSyncData`
+  // menegakkan allowlist atas `data`, jadi penanda di sana membuat client versi lama MELEMPAR →
+  // `feedHole` menyala → kursornya tertahan selamanya.
+  op        String   @default("upsert")
   deviceId  String?
   createdAt DateTime @default(now())
 
@@ -427,6 +432,27 @@ model SyncConflict {
   serverUpdatedAt DateTime
   detectedAt      DateTime  @default(now())
   resolvedAt      DateTime?
+
+  @@unique([entity, recordId])
+}
+
+// SPEC-799 · ADR-0119 · LOCAL-ONLY sebagai tabel, tapi maknanya menyeberang: keadaan "record ini
+// dihapus" yang bertahan restart dan menahan setiap upaya membangkitkannya kembali. Hard-delete
+// dipertahankan (bukan soft-delete `deletedAt` per entitas) supaya cascade tingkat-DB tetap bekerja
+// dan tak satu pun query baca yang sudah ada harus berubah — penyaring yang terlewat di bentuk itu
+// gagal SENYAP dengan gejala persis bug yang sedang diperbaiki.
+//
+// `data` = snapshot field tersync tepat sebelum baris dihapus. Ia BUKAN kenyamanan: tanpa snapshot,
+// push delete ke hub versi LAMA (yang membuang `op` sebagai field tak dikenal) berbentuk create
+// tanpa kolom required → P2011 → 500 di setiap siklus push.
+model SyncTombstone {
+  id        String   @id @default(cuid())
+  entity    String
+  recordId  String
+  version   Int      // versi record SESUDAH dihapus (= versi terakhirnya + 1)
+  data      Json
+  deletedAt DateTime @default(now())
+  deviceId  String?
 
   @@unique([entity, recordId])
 }
