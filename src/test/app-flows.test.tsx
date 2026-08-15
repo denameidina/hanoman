@@ -26,6 +26,17 @@ vi.mock("../src/api/client", () => ({
     getMethodStatus: vi.fn(async () => ({ methods: [] })),
     startSession: vi.fn(async () => ({ id: "spec-341" })), deleteSpec: vi.fn(), createSpec: vi.fn(),
     listNotifications: vi.fn(async () => ({ items: [], unread: 0 })), // SPEC-180 · provider poll
+    // SPEC-786 · ADR-0118 · layout Terminal hidup di server, bukan lagi localStorage. Mock `api`
+    // parsial yang menghilangkan pasangan ini membuat `useTerminalWorkspace` jatuh ke `recovering`
+    // dan `writable: false` — dan sesi TIDAK PERNAH ditaruh di grid, karena perangkat yang tak
+    // bisa menghubungi server memang dilarang menimpa layout kanonik. Gejalanya terbaca persis
+    // seperti "Buka sesi tak membuka apa-apa", padahal jalur produknya sehat.
+    getTerminalWorkspace: vi.fn(async () => ({ workspace: null, revision: 0, updatedAt: null })),
+    putTerminalWorkspace: vi.fn(async (input: { baseRevision: number; workspace: unknown }) => ({
+      workspace: input.workspace,
+      revision: input.baseRevision + 1,
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    })),
   },
   ApiError: class extends Error {},
 }));
