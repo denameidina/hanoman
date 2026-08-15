@@ -18,6 +18,9 @@ const zPush = z.object({
   records: z.array(z.object({
     entity: z.string(), id: z.string(), baseVersion: z.number().int().nonnegative(),
     data: z.record(z.unknown()),
+    // SPEC-799 · ADR-0119 · absen = "upsert" (client versi lama). Hub versi lama membuang field ini
+    // dan sekadar memperlakukan push delete sebagai update — status quo, bukan galat.
+    op: z.enum(["upsert", "delete"]).optional(),
   })),
 });
 
@@ -51,7 +54,7 @@ export default async function (app: FastifyInstance) {
       if (!isEntity(rec.entity)) { results.push({ id: rec.id, ok: false, error: "unknown entity" }); continue; }
       const data = { ...rec.data };
       if (AUTHORED.includes(rec.entity) && !data.author && user) data.author = user.email;
-      const r = await applyPush(rec.entity, rec.id, rec.baseVersion, data, req.device!.id);
+      const r = await applyPush(rec.entity, rec.id, rec.baseVersion, data, req.device!.id, rec.op ?? "upsert");
       results.push({ id: rec.id, ...r });
     }
     return { results };

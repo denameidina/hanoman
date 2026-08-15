@@ -1,5 +1,10 @@
 import { prisma } from "../db";
-import { pull as _pull, snapshot, upsertLocal, isEntity, validateSyncData, type Entity } from "./sync";
+import {
+  pull as _pull, snapshot, upsertLocal, deleteRow, isEntity, validateSyncData,
+  PARENTS, type Entity, type SyncOp,
+} from "./sync";
+import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
+import { recordSyncDelete } from "./notifications";
 import { recordConflict } from "./conflicts";
 import { listOutbox, clearOutbox } from "./outbox";
 import { RENAME_SEP } from "./rename-project";
@@ -15,8 +20,13 @@ export type Transport = (
 ) => Promise<{ status: number; body: any }>;
 
 const MAX_SYNC_RECORD_BYTES = 1024 * 1024;
+
+// SPEC-799 · ADR-0119 · `op` dibaca dari TOP-LEVEL record dan TIDAK pernah dari `data` — allowlist
+// `validateSyncData` akan menolak penanda di sana, dan penolakan itu menyalakan `feedHole` yang
+// menahan kursor selamanya. Jenis yang tak dikenal (hub lebih baru) mengembalikan `null` supaya
+// pemanggil MELEWATINYA; melempar di sini berarti hub yang lebih baru bisa mematikan client lama.
 export function validateIncomingRecord(input: unknown): {
-  entity: Entity; recordId: string; version: number; data: Record<string, unknown>;
+  entity: Entity; recordId: string; version: number; data: Record<string, unknown>; op: SyncOp | null;
 } {
   if (!input || typeof input !== "object") throw new Error("sync record harus object");
   const row = input as Record<string, unknown>;
@@ -26,7 +36,12 @@ export function validateIncomingRecord(input: unknown): {
   if (!row.data || typeof row.data !== "object" || Array.isArray(row.data)) throw new Error("sync data invalid");
   if (Buffer.byteLength(JSON.stringify(input)) > MAX_SYNC_RECORD_BYTES) throw new Error("sync record terlalu besar");
   validateSyncData(row.entity, row.data as Record<string, unknown>, { allowProjectRename: true });
-  return { entity: row.entity, recordId: row.recordId, version: Number(row.version), data: row.data as Record<string, unknown> };
+  const op: SyncOp | null = row.op === undefined || row.op === null || row.op === "upsert" ? "upsert"
+    : row.op === "delete" ? "delete" : null;
+  return {
+    entity: row.entity, recordId: row.recordId, version: Number(row.version),
+    data: row.data as Record<string, unknown>, op,
+  };
 }
 
 // Kursor pull terakhir (SyncState singleton, LOCAL-only).
@@ -39,9 +54,54 @@ export async function setCursor(cursor: string): Promise<void> {
 }
 
 // Terapkan satu record dari server ke DB lokal (server-authoritative), tanpa menulis feed/outbox.
-export async function applyRemote(entity: string, recordId: string, version: number, data: Record<string, unknown>): Promise<void> {
-  if (!isEntity(entity)) return;
+//
+// SPEC-799 · ADR-0119 · "dropped" = dibuang SENGAJA (bukan gagal): upsert basi atas id bertombstone,
+// atau record anak bagi induk yang sudah bertombstone. Membedakannya dari lemparan itu yang membuat
+// `syncOnce` tahu mana yang layak ditunda dan mana yang memang sudah selesai urusannya.
+export async function applyRemote(
+  entity: string, recordId: string, version: number, data: Record<string, unknown>, op: SyncOp = "upsert",
+): Promise<"applied" | "dropped"> {
+  if (!isEntity(entity)) return "dropped";
+  if (op === "delete") { await applyRemoteDelete(entity, recordId, version, data); return "applied"; }
+
+  const tomb = await findTombstone(entity, recordId);
+  if (tomb) {
+    if (version <= tomb.version) return "dropped";   // replay feed lama — inilah konvergensi full-pull
+    await clearTombstone(entity, recordId);          // hub memakai ulang id-nya secara sah
+  }
+  if (await parentTombstoned(entity, data)) return "dropped";
   await upsertLocal(entity, recordId, version, data);
+  return "applied";
+}
+
+// Idempoten by construction: tombstone untuk baris yang sudah tak ada = no-op SUKSES. Kalau ia
+// melempar, kursor tertahan di depannya (feedHole) dan seluruh sync client mandek — kegagalan lama
+// yang ditutup ADR-0082, jangan dibuka lagi lewat pintu ini.
+async function applyRemoteDelete(
+  entity: Entity, recordId: string, version: number, data: Record<string, unknown>,
+): Promise<void> {
+  const existing = await snapshot(entity, recordId);
+  await writeTombstone(entity, recordId, version, existing?.data ?? data);
+  if (existing) await deleteRow(entity, recordId);
+  const pending = await prisma.syncOutbox.findFirst({ where: { entity, recordId } });
+  if (!pending) return;
+  await clearOutbox(entity, recordId);
+  if (existing) {
+    await recordSyncDelete(entity, recordId, version,
+      `Dihapus di peer: ${entity} ${recordId} — suntingan lokal yang belum tersinkron dibuang`);
+  }
+}
+
+// SPEC-799 · ADR-0119 · anak yatim BUKAN anomali: induknya memang dihapus, dan penerima sudah punya
+// keadaan itu. Dulu ia jatuh ke `console.warn("induk absen?")` — sebuah tebakan yang tak bisa
+// dibedakan dari kegagalan sungguhan.
+async function parentTombstoned(entity: Entity, data: Record<string, unknown>): Promise<boolean> {
+  for (const p of PARENTS[entity] ?? []) {
+    const v = data[p.field];
+    if (typeof v !== "string" || !v) continue;
+    if (await findTombstone(p.entity, v)) return true;
+  }
+  return false;
 }
 
 // SPEC-382 · feed memuat record BERELASI (`ticketAttachment.ticketId` → `Ticket.id`, FK) yang bisa
@@ -53,12 +113,15 @@ let feedHole = false;
 
 // Terapkan satu frame changefeed WS. `false` = belum bisa diterapkan (kursor ditahan, tunggu pull).
 export async function applyFeedFrame(msg: {
-  entity?: string; recordId?: string; version?: number; data?: Record<string, unknown>; seq?: string | number;
+  entity?: string; recordId?: string; version?: number; op?: string;
+  data?: Record<string, unknown>; seq?: string | number;
 }): Promise<boolean> {
   if (!msg.entity || !msg.recordId) return true; // bukan frame record — tak ada yang bisa hilang
   try {
     const record = validateIncomingRecord({ ...msg, version: Number(msg.version ?? 0), data: msg.data ?? {} });
-    await applyRemote(record.entity, record.recordId, record.version, record.data);
+    // SPEC-799 · `op` tak dikenal = frame dari hub yang lebih baru. Dilewati, TIDAK menahan kursor:
+    // menahannya berarti satu jenis peristiwa masa depan cukup untuk mematikan client ini.
+    if (record.op) await applyRemote(record.entity, record.recordId, record.version, record.data, record.op);
   } catch {
     feedHole = true;
     return false;
@@ -67,12 +130,12 @@ export async function applyFeedFrame(msg: {
   return true;
 }
 
-export type SyncStats = { pulled: number; pushed: number; conflicts: number };
+export type SyncStats = { pulled: number; pushed: number; conflicts: number; deleted: number; dropped: number };
 
 // Satu siklus sync: pull (skip record yang punya edit lokal pending agar tak menimpanya),
 // lalu drain outbox dengan baseVersion = versi lokal saat ini.
 export async function syncOnce(transport: Transport): Promise<SyncStats> {
-  let pulled = 0, pushed = 0, conflicts = 0;
+  let pulled = 0, pushed = 0, conflicts = 0, deleted = 0, dropped = 0;
 
   const cursor = await getCursor();
   const outbox = await listOutbox();
@@ -95,7 +158,11 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
   const deferred: typeof records = [];
   for (const rec of records) {
     if (!isEntity(rec.entity)) continue;
-    if (pending.has(`${rec.entity}:${rec.recordId}`)) {
+    // SPEC-799 · jenis peristiwa dari hub yang lebih baru — dilewati, bukan ditunda & bukan melempar.
+    if (!rec.op) { dropped++; continue; }
+    // SPEC-270 · anti-clobber HANYA untuk upsert. SPEC-799: delete menang tanpa syarat, jadi edit
+    // lokal pending justru bukan alasan menundanya — di situlah keputusannya harus berlaku.
+    if (rec.op === "upsert" && pending.has(`${rec.entity}:${rec.recordId}`)) {
       // SPEC-270 · ada edit lokal pending — klasifikasi: data sama → biarkan (push nanti),
       // beda → catat konflik untuk keputusan manusia. Jangan clobber edit lokal.
       const local = await snapshot(rec.entity as Entity, rec.recordId);
@@ -105,8 +172,12 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
       }
       continue;
     }
-    try { await applyRemote(rec.entity, rec.recordId, rec.version, rec.data); pulled++; }
-    catch { deferred.push(rec); }
+    try {
+      const r = await applyRemote(rec.entity, rec.recordId, rec.version, rec.data, rec.op);
+      if (r === "dropped") dropped++;
+      else if (rec.op === "delete") deleted++;
+      else pulled++;
+    } catch { deferred.push(rec); }
   }
   // Pass ulang selama masih ada kemajuan: induk yang menyusul di batch yang sama membuka anaknya
   // (rantai berapa pun dalam). Berhenti saat satu putaran penuh tak menerapkan apa pun.
@@ -114,14 +185,20 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
   while (rest.length) {
     const still: typeof rest = [];
     for (const rec of rest) {
-      try { await applyRemote(rec.entity, rec.recordId, rec.version, rec.data); pulled++; }
-      catch { still.push(rec); }
+      try {
+        const r = await applyRemote(rec.entity, rec.recordId, rec.version, rec.data, rec.op ?? "upsert");
+        if (r === "dropped") dropped++;
+        else if (rec.op === "delete") deleted++;
+        else pulled++;
+      } catch { still.push(rec); }
     }
     if (still.length === rest.length) {
-      // Betul-betul yatim (induknya sudah dihapus di hub — feed append-only tanpa tombstone,
-      // ADR-0068). Dilewati dengan jejak, bukan didiamkan: menahan kursor di sini = livelock.
+      // SPEC-799 · yatim yang induknya BERTOMBSTONE sudah dibuang sengaja oleh `applyRemote`, jadi
+      // sisa di sini benar-benar tak bisa dijelaskan. Dilewati dengan jejak, bukan didiamkan:
+      // menahan kursor di sini = livelock (ADR-0082).
       for (const rec of still) {
-        console.warn(`sync: record ${rec.entity}:${rec.recordId} tak bisa diterapkan (induk absen?) — dilewati`);
+        console.warn(`sync: record ${rec.entity}:${rec.recordId} tak bisa diterapkan — dilewati`);
+        dropped++;
       }
       break;
     }
@@ -148,7 +225,24 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
     }
     if (!isEntity(item.entity)) { await clearOutbox(item.entity, item.recordId); continue; }
     const snap = await snapshot(item.entity, item.recordId);
-    if (!snap) { await clearOutbox(item.entity, item.recordId); continue; } // record hilang lokal
+    // SPEC-799 · ADR-0119 · baris tak ada TAPI tombstone ada = penghapusan lokal menunggu jendela
+    // online. Dulu cabang ini sekadar `clearOutbox` ("record hilang lokal") — di situlah setiap
+    // penghapusan client mati tanpa jejak.
+    if (!snap) {
+      const tomb = await findTombstone(item.entity, item.recordId);
+      if (!tomb) { await clearOutbox(item.entity, item.recordId); continue; } // hilang tanpa jejak
+      // `baseVersion` = versi SEBELUM dihapus & `data` = snapshot terakhir: hub versi LAMA membuang
+      // `op` sebagai field tak dikenal dan memperlakukannya sebagai update biasa — record sekadar
+      // hidup di sana (status quo), bukan 500 di tiap siklus push karena create tanpa kolom required.
+      const res = await transport("POST", "/api/sync/push", {
+        records: [{
+          entity: item.entity, id: item.recordId,
+          baseVersion: Math.max(tomb.version - 1, 0), op: "delete", data: tomb.data,
+        }],
+      });
+      if (res.body?.results?.[0]?.ok) { await clearOutbox(item.entity, item.recordId); pushed++; }
+      continue;
+    }
     const res = await transport("POST", "/api/sync/push", {
       records: [{ entity: item.entity, id: item.recordId, baseVersion: snap.version, data: snap.data }],
     });
@@ -161,6 +255,15 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
       }
       await clearOutbox(item.entity, item.recordId); pushed++;
     } else if (r?.conflict) {
+      // SPEC-799 · ADR-0119 · hub sudah menghapusnya. Delete menang: adopsi tombstone-nya, buang
+      // edit lokal, berhenti mendorong. Tanpa lapis ini record bertombstone di-push selamanya.
+      if (r.deleted) {
+        await applyRemote(item.entity, item.recordId,
+          Number(r.deletedVersion ?? snap.version + 1), snap.data, "delete");
+        await clearOutbox(item.entity, item.recordId);
+        deleted++;
+        continue;
+      }
       // SPEC-270 · hub menolak → catat konflik dua-sisi bila datanya beda; else konvergen (adopsi hub).
       const server = r.server as { version: number; data: Record<string, unknown> } | null;
       if (server && JSON.stringify(server.data) !== JSON.stringify(snap.data)) {
@@ -172,7 +275,7 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
       }
     }
   }
-  return { pulled, pushed, conflicts };
+  return { pulled, pushed, conflicts, deleted, dropped };
 }
 
 // Transport HTTP nyata ke hub remote (server-to-server): Bearer device token.
@@ -207,11 +310,12 @@ export async function syncNow(opts?: { full?: boolean }): Promise<SyncStats | nu
   const transport = fetchTransport(base, token);
   if (!opts?.full) return syncOnce(transport);
   await setCursor("0");
-  const total: SyncStats = { pulled: 0, pushed: 0, conflicts: 0 };
+  const total: SyncStats = { pulled: 0, pushed: 0, conflicts: 0, deleted: 0, dropped: 0 };
   let seen = "0";
   for (let page = 0; page < FULL_PULL_MAX_PAGES; page++) {
     const s = await syncOnce(transport);
     total.pulled += s.pulled; total.pushed += s.pushed; total.conflicts += s.conflicts;
+    total.deleted += s.deleted; total.dropped += s.dropped;
     const now = await getCursor();
     if (now === seen) break; // kursor berhenti bergerak → feed habis
     seen = now;

@@ -39,6 +39,18 @@ export async function recordCompletion(specId: string, title: string, projectId:
   }).catch(() => { /* P2002: sudah ada */ });
 }
 
+// SPEC-799 · ADR-0119 · delete menang TANPA SYARAT atas edit lokal yang belum sempat ter-push.
+// Menang bukan berarti diam: tanpa baris ini suntingan operator lenyap tanpa satu pun jejak, dan
+// "hilang tanpa sebab" adalah persis keluhan yang melahirkan spec ini. `key` memuat versi tombstone
+// supaya penghapusan BERIKUTNYA atas id yang sudah dibuat ulang tetap punya suaranya sendiri.
+export async function recordSyncDelete(
+  entity: string, recordId: string, version: number, title: string,
+): Promise<void> {
+  await prisma.notification.create({
+    data: { type: "sync", key: `sync-delete:${entity}:${recordId}:${version}`, title, projectId: null },
+  }).catch(() => { /* P2002: sudah ada */ });
+}
+
 // SPEC-298 · notif saat sesi scheduler gagal / kena limit (rekonsiliasi akhir sesi, reconcile.ts).
 // Dedup `key:fail:<specId>` idempoten (insert kedua kena P2002, diabaikan). sessionId turunan =
 // idFor(specId) → aksi "Buka" bisa memutar ulang pane mati (log gagal). TANPA retry (PRD non-goal).
