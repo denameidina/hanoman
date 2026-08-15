@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { SessionResultView } from "@hanoman/shared";
 import { prisma } from "../db";
+import { deleteSynced } from "../services/sync-delete";
 
 // SPEC-213 · ADR-0047 · baca & purge activity log (cookie-authed dashboard). Append-only:
 // satu-satunya penghapusan adalah purge manual scoped project dan/atau rentang tanggal (AC-22).
@@ -35,7 +36,11 @@ export default async function (app: FastifyInstance) {
       if (Number.isNaN(d.getTime())) return reply.code(400).send({ error: "before bukan tanggal valid" });
       where.createdAt = { lt: d };
     }
-    const { count } = await prisma.sessionResult.deleteMany({ where });
-    return { purged: count };
+    // SPEC-799 · ADR-0119 · id dikumpulkan LEBIH DULU: `deleteMany` tak mengembalikan barisnya, dan
+    // tombstone butuh version + snapshot tiap baris. Purge tetap satu operasi bagi pemanggilnya.
+    const rows = await prisma.sessionResult.findMany({ where, select: { id: true } });
+    let purged = 0;
+    for (const r of rows) if (await deleteSynced("sessionResult", r.id)) purged++;
+    return { purged };
   });
 }

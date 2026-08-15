@@ -16,6 +16,7 @@ import { deriveSpecFields } from "../services/spec-fields";
 import { checkSourceChange, sourceChangeEntry, appendSourceHistory } from "../services/spec-source";
 import { recordSourceChange } from "../services/notifications";
 import { notifySynced } from "../services/sync-notify";
+import { deleteSynced } from "../services/sync-delete";
 import { branchFromCandidates } from "../services/branches";
 import { STAGES } from "../services/stage-machine";
 import { artifactsToRemove } from "../services/stage-artifacts";
@@ -306,7 +307,7 @@ export default async function (app: FastifyInstance) {
     // tanpa pembersihan ini menghapus satu item mengunci dependent-nya SELAMANYA dengan alasan
     // `missing` yang tak bisa diperbaiki dari UI.
     const gone = await prisma.spec.findUnique({ where: { id }, select: { projectId: true } });
-    await prisma.spec.delete({ where: { id } }).catch(() => { });
+    await deleteSynced("spec", id).catch(() => { });
     if (gone) {
       const rows = await prisma.spec.findMany({
         where: { projectId: gone.projectId }, select: { id: true, dependsOn: true },

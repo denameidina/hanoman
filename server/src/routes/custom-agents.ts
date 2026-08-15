@@ -6,6 +6,7 @@ import {
 } from "@hanoman/shared";
 import { prisma } from "../db";
 import { notifySynced } from "../services/sync-notify";
+import { deleteSynced } from "../services/sync-delete";
 import { resolveRepoDir } from "../services/local-binding";
 import { agentToolCatalog, agentToolIds } from "../services/agent-tool-catalog";
 import {
@@ -192,7 +193,7 @@ export default async function (app: FastifyInstance) {
     const existing = await prisma.customAgent.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "not found" });
 
-    await prisma.customAgent.delete({ where: { id } });
+    await deleteSynced("customAgent", id);
     // Cabut namanya dari mentions agen lain — tanpa ini rujukan yatim mengunci UI dan setiap
     // penyuntingan berikutnya ditolak "mention tak dikenal" (cermin DELETE /specs/:id, ADR-0093).
     const name = (existing as unknown as CustomAgentRow).name;

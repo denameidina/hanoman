@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../db";
 import { paginate } from "../services/paginate";
 import { notifySynced } from "../services/sync-notify";
+import { deleteSynced } from "../services/sync-delete";
 import { readUploadOrFetch, deleteUpload } from "../services/uploads";
 import { generateShareToken } from "../services/ticket";
 import { acceptTicket } from "../services/ticket-accept";
@@ -132,7 +133,7 @@ export default async function (app: FastifyInstance) {
     const t = await prisma.ticket.findUnique({ where: { id }, include: { attachments: true } });
     if (!t) return reply.code(404).send({ error: "not found" });
     for (const a of t.attachments) await deleteUpload(a.storageKey);
-    await prisma.ticket.delete({ where: { id } });
+    await deleteSynced("ticket", id); // lampiran ikut lewat onDelete: Cascade, di sini & di penerima
     return { ok: true };
   });
 }

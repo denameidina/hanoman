@@ -4,6 +4,7 @@ import { prisma } from "../db";
 import { renameProject } from "../services/rename-project";
 import { toProjectView } from "../services/project-view";
 import { notifySynced } from "../services/sync-notify";
+import { deleteSynced } from "../services/sync-delete";
 import { listRepoBranches, listRepoRemoteBranches, defaultBranch } from "../services/branches";
 import { checkAutoMerge } from "../services/auto-merge-gate";
 import { Prisma } from "@prisma/client";
@@ -102,7 +103,9 @@ export default async function (app: FastifyInstance) {
     const active = listSessions().filter((s) => s.projectId === id && !s.exited).length;
     if (active) return reply.code(409).send({ error: `project "${id}" masih punya ${active} sesi aktif` });
     // ponytail: worktree di .worktrees/ tidak ikut dibersihkan; tambahkan kalau disknya penuh.
-    await prisma.project.delete({ where: { id } }); // specs ikut lewat onDelete: Cascade
+    // SPEC-799 · ADR-0119 · spec/ticket/customAgent/githubIssue ikut lewat onDelete: Cascade di SINI
+    // maupun di setiap penerima — karena itu tombstone hanya untuk INDUK, bukan per anak.
+    await deleteSynced("project", id);
     return reply.code(204).send();
   });
   // SPEC-143: memasok dropdown branch di backlog. Server duduk di mesin yang sama dengan

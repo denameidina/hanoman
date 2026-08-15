@@ -12,6 +12,7 @@ import { bootstrapKey } from "../services/vps-bootstrap";
 import { createSession } from "../services/pty";
 import { sessionModel } from "../services/settings";
 import { notifySynced } from "../services/sync-notify";
+import { deleteSynced } from "../services/sync-delete";
 
 // Audit (dan nanti harden/session) = eksekusi remote via SSH dengan key milik mesin ini.
 // Tanpa auth — pagarnya bind 127.0.0.1 di server.ts, sama seperti /api/terminal
@@ -63,10 +64,10 @@ export default async function (app: FastifyInstance) {
   });
 
   app.delete("/vps/:id", async (req, reply) => {
-    try {
-      await prisma.vps.delete({ where: { id: (req.params as { id: string }).id } });
-      return reply.code(204).send();
-    } catch { return reply.code(404).send({ error: "not found" }); }
+    const { id } = req.params as { id: string };
+    // SPEC-799 · ADR-0119 · `false` = barisnya memang tak ada; try/catch lama tak lagi dibutuhkan.
+    if (!(await deleteSynced("vps", id))) return reply.code(404).send({ error: "not found" });
+    return reply.code(204).send();
   });
 
   app.post("/vps/:id/audit", async (req, reply) => {
