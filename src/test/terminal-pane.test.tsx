@@ -238,22 +238,22 @@ describe("TerminalPane · liveness socket (SPEC-800)", () => {
     }
   });
 
-  it("menyerah sesudah enam percobaan dan menawarkan sambung ulang manual", async () => {
+  it("menyerah sesudah anggaran percobaan habis dan menawarkan sambung ulang manual", async () => {
     vi.useFakeTimers();
     try {
       const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
       await vi.waitFor(() => expect(sockets).toHaveLength(1));
-      for (let i = 0; i < 7; i += 1) {
+      for (let i = 0; i < 13; i += 1) {
         sockets.at(-1)!.readyState = 3;
         act(() => { sockets.at(-1)!.onclose?.({ code: 1006 }); });
         await vi.advanceTimersByTimeAsync(10_000);
       }
-      expect(sockets).toHaveLength(7);
+      expect(sockets).toHaveLength(13);
       const retry = container.querySelector<HTMLButtonElement>('[data-testid="terminal-link"] button')!;
       expect(retry.textContent).toContain("Sambungkan lagi");
       act(() => { retry.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
       await vi.advanceTimersByTimeAsync(10);
-      await vi.waitFor(() => expect(sockets).toHaveLength(8));
+      await vi.waitFor(() => expect(sockets).toHaveLength(14));
     } finally {
       vi.useRealTimers();
     }

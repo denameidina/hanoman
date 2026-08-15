@@ -79,9 +79,11 @@ yang lahir dari audit SPEC-800:
   sehingga aksi yang tak muat bukan hanya tak terbaca melainkan **tak bisa diklik**. Aritmetikanya
   murni di `screens/terminal-chrome.ts` (`inlineActionCount`); `Layar penuh` dan `Tutup` tak pernah
   runtuh. Sisanya masuk `OverflowActions` (DS).
-- **Pane menyambung ulang WebSocket-nya sendiri** (backoff 500 ms→8 s, maksimum 6 percobaan, tiket
-  admission baru tiap percobaan sesuai ADR-0117, berhenti pada close 4004 karena sesi tmux-nya memang
-  lenyap) dan **menguras input yang mengantre pada SETIAP `onopen`**. Sebelum SPEC-800 tak ada satu
+- **Pane menyambung ulang WebSocket-nya sendiri** (backoff 500 ms→8 s dengan plafon 8 s, 12 percobaan
+  ≈ 76 dtk, tiket admission baru tiap percobaan sesuai ADR-0117, berhenti pada close 4004 karena sesi
+  tmux-nya memang lenyap) dan **menguras input yang mengantre pada SETIAP `onopen`**. Anggaran 12
+  percobaan itu dikalibrasi dari smoke SPEC-800: restart server sungguhan memakan lebih dari 20 detik,
+  dan anggaran 6 percobaan (≈23 dtk) menyerah sebelum server kembali. Sebelum SPEC-800 tak ada satu
   pun `onclose`, jadi setiap penutupan — revalidasi principal, kuota, restart server saat update,
   jaringan mobile — membuat ketikan menumpuk di buffer tanpa pembaca dan hilang tanpa tanda.
   Keadaannya kasatmata di dalam pane; diam adalah cacatnya, bukan bagian perbaikannya.

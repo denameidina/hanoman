@@ -79,7 +79,7 @@ pun; sisanya runtuh lebih dulu.
 ### 3. Sambung ulang WebSocket: hak yang sama, bukan jalan pintas
 
 `TerminalPane` memasang `onclose`/`onerror` dan menyambung ulang dengan backoff bertingkat
-(500ms → 1s → 2s → 4s → 8s, plafon 8s, maksimum 6 percobaan) dengan aturan:
+(500ms → 1s → 2s → 4s → 8s, plafon 8s, 12 percobaan ≈ 76 dtk) dengan aturan:
 
 - **Tiket baru tiap percobaan.** `issueWsTicket` bersifat sekali pakai; sambung ulang menempuh
   jalur admission yang sama persis (ADR-0117) — tak ada pintu belakang.
@@ -88,7 +88,7 @@ pun; sisanya runtuh lebih dulu.
 - **Unmount membatalkan timer.** Pane yang dilepas tak boleh menghidupkan socket zombi.
 - **`pendingInput` dikuras di setiap `onopen`**, bukan hanya yang pertama. Ini inti perbaikannya:
   buffer SPEC-771 berubah dari penyembunyi kegagalan menjadi penyelamat ketikan.
-- **Keadaan terlihat.** Strip tipis di dalam pane: `menyambung ulang… (2/6)`, lalu
+- **Keadaan terlihat.** Strip tipis di dalam pane: `menyambung ulang… (2/12)`, lalu
   `terputus — Sambungkan lagi` sebagai tombol saat percobaan habis. Diam adalah cacatnya; diam
   tidak boleh menjadi bagian dari perbaikannya.
 
@@ -190,9 +190,9 @@ Aksi tak ada yang dihapus, hanya dipindahkan — "semua aksi tetap dapat dipilih
 2. **AC-2** Toolbar halaman di mobile menampilkan paling banyak dua kontrol inline; sisanya di
    panel overflow, dan tak satu pun aksi hilang.
 3. **AC-3** Sesudah socket terminal tertutup, pane menyambung ulang (backoff bertingkat, tiket baru
-   tiap percobaan, berhenti pada kode 4004 dan sesudah 6 percobaan), dan input yang diketik selama
+   tiap percobaan, berhenti pada kode 4004 dan sesudah 12 percobaan), dan input yang diketik selama
    putus terkirim berurutan begitu socket terbuka lagi.
-4. **AC-4** Keadaan koneksi terlihat: `menyambung ulang… (n/6)` selama mencoba, dan tombol
+4. **AC-4** Keadaan koneksi terlihat: `menyambung ulang… (n/12)` selama mencoba, dan tombol
    `Sambungkan lagi` sesudah menyerah.
 5. **AC-5** `TerminalKeys` mengirim `Esc`, `Tab`, `↑`, `↓`, `←`, `→`, `Enter` sebagai **satu**
    panggilan input berisi **satu** keystroke per tekan.

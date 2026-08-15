@@ -1551,7 +1551,7 @@ git commit -m "feat(spec-800): header sel sadar-lebar + toolbar mobile diringkas
 - Modify: `internal/docs/README.md`
 - Test: seluruh berkas test yang tersentuh
 
-- [ ] **Step 1: Perbarui doc arsitektur**
+- [x] **Step 1: Perbarui doc arsitektur**
 
 Tambahkan sub-bagian pada `internal/docs/architecture/stack.md` di dekat penjelasan PTY/tmux:
 
@@ -1561,7 +1561,7 @@ Tambahkan sub-bagian pada `internal/docs/architecture/stack.md` di dekat penjela
 - Aksi header sel runtuh ke `OverflowActions` berdasarkan **lebar kontainernya**, bukan lebar
   viewport: sel grid 4 kolom di desktop lebih sempit daripada satu pane di ponsel. `Layar penuh`
   dan `Tutup` tak pernah runtuh.
-- Pane menyambung ulang WebSocket-nya sendiri (backoff 500ms→8s, maksimum 6 percobaan, tiket baru
+- Pane menyambung ulang WebSocket-nya sendiri (backoff 500ms→8s, 12 percobaan ≈ 76 dtk, tiket baru
   tiap percobaan, berhenti pada close 4004) dan menguras input yang mengantre pada setiap `onopen`.
   Sebelum SPEC-800 setiap close membuat ketikan hilang tanpa satu tanda pun.
 - Papan tombol layar mengirim **satu keystroke per tekan** (SPEC-452): `Esc` adalah satu-satunya
@@ -1573,7 +1573,7 @@ Tambahkan sub-bagian pada `internal/docs/architecture/stack.md` di dekat penjela
   workspace kanonik per-user (SPEC-786 · ADR-0118).
 ```
 
-- [ ] **Step 2: Tautkan di index**
+- [x] **Step 2: Tautkan di index**
 
 Tambahkan entri audit SPEC-800 pada bagian `## research` di `internal/docs/README.md` bila belum ada
 (fase Audit sudah menambahkannya), dan pastikan perubahan `architecture/stack.md` tetap ter-link.
@@ -1581,7 +1581,7 @@ Tambahkan entri audit SPEC-800 pada bagian `## research` di `internal/docs/READM
 Run: `node cli/dist/index.js docs index --check` atau `pnpm --filter ./cli exec hanoman docs index --check`
 Expected: index konsisten (`ok`).
 
-- [ ] **Step 3: Jalankan seluruh test yang tersentuh**
+- [x] **Step 3: Jalankan seluruh test yang tersentuh**
 
 ```bash
 cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run \
@@ -1593,12 +1593,12 @@ cd src && env -u NODE_ENV -u DATABASE_URL ../node_modules/.bin/vitest --run \
 
 Expected: semua berkas lulus, **nol** "no test files".
 
-- [ ] **Step 4: Typecheck paket yang tersentuh**
+- [x] **Step 4: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: nol error. (Jangan `pnpm -r typecheck` — mesin ini menjalankan beberapa sesi.)
 
-- [ ] **Step 5: Smoke runtime sekali di akhir**
+- [x] **Step 5: Smoke runtime sekali di akhir**
 
 Karena perilaku runtime WS berubah, jalankan satu smoke lokal: boot server pada instance terisolasi,
 buat satu sesi tmux di socket `hanoman` (jangan `POST /terminal/sessions` — ia men-spawn `claude`
@@ -1613,7 +1613,7 @@ tmux -L hanoman -f /dev/null new-session -d -s hanoman-smoke800 -c /tmp 'sh' \
 tmux -L hanoman kill-session -t hanoman-smoke800
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs

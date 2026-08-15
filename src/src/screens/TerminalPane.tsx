@@ -12,7 +12,11 @@ import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./te
 // (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
 // Sebelum ini tak ada satu pun `onclose`, jadi `pendingInput` menumpuk pada buffer yang tak punya
 // pembaca dan ketikan hilang tanpa satu tanda pun.
-const RECONNECT_BACKOFF_MS = [500, 1_000, 2_000, 4_000, 8_000, 8_000];
+// Anggarannya ~76 dtk (5 langkah naik lalu plafon 8 dtk): restart server saat update terukur
+// memakan lebih dari 20 dtk pada smoke SPEC-800, dan menyerah lebih cepat memaksa operator
+// menekan tombol untuk kejadian yang paling rutin. Plafon 8 dtk menjaga satu pane tetap jauh
+// dari "generator koneksi" yang dilarang SPEC-761.
+const RECONNECT_BACKOFF_MS = [500, 1_000, 2_000, 4_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000];
 const RECONNECT_MAX = RECONNECT_BACKOFF_MS.length;
 
 type LinkState =
