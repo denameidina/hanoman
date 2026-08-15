@@ -703,6 +703,17 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 
 ## Terminal
 ```
+GET    /terminal/workspace
+#   COOKIE_ONLY, admin; identitas selalu req.user.id.
+#   → { workspace: TerminalWorkspaceV1|null, revision: number, updatedAt: string|null }
+PUT    /terminal/workspace  { baseRevision, workspace: TerminalWorkspaceV1 }
+#   COOKIE_ONLY, admin. Sukses → snapshot dengan revision +1; payload salah → 400.
+#   baseRevision stale → 409 { code:"revision-conflict", current:<snapshot> } tanpa mengubah row.
+#   JSON tersimpan non-null yang gagal schema → 422 { error:"stored terminal workspace is invalid" }.
+#   TerminalWorkspaceV1 = {version:1,groups:[{id,name,layout:{rows,cols,cells}}]}; groups berurutan,
+#   cells row-major, sessionId string|null dan unik lintas seluruh grup. `active`/fullscreen/viewport
+#   tidak masuk payload. Route ini dipetakan COOKIE_ONLY sebelum capability `sessions` generik;
+#   AgentToken selalu 403. State LOCAL-only per User, bukan device sync ADR-0043/0045.
 POST   /ws-tickets { target:"events"|"terminal:<sessionId>" } -> { ticket }
 #   Cookie user atau AgentToken yang sudah lolos gate; tiket 192-bit base64url, target-specific,
 #   one-use, 30 detik, bounded 2048. Browser mengirimnya sebagai subprotocol, bukan URL.

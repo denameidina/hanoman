@@ -64,6 +64,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0118 — Workspace Terminal kanonik per user dengan optimistic concurrency](adr/0118-workspace-terminal-kanonik-per-user.md)
 - [0117 — Boundary deployment publik, otoritas efektif, dan sandbox sesi](adr/0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md)
 - [0116 — Penutupan sesi asinkron: worktree dipindah ke `.trash`, penyapu latar yang menghapus](adr/0116-penutupan-sesi-asinkron-worktree-trash.md)
 - [0115 — State tampilan dashboard persisten: kunci `hn.ui.v1.<screen>.<field>`, satu hook bersama](adr/0115-state-tampilan-dashboard-persisten.md)

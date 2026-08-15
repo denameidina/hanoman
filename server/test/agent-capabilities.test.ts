@@ -27,6 +27,8 @@ describe("capabilityForRoute", () => {
     ["GET", "/api/terminal/sessions", "sessions:read"],
     ["POST", "/api/terminal/sessions", "sessions:write"],
     ["GET", "/api/terminal/sessions/abc/ws", "sessions:write"], // WS = kontrol interaktif
+    ["GET", "/api/terminal/workspace", "COOKIE_ONLY"],
+    ["PUT", "/api/terminal/workspace", "COOKIE_ONLY"],
     // SPEC-742 · ADR-0116 · route baru di bawah /terminal ikut capability `sessions` yang sudah
     // ada — nol domain baru, nol perubahan gerbang. Diikat di sini supaya tetap begitu.
     ["GET", "/api/terminal/cleanups", "sessions:read"],

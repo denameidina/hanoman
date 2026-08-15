@@ -3,7 +3,8 @@
 - Status: Accepted
 - Tanggal: 2026-08-13
 - SPEC: SPEC-740
-- Terkait: **menegakkan** [0107](0107-paginasi-seragam-daftar-dashboard.md) (yang dipulihkan `page`,
+- Terkait: **diamandemen sebagian oleh [0118](0118-workspace-terminal-kanonik-per-user.md)** untuk
+  mapping kerja Terminal; **menegakkan** [0107](0107-paginasi-seragam-daftar-dashboard.md) (yang dipulihkan `page`,
   tak pernah `limit`) dan [0071](0071-link-ticket-triase-deeplink-sharetoken.md) (deep-link hash
   tetap menang atas state yang dipulihkan); **tidak** mencabut apa pun. Tak menyentuh
   [0038](0038-paginasi-di-response-layer.md), skema, maupun kontrak API — ini murni state klien.
@@ -86,7 +87,7 @@ terbaca sebagai "terlewat".
 | triage | — | `tab`, `project`, `status`, `q`, `page`, `openId`, scroll |
 | scheduler | — | `queue-<status>-page` (tiga seksi), `cronRunsPage`, `cronProject`, `cronOpenRuns` |
 | lead | — | `filter`, `decPage`, `flowPage` |
-| terminal | — | `project` (workspace grid tetap di kunci lamanya) |
+| terminal | — | `project`; mapping grid dipindah ke server per user oleh ADR-0118 |
 | ide | project | `tab`, `viewRef`, `selected`, `selKind`, `mdView`, `stagedView`, `changedView`, `diffTab` |
 | vps | — | `detailId` |
 | docs | project | `selected` |
@@ -107,8 +108,9 @@ menyimpan **id/slug**-nya saja lalu meresolusi ulang dari daftar hidup.
 - **Satu blob JSON per layar** (`hn.ui.v1.backlog = {...}`). Lebih sedikit kunci, tapi menambah field
   berarti memigrasi bentuk blob, dan satu field rusak menjatuhkan seluruh layar ke default. Kunci
   per-field membuat kerusakan berskop satu nilai.
-- **State tampilan di server per user.** Menambah kolom/tabel + endpoint untuk sesuatu yang murni
-  properti mesin & browser — cermin alasan `LocalBinding`/`repoDir` tak disync.
+- **State tampilan murni di server per user.** Menambah kolom/tabel + endpoint untuk filter, scroll,
+  fullscreen, atau panel aktif tetap ditolak. ADR-0118 kemudian mengecualikan mapping kerja Terminal:
+  grup/grid/`sessionId` adalah orientasi sesi lintas perangkat, bukan presentasi satu browser.
 
 ## Konsekuensi & gotcha
 
@@ -136,8 +138,8 @@ menyimpan **id/slug**-nya saja lalu meresolusi ulang dari daftar hidup.
 7. **Reset berskop satu layar.** State yang dipakai sebuah layar tapi dimiliki App (`projectFilter` di
    Backlog) di luar jangkauan `resetUiState(screen)` — layar menanganinya lewat prop `onReset`.
 
-## Yang tidak berubah
+## Yang tidak berubah (dengan amandemen ADR-0118)
 
-Tanpa perubahan skema Prisma, endpoint baru, atau perubahan kontrak API. `hanoman.terminal.workspace`
-dan flag Pet tetap pada kuncinya masing-masing — memindahkannya ke namespace baru berarti kehilangan
-state pengguna yang sudah ada, dengan imbalan nol.
+Implementasi SPEC-740 sendiri tidak mengubah skema atau API. Flag Pet tetap pada kuncinya. Sejak
+SPEC-786/ADR-0118, `hanoman.terminal.workspace` dipertahankan hanya sebagai input migrasi satu kali;
+mapping kanonik pindah ke server per user, sementara state presentasional Terminal tetap lokal.

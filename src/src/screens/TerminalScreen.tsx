@@ -3,7 +3,7 @@ import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, Stat
   ProductStateIllustration, Tabs, useResponsiveTier } from "../ds";
 import { api, ApiError, type TerminalSession, type Phase, type Flow } from "../api/client";
 import { subscribe } from "../api/events";
-import { flowForSource, type SessionHistoryView, type WorktreeCleanupView } from "@hanoman/shared";
+import { flowForSource, sameTerminalWorkspace, type SessionHistoryView, type WorktreeCleanupView } from "@hanoman/shared";
 import { TerminalPane } from "./TerminalPane";
 import { SessionHistoryModal } from "./SessionHistoryModal";
 import { NewTerminalModal } from "./NewTerminalModal";
@@ -13,9 +13,11 @@ import { B_STAGES } from "./BacklogScreen";
 import type { Spec } from "./types";
 import * as L from "./terminal-layout";
 import * as W from "./terminal-workspace";
+import { useTerminalWorkspace } from "./use-terminal-workspace";
 import { usePersistedState, isStr } from "../ui-state";
 
-export function TerminalScreen({ projects, backlog = [], focusSession, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf }: {
+export function TerminalScreen({ userId = "test-user", projects, backlog = [], focusSession, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf }: {
+  userId?: string;
   projects: { id: string; name: string }[]; backlog?: Spec[]; focusSession?: string | null;
   onOpenReview?: (specId: string) => void;
   onOpenSessionReview?: (sessionId: string, title: string) => void;
@@ -27,10 +29,17 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
   const [sessions, setSessions] = React.useState<TerminalSession[]>([]);
   // SPEC-742 · ADR-0116 · worktree yang masih disapu di latar. Bukan sesi: sesinya sudah lenyap.
   const [cleanups, setCleanups] = React.useState<WorktreeCleanupView[]>([]);
-  const [ws, setWs] = React.useState<W.Workspace>(() => W.load() ?? W.emptyWorkspace());
-  // SPEC-740 · ADR-0115 · project pemilih sesi baru. Workspace grid TIDAK dipindah ke
-  // namespace ini — ia sudah persisten di kunci `hanoman.terminal.workspace`, dan
-  // memindahkannya membuang state pengguna yang sudah ada dengan imbalan nol.
+  const workspaceController = useTerminalWorkspace(userId);
+  const {
+    workspace: ws,
+    status: workspaceStatus,
+    message: workspaceMessage,
+    writable: workspaceWritable,
+    mutate: mutateWorkspace,
+    setActive: setActiveGroup,
+    refresh: refreshWorkspace,
+  } = workspaceController;
+  // Project pemilih sesi baru tetap presentasional dan lokal; hanya mapping grid yang kanonik.
   const [project, setProject] = usePersistedState("terminal", "project", projects[0]?.id ?? "", isStr);
   const [maxed, setMaxed] = React.useState(false);
   // SPEC-232 · id sesi yang sedang dilihat layar-penuh (satu terminal, sebagai modal).
@@ -50,9 +59,12 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
   const [requestedSession, setRequestedSession] = React.useState<string | null>(null);
   const handledFocus = React.useRef<string | null>(null);
 
-  const [loaded, setLoaded] = React.useState(false);
+  const [sessionsLoaded, setSessionsLoaded] = React.useState(false);
   React.useEffect(() => {
-    api.listTerminals().then(setSessions).catch(() => setSessions([])).finally(() => setLoaded(true));
+    api.listTerminals().then((current) => {
+      setSessions(current);
+      setSessionsLoaded(true);
+    }).catch(() => {});
   }, []);
 
   // SPEC-199 · daftar sesi (`exited` + marker "menunggu keputusan") didorong lewat WS siar
@@ -67,14 +79,15 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
 
   // Sesi hidup di tmux dan selamat dari restart server (ADR-0016): workspace ter-load bisa
   // menunjuk sesi yang masih hidup (disambung ulang) atau yang sudah di-kill (dikosongkan).
-  // Ditahan sampai `loaded`: sebelum listTerminals() resolve, `sessions` masih [] dan
-  // rekonsiliasi dini akan mengosongkan workspace yang baru saja dipulihkan dari localStorage.
+  // Ditahan sampai kedua sumber otoritatif siap. Gagal memuat tmux bukan bukti bahwa semua sesi
+  // hilang, dan cache recovery bukan kewenangan untuk menulis server.
   React.useEffect(() => {
-    if (!loaded) return;
-    setWs((w) => W.reconcileAll(w, new Set(sessions.map((s) => s.id))));
-  }, [loaded, sessions]);
-
-  React.useEffect(() => { W.save(ws); }, [ws]);
+    if (!sessionsLoaded || !workspaceWritable) return;
+    const liveIds = new Set(sessions.map((session) => session.id));
+    const reconciled = W.reconcileAll(ws, liveIds);
+    if (sameTerminalWorkspace(W.toCanonical(reconciled), W.toCanonical(ws))) return;
+    void mutateWorkspace((current) => W.reconcileAll(current, liveIds));
+  }, [mutateWorkspace, sessions, sessionsLoaded, workspaceWritable, ws]);
 
   // SPEC-184 · notifikasi mengarahkan ke sesi tertentu → tempatkan ke grid aktif begitu sesi itu
   // muncul di daftar hidup. SPEC-197 · efek ini jalan tiap `sessions` berubah; tanpa guard, sesi
@@ -82,22 +95,26 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
   // bila belum ada di grid mana pun (placedIds); kalau sudah, kembalikan w apa adanya (no-op).
   React.useEffect(() => {
     if (!focusSession) { handledFocus.current = null; return; }
-    if (!loaded || handledFocus.current === focusSession) return;
+    if (!sessionsLoaded || handledFocus.current === focusSession) return;
     if (!sessions.some((s) => s.id === focusSession && !s.exited)) return;
     handledFocus.current = focusSession;
     setRequestedSession(focusSession);
-  }, [focusSession, loaded, sessions]);
+  }, [focusSession, sessions, sessionsLoaded]);
 
   React.useEffect(() => {
     if (!requestedSession) return;
-    setWs((current) => {
-      const existing = current.groups.find((group) => group.layout.cells.includes(requestedSession));
-      if (existing) return existing.id === current.active ? current : W.selectGroup(current, existing.id);
+    const existing = ws.groups.find((group) => group.layout.cells.includes(requestedSession));
+    if (existing) {
+      if (existing.id !== ws.active) setActiveGroup(existing.id);
+      return;
+    }
+    if (!workspaceWritable) return;
+    void mutateWorkspace((current) => {
       const placed = W.placeFirstEmptyInActive(current, requestedSession);
       if (placed !== current || !mobile) return placed;
       return W.placeInActive(current, activeCell, requestedSession);
     });
-  }, [activeCell, mobile, requestedSession]);
+  }, [activeCell, mobile, mutateWorkspace, requestedSession, setActiveGroup, workspaceWritable, ws]);
 
   // SPEC-232 · fullscreen menunjuk satu sesi hidup; bila sesi itu hilang (kill/exit lewat
   // frame WS), lepas fullscreen supaya modal tak menggantung ke sesi yang sudah lenyap.
@@ -115,7 +132,7 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
     setSessions((s) => (s.some((x) => x.id === id)
       ? s
       : [...s, { id, projectId: project, cwd: "", exited: false }]));
-    setWs((w) => W.placeFirstEmptyInActive(w, id));
+    void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, id));
     setRequestedSession(id);
   }
 
@@ -125,7 +142,7 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
     if (!project) return;
     const { id } = await api.createShell(project);
     setSessions((s) => [...s, { id, projectId: project, cwd: "", exited: false }]);
-    setWs((w) => W.placeFirstEmptyInActive(w, id));
+    void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, id));
     setRequestedSession(id);
   }
 
@@ -138,7 +155,7 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
       setSessions((s) => s.some((x) => x.id === id)
         ? s
         : [...s, { id, projectId: spec.projectId, specId: spec.id, flow, cwd: "", exited: false }]);
-      setWs((w) => W.placeFirstEmptyInActive(w, id));
+      void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, id));
       setRequestedSession(id);
       setPicking(false);
       setPickError(null);
@@ -170,7 +187,7 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
       setSessions((s) => (s.some((x) => x.id === born.id)
         ? s
         : [...s, { id: born.id, projectId: r.projectId, specId: r.specId ?? undefined, cwd: "", exited: false }]));
-      setWs((w) => W.placeFirstEmptyInActive(w, born.id));
+      void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, born.id));
       setRequestedSession(born.id);
       setHistoryOpen(false);
     } catch {
@@ -201,9 +218,15 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
     setSessions((s) => s.map((x) => (x.id === id ? { ...x, exited: true, exitCode: code } : x)));
   }, []);
 
-  const place = (idx: number, id: string) => { setActiveCell(idx); setWs((w) => W.placeInActive(w, idx, id)); };
-  const placeFirst = (id: string) => { setRequestedSession(id); setWs((w) => W.placeFirstEmptyInActive(w, id)); };
-  const detach = (id: string) => setWs((w) => W.detach(w, id));
+  const place = (idx: number, id: string) => {
+    setActiveCell(idx);
+    void mutateWorkspace((current) => W.placeInActive(current, idx, id));
+  };
+  const placeFirst = (id: string) => {
+    setRequestedSession(id);
+    void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, id));
+  };
+  const detach = (id: string) => { void mutateWorkspace((current) => W.detach(current, id)); };
 
   const placed = W.placedIds(ws);
   const unplaced = sessions.filter((s) => !placed.has(s.id));
@@ -245,17 +268,31 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
         <GroupTabs
           compact={maxed}
           ws={ws}
-          onSelect={(id) => setWs((w) => W.selectGroup(w, id))}
-          onAdd={() => setWs((w) => W.addGroup(w, `Grup ${w.groups.length + 1}`))}
-          onRename={(id, name) => setWs((w) => W.renameGroup(w, id, name))}
-          onRemove={(id) => setWs((w) => W.removeGroup(w, id))}
+          writable={workspaceWritable}
+          onSelect={setActiveGroup}
+          onAdd={() => void mutateWorkspace((current) => W.addGroup(current, `Grup ${current.groups.length + 1}`))}
+          onRename={(id, name) => void mutateWorkspace((current) => W.renameGroup(current, id, name))}
+          onRemove={(id) => void mutateWorkspace((current) => W.removeGroup(current, id))}
         />
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
           ...(maxed ? { flex: 1, minWidth: 0 } : {}) }}>
-          <Button size="sm" variant="ghost" onClick={() => setWs((w) => W.mapActiveLayout(w, L.addColumn))}>+ Kolom</Button>
-          <Button size="sm" variant="ghost" onClick={() => setWs((w) => W.mapActiveLayout(w, L.addRow))}>+ Baris</Button>
+          <Button size="sm" variant="ghost" disabled={!workspaceWritable}
+            onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, L.addColumn))}>+ Kolom</Button>
+          <Button size="sm" variant="ghost" disabled={!workspaceWritable}
+            onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, L.addRow))}>+ Baris</Button>
           <div style={{ flex: 1, minWidth: 0 }} />
+          {workspaceStatus !== "ready" && (
+            <span data-testid="terminal-workspace-status" title={workspaceMessage ?? undefined}
+              style={{ fontSize: 12, color: workspaceStatus === "conflict" ? "var(--status-warn)" : "var(--text-muted)" }}>
+              {workspaceStatus === "loading"
+                ? "Memuat layout server…"
+                : workspaceStatus === "recovering"
+                  ? <><span>Layout server belum tersambung</span>{" "}
+                      <button type="button" onClick={() => void refreshWorkspace()}>Retry</button></>
+                  : workspaceMessage ?? "Layout berubah di perangkat lain"}
+            </span>
+          )}
           {cleanups.length > 0 && (
             <span data-testid="worktree-cleanups"
               title={cleanups.map((c) => `${c.sessionId}${c.error ? ` — ${c.error}` : ""}`).join("\n")}
@@ -293,7 +330,8 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
               borderRadius: "var(--radius-sm)", background: "var(--bone-200)",
               border: "1px solid var(--border-hair)", fontFamily: "var(--font-mono)", fontSize: 11,
             }}>
-              <button className="hn-terminal-unplaced-action" onClick={() => placeFirst(s.id)} title="Taruh di sel kosong pertama grup ini"
+              <button className="hn-terminal-unplaced-action" disabled={!workspaceWritable}
+                onClick={() => placeFirst(s.id)} title="Taruh di sel kosong pertama grup ini"
                 style={{ all: "unset", cursor: "pointer" }}>
                 {s.specId ?? nameOf(s.projectId)} · {s.id.slice(0, 6)}
               </button>
@@ -311,10 +349,10 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
             tabs={layout.cells.map((id, idx) => ({ value: String(idx),
               label: `Panel ${idx + 1}${id ? ` · ${id.slice(0, 6)}` : " · kosong"}` }))} />
           <div className="hn-wrap-mobile" style={{ display: "flex", gap: 8 }}>
-            <Button size="sm" variant="ghost" disabled={layout.cols === 1} aria-label="Hapus kolom aktif"
-              onClick={() => setWs((w) => W.mapActiveLayout(w, (l) => L.removeColumn(l, activeCell % l.cols)))}>Hapus kolom</Button>
-            <Button size="sm" variant="ghost" disabled={layout.rows === 1} aria-label="Hapus baris aktif"
-              onClick={() => setWs((w) => W.mapActiveLayout(w, (l) => L.removeRow(l, Math.floor(activeCell / l.cols))))}>Hapus baris</Button>
+            <Button size="sm" variant="ghost" disabled={!workspaceWritable || layout.cols === 1} aria-label="Hapus kolom aktif"
+              onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeColumn(l, activeCell % l.cols)))}>Hapus kolom</Button>
+            <Button size="sm" variant="ghost" disabled={!workspaceWritable || layout.rows === 1} aria-label="Hapus baris aktif"
+              onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeRow(l, Math.floor(activeCell / l.cols))))}>Hapus baris</Button>
           </div>
         </div>
       )}
@@ -332,13 +370,13 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
         }}>
           {!mobile && <div />}{/* pojok kiri-atas: perpotongan kedua gutter */}
           {!mobile && Array.from({ length: layout.cols }, (_, c) => (
-            <GutterX key={`col-${c}`} label={`Tutup kolom ${c + 1}`} disabled={layout.cols === 1}
-              onClick={() => setWs((w) => W.mapActiveLayout(w, (l) => L.removeColumn(l, c)))} />
+            <GutterX key={`col-${c}`} label={`Tutup kolom ${c + 1}`} disabled={!workspaceWritable || layout.cols === 1}
+              onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeColumn(l, c)))} />
           ))}
           {Array.from({ length: layout.rows }, (_, r) => (
             <React.Fragment key={`row-${r}`}>
-              {!mobile && <GutterX label={`Tutup baris ${r + 1}`} disabled={layout.rows === 1}
-                onClick={() => setWs((w) => W.mapActiveLayout(w, (l) => L.removeRow(l, r)))} />
+              {!mobile && <GutterX label={`Tutup baris ${r + 1}`} disabled={!workspaceWritable || layout.rows === 1}
+                onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeRow(l, r)))} />
               }
               {Array.from({ length: layout.cols }, (_, c) => {
                 const idx = r * layout.cols + c;
@@ -352,11 +390,11 @@ export function TerminalScreen({ projects, backlog = [], focusSession, onOpenRev
                   }}>
                     {s
                       ? <Cell session={s} nameOf={nameOf} onClose={() => void close(s.id)}
-                          onDetach={() => detach(s.id)} onExit={(code) => markExited(s.id, code)} onReview={onOpenReview}
+                          canArrange={workspaceWritable} onDetach={() => detach(s.id)} onExit={(code) => markExited(s.id, code)} onReview={onOpenReview}
                           onSessionReview={onOpenSessionReview}
                           titleOf={titleOf} onIntegrate={onIntegrate} onIntegrateSession={onIntegrateSession} specOf={specOf}
                           fullscreen={fullId === s.id} onFullscreen={() => setFullId(s.id)} />
-                      : <EmptyCell unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
+                      : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
                   </div>
                 );
               })}
@@ -489,8 +527,8 @@ function BacklogPicker({ seed, activeIds, error, onPick, onClose }: {
 // Tab = grup, tiap grup punya grid sendiri. Grup non-aktif tak dirender: pane-nya unmount
 // dan WebSocket-nya tertutup. Kembali ke tab itu meng-attach ulang ke sesi tmux yang sama —
 // scrollback dipegang tmux (ADR-0016), bukan buffer xterm di memori.
-function GroupTabs({ ws, compact = false, onSelect, onAdd, onRename, onRemove }: {
-  ws: W.Workspace; compact?: boolean; onSelect: (id: string) => void; onAdd: () => void;
+function GroupTabs({ ws, compact = false, writable, onSelect, onAdd, onRename, onRemove }: {
+  ws: W.Workspace; compact?: boolean; writable: boolean; onSelect: (id: string) => void; onAdd: () => void;
   onRename: (id: string, name: string) => void; onRemove: (id: string) => void;
 }) {
   const [editing, setEditing] = React.useState<string | null>(null);
@@ -532,7 +570,7 @@ function GroupTabs({ ws, compact = false, onSelect, onAdd, onRename, onRemove }:
               style={{ border: 0, padding: 0, background: "transparent", font: "inherit", cursor: "pointer", color: isActive ? "var(--text-strong)" : "var(--text-muted)" }}>
               {g.name}
             </button>
-            {isActive && (
+            {isActive && writable && (
               <>
                 <button className="hn-terminal-group-control" aria-label={`Ganti nama grup ${g.name}`} title="Ganti nama"
                   onClick={() => setEditing(g.id)}
@@ -547,7 +585,8 @@ function GroupTabs({ ws, compact = false, onSelect, onAdd, onRename, onRemove }:
           </span>
         );
       })}
-      <button className="hn-terminal-group-control" aria-label="Grup baru" title="Grup baru" onClick={onAdd}
+      <button className="hn-terminal-group-control" aria-label="Grup baru" title="Grup baru"
+        disabled={!writable} onClick={onAdd}
         style={{ border: 0, background: "transparent", cursor: "pointer", padding: "3px 8px", color: "var(--text-subtle)", fontSize: 12 }}>+</button>
     </div>
   );
@@ -613,9 +652,9 @@ export function PhaseStrip({ phases }: { phases: Phase[] | null }) {
   );
 }
 
-function Cell({ session, nameOf, onClose, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fullscreen, onFullscreen }: {
+function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fullscreen, onFullscreen }: {
   session: TerminalSession; nameOf: (pid: string) => string;
-  onClose: () => void; onDetach: () => void; onExit: (code: number) => void;
+  onClose: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
   onReview?: (specId: string) => void;
   onSessionReview?: (sessionId: string, title: string) => void;
   titleOf?: (specId: string) => string | undefined;
@@ -732,6 +771,7 @@ function Cell({ session, nameOf, onClose, onDetach, onExit, onReview, onSessionR
           <Icon name="fullscreen" size={12} />
         </button>
         <button type="button" className="hn-terminal-action hn-terminal-action--text" onClick={onDetach}
+          disabled={!canArrange}
           title="Lepas dari grid (sesi tetap hidup)">lepas</button>
         <button type="button" className="hn-terminal-action" aria-label={`Tutup sesi ${session.id}`}
           onClick={onClose}>×</button>
@@ -786,12 +826,12 @@ function FullscreenTerminal({ session, label, onClose }: {
   );
 }
 
-function EmptyCell({ unplaced, nameOf, onPick }: {
-  unplaced: TerminalSession[]; nameOf: (pid: string) => string; onPick: (id: string) => void;
+function EmptyCell({ unplaced, nameOf, onPick, disabled }: {
+  unplaced: TerminalSession[]; nameOf: (pid: string) => string; onPick: (id: string) => void; disabled: boolean;
 }) {
   return (
     <div style={{ flex: 1, display: "grid", placeItems: "center", padding: 12 }}>
-      <Select size="sm" value="" aria-label="Pilih sesi untuk sel" disabled={!unplaced.length}
+      <Select size="sm" value="" aria-label="Pilih sesi untuk sel" disabled={disabled || !unplaced.length}
         onChange={(e) => e.target.value && onPick(e.target.value)}
         options={[{ value: "", label: unplaced.length ? "Pilih sesi…" : "tidak ada sesi bebas" }]
           .concat(unplaced.map((s) => ({

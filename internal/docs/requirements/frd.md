@@ -99,6 +99,20 @@ tanpa penopang tidak ditulis.
   `Run` di DB — dan sesi SHALL bertahan lintas restart API
   ([ADR-0016](../adr/0016-sesi-terminal-hidup-di-tmux.md)).
 - WHILE sesi berjalan, THE SYSTEM SHALL menerima steer, interupsi, dan penutupan dari terminal web.
+- THE SYSTEM SHALL menyimpan identitas/nama/urutan grup, dimensi grid, urutan cell row-major, dan
+  `sessionId` per cell sebagai `TerminalWorkspaceV1` kanonik **per akun admin** di server; akun lain
+  SHALL tidak mewarisi mapping itu ([ADR-0118](../adr/0118-workspace-terminal-kanonik-per-user.md)).
+- WHEN Terminal dibuka, THE SYSTEM SHALL memuat workspace server sebelum mengaktifkan write. Browser
+  legacy SHALL menjadi seed hanya bila server belum punya workspace; browser tanpa legacy SHALL tidak
+  menulis workspace kosong, dan cache lokal SHALL tidak pernah diunggah otomatis sesudah fetch gagal.
+- WHEN dua tab/perangkat menyimpan revision yang sama, THE SYSTEM SHALL menerima paling banyak satu
+  write dan SHALL menjawab write stale dengan `revision-conflict` + snapshot current. Klien MAY
+  menerapkan ulang mutasinya tepat sekali, tetapi SHALL tidak melakukan last-write-wins diam-diam.
+- THE SYSTEM SHALL me-refresh workspace lewat HTTP saat mount, focus/visible kembali, dan sesudah
+  mutasi. Adaptasi desktop/tablet/mobile SHALL hanya mengubah proyeksi; grup, koordinat, dan pemetaan
+  sesi kanonik SHALL tidak berubah karena viewport.
+- THE SYSTEM SHALL merekonsiliasi `sessionId` yang hilang hanya setelah workspace server **dan** daftar
+  tmux otoritatif berhasil dimuat. Kegagalan daftar tmux SHALL tidak dianggap sebagai daftar kosong.
 - THE SYSTEM SHALL menurunkan fase aktif dari phase-file append-only yang ditulis sesi
   (`echo "<Fase> done" >> $HANOMAN_PHASE_FILE`), bukan dari proses terpisah per fase.
 - THE SYSTEM SHALL menjalankan sesi dengan agen `claude` **atau** `codex` sesuai `Setting.agent`, dengan

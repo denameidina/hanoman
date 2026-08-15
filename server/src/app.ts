@@ -17,6 +17,7 @@ import docs from "./routes/docs";
 import ide from "./routes/ide";
 import fs from "./routes/fs";
 import terminal from "./routes/terminal";
+import terminalWorkspace from "./routes/terminal-workspace";
 import vps from "./routes/vps";
 import limits from "./routes/limits";
 import codex from "./routes/codex";
@@ -176,6 +177,7 @@ export function buildApp(
     await api.register(fs);
     const wsOptions = { allowedOrigins: wsControlOrigins(env) };
     await api.register(terminal, wsOptions);
+    await api.register(terminalWorkspace);
     await api.register(vps);
     await api.register(limits);
     await api.register(update);

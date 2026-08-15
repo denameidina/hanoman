@@ -310,6 +310,11 @@ tidak boleh menulis `RuntimeConfig` maupun field launch approval.
   DISENGAJA: itulah yang membuat migrasi aman untuk instance yang sudah berjalan (setiap baris lama
   otomatis admin, nol backfill). `disabled` ditegakkan di **dua** titik — `POST /auth/login` **dan**
   `lookupSession()`; hanya menutup login berarti cookie yang sudah terbit hidup sampai 7 hari.
+  **Workspace Terminal sejak SPEC-786/[ADR-0118](../adr/0118-workspace-terminal-kanonik-per-user.md):**
+  `terminalWorkspace Json?` (`TerminalWorkspaceV1` atau null), `terminalWorkspaceRevision Int
+  @default(0)`, dan `terminalWorkspaceUpdatedAt DateTime?`. Ketiganya LOCAL-only per akun admin:
+  tidak masuk `SYNCED`/`FIELDS`, `PG_ORDER`, atau webhook. Revision di-increment atomik oleh PUT CAS;
+  JSON non-null yang gagal schema dibaca sebagai 422, tidak disulap menjadi workspace kosong.
 - **ClientProjectAccess** (SPEC-617 · ADR-0110): `id` (cuid), `userId`, `projectId`, `createdAt`,
   `@@unique([userId, projectId])`, `onDelete: Cascade` dari **keduanya** (dan `onUpdate: Cascade`
   bawaan Prisma membuat rename `Project.id` — ADR-0064 — merambat tanpa baris tambahan). Project yang

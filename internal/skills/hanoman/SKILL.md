@@ -107,8 +107,18 @@ Pakai skill lebih sempit saat task cocok:
   per berkas → state bocor antar-test dan terbaca seperti regresi komponen); `ResetViewButton` &
   `ds/shell.tsx` mengimpor lewat berkas, **bukan barrel** (`ds → shell → ui-state → ds` = lingkaran
   impor yang mati saat init); dan state milik App yang dipakai sebuah layar (`projectFilter`) di luar
-  jangkauan reset berskop layar → lewat prop `onReset`. Tanpa migration, endpoint, atau perubahan
-  kontrak API — murni state klien; kunci `hanoman.terminal.workspace` & flag Pet sengaja tak dipindah.
+  jangkauan reset berskop layar → lewat prop `onReset`. Filter/scroll/fullscreen tetap murni state
+  klien; pengecualian mapping kerja Terminal ditetapkan ADR-0118. Flag Pet tetap pada key lamanya.
+- **Mapping workspace Terminal adalah state server per akun admin** (SPEC-786/**ADR-0118**,
+  mengamandemen sebagian ADR-0115; ADR-0016 ditegakkan): `TerminalWorkspaceV1` berisi grup berurutan
+  + grid row-major + `sessionId`, disimpan LOCAL-only pada `User.terminalWorkspace` bersama
+  `terminalWorkspaceRevision`/`terminalWorkspaceUpdatedAt`. `GET/PUT /api/terminal/workspace`
+  COOKIE_ONLY; PUT wajib `{baseRevision,workspace}`, stale → `409 revision-conflict + current`.
+  Klien server-first: legacy `hanoman.terminal.workspace` hanya seed bila GET null; browser kosong
+  tak PUT; cache `hanoman.terminal.workspace.v2.<userId>` hanya recovery read-only. Semua request
+  diserialkan, konflik di-reapply tepat sekali lalu refetch/fail visible. Rekonsiliasi cell mati baru
+  setelah workspace server + daftar tmux sukses; rejection bukan `[]`. Responsive hanya proyeksi:
+  active group/cell, fullscreen, modal, viewport tetap lokal dan resize tak pernah menulis mapping.
 - Terminal server: **node-pty + tmux** (socket `-L hanoman`, `remain-on-exit on`); terminal web: **xterm.js** merender TUI Claude Code apa adanya. tmux menahan sesi hidup lintas restart API (ADR-0016). xterm mengirim satu frame WS per ketikan, jadi route terminal memakai quota 6.000 frame/menit (bukan default 120); `TerminalPane` menahan input selama `CONNECTING` dan swipe vertikal satu jari menggulir scrollback lewat `Terminal.scrollLines()` tanpa menggerakkan layout (SPEC-771).
 - **Tidak ada** message queue, Redis, worker terpisah, scheduler cron, maupun webhook GitHub — semua dicabut saat pindah ke sesi interaktif (ADR-0024). Kerja latar semuanya `setInterval` in-process yang di-`start` dari `server.ts` (`app.ts` bebas-timer): monitor VPS (health 5 mnt, audit 24 jam), engine scheduler (ADR-0072) — yang sejak **SPEC-646/ADR-0112** juga memiliki **cronjob per project** (jadwal HH:MM yang ditunda ADR-0072): jatuh tempo dimaterialisasi jadi baris `SchedulerCronRun` di tick yang SAMA, tanpa timer kedua, dan sesinya lahir ber-id deterministik `cron-<cronId>` di worktree isolasi — dan denyut hanoman-lead (ADR-0091).
 - Server production **bind `127.0.0.1` tanpa pengecualian**; public/control exact origin dipisah dan control host wajib access proxy SSO/MFA/VPN (SPEC-761/ADR-0117).

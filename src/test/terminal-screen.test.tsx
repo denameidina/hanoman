@@ -36,8 +36,12 @@ const listSpecs = vi.fn();   // SPEC-198 · picker startable via API
 // SPEC-517 · "Sesi baru" membuka form runtime yang membaca setelan global + versi codex CLI.
 const getSettings = vi.fn();
 const getCodexVersion = vi.fn();
+const getTerminalWorkspace = vi.fn();
+const putTerminalWorkspace = vi.fn();
 vi.mock("../src/api/client", () => ({
-  ApiError: class ApiError extends Error { constructor(public status: number, msg: string) { super(msg); } },
+  ApiError: class ApiError extends Error {
+    constructor(public status: number, msg: string, public detail: unknown = null) { super(msg); }
+  },
   api: {
     listTerminals: (...a: unknown[]) => listTerminals(...a),
     createTerminal: (...a: unknown[]) => createTerminal(...a),
@@ -48,6 +52,8 @@ vi.mock("../src/api/client", () => ({
     listSpecs: (...a: unknown[]) => listSpecs(...a),
     getSettings: (...a: unknown[]) => getSettings(...a),
     getCodexVersion: (...a: unknown[]) => getCodexVersion(...a),
+    getTerminalWorkspace: (...a: unknown[]) => getTerminalWorkspace(...a),
+    putTerminalWorkspace: (...a: unknown[]) => putTerminalWorkspace(...a),
   },
 }));
 // SPEC-199 · daftar sesi kini didorong lewat WS siar; tangkap handler subscribe untuk mempush frame.
@@ -88,6 +94,13 @@ beforeEach(() => {
   // SPEC-517 · form "Sesi baru": default global + versi codex. Keduanya gagal-diam di modal,
   // tapi mock-nya tetap dipasang supaya test tak bergantung pada jalur galat.
   getSettings.mockReset(); getCodexVersion.mockReset();
+  getTerminalWorkspace.mockReset(); putTerminalWorkspace.mockReset();
+  getTerminalWorkspace.mockResolvedValue({ workspace: null, revision: 0, updatedAt: null });
+  putTerminalWorkspace.mockImplementation(async (input: { baseRevision: number; workspace: unknown }) => ({
+    workspace: input.workspace,
+    revision: input.baseRevision + 1,
+    updatedAt: "2026-08-15T00:00:00.000Z",
+  }));
   getSettings.mockResolvedValue({ model: "claude-opus-5", effort: "xhigh", agent: "claude",
     codex: { model: "gpt-5.6-sol", effort: "xhigh" } });
   getCodexVersion.mockResolvedValue({ version: "0.145.0", minRequired: "0.144.0", ok: true });
@@ -95,24 +108,128 @@ beforeEach(() => {
 afterEach(resetViewport);
 
 describe("TerminalScreen (grid)", () => {
+  it("memuat state server sebelum render dan tidak menulis ulang snapshot yang sama", async () => {
+    getTerminalWorkspace.mockResolvedValue({
+      workspace: { version: 1, groups: [{
+        id: "server-group", name: "Server", layout: { rows: 1, cols: 1, cells: ["remote-session"] },
+      }] },
+      revision: 4,
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    listTerminals.mockResolvedValue([
+      { id: "remote-session", projectId: "p1", cwd: "/repo", exited: false },
+    ]);
+
+    render(<TerminalScreen userId="u1" projects={projects} />);
+    expect(await screen.findByTestId("pane")).toHaveTextContent("remote-session");
+    expect(screen.getByRole("tab", { name: "Server" })).toBeInTheDocument();
+    expect(putTerminalWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("menunggu workspace dan daftar tmux otoritatif sebelum merekonsiliasi sesi hilang", async () => {
+    let resolveSessions!: (sessions: unknown[]) => void;
+    getTerminalWorkspace.mockResolvedValue({
+      workspace: { version: 1, groups: [{
+        id: "g1", name: "Utama", layout: { rows: 1, cols: 1, cells: ["gone-session"] },
+      }] },
+      revision: 3,
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    listTerminals.mockReturnValue(new Promise((resolve) => { resolveSessions = resolve; }));
+    render(<TerminalScreen userId="u1" projects={projects} />);
+
+    await waitFor(() => expect(getTerminalWorkspace).toHaveBeenCalled());
+    expect(putTerminalWorkspace).not.toHaveBeenCalled();
+    resolveSessions([]);
+    await waitFor(() => expect(putTerminalWorkspace).toHaveBeenCalledWith({
+      baseRevision: 3,
+      workspace: { version: 1, groups: [{
+        id: "g1", name: "Utama", layout: { rows: 1, cols: 1, cells: [null] },
+      }] },
+    }));
+  });
+
+  it("tidak merekonsiliasi atau menulis bila daftar tmux gagal dimuat", async () => {
+    getTerminalWorkspace.mockResolvedValue({
+      workspace: { version: 1, groups: [{
+        id: "g1", name: "Utama", layout: { rows: 1, cols: 1, cells: ["keep-session"] },
+      }] },
+      revision: 3,
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    listTerminals.mockRejectedValue(new Error("tmux unavailable"));
+    render(<TerminalScreen userId="u1" projects={projects} />);
+
+    await waitFor(() => expect(getTerminalWorkspace).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Utama" })).toBeInTheDocument());
+    expect(listTerminals).toHaveBeenCalled();
+    expect(putTerminalWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("menampilkan recovery, menonaktifkan writer, lalu Retry memulihkan layout", async () => {
+    getTerminalWorkspace.mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ workspace: null, revision: 0, updatedAt: null });
+    listTerminals.mockResolvedValue([]);
+    render(<TerminalScreen userId="u1" projects={projects} />);
+
+    expect(await screen.findByTestId("terminal-workspace-status"))
+      .toHaveTextContent("Layout server belum tersambung");
+    expect(screen.getByRole("button", { name: "+ Kolom" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.queryByTestId("terminal-workspace-status")).toBeNull());
+    expect(screen.getByRole("button", { name: "+ Kolom" })).toBeEnabled();
+    expect(putTerminalWorkspace).not.toHaveBeenCalled();
+  });
   it("keeps every terminal mounted while the mobile panel selector changes presentation only", async () => {
     mockViewport(390);
     localStorage.setItem(WKEY, JSON.stringify({ active: "g1", groups: [
       { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: ["aaaa1111", "bbbb2222"] } },
     ] }));
-    const before = localStorage.getItem(WKEY);
     listTerminals.mockResolvedValue([
       { id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false },
       { id: "bbbb2222", projectId: "p1", cwd: "/repo", exited: false },
     ]);
     render(<TerminalScreen projects={projects} />);
     await screen.findByRole("tablist", { name: "Panel terminal" });
+    await waitFor(() => expect(putTerminalWorkspace).toHaveBeenCalledTimes(1));
+    const seeded = structuredClone(putTerminalWorkspace.mock.calls[0]![0]);
     expect(screen.getAllByTestId("pane")).toHaveLength(2);
     expect(document.querySelector('[data-terminal-cell-index="0"]')).toHaveAttribute("aria-hidden", "false");
     fireEvent.click(screen.getByRole("tab", { name: /Panel 2/ }));
     expect(document.querySelector('[data-terminal-cell-index="1"]')).toHaveAttribute("aria-hidden", "false");
-    expect(JSON.parse(localStorage.getItem(WKEY)!)).toEqual(JSON.parse(before!));
+    expect(putTerminalWorkspace).toHaveBeenCalledTimes(1);
+    expect(putTerminalWorkspace.mock.calls[0]![0]).toEqual(seeded);
     expect(screen.getByRole("button", { name: "Hapus kolom aktif" })).toBeInTheDocument();
+  });
+  it("desktop → tablet → mobile mempertahankan grup dan koordinat sessionId kanonik", async () => {
+    const viewport = mockViewport(1440);
+    getTerminalWorkspace.mockResolvedValue({
+      workspace: { version: 1, groups: [
+        { id: "g-main", name: "Utama", layout: { rows: 1, cols: 1, cells: [null] } },
+        { id: "g-debug", name: "Debug", layout: {
+          rows: 2, cols: 2, cells: [null, "session-x", null, null],
+        } },
+      ] },
+      revision: 9,
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    listTerminals.mockResolvedValue([
+      { id: "session-x", projectId: "p1", cwd: "/repo", exited: false },
+    ]);
+    render(<TerminalScreen userId="u1" projects={projects} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Debug" }));
+    await waitFor(() => expect(document.querySelector('[data-terminal-cell-index="1"]')).toHaveTextContent("session-x"));
+    expect(putTerminalWorkspace).not.toHaveBeenCalled();
+
+    act(() => viewport.resize(900));
+    expect(document.querySelector('[data-terminal-cell-index="1"]')).toHaveTextContent("session-x");
+    act(() => viewport.resize(390));
+    fireEvent.click(await screen.findByRole("tab", { name: /Panel 2/ }));
+    expect(document.querySelector('[data-terminal-cell-index="1"]')).toHaveTextContent("session-x");
+    fireEvent.click(screen.getByRole("tab", { name: /Panel 1/ }));
+    expect(document.querySelector('[data-terminal-cell-index="1"]')).toHaveTextContent("session-x");
+    expect(screen.getByRole("tab", { name: "Debug" })).toHaveAttribute("aria-selected", "true");
+    expect(putTerminalWorkspace).not.toHaveBeenCalled();
   });
   it("reveals the requested session cell on mobile without changing the persisted grid", async () => {
     mockViewport(390);

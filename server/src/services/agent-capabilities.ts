@@ -67,6 +67,9 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   if (top === "vps") return rw("vps");
   if (top === "prds") return rw("docs");
   if (top === "terminal") {
+    // SPEC-786 · workspace memuat preferensi per akun dan diturunkan dari req.user.id;
+    // capability sesi tak membawa identitas admin yang diperlukan untuk isolasi row ini.
+    if (seg[1] === "workspace") return "COOKIE_ONLY";
     if (seg[seg.length - 1] === "ws") return "sessions:write"; // WS = kontrol interaktif
     return rw("sessions");
   }

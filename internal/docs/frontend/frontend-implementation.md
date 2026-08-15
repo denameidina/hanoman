@@ -164,7 +164,7 @@ menyapu sisanya. Nilai yang gagal di-parse atau salah bentuk jatuh ke default, t
 | triage | — | `tab`, `project`, `status`, `q`, `page`, `openId`, scroll |
 | scheduler | — | `queue-<status>-page`, `cronRunsPage`, `cronProject`, `cronOpenRuns` |
 | lead | — | `filter`, `decPage`, `flowPage` |
-| terminal | — | `project` (grid tetap di kunci lama `hanoman.terminal.workspace`) |
+| terminal | — | `project`; mapping grid kanonik di server per user (ADR-0118) |
 | ide | project | `tab`, `viewRef`, `selected`, `selKind`, `mdView`, `stagedView`, `changedView`, `diffTab` |
 | vps | — | `detailId` |
 | docs | project | `selected` |
@@ -349,7 +349,7 @@ diumumkan. Pose aktif membawa alt bermakna berisi kalimat statusnya; lapisan pos
 sama lewat `title`; klik membuka kartunya. Panel yang sedang keluar inert agar kontrol tersembunyi
 tidak dapat menerima fokus.
 
-**Sembunyikan** disimpan di `localStorage` `hanoman.pet.hidden` (pola `hanoman.terminal.workspace`)
+**Sembunyikan** disimpan di `localStorage` `hanoman.pet.hidden` sebagai state presentasional lokal
 — preferensi per-browser, tanpa skema & tanpa endpoint. Disembunyikan berarti **menyusut** jadi
 pegangan bundar 44 px ber-`Mark` buntut, bukan lenyap: tanpa itu operator tak punya jalan kembali
 selain membersihkan `localStorage`.
@@ -581,16 +581,31 @@ mengganti nama, `×` menghapus; grup terakhir tak bisa dihapus). Tiap grup memeg
 sendiri, dan satu sesi menempati paling banyak satu sel **di satu grup** — tray karena itu global,
 berisi sesi yang tak punya sel di grup mana pun. Grup non-aktif tidak dirender, jadi pindah tab
 menutup lalu membuka ulang WebSocket sesi di grup tujuan; scrollback dipegang tmux, bukan buffer
-xterm. State `{groups, active}` disimpan di `localStorage` (`hanoman.terminal.workspace`) dan
-memigrasikan key lama `hanoman.terminal.layout` menjadi satu grup "Utama" saat pertama dibaca.
-Logika grup murni ada di `screens/terminal-workspace.ts` (SPEC-161).
+xterm. Sejak SPEC-786/[ADR-0118](../adr/0118-workspace-terminal-kanonik-per-user.md), state kanonik
+adalah `TerminalWorkspaceV1 = {version:1,groups}` di `User.terminalWorkspace`: urutan grup,
+`{rows,cols,cells}` row-major, dan `sessionId` per cell. `active`, `activeCell`, fullscreen, modal,
+viewport, dan panel mobile yang terlihat tetap lokal. Logika grup murni ada di
+`screens/terminal-workspace.ts`; schema wire bersama ada di `@hanoman/shared`.
 
-Layout (`{rows,cols,cells}`) tiap grup disimpan di
-`localStorage` dan **direkonsiliasi** ke `listSessions()` saat mount — sesi hidup di tmux dan
-selamat dari restart server (ADR-0016), jadi sel yang sesinya masih hidup tersambung ulang dan sel
-yang sesinya sudah di-kill dikosongkan. Logika grid murni ada di `screens/terminal-layout.ts`
-(teruji tanpa DOM). Ini bukan chat buatan sendiri — yang dirender adalah TUI Claude Code asli, byte
-demi byte. Nol perubahan server: route dan `pty.ts` dipakai apa adanya (SPEC-158).
+`useTerminalWorkspace(userId)` melakukan `GET /terminal/workspace` **sebelum** writer aktif,
+menserialkan semua GET/PUT, dan menyimpan lewat `{baseRevision,workspace}`. Satu 409
+`revision-conflict` menerapkan ulang fungsi mutasi ke snapshot `current` tepat sekali; konflik kedua
+memuat state terbaru dan menampilkan status, bukan overwrite diam-diam. Mount, window focus,
+document visible, dan write sukses diikuti refresh/adopsi HTTP; tak ada WebSocket baru.
+
+`hanoman.terminal.workspace` dan `hanoman.terminal.layout` sekarang hanya input migrasi satu kali:
+bila GET server null dan legacy valid, browser itu boleh seed; browser kosong tidak PUT. Setelah
+server mempunyai state, legacy dibuang. Cache `hanoman.terminal.workspace.v2.<userId>` hanya paint
+recovery per-user saat GET gagal — writer mati, cache tidak pernah diunggah otomatis. Status
+`loading`/`recovering`/`conflict` terlihat di toolbar dan kontrol mapping dinonaktifkan ketika write
+tidak aman.
+
+Rekonsiliasi menunggu workspace server **dan** `listTerminals()` sukses. Rejection list tidak diubah
+menjadi `[]`; hanya sesi yang terbukti tak ada pada snapshot tmux sukses yang dikeluarkan dari cell,
+dan hasil berbeda dipersistenkan lewat CAS. Logika grid murni tetap di
+`screens/terminal-layout.ts` (teruji tanpa DOM). Responsive desktop/tablet/mobile memakai objek
+kanonik yang sama: resize dan selector panel tidak pernah memanggil writer atau mengubah koordinat.
+Ini bukan chat buatan sendiri — yang dirender adalah TUI agen asli, byte demi byte.
 
 Tombol **Layar penuh** (`maximize-2`) di ujung toolbar memaksimalkan screen: root-nya jadi
 `position: fixed; inset: 0; z-index: 100`, menimpa sidebar dan topbar `Shell` — di bawah modal (150)

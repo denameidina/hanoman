@@ -107,32 +107,62 @@ describe("terminal-workspace", () => {
     expect(live.groups[1]!.layout.cells).toEqual(["b", null]);
   });
 
-  it("load/save round-trip lewat localStorage", () => {
+  it("toCanonical/fromCanonical memisahkan active lokal tanpa mengubah grup", () => {
     const ws = twoGroups();
-    W.save(ws);
-    expect(W.load()).toEqual(ws);
+    const canonical = W.toCanonical(ws);
+    expect(canonical).toEqual({ version: 1, groups: ws.groups });
+    expect(W.fromCanonical(canonical, ws.active)).toEqual(ws);
+    expect(W.fromCanonical(canonical, "hantu").active).toBe(ws.groups[0]!.id);
   });
 
-  it("load memigrasikan key lama jadi satu grup 'Utama' dan menghapus key lama", () => {
+  it("readLegacy memvalidasi workspace lama tanpa menghapusnya sebelum server menerima seed", () => {
+    const ws = twoGroups();
+    localStorage.setItem(W.KEY, JSON.stringify(ws));
+    expect(W.readLegacy()).toEqual({ workspace: W.toCanonical(ws), active: ws.active });
+    expect(localStorage.getItem(W.KEY)).not.toBeNull();
+  });
+
+  it("readLegacy memigrasikan key layout lama di memori tanpa menulis storage", () => {
     const legacy = { rows: 1, cols: 2, cells: ["a", null] };
     localStorage.setItem(W.LEGACY_KEY, JSON.stringify(legacy));
-    const ws = W.load()!;
-    expect(ws.groups).toHaveLength(1);
-    expect(ws.groups[0]!.name).toBe("Utama");
-    expect(ws.groups[0]!.layout).toEqual(legacy);
-    expect(ws.active).toBe(ws.groups[0]!.id);
-    expect(localStorage.getItem(W.LEGACY_KEY)).toBeNull();       // tak ditinggal jadi sampah
-    expect(JSON.parse(localStorage.getItem(W.KEY)!)).toEqual(ws); // sudah dipersist
+    const migrated = W.readLegacy()!;
+    expect(migrated.workspace.groups).toHaveLength(1);
+    expect(migrated.workspace.groups[0]!.name).toBe("Utama");
+    expect(migrated.workspace.groups[0]!.layout).toEqual(legacy);
+    expect(migrated.active).toBe(migrated.workspace.groups[0]!.id);
+    expect(localStorage.getItem(W.LEGACY_KEY)).not.toBeNull();
+    expect(localStorage.getItem(W.KEY)).toBeNull();
   });
 
-  it("load: key baru menang atas key lama", () => {
+  it("readLegacy: workspace lama menang atas layout yang lebih tua", () => {
     const ws = W.emptyWorkspace();
-    W.save(ws);
+    localStorage.setItem(W.KEY, JSON.stringify(ws));
     localStorage.setItem(W.LEGACY_KEY, JSON.stringify({ rows: 9, cols: 9, cells: [] }));
-    expect(W.load()).toEqual(ws);
+    expect(W.readLegacy()).toEqual({ workspace: W.toCanonical(ws), active: ws.active });
   });
 
-  it("load tanpa data → null", () => {
-    expect(W.load()).toBeNull();
+  it("clearLegacy baru membuang kedua key sesudah bootstrap server selesai", () => {
+    localStorage.setItem(W.KEY, "{}");
+    localStorage.setItem(W.LEGACY_KEY, "{}");
+    W.clearLegacy();
+    expect(localStorage.getItem(W.KEY)).toBeNull();
+    expect(localStorage.getItem(W.LEGACY_KEY)).toBeNull();
+  });
+
+  it("cache recovery tervalidasi dan terisolasi per user", () => {
+    const ws = twoGroups();
+    const cached = { workspace: W.toCanonical(ws), revision: 7, active: ws.active };
+    W.writeCache("u1", cached);
+    expect(W.readCache("u1")).toEqual(cached);
+    expect(W.readCache("u2")).toBeNull();
+
+    localStorage.setItem(W.cacheKey("bad"), JSON.stringify({ ...cached, revision: -1 }));
+    expect(W.readCache("bad")).toBeNull();
+  });
+
+  it("legacy/cache rusak dan storage kosong jatuh ke null tanpa melempar", () => {
+    localStorage.setItem(W.KEY, "{not-json");
+    expect(W.readLegacy()).toBeNull();
+    expect(W.readCache("u1")).toBeNull();
   });
 });

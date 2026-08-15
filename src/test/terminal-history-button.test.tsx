@@ -16,8 +16,12 @@ vi.mock("../src/api/client", () => ({
     createShell: (...a: unknown[]) => createShell(...a),
     createTerminal: (...a: unknown[]) => createTerminal(...a),
     deleteTerminal: vi.fn(async () => {}),
+    getTerminalWorkspace: vi.fn(async () => ({ workspace: null, revision: 0, updatedAt: null })),
+    putTerminalWorkspace: vi.fn(async (input: { baseRevision: number; workspace: unknown }) => ({
+      workspace: input.workspace, revision: input.baseRevision + 1, updatedAt: "2026-08-15T00:00:00.000Z",
+    })),
   },
-  ApiError: class extends Error {},
+  ApiError: class extends Error { status = 0; detail: unknown = null; },
 }));
 vi.mock("../src/api/events", () => ({ subscribe: () => () => {} }));
 vi.mock("../src/screens/TerminalPane", () => ({ TerminalPane: () => <div data-testid="pane" /> }));

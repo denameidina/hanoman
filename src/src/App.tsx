@@ -1255,7 +1255,7 @@ export default function App() {
           ? <StateBlock kind="empty" icon="box" title="Belum ada project"
               hint="Terminal butuh project dengan repoDir untuk dijalankan."
               action={() => setModal("project")} actionLabel="Project baru" />
-          : <TerminalScreen projects={projectsView} backlog={backlog} focusSession={focusSession}
+          : <TerminalScreen userId={me.id} projects={projectsView} backlog={backlog} focusSession={focusSession}
               onOpenReview={openReviewSpecId} onOpenSessionReview={openSessionReview}
               titleOf={(id) => backlog.find((s) => s.id === id)?.title}
               onIntegrate={integrateSpec} onIntegrateSession={integrateSession}

@@ -207,6 +207,11 @@ model User {
   // cookie yang sudah terbit tetap hidup sampai 7 hari (pencabutan yang tak mencabut).
   disabled     Boolean   @default(false)
   createdAt    DateTime  @default(now())
+  // SPEC-786 · LOCAL-only. Mapping Terminal is state operator per akun pada instance ini;
+  // fullscreen, focus, dan pilihan grup aktif tetap di browser dan tidak masuk JSON ini.
+  terminalWorkspace          Json?
+  terminalWorkspaceRevision  Int       @default(0)
+  terminalWorkspaceUpdatedAt DateTime?
   sessions     Session[]
   deviceTokens DeviceToken[]
   projectAccess ClientProjectAccess[]

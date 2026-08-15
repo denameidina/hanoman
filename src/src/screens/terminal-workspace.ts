@@ -4,6 +4,10 @@
 // Invarian "satu rumah": satu sesi terpasang di ≤1 sel, di ≤1 grup, lintas seluruh workspace.
 // L.setCell hanya menjamin keunikan DI DALAM satu layout; lintas-grup ditegakkan di placeInActive.
 import * as L from "./terminal-layout";
+import {
+  type TerminalWorkspaceV1,
+  zTerminalWorkspaceV1,
+} from "@hanoman/shared";
 
 export type Group = { id: string; name: string; layout: L.Layout };
 export type Workspace = { groups: Group[]; active: string };
@@ -76,20 +80,95 @@ export const reconcileAll = (ws: Workspace, liveIds: Set<string>): Workspace =>
 export const KEY = "hanoman.terminal.workspace";
 export const LEGACY_KEY = "hanoman.terminal.layout"; // SPEC-158, satu layout tanpa grup
 
-export function load(): Workspace | null {
-  try {
-    const s = localStorage.getItem(KEY);
-    if (s) return JSON.parse(s) as Workspace;
-    const legacy = localStorage.getItem(LEGACY_KEY);
-    if (!legacy) return null;
-    const g: Group = { ...newGroup("Utama"), layout: JSON.parse(legacy) as L.Layout };
-    const ws: Workspace = { groups: [g], active: g.id };
-    save(ws);
-    localStorage.removeItem(LEGACY_KEY);
-    return ws;
-  } catch { return null; }
+export type WorkspaceCache = {
+  workspace: TerminalWorkspaceV1;
+  revision: number;
+  active: string;
+};
+
+export const toCanonical = (ws: Workspace): TerminalWorkspaceV1 =>
+  zTerminalWorkspaceV1.parse({ version: 1, groups: ws.groups });
+
+export function fromCanonical(canonical: TerminalWorkspaceV1, active?: string): Workspace {
+  const groups = canonical.groups;
+  const selected = active && groups.some((group) => group.id === active)
+    ? active
+    : groups[0]!.id;
+  return { groups, active: selected };
 }
 
-export function save(ws: Workspace): void {
-  try { localStorage.setItem(KEY, JSON.stringify(ws)); } catch { /* mode privat / kuota penuh */ }
+function parseLegacyWorkspace(raw: string): { workspace: TerminalWorkspaceV1; active: string } | null {
+  try {
+    const value = JSON.parse(raw) as unknown;
+    if (!value || typeof value !== "object") return null;
+    const legacy = value as { groups?: unknown; active?: unknown };
+    const workspace = zTerminalWorkspaceV1.parse({ version: 1, groups: legacy.groups });
+    return {
+      workspace,
+      active: typeof legacy.active === "string"
+        && workspace.groups.some((group) => group.id === legacy.active)
+        ? legacy.active
+        : workspace.groups[0]!.id,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function readLegacy(): { workspace: TerminalWorkspaceV1; active: string } | null {
+  try {
+    const workspace = localStorage.getItem(KEY);
+    if (workspace) return parseLegacyWorkspace(workspace);
+
+    const layout = localStorage.getItem(LEGACY_KEY);
+    if (!layout) return null;
+    const parsedLayout = JSON.parse(layout) as unknown;
+    const group = { id: crypto.randomUUID(), name: "Utama", layout: parsedLayout };
+    const canonical = zTerminalWorkspaceV1.parse({ version: 1, groups: [group] });
+    return { workspace: canonical, active: group.id };
+  } catch {
+    return null;
+  }
+}
+
+export function clearLegacy(): void {
+  try {
+    localStorage.removeItem(KEY);
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    // Storage may be unavailable in private browsing modes.
+  }
+}
+
+export const cacheKey = (userId: string): string =>
+  `hanoman.terminal.workspace.v2.${encodeURIComponent(userId)}`;
+
+export function readCache(userId: string): WorkspaceCache | null {
+  try {
+    const raw = localStorage.getItem(cacheKey(userId));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<WorkspaceCache>;
+    const workspace = zTerminalWorkspaceV1.parse(value.workspace);
+    if (!Number.isInteger(value.revision) || (value.revision ?? -1) < 0) return null;
+    const active = typeof value.active === "string"
+      && workspace.groups.some((group) => group.id === value.active)
+      ? value.active
+      : workspace.groups[0]!.id;
+    return { workspace, revision: value.revision!, active };
+  } catch {
+    return null;
+  }
+}
+
+export function writeCache(userId: string, cache: WorkspaceCache): void {
+  try {
+    const workspace = zTerminalWorkspaceV1.parse(cache.workspace);
+    if (!Number.isInteger(cache.revision) || cache.revision < 0) return;
+    const active = workspace.groups.some((group) => group.id === cache.active)
+      ? cache.active
+      : workspace.groups[0]!.id;
+    localStorage.setItem(cacheKey(userId), JSON.stringify({ workspace, revision: cache.revision, active }));
+  } catch {
+    // Recovery cache is best-effort and never authoritative.
+  }
 }

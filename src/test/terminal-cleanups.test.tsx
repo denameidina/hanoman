@@ -19,6 +19,10 @@ vi.mock("../src/api/client", () => ({
     getSettings: vi.fn(async () => ({ model: "claude-opus-5", effort: "xhigh", agent: "claude",
       codex: { model: "gpt-5.6-sol", effort: "xhigh" } })),
     getCodexVersion: vi.fn(async () => ({ version: "0.145.0", minRequired: "0.144.0", ok: true })),
+    getTerminalWorkspace: vi.fn(async () => ({ workspace: null, revision: 0, updatedAt: null })),
+    putTerminalWorkspace: vi.fn(async (input: { baseRevision: number; workspace: unknown }) => ({
+      workspace: input.workspace, revision: input.baseRevision + 1, updatedAt: "2026-08-15T00:00:00.000Z",
+    })),
   },
 }));
 const ev = vi.hoisted(() => ({ handler: undefined as ((m: unknown) => void) | undefined }));

@@ -15,6 +15,10 @@ vi.mock("../src/api/client", () => ({
     listSpecs: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 0 })),
     getSettings: (...a: unknown[]) => getSettings(...a),
     getCodexVersion: (...a: unknown[]) => getCodexVersion(...a),
+    getTerminalWorkspace: vi.fn(async () => ({ workspace: null, revision: 0, updatedAt: null })),
+    putTerminalWorkspace: vi.fn(async (input: { baseRevision: number; workspace: unknown }) => ({
+      workspace: input.workspace, revision: input.baseRevision + 1, updatedAt: "2026-08-15T00:00:00.000Z",
+    })),
   },
 }));
 vi.mock("../src/api/events", () => ({ subscribe: () => () => {} }));

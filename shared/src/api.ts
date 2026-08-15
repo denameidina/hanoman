@@ -82,6 +82,7 @@ export const paths = {
   ideGitDrop: (id: string) => `${API}/projects/${id}/git/drop`,     // SPEC-233 · drop commit isolasi
   fsBrowse: (path?: string) => `${API}/fs/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`,
   terminalSessions: `${API}/terminal/sessions`,
+  terminalWorkspace: `${API}/terminal/workspace`,
   // SPEC-742 · ADR-0116 · pembersihan worktree yang masih tertunda sesudah sesi ditutup. Di bawah
   // prefix /terminal supaya ikut capability `sessions` yang sudah ada (cermin sessionHistory).
   terminalCleanups: `${API}/terminal/cleanups`,
