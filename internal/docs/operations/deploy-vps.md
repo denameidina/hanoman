@@ -26,8 +26,11 @@ operator ─ SSO/MFA/VPN ─ admin.example ┘                         │
   Nilainya juga menjadi basis link status yang dibagikan operator dan tujuan redirect `/help/*` dari
   host control (SPEC-805). Mengisinya hanya agar `assertRuntimeBoundary` mengizinkan boot membuat
   seluruh Help tak terjangkau lewat host mana pun — host control menolaknya secara desain, host
-  publik tak pernah di-resolve. Menjalankan single-origin (tanpa env ini) sah untuk instalasi non-
-  produksi dan menyajikan Help di host control, tetapi membatalkan pemisahan trust boundary ADR-0117.
+  publik tak pernah di-resolve. Bila host publik memang tak akan didirikan, pilih single-origin
+  secara **sadar**: hapus `HANOMAN_PUBLIC_ORIGINS` dan setel `HANOMAN_SINGLE_ORIGIN=1` — Help lalu
+  disajikan di host control itu sendiri. Mengosongkan env tanpa flag itu tetap gagal boot. Split
+  tetap bentuk yang dianjurkan; single-origin menaruh control plane di host yang sama dengan
+  permukaan anonim dan menyerahkan perlindungannya pada cookie login + limiter.
 - Hanoman bind loopback. Firewall hanya membuka SSH dan listener reverse proxy; port 8787 tidak
   pernah dibuka langsung.
 - Caddy harus menjadi satu-satunya proxy ke origin. `HANOMAN_TRUST_PROXY=1` berarti tepat satu hop;

@@ -130,6 +130,15 @@ Dua konsekuensi yang menyertainya:
   baru (info + submit), bukan menutup status tiket yang sudah masuk, dan `Project.id` dapat
   di-rename (SPEC-255) sehingga slug pada link lama basi. Submit dan info halaman tak berubah.
 
+Terakhir, **single-origin production kini sah lewat `HANOMAN_SINGLE_ORIGIN=1`**. Keputusan asli
+"origin wajib dipisahkan" hanya menegakkan bentuk env, bukan kenyataan: hub produksi lolos boot
+dengan `HANOMAN_PUBLIC_ORIGINS` menunjuk host yang tak punya DNS maupun vhost, dan vhost control-nya
+sendiri tak pernah berdiri di belakang access proxy. Yang dihasilkannya bukan boundary, melainkan
+Help yang mati diam-diam. Karena itu operator boleh memilih satu origin, tetapi harus **mengaku**;
+mengosongkan env begitu saja tetap gagal boot. Split tetap bentuk yang dianjurkan — memilih satu
+origin berarti control plane berada di host yang sama dengan permukaan anonim, dan perlindungannya
+turun ke cookie login + limiter, bukan lagi pemisahan ingress.
+
 Detail bukti di [audit SPEC-805](../research/audit-spec-805-link-status-publik-help-404.md).
 
 ## Invariant yang tidak boleh dilonggarkan diam-diam

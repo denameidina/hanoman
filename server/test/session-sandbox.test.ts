@@ -11,6 +11,20 @@ describe("production session sandbox", () => {
     expect(() => assertRuntimeBoundary({ NODE_ENV: "production", HANOMAN_SESSION_SANDBOX: "podman" }, { uid: 1000, host: "0.0.0.0" })).toThrow(/origin/);
   });
 
+  // SPEC-805 · single-origin hanya boleh lewat pengakuan eksplisit, bukan dengan mengosongkan env.
+  it("accepts single origin only when acknowledged explicitly (SPEC-805)", () => {
+    const single = { NODE_ENV: "production", HANOMAN_SESSION_SANDBOX: "podman",
+      HANOMAN_CONTROL_ORIGINS: "https://admin.example", HANOMAN_TRUST_PROXY: "127.0.0.1/32" };
+    expect(() => assertRuntimeBoundary(single, { uid: 1000, host: "127.0.0.1" })).toThrow(/origin/);
+    expect(() => assertRuntimeBoundary({ ...single, HANOMAN_SINGLE_ORIGIN: "1" }, { uid: 1000, host: "127.0.0.1" }))
+      .not.toThrow();
+    // pengakuan itu tak menghapus syarat lain, dan control origin tetap wajib
+    expect(() => assertRuntimeBoundary({ ...single, HANOMAN_SINGLE_ORIGIN: "1", HANOMAN_CONTROL_ORIGINS: undefined },
+      { uid: 1000, host: "127.0.0.1" })).toThrow(/origin/);
+    expect(() => assertRuntimeBoundary({ ...single, HANOMAN_SINGLE_ORIGIN: "1", HANOMAN_TRUST_PROXY: undefined },
+      { uid: 1000, host: "127.0.0.1" })).toThrow(/proxy/);
+  });
+
   it("builds a rootless, narrow-mount, internal-network Podman invocation", () => {
     const argv = sandboxArgv({
       command: "claude --dangerously-skip-permissions", worktree: "/srv/repo/.worktrees/spec-1",

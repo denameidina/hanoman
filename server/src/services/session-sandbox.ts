@@ -5,8 +5,11 @@ export function assertRuntimeBoundary(env: Env, runtime: { uid: number | undefin
   if (runtime.uid === 0) throw new Error("production Hanoman harus berjalan sebagai user non-root");
   if (env.HANOMAN_SESSION_SANDBOX !== "podman")
     throw new Error("HANOMAN_SESSION_SANDBOX=podman wajib di production");
-  if (!env.HANOMAN_PUBLIC_ORIGINS || !env.HANOMAN_CONTROL_ORIGINS)
-    throw new Error("public/control origin wajib dipisahkan di production");
+  // SPEC-805 · single-origin sah, tetapi hanya sebagai pengakuan eksplisit. Tanpa `HANOMAN_SINGLE_ORIGIN`
+  // syarat split tetap berlaku — sebab kegagalan yang dihindari di sini adalah env yang diisi asal agar
+  // boot lolos (host publik tanpa DNS/vhost), yang mematikan seluruh permukaan Help tanpa jejak.
+  if (!env.HANOMAN_CONTROL_ORIGINS || (!env.HANOMAN_PUBLIC_ORIGINS && !env.HANOMAN_SINGLE_ORIGIN))
+    throw new Error("public/control origin wajib dipisahkan di production (HANOMAN_SINGLE_ORIGIN=1 untuk sadar memilih satu origin)");
   if (!env.HANOMAN_TRUST_PROXY) throw new Error("trusted proxy hop/CIDR wajib di production");
   if (runtime.host !== "127.0.0.1" && runtime.host !== "::1" && runtime.host !== "localhost")
     throw new Error("origin Hanoman harus bind loopback; buka hanya reverse proxy");
