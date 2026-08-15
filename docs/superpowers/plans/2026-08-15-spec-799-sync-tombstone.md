@@ -1,6 +1,6 @@
 # SPEC-799 — Sync tombstone: penghapusan menyeberang antar-instance
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Penghapusan sebuah record menyeberang dua arah antara hub dan client sebagai keadaan pertama-kelas, dan record yang sudah dihapus tak pernah bisa dibangkitkan ulang oleh jalur mana pun.
 
@@ -76,7 +76,7 @@
   - `writeTombstone(entity: string, recordId: string, version: number, data: Record<string, unknown>, deviceId?: string): Promise<Tombstone>`
   - `clearTombstone(entity: string, recordId: string): Promise<void>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/tombstone.service.test.ts`:
 
@@ -124,14 +124,14 @@ describe("tombstone store (SPEC-799 · ADR-0119)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/tombstone.service.test.ts
 ```
 Expected: FAIL — `Cannot find module '../src/services/tombstone'`.
 
-- [ ] **Step 3: Tambah model & kolom di `server/prisma/schema.prisma`**
+- [x] **Step 3: Tambah model & kolom di `server/prisma/schema.prisma`**
 
 Sisipkan **sesudah** model `SyncConflict` (blok yang berakhir di ~baris 432):
 
@@ -168,7 +168,7 @@ Di model `SyncLog`, tambahkan kolom **sesudah** `data Json`:
   op        String   @default("upsert")
 ```
 
-- [ ] **Step 4: Tulis migration**
+- [x] **Step 4: Tulis migration**
 
 Buat `server/prisma/migrations/20260815120000_sync_tombstone/migration.sql`:
 
@@ -191,7 +191,7 @@ ALTER TABLE "SyncLog" ADD COLUMN "op" TEXT NOT NULL DEFAULT 'upsert';
 
 Catatan: `DEFAULT CURRENT_TIMESTAMP` di sini sah karena berada di dalam `CREATE TABLE`. SQLite melarangnya hanya pada `ALTER TABLE … ADD COLUMN` (jebakan SPEC-408).
 
-- [ ] **Step 5: Tambahkan `SyncTombstone` ke `PG_ORDER`**
+- [x] **Step 5: Tambahkan `SyncTombstone` ke `PG_ORDER`**
 
 Di `cli/src/commands/migrate-pg.ts:26`, ganti baris:
 
@@ -208,7 +208,7 @@ menjadi:
 
 `cli/test/migrate-pg.test.ts` menuntut daftar ini sama persis dengan DMMF — model baru yang tak didaftarkan membuat test itu merah, dan itulah satu-satunya gerbangnya.
 
-- [ ] **Step 6: Tulis `server/src/services/tombstone.ts`**
+- [x] **Step 6: Tulis `server/src/services/tombstone.ts`**
 
 ```ts
 import { prisma } from "../db";
@@ -257,7 +257,7 @@ export async function clearTombstone(entity: string, recordId: string): Promise<
 }
 ```
 
-- [ ] **Step 7: Terapkan migration & generate client**
+- [x] **Step 7: Terapkan migration & generate client**
 
 ```bash
 cd server && npx prisma generate && cd ..
@@ -265,7 +265,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 ```
 Expected: PASS 5/5. (`server/test/global-setup.ts` menjalankan migrasi ke DB test secara otomatis.)
 
-- [ ] **Step 8: Jalankan test kontrak PG_ORDER + typecheck**
+- [x] **Step 8: Jalankan test kontrak PG_ORDER + typecheck**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism cli/test/migrate-pg.test.ts
@@ -273,7 +273,7 @@ pnpm --filter ./server typecheck
 ```
 Expected: PASS, typecheck bersih.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations/20260815120000_sync_tombstone \
@@ -307,7 +307,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `PARENTS: Partial<Record<Entity, { field: string; entity: Entity }[]>>`
   - `AcceptedHook` row bertambah `op: SyncOp`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-tombstone.service.test.ts`:
 
@@ -466,14 +466,14 @@ describe("hub: tombstone di change-feed (SPEC-799 · ADR-0119)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/sync-tombstone.service.test.ts
 ```
 Expected: FAIL — `publishDelete`/`deleteRow`/`consumeTombstoneOnRecreate` belum diekspor.
 
-- [ ] **Step 3: `sync.ts` — impor, tipe delegate, `PARENTS`**
+- [x] **Step 3: `sync.ts` — impor, tipe delegate, `PARENTS`**
 
 Di atas berkas, tambahkan impor:
 
@@ -507,7 +507,7 @@ export const PARENTS: Partial<Record<Entity, { field: string; entity: Entity }[]
 };
 ```
 
-- [ ] **Step 4: `sync.ts` — `op` di wire, `deleteRow`, `publishDelete`, `consumeTombstoneOnRecreate`**
+- [x] **Step 4: `sync.ts` — `op` di wire, `deleteRow`, `publishDelete`, `consumeTombstoneOnRecreate`**
 
 Ganti deklarasi `PulledRecord` (~baris 222) dan `pull` (~baris 224-236):
 
@@ -595,7 +595,7 @@ export async function consumeTombstoneOnRecreate(entity: Entity, id: string): Pr
 }
 ```
 
-- [ ] **Step 5: `sync.ts` — `applyPush` sadar tombstone**
+- [x] **Step 5: `sync.ts` — `applyPush` sadar tombstone**
 
 Ganti tanda tangan `applyPush` dan `PushResult` (~baris 167-175):
 
@@ -674,7 +674,7 @@ Sesudah `upsert` berhasil (sebelum `const snap = await snapshot(...)` yang menut
 
 dan tambahkan `op: "upsert"` pada `syncLog.create` + `onAccepted` di jalur ini.
 
-- [ ] **Step 6: `sync.ts` — `backfillFeed` mencakup tombstone**
+- [x] **Step 6: `sync.ts` — `backfillFeed` mencakup tombstone**
 
 Sesudah loop entitas yang sudah ada di `backfillFeed`, sebelum `return published`:
 
@@ -693,14 +693,14 @@ Sesudah loop entitas yang sudah ada di `backfillFeed`, sebelum `return published
   }
 ```
 
-- [ ] **Step 7: Jalankan test — pastikan LULUS**
+- [x] **Step 7: Jalankan test — pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/sync-tombstone.service.test.ts
 ```
 Expected: PASS 12/12.
 
-- [ ] **Step 8: Jalankan test sync yang SUDAH ada — pastikan tak ada regresi**
+- [x] **Step 8: Jalankan test sync yang SUDAH ada — pastikan tak ada regresi**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -710,7 +710,7 @@ pnpm --filter ./server typecheck
 ```
 Expected: semuanya PASS. Bila `sync-ws.test.ts` gagal soal bentuk frame, sebabnya field `op` baru di siar — perbarui ekspektasinya, itu memang kontrak yang berubah.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/src/services/sync.ts server/src/services/tombstone.ts server/test/sync-tombstone.service.test.ts
@@ -739,7 +739,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `deleteSynced(entity: Entity, id: string, deviceId?: string): Promise<boolean>`
   - `listPendingDeletes(): Promise<{ entity: string; recordId: string; deletedAt: string }[]>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-delete.service.test.ts`:
 
@@ -826,14 +826,14 @@ describe("deleteSynced (SPEC-799 · ADR-0119)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/sync-delete.service.test.ts
 ```
 Expected: FAIL — `Cannot find module '../src/services/sync-delete'`.
 
-- [ ] **Step 3: Tulis `server/src/services/sync-delete.ts`**
+- [x] **Step 3: Tulis `server/src/services/sync-delete.ts`**
 
 ```ts
 import { snapshot, deleteRow, type Entity } from "./sync";
@@ -871,7 +871,7 @@ export async function listPendingDeletes(): Promise<{ entity: string; recordId: 
 
 Entri outbox yang punya tombstone **selalu** berarti "delete menunggu": `deleteSynced` menghapus barisnya lebih dulu, dan id yang dibuat ulang sudah kehilangan tombstone-nya lewat `consumeTombstoneOnRecreate` di `notifySynced`.
 
-- [ ] **Step 4: `sync-notify.ts` — `notifyDeleted` + konsumsi tombstone**
+- [x] **Step 4: `sync-notify.ts` — `notifyDeleted` + konsumsi tombstone**
 
 Ganti seluruh isi `server/src/services/sync-notify.ts`:
 
@@ -908,7 +908,7 @@ export async function notifyDeleted(entity: string, id: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 5: Jalankan test — pastikan LULUS**
+- [x] **Step 5: Jalankan test — pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -917,7 +917,7 @@ pnpm --filter ./server typecheck
 ```
 Expected: keduanya PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/sync-delete.ts server/src/services/sync-notify.ts server/test/sync-delete.service.test.ts
@@ -947,7 +947,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `applyRemote(entity, recordId, version, data, op?: SyncOp): Promise<"applied" | "dropped">`
   - `recordSyncDelete(entity: string, recordId: string, version: number, title: string): Promise<void>` (di `notifications.ts`)
 
-- [ ] **Step 1: Tulis test yang gagal — perilaku client**
+- [x] **Step 1: Tulis test yang gagal — perilaku client**
 
 Buat `server/test/sync-tombstone.client.test.ts`:
 
@@ -1128,7 +1128,7 @@ describe("client: menerapkan tombstone (SPEC-799 · ADR-0119)", () => {
 });
 ```
 
-- [ ] **Step 2: Tulis test kompatibilitas**
+- [x] **Step 2: Tulis test kompatibilitas**
 
 Buat `server/test/sync-tombstone.compat.test.ts`:
 
@@ -1164,7 +1164,7 @@ describe("kompat versi campur (SPEC-799 · ADR-0119)", () => {
 });
 ```
 
-- [ ] **Step 3: Tulis test kontrak DMMF untuk `PARENTS`**
+- [x] **Step 3: Tulis test kontrak DMMF untuk `PARENTS`**
 
 Buat `server/test/sync-parents-dmmf.test.ts`:
 
@@ -1201,7 +1201,7 @@ describe("PARENTS = himpunan FK antar model SYNCED", () => {
 });
 ```
 
-- [ ] **Step 4: Jalankan ketiga test — pastikan GAGAL**
+- [x] **Step 4: Jalankan ketiga test — pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -1209,7 +1209,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 ```
 Expected: FAIL — `op` belum ada di `validateIncomingRecord`, `SyncStats` belum punya `deleted`/`dropped`.
 
-- [ ] **Step 5: `notifications.ts` — `recordSyncDelete`**
+- [x] **Step 5: `notifications.ts` — `recordSyncDelete`**
 
 Tambahkan di akhir `server/src/services/notifications.ts`:
 
@@ -1227,7 +1227,7 @@ export async function recordSyncDelete(
 }
 ```
 
-- [ ] **Step 6: `sync-client.ts` — `op` di validasi & apply**
+- [x] **Step 6: `sync-client.ts` — `op` di validasi & apply**
 
 Ganti impor teratas:
 
@@ -1338,7 +1338,7 @@ export async function applyFeedFrame(msg: {
 }
 ```
 
-- [ ] **Step 7: `sync-client.ts` — `syncOnce` menghitung & mem-push delete**
+- [x] **Step 7: `sync-client.ts` — `syncOnce` menghitung & mem-push delete**
 
 Ganti `SyncStats` (baris 70):
 
@@ -1452,7 +1452,7 @@ Dan pada cabang konflik push (baris 163-173), sisipkan **sebelum** perbandingan 
     total.deleted += s.deleted; total.dropped += s.dropped;
 ```
 
-- [ ] **Step 8: `routes/sync.ts` — `op` di push**
+- [x] **Step 8: `routes/sync.ts` — `op` di push**
 
 Ganti `zPush` (baris 17-22):
 
@@ -1474,7 +1474,7 @@ Dan pemanggilannya (baris 54):
       const r = await applyPush(rec.entity, rec.id, rec.baseVersion, data, req.device!.id, rec.op ?? "upsert");
 ```
 
-- [ ] **Step 9: Jalankan test — pastikan LULUS**
+- [x] **Step 9: Jalankan test — pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -1482,7 +1482,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 ```
 Expected: PASS semua.
 
-- [ ] **Step 10: Regresi sync yang sudah ada + typecheck**
+- [x] **Step 10: Regresi sync yang sudah ada + typecheck**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -1492,7 +1492,7 @@ pnpm --filter ./server typecheck
 ```
 Expected: PASS. Test lama yang menyebut `SyncStats` lengkap (mis. `toEqual({pulled,pushed,conflicts})`) perlu ditambahi `deleted: 0, dropped: 0` — kontraknya memang bertambah.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add server/src/services/sync-client.ts server/src/services/notifications.ts server/src/routes/sync.ts \
@@ -1518,7 +1518,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `deleteSynced` (Task 3)
 - Produces: tak ada API baru — kontrak HTTP keenam route **tidak berubah**
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-delete.routes.test.ts`:
 
@@ -1608,14 +1608,14 @@ describe("route DELETE menerbitkan tombstone (SPEC-799 · ADR-0119)", () => {
 
 Verifikasi dua asumsi kecil sebelum menjalankan: `resetDb()` di `server/test/factory.ts:149` harus ikut mengosongkan `syncTombstone`/`syncLog` — bila belum, tambahkan keduanya di sana (satu tempat, dipakai seluruh test route). Dan `pruneOldTickets()` di `server/src/services/ticket.ts:53` memang tanpa argumen wajib.
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/sync-delete.routes.test.ts
 ```
 Expected: FAIL — tombstone `null` di keenam kasus pertama.
 
-- [ ] **Step 3: `projects.ts`**
+- [x] **Step 3: `projects.ts`**
 
 Tambahkan impor `import { deleteSynced } from "../services/sync-delete";` lalu ganti baris 105:
 
@@ -1627,7 +1627,7 @@ Tambahkan impor `import { deleteSynced } from "../services/sync-delete";` lalu g
     return reply.code(204).send();
 ```
 
-- [ ] **Step 4: `specs.ts`**
+- [x] **Step 4: `specs.ts`**
 
 Ganti baris 309 (`await prisma.spec.delete({ where: { id } }).catch(() => { });`):
 
@@ -1637,7 +1637,7 @@ Ganti baris 309 (`await prisma.spec.delete({ where: { id } }).catch(() => { });`
 
 Tambahkan impor `deleteSynced`. Pembersihan `dependsOn` di bawahnya **tetap seperti sekarang** — ia menyunting spec LAIN dan sudah memanggil `notifySynced` sendiri.
 
-- [ ] **Step 5: `vps.ts`**
+- [x] **Step 5: `vps.ts`**
 
 Ganti isi handler (baris 65-70):
 
@@ -1651,7 +1651,7 @@ Ganti isi handler (baris 65-70):
 
 Tambahkan impor `deleteSynced`. `deleteSynced` mengembalikan `false` untuk baris yang tak ada, jadi `try/catch` lama tak lagi dibutuhkan.
 
-- [ ] **Step 6: `tickets.ts`**
+- [x] **Step 6: `tickets.ts`**
 
 Ganti baris 135 (`await prisma.ticket.delete({ where: { id } });`):
 
@@ -1661,7 +1661,7 @@ Ganti baris 135 (`await prisma.ticket.delete({ where: { id } });`):
 
 Tambahkan impor `deleteSynced`. Loop `deleteUpload` di atasnya tetap.
 
-- [ ] **Step 7: `custom-agents.ts`**
+- [x] **Step 7: `custom-agents.ts`**
 
 Ganti baris 195 (`await prisma.customAgent.delete({ where: { id } });`):
 
@@ -1671,7 +1671,7 @@ Ganti baris 195 (`await prisma.customAgent.delete({ where: { id } });`):
 
 Tambahkan impor `deleteSynced`. Pencabutan `mentions` di bawahnya tetap.
 
-- [ ] **Step 8: `session-results.ts`**
+- [x] **Step 8: `session-results.ts`**
 
 Ganti blok purge (baris 38-39):
 
@@ -1686,7 +1686,7 @@ Ganti blok purge (baris 38-39):
 
 Tambahkan impor `import { deleteSynced } from "../services/sync-delete";`.
 
-- [ ] **Step 9: Jalankan test — pastikan LULUS**
+- [x] **Step 9: Jalankan test — pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -1695,7 +1695,7 @@ pnpm --filter ./server typecheck
 ```
 Expected: PASS. Bila `projects.route.test.ts`/`specs.route.test.ts` tak ada dengan nama itu, jalankan yang benar-benar ada: `ls server/test | grep -E "project|spec"`.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add server/src/routes/projects.ts server/src/routes/specs.ts server/src/routes/vps.ts \
@@ -1726,7 +1726,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `paths.syncPending` di `@hanoman/shared`
   - `api.getSyncPending()` di klien web
 
-- [ ] **Step 1: Tulis test route yang gagal**
+- [x] **Step 1: Tulis test route yang gagal**
 
 Buat `server/test/sync-pending.route.test.ts`:
 
@@ -1768,14 +1768,14 @@ describe("GET /api/sync/pending (SPEC-799 · ADR-0119)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — pastikan GAGAL**
+- [x] **Step 2: Jalankan — pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism server/test/sync-pending.route.test.ts
 ```
 Expected: FAIL — 404 pada route.
 
-- [ ] **Step 3: Endpoint + pengecualian gate**
+- [x] **Step 3: Endpoint + pengecualian gate**
 
 Di `server/src/routes/sync.ts`, tambahkan impor `import { listPendingDeletes } from "../services/sync-delete";` lalu sesudah handler `/sync/conflicts`:
 
@@ -1796,7 +1796,7 @@ Di `server/src/app.ts:134`, ganti barisnya:
           && !path.startsWith("/api/sync/conflicts")) return;
 ```
 
-- [ ] **Step 4: Verifikasi gerbang agent-token**
+- [x] **Step 4: Verifikasi gerbang agent-token**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -1804,7 +1804,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 ```
 Expected: PASS. `/sync/*` sudah cookie-only bagi agent token; endpoint baru mewarisi aturan itu karena berada di bawah prefix yang sama. Bila salah satu test kontrak merah, ikuti pesannya — daftar cookie-only memang kontrak yang dijaga.
 
-- [ ] **Step 5: Path bersama + klien API**
+- [x] **Step 5: Path bersama + klien API**
 
 Di `shared/src/api.ts`, sesudah baris `syncConflicts`:
 
@@ -1829,7 +1829,7 @@ dan lengkapi tipe balikan `syncNow` dengan dua hitungan baru:
       paths.syncNow, { method: "POST", ...body({ full: opts?.full === true }) }),
 ```
 
-- [ ] **Step 6: Tulis test web yang gagal**
+- [x] **Step 6: Tulis test web yang gagal**
 
 Buat `src/src/test/sync-pending-badge.test.tsx`:
 
@@ -1862,14 +1862,14 @@ describe("SyncButton — hapus tertunda (SPEC-799 · ADR-0119)", () => {
 });
 ```
 
-- [ ] **Step 7: Jalankan — pastikan GAGAL**
+- [x] **Step 7: Jalankan — pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/src/test/sync-pending-badge.test.tsx
 ```
 Expected: FAIL — teks lencana belum ada.
 
-- [ ] **Step 8: Render lencana di `SyncButton.tsx`**
+- [x] **Step 8: Render lencana di `SyncButton.tsx`**
 
 Sesudah `const [showModal, setShowModal] = React.useState(false);` tambahkan:
 
@@ -1905,7 +1905,7 @@ Dan di JSX, sesudah tombol "Tarik ulang":
       )}
 ```
 
-- [ ] **Step 9: Jalankan test — pastikan LULUS**
+- [x] **Step 9: Jalankan test — pastikan LULUS**
 
 ```bash
 env -u NODE_ENV ./node_modules/.bin/vitest --run src/src/test/sync-pending-badge.test.tsx
@@ -1913,7 +1913,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 ```
 Expected: PASS keduanya.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add server/src/routes/sync.ts server/src/app.ts shared/src/api.ts src/src/api/client.ts \
@@ -1941,7 +1941,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: seluruh keputusan Task 1–6
 - Produces: dokumen SoT; tak ada kode
 
-- [ ] **Step 1: Pastikan nomor 0119 masih bebas**
+- [x] **Step 1: Pastikan nomor 0119 masih bebas**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman && git worktree list
@@ -1949,7 +1949,7 @@ for b in $(git for-each-ref --format='%(refname)' refs/heads refs/remotes); do g
 ```
 Expected: tertinggi `0118-`. Bila sesi paralel sudah mengklaim `0119`, naik ke nomor bebas berikutnya dan ganti seluruh rujukan `ADR-0119` di kode + docs.
 
-- [ ] **Step 2: Tulis `internal/docs/adr/0119-tombstone-sync-penghapusan-menyeberang.md`**
+- [x] **Step 2: Tulis `internal/docs/adr/0119-tombstone-sync-penghapusan-menyeberang.md`**
 
 Ikuti struktur ADR repo (`# ADR-0119 — …`, `**Status:** accepted · **Tanggal:** 2026-08-15 · **Spec:** SPEC-799`, `**Terkait:**`, `## Konteks`, `## Keputusan`, `## Konsekuensi`). Isi yang wajib ada — semuanya sudah diputuskan, tinggal dituliskan:
 
@@ -1971,7 +1971,7 @@ Ikuti struktur ADR repo (`# ADR-0119 — …`, `**Status:** accepted · **Tangga
    (5) konsumsi tombstone saat pembuatan ulang duduk di **`notifySynced`**, bukan di tiap jalur `create` — kelas bug SPEC-431/448/475/481 — dan **wajib mengangkat `version` baris ke versi tombstone**, kalau tidak push-nya membawa `baseVersion = 0` dan ditolak selamanya;
    (6) `op` tak dikenal **dilewati**, tak pernah melempar — melempar berarti hub yang lebih baru bisa mematikan client lama lewat satu jenis peristiwa.
 
-- [ ] **Step 3: Tandai ADR yang tersentuh**
+- [x] **Step 3: Tandai ADR yang tersentuh**
 
 Di `internal/docs/adr/0068-lampiran-tiket-masuk-record-sync.md`, tepat di bawah baris `**Status:** accepted …`, tambahkan:
 
@@ -1991,7 +1991,7 @@ Di `internal/docs/adr/0082-kontrak-apply-changefeed-record-tertunda.md`, tepat d
 > justru **ditegakkan**: tombstone mengalir lewat kontrak apply yang sama.
 ```
 
-- [ ] **Step 4: Tautkan di kedua index**
+- [x] **Step 4: Tautkan di kedua index**
 
 Di `internal/docs/README.md`, bagian `## adr`, sisipkan **di atas** baris 0118:
 
@@ -2001,7 +2001,7 @@ Di `internal/docs/README.md`, bagian `## adr`, sisipkan **di atas** baris 0118:
 
 Di `internal/docs/adr/README.md`, tambahkan entri narasi ADR-0119 mengikuti bentuk tetangganya: apa yang diperluas/dicabut, keputusan intinya, dan keenam gotcha. Jangan salin ADR-nya utuh — sub-index ini dibaca saat butuh riwayat.
 
-- [ ] **Step 5: Perbarui doc arsitektur**
+- [x] **Step 5: Perbarui doc arsitektur**
 
 `internal/docs/architecture/data-model.md`: tambahkan `SyncTombstone` (entity, recordId, version, data, deletedAt, deviceId; unique `(entity, recordId)`; LOCAL sebagai tabel, tapi maknanya menyeberang) dan kolom `SyncLog.op`.
 
@@ -2009,14 +2009,14 @@ Di `internal/docs/adr/README.md`, tambahkan entri narasi ADR-0119 mengikuti bent
 
 `internal/skills/hanoman/SKILL.md`: satu butir baru di "Aturan Arsitektur", ditulis dengan kepadatan yang sama seperti butir tetangganya (SPEC + ADR + keputusan inti + gotcha yang mengikat).
 
-- [ ] **Step 6: Verifikasi integritas index**
+- [x] **Step 6: Verifikasi integritas index**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli exec tsx src/index.ts docs index --check
 ```
 Expected: laporan bersih. Bila perintahnya tak tersedia di worktree ini, verifikasi manual bahwa berkas ADR baru tertaut di `internal/docs/README.md` **dan** `internal/docs/adr/README.md`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs internal/skills
@@ -2038,7 +2038,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: seluruh Task 1–7
 - Produces: bukti kriteria selesai brief
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run --no-file-parallelism \
@@ -2046,7 +2046,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" ./node_modules/.bin/vitest --run
 ```
 Expected: hijau. **Pastikan test-nya benar-benar berjalan** — `--changed` menyalakan `passWithNoTests`, jadi "no test files" bukan bukti. Hitung jumlah berkas & test yang dilaporkan.
 
-- [ ] **Step 2: Typecheck paket tersentuh**
+- [x] **Step 2: Typecheck paket tersentuh**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -2056,7 +2056,7 @@ pnpm --filter ./cli typecheck
 ```
 Expected: bersih. (Empat paket, bukan `-r`: `shared/api.ts`, `cli/migrate-pg.ts`, dan UI memang ikut berubah.)
 
-- [ ] **Step 3: Siapkan dua instance nyata**
+- [x] **Step 3: Siapkan dua instance nyata**
 
 ```bash
 HUB_HOME=$(mktemp -d); CLI_HOME=$(mktemp -d)
@@ -2068,7 +2068,7 @@ Boot HUB di port 7801 dan CLIENT di port 7802, masing-masing dengan `HANOMAN_HOM
 Pada CLIENT, setel `SYNC_SERVER_URL=http://127.0.0.1:7801` dan `SYNC_DEVICE_TOKEN=<token dari hub>`
 (terbitkan lewat `POST /api/device-tokens` di hub dengan cookie admin).
 
-- [ ] **Step 4: Bukti arah client → hub**
+- [x] **Step 4: Bukti arah client → hub**
 
 1. Buat project `e2e-1` di **hub**, tunggu client menariknya (`GET /api/projects` di client memuatnya).
 2. `DELETE /api/projects/e2e-1` di **client**.
@@ -2078,7 +2078,7 @@ Pada CLIENT, setel `SYNC_SERVER_URL=http://127.0.0.1:7801` dan `SYNC_DEVICE_TOKE
 6. `POST /api/sync/now {"full":true}` di client.
 7. `GET /api/projects` di **kedua** instance → `e2e-1` **tetap hilang**.
 
-- [ ] **Step 5: Bukti arah hub → client**
+- [x] **Step 5: Bukti arah hub → client**
 
 1. Buat project `e2e-2` di **hub**, tunggu client menariknya.
 2. `PATCH /api/projects/e2e-2` di **client** (edit lokal → entri outbox).
@@ -2087,13 +2087,13 @@ Pada CLIENT, setel `SYNC_SERVER_URL=http://127.0.0.1:7801` dan `SYNC_DEVICE_TOKE
 5. `GET /api/projects` di **client** → `e2e-2` **hilang**; `GET /api/notifications` memuat satu baris `sync-delete:project:e2e-2:*`.
 6. `POST /api/sync/now` sekali lagi → `e2e-2` **tidak** muncul lagi di hub (push client tak membangkitkannya).
 
-- [ ] **Step 6: Bersihkan & catat bukti**
+- [x] **Step 6: Bersihkan & catat bukti**
 
 Matikan kedua server **per-PID**, hapus kedua `HANOMAN_HOME` sementara. Tulis ringkasan hasil langkah 4–5 (perintah + respons kunci) ke dalam pesan commit atau ke ADR-0119 sebagai catatan verifikasi.
 
-- [ ] **Step 7: Centang seluruh kotak plan & commit penutup**
+- [x] **Step 7: Centang seluruh kotak plan & commit penutup**
 
-Pastikan tak ada lagi `- [ ]` yang tersisa di berkas ini, lalu:
+Pastikan tak ada lagi `- [x]` yang tersisa di berkas ini, lalu:
 
 ```bash
 git add -u docs/superpowers/plans/2026-08-15-spec-799-sync-tombstone.md

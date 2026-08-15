@@ -184,6 +184,31 @@ Tambahan yang mengikat: **rename bukan hapus.** Pintu rename (`renamedFrom`, ADR
 MELEWATI optimistic-concurrency biasa, jadi ia mendapat gerbang tombstone sendiri — rename ke id
 yang bertombstone ditolak, dan project asalnya dibiarkan utuh.
 
+## Verifikasi dua instance (2026-08-15)
+
+Bukan repro sintetis: dua proses server nyata, `HANOMAN_HOME` + DB terpisah, hub `127.0.0.1:7801`
+tanpa `SYNC_SERVER_URL` dan client `127.0.0.1:7802` ber-`SYNC_SERVER_URL`/`SYNC_DEVICE_TOKEN`.
+
+**Arah client → hub.** `e2e-1` dibuat di hub, ditarik client. `DELETE /api/projects/e2e-1` di client
+→ `204`, `GET /api/sync/pending` menjawab `{total:1}` (lencana "1 hapus menunggu"). Satu
+`POST /sync/now` → `pushed:1`, `pending` kembali `0`, dan **hilang di hub**. Hub lalu **di-restart**
+(`backfillFeed()` jalan saat boot) dan client menjalankan **`{full:true}`** — kursor balik ke `0`,
+seluruh feed diputar ulang: `{deleted:1, dropped:1}` dan `e2e-1` **tetap hilang di kedua sisi**.
+`dropped:1` itu tepat baris upsert lama untuk `e2e-1` — baris yang sebelum ADR ini
+**membangkitkannya kembali**.
+
+**Arah hub → client, melawan edit lokal pending.** `e2e-2` dibuat di hub, ditarik client, lalu
+**disunting di client** (masuk outbox, belum ter-push). `DELETE /api/projects/e2e-2` di hub → client
+menghapus barisnya **dan** melahirkan notifikasi
+`Dihapus di peer: project e2e-2 — suntingan lokal yang belum tersinkron dibuang` — delete menang,
+tapi tidak senyap.
+
+**Kebangkitan lewat push (jalur 2 konteks).** Push mentah dari device token untuk id yang sudah
+bertombstone dijawab
+`{"ok":false,"conflict":true,"server":null,"deleted":true,"deletedVersion":2}` — dan hub tetap
+kosong. Tiga siklus sync + satu `{full:true}` sesudahnya: `{deleted:2, dropped:2}`, kedua instance
+tetap kosong.
+
 ## Konsekuensi
 
 - **Penghapusan menyeberang dua arah** untuk seluruh entitas `SYNCED`, dan record yang sudah
