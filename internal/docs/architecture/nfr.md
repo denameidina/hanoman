@@ -2,7 +2,10 @@
 
 - **Realtime terminal** — latensi frame terminal ke UI < 1 dtk (WebSocket PTY); input yang diterima
   selama koneksi dibuka atau saat key-repeat cepat tetap terkirim berurutan tanpa terpotong quota
-  normal pengguna.
+  normal pengguna. Arah keluarnya **hemat kawat** (SPEC-812): keluaran PTY di-coalesce dalam jendela
+  16 ms dan socket memakai `permessage-deflate`, sehingga satu pane ramai keluaran menempati puluhan
+  kbit/detik alih-alih ±1 Mbit/detik — batas yang menentukan apakah echo ketikan dari ponsel lewat
+  domain publik mengalir atau mengantre di belakang keluaran agen.
 - **Interupsi** — instruksi ke sesi (steer / ctrl-c / tutup) diterapkan ≤ 2 dtk lewat tmux.
 - **Isolasi** — tiap backlog memakai worktree terpisah (boundary Git), sedangkan production menjalankan
   semua agen dalam rootless Podman dengan mount minimum, root read-only, resource limit, dan egress

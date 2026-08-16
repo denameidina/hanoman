@@ -103,7 +103,20 @@ export function buildApp(
     catch (err) { (err as Error & { statusCode?: number }).statusCode = 400; done(err as Error, undefined); }
   });
   // fastify-plugin'd, jadi dekoratornya menurun ke scope /api di bawah.
-  app.register(websocket, { options: { maxPayload: MAX_WS_MESSAGE_BYTES } });
+  // SPEC-812 · `ws` mematikan permessage-deflate secara default, dan Cloudflare Tunnel meneruskan
+  // frame WebSocket apa adanya — jadi aliran terminal berjalan tanpa kompresi sama sekali sampai
+  // ke ponsel. Terukur pada aliran TUI agen sungguhan: 966 → 36 kbit/detik per pane (26,5×), dan
+  // burst scrollback saat attach/reconnect 306 → 15,4 KB. Ongkosnya 15 ms CPU per 10 detik aliran.
+  // `memLevel` 7 memberi rasio identik dengan 8 pada aliran ini dengan separuh memori deflate per
+  // koneksi; `threshold` bawaan (1 KiB) menjaga frame kecil — `phase`, `exit` — tak membayar apa pun.
+  // Arah masuk tetap tergerbang SPEC-761: `ws` menegakkan `maxPayload` atas ukuran TERDEKOMPRESI
+  // dan membatalkan inflate begitu melewatinya, jadi frame kompresi-bom tak punya jalan masuk.
+  app.register(websocket, {
+    options: {
+      maxPayload: MAX_WS_MESSAGE_BYTES,
+      perMessageDeflate: { zlibDeflateOptions: { level: 6, memLevel: 7 }, concurrencyLimit: 10 },
+    },
+  });
   // Lepaskan klien tmux (PTY yatim menahan proses tetap hidup), tapi JANGAN bunuh sesinya:
   // claude yang sedang bekerja harus selamat dari restart server (ADR-0016).
   app.addHook("onClose", async () => { await stopTelegramRuntime(); detachAll(); });

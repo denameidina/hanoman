@@ -89,6 +89,18 @@ describe("terminal routes", () => {
     second.ws.close();
   });
 
+  // SPEC-812 · aliran terminal terukur 26× kompresibel, dan lewat tunnel ke ponsel ia satu-satunya
+  // hal yang mengisi antrean kirim di depan echo ketikan. Kompresinya dinegosiasikan di handshake,
+  // jadi yang diuji adalah handshake-nya — bukan opsi yang dilewatkan ke `ws`.
+  it("menegosiasikan permessage-deflate pada socket terminal", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    const id = await createSession();
+    const c = connect(id);
+    await c.opened;
+    expect(c.ws.extensions).toContain("permessage-deflate");
+    c.ws.close();
+  });
+
   it("keeps accepting a normal rapid-typing burst beyond 120 input frames", async () => {
     process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
     const id = await createSession();

@@ -10,6 +10,7 @@ import {
   createSession, getSession, listSessions, killSession, killAll, detachAll, attach, writeTo,
   sessionPhases, sessionFinished, markerFilled, promptFilePath, armGoalInTui, goalGatePath,
   sessionKind, registerSessionHooks, rootBypassEnv, sendToPane,
+  MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback,
   type SessionBirth, type SessionDeath,
 } from "../src/services/pty";
 import { phaseFilePath, type Phase } from "../src/services/session-phases";
@@ -27,6 +28,10 @@ const FAKE_CODEX_GOAL = fileURLToPath(new URL("./fixtures/fake-codex-goal.sh", i
 const FAKE_DIALOG = fileURLToPath(new URL("./fixtures/fake-dialog.sh", import.meta.url));
 const FAKE_REVIEW = fileURLToPath(new URL("./fixtures/fake-review.sh", import.meta.url));
 const FAKE_NOTES = fileURLToPath(new URL("./fixtures/fake-notes-dialog.sh", import.meta.url));
+
+// SPEC-812 · TUI redraw penuh berjeda: satu-satunya bentuk keluaran yang benar-benar tiba di klien
+// sebagai burst (tmux menggabungkan keluaran tanpa jeda sebelum sempat meninggalkan pane).
+const BURST_TUI = fileURLToPath(new URL("./fixtures/burst-tui.mjs", import.meta.url));
 
 // SPEC-402 · `tmux` yang gagal karena sebab SELAIN "tak ada server". Ditaruh di PATH sebagai satu
 // berkas bernama `tmux` — pty.ts memanggil `execFileSync("tmux", …)` tanpa path absolut, jadi ini
@@ -315,6 +320,35 @@ describe("pty service", () => {
     await waitFor(() => allData(c).includes("halo"));
     expect(listSessions()[0]).toMatchObject({ id: s.id, projectId: "p2", cwd: process.cwd(), exited: false });
     expect(getSession(s.id)).toMatchObject({ id: s.id, projectId: "p2" });
+  });
+
+  // SPEC-812 · node-pty membaca dengan buffer tetap 1024 byte, jadi satu frame per chunk berarti
+  // ±128 frame/detik untuk sesi yang ramai keluaran. Karena tak ada chunk node-pty yang melewati
+  // ±1026 byte, satu frame `data` yang lebih besar dari itu adalah bukti langsung coalescing.
+  it("menggabungkan burst keluaran PTY menjadi frame data yang jauh lebih besar dari satu chunk", async () => {
+    const s = createSession("p9", process.cwd(), { command: [process.execPath, BURST_TUI, "20"] });
+    const c = fakeClient();
+    attach(s.id, c);
+    await waitFor(() => allData(c).includes("BURSTDONE"), 30_000);
+
+    const sizes = c.frames.filter((f) => f.t === "data").map((f) => (f.d ?? "").length);
+    expect(sizes.reduce((a, b) => a + b, 0)).toBeGreaterThan(20_000);
+    expect(Math.max(...sizes)).toBeGreaterThan(4 * 1024);
+  });
+
+  // SPEC-812 · trim scrollback diamortisasi (satu potong per slack, bukan per chunk), jadi
+  // batasnya bergeser dari MAX_SCROLLBACK menjadi MAX_SCROLLBACK + SCROLLBACK_SLACK. Yang tak
+  // boleh bergeser: ia tetap BERBATAS, dan yang dibuang selalu kepala — sesi yang menyala
+  // berhari-hari tak boleh menahan memori, dan riwayat TERBARU tak boleh ikut terbuang.
+  it("trimScrollback menahan batas atas dan selalu menyisakan ekor", () => {
+    const at = (n: number) => "x".repeat(n);
+    expect(trimScrollback(at(MAX_SCROLLBACK + SCROLLBACK_SLACK)).length)
+      .toBe(MAX_SCROLLBACK + SCROLLBACK_SLACK);
+    expect(trimScrollback(at(MAX_SCROLLBACK + SCROLLBACK_SLACK + 1)).length).toBe(MAX_SCROLLBACK);
+
+    const grown = trimScrollback(`${at(MAX_SCROLLBACK + SCROLLBACK_SLACK)}EKOR`);
+    expect(grown.length).toBe(MAX_SCROLLBACK);
+    expect(grown.endsWith("EKOR")).toBe(true);
   });
 
   // Inti ADR-0016: sesi hidup di tmux server, bukan di proses API. Menutup server — atau

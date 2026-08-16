@@ -31,7 +31,12 @@ const PREFIX = "hanoman-";
 
 // Cukup untuk mengembalikan satu layar penuh plus riwayat, tanpa menahan memori tak
 // terbatas untuk sesi yang menyala berhari-hari.
-const MAX_SCROLLBACK = 256 * 1024;
+export const MAX_SCROLLBACK = 256 * 1024;
+// SPEC-812 · `(scrollback + d).slice(-MAX)` meratakan cons-string, jadi memotong tiap chunk
+// membayar salinan ±512 KB per chunk 1 KB — terukur 178 µs/chunk = 210 ms CPU per 10 dtk per pane,
+// dan justru saat keluaran deras. Slack membuat pemotongan itu satu kali per slack, bukan per
+// chunk; yang dibeli batas atas memori sedikit lebih longgar, dan itu tetap BERBATAS.
+export const SCROLLBACK_SLACK = 64 * 1024;
 const POLL_MS = 500;
 
 // SPEC-196 · marker keputusan (.worktrees/.decisions/<id>) yang terisi = sesi sedang menunggu
@@ -68,7 +73,11 @@ type Pane = SessionInfo & {
 
 // Satu attachment per sesi: satu klien tmux melayani semua WebSocket yang menonton.
 // `lastPhases` menahan JSON fase terakhir yang disiarkan — frame lahir hanya saat berubah.
-type Attachment = { pty: IPty; scrollback: string; clients: Set<Client>; lastPhases: string };
+// `pending` menahan keluaran yang belum disiarkan (SPEC-812) — lihat flushOutput.
+type Attachment = {
+  pty: IPty; scrollback: string; clients: Set<Client>; lastPhases: string;
+  pending: string; flushTimer?: NodeJS.Timeout;
+};
 const attached = new Map<string, Attachment>();
 
 // Variabel yang sama yang dipakai runner/src/claude-cli.ts.
@@ -679,14 +688,41 @@ function broadcast(a: Attachment, f: Frame): void {
   for (const c of a.clients) c.send(msg);
 }
 
+// SPEC-812 · node-pty membaca dengan buffer tetap 1024 byte, jadi satu frame per chunk berarti
+// ±128 frame/detik ≈ 966 kbit/detik per pane saat sesi ramai keluaran — untuk aliran yang terukur
+// 26× kompresibel. Di localhost itu tak terasa; lewat tunnel ke ponsel ia terus mengisi antrean
+// kirim, dan echo ketikan lahir di belakangnya. Jendela satu frame animasi menggabungkan tiap
+// redraw menjadi satu frame (terukur 128 → 20 frame/detik) tanpa menambah latensi yang terasa
+// untuk ketikan tunggal saat sesi diam.
+const COALESCE_MS = 16;
+// Burst yang lebih besar dari ini tak perlu menunggu jendelanya habis — ia sudah cukup besar untuk
+// membayar ongkos framing-nya sendiri.
+const COALESCE_MAX_BYTES = 64 * 1024;
+
+export const trimScrollback = (s: string): string =>
+  s.length > MAX_SCROLLBACK + SCROLLBACK_SLACK ? s.slice(-MAX_SCROLLBACK) : s;
+
+// `pending` masuk ke `scrollback` HANYA di sini. Itu yang membuat replay scrollback ke klien baru
+// tak pernah bisa menduplikasi byte yang masih menunggu siaran: scrollback selalu berakhir persis
+// di tempat `pending` mulai.
+function flushOutput(a: Attachment): void {
+  if (a.flushTimer) { clearTimeout(a.flushTimer); a.flushTimer = undefined; }
+  if (!a.pending) return;
+  const d = a.pending;
+  a.pending = "";
+  a.scrollback = trimScrollback(a.scrollback + d);
+  broadcast(a, { t: "data", d });
+}
+
 // Klien tmux mati bukan berarti sesi berakhir: kita bisa di-detach paksa, atau server API
 // ditutup. Yang menentukan akhir adalah pane-nya — itulah yang di-poll di bawah.
 function open(id: string): Attachment {
   const pty = spawnPty("attach-session", "-d", "-t", name(id));
-  const a: Attachment = { pty, scrollback: "", clients: new Set(), lastPhases: "" };
+  const a: Attachment = { pty, scrollback: "", clients: new Set(), lastPhases: "", pending: "" };
   pty.onData((d) => {
-    a.scrollback = (a.scrollback + d).slice(-MAX_SCROLLBACK);
-    broadcast(a, { t: "data", d });
+    a.pending += d;
+    if (a.pending.length >= COALESCE_MAX_BYTES) flushOutput(a);
+    else if (!a.flushTimer) a.flushTimer = setTimeout(() => flushOutput(a), COALESCE_MS);
   });
   pty.onExit(() => { if (attached.get(id) === a) drop(id); });
   attached.set(id, a);
@@ -698,6 +734,9 @@ function open(id: string): Attachment {
 function drop(id: string): void {
   const a = attached.get(id);
   if (!a) return;
+  // Byte terakhir sebuah sesi lahir tepat sebelum kliennya dilepas; menutup socket dengan
+  // `pending` masih terisi berarti membuangnya.
+  flushOutput(a);
   attached.delete(id);
   a.pty.kill();
   for (const c of a.clients) c.close();
@@ -708,6 +747,8 @@ function drop(id: string): void {
 function end(id: string, code: number): void {
   const a = attached.get(id);
   if (!a) return;
+  // `exit` tak boleh mendahului keluaran yang mendahuluinya.
+  flushOutput(a);
   broadcast(a, { t: "exit", code });
   drop(id);
 }
