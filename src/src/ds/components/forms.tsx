@@ -130,7 +130,7 @@ export function Select({ options = [], value, defaultValue, onChange, size = "md
   const borderColor = invalid ? "var(--status-err)" : focus ? "var(--border-focus)" : "var(--border-strong)";
   const norm = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
   return React.createElement("div", {
-    className: `hn-touch-target ${className}`.trim(),
+    className: `hn-touch-target hn-select ${className}`.trim(),
     style: { position: "relative", display: "inline-flex", alignItems: "center", height: s.h,
       background: disabled ? "var(--bone-200)" : "var(--surface-card)", border: `1px solid ${borderColor}`,
       borderRadius: "var(--radius-sm)", boxShadow: focus ? "var(--ring)" : "var(--shadow-inset)",
@@ -141,6 +141,8 @@ export function Select({ options = [], value, defaultValue, onChange, size = "md
     }, rest, {
       style: { appearance: "none", WebkitAppearance: "none", border: "none", outline: "none", background: "transparent",
         color: "var(--text-strong)", fontFamily: "var(--font-ui)", fontSize: s.fs, height: "100%",
+        // Isi penuh lebar pembungkus supaya SELURUH field (bukan cuma teksnya) membuka dropdown.
+        flex: 1, width: "100%", minWidth: 0, boxSizing: "border-box",
         padding: `0 ${s.px + 22}px 0 ${s.px}px`, cursor: disabled ? "not-allowed" : "pointer" },
     }),
       placeholder && React.createElement("option", { value: "", disabled: true }, placeholder),

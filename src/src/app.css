@@ -25,6 +25,11 @@ textarea:focus-visible,
   outline-offset: 2px;
 }
 
+/* Select kit: pembungkusnya sudah menandai fokus lewat border + ring, jadi outline
+   bawaan hanya menggambar kotak kedua di dalam field. */
+.hn-select select:focus,
+.hn-select select:focus-visible { outline: none !important; }
+
 .hn-shell {
   display: flex;
   width: 100%;
