@@ -283,6 +283,11 @@ textarea:focus-visible,
 .hn-tabs {
   max-width: 100%;
   overflow-x: auto;
+  /* `overflow-x: auto` sendirian membuat sumbu-Y ikut jadi `auto` (spec CSS: `visible` di satu sumbu
+     dipaksa `auto` bila sumbu lain bukan `visible`) — strip tab lalu memunculkan scrollbar VERTIKAL
+     saat isi lebih tinggi sedikit dari kotaknya (mis. `min-height: var(--touch-target)` di tab
+     pointer-kasar, atau border-bottom hair). Kunci sumbu-Y supaya hanya scroll mendatar. */
+  overflow-y: hidden;
   overscroll-behavior-inline: contain;
 }
 
