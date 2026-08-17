@@ -41,8 +41,9 @@ describe("SPEC-471 · acceptGithubIssue", () => {
     expect(created).toBe(true);
     expect(spec.source).toBe("qa");
     expect(spec.author).toBe("GitHub · dena@x.co");
-    const p = spec.payload as { severity: string; actual: string };
+    const p = spec.payload as { severity: string; actual: string; constraints: string };
     expect(p.severity).toBe("major");
+    expect(p.constraints).toBe("");   // SPEC-826
     expect(p.actual).toContain("Langkah reproduksi");
     expect(p.actual).toContain("denameidina/hanoman#9");
     expect(p.actual).toContain("https://github.com/denameidina/hanoman/issues/9");

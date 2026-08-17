@@ -210,6 +210,9 @@ describe("SPEC-291 · eskalasi triase → backlog sesuai kategori", () => {
     const spec = await accept("bug");
     expect(spec.source).toBe("qa");
     expect(spec.payload).toHaveProperty("severity");
+    // SPEC-826 · pabrik payload qa wajib melahirkan bentuk LENGKAP; field yang absen di kelahiran
+    // tak pernah muncul di form edit sampai seseorang mengetiknya.
+    expect(spec.payload).toHaveProperty("constraints", "");
     expect(spec.payload.actual).toContain("keluhan");
     expect(spec.payload.actual).toContain("Dari tiket Help Center #");
   });

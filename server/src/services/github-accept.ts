@@ -35,7 +35,7 @@ export async function acceptGithubIssue(
     ? { severity: "major" as const,
         steps: "Reproduksi dari deskripsi issue.",
         expected: "Perilaku yang diharapkan pelapor issue.",
-        actual: detail, env: "" }
+        actual: detail, env: "", constraints: "" }
     : { context: detail, outcome: "", constraints: "", priority };
 
   const repoDir = await resolveRepoDir(issue.projectId).catch(() => null);

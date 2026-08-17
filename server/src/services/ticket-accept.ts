@@ -52,7 +52,7 @@ export async function acceptTicket(
   // pelapor + direktif lampiran masuk ke `actual`; selebihnya ke `context` brief.
   const payload = source === "qa"
     ? { severity: "major" as const, steps: "Reproduksi dari keluhan pelapor & lampiran.",
-        expected: "Perilaku yang diharapkan pelapor.", actual: detail, env: "" }
+        expected: "Perilaku yang diharapkan pelapor.", actual: detail, env: "", constraints: "" }
     : { context: detail, outcome: "", constraints: "" };
   const repoDir = await resolveRepoDir(t.projectId);
   // SPEC-197 · nextSpecId TOCTOU → retry P2002 (≤3), bukan 500. Cermin routes/specs & error-escalate.
