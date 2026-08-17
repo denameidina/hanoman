@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clipboardIntent } from "../src/screens/terminal-clipboard";
+import { clipboardIntent, imageFilesFrom, hasImageDrag } from "../src/screens/terminal-clipboard";
 
 const key = (over: Partial<KeyboardEvent> & { key: string }): KeyboardEvent =>
   ({ type: "keydown", metaKey: false, ctrlKey: false, shiftKey: false, ...over } as KeyboardEvent);
@@ -39,5 +39,30 @@ describe("clipboardIntent", () => {
 
   it("ignores unrelated keys", () => {
     expect(clipboardIntent(key({ key: "a", metaKey: true }), true)).toBeNull();
+  });
+});
+
+describe("SPEC-816 · pemilah berkas gambar", () => {
+  it("mengambil png/jpeg/webp dan membuang sisanya", () => {
+    const files = [
+      { type: "image/png" }, { type: "text/plain" }, { type: "image/webp" },
+      { type: "image/gif" }, { type: "image/jpeg" }, { type: "application/pdf" },
+    ];
+    expect(imageFilesFrom({ files }).map((f) => f.type))
+      .toEqual(["image/png", "image/webp", "image/jpeg"]);
+  });
+
+  it("clipboard teks polos tak menghasilkan lampiran", () => {
+    expect(imageFilesFrom({ files: [] })).toEqual([]);
+    expect(imageFilesFrom(null)).toEqual([]);
+    expect(imageFilesFrom(undefined)).toEqual([]);
+  });
+
+  // dragover: `files` masih KOSONG selama seret berlangsung (baru terisi saat drop), jadi
+  // keputusan preventDefault harus dibaca dari `types`.
+  it("hasImageDrag membaca types, bukan files", () => {
+    expect(hasImageDrag({ types: ["Files"] })).toBe(true);
+    expect(hasImageDrag({ types: ["text/plain"] })).toBe(false);
+    expect(hasImageDrag(null)).toBe(false);
   });
 });

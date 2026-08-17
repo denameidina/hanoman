@@ -17,3 +17,21 @@ export function clipboardIntent(e: KeyLike, hasSelection: boolean): ClipboardInt
   if (k === "v") return "paste";
   return null;
 }
+
+// SPEC-816 · allowlist ini CERMIN `ATTACHMENT_MIME` di routes/terminal.ts dan kunci `EXT` di
+// services/uploads.ts. `image/gif` sengaja di luar: `extFor` memetakannya ke `.bin`.
+export const ATTACHABLE_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+export function imageFilesFrom<T extends { type: string }>(
+  dt: { files?: ArrayLike<T> | null } | null | undefined,
+): T[] {
+  const files = dt?.files ? Array.from(dt.files) : [];
+  return files.filter((f) => ATTACHABLE_MIME.has(f.type));
+}
+
+// `dataTransfer.files` KOSONG selama `dragover` — isinya baru terbit saat `drop`. Jadi keputusan
+// "seret ini membawa berkas" dibaca dari `types`, dan tanpa preventDefault di dragover browser
+// menolak drop-nya sama sekali.
+export function hasImageDrag(dt: { types?: ArrayLike<string> | null } | null | undefined): boolean {
+  return dt?.types ? Array.from(dt.types).includes("Files") : false;
+}
