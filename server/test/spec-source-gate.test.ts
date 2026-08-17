@@ -16,9 +16,9 @@ describe("SPEC-546 · ADR-0109 · gerbang konversi", () => {
   it("tanpa payload, server memakai convertPayload sebagai default", () => {
     const g = checkSourceChange(fresh, "qa");
     expect(g.ok && g.payload).toEqual({
-      severity: "minor", steps: "", expected: "o", actual: "c", env: "",
+      severity: "minor", steps: "", expected: "o", actual: "c", env: "", constraints: "k",
     });
-    expect(g.ok && g.dropped).toEqual(["constraints"]);
+    expect(g.ok && g.dropped).toEqual([]);   // SPEC-826 · brief→qa tak lagi membuang constraints
   });
 
   it("payload yang dikirim dipakai apa adanya bila bentuknya cocok", () => {

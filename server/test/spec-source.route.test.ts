@@ -26,7 +26,7 @@ describe("SPEC-546 · ADR-0109 · POST /specs/:id/source", () => {
     expect(body.source).toBe("qa");
     expect(body.payload).toEqual({
       severity: "minor", steps: "", expected: "satu badge di Overview",
-      actual: "operator buka tiga layar", env: "",
+      actual: "operator buka tiga layar", env: "", constraints: "reuse queue",
     });
     expect(body.priority).toBe("sedang");                   // diturunkan dari severity
     expect(body.objective).toBe("operator buka tiga layar");
