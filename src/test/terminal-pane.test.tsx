@@ -397,3 +397,74 @@ describe("TerminalPane · tap memilih opsi dialog (SPEC-800)", () => {
     expect(sockets[0]!.sent.slice(before)).toEqual([]);
   });
 });
+
+// SPEC-816 · lampiran gambar: berkas diunggah lebih dulu, PATH-nya yang masuk ke prompt.
+const imageFile = (type = "image/png") =>
+  ({ type, name: "tangkapan.png", size: 4 }) as unknown as File;
+
+describe("SPEC-816 · lampiran gambar", () => {
+  it("mem-paste gambar mengunggahnya dan mengetik path-nya TANPA Enter", async () => {
+    const upload = vi.spyOn(api, "uploadTerminalAttachment")
+      .mockResolvedValue({ path: "/Users/d/.hanoman/uploads/terminal/sesi-1/abc.png" });
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]?.onopen?.(); });
+
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: { files: [imageFile()] } });
+    act(() => { paneHost(container).dispatchEvent(event); });
+
+    await vi.waitFor(() => expect(upload).toHaveBeenCalledWith("sesi-1", expect.anything()));
+    await vi.waitFor(() => expect(sockets[0]?.sent).toContain(
+      JSON.stringify({ t: "in", d: "/Users/d/.hanoman/uploads/terminal/sesi-1/abc.png " })));
+    expect(event.defaultPrevented).toBe(true);
+    // Tanpa Enter: operator melanjutkan mengetik kalimatnya di sebelah path.
+    expect(sockets[0]?.sent.some((s) => s.includes("\\r"))).toBe(false);
+  });
+
+  it("paste teks polos tak memanggil unggahan sama sekali", async () => {
+    const upload = vi.spyOn(api, "uploadTerminalAttachment").mockResolvedValue({ path: "/x.png" });
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: { files: [] } });
+    act(() => { paneHost(container).dispatchEvent(event); });
+    expect(upload).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("menyeret berkas ke pane mengunggahnya", async () => {
+    const upload = vi.spyOn(api, "uploadTerminalAttachment")
+      .mockResolvedValue({ path: "/tmp/seret.webp" });
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]?.onopen?.(); });
+
+    const over = new Event("dragover", { bubbles: true, cancelable: true });
+    Object.defineProperty(over, "dataTransfer", { value: { types: ["Files"], files: [] } });
+    act(() => { paneHost(container).dispatchEvent(over); });
+    expect(over.defaultPrevented).toBe(true);   // tanpa ini browser menolak drop-nya
+
+    const drop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "dataTransfer", {
+      value: { types: ["Files"], files: [imageFile("image/webp")] },
+    });
+    act(() => { paneHost(container).dispatchEvent(drop); });
+    await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(sockets[0]?.sent)
+      .toContain(JSON.stringify({ t: "in", d: "/tmp/seret.webp " })));
+  });
+
+  // Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya.
+  it("menulis baris merah ke pane saat unggahan ditolak", async () => {
+    vi.spyOn(api, "uploadTerminalAttachment")
+      .mockRejectedValue(new Error("tipe berkas tak didukung"));
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: { files: [imageFile()] } });
+    act(() => { paneHost(container).dispatchEvent(event); });
+    await vi.waitFor(() => expect(xt.written.join("")).toContain("tipe berkas tak didukung"));
+    expect(xt.written.join("")).toContain("\x1b[31m");
+  });
+});

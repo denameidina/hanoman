@@ -5,7 +5,7 @@ import "@xterm/xterm/css/xterm.css";
 import { paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
-import { clipboardIntent } from "./terminal-clipboard";
+import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
 import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
@@ -235,6 +235,40 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       const choice = dialogChoiceAt(lines, row);
       if (choice) sendInput(choice);
     };
+    // SPEC-816 · lampiran gambar. Yang bisa dikirim ke PTY hanyalah teks, jadi berkasnya diunggah
+    // lebih dulu dan yang masuk ke prompt adalah PATH-nya — agen membacanya sendiri dengan Read.
+    // Ini juga yang membuatnya lepas dari clipboard mesin server: umur sesi tak lagi jadi variabel.
+    const attach = async (files: File[]) => {
+      for (const file of files) {
+        try {
+          const { path } = await api.uploadTerminalAttachment(sessionId, file);
+          // Spasi, bukan Enter: operator melanjutkan mengetik kalimatnya di sebelah path.
+          // sendInput menampung ke `pendingInput` bila socket sedang menyambung ulang.
+          sendInput(`${path} `);
+        } catch (e) {
+          term.write(`\r\n\x1b[31mlampiran gagal: ${(e as Error).message}\x1b[0m\r\n`);
+        }
+      }
+    };
+    const onPaste = (event: ClipboardEvent) => {
+      const files = imageFilesFrom(event.clipboardData);
+      if (!files.length) return;      // teks polos tetap milik jalur lama
+      event.preventDefault();
+      void attach(files as File[]);
+    };
+    const onDragOver = (event: DragEvent) => {
+      if (hasImageDrag(event.dataTransfer)) event.preventDefault();
+    };
+    const onDrop = (event: DragEvent) => {
+      const files = imageFilesFrom(event.dataTransfer);
+      if (!files.length) return;
+      event.preventDefault();
+      void attach(files as File[]);
+    };
+    el.addEventListener("paste", onPaste);
+    el.addEventListener("dragover", onDragOver);
+    el.addEventListener("drop", onDrop);
+
     el.addEventListener("touchstart", onTouchStart, { passive: true });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd, { passive: true });
@@ -254,6 +288,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       retryNow.current = () => {};
       sendKey.current = () => {};
       view.current = null;
+      el.removeEventListener("paste", onPaste);
+      el.removeEventListener("dragover", onDragOver);
+      el.removeEventListener("drop", onDrop);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);

@@ -99,6 +99,16 @@ async function j<T>(url: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 const body = (b: unknown) => ({ body: JSON.stringify(b) });
+// SPEC-816 · multipart punya fetch sendiri: `j()` memaksa `content-type: application/json`, dan
+// header itu MENGHAPUS boundary yang dihasilkan FormData → server tak bisa mem-parse body-nya.
+async function jUpload<T>(url: string, form: FormData): Promise<T> {
+  const res = await fetch(url, { method: "POST", body: form });
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new ApiError(res.status, detail?.error ?? `POST ${url} → ${res.status}`, detail);
+  }
+  return res.json() as Promise<T>;
+}
 // SPEC-198 · bangun query-string; buang undefined/"" (caller memetakan sentinel "all" → undefined).
 const qs = (params: Record<string, string | number | boolean | undefined>) => {
   const p = new URLSearchParams();
@@ -117,6 +127,13 @@ export type ProjectListParams = { q?: string; page?: number; limit?: number };
 export const api = {
   issueWsTicket: (target: "events" | `terminal:${string}`) =>
     j<{ ticket: string }>(paths.wsTickets, { method: "POST", ...body({ target }) }),
+  // SPEC-816 · lampiran gambar sesi terminal. Yang kembali adalah PATH berkas di server; pane
+  // mengetikkannya ke prompt dan agen membacanya sendiri dengan Read.
+  uploadTerminalAttachment: (sessionId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file, file.name || "lampiran");
+    return jUpload<{ path: string }>(paths.terminalAttachments(sessionId), form);
+  },
   listProjects: (params: ProjectListParams = {}) => j<Paginated<ProjectView>>(paths.projects + qs(params)),
   getProject: (id: string) => j<ProjectView>(paths.project(id)),
   createProject: (b: unknown) => j<ProjectView>(paths.projects, { method: "POST", ...body(b) }),
