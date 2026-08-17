@@ -57,6 +57,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 ## architecture
 - [stack](architecture/stack.md) · [data-model](architecture/data-model.md) · [api-contract](architecture/api-contract.md) · [nfr](architecture/nfr.md)
 - [vps-compliance](architecture/vps-compliance.md) — kerangka kepatuhan checklist 232 item (SPEC-220 · ADR-0050)
+- **Operasi berkas IDE Explorer (ADR-0121)** — buat/rename/hapus lewat `POST|PATCH|DELETE /projects/:id/entry`, unggah berkas & folder lewat `POST /projects/:id/upload` ([api-contract](architecture/api-contract.md)). Sebelumnya permukaan tulis IDE cuma `PUT /file` (menimpa berkas yang path-nya sudah diketahui), jadi memasukkan berkas dari mesin operator — apalagi berkas biner — hanya mungkin lewat sesi agen atau shell di server. Logikanya di service murni `services/repo-fs.ts` di atas penjaga path yang sudah ada; folder kosong ditulis dengan `.gitkeep` karena pohon Explorer dibangun dari `git ls-files`. Batas unggah route ini (100 MB/berkas, 1000 berkas, 2 GB total, part di-stream ke `.tmp`) terpisah dari registrasi multipart global 5 MB milik lampiran gambar SPEC-816. Otorisasi `ide:write` — sama dengan yang sudah boleh menimpa berkas apa pun; yang menjaga hapus/rename adalah konfirmasi UI, bukan gerbang server.
 - **Lampiran gambar sesi terminal (SPEC-816)** — paste/drop gambar di pane mengunggahnya ke `POST /terminal/sessions/:id/attachments` ([api-contract](architecture/api-contract.md)) dan yang masuk ke prompt adalah **path**-nya, bukan gambar inline: ke PTY hanya bisa dikirim teks, jadi agen membaca berkasnya sendiri dengan Read. Berkas hidup di `HANOMAN_UPLOAD_DIR/terminal/<sessionId>/`, disapu `killSession()` dan bukan `detachAll()` ([stack](architecture/stack.md)). Ini melepas lampiran dari clipboard mesin server — sebelumnya gambar hanya bisa masuk bila agen membaca clipboard host, sehingga umur sesi menentukan nasibnya dan dari HP/tablet mustahil sama sekali. Tanpa ADR: nol perubahan skema, kepemilikan berkas dicatat subdirektori per sesi.
 
 ## integrasi (untuk project yang memakai hanoman)
@@ -68,6 +69,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0121 — Operasi berkas dari IDE Explorer: satu path `entry`, unggah multipart di-stream, tanpa gerbang sesi](adr/0121-operasi-berkas-ide-explorer.md)
 - [0120 — Tandai backlog selesai manual: operasi khusus `POST /specs/:id/done`, jejak `Spec.manualDone`](adr/0120-tandai-backlog-selesai-manual.md)
 - [0119 — Tombstone sync: hard-delete + `SyncTombstone`, `SyncLog.op`, delete menang tanpa syarat](adr/0119-tombstone-sync-penghapusan-menyeberang.md)
 - [0118 — Workspace Terminal kanonik per user dengan optimistic concurrency](adr/0118-workspace-terminal-kanonik-per-user.md)

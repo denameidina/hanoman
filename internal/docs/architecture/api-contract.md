@@ -430,6 +430,26 @@ GET    /projects/:id/file?path=&ref=    # { path, content, binary, truncated }  
 GET    /projects/:id/working-status      # (SPEC-234) { branch, staged:ChangedFile[], unstaged:ChangedFile[] }  staged=index vs HEAD, unstaged=working tree vs index+untracked (temp-index); read-only, TAK digerbang sesi; repoDir kosong → {branch:"",staged:[],unstaged:[]}; 404 project tak ada. Path /working-status dibedakan dari /status milik SPEC-233 (repoStatus, baris di bawah) yang beda bentuk respons.
 GET    /projects/:id/file-diff?path=&staged=  # (SPEC-234) ReviewFile diff satu file working tree; staged=1 → index vs HEAD, else working tree vs index; 400 path buruk/kosong; 404 file tak dalam changeset
 PUT    /projects/:id/file               { path, content }   # tulis file ke working tree; 400 guard path. TAK digerbang sesi.
+#   ADR-0121 · operasi berkas Explorer. Capability ide:write (diturunkan dari METHOD, bukan prefix).
+#   Keempatnya TAK digerbang sesi aktif — alasan sama dengan PUT /file: bukan operasi git, tak
+#   memindahkan HEAD, sesi hidup di .worktrees/<id> terpisah. Yang menjaga hapus/rename = konfirmasi UI.
+POST   /projects/:id/entry              { path, kind:"file"|"dir" }  # 201 { path }; 409 sudah ada
+#   kind="dir" menulis <folder>/.gitkeep — git tak melacak folder kosong & pohon dibangun dari ls-files,
+#   jadi tanpa itu folder baru adalah folder hantu yang hilang saat muat ulang.
+PATCH  /projects/:id/entry              { from, to }        # 200 { from, to }; 404 from; 409 to; 400 to di dalam from
+DELETE /projects/:id/entry?path=<rel>                       # 200 { path, kind }; 404 tak ada; folder → rekursif
+POST   /projects/:id/upload             multipart/form-data # 200 { written:string[], skipped:{path,reason}[] }
+#   URUTAN part ADALAH kontrak: dir → overwrite → manifest → N×file. `manifest` = JSON array path
+#   relatif, urut sama dengan part berkas; dialah yang membawa struktur folder (webkitRelativePath).
+#   Nama multipart ber-`/` tak punya jaminan lintas implementasi, karena itu bukan filename yang dipakai.
+#   Tanpa manifest → jatuh ke part.filename (unggah berkas tunggal). Jumlah tak cocok → 400.
+#   reason ∈ exists (tanpa overwrite) · too-large (>100 MB) · budget (total >2 GB) · denied (guard path).
+#   Status TETAP 200 selama badan sah — kegagalan per-berkas hidup di `skipped` (pola /branches/delete).
+#   Batas PER-REQUEST: fileSize 100 MB, files 1000, fields 10, fieldSize 1 MB, total 2 GB. Registrasi
+#   multipart global (app.ts, 5 MB/12 berkas milik lampiran gambar SPEC-816) TIDAK ikut naik.
+#   Part di-stream ke .tmp lalu di-rename; berkas ter-truncate tak pernah mendarat.
+#   Keempatnya: 400 bila path absolut/kosong/ber-`..`/memuat komponen .git/menembus symlink;
+#   404 project tak ada; 400 project tanpa repoDir.
 GET    /projects/:id/graph?limit=200    # { commits:{sha,parents,author,at,subject,refs[],tags[]}[], current, total }  git log --date-order
 #   SPEC-233: tag dipisah dari refs (tags[]). Filter opsional ?branches=a,b (bukan --all) & showRemote=/showTags=false.
 #   SPEC-351: limit = HALAMAN, bukan plafon. Tak ada cap server; client menaikkannya kelipatan 200 saat
