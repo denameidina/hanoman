@@ -164,6 +164,66 @@ export default async function (app: FastifyInstance) {
     catch (e) { return entryError(reply, e); }
   });
 
+  // ADR-0121 · unggah N berkas. Urutan part adalah kontrak: dir → overwrite → manifest → berkas.
+  // Manifest (array path relatif) dipakai alih-alih `filename` karena nama multipart ber-`/`
+  // tak punya jaminan lintas implementasi; ia yang membawa struktur folder dari webkitRelativePath.
+  app.post("/projects/:id/upload", async (req, reply) => {
+    const repoDir = await repoOf((req.params as { id: string }).id);
+    if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
+    if (!repoDir) return reply.code(400).send({ error: "project tidak punya repoDir" });
+    if (!(req as any).isMultipart?.()) return reply.code(400).send({ error: "butuh multipart/form-data" });
+
+    // Anggaran total dibaca PER-REQUEST supaya bisa diturunkan di test tanpa mengirim 2 GB.
+    // Bukan knob produk: tak ada UI maupun Setting yang menulisnya.
+    const totalMax = Number(process.env.HANOMAN_IDE_UPLOAD_MAX_BYTES) || UPLOAD_TOTAL_MAX;
+    let dir = "", overwrite = false, manifest: string[] | null = null, seen = 0, total = 0;
+    const written: string[] = [];
+    const skipped: { path: string; reason: "exists" | "too-large" | "budget" | "denied" }[] = [];
+
+    for await (const part of (req as any).parts({ limits: UPLOAD_LIMITS })) {
+      if (part.type === "field") {
+        if (part.fieldname === "dir") dir = String(part.value ?? "");
+        else if (part.fieldname === "overwrite") overwrite = part.value === "1" || part.value === "true";
+        else if (part.fieldname === "manifest") {
+          try {
+            const parsed = JSON.parse(String(part.value));
+            if (!Array.isArray(parsed) || parsed.some((p) => typeof p !== "string")) throw new Error("bentuk");
+            manifest = parsed as string[];
+          } catch { return reply.code(400).send({ error: "manifest tak sah" }); }
+        }
+        continue;
+      }
+      const name = manifest ? manifest[seen] : (part.filename as string | undefined);
+      seen++;
+      if (name === undefined) {
+        part.file.resume();   // kuras stream, kalau tidak busboy menggantung
+        return reply.code(400).send({ error: "manifest tak cocok dengan berkas" });
+      }
+      // Path ditampilkan apa adanya di `skipped` supaya operator melihat yang ia kirim,
+      // bukan bentuk ternormalkan yang tak ia kenali.
+      let rel = name;
+      try {
+        rel = joinRel(dir, name);
+        if (total >= totalMax) { part.file.resume(); skipped.push({ path: rel, reason: "budget" }); continue; }
+        const r = await saveUpload(repoDir, rel, part.file, {
+          overwrite, isTruncated: () => part.file.truncated === true });
+        if (r.status === "written") { written.push(rel); total += Number(part.file.bytesRead ?? 0); }
+        else {
+          // `exists` memulangkan keputusan TANPA membaca stream-nya; tanpa resume() busboy
+          // menunggu part itu selesai selamanya dan seluruh request menggantung.
+          part.file.resume();
+          skipped.push({ path: rel, reason: r.status });
+        }
+      } catch {
+        part.file.resume();
+        skipped.push({ path: name, reason: "denied" });
+      }
+    }
+    if (manifest && seen !== manifest.length)
+      return reply.code(400).send({ error: "manifest tak cocok dengan berkas" });
+    return { written, skipped };
+  });
+
   app.get("/projects/:id/graph", async (req, reply) => {
     const repoDir = await repoOf((req.params as { id: string }).id);
     if (repoDir === undefined) return reply.code(404).send({ error: "not found" });

@@ -393,7 +393,7 @@ describe("branch cleanup (SPEC-360)", () => {
 
 // ADR-0121 · operasi berkas Explorer: buat, rename, hapus.
 describe("operasi berkas IDE (entry)", () => {
-  const post = (b: unknown) => app.inject({ method: "POST", url: "/api/projects/entryrepo/entry", payload: b });
+  const post = (b: Record<string, unknown>) => app.inject({ method: "POST", url: "/api/projects/entryrepo/entry", payload: b });
 
   it("POST membuat berkas kosong", async () => {
     const r = await post({ path: "src/ds/Baru.tsx", kind: "file" });
@@ -428,7 +428,7 @@ describe("operasi berkas IDE (entry)", () => {
   });
 
   it("PATCH sumber tak ada → 404; tujuan sudah ada → 409; tujuan di dalam sumber → 400", async () => {
-    const patch = (b: unknown) => app.inject({ method: "PATCH", url: "/api/projects/entryrepo/entry", payload: b });
+    const patch = (b: Record<string, unknown>) => app.inject({ method: "PATCH", url: "/api/projects/entryrepo/entry", payload: b });
     expect((await patch({ from: "hantu.txt", to: "z.txt" })).statusCode).toBe(404);
     await post({ path: "ada1.txt", kind: "file" });
     await post({ path: "ada2.txt", kind: "file" });
@@ -474,5 +474,88 @@ describe("operasi berkas IDE (entry)", () => {
     createSession("entryrepo", process.cwd());
     expect((await post({ path: "saat-sesi.txt", kind: "file" })).statusCode).toBe(201);
     killAll();
+  });
+});
+
+// Badan multipart minimal: field lebih dulu, lalu berkas — urutan itu bagian dari kontrak
+// (manifest harus terbaca sebelum part berkas pertama).
+function multipart(fields: Record<string, string>, files: { name: string; body: string }[]) {
+  const B = "----hanomanTestBoundary";
+  const chunks: string[] = [];
+  for (const [k, v] of Object.entries(fields))
+    chunks.push(`--${B}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`);
+  for (const f of files)
+    chunks.push(`--${B}\r\nContent-Disposition: form-data; name="file"; filename="${f.name}"\r\n` +
+      `Content-Type: application/octet-stream\r\n\r\n${f.body}\r\n`);
+  chunks.push(`--${B}--\r\n`);
+  return { payload: chunks.join(""), headers: { "content-type": `multipart/form-data; boundary=${B}` } };
+}
+const upload = (project: string, fields: Record<string, string>, files: { name: string; body: string }[]) =>
+  app.inject({ method: "POST", url: `/api/projects/${project}/upload`, ...multipart(fields, files) });
+
+// Catatan cakupan: `reason: "too-large"` (>100 MB) TIDAK diuji di lapis route — mengirim 100 MB
+// lewat app.inject tak sepadan. Ia diuji di lapis service (`repo-fs.test.ts`, jalur `isTruncated`),
+// dan yang tersisa di route hanya penyambungan `() => part.file.truncated === true`.
+describe("unggah berkas IDE (upload)", () => {
+  it("menulis berkas ke folder tujuan, struktur manifest ikut terbentuk", async () => {
+    const r = await upload("entryrepo",
+      { dir: "aset", manifest: JSON.stringify(["a.txt", "sub/b.txt"]) },
+      [{ name: "a.txt", body: "AAA" }, { name: "b.txt", body: "BBB" }]);
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ written: ["aset/a.txt", "aset/sub/b.txt"], skipped: [] });
+    const tree = (await app.inject({ url: "/api/projects/entryrepo/tree" })).json().files;
+    expect(tree).toContain("aset/sub/b.txt");
+  });
+
+  it("tanpa manifest, nama berkas multipart yang dipakai", async () => {
+    const r = await upload("entryrepo", { dir: "" }, [{ name: "polos.txt", body: "P" }]);
+    expect(r.json().written).toEqual(["polos.txt"]);
+  });
+
+  it("berkas yang sudah ada dilewati & dilaporkan, sisanya tetap ditulis", async () => {
+    await upload("entryrepo", { dir: "dup" }, [{ name: "sama.txt", body: "asli" }]);
+    const r = await upload("entryrepo", { dir: "dup", manifest: JSON.stringify(["sama.txt", "beda.txt"]) },
+      [{ name: "sama.txt", body: "baru" }, { name: "beda.txt", body: "baru" }]);
+    expect(r.json()).toEqual({ written: ["dup/beda.txt"], skipped: [{ path: "dup/sama.txt", reason: "exists" }] });
+    const isi = await app.inject({ url: "/api/projects/entryrepo/file?path=dup%2Fsama.txt" });
+    expect(isi.json().content).toBe("asli");
+  });
+
+  it("overwrite=1 menimpa", async () => {
+    await upload("entryrepo", { dir: "ow" }, [{ name: "x.txt", body: "lama" }]);
+    const r = await upload("entryrepo", { dir: "ow", overwrite: "1" }, [{ name: "x.txt", body: "baru" }]);
+    expect(r.json().written).toEqual(["ow/x.txt"]);
+    expect((await app.inject({ url: "/api/projects/entryrepo/file?path=ow%2Fx.txt" })).json().content).toBe("baru");
+  });
+
+  it("path berbahaya masuk skipped:denied, bukan menggagalkan unggahan", async () => {
+    const r = await upload("entryrepo", { dir: "", manifest: JSON.stringify(["../keluar.txt", "aman.txt"]) },
+      [{ name: "keluar.txt", body: "X" }, { name: "aman.txt", body: "Y" }]);
+    expect(r.json().written).toEqual(["aman.txt"]);
+    expect(r.json().skipped).toEqual([{ path: "../keluar.txt", reason: "denied" }]);
+  });
+
+  // AC-8 · anggaran total. Ceiling dibaca PER-REQUEST dari env supaya bisa diuji tanpa
+  // mengirim 2 GB; default-nya tetap 2 GB dan tak ada UI/knob yang mengubahnya.
+  it("total badan melewati anggaran → sisanya skipped:budget", async () => {
+    process.env.HANOMAN_IDE_UPLOAD_MAX_BYTES = "3";
+    try {
+      const r = await upload("entryrepo", { dir: "bujet", manifest: JSON.stringify(["p.txt", "q.txt"]) },
+        [{ name: "p.txt", body: "AAAA" }, { name: "q.txt", body: "B" }]);
+      expect(r.json().written).toEqual(["bujet/p.txt"]);
+      expect(r.json().skipped).toEqual([{ path: "bujet/q.txt", reason: "budget" }]);
+    } finally { delete process.env.HANOMAN_IDE_UPLOAD_MAX_BYTES; }
+  });
+
+  it("manifest tak sepanjang daftar berkas → 400", async () => {
+    const r = await upload("entryrepo", { dir: "", manifest: JSON.stringify(["satu.txt"]) },
+      [{ name: "satu.txt", body: "1" }, { name: "dua.txt", body: "2" }]);
+    expect(r.statusCode).toBe(400);
+  });
+
+  it("bukan multipart → 400; project tanpa repoDir → 400; project tak ada → 404", async () => {
+    expect((await app.inject({ method: "POST", url: "/api/projects/entryrepo/upload", payload: { a: 1 } })).statusCode).toBe(400);
+    expect((await upload("nodir", { dir: "" }, [{ name: "a.txt", body: "A" }])).statusCode).toBe(400);
+    expect((await upload("ghost", { dir: "" }, [{ name: "a.txt", body: "A" }])).statusCode).toBe(404);
   });
 });

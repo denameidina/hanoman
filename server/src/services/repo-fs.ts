@@ -76,6 +76,9 @@ export async function deleteEntry(repoDir: string, rel: string): Promise<{ path:
 // Unggahan di-STREAM ke .tmp lalu di-rename: pada batas 100 MB × 1000 berkas, memuat berkas
 // penuh di RAM (pola toBuffer lampiran gambar 5 MB) adalah cara termudah membunuh instance 8 GB.
 // `isTruncated` dibaca SESUDAH stream habis — batas ukuran multipart baru diketahui di akhir.
+// PERHATIAN pemanggil: pada `exists` fungsi ini memulangkan keputusan TANPA membaca `source`.
+// Menguras sisa stream itu tugas pemanggil (untuk multipart: `part.file.resume()`), kalau tidak
+// parser-nya menunggu part yang tak pernah selesai.
 export async function saveUpload(
   repoDir: string, rel: string, source: Readable,
   opts: { overwrite?: boolean; isTruncated?: () => boolean } = {},
