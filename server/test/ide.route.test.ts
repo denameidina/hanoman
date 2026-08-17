@@ -45,6 +45,8 @@ beforeAll(async () => {
   await makeProject({ id: "resetrepo", repoDir: twoCommitRepo() });
   await makeProject({ id: "nodir", repoDir: null });
   await makeProject({ id: "chg", repoDir: makeRepoWithChanges() });
+  // ADR-0121 · operasi berkas Explorer (entry + upload)
+  await makeProject({ id: "entryrepo", repoDir: makeRepoWithBranches() });
   // SPEC-360 · branch cleanup
   await makeProject({ id: "cleanrepo", repoDir: mergedRepo("clean") });
   await makeProject({ id: "lockrepo", repoDir: mergedRepo("locked") });
@@ -386,5 +388,91 @@ describe("branch cleanup (SPEC-360)", () => {
     expect(r.json().results[0]).toMatchObject({ name: "hanoman/clean", ok: true, scope: "both" });
     const after = await app.inject({ url: "/api/projects/cleanrepo/branches/unused" });
     expect(after.json().branches.some((x: { name: string }) => x.name === "hanoman/clean")).toBe(false);
+  });
+});
+
+// ADR-0121 · operasi berkas Explorer: buat, rename, hapus.
+describe("operasi berkas IDE (entry)", () => {
+  const post = (b: unknown) => app.inject({ method: "POST", url: "/api/projects/entryrepo/entry", payload: b });
+
+  it("POST membuat berkas kosong", async () => {
+    const r = await post({ path: "src/ds/Baru.tsx", kind: "file" });
+    expect(r.statusCode).toBe(201);
+    expect(r.json()).toEqual({ path: "src/ds/Baru.tsx" });
+    const tree = await app.inject({ url: "/api/projects/entryrepo/tree" });
+    expect(tree.json().files).toContain("src/ds/Baru.tsx");
+  });
+
+  it("POST kind=dir membuat folder ber-.gitkeep", async () => {
+    expect((await post({ path: "kosong", kind: "dir" })).statusCode).toBe(201);
+    const tree = await app.inject({ url: "/api/projects/entryrepo/tree" });
+    expect(tree.json().files).toContain("kosong/.gitkeep");
+  });
+
+  it("POST path yang sudah ada → 409", async () => {
+    await post({ path: "dobel.txt", kind: "file" });
+    expect((await post({ path: "dobel.txt", kind: "file" })).statusCode).toBe(409);
+  });
+
+  it("POST body tak sah → 400", async () => {
+    expect((await post({ kind: "file" })).statusCode).toBe(400);
+    expect((await post({ path: "x.txt", kind: "symlink" })).statusCode).toBe(400);
+  });
+
+  it("PATCH me-rename berkas", async () => {
+    await post({ path: "lama.txt", kind: "file" });
+    const r = await app.inject({ method: "PATCH", url: "/api/projects/entryrepo/entry",
+      payload: { from: "lama.txt", to: "baru/nama.txt" } });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ from: "lama.txt", to: "baru/nama.txt" });
+  });
+
+  it("PATCH sumber tak ada → 404; tujuan sudah ada → 409; tujuan di dalam sumber → 400", async () => {
+    const patch = (b: unknown) => app.inject({ method: "PATCH", url: "/api/projects/entryrepo/entry", payload: b });
+    expect((await patch({ from: "hantu.txt", to: "z.txt" })).statusCode).toBe(404);
+    await post({ path: "ada1.txt", kind: "file" });
+    await post({ path: "ada2.txt", kind: "file" });
+    expect((await patch({ from: "ada1.txt", to: "ada2.txt" })).statusCode).toBe(409);
+    await post({ path: "folder/isi.txt", kind: "file" });
+    expect((await patch({ from: "folder", to: "folder/dalam" })).statusCode).toBe(400);
+  });
+
+  it("DELETE menghapus berkas & folder; yang tak ada → 404", async () => {
+    await post({ path: "buang.txt", kind: "file" });
+    const r = await app.inject({ method: "DELETE", url: "/api/projects/entryrepo/entry?path=buang.txt" });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ path: "buang.txt", kind: "file" });
+    await post({ path: "buangdir/isi.txt", kind: "file" });
+    expect((await app.inject({ method: "DELETE", url: "/api/projects/entryrepo/entry?path=buangdir" })).json())
+      .toEqual({ path: "buangdir", kind: "dir" });
+    expect((await app.inject({ method: "DELETE", url: "/api/projects/entryrepo/entry?path=hantu.txt" })).statusCode).toBe(404);
+    expect((await app.inject({ method: "DELETE", url: "/api/projects/entryrepo/entry" })).statusCode).toBe(400);
+  });
+
+  it("path berbahaya ditolak 400 di ketiga method, .git utuh", async () => {
+    for (const p of ["../keluar.txt", "/etc/passwd", ".git/hooks/pre-commit"]) {
+      expect((await post({ path: p, kind: "file" })).statusCode).toBe(400);
+      expect((await app.inject({ method: "PATCH", url: "/api/projects/entryrepo/entry",
+        payload: { from: "README.md", to: p } })).statusCode).toBe(400);
+      expect((await app.inject({ method: "DELETE",
+        url: `/api/projects/entryrepo/entry?path=${encodeURIComponent(p)}` })).statusCode).toBe(400);
+    }
+    expect((await app.inject({ url: "/api/projects/entryrepo/tree" })).json().files).toContain("README.md");
+  });
+
+  it("project tak ada → 404; project tanpa repoDir → 400", async () => {
+    expect((await app.inject({ method: "POST", url: "/api/projects/ghost/entry",
+      payload: { path: "a.txt", kind: "file" } })).statusCode).toBe(404);
+    expect((await app.inject({ method: "POST", url: "/api/projects/nodir/entry",
+      payload: { path: "a.txt", kind: "file" } })).statusCode).toBe(400);
+  });
+
+  // AC-14 · sesi aktif TIDAK memblokir: ini bukan operasi git & tak memindahkan HEAD.
+  // Pola persis test "PUT /file … TIDAK digerbang sesi aktif" di berkas yang sama.
+  it("sesi aktif tak memblokir operasi berkas", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    createSession("entryrepo", process.cwd());
+    expect((await post({ path: "saat-sesi.txt", kind: "file" })).statusCode).toBe(201);
+    killAll();
   });
 });

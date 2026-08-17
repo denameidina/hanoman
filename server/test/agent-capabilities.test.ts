@@ -21,6 +21,11 @@ describe("capabilityForRoute", () => {
     ["POST", "/api/projects/foo/git", "ide:write"],
     ["GET", "/api/projects/foo/status", "ide:read"],
     ["POST", "/api/projects/foo/remotes", "ide:write"],
+    // ADR-0121 · operasi berkas Explorer. Diturunkan DARI METHOD, bukan dari prefix.
+    ["POST", "/api/projects/foo/entry", "ide:write"],
+    ["PATCH", "/api/projects/foo/entry", "ide:write"],
+    ["DELETE", "/api/projects/foo/entry", "ide:write"],
+    ["POST", "/api/projects/foo/upload", "ide:write"],
     ["GET", "/api/specs", "backlog:read"],
     ["POST", "/api/specs", "backlog:write"],
     ["POST", "/api/specs/SPEC-1/integrate", "backlog:write"],

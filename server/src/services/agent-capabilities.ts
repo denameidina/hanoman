@@ -7,6 +7,10 @@ type Resolved = Capability | "COOKIE_ONLY" | "GLOBAL_READ" | null;
 const IDE_SUBS = new Set([
   "tree", "file", "working-status", "file-diff", "graph", "commit", "git",
   "status", "stashes", "remotes", "compare", "archive", "pr-url",
+  // ADR-0121 · operasi berkas Explorer. `rw()` menurunkan read/write DARI METHOD, jadi
+  // POST/PATCH/DELETE menuntut ide:write — capability yang sudah memberi hak menimpa isi
+  // berkas apa pun lewat PUT /file (hindari kelas bug SPEC-405: prefix tanpa lihat method).
+  "entry", "upload",
 ]);
 
 export function capabilityForRoute(method: string, path: string): Resolved {

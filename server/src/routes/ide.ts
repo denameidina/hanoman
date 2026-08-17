@@ -16,6 +16,10 @@ import {
   searchCommits, runGitOp, validateGitOp, touchesTree, repoStatus, listStashes,
   workingStatus, workingFileDiff, type GitOp, type GraphOpts,
 } from "../services/git-ide";
+import {
+  createEntry, renameEntry, deleteEntry, saveUpload, joinRel,
+  EntryExistsError, EntryMissingError, EntryTargetInsideError,
+} from "../services/repo-fs";
 
 // undefined = project tak ada (→404); null = ada tapi tanpa checkout lokal; string = repoDir.
 // SPEC-213 · binding lokal per-device menang atas Project.repoDir (AC-6).
@@ -44,6 +48,22 @@ async function lockInputs(id: string) {
     sessionBranches: new Set(sessions),
   };
 }
+
+// ADR-0121 · terjemahan seragam error service berkas → kode HTTP. Apa pun yang tak dikenal
+// jatuh ke 400: seluruh sisanya adalah penolakan penjaga path, dan itu salah peminta.
+function entryError(reply: import("fastify").FastifyReply, e: unknown) {
+  if (e instanceof EntryMissingError) return reply.code(404).send({ error: "not found" });
+  if (e instanceof EntryExistsError) return reply.code(409).send({ error: "sudah ada" });
+  if (e instanceof EntryTargetInsideError) return reply.code(400).send({ error: "tujuan di dalam sumber" });
+  return reply.code(400).send({ error: (e as Error).message });
+}
+
+// ADR-0121 · batas unggah IDE, PER-REQUEST. Registrasi global @fastify/multipart (app.ts:127)
+// tetap 5 MB/12 berkas — itu milik lampiran gambar SPEC-816 dan tak boleh ikut naik.
+const UPLOAD_LIMITS = {
+  fileSize: 100 * 1024 * 1024, files: 1000, fields: 10, fieldSize: 1024 * 1024,
+} as const;
+const UPLOAD_TOTAL_MAX = 2 * 1024 * 1024 * 1024;
 
 export default async function (app: FastifyInstance) {
   app.get("/projects/:id/tree", async (req, reply) => {
@@ -107,6 +127,41 @@ export default async function (app: FastifyInstance) {
     if (!b?.path || typeof b.content !== "string") return reply.code(400).send({ error: "path & content wajib" });
     try { await writeRepoFile(repoDir, b.path, b.content); return { path: b.path, content: b.content }; }
     catch (e) { return reply.code(400).send({ error: (e as Error).message }); }
+  });
+
+  // ADR-0121 · operasi struktural berkas. SENGAJA tak digerbang sesi aktif, alasan yang sama
+  // dengan PUT /file di atas: bukan operasi git, tak memindahkan HEAD, dan sesi hidup di
+  // .worktrees/<id> yang terpisah. Yang menjaga hapus/rename adalah konfirmasi di UI.
+  app.post("/projects/:id/entry", async (req, reply) => {
+    const repoDir = await repoOf((req.params as { id: string }).id);
+    if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
+    if (!repoDir) return reply.code(400).send({ error: "project tidak punya repoDir" });
+    const b = req.body as { path?: string; kind?: string };
+    if (!b?.path || typeof b.path !== "string") return reply.code(400).send({ error: "path wajib" });
+    if (b.kind !== "file" && b.kind !== "dir") return reply.code(400).send({ error: "kind harus file atau dir" });
+    try { return reply.code(201).send(await createEntry(repoDir, b.path, b.kind)); }
+    catch (e) { return entryError(reply, e); }
+  });
+
+  app.patch("/projects/:id/entry", async (req, reply) => {
+    const repoDir = await repoOf((req.params as { id: string }).id);
+    if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
+    if (!repoDir) return reply.code(400).send({ error: "project tidak punya repoDir" });
+    const b = req.body as { from?: string; to?: string };
+    if (!b?.from || !b?.to || typeof b.from !== "string" || typeof b.to !== "string")
+      return reply.code(400).send({ error: "from & to wajib" });
+    try { return await renameEntry(repoDir, b.from, b.to); }
+    catch (e) { return entryError(reply, e); }
+  });
+
+  app.delete("/projects/:id/entry", async (req, reply) => {
+    const repoDir = await repoOf((req.params as { id: string }).id);
+    if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
+    if (!repoDir) return reply.code(400).send({ error: "project tidak punya repoDir" });
+    const { path } = req.query as { path?: string };
+    if (!path) return reply.code(400).send({ error: "path wajib" });
+    try { return await deleteEntry(repoDir, path); }
+    catch (e) { return entryError(reply, e); }
   });
 
   app.get("/projects/:id/graph", async (req, reply) => {
