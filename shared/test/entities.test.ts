@@ -10,6 +10,32 @@ describe("zQaPayload fromAudit (SPEC-244)", () => {
   });
 });
 
+describe("SPEC-826 · zQaPayload.constraints", () => {
+  const legacy = { severity: "major", steps: "1. buka", expected: "e", actual: "a", env: "prod" };
+
+  it("payload qa LAMA (tanpa constraints) tetap terbaca, ternormalkan ke string kosong", () => {
+    const r = zQaPayload.parse(legacy);
+    expect(r.constraints).toBe("");
+  });
+
+  it("constraints yang dikirim dipakai apa adanya", () => {
+    expect(zQaPayload.parse({ ...legacy, constraints: "jangan ubah kontrak API" }).constraints)
+      .toBe("jangan ubah kontrak API");
+  });
+
+  it("payload qa lama lolos boundary create & patch — bukan hanya skema payload-nya", () => {
+    expect(zCreateSpec.safeParse({
+      project: "p", source: "qa", title: "t", priority: "sedang", payload: legacy }).success).toBe(true);
+    expect(zPatchSpec.safeParse({ payload: legacy }).success).toBe(true);
+  });
+
+  it("ketiga bentuk payload sama-sama punya constraints", () => {
+    const qa = zQaPayload.parse(legacy);
+    const goal = zGoalPayload.parse({ goal: "g", done: "", constraints: "", priority: "sedang" });
+    expect("constraints" in qa && "constraints" in goal).toBe(true);
+  });
+});
+
 describe("schemas", () => {
   it("parses a valid project", () => {
     const p = zProject.parse({ id: "arta", name: "arta", desc: "x", kind: "existing",

@@ -29,6 +29,10 @@ export const zBriefPayload = z.object({
 export const zQaPayload = z.object({
   severity: z.enum(["critical","major","minor"]), steps: z.string(),
   expected: z.string(), actual: z.string(), env: z.string(),
+  // SPEC-826 · bentuk ketiga yang ikut punya batasan pengerjaan. `.default("")` bukan gaya:
+  // payload qa yang SUDAH tersimpan tak punya field ini, dan `z.string()` polos membuat setiap
+  // baris lama gagal validasi begitu ia lewat zSpec/zCreateSpec/zPatchSpec/zChangeSpecSource.
+  constraints: z.string().default(""),
   fromAudit: z.string().optional() });   // SPEC-244 · qa dinaikkan dari audit → sinyal skip fase Audit (ADR-0059)
 // SPEC-407 · ADR-0089 · bentuk payload KETIGA: backlog goal. Sesi mengejar SATU goal tanpa fase
 // perencanaan, jadi yang disimpan bukan konteks+outcome melainkan goal itu sendiri. `goal` wajib —
