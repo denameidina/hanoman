@@ -3,8 +3,8 @@
 import React from "react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
-import { Card, Button, Select, Icon, StateBlock, Tabs, Badge, DocDownload, DocPreviewModal, isMarkdownPath, ResponsivePanels, Modal, Input } from "../ds";
-import { api, ApiError, type RepoFile, type ReviewFile, type WorkingStatus, type GitOp, type Remote } from "../api/client";
+import { Card, Button, Select, Icon, StateBlock, Tabs, Badge, DocDownload, DocPreviewModal, isMarkdownPath, ResponsivePanels, Modal, Input, ConfirmDialog } from "../ds";
+import { api, ApiError, type RepoFile, type ReviewFile, type WorkingStatus, type GitOp, type Remote, type IdeUploadResult } from "../api/client";
 import type { ProjectVM } from "./types";
 import { GitGraph } from "./GitGraph";
 import { BranchesPanel } from "./BranchesPanel";
@@ -99,6 +99,17 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   // sempit di samping tree), di mode diff inilah satu-satunya cara membacanya terender.
   const [preview, setPreview] = React.useState(false);
   const [panel, setPanel] = React.useState<"files" | "viewer">("files");
+  // ADR-0121 · tujuan operasi berkas. SENGAJA tak persisten: folder bisa lenyap di antara
+  // kunjungan, dan memulihkan tujuan yang sudah tak ada membuat berkas mendarat entah di mana.
+  const [dirSel, setDirSel] = React.useState("");
+  const [nameDialog, setNameDialog] = React.useState<
+    { mode: "file" | "dir" | "rename"; value: string } | null>(null);
+  const [conflict, setConflict] = React.useState<{ files: { path: string; file: File }[] } | null>(null);
+  const [pendingDelete, setPendingDelete] = React.useState<{ path: string; kind: "file" | "dir" } | null>(null);
+  const [dropping, setDropping] = React.useState(false);
+  const fileInput = React.useRef<HTMLInputElement>(null);
+  const dirInput = React.useRef<HTMLInputElement>(null);
+  const canPickDir = typeof HTMLInputElement !== "undefined" && "webkitdirectory" in HTMLInputElement.prototype;
 
   const reloadTree = React.useCallback(() => {
     setTreeState("loading");
@@ -192,6 +203,49 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     reloadStatus(); // menyimpan file mengubah status working tree
   }
 
+  // ADR-0121 · operasi berkas Explorer.
+  const underDir = (p: string) => (dirSel ? `${dirSel}/${p}` : p);
+  const afterWrite = () => { reloadTree(); reloadStatus(); };
+
+  async function createEntry(kind: "file" | "dir", name: string) {
+    if (!name.trim()) return;
+    const path = underDir(name.trim());
+    try {
+      await api.ideCreateEntry(projectId, path, kind);
+      afterWrite();
+      onToast?.(`${kind === "dir" ? "folder" : "berkas"} dibuat · ${path}`, "ok", "file-plus");
+    } catch (e) {
+      const code = e instanceof ApiError ? e.status : 0;
+      onToast?.(code === 409 ? `sudah ada · ${path}` : `gagal membuat ${path}`, "err", "x-circle");
+    }
+  }
+
+  // Dipakai tombol unggah, drop, dan "Timpa semua". `list` memakai path RELATIF terhadap dirSel;
+  // perbandingan dengan `skipped` karena itu lewat underDir(), bukan sebaliknya.
+  async function runUpload(list: { path: string; file: File }[], overwrite = false) {
+    if (!list.length) return;
+    let r: IdeUploadResult;
+    try { r = await api.ideUpload(projectId, dirSel, list, overwrite); }
+    catch { onToast?.("gagal mengunggah", "err", "x-circle"); return; }
+    afterWrite();
+    const bentrok = new Set(r.skipped.filter((s) => s.reason === "exists").map((s) => s.path));
+    const lain = r.skipped.filter((s) => s.reason !== "exists");
+    if (r.written.length) onToast?.(`${r.written.length} berkas terunggah`, "ok", "upload");
+    if (lain.length) onToast?.(`${lain.length} berkas dilewati · ${lain[0]!.reason}`, "warn", "alert-triangle");
+    setConflict(bentrok.size ? { files: list.filter((f) => bentrok.has(underDir(f.path))) } : null);
+  }
+
+  // Diisi penuh di task rename/hapus; sekarang cukup no-op supaya dialog nama satu bentuk.
+  async function renameTarget(_to: string) { /* Task 9 */ }
+
+  const pickedFiles = (input: HTMLInputElement | null) => {
+    const files = Array.from(input?.files ?? []);
+    const list = files.map((f) => ({
+      path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, file: f }));
+    if (input) input.value = "";   // memilih berkas yang sama dua kali harus tetap memicu change
+    return list;
+  };
+
   const highlighted = React.useMemo(() => {
     if (!file || file.content === null) return "";
     const lang = langOf(selected);
@@ -252,7 +306,30 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
           <Card padding={0} fill>
             <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--border-hair)" }}>
               <span className="hn-eyebrow" style={{ flex: 1 }}>changes{status?.branch ? ` · ${status.branch}` : ""}</span>
-              <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={() => { reloadTree(); reloadStatus(); }}>Muat ulang</Button>
+              <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={afterWrite}>Muat ulang</Button>
+            </div>
+            {/* ADR-0121 · aksi berkas. Label tujuan wajib terlihat: tanpa itu folder tujuan jadi
+                keadaan tersembunyi dan berkas mendarat di tempat yang tak diduga operator. */}
+            <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
+              padding: "8px 14px", borderBottom: "1px solid var(--border-hair)" }}>
+              <Button size="sm" variant="ghost" leftIcon="file-plus"
+                onClick={() => setNameDialog({ mode: "file", value: "" })}>File baru</Button>
+              <Button size="sm" variant="ghost" leftIcon="folder-plus"
+                onClick={() => setNameDialog({ mode: "dir", value: "" })}>Folder baru</Button>
+              <Button size="sm" variant="ghost" leftIcon="upload"
+                onClick={() => fileInput.current?.click()}>Unggah</Button>
+              {canPickDir && (
+                <Button size="sm" variant="ghost" leftIcon="folder-up"
+                  onClick={() => dirInput.current?.click()}>Unggah folder</Button>
+              )}
+              <span style={{ flex: 1 }} />
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-subtle)" }}>
+                → {dirSel || "root"}
+              </span>
+              <input ref={fileInput} type="file" multiple hidden
+                onChange={() => void runUpload(pickedFiles(fileInput.current))} />
+              <input ref={dirInput} type="file" hidden {...{ webkitdirectory: "" }}
+                onChange={() => void runUpload(pickedFiles(dirInput.current))} />
             </div>
             <div data-testid="ide-tree-scroll" style={{ padding: 8, flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
               <ChangedSection label="Staged" changed={status?.staged ?? []}
@@ -269,7 +346,8 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                 : treeState === "error" ? <StateBlock kind="error" compact title="Gagal memuat file" action={reloadTree} />
                 : files.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Tak ada file" />
                 : buildFileTree(files).map((n) => (
-                    <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""} onSelect={selectFile} />
+                    <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""}
+                      onSelect={selectFile} dirSelected={dirSel} onSelectDir={setDirSel} />
                   ))}
             </div>
           </Card>
@@ -374,6 +452,37 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
       {preview && previewSrc && (
         <DocPreviewModal path={selected} text={previewSrc.text} eyebrow={viewRef || status?.branch || projectId}
           download={previewSrc.download} onClose={() => setPreview(false)} />
+      )}
+      {nameDialog && (
+        <Modal open title={nameDialog.mode === "dir" ? "Folder baru" : nameDialog.mode === "file" ? "Berkas baru" : "Ganti nama"}
+          eyebrow={nameDialog.mode === "rename" ? undefined : `→ ${dirSel || "root"}`}
+          onClose={() => setNameDialog(null)} width={460} footer={<>
+            <Button size="sm" variant="ghost" onClick={() => setNameDialog(null)}>Batal</Button>
+            <Button size="sm" leftIcon="check" disabled={!nameDialog.value.trim()}
+              onClick={() => { const d = nameDialog; setNameDialog(null);
+                if (d.mode === "rename") void renameTarget(d.value); else void createEntry(d.mode, d.value); }}>Simpan</Button>
+          </>}>
+          <Input size="sm" autoFocus value={nameDialog.value}
+            aria-label={nameDialog.mode === "dir" ? "Nama folder" : nameDialog.mode === "file" ? "Nama berkas" : "Path baru"}
+            placeholder={nameDialog.mode === "dir" ? "komponen" : "Baru.tsx"}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNameDialog({ ...nameDialog, value: e.target.value })}
+            style={{ width: "100%" }} />
+        </Modal>
+      )}
+      {conflict && (
+        <Modal open title={`${conflict.files.length} berkas sudah ada`} onClose={() => setConflict(null)} width={520}
+          footer={<>
+            <Button size="sm" variant="ghost" onClick={() => setConflict(null)}>Biarkan</Button>
+            <Button size="sm" leftIcon="alert-triangle"
+              onClick={() => { const f = conflict.files; setConflict(null); void runUpload(f, true); }}>Timpa semua</Button>
+          </>}>
+          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10 }}>
+            Berkas berikut dilewati supaya perubahan yang belum di-commit tak hilang.
+          </div>
+          <pre style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 12, maxHeight: 220, overflow: "auto" }}>
+            {conflict.files.map((f) => underDir(f.path)).join("\n")}
+          </pre>
+        </Modal>
       )}
       {pendingForce && <ForceDialog msg={pendingForce.msg} onForce={confirmForce} onCancel={() => setPendingForce(null)} />}
       {showRemotes && <RemotesModal projectId={projectId} onClose={() => setShowRemotes(false)} />}
