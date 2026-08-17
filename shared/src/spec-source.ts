@@ -61,8 +61,9 @@ export interface PayloadConversion {
 
 /**
  * Field bentuk tujuan yang dianggap harus terisi. `constraints` sengaja TIDAK di sini: kosong
- * itu keadaan normal untuk brief maupun goal, dan menandainya "kurang" tiap konversi jadi
- * kebisingan. `severity`/`priority` juga tidak: keduanya selalu punya nilai turunan.
+ * itu keadaan normal untuk KETIGA bentuk (SPEC-826 membawanya ke qa juga), dan menandainya
+ * "kurang" tiap konversi jadi kebisingan. `severity`/`priority` juga tidak: keduanya selalu
+ * punya nilai turunan.
  */
 export const SHAPE_REQUIRED: Record<PayloadShape, readonly string[]> = {
   brief: ["context", "outcome"],
@@ -108,12 +109,13 @@ export function convertPayload(to: string, payload: unknown): PayloadConversion 
     if (fromShape === "brief")
       return done({
         severity: severityFromPriority(prio()), steps: "", expected: str("outcome"),
-        actual: str("context"), env: "", ...(fromAudit ? { fromAudit } : {}),
-      }, nonEmpty(["constraints"]));
+        actual: str("context"), env: "", constraints: str("constraints"),
+        ...(fromAudit ? { fromAudit } : {}),
+      }, []);
     return done({
       severity: severityFromPriority(prio()), steps: "", expected: str("goal"),
-      actual: "", env: "",
-    }, nonEmpty(["done", "constraints"]));
+      actual: "", env: "", constraints: str("constraints"),
+    }, nonEmpty(["done"]));
   }
 
   if (toShape === "goal") {
@@ -124,7 +126,7 @@ export function convertPayload(to: string, payload: unknown): PayloadConversion 
         nonEmpty([...(str("outcome") ? ["context"] : []), "fromAudit"]));
     }
     return done({
-      goal: str("expected"), done: "", constraints: "",
+      goal: str("expected"), done: "", constraints: str("constraints"),
       priority: priorityFromSeverity(p.severity),
     }, nonEmpty(["steps", "actual", "env", "fromAudit"]));
   }
@@ -132,7 +134,7 @@ export function convertPayload(to: string, payload: unknown): PayloadConversion 
   // → bentuk brief (brief | audit | help)
   if (fromShape === "qa")
     return done({
-      context: str("actual"), outcome: str("expected"), constraints: "",
+      context: str("actual"), outcome: str("expected"), constraints: str("constraints"),
       priority: priorityFromSeverity(p.severity), ...(fromAudit ? { fromAudit } : {}),
     }, nonEmpty(["steps", "env"]));
   return done({
