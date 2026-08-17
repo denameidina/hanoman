@@ -28,7 +28,7 @@ function beneath(root: string, candidate: string): boolean {
   return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
 }
 
-async function ensureRepoParents(root: string, rel: string): Promise<void> {
+export async function ensureRepoParents(root: string, rel: string): Promise<void> {
   const base = await canonicalRoot(root);
   const parts = components(rel).slice(0, -1);
   let current = base;
@@ -61,7 +61,7 @@ function ensureRepoParentsSync(root: string, rel: string): void {
 }
 
 export async function resolveRepoEntry(
-  root: string, rel: string, opts: { allowMissingFinal?: boolean } = {},
+  root: string, rel: string, opts: { allowMissingFinal?: boolean; allowMissingTail?: boolean } = {},
 ): Promise<{ root: string; path: string; parent: string }> {
   const base = await canonicalRoot(root);
   const parts = components(rel);
@@ -69,6 +69,9 @@ export async function resolveRepoEntry(
   for (let i = 0; i < parts.length; i++) {
     current = join(current, parts[i]!);
     const stat = await lstat(current).catch((error: NodeJS.ErrnoException) => {
+      // allowMissingTail: seluruh sisa path boleh belum ada (jalur "boleh dibuat", cermin
+      // assertSafeRepoPathSync). allowMissingFinal: hanya komponen terakhir.
+      if (error.code === "ENOENT" && opts.allowMissingTail) return null;
       if (error.code === "ENOENT" && opts.allowMissingFinal && i === parts.length - 1) return null;
       return denied("komponen tidak ada");
     });
