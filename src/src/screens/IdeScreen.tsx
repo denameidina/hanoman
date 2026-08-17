@@ -9,6 +9,7 @@ import type { ProjectVM } from "./types";
 import { GitGraph } from "./GitGraph";
 import { BranchesPanel } from "./BranchesPanel";
 import { buildFileTree, TreeRow, ChangedSection } from "./file-tree";
+import { readDroppedEntries } from "./drop-entries";
 import { DiffView } from "./diff-view";
 import { MarkdownView } from "../ds/markdown";
 import { usePersistedState, scoped, isStr, oneOf } from "../ui-state";
@@ -331,7 +332,13 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
               <input ref={dirInput} type="file" hidden {...{ webkitdirectory: "" }}
                 onChange={() => void runUpload(pickedFiles(dirInput.current))} />
             </div>
-            <div data-testid="ide-tree-scroll" style={{ padding: 8, flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+            <div data-testid="ide-tree-scroll"
+              onDragOver={(e) => { e.preventDefault(); setDropping(true); }}
+              onDragLeave={() => setDropping(false)}
+              onDrop={(e) => { e.preventDefault(); setDropping(false);
+                void readDroppedEntries(e.dataTransfer).then((list) => runUpload(list)); }}
+              style={{ padding: 8, flex: "1 1 auto", minHeight: 0, overflow: "auto",
+                outline: dropping ? "2px dashed var(--brass-500)" : "none", outlineOffset: -4 }}>
               <ChangedSection label="Staged" changed={status?.staged ?? []}
                 selected={selKind === "staged" ? selected : ""} onSelect={selectStaged}
                 view={stagedView} onView={setStagedView} emptyText="Tak ada file staged." />

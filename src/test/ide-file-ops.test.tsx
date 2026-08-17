@@ -91,3 +91,16 @@ describe("Explorer · buat & unggah", () => {
     await waitFor(() => expect(up).toHaveBeenLastCalledWith("p1", "", [{ path: "a.txt", file: fa }], true));
   });
 });
+
+describe("Explorer · drop", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("drop berkas mengunggahnya ke tujuan yang aktif", async () => {
+    const up = vi.spyOn(api, "ideUpload").mockResolvedValue({ written: ["src/a.txt"], skipped: [] });
+    mountIde();
+    fireEvent.click(await screen.findByText("src/"));
+    const f = new File(["A"], "a.txt");
+    fireEvent.drop(screen.getByTestId("ide-tree-scroll"), { dataTransfer: { items: [], files: [f] } });
+    await waitFor(() => expect(up).toHaveBeenCalledWith("p1", "src", [{ path: "a.txt", file: f }], false));
+  });
+});
