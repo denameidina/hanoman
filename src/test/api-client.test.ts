@@ -125,3 +125,34 @@ describe("URL unduh pratinjau review & diff (SPEC-385)", () => {
       .toBe("/api/projects/p1/compare/file?from=aaa&to=bbb&path=docs%2Fa.md&download=pdf");
   });
 });
+
+// ADR-0121 · operasi berkas IDE Explorer.
+describe("api client · operasi berkas IDE", () => {
+  it("path entry & upload", () => {
+    expect(paths.ideEntry("p1")).toBe("/api/projects/p1/entry");
+    expect(paths.ideEntry("p1", "src/a b.ts")).toBe("/api/projects/p1/entry?path=src%2Fa%20b.ts");
+    expect(paths.ideUpload("p1")).toBe("/api/projects/p1/upload");
+  });
+
+  it("ideUpload menyusun FormData: dir → overwrite → manifest → berkas", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ written: [], skipped: [] }), { status: 200 }));
+    await api.ideUpload("p1", "src/ds", [
+      { path: "sub/a.ts", file: new File(["A"], "a.ts") },
+      { path: "b.ts", file: new File(["B"], "b.ts") },
+    ], true);
+    const form = fetchMock.mock.calls[0]![1]!.body as FormData;
+    expect([...form.keys()]).toEqual(["dir", "overwrite", "manifest", "file", "file"]);
+    expect(form.get("dir")).toBe("src/ds");
+    expect(form.get("overwrite")).toBe("1");
+    expect(form.get("manifest")).toBe(JSON.stringify(["sub/a.ts", "b.ts"]));
+  });
+
+  it("ideUpload tanpa overwrite tak mengirim field-nya", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ written: [], skipped: [] }), { status: 200 }));
+    await api.ideUpload("p1", "", [{ path: "a.ts", file: new File(["A"], "a.ts") }]);
+    const form = fetchMock.mock.calls[0]![1]!.body as FormData;
+    expect([...form.keys()]).toEqual(["dir", "manifest", "file"]);
+  });
+});

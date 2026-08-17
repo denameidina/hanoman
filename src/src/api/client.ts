@@ -37,6 +37,12 @@ export type ReviewFile = {
 export type RepoFile = { path: string; content: string | null; binary: boolean; truncated: boolean };
 // SPEC-234 · status working tree utama (staged/unstaged), diturunkan dari git.
 export type WorkingStatus = { branch: string; staged: ChangedFile[]; unstaged: ChangedFile[] };
+// ADR-0121 · unggahan selalu 200 selama badannya sah; kegagalan per-berkas hidup di `skipped`
+// (pola POST /branches/delete), supaya satu berkas bentrok tak membatalkan 999 lainnya.
+export type IdeUploadResult = {
+  written: string[];
+  skipped: { path: string; reason: "exists" | "too-large" | "budget" | "denied" }[];
+};
 export type GraphCommit = { sha: string; parents: string[]; author: string; at: string; subject: string; refs: string[]; tags: string[] };
 export type CommitDetail = { sha: string; parents: string[]; author: string; at: string; subject: string; body: string; changed: ChangedFile[]; signed: boolean; committer: string; committedAt: string; authorEmail: string };
 export type GitOp =
@@ -262,6 +268,22 @@ export const api = {
   ideFile: (id: string, path: string, ref = "") => j<RepoFile>(paths.ideFile(id, path, ref)),
   putIdeFile: (id: string, path: string, content: string) =>
     j<{ path: string; content: string }>(paths.ideFile(id), { method: "PUT", ...body({ path, content }) }),
+  // ADR-0121 · operasi berkas Explorer.
+  ideCreateEntry: (id: string, path: string, kind: "file" | "dir") =>
+    j<{ path: string }>(paths.ideEntry(id), { method: "POST", ...body({ path, kind }) }),
+  ideRenameEntry: (id: string, from: string, to: string) =>
+    j<{ from: string; to: string }>(paths.ideEntry(id), { method: "PATCH", ...body({ from, to }) }),
+  ideDeleteEntry: (id: string, path: string) =>
+    j<{ path: string; kind: "file" | "dir" }>(paths.ideEntry(id, path), { method: "DELETE" }),
+  // Urutan append ADALAH kontrak: server membaca manifest sebelum part berkas pertama.
+  ideUpload: (id: string, dir: string, files: { path: string; file: File }[], overwrite = false) => {
+    const form = new FormData();
+    form.append("dir", dir);
+    if (overwrite) form.append("overwrite", "1");
+    form.append("manifest", JSON.stringify(files.map((f) => f.path)));
+    for (const f of files) form.append("file", f.file, f.path.split("/").pop() || "berkas");
+    return jUpload<IdeUploadResult>(paths.ideUpload(id), form);
+  },
   ideGraph: (id: string, limit = 200, opts?: { branches?: string[]; showRemote?: boolean; showTags?: boolean }) =>
     // SPEC-523 · `total` = commit terjangkau dari ref yang digambar. Graph tetap JENDELA
     // tumbuh (SPEC-351), bukan halaman diskrit — lane butuh commit kontigu (ADR-0107).

@@ -73,6 +73,10 @@ export const paths = {
   ideCompareFile: (id: string, from: string, to: string, path: string) =>
     `${API}/projects/${id}/compare/file?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&path=${encodeURIComponent(path)}`,
   ideGit: (id: string) => `${API}/projects/${id}/git`,
+  // ADR-0121 · operasi berkas Explorer: satu path untuk buat/rename/hapus, satu untuk unggah.
+  ideEntry: (id: string, path?: string) =>
+    `${API}/projects/${id}/entry${path ? `?path=${encodeURIComponent(path)}` : ""}`,
+  ideUpload: (id: string) => `${API}/projects/${id}/upload`,
   ideGitMerge: (id: string) => `${API}/projects/${id}/git/merge`, // SPEC-229 · merge git graph isolasi
   // SPEC-234 · status working tree (staged/unstaged) + diff satu file working tree
   // catat: /working-status dibedakan dari /status milik SPEC-233 (repoStatus graph) — beda bentuk respons.
