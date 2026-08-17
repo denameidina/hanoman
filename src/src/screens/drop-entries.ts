@@ -38,8 +38,10 @@ async function walk(entry: Entry, prefix: string, out: { path: string; file: Fil
 
 export async function readDroppedEntries(dt: DataTransfer): Promise<{ path: string; file: File }[]> {
   const items = dt.items ? Array.from(dt.items as unknown as ArrayLike<DataTransferItem>) : [];
+  // Cast lewat `unknown`: lib.dom mendeklarasikan `webkitGetAsEntry(): FileSystemEntry | null`,
+  // dan tipe itu tak memuat `file`/`createReader` yang justru kita pakai.
   const entries = items
-    .map((i) => (i as DataTransferItem & { webkitGetAsEntry?: () => Entry | null }).webkitGetAsEntry?.())
+    .map((i) => i.webkitGetAsEntry?.() as unknown as Entry | null | undefined)
     .filter((e): e is Entry => !!e);
   if (!entries.length) return Array.from(dt.files ?? []).map((f) => ({ path: f.name, file: f }));
   const out: { path: string; file: File }[] = [];

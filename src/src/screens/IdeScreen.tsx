@@ -236,8 +236,34 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     setConflict(bentrok.size ? { files: list.filter((f) => bentrok.has(underDir(f.path))) } : null);
   }
 
-  // Diisi penuh di task rename/hapus; sekarang cukup no-op supaya dialog nama satu bentuk.
-  async function renameTarget(_to: string) { /* Task 9 */ }
+  // Target aksi = berkas yang sedang dibuka bila ada, kalau tidak folder yang dipilih.
+  // Diff dari Staged/Changed BUKAN target: yang ditampilkan di sana bisa berkas yang sudah terhapus.
+  const target = selKind === "file" && selected ? { path: selected, kind: "file" as const }
+    : dirSel ? { path: dirSel, kind: "dir" as const } : null;
+
+  async function renameTarget(to: string) {
+    if (!target || !to.trim()) return;
+    try {
+      await api.ideRenameEntry(projectId, target.path, to.trim());
+      afterWrite();
+      if (target.kind === "file") setSelected(to.trim()); else setDirSel(to.trim());
+      onToast?.(`diganti nama · ${to.trim()}`, "ok", "pencil");
+    } catch (e) {
+      const code = e instanceof ApiError ? e.status : 0;
+      onToast?.(code === 409 ? "nama tujuan sudah dipakai" : "gagal mengganti nama", "err", "x-circle");
+    }
+  }
+
+  async function deleteTarget() {
+    if (!target) return;
+    setPendingDelete(null);
+    try {
+      await api.ideDeleteEntry(projectId, target.path);
+      afterWrite();
+      if (target.kind === "file") { setSelected(""); setFile(null); } else setDirSel("");
+      onToast?.(`dihapus · ${target.path}`, "ok", "trash-2");
+    } catch { onToast?.(`gagal menghapus ${target.path}`, "err", "x-circle"); }
+  }
 
   const pickedFiles = (input: HTMLInputElement | null) => {
     const files = Array.from(input?.files ?? []);
@@ -323,6 +349,10 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                 <Button size="sm" variant="ghost" leftIcon="folder-up"
                   onClick={() => dirInput.current?.click()}>Unggah folder</Button>
               )}
+              <Button size="sm" variant="ghost" leftIcon="pencil" disabled={!target}
+                onClick={() => setNameDialog({ mode: "rename", value: target?.path ?? "" })}>Ganti nama</Button>
+              <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={!target}
+                onClick={() => setPendingDelete(target)}>Hapus</Button>
               <span style={{ flex: 1 }} />
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-subtle)" }}>
                 → {dirSel || "root"}
@@ -491,6 +521,17 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
           </pre>
         </Modal>
       )}
+      {/* ADR-0121 · folder menuntut nama diketik ulang: penghapusannya rekursif dan yang belum
+          di-commit tak bisa dipulihkan dari mana pun. */}
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title={pendingDelete?.kind === "dir" ? "Hapus folder beserta isinya?" : "Hapus berkas?"}
+        eyebrow={pendingDelete?.path}
+        message={pendingDelete?.kind === "dir"
+          ? "Seluruh isi folder ini hilang. Yang belum di-commit tak bisa dikembalikan."
+          : "Yang belum di-commit tak bisa dikembalikan."}
+        requireText={pendingDelete?.kind === "dir" ? pendingDelete.path.split("/").pop() : undefined}
+        onConfirm={() => void deleteTarget()} onCancel={() => setPendingDelete(null)} />
       {pendingForce && <ForceDialog msg={pendingForce.msg} onForce={confirmForce} onCancel={() => setPendingForce(null)} />}
       {showRemotes && <RemotesModal projectId={projectId} onClose={() => setShowRemotes(false)} />}
     </div>
