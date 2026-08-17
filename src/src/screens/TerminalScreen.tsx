@@ -120,6 +120,13 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
     }
     if (!workspaceWritable) return;
     void mutateWorkspace((current) => {
+      // Gerbang `existing` di atas membaca `ws` HASIL RENDER, dan `mutate` menempuh round-trip
+      // server: pemanggil yang sudah menaruh sendiri (placeFirst/placeNew/openShell/pickBacklog
+      // → placeFirstEmptyInActive, lalu setRequestedSession) belum terlihat di sana saat efek ini
+      // jalan. Tanpa gerbang kedua di dalam `change` — satu-satunya tempat yang melihat workspace
+      // terbaru — place kedua ini menemukan sel kosong pertama BERIKUTNYA dan menggeser sesi satu
+      // sel dari tempat mendaratnya. Sudah tertempel = tak ada yang perlu dikerjakan.
+      if (W.placedIds(current).has(requestedSession)) return current;
       const placed = W.placeFirstEmptyInActive(current, requestedSession);
       if (placed !== current || !mobile) return placed;
       return W.placeInActive(current, activeCell, requestedSession);

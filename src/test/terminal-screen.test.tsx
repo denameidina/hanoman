@@ -273,6 +273,47 @@ describe("TerminalScreen (grid)", () => {
     await waitFor(() => expect(createShell).toHaveBeenCalledWith("p1"));
   });
 
+  // Chip tray menjanjikan "sel kosong PERTAMA". `mutate` menempuh round-trip server, jadi efek
+  // `requestedSession` sempat membaca `ws` yang belum ter-update dan mengantre place KEDUA —
+  // yang menemukan sel kosong pertama BERIKUTNYA dan menggeser sesi ke sana.
+  it("chip tray mendarat di sel kosong pertama, bukan bergeser satu sel", async () => {
+    getTerminalWorkspace.mockResolvedValue({
+      workspace: { version: 1, groups: [
+        { id: "g1", name: "Utama", layout: { rows: 1, cols: 3, cells: [null, null, null] } },
+      ] },
+      revision: 4,
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    render(<TerminalScreen userId="u1" projects={projects} />);
+
+    fireEvent.click(await screen.findByTitle("Taruh di sel kosong pertama grup ini"));
+    await waitFor(() => expect(screen.getByTestId("pane")).toBeInTheDocument());
+    expect(document.querySelector('[data-terminal-cell-index="0"]')).toHaveTextContent("aaaa1111");
+    expect(putTerminalWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  // Jalur toolbar (openShell/placeNew/pickBacklog) memakai pasangan yang sama —
+  // placeFirstEmptyInActive lalu setRequestedSession — jadi ia bergeser dengan cara yang sama.
+  it("sesi baru dari toolbar mendarat di sel kosong pertama, bukan bergeser satu sel", async () => {
+    getTerminalWorkspace.mockResolvedValue({
+      workspace: { version: 1, groups: [
+        { id: "g1", name: "Utama", layout: { rows: 1, cols: 3, cells: [null, null, null] } },
+      ] },
+      revision: 4,
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    listTerminals.mockResolvedValue([]);
+    createShell.mockResolvedValue({ id: "shell-abc123" });
+    render(<TerminalScreen userId="u1" projects={projects} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "+ Kolom" })).toBeEnabled());
+
+    fireEvent.click(screen.getByText("Terminal biasa"));
+    await waitFor(() => expect(screen.getByTestId("pane")).toBeInTheDocument());
+    expect(document.querySelector('[data-terminal-cell-index="0"]')).toHaveTextContent("shell-abc123");
+    expect(putTerminalWorkspace).toHaveBeenCalledTimes(1);
+  });
+
   it("me-mount satu pane per sel terisi — beberapa sekaligus", async () => {
     localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 2, cells: ["aaaa1111", "bbbb2222"] }));
     listTerminals.mockResolvedValue([
