@@ -12,6 +12,7 @@ import {
 import { coerceCodexEffort, resolveChoices, type SessionKind } from "@hanoman/shared";
 import { readPhases, sessionComplete, type Phase } from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
+import { dropSessionUploads } from "./uploads";
 import {
   answerChoiceDialog, answerMultiSelectDialog, answerNotesDialog, readDialogScreen, submitReview,
   type PaneIO,
@@ -870,6 +871,9 @@ export function killSession(id: string): boolean {
   drop(id);
   tmux("kill-session", "-t", name(id));
   emitDeath({ sessionId: id, exitCode: p.exited ? p.code : null, transcript });
+  // SPEC-816 · lampiran gambar sesi ini ikut mati. Fire-and-forget: `rm` async (rmSync memblokir
+  // event loop, SPEC-742/ADR-0116) dan kegagalannya tak boleh menahan penutupan sesi.
+  void dropSessionUploads(id).catch(() => { /* berkas sisa tak fatal */ });
   return true;
 }
 

@@ -2,7 +2,7 @@
 // Berkas hidup di HANOMAN_UPLOAD_DIR — server-local, DI LUAR repoDir, TAK disync (cermin Vps.keyPath
 // yang juga berkas di server, tak pernah di DB). Nama berkas opaque (uuid+ext); nama asli metadata saja.
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, readFile, unlink } from "node:fs/promises";
+import { mkdir, writeFile, readFile, unlink, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { effectiveStr } from "../config";
 import { safeRequest } from "./safe-outbound-request";
@@ -27,6 +27,37 @@ export async function saveUpload(buf: Buffer, mimeType: string): Promise<{ stora
   const storageKey = `${randomUUID()}${extFor(mimeType)}`;
   await writeFile(join(dir, storageKey), buf, { mode: 0o600 });
   return { storageKey, size: buf.length };
+}
+
+// SPEC-816 · lampiran gambar sesi terminal. Kepemilikan berkas dicatat SUBDIREKTORI per sesi —
+// tanpa tabel, tanpa migration. `sessionId` datang dari parameter URL (beda dari `storageKey`
+// yang selalu lahir dari saveUpload), jadi ia divalidasi sebelum menyentuh disk. Bentuknya
+// diturunkan dari kedua pabrik id: `randomUUID().slice(0,8)` dan `sessionIdForSpec`
+// (lowercase + `_`/`-`, session-id.ts).
+const SESSION_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+export function sessionUploadDir(sessionId: string): string {
+  if (!SESSION_ID.test(sessionId)) throw new Error(`sessionId tak sah: ${sessionId}`);
+  return join(uploadDir(), "terminal", sessionId);
+}
+
+export async function saveSessionUpload(
+  sessionId: string, buf: Buffer, mimeType: string,
+): Promise<{ path: string; size: number }> {
+  const dir = sessionUploadDir(sessionId);
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  const path = join(dir, `${randomUUID()}${extFor(mimeType)}`);
+  await writeFile(path, buf, { mode: 0o600 });
+  return { path, size: buf.length };
+}
+
+// Best-effort: kegagalan menghapus TAK boleh menahan penutupan sesi (alasan yang sama seperti
+// emitDeath menelan galatnya sendiri). `rm` async, bukan `rmSync` — rmSync memblokir seluruh
+// event loop (SPEC-742/ADR-0116).
+export async function dropSessionUploads(sessionId: string): Promise<void> {
+  let dir: string;
+  try { dir = sessionUploadDir(sessionId); } catch { return; }
+  await rm(dir, { recursive: true, force: true }).catch(() => { /* sudah tak ada */ });
 }
 
 // storageKey selalu dari saveUpload (uuid+ext, bukan input user) → tanpa traversal; basename-kan
