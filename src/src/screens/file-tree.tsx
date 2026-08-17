@@ -27,9 +27,12 @@ export function buildFileTree(paths: string[]): FileNode[] {
 
 export const ST_COLOR: Record<string, string> = { A: "var(--leaf-600)", M: "var(--brass-600)", D: "var(--clay-500)" };
 
-export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen = false }:
+export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen = false, dirSelected, onSelectDir }:
   { node: FileNode; selected: string; onSelect: (p: string) => void; depth?: number;
-    meta?: Record<string, ChangedFile>; defaultOpen?: boolean }) {
+    meta?: Record<string, ChangedFile>; defaultOpen?: boolean;
+    // ADR-0121 · folder sebagai TUJUAN operasi berkas. Opsional supaya pemakaian di Review
+    // (ChangedSection) tak berubah sedikit pun.
+    dirSelected?: string; onSelectDir?: (p: string) => void }) {
   const [open, setOpen] = React.useState(defaultOpen);
   if (node.leaf) {
     const on = node.path === selected;
@@ -53,18 +56,25 @@ export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen
       </button>
     );
   }
+  // Satu klik sekaligus buka/tutup dan memilih: memisahkan chevron jadi tombol tersendiri
+  // berarti tombol bersarang di dalam tombol — tak sah di HTML & merusak navigasi keyboard.
+  const dirOn = !!onSelectDir && node.path === dirSelected;
   return (
     <div>
-      <button onClick={() => setOpen((o) => !o)} style={{
+      <button onClick={() => { setOpen((o) => !o); onSelectDir?.(node.path); }} style={{
         display: "flex", alignItems: "center", gap: 8, width: "100%",
         padding: "5px 6px", paddingLeft: 6 + depth * 12, border: "none",
-        background: "transparent", cursor: "pointer", textAlign: "left",
+        background: dirOn ? "var(--brass-100)" : "transparent", cursor: "pointer", textAlign: "left",
       }}>
         <Icon name={open ? "chevron-down" : "chevron-right"} size={14} color="var(--text-subtle)" />
-        <Icon name="folder" size={15} color="var(--brass-500)" />
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", fontWeight: 500 }}>{node.name}/</span>
+        <Icon name="folder" size={15} color={dirOn ? "var(--brass-700)" : "var(--brass-500)"} />
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5,
+          color: dirOn ? "var(--brass-700)" : "var(--text-strong)", fontWeight: dirOn ? 700 : 500 }}>{node.name}/</span>
       </button>
-      {open && node.kids.map((k) => <TreeRow key={k.path} node={k} selected={selected} onSelect={onSelect} depth={depth + 1} meta={meta} defaultOpen={defaultOpen} />)}
+      {open && node.kids.map((k) => (
+        <TreeRow key={k.path} node={k} selected={selected} onSelect={onSelect} depth={depth + 1}
+          meta={meta} defaultOpen={defaultOpen} dirSelected={dirSelected} onSelectDir={onSelectDir} />
+      ))}
     </div>
   );
 }
