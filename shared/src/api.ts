@@ -97,6 +97,9 @@ export const paths = {
   sessionReviewFile: (id: string, path: string) => `${API}/terminal/sessions/${id}/review/${path}`,
   sessionIntegrate: (id: string) => `${API}/terminal/sessions/${id}/integrate`,
   terminalWs: (id: string) => `${API}/terminal/sessions/${id}/ws`,
+  // SPEC-816 · lampiran gambar sesi (multipart). Di bawah prefix /terminal supaya ikut capability
+  // `sessions` yang sudah ada — POST menurunkan cabang tulisnya tanpa perubahan peta.
+  terminalAttachments: (id: string) => `${API}/terminal/sessions/${id}/attachments`,
   // SPEC-362 · ADR-0079 · riwayat sesi. Di bawah prefix /terminal supaya ikut capability
   // `sessions` yang sudah ada (services/agent-capabilities.ts) tanpa menambah domain baru.
   sessionHistory: (qs = "") => `${API}/terminal/history${qs}`,

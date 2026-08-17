@@ -26,6 +26,13 @@ import {
   createSession, getSession, listSessions, killSession, sessionPhases,
   attach, detach, writeTo, resize, shellBin, sendToPane, interruptPane, type Client,
 } from "../services/pty";
+import { saveSessionUpload } from "../services/uploads";
+
+// SPEC-816 · lampiran gambar sesi terminal. Berkas + path, bukan gambar inline: yang bisa dikirim
+// ke PTY hanyalah teks, dan CLI-lah yang menyusun blok image dari berkas yang dibacanya.
+// Allowlist ini CERMIN kunci `EXT` di services/uploads.ts — `image/gif` sengaja di luar karena
+// `extFor` memetakannya ke `.bin`.
+const ATTACHMENT_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 // SPEC-771 · input xterm berbingkai per keystroke; default 120/menit menutup koneksi pada dua
 // karakter/detik. 100/detik tetap bounded tetapi berada di atas key-repeat browser yang wajar.
@@ -457,6 +464,25 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     }
     killSession(id);
     return reply.code(202).send({ cleanup: null });
+  });
+
+  // SPEC-816 · lampiran gambar → berkas di server, path-nya yang masuk ke prompt sesi.
+  app.post("/terminal/sessions/:id/attachments", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    // Gerbang sesi hidup berdiri SEBELUM disk tersentuh: id yang mencoba traversal tak akan pernah
+    // cocok dengan sesi tmux mana pun, jadi ia jatuh di 404 yang sama.
+    if (!getSession(id)) return reply.code(404).send({ error: "not found" });
+    if (!(req as any).isMultipart?.()) return reply.code(400).send({ error: "butuh multipart/form-data" });
+
+    const part = await (req as any).file?.();
+    if (!part) return reply.code(400).send({ error: "unggahan tak valid" });
+    const buf = await part.toBuffer();           // menguras stream lebih dulu
+    // throwFileSizeLimit:false (app.ts) → oversize datang ter-truncate, bukan sebagai error.
+    if (part.file?.truncated) return reply.code(413).send({ error: "berkas melebihi 5 MB" });
+    if (!ATTACHMENT_MIME.has(part.mimetype)) return reply.code(415).send({ error: "tipe berkas tak didukung" });
+
+    const { path } = await saveSessionUpload(id, buf, part.mimetype);
+    return { path };
   });
 
   app.get("/terminal/sessions/:id/ws", {
