@@ -4,8 +4,8 @@
 
 /** Lebar minimum label sesi di header sel; di bawah ini label tak lagi bisa dibaca. */
 export const HEADER_LABEL_MIN = 96;
-/** Ilustrasi state (34px) + petunjuk clipboard + gap-nya. */
-export const HEADER_MEDIA_PX = 58;
+/** Ilustrasi state (34px) + gap-nya. */
+export const HEADER_MEDIA_PX = 42;
 export const ACTION_GAP = 8;
 /** `Layar penuh` + `Tutup` tak pernah runtuh: keduanya jalan keluar, bukan aksi tambahan. */
 export const ALWAYS_INLINE = 2;

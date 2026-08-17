@@ -875,21 +875,8 @@ describe("TerminalScreen · integrate (SPEC-175)", () => {
   });
 });
 
-// SPEC-511 · modifier yang tak terlihat sama saja dengan tak ada. tmux `mouse on` (SPEC-209)
-// membuat drag polos diteruskan ke tmux, bukan menyeleksi; satu-satunya jalan menyeleksi adalah
-// menahan Option (macOS) / Shift (Windows·Linux). Petunjuknya hidup di header sel, permukaan yang
-// sama tempat semua affordance sel lain berada.
-describe("TerminalScreen · petunjuk salin (SPEC-511)", () => {
-  it("tiap sel memberi tahu modifier seleksi dan kombo salinnya", async () => {
-    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 1, cells: ["aaaa1111"] }));
-    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
-    render(<TerminalScreen projects={projects} />);
-    await waitFor(() => expect(screen.getByTestId("pane")).toBeInTheDocument());
-    const hint = screen.getByLabelText("Cara menyalin teks terminal");
-    expect(hint).toHaveAttribute("title", expect.stringContaining("Option"));
-    expect(hint).toHaveAttribute("title", expect.stringContaining("Shift"));
-  });
-});
+// Petunjuk clipboard di header sel (SPEC-511) dicabut: ikonnya tak dipakai operator dan hanya
+// memakan slot aksi. Kombo salin/tempel keyboard sendiri tetap hidup di TerminalPane.
 
 // SPEC-162 · fase dilaporkan agen, server menyiarkannya lewat WS terminal. Strip ini hanya
 // menggambar apa yang dilaporkan — ia tak menyimpulkan apa pun sendiri.

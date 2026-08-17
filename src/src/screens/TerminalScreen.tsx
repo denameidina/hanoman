@@ -877,14 +877,6 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
         {awaiting && !finished && (deciding
           ? <StatusPill status="running" size="sm">Lead memutuskan</StatusPill>
           : <StatusPill status="awaiting" size="sm" />)}
-        {/* SPEC-511 · seleksi teks butuh modifier: tmux `mouse on` (SPEC-209) mengirim drag polos
-            ke tmux, bukan ke seleksi xterm. Modifier yang tak terlihat = tak ada, jadi petunjuknya
-            duduk di baris affordance yang sama dengan dokumen/review/integrate. */}
-        <span aria-label="Cara menyalin teks terminal"
-          title="Seleksi: tahan Option (macOS) atau Shift (Windows·Linux) sambil drag — pane ini memakai mouse mode tmux. Salin: Cmd+C atau Ctrl+Shift+C. Tempel: Cmd+V atau Ctrl+Shift+V."
-          style={{ cursor: "help", color: "var(--text-subtle)", display: "inline-flex", alignItems: "center" }}>
-          <Icon name="clipboard" size={12} />
-        </span>
         {collapsible.slice(0, inline).map((action) => action.render)}
         {hidden.length > 0 && (
           <OverflowActions label={`Aksi lain sesi ${session.id}`}
