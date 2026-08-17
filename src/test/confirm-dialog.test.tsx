@@ -26,3 +26,28 @@ describe("ConfirmDialog (SPEC-269)", () => {
     expect((screen.getByText("Hapus").closest("button") as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+// ADR-0121 · aksi yang tak bisa dibatalkan (hapus folder rekursif) menuntut nama diketik ulang.
+describe("ConfirmDialog requireText (ADR-0121)", () => {
+  it("mengunci konfirmasi sampai teksnya cocok", () => {
+    const onConfirm = vi.fn();
+    render(<ConfirmDialog open title="Hapus folder" requireText="src"
+      onConfirm={onConfirm} onCancel={() => {}} />);
+    const tombol = screen.getByRole("button", { name: "Hapus" });
+    expect(tombol).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Ketik src untuk konfirmasi"), { target: { value: "sr" } });
+    expect(tombol).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Ketik src untuk konfirmasi"), { target: { value: "src" } });
+    expect(tombol).toBeEnabled();
+    fireEvent.click(tombol);
+    expect(onConfirm).toHaveBeenCalled();
+  });
+
+  it("tanpa requireText dialog lama tetap langsung bisa dikonfirmasi", () => {
+    const onConfirm = vi.fn();
+    render(<ConfirmDialog open title="Hapus" onConfirm={onConfirm} onCancel={() => {}} />);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Hapus" }));
+    expect(onConfirm).toHaveBeenCalled();
+  });
+});
