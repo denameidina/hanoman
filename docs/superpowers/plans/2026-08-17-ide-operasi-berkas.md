@@ -44,7 +44,7 @@ Spec: `docs/superpowers/specs/2026-08-17-ide-operasi-berkas-design.md`.
   - `saveUpload(repoDir: string, rel: string, source: Readable, opts: { overwrite?: boolean; isTruncated?: () => boolean }): Promise<{ status: "written" | "exists" | "too-large" }>`
   - `joinRel(dir: string, name: string): string`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/repo-fs.test.ts`:
 
@@ -173,14 +173,14 @@ describe("joinRel", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/repo-fs.test.ts --no-file-parallelism
 ```
 Expected: FAIL — `Failed to resolve import "../src/services/repo-fs"`.
 
-- [ ] **Step 3: Buka dua kemampuan di `safe-repo-path.ts`**
+- [x] **Step 3: Buka dua kemampuan di `safe-repo-path.ts`**
 
 `resolveRepoEntry` hari ini menolak path yang **induknya** belum ada; kembarannya yang sync (`assertSafeRepoPathSync`) sudah punya `allowMissingTail` untuk itu. Samakan, dan ekspor pembuat induk yang sudah ada.
 
@@ -222,7 +222,7 @@ export async function resolveRepoEntry(
 
 Catatan: dengan `allowMissingTail`, `path` yang dikembalikan adalah komponen pertama yang belum ada — cukup untuk `lstat` (yang akan ENOENT) dan itulah yang dipakai `entryKind`.
 
-- [ ] **Step 4: Tulis `server/src/services/repo-fs.ts`**
+- [x] **Step 4: Tulis `server/src/services/repo-fs.ts`**
 
 ```ts
 // SPEC (IDE operasi berkas) · ADR-0121 · buat/rename/hapus/unggah isi checkout project.
@@ -327,7 +327,7 @@ export async function saveUpload(
 }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/repo-fs.test.ts --no-file-parallelism
@@ -335,14 +335,14 @@ pnpm --filter ./server typecheck
 ```
 Expected: seluruh test `repo-fs.test.ts` PASS; typecheck bersih.
 
-- [ ] **Step 6: Pastikan pemakai lama `safe-repo-path` tak berubah perilakunya**
+- [x] **Step 6: Pastikan pemakai lama `safe-repo-path` tak berubah perilakunya**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/safe-repo-path.test.ts server/test/git-ide.test.ts --no-file-parallelism
 ```
 Expected: PASS. (Bila `safe-repo-path.test.ts` tak ada, jalankan `git-ide.test.ts` saja — `allowMissingTail` bersifat opt-in sehingga pemanggil lama menempuh cabang yang sama persis seperti sebelumnya.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/repo-fs.ts server/src/services/safe-repo-path.ts server/test/repo-fs.test.ts
@@ -362,7 +362,7 @@ git commit -m "feat(ide): service repo-fs — buat, rename, hapus, simpan unggah
 - Consumes: `entryKind`, `createEntry`, `renameEntry`, `deleteEntry`, `EntryExistsError`, `EntryMissingError`, `EntryTargetInsideError` dari Task 1.
 - Produces: `POST|PATCH|DELETE /api/projects/:id/entry` dengan bentuk respons yang dipakai Task 4 (`{ path }`, `{ from, to }`, `{ path, kind }`), dan helper lokal `entryError(reply, e)`.
 
-- [ ] **Step 1: Tulis test route yang gagal**
+- [x] **Step 1: Tulis test route yang gagal**
 
 Tambahkan di akhir `server/test/ide.route.test.ts` (sebelum kurung tutup berkas), dan tambahkan `"entryrepo"` ke `beforeAll`:
 
@@ -466,14 +466,14 @@ Tambahkan juga di `server/test/agent-capabilities.test.ts`, ke dalam array `case
     ["POST", "/api/projects/foo/upload", "ide:write"],
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/ide.route.test.ts server/test/agent-capabilities.test.ts --no-file-parallelism
 ```
 Expected: FAIL — route `entry` menjawab 404 (belum terdaftar), dan capability memetakan ke `projects:write`.
 
-- [ ] **Step 3: Daftarkan sub-path di peta capability**
+- [x] **Step 3: Daftarkan sub-path di peta capability**
 
 Ubah `server/src/services/agent-capabilities.ts:7-10`:
 
@@ -488,7 +488,7 @@ const IDE_SUBS = new Set([
 ]);
 ```
 
-- [ ] **Step 4: Tambahkan route `entry`**
+- [x] **Step 4: Tambahkan route `entry`**
 
 Di `server/src/routes/ide.ts`, tambahkan import sesudah baris 18:
 
@@ -552,7 +552,7 @@ Tambahkan route sesudah `PUT /projects/:id/file` (sesudah baris 110):
   });
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/ide.route.test.ts server/test/agent-capabilities.test.ts --no-file-parallelism
@@ -560,7 +560,7 @@ pnpm --filter ./server typecheck
 ```
 Expected: PASS semua.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/ide.ts server/src/services/agent-capabilities.ts server/test/ide.route.test.ts server/test/agent-capabilities.test.ts
@@ -579,7 +579,7 @@ git commit -m "feat(ide): endpoint entry — buat, rename, hapus berkas & folder
 - Consumes: `saveUpload`, `joinRel` dari Task 1.
 - Produces: `POST /api/projects/:id/upload` → `{ written: string[]; skipped: { path: string; reason: "exists" | "too-large" | "budget" | "denied" }[] }` — bentuk yang dipakai Task 4 & 7.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `server/test/ide.route.test.ts`. Helper multipart ditulis tangan karena `app.inject` tak punya pembangun multipart:
 
@@ -669,14 +669,14 @@ describe("unggah berkas IDE (upload)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/ide.route.test.ts --no-file-parallelism -t "unggah berkas IDE"
 ```
 Expected: FAIL — 404, route belum ada.
 
-- [ ] **Step 3: Implementasikan route**
+- [x] **Step 3: Implementasikan route**
 
 Tambahkan import di `server/src/routes/ide.ts` (gabungkan dengan import Task 2):
 
@@ -754,7 +754,7 @@ Tambahkan route sesudah route `entry`:
   });
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/ide.route.test.ts --no-file-parallelism
@@ -762,7 +762,7 @@ pnpm --filter ./server typecheck
 ```
 Expected: PASS semua, termasuk blok `entry` dari Task 2.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/ide.ts server/test/ide.route.test.ts
@@ -788,7 +788,7 @@ git commit -m "feat(ide): endpoint upload multipart — unggah berkas & folder k
   - `api.ideDeleteEntry(id: string, path: string): Promise<{ path: string; kind: "file" | "dir" }>`
   - `api.ideUpload(id: string, dir: string, files: { path: string; file: File }[], overwrite?: boolean): Promise<IdeUploadResult>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/api-client.test.ts`:
 
@@ -824,14 +824,14 @@ it("ideUpload tanpa overwrite tak mengirim field-nya", async () => {
 
 Pastikan berkas test itu mengimpor `vi`, `paths`, dan `api` (`import { paths } from "@hanoman/shared"` bila belum ada — ikuti impor yang sudah dipakai berkas itu).
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 pnpm vitest --run src/test/api-client.test.ts
 ```
 Expected: FAIL — `paths.ideEntry is not a function`.
 
-- [ ] **Step 3: Tambahkan path di `shared/src/api.ts`**
+- [x] **Step 3: Tambahkan path di `shared/src/api.ts`**
 
 Sesudah baris `ideGit:` (baris 75):
 
@@ -842,7 +842,7 @@ Sesudah baris `ideGit:` (baris 75):
   ideUpload: (id: string) => `${API}/projects/${id}/upload`,
 ```
 
-- [ ] **Step 4: Tambahkan tipe & method di `src/src/api/client.ts`**
+- [x] **Step 4: Tambahkan tipe & method di `src/src/api/client.ts`**
 
 Tipe (dekat `RepoFile`/`WorkingStatus`, dan **ekspor**):
 
@@ -875,7 +875,7 @@ Method, sesudah `putIdeFile` (baris 263):
   },
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run src/test/api-client.test.ts
@@ -883,7 +883,7 @@ pnpm --filter ./src typecheck
 ```
 Expected: PASS. (Bila nama filter paket berbeda, pakai nama dari `package.json` paket frontend.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/api.ts src/src/api/client.ts src/test/api-client.test.ts
@@ -901,7 +901,7 @@ git commit -m "feat(ide): klien API untuk entry & upload"
 **Interfaces:**
 - Produces: prop opsional `requireText?: string` — tombol konfirmasi nonaktif sampai isi input sama persis. Dipakai Task 9 untuk hapus folder.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/confirm-dialog.test.tsx`:
 
@@ -929,14 +929,14 @@ it("tanpa requireText dialog lama tetap langsung bisa dikonfirmasi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 pnpm vitest --run src/test/confirm-dialog.test.tsx
 ```
 Expected: FAIL — tombol sudah enabled sejak awal / label input tak ditemukan.
 
-- [ ] **Step 3: Implementasikan**
+- [x] **Step 3: Implementasikan**
 
 Ganti isi `src/src/ds/ConfirmDialog.tsx`:
 
@@ -987,14 +987,14 @@ export function ConfirmDialog({
 
 Bila `Input` bukan ekspor `./components/forms`, ikuti jalur impor yang dipakai `IdeScreen.tsx` (`../ds`) — jangan mengimpor dari `../ds/index` di dalam `ds` sendiri karena itu impor melingkar.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run src/test/confirm-dialog.test.tsx
 ```
 Expected: PASS, termasuk seluruh test lama di berkas itu.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/ds/ConfirmDialog.tsx src/test/confirm-dialog.test.tsx
@@ -1012,7 +1012,7 @@ git commit -m "feat(ds): ConfirmDialog requireText untuk aksi tak terbatalkan"
 **Interfaces:**
 - Produces: `TreeRow` menerima `dirSelected?: string` dan `onSelectDir?: (p: string) => void`; keduanya opsional sehingga pemakaian di `ReviewScreen`/`ChangedSection` tak berubah.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/ide-file-ops.test.tsx`:
 
@@ -1043,14 +1043,14 @@ describe("TreeRow · folder sebagai target", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 pnpm vitest --run src/test/ide-file-ops.test.tsx
 ```
 Expected: FAIL — `onSelectDir` tak pernah dipanggil (prop belum ada).
 
-- [ ] **Step 3: Implementasikan**
+- [x] **Step 3: Implementasikan**
 
 Ganti cabang folder di `src/src/screens/file-tree.tsx` (baris 30-32 tanda tangan, 56-69 badan):
 
@@ -1089,14 +1089,14 @@ export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen
 
 Catatan desain: satu klik **sekaligus** buka/tutup dan memilih. Memisahkan chevron jadi tombol tersendiri berarti tombol bersarang di dalam tombol — tak sah di HTML dan merusak navigasi keyboard.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run src/test/ide-file-ops.test.tsx src/test/ide-screen.test.tsx src/test/review-screen.test.tsx
 ```
 Expected: PASS. (Lewati berkas test yang memang tak ada di repo.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/file-tree.tsx src/test/ide-file-ops.test.tsx
@@ -1115,7 +1115,7 @@ git commit -m "feat(ide): folder di pohon Explorer bisa dipilih sebagai tujuan"
 - Consumes: `api.ideCreateEntry`, `api.ideUpload` (Task 4); `TreeRow` prop folder (Task 6).
 - Produces: state `dirSel` + fungsi `runUpload(list, overwrite)` yang dipakai Task 8 (drop) dan `NameDialog` yang dipakai Task 9 (rename).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/ide-file-ops.test.tsx`:
 
@@ -1192,14 +1192,14 @@ describe("Explorer · buat & unggah", () => {
 
 Tambahkan `waitFor` ke impor `@testing-library/react` di berkas test itu.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 pnpm vitest --run src/test/ide-file-ops.test.tsx -t "Explorer · buat & unggah"
 ```
 Expected: FAIL — teks `→ root` dan tombol `File baru` tak ditemukan.
 
-- [ ] **Step 3: Tambahkan state & aksi di `IdeScreen`**
+- [x] **Step 3: Tambahkan state & aksi di `IdeScreen`**
 
 Impor tambahan di baris 6-14:
 
@@ -1263,7 +1263,7 @@ Fungsi, letakkan sesudah `save()` (sesudah baris 193):
   };
 ```
 
-- [ ] **Step 4: Render baris aksi & sambungkan pohon**
+- [x] **Step 4: Render baris aksi & sambungkan pohon**
 
 Ganti header pane Files (baris 253-256) menjadi header lama **plus** baris aksi:
 
@@ -1349,14 +1349,14 @@ Tambahkan dialog di dekat modal lain (sesudah baris 379):
   async function renameTarget(_to: string) { /* Task 9 */ }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run src/test/ide-file-ops.test.tsx src/test/ide-screen.test.tsx
 ```
 Expected: PASS semua, termasuk test IdeScreen lama.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/IdeScreen.tsx src/test/ide-file-ops.test.tsx
@@ -1375,7 +1375,7 @@ git commit -m "feat(ide): baris aksi Explorer — buat berkas/folder & unggah"
 **Interfaces:**
 - Produces: `readDroppedEntries(dt: DataTransfer): Promise<{ path: string; file: File }[]>` — membaca folder lewat `webkitGetAsEntry` dan jatuh ke `dt.files` bila API itu tak ada.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/drop-entries.test.ts`:
 
@@ -1412,14 +1412,14 @@ describe("readDroppedEntries", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 pnpm vitest --run src/test/drop-entries.test.ts
 ```
 Expected: FAIL — modul tak ditemukan.
 
-- [ ] **Step 3: Implementasikan `drop-entries.ts`**
+- [x] **Step 3: Implementasikan `drop-entries.ts`**
 
 ```ts
 // ADR-0121 · membaca hasil drop jadi daftar { path relatif, File }. `webkitGetAsEntry` BUKAN
@@ -1469,7 +1469,7 @@ export async function readDroppedEntries(dt: DataTransfer): Promise<{ path: stri
 }
 ```
 
-- [ ] **Step 4: Sambungkan ke pane pohon**
+- [x] **Step 4: Sambungkan ke pane pohon**
 
 Di `IdeScreen.tsx`, impor `readDroppedEntries` dan tambahkan handler pada div `data-testid="ide-tree-scroll"` (baris 257):
 
@@ -1498,14 +1498,14 @@ Tambahkan test di `src/test/ide-file-ops.test.tsx`:
   });
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run src/test/drop-entries.test.ts src/test/ide-file-ops.test.tsx
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/drop-entries.ts src/src/screens/IdeScreen.tsx src/test/drop-entries.test.ts src/test/ide-file-ops.test.tsx
@@ -1524,7 +1524,7 @@ git commit -m "feat(ide): seret berkas & folder ke pohon Explorer untuk mengungg
 - Consumes: `api.ideRenameEntry`, `api.ideDeleteEntry` (Task 4); `ConfirmDialog requireText` (Task 5); `nameDialog` mode `"rename"` (Task 7).
 - Produces: perilaku akhir fitur — tak ada task sesudah ini yang bergantung padanya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/ide-file-ops.test.tsx`:
 
@@ -1578,14 +1578,14 @@ describe("Explorer · rename & hapus", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 pnpm vitest --run src/test/ide-file-ops.test.tsx -t "rename & hapus"
 ```
 Expected: FAIL — tombol "Ganti nama"/"Hapus" tak ada.
 
-- [ ] **Step 3: Implementasikan target, rename, dan hapus**
+- [x] **Step 3: Implementasikan target, rename, dan hapus**
 
 Ganti no-op `renameTarget` dari Task 7 dengan yang sebenarnya, dan tambahkan sesudahnya:
 
@@ -1647,7 +1647,7 @@ Tambahkan dialog konfirmasi di dekat modal lain:
         onConfirm={() => void deleteTarget()} onCancel={() => setPendingDelete(null)} />
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run src/test/ide-file-ops.test.tsx src/test/ide-screen.test.tsx src/test/confirm-dialog.test.tsx
@@ -1655,7 +1655,7 @@ pnpm --filter ./src typecheck
 ```
 Expected: PASS semua.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/IdeScreen.tsx src/test/ide-file-ops.test.tsx
@@ -1672,14 +1672,14 @@ git commit -m "feat(ide): ganti nama & hapus berkas/folder dari Explorer"
 - Modify: `internal/docs/README.md`
 - Modify: `internal/docs/adr/README.md`
 
-- [ ] **Step 1: Pastikan nomor ADR belum direbut worktree lain**
+- [x] **Step 1: Pastikan nomor ADR belum direbut worktree lain**
 
 ```bash
 ls internal/docs/adr/ | sort | tail -3
 ```
 Expected: `0120-…` adalah yang tertinggi. Bila sudah ada `0121-…` milik pekerjaan lain, pakai nomor bebas berikutnya dan ganti seluruh sebutan "ADR-0121" di kode & docs (`grep -rn "ADR-0121" server/src src/src shared/src internal/docs docs`).
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Buat `internal/docs/adr/0121-operasi-berkas-ide-explorer.md`:
 
@@ -1727,7 +1727,7 @@ tak punya jalur sama sekali; satu-satunya jalan adalah sesi agen atau shell di m
   tak menaikkan yang lain, dan itu disengaja (lampiran gambar SPEC-816 tetap 5 MB).
 ```
 
-- [ ] **Step 3: Perbarui api-contract**
+- [x] **Step 3: Perbarui api-contract**
 
 Tambahkan ke `internal/docs/architecture/api-contract.md`, di bagian endpoint IDE:
 
@@ -1750,7 +1750,7 @@ Tambahkan ke `internal/docs/architecture/api-contract.md`, di bagian endpoint ID
 - Path ditolak 400 bila absolut, kosong, ber-`..`, memuat komponen `.git`, atau menembus symlink.
 ```
 
-- [ ] **Step 4: Tautkan di index**
+- [x] **Step 4: Tautkan di index**
 
 Di `internal/docs/README.md`, tambahkan satu baris di daftar ADR (di atas entri 0120):
 
@@ -1766,7 +1766,7 @@ Di `internal/docs/README.md`, tambahkan satu baris di daftar ADR (di atas entri 
 
 Tambahkan juga narasi satu paragraf di `internal/docs/adr/README.md` mengikuti bentuk entri ADR di sekitarnya.
 
-- [ ] **Step 5: Uji endpoint nyata di local**
+- [x] **Step 5: Uji endpoint nyata di local**
 
 Boot server lalu curl keempat endpoint (AGENTS.md — sekali di akhir, bukan tiap task). Ganti
 `<project>` dengan id project yang punya `repoDir`:
@@ -1787,7 +1787,7 @@ Expected: `{"path":"tmp-uji/a.txt"}` · `{"written":["tmp-uji/b.txt"],"skipped":
 Pastikan `tmp-uji` benar-benar lenyap dari checkout sesudahnya. Hentikan server per-PID
 (`lsof -ti:3000 | xargs kill`) — **jangan** `pkill -f`, itu membunuh sesi agen tetangga (SPEC-402).
 
-- [ ] **Step 6: Jalankan seluruh test yang tersentuh sekali lagi**
+- [x] **Step 6: Jalankan seluruh test yang tersentuh sekali lagi**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run \
@@ -1797,7 +1797,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run \
 ```
 Expected: PASS semua.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs/
