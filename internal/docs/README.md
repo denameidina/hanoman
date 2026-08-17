@@ -57,6 +57,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 ## architecture
 - [stack](architecture/stack.md) · [data-model](architecture/data-model.md) · [api-contract](architecture/api-contract.md) · [nfr](architecture/nfr.md)
 - [vps-compliance](architecture/vps-compliance.md) — kerangka kepatuhan checklist 232 item (SPEC-220 · ADR-0050)
+- **Lampiran gambar sesi terminal (SPEC-816)** — paste/drop gambar di pane mengunggahnya ke `POST /terminal/sessions/:id/attachments` ([api-contract](architecture/api-contract.md)) dan yang masuk ke prompt adalah **path**-nya, bukan gambar inline: ke PTY hanya bisa dikirim teks, jadi agen membaca berkasnya sendiri dengan Read. Berkas hidup di `HANOMAN_UPLOAD_DIR/terminal/<sessionId>/`, disapu `killSession()` dan bukan `detachAll()` ([stack](architecture/stack.md)). Ini melepas lampiran dari clipboard mesin server — sebelumnya gambar hanya bisa masuk bila agen membaca clipboard host, sehingga umur sesi menentukan nasibnya dan dari HP/tablet mustahil sama sekali. Tanpa ADR: nol perubahan skema, kepemilikan berkas dicatat subdirektori per sesi.
 
 ## integrasi (untuk project yang memakai hanoman)
 - **Webhook keluar** — hanoman mem-POST amplop bertanda tangan HMAC ke endpoint yang didaftarkan operator setiap kali sebuah baris berubah. Dokumentasinya hidup **di dalam aplikasi** (Settings → Webhook → Dokumentasi webhook), dirender dari katalog `WEBHOOK_ENTITIES` yang sama dengan pengirimnya — tak ada salinan markdown yang bisa basi (SPEC-481 · ADR-0100)

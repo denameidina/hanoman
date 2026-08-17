@@ -95,6 +95,19 @@ yang lahir dari audit SPEC-800:
   `Shift+wheel` menggulir scrollback xterm secara lokal lewat `attachCustomWheelEventHandler`, satu
   jalur gulir yang tak pernah melewati mouse-mode. Ukuran font terminal adalah state tampilan
   persisten (SPEC-740 · ADR-0115), bukan bagian workspace kanonik per-user (SPEC-786 · ADR-0118).
+- **Lampiran gambar adalah BERKAS + PATH, bukan gambar inline** (SPEC-816). Yang bisa dikirim ke PTY
+  hanyalah teks; CLI-lah yang menyusun blok image, dari clipboard mesin server atau dari berkas yang
+  dibacanya. Pane karena itu mengunggah gambar yang di-paste/di-drop ke
+  `POST /terminal/sessions/:id/attachments`, lalu mengetikkan path absolut yang dikembalikan (+ satu
+  spasi, tanpa Enter) supaya operator melanjutkan kalimatnya. Berkasnya hidup di
+  `HANOMAN_UPLOAD_DIR/terminal/<sessionId>/` — subdirektori itulah yang mencatat kepemilikan, tanpa
+  tabel dan tanpa migration — dan disapu `killSession()`, **bukan** `detachAll()` (restart server
+  membiarkan sesi hidup, ADR-0016). Sebelumnya hanoman tak punya satu baris pun jalur gambar: Cmd+V
+  hanya membaca teks dan Ctrl+V polos diteruskan mentah ke tmux, sehingga gambar hanya bisa masuk
+  bila proses agen membaca clipboard mesin server sendiri — mustahil dari HP/tablet, dan rapuh
+  terhadap umur sesi. Pemilahan berkas dari `DataTransfer` murni di `screens/terminal-clipboard.ts`
+  (`imageFilesFrom`, `hasImageDrag`); `dataTransfer.files` KOSONG selama `dragover` — baru terisi
+  saat `drop` — jadi keputusan `preventDefault` di dragover dibaca dari `types`.
 
 **Dua agen didukung** (SPEC-338/ADR-0074): `Agent = "claude" | "codex"`. Default global
 `Setting.agent` berlaku untuk semua sesi yang men-spawn agen; sesi backlog bisa meng-override saat

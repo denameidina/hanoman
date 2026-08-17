@@ -874,6 +874,22 @@ GET    /terminal/sessions/:id/phases # fase yang sudah dilaporkan sesi (dari $HA
 GET    /terminal/sessions/:id/review        # (SPEC-230, ADR-0054) diff worktree HIDUP sesi project-level (PRD);
 #   bentuk = /specs/:id/review; kunci worktree = id sesi; 409 bila worktree lenyap (sesi ditutup) — bukan 500
 GET    /terminal/sessions/:id/review/*path  # { path, status, binary, truncated, diff, content } · 404 · 409
+POST   /terminal/sessions/:id/attachments   # multipart/form-data, field `file` → 200 { path }
+#   (SPEC-816) lampiran gambar sesi. `path` = path ABSOLUT berkas di server; pane mengetikkannya ke
+#   prompt (+ satu spasi, TANPA Enter) dan agen membacanya sendiri dengan Read. Berkas + path,
+#   bukan gambar inline: yang bisa dikirim ke PTY hanyalah teks — CLI-lah yang menyusun blok image
+#   dari berkas yang dibacanya. Itu pula yang melepasnya dari clipboard mesin server, sehingga umur
+#   sesi berhenti menjadi variabel dan pane di HP/tablet memakai jalur yang sama.
+#   Tersimpan di HANOMAN_UPLOAD_DIR/terminal/<sessionId>/<uuid>.<ext> (0700/0600); direktori itulah
+#   yang mencatat kepemilikan — tanpa tabel, tanpa migration. Disapu `killSession()`, TIDAK oleh
+#   `detachAll()` (restart server membiarkan sesi hidup, ADR-0016 — lampirannya ikut selamat).
+#   404 sesi tak dikenal (gerbang `getSession` berdiri SEBELUM disk tersentuh, jadi id yang mencoba
+#     traversal jatuh di 404 yang sama) · 400 bukan multipart / tanpa berkas
+#   415 mime di luar { image/png, image/jpeg, image/webp } — cermin kunci `EXT` di services/uploads.ts;
+#     image/gif SENGAJA di luar karena `extFor` memetakannya ke `.bin`
+#   413 berkas > 5 MB. WAJIB diperiksa lewat `part.file.truncated`: multipart terdaftar
+#     `throwFileSizeLimit:false`, jadi berkas oversize datang TER-TRUNCATE, bukan sebagai error —
+#     tanpa gerbang ini kita menyimpan gambar rusak yang gagal dibaca agen tanpa satu tanda pun.
 POST   /terminal/sessions/:id/integrate  { op:"merge"|"rebase", target:"local:<b>"|"origin:<b>" }
 #   (SPEC-230, ADR-0054) rebase/merge branch sesi (PRD prd/<slug>); { status:"clean", detail } |
 #   { status:"conflict", sessionId } (spawn sesi claude di worktree merge-<id>) | 400 op/target · 409 branch/sesi tanpa branch

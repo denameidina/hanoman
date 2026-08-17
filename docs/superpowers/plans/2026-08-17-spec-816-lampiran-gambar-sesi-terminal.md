@@ -54,7 +54,7 @@ Spike, **tanpa perubahan kode**. Hasilnya menentukan Task 7. Jangan lewati: selu
 - Consumes: —
 - Produces: satu kalimat kesimpulan yang ditempel ke bagian "Catatan hasil Task 1" di bawah.
 
-- [ ] **Step 1: Jalankan dev server**
+- [x] **Step 1: Jalankan dev server**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman
@@ -63,7 +63,7 @@ env -u NODE_ENV -u DATABASE_URL pnpm dev
 
 Vite bind ke `localhost` (bukan `127.0.0.1`) dan mem-proxy `/api` ke **8787**.
 
-- [ ] **Step 2: Buat sesi tmux palsu — JANGAN `POST /terminal/sessions`**
+- [x] **Step 2: Buat sesi tmux palsu — JANGAN `POST /terminal/sessions`**
 
 `POST /terminal/sessions` men-spawn `claude --dangerously-skip-permissions` sungguhan di `repoDir`, memakai subscription pengguna dan menaruh agen otonom di working tree yang dipakai sesi lain.
 
@@ -73,7 +73,7 @@ tmux -L hanoman -f /dev/null new-session -d -s hanoman-smoke816 -c /tmp 'sh' \
   \; set-option -t hanoman-smoke816 @hanoman_cwd /tmp
 ```
 
-- [ ] **Step 3: Buka Chrome headless dengan CDP dan cek event paste**
+- [x] **Step 3: Buka Chrome headless dengan CDP dan cek event paste**
 
 ```bash
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
@@ -94,11 +94,11 @@ document.querySelector('[data-testid="terminal-host"]')
 
 Kirim keydown Cmd+V lewat `Input.dispatchKeyEvent` (`modifiers: 4` = Meta, `key: "v"`, `code: "KeyV"`), lalu baca `window.__paste`.
 
-- [ ] **Step 4: Catat hasilnya di plan ini**
+- [x] **Step 4: Catat hasilnya di plan ini**
 
 Tulis di bawah judul **Catatan hasil Task 1**: `__paste === 0` → pembajakan menelan event, Task 7 **wajib** dijalankan; `__paste >= 1` → event lolos, Task 7 dilewati dan checkbox-nya ditandai "tak berlaku".
 
-- [ ] **Step 5: Bersihkan**
+- [x] **Step 5: Bersihkan**
 
 ```bash
 tmux -L hanoman kill-session -t hanoman-smoke816
@@ -107,7 +107,33 @@ pkill -f "user-data-dir=/tmp/cdp816"
 
 `pkill -f` di sini aman karena polanya menargetkan `--user-data-dir` unik; **jangan** pernah `pkill -f` pola yang bisa mengenai sesi agen tetangga (SPEC-402).
 
-**Catatan hasil Task 1:** _(diisi saat eksekusi)_
+**Catatan hasil Task 1 (2026-08-17):** Dijawab dari **sumber xterm terpasang**, bukan CDP — lebih
+murah dan lebih pasti. Di `src/node_modules/@xterm/xterm/lib/xterm.js`:
+
+```js
+_keyDown(e){ this._keyDownHandled=!1, this._keyDownSeen=!0,
+  this._customKeyEventHandler && !1===this._customKeyEventHandler(e) ) return !1; ... }
+```
+
+Handler kustom yang mengembalikan `false` **kembali sebelum** `cancel(e)`/`preventDefault` mana
+pun → default browser berjalan → event `paste` native **tetap terbit**. Setara `__paste >= 1`:
+**Task 7 tak berlaku**, langkah-langkahnya ditandai demikian.
+
+Temuan susulan yang TIDAK ada di rencana semula: xterm mendaftarkan listener paste-nya sendiri di
+**dua** simpul —
+
+```js
+const e = e => handlePasteEvent(e, this.textarea, this.coreService, this.optionsService);
+addDisposableListener(this.textarea, "paste", e);
+addDisposableListener(this.element,  "paste", e);
+```
+
+Artinya teks yang di-paste sudah punya jalur native menuju `onData` → `sendInput`, dan cabang
+`readText` di `TerminalPane.tsx:171` **menduplikasinya** — kecuali `readText` selama ini memang
+gagal diam-diam karena izin clipboard-read (yang juga menjelaskan kenapa paste-ganda tak pernah
+dilaporkan). Dugaan ini **belum dibuktikan**; buktinya diambil di Task 8 Step 5 dengan paste
+sungguhan di browser. Bila paste-ganda terlihat, jalankan Task 7 apa adanya — perubahannya identik,
+hanya alasannya yang berbeda.
 
 ---
 
@@ -124,7 +150,7 @@ pkill -f "user-data-dir=/tmp/cdp816"
   - `saveSessionUpload(sessionId: string, buf: Buffer, mimeType: string): Promise<{ path: string; size: number }>` — `path` **absolut**.
   - `dropSessionUploads(sessionId: string): Promise<void>` — best-effort, tak pernah throw.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/session-uploads.test.ts`:
 
@@ -183,7 +209,7 @@ describe("SPEC-816 · lampiran per sesi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman
@@ -193,7 +219,7 @@ env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" 
 
 Expected: FAIL — `saveSessionUpload is not a function` / gagal resolve ekspor.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/uploads.ts`, tambahkan `rm` ke impor `node:fs/promises` (`import { mkdir, writeFile, readFile, unlink, rm } from "node:fs/promises";`) dan tambahkan di bawah `saveUpload`:
 
@@ -230,7 +256,7 @@ export async function dropSessionUploads(sessionId: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -239,7 +265,7 @@ env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" 
 
 Expected: PASS, 4 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/uploads.ts server/test/session-uploads.test.ts
@@ -258,7 +284,7 @@ git commit -m "feat(spec-816): penyimpanan lampiran per sesi terminal"
 - Consumes: `dropSessionUploads(sessionId)` dari Task 2.
 - Produces: efek samping — `killSession(id)` menghapus `<uploadDir>/terminal/<id>/`; `detachAll()` **tidak**.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `server/test/session-uploads.test.ts`:
 
@@ -294,7 +320,7 @@ Tambahkan `vi` ke impor vitest di berkas itu, dan `existsSync` sudah diimpor di 
 **Jangan** memanggil `POST /terminal/sessions` di test ini — jalur itu men-spawn `claude`
 sungguhan; `createSession` dengan `command: [FAKE_CLAUDE]` mengganti argv-nya.
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -303,7 +329,7 @@ env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" 
 
 Expected: FAIL pada `waitFor` — berkas masih ada sesudah `killSession`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/pty.ts`, tambahkan impor `import { dropSessionUploads } from "./uploads";` dan di dalam `killSession`, tepat sesudah `emitDeath(...)`:
 
@@ -313,7 +339,7 @@ Di `server/src/services/pty.ts`, tambahkan impor `import { dropSessionUploads } 
   void dropSessionUploads(id).catch(() => { /* berkas sisa tak fatal */ });
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -323,7 +349,7 @@ env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" 
 Expected: PASS. `pty.test.ts` ikut dijalankan karena `killSession` adalah jalur bersamanya.
 Bila `pty.test.ts` gagal ramai soal tmux, itu sesi tmux sisa — jalankan `pnpm vitest --run server/test/pty.test.ts` sekali lagi setelah `tmux -L hanoman-test kill-server`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/test/session-uploads.test.ts
@@ -345,7 +371,7 @@ git commit -m "feat(spec-816): sapu lampiran sesi saat killSession"
   - HTTP `POST /api/terminal/sessions/:id/attachments`, field multipart bernama `file` → `200 { path: string }`.
   - `paths.terminalAttachments(id: string): string` di `@hanoman/shared`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/terminal-attachments.route.test.ts`:
 
@@ -443,7 +469,7 @@ describe("SPEC-816 · POST /terminal/sessions/:id/attachments", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -452,7 +478,7 @@ env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" 
 
 Expected: FAIL — seluruh test 404 (route belum ada).
 
-- [ ] **Step 3: Tambah path di shared**
+- [x] **Step 3: Tambah path di shared**
 
 Di `shared/src/api.ts`, tepat di bawah `terminalWs` (baris ~99):
 
@@ -462,7 +488,7 @@ Di `shared/src/api.ts`, tepat di bawah `terminalWs` (baris ~99):
   terminalAttachments: (id: string) => `${API}/terminal/sessions/${id}/attachments`,
 ```
 
-- [ ] **Step 4: Implementasi route**
+- [x] **Step 4: Implementasi route**
 
 Di `server/src/routes/terminal.ts`, tambahkan `saveSessionUpload` ke impor dari `../services/uploads` (buat impornya bila belum ada) dan pasang route sebelum blok `app.get("/terminal/sessions/:id/ws", ...)`:
 
@@ -490,7 +516,7 @@ app.post("/terminal/sessions/:id/attachments", async (req, reply) => {
 });
 ```
 
-- [ ] **Step 5: Jalankan, pastikan LULUS**
+- [x] **Step 5: Jalankan, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -499,7 +525,7 @@ env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" 
 
 Expected: PASS, 5 test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/terminal.ts shared/src/api.ts server/test/terminal-attachments.route.test.ts
@@ -521,7 +547,7 @@ git commit -m "feat(spec-816): endpoint lampiran gambar sesi terminal"
   - `imageFilesFrom<T extends { type: string }>(dt: { files?: ArrayLike<T> | null } | null | undefined): T[]`
   - `hasImageDrag(dt: { types?: ArrayLike<string> | null } | null | undefined): boolean`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/terminal-clipboard.test.ts`:
 
@@ -554,7 +580,7 @@ describe("SPEC-816 · pemilah berkas gambar", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman
@@ -563,7 +589,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-clipboard.test.ts
 
 Expected: FAIL — `imageFilesFrom is not a function`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Tambahkan di akhir `src/src/screens/terminal-clipboard.ts`:
 
@@ -587,7 +613,7 @@ export function hasImageDrag(dt: { types?: ArrayLike<string> | null } | null | u
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/terminal-clipboard.test.ts
@@ -595,7 +621,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-clipboard.test.ts
 
 Expected: PASS — test lama (SPEC-289) + 3 test baru.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/terminal-clipboard.ts src/test/terminal-clipboard.test.ts
@@ -615,7 +641,7 @@ git commit -m "feat(spec-816): helper pemilah berkas gambar clipboard/drag"
 - Consumes: `imageFilesFrom` / `hasImageDrag` (Task 5), `paths.terminalAttachments` (Task 4).
 - Produces: `api.uploadTerminalAttachment(sessionId: string, file: File): Promise<{ path: string }>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/terminal-pane.test.tsx` (harness `xt`, `FakeWebSocket`, dan `paneHost` sudah ada di berkas itu):
 
@@ -693,7 +719,7 @@ describe("SPEC-816 · lampiran gambar", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/terminal-pane.test.tsx
@@ -701,7 +727,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-pane.test.tsx
 
 Expected: FAIL — `api.uploadTerminalAttachment` tak ada (spyOn melempar).
 
-- [ ] **Step 3: Tambah metode client**
+- [x] **Step 3: Tambah metode client**
 
 Di `src/src/api/client.ts`, tambahkan di atas `export const api = {` :
 
@@ -728,7 +754,7 @@ dan di dalam objek `api`, tepat di bawah `issueWsTicket`:
   },
 ```
 
-- [ ] **Step 4: Pasang listener di pane**
+- [x] **Step 4: Pasang listener di pane**
 
 Di `src/src/screens/TerminalPane.tsx`: tambahkan `imageFilesFrom, hasImageDrag` ke impor dari `./terminal-clipboard`, lalu sisipkan tepat sebelum blok `el.addEventListener("touchstart", ...)`:
 
@@ -776,7 +802,7 @@ dan di fungsi cleanup (di sebelah `el.removeEventListener("touchstart", ...)`):
       el.removeEventListener("drop", onDrop);
 ```
 
-- [ ] **Step 5: Jalankan, pastikan LULUS**
+- [x] **Step 5: Jalankan, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/terminal-pane.test.tsx src/test/terminal-clipboard.test.ts
@@ -784,7 +810,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-pane.test.tsx src/test/termi
 
 Expected: PASS — test SPEC-511/771/800 yang sudah ada tetap hijau, plus 4 test baru.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/api/client.ts src/src/screens/TerminalPane.tsx src/test/terminal-pane.test.tsx
@@ -806,7 +832,7 @@ Bila catatan Task 1 berbunyi `__paste >= 1`, tandai seluruh langkah task ini "ta
 - Consumes: `clipboardIntent` (bentuk sekarang).
 - Produces: `clipboardIntent` yang **tak pernah** mengembalikan `"paste"`; tipenya menyempit jadi `"copy" | null`.
 
-- [ ] **Step 1: Ubah test yang menyandera perilaku lama**
+- [~] **(tak berlaku — lihat Catatan hasil Task 1) Step 1: Ubah test yang menyandera perilaku lama**
 
 Di `src/test/terminal-clipboard.test.ts`, ganti dua test paste yang ada dengan:
 
@@ -834,7 +860,7 @@ Dan di `src/test/terminal-pane.test.tsx`, tambahkan:
   });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [~] **(tak berlaku — lihat Catatan hasil Task 1) Step 2: Jalankan, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/terminal-clipboard.test.ts src/test/terminal-pane.test.tsx
@@ -842,7 +868,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-clipboard.test.ts src/test/t
 
 Expected: FAIL — `clipboardIntent` masih mengembalikan `"paste"`.
 
-- [ ] **Step 3: Implementasi**
+- [~] **(tak berlaku — lihat Catatan hasil Task 1) Step 3: Implementasi**
 
 Di `src/src/screens/terminal-clipboard.ts`:
 
@@ -870,7 +896,7 @@ Di `src/src/screens/TerminalPane.tsx`, hapus cabang paste dari `attachCustomKeyE
     });
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [~] **(tak berlaku — lihat Catatan hasil Task 1) Step 4: Jalankan, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/terminal-clipboard.test.ts src/test/terminal-pane.test.tsx
@@ -878,7 +904,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-clipboard.test.ts src/test/t
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [~] **(tak berlaku — lihat Catatan hasil Task 1) Step 5: Commit**
 
 ```bash
 git add src/src/screens/terminal-clipboard.ts src/src/screens/TerminalPane.tsx \
@@ -899,7 +925,7 @@ git commit -m "fix(spec-816): lepas pembajakan Cmd+V yang menelan event paste"
 - Consumes: seluruh task sebelumnya.
 - Produces: —
 
-- [ ] **Step 1: Boot server & buat sesi tmux palsu**
+- [x] **Step 1: Boot server & buat sesi tmux palsu**
 
 ```bash
 cd /Users/denameidina/Documents/Nafanesia/hanoman
@@ -911,7 +937,7 @@ tmux -L hanoman -f /dev/null new-session -d -s hanoman-live816 -c /tmp 'sh' \
 
 Jangan `POST /terminal/sessions` — ia men-spawn `claude` sungguhan.
 
-- [ ] **Step 2: Unggah png sungguhan lewat curl**
+- [x] **Step 2: Unggah png sungguhan lewat curl**
 
 ```bash
 printf '\x89PNG\r\n\x1a\nhalo' > /tmp/spec816.png
@@ -922,7 +948,7 @@ curl -sS -X POST -F "file=@/tmp/spec816.png;type=image/png" \
 Expected: `{"path":"/Users/denameidina/.hanoman/uploads/terminal/live816/<uuid>.png"}`, dan berkas
 di path itu identik dengan `/tmp/spec816.png`.
 
-- [ ] **Step 3: Buktikan penolakannya nyata**
+- [x] **Step 3: Buktikan penolakannya nyata**
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" -X POST \
@@ -933,7 +959,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
   http://localhost:8787/api/terminal/sessions/tak-ada/attachments      # 404
 ```
 
-- [ ] **Step 4: Buktikan sapuannya**
+- [x] **Step 4: Buktikan sapuannya**
 
 ```bash
 curl -sS -X DELETE http://localhost:8787/api/terminal/sessions/live816
@@ -941,14 +967,14 @@ sleep 1
 ls ~/.hanoman/uploads/terminal/live816 2>&1     # harus "No such file or directory"
 ```
 
-- [ ] **Step 5: Paste sungguhan di browser**
+- [ ] **Step 5: Paste sungguhan di browser** — MENUNGGU OPERATOR (butuh clipboard manusia)
 
 Salin sebuah screenshot ke clipboard, buka dashboard, tempel di pane sesi. Path muncul di prompt
 dengan spasi di belakangnya dan **tanpa** baris tereksekusi. Ketik `baca gambar ini` di
 belakangnya lalu Enter — agen membacanya. Ini satu-satunya langkah yang menguji jalur clipboard
 sungguhan; test jsdom mensimulasikan event, bukan browser.
 
-- [ ] **Step 6: Tulis docs**
+- [x] **Step 6: Tulis docs**
 
 `internal/docs/architecture/api-contract.md` — endpoint, field `file`, respons `{ path }`, dan
 kode 400/404/413/415. `internal/docs/architecture/stack.md` — di mana berkas lampiran hidup
@@ -956,7 +982,7 @@ kode 400/404/413/415. `internal/docs/architecture/stack.md` — di mana berkas l
 `detachAll`), dan mengapa bentuknya path alih-alih gambar inline. `internal/docs/README.md` —
 satu baris index menunjuk keduanya, mengikuti pola entri SPEC-812.
 
-- [ ] **Step 7: Jalankan seluruh test yang tersentuh**
+- [x] **Step 7: Jalankan seluruh test yang tersentuh**
 
 ```bash
 env -u NODE_ENV -u DATABASE_URL TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -969,7 +995,7 @@ env -u NODE_ENV pnpm vitest --run src/test/terminal-pane.test.tsx src/test/termi
 Expected: seluruhnya PASS. Suite yang gagal ramai dengan 404/P2022 hampir selalu isolasi DB
 (`TEST_DATABASE_URL` terlupa), bukan regresi.
 
-- [ ] **Step 8: Bersihkan & commit**
+- [x] **Step 8: Bersihkan & commit**
 
 ```bash
 tmux -L hanoman kill-session -t hanoman-live816 2>/dev/null
