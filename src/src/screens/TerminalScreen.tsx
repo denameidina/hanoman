@@ -877,19 +877,24 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
         {awaiting && !finished && (deciding
           ? <StatusPill status="running" size="sm">Lead memutuskan</StatusPill>
           : <StatusPill status="awaiting" size="sm" />)}
-        {collapsible.slice(0, inline).map((action) => action.render)}
-        {hidden.length > 0 && (
-          <OverflowActions label={`Aksi lain sesi ${session.id}`}
-            items={hidden.map(({ render: _render, ...item }) => item)} />
-        )}
-        {/* SPEC-232 · lihat SATU terminal ini secara penuh dalam modal. */}
-        <button type="button" className="hn-terminal-action" onClick={onFullscreen} title="Layar penuh — fokus 1 terminal"
-          aria-label={`Layar penuh sesi ${session.id}`}
-        >
-          <Icon name="fullscreen" size={12} />
-        </button>
-        <button type="button" className="hn-terminal-action" aria-label={`Tutup sesi ${session.id}`}
-          onClick={onClose}>×</button>
+        {/* Aksi sel duduk di klaster ber-gap sendiri (lebih rapat dari gap header): tombolnya
+            sudah punya target sentuh 28/44px, jadi jarak antar-tombol tak perlu selebar jarak
+            label↔status. Angkanya dicerminkan `ACTION_GAP` supaya aritmetika kolaps ikut. */}
+        <span className="hn-terminal-actions">
+          {collapsible.slice(0, inline).map((action) => action.render)}
+          {hidden.length > 0 && (
+            <OverflowActions label={`Aksi lain sesi ${session.id}`}
+              items={hidden.map(({ render: _render, ...item }) => item)} />
+          )}
+          {/* SPEC-232 · lihat SATU terminal ini secara penuh dalam modal. */}
+          <button type="button" className="hn-terminal-action" onClick={onFullscreen} title="Layar penuh — fokus 1 terminal"
+            aria-label={`Layar penuh sesi ${session.id}`}
+          >
+            <Icon name="fullscreen" size={12} />
+          </button>
+          <button type="button" className="hn-terminal-action" aria-label={`Tutup sesi ${session.id}`}
+            onClick={onClose}>×</button>
+        </span>
       </div>
       {/* Sesi berakhir (SPEC-188): badan diredupkan agar terbaca beku; header + badge
           "Selesai" tetap penuh supaya statusnya justru paling kontras. */}

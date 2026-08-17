@@ -4,9 +4,10 @@
 
 /** Lebar minimum label sesi di header sel; di bawah ini label tak lagi bisa dibaca. */
 export const HEADER_LABEL_MIN = 96;
-/** Ilustrasi state (34px) + gap-nya. */
-export const HEADER_MEDIA_PX = 42;
-export const ACTION_GAP = 8;
+/** Ilustrasi state (34px) + gap header di kedua sisinya (ilustrasi↔label, label↔klaster aksi). */
+export const HEADER_MEDIA_PX = 50;
+/** Jarak antar tombol aksi di dalam klaster `.hn-terminal-actions` — bukan gap header (8px). */
+export const ACTION_GAP = 2;
 /** `Layar penuh` + `Tutup` tak pernah runtuh: keduanya jalan keluar, bukan aksi tambahan. */
 export const ALWAYS_INLINE = 2;
 

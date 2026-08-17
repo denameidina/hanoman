@@ -14,12 +14,13 @@ describe("inlineActionCount", () => {
   });
 
   it("menyisakan satu slot untuk tombol overflow saat tak semuanya muat", () => {
-    // slot 36px, tetap 96 + 58 + 2×36 = 226 → sisa 114 → 3 slot; satu dipakai tombol overflow
-    expect(inlineActionCount(340, 4, 28)).toBe(2);
+    // slot 30px (28 + gap klaster 2), tetap 96 + 50 + 2×30 = 206 → sisa 94 → 3 slot;
+    // satu dipakai tombol overflow
+    expect(inlineActionCount(300, 4, 28)).toBe(2);
   });
 
   it("meruntuhkan seluruh aksi saat pointer kasar memperbesar tiap kontrol", () => {
-    // slot 52px, tetap 96 + 58 + 2×52 = 258 → sisa 42 → 0 slot
+    // slot 46px, tetap 96 + 50 + 2×46 = 238 → sisa 62 → 1 slot, habis untuk tombol overflow
     expect(inlineActionCount(300, 4, 44)).toBe(0);
   });
 

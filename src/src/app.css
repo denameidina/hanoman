@@ -358,6 +358,16 @@ textarea:focus-visible,
 
 .hn-graph-action:hover { background: var(--bone-200); }
 
+/* Klaster aksi header sel: gap 2px, lebih rapat dari gap 8px header. Padanan angkanya ada di
+   `terminal-chrome.ts` (`ACTION_GAP`) — kalau salah satu bergeser sendiri, perhitungan berapa
+   aksi yang muat inline ikut meleset. */
+.hn-terminal-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+
 .hn-terminal-action {
   display: inline-grid;
   min-width: 28px;
