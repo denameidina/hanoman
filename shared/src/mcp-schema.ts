@@ -95,6 +95,7 @@ export const QA_PAYLOAD = obj({
     expected: str("Yang seharusnya terjadi."),
     actual: str("Yang sebenarnya terjadi. Dari sinilah `objective` backlog diturunkan server."),
     env: str("Lingkungan tempat temuan muncul: versi, browser, OS, instance."),
+    constraints: str("Batasan yang mengikat pengerjaan: yang tak boleh berubah, yang wajib dipertahankan. Boleh string kosong — SENGAJA tak wajib (SPEC-826)."),
     fromAudit: str("Opsional. Id backlog audit asal (mis. `SPEC-371`)."),
   },
   required: ["severity", "steps", "expected", "actual", "env"],
@@ -114,7 +115,7 @@ export const GOAL_PAYLOAD = obj({
 
 export const SPEC_PAYLOAD_ONEOF: JsonSchemaNode = {
   description:
-    "Isi backlog. BENTUKNYA DITENTUKAN `source`: `qa` → {severity, steps, expected, actual, env}; `goal` → {goal, done, constraints, priority}; `brief`/`audit`/`help` → {context, outcome, constraints, priority}. Bentuk yang tak cocok ditolak sebelum dikirim.",
+    "Isi backlog. BENTUKNYA DITENTUKAN `source`: `qa` → {severity, steps, expected, actual, env, constraints}; `goal` → {goal, done, constraints, priority}; `brief`/`audit`/`help` → {context, outcome, constraints, priority}. `constraints` qa opsional (default string kosong); bentuk yang tak cocok ditolak sebelum dikirim.",
   oneOf: [BRIEF_PAYLOAD, QA_PAYLOAD, GOAL_PAYLOAD],
 };
 
