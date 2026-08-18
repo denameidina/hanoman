@@ -232,15 +232,16 @@ server menegakkannya di boundary.
 | `audit` | brief | idem — audit-only: hasilnya dokumen temuan, tanpa Execute |
 | `help` | brief | idem — item yang lahir dari tiket Help Center |
 | `qa` | qa | `severity` (`critical`\|`major`\|`minor`), `steps`, `expected`, `actual`, `env`, `constraints` (opsional, default `""`) |
-| `goal` | goal | `goal` (wajib), `done`, `constraints`, `priority` |
+| `goal` | goal | `goal` (wajib), `done`, `constraints`, `priority` — sesi dua fase (Goal → Verifikasi) |
+| `no_effort` | goal | idem — task remeh, sesi SATU fase (`Kerjakan`): langsung dikerjakan lalu berhenti |
 
 Body lengkap: `project` (slug project), `source`, `title`, `priority`
 (`tinggi`\|`sedang`\|`rendah`), `payload`; opsional `branchFrom` (branch basis — harus benar-benar
 ada di repo project) dan `dependsOn` (array id backlog yang harus selesai & ter-merge lebih dulu).
 
 Yang **tak** kamu kirim karena diturunkan server: `objective` (dari `outcome`/`context` untuk brief,
-`actual`/`steps` untuk qa, `goal` untuk goal) dan — khusus `qa` — `priority`, yang diturunkan dari
-`severity`.
+`actual`/`steps` untuk qa, `goal` untuk goal & no_effort) dan — khusus `qa` — `priority`, yang
+diturunkan dari `severity`.
 
 ```json
 {
