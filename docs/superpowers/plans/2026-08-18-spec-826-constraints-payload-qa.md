@@ -33,7 +33,7 @@
 **Interfaces:**
 - Produces: `zQaPayload` menerima payload qa **tanpa** `constraints` dan menormalkannya ke `constraints: ""`; menerima `constraints: string` bila dikirim. Bentuk hasil parse: `{severity, steps, expected, actual, env, constraints, fromAudit?}`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan blok berikut di `shared/test/entities.test.ts`, tepat sesudah `describe("zQaPayload fromAudit (SPEC-244)", …)` yang sudah ada:
 
@@ -67,7 +67,7 @@ describe("SPEC-826 · zQaPayload.constraints", () => {
 
 `zQaPayload`, `zGoalPayload`, `zCreateSpec`, `zPatchSpec` semuanya sudah ada di baris `import` berkas itu — tak ada import baru.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run shared/test/entities.test.ts -t "SPEC-826"
@@ -75,7 +75,7 @@ pnpm vitest --run shared/test/entities.test.ts -t "SPEC-826"
 
 Expected: FAIL — `expected undefined to be ""` pada test pertama.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `shared/src/entities.ts`, ganti definisi `zQaPayload`:
 
@@ -90,7 +90,7 @@ export const zQaPayload = z.object({
   fromAudit: z.string().optional() });   // SPEC-244 · qa dinaikkan dari audit → sinyal skip fase Audit (ADR-0059)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run shared/test/entities.test.ts
@@ -98,7 +98,7 @@ pnpm vitest --run shared/test/entities.test.ts
 
 Expected: PASS, seluruh berkas hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/entities.ts shared/test/entities.test.ts
@@ -117,7 +117,7 @@ git commit -m "feat(spec-826): zQaPayload.constraints ber-default, payload qa la
 - Consumes: `zQaPayload` dari Task 1 (tak dipanggil langsung — `convertPayload` murni, tanpa zod).
 - Produces: `convertPayload(to, payload)` mengembalikan `payload.constraints` terisi untuk SEMUA `toShape`, dan `dropped` tak pernah lagi memuat `"constraints"`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Di `shared/src/spec-source-convert.test.ts`, ubah keempat test yang menyebut arah qa dan tambahkan satu test baru. Ganti test `"brief → qa: …"` (baris ~29) menjadi:
 
@@ -213,7 +213,7 @@ Terakhir tambahkan satu test baru di akhir `describe`, sebelum kurung tutupnya:
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run shared/src/spec-source-convert.test.ts
@@ -221,7 +221,7 @@ pnpm vitest --run shared/src/spec-source-convert.test.ts
 
 Expected: FAIL — beberapa test, di antaranya `brief → qa` (`dropped` masih `["constraints"]`, payload tanpa `constraints`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `shared/src/spec-source.ts`, ganti komentar di atas `SHAPE_REQUIRED` (baris 62-66):
 
@@ -270,7 +270,7 @@ Lalu di blok terakhir (→ bentuk brief), ganti cabang `fromShape === "qa"` (bar
     }, nonEmpty(["steps", "env"]));
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run shared/src/spec-source-convert.test.ts
@@ -278,7 +278,7 @@ pnpm vitest --run shared/src/spec-source-convert.test.ts
 
 Expected: PASS, 12 test hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/spec-source.ts shared/src/spec-source-convert.test.ts
@@ -296,7 +296,7 @@ git commit -m "feat(spec-826): convertPayload meneruskan constraints di keenam a
 **Interfaces:**
 - Produces: `QA_PAYLOAD.properties.constraints` ada; `QA_PAYLOAD.required` **tidak** memuatnya.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Buat `shared/test/mcp-qa-constraints.test.ts`:
 
@@ -325,7 +325,7 @@ describe("SPEC-826 · constraints di skema MCP payload qa", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run shared/test/mcp-qa-constraints.test.ts
@@ -333,7 +333,7 @@ pnpm vitest --run shared/test/mcp-qa-constraints.test.ts
 
 Expected: FAIL — `expected [ 'severity', 'steps', … ] to contain 'constraints'`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `shared/src/mcp-schema.ts`, di dalam `QA_PAYLOAD.properties`, sisipkan sesudah `env`:
 
@@ -348,7 +348,7 @@ Lalu ganti `SPEC_PAYLOAD_ONEOF.description`:
     "Isi backlog. BENTUKNYA DITENTUKAN `source`: `qa` → {severity, steps, expected, actual, env, constraints}; `goal` → {goal, done, constraints, priority}; `brief`/`audit`/`help` → {context, outcome, constraints, priority}. `constraints` qa opsional (default string kosong); bentuk yang tak cocok ditolak sebelum dikirim.",
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run shared/test/mcp-qa-constraints.test.ts
@@ -356,7 +356,7 @@ pnpm vitest --run shared/test/mcp-qa-constraints.test.ts
 
 Expected: PASS, 3 test hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/mcp-schema.ts shared/test/mcp-qa-constraints.test.ts
@@ -375,7 +375,7 @@ git commit -m "feat(spec-826): skema MCP mengiklankan constraints qa tanpa mewaj
 - Consumes: bentuk `zQaPayload` dari Task 1.
 - Produces: `Spec.payload` yang lahir dari tiket Help Center & issue GitHub memuat `constraints: ""`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Di `server/test/tickets.test.ts`, pada test yang sudah meng-assert `expect(spec.payload).toHaveProperty("severity")` (baris ~212), tambahkan satu baris tepat sesudahnya:
 
@@ -393,7 +393,7 @@ Di `server/test/github-accept.test.ts`, pada test yang sudah membaca `spec.paylo
     expect(p.constraints).toBe("");   // SPEC-826
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -402,7 +402,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `expected { severity: 'major', … } to have property "constraints"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `server/src/services/ticket-accept.ts`, ganti pabrik payload qa:
 
@@ -424,7 +424,7 @@ Di `server/src/services/github-accept.ts`:
     : { context: detail, outcome: "", constraints: "", priority };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -433,7 +433,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/ticket-accept.ts server/src/services/github-accept.ts \
@@ -452,7 +452,7 @@ git commit -m "feat(spec-826): pabrik payload qa tiket & issue melahirkan constr
 - Consumes: `convertPayload` dari Task 2 lewat `checkSourceChange`.
 - Produces: tak ada kode produksi baru — task ini menegakkan bahwa perubahan Task 2 merambat sampai jalur HTTP.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Di `server/test/spec-source-gate.test.ts`, ganti test `"tanpa payload, server memakai convertPayload sebagai default"`:
 
@@ -475,7 +475,7 @@ Di `server/test/spec-source.route.test.ts`, ganti assert payload di test `"brief
     });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -484,11 +484,11 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS langsung — kode produksi sudah benar sejak Task 2; kalau FAIL, Task 2 belum merambat dan itulah yang task ini ada untuk menangkap.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Tak ada kode produksi. Bila step 2 gagal, perbaiki cabang `convertPayload` yang belum sesuai Task 2 — bukan test-nya.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -498,7 +498,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS, ketiganya hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/test/spec-source-gate.test.ts server/test/spec-source.route.test.ts
@@ -518,7 +518,7 @@ git commit -m "test(spec-826): konversi ke qa membawa constraints sampai jalur H
 - Consumes: `convertPayload` dari Task 2 (prefill dialog).
 - Produces: `QA_FIELDS` memuat tuple `["constraints", "Batasan", "mis. jangan ubah kontrak API"]` sebagai entri TERAKHIR; `BRIEF_FIELDS` entri constraints berlabel `"Batasan"`. Keduanya terbaca `SHAPE_FIELDS` sehingga `BacklogScreen` (edit + baca) dan `ChangeSourceDialog` ikut tanpa perubahan call site.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Di `src/test/change-source.test.tsx`, ganti test `"memilih qa merender field bentuk qa ter-prefill convertPayload"`:
 
@@ -552,7 +552,7 @@ Ganti test `"memberitahu field yang tak punya padanan, dan menyebut jejak sebaga
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run src/test/change-source.test.tsx
@@ -560,7 +560,7 @@ pnpm vitest --run src/test/change-source.test.tsx
 
 Expected: FAIL — `Unable to find a label with the text of: Batasan`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `src/src/screens/source-meta.ts`, ganti label brief dan tambahkan entri qa:
 
@@ -592,7 +592,7 @@ export const QA_FIELDS = [
 ] as const;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run src/test/change-source.test.tsx
@@ -600,7 +600,7 @@ pnpm vitest --run src/test/change-source.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/source-meta.ts src/test/change-source.test.tsx
@@ -622,7 +622,7 @@ git commit -m "feat(spec-826): QA_FIELDS punya Batasan, label brief diseragamkan
 Komponen detailnya bernama `SpecDetail` dan **tidak** diekspor; ia dibuka lewat `BacklogScreen`
 (klik judul item), persis pola `src/test/backlog-goal.test.tsx`. Jangan mengekspornya.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Buat `src/test/backlog-qa-constraints.test.tsx`:
 
@@ -680,7 +680,7 @@ describe("SPEC-826 · Batasan di detail backlog qa", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run src/test/backlog-qa-constraints.test.tsx
@@ -689,7 +689,7 @@ pnpm vitest --run src/test/backlog-qa-constraints.test.tsx
 Expected: FAIL — `Unable to find a label with the text of: Batasan` (`Field` membungkus anaknya
 dalam `<label>` tanpa `aria-label`, jadi nama yang bisa dipegang test belum ada).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 **(a)** Di `src/src/screens/BacklogScreen.tsx`, di dalam `fields.map` pada blok `editing`, beri
 nama aksesibilitas pada kedua kontrol — cermin `ChangeSourceDialog` yang sudah melakukannya:
@@ -704,6 +704,10 @@ nama aksesibilitas pada kedua kontrol — cermin `ChangeSourceDialog` yang sudah
           ))}
 ```
 
+> **Deviasi saat eksekusi:** (a) **tidak dikerjakan**. `Field` membungkus anaknya dalam `<label>`,
+> dan Field ini tak punya `hint`, jadi nama aksesibilitasnya sudah "Batasan" tanpa `aria-label` —
+> test step 1 lulus tanpanya. Menambahkannya berarti kode yang tak dituntut satu pun test.
+
 **(b)** Ganti cabang qa di `saveEdit`:
 
 ```ts
@@ -717,7 +721,7 @@ nama aksesibilitas pada kedua kontrol — cermin `ChangeSourceDialog` yang sudah
 
 (sisa ternari — cabang goal & brief — tak berubah.)
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run src/test/backlog-qa-constraints.test.tsx src/test/change-source.test.tsx \
@@ -726,7 +730,7 @@ pnpm vitest --run src/test/backlog-qa-constraints.test.tsx src/test/change-sourc
 
 Expected: PASS semua — `aria-label` baru tak boleh membuat selector test tetangga jadi ambigu.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/BacklogScreen.tsx src/test/backlog-qa-constraints.test.tsx
@@ -749,7 +753,7 @@ Dua lapis test disengaja: `NewSpecModal` membuktikan field-nya ada dan ikut di `
 (`onCreate(f)` meneruskan seluruh form), sementara perakitan `payload` hidup di `createSpec`
 milik `App` — hanya test tingkat-App yang menyentuh baris itu.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Buat `src/test/new-spec-qa-constraints.test.tsx`:
 
@@ -817,7 +821,7 @@ berkas baru):
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run src/test/new-spec-qa-constraints.test.tsx src/test/app-flows.test.tsx
@@ -825,7 +829,7 @@ pnpm vitest --run src/test/new-spec-qa-constraints.test.tsx src/test/app-flows.t
 
 Expected: FAIL — `Unable to find a label with the text of: Batasan` di kedua berkas.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 **(a)** `SpecPrefill` (baris ~54) — tambahkan `constraints`:
 
@@ -874,7 +878,7 @@ type SpecPrefill = { project?: string; title?: string; context?: string; outcome
           ...(f.fromAudit ? { fromAudit: f.fromAudit } : {}) }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run src/test/new-spec-qa-constraints.test.tsx src/test/app-flows.test.tsx \
@@ -883,7 +887,7 @@ pnpm vitest --run src/test/new-spec-qa-constraints.test.tsx src/test/app-flows.t
 
 Expected: PASS — termasuk kontrak placeholder SPEC-490 atas Field baru.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/App.tsx src/test/new-spec-qa-constraints.test.tsx src/test/app-flows.test.tsx
@@ -906,7 +910,7 @@ git commit -m "feat(spec-826): form temuan QA punya field Batasan"
 - Consumes: seluruh keputusan Task 1-8.
 - Produces: nomor ADR **0122** (0121 dipakai SPEC-826-pendahulunya "operasi berkas IDE"; periksa ulang `ls internal/docs/adr/` sebelum menulis — nomor bisa direbut worktree tetangga).
 
-- [ ] **Step 1: Periksa nomor ADR belum direbut**
+- [x] **Step 1: Periksa nomor ADR belum direbut**
 
 ```bash
 ls internal/docs/adr/ | tail -3
@@ -915,7 +919,7 @@ git ls-remote --heads origin
 
 Expected: `0121-operasi-berkas-ide-explorer.md` adalah yang terakhir. Bila `0122-*` sudah ada, pakai nomor bebas berikutnya dan sesuaikan seluruh rujukan di berkas yang ditulis task ini.
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Buat `internal/docs/adr/0122-constraints-di-payload-qa.md` dengan struktur yang sama dengan ADR tetangga (`0120`): judul, Status, Konteks, Keputusan, Konsekuensi, Gotcha. Isinya wajib menyatakan, dengan angka & nama berkas:
 
@@ -925,7 +929,7 @@ Buat `internal/docs/adr/0122-constraints-di-payload-qa.md` dengan struktur yang 
 4. **Apa yang TIDAK berubah dan kenapa itu keputusan:** `constraints` di luar `SHAPE_REQUIRED.qa` (kosong itu normal); `priority` tetap tak ada di payload qa (diturunkan dari `severity` — menambahkannya menabrak `deriveSpecFields`); pembeda `shapeOfPayload` tetap `severity`/`goal` sehingga qa & goal tak jadi ambigu; tanpa migration; tanpa entri `FIELDS.spec` baru.
 5. **Gotcha:** (a) `.default("")` adalah SATU-SATUNYA hal yang membuat baris lama selamat — diuji dengan payload qa **tanpa** field itu, bukan hanya yang baru; (b) `dropped` yang menyusut mengubah UI: blok `source-dropped` di `ChangeSourceDialog` **hilang** untuk `brief→qa`, jadi test yang membuktikan laporan `dropped` harus pindah ke arah yang memang masih membuang (`brief→goal`); (c) skema MCP wajib mengiklankan field tanpa memasukkannya ke `required` — agen hanya mengirim apa yang diiklankan; (d) dua pabrik payload qa di server (`ticket-accept.ts`, `github-accept.ts`) melahirkan payload TANPA lewat zod, jadi keduanya harus disebut eksplisit atau item dari tiket & issue lahir tanpa field itu.
 
-- [ ] **Step 3: Perbarui docs SoT yang menyebut bentuk payload qa**
+- [x] **Step 3: Perbarui docs SoT yang menyebut bentuk payload qa**
 
 `internal/docs/architecture/api-contract.md` — di sekitar baris 197 tempat bentuk qa dieja, tambahkan `constraints` ke daftar field qa dengan catatan "opsional, default string kosong (SPEC-826)".
 
@@ -949,7 +953,7 @@ menjadi baris yang mengeja qa sebagai `severity/steps/expected/actual/env/constr
 
 `internal/docs/README.md` — pastikan ADR 0122 ter-link di daftar ADR (ikuti pola entri 0121).
 
-- [ ] **Step 4: Verifikasi index & kontrak docs**
+- [x] **Step 4: Verifikasi index & kontrak docs**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli exec tsx src/index.ts docs index --check
@@ -959,7 +963,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: index `--check` tanpa keluhan; kedua test agent-doc PASS (tabel payload tetap menyebut setiap nilai `zSpecSource`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs docs/agent-integration.md internal/skills/hanoman/SKILL.md
@@ -972,7 +976,7 @@ git commit -m "docs(adr-0122): constraints di payload qa"
 
 **Files:** tak ada perubahan berkas; task ini gerbangnya.
 
-- [ ] **Step 1: Typecheck paket yang tersentuh**
+- [x] **Step 1: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
@@ -980,7 +984,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --f
 
 Expected: ketiganya exit 0. (Ketiga paket memang tersentuh; `runner` & `cli` tidak.)
 
-- [ ] **Step 2: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 2: Jalankan seluruh test yang tersentuh perubahan ini**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -1000,7 +1004,15 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
   src/test/new-spec-qa-constraints.test.tsx src/test/placeholder-contract.test.ts
 ```
 
-- [ ] **Step 3: Smoke endpoint nyata (task ini menyentuh `POST /specs` & `POST /specs/:id/source`)**
+- [x] **Step 3: Smoke endpoint nyata (task ini menyentuh `POST /specs` & `POST /specs/:id/source`)**
+
+> **DILEWATI atas keputusan operator** (2026-08-18): permintaan eksplisit "cukup merge saja yang
+> sekarang". Spec ini tak menambah/mengubah endpoint — yang berubah bentuk payload-nya — dan
+> `server/test/spec-source.route.test.ts` + `specs.route.test.ts` sudah melewati `POST /specs` dan
+> `POST /specs/:id/source` lewat Fastify inject dengan Prisma dan boundary zod yang sungguhan,
+> termasuk payload qa TANPA `constraints`. Yang tak terbukti karenanya tinggal lapisan socket HTTP
+> + auth, dan keduanya tak disentuh spec ini.
+
 
 Boot server sekali dengan DB khusus lalu curl:
 
@@ -1014,7 +1026,7 @@ curl -sS -X POST localhost:5174/api/specs -H 'content-type: application/json' \
 
 Expected: `payload.constraints === ""` (payload qa **tanpa** field itu diterima — inilah klaim kompatibilitas mundur, diuji di server hidup). Lalu POST kedua dengan `"constraints":"jangan ubah kontrak API"` → tersimpan apa adanya. Lalu `POST /api/specs/<id>/source {"source":"brief"}` → respons `payload.constraints` sama dengan yang dikirim, bukan `""`. Matikan server per-PID (`lsof -ti:5174` → `kill <pid>`), **jangan** `pkill -f`.
 
-- [ ] **Step 4: Diff bersih & push**
+- [x] **Step 4: Diff bersih & push**
 
 ```bash
 git status --porcelain          # harus kosong
