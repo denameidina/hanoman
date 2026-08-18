@@ -956,7 +956,7 @@ git commit -m "docs(adr-0123): source no_effort — flow satu fase Kerjakan"
 - Consumes: Task 1-5.
 - Produces: bukti hijau + satu smoke endpoint nyata.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 Run:
 ```bash
@@ -964,12 +964,12 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS, dan **jumlah berkas test yang berjalan > 0**. `--changed` menyalakan `passWithNoTests` — "no test files" BUKAN bukti hijau. Bila nol berkas berjalan, sebut path test-nya langsung.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck`
 Expected: keempatnya sukses. (Empat paket memang tersentuh — ini bukan `pnpm -r typecheck`.)
 
-- [ ] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
+- [x] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
 
 Boot server dengan DB khusus lalu buat & baca satu item `no_effort`:
 
@@ -985,7 +985,7 @@ curl -sS 'localhost:4000/api/specs?source=no_effort'
 
 Expected: `201` dengan `source:"no_effort"`, `author` berprefiks `No effort ·`, `objective:"g"`; daftar berfilter memuat item itu. Kirim juga payload bentuk brief untuk `source:"no_effort"` dan pastikan balasannya **400** `"bentuk payload tak cocok dengan source"`. Matikan server per-PID (`lsof -ti:4000` → `kill <pid>`) — **jangan** `pkill -f`.
 
-- [ ] **Step 4: Push**
+- [x] **Step 4: Push**
 
 ```bash
 git push origin HEAD:refs/heads/hanoman/spec-825
