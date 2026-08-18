@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { PIPELINES, type Flow } from "@hanoman/runner";
+import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
 import { PLAN_DIRS, type Stage } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
 
@@ -58,13 +58,17 @@ const REACHED: Record<string, Stage> = {
   // SPEC-407 · ADR-0089 · flow goal (Goal → Verifikasi): fase kerja mencapai `executing`, fase
   // verifikasi yang mencapai `done`. Kedua nama unik lintas PIPELINES — peta ini berkunci nama.
   Goal: "executing", Verifikasi: "done",
+  // SPEC-825 · ADR-0123 · flow no_effort (Kerjakan): satu fase, jadi fase kerjanya sendiri yang
+  // mencapai `done` — tak ada fase verifikasi untuk menutupnya.
+  Kerjakan: "done",
 };
 export function stageFor(phases: Phase[]): Stage | null {
   let best = -1;
   for (const p of phases) {
-    // Fase KERJA yang sedang berjalan sudah berarti `executing` — berlaku untuk `Execute`
-    // (feature/qa) maupun `Goal` (SPEC-407, flow tanpa fase perencanaan sama sekali).
-    if ((p.name === "Execute" || p.name === "Goal") && p.state === "active")
+    // Fase KERJA yang sedang berjalan sudah berarti `executing`. SPEC-825 · daftarnya
+    // `WORK_PHASES` di runner — sumber yang SAMA dengan gerbang `writesCode`, supaya flow
+    // penulis-kode baru tak bisa lahir dengan salah satunya terpasang dan yang lain terlewat.
+    if ((WORK_PHASES as readonly string[]).includes(p.name) && p.state === "active")
       best = Math.max(best, STAGES.indexOf("executing"));
     if (p.state !== "done" && p.state !== "skipped") continue;
     const s = REACHED[p.name];

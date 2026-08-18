@@ -69,3 +69,35 @@ describe("SPEC-546 · ADR-0109 · gerbang konversi", () => {
     expect(appendSourceHistory("rusak", e1)).toEqual([e1]);     // nilai tak terduga tak melempar
   });
 });
+
+// SPEC-825 · gerbang ADR-0109 mengunci FLOW, dan `no_effort` punya flow sendiri — jadi item yang
+// sudah dimulai terkunci dari/ke sana TANPA satu baris gerbang baru. Diuji, bukan diasumsikan:
+// berkas fase item feature tak akan pernah memuaskan phasesComplete(["Kerjakan"]) (bentuk SPEC-433).
+describe("SPEC-825 · no_effort", () => {
+  const goal = { goal: "g", done: "d", constraints: "", priority: "sedang" };
+
+  it("item yang sudah dimulai ditolak 409 ke no_effort", () => {
+    expect(checkSourceChange(started, "no_effort")).toEqual({
+      ok: false, code: 409,
+      error: "backlog item sudah dimulai — type hanya bisa pindah ke source dengan flow yang sama",
+    });
+  });
+
+  it("item no_effort yang sudah dimulai ditolak ke goal — flow-nya berbeda", () => {
+    const startedNoEffort = { source: "no_effort", stage: "executing", baseSha: "abc123", payload: goal };
+    expect(checkSourceChange(startedNoEffort, "goal").ok).toBe(false);
+  });
+
+  it("item belum dimulai brief → no_effort mengkonversi ke bentuk goal", () => {
+    const g = checkSourceChange(fresh, "no_effort");
+    expect(g.ok && g.payload).toEqual({ goal: "o", done: "", constraints: "k", priority: "sedang" });
+    expect(g.ok && g.dropped).toEqual(["context"]);
+  });
+
+  it("goal → no_effort untuk item belum dimulai tak mengubah payload — sebentuk", () => {
+    const freshGoal = { source: "goal", stage: "brainstorming", baseSha: null, payload: goal };
+    const g = checkSourceChange(freshGoal, "no_effort");
+    expect(g.ok && g.payload).toEqual(goal);
+    expect(g.ok && g.dropped).toEqual([]);
+  });
+});

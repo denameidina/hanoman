@@ -466,7 +466,7 @@ git commit -m "feat(spec-825): pipeline Kerjakan, WORK_PHASES, prompt no_effort 
 - Consumes: `WORK_PHASES` & `PIPELINES` dari `@hanoman/runner` (Task 2); `isGoalShapedFlow` & `payloadShapeFor` dari `@hanoman/shared` (Task 1).
 - Produces: `stageFor([{name:"Kerjakan",state:"active"}]) === "executing"`, `stageFor([{name:"Kerjakan",state:"done"}]) === "done"`; `deriveSpecFields("no_effort", {goal:"…"}, "rendah").objective === "…"`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan di `server/test/session-phases.test.ts`, di akhir berkas:
 
@@ -529,12 +529,12 @@ describe("SPEC-825 · no_effort", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-phases.test.ts server/test/spec-source-gate.test.ts`
 Expected: FAIL — `readPhases(file, "no_effort")` mengembalikan `[]` (PIPELINES belum ada di build server) dan `stageFor` mengembalikan `null` untuk `Kerjakan`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `server/src/services/session-phases.ts` — impor `WORK_PHASES` dan pakai di dua tempat:
 
@@ -612,7 +612,7 @@ dan di perakitan prompt:
     });
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-phases.test.ts server/test/spec-source-gate.test.ts server/test/spec-source-contract.test.ts server/test/spec-source.route.test.ts server/test/specs.route.test.ts`
 Expected: PASS semua.
@@ -620,7 +620,7 @@ Expected: PASS semua.
 Run: `pnpm --filter ./server typecheck`
 Expected: sukses tanpa error.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/session-phases.ts server/src/services/spec-fields.ts \

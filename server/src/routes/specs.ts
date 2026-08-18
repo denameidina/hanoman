@@ -117,6 +117,8 @@ export default async function (app: FastifyInstance) {
               : b.source === "audit" ? `Audit · ${author}`
               // SPEC-407 · asal item goal terbaca di backlog (cermin `Audit ·`).
               : b.source === "goal" ? `Goal · ${author}`
+              // SPEC-825 · asal item no_effort terbaca di backlog (cermin `Audit ·`/`Goal ·`).
+              : b.source === "no_effort" ? `No effort · ${author}`
               : author,
             objective, payload: b.payload,
             branchFrom: b.branchFrom ?? null,

@@ -1,4 +1,4 @@
-import { priorityFromSeverity } from "@hanoman/shared";
+import { payloadShapeFor, priorityFromSeverity } from "@hanoman/shared";
 
 // SPEC-186 · derivasi priority + objective dari source+payload. Satu sumber untuk POST /specs,
 // PATCH /specs/:id, dan — sejak SPEC-546 — POST /specs/:id/source. Dipindah dari routes/specs.ts
@@ -11,7 +11,9 @@ export function deriveSpecFields(source: string, payload: any, manualPriority: s
   // SPEC-407 · ADR-0089 · backlog goal: objective ADALAH goal-nya (yang dibaca prompt sesi &
   // kondisi Stop hook). Prioritas tetap manual — tak ada severity untuk diturunkan, dan operator
   // yang tahu seberapa mendesak goal itu.
-  if (source === "goal") {
+  // SPEC-825 · ADR-0123 · digerbangi BENTUK payload, bukan nama source: `no_effort` memakai bentuk
+  // yang sama, dan predikat bentuknya tetap satu (`payloadShapeFor`).
+  if (payloadShapeFor(source) === "goal") {
     const pick = (v: unknown) => (typeof v === "string" ? v.trim() : "");
     return {
       priority: manualPriority,

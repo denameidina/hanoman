@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import type { Spec } from "@prisma/client";
 import { realGit, startPrompt, continuePrompt, resumePrompt, startGoalPrompt, resolveGoalCondition, type Flow, type Autonomy, type VerifyScope, type ResumeCtx } from "@hanoman/runner";
-import { resolveMethod, readSpecMethod, stampSpecMethod, type Agent } from "@hanoman/shared";
+import { resolveMethod, readSpecMethod, stampSpecMethod, isGoalShapedFlow, type Agent } from "@hanoman/shared";
 import { resolveRepoDir } from "./local-binding";
 import { getSetting } from "./settings";
 import { ensureCodexTrust } from "./codex-trust";
@@ -127,7 +127,9 @@ export async function startSpecSession(
   // biasa berprompt lain. (b) Template global DILEWATI: ia generik untuk semua sesi, sedangkan
   // item goal membawa kondisinya sendiri, dan yang lebih spesifik harus menang. Override
   // per-sesi tetap paling tinggi.
-  const isGoalFlow = opts.flow === "goal";
+  // SPEC-825 · ADR-0123 · flow `no_effort` mewarisi ketiga aturan di atas apa adanya — satu
+  // predikat bersama (`isGoalShapedFlow`), bukan dua gerbang yang bisa berselisih.
+  const isGoalFlow = isGoalShapedFlow(opts.flow);
   const goalArgs = {
     flow: opts.flow, specId: spec.id, branchTo,
     spec: { payload: spec.payload ?? undefined, objective: spec.objective },
@@ -192,7 +194,7 @@ export async function startSpecSession(
   if (isGoalFlow) {
     // SPEC-407 · satu builder untuk ketiga keadaan sesi goal: `continuePrompt`/`resumePrompt`
     // bicara plan berkotak & fase perencanaan, dan sesi goal tak punya keduanya.
-    prompt = startGoalPrompt(brief, branchTo, {
+    prompt = startGoalPrompt(opts.flow as "goal" | "no_effort", brief, branchTo, {
       autonomy: opts.autonomy, verifyScope, resume: resumeCtx, method: method.id,
     });
   } else if (isContinue) {

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   phaseFilePath, decisionFilePath, readPhases, stageFor, planComplete, stageForRun,
-  phasesComplete, sessionComplete, type Phase,
+  phasesComplete, sessionComplete, type Phase, type PhaseState,
 } from "../src/services/session-phases";
 
 describe("decisionFilePath (SPEC-184)", () => {
@@ -279,5 +279,28 @@ describe("planComplete · lintas metode (SPEC-734)", () => {
 
   it("tak ada plan cocok sama sekali → true (tak ada checklist untuk digerbang)", () => {
     expect(planComplete(wt(), "SPEC-9")).toBe(true);
+  });
+});
+
+describe("SPEC-825 · flow no_effort (satu fase)", () => {
+  const kerjakan = (state: PhaseState): Phase[] => [{ name: "Kerjakan", state }];
+
+  it("readPhases memberi satu fase aktif saat berkas belum ada", () => {
+    expect(readPhases(file, "no_effort").map((p) => `${p.name}:${p.state}`))
+      .toEqual(["Kerjakan:active"]);
+  });
+
+  it("fase kerja yang AKTIF sudah berarti executing — cermin Execute & Goal", () => {
+    expect(stageFor(kerjakan("active"))).toBe("executing");
+  });
+
+  it("fase kerja selesai langsung mencapai done — tak ada fase verifikasi untuk menutup", () => {
+    expect(stageFor(kerjakan("done"))).toBe("done");
+    expect(stageFor(kerjakan("skipped"))).toBe("done");
+  });
+
+  it("phasesComplete benar untuk pipeline satu fase", () => {
+    expect(phasesComplete(kerjakan("done"))).toBe(true);
+    expect(phasesComplete(kerjakan("active"))).toBe(false);
   });
 });
