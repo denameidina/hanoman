@@ -24,10 +24,13 @@ export const SOURCE_OPTS = zSpecSource.options.map((v) => ({ value: v, label: so
 
 // SPEC-490 · elemen ketiga = placeholder (contoh nilai). Satu <HnTextarea> merender ketiga daftar
 // ini, jadi contohnya milik katalog fieldnya — bukan call site.
+// SPEC-826 · label batasan diseragamkan "Batasan" untuk KETIGA bentuk: form buat-backlog
+// (`App.tsx`) sudah menulis "Batasan" untuk brief, jadi "Constraints" di sini membuat field yang
+// sama bernama dua hal tergantung layar mana yang dibuka operator.
 export const BRIEF_FIELDS = [
   ["context", "Konteks", "mis. operator harus membuka tiga layar untuk tahu sesi mana yang menunggu"],
   ["outcome", "Outcome", "mis. satu badge di Overview menunjukkan jumlah sesi yang menunggu"],
-  ["constraints", "Constraints", "mis. reuse queue yang ada"],
+  ["constraints", "Batasan", "mis. reuse queue yang ada"],
 ] as const;
 // SPEC-407 · ADR-0089 · bentuk payload backlog goal (zGoalPayload) — bukan konteks/outcome.
 export const GOAL_FIELDS = [
@@ -41,6 +44,8 @@ export const QA_FIELDS = [
   ["expected", "Diharapkan", "mis. total funnel sama dengan jumlah baris laporan harian"],
   ["actual", "Aktual", "mis. total funnel dua kali lipat untuk sesi yang melewati tengah malam"],
   ["env", "Environment", "prod · web · v0.9.2"],
+  // SPEC-826 · terakhir, cermin posisi constraints di brief & goal.
+  ["constraints", "Batasan", "mis. jangan ubah kontrak API"],
 ] as const;
 
 /** bentuk payload → daftar field yang dirender form. Kunci sama dengan `PayloadShape`. */

@@ -29,19 +29,28 @@ describe("SPEC-546 · ChangeSourceDialog", () => {
     expect([...sel.options].map((o) => o.value).sort()).toEqual(["audit", "goal", "help", "qa"]);
   });
 
-  it("memilih qa merender field bentuk qa ter-prefill convertPayload", () => {
+  it("memilih qa merender field bentuk qa ter-prefill convertPayload, Batasan ikut", () => {
     render(<ChangeSourceDialog spec={briefSpec} onClose={() => {}} onSubmit={() => {}} />);
     fireEvent.change(screen.getByLabelText("Type tujuan"), { target: { value: "qa" } });
     expect((screen.getByLabelText("Aktual") as HTMLTextAreaElement).value).toBe("gejalanya");
     expect((screen.getByLabelText("Diharapkan") as HTMLTextAreaElement).value).toBe("maunya");
     expect((screen.getByLabelText("Langkah reproduksi") as HTMLTextAreaElement).value).toBe("");
+    // SPEC-826 · batasan brief menyeberang ke bentuk qa alih-alih dilaporkan hilang.
+    expect((screen.getByLabelText("Batasan") as HTMLTextAreaElement).value).toBe("tanpa cache");
   });
 
   it("memberitahu field yang tak punya padanan, dan menyebut jejak sebagai penyelamatnya", () => {
     render(<ChangeSourceDialog spec={briefSpec} onClose={() => {}} onSubmit={() => {}} />);
-    fireEvent.change(screen.getByLabelText("Type tujuan"), { target: { value: "qa" } });
-    expect(screen.getByTestId("source-dropped").textContent).toContain("Constraints");
+    // brief → goal masih membuang Konteks; brief → qa sejak SPEC-826 tak membuang apa pun.
+    fireEvent.change(screen.getByLabelText("Type tujuan"), { target: { value: "goal" } });
+    expect(screen.getByTestId("source-dropped").textContent).toContain("Konteks");
     expect(screen.getByTestId("source-dropped").textContent).toContain("jejak konversi");
+  });
+
+  it("SPEC-826 · brief → qa tak lagi melaporkan apa pun sebagai hilang", () => {
+    render(<ChangeSourceDialog spec={briefSpec} onClose={() => {}} onSubmit={() => {}} />);
+    fireEvent.change(screen.getByLabelText("Type tujuan"), { target: { value: "qa" } });
+    expect(screen.queryByTestId("source-dropped")).toBeNull();
   });
 
   it("Simpan mengirim source + payload hasil form", () => {
