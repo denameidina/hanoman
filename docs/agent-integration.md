@@ -231,7 +231,7 @@ server menegakkannya di boundary.
 | `brief` | brief | `context`, `outcome`, `constraints`, `priority` |
 | `audit` | brief | idem — audit-only: hasilnya dokumen temuan, tanpa Execute |
 | `help` | brief | idem — item yang lahir dari tiket Help Center |
-| `qa` | qa | `severity` (`critical`\|`major`\|`minor`), `steps`, `expected`, `actual`, `env` |
+| `qa` | qa | `severity` (`critical`\|`major`\|`minor`), `steps`, `expected`, `actual`, `env`, `constraints` (opsional, default `""`) |
 | `goal` | goal | `goal` (wajib), `done`, `constraints`, `priority` |
 
 Body lengkap: `project` (slug project), `source`, `title`, `priority`

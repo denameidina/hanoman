@@ -346,6 +346,20 @@ Pakai skill lebih sempit saat task cocok:
   "Jejak konversi type"; katalog source (lencana, opsi, field per bentuk) pindah ke satu berkas
   `src/src/screens/source-meta.ts` — yang sekalian menambal entri **`help`** yang selama ini hilang
   (item Help Center memakai lencana "feature brief" lewat fallback) berikut tab filternya.
+  **SPEC-826/ADR-0122** menutup empat arah lossy di dalamnya: `constraints` kini dimiliki **ketiga**
+  bentuk payload, jadi `convertPayload` tak lagi membuangnya ke `dropped` (`brief→qa` kini
+  `dropped: []`, `goal→qa` tinggal `["done"]`) maupun melahirkannya kosong di arah balik. Kuncinya
+  `zQaPayload.constraints` **`z.string().default("")`, bukan `z.string()` polos** — payload qa yang
+  sudah tersimpan tak punya field itu dan `zQaPayload` dipakai `zSpec`/`zCreateSpec`/`zPatchSpec`/
+  `zChangeSpecSource`, jadi polos berarti setiap baris lama gagal validasi begitu ia dibaca,
+  diedit, atau dikonversi. Yang **tetap** pengecualian dan itu disengaja: `priority` tak ada di
+  payload qa (turunan `severity`, menambahkannya menabrak `deriveSpecFields`), `constraints` di
+  luar `SHAPE_REQUIRED.qa` (kosong = normal), dan pembeda `shapeOfPayload` tetap `severity`/`goal`.
+  Label diseragamkan **"Batasan"** untuk ketiga bentuk. Dua gotcha: `dropped` yang menyusut
+  membuat blok `source-dropped` dialog **tak dirender** untuk `brief→qa` (test pelaporan `dropped`
+  pindah ke `brief→goal`), dan **dua pabrik payload qa di server** (`ticket-accept.ts`,
+  `github-accept.ts`) menulis lewat `prisma.spec.create` **tanpa zod** sehingga default tak
+  menyentuhnya — kelas ADR-0090/0093/0105.
 - **MCP server = `hanoman mcp`, KLIEN REST, bukan permukaan kedua** (SPEC-482/ADR-0099, memperluas
   ADR-0065): subcommand stdio di CLI yang memanggil `/api` dengan agent token yang sama, sehingga
   gate `onRequest` tetap satu-satunya otorisasi dan route cookie-only tak terjangkau **secara

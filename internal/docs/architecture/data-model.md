@@ -106,10 +106,16 @@ tiap berkas.
   `DATE_FIELDS.spec`, feed sync, webhook, atau input record remote. Cookie admin dan AgentToken
   `sessions:write` adalah satu-satunya penulis; scheduler/governor/lead/cron hanya mengonsumsi.
   Migration memberi baris legacy approval `legacy-admin` agar upgrade tidak mematikan backlog lama.
-- `payload` (Json?) — brief (context/outcome/constraints), qa (severity/steps/expected/actual/env),
-  atau **goal** (goal/done/constraints, SPEC-407). Bentuknya **terikat `source`** di boundary
+- `payload` (Json?) — brief (context/outcome/constraints), qa
+  (severity/steps/expected/actual/env/**constraints**, SPEC-826), atau **goal**
+  (goal/done/constraints, SPEC-407). Bentuknya **terikat `source`** di boundary
   (`zCreateSpec.superRefine`, tiga-arah): `qa` ↔ `severity`, `goal` ↔ `goal`, selain itu brief —
   tanpa ikatan itu `deriveSpecFields` bisa menurunkan objective dari bentuk yang salah.
+  **SPEC-826 · ADR-0122:** ketiga bentuk sama-sama punya `constraints`; di qa ia
+  `z.string().default("")` — bukan `z.string()` polos — karena baris qa yang sudah tersimpan tak
+  punya field itu dan polos berarti setiap baris lama gagal validasi begitu ia dibaca/diedit/
+  dikonversi. Tanpa migration: kolomnya sudah `Json`. `priority` **tetap** tak ada di payload qa
+  (diturunkan dari `severity`, ADR-0109), dan `constraints` **tetap** di luar `SHAPE_REQUIRED.qa`.
 - `branchFrom?` — branch sumber worktree bagi sesi yang lahir dari item ini. `null` = default project
   (`main`). Divalidasi terhadap `refs/heads` repo project; lihat
   [ADR-0032](../adr/0032-branch-adalah-properti-backlog-item.md).

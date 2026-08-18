@@ -195,7 +195,11 @@ POST /specs/batch         { project, items:[BreakdownItem], branchFrom?, prdPath
 #   BreakdownItem = { title, context, outcome, priority:"tinggi"|"sedang"|"rendah" }.
 #   source ∈ brief|qa|audit|help|goal (SPEC-237/253/407). audit = audit-only (payload
 #   brief-shaped, author `Audit ·`); qa payload ber-severity (superRefine mengikat source↔bentuk payload,
-#   TIGA-arah sejak SPEC-407). audit → flow `audit` (Audit → Laporan, dokumen SoT tanpa Execute; ADR-0057).
+#   TIGA-arah sejak SPEC-407).
+#   SPEC-826 · ADR-0122 · payload qa = { severity, steps, expected, actual, env, constraints } —
+#   `constraints` OPSIONAL (`.default("")`), jadi payload qa lama tanpa field itu tetap diterima dan
+#   ternormalkan ke string kosong. Ia SENGAJA di luar `SHAPE_REQUIRED.qa` (kosong = keadaan normal),
+#   dan `priority` tetap TIDAK ada di payload qa: ia diturunkan dari `severity` (ADR-0109). audit → flow `audit` (Audit → Laporan, dokumen SoT tanpa Execute; ADR-0057).
 #   SPEC-407 · ADR-0089 · source `goal` → flow `goal` (Goal → Verifikasi): payload bentuk KETIGA
 #   { goal, done, constraints, priority } — `goal` WAJIB, `Spec.objective` diturunkan darinya (`done`
 #   sebagai cadangan), author `Goal ·`. Payload brief/qa untuk source goal (atau sebaliknya) → 400.
