@@ -643,8 +643,11 @@ GET      /update                        # UpdateStatus — status update dari re
 #                    updateAvailable, command, canApply }
 #   updateAvailable = compareSemver(latest, current) > 0, sesudah GET <registry>/hanoman/latest (ter-gate HANOMAN_UPDATE_FETCH=1, TTL 5 mnt)
 #   canApply        = proses server ini anak dari `hanoman start` (env HANOMAN_SUPERVISOR=1) — SPEC-405/ADR-0088
+#   command         = "npm i -g hanoman@latest --prefer-online" saat updateAvailable, "" bila tidak. `--prefer-online`
+#                     memaksa revalidasi packument: tanpa itu `@latest` bisa diselesaikan dari metadata cache yang
+#                     basi dan tombol update memasang ulang versi yang sama. Cermin INSTALL_ARGS (cli/commands/update.ts).
 POST     /update/apply                  # { confirm?: boolean } — SPEC-405 · ADR-0088. Server TAK memasang apa pun:
-#   ia keluar dengan UPDATE_RESTART_EXIT=75 dan supervisor `hanoman start` yang `npm i -g` lalu menjalankan ulang.
+#   ia keluar dengan UPDATE_RESTART_EXIT=75 dan supervisor `hanoman start` yang `npm i -g … --prefer-online` lalu menjalankan ulang.
 #   400 { error:"bad-body" }                                 — confirm bukan boolean
 #   409 { error:"unsupervised" }                             — canApply false
 #   409 { error:"up-to-date", current }                      — tak ada versi lebih baru

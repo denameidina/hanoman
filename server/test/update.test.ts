@@ -28,7 +28,7 @@ describe("composeUpdate", () => {
     expect(composeUpdate({ ...base, latestVersion: "9.9.9" }).updateAvailable).toBe(false);
   });
   it("perintahnya memasang paket global bernama hanoman", () => {
-    expect(UPDATE_COMMAND).toBe("npm i -g hanoman@latest");
+    expect(UPDATE_COMMAND).toBe("npm i -g hanoman@latest --prefer-online");
   });
 });
 

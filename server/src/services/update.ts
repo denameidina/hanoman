@@ -10,7 +10,9 @@ import { effectiveStr, effectiveBool, effectiveInt } from "../config";
 // Tetap READ-ONLY: server tak pernah memasang apa pun (ADR-0048). `hanoman update` di CLI yang
 // melakukannya, karena instance yang me-`npm i` dirinya sendiri lalu keluar akan memutus sesi tmux
 // yang sedang berjalan tanpa peringatan.
-export const UPDATE_COMMAND = "npm i -g hanoman@latest";
+// Cermin INSTALL_ARGS di cli/src/commands/update.ts — `--prefer-online` supaya `@latest` tak
+// diselesaikan dari packument cache yang basi (lihat komentarnya di sana).
+export const UPDATE_COMMAND = "npm i -g hanoman@latest --prefer-online";
 
 export type UpdateInputs = {
   currentVersion: string;

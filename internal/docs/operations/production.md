@@ -114,7 +114,7 @@ ter-gate `HANOMAN_UPDATE_FETCH`, registry bisa diarahkan `HANOMAN_NPM_REGISTRY`,
 untuk disalin. Terapkan:
 
 ```sh
-hanoman update              # npm i -g hanoman@latest
+hanoman update              # npm i -g hanoman@latest --prefer-online
 systemctl restart hanoman   # atau matikan & jalankan ulang `hanoman`
 ```
 

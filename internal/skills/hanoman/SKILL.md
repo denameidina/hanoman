@@ -63,7 +63,7 @@ Pakai skill lebih sempit saat task cocok:
 - **Distribusi = paket npm global** (SPEC-398/ADR-0087): `npm i -g hanoman` → `hanoman`. `hanoman` telanjang = `start` (migrate deploy → spawn server production); `doctor` juga memeriksa kesiapan rootless Podman/network/egress proxy/credential dir saat public/production boundary diwajibkan (SPEC-761/ADR-0117). `update [--check]` membandingkan semver registry; `migrate-from-postgres` memindahkan instance lama. Packaging server tetap non-container, tetapi semua proses agen production masuk sandbox. Deteksi update read-only di server; staging rilis `dist-npm/` dirakit `hanoman __pack`; **`npm publish` tindakan manusia**.
 - **Update sekali klik, tapi server tetap tak memasang apa pun** (SPEC-405/ADR-0088, mengamandemen
   ADR-0048 & membalik satu alternatif yang ditolak ADR-0087): `POST /api/update/apply` hanya membuat
-  proses server **keluar dengan `UPDATE_RESTART_EXIT = 75`**; yang menjalankan `npm i -g hanoman@latest`
+  proses server **keluar dengan `UPDATE_RESTART_EXIT = 75`**; yang menjalankan `npm i -g hanoman@latest --prefer-online`
   → `prisma generate` → `migrate deploy` → spawn lagi adalah **CLI parent `hanoman start`**, yang sejak
   ADR-0087 memang sudah men-spawn server sebagai proses ANAK. **Supervised-only**: digerbangi
   `process.env.HANOMAN_SUPERVISOR === "1"` yang HANYA disuntik `serverEnv()` di

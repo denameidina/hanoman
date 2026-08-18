@@ -7,7 +7,11 @@ import type { Ctx } from "../router";
 import { currentVersion } from "../router";
 
 export const PKG = "hanoman";
-export const INSTALL_ARGS = ["i", "-g", `${PKG}@latest`] as const;
+// `--prefer-online`: npm melayani METADATA paket dari cache selama masih "fresh", jadi `@latest`
+// bisa menyelesaikan ke versi basi — tombol update di UI lalu memasang ulang versi yang sama dan
+// tampak tak berefek. Flag ini memaksa revalidasi packument ke registry (tarball tetap dari cache
+// bila hash-nya cocok, jadi bukan `--prefer-offline`-nya yang dibalik, hanya kesegaran metadata).
+export const INSTALL_ARGS = ["i", "-g", `${PKG}@latest`, "--prefer-online"] as const;
 const DEFAULT_REGISTRY = "https://registry.npmjs.org";
 
 export type UpdatePlan =

@@ -75,7 +75,7 @@ Dua instance dipisah **`HANOMAN_HOME` + port + tmux socket + sandbox network/cre
 Badge "Update" muncul saat versi di **registry npm** lebih baru dari versi yang jalan — perbandingan **semver**, bukan SHA git (`pnpm build` menanam `version` root ke `dist/build-info.json`; fetch ter-gate `HANOMAN_UPDATE_FETCH`, registry bisa diarahkan `HANOMAN_NPM_REGISTRY`, TTL 5 mnt, gagal → `unavailable` tanpa melempar). Terapkan:
 
 ```sh
-hanoman update              # npm i -g hanoman@latest  (`--check` hanya melaporkan)
+hanoman update              # npm i -g hanoman@latest --prefer-online  (`--check` hanya melaporkan)
 systemctl restart hanoman
 ```
 

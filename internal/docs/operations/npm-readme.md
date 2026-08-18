@@ -75,7 +75,7 @@ langsung), panel tetap hanya menampilkan perintah untuk disalin.
 Dari terminal:
 
 ```bash
-hanoman update            # npm i -g hanoman@latest
+hanoman update            # npm i -g hanoman@latest --prefer-online
 ```
 
 Sesudah `hanoman update`, instance yang berjalan perlu di-restart (mis. `systemctl restart hanoman`).

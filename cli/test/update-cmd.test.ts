@@ -18,7 +18,7 @@ describe("planUpdate", () => {
     expect(planUpdate("0.0.0", "0.1.0").action).toBe("install");
   });
   it("perintah pemasangan global & bernama tepat", () => {
-    expect(INSTALL_ARGS.join(" ")).toBe(`i -g ${PKG}@latest`);
+    expect(INSTALL_ARGS.join(" ")).toBe(`i -g ${PKG}@latest --prefer-online`);
     expect(PKG).toBe("hanoman");
   });
 });
