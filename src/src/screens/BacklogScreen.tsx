@@ -174,7 +174,10 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
   const saveEdit = () => {
     if (!spec || !onEditSpec) return;
     const patch = spec.source === "qa"
-      ? { title: form.title, payload: { severity: form.severity, steps: form.steps, expected: form.expected, actual: form.actual, env: form.env } }
+      // SPEC-826 · `?? ""` bukan hiasan: item qa yang lahir sebelum spec ini tak punya field ini
+      // di payload, jadi `form.constraints` undefined sampai operator mengetiknya.
+      ? { title: form.title, payload: { severity: form.severity, steps: form.steps, expected: form.expected,
+          actual: form.actual, env: form.env, constraints: form.constraints ?? "" } }
       // SPEC-407 · bentuk payload terikat source di boundary server (zPatchSpec + superRefine
       // POST); mengirim bentuk brief untuk item goal akan ditolak dan menghapus goal-nya.
       : spec.source === "goal"
