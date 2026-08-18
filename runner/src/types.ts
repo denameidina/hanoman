@@ -1,5 +1,6 @@
 // SPEC-407 · ADR-0089 · +goal · sesi backlog dua fase (Goal → Verifikasi), tanpa fase perencanaan.
-export type Flow = "feature" | "qa" | "scaffold" | "reverse" | "prd" | "audit" | "breakdown" | "goal";
+// SPEC-825 · ADR-0123 · +no_effort · sesi backlog SATU fase (Kerjakan) untuk task remeh.
+export type Flow = "feature" | "qa" | "scaffold" | "reverse" | "prd" | "audit" | "breakdown" | "goal" | "no_effort";
 
 // SPEC-298 · mode autonomy sesi scheduler (Setting.scheduler.autonomy). full-control = putuskan
 // sendiri & tembus sampai done tanpa berhenti bertanya; butuh-keputusan = berhenti di titik

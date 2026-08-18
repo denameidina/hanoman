@@ -225,7 +225,7 @@ git commit -m "feat(spec-825): source & flow no_effort di shared, menumpang bent
   - `startGoalPrompt(flow: Flow, spec: SpecBrief, branchTo: string, opts?): string` — **signature berubah**, flow jadi parameter pertama.
   - `Flow` union memuat `"no_effort"`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Buat `runner/src/no-effort-prompt.test.ts`:
 
@@ -300,12 +300,12 @@ describe("SPEC-825 · prompt sesi no_effort", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run runner/src/no-effort-prompt.test.ts`
 Expected: FAIL — `WORK_PHASES` tak diekspor; `PIPELINES.no_effort` undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `runner/src/types.ts` baris 2 — tambahkan `"no_effort"` ke union `Flow`:
 
@@ -436,14 +436,14 @@ dan di `defaultGoalCondition` ganti gerbangnya:
   if (isGoalShapedFlow(flow)) return goalFlowCondition(flow, specId, branchTo, spec);
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm vitest --run runner/src/no-effort-prompt.test.ts`
 Expected: PASS. Bila `expect(p).toContain("Scope verifikasi")` gagal, buka `runner/src/verify-scope.ts` dan `runner/src/code-style.ts` lalu ganti string yang di-assert dengan potongan judul klausa yang benar-benar ada di sana (jangan melemahkan assert-nya jadi `toBeTruthy`).
 
 Run juga: `pnpm --filter ./runner typecheck` — Expected: sukses, kecuali error di `server/src/services/session-launch.ts` yang diperbaiki Task 3 (typecheck runner sendiri harus bersih).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/types.ts runner/src/prompt.ts runner/src/goal.ts runner/src/no-effort-prompt.test.ts

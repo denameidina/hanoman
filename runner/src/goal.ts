@@ -1,5 +1,5 @@
 import type { Flow } from "./types";
-import { PLAN_DIRS } from "@hanoman/shared";
+import { PLAN_DIRS, isGoalShapedFlow } from "@hanoman/shared";
 import { PIPELINES } from "./prompt";
 import { readGoalPayload } from "./goal-spec";
 
@@ -16,8 +16,10 @@ export type GoalArgs = {
 
 // SPEC-407 · ADR-0089 · kondisi sesi goal. Klausa 2 & 3 bukan hiasan: tanpa baris fase, board tak
 // pernah melihat item ini selesai (ADR-0008); tanpa push, hasilnya hilang bersama worktree-nya.
+// SPEC-825 · daftar fase datang dari `PIPELINES[flow]`, bukan `PIPELINES.goal` hardcode — flow
+// `no_effort` memakai kondisi yang sama dengan daftar fasenya sendiri.
 function goalFlowCondition(
-  specId: string, branchTo: string, spec?: { payload?: unknown; objective?: string },
+  flow: Flow, specId: string, branchTo: string, spec?: { payload?: unknown; objective?: string },
 ): string {
   const g = readGoalPayload(spec?.payload);
   const goal = g?.goal || (spec?.objective ?? "").trim() || "(goal tak tercatat di backlog item)";
@@ -27,7 +29,7 @@ function goalFlowCondition(
     "Sesi ini hanya boleh berhenti bila transkrip TERBARU memuat bukti langsung semua hal berikut:",
     `1. goal tercapai — ${bukti};`,
     `2. output \`cat "$HANOMAN_PHASE_FILE"\` yang memuat satu baris untuk SETIAP fase `
-      + `${PIPELINES.goal.join(" → ")}, masing-masing berakhiran \`done\` atau \`skipped\`;`,
+      + `${PIPELINES[flow].join(" → ")}, masing-masing berakhiran \`done\` atau \`skipped\`;`,
     `3. output \`git push origin HEAD:refs/heads/${branchTo}\` yang SUKSES sesudah commit terakhir.`,
     "Bila salah satu bukti tak ada di transkrip terbaru, kondisi BELUM terpenuhi: jalankan "
       + "perintah verifikasinya, tuntaskan yang masih kurang, lalu lanjutkan — jangan berhenti.",
@@ -40,7 +42,8 @@ function goalFlowCondition(
 // transkrip terbaru, bukan klaim agen bahwa pekerjaannya sudah selesai.
 export function defaultGoalCondition({ flow, specId, branchTo, spec }: GoalArgs): string {
   // SPEC-407 · flow goal punya kondisinya sendiri: goal item, bukan DoD pipeline.
-  if (flow === "goal") return goalFlowCondition(specId, branchTo, spec);
+  // SPEC-825 · berlaku sama untuk `no_effort` — satu predikat (`isGoalShapedFlow`), bukan dua.
+  if (isGoalShapedFlow(flow)) return goalFlowCondition(flow, specId, branchTo, spec);
   const phases = PIPELINES[flow];
   // Gate plan hanya berlaku untuk flow ber-fase Plan+Execute (cermin phaseInstruction & ADR-0029).
   const planGate = phases.includes("Plan") && phases.includes("Execute");

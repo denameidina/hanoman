@@ -484,7 +484,7 @@ describe("startGoalPrompt (SPEC-407)", () => {
   });
 
   it("mengeja goal, selesai-bila, batasan, dua fase, dan push", () => {
-    const p = startGoalPrompt(goalSpec, "hanoman/spec-407");
+    const p = startGoalPrompt("goal", goalSpec, "hanoman/spec-407");
     expect(p).toContain("Goal: p95 /api/specs < 200 ms");
     expect(p).toContain("Selesai bila: output benchmark < 200 ms");
     expect(p).toContain("Batasan: tanpa cache eksternal");
@@ -494,7 +494,7 @@ describe("startGoalPrompt (SPEC-407)", () => {
   });
 
   it("tak menyeret pipeline perencanaan maupun skill-nya", () => {
-    const p = startGoalPrompt(goalSpec, "b");
+    const p = startGoalPrompt("goal", goalSpec, "b");
     expect(p).not.toContain("Kerjakan fase berurutan: Brainstorm");
     expect(p).not.toContain("superpowers:brainstorming");
     expect(p).not.toContain("superpowers:writing-plans");
@@ -505,20 +505,20 @@ describe("startGoalPrompt (SPEC-407)", () => {
   });
 
   it("membawa klausa scope verifikasi — sesi goal menulis kode meski tanpa fase Execute", () => {
-    expect(startGoalPrompt(goalSpec, "b", { verifyScope: "changed" }))
+    expect(startGoalPrompt("goal", goalSpec, "b", { verifyScope: "changed" }))
       .toContain("Scope verifikasi: HANYA yang berubah");
-    expect(startGoalPrompt(goalSpec, "b")).not.toContain("Scope verifikasi");
+    expect(startGoalPrompt("goal", goalSpec, "b")).not.toContain("Scope verifikasi");
   });
 
   it("payload rusak → jatuh ke objective spec, tanpa melempar", () => {
-    const p = startGoalPrompt({ ...goalSpec, payload: { context: "c" } }, "b");
+    const p = startGoalPrompt("goal", { ...goalSpec, payload: { context: "c" } }, "b");
     expect(p).toContain("Goal: p95 < 200 ms");
     expect(p).not.toContain("Selesai bila:");
     expect(p).not.toContain("undefined");
   });
 
   it("varian resume menyebut keadaan nyata tanpa menyuruh mencari plan", () => {
-    const p = startGoalPrompt(goalSpec, "hanoman/spec-407", {
+    const p = startGoalPrompt("goal", goalSpec, "hanoman/spec-407", {
       resume: { recorded: ["Goal done"], next: "Verifikasi", worktreeKept: true },
     });
     expect(p).toContain("MELANJUTKAN");
@@ -553,7 +553,7 @@ describe("klausa gaya kode (SPEC-543)", () => {
   });
 
   it("startGoalPrompt membawanya (flow goal menulis kode walau tanpa fase Execute)", () => {
-    expect(startGoalPrompt({ ...spec, source: "goal" }, "b")).toContain(MARK);
+    expect(startGoalPrompt("goal", { ...spec, source: "goal" }, "b")).toContain(MARK);
   });
 
   // Tak bergantung pada verifyScope: klausa gaya kode tak punya knob (ADR-0108 keputusan 4).
@@ -590,7 +590,7 @@ describe("SPEC-734 · metode workflow", () => {
       .toBe(continuePrompt("feature", s, "b", undefined, undefined, "superpowers"));
     expect(resumePrompt("qa", s, "b", r))
       .toBe(resumePrompt("qa", s, "b", r, undefined, undefined, "superpowers"));
-    expect(startGoalPrompt(s, "b")).toBe(startGoalPrompt(s, "b", { method: "superpowers" }));
+    expect(startGoalPrompt("goal", s, "b")).toBe(startGoalPrompt("goal", s, "b", { method: "superpowers" }));
   });
 
   // AC-3 · instruksi skill disusun dari METHODS[M].phaseSkills untuk fase PIPELINES[flow] SAJA.
@@ -616,7 +616,7 @@ describe("SPEC-734 · metode workflow", () => {
   });
 
   it("INVARIAN 2 · flow goal metode matt tetap bergerbang di fase Verifikasi", () => {
-    expect(startGoalPrompt(s, "b", { method: "matt" }))
+    expect(startGoalPrompt("goal", s, "b", { method: "matt" }))
       .toContain("- Verifikasi: superpowers:verification-before-completion");
   });
 

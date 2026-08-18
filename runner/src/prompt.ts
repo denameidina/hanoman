@@ -19,7 +19,19 @@ export const PIPELINES: Record<Flow, readonly string[]> = {
   // `Verifikasi` = buktikan. Kedua nama unik lintas PIPELINES — syarat peta REACHED di server,
   // yang berkunci nama fase saja.
   goal: ["Goal", "Verifikasi"],
+  // SPEC-825 · ADR-0123 · task remeh: SATU fase. Fase `Verifikasi` milik flow goal menghabiskan
+  // satu giliran agen untuk membuktikan sesuatu yang diff-nya sendiri sudah membuktikan; untuk
+  // ganti copy / bump konstanta / typo docs itu murni biaya. Nama `Kerjakan` unik lintas
+  // PIPELINES — syarat peta REACHED server, yang berkunci nama fase saja.
+  no_effort: ["Kerjakan"],
 };
+
+// SPEC-825 · daftar fase KERJA — "sesi ini menulis kode". Dipakai DUA gerbang di DUA paket:
+// `writesCode` di bawah (verifyScope + klausa gaya kode + exitSkills) dan aturan "fase kerja yang
+// sedang aktif sudah berarti stage `executing`" di `stageFor` (server/services/session-phases.ts).
+// Sebelumnya keduanya rantai `||` berisi nama yang sama, dan suku yang lupa ditambah saat flow
+// baru lahir tak menghasilkan error apa pun — cuma klausa yang diam-diam hilang.
+export const WORK_PHASES = ["Execute", "Goal", "Kerjakan"] as const;
 
 // SPEC-252 · ADR-0061 — model & effort kini PER SESI (dipilih saat Start, argv saat lahir), bukan per
 // fase. Matrix per-fase + injeksi `/model`+`/effort` oleh agen (resolvePhaseModels/phaseModelInstruction,
@@ -195,8 +207,9 @@ const auditContinuationInstruction = (flow: Flow, spec: SpecBrief): string => {
 // sumber kebenaran yang sama dengan gate plan di phaseInstruction.
 // SPEC-407 · flow goal MENULIS KODE juga, meski pipeline-nya tak punya fase `Execute`. Tanpa
 // klausa ini ia jatuh ke DoD repo target dan menjalankan suite penuh — persis lubang ADR-0080.
+// SPEC-825 · daftarnya `WORK_PHASES`, bukan rantai `||` yang tumbuh satu suku tiap flow baru.
 const writesCode = (flow: Flow): boolean =>
-  PIPELINES[flow].includes("Execute") || PIPELINES[flow].includes("Goal");
+  PIPELINES[flow].some((p) => (WORK_PHASES as readonly string[]).includes(p));
 const scopeClause = (flow: Flow, scope?: VerifyScope): string =>
   scope && writesCode(flow) ? verifyScopeClause(scope) : "";
 
@@ -345,34 +358,47 @@ export function resumePrompt(
 // keputusan pasca-Audit, tak ada skill Brainstorm/Plan, tak ada blok Detail berisi JSON payload
 // (isi payload sudah dieja sebagai Goal/Selesai bila/Batasan). Mode goal (Stop hook ADR-0073)
 // dipasang di sisi server saat sesi lahir, bukan lewat prompt ini.
+//
+// SPEC-825 · ADR-0123 · flow `no_effort` memakai KERANGKA yang sama persis — payload bentuk yang
+// sama, tanpa fase perencanaan, isi payload dieja sebagai prosa — jadi ia diparametrisasi flow,
+// bukan disalin. Yang berbeda hanya kepala prompt dan ada/tidaknya klausa fase Verifikasi.
 export function startGoalPrompt(
-  spec: SpecBrief, branchTo: string,
+  flow: "goal" | "no_effort", spec: SpecBrief, branchTo: string,
   opts: { autonomy?: Autonomy; verifyScope?: VerifyScope; resume?: ResumeCtx; method?: string } = {},
 ): string {
   const m = resolveMethod(opts.method);
   const g = readGoalPayload(spec.payload);
+  const noEffort = flow === "no_effort";
   const detail = [
     `Goal: ${g?.goal ?? spec.objective}`,
     g?.done ? `Selesai bila: ${g.done}` : "",
     g?.constraints ? `Batasan: ${g.constraints}` : "",
   ].filter(Boolean).join("\n");
   return [
-    "hanoman goal — sesi ini mengejar SATU goal sampai tercapai. TIDAK ada fase Brainstorm, "
-      + "Objective, Spec, maupun Plan: jangan menulis design doc, jangan menulis plan berkotak, "
-      + "jangan memecah pekerjaan ini jadi backlog baru. Langsung kerjakan goal-nya. Tetap ikuti "
-      + "internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di "
-      + "index, dalam commit yang sama.",
+    noEffort
+      ? "hanoman no-effort — sesi ini mengerjakan SATU pekerjaan remeh lalu berhenti. TIDAK ada "
+        + "fase Brainstorm, Objective, Spec, Plan, maupun fase pembuktian terpisah: jangan menulis "
+        + "design doc, jangan menulis plan berkotak, jangan memecah pekerjaan ini jadi backlog "
+        + "baru, dan jangan menambah fase sendiri. Langsung kerjakan, buktikan seperlunya di fase "
+        + "yang sama, lalu berhenti. Tetap ikuti internal/docs sebagai Source of Truth; perbarui "
+        + "docs yang tersentuh dan link-nya di index, dalam commit yang sama."
+      : "hanoman goal — sesi ini mengejar SATU goal sampai tercapai. TIDAK ada fase Brainstorm, "
+        + "Objective, Spec, maupun Plan: jangan menulis design doc, jangan menulis plan berkotak, "
+        + "jangan memecah pekerjaan ini jadi backlog baru. Langsung kerjakan goal-nya. Tetap ikuti "
+        + "internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di "
+        + "index, dalam commit yang sama.",
     opts.resume ? resumeClause(opts.resume, branchTo, m.planDir, false) : "",
     detail,
-    phaseInstruction(PIPELINES.goal, m),
-    "Fase Verifikasi bukan formalitas: jalankan perintah yang membuktikan goal-nya tercapai "
-      + "(test/typecheck/benchmark/perintah yang relevan) dan baca outputnya. Klaim tanpa output "
-      + "bukan bukti.",
+    phaseInstruction(PIPELINES[flow], m),
+    noEffort ? ""
+      : "Fase Verifikasi bukan formalitas: jalankan perintah yang membuktikan goal-nya tercapai "
+        + "(test/typecheck/benchmark/perintah yang relevan) dan baca outputnya. Klaim tanpa output "
+        + "bukan bukti.",
     autonomyClause(opts.autonomy),
-    scopeClause("goal", opts.verifyScope),
-    codeStyleClause("goal"),
+    scopeClause(flow, opts.verifyScope),
+    codeStyleClause(flow),
     methodClause(m),
-    skillInstruction(PIPELINES.goal, m, writesCode("goal")),
+    skillInstruction(PIPELINES[flow], m, writesCode(flow)),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
     `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
