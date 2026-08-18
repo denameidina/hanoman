@@ -3,7 +3,8 @@ export const zStage = z.enum(["brainstorming","objective","spec-ready","planned"
 // SPEC-253 · +help (tiket → backlog)
 // SPEC-407 · +goal · backlog yang langsung dikejar sesi mode goal, tanpa fase perencanaan.
 // SPEC-384 · −cross-audit (ADR-0092) · dicabut bersama error monitoring.
-export const zSpecSource = z.enum(["brief","qa","audit","help","goal"]);
+// SPEC-825 · +no_effort · task remeh: satu fase `Kerjakan`, tanpa perencanaan maupun verifikasi.
+export const zSpecSource = z.enum(["brief","qa","audit","help","goal","no_effort"]);
 export const zDocStatus = z.enum(["ok","drift","broken"]);
 export const zPriority = z.enum(["tinggi","sedang","rendah"]);
 export const zProjectKind = z.enum(["from-scratch","existing"]);

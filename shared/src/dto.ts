@@ -274,7 +274,8 @@ export const zLeadStatusView = z.object({
 export type LeadStatusView = z.infer<typeof zLeadStatusView>;
 
 // SPEC-407 · +goal · sesi dua fase (Goal → Verifikasi) tanpa fase perencanaan sama sekali.
-export const zFlow = z.enum(["feature", "qa", "scaffold", "reverse", "prd", "audit", "breakdown", "goal"]);
+// SPEC-825 · +no_effort · sesi SATU fase (Kerjakan) untuk task remeh.
+export const zFlow = z.enum(["feature", "qa", "scaffold", "reverse", "prd", "audit", "breakdown", "goal", "no_effort"]);
 export type FlowName = z.infer<typeof zFlow>;
 // SPEC-237 · satu-satunya pemetaan source → flow (client memakainya saat start sesi).
 // qa → audit lalu execute perbaikan; audit → dokumen saja (Audit → Laporan, tanpa Execute).
@@ -283,8 +284,20 @@ export function flowForSource(source: string): FlowName {
     : source === "audit" ? "audit"
     // SPEC-407 · goal → sesi dua fase yang langsung mengejar goal item, tanpa perencanaan.
     : source === "goal" ? "goal"
+    // SPEC-825 · no_effort → sesi satu fase. Flow SENDIRI, bukan varian `goal`: gerbang konversi
+    // ADR-0109 mengunci FLOW, jadi flow yang berdiri sendiri itulah yang menolak item berjalan
+    // pindah ke/dari sini — berkas fase `Kerjakan` tak akan pernah memuaskan pipeline lain.
+    : source === "no_effort" ? "no_effort"
     : "feature";
 }
+
+/**
+ * Flow yang membawa payload bentuk `goal` dan tak punya fase perencanaan (SPEC-407 · SPEC-825).
+ * Tiga akibat berlaku sama untuk keduanya: mode goal DIPAKSA menyala, template global
+ * `Setting.goal.condition` dilewati (item membawa kondisinya sendiri), dan prompt-nya dirakit
+ * builder yang sama. Satu predikat — cermin `flowForSource` di atasnya.
+ */
+export const isGoalShapedFlow = (flow: string): boolean => flow === "goal" || flow === "no_effort";
 
 // SPEC-210 · brief awal PRD (sesi prd project-level, tanpa Spec). Disisipkan ke prompt sesi.
 export const zPrdBrief = z.object({

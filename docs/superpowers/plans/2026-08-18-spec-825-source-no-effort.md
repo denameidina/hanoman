@@ -44,7 +44,7 @@
   - `isGoalShapedFlow(flow: string): boolean` — `true` untuk `"goal"` dan `"no_effort"`
 - Consumes: tidak ada (task pertama).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Ubah `shared/src/spec-source.test.ts` — ganti tiga `it` pertama di `describe("SPEC-546 · bentuk payload per source (satu predikat)")` menjadi:
 
@@ -114,12 +114,12 @@ describe("SPEC-825 · source & flow no_effort", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run shared/src/spec-source.test.ts shared/src/no-effort.test.ts`
 Expected: FAIL — `zSpecSource.options` masih lima nilai; `isGoalShapedFlow` tak ada (error impor).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `shared/src/enums.ts` — ganti baris `zSpecSource`, tambahkan komentar di atasnya bersama komentar source lain:
 
@@ -194,12 +194,12 @@ export const SPEC_PAYLOAD_ONEOF: JsonSchemaNode = {
   { if: { properties: { source: { enum: ["goal", "no_effort"] } }, required: ["source"] }, then: { properties: { payload: GOAL_PAYLOAD } } },
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm vitest --run shared/src/spec-source.test.ts shared/src/no-effort.test.ts shared/src/mcp-schema.test.ts shared/test/enums.test.ts shared/test/dto.test.ts`
 Expected: PASS semua. Bila `shared/test/enums.test.ts` mengunci daftar source lama, perbarui daftarnya di sana juga (tambahkan `"no_effort"` di posisi terakhir) lalu jalankan ulang.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/enums.ts shared/src/spec-source.ts shared/src/dto.ts shared/src/mcp-schema.ts \

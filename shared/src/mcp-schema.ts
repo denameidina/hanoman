@@ -103,7 +103,7 @@ export const QA_PAYLOAD = obj({
 
 export const GOAL_PAYLOAD = obj({
   description:
-    "Bentuk payload untuk source `goal`. Sesi goal mengejar satu tujuan tanpa fase perencanaan (ADR-0089).",
+    "Bentuk payload untuk source `goal` dan `no_effort`. Sesi goal mengejar satu tujuan tanpa fase perencanaan (ADR-0089); sesi no_effort mengerjakan satu task remeh dalam SATU fase lalu berhenti (ADR-0123).",
   properties: {
     goal: str("Satu tujuan yang dikejar sesi. Dari sinilah `objective` backlog diturunkan server."),
     done: str("Bukti berhenti yang dituntut. Kosong berarti goal itu sendiri buktinya."),
@@ -115,7 +115,7 @@ export const GOAL_PAYLOAD = obj({
 
 export const SPEC_PAYLOAD_ONEOF: JsonSchemaNode = {
   description:
-    "Isi backlog. BENTUKNYA DITENTUKAN `source`: `qa` → {severity, steps, expected, actual, env, constraints}; `goal` → {goal, done, constraints, priority}; `brief`/`audit`/`help` → {context, outcome, constraints, priority}. `constraints` qa opsional (default string kosong); bentuk yang tak cocok ditolak sebelum dikirim.",
+    "Isi backlog. BENTUKNYA DITENTUKAN `source`: `qa` → {severity, steps, expected, actual, env, constraints}; `goal`/`no_effort` → {goal, done, constraints, priority}; `brief`/`audit`/`help` → {context, outcome, constraints, priority}. `constraints` qa opsional (default string kosong); bentuk yang tak cocok ditolak sebelum dikirim.",
   oneOf: [BRIEF_PAYLOAD, QA_PAYLOAD, GOAL_PAYLOAD],
 };
 
@@ -123,7 +123,7 @@ export const SPEC_PAYLOAD_ONEOF: JsonSchemaNode = {
 // oleh KLIEN — bukan ditemukan lewat 400 `"bentuk payload tak cocok dengan source"` dari server.
 export const SOURCE_PAYLOAD_ALLOF: readonly IfThen[] = [
   { if: { properties: { source: { const: "qa" } }, required: ["source"] }, then: { properties: { payload: QA_PAYLOAD } } },
-  { if: { properties: { source: { const: "goal" } }, required: ["source"] }, then: { properties: { payload: GOAL_PAYLOAD } } },
+  { if: { properties: { source: { enum: ["goal", "no_effort"] } }, required: ["source"] }, then: { properties: { payload: GOAL_PAYLOAD } } },
   { if: { properties: { source: { enum: ["brief", "audit", "help"] } }, required: ["source"] }, then: { properties: { payload: BRIEF_PAYLOAD } } },
 ];
 

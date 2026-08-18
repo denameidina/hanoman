@@ -8,10 +8,10 @@ const qa = { severity: "major" as const, steps: "s", expected: "e", actual: "a",
 const goal = { goal: "g", done: "d", constraints: "", priority: "sedang" as const };
 
 describe("SPEC-546 · bentuk payload per source (satu predikat)", () => {
-  it("lima source memetakan ke tiga bentuk", () => {
-    expect(zSpecSource.options).toEqual(["brief", "qa", "audit", "help", "goal"]);
+  it("enam source memetakan ke tiga bentuk", () => {
+    expect(zSpecSource.options).toEqual(["brief", "qa", "audit", "help", "goal", "no_effort"]);
     expect(zSpecSource.options.map(payloadShapeFor))
-      .toEqual(["brief", "qa", "brief", "brief", "goal"]);
+      .toEqual(["brief", "qa", "brief", "brief", "goal", "goal"]);
   });
 
   it("shapeOfPayload mengenali ketiga bentuk; payload null dibaca sebagai brief", () => {
@@ -21,7 +21,7 @@ describe("SPEC-546 · bentuk payload per source (satu predikat)", () => {
     expect(shapeOfPayload(null)).toBe("brief");
   });
 
-  it("payloadMatchesSource benar untuk seluruh matriks 5×3", () => {
+  it("payloadMatchesSource benar untuk seluruh matriks 6×3", () => {
     for (const s of zSpecSource.options)
       for (const [shape, p] of [["brief", brief], ["qa", qa], ["goal", goal]] as const)
         expect(payloadMatchesSource(s, p)).toBe(payloadShapeFor(s) === shape);
@@ -35,6 +35,14 @@ describe("SPEC-546 · bentuk payload per source (satu predikat)", () => {
     expect(zCreateSpec.safeParse({ ...base, source: "goal", payload: qa }).success).toBe(false);
     expect(zCreateSpec.safeParse({ ...base, source: "help", payload: brief }).success).toBe(true);
     expect(zCreateSpec.safeParse({ ...base, source: "qa", payload: qa }).success).toBe(true);
+  });
+
+  // SPEC-825 · source `no_effort` menumpang bentuk goal — tak ada bentuk keempat.
+  it("zCreateSpec mengikat no_effort ke bentuk goal", () => {
+    const base = { project: "p", title: "t", priority: "sedang" as const };
+    expect(zCreateSpec.safeParse({ ...base, source: "no_effort", payload: goal }).success).toBe(true);
+    expect(zCreateSpec.safeParse({ ...base, source: "no_effort", payload: brief }).success).toBe(false);
+    expect(zCreateSpec.safeParse({ ...base, source: "no_effort", payload: qa }).success).toBe(false);
   });
 
   it("zChangeSpecSource: payload opsional, tapi bila ada wajib cocok source tujuan", () => {

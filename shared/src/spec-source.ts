@@ -9,12 +9,17 @@ export type SpecSource = z.infer<typeof zSpecSource>;
 export type Priority = z.infer<typeof zPriority>;
 export type Severity = z.infer<typeof zSeverity>;
 
-/** Lima source dilayani TIGA bentuk payload (SPEC-197 · SPEC-407 · ADR-0089). */
+/** Enam source dilayani TIGA bentuk payload (SPEC-197 · SPEC-407 · SPEC-825 · ADR-0089). */
 export type PayloadShape = "brief" | "qa" | "goal";
+
+// SPEC-825 · ADR-0123 · `no_effort` menumpang bentuk `goal`, bukan bentuk keempat: field yang
+// dibutuhkannya persis sama, dan bentuk keempat yang tak terbedakan dari ISI-nya membuat
+// `shapeOfPayload` — yang menjaga `payloadMatchesSource` — tak bisa ditulis sama sekali.
+const GOAL_SHAPED_SOURCES = new Set(["goal", "no_effort"]);
 
 /** source → bentuk yang WAJIB dipakai payload-nya. */
 export function payloadShapeFor(source: string): PayloadShape {
-  return source === "qa" ? "qa" : source === "goal" ? "goal" : "brief";
+  return source === "qa" ? "qa" : GOAL_SHAPED_SOURCES.has(source) ? "goal" : "brief";
 }
 
 /**
