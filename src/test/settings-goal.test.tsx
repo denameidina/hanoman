@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -35,9 +35,9 @@ const openSesi = () => {
 describe("SettingsScreen · kartu mode goal", () => {
   it("menyalakan default global mode goal → PUT settings", async () => {
     openSesi();
-    // Switch DS menaruh aria-label di wrapper; handler klik ada di elemen role=switch di dalamnya.
-    const wrap = await screen.findByLabelText("Mode goal default");
-    fireEvent.click(within(wrap).getByRole("switch"));
+    // Switch DS menaruh aria-label PADA elemen ber-role (sejak 9f344904) — dicari lewat peran +
+    // nama aksesibelnya, bukan lewat bentuk DOM-nya.
+    fireEvent.click(await screen.findByRole("switch", { name: "Mode goal default" }));
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(
       expect.objectContaining({ goal: { enabled: true, condition: "" } })));
   });

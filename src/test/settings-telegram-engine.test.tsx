@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 // SPEC-492 · runtime/model/effort KHUSUS sesi operator Telegram. Sebelum ini sesi operator selalu
 // mengikuti default global sesi kerja, padahal bebannya beda jauh (baca API + rangkum vs tulis kode).
@@ -80,8 +80,7 @@ describe("SPEC-492 · kartu agen operator Telegram", () => {
 
   it("menyalakan override → PUT /settings dengan telegram.engine.enabled true", async () => {
     openModel();
-    const wrap = await screen.findByLabelText("Override agen Telegram");
-    fireEvent.click(within(wrap).getByRole("switch"));
+    fireEvent.click(await screen.findByRole("switch", { name: "Override agen Telegram" }));
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(
       expect.objectContaining({ telegram: expect.objectContaining({
         engine: expect.objectContaining({ enabled: true }) }) })));
@@ -94,8 +93,7 @@ describe("SPEC-492 · kartu agen operator Telegram", () => {
     await screen.findByText("Agen operator Telegram");
     vi.mocked(api.getSettings).mockResolvedValue(
       tg({ enabled: true, agent: "codex", model: "gpt-5.5", effort: "medium" }) as any);
-    const wrap = screen.getByLabelText("Override agen Telegram");
-    fireEvent.click(within(wrap).getByRole("switch"));
+    fireEvent.click(screen.getByRole("switch", { name: "Override agen Telegram" }));
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(
       expect.objectContaining({ telegram: expect.objectContaining({
         engine: expect.objectContaining({ agent: "codex", model: "gpt-5.5" }) }) })));

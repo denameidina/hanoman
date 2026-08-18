@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -57,9 +57,9 @@ describe("SPEC-383 · kartu default sesi konflik", () => {
 
   it("menyalakan override → PUT settings conflict.enabled true", async () => {
     openModel();
-    // Switch DS menaruh aria-label di wrapper; handler klik ada di elemen role=switch di dalamnya.
-    const wrap = await screen.findByLabelText("Override agen konflik");
-    fireEvent.click(within(wrap).getByRole("switch"));
+    // Switch DS menaruh aria-label PADA elemen ber-role (sejak 9f344904) — dicari lewat peran +
+    // nama aksesibelnya, bukan lewat bentuk DOM-nya.
+    fireEvent.click(await screen.findByRole("switch", { name: "Override agen konflik" }));
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(
       expect.objectContaining({ conflict: expect.objectContaining({ enabled: true }) })));
   });

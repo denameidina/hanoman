@@ -11,7 +11,9 @@ vi.mock("../src/api/client", () => ({
 import { api } from "../src/api/client";
 
 const ACCOUNT = { id: "u1", email: "klien@x.co", disabled: false, createdAt: "2026-08-01T00:00:00Z", projects: ["p1"] };
-const pick = (name: string) => fireEvent.click(screen.getByLabelText(name).firstElementChild!);
+// Kontrol DS menaruh aria-label PADA elemen ber-role (sejak 9f344904), jadi peran + nama
+// aksesibelnya yang dicari — bukan bentuk DOM-nya.
+const pick = (name: string) => fireEvent.click(screen.getByRole("checkbox", { name }));
 
 beforeEach(() => {
   (api.listClientAccounts as any).mockResolvedValue({ items: [ACCOUNT] });
@@ -29,9 +31,9 @@ describe("ClientAccessPanel (SPEC-617)", () => {
     render(<ClientAccessPanel />);
     expect(await screen.findByText("klien@x.co")).toBeTruthy();
     await waitFor(() =>
-      expect(screen.getByLabelText("klien@x.co · Toko Mekar").firstElementChild!
+      expect(screen.getByRole("checkbox", { name: "klien@x.co · Toko Mekar" })
         .getAttribute("aria-checked")).toBe("true"));
-    expect(screen.getByLabelText("klien@x.co · Warung Sedap").firstElementChild!
+    expect(screen.getByRole("checkbox", { name: "klien@x.co · Warung Sedap" })
       .getAttribute("aria-checked")).toBe("false");
   });
 

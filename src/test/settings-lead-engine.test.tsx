@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 // SPEC-488 · runtime/model/effort agen hanoman-lead. Blok `Setting.lead.engine` ada sejak ADR-0091
 // tapi tak pernah punya satu pun kontrol — satu-satunya jalan menyetelnya adalah curl.
@@ -71,8 +71,7 @@ describe("SPEC-488 · kartu agen hanoman-lead", () => {
 
   it("menyalakan override → PUT /lead/config dengan engine.enabled true", async () => {
     openModel();
-    const wrap = await screen.findByLabelText("Override agen lead");
-    fireEvent.click(within(wrap).getByRole("switch"));
+    fireEvent.click(await screen.findByRole("switch", { name: "Override agen lead" }));
     await waitFor(() => expect(api.putLeadConfig).toHaveBeenCalledWith(
       expect.objectContaining({ engine: expect.objectContaining({ enabled: true }) })));
   });
@@ -83,8 +82,7 @@ describe("SPEC-488 · kartu agen hanoman-lead", () => {
   it("field lead lain datang dari GET segar, bukan snapshot Settings", async () => {
     vi.mocked(api.getLeadConfig).mockResolvedValue(LEAD({ paused: true, everyMin: 42 }) as any);
     openModel();
-    const wrap = await screen.findByLabelText("Override agen lead");
-    fireEvent.click(within(wrap).getByRole("switch"));
+    fireEvent.click(await screen.findByRole("switch", { name: "Override agen lead" }));
     await waitFor(() => expect(api.putLeadConfig).toHaveBeenCalledWith(
       expect.objectContaining({ paused: true, everyMin: 42 })));
     expect(api.putSettings).not.toHaveBeenCalled();

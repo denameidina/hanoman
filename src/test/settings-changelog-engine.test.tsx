@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 // SPEC-518 · runtime/model/effort agen pembuat changelog (SPEC-516/ADR-0105). Sampai spec ini
 // `generateChangelog` selalu memakai default sesi kerja dan operator tak punya satu pun kontrol.
@@ -69,8 +69,7 @@ describe("SPEC-518 · kartu agen changelog", () => {
   // sama seperti kartu konflik.
   it("menyalakan override → PUT /settings dengan changelog.enabled true", async () => {
     openModel();
-    const wrap = await screen.findByLabelText("Override agen changelog");
-    fireEvent.click(within(wrap).getByRole("switch"));
+    fireEvent.click(await screen.findByRole("switch", { name: "Override agen changelog" }));
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(
       expect.objectContaining({ changelog: expect.objectContaining({ enabled: true }) })));
   });
