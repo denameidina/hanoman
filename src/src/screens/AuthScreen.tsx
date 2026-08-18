@@ -56,7 +56,7 @@ export function AuthScreen({ needsSetup, onDone }: { needsSetup: boolean; onDone
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} style={{ width: "100%" }} />
             </Field>
             {needsSetup && <Field label="Setup token" hint="baca setup.token di HANOMAN_HOME pada host server">
-              <Input type="password" autoComplete="off" value={setupToken}
+              <Input type="password" autoComplete="off" value={setupToken} placeholder="••••••••"
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSetupToken(e.target.value)} style={{ width: "100%" }} />
             </Field>}
             {err && <div style={{ fontSize: 12.5, color: "var(--status-err)", marginBottom: 12 }}>{err}</div>}
