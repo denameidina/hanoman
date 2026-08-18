@@ -74,7 +74,7 @@ tiap berkas.
 - `docStatus` ("ok" | "drift" | "broken") + `coverage` (0–100) **bukan kolom** — diturunkan dari disk tiap `toProjectView` (ADR-0018).
 
 ## Spec (backlog item)
-- `id` (SPEC-n), `projectId`, `title`, `source` ("brief" | "qa" | "audit" | "help" | "goal")
+- `id` (SPEC-n), `projectId`, `title`, `source` ("brief" | "qa" | "audit" | "help" | "goal" | "no_effort")
   - **`help`** (SPEC-253/[ADR-0062](../adr/0062-help-center-tiket-publik-triase.md)): backlog hasil
     promosi tiket Help Center. `flowForSource("help") = "feature"` (pipeline penuh), payload brief-shaped
     (context berisi keluhan + kategori + pelapor + backlink tiket). Author `Help ·`. Tanpa migration
@@ -93,6 +93,20 @@ tiap berkas.
     (ADR-0073) **selalu** menyala untuk flow ini dan kondisinya diturunkan dari item (template
     global `Setting.goal.condition` dilewati; override per-sesi tetap menang). Author berawalan
     `Goal ·`. Gerbang plan ADR-0029 tetap berlaku bila sesi kebetulan menulis plan. Tanpa migration.
+  - **`no_effort`** (SPEC-825/[ADR-0123](../adr/0123-source-no-effort-flow-satu-fase.md)): task remeh
+    — ganti copy/label, bump konstanta, typo docs, satu baris allowlist. Flow `no_effort` = pipeline
+    **`Kerjakan`** (SATU fase): tak ada perencanaan maupun fase pembuktian terpisah. Stage:
+    `Kerjakan` aktif → `executing`, `Kerjakan` done/skipped → `done`
+    (`REACHED.Kerjakan="done"`); tak ada stage antara karena tak ada fase antara. **Payload
+    memakai bentuk `goal` yang sama** (`{goal, done, constraints, priority}`) — sengaja BUKAN
+    bentuk keempat: field yang dibutuhkannya identik, dan bentuk yang tak terbedakan dari isinya
+    membuat `shapeOfPayload` tak bisa ditulis. Konsekuensinya `Spec.source` adalah satu-satunya
+    pembeda item `goal` dari item `no_effort`. Sesi tetap **menulis kode**: `verifyScope`
+    (ADR-0080), klausa gaya kode (ADR-0108), dan `exitSkills` (ADR-0113) terpasang lewat gerbang
+    `writesCode` yang sama, kini diturunkan dari daftar bersama `WORK_PHASES`. Mode goal (ADR-0073)
+    **selalu** menyala dan template global dilewati, persis flow `goal` (`isGoalShapedFlow`).
+    Author berawalan `No effort ·`. Nama fase `Kerjakan` unik lintas seluruh `PIPELINES` — syarat
+    peta `REACHED`, yang berkunci nama fase saja. Tanpa migration.
 - `stage` ("brainstorming" | "objective" | "spec-ready" | "planned" | "executing" | "done").
   Bergerak **maju** hanya lewat fase yang dilaporkan sesi (ADR-0008/0024), **mundur** hanya
   lewat aksi human eksplisit `PATCH /specs/:id { stage }` (backward-only, SPEC-167/ADR-0027).
@@ -108,9 +122,11 @@ tiap berkas.
   Migration memberi baris legacy approval `legacy-admin` agar upgrade tidak mematikan backlog lama.
 - `payload` (Json?) — brief (context/outcome/constraints), qa
   (severity/steps/expected/actual/env/**constraints**, SPEC-826), atau **goal**
-  (goal/done/constraints, SPEC-407). Bentuknya **terikat `source`** di boundary
-  (`zCreateSpec.superRefine`, tiga-arah): `qa` ↔ `severity`, `goal` ↔ `goal`, selain itu brief —
-  tanpa ikatan itu `deriveSpecFields` bisa menurunkan objective dari bentuk yang salah.
+  (goal/done/constraints, SPEC-407 — dipakai source `goal` **dan** `no_effort`, SPEC-825).
+  Bentuknya **terikat `source`** di boundary
+  (`zCreateSpec.superRefine`, tiga-arah): `qa` ↔ `severity`, `goal`/`no_effort` ↔ `goal`, selain
+  itu brief — tanpa ikatan itu `deriveSpecFields` bisa menurunkan objective dari bentuk yang
+  salah. Predikatnya SATU (`payloadShapeFor`, `shared/src/spec-source.ts`).
   **SPEC-826 · ADR-0122:** ketiga bentuk sama-sama punya `constraints`; di qa ia
   `z.string().default("")` — bukan `z.string()` polos — karena baris qa yang sudah tersimpan tak
   punya field itu dan polos berarti setiap baris lama gagal validasi begitu ia dibaca/diedit/

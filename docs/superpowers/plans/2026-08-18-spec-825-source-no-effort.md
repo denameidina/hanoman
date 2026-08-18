@@ -888,7 +888,7 @@ git commit -m "feat(spec-825): lencana, tab filter, dan form backlog no_effort"
 - Consumes: keputusan Task 1-4 apa adanya.
 - Produces: docs SoT yang menyebut source keenam, flow keenam, fase `Kerjakan`, dan `WORK_PHASES`.
 
-- [ ] **Step 1: Tulis ADR-0123**
+- [x] **Step 1: Tulis ADR-0123**
 
 Buat `internal/docs/adr/0123-source-no-effort-flow-satu-fase.md` mengikuti bentuk ADR terbaru (`0122-constraints-di-payload-qa.md`): judul `# ADR-0123 — …`, `Status: berlaku`, `Tanggal`, `Konteks`, `Keputusan` (bernomor), `Konsekuensi`, `Alternatif yang ditolak`.
 
@@ -904,7 +904,7 @@ Isi wajib memuat, apa adanya dari design doc:
 
 Alternatif yang ditolak, tulis dengan alasannya: (a) knob "lewati fase Verifikasi" di atas flow `goal` — knob tak mengubah `PIPELINES`, jadi `REACHED`/`phasesComplete`/gate codex tetap menuntut fase yang tak akan pernah ditulis (bentuk SPEC-433); (b) bentuk payload keempat — lihat butir 2; (c) memakai ulang nama fase `Execute` — merusak deteksi fase seluruh flow yang memakainya.
 
-- [ ] **Step 2: Tautkan di kedua index**
+- [x] **Step 2: Tautkan di kedua index**
 
 `internal/docs/adr/README.md` — tambahkan baris paling atas daftar:
 
@@ -914,7 +914,7 @@ Alternatif yang ditolak, tulis dengan alasannya: (a) knob "lewati fase Verifikas
 
 `internal/docs/README.md` — tambahkan baris yang sama di atas baris `0122`, dengan path `adr/0123-source-no-effort-flow-satu-fase.md`.
 
-- [ ] **Step 3: Perbarui docs arsitektur**
+- [x] **Step 3: Perbarui docs arsitektur**
 
 `internal/docs/architecture/data-model.md`:
 - baris 77: daftar nilai `source` → `("brief" | "qa" | "audit" | "help" | "goal" | "no_effort")`;
@@ -927,7 +927,7 @@ Alternatif yang ditolak, tulis dengan alasannya: (a) knob "lewati fase Verifikas
 - baris 231: daftar nilai `POST /specs/:id/source` += `"no_effort"`, dengan catatan bahwa item yang sudah dimulai selalu ditolak 409 ke/dari sana (flow berbeda);
 - baris 864-868: `flow ∈ feature|qa|audit|goal|no_effort`, dan blok penjelas flow `no_effort` (pipeline satu fase, stage `Kerjakan → executing/done`, mode goal dipaksa menyala & template global dilewati — sama seperti `goal`).
 
-- [ ] **Step 4: Perbarui skill project**
+- [x] **Step 4: Perbarui skill project**
 
 `internal/skills/hanoman/SKILL.md` — sesudah butir "**Backlog goal — sesi dua fase tanpa perencanaan** (SPEC-407/ADR-0089…)", tambahkan butir baru bergaya sama:
 
@@ -935,7 +935,7 @@ Alternatif yang ditolak, tulis dengan alasannya: (a) knob "lewati fase Verifikas
 
 Sesuaikan juga penyebutan "lima source"/"tiga bentuk" di sekitar baris 351-360 SKILL.md menjadi **enam source → tiga bentuk**.
 
-- [ ] **Step 5: Verifikasi integritas index & commit**
+- [x] **Step 5: Verifikasi integritas index & commit**
 
 Run: `node cli/dist/index.js docs index --check` — bila `cli/dist` belum dibangun, jalankan `pnpm --filter ./cli build` lebih dulu; bila tetap tak tersedia, verifikasi manual bahwa `internal/docs/adr/0123-*.md` muncul di `internal/docs/README.md` **dan** `internal/docs/adr/README.md`.
 Expected: tidak ada doc yang tak ter-link.

@@ -169,9 +169,10 @@ GET  /specs?project=&source=&q=&stage=&priority=&startable=&dateField=&from=&to=
 #   Tanpa page/limit → seluruh item terfilter (page 1, pageSize=total). Lihat ADR-0038.
 #   SPEC-521 · `source` beda LAPIS dari filter lain: ia disaring di DB (`liveSpecs` where) SEBELUM
 #   overlay, jadi ia yang menentukan scope overlay/write-through/notifikasi — sementara sisanya
-#   disaring di memori sesudahnya. Nilai sah = `zSpecSource` (brief|qa|audit|help|goal); nilai tak
-#   dikenal → himpunan KOSONG (bukan 400, dan bukan "diabaikan" seperti stage/priority/dateField).
-#   Pemakainya: deret tab sumber daftar backlog — Semua spec · Dari brief · Dari QA · Audit · Goal.
+#   disaring di memori sesudahnya. Nilai sah = `zSpecSource` (brief|qa|audit|help|goal|no_effort);
+#   nilai tak dikenal → himpunan KOSONG (bukan 400, dan bukan "diabaikan" seperti stage/priority/dateField).
+#   Pemakainya: deret tab sumber daftar backlog — Semua spec · Dari brief · Dari QA · Audit · Goal ·
+#   Help Center · Tanpa effort (SPEC-825).
 #   SPEC-408 · ADR-0090 · rentang tanggal: `dateField` = created (default) | started — sumbu
 #   `Spec.createdAt` atau `Spec.startedAt`; `from`/`to` = `YYYY-MM-DD` INKLUSIF (boleh sendirian),
 #   di-parse di zona waktu LOKAL SERVER (`from` 00:00:00.000, `to` 23:59:59.999) — `new Date("…")`
@@ -193,7 +194,7 @@ POST /specs/batch         { project, items:[BreakdownItem], branchFrom?, prdPath
 #   SPEC-273 · ADR-0069 · materialize breakdown: N spec `source:"brief"` independen (id berurutan via
 #   nextSpecId+retry), provenance PRD di teks Konteks. 400 items kosong / branch tak dikenal; 404 project.
 #   BreakdownItem = { title, context, outcome, priority:"tinggi"|"sedang"|"rendah" }.
-#   source ∈ brief|qa|audit|help|goal (SPEC-237/253/407). audit = audit-only (payload
+#   source ∈ brief|qa|audit|help|goal|no_effort (SPEC-237/253/407/825). audit = audit-only (payload
 #   brief-shaped, author `Audit ·`); qa payload ber-severity (superRefine mengikat source↔bentuk payload,
 #   TIGA-arah sejak SPEC-407).
 #   SPEC-826 · ADR-0122 · payload qa = { severity, steps, expected, actual, env, constraints } —
@@ -204,6 +205,9 @@ POST /specs/batch         { project, items:[BreakdownItem], branchFrom?, prdPath
 #   { goal, done, constraints, priority } — `goal` WAJIB, `Spec.objective` diturunkan darinya (`done`
 #   sebagai cadangan), author `Goal ·`. Payload brief/qa untuk source goal (atau sebaliknya) → 400.
 #   Client memetakan source→flow via flowForSource.
+#   SPEC-825 · ADR-0123 · source `no_effort` → flow `no_effort` (Kerjakan, SATU fase): payload memakai
+#   bentuk `goal` yang SAMA — `{ goal, done, constraints, priority }`, tak ada bentuk keempat — jadi
+#   `goal` tetap WAJIB dan `Spec.objective` diturunkan darinya. Author `No effort ·`.
 #   SPEC-340 · ADR-0076 · eskalasi audit → backlog: payload boleh membawa `fromAudit:"SPEC-n"` untuk
 #   source `qa` (ADR-0059, lewati fase Audit) MAUPUN `brief` (baca dokumen audit sbg bahan Brainstorm/
 #   Objective, tanpa `skipped`). Pasangannya branchFrom `hanoman/<audit-id>` agar dokumen audit ada di worktree.
@@ -228,7 +232,9 @@ PATCH /specs/:id          { branchFrom?: string|null, stage?, confirmDelete?, de
 #   ke WARISAN PROJECT, sedangkan `{mode:"off"}` MEMATIKANNYA untuk item ini saja — dua keadaan
 #   berbeda. Gerbang & kode galat sama persis dengan PATCH /projects/:id. Juga di luar gerbang edit
 #   SPEC-186, alasan yang sama dengan dependsOn.
-POST /specs/:id/source    { source: "brief"|"qa"|"audit"|"help"|"goal", payload? }   -> Spec
+POST /specs/:id/source    { source: "brief"|"qa"|"audit"|"help"|"goal"|"no_effort", payload? }   -> Spec
+#   SPEC-825 · `no_effort` punya flow sendiri, jadi item yang SUDAH dimulai selalu ditolak 409
+#   ke/dari sana — konsekuensi gerbang flow di bawah, bukan aturan tambahan.
 #   SPEC-546 · ADR-0109 · ubah type/source item IN-PLACE: id SPEC-nnn, createdAt, dependsOn,
 #   branchFrom, dan dokumen sesi TAK DISENTUH; tak ada baris baru (bukan clone+delete).
 #   Operasi khusus, BUKAN field PATCH: gerbangnya berbeda dari `editingContent` (SPEC-186), dan
@@ -861,12 +867,16 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #       DETERMINISTIK sebagai Stop hook `command` — cek phase file lengkap + plan tak menyisakan
 #       `- [ ]`; belum terpenuhi → exit 2 (stderr jadi continuation prompt, codex dipaksa lanjut).
 #       Kondisi prosa ikut sebagai teks alasan, bukan yang menggerbang. Pagar anti-loop: 25 penolakan.
-#     flow ∈ feature|qa|audit|goal (dari source; flowForSource).
+#     flow ∈ feature|qa|audit|goal|no_effort (dari source; flowForSource).
 #     goal (SPEC-407/ADR-0089) = pipeline Goal → Verifikasi, tanpa fase perencanaan: prompt-nya
 #     startGoalPrompt (mengeja Goal/Selesai bila/Batasan dari payload, tanpa skill Brainstorm/Plan),
 #     stage Goal→executing & Verifikasi→done, dan mode goal DIPAKSA menyala — `goal:false` diabaikan,
 #     template global Setting.goal.condition DILEWATI (kondisi diturunkan dari item), `goalCondition`
 #     per-request tetap menang. Klausa scope verifikasi ikut (flow ini menulis kode meski tanpa Execute).
+#     no_effort (SPEC-825/ADR-0123) = pipeline Kerjakan (SATU fase), dirakit builder yang SAMA
+#     (startGoalPrompt berparameter flow); stage Kerjakan→executing saat aktif dan →done saat tercatat;
+#     ketiga aturan mode goal di atas berlaku identik (predikat bersama isGoalShapedFlow). Klausa scope
+#     verifikasi & gaya kode ikut — gerbangnya writesCode yang sama, kini atas daftar WORK_PHASES.
 #     audit (SPEC-237/ADR-0057) = pipeline
 #     Audit → Laporan: investigasi + dokumen SoT (research/audit-<spec>-<slug>.md), TANPA Execute; stage done via Laporan.
 #   SPEC-172: bila Spec.stage === "done", sesi baru dibuka dengan prompt LANJUTAN (fase Execute

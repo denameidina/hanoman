@@ -355,6 +355,8 @@ Pakai skill lebih sempit saat task cocok:
   diedit, atau dikonversi. Yang **tetap** pengecualian dan itu disengaja: `priority` tak ada di
   payload qa (turunan `severity`, menambahkannya menabrak `deriveSpecFields`), `constraints` di
   luar `SHAPE_REQUIRED.qa` (kosong = normal), dan pembeda `shapeOfPayload` tetap `severity`/`goal`.
+  **SPEC-825/ADR-0123** menambah source keenam `no_effort` tanpa menambah bentuk: peta kini **enam
+  source → tiga bentuk**, dan `no_effort` menumpang bentuk `goal` (lihat butir "Task remeh").
   Label diseragamkan **"Batasan"** untuk ketiga bentuk. Dua gotcha: `dropped` yang menyusut
   membuat blok `source-dropped` dialog **tak dirender** untuk `brief→qa` (test pelaporan `dropped`
   pindah ke `brief→goal`), dan **dua pabrik payload qa di server** (`ticket-accept.ts`,
@@ -668,6 +670,38 @@ Pakai skill lebih sempit saat task cocok:
   di modal backlog baru, dan tombol **"Take ke backlog"** di preview PRD yang kini **pemilih**
   (brief / goal, keduanya ber-`branchFrom = prd/<slug>`). Tanpa migration, tanpa endpoint baru;
   ADR-0029 (gerbang plan) & ADR-0037 tetap utuh.
+- **Task remeh — sesi SATU fase** (SPEC-825/**ADR-0123**, memperluas ADR-0089): source
+  **`no_effort`** → flow **`no_effort`** = `PIPELINES.no_effort = ["Kerjakan"]`. Untuk ganti
+  copy/label, bump konstanta, typo docs, satu baris allowlist — pekerjaan yang fase `Verifikasi`
+  flow goal-nya cuma membuktikan ulang apa yang diff-nya sudah buktikan, sementara satu slot sesi
+  tertahan (premis yang sama dengan ADR-0080). Stage: `Kerjakan` **aktif** → `executing`,
+  **done/skipped** → `done`; nama fasenya wajib **unik lintas seluruh `PIPELINES`** karena peta
+  `REACHED` berkunci **nama fase saja** — memakai ulang `Execute`/`Goal` tak menghasilkan error,
+  ia merusak deteksi fase seluruh flow yang memakai nama itu. **Payload menumpang bentuk `goal`,
+  tak ada bentuk keempat**: field yang dibutuhkannya identik, dan bentuk keempat menuntut pembeda
+  baru di `shapeOfPayload` padahal **tak ada field yang bisa membedakannya** — `shapeOfPayload`
+  adalah yang menjaga `payloadMatchesSource` di boundary, jadi itu bukan duplikasi melainkan
+  predikat yang tak bisa ditulis. Konsekuensinya **`Spec.source` satu-satunya pembeda** item
+  `goal` dari item `no_effort`; kode yang perlu membedakannya wajib membaca source/flow, bukan
+  menebak dari isi. **`WORK_PHASES` — satu daftar fase kerja untuk DUA gerbang di DUA paket**
+  (`writesCode` di runner, aturan fase-kerja-aktif di `stageFor` server): sebelumnya keduanya
+  rantai `||` berisi nama yang sama, dan **suku yang lupa ditambah saat flow baru lahir tak
+  menghasilkan error apa pun** — yang hilang adalah `verifyScope` (ADR-0080), klausa gaya kode
+  (ADR-0108), dan `exitSkills` (ADR-0113), semuanya diam-diam. `writesCode` tetap **satu
+  definisi**; yang berubah cuma sumber daftarnya. **`isGoalShapedFlow`** (tetangga
+  `flowForSource`) menggantikan `flow === "goal"` di `session-launch.ts` & `defaultGoalCondition`:
+  mode goal **dipaksa menyala**, template global `Setting.goal.condition` **dilewati**, dan
+  `goalFlowCondition` kini menyebut `PIPELINES[flow]` alih-alih `PIPELINES.goal` hardcode.
+  Prompt-nya **builder yang SAMA**, `startGoalPrompt` diparametrisasi flow — yang berbeda hanya
+  kepala prompt dan klausa "fase Verifikasi bukan formalitas"; prompt flow `goal` tetap
+  byte-identik. **Item berjalan terkunci OTOMATIS**: gerbang ADR-0109 mengunci FLOW dan
+  `no_effort` berdiri sendiri, jadi berkas fase item `feature` tak akan pernah memuaskan
+  `phasesComplete(["Kerjakan"])` dan sebaliknya (bentuk SPEC-433) — yang ditambahkan cuma test.
+  Item **belum** dimulai tetap bebas pindah: `convertPayload` berkunci **bentuk**, jadi
+  `brief ↔ no_effort` sudah dilayani jalur `brief ↔ goal` tanpa satu baris baru. **Gotcha:**
+  `SOURCE_META` wajib berentri (`Tanpa effort`) — fallback `?? SOURCE_META.brief` **diam**, jadi
+  tanpa entri item ini memakai lencana "feature brief" tanpa satu pun error, persis yang menimpa
+  `help` (ADR-0109 poin 5). Author `No effort ·`. Tanpa migration, tanpa endpoint baru.
 - **hanoman-lead — agen pemimpin di atas agen** (SPEC-409/ADR-0091, **mengamandemen ADR-0035**):
   mekanisme "sesi menunggu keputusan" sudah lengkap sejak SPEC-184/196; yang tak pernah ada adalah
   **yang menjawabnya selain manusia**. Lead adalah **agen** yang dipanggil sekali-jalan non-interaktif

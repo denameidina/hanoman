@@ -70,6 +70,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0123 — Source `no_effort`: flow satu fase `Kerjakan` untuk task remeh, payload menumpang bentuk goal](adr/0123-source-no-effort-flow-satu-fase.md)
 - [0122 — `constraints` di payload qa: bentuk payload seragam lintas source, `.default("")` untuk baris lama](adr/0122-constraints-di-payload-qa.md)
 - [0121 — Operasi berkas dari IDE Explorer: satu path `entry`, unggah multipart di-stream, tanpa gerbang sesi](adr/0121-operasi-berkas-ide-explorer.md)
 - [0120 — Tandai backlog selesai manual: operasi khusus `POST /specs/:id/done`, jejak `Spec.manualDone`](adr/0120-tandai-backlog-selesai-manual.md)
