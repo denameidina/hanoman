@@ -25,6 +25,9 @@ vi.mock("../src/api/client", () => ({
     // parsial WAJIB menyebutnya, kalau tidak efeknya melempar dan terbaca seperti regresi.
     getMethodStatus: vi.fn(async () => ({ methods: [] })),
     startSession: vi.fn(async () => ({ id: "spec-341" })), deleteSpec: vi.fn(), createSpec: vi.fn(),
+    // SPEC-826 · NewSpecModal memuat daftar branch saat terbuka; mock `api` parsial tanpa ini
+    // melempar di efek dan terbaca seperti modalnya sendiri yang rusak.
+    listBranches: vi.fn(async () => ({ branches: ["main"], remotes: [] })),
     listNotifications: vi.fn(async () => ({ items: [], unread: 0 })), // SPEC-180 · provider poll
     // SPEC-786 · ADR-0118 · layout Terminal hidup di server, bukan lagi localStorage. Mock `api`
     // parsial yang menghilangkan pasangan ini membuat `useTerminalWorkspace` jatuh ke `recovering`
@@ -65,6 +68,28 @@ describe("app flows", () => {
     await waitFor(() => expect(api.startSession).toHaveBeenCalled());
     expect(screen.getByText("specs · brainstorm → execute")).toBeInTheDocument();
     expect(screen.queryByTestId("terminal-root")).toBeNull();
+  });
+
+  // SPEC-826 · perakitan payload hidup di `createSpec` milik App, bukan di modal: modal
+  // meneruskan SELURUH SpecForm apa adanya, jadi test tingkat-modal tak menyentuh baris ini.
+  it("SPEC-826 · QA finding baru mengirim constraints di payload qa", async () => {
+    listSpecs.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
+    vi.mocked(api.createSpec).mockResolvedValue(
+      { ...spec, id: "SPEC-900", source: "qa", payload: {} } as never);
+    render(<App />);
+    await waitFor(() => expect(screen.getAllByText(/arta/i).length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText("Backlog")[0]!);
+    fireEvent.click(await screen.findByRole("button", { name: "Tambah spec" }));
+    fireEvent.click(screen.getByText("QA finding"));
+    fireEvent.change(screen.getByLabelText("Judul"), { target: { value: "Funnel dobel" } });
+    fireEvent.change(screen.getByLabelText("Batasan"),
+      { target: { value: "jangan ubah kontrak API" } });
+    fireEvent.click(screen.getByText("Filekan finding → audit"));
+    await waitFor(() => expect(api.createSpec).toHaveBeenCalledWith(expect.objectContaining({
+      source: "qa",
+      payload: expect.objectContaining({
+        severity: "major", constraints: "jangan ubah kontrak API" }),
+    })));
   });
 
   it("Buka sesi dari Backlog menampilkan sesi spec yang dipilih", async () => {

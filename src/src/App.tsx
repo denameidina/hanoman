@@ -54,6 +54,8 @@ type SpecForm = { kind: string; project: string; title: string; context: string;
 // SPEC-244 · branchFrom (teruskan branch PRD/audit) + fromAudit (sinyal skip-audit) juga di-seed.
 type SpecPrefill = { project?: string; title?: string; context?: string; outcome?: string; prdPath?: string;
   kind?: string; steps?: string; actual?: string; severity?: string; branchFrom?: string; fromAudit?: string;
+  // SPEC-826 · batasan pengerjaan kini dimiliki KETIGA bentuk payload, jadi ia bisa ikut di-seed.
+  constraints?: string;
   goal?: string; done?: string };   // SPEC-407 · seed dari "Take ke backlog → sebagai goal"
 
 // SPEC-252 · ADR-0061 — picker model & effort PER SESI saat Start backlog. Default = setelan global
@@ -288,7 +290,8 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
     // siar WS) — sengaja TANPA fetch baru: daftar yang sama sudah ada di memori.
     specs?: Spec[] }) {
   const blank: SpecForm = { kind: prefill?.kind ?? "brief", project: prefill?.project || defaultProject,
-    title: prefill?.title ?? "", context: prefill?.context ?? "", outcome: prefill?.outcome ?? "", constraints: "",
+    title: prefill?.title ?? "", context: prefill?.context ?? "", outcome: prefill?.outcome ?? "",
+    constraints: prefill?.constraints ?? "",
     priority: "sedang", severity: prefill?.severity ?? "major", steps: prefill?.steps ?? "",
     expected: "", actual: prefill?.actual ?? "", env: "", branchFrom: prefill?.branchFrom ?? "", fromAudit: prefill?.fromAudit ?? "",
     goal: prefill?.goal ?? "", done: prefill?.done ?? "",   // SPEC-407
@@ -426,6 +429,10 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
           </div>
           <Field label="Environment" hint="build / kanal tempat finding muncul">
             <Input value={f.env} onChange={set("env")} placeholder="prod · web · v0.9.2" style={{ width: "100%" }} />
+          </Field>
+          <Field label="Batasan" hint="opsional — batasan pengerjaan yang sudah kamu ketahui">
+            <Input aria-label="Batasan" value={f.constraints} onChange={set("constraints")}
+              placeholder="mis. jangan ubah kontrak API" style={{ width: "100%" }} />
           </Field>
         </>
       ) : (
@@ -1004,6 +1011,9 @@ export default function App() {
     setSpecPrefill({ project: spec.projectId, kind: "qa", title: pf?.title || spec.title,
       steps: (pf?.steps || backlink).slice(0, 500), actual: pf?.context || spec.objective,
       severity: pf?.severity && ["critical", "major", "minor"].includes(pf.severity) ? pf.severity : "major",
+      // SPEC-826 · `zEscalationPrefill.constraints` sudah ada sejak SPEC-340 tapi tak punya tujuan
+      // di bentuk qa; sejak spec ini ia punya.
+      constraints: pf?.constraints ?? "",
       // SPEC-244 · teruskan branch audit (hanoman/<audit-id>) + sinyal skip fase Audit (ADR-0059).
       branchFrom: `hanoman/${spec.id.toLowerCase()}`, fromAudit: spec.id });
     setModal("brief");
@@ -1138,6 +1148,7 @@ export default function App() {
     const payload = isQa
       // SPEC-244 · fromAudit (bila qa dinaikkan dari audit) → runner lewati fase Audit (ADR-0059).
       ? { severity: f.severity, steps: f.steps, expected: f.expected, actual: f.actual, env: f.env,
+          constraints: f.constraints,
           ...(f.fromAudit ? { fromAudit: f.fromAudit } : {}) }
       // Brief dari "Take ke backlog" menaut PRD lewat teks Konteks ("Dari PRD: …"), bukan field
       // payload terpisah — zBriefPayload strip key tak dikenal, dan tak ada yang mengonsumsinya.
