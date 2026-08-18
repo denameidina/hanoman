@@ -18,15 +18,15 @@ describe("SPEC-546 · lencana & tab source", () => {
   it("SOURCE_META punya entri help — tanpa itu item Help Center memakai lencana brief", () => {
     expect(SOURCE_META.help).toBeTruthy();
     expect(SOURCE_META.help!.label).toBe("Help Center");
-    expect(Object.keys(SOURCE_META).sort()).toEqual(["audit", "brief", "goal", "help", "qa"]);
+    expect(Object.keys(SOURCE_META).sort()).toEqual(["audit", "brief", "goal", "help", "no_effort", "qa"]);
   });
 });
 
 describe("SPEC-546 · ChangeSourceDialog", () => {
-  it("item belum dimulai menawarkan keempat source lain", () => {
+  it("item belum dimulai menawarkan kelima source lain", () => {
     render(<ChangeSourceDialog spec={briefSpec} onClose={() => {}} onSubmit={() => {}} />);
     const sel = screen.getByLabelText("Type tujuan") as HTMLSelectElement;
-    expect([...sel.options].map((o) => o.value).sort()).toEqual(["audit", "goal", "help", "qa"]);
+    expect([...sel.options].map((o) => o.value).sort()).toEqual(["audit", "goal", "help", "no_effort", "qa"]);
   });
 
   it("memilih qa merender field bentuk qa ter-prefill convertPayload, Batasan ikut", () => {

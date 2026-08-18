@@ -15,6 +15,8 @@ export const SOURCE_META: Record<string, { label: string; icon: string; tone: "e
   // SPEC-407 · ADR-0089 · backlog goal: sesi dua fase (Goal → Verifikasi), tanpa perencanaan.
   goal:  { label: "Goal",          icon: "target",    tone: "brass", color: "var(--brass-600)" },
   help:  { label: "Help Center",   icon: "life-buoy", tone: "info",  color: "var(--wind-500)" },
+  // SPEC-825 · ADR-0123 · task remeh: satu fase `Kerjakan`, tanpa perencanaan maupun verifikasi.
+  no_effort: { label: "Tanpa effort", icon: "zap", tone: "brass", color: "var(--brass-400)" },
 };
 export const sourceMeta = (s: string) => SOURCE_META[s] ?? SOURCE_META.brief!;
 
@@ -33,6 +35,7 @@ export const BRIEF_FIELDS = [
   ["constraints", "Batasan", "mis. reuse queue yang ada"],
 ] as const;
 // SPEC-407 · ADR-0089 · bentuk payload backlog goal (zGoalPayload) — bukan konteks/outcome.
+// SPEC-825 · dipakai source `goal` DAN `no_effort`: katalog berkunci BENTUK, bukan source.
 export const GOAL_FIELDS = [
   ["goal", "Goal", "mis. p95 GET /api/specs di bawah 200 ms"],
   ["done", "Selesai bila", "mis. output benchmark menunjukkan < 200 ms"],

@@ -645,7 +645,7 @@ git commit -m "feat(spec-825): stage Kerjakan, objective per bentuk payload, pel
 - Consumes: `zSpecSource`, `payloadShapeFor`, `isGoalShapedFlow`, `flowForSource` dari `@hanoman/shared` (Task 1).
 - Produces: `SOURCE_META.no_effort = { label: "Tanpa effort", icon: "zap", tone: "brass", color: "var(--brass-400)" }`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Di `src/test/change-source.test.tsx`, ganti dua assert daftar:
 
@@ -706,12 +706,12 @@ describe("SPEC-825 · daftar backlog", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm vitest --run src/test/change-source.test.tsx src/test/backlog-no-effort.test.tsx`
 Expected: FAIL — `SOURCE_META.no_effort` undefined; tab "Tanpa effort" tak ditemukan.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `src/src/screens/source-meta.ts` — tambahkan entri sesudah `goal`:
 
@@ -856,7 +856,7 @@ Tambahkan `payloadShapeFor` ke impor `@hanoman/shared` di `App.tsx`.
 export type Flow = "feature" | "qa" | "scaffold" | "reverse" | "prd" | "audit" | "breakdown" | "goal" | "no_effort";
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm vitest --run src/test/change-source.test.tsx src/test/backlog-no-effort.test.tsx src/test/backlog-goal.test.tsx src/test/start-session-goal.test.tsx src/test/placeholder-contract.test.tsx`
 Expected: PASS semua. Bila `placeholder-contract.test.tsx` mengeluh soal placeholder baru, pastikan setiap placeholder yang ditambahkan berbentuk contoh nilai konkret (`mis. …`), bukan instruksi (SPEC-490).
@@ -864,7 +864,7 @@ Expected: PASS semua. Bila `placeholder-contract.test.tsx` mengeluh soal placeho
 Run: `pnpm --filter ./src typecheck`
 Expected: sukses.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/source-meta.ts src/src/screens/BacklogScreen.tsx src/src/App.tsx \

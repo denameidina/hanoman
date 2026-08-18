@@ -12,7 +12,6 @@ import { SyncButton } from "./SyncButton";
 import { branchOptions } from "./branch";
 import {
   SOURCE_META, sourceMeta, SHAPE_FIELDS, PRIO_OPTS, SEV_OPTS,
-  BRIEF_FIELDS, GOAL_FIELDS, QA_FIELDS,
 } from "./source-meta";
 import { ChangeSourceDialog } from "./ChangeSourceDialog";
 import { MarkDoneDialog, type MarkDoneResult } from "./MarkDoneDialog";
@@ -22,7 +21,7 @@ import {
 import type { Spec } from "./types";
 import type { ProjectVM } from "./types";
 import type { AuditEscalation } from "@hanoman/shared";
-import { AUTO_MERGE_OFF, autoMergeSummary, resolveAutoMerge, type AutoMerge } from "@hanoman/shared";
+import { AUTO_MERGE_OFF, autoMergeSummary, resolveAutoMerge, payloadShapeFor, type AutoMerge } from "@hanoman/shared";
 
 // Kosakata stage frontend (key → label). Di-reuse oleh BacklogPicker di TerminalScreen (SPEC-179).
 export const B_STAGES = [
@@ -180,7 +179,8 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
           actual: form.actual, env: form.env, constraints: form.constraints ?? "" } }
       // SPEC-407 · bentuk payload terikat source di boundary server (zPatchSpec + superRefine
       // POST); mengirim bentuk brief untuk item goal akan ditolak dan menghapus goal-nya.
-      : spec.source === "goal"
+      // SPEC-825 · digerbangi BENTUK, bukan nama source — `no_effort` memakai bentuk yang sama.
+      : payloadShapeFor(spec.source) === "goal"
       ? { title: form.title, priority: form.priority, payload: { goal: form.goal, done: form.done ?? "", constraints: form.constraints ?? "", priority: form.priority } }
       : { title: form.title, priority: form.priority, payload: { context: form.context, outcome: form.outcome, constraints: form.constraints, priority: form.priority } };
     onEditSpec(spec, patch);
@@ -236,12 +236,12 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
   const currentStageLabel = B_STAGES.find((s) => s.key === spec.stage)?.label ?? spec.stage;
   const targetStageLabel = B_STAGES.find((s) => s.key === stageTarget)?.label ?? stageTarget;
   const qa = spec.source === "qa";
-  const isGoal = spec.source === "goal";   // SPEC-407 · payload-nya bentuk ketiga
+  const shape = payloadShapeFor(spec.source);   // SPEC-407/825 · goal & no_effort sebentuk
   const p = (spec.payload || {}) as Record<string, string>;
   // SPEC-447 · kandidat dependency = backlog project yang sama, kecuali diri sendiri (server pun
   // menolak keduanya). Diambil dari daftar yang sudah dimuat layar — tanpa fetch tambahan.
   const depPickList = (allSpecs ?? []).filter((c) => c.projectId === spec.projectId && c.id !== spec.id);
-  const fields: readonly (readonly [string, string, string])[] = qa ? QA_FIELDS : isGoal ? GOAL_FIELDS : BRIEF_FIELDS;
+  const fields: readonly (readonly [string, string, string])[] = SHAPE_FIELDS[shape]!;
   return (
     <Modal open title={spec.title} eyebrow={spec.id + " · " + spec.projectId}
       icon={sourceMeta(spec.source).icon} onClose={closeDetail}>
@@ -937,6 +937,9 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             // SPEC-546 · ADR-0109 · `help` kini tujuan konversi yang sah, jadi ia butuh pintunya
             // sendiri — tanpa tab ini item Help Center hanya muncul tercampur di "Semua spec".
             { value: "help", label: "Help Center" },
+            // SPEC-825 · ADR-0123 · item no_effort punya alur sendiri (satu fase), jadi ia butuh
+            // pintunya sendiri — tanpa tab ini ia hanya muncul tercampur di "Semua spec".
+            { value: "no_effort", label: "Tanpa effort" },
           ]} />
           <div className="hn-backlog-view-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Tabs variant="pill" value={view} onChange={setView} tabs={VIEWS} aria-label="Mode tampilan" />

@@ -9,7 +9,7 @@ import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem } from "@hanoman/shared";
-import { flowForSource, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
+import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
@@ -107,7 +107,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       // item), jadi (a) mode goal-nya tak boleh bisa dimatikan — itulah yang membedakan source ini
       // dari brief — dan (b) template global TIDAK ikut di-prefill: mengirimnya sebagai override
       // per-sesi akan menggantikan goal item dengan kalimat generik.
-      const goalLockedNow = !!spec && flowForSource(spec.source) === "goal";
+      const goalLockedNow = !!spec && isGoalShapedFlow(flowForSource(spec.source));
       setGoalOn(goalLockedNow || s.goal.enabled);
       setGoalCond(goalLockedNow ? "" : s.goal.condition);
       setVerifyScope(s.verifyScope ?? "changed");
@@ -140,9 +140,9 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   if (!spec) return null;
   const s = spec;
   const flow = flowForSource(s.source);
-  // SPEC-407 · ADR-0089 · sesi backlog goal selalu lahir bermode goal (server pun memaksanya —
-  // ini cerminan UI-nya, bukan gerbangnya).
-  const goalLocked = flow === "goal";
+  // SPEC-407 · ADR-0089 · SPEC-825 · ADR-0123 · sesi backlog goal & no_effort selalu lahir
+  // bermode goal (server pun memaksanya — ini cerminan UI-nya, bukan gerbangnya).
+  const goalLocked = isGoalShapedFlow(flow);
   // SPEC-447 · ADR-0093 · gerbang dependency ada di SERVER (409); ini cerminannya supaya operator
   // tahu apa yang ia paksa sebelum menekannya. `force` tak pernah terkirim bila daftar ini kosong.
   const blockers = s.blockedBy ?? [];
@@ -322,6 +322,9 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
   const isQa = f.kind === "qa";
   const isAudit = f.kind === "audit";                       // SPEC-237 · audit-only (dokumen, tanpa perbaikan)
   const isGoal = f.kind === "goal";                         // SPEC-407 · backlog goal (Goal → Verifikasi)
+  const isNoEffort = f.kind === "no_effort";                // SPEC-825 · task remeh (Kerjakan)
+  // Keduanya berbagi BENTUK payload, jadi validasi & daftar field-nya satu (ADR-0123).
+  const isGoalShape = payloadShapeFor(f.kind) === "goal";
   // SPEC-447 · ADR-0093 · dependency adalah properti ITEM, bukan properti bentuk payload → picker
   // ini hidup di luar cabang kind. Kandidatnya hanya project terpilih: dependency lintas project
   // menuntut merge lintas repo dan ditolak server.
@@ -331,15 +334,19 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
   }));
   // SPEC-407 · goal wajib: `Spec.objective` diturunkan darinya, dan item ber-objective kosong
   // melahirkan sesi tanpa sasaran.
-  const submit = () => { if (!f.title.trim() || (isGoal && !f.goal.trim())) return; onCreate(f); };
+  const submit = () => { if (!f.title.trim() || (isGoalShape && !f.goal.trim())) return; onCreate(f); };
   return (
-    <Modal open={open} onClose={onClose} icon={isQa ? "bug" : isAudit ? "search" : isGoal ? "target" : "lightbulb"} eyebrow="human → hanoman"
-      title={isQa ? "QA finding baru" : isAudit ? "Audit baru" : isGoal ? "Goal baru" : "Feature brief baru"}
+    <Modal open={open} onClose={onClose}
+      icon={isQa ? "bug" : isAudit ? "search" : isNoEffort ? "zap" : isGoal ? "target" : "lightbulb"} eyebrow="human → hanoman"
+      title={isQa ? "QA finding baru" : isAudit ? "Audit baru"
+        : isNoEffort ? "Task remeh baru" : isGoal ? "Goal baru" : "Feature brief baru"}
       footer={<>
         <Button variant="ghost" size="sm" onClick={onClose}>Batal</Button>
-        <Button size="sm" leftIcon={isQa ? "radar" : isAudit ? "search" : isGoal ? "target" : "messages-square"} onClick={submit}>
+        <Button size="sm" leftIcon={isQa ? "radar" : isAudit ? "search" : isNoEffort ? "zap" : isGoal ? "target" : "messages-square"} onClick={submit}>
           {isQa ? "Filekan finding → audit"
-            : isAudit ? "Buat audit → investigasi" : isGoal ? "Buat goal → sesi goal" : "Buat brief → brainstorm"}
+            : isAudit ? "Buat audit → investigasi"
+            : isNoEffort ? "Buat task → sesi satu fase"
+            : isGoal ? "Buat goal → sesi goal" : "Buat brief → brainstorm"}
         </Button>
       </>}>
       <div style={{ marginBottom: 16 }}>
@@ -349,9 +356,12 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
           { value: "audit", label: "Audit", icon: "search" },
           // SPEC-407 · ADR-0089 · backlog goal: cukup goal-nya, tanpa ritual perencanaan.
           { value: "goal", label: "Goal", icon: "target" },
+          // SPEC-825 · ADR-0123 · task remeh: satu fase, bahkan tanpa fase pembuktian terpisah.
+          { value: "no_effort", label: "Tanpa effort", icon: "zap" },
         ]} />
         <div style={{ fontSize: 12, color: "var(--text-subtle)", marginTop: 8, lineHeight: 1.5 }}>
-          {isGoal ? "Sesi goal langsung mengejar goal-nya — tanpa brainstorm, spec, atau plan (fase: Goal → Verifikasi). Sesi lahir dengan mode goal aktif dan menolak berhenti sampai buktinya ada di transkrip."
+          {isNoEffort ? "Sesi satu fase (Kerjakan): langsung mengerjakan lalu berhenti — tanpa brainstorm, spec, plan, maupun fase pembuktian terpisah. Untuk ganti copy, bump konstanta, perbaiki typo docs, tambah satu baris allowlist."
+            : isGoal ? "Sesi goal langsung mengejar goal-nya — tanpa brainstorm, spec, atau plan (fase: Goal → Verifikasi). Sesi lahir dengan mode goal aktif dan menolak berhenti sampai buktinya ada di transkrip."
             : isQa ? "Finding masuk lewat alur audit → spec → plan → execute. hanoman menelusuri akar masalah dulu."
             : isAudit ? "Audit HANYA menghasilkan dokumen (audit → laporan) — tanpa perbaikan kode. Bisa dinaikkan jadi Finding QA bila perlu diperbaiki."
             : "Brief masuk lewat alur brainstorm → objective → spec → plan → execute."}
@@ -390,12 +400,13 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
       <Field label="Judul">
         <Input aria-label="Judul" value={f.title} onChange={set("title")}
           placeholder={isQa ? "mis. Funnel double-count sesi lintas tengah malam"
+            : isNoEffort ? "mis. Label tombol Simpan di form backlog"
             : isGoal ? "mis. Latensi daftar backlog" : "mis. Jadwal invoice berulang"}
           style={{ width: "100%" }} />
       </Field>
       {/* SPEC-407 · ADR-0089 · bentuk payload goal: goal + bukti berhenti + batasan. Sengaja
           BUKAN konteks/outcome — server mengikat source ↔ bentuk payload di boundary. */}
-      {isGoal ? (
+      {isGoalShape ? (
         <>
           <Field label="Goal" hint="Keadaan yang harus tercapai — inilah yang dikejar sesi sampai terbukti">
             <HnTextarea aria-label="Goal" value={f.goal} onChange={set("goal")} rows={3}
@@ -1144,7 +1155,9 @@ export default function App() {
 
   async function createSpec(f: SpecForm) {
     const isQa = f.kind === "qa";
-    const isGoal = f.kind === "goal";   // SPEC-407 · ADR-0089
+    // SPEC-407 · ADR-0089 · SPEC-825 · ADR-0123 · goal & no_effort berbagi bentuk payload;
+    // predikat bentuknya satu (`payloadShapeFor`), sumber yang sama dengan gerbang server.
+    const isGoalShape = payloadShapeFor(f.kind) === "goal";
     const payload = isQa
       // SPEC-244 · fromAudit (bila qa dinaikkan dari audit) → runner lewati fase Audit (ADR-0059).
       ? { severity: f.severity, steps: f.steps, expected: f.expected, actual: f.actual, env: f.env,
@@ -1156,7 +1169,7 @@ export default function App() {
       // (zBriefPayload kini menerima fromAudit; tanpa itu zod membuangnya di boundary).
       // SPEC-407 · ADR-0089 · backlog goal punya bentuk payload sendiri (zGoalPayload); server
       // mengikat source ↔ bentuk payload, jadi bentuk brief di sini akan ditolak 400.
-      : isGoal
+      : isGoalShape
       ? { goal: f.goal.trim(), done: f.done, constraints: f.constraints, priority: f.priority }
       : { context: f.context, outcome: f.outcome, constraints: f.constraints, priority: f.priority,
           ...(f.fromAudit ? { fromAudit: f.fromAudit } : {}) };
@@ -1168,10 +1181,12 @@ export default function App() {
       setBacklog((b) => [created, ...b]);
       setModal(null); setSpecPrefill(null); setSection("backlog");
       const toastMsg = f.kind === "audit" ? " dibuat · audit-only (dokumen)"
-        : isGoal ? " dibuat · sesi goal (Goal → Verifikasi)"
+        : f.kind === "no_effort" ? " dibuat · sesi satu fase (Kerjakan)"
+        : f.kind === "goal" ? " dibuat · sesi goal (Goal → Verifikasi)"
         : isQa ? " difilekan · masuk audit" : " dibuat · masuk brainstorm";
       showToast(created.id + toastMsg, "ok",
-        f.kind === "audit" ? "search" : isGoal ? "target" : isQa ? "bug" : "lightbulb");
+        f.kind === "audit" ? "search" : f.kind === "no_effort" ? "zap"
+          : f.kind === "goal" ? "target" : isQa ? "bug" : "lightbulb");
     } catch { showToast("Gagal membuat spec", "err", "x-circle"); }
   }
 

@@ -7,7 +7,7 @@ export class ApiError extends Error {
   constructor(public status: number, msg: string, public detail: unknown = null) { super(msg); }
 }
 // SPEC-407 · ADR-0089 · +goal · sesi dua fase (Goal → Verifikasi), tanpa fase perencanaan.
-export type Flow = "feature" | "qa" | "scaffold" | "reverse" | "prd" | "audit" | "breakdown" | "goal";
+export type Flow = "feature" | "qa" | "scaffold" | "reverse" | "prd" | "audit" | "breakdown" | "goal" | "no_effort";
 // SPEC-210 · dokumen PRD project (freshest-wins: worktree sesi prd hidup > repoDir). Tipe di @hanoman/shared.
 export type { PrdDoc };
 export type Phase = { name: string; state: "done" | "skipped" | "active" | "pending" };
