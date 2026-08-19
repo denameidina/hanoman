@@ -1221,7 +1221,7 @@ git commit -m "feat(api): endpoint lampiran backlog di bawah capability backlog 
   - `pty.CreateOpts.attachmentsDir?: string` → env `HANOMAN_ATTACHMENTS_DIR` + mount sandbox
   - `SandboxInput.attachmentsDir?: string`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `runner/src/attachment-prompt.test.ts`:
 
@@ -1296,12 +1296,12 @@ describe("SPEC-843 · mount lampiran di sandbox sesi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/src/attachment-prompt.test.ts server/test/spec-attachment-launch.test.ts`
 Expected: FAIL — argumen ke-7 tak dikenal / `attachmentsDir` tak dikenal.
 
-- [ ] **Step 3: Tambahkan tipe di `runner/src/types.ts`**
+- [x] **Step 3: Tambahkan tipe di `runner/src/types.ts`**
 
 Setelah `SpecBrief`:
 
@@ -1314,7 +1314,7 @@ export type SpecAttachmentBrief = {
 export type AttachmentCtx = { dir: string; items: readonly SpecAttachmentBrief[] };
 ```
 
-- [ ] **Step 4: Tambahkan klausa di `runner/src/prompt.ts`**
+- [x] **Step 4: Tambahkan klausa di `runner/src/prompt.ts`**
 
 Tambahkan `SpecAttachmentBrief, AttachmentCtx` ke daftar impor `./types`, lalu tambahkan klausa
 tepat setelah `const methodClause = …`:
@@ -1396,7 +1396,7 @@ export function resumePrompt(
     attachmentClause(opts.attachments),
 ```
 
-- [ ] **Step 5: Mount sandbox di `server/src/services/session-sandbox.ts`**
+- [x] **Step 5: Mount sandbox di `server/src/services/session-sandbox.ts`**
 
 Tambahkan field ke `SandboxInput`:
 
@@ -1414,7 +1414,7 @@ Di `sandboxArgv`, setelah baris `promptFile`:
 Di `sandboxArgvFromEnv` dan `sandboxCommand`, tambahkan `attachmentsDir?: string` ke tipe `input`
 (keduanya sudah meneruskan `...input`, jadi tak ada perubahan badan selain tipe).
 
-- [ ] **Step 6: Teruskan lewat `server/src/services/pty.ts`**
+- [x] **Step 6: Teruskan lewat `server/src/services/pty.ts`**
 
 Tambahkan ke `CreateOpts`:
 
@@ -1438,7 +1438,7 @@ Dan teruskan ke sandbox:
   });
 ```
 
-- [ ] **Step 7: Rakit di `server/src/services/session-launch.ts`**
+- [x] **Step 7: Rakit di `server/src/services/session-launch.ts`**
 
 Tambahkan impor:
 
@@ -1486,17 +1486,17 @@ Dan ke `createSession`:
   });
 ```
 
-- [ ] **Step 8: Jalankan test, pastikan lulus**
+- [x] **Step 8: Jalankan test, pastikan lulus**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/src/attachment-prompt.test.ts server/test/spec-attachment-launch.test.ts`
 Expected: PASS.
 
-- [ ] **Step 9: Typecheck paket yang tersentuh**
+- [x] **Step 9: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./runner typecheck && pnpm --filter ./server typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add runner/src/types.ts runner/src/prompt.ts runner/src/attachment-prompt.test.ts server/src/services/session-sandbox.ts server/src/services/pty.ts server/src/services/session-launch.ts server/test/spec-attachment-launch.test.ts

@@ -1,4 +1,4 @@
-import type { Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx } from "./types";
+import type { Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx, AttachmentCtx } from "./types";
 import { resolveMethod, type MethodDef } from "@hanoman/shared";
 import { REVERSE_STANDARD } from "./reverse-standard";
 import { verifyScopeClause } from "./verify-scope";
@@ -224,6 +224,28 @@ const codeStyleClause = (flow: Flow): string => writesCode(flow) ? CODE_STYLE_CL
 // sedikit pun, yang membuat default `superpowers` byte-identik dengan sebelum spec ini.
 const methodClause = (method: MethodDef): string => method.extraClause ?? "";
 
+// SPEC-843 · ADR-0124 · lampiran backlog. Directive AKTIF dengan path absolut — kebalikan SADAR dari
+// lampiran tiket, yang dibingkai UNTRUSTED dan sengaja TANPA path host (SPEC-761). Bedanya asal,
+// bukan derajat: lampiran backlog diunggah operator yang sudah lolos gate, sumber kepercayaan yang
+// SAMA dengan `Spec.objective` dan `payload` yang memang sudah masuk prompt apa adanya.
+//
+// Kalimat "baca ulang di awal setiap fase" adalah inti fiturnya, bukan hiasan: prompt ditulis SEKALI
+// saat sesi lahir (ADR-0024), jadi daftar di bawah basi begitu operator menambah lampiran.
+// Manifest-lah yang selalu segar — server merekonsiliasinya tiap perubahan.
+const attachmentClause = (ctx?: AttachmentCtx): string => {
+  if (!ctx || ctx.items.length === 0) return "";
+  const list = ctx.items.map((a) =>
+    `- \`${a.path}\` — ${a.filename} (${a.mimeType}, ${Math.max(1, Math.round(a.size / 1024))} KB)`).join("\n");
+  return `LAMPIRAN backlog item ini (${ctx.items.length} berkas) sudah tersedia sebagai berkas di mesin ini:\n`
+    + `${list}\n`
+    + "BACA semuanya SEBELUM mengerjakan fase pertama — dokumen teks (.md/.txt/.log/.json/.csv) baca "
+    + "langsung, PDF dan gambar baca lewat path berkasnya. Ini konteks yang dipegang manusia saat "
+    + "memfilekan item ini; mengabaikannya berarti bekerja dengan konteks yang lebih miskin darinya.\n"
+    + "Lampiran bisa BERTAMBAH atau BERKURANG selagi sesi berjalan. Di AWAL SETIAP FASE, baca ulang "
+    + `manifest \`${ctx.dir}/INDEX.md\` lalu baca lampiran yang belum pernah kamu baca — daftar di atas `
+    + "adalah keadaan saat sesi ini lahir, bukan keadaan tetap.";
+};
+
 // Sesi project-level (reverse/scaffold/prd/breakdown) TAK punya baris `Spec`, jadi tak punya metode
 // tersimpan; ketiganya juga flow dokumen, yang katalog mattpocock tak layani. Mereka tetap di metode
 // default — dinyatakan, bukan kebetulan (ADR-0113).
@@ -231,7 +253,7 @@ const PROJECT_METHOD = resolveMethod();
 
 export function startPrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, autonomy?: Autonomy, verifyScope?: VerifyScope,
-  method?: string,
+  method?: string, attachments?: AttachmentCtx,
 ): string {
   const m = resolveMethod(method);
   const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
@@ -246,6 +268,7 @@ export function startPrompt(
     scopeClause(flow, verifyScope),
     codeStyleClause(flow),
     methodClause(m),
+    attachmentClause(attachments),
     skillInstruction(PIPELINES[flow], m, writesCode(flow)),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
@@ -261,7 +284,7 @@ export function startPrompt(
 // kerja yang selesai umumnya sudah ter-merge ke branchFrom (worktree lahir dari sana).
 export function continuePrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, autonomy?: Autonomy, verifyScope?: VerifyScope,
-  method?: string,
+  method?: string, attachments?: AttachmentCtx,
 ): string {
   const m = resolveMethod(method);
   const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
@@ -276,6 +299,7 @@ export function continuePrompt(
     scopeClause(flow, verifyScope),
     codeStyleClause(flow),
     methodClause(m),
+    attachmentClause(attachments),
     skillInstruction(["Execute"], m, writesCode(flow)),
     `Setelah selesai: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Worktree `
       + `ini detached HEAD — itu memang disengaja.`,
@@ -326,7 +350,7 @@ const resumeClause = (
 
 export function resumePrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, resume: ResumeCtx,
-  autonomy?: Autonomy, verifyScope?: VerifyScope, method?: string,
+  autonomy?: Autonomy, verifyScope?: VerifyScope, method?: string, attachments?: AttachmentCtx,
 ): string {
   const m = resolveMethod(method);
   const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
@@ -345,6 +369,7 @@ export function resumePrompt(
     scopeClause(flow, verifyScope),
     codeStyleClause(flow),
     methodClause(m),
+    attachmentClause(attachments),
     skillInstruction(PIPELINES[flow], m, writesCode(flow)),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
@@ -364,7 +389,8 @@ export function resumePrompt(
 // bukan disalin. Yang berbeda hanya kepala prompt dan ada/tidaknya klausa fase Verifikasi.
 export function startGoalPrompt(
   flow: "goal" | "no_effort", spec: SpecBrief, branchTo: string,
-  opts: { autonomy?: Autonomy; verifyScope?: VerifyScope; resume?: ResumeCtx; method?: string } = {},
+  opts: { autonomy?: Autonomy; verifyScope?: VerifyScope; resume?: ResumeCtx; method?: string;
+          attachments?: AttachmentCtx } = {},
 ): string {
   const m = resolveMethod(opts.method);
   const g = readGoalPayload(spec.payload);
@@ -398,6 +424,7 @@ export function startGoalPrompt(
     scopeClause(flow, opts.verifyScope),
     codeStyleClause(flow),
     methodClause(m),
+    attachmentClause(opts.attachments),
     skillInstruction(PIPELINES[flow], m, writesCode(flow)),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
