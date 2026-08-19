@@ -7,7 +7,7 @@
    menembusnya putus (audit SPEC-393). Kartu ini duduk di antara dua kartu lain di kolom yang
    menggulir bersama <main>, jadi tinggi tetap memang bentuk yang benar di sini. */
 import React from "react";
-import { Card, Button, Badge, Input, StateBlock, MarkdownView, Callout, Pager, serverPage } from "../ds";
+import { Card, Button, Badge, Input, StateBlock, MarkdownView, Callout, Pager, serverPage, useConfirm } from "../ds";
 import { api } from "../api/client";
 import { paths } from "@hanoman/shared";
 import type { ChangelogView } from "@hanoman/shared";
@@ -97,11 +97,17 @@ export function ChangelogScreen({ p, onToast, initialChangelogId }:
   }, [p.id, initialChangelogId, onToast]);
 
   const pg = serverPage(total, page, PAGE_SIZE);
+  // SPEC-847 · ADR-0125 · konfirmasi hapus rilis memakai dialog aplikasi.
+  const { confirm, dialog } = useConfirm();
 
   async function remove(c: ChangelogView) {
-    if (!window.confirm(`Hapus changelog "${c.title}"?`)) return;
     try {
-      await api.deleteChangelog(p.id, c.id);
+      if (!await confirm({
+        title: `Hapus changelog "${c.title}"?`,
+        message: "Rilis ini hilang dari riwayat project.",
+        confirmLabel: "Hapus rilis",
+        run: () => api.deleteChangelog(p.id, c.id),
+      })) return;
       if (selectedId === c.id) setSelected(null);
       setReloadKey((v) => v + 1);
       onToast("Changelog dihapus", "ok", "trash-2");
@@ -160,6 +166,7 @@ export function ChangelogScreen({ p, onToast, initialChangelogId }:
           <MarkdownView text={selected.body} name="changelog.md" />
         </Card>
       )}
+      {dialog}
     </div>
   );
 }

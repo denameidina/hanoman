@@ -6,7 +6,7 @@
    tombol buka/salin link backlog (deep-link #spec=, ADR-0071) + buka/salin link publik status
    tiket (shareToken) untuk dibagikan ke pelapor. */
 import React from "react";
-import { Button, Badge, Select, StateBlock, Icon, Input, Field, HnTextarea, ConfirmDialog, Pager, ResponsivePanels, serverPage } from "../ds";
+import { Button, Badge, Select, StateBlock, Icon, Input, Field, HnTextarea, ConfirmDialog, useConfirm, Pager, ResponsivePanels, serverPage } from "../ds";
 import { paths, publicStatus, type TicketView, type TicketDetail, type Spec, type GithubIssueView } from "@hanoman/shared";
 import { api } from "../api/client";
 import { specDeepLink } from "./deeplink";
@@ -82,6 +82,9 @@ function TicketDetailView({ id, onBack, onAccepted, onDeleted, onToast }:
   const [priority, setPriority] = React.useState("sedang");
   const [editing, setEditing] = React.useState(false);
   const [confirm, setConfirm] = React.useState(false);
+  // SPEC-847 · ADR-0125 · `confirm` sudah dipakai state dialog hapus tiket, jadi hook-nya
+  // dinamai `askConfirm`; `dialog` tetap dinamai baku agar penjaga inventaris menghitungnya.
+  const { confirm: askConfirm, dialog } = useConfirm();
   const [form, setForm] = React.useState({ title: "", detail: "", category: "bug", status: "new" });
 
   const load = React.useCallback(() => {
@@ -101,7 +104,12 @@ function TicketDetailView({ id, onBack, onAccepted, onDeleted, onToast }:
     finally { setBusy(false); }
   }
   async function reject() {
-    if (!window.confirm(`Tolak & tutup tiket #${t!.number}? Tak membuat backlog.`)) return;
+    if (!await askConfirm({
+      title: `Tolak & tutup tiket #${t!.number}?`,
+      message: `"${t!.title}" ditutup tanpa membuat backlog item.`,
+      confirmLabel: "Tolak tiket",
+      icon: "x-circle",
+    })) return;
     setBusy(true);
     try { await api.rejectTicket(id); setT({ ...t!, status: "rejected" }); onToast("Tiket ditutup", "ok", "check"); }
     catch { onToast("Gagal menolak tiket", "err", "x-circle"); }
@@ -221,6 +229,7 @@ function TicketDetailView({ id, onBack, onAccepted, onDeleted, onToast }:
       <ConfirmDialog open={confirm} title="Hapus tiket?" eyebrow={`#${t.number}`}
         message={`Tiket "${t.title}" dan seluruh lampirannya akan dihapus permanen. Tindakan ini tak bisa dibatalkan.`}
         busy={busy} onCancel={() => setConfirm(false)} onConfirm={remove} />
+      {dialog}
     </div>
   );
 }

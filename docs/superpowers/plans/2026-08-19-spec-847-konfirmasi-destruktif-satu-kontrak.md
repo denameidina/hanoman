@@ -1072,7 +1072,7 @@ git commit -m "feat(vps): apply, tandai N/A, harden, dan hapus registrasi memaka
 **Interfaces:**
 - Consumes: `useConfirm` (Task 2). `TriageScreen` sudah mengimpor `ConfirmDialog` untuk *hapus tiket*; biarkan — keduanya memakai komponen DS yang sama.
 
-- [ ] **Step 1: `ChangelogScreen`**
+- [x] **Step 1: `ChangelogScreen`**
 
 Tambahkan `useConfirm` ke impor `"../ds"`, `const { confirm, dialog } = useConfirm();` di badan komponen, lalu:
 
@@ -1094,7 +1094,7 @@ Tambahkan `useConfirm` ke impor `"../ds"`, `const { confirm, dialog } = useConfi
 
 Render `{dialog}` sebagai anak terakhir `<div>` yang dikembalikan komponen.
 
-- [ ] **Step 2: `TriageScreen`**
+- [x] **Step 2: `TriageScreen`**
 
 Tambahkan `useConfirm` ke impor `"../ds"`, `const { confirm, dialog } = useConfirm();` di `TicketDetailPanel`, lalu:
 
@@ -1117,7 +1117,7 @@ Render `{dialog}` tepat sesudah `<ConfirmDialog open={confirm} … />` yang suda
 
 **Awas tabrakan nama:** komponen itu punya state bernama `confirm` (`const [confirm, setConfirm] = …` untuk dialog hapus tiket). Ganti nama hasil destructuring hook menjadi `const { confirm: askConfirm, dialog } = useConfirm();` **hanya bila** tabrakan itu memang ada, dan pakai `askConfirm(...)` di `reject`. Aturan penamaan global tetap berlaku untuk `dialog`.
 
-- [ ] **Step 3: `ProjectDetailScreen`**
+- [x] **Step 3: `ProjectDetailScreen`**
 
 Tambahkan `useConfirm` ke impor `"../ds"`, `const { confirm, dialog } = useConfirm();` di `HelpCenterCard`, lalu:
 
@@ -1143,7 +1143,7 @@ Tambahkan `useConfirm` ke impor `"../ds"`, `const { confirm, dialog } = useConfi
 
 Render `{dialog}` sebagai anak terakhir `<Card>`.
 
-- [ ] **Step 4: Perbarui test lama**
+- [x] **Step 4: Perbarui test lama**
 
 `src/test/project-help-center.test.tsx` — buang `vi.spyOn(window, "confirm").mockReturnValue(true);` (baris 55) dan setelah `fireEvent.click(screen.getByText("Nonaktifkan"))` tekan tombol konfirmasi dialog:
 
@@ -1158,7 +1158,7 @@ Render `{dialog}` sebagai anak terakhir `<Card>`.
     fireEvent.click(within(dialog).getByRole("button", { name: "Nonaktifkan" }));
 ```
 
-- [ ] **Step 5: Verifikasi**
+- [x] **Step 5: Verifikasi**
 
 Run: `pnpm vitest --run src/test/project-help-center.test.tsx src/test/triage.test.tsx src/test/changelog-nav.test.tsx src/test/changelog-deeplink.test.ts`
 Expected: PASS semua.
@@ -1166,7 +1166,7 @@ Expected: PASS semua.
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/ChangelogScreen.tsx src/src/screens/TriageScreen.tsx src/src/screens/ProjectDetailScreen.tsx src/test/project-help-center.test.tsx
