@@ -1368,29 +1368,49 @@ git commit -m "docs(adr): ADR-0125 satu kontrak konfirmasi destruktif"
 
 ### Task 10: Verifikasi akhir & push
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 Run:
 ```bash
-pnpm vitest --run --changed "$HANOMAN_BASE_SHA"
+pnpm vitest --run --no-file-parallelism \
+  src/test/confirm-dialog.test.tsx src/test/use-confirm.test.tsx src/test/confirm-inventory.test.ts \
+  src/test/delete-project-confirm.test.tsx src/test/docs-delete-confirm.test.tsx \
+  src/test/settings-destructive-confirm.test.tsx src/test/vps-apply-confirm.test.tsx \
+  src/test/vps-checklist.test.tsx src/test/vps-screen.test.tsx src/test/project-help-center.test.tsx \
+  src/test/triage.test.tsx src/test/changelog-nav.test.tsx src/test/agent-tokens.test.tsx \
+  src/test/app-flows.test.tsx src/test/edit-project-id.test.tsx src/test/edit-project-gitremote.test.tsx \
+  src/test/branches-panel.test.tsx src/test/ide-screen.test.tsx
 ```
-Expected: PASS. **Jangan menerima "no test files" sebagai bukti** — `--changed` menyalakan `passWithNoTests`. Pastikan berkas test SPEC-847 (`use-confirm`, `confirm-dialog`, `confirm-inventory`, `delete-project-confirm`, `docs-delete-confirm`, `settings-destructive-confirm`, `vps-apply-confirm`, `project-help-center`, `vps-checklist`, `triage`) benar-benar berjalan di keluarannya.
+Hasil terukur: **18 berkas, 121 test, semuanya lulus, exit 0**. Berkas test SPEC-847 semuanya terlihat
+berjalan di keluaran — `--changed` menyalakan `passWithNoTests`, jadi "no test files" bukan bukti.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+**Catatan pengukuran yang harus dibaca sebelum menuduh regresi.** `pnpm vitest --run --changed
+"$HANOMAN_BASE_SHA"` menarik ±128 berkas (setiap dependent `ds/`) dan pada mesin ini — load average
+**22–32** karena beberapa sesi hanoman berjalan bersamaan — sebagian berkas React berat menembus
+`testTimeout` 5000 ms. Nama test yang gagal **berganti tiap run**, dan A/B langsung membuktikan itu
+bukan regresi: lima berkas yang sama (`client-portal`, `git-graph-view`, `portal-scroll`,
+`branches-panel`, `review-screen`) dijalankan berturut-turut di bawah beban yang sama memberi
+**1 gagal di HEAD** dan **2 gagal di BASE** (`git checkout $HANOMAN_BASE_SHA -- src/`), semuanya
+berdurasi 6–10 dtk alias timeout, dan test yang gagal berbeda di kedua sisi. Suite penuh tetap tugas
+manusia sebelum merge (AGENTS.md).
 
-Run: `pnpm --filter ./src typecheck`
-Expected: keluar tanpa error. (`server`/`shared`/`cli` tak tersentuh — jangan `pnpm -r typecheck`.)
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
-- [ ] **Step 3: Pastikan tak ada `window.confirm` yang tersisa tanpa alasan**
+Run: `pnpm --filter ./src typecheck` → **exit 0, tanpa keluaran error**. (`server`/`shared`/`cli` tak
+tersentuh — jangan `pnpm -r typecheck`.)
 
-Run: `grep -rn "window.confirm" src/src | grep -v "confirm-exempt"`
-Expected: hanya baris `GitGraph.tsx` yang komentarnya berada di baris terpisah di atasnya — cocokkan dengan hasil `pnpm vitest --run src/test/confirm-inventory.test.ts` yang harus PASS.
+- [x] **Step 3: Pastikan tak ada `window.confirm` yang tersisa tanpa alasan**
 
-- [ ] **Step 4: Centang seluruh kotak plan ini**
+Run: `grep -rn "window.confirm" src/src`
+Hasil: satu pemakaian nyata, `src/src/screens/GitGraph.tsx:137`, dengan komentar `confirm-exempt:`
+di baris-baris tepat di atasnya; sisanya hanya komentar yang menyebut namanya. Cocok dengan
+`src/test/confirm-inventory.test.ts` yang lulus 5/5.
+
+- [x] **Step 4: Centang seluruh kotak plan ini**
 
 Setiap `- [ ]` di berkas ini harus sudah `- [x]`. hanoman menahan backlog di `executing` selama masih ada kotak kosong.
 
-- [ ] **Step 5: Commit sisa & push**
+- [x] **Step 5: Commit sisa & push**
 
 ```bash
 git add -A
