@@ -67,7 +67,10 @@ Sebelum sebuah perubahan boleh masuk `main`:
    Jebakan yang harus disadari: `--changed` menyalakan `passWithNoTests`, jadi **nol test terlihat
    hijau** — pastikan test-nya memang berjalan.
 2. **Suite penuh** (`vitest run --no-file-parallelism`) — langkah **manusia** sebelum merge, bukan tugas
-   sesi.
+   sesi. Sejak [ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md) ia **juga** dijalankan CI
+   (`.github/workflows/validate.yml`) pada tiap pull request dan push ke `main`, lewat satu perintah
+   `pnpm validate` = `pnpm db:generate` → `pnpm typecheck` → `pnpm test`. Job `publish` di
+   `release.yml` ber-`needs: validate`, jadi commit yang merah tak bisa terbit ke npm.
 3. **Docs tersentuh diperbarui & ter-link** di [internal/docs/README.md](../README.md); ADR baru ditaut
    di index utama **dan** sub-index [adr/README.md](../adr/README.md) (SPEC-386).
 4. **Migration additif.** Instance hub produksi memuat data pengguna sungguhan — tak pernah
@@ -181,7 +184,9 @@ query token, atau sandbox `off` ([operations/deploy-vps](../operations/deploy-vp
 ## Yang tidak ada
 
 - **Tak ada pipeline CI yang men-deploy.** Deploy dan update instance adalah tindakan operator; yang
-  dilakukan CI hanyalah **menerbitkan** paket pada tag `v*`.
+  dilakukan CI hanyalah **memvalidasi** tiap pull request & push `main` (`validate.yml`) lalu
+  **menerbitkan** paket pada tag `v*` (`release.yml`, ber-`needs: validate` sejak
+  [ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md)).
 - **Tak ada supervisor auto-heal.** `hanoman start` me-restart server hanya sebagai jawaban atas exit
   sentinel `75` yang dipicu manusia lewat tombol update, dengan jatah `MAX_UPDATE_RESTARTS = 5` — bukan
   sebagai pemulihan crash. Menjaga proses tetap hidup adalah tugas systemd (`Restart=on-failure`).

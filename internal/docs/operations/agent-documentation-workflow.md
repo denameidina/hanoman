@@ -14,7 +14,7 @@ Kontrak operasional untuk hanoman + Claude Code.
   (satu pertanyaan/giliran) → kunci objective → menyusun seluruh doc index dari ide, pakai STANDAR DOCS
   yang sama dengan reverse (SPEC-222, ADR-0052). Tombol "Scaffold docs" di layar project + `autoScaffold`
   (auto-start setelah buat project); hasil di branch `scaffold-docs`, manusia merge.
-- **Existing:** tombol **Reverse docs** di layar project — sesi interaktif menyusun docs dari codebase (SPEC-166, ADR-0026): Scan → Docs teknis → Wawancara → Konvensi & index → Serah terima, hasil di branch `reverse-docs`.
+- **Existing:** sesi interaktif menyusun docs dari codebase (SPEC-166, ADR-0026): Scan → Docs teknis → Wawancara → Konvensi & index → Serah terima, hasil di branch `reverse-docs`. Pemicu ganda seperti scaffold — CTA **Tambah/Clone → reverse-engineer docs** saat project dibuat memulainya langsung, tombol **Reverse docs** di layar project mengulanginya (SPEC-848).
 - Guardrail Source of Truth dicabut (SPEC-160, ADR-0023) — lihat bagian di bawah.
 - Setiap sesi di worktree terpisah; commit di worktree, lalu integrasi (rebase/merge) ke target dipicu manual dari dashboard (SPEC-175/ADR-0031); perbarui docs yang tersentuh dalam commit yang sama.
 

@@ -90,8 +90,17 @@ HANOMAN_AGENT_CREDENTIAL_DIR=/var/lib/hanoman/agent-credentials
 HANOMAN_UPLOAD_SCANNER=/opt/security/bin/scan-upload
 ```
 
-`DATABASE_URL` tidak perlu: default adalah `$HANOMAN_HOME/hanoman.db`. Bila diisi, hanya URL
-SQLite `file:` yang sah. `SYNC_SERVER_URL` dan `SYNC_DEVICE_TOKEN` adalah pairing opsional; perubahan
+`DATABASE_URL` tidak perlu: default adalah `$HANOMAN_HOME/hanoman.db`. Nilai non-`file:` yang masih
+terwarisi dari shell atau unit lama **tidak** menggagalkan boot — hanoman mengabaikannya, tetap
+memakai berkas default, dan mencetak notice yang menyebut skemanya saja (amandemen
+[ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md), karena nama env itu hampir selalu milik
+project lain). Notice itu satu-satunya sinyal bahwa instance memakai DB default; instance yang
+tampak kosong sesudah cutover hampir selalu ini, bukan data hilang. Knob milik hanoman sendiri
+adalah `HANOMAN_DATABASE_URL` — di situ niatnya eksplisit, jadi nilai non-`file:` **gagal keras**
+saat boot maupun migrasi. Bila target tidak boleh ambigu, sebut berkasnya langsung: `hanoman --db
+<file>` dan `migrate-from-postgres --to <file>` menang atas kedua env.
+
+`SYNC_SERVER_URL` dan `SYNC_DEVICE_TOKEN` adalah pairing opsional; perubahan
 origin sync dari Settings menghapus token lama secara atomik dan wajib di-pair ulang.
 
 Jalankan pemeriksaan sebagai user service. Production dianggap belum siap bila doctor melaporkan
@@ -195,9 +204,15 @@ Backup dan dry-run lebih dulu; data produksi memuat akun dan tiket nyata.
 ```sh
 umask 077
 pg_dump "$OLD_PG_URL" > /var/lib/hanoman/backup-postgres.sql
-sudo -u hanoman hanoman migrate-from-postgres --from "$OLD_PG_URL" --dry-run
-sudo -u hanoman hanoman migrate-from-postgres --from "$OLD_PG_URL"
+sudo -u hanoman hanoman migrate-from-postgres --from "$OLD_PG_URL" --to /var/lib/hanoman/hanoman.db --dry-run
+sudo -u hanoman hanoman migrate-from-postgres --from "$OLD_PG_URL" --to /var/lib/hanoman/hanoman.db
 ```
+
+`--to` disebut eksplisit karena tanpa ia target diturunkan dari env — dan `DATABASE_URL` Postgres
+lama yang masih terwarisi diabaikan, bukan ditolak, sehingga migrasi menarget berkas default tanpa
+memberi tahu selain lewat notice. `--to` melewati resolusi env sepenuhnya. Pada `--dry-run` ia inert
+— dry-run adalah pertanyaan tentang sumber dan tak menyentuh target sama sekali — tetapi menuliskannya
+membuat kedua perintah identik selain flag itu, sehingga yang di-dry-run memang yang dijalankan.
 
 Target berisi ditolak kecuali `--force`. Jangan memakai `--force` pada instance live. Tabel sumber
 yang memang tidak ada dilewati; integer di luar safe range ditolak. Dry-run tidak membuktikan semua

@@ -168,7 +168,7 @@ Detail perintah & konfigurasi: [operations/npm-readme](internal/docs/operations/
 CLI agen ([Claude Code](https://claude.com/claude-code) dan/atau Codex) yang sudah login.
 
 ```bash
-pnpm install
+pnpm install    # postinstall men-generate Prisma Client dari server/prisma/schema.prisma
 pnpm dev        # API (:8787) + dashboard (:5173)
 ```
 
@@ -177,6 +177,10 @@ Lalu buka **http://localhost:5173**, buat akun pada layar setup pertama, dan tam
 > DB dev adalah berkas SQLite (`DATABASE_URL=file:../../hanoman-dev.db` di `.env` — lihat
 > `.env.example`), dimigrasi dengan `pnpm db:migrate`. Sesi memakai kredensial `claude`/`codex` yang
 > sudah login di terminalmu. Merakit paket npm-nya: `pnpm release`.
+>
+> Validasi lengkap — jalur yang sama persis dengan yang dijalankan CI sebelum publish — adalah
+> **`pnpm validate`** (`pnpm db:generate` → `pnpm typecheck` → `pnpm test`). Kalau `pnpm install`
+> pernah dijalankan dengan `--ignore-scripts`, `pnpm db:generate` sendiri yang memulihkannya.
 
 ## Brand & ilustrasi
 

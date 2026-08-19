@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.0",
   "scripts": {
-    "postinstall": "chmod +x node_modules/node-pty/prebuilds/*/spawn-helper 2>/dev/null || true",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/*/spawn-helper 2>/dev/null || true; prisma generate --schema prisma/schema.prisma",
     "dev": "tsx watch src/server.ts",
     "build": "esbuild src/server.ts --bundle --platform=node --format=esm --outdir=dist --external:fastify --external:@fastify/static --external:@prisma/client --external:node-pty --external:@fastify/websocket --external:@fastify/cookie --external:pdfkit --banner:js=\"import { createRequire as __hanomanCreateRequire } from 'module'; const require = __hanomanCreateRequire(import.meta.url);\"",
     "typecheck": "tsc --noEmit",

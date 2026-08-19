@@ -4,7 +4,19 @@ import {
   PG_ORDER, chunk, parseMigrateArgs, migrationSteps, coerceInt8, isUndefinedTable, INT8_OID,
 } from "../src/commands/migrate-pg";
 
-const models = Prisma.dmmf.datamodel.models;
+// SPEC-852 · issue #1 · `Prisma.dmmf` baru ada SESUDAH `prisma generate`, dan tanpanya berkas ini
+// dulu meledak saat collect: vitest melaporkan `0 test` / `no tests` dengan pesan
+// `Cannot read properties of undefined (reading 'datamodel')` yang tak menyebut Prisma sama
+// sekali. Dibaca lewat optional chaining, prasyarat itu jadi satu test bernama yang menyebut
+// perbaikannya — dan `--changed` (yang menyalakan `passWithNoTests`) tak bisa lagi membuat
+// berkas yang gagal-collect terlihat hijau.
+const models = Prisma.dmmf?.datamodel?.models ?? [];
+
+describe("prasyarat Prisma Client", () => {
+  it("DMMF ter-generate — jalankan `pnpm db:generate` bila kosong", () => {
+    expect(models.length).toBeGreaterThan(0);
+  });
+});
 
 describe("PG_ORDER", () => {
   it("memuat setiap model Prisma tepat sekali", () => {

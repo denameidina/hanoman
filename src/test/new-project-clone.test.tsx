@@ -8,6 +8,9 @@ const CREATED = {
   session: { status: "idle", phase: null, flow: null },
 };
 
+// SPEC-848 · CTA clone kini memulai sesi reverse lalu berpindah ke Terminal; layar itu self-fetch
+// workspace/riwayat dan bukan subjek berkas ini.
+vi.mock("../src/screens/TerminalScreen", () => ({ TerminalScreen: () => null }));
 vi.mock("../src/api/client", () => ({
   api: {
     authStatus: vi.fn(async () => ({ needsSetup: false, user: { id: "u1", email: "a@b.co", createdAt: "" } })),
@@ -19,7 +22,7 @@ vi.mock("../src/api/client", () => ({
     createProject: vi.fn(async () => CREATED),
     cloneProject: vi.fn(async () => ({ repoDir: "/tmp/clone" })),
     getProject: vi.fn(async () => ({ ...CREATED, binding: "/tmp/clone" })),
-    getDocs: vi.fn(async () => ({ coverage: 0, tree: [] })),   // DocsWorkspace mount sesudah create
+    reverseDocs: vi.fn(async () => ({ id: "reverse-repo" })),   // SPEC-848 · auto-start sesudah clone
   },
   ApiError: class extends Error {},
 }));
