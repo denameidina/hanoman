@@ -1,5 +1,7 @@
 import React from "react";
-import type { PortalChatMessageView, PortalChatSessionView, PortalChatType } from "@hanoman/shared";
+import type {
+  PortalChatMessageView, PortalChatQuotaView, PortalChatSessionView, PortalChatType,
+} from "@hanoman/shared";
 import { Button, Card, HnTextarea, StateBlock } from "../ds";
 import { portalApi } from "../api/portal";
 
@@ -21,6 +23,10 @@ const TIPE: { value: PortalChatType; label: string; jelas: string }[] = [
 
 const GAGAL_UMUM = "Maaf, ada kendala sebentar. Coba lagi ya.";
 
+// Tanggal panjang, bukan ISO: yang dibaca klien adalah "1 September 2026", bukan stempel waktu.
+const tanggalPanjang = (iso: string) =>
+  new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
 const BUBBLE: React.CSSProperties = {
   maxWidth: "min(560px, 88%)", padding: "10px 14px", borderRadius: "var(--radius-lg)",
   border: "1px solid var(--border-hair)", whiteSpace: "pre-wrap", lineHeight: 1.6,
@@ -33,13 +39,19 @@ export function ChatPanel({ projectId }: { projectId: string }) {
   const [draft, setDraft] = React.useState("");
   const [menunggu, setMenunggu] = React.useState(false);
   const [galat, setGalat] = React.useState<string | null>(null);
+  const [kuota, setKuota] = React.useState<PortalChatQuotaView | null>(null);
 
   React.useEffect(() => {
     setSesi(null); setPesan([]); setGalat(null);
     portalApi.listChatSessions(projectId, PAGE)
       .then((r) => setRiwayat(r.items))
       .catch(() => setRiwayat([]));
+    portalApi.getChatQuota(projectId).then(setKuota).catch(() => setKuota(null));
   }, [projectId]);
+
+  // Jatah dimuat ulang sesudah sesi lahir supaya angkanya tak basi satu langkah.
+  const segarkanKuota = () =>
+    void portalApi.getChatQuota(projectId).then(setKuota).catch(() => {});
 
   const buka = async (s: PortalChatSessionView) => {
     setSesi(s); setGalat(null);
@@ -54,6 +66,7 @@ export function ChatPanel({ projectId }: { projectId: string }) {
     try {
       const s = await portalApi.startChatSession(projectId, type);
       setSesi(s); setPesan([]); setRiwayat((r) => [s, ...r]);
+      segarkanKuota();
     } catch { setGalat(GAGAL_UMUM); }
   };
 
@@ -88,14 +101,27 @@ export function ChatPanel({ projectId }: { projectId: string }) {
     </p>
   );
 
+  const sisaOf = (t: PortalChatType) => kuota?.[t === "brainstorm" ? "brainstorm" : "tanya"];
+
+  const jatahBlok = kuota && (
+    <p data-testid="chat-jatah" style={{
+      margin: "0 0 14px", color: "var(--text-subtle)", fontSize: 13, lineHeight: 1.6,
+    }}>
+      Brainstorming: sudah dipakai {kuota.brainstorm.terpakai} dari {kuota.brainstorm.jatah} bulan
+      ini. Bertanya: {kuota.tanya.terpakai} dari {kuota.tanya.jatah}. Jatah kembali penuh pada{" "}
+      {tanggalPanjang(kuota.resetPada)}.
+    </p>
+  );
+
   if (!sesi) return (
     <div>
       {beda}
+      {jatahBlok}
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
         {TIPE.map((t) => (
           <Card key={t.value}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-start" }}>
-              <Button onClick={() => void mulai(t.value)}>{t.label}</Button>
+              <Button disabled={sisaOf(t.value)?.sisa === 0} onClick={() => void mulai(t.value)}>{t.label}</Button>
               <p style={{ margin: 0, color: "var(--text-subtle)", fontSize: 13, lineHeight: 1.6 }}>
                 {t.jelas}
               </p>

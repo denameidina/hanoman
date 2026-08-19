@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SettingsScreen } from "./SettingsScreen";
-import { CODEX_DEFAULTS, CONFLICT_DEFAULTS, GOAL_DEFAULTS, LEAD_DEFAULTS, SCHEDULER_DEFAULTS, TELEGRAM_DEFAULTS } from "@hanoman/shared";
+import { CODEX_DEFAULTS, CONFLICT_DEFAULTS, GOAL_DEFAULTS, LEAD_DEFAULTS, PORTAL_CHAT_DEFAULTS, SCHEDULER_DEFAULTS, TELEGRAM_DEFAULTS } from "@hanoman/shared";
 
 const setting = {
   model: "claude-opus-5", effort: "xhigh", autoDefault: true, autoScaffold: true,
@@ -10,6 +10,7 @@ const setting = {
   notifyDecisionSound: "alert", agentAccessEnabled: true, scheduler: SCHEDULER_DEFAULTS,
   goal: GOAL_DEFAULTS, agent: "claude", codex: CODEX_DEFAULTS, verifyScope: "changed",
   conflict: CONFLICT_DEFAULTS, lead: LEAD_DEFAULTS, telegram: TELEGRAM_DEFAULTS,
+  portalChat: { ...PORTAL_CHAT_DEFAULTS, enabled: true },
 };
 const status = {
   configured: true, enabled: false, running: false, readiness: "ready", botUsername: "hanoman_bot",
@@ -128,5 +129,45 @@ describe("SettingsScreen Telegram kredensial (SPEC-477)", () => {
     expect(screen.getAllByRole("switch")).toHaveLength(2);
     fireEvent.click(screen.getAllByRole("switch")[0]!);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/settings", expect.objectContaining({ method: "PUT" })));
+  });
+});
+
+// SPEC-854 · ADR-0130 · kartu jatah obrolan portal. Ia SENGAJA tak menawarkan pilihan runtime:
+// gerbang tool yang menjaga fitur ini adalah flag claude (ADR-0129 gotcha 5).
+describe("SettingsScreen obrolan portal klien (SPEC-854)", () => {
+  it("kartu ada, jatah terbaca, dan tak ada pemilih agen", async () => {
+    telegramFetch();
+    render(<SettingsScreen
+      me={{ id: "u1", email: "dena@example.test", role: "admin", createdAt: "2026-08-01T00:00:00.000Z" }}
+      onLoggedOut={() => {}}
+    />);
+    fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+    expect(await screen.findByText("Obrolan portal klien")).toBeInTheDocument();
+    expect((screen.getByLabelText("Jatah brainstorming") as HTMLInputElement).value)
+      .toBe(String(PORTAL_CHAT_DEFAULTS.brainstormPerMonth));
+    expect((screen.getByLabelText("Jatah pertanyaan") as HTMLInputElement).value)
+      .toBe(String(PORTAL_CHAT_DEFAULTS.askPerMonth));
+    expect(screen.queryByLabelText("Runtime obrolan portal")).toBeNull();
+  });
+
+  it("mengubah jatah menyimpannya lewat PUT /api/settings", async () => {
+    const puts: unknown[] = [];
+    telegramFetch((path, init) => {
+      if (path === "/api/settings" && init?.method === "PUT") {
+        puts.push(JSON.parse(String(init.body)));
+        return json(setting);
+      }
+      return null;
+    });
+    render(<SettingsScreen
+      me={{ id: "u1", email: "dena@example.test", role: "admin", createdAt: "2026-08-01T00:00:00.000Z" }}
+      onLoggedOut={() => {}}
+    />);
+    fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+    const input = await screen.findByLabelText("Jatah brainstorming");
+    fireEvent.change(input, { target: { value: "5" } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect((puts[0] as { portalChat: { brainstormPerMonth: number } }).portalChat.brainstormPerMonth).toBe(5);
   });
 });

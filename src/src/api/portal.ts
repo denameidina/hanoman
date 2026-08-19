@@ -1,5 +1,5 @@
 import type {
-  Paginated, PortalChatMessageView, PortalChatSessionView, PortalChatType,
+  Paginated, PortalChatMessageView, PortalChatQuotaView, PortalChatSessionView, PortalChatType,
   PortalProject, PortalSpec, PortalTicket, PortalTicketDetail,
 } from "@hanoman/shared";
 import { ApiError } from "./client";
@@ -45,6 +45,7 @@ export const portalApi = {
     return res.json();
   },
   // SPEC-854 · ADR-0129 · chat portal klien.
+  getChatQuota: (id: string) => get<PortalChatQuotaView>(`${p(id)}/chat`),
   listChatSessions: (id: string, pg: PortalPage) =>
     get<Paginated<PortalChatSessionView>>(`${p(id)}/chat/sessions${q(pg)}`),
   getChatSession: (id: string, sid: string, pg: PortalPage) =>

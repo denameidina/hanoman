@@ -898,6 +898,15 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
       // diubah di tempat lain. Blok `changelog` tak punya penulis kedua: kartu ini satu-satunya.
       const saveChangelog = (patch: Partial<Setting["changelog"]>, msg: string) =>
         save({ changelog: { ...changelog, ...patch } }, msg);
+      // SPEC-854 · ADR-0130 · blok chat portal. Cermin `changelog`: satu-satunya penulisnya kartu
+      // ini, jadi menulis dari snapshot mount aman.
+      const portalChat = s.portalChat ?? PORTAL_CHAT_DEFAULTS;
+      const savePortalChat = (patch: Partial<Setting["portalChat"]>, msg: string) =>
+        save({ portalChat: { ...portalChat, ...patch } }, msg);
+      const jatah = (nilai: string, fallback: number) => {
+        const n = Math.floor(Number(nilai));
+        return Number.isFinite(n) && n >= 0 ? n : fallback;
+      };
       return (
       <>
       {/* SPEC-338 · ADR-0074 · mesin sesi default. Berlaku untuk SEMUA sesi yang men-spawn agen
@@ -1191,6 +1200,63 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
                   ? codexEfforts(changelog.model).map((v) => ({ value: v, label: v }))
                   : S_EFFORT}
                 onChange={(e) => saveChangelog({ effort: e.target.value }, "Effort changelog → " + e.target.value)} />
+            </SettingRow>
+          </>
+        )}
+      </Card>
+
+      {/* SPEC-854 · ADR-0130 · obrolan portal klien. TANPA pemilih runtime: gerbang tool
+          (`--tools`) yang menjaga fitur ini adalah flag claude, dan bentuk one-shot codex hanya
+          punya bypass penuh — menawarkan pilihan agen di sini berarti menjanjikan penjagaan yang
+          separuhnya tak bisa ditegakkan (ADR-0129 gotcha 5). */}
+      <Card eyebrow="portal" title="Obrolan portal klien">
+        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
+          Permukaan obrolan di portal klien: klien memilih <b>Brainstorming</b> (digali sampai jelas,
+          keluarannya PRD draft untuk Anda review) atau <b>Bertanya</b> (dijawab langsung dari dokumen
+          project). Jatah berlaku <b>per project</b> dan dihitung bulanan; brainstorming dan
+          pertanyaan punya jatah masing-masing. Mati = tab Obrolan tak muncul di portal.
+        </div>
+        <SettingRow title="Aktifkan obrolan"
+          desc="Mati = klien hanya punya Pekerjaan & Help desk, persis seperti sebelumnya.">
+          <Switch aria-label="Aktifkan obrolan portal" checked={portalChat.enabled}
+            onChange={(v: boolean) => savePortalChat({ enabled: v },
+              "Obrolan portal" + (v ? " · aktif" : " · mati"))} />
+        </SettingRow>
+        {portalChat.enabled && (
+          <>
+            <SettingRow title="Jatah brainstorming" desc="Berapa sesi brainstorming per project tiap bulan. 0 = tertutup.">
+              <Input aria-label="Jatah brainstorming" type="number" min={0} max={1000}
+                style={{ width: 110 }} defaultValue={portalChat.brainstormPerMonth}
+                onBlur={(e: React.FocusEvent<HTMLInputElement>) => savePortalChat(
+                  { brainstormPerMonth: jatah(e.target.value, portalChat.brainstormPerMonth) },
+                  "Jatah brainstorming → " + e.target.value)} />
+            </SettingRow>
+            <SettingRow title="Jatah pertanyaan" desc="Berapa sesi tanya-jawab per project tiap bulan. 0 = tertutup.">
+              <Input aria-label="Jatah pertanyaan" type="number" min={0} max={10000}
+                style={{ width: 110 }} defaultValue={portalChat.askPerMonth}
+                onBlur={(e: React.FocusEvent<HTMLInputElement>) => savePortalChat(
+                  { askPerMonth: jatah(e.target.value, portalChat.askPerMonth) },
+                  "Jatah pertanyaan → " + e.target.value)} />
+            </SettingRow>
+            <SettingRow title="Model" desc="Mesin obrolan selalu Claude — gerbang tool yang menjaganya tak ada di runtime lain.">
+              <Select size="sm" aria-label="Model obrolan portal" value={portalChat.model}
+                style={{ width: 190 }} options={S_MODELS}
+                onChange={(e) => savePortalChat({ model: e.target.value },
+                  "Model obrolan portal → " + e.target.value)} />
+            </SettingRow>
+            <SettingRow title="Effort">
+              <Select size="sm" aria-label="Effort obrolan portal" value={portalChat.effort}
+                style={{ width: 130 }} options={S_EFFORT}
+                onChange={(e) => savePortalChat({ effort: e.target.value },
+                  "Effort obrolan portal → " + e.target.value)} />
+            </SettingRow>
+            <SettingRow title="Batas waktu satu jawaban" last
+              desc="Detik. Lewat dari ini klien menerima kalimat 'coba lagi sebentar', bukan layar menggantung.">
+              <Input aria-label="Batas waktu obrolan portal" type="number" min={10} max={900}
+                style={{ width: 110 }} defaultValue={portalChat.timeoutSec}
+                onBlur={(e: React.FocusEvent<HTMLInputElement>) => savePortalChat(
+                  { timeoutSec: jatah(e.target.value, portalChat.timeoutSec) },
+                  "Batas waktu obrolan → " + e.target.value)} />
             </SettingRow>
           </>
         )}

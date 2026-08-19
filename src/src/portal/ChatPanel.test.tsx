@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ChatPanel } from "./ChatPanel";
 
+const getChatQuota = vi.fn();
 const listChatSessions = vi.fn();
 const getChatSession = vi.fn();
 const startChatSession = vi.fn();
@@ -10,6 +11,7 @@ const sendChatMessage = vi.fn();
 
 vi.mock("../api/portal", () => ({
   portalApi: {
+    getChatQuota: (...a: unknown[]) => getChatQuota(...a),
     listChatSessions: (...a: unknown[]) => listChatSessions(...a),
     getChatSession: (...a: unknown[]) => getChatSession(...a),
     startChatSession: (...a: unknown[]) => startChatSession(...a),
@@ -18,6 +20,8 @@ vi.mock("../api/portal", () => ({
 }));
 
 const KOSONG = { items: [], total: 0, page: 1, pageSize: 20 };
+const KUOTA = { enabled: true, brainstorm: { terpakai: 0, jatah: 2, sisa: 2 },
+  tanya: { terpakai: 0, jatah: 30, sisa: 30 }, resetPada: "2026-09-01T00:00:00.000Z" };
 const SESI = {
   id: "s1", type: "tanya" as const, summary: "", prdSiap: false,
   createdAt: "2026-08-19T00:00:00.000Z", updatedAt: "2026-08-19T00:00:00.000Z",
@@ -25,6 +29,7 @@ const SESI = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getChatQuota.mockResolvedValue(KUOTA);
   listChatSessions.mockResolvedValue(KOSONG);
   getChatSession.mockResolvedValue({ session: SESI, messages: KOSONG });
   startChatSession.mockResolvedValue(SESI);
@@ -65,6 +70,26 @@ describe("permukaan chat portal (SPEC-854)", () => {
     await screen.findByTestId("chat-input");
     fireEvent.click(screen.getByTestId("chat-kirim"));
     expect(sendChatMessage).not.toHaveBeenCalled();
+  });
+
+  it("sisa jatah & tanggal reset terbaca dengan bahasa biasa", async () => {
+    getChatQuota.mockResolvedValue({ ...KUOTA,
+      brainstorm: { terpakai: 1, jatah: 2, sisa: 1 } });
+    render(<ChatPanel projectId="p1" />);
+    const jatah = await screen.findByTestId("chat-jatah");
+    expect(jatah.textContent).toMatch(/1 dari 2/);
+    expect(jatah.textContent).toMatch(/1 September 2026/);
+    expect(jatah.textContent).not.toMatch(/error|galat|kuota habis/i);
+  });
+
+  it("jatah habis: tombol tipe itu tak bisa dipakai, tetangganya tetap bisa", async () => {
+    getChatQuota.mockResolvedValue({ ...KUOTA,
+      brainstorm: { terpakai: 2, jatah: 2, sisa: 0 } });
+    render(<ChatPanel projectId="p1" />);
+    const b = await screen.findByText("Brainstorming");
+    await waitFor(() =>
+      expect((b.closest("button") as HTMLButtonElement).disabled).toBe(true));
+    expect((screen.getByText("Bertanya").closest("button") as HTMLButtonElement).disabled).toBe(false);
   });
 
   // Gagal jaringan tak boleh memuntahkan kode status / nama route ke klien (huruf E).
