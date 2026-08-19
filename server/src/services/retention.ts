@@ -1,5 +1,6 @@
 import { prisma } from "../db";
 import { deleteTranscript as deleteTranscriptFile } from "./transcript-store";
+import { reconcileTranscripts } from "./session-history";
 import { deleteUpload } from "./uploads";
 
 export const RETENTION_DAYS = {
@@ -10,7 +11,10 @@ type RetentionOptions = {
   now?: Date; dryRun?: boolean; batchSize?: number; holds?: Set<string>;
 };
 type RetentionDeps = { deleteTranscript?: (key: string) => Promise<void>; deleteUpload?: (key: string) => Promise<void> };
-export type RetentionReport = { candidates: number; deleted: number; bytes: number; failed: number };
+export type RetentionReport = {
+  candidates: number; deleted: number; bytes: number; failed: number;
+  orphans: number; dangling: number;
+};
 
 const before = (now: Date, days: number) => new Date(now.getTime() - days * 86_400_000);
 
@@ -18,10 +22,28 @@ export async function runRetention(
   opts: RetentionOptions = {},
   deps: RetentionDeps = {},
 ): Promise<RetentionReport> {
+  const report: RetentionReport = {
+    candidates: 0, deleted: 0, bytes: 0, failed: 0, orphans: 0, dangling: 0,
+  };
+  await deleteExpired(report, opts, deps);
+  // SPEC-845 · ADR-0125 · rekonsiliasi jalan di SETIAP sapuan, termasuk saat jatah batch habis di
+  // tengah jalan — berkas yatim justru lahir dari penghapusan yang terpotong. Ini juga satu-satunya
+  // job maintenance-nya: tak ada timer maupun proses kedua (ADR-0024).
+  const gc = await reconcileTranscripts({ dryRun: opts.dryRun });
+  report.orphans = gc.orphans;
+  report.dangling = gc.dangling;
+  report.failed += gc.failed;
+  return report;
+}
+
+async function deleteExpired(
+  report: RetentionReport,
+  opts: RetentionOptions,
+  deps: RetentionDeps,
+): Promise<void> {
   const now = opts.now ?? new Date();
   const holds = opts.holds ?? new Set<string>();
   let remaining = Math.min(Math.max(opts.batchSize ?? 100, 1), 1_000);
-  const report: RetentionReport = { candidates: 0, deleted: 0, bytes: 0, failed: 0 };
   const removeTranscript = deps.deleteTranscript ?? deleteTranscriptFile;
   const removeUpload = deps.deleteUpload ?? deleteUpload;
 
@@ -34,11 +56,13 @@ export async function runRetention(
     report.candidates++; report.bytes += row.transcriptBytes ?? 0;
     if (opts.dryRun) continue;
     try {
-      if (row.transcriptKey) await removeTranscript(row.transcriptKey);
       await prisma.sessionHistory.delete({ where: { id: row.id } });
       report.deleted++; remaining--;
-    } catch { report.failed++; }
-    if (remaining <= 0) return report;
+    } catch { report.failed++; continue; }
+    // Berkas dihapus SESUDAH barisnya commit (ADR-0125): kegagalan di sini menyisakan yatim, yang
+    // rekonsiliasi di akhir sapuan ini juga sudah memungutnya — bukan bukti hancur milik baris hidup.
+    if (row.transcriptKey) await removeTranscript(row.transcriptKey).catch(() => { /* jadi yatim */ });
+    if (remaining <= 0) return;
   }
 
   const tickets = await prisma.ticket.findMany({
@@ -57,7 +81,7 @@ export async function runRetention(
       await prisma.ticket.delete({ where: { id: row.id } });
       report.deleted++; remaining--;
     } catch { report.failed++; }
-    if (remaining <= 0) return report;
+    if (remaining <= 0) return;
   }
 
   const deliveries = await prisma.webhookDelivery.findMany({
@@ -71,7 +95,7 @@ export async function runRetention(
       try { await prisma.webhookDelivery.delete({ where: { id: row.id } }); report.deleted++; remaining--; }
       catch { report.failed++; }
     }
-    if (remaining <= 0) return report;
+    if (remaining <= 0) return;
   }
 
   const results = await prisma.sessionResult.findMany({
@@ -87,7 +111,6 @@ export async function runRetention(
     }
     if (remaining <= 0) break;
   }
-  return report;
 }
 
 let timer: NodeJS.Timeout | undefined;
@@ -96,7 +119,10 @@ export function startRetentionSweep(): void {
   const sweep = () => {
     const holds = new Set((process.env.HANOMAN_RETENTION_HOLDS ?? "").split(",").map((v) => v.trim()).filter(Boolean));
     void runRetention({ holds }).then((report) => {
-      if (report.deleted || report.failed) console.log(`retention: ${report.deleted} dihapus, ${report.failed} gagal`);
+      if (report.deleted || report.failed || report.orphans || report.dangling) {
+        console.log(`retention: ${report.deleted} dihapus, ${report.failed} gagal, `
+          + `${report.orphans} transkrip yatim disapu, ${report.dangling} metadata menggantung dibersihkan`);
+      }
     }).catch((error) => console.error("retention sweep:", error));
   };
   sweep();

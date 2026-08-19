@@ -125,6 +125,13 @@ tanpa penopang tidak ditulis.
 - WHEN sesi lahir dan saat ia dibunuh, THE SYSTEM SHALL mencatat baris `SessionHistory` (LOCAL-only) dan
   SHALL meng-`capture-pane` transkripnya **sebelum** pane dibunuh
   ([ADR-0079](../adr/0079-history-sesi-terminal-store-lokal-plus-transkrip.md)).
+- WHEN riwayat sesi dihapus (purge manual maupun sweep retensi), THE SYSTEM SHALL meng-`unlink` berkas
+  transkripnya **hanya sesudah** penghapusan barisnya commit, dan SHALL melaporkan berkas yang gagal
+  dihapus sebagai sukses sebagian
+  ([ADR-0125](../adr/0125-durabilitas-penghapusan-transkrip-riwayat.md)).
+- WHILE sweep retensi berjalan, THE SYSTEM SHALL menyapu berkas transkrip yang tak dirujuk baris mana
+  pun dan lebih tua dari tenggang, dan SHALL mengosongkan `transcriptKey` yang menunjuk berkas hilang
+  sehingga `hasTranscript` tak pernah bertentangan dengan endpoint transkripnya.
 - WHEN sesi ditutup, THE SYSTEM SHALL menghapus worktree-nya **hanya** bila cwd sesi benar-benar berada
   di dalam `<repoDir>/.worktrees/` (`ownsWorktree`) — bukan berdasarkan bentuk path.
 - WHERE mode goal aktif, THE SYSTEM SHALL memasang gate `Stop` saat sesi lahir

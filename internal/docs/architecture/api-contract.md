@@ -978,8 +978,13 @@ GET    /terminal/history/:id         # SessionHistoryView + { hasTranscript } ·
 GET    /terminal/history/:id/transcript  # { text, bytes } · 404 bila baris/transkrip tak ada
 #   Teks POLOS (capture-pane tanpa -e), di-capture sebelum pane dibunuh, cap 1 MiB menyimpan ekor.
 DELETE /terminal/history?projectId&before
-#   → { purged } · 400 tanpa parameter (purge WAJIB ber-scope) · 400 `before` bukan tanggal valid.
-#   Ikut menghapus berkas transkrip milik baris yang dibuang. Cermin DELETE /session-results.
+#   → { purged, transcriptsDeleted, transcriptsFailed } · 400 tanpa parameter (purge WAJIB
+#   ber-scope) · 400 `before` bukan tanggal valid. Cermin DELETE /session-results.
+#   SPEC-845 · ADR-0125 · berkas transkrip dihapus SESUDAH baris-barisnya commit, per potongan atas
+#   himpunan id EKSPLISIT. `transcriptsFailed > 0` = sukses SEBAGIAN (tetap 200: barisnya memang
+#   terhapus); berkas yang tertinggal jadi yatim dan dipungut `reconcileTranscripts()` di sweep
+#   retensi berikutnya, yang juga mengosongkan `transcriptKey` yang menunjuk berkas hilang sehingga
+#   `hasTranscript` tak bisa lagi berbohong terhadap 404 endpoint transkrip.
 ```
 
 > Riwayat sesi sengaja hidup di bawah prefix `/terminal` supaya mewarisi capability `sessions`

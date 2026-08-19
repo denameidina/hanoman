@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { mkdtempSync, existsSync } from "node:fs";
+import { mkdtempSync, existsSync, chmodSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   MAX_TRANSCRIPT_BYTES, transcriptDir, saveTranscript, readTranscript, deleteTranscript,
+  listTranscripts,
 } from "../src/services/transcript-store";
 
 let dir: string;
@@ -47,6 +48,36 @@ describe("transcript-store (SPEC-362)", () => {
     await deleteTranscript(key);
     expect(existsSync(join(dir, key))).toBe(false);
     await deleteTranscript(key);
+  });
+
+  // SPEC-845 · ADR-0125 · purge kini melaporkan kegagalan sebagian, jadi kegagalan filesystem
+  // yang BUKAN "sudah tak ada" harus punya suara.
+  it("hapus melempar untuk galat selain ENOENT", async () => {
+    const { key } = await saveTranscript("isi");
+    chmodSync(dir, 0o500);  // direktori read-only → unlink EACCES
+    try {
+      await expect(deleteTranscript(key)).rejects.toThrow();
+    } finally {
+      chmodSync(dir, 0o700);
+    }
+  });
+
+  it("listTranscripts memberi kunci + mtime tiap berkas, mengabaikan yang bukan transkrip", async () => {
+    const { key } = await saveTranscript("isi");
+    writeFileSync(join(dir, "catatan.txt"), "bukan transkrip");
+    const lama = join(dir, "lama.log");
+    writeFileSync(lama, "x");
+    const jam = Date.now() / 1000 - 7200;
+    utimesSync(lama, jam, jam);
+
+    const rows = await listTranscripts();
+    expect(rows.map((r) => r.key).sort()).toEqual([key, "lama.log"].sort());
+    expect(rows.find((r) => r.key === "lama.log")!.mtimeMs).toBeLessThan(Date.now() - 3_600_000);
+  });
+
+  it("listTranscripts pada direktori yang belum ada → daftar kosong", async () => {
+    process.env.HANOMAN_TRANSCRIPT_DIR = join(dir, "belum-ada");
+    expect(await listTranscripts()).toEqual([]);
   });
 
   it("teks kosong tak menghasilkan berkas", async () => {
