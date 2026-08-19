@@ -15,7 +15,7 @@
 - **Jangan sentuh `src/src/ds/kit.tsx` (`Modal`).** Focus trap, focus restore ke pemicu, `aria-modal`, dan `onClose` yang `undefined` saat `busy` sudah ada. AC-3 dipenuhi dengan MENGUNCI perilaku itu lewat test, bukan menulis ulang. React `autoFocus` tak akan bekerja di dalamnya — layout effect `Modal` (`initial?.focus()`) berjalan sesudah `commitMount` anaknya dan menimpanya.
 - **Focus awal `ConfirmDialog` tanpa `requireText` jatuh ke tombol "Tutup" di header** (kontrol aman: ia membatalkan). Test menegaskan fokus TIDAK di tombol destruktif; jangan menuntutnya di "Batal".
 - **`confirm()` melempar bila `run` melempar; `false` HANYA untuk pembatalan.** Jangan menerjemahkan kegagalan mutasi jadi `false` — call site akan menelannya.
-- **Nama hasil destructuring WAJIB `{ confirm, dialog }`** di setiap call site. Test inventaris menghitung `useConfirm(` vs `{dialog}` per berkas; nama lain lolos hitungan dan mematikan penjaganya.
+- **Nama hasil destructuring WAJIB `{ confirm, dialog }`** di setiap call site. Test inventaris menghitung `= useConfirm(` vs `{dialog}` per berkas; nama lain lolos hitungan dan mematikan penjaganya.
 - **Setiap komponen yang memanggil `useConfirm()` WAJIB merender `{dialog}`.** Lupa = promise menggantung selamanya tanpa error dan tanpa gejala selain "tombolnya tak melakukan apa-apa".
 - **Teks Indonesia**, mengikuti kalimat `window.confirm` yang digantikan. Judul menyebut **nama objeknya** (AC-1).
 - **Jangan menambah `try/catch` yang hari ini tak ada** di sebuah call site (`DocsWorkspace.removeDoc`). Paritas perilaku; perbaikan penanganan error di luar scope.
@@ -1192,7 +1192,7 @@ git commit -m "feat(screens): changelog, tolak tiket, dan Help Center memakai di
   export function scannedFileCount(root: string): number;
   ```
 
-- [ ] **Step 1: Tulis helper pemindai**
+- [x] **Step 1: Tulis helper pemindai**
 
 Buat `src/test/helpers/native-confirm.ts` (cermin `helpers/form-fields.ts` — baca berkas itu untuk pola `walk`):
 
@@ -1238,14 +1238,14 @@ const count = (src: string, needle: string) => src.split(needle).length - 1;
 export function scanHookBalance(root: string) {
   return files(root)
     .map((f) => { const src = readFileSync(f, "utf8");
-      return { file: f, hooks: count(src, "useConfirm("), dialogs: count(src, "{dialog}") }; })
+      return { file: f, hooks: count(src, "= useConfirm("), dialogs: count(src, "{dialog}") }; })
     .filter((r) => r.hooks > 0);
 }
 
 export const scannedFileCount = (root: string) => files(root).length;
 ```
 
-- [ ] **Step 2: Tulis test inventaris**
+- [x] **Step 2: Tulis test inventaris**
 
 Buat `src/test/confirm-inventory.test.ts`:
 
@@ -1290,7 +1290,7 @@ describe("inventaris window.confirm (SPEC-847)", () => {
 
 Nomor baris di test "pengecualian yang diketahui" harus disesuaikan dengan hasil nyata sesudah Step 3 — jalankan test, baca nomor yang dilaporkan, tulis nomor itu.
 
-- [ ] **Step 3: Tandai pengecualian `GitGraph`**
+- [x] **Step 3: Tandai pengecualian `GitGraph`**
 
 Di `src/src/screens/GitGraph.tsx`, ganti komentar & baris di sekitar `window.confirm` (baris ~131-134):
 
@@ -1308,12 +1308,12 @@ Di `src/src/screens/GitGraph.tsx`, ganti komentar & baris di sekitar `window.con
     } },
 ```
 
-- [ ] **Step 4: Jalankan test — harus lulus**
+- [x] **Step 4: Jalankan test — harus lulus**
 
 Run: `pnpm vitest --run src/test/confirm-inventory.test.ts`
 Expected: PASS. Bila "tak ada window.confirm tanpa pengecualian" gagal, daftar berkas:barisnya adalah call site yang terlewat dari Task 3-7 — selesaikan dulu, jangan tambahkan pengecualian baru.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/test/helpers/native-confirm.ts src/test/confirm-inventory.test.ts src/src/screens/GitGraph.tsx
