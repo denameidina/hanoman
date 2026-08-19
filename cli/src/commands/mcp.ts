@@ -8,8 +8,8 @@
 //     jalan, dan setiap panggilan menjawab dengan kalimat yang menyebut variabel yang harus diisi
 //     — `hanoman_about` bahkan menjawab tanpa token sama sekali.
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { resolveHome } from "@hanoman/runner";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import type { Ctx } from "../router";
 import { currentVersion } from "../router";
@@ -18,9 +18,13 @@ import { createCaller } from "../mcp/client";
 import { buildMcpServer } from "../mcp/server";
 import { redactToken } from "../mcp/redact";
 
+// SPEC-846 · lewat `resolveHome()`, bukan salinan logikanya: salinan sebelumnya tak mem-`trim()`
+// sehingga `HANOMAN_HOME` berisi spasi membuat token tak pernah ketemu dan MCP berjalan tanpa
+// autentikasi — kegagalan yang hanya terbaca sebagai satu baris peringatan di stderr.
+export const agentTokenPath = (env: Ctx["env"]): string => join(resolveHome(env), "agent-token");
+
 const tokenFile = (env: Ctx["env"]): string | null => {
-  const home = env.HANOMAN_HOME ?? join(homedir(), ".hanoman");
-  try { return readFileSync(join(home, "agent-token"), "utf8"); } catch { return null; }
+  try { return readFileSync(agentTokenPath(env), "utf8"); } catch { return null; }
 };
 
 export default async function mcp(argv: string[], ctx: Ctx): Promise<number> {

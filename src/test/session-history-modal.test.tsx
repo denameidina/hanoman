@@ -16,7 +16,8 @@ const row = (over: Record<string, unknown> = {}) => ({
   id: "h1", sessionId: "spec-362", projectId: "p1", specId: "SPEC-362", title: "History session terminal",
   kind: "spec", flow: "feature", agent: "claude", model: "claude-opus-5", effort: "xhigh",
   branch: null, cwd: "/r/.worktrees/spec-362", startedAt: "2026-07-28T01:00:00.000Z",
-  endedAt: "2026-07-28T02:00:00.000Z", exitCode: 0, transcriptBytes: 42, ...over,
+  endedAt: "2026-07-28T02:00:00.000Z", endedReason: "closed", reconciledAt: null,
+  exitCode: 0, transcriptBytes: 42, ...over,
 });
 
 beforeEach(() => {
@@ -40,6 +41,34 @@ describe("SessionHistoryModal (SPEC-362)", () => {
       items: [row({ endedAt: null, exitCode: null })], total: 1, page: 1, pageSize: 20 });
     render(<SessionHistoryModal projects={projects} onClose={() => {}} onRestart={() => {}} />);
     expect(await screen.findByText("berjalan")).toBeTruthy();
+  });
+
+  it("exit bukan nol terbaca sebagai kodenya, bukan 'selesai'", async () => {
+    listSessionHistory.mockResolvedValue({
+      items: [row({ exitCode: 2 })], total: 1, page: 1, pageSize: 20 });
+    render(<SessionHistoryModal projects={projects} onClose={() => {}} onRestart={() => {}} />);
+    expect(await screen.findByText("exit 2")).toBeTruthy();
+  });
+
+  // SPEC-844 · sebelum ini baris rekonsiliasi tampil hijau "selesai · 0 dtk".
+  it("baris hasil rekonsiliasi boot terbaca 'terputus', bukan 'selesai'", async () => {
+    listSessionHistory.mockResolvedValue({
+      items: [row({ endedAt: "2026-07-28T01:00:00.000Z", endedReason: "reconciled",
+        reconciledAt: "2026-07-29T03:00:00.000Z", exitCode: null, transcriptBytes: null })],
+      total: 1, page: 1, pageSize: 20 });
+    render(<SessionHistoryModal projects={projects} onClose={() => {}} onRestart={() => {}} />);
+    expect(await screen.findByText("terputus")).toBeTruthy();
+    expect(screen.queryByText("selesai")).toBeNull();
+  });
+
+  it("baris terputus tak mengarang durasi", async () => {
+    listSessionHistory.mockResolvedValue({
+      items: [row({ endedAt: "2026-07-28T01:00:00.000Z", endedReason: "reconciled",
+        reconciledAt: "2026-07-29T03:00:00.000Z", exitCode: null })],
+      total: 1, page: 1, pageSize: 20 });
+    render(<SessionHistoryModal projects={projects} onClose={() => {}} onRestart={() => {}} />);
+    await screen.findByText("terputus");
+    expect(screen.queryByText("0 dtk")).toBeNull();
   });
 
   // SPEC-523 · muat-lebih (append) DICABUT: halaman MENGGANTI isi, sama seperti backlog/project/
@@ -105,6 +134,21 @@ describe("SessionHistoryModal — detail (SPEC-362)", () => {
     fireEvent.click(await screen.findByText("History session terminal"));
     fireEvent.click(await screen.findByText("Mulai lagi"));
     expect(onRestart).toHaveBeenCalledWith(expect.objectContaining({ id: "h1" }));
+  });
+
+  // SPEC-844 · AC "Session detail explains that exit code and final transcript may be incomplete"
+  it("detail baris terputus menjelaskan hasil tak diketahui & tetap menawarkan 'Mulai lagi'", async () => {
+    listSessionHistory.mockResolvedValue({
+      items: [row({ endedAt: "2026-07-28T01:00:00.000Z", endedReason: "reconciled",
+        reconciledAt: "2026-07-29T03:00:00.000Z", exitCode: null, transcriptBytes: null })],
+      total: 1, page: 1, pageSize: 20 });
+    render(<SessionHistoryModal projects={projects} onClose={() => {}} onRestart={() => {}} />);
+    fireEvent.click(await screen.findByText("History session terminal"));
+    expect(await screen.findByText("Sesi terputus — hasilnya tak diketahui")).toBeTruthy();
+    expect(screen.getByText("Terakhir terlihat hidup")).toBeTruthy();
+    expect(screen.getByText("Terdeteksi mati")).toBeTruthy();
+    expect(screen.getByText("Mulai lagi")).toBeTruthy();
+    expect(screen.queryByText(/ditutup sebelum fitur riwayat ada/)).toBeNull();
   });
 
   it("kind tak restartable tak menawarkan 'Mulai lagi'", async () => {

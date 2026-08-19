@@ -226,8 +226,33 @@ Postgres lama. Simpan backup sampai cutover dinyatakan selesai.
   hari; session result 90 hari. Set `HANOMAN_RETENTION_HOLDS` untuk legal/incident hold eksplisit.
 - Upload production fail-closed bila scanner hilang/gagal/timeout. Pantau quota 250 MiB/project dan
   1 GiB/global serta direktori quarantine.
-- Backup SQLite secara konsisten (`sqlite3 … '.backup …'`) bersama `secret.key`; backup tanpa key
-  tidak dapat membuka RuntimeConfig/webhook secret. Backup harus dienkripsi dan mode private.
+- **Batas backup/restore adalah `$HANOMAN_HOME` seutuhnya, bukan hanya DB** (SPEC-846). Menyalin
+  `hanoman.db` saja menghasilkan restore yang metadatanya utuh tetapi byte-nya hilang: transkrip
+  terbaca "ada" lalu gagal dibuka, lampiran tiket 404, dan identitas SSH lahir baru sehingga setiap
+  VPS yang sudah di-bootstrap menolak koneksi tanpa pemberitahuan.
+
+  | Path (relatif `$HANOMAN_HOME`) | Isi |
+  |---|---|
+  | `hanoman.db` (+ `-wal`/`-shm`) | seluruh state aplikasi |
+  | `secret.key` | kunci AES RuntimeConfig & webhook secret |
+  | `id_ed25519` + `.pub` | identitas SSH hanoman ke VPS |
+  | `transcripts/` | transkrip sesi yang ditutup |
+  | `uploads/` | lampiran tiket + byte source-map lama + `terminal/<sessionId>/` |
+
+  ```sh
+  umask 077
+  sudo -u hanoman sqlite3 "$HANOMAN_HOME/hanoman.db" ".backup '/backup/hanoman.db'"
+  sudo -u hanoman tar -C "$HANOMAN_HOME" -czf /backup/hanoman-files.tgz \
+    secret.key id_ed25519 id_ed25519.pub transcripts uploads
+  ```
+
+  Restore: buat `$HANOMAN_HOME` mode `0700` milik user service, kembalikan kedua artefak di atas,
+  lalu jalankan `hanoman doctor` — ia mencetak setiap path data efektif beserta izin tulisnya.
+  Backup tanpa `secret.key` tidak dapat membuka RuntimeConfig/webhook secret. Backup harus
+  dienkripsi dan mode private: ia memuat kunci privat SSH.
+- Mengeset `HANOMAN_TRANSCRIPT_DIR`, `HANOMAN_UPLOAD_DIR`, atau `HANOMAN_SSH_KEY_DIR` memindahkan
+  bagian itu keluar dari batas tersebut. Sah, tetapi backup-nya menjadi item runbook tersendiri —
+  `hanoman doctor` mencetak path efektif yang berlaku.
 - Setelah dugaan compromise atau migrasi dari deployment lama, rotasi cookie/session (cabut sesi),
   device token sync, AgentToken, webhook secret, model/API/Git credential, VPS key, setup token yang
   belum dipakai, serta credential access proxy. Jangan hanya mengganti password dashboard.

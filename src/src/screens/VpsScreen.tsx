@@ -2,7 +2,7 @@
    Audit / Harden / Sesi Claude (SPEC-164). Screen mandiri (pola SettingsScreen):
    memuat datanya sendiri, App hanya memasang Shell. */
 import React from "react";
-import { Button, Modal, Field, Input, StateBlock, StatusPill, Icon } from "../ds";
+import { Button, Modal, Field, Input, StateBlock, StatusPill, Icon, useConfirm } from "../ds";
 import { api } from "../api/client";
 import { subscribe } from "../api/events";
 import type { VpsView } from "@hanoman/shared";
@@ -98,6 +98,9 @@ export function VpsScreen({ onToast, onGotoTerminal }:
     return subscribe((m) => { if (m.t === "vps") { setList(m.vps); setStatus("ready"); } });
   }, [load]);
 
+  // SPEC-847 · ADR-0127 · konfirmasi mutasi VPS memakai dialog aplikasi.
+  const { confirm, dialog } = useConfirm();
+
   async function run(label: string, id: string, fn: () => Promise<unknown>, okMsg: string) {
     setBusy(`${label}:${id}`);
     try { await fn(); load(); onToast(okMsg, "ok", "server"); }
@@ -105,12 +108,19 @@ export function VpsScreen({ onToast, onGotoTerminal }:
     finally { setBusy(null); }
   }
   const audit = (v: VpsView) => run("audit", v.id, () => api.auditVps(v.id), `${v.name} · audit selesai`);
-  function harden(v: VpsView) {
-    // window.confirm cukup (pola deleteProject di App): sebut persis apa yang berubah.
-    if (!window.confirm(
-      `Harden "${v.name}"?\n\nYang diterapkan: firewall (allow ${v.port}/80/443), fail2ban, ` +
-      `auto security update, PermitRootLogin & PasswordAuthentication off, NTP.\n` +
-      `Pastikan akses key SSH non-password kamu sudah bekerja.`)) return;
+  async function harden(v: VpsView) {
+    if (!await confirm({
+      title: `Harden "${v.name}"?`,
+      message: "Pastikan akses key SSH non-password kamu sudah bekerja sebelum melanjutkan.",
+      impact: [
+        `Firewall: izinkan ${v.port}/80/443.`,
+        "fail2ban & auto security update dipasang.",
+        "PermitRootLogin & PasswordAuthentication dimatikan.",
+        "NTP disinkronkan.",
+      ],
+      confirmLabel: "Harden",
+      icon: "shield",
+    })) return;
     void run("harden", v.id, () => api.hardenVps(v.id), `${v.name} · harden selesai`);
   }
   const session = (v: VpsView) =>
@@ -123,8 +133,15 @@ export function VpsScreen({ onToast, onGotoTerminal }:
   const openConsole = (v: VpsView) =>
     run("console", v.id, async () => { const { id } = await api.vpsConsole(v.id); onGotoTerminal(id); }, `${v.name} · console dibuka`);
   async function remove(v: VpsView) {
-    if (!window.confirm(`Hapus registrasi VPS "${v.name}"? Server-nya sendiri tak disentuh.`)) return;
-    await api.deleteVps(v.id).then(load).catch(() => onToast("Gagal hapus", "err", "x-circle"));
+    try {
+      if (!await confirm({
+        title: `Hapus registrasi VPS "${v.name}"?`,
+        message: "Server-nya sendiri tak disentuh — hanya pendaftarannya di dashboard ini yang dihapus.",
+        confirmLabel: "Hapus registrasi",
+        run: () => api.deleteVps(v.id),
+      })) return;
+      load();
+    } catch { onToast("Gagal hapus", "err", "x-circle"); }
   }
 
   async function create(f: VpsForm) {
@@ -194,7 +211,7 @@ export function VpsScreen({ onToast, onGotoTerminal }:
               <Button size="sm" variant="secondary" leftIcon="radar" loading={busy === `audit:${v.id}`}
                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); void audit(v); }}>Audit</Button>
               <Button size="sm" leftIcon="shield" loading={busy === `harden:${v.id}`}
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); harden(v); }}>Harden</Button>
+                onClick={(e: React.MouseEvent) => { e.stopPropagation(); void harden(v); }}>Harden</Button>
               <Button size="sm" variant="ghost" leftIcon="terminal" loading={busy === `sesi:${v.id}`}
                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); void session(v); }}>Sesi Claude</Button>
               <Button size="sm" variant="ghost" leftIcon="pencil" title={`Edit ${v.name}`}
@@ -217,6 +234,7 @@ export function VpsScreen({ onToast, onGotoTerminal }:
         <VpsModal open title={`Edit ${modal.name}`} submitLabel="Simpan" initial={formOf(modal)}
           onClose={() => setModal(null)} onSubmit={(f) => save(modal, f)} />
       )}
+      {dialog}
     </div>
   );
 }

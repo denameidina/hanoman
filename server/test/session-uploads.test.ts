@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join, isAbsolute } from "node:path";
-import { saveSessionUpload, dropSessionUploads, sessionUploadDir } from "../src/services/uploads";
+import { saveSessionUpload, dropSessionUploads, sessionUploadDir, uploadDir } from "../src/services/uploads";
 import { killSession, detachAll, killAll, createSession } from "../src/services/pty";
 
 // Fixture yang sama dipakai terminal.route.test.ts: /bin/cat mati karena
@@ -75,5 +75,30 @@ describe("SPEC-816 · lampiran ikut mati bersama sesinya", () => {
     killSession(id);
     // Penghapusan fire-and-forget (bukan rmSync, SPEC-742), jadi ditunggu.
     await vi.waitFor(() => expect(existsSync(path)).toBe(false));
+  });
+});
+
+// SPEC-846 · cermin transcript-store: tanpa override, lampiran hidup di bawah `$HANOMAN_HOME`
+// supaya backup satu direktori benar-benar memuat byte yang ditunjuk metadata DB.
+describe("uploadDir turun dari HANOMAN_HOME (SPEC-846)", () => {
+  let home = "";
+  beforeEach(() => {
+    delete process.env.HANOMAN_UPLOAD_DIR;
+    home = mkdtempSync(join(tmpdir(), "hanoman-home-u846-"));
+    process.env.HANOMAN_HOME = home;
+  });
+  afterEach(() => {
+    delete process.env.HANOMAN_HOME;
+    process.env.HANOMAN_UPLOAD_DIR = dir;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("default = $HANOMAN_HOME/uploads, lepas dari cwd", () => {
+    expect(uploadDir()).toBe(join(home, "uploads"));
+  });
+
+  it("override berisi spasi diabaikan, bukan menjadi direktori di bawah cwd", () => {
+    process.env.HANOMAN_UPLOAD_DIR = "  ";
+    expect(uploadDir()).toBe(join(home, "uploads"));
   });
 });

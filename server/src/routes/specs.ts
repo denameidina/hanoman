@@ -18,6 +18,12 @@ import { recordSourceChange } from "../services/notifications";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { completeSpecManually } from "../services/spec-complete";
+import {
+  addSpecAttachments, deleteSpecAttachment, dropSpecAttachments, listSpecAttachments,
+  SPEC_ATTACHMENT_LIMITS, type SpecUpload,
+} from "../services/spec-attachment";
+import { dropSpecAttachmentsDir, syncSpecAttachmentsDir } from "../services/spec-attachment-dir";
+import { readUpload } from "../services/uploads";
 import { branchFromCandidates } from "../services/branches";
 import { STAGES } from "../services/stage-machine";
 import { artifactsToRemove } from "../services/stage-artifacts";
@@ -304,6 +310,68 @@ export default async function (app: FastifyInstance) {
     return res.spec;
   });
 
+  // SPEC-843 · ADR-0124 · lampiran backlog item. Capability-nya jatuh dari prefix `specs`
+  // (`capabilityForRoute` → `rw("backlog")`), jadi read/write diturunkan dari METHOD dan 403-nya
+  // tetap membawa `need` tanpa satu baris pun perubahan di peta capability.
+  app.get("/specs/:id/attachments", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!await prisma.spec.findUnique({ where: { id }, select: { id: true } }))
+      return reply.code(404).send({ error: "not found" });
+    return { attachments: await listSpecAttachments(id) };
+  });
+
+  // Batas multipart dipasang PER-REQUEST: registrasi global (5 MB/12 berkas, app.ts) milik lampiran
+  // gambar SPEC-816 dan tak boleh ikut naik. Pola yang sama dipakai POST /projects/:id/upload.
+  app.post("/specs/:id/attachments", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const spec = await prisma.spec.findUnique({ where: { id }, select: { id: true, projectId: true } });
+    if (!spec) return reply.code(404).send({ error: "not found" });
+    if (!(req as any).isMultipart?.()) return reply.code(400).send({ error: "butuh multipart/form-data" });
+
+    const files: SpecUpload[] = [];
+    try {
+      for await (const part of (req as any).parts({
+        limits: { fileSize: SPEC_ATTACHMENT_LIMITS.fileBytes, files: SPEC_ATTACHMENT_LIMITS.perSpec + 2 },
+      })) {
+        if (part.type !== "file") continue;
+        const buf = await part.toBuffer();   // menguras stream — tanpa ini busboy menggantung
+        files.push({
+          buf, mime: part.mimetype, name: String(part.filename ?? "lampiran"),
+          truncated: part.file?.truncated === true,
+        });
+      }
+    } catch { return reply.code(400).send({ error: "unggahan tak valid" }); }
+    if (!files.length) return reply.code(400).send({ error: "tak ada berkas" });
+
+    const result = await addSpecAttachments(spec, files);
+    // Materialisasi SESUDAH baris tertulis: sesi yang sedang berjalan membaca ulang INDEX.md di awal
+    // fase berikutnya, jadi lampiran yang datang di tengah sesi tetap sampai (ADR-0124 §3).
+    await syncSpecAttachmentsDir(spec.id, spec.projectId);
+    return reply.code(201).send(result);
+  });
+
+  app.get("/specs/:id/attachments/:attId", async (req, reply) => {
+    const { id, attId } = req.params as { id: string; attId: string };
+    const a = await prisma.specAttachment.findUnique({ where: { id: attId } });
+    if (!a || a.specId !== id) return reply.code(404).send({ error: "not found" });
+    const buf = await readUpload(a.storageKey).catch(() => null);
+    if (!buf) return reply.code(404).send({ error: "not found" });
+    reply.header("content-type", a.mimeType);
+    reply.header("content-disposition", `attachment; filename="${a.filename.replace(/["\\\r\n]/g, "_")}"`);
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("content-security-policy", "sandbox; default-src 'none'");
+    return reply.send(buf);
+  });
+
+  app.delete("/specs/:id/attachments/:attId", async (req, reply) => {
+    const { id, attId } = req.params as { id: string; attId: string };
+    const spec = await prisma.spec.findUnique({ where: { id }, select: { id: true, projectId: true } });
+    if (!spec) return reply.code(404).send({ error: "not found" });
+    if (!await deleteSpecAttachment(id, attId)) return reply.code(404).send({ error: "not found" });
+    await syncSpecAttachmentsDir(spec.id, spec.projectId);
+    return { ok: true };
+  });
+
   // SPEC-170 · dokumen sebuah backlog item (audit/objective/spec/plan/brainstorm).
   // Sumber freshest-wins ada di resolveDir: worktree sesi hidup > repoDir.
   app.get("/specs/:id/docs", async (req) =>
@@ -338,6 +406,12 @@ export default async function (app: FastifyInstance) {
     // tanpa pembersihan ini menghapus satu item mengunci dependent-nya SELAMANYA dengan alasan
     // `missing` yang tak bisa diperbaiki dari UI.
     const gone = await prisma.spec.findUnique({ where: { id }, select: { projectId: true } });
+    // SPEC-843 · ADR-0124 · baris lampiran ikut `onDelete: Cascade`, BYTE-nya tidak — cascade DB tak
+    // menyentuh disk. Dibaca selagi barisnya masih ada, karena itu di SINI dan bukan sesudahnya.
+    if (gone) {
+      await dropSpecAttachments(id);
+      await dropSpecAttachmentsDir(id, gone.projectId);
+    }
     await deleteSynced("spec", id).catch(() => { });
     if (gone) {
       const rows = await prisma.spec.findMany({

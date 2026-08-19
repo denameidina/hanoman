@@ -567,12 +567,22 @@ Itulah cara memenuhi "mudah diakses tapi tidak menghalangi UI terminal": grid di
 berubah ukuran sama sekali, dan selama modal tak dibuka **tak ada request riwayat** yang berjalan.
 Isinya: penyaring (project · jenis · cari), daftar baris (waktu mulai, badge jenis **berlabel manusia**
 dari `SESSION_KIND_LABEL` — bukan slug, pelajaran SPEC-262/264 — judul/spec, penanda transkrip, durasi,
-status `berjalan`/`selesai`/`exit <code>`), lalu **muat lebih**: `IntersectionObserver` auto-load dengan
-tombol manual sebagai fallback, dan **baris penutup** yang membedakan "masih ada" dari "seluruh riwayat"
-(pelajaran SPEC-351 — daftar habis yang tak terbedakan dari daftar terpotong terbaca sebagai bug).
-Server yang memaginasi (`{items,total,page,pageSize}`); modal hanya menaikkan `page` dan **menambah**
-item, tak menggantinya. Klik baris → detail: metadata + transkrip read-only dalam `<pre>` teks polos,
-tombol **Salin transkrip** dan **Mulai lagi**. "Mulai lagi" tak pernah menghidupkan sesi lama (tmux
+status `berjalan`/`selesai`/`exit <code>`/**`terputus`**), lalu **kontrol halaman** `Pager` DS: sejak
+SPEC-523 halaman **mengganti** isi (muat-lebih `IntersectionObserver` dicabut demi satu pola paginasi
+yang sama dengan backlog/project/tiket), dan `Pager` sendiri yang menyatakan "N–M dari T" sehingga baris
+penutup SPEC-351 tak lagi perlu. Server yang memaginasi (`{items,total,page,pageSize}`); modal hanya
+menaikkan `page`. Klik baris → detail: metadata + transkrip read-only dalam `<pre>` teks polos,
+tombol **Salin transkrip** dan **Mulai lagi**.
+
+Status **`terputus`** adalah SPEC-844 · [ADR-0125](../adr/0125-akhir-sesi-riwayat-tercatat.md): baris
+hasil rekonsiliasi boot (`endedReason: "reconciled"` — pane lenyap karena reboot/`kill-server`/crash).
+Hijau `selesai` berbohong dan merah mengarang, jadi tone-nya **`warn`**. Verdict-nya **tidak** dihitung
+di layar — `statusOf()` memanggil `sessionOutcome()` (`@hanoman/shared`), satu definisi yang dipakai UI,
+test, dan prosa kontrak webhook; menyalinnya ke sini adalah kelas bug SPEC-431/448. Durasi baris terputus
+`—`, bukan `0 dtk` (`endedAt`-nya batas bawah, `reconciledAt` batas atas — mengurangkannya menghasilkan
+nol yang tak berarti), dan detailnya merender `Callout` warn yang menyatakan hasil & transkripnya tak
+diketahui plus dua stempel `Terakhir terlihat hidup`/`Terdeteksi mati`. "Mulai lagi" tetap jalur
+pemulihannya — tak ada endpoint baru. "Mulai lagi" tak pernah menghidupkan sesi lama (tmux
 sudah membunuhnya) — ia men-spawn sesi baru lewat endpoint yang sudah ada, dan hanya muncul untuk
 `restartableKind()` (`spec`/`terminal`/`shell`/`reverse`/`scaffold`).
 
@@ -784,6 +794,50 @@ tangan. Tak ada `favicon.ico`: Safari 26+ sudah mendukung favicon SVG, dan bila 
 lawas perlu didukung, `.ico` cukup dijatuhkan ke `src/public/` **tanpa perubahan markup** — browser
 me-request `/favicon.ico` dari root dengan sendirinya.
 
+## Konfirmasi destruktif: satu kontrak, `window.confirm` nol (SPEC-847 · ADR-0127)
+
+Setiap aksi destruktif produk memakai dialog aplikasi. Bentuk pemanggilannya **`useConfirm()`**
+(`ds/useConfirm.tsx`), yang memulangkan `{ confirm, dialog }`:
+
+```tsx
+const { confirm, dialog } = useConfirm();
+…
+if (!await confirm({
+  title: `Hapus project "${p.name}"?`,
+  impact: ["Semua backlog item project ini ikut terhapus.", "Tindakan ini tak bisa dibatalkan."],
+  confirmLabel: "Hapus project",
+  run: () => api.deleteProject(p.id),
+})) return;
+```
+
+`confirm(options)` sebuah `Promise<boolean>` supaya call site tetap satu baris di tengah fungsi
+async — itulah gerbangnya. Dialognya **dirender pemanggilnya sendiri** (`{dialog}`), bukan lewat
+Provider di akar App: layar di repo ini dirender berdiri sendiri di test, dan nilai default sebuah
+context akan menjawab "batal" atau "ya" **tanpa satu pun error**.
+
+- **`impact?: React.ReactNode[]`** → daftar `<ul>` di bawah `message`. Dampak berbaris-baris
+  (rename `Project.id`, harden VPS) tak lagi dipadatkan jadi satu string `\n`-terpisah.
+- **`icon?: string`** → menimpa ikon header **dan** ikon tombol konfirmasi. Aksi yang bukan hapus
+  memakai ikonnya sendiri (`pencil` rename, `key-round` cabut token, `ban` nonaktifkan,
+  `shield` mutasi VPS, `x-circle` tolak tiket); default tetap turunan `tone`.
+- **`run?: () => Promise<unknown>`** → dialog tetap terbuka & `busy` selama mutasi; cancel,
+  confirm, Tutup, Escape, dan klik overlay semuanya mati. Bila `run` melempar, `confirm()` ikut
+  melempar — `false` **hanya** berarti pembatalan, tak pernah kegagalan.
+- Tombol konfirmasi memakai `variant="danger"` (`--clay-600`) saat `tone="danger"`.
+
+Yang menjaganya tetap berlaku adalah **test pemindai sumber**, bukan disiplin — pola yang sama
+dengan kontrak placeholder di bawah. `src/test/confirm-inventory.test.ts` (+
+`test/helpers/native-confirm.ts`) memindai `src/src/**` dan menegakkan tiga hal: tak ada
+`window.confirm` tanpa komentar `confirm-exempt: <alasan>`, daftar pengecualian persis satu, dan
+setiap `= useConfirm(` diimbangi `{dialog}` yang dirender (lupa merendernya membuat promise
+menggantung selamanya tanpa gejala apa pun). Satu pengecualian: `GitGraph` "Dorong tag ke origin?"
+— jawabannya **nilai** `push`, bukan izin, dan membatalkannya tetap membuat tag.
+
+`Modal` (`ds/kit.tsx`) tak disentuh: focus trap, focus restore ke pemicu, `aria-modal`, dan
+`onClose` yang `undefined` saat `busy` sudah ada di sana. Fokus awal jatuh ke tombol **"Tutup"** di
+header (kontrol aman); React `autoFocus` tak bisa memindahkannya karena layout effect `Modal`
+berjalan sesudah `commitMount` anaknya.
+
 ## Placeholder tiap field form (SPEC-490)
 
 Aturan isinya ada di [design-system](../design-system/design-system.md). Yang menjaganya
@@ -975,7 +1029,7 @@ terpetakan otomatis. Layout minimal (bone paper, `Card`/`Button`/`Select`/`State
 `GitGraph`, `!document.hidden`). Master→detail: daftar tiket (Badge status + kategori, judul, email, waktu
 relatif, badge **"belum ditinjau"** dari `unreviewed`) + filter project/status + cari; detail = isi penuh +
 **lampiran** (thumbnail via `GET /tickets/:id/attachments/:attId`, ber-auth same-origin) + email + tombol
-**Terima** (Select prioritas → `api.acceptTicket`) & **Tolak** (`window.confirm` → `api.rejectTicket`) + tautan
+**Terima** (Select prioritas → `api.acceptTicket`) & **Tolak** (`useConfirm` → `api.rejectTicket`) + tautan
 `→ SPEC-N` bila sudah promoted. **Terima** → `onAccepted(spec)` → `setProjectFilter` + `setSection("backlog")` + toast.
 
 **Kartu Help Center** di `ProjectDetailScreen.tsx` (`HelpCenterCard`): toggle

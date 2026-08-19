@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
-import { beginSession, finishSession } from "../src/services/session-history";
+import { beginSession, finishSession, reconcileHistory } from "../src/services/session-history";
 
 const app = buildApp();
 const clean = async () => {
@@ -82,8 +82,40 @@ describe("GET/DELETE /api/terminal/history (SPEC-362)", () => {
     await seed(4);
     expect((await app.inject({ method: "DELETE", url: "/api/terminal/history", headers: { cookie } })).statusCode).toBe(400);
     const r = await app.inject({ method: "DELETE", url: "/api/terminal/history?projectId=p1", headers: { cookie } });
-    expect(r.json().purged).toBe(2);
+    // SPEC-845 · ADR-0126 · pemanggil harus bisa membedakan sukses penuh dari sukses sebagian.
+    expect(r.json()).toMatchObject({ purged: 2, transcriptsDeleted: 0, transcriptsFailed: 0 });
     expect((await app.inject({ method: "GET", url: "/api/terminal/history", headers: { cookie } })).json().total).toBe(2);
+  });
+
+  it("purge melaporkan berkas transkrip yang gagal dihapus", async () => {
+    const cookie = await login();
+    await beginSession({ sessionId: "t9", projectId: "p9", kind: "shell", agent: "claude", cwd: "/r" });
+    await finishSession({ sessionId: "t9", exitCode: 0, transcript: "isi" });
+    chmodSync(process.env.HANOMAN_TRANSCRIPT_DIR!, 0o500);
+    try {
+      const r = await app.inject({ method: "DELETE", url: "/api/terminal/history?projectId=p9", headers: { cookie } });
+      expect(r.statusCode).toBe(200);
+      expect(r.json()).toMatchObject({ purged: 1, transcriptsDeleted: 0, transcriptsFailed: 1 });
+    } finally {
+      chmodSync(process.env.HANOMAN_TRANSCRIPT_DIR!, 0o700);
+    }
+  });
+
+  // SPEC-844 · ADR-0125 · kedua kolom baru harus MENYEBERANG kawat: tanpa itu klien tak punya cara
+  // membedakan sesi yang ditutup operator dari sesi yang mati bersama tmux.
+  it("endedReason & reconciledAt sampai ke klien, dan membedakan kedua jalur tutup", async () => {
+    const cookie = await login();
+    await beginSession({ sessionId: "ditutup", projectId: "p1", kind: "shell", agent: "claude", cwd: "/r" });
+    await finishSession({ sessionId: "ditutup", exitCode: null, transcript: null });
+    await beginSession({ sessionId: "zombie", projectId: "p1", kind: "shell", agent: "claude", cwd: "/r" });
+    expect(await reconcileHistory([])).toBe(1);
+
+    const items = (await app.inject({ method: "GET", url: "/api/terminal/history", headers: { cookie } }))
+      .json().items as { sessionId: string; endedReason: string | null; reconciledAt: string | null }[];
+    const by = Object.fromEntries(items.map((r) => [r.sessionId, r]));
+    expect(by["ditutup"]).toMatchObject({ endedReason: "closed", reconciledAt: null });
+    expect(by["zombie"]!.endedReason).toBe("reconciled");
+    expect(Date.parse(by["zombie"]!.reconciledAt!)).toBeGreaterThan(0);
   });
 
   it("before bukan tanggal valid → 400", async () => {
