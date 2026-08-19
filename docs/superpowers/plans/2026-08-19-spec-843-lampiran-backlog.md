@@ -1874,12 +1874,12 @@ git commit -m "feat(ui): unggah & kelola lampiran backlog di form buat + detail 
 **Interfaces:**
 - Consumes: bentuk endpoint dari Task 5, model dari Task 1.
 
-- [ ] **Step 1: Baca kontrak naskah agen**
+- [x] **Step 1: Baca kontrak naskah agen**
 
 Run: `sed -n '1,80p' server/test/agent-doc-contract.test.ts`
 Tujuan: tahu apa yang diuji (mis. setiap endpoint di tabel harus punya capability yang cocok dengan `capabilityForRoute`).
 
-- [ ] **Step 2: Tambahkan bagian model di `internal/docs/architecture/data-model.md`**
+- [x] **Step 2: Tambahkan bagian model di `internal/docs/architecture/data-model.md`**
 
 Tepat setelah bagian `## Ticket / TicketAttachment`, tambahkan:
 
@@ -1905,7 +1905,7 @@ untuk tampilan saja.
   (sekamar `.phases`, **di luar** worktree) dengan `INDEX.md`, direkonsiliasi penuh tiap perubahan.
 ```
 
-- [ ] **Step 3: Tambahkan endpoint di `internal/docs/architecture/api-contract.md`**
+- [x] **Step 3: Tambahkan endpoint di `internal/docs/architecture/api-contract.md`**
 
 Cari bagian route `/specs` (blok yang memuat `POST /specs/:id/done`) dan tambahkan sesudahnya:
 
@@ -1925,7 +1925,7 @@ GET    /specs/:id/attachments/:attId      # 200 byte (Content-Type mime, Content
 DELETE /specs/:id/attachments/:attId      # 200 { ok:true } | 404
 ```
 
-- [ ] **Step 4: Perbarui `docs/agent-integration.md`**
+- [x] **Step 4: Perbarui `docs/agent-integration.md`**
 
 Di tabel §6 (endpoint yang paling sering dipakai), tepat setelah baris `POST /api/specs/:id/done`:
 
@@ -1953,7 +1953,7 @@ Tambahkan juga catatan di §9 (jebakan yang sudah diketahui):
   manusia, kamu mungkin sedang bicara ke instance yang bukan tempat lampiran itu diunggah.
 ```
 
-- [ ] **Step 5: Verifikasi index & kontrak naskah agen**
+- [x] **Step 5: Verifikasi index & kontrak naskah agen**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/agent-doc-contract.test.ts server/test/agent-doc.route.test.ts server/test/agent-capabilities.test.ts`
 Expected: PASS.
@@ -1961,7 +1961,7 @@ Expected: PASS.
 Run: `node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli exec tsx src/index.ts docs index --check`
 Expected: index bersih (ADR-0124 sudah ter-link dari Task Spec).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs docs/agent-integration.md
