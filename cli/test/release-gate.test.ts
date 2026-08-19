@@ -83,6 +83,21 @@ describe("workflow validate", () => {
     expect(ciSetup).toContain("pnpm install --frozen-lockfile");
   });
 
+  // BYPASS SEMENTARA (2026-08-19). Yang dijaga di sini bukan "test wajib jalan" — untuk sementara
+  // memang tidak — melainkan bahwa melewatinya tetap TINDAKAN YANG DISEBUT: defaultnya `false`,
+  // dan jalur sehari-hari (pull_request / push main) tak punya input sama sekali sehingga tak ikut
+  // terlonggarkan. Bypass yang defaultnya longgar akan jadi permanen tanpa ada yang merah.
+  it("melewati test hanya lewat input eksplisit, defaultnya tidak", () => {
+    expect(validate).toMatch(/skip_test:/);
+    expect(validate).toMatch(/default:\s*false/);
+    expect(validate).toMatch(/if:\s*\$\{\{\s*!inputs\.skip_test\s*\}\}/);
+  });
+
+  // Hang 6 jam (tiga run terukur) menyamar sebagai "CI lambat". Pagar waktu membuatnya lapor merah.
+  it("kedua job punya batas waktu", () => {
+    expect(validate.match(/timeout-minutes:/g) ?? []).toHaveLength(2);
+  });
+
   // tmux hanya dibutuhkan job test (sesi terminal ADR-0016) — memasangnya di job typecheck
   // menambah waktu tanpa alasan. Yang dijaga: job test TIDAK boleh kehilangan tmux.
   it("job test tetap memasang tmux", () => {

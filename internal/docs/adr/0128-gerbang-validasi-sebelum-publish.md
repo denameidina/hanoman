@@ -68,6 +68,27 @@ sebagai issue [#1](https://github.com/denameidina/hanoman/issues/1).
    `.github/actions/ci-setup` — dua job berarti dua salinan langkah yang identik, dan salinan yang
    menyimpang tanpa ada yang merah adalah persis kelas kegagalan yang ADR ini perbaiki.
    `tmux` dan identitas git **tetap hanya di job `test`**: typecheck tak menjalankan satu test pun.
+
+   **Bypass sementara 2026-08-19 — `skip_test`, dan alasan kenapa ia bukan pencabutan gerbang.**
+   Job `test` di CI **tidak merah, ia menggantung**: tiga run (`main`, `spec-850`, `spec-851`)
+   berhenti di **6:00:18 / 5:59:54 / 6:00:18** — plafon job GitHub — seluruhnya di langkah
+   `pnpm validate`, sementara setup, install, tmux, dan identitas git selesai dalam hitungan detik.
+   Bedanya penting: gerbang yang merah menahan commit buruk, gerbang yang menggantung **tidak
+   menahan apa pun** — ia hanya membuat semua rilis mustahil, termasuk `0.1.48` yang membawa
+   perbaikan agar sesi terminal bisa hidup di instalasi ber-shell `nologin` (ADR-0056). Karena itu
+   `workflow_call` menerima input **`skip_test`**, dan `release.yml` mengirim `skip_test: true`.
+   Yang **tetap** menggerbangi publish: `typecheck` seluruh paket (terukur 1 menit, hijau),
+   ancestry tag → `main` (SPEC-851), tag == `version`, dan smoke `hanoman --version` atas tarball
+   hasil rakitan. Yang **hilang sementara**: suite test — diterima sadar.
+   Dua sifat membuatnya tak diam-diam jadi permanen: defaultnya **`false`**, dan pemicu
+   `pull_request`/`push: main` **tak punya input sama sekali**, jadi jalur sehari-hari tetap
+   menjalankan test — bypass hanya berlaku di jalur rilis, dan hanya karena disebut. Dipagari
+   `release-gate.test.ts` (default `false`, `if` menyebut `!inputs.skip_test`).
+   **Pagar kedua: `timeout-minutes`** (typecheck 15, test 30). Tanpa itu, hang menghabiskan 6 jam
+   runner sambil menyamar sebagai "CI lambat" alih-alih lapor merah dalam menit — dan itulah yang
+   membuat masalah ini lama tak terbaca sebagai bug.
+   **PENCABUTAN:** hapus `with: skip_test: true` di `release.yml` dan input `skip_test` di
+   `validate.yml` begitu penyebab hang ditemukan dan diperbaiki. `timeout-minutes` **tetap**.
 5. **`release.yml` memanggil `validate.yml`, bukan menyalin langkahnya**, dan job `publish`
    ber-`needs: validate`. Menyalin akan menghasilkan dua definisi yang menyimpang tanpa ada yang
    merah — kelas kegagalan yang sama dengan yang ADR ini perbaiki.

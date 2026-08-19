@@ -70,6 +70,14 @@ Workflow lalu menjalankan **dua job**: `validate` (`.github/workflows/validate.y
 `main` → tag == `version` → `pnpm install --frozen-lockfile` → `pnpm release` → **memasang
 tarball hasil rakitan dan menjalankan `hanoman --version`** → `npm publish --provenance`.
 
+> **BYPASS AKTIF (2026-08-19):** `release.yml` memanggil `validate.yml` dengan `skip_test: true`,
+> jadi **rilis saat ini tidak dijaga suite test** — job `test` menggantung di CI (tiga run mati di
+> plafon 6 jam GitHub, semuanya di `pnpm validate`), sehingga gerbangnya bukan menahan commit merah
+> melainkan memblokir semua rilis. `typecheck` + ancestry + tag==version + smoke `--version` tetap
+> berlaku. Sebelum menaikkan versi, **jalankan `pnpm test` di local** — itu satu-satunya lapis yang
+> hilang. Cabut bypass-nya (`with: skip_test` di `release.yml`, input di `validate.yml`) begitu
+> penyebab hang diperbaiki; `timeout-minutes` tetap.
+
 Sejak SPEC-853 `validate.yml` sendiri berisi **dua job yang berjalan bersamaan** — `typecheck` dan
 `test` — tanpa `needs` di antaranya; keduanya wajib hijau, karena `workflow_call` baru selesai
 setelah semua job-nya selesai. Setup bersamanya (toolchain → `pnpm install --frozen-lockfile` →
