@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
-  zPortalChatType, periodKeyOf,
+  zPortalChatType, TEKS_TETAP,
   type PortalChatMessageView, type PortalChatSessionView,
 } from "@hanoman/shared";
 import { prisma } from "../db";
@@ -10,6 +10,7 @@ import { hasProjectAccess } from "../services/client-access";
 import { getSetting } from "../services/settings";
 import { runTurn } from "../services/portal-chat/turn";
 import { sanitizeClientText } from "../services/portal-chat/guard-input";
+import { quotaView, startSessionWithQuota } from "../services/portal-chat/quota";
 
 // SPEC-854 · ADR-0129 · permukaan chat klien. Ia hidup di berkas sendiri, bukan di `portal.ts`:
 // portal.ts adalah permukaan BACA + satu pintu tiket, dan menaruh mesin percakapan di sana
@@ -53,6 +54,13 @@ export default async function (app: FastifyInstance) {
     return s && s.projectId === projectId && s.userId === userId ? s : null;
   }
 
+  app.get("/portal/projects/:id/chat", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const cfg = await gate(req.user!.id, id);
+    if (!cfg) return reply.code(404).send(NOT_FOUND);
+    return quotaView(id, cfg);
+  });
+
   app.get("/portal/projects/:id/chat/sessions", async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!(await gate(req.user!.id, id))) return reply.code(404).send(NOT_FOUND);
@@ -68,10 +76,13 @@ export default async function (app: FastifyInstance) {
     if (!cfg) return reply.code(404).send(NOT_FOUND);
     const parsed = zStart.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "tipe sesi tak dikenal" });
-    const s = await prisma.portalChatSession.create({ data: {
-      projectId: id, userId: req.user!.id, type: parsed.data.type,
-      periodKey: periodKeyOf(new Date()) } });
-    return reply.code(201).send(toSessionView(s));
+    const hasil = await startSessionWithQuota({
+      projectId: id, userId: req.user!.id, type: parsed.data.type, cfg });
+    // BUKAN pesan galat: klien membaca sisa jatah & tanggal resetnya dalam bahasa biasa (huruf C).
+    // Statusnya tetap 409 supaya klien HTTP tak menganggapnya sesi yang lahir.
+    if ("error" in hasil)
+      return reply.code(409).send({ pesan: TEKS_TETAP.kuotaHabis, kuota: await quotaView(id, cfg) });
+    return reply.code(201).send(toSessionView(hasil.session));
   });
 
   app.get("/portal/projects/:id/chat/sessions/:sid", async (req, reply) => {

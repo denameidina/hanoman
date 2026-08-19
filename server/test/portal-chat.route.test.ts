@@ -127,6 +127,35 @@ describe("route chat portal klien (SPEC-854)", () => {
     expect(r.json().items).toHaveLength(2);
   });
 
+  it("jatah habis → kalimat biasa + sisa jatah + tanggal reset, bukan pesan galat", async () => {
+    const { cookie } = await seed(); jawab();
+    await prisma.setting.update({ where: { id: 1 }, data: {
+      data: setting({ ...PORTAL_CHAT_DEFAULTS, enabled: true, askPerMonth: 1 }) as object } });
+    expect((await mulai(cookie)).statusCode).toBe(201);
+    const b = await mulai(cookie);
+    expect(b.statusCode).toBe(409);
+    expect(b.json().pesan).toBe(TEKS_TETAP.kuotaHabis);
+    expect(b.json().kuota).toMatchObject({ tanya: { sisa: 0, jatah: 1 } });
+    expect(b.json().kuota.resetPada).toMatch(/^\d{4}-\d{2}-01T00:00:00\.000Z$/);
+    expect(JSON.stringify(b.json())).not.toMatch(/error|Error/);
+  });
+
+  it("kuota terbaca klien lewat GET …/chat", async () => {
+    const { cookie } = await seed();
+    const r = await app.inject({ method: "GET", url: "/api/portal/projects/p1/chat",
+      headers: { cookie } });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toMatchObject({ enabled: true, tanya: { terpakai: 0 },
+      brainstorm: { terpakai: 0 } });
+  });
+
+  it("kuota project bukan haknya → 404 yang sama", async () => {
+    const { cookie } = await seed();
+    const r = await app.inject({ method: "GET", url: "/api/portal/projects/p2/chat",
+      headers: { cookie } });
+    expect(r.statusCode).toBe(404);
+  });
+
   // Riwayat yang diteruskan ke runTurn adalah giliran SEBELUM pesan baru, urut, tanpa duplikat.
   it("riwayat diputar ulang urut ke mesin", async () => {
     const { cookie } = await seed(); jawab();
