@@ -614,7 +614,7 @@ git commit -m "feat(app): hapus project & rename id memakai dialog konfirmasi ap
 **Interfaces:**
 - Consumes: `useConfirm` (Task 2).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/docs-delete-confirm.test.tsx`:
 
@@ -678,14 +678,14 @@ describe("DocsWorkspace hapus doc · konfirmasi aplikasi (SPEC-847)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 Run: `pnpm vitest --run src/test/docs-delete-confirm.test.tsx`
 Expected: FAIL — `screen.findByRole("dialog")` timeout: `window.confirm` di jsdom memulangkan `undefined`, jadi `removeDoc` berhenti di baris pertamanya.
 
 **Bila mock modul di atas kurang lengkap** (DocsWorkspace memanggil API lain saat mount), lengkapi daftar `vi.mock` sesuai impor nyata berkas itu — jangan mengubah komponennya agar cocok dengan test.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/screens/DocsWorkspace.tsx`:
 
@@ -726,12 +726,12 @@ Di `src/src/screens/DocsWorkspace.tsx`:
   );
 ```
 
-- [ ] **Step 4: Verifikasi**
+- [x] **Step 4: Verifikasi**
 
 Run: `pnpm vitest --run src/test/docs-delete-confirm.test.tsx src/test/docs-tree.test.ts src/test/doc-download-screens.test.tsx`
 Expected: PASS semua.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/DocsWorkspace.tsx src/test/docs-delete-confirm.test.tsx

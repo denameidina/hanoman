@@ -2,7 +2,7 @@
    to the API: tree+coverage from GET /docs, file bodies from GET/PUT
    /docs/*path (server-persisted, replacing the prototype's localStorage). */
 import React from "react";
-import { Card, StatusPill, Badge, Button, ProgressBar, Icon, StateBlock, MarkdownView, DocDownload, ResponsivePanels } from "../ds";
+import { Card, StatusPill, Badge, Button, ProgressBar, Icon, StateBlock, MarkdownView, DocDownload, ResponsivePanels, useConfirm } from "../ds";
 import { api } from "../api/client";
 import { usePersistedState, scoped, isStr } from "../ui-state";
 
@@ -105,6 +105,8 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
   const [panel, setPanel] = React.useState<"tree" | "viewer">("tree");
   const [draft, setDraft] = React.useState("");
   const [scanning, setScanning] = React.useState(false);
+  // SPEC-847 · ADR-0125 · konfirmasi hapus dokumen memakai dialog aplikasi.
+  const { confirm, dialog } = useConfirm();
   const [ixStatus, setIxStatus] = React.useState<"loading" | "ready" | "error">("loading");
   const [ixTry, setIxTry] = React.useState(0);
 
@@ -172,8 +174,13 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
     try { await reloadIndex(); } finally { setScanning(false); }
   }
   async function removeDoc() {
-    if (!selected || !window.confirm(`Hapus ${selected}? File aslinya di disk akan dihapus.`)) return;
-    await api.deleteDoc(projectId, selected);
+    if (!selected) return;
+    if (!await confirm({
+      title: `Hapus ${selected}?`,
+      message: "Berkas aslinya di disk ikut dihapus — dokumen ini adalah Source of Truth project.",
+      confirmLabel: "Hapus dokumen",
+      run: () => api.deleteDoc(projectId, selected),
+    })) return;
     setCache((c) => { const n = { ...c }; delete n[selected]; return n; });
     await reloadIndex();
   }
@@ -186,6 +193,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
     // (bukan `height`, SPEK-351), jadi item ber-basis-auto memakai tinggi ISI-nya dan justru
     // menumbuhkan halaman — terukur pane 6000 px + halaman ikut menggulir. Basis 0 membuat
     // tinggi container pasti lebih dulu, lalu item mengisi sisanya.
+    <>
     <ResponsivePanels
       ariaLabel="Panel Docs"
       active={panel}
@@ -296,5 +304,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
         ) },
       ]}
     />
+    {dialog}
+    </>
   );
 }
