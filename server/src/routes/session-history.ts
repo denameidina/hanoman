@@ -34,6 +34,9 @@ export default async function (app: FastifyInstance) {
       cut = new Date(before);
       if (Number.isNaN(cut.getTime())) return reply.code(400).send({ error: "before bukan tanggal valid" });
     }
-    return { purged: await purgeHistory({ projectId, before: cut }) };
+    // SPEC-845 · ADR-0126 · barisnya memang terhapus meski berkasnya tidak, jadi ini tetap 200 —
+    // `transcriptsFailed` yang menyatakan sukses SEBAGIAN. Berkas yang tertinggal jadi yatim dan
+    // dipungut `reconcileTranscripts()` di sweep retensi berikutnya.
+    return purgeHistory({ projectId, before: cut });
   });
 }

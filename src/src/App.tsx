@@ -4,7 +4,7 @@
 import React from "react";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, Tabs, Toast, useToast, Icon, StateBlock } from "./ds";
+import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, Tabs, Toast, useToast, Icon, StateBlock, useConfirm } from "./ds";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
@@ -13,6 +13,7 @@ import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, co
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
+import { AttachmentPicker } from "./screens/SpecAttachments";
 import { AuthScreen } from "./screens/AuthScreen";
 import { ClientPortal } from "./portal/ClientPortal";
 import { AuthProvider } from "./auth/AuthContext";
@@ -48,7 +49,9 @@ type SpecForm = { kind: string; project: string; title: string; context: string;
   // SPEC-407 · ADR-0089 · backlog goal: goal yang dikejar + bukti berhentinya.
   goal: string; done: string;
   // SPEC-447 · ADR-0093 · backlog yang harus selesai & ter-merge sebelum item ini boleh jalan.
-  dependsOn: string[] };
+  dependsOn: string[];
+  // SPEC-843 · ADR-0124 · lampiran yang ditahan di memori sampai item lahir — ia butuh specId.
+  attachments: File[] };
 // SPEC-210 (PRD take-to-backlog) + SPEC-237 (promosi audit → Finding QA) menyeed NewSpecModal.
 // Semua opsional → PrdPrefill (field wajib) tetap assignable ke sini.
 // SPEC-244 · branchFrom (teruskan branch PRD/audit) + fromAudit (sinyal skip-audit) juga di-seed.
@@ -295,7 +298,8 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
     priority: "sedang", severity: prefill?.severity ?? "major", steps: prefill?.steps ?? "",
     expected: "", actual: prefill?.actual ?? "", env: "", branchFrom: prefill?.branchFrom ?? "", fromAudit: prefill?.fromAudit ?? "",
     goal: prefill?.goal ?? "", done: prefill?.done ?? "",   // SPEC-407
-    dependsOn: [] };                                        // SPEC-447
+    dependsOn: [],                                          // SPEC-447
+    attachments: [] };                                      // SPEC-843
   const [f, setF] = React.useState<SpecForm>(blank);
   React.useEffect(() => {
     if (open) setF({ ...blank, project: prefill?.project || defaultProject });
@@ -467,6 +471,11 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
           </div>
         </>
       )}
+      {/* SPEC-843 · ADR-0124 · lampiran jadi konteks sesi agen, jadi ia bagian dari pengisian item —
+          bukan sesuatu yang baru bisa ditempel sesudahnya. */}
+      <Field label="Lampiran" hint="Gambar, log, CSV, JSON, atau PDF — sesi agen membacanya sebagai konteks">
+        <AttachmentPicker files={f.attachments} onChange={(list) => setF((s) => ({ ...s, attachments: list }))} />
+      </Field>
     </Modal>
   );
 }
@@ -697,6 +706,8 @@ export default function App() {
   // meski state-nya hidup di App.
   const [search, setSearch] = usePersistedState("projects", "q", "", isStr);
   const [modal, setModal] = React.useState<string | null>(null);
+  // SPEC-847 · ADR-0127 · konfirmasi destruktif memakai dialog aplikasi, bukan window.confirm.
+  const { confirm, dialog } = useConfirm();
   // SPEC-210 · prefill NewSpecModal saat "Take ke backlog" dari sebuah PRD.
   const [specPrefill, setSpecPrefill] = React.useState<SpecPrefill | null>(null);
   // SPEC-340 · ADR-0076 · eskalasi audit → PRD: modal brief PRD ter-prefill + asal auditnya.
@@ -813,11 +824,16 @@ export default function App() {
       // SPEC-255 · ADR-0064 · rename id lebih dulu (operasi khusus): konfirmasi dampak → renameProject.
       // Efek merambat: Help /help/<id> dan sync ke server (hub ikut berganti).
       if (newId && newId !== proj.id) {
-        if (!window.confirm(
-          `Ganti ID project "${proj.id}" → "${newId}"?\n\n` +
-          `Ini berpengaruh ke SEMUA yang terkait project:\n` +
-          `• Link Help Center publik berubah jadi /help/${newId} — tautan lama rusak.\n` +
-          `• Perubahan dirambatkan (sync) ke server; server ikut berganti id.`)) return;
+        if (!await confirm({
+          title: `Ganti ID project "${proj.id}" → "${newId}"?`,
+          message: "Ini berpengaruh ke SEMUA yang terkait project:",
+          impact: [
+            <>Link Help Center publik berubah jadi <code>/help/{newId}</code> — tautan lama rusak.</>,
+            "Perubahan dirambatkan (sync) ke server; server ikut berganti id.",
+          ],
+          confirmLabel: "Ganti ID",
+          icon: "pencil",
+        })) return;
         const r = await api.renameProject(proj.id, newId);
         if (r.helpUrl) showToast("Help Center baru: " + r.helpUrl, "ok", "life-buoy");
       }
@@ -905,9 +921,14 @@ export default function App() {
 
   // Cascade di DB ikut menghapus spec project ini — cermin state lokalnya.
   async function deleteProject(p: ProjectVM) {
-    if (!window.confirm(`Hapus project "${p.name}"? Semua spec-nya ikut terhapus.`)) return;
     try {
-      await api.deleteProject(p.id);
+      if (!await confirm({
+        title: `Hapus project "${p.name}"?`,
+        message: `Project "${p.id}" dan seluruh isinya dihapus dari dashboard ini.`,
+        impact: ["Semua backlog item project ini ikut terhapus.", "Tindakan ini tak bisa dibatalkan."],
+        confirmLabel: "Hapus project",
+        run: () => api.deleteProject(p.id),
+      })) return;
       setProjects((list) => list.filter((x) => x.id !== p.id));
       setBacklog((b) => b.filter((s) => s.projectId !== p.id));
       setSessions((t) => t.filter((x) => x.projectId !== p.id));
@@ -1193,6 +1214,15 @@ export default function App() {
         // SPEC-447 · ADR-0093 · dikirim hanya bila ada isinya; server yang memvalidasi.
         ...(f.dependsOn.length ? { dependsOn: f.dependsOn } : {}) });
       setBacklog((b) => [created, ...b]);
+      // SPEC-843 · ADR-0124 · unggah SESUDAH item lahir — lampiran butuh specId. Kegagalannya tak
+      // boleh membatalkan item yang sudah jadi; operator bisa mengulang unggah dari detail backlog.
+      if (f.attachments.length) {
+        const up = await api.uploadSpecAttachments(created.id, f.attachments).catch(() => null);
+        if (!up) showToast("Item dibuat, tapi lampiran gagal diunggah", "warn", "paperclip");
+        else if (up.rejected.length)
+          showToast(`${up.rejected.length} lampiran ditolak: ${up.rejected.map((x) => x.filename).join(", ")}`,
+            "warn", "paperclip");
+      }
       setModal(null); setSpecPrefill(null); setSection("backlog");
       const toastMsg = f.kind === "audit" ? " dibuat · audit-only (dokumen)"
         : f.kind === "no_effort" ? " dibuat · sesi satu fase (Kerjakan)"
@@ -1456,6 +1486,7 @@ export default function App() {
             const noRepo = e instanceof ApiError && (e.status === 400 || e.status === 422);
             showToast((startSpec?.id ?? "") + " · gagal mulai sesi" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
           }} />
+        {dialog}
         <Toast toast={toast} />
       </NotificationsProvider>
     </AuthProvider>

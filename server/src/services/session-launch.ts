@@ -8,6 +8,7 @@ import { ensureCodexTrust } from "./codex-trust";
 import { createSession, getSession, killSession, sessionIdForSpec } from "./pty";
 import { blockersForSpec, blockedNote, type SpecBlocker } from "./spec-deps";
 import { phaseFilePath, decisionFilePath, readPhases } from "./session-phases";
+import { specAttachmentsDir, syncSpecAttachmentsDir } from "./spec-attachment-dir";
 import { assertLaunchApproved } from "./launch-authority";
 
 // Re-ekspor supaya pemanggil (governor, test) punya satu titik impor jalur peluncuran.
@@ -185,6 +186,13 @@ export async function startSpecSession(
     if (stamped) await prisma.spec.update({ where: { id: spec.id }, data: { payload: stamped } });
   }
 
+  // SPEC-843 · ADR-0124 · lampiran dimaterialisasi ULANG di tiap kelahiran sesi, bukan hanya saat
+  // diunggah: worktree bisa dibangun ulang dan direktori materialisasi bisa ikut hilang bersamanya.
+  const attachments = {
+    dir: specAttachmentsDir(repoDir, id),
+    items: await syncSpecAttachmentsDir(spec.id, spec.projectId),
+  };
+
   const brief = {
     id: spec.id, title: spec.title, source: spec.source,
     priority: spec.priority, objective: spec.objective, payload: spec.payload ?? undefined,
@@ -195,14 +203,14 @@ export async function startSpecSession(
     // SPEC-407 · satu builder untuk ketiga keadaan sesi goal: `continuePrompt`/`resumePrompt`
     // bicara plan berkotak & fase perencanaan, dan sesi goal tak punya keduanya.
     prompt = startGoalPrompt(opts.flow as "goal" | "no_effort", brief, branchTo, {
-      autonomy: opts.autonomy, verifyScope, resume: resumeCtx, method: method.id,
+      autonomy: opts.autonomy, verifyScope, resume: resumeCtx, method: method.id, attachments,
     });
   } else if (isContinue) {
-    prompt = continuePrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id);
+    prompt = continuePrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id, attachments);
   } else if (resumeCtx) {
-    prompt = resumePrompt(opts.flow, brief, branchTo, resumeCtx, opts.autonomy, verifyScope, method.id);
+    prompt = resumePrompt(opts.flow, brief, branchTo, resumeCtx, opts.autonomy, verifyScope, method.id, attachments);
   } else {
-    prompt = startPrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id);
+    prompt = startPrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id, attachments);
   }
   // SPEC-376 · ADR-0080 · env sesi. baseSha SUDAH dihitung di addWorktree di atas — tanpa
   // meneruskannya, klausa "berkas yang berubah" tak bisa dieksekusi tanpa menebak: worktree
@@ -212,6 +220,7 @@ export async function startSpecSession(
     specId: spec.id, flow: opts.flow, model, effort, goal, agent,
     phaseFile: phaseFilePath(repoDir, id),
     decisionFile: decisionFilePath(repoDir, id),
+    attachmentsDir: attachments.items.length ? attachments.dir : undefined,
     prompt,
     env: scopeEnv,
   });

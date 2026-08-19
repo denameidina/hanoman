@@ -34,6 +34,9 @@ export const zSessionHistory = z.object({
   title: z.string().nullable(), kind: z.string(), flow: z.string().nullable(), agent: z.string(),
   model: z.string().nullable(), effort: z.string().nullable(), branch: z.string().nullable(),
   cwd: z.string(), startedAt: z.string(), endedAt: z.string().nullable(),
+  // SPEC-844 · ADR-0125 · `string` longgar, bukan enum: baris lama null dan nilai asing dari
+  // instance lebih baru tak boleh melempar di boundary — `sessionOutcome()` yang menafsirkannya.
+  endedReason: z.string().nullable(), reconciledAt: z.string().nullable(),
   exitCode: z.number().nullable(), transcriptBytes: z.number().nullable(),
 });
 export type SessionHistoryView = z.infer<typeof zSessionHistory>;
@@ -646,6 +649,13 @@ export const zTicketAttachmentView = z.object({
   id: z.string(), filename: z.string(), mimeType: z.string(), size: z.number().int(),
 });
 export type TicketAttachmentView = z.infer<typeof zTicketAttachmentView>;
+// SPEC-843 · ADR-0124 · lampiran backlog item. Sengaja BUKAN zTicketAttachmentView: ia punya
+// `createdAt` (UI mengurut & menampilkannya) dan hidup di domain yang aturan sync-nya berbeda.
+export const zSpecAttachmentView = z.object({
+  id: z.string(), filename: z.string(), mimeType: z.string(),
+  size: z.number().int(), createdAt: z.string(),
+});
+export type SpecAttachmentView = z.infer<typeof zSpecAttachmentView>;
 export const zTicketDetail = zTicketView.extend({
   detail: z.string(),
   attachments: z.array(zTicketAttachmentView),
