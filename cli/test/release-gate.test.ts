@@ -12,6 +12,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const validate = read(".github/workflows/validate.yml");
 const release = read(".github/workflows/release.yml");
+const ciSetup = read(".github/actions/ci-setup/action.yml");
 const rootPkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
 const serverPkg = JSON.parse(read("server/package.json")) as { scripts: Record<string, string> };
 
@@ -54,8 +55,38 @@ describe("workflow validate", () => {
     expect(validate).toMatch(/^\s*workflow_call:/m);
   });
 
-  it("menjalankan `pnpm validate`", () => {
-    expect(validate).toContain("pnpm validate");
+  // SPEC-853 · Dulu satu job menjalankan `pnpm validate` (db:generate → typecheck → test) secara
+  // berurutan; wall-clock-nya = jumlah keduanya, dan test serial (SPEC-397) mendominasi. Dipisah
+  // jadi dua job yang berjalan BERSAMAAN. Yang dijaga bukan bentuk perintahnya melainkan
+  // CAKUPANNYA: kedua lapisan harus tetap ada, karena job yang hilang tak menggagalkan apa pun —
+  // ia hanya membuat publish lewat begitu saja (kelas kegagalan yang sama dengan issue #1).
+  it("menjalankan typecheck DAN test — keduanya, sebagai job terpisah", () => {
+    expect(validate).toMatch(/^\s{2}typecheck:/m);
+    expect(validate).toMatch(/^\s{2}test:/m);
+    expect(validate).toContain("pnpm typecheck");
+    expect(validate).toContain("pnpm test");
+  });
+
+  // Paralel hanya menghemat waktu bila tak ada `needs` di antara keduanya.
+  it("kedua job tak saling menunggu", () => {
+    expect(validate).not.toMatch(/needs:\s*typecheck/);
+    expect(validate).not.toMatch(/needs:\s*test/);
+  });
+
+  // Prisma Client tak ada di checkout bersih (ADR-0128): typecheck DAN test sama-sama mati
+  // tanpanya, dan job terpisah tak mewarisi apa pun dari job tetangga. Setup-nya hidup di composite
+  // action supaya tak jadi dua salinan yang menyimpang — yang dijaga: kedua job memakainya, dan
+  // action itu benar-benar men-generate client.
+  it("kedua job memakai setup bersama yang menyiapkan Prisma Client", () => {
+    expect(validate.match(/uses:\s*\.\/\.github\/actions\/ci-setup/g) ?? []).toHaveLength(2);
+    expect(ciSetup).toContain("pnpm db:generate");
+    expect(ciSetup).toContain("pnpm install --frozen-lockfile");
+  });
+
+  // tmux hanya dibutuhkan job test (sesi terminal ADR-0016) — memasangnya di job typecheck
+  // menambah waktu tanpa alasan. Yang dijaga: job test TIDAK boleh kehilangan tmux.
+  it("job test tetap memasang tmux", () => {
+    expect(validate.split(/^\s{2}test:/m)[1] ?? "").toContain("tmux");
   });
 });
 

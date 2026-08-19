@@ -1,0 +1,29 @@
+# SPEC-853 · Setup bersama job `typecheck` dan `test` di validate.yml. Ada sebagai composite action
+# karena kedua job butuh langkah yang IDENTIK (toolchain → install → Prisma Client), dan menyalinnya
+# ke dua tempat adalah kelas kegagalan yang sama dengan yang ADR-0128 perbaiki: salinan menyimpang
+# tanpa ada yang merah. Yang TIDAK ada di sini adalah yang memang cuma dipakai satu job — tmux dan
+# identitas git hanya dibutuhkan job test.
+name: hanoman ci setup
+description: Toolchain pnpm/node, dependensi terkunci, dan Prisma Client untuk job validasi.
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        # Root package.json tak punya field `packageManager`, jadi versinya dipatok di sini.
+        version: 11
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: pnpm
+
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+
+    # Checkout bersih TAK punya Prisma Client (ADR-0128): postinstall `@prisma/client` hanya mencari
+    # skema di lokasi default dan menyerah dengan peringatan. Tanpa langkah ini typecheck exit 2 dan
+    # test gagal saat collect. Diulang di tiap job karena job terpisah tak berbagi apa pun.
+    - run: pnpm db:generate
+      shell: bash

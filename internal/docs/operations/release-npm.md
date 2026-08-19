@@ -70,6 +70,12 @@ Workflow lalu menjalankan **dua job**: `validate` (`.github/workflows/validate.y
 `main` → tag == `version` → `pnpm install --frozen-lockfile` → `pnpm release` → **memasang
 tarball hasil rakitan dan menjalankan `hanoman --version`** → `npm publish --provenance`.
 
+Sejak SPEC-853 `validate.yml` sendiri berisi **dua job yang berjalan bersamaan** — `typecheck` dan
+`test` — tanpa `needs` di antaranya; keduanya wajib hijau, karena `workflow_call` baru selesai
+setelah semua job-nya selesai. Setup bersamanya (toolchain → `pnpm install --frozen-lockfile` →
+`pnpm db:generate`) hidup di composite action `.github/actions/ci-setup`; `tmux` dan identitas git
+hanya dipasang job `test`. Isi gerbangnya sama persis dengan sebelumnya:
+
 Job `validate` menjalankan **`pnpm validate`** = `pnpm db:generate` → `pnpm typecheck` (seluruh
 paket) → `pnpm test` (`vitest run --no-file-parallelism`) — perintah yang sama persis dengan yang
 dijalankan manusia di local ([ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md)). Sampai

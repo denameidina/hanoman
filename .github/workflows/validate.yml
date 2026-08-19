@@ -8,6 +8,13 @@
 # Berkas ini adalah SATU definisi gerbang itu, dipakai tiga pemicu: pull request, push ke main,
 # dan `release.yml` lewat `workflow_call`. Menyalin langkahnya ke release.yml berarti dua
 # definisi yang akan menyimpang tanpa ada yang merah.
+#
+# SPEC-853 · Gerbangnya kini DUA job yang berjalan bersamaan, bukan satu `pnpm validate` berurutan.
+# Wall-clock sebelumnya = typecheck + suite serial, dan suite serial itu tak bisa diparalelkan
+# (SPEC-397: test server berbagi satu berkas DB, 181 gagal palsu paralel vs 736 lulus serial). Yang
+# bisa diparalelkan adalah dua LAPISAN yang memang tak saling bergantung. Cakupannya tetap sama
+# persis — `pnpm validate` tetap ada dan tetap jalur local yang terdokumentasi; CI menjalankan
+# lapisan penyusunnya, dan `cli/test/release-gate.test.ts` menjaga tak ada lapisan yang hilang.
 name: validate
 
 on:
@@ -26,7 +33,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
+  # Tak ber-`needs`: justru itu inti pemisahannya. Job yang menunggu tetangganya tak menghemat
+  # apa pun. Keduanya wajib hijau — `workflow_call` baru selesai setelah SEMUA job-nya selesai,
+  # jadi `needs: validate` di release.yml tetap menunggu keduanya tanpa perubahan apa pun di sana.
+  typecheck:
+    runs-on: ubuntu-latest
+    env:
+      HANOMAN_UPDATE_FETCH: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ci-setup
+      - run: pnpm typecheck
+
+  test:
     runs-on: ubuntu-latest
     env:
       # Berkas DB test diturunkan dari HANOMAN_HOME, BUKAN dari checkout (SPEC-479). Di runner ia
@@ -34,23 +53,13 @@ jobs:
       HANOMAN_HOME: ${{ github.workspace }}/.hanoman-ci
       # Deteksi update menyentuh registry npm; validasi tak boleh bergantung pada jaringan.
       HANOMAN_UPDATE_FETCH: "0"
-
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          # Root package.json tak punya field `packageManager`, jadi versinya dipatok di sini.
-          version: 11
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
       # Sesi terminal hidup di tmux (ADR-0016) dan sebagian besar test server men-spawn pane
       # sungguhan lewat socket `hanoman-test`. Tanpa tmux mereka gagal karena lingkungan runner,
-      # bukan karena kode — kelas kegagalan yang paling mahal dibaca.
+      # bukan karena kode — kelas kegagalan yang paling mahal dibaca. Hanya job ini yang butuh:
+      # typecheck tak menjalankan satu test pun.
       - name: tmux (dipakai test sesi terminal)
         run: command -v tmux || { sudo apt-get update && sudo apt-get install -y tmux; }
 
@@ -61,9 +70,8 @@ jobs:
           git config --global user.email "ci@hanoman.invalid"
           git config --global user.name "hanoman CI"
 
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/ci-setup
 
-      # `pnpm validate` = `prisma generate` → typecheck seluruh paket → suite serial. Satu
-      # perintah, sama persis dengan yang dijalankan manusia di local — jalur validasi yang
-      # terdokumentasi hanya berguna kalau CI benar-benar menempuh jalur itu.
-      - run: pnpm validate
+      # `--no-file-parallelism` hidup di script `pnpm test` dan DIJAGA test: melepasnya membuat CI
+      # merah karena alasan yang salah, lalu membuat orang mematikan gerbangnya (SPEC-397).
+      - run: pnpm test

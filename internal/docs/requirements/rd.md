@@ -68,8 +68,10 @@ Sebelum sebuah perubahan boleh masuk `main`:
    hijau** — pastikan test-nya memang berjalan.
 2. **Suite penuh** (`vitest run --no-file-parallelism`) — langkah **manusia** sebelum merge, bukan tugas
    sesi. Sejak [ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md) ia **juga** dijalankan CI
-   (`.github/workflows/validate.yml`) pada tiap pull request dan push ke `main`, lewat satu perintah
-   `pnpm validate` = `pnpm db:generate` → `pnpm typecheck` → `pnpm test`. Job `publish` di
+   (`.github/workflows/validate.yml`) pada tiap pull request dan push ke `main`. Di local jalurnya
+   satu perintah, `pnpm validate` = `pnpm db:generate` → `pnpm typecheck` → `pnpm test`; di CI
+   lapisan itu dipecah jadi **dua job paralel** (`typecheck` dan `test`, SPEC-853) — cakupannya
+   sama, keduanya wajib hijau, hanya wall-clock-nya yang turun. Job `publish` di
    `release.yml` ber-`needs: validate`, jadi commit yang merah tak bisa terbit ke npm.
 3. **Docs tersentuh diperbarui & ter-link** di [internal/docs/README.md](../README.md); ADR baru ditaut
    di index utama **dan** sub-index [adr/README.md](../adr/README.md) (SPEC-386).

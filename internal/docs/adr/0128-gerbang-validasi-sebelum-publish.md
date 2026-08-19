@@ -50,6 +50,24 @@ sebagai issue [#1](https://github.com/denameidina/hanoman/issues/1).
 4. **Workflow `validate.yml` dengan tiga pemicu: `pull_request`, `push: main`, dan
    `workflow_call`.** Ia menjalankan `pnpm validate`, tak lebih — supaya CI menempuh **persis**
    jalur yang ditempuh manusia di local.
+
+   **Amandemen 2026-08-19 (SPEC-853) — dua job paralel, bukan satu perintah berurutan.**
+   Wall-clock gerbang ini = typecheck + suite serial, dijalankan berderet. Suite serialnya sendiri
+   **tak bisa diparalelkan** (SPEC-397, dan itu tak berubah), tapi typecheck dan test adalah dua
+   lapisan yang **tak saling bergantung** — menjalankannya berderet membayar jumlah keduanya untuk
+   informasi yang bisa datang bersamaan. `validate.yml` karena itu kini punya dua job tanpa `needs`
+   di antaranya: `typecheck` (`pnpm typecheck`) dan `test` (`pnpm test`). **Cakupan gerbang tidak
+   berkurang** — `workflow_call` baru selesai setelah semua job-nya selesai, jadi `needs: validate`
+   di `release.yml` tetap menunggu keduanya tanpa satu baris pun berubah di sana.
+   Yang **tidak** ikut berubah: `pnpm validate` tetap ada dan tetap satu jalur bernama yang
+   ditempuh manusia di local — poin 3 utuh. Yang bergeser hanya klaim "CI menjalankan perintah yang
+   sama persis": CI kini menjalankan **lapisan penyusunnya**, dan supaya pergeseran itu tak jadi
+   celah, `release-gate.test.ts` berhenti mencocokkan string `pnpm validate` dan mulai menuntut
+   **cakupan**: kedua job ada, keduanya menyebut lapisannya, dan tak satu pun ber-`needs` ke
+   tetangganya. Setup bersama (toolchain → install → `db:generate`) hidup di composite action
+   `.github/actions/ci-setup` — dua job berarti dua salinan langkah yang identik, dan salinan yang
+   menyimpang tanpa ada yang merah adalah persis kelas kegagalan yang ADR ini perbaiki.
+   `tmux` dan identitas git **tetap hanya di job `test`**: typecheck tak menjalankan satu test pun.
 5. **`release.yml` memanggil `validate.yml`, bukan menyalin langkahnya**, dan job `publish`
    ber-`needs: validate`. Menyalin akan menghasilkan dua definisi yang menyimpang tanpa ada yang
    merah — kelas kegagalan yang sama dengan yang ADR ini perbaiki.
