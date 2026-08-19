@@ -38,9 +38,16 @@ tanpa penopang tidak ditulis.
 - WHEN project `from-scratch` dibuat dengan direktori dipilih, THE SYSTEM SHALL `git init` direktori itu
   dan membuat commit seed bila belum ada HEAD; IF gagal, THEN THE SYSTEM SHALL menolak (400) tanpa
   meninggalkan baris project ([ADR-0052](../adr/0052-scaffold-flow-from-ide.md)).
-- WHERE project `existing` dipilih, THE SYSTEM SHALL menawarkan **Reverse docs** yang menyusun Source of
-  Truth dari codebase lewat sesi interaktif
-  ([ADR-0026](../adr/0026-reverse-docs-sesi-interaktif-project-level.md)).
+- WHEN project `existing` dibuat lewat CTA **Tambah/Clone → reverse-engineer docs** (kedua mode: folder
+  lokal dan clone dari URL git), THE SYSTEM SHALL memulai **tepat satu** sesi `reverse` untuk project itu
+  dan membuka Terminal; IF sesi gagal dimulai, THEN THE SYSTEM SHALL mempertahankan project, menampilkan
+  penyebabnya, dan mendaratkan operator di layar detail project tempat aksi **Reverse docs** mengulanginya
+  tanpa membuat project kedua (SPEC-848). Pada mode clone, sesi dimulai **sesudah** binding hasil clone
+  terbaca.
+- WHERE project punya path repo efektif, THE SYSTEM SHALL menawarkan aksi **Reverse docs** (`existing`) /
+  **Scaffold docs** (`from-scratch`) di layar detail project, digerbangi `LocalBinding ?? Project.repoDir`
+  — bukan `Project.repoDir` saja, yang menyembunyikannya dari project hasil clone
+  ([ADR-0026](../adr/0026-reverse-docs-sesi-interaktif-project-level.md), SPEC-848).
 - THE SYSTEM SHALL menurunkan path repo sebagai `resolveRepoDir = LocalBinding ?? Project.repoDir` di
   **seluruh** jalur baca (spawn, IDE, coverage, branches, specs, docs); `LocalBinding` bersifat per-mesin
   dan tidak ikut disinkronkan.
