@@ -282,6 +282,8 @@ export type CreateOpts = {
   goal?: string;
   // SPEC-338 · ADR-0074 · mesin sesi; kosong = claude (default historis).
   agent?: Agent;
+  // SPEC-843 · ADR-0124 · direktori lampiran backlog yang dimaterialisasi server.
+  attachmentsDir?: string;
   // Env tambahan di depan argv sesi (mis. HANOMAN_BASE_SHA / HANOMAN_VERIFY_SCOPE).
   env?: Record<string, string>;
 };
@@ -399,11 +401,13 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     mkdirSync(dirname(opts.phaseFile), { recursive: true });
     envPairs.push(`HANOMAN_PHASE_FILE=${sq(opts.phaseFile)}`);
   }
+  if (opts.attachmentsDir) envPairs.push(`HANOMAN_ATTACHMENTS_DIR=${sq(opts.attachmentsDir)}`);
   // Env tambahan dari pemanggil lewat jalur yang sama.
   for (const [k, v] of Object.entries(opts.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
   let cmd = envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
   if (!opts.command) cmd = sandboxCommand({
     command: cmd, worktree: cwd, phaseFile: opts.phaseFile, promptFile,
+    attachmentsDir: opts.attachmentsDir,
   });
   // SPEC-184 · direktori marker keputusan; hook Notification menulis absolute path di dalamnya.
   if (opts.decisionFile) mkdirSync(dirname(opts.decisionFile), { recursive: true });

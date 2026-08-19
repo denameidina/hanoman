@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { chmodSync, mkdtempSync } from "node:fs";
+import { chmodSync, mkdtempSync, existsSync, writeFileSync, utimesSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prisma } from "../src/db";
 import {
   beginSession, finishSession, listHistory, getHistory, transcriptOf, purgeHistory, reconcileHistory,
+  reconcileTranscripts,
 } from "../src/services/session-history";
+import { transcriptDir } from "../src/services/transcript-store";
 
 const clean = () => prisma.sessionHistory.deleteMany();
 beforeEach(async () => {
@@ -116,13 +118,167 @@ describe("session-history service (SPEC-362)", () => {
     expect((await getHistory(items[0]!.id))?.hasTranscript).toBe(false);
   });
 
+  // SPEC-844 · ADR-0125 · dua jalur tutup yang dulu tak terbedakan.
+  it("finishSession menandai baris `closed` dan TIDAK menyentuh reconciledAt", async () => {
+    await beginSession(birth({ sessionId: "tutup" }));
+    await finishSession({ sessionId: "tutup", exitCode: null, transcript: null });
+    const { items } = await listHistory({ q: "tutup" });
+    expect(items[0]).toMatchObject({ endedReason: "closed", reconciledAt: null });
+  });
+
+  it("reconcileHistory menandai `reconciled`, menstempel reconciledAt, dan endedAt tetap batas BAWAH", async () => {
+    await beginSession(birth({ sessionId: "zombie" }));
+    const born = await prisma.sessionHistory.findFirstOrThrow({ where: { sessionId: "zombie" } });
+    const before = Date.now();
+    expect(await reconcileHistory([])).toBe(1);
+    const row = await prisma.sessionHistory.findUniqueOrThrow({ where: { id: born.id } });
+    expect(row.endedReason).toBe("reconciled");
+    // endedAt = updatedAt SEBELUM update ini — batas bawah "terakhir diketahui hidup", bukan waktu
+    // boot. Memindahkannya ke waktu boot mengarang klaim bahwa sesinya hidup selama downtime.
+    expect(row.endedAt?.getTime()).toBe(born.updatedAt.getTime());
+    expect(row.reconciledAt).not.toBeNull();
+    expect(row.reconciledAt!.getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it("satu sapuan boot memberi SATU stempel reconciledAt untuk semua barisnya", async () => {
+    await beginSession(birth({ sessionId: "z1" }));
+    await beginSession(birth({ sessionId: "z2" }));
+    expect(await reconcileHistory([])).toBe(2);
+    const rows = await prisma.sessionHistory.findMany({ where: { sessionId: { in: ["z1", "z2"] } } });
+    expect(new Set(rows.map((r) => r.reconciledAt!.getTime())).size).toBe(1);
+  });
+
   it("purge menghapus baris ber-scope dan berkas transkripnya", async () => {
     await beginSession(birth({ sessionId: "x", projectId: "p9" }));
     await finishSession({ sessionId: "x", exitCode: 0, transcript: "akan dihapus" });
     const { items } = await listHistory({ projectId: "p9" });
     const id = items[0]!.id;
-    expect(await purgeHistory({ projectId: "p9" })).toBe(1);
+    expect(await purgeHistory({ projectId: "p9" }))
+      .toMatchObject({ purged: 1, transcriptsDeleted: 1, transcriptsFailed: 0 });
     expect((await listHistory({ projectId: "p9" })).total).toBe(0);
     expect(await transcriptOf(id)).toBeNull();
+  });
+});
+
+// SPEC-845 · ADR-0126 · urutan penghapusan purge. Bukti transkrip tak boleh hancur untuk baris yang
+// SELAMAT; sisa yang boleh ada hanyalah berkas yatim, karena hanya ia yang bisa dipulihkan.
+describe("durabilitas purge (SPEC-845)", () => {
+  const seed = async (sessionId: string, transcript: string) => {
+    await beginSession({ sessionId, projectId: "p9", kind: "shell", agent: "claude", cwd: "/r" });
+    await finishSession({ sessionId, exitCode: 0, transcript });
+  };
+
+  it("deleteMany yang melempar tak menghancurkan transkrip baris yang selamat", async () => {
+    await seed("x", "BUKTI-INSIDEN");
+    const id = (await listHistory({ projectId: "p9" })).items[0]!.id;
+
+    const asli = prisma.sessionHistory.deleteMany;
+    (prisma.sessionHistory as unknown as Record<string, unknown>).deleteMany = async () => {
+      throw new Error("SQLITE_BUSY");
+    };
+    try {
+      await expect(purgeHistory({ projectId: "p9" })).rejects.toThrow("SQLITE_BUSY");
+    } finally {
+      (prisma.sessionHistory as unknown as Record<string, unknown>).deleteMany = asli;
+    }
+
+    expect((await listHistory({ projectId: "p9" })).total).toBe(1);
+    expect((await getHistory(id))?.hasTranscript).toBe(true);
+    expect((await transcriptOf(id))?.text).toBe("BUKTI-INSIDEN");
+  });
+
+  it("berkas yang gagal dihapus dilaporkan, tanpa menahan penghapusan barisnya", async () => {
+    await seed("y", "isi");
+    chmodSync(transcriptDir(), 0o500);  // direktori read-only → unlink EACCES
+    try {
+      expect(await purgeHistory({ projectId: "p9" }))
+        .toMatchObject({ purged: 1, transcriptsDeleted: 0, transcriptsFailed: 1 });
+    } finally {
+      chmodSync(transcriptDir(), 0o700);
+    }
+    expect((await listHistory({ projectId: "p9" })).total).toBe(0);
+    expect(readdirSync(transcriptDir())).toHaveLength(1);  // yatim — dipungut reconcileTranscripts
+  });
+
+  it("purge idempoten: pengulangan mengembalikan nol tanpa melempar", async () => {
+    await seed("z", "isi");
+    expect((await purgeHistory({ projectId: "p9" })).purged).toBe(1);
+    expect(await purgeHistory({ projectId: "p9" }))
+      .toMatchObject({ purged: 0, transcriptsDeleted: 0, transcriptsFailed: 0 });
+  });
+
+  it("baris yang selesai SESUDAH snapshot tak ikut terhapus — himpunan id eksplisit", async () => {
+    await beginSession({ sessionId: "berjalan", projectId: "p9", kind: "shell", agent: "claude", cwd: "/r" });
+    const asli = prisma.sessionHistory.deleteMany;
+    (prisma.sessionHistory as unknown as Record<string, unknown>).deleteMany = async (args: unknown) => {
+      (prisma.sessionHistory as unknown as Record<string, unknown>).deleteMany = asli;
+      // Persis yang dilakukan hook onDeath saat sebuah sesi ditutup di jendela ini (ADR-0079 §3).
+      await beginSession({ sessionId: "menyusul", projectId: "p9", kind: "shell", agent: "claude", cwd: "/r" });
+      await finishSession({ sessionId: "menyusul", exitCode: 0, transcript: "LAHIR-BELAKANGAN" });
+      return asli.call(prisma.sessionHistory, args as never);
+    };
+    await purgeHistory({ projectId: "p9" });
+
+    const { items } = await listHistory({ projectId: "p9" });
+    expect(items.map((r) => r.sessionId)).toEqual(["menyusul"]);
+    expect((await transcriptOf(items[0]!.id))?.text).toBe("LAHIR-BELAKANGAN");
+  });
+});
+
+describe("reconcileTranscripts (SPEC-845)", () => {
+  const berkasLama = (nama: string) => {
+    const path = join(transcriptDir(), nama);
+    writeFileSync(path, "sampah");
+    const dulu = Date.now() / 1000 - 7200;
+    utimesSync(path, dulu, dulu);
+    return path;
+  };
+
+  it("menyapu berkas yatim yang sudah lewat tenggang", async () => {
+    const yatim = berkasLama("yatim.log");
+    expect(await reconcileTranscripts()).toMatchObject({ orphans: 1, dangling: 0, failed: 0 });
+    expect(existsSync(yatim)).toBe(false);
+  });
+
+  it("membiarkan berkas yang masih dirujuk sebuah baris, setua apa pun", async () => {
+    await beginSession({ sessionId: "hidup", projectId: "p1", kind: "shell", agent: "claude", cwd: "/r" });
+    await finishSession({ sessionId: "hidup", exitCode: 0, transcript: "masih dipakai" });
+    const id = (await listHistory({})).items[0]!.id;
+    const key = (await prisma.sessionHistory.findUnique({ where: { id } }))!.transcriptKey!;
+    const dulu = Date.now() / 1000 - 7200;
+    utimesSync(join(transcriptDir(), key), dulu, dulu);
+
+    expect(await reconcileTranscripts()).toMatchObject({ orphans: 0 });
+    expect((await transcriptOf(id))?.text).toBe("masih dipakai");
+  });
+
+  // saveTranscript menulis berkas SEBELUM finishSession menulis transcriptKey-nya: di antara
+  // keduanya ada berkas hidup yang belum dirujuk siapa pun. Menyapu tanpa tenggang = melahirkan
+  // kembali cacat yang sedang diperbaiki.
+  it("membiarkan berkas yatim yang masih SEGAR — jendela tulis belum ditutup", async () => {
+    writeFileSync(join(transcriptDir(), "baru-saja.log"), "baru ditulis");
+    expect(await reconcileTranscripts()).toMatchObject({ orphans: 0 });
+    expect(existsSync(join(transcriptDir(), "baru-saja.log"))).toBe(true);
+  });
+
+  it("mengosongkan transcriptKey yang menunjuk berkas hilang, jadi hasTranscript berhenti berbohong", async () => {
+    await beginSession({ sessionId: "menggantung", projectId: "p1", kind: "shell", agent: "claude", cwd: "/r" });
+    await finishSession({ sessionId: "menggantung", exitCode: 0, transcript: "akan lenyap" });
+    const id = (await listHistory({})).items[0]!.id;
+    const key = (await prisma.sessionHistory.findUnique({ where: { id } }))!.transcriptKey!;
+    const { unlinkSync } = await import("node:fs");
+    unlinkSync(join(transcriptDir(), key));
+    expect((await getHistory(id))?.hasTranscript).toBe(true);  // berbohong sebelum rekonsiliasi
+
+    expect(await reconcileTranscripts()).toMatchObject({ dangling: 1, orphans: 0 });
+    const row = await getHistory(id);
+    expect(row?.hasTranscript).toBe(false);
+    expect(row?.transcriptBytes).toBeNull();
+  });
+
+  it("dryRun melaporkan tanpa menyentuh disk maupun baris", async () => {
+    const yatim = berkasLama("yatim.log");
+    expect(await reconcileTranscripts({ dryRun: true })).toMatchObject({ orphans: 1 });
+    expect(existsSync(yatim)).toBe(true);
   });
 });

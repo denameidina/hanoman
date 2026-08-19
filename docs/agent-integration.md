@@ -169,6 +169,10 @@ dan tak memakai agent token.
 | `POST /api/specs` | `backlog:write` | buat backlog item — bentuk payload di §7. |
 | `PATCH /api/specs/:id` | `backlog:write` | ubah item; konten hanya selagi belum dimulai. |
 | `POST /api/specs/:id/done` | `backlog:write` | tandai item **selesai** tanpa menjalankan sesi — untuk pekerjaan yang beres di luar hanoman. Body `{ reason?: string (≤280), confirm?: boolean }`, keduanya opsional; balasannya `Spec` yang sudah `stage:"done"`. Tak menjalankan maupun menghentikan sesi apa pun. |
+| `GET /api/specs/:id/attachments` | `backlog:read` | lampiran backlog item — gambar & dokumen yang dilampirkan manusia sebagai konteks kerja. |
+| `POST /api/specs/:id/attachments` | `backlog:write` | unggah lampiran (`multipart/form-data`, beberapa berkas per request). Berkas yang ditolak **tak** menggagalkan yang lain — periksa `rejected[]`. |
+| `GET /api/specs/:id/attachments/:attId` | `backlog:read` | byte satu lampiran. |
+| `DELETE /api/specs/:id/attachments/:attId` | `backlog:write` | hapus satu lampiran. |
 | `GET /api/specs/:id/docs` | `backlog:read` | dokumen yang ditulis sesi item itu. |
 | `GET /api/specs/:id/review` | `backlog:read` | diff hasil kerja sesi. |
 | `GET /api/projects/:id/docs` | `docs:read` | index Source of Truth project. |
@@ -299,6 +303,7 @@ memanggilnya; jangan lakukan tanpa manusia.
 | `branchFrom` yang tak ada di repo project → **400**, bukan diterima lalu gagal di tengah sesi | ambil kandidatnya dari `GET /api/projects/:id/branches` |
 | **401 telanjang** tak memisahkan "host salah" dari "token salah" dari "master switch mati" | probe `GET /api/health` sekali: 200 = host benar → masalahnya token atau master switch |
 | **403** bukan kegagalan permanen | bacalah field `need`, sampaikan ke manusia, minta capability itu ditambahkan |
+| **Lampiran backlog tak menyeberang sync** (`SpecAttachment` LOCAL-only, ADR-0124) | item yang sama di instance lain tampil **tanpa** lampiran. Kalau lampiran yang disebut manusia tak kamu temukan, kemungkinan besar kamu bicara ke instance yang bukan tempat lampiran itu diunggah — tanyakan, jangan simpulkan lampirannya tak ada |
 
 ## 10. Contoh alur end-to-end
 
@@ -460,6 +465,11 @@ Membuat sesi terminal (`POST /api/terminal/sessions` — menjalankan agen di wor
 dan seluruh `/api/vps*` (remote exec) **tidak ikut**, begitu pula merge/rebase (`integrate`),
 penghapusan backlog, dan perubahan `stage`. Batasan ini ada di katalog toolnya, bukan di token:
 token yang punya `sessions:write` sekalipun tak akan menemukan tool untuk memakainya. Lihat §8.
+
+**Lampiran backlog** (`/api/specs/:id/attachments*`, SPEC-843 · ADR-0124) juga sengaja **tak punya
+tool**: berkasnya lahir dari disk manusia, bukan dari model, dan tool MCP berbentuk JSON sehingga
+byte biner tak punya representasi di sana. REST-nya tetap terjangkau agent token
+ber-`backlog:read`/`backlog:write` — yang tak dipajang adalah **tool**-nya.
 
 ### Opsi
 

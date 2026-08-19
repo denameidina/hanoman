@@ -17,6 +17,7 @@ export * from "./ticket-status";
 export * from "./portal";
 export * from "./prd-status";
 export * from "./session-kind";
+export * from "./session-end";
 export * from "./config";
 export * from "./config-registry";
 export * from "./semver";
