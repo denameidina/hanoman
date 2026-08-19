@@ -972,6 +972,11 @@ GET    /terminal/history?projectId&specId&kind&q&page&limit
 #   → { items: SessionHistoryView[], total, page, pageSize } · urut startedAt desc
 #   q mencocokkan sessionId/specId/title/branch (insensitive). Tanpa `limit` → seluruh riwayat
 #   terfilter dalam satu halaman. `limit` di-clamp 1..200. `endedAt: null` = sesi masih berjalan.
+#   `endedReason` = cara baris ditutup: "closed" (hanoman menutupnya — `exitCode` berlaku, dan null
+#   di sana berarti agen MASIH HIDUP saat ditutup) | "reconciled" (pane lenyap saat boot — hasil TAK
+#   DIKETAHUI, `exitCode` selalu null, `endedAt` batas BAWAH, `reconciledAt` batas atasnya) | null
+#   (baris sebelum SPEC-844, dibaca seperti "closed"). Kelas hasilnya diturunkan `sessionOutcome()`
+#   (@hanoman/shared), tak disimpan — SPEC-844/ADR-0125.
 #   skip/take dilakukan di query DB — SAH di sini, tak seperti larangan ADR-0038 untuk GET /specs
 #   (riwayat adalah baris mati; tak ada overlay stage live / write-through yang butuh set penuh).
 GET    /terminal/history/:id         # SessionHistoryView + { hasTranscript } · 404
