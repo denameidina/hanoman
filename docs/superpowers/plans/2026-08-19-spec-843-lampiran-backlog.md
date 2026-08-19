@@ -942,7 +942,7 @@ git commit -m "feat(backlog): materialisasi lampiran ke direktori sesi + INDEX.m
   - `paths.specAttachments(id)` → `/api/specs/:id/attachments`
   - `paths.specAttachment(id, attId)` → `/api/specs/:id/attachments/:attId`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/spec-attachments.route.test.ts`:
 
@@ -1069,12 +1069,12 @@ describe("SPEC-843 · endpoint lampiran backlog", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-attachments.route.test.ts`
 Expected: FAIL — 404 untuk seluruh endpoint lampiran.
 
-- [ ] **Step 3: Tambahkan DTO di `shared/src/dto.ts`**
+- [x] **Step 3: Tambahkan DTO di `shared/src/dto.ts`**
 
 Tepat setelah blok `zTicketAttachmentView` / `TicketAttachmentView`:
 
@@ -1088,7 +1088,7 @@ export const zSpecAttachmentView = z.object({
 export type SpecAttachmentView = z.infer<typeof zSpecAttachmentView>;
 ```
 
-- [ ] **Step 4: Tambahkan path di `shared/src/api.ts`**
+- [x] **Step 4: Tambahkan path di `shared/src/api.ts`**
 
 Tepat setelah baris `specDone`:
 
@@ -1098,7 +1098,7 @@ Tepat setelah baris `specDone`:
   specAttachment: (id: string, attId: string) => `${API}/specs/${id}/attachments/${attId}`,
 ```
 
-- [ ] **Step 5: Tambahkan endpoint di `server/src/routes/specs.ts`**
+- [x] **Step 5: Tambahkan endpoint di `server/src/routes/specs.ts`**
 
 Tambahkan impor di kepala berkas:
 
@@ -1186,17 +1186,17 @@ Di route `DELETE /specs/:id` yang sudah ada, tepat **sebelum** `await deleteSync
     await dropSpecAttachmentsDir(id, spec.projectId);
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan lulus**
+- [x] **Step 6: Jalankan test, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-attachments.route.test.ts`
 Expected: PASS (7 test).
 
-- [ ] **Step 7: Typecheck paket yang tersentuh**
+- [x] **Step 7: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add shared/src/dto.ts shared/src/api.ts server/src/routes/specs.ts server/test/spec-attachments.route.test.ts

@@ -646,6 +646,13 @@ export const zTicketAttachmentView = z.object({
   id: z.string(), filename: z.string(), mimeType: z.string(), size: z.number().int(),
 });
 export type TicketAttachmentView = z.infer<typeof zTicketAttachmentView>;
+// SPEC-843 · ADR-0124 · lampiran backlog item. Sengaja BUKAN zTicketAttachmentView: ia punya
+// `createdAt` (UI mengurut & menampilkannya) dan hidup di domain yang aturan sync-nya berbeda.
+export const zSpecAttachmentView = z.object({
+  id: z.string(), filename: z.string(), mimeType: z.string(),
+  size: z.number().int(), createdAt: z.string(),
+});
+export type SpecAttachmentView = z.infer<typeof zSpecAttachmentView>;
 export const zTicketDetail = zTicketView.extend({
   detail: z.string(),
   attachments: z.array(zTicketAttachmentView),
