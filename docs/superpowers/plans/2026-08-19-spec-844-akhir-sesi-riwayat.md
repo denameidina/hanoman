@@ -665,7 +665,7 @@ git commit -m "feat(spec-844): riwayat sesi merender 'terputus' & menjelaskan ha
 - Consumes: seluruh keputusan Task 1-5.
 - Produces: —
 
-- [ ] **Step 1: Tulis ADR-0125**
+- [x] **Step 1: Tulis ADR-0125**
 
 Isi wajib, mengikuti bentuk ADR lain di `internal/docs/adr/`: Status `Diterima`, tanggal 2026-08-19, konteks (tiga akhir sesi yang dipadatkan ke dua kolom + angka DB hidup 784/797 dan 20/20), keputusan (§1-§5 design doc), konsekuensi, dan **gotcha**:
 
@@ -675,7 +675,7 @@ Isi wajib, mengikuti bentuk ADR lain di `internal/docs/adr/`: Status `Diterima`,
 4. Kolom baru wajib masuk `WEBHOOK_ENTITIES.fields`, dijaga `webhook-catalog-dmmf.test.ts`; salah ketik nama kolom mengosongkan payload **tanpa satu pun error**.
 5. Baris `closed` **sengaja tak berubah** — menutup sesi yang panenya masih hidup adalah cara normal sesi sehat berakhir (`pty.ts:55`), dan melabelinya "terputus" menukar bug ini dengan kebalikannya yang 38× lebih besar.
 
-- [ ] **Step 2: Perbarui butir `data-model.md` "Zombie dibereskan saat boot"**
+- [x] **Step 2: Perbarui butir `data-model.md` "Zombie dibereskan saat boot"**
 
 Ganti baris 599-601 menjadi (menyebut kedua kolom baru, `endedAt` sebagai batas bawah, dan backfill):
 
@@ -694,7 +694,7 @@ Ganti baris 599-601 menjadi (menyebut kedua kolom baru, `endedAt` sebagai batas 
   ("terakhir diketahui hidup") dan `reconciledAt` batas atasnya — durasinya karena itu tak dirender.
 ```
 
-- [ ] **Step 3: Perbarui `api-contract.md`**
+- [x] **Step 3: Perbarui `api-contract.md`**
 
 Di blok `# --- riwayat sesi …`, ganti kalimat `` `endedAt: null` = sesi masih berjalan. `` menjadi:
 
@@ -706,24 +706,24 @@ Di blok `# --- riwayat sesi …`, ganti kalimat `` `endedAt: null` = sesi masih 
 #   (@hanoman/shared), tak disimpan — SPEC-844/ADR-0125.
 ```
 
-- [ ] **Step 4: Perbarui `frontend-implementation.md`**
+- [x] **Step 4: Perbarui `frontend-implementation.md`**
 
 Di paragraf toolbar **Riwayat** (baris ±564-575): ganti `status `berjalan`/`selesai`/`exit <code>`` menjadi ``status `berjalan`/`selesai`/`exit <code>`/**`terputus`** (SPEC-844 · ADR-0125 — baris hasil rekonsiliasi boot: hijau berbohong dan merah mengarang, jadi tone `warn`; durasinya `—` bukan `0 dtk`, dan detailnya merender Callout yang menyatakan hasil & transkripnya tak diketahui plus dua stempel `Terakhir terlihat hidup`/`Terdeteksi mati`)``. Ganti kalimat "lalu **muat lebih**: `IntersectionObserver` auto-load … terbaca sebagai bug)" dengan penyebutan `Pager` DS (SPEC-523: halaman **mengganti** isi, kontrol halaman sendiri yang menyatakan "N–M dari T"), dan hapus kalimat "modal hanya menaikkan `page` dan **menambah** item, tak menggantinya."
 
-- [ ] **Step 5: Perbarui `internal/skills/hanoman/SKILL.md`**
+- [x] **Step 5: Perbarui `internal/skills/hanoman/SKILL.md`**
 
 Di butir **Riwayat sesi** (SPEC-362/ADR-0079), tambahkan kalimat SPEC-844 sesudah kalimat "…ditutup saat `killSession`": bahwa baris kini mencatat **bagaimana** ia berakhir (`endedReason`), bahwa `exitCode: null` adalah keadaan **normal** sesi sehat sehingga tak bisa dipakai membedakan zombie, dan bahwa verdict-nya satu fungsi murni `sessionOutcome()` di shared — jangan menyalinnya ke UI.
 
-- [ ] **Step 6: Tautkan ADR baru di `internal/docs/README.md` dan `internal/docs/adr/README.md`**
+- [x] **Step 6: Tautkan ADR baru di `internal/docs/README.md` dan `internal/docs/adr/README.md`**
 
 Ikuti bentuk baris ADR yang sudah ada (satu baris padat berisi keputusan + gotcha terukur).
 
-- [ ] **Step 7: Verifikasi integritas index**
+- [x] **Step 7: Verifikasi integritas index**
 
 Run: `pnpm --filter ./cli exec tsx src/hanoman.ts docs index --check`
 Expected: index utuh, nol doc tak tertaut. (Bila CLI belum ter-build, boleh dilewati — cukup pastikan setiap berkas doc baru muncul di `internal/docs/README.md`.)
 
-- [ ] **Step 8: Verifikasi penuh berkas yang berubah**
+- [x] **Step 8: Verifikasi penuh berkas yang berubah**
 
 Run:
 ```bash
@@ -734,7 +734,7 @@ Expected: PASS, dan **jumlah berkas test > 0** (`--changed` menyalakan `passWith
 Run: `pnpm --filter ./server typecheck && pnpm --filter ./src typecheck && pnpm --filter ./shared typecheck`
 Expected: ketiganya exit 0.
 
-- [ ] **Step 9: Smoke endpoint nyata (task ini menyentuh response `GET /api/terminal/history`)**
+- [x] **Step 9: Smoke endpoint nyata (task ini menyentuh response `GET /api/terminal/history`)**
 
 Boot server terhadap DB sekali pakai, isi satu baris zombie, lalu curl:
 
@@ -753,7 +753,7 @@ curl -s "http://127.0.0.1:<port>/api/terminal/history?q=s-smoke" | python3 -m js
 
 Expected: item memuat `"endedReason": "reconciled"` dan `"reconciledAt": "1970-01-13T..."` (ISO non-null). Matikan server per-PID (`lsof -ti:<port>` → `kill <pid>`), **jangan** `pkill -f`.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add internal/docs docs/superpowers
