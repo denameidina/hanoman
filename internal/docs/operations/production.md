@@ -25,7 +25,7 @@ sehingga ia menyajikan dashboard dari `web/` di dalam paket sekaligus API
 ([ADR-0087](../adr/0087-distribusi-npm-global-satu-perintah.md)). Tak ada proses worker terpisah.
 
 `--no-migrate` melewati langkah migrasi; `--db <file>` menunjuk berkas DB langsung (menang atas
-`DATABASE_URL`); `--host` mengubah bind. Untuk instance yang harus selamat reboot, jalankan di bawah
+`HANOMAN_DATABASE_URL` maupun `DATABASE_URL`); `--host` mengubah bind. Untuk instance yang harus selamat reboot, jalankan di bawah
 systemd — lihat [deploy-vps](deploy-vps.md).
 
 `/etc/hanoman-prod.env` wajib memuat seluruh boundary dari runbook deploy-vps, bukan hanya home/port.
