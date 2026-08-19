@@ -10,6 +10,7 @@
     "dev": "pnpm run \"/^dev:/\"",
     "dev:api": "pnpm --filter ./server dev",
     "dev:web": "pnpm --filter ./src dev",
+    "db:generate": "pnpm --filter ./server exec prisma generate --schema prisma/schema.prisma",
     "db:migrate": "set -a && . ./.env && set +a && pnpm --filter ./server exec prisma migrate deploy",
     "prod:setup": "set -a && . ./.env.production && set +a && pnpm --filter ./server exec prisma migrate deploy && pnpm --filter ./server exec prisma generate && pnpm build",
     "prod:api": "set -a && . ./.env.production && set +a && node server/dist/server.js",
@@ -18,7 +19,8 @@
     "build:cli": "pnpm --filter ./cli build",
     "release": "pnpm build && pnpm build:cli && node cli/dist/hanoman.js __pack && (cd dist-npm && npm pack --dry-run)",
     "typecheck": "pnpm -r typecheck",
-    "test": "vitest run --no-file-parallelism"
+    "test": "vitest run --no-file-parallelism",
+    "validate": "pnpm db:generate && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

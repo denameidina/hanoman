@@ -60,8 +60,18 @@ npm version 0.2.0 --no-git-tag-version    # atau sunting "version" langsung
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-Workflow lalu: memeriksa tag == `version` → `pnpm install --frozen-lockfile` → `pnpm release` →
-**memasang tarball hasil rakitan dan menjalankan `hanoman --version`** → `npm publish --provenance`.
+Workflow lalu menjalankan **dua job**: `validate` (`.github/workflows/validate.yml` lewat
+`workflow_call`) → `publish` yang ber-`needs: validate`. Job `publish` memeriksa tag == `version` →
+`pnpm install --frozen-lockfile` → `pnpm release` → **memasang tarball hasil rakitan dan
+menjalankan `hanoman --version`** → `npm publish --provenance`.
+
+Job `validate` menjalankan **`pnpm validate`** = `pnpm db:generate` → `pnpm typecheck` (seluruh
+paket) → `pnpm test` (`vitest run --no-file-parallelism`) — perintah yang sama persis dengan yang
+dijalankan manusia di local ([ADR-0126](../adr/0126-gerbang-validasi-sebelum-publish.md)). Sampai
+2026-08-19 gerbang ini **tak ada sama sekali**: jalur rilis tak pernah memanggil `vitest` maupun
+`tsc`, dan karena server & CLI dibundel esbuild (yang tak melakukan type checking), build hijau
+bukan pernyataan apa pun tentang kesehatan kode yang diterbitkan. Bukti & reproduksinya di
+[issue #1](https://github.com/denameidina/hanoman/issues/1).
 
 Versi hidup di root `package.json` dan ditanam ke `dist/build-info.json` oleh
 `scripts/stamp-build.mjs`. **Jangan** menyunting `dist-npm/package.json` — ia di-*generate*
@@ -71,6 +81,7 @@ Versi hidup di root `package.json` dan ditanam ke `dist/build-info.json` oleh
 
 | Pagar | Kegagalan yang dicegah |
 |---|---|
+| Job `publish` ber-`needs: validate` | menerbitkan commit yang test/typecheck-nya merah |
 | Trigger hanya tag `v*` | publish tak sengaja dari push biasa ke main |
 | Tag harus == `version` root | menerbitkan nomor versi salah — dan nomor terbit **tak bisa dipakai ulang** |
 | Tarball dipasang & `hanoman --version` diuji | menerbitkan paket yang tak bisa dijalankan |
@@ -78,10 +89,17 @@ Versi hidup di root `package.json` dan ditanam ke `dist/build-info.json` oleh
 | ~~Environment `release` + reviewer~~ | ~~rilis tanpa persetujuan manusia~~ — **dicabut 2026-07-31**, tak ada lagi gerbang manusia |
 
 `hanoman doctor` **tidak** dipakai di CI: ia menuntut `git`, `tmux`, dan CLI agen yang memang tak
-ada di runner, jadi ia akan exit 1 karena alasan yang tak relevan dengan kesehatan paket.
+ada di runner, jadi ia akan exit 1 karena alasan yang tak relevan dengan kesehatan paket. Job
+`validate` **memang** memasang `tmux` dan mengisi identitas git — bukan untuk `doctor`, melainkan
+karena test sesi terminal men-spawn pane tmux sungguhan ([ADR-0016](../adr/0016-sesi-terminal-hidup-di-tmux.md)) dan
+test worktree menjalankan `git commit`.
 
 ## Kalau publish gagal
 
+- **Job `validate` merah** — publish tak pernah berjalan, dan itu maksudnya. Reproduksi di local
+  dengan perintah yang sama: `pnpm install --frozen-lockfile && pnpm validate`. Kalau merahnya
+  ramai dengan `Property 'dmmf' does not exist` atau `Cannot read properties of undefined (reading
+  'datamodel')`, itu Prisma Client yang belum di-generate — `pnpm db:generate`, bukan regresi kode.
 - **`repository.url` tak cocok** — trusted publishing & `--provenance` membandingkannya dengan repo
   pembangun **persis**. Nilainya `REPO_URL` di `cli/src/release/pack.ts`; bandingkan dengan
   `git remote get-url origin` (bentuknya `git+<url>`).
