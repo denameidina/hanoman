@@ -45,7 +45,15 @@ export async function finishSession(d: SessionDeath): Promise<void> {
     where: { sessionId: d.sessionId, endedAt: null }, orderBy: { startedAt: "desc" },
   });
   if (!open) return;  // sesi lahir sebelum fitur ini ada, atau sudah direkonsiliasi
-  const t = d.transcript ? await saveTranscript(d.transcript) : { key: "", bytes: 0 };
+  // SPEC-846 · transkrip adalah I/O OPSIONAL; `endedAt`/`exitCode` tidak. Disk penuh atau
+  // `$HANOMAN_HOME` read-only tak boleh membatalkan penutupan baris — hook `onDeath` menelan
+  // lemparan, jadi sesi mati akan terbaca "berjalan" sampai boot berikutnya. Cermin
+  // `dropSessionUploads` yang best-effort karena alasan yang sama.
+  let t = { key: "", bytes: 0 };
+  if (d.transcript) {
+    try { t = await saveTranscript(d.transcript); }
+    catch (e) { console.error("riwayat sesi (transkrip tak tersimpan):", e); }
+  }
   await prisma.sessionHistory.update({
     where: { id: open.id },
     data: {

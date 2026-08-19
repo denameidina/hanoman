@@ -3,18 +3,22 @@
 // tmux yang tak dibaca siapa pun. Keputusannya murni (probes → laporan) supaya bisa dites.
 import { execFileSync } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
-import { dirname } from "node:path";
-import { resolveHome, resolveDbUrl, dbFilePath, dbUrlNotice, scanAgentSkills } from "@hanoman/runner";
+import { dirname, resolve } from "node:path";
+import { resolveDataDirs, resolveDbUrl, dbFilePath, dbUrlNotice, scanAgentSkills } from "@hanoman/runner";
 import { DEFAULT_METHOD, METHODS, methodStatus, zAgent, type MethodSkillStatus } from "@hanoman/shared";
 import type { Ctx } from "../router";
 import { resolveLayout } from "../layout";
 import { distDir } from "./start";
 
+// SPEC-846 · satu direktori data efektif beserta izin tulisnya. Operator tak bisa mendefinisikan
+// batas backup/restore selama perintah kesehatan tak pernah menyebut direktori mana yang dipakai.
+export type DirProbe = { label: string; path: string; writable: boolean; fatal: boolean };
+
 export type Probes = {
   node: string; git: string | null; tmux: string | null;
   claude: string | null; codex: string | null;
   gh: string | null;   // SPEC-471 · opsional: tanpa gh, tarik issue lewat REST + GITHUB_TOKEN
-  homeWritable: boolean; web: boolean; db: string;
+  dirs: DirProbe[]; web: boolean; db: string;
   podman: string | null; sandboxRequired: boolean; sandboxReady: boolean;
   // SPEC-739 · ADR-0114 · kesiapan metode DEFAULT untuk tiap agen yang CLI-nya benar-benar ada.
   // Kosong = tak ada yang dilaporkan (mis. tak ada CLI agen sama sekali).
@@ -33,7 +37,13 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
     { mark: p.gh ? "✓" : "·",
       text: p.gh ? `gh ${p.gh}` : "gh — tak ada (tarik issue akan lewat HTTP + GITHUB_TOKEN)",
       fatal: false },
-    { mark: p.homeWritable ? "✓" : "✗", text: `data dir ${p.homeWritable ? "bisa ditulis" : "TAK bisa ditulis"}`, fatal: !p.homeWritable },
+    // Direktori turunan lahir saat dipakai, jadi izin tulis yang belum ada di situ adalah
+    // peringatan — bukan alasan menyatakan hanoman tak bisa menjalankan sesi. Home tetap fatal.
+    ...p.dirs.map((d) => ({
+      mark: d.writable ? "✓" : d.fatal ? "✗" : "!",
+      text: `${d.label} ${d.path}${d.writable ? "" : " — TAK bisa ditulis"}`,
+      fatal: d.fatal && !d.writable,
+    })),
     { mark: p.web ? "✓" : "!", text: p.web ? "aset dashboard ada" : "aset dashboard tak ada — API jalan, dashboard tidak", fatal: false },
     { mark: "·", text: `db ${p.db}`, fatal: false },
     { mark: p.sandboxReady ? "✓" : p.sandboxRequired ? "✗" : "!",
@@ -62,6 +72,19 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
   return { lines: rows.map((r) => `  ${r.mark} ${r.text}`), ok: !rows.some((r) => r.fatal) };
 }
 
+// Direktori data dibuat saat dipakai, jadi yang bisa diperiksa hari ini adalah leluhur terdekat
+// yang sudah ada — bukan path yang belum lahir. Override boleh menunjuk beberapa level ke depan.
+function writable(path: string): boolean {
+  for (let p = resolve(path); ; ) {
+    if (existsSync(p)) {
+      try { accessSync(p, constants.W_OK); return true; } catch { return false; }
+    }
+    const up = dirname(p);
+    if (up === p) return false;
+    p = up;
+  }
+}
+
 function version(bin: string, args: string[]): string | null {
   try { return execFileSync(bin, args, { encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "ignore"] }).trim().split("\n")[0] ?? null; }
   catch { return null; }
@@ -75,10 +98,13 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
     db = dbFilePath(resolveDbUrl(ctx.env, dirname(layout.schema)));
   } catch (e) { ctx.stderr(`${(e as Error).message}\n`); return 1; }
 
-  const home = resolveHome(ctx.env);
-  let homeWritable = false;
-  try { accessSync(existsSync(home) ? home : dirname(home), constants.W_OK); homeWritable = true; }
-  catch { /* tetap false */ }
+  const d = resolveDataDirs(ctx.env);
+  const dirs: DirProbe[] = [
+    { label: "data dir", path: d.home, writable: writable(d.home), fatal: true },
+    { label: "transkrip", path: d.transcripts, writable: writable(d.transcripts), fatal: false },
+    { label: "upload", path: d.uploads, writable: writable(d.uploads), fatal: false },
+    { label: "key SSH", path: d.sshKeys, writable: writable(d.sshKeys), fatal: false },
+  ];
 
   const claude = version(ctx.env.HANOMAN_CLAUDE_BIN ?? "claude", ["--version"]);
   const codex = version(ctx.env.HANOMAN_CODEX_BIN ?? "codex", ["--version"]);
@@ -110,7 +136,7 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
     tmux: version("tmux", ["-V"]),
     claude, codex,
     gh: version(ctx.env.HANOMAN_GH_BIN ?? "gh", ["--version"]),
-    homeWritable, web: layout.web !== null, db, methods,
+    dirs, web: layout.web !== null, db, methods,
     podman, sandboxRequired, sandboxReady,
   });
   ctx.stdout(`hanoman doctor\n${r.lines.join("\n")}\n`);
