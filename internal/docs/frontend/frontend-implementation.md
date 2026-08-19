@@ -567,12 +567,22 @@ Itulah cara memenuhi "mudah diakses tapi tidak menghalangi UI terminal": grid di
 berubah ukuran sama sekali, dan selama modal tak dibuka **tak ada request riwayat** yang berjalan.
 Isinya: penyaring (project · jenis · cari), daftar baris (waktu mulai, badge jenis **berlabel manusia**
 dari `SESSION_KIND_LABEL` — bukan slug, pelajaran SPEC-262/264 — judul/spec, penanda transkrip, durasi,
-status `berjalan`/`selesai`/`exit <code>`), lalu **muat lebih**: `IntersectionObserver` auto-load dengan
-tombol manual sebagai fallback, dan **baris penutup** yang membedakan "masih ada" dari "seluruh riwayat"
-(pelajaran SPEC-351 — daftar habis yang tak terbedakan dari daftar terpotong terbaca sebagai bug).
-Server yang memaginasi (`{items,total,page,pageSize}`); modal hanya menaikkan `page` dan **menambah**
-item, tak menggantinya. Klik baris → detail: metadata + transkrip read-only dalam `<pre>` teks polos,
-tombol **Salin transkrip** dan **Mulai lagi**. "Mulai lagi" tak pernah menghidupkan sesi lama (tmux
+status `berjalan`/`selesai`/`exit <code>`/**`terputus`**), lalu **kontrol halaman** `Pager` DS: sejak
+SPEC-523 halaman **mengganti** isi (muat-lebih `IntersectionObserver` dicabut demi satu pola paginasi
+yang sama dengan backlog/project/tiket), dan `Pager` sendiri yang menyatakan "N–M dari T" sehingga baris
+penutup SPEC-351 tak lagi perlu. Server yang memaginasi (`{items,total,page,pageSize}`); modal hanya
+menaikkan `page`. Klik baris → detail: metadata + transkrip read-only dalam `<pre>` teks polos,
+tombol **Salin transkrip** dan **Mulai lagi**.
+
+Status **`terputus`** adalah SPEC-844 · [ADR-0125](../adr/0125-akhir-sesi-riwayat-tercatat.md): baris
+hasil rekonsiliasi boot (`endedReason: "reconciled"` — pane lenyap karena reboot/`kill-server`/crash).
+Hijau `selesai` berbohong dan merah mengarang, jadi tone-nya **`warn`**. Verdict-nya **tidak** dihitung
+di layar — `statusOf()` memanggil `sessionOutcome()` (`@hanoman/shared`), satu definisi yang dipakai UI,
+test, dan prosa kontrak webhook; menyalinnya ke sini adalah kelas bug SPEC-431/448. Durasi baris terputus
+`—`, bukan `0 dtk` (`endedAt`-nya batas bawah, `reconciledAt` batas atas — mengurangkannya menghasilkan
+nol yang tak berarti), dan detailnya merender `Callout` warn yang menyatakan hasil & transkripnya tak
+diketahui plus dua stempel `Terakhir terlihat hidup`/`Terdeteksi mati`. "Mulai lagi" tetap jalur
+pemulihannya — tak ada endpoint baru. "Mulai lagi" tak pernah menghidupkan sesi lama (tmux
 sudah membunuhnya) — ia men-spawn sesi baru lewat endpoint yang sudah ada, dan hanya muncul untuk
 `restartableKind()` (`spec`/`terminal`/`shell`/`reverse`/`scaffold`).
 
@@ -784,7 +794,7 @@ tangan. Tak ada `favicon.ico`: Safari 26+ sudah mendukung favicon SVG, dan bila 
 lawas perlu didukung, `.ico` cukup dijatuhkan ke `src/public/` **tanpa perubahan markup** — browser
 me-request `/favicon.ico` dari root dengan sendirinya.
 
-## Konfirmasi destruktif: satu kontrak, `window.confirm` nol (SPEC-847 · ADR-0125)
+## Konfirmasi destruktif: satu kontrak, `window.confirm` nol (SPEC-847 · ADR-0127)
 
 Setiap aksi destruktif produk memakai dialog aplikasi. Bentuk pemanggilannya **`useConfirm()`**
 (`ds/useConfirm.tsx`), yang memulangkan `{ confirm, dialog }`:

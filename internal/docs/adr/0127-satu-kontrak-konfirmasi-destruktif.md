@@ -1,4 +1,4 @@
-# ADR-0125 — Satu kontrak konfirmasi destruktif: `useConfirm()`, `window.confirm` nol di produk
+# ADR-0127 — Satu kontrak konfirmasi destruktif: `useConfirm()`, `window.confirm` nol di produk
 
 Status: accepted · 2026-08-19
 

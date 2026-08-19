@@ -38,7 +38,7 @@
 Tambahkan di akhir `src/test/confirm-dialog.test.tsx`:
 
 ```tsx
-// SPEC-847 · ADR-0125 · dampak berbaris-baris tak boleh dipadatkan jadi satu string, dan aksi
+// SPEC-847 · ADR-0127 · dampak berbaris-baris tak boleh dipadatkan jadi satu string, dan aksi
 // yang bukan hapus tak boleh dipaksa memakai ikon trash.
 describe("ConfirmDialog impact & icon (SPEC-847)", () => {
   it("merender daftar dampak terstruktur, bukan satu paragraf", () => {
@@ -91,7 +91,7 @@ Ganti isi `src/src/ds/ConfirmDialog.tsx` (pertahankan seluruh komentar SPEC-269/
 // ADR-0121 · `requireText` untuk aksi yang tak bisa dibatalkan (hapus folder rekursif):
 // tombol tetap mati sampai operator mengetik ulang namanya. Tanpa prop itu perilakunya
 // identik dengan sebelumnya bagi seluruh pemakai lama.
-// SPEC-847 · ADR-0125 · `impact` (daftar dampak terstruktur) dan `icon` (aksi yang bukan hapus
+// SPEC-847 · ADR-0127 · `impact` (daftar dampak terstruktur) dan `icon` (aksi yang bukan hapus
 // tak dipaksa memakai trash). Tombol konfirmasi mengikuti severity lewat varian `danger` DS.
 import React from "react";
 import { Modal } from "./kit";
@@ -183,7 +183,7 @@ git commit -m "feat(ds): ConfirmDialog punya daftar dampak, ikon per-aksi, dan t
 Buat `src/test/use-confirm.test.tsx`:
 
 ```tsx
-// SPEC-847 · ADR-0125 · kontrak useConfirm: satu promise per dialog, diselesaikan tepat sekali;
+// SPEC-847 · ADR-0127 · kontrak useConfirm: satu promise per dialog, diselesaikan tepat sekali;
 // `run` menahan dialog terbuka & busy selama mutasi (pending protection); lemparan `run`
 // diteruskan ke pemanggil, TIDAK diterjemahkan jadi `false`.
 import { describe, it, expect, vi } from "vitest";
@@ -317,7 +317,7 @@ Expected: FAIL — modul `../src/ds/useConfirm` tak ada.
 Buat `src/src/ds/useConfirm.tsx`:
 
 ```tsx
-// SPEC-847 · ADR-0125 · konfirmasi destruktif dengan bentuk pemanggilan seharga `window.confirm`:
+// SPEC-847 · ADR-0127 · konfirmasi destruktif dengan bentuk pemanggilan seharga `window.confirm`:
 // satu baris di tengah fungsi async, alur kontrol call site utuh. `dialog` dirender PEMANGGILNYA
 // sendiri — bukan Provider di akar App — karena layar di repo ini dirender berdiri sendiri di
 // test, dan Provider berarti nilai default yang diam-diam menjawab "batal" atau "ya".
@@ -534,7 +534,7 @@ Expected: FAIL — `useConfirm` ada (Task 2) tapi berkas test belum; setelah dib
 2. Di dalam `export default function App()` (sesudah blok `const [modal, setModal] = …`, baris ~699) tambahkan:
 
 ```tsx
-// SPEC-847 · ADR-0125 · konfirmasi destruktif memakai dialog aplikasi, bukan window.confirm.
+// SPEC-847 · ADR-0127 · konfirmasi destruktif memakai dialog aplikasi, bukan window.confirm.
 const { confirm, dialog } = useConfirm();
 ```
 
@@ -693,7 +693,7 @@ Di `src/src/screens/DocsWorkspace.tsx`:
 2. Di badan `DocsWorkspace` (sesudah `const [scanning, setScanning] = React.useState(false);`, baris ~107):
 
 ```tsx
-  // SPEC-847 · ADR-0125 · konfirmasi hapus dokumen memakai dialog aplikasi.
+  // SPEC-847 · ADR-0127 · konfirmasi hapus dokumen memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
 ```
 
@@ -964,7 +964,7 @@ Expected: FAIL — tak ada `role="dialog"`.
 Tambahkan `useConfirm` ke impor `"../ds"`, lalu di badan `VpsChecklist`:
 
 ```tsx
-  // SPEC-847 · ADR-0125 · konfirmasi mutasi VPS memakai dialog aplikasi.
+  // SPEC-847 · ADR-0127 · konfirmasi mutasi VPS memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
 ```
 
@@ -1197,7 +1197,7 @@ git commit -m "feat(screens): changelog, tolak tiket, dan Help Center memakai di
 Buat `src/test/helpers/native-confirm.ts` (cermin `helpers/form-fields.ts` — baca berkas itu untuk pola `walk`):
 
 ```ts
-// SPEC-847 · ADR-0125 · AC-4 ditegakkan atas SUMBER, bukan DOM: `window.confirm` tak punya
+// SPEC-847 · ADR-0127 · AC-4 ditegakkan atas SUMBER, bukan DOM: `window.confirm` tak punya
 // jejak di pohon render aplikasi, jadi tak ada test render yang akan menangkap call site baru.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -1250,7 +1250,7 @@ export const scannedFileCount = (root: string) => files(root).length;
 Buat `src/test/confirm-inventory.test.ts`:
 
 ```ts
-// SPEC-847 · ADR-0125 · AC-4: frontend produksi tak memakai `window.confirm` untuk destructive
+// SPEC-847 · ADR-0127 · AC-4: frontend produksi tak memakai `window.confirm` untuk destructive
 // product flow; pengecualian wajib menyebut alasannya lewat komentar `confirm-exempt:`.
 import { describe, expect, it } from "vitest";
 import { scanConfirmDir, scanHookBalance, scannedFileCount } from "./helpers/native-confirm";
@@ -1322,18 +1322,18 @@ git commit -m "test(ds): inventaris window.confirm ditegakkan atas sumber, satu 
 
 ---
 
-### Task 9: Docs — ADR-0125 + Source of Truth yang tersentuh
+### Task 9: Docs — ADR-0127 + Source of Truth yang tersentuh
 
 **Files:**
-- Create: `internal/docs/adr/0125-satu-kontrak-konfirmasi-destruktif.md`
+- Create: `internal/docs/adr/0127-satu-kontrak-konfirmasi-destruktif.md`
 - Modify: `internal/docs/adr/README.md` (entri 0125 di puncak daftar)
 - Modify: `internal/docs/README.md` (link ADR 0125; audit SPEC-847 sudah ter-link)
 - Modify: `internal/docs/frontend/frontend-implementation.md:978` (Triase "Tolak" tak lagi `window.confirm`) + bagian design-system frontend
 - Modify: `internal/docs/design-system/design-system.md:44-46` (kontrak konfirmasi destruktif)
 
-- [x] **Step 1: Tulis ADR-0125**
+- [x] **Step 1: Tulis ADR-0127**
 
-Buat `internal/docs/adr/0125-satu-kontrak-konfirmasi-destruktif.md` dengan struktur ADR repo (baca `0121-operasi-berkas-ide-explorer.md` sebagai contoh bentuk). Isi wajib menyebut:
+Buat `internal/docs/adr/0127-satu-kontrak-konfirmasi-destruktif.md` dengan struktur ADR repo (baca `0121-operasi-berkas-ide-explorer.md` sebagai contoh bentuk). Isi wajib menyebut:
 
 - Konteks: 15 call site `window.confirm` vs `ConfirmDialog` yang sudah ada; akarnya **bentuk pemanggilan** (sinkron vs deklaratif), bukan kelalaian; bukti terukur bahwa delapan flow destruktif tak punya satu pun test yang menekan tombolnya karena jsdom memulangkan `undefined`.
 - Keputusan: `useConfirm()` memulangkan `{ confirm, dialog }`; **lokal per komponen, bukan Provider** (alasannya: layar dirender berdiri sendiri di test; nilai default context gagal senyap ke dua arah); `run` untuk pending protection; `confirm()` **melempar** bila `run` melempar dan `false` hanya untuk pembatalan.
@@ -1361,7 +1361,7 @@ Expected: index konsisten. Bila CLI belum ter-build di worktree ini, cukup pasti
 
 ```bash
 git add internal/docs
-git commit -m "docs(adr): ADR-0125 satu kontrak konfirmasi destruktif"
+git commit -m "docs(adr): ADR-0127 satu kontrak konfirmasi destruktif"
 ```
 
 ---

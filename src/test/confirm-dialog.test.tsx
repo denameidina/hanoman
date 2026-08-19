@@ -52,7 +52,7 @@ describe("ConfirmDialog requireText (ADR-0121)", () => {
   });
 });
 
-// SPEC-847 · ADR-0125 · dampak berbaris-baris tak boleh dipadatkan jadi satu string, dan aksi
+// SPEC-847 · ADR-0127 · dampak berbaris-baris tak boleh dipadatkan jadi satu string, dan aksi
 // yang bukan hapus tak boleh dipaksa memakai ikon trash.
 describe("ConfirmDialog impact & icon (SPEC-847)", () => {
   it("merender daftar dampak terstruktur, bukan satu paragraf", () => {

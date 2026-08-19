@@ -1,4 +1,4 @@
-// SPEC-847 · ADR-0125 · kontrak useConfirm: satu promise per dialog, diselesaikan tepat sekali;
+// SPEC-847 · ADR-0127 · kontrak useConfirm: satu promise per dialog, diselesaikan tepat sekali;
 // `run` menahan dialog terbuka & busy selama mutasi (pending protection); lemparan `run`
 // diteruskan ke pemanggil, TIDAK diterjemahkan jadi `false`.
 import { describe, it, expect, vi } from "vitest";

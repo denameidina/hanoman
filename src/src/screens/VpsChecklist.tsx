@@ -158,7 +158,7 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, onClose
   const toggleSection = (id: string) => setExpandedManual((e) => {
     const n = new Set(e); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  // SPEC-847 · ADR-0125 · konfirmasi mutasi VPS memakai dialog aplikasi.
+  // SPEC-847 · ADR-0127 · konfirmasi mutasi VPS memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
 
   async function doPreview() {

@@ -98,7 +98,7 @@ export function VpsScreen({ onToast, onGotoTerminal }:
     return subscribe((m) => { if (m.t === "vps") { setList(m.vps); setStatus("ready"); } });
   }, [load]);
 
-  // SPEC-847 · ADR-0125 · konfirmasi mutasi VPS memakai dialog aplikasi.
+  // SPEC-847 · ADR-0127 · konfirmasi mutasi VPS memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
 
   async function run(label: string, id: string, fn: () => Promise<unknown>, okMsg: string) {

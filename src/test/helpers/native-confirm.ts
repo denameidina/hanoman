@@ -1,4 +1,4 @@
-// SPEC-847 · ADR-0125 · AC-4 ditegakkan atas SUMBER, bukan DOM: `window.confirm` tak punya
+// SPEC-847 · ADR-0127 · AC-4 ditegakkan atas SUMBER, bukan DOM: `window.confirm` tak punya
 // jejak di pohon render aplikasi, jadi tak ada test render yang akan menangkap call site baru.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";

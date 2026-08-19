@@ -82,7 +82,7 @@ function TicketDetailView({ id, onBack, onAccepted, onDeleted, onToast }:
   const [priority, setPriority] = React.useState("sedang");
   const [editing, setEditing] = React.useState(false);
   const [confirm, setConfirm] = React.useState(false);
-  // SPEC-847 · ADR-0125 · `confirm` sudah dipakai state dialog hapus tiket, jadi hook-nya
+  // SPEC-847 · ADR-0127 · `confirm` sudah dipakai state dialog hapus tiket, jadi hook-nya
   // dinamai `askConfirm`; `dialog` tetap dinamai baku agar penjaga inventaris menghitungnya.
   const { confirm: askConfirm, dialog } = useConfirm();
   const [form, setForm] = React.useState({ title: "", detail: "", category: "bug", status: "new" });

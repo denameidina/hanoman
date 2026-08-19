@@ -97,7 +97,7 @@ export function ChangelogScreen({ p, onToast, initialChangelogId }:
   }, [p.id, initialChangelogId, onToast]);
 
   const pg = serverPage(total, page, PAGE_SIZE);
-  // SPEC-847 · ADR-0125 · konfirmasi hapus rilis memakai dialog aplikasi.
+  // SPEC-847 · ADR-0127 · konfirmasi hapus rilis memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
 
   async function remove(c: ChangelogView) {

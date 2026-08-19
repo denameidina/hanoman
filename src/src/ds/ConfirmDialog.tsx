@@ -2,7 +2,7 @@
 // ADR-0121 · `requireText` untuk aksi yang tak bisa dibatalkan (hapus folder rekursif):
 // tombol tetap mati sampai operator mengetik ulang namanya. Tanpa prop itu perilakunya
 // identik dengan sebelumnya bagi seluruh pemakai lama.
-// SPEC-847 · ADR-0125 · `impact` (daftar dampak terstruktur) dan `icon` (aksi yang bukan hapus
+// SPEC-847 · ADR-0127 · `impact` (daftar dampak terstruktur) dan `icon` (aksi yang bukan hapus
 // tak dipaksa memakai trash). Tombol konfirmasi mengikuti severity lewat varian `danger` DS.
 import React from "react";
 import { Modal } from "./kit";

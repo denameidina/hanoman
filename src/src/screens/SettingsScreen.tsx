@@ -128,7 +128,7 @@ function AccountPanel({ me, onLoggedOut, onToast }: { me: UserView; onLoggedOut:
 
 // SPEC-169 · Users: daftar, invite (set password langsung), hapus. Tanpa RBAC — semua setara.
 function UsersPanel({ me, onToast }: { me: UserView; onToast?: ShowToast }) {
-  // SPEC-847 · ADR-0125 · konfirmasi destruktif memakai dialog aplikasi, bukan window.confirm.
+  // SPEC-847 · ADR-0127 · konfirmasi destruktif memakai dialog aplikasi, bukan window.confirm.
   const { confirm, dialog } = useConfirm();
   const [users, setUsers] = React.useState<UserView[] | null>(null);
   const [email, setEmail] = React.useState("");

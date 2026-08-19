@@ -1,4 +1,4 @@
-// SPEC-847 · ADR-0125 · konfirmasi destruktif dengan bentuk pemanggilan seharga `window.confirm`:
+// SPEC-847 · ADR-0127 · konfirmasi destruktif dengan bentuk pemanggilan seharga `window.confirm`:
 // satu baris di tengah fungsi async, alur kontrol call site utuh. `dialog` dirender PEMANGGILNYA
 // sendiri — bukan Provider di akar App — karena layar di repo ini dirender berdiri sendiri di
 // test, dan Provider berarti nilai default yang diam-diam menjawab "batal" atau "ya".

@@ -21,6 +21,8 @@ export type SandboxInput = {
   worktreeMode?: "ro" | "rw";
   phaseFile?: string;
   promptFile?: string;
+  /** SPEC-843 · ADR-0124 · direktori lampiran backlog. RO: sesi membacanya, tak pernah menulisnya. */
+  attachmentsDir?: string;
   credentialDir: string;
   image: string;
   network: string;
@@ -31,6 +33,8 @@ export function sandboxArgv(input: SandboxInput): string[] {
   const mounts = ["--volume", `${input.worktree}:/workspace:${input.worktreeMode ?? "rw"}`];
   if (input.phaseFile) mounts.push("--volume", `${input.phaseFile}:${input.phaseFile}:rw`);
   if (input.promptFile) mounts.push("--volume", `${input.promptFile}:${input.promptFile}:ro`);
+  if (input.attachmentsDir)
+    mounts.push("--volume", `${input.attachmentsDir}:${input.attachmentsDir}:ro`);
   mounts.push("--volume", `${input.credentialDir}:/agent-home:ro`);
   return [
     "podman", "run", "--rm", "--read-only", "--cap-drop=ALL", "--userns=keep-id",
@@ -47,7 +51,7 @@ const quote = (value: string): string => `'${value.replace(/'/g, `'"'"'`)}'`;
 
 export function sandboxArgvFromEnv(input: {
   command: string; worktree: string; worktreeMode?: "ro" | "rw";
-  phaseFile?: string; promptFile?: string; env?: Env;
+  phaseFile?: string; promptFile?: string; attachmentsDir?: string; env?: Env;
 }): string[] | null {
   const env = input.env ?? process.env;
   const mode = env.HANOMAN_SESSION_SANDBOX ?? (env.NODE_ENV === "production" ? "required" : "off");
@@ -64,7 +68,8 @@ export function sandboxArgvFromEnv(input: {
 }
 
 export function sandboxCommand(input: {
-  command: string; worktree: string; phaseFile?: string; promptFile?: string; env?: Env;
+  command: string; worktree: string; phaseFile?: string; promptFile?: string;
+  attachmentsDir?: string; env?: Env;
 }): string {
   const argv = sandboxArgvFromEnv(input);
   if (!argv) return input.command;

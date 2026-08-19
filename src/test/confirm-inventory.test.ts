@@ -1,4 +1,4 @@
-// SPEC-847 · ADR-0125 · AC-4: frontend produksi tak memakai `window.confirm` untuk destructive
+// SPEC-847 · ADR-0127 · AC-4: frontend produksi tak memakai `window.confirm` untuk destructive
 // product flow; pengecualian wajib menyebut alasannya lewat komentar `confirm-exempt:`.
 import { describe, expect, it } from "vitest";
 import { scanConfirmDir, scanHookBalance, scannedFileCount } from "./helpers/native-confirm";

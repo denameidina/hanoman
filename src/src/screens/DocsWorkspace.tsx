@@ -105,7 +105,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
   const [panel, setPanel] = React.useState<"tree" | "viewer">("tree");
   const [draft, setDraft] = React.useState("");
   const [scanning, setScanning] = React.useState(false);
-  // SPEC-847 · ADR-0125 · konfirmasi hapus dokumen memakai dialog aplikasi.
+  // SPEC-847 · ADR-0127 · konfirmasi hapus dokumen memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
   const [ixStatus, setIxStatus] = React.useState<"loading" | "ready" | "error">("loading");
   const [ixTry, setIxTry] = React.useState(0);

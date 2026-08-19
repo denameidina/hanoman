@@ -19,7 +19,7 @@ function HelpCenterCard({ p, onToast, onProjectChanged }:
   const [busy, setBusy] = React.useState(false);
   // Link publik same-origin — dibangun di klien (setara publicUrl server), tanpa fetch saat mount.
   const publicUrl = `${window.location.origin}/help/${encodeURIComponent(p.id)}`;
-  // SPEC-847 · ADR-0125 · konfirmasi nonaktifkan Help Center memakai dialog aplikasi.
+  // SPEC-847 · ADR-0127 · konfirmasi nonaktifkan Help Center memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
 
   async function enable() {
