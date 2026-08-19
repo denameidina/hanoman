@@ -749,7 +749,7 @@ git commit -m "feat(docs): hapus dokumen SoT memakai dialog konfirmasi aplikasi"
 **Interfaces:**
 - Consumes: `useConfirm` (Task 2). Empat panel adalah empat komponen terpisah → **empat** pemanggilan `useConfirm()`, masing-masing merender `{dialog}`-nya sendiri.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/settings-destructive-confirm.test.tsx` — mencakup device token (flow yang diminta issue) beserta agent token:
 
@@ -809,12 +809,12 @@ describe("Settings · cabut device token (SPEC-847)", () => {
 
 Bila `DeviceTokensPanel` belum di-`export`, tambahkan `export` pada deklarasinya (perubahan visibilitas saja; tak ada logika yang berubah).
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 Run: `pnpm vitest --run src/test/settings-destructive-confirm.test.tsx`
 Expected: FAIL — tak ada `role="dialog"` (native confirm).
 
-- [ ] **Step 3: Implementasi — keempat panel**
+- [x] **Step 3: Implementasi — keempat panel**
 
 Tambahkan `useConfirm` ke impor `"../ds"` di baris 4, lalu:
 
@@ -897,7 +897,7 @@ Render `{dialog}` sebagai anak terakhir `<Card>`-nya.
 
 Render `{dialog}` sebagai anak terakhir `<Card>`-nya.
 
-- [ ] **Step 4: Verifikasi**
+- [x] **Step 4: Verifikasi**
 
 Run: `pnpm vitest --run src/test/settings-destructive-confirm.test.tsx src/test/agent-tokens.test.tsx src/test/config-panel.test.tsx src/test/account-menu.test.tsx`
 Expected: PASS semua.
@@ -905,7 +905,7 @@ Expected: PASS semua.
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SettingsScreen.tsx src/test/settings-destructive-confirm.test.tsx

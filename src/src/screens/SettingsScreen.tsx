@@ -1,7 +1,7 @@
 /* SettingsScreen — workspace settings. Ported; persistence moved from
    localStorage to the API (GET/PUT /settings). Model per pipeline step. */
 import React from "react";
-import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useResponsiveTier } from "../ds";
+import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier } from "../ds";
 import { api, ApiError } from "../api/client";
 import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus } from "@hanoman/shared";
@@ -128,6 +128,8 @@ function AccountPanel({ me, onLoggedOut, onToast }: { me: UserView; onLoggedOut:
 
 // SPEC-169 · Users: daftar, invite (set password langsung), hapus. Tanpa RBAC — semua setara.
 function UsersPanel({ me, onToast }: { me: UserView; onToast?: ShowToast }) {
+  // SPEC-847 · ADR-0125 · konfirmasi destruktif memakai dialog aplikasi, bukan window.confirm.
+  const { confirm, dialog } = useConfirm();
   const [users, setUsers] = React.useState<UserView[] | null>(null);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -147,8 +149,16 @@ function UsersPanel({ me, onToast }: { me: UserView; onToast?: ShowToast }) {
     } finally { setBusy(false); }
   }
   async function remove(u: UserView) {
-    if (!window.confirm(`Hapus user "${u.email}"? Semua sesinya ikut dicabut.`)) return;
-    try { await api.deleteUser(u.id); load(); onToast?.("User " + u.email + " dihapus", "warn", "trash-2"); }
+    try {
+      if (!await confirm({
+        title: `Hapus user "${u.email}"?`,
+        message: "User ini kehilangan akses ke dashboard seketika.",
+        impact: ["Semua sesi login miliknya ikut dicabut.", "Tindakan ini tak bisa dibatalkan."],
+        confirmLabel: "Hapus user",
+        run: () => api.deleteUser(u.id),
+      })) return;
+      load(); onToast?.("User " + u.email + " dihapus", "warn", "trash-2");
+    }
     catch (e) { onToast?.(e instanceof ApiError && e.status === 400 ? "Tak bisa hapus user terakhir" : "Gagal hapus user", "err", "x-circle"); }
   }
   return (
@@ -175,13 +185,15 @@ function UsersPanel({ me, onToast }: { me: UserView; onToast?: ShowToast }) {
             style={{ marginBottom: 14 }}>Invite</Button>
         </div>
       </div>
+      {dialog}
     </Card>
   );
 }
 
 // SPEC-213 · Perangkat: device token per-device untuk auth sync ke hub. Token plaintext hanya
 // ditampilkan SEKALI saat dibuat (server simpan hash). Revoke = cabut satu device, yang lain aman.
-function DeviceTokensPanel({ onToast }: { onToast?: ShowToast }) {
+export function DeviceTokensPanel({ onToast }: { onToast?: ShowToast }) {
+  const { confirm, dialog } = useConfirm();
   const [tokens, setTokens] = React.useState<DeviceTokenView[] | null>(null);
   const [name, setName] = React.useState("");
   const [fresh, setFresh] = React.useState<{ name: string; token: string } | null>(null);
@@ -199,8 +211,16 @@ function DeviceTokensPanel({ onToast }: { onToast?: ShowToast }) {
     finally { setBusy(false); }
   }
   async function revoke(t: DeviceTokenView) {
-    if (!window.confirm(`Cabut token "${t.name}"? Perangkat itu tak bisa sync lagi.`)) return;
-    try { await api.revokeDeviceToken(t.id); load(); onToast?.("Token dicabut", "warn", "trash-2"); }
+    try {
+      if (!await confirm({
+        title: `Cabut token perangkat "${t.name}"?`,
+        message: "Perangkat itu tak bisa sync lagi sampai token baru dibuat.",
+        confirmLabel: "Cabut token",
+        icon: "key-round",
+        run: () => api.revokeDeviceToken(t.id),
+      })) return;
+      load(); onToast?.("Token dicabut", "warn", "trash-2");
+    }
     catch { onToast?.("Gagal mencabut token", "err", "x-circle"); }
   }
   const active = (tokens ?? []).filter((t) => !t.revokedAt);
@@ -233,20 +253,33 @@ function DeviceTokensPanel({ onToast }: { onToast?: ShowToast }) {
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} style={{ width: "100%" }} /></Field>
         <Button size="sm" leftIcon="plus" disabled={name.trim().length < 1 || busy} onClick={create} style={{ marginBottom: 14 }}>Buat token</Button>
       </div>
+      {dialog}
     </Card>
   );
 }
 
 // SPEC-213 · Aktivitas: activity log ringkasan hasil sesi (append-only, disync dari semua device).
 function ActivityPanel({ onToast }: { onToast?: ShowToast }) {
+  const { confirm, dialog } = useConfirm();
   const [projectId, setProjectId] = React.useState("");
   const [rows, setRows] = React.useState<SessionResultView[] | null>(null);
   const load = React.useCallback(() => { api.listSessionResults(projectId || undefined).then(setRows).catch(() => setRows([])); }, [projectId]);
   React.useEffect(() => { load(); }, [load]);
   async function purge() {
     if (!projectId) { onToast?.("Isi project id untuk purge", "warn", "alert-triangle"); return; }
-    if (!window.confirm(`Purge activity log project "${projectId}"?`)) return;
-    try { const r = await api.purgeSessionResults(projectId); load(); onToast?.(`${r.purged} entri dihapus`, "warn", "trash-2"); }
+    try {
+      if (!await confirm({
+        title: `Purge activity log project "${projectId}"?`,
+        message: "Seluruh entri hasil sesi project ini dihapus dari device ini.",
+        impact: ["Log bersifat append-only — entri yang dihapus tak bisa dipulihkan."],
+        confirmLabel: "Purge",
+        run: async () => {
+          const r = await api.purgeSessionResults(projectId);
+          onToast?.(`${r.purged} entri dihapus`, "warn", "trash-2");
+        },
+      })) return;
+      load();
+    }
     catch { onToast?.("Gagal purge", "err", "x-circle"); }
   }
   return (
@@ -268,6 +301,7 @@ function ActivityPanel({ onToast }: { onToast?: ShowToast }) {
             {r.prUrl && <a href={r.prUrl} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost" leftIcon="external-link">PR</Button></a>}
           </SettingRow>
         ))}
+      {dialog}
     </Card>
   );
 }
@@ -355,6 +389,7 @@ function ConfigField({ entry, draft, onDraft, onSave, onReset }: {
 
 // SPEC-257 · ADR-0065 · Akses AI Agent: master switch + agent token + capability per-domain.
 export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
+  const { confirm, dialog } = useConfirm();
   const [caps, setCaps] = React.useState<CapabilityInfo[]>([]);
   const [items, setItems] = React.useState<AgentTokenView[] | null>(null);
   const [setting, setSetting] = React.useState<Setting | null>(null);
@@ -388,8 +423,16 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
     finally { setBusy(false); }
   }
   async function revoke(t: AgentTokenView) {
-    if (!window.confirm(`Cabut agent token "${t.name}"? Agen itu langsung kehilangan akses.`)) return;
-    try { await api.revokeAgentToken(t.id); load(); onToast?.("Token dicabut", "warn", "trash-2"); }
+    try {
+      if (!await confirm({
+        title: `Cabut agent token "${t.name}"?`,
+        message: "Agen yang memakainya langsung kehilangan akses.",
+        confirmLabel: "Cabut token",
+        icon: "key-round",
+        run: () => api.revokeAgentToken(t.id),
+      })) return;
+      load(); onToast?.("Token dicabut", "warn", "trash-2");
+    }
     catch { onToast?.("Gagal mencabut token", "err", "x-circle"); }
   }
   async function setEnabled(t: AgentTokenView, enabled: boolean) {
@@ -467,6 +510,7 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
             <Button size="sm" leftIcon="plus" disabled={name.trim().length < 1 || busy} onClick={() => void create()}>Buat token</Button>
           </div>
         </div>
+        {dialog}
       </Card>
 
       {/* SPEC-482 · ADR-0099 · memasang MCP server dan memberi capability adalah satu pekerjaan
