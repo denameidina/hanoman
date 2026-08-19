@@ -38,6 +38,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Gerbang di bawah butuh riwayat penuh. Dengan default `fetch-depth: 1`, `merge-base`
+          # menjawab SALAH satu jurusan — terukur: commit ke-6 dari ujung `main` ditolak walau
+          # jelas ada di sana. Skripnya fail closed saat repo masih dangkal, jadi menghapus baris
+          # ini membuat rilis BERHENTI, bukan lolos diam-diam.
+          fetch-depth: 0
+
+      # SPEC-851 · Gerbang provenance: hanya commit yang SUDAH masuk `main` boleh terbit. Runbook
+      # memang mensyaratkan merge dulu baru tag, tapi sampai sini itu semata konvensi manusia —
+      # repo ini tak punya ruleset tag, dan required reviewer di environment `release` dicabut
+      # 2026-07-31. Jadi mendorong tag = menerbitkan ke npm, dari commit mana pun. Dijalankan
+      # paling awal: sebelum toolchain, install, build, dan sebelum apa pun meminta OIDC.
+      # `checkout` pada push bertag hanya mengambil refspec tag itu, jadi `main` di-fetch sendiri.
+      - name: Tag harus sudah masuk main
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          scripts/assert-release-ancestry.sh HEAD origin/main
 
       - uses: pnpm/action-setup@v4
         with:
