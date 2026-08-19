@@ -1,7 +1,7 @@
 import React from "react";
-import { Modal, Input, Select, Button, Badge, StateBlock, Icon, Pager, serverPage } from "../ds";
+import { Modal, Input, Select, Button, Badge, Callout, StateBlock, Icon, Pager, serverPage } from "../ds";
 import { api } from "../api/client";
-import { SESSION_KINDS, SESSION_KIND_LABEL, restartableKind, type SessionHistoryView } from "@hanoman/shared";
+import { SESSION_KINDS, SESSION_KIND_LABEL, restartableKind, sessionOutcome, type SessionHistoryView } from "@hanoman/shared";
 
 const PAGE = 20;
 
@@ -18,11 +18,22 @@ export function humanDuration(startedAt: string, endedAt: string | null): string
   return `${h} jam ${m % 60} mnt`;
 }
 
-export function statusOf(r: SessionHistoryView): { label: string; tone: "ok" | "err" | "neutral" } {
-  if (!r.endedAt) return { label: "berjalan", tone: "neutral" };
-  if (r.exitCode === null) return { label: "selesai", tone: "ok" };
-  return r.exitCode === 0 ? { label: "selesai", tone: "ok" } : { label: `exit ${r.exitCode}`, tone: "err" };
+export function statusOf(r: SessionHistoryView): { label: string; tone: "ok" | "err" | "warn" | "neutral" } {
+  switch (sessionOutcome(r)) {
+    case "running": return { label: "berjalan", tone: "neutral" };
+    // SPEC-844 · ADR-0125 · panenya lenyap saat boot: bukan sukses (hijau berbohong) dan bukan
+    // kegagalan terbukti (merah mengarang) — hasilnya memang tak diketahui.
+    case "interrupted": return { label: "terputus", tone: "warn" };
+    case "failed": return { label: `exit ${r.exitCode}`, tone: "err" };
+    default: return { label: "selesai", tone: "ok" };
+  }
 }
+
+// Baris terputus tak punya durasi yang bisa dipercaya: `endedAt`-nya batas bawah (waktu baris
+// terakhir disentuh = waktu lahirnya), `reconciledAt` batas atasnya. "0 dtk" adalah angka karangan
+// — prinsip yang sama dengan `humanDuration` untuk sesi yang belum ditutup.
+export const durationOf = (r: SessionHistoryView): string =>
+  sessionOutcome(r) === "interrupted" ? "—" : humanDuration(r.startedAt, r.endedAt);
 
 const labelOfKind = (kind: string): string =>
   SESSION_KIND_LABEL[kind as keyof typeof SESSION_KIND_LABEL] ?? kind;
@@ -115,7 +126,7 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
                 </span>
                 {r.transcriptBytes !== null && <Icon name="file-text" size={12} color="var(--text-subtle)" />}
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)", flex: "0 0 72px" }}>
-                  {humanDuration(r.startedAt, r.endedAt)}
+                  {durationOf(r)}
                 </span>
                 <Badge size="sm" tone={st.tone}>{st.label}</Badge>
                 </span>
@@ -158,14 +169,20 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
     return () => { alive = false; };
   }, [row.id, row.transcriptBytes]);
 
+  const interrupted = sessionOutcome(row) === "interrupted";
   const meta: [string, string][] = [
     ["Project", projectName],
     ["Sesi", row.sessionId],
     ["Jenis", labelOfKind(row.kind)],
     ["Agen", [row.agent, row.model, row.effort].filter(Boolean).join(" · ")],
     ["Mulai", new Date(row.startedAt).toLocaleString("id-ID")],
-    ["Selesai", row.endedAt ? new Date(row.endedAt).toLocaleString("id-ID") : "berjalan"],
-    ["Durasi", humanDuration(row.startedAt, row.endedAt)],
+    // Baris terputus punya DUA stempel yang berbeda artinya, jadi satu label "Selesai" berbohong.
+    [interrupted ? "Terakhir terlihat hidup" : "Selesai",
+      row.endedAt ? new Date(row.endedAt).toLocaleString("id-ID") : "berjalan"],
+    ...(interrupted && row.reconciledAt
+      ? [["Terdeteksi mati", new Date(row.reconciledAt).toLocaleString("id-ID")] as [string, string]]
+      : []),
+    ["Durasi", durationOf(row)],
     ["Direktori", row.cwd],
   ];
   if (row.specId) meta.splice(1, 0, ["Backlog", `${row.specId}${row.title ? ` · ${row.title}` : ""}`]);
@@ -187,6 +204,16 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
         )}
       </div>
 
+      {interrupted && (
+        <Callout tone="warn" title="Sesi terputus — hasilnya tak diketahui" style={{ marginBottom: 12 }}>
+          Panenya sudah lenyap saat hanoman menyala lagi (reboot, <code>tmux kill-server</code>, atau
+          host mati), jadi sesi ini tak meninggalkan exit code dan transkripnya kemungkinan besar tak
+          sempat diambil — capture berjalan tepat sebelum pane dibunuh, dan di jalur ini sudah tak ada
+          pane untuk dibaca. Periksa worktree &amp; branch sesi ini sebelum menganggapnya selesai, lalu
+          mulai lagi bila pekerjaannya belum tuntas.
+        </Callout>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", marginBottom: 12,
         fontSize: 12 }}>
         {meta.map(([k, v]) => (
@@ -200,7 +227,9 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
       {state === "loading" && <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>memuat transkrip…</div>}
       {state === "none" && (
         <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>
-          Tanpa transkrip — sesi ini ditutup sebelum fitur riwayat ada, atau panenya tak menyisakan keluaran.
+          {interrupted
+            ? "Tanpa transkrip — panenya sudah lenyap sebelum hanoman sempat mengambilnya."
+            : "Tanpa transkrip — sesi ini ditutup sebelum fitur riwayat ada, atau panenya tak menyisakan keluaran."}
         </div>
       )}
       {state === "error" && (

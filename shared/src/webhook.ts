@@ -139,21 +139,22 @@ export const WEBHOOK_ENTITIES: WebhookEntityDef[] = [
   {
     entity: "session", model: "SessionHistory", label: "Sesi terminal",
     fields: ["id", "sessionId", "projectId", "specId", "title", "kind", "flow", "agent",
-      "model", "effort", "branch", "startedAt", "endedAt", "exitCode"],
+      "model", "effort", "branch", "startedAt", "endedAt", "endedReason", "reconciledAt", "exitCode"],
     projectIdField: "projectId",
     events: {
       created: { type: "session.started", label: "Sesi mulai", when: "Sebuah sesi agen lahir di tmux — backlog, PRD, reverse, scaffold, breakdown, konflik integrasi, terminal, atau konsol VPS." },
     },
     derived: [{
-      type: "session.ended", label: "Sesi selesai atau gagal", changed: ["endedAt"],
-      when: "Sesi ditutup dan endedAt terisi. exitCode bukan 0 berarti pane mati gagal; null berarti tak terbaca, misalnya tmux mati di luar hanoman.",
+      type: "session.ended", label: "Sesi selesai, gagal, atau terputus", changed: ["endedAt"],
+      when: "Sesi berakhir dan endedAt terisi. endedReason memberi tahu CARANYA: \"closed\" = hanoman menutupnya, jadi exitCode berlaku (null = agen masih hidup saat ditutup, 0 = keluar bersih, selain itu gagal); \"reconciled\" = panenya sudah lenyap saat hanoman menyala lagi (reboot, kill-server, host mati) sehingga hasilnya TAK DIKETAHUI, exitCode selalu null, dan reconciledAt menyebut kapan hanoman menemukannya — endedAt di kasus itu batas BAWAH, bukan waktu berakhir sebenarnya. null = baris lahir sebelum SPEC-844.",
     }],
     sample: {
       id: "6f0c1c1e-1a2b-4c3d-8e9f-0a1b2c3d4e5f", sessionId: "spec_481", projectId: "hanoman",
       specId: "SPEC-481", title: "Webhook keluar untuk setiap perubahan", kind: "spec",
       flow: "feature", agent: "claude", model: "claude-opus-5", effort: "xhigh",
       branch: "hanoman/spec-481",
-      startedAt: "2026-08-01T02:12:31.000Z", endedAt: "2026-08-01T09:44:02.000Z", exitCode: 0,
+      startedAt: "2026-08-01T02:12:31.000Z", endedAt: "2026-08-01T09:44:02.000Z",
+      endedReason: "closed", reconciledAt: null, exitCode: 0,
     },
   },
   {

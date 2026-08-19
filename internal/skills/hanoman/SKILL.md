@@ -490,7 +490,14 @@ Pakai skill lebih sempit saat task cocok:
 - **Katalog codex per model** (SPEC-339): effort adalah properti MODEL, bukan properti CLI. `CODEX_MODELS` (shared) membawa `efforts`/`fallback`/`minClient` per entri; `CODEX_EFFORTS` tinggal gabungan, **bukan** sumber pilihan UI — picker WAJIB `codexEfforts(model)`. Isi katalog: `gpt-5.6-sol` (default global) & `gpt-5.6-terra` = ultra/max/xhigh/high/medium/low, `gpt-5.6-luna` = **tanpa ultra**, `gpt-5.5` = tanpa max & ultra. Koersi effort dilakukan di **`createSession`** (titik cekik tunggal — jalur ber-`AgentToken` pun lewat sana), dan model pensiun (`gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex-spark`) diremap ke `gpt-5.5` saat `getSetting()` membaca; sengaja bukan ke 5.6 agar setelan lama tak pindah ke model yang CLI-nya belum sanggup. **Gotcha wajib:** trio 5.6 butuh codex CLI **≥ 0.144.0** dan manifest model disaring server **berdasarkan versi klien** (cache `~/.codex/models_cache.json`) — CLI lama tak akan pernah melihat model itu, dan `max` bahkan belum ada di enum effort 0.142.5. `GET /api/codex/version` memberi catatan lunak di Settings & picker Start, **tanpa** memblokir Start. Rujukan otoritatif katalog = `codex debug models`, bukan ingatan.
 - **Riwayat sesi** (SPEC-362/ADR-0079): tmux tetap sumber kebenaran sesi **hidup**, tapi setiap sesi kini
   meninggalkan baris `SessionHistory` (LOCAL-only, tak disync) yang **lahir bersama sesinya** (sesi berjalan
-  pun tercatat, `endedAt: null`) dan ditutup saat `killSession`. `pty.ts` tetap **nol dependensi DB** — ia
+  pun tercatat, `endedAt: null`) dan ditutup saat `killSession`. **SPEC-844/ADR-0125:** baris juga mencatat
+  **bagaimana** ia berakhir — `endedReason` `closed`|`reconciled` + `reconciledAt`. Jangan memakai
+  `exitCode: null` untuk mengenali zombie: `killSession` mengirimnya untuk pane yang MASIH HIDUP, dan pane
+  sesi sukses memang tak pernah mati (`pty.ts:55`), jadi 98,4 % baris riwayat DB hidup ber-`exitCode` null.
+  Verdict `running|completed|failed|interrupted` **diturunkan** satu fungsi murni `sessionOutcome()` di
+  `@hanoman/shared` — jangan menyalin logikanya ke UI atau route. `endedAt` baris `reconciled` adalah batas
+  **bawah** (waktu lahir baris, bukan waktu berakhir), jadi jangan menghitung durasi darinya.
+  `pty.ts` tetap **nol dependensi DB** — ia
   hanya menembakkan `registerSessionHooks({onBirth,onDeath})` dari **dua titik cekik**
   `createSession`/`killSession`; jangan menambahkan pencatatan di call site (ada 12, dan flow baru akan
   menambah lagi). `onBirth` **tak** menembak saat re-attach. Transkrip di-`capture-pane` **tanpa `-e`**

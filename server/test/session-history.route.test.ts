@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
-import { beginSession, finishSession } from "../src/services/session-history";
+import { beginSession, finishSession, reconcileHistory } from "../src/services/session-history";
 
 const app = buildApp();
 const clean = async () => {
@@ -84,6 +84,23 @@ describe("GET/DELETE /api/terminal/history (SPEC-362)", () => {
     const r = await app.inject({ method: "DELETE", url: "/api/terminal/history?projectId=p1", headers: { cookie } });
     expect(r.json().purged).toBe(2);
     expect((await app.inject({ method: "GET", url: "/api/terminal/history", headers: { cookie } })).json().total).toBe(2);
+  });
+
+  // SPEC-844 · ADR-0125 · kedua kolom baru harus MENYEBERANG kawat: tanpa itu klien tak punya cara
+  // membedakan sesi yang ditutup operator dari sesi yang mati bersama tmux.
+  it("endedReason & reconciledAt sampai ke klien, dan membedakan kedua jalur tutup", async () => {
+    const cookie = await login();
+    await beginSession({ sessionId: "ditutup", projectId: "p1", kind: "shell", agent: "claude", cwd: "/r" });
+    await finishSession({ sessionId: "ditutup", exitCode: null, transcript: null });
+    await beginSession({ sessionId: "zombie", projectId: "p1", kind: "shell", agent: "claude", cwd: "/r" });
+    expect(await reconcileHistory([])).toBe(1);
+
+    const items = (await app.inject({ method: "GET", url: "/api/terminal/history", headers: { cookie } }))
+      .json().items as { sessionId: string; endedReason: string | null; reconciledAt: string | null }[];
+    const by = Object.fromEntries(items.map((r) => [r.sessionId, r]));
+    expect(by["ditutup"]).toMatchObject({ endedReason: "closed", reconciledAt: null });
+    expect(by["zombie"]!.endedReason).toBe("reconciled");
+    expect(Date.parse(by["zombie"]!.reconciledAt!)).toBeGreaterThan(0);
   });
 
   it("before bukan tanggal valid → 400", async () => {

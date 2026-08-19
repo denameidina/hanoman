@@ -34,6 +34,9 @@ export const zSessionHistory = z.object({
   title: z.string().nullable(), kind: z.string(), flow: z.string().nullable(), agent: z.string(),
   model: z.string().nullable(), effort: z.string().nullable(), branch: z.string().nullable(),
   cwd: z.string(), startedAt: z.string(), endedAt: z.string().nullable(),
+  // SPEC-844 · ADR-0125 · `string` longgar, bukan enum: baris lama null dan nilai asing dari
+  // instance lebih baru tak boleh melempar di boundary — `sessionOutcome()` yang menafsirkannya.
+  endedReason: z.string().nullable(), reconciledAt: z.string().nullable(),
   exitCode: z.number().nullable(), transcriptBytes: z.number().nullable(),
 });
 export type SessionHistoryView = z.infer<typeof zSessionHistory>;

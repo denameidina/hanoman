@@ -392,6 +392,13 @@ model SessionHistory {
   startedAt       DateTime  @default(now())
   endedAt         DateTime?
   exitCode        Int?
+  // SPEC-844 · ADR-0125 · CARA baris ini ditutup: "closed" (killSession) atau "reconciled" (pane
+  // sudah lenyap saat boot — hasilnya tak diketahui). null = baris lahir sebelum kolom ini ada.
+  // Kelas hasil (selesai/gagal) sengaja TIDAK disimpan: ia turunan exitCode (sessionOutcome).
+  endedReason     String?
+  // Kapan boot menemukan panenya lenyap. `endedAt` baris rekonsiliasi adalah batas BAWAH
+  // ("terakhir diketahui hidup"); kolom ini batas atasnya.
+  reconciledAt    DateTime?
   transcriptKey   String?
   transcriptBytes Int?
   createdAt       DateTime  @default(now())
