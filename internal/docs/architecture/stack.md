@@ -49,8 +49,11 @@ Server (Fastify, bind 127.0.0.1:8787)
 **Nol proses eksternal, dan itu termasuk DB-nya.** Sejak SPEC-398/ADR-0086 provider Prisma adalah
 `sqlite`: satu berkas di `$HANOMAN_HOME` (default `~/.hanoman/hanoman.db`), tanpa Docker, tanpa
 Postgres, tanpa Redis. Lokasinya ditentukan tiga fungsi murni di `runner/src/paths.ts`
-(`resolveHome`/`resolveDbUrl`/`dbFilePath`) yang dipakai server **dan** CLI; `DATABASE_URL` yang
-bukan `file:` **melempar** dan menunjuk `hanoman migrate-from-postgres`.
+(`resolveHome`/`resolveDbUrl`/`dbFilePath`) yang dipakai server **dan** CLI, dengan presedensi
+`HANOMAN_DATABASE_URL` → `DATABASE_URL` → `<home>/hanoman.db`: `HANOMAN_DATABASE_URL` non-`file:`
+**melempar** dan menunjuk `hanoman migrate-from-postgres`, sedangkan `DATABASE_URL` non-`file:`
+**diabaikan** dengan peringatan (`dbUrlNotice`) karena nama env itu hampir selalu milik project
+lain — amandemen [ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md).
 
 Yang tidak bisa dibawa npm justru inti produknya: **`git`** (worktree per sesi, ADR-0002), **`tmux`**
 (sesi agen, ADR-0016), dan **CLI agen** `claude`/`codex`. `hanoman doctor` melaporkan keberadaannya

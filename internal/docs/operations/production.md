@@ -25,7 +25,7 @@ sehingga ia menyajikan dashboard dari `web/` di dalam paket sekaligus API
 ([ADR-0087](../adr/0087-distribusi-npm-global-satu-perintah.md)). Tak ada proses worker terpisah.
 
 `--no-migrate` melewati langkah migrasi; `--db <file>` menunjuk berkas DB langsung (menang atas
-`DATABASE_URL`); `--host` mengubah bind. Untuk instance yang harus selamat reboot, jalankan di bawah
+`HANOMAN_DATABASE_URL` maupun `DATABASE_URL`); `--host` mengubah bind. Untuk instance yang harus selamat reboot, jalankan di bawah
 systemd — lihat [deploy-vps](deploy-vps.md).
 
 `/etc/hanoman-prod.env` wajib memuat seluruh boundary dari runbook deploy-vps, bukan hanya home/port.
@@ -118,9 +118,13 @@ hanoman update              # npm i -g hanoman@latest --prefer-online
 systemctl restart hanoman   # atau matikan & jalankan ulang `hanoman`
 ```
 
-Deteksi saja — server tak pernah memasang apa pun sendiri
-([ADR-0048](../adr/0048-auto-update-deteksi-read-only.md) utuh): instance yang me-`npm i` dirinya
-sendiri lalu keluar akan memutus sesi tmux yang sedang berjalan tanpa peringatan. `hanoman update
+Atau dari dashboard: badge Update → **Pasang & mulai ulang** → konfirmasi (SPEC-405 ·
+[ADR-0088](../adr/0088-tombol-update-npm-restart-tersupervisi.md), **mengamandemen**
+[ADR-0048](../adr/0048-auto-update-deteksi-read-only.md)). Server tetap tak memasang apa pun: ia hanya
+keluar dengan kode sentinel `75`, dan yang me-`npm i -g` lalu men-spawn ulang adalah CLI parent
+`hanoman start`. Karena itu tombolnya hanya muncul bila instance dijalankan lewat `hanoman` —
+`node dist/server.js` telanjang tetap read-only. Sesi tmux **tidak** putus (tmux daemon terpisah,
+ADR-0016); yang putus hanya jembatan attach + WebSocket yang menyambung ulang sendiri. `hanoman update
 --check` hanya melaporkan, exit 0.
 
 ## SPEC-384 · membersihkan byte source-map (sekali, SEBELUM migrate)
