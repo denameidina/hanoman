@@ -128,7 +128,7 @@ tanpa penopang tidak ditulis.
 - WHEN riwayat sesi dihapus (purge manual maupun sweep retensi), THE SYSTEM SHALL meng-`unlink` berkas
   transkripnya **hanya sesudah** penghapusan barisnya commit, dan SHALL melaporkan berkas yang gagal
   dihapus sebagai sukses sebagian
-  ([ADR-0125](../adr/0125-durabilitas-penghapusan-transkrip-riwayat.md)).
+  ([ADR-0126](../adr/0126-durabilitas-penghapusan-transkrip-riwayat.md)).
 - WHILE sweep retensi berjalan, THE SYSTEM SHALL menyapu berkas transkrip yang tak dirujuk baris mana
   pun dan lebih tua dari tenggang, dan SHALL mengosongkan `transcriptKey` yang menunjuk berkas hilang
   sehingga `hasTranscript` tak pernah bertentangan dengan endpoint transkripnya.

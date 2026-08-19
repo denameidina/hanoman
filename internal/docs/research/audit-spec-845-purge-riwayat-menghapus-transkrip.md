@@ -10,7 +10,7 @@
 - **Keputusan fase**: **Spec dan Plan DILEWATI**. Akarnya satu urutan operasi, terbukti dua kali
   lewat reproduksi terukur (§1), dan premis yang menopangnya terbukti **salah** (§2) — perbaikannya
   jelas dan terkonsentrasi. Dokumen ini jadi doc-of-record.
-- **ADR**: [ADR-0125](../adr/0125-durabilitas-penghapusan-transkrip-riwayat.md) — **mengamandemen
+- **ADR**: [ADR-0126](../adr/0126-durabilitas-penghapusan-transkrip-riwayat.md) — **mengamandemen
   ADR-0079 §5** (purge "ikut menghapus berkas transkripnya" kini punya urutan & aturan durabilitas
   yang mengikat). ADR-0018/0019 (nilai turunan) **ditegakkan**, ADR-0024 (tanpa worker/cron)
   **ditegakkan**.

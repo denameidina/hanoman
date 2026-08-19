@@ -101,6 +101,36 @@ describe("session-history service (SPEC-362)", () => {
     expect(byId["hidup"]!.endedAt).toBeNull();
   });
 
+  // SPEC-844 · ADR-0125 · dua jalur tutup yang dulu tak terbedakan.
+  it("finishSession menandai baris `closed` dan TIDAK menyentuh reconciledAt", async () => {
+    await beginSession(birth({ sessionId: "tutup" }));
+    await finishSession({ sessionId: "tutup", exitCode: null, transcript: null });
+    const { items } = await listHistory({ q: "tutup" });
+    expect(items[0]).toMatchObject({ endedReason: "closed", reconciledAt: null });
+  });
+
+  it("reconcileHistory menandai `reconciled`, menstempel reconciledAt, dan endedAt tetap batas BAWAH", async () => {
+    await beginSession(birth({ sessionId: "zombie" }));
+    const born = await prisma.sessionHistory.findFirstOrThrow({ where: { sessionId: "zombie" } });
+    const before = Date.now();
+    expect(await reconcileHistory([])).toBe(1);
+    const row = await prisma.sessionHistory.findUniqueOrThrow({ where: { id: born.id } });
+    expect(row.endedReason).toBe("reconciled");
+    // endedAt = updatedAt SEBELUM update ini — batas bawah "terakhir diketahui hidup", bukan waktu
+    // boot. Memindahkannya ke waktu boot mengarang klaim bahwa sesinya hidup selama downtime.
+    expect(row.endedAt?.getTime()).toBe(born.updatedAt.getTime());
+    expect(row.reconciledAt).not.toBeNull();
+    expect(row.reconciledAt!.getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it("satu sapuan boot memberi SATU stempel reconciledAt untuk semua barisnya", async () => {
+    await beginSession(birth({ sessionId: "z1" }));
+    await beginSession(birth({ sessionId: "z2" }));
+    expect(await reconcileHistory([])).toBe(2);
+    const rows = await prisma.sessionHistory.findMany({ where: { sessionId: { in: ["z1", "z2"] } } });
+    expect(new Set(rows.map((r) => r.reconciledAt!.getTime())).size).toBe(1);
+  });
+
   it("purge menghapus baris ber-scope dan berkas transkripnya", async () => {
     await beginSession(birth({ sessionId: "x", projectId: "p9" }));
     await finishSession({ sessionId: "x", exitCode: 0, transcript: "akan dihapus" });
@@ -113,7 +143,7 @@ describe("session-history service (SPEC-362)", () => {
   });
 });
 
-// SPEC-845 · ADR-0125 · urutan penghapusan purge. Bukti transkrip tak boleh hancur untuk baris yang
+// SPEC-845 · ADR-0126 · urutan penghapusan purge. Bukti transkrip tak boleh hancur untuk baris yang
 // SELAMAT; sisa yang boleh ada hanyalah berkas yatim, karena hanya ia yang bisa dipulihkan.
 describe("durabilitas purge (SPEC-845)", () => {
   const seed = async (sessionId: string, transcript: string) => {

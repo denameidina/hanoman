@@ -37,6 +37,10 @@ export const PG_ORDER = [
   "TelegramGatewayState", "TelegramChat", "TelegramUpdate", "TelegramMemory",
   "TelegramOutbox", "TelegramConfirmation", "TelegramAudit",
   "Ticket", "TicketAttachment",
+  // SPEC-843 · ADR-0124 · SpecAttachment WAJIB sesudah Spec (FK specId, cascade). Tabel ini
+  // LOCAL-only dan lazimnya TIDAK ada di sumber Postgres lama — jalur 42P01 memperlakukannya
+  // sebagai nol baris, cermin Changelog.
+  "SpecAttachment",
   // SPEC-471 · ADR-0095 · GithubIssue sesudah Project (FK projectId) DAN sesudah Spec: `specId`
   // memang tanpa FK, tapi memindahkannya lebih awal membuat urutan tabel tak lagi mencerminkan
   // arah tautannya bagi pembaca berikutnya.

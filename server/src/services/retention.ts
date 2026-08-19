@@ -26,7 +26,7 @@ export async function runRetention(
     candidates: 0, deleted: 0, bytes: 0, failed: 0, orphans: 0, dangling: 0,
   };
   await deleteExpired(report, opts, deps);
-  // SPEC-845 · ADR-0125 · rekonsiliasi jalan di SETIAP sapuan, termasuk saat jatah batch habis di
+  // SPEC-845 · ADR-0126 · rekonsiliasi jalan di SETIAP sapuan, termasuk saat jatah batch habis di
   // tengah jalan — berkas yatim justru lahir dari penghapusan yang terpotong. Ini juga satu-satunya
   // job maintenance-nya: tak ada timer maupun proses kedua (ADR-0024).
   const gc = await reconcileTranscripts({ dryRun: opts.dryRun });
@@ -59,7 +59,7 @@ async function deleteExpired(
       await prisma.sessionHistory.delete({ where: { id: row.id } });
       report.deleted++; remaining--;
     } catch { report.failed++; continue; }
-    // Berkas dihapus SESUDAH barisnya commit (ADR-0125): kegagalan di sini menyisakan yatim, yang
+    // Berkas dihapus SESUDAH barisnya commit (ADR-0126): kegagalan di sini menyisakan yatim, yang
     // rekonsiliasi di akhir sapuan ini juga sudah memungutnya — bukan bukti hancur milik baris hidup.
     if (row.transcriptKey) await removeTranscript(row.transcriptKey).catch(() => { /* jadi yatim */ });
     if (remaining <= 0) return;

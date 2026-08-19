@@ -46,7 +46,7 @@ export async function readTranscript(key: string): Promise<string | null> {
   catch { return null; }
 }
 
-// SPEC-845 · ADR-0125 · HANYA `ENOENT` yang ditelan — itulah yang membuat penghapusan idempoten,
+// SPEC-845 · ADR-0126 · HANYA `ENOENT` yang ditelan — itulah yang membuat penghapusan idempoten,
 // dan purge memang berhak menemui berkas yang sudah lenyap. Galat lain (EACCES, EIO, EROFS) wajib
 // bersuara: purge melaporkan kegagalan sebagian, dan diam di sini membuatnya melaporkan sukses
 // penuh atas berkas yang sebenarnya masih ada di disk.
@@ -56,7 +56,7 @@ export async function deleteTranscript(key: string): Promise<void> {
   catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
 }
 
-// Isi direktori apa adanya, untuk mark & sweep ADR-0125: manifes berkas hidup adalah kolom
+// Isi direktori apa adanya, untuk mark & sweep ADR-0126: manifes berkas hidup adalah kolom
 // `transcriptKey`, jadi yang dibutuhkan pemanggil cuma nama + umur tiap berkas. Disaring ke `.log`
 // (satu-satunya bentuk yang saveTranscript hasilkan) supaya berkas asing yang kebetulan mendarat di
 // direktori ini tak pernah ikut tersapu.

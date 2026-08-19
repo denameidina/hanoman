@@ -156,7 +156,7 @@
     `HANOMAN_RETENTION_HOLDS` mengecualikan `session:<id>`, `ticket:<id>`, `delivery:<id>`, atau
     `result:<id>` yang wajib dipertahankan.
   - **Penghapusan tak pernah menghancurkan bukti milik baris yang selamat** (SPEC-845,
-    [ADR-0125](../adr/0125-durabilitas-penghapusan-transkrip-riwayat.md), mengamandemen ADR-0079 §5).
+    [ADR-0126](../adr/0126-durabilitas-penghapusan-transkrip-riwayat.md), mengamandemen ADR-0079 §5).
     Berkas transkrip di-`unlink` **sesudah** penghapusan barisnya commit, per potongan atas himpunan
     id eksplisit — bukan sebelumnya. Arah kegagalan ini yang dipilih karena hanya sisanya yang bisa
     dipulihkan: berkas yatim ditemukan kembali sebagai selisih isi direktori vs kolom `transcriptKey`

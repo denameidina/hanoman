@@ -50,7 +50,7 @@ describe("transcript-store (SPEC-362)", () => {
     await deleteTranscript(key);
   });
 
-  // SPEC-845 · ADR-0125 · purge kini melaporkan kegagalan sebagian, jadi kegagalan filesystem
+  // SPEC-845 · ADR-0126 · purge kini melaporkan kegagalan sebagian, jadi kegagalan filesystem
   // yang BUKAN "sudah tak ada" harus punya suara.
   it("hapus melempar untuk galat selain ENOENT", async () => {
     const { key } = await saveTranscript("isi");

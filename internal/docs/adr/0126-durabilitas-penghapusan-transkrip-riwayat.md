@@ -1,4 +1,4 @@
-# ADR-0125 — Durabilitas penghapusan transkrip riwayat: DB commit dulu, berkas disapu mark & sweep
+# ADR-0126 — Durabilitas penghapusan transkrip riwayat: DB commit dulu, berkas disapu mark & sweep
 
 - Status: accepted
 - Tanggal: 2026-08-19

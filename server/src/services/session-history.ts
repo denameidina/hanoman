@@ -1,7 +1,7 @@
 // SPEC-362 · ADR-0079 · riwayat sesi terminal. Satu-satunya tempat yang menyentuh tabel
 // SessionHistory; pty.ts tetap bebas DB dan hanya menembakkan peristiwa ke sini.
 import { randomUUID } from "node:crypto";
-import type { Paginated, SessionHistoryView } from "@hanoman/shared";
+import type { Paginated, SessionEndReason, SessionHistoryView } from "@hanoman/shared";
 import { prisma } from "../db";
 import { registerSessionHooks, type SessionBirth, type SessionDeath } from "./pty";
 import { saveTranscript, readTranscript, deleteTranscript, listTranscripts } from "./transcript-store";
@@ -10,13 +10,20 @@ type Row = {
   id: string; sessionId: string; projectId: string; specId: string | null; title: string | null;
   kind: string; flow: string | null; agent: string; model: string | null; effort: string | null;
   branch: string | null; cwd: string; startedAt: Date; endedAt: Date | null; exitCode: number | null;
+  endedReason: string | null; reconciledAt: Date | null;
   transcriptKey: string | null; transcriptBytes: number | null;
 };
+
+// Kosakata `endedReason` hidup di @hanoman/shared bersama pembacanya (`sessionOutcome`): penulis
+// dan pembaca yang tak sepakat adalah kelas bug SPEC-431/448.
+const CLOSED: SessionEndReason = "closed";
+const RECONCILED: SessionEndReason = "reconciled";
 
 const view = (r: Row): SessionHistoryView => ({
   id: r.id, sessionId: r.sessionId, projectId: r.projectId, specId: r.specId, title: r.title,
   kind: r.kind, flow: r.flow, agent: r.agent, model: r.model, effort: r.effort, branch: r.branch,
   cwd: r.cwd, startedAt: r.startedAt.toISOString(), endedAt: r.endedAt?.toISOString() ?? null,
+  endedReason: r.endedReason, reconciledAt: r.reconciledAt?.toISOString() ?? null,
   exitCode: r.exitCode, transcriptBytes: r.transcriptBytes,
 });
 
@@ -49,7 +56,7 @@ export async function finishSession(d: SessionDeath): Promise<void> {
   await prisma.sessionHistory.update({
     where: { id: open.id },
     data: {
-      endedAt: new Date(), exitCode: d.exitCode,
+      endedAt: new Date(), endedReason: CLOSED, exitCode: d.exitCode,
       transcriptKey: t.key || null, transcriptBytes: t.key ? t.bytes : null,
     },
   });
@@ -104,7 +111,7 @@ export type PurgeReport = { purged: number; transcriptsDeleted: number; transcri
 // Potongan sekaligus menjaga panjang klausa `IN` dan durasi kunci tulis SQLite tetap wajar.
 const PURGE_BATCH = 200;
 
-// SPEC-845 · ADR-0125 · berkas transkrip dihapus SESUDAH penghapusan barisnya commit. Dari dua
+// SPEC-845 · ADR-0126 · berkas transkrip dihapus SESUDAH penghapusan barisnya commit. Dari dua
 // urutan yang mungkin hanya urutan ini yang sisanya bisa dipulihkan: berkas yatim ditemukan kembali
 // oleh reconcileTranscripts (selisih isi disk vs kolom transcriptKey), sedangkan byte yang telanjur
 // di-unlink untuk baris yang penghapusannya GAGAL hilang selamanya. Urutan sebaliknya pun tak pernah
@@ -135,11 +142,11 @@ export async function purgeHistory(q: { projectId?: string; before?: Date }): Pr
 
 // Tenggang sapuan. `saveTranscript` menulis berkas SEBELUM `finishSession` menulis
 // `transcriptKey`-nya, jadi selalu ada jendela berisi berkas hidup yang belum dirujuk baris mana
-// pun; menyapu tanpa tenggang akan menghancurkannya — cacat yang sama dengan yang ADR-0125
+// pun; menyapu tanpa tenggang akan menghancurkannya — cacat yang sama dengan yang ADR-0126
 // perbaiki, dilahirkan kembali oleh perbaikannya sendiri. Satu jam jauh melampaui jendela nyata.
 export const TRANSCRIPT_GC_GRACE_MS = 60 * 60_000;
 
-// SPEC-845 · ADR-0125 · mark & sweep dua arah antara tabel dan direktori transkrip. Manifesnya
+// SPEC-845 · ADR-0126 · mark & sweep dua arah antara tabel dan direktori transkrip. Manifesnya
 // kolom `transcriptKey` itu sendiri — tak ada tabel, kolom, atau direktori staging baru (cermin
 // `.trash` worktree ADR-0116: isinya sampah menurut konstruksi). Dipanggil dari sweep retensi,
 // bukan timer sendiri (ADR-0024).
@@ -178,16 +185,29 @@ export async function reconcileTranscripts(
 
 // tmux bisa mati di luar hanoman (kill-server, reboot). Tanpa ini, baris tanpa pane akan selamanya
 // terbaca "berjalan". Dipanggil sekali saat boot — cermin backfillFeed saat hub boot (ADR-0067).
+// SPEC-844 · ADR-0125 · barisnya ditandai `reconciled`: `exitCode` null DI SINI berarti "hasil tak
+// diketahui", sementara `exitCode` null di jalur `finishSession` berarti "agen masih hidup saat
+// ditutup" — dua keadaan yang dulu tak terbedakan dan sama-sama dirender hijau "selesai".
 export async function reconcileHistory(liveSessionIds: string[]): Promise<number> {
   const open = await prisma.sessionHistory.findMany({
     where: { endedAt: null }, select: { id: true, sessionId: true, updatedAt: true },
   });
   const live = new Set(liveSessionIds);
+  // Satu stempel untuk seluruh sapuan: semua baris yang ditemukan mati oleh boot yang sama memang
+  // ditemukan pada saat yang sama.
+  const at = new Date();
   let closed = 0;
   for (const r of open) {
     if (live.has(r.sessionId)) continue;
-    // updatedAt = waktu terbaik yang tersedia; exitCode tetap null karena memang tak diketahui.
-    await prisma.sessionHistory.update({ where: { id: r.id }, data: { endedAt: r.updatedAt } });
+    // `updatedAt` = kapan baris ini TERAKHIR disentuh, dan service ini hanya menulis saat lahir &
+    // tutup — jadi untuk baris berjalan ia sama dengan waktu lahirnya. Ia dipakai apa adanya
+    // sebagai batas BAWAH ("terakhir diketahui hidup"), `reconciledAt` batas atasnya; memindahkan
+    // `endedAt` ke `at` akan mengarang klaim bahwa sesinya hidup selama seluruh downtime. UI tak
+    // merender durasi baris ini sama sekali (SPEC-844).
+    await prisma.sessionHistory.update({
+      where: { id: r.id },
+      data: { endedAt: r.updatedAt, endedReason: RECONCILED, reconciledAt: at },
+    });
     closed++;
   }
   return closed;

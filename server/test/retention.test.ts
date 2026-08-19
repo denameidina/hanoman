@@ -9,7 +9,7 @@ import { runRetention } from "../src/services/retention";
 const old = new Date("2025-01-01T00:00:00Z");
 const now = new Date("2026-08-14T00:00:00Z");
 
-// Sapuan kini ikut merekonsiliasi direktori transkrip (SPEC-845 · ADR-0125); tanpa direktori
+// Sapuan kini ikut merekonsiliasi direktori transkrip (SPEC-845 · ADR-0126); tanpa direktori
 // terisolasi ia akan menyapu ~/.hanoman/transcripts milik instance sungguhan.
 beforeEach(async () => {
   process.env.HANOMAN_TRANSCRIPT_DIR = mkdtempSync(join(tmpdir(), "hanoman-ret-"));
@@ -33,7 +33,7 @@ describe("bounded retention", () => {
     expect(await prisma.sessionHistory.count()).toBe(2);
   });
 
-  // SPEC-845 · ADR-0125 · membalik kontrak lama ("baris ditahan bila berkas gagal dihapus"): berkas
+  // SPEC-845 · ADR-0126 · membalik kontrak lama ("baris ditahan bila berkas gagal dihapus"): berkas
   // kini dihapus SESUDAH barisnya commit, jadi kegagalan filesystem menyisakan yatim yang bisa
   // dipungut — bukan baris tertahan yang transkripnya sudah telanjur hancur.
   it("kegagalan hapus berkas menyisakan yatim, bukan baris yang tertahan", async () => {
