@@ -19,7 +19,9 @@ const iconFor = (mime: string): string =>
   mime === "application/pdf" ? "file-text" : mime === "text/csv" ? "table" : "file";
 
 export const humanSize = (n: number): string =>
-  n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+  n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB`
+    : n >= 1024 ? `${Math.round(n / 1024)} KB`
+    : `${n} B`;
 
 const CARD: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
@@ -101,9 +103,15 @@ export function SpecAttachmentsPanel({ specId, onToast }: { specId: string; onTo
   const [items, setItems] = React.useState<SpecAttachmentView[]>([]);
   const [busy, setBusy] = React.useState(false);
 
+  // Dua penjagaan, dua sebab berbeda — keduanya kelas "detail backlog roboh seluruhnya":
+  // `?.` untuk klien yang tak punya method ini (layar yang me-mock `../api/client` sebagian, pola
+  // `api.getEscalation?.()` yang sudah ada di BacklogScreen), dan `Array.isArray` untuk respons
+  // yang bentuknya bukan amplop ini — `setItems(undefined)` melempar di render berikutnya, bukan
+  // di sini, jadi jejaknya menunjuk ke tempat yang salah. Bentuk yang tak dikenali membiarkan
+  // daftar terakhir berdiri, bukan mengosongkannya: kedip jaringan bukan "lampiran dihapus".
   const load = React.useCallback(async () => {
-    const r = await api.listSpecAttachments(specId).catch(() => null);
-    if (r) setItems(r.attachments);
+    const r = await api.listSpecAttachments?.(specId).catch(() => null);
+    if (Array.isArray(r?.attachments)) setItems(r.attachments);
   }, [specId]);
   React.useEffect(() => { void load(); }, [load]);
 

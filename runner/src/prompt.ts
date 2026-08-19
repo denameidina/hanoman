@@ -235,7 +235,7 @@ const methodClause = (method: MethodDef): string => method.extraClause ?? "";
 const attachmentClause = (ctx?: AttachmentCtx): string => {
   if (!ctx || ctx.items.length === 0) return "";
   const list = ctx.items.map((a) =>
-    `- \`${a.path}\` — ${a.filename} (${a.mimeType}, ${Math.max(1, Math.round(a.size / 1024))} KB)`).join("\n");
+    `- \`${a.path}\` — ${a.filename} (${a.mimeType}, ${a.size} byte)`).join("\n");
   return `LAMPIRAN backlog item ini (${ctx.items.length} berkas) sudah tersedia sebagai berkas di mesin ini:\n`
     + `${list}\n`
     + "BACA semuanya SEBELUM mengerjakan fase pertama — dokumen teks (.md/.txt/.log/.json/.csv) baca "

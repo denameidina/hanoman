@@ -1974,7 +1974,7 @@ git commit -m "docs: SpecAttachment di data-model, api-contract, naskah agen (SP
 
 **Files:** —
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
 
 Run:
 ```bash
@@ -1982,12 +1982,12 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --changed "$HA
 ```
 Expected: PASS, dan **jumlah berkas test > 0** (`--changed` menyalakan `passWithNoTests`, jadi nol test terlihat hijau — baca outputnya).
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck`
 Expected: keluar 0 untuk keempatnya.
 
-- [ ] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint)**
+- [x] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint)**
 
 ```bash
 HANOMAN_HOME="$(mktemp -d)" HANOMAN_UPLOAD_DIR="$(mktemp -d)" NODE_ENV=development \
@@ -2002,10 +2002,35 @@ curl -sS -o /dev/null -w '%{http_code}\n' localhost:3001/api/specs/<SPEC-ID>/att
 Expected: `201` unggah dengan `saved` berisi satu berkas, daftar memuatnya, unduh `200`.
 Matikan server per-PID (`lsof -ti:3001` → `kill <pid>`), **jangan** `pkill -f`.
 
-- [ ] **Step 4: Commit sisa & push**
+- [x] **Step 4: Commit sisa & push**
 
 ```bash
 git add -A
 git commit -m "chore(spec-843): verifikasi akhir"
 git push origin HEAD:refs/heads/hanoman/spec-843
 ```
+
+---
+
+## Catatan verifikasi (diisi saat Execute)
+
+- **`--changed "$HANOMAN_BASE_SHA"` mengembang jadi 417 berkas test** (2,2 jam): `App.tsx`,
+  `runner/src/prompt.ts`, dan `upload-pipeline.ts` diimpor sangat luas. Di mesin yang menjalankan
+  beberapa sesi sekaligus, hasilnya 34 berkas "gagal" yang hampir seluruhnya **timeout kontensi** —
+  `integrate.test.ts` sendiri butuh 990 detik. Semua suite yang gagal dijalankan ULANG terisolasi
+  dan lulus: 8 suite server (61 test), 7 suite server ringan (148 test), 6 suite berat (184 test),
+  13 berkas frontend (81 test).
+- **Dua regresi NYATA yang ditemukan run itu, sudah diperbaiki:**
+  1. `SpecAttachmentsPanel` merobohkan seluruh detail backlog di layar yang me-mock `../api/client`
+     sebagian (`api.listSpecAttachments is not a function`) **dan** di layar yang mem-spy `fetch`
+     dengan satu amplop untuk semua URL (`setItems(undefined)` → `undefined.length` di render
+     BERIKUTNYA, jadi jejaknya menunjuk ke tempat yang salah). Dijaga `?.` + `Array.isArray`.
+  2. `PG_ORDER` (`cli/src/commands/migrate-pg.ts`) wajib memuat SETIAP model Prisma tepat sekali —
+     `SpecAttachment` ditambahkan sesudah `Spec`.
+- **Dua kegagalan PRE-EXISTING**, dibuktikan dengan menjalankan suite yang sama di worktree
+  `$HANOMAN_BASE_SHA`: `server/test/events.route.test.ts` (2 gagal, WS 401) dan
+  `server/test/terminal.route.test.ts` (15 gagal) — angkanya identik di kedua sisi. Keduanya
+  bergantung pada env sesi (`HANOMAN_CONTROL_ORIGINS`) yang sengaja dilepas saat menjalankan test.
+- **Jebakan env yang terkonfirmasi lagi:** `HANOMAN_CONTROL_ORIGINS` di env sesi membuat
+  `classifyIngress` menjawab `denied` → **seluruh** route test 404 dengan body `{"error":"not found"}`
+  milik handler sendiri, termasuk `DELETE /specs/:id` yang tak punya jalur 404 sama sekali.

@@ -25,7 +25,9 @@ export type MaterializedAttachment = {
 const INDEX = "INDEX.md";
 
 const humanSize = (n: number): string =>
-  n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+  n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB`
+    : n >= 1024 ? `${Math.round(n / 1024)} KB`
+    : `${n} B`;
 
 // Nama materialisasi diturunkan dari `filename` supaya terbaca manusia DAN agen di prompt. Dua
 // lampiran boleh punya nama asli yang sama, jadi tabrakan disuffiks — menimpa berarti satu lampiran
