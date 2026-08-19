@@ -425,7 +425,7 @@ git commit -m "feat(uploads): jalur dokumen di upload pipeline + parentBytes (SP
   - `deleteSpecAttachment(specId: string, attId: string): Promise<boolean>`
   - `dropSpecAttachments(specId: string): Promise<void>` — hapus byte semua lampiran satu Spec (baris ikut cascade DB)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/spec-attachment.service.test.ts`:
 
@@ -520,12 +520,12 @@ describe("SPEC-843 · hapus", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-attachment.service.test.ts`
 Expected: FAIL — modul `spec-attachment` tak ada.
 
-- [ ] **Step 3: Tulis `server/src/services/spec-attachment.ts`**
+- [x] **Step 3: Tulis `server/src/services/spec-attachment.ts`**
 
 ```ts
 // SPEC-843 · ADR-0124 · lampiran per backlog item. Domain-nya di sini; route tinggal tipis.
@@ -658,12 +658,12 @@ export async function dropSpecAttachments(specId: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-attachment.service.test.ts`
 Expected: PASS (7 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/spec-attachment.ts server/test/spec-attachment.service.test.ts
