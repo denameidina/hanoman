@@ -23,6 +23,9 @@ export const paths = {
   specSource: (id: string) => `${API}/specs/${id}/source`,
   // SPEC-804 · ADR-0120 · tandai item selesai manual (operasi khusus, bukan field PATCH).
   specDone: (id: string) => `${API}/specs/${id}/done`,
+  // SPEC-843 · ADR-0124 · lampiran backlog item (multi-berkas per request).
+  specAttachments: (id: string) => `${API}/specs/${id}/attachments`,
+  specAttachment: (id: string, attId: string) => `${API}/specs/${id}/attachments/${attId}`,
   specReview: (id: string) => `${API}/specs/${id}/review`,
   specReviewFile: (id: string, path: string) => `${API}/specs/${id}/review/${path}`,
   settings: `${API}/settings`,

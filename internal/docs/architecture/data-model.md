@@ -448,6 +448,29 @@ di-cache lokal. `status`/`category` = `String` + zod (`zTicketStatus`/`zTicketCa
   honeypot (`hc_trap`). Triase scheduler hanya membuat notification review; promosi selalu aksi
   manusia dan payloadnya dibingkai sebagai data tidak tepercaya.
 
+## SpecAttachment (SPEC-843 · [ADR-0124](../adr/0124-lampiran-backlog-konteks-agen.md))
+
+Lampiran per **backlog item**, terpisah dari `TicketAttachment` — tiket dan backlog dua domain
+dengan aturan sync dan tingkat kepercayaan yang berbeda. Byte hidup di `HANOMAN_UPLOAD_DIR`
+(server-local, di luar `repoDir`); `storageKey` opaque uuid+ext, `filename` nama asli tersanitasi
+untuk tampilan saja.
+
+- **`SpecAttachment`** — `id`, `specId`→Spec (**cascade**), `projectId` (denormal, kuota &
+  isolasi), `filename`, `mimeType`, `size`, `storageKey`, `createdAt`.
+- **LOCAL-only** — **tanpa** kolom `version`, jadi ia tak pernah masuk changefeed sync (cermin
+  `LeadFlow`/`WebhookEndpoint`/`Changelog`). Byte memang tak menyeberang (ADR-0062), dan metadata
+  yang menyeberang **tanpa** byte-nya hanya menghasilkan lampiran yang tak bisa dibuka di mesin
+  lain. Konsekuensinya dinyatakan: lampiran hanya terlihat di mesin tempat ia diunggah.
+- Tipe diterima: `image/png|jpeg|webp`, `application/pdf`, `text/markdown`, `text/plain`,
+  `application/json`, `text/csv` — gerbangnya **pasangan** mimeType ↔ ekstensi, dan tipe teks
+  divalidasi "UTF-8 sah tanpa byte NUL" (bukan magic bytes, yang tak ada untuk teks polos).
+- Batas: 10 MB/berkas, 10 lampiran/backlog, 40 MB/backlog.
+- Menghapus `Spec` menghapus baris (cascade DB) **dan** byte + direktori materialisasi
+  (`services/spec-attachment.ts`, `services/spec-attachment-dir.ts`) — cascade DB tak menyentuh disk.
+- Jalur ke agen: lampiran dimaterialisasi ke `<repoDir>/.worktrees/.attachments/<sessionId>/`
+  berikut `INDEX.md` — sekamar dengan `.phases`, **di luar** worktree sehingga `git add -A` agen tak
+  bisa men-stage-nya. Direkonsiliasi **penuh** tiap perubahan, dan di-mount `:ro` ke sandbox sesi.
+
 ## Sync — konflik & jam LWW (SPEC-270 · [ADR-0067](../adr/0067-sync-lww-reconciliation-manual.md))
 - **`updatedAt` = jam LWW.** Model synced (`Project`, `Spec`, `Vps`, `SessionResult`,
   `Ticket`, `TicketAttachment`) kini `updatedAt @updatedAt` (dulu `@default(now())`) — auto-bump tiap edit;

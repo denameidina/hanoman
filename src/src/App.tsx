@@ -13,6 +13,7 @@ import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, co
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
+import { AttachmentPicker } from "./screens/SpecAttachments";
 import { AuthScreen } from "./screens/AuthScreen";
 import { ClientPortal } from "./portal/ClientPortal";
 import { AuthProvider } from "./auth/AuthContext";
@@ -48,7 +49,9 @@ type SpecForm = { kind: string; project: string; title: string; context: string;
   // SPEC-407 · ADR-0089 · backlog goal: goal yang dikejar + bukti berhentinya.
   goal: string; done: string;
   // SPEC-447 · ADR-0093 · backlog yang harus selesai & ter-merge sebelum item ini boleh jalan.
-  dependsOn: string[] };
+  dependsOn: string[];
+  // SPEC-843 · ADR-0124 · lampiran yang ditahan di memori sampai item lahir — ia butuh specId.
+  attachments: File[] };
 // SPEC-210 (PRD take-to-backlog) + SPEC-237 (promosi audit → Finding QA) menyeed NewSpecModal.
 // Semua opsional → PrdPrefill (field wajib) tetap assignable ke sini.
 // SPEC-244 · branchFrom (teruskan branch PRD/audit) + fromAudit (sinyal skip-audit) juga di-seed.
@@ -295,7 +298,8 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
     priority: "sedang", severity: prefill?.severity ?? "major", steps: prefill?.steps ?? "",
     expected: "", actual: prefill?.actual ?? "", env: "", branchFrom: prefill?.branchFrom ?? "", fromAudit: prefill?.fromAudit ?? "",
     goal: prefill?.goal ?? "", done: prefill?.done ?? "",   // SPEC-407
-    dependsOn: [] };                                        // SPEC-447
+    dependsOn: [],                                          // SPEC-447
+    attachments: [] };                                      // SPEC-843
   const [f, setF] = React.useState<SpecForm>(blank);
   React.useEffect(() => {
     if (open) setF({ ...blank, project: prefill?.project || defaultProject });
@@ -467,6 +471,11 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
           </div>
         </>
       )}
+      {/* SPEC-843 · ADR-0124 · lampiran jadi konteks sesi agen, jadi ia bagian dari pengisian item —
+          bukan sesuatu yang baru bisa ditempel sesudahnya. */}
+      <Field label="Lampiran" hint="Gambar, log, CSV, JSON, atau PDF — sesi agen membacanya sebagai konteks">
+        <AttachmentPicker files={f.attachments} onChange={(list) => setF((s) => ({ ...s, attachments: list }))} />
+      </Field>
     </Modal>
   );
 }
@@ -1179,6 +1188,15 @@ export default function App() {
         // SPEC-447 · ADR-0093 · dikirim hanya bila ada isinya; server yang memvalidasi.
         ...(f.dependsOn.length ? { dependsOn: f.dependsOn } : {}) });
       setBacklog((b) => [created, ...b]);
+      // SPEC-843 · ADR-0124 · unggah SESUDAH item lahir — lampiran butuh specId. Kegagalannya tak
+      // boleh membatalkan item yang sudah jadi; operator bisa mengulang unggah dari detail backlog.
+      if (f.attachments.length) {
+        const up = await api.uploadSpecAttachments(created.id, f.attachments).catch(() => null);
+        if (!up) showToast("Item dibuat, tapi lampiran gagal diunggah", "warn", "paperclip");
+        else if (up.rejected.length)
+          showToast(`${up.rejected.length} lampiran ditolak: ${up.rejected.map((x) => x.filename).join(", ")}`,
+            "warn", "paperclip");
+      }
       setModal(null); setSpecPrefill(null); setSection("backlog");
       const toastMsg = f.kind === "audit" ? " dibuat · audit-only (dokumen)"
         : f.kind === "no_effort" ? " dibuat · sesi satu fase (Kerjakan)"

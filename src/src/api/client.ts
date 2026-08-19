@@ -1,4 +1,4 @@
-import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite } from "@hanoman/shared";
+import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -163,6 +163,18 @@ export const api = {
   listSpecs: (params: SpecListParams = {}) => j<Paginated<Spec>>(paths.specs + qs(params)),
   createSpec: (b: unknown) => j<Spec>(paths.specs, { method: "POST", ...body(b) }),
   deleteSpec: (id: string) => j<void>(paths.spec(id), { method: "DELETE" }),
+  // SPEC-843 · ADR-0124 · lampiran backlog. Unggah lewat jUpload (bukan j): header
+  // application/json menghapus boundary FormData.
+  listSpecAttachments: (id: string) =>
+    j<{ attachments: SpecAttachmentView[] }>(paths.specAttachments(id)),
+  uploadSpecAttachments: (id: string, files: File[]) => {
+    const form = new FormData();
+    for (const f of files) form.append("files", f, f.name || "lampiran");
+    return jUpload<{ saved: SpecAttachmentView[]; rejected: { filename: string; reason: string }[] }>(
+      paths.specAttachments(id), form);
+  },
+  deleteSpecAttachment: (id: string, attId: string) =>
+    j<{ ok: true }>(paths.specAttachment(id, attId), { method: "DELETE" }),
   // SPEC-143 · branch sumber worktree milik backlog item. `null` = default project (main).
   // SPEC-175 · `remotes` = branch origin, target rebase/merge.
   // SPEC-486 · ADR-0103 · `defaultBranch` memasok label opsi "default branch repo".
