@@ -87,6 +87,30 @@ model Spec {
   sourceHistory Json?
   updatedAt  DateTime @updatedAt
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  attachments SpecAttachment[]
+}
+
+// SPEC-843 · ADR-0124 · lampiran per backlog item — konteks yang dipegang manusia saat memfilekan
+// item, dibaca agen di dalam sesi. Byte hidup di HANOMAN_UPLOAD_DIR (server-local, di luar repoDir);
+// `storageKey` opaque, `filename` nama asli tersanitasi untuk tampilan saja.
+//
+// LOCAL-only: TANPA `version`, jadi ia tak pernah masuk changefeed sync (cermin LeadFlow,
+// WebhookEndpoint, Changelog). Byte memang tak menyeberang (ADR-0062), dan metadata yang menyeberang
+// TANPA byte-nya hanya menghasilkan lampiran yang tak bisa dibuka di mesin lain — keadaan terburuk
+// dari ketiga pilihan. Sengaja BUKAN TicketAttachment: tiket dan backlog dua domain dengan aturan
+// sync dan tingkat kepercayaan yang berbeda (ADR-0124 §1/§4).
+model SpecAttachment {
+  id         String   @id @default(cuid())
+  specId     String
+  projectId  String   // denormal — kuota & isolasi per project, cermin TicketAttachment
+  filename   String
+  mimeType   String
+  size       Int
+  storageKey String
+  createdAt  DateTime @default(now())
+  spec       Spec     @relation(fields: [specId], references: [id], onDelete: Cascade)
+
+  @@index([specId])
 }
 
 // SPEC-516 · ADR-0105 · changelog naratif per project yang sudah dibangkitkan.
@@ -368,6 +392,13 @@ model SessionHistory {
   startedAt       DateTime  @default(now())
   endedAt         DateTime?
   exitCode        Int?
+  // SPEC-844 · ADR-0125 · CARA baris ini ditutup: "closed" (killSession) atau "reconciled" (pane
+  // sudah lenyap saat boot — hasilnya tak diketahui). null = baris lahir sebelum kolom ini ada.
+  // Kelas hasil (selesai/gagal) sengaja TIDAK disimpan: ia turunan exitCode (sessionOutcome).
+  endedReason     String?
+  // Kapan boot menemukan panenya lenyap. `endedAt` baris rekonsiliasi adalah batas BAWAH
+  // ("terakhir diketahui hidup"); kolom ini batas atasnya.
+  reconciledAt    DateTime?
   transcriptKey   String?
   transcriptBytes Int?
   createdAt       DateTime  @default(now())

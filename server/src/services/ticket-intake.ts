@@ -56,7 +56,7 @@ export async function intakeTicket(input: {
     try {
       const safe = await processUpload({
         buffer: f.buf, clientName: f.name, clientMime: f.mime,
-        projectId: input.projectId, ticketBytes,
+        projectId: input.projectId, parentBytes: ticketBytes,
       });
       let att;
       try {

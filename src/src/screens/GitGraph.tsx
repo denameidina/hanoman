@@ -126,10 +126,14 @@ function menuItems(c: GraphCommit, current: string, act: (op: GitOp) => void, me
     { label: "Copy hash", run: () => copy(c.sha) },
     { label: "Copy subject", run: () => copy(c.subject) },
     { label: "Buat branch di sini…", run: () => { const name = window.prompt("Nama branch baru:"); if (name) act({ op: "branch", name, at: c.sha, checkout: true }); } },
-    // SPEC-233 · buat tag di commit ini. Pesan kosong = lightweight; terisi = annotated. Konfirmasi push.
+    // SPEC-233 · buat tag di commit ini. Pesan kosong = lightweight; terisi = annotated.
     { label: "Add tag…", run: () => {
       const name = window.prompt("Nama tag:"); if (!name) return;
       const message = window.prompt("Pesan (kosong = lightweight):") || undefined;
+      // SPEC-847 · confirm-exempt: bukan gerbang destruktif — jawabannya adalah NILAI `push`,
+      // bukan izin, dan membatalkannya tetap membuat tag. Merendernya sebagai ConfirmDialog
+      // justru menipu ("Batal" yang tetap mengeksekusi). Bentuk benarnya modal form bersama
+      // kedua window.prompt di atas; itu di luar scope SPEC-847 yang menyoal window.confirm.
       const push = window.confirm("Dorong tag ke origin?");
       act({ op: "tag", name, message, at: c.sha, push });
     } },
