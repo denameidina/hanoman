@@ -30,6 +30,7 @@ model Project {
   githubIssues GithubIssue[] // SPEC-471 · ADR-0095 · cermin issue repo GitHub project ini
   changelogs   Changelog[]   // SPEC-516 · ADR-0105 · changelog tersimpan project ini
   clientAccess ClientProjectAccess[] // SPEC-617 · ADR-0110 · akun klien yang boleh melihat project ini
+  portalChats  PortalChatSession[]   // SPEC-854 · ADR-0129 · percakapan portal klien project ini
 }
 
 model Spec {
@@ -245,6 +246,7 @@ model User {
   sessions     Session[]
   deviceTokens DeviceToken[]
   projectAccess ClientProjectAccess[]
+  portalChats   PortalChatSession[]   // SPEC-854 · ADR-0129
 }
 
 // SPEC-617 · ADR-0110 · project yang boleh dilihat sebuah akun klien. Tabel join, bukan kolom
@@ -844,4 +846,46 @@ model WebhookDelivery {
   @@index([status, nextAttemptAt])
   @@index([endpointId, createdAt])
   @@index([eventId])
+}
+
+// SPEC-854 · ADR-0129 · satu percakapan klien di portal. LOCAL-only (cermin
+// ClientProjectAccess, ADR-0110) — akun klien adalah kredensial per-instance, jadi percakapannya
+// tak menyeberang sync maupun webhook. `periodKey` DIBEKUKAN saat sesi lahir, bukan dihitung
+// ulang saat dibaca: itu yang membuat perilaku sesudah reset kuota bisa diuji tanpa memalsukan
+// jam mesin.
+model PortalChatSession {
+  id          String    @id @default(cuid())
+  projectId   String
+  userId      String
+  type        String    // "brainstorm" | "tanya"
+  periodKey   String    // "YYYY-MM" UTC
+  summary     String    @default("")
+  prdMarkdown String?
+  prdReadyAt  DateTime?
+  prdDocPath  String?   // terisi saat operator memateralisasi jadi docs/prd/<slug>.md
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    PortalChatMessage[]
+
+  @@index([projectId, type, periodKey])
+}
+
+// SPEC-854 · satu giliran percakapan. `rawText`+`blockReasons` menyimpan balasan agen yang
+// DITOLAK gerbang keluaran beserta alasannya — justru baris itu yang paling perlu dibaca
+// operator, dan membuangnya membuat kegagalan penjagaan jadi tak terlihat.
+model PortalChatMessage {
+  id           String   @id @default(cuid())
+  sessionId    String
+  seq          Int
+  role         String   // "klien" | "hanoman"
+  text         String
+  rawText      String?
+  blocked      Boolean  @default(false)
+  blockReasons Json?
+  createdAt    DateTime @default(now())
+  session      PortalChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, seq])
 }
