@@ -924,7 +924,7 @@ git commit -m "feat(settings): hapus user, cabut token, dan purge log memakai di
 **Interfaces:**
 - Consumes: `useConfirm` (Task 2).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/vps-apply-confirm.test.tsx` mengikuti pola mock yang sudah dipakai `src/test/vps-checklist.test.tsx` (baca berkas itu lebih dulu dan gunakan mock/fixture yang sama — jangan menulis fixture kedua):
 
@@ -954,12 +954,12 @@ describe("VPS apply remediasi · konfirmasi aplikasi (SPEC-847)", () => {
 
 **Isi keempat test dengan langkah konkret**, meniru cara `vps-checklist.test.tsx` memilih item dan menekan tombol; jangan meninggalkan `/* … */` di berkas akhir.
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 Run: `pnpm vitest --run src/test/vps-apply-confirm.test.tsx`
 Expected: FAIL — tak ada `role="dialog"`.
 
-- [ ] **Step 3: `VpsChecklist.tsx`**
+- [x] **Step 3: `VpsChecklist.tsx`**
 
 Tambahkan `useConfirm` ke impor `"../ds"`, lalu di badan `VpsChecklist`:
 
@@ -999,7 +999,7 @@ Ganti gerbang `onSectionNa`:
 
 Render `{dialog}` tepat sesudah `{body()}` di dalam `<Modal>`. (`Modal` bertumpuk aman: `modalStack` membuat Escape & focus trap menyasar dialog teratas.)
 
-- [ ] **Step 4: `VpsScreen.tsx`**
+- [x] **Step 4: `VpsScreen.tsx`**
 
 Tambahkan `useConfirm` ke impor `"../ds"`, `const { confirm, dialog } = useConfirm();` di badan `VpsScreen`, lalu:
 
@@ -1036,7 +1036,7 @@ Hapus komentar `// window.confirm cukup (pola deleteProject di App): sebut persi
 
 Render `{dialog}` sebagai anak terakhir `<div>` yang dikembalikan `VpsScreen`.
 
-- [ ] **Step 5: Bersihkan mock lama**
+- [x] **Step 5: Bersihkan mock lama**
 
 Di `src/test/vps-checklist.test.tsx`, hapus kedua baris `vi.spyOn(window, "confirm").mockReturnValue(true);` (baris 135 & 150) dan ganti dengan menekan tombol konfirmasi dialog, mis.:
 
@@ -1044,7 +1044,7 @@ Di `src/test/vps-checklist.test.tsx`, hapus kedua baris `vi.spyOn(window, "confi
     fireEvent.click(await screen.findByRole("button", { name: "Terapkan" }));
 ```
 
-- [ ] **Step 6: Verifikasi**
+- [x] **Step 6: Verifikasi**
 
 Run: `pnpm vitest --run src/test/vps-apply-confirm.test.tsx src/test/vps-checklist.test.tsx`
 Expected: PASS semua; tak ada lagi `vi.spyOn(window, "confirm")` di kedua berkas.
@@ -1052,7 +1052,7 @@ Expected: PASS semua; tak ada lagi `vi.spyOn(window, "confirm")` di kedua berkas
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/VpsChecklist.tsx src/src/screens/VpsScreen.tsx src/test/vps-apply-confirm.test.tsx src/test/vps-checklist.test.tsx
