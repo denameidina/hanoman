@@ -277,3 +277,17 @@ tanpa penopang tidak ditulis.
   token, header, dan credential SHALL tidak pernah menjadi output Telegram.
 - WHERE agent default Settings adalah claude atau codex, THE SYSTEM SHALL memakai helper default sesi,
   protocol, capability, memory, dan acceptance suite yang sama.
+
+## Jatah obrolan portal klien (SPEC-854 · [ADR-0130](../adr/0130-kuota-chat-portal-klien.md))
+
+- Jatah berlaku **per project**, terpisah untuk brainstorming dan untuk pertanyaan, nilainya diatur
+  di Settings (`Setting.portalChat`). Periodenya bulanan (bulan UTC).
+- Yang menghabiskan jatah adalah **sesi yang dimulai**, bukan pesan yang dikirim — membuka banyak
+  tab, memuat ulang halaman, atau membuka sesi lama tak menambah pemakaian apa pun.
+- Jatah dimiliki project, bukan akun: beberapa akun klien di project yang sama berbagi satu jatah.
+- Setelah jatah habis, klien tak bisa memulai sesi baru sampai periode berikutnya. Sesi yang sudah
+  berjalan tetap bisa dilanjutkan.
+- Klien melihat sisa jatah dan tanggal resetnya dalam **bahasa biasa**, sebelum menekan apa pun —
+  tombol tipe yang jatahnya habis menonaktifkan diri. Penolakan bukan pesan galat.
+- Jatah `0` berarti tipe sesi itu **tertutup**, bukan tak terbatas.
+- Operator membaca angka yang sama di dashboard, dari sumber yang sama (`quotaView`).
