@@ -2523,7 +2523,7 @@ git add internal/docs && git commit -m "docs(spec-854): ADR-0130 kuota chat port
 - Consumes: `quotaView` (Task 11), `writeDocFile` (`../services/scan`), `resolveRepoDir` (`../services/local-binding`), `getSetting`
 - Produces: `GET /api/portal-chat/sessions`, `GET /api/portal-chat/sessions/:id`, `POST /api/portal-chat/sessions/:id/prd`, `GET /api/portal-chat/export`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/portal-chat-admin.route.test.ts
@@ -2656,12 +2656,12 @@ describe("permukaan operator chat portal (SPEC-854)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-admin.route.test.ts`
 Expected: FAIL — route belum ada
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `server/src/routes/portal-chat-admin.ts`. Poin yang mengikat:
 
@@ -2679,12 +2679,12 @@ Buat `server/src/routes/portal-chat-admin.ts`. Poin yang mengikat:
 
 Daftarkan di `app.ts`: `await api.register(portalChatAdmin);`.
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS (8 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/portal-chat-admin.ts server/src/app.ts server/test/portal-chat-admin.route.test.ts
@@ -2703,7 +2703,7 @@ git commit -m "feat(spec-854): permukaan operator — transkrip, PRD draft, mate
 - Test: `src/src/screens/PortalChatPanel.test.tsx`
 - Test: `server/test/portal-chat-turn.test.ts` (tambahan)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 // src/src/screens/PortalChatPanel.test.tsx
@@ -2766,13 +2766,13 @@ Dan tambahkan ke `server/test/portal-chat-turn.test.ts`:
   });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/src/screens/PortalChatPanel.test.tsx` lalu
 `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-turn.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implementasi panel dashboard**
+- [x] **Step 3: Implementasi panel dashboard**
 
 `PortalChatPanel.tsx` mengikuti bentuk panel operator yang sudah ada (`ChangelogPanel.tsx`
 paling dekat: `Card padding={0}` + baris + `Pager`). Wajib:
@@ -2790,19 +2790,19 @@ paling dekat: `Card padding={0}` + baris + `Pager`). Wajib:
 Tambahkan `portalChatApi` ke `src/src/api/client.ts` mengikuti bentuk namespace yang sudah ada
 di berkas itu.
 
-- [ ] **Step 4: Draft portal di PrdScreen**
+- [x] **Step 4: Draft portal di PrdScreen**
 
 Di `PrdScreen.tsx`, tambahkan bagian **"Draft dari portal klien"** di atas daftar PRD dokumen:
 tiap draft menyebut sesi, tanggal, dan email klien, dengan tombol yang membuka
 `PortalChatPanel`. Draft yang **sudah** dimaterialisasi (`prdDocPath` terisi) tampil tertaut ke
 dokumennya, bukan sebagai draft kedua.
 
-- [ ] **Step 5: Jalankan, pastikan LULUS**
+- [x] **Step 5: Jalankan, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/PortalChatPanel.tsx src/src/screens/PortalChatPanel.test.tsx \
@@ -2820,7 +2820,7 @@ git commit -m "feat(spec-854): PRD draft portal & panel sesi di dashboard operat
   `internal/docs/requirements/prd.md`, `internal/docs/frontend/frontend-implementation.md`,
   `internal/skills/hanoman/SKILL.md`
 
-- [ ] **Step 1: Perbarui docs**
+- [x] **Step 1: Perbarui docs**
 
 - `product/blueprint.md`: portal klien punya tiga permukaan (baca, Help desk, obrolan) dan
   bedanya.
@@ -2829,14 +2829,14 @@ git commit -m "feat(spec-854): PRD draft portal & panel sesi di dashboard operat
 - `internal/skills/hanoman/SKILL.md`: satu paragraf chat portal + rujukan ADR-0129/0130.
 - Tautkan semua yang baru di `internal/docs/README.md`.
 
-- [ ] **Step 2: Verifikasi index docs**
+- [x] **Step 2: Verifikasi index docs**
 
 ```bash
 node cli/dist/index.js docs index --check
 ```
 Expected: tanpa temuan
 
-- [ ] **Step 3: Jalankan SELURUH test yang tersentuh SPEC-854**
+- [x] **Step 3: Jalankan SELURUH test yang tersentuh SPEC-854**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -2854,14 +2854,14 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: semua PASS, jumlah test **bukan nol** per berkas.
 
-- [ ] **Step 4: Typecheck paket yang tersentuh**
+- [x] **Step 4: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
 ```
 Expected: bersih. **Jangan** `pnpm -r typecheck`.
 
-- [ ] **Step 5: Smoke nyata sekali di akhir**
+- [x] **Step 5: Smoke nyata sekali di akhir**
 
 Task ini menyentuh endpoint, jadi sekali di akhir: boot server dengan `HANOMAN_HOME` khusus,
 buat project + akun klien + akses, nyalakan `portalChat.enabled`, lalu login sebagai klien dan:
@@ -2878,7 +2878,7 @@ Yang harus terlihat: balasan awam **atau** kalimat penolakan karangan server —
 nama project lain, path, kode, atau jejak galat. Bunuh server **per-PID**
 (`lsof -ti:3000` → `kill <pid>`), jangan `pkill -f`.
 
-- [ ] **Step 6: Commit terakhir**
+- [x] **Step 6: Commit terakhir**
 
 ```bash
 git add internal/docs internal/skills
