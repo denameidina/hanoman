@@ -901,8 +901,22 @@ export default function App() {
       showToast(`Project ${created.id} dibuat · tekan "Scaffold docs" untuk menyusun SoT`, "ok", "box");
       return;
     }
-    setProjectId(created.id); setSection("docs");
-    showToast("Project " + created.id + " dibuat · reverse-engineer docs", "ok", "box");
+    // SPEC-848 · existing: CTA-nya sendiri berbunyi "→ reverse-engineer docs", jadi sesinya lahir di
+    // sini — cermin cabang scaffold di atas, dan pemicu manusia yang dimaksud ADR-0026. Membuka Docs
+    // tanpa sesi berarti menjanjikan proses lalu menyodorkan pohon docs yang memang belum disusun.
+    setProjectId(created.id);
+    try {
+      const { id } = await api.reverseDocs(created.id);
+      openTerminal(id);
+      showToast(`Project ${created.id} dibuat · reverse docs · sesi ${id} dimulai`, "ok", "radar");
+    } catch (e) {
+      // Project dipertahankan (cermin kegagalan clone di atas): mendarat di detail project, tempat
+      // pintu "Reverse docs" jadi retry-nya — bukan Docs kosong yang tak menawarkan langkah apa pun.
+      const detail = (e as { detail?: { error?: string } }).detail?.error;
+      setSection("project");
+      showToast(`Project ${created.id} dibuat, tapi reverse docs gagal dimulai`
+        + (detail ? ` · ${detail}` : "") + ` · ulangi lewat "Reverse docs"`, "warn", "radar");
+    }
   }
 
   // Cascade di DB ikut menghapus spec project ini — cermin state lokalnya.
@@ -1265,6 +1279,10 @@ export default function App() {
     screen = (
       <Shell active="projects" title={proj ? proj.name : "Project"}
         breadcrumb={proj ? "projects · " + proj.id : "projects"} onNavigate={setSection}>
+        {/* SPEC-848 · gerbang pintu Reverse/Scaffold memakai path EFEKTIF, cermin `resolveRepoDir`
+            di server: project hasil clone disimpan sebagai LocalBinding (SPEC-213/217/218) dan
+            `repoDir`-nya tetap null — digerbangi `repoDir` saja, pintunya tak pernah muncul justru
+            untuk project yang paling butuh jalan kembali. */}
         {gate(proj
           ? <ProjectDetailScreen p={proj} onEdit={() => setModal("project-edit")} onToast={showToast}
               onProjectChanged={refreshProject}
@@ -1272,8 +1290,8 @@ export default function App() {
               onGotoTerminal={() => { setProjectFilter(proj.id); openTerminal(); }}
               onGotoBacklog={() => { setProjectFilter(proj.id); setSection("backlog"); }}
               onGotoChangelog={() => setSection("changelog")}
-              onReverse={proj.kind === "existing" && proj.repoDir ? () => reverseDocs(proj) : undefined}
-              onScaffold={proj.kind === "from-scratch" && proj.repoDir ? () => scaffoldDocs(proj) : undefined}
+              onReverse={proj.kind === "existing" && (proj.binding ?? proj.repoDir) ? () => reverseDocs(proj) : undefined}
+              onScaffold={proj.kind === "from-scratch" && (proj.binding ?? proj.repoDir) ? () => scaffoldDocs(proj) : undefined}
               onDelete={() => deleteProject(proj)} />
           : <StateBlock kind="empty" icon="box" title="Belum ada project"
               hint="Mulai dari nol atau tambahkan codebase yang sudah ada."

@@ -1,0 +1,69 @@
+# SPEC-852 · ADR-0128 · Gerbang validasi paket `hanoman`. Sebelum ini repo tak punya workflow
+# validasi sama sekali — `.github/workflows/` berisi tepat satu berkas, `release.yml`, dan
+# jalurnya `install → pnpm release → smoke --version → publish`. Tak ada `prisma generate`,
+# vitest, maupun tsc di mana pun, jadi paket bisa terbit dari commit yang test dan kontrak
+# TypeScript-nya merah (issue #1). Build memakai esbuild, jadi "build hijau" tak pernah jadi
+# bukti apa pun tentang typecheck.
+#
+# Berkas ini adalah SATU definisi gerbang itu, dipakai tiga pemicu: pull request, push ke main,
+# dan `release.yml` lewat `workflow_call`. Menyalin langkahnya ke release.yml berarti dua
+# definisi yang akan menyimpang tanpa ada yang merah.
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+# Saat dipanggil release.yml, `github.workflow` berisi nama workflow PEMANGGIL ("release"),
+# jadi grup ini tak pernah bertabrakan dengan — apalagi membatalkan — run rilis yang berjalan.
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      # Berkas DB test diturunkan dari HANOMAN_HOME, BUKAN dari checkout (SPEC-479). Di runner ia
+      # diarahkan ke dalam workspace supaya pasti bisa ditulis dan tak berbagi dengan apa pun.
+      HANOMAN_HOME: ${{ github.workspace }}/.hanoman-ci
+      # Deteksi update menyentuh registry npm; validasi tak boleh bergantung pada jaringan.
+      HANOMAN_UPDATE_FETCH: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Root package.json tak punya field `packageManager`, jadi versinya dipatok di sini.
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Sesi terminal hidup di tmux (ADR-0016) dan sebagian besar test server men-spawn pane
+      # sungguhan lewat socket `hanoman-test`. Tanpa tmux mereka gagal karena lingkungan runner,
+      # bukan karena kode — kelas kegagalan yang paling mahal dibaca.
+      - name: tmux (dipakai test sesi terminal)
+        run: command -v tmux || { sudo apt-get update && sudo apt-get install -y tmux; }
+
+      # Test worktree menjalankan `git commit`; git menolak tanpa identitas, dan pesannya tak
+      # menyebut test sama sekali.
+      - name: Identitas git untuk test worktree
+        run: |
+          git config --global user.email "ci@hanoman.invalid"
+          git config --global user.name "hanoman CI"
+
+      - run: pnpm install --frozen-lockfile
+
+      # `pnpm validate` = `prisma generate` → typecheck seluruh paket → suite serial. Satu
+      # perintah, sama persis dengan yang dijalankan manusia di local — jalur validasi yang
+      # terdokumentasi hanya berguna kalau CI benar-benar menempuh jalur itu.
+      - run: pnpm validate
