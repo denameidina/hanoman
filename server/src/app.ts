@@ -40,6 +40,7 @@ import githubIssues from "./routes/github-issues";
 import telegram from "./routes/telegram";
 import webhooks from "./routes/webhooks";
 import portal from "./routes/portal";
+import portalChat from "./routes/portal-chat";
 import clientAccounts from "./routes/client-accounts";
 import wsTickets from "./routes/ws-tickets";
 import fastifyMultipart from "@fastify/multipart";
@@ -223,6 +224,7 @@ export function buildApp(
     await api.register(webhooks);     // SPEC-481 · ADR-0100 · webhook keluar (cookie-only)
     await api.register(changelog);    // SPEC-516 · ADR-0105 · changelog per project (capability `docs`)
     await api.register(portal);       // SPEC-617 · ADR-0110 · portal klien baca-saja (cookie-only)
+    await api.register(portalChat);   // SPEC-854 · ADR-0129 · chat portal klien
     await api.register(clientAccounts); // SPEC-617 · ADR-0110 · kelola akun klien (cookie-only)
   }, { prefix: "/api" });
 
