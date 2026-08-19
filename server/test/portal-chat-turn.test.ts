@@ -85,6 +85,15 @@ describe("satu giliran chat portal (SPEC-854)", () => {
     expect((await runTurn(OPS)).reply).toBe(TEKS_TETAP.gagal);
   });
 
+  // Huruf B: PRD lahir sebagai DRAFT dan tak menyentuh backlog sama sekali.
+  it("brainstorm: PRD jadi draft, bukan backlog", async () => {
+    jawab({ balasan: "Sudah cukup jelas.", keluar_topik: false, prd_siap: true,
+      prd: "# Program loyalitas\n\nisi", ringkasan: "ide loyalitas" });
+    const r = await runTurn({ ...OPS, type: "brainstorm" });
+    expect(r.prd).toContain("Program loyalitas");
+    expect(await prisma.spec.count()).toBe(0);
+  });
+
   // Percobaan keluar workspace tercatat — supaya operator bisa melihatnya, bukan menebaknya.
   it("percobaan keluar workspace ikut dicatat", async () => {
     jawab({ balasan: "Saya tidak bisa membaca itu.", keluar_topik: false,
