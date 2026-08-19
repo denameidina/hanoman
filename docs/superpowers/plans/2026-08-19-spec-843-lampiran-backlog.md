@@ -1519,7 +1519,7 @@ git commit -m "feat(sesi): lampiran backlog masuk prompt fase + mount sandbox (S
   - `<AttachmentPicker files onChange />` — mode *staged* (belum ada `specId`), dipakai `NewSpecModal`
   - `<SpecAttachmentsPanel specId onToast />` — mode live, dipakai detail backlog
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `src/test/spec-attachments.test.tsx`:
 
@@ -1584,12 +1584,12 @@ describe("SPEC-843 · UI lampiran backlog", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `pnpm vitest --run src/test/spec-attachments.test.tsx`
 Expected: FAIL — modul `SpecAttachments` tak ada.
 
-- [ ] **Step 3: Tambahkan klien API di `src/src/api/client.ts`**
+- [x] **Step 3: Tambahkan klien API di `src/src/api/client.ts`**
 
 Tambahkan `type SpecAttachmentView` ke daftar impor `@hanoman/shared`, lalu tepat setelah
 `deleteSpec`:
@@ -1609,7 +1609,7 @@ Tambahkan `type SpecAttachmentView` ke daftar impor `@hanoman/shared`, lalu tepa
     j<{ ok: true }>(paths.specAttachment(id, attId), { method: "DELETE" }),
 ```
 
-- [ ] **Step 4: Tulis `src/src/screens/SpecAttachments.tsx`**
+- [x] **Step 4: Tulis `src/src/screens/SpecAttachments.tsx`**
 
 ```tsx
 /* SPEC-843 · ADR-0124 · lampiran backlog item. Dua mode, satu berkas: `AttachmentPicker` untuk
@@ -1761,7 +1761,7 @@ export function SpecAttachmentsPanel({ specId, onToast }:
 }
 ```
 
-- [ ] **Step 5: Pasang di form buat backlog (`src/src/App.tsx`)**
+- [x] **Step 5: Pasang di form buat backlog (`src/src/App.tsx`)**
 
 Impor komponen:
 
@@ -1820,7 +1820,7 @@ dan tepat setelah `setBacklog((b) => [created, ...b]);`:
       }
 ```
 
-- [ ] **Step 6: Pasang di detail backlog (`src/src/screens/BacklogScreen.tsx`)**
+- [x] **Step 6: Pasang di detail backlog (`src/src/screens/BacklogScreen.tsx`)**
 
 Impor:
 
@@ -1842,19 +1842,19 @@ Bila komponen detail belum punya `onToast`, tambahkan ke tipe prop-nya sebagai
 `onToast?: (msg: string, tone?: "ok" | "warn" | "err") => void` dan teruskan dari `App.tsx`
 dengan `onToast={(m, tone) => showToast(m, tone ?? "ok", "paperclip")}`.
 
-- [ ] **Step 7: Jalankan test, pastikan lulus**
+- [x] **Step 7: Jalankan test, pastikan lulus**
 
 Run: `pnpm vitest --run src/test/spec-attachments.test.tsx`
 Expected: PASS (4 test).
 
-- [ ] **Step 8: Jalankan test frontend yang tersentuh + typecheck**
+- [x] **Step 8: Jalankan test frontend yang tersentuh + typecheck**
 
 Run: `pnpm vitest --run src/test/backlog-board.test.tsx src/test/app-flows.test.tsx src/test/api-client.test.ts`
 Expected: PASS.
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/src/screens/SpecAttachments.tsx src/src/api/client.ts src/src/App.tsx src/src/screens/BacklogScreen.tsx src/test/spec-attachments.test.tsx
