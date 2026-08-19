@@ -118,9 +118,13 @@ hanoman update              # npm i -g hanoman@latest --prefer-online
 systemctl restart hanoman   # atau matikan & jalankan ulang `hanoman`
 ```
 
-Deteksi saja — server tak pernah memasang apa pun sendiri
-([ADR-0048](../adr/0048-auto-update-deteksi-read-only.md) utuh): instance yang me-`npm i` dirinya
-sendiri lalu keluar akan memutus sesi tmux yang sedang berjalan tanpa peringatan. `hanoman update
+Atau dari dashboard: badge Update → **Pasang & mulai ulang** → konfirmasi (SPEC-405 ·
+[ADR-0088](../adr/0088-tombol-update-npm-restart-tersupervisi.md), **mengamandemen**
+[ADR-0048](../adr/0048-auto-update-deteksi-read-only.md)). Server tetap tak memasang apa pun: ia hanya
+keluar dengan kode sentinel `75`, dan yang me-`npm i -g` lalu men-spawn ulang adalah CLI parent
+`hanoman start`. Karena itu tombolnya hanya muncul bila instance dijalankan lewat `hanoman` —
+`node dist/server.js` telanjang tetap read-only. Sesi tmux **tidak** putus (tmux daemon terpisah,
+ADR-0016); yang putus hanya jembatan attach + WebSocket yang menyambung ulang sendiri. `hanoman update
 --check` hanya melaporkan, exit 0.
 
 ## SPEC-384 · membersihkan byte source-map (sekali, SEBELUM migrate)
