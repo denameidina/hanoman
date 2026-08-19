@@ -99,6 +99,52 @@ POST /portal/projects/:id/tickets           -> 201 PortalTicket        # multipa
 #   sebagai method — route portal berikutnya tetap tertutup secara default.
 ```
 
+## Obrolan portal klien (SPEC-854 · [ADR-0129](../adr/0129-mesin-chat-portal-klien.md) · [ADR-0130](../adr/0130-kuota-chat-portal-klien.md)) — **COOKIE_ONLY**
+
+Percakapan yang dijawab hanoman sendiri — beda dari Help Center, yang antrean tiket ke manusia.
+Tiap giliran memanggil satu proses agen berumur pendek di **workspace dokumen** ber-tool baca-saja;
+klien tak pernah menyentuh runtime. Opt-in lewat `Setting.portalChat.enabled`: selama mati, kelima
+route di bawah membalas **404 yang sama** dengan project tak ditugaskan (permukaan ini tak boleh
+jadi alat enumerasi).
+
+```
+GET  /portal/projects/:id/chat                        -> PortalChatQuotaView
+#   { enabled, brainstorm: { terpakai, jatah, sisa }, tanya: {…}, resetPada }
+GET  /portal/projects/:id/chat/sessions?page=&limit=  -> { items: PortalChatSessionView[], total, page, pageSize }
+#   HANYA sesi milik akun yang login — bukan seluruh sesi project.
+POST /portal/projects/:id/chat/sessions               <- { type: "brainstorm" | "tanya" }   # TULIS #2
+#   201 -> PortalChatSessionView
+#   400 tipe tak dikenal · 404 project bukan haknya / chat mati
+#   409 -> { pesan, kuota } — jatah bulan ini habis. `pesan` KALIMAT BIASA (TEKS_TETAP), bukan
+#         pesan galat: klien membaca sisa jatah & tanggal resetnya, bukan kode kesalahan.
+GET  /portal/projects/:id/chat/sessions/:sid?page=&limit=
+#   -> { session: PortalChatSessionView, messages: { items: PortalChatMessageView[], … } }
+#   404 kalau sesinya milik project lain ATAU akun klien lain.
+POST /portal/projects/:id/chat/sessions/:sid/messages <- { text }                            # TULIS #3
+#   201 -> PortalChatMessageView (giliran hanoman). Giliran klien disimpan LEBIH DULU, jadi
+#   pesannya tetap ada meski panggilan agen gagal/timeout.
+#   Balasan yang tertolak gerbang keluaran tetap 201 — isinya kalimat karangan server, dan teks
+#   mentah agen tersimpan di `rawText` untuk operator.
+```
+
+Allowlist klien (`clientRouteAllowed`) membuka **dua bentuk path** baru dan hanya itu — bukan
+"portal boleh POST" (idiom ADR-0111). `POST …/sessions/:id/prd` sengaja TIDAK ada di sana.
+
+## Obrolan portal — permukaan operator (SPEC-854 · ADR-0129) — **COOKIE_ONLY, admin**
+
+```
+GET  /portal-chat/sessions?project=&page=&limit=  -> { items: […, clientEmail, prdSiap], total, …, kuota }
+GET  /portal-chat/sessions/:id                    -> { …sesi, prdMarkdown, messages[] }
+POST /portal-chat/sessions/:id/prd                <- { slug }  -> 201 { path }
+#   Materialisasi PRD draft jadi docs/prd/<slug>.md. TIDAK melahirkan backlog dan tidak memicu
+#   pekerjaan apa pun — eskalasi adalah keputusan manusia pemilik project (SPEC-854 huruf B).
+#   400 slug tak aman · 409 project tanpa checkout
+GET  /portal-chat/export?project=&from=&to=       -> application/x-ndjson (transkrip untuk training)
+```
+
+Tak satu pun route ini ada di `clientRouteAllowed`, jadi gerbang `app.ts` membalasnya **403** untuk
+akun klien.
+
 ## Kelola akun klien (SPEC-617 · ADR-0110) — **COOKIE_ONLY, admin**
 
 ```

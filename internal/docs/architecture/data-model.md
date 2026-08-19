@@ -901,3 +901,33 @@ pernah ikut dipangkas.
 Peristiwanya sendiri **bukan** kolom di mana pun: ia diturunkan tap Prisma dari perubahan baris
 model yang dienumerasi `WEBHOOK_ENTITIES` (`@hanoman/shared`), dengan **allowlist field** sebagai
 pagar data sensitif sekaligus kontrak payload.
+
+## PortalChatSession / PortalChatMessage (SPEC-854 · [ADR-0129](../adr/0129-mesin-chat-portal-klien.md))
+
+Percakapan klien di portal — dua tipe sesi (`brainstorm`, `tanya`), seluruh gilirannya terekam.
+
+`PortalChatSession { id, projectId, userId, type, periodKey, summary, prdMarkdown, prdReadyAt,
+prdDocPath, createdAt, updatedAt }` · `@@index([projectId, type, periodKey])`, FK cascade ke
+`Project` **dan** `User`.
+
+`PortalChatMessage { id, sessionId, seq, role, text, rawText, blocked, blockReasons, createdAt }` ·
+`@@unique([sessionId, seq])`, FK cascade ke sesinya.
+
+Yang mengikat:
+
+- **`periodKey` (`"YYYY-MM"` UTC) DIBEKUKAN saat sesi lahir**, bukan dihitung ulang saat dibaca.
+  Baris sesi ITU SENDIRI adalah buku besar kuota ([ADR-0130](../adr/0130-kuota-chat-portal-klien.md)) —
+  tak ada tabel penghitung kedua yang bisa menyimpang, dan perilaku sesudah reset bisa diuji dengan
+  menyisipkan baris ber-`periodKey` lain alih-alih memalsukan jam mesin.
+- **`rawText` + `blockReasons` menyimpan balasan agen yang DITOLAK gerbang keluaran** beserta
+  alasannya. Justru baris itu yang paling perlu dibaca operator; membuangnya membuat kegagalan
+  penjagaan jadi tak terlihat. `text` selalu berisi apa yang benar-benar dilihat klien.
+- **`summary` diperbarui tiap giliran** dari keluaran terstruktur agen — sesi bisa dibaca cepat
+  tanpa membuka seluruh percakapan.
+- **LOCAL-only.** Tak masuk `SYNCED` (`services/sync.ts`) maupun `WEBHOOK_ENTITIES` — cermin
+  `ClientProjectAccess` (ADR-0110): akun klien adalah kredensial per-instance, jadi percakapannya
+  tak menyeberang. Tapi **wajib** masuk `PG_ORDER` (`cli/src/commands/migrate-pg.ts`) sesudah
+  `User` dan `Project`; `cli/test/migrate-pg.test.ts` mengadu daftar itu ke DMMF.
+- **PRD tetap dokumen (ADR-0041).** `prdMarkdown` adalah **draft** milik sesi, bukan entitas PRD
+  baru; ia jadi dokumen `docs/prd/<slug>.md` hanya saat operator memateralisasinya, dan `prdDocPath`
+  merekam ke mana ia mendarat.
