@@ -165,6 +165,13 @@ dan project ber-`repoDir` null tetap harus bisa menghasilkan PRD. ADR-0041 tetap
    pernah dibaca siapa pun. `shared/src/portal-chat.test.ts` mengadu daftar kuncinya ke zod.
 7. **`permission_denials` adalah sinyal, bukan sampah.** Ia satu-satunya cara operator melihat
    percobaan keluar workspace tanpa menebak. Disimpan sebagai `escapeAttempts`.
-8. **Kedua model LOCAL-only** — tak masuk `SYNCED` maupun `WEBHOOK_ENTITIES` (cermin
+8. **Sebab gagal dibaca dari KEDUA stream, tak pernah dari argv** (pelajaran SPEC-472,
+   dikonfirmasi ulang saat smoke SPEC-854). `execFile` menyusun `err.message` sebagai
+   `Command failed: <argv…>` dan argumen terakhir chat portal adalah **prompt** — memakainya
+   berarti menulis seluruh percakapan klien ke log alih-alih sebabnya. Pada smoke, satu-satunya
+   keterangan berguna (`api_error_status: 401 · Invalid bearer token`) datang di **stdout**,
+   dengan stderr kosong. `chatFailureReason()` karena itu membaca stderr lalu stdout, menyimpan
+   **ekor**, dan menyebut exit code/sinyal.
+9. **Kedua model LOCAL-only** — tak masuk `SYNCED` maupun `WEBHOOK_ENTITIES` (cermin
    `ClientProjectAccess`), tetapi **wajib** masuk `PG_ORDER`; `cli/test/migrate-pg.test.ts`
    mengadunya ke DMMF.

@@ -52,3 +52,35 @@ Turunan terukur dari `entrypoints/prd.md`.
   diperiksa/dilupakan/reset.
 - Secret env-only; action lewat API ber-AgentToken/capability/audit; raw PTY/reasoning/ANSI tidak
   pernah dijadikan reply Telegram.
+
+## 10. Obrolan portal klien (SPEC-854 · [ADR-0129](../adr/0129-mesin-chat-portal-klien.md) · [ADR-0130](../adr/0130-kuota-chat-portal-klien.md))
+
+Satu permukaan chat di portal klien, dijawab hanoman sendiri — beda dari Help Center yang antrean
+tiket ke manusia. Acceptance criteria (huruf A–F brief SPEC-854):
+
+**A. Dua tipe sesi.** Klien memilih saat memulai. *Brainstorming* menggali aktif ala grill-me
+dengan bekal dokumen project dan berakhir dengan PRD. *Bertanya* menjawab seputar project klien
+itu sendiri, langsung di percakapan. Tipe tak bisa diubah setelah sesi lahir.
+
+**B. Keluaran brainstorming = PRD berstatus draft.** Tersimpan di baris sesi, muncul di dashboard
+operator dengan asal yang terbaca (sesi mana, kapan, dari akun klien mana). **Tidak** otomatis jadi
+backlog dan **tidak** memicu pekerjaan apa pun; materialisasi jadi `docs/prd/<slug>.md` adalah aksi
+operator.
+
+**C. Kuota.** Per project, terpisah untuk brainstorming dan pertanyaan, nilainya di Settings,
+periode bulanan. Habis = tak bisa memulai sesi baru sampai periode berikutnya. Klien melihat sisa
+jatah & tanggal reset dalam bahasa biasa — bukan pesan galat. Operator membaca angka yang sama.
+
+**D. Rekaman & ringkasan.** Setiap giliran (masukan klien maupun jawaban hanoman) tersimpan
+berurutan, terikat project + akun klien + tipe sesi. Tiap sesi punya ringkasan yang bisa dibaca
+cepat. Transkrip bisa diambil untuk training (`GET /api/portal-chat/export`, NDJSON).
+
+**E. Penjagaan.** Klien hanya pernah melihat isi projectnya sendiri; percakapan tetap pada topik;
+instruksi yang diselipkan klien tak mengubah perilaku hanoman; klien tak pernah melihat kode, nama
+berkas, nama tabel, jejak galat, perintah, atau konfigurasi; bahasanya awam; dan klien tak punya
+jalan menjalankan apa pun. Ditegakkan **empat lapis** (gerbang masukan · workspace dokumen ·
+argv+sandbox · gerbang keluaran), bukan oleh prompt.
+
+**F. Bukti.** Keempat lapis adalah fungsi murni, jadi huruf E dibuktikan test tanpa memanggil agen
+— termasuk korpus injeksi yang sungguh-sungguh mencoba menembus dan percobaan memancing isi project
+lain. Kuota diuji sampai perilaku di batas, lintas akun di project yang sama, dan sesudah reset.

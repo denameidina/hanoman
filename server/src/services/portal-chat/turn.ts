@@ -21,6 +21,28 @@ const gagal = (reasons: string[]): TurnResult => ({
   summary: "", prd: null, escapeAttempts: 0,
 });
 
+/**
+ * Sebab gagal hidup di EKOR keluaran, dan agen CLI tak sepakat soal stream-nya — pelajaran
+ * SPEC-472, yang di sana menghasilkan 152 baris jejak identik tanpa satu pun petunjuk. `execFile`
+ * menyusun `err.message` sebagai `Command failed: <argv…>`, dan argumen terakhir kita adalah
+ * PROMPT: memakainya berarti menulis seluruh percakapan klien ke log alih-alih sebabnya.
+ */
+const EKOR = 500;
+const ekor = (v: string) => {
+  const t = v.trim();
+  return t.length > EKOR ? `…${t.slice(-EKOR)}` : t;
+};
+export function chatFailureReason(err: {
+  message: string; code?: number | string; signal?: NodeJS.Signals | null; killed?: boolean;
+}, stdout: string, stderr: string, timeoutMs: number): string {
+  if (err.killed) return `chat portal kehabisan waktu ${timeoutMs} ms`;
+  const dariErr = err.message.startsWith("Command failed:") ? "" : err.message;
+  const detail = [ekor(stderr), ekor(stdout)].filter(Boolean).join(" · ")
+    || ekor(dariErr) || "tanpa keluaran";
+  const bagaimana = err.signal ? `sinyal ${err.signal}` : `exit ${err.code ?? "?"}`;
+  return `chat portal gagal (${bagaimana}): ${detail}`;
+}
+
 function runProcess(
   p: { file: string; args: string[]; cwd?: string }, timeoutMs: number,
 ): Promise<string> {
@@ -28,7 +50,10 @@ function runProcess(
     const child = execFile(p.file, p.args, {
       cwd: p.cwd, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, encoding: "utf8",
       killSignal: "SIGTERM",
-    }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
+    }, (err, stdout, stderr) => (err
+      ? reject(new Error(chatFailureReason(
+          err as unknown as Parameters<typeof chatFailureReason>[0], stdout, stderr, timeoutMs)))
+      : resolve(stdout)));
     // SPEC-448 · tutup stdin: `claude -p` membaca stdin sebagai sumber prompt alternatif dan
     // menunggu 3 detik penuh pada pipa hidup-tapi-bisu sebelum menyerah.
     child.stdin?.end();
@@ -58,7 +83,8 @@ export async function runTurn(o: {
     stdout = await runProcess(proc, o.timeoutSec * 1000);
   } catch (error) {
     // Sebab teknisnya sengaja TIDAK ikut ke klien (huruf E) — ia hidup di log server saja.
-    console.warn(`chat portal gagal untuk project ${o.projectId}:`, error);
+    console.warn(`[portal-chat] project ${o.projectId}: `
+      + (error instanceof Error ? error.message : String(error)));
     return gagal(["agen-gagal"]);
   } finally {
     ws.cleanup();

@@ -55,7 +55,7 @@
 **Interfaces:**
 - Produces: `PORTAL_CHAT_TYPES`, `zPortalChatType`, `PortalChatType`, `zAgentReply`, `AgentReply`, `PORTAL_CHAT_REPLY_SCHEMA`, `TEKS_TETAP`, `PortalChatSessionView`, `PortalChatMessageView`, `PortalChatQuotaView`, `periodKeyOf`, `nextResetOf`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // shared/src/portal-chat.test.ts
@@ -103,12 +103,12 @@ describe("kontrak chat portal (SPEC-854)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/portal-chat.test.ts`
 Expected: FAIL — `Failed to resolve import "./portal-chat"`
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // shared/src/portal-chat.ts
@@ -197,12 +197,12 @@ Lalu tambahkan ke `shared/src/index.ts`, mengikuti bentuk baris di sekitarnya:
 export * from "./portal-chat";
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 Run: `pnpm vitest --run shared/src/portal-chat.test.ts`
 Expected: PASS (5 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/portal-chat.ts shared/src/portal-chat.test.ts shared/src/index.ts
@@ -222,7 +222,7 @@ git commit -m "feat(spec-854): kontrak bersama chat portal klien"
 **Interfaces:**
 - Produces: `prisma.portalChatSession`, `prisma.portalChatMessage`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/portal-chat-schema.test.ts
@@ -297,12 +297,12 @@ describe("skema chat portal (SPEC-854 · ADR-0129)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-schema.test.ts`
 Expected: FAIL — `prisma.portalChatSession` undefined
 
-- [ ] **Step 3: Tambahkan model ke `server/prisma/schema.prisma`**
+- [x] **Step 3: Tambahkan model ke `server/prisma/schema.prisma`**
 
 Sisipkan di akhir berkas:
 
@@ -362,7 +362,7 @@ dan di `model User` (dekat `projectAccess`):
   portalChats   PortalChatSession[] // SPEC-854 · ADR-0129
 ```
 
-- [ ] **Step 4: Tulis migration dengan tangan**
+- [x] **Step 4: Tulis migration dengan tangan**
 
 Jangan `migrate dev` — worktree tetangga bisa memicu reset (jebakan terdokumentasi). Buat
 `server/prisma/migrations/20260819140000_portal_chat/migration.sql`:
@@ -401,7 +401,7 @@ CREATE TABLE "PortalChatMessage" (
 CREATE UNIQUE INDEX "PortalChatMessage_sessionId_seq_key" ON "PortalChatMessage"("sessionId", "seq");
 ```
 
-- [ ] **Step 5: Tambahkan ke PG_ORDER**
+- [x] **Step 5: Tambahkan ke PG_ORDER**
 
 Di `cli/src/commands/migrate-pg.ts`, sesudah baris `"User", "ClientProjectAccess", …`:
 
@@ -412,7 +412,7 @@ Di `cli/src/commands/migrate-pg.ts`, sesudah baris `"User", "ClientProjectAccess
   "PortalChatSession", "PortalChatMessage",
 ```
 
-- [ ] **Step 6: Generate client & jalankan test**
+- [x] **Step 6: Generate client & jalankan test**
 
 ```bash
 pnpm db:generate
@@ -421,7 +421,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations cli/src/commands/migrate-pg.ts server/test/portal-chat-schema.test.ts
@@ -439,7 +439,7 @@ git commit -m "feat(spec-854): skema sesi & pesan chat portal (LOCAL-only)"
 **Interfaces:**
 - Produces: `wrapClientMessage(text: string, nonce: string): string`, `newNonce(): string`, `MAX_PESAN = 4000`, `sanitizeClientText(text: string): string`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/portal-chat-guard-input.test.ts
@@ -491,12 +491,12 @@ describe("gerbang masukan chat portal (SPEC-854 huruf E)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-guard-input.test.ts`
 Expected: FAIL — modul tak ada
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // server/src/services/portal-chat/guard-input.ts
@@ -535,12 +535,12 @@ export function wrapClientMessage(text: string, nonce: string): string {
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS (4 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/portal-chat/guard-input.ts server/test/portal-chat-guard-input.test.ts
@@ -559,7 +559,7 @@ git commit -m "feat(spec-854): gerbang masukan — pesan klien selalu jadi bahan
 - Consumes: `liveSpecs` (`../live-specs`), `toPortalSpec`/`toPortalTicket` (`@hanoman/shared`), `listPrds`/`readPrd` (`../project-prds`), `prisma`
 - Produces: `WORKSPACE_FILES: readonly string[]`, `buildChatWorkspace(projectId: string): Promise<{ dir: string; files: string[]; cleanup(): void }>`, `renderProjectDoc`, `renderBacklogDoc`, `renderTicketDoc`, `renderChangelogDoc`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/portal-chat-workspace.test.ts
@@ -649,12 +649,12 @@ describe("workspace dokumen chat portal (SPEC-854 · ADR-0129)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-workspace.test.ts`
 Expected: FAIL — modul tak ada
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // server/src/services/portal-chat/workspace.ts
@@ -765,12 +765,12 @@ export async function buildChatWorkspace(projectId: string): Promise<ChatWorkspa
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS (5 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/portal-chat/workspace.ts server/test/portal-chat-workspace.test.ts
@@ -789,7 +789,7 @@ git commit -m "feat(spec-854): workspace dokumen — allowlist berkas, tanpa sou
 - Consumes: `sandboxArgvFromEnv` (`../session-sandbox`), `PORTAL_CHAT_REPLY_SCHEMA` (`@hanoman/shared`)
 - Produces: `PORTAL_CHAT_TOOLS = "Read,Glob,Grep"`, `FLAG_TERLARANG: readonly string[]`, `portalChatArgv(o): string[]`, `portalChatProcess(o, env): { file, args, cwd? }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/portal-chat-argv.test.ts
@@ -856,12 +856,12 @@ describe("argv chat portal (SPEC-854 · ADR-0129 huruf E)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-argv.test.ts`
 Expected: FAIL — modul tak ada
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // server/src/services/portal-chat/argv.ts
@@ -949,12 +949,12 @@ export function portalChatProcess(
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS (7 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/portal-chat/argv.ts server/test/portal-chat-argv.test.ts
@@ -972,7 +972,7 @@ git commit -m "feat(spec-854): argv chat portal — nol tool tulis, fail closed 
 **Interfaces:**
 - Produces: `guardReply(text: string, o: { projectName: string; otherNames: string[] }): { text: string; blocked: boolean; reasons: string[] }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/portal-chat-guard-output.test.ts
@@ -1053,12 +1053,12 @@ describe("gerbang keluaran chat portal (SPEC-854 huruf E)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-guard-output.test.ts`
 Expected: FAIL — modul tak ada
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // server/src/services/portal-chat/guard-output.ts
@@ -1123,13 +1123,13 @@ export function guardReply(
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS (9 test). Kalau test "jawaban awam lolos" gagal karena pola `istilah-teknis`
 terlalu lapar, perbaiki polanya — jangan melonggarkan test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/portal-chat/guard-output.ts server/test/portal-chat-guard-output.test.ts
@@ -1150,7 +1150,7 @@ git commit -m "feat(spec-854): gerbang keluaran — tolak istilah teknis & isi p
 - Consumes: Task 1 (`zAgentReply`, `TEKS_TETAP`), Task 3 (`wrapClientMessage`, `newNonce`), Task 4 (`buildChatWorkspace`), Task 5 (`portalChatProcess`), Task 6 (`guardReply`)
 - Produces: `systemPromptFor(type, nonce): string`, `renderTurnPrompt(o): string`, `TurnHistory`, `runTurn(o): Promise<TurnResult>` dengan `TurnResult = { reply: string; blocked: boolean; reasons: string[]; raw: string | null; summary: string; prd: string | null; escapeAttempts: number }`
 
-- [ ] **Step 1: Tulis test prompt yang gagal**
+- [x] **Step 1: Tulis test prompt yang gagal**
 
 ```ts
 // server/test/portal-chat-prompt.test.ts
@@ -1196,12 +1196,12 @@ describe("system prompt chat portal (SPEC-854)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-prompt.test.ts`
 Expected: FAIL — modul tak ada
 
-- [ ] **Step 3: Implementasi prompt**
+- [x] **Step 3: Implementasi prompt**
 
 ```ts
 // server/src/services/portal-chat/prompt.ts
@@ -1287,12 +1287,12 @@ export function renderTurnPrompt(o: {
 }
 ```
 
-- [ ] **Step 4: Jalankan test prompt, pastikan LULUS**
+- [x] **Step 4: Jalankan test prompt, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS (4 test)
 
-- [ ] **Step 5: Tulis test orkestrasi yang gagal**
+- [x] **Step 5: Tulis test orkestrasi yang gagal**
 
 ```ts
 // server/test/portal-chat-turn.test.ts
@@ -1391,12 +1391,12 @@ describe("satu giliran chat portal (SPEC-854)", () => {
 });
 ```
 
-- [ ] **Step 6: Jalankan, pastikan GAGAL**
+- [x] **Step 6: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-turn.test.ts`
 Expected: FAIL — modul tak ada
 
-- [ ] **Step 7: Implementasi orkestrasi**
+- [x] **Step 7: Implementasi orkestrasi**
 
 ```ts
 // server/src/services/portal-chat/turn.ts
@@ -1489,12 +1489,12 @@ export async function runTurn(o: {
 }
 ```
 
-- [ ] **Step 8: Jalankan test turn, pastikan LULUS**
+- [x] **Step 8: Jalankan test turn, pastikan LULUS**
 
 Run: perintah Step 6
 Expected: PASS (7 test)
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/src/services/portal-chat/prompt.ts server/src/services/portal-chat/turn.ts \
@@ -1519,7 +1519,7 @@ git commit -m "feat(spec-854): prompt dua tipe sesi + orkestrasi satu giliran"
 - Consumes: Task 7 (`runTurn`), `hasProjectAccess`, `paginate`, `getSetting`
 - Produces: route `GET|POST /api/portal/projects/:id/chat[...]`, `zPortalChat`, `PORTAL_CHAT_DEFAULTS`
 
-- [ ] **Step 1: Tambahkan test allowlist yang gagal**
+- [x] **Step 1: Tambahkan test allowlist yang gagal**
 
 Sisipkan di `server/test/client-route-allowed.test.ts`, di dalam `describe` yang ada:
 
@@ -1557,12 +1557,12 @@ Sisipkan di `server/test/client-route-allowed.test.ts`, di dalam `describe` yang
   });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/client-route-allowed.test.ts`
 Expected: FAIL pada tiga test baru
 
-- [ ] **Step 3: Perluas allowlist**
+- [x] **Step 3: Perluas allowlist**
 
 Di `server/src/services/client-access.ts`, di bawah `isPortalTicketSubmit`:
 
@@ -1588,12 +1588,12 @@ dan ubah baris `portal`:
       || isPortalChatStart(method, seg) || isPortalChatSend(method, seg);
 ```
 
-- [ ] **Step 4: Jalankan allowlist, pastikan LULUS**
+- [x] **Step 4: Jalankan allowlist, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS
 
-- [ ] **Step 5: Tambahkan blok Settings**
+- [x] **Step 5: Tambahkan blok Settings**
 
 Di `shared/src/entities.ts`, sebelum `zSetting`:
 
@@ -1630,7 +1630,7 @@ ke daftar import `@hanoman/shared` berkas itu):
   portalChat: PORTAL_CHAT_DEFAULTS,   // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
 ```
 
-- [ ] **Step 6: Tulis test route yang gagal**
+- [x] **Step 6: Tulis test route yang gagal**
 
 ```ts
 // server/test/portal-chat.route.test.ts
@@ -1768,12 +1768,12 @@ describe("route chat portal klien (SPEC-854)", () => {
 });
 ```
 
-- [ ] **Step 7: Jalankan, pastikan GAGAL**
+- [x] **Step 7: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat.route.test.ts`
 Expected: FAIL — route belum ada (404 di semuanya)
 
-- [ ] **Step 8: Implementasi route**
+- [x] **Step 8: Implementasi route**
 
 ```ts
 // server/src/routes/portal-chat.ts
@@ -1904,12 +1904,12 @@ await api.register(portalChat);   // SPEC-854 · ADR-0129 · chat portal klien
 
 dengan `import portalChat from "./routes/portal-chat";` di blok import.
 
-- [ ] **Step 9: Jalankan, pastikan LULUS**
+- [x] **Step 9: Jalankan, pastikan LULUS**
 
 Run: perintah Step 7
 Expected: PASS (8 test)
 
-- [ ] **Step 10: Typecheck & commit**
+- [x] **Step 10: Typecheck & commit**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
@@ -1933,7 +1933,7 @@ git commit -m "feat(spec-854): route chat portal + dua bentuk tulis di allowlist
 - Consumes: DTO Task 1, route Task 8
 - Produces: komponen `<ChatPanel projectId={string} />`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 // src/src/portal/ChatPanel.test.tsx
@@ -1995,12 +1995,12 @@ describe("permukaan chat portal (SPEC-854)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/src/portal/ChatPanel.test.tsx`
 Expected: FAIL — `ChatPanel` tak ada
 
-- [ ] **Step 3: Tambahkan klien API**
+- [x] **Step 3: Tambahkan klien API**
 
 Di `src/src/api/portal.ts`, tambahkan helper di dekat `get`:
 
@@ -2033,7 +2033,7 @@ dan di dalam `portalApi`:
 Tambahkan `PortalChatQuotaView`, `PortalChatSessionView`, `PortalChatMessageView`,
 `PortalChatType` ke daftar `import type` di kepala berkas.
 
-- [ ] **Step 4: Implementasi ChatPanel**
+- [x] **Step 4: Implementasi ChatPanel**
 
 Tulis `src/src/portal/ChatPanel.tsx` memakai komponen DS yang sudah ada (`Card`, `Button`,
 `StateBlock`, `Pager`/`serverPage`, `LIST_SCROLL_STYLE`) dan token warna yang sama dengan
@@ -2054,18 +2054,18 @@ Tulis `src/src/portal/ChatPanel.tsx` memakai komponen DS yang sudah ada (`Card`,
 Aturan yang mengikat: **tak ada satu pun teks teknis di komponen ini** — tanpa kode status HTTP,
 tanpa nama route, tanpa pesan galat mentah. Gagal jaringan → satu kalimat awam.
 
-- [ ] **Step 5: Sambungkan ke ClientPortal**
+- [x] **Step 5: Sambungkan ke ClientPortal**
 
 Di `src/src/portal/ClientPortal.tsx`, tambahkan tab ketiga `{ value: "chat", label: "Obrolan" }`
 dan cabang render `tab === "chat" ? <ChatPanel projectId={active!} /> : …`. Tab hanya muncul
 bila `getChatQuota` tidak 404 (chat mati di Settings → tab tak ada).
 
-- [ ] **Step 6: Jalankan, pastikan LULUS**
+- [x] **Step 6: Jalankan, pastikan LULUS**
 
 Run: `pnpm vitest --run src/src/portal/ChatPanel.test.tsx`
 Expected: PASS (3 test)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/api/portal.ts src/src/portal/ChatPanel.tsx src/src/portal/ChatPanel.test.tsx src/src/portal/ClientPortal.tsx
@@ -2083,7 +2083,7 @@ git commit -m "feat(spec-854): permukaan chat di portal klien"
 - Modify: `internal/docs/architecture/api-contract.md`
 - Modify: `internal/docs/security/threat-model.md`
 
-- [ ] **Step 1: Tulis ADR-0129**
+- [x] **Step 1: Tulis ADR-0129**
 
 Ikuti bentuk ADR tetangga (`0111-portal-klien-kirim-tiket.md`): header
 Status/Tanggal/Konteks/Mengamandemen/Menegakkan/Tidak mencabut, lalu Konteks → Keputusan
@@ -2103,7 +2103,7 @@ bernomor → Konsekuensi → Gotcha. Isi wajib:
 7. **Gotcha 4:** khusus claude; `--tools` tak punya padanan di `codex exec`.
 8. **Gotcha 5:** `PORTAL_CHAT_REPLY_SCHEMA` ditulis tangan dan `additionalProperties: false`.
 
-- [ ] **Step 2: Tautkan & perbarui docs**
+- [x] **Step 2: Tautkan & perbarui docs**
 
 - `internal/docs/README.md` bagian `adr`: baris baru di puncak daftar, bentuk sama dengan
   tetangganya.
@@ -2113,7 +2113,7 @@ bernomor → Konsekuensi → Gotcha. Isi wajib:
   empat lapis, dan yang secara sadar diterima (`userEmail` di system-reminder claude ditutup
   gerbang keluaran, bukan dicegah di sumbernya).
 
-- [ ] **Step 3: Verifikasi index & commit**
+- [x] **Step 3: Verifikasi index & commit**
 
 ```bash
 pnpm --filter ./cli build && node cli/dist/index.js docs index --check
@@ -2121,7 +2121,7 @@ git add internal/docs
 git commit -m "docs(spec-854): ADR-0129 mesin chat portal + data model, kontrak API, threat model"
 ```
 
-- [ ] **Step 4: Jalankan seluruh test PR1**
+- [x] **Step 4: Jalankan seluruh test PR1**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -2152,7 +2152,7 @@ Expected: semua PASS. **Pastikan angkanya bukan nol** — `--changed` menyalakan
 - Consumes: `PortalChat` (Task 8), `periodKeyOf`/`nextResetOf` (Task 1)
 - Produces: `quotaView(projectId, cfg, now?): Promise<PortalChatQuotaView>`, `startSessionWithQuota(o): Promise<{ session } | { error: "kuota" }>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/portal-chat-quota.test.ts
@@ -2244,12 +2244,12 @@ describe("kuota chat portal (SPEC-854 · ADR-0130 huruf C/F)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-quota.test.ts`
 Expected: FAIL — modul tak ada
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // server/src/services/portal-chat/quota.ts
@@ -2320,12 +2320,12 @@ export async function startSessionWithQuota(o: {
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan LULUS**
+- [x] **Step 4: Jalankan, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS (7 test)
 
-- [ ] **Step 5: Sambungkan ke route**
+- [x] **Step 5: Sambungkan ke route**
 
 Di `server/src/routes/portal-chat.ts`, ganti badan `POST …/chat/sessions` supaya memakai
 `startSessionWithQuota`, dan tambahkan endpoint kuota:
@@ -2352,7 +2352,7 @@ Di `server/src/routes/portal-chat.ts`, ganti badan `POST …/chat/sessions` supa
 dengan `TEKS_TETAP` ditambahkan ke import `@hanoman/shared` dan
 `import { quotaView, startSessionWithQuota } from "../services/portal-chat/quota";`.
 
-- [ ] **Step 6: Tambahkan test route kuota**
+- [x] **Step 6: Tambahkan test route kuota**
 
 Sisipkan di `server/test/portal-chat.route.test.ts`:
 
@@ -2382,12 +2382,12 @@ Sisipkan di `server/test/portal-chat.route.test.ts`:
   });
 ```
 
-- [ ] **Step 7: Jalankan, pastikan LULUS**
+- [x] **Step 7: Jalankan, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-quota.test.ts server/test/portal-chat.route.test.ts`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/portal-chat/quota.ts server/src/routes/portal-chat.ts \
@@ -2405,7 +2405,7 @@ git commit -m "feat(spec-854): kuota bulanan per project × tipe, dibekukan di b
 - Test: `src/src/portal/ChatPanel.test.tsx` (tambahan)
 - Test: `src/src/screens/SettingsScreen.test.tsx` (tambahan)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `src/src/portal/ChatPanel.test.tsx`:
 
@@ -2447,12 +2447,12 @@ berkas itu):
   });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan GAGAL**
+- [x] **Step 2: Jalankan, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/src/portal/ChatPanel.test.tsx src/src/screens/SettingsScreen.test.tsx`
 Expected: FAIL pada tiga test baru
 
-- [ ] **Step 3: Implementasi banner jatah**
+- [x] **Step 3: Implementasi banner jatah**
 
 Di `ChatPanel.tsx`, muat `getChatQuota` bersama daftar sesi dan render blok
 `data-testid="chat-jatah"` dengan:
@@ -2465,7 +2465,7 @@ const tanggalPanjang = (iso: string) =>
 Teksnya awam, mis. *"Brainstorming: sudah dipakai 1 dari 2 bulan ini. Bertanya: 0 dari 30.
 Jatah kembali penuh pada 1 September 2026."* Tombol tipe ber-`disabled` saat `sisa === 0`.
 
-- [ ] **Step 4: Kartu Settings**
+- [x] **Step 4: Kartu Settings**
 
 Di `SettingsScreen.tsx`, tambahkan kartu **"Obrolan portal klien"** mengikuti bentuk kartu
 `lead`/`changelog` yang sudah ada: saklar `enabled`, dua field angka (`brainstormPerMonth`,
@@ -2473,12 +2473,12 @@ Di `SettingsScreen.tsx`, tambahkan kartu **"Obrolan portal klien"** mengikuti be
 keterangan: *"Jatah berlaku per project dan dihitung bulanan. Brainstorming dan pertanyaan
 punya jatah masing-masing."*
 
-- [ ] **Step 5: Jalankan, pastikan LULUS**
+- [x] **Step 5: Jalankan, pastikan LULUS**
 
 Run: perintah Step 2
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/SettingsScreen.tsx src/src/portal/ChatPanel.tsx \
@@ -2494,14 +2494,14 @@ git commit -m "feat(spec-854): jatah obrolan di Settings & terbaca klien dengan 
 - Create: `internal/docs/adr/0130-kuota-chat-portal-klien.md`
 - Modify: `internal/docs/README.md`, `internal/docs/requirements/frd.md`
 
-- [ ] **Step 1: Tulis ADR-0130**
+- [x] **Step 1: Tulis ADR-0130**
 
 Isi wajib: ember (project × tipe × periode) dan kenapa BUKAN per akun · sesi-yang-lahir sebagai
 satuan dan kenapa bukan pesan · `periodKey` dibekukan dan kenapa · baris sesi = buku besar
 (tanpa tabel penghitung kedua) · `$transaction` + asumsi single-process yang dinyatakan terbuka ·
 jatah 0 = tertutup bukan tak terbatas · 409 + kalimat awam, bukan pesan galat.
 
-- [ ] **Step 2: Tautkan, verifikasi, commit**
+- [x] **Step 2: Tautkan, verifikasi, commit**
 
 ```bash
 node cli/dist/index.js docs index --check
