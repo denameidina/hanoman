@@ -1,4 +1,7 @@
-import type { Paginated, PortalProject, PortalSpec, PortalTicket, PortalTicketDetail } from "@hanoman/shared";
+import type {
+  Paginated, PortalChatMessageView, PortalChatSessionView, PortalChatType,
+  PortalProject, PortalSpec, PortalTicket, PortalTicketDetail,
+} from "@hanoman/shared";
 import { ApiError } from "./client";
 
 // SPEC-617 · ADR-0110 · permukaan klien punya berkasnya sendiri, terpisah dari api/client.ts:
@@ -6,6 +9,15 @@ import { ApiError } from "./client";
 async function get<T>(url: string): Promise<T> {
   const res = await fetch(url, { headers: { "content-type": "application/json" } });
   if (!res.ok) throw new ApiError(res.status, `GET ${url} → ${res.status}`);
+  return res.json();
+}
+
+// SPEC-854 · ADR-0129 · chat portal punya dua pintu tulis, keduanya JSON biasa — percakapan
+// tak punya lampiran, jadi tak ada multipart di sini.
+async function post<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) throw new ApiError(res.status, `POST ${url} → ${res.status}`);
   return res.json();
 }
 
@@ -32,6 +44,16 @@ export const portalApi = {
     if (!res.ok) throw new ApiError(res.status, `POST ${url} → ${res.status}`);
     return res.json();
   },
+  // SPEC-854 · ADR-0129 · chat portal klien.
+  listChatSessions: (id: string, pg: PortalPage) =>
+    get<Paginated<PortalChatSessionView>>(`${p(id)}/chat/sessions${q(pg)}`),
+  getChatSession: (id: string, sid: string, pg: PortalPage) =>
+    get<{ session: PortalChatSessionView; messages: Paginated<PortalChatMessageView> }>(
+      `${p(id)}/chat/sessions/${encodeURIComponent(sid)}${q(pg)}`),
+  startChatSession: (id: string, type: PortalChatType) =>
+    post<PortalChatSessionView>(`${p(id)}/chat/sessions`, { type }),
+  sendChatMessage: (id: string, sid: string, text: string) =>
+    post<PortalChatMessageView>(`${p(id)}/chat/sessions/${encodeURIComponent(sid)}/messages`, { text }),
   logout: async () => {
     const res = await fetch("/api/auth/logout", { method: "POST" });
     if (!res.ok) throw new ApiError(res.status, `POST /api/auth/logout → ${res.status}`);
