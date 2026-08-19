@@ -280,6 +280,33 @@ DELETE /specs/:id
 #   SPEC-447 · ADR-0093 · id yang dihapus juga DICABUT dari `dependsOn` seluruh spec lain di project
 #   yang sama (+ antre sync per baris yang berubah). Tanpa itu, dependent-nya terkunci selamanya
 #   dengan alasan `missing` yang tak bisa diperbaiki dari UI.
+#   SPEC-843 · ADR-0124 · baris SpecAttachment ikut cascade DB, BYTE-nya tidak — jadi berkas di
+#   HANOMAN_UPLOAD_DIR + direktori materialisasi dihapus eksplisit SEBELUM barisnya lenyap.
+
+# --- Lampiran backlog item (SPEC-843 · ADR-0124) -------------------------------------------------
+#   Capability jatuh dari prefix `specs` → domain `backlog`, read/write diturunkan dari METHOD
+#   (tanpa peta capability baru); 403 tetap membawa field `need`. Batas multipart dipasang
+#   PER-REQUEST (10 MB/berkas, 10 lampiran/backlog, 40 MB/backlog) — registrasi global
+#   (5 MB/12 berkas, app.ts) milik lampiran gambar SPEC-816 TIDAK ikut naik.
+#   Tipe: image/png|jpeg|webp, application/pdf, text/markdown, text/plain, application/json,
+#   text/csv — gerbangnya PASANGAN mimeType ↔ ekstensi. LOCAL-only: tak menyeberang sync.
+#   TIDAK dipajang di katalog MCP (unggah lampiran = tindakan manusia; byte biner tak punya
+#   representasi JSON) — REST-nya tetap terjangkau agent token ber-capability.
+GET    /specs/:id/attachments             # 200 { attachments:[{id,filename,mimeType,size,createdAt}] }
+#                                         #   urut createdAt naik | 404 spec tak ada
+POST   /specs/:id/attachments             # multipart/form-data, N berkas per request ->
+#   201 { saved:[{id,filename,mimeType,size,createdAt}], rejected:[{filename,reason}] }
+#   reason = type|size|count|quota|scan. Berkas yang ditolak TIDAK menggagalkan yang lain
+#   (pola intakeTicket) — penolakan senyap adalah kelas kegagalan tersendiri.
+#   400 = bukan multipart / unggahan tak terbaca / tak ada berkas · 404 = spec tak ada
+#   Efek samping: direktori materialisasi <repoDir>/.worktrees/.attachments/<sessionId>/
+#   direkonsiliasi PENUH, jadi sesi yang SEDANG berjalan melihatnya di fase berikutnya.
+GET    /specs/:id/attachments/:attId      # 200 byte (Content-Type mime, Content-Disposition
+#   attachment, X-Content-Type-Options nosniff, CSP `sandbox; default-src 'none'`)
+#   404 = lampiran bukan milik spec ini / berkasnya hilang dari upload dir
+DELETE /specs/:id/attachments/:attId      # 200 { ok:true } | 404. Byte ikut dihapus + materialisasi
+#   direkonsiliasi, supaya "hapus" tak hanya berarti "hilang dari dashboard" sementara agen
+#   masih membacanya.
 GET  /specs/:id/docs                   # daftar dokumen superpowers backlog ini (audit/spec/plan/objective/brainstorm) — SPEC-170
 #   kind audit = `*-audit.md` ATAU `…/research/audit-…` (SPEC-237/ADR-0057) — dokumen audit SoT ikut tampil sbg audit
 GET  /specs/:id/docs/*path             # isi satu dokumen superpowers (raw)
@@ -972,14 +999,24 @@ GET    /terminal/history?projectId&specId&kind&q&page&limit
 #   → { items: SessionHistoryView[], total, page, pageSize } · urut startedAt desc
 #   q mencocokkan sessionId/specId/title/branch (insensitive). Tanpa `limit` → seluruh riwayat
 #   terfilter dalam satu halaman. `limit` di-clamp 1..200. `endedAt: null` = sesi masih berjalan.
+#   `endedReason` = cara baris ditutup: "closed" (hanoman menutupnya — `exitCode` berlaku, dan null
+#   di sana berarti agen MASIH HIDUP saat ditutup) | "reconciled" (pane lenyap saat boot — hasil TAK
+#   DIKETAHUI, `exitCode` selalu null, `endedAt` batas BAWAH, `reconciledAt` batas atasnya) | null
+#   (baris sebelum SPEC-844, dibaca seperti "closed"). Kelas hasilnya diturunkan `sessionOutcome()`
+#   (@hanoman/shared), tak disimpan — SPEC-844/ADR-0125.
 #   skip/take dilakukan di query DB — SAH di sini, tak seperti larangan ADR-0038 untuk GET /specs
 #   (riwayat adalah baris mati; tak ada overlay stage live / write-through yang butuh set penuh).
 GET    /terminal/history/:id         # SessionHistoryView + { hasTranscript } · 404
 GET    /terminal/history/:id/transcript  # { text, bytes } · 404 bila baris/transkrip tak ada
 #   Teks POLOS (capture-pane tanpa -e), di-capture sebelum pane dibunuh, cap 1 MiB menyimpan ekor.
 DELETE /terminal/history?projectId&before
-#   → { purged } · 400 tanpa parameter (purge WAJIB ber-scope) · 400 `before` bukan tanggal valid.
-#   Ikut menghapus berkas transkrip milik baris yang dibuang. Cermin DELETE /session-results.
+#   → { purged, transcriptsDeleted, transcriptsFailed } · 400 tanpa parameter (purge WAJIB
+#   ber-scope) · 400 `before` bukan tanggal valid. Cermin DELETE /session-results.
+#   SPEC-845 · ADR-0126 · berkas transkrip dihapus SESUDAH baris-barisnya commit, per potongan atas
+#   himpunan id EKSPLISIT. `transcriptsFailed > 0` = sukses SEBAGIAN (tetap 200: barisnya memang
+#   terhapus); berkas yang tertinggal jadi yatim dan dipungut `reconcileTranscripts()` di sweep
+#   retensi berikutnya, yang juga mengosongkan `transcriptKey` yang menunjuk berkas hilang sehingga
+#   `hasTranscript` tak bisa lagi berbohong terhadap 404 endpoint transkrip.
 ```
 
 > Riwayat sesi sengaja hidup di bawah prefix `/terminal` supaya mewarisi capability `sessions`

@@ -13,6 +13,32 @@ export function resolveHome(env: EnvLike = process.env, home: string = homedir()
   return v ? v : join(home, ".hanoman");
 }
 
+/** Direktori data hanoman yang efektif — akar plus setiap turunannya. */
+export type DataDirs = { home: string; transcripts: string; uploads: string; sshKeys: string };
+
+/**
+ * Seluruh lokasi data dalam SATU resolusi, supaya `$HANOMAN_HOME` benar-benar menjadi batas
+ * backup/restore yang dijanjikan runbook (SPEC-846). Setiap pemakai yang menurunkan lokasinya
+ * sendiri adalah drift menunggu terjadi: sebelum ini `vps-key.ts` menurunkannya dari `homedir()`,
+ * jadi key SSH mendarat di luar `HANOMAN_HOME` dan backup home tak memuat identitas SSH sama sekali.
+ *
+ * `sshKeys` default ke AKAR home, bukan subdirektori: di situlah key sudah hidup sejak SPEC-165,
+ * dan memindahkannya akan membuat instance `~/.hanoman` melahirkan identitas baru diam-diam.
+ *
+ * Server punya lapis override yang lebih tinggi (`effectiveStr`: DB → env). Nilai di sini sudah
+ * memperhitungkan env, jadi ia aman dipakai sebagai fallback dari lapis itu.
+ */
+export function resolveDataDirs(env: EnvLike = process.env, home: string = homedir()): DataDirs {
+  const root = resolveHome(env, home);
+  const dir = (key: string, name: string): string => env[key]?.trim() || join(root, name);
+  return {
+    home: root,
+    transcripts: dir("HANOMAN_TRANSCRIPT_DIR", "transcripts"),
+    uploads: dir("HANOMAN_UPLOAD_DIR", "uploads"),
+    sshKeys: env.HANOMAN_SSH_KEY_DIR?.trim() || root,
+  };
+}
+
 /** Skema dari URL, tanpa membawa kredensial yang mungkin ada di dalamnya. */
 function schemeOf(raw: string): string {
   return raw.split("://")[0] ?? "?";

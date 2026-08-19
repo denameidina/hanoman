@@ -4,7 +4,14 @@ import { doctorReport } from "../src/commands/doctor";
 
 const ok = {
   node: "v22.0.0", git: "git version 2.44.0", tmux: "tmux 3.4",
-  claude: "1.0.0", codex: null, gh: null, homeWritable: true, web: true, db: "/h/.hanoman/hanoman.db",
+  claude: "1.0.0", codex: null, gh: null, web: true, db: "/h/.hanoman/hanoman.db",
+  // SPEC-846 · path data efektif dilaporkan satu per satu; home fatal, turunannya memperingatkan.
+  dirs: [
+    { label: "data dir", path: "/h/.hanoman", writable: true, fatal: true },
+    { label: "transkrip", path: "/h/.hanoman/transcripts", writable: true, fatal: false },
+    { label: "upload", path: "/h/.hanoman/uploads", writable: true, fatal: false },
+    { label: "key SSH", path: "/h/.hanoman", writable: true, fatal: false },
+  ],
   methods: [],   // SPEC-739 · kosong = tak ada metode yang dilaporkan
   podman: null, sandboxRequired: false, sandboxReady: false,
 };
@@ -30,8 +37,28 @@ describe("doctorReport", () => {
   it("satu agen cukup", () => {
     expect(doctorReport({ ...ok, claude: null, codex: "0.146.0" }).ok).toBe(true);
   });
+  // SPEC-846 · operator tak bisa mendefinisikan batas backup/restore bila perintah kesehatan tak
+  // pernah menyebut direktori mana yang sebenarnya dipakai.
+  it("setiap path data efektif tercetak", () => {
+    const text = doctorReport(ok).lines.join("\n");
+    for (const d of ok.dirs) expect(text).toContain(d.path);
+    expect(text).toContain("transkrip");
+    expect(text).toContain("upload");
+    expect(text).toContain("key SSH");
+  });
   it("data dir tak bisa ditulis → tidak ok", () => {
-    expect(doctorReport({ ...ok, homeWritable: false }).ok).toBe(false);
+    const dirs = ok.dirs.map((d) => (d.label === "data dir" ? { ...d, writable: false } : d));
+    const r = doctorReport({ ...ok, dirs });
+    expect(r.ok).toBe(false);
+    expect(r.lines.join("\n")).toContain("TAK bisa ditulis");
+  });
+  // Direktori turunan lahir saat dipakai; absennya izin tulis di situ adalah peringatan, bukan
+  // alasan menyatakan hanoman tak bisa menjalankan sesi.
+  it("direktori turunan tak bisa ditulis → peringatan, tetap ok", () => {
+    const dirs = ok.dirs.map((d) => (d.label === "transkrip" ? { ...d, writable: false } : d));
+    const r = doctorReport({ ...ok, dirs });
+    expect(r.ok).toBe(true);
+    expect(r.lines.join("\n")).toContain("! transkrip");
   });
   it("aset web absen → peringatan, tetap ok (API tetap jalan)", () => {
     const r = doctorReport({ ...ok, web: false });

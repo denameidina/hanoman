@@ -7,6 +7,7 @@ import {
 } from "../ds";
 import { api } from "../api/client";
 import { SpecDocsModal } from "./SpecDocsModal";
+import { SpecAttachmentsPanel, type AttachmentToast } from "./SpecAttachments";
 import { IntegrateDialog } from "./IntegrateDialog";
 import { SyncButton } from "./SyncButton";
 import { branchOptions } from "./branch";
@@ -107,7 +108,7 @@ const escVariant = (e: AuditEscalation | null, target: string): "primary" | "sec
 // Source yang berujung dokumen audit — berhak atas ketiga pintu eskalasi.
 const isAuditSource = (source: string) => source === "audit";
 
-function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, projectPolicy, allSpecs }:
+function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, projectPolicy, allSpecs, onAttachmentToast }:
   {
     spec: Spec | null; onClose: () => void; onEditBranch?: (s: Spec, b: string | null) => void;
     onRevertStage?: (s: Spec, target: string, confirmDelete?: boolean) => Promise<any>;
@@ -134,6 +135,9 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
     onChangeSource?: (s: Spec, source: string, payload?: unknown) => void;
     projectPolicy?: unknown;   // Project.autoMerge — untuk label "Ikut project (…)"
     allSpecs?: Spec[];
+    // SPEC-843 · ADR-0124 · hasil unggah/hapus lampiran. Bentuknya `AttachmentToast`, bukan
+    // `onToast` layar (yang bersignature toast App); panel lampiran tak perlu tahu ikon.
+    onAttachmentToast?: AttachmentToast;
   }) {
   // Hook HARUS mendahului early-return `if (!spec)` — rules-of-hooks.
   const [branches, setBranches] = React.useState<string[]>([]);
@@ -440,6 +444,9 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
           onChange={(e) => onEditBranch && onEditBranch(spec, e.target.value || null)}
           options={branchOptions(branches, remoteOnly)} />
       </div>
+      {/* SPEC-843 · ADR-0124 · lampiran boleh ditambah/dihapus KAPAN SAJA, termasuk selagi sesi
+          berjalan — server memateralisasi ulang dan fase berikutnya membacanya. */}
+      <SpecAttachmentsPanel specId={spec.id} onToast={onAttachmentToast ?? (() => {})} />
       {/* SPEC-447 · ADR-0093 · siapa yang ditunggu item ini, dan kenapa. */}
       <div style={{ marginBottom: 14 }}>
         <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Bergantung pada</div>
@@ -1021,7 +1028,8 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
         onPromoteToBrief={onPromoteToBrief} onPromoteToPrd={onPromoteToPrd}
         onEditDeps={onEditDeps} onEditAutoMerge={onEditAutoMerge} onChangeSource={onChangeSource}
         projectPolicy={(projects.find((x) => x.id === backlog.find((s) => s.id === detailId)?.projectId) as { autoMerge?: unknown } | undefined)?.autoMerge}
-        allSpecs={backlog} />
+        allSpecs={backlog}
+        onAttachmentToast={(m, tone) => onToast?.(m, tone ?? "ok", "paperclip")} />
     </div>
   );
 }

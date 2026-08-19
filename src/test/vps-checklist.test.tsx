@@ -132,10 +132,11 @@ describe("VpsChecklistModal (SPEC-220/221 · UI modal)", () => {
   });
 
   it("Apply memanggil api.remediate (AC-14)", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     await open(); expand("firewall");
     fireEvent.click(within(screen.getByTestId("item-fw-b1")).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: /^apply/i }));
+    // SPEC-847 · konfirmasi kini dialog aplikasi, bukan window.confirm yang di-mock.
+    fireEvent.click(await screen.findByRole("button", { name: "Terapkan" }));
     await vi.waitFor(() => expect(remediate).toHaveBeenCalledWith("v1", ["fw-b1"]));
   });
 
@@ -147,10 +148,11 @@ describe("VpsChecklistModal (SPEC-220/221 · UI modal)", () => {
   });
 
   it("seksi app-layer stack absent → banner saran + Tandai seksi N/A memanggil markNaBulk", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     await open(); expand("webserver");
     const banner = screen.getByTestId("suggestion-webserver");
     fireEvent.click(within(banner).getByRole("button", { name: /tandai seksi n\/a/i }));
+    // SPEC-847 · konfirmasi kini dialog aplikasi, bukan window.confirm yang di-mock.
+    fireEvent.click(await screen.findByRole("button", { name: "Tandai N/A" }));
     await vi.waitFor(() => expect(markNaBulk).toHaveBeenCalledWith("v1", ["ws-b1"], true, expect.any(String)));
   });
 

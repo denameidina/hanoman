@@ -153,8 +153,18 @@
   - **Isinya sekelas isi repo** (kode, path, output perintah), bukan kredensial: rahasia yang hanoman
     pegang (Keychain, `~/.claude/.credentials.json`, `Vps.keyPath`) tak pernah dicetak ke pane.
   - Retensi otomatis bounded menghapus sesi berakhir >30 hari; purge manual scoped tetap tersedia.
-    Delete file gagal mempertahankan record DB untuk retry; `HANOMAN_RETENTION_HOLDS` mengecualikan
-    `session:<id>`, `ticket:<id>`, `delivery:<id>`, atau `result:<id>` yang wajib dipertahankan.
+    `HANOMAN_RETENTION_HOLDS` mengecualikan `session:<id>`, `ticket:<id>`, `delivery:<id>`, atau
+    `result:<id>` yang wajib dipertahankan.
+  - **Penghapusan tak pernah menghancurkan bukti milik baris yang selamat** (SPEC-845,
+    [ADR-0126](../adr/0126-durabilitas-penghapusan-transkrip-riwayat.md), mengamandemen ADR-0079 §5).
+    Berkas transkrip di-`unlink` **sesudah** penghapusan barisnya commit, per potongan atas himpunan
+    id eksplisit — bukan sebelumnya. Arah kegagalan ini yang dipilih karena hanya sisanya yang bisa
+    dipulihkan: berkas yatim ditemukan kembali sebagai selisih isi direktori vs kolom `transcriptKey`
+    dan disapu `reconcileTranscripts()` di sweep retensi (bertenggang 1 jam, hanya `.log`), sedangkan
+    byte yang telanjur dihapus untuk baris yang gagal terhapus hilang selamanya. Sweep yang sama
+    mengosongkan `transcriptKey` yang menunjuk berkas hilang, jadi `hasTranscript` tak bisa
+    bertentangan dengan 404 endpoint transkrip. `DELETE /terminal/history` melaporkan
+    `transcriptsFailed` supaya sukses sebagian tak terbaca sebagai sukses penuh.
 - **Permission dan lifecycle data**: process memasang umask 0077. `$HANOMAN_HOME`, uploads,
   transcripts, quarantine, dan direktori prompt memakai 0700; DB, `secret.key`, setup token, upload,
   transcript, dan prompt memakai 0600. Symlink final ditolak. Sweep harian/batch 100 menghapus tiket

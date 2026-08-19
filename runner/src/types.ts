@@ -23,6 +23,13 @@ export type SpecBrief = {
   objective: string; payload?: unknown;
 };
 
+// SPEC-843 · ADR-0124 · lampiran backlog yang SUDAH dimaterialisasi ke direktori yang terjangkau
+// sesi. `path` absolut dan terjamin terbaca agen — bukan storageKey, dan bukan URL.
+export type SpecAttachmentBrief = {
+  filename: string; mimeType: string; size: number; path: string;
+};
+export type AttachmentCtx = { dir: string; items: readonly SpecAttachmentBrief[] };
+
 // SPEC-394 · keadaan yang HANYA diketahui server saat sebuah sesi backlog dilanjutkan. Dipisah
 // dari SpecBrief karena isinya bukan properti backlog item melainkan properti peluncuran ini.
 export type ResumeCtx = {

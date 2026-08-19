@@ -2,7 +2,7 @@
    Seksi collapse/expand (default collapsed agar mudah di-track), search + filter existing,
    aksi N/A/attest/remediasi selektif. Data dari GET /vps/:id/checklist (server menghidrasi penuh). */
 import React from "react";
-import { Button, Modal, StateBlock, Icon } from "../ds";
+import { Button, Modal, StateBlock, Icon, useConfirm } from "../ds";
 import { api } from "../api/client";
 import type { ChecklistView, ChecklistSection, ChecklistItem, VpsItemStatus, VpsMode, VpsSeverity, RemediateStep, VpsHealth } from "@hanoman/shared";
 
@@ -158,6 +158,9 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, onClose
   const toggleSection = (id: string) => setExpandedManual((e) => {
     const n = new Set(e); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
+  // SPEC-847 · ADR-0127 · konfirmasi mutasi VPS memakai dialog aplikasi.
+  const { confirm, dialog } = useConfirm();
+
   async function doPreview() {
     setAction("preview");
     try { setPreview((await api.remediatePreview(vpsId, [...selected])).steps); }
@@ -165,7 +168,13 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, onClose
     finally { setAction(""); }
   }
   async function doApply() {
-    if (!window.confirm(`Terapkan ${selected.size} item AUTO ke VPS ini?\nIdempoten & anti-lockout, lalu audit ulang.`)) return;
+    if (!await confirm({
+      title: `Terapkan ${selected.size} item AUTO ke VPS ini?`,
+      message: "Remediasi dijalankan langsung di server yang terdaftar.",
+      impact: ["Langkahnya idempoten dan anti-lockout.", "Checklist diaudit ulang setelah selesai."],
+      confirmLabel: "Terapkan",
+      icon: "shield",
+    })) return;
     setAction("apply");
     try { await api.remediate(vpsId, [...selected]); clearSel(); load(); onToast("Remediasi diterapkan · audit ulang", "ok", "shield"); }
     catch { onToast("Remediasi gagal", "err", "x-circle"); }
@@ -184,7 +193,12 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, onClose
     act(item, () => api.attestItem(vpsId, item.id), `${item.id} di-attest`);
   async function onSectionNa(section: ChecklistSection) {
     const ids = section.items.map((i) => i.id);
-    if (!window.confirm(`Tandai ${ids.length} item seksi "${section.title}" sebagai N/A?\nStack-nya tak terdeteksi — cek Docker manual bila ragu.`)) return;
+    if (!await confirm({
+      title: `Tandai ${ids.length} item seksi "${section.title}" sebagai N/A?`,
+      message: "Stack-nya tak terdeteksi — cek Docker manual bila ragu.",
+      confirmLabel: "Tandai N/A",
+      icon: "shield",
+    })) return;
     setBusy(`section:${section.id}`);
     try {
       await api.markNaBulk(vpsId, ids, true, "app-layer: stack tak terdeteksi");
@@ -289,6 +303,7 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, onClose
         {health && ` · disk ${health.disk} · mem ${health.mem} · load ${health.load}`}
       </div>
       {body()}
+      {dialog}
     </Modal>
   );
 }

@@ -2,7 +2,7 @@
    Tak ada fetch sendiri: ProjectVM dari daftar sudah memuat setiap field yang dirender
    (SPEC-146). GET /projects/:id ada, tapi memanggilnya hanya menambah state loading. */
 import React from "react";
-import { Card, Badge, StatusPill, ProgressBar, Button, Icon } from "../ds";
+import { Card, Badge, StatusPill, ProgressBar, Button, Icon, useConfirm } from "../ds";
 import { api } from "../api/client";
 import type { ProjectVM } from "./types";
 import { CustomAgentsPanel } from "./CustomAgentsPanel";
@@ -19,6 +19,8 @@ function HelpCenterCard({ p, onToast, onProjectChanged }:
   const [busy, setBusy] = React.useState(false);
   // Link publik same-origin — dibangun di klien (setara publicUrl server), tanpa fetch saat mount.
   const publicUrl = `${window.location.origin}/help/${encodeURIComponent(p.id)}`;
+  // SPEC-847 · ADR-0127 · konfirmasi nonaktifkan Help Center memakai dialog aplikasi.
+  const { confirm, dialog } = useConfirm();
 
   async function enable() {
     setBusy(true);
@@ -30,7 +32,14 @@ function HelpCenterCard({ p, onToast, onProjectChanged }:
     finally { setBusy(false); }
   }
   async function disable() {
-    if (!window.confirm(`Nonaktifkan Help Center project "${p.name}"? Link publik berhenti menerima keluhan baru (tiket lama tetap ada).`)) return;
+    if (!await confirm({
+      title: `Nonaktifkan Help Center project "${p.name}"?`,
+      message: "Link publik berhenti menerima keluhan baru.",
+      impact: ["Tiket lama tetap ada dan tetap bisa ditriase.", "Bisa diaktifkan lagi kapan saja."],
+      confirmLabel: "Nonaktifkan",
+      icon: "ban",
+      tone: "default",
+    })) return;
     setBusy(true);
     try {
       await api.disableHelpCenter(p.id); setEnabled(false); onToast("Help Center nonaktif", "ok", "inbox");
@@ -57,6 +66,7 @@ function HelpCenterCard({ p, onToast, onProjectChanged }:
           </>
         )}
       </div>
+      {dialog}
     </Card>
   );
 }

@@ -9,6 +9,7 @@ export type { OverflowItem } from "./components/ui";
 export { useToast, Toast, Modal, Field, HnTextarea, serverPage, Pager, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE } from "./kit";
 export type { ToastData, ShowToast } from "./kit";
 export { ConfirmDialog } from "./ConfirmDialog";
+export { useConfirm, type ConfirmOptions } from "./useConfirm";
 export { Shell, HN_NAV, NAV_KEYS } from "./shell";
 export {
   DESKTOP_QUERY,
