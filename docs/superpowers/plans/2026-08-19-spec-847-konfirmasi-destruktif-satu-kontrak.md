@@ -1331,7 +1331,7 @@ git commit -m "test(ds): inventaris window.confirm ditegakkan atas sumber, satu 
 - Modify: `internal/docs/frontend/frontend-implementation.md:978` (Triase "Tolak" tak lagi `window.confirm`) + bagian design-system frontend
 - Modify: `internal/docs/design-system/design-system.md:44-46` (kontrak konfirmasi destruktif)
 
-- [ ] **Step 1: Tulis ADR-0125**
+- [x] **Step 1: Tulis ADR-0125**
 
 Buat `internal/docs/adr/0125-satu-kontrak-konfirmasi-destruktif.md` dengan struktur ADR repo (baca `0121-operasi-berkas-ide-explorer.md` sebagai contoh bentuk). Isi wajib menyebut:
 
@@ -1340,11 +1340,11 @@ Buat `internal/docs/adr/0125-satu-kontrak-konfirmasi-destruktif.md` dengan struk
 - Konsekuensi & gotcha: (1) lupa merender `{dialog}` = promise menggantung selamanya tanpa error — penjaganya test inventaris, bukan disiplin; (2) `Modal` tak disentuh, AC-3 dipenuhi dengan mengunci perilaku yang sudah ada, dan React `autoFocus` tak bekerja di dalamnya karena layout effect `Modal` berjalan sesudah `commitMount` anaknya; (3) fokus awal jatuh ke tombol "Tutup" header — kontrol aman, bukan "Batal"; (4) sumber kebenaran anti-klik-ganda adalah **ref**, bukan state, karena klik kedua tiba sebelum render ulang; (5) satu pengecualian `GitGraph` beralasan karena jawabannya nilai, bukan izin.
 - Alternatif yang ditolak: Provider global; migrasi manual 15 call site tanpa primitif (call site ke-16 lahir besok); ESLint rule (repo tak memakai ESLint — penegakannya test pemindai sumber, pola SPEC-490).
 
-- [ ] **Step 2: Tautkan ADR di kedua index**
+- [x] **Step 2: Tautkan ADR di kedua index**
 
 Tambahkan entri 0125 di puncak daftar `internal/docs/adr/README.md`, dan tambahkan barisnya di bagian `## adr` `internal/docs/README.md` mengikuti format baris yang sudah ada.
 
-- [ ] **Step 3: Perbarui doc frontend yang tersentuh**
+- [x] **Step 3: Perbarui doc frontend yang tersentuh**
 
 `internal/docs/frontend/frontend-implementation.md`:
 - Baris ~978: `**Tolak** (`window.confirm` → `api.rejectTicket`)` → `**Tolak** (`ConfirmDialog` lewat `useConfirm` → `api.rejectTicket`)`.
@@ -1352,12 +1352,12 @@ Tambahkan entri 0125 di puncak daftar `internal/docs/adr/README.md`, dan tambahk
 
 `internal/docs/design-system/design-system.md` (sekitar baris 44-46, sesudah kalimat "Drawer dan Modal wajib punya label, state expanded/open, Escape, focus trap, serta focus restore."): tambahkan kalimat bahwa konfirmasi destruktif memakai dialog aplikasi (`ConfirmDialog` lewat `useConfirm`), menyebut nama objek + dampak terstruktur + label aksi eksplisit, mematikan cancel/confirm/close/Escape selama mutasi pending, dan bahwa dialog browser native tak dipakai untuk flow produk.
 
-- [ ] **Step 4: Verifikasi integritas index**
+- [x] **Step 4: Verifikasi integritas index**
 
 Run: `node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli build && node cli/dist/index.js docs index --check`
 Expected: index konsisten. Bila CLI belum ter-build di worktree ini, cukup pastikan setiap berkas doc baru muncul di `internal/docs/README.md` secara manual (guardrail SoT sudah dicabut, ADR-0023 — ini konvensi).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs
