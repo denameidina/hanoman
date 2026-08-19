@@ -51,3 +51,35 @@ describe("ConfirmDialog requireText (ADR-0121)", () => {
     expect(onConfirm).toHaveBeenCalled();
   });
 });
+
+// SPEC-847 · ADR-0125 · dampak berbaris-baris tak boleh dipadatkan jadi satu string, dan aksi
+// yang bukan hapus tak boleh dipaksa memakai ikon trash.
+describe("ConfirmDialog impact & icon (SPEC-847)", () => {
+  it("merender daftar dampak terstruktur, bukan satu paragraf", () => {
+    render(<ConfirmDialog open title="Ganti ID?" message="Dampaknya:"
+      impact={["Link Help publik berubah.", "Perubahan dirambatkan ke hub."]}
+      onConfirm={() => {}} onCancel={() => {}} />);
+    const items = screen.getAllByRole("listitem");
+    expect(items.map((li) => li.textContent)).toEqual([
+      "Link Help publik berubah.", "Perubahan dirambatkan ke hub.",
+    ]);
+  });
+
+  it("tanpa impact tak ada list sama sekali", () => {
+    render(<ConfirmDialog open title="Hapus?" message="pesan" onConfirm={() => {}} onCancel={() => {}} />);
+    expect(screen.queryByRole("list")).toBeNull();
+  });
+
+  it("icon menimpa trash-2 di header dan di tombol konfirmasi", () => {
+    const { container } = render(<ConfirmDialog open title="Cabut token?" icon="key-round"
+      confirmLabel="Cabut" onConfirm={() => {}} onCancel={() => {}} />);
+    expect(container.querySelector('[data-icon="trash-2"]')).toBeNull();
+    expect(container.querySelectorAll('[data-icon="key-round"]').length).toBe(2);
+  });
+
+  it("tone danger memberi tombol konfirmasi varian danger", () => {
+    render(<ConfirmDialog open title="Hapus?" confirmLabel="Hapus" onConfirm={() => {}} onCancel={() => {}} />);
+    const btn = screen.getByRole("button", { name: "Hapus" });
+    expect(btn.style.background).toContain("--clay-600");
+  });
+});
