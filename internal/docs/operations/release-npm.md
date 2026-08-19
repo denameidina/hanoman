@@ -56,14 +56,19 @@ setelan paket. Jadi versi pertama tak bisa diotomasi.
 # 1. Bump versi — SATU sumber, di root package.json
 npm version 0.2.0 --no-git-tag-version    # atau sunting "version" langsung
 # 2. Commit + merge ke main lewat alur biasa
-# 3. Dorong tag yang COCOK dengan versi itu
+# 3. Dorong tag yang COCOK dengan versi itu — dari commit yang SUDAH ada di main
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
+Langkah 2 **ditegakkan mesin sejak SPEC-851**, bukan lagi konvensi: tag pada commit yang belum
+masuk `main` menggagalkan run sebelum toolchain, install, build, dan OIDC. Kalau tag terlanjur
+didorong dari branch yang belum merge, urutannya merge dulu, lalu tag **nomor versi berikutnya**
+dari commit yang sudah ada di `main` — jangan memindahkan tag yang sama.
+
 Workflow lalu menjalankan **dua job**: `validate` (`.github/workflows/validate.yml` lewat
-`workflow_call`) → `publish` yang ber-`needs: validate`. Job `publish` memeriksa tag == `version` →
-`pnpm install --frozen-lockfile` → `pnpm release` → **memasang tarball hasil rakitan dan
-menjalankan `hanoman --version`** → `npm publish --provenance`.
+`workflow_call`) → `publish` yang ber-`needs: validate`. Job `publish` memeriksa commit ada di
+`main` → tag == `version` → `pnpm install --frozen-lockfile` → `pnpm release` → **memasang
+tarball hasil rakitan dan menjalankan `hanoman --version`** → `npm publish --provenance`.
 
 Job `validate` menjalankan **`pnpm validate`** = `pnpm db:generate` → `pnpm typecheck` (seluruh
 paket) → `pnpm test` (`vitest run --no-file-parallelism`) — perintah yang sama persis dengan yang
@@ -83,6 +88,7 @@ Versi hidup di root `package.json` dan ditanam ke `dist/build-info.json` oleh
 |---|---|
 | Job `publish` ber-`needs: validate` | menerbitkan commit yang test/typecheck-nya merah |
 | Trigger hanya tag `v*` | publish tak sengaja dari push biasa ke main |
+| Commit tag wajib ancestor `origin/main` | menerbitkan kode yang tak pernah direview/merge (SPEC-851) |
 | Tag harus == `version` root | menerbitkan nomor versi salah — dan nomor terbit **tak bisa dipakai ulang** |
 | Tarball dipasang & `hanoman --version` diuji | menerbitkan paket yang tak bisa dijalankan |
 | `repository.url` dijaga `cli/test/pack.test.ts` | publish ditolak OIDC/provenance karena URL tak cocok |
@@ -96,6 +102,16 @@ test worktree menjalankan `git commit`.
 
 ## Kalau publish gagal
 
+- **`commit … BELUM masuk 'origin/main'`** (SPEC-851) — tagnya lahir dari commit yang belum merge.
+  Bukan bug workflow. Merge dulu, lalu tag nomor berikutnya dari commit yang sudah di `main`.
+- **`riwayat git masih dangkal (shallow)`** — `fetch-depth: 0` hilang dari `actions/checkout` di
+  `release.yml`. Gerbangnya sengaja **fail closed** di sini: di repo dangkal `merge-base` menolak
+  commit yang sebenarnya ADA di `main`, jadi menjawab dari riwayat terpotong berarti memblokir
+  rilis sah sambil menuduh commit yang benar. Kembalikan `fetch-depth: 0`; dijaga
+  `cli/test/release-ancestry.test.ts`.
+- **`ref rilis 'origin/main' tak ada di clone ini`** — langkah `git fetch --no-tags origin
+  +refs/heads/main:refs/remotes/origin/main` hilang. `actions/checkout` pada push bertag hanya
+  mengambil refspec tag itu; `origin/main` tak pernah lahir sendiri, bahkan dengan `fetch-depth: 0`.
 - **Job `validate` merah** — publish tak pernah berjalan, dan itu maksudnya. Reproduksi di local
   dengan perintah yang sama: `pnpm install --frozen-lockfile && pnpm validate`. Kalau merahnya
   ramai dengan `Property 'dmmf' does not exist` atau `Cannot read properties of undefined (reading

@@ -43,12 +43,27 @@
 > `v0.1.3`/`v0.1.5`. Memulihkan gerbangnya = pasang kembali *Required reviewers*
 > (`gh api -X PUT repos/denameidina/hanoman/environments/release`).
 >
-> **Tiga pagar yang tak bergantung penilaian siapa pun:** (a) workflow hanya menembak pada tag
+> **Pagar yang tak bergantung penilaian siapa pun:** (a) workflow hanya menembak pada tag
 > `v*`; (b) tag yang tak cocok dengan `version` di root `package.json` **menggagalkan** run sebelum
 > menyentuh registry — nomor versi yang salah terbit tak bisa dipakai ulang; (c) tarball hasil
 > rakitan **dipasang dan dijalankan** (`hanoman --version` harus sama dengan versi tag) sebelum
-> publish. `hanoman doctor` sengaja tak dipakai di CI: ia menuntut tmux & CLI agen yang memang tak
+> publish; (d) **sejak SPEC-851**, commit yang ditag wajib sudah menjadi ancestor `origin/main`.
+> `hanoman doctor` sengaja tak dipakai di CI: ia menuntut tmux & CLI agen yang memang tak
 > ada di runner, jadi ia akan gagal karena alasan yang tak relevan.
+>
+> **Amandemen 2026-08-19 (SPEC-851) — pagar keempat: asal-usul commit.** Ketiga pagar di atas
+> semuanya menilai *artefaknya* (nomor versinya benar, ia bisa dijalankan); tak satu pun menilai
+> dari mana kodenya datang. Sesudah *Required reviewers* dicabut, itu berarti tag pada branch
+> eksperimen mana pun bisa menerbitkan paket yang isinya tak pernah masuk `main` — dan diverifikasi
+> hidup bahwa memang tak ada pagar lain yang menahannya (`rulesets: []`, `protection_rules: []`,
+> `deployment_branch_policy: null`). Workflow kini memanggil `scripts/assert-release-ancestry.sh`
+> tepat sesudah checkout, sebelum toolchain/install/build/OIDC. **Ini bukan pengganti gerbang
+> manusia** — ia menjawab pertanyaan lain ("kode ini sudah masuk branch rilis?"), bukan "manusia
+> menyetujui rilis ini?"; keputusan 2026-07-31 tetap berdiri. Dua gotcha yang membuatnya bekerja:
+> `actions/checkout` butuh `fetch-depth: 0` karena di repo dangkal `merge-base` menolak commit yang
+> sebenarnya ADA di `main` (skripnya karena itu **fail closed** pada repo dangkal, dengan alasan
+> "riwayat kurang" alih-alih menuduh commitnya), dan `origin/main` tetap harus di-fetch sendiri —
+> checkout pada push bertag hanya mengambil refspec tag itu.
 >
 > **Konsekuensi berantai yang wajib:** `packageJsonFor()` sekarang menyertakan
 > `repository.url`. Trusted publishing **dan** `--provenance` membandingkan nilai itu dengan repo
