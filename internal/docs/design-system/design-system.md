@@ -43,6 +43,10 @@ mati melalui query global `prefers-reduced-motion: reduce` tanpa menghilangkan s
 
 Navigation, tab, row, serta action memakai elemen native `button`/`select` atau pola ARIA yang setara.
 Drawer dan Modal wajib punya label, state expanded/open, Escape, focus trap, serta focus restore.
+Konfirmasi destruktif memakai dialog aplikasi (`ConfirmDialog` lewat `useConfirm`), tak pernah dialog
+native browser: ia menyebut nama objeknya, dampaknya sebagai daftar terstruktur, dan label aksi yang
+eksplisit (bukan "OK"), memakai ikon yang cocok dengan aksinya alih-alih memaksa ikon hapus, dan
+mematikan cancel/confirm/close/Escape selama mutasinya berjalan sehingga submit ganda mustahil.
 Konten di belakang drawer menjadi `inert`. Popover topbar memakai `usePopoverFocus`: fokus masuk,
 Escape/outside-click menutup, fokus kembali, dan menu mendukung Arrow/Home/End.
 Target responsif bukan menyederhanakan fitur: data, status, field penting, dan aksi yang tersedia di
