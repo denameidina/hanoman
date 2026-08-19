@@ -46,7 +46,7 @@ Sebelum sebuah perubahan boleh masuk `main`:
    Jebakan yang harus disadari: `--changed` menyalakan `passWithNoTests`, jadi **nol test terlihat
    hijau** — pastikan test-nya memang berjalan.
 2. **Suite penuh** (`vitest run --no-file-parallelism`) — langkah **manusia** sebelum merge, bukan tugas
-   sesi. Sejak [ADR-0126](../adr/0126-gerbang-validasi-sebelum-publish.md) ia **juga** dijalankan CI
+   sesi. Sejak [ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md) ia **juga** dijalankan CI
    (`.github/workflows/validate.yml`) pada tiap pull request dan push ke `main`, lewat satu perintah
    `pnpm validate` = `pnpm db:generate` → `pnpm typecheck` → `pnpm test`. Job `publish` di
    `release.yml` ber-`needs: validate`, jadi commit yang merah tak bisa terbit ke npm.
@@ -66,7 +66,7 @@ samping dev pada mesin dev, lihat [production](../operations/production.md)):
 git pull --ff-only
 pnpm install                 # dependency baru sering terlewat; postinstall men-generate Prisma Client
 pnpm --filter ./server exec prisma migrate deploy
-pnpm --filter ./server exec prisma generate   # redundan sejak ADR-0126, dibiarkan untuk --ignore-scripts
+pnpm --filter ./server exec prisma generate   # redundan sejak ADR-0128, dibiarkan untuk --ignore-scripts
 pnpm build                   # verifikasi exit 0 secara eksplisit
 systemctl restart hanoman
 ```
@@ -90,7 +90,7 @@ yang menuntut ADR tersendiri sejak awal.
 - Tak ada pipeline CI yang men-deploy; deploy adalah tindakan operator. CI hanya **memvalidasi**
   (`validate.yml`) dan **menerbitkan paket npm** dari tag `v*` (`release.yml`,
   [ADR-0087](../adr/0087-distribusi-npm-global-satu-perintah.md) ·
-  [ADR-0126](../adr/0126-gerbang-validasi-sebelum-publish.md)).
+  [ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md)).
 - Tak ada self-update, self-restart, maupun supervisor auto-heal — menghidupkannya butuh ADR baru
   ([ADR-0048](../adr/0048-auto-update-deteksi-read-only.md)).
 - Distribusi publik = paket npm `hanoman` itu sendiri ([ADR-0087](../adr/0087-distribusi-npm-global-satu-perintah.md));

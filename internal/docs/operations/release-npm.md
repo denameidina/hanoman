@@ -67,7 +67,7 @@ menjalankan `hanoman --version`** → `npm publish --provenance`.
 
 Job `validate` menjalankan **`pnpm validate`** = `pnpm db:generate` → `pnpm typecheck` (seluruh
 paket) → `pnpm test` (`vitest run --no-file-parallelism`) — perintah yang sama persis dengan yang
-dijalankan manusia di local ([ADR-0126](../adr/0126-gerbang-validasi-sebelum-publish.md)). Sampai
+dijalankan manusia di local ([ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md)). Sampai
 2026-08-19 gerbang ini **tak ada sama sekali**: jalur rilis tak pernah memanggil `vitest` maupun
 `tsc`, dan karena server & CLI dibundel esbuild (yang tak melakukan type checking), build hijau
 bukan pernyataan apa pun tentang kesehatan kode yang diterbitkan. Bukti & reproduksinya di

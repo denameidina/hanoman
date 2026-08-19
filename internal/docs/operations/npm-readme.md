@@ -84,12 +84,54 @@ Sesudah `hanoman update`, instance yang berjalan perlu di-restart (mis. `systemc
 
 | Env | Default | Untuk apa |
 |---|---|---|
-| `HANOMAN_HOME` | `~/.hanoman` | DB SQLite, key SSH, transkrip sesi |
+| `HANOMAN_HOME` | `~/.hanoman` | akar seluruh state hanoman — lihat [Isi `$HANOMAN_HOME`](#isi-hanoman_home) |
 | `HANOMAN_DATABASE_URL` | — | berkas DB khusus hanoman; hanya URL `file:` (nilai lain **melempar**) |
 | `DATABASE_URL` | `file:$HANOMAN_HOME/hanoman.db` | dipakai bila ber-`file:`; nilai lain **diabaikan** dengan peringatan |
+| `HANOMAN_TRANSCRIPT_DIR` | `$HANOMAN_HOME/transcripts` | transkrip sesi yang sudah ditutup |
+| `HANOMAN_UPLOAD_DIR` | `$HANOMAN_HOME/uploads` | lampiran tiket & lampiran gambar sesi terminal |
+| `HANOMAN_SSH_KEY_DIR` | `$HANOMAN_HOME` | keypair identitas hanoman untuk VPS |
 | `PORT` / `HOST` | `8787` / `127.0.0.1` | alamat bind |
 | `HANOMAN_CLAUDE_BIN` / `HANOMAN_CODEX_BIN` | `claude` / `codex` | biner agen |
 | `HANOMAN_TMUX_SOCKET` | `hanoman` | socket tmux terpisah dari milikmu |
+
+<a id="isi-hanoman_home"></a>
+
+## Isi `$HANOMAN_HOME` — satu batas backup/restore
+
+Tanpa override, **seluruh** state hanoman hidup di bawah satu direktori. Itulah batas yang harus
+disalin: memindahkan DB saja meninggalkan metadata yang menunjuk byte yang tak ada (SPEC-846).
+
+| Path | Isi | Hilang berarti |
+|---|---|---|
+| `hanoman.db` (+ `-wal`/`-shm`) | seluruh state aplikasi | semuanya |
+| `secret.key` | kunci AES untuk RuntimeConfig & webhook secret | credential terenkripsi tak bisa dibuka |
+| `id_ed25519` + `.pub` | identitas SSH hanoman ke VPS | akses VPS mati; `authorized_keys` tak lagi cocok |
+| `transcripts/` | transkrip sesi yang ditutup | `hasTranscript` benar, isinya tak terbaca |
+| `uploads/` | lampiran tiket, byte source-map lama | lampiran 404 walau metadata utuh |
+| `uploads/terminal/<sessionId>/` | lampiran gambar sesi terminal | path di prompt agen menunjuk berkas hilang |
+| `setup.token` | token bootstrap admin pertama (one-time, 15 menit) | hanya relevan sebelum admin pertama |
+| `agent-token` | agent token yang dibaca `hanoman mcp` | klien MCP lokal kehilangan autentikasi |
+
+```bash
+# Backup — SQLite disalin konsisten, sisanya berkas biasa.
+sqlite3 "$HANOMAN_HOME/hanoman.db" ".backup '/backup/hanoman.db'"
+tar -C "$HANOMAN_HOME" -czf /backup/hanoman-files.tgz \
+  secret.key id_ed25519 id_ed25519.pub transcripts uploads
+
+# Restore di host lain — umask dulu, isinya memuat kunci privat.
+umask 077
+install -d -m 0700 "$HANOMAN_HOME"
+cp /backup/hanoman.db "$HANOMAN_HOME/hanoman.db"
+tar -C "$HANOMAN_HOME" -xzf /backup/hanoman-files.tgz
+hanoman doctor          # memverifikasi tiap path data efektif + izin tulisnya
+```
+
+`setup.token` dan `agent-token` sengaja **tidak** ikut: yang pertama one-time dan lahir ulang
+sendiri bila DB belum punya user, yang kedua sebaiknya diterbitkan ulang di host baru.
+
+Mengeset `HANOMAN_TRANSCRIPT_DIR`, `HANOMAN_UPLOAD_DIR`, atau `HANOMAN_SSH_KEY_DIR` memindahkan
+bagian itu ke luar batas ini — sah, tapi backup-nya menjadi tanggung jawabmu. `hanoman doctor`
+mencetak path efektifnya supaya tak perlu ditebak.
 
 ## Bind & TLS
 

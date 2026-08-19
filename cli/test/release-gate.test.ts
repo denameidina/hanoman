@@ -1,4 +1,4 @@
-// SPEC-852 · ADR-0126 · Gerbang rilis hidup di berkas konfigurasi, dan berkas konfigurasi rusak
+// SPEC-852 · ADR-0128 · Gerbang rilis hidup di berkas konfigurasi, dan berkas konfigurasi rusak
 // tanpa suara: sebuah langkah yang terhapus tak menggagalkan apa pun, ia hanya membuat publish
 // lewat begitu saja. Persis itu yang terjadi sampai issue #1 — `release.yml` tak pernah memanggil
 // vitest maupun tsc, dan tak ada yang merah karenanya. Pagar ini menahannya secara mekanis.

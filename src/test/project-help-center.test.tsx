@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // SPEC-384 · berkas ini dulu menguji kartu DSN (project-dsn.test.tsx). Kartu itu dicabut bersama
@@ -51,11 +51,25 @@ describe("Help Center management (SPEC-253)", () => {
     expect(screen.getByText("Salin")).toBeInTheDocument();
   });
 
+  // SPEC-847 · konfirmasinya kini dialog aplikasi, jadi test ini menekan tombol sungguhan
+  // alih-alih mem-mock window.confirm. Ada DUA tombol "Nonaktifkan" saat dialog terbuka
+  // (pemicu di kartu + konfirmasi di dialog) — query disempitkan ke dalam dialognya.
   it("Nonaktifkan memanggil API sesudah konfirmasi", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<ProjectDetailScreen p={vm({ helpEnabled: true })} {...props} />);
     fireEvent.click(screen.getByText("Nonaktifkan"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/tetap bisa ditriase/i)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Nonaktifkan" }));
     await waitFor(() => expect(disableHelpCenter).toHaveBeenCalledWith("a"));
+  });
+
+  it("membatalkan konfirmasi TIDAK menonaktifkan Help Center", async () => {
+    render(<ProjectDetailScreen p={vm({ helpEnabled: true })} {...props} />);
+    fireEvent.click(screen.getByText("Nonaktifkan"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Batal" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(disableHelpCenter).not.toHaveBeenCalled();
   });
 
   // SPEC-258 · Regresi: status yang baru diubah tak boleh "hilang" saat layar di-refresh

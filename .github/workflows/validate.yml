@@ -1,4 +1,4 @@
-# SPEC-852 · ADR-0126 · Gerbang validasi paket `hanoman`. Sebelum ini repo tak punya workflow
+# SPEC-852 · ADR-0128 · Gerbang validasi paket `hanoman`. Sebelum ini repo tak punya workflow
 # validasi sama sekali — `.github/workflows/` berisi tepat satu berkas, `release.yml`, dan
 # jalurnya `install → pnpm release → smoke --version → publish`. Tak ada `prisma generate`,
 # vitest, maupun tsc di mana pun, jadi paket bisa terbit dari commit yang test dan kontrak

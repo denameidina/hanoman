@@ -448,6 +448,29 @@ di-cache lokal. `status`/`category` = `String` + zod (`zTicketStatus`/`zTicketCa
   honeypot (`hc_trap`). Triase scheduler hanya membuat notification review; promosi selalu aksi
   manusia dan payloadnya dibingkai sebagai data tidak tepercaya.
 
+## SpecAttachment (SPEC-843 · [ADR-0124](../adr/0124-lampiran-backlog-konteks-agen.md))
+
+Lampiran per **backlog item**, terpisah dari `TicketAttachment` — tiket dan backlog dua domain
+dengan aturan sync dan tingkat kepercayaan yang berbeda. Byte hidup di `HANOMAN_UPLOAD_DIR`
+(server-local, di luar `repoDir`); `storageKey` opaque uuid+ext, `filename` nama asli tersanitasi
+untuk tampilan saja.
+
+- **`SpecAttachment`** — `id`, `specId`→Spec (**cascade**), `projectId` (denormal, kuota &
+  isolasi), `filename`, `mimeType`, `size`, `storageKey`, `createdAt`.
+- **LOCAL-only** — **tanpa** kolom `version`, jadi ia tak pernah masuk changefeed sync (cermin
+  `LeadFlow`/`WebhookEndpoint`/`Changelog`). Byte memang tak menyeberang (ADR-0062), dan metadata
+  yang menyeberang **tanpa** byte-nya hanya menghasilkan lampiran yang tak bisa dibuka di mesin
+  lain. Konsekuensinya dinyatakan: lampiran hanya terlihat di mesin tempat ia diunggah.
+- Tipe diterima: `image/png|jpeg|webp`, `application/pdf`, `text/markdown`, `text/plain`,
+  `application/json`, `text/csv` — gerbangnya **pasangan** mimeType ↔ ekstensi, dan tipe teks
+  divalidasi "UTF-8 sah tanpa byte NUL" (bukan magic bytes, yang tak ada untuk teks polos).
+- Batas: 10 MB/berkas, 10 lampiran/backlog, 40 MB/backlog.
+- Menghapus `Spec` menghapus baris (cascade DB) **dan** byte + direktori materialisasi
+  (`services/spec-attachment.ts`, `services/spec-attachment-dir.ts`) — cascade DB tak menyentuh disk.
+- Jalur ke agen: lampiran dimaterialisasi ke `<repoDir>/.worktrees/.attachments/<sessionId>/`
+  berikut `INDEX.md` — sekamar dengan `.phases`, **di luar** worktree sehingga `git add -A` agen tak
+  bisa men-stage-nya. Direkonsiliasi **penuh** tiap perubahan, dan di-mount `:ro` ke sandbox sesi.
+
 ## Sync — konflik & jam LWW (SPEC-270 · [ADR-0067](../adr/0067-sync-lww-reconciliation-manual.md))
 - **`updatedAt` = jam LWW.** Model synced (`Project`, `Spec`, `Vps`, `SessionResult`,
   `Ticket`, `TicketAttachment`) kini `updatedAt @updatedAt` (dulu `@default(now())`) — auto-bump tiap edit;
@@ -597,8 +620,19 @@ scaffold, breakdown, dan konsol VPS.
   `HANOMAN_TRANSCRIPT_DIR` oleh `services/transcript-store.ts` (cermin `services/uploads.ts`), cap
   **1 MiB menyimpan ekor** + penanda pemangkasan.
 - **Zombie dibereskan saat boot:** `reconcileHistory()` menutup baris `endedAt: null` yang `sessionId`-nya
-  tak ada di `pty.listSessions()` (tmux mati di luar hanoman) dengan `endedAt = updatedAt`, `exitCode`
-  tetap null. Cermin `backfillFeed` saat hub boot (ADR-0067).
+  tak ada di `pty.listSessions()` (tmux mati di luar hanoman) dengan `endedAt = updatedAt`,
+  `endedReason = "reconciled"`, dan `reconciledAt` = waktu sapuan (satu stempel untuk seluruh sapuan);
+  `exitCode` tetap null. Cermin `backfillFeed` saat hub boot (ADR-0067).
+- **`endedReason` + `reconciledAt`** (SPEC-844 · [ADR-0125](../adr/0125-akhir-sesi-riwayat-tercatat.md)):
+  `endedReason` = **cara** baris ditutup — `"closed"` (`killSession()`) atau `"reconciled"` (pane sudah
+  lenyap saat boot, hasil **tak diketahui**); `null` = baris lahir sebelum kolom ini ada, dibaca seperti
+  `closed`. Kelas hasil (`running|completed|failed|interrupted`) **tidak** disimpan — ia diturunkan
+  `sessionOutcome()` (`@hanoman/shared`) dari `endedAt`+`endedReason`+`exitCode`, karena
+  `completed`/`failed` sudah terbaca dari `exitCode` (ADR-0011/0018) sementara siapa yang menutup barisnya
+  tidak (arah ADR-0090). **`exitCode: null` bukan penanda anomali**: `killSession` mengirimnya untuk pane
+  yang masih hidup, dan pane sesi sukses memang tak pernah mati (`pty.ts:55`) — itulah kenapa dua keadaan
+  ini dulu tak terbedakan. Untuk baris `reconciled`, `endedAt` adalah **batas bawah** ("terakhir diketahui
+  hidup") dan `reconciledAt` batas atasnya, jadi durasinya tak dirender sama sekali.
 - **Purge manual ber-scope** (`projectId` dan/atau `before`) tetap tersedia. Sweep retention harian
   juga memilih sesi berakhir >30 hari dalam batch bounded; hold `session:<id>` mengecualikan record.
   Bila delete transkrip gagal, record DB dipertahankan agar percobaan berikutnya dapat retry.

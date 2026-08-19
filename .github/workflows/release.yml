@@ -5,7 +5,7 @@
 # yang bisa dibaca proses mana pun di mesin itu — termasuk sesi agen. OIDC tak menyimpan rahasia
 # apa pun; npm memverifikasi bahwa yang meminta publish memang workflow INI di repo INI.
 #
-# Publish DIGERBANGI job `validate` (SPEC-852/ADR-0126): `pnpm validate` = prisma generate →
+# Publish DIGERBANGI job `validate` (SPEC-852/ADR-0128): `pnpm validate` = prisma generate →
 # typecheck seluruh paket → suite serial. Sebelum gerbang itu ada, jalur rilis tak pernah
 # memanggil tsc maupun vitest, jadi paket bisa terbit dari commit yang merah — dan build esbuild
 # yang hijau membuatnya tak terlihat.
@@ -35,7 +35,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # SPEC-852 · ADR-0126 · Gerbang yang dulu tak ada sama sekali: publish menunggu validasi
+  # SPEC-852 · ADR-0128 · Gerbang yang dulu tak ada sama sekali: publish menunggu validasi
   # commit YANG SAMA dengan yang akan diterbitkan. Definisinya hidup di validate.yml supaya
   # PR, main, dan rilis menempuh jalur yang identik — salinan langkah di sini akan menyimpang
   # tanpa ada yang merah, dan itu persis kelas kegagalan yang dilaporkan issue #1.

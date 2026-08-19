@@ -2,7 +2,7 @@
 
 Sumber: GitHub issue [denameidina/hanoman#1](https://github.com/denameidina/hanoman/issues/1)
 (pelapor @RamaAditya49) · severity major · 2026-08-19
-Doc-of-record: audit ini + [ADR-0126](../../../internal/docs/adr/0126-gerbang-validasi-sebelum-publish.md)
+Doc-of-record: audit ini + [ADR-0128](../../../internal/docs/adr/0128-gerbang-validasi-sebelum-publish.md)
 (Spec & Plan sengaja `skipped` — akar masalah tunggal, remedinya sudah diresepkan acceptance
 criteria issue-nya sendiri).
 

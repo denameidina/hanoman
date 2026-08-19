@@ -1,4 +1,4 @@
-# ADR-0126 — Gerbang validasi sebelum publish, dan bootstrap Prisma Client di postinstall
+# ADR-0128 — Gerbang validasi sebelum publish, dan bootstrap Prisma Client di postinstall
 
 Status: accepted · 2026-08-19
 
