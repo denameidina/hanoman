@@ -5,14 +5,17 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, readFile, unlink, readdir, stat } from "node:fs/promises";
 import { join, resolve, basename } from "node:path";
 import { effectiveStr } from "../config";
-import { resolveHome } from "@hanoman/runner";
+import { resolveDataDirs } from "@hanoman/runner";
 
 // Sesi berhari-hari bisa meninggalkan puluhan MB scrollback. 1 MiB menampung ribuan baris —
 // cukup untuk membaca ulang apa yang terjadi, tanpa menjadikan riwayat pengisi disk diam-diam.
 export const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 
+// SPEC-846 · fallback-nya `resolveDataDirs()`, bukan turunan sendiri: satu penurun lokasi data
+// untuk server & CLI. `.trim()` menjaga override berisi spasi (EnvironmentFile ceroboh) tidak
+// menjadi direktori di bawah cwd lewat `resolve()`.
 export function transcriptDir(): string {
-  return resolve(effectiveStr("HANOMAN_TRANSCRIPT_DIR") ?? join(resolveHome(), "transcripts"));
+  return resolve(effectiveStr("HANOMAN_TRANSCRIPT_DIR")?.trim() || resolveDataDirs().transcripts);
 }
 
 // Memangkas KEPALA, menyimpan EKOR: saat membaca ulang sesi, yang dicari hampir selalu apa yang

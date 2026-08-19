@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { mkdtempSync, existsSync, chmodSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -84,5 +84,28 @@ describe("transcript-store (SPEC-362)", () => {
     const r = await saveTranscript("   \n  ");
     expect(r.key).toBe("");
     expect(r.bytes).toBe(0);
+  });
+});
+
+// SPEC-846 · `$HANOMAN_HOME` adalah satu-satunya batas backup/restore. Tanpa override, lokasi
+// transkrip tak boleh bergantung pada cwd peluncur — di bawah systemd cwd bisa apa saja.
+describe("transcriptDir turun dari HANOMAN_HOME (SPEC-846)", () => {
+  let home: string;
+  beforeEach(() => {
+    delete process.env.HANOMAN_TRANSCRIPT_DIR;
+    home = mkdtempSync(join(tmpdir(), "hanoman-home-t846-"));
+    process.env.HANOMAN_HOME = home;
+  });
+  afterEach(() => { delete process.env.HANOMAN_HOME; process.env.HANOMAN_TRANSCRIPT_DIR = dir; });
+
+  it("default = $HANOMAN_HOME/transcripts, lepas dari cwd", () => {
+    expect(transcriptDir()).toBe(join(home, "transcripts"));
+  });
+
+  // Override yang hanya berisi spasi lahir dari `EnvironmentFile` yang ceroboh. `resolve("  ")`
+  // menempelkannya ke cwd — persis kelas bug yang SPEC-846 tutup.
+  it("override berisi spasi diabaikan, bukan menjadi direktori di bawah cwd", () => {
+    process.env.HANOMAN_TRANSCRIPT_DIR = "  ";
+    expect(transcriptDir()).toBe(join(home, "transcripts"));
   });
 });

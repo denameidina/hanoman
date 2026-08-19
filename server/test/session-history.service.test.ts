@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { mkdtempSync, existsSync, chmodSync, writeFileSync, utimesSync, readdirSync } from "node:fs";
+import { chmodSync, mkdtempSync, existsSync, writeFileSync, utimesSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prisma } from "../src/db";
@@ -99,6 +99,23 @@ describe("session-history service (SPEC-362)", () => {
     const byId = Object.fromEntries(items.map((r) => [r.sessionId, r]));
     expect(byId["mati"]!.endedAt).not.toBeNull();
     expect(byId["hidup"]!.endedAt).toBeNull();
+  });
+
+  // SPEC-846 · transkrip adalah I/O OPSIONAL; `endedAt`/`exitCode` tidak. Sebelum ini lemparan
+  // `saveTranscript` (disk penuh, $HANOMAN_HOME read-only) melewati `update()` dan ditelan
+  // `installSessionHistory`, sehingga sesi mati terbaca "berjalan" sampai boot berikutnya —
+  // konflasi exited↔selesai yang sama seperti SPEC-433/451.
+  it("direktori transkrip tak bisa ditulis → baris TETAP ditutup dengan exitCode", async () => {
+    const dir = process.env.HANOMAN_TRANSCRIPT_DIR!;
+    await beginSession(birth({ sessionId: "readonly" }));
+    chmodSync(dir, 0o500);
+    try {
+      await finishSession({ sessionId: "readonly", exitCode: 3, transcript: "tak akan tersimpan" });
+    } finally { chmodSync(dir, 0o700); }
+    const { items } = await listHistory({ q: "readonly" });
+    expect(items[0]!.endedAt).not.toBeNull();
+    expect(items[0]!.exitCode).toBe(3);
+    expect((await getHistory(items[0]!.id))?.hasTranscript).toBe(false);
   });
 
   // SPEC-844 · ADR-0125 · dua jalur tutup yang dulu tak terbedakan.

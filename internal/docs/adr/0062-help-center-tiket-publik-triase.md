@@ -41,7 +41,7 @@ Model **server-local** (seperti `ErrorGroup`/`Notification`): **tanpa** `version
 
 ### 4. Kapabilitas file storage baru (server-local)
 
-Lampiran hidup di `HANOMAN_UPLOAD_DIR` (default `<server>/data/uploads` — **di luar `repoDir`**, **tak disync**; sejalan `Vps.keyPath` yang juga berkas di server, tak pernah di DB). Multipart via **`@fastify/multipart`** (dependensi pertama di repo). Batas: **≤3 berkas**, **≤5MB/berkas**, mime `image/png|jpeg|webp`; berkas invalid **di-skip** (submit sisanya tetap jadi, AC PRD; `throwFileSizeLimit:false` + validasi per-part di route). Penyajian **hanya ber-auth** (`GET /api/tickets/:id/attachments/:attId`, di belakang gate); halaman status publik **tidak** menampilkan lampiran balik (lebih tipis & aman).
+Lampiran hidup di `HANOMAN_UPLOAD_DIR` (default `$HANOMAN_HOME/uploads` sejak SPEC-761/SPEC-846; `<server>/data/uploads` saat ADR ini ditulis — **di luar `repoDir`**, **tak disync**; sejalan `Vps.keyPath` yang juga berkas di server, tak pernah di DB). Multipart via **`@fastify/multipart`** (dependensi pertama di repo). Batas: **≤3 berkas**, **≤5MB/berkas**, mime `image/png|jpeg|webp`; berkas invalid **di-skip** (submit sisanya tetap jadi, AC PRD; `throwFileSizeLimit:false` + validasi per-part di route). Penyajian **hanya ber-auth** (`GET /api/tickets/:id/attachments/:attId`, di belakang gate); halaman status publik **tidak** menampilkan lampiran balik (lebih tipis & aman).
 
 ### 5. Jembatan tiket → `Spec` (source baru `help`) reuse jalur existing
 

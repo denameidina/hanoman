@@ -6,7 +6,7 @@ import { mkdir, writeFile, readFile, unlink, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { effectiveStr } from "../config";
 import { safeRequest } from "./safe-outbound-request";
-import { resolveHome } from "@hanoman/runner";
+import { resolveDataDirs } from "@hanoman/runner";
 
 const EXT: Record<string, string> = {
   "image/png": ".png",
@@ -17,8 +17,10 @@ export function extFor(mimeType: string): string {
   return EXT[mimeType] ?? ".bin";
 }
 
+// SPEC-846 · cermin transcript-store: fallback ke `resolveDataDirs()` dan `.trim()` supaya
+// override berisi spasi tak berubah menjadi direktori di bawah cwd lewat `resolve()`.
 export function uploadDir(): string {
-  return resolve(effectiveStr("HANOMAN_UPLOAD_DIR") ?? join(resolveHome(), "uploads"));
+  return resolve(effectiveStr("HANOMAN_UPLOAD_DIR")?.trim() || resolveDataDirs().uploads);
 }
 
 export async function saveUpload(buf: Buffer, mimeType: string): Promise<{ storageKey: string; size: number }> {

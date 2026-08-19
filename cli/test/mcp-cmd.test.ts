@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { join } from "node:path";
+import { resolveHome } from "@hanoman/runner";
 import { route } from "../src/router";
 
 describe("route mcp", () => {
@@ -27,5 +29,20 @@ describe("perintah mcp", () => {
     expect(stdout).not.toHaveBeenCalled();
     expect(stderr).toHaveBeenCalled();
     expect(stderr.mock.calls.join(" ")).toContain("HANOMAN_HOST");
+  });
+});
+
+// SPEC-846 · lokasi home diturunkan `resolveHome()`, tidak DISALIN. Salinan lamanya tak mem-`trim()`,
+// jadi `HANOMAN_HOME` berisi spasi — mudah lahir dari `EnvironmentFile` yang ceroboh — membuat
+// agent token dicari di direktori yang mustahil dan MCP berjalan tanpa autentikasi sambil hanya
+// mengeluh di stderr.
+describe("agentTokenPath (SPEC-846)", () => {
+  it("mengikuti HANOMAN_HOME", async () => {
+    const { agentTokenPath } = await import("../src/commands/mcp");
+    expect(agentTokenPath({ HANOMAN_HOME: "/srv/hn" })).toBe("/srv/hn/agent-token");
+  });
+  it("HANOMAN_HOME berisi spasi jatuh ke default, sejalan resolveHome", async () => {
+    const { agentTokenPath } = await import("../src/commands/mcp");
+    expect(agentTokenPath({ HANOMAN_HOME: "  " })).toBe(join(resolveHome({}), "agent-token"));
   });
 });
