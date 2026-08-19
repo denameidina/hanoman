@@ -15,7 +15,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("upload quarantine pipeline", () => {
   it("uses magic bytes instead of a spoofed client MIME", async () => {
     await expect(processUpload({
-      buffer: PNG, clientName: "photo.jpg", clientMime: "image/jpeg", projectId: "p1", ticketBytes: 0,
+      buffer: PNG, clientName: "photo.jpg", clientMime: "image/jpeg", projectId: "p1", parentBytes: 0,
     }, { storageDir: await dir(), scanner: async () => {} }))
       .rejects.toMatchObject({ code: "UPLOAD_TYPE" });
   });
@@ -24,7 +24,7 @@ describe("upload quarantine pipeline", () => {
     const storageDir = await dir();
     const result = await processUpload({
       buffer: Buffer.concat([PNG, Buffer.from("<script>alert(1)</script>")]),
-      clientName: "../../proof.PNG", clientMime: "image/png", projectId: "p1", ticketBytes: 0,
+      clientName: "../../proof.PNG", clientMime: "image/png", projectId: "p1", parentBytes: 0,
     }, { storageDir, scanner: async () => {} });
     const stored = await readFile(join(storageDir, result.storageKey));
     expect(stored.includes(Buffer.from("<script>"))).toBe(false);
@@ -34,14 +34,14 @@ describe("upload quarantine pipeline", () => {
 
   it("enforces cumulative quotas before promotion", async () => {
     await expect(processUpload({
-      buffer: PNG, clientName: "p.png", clientMime: "image/png", projectId: "p1", ticketBytes: UPLOAD_LIMITS.ticketBytes,
+      buffer: PNG, clientName: "p.png", clientMime: "image/png", projectId: "p1", parentBytes: UPLOAD_LIMITS.parentBytes,
     }, { storageDir: await dir(), scanner: async () => {} }))
       .rejects.toMatchObject({ code: "UPLOAD_QUOTA" });
   });
 
   it("fails closed when the malware scanner errors", async () => {
     await expect(processUpload({
-      buffer: PNG, clientName: "p.png", clientMime: "image/png", projectId: "p1", ticketBytes: 0,
+      buffer: PNG, clientName: "p.png", clientMime: "image/png", projectId: "p1", parentBytes: 0,
     }, { storageDir: await dir(), scanner: async () => { throw new Error("scanner unavailable"); } }))
       .rejects.toBeInstanceOf(UploadError);
   });

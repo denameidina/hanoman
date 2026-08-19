@@ -174,7 +174,7 @@ git commit -m "feat(backlog): model SpecAttachment + migration (SPEC-843, ADR-01
   - `processDocumentUpload(input: { buffer, clientName, clientMime, clientExt }, deps: { storageDir?, scanner? }): Promise<SafeUpload>`
   - `SafeUpload.width`/`height` menjadi opsional (`number | undefined`) — dokumen tak punya dimensi
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/upload-document.test.ts`:
 
@@ -239,12 +239,12 @@ describe("SPEC-843 · pipeline dokumen", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `pnpm vitest --run --no-file-parallelism server/test/upload-document.test.ts`
 Expected: FAIL — `processDocumentUpload` tidak diekspor.
 
-- [ ] **Step 3: Ubah `upload-pipeline.ts`**
+- [x] **Step 3: Ubah `upload-pipeline.ts`**
 
 Ganti `ticketBytes` → `parentBytes` di `UPLOAD_LIMITS` dan di `type Input`:
 
@@ -380,7 +380,7 @@ export async function processDocumentUpload(
 }
 ```
 
-- [ ] **Step 4: Perbarui call site & test lama**
+- [x] **Step 4: Perbarui call site & test lama**
 
 `server/src/services/ticket-intake.ts` — ganti `ticketBytes` menjadi `parentBytes` di pemanggilan `processUpload` (satu tempat, variabel lokal `ticketBytes` boleh tetap bernama begitu karena ia memang byte tiket):
 
@@ -393,12 +393,12 @@ export async function processDocumentUpload(
 
 `server/test/upload-pipeline.test.ts` — ganti keempat kemunculan `ticketBytes:` menjadi `parentBytes:` dan `UPLOAD_LIMITS.ticketBytes` menjadi `UPLOAD_LIMITS.parentBytes`.
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 Run: `pnpm vitest --run --no-file-parallelism server/test/upload-document.test.ts server/test/upload-pipeline.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/upload-pipeline.ts server/src/services/ticket-intake.ts server/test/upload-pipeline.test.ts server/test/upload-document.test.ts
