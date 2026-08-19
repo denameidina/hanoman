@@ -178,7 +178,7 @@ git commit -m "feat(ds): ConfirmDialog punya daftar dampak, ikon per-aksi, dan t
   ```
   `confirm` stabil antar-render (aman sebagai dependency `useCallback`/`useEffect`).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/use-confirm.test.tsx`:
 
@@ -307,12 +307,12 @@ describe("useConfirm (SPEC-847)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus gagal**
+- [x] **Step 2: Jalankan test — harus gagal**
 
 Run: `pnpm vitest --run src/test/use-confirm.test.tsx`
 Expected: FAIL — modul `../src/ds/useConfirm` tak ada.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `src/src/ds/useConfirm.tsx`:
 
@@ -396,7 +396,7 @@ export function useConfirm() {
 }
 ```
 
-- [ ] **Step 4: Ekspor dari barrel**
+- [x] **Step 4: Ekspor dari barrel**
 
 Di `src/src/ds/index.ts`, tepat sesudah baris 11:
 
@@ -405,17 +405,17 @@ export { ConfirmDialog } from "./ConfirmDialog";
 export { useConfirm, type ConfirmOptions } from "./useConfirm";
 ```
 
-- [ ] **Step 5: Jalankan test — harus lulus**
+- [x] **Step 5: Jalankan test — harus lulus**
 
 Run: `pnpm vitest --run src/test/use-confirm.test.tsx`
 Expected: PASS (9 test).
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/ds/useConfirm.tsx src/src/ds/index.ts src/test/use-confirm.test.tsx
