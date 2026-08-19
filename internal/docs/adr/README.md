@@ -77,7 +77,7 @@ setiap sesi agen, riwayat ADR hanya saat seseorang butuh alasannya.
 - [0059 — Kontinuitas branch take-to-backlog (PRD→brief, audit→QA) + skip-audit qa lanjutan audit](0059-kontinuitas-branch-take-to-backlog-dan-skip-audit.md) — **memperluas 0032/0040/0041/0057** (SPEC-244)
 - [0058 — Model & effort per fase, lewat `/model`+`/effort` in-session](0058-model-effort-per-fase.md) — **mengamandemen 0024, sebagian menghidupkan 0003** (SPEC-238) — *mekanisme per-fase dicabut oleh 0061*
 - [0057 — Audit-only sebagai source + flow (dokumen, tanpa perbaikan)](0057-audit-only-source-flow.md) — SPEC-237
-- [0056 — Terminal biasa = shell mentah di repoDir project (bukan claude)](0056-terminal-shell-non-claude.md) — SPEC-236, pola ADR-0042
+- [0056 — Terminal biasa = shell mentah di repoDir project (bukan claude)](0056-terminal-shell-non-claude.md) — SPEC-236, pola ADR-0042 · **amandemen 2026-08-19**: `shellBin()` juga dipakai untuk `set-option -g default-shell` tmux (sebelum `new-session`, seperti `remain-on-exit` 0016), berlaku untuk SEMUA sesi termasuk claude — tanpa itu shell login user service (`/usr/sbin/nologin` di host yang dikeraskan) yang menentukan, dan setiap pane mati saat lahir
 - [0055 — Git graph parity: taksonomi operasi + eksekusi berlapis](0055-git-graph-parity-op-taxonomy.md) — **memperluas 0034/0053** (SPEC-233)
 - [0054 — Review + integrate ber-skop sesi untuk sesi project-level (PRD)](0054-review-integrate-ber-skop-sesi-untuk-prd.md) — **memperluas 0041**
 - [0053 — Merge via git graph: deterministik di worktree isolasi, konflik → sesi claude (pola integrate)](0053-git-graph-merge-worktree-isolasi-sesi-claude.md)

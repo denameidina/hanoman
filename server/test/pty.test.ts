@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import {
   createSession, getSession, listSessions, killSession, killAll, detachAll, attach, writeTo,
   sessionPhases, sessionFinished, markerFilled, promptFilePath, armGoalInTui, goalGatePath,
-  sessionKind, registerSessionHooks, rootBypassEnv, sendToPane,
+  sessionKind, registerSessionHooks, rootBypassEnv, sendToPane, shellBin,
   MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback,
   type SessionBirth, type SessionDeath,
 } from "../src/services/pty";
@@ -71,6 +71,12 @@ const tmuxCapture = (id: string): string | null => {
   try {
     return execFileSync("tmux", ["-L", process.env.HANOMAN_TMUX_SOCKET ?? "hanoman-test",
       "-f", "/dev/null", "capture-pane", "-p", "-t", `hanoman-${id}`], { encoding: "utf8" });
+  } catch { return null; }
+};
+const tmuxShowOption = (name: string): string | null => {
+  try {
+    return execFileSync("tmux", ["-L", process.env.HANOMAN_TMUX_SOCKET ?? "hanoman-test",
+      "-f", "/dev/null", "show-option", "-gv", name], { encoding: "utf8" }).trim();
   } catch { return null; }
 };
 const lastFrame = (c: ReturnType<typeof fakeClient>) => c.frames[c.frames.length - 1];
@@ -286,6 +292,22 @@ describe("pty service", () => {
     attach(s.id, c);
     expect(allData(c)).toContain("halo-console");
     expect(allData(c)).not.toContain("--dangerously-skip-permissions");
+  });
+
+  // tmux menyerahkan argumen perintah `new-session` ke `default-shell`, yang defaultnya diambil
+  // dari /etc/passwd milik user pemanggil. Di VPS user service-nya `/usr/sbin/nologin` → SETIAP
+  // pane lahir langsung mati ("Attempted login by UNKNOWN") dan tak ada sesi terminal yang jalan.
+  // Karena itu default-shell dipatok eksplisit ke shellBin(), bukan diwariskan dari passwd.
+  // HANOMAN_SHELL dipakai supaya nilainya BERBEDA dari shell login user yang menjalankan test —
+  // menyamakan keduanya membuat assert lulus tanpa perbaikan apa pun.
+  it("memaku default-shell tmux ke shellBin(), tidak mewarisi shell login user", async () => {
+    process.env.HANOMAN_SHELL = "/bin/sh";
+    try {
+      const s = createSession("shl1", process.cwd(), { command: ["/bin/echo", "halo"] });
+      await waitFor(() => exited(s.id));
+      expect(shellBin()).toBe("/bin/sh");
+      expect(tmuxShowOption("default-shell")).toBe("/bin/sh");
+    } finally { delete process.env.HANOMAN_SHELL; }
   });
 
   // `remain-on-exit` menahan pane yang sudah mati: output terakhir sesi yang gagal masih

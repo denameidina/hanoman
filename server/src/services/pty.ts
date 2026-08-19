@@ -416,6 +416,12 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // `remain-on-exit`, jadi proses yang mati seketika pun meninggalkan pane mati yang masih
   // bisa dibaca. Menyetelnya setelah new-session akan balapan dengan proses yang cepat mati.
   tmux(
+    // tmux menyerahkan argumen perintah `new-session` ke `default-shell`, dan defaultnya adalah
+    // shell login pemanggil di /etc/passwd. Saat hanoman jalan sebagai user service ber-shell
+    // `/usr/sbin/nologin`, SETIAP pane lahir langsung mati ("Attempted login by UNKNOWN") dan tak
+    // satu pun sesi terminal bisa hidup. Dipatok eksplisit — dan wajib mendahului `new-session`,
+    // sama seperti remain-on-exit di bawah.
+    "set-option", "-g", "default-shell", shellBin(), ";",
     "set-option", "-g", "remain-on-exit", "on", ";",
     "set-option", "-g", "status", "off", ";",
     // Prefix mati: tmux di sini adalah detail implementasi, dan C-b harus sampai ke claude.

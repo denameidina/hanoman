@@ -22,6 +22,21 @@ Console VPS (ADR-0042) sudah membuktikan pola shell mentah lewat `createSession(
   plain dan shell terbuang).
 - **Id acak → banyak shell per project diizinkan** (cermin "Sesi baru"), bukan deterministik.
 
+### Amandemen 2026-08-19 — `shellBin()` juga memaku `default-shell` tmux
+`shellBin()` semula hanya menentukan **isi** perintah sesi shell. Tetapi tmux menyerahkan argumen
+perintah `new-session` ke opsi **`default-shell`**, yang defaultnya adalah shell login pemanggil di
+`/etc/passwd` — dan itu berlaku untuk **semua** sesi, termasuk sesi `claude`, bukan hanya sesi shell
+ADR ini. Di deployment yang menjalankan hanoman sebagai user service ber-shell `/usr/sbin/nologin`
+(pola pengerasan lazim; terpantau pada `hanoman.service`, uid 995), setiap pane karena itu lahir dan
+mati seketika — journal mencatat `nologin: Attempted login by UNKNOWN (UID: 995)` dan tmux membalas
+`no server running`, sehingga **tak satu pun sesi terminal bisa hidup**. Keputusannya: `pty.ts`
+menyetel `set-option -g default-shell shellBin()` secara eksplisit, dan — seperti `remain-on-exit`
+(ADR-0016) — opsi itu **wajib mendahului `new-session` dalam invokasi yang sama**, karena menyetelnya
+sesudah akan balapan dengan proses yang mati seketika. Efeknya: shell sesi ditentukan konfigurasi
+hanoman, bukan `/etc/passwd` host. Dipagari `server/test/pty.test.ts` lewat `HANOMAN_SHELL` yang
+sengaja berbeda dari shell login pemakai test — menyamakan keduanya membuat assert lulus palsu.
+Perbaikan operasional pendamping (host yang sudah terlanjur): beri user service shell nyata.
+
 ## Alasan
 - Nyaris nol kode baru: reuse penuh attach/scrollback/WS/resize/kill/persistensi tmux (ADR-0016).
 - Tak ada perubahan skema — sesi terminal tmux-only, tak ada baris DB.
