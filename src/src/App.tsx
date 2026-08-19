@@ -4,7 +4,7 @@
 import React from "react";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, Tabs, Toast, useToast, Icon, StateBlock } from "./ds";
+import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, Tabs, Toast, useToast, Icon, StateBlock, useConfirm } from "./ds";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
@@ -697,6 +697,8 @@ export default function App() {
   // meski state-nya hidup di App.
   const [search, setSearch] = usePersistedState("projects", "q", "", isStr);
   const [modal, setModal] = React.useState<string | null>(null);
+  // SPEC-847 · ADR-0125 · konfirmasi destruktif memakai dialog aplikasi, bukan window.confirm.
+  const { confirm, dialog } = useConfirm();
   // SPEC-210 · prefill NewSpecModal saat "Take ke backlog" dari sebuah PRD.
   const [specPrefill, setSpecPrefill] = React.useState<SpecPrefill | null>(null);
   // SPEC-340 · ADR-0076 · eskalasi audit → PRD: modal brief PRD ter-prefill + asal auditnya.
@@ -813,11 +815,16 @@ export default function App() {
       // SPEC-255 · ADR-0064 · rename id lebih dulu (operasi khusus): konfirmasi dampak → renameProject.
       // Efek merambat: Help /help/<id> dan sync ke server (hub ikut berganti).
       if (newId && newId !== proj.id) {
-        if (!window.confirm(
-          `Ganti ID project "${proj.id}" → "${newId}"?\n\n` +
-          `Ini berpengaruh ke SEMUA yang terkait project:\n` +
-          `• Link Help Center publik berubah jadi /help/${newId} — tautan lama rusak.\n` +
-          `• Perubahan dirambatkan (sync) ke server; server ikut berganti id.`)) return;
+        if (!await confirm({
+          title: `Ganti ID project "${proj.id}" → "${newId}"?`,
+          message: "Ini berpengaruh ke SEMUA yang terkait project:",
+          impact: [
+            <>Link Help Center publik berubah jadi <code>/help/{newId}</code> — tautan lama rusak.</>,
+            "Perubahan dirambatkan (sync) ke server; server ikut berganti id.",
+          ],
+          confirmLabel: "Ganti ID",
+          icon: "pencil",
+        })) return;
         const r = await api.renameProject(proj.id, newId);
         if (r.helpUrl) showToast("Help Center baru: " + r.helpUrl, "ok", "life-buoy");
       }
@@ -891,9 +898,14 @@ export default function App() {
 
   // Cascade di DB ikut menghapus spec project ini — cermin state lokalnya.
   async function deleteProject(p: ProjectVM) {
-    if (!window.confirm(`Hapus project "${p.name}"? Semua spec-nya ikut terhapus.`)) return;
     try {
-      await api.deleteProject(p.id);
+      if (!await confirm({
+        title: `Hapus project "${p.name}"?`,
+        message: `Project "${p.id}" dan seluruh isinya dihapus dari dashboard ini.`,
+        impact: ["Semua backlog item project ini ikut terhapus.", "Tindakan ini tak bisa dibatalkan."],
+        confirmLabel: "Hapus project",
+        run: () => api.deleteProject(p.id),
+      })) return;
       setProjects((list) => list.filter((x) => x.id !== p.id));
       setBacklog((b) => b.filter((s) => s.projectId !== p.id));
       setSessions((t) => t.filter((x) => x.projectId !== p.id));
@@ -1438,6 +1450,7 @@ export default function App() {
             const noRepo = e instanceof ApiError && (e.status === 400 || e.status === 422);
             showToast((startSpec?.id ?? "") + " · gagal mulai sesi" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
           }} />
+        {dialog}
         <Toast toast={toast} />
       </NotificationsProvider>
     </AuthProvider>

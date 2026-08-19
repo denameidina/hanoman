@@ -433,7 +433,7 @@ git commit -m "feat(ds): useConfirm — konfirmasi destruktif berbasis promise d
 **Interfaces:**
 - Consumes: `useConfirm` dari Task 2.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/delete-project-confirm.test.tsx`. Merender `App` penuh mahal; uji komponen sesungguhnya yang memuat aksi ini lewat harness tipis yang meniru `deleteProject` **apa adanya** tak akan menguji kode produksi. Karena itu test ini merender `ProjectsScreen` — permukaan yang menyalakan `onDelete` — dan menyuntikkan `deleteProject` App:
 
@@ -523,12 +523,12 @@ describe("hapus project · konfirmasi aplikasi (SPEC-847)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan — harus gagal**
+- [x] **Step 2: Jalankan — harus gagal**
 
 Run: `pnpm vitest --run src/test/delete-project-confirm.test.tsx`
 Expected: FAIL — `useConfirm` ada (Task 2) tapi berkas test belum; setelah dibuat ia harus langsung PASS karena harness memakai primitif yang sudah jadi. **Bila sudah PASS di sini, itu benar** — nilai test ini adalah mengunci copy + kontrak AC untuk flow ini; kegagalan sesungguhnya muncul kalau Step 3 menyimpang dari harness.
 
-- [ ] **Step 3: Ubah `App.tsx`**
+- [x] **Step 3: Ubah `App.tsx`**
 
 1. Baris 7 — tambahkan `useConfirm` ke impor dari `"./ds"`.
 2. Di dalam `export default function App()` (sesudah blok `const [modal, setModal] = …`, baris ~699) tambahkan:
@@ -588,7 +588,7 @@ const { confirm, dialog } = useConfirm();
         <Toast toast={toast} />
 ```
 
-- [ ] **Step 4: Verifikasi**
+- [x] **Step 4: Verifikasi**
 
 Run: `pnpm vitest --run src/test/delete-project-confirm.test.tsx src/test/app-flows.test.tsx src/test/app-states.test.tsx src/test/edit-project-id.test.tsx src/test/edit-project-gitremote.test.tsx`
 Expected: PASS semua.
@@ -596,7 +596,7 @@ Expected: PASS semua.
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/App.tsx src/test/delete-project-confirm.test.tsx
