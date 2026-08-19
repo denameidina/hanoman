@@ -686,7 +686,7 @@ git commit -m "feat(backlog): service lampiran backlog (allowlist, kuota, hapus)
   - `syncSpecAttachmentsDir(specId: string, projectId: string): Promise<MaterializedAttachment[]>` — rekonsiliasi penuh; `[]` bila project belum di-bind
   - `dropSpecAttachmentsDir(specId: string, projectId: string): Promise<void>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/spec-attachment-dir.test.ts`:
 
@@ -797,12 +797,12 @@ describe("SPEC-843 · materialisasi lampiran", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-attachment-dir.test.ts`
 Expected: FAIL — modul tak ada.
 
-- [ ] **Step 3: Tulis `server/src/services/spec-attachment-dir.ts`**
+- [x] **Step 3: Tulis `server/src/services/spec-attachment-dir.ts`**
 
 ```ts
 // SPEC-843 · ADR-0124 · materialisasi lampiran backlog ke direktori yang terjangkau sesi.
@@ -914,12 +914,12 @@ export async function dropSpecAttachmentsDir(specId: string, projectId: string):
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-attachment-dir.test.ts`
 Expected: PASS (5 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/spec-attachment-dir.ts server/test/spec-attachment-dir.test.ts
