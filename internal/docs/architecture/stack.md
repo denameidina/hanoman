@@ -5,7 +5,7 @@
 | Dashboard | React + TypeScript + Vite | UI cepat, tim familiar |
 | Realtime | WebSocket (terminal) + HTTP polling | terminal butuh stream dua arah; sisanya cukup poll |
 | Server | Node.js + TypeScript (Fastify) | satu bahasa lintas stack; `@fastify/websocket`, `cookie`, `static` |
-| DB | **SQLite (Prisma 6)** | embedded, nol proses eksternal; berkas di `~/.hanoman/hanoman.db` ([ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md)) |
+| DB | **SQLite (Prisma 6)** | embedded, nol proses eksternal; berkas di `~/.hanoman/hanoman.db` ([ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md)), dibuka `journal_mode=WAL` ([ADR-0131](../adr/0131-retensi-change-feed-sync.md) §4) |
 | Distribusi | **paket npm global `hanoman`** | `npm i -g hanoman` → `hanoman`; update `hanoman update` ([ADR-0087](../adr/0087-distribusi-npm-global-satu-perintah.md)) |
 | Terminal (server) | node-pty + **tmux** | sesi `claude` interaktif butuh TTY sungguhan; tmux menahannya hidup lintas restart API (ADR-0016) |
 | Terminal (web) | xterm.js | render TUI Claude Code apa adanya |

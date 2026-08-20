@@ -26,8 +26,25 @@ describe("penulis yang tak terlihat tap", () => {
     expect(bad).toEqual([]);
   });
 
-  it("tak ada $executeRaw / $queryRaw di server/src", () => {
-    const bad = walk(SRC).filter((f) => /\$(execute|query)Raw/.test(readFileSync(f, "utf8")));
+  // SPEC-857 · ADR-0131 §4 · yang dilarang adalah raw yang bisa MENULIS model terlacak, karena
+  // itulah yang menghilangkan peristiwa tanpa jejak. `PRAGMA` tak menyentuh satu baris model pun,
+  // jadi ia lolos — tapi hanya di berkas yang disebut namanya, dan hanya berbentuk pragma. Raw
+  // dalam bentuk lain tetap ditolak, termasuk di berkas itu sendiri.
+  const PRAGMA_ONLY = new Set([join(SRC, "db.ts")]);
+  const RAW_CALL = /\$(?:execute|query)Raw(?:Unsafe)?(?:<[^>]*>)?\(\s*[`"']([^`"']*)/g;
+
+  it("tak ada $executeRaw / $queryRaw di server/src, selain PRAGMA yang disebut namanya", () => {
+    const bad: string[] = [];
+    for (const f of walk(SRC)) {
+      const src = readFileSync(f, "utf8");
+      const calls = [...src.matchAll(RAW_CALL)];
+      if (!calls.length) {
+        if (/\$(execute|query)Raw/.test(src)) bad.push(`${f}: raw tanpa literal yang bisa dibaca`);
+        continue;
+      }
+      for (const [, stmt] of calls)
+        if (!(PRAGMA_ONLY.has(f) && /^PRAGMA /.test(stmt!))) bad.push(`${f}: ${stmt}`);
+    }
     expect(bad).toEqual([]);
   });
 });

@@ -520,6 +520,14 @@ untuk tampilan saja.
   Pemangkasan feed sengaja **tak tunduk pada jatah `batchSize`** (jatah itu melindungi penghapusan
   yang menyentuh berkas): dengan 100/hari, 121.222 baris butuh 1.210 hari. Ia dilaporkan terpisah
   sebagai `RetentionReport.feedPruned`.
+- **DB dibuka dalam `journal_mode=WAL`, disetel di `server/src/db.ts`** (SPEC-857,
+  [ADR-0131](../adr/0131-retensi-change-feed-sync.md) §4). Default SQLite adalah `delete`, dan di
+  mode itu tiap tulisan mengambil kunci eksklusif atas **seluruh berkas** serta memblokir semua
+  pembaca — lapis kedua insiden di atas, yang tak tersentuh retensi. Mode jurnal tersimpan di header
+  berkas, jadi menyetelnya di satu titik lahir klien Prisma membuatnya berlaku untuk setiap proses
+  yang membuka DB itu, termasuk `prisma migrate`. Konsekuensi operasional: backup harus memakai
+  `sqlite3 ".backup"` (backup online, ikut membaca WAL), **bukan** `cp hanoman.db` — di WAL commit
+  terbaru bisa masih berada di berkas `-wal`.
 - **`SyncTombstone` wajib ada di `PG_ORDER`** (`cli/src/commands/migrate-pg.ts`) —
   `cli/test/migrate-pg.test.ts` menuntutnya sama persis dengan DMMF dan itu satu-satunya gerbangnya.
 

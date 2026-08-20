@@ -246,6 +246,11 @@ Postgres lama. Simpan backup sampai cutover dinyatakan selesai.
     secret.key id_ed25519 id_ed25519.pub transcripts uploads
   ```
 
+  `sqlite3 ".backup"` bukan gaya penulisan: DB dibuka `journal_mode=WAL` (SPEC-857,
+  [ADR-0131](../adr/0131-retensi-change-feed-sync.md) §4), dan di WAL commit terbaru bisa masih
+  berada di berkas `-wal`. `.backup` adalah backup online yang ikut membacanya; `cp hanoman.db`
+  menghasilkan salinan yang **diam-diam** tertinggal beberapa transaksi.
+
   Restore: buat `$HANOMAN_HOME` mode `0700` milik user service, kembalikan kedua artefak di atas,
   lalu jalankan `hanoman doctor` — ia mencetak setiap path data efektif beserta izin tulisnya.
   Backup tanpa `secret.key` tidak dapat membuka RuntimeConfig/webhook secret. Backup harus
