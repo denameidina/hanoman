@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { basename } from "node:path";
-import { spawn } from "node:child_process";
+import { basename, resolve } from "node:path";
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { listRemotes, addRemote, setRemoteUrl, removeRemote, prUrl } from "../services/git-remotes";
 import { downloadFormat, sendDocDownload, sendReviewDownload } from "../services/doc-export";
@@ -11,6 +12,10 @@ import { conflictSessionDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { mergeIntoCurrent, rebaseOntoCurrent, pullIntoCurrent, dropCommit, sourceBranch, type GraphMergeResult } from "../services/integrate";
 import { listUnusedBranches, deleteBranches, type BranchScope } from "../services/branch-cleanup";
+import { listWorktrees, worktreeStats, deleteWorktrees, type WorktreeInputs } from "../services/worktree-list";
+import { closeSession } from "../services/session-close";
+import { releaseWorktree } from "../services/worktree-reaper";
+import { sessionIdForSpec } from "../services/session-id";
 import {
   listRepoTree, readRepoFile, writeRepoFile, listGraph, commitDetail, commitFileDiff, compareCommits, compareFile,
   searchCommits, runGitOp, validateGitOp, touchesTree, repoStatus, listStashes,
@@ -48,6 +53,21 @@ async function lockInputs(id: string) {
     sessionBranches: new Set(sessions),
   };
 }
+
+// SPEC-861 · ADR-0132 · sinyal NON-git sebuah worktree, dikumpulkan di route dengan alasan yang
+// sama dengan `lockInputs` di atas: service-nya murni. Kunci `specs` adalah id sesi yang
+// deterministik dari id spec (ADR-0015) — sama dengan `basename` worktree-nya.
+async function worktreeInputs(id: string): Promise<WorktreeInputs> {
+  const specs = await prisma.spec.findMany({ where: { projectId: id }, select: { id: true, stage: true } });
+  return {
+    specs: new Map(specs.map((s) => [sessionIdForSpec(s.id), { id: s.id, stage: s.stage }])),
+    sessions: new Map(listSessions()
+      .filter((s) => s.projectId === id && !s.exited)
+      .map((s) => [resolve(s.cwd), { id: s.id, specId: s.specId ?? null }])),
+  };
+}
+
+const execAsync = promisify(execFile);
 
 // ADR-0121 · terjemahan seragam error service berkas → kode HTTP. Apa pun yang tak dikenal
 // jatuh ke 400: seluruh sisanya adalah penolakan penjaga path, dan itu salah peminta.
@@ -470,6 +490,62 @@ export default async function (app: FastifyInstance) {
       scope: (b.scope as BranchScope | undefined) ?? "both",
       base: typeof b.base === "string" && b.base ? b.base : undefined,
       ...(await lockInputs(id)),
+    });
+  });
+
+  // SPEC-861 · ADR-0132 · worktree yang masih HIDUP. Read murni turunan git (ADR-0018) — tak
+  // digerbang sesi aktif, cermin /branches/unused. Entri `.trash/**` tak muncul di sini: itu
+  // wilayah reaper, dan permukaannya `GET /terminal/cleanups`.
+  app.get("/projects/:id/worktrees", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const repoDir = await repoOf(id);
+    if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
+    return listWorktrees(repoDir, await worktreeInputs(id));
+  });
+
+  // SPEC-861 · sinyal MAHAL per baris (ukuran disk, isi kotor, commit yatim) — sengaja terpisah
+  // supaya daftar tak menunggu `du`. `name` divalidasi terhadap daftar TURUNAN: klien tak pernah
+  // mengirim path, jadi tak ada permukaan traversal di sini.
+  app.get("/projects/:id/worktrees/stats", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const repoDir = await repoOf(id);
+    if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
+    if (!repoDir) return reply.code(400).send({ error: "project tidak punya repoDir" });
+    const { name } = req.query as { name?: string };
+    const report = await listWorktrees(repoDir, await worktreeInputs(id));
+    const w = report.worktrees.find((x) => x.name === name);
+    if (!w) return reply.code(404).send({ error: "not found" });
+    return worktreeStats(report.repoDir, w);
+  });
+
+  // SPEC-861 · ADR-0132 · hapus batch. Operasi destruktif; diperlakukan seperti /branches/delete —
+  // selalu 200 bila body sah, kegagalan hidup di baris `results`. Penghapusan byte-nya TIDAK
+  // terjadi di sini: worktree cuma di-`rename` ke `.trash` (SPEC-742) supaya event loop yang
+  // melayani terminal PTY tak terblokir.
+  app.post("/projects/:id/worktrees/delete", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const repoDir = await repoOf(id);
+    if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
+    if (!repoDir) return reply.code(400).send({ error: "project tidak punya repoDir" });
+    const b = req.body as { names?: unknown; deleteBranch?: unknown };
+    if (!Array.isArray(b?.names) || b.names.some((n) => typeof n !== "string" || !n))
+      return reply.code(400).send({ error: "names wajib berisi nama worktree" });
+    const locks = await lockInputs(id);
+    return deleteWorktrees(repoDir, b.names as string[], {
+      withBranch: b.deleteBranch === true,
+      ...(await worktreeInputs(id)),
+      closeSession,
+      release: (repo, path) => releaseWorktree(repo, path, id),
+      prune: async (repo) => {
+        // Gagal-diam: registrasi basi bukan alasan menahan penghapusan (cermin prodReaperDeps).
+        try { await execAsync("git", ["worktree", "prune"], { cwd: repo, timeout: 30_000 }); } catch { /* */ }
+      },
+      // Pagar kunci ADR-0077 ikut apa adanya — satu-satunya jalur hapus branch di codebase.
+      deleteBranch: async (repo, name) => {
+        const r = await deleteBranches(repo, [name], { scope: "both", ...locks });
+        const first = r.results[0];
+        return { ok: !!first?.ok, ...(first?.error ? { error: first.error } : {}) };
+      },
     });
   });
 }

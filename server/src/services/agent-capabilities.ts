@@ -11,6 +11,9 @@ const IDE_SUBS = new Set([
   // POST/PATCH/DELETE menuntut ide:write — capability yang sudah memberi hak menimpa isi
   // berkas apa pun lewat PUT /file (hindari kelas bug SPEC-405: prefix tanpa lihat method).
   "entry", "upload",
+  // SPEC-861 · ADR-0132 · daftar & hapus worktree hidup. `rw()` menurunkan read/write DARI METHOD,
+  // jadi POST /worktrees/delete menuntut ide:write (hindari kelas bug SPEC-405).
+  "worktrees",
 ]);
 
 export function capabilityForRoute(method: string, path: string): Resolved {

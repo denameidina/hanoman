@@ -9,6 +9,11 @@ export const paths = {
   branchesUnused: (id: string, base?: string) =>
     `${API}/projects/${id}/branches/unused${base ? `?base=${encodeURIComponent(base)}` : ""}`,
   branchesDelete: (id: string) => `${API}/projects/${id}/branches/delete`,
+  // SPEC-861 · ADR-0132 · worktree HIDUP (nilai turunan git) + sinyal mahal per baris + hapus batch.
+  worktrees: (id: string) => `${API}/projects/${id}/worktrees`,
+  worktreeStats: (id: string, name: string) =>
+    `${API}/projects/${id}/worktrees/stats?name=${encodeURIComponent(name)}`,
+  worktreesDelete: (id: string) => `${API}/projects/${id}/worktrees/delete`,
   // SPEC-217 · path per-mesin (LocalBinding, tak disync) + clone dari gitRemote
   binding: (id: string) => `${API}/projects/${id}/binding`,
   clone: (id: string) => `${API}/projects/${id}/clone`,

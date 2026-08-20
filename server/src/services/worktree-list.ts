@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
-import type { WorktreeReport, WorktreeStats, WorktreeView } from "@hanoman/shared";
+import type { WorktreeDeleteResult, WorktreeReport, WorktreeStats, WorktreeView } from "@hanoman/shared";
 import { ownsWorktree } from "./session-worktree";
 
 // SPEC-861 · ADR-0132 · penemuan worktree yang masih HIDUP di sebuah project — pasangan
@@ -156,4 +156,65 @@ async function orphanCount(repoDir: string, w: WorktreeView): Promise<number> {
   else args.push("--branches", "--remotes", "--tags");
   const n = Number.parseInt((await out(repoDir, args)).trim(), 10);
   return Number.isFinite(n) ? n : 0;
+}
+
+// SPEC-861 · ADR-0132 · orkestrasi penghapusan. Deps disuntik supaya modul ini tetap murni: tutup
+// sesi (tmux+DB), lepas worktree (fs), prune (git), hapus branch (branch-cleanup) semuanya dirakit
+// di routes/ide.ts, yang memang sudah boleh menyentuh DB & tmux — cermin `lockInputs()` di sana.
+export type WorktreeDeleteDeps = {
+  /** `services/session-close.ts` — SATU definisi penutupan sesi. */
+  closeSession: (sessionId: string) => Promise<{ cleanup: string | null } | null>;
+  /** `worktree-reaper.releaseWorktree` — `rename` ke `.trash`, byte-nya milik penyapu (SPEC-742). */
+  release: (repoDir: string, path: string) => string | null;
+  prune: (repoDir: string) => Promise<void>;
+  /** `branch-cleanup.deleteBranches` BESERTA pagar kuncinya — jangan tulis jalur kedua. */
+  deleteBranch: (repoDir: string, name: string) => Promise<{ ok: boolean; error?: string }>;
+};
+
+export async function deleteWorktrees(
+  repoDir: string,
+  names: string[],
+  // `withBranch`, bukan `deleteBranch`: nama itu sudah dipakai DEP-nya di bawah, dan bentuk wire
+  // (`{ names, deleteBranch }`) memang berbeda dari bentuk internal.
+  opts: { withBranch?: boolean } & WorktreeInputs & WorktreeDeleteDeps,
+): Promise<{ results: WorktreeDeleteResult[] }> {
+  // Turunkan ulang daftarnya SENDIRI lalu validasi tiap nama terhadap daftar itu: klien tak pernah
+  // mengirim path, dan gerbang `deletable` ditegakkan di jalur TULIS — bukan sekadar petunjuk UI
+  // (cermin pagar per-branch ADR-0077).
+  const report = await listWorktrees(repoDir, opts);
+  const byName = new Map(report.worktrees.map((w) => [w.name, w]));
+  const results: WorktreeDeleteResult[] = [];
+  for (const name of names) {
+    const w = byName.get(name);
+    if (!w) { results.push({ name, ok: false, cleanup: null, error: "worktree tak ditemukan" }); continue; }
+    if (!w.deletable) {
+      results.push({ name, ok: false, cleanup: null, error: `tak bisa dihapus: ${w.blocked}` });
+      continue;
+    }
+    const row: WorktreeDeleteResult = { name, ok: true, cleanup: null };
+    try {
+      // Sesi hidup ditutup lewat jalur penutupan sesi yang SUDAH ADA — bukan mencabut direktori
+      // dari bawah proses yang masih jalan. Jalur itu juga yang memajukan stage & mencatat headSha
+      // selagi worktree-nya masih di tempatnya, lalu melepasnya sendiri.
+      if (w.session) {
+        const closed = await opts.closeSession(w.session.id);
+        row.closedSession = w.session.id;
+        row.cleanup = closed?.cleanup ?? null;
+      }
+      if (!row.cleanup) row.cleanup = opts.release(report.repoDir, w.path);
+      // Registrasi harus lenyap SEKARANG: bersamanya lepas pula kunci `BranchLock: "worktree"`
+      // di tab Branches — itulah yang membuka kebuntuan yang jadi alasan SPEC-861 ada. Ia juga
+      // satu-satunya yang membereskan baris `prunable` (registrasi tanpa direktori).
+      await opts.prune(report.repoDir);
+      if (opts.withBranch && w.branch) {
+        const b = await opts.deleteBranch(report.repoDir, w.branch);
+        row.branch = { name: w.branch, ok: b.ok, ...(b.error ? { error: b.error } : {}) };
+      }
+    } catch (e) {
+      row.ok = false;
+      row.error = (e as Error).message;
+    }
+    results.push(row);
+  }
+  return { results };
 }
