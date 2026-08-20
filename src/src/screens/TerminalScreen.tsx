@@ -50,6 +50,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
   const [fontSize, setFontSize] = usePersistedState(
     "terminal", "fontSize", coarse ? FONT_DEFAULT_MOBILE : FONT_DEFAULT, isNum);
   const [keysOpen, setKeysOpen] = usePersistedState("terminal", "keys", coarse, isBool);
+  // SPEC-856 · echo prediktif lokal. State TAMPILAN per browser seperti ukuran font & papan
+  // tombol (SPEC-740 · ADR-0115), bukan payload workspace kanonik per-user (ADR-0118) — dan
+  // sekaligus alat ukur sebelum/sesudah: satu build, satu variabel.
+  const [predict, setPredict] = usePersistedState("terminal", "predict", true, isBool);
   const bumpFont = (delta: number) => setFontSize((n) => clampFontSize(n + delta));
   const [maxed, setMaxed] = React.useState(false);
   // SPEC-232 · id sesi yang sedang dilihat layar-penuh (satu terminal, sebagai modal).
@@ -282,6 +286,14 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
         <Button size="sm" variant="secondary" aria-pressed={keysOpen}
           onClick={() => setKeysOpen((on) => !on)}>{keysOpen ? "Sembunyikan" : "Tampilkan"}</Button>
       </div>
+      <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+          Ketik responsif (huruf tampil sebelum echo server)
+        </span>
+        <Button size="sm" variant="secondary" aria-pressed={predict}
+          aria-label={`${predict ? "Matikan" : "Nyalakan"} ketik responsif`}
+          onClick={() => setPredict((on) => !on)}>{predict ? "Matikan" : "Nyalakan"}</Button>
+      </div>
       {mobile && (
         <Select size="sm" aria-label="Project sesi baru" value={project}
           onChange={(e) => setProject(e.target.value)}
@@ -464,7 +476,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
                           canArrange={workspaceWritable} onDetach={() => detach(s.id)} onExit={(code) => markExited(s.id, code)} onReview={onOpenReview}
                           onSessionReview={onOpenSessionReview}
                           titleOf={titleOf} onIntegrate={onIntegrate} onIntegrateSession={onIntegrateSession} specOf={specOf}
-                          fontSize={fontSize} showKeys={keysOpen}
+                          fontSize={fontSize} showKeys={keysOpen} predict={predict}
                           fullscreen={fullId === s.id} onFullscreen={() => setFullId(s.id)} />
                       : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
                   </div>
@@ -493,7 +505,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
       {fullId && byId(fullId) && (
         <FullscreenTerminal session={byId(fullId)!}
           label={cellLabel(byId(fullId)!, nameOf, titleOf)}
-          fontSize={fontSize} showKeys={keysOpen}
+          fontSize={fontSize} showKeys={keysOpen} predict={predict}
           onClose={() => setFullId(null)} />
       )}
     </div>
@@ -725,7 +737,7 @@ export function PhaseStrip({ phases }: { phases: Phase[] | null }) {
   );
 }
 
-function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, fullscreen, onFullscreen }: {
+function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, fullscreen, onFullscreen }: {
   session: TerminalSession; nameOf: (pid: string) => string;
   onClose: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
   onReview?: (specId: string) => void;
@@ -734,7 +746,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
   onIntegrate?: (spec: Spec, op: "merge" | "rebase", target: string) => void;
   onIntegrateSession?: (session: TerminalSession, op: "merge" | "rebase", target: string) => void;
   specOf?: (specId: string) => Spec | undefined;
-  fontSize: number; showKeys: boolean;
+  fontSize: number; showKeys: boolean; predict: boolean;
   fullscreen: boolean; onFullscreen: () => void;
 }) {
   const [phases, setPhases] = React.useState<Phase[] | null>(null);
@@ -918,7 +930,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
                 Terbuka di layar penuh
               </div>
             : <TerminalPane key={session.id} sessionId={session.id} onExit={onExit} onPhases={onPhases}
-                fontSize={fontSize} showKeys={showKeys} />}
+                fontSize={fontSize} showKeys={showKeys} predict={predict} />}
         </div>
       </div>
       {docs && session.specId && <SpecDocsModal specId={session.specId} onClose={() => setDocs(false)} />}
@@ -941,15 +953,16 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
 // menampilkan placeholder (lihat Cell) supaya tmux tetap satu attach. closeOnEscape=false:
 // Escape tombol tersibuk TUI Claude Code — keluar via × / backdrop saja (sejalan maximize-grid,
 // SPEC-163). Menutup modal memasang ulang pane di sel (reconnect murah; scrollback dari tmux).
-function FullscreenTerminal({ session, label, fontSize, showKeys, onClose }: {
-  session: TerminalSession; label: string; fontSize: number; showKeys: boolean; onClose: () => void;
+function FullscreenTerminal({ session, label, fontSize, showKeys, predict, onClose }: {
+  session: TerminalSession; label: string; fontSize: number; showKeys: boolean; predict: boolean;
+  onClose: () => void;
 }) {
   return (
     <Modal open icon="terminal" title={label} onClose={onClose} closeOnEscape={false} width={1600}>
       <div style={{ height: "min(72vh, calc(100dvh - 180px))", minHeight: 0, display: "flex", flexDirection: "column",
         opacity: session.exited ? 0.6 : 1 }}>
         <TerminalPane key={session.id} sessionId={session.id} onExit={() => {}}
-          fontSize={fontSize} showKeys={showKeys} />
+          fontSize={fontSize} showKeys={showKeys} predict={predict} />
       </div>
     </Modal>
   );

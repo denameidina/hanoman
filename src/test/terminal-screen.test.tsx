@@ -992,6 +992,24 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     }
   });
 
+  it("SPEC-856 · sakelar echo prediktif hidup secara default dan tersimpan", async () => {
+    mockViewport(390);
+    listTerminals.mockResolvedValue([]);
+    const view = render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /Sesi baru/ });
+    fireEvent.click(screen.getByRole("button", { name: "Aksi terminal lain" }));
+    const toggle = screen.getByRole("button", { name: "Matikan ketik responsif" });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(toggle);
+    expect(localStorage.getItem("hn.ui.v1.terminal.predict")).toBe("false");
+    view.unmount();
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /Sesi baru/ });
+    fireEvent.click(screen.getByRole("button", { name: "Aksi terminal lain" }));
+    expect(screen.getByRole("button", { name: "Nyalakan ketik responsif" }))
+      .toHaveAttribute("aria-pressed", "false");
+  });
+
   it("menyimpan ukuran font terminal lintas render", async () => {
     mockViewport(390);
     listTerminals.mockResolvedValue([]);
