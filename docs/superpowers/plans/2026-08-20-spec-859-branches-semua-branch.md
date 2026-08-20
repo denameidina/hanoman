@@ -991,7 +991,7 @@ git commit -m "docs(branches): amandemen ADR-0077 untuk daftar branch penuh + ge
 
 **Files:** tak ada perubahan berkas; hanya verifikasi.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 Run:
 ```bash
@@ -1001,12 +1001,12 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS semua; jumlah test berjalan **> 0** (jangan terima "no test files" sebagai bukti).
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./server typecheck && pnpm --filter ./src typecheck && pnpm --filter ./shared typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint)**
+- [x] **Step 3: Smoke endpoint nyata (task ini menyentuh endpoint)**
 
 Boot server lalu curl kedua endpoint terhadap project yang punya `repoDir`:
 ```bash
@@ -1018,7 +1018,7 @@ curl -s -X POST "http://127.0.0.1:<port>/api/projects/<id>/branches/delete" \
 Expected: daftar `include=all` **lebih panjang atau sama** dengan daftar default; tiap baris punya
 `merged`; body cacat → `400`.
 
-- [ ] **Step 4: Commit sisa & push**
+- [x] **Step 4: Commit sisa & push**
 
 ```bash
 git status --porcelain      # harus bersih setelah semua commit
