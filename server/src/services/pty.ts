@@ -119,6 +119,48 @@ const goalStatePath = (id: string): string => `${tmpdir()}/hanoman-goal-gates/${
 // cwd: cwd bisa homedir (sesi VPS) yang tak boleh dikotori, dan worktree bisa lenyap.
 export const agentsFilePath = (id: string): string => `${tmpdir()}/hanoman-agents/${id}.json`;
 
+// SPEC-862 · skrip askpass milik hanoman. Sekamar dengan berkas prompt (SPEC-223) dan sengaja
+// TIDAK ber-id sesi: isinya sama untuk semua sesi dan tak memuat apa pun yang khas satu sesi.
+export const askpassDenyPath = (): string => `${tmpdir()}/hanoman-askpass/deny.sh`;
+
+// Tak sebaris pun boleh ke stdout: apa pun yang dicetak di sana dibaca ssh SEBAGAI passphrase.
+const ASKPASS_DENY = `#!/bin/sh
+echo "hanoman: tak ada manusia di pane ini — permintaan ketikan ditolak: $1" >&2
+echo "hanoman: buka kuncinya di luar sesi (mis. ssh-add ~/.ssh/id_rsa), lalu ulangi." >&2
+exit 1
+`;
+
+/**
+ * SPEC-862 · pane sesi agen tak punya manusia, tapi `ssh` tak tahu itu: `read_passphrase()`
+ * membuka **`/dev/tty` langsung**, bukan stdin, jadi ia merebut tty dari widget Ink milik agen
+ * yang sedang memegangnya dalam raw mode (SPEC-452). Keduanya lalu menjadi pembaca atas satu tty.
+ * Terukur di tmux nyata: urutan escape panah operator tak pernah sampai utuh — pembelahannya tak
+ * deterministik, dan salah satu bentuknya membuat `Enter` mengirim pilihan **pertama** ke agen
+ * sebagai jawaban yang tak dipilih siapa pun. Redraw TUI lalu menghapus prompt ssh dari layar,
+ * jadi sesi macet dengan tampilan yang terlihat sehat.
+ *
+ * Penalarannya dipakai ulang dari `vps-ssh.ts` (SPEC-165): tanpa password, ssh tak boleh punya
+ * prompt sama sekali. Bedanya di sini hanoman tak memanggil ssh sendiri — yang memanggilnya agen,
+ * lewat `git`, dengan argv yang bukan milik kita. Maka gerbangnya di env sesi, satu-satunya kanal
+ * yang kita pegang; `BatchMode` gugur karena ia hanya ada sebagai opsi `-o`/config.
+ * `SSH_ASKPASS_REQUIRE=force` membuat askpass dipakai untuk SELURUH input passphrase tanpa peduli
+ * `DISPLAY`, dan ssh **tidak** jatuh balik ke tty saat askpass gagal.
+ *
+ * `GIT_TERMINAL_PROMPT=0` menyertainya karena menyetel `SSH_ASKPASS` saja justru setengah jalan:
+ * git mencari askpass `GIT_ASKPASS` → `core.askPass` → **`SSH_ASKPASS`**, lalu tetap bertanya di
+ * terminal bila semuanya gagal — pesan kita, lalu menggantung sama saja.
+ *
+ * Di dalam sandbox ADR-0117 berkas ini tak ter-mount, jadi `exec` askpass gagal — dan itu tetap
+ * menghasilkan `Permission denied` seketika tanpa menyentuh tty (terverifikasi). Yang hilang di
+ * sana hanya pesannya, bukan perlindungannya.
+ */
+export function noTtyPromptEnv(): Record<string, string> {
+  const path = askpassDenyPath();
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  writeFileSync(path, ASKPASS_DENY, { mode: 0o700 });
+  return { SSH_ASKPASS: path, SSH_ASKPASS_REQUIRE: "force", GIT_TERMINAL_PROMPT: "0" };
+}
+
 // SPEC-402 · "tmux gagal" BUKAN "tak ada sesi". Hanya dua sinyal di bawah yang benar-benar berarti
 // belum/tak ada tmux server di socket ini; sisanya (fork gagal saat mesin penuh proses, socket knob
 // salah, server kedip) adalah keadaan TAK DIKETAHUI. Membacanya sebagai daftar kosong sama dengan
@@ -396,6 +438,12 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // dan codex tak punya gerbang root ini. Dipasang sebelum env pemanggil supaya tetap bisa ditimpa.
   if (!opts.command && agent === "claude") {
     for (const [k, v] of Object.entries(rootBypassEnv())) envPairs.push(`${k}=${sq(v)}`);
+  }
+  // SPEC-862 · kedua agen, karena pembedanya bukan mesin sesinya melainkan siapa yang memegang tty.
+  // Console VPS (ADR-0042) & terminal biasa (SPEC-236) sengaja di luar: di sana manusia MEMANG
+  // mengetik, dan memaksa ssh gagal akan mematikan fiturnya.
+  if (!opts.command) {
+    for (const [k, v] of Object.entries(noTtyPromptEnv())) envPairs.push(`${k}=${sq(v)}`);
   }
   if (opts.phaseFile) {
     mkdirSync(dirname(opts.phaseFile), { recursive: true });
