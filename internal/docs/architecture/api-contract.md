@@ -727,7 +727,8 @@ POST     /update/apply                  # { confirm?: boolean } — SPEC-405 · 
 #   409 { error:"confirm-required", liveSessions, from, to }  — dry-run; sesi hidup dihitung SAAT ITU, tak memblokir
 #   202 { accepted:true, from, to, liveSessions }             — lalu proses keluar
 #   agent token DITOLAK (403): prefix status hanya GLOBAL_READ untuk method baca
-GET      /fs/browse?path=               # directory picker sisi server (untuk memilih repoDir project)
+GET      /fs/browse?path=               # directory picker sisi server; menopang `FolderPicker` di modal
+#   Project baru (repoDir/folder clone) DAN modal Edit project (path per-mesin, SPEC-858)
 GET      /health                        # publik; liveness
 ```
 

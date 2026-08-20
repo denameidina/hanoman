@@ -900,6 +900,28 @@ editorial.
 salinan itu memang yang diperbaiki spec ini — tiga test pecah karenanya. Peganglah nama
 aksesibilitasnya (`getByLabelText`), bukan placeholder-nya.
 
+## Path project dipilih, bukan diketik (SPEC-217/218 · SPEC-858)
+
+Browser tak bisa memulangkan path absolut dari `<input type="file" webkitdirectory>`, jadi
+setiap field path project memakai `FolderPicker` (`App.tsx`) — modal yang menelusuri
+filesystem **mesin server** lewat `GET /fs/browse` dan memulangkan path absolut. Ia dipakai
+tiga call site dengan bentuk yang sama — `Field` membungkus satu baris flex berisi `Input`
+(`flex:1`, `minWidth:0` supaya baris tak melar di viewport sempit) + `Button size="sm"
+variant="secondary" leftIcon="folder-open"` berbunyi "Pilih folder":
+
+- **Project baru → from scratch**: Direktori tempat repo baru di-init.
+- **Project baru → existing**: Direktori checkout lokal, atau folder tujuan clone.
+- **Edit project → "Path (mesin ini)"** (SPEC-858): override per-mesin `LocalBinding`.
+
+Dua invariant. **`start={f.dir}`** — picker mulai dari nilai yang sedang ada di field, bukan
+dari `homedir()`; tanpa itu mengoreksi satu path berarti menelusuri ulang dari akar tiap kali.
+Dan **input teksnya tetap bisa diketik** sebagai fallback: picker hanya menulis `f.dir`, ia
+bukan satu-satunya jalan masuk — path di mesin lain (atau yang belum ada) hanya bisa diketik.
+
+Jalur simpannya tak berubah: Edit project tetap lewat `updateProject()` yang memisahkan
+`name`/`desc`/`gitRemote` (`PATCH /projects/:id`, disync) dari `dir` (`PUT`/`DELETE
+/projects/:id/binding`, **tak disync** — lihat [api-contract](../architecture/api-contract.md)).
+
 ## Notifikasi backlog selesai (SPEC-180)
 Awareness saat backlog mencapai `done`: toast, daftar (lonceng), dan sound. Semua sisi klien
 bersandar pada notifikasi yang **dibuat server-side** (`GET /notifications`) — lihat

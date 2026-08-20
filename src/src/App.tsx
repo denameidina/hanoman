@@ -635,6 +635,7 @@ export function EditProjectModal({ open, project, onClose, onSave }:
   // SPEC-218 · `gitRemote` = remote resmi (disync) agar device lain bisa clone.
   // SPEC-255 · `id` = slug renameable; ganti berdampak Help Center & sync ke server.
   const [f, setF] = React.useState({ id: "", name: "", desc: "", dir: "", gitRemote: "" });
+  const [picker, setPicker] = React.useState(false);
   React.useEffect(() => {
     if (open && project) setF({ id: project.id, name: project.name, desc: project.desc, dir: project.binding ?? "", gitRemote: project.gitRemote ?? "" });
   }, [open, project]);
@@ -660,10 +661,16 @@ export function EditProjectModal({ open, project, onClose, onSave }:
         <Input value={f.desc} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, desc: e.target.value }))}
           placeholder="mis. ERP manufaktur + inventori" style={{ width: "100%" }} />
       </Field>
+      {/* SPEC-858 · picker folder yang sama dengan modal Project baru; ketik manual tetap jalan. */}
       <Field label="Path (mesin ini)" hint="opsional · disimpan lokal, tak disync · kosongkan = pakai default">
-        <Input value={f.dir} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, dir: e.target.value }))}
-          leftIcon="folder" mono placeholder="/path/ke/repo (mesin ini)" style={{ width: "100%" }} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <Input value={f.dir} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, dir: e.target.value }))}
+            leftIcon="folder" mono placeholder="/path/ke/repo (mesin ini)" style={{ flex: 1, minWidth: 0 }} />
+          <Button size="sm" variant="secondary" leftIcon="folder-open" onClick={() => setPicker(true)}>Pilih folder</Button>
+        </div>
       </Field>
+      <FolderPicker open={picker} onClose={() => setPicker(false)}
+        start={f.dir} onPick={(p) => setF((s) => ({ ...s, dir: p }))} />
       {/* SPEC-218 · remote resmi (disync) — device lain bisa clone project ini. */}
       <Field label="Git remote" hint="opsional · remote resmi agar device lain bisa clone project ini · disync antar-device">
         <Input value={f.gitRemote} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, gitRemote: e.target.value }))}
