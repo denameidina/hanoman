@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applySeq, canPredict, classifyInput, echoedPrefixLen, initialState, looksLikePasswordPrompt,
-  COALESCE_IN_MS, createInputBatcher, onInput, onReattach, onServerData, onTick, reapply,
-  rollbackSeq, scanAltScreen,
+  COALESCE_IN_MS, createInputBatcher, onInput, onPaneAltScreen, onReattach, onServerData, onTick,
+  reapply, rollbackSeq,
   SUSPEND_MS, TTL_MS, type PredictState, type View,
 } from "../src/screens/terminal-predict";
 
@@ -48,28 +48,39 @@ const view = (over: Partial<View> = {}): View =>
   ({ cursorX: 4, cols: 100, line: "❯ h", connected: true, ...over });
 const state = (over: Partial<PredictState> = {}): PredictState => ({ ...initialState(), ...over });
 
-describe("scanAltScreen", () => {
-  it("menyala pada ?1049h dan padam pada ?1049l", () => {
-    expect(scanAltScreen("\x1b[?1049h", false)).toBe(true);
-    expect(scanAltScreen("\x1b[?1049l", true)).toBe(false);
+// SPEC-863 · aliran byte klien tmux BUKAN sumber kebenaran soal keadaan pane. Terukur pada tmux
+// 3.4, 3.5a, dan 3.7b: `?1049h` milik handshake attach tmux sendiri (`smcup` terminfo) datang
+// sebagai byte pertama dan pasangan `l`-nya baru dikirim saat DETACH, sementara `?1049h/l` milik
+// program di DALAM pane tak pernah diteruskan sama sekali. Memindainya karena itu hanya bisa
+// salah-positif, tak pernah benar-positif.
+const TMUX_ATTACH_HANDSHAKE =
+  "\x1b[?1049h\x1b[22;0;0t\x1b[?1h\x1b=\x1b[H\x1b[2J\x1b[?12l\x1b[?25h" +
+  "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?1005l\x1b[?2004h";
+
+describe("keadaan alternate screen", () => {
+  it("TIDAK menyala oleh handshake attach tmux nyata", () => {
+    expect(onServerData(initialState(), TMUX_ATTACH_HANDSHAKE, 0).state.altScreen).toBe(false);
   });
-  it("menghormati ?1047h/l juga", () => {
-    expect(scanAltScreen("\x1b[?1047h", false)).toBe(true);
-    expect(scanAltScreen("\x1b[?1047l", true)).toBe(false);
+  it("TIDAK memindai mode DEC dari aliran sama sekali", () => {
+    for (const seq of ["\x1b[?1049h", "\x1b[?1047h", "\x1b[?47h", "\x1b[?2004h"]) {
+      expect(onServerData(initialState(), seq, 0).state.altScreen).toBe(false);
+    }
   });
-  // Terukur di probe SPEC-856: `?47h` DAN `?2004h` sama-sama lahir dari handshake attach tmux —
-  // muncul 1x pada `bash --noprofile --norc` polos, bukan hanya pada TUI agen. Mempercayainya
-  // berarti prediksi mati selamanya di setiap attach.
-  it("MENGABAIKAN ?47h dan ?2004h — keduanya milik handshake attach tmux", () => {
-    expect(scanAltScreen("\x1b[?47h", false)).toBe(false);
-    expect(scanAltScreen("\x1b[?2004h", false)).toBe(false);
+  it("menyala dan padam hanya lewat sinyal pane dari server", () => {
+    const on = onPaneAltScreen(initialState(), true);
+    expect(on.altScreen).toBe(true);
+    expect(onPaneAltScreen(on, false).altScreen).toBe(false);
   });
-  it("memakai kejadian terakhir dalam satu frame", () => {
-    expect(scanAltScreen("\x1b[?1049h isi \x1b[?1049l", false)).toBe(false);
+  it("tak membiarkan aliran mematikan sinyal pane yang sedang menyala", () => {
+    const on = onPaneAltScreen(initialState(), true);
+    expect(onServerData(on, "\x1b[?1049l teks", 0).state.altScreen).toBe(true);
   });
-  it("mempertahankan keadaan saat frame tak menyebut mode apa pun", () => {
-    expect(scanAltScreen("teks biasa", true)).toBe(true);
-    expect(scanAltScreen("teks biasa", false)).toBe(false);
+  // `pending` sengaja tidak disentuh: rollback tetap milik dua jalur yang sudah ada (byte server
+  // berikutnya, atau TTL). Mengosongkannya di sini akan meninggalkan glyph yatim di layar.
+  it("tak menyentuh prediksi yang sedang menunggu", () => {
+    const s = onPaneAltScreen(state({ pending: "ab", since: 1_000 }), true);
+    expect(s.pending).toBe("ab");
+    expect(s.since).toBe(1_000);
   });
 });
 
@@ -174,9 +185,6 @@ describe("onServerData", () => {
     const r = onServerData(initialState(), "DATA", 0);
     expect(r.write).toBe("DATA");
     expect(r.tail).toBe("");
-  });
-  it("memperbarui alt-screen dari aliran yang sama", () => {
-    expect(onServerData(initialState(), "\x1b[?1049h", 0).state.altScreen).toBe(true);
   });
   // Frame nyata SPEC-856: satu keystroke di TUI claude membalas repaint layar penuh ber-posisi
   // absolut. Prediksi tetap harus dilepas lebih dulu, dan byte server lewat tanpa disunat.

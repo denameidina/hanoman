@@ -151,7 +151,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         };
         socket.onmessage = (ev) => {
           const f = JSON.parse(ev.data as string) as {
-            t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
+            t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean; on?: boolean;
           };
           if (f.t === "data") {
             const r = P.onServerData(pred, f.d ?? "", Date.now());
@@ -172,6 +172,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
           // SPEC-433 · sejak sekarang juga saat `complete` berubah tanpa daftar fase berubah —
           // kotak `- [ ]` terakhir di plan dicentang sesudah `Execute done`.
           else if (f.t === "phase") phaseRef.current?.(f.phases ?? [], f.complete === true);
+          // SPEC-863 · alternate screen PANE. Ia tak bisa dibaca dari aliran: tmux tak pernah
+          // meneruskan `?1049h/l` milik program di dalam pane, dan `?1049h` yang memang sampai
+          // adalah milik klien tmux sendiri — menyala di byte pertama, tak pernah padam.
+          else if (f.t === "alt") pred = P.onPaneAltScreen(pred, f.on === true);
           else if (f.t === "exit") {
             finished = true;
             term.write(`\r\n\x1b[33m— sesi berakhir (exit ${f.code}) —\x1b[0m\r\n`);

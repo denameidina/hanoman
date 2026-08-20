@@ -37,6 +37,7 @@ export type PredictState = {
   pending: string;
   /** stempel prediksi terlama yang masih menunggu, untuk TTL */
   since: number | null;
+  /** SPEC-863 · keadaan alternate screen PANE, dipasok server lewat frame `alt`. */
   altScreen: boolean;
   /** prediksi mati sampai stempel ini (0 = tidak disuspend) */
   suspendedUntil: number;
@@ -51,21 +52,16 @@ export function initialState(): PredictState {
   return { pending: "", since: null, altScreen: false, suspendedUntil: 0 };
 }
 
-// SPEC-856 · HANYA ?1049 dan ?1047. `?47h`/`?2004h` terukur ikut lahir dari handshake attach tmux
-// pada `bash` polos — bukan penanda TUI apa pun.
-const ALT_ON = /\x1b\[\?(?:1049|1047)h/g;
-const ALT_OFF = /\x1b\[\?(?:1049|1047)l/g;
-
-export function scanAltScreen(data: string, alt: boolean): boolean {
-  const last = (re: RegExp): number => {
-    let at = -1;
-    for (const m of data.matchAll(re)) at = m.index ?? at;
-    return at;
-  };
-  const on = last(ALT_ON);
-  const off = last(ALT_OFF);
-  if (on < 0 && off < 0) return alt;
-  return on > off;
+/** SPEC-863 · satu-satunya jalan masuk keadaan alternate screen: frame `alt` dari server, yang
+ *  membacanya dari `#{alternate_on}` milik tmux. Aliran byte tak pernah dipindai lagi — tmux
+ *  mengemulasi terminal pane, jadi `\x1b[?1049h/l` milik program di dalamnya tak pernah sampai ke
+ *  klien, sementara yang sampai (`smcup` klien tmux) menyala di byte pertama dan tak pernah padam.
+ *  Memindainya karena itu hanya bisa salah-positif — terukur mematikan prediksi total, ADR-0133.
+ *
+ *  `pending` sengaja tak disentuh: rollback tetap milik dua jalur yang sudah ada (byte server
+ *  berikutnya, atau TTL), dan mengosongkannya di sini akan meninggalkan glyph tanpa pemilik. */
+export function onPaneAltScreen(state: PredictState, on: boolean): PredictState {
+  return { ...state, altScreen: on };
 }
 
 const PASSWORD = /(password|passphrase|pass|pin)\s*(?:for\s+\S+\s*)?:\s*$/i;
@@ -111,9 +107,8 @@ export function onInput(
 export function onServerData(
   state: PredictState, data: string, _now: number,
 ): { state: PredictState; write: string; tail: string } {
-  const altScreen = scanAltScreen(data, state.altScreen);
   return {
-    state: { ...state, pending: "", since: null, altScreen },
+    state: { ...state, pending: "", since: null },
     write: rollbackSeq(state.pending.length) + data,
     tail: state.pending,
   };
@@ -148,7 +143,9 @@ export function onTick(
   };
 }
 
-/** tmux memutar ulang layar penuh saat attach — tak ada yang boleh diwarisi lintas sambungan. */
+/** tmux memutar ulang layar penuh saat attach — tak ada yang boleh diwarisi lintas sambungan.
+ *  `altScreen` ikut kembali ke `false` dan itu aman: server mengirim frame `alt` berisi keadaan
+ *  yang sedang berlaku ke setiap klien baru, di dalam `attach()` (SPEC-863). */
 export function onReattach(): PredictState {
   return initialState();
 }
