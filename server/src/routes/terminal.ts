@@ -510,7 +510,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       let m: { t?: string; d?: string; cols?: number; rows?: number };
       // ponytail: frame rusak dibuang diam-diam — pengirimnya UI kita sendiri.
       try { m = JSON.parse(raw.toString()); } catch { return; }
-      if (m.t === "in" && typeof m.d === "string") writeTo(id, m.d);
+      if (m.t === "in" && typeof m.d === "string") writeTo(id, m.d, client);
       else if (m.t === "resize" && m.cols && m.rows) resize(id, m.cols, m.rows);
     });
     const revalidate = setInterval(() => {

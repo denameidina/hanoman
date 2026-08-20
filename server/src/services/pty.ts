@@ -835,6 +835,42 @@ function startPoll(): void {
   poll.unref();
 }
 
+// SPEC-860 · Replay adalah GAMBAR, bukan percakapan. Aliran pty memuat PERTANYAAN terminal —
+// handshake attach tmux (`\x1b[c`, `\x1b[>c`, `\x1b[>q`, `\x1b[?996n`, `\x1b]10;?`, `\x1b]11;?`)
+// dan pertanyaan program yang diteruskan tmux (`\x1b]4;n;?`, laporan ukuran XTWINOPS). Memutar
+// ulangnya apa adanya membuat setiap klien baru MENJAWAB pertanyaan lama; tmux sudah lewat
+// handshake DA-nya (`TTY_HAVEDA`) sehingga jawaban itu diteruskan ke pane sebagai KETIKAN —
+// satu salinan `[?1;2c[>0;276;0c` di baris prompt agen per attach, menumpuk tiap reconnect.
+// Tak satu pun bentuk di bawah ini menggambar apa pun, jadi membuangnya dari replay tak
+// mengubah satu sel pun. Aliran HIDUP sengaja tak disentuh: di sana tmux memang menunggu
+// jawabannya, dan attach pertama terukur bersih.
+const TERMINAL_QUERY = new RegExp([
+  "\\x1b\\[[?>=]?[0-9;]*c",                 // Device Attributes 1/2/3
+  "\\x1b\\[>[0-9;]*q",                      // XTVERSION — `>` wajib, DECSCUSR `\\x1b[2 q` bukan ini
+  "\\x1b\\[\\??[0-9;]*n",                   // DSR/DECDSR, termasuk `?996n` (skema warna)
+  "\\x1b\\[\\??[0-9;]*\\$[py]",             // DECRQM & balasannya
+  "\\x1b\\][0-9][0-9;]*\\?(?:\\x07|\\x1b\\\\)",   // OSC 4/10/11/12 `…;?`
+  "\\x1bP[0-9]*[$+][a-z][^\\x1b]*\\x1b\\\\",      // DECRQSS & XTGETTCAP
+  "\\x1b\\[(?:11|13|14|15|16|18|19|20|21)t",      // XTWINOPS laporan — berparameter TUNGGAL
+].join("|"), "g");
+
+export const stripTerminalQueries = (s: string): string => s.replace(TERMINAL_QUERY, "");
+
+// Bentuk balasan terminal. Tak satu pun beririsan dengan sekuens tombol (`\x1b[A`, `\x1bOA`,
+// `\x1b[3~`, laporan mouse `…M`), jadi ketikan manusia tak pernah tersentuh gerbangnya.
+const TERMINAL_RESPONSE = new RegExp([
+  "\\x1b\\[[?>][0-9;]*c",                   // balasan DA
+  "\\x1b\\[\\??[0-9]+;[0-9]+R",             // CPR / DECXCPR
+  "\\x1b\\[\\??[0-9;]*n",                   // balasan DSR
+  "\\x1b\\[\\??[0-9;]*\\$y",                // DECRPM
+  "\\x1b\\][0-9][0-9;]*;[^\\x07\\x1b]*(?:\\x07|\\x1b\\\\)",   // balasan warna OSC
+  "\\x1bP[0-9]*[$+>][a-z|][^\\x1b]*\\x1b\\\\",                // DECRPSS / XTGETTCAP / XTVERSION
+].join("|"), "g");
+
+/** Frame yang isinya SELURUHNYA balasan terminal — tak ada satu pun byte ketikan di dalamnya. */
+export const isTerminalResponse = (d: string): boolean =>
+  d.length > 0 && d.replace(TERMINAL_RESPONSE, "") === "";
+
 export function attach(id: string, c: Client): void {
   const p = getSession(id);
   if (!p) { c.close(); return; }
@@ -842,7 +878,9 @@ export function attach(id: string, c: Client): void {
   // Putar ulang layarnya lalu tutup, persis seperti membuka kembali tab sesi yang berakhir.
   if (p.exited) {
     const screen = tmux("capture-pane", "-p", "-e", "-J", "-S", "-2000", "-t", name(id));
-    if (screen.trim()) c.send(frame({ t: "data", d: screen.replace(/\n/g, "\r\n") }));
+    if (screen.trim()) {
+      c.send(frame({ t: "data", d: stripTerminalQueries(screen.replace(/\n/g, "\r\n")) }));
+    }
     c.send(frame({ t: "exit", code: p.code }));
     c.close();
     return;
@@ -850,7 +888,7 @@ export function attach(id: string, c: Client): void {
   const a = attached.get(id) ?? open(id);
   a.clients.add(c);
   // Scrollback lebih dulu untuk klien kedua; klien pertama digambar ulang oleh tmux sendiri.
-  if (a.scrollback) c.send(frame({ t: "data", d: a.scrollback }));
+  if (a.scrollback) c.send(frame({ t: "data", d: stripTerminalQueries(a.scrollback) }));
   // Fase dikirim ke klien ini saja: `lastPhases` milik attachment sudah terisi kalau klien
   // pertama menerimanya, dan siaran ulang tak akan pernah sampai ke klien kedua.
   // SPEC-433 · dibaca dari `p` yang sudah di tangan, bukan `sessionPhases(id)` yang memanggil
@@ -867,7 +905,16 @@ export function attach(id: string, c: Client): void {
 
 export const detach = (id: string, c: Client): void => { attached.get(id)?.clients.delete(c); };
 
-export function writeTo(id: string, d: string): void { attached.get(id)?.pty.write(d); }
+// SPEC-860 · satu attachment menyiarkan ke SEMUA klien, jadi setiap penonton menjawab pertanyaan
+// terminal yang sama; program hanya membaca satu, sisanya mendarat sebagai ketikan. Penjawabnya
+// klien pertama attachment — ia pergi, penerusnya yang menjawab. `from` opsional: pemanggil
+// internal (dialog TUI, papan tombol) bukan terminal dan tak pernah membalas apa pun.
+export function writeTo(id: string, d: string, from?: Client): void {
+  const a = attached.get(id);
+  if (!a) return;
+  if (from && isTerminalResponse(d) && a.clients.values().next().value !== from) return;
+  a.pty.write(d);
+}
 
 export function resize(id: string, cols: number, rows: number): void {
   attached.get(id)?.pty.resize(cols, rows);
