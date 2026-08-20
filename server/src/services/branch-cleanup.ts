@@ -160,7 +160,7 @@ export async function listUnusedBranches(
   return { base, baseRemote, current, branches };
 }
 
-export type DeleteResult = { name: string; ok: boolean; scope: BranchScope | "none"; error?: string };
+export type DeleteResult = { name: string; ok: boolean; scope: BranchScope | "none"; forced?: true; error?: string };
 
 // Scope efektif = irisan yang DIMINTA dengan ref yang benar-benar ADA pada branch itu.
 function effectiveScope(want: BranchScope, b: UnusedBranch): BranchScope | "none" {
@@ -172,29 +172,38 @@ function effectiveScope(want: BranchScope, b: UnusedBranch): BranchScope | "none
   return "none";
 }
 
-// SPEC-360 · ADR-0077 · hapus batch. Menurunkan daftar ter-merge lebih dulu, lalu MEMVALIDASI ULANG
+// SPEC-360 · ADR-0077 · hapus batch. Menurunkan daftar branch lebih dulu, lalu MEMVALIDASI ULANG
 // tiap nama terhadap daftar itu: klien tak bisa menyelundupkan branch sembarang lewat body, dan
 // kunci proteksi ditegakkan di jalur tulis (bukan sekadar petunjuk UI). Eksekusi didelegasikan ke
 // runGitOp `delete-branch` (SPEC-206) — satu-satunya jalur hapus branch di codebase, jadi tak ada
-// implementasi kedua yang bisa drift. Force TAK PERNAH dipakai: semua kandidat sudah ter-merge.
+// implementasi kedua yang bisa drift.
+//
+// SPEC-859 (amandemen ADR-0077) · daftarnya kini `include:"all"`, jadi premis lama "semua kandidat
+// sudah ter-merge" gugur dan larangan mutlak `-D` ikut gugur bersamanya. Gerbangnya `allowUnmerged`,
+// yang hanya dikirim dialog konfirmasi risiko: tanpa itu baris belum-ter-merge ditolak apa adanya.
+// Force dipasang per SISI — `push origin --delete` tak pernah menguji merged-ness.
 export async function deleteBranches(
   repoDir: string,
   names: string[],
-  opts: { scope: BranchScope; base?: string } & LockInputs,
+  opts: { scope: BranchScope; base?: string; allowUnmerged?: boolean } & LockInputs,
 ): Promise<{ base: string; results: DeleteResult[] }> {
-  const report = await listUnusedBranches(repoDir, opts);
+  const report = await listUnusedBranches(repoDir, { ...opts, include: "all" });
   const byName = new Map(report.branches.map((b) => [b.name, b]));
   const results: DeleteResult[] = [];
   for (const name of names) {
     const b = byName.get(name);
     if (!b) {
-      results.push({ name, ok: false, scope: "none",
-        error: `branch tak ditemukan di daftar ter-merge ke ${report.base}` });
+      results.push({ name, ok: false, scope: "none", error: "branch tak ditemukan di repo" });
       continue;
     }
     if (b.locks.length) {
       results.push({ name, ok: false, scope: "none",
         error: `terkunci: ${b.locks.map((l) => LOCK_REASON[l]).join(", ")}` });
+      continue;
+    }
+    if (!b.merged && !opts.allowUnmerged) {
+      results.push({ name, ok: false, scope: "none",
+        error: `belum ter-merge ke ${report.base} — commit-nya bisa hilang; butuh konfirmasi terpisah` });
       continue;
     }
     const scope = effectiveScope(opts.scope, b);
@@ -203,9 +212,12 @@ export async function deleteBranches(
         error: opts.scope === "remote" ? "branch tak punya ref origin" : "branch tak punya ref lokal" });
       continue;
     }
+    const forced = scope !== "remote" && !b.mergedLocal;
     const r = await runGitOp(repoDir, {
-      op: "delete-branch", name, local: scope !== "remote", remote: scope !== "local" });
-    results.push(r.ok ? { name, ok: true, scope } : { name, ok: false, scope, error: r.stderr || "hapus branch gagal" });
+      op: "delete-branch", name, local: scope !== "remote", remote: scope !== "local", force: forced });
+    results.push(r.ok
+      ? { name, ok: true, scope, ...(forced ? { forced: true as const } : {}) }
+      : { name, ok: false, scope, error: r.stderr || "hapus branch gagal" });
   }
   return { base: report.base, results };
 }

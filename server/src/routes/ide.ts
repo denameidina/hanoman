@@ -443,32 +443,40 @@ export default async function (app: FastifyInstance) {
     return finishGraphOp(reply, id, repoDir, await dropCommit(repoDir, b.sha), "drop");
   });
 
-  // SPEC-360 · ADR-0077 · daftar branch yang sudah ter-merge ke base + alasan kunci per branch.
-  // Read murni turunan git (ADR-0018) — tak digerbang sesi aktif.
+  // SPEC-360 · ADR-0077 · daftar branch + alasan kunci per branch. Read murni turunan git
+  // (ADR-0018) — tak digerbang sesi aktif.
+  // SPEC-859 · `?include=all` memuat branch yang BELUM ter-merge. Tanpa parameter itu himpunan
+  // barisnya persis seperti sebelumnya, jadi klien lama tak pecah.
   app.get("/projects/:id/branches/unused", async (req, reply) => {
     const { id } = req.params as { id: string };
     const repoDir = await repoOf(id);
     if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
-    const { base } = req.query as { base?: string };
-    return listUnusedBranches(repoDir, { base, ...(await lockInputs(id)) });
+    const { base, include } = req.query as { base?: string; include?: string };
+    return listUnusedBranches(repoDir, {
+      base, include: include === "all" ? "all" : "merged", ...(await lockInputs(id)) });
   });
 
   // SPEC-360 · ADR-0077 · hapus batch. TAK memakai gerbang sesi-aktif global (touchesTree):
   // delete-branch adalah op ref-only (ADR-0055) dan pagarnya sudah per-branch & lebih tepat.
   // Selalu 200 bila body sah — kegagalan hidup di baris `results`, bukan di status HTTP.
+  // SPEC-859 · `allowUnmerged` membuka baris yang belum ter-merge, dan hanya itu: kunci proteksi
+  // tak ikut longgar, dan UI-lah yang wajib meminta konfirmasi risiko sebelum mengirimnya.
   app.post("/projects/:id/branches/delete", async (req, reply) => {
     const { id } = req.params as { id: string };
     const repoDir = await repoOf(id);
     if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
     if (!repoDir) return reply.code(400).send({ error: "project tidak punya repoDir" });
-    const b = req.body as { names?: unknown; scope?: unknown; base?: unknown };
+    const b = req.body as { names?: unknown; scope?: unknown; base?: unknown; allowUnmerged?: unknown };
     if (!Array.isArray(b?.names) || b.names.some((n) => typeof n !== "string" || !n))
       return reply.code(400).send({ error: "names wajib berisi nama branch" });
     if (b.scope !== undefined && b.scope !== "local" && b.scope !== "remote" && b.scope !== "both")
       return reply.code(400).send({ error: "scope harus local, remote, atau both" });
+    if (b.allowUnmerged !== undefined && typeof b.allowUnmerged !== "boolean")
+      return reply.code(400).send({ error: "allowUnmerged harus boolean" });
     return deleteBranches(repoDir, b.names as string[], {
       scope: (b.scope as BranchScope | undefined) ?? "both",
       base: typeof b.base === "string" && b.base ? b.base : undefined,
+      allowUnmerged: b.allowUnmerged === true,
       ...(await lockInputs(id)),
     });
   });

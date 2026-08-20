@@ -208,7 +208,7 @@ describe("deleteBranches", () => {
     expect(branchList(dir)).toContain("main");
   });
 
-  it("nama di luar daftar ter-merge ditolak (tak bisa diselundupkan lewat body)", async () => {
+  it("branch belum ter-merge tak bisa diselundupkan lewat body", async () => {
     const { repoDir } = makeRepoWithSpecBranch("d6"); // hanoman/d6 BELUM ter-merge
     const r = await deleteBranches(repoDir, ["hanoman/d6"], { scope: "both", ...NONE });
     expect(r.results[0]!.ok).toBe(false);
@@ -239,6 +239,50 @@ describe("deleteBranches", () => {
     expect(r.results.find((x) => x.name === "main")!.ok).toBe(false);
     expect(r.results.find((x) => x.name === "ikut")!.ok).toBe(true);
     expect(branchList(dir)).not.toContain("ikut");
+  });
+
+  // SPEC-859 · amandemen ADR-0077 — branch belum ter-merge boleh dihapus, tapi HANYA lewat
+  // gerbang eksplisit `allowUnmerged` (dikirim dialog konfirmasi risiko di UI).
+  it("branch belum ter-merge DITOLAK tanpa allowUnmerged, alasannya menyebut risiko", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("u1");
+    const r = await deleteBranches(repoDir, ["hanoman/u1"], { scope: "both", ...NONE });
+    expect(r.results[0]!.ok).toBe(false);
+    expect(r.results[0]!.error).toMatch(/belum ter-merge/);
+    expect(r.results[0]!.error).toMatch(/hilang/);
+    expect(branchList(repoDir)).toContain("hanoman/u1");
+  });
+
+  it("allowUnmerged menghapus branch belum ter-merge dan menandainya forced", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("u2");
+    const r = await deleteBranches(repoDir, ["hanoman/u2"], {
+      scope: "local", allowUnmerged: true, ...NONE });
+    expect(r.results[0]).toEqual({ name: "hanoman/u2", ok: true, scope: "local", forced: true });
+    expect(branchList(repoDir)).not.toContain("hanoman/u2");
+  });
+
+  it("branch ter-merge TAK PERNAH dipaksa meski allowUnmerged menyala", async () => {
+    const dir = mergedRepo("u3");
+    const r = await deleteBranches(dir, ["hanoman/u3"], {
+      scope: "both", allowUnmerged: true, ...NONE });
+    expect(r.results[0]).toEqual({ name: "hanoman/u3", ok: true, scope: "both" });
+  });
+
+  it("kunci menang atas allowUnmerged", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("u4");
+    const r = await deleteBranches(repoDir, ["hanoman/u4"], {
+      scope: "both", allowUnmerged: true,
+      openSpecBranches: new Set(["hanoman/u4"]), sessionBranches: new Set() });
+    expect(r.results[0]!.ok).toBe(false);
+    expect(r.results[0]!.error).toContain(LOCK_REASON["spec-open"]);
+    expect(branchList(repoDir)).toContain("hanoman/u4");
+  });
+
+  it("nama yang bukan branch nyata tetap ditolak meski allowUnmerged menyala", async () => {
+    const dir = mergedRepo("u5");
+    const r = await deleteBranches(dir, ["tidak-ada-branch-ini"], {
+      scope: "both", allowUnmerged: true, ...NONE });
+    expect(r.results[0]!.ok).toBe(false);
+    expect(r.results[0]!.error).toMatch(/tak ditemukan/);
   });
 
   it("names kosong → results kosong, base tetap dilaporkan", async () => {

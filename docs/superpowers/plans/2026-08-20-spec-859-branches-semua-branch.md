@@ -236,7 +236,7 @@ git commit -m "feat(branches): daftar branch penuh + flag merged per sisi (SPEC-
   ): Promise<{ base: string; results: DeleteResult[] }>;
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/branch-cleanup.test.ts` di dalam `describe("deleteBranches", ...)`:
 
@@ -307,12 +307,12 @@ Tambahkan ke `server/test/ide.route.test.ts` di dalam `describe("branch cleanup 
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/branch-cleanup.test.ts server/test/ide.route.test.ts -t "allowUnmerged"`
 Expected: FAIL — `allowUnmerged` bukan properti yang dikenal; route membalas 200, bukan 400.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/branch-cleanup.ts`, ganti `DeleteResult` dan badan `deleteBranches`:
 
@@ -411,17 +411,17 @@ Di `server/src/routes/ide.ts`, ganti kedua handler branches:
   });
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/branch-cleanup.test.ts server/test/ide.route.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Typecheck server**
+- [x] **Step 5: Typecheck server**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: keluar 0, tanpa error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/branch-cleanup.ts server/src/routes/ide.ts server/test/branch-cleanup.test.ts server/test/ide.route.test.ts

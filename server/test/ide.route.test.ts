@@ -381,6 +381,21 @@ describe("branch cleanup (SPEC-360)", () => {
     expect(after.json().branches.some((x: { name: string }) => x.name === "hanoman/locked")).toBe(true);
   });
 
+  it("GET /branches/unused?include=all memuat flag merged di tiap baris (SPEC-859)", async () => {
+    const r = await app.inject({ url: "/api/projects/cleanrepo/branches/unused?include=all" });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().branches.length).toBeGreaterThan(0);
+    for (const b of r.json().branches) expect(typeof b.merged).toBe("boolean");
+    const plain = await app.inject({ url: "/api/projects/cleanrepo/branches/unused" });
+    expect(plain.json().branches.every((x: { merged: boolean }) => x.merged)).toBe(true);
+  });
+
+  it("POST /branches/delete: allowUnmerged bukan boolean → 400 (SPEC-859)", async () => {
+    const r = await app.inject({ method: "POST", url: "/api/projects/cleanrepo/branches/delete",
+      payload: { names: ["hanoman/clean"], allowUnmerged: "ya" } });
+    expect(r.statusCode).toBe(400);
+  });
+
   it("POST /branches/delete: hapus local+origin benar-benar terjadi", async () => {
     const r = await app.inject({ method: "POST", url: "/api/projects/cleanrepo/branches/delete",
       payload: { names: ["hanoman/clean"], scope: "both" } });
