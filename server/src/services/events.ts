@@ -23,7 +23,11 @@ const clients = new Set<Client>();
 // SPEC-215 · dibaca per-pakai (cfg live). Test menurunkan tick agar cepat; prod 1s. Loop cuma jalan saat ada klien.
 const tickMs = () => effectiveInt("HANOMAN_EVENTS_TICK_MS") ?? 1000;
 
-type Group = { everyTicks: number; last: string; build: () => Promise<WireMsg> };
+// SPEC-857 · ADR-0131 · `failing` menggerbangi log agar kegagalan build TERLIHAT tanpa membanjiri
+// journal: grup `specs` di-recompute tiap detik, jadi hub yang tercekik `P1008 Socket timeout`
+// dulu melahirkan `catch { continue; }` senyap 86.400 kali sehari — klien membeku pada snapshot
+// terakhir tanpa satu pun jejak kenapa. Dicatat sekali saat mulai gagal, sekali saat pulih.
+type Group = { everyTicks: number; last: string; build: () => Promise<WireMsg>; failing?: boolean };
 // everyTicks = recompute tiap N detik: board 1s, notif 3s, vps 15s, limits 30s (cache 30s service).
 const GROUPS: Group[] = [
   // SPEC-409 · ADR-0091 · AC-3 · `deciding` menandai sesi yang sedang DISUSUN keputusannya oleh
@@ -70,7 +74,12 @@ export async function __tick(): Promise<void> {
     for (const g of GROUPS) {
       if (tick % g.everyTicks !== 0) continue;
       let msg: WireMsg;
-      try { msg = await g.build(); } catch { continue; }
+      try { msg = await g.build(); }
+      catch (e) {
+        if (!g.failing) { g.failing = true; console.error("siar dashboard gagal membangun frame:", e); }
+        continue;
+      }
+      if (g.failing) { g.failing = false; console.log(`siar dashboard pulih: ${msg.t}`); }
       const sig = JSON.stringify(msg);
       if (sig === g.last) continue;
       g.last = sig;

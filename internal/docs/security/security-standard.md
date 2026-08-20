@@ -154,7 +154,10 @@
     pegang (Keychain, `~/.claude/.credentials.json`, `Vps.keyPath`) tak pernah dicetak ke pane.
   - Retensi otomatis bounded menghapus sesi berakhir >30 hari; purge manual scoped tetap tersedia.
     `HANOMAN_RETENTION_HOLDS` mengecualikan `session:<id>`, `ticket:<id>`, `delivery:<id>`, atau
-    `result:<id>` yang wajib dipertahankan.
+    `result:<id>` yang wajib dipertahankan. Sapuan yang sama memangkas **change-feed `SyncLog`**
+    (SPEC-857, [ADR-0131](../adr/0131-retensi-change-feed-sync.md)): baris tersusul yang lewat 7
+    hari dibuang, **puncak tiap record tak pernah** — feed tak berbatas bukan cuma soal disk, ia
+    mencekik pembaca DB sampai `P1008` dan membuat dashboard menyajikan angka basi tanpa tanda.
   - **Penghapusan tak pernah menghancurkan bukti milik baris yang selamat** (SPEC-845,
     [ADR-0126](../adr/0126-durabilitas-penghapusan-transkrip-riwayat.md), mengamandemen ADR-0079 §5).
     Berkas transkrip di-`unlink` **sesudah** penghapusan barisnya commit, per potongan atas himpunan

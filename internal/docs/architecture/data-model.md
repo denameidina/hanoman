@@ -505,6 +505,21 @@ untuk tampilan saja.
   tombstone, jadi penolakan kebangkitan jatuh dari optimistic-concurrency yang sudah ada. Push
   `op:"delete"` diterima **tanpa** cek `baseVersion` (delete menang tanpa syarat → hasil independen
   urutan tiba) dan **idempoten** (tombstone yang sudah ada = nol baris feed kedua).
+- **`SyncLog` berbatas — dan batasnya punya satu invarian**
+  (SPEC-857, [ADR-0131](../adr/0131-retensi-change-feed-sync.md)). Feed ini dulu tumbuh tanpa batas:
+  di hub produksi 121.222 baris entity `vps` = **213,6 MB dari DB 258 MB** (83% isi database),
+  karena `pollHealth()` memanggil `notifySynced("vps", …)` di setiap polling. Di SQLite yang
+  mengunci berkas saat menulis, feed sebesar itu mencekik pembaca sampai `P1008 Socket timeout` —
+  termasuk `GET /specs`. `pruneSyncFeed()` (`services/retention.ts`) kini membuang baris yang sudah
+  **tersusul** DAN lewat `RETENTION_DAYS.syncFeed` (7 hari).
+  > **Baris terbaru per (`entity`, `recordId`) TAK PERNAH dipangkas.** `pull()` membaca
+  > `seq > cursor` **tanpa syarat kontiguitas** (`feedHole` menandai record yang gagal *divalidasi*,
+  > bukan seq yang hilang), jadi klien setertinggal apa pun tetap konvergen selama versi terakhir
+  > tiap record ada di feed. Melanggar invarian ini = klien lambat kehilangan keadaan secara senyap.
+
+  Pemangkasan feed sengaja **tak tunduk pada jatah `batchSize`** (jatah itu melindungi penghapusan
+  yang menyentuh berkas): dengan 100/hari, 121.222 baris butuh 1.210 hari. Ia dilaporkan terpisah
+  sebagai `RetentionReport.feedPruned`.
 - **`SyncTombstone` wajib ada di `PG_ORDER`** (`cli/src/commands/migrate-pg.ts`) —
   `cli/test/migrate-pg.test.ts` menuntutnya sama persis dengan DMMF dan itu satu-satunya gerbangnya.
 

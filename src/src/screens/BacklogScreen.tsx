@@ -891,6 +891,15 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // PLAFON (SPEC-523 · ADR-0107). `pageSize` tetap prop konstanta.
   const [page, setPage] = usePersistedState("backlog", "page", 1, isNum);
   const [dq, setDq] = React.useState("");
+  // SPEC-857 · ADR-0131 · kegagalan refetch dulu ditelan `.catch(() => { })`: `data` bertahan pada
+  // nilai terakhir yang BERHASIL dan layar menyajikan jumlah basi seolah itu kebenaran, tanpa satu
+  // pun tanda. Itulah bentuk keluhan "backlog saya berkurang" — hub yang tercekik `P1008 Socket
+  // timeout` (change-feed tak berbatas, ADR-0131) membuat sebagian refetch gagal dan sisanya lolos,
+  // jadi angkanya berubah-ubah sementara DB-nya sendiri tak pernah kehilangan satu baris pun.
+  const [stale, setStale] = React.useState(false);
+  // Refetch ikut tiap `dataVersion` (tiap frame siar WS), jadi toast digerbangi TRANSISI
+  // sehat→gagal lewat ref — bukan setiap kegagalan, yang akan jadi hujan toast saat hub sakit.
+  const staleRef = React.useRef(false);
   // Filter yang dipulihkan wajib TERLIHAT menyala: daftar yang tampak kosong tak boleh
   // terbaca sebagai backlog kosong.
   const activeFilters = [
@@ -921,7 +930,19 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
       page: view === "board" ? undefined : page,
       limit: view === "board" ? undefined : pageSize,
     });
-    p?.then((r) => { if (alive) setData({ items: r.items, total: r.total }); }).catch(() => { });
+    p?.then((r) => {
+      if (!alive) return;
+      setData({ items: r.items, total: r.total });
+      staleRef.current = false;
+      setStale(false);
+    }).catch(() => {
+      if (!alive) return;
+      if (!staleRef.current) {
+        staleRef.current = true;
+        onToast?.("Gagal menyegarkan backlog — jumlah & daftar di layar mungkin basi", "warn");
+      }
+      setStale(true);
+    });
     return () => { alive = false; };
   }, [tab, proj, stageFilter, prioFilter, dq, view, page, pageSize, dataVersion, syncNonce, dateField, from, to]);
   const backlogById = React.useMemo(() => new Map(backlog.map((s) => [s.id, s])), [backlog]);
@@ -952,7 +973,14 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             <Tabs variant="pill" value={view} onChange={setView} tabs={VIEWS} aria-label="Mode tampilan" />
             <SyncButton onDone={() => setSyncNonce((n) => n + 1)} onToast={onToast ?? (() => {})} />
             <ResetViewButton screen="backlog" active={activeFilters} onReset={resetView} />
-            <span className="hn-eyebrow">{data.total} spec</span>
+            {/* SPEC-857 · ADR-0131 · saat refetch gagal, jumlah ini TIDAK boleh tampil sebagai
+                kebenaran — operator harus tahu ia sedang membaca nilai basi, bukan backlog yang
+                menyusut. `role="status"` supaya perubahannya juga terdengar pembaca layar. */}
+            <span className="hn-eyebrow" role="status"
+              style={stale ? { color: "var(--amber-600)" } : undefined}
+              title={stale ? "Server tak menjawab saat menyegarkan — angka ini dari muatan terakhir yang berhasil" : undefined}>
+              {data.total} spec{stale ? " · basi" : ""}
+            </span>
           </div>
         </div>
         {/* SPEC-178 · baris penyaring: search + project + stage + prioritas. */}
