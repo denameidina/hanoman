@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { makeRepoWithSpecBranch, makeRepoWithBranches } from "./factory";
 import { listUnusedBranches, deleteBranches, LOCK_REASON } from "../src/services/branch-cleanup";
@@ -55,6 +55,25 @@ describe("listUnusedBranches", () => {
     expect(r.branches.some((x) => x.name === "origin")).toBe(false);
     expect(r.branches.some((x) => x.name === "HEAD")).toBe(false);
     expect(r.branches.some((x) => x.name === "origin/HEAD")).toBe(false);
+  });
+
+  // SPEC-861 · kebuntuan 'branch tak bisa dihapus karena worktree, worktree tak terlihat di mana
+  // pun' butuh jalan keluar: baris branch harus menyebut worktree MANA yang menguncinya.
+  it("kunci worktree menyebut path worktree yang menguncinya", async () => {
+    const dir = mergedRepo("s9");
+    mkdirSync(join(dir, ".worktrees"), { recursive: true });
+    g(dir, "worktree", "add", "-q", join(dir, ".worktrees", "wt-s9"), "hanoman/s9");
+    const r = await listUnusedBranches(dir, NONE);
+    const b = r.branches.find((x) => x.name === "hanoman/s9")!;
+    expect(b.locks).toContain("worktree");
+    // git menjawab path FISIK (macOS: /var/folders → /private/var/folders); yang dipakai UI
+    // untuk menautkan ke baris tab Worktrees adalah `basename`-nya, dan itu sama di kedua bentuk.
+    expect(b.worktree).toBe(join(realpathSync(dir), ".worktrees", "wt-s9"));
+  });
+
+  it("branch tanpa worktree tak punya field worktree", async () => {
+    const r = await listUnusedBranches(mergedRepo("s10"), NONE);
+    expect(r.branches.find((x) => x.name === "hanoman/s10")!.worktree).toBeUndefined();
   });
 
   // GOTCHA · di worktree detached, git branch --merged memancarkan baris "(no branch)"

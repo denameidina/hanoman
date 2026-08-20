@@ -37,7 +37,11 @@ const rel = (iso: string): string => {
 const deletable = (b: UnusedBranch) => b.locks.length === 0;
 const scopeOf = (b: UnusedBranch) => (b.local && b.remote ? "local + origin" : b.local ? "local" : "origin");
 
-export function BranchesPanel({ projectId }: { projectId: string }) {
+export function BranchesPanel({ projectId, onOpenWorktree }: {
+  projectId: string;
+  /** SPEC-861 · pindah ke tab Worktrees pada baris yang menahan branch ini. */
+  onOpenWorktree?: (path: string) => void;
+}) {
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
   const [report, setReport] = React.useState<UnusedReport | null>(null);
   const [bases, setBases] = React.useState<string[]>([]);
@@ -174,7 +178,16 @@ export function BranchesPanel({ projectId }: { projectId: string }) {
                   {b.merged ? "ter-merge" : "belum ter-merge"}
                 </Badge>
                 <Badge size="sm" tone="brass">{scopeOf(b)}</Badge>
-                {b.locks.map((l) => <Badge key={l} size="sm" tone="warn">{LOCK_LABEL[l]}</Badge>)}
+                {/* SPEC-861 · kunci `worktree` adalah SATU-SATUNYA yang punya jalan keluar di
+                    layar lain: badge-nya jadi tautan ke baris worktree yang menahannya. */}
+                {b.locks.map((l) =>
+                  l === "worktree" && b.worktree && onOpenWorktree
+                    ? <button key={l} data-testid={`goto-worktree-${b.name}`}
+                        onClick={() => onOpenWorktree(b.worktree!)}
+                        style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>
+                        <Badge size="sm" tone="warn">{LOCK_LABEL[l]} →</Badge>
+                      </button>
+                    : <Badge key={l} size="sm" tone="warn">{LOCK_LABEL[l]}</Badge>)}
                 <span style={{ fontSize: 11.5, color: "var(--text-subtle)", minWidth: 200, textAlign: "right" }}>
                   {b.lastCommit ? `${b.lastCommit.subject} · ${rel(b.lastCommit.at)}` : "—"}
                 </span>

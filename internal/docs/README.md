@@ -81,6 +81,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0132 — Permukaan penghapusan worktree: tab Worktrees, daftar turunan git, hapus lewat `.trash`](adr/0132-permukaan-penghapusan-worktree.md) — menegakkan 0116, 0077, 0002/0015, 0018/0011, 0127 (SPEC-861)
 - [0131 — Retensi change-feed sync (puncak per record tak pernah dipangkas), `journal_mode=WAL`, dan kegagalan memuat yang tak boleh senyap](adr/0131-retensi-change-feed-sync.md) — menegakkan 0045, 0086, 0100 (SPEC-857)
 - [0130 — Kuota obrolan portal: ember (project × tipe × periode), satuannya sesi yang lahir](adr/0130-kuota-chat-portal-klien.md)
 - [0129 — Mesin chat portal klien: sesi agen tersandbox di workspace dokumen, empat lapis penjagaan](adr/0129-mesin-chat-portal-klien.md)

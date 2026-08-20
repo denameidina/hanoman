@@ -637,6 +637,57 @@ export type WorktreeCleanupView = {
   error?: string;
 };
 
+// SPEC-861 · ADR-0132 · worktree yang masih HIDUP di sebuah project. Nilai turunan penuh dari
+// `git worktree list --porcelain` tiap request (ADR-0018/0011): tak ada kolom DB, tak ada cache.
+// Entri `.worktrees/.trash/**` TIDAK muncul di sini — itu wilayah reaper (WorktreeCleanupView).
+export type WorktreeView = {
+  /** Path absolut apa adanya dari git. */
+  path: string;
+  /** `basename(path)` — juga id baris di API tulis; klien tak pernah mengirim path. */
+  name: string;
+  /** SHA HEAD; "" bila tak terbaca (registrasi prunable). */
+  head: string;
+  /** null = detached HEAD. Sesi hanoman SELALU detached (ADR-0002). */
+  branch: string | null;
+  /** Registrasi git menunjuk direktori yang sudah lenyap. */
+  prunable: boolean;
+  /** `git worktree lock`. */
+  locked: boolean;
+  /** `ownsWorktree(repoDir, path)` — SATU-SATUNYA gerbang penghapusan. */
+  deletable: boolean;
+  /** Alasan prosa saat `deletable` false; null saat boleh dihapus. */
+  blocked: string | null;
+  spec: { id: string; stage: string } | null;
+  /** Sesi tmux yang HIDUP di worktree ini sekarang. */
+  session: { id: string; specId: string | null } | null;
+  createdAt: string | null;
+};
+export type WorktreeReport = { repoDir: string; worktrees: WorktreeView[] };
+
+// SPEC-861 · sinyal MAHAL, sengaja di endpoint terpisah supaya daftar tak menunggu keduanya.
+export type WorktreeStats = {
+  name: string;
+  /** null = `du` gagal/timeout atau direktorinya sudah lenyap. */
+  sizeBytes: number | null;
+  dirtyFiles: number;
+  /** Commit yang HANYA hidup di worktree ini — kerja yang benar-benar hilang bila dihapus. */
+  orphanCommits: number;
+};
+
+// SPEC-861 · ADR-0132 · satu baris hasil per worktree yang diminta. Selalu 200 bila body sah —
+// kegagalan hidup di baris ini, bukan di status HTTP (cermin POST /branches/delete).
+export type WorktreeDeleteResult = {
+  name: string;
+  ok: boolean;
+  /** Nama entri `.worktrees/.trash/` yang lahir (SPEC-742); null bila tak ada yang dipindah. */
+  cleanup: string | null;
+  /** Id sesi tmux yang ikut ditutup lebih dulu. */
+  closedSession?: string;
+  /** Hasil `deleteBranches` bila 'hapus branch juga' diminta — pagar ADR-0077 tetap berlaku. */
+  branch?: { name: string; ok: boolean; error?: string };
+  error?: string;
+};
+
 // SPEC-253 · Help Center — DTO triase + halaman publik.
 export const zTicketView = z.object({
   id: z.string(), projectId: z.string(), number: z.number().int(),
