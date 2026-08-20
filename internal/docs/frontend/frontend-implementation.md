@@ -540,6 +540,33 @@ melalui tinggi host/jumlah row dan `Terminal.scrollLines()` (dengan sisa pecahan
 `preventDefault()` menahan scroller halaman. Pan horizontal dan pinch-zoom tetap diserahkan ke
 browser; gesture multi-touch tidak diambil terminal.
 
+**Echo prediktif lokal** (SPEC-856, tanpa ADR — arah MASUK, pelengkap arah keluar SPEC-812; seluruh
+perubahannya di klien). Sebelumnya sebuah huruf baru tampil sesudah round-trip penuh
+klien → server → tmux → pty → flush coalesce → klien: terukur **242 ms** dari keydown sampai glyph
+pada RTT 200 ms di TUI claude, **2,7 ms** sesudahnya. Logikanya di modul murni
+`src/src/screens/terminal-predict.ts` (tanpa React, tanpa xterm — `TerminalPane` menyuplai
+pandangan layar sebagai data), dengan **satu invarian keselamatan**: begitu satu byte pun datang
+dari pty, prediksi di-rollback **sebelum** byte itu ditulis, dalam **satu** panggilan `term.write`,
+sehingga layar sesudah tiap frame server byte-identik dengan layar tanpa prediksi (dibuktikan
+membandingkan model layar xterm *dan* `tmux capture-pane`). Karakter tampil bergaris bawah
+(`\x1b[4m`…`\x1b[24m` — netral SGR; `\x1b[m` akan merusak latar yang dipakai `\x1b[K` saat
+rollback) dan rollback-nya `\x1b[<n>D\x1b[K`, setia karena gerbang menjamin ekor baris kosong.
+Prediksi **mati** saat: sakelar operator mati, socket belum `open`, alternate screen
+(`?1049`/`?1047` — **bukan** `?47`/`?2004`, yang terukur ikut lahir dari handshake attach tmux
+pada `bash` polos), input bukan teks tunggal (escape/panah/Enter/Tab/ctrl/paste/IME), kursor di dua
+kolom terakhir, ekor baris tak kosong, baris berpola password, dan begitu satu prediksi mencapai
+TTL 500 ms tanpa pernah ter-echo (suspend ber-cooldown 30 detik; `read -s` dan tombol yang ditelan
+dialog sama-sama terukur membalas nol byte). Sisa yang belum ter-echo dihidupkan ulang di kursor
+baru lewat `echoedPrefixLen`, atau dibuang bila gerbang tak lagi lolos — tak ada jalur yang
+meninggalkan karakter tanpa pemilik. Di atasnya, **hanya `term.onData`** yang melewati batcher
+input 16 ms, dan batcher itu **hanya aktif saat prediksi aktif**; control & paste menguras antrean
+lalu lewat seketika, jadi jaminan "satu keystroke = satu frame" milik clipboard (SPEC-289), tap
+dialog (SPEC-452), lampiran (SPEC-816), dan papan tombol layar (SPEC-800) tak berubah. Batcher
+tak memanen ketikan manusia (jeda 120–200 ms ≫ 16 ms) — nilainya di burst: terukur frame masuk
+10 → 5 dan byte keluar 20 524 → 11 370, karena TUI agen menggambar ulang sekali per *event input*,
+bukan per karakter. Sakelarnya state tampilan lokal `hn.ui.v1.terminal.predict` (SPEC-740 ·
+ADR-0115), default hidup, di panel tampilan bersama ukuran font & papan tombol.
+
 Toolbar juga punya **Ambil backlog** (SPEC-179): tombol yang membuka modal picker berisi
 backlog item yang bisa diambil (`stage !== "done"` dan belum punya sesi hidup). Memilih satu
 memanggil `POST /terminal/sessions {spec, flow}` — endpoint idempoten yang sama dengan tombol
