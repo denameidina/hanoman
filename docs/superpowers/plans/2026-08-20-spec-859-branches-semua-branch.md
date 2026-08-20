@@ -46,7 +46,7 @@
   ): Promise<UnusedReport>;
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/branch-cleanup.test.ts`, di dalam `describe("listUnusedBranches", ...)`:
 
@@ -97,12 +97,12 @@ Tambahkan ke `server/test/branch-cleanup.test.ts`, di dalam `describe("listUnuse
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/branch-cleanup.test.ts -t "include all"`
 Expected: FAIL — `include` bukan properti yang dikenal `opts` (typecheck), dan daftar tetap hanya memuat yang ter-merge.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/branch-cleanup.ts`, tambahkan tipe `BranchInclude` dan ganti `UnusedBranch`:
 
@@ -204,12 +204,12 @@ export async function listUnusedBranches(
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/branch-cleanup.test.ts`
 Expected: PASS seluruh berkas, termasuk test lama (mode default tak berubah).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/branch-cleanup.ts server/test/branch-cleanup.test.ts

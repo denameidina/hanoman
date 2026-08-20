@@ -21,10 +21,19 @@ export const LOCK_REASON: Record<BranchLock, string> = {
   session: "sesi aktif memakainya",
 };
 
+export type BranchInclude = "merged" | "all";
+
 export type UnusedBranch = {
   name: string;
+  // SPEC-859 · `local`/`remote` = ref itu ADA, bukan "ref itu ter-merge": badge scope di UI harus
+  // jujur untuk branch yang belum ter-merge. Merged-ness hidup di tiga field di bawahnya.
   local: boolean;
   remote: boolean;
+  mergedLocal: boolean;
+  mergedRemote: boolean;
+  // Ter-merge = TIAP sisi yang ada sudah ter-merge ke base-nya masing-masing. Repo yang
+  // origin/<base>-nya tertinggal karena itu terbaca `belum`, bukan setengah-aman.
+  merged: boolean;
   lastCommit: { sha: string; at: string; subject: string } | null;
   locks: BranchLock[];
 };
@@ -80,21 +89,30 @@ async function worktreeBranches(repoDir: string): Promise<Set<string>> {
 // saat disalin. Dan jangan pernah "" (string kosong): split("") memecah per-karakter.
 const SEP = "\u001f";
 type CommitMeta = { sha: string; at: string; subject: string };
-async function lastCommits(repoDir: string): Promise<Map<string, CommitMeta>> {
-  const fmt = ["%(refname:short)", "%(objectname)", "%(committerdate:iso-strict)", "%(contents:subject)"].join(SEP);
-  const m = new Map<string, CommitMeta>();
+type RefIndex = { locals: Set<string>; remotes: Set<string>; meta: Map<string, CommitMeta> };
+
+// Satu for-each-ref memasok himpunan ref DAN commit terakhir. `%(refname)` penuh dibaca lebih dulu
+// karena `refname:short` sudah kehilangan info sisi mana ref itu hidup (SPEC-859 butuh keduanya).
+async function refIndex(repoDir: string): Promise<RefIndex> {
+  const fmt = ["%(refname)", "%(refname:short)", "%(objectname)",
+    "%(committerdate:iso-strict)", "%(contents:subject)"].join(SEP);
+  const idx: RefIndex = { locals: new Set(), remotes: new Set(), meta: new Map() };
   for (const l of lines(await out(repoDir, ["for-each-ref", `--format=${fmt}`, "refs/heads", "refs/remotes/origin"]))) {
-    const [ref, sha, at, ...rest] = l.split(SEP);
+    const [full, ref, sha, at, ...rest] = l.split(SEP);
     const name = shortName(ref ?? "");
     if (!name || !sha) continue;
-    if (!m.has(name)) m.set(name, { sha, at: at ?? "", subject: rest.join(SEP) });
+    (full?.startsWith("refs/heads/") ? idx.locals : idx.remotes).add(name);
+    // refs/heads tersortir sebelum refs/remotes → meta lokal menang, sama seperti sebelum SPEC-859.
+    if (!idx.meta.has(name)) idx.meta.set(name, { sha, at: at ?? "", subject: rest.join(SEP) });
   }
-  return m;
+  return idx;
 }
 
+// SPEC-859 · `include: "all"` memancarkan SELURUH ref (local ∪ origin), ter-merge maupun belum.
+// Default tetap `"merged"` supaya himpunan barisnya identik dengan sebelum SPEC-859.
 export async function listUnusedBranches(
   repoDir: string | null,
-  opts: { base?: string } & LockInputs,
+  opts: { base?: string; include?: BranchInclude } & LockInputs,
 ): Promise<UnusedReport> {
   if (!repoDir) return EMPTY;
   const current = (await out(repoDir, ["rev-parse", "--abbrev-ref", "HEAD"])).trim();
@@ -106,27 +124,39 @@ export async function listUnusedBranches(
   const baseRemote = (await revSha(repoDir, `origin/${base}`)) ? `origin/${base}` : null;
   const baseRemoteSha = baseRemote ? await revSha(repoDir, baseRemote) : baseSha;
 
-  const [localMerged, remoteMerged, wt, meta] = await Promise.all([
+  const [localMerged, remoteMerged, wt, refs] = await Promise.all([
     out(repoDir, ["branch", "--merged", baseSha, "--format=%(refname:short)"]),
     out(repoDir, ["branch", "-r", "--merged", baseRemoteSha, "--format=%(refname:short)"]),
     worktreeBranches(repoDir),
-    lastCommits(repoDir),
+    refIndex(repoDir),
   ]);
 
-  const locals = new Set(lines(localMerged).map(shortName).filter(Boolean));
-  const remotes = new Set(
+  const mergedLocals = new Set(lines(localMerged).map(shortName).filter(Boolean));
+  const mergedRemotes = new Set(
     lines(remoteMerged).filter((r) => r.startsWith("origin/")).map(shortName).filter(Boolean));
 
-  const names = [...new Set([...locals, ...remotes])].sort();
-  const branches = names.map<UnusedBranch>((name) => {
+  const all = opts.include === "all";
+  const names = [...new Set(all
+    ? [...refs.locals, ...refs.remotes]
+    : [...mergedLocals, ...mergedRemotes])].sort();
+
+  const branches: UnusedBranch[] = [];
+  for (const name of names) {
+    const local = refs.locals.has(name);
+    const remote = refs.remotes.has(name);
+    const mergedLocal = local && mergedLocals.has(name);
+    const mergedRemote = remote && mergedRemotes.has(name);
+    const merged = (!local || mergedLocal) && (!remote || mergedRemote);
+    if (!all && !merged) continue;
     const locks: BranchLock[] = [];
     if (name === current) locks.push("current");
     if (name === base) locks.push("base");
     if (wt.has(name)) locks.push("worktree");
     if (opts.openSpecBranches.has(name)) locks.push("spec-open");
     if (opts.sessionBranches.has(name)) locks.push("session");
-    return { name, local: locals.has(name), remote: remotes.has(name), lastCommit: meta.get(name) ?? null, locks };
-  });
+    branches.push({ name, local, remote, mergedLocal, mergedRemote, merged,
+      lastCommit: refs.meta.get(name) ?? null, locks });
+  }
   return { base, baseRemote, current, branches };
 }
 

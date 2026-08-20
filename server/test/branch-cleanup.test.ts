@@ -109,6 +109,52 @@ describe("listUnusedBranches", () => {
     expect(r.branches).toEqual([]);
   });
 
+  // SPEC-859 · daftar melebar ke SELURUH branch lewat include:"all".
+  it("include all memuat branch yang BELUM ter-merge", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("a1"); // hanoman/a1 tak di-merge
+    const r = await listUnusedBranches(repoDir, { ...NONE, include: "all" });
+    const b = r.branches.find((x) => x.name === "hanoman/a1")!;
+    expect(b).toBeTruthy();
+    expect(b.merged).toBe(false);
+    expect(b.local).toBe(true);
+  });
+
+  it("include all tetap menyaring baris hantu & origin/HEAD", async () => {
+    const dir = mergedRepo("a2");
+    g(dir, "remote", "set-head", "origin", "main");
+    g(dir, "checkout", "-q", "--detach", "HEAD");
+    const r = await listUnusedBranches(dir, { ...NONE, include: "all" });
+    for (const ghost of ["(no branch)", "origin", "origin/HEAD", "HEAD", ""])
+      expect(r.branches.some((x) => x.name === ghost)).toBe(false);
+  });
+
+  it("default (tanpa include) tetap HANYA branch ter-merge", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("a3");
+    const r = await listUnusedBranches(repoDir, NONE);
+    expect(r.branches.some((x) => x.name === "hanoman/a3")).toBe(false);
+  });
+
+  it("merged benar per sisi: ter-merge local+origin", async () => {
+    const r = await listUnusedBranches(mergedRepo("a4"), { ...NONE, include: "all" });
+    const b = r.branches.find((x) => x.name === "hanoman/a4")!;
+    expect(b).toMatchObject({ local: true, remote: true, mergedLocal: true, mergedRemote: true, merged: true });
+  });
+
+  it("branch lokal tanpa ref origin: remote false, merged menilai sisi lokal saja", async () => {
+    const dir = mergedRepo("a5");
+    g(dir, "branch", "lokal-baru"); // di commit main → ter-merge, tanpa ref origin
+    const r = await listUnusedBranches(dir, { ...NONE, include: "all" });
+    const b = r.branches.find((x) => x.name === "lokal-baru")!;
+    expect(b).toMatchObject({ local: true, remote: false, mergedRemote: false, merged: true });
+  });
+
+  it("kunci tetap dihitung untuk branch belum ter-merge", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("a6");
+    const r = await listUnusedBranches(repoDir, {
+      ...NONE, include: "all", sessionBranches: new Set(["hanoman/a6"]) });
+    expect(r.branches.find((x) => x.name === "hanoman/a6")!.locks).toContain("session");
+  });
+
   it("LOCK_REASON punya prosa Indonesia untuk tiap kunci", () => {
     for (const k of ["current", "base", "worktree", "spec-open", "session"] as const) {
       expect(LOCK_REASON[k]).toMatch(/\S/);
