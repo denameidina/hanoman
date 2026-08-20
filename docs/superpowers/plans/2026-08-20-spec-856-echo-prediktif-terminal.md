@@ -49,7 +49,7 @@
 - Consumes: —
 - Produces: `type InputKind = "text" | "control" | "bulk"`; `classifyInput(d: string): InputKind`; `applySeq(chars: string): string`; `rollbackSeq(n: number): string`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/test/terminal-predict.test.ts`:
 
@@ -96,12 +96,12 @@ describe("applySeq / rollbackSeq", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/terminal-predict.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/screens/terminal-predict"`
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `src/src/screens/terminal-predict.ts`:
 
@@ -137,12 +137,12 @@ export function rollbackSeq(n: number): string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/terminal-predict.test.ts`
 Expected: PASS (4 + 3 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/terminal-predict.ts src/test/terminal-predict.test.ts
@@ -167,7 +167,7 @@ git commit -m "feat(terminal): klasifikasi input & sekuens apply/rollback predik
   - `looksLikePasswordPrompt(line: string): boolean`
   - `canPredict(state: PredictState, d: string, view: View, now: number, enabled: boolean): boolean`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan ke `src/test/terminal-predict.test.ts`:
 
@@ -250,12 +250,12 @@ describe("canPredict", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/terminal-predict.test.ts`
 Expected: FAIL — `canPredict is not a function` / import error
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Tambahkan ke `src/src/screens/terminal-predict.ts`:
 
@@ -319,12 +319,12 @@ export function canPredict(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/terminal-predict.test.ts`
 Expected: PASS (semua, termasuk 9 test `canPredict`)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/terminal-predict.ts src/test/terminal-predict.test.ts
