@@ -921,7 +921,7 @@ git commit -m "feat(terminal): wiring echo prediktif + batcher di TerminalPane (
 - Consumes: prop `predict` (Task 5)
 - Produces: kunci UI-state `hn.ui.v1.terminal.predict`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan ke `src/test/terminal-screen.test.tsx`:
 
@@ -940,12 +940,12 @@ it("SPEC-856 · sakelar echo prediktif hidup secara default dan tersimpan", asyn
 Bila `renderScreen`/`openDisplayPanel` bernama lain di berkas itu, pakai nama yang ada — pola
 pembukaan panel `displayControls` sudah dipakai test ukuran font & papan tombol.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/terminal-screen.test.tsx -t "echo prediktif"`
 Expected: FAIL — `Unable to find an accessible element with the role "button" and name /ketik responsif/i`
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `src/src/screens/TerminalScreen.tsx`:
 
@@ -974,12 +974,12 @@ Di `src/src/screens/TerminalScreen.tsx`:
    `Cell` (deklarasi tipe di ±737 dan pemakaian di ±921) dan `FullscreenTerminal` (±945/±952)
    persis mengikuti bentuk `showKeys`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/terminal-screen.test.tsx`
 Expected: PASS — test baru dan seluruh test lama layar Terminal
 
-- [ ] **Step 5: Typecheck & commit**
+- [x] **Step 5: Typecheck & commit**
 
 ```bash
 pnpm --filter ./src typecheck
