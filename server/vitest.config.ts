@@ -30,7 +30,12 @@ try {
 
 // Sesi terminal hidup di tmux server, dan `killAll()` membunuh server itu seluruhnya.
 // Socket terpisah supaya test tidak pernah menyentuh sesi hanoman (atau tmux) yang nyata.
-process.env.HANOMAN_TMUX_SOCKET = "hanoman-test";
+// SPEC-861 · `??=`, bukan `=`: default `hanoman-test` DIPAKAI BERSAMA semua worktree di satu
+// mesin, jadi `killAll()` sebuah run membunuh sesi tmux run TETANGGA di tengah kerjanya (dan
+// sebaliknya). Terukur pada `terminal.route.test.ts`: **75 gagal → 18 gagal** semata sebagai
+// fungsi isolasi socket, tanpa satu baris pun perubahan kode. Beri `HANOMAN_TMUX_SOCKET` sendiri
+// per sesi bila ada run lain di mesin ini — cermin `TEST_DATABASE_URL` (SPEC-479).
+process.env.HANOMAN_TMUX_SOCKET ??= "hanoman-test";
 // SPEC-215 · deteksi update kini dibaca via resolver config (default registry "1"). Test tak boleh
 // menyentuh jaringan → paksa OFF di sini (dulu tergantung server.ts yang tak dimuat test).
 process.env.HANOMAN_UPDATE_FETCH = "0";
