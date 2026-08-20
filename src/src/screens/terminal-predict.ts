@@ -88,3 +88,67 @@ export function canPredict(
   if (view.line.slice(view.cursorX).trim().length > 0) return false;
   return !looksLikePasswordPrompt(view.line.trimEnd());
 }
+
+/** Berapa karakter awal `pending` yang sudah digambar server, dilihat dari teks di kiri kursor
+ *  SESUDAH frame server ditulis (saat itu xterm sudah otoritatif). */
+export function echoedPrefixLen(before: string, pending: string): number {
+  for (let n = pending.length; n > 0; n -= 1) {
+    if (before.endsWith(pending.slice(0, n))) return n;
+  }
+  return 0;
+}
+
+export function onInput(
+  state: PredictState, d: string, view: View, now: number, enabled: boolean,
+): { state: PredictState; write: string } {
+  if (!canPredict(state, d, view, now, enabled)) return { state, write: "" };
+  return {
+    state: { ...state, pending: state.pending + d, since: state.since ?? now },
+    write: applySeq(d),
+  };
+}
+
+export function onServerData(
+  state: PredictState, data: string, _now: number,
+): { state: PredictState; write: string; tail: string } {
+  const altScreen = scanAltScreen(data, state.altScreen);
+  return {
+    state: { ...state, pending: "", since: null, altScreen },
+    write: rollbackSeq(state.pending.length) + data,
+    tail: state.pending,
+  };
+}
+
+export function reapply(
+  state: PredictState, tail: string, view: View, now: number, enabled: boolean,
+): { state: PredictState; write: string } {
+  if (!tail) return { state, write: "" };
+  // Gerbang diuji terhadap SELURUH sisa sekaligus, dengan kursor dimajukan sendiri: memasang
+  // sebagian lalu kehabisan kolom akan meninggalkan pending yang tak bisa di-rollback.
+  const chars = [...tail];
+  for (let i = 0; i < chars.length; i += 1) {
+    const at: View = { ...view, cursorX: view.cursorX + i };
+    if (!canPredict({ ...state, pending: "" }, chars[i]!, at, now, enabled)) {
+      return { state, write: "" };
+    }
+  }
+  return { state: { ...state, pending: tail, since: now }, write: applySeq(tail) };
+}
+
+export function onTick(
+  state: PredictState, now: number,
+): { state: PredictState; write: string; missed: boolean } {
+  if (!state.pending || state.since === null || now < state.since + TTL_MS) {
+    return { state, write: "", missed: false };
+  }
+  return {
+    state: { ...state, pending: "", since: null, suspendedUntil: now + SUSPEND_MS },
+    write: rollbackSeq(state.pending.length),
+    missed: true,
+  };
+}
+
+/** tmux memutar ulang layar penuh saat attach — tak ada yang boleh diwarisi lintas sambungan. */
+export function onReattach(): PredictState {
+  return initialState();
+}

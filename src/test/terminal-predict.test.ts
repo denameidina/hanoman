@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { classifyInput, applySeq, rollbackSeq } from "../src/screens/terminal-predict";
+import {
+  applySeq, canPredict, classifyInput, echoedPrefixLen, initialState, looksLikePasswordPrompt,
+  onInput, onReattach, onServerData, onTick, reapply, rollbackSeq, scanAltScreen,
+  SUSPEND_MS, TTL_MS, type PredictState, type View,
+} from "../src/screens/terminal-predict";
 
 describe("classifyInput", () => {
   it("menyebut satu grafem cetak sebagai teks", () => {
@@ -38,9 +42,6 @@ describe("applySeq / rollbackSeq", () => {
     expect(rollbackSeq(-1)).toBe("");
   });
 });
-
-import { canPredict, initialState, looksLikePasswordPrompt, scanAltScreen,
-  type PredictState, type View } from "../src/screens/terminal-predict";
 
 const view = (over: Partial<View> = {}): View =>
   ({ cursorX: 4, cols: 100, line: "❯ h", connected: true, ...over });
@@ -122,5 +123,116 @@ describe("canPredict", () => {
     const s = state({ suspendedUntil: 30_000 });
     expect(canPredict(s, "a", view(), 29_999, true)).toBe(false);
     expect(canPredict(s, "a", view(), 30_000, true)).toBe(true);
+  });
+});
+
+describe("echoedPrefixLen", () => {
+  it("menghitung berapa karakter pending yang sudah digambar server", () => {
+    expect(echoedPrefixLen("❯ he", "el")).toBe(1);
+    expect(echoedPrefixLen("❯ hel", "el")).toBe(2);
+    expect(echoedPrefixLen("❯ h", "el")).toBe(0);
+  });
+  it("mengambil prefiks TERPANJANG, bukan yang pertama cocok", () => {
+    expect(echoedPrefixLen("aaa", "aa")).toBe(2);
+  });
+  it("nol untuk pending kosong", () => {
+    expect(echoedPrefixLen("apa pun", "")).toBe(0);
+  });
+});
+
+describe("onInput", () => {
+  it("menulis karakter bergaris bawah dan menyimpannya sebagai pending", () => {
+    const r = onInput(initialState(), "a", view(), 1_000, true);
+    expect(r.write).toBe("\x1b[4ma\x1b[24m");
+    expect(r.state.pending).toBe("a");
+    expect(r.state.since).toBe(1_000);
+  });
+  it("menumpuk karakter kedua tanpa memindahkan stempel TTL", () => {
+    const first = onInput(initialState(), "a", view(), 1_000, true);
+    const second = onInput(first.state, "b", view({ cursorX: 5 }), 1_100, true);
+    expect(second.state.pending).toBe("ab");
+    expect(second.state.since).toBe(1_000);
+  });
+  it("tak menulis apa pun saat gerbang menolak", () => {
+    const r = onInput(initialState(), "\r", view(), 1_000, true);
+    expect(r.write).toBe("");
+    expect(r.state.pending).toBe("");
+  });
+});
+
+describe("onServerData", () => {
+  it("mendahulukan rollback lalu data — satu string, satu write", () => {
+    const s = state({ pending: "ab", since: 1_000 });
+    const r = onServerData(s, "DATA", 1_050);
+    expect(r.write).toBe("\x1b[2D\x1b[KDATA");
+    expect(r.state.pending).toBe("");
+    expect(r.state.since).toBeNull();
+    expect(r.tail).toBe("ab");
+  });
+  it("melewatkan data apa adanya saat tak ada pending", () => {
+    const r = onServerData(initialState(), "DATA", 0);
+    expect(r.write).toBe("DATA");
+    expect(r.tail).toBe("");
+  });
+  it("memperbarui alt-screen dari aliran yang sama", () => {
+    expect(onServerData(initialState(), "\x1b[?1049h", 0).state.altScreen).toBe(true);
+  });
+  // Frame nyata SPEC-856: satu keystroke di TUI claude membalas repaint layar penuh ber-posisi
+  // absolut. Prediksi tetap harus dilepas lebih dulu, dan byte server lewat tanpa disunat.
+  it("melepas prediksi di depan repaint absolut TUI agen tanpa mengubah byte server", () => {
+    const frame = "\x1b[38;5;174m\x1b[H ▐▛███▛█\x1b[K\x1b[8;1H❯ h\x1b[K\x1b[8;4H";
+    const r = onServerData(state({ pending: "h", since: 1_000 }), frame, 1_050);
+    expect(r.write).toBe("\x1b[1D\x1b[K" + frame);
+    expect(r.state.altScreen).toBe(false);
+  });
+});
+
+describe("reapply", () => {
+  it("menghidupkan ulang hanya sisa yang belum ter-echo", () => {
+    const r = reapply(initialState(), "b", view({ cursorX: 5, line: "❯ ha" }), 1_050, true);
+    expect(r.write).toBe("\x1b[4mb\x1b[24m");
+    expect(r.state.pending).toBe("b");
+  });
+  it("membuang sisa tanpa menulis apa pun bila gerbang tak lagi lolos", () => {
+    const r = reapply(initialState(), "b", view({ connected: false }), 1_050, true);
+    expect(r.write).toBe("");
+    expect(r.state.pending).toBe("");
+  });
+  it("menolak seluruh sisa saat sebagiannya akan membungkus baris", () => {
+    const r = reapply(initialState(), "bcd", view({ cursorX: 96, cols: 100, line: "" }), 1_050, true);
+    expect(r.write).toBe("");
+    expect(r.state.pending).toBe("");
+  });
+  it("diam untuk sisa kosong", () => {
+    expect(reapply(initialState(), "", view(), 0, true).write).toBe("");
+  });
+});
+
+describe("onTick", () => {
+  it("diam selama TTL belum lewat", () => {
+    const s = state({ pending: "a", since: 1_000 });
+    const r = onTick(s, 1_000 + TTL_MS - 1);
+    expect(r.write).toBe("");
+    expect(r.missed).toBe(false);
+    expect(r.state.pending).toBe("a");
+  });
+  // Kasus terukur: `read -s` dan dialog trust claude sama-sama membalas NOL byte. TTL adalah
+  // satu-satunya sinyal yang membedakannya dari jaringan lambat.
+  it("me-rollback dan menyuspend begitu TTL lewat tanpa echo", () => {
+    const s = state({ pending: "ab", since: 1_000 });
+    const r = onTick(s, 1_000 + TTL_MS);
+    expect(r.write).toBe("\x1b[2D\x1b[K");
+    expect(r.missed).toBe(true);
+    expect(r.state.pending).toBe("");
+    expect(r.state.suspendedUntil).toBe(1_000 + TTL_MS + SUSPEND_MS);
+  });
+  it("diam saat tak ada pending", () => {
+    expect(onTick(initialState(), 9_999).write).toBe("");
+  });
+});
+
+describe("onReattach", () => {
+  it("melupakan segalanya — tmux memutar ulang layar penuh saat attach", () => {
+    expect(onReattach()).toEqual(initialState());
   });
 });
