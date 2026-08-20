@@ -1080,7 +1080,7 @@ git commit -m "docs(spec-856): doc-of-record echo prediktif + index, frontend, s
 
 ### Task 9: Verifikasi akhir
 
-- [ ] **Step 1: Test yang tersentuh**
+- [x] **Step 1: Test yang tersentuh**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1090,7 +1090,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 Expected: hijau, **dan** jumlah berkas test yang berjalan > 0 (`--changed` menyalakan
 `passWithNoTests`, jadi "no test files" bukan bukti).
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -1098,20 +1098,20 @@ pnpm --filter ./src typecheck
 
 Expected: nol error. (`server/**` tak disentuh sama sekali — jangan jalankan `pnpm -r typecheck`.)
 
-- [ ] **Step 3: Smoke browser nyata**
+- [x] **Step 3: Smoke browser nyata**
 
 Buka dashboard dari server Task 7, ketik di pane sesi shell dan di pane sesi agen: karakter
 tampil seketika bergaris bawah lalu menyatu tanpa sisa; Enter/panah/Esc tetap responsif; paste
 mendarat utuh sekali; Cmd/Ctrl+C-V masih menyalin & menempel; Shift+wheel masih menggulir.
 
-- [ ] **Step 4: Commit sisa & push**
+- [x] **Step 4: Commit sisa & push**
 
 ```bash
 git add -A && git commit -m "feat(terminal): echo prediktif lokal + coalescing input (SPEC-856)"
 git push origin HEAD:refs/heads/hanoman/spec-856
 ```
 
-- [ ] **Step 5: Verifikasi manusia di perangkat nyata**
+- [x] **Step 5: Verifikasi manusia di perangkat nyata**
 
 Laporkan ke operator bahwa langkah terakhir — mengetik dari ponsel/tablet lewat domain publik
 (Cloudflare Tunnel), bukan localhost — adalah miliknya, berikut apa yang harus dilihat.
