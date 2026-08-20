@@ -998,7 +998,7 @@ git commit -m "feat(terminal): sakelar ketik responsif di panel tampilan (SPEC-8
 **Interfaces:**
 - Consumes: sakelar `predict` (Task 6) sebagai **satu-satunya variabel** — satu build, dua kondisi.
 
-- [ ] **Step 1: Boot server hidup dari worktree ini**
+- [x] **Step 1: Boot server hidup dari worktree ini**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm dev
@@ -1007,7 +1007,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm dev
 Tunggu sampai dashboard dan `GET /api/health` menjawab. Buat satu sesi shell biasa
 (`Terminal biasa`) supaya ada pane yang bisa diketik tanpa membangunkan agen.
 
-- [ ] **Step 2: Jalankan probe CDP dengan RTT disuntik**
+- [x] **Step 2: Jalankan probe CDP dengan RTT disuntik**
 
 Chrome headless via CDP (pola yang sudah dipakai SPEC-812 & SPEC-800). Untuk tiap kondisi
 (`predict` on/off) dan tiap RTT (0 ms dan 200 ms lewat `Network.emulateNetworkConditions`):
@@ -1018,13 +1018,13 @@ Chrome headless via CDP (pola yang sudah dipakai SPEC-812 & SPEC-800). Untuk tia
 - catat **frame masuk/detik** (hitung `WebSocket.send` lewat `Network.webSocketFrameSent`);
 - catat **byte** dua arah lewat `Network.webSocketFrameSent`/`Received`.
 
-- [ ] **Step 3: Isi tabel hasil di doc-of-record**
+- [x] **Step 3: Isi tabel hasil di doc-of-record**
 
 Isi §"Hasil terukur" dengan matriks 2×2 (predict on/off × RTT 0/200 ms) berisi ketiga metrik.
 Bila jendela 16 ms terukur tak menggabungkan apa pun pada kecepatan ketik manusia, **katakan
 begitu** — itu kontrol negatif, bukan kegagalan.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/docs/research/audit-spec-856-echo-prediktif-terminal.md
@@ -1041,7 +1041,7 @@ git commit -m "docs(spec-856): hasil ukur sebelum/sesudah echo prediktif"
 - Modify: `internal/docs/frontend/frontend-implementation.md`
 - Modify: `internal/skills/hanoman/SKILL.md`
 
-- [ ] **Step 1: Tulis doc-of-record**
+- [x] **Step 1: Tulis doc-of-record**
 
 Ikuti bentuk `internal/docs/research/audit-spec-812-latensi-ketik-terminal-mobile.md`:
 ringkasan · feedback loop merah · temuan bernomor berikut tabel angka · kontrol negatif ·
@@ -1050,25 +1050,25 @@ Angka probe wajib masuk apa adanya: 1 byte (bash) vs 1 540 byte (claude) per key
 0 byte (`read -s` & dialog trust), 22 frame/16 999 B vs 2 frame/1 551 B untuk `hello world`,
 dan kontrol negatif `?47h`/`?2004h` yang juga muncul pada `bash` polos.
 
-- [ ] **Step 2: Tautkan di index**
+- [x] **Step 2: Tautkan di index**
 
 Tambahkan satu baris di bagian `## research` `internal/docs/README.md`, **di atas** baris
 SPEC-851, mengikuti format `- [judul](research/berkas.md) — ringkasan padat`.
 
-- [ ] **Step 3: Perbarui bagian Terminal frontend**
+- [x] **Step 3: Perbarui bagian Terminal frontend**
 
 Di `internal/docs/frontend/frontend-implementation.md`, sesudah paragraf "Input xterm yang lahir
 saat tiket/upgrade WebSocket masih `CONNECTING`…", tambahkan paragraf SPEC-856: invarian
 rollback-sebelum-data, daftar gerbang, TTL 500 ms + cooldown 30 dtk, batcher 16 ms yang
 meloloskan control/bulk, dan sakelar `hn.ui.v1.terminal.predict`.
 
-- [ ] **Step 4: Perbarui butir arsitektur terminal di skill**
+- [x] **Step 4: Perbarui butir arsitektur terminal di skill**
 
 Di `internal/skills/hanoman/SKILL.md`, pada butir "Terminal server: **node-pty + tmux**…",
 sambung sesudah kalimat SPEC-812: arah MASUK diselesaikan SPEC-856 di klien, berikut invarian,
 gerbang, dan gotcha `?47h`/`?2004h`.
 
-- [ ] **Step 5: Verifikasi integritas index & commit**
+- [x] **Step 5: Verifikasi integritas index & commit**
 
 ```bash
 node cli/dist/index.js docs index --check || pnpm --filter ./cli build && node cli/dist/index.js docs index --check
