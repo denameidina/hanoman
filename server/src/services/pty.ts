@@ -53,7 +53,13 @@ export type Frame =
   // SPEC-433 · `complete` = verdict, bukan daftar nama: seluruh fase pipeline sudah tercatat DAN
   // plan spec-nya tak menyisakan `- [ ]` (ADR-0029). Terminal tak punya sumber lain untuk
   // "selesai" — `exited` hanya berarti prosesnya mati, dan TUI agen tak pernah mati sendiri.
-  | { t: "phase"; phases: Phase[]; complete: boolean };
+  | { t: "phase"; phases: Phase[]; complete: boolean }
+  // SPEC-863 · ADR-0133 · alternate screen PANE. Ia tak bisa diturunkan dari aliran byte: tmux
+  // mengemulasi terminal pane, jadi `\x1b[?1049h/l` milik program di dalamnya tak pernah
+  // diteruskan ke klien luar — yang sampai ke sana hanya `smcup` milik klien tmux sendiri, di
+  // byte pertama dan tanpa pasangan `l` selama sambungan hidup. Satu-satunya yang tahu adalah
+  // tmux, lewat `#{alternate_on}`.
+  | { t: "alt"; on: boolean };
 // Sengaja bukan `WebSocket`: service ini tidak boleh tahu soal transport, dan test
 // menyuntikkan perekam frame biasa.
 export type Client = { send(msg: string): void; close(): void };
@@ -70,13 +76,17 @@ export type SessionInfo = {
 };
 type Pane = SessionInfo & {
   code: number; phaseFile?: string; decisionFile?: string;
+  // SPEC-863 · `#{alternate_on}` pane — TUI layar penuh (vim) 1, shell dan TUI agen 0.
+  altScreen: boolean;
 };
 
 // Satu attachment per sesi: satu klien tmux melayani semua WebSocket yang menonton.
 // `lastPhases` menahan JSON fase terakhir yang disiarkan — frame lahir hanya saat berubah.
+// `lastAlt` melakukan hal yang sama untuk alternate screen pane (SPEC-863).
 // `pending` menahan keluaran yang belum disiarkan (SPEC-812) — lihat flushOutput.
 type Attachment = {
   pty: IPty; scrollback: string; clients: Set<Client>; lastPhases: string;
+  lastAlt?: boolean;
   pending: string; flushTimer?: NodeJS.Timeout;
 };
 const attached = new Map<string, Attachment>();
@@ -162,7 +172,7 @@ const idFor = (specId?: string) =>
 const FMT = [
   "#{session_name}", "#{@hanoman_project}", "#{@hanoman_spec}", "#{@hanoman_flow}",
   "#{@hanoman_phase_file}", "#{@hanoman_cwd}", "#{pane_dead}", "#{pane_dead_status}",
-  "#{@hanoman_decision_file}", "#{@hanoman_branch}", "#{@hanoman_agent}",
+  "#{@hanoman_decision_file}", "#{@hanoman_branch}", "#{@hanoman_agent}", "#{alternate_on}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -177,7 +187,8 @@ function listPanes(): Pane[] {
     throw e;
   }
   return out.split("\n").filter(Boolean).flatMap((line) => {
-    const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent] = line.split("\t");
+    const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
+      alternate] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     return [{
@@ -191,6 +202,7 @@ function listPanes(): Pane[] {
       decision: !exited && !!decisionFile && markerFilled(decisionFile),
       // SPEC-338 · sesi yang lahir sebelum ADR-0074 tak punya opsi ini → claude.
       agent: (agent === "codex" ? "codex" : "claude") as Agent,
+      altScreen: alternate === "1",
     }];
   });
 }
@@ -809,6 +821,14 @@ function pollPhases(p: Pane, a: Attachment): void {
   broadcast(a, { t: "phase", phases, complete });
 }
 
+// SPEC-863 · cermin pollPhases: frame lahir hanya saat berubah, dan sumbernya `Pane` yang sudah
+// dipegang loop poll — tak ada invokasi tmux tambahan, `#{alternate_on}` ikut di `FMT`.
+function pollAlt(p: Pane, a: Attachment): void {
+  if (p.altScreen === a.lastAlt) return;
+  a.lastAlt = p.altScreen;
+  broadcast(a, { t: "alt", on: p.altScreen });
+}
+
 let poll: NodeJS.Timeout | undefined;
 // ponytail: satu `tmux list-panes` + satu bacaan berkas fase per 500ms untuk semua sesi
 // terbuka. Ganti dengan hook `pane-died` + `wait-for` kalau terminal yang terbuka bersamaan
@@ -828,7 +848,11 @@ function startPoll(): void {
       const p = live.get(id);
       if (!p) end(id, 0);            // sesinya dibunuh dari luar
       else if (p.exited) end(id, p.code);
-      else pollPhases(p, attached.get(id)!);
+      else {
+        const a = attached.get(id)!;
+        pollPhases(p, a);
+        pollAlt(p, a);
+      }
     }
     if (attached.size === 0 && poll) { clearInterval(poll); poll = undefined; }
   }, POLL_MS);
@@ -851,6 +875,11 @@ export function attach(id: string, c: Client): void {
   a.clients.add(c);
   // Scrollback lebih dulu untuk klien kedua; klien pertama digambar ulang oleh tmux sendiri.
   if (a.scrollback) c.send(frame({ t: "data", d: a.scrollback }));
+  // SPEC-863 · alasan yang sama dengan `phase` di bawah: siaran hanya lahir saat BERUBAH, jadi
+  // klien yang mendarat di tengah alternate screen tak akan pernah mendapatnya. Prediksi klien
+  // default `false`, dan tanpa baris ini ia akan meramal di dalam TUI layar penuh.
+  a.lastAlt = p.altScreen;
+  c.send(frame({ t: "alt", on: p.altScreen }));
   // Fase dikirim ke klien ini saja: `lastPhases` milik attachment sudah terisi kalau klien
   // pertama menerimanya, dan siaran ulang tak akan pernah sampai ke klien kedua.
   // SPEC-433 · dibaca dari `p` yang sudah di tangan, bukan `sessionPhases(id)` yang memanggil

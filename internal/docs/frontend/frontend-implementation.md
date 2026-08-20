@@ -551,9 +551,12 @@ sehingga layar sesudah tiap frame server byte-identik dengan layar tanpa prediks
 membandingkan model layar xterm *dan* `tmux capture-pane`). Karakter tampil bergaris bawah
 (`\x1b[4m`…`\x1b[24m` — netral SGR; `\x1b[m` akan merusak latar yang dipakai `\x1b[K` saat
 rollback) dan rollback-nya `\x1b[<n>D\x1b[K`, setia karena gerbang menjamin ekor baris kosong.
-Prediksi **mati** saat: sakelar operator mati, socket belum `open`, alternate screen
-(`?1049`/`?1047` — **bukan** `?47`/`?2004`, yang terukur ikut lahir dari handshake attach tmux
-pada `bash` polos), input bukan teks tunggal (escape/panah/Enter/Tab/ctrl/paste/IME), kursor di dua
+Prediksi **mati** saat: sakelar operator mati, socket belum `open`, alternate screen **pane**
+(SPEC-863 · ADR-0133 — dipasok server lewat frame `{t:"alt"}` dari `#{alternate_on}` milik tmux,
+**bukan** dipindai dari aliran: tmux tak pernah meneruskan `?1049h/l` milik program di dalam pane,
+sementara `?1049h` yang memang sampai adalah `smcup` klien tmux sendiri — byte pertama tiap attach,
+tanpa pasangan `l` selama sambungan hidup, dan memindainya terukur mematikan fitur ini **total**),
+input bukan teks tunggal (escape/panah/Enter/Tab/ctrl/paste/IME), kursor di dua
 kolom terakhir, ekor baris tak kosong, baris berpola password, dan begitu satu prediksi mencapai
 TTL 500 ms tanpa pernah ter-echo (suspend ber-cooldown 30 detik; `read -s` dan tombol yang ditelan
 dialog sama-sama terukur membalas nol byte). Sisa yang belum ter-echo dihidupkan ulang di kursor
