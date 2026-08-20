@@ -78,16 +78,19 @@ export type Remote = { name: string; fetch: string; push: string };
 export type GitOpResult = { ok: boolean; stdout: string; stderr: string; current: string; error?: string };
 // SPEC-229 · hasil merge via git graph: bersih → detail; konflik → sesi claude (sessionId).
 export type GraphMergeResult = { status: "clean"; detail: string } | { status: "conflict"; sessionId: string };
-// SPEC-360 · ADR-0077 · branch ter-merge & hapus batch. Cermin server/src/services/branch-cleanup.ts.
+// SPEC-360 · ADR-0077 · branch & hapus batch. Cermin server/src/services/branch-cleanup.ts.
 export type BranchLock = "current" | "base" | "worktree" | "spec-open" | "session";
 export type BranchScope = "local" | "remote" | "both";
 export type UnusedBranch = {
-  name: string; local: boolean; remote: boolean;
+  name: string;
+  // SPEC-859 · `local`/`remote` = ref itu ADA; merged-ness terpisah di tiga field di bawah.
+  local: boolean; remote: boolean;
+  merged: boolean; mergedLocal: boolean; mergedRemote: boolean;
   lastCommit: { sha: string; at: string; subject: string } | null;
   locks: BranchLock[];
 };
 export type UnusedReport = { base: string; baseRemote: string | null; current: string; branches: UnusedBranch[] };
-export type BranchDeleteResult = { name: string; ok: boolean; scope: BranchScope | "none"; error?: string };
+export type BranchDeleteResult = { name: string; ok: boolean; scope: BranchScope | "none"; forced?: true; error?: string };
 // Label badge kunci di UI — versi ringkas LOCK_REASON server (badge sempit, prosa panjang di error).
 export const LOCK_LABEL: Record<BranchLock, string> = {
   current: "branch aktif",
@@ -326,9 +329,11 @@ export const api = {
   ideGitRebase: (id: string, onto: string) => j<GraphMergeResult>(paths.ideGitRebase(id), { method: "POST", ...body({ onto }) }),
   ideGitPull: (id: string, b: { source: string; ff?: "no-ff" | "ff-only" }) => j<GraphMergeResult>(paths.ideGitPull(id), { method: "POST", ...body(b) }),
   ideGitDrop: (id: string, sha: string) => j<GraphMergeResult>(paths.ideGitDrop(id), { method: "POST", ...body({ sha }) }),
-  // SPEC-360 · ADR-0077 · daftar branch ter-merge + hapus batch (local/origin).
-  branchesUnused: (id: string, base?: string) => j<UnusedReport>(paths.branchesUnused(id, base)),
-  deleteBranches: (id: string, b: { names: string[]; scope?: BranchScope; base?: string }) =>
+  // SPEC-360 · ADR-0077 · daftar branch + hapus batch (local/origin).
+  // SPEC-859 · `include: "all"` memuat branch belum ter-merge; `allowUnmerged` membuka hapusnya.
+  branchesUnused: (id: string, base?: string, include?: "all") =>
+    j<UnusedReport>(paths.branchesUnused(id, base, include)),
+  deleteBranches: (id: string, b: { names: string[]; scope?: BranchScope; base?: string; allowUnmerged?: boolean }) =>
     j<{ base: string; results: BranchDeleteResult[] }>(paths.branchesDelete(id), { method: "POST", ...body(b) }),
   browseFs: (path?: string) =>
     j<{ path: string; parent: string | null; entries: { name: string; path: string }[] }>(paths.fsBrowse(path)),

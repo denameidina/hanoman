@@ -449,7 +449,7 @@ git commit -m "feat(branches): hapus branch belum ter-merge di balik allowUnmerg
   type BranchDeleteResult = { name; ok; scope; forced?: true; error? }
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `src/test/branch-cleanup-client.test.ts` di dalam `describe("api branch cleanup (SPEC-360)", ...)`:
 
@@ -476,12 +476,12 @@ Tambahkan ke `src/test/branch-cleanup-client.test.ts` di dalam `describe("api br
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run --no-file-parallelism src/test/branch-cleanup-client.test.ts -t "SPEC-859"`
 Expected: FAIL — URL tak memuat `include=all`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `shared/src/api.ts` ganti `branchesUnused`:
 
@@ -526,12 +526,12 @@ Dan ganti kedua fungsi api:
     j<{ base: string; results: BranchDeleteResult[] }>(paths.branchesDelete(id), { method: "POST", ...body(b) }),
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run --no-file-parallelism src/test/branch-cleanup-client.test.ts`
 Expected: PASS — termasuk test lama (`branchesUnused("p1")` tetap tanpa query, `("p1","dev")` tetap `?base=dev`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/api.ts src/src/api/client.ts src/test/branch-cleanup-client.test.ts
