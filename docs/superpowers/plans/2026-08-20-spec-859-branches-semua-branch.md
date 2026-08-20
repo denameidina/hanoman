@@ -940,7 +940,7 @@ git commit -m "feat(branches): panel menampilkan semua branch + filter status & 
 - Modify: `internal/docs/requirements/rd.md` (kalimat "tanpa `--force`")
 - Verify: `internal/docs/README.md` (tak ada berkas doc baru — cukup pastikan index tetap konsisten)
 
-- [ ] **Step 1: Amandemen ADR-0077**
+- [x] **Step 1: Amandemen ADR-0077**
 
 Tambahkan blok **Amandemen SPEC-859 (2026-08-20)** di ujung `0077-*.md` yang menyatakan:
 
@@ -956,7 +956,7 @@ Tambahkan blok **Amandemen SPEC-859 (2026-08-20)** di ujung `0077-*.md` yang men
 - Lima kunci proteksi **tidak** dilonggarkan dan tetap menang atas `allowUnmerged`.
 - `push origin --delete` tak pernah menguji merged-ness, jadi sisi origin tak ikut digerbangi force.
 
-- [ ] **Step 2: Perbarui index ADR & empat doc kontrak**
+- [x] **Step 2: Perbarui index ADR & empat doc kontrak**
 
 - `adr/README.md`: tambahkan klausa `— **Diamandemen SPEC-859 (2026-08-20)**: …` pada baris 0077.
 - `architecture/api-contract.md`: `GET …/branches/unused?base=&include=` (`merged` default | `all`),
@@ -973,12 +973,12 @@ Tambahkan blok **Amandemen SPEC-859 (2026-08-20)** di ujung `0077-*.md` yang men
 - `requirements/rd.md`: ganti "tanpa `--force`" menjadi "`--force` hanya di balik `allowUnmerged` +
   konfirmasi ketik-ulang (SPEC-859)".
 
-- [ ] **Step 3: Verifikasi integritas index**
+- [x] **Step 3: Verifikasi integritas index**
 
 Run: `git diff --name-only -- internal/docs`
 Expected: hanya berkas yang sudah ter-link di `internal/docs/README.md` (tak ada berkas baru).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/docs

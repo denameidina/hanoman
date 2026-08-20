@@ -985,21 +985,36 @@ dan **Branches** (SPEC-360).
   dengan pesan git asli + tombol **Paksa** yang mengulang op `force:true` (peringatan: bisa membuang
   perubahan tak ter-commit & mengganggu sesi Claude). Aman-default; force opt-in per aksi.
 
-### Tab Branches — bersihkan branch tak terpakai (SPEC-360 · ADR-0077)
+### Tab Branches — semua branch project (SPEC-360 · ADR-0077 · SPEC-859)
 Tab ketiga IDE Visual, di samping Explorer & Git Graph. `BranchesPanel.tsx` hidup sebagai komponen
-sendiri — `GitGraph.tsx` sudah 43 KB dan tak layak ditumpangi lagi. Isinya branch yang **sudah
-ter-merge ke base** (`api.branchesUnused`):
+sendiri — `GitGraph.tsx` sudah 43 KB dan tak layak ditumpangi lagi. Isinya **seluruh** branch project,
+local maupun origin, ter-merge maupun belum: panel meminta `api.branchesUnused(id, base, "all")` sekali
+lalu menyaring di klien, sehingga "yang sedang tampak" persis sama dengan yang bisa dipilih.
 
-- **Header**: `Select` **base** (default "base otomatis", opsinya dari `api.listBranches`) + `Select`
-  **scope** (`local + origin` default · `local saja` · `origin saja`) + **Muat ulang** + tombol
-  **Hapus terpilih (N)**. Mengganti base memuat ulang laporan dan mengosongkan pilihan.
-- **Baris**: checkbox · nama branch (mono) · badge `local`/`origin`/`local + origin` · badge alasan
-  untuk baris terkunci (`LOCK_LABEL`) · subject + umur commit terakhir · tombol **Hapus** per baris.
-  Baris terkunci (`locks` tak kosong — termasuk `main` yang selalu tampil sebagai base+current)
-  checkbox-nya mati dan tombol Hapus-nya disabled; "Pilih semua yang boleh" melewatinya.
+- **Header**: kotak **cari** nama branch + `Select` **status** (`semua status` default ·
+  `ter-merge saja` · `belum ter-merge`) + `Select` **base** (default "base otomatis", opsinya dari
+  `api.listBranches`) + `Select` **scope** (`local + origin` default · `local saja` · `origin saja`) +
+  **Muat ulang** + tombol **Hapus terpilih (N)**. Mengganti base memuat ulang laporan; mengganti
+  status/cari mengosongkan pilihan dan mengembalikan batas render.
+- **Baris**: checkbox · nama branch (mono) · badge **status** (`ter-merge` tone `ok` / `belum ter-merge`
+  tone `warn`) · badge scope `local`/`origin`/`local + origin` · badge alasan untuk baris terkunci
+  (`LOCK_LABEL`) · subject + umur commit terakhir · tombol **Hapus** per baris. Baris terkunci
+  (`locks` tak kosong — termasuk `main` yang selalu tampil sebagai base+current) checkbox-nya mati dan
+  tombol Hapus-nya disabled; "Pilih semua yang boleh" melewatinya.
+- **Batas render** `PAGE = 100` + tombol **Tampilkan N lagi**. Batas ini **bagian dari definisi "sedang
+  tampak"**: `Pilih semua yang boleh (N)` hanya mencakup baris yang benar-benar dirender, jadi pilihan
+  tak pernah memuat branch yang tak terlihat operator. Server memancarkan daftar penuh urut nama;
+  yang membatasi hanya klien.
 - **Konfirmasi & hasil**: `ConfirmDialog` menyebut jumlah + scope; hasil dilaporkan per baris
-  (`N terhapus · M gagal`, tiap kegagalan menampilkan `error` dari server) sehingga kegagalan
-  sebagian terlihat apa adanya, bukan tersembunyi di balik satu toast.
+  (`N terhapus (K dipaksa) · M gagal`, tiap kegagalan menampilkan `error` dari server) sehingga
+  kegagalan sebagian terlihat apa adanya, bukan tersembunyi di balik satu toast.
+- **Dialog risiko untuk branch belum ter-merge (SPEC-859)**: begitu target memuat satu saja branch
+  `merged:false`, dialognya berbeda — `impact` menyebut jumlah + nama branch-nya dan menyatakan commit
+  yang hanya ada di sana akan hilang, dan `requireText` menuntut ketikan ulang (nama branch bila
+  targetnya satu, `hapus paksa` bila batch — pola ADR-0121). **Hanya** dialog inilah yang mengirim
+  `allowUnmerged: true`; batch yang seluruhnya ter-merge tak pernah membawanya.
+- **Dua empty state yang berbeda**: "Tak ada branch" (project memang belum punya branch) vs "Tak ada
+  branch cocok filter" (daftar tersaring) — supaya daftar tersaring tak terbaca sebagai data kosong.
 - **Dua jebakan test yang sudah memakan korban** — keduanya membuat test "lulus" secara palsu:
   `Checkbox` design system bukan `<input type=checkbox>` melainkan `<label>` (pembawa `data-testid`)
   yang membungkus `<span>`, dan **onClick hidup di span itu** — mengklik label adalah no-op
