@@ -85,6 +85,8 @@ export type UnusedBranch = {
   name: string; local: boolean; remote: boolean;
   lastCommit: { sha: string; at: string; subject: string } | null;
   locks: BranchLock[];
+  /** SPEC-861 · path worktree yang menahannya; ada hanya saat kunci `worktree` menyala. */
+  worktree?: string;
 };
 export type UnusedReport = { base: string; baseRemote: string | null; current: string; branches: UnusedBranch[] };
 export type BranchDeleteResult = { name: string; ok: boolean; scope: BranchScope | "none"; error?: string };
@@ -95,6 +97,20 @@ export const LOCK_LABEL: Record<BranchLock, string> = {
   worktree: "dipakai worktree",
   "spec-open": "backlog belum selesai",
   session: "sesi aktif",
+};
+// SPEC-861 · ADR-0132 · cermin server/src/services/worktree-list.ts + shared/src/dto.ts.
+export type WorktreeView = {
+  path: string; name: string; head: string; branch: string | null;
+  prunable: boolean; locked: boolean; deletable: boolean; blocked: string | null;
+  spec: { id: string; stage: string } | null;
+  session: { id: string; specId: string | null } | null;
+  createdAt: string | null;
+};
+export type WorktreeReport = { repoDir: string; worktrees: WorktreeView[] };
+export type WorktreeStats = { name: string; sizeBytes: number | null; dirtyFiles: number; orphanCommits: number };
+export type WorktreeDeleteResult = {
+  name: string; ok: boolean; cleanup: string | null; closedSession?: string;
+  branch?: { name: string; ok: boolean; error?: string }; error?: string;
 };
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { headers: { "content-type": "application/json" }, ...init });
@@ -330,6 +346,12 @@ export const api = {
   branchesUnused: (id: string, base?: string) => j<UnusedReport>(paths.branchesUnused(id, base)),
   deleteBranches: (id: string, b: { names: string[]; scope?: BranchScope; base?: string }) =>
     j<{ base: string; results: BranchDeleteResult[] }>(paths.branchesDelete(id), { method: "POST", ...body(b) }),
+  // SPEC-861 · ADR-0132 · worktree hidup. `worktreeStats` terpisah karena `du` lambat: daftar
+  // lahir dulu, sinyal mahal menyusul per baris.
+  worktrees: (id: string) => j<WorktreeReport>(paths.worktrees(id)),
+  worktreeStats: (id: string, name: string) => j<WorktreeStats>(paths.worktreeStats(id, name)),
+  deleteWorktrees: (id: string, b: { names: string[]; deleteBranch?: boolean }) =>
+    j<{ results: WorktreeDeleteResult[] }>(paths.worktreesDelete(id), { method: "POST", ...body(b) }),
   browseFs: (path?: string) =>
     j<{ path: string; parent: string | null; entries: { name: string; path: string }[] }>(paths.fsBrowse(path)),
   listTerminals: () => j<TerminalSession[]>(paths.terminalSessions),
