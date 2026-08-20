@@ -70,9 +70,9 @@ hanoman --version | --help
   `pnpm -r typecheck`, atau build penuh sebagai rutinitas — mesin ini menjalankan beberapa sesi
   sekaligus. Perluas scope hanya bila perubahannya memang berdampak luas, dan katakan alasannya.
   Jebakan: `--changed` menyalakan `passWithNoTests`, jadi nol test **terlihat hijau**.
-- Suite penuh (`vitest run --no-file-parallelism`) dijalankan **manusia** sebelum merge, bukan sesi —
-  dan sejak SPEC-852/ADR-0128 juga oleh CI (`.github/workflows/validate.yml`, `pnpm validate`) pada
-  tiap pull request & push ke `main`; job `publish` di `release.yml` ber-`needs: validate`.
+- Suite penuh (`vitest run --no-file-parallelism`) dijalankan **manusia** sebelum merge, bukan sesi
+  dan bukan CI. Sejak amandemen ADR-0128 tanggal 2026-08-20, `.github/workflows/validate.yml` hanya
+  menjalankan `pnpm typecheck`; job `publish` di `release.yml` tetap ber-`needs: validate`.
 - **Worktree baru:** `pnpm install` sudah cukup — `postinstall` paket `server` men-generate Prisma
   Client dari `server/prisma/schema.prisma` (ADR-0128). Bila suatu saat ia terlewat, gejalanya
   `Property 'dmmf' does not exist` / `Cannot read properties of undefined (reading 'datamodel')`;

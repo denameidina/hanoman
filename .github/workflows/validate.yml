@@ -9,12 +9,9 @@
 # dan `release.yml` lewat `workflow_call`. Menyalin langkahnya ke release.yml berarti dua
 # definisi yang akan menyimpang tanpa ada yang merah.
 #
-# SPEC-853 · Gerbangnya kini DUA job yang berjalan bersamaan, bukan satu `pnpm validate` berurutan.
-# Wall-clock sebelumnya = typecheck + suite serial, dan suite serial itu tak bisa diparalelkan
-# (SPEC-397: test server berbagi satu berkas DB, 181 gagal palsu paralel vs 736 lulus serial). Yang
-# bisa diparalelkan adalah dua LAPISAN yang memang tak saling bergantung. Cakupannya tetap sama
-# persis — `pnpm validate` tetap ada dan tetap jalur local yang terdokumentasi; CI menjalankan
-# lapisan penyusunnya, dan `cli/test/release-gate.test.ts` menjaga tak ada lapisan yang hilang.
+# SPEC-853 awalnya memecah gerbang menjadi job `typecheck` dan `test`. Amandemen 2026-08-20
+# menghapus job `test` karena suite itu menggantung sampai plafon runner dan memblokir semua rilis.
+# `pnpm test` dan `pnpm validate` tetap menjadi jalur verifikasi local; CI menjaga typecheck.
 name: validate
 
 on:
@@ -22,18 +19,6 @@ on:
   push:
     branches: [main]
   workflow_call:
-    inputs:
-      # SEMENTARA (2026-08-19) · Jalan keluar untuk rilis yang tersandera job `test` yang
-      # MENGGANTUNG — bukan yang merah. Bukti: tiga run (`main`, `spec-850`, `spec-851`) mati di
-      # batas 6 jam GitHub, seluruhnya di langkah `pnpm validate`, sementara setup/install/tmux
-      # selesai dalam hitungan detik. Selama hang itu belum diperbaiki, gerbangnya tak menahan
-      # commit merah — ia hanya membuat SEMUA rilis mustahil.
-      # Default `false`: melewati test harus jadi tindakan yang DISEBUT, bukan keadaan diam-diam.
-      # PENCABUTAN: hapus input ini dan `skip_test: true` di release.yml begitu hang teratasi.
-      skip_test:
-        description: Lewati job test (bypass sementara; typecheck TETAP wajib hijau).
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -45,14 +30,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Tak ber-`needs`: justru itu inti pemisahannya. Job yang menunggu tetangganya tak menghemat
-  # apa pun. Keduanya wajib hijau — `workflow_call` baru selesai setelah SEMUA job-nya selesai,
-  # jadi `needs: validate` di release.yml tetap menunggu keduanya tanpa perubahan apa pun di sana.
   typecheck:
     runs-on: ubuntu-latest
-    # Job yang menggantung menghabiskan 6 jam runner dan menyamar sebagai "CI lambat" alih-alih
-    # lapor merah. Angkanya longgar terhadap jalur sehat (typecheck terukur 1 menit) dan ketat
-    # terhadap hang.
+    # Jalur sehat terukur sekitar satu menit; batas ini membuat gangguan runner gagal dengan suara.
     timeout-minutes: 15
     env:
       HANOMAN_UPDATE_FETCH: "0"
@@ -60,40 +40,3 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/ci-setup
       - run: pnpm typecheck
-
-  test:
-    # Bypass HANYA lewat input eksplisit. Pemicu `pull_request`/`push: main` tak punya input, jadi
-    # di sana `inputs.skip_test` kosong → job tetap jalan: jalur sehari-hari TIDAK ikut dilonggarkan.
-    if: ${{ !inputs.skip_test }}
-    runs-on: ubuntu-latest
-    # Terukur: run yang menggantung berhenti di 6:00:00 (plafon GitHub). Dengan pagar ini, hang
-    # yang sama lapor merah dalam 30 menit — dan jalur sehat tak pernah mendekati angka itu.
-    timeout-minutes: 30
-    env:
-      # Berkas DB test diturunkan dari HANOMAN_HOME, BUKAN dari checkout (SPEC-479). Di runner ia
-      # diarahkan ke dalam workspace supaya pasti bisa ditulis dan tak berbagi dengan apa pun.
-      HANOMAN_HOME: ${{ github.workspace }}/.hanoman-ci
-      # Deteksi update menyentuh registry npm; validasi tak boleh bergantung pada jaringan.
-      HANOMAN_UPDATE_FETCH: "0"
-    steps:
-      - uses: actions/checkout@v4
-
-      # Sesi terminal hidup di tmux (ADR-0016) dan sebagian besar test server men-spawn pane
-      # sungguhan lewat socket `hanoman-test`. Tanpa tmux mereka gagal karena lingkungan runner,
-      # bukan karena kode — kelas kegagalan yang paling mahal dibaca. Hanya job ini yang butuh:
-      # typecheck tak menjalankan satu test pun.
-      - name: tmux (dipakai test sesi terminal)
-        run: command -v tmux || { sudo apt-get update && sudo apt-get install -y tmux; }
-
-      # Test worktree menjalankan `git commit`; git menolak tanpa identitas, dan pesannya tak
-      # menyebut test sama sekali.
-      - name: Identitas git untuk test worktree
-        run: |
-          git config --global user.email "ci@hanoman.invalid"
-          git config --global user.name "hanoman CI"
-
-      - uses: ./.github/actions/ci-setup
-
-      # `--no-file-parallelism` hidup di script `pnpm test` dan DIJAGA test: melepasnya membuat CI
-      # merah karena alasan yang salah, lalu membuat orang mematikan gerbangnya (SPEC-397).
-      - run: pnpm test

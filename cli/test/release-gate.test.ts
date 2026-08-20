@@ -16,6 +16,20 @@ const ciSetup = read(".github/actions/ci-setup/action.yml");
 const rootPkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
 const serverPkg = JSON.parse(read("server/package.json")) as { scripts: Record<string, string> };
 
+const workflowJobNames = (workflow: string) => {
+  const jobs = workflow.split(/^jobs:\s*$/m)[1] ?? "";
+  return [...jobs.matchAll(/^  ([A-Za-z0-9_-]+):\s*$/gm)].map((match) => match[1]);
+};
+
+const executableYaml = (source: string) =>
+  source
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .join("\n");
+
+const TEST_ENTRYPOINT =
+  /\b(?:pnpm\s+(?:run\s+)?(?:test|validate|vitest)|pnpm\s+exec\s+vitest|npx\s+vitest|vitest\s+run|npm\s+(?:run\s+)?test)\b/i;
+
 describe("bootstrap Prisma Client", () => {
   // Akar issue #1: `pnpm install` sendiri TIDAK menghasilkan client — postinstall @prisma/client
   // hanya mencari skema di lokasi default, sementara skema hanoman ada di server/prisma/. Tanpa
@@ -55,53 +69,29 @@ describe("workflow validate", () => {
     expect(validate).toMatch(/^\s*workflow_call:/m);
   });
 
-  // SPEC-853 · Dulu satu job menjalankan `pnpm validate` (db:generate → typecheck → test) secara
-  // berurutan; wall-clock-nya = jumlah keduanya, dan test serial (SPEC-397) mendominasi. Dipisah
-  // jadi dua job yang berjalan BERSAMAAN. Yang dijaga bukan bentuk perintahnya melainkan
-  // CAKUPANNYA: kedua lapisan harus tetap ada, karena job yang hilang tak menggagalkan apa pun —
-  // ia hanya membuat publish lewat begitu saja (kelas kegagalan yang sama dengan issue #1).
-  it("menjalankan typecheck DAN test — keduanya, sebagai job terpisah", () => {
-    expect(validate).toMatch(/^\s{2}typecheck:/m);
-    expect(validate).toMatch(/^\s{2}test:/m);
+  // Amandemen 2026-08-20: suite test tetap tersedia lewat `pnpm test`/`pnpm validate` di local,
+  // tetapi tak lagi menjadi job CI karena hang memblokir semua rilis. Typecheck tetap menjadi
+  // satu-satunya lapisan validasi kode di GitHub Actions.
+  it("menjalankan typecheck sebagai satu-satunya job CI", () => {
+    expect(workflowJobNames(validate)).toEqual(["typecheck"]);
     expect(validate).toContain("pnpm typecheck");
-    expect(validate).toContain("pnpm test");
   });
 
-  // Paralel hanya menghemat waktu bila tak ada `needs` di antara keduanya.
-  it("kedua job tak saling menunggu", () => {
-    expect(validate).not.toMatch(/needs:\s*typecheck/);
-    expect(validate).not.toMatch(/needs:\s*test/);
+  it("tak menjalankan entrypoint test lewat workflow atau composite action", () => {
+    for (const source of [validate, release, ciSetup]) {
+      expect(executableYaml(source)).not.toMatch(TEST_ENTRYPOINT);
+    }
   });
 
-  // Prisma Client tak ada di checkout bersih (ADR-0128): typecheck DAN test sama-sama mati
-  // tanpanya, dan job terpisah tak mewarisi apa pun dari job tetangga. Setup-nya hidup di composite
-  // action supaya tak jadi dua salinan yang menyimpang — yang dijaga: kedua job memakainya, dan
-  // action itu benar-benar men-generate client.
-  it("kedua job memakai setup bersama yang menyiapkan Prisma Client", () => {
-    expect(validate.match(/uses:\s*\.\/\.github\/actions\/ci-setup/g) ?? []).toHaveLength(2);
+  // Prisma Client tak ada di checkout bersih (ADR-0128), jadi typecheck mati tanpa setup ini.
+  it("job typecheck memakai setup yang menyiapkan Prisma Client", () => {
+    expect(validate.match(/uses:\s*\.\/\.github\/actions\/ci-setup/g) ?? []).toHaveLength(1);
     expect(ciSetup).toContain("pnpm db:generate");
     expect(ciSetup).toContain("pnpm install --frozen-lockfile");
   });
 
-  // BYPASS SEMENTARA (2026-08-19). Yang dijaga di sini bukan "test wajib jalan" — untuk sementara
-  // memang tidak — melainkan bahwa melewatinya tetap TINDAKAN YANG DISEBUT: defaultnya `false`,
-  // dan jalur sehari-hari (pull_request / push main) tak punya input sama sekali sehingga tak ikut
-  // terlonggarkan. Bypass yang defaultnya longgar akan jadi permanen tanpa ada yang merah.
-  it("melewati test hanya lewat input eksplisit, defaultnya tidak", () => {
-    expect(validate).toMatch(/skip_test:/);
-    expect(validate).toMatch(/default:\s*false/);
-    expect(validate).toMatch(/if:\s*\$\{\{\s*!inputs\.skip_test\s*\}\}/);
-  });
-
-  // Hang 6 jam (tiga run terukur) menyamar sebagai "CI lambat". Pagar waktu membuatnya lapor merah.
-  it("kedua job punya batas waktu", () => {
-    expect(validate.match(/timeout-minutes:/g) ?? []).toHaveLength(2);
-  });
-
-  // tmux hanya dibutuhkan job test (sesi terminal ADR-0016) — memasangnya di job typecheck
-  // menambah waktu tanpa alasan. Yang dijaga: job test TIDAK boleh kehilangan tmux.
-  it("job test tetap memasang tmux", () => {
-    expect(validate.split(/^\s{2}test:/m)[1] ?? "").toContain("tmux");
+  it("job typecheck punya batas waktu", () => {
+    expect(validate.match(/timeout-minutes:/g) ?? []).toHaveLength(1);
   });
 });
 

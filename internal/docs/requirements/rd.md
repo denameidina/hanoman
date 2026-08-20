@@ -67,12 +67,13 @@ Sebelum sebuah perubahan boleh masuk `main`:
    Jebakan yang harus disadari: `--changed` menyalakan `passWithNoTests`, jadi **nol test terlihat
    hijau** — pastikan test-nya memang berjalan.
 2. **Suite penuh** (`vitest run --no-file-parallelism`) — langkah **manusia** sebelum merge, bukan tugas
-   sesi. Sejak [ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md) ia **juga** dijalankan CI
-   (`.github/workflows/validate.yml`) pada tiap pull request dan push ke `main`. Di local jalurnya
-   satu perintah, `pnpm validate` = `pnpm db:generate` → `pnpm typecheck` → `pnpm test`; di CI
-   lapisan itu dipecah jadi **dua job paralel** (`typecheck` dan `test`, SPEC-853) — cakupannya
-   sama, keduanya wajib hijau, hanya wall-clock-nya yang turun. Job `publish` di
-   `release.yml` ber-`needs: validate`, jadi commit yang merah tak bisa terbit ke npm.
+   sesi dan bukan job CI. Di local jalurnya satu perintah, `pnpm validate` = `pnpm db:generate` →
+   `pnpm typecheck` → `pnpm test`. Sejak amandemen
+   [ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md) tanggal 2026-08-20,
+   `.github/workflows/validate.yml` hanya menjalankan job `typecheck` pada pull request, push ke
+   `main`, dan rilis. Job `publish` di `release.yml` tetap ber-`needs: validate`, jadi kontrak
+   TypeScript yang merah tetap tidak bisa terbit ke npm; kesehatan suite test menjadi tanggung
+   jawab verifikasi local sebelum merge.
 3. **Docs tersentuh diperbarui & ter-link** di [internal/docs/README.md](../README.md); ADR baru ditaut
    di index utama **dan** sub-index [adr/README.md](../adr/README.md) (SPEC-386).
 4. **Migration additif.** Instance hub produksi memuat data pengguna sungguhan — tak pernah
@@ -186,7 +187,7 @@ query token, atau sandbox `off` ([operations/deploy-vps](../operations/deploy-vp
 ## Yang tidak ada
 
 - **Tak ada pipeline CI yang men-deploy.** Deploy dan update instance adalah tindakan operator; yang
-  dilakukan CI hanyalah **memvalidasi** tiap pull request & push `main` (`validate.yml`) lalu
+  dilakukan CI hanyalah **typecheck** tiap pull request & push `main` (`validate.yml`) lalu
   **menerbitkan** paket pada tag `v*` (`release.yml`, ber-`needs: validate` sejak
   [ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md)).
 - **Tak ada supervisor auto-heal.** `hanoman start` me-restart server hanya sebagai jawaban atas exit

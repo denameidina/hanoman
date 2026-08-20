@@ -70,27 +70,13 @@ Workflow lalu menjalankan **dua job**: `validate` (`.github/workflows/validate.y
 `main` → tag == `version` → `pnpm install --frozen-lockfile` → `pnpm release` → **memasang
 tarball hasil rakitan dan menjalankan `hanoman --version`** → `npm publish --provenance`.
 
-> **BYPASS AKTIF (2026-08-19):** `release.yml` memanggil `validate.yml` dengan `skip_test: true`,
-> jadi **rilis saat ini tidak dijaga suite test** — job `test` menggantung di CI (tiga run mati di
-> plafon 6 jam GitHub, semuanya di `pnpm validate`), sehingga gerbangnya bukan menahan commit merah
-> melainkan memblokir semua rilis. `typecheck` + ancestry + tag==version + smoke `--version` tetap
-> berlaku. Sebelum menaikkan versi, **jalankan `pnpm test` di local** — itu satu-satunya lapis yang
-> hilang. Cabut bypass-nya (`with: skip_test` di `release.yml`, input di `validate.yml`) begitu
-> penyebab hang diperbaiki; `timeout-minutes` tetap.
-
-Sejak SPEC-853 `validate.yml` sendiri berisi **dua job yang berjalan bersamaan** — `typecheck` dan
-`test` — tanpa `needs` di antaranya; keduanya wajib hijau, karena `workflow_call` baru selesai
-setelah semua job-nya selesai. Setup bersamanya (toolchain → `pnpm install --frozen-lockfile` →
-`pnpm db:generate`) hidup di composite action `.github/actions/ci-setup`; `tmux` dan identitas git
-hanya dipasang job `test`. Isi gerbangnya sama persis dengan sebelumnya:
-
-Job `validate` menjalankan **`pnpm validate`** = `pnpm db:generate` → `pnpm typecheck` (seluruh
-paket) → `pnpm test` (`vitest run --no-file-parallelism`) — perintah yang sama persis dengan yang
-dijalankan manusia di local ([ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md)). Sampai
-2026-08-19 gerbang ini **tak ada sama sekali**: jalur rilis tak pernah memanggil `vitest` maupun
-`tsc`, dan karena server & CLI dibundel esbuild (yang tak melakukan type checking), build hijau
-bukan pernyataan apa pun tentang kesehatan kode yang diterbitkan. Bukti & reproduksinya di
-[issue #1](https://github.com/denameidina/hanoman/issues/1).
+Sejak amandemen [ADR-0128](../adr/0128-gerbang-validasi-sebelum-publish.md) tanggal 2026-08-20,
+`validate.yml` berisi **satu job `typecheck`**: setup toolchain → `pnpm install --frozen-lockfile`
+→ `pnpm db:generate` → `pnpm typecheck`. Job `test` dicabut setelah tiga run menggantung sampai
+plafon enam jam dan memblokir seluruh rilis; input bypass `skip_test` ikut dihapus karena tak ada
+lagi job yang perlu dilewati. `pnpm test` dan `pnpm validate` tetap tersedia untuk verifikasi
+local sebelum merge. Artinya CI menjaga kontrak TypeScript, sedangkan suite test penuh adalah
+tanggung jawab local.
 
 Versi hidup di root `package.json` dan ditanam ke `dist/build-info.json` oleh
 `scripts/stamp-build.mjs`. **Jangan** menyunting `dist-npm/package.json` — ia di-*generate*
@@ -100,7 +86,7 @@ Versi hidup di root `package.json` dan ditanam ke `dist/build-info.json` oleh
 
 | Pagar | Kegagalan yang dicegah |
 |---|---|
-| Job `publish` ber-`needs: validate` | menerbitkan commit yang test/typecheck-nya merah |
+| Job `publish` ber-`needs: validate` | menerbitkan commit yang typecheck-nya merah |
 | Trigger hanya tag `v*` | publish tak sengaja dari push biasa ke main |
 | Commit tag wajib ancestor `origin/main` | menerbitkan kode yang tak pernah direview/merge (SPEC-851) |
 | Tag harus == `version` root | menerbitkan nomor versi salah — dan nomor terbit **tak bisa dipakai ulang** |
@@ -109,10 +95,7 @@ Versi hidup di root `package.json` dan ditanam ke `dist/build-info.json` oleh
 | ~~Environment `release` + reviewer~~ | ~~rilis tanpa persetujuan manusia~~ — **dicabut 2026-07-31**, tak ada lagi gerbang manusia |
 
 `hanoman doctor` **tidak** dipakai di CI: ia menuntut `git`, `tmux`, dan CLI agen yang memang tak
-ada di runner, jadi ia akan exit 1 karena alasan yang tak relevan dengan kesehatan paket. Job
-`validate` **memang** memasang `tmux` dan mengisi identitas git — bukan untuk `doctor`, melainkan
-karena test sesi terminal men-spawn pane tmux sungguhan ([ADR-0016](../adr/0016-sesi-terminal-hidup-di-tmux.md)) dan
-test worktree menjalankan `git commit`.
+ada di runner, jadi ia akan exit 1 karena alasan yang tak relevan dengan kesehatan paket.
 
 ## Kalau publish gagal
 
@@ -127,9 +110,10 @@ test worktree menjalankan `git commit`.
   +refs/heads/main:refs/remotes/origin/main` hilang. `actions/checkout` pada push bertag hanya
   mengambil refspec tag itu; `origin/main` tak pernah lahir sendiri, bahkan dengan `fetch-depth: 0`.
 - **Job `validate` merah** — publish tak pernah berjalan, dan itu maksudnya. Reproduksi di local
-  dengan perintah yang sama: `pnpm install --frozen-lockfile && pnpm validate`. Kalau merahnya
-  ramai dengan `Property 'dmmf' does not exist` atau `Cannot read properties of undefined (reading
-  'datamodel')`, itu Prisma Client yang belum di-generate — `pnpm db:generate`, bukan regresi kode.
+  dengan lapisan yang sama: `pnpm install --frozen-lockfile && pnpm db:generate && pnpm typecheck`.
+  Kalau merahnya ramai dengan `Property 'dmmf' does not exist` atau
+  `Cannot read properties of undefined (reading 'datamodel')`, itu Prisma Client yang belum
+  di-generate — `pnpm db:generate`, bukan regresi kode.
 - **`repository.url` tak cocok** — trusted publishing & `--provenance` membandingkannya dengan repo
   pembangun **persis**. Nilainya `REPO_URL` di `cli/src/release/pack.ts`; bandingkan dengan
   `git remote get-url origin` (bentuknya `git+<url>`).

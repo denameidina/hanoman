@@ -1,6 +1,6 @@
 # ADR-0128 — Gerbang validasi sebelum publish, dan bootstrap Prisma Client di postinstall
 
-Status: accepted · 2026-08-19
+Status: accepted · 2026-08-19 · amended 2026-08-20
 
 ## Konteks
 
@@ -48,8 +48,8 @@ sebagai issue [#1](https://github.com/denameidina/hanoman/issues/1).
    (`--ignore-scripts`, sebagian CI), dan jalur validasi yang mengandaikan langkah tersembunyi
    bukan jalur validasi. Pola dua lapis yang sama dengan ADR-0087.
 4. **Workflow `validate.yml` dengan tiga pemicu: `pull_request`, `push: main`, dan
-   `workflow_call`.** Ia menjalankan `pnpm validate`, tak lebih — supaya CI menempuh **persis**
-   jalur yang ditempuh manusia di local.
+   `workflow_call`.** Keputusan awalnya menjalankan `pnpm validate`, tak lebih — supaya CI
+   menempuh **persis** jalur yang ditempuh manusia di local.
 
    **Amandemen 2026-08-19 (SPEC-853) — dua job paralel, bukan satu perintah berurutan.**
    Wall-clock gerbang ini = typecheck + suite serial, dijalankan berderet. Suite serialnya sendiri
@@ -89,12 +89,22 @@ sebagai issue [#1](https://github.com/denameidina/hanoman/issues/1).
    membuat masalah ini lama tak terbaca sebagai bug.
    **PENCABUTAN:** hapus `with: skip_test: true` di `release.yml` dan input `skip_test` di
    `validate.yml` begitu penyebab hang ditemukan dan diperbaiki. `timeout-minutes` **tetap**.
+
+   **Amandemen 2026-08-20 — job `test` dicabut dari CI.** Pemilik repo memutuskan bahwa suite
+   yang menggantung tidak lagi menjadi gate GitHub Actions: `validate.yml` kini hanya memiliki
+   job `typecheck`, berlaku sama untuk pull request, push ke `main`, dan pemanggilan dari workflow
+   rilis. Amandemen ini **menggantikan** bentuk dua-job SPEC-853 sekaligus bypass sementara di
+   atas: job `test`, input `skip_test`, `tmux`, identitas git, dan environment DB test dihapus dari
+   workflow. `pnpm test` dan `pnpm validate` **tidak dihapus**; keduanya tetap jalur verifikasi
+   local sebelum merge. Publish tetap menunggu `validate`, sehingga typecheck seluruh paket,
+   ancestry tag → `main`, kecocokan tag dengan versi, smoke tarball `hanoman --version`, dan OIDC
+   provenance tetap menjadi pagar mekanis. Yang dicabut hanya eksekusi suite test oleh CI.
 5. **`release.yml` memanggil `validate.yml`, bukan menyalin langkahnya**, dan job `publish`
    ber-`needs: validate`. Menyalin akan menghasilkan dua definisi yang menyimpang tanpa ada yang
    merah — kelas kegagalan yang sama dengan yang ADR ini perbaiki.
 6. **Gerbangnya dipagari test**, bukan konvensi: `cli/test/release-gate.test.ts` membaca
    `.github/workflows/*.yml` dan kedua `package.json`, lalu menuntut postinstall men-generate
-   client, `validate` memanggil typecheck **dan** test, suite root tetap `--no-file-parallelism`,
+   client, `validate` hanya memiliki job typecheck, script local tetap memuat test serial,
    `release.yml` memanggil `validate.yml`, `publish` ber-`needs: validate`, dan `npm publish`
    tetap muncul tepat sekali. Berkas konfigurasi rusak **tanpa suara** — sebuah langkah yang
    terhapus tak menggagalkan apa pun, ia hanya membuat publish lewat begitu saja. Pola yang sama
@@ -107,17 +117,13 @@ sebagai issue [#1](https://github.com/denameidina/hanoman/issues/1).
 
 ## Konsekuensi
 
-- **Rilis kini bisa diblokir CI.** Itu maksudnya, dan harganya nyata: suite yang gagal karena
-  lingkungan runner menahan publish. Mitigasinya dipasang di `validate.yml` sebagai langkah
-  eksplisit — `tmux` (dituntut test sesi terminal, ADR-0016), identitas git (dituntut test
-  worktree), `HANOMAN_HOME` diarahkan ke dalam workspace runner (berkas DB test diturunkan dari
-  `HANOMAN_HOME`, bukan dari checkout — SPEC-479), dan `HANOMAN_UPDATE_FETCH=0` supaya validasi
-  tak pernah bergantung pada jaringan. Urutan pemicunya sendiri adalah mitigasi: `pull_request` dan
-  `push: main` menjalankan definisi yang **sama** jauh sebelum tag pertama didorong, jadi kegagalan
-  lingkungan runner muncul di PR — bukan pertama kali pada sebuah rilis.
-- **Waktu CI naik** dari ±3 menit jadi suite serial penuh. Serial tak bisa ditawar: set yang sama
-  memberi **181 gagal palsu paralel vs 736 lulus serial** (SPEC-397/ADR-0080), jadi menukarnya
-  dengan kecepatan berarti menukar gerbang ini dengan gerbang yang orang matikan.
+- **Rilis tetap bisa diblokir CI, tetapi hanya oleh typecheck.** `HANOMAN_UPDATE_FETCH=0` menjaga
+  job itu bebas jaringan. Prasyarat khusus suite (`tmux`, identitas git, `HANOMAN_HOME` test) tidak
+  lagi dipasang karena tidak ada test yang berjalan di runner.
+- **Suite penuh kembali menjadi tanggung jawab verifikasi local sebelum merge.** CI tidak lagi
+  mendeteksi regresi runtime/test; ini risiko yang diterima sadar untuk menghilangkan gate yang
+  menggantung dan membuat semua rilis mustahil. `pnpm validate` tetap menjalankan suite serial
+  (`--no-file-parallelism`) agar jalur local tidak berubah.
 - **`pnpm -r typecheck` sah di CI, tetap terlarang sebagai rutinitas sesi.** ADR-0080 **tidak**
   dicabut: larangannya adalah tentang mesin dev yang menjalankan beberapa sesi sekaligus, bukan
   tentang runner yang memang berdiri sendiri.
@@ -128,7 +134,7 @@ sebagai issue [#1](https://github.com/denameidina/hanoman/issues/1).
   tetap menyebut `prisma generate` eksplisit. Kini redundan, sengaja dibiarkan: deploy berjalan di
   mesin yang bisa saja memasang dengan `--ignore-scripts`.
 
-## Alternatif yang ditolak
+## Alternatif yang ditolak pada keputusan awal
 
 - **Menyalin langkah validasi ke `release.yml`.** Ditolak: dua definisi menyimpang diam-diam, dan
   yang menyimpang selalu yang jarang dijalankan (rilis).

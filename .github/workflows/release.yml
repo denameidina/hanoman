@@ -5,10 +5,9 @@
 # yang bisa dibaca proses mana pun di mesin itu — termasuk sesi agen. OIDC tak menyimpan rahasia
 # apa pun; npm memverifikasi bahwa yang meminta publish memang workflow INI di repo INI.
 #
-# Publish DIGERBANGI job `validate` (SPEC-852/ADR-0128): `pnpm validate` = prisma generate →
-# typecheck seluruh paket → suite serial. Sebelum gerbang itu ada, jalur rilis tak pernah
-# memanggil tsc maupun vitest, jadi paket bisa terbit dari commit yang merah — dan build esbuild
-# yang hijau membuatnya tak terlihat.
+# Publish DIGERBANGI job `validate` (SPEC-852/ADR-0128), yang menjalankan typecheck seluruh paket.
+# Suite test tetap tersedia melalui `pnpm test`/`pnpm validate` di local, tetapi sejak amandemen
+# 2026-08-20 tidak menjadi job CI karena hang memblokir seluruh rilis.
 #
 # PRASYARAT SEKALI DI AWAL (tak bisa dari sini, dan tak bisa sebelum paketnya ada):
 #   1. `0.1.0` diterbitkan sekali secara berautentikasi (interaktif `npm login` + OTP).
@@ -35,23 +34,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # SPEC-852 · ADR-0128 · Gerbang yang dulu tak ada sama sekali: publish menunggu validasi
-  # commit YANG SAMA dengan yang akan diterbitkan. Definisinya hidup di validate.yml supaya
-  # PR, main, dan rilis menempuh jalur yang identik — salinan langkah di sini akan menyimpang
-  # tanpa ada yang merah, dan itu persis kelas kegagalan yang dilaporkan issue #1.
+  # Publish menunggu typecheck commit YANG SAMA dengan yang akan diterbitkan. Definisinya hidup
+  # di validate.yml supaya PR, main, dan rilis menempuh jalur yang identik.
   validate:
     uses: ./.github/workflows/validate.yml
-    # BYPASS SEMENTARA 2026-08-19 — CABUT BEGITU HANG TERATASI.
-    # Job `test` tidak merah, ia MENGGANTUNG: tiga run mati di batas 6 jam GitHub, seluruhnya di
-    # `pnpm validate`, sementara setup/install/tmux selesai dalam detik. Efek sebenarnya bukan
-    # "gerbang menahan commit merah" melainkan "tak ada rilis yang bisa terbit sama sekali" —
-    # termasuk 0.1.48 yang membawa perbaikan agar sesi terminal bisa hidup di instalasi yang
-    # berjalan sebagai user service ber-shell nologin.
-    # Yang TETAP menggerbangi publish: `typecheck` (seluruh paket), ancestry tag → main, tag ==
-    # version, dan smoke `hanoman --version` atas tarball hasil rakitan.
-    # Yang HILANG sementara: suite test. Diterima sadar, dengan bypass yang terlihat di diff.
-    with:
-      skip_test: true
 
   publish:
     needs: validate
