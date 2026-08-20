@@ -31,6 +31,27 @@ describe("api branch cleanup (SPEC-360)", () => {
     expect(JSON.parse(init.body as string)).toEqual({ names: ["hanoman/x"], scope: "local" });
   });
 
+  it("branchesUnused meneruskan include=all (SPEC-859)", async () => {
+    const f = mockFetch({ base: "main", baseRemote: null, current: "main", branches: [] });
+    await api.branchesUnused("p1", undefined, "all");
+    expect(String(f.mock.calls[0]![0])).toContain("include=all");
+  });
+
+  it("branchesUnused menggabungkan base & include (SPEC-859)", async () => {
+    const f = mockFetch({ base: "dev", baseRemote: null, current: "main", branches: [] });
+    await api.branchesUnused("p1", "dev", "all");
+    const url = String(f.mock.calls[0]![0]);
+    expect(url).toContain("base=dev");
+    expect(url).toContain("include=all");
+  });
+
+  it("deleteBranches meneruskan allowUnmerged (SPEC-859)", async () => {
+    const f = mockFetch({ base: "main", results: [] });
+    await api.deleteBranches("p1", { names: ["x"], scope: "local", allowUnmerged: true });
+    const init = f.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({ names: ["x"], scope: "local", allowUnmerged: true });
+  });
+
   it("LOCK_LABEL punya prosa untuk tiap kunci", () => {
     for (const k of ["current", "base", "worktree", "spec-open", "session"] as const) {
       expect(LOCK_LABEL[k]).toMatch(/\S/);

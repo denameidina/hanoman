@@ -195,12 +195,16 @@ tanpa penopang tidak ditulis.
 
 ## Branches
 
-- THE SYSTEM SHALL menurunkan daftar branch tak terpakai langsung dari git (`git branch --merged`) dengan
+- THE SYSTEM SHALL menurunkan daftar branch langsung dari git (`git branch --merged`) dengan
   base `?base=` → `main` → `master` → branch aktif — tidak pernah hardcode `"main"`
   ([ADR-0077](../adr/0077-hapus-branch-tak-terpakai-pagar-per-branch.md)).
+- THE SYSTEM SHALL menampilkan seluruh branch project (local + origin) beserta status ter-merge-nya
+  saat diminta `?include=all`, dan hanya branch ter-merge tanpa parameter itu (SPEC-859).
 - THE SYSTEM SHALL menegakkan ulang lima kunci proteksi (`current`, `base`, `worktree`, `spec-open`,
   `session`) **di jalur tulis**, sehingga klien tak dapat menyelundupkan branch lewat body.
-- THE SYSTEM SHALL menghapus branch tanpa `--force`.
+- THE SYSTEM SHALL menolak penghapusan branch yang belum ter-merge kecuali permintaan membawa
+  `allowUnmerged`, dan alasan penolakannya menyebut risiko kehilangan commit (SPEC-859).
+- THE SYSTEM SHALL menghapus branch yang sudah ter-merge tanpa `--force`.
 
 ## Help Desk & triase
 

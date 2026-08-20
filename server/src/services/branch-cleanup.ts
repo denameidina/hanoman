@@ -21,10 +21,19 @@ export const LOCK_REASON: Record<BranchLock, string> = {
   session: "sesi aktif memakainya",
 };
 
+export type BranchInclude = "merged" | "all";
+
 export type UnusedBranch = {
   name: string;
+  // SPEC-859 · `local`/`remote` = ref itu ADA, bukan "ref itu ter-merge": badge scope di UI harus
+  // jujur untuk branch yang belum ter-merge. Merged-ness hidup di tiga field di bawahnya.
   local: boolean;
   remote: boolean;
+  mergedLocal: boolean;
+  mergedRemote: boolean;
+  // Ter-merge = TIAP sisi yang ada sudah ter-merge ke base-nya masing-masing. Repo yang
+  // origin/<base>-nya tertinggal karena itu terbaca `belum`, bukan setengah-aman.
+  merged: boolean;
   lastCommit: { sha: string; at: string; subject: string } | null;
   locks: BranchLock[];
 };
@@ -80,21 +89,30 @@ async function worktreeBranches(repoDir: string): Promise<Set<string>> {
 // saat disalin. Dan jangan pernah "" (string kosong): split("") memecah per-karakter.
 const SEP = "\u001f";
 type CommitMeta = { sha: string; at: string; subject: string };
-async function lastCommits(repoDir: string): Promise<Map<string, CommitMeta>> {
-  const fmt = ["%(refname:short)", "%(objectname)", "%(committerdate:iso-strict)", "%(contents:subject)"].join(SEP);
-  const m = new Map<string, CommitMeta>();
+type RefIndex = { locals: Set<string>; remotes: Set<string>; meta: Map<string, CommitMeta> };
+
+// Satu for-each-ref memasok himpunan ref DAN commit terakhir. `%(refname)` penuh dibaca lebih dulu
+// karena `refname:short` sudah kehilangan info sisi mana ref itu hidup (SPEC-859 butuh keduanya).
+async function refIndex(repoDir: string): Promise<RefIndex> {
+  const fmt = ["%(refname)", "%(refname:short)", "%(objectname)",
+    "%(committerdate:iso-strict)", "%(contents:subject)"].join(SEP);
+  const idx: RefIndex = { locals: new Set(), remotes: new Set(), meta: new Map() };
   for (const l of lines(await out(repoDir, ["for-each-ref", `--format=${fmt}`, "refs/heads", "refs/remotes/origin"]))) {
-    const [ref, sha, at, ...rest] = l.split(SEP);
+    const [full, ref, sha, at, ...rest] = l.split(SEP);
     const name = shortName(ref ?? "");
     if (!name || !sha) continue;
-    if (!m.has(name)) m.set(name, { sha, at: at ?? "", subject: rest.join(SEP) });
+    (full?.startsWith("refs/heads/") ? idx.locals : idx.remotes).add(name);
+    // refs/heads tersortir sebelum refs/remotes → meta lokal menang, sama seperti sebelum SPEC-859.
+    if (!idx.meta.has(name)) idx.meta.set(name, { sha, at: at ?? "", subject: rest.join(SEP) });
   }
-  return m;
+  return idx;
 }
 
+// SPEC-859 · `include: "all"` memancarkan SELURUH ref (local ∪ origin), ter-merge maupun belum.
+// Default tetap `"merged"` supaya himpunan barisnya identik dengan sebelum SPEC-859.
 export async function listUnusedBranches(
   repoDir: string | null,
-  opts: { base?: string } & LockInputs,
+  opts: { base?: string; include?: BranchInclude } & LockInputs,
 ): Promise<UnusedReport> {
   if (!repoDir) return EMPTY;
   const current = (await out(repoDir, ["rev-parse", "--abbrev-ref", "HEAD"])).trim();
@@ -106,31 +124,43 @@ export async function listUnusedBranches(
   const baseRemote = (await revSha(repoDir, `origin/${base}`)) ? `origin/${base}` : null;
   const baseRemoteSha = baseRemote ? await revSha(repoDir, baseRemote) : baseSha;
 
-  const [localMerged, remoteMerged, wt, meta] = await Promise.all([
+  const [localMerged, remoteMerged, wt, refs] = await Promise.all([
     out(repoDir, ["branch", "--merged", baseSha, "--format=%(refname:short)"]),
     out(repoDir, ["branch", "-r", "--merged", baseRemoteSha, "--format=%(refname:short)"]),
     worktreeBranches(repoDir),
-    lastCommits(repoDir),
+    refIndex(repoDir),
   ]);
 
-  const locals = new Set(lines(localMerged).map(shortName).filter(Boolean));
-  const remotes = new Set(
+  const mergedLocals = new Set(lines(localMerged).map(shortName).filter(Boolean));
+  const mergedRemotes = new Set(
     lines(remoteMerged).filter((r) => r.startsWith("origin/")).map(shortName).filter(Boolean));
 
-  const names = [...new Set([...locals, ...remotes])].sort();
-  const branches = names.map<UnusedBranch>((name) => {
+  const all = opts.include === "all";
+  const names = [...new Set(all
+    ? [...refs.locals, ...refs.remotes]
+    : [...mergedLocals, ...mergedRemotes])].sort();
+
+  const branches: UnusedBranch[] = [];
+  for (const name of names) {
+    const local = refs.locals.has(name);
+    const remote = refs.remotes.has(name);
+    const mergedLocal = local && mergedLocals.has(name);
+    const mergedRemote = remote && mergedRemotes.has(name);
+    const merged = (!local || mergedLocal) && (!remote || mergedRemote);
+    if (!all && !merged) continue;
     const locks: BranchLock[] = [];
     if (name === current) locks.push("current");
     if (name === base) locks.push("base");
     if (wt.has(name)) locks.push("worktree");
     if (opts.openSpecBranches.has(name)) locks.push("spec-open");
     if (opts.sessionBranches.has(name)) locks.push("session");
-    return { name, local: locals.has(name), remote: remotes.has(name), lastCommit: meta.get(name) ?? null, locks };
-  });
+    branches.push({ name, local, remote, mergedLocal, mergedRemote, merged,
+      lastCommit: refs.meta.get(name) ?? null, locks });
+  }
   return { base, baseRemote, current, branches };
 }
 
-export type DeleteResult = { name: string; ok: boolean; scope: BranchScope | "none"; error?: string };
+export type DeleteResult = { name: string; ok: boolean; scope: BranchScope | "none"; forced?: true; error?: string };
 
 // Scope efektif = irisan yang DIMINTA dengan ref yang benar-benar ADA pada branch itu.
 function effectiveScope(want: BranchScope, b: UnusedBranch): BranchScope | "none" {
@@ -142,29 +172,38 @@ function effectiveScope(want: BranchScope, b: UnusedBranch): BranchScope | "none
   return "none";
 }
 
-// SPEC-360 · ADR-0077 · hapus batch. Menurunkan daftar ter-merge lebih dulu, lalu MEMVALIDASI ULANG
+// SPEC-360 · ADR-0077 · hapus batch. Menurunkan daftar branch lebih dulu, lalu MEMVALIDASI ULANG
 // tiap nama terhadap daftar itu: klien tak bisa menyelundupkan branch sembarang lewat body, dan
 // kunci proteksi ditegakkan di jalur tulis (bukan sekadar petunjuk UI). Eksekusi didelegasikan ke
 // runGitOp `delete-branch` (SPEC-206) — satu-satunya jalur hapus branch di codebase, jadi tak ada
-// implementasi kedua yang bisa drift. Force TAK PERNAH dipakai: semua kandidat sudah ter-merge.
+// implementasi kedua yang bisa drift.
+//
+// SPEC-859 (amandemen ADR-0077) · daftarnya kini `include:"all"`, jadi premis lama "semua kandidat
+// sudah ter-merge" gugur dan larangan mutlak `-D` ikut gugur bersamanya. Gerbangnya `allowUnmerged`,
+// yang hanya dikirim dialog konfirmasi risiko: tanpa itu baris belum-ter-merge ditolak apa adanya.
+// Force dipasang per SISI — `push origin --delete` tak pernah menguji merged-ness.
 export async function deleteBranches(
   repoDir: string,
   names: string[],
-  opts: { scope: BranchScope; base?: string } & LockInputs,
+  opts: { scope: BranchScope; base?: string; allowUnmerged?: boolean } & LockInputs,
 ): Promise<{ base: string; results: DeleteResult[] }> {
-  const report = await listUnusedBranches(repoDir, opts);
+  const report = await listUnusedBranches(repoDir, { ...opts, include: "all" });
   const byName = new Map(report.branches.map((b) => [b.name, b]));
   const results: DeleteResult[] = [];
   for (const name of names) {
     const b = byName.get(name);
     if (!b) {
-      results.push({ name, ok: false, scope: "none",
-        error: `branch tak ditemukan di daftar ter-merge ke ${report.base}` });
+      results.push({ name, ok: false, scope: "none", error: "branch tak ditemukan di repo" });
       continue;
     }
     if (b.locks.length) {
       results.push({ name, ok: false, scope: "none",
         error: `terkunci: ${b.locks.map((l) => LOCK_REASON[l]).join(", ")}` });
+      continue;
+    }
+    if (!b.merged && !opts.allowUnmerged) {
+      results.push({ name, ok: false, scope: "none",
+        error: `belum ter-merge ke ${report.base} — commit-nya bisa hilang; butuh konfirmasi terpisah` });
       continue;
     }
     const scope = effectiveScope(opts.scope, b);
@@ -173,9 +212,12 @@ export async function deleteBranches(
         error: opts.scope === "remote" ? "branch tak punya ref origin" : "branch tak punya ref lokal" });
       continue;
     }
+    const forced = scope !== "remote" && !b.mergedLocal;
     const r = await runGitOp(repoDir, {
-      op: "delete-branch", name, local: scope !== "remote", remote: scope !== "local" });
-    results.push(r.ok ? { name, ok: true, scope } : { name, ok: false, scope, error: r.stderr || "hapus branch gagal" });
+      op: "delete-branch", name, local: scope !== "remote", remote: scope !== "local", force: forced });
+    results.push(r.ok
+      ? { name, ok: true, scope, ...(forced ? { forced: true as const } : {}) }
+      : { name, ok: false, scope, error: r.stderr || "hapus branch gagal" });
   }
   return { base: report.base, results };
 }

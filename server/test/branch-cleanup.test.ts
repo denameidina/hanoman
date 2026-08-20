@@ -109,6 +109,52 @@ describe("listUnusedBranches", () => {
     expect(r.branches).toEqual([]);
   });
 
+  // SPEC-859 · daftar melebar ke SELURUH branch lewat include:"all".
+  it("include all memuat branch yang BELUM ter-merge", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("a1"); // hanoman/a1 tak di-merge
+    const r = await listUnusedBranches(repoDir, { ...NONE, include: "all" });
+    const b = r.branches.find((x) => x.name === "hanoman/a1")!;
+    expect(b).toBeTruthy();
+    expect(b.merged).toBe(false);
+    expect(b.local).toBe(true);
+  });
+
+  it("include all tetap menyaring baris hantu & origin/HEAD", async () => {
+    const dir = mergedRepo("a2");
+    g(dir, "remote", "set-head", "origin", "main");
+    g(dir, "checkout", "-q", "--detach", "HEAD");
+    const r = await listUnusedBranches(dir, { ...NONE, include: "all" });
+    for (const ghost of ["(no branch)", "origin", "origin/HEAD", "HEAD", ""])
+      expect(r.branches.some((x) => x.name === ghost)).toBe(false);
+  });
+
+  it("default (tanpa include) tetap HANYA branch ter-merge", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("a3");
+    const r = await listUnusedBranches(repoDir, NONE);
+    expect(r.branches.some((x) => x.name === "hanoman/a3")).toBe(false);
+  });
+
+  it("merged benar per sisi: ter-merge local+origin", async () => {
+    const r = await listUnusedBranches(mergedRepo("a4"), { ...NONE, include: "all" });
+    const b = r.branches.find((x) => x.name === "hanoman/a4")!;
+    expect(b).toMatchObject({ local: true, remote: true, mergedLocal: true, mergedRemote: true, merged: true });
+  });
+
+  it("branch lokal tanpa ref origin: remote false, merged menilai sisi lokal saja", async () => {
+    const dir = mergedRepo("a5");
+    g(dir, "branch", "lokal-baru"); // di commit main → ter-merge, tanpa ref origin
+    const r = await listUnusedBranches(dir, { ...NONE, include: "all" });
+    const b = r.branches.find((x) => x.name === "lokal-baru")!;
+    expect(b).toMatchObject({ local: true, remote: false, mergedRemote: false, merged: true });
+  });
+
+  it("kunci tetap dihitung untuk branch belum ter-merge", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("a6");
+    const r = await listUnusedBranches(repoDir, {
+      ...NONE, include: "all", sessionBranches: new Set(["hanoman/a6"]) });
+    expect(r.branches.find((x) => x.name === "hanoman/a6")!.locks).toContain("session");
+  });
+
   it("LOCK_REASON punya prosa Indonesia untuk tiap kunci", () => {
     for (const k of ["current", "base", "worktree", "spec-open", "session"] as const) {
       expect(LOCK_REASON[k]).toMatch(/\S/);
@@ -162,7 +208,7 @@ describe("deleteBranches", () => {
     expect(branchList(dir)).toContain("main");
   });
 
-  it("nama di luar daftar ter-merge ditolak (tak bisa diselundupkan lewat body)", async () => {
+  it("branch belum ter-merge tak bisa diselundupkan lewat body", async () => {
     const { repoDir } = makeRepoWithSpecBranch("d6"); // hanoman/d6 BELUM ter-merge
     const r = await deleteBranches(repoDir, ["hanoman/d6"], { scope: "both", ...NONE });
     expect(r.results[0]!.ok).toBe(false);
@@ -193,6 +239,50 @@ describe("deleteBranches", () => {
     expect(r.results.find((x) => x.name === "main")!.ok).toBe(false);
     expect(r.results.find((x) => x.name === "ikut")!.ok).toBe(true);
     expect(branchList(dir)).not.toContain("ikut");
+  });
+
+  // SPEC-859 · amandemen ADR-0077 — branch belum ter-merge boleh dihapus, tapi HANYA lewat
+  // gerbang eksplisit `allowUnmerged` (dikirim dialog konfirmasi risiko di UI).
+  it("branch belum ter-merge DITOLAK tanpa allowUnmerged, alasannya menyebut risiko", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("u1");
+    const r = await deleteBranches(repoDir, ["hanoman/u1"], { scope: "both", ...NONE });
+    expect(r.results[0]!.ok).toBe(false);
+    expect(r.results[0]!.error).toMatch(/belum ter-merge/);
+    expect(r.results[0]!.error).toMatch(/hilang/);
+    expect(branchList(repoDir)).toContain("hanoman/u1");
+  });
+
+  it("allowUnmerged menghapus branch belum ter-merge dan menandainya forced", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("u2");
+    const r = await deleteBranches(repoDir, ["hanoman/u2"], {
+      scope: "local", allowUnmerged: true, ...NONE });
+    expect(r.results[0]).toEqual({ name: "hanoman/u2", ok: true, scope: "local", forced: true });
+    expect(branchList(repoDir)).not.toContain("hanoman/u2");
+  });
+
+  it("branch ter-merge TAK PERNAH dipaksa meski allowUnmerged menyala", async () => {
+    const dir = mergedRepo("u3");
+    const r = await deleteBranches(dir, ["hanoman/u3"], {
+      scope: "both", allowUnmerged: true, ...NONE });
+    expect(r.results[0]).toEqual({ name: "hanoman/u3", ok: true, scope: "both" });
+  });
+
+  it("kunci menang atas allowUnmerged", async () => {
+    const { repoDir } = makeRepoWithSpecBranch("u4");
+    const r = await deleteBranches(repoDir, ["hanoman/u4"], {
+      scope: "both", allowUnmerged: true,
+      openSpecBranches: new Set(["hanoman/u4"]), sessionBranches: new Set() });
+    expect(r.results[0]!.ok).toBe(false);
+    expect(r.results[0]!.error).toContain(LOCK_REASON["spec-open"]);
+    expect(branchList(repoDir)).toContain("hanoman/u4");
+  });
+
+  it("nama yang bukan branch nyata tetap ditolak meski allowUnmerged menyala", async () => {
+    const dir = mergedRepo("u5");
+    const r = await deleteBranches(dir, ["tidak-ada-branch-ini"], {
+      scope: "both", allowUnmerged: true, ...NONE });
+    expect(r.results[0]!.ok).toBe(false);
+    expect(r.results[0]!.error).toMatch(/tak ditemukan/);
   });
 
   it("names kosong → results kosong, base tetap dilaporkan", async () => {

@@ -574,21 +574,31 @@ GET    /projects/:id/graph/search?q=&by=          # { shas:string[] }  by ∈ al
 GET    /projects/:id/archive?ref=&format=         # stream (download) git archive  format ∈ zip|tar; 400 ref tak valid
 GET    /projects/:id/pr-url?branch=&base=         # { url:string|null }  URL "Create PR" dari origin (github/gitlab/bitbucket) atau null
 POST   /projects/:id/remotes  {name,url} · PATCH /projects/:id/remotes/:name {url} · DELETE /projects/:id/remotes/:name   # → Remote[]; 400 field cacat; 409 git gagal
-# Bersihkan branch tak terpakai (SPEC-360 · ADR-0077) — nilai turunan git, tanpa kolom DB
-GET  /projects/:id/branches/unused?base=   # { base, baseRemote, current, branches:[{name,local,remote,lastCommit:{sha,at,subject}|null,locks[]}] }
-#   Isi daftar = HANYA branch ter-merge ke base (git branch --merged); ref origin dibanding origin/<base>.
+# Daftar & bersihkan branch (SPEC-360 · ADR-0077 · SPEC-859) — nilai turunan git, tanpa kolom DB
+GET  /projects/:id/branches/unused?base=&include=
+#   { base, baseRemote, current, branches:[{name,local,remote,merged,mergedLocal,mergedRemote,lastCommit:{sha,at,subject}|null,locks[]}] }
+#   include ∈ merged (DEFAULT) | all. `all` = SELURUH ref (refs/heads ∪ refs/remotes/origin), ter-merge
+#   maupun belum (SPEC-859). Tanpa parameter itu himpunan barisnya = HANYA yang ter-merge, seperti sebelumnya.
+#   local/remote = ref itu ADA (bukan "ref itu ter-merge"). merged = TIAP sisi yang ada sudah ter-merge
+#   ke base-nya (local → base, origin → origin/<base>); mergedLocal/mergedRemote memberi per-sisinya.
 #   base: ?base= → main → master → branch aktif → "HEAD". TAK PERNAH hardcode "main" (SPEC-227).
 #   base di-resolve ke SHA sebelum diberikan ke --merged: `--end-of-options` TAK bisa dipakai di sana
 #   (git menelannya sebagai nilai --merged, lalu --format jadi argumen posisi). Hex tak pernah jadi flag (ADR-0032).
 #   locks ∈ current|base|worktree|spec-open|session — kosong = boleh dihapus. base & current ikut tampil (terkunci).
 #   `session` terpisah dari `worktree` karena sesi lahir --detach (ADR-0002) → tak muncul di `git worktree list`.
 #   Disaring: baris `(no branch)` (dipancarkan saat dijalankan di worktree detached) & `origin/HEAD` (git memendekkannya jadi bare `origin`).
+#   Urutan deterministik (urut nama); daftar TAK dipotong server — klien yang membatasi render.
 #   404 project tak ada; tanpa repoDir/bukan repo → { base:"", baseRemote:null, current:"", branches:[] }.
-POST /projects/:id/branches/delete  { names:string[], scope?, base? }   # { base, results:[{name,ok,scope,error?}] }
+POST /projects/:id/branches/delete  { names:string[], scope?, base?, allowUnmerged? }
+#   { base, results:[{name,ok,scope,forced?,error?}] }
 #   scope ∈ local|remote|both (default both); menyempit per branch mengikuti ref yang benar-benar ada.
-#   Menurunkan ulang daftar unused lalu memvalidasi tiap nama: di luar daftar / terkunci → baris ok:false.
-#   Selalu 200 bila body sah — kegagalan hidup di baris results, bukan status HTTP. TAK PERNAH pakai -D/force.
-#   TAK digerbang sesi aktif global (op ref-only, ADR-0055); pagarnya per-branch. 400 names/scope cacat, tanpa repoDir.
+#   Menurunkan ulang daftar (include:"all") lalu memvalidasi tiap nama: bukan branch nyata / terkunci → ok:false.
+#   allowUnmerged (SPEC-859, amandemen ADR-0077): tanpa itu baris belum-ter-merge ditolak dengan alasan yang
+#   menyebut risiko kehilangan commit. Dengan itu `-D` dipakai HANYA untuk sisi lokal yang !mergedLocal, dan
+#   barisnya balas forced:true. Kunci proteksi MENANG atas allowUnmerged. `push origin --delete` tak butuh flag.
+#   Selalu 200 bila body sah — kegagalan hidup di baris results, bukan status HTTP.
+#   TAK digerbang sesi aktif global (op ref-only, ADR-0055); pagarnya per-branch.
+#   400 names/scope cacat, allowUnmerged bukan boolean, tanpa repoDir.
 #   Capability agent: keduanya di domain `projects` (projects:read/write), BUKAN `ide` — cermin GET /branches lama.
 # Isolasi (merge/rebase/pull/drop): { status:"clean",detail } | { status:"conflict",sessionId } | 400 body/target · 409 detached/source hilang/working-tree kotor
 # Read (status/stashes/remotes/compare/search): 404 project tak ada; commit-file/compare-file: 400 path keluar repo · 404 tak ada

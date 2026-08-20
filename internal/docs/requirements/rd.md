@@ -41,8 +41,9 @@ Kanal integrasi:
 - Integrasi (rebase/merge) **dipicu manual** dari dashboard, tidak otomatis
   ([ADR-0031](../adr/0031-rebase-merge-backlog.md)).
 
-Branch yang sudah ter-merge dibersihkan lewat tab Branches, dengan lima kunci proteksi dan tanpa
-`--force` ([ADR-0077](../adr/0077-hapus-branch-tak-terpakai-pagar-per-branch.md)).
+Seluruh branch project terlihat di tab Branches dan dibersihkan dari sana, dengan lima kunci proteksi;
+`--force` hanya di balik `allowUnmerged` + konfirmasi ketik-ulang untuk branch yang belum ter-merge
+(SPEC-859, [ADR-0077](../adr/0077-hapus-branch-tak-terpakai-pagar-per-branch.md)).
 
 Kanal rilis:
 

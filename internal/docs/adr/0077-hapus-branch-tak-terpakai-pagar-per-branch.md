@@ -80,3 +80,50 @@ dipakai. Dikunci satu test agar jadi keputusan, bukan kebetulan.
   argumen `--merged`** (git menelannya sebagai nilai opsi, lalu memperlakukan `--format` sebagai
   argumen posisi). Karena itu base di-resolve ke **SHA** lebih dulu — heksadesimal tak pernah
   terbaca sebagai flag, jadi keamanan argumen ADR-0032 tetap utuh lewat jalur lain.
+
+## Amandemen SPEC-859 (2026-08-20) — panel jadi daftar branch penuh, `-D` dipersempit bukan dicabut
+
+Keputusan aslinya berdiri; **cakupannya** yang melebar, dan satu larangan di dalamnya dipersempit
+karena premisnya gugur.
+
+**Yang berubah.**
+
+1. **`GET /projects/:id/branches/unused?include=all`** memancarkan SELURUH ref (`refs/heads` ∪
+   `refs/remotes/origin`), ter-merge maupun belum. Tanpa parameter itu himpunan barisnya tetap
+   "hanya yang ter-merge", jadi klien lama tak pecah. Sebabnya: panel Branches hanya pernah memanggil
+   endpoint ini, sehingga branch yang masih **aktif** tak terlihat sama sekali di dashboard dan
+   empty state `"Tak ada branch ter-merge"` membuat repo ber-belasan branch tampak kosong.
+2. **`local`/`remote` kini berarti "ref itu ADA"**, bukan "ref itu ter-merge"; merged-ness pindah ke
+   `mergedLocal`/`mergedRemote` + turunannya `merged` (= **tiap sisi yang ada** sudah ter-merge ke
+   base-nya masing-masing). Tanpa penajaman ini badge scope di UI berbohong untuk branch belum
+   ter-merge. Konsekuensinya pada mode default hanya di kasus **divergen** — `x` ter-merge ke `main`
+   lokal tetapi `origin/x` belum ke `origin/main`: dulu barisnya muncul dengan `remote:false`, kini
+   `merged:false` sehingga **tak muncul**. Arahnya **lebih ketat**, tak pernah lebih longgar; klien
+   lama tak pernah menerima baris yang tak aman dihapus.
+3. **Larangan `-D` dipersempit, bukan dicabut.** Alasan yang ditulis keputusan ini apa adanya —
+   *"Force TAK PERNAH dipakai: semua kandidat sudah ter-merge"* — gugur begitu daftarnya memuat
+   branch belum ter-merge, dan `git branch -d` memang **menolak** branch semacam itu. Gerbangnya
+   `allowUnmerged: true` di body `POST /projects/:id/branches/delete`, dan **hanya** dialog
+   konfirmasi risiko di UI yang mengirimkannya: dialog itu menyebut jumlah + nama branch belum
+   ter-merge, menyatakan commit-nya akan hilang, dan menuntut **ketikan ulang** (nama branch bila
+   targetnya satu, `hapus paksa` bila batch — pola `requireText` ADR-0121). Force dipasang **per
+   sisi**: hanya sisi lokal yang `!mergedLocal`, karena `git push origin --delete` tak pernah
+   menguji merged-ness sama sekali.
+
+**Yang TIDAK berubah.** Lima kunci proteksi ditegakkan ulang di jalur tulis dan **menang atas
+`allowUnmerged`** — branch berkunci tetap tak bisa dihapus, apa pun isi body. Validasi ulang tiap
+nama terhadap daftar turunan tetap ada (nama yang bukan branch nyata → `branch tak ditemukan di
+repo`), jadi penyelundupan lewat body tetap mustahil. Eksekusi tetap satu jalur `runGitOp`
+`delete-branch` (SPEC-206), tetap ref-only (ADR-0055), tetap tanpa gerbang sesi aktif, tetap nilai
+turunan git tanpa kolom DB. ADR-0037 tetap utuh: ini pagar keselamatan data untuk satu endpoint
+bulk, bukan guardrail eksekusi.
+
+**Konsekuensi baru.**
+
+- `DeleteResult` mendapat `forced?: true` pada baris yang benar-benar memakai `-D`; hasil di UI
+  membacanya sebagai `N terhapus (K dipaksa)` supaya tindakan merusak itu berjejak, bukan senyap.
+- Daftar penuh bisa ratusan baris di repo besar. Server tetap memancarkan **seluruhnya**, urut nama
+  (deterministik); yang membatasi adalah klien — filter status, kotak cari, dan batas render 100
+  baris. Batas render itu **bagian dari definisi "sedang tampak"**: `Pilih semua yang boleh (N)`
+  hanya mencakup baris yang benar-benar dirender, sehingga pilihan tak pernah memuat branch yang tak
+  terlihat operator.
