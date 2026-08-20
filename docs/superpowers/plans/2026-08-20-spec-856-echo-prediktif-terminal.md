@@ -551,7 +551,7 @@ git commit -m "feat(terminal): rekonsiliasi prediksi + TTL/suspend sebagai fungs
 - Consumes: `classifyInput` (Task 1)
 - Produces: `COALESCE_IN_MS: number`; `createInputBatcher(send: (d: string) => void): { push(d: string, coalesce: boolean): void; flush(): void; dispose(): void }`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan ke `src/test/terminal-predict.test.ts`:
 
@@ -611,12 +611,12 @@ describe("createInputBatcher", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/terminal-predict.test.ts`
 Expected: FAIL — `createInputBatcher is not a function`
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Tambahkan ke `src/src/screens/terminal-predict.ts`:
 
@@ -652,12 +652,12 @@ export function createInputBatcher(send: (d: string) => void): {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/terminal-predict.test.ts`
 Expected: PASS (6 test batcher + seluruh berkas)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/terminal-predict.ts src/test/terminal-predict.test.ts

@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applySeq, canPredict, classifyInput, echoedPrefixLen, initialState, looksLikePasswordPrompt,
-  onInput, onReattach, onServerData, onTick, reapply, rollbackSeq, scanAltScreen,
+  COALESCE_IN_MS, createInputBatcher, onInput, onReattach, onServerData, onTick, reapply,
+  rollbackSeq, scanAltScreen,
   SUSPEND_MS, TTL_MS, type PredictState, type View,
 } from "../src/screens/terminal-predict";
 
@@ -234,5 +235,56 @@ describe("onTick", () => {
 describe("onReattach", () => {
   it("melupakan segalanya — tmux memutar ulang layar penuh saat attach", () => {
     expect(onReattach()).toEqual(initialState());
+  });
+});
+
+describe("createInputBatcher", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("menggabungkan teks yang tiba dalam satu jendela menjadi SATU frame", () => {
+    const sent: string[] = [];
+    const b = createInputBatcher((d) => sent.push(d));
+    b.push("a", true); b.push("b", true); b.push("c", true);
+    expect(sent).toEqual([]);
+    vi.advanceTimersByTime(COALESCE_IN_MS);
+    expect(sent).toEqual(["abc"]);
+  });
+  it("mengirim seketika saat coalesce dimatikan — sakelar prediksi mati tak boleh menambah latensi", () => {
+    const sent: string[] = [];
+    const b = createInputBatcher((d) => sent.push(d));
+    b.push("a", false);
+    expect(sent).toEqual(["a"]);
+  });
+  // SPEC-452/800/816: Enter, panah, Esc, path lampiran, dan digit dialog wajib tetap satu
+  // keystroke = satu frame, dan wajib tak pernah menyalip teks yang sudah mengantre.
+  it("meloloskan control seketika, sesudah menguras buffer lebih dulu", () => {
+    const sent: string[] = [];
+    const b = createInputBatcher((d) => sent.push(d));
+    b.push("h", true); b.push("i", true);
+    b.push("\r", true);
+    expect(sent).toEqual(["hi", "\r"]);
+  });
+  it("meloloskan bulk (paste) seketika sebagai satu frame", () => {
+    const sent: string[] = [];
+    const b = createInputBatcher((d) => sent.push(d));
+    b.push("tempelan panjang", true);
+    expect(sent).toEqual(["tempelan panjang"]);
+  });
+  it("flush() mengosongkan buffer tanpa menunggu timer", () => {
+    const sent: string[] = [];
+    const b = createInputBatcher((d) => sent.push(d));
+    b.push("a", true);
+    b.flush();
+    expect(sent).toEqual(["a"]);
+  });
+  it("dispose() menguras buffer — ketikan tak boleh mati bersama pane", () => {
+    const sent: string[] = [];
+    const b = createInputBatcher((d) => sent.push(d));
+    b.push("a", true);
+    b.dispose();
+    expect(sent).toEqual(["a"]);
+    vi.advanceTimersByTime(COALESCE_IN_MS * 4);
+    expect(sent).toEqual(["a"]);
   });
 });

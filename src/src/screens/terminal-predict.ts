@@ -152,3 +152,33 @@ export function onTick(
 export function onReattach(): PredictState {
   return initialState();
 }
+
+/** Satu frame animasi, cermin `COALESCE_MS` arah keluar (SPEC-812). Terukur: TUI agen menggambar
+ *  ulang sekali per EVENT input, bukan per karakter — `hello world` sebagai 11 keystroke terpisah
+ *  membalas 22 frame / 16 999 byte, sebagai satu frame 2 frame / 1 551 byte. */
+export const COALESCE_IN_MS = 16;
+
+export function createInputBatcher(send: (d: string) => void): {
+  push(d: string, coalesce: boolean): void; flush(): void; dispose(): void;
+} {
+  let buf = "";
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const flush = (): void => {
+    if (timer) { clearTimeout(timer); timer = undefined; }
+    if (!buf) return;
+    const d = buf;
+    buf = "";
+    send(d);
+  };
+  return {
+    push(d, coalesce) {
+      // Control & bulk tak pernah ditahan: mereka menguras antrean lebih dulu supaya urutan byte
+      // ke pty tak pernah berubah, lalu lewat sendiri.
+      if (!coalesce || classifyInput(d) !== "text") { flush(); if (d) send(d); return; }
+      buf += d;
+      if (!timer) timer = setTimeout(flush, COALESCE_IN_MS);
+    },
+    flush,
+    dispose() { flush(); },
+  };
+}
