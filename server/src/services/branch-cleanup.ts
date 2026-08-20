@@ -27,6 +27,8 @@ export type UnusedBranch = {
   remote: boolean;
   lastCommit: { sha: string; at: string; subject: string } | null;
   locks: BranchLock[];
+  /** SPEC-861 · path worktree yang menahannya; ada hanya saat kunci `worktree` menyala. */
+  worktree?: string;
 };
 export type UnusedReport = { base: string; baseRemote: string | null; current: string; branches: UnusedBranch[] };
 export type LockInputs = { openSpecBranches: Set<string>; sessionBranches: Set<string> };
@@ -66,13 +68,20 @@ async function resolveBase(repoDir: string, want: string | undefined, current: s
   return current && current !== "HEAD" ? current : "HEAD";
 }
 
-// Branch yang ter-checkout di worktree lain. Sesi hanoman lahir --detach (ADR-0002) jadi seringnya
-// TAK ada baris `branch` sama sekali — itulah alasan kunci `session` tetap perlu, terpisah dari ini.
-async function worktreeBranches(repoDir: string): Promise<Set<string>> {
-  const s = new Set<string>();
-  for (const l of lines(await out(repoDir, ["worktree", "list", "--porcelain"])))
-    if (l.startsWith("branch refs/heads/")) s.add(l.slice("branch refs/heads/".length));
-  return s;
+// Branch yang ter-checkout di worktree lain, BESERTA path worktree-nya. Sesi hanoman lahir
+// --detach (ADR-0002) jadi seringnya TAK ada baris `branch` sama sekali — itulah alasan kunci
+// `session` tetap perlu, terpisah dari ini.
+// SPEC-861 · path-nya ikut dibawa supaya baris branch bisa menunjuk worktree mana yang menguncinya
+// (tab Branches → tab Worktrees). Blok porcelain berurutan: `worktree <path>` mendahului
+// `branch <ref>` miliknya, jadi path terakhir yang terbaca selalu pemilik baris branch itu.
+async function worktreeBranches(repoDir: string): Promise<Map<string, string>> {
+  const m = new Map<string, string>();
+  let path = "";
+  for (const l of lines(await out(repoDir, ["worktree", "list", "--porcelain"]))) {
+    if (l.startsWith("worktree ")) path = l.slice("worktree ".length);
+    else if (l.startsWith("branch refs/heads/")) m.set(l.slice("branch refs/heads/".length), path);
+  }
+  return m;
 }
 
 // U+001F unit separator: tak pernah muncul di subject commit, jadi aman jadi pemisah field.
@@ -125,7 +134,9 @@ export async function listUnusedBranches(
     if (wt.has(name)) locks.push("worktree");
     if (opts.openSpecBranches.has(name)) locks.push("spec-open");
     if (opts.sessionBranches.has(name)) locks.push("session");
-    return { name, local: locals.has(name), remote: remotes.has(name), lastCommit: meta.get(name) ?? null, locks };
+    const wtPath = wt.get(name);
+    return { name, local: locals.has(name), remote: remotes.has(name),
+      lastCommit: meta.get(name) ?? null, locks, ...(wtPath ? { worktree: wtPath } : {}) };
   });
   return { base, baseRemote, current, branches };
 }
