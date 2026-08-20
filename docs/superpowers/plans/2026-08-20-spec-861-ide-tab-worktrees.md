@@ -59,7 +59,7 @@
   - `type WorktreeInputs = { specs: Map<string, { id: string; stage: string }>; sessions: Map<string, { id: string; specId: string | null }> }`
   - DTO `WorktreeView` / `WorktreeReport` dari `@hanoman/shared`.
 
-- [ ] **Step 1: Tambahkan DTO di `shared/src/dto.ts`**
+- [x] **Step 1: Tambahkan DTO di `shared/src/dto.ts`**
 
 Sisipkan tepat SESUDAH blok `WorktreeCleanupView` (cari `state: "closing" | "failed";`):
 
@@ -102,7 +102,7 @@ export type WorktreeStats = {
 };
 ```
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 Buat `server/test/worktree-list.test.ts`:
 
@@ -232,7 +232,7 @@ describe("listWorktrees", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test — harus GAGAL**
+- [x] **Step 3: Jalankan test — harus GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/worktree-list.test.ts
@@ -240,7 +240,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `Failed to resolve import "../src/services/worktree-list"`.
 
-- [ ] **Step 4: Tulis `server/src/services/worktree-list.ts`**
+- [x] **Step 4: Tulis `server/src/services/worktree-list.ts`**
 
 ```ts
 import { execFile } from "node:child_process";
@@ -341,7 +341,7 @@ export async function listWorktrees(
 }
 ```
 
-- [ ] **Step 5: Jalankan test — harus LULUS**
+- [x] **Step 5: Jalankan test — harus LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/worktree-list.test.ts
@@ -349,7 +349,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS, 10 test.
 
-- [ ] **Step 6: Typecheck paket yang tersentuh**
+- [x] **Step 6: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
@@ -357,7 +357,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 
 Expected: keluar 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/dto.ts server/src/services/worktree-list.ts server/test/worktree-list.test.ts
@@ -376,7 +376,7 @@ git commit -m "feat(ide): daftar worktree hidup turunan git (SPEC-861)"
 - Consumes: `WorktreeView` dari Task 1.
 - Produces: `worktreeStats(repoDir: string, w: WorktreeView): Promise<WorktreeStats>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `server/test/worktree-list.test.ts` (dan tambahkan `worktreeStats` ke baris `import`):
 
@@ -427,7 +427,7 @@ describe("worktreeStats", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus GAGAL**
+- [x] **Step 2: Jalankan test — harus GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/worktree-list.test.ts
@@ -435,7 +435,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `worktreeStats is not a function` / import error.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Tambahkan ke `server/src/services/worktree-list.ts` (dan tambahkan `WorktreeStats` ke `import type`):
 
@@ -484,7 +484,7 @@ async function orphanCount(repoDir: string, w: WorktreeView): Promise<number> {
 }
 ```
 
-- [ ] **Step 4: Jalankan test — harus LULUS**
+- [x] **Step 4: Jalankan test — harus LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/worktree-list.test.ts
@@ -492,7 +492,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS, 15 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/worktree-list.ts server/test/worktree-list.test.ts
@@ -513,7 +513,7 @@ Menutup sesi hari ini hidup **inline** di `DELETE /terminal/sessions/:id`. Route
 **Interfaces:**
 - Produces: `closeSession(id: string): Promise<{ cleanup: string | null } | null>` — `null` = sesi tak ada.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/session-close.test.ts`:
 
@@ -563,7 +563,7 @@ describe("closeSession", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus GAGAL**
+- [x] **Step 2: Jalankan test — harus GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-close.test.ts
@@ -571,7 +571,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `Failed to resolve import "../src/services/session-close"`.
 
-- [ ] **Step 3: Pindahkan `advanceStage` + badan DELETE ke service baru**
+- [x] **Step 3: Pindahkan `advanceStage` + badan DELETE ke service baru**
 
 Buat `server/src/services/session-close.ts` dengan isi yang dipindah **apa adanya** dari `routes/terminal.ts` (jangan menulis ulang logikanya):
 
@@ -649,7 +649,7 @@ Lalu di `server/src/routes/terminal.ts`:
   });
 ```
 
-- [ ] **Step 4: Jalankan test baru + test route terminal yang sudah ada**
+- [x] **Step 4: Jalankan test baru + test route terminal yang sudah ada**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -658,7 +658,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS semua — `terminal.route.test.ts` adalah bukti bahwa ekstraksi tak mengubah perilaku.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -666,7 +666,7 @@ pnpm --filter ./server typecheck
 
 Expected: keluar 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/session-close.ts server/src/routes/terminal.ts server/test/session-close.test.ts
@@ -691,7 +691,7 @@ git commit -m "refactor(sesi): satu definisi penutupan sesi di services/session-
   - `type WorktreeDeleteDeps = { closeSession; release; prune; deleteBranch }`
   - `GET /projects/:id/worktrees`, `GET /projects/:id/worktrees/stats?name=`, `POST /projects/:id/worktrees/delete`
 
-- [ ] **Step 1: Tambahkan DTO hasil hapus di `shared/src/dto.ts`**
+- [x] **Step 1: Tambahkan DTO hasil hapus di `shared/src/dto.ts`**
 
 Sisipkan tepat sesudah `WorktreeStats`:
 
@@ -711,7 +711,7 @@ export type WorktreeDeleteResult = {
 };
 ```
 
-- [ ] **Step 2: Tambahkan path di `shared/src/api.ts`**
+- [x] **Step 2: Tambahkan path di `shared/src/api.ts`**
 
 Sisipkan tepat sesudah `branchesDelete`:
 
@@ -723,7 +723,7 @@ Sisipkan tepat sesudah `branchesDelete`:
   worktreesDelete: (id: string) => `${API}/projects/${id}/worktrees/delete`,
 ```
 
-- [ ] **Step 3: Tulis test route yang gagal**
+- [x] **Step 3: Tulis test route yang gagal**
 
 Buat `server/test/worktrees.route.test.ts`:
 
@@ -870,7 +870,7 @@ describe("POST /projects/:id/worktrees/delete", () => {
 });
 ```
 
-- [ ] **Step 4: Jalankan test — harus GAGAL**
+- [x] **Step 4: Jalankan test — harus GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/worktrees.route.test.ts
@@ -878,7 +878,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — seluruh request 404 (route belum ada).
 
-- [ ] **Step 5: Tambahkan `deleteWorktrees` ke `worktree-list.ts`**
+- [x] **Step 5: Tambahkan `deleteWorktrees` ke `worktree-list.ts`**
 
 ```ts
 // SPEC-861 · ADR-0132 · orkestrasi penghapusan. Deps disuntik supaya modul ini tetap murni: tutup
@@ -942,7 +942,7 @@ export async function deleteWorktrees(
 
 Tambahkan `WorktreeDeleteResult` ke `import type { … } from "@hanoman/shared"`.
 
-- [ ] **Step 6: Tambahkan tiga route di `server/src/routes/ide.ts`**
+- [x] **Step 6: Tambahkan tiga route di `server/src/routes/ide.ts`**
 
 Impor:
 
@@ -1043,7 +1043,7 @@ dan deps-nya:
       },
 ```
 
-- [ ] **Step 7: Tambahkan capability**
+- [x] **Step 7: Tambahkan capability**
 
 Di `server/src/services/agent-capabilities.ts`, tambahkan ke `IDE_SUBS`:
 
@@ -1053,7 +1053,7 @@ Di `server/src/services/agent-capabilities.ts`, tambahkan ke `IDE_SUBS`:
   "worktrees",
 ```
 
-- [ ] **Step 8: Jalankan test — harus LULUS**
+- [x] **Step 8: Jalankan test — harus LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -1062,7 +1062,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS. (Bila `agent-capabilities.test.ts` tak ada, jalankan `server/test/agent-*.test.ts`.)
 
-- [ ] **Step 9: Typecheck + commit**
+- [x] **Step 9: Typecheck + commit**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
@@ -1082,7 +1082,7 @@ git commit -m "feat(ide): endpoint daftar & hapus worktree + branch-nya (SPEC-86
 **Interfaces:**
 - Produces: field **additif** `UnusedBranch.worktree?: string` — path worktree yang mengunci branch itu.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `describe("listUnusedBranches", …)` pada `server/test/branch-cleanup.test.ts`:
 
@@ -1105,7 +1105,7 @@ Tambahkan di `describe("listUnusedBranches", …)` pada `server/test/branch-clea
   });
 ```
 
-- [ ] **Step 2: Jalankan test — harus GAGAL**
+- [x] **Step 2: Jalankan test — harus GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/branch-cleanup.test.ts
@@ -1113,7 +1113,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `expected undefined to be '…/wt-s9'`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/branch-cleanup.ts`:
 
@@ -1156,7 +1156,7 @@ Di badan `listUnusedBranches`, ganti pemakaian `wt`:
       ...(wt.get(name) ? { worktree: wt.get(name)! } : {}) };
 ```
 
-- [ ] **Step 4: Jalankan test — harus LULUS**
+- [x] **Step 4: Jalankan test — harus LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -1165,7 +1165,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/branch-cleanup.ts server/test/branch-cleanup.test.ts
@@ -1187,7 +1187,7 @@ git commit -m "feat(branches): baris branch menyebut worktree yang menguncinya (
   - `api.worktrees(id)`, `api.worktreeStats(id, name)`, `api.deleteWorktrees(id, { names, deleteBranch })`
   - `<WorktreesPanel projectId focus onOpenBranch />`
 
-- [ ] **Step 1: Tambahkan tipe + method di `src/src/api/client.ts`**
+- [x] **Step 1: Tambahkan tipe + method di `src/src/api/client.ts`**
 
 Tepat sesudah `LOCK_LABEL`:
 
@@ -1219,7 +1219,7 @@ Method, tepat sesudah `deleteBranches`:
     j<{ results: WorktreeDeleteResult[] }>(paths.worktreesDelete(id), { method: "POST", body: JSON.stringify(b) }),
 ```
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 Buat `src/test/worktrees-panel.test.tsx`:
 
@@ -1322,7 +1322,7 @@ describe("WorktreesPanel", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test — harus GAGAL**
+- [x] **Step 3: Jalankan test — harus GAGAL**
 
 ```bash
 pnpm vitest --run src/test/worktrees-panel.test.tsx
@@ -1330,7 +1330,7 @@ pnpm vitest --run src/test/worktrees-panel.test.tsx
 
 Expected: FAIL — `Failed to resolve import "../src/screens/WorktreesPanel"`.
 
-- [ ] **Step 4: Tulis `src/src/screens/WorktreesPanel.tsx`**
+- [x] **Step 4: Tulis `src/src/screens/WorktreesPanel.tsx`**
 
 ```tsx
 /* SPEC-861 · ADR-0132 — panel worktree hidup: satu baris per worktree terdaftar di git, dengan
@@ -1525,7 +1525,7 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
 }
 ```
 
-- [ ] **Step 5: Jalankan test — harus LULUS**
+- [x] **Step 5: Jalankan test — harus LULUS**
 
 ```bash
 pnpm vitest --run src/test/worktrees-panel.test.tsx
@@ -1533,7 +1533,7 @@ pnpm vitest --run src/test/worktrees-panel.test.tsx
 
 Expected: PASS, 8 test. Bila `usePersistedState`/`scoped` diimpor dari jalur yang salah, samakan dengan baris impor di `src/src/screens/IdeScreen.tsx`.
 
-- [ ] **Step 6: Typecheck + commit**
+- [x] **Step 6: Typecheck + commit**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -1554,7 +1554,7 @@ git commit -m "feat(ide): panel Worktrees + klien API (SPEC-861)"
 - Consumes: `<WorktreesPanel projectId focus onOpenBranch />` (Task 6); `UnusedBranch.worktree` (Task 5).
 - Produces: `<BranchesPanel projectId onOpenWorktree?: (path: string) => void />`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `src/test/branches-panel.test.tsx` (dan tambahkan `worktree: "/repo/.worktrees/wt-b"` + `locks: ["worktree"]` pada satu baris di `report()`; tambahkan baris baru agar test lama tak berubah):
 
@@ -1619,7 +1619,7 @@ describe("IdeScreen · tab Worktrees", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — harus GAGAL**
+- [x] **Step 2: Jalankan test — harus GAGAL**
 
 ```bash
 pnpm vitest --run src/test/ide-worktrees-tab.test.tsx src/test/branches-panel.test.tsx
@@ -1627,7 +1627,7 @@ pnpm vitest --run src/test/ide-worktrees-tab.test.tsx src/test/branches-panel.te
 
 Expected: FAIL — tab tak ada / `goto-worktree-…` tak ditemukan.
 
-- [ ] **Step 3: `BranchesPanel` — badge kunci jadi tautan**
+- [x] **Step 3: `BranchesPanel` — badge kunci jadi tautan**
 
 Ubah signature dan render badge kunci:
 
@@ -1648,7 +1648,7 @@ export function BranchesPanel({ projectId, onOpenWorktree }: {
                     : <Badge key={l} size="sm" tone="warn">{LOCK_LABEL[l]}</Badge>)}
 ```
 
-- [ ] **Step 4: `IdeScreen` — tab keempat + jembatan dua arah**
+- [x] **Step 4: `IdeScreen` — tab keempat + jembatan dua arah**
 
 ```tsx
 import { WorktreesPanel } from "./WorktreesPanel";
@@ -1684,7 +1684,7 @@ Render — ganti cabang terakhir:
       )}
 ```
 
-- [ ] **Step 5: Jalankan test — harus LULUS**
+- [x] **Step 5: Jalankan test — harus LULUS**
 
 ```bash
 pnpm vitest --run src/test/ide-worktrees-tab.test.tsx src/test/branches-panel.test.tsx src/test/worktrees-panel.test.tsx
@@ -1692,7 +1692,7 @@ pnpm vitest --run src/test/ide-worktrees-tab.test.tsx src/test/branches-panel.te
 
 Expected: PASS.
 
-- [ ] **Step 6: Typecheck + commit**
+- [x] **Step 6: Typecheck + commit**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -1709,7 +1709,7 @@ git commit -m "feat(ide): tab Worktrees + tautan dua arah dengan tab Branches (S
 - Create: `internal/docs/adr/0132-permukaan-penghapusan-worktree.md`
 - Modify: `internal/docs/README.md`, `internal/docs/architecture/api-contract.md`, `internal/skills/hanoman/SKILL.md`
 
-- [ ] **Step 1: Pastikan nomor ADR masih bebas**
+- [x] **Step 1: Pastikan nomor ADR masih bebas**
 
 ```bash
 ls internal/docs/adr/ | grep -c '^0132' || true
@@ -1717,7 +1717,7 @@ ls internal/docs/adr/ | grep -c '^0132' || true
 
 Expected: `0`. Bila sudah terpakai (sesi lain menomori duluan — lihat memori "ADR/SPEC number collisions"), pakai nomor bebas berikutnya dan ganti seluruh rujukan `ADR-0132` di kode & docs.
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Buat `internal/docs/adr/0132-permukaan-penghapusan-worktree.md` mengikuti bentuk ADR yang sudah ada (`0116-penutupan-sesi-asinkron-worktree-trash.md` sebagai contoh terdekat). Isi yang WAJIB ada:
 
@@ -1727,7 +1727,7 @@ Buat `internal/docs/adr/0132-permukaan-penghapusan-worktree.md` mengikuti bentuk
 - **Yang TIDAK berubah:** domain reaper tetap `.trash/**`; `DELETE /terminal/sessions/:id` berperilaku identik; tak ada kolom DB baru.
 - **Gotcha terukur:** pola `--exclude` `rev-list` relatif terhadap `refs/heads/` (`feat`, bukan `refs/heads/feat`) dan di-reset sesudah tiap `--branches`/`--remotes`/`--tags`; kasus dogfood (project ter-bind ke checkout di bawah `.worktrees/`) membuat seluruh baris `deletable:false` — itu benar dan disengaja.
 
-- [ ] **Step 3: Tautkan di index**
+- [x] **Step 3: Tautkan di index**
 
 Di `internal/docs/README.md`, tambahkan pada daftar ADR (di atas baris `0131`):
 
@@ -1735,15 +1735,15 @@ Di `internal/docs/README.md`, tambahkan pada daftar ADR (di atas baris `0131`):
 - [0132 — Permukaan penghapusan worktree: tab Worktrees, daftar turunan git, hapus lewat `.trash`](adr/0132-permukaan-penghapusan-worktree.md)
 ```
 
-- [ ] **Step 4: Kontrak API**
+- [x] **Step 4: Kontrak API**
 
 Di `internal/docs/architecture/api-contract.md`, tepat sesudah blok `/projects/:id/branches/*`, tambahkan ketiga endpoint dengan bentuk request/response-nya (`WorktreeReport`, `WorktreeStats`, `{ names, deleteBranch? }` → `{ results: WorktreeDeleteResult[] }`), capability `ide:read`/`ide:write`, dan catatan "selalu 200 bila body sah".
 
-- [ ] **Step 5: Skill project**
+- [x] **Step 5: Skill project**
 
 Di `internal/skills/hanoman/SKILL.md`, tambahkan satu butir di "Aturan Arsitektur" tepat sesudah butir SPEC-360/ADR-0077, ringkas (3–6 kalimat) dengan pola yang sama: keputusan, gerbang `ownsWorktree`, `.trash` dikecualikan, pagar branch tetap ADR-0077, dan gotcha `--exclude`.
 
-- [ ] **Step 6: Cek integritas index**
+- [x] **Step 6: Cek integritas index**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli build && node cli/dist/index.js docs index --check
@@ -1751,7 +1751,7 @@ node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli bui
 
 Expected: index konsisten (atau perbaiki dengan `docs index --fix`).
 
-- [ ] **Step 7: Smoke endpoint nyata (sekali, di akhir)**
+- [x] **Step 7: Smoke endpoint nyata (sekali, di akhir)**
 
 ```bash
 pnpm --filter ./server build
@@ -1767,7 +1767,7 @@ kill $SRV     # per-PID, JANGAN pkill -f
 
 Expected: GET → `{ repoDir, worktrees: [...] }`; POST → 200 dengan `results[0].ok === false`.
 
-- [ ] **Step 8: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 8: Jalankan seluruh test yang tersentuh perubahan ini**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1776,7 +1776,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: PASS. Pastikan test-nya memang BERJALAN — `--changed` menyalakan `passWithNoTests`, jadi "no test files" bukan bukti.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add internal/docs/adr/0132-permukaan-penghapusan-worktree.md internal/docs/README.md \
