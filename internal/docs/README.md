@@ -80,7 +80,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
-- [0131 — Retensi change-feed sync (puncak per record tak pernah dipangkas), dan kegagalan memuat yang tak boleh senyap](adr/0131-retensi-change-feed-sync.md) — menegakkan 0045, 0086, 0100 (SPEC-857)
+- [0131 — Retensi change-feed sync (puncak per record tak pernah dipangkas), `journal_mode=WAL`, dan kegagalan memuat yang tak boleh senyap](adr/0131-retensi-change-feed-sync.md) — menegakkan 0045, 0086, 0100 (SPEC-857)
 - [0130 — Kuota obrolan portal: ember (project × tipe × periode), satuannya sesi yang lahir](adr/0130-kuota-chat-portal-klien.md)
 - [0129 — Mesin chat portal klien: sesi agen tersandbox di workspace dokumen, empat lapis penjagaan](adr/0129-mesin-chat-portal-klien.md)
 - [0128 — Gerbang validasi sebelum publish, dan bootstrap Prisma Client di postinstall](adr/0128-gerbang-validasi-sebelum-publish.md)

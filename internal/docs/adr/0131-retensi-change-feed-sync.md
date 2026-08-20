@@ -76,9 +76,28 @@ hapus-baris murni dan harus bisa mengejar tunggakan: dengan jatah 100/hari, 121.
   tiap frame siar WS dan toast per-kegagalan akan jadi hujan toast saat hub sakit.
 - Siar dashboard mencatat kegagalan build frame sekali saat mulai gagal dan sekali saat pulih.
 
-**4. Hub produksi dipindah ke `journal_mode=WAL`** (dieksekusi 2026-08-20 bersama pemangkasan
-manual pertama). Di `delete` penulis memblokir pembaca; di WAL tidak. Ini yang mengubah pembacaan
-`Spec` dari `database is locked` menjadi 4 ms selagi service berjalan.
+**4. `journal_mode=WAL` disetel di kode, bukan dengan tangan.**
+
+Di `delete` — default SQLite — penulis memblokir pembaca; di WAL tidak. Itulah yang mengubah
+pembacaan `Spec` dari `database is locked` menjadi 4 ms selagi service berjalan saat hub dipindah ke
+WAL pada 2026-08-20. Ukuran feed adalah lapis pertama insiden ini; mode jurnal adalah lapis kedua,
+dan retensi saja tak menyentuhnya.
+
+Peralihan itu semula dijalankan dengan tangan pada satu berkas di satu host, jadi ia tak berlaku ke
+mana pun: setiap instalasi lain (`~/.hanoman/hanoman.db` bawaan paket npm global, ADR-0086) tetap
+`delete`, dan hub sendiri diam-diam kembali ke `delete` bila DB-nya dipulihkan dari backup pra-2026-08-20
+atau dibuat ulang. Karena itu pragma kini disetel di `server/src/db.ts`, satu-satunya tempat klien
+Prisma lahir (ADR-0100) dan jalur yang sama-sama dilewati `hanoman` CLI maupun `node dist/server.js`.
+Mode jurnal tersimpan di **header berkas**, jadi sekali disetel ia berlaku untuk setiap proses yang
+membuka DB itu — termasuk `prisma migrate`. Kegagalannya tak fatal: koneksi lain yang sedang menulis
+menolak peralihan mode sementara, dan boot berikutnya mencobanya lagi.
+
+Konsekuensinya satu guard ikut dipersempit. `server/test/webhook-no-raw-writes.test.ts` melarang
+`$executeRaw`/`$queryRaw` di seluruh `server/src` karena tap webhook tak bisa melihat SQL mentah dan
+pelanggarannya gagal **senyap**. Yang sebenarnya dijaga aturan itu adalah raw yang **menulis model
+terlacak**; `PRAGMA` tak menyentuh satu baris model pun. Guard-nya kini menolak raw apa pun yang
+bukan pragma **dan** yang berada di luar berkas yang disebut namanya — jadi ia masih menangkap
+`$executeRawUnsafe("DELETE FROM Spec")` sekalipun ditulis di dalam `db.ts`.
 
 ## Konsekuensi
 
@@ -89,6 +108,11 @@ manual pertama). Di `delete` penulis memblokir pembaca; di WAL tidak. Ini yang m
   lebih agresif suatu saat.
 - Operator kini melihat perbedaan antara "backlog memang segitu" dan "layar gagal disegarkan".
   Angka tanpa penanda kembali bisa dipercaya.
+- Setiap DB yang dibuka hanoman berpindah ke WAL saat boot pertama, bukan hanya hub. Backup yang
+  terdokumentasi (`sqlite3 ".backup"`, [deploy-vps](../operations/deploy-vps.md) §7) tetap benar
+  karena ia backup online yang ikut membaca WAL; menyalin `hanoman.db` dengan `cp` mentah **tidak**
+  — di WAL commit terbaru bisa masih berada di berkas `-wal`. `server/test/global-setup.ts` sudah
+  menghapus `-wal`/`-shm` bersama berkas DB, jadi DB test tetap lahir bersih tiap run.
 - Yang **tidak** diubah: `pollHealth()` tetap memanggil `notifySynced("vps", …)` tiap polling.
   Retensi membatasi akibatnya, jadi menahan publikasi saat health tak berubah adalah optimasi
   terpisah — bukan syarat kebenaran, dan tak perlu ikut di sini.
@@ -107,6 +131,9 @@ manual pertama). Di `delete` penulis memblokir pembaca; di WAL tidak. Ini yang m
 - **Batasi feed dengan "simpan N terakhir" seperti histori webhook.** N per record tak menjawab
   entity yang punya satu record tapi ribuan tulisan (justru kasus `vps`), sedangkan jendela waktu
   menjawab keduanya.
+- **Cukup setel WAL di hub dan catat langkahnya di runbook.** Itu yang sudah terjadi, dan justru
+  bentuk kegagalannya: keputusan yang hidup hanya di runbook tak berlaku untuk instalasi yang tak
+  membaca runbook itu, dan tak bertahan melewati satu restore pun.
 - **Biarkan `.catch(() => { })` dan cukup perbaiki servernya.** Menghapus penyebab hari ini tanpa
   menghapus kelas kegagalannya: kegagalan muat apa pun di masa depan akan kembali menyamar sebagai
   data, dan justru penyamaran itu yang membuat insiden ini butuh investigasi penuh untuk dikenali.

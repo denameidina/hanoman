@@ -23,6 +23,14 @@ mkdirSync(dirname(dbFilePath(url)), { recursive: true, mode: 0o700 }); // SQLite
 // `base` dipakai tap untuk membaca keadaan sebelum/sesudah TANPA melewati extension lagi
 // (rekursi), sekaligus berbagi engine & koneksi yang sama dengan klien yang diekspor.
 const base = new PrismaClient();
+// SPEC-857 · ADR-0131 §4 · mode jurnal disetel DI SINI karena ia tersimpan di header berkas: sekali
+// disetel ia berlaku untuk setiap proses yang membuka DB itu, termasuk `prisma migrate` dan CLI.
+// Default SQLite adalah `delete`, dan di mode itu tiap tulisan mengambil kunci eksklusif atas
+// SELURUH berkas serta memblokir semua pembaca — itulah yang mengubah change-feed gemuk menjadi
+// `P1008 Socket timeout` di hub, bukan ukurannya semata. Tak fatal bila gagal: koneksi lain yang
+// sedang menulis menolak peralihan mode sementara, dan boot berikutnya mencobanya lagi.
+void base.$queryRawUnsafe("PRAGMA journal_mode=WAL")
+  .catch((e) => console.warn("tak bisa menyetel journal_mode=WAL:", e));
 export const prisma = base.$extends(webhookTap(base as unknown as TapBase));
 
 // Klien yang diekspor kini ber-extension, jadi ia TAK assignable ke `PrismaClient` polos maupun
