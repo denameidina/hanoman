@@ -1335,3 +1335,34 @@ Kartu agen menampilkan pil runtime (`claude`/`codex`); **warisi tak menampilkan 
 untuk keadaan default hanya menambah derau. Kolom Tools di kartu tetap merender **hasil resolusi**
 (`resolveTools`), dan `["*"]` ikut di-expand secara tampilan supaya yang terbaca adalah apa yang
 benar-benar diterima agen.
+
+## Obrolan portal klien — `ChatPanel` + `PortalChatPanel` (SPEC-854 · ADR-0129/0130)
+
+Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa pun kecuali DTO.
+
+**`src/src/portal/ChatPanel.tsx`** (klien, di dalam `ClientPortal` sebagai tab **Obrolan**):
+
+- Layar pilih tipe (**Brainstorming** / **Bertanya**), masing-masing dengan satu kalimat penjelas.
+  Tombol tipe yang jatahnya habis **menonaktifkan diri** — klien tahu sebelum menekan.
+- Blok `chat-beda-help` menjelaskan bedanya dari Help desk. Ini bukan hiasan: "kenapa ada dua
+  kotak masuk" adalah pertanyaan pertama yang muncul, dan brief mensyaratkan jawabannya ada di UI.
+- Blok `chat-jatah` menyebut pemakaian & tanggal reset dalam **tanggal panjang** ("1 September
+  2026"), bukan stempel waktu.
+- Satu giliran bisa memakan 30–180 detik, jadi kirim menampilkan `StateBlock kind="loading"`
+  ("hanoman sedang memikirkan…") alih-alih terlihat menggantung. Giliran klien dirender optimistis;
+  server tetap yang menomori urutannya.
+- **Aturan berkas itu:** tak satu pun teksnya boleh teknis. Gagal apa pun — jaringan, 500, timeout —
+  dijawab satu kalimat biasa lewat `chat-galat`. Diuji: teks galat tak boleh memuat kode status,
+  nama alamat, atau kata `Error`.
+
+**`src/src/screens/PortalChatPanel.tsx`** (operator, dibuka dari `PrdScreen` lewat tombol
+**"Draft dari portal klien"**, hanya saat satu project terpilih):
+
+- Baris sesi menyebut tipe, ringkasan, **email klien**, dan tanggal — itulah "asal draft" yang
+  disyaratkan huruf B. Pil `PRD draft` / `PRD dokumen` membedakan yang belum & sudah dimaterialisasi.
+- Transkrip menampilkan giliran yang **diblokir gerbang keluaran** dengan border merah, alasannya,
+  dan **teks asli agen**. Hanya dari sini operator bisa menilai penjagaan bekerja atau kelewat lapar.
+- PRD draft dirender `MarkdownView`, dengan input slug + tombol **"Jadikan dokumen PRD"**. Salinan
+  di sebelahnya menyatakan apa adanya: menyimpan ke `docs/prd/`, **tidak** membuat backlog.
+- Angka jatah di `portal-chat-kuota` datang dari amplop daftar (`quotaView` yang sama dengan klien),
+  bukan hitungan kedua.

@@ -594,3 +594,34 @@ export const api = {
   retryWebhookDelivery: (id: string) =>
     j<WebhookDeliveryView>(paths.webhookDeliveryRetry(id), { method: "POST", ...body({}) }),
 };
+
+// SPEC-854 · ADR-0129 · permukaan OPERATOR untuk obrolan portal klien. Namespace sendiri, cermin
+// `portalApi` di sisi klien: dua audiens yang sangat berbeda tak boleh berbagi satu objek yang
+// autocomplete-nya menawarkan route audiens lain.
+export type PortalChatSessionRow = {
+  id: string; projectId: string; type: string; summary: string; periodKey: string;
+  prdSiap: boolean; prdDocPath: string | null; prdReadyAt: string | null;
+  clientEmail: string; createdAt: string; updatedAt: string;
+};
+export type PortalChatMessageRow = {
+  id: string; seq: number; role: string; text: string; rawText: string | null;
+  blocked: boolean; blockReasons: string[] | null; createdAt: string;
+};
+export type PortalChatQuotaRow = {
+  enabled: boolean;
+  brainstorm: { terpakai: number; jatah: number; sisa: number };
+  tanya: { terpakai: number; jatah: number; sisa: number };
+  resetPada: string;
+};
+
+export const portalChatApi = {
+  listSessions: (project: string, params: { page?: number; limit?: number } = {}) =>
+    j<{ items: PortalChatSessionRow[]; total: number; page: number; pageSize: number;
+        kuota: PortalChatQuotaRow }>("/api/portal-chat/sessions" + qs({ project, ...params })),
+  getSession: (id: string) =>
+    j<PortalChatSessionRow & { prdMarkdown: string | null; messages: PortalChatMessageRow[] }>(
+      `/api/portal-chat/sessions/${encodeURIComponent(id)}`),
+  materializePrd: (id: string, slug: string) =>
+    j<{ path: string }>(`/api/portal-chat/sessions/${encodeURIComponent(id)}/prd`,
+      { method: "POST", ...body({ slug }) }),
+};

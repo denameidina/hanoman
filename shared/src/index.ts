@@ -15,6 +15,7 @@ export * from "./api";
 export * from "./coverage";
 export * from "./ticket-status";
 export * from "./portal";
+export * from "./portal-chat";
 export * from "./prd-status";
 export * from "./session-kind";
 export * from "./session-end";

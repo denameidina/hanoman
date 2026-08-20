@@ -3,6 +3,7 @@
    backlog. Filter project punya opsi "Semua project" → listAllPrds() lintas-project, dikelompokkan
    per project. PRD adalah dokumen, bukan entitas DB (ADR-0011/0041). */
 import React from "react";
+import { PortalChatPanel } from "./PortalChatPanel";
 import {
   Badge, Button, Select, Modal, Field, Input, HnTextarea, StateBlock, MarkdownView, Icon,
   DocDownload, LIST_SCREEN_STYLE, FIXED_ROW_STYLE, ResponsivePanels,
@@ -282,6 +283,10 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
     return () => { alive = false; };
   }, [projectFilter, dataVersion]);
 
+  // SPEC-854 · ADR-0129 · draft PRD yang lahir dari obrolan portal klien hidup di baris SESI,
+  // bukan di docs/prd/ — jadi ia tak muncul di daftar dokumen sampai operator
+  // memateralisasinya. Panel ini pintunya, dan ia butuh satu project terpilih.
+  const [portalOpen, setPortalOpen] = React.useState(false);
   const visible = statusFilter === "all" ? items : items.filter((p) => p.status === statusFilter);
   const groups = groupByProject(visible);
   const selProject = sel ? (sel.projectId || activeProject) : "";
@@ -300,9 +305,20 @@ export function PrdScreen({ projects, projectFilter, onProjectFilter, onNewPrd, 
               .concat(PRD_STATUSES.map((s) => ({ value: s, label: s })))} />
           <ResetViewButton screen="prd" active={statusFilter === "all" ? 0 : 1} />
         </div>
-        <Button size="sm" leftIcon="plus"
-          onClick={() => setCreating(true)}>PRD baru</Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {!all && (
+            <Button size="sm" variant={portalOpen ? "primary" : "ghost"} leftIcon="messages-square"
+              onClick={() => setPortalOpen((v) => !v)}>Draft dari portal klien</Button>
+          )}
+          <Button size="sm" leftIcon="plus"
+            onClick={() => setCreating(true)}>PRD baru</Button>
+        </div>
       </div>
+      {portalOpen && !all && (
+        <div style={{ ...FIXED_ROW_STYLE, marginBottom: 18 }}>
+          <PortalChatPanel projectId={projectFilter} />
+        </div>
+      )}
       <ResponsivePanels
         ariaLabel="Panel PRD"
         active={panel}

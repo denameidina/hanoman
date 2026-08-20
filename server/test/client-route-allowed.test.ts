@@ -58,6 +58,38 @@ describe("clientRouteAllowed (SPEC-617)", () => {
     expect(clientRouteAllowed("POST", "/api/portal/projects/toko-mekar/tickets")).toBe(true);
   });
 
+  // SPEC-854 · ADR-0129 · dua bentuk tulis baru, masing-masing dinyatakan sebagai BENTUK PATH
+  // yang persis — bukan "portal boleh POST" (idiom ADR-0111).
+  it("chat portal: baca boleh, dua bentuk tulis boleh", () => {
+    expect(clientRouteAllowed("GET", "/api/portal/projects/p1/chat")).toBe(true);
+    expect(clientRouteAllowed("GET", "/api/portal/projects/p1/chat/sessions")).toBe(true);
+    expect(clientRouteAllowed("GET", "/api/portal/projects/p1/chat/sessions/s1")).toBe(true);
+    expect(clientRouteAllowed("POST", "/api/portal/projects/p1/chat/sessions")).toBe(true);
+    expect(clientRouteAllowed("POST", "/api/portal/projects/p1/chat/sessions/s1/messages")).toBe(true);
+  });
+
+  it("bentuk tulis chat lain tetap ditolak", () => {
+    const paths = [
+      "/api/portal/projects/p1/chat", "/api/portal/projects/p1/chat/sessions/s1",
+      "/api/portal/projects/p1/chat/sessions/s1/prd",
+      "/api/portal/projects/p1/chat/sessions/s1/messages/m1",
+      "/api/portal/projects/p1/chat/export",
+    ];
+    for (const p of paths)
+      for (const m of ["POST", "PATCH", "PUT", "DELETE"])
+        expect(clientRouteAllowed(m, p), `${m} ${p}`).toBe(false);
+    for (const m of ["PATCH", "PUT", "DELETE"])
+      expect(clientRouteAllowed(m, "/api/portal/projects/p1/chat/sessions"), m).toBe(false);
+  });
+
+  // Permukaan operator chat portal tetap tertutup bagi klien.
+  it("route operator chat portal tertutup", () => {
+    for (const m of ["GET", "POST", "PATCH", "DELETE"]) {
+      expect(clientRouteAllowed(m, "/api/portal-chat/sessions"), m).toBe(false);
+      expect(clientRouteAllowed(m, "/api/portal-chat/export"), m).toBe(false);
+    }
+  });
+
   it("bentuk tulis portal lain tetap ditolak", () => {
     const paths = [
       "/api/portal/projects/p1/tickets/t1", "/api/portal/projects/p1/backlog",

@@ -15,6 +15,18 @@ const segments = (path: string) =>
 const isPortalTicketSubmit = (method: string, seg: string[]): boolean =>
   method === "POST" && seg.length === 4 && seg[1] === "projects" && seg[3] === "tickets";
 
+// SPEC-854 · ADR-0129 · dua bentuk tulis chat, masing-masing PERSIS. Alasan yang sama dengan
+// ADR-0111: melonggarkan METHOD membuat setiap route portal yang lahir nanti ikut terbuka tanpa
+// seorang pun memutuskannya. `POST …/sessions/:sid/prd` (materialisasi PRD) sengaja TIDAK ada di
+// sini — itu keputusan operator, bukan klien.
+const isPortalChatStart = (method: string, seg: string[]): boolean =>
+  method === "POST" && seg.length === 5 && seg[1] === "projects"
+  && seg[3] === "chat" && seg[4] === "sessions";
+
+const isPortalChatSend = (method: string, seg: string[]): boolean =>
+  method === "POST" && seg.length === 7 && seg[1] === "projects"
+  && seg[3] === "chat" && seg[4] === "sessions" && seg[6] === "messages";
+
 export function clientRouteAllowed(method: string, path: string): boolean {
   const seg = segments(path);
   // `..` tak pernah muncul di route sah; menolaknya di sini menutup normalisasi path yang
@@ -23,7 +35,9 @@ export function clientRouteAllowed(method: string, path: string): boolean {
   const top = seg[0] ?? "";
   const read = method === "GET" || method === "HEAD";
 
-  if (top === "portal") return read || isPortalTicketSubmit(method, seg);
+  if (top === "portal")
+    return read || isPortalTicketSubmit(method, seg)
+      || isPortalChatStart(method, seg) || isPortalChatSend(method, seg);
   // Help Center sudah publik tanpa login (app.ts mem-bypass gate untuknya). Menolaknya di sini
   // membuat klien yang login justru punya hak LEBIH SEDIKIT daripada pengunjung anonim.
   if (top === "help") return true;

@@ -320,6 +320,24 @@ export const zLead = z.object({
 export type Lead = z.infer<typeof zLead>;
 export const LEAD_DEFAULTS: Lead = zLead.parse({});
 
+// SPEC-854 · ADR-0130 · chat portal klien. Kolom `Setting.data` bertipe Json → blok ini TANPA
+// migration, cermin scheduler/goal/conflict/lead. Opt-in: selama `enabled` mati, permukaan chat
+// tak muncul di portal dan route-nya membalas 404 yang SAMA dengan project tak ditugaskan.
+//
+// TANPA `agent` — chat portal khusus claude. Gerbang tool (`--tools`) adalah flag claude, dan
+// bentuk one-shot codex hanya punya `--dangerously-bypass-approvals-and-sandbox`. Memaparkan
+// pilihan agen di sini berarti menjanjikan penjagaan yang separuhnya tak bisa ditegakkan.
+export const zPortalChat = z.object({
+  enabled: z.boolean().default(false),
+  brainstormPerMonth: z.number().int().min(0).max(1000).default(2),
+  askPerMonth: z.number().int().min(0).max(10000).default(30),
+  model: z.string().default("claude-opus-5"),
+  effort: z.string().default("high"),
+  timeoutSec: z.number().int().min(10).max(900).default(180),
+});
+export type PortalChat = z.infer<typeof zPortalChat>;
+export const PORTAL_CHAT_DEFAULTS: PortalChat = zPortalChat.parse({});
+
 export const zSetting = z.object({
   model: z.string().default("claude-opus-5"),
   effort: z.string().default("xhigh"),
@@ -345,6 +363,7 @@ export const zSetting = z.object({
   lead: zLead.default(LEAD_DEFAULTS),                                     // SPEC-409 · ADR-0091 · hanoman-lead (default mati)
   telegram: zTelegramSettings.default(TELEGRAM_DEFAULTS),                 // SPEC-476 · ADR-0096 · gateway Telegram (default mati)
   changelog: zAgentEngine.default(CHANGELOG_ENGINE_DEFAULTS),             // SPEC-518 · agen pembuat changelog (opt-in, mati)
+  portalChat: zPortalChat.default(PORTAL_CHAT_DEFAULTS),                  // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
 });
 export type Setting = z.infer<typeof zSetting>;
 

@@ -21,6 +21,10 @@ export const PG_ORDER = [
   "Changelog",
   // SPEC-617 · ADR-0110 · ClientProjectAccess sesudah User DAN Project (FK ke keduanya).
   "User", "ClientProjectAccess", "Session", "DeviceToken", "AgentToken",
+  // SPEC-854 · ADR-0129 · PortalChatSession sesudah User DAN Project (FK ke keduanya);
+  // PortalChatMessage sesudah sesinya (FK sessionId, cascade). Keduanya LOCAL-only dan lazimnya
+  // TIDAK ada di sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris.
+  "PortalChatSession", "PortalChatMessage",
   "Vps", "VpsAuditSnapshot", "VpsItemState",
   "SessionResult", "SessionHistory",
   // SPEC-799 · ADR-0119 · SyncTombstone LOCAL-only, tanpa FK; letaknya bersama tabel sync lain.

@@ -104,3 +104,26 @@ redirect webhook, atau deny-hook command sebagai pengganti OS sandbox memerlukan
 Active DAST terhadap produksi, malware upload nyata, credential replay, DNS rebinding ke target live,
 atau pengujian yang mengubah data user memerlukan otorisasi manusia terpisah. Default verifikasi adalah
 unit/integrasi negatif dan smoke lokal/staging.
+
+## Obrolan portal klien (SPEC-854 · [ADR-0129](../adr/0129-mesin-chat-portal-klien.md))
+
+Permukaan baru yang membawa **teks tak tepercaya dari luar sampai ke sebuah proses agen**. Ia
+dijaga empat lapis, dan tiga di antaranya ada karena kebocoran yang **terukur**, bukan karena
+kehati-hatian umum.
+
+| Abuse case | Kontrol | Residual risk |
+|---|---|---|
+| Klien menyuntik instruksi di pesannya | Lapis 1: blok berbatas ber-nonce **acak per giliran**; penanda yang diketik klien disisipi spasi lebar-nol. Giliran klien di riwayat ikut dibungkus | Model tetap bisa terbujuk; lapis 2 & 4 yang menahan akibatnya |
+| Klien memancing isi project lain | Lapis 2: workspace hanya memuat proyeksi portal project itu — tak ada jalur data ke project lain sama sekali. Lapis 4: nama/id project lain di balasan → tolak total. Route: project bukan haknya = 404 yang sama dengan project tak ada | — |
+| Klien menjalankan sesuatu | Lapis 3: `--tools "Read,Glob,Grep"` (tanpa Bash/Write/WebFetch/Task), tanpa flag bypass, tanpa MCP, tanpa skill, tanpa settings. Tak ada tmux/PTY: klien tak pernah punya keyboard ke TUI | — |
+| Agen keluar dari workspace | Containment cwd claude — terukur **7/7 percobaan ditolak** (Read relatif & absolut, Glob `../`/absolut/`**`, Grep `..`/absolut) tanpa podman. Di produksi ditambah sandbox podman `:ro`, **fail closed** | Percobaan keluar tercatat di `permission_denials` → `escapeAttempts` |
+| Balasan membocorkan isi dalam hanoman | Lapis 4: blok kode, path, email, nama berkas, istilah teknis, perintah, konfigurasi, jejak galat → tolak total, diganti kalimat karangan server | Mentahnya disimpan (`rawText`) untuk operator, tak pernah dikirim |
+| Klien menghabiskan sumber daya | Jatah bulanan per project × tipe ([ADR-0130](../adr/0130-kuota-chat-portal-klien.md)); satuan = sesi yang lahir, jadi banyak tab/muat ulang tak menambah apa pun | Kuota menumpang langganan yang sama dengan sesi pekerja (sadar, cermin ADR-0091 OQ-1) |
+
+Yang **diterima secara sadar**: `claude` menyuntikkan `userEmail` operator ke dalam
+system-reminder-nya sendiri, dan itu tak bisa dimatikan tanpa membongkar auth langganan. Ia
+ditutup di **gerbang keluaran** (pola `email` → tolak total), bukan dicegah di sumbernya.
+
+Invariant pengujian yang mengikat: keempat lapis adalah **fungsi murni**, jadi seluruhnya diuji
+tanpa memanggil agen — termasuk korpus injeksi yang sungguh-sungguh mencoba menembus dan korpus
+balasan bocor yang tiga di antaranya benar-benar diproduksi agen saat pengukuran SPEC-854.

@@ -8,6 +8,7 @@ import { Mark } from "../ds/marks";
 import { portalApi } from "../api/portal";
 import { stagePill, ticketPill } from "./status-pill";
 import { TicketForm } from "./TicketForm";
+import { ChatPanel } from "./ChatPanel";
 
 // SPEC-617 · ADR-0110 · permukaan klien. SENGAJA tidak memakai <Shell>: sidebar HN_NAV adalah
 // navigasi OPERATOR, dan setiap entrinya adalah 403 yang menunggu diklik. Chrome-nya sendiri,
@@ -57,6 +58,10 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   const [openTicket, setOpenTicket] = React.useState<PortalTicketDetail | null>(null);
   const [failed, setFailed] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
+  // SPEC-854 · ADR-0129 · chat portal opt-in. Kehadirannya disimpulkan dari route-nya sendiri,
+  // bukan dari knob yang disalin ke klien: Settings adalah permukaan operator dan tak pernah
+  // dibaca akun klien (ADR-0110).
+  const [chatAda, setChatAda] = React.useState(false);
 
   React.useEffect(() => {
     portalApi.listProjects()
@@ -80,6 +85,13 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   }, []);
 
   React.useEffect(() => { if (active) loadLists(active, bPage, tPage); }, [active, bPage, tPage, reload, loadLists]);
+  React.useEffect(() => {
+    if (!active) return;
+    setChatAda(false);
+    portalApi.listChatSessions(active, { page: 1, limit: 1 })
+      .then(() => setChatAda(true))
+      .catch(() => setChatAda(false));
+  }, [active]);
   // Ganti project atau tab = kembali ke halaman 1 (idiom TriageScreen SPEC-523): halaman 5 dari
   // konteks lama menjawab daftar konteks baru yang cuma punya 2 halaman → kosong tanpa sebab.
   React.useEffect(() => { setBPage(1); setTPage(1); }, [active, tab]);
@@ -137,11 +149,14 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                 <Tabs value={tab} onChange={setTab} style={{ flex: 1, minWidth: 0 }} tabs={[
                   { value: "backlog", label: "Pekerjaan", count: backlog.total },
                   { value: "tickets", label: "Help desk", count: tickets.total },
+                  // SPEC-854 · ADR-0129 · tab hanya lahir kalau chat menyala di Settings; selama
+                  // mati, route-nya 404 dan `chatAda` tetap false (tak ada tab yang menipu).
+                  ...(chatAda ? [{ value: "chat", label: "Obrolan" }] : []),
                 ]} />
                 <Button size="sm" leftIcon="send" onClick={() => setComposing(true)}>Kirim keluhan</Button>
               </div>
 
-              {tab === "backlog" ? (
+              {tab === "chat" ? <ChatPanel projectId={active!} /> : tab === "backlog" ? (
                 backlog.total === 0
                   ? <StateBlock kind="empty" icon="list-checks" title="Belum ada pekerjaan tercatat"
                       hint="Begitu tim mulai mengerjakan sesuatu di project ini, daftarnya muncul di sini." />
