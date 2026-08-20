@@ -550,7 +550,7 @@ git commit -m "feat(branches): klien meneruskan include & allowUnmerged (SPEC-85
 - Consumes: `api.branchesUnused(id, base, "all")`, `api.deleteBranches(id, { names, scope, allowUnmerged })`, tipe dari Task 3.
 - Produces: komponen `BranchesPanel({ projectId })` — prop tak berubah.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Ganti helper `report()` di `src/test/branches-panel.test.tsx` supaya memuat branch belum ter-merge
 (dan tambahkan `type UnusedBranch` ke baris import dari `../src/api/client`):
@@ -677,12 +677,12 @@ Test baru di dalam `describe("BranchesPanel", ...)`:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run --no-file-parallelism src/test/branches-panel.test.tsx`
 Expected: FAIL — `getByTestId("status")` tak ditemukan; `api.branchesUnused` dipanggil tanpa `"all"`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Tulis ulang `src/src/screens/BranchesPanel.tsx`:
 
@@ -904,23 +904,23 @@ export function BranchesPanel({ projectId }: { projectId: string }) {
 }
 ```
 
-- [ ] **Step 4: Perbarui fixture `ide-screen.test.tsx`**
+- [x] **Step 4: Perbarui fixture `ide-screen.test.tsx`**
 
 Mock `api.branchesUnused` di `describe("IdeScreen tab Branches (SPEC-360)")` memakai objek
 `UnusedBranch` literal — tambahkan `merged: true, mergedLocal: true, mergedRemote: true` supaya
 typecheck-nya hijau.
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run --no-file-parallelism src/test/branches-panel.test.tsx src/test/ide-screen.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 6: Typecheck frontend**
+- [x] **Step 6: Typecheck frontend**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0, tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/BranchesPanel.tsx src/test/branches-panel.test.tsx src/test/ide-screen.test.tsx

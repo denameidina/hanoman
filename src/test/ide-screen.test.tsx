@@ -198,7 +198,8 @@ describe("IdeScreen tab Branches (SPEC-360)", () => {
   it("tab Branches merender panel branch ter-merge", async () => {
     vi.spyOn(api, "branchesUnused").mockResolvedValue({
       base: "main", baseRemote: "origin/main", current: "main",
-      branches: [{ name: "hanoman/spec-9", local: true, remote: true, lastCommit: null, locks: [] }],
+      branches: [{ name: "hanoman/spec-9", local: true, remote: true, merged: true,
+        mergedLocal: true, mergedRemote: true, lastCommit: null, locks: [] }],
     });
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
     // `Tabs` merender <button role="tab">; role eksplisit menimpa role implisit "button",
