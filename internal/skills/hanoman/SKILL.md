@@ -135,6 +135,31 @@ Pakai skill lebih sempit saat task cocok:
   dipendekkan git jadi bare `origin` (cermin `services/branches.ts`); dan `--end-of-options` **tak
   berlaku** untuk argumen `--merged` → base wajib di-resolve ke SHA lebih dulu. Ini pagar keselamatan
   data untuk satu endpoint bulk, **bukan** guardrail eksekusi — ADR-0037 tetap utuh.
+- **Worktree hidup punya permukaannya sendiri** (SPEC-861/**ADR-0132**; ADR-0116, 0077, 0002/0015,
+  0018/0011, 0127 ditegakkan — **tak ada yang dicabut**): tab **Worktrees** di IDE + `GET
+  /projects/:id/worktrees`, `GET …/worktrees/stats?name=`, `POST …/worktrees/delete`, semuanya di
+  domain capability `ide` yang diturunkan **dari method**. Sebelumnya yang terlihat dari dashboard
+  hanya pembersihan yang TERTUNDA (`WorktreeCleanupView`, isi `.trash/`); worktree yang masih HIDUP
+  tak terdaftar di mana pun, sehingga worktree yatim memakan disk **dan** registrasinya mengunci
+  branch di tab Branches (`BranchLock: "worktree"`) — dua kebuntuan yang saling mengait. Daftarnya
+  **nilai turunan penuh** `git worktree list --porcelain` tiap request (tanpa kolom DB, tanpa cache),
+  servicenya **murni** seperti `branch-cleanup.ts`: `out()` tak pernah melempar, `execFile` async
+  (route ini berbagi event loop dengan terminal PTY), dan Spec/sesi tmux/efek samping masuk sebagai
+  parameter & deps yang dirakit di `routes/ide.ts`. **Entri `.trash/**` dikecualikan** — domain reaper
+  TIDAK diperlebar, yang berubah hanya APA yang masuk ke `.trash`. **`ownsWorktree()` satu-satunya
+  gerbang `deletable`**, ditegakkan di jalur tulis (hanoman didogfood di worktree-nya sendiri, jadi
+  menguji bentuk path pernah menghapus checkout project — SPEC-362). Penghapusan hanya me-`rename`
+  ke `.trash` (SPEC-742) lalu `git worktree prune` **seketika** — di situlah kunci `worktree` lepas.
+  **Tak ada baris terkunci permanen**: sesi hidup / backlog belum done / isi kotor = peringatan yang
+  dinamai `useConfirm` lewat `impact[]`, bukan penolakan; sesinya ditutup lewat `services/session-close.ts`
+  — SATU definisi yang kini dipakai `DELETE /terminal/sessions/:id` juga. Penghapusan **branch** tetap
+  lewat `deleteBranches` **beserta pagar ADR-0077** dan bisa gagal dengan alasannya dilaporkan per
+  baris. **Tiga gotcha:** pola `--exclude` `rev-list` relatif terhadap ruang ref-nya (`feat`, BUKAN
+  `refs/heads/feat` — bentuk panjang diam-diam tak mengecualikan apa pun) dan di-reset sesudah tiap
+  `--branches`/`--remotes`/`--tags`; `git worktree list` selalu menjawab path **fisik** sementara
+  repoDir/cwd datang apa adanya, jadi tanpa `realpath` baris tak pernah cocok dengan sesinya —
+  **senyap**; dan entri `.trash` tak bisa di-assert keberadaannya di test karena `releaseWorktree`
+  menendang penyapunya seketika — yang membuktikan ia dipindah adalah bentuk namanya `<sesi>.<stempel>`.
 - **Backlog bisa ditandai selesai MANUAL** (SPEC-804/**ADR-0120**; ADR-0008 & ADR-0047 & ADR-0099 &
   ADR-0105 ditegakkan, **ADR-0103 diamandemen**): `POST /specs/:id/done` `{reason?, confirm?}`
   memajukan satu item ke `done` tanpa sesi — untuk pekerjaan yang beres DI LUAR sesi (dikerjakan

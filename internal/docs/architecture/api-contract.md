@@ -575,13 +575,14 @@ GET    /projects/:id/archive?ref=&format=         # stream (download) git archiv
 GET    /projects/:id/pr-url?branch=&base=         # { url:string|null }  URL "Create PR" dari origin (github/gitlab/bitbucket) atau null
 POST   /projects/:id/remotes  {name,url} · PATCH /projects/:id/remotes/:name {url} · DELETE /projects/:id/remotes/:name   # → Remote[]; 400 field cacat; 409 git gagal
 # Bersihkan branch tak terpakai (SPEC-360 · ADR-0077) — nilai turunan git, tanpa kolom DB
-GET  /projects/:id/branches/unused?base=   # { base, baseRemote, current, branches:[{name,local,remote,lastCommit:{sha,at,subject}|null,locks[]}] }
+GET  /projects/:id/branches/unused?base=   # { base, baseRemote, current, branches:[{name,local,remote,lastCommit:{sha,at,subject}|null,locks[],worktree?}] }
 #   Isi daftar = HANYA branch ter-merge ke base (git branch --merged); ref origin dibanding origin/<base>.
 #   base: ?base= → main → master → branch aktif → "HEAD". TAK PERNAH hardcode "main" (SPEC-227).
 #   base di-resolve ke SHA sebelum diberikan ke --merged: `--end-of-options` TAK bisa dipakai di sana
 #   (git menelannya sebagai nilai --merged, lalu --format jadi argumen posisi). Hex tak pernah jadi flag (ADR-0032).
 #   locks ∈ current|base|worktree|spec-open|session — kosong = boleh dihapus. base & current ikut tampil (terkunci).
 #   `session` terpisah dari `worktree` karena sesi lahir --detach (ADR-0002) → tak muncul di `git worktree list`.
+#   SPEC-861 · `worktree` (path) ada hanya saat kunci `worktree` menyala → UI menautkannya ke barisnya di tab Worktrees.
 #   Disaring: baris `(no branch)` (dipancarkan saat dijalankan di worktree detached) & `origin/HEAD` (git memendekkannya jadi bare `origin`).
 #   404 project tak ada; tanpa repoDir/bukan repo → { base:"", baseRemote:null, current:"", branches:[] }.
 POST /projects/:id/branches/delete  { names:string[], scope?, base? }   # { base, results:[{name,ok,scope,error?}] }
@@ -590,6 +591,32 @@ POST /projects/:id/branches/delete  { names:string[], scope?, base? }   # { base
 #   Selalu 200 bila body sah — kegagalan hidup di baris results, bukan status HTTP. TAK PERNAH pakai -D/force.
 #   TAK digerbang sesi aktif global (op ref-only, ADR-0055); pagarnya per-branch. 400 names/scope cacat, tanpa repoDir.
 #   Capability agent: keduanya di domain `projects` (projects:read/write), BUKAN `ide` — cermin GET /branches lama.
+# Worktree yang masih HIDUP (SPEC-861 · ADR-0132) — nilai turunan git, tanpa kolom DB, tanpa cache
+GET  /projects/:id/worktrees          # { repoDir, worktrees:[{path,name,head,branch|null,prunable,locked,deletable,blocked|null,spec:{id,stage}|null,session:{id,specId}|null,createdAt}] }
+#   Turunan `git worktree list --porcelain` TIAP request. Entri `.worktrees/.trash/**` DIKECUALIKAN —
+#   itu wilayah reaper & sudah punya permukaannya sendiri (GET /terminal/cleanups, ADR-0116).
+#   branch null = detached HEAD → pakai `head` (sesi hanoman SELALU detached, ADR-0002).
+#   spec dipetakan dari `basename(path)` == sessionIdForSpec(specId) (ADR-0015); merge-*/cron-* → null.
+#   deletable = ownsWorktree(repoDir, path) — HUBUNGAN path↔repoDir, bukan bentuk path (SPEC-362).
+#   Checkout project ikut tampil dengan deletable:false + blocked:"checkout project".
+#   Path git selalu FISIK (macOS: /var/folders → /private/**) → dinormalkan lewat realpath.
+#   404 project tak ada; tanpa repoDir/bukan repo → { repoDir:"", worktrees:[] } — TAK PERNAH 500.
+GET  /projects/:id/worktrees/stats?name=   # { name, sizeBytes:number|null, dirtyFiles, orphanCommits }
+#   Sinyal MAHAL (du -sk + git status) sengaja terpisah supaya daftar tak menunggunya; UI memuat per baris.
+#   orphanCommits = commit yang HANYA hidup di worktree ini (branch yang ter-checkout di sini ikut
+#   dikecualikan, karena 'hapus branch juga' akan ikut menghapusnya) = kerja yang benar-benar hilang.
+#   `name` divalidasi terhadap daftar TURUNAN → klien tak pernah mengirim path. 404 nama di luar daftar.
+POST /projects/:id/worktrees/delete  { names:string[], deleteBranch? }  # { results:[{name,ok,cleanup|null,closedSession?,branch?:{name,ok,error?},error?}] }
+#   Urutan mengikat: turunkan ulang daftar → gerbang deletable → [sesi hidup? closeSession()] →
+#   releaseWorktree() (rename ke .trash, SPEC-742 — event loop tak terblokir) → git worktree prune →
+#   [deleteBranch? deleteBranches() BESERTA pagar kunci ADR-0077, bukan jalur kedua].
+#   prune dijalankan SEKARANG: di situlah kunci BranchLock "worktree" lepas (itu inti SPEC-861), dan
+#   itu pula yang membereskan baris `prunable` (registrasi tanpa direktori).
+#   Tak ada baris terkunci permanen: sesi hidup / backlog belum done / isi kotor = PERINGATAN yang
+#   dinamai dialog konfirmasi (useConfirm + impact[], ADR-0127), bukan penolakan. Yang menolak hanya
+#   ownsWorktree. Penghapusan BRANCH tetap bisa gagal & alasannya dilaporkan di baris `branch`.
+#   Selalu 200 bila body sah — kegagalan hidup di baris results. 400 names cacat, tanpa repoDir.
+#   Capability agent: domain `ide` (ide:read/write), diturunkan DARI METHOD (hindari kelas bug SPEC-405).
 # Isolasi (merge/rebase/pull/drop): { status:"clean",detail } | { status:"conflict",sessionId } | 400 body/target · 409 detached/source hilang/working-tree kotor
 # Read (status/stashes/remotes/compare/search): 404 project tak ada; commit-file/compare-file: 400 path keluar repo · 404 tak ada
 # GET /projects/:id/graph menerima filter opsional: ?branches=a,b&showRemote=&showTags= (default = --all lama)
