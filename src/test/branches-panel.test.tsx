@@ -58,8 +58,8 @@ describe("BranchesPanel", () => {
   // pun' — badge kuncinya harus jadi jalan keluar, bukan sekadar label.
   it("badge kunci worktree menautkan ke barisnya di tab Worktrees", async () => {
     vi.spyOn(api, "branchesUnused").mockResolvedValue(report({
-      branches: [{ name: "hanoman/spec-4", local: true, remote: false, lastCommit: null,
-        locks: ["worktree"], worktree: "/repo/.worktrees/wt-b" }],
+      branches: [br({ name: "hanoman/spec-4", remote: false, mergedRemote: false, lastCommit: null,
+        locks: ["worktree"], worktree: "/repo/.worktrees/wt-b" })],
     }));
     const onOpenWorktree = vi.fn();
     render(<BranchesPanel projectId="p1" onOpenWorktree={onOpenWorktree} />);

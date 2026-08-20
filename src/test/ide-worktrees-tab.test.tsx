@@ -14,7 +14,8 @@ beforeEach(() => {
   vi.spyOn(api, "ideWorkingStatus").mockResolvedValue({ branch: "main", staged: [], unstaged: [] } as any);
   vi.spyOn(api, "branchesUnused").mockResolvedValue({
     base: "main", baseRemote: null, current: "main",
-    branches: [{ name: "hanoman/spec-1", local: true, remote: false, lastCommit: null,
+    branches: [{ name: "hanoman/spec-1", local: true, remote: false,
+      merged: true, mergedLocal: true, mergedRemote: false, lastCommit: null,
       locks: ["worktree"], worktree: "/repo/.worktrees/spec-1" }],
   });
   vi.spyOn(api, "worktrees").mockResolvedValue({
