@@ -21,6 +21,8 @@ const xt = vi.hoisted(() => ({
   wheelHandler: undefined as ((e: WheelEvent) => boolean) | undefined,
   buffer: {
     viewportY: 0,
+    cursorX: 0,
+    cursorY: 0,
     getLine: (_: number) => undefined as undefined | { translateToString: () => string },
   },
 }));
@@ -76,7 +78,7 @@ beforeEach(() => {
   xt.options = undefined; xt.keyHandler = undefined; xt.selection = ""; xt.written = [];
   xt.focused = 0; xt.fitCount = 0; xt.scrolled = []; xt.dataHandler = undefined; xt.resize = undefined;
   xt.wheelHandler = undefined;
-  xt.buffer = { viewportY: 0, getLine: () => undefined };
+  xt.buffer = { viewportY: 0, cursorX: 0, cursorY: 0, getLine: () => undefined };
   sockets.length = 0;
   vi.spyOn(api, "issueWsTicket").mockResolvedValue({ ticket: "ws-once" });
   vi.stubGlobal("WebSocket", FakeWebSocket);
@@ -466,5 +468,93 @@ describe("SPEC-816 · lampiran gambar", () => {
     act(() => { paneHost(container).dispatchEvent(event); });
     await vi.waitFor(() => expect(xt.written.join("")).toContain("tipe berkas tak didukung"));
     expect(xt.written.join("")).toContain("\x1b[31m");
+  });
+});
+
+// SPEC-856 · echo prediktif. Yang diuji di sini kontrak call site-nya — keputusan murninya sudah
+// dikunci `terminal-predict.test.ts`. Mock xterm tak punya buffer sungguhan, jadi yang diperiksa
+// adalah string yang ditulis dan frame yang dikirim, bukan piksel.
+describe("TerminalPane · echo prediktif (SPEC-856)", () => {
+  const lineIs = (text: string, cursorX = 0) => {
+    xt.buffer.cursorX = cursorX;
+    xt.buffer.getLine = () => ({ translateToString: () => text });
+  };
+  const sentInputs = (): string[] => (sockets[0]?.sent ?? [])
+    .map((m) => JSON.parse(m) as { t: string; d?: string })
+    .filter((f) => f.t === "in").map((f) => f.d!);
+  // Timer palsu dipasang SEBELUM render: `setInterval` TTL lahir di dalam effect, jadi
+  // memasangnya sesudahnya meninggalkan interval yang berjalan pada jam sungguhan.
+  const mount = async (node: React.ReactElement) => {
+    vi.useFakeTimers();
+    render(node);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]?.onopen?.(); });
+    xt.written.length = 0;
+  };
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("menulis karakter bergaris bawah lokal lalu mengirimnya setelah jendela 16 ms", async () => {
+    lineIs("");
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    act(() => { xt.dataHandler?.("a"); });
+    expect(xt.written).toEqual(["\x1b[4ma\x1b[24m"]);
+    expect(sentInputs()).toEqual([]);
+    act(() => { vi.advanceTimersByTime(16); });
+    expect(sentInputs()).toEqual(["a"]);
+  });
+
+  it("me-rollback SEBELUM data server, dalam satu write", async () => {
+    lineIs("");
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    act(() => { xt.dataHandler?.("a"); });
+    xt.written.length = 0;
+    act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "data", d: "❯ a" }) }); });
+    expect(xt.written[0]).toBe("\x1b[1D\x1b[K❯ a");
+  });
+
+  it("tak memprediksi control dan mengirimnya seketika", async () => {
+    lineIs("");
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    act(() => { xt.dataHandler?.("\x1b[A"); });
+    expect(xt.written).toEqual([]);
+    expect(sentInputs()).toEqual(["\x1b[A"]);
+  });
+
+  it("mengirim paste sebagai SATU frame tanpa memprediksinya", async () => {
+    lineIs("");
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    act(() => { xt.dataHandler?.("tempelan panjang"); });
+    expect(xt.written).toEqual([]);
+    expect(sentInputs()).toEqual(["tempelan panjang"]);
+  });
+
+  it("predict=false: nol tulis lokal dan kirim seketika (sakelar)", async () => {
+    lineIs("");
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} predict={false} />);
+    act(() => { xt.dataHandler?.("a"); });
+    expect(xt.written).toEqual([]);
+    expect(sentInputs()).toEqual(["a"]);
+  });
+
+  // Terukur: `read -s` dan dialog trust claude sama-sama membalas NOL byte.
+  it("me-rollback dan berhenti memprediksi saat TTL lewat tanpa echo", async () => {
+    lineIs("");
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    act(() => { xt.dataHandler?.("a"); });
+    xt.written.length = 0;
+    act(() => { vi.advanceTimersByTime(700); });
+    expect(xt.written).toEqual(["\x1b[1D\x1b[K"]);
+    xt.written.length = 0;
+    act(() => { xt.dataHandler?.("b"); });
+    expect(xt.written).toEqual([]);
+    expect(sentInputs()).toEqual(["a", "b"]);
+  });
+
+  it("tak memprediksi di baris berpola password", async () => {
+    lineIs("[sudo] password for dena:", 25);
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    act(() => { xt.dataHandler?.("s"); });
+    expect(xt.written).toEqual([]);
+    expect(sentInputs()).toEqual(["s"]);
   });
 });
