@@ -8,6 +8,7 @@ import { api, ApiError, type RepoFile, type ReviewFile, type WorkingStatus, type
 import type { ProjectVM } from "./types";
 import { GitGraph } from "./GitGraph";
 import { BranchesPanel } from "./BranchesPanel";
+import { WorktreesPanel } from "./WorktreesPanel";
 import { buildFileTree, TreeRow, ChangedSection } from "./file-tree";
 import { readDroppedEntries } from "./drop-entries";
 import { DiffView } from "./diff-view";
@@ -76,6 +77,10 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   // draft editor bukan parameter tampilan, dan memulihkan mode edit tanpa draft-nya menyesatkan.
   const ui = scoped("ide", projectId);
   const [tab, setTab] = usePersistedState(ui, "tab", "explorer", isStr);
+  // SPEC-861 · baris Worktrees yang di-fokus saat datang dari badge kunci di tab Branches.
+  // SENGAJA tak persisten: sebuah worktree bisa lenyap di antara kunjungan, dan memulihkan
+  // fokus ke baris yang sudah tak ada menyorot baris yang salah.
+  const [wtFocus, setWtFocus] = React.useState("");
   const [viewRef, setViewRef] = usePersistedState(ui, "viewRef", "", isStr);   // kosong = working tree
   const [branches, setBranches] = React.useState<{ branches: string[]; remotes: string[] }>({ branches: [], remotes: [] });
   const [files, setFiles] = React.useState<string[]>([]);
@@ -311,13 +316,14 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
 
   return (
     // SPEC-363 · hanya tab Explorer yang ikut rantai flex (dua pane-nya menggulir sendiri);
-    // Git Graph & Branches tetap tumbuh mengikuti isi seperti sebelumnya — graph bergantung
+    // Git Graph, Branches & Worktrees tetap tumbuh mengikuti isi seperti sebelumnya — graph bergantung
     // pada `<main>` yang menggulir untuk auto-load `IntersectionObserver` (SPEC-351).
     <div style={{ display: "flex", flexDirection: "column", gap: 16,
       ...(tab === "explorer" ? { flex: "1 1 0", minHeight: 0 } : null) }}>
       <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Tabs tabs={[{ value: "explorer", label: "Explorer" }, { value: "graph", label: "Git Graph" },
-          { value: "branches", label: "Branches" }]} value={tab} onChange={setTab} />
+          { value: "branches", label: "Branches" }, { value: "worktrees", label: "Worktrees" }]}
+          value={tab} onChange={setTab} />
         {toolbar}
       </div>
 
@@ -481,9 +487,13 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
         <GitGraph projectId={projectId} onRunGit={runGit} onMerge={mergeGraph}
           onRebase={(onto) => graphIsolated("rebase", onto)} onPull={(src) => graphIsolated("pull", src)} onDrop={(sha) => graphIsolated("drop", sha)}
           onOpenFile={(p, ref) => { setViewRef(ref); selectFile(p); setTab("explorer"); }} />
-      ) : (
+      ) : tab === "branches" ? (
         /* SPEC-360 · ADR-0077 · bersihkan branch yang sudah ter-merge ke branch utamanya. */
-        <BranchesPanel projectId={projectId} />
+        <BranchesPanel projectId={projectId}
+          onOpenWorktree={(path) => { setWtFocus(path.split("/").pop() ?? ""); setTab("worktrees"); }} />
+      ) : (
+        /* SPEC-861 · ADR-0132 · worktree yang masih hidup + hapus worktree & branch-nya sekaligus. */
+        <WorktreesPanel projectId={projectId} focus={wtFocus} onOpenBranch={() => setTab("branches")} />
       )}
 
       {preview && previewSrc && (

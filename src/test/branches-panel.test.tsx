@@ -48,6 +48,19 @@ describe("BranchesPanel", () => {
     expect(screen.getByTestId("bulk-delete")).toHaveTextContent("2");
   });
 
+  // SPEC-861 · kebuntuan 'branch tak bisa dihapus karena worktree, worktree tak terlihat di mana
+  // pun' — badge kuncinya harus jadi jalan keluar, bukan sekadar label.
+  it("badge kunci worktree menautkan ke barisnya di tab Worktrees", async () => {
+    vi.spyOn(api, "branchesUnused").mockResolvedValue(report({
+      branches: [{ name: "hanoman/spec-4", local: true, remote: false, lastCommit: null,
+        locks: ["worktree"], worktree: "/repo/.worktrees/wt-b" }],
+    }));
+    const onOpenWorktree = vi.fn();
+    render(<BranchesPanel projectId="p1" onOpenWorktree={onOpenWorktree} />);
+    fireEvent.click(await screen.findByTestId("goto-worktree-hanoman/spec-4"));
+    expect(onOpenWorktree).toHaveBeenCalledWith("/repo/.worktrees/wt-b");
+  });
+
   it("tombol hapus per baris memanggil api dengan satu nama", async () => {
     const del = vi.spyOn(api, "deleteBranches").mockResolvedValue({
       base: "main", results: [{ name: "hanoman/spec-1", ok: true, scope: "both" }] });
