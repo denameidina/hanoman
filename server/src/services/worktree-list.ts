@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
-import type { WorktreeReport, WorktreeView } from "@hanoman/shared";
+import type { WorktreeReport, WorktreeStats, WorktreeView } from "@hanoman/shared";
 import { ownsWorktree } from "./session-worktree";
 
 // SPEC-861 · ADR-0132 · penemuan worktree yang masih HIDUP di sebuah project — pasangan
@@ -112,4 +112,48 @@ export async function listWorktrees(
   // Deterministik untuk test & UI: yang tak bisa dihapus di atas (konteks), sisanya per nama.
   rows.sort((a, b) => Number(a.deletable) - Number(b.deletable) || a.name.localeCompare(b.name));
   return { repoDir: base, worktrees: rows };
+}
+
+// SPEC-861 · sinyal MAHAL. Sengaja TERPISAH dari listWorktrees: `du` menelusuri seluruh pohon dan
+// `status` bisa lambat di repo besar, sementara daftar harus lahir seketika. UI memuatnya menyusul
+// per baris. Ketiganya gagal-diam — tak satu pun boleh jadi 500.
+export async function worktreeStats(repoDir: string, w: WorktreeView): Promise<WorktreeStats> {
+  const [sizeBytes, dirtyFiles, orphanCommits] = await Promise.all([
+    diskBytes(w), dirtyCount(w), orphanCount(resolve(repoDir), w),
+  ]);
+  return { name: w.name, sizeBytes, dirtyFiles, orphanCommits };
+}
+
+async function diskBytes(w: WorktreeView): Promise<number | null> {
+  if (w.prunable) return null;   // direktorinya sudah lenyap
+  try {
+    const { stdout } = await exec("du", ["-sk", w.path],
+      { timeout: 30_000, maxBuffer: 1 << 20, encoding: "utf8" });
+    const kb = Number.parseInt(stdout.trim().split(/\s+/)[0] ?? "", 10);
+    return Number.isFinite(kb) ? kb * 1024 : null;
+  } catch { return null; }
+}
+
+async function dirtyCount(w: WorktreeView): Promise<number> {
+  if (w.prunable) return 0;
+  const s = await out(w.path, ["status", "--porcelain"]);
+  return s.split("\n").filter((l) => l.trim()).length;
+}
+
+// "Kerja yang akan hilang": commit reachable dari HEAD worktree ini tetapi TIDAK dari ref lain mana
+// pun — dengan branch yang ter-checkout DI SINI ikut dikecualikan, karena checkbox 'hapus branch
+// juga' akan ikut menghapusnya. SHA heksadesimal tak pernah terbaca sebagai flag (ADR-0032).
+//
+// GOTCHA terukur (git 2.50.1): pola `--exclude` untuk `--branches` relatif terhadap `refs/heads/`
+// (`feat`, BUKAN `refs/heads/feat` — bentuk panjang diam-diam tak mengecualikan apa pun, jadi
+// jawabannya 0 dan seluruh kerja yang akan hilang tak pernah disebut dialog konfirmasi) dan untuk
+// `--remotes` relatif terhadap `refs/remotes/` (`*/feat`). `--exclude` juga di-RESET sesudah tiap
+// `--branches`/`--remotes`/`--tags`, jadi ia wajib ditulis ulang sebelum masing-masing.
+async function orphanCount(repoDir: string, w: WorktreeView): Promise<number> {
+  if (!w.head) return 0;
+  const args = ["rev-list", "--count", w.head, "--not"];
+  if (w.branch) args.push(`--exclude=${w.branch}`, "--branches", `--exclude=*/${w.branch}`, "--remotes", "--tags");
+  else args.push("--branches", "--remotes", "--tags");
+  const n = Number.parseInt((await out(repoDir, args)).trim(), 10);
+  return Number.isFinite(n) ? n : 0;
 }

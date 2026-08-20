@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { parseWorktreePorcelain, listWorktrees, type WorktreeInputs } from "../src/services/worktree-list";
+import { parseWorktreePorcelain, listWorktrees, worktreeStats, type WorktreeInputs } from "../src/services/worktree-list";
 
 // SPEC-861 · ADR-0132 · penemuan worktree HIDUP. Modul yang diuji di sini murni: tak menyentuh DB
 // maupun tmux, jadi seluruh berkas ini berjalan atas repo git sungguhan saja.
@@ -122,5 +122,50 @@ describe("listWorktrees", () => {
     expect((await listWorktrees(null, NONE)).worktrees).toEqual([]);
     const plain = mkdtempSync(join(tmpdir(), "hanoman-notrepo-"));
     expect((await listWorktrees(plain, NONE)).worktrees).toEqual([]);
+  });
+});
+
+describe("worktreeStats", () => {
+  const find = async (dir: string, name: string) =>
+    (await listWorktrees(dir, NONE)).worktrees.find((w) => w.name === name)!;
+
+  it("menghitung berkas yang belum tersimpan", async () => {
+    const dir = repo();
+    writeFileSync(join(dir, ".worktrees", "spec-1", "baru.txt"), "kerja");
+    const s = await worktreeStats(dir, await find(dir, "spec-1"));
+    expect(s.dirtyFiles).toBe(1);
+    expect(s.sizeBytes).toBeGreaterThan(0);
+  });
+
+  it("commit yang juga ada di branch lain BUKAN yatim", async () => {
+    const dir = repo();
+    expect((await worktreeStats(dir, await find(dir, "wt-feat"))).orphanCommits).toBe(0);
+  });
+
+  // GOTCHA git 2.50.1 · pola --exclude untuk --branches RELATIF terhadap refs/heads/:
+  // `--exclude=feat` bekerja, `--exclude=refs/heads/feat` diam-diam tak mengecualikan apa pun.
+  // Untuk --remotes ia relatif terhadap refs/remotes/ → `*/feat`. Dan --exclude di-RESET sesudah
+  // tiap --branches/--remotes/--tags, jadi wajib ditulis ulang sebelum masing-masing.
+  it("commit di branch worktree ini SENDIRI dihitung yatim (ia ikut hilang bila branch dihapus)", async () => {
+    const dir = repo();
+    const wt = join(dir, ".worktrees", "wt-feat");
+    writeFileSync(join(wt, "kerja.txt"), "satu");
+    g(wt, "add", "-A"); g(wt, "commit", "-qm", "kerja");
+    expect((await worktreeStats(dir, await find(dir, "wt-feat"))).orphanCommits).toBe(1);
+  });
+
+  it("commit detached yang lepas dari semua ref dihitung yatim", async () => {
+    const dir = repo();
+    const wt = join(dir, ".worktrees", "spec-1");
+    writeFileSync(join(wt, "lepas.txt"), "x");
+    g(wt, "add", "-A"); g(wt, "commit", "-qm", "lepas");
+    expect((await worktreeStats(dir, await find(dir, "spec-1"))).orphanCommits).toBe(1);
+  });
+
+  it("baris prunable tak melempar dan menjawab nol", async () => {
+    const dir = repo();
+    const s = await worktreeStats(dir, await find(dir, "gone"));
+    expect(s.dirtyFiles).toBe(0);
+    expect(s.sizeBytes).toBeNull();
   });
 });
