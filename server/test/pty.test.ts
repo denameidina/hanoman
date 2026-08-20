@@ -1,15 +1,17 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { fileURLToPath } from "node:url";
 import {
-  appendFileSync, chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync,
+  appendFileSync, chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   createSession, getSession, listSessions, killSession, killAll, detachAll, attach, writeTo,
   sessionPhases, sessionFinished, markerFilled, promptFilePath, armGoalInTui, goalGatePath,
-  sessionKind, registerSessionHooks, rootBypassEnv, sendToPane, shellBin,
+  sessionKind, registerSessionHooks, rootBypassEnv, noTtyPromptEnv, askpassDenyPath,
+  sendToPane, shellBin,
   MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback,
   type SessionBirth, type SessionDeath,
 } from "../src/services/pty";
@@ -126,6 +128,53 @@ describe("pty service", () => {
     await waitFor(() => allData(c2).includes("env:"));
     expect(allData(c2).replace(/\s+/g, " ")).toContain("env: IS_SANDBOX=");
     expect(allData(c2).replace(/\s+/g, " ")).not.toContain("env: IS_SANDBOX=1");
+  });
+
+  // SPEC-862 · `ssh` membaca passphrase lewat `/dev/tty` LANGSUNG, bukan stdin — jadi ia merebut
+  // tty dari widget Ink agen yang sedang memegangnya (SPEC-452). Terukur di tmux nyata: tombol
+  // panah operator ditelan ssh, `Enter` mengirim pilihan pertama sebagai jawaban dialog, dan
+  // redraw TUI menghapus prompt ssh dari layar → sesi macet dengan tampilan yang terlihat sehat.
+  it("askpass hanoman menolak tanpa membocorkan apa pun ke stdout", () => {
+    const path = askpassDenyPath();
+    expect(noTtyPromptEnv().SSH_ASKPASS).toBe(path);
+    expect(statSync(path).mode & 0o111).toBeTruthy();
+    const r = spawnSync(path, ["Enter passphrase for key '/home/x/.ssh/id_rsa':"], {
+      encoding: "utf8",
+    });
+    expect(r.status).toBe(1);
+    // stdout apa pun akan dibaca ssh SEBAGAI passphrase — ia wajib kosong, bukan sekadar rapi.
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain("id_rsa");
+    expect(r.stderr).toContain("ssh-add");
+  });
+
+  it("sesi agen lahir tanpa jalan meminta ketikan kredensial; sesi argv mentah tetap punya", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    const s = createSession("ssh1", process.cwd());
+    const c = fakeClient();
+    attach(s.id, c);
+    await waitFor(() => allData(c).includes("sshenv:"));
+    const line = allData(c).replace(/\s+/g, " ");
+    expect(line).toContain(`ASKPASS=${askpassDenyPath()}`);
+    expect(line).toContain("REQUIRE=force");
+    expect(line).toContain("GITPROMPT=0");
+
+    // Console VPS (ADR-0042) & terminal biasa (SPEC-236): di sana manusia MEMANG memegang pane,
+    // dan memaksa ssh gagal akan mematikan fiturnya. Pembedanya sama dengan rootBypassEnv.
+    const raw = createSession("ssh2", process.cwd(), { command: [FAKE_CLAUDE] });
+    const c2 = fakeClient();
+    attach(raw.id, c2);
+    await waitFor(() => allData(c2).includes("sshenv:"));
+    expect(allData(c2).replace(/\s+/g, " ")).toContain("sshenv: ASKPASS= REQUIRE= GITPROMPT=");
+  });
+
+  it("opts.env pemanggil tetap menang atas gerbang prompt kredensial", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    const s = createSession("ssh3", process.cwd(), { env: { SSH_ASKPASS_REQUIRE: "never" } });
+    const c = fakeClient();
+    attach(s.id, c);
+    await waitFor(() => allData(c).includes("sshenv:"));
+    expect(allData(c).replace(/\s+/g, " ")).toContain("REQUIRE=never");
   });
 
   // SPEC-332 · ADR-0073 · mode goal: Stop hook bertipe prompt ikut lahir bersama sesi.
