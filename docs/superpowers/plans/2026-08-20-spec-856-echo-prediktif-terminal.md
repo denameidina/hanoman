@@ -676,7 +676,7 @@ git commit -m "feat(terminal): batcher input 16 ms yang meloloskan control & pas
 - Consumes: seluruh API `terminal-predict.ts`
 - Produces: prop baru `predict?: boolean` (default `true`) pada `TerminalPane`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Mock xterm di `src/test/terminal-pane.test.tsx` belum punya kursor maupun isi baris. Perluas objek `xt` dan kelas `Terminal`-nya:
 
@@ -787,12 +787,12 @@ const sentInputs = (): string[] => (sockets[0]?.sent ?? [])
 
 `openSocket()` mengikuti pola yang sudah dipakai berkas ini untuk menyelesaikan `issueWsTicket` lalu memanggil `sockets[0].onopen()`; pakai helper yang sudah ada di berkas kalau namanya berbeda.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/terminal-pane.test.tsx`
 Expected: FAIL — prediksi belum ada; `xt.written` kosong pada test pertama
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `src/src/screens/TerminalPane.tsx`:
 
@@ -896,12 +896,12 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const typed = term.onData(onTyped);
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/terminal-pane.test.tsx`
 Expected: PASS — 6 test baru **dan** seluruh test lama (clipboard, wheel, touch, lampiran, reconnect) tetap hijau
 
-- [ ] **Step 5: Typecheck & commit**
+- [x] **Step 5: Typecheck & commit**
 
 ```bash
 pnpm --filter ./src typecheck

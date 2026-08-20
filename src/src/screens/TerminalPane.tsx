@@ -7,6 +7,7 @@ import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
 import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
+import * as P from "./terminal-predict";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
 // (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
@@ -23,7 +24,8 @@ type LinkState =
   | { state: "connecting" | "open" | "gone" | "lost" }
   | { state: "retrying"; attempt: number };
 
-export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false }: {
+export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
+  predict = true }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -31,12 +33,17 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   onPhases?: (p: Phase[], complete: boolean) => void;
   fontSize?: number;
   showKeys?: boolean;
+  // SPEC-856 · sakelar echo prediktif, dipegang di ref bersama fontSize: mematikannya tak boleh
+  // melahirkan socket baru.
+  predict?: boolean;
 }) {
   const host = React.useRef<HTMLDivElement>(null);
   // Dipegang di ref supaya effect koneksi tetap hanya bergantung pada `sessionId`: mengubah
   // ukuran font tak boleh melahirkan socket baru.
   const fontSizeRef = React.useRef(fontSize);
   fontSizeRef.current = fontSize;
+  const predictRef = React.useRef(predict);
+  predictRef.current = predict;
   const view = React.useRef<{ term: Terminal; fit: FitAddon; send: (m: unknown) => void } | null>(null);
   // onExit boleh berubah tiap render; menaruhnya di ref menjaga effect ini
   // hanya bergantung pada sessionId — remount = sesi yang benar-benar berbeda.
@@ -89,6 +96,33 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     };
     sendKey.current = sendInput;
 
+    // SPEC-856 · echo prediktif. HANYA `term.onData` yang lewat sini; clipboard (SPEC-289), tap
+    // dialog (SPEC-452), lampiran (SPEC-816), dan papan tombol (SPEC-800) tetap memakai `sendInput`
+    // mentah, jadi jaminan "satu keystroke = satu frame" milik mereka tak berubah.
+    let pred = P.initialState();
+    const batcher = P.createInputBatcher(sendInput);
+    const viewOf = (): P.View => {
+      const buf = term.buffer.active;
+      return {
+        cursorX: buf.cursorX, cols: term.cols, connected: ws?.readyState === WebSocket.OPEN,
+        line: buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "",
+      };
+    };
+    const onTyped = (d: string) => {
+      const wasPredicting = pred.pending.length > 0;
+      const r = P.onInput(pred, d, viewOf(), Date.now(), predictRef.current);
+      pred = r.state;
+      if (r.write) term.write(r.write);
+      batcher.push(d, wasPredicting || r.write.length > 0);
+    };
+    // TTL adalah satu-satunya sinyal yang memisahkan "pty diam" — password dan tombol yang ditelan
+    // dialog sama-sama terukur membalas NOL byte — dari "jaringan lambat".
+    const ttl = setInterval(() => {
+      const r = P.onTick(pred, Date.now());
+      pred = r.state;
+      if (r.write) term.write(r.write);
+    }, 100);
+
     const connect = () => {
       void api.issueWsTicket(`terminal:${sessionId}`).then(({ ticket }) => {
         if (disposed) return;
@@ -99,6 +133,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
 
         socket.onopen = () => {
           attempt = 0;
+          // tmux memutar ulang layar penuh saat attach — tak ada prediksi yang boleh diwarisi.
+          pred = P.onReattach();
           setLink({ state: "open" });
           // Dikuras di SETIAP open, bukan hanya yang pertama: itu yang mengubah buffer SPEC-771
           // dari penyembunyi kegagalan menjadi penyelamat ketikan.
@@ -117,7 +153,21 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
           const f = JSON.parse(ev.data as string) as {
             t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
           };
-          if (f.t === "data") term.write(f.d ?? "");
+          if (f.t === "data") {
+            const r = P.onServerData(pred, f.d ?? "", Date.now());
+            pred = r.state;
+            // Rollback dan data server WAJIB satu panggilan write: keadaan antara tak boleh pernah
+            // dirender, dan itulah yang membuat layar byte-identik dengan tanpa prediksi.
+            term.write(r.write);
+            if (r.tail) {
+              const buf = term.buffer.active;
+              const line = buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "";
+              const tail = r.tail.slice(P.echoedPrefixLen(line.slice(0, buf.cursorX), r.tail));
+              const back = P.reapply(pred, tail, viewOf(), Date.now(), predictRef.current);
+              pred = back.state;
+              if (back.write) term.write(back.write);
+            }
+          }
           // Server menyiarkan fase saat attach dan setiap kali agen menutup satu (SPEC-162).
           // SPEC-433 · sejak sekarang juga saat `complete` berubah tanpa daftar fase berubah —
           // kotak `- [ ]` terakhir di plan dicentang sesudah `Execute done`.
@@ -188,7 +238,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       if (lines) term.scrollLines(lines);
       return false;
     });
-    const typed = term.onData(sendInput);
+    const typed = term.onData(onTyped);
 
     // SPEC-771 · viewport internal xterm 6 tak memiliki pemilik gesture touch. Tanpa handler
     // passive-false ini swipe bubble ke page scroller meski scrollback terminal masih tersedia.
@@ -296,6 +346,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", resetTouch);
       ro.disconnect();
+      clearInterval(ttl);
+      batcher.dispose();
       typed.dispose();
       ws?.close();
       term.dispose();
