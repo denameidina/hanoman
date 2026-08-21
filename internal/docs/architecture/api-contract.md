@@ -192,6 +192,10 @@ GET    /projects/:id/binding  -> { repoDir: string | null }   # nilai override m
 PUT    /projects/:id/binding  { repoDir }   # 200 { repoDir }; set override; 400 kosong; 404 project.
 DELETE /projects/:id/binding  # 204 · kosongkan override → path efektif jatuh ke Project.repoDir (SPEC-217). 404 project.
 POST   /projects/:id/clone    { dir }   # 201 { repoDir } · git clone gitRemote→dir lalu set binding; 409 tanpa gitRemote / clone gagal.
+#   409 clone gagal membawa `detail` = stderr git — satu-satunya keterangan yang bisa ditindaklanjuti.
+#   SPEC-867 · bukan hanya jalur pembuatan project: kartu "Belum ada checkout di mesin ini" di detail
+#   project memanggil endpoint yang SAMA untuk project yang sudah ada (dari sync hub, atau yang
+#   clone-nya gagal saat dibuat). Binding ditulis endpoint ini, bukan oleh klien sesudahnya.
 
 # SPEC-253 · ADR-0062 · Help Center per project (opt-in). Link publik terikat Project.id (slug).
 GET    /projects/:id/help-center  -> { enabled, publicUrl }   # 404 project.
@@ -765,7 +769,9 @@ POST     /update/apply                  # { confirm?: boolean } — SPEC-405 · 
 #   202 { accepted:true, from, to, liveSessions }             — lalu proses keluar
 #   agent token DITOLAK (403): prefix status hanya GLOBAL_READ untuk method baca
 GET      /fs/browse?path=               # directory picker sisi server; menopang `FolderPicker` di modal
-#   Project baru (repoDir/folder clone) DAN modal Edit project (path per-mesin, SPEC-858)
+#   Project baru (repoDir/folder clone), modal Edit project (path per-mesin, SPEC-858), DAN kartu
+#   "Belum ada checkout di mesin ini" di detail project (SPEC-867 — folder yang dipilih di sana
+#   adalah INDUK folder clone). Hanya melist DIREKTORI, jadi ia tak bisa menjawab "folder ini kosong?".
 GET      /health                        # publik; liveness
 ```
 

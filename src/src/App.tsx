@@ -4,7 +4,7 @@
 import React from "react";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, Tabs, Toast, useToast, Icon, StateBlock, useConfirm } from "./ds";
+import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
@@ -19,6 +19,8 @@ import { ClientPortal } from "./portal/ClientPortal";
 import { AuthProvider } from "./auth/AuthContext";
 import type { ProjectVM } from "./screens/types";
 import { branchOptions } from "./screens/branch";
+import { FolderPicker } from "./screens/FolderPicker";
+import { repoBasename, cloneErrorText } from "./screens/git-remote";
 import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
@@ -480,64 +482,6 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
   );
 }
 
-type FsEntry = { name: string; path: string };
-function FolderRow({ icon, name, onClick }: { icon: string; name: string; onClick: () => void }) {
-  const [hover, setHover] = React.useState(false);
-  return (
-    <div onClick={onClick}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer",
-        borderBottom: "1px solid var(--border-hair)", background: hover ? "var(--bone-100)" : "transparent",
-        fontSize: 13, color: "var(--text-strong)" }}>
-      <Icon name={icon} size={16} color="var(--brass-700)" />
-      <span style={{ fontFamily: "var(--font-mono)" }}>{name}</span>
-    </div>
-  );
-}
-
-// Real device folder picker: navigates the server's filesystem (same machine)
-// and returns an absolute path — replaces the old mock that faked "~/code/…".
-function FolderPicker({ open, onClose, onPick, start }:
-  { open: boolean; onClose: () => void; onPick: (path: string) => void; start?: string }) {
-  const [cur, setCur] = React.useState("");
-  const [parent, setParent] = React.useState<string | null>(null);
-  const [entries, setEntries] = React.useState<FsEntry[]>([]);
-  const [err, setErr] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const load = React.useCallback((path?: string) => {
-    setLoading(true); setErr("");
-    api.browseFs(path)
-      .then((r) => { setCur(r.path); setParent(r.parent); setEntries(r.entries); })
-      .catch(() => setErr("Tak bisa membuka folder ini"))
-      .finally(() => setLoading(false));
-  }, []);
-  React.useEffect(() => { if (open) load(start && start.trim() ? start.trim() : undefined); }, [open, start, load]);
-  return (
-    <Modal open={open} onClose={onClose} icon="folder-open" eyebrow="device" title="Pilih folder codebase"
-      footer={<>
-        <Button variant="ghost" size="sm" onClick={onClose}>Batal</Button>
-        <Button size="sm" leftIcon="check" disabled={!cur} onClick={() => { onPick(cur); onClose(); }}>Pilih folder ini</Button>
-      </>}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <Input value={cur} onChange={(e: any) => setCur(e.target.value)}
-          onKeyDown={(e: any) => { if (e.key === "Enter") load(e.currentTarget.value); }}
-          leftIcon="folder" mono style={{ flex: 1 }} placeholder="/path/ke/folder" />
-        <Button size="sm" variant="secondary" onClick={() => load(cur)}>Buka</Button>
-      </div>
-      <div style={{ border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", maxHeight: 320, overflow: "auto" }}>
-        {loading ? <StateBlock kind="loading" compact title="Membuka folder…" />
-          : err ? <StateBlock kind="error" compact title={err} hint={cur} action={() => load(cur)} />
-          : <>
-              {parent && <FolderRow icon="corner-left-up" name=".." onClick={() => load(parent)} />}
-              {entries.map((e) => <FolderRow key={e.path} icon="folder" name={e.name} onClick={() => load(e.path)} />)}
-              {entries.length === 0 && <StateBlock kind="empty" compact icon="folder"
-                title="Tak ada sub-folder" hint="Folder ini bisa langsung dipilih." />}
-            </>}
-      </div>
-    </Modal>
-  );
-}
-
 type ProjectForm = { kind: string; mode: "local" | "clone"; name: string; desc: string; dir: string; gitRemote: string; objective: string };
 function NewProjectModal({ open, onClose, onCreate }:
   { open: boolean; onClose: () => void; onCreate: (f: ProjectForm) => void | Promise<void> }) {
@@ -865,7 +809,8 @@ export default function App() {
     const scratch = f.kind === "from-scratch";
     const clone = !scratch && f.mode === "clone";
     // SPEC-218 · mode clone: turunkan nama dari basename URL bila user tak isi (buang .git & host).
-    const fromUrl = f.gitRemote.trim().replace(/\.git$/, "").split(/[/:]/).filter(Boolean).pop() || "repo";
+    // SPEC-867 · perhitungan yang sama dipakai kartu tanpa-dir untuk menyusun folder tujuan clone.
+    const fromUrl = repoBasename(f.gitRemote);
     const name = f.name.trim() || (clone ? fromUrl : (f.dir.split("/").filter(Boolean).pop() || "repo"));
     let created;
     try {
@@ -875,17 +820,21 @@ export default function App() {
         gitRemote: clone ? f.gitRemote.trim() : undefined,
       });
     } catch { showToast("Gagal membuat project", "err", "x-circle"); return; }
-    // SPEC-218 · project sudah ada; clone di jalur terpisah agar gagal-clone tak menghapus project
-    // (remote tersimpan → bisa clone ulang dari Edit). AC-8.
+    // SPEC-218 · project sudah ada; clone di jalur terpisah agar gagal-clone tak menghapus project.
+    // SPEC-867 · remote tersimpan, jadi clone bisa diulang dari kartu "Belum ada checkout di mesin
+    // ini" di detail project — cabang catch di bawah mendaratkan operator tepat di kartu itu. AC-8.
     if (clone) {
       try {
         await api.cloneProject(created.id, f.dir.trim());
         created = await api.getProject(created.id);   // binding hasil clone
       } catch (e) {
-        const detail = e instanceof ApiError ? ` · ${e.message}` : "";
+        // SPEC-867 · `ApiError.message` hanya "POST /api/… → 409"; yang bisa ditindaklanjuti adalah
+        // pesan endpoint-nya.
+        const { error } = cloneErrorText(e);
         setProjects((list) => [created!, ...list]);
         setProjectId(created.id); setModal(null); setSection("project");
-        showToast(`Project ${created.id} dibuat, tapi clone gagal${detail} · clone ulang dari Edit`, "warn", "git-branch");
+        showToast(`Project ${created.id} dibuat, tapi clone gagal · ${error} · clone ulang dari detail project`,
+          "warn", "git-branch");
         return;
       }
     }

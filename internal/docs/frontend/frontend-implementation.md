@@ -906,15 +906,18 @@ aksesibilitasnya (`getByLabelText`), bukan placeholder-nya.
 ## Path project dipilih, bukan diketik (SPEC-217/218 · SPEC-858)
 
 Browser tak bisa memulangkan path absolut dari `<input type="file" webkitdirectory>`, jadi
-setiap field path project memakai `FolderPicker` (`App.tsx`) — modal yang menelusuri
+setiap field path project memakai `FolderPicker` (`src/src/screens/FolderPicker.tsx` — pindah
+dari `App.tsx` di SPEC-867 saat call site keempat lahir di berkas lain) — modal yang menelusuri
 filesystem **mesin server** lewat `GET /fs/browse` dan memulangkan path absolut. Ia dipakai
-tiga call site dengan bentuk yang sama — `Field` membungkus satu baris flex berisi `Input`
+empat call site dengan bentuk yang sama — `Field` membungkus satu baris flex berisi `Input`
 (`flex:1`, `minWidth:0` supaya baris tak melar di viewport sempit) + `Button size="sm"
 variant="secondary" leftIcon="folder-open"` berbunyi "Pilih folder":
 
 - **Project baru → from scratch**: Direktori tempat repo baru di-init.
 - **Project baru → existing**: Direktori checkout lokal, atau folder tujuan clone.
 - **Edit project → "Path (mesin ini)"** (SPEC-858): override per-mesin `LocalBinding`.
+- **Detail project → "Belum ada checkout di mesin ini"** (SPEC-867): folder tujuan clone (picker
+  memilih **induk**), dan folder repo yang sudah ter-clone manual.
 
 Dua invariant. **`start={f.dir}`** — picker mulai dari nilai yang sedang ada di field, bukan
 dari `homedir()`; tanpa itu mengoreksi satu path berarti menelusuri ulang dari akar tiap kali.
@@ -924,6 +927,52 @@ bukan satu-satunya jalan masuk — path di mesin lain (atau yang belum ada) hany
 Jalur simpannya tak berubah: Edit project tetap lewat `updateProject()` yang memisahkan
 `name`/`desc`/`gitRemote` (`PATCH /projects/:id`, disync) dari `dir` (`PUT`/`DELETE
 /projects/:id/binding`, **tak disync** — lihat [api-contract](../architecture/api-contract.md)).
+
+## Project tanpa checkout di mesin ini (SPEC-867)
+
+`Project.repoDir` **tak pernah menyeberang sync** (`server/src/services/sync.ts`) dan `LocalBinding`
+LOCAL-only per-device (ADR-0043), jadi project yang datang dari hub — dan project yang clone-nya
+gagal saat dibuat — mendarat dengan `binding` **dan** `repoDir` null. Justru di keadaan itu detail
+project paling bisu: pintu "Reverse docs"/"Scaffold docs" digerbangi path efektif (`App.tsx`),
+sehingga keduanya **hilang tanpa alasan**. `MissingRepoCard`
+(`src/src/screens/MissingRepoCard.tsx`) mengisi lubang itu dengan predikat yang **sama persis**
+(`p.binding ?? p.repoDir`) — ia muncul tepat saat dua pintu itu menghilang, dan merender `null`
+selebihnya.
+
+Dua cabang. **Ada `gitRemote`**: "Clone dari git remote" (membuka modal) + "Pilih folder di device".
+**Tanpa `gitRemote`**: clone dinyatakan mustahil apa adanya, tombolnya "Isi git remote" (mengantar
+ke modal Edit yang memang punya field itu) + "Pilih folder di device".
+
+Tiga hal yang membuatnya bekerja:
+
+- **Folder pilihan adalah INDUK, bukan target.** `FolderPicker` memulangkan folder yang **sudah
+  ada**; `git clone` menolak folder tak kosong. `cloneTargetInto` (`screens/git-remote.ts`)
+  menyusun `<induk>/<repoBasename(remote)>` — tanpa itu percobaan pertama selalu gagal dengan
+  "destination path already exists". `start` picker memegang **induk** terakhir, bukan target,
+  karena target belum ada dan `GET /fs/browse` akan membalas 400 untuknya.
+- **Kegagalan tinggal di dalam modal.** `POST /projects/:id/clone` membalas `{ error, detail }`
+  dengan `detail` = **stderr git**, sementara `ApiError.message` cuma `POST /api/… → 409`.
+  `cloneErrorText` mengangkat keduanya; modal tetap terbuka dengan tombol "Coba lagi", dan project
+  tak tersentuh sama sekali.
+- **Clone digerbangi `useConfirm`** (SPEC-847/ADR-0127). Klien tak bisa menjawab "folder ini
+  kosong?" — `GET /fs/browse` hanya melist **direktori**, bukan berkas — jadi tak ada cara
+  menggerbangi konfirmasi hanya pada folder tak kosong; ia dipasang di **setiap** clone, karena
+  menulis ke disk mesin ini dan mengunduh isi repo memang layak dinamai lebih dulu. Dialognya
+  menyebut folder tujuan, remote-nya, dan fakta bahwa **git yang menolak** folder berisi (terukur:
+  `fatal: destination path '…' already exists and is not an empty directory`, berkas yang sudah ada
+  tak tersentuh) — jadi pertanyaan "apa ini menimpa sesuatu?" dijawab di dalam dialog, bukan
+  digantung. Opsi `run:` dipakai supaya dialog tetap terbuka & `busy` selama `git clone` berjalan;
+  itulah yang menutup submit kedua, dan lemparannya diteruskan ke `catch` yang menampilkan stderr.
+  Dua gotcha: `{dialog}` dirender **di luar** `<Modal>` clone (focus trap & entri `modalStack`
+  sendiri; yang terakhir di DOM tampil paling atas), dan tombol ghost modal clone berbunyi
+  **"Tutup"**, bukan "Batal" — dua "Batal" yang bertumpuk tak bisa dibedakan operator maupun test.
+  "Pilih folder di device" **tak** dikonfirmasi: ia tak menyentuh disk sama sekali (hanya baris
+  `LocalBinding`).
+
+Binding hasil clone ditulis **oleh endpoint**; klien hanya memanggil `onProjectChanged` (jalur
+refetch VM SPEC-258). Toast kegagalan clone di modal Project baru karena itu berhenti menyebut
+"Edit" dan menunjuk kartu ini — cabang `catch`-nya sudah `setSection("project")`, jadi operator
+mendarat persis di sana.
 
 ## Notifikasi backlog selesai (SPEC-180)
 Awareness saat backlog mencapai `done`: toast, daftar (lonceng), dan sound. Semua sisi klien
