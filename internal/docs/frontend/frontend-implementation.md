@@ -551,24 +551,39 @@ sehingga layar sesudah tiap frame server byte-identik dengan layar tanpa prediks
 membandingkan model layar xterm *dan* `tmux capture-pane`). Karakter tampil bergaris bawah
 (`\x1b[4m`…`\x1b[24m` — netral SGR; `\x1b[m` akan merusak latar yang dipakai `\x1b[K` saat
 rollback) dan rollback-nya `\x1b[<n>D\x1b[K`, setia karena gerbang menjamin ekor baris kosong.
-Prediksi **mati** saat: sakelar operator mati, socket belum `open`, alternate screen **pane**
+Prediksi **mati** saat: sakelar operator mati, byte tak akan pernah terkirimkan (`View.deliverable` — sesi tmux lenyap/4004 atau antrean penuh; SPEC-878 · ADR-0134: byte yang diantre untuk sambungan yang masih akan pulih **tetap** diprediksi, karena "tersambung" bukan "terkirim"), alternate screen **pane**
 (SPEC-863 · ADR-0133 — dipasok server lewat frame `{t:"alt"}` dari `#{alternate_on}` milik tmux,
 **bukan** dipindai dari aliran: tmux tak pernah meneruskan `?1049h/l` milik program di dalam pane,
 sementara `?1049h` yang memang sampai adalah `smcup` klien tmux sendiri — byte pertama tiap attach,
 tanpa pasangan `l` selama sambungan hidup, dan memindainya terukur mematikan fitur ini **total**),
 input bukan teks tunggal (escape/panah/Enter/Tab/ctrl/paste/IME), kursor di dua
 kolom terakhir, ekor baris tak kosong, baris berpola password, dan begitu satu prediksi mencapai
-TTL 500 ms tanpa pernah ter-echo (suspend ber-cooldown 30 detik; `read -s` dan tombol yang ditelan
-dialog sama-sama terukur membalas nol byte). Sisa yang belum ter-echo dihidupkan ulang di kursor
+TTL 500 ms tanpa pernah ter-echo **sesudah frame yang membawanya diakui server** (`{t:"in", d, seq}` → `{t:"ack", seq}` — SPEC-878 · ADR-0134; sebelum pengakuan itu jam TTL **tak berjalan sama sekali**, karena diamnya server tak memisahkan "pty bungkam" dari "byte belum sampai", dan menghukumnya terukur membeli 30,5 detik layar bisu untuk satu kedip 500 ms). Suspend ber-cooldown 30 detik tak berubah; `read -s` dan tombol yang ditelan dialog sama-sama terukur membalas nol byte. Sisa yang belum ter-echo dihidupkan ulang di kursor
 baru lewat `echoedPrefixLen`, atau dibuang bila gerbang tak lagi lolos — tak ada jalur yang
-meninggalkan karakter tanpa pemilik. Di atasnya, **hanya `term.onData`** yang melewati batcher
-input 16 ms, dan batcher itu **hanya aktif saat prediksi aktif**; control & paste menguras antrean
-lalu lewat seketika, jadi jaminan "satu keystroke = satu frame" milik clipboard (SPEC-289), tap
-dialog (SPEC-452), lampiran (SPEC-816), dan papan tombol layar (SPEC-800) tak berubah. Batcher
+meninggalkan karakter tanpa pemilik. Di atasnya, **semua** jalur input keluar lewat batcher
+yang sama (SPEC-878): `term.onData` boleh ditahan 16 ms selagi prediksi aktif, sedangkan clipboard
+(SPEC-289), tap dialog (SPEC-452), lampiran (SPEC-816), dan papan tombol layar (SPEC-800) memakai
+`sendRaw` = `push(d, false)` yang **menguras antrean lebih dulu** lalu meneruskan payload utuh dalam
+satu frame — jaminan "satu tekan = satu keystroke" dan "paste utuh" tak berubah, sementara
+transposisi yang terukur (`["\x1b","z"]` untuk `z` lalu Escape) hilang secara konstruksi. Batcher
 tak memanen ketikan manusia (jeda 120–200 ms ≫ 16 ms) — nilainya di burst: terukur frame masuk
 10 → 5 dan byte keluar 20 524 → 11 370, karena TUI agen menggambar ulang sekali per *event input*,
 bukan per karakter. Sakelarnya state tampilan lokal `hn.ui.v1.terminal.predict` (SPEC-740 ·
 ADR-0115), default hidup, di panel tampilan bersama ukuran font & papan tombol.
+
+**Antrean ketikan saat sambungan putus** (SPEC-878 · ADR-0134). `pendingInput` berbatas
+`MAX_PENDING_INPUT = 4 096` byte; penuh berarti byte baru **tidak** diterima, `deliverable` tertutup
+(jadi tak ada glyph yang menjanjikan sesuatu yang dibuang), dan strip mengatakannya. Byte tak pernah
+menyalip antrean yang belum terkuras — `sendInput` mengirim langsung **hanya** saat antrean kosong.
+Saat sambungan pulih, prediksi outage di-rollback lebih dulu, lalu `{t:"resize"}` dikirim (geometri
+yang berubah selagi putus hilang senyap karena `send` no-op), baru antrean dikuras — **kecuali** bila
+ia memuat `\r`/`\n`: antrean itu **seluruhnya ditahan** dan strip menawarkan `Kirim` / `Buang`.
+Alasannya terukur: layar operator sudah basi berdetik-detik saat blob mendarat, dan `capture-pane`
+memperlihatkan baris yang salah benar-benar ter-submit ke agen. Memecah di `\r` pertama ditolak —
+itu mengirim separuh kalimat operator. Balasan handshake terminal (`isTerminalResponse`, kini di
+`@hanoman/shared`) tak pernah ikut mengantre: ia milik sambungan yang sudah mati, dan blob campuran
+menembus gerbang `writeTo` (SPEC-860) apa adanya. Antrean **tidak** dipersistensi lintas unmount, dan
+dibuang saat sesi dinyatakan lenyap (4004) karena tak ada lagi tujuannya.
 
 Toolbar juga punya **Ambil backlog** (SPEC-179): tombol yang membuka modal picker berisi
 backlog item yang bisa diambil (`stage !== "done"` dan belum punya sesi hidup). Memilih satu
