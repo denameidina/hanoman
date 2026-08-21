@@ -364,6 +364,14 @@ export const zSetting = z.object({
   telegram: zTelegramSettings.default(TELEGRAM_DEFAULTS),                 // SPEC-476 · ADR-0096 · gateway Telegram (default mati)
   changelog: zAgentEngine.default(CHANGELOG_ENGINE_DEFAULTS),             // SPEC-518 · agen pembuat changelog (opt-in, mati)
   portalChat: zPortalChat.default(PORTAL_CHAT_DEFAULTS),                  // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
+  // SPEC-881 · ADR-0136 · sidik jari isi bawaan yang TERAKHIR ditulis seed di mesin ini, per nama
+  // agen. Dipakai seed untuk membedakan "belum pernah disunting operator" dari "sudah". WAJIB
+  // dideklarasikan di sini: zod membuang kunci tak dikenal dan `PUT /settings` menulis balik hasil
+  // parse — kunci asing akan lenyap tanpa satu pun error, lalu seed menimpa kerja operator.
+  //
+  // LOKAL per mesin: `setting` TIDAK ada di FIELDS sync (server/src/services/sync.ts), jadi dua
+  // mesin dengan versi hanoman berbeda tak bisa saling menimpa definisi bolak-balik.
+  builtinAgents: z.record(z.string(), z.string()).default({}),
 });
 export type Setting = z.infer<typeof zSetting>;
 

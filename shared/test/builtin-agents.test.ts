@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { BUILTIN_AGENTS, BUILTIN_AGENT_NAMES, AGENT_NAME_RE, DEFAULT_AGENT_TOOLS } from "../src";
+import {
+  BUILTIN_AGENTS, BUILTIN_AGENT_NAMES, AGENT_NAME_RE, DEFAULT_AGENT_TOOLS, zSetting,
+} from "../src";
 
 // SPEC-881 · ADR-0136 · kontrak katalog agen bawaan. Seed menulis LANGSUNG lewat Prisma dan
 // MELEWATI validasi route, jadi batas-batas di bawah hanya ditegakkan di sini — kalau test ini
@@ -47,5 +49,27 @@ describe("katalog agen bawaan", () => {
   it("tabelnya data murni — tanpa impor node:*", () => {
     const src = readFileSync(new URL("../src/builtin-agents.ts", import.meta.url), "utf8");
     expect(src).not.toMatch(/from "node:/);
+  });
+});
+
+describe("bookkeeping sidik jari di zSetting", () => {
+  // Tiga field ini tak punya `.default()`, jadi `parse({})` gagal karena mereka — bukan karena
+  // field yang sedang diuji. Basis minimal ini yang membuat testnya menguji apa yang dimaksud.
+  const base = { autoDefault: true, autoScaffold: true, notifyFail: true };
+
+  // Zod MEMBUANG kunci tak dikenal, dan `PUT /settings` menulis balik hasil parse. Kalau field ini
+  // tak dideklarasikan, seluruh bookkeeping lenyap diam-diam di penyimpanan Settings pertama — dan
+  // seed lalu menganggap SEMUA baris belum pernah disunting, lalu menimpa kerja operator.
+  it("bertahan melewati parse", () => {
+    const parsed = zSetting.parse({ ...base, builtinAgents: { scout: "abc123" } });
+    expect(parsed.builtinAgents).toEqual({ scout: "abc123" });
+  });
+
+  it("default objek kosong saat absen", () => {
+    expect(zSetting.parse(base).builtinAgents).toEqual({});
+  });
+
+  it("bentuk asing ditolak, tidak diterima diam-diam", () => {
+    expect(zSetting.safeParse({ ...base, builtinAgents: "bukan objek" }).success).toBe(false);
   });
 });
