@@ -24,6 +24,10 @@ model Project {
   // SPEC-486 · ADR-0103 · kebijakan auto-merge saat backlog item selesai (LOCAL — tak masuk
   // FIELDS sync, cermin repoDir/schedulerOptIn). null = tanpa auto-merge (default, nol backfill).
   autoMerge      Json?
+  // SPEC-880 · ADR-0135 · daftar hanoman client yang memegang project ini: [{deviceId,name}].
+  // BERBEDA dari repoDir/schedulerOptIn/leadOptIn/autoMerge di atas — kolom ini MASUK FIELDS sync,
+  // karena justru menyeberangnya nilai ini yang jadi inti SPEC-880. null = belum ditetapkan.
+  handledBy      Json?
   specs        Spec[]
   tickets      Ticket[]
   customAgents CustomAgent[] // SPEC-450 · ADR-0094 · custom agent milik project ini

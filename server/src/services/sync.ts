@@ -38,7 +38,12 @@ const DELEGATE: Record<Entity, Delegate> = {
 // Vps.keyPath) dan kolom lokal (createdAt server, dst). Hanya field di sini yang menyeberang.
 // SPEC-270 · ADR-0067 · `updatedAt` ikut menyeberang sebagai jam LWW (default modal rekonsil).
 const FIELDS: Record<Entity, string[]> = {
-  project: ["name", "desc", "kind", "stack", "gitRemote", "updatedAt"],
+  // SPEC-880 · ADR-0135 · `handledBy` ikut menyeberang: "project ini dipegang mesin yang mana"
+  // adalah pernyataan bersama, bukan setelan mesin — dan justru menyeberangnya nilai itu yang
+  // jadi inti spec-nya. SENGAJA bukan cermin `repoDir`/`schedulerOptIn`/`autoMerge` yang LOCAL-only
+  // (mereka properti checkout mesin ini). Tiap entri membawa `name` karena `DeviceToken` TIDAK
+  // ikut SYNCED: penerima tak punya baris device untuk di-join. BUKAN DATE_FIELDS.
+  project: ["name", "desc", "kind", "stack", "gitRemote", "handledBy", "updatedAt"],
   // SPEC-408 · ADR-0090 · createdAt/startedAt ikut menyeberang — sejajar baseSha/headSha. Tanpa
   // ini spec asal-hub mendapat createdAt lokal palsu di tiap client (kolom NOT NULL ber-default).
   // SPEC-447 · ADR-0093 · dependsOn ikut juga: tanpa itu client tak tahu urutannya dan akan
@@ -112,6 +117,7 @@ const NUMBER_FIELDS = new Set([
 ]);
 const BOOLEAN_FIELDS = new Set(["vps:hardened", "customAgent:enabled"]);
 const JSON_FIELDS = new Set([
+  "project:handledBy",
   "spec:payload", "spec:dependsOn", "spec:sourceHistory", "spec:manualDone",
   "vps:health", "vps:audit",
   "customAgent:tools", "customAgent:mentions",

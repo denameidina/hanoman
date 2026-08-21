@@ -71,7 +71,7 @@ TES() { env -u HANOMAN_CONTROL_ORIGINS -u HANOMAN_SUPERVISOR -u HANOMAN_WEB_DIR 
   - `handledByOf(raw: unknown): HandledByEntry[]`
   - kolom Prisma `Project.handledBy: Prisma.JsonValue | null`
 
-- [ ] **Step 1: Tulis test kontrak yang gagal**
+- [x] **Step 1: Tulis test kontrak yang gagal**
 
 Buat `server/test/project-handled-by-contract.test.ts`:
 
@@ -137,7 +137,7 @@ describe("SPEC-880 · kontrak kolom Project.handledBy", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TES server/test/project-handled-by-contract.test.ts
@@ -145,7 +145,7 @@ TES server/test/project-handled-by-contract.test.ts
 
 Expected: FAIL — `Cannot find module` / `zHandledBy is not exported` (berkas `shared/src/handled-by.ts` belum ada).
 
-- [ ] **Step 3: Buat `shared/src/handled-by.ts`**
+- [x] **Step 3: Buat `shared/src/handled-by.ts`**
 
 ```ts
 import { z } from "zod";
@@ -197,7 +197,7 @@ export function handledByOf(raw: unknown): HandledByEntry[] {
 }
 ```
 
-- [ ] **Step 4: Ekspor dari `shared/src/index.ts`**
+- [x] **Step 4: Ekspor dari `shared/src/index.ts`**
 
 Sisipkan tepat di bawah baris `export * from "./auto-merge";`:
 
@@ -205,7 +205,7 @@ Sisipkan tepat di bawah baris `export * from "./auto-merge";`:
 export * from "./handled-by";
 ```
 
-- [ ] **Step 5: Tambah kolom di `server/prisma/schema.prisma`**
+- [x] **Step 5: Tambah kolom di `server/prisma/schema.prisma`**
 
 Di model `Project`, sisipkan tepat **setelah** blok `autoMerge Json?`:
 
@@ -216,7 +216,7 @@ Di model `Project`, sisipkan tepat **setelah** blok `autoMerge Json?`:
   handledBy      Json?
 ```
 
-- [ ] **Step 6: Tulis migration tangan**
+- [x] **Step 6: Tulis migration tangan**
 
 Buat `server/prisma/migrations/20260821120000_project_handled_by/migration.sql`:
 
@@ -232,7 +232,7 @@ Buat `server/prisma/migrations/20260821120000_project_handled_by/migration.sql`:
 ALTER TABLE "Project" ADD COLUMN "handledBy" JSONB;
 ```
 
-- [ ] **Step 7: Regenerate Prisma Client**
+- [x] **Step 7: Regenerate Prisma Client**
 
 ```bash
 pnpm db:generate
@@ -240,7 +240,7 @@ pnpm db:generate
 
 Expected: `Generated Prisma Client`. Bila gagal dengan `Property 'dmmf' does not exist`, jalankan `pnpm install` dulu (postinstall paket `server` yang men-generate-nya).
 
-- [ ] **Step 8: Daftarkan kolom di `server/src/services/sync.ts`**
+- [x] **Step 8: Daftarkan kolom di `server/src/services/sync.ts`**
 
 Ganti baris `FIELDS.project` (baris 41). Cari:
 
@@ -271,7 +271,7 @@ const JSON_FIELDS = new Set([
 ]);
 ```
 
-- [ ] **Step 9: Daftarkan di allowlist webhook `shared/src/webhook.ts`**
+- [x] **Step 9: Daftarkan di allowlist webhook `shared/src/webhook.ts`**
 
 Cari blok `entity: "project"` (baris ~122) dan ganti `fields` + `sample`:
 
@@ -300,7 +300,7 @@ Dan pada `events.updated.when`, ganti kalimatnya jadi:
       updated: { type: "project.updated", label: "Project diubah", when: "Nama, deskripsi, stack, remote, penanda \"ditangani oleh\", atau opt-in scheduler/lead/Help Center berubah." },
 ```
 
-- [ ] **Step 10: Jalankan test — pastikan HIJAU**
+- [x] **Step 10: Jalankan test — pastikan HIJAU**
 
 ```bash
 TES server/test/project-handled-by-contract.test.ts
@@ -308,7 +308,7 @@ TES server/test/project-handled-by-contract.test.ts
 
 Expected: PASS — 6 test.
 
-- [ ] **Step 11: Pastikan kontrak sync yang sudah ada tak pecah**
+- [x] **Step 11: Pastikan kontrak sync yang sudah ada tak pecah**
 
 ```bash
 TES server/test/sync-exclusions.test.ts server/test/sync.service.test.ts server/test/sync-client.test.ts server/test/webhook-payload.test.ts
@@ -316,7 +316,7 @@ TES server/test/sync-exclusions.test.ts server/test/sync.service.test.ts server/
 
 Expected: PASS semua. (Bila `webhook-payload.test.ts` tak ada, hilangkan dari daftar — jalankan `ls server/test | grep webhook` untuk melihat berkas webhook yang nyata dan sertakan semuanya.)
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations/20260821120000_project_handled_by \

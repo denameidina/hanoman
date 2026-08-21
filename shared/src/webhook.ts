@@ -121,18 +121,23 @@ export const WEBHOOK_ENTITIES: WebhookEntityDef[] = [
   {
     entity: "project", model: "Project", label: "Project",
     fields: ["id", "name", "desc", "kind", "gitRemote", "stack", "helpEnabled",
+      // SPEC-880 · ADR-0135 · penerima harus bisa tahu mesin mana yang memegang project ini
+      // tanpa mendiff dua amplop. Entrinya snapshot: [{deviceId,name}].
+      "handledBy",
       "schedulerOptIn", "leadOptIn", "autoMerge", "createdAt", "updatedAt"],
     projectIdField: "id",
     cascade: ["spec", "ticket", "customAgent", "githubIssue"],
     events: {
       created: { type: "project.created", label: "Project ditambah", when: "Project baru terdaftar di workspace." },
-      updated: { type: "project.updated", label: "Project diubah", when: "Nama, deskripsi, stack, remote, atau opt-in scheduler/lead/Help Center berubah." },
+      updated: { type: "project.updated", label: "Project diubah", when: "Nama, deskripsi, stack, remote, penanda \"ditangani oleh\", atau opt-in scheduler/lead/Help Center berubah." },
       deleted: { type: "project.deleted", label: "Project dihapus", when: "Project dihapus. data.cascade menyebut jumlah anak yang ikut terhapus — anaknya sendiri TIDAK memancarkan deleted, sebab cascade dieksekusi SQLite, di luar jangkauan tap." },
     },
     sample: {
       id: "hanoman", name: "hanoman", desc: "Orchestrator + dashboard docs-driven",
       kind: "web", gitRemote: "git@github.com:nafanesia/hanoman.git", stack: "ts",
-      helpEnabled: false, schedulerOptIn: true, leadOptIn: false, autoMerge: null,
+      helpEnabled: false,
+      handledBy: [{ deviceId: "clq0device1", name: "hm-dena" }],
+      schedulerOptIn: true, leadOptIn: false, autoMerge: null,
       createdAt: "2026-05-02T04:00:00.000Z", updatedAt: "2026-08-01T09:00:00.000Z",
     },
   },
