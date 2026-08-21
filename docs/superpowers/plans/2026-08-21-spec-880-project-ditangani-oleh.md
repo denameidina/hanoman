@@ -847,7 +847,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `FIELDS.project` + `handledBy` (Task 1); `applyPush`, `pull`, `snapshot`, `upsertLocal` dari `server/src/services/sync.ts`
 - Produces: — (test murni; ia mengunci kontrak Task 1)
 
-- [ ] **Step 1: Tulis test round-trip**
+- [x] **Step 1: Tulis test round-trip**
 
 Buat `server/test/project-handled-by-sync.test.ts`:
 
@@ -921,7 +921,7 @@ describe("SPEC-880 · round-trip sync handledBy", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan HIJAU**
+- [x] **Step 2: Jalankan test — pastikan HIJAU**
 
 ```bash
 TES server/test/project-handled-by-sync.test.ts
@@ -929,7 +929,7 @@ TES server/test/project-handled-by-sync.test.ts
 
 Expected: PASS — 4 test. (Ia lulus di atas Task 1; ia ADA untuk menjaga kontrak itu tetap benar, dan akan merah begitu `handledBy` dicabut dari `FIELDS.project`.)
 
-- [ ] **Step 3: Verifikasi test ini benar-benar menjaga sesuatu**
+- [x] **Step 3: Verifikasi test ini benar-benar menjaga sesuatu**
 
 Sementara, hapus `"handledBy", ` dari `FIELDS.project` di `server/src/services/sync.ts`, lalu:
 
@@ -939,7 +939,7 @@ TES server/test/project-handled-by-sync.test.ts
 
 Expected: FAIL (minimal 3 test). Kembalikan baris itu dan jalankan lagi — harus PASS. Jangan commit dalam keadaan dicabut.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/test/project-handled-by-sync.test.ts
