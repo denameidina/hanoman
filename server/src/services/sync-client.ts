@@ -247,6 +247,15 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
       records: [{ entity: item.entity, id: item.recordId, baseVersion: snap.version, data: snap.data }],
     });
     const r = res.body?.results?.[0];
+    // SPEC-880 · hub yang menolak record (500, atau `{ok:false,error}` per-record) dulu tak
+    // meninggalkan jejak apa pun: item tetap di outbox dan diulang tiap siklus SELAMANYA tanpa
+    // satu baris log. Gejala paling mungkin: hub lebih tua dari client, belum punya kolom yang
+    // dikirim `snapshot()`. Non-destruktif & sembuh sendiri begitu hub naik versi — tapi ia harus
+    // bisa didiagnosis, bukan ditebak.
+    if (!r) {
+      console.warn(`sync: push ${item.entity}:${item.recordId} tak dijawab hub (status ${res.status})`
+        + " — tetap di outbox; periksa apakah hub lebih tua dari client ini");
+    }
     if (r?.ok) {
       // SPEC-270 · naikkan versi lokal = versi hub agar tak nyimpang di edit berikutnya.
       if (typeof r.version === "number") {

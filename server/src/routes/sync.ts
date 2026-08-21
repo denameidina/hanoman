@@ -55,8 +55,18 @@ export default async function (app: FastifyInstance) {
       if (!isEntity(rec.entity)) { results.push({ id: rec.id, ok: false, error: "unknown entity" }); continue; }
       const data = { ...rec.data };
       if (AUTHORED.includes(rec.entity) && !data.author && user) data.author = user.email;
-      const r = await applyPush(rec.entity, rec.id, rec.baseVersion, data, req.device!.id, rec.op ?? "upsert");
-      results.push({ id: rec.id, ...r });
+      // SPEC-880 · kegagalan SATU record (umumnya field dari instance yang lebih baru — validateSyncData
+      // melempar) dulu keluar dari loop dan menjadikan SELURUH batch 500, sehingga client membaca
+      // seluruh push-nya gagal dan mengulanginya tanpa ujung. Per-record: bentuk yang sama dengan
+      // "unknown entity" di atas. Ini TIDAK membuat hub versi lama menerima field baru — urutan
+      // rilis hub-dulu yang menutup jendela itu (ADR-0135); ini menutup kelasnya ke depan.
+      try {
+        const r = await applyPush(rec.entity, rec.id, rec.baseVersion, data, req.device!.id, rec.op ?? "upsert");
+        results.push({ id: rec.id, ...r });
+      } catch (e) {
+        req.log.warn({ entity: rec.entity, recordId: rec.id, err: e }, "sync push record ditolak");
+        results.push({ id: rec.id, ok: false, error: (e as Error).message });
+      }
     }
     return { results };
   });

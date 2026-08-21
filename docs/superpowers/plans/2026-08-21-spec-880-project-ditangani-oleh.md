@@ -963,7 +963,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Mengapa ini ada di plan SPEC-880:** `snapshot()` menyusun `data` dari **seluruh** `FIELDS`, jadi begitu Task 1 mendarat, client baru mengirim `handledBy: null` di **setiap** push project. `validateSyncData` melempar untuk field tak dikenal dan `applyPush` memanggilnya lebih dulu, sehingga hub versi lama menjawab **500 untuk seluruh batch** — bukan hanya untuk project yang penandanya diisi. Perbaikan ini **tak menolong hub lama** (ia tak punya perbaikannya; urutan rilis **hub dulu** yang menutup jendela itu) — ia menutup kelasnya untuk setiap penambahan field berikutnya dan mengubah kegagalan senyap jadi hasil yang terbaca.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-push-partial-failure.test.ts`:
 
@@ -1014,7 +1014,7 @@ describe("SPEC-880 · POST /sync/push tahan record buruk", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TES server/test/sync-push-partial-failure.test.ts
@@ -1022,7 +1022,7 @@ TES server/test/sync-push-partial-failure.test.ts
 
 Expected: FAIL — `expected 500 to be 200`.
 
-- [ ] **Step 3: Tangkap per-record di `server/src/routes/sync.ts`**
+- [x] **Step 3: Tangkap per-record di `server/src/routes/sync.ts`**
 
 Cari di handler `POST /sync/push`:
 
@@ -1048,7 +1048,7 @@ Ganti jadi:
       }
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan HIJAU**
+- [x] **Step 4: Jalankan test — pastikan HIJAU**
 
 ```bash
 TES server/test/sync-push-partial-failure.test.ts
@@ -1056,7 +1056,7 @@ TES server/test/sync-push-partial-failure.test.ts
 
 Expected: PASS — 1 test.
 
-- [ ] **Step 5: Buat kemacetan push terlihat di client**
+- [x] **Step 5: Buat kemacetan push terlihat di client**
 
 Di `server/src/services/sync-client.ts`, di loop drain outbox, cari cabang terakhir:
 
@@ -1082,7 +1082,7 @@ Sisipkan tepat sesudah `const r = res.body?.results?.[0];`:
     }
 ```
 
-- [ ] **Step 6: Pastikan sync client & route yang ada tak pecah**
+- [x] **Step 6: Pastikan sync client & route yang ada tak pecah**
 
 ```bash
 TES server/test/sync-push-partial-failure.test.ts server/test/sync-client.test.ts server/test/sync.route.test.ts server/test/sync-hub-origin-writes.test.ts server/test/sync-tombstone.compat.test.ts
@@ -1090,7 +1090,7 @@ TES server/test/sync-push-partial-failure.test.ts server/test/sync-client.test.t
 
 Expected: PASS semua.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/routes/sync.ts server/src/services/sync-client.ts server/test/sync-push-partial-failure.test.ts
