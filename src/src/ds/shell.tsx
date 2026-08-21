@@ -6,7 +6,7 @@ import { Input } from "./components/forms";
 import { Mark } from "./marks";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { LimitBadge, CodexLimitBadge } from "../screens/LimitIndicator";
-import { UpdateBadge } from "../screens/UpdateIndicator";
+import { UpdateBadge, ReloadBadge } from "../screens/UpdateIndicator";
 import { AccountMenu } from "../auth/AccountMenu";
 import { useResponsiveTier } from "./responsive";
 // Dari `../ui-state/hooks`, BUKAN barrel `../ui-state`: barrel itu memuat ResetViewButton
@@ -219,6 +219,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
                 readOnly={!onSearchChange} />
             )}
             <UpdateBadge />
+            <ReloadBadge />
             <NotificationBell />
             <LimitBadge />
             <CodexLimitBadge />

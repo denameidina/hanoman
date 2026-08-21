@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 // Widget topbar yang self-fetch / butuh provider → di-noop agar Shell bisa dirender terisolasi.
 vi.mock("../src/notifications/NotificationBell", () => ({ NotificationBell: () => null }));
 vi.mock("../src/screens/LimitIndicator", () => ({ LimitBadge: () => null, CodexLimitBadge: () => null }));
-vi.mock("../src/screens/UpdateIndicator", () => ({ UpdateBadge: () => null }));
+vi.mock("../src/screens/UpdateIndicator", () => ({ UpdateBadge: () => null, ReloadBadge: () => null }));
 vi.mock("../src/auth/AccountMenu", () => ({ AccountMenu: () => null }));
 
 import { Shell, HN_NAV } from "../src/ds/shell";

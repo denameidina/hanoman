@@ -943,6 +943,37 @@ Jalur simpannya tak berubah: Edit project tetap lewat `updateProject()` yang mem
 `name`/`desc`/`gitRemote` (`PATCH /projects/:id`, disync) dari `dir` (`PUT`/`DELETE
 /projects/:id/binding`, **tak disync** — lihat [api-contract](../architecture/api-contract.md)).
 
+Laporan "tombol Pilih folder di Edit project tidak ada" (SPEC-868) **bukan** cacat baris ini: diukur
+di browser nyata 390–1440px tombolnya tampil penuh dan picker-nya terbuka di atas modal Edit. Yang
+lama adalah JS di tab yang sudah terbuka — lihat
+[audit SPEC-868](../research/audit-spec-868-tab-basi-setelah-update.md) dan seksi berikutnya.
+
+## Tab yang bundle-nya ketinggalan servernya (SPEC-868)
+
+Frontend disajikan dari paket npm yang sama dengan server, jadi restart update (ADR-0088) mengganti
+bundle yang dilayani — tetapi **tab yang sudah ter-load tak memuat ulang apa pun**. Ia terus polling
+`/api/*` dengan sukses karena API kompatibel mundur, jadi tak ada yang terlihat rusak; pengguna
+hanya tak punya UI yang baru dirilis. Yang membuatnya tak terdiagnosis: `UpdateBadge` dirender
+**hanya saat `updateAvailable`**, dan tepat sesudah update terpasang nilai itu kembali `false` —
+**tab paling basi justru terlihat paling terkini**.
+
+`UpdateStatus.currentVersion` (versi proses server) sudah tiba tiap frame WS grup `update`; yang
+kurang cuma membandingkannya dengan versi saat tab ini memuat. `trackServerVersion`
+(`src/src/api/update.ts`) adalah reducer murni yang menyimpan versi frame pertama sebagai `boot`;
+`currentVersion` berbeda sesudahnya = server sudah di-restart ke versi lain → `restartedTo`.
+
+Tiga invariant yang tak terbaca dari bentuknya. **Versi kosong tak pernah dihitung drift** — dev dan
+bundle yang belum ter-stamp memulangkan `""`. **Server yang kembali ke `boot` menghapus status
+basi**, bukan melatch-nya. Dan **`prev` dipulangkan apa adanya saat tak berubah**: frame `update`
+datang tiap kali status registry di-recompute, sementara `getSnapshot` `useSyncExternalStore` wajib
+referensial stabil.
+
+`ReloadBadge` (`screens/UpdateIndicator.tsx`) menghuni slot topbar yang sama dengan `UpdateBadge` dan
+merupakan pasangan arah sebaliknya — `UpdateBadge` = "server ketinggalan npm", `ReloadBadge` = "tab
+ini ketinggalan server"; keduanya hampir tak pernah muncul bersamaan. Label panjang/ringkas mengikuti
+kontrak topbar mobile SPEC-763. Ia **mengajak**, tak pernah memuat ulang sendiri: refresh tanpa
+diminta membuang apa yang sedang diketik operator.
+
 ## Project tanpa checkout di mesin ini (SPEC-867)
 
 `Project.repoDir` **tak pernah menyeberang sync** (`server/src/services/sync.ts`) dan `LocalBinding`

@@ -11,14 +11,24 @@ const UP_TO_DATE: UpdateStatus = {
   registry: { status: "unavailable", checkedAt: null },
   updateAvailable: false, command: "", canApply: false,
 };
+// SPEC-868 · versi server saat tab ini memuat vs versi server sekarang. Lihat `trackServerVersion`.
+export type VersionDrift = { boot: string | null; restartedTo: string | null };
+export const NO_DRIFT: VersionDrift = { boot: null, restartedTo: null };
+
 let state: UpdateStatus = UP_TO_DATE;
+let drift: VersionDrift = NO_DRIFT;
 let unsub: (() => void) | undefined;
 const subs = new Set<() => void>();
 
 function subscribe(cb: () => void): () => void {
   subs.add(cb);
   if (subs.size === 1) {
-    unsub = subscribeEvents((m) => { if (m.t === "update") { state = m.update; for (const s of subs) s(); } });
+    unsub = subscribeEvents((m) => {
+      if (m.t !== "update") return;
+      state = m.update;
+      drift = trackServerVersion(drift, m.update.currentVersion);
+      for (const s of subs) s();
+    });
   }
   return () => { subs.delete(cb); if (subs.size === 0 && unsub) { unsub(); unsub = undefined; } };
 }
@@ -95,3 +105,37 @@ export function applyConfirmMessage(liveSessions: number): string {
   if (liveSessions <= 0) return "Pasang versi baru lalu jalankan ulang hanoman? Tak ada sesi yang sedang berjalan.";
   return `${liveSessions} sesi sedang berjalan. Sesi itu tetap hidup di tmux dan terminalnya tersambung lagi sendiri. Lanjutkan?`;
 }
+
+// ── SPEC-868 · tab yang bundle-nya sudah ketinggalan servernya ─────────────────────────────────
+// Diaudit dari laporan "tombol Pilih folder (SPEC-858) tak ada": kodenya utuh, dua instance
+// menyajikannya, tapi restart update terjadi 10–59 menit sebelum laporan — tab yang sudah terbuka
+// tetap menjalankan JS lama selamanya, karena tak ada yang memuat ulang halaman. Yang membuatnya
+// tak terdeteksi: badge update justru MENGHILANG saat itu (`updateAvailable` kembali false), jadi
+// tab paling basi terlihat paling terkini. `currentVersion` milik proses server sudah tiba tiap
+// frame WS; yang kurang cuma membandingkannya dengan versi saat tab ini memuat.
+/**
+ * `prev` dipulangkan apa adanya saat tak ada perubahan — `getSnapshot` useSyncExternalStore wajib
+ * referensial stabil, dan frame `update` datang tiap kali status registry di-recompute.
+ */
+export function trackServerVersion(prev: VersionDrift, currentVersion: string): VersionDrift {
+  if (!currentVersion) return prev;
+  if (prev.boot === null) return { boot: currentVersion, restartedTo: null };
+  if (currentVersion === prev.boot)
+    return prev.restartedTo === null ? prev : { boot: prev.boot, restartedTo: null };
+  if (currentVersion === prev.restartedTo) return prev;
+  return { boot: prev.boot, restartedTo: currentVersion };
+}
+
+/** Versi server saat ini bila ia sudah berbeda dari versi tab ini; null = bundle masih sejalan. */
+export function useServerRestartedTo(): string | null {
+  return useSyncExternalStore(subscribe, () => drift.restartedTo, () => drift.restartedTo);
+}
+
+export function reloadNoticeLabel(version: string): string { return `Muat ulang · ${version}`; }
+
+export function reloadNoticeText(version: string): string {
+  return `hanoman di server sudah diperbarui ke ${version}. Halaman ini masih menjalankan versi lama — muat ulang untuk memakainya.`;
+}
+
+/** Ekspor tersendiri karena `location` milik jsdom tak bisa diganti dengan bersih dari test. */
+export function reloadPage(): void { location.reload(); }

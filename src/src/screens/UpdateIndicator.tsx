@@ -3,6 +3,7 @@ import { Icon } from "../ds/icon";
 import {
   useUpdate, updateHeadline, updateBadgeLabel, updateBadgeLabelShort, updateVersionLine,
   applyUpdate, applyConfirmMessage, type ApplyOutcome,
+  useServerRestartedTo, reloadNoticeLabel, reloadNoticeText, reloadPage,
 } from "../api/update";
 import { usePopoverFocus } from "../ds/popover";
 
@@ -108,5 +109,26 @@ export function UpdateBadge() {
         </div>
       )}
     </div>
+  );
+}
+
+// SPEC-868 · pasangan UpdateBadge untuk arah sebaliknya: bukan "server ketinggalan npm", melainkan
+// "tab ini ketinggalan server". Keduanya menghuni slot topbar yang sama dan hampir tak pernah muncul
+// bersamaan — begitu update terpasang, UpdateBadge padam dan justru DI SITU tab jadi basi.
+export function ReloadBadge() {
+  const version = useServerRestartedTo();
+  if (!version) return null;
+  return (
+    <button onClick={reloadPage} title={reloadNoticeText(version)} aria-label={reloadNoticeLabel(version)}
+      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
+        borderRadius: "var(--radius-pill, 999px)", border: "1px solid var(--brass-300, var(--border-hair))",
+        background: "var(--brass-100)", color: "var(--brass-700)", cursor: "pointer",
+        fontFamily: "var(--font-mono)", fontSize: 12 }}>
+      <Icon name="refresh-cw" size={13} color="var(--brass-700)" />
+      {/* SPEC-763 · label panjang dijatuhkan di topbar mobile; versinya tetap dirender karena
+          ikon telanjang tak mengatakan apa pun. */}
+      <span className="hn-topbar-label">{reloadNoticeLabel(version)}</span>
+      <span className="hn-topbar-label-short" aria-hidden="true">{version}</span>
+    </button>
   );
 }
