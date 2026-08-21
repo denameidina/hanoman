@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import type { ProjectVM } from "./types";
 import { CustomAgentsPanel } from "./CustomAgentsPanel";
 import { AutoMergeCard } from "./AutoMergeCard";
+import { MissingRepoCard } from "./MissingRepoCard";
 
 const COV_TONE = (s: string) => (s === "broken" ? "err" : s === "drift" ? "warn" : "ok");
 
@@ -145,6 +146,10 @@ export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onG
           <ProgressBar value={p.coverage} showLabel tone={COV_TONE(p.docStatus)} size="sm" />
         </div>
       </Card>
+
+      {/* SPEC-867 · project tanpa checkout di mesin ini: keadaan + dua jalan keluarnya. Merender
+          null saat repo-nya ada, jadi urutan kartu di bawah tak berubah. */}
+      <MissingRepoCard p={p} onEdit={onEdit} onToast={onToast} onProjectChanged={onProjectChanged} />
 
       <HelpCenterCard p={p} onToast={onToast} onProjectChanged={onProjectChanged} />
 
