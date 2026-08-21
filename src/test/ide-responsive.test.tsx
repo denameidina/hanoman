@@ -144,3 +144,32 @@ describe("SPEC-879 · baris Branches & Worktrees membungkus sebelum memotong", (
     "%s: tak memakai `all: unset` (ia menang atas min-height target sentuh DAN atas flex-wrap)",
     (file) => expect(source(file)).not.toContain('all: "unset"'));
 });
+
+describe("SPEC-879 · kontrol IDE memakai primitive design system", () => {
+  it("Git Graph tak lagi memakai <input type=checkbox> mentah", async () => {
+    const { container } = renderGraph();
+    await screen.findByTestId("ide-graph-rows");
+    // `input { min-width/min-height: var(--touch-target) }` merentangkan checkbox mentah jadi kotak
+    // biru 44×44; `Checkbox` DS menaruh kotak 18×18 DI DALAM area sentuh itu.
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    for (const name of ["remote", "tag", "muted merge"]) {
+      expect(screen.getByRole("checkbox", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("label tujuan Explorer menyerap sisa lebar, bukan bergantung pada spacer yang boleh runtuh", async () => {
+    renderIde();
+    const dest = await screen.findByTestId("ide-entry-dest");
+    expect(dest).toHaveTextContent("→ root");
+    expect(dest).toHaveStyle({ flex: "1 1 auto" });
+    const spacers = [...dest.parentElement!.children].filter((c) =>
+      c !== dest && !c.textContent?.trim() && (c as HTMLElement).style.flex === "1");
+    expect(spacers).toHaveLength(0);
+  });
+
+  it("editor berkas tak memaksa tinggi tetap yang melewati viewport ponsel", () => {
+    const ide = source("IdeScreen.tsx");
+    expect(ide).toContain('minHeight: "clamp(240px, 50dvh, 560px)"');
+    expect(ide).not.toContain("minHeight: 560");
+  });
+});

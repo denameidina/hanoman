@@ -495,7 +495,7 @@ Akar 4 plus dua pembersihan kecil dari spec: label tujuan Explorer (ADR-0121) be
 - Consumes: `Checkbox` dari `../ds` — `{ checked: boolean; onChange: (next: boolean) => void; label: React.ReactNode }`, merender `span[role="checkbox"][aria-checked]` di dalam `label.hn-choice-target`.
 - Produces: `data-testid="ide-entry-dest"` pada label tujuan — dipakai test ini dan harness bukti Task 6.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `src/test/ide-responsive.test.tsx`:
 
@@ -534,7 +534,7 @@ describe("SPEC-879 · kontrol IDE memakai primitive design system", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.test.tsx -t "primitive design system"
@@ -542,7 +542,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.te
 
 Harapan: FAIL — 3 checkbox mentah masih ada; `ide-entry-dest` belum ada; `minHeight: 560` masih ada.
 
-- [ ] **Step 3: Ganti checkbox Git Graph dengan `Checkbox` DS**
+- [x] **Step 3: Ganti checkbox Git Graph dengan `Checkbox` DS**
 
 Di `src/src/screens/GitGraph.tsx:4`, tambahkan `Checkbox` ke daftar impor dari `"../ds"`.
 
@@ -554,7 +554,7 @@ Ganti tiga `<label>` pembungkus `<input type="checkbox">` (`:419-428`) dengan:
           <Checkbox checked={muted} onChange={setMuted} label="muted merge" />
 ```
 
-- [ ] **Step 4: Ubah label tujuan Explorer**
+- [x] **Step 4: Ubah label tujuan Explorer**
 
 Di `src/src/screens/IdeScreen.tsx`, hapus `<span style={{ flex: 1 }} />` (`:358`) dan ganti label tujuan:
 
@@ -568,7 +568,7 @@ Di `src/src/screens/IdeScreen.tsx`, hapus `<span style={{ flex: 1 }} />` (`:358`
               </span>
 ```
 
-- [ ] **Step 5: Ubah tinggi minimum editor**
+- [x] **Step 5: Ubah tinggi minimum editor**
 
 Di `src/src/screens/IdeScreen.tsx:494`, ganti `minHeight: 560` pada `<textarea>` mode edit:
 
@@ -576,7 +576,7 @@ Di `src/src/screens/IdeScreen.tsx:494`, ganti `minHeight: 560` pada `<textarea>`
                           width: "100%", minHeight: "clamp(240px, 50dvh, 560px)", boxSizing: "border-box",
 ```
 
-- [ ] **Step 6: Jalankan test sampai lulus**
+- [x] **Step 6: Jalankan test sampai lulus**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.test.tsx test/git-graph-view.test.tsx test/ide-screen.test.tsx test/ide-file-ops.test.tsx
@@ -584,7 +584,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.te
 
 Harapan: PASS semua. `ide-file-ops.test.tsx:42` mencari teks `→ root` — bentuk teksnya tak berubah.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/GitGraph.tsx src/src/screens/IdeScreen.tsx src/test/ide-responsive.test.tsx

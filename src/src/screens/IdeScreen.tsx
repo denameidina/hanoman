@@ -359,8 +359,12 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                 onClick={() => setNameDialog({ mode: "rename", value: target?.path ?? "" })}>Ganti nama</Button>
               <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={!target}
                 onClick={() => setPendingDelete(target)}>Hapus</Button>
-              <span style={{ flex: 1 }} />
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-subtle)" }}>
+              {/* SPEC-879 · label tujuan MENYERAP sisa lebar di baris mana pun ia mendarat, jadi
+                  ia terlihat secara konstruksi — bukan sebagai efek samping spacer yang boleh
+                  runtuh saat barisnya membungkus. */}
+              <span data-testid="ide-entry-dest" style={{ flex: "1 1 auto", minWidth: 0,
+                textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-subtle)" }}>
                 → {dirSel || "root"}
               </span>
               <input ref={fileInput} type="file" multiple hidden
@@ -469,7 +473,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                     : mode === "edit"
                       /* placeholder-exempt: isi berkas apa pun bahasanya — tak ada satu contoh yang benar lintas .ts/.json/.sh */
                       ? <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} style={{
-                          width: "100%", minHeight: 560, boxSizing: "border-box", resize: "vertical", border: "none",
+                          width: "100%", minHeight: "clamp(240px, 50dvh, 560px)", boxSizing: "border-box", resize: "vertical", border: "none",
                           outline: "none", padding: "16px 18px", fontFamily: "var(--font-mono)", fontSize: 12.5,
                           lineHeight: 1.7, color: "var(--text-body)", background: "var(--surface-card)" }} />
                       : isMarkdownPath(selected) && mdView === "preview"

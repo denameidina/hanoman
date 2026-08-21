@@ -1,7 +1,7 @@
 /* GitGraph — DAG commit read + aksi (SPEC-182). Lane dihitung computeLanes (nol dep).
    Baris = grid [svg lane | subject | refs | meta]; klik = detail; klik-kanan = context-menu. */
 import React from "react";
-import { Card, Button, StateBlock, Badge, Icon, DocDownload, MarkdownView, isMarkdownPath, Tabs, LocalOverflow, Modal, useCoarsePointer, useResponsiveTier } from "../ds";
+import { Card, Button, Checkbox, StateBlock, Badge, Icon, DocDownload, MarkdownView, isMarkdownPath, Tabs, LocalOverflow, Modal, useCoarsePointer, useResponsiveTier } from "../ds";
 import { api, type GraphCommit, type CommitDetail, type GitOp, type RepoStatus, type Stash, type ReviewFile } from "../api/client";
 import { computeLanes, rowEdges, type GraphRow, type Edge } from "./git-graph";
 import { buildFileTree, TreeRow } from "./file-tree";
@@ -424,15 +424,12 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             <option value="">semua branch</option>
             {localBranches.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "var(--text-muted)" }}>
-            <input type="checkbox" checked={gopts.showRemote} onChange={(e) => setView({ showRemote: e.target.checked })} /> remote
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "var(--text-muted)" }}>
-            <input type="checkbox" checked={gopts.showTags} onChange={(e) => setView({ showTags: e.target.checked })} /> tag
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "var(--text-muted)" }}>
-            <input type="checkbox" checked={muted} onChange={(e) => setMuted(e.target.checked)} /> muted merge
-          </label>
+          {/* SPEC-879 · `input` telanjang direntangkan aturan mobile `input { min-height:
+              var(--touch-target) }` jadi kotak biru 44×44; `Checkbox` DS menaruh kotak 18×18 di
+              DALAM area sentuh itu. */}
+          <Checkbox checked={gopts.showRemote} onChange={(next) => setView({ showRemote: next })} label="remote" />
+          <Checkbox checked={gopts.showTags} onChange={(next) => setView({ showTags: next })} label="tag" />
+          <Checkbox checked={muted} onChange={(next) => setMuted(next)} label="muted merge" />
           <button onClick={() => setStyle((s) => (s === "rounded" ? "angular" : "rounded"))}
             style={{ border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", cursor: "pointer", padding: "3px 8px", fontSize: 12, color: "var(--text-muted)" }}>
             style: {style}
