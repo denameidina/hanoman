@@ -291,6 +291,47 @@ textarea:focus-visible,
   overscroll-behavior-inline: contain;
 }
 
+/* SPEC-879 · baris kepala IDE = strip tab + toolbar. Keduanya dulu `flex: 0 1 auto`, jadi tak ada
+   yang mengambil sisa lebar dan tak ada yang menyerap kekurangan: begitu jumlahnya melewati baris,
+   SELURUH toolbar turun. Terukur di ~1100px pada viewport yang sama, tab Explorer memberi kepala
+   satu baris sementara tab Worktrees memberi dua — semata karena label tab aktif dirender
+   `font-weight: 600`. Strip tab yang menyerap sisa lebar (dan sudah punya `overflow-x: auto`
+   sendiri) membuat kekurangan beberapa piksel dibayar dengan menggulir, bukan dengan wrap. */
+.hn-ide-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+}
+
+.hn-ide-head > .hn-tabs { flex: 1 1 auto; min-width: 0; }
+
+.hn-ide-toolbar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  /* Toolbar (dua `Select` + tiga tombol ≈ 570px) membungkus sendiri jadi dua baris di 390px →
+     kepala tiga baris. Di sini ia jadi SATU baris yang menggulir, cermin papan tombol terminal
+     SPEC-800; `flex: 0 0 auto` pada itemnya yang membuat scroller itu hidup. Sumbu-Y dikunci
+     dengan alasan yang sama seperti `.hn-tabs` di atas. */
+  .hn-ide-head > * { flex: 1 1 100%; min-width: 0; }
+  .hn-ide-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+  }
+  .hn-ide-toolbar > * { flex: 0 0 auto; }
+}
+
 @media (pointer: coarse), (max-width: 767px) {
   button:not(.hn-shell-backdrop) { min-width: var(--touch-target); min-height: var(--touch-target); }
   input, select, textarea { min-width: var(--touch-target); min-height: var(--touch-target); }

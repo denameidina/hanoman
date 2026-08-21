@@ -52,7 +52,7 @@ Akar 1. Di ~1100px kepala jadi 1 atau 2 baris **tergantung tab mana yang aktif**
 - Consumes: `.hn-tabs` (sudah ada: `max-width: 100%; overflow-x: auto; overflow-y: hidden`), token `--touch-target`.
 - Produces: kelas `.hn-ide-head` dan `.hn-ide-toolbar`; Task 2 tidak memakainya, Task 5 mengujinya lewat berkas test yang sama.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/ide-responsive.test.tsx`:
 
@@ -120,7 +120,7 @@ describe("SPEC-879 · baris kepala IDE punya pemilik sisa lebar", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.test.tsx
@@ -128,7 +128,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.te
 
 Harapan: FAIL — `.hn-ide-head {` tak ada di `app.css` (`indexOf` mengembalikan −1 → slice kosong), dan `head` tak punya kelas `hn-ide-head`.
 
-- [ ] **Step 3: Tambahkan aturan CSS**
+- [x] **Step 3: Tambahkan aturan CSS**
 
 Di `src/src/app.css`, sesudah blok `.hn-tabs { … }` dan **sebelum** `@media (pointer: coarse), (max-width: 767px)`:
 
@@ -175,7 +175,7 @@ Di `src/src/app.css`, sesudah blok `.hn-tabs { … }` dan **sebelum** `@media (p
 }
 ```
 
-- [ ] **Step 4: Pasang kelasnya di `IdeScreen.tsx`**
+- [x] **Step 4: Pasang kelasnya di `IdeScreen.tsx`**
 
 Ganti konstanta `toolbar` (`src/src/screens/IdeScreen.tsx:301`):
 
@@ -206,7 +206,7 @@ Ganti baris kepala di `return` (`src/src/screens/IdeScreen.tsx:318`):
 
 `flex: "0 0 auto"` tetap inline: ia milik rantai flex Explorer (SPEC-363), bukan milik kelas kepala.
 
-- [ ] **Step 5: Jalankan test sampai lulus**
+- [x] **Step 5: Jalankan test sampai lulus**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.test.tsx
@@ -214,7 +214,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.te
 
 Harapan: PASS (3 test).
 
-- [ ] **Step 6: Jalankan test IDE yang sudah ada**
+- [x] **Step 6: Jalankan test IDE yang sudah ada**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-screen.test.tsx test/ide-file-ops.test.tsx test/ide-worktrees-tab.test.tsx test/scroll-chain.test.tsx test/responsive-no-squeeze.test.tsx
@@ -222,7 +222,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-screen.test.t
 
 Harapan: PASS semua.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/app.css src/src/screens/IdeScreen.tsx src/test/ide-responsive.test.tsx

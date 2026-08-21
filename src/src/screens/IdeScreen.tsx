@@ -301,7 +301,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   })();
 
   const toolbar = (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+    <div className="hn-ide-toolbar">
       <Select size="sm" value={projectId} onChange={(e) => onProject(e.target.value)}
         options={projects.map((p) => ({ value: p.id, label: p.name }))} />
       <Select size="sm" value={viewRef} onChange={(e) => setViewRef(e.target.value)} options={refOptions} />
@@ -320,7 +320,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     // pada `<main>` yang menggulir untuk auto-load `IntersectionObserver` (SPEC-351).
     <div style={{ display: "flex", flexDirection: "column", gap: 16,
       ...(tab === "explorer" ? { flex: "1 1 0", minHeight: 0 } : null) }}>
-      <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div className="hn-ide-head" style={{ flex: "0 0 auto" }}>
         <Tabs tabs={[{ value: "explorer", label: "Explorer" }, { value: "graph", label: "Git Graph" },
           { value: "branches", label: "Branches" }, { value: "worktrees", label: "Worktrees" }]}
           value={tab} onChange={setTab} />
