@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { renderAgentsJson, agentRosterBlock, agentPromptOf, type AgentDef } from "../src/custom-agents";
+import {
+  renderAgentsJson, agentRosterBlock, agentPromptOf, agentDelegationClause, type AgentDef,
+} from "../src/custom-agents";
 import { DEFAULT_AGENT_TOOLS, MENTION_MAX_HOPS } from "@hanoman/shared";
 
 const def = (o: Partial<AgentDef> & { name: string }): AgentDef => ({
@@ -118,5 +120,30 @@ describe("klausa gaya kode di custom agent (SPEC-543)", () => {
   // menggandakan teks yang sama sekali per peran.
   it("roster codex TIDAK mengulanginya", () => {
     expect(agentRosterBlock([def({ name: "a" }), def({ name: "b" })])).not.toContain(MARK);
+  });
+});
+
+// SPEC-881 · ADR-0136 · dorongan untuk jalur CLAUDE. Codex sudah menerima roster yang menyuruhnya
+// MENGADOPSI peran; claude menerima definisinya lewat `--agents` tapi tak menerima satu pun alasan
+// untuk menoleh ke sana — dan katalog yang tak pernah dipanggil sama saja dengan katalog kosong.
+describe("agentDelegationClause", () => {
+  const def = (name: string, description: string): AgentDef => ({
+    name, description, instructions: "i", tools: null, model: null, mentions: [],
+  });
+
+  // Invarian ADR-0094: katalog kosong → prompt byte-identik dengan sebelum fitur ini.
+  it("kosong saat tak ada agen", () => {
+    expect(agentDelegationClause([])).toBe("");
+  });
+
+  it("hanya menyebut agen yang ada di roster", () => {
+    const out = agentDelegationClause([def("scout", "cari kode"), def("qa-verifier", "uji")]);
+    expect(out).toContain("scout");
+    expect(out).toContain("qa-verifier");
+    expect(out).not.toContain("blast-radius");
+  });
+
+  it("membawa deskripsi tiap agen sebagai pemicunya", () => {
+    expect(agentDelegationClause([def("scout", "cari kode")])).toContain("cari kode");
   });
 });

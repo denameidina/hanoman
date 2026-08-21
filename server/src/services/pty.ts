@@ -7,7 +7,7 @@ import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
-  renderAgentsJson, agentRosterBlock, type AgentDef, type Flow, type Agent,
+  renderAgentsJson, agentRosterBlock, agentDelegationClause, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import { coerceCodexEffort, isTerminalResponse, resolveChoices, type SessionKind } from "@hanoman/shared";
 import { readPhases, sessionComplete, type Phase } from "./session-phases";
@@ -381,7 +381,12 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // codex tak punya padanan `--agents` yang bisa diverifikasi (ADR-0094 M5: kunci `-c` tak dikenal
   // diterima diam-diam), jadi rosternya lewat kanal yang memang milik hanoman sendiri: prompt.
   // Mengembalikan "" saat katalog kosong → prompt sesi lain byte-identik seperti sebelumnya.
-  const rosterBlock = agentForDefs === "codex" ? agentRosterBlock(customDefs) : "";
+  // SPEC-881 · ADR-0136 · dua kanal, satu titik. Codex mengadopsi peran INLINE lewat roster; claude
+  // menerima definisi lewat `--agents` dan hanya perlu DORONGAN untuk menoleh ke sana. Keduanya
+  // mengembalikan "" saat katalog kosong → prompt sesi byte-identik seperti sebelumnya.
+  const rosterBlock = agentForDefs === "codex"
+    ? agentRosterBlock(customDefs)
+    : agentDelegationClause(customDefs);
 
   let promptArg = "";
   let promptFile: string | undefined;

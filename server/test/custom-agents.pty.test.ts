@@ -72,10 +72,17 @@ describe("createSession · claude", () => {
     expect(existsSync(agentsFilePath(s.id))).toBe(false);
   });
 
-  it("prompt claude TIDAK ditempeli roster (claude memakai jalur native)", () => {
+  // SPEC-881 · ADR-0136 · dipersempit dengan sengaja. Dulu berbunyi `toBe("halo")`; sejak spec ini
+  // claude menerima KLAUSA delegasi pendek di prompt-nya. Yang tetap dijaga di sini adalah maksud
+  // asli test-nya: blok roster codex — nama, deskripsi, DAN seluruh prosa instruksi tiap agen —
+  // tak pernah bocor ke jalur claude, yang memang menerima definisinya native lewat `--agents`.
+  it("prompt claude TIDAK ditempeli roster codex (claude memakai jalur native)", () => {
     registerCustomAgentSource(() => defs);
     const s = createSession("p1", cwd, { id: born("ca-claude-4"), agent: "claude", prompt: "halo" });
-    expect(readFileSync(promptFilePath(s.id), "utf8")).toBe("halo");
+    const prompt = readFileSync(promptFilePath(s.id), "utf8");
+    expect(prompt).toContain("halo");
+    expect(prompt).not.toContain("## Custom agent hanoman");
+    expect(prompt).not.toContain("kamu peninjau");   // instruksi agen, hanya ada di roster codex
   });
 });
 
@@ -157,5 +164,35 @@ describe("penyaring runtime (SPEC-484 · ADR-0101)", () => {
     const prompt = readFileSync(promptFilePath(s.id), "utf8");
     expect(prompt).toContain("@cx");
     expect(prompt).not.toContain("@cl");
+  });
+});
+
+// SPEC-881 · ADR-0136 · klausa delegasi. Diperiksa lewat ISI BERKAS PROMPT, bukan bentuk respons —
+// alasan yang sama dengan kontrak argv di atas.
+describe("klausa delegasi di prompt", () => {
+  it("sesi claude menerima klausa yang menyebut agen di roster", () => {
+    registerCustomAgentSource(() => defs);
+    const s = createSession("p1", cwd, { id: born("ca-klausa-1"), agent: "claude", prompt: "halo" });
+    const prompt = readFileSync(promptFilePath(s.id), "utf8");
+    expect(prompt).toContain("## Subagent yang tersedia");
+    expect(prompt).toContain("- **rev** — tinjau");
+    expect(prompt).toContain("- **tes** — uji");
+  });
+
+  // Invarian ADR-0094: katalog kosong → prompt byte-identik dengan sebelum fitur ini.
+  it("sesi claude tanpa custom agent menerima prompt byte-identik", () => {
+    registerCustomAgentSource(() => []);
+    const s = createSession("p1", cwd, { id: born("ca-klausa-2"), agent: "claude", prompt: "halo" });
+    expect(readFileSync(promptFilePath(s.id), "utf8")).toBe("halo");
+  });
+
+  // Codex mengadopsi peran INLINE lewat roster (ADR-0094 keputusan 4) — ia tak punya subagent untuk
+  // didelegasi, jadi klausa claude di sana akan menyuruhnya memanggil yang tak ada.
+  it("sesi codex tetap menerima roster, bukan klausa", () => {
+    registerCustomAgentSource(() => defs);
+    const s = createSession("p1", cwd, { id: born("ca-klausa-3"), agent: "codex", prompt: "halo" });
+    const prompt = readFileSync(promptFilePath(s.id), "utf8");
+    expect(prompt).toContain("## Custom agent hanoman");
+    expect(prompt).not.toContain("## Subagent yang tersedia");
   });
 });
