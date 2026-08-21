@@ -620,6 +620,34 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     expect(xt.written[0]).toBe("\x1b[3D\x1b[K");
   });
 
+  // SPEC-878 · transposisi harfiah: jalur mentah menyalip ketikan yang masih ditahan jendela 16 ms.
+  // Terukur di jalur nyata — pty menerima `["\x1b","z"]` untuk `z` lalu Escape.
+  it("mengirim tombol papan tombol SESUDAH ketikan yang masih ditahan batcher", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    const before = inputsOf(sockets[0]).length;
+    act(() => { xt.dataHandler?.("z"); });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Kirim Escape ke terminal" })); });
+    await wait(40);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["z", "\x1b"]);
+  });
+
+  it("mengirim path lampiran SESUDAH ketikan yang masih ditahan batcher", async () => {
+    vi.spyOn(api, "uploadTerminalAttachment").mockResolvedValue({ path: "/tmp/a.png" });
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    const before = inputsOf(sockets[0]).length;
+    act(() => { xt.dataHandler?.("z"); });
+    const drop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "dataTransfer", {
+      value: { types: ["Files"], files: [new File(["x"], "a.png", { type: "image/png" })] },
+    });
+    act(() => { paneHost(container).dispatchEvent(drop); });
+    await vi.waitFor(() => expect(inputsOf(sockets[0]).slice(before)).toEqual(["z", "/tmp/a.png "]));
+  });
+
   it("berhenti memprediksi begitu sesi tmux-nya dinyatakan lenyap", async () => {
     render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));

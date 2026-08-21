@@ -110,13 +110,16 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       if (gone || isTerminalResponse(d)) return;
       pendingInput += d;
     };
-    sendKey.current = sendInput;
 
-    // SPEC-856 · echo prediktif. HANYA `term.onData` yang lewat sini; clipboard (SPEC-289), tap
-    // dialog (SPEC-452), lampiran (SPEC-816), dan papan tombol (SPEC-800) tetap memakai `sendInput`
-    // mentah, jadi jaminan "satu keystroke = satu frame" milik mereka tak berubah.
+    // SPEC-856 · echo prediktif.
     let pred = P.initialState();
     const batcher = P.createInputBatcher(sendInput);
+    // SPEC-878 · SATU pintu keluar untuk SEMUA jalur input. Yang melewati batcher bisa mendarat di
+    // pty SEBELUM ketikan yang masih ditahan jendela 16 ms — terukur `["\x1b","z"]` untuk `z` lalu
+    // Escape. `coalesce=false` menguras antrean lebih dulu lalu meneruskan payload UTUH dalam satu
+    // frame, jadi "satu tekan = satu keystroke" (SPEC-452) dan "paste utuh" (SPEC-289) tak berubah.
+    const sendRaw = (d: string) => batcher.push(d, false);
+    sendKey.current = sendRaw;
     const viewOf = (): P.View => {
       const buf = term.buffer.active;
       return {
@@ -271,7 +274,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         return false;
       }
       if (intent === "paste") {
-        void navigator.clipboard?.readText().then((t) => { if (t) sendInput(t); });
+        void navigator.clipboard?.readText().then((t) => { if (t) sendRaw(t); });
         return false;
       }
       return true;
@@ -335,7 +338,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       const lines = Array.from({ length: term.rows },
         (_, i) => buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? "");
       const choice = dialogChoiceAt(lines, row);
-      if (choice) sendInput(choice);
+      if (choice) sendRaw(choice);
     };
     // SPEC-816 · lampiran gambar. Yang bisa dikirim ke PTY hanyalah teks, jadi berkasnya diunggah
     // lebih dulu dan yang masuk ke prompt adalah PATH-nya — agen membacanya sendiri dengan Read.
@@ -346,7 +349,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
           const { path } = await api.uploadTerminalAttachment(sessionId, file);
           // Spasi, bukan Enter: operator melanjutkan mengetik kalimatnya di sebelah path.
           // sendInput menampung ke `pendingInput` bila socket sedang menyambung ulang.
-          sendInput(`${path} `);
+          sendRaw(`${path} `);
         } catch (e) {
           term.write(`\r\n\x1b[31mlampiran gagal: ${(e as Error).message}\x1b[0m\r\n`);
         }
