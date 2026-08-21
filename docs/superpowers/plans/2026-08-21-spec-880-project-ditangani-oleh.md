@@ -1848,7 +1848,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: seluruh task sebelumnya
 - Produces: bukti hijau sebelum push
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u HANOMAN_SUPERVISOR -u HANOMAN_WEB_DIR -u DATABASE_URL \
@@ -1869,7 +1869,7 @@ TES server/test/project-handled-by-contract.test.ts server/test/project-handled-
 Bila ada yang merah, ukur baseline di `$HANOMAN_BASE_SHA` sebelum menyimpulkan regresi —
 `portal-chat`/`settings` sudah merah di base dan bukan urusan spec ini.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
@@ -1877,7 +1877,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --f
 
 Expected: keluar tanpa galat. **Jangan** `pnpm -r typecheck`.
 
-- [ ] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
+- [x] **Step 3: Smoke endpoint nyata (sekali, di akhir)**
 
 Spec ini menyentuh endpoint, jadi boot server terhadap DB khusus lalu curl.
 
@@ -1910,7 +1910,7 @@ Bereskan prosesnya **per-PID**, jangan `pkill -f`:
 kill "$(lsof -ti:8799)"
 ```
 
-- [ ] **Step 4: Diff bersih & centang seluruh checklist plan**
+- [x] **Step 4: Diff bersih & centang seluruh checklist plan**
 
 ```bash
 git status --porcelain
@@ -1919,7 +1919,7 @@ git status --porcelain
 Expected: kosong. Pastikan setiap `- [ ]` di plan ini sudah jadi `- [x]` — hanoman menahan backlog
 di `executing` selama masih ada kotak kosong.
 
-- [ ] **Step 5: Push**
+- [x] **Step 5: Push**
 
 ```bash
 git push origin HEAD:refs/heads/hanoman/spec-880
