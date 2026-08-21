@@ -4,6 +4,7 @@ import { prisma } from "../src/db";
 import { capabilityForRoute } from "../src/services/agent-capabilities";
 import { customAgentId } from "@hanoman/shared";
 import { agentDefsFor } from "../src/services/custom-agents";
+import { seedBuiltinAgents } from "../src/services/builtin-agents";
 
 const app = buildApp({ requireAuth: false });
 const clean = async () => {
@@ -285,5 +286,48 @@ describe("PATCH · validasi HANYA atas field yang ada di payload", () => {
     } });
     const r = await app.inject({ method: "PATCH", url: `/api/custom-agents/${id}`, payload: { runtime: "codex" } });
     expect(r.statusCode).toBe(400);
+  });
+});
+
+// SPEC-881 · ADR-0136 · status "bawaan" DITURUNKAN di lapis response, bukan kolom. Kolom baru
+// berarti kolom baru di changefeed sync, dan hub versi lama menolak SELURUH push yang membawanya.
+describe("field turunan agen bawaan", () => {
+  const list = async () =>
+    (await app.inject({ method: "GET", url: "/api/custom-agents" }))
+      .json() as Array<Record<string, unknown>>;
+
+  it("menandai baris bawaan", async () => {
+    await seedBuiltinAgents();
+    const scout = (await list()).find((a) => a.name === "scout")!;
+    expect(scout.builtin).toBe(true);
+    expect(scout.builtinEdited).toBe(false);
+  });
+
+  it("menandai baris bawaan yang sudah disunting", async () => {
+    await seedBuiltinAgents();
+    await app.inject({
+      method: "PATCH", url: "/api/custom-agents/global:scout",
+      payload: { instructions: "punya operator" },
+    });
+    const scout = (await list()).find((a) => a.name === "scout")!;
+    expect(scout.builtin).toBe(true);
+    expect(scout.builtinEdited).toBe(true);
+  });
+
+  it("baris buatan operator tidak ditandai bawaan", async () => {
+    await post({ name: "punyaku", description: "d", instructions: "i" });
+    const mine = (await list()).find((a) => a.name === "punyaku")!;
+    expect(mine.builtin).toBe(false);
+    expect(mine.builtinEdited).toBe(false);
+  });
+
+  // Nama bawaan yang dipakai sebagai agen PROJECT adalah baris milik operator, bukan bawaan —
+  // bawaan selalu global (ADR-0094: project menimpa global).
+  it("agen project bernama sama tidak ditandai bawaan", async () => {
+    await post({ projectId: "p1", name: "scout", description: "d", instructions: "i" });
+    const list1 = (await app.inject({ method: "GET", url: "/api/custom-agents?projectId=p1" }))
+      .json() as Array<Record<string, unknown>>;
+    const proj = list1.find((a) => a.projectId === "p1")!;
+    expect(proj.builtin).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import {
   zCreateCustomAgent, zUpdateCustomAgent, customAgentId, mentionsOf, toolsOf, runtimeOf,
-  modelsForRuntime, ALL_TOOLS, AGENT_RUNTIMES, AGENT_RUNTIME_LABELS,
+  modelsForRuntime, ALL_TOOLS, AGENT_RUNTIMES, AGENT_RUNTIME_LABELS, BUILTIN_AGENT_NAMES,
   type AgentRuntime, type AgentCatalogView,
 } from "@hanoman/shared";
 import { prisma } from "../db";
@@ -9,6 +9,8 @@ import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { resolveRepoDir } from "../services/local-binding";
 import { agentToolCatalog, agentToolIds } from "../services/agent-tool-catalog";
+import { getSetting } from "../services/settings";
+import { rowFingerprint } from "../services/builtin-agents";
 import {
   loadCustomAgents, validateGraph, unknownMentions, type CustomAgentRow,
 } from "../services/custom-agents";
@@ -20,15 +22,31 @@ import {
 const rowsOf = async (): Promise<CustomAgentRow[]> =>
   (await prisma.customAgent.findMany()) as unknown as CustomAgentRow[];
 
+/**
+ * SPEC-881 · ADR-0136 · peta sidik jari agen bawaan. Dibaca SEKALI per request, bukan per baris —
+ * `view` sinkron sementara `getSetting()` tidak.
+ */
+const stampsOf = async (): Promise<Record<string, string>> => (await getSetting()).builtinAgents;
+
 /** Satu tempat yang tahu bentuk respons; `inherited` hanya bermakna saat diminta per-project. */
-const view = (r: CustomAgentRow, projectId?: string) => ({
-  id: r.id, projectId: r.projectId, name: r.name,
-  description: r.description, instructions: r.instructions,
-  tools: toolsOf(r.tools), model: r.model, mentions: mentionsOf(r.mentions),
-  runtime: runtimeOf(r.runtime),
-  enabled: r.enabled,
-  ...(projectId ? { inherited: r.projectId === null } : {}),
-});
+const view = (r: CustomAgentRow, projectId?: string, stamps: Record<string, string> = {}) => {
+  // Bawaan SELALU global: nama yang sama dipakai sebagai agen project adalah baris milik operator
+  // yang menimpa bawaan (ADR-0094), bukan bawaan itu sendiri.
+  const builtin = r.projectId === null && BUILTIN_AGENT_NAMES.includes(r.name);
+  return {
+    id: r.id, projectId: r.projectId, name: r.name,
+    description: r.description, instructions: r.instructions,
+    tools: toolsOf(r.tools), model: r.model, mentions: mentionsOf(r.mentions),
+    runtime: runtimeOf(r.runtime),
+    enabled: r.enabled,
+    builtin,
+    // Sidik jari yang tak tercatat (baris menyeberang sync dari mesin lain, seed di sini belum
+    // pernah menyentuhnya) dibaca sebagai "disunting" — lebih baik menandai berlebih daripada
+    // menjanjikan "asli bawaan" untuk isi yang tak bisa kita buktikan.
+    builtinEdited: builtin ? stamps[r.name] !== rowFingerprint(r) : false,
+    ...(projectId ? { inherited: r.projectId === null } : {}),
+  };
+};
 
 /** repoDir project (bila ada) — sumber `<repoDir>/.mcp.json` & `~/.claude.json` projects[<repoDir>]. */
 const repoDirOf = async (projectId?: string | null): Promise<string | null> =>
@@ -81,9 +99,10 @@ export default async function (app: FastifyInstance) {
     const byName = new Map<string, CustomAgentRow>();
     for (const r of rows) if (r.projectId === null) byName.set(r.name, r);
     for (const r of rows) if (r.projectId !== null) byName.set(r.name, r);
+    const stamps = await stampsOf();
     return [...byName.values()]
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((r) => view(r, projectId));
+      .map((r) => view(r, projectId, stamps));
   });
 
   app.post("/custom-agents", async (req, reply) => {
@@ -126,7 +145,7 @@ export default async function (app: FastifyInstance) {
     // basi, dan gejalanya senyap (agen lama tetap muncul, agen baru tak pernah).
     await loadCustomAgents();
     await notifySynced("customAgent", id);
-    return reply.code(201).send(view(row as unknown as CustomAgentRow));
+    return reply.code(201).send(view(row as unknown as CustomAgentRow, undefined, await stampsOf()));
   });
 
   app.patch("/custom-agents/:id", async (req, reply) => {
@@ -185,7 +204,7 @@ export default async function (app: FastifyInstance) {
     } });
     await loadCustomAgents();
     await notifySynced("customAgent", id);
-    return view(row as unknown as CustomAgentRow);
+    return view(row as unknown as CustomAgentRow, undefined, await stampsOf());
   });
 
   app.delete("/custom-agents/:id", async (req, reply) => {
