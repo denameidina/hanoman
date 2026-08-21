@@ -57,7 +57,7 @@
 - Consumes: `AGENT_NAME_RE`, `DEFAULT_AGENT_TOOLS` dari `shared/src/custom-agent.ts`.
 - Produces: `type BuiltinAgentDef = { readonly name: string; readonly description: string; readonly instructions: string; readonly tools: readonly string[]; readonly enabledByDefault: boolean }` dan `export const BUILTIN_AGENTS: readonly BuiltinAgentDef[]`.
 
-- [ ] **Step 1: Tulis test kontrak yang gagal**
+- [x] **Step 1: Tulis test kontrak yang gagal**
 
 ```ts
 // shared/test/builtin-agents.test.ts
@@ -110,12 +110,12 @@ describe("katalog agen bawaan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `pnpm vitest --run shared/test/builtin-agents.test.ts`
 Expected: FAIL — `BUILTIN_AGENTS` tak diekspor dari `../src`.
 
-- [ ] **Step 3: Tulis tabel katalog**
+- [x] **Step 3: Tulis tabel katalog**
 
 Buat `shared/src/builtin-agents.ts` dengan header:
 
@@ -158,7 +158,7 @@ export const BUILTIN_AGENT_NAMES: readonly string[] = BUILTIN_AGENTS.map((a) => 
 
 Catatan: `AGENT_NAME_RE` & `DEFAULT_AGENT_TOOLS` diimpor **hanya** bila dipakai. Bila entri di bawah tak memakainya, hapus impornya — TypeScript strict akan mengeluh.
 
-- [ ] **Step 3a: Entri `scout`**
+- [x] **Step 3a: Entri `scout`**
 
 ```ts
   {
@@ -193,7 +193,7 @@ Catatan: `AGENT_NAME_RE` & `DEFAULT_AGENT_TOOLS` diimpor **hanya** bila dipakai.
   },
 ```
 
-- [ ] **Step 3b: Entri `root-causer`**
+- [x] **Step 3b: Entri `root-causer`**
 
 ```ts
   {
@@ -231,7 +231,7 @@ Catatan: `AGENT_NAME_RE` & `DEFAULT_AGENT_TOOLS` diimpor **hanya** bila dipakai.
   },
 ```
 
-- [ ] **Step 3c: Entri `qa-verifier`**
+- [x] **Step 3c: Entri `qa-verifier`**
 
 ```ts
   {
@@ -276,7 +276,7 @@ Catatan: `AGENT_NAME_RE` & `DEFAULT_AGENT_TOOLS` diimpor **hanya** bila dipakai.
   },
 ```
 
-- [ ] **Step 3d: Entri `edge-case-hunter`**
+- [x] **Step 3d: Entri `edge-case-hunter`**
 
 ```ts
   {
@@ -316,7 +316,7 @@ Catatan: `AGENT_NAME_RE` & `DEFAULT_AGENT_TOOLS` diimpor **hanya** bila dipakai.
   },
 ```
 
-- [ ] **Step 3e: Entri `blast-radius`**
+- [x] **Step 3e: Entri `blast-radius`**
 
 ```ts
   {
@@ -356,7 +356,7 @@ Catatan: `AGENT_NAME_RE` & `DEFAULT_AGENT_TOOLS` diimpor **hanya** bila dipakai.
   },
 ```
 
-- [ ] **Step 3f: Entri `spec-auditor`**
+- [x] **Step 3f: Entri `spec-auditor`**
 
 ```ts
   {
@@ -392,7 +392,7 @@ Catatan: `AGENT_NAME_RE` & `DEFAULT_AGENT_TOOLS` diimpor **hanya** bila dipakai.
   },
 ```
 
-- [ ] **Step 3g: Entri `security-reviewer`**
+- [x] **Step 3g: Entri `security-reviewer`**
 
 ```ts
   {
@@ -436,7 +436,7 @@ Catatan: `AGENT_NAME_RE` & `DEFAULT_AGENT_TOOLS` diimpor **hanya** bila dipakai.
   },
 ```
 
-- [ ] **Step 3h: Entri `dep-auditor`**
+- [x] **Step 3h: Entri `dep-auditor`**
 
 ```ts
   {
@@ -475,7 +475,7 @@ Catatan: `AGENT_NAME_RE` & `DEFAULT_AGENT_TOOLS` diimpor **hanya** bila dipakai.
   },
 ```
 
-- [ ] **Step 4: Ekspor dari index**
+- [x] **Step 4: Ekspor dari index**
 
 Di `shared/src/index.ts`, tambahkan sejajar ekspor `custom-agent`:
 
@@ -483,12 +483,12 @@ Di `shared/src/index.ts`, tambahkan sejajar ekspor `custom-agent`:
 export * from "./builtin-agents";
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 Run: `pnpm vitest --run shared/test/builtin-agents.test.ts`
 Expected: PASS, 6 test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/builtin-agents.ts shared/src/index.ts shared/test/builtin-agents.test.ts
@@ -508,7 +508,7 @@ git commit -m "feat(spec-881): katalog delapan agen bawaan sebagai tabel konstan
 - Consumes: `zSetting` dari Task 0 (sudah ada).
 - Produces: `Setting["builtinAgents"]` bertipe `Record<string, string>` — peta `name → sidik jari isi bawaan yang TERAKHIR ditulis seed di mesin ini`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `shared/test/builtin-agents.test.ts`:
 
@@ -536,12 +536,12 @@ describe("bookkeeping sidik jari di zSetting", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `pnpm vitest --run shared/test/builtin-agents.test.ts -t "bookkeeping"`
 Expected: FAIL — `parsed.builtinAgents` undefined.
 
-- [ ] **Step 3: Tambahkan field ke `zSetting`**
+- [x] **Step 3: Tambahkan field ke `zSetting`**
 
 Di `shared/src/entities.ts`, di dalam objek `zSetting` sesudah baris `portalChat: …`:
 
@@ -556,7 +556,7 @@ Di `shared/src/entities.ts`, di dalam objek `zSetting` sesudah baris `portalChat
   builtinAgents: z.record(z.string(), z.string()).default({}),  // SPEC-881 · ADR-0136
 ```
 
-- [ ] **Step 4: Tambahkan ke `DEFAULT_SETTING`**
+- [x] **Step 4: Tambahkan ke `DEFAULT_SETTING`**
 
 Di `server/src/services/settings.ts`, di dalam `DEFAULT_SETTING` sesudah `portalChat`:
 
@@ -564,17 +564,17 @@ Di `server/src/services/settings.ts`, di dalam `DEFAULT_SETTING` sesudah `portal
   builtinAgents: {},                // SPEC-881 · ADR-0136 · sidik jari seed (lokal, tak disync)
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 Run: `pnpm vitest --run shared/test/builtin-agents.test.ts`
 Expected: PASS, 9 test.
 
-- [ ] **Step 6: Pastikan tipe `Setting` tak memecah pemakai lain**
+- [x] **Step 6: Pastikan tipe `Setting` tak memecah pemakai lain**
 
 Run: `pnpm --filter @hanoman/server exec tsc --noEmit`
 Expected: nol error. Bila ada objek `Setting` yang dibangun literal di test, ia akan mengeluh kurang field — tambahkan `builtinAgents: {}` di sana.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/entities.ts server/src/services/settings.ts shared/test/builtin-agents.test.ts
@@ -596,7 +596,7 @@ git commit -m "feat(spec-881): bookkeeping sidik jari agen bawaan di Setting"
   - `export function rowFingerprint(r: { name: string; description: string; instructions: string; tools: unknown }): string` — sidik jari baris DB, memakai fungsi hash yang sama.
   - `export async function seedBuiltinAgents(): Promise<void>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/builtin-agents.test.ts
@@ -743,12 +743,12 @@ describe("seedBuiltinAgents — tak pernah menggagalkan boot", () => {
 
 Catatan penting untuk test terakhir: `mockRestore()` pada method Prisma **menghapus** method itu di beberapa versi klien — kalau test berikutnya gagal dengan "findUnique is not a function", ganti `spy.mockRestore()` menjadi `spy.mockReset()` lalu pulihkan implementasi aslinya secara eksplisit, atau pindahkan test ini ke berkas sendiri.
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/builtin-agents.test.ts`
 Expected: FAIL — modul `../src/services/builtin-agents` tak ada.
 
-- [ ] **Step 3: Tulis service seed**
+- [x] **Step 3: Tulis service seed**
 
 ```ts
 // server/src/services/builtin-agents.ts
@@ -841,14 +841,14 @@ export async function seedBuiltinAgents(): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/builtin-agents.test.ts`
 Expected: PASS, 10 test.
 
 Bila `mencatat sidik jari` merah dengan `builtinAgents` undefined: Task 2 belum termuat — jalankan `pnpm --filter @hanoman/shared build` bila server memakai hasil build, bukan sumber.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/builtin-agents.ts server/test/builtin-agents.test.ts
@@ -867,7 +867,7 @@ git commit -m "feat(spec-881): service seed agen bawaan (hormati tombstone, tak 
 - Consumes: `seedBuiltinAgents` (Task 3); `loadCustomAgents`, `agentDefsFor`, `registerCustomAgentSource` (sudah ada).
 - Produces: tak ada tanda tangan baru — hanya urutan di dalam `installCustomAgents()`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/builtin-agents.test.ts`:
 
@@ -886,12 +886,12 @@ describe("installCustomAgents — urutan mengikat", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/builtin-agents.test.ts -t "urutan mengikat"`
 Expected: FAIL — `names` kosong (`[]`).
 
-- [ ] **Step 3: Pasang seed sebelum load**
+- [x] **Step 3: Pasang seed sebelum load**
 
 Di `server/src/services/custom-agents.ts`, ganti isi `installCustomAgents`:
 
@@ -913,14 +913,14 @@ Tambahkan impornya di kepala berkas:
 import { seedBuiltinAgents } from "./builtin-agents";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/builtin-agents.test.ts server/test/custom-agents.service.test.ts`
 Expected: PASS keduanya.
 
 `custom-agents.service.test.ts` memanggil `loadCustomAgents()` langsung (bukan `installCustomAgents`), jadi seharusnya tak terpengaruh. Bila ia tetap merah karena jumlah agen tak terduga, perbaiki `clean()`-nya agar menghapus `customAgent` — **jangan** menambahkan pengecualian di service.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/custom-agents.ts server/test/builtin-agents.test.ts
@@ -940,7 +940,7 @@ git commit -m "feat(spec-881): seed agen bawaan di titik boot installCustomAgent
 - Consumes: `BUILTIN_AGENT_NAMES` (Task 1), `rowFingerprint` (Task 3), `getSetting`.
 - Produces: `CustomAgentView` bertambah dua field opsional — `builtin?: boolean`, `builtinEdited?: boolean`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/custom-agents.route.test.ts`. Berkas itu sudah punya `const app = buildApp({ requireAuth: false })` dan memanggil route lewat prefix `/api` — pakai keduanya apa adanya:
 
@@ -983,12 +983,12 @@ describe("field turunan agen bawaan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/custom-agents.route.test.ts -t "field turunan"`
 Expected: FAIL — `scout.builtin` undefined.
 
-- [ ] **Step 3: Tambahkan field ke tipe view**
+- [x] **Step 3: Tambahkan field ke tipe view**
 
 Di `shared/src/custom-agent.ts`, di dalam `export type CustomAgentView`, sesudah `enabled: boolean;`:
 
@@ -1003,7 +1003,7 @@ Di `shared/src/custom-agent.ts`, di dalam `export type CustomAgentView`, sesudah
   builtinEdited?: boolean;
 ```
 
-- [ ] **Step 4: Hitung field itu di route**
+- [x] **Step 4: Hitung field itu di route**
 
 Di `server/src/routes/custom-agents.ts`, tambahkan impor:
 
@@ -1042,12 +1042,12 @@ Lalu setiap pemanggil `view(...)`:
 - `GET /custom-agents`: `const stamps = await stampsOf();` sebelum `.map`, lalu `view(r, projectId, stamps)`.
 - `POST` (201) dan `PATCH` (200): `view(row as unknown as CustomAgentRow, undefined, await stampsOf())`.
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/custom-agents.route.test.ts`
 Expected: PASS seluruh berkas.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/custom-agent.ts server/src/routes/custom-agents.ts server/test/custom-agents.route.test.ts
@@ -1067,7 +1067,7 @@ git commit -m "feat(spec-881): tandai baris bawaan & yang disunting di response 
 - Consumes: `AgentDef` (sudah ada di `runner/src/custom-agents.ts`).
 - Produces: `export function agentDelegationClause(defs: AgentDef[]): string` — string kosong saat `defs` kosong.
 
-- [ ] **Step 1: Tulis test runner yang gagal**
+- [x] **Step 1: Tulis test runner yang gagal**
 
 Tambahkan ke `runner/test/custom-agents.test.ts`:
 
@@ -1097,12 +1097,12 @@ describe("agentDelegationClause", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run runner/test/custom-agents.test.ts -t "agentDelegationClause"`
 Expected: FAIL — `agentDelegationClause` tak diekspor.
 
-- [ ] **Step 3: Tulis fungsinya**
+- [x] **Step 3: Tulis fungsinya**
 
 Tambahkan di akhir `runner/src/custom-agents.ts`:
 
@@ -1140,12 +1140,12 @@ export function agentDelegationClause(defs: AgentDef[]): string {
 
 `MENTION_TOOL` sudah diimpor di kepala berkas itu.
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run runner/test/custom-agents.test.ts`
 Expected: PASS seluruh berkas.
 
-- [ ] **Step 5: Tulis test pty yang gagal**
+- [x] **Step 5: Tulis test pty yang gagal**
 
 Tambahkan ke `server/test/custom-agents.pty.test.ts`. Berkas itu sudah punya `defs`, `cwd`, `born()`, `registerCustomAgentSource`, `promptFilePath`, dan `readFileSync` — pakai semuanya apa adanya:
 
@@ -1179,12 +1179,12 @@ describe("klausa delegasi di prompt", () => {
 });
 ```
 
-- [ ] **Step 6: Jalankan, pastikan gagal**
+- [x] **Step 6: Jalankan, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/custom-agents.pty.test.ts`
 Expected: FAIL pada test pertama.
 
-- [ ] **Step 7: Pasang di pty**
+- [x] **Step 7: Pasang di pty**
 
 Di `server/src/services/pty.ts` baris 384, ganti:
 
@@ -1199,12 +1199,12 @@ Di `server/src/services/pty.ts` baris 384, ganti:
 
 dan tambahkan `agentDelegationClause` ke impor `@hanoman/runner` di baris 10.
 
-- [ ] **Step 8: Jalankan, pastikan lulus**
+- [x] **Step 8: Jalankan, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/custom-agents.pty.test.ts runner/test/custom-agents.test.ts`
 Expected: PASS keduanya.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add runner/src/custom-agents.ts runner/test/custom-agents.test.ts server/src/services/pty.ts server/test/custom-agents.pty.test.ts
@@ -1223,7 +1223,7 @@ git commit -m "feat(spec-881): klausa delegasi subagent di prompt sesi claude"
 - Consumes: `CustomAgentView.builtin` & `.builtinEdited` (Task 5).
 - Produces: tak ada API baru.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `src/test/custom-agents-panel.test.tsx`. Berkas itu memakai mock `listCustomAgents` dan array `rows` yang sudah ada; **jest-dom tidak terpasang di sana**, jadi assert lewat `.textContent`/`queryByTestId`, bukan `toBeInTheDocument()`:
 
@@ -1260,12 +1260,12 @@ describe("badge agen bawaan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run src/test/custom-agents-panel.test.tsx -t "bawaan"`
 Expected: FAIL — teks "bawaan" tak ditemukan.
 
-- [ ] **Step 3: Render badge-nya**
+- [x] **Step 3: Render badge-nya**
 
 Di `src/src/screens/CustomAgentsPanel.tsx`, sesudah baris `{readOnly && <Badge tone="neutral" size="sm">warisan global</Badge>}`:
 
@@ -1277,14 +1277,14 @@ Di `src/src/screens/CustomAgentsPanel.tsx`, sesudah baris `{readOnly && <Badge t
 )}
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run src/test/custom-agents-panel.test.tsx`
 Expected: PASS seluruh berkas.
 
 Bila SELURUH berkas jsdom gagal ramai soal `localStorage`, itu Node 25 — bukan regresi perubahan ini. Jalankan dengan Node 22/24.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/CustomAgentsPanel.tsx src/test/custom-agents-panel.test.tsx
@@ -1303,25 +1303,25 @@ git commit -m "feat(spec-881): badge bawaan di panel custom agent"
 **Interfaces:**
 - Consumes: seluruh keputusan Task 1-7. Produces: dokumen; tak ada kode.
 
-- [ ] **Step 1: Tulis ADR-0136**
+- [x] **Step 1: Tulis ADR-0136**
 
 Ikuti bentuk `internal/docs/adr/0101-form-custom-agent-katalog-runtime.md`: Status · Tanggal · SPEC · Terkait (**memperluas** ADR-0094 & ADR-0101; **mengikuti** ADR-0113 pola tabel konstanta dan ADR-0119 tombstone; **tidak mencabut** apa pun) · Konteks · Keputusan · Konsekuensi · Gotcha yang wajib diingat · Alternatif yang ditolak.
 
 Isinya diangkat dari `docs/superpowers/specs/2026-08-22-spec-881-custom-agent-bawaan-design.md`: enam keputusan (K1-K6), enam gotcha, dan tiga alternatif yang ditolak (konstanta runtime + lapis override keempat · galeri template · selalu timpa tiap boot).
 
-- [ ] **Step 2: Tautkan di index**
+- [x] **Step 2: Tautkan di index**
 
 Tambahkan satu baris ADR-0136 di `internal/docs/adr/README.md` mengikuti bentuk baris tetangganya, dan pastikan `internal/docs/README.md` menautkan berkas yang tersentuh.
 
-- [ ] **Step 3: Perbarui kontrak API**
+- [x] **Step 3: Perbarui kontrak API**
 
 Di `internal/docs/architecture/api-contract.md`, bagian `/api/custom-agents`: tambahkan `builtin` & `builtinEdited` pada bentuk response, dengan catatan bahwa keduanya **turunan, bukan kolom**, dan tak menyeberang sync.
 
-- [ ] **Step 4: Centang checklist plan**
+- [x] **Step 4: Centang checklist plan**
 
 Ubah seluruh `- [ ]` yang sudah dikerjakan menjadi `- [x]` di berkas plan ini.
 
-- [ ] **Step 5: Verifikasi API nyata di local**
+- [x] **Step 5: Verifikasi API nyata di local**
 
 ```bash
 # HOME khusus supaya smoke tak menyentuh instalasi nyata — tanpa ini `setup.token` ditulis ke
@@ -1354,7 +1354,7 @@ curl -s localhost:3000/api/custom-agents | jq -r '.[] | select(.name=="scout") |
 
 Expected: `disunting` — bukan teks bawaan. Ini yang membuktikan K4 bekerja end-to-end.
 
-- [ ] **Step 6: Jalankan seluruh test yang tersentuh**
+- [x] **Step 6: Jalankan seluruh test yang tersentuh**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -1370,7 +1370,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: seluruhnya hijau. `custom-agent-sync.test.ts` ikut karena baris bawaan menyeberang changefeed seperti baris lain — bila ia merah, yang berubah adalah `FIELDS.customAgent` atau bentuk barisnya, bukan test-nya yang salah.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs docs/superpowers/plans/2026-08-22-spec-881-custom-agent-bawaan.md
