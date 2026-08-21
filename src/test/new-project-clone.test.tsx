@@ -11,6 +11,9 @@ const CREATED = {
 // SPEC-848 · CTA clone kini memulai sesi reverse lalu berpindah ke Terminal; layar itu self-fetch
 // workspace/riwayat dan bukan subjek berkas ini.
 vi.mock("../src/screens/TerminalScreen", () => ({ TerminalScreen: () => null }));
+// SPEC-867 · cabang gagal-clone mendarat di detail project; AutoMergeCard di sana self-fetch
+// `listBranches` dan bukan subjek berkas ini.
+vi.mock("../src/screens/AutoMergeCard", () => ({ AutoMergeCard: () => null }));
 vi.mock("../src/api/client", () => ({
   api: {
     authStatus: vi.fn(async () => ({ needsSetup: false, user: { id: "u1", email: "a@b.co", createdAt: "" } })),
@@ -45,5 +48,26 @@ describe("create existing via clone (SPEC-218)", () => {
     const arg = (api.createProject as any).mock.calls[0][0];
     expect(arg).toMatchObject({ kind: "existing", gitRemote: "https://github.com/org/repo.git" });
     expect(arg.repoDir).toBeUndefined();
+  });
+
+  it("clone gagal: project bertahan, toast memakai pesan endpoint & menunjuk detail project (SPEC-867)", async () => {
+    const { api } = await import("../src/api/client");
+    (api.cloneProject as any).mockRejectedValueOnce(Object.assign(
+      new Error("POST /api/projects/repo/clone → 409"),
+      { detail: { error: "git clone gagal", detail: "fatal: repository not found" } }));
+    render(<App />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getAllByText("Projects")[0]!);
+    fireEvent.click((await screen.findAllByText("Project baru"))[0]!);
+    fireEvent.click(await screen.findByText("Existing codebase"));
+    fireEvent.click(await screen.findByText("Clone dari URL git"));
+    fireEvent.change(await screen.findByPlaceholderText("https://github.com/org/repo.git"),
+      { target: { value: "https://github.com/org/repo.git" } });
+    fireEvent.change(screen.getByPlaceholderText("/path/ke/repo"), { target: { value: "/tmp/clone" } });
+    fireEvent.click(screen.getByText("Clone → reverse-engineer docs"));
+    const toast = await screen.findByText(/clone gagal/);
+    expect(toast.textContent).toContain("git clone gagal");
+    expect(toast.textContent).toContain("detail project");
+    expect(toast.textContent).not.toContain("dari Edit");
   });
 });

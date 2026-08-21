@@ -20,7 +20,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import type { ProjectVM } from "./screens/types";
 import { branchOptions } from "./screens/branch";
 import { FolderPicker } from "./screens/FolderPicker";
-import { repoBasename } from "./screens/git-remote";
+import { repoBasename, cloneErrorText } from "./screens/git-remote";
 import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
@@ -820,17 +820,21 @@ export default function App() {
         gitRemote: clone ? f.gitRemote.trim() : undefined,
       });
     } catch { showToast("Gagal membuat project", "err", "x-circle"); return; }
-    // SPEC-218 · project sudah ada; clone di jalur terpisah agar gagal-clone tak menghapus project
-    // (remote tersimpan → bisa clone ulang dari Edit). AC-8.
+    // SPEC-218 · project sudah ada; clone di jalur terpisah agar gagal-clone tak menghapus project.
+    // SPEC-867 · remote tersimpan, jadi clone bisa diulang dari kartu "Belum ada checkout di mesin
+    // ini" di detail project — cabang catch di bawah mendaratkan operator tepat di kartu itu. AC-8.
     if (clone) {
       try {
         await api.cloneProject(created.id, f.dir.trim());
         created = await api.getProject(created.id);   // binding hasil clone
       } catch (e) {
-        const detail = e instanceof ApiError ? ` · ${e.message}` : "";
+        // SPEC-867 · `ApiError.message` hanya "POST /api/… → 409"; yang bisa ditindaklanjuti adalah
+        // pesan endpoint-nya.
+        const { error } = cloneErrorText(e);
         setProjects((list) => [created!, ...list]);
         setProjectId(created.id); setModal(null); setSection("project");
-        showToast(`Project ${created.id} dibuat, tapi clone gagal${detail} · clone ulang dari Edit`, "warn", "git-branch");
+        showToast(`Project ${created.id} dibuat, tapi clone gagal · ${error} · clone ulang dari detail project`,
+          "warn", "git-branch");
         return;
       }
     }
