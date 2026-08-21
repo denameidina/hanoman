@@ -240,3 +240,33 @@ describe("CustomAgentsPanel · kontrol pilihan (SPEC-484)", () => {
     expect(screen.queryByTestId("runtime-bb")).toBeNull();
   });
 });
+
+// SPEC-881 · ADR-0136 · status "bawaan" datang sebagai field TURUNAN dari response, bukan kolom.
+describe("badge agen bawaan", () => {
+  const bawaan = (extra: Record<string, unknown>) => ({
+    id: "global:scout", projectId: null, name: "scout", description: "cari kode",
+    instructions: "i", tools: null, model: null, mentions: [], runtime: null,
+    enabled: true, inherited: false, ...extra,
+  });
+
+  it("menandai agen bawaan", async () => {
+    listCustomAgents.mockResolvedValue([bawaan({ builtin: true, builtinEdited: false })]);
+    render(<CustomAgentsPanel projectId={null} />);
+    expect((await screen.findByTestId("builtin-scout")).textContent).toBe("bawaan");
+  });
+
+  it("membedakan bawaan yang sudah disunting", async () => {
+    listCustomAgents.mockResolvedValue([bawaan({ builtin: true, builtinEdited: true })]);
+    render(<CustomAgentsPanel projectId={null} />);
+    expect((await screen.findByTestId("builtin-scout")).textContent).toBe("bawaan · disunting");
+  });
+
+  it("agen buatan operator tak bertanda bawaan", async () => {
+    listCustomAgents.mockResolvedValue([
+      bawaan({ id: "global:punyaku", name: "punyaku", builtin: false, builtinEdited: false }),
+    ]);
+    render(<CustomAgentsPanel projectId={null} />);
+    await waitFor(() => expect(listCustomAgents).toHaveBeenCalled());
+    expect(screen.queryByTestId("builtin-punyaku")).toBeNull();
+  });
+});
