@@ -9,6 +9,7 @@ import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipbo
 import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
 import * as P from "./terminal-predict";
 import * as D from "./terminal-diag";
+import { TerminalComposer } from "./TerminalComposer";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
 // (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
@@ -73,6 +74,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   const sendKey = React.useRef<(d: string) => void>(() => {});
   const sendHeld = React.useRef<() => void>(() => {});
   const dropHeld = React.useRef<() => void>(() => {});
+  // SPEC-882 · diisi `TerminalComposer`; dipanggil setiap kali byte lahir DI LUAR kolom ketik.
+  const composerDrain = React.useRef<() => void>(() => {});
 
   React.useEffect(() => {
     const el = host.current;
@@ -551,6 +554,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
         background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)",
         touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
+      {showKeys && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
+        external={composerDrain} linkState={link.state} queue={queue} />}
       {showKeys && <TerminalKeys onKey={(seq) => sendKey.current(seq)} />}
     </div>
   );

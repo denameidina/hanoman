@@ -749,3 +749,44 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     expect(glyphs()).toHaveLength(0);
   });
 });
+
+describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", () => {
+  const composer = () => screen.getByTestId("terminal-composer") as HTMLInputElement;
+
+  it("tak merender kolom ketik saat sakelar papan tombol layar mati", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    expect(screen.queryByTestId("terminal-composer")).toBeNull();
+  });
+
+  it("merender kolom ketik mengikuti sakelar yang sudah ada", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    expect(screen.getByTestId("terminal-composer")).not.toBeNull();
+  });
+
+  // Tombol aksi turun ke paling bawah.
+  it("menaruh kolom ketik DI ANTARA host terminal dan bar tombol", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    const kids = Array.from(paneHost(container).parentElement!.children);
+    const at = (sel: string) => kids.findIndex((k) => k.matches(sel) || k.querySelector(sel) !== null);
+    expect(at('[data-testid="terminal-host"]')).toBeGreaterThanOrEqual(0);
+    expect(at('[data-testid="terminal-host"]')).toBeLessThan(at(".hn-terminal-composer"));
+    expect(at(".hn-terminal-composer")).toBeLessThan(at(".hn-terminal-keys"));
+  });
+
+  // Tanpa atribut ini papan ketik Android mengapitalkan & mengoreksi otomatis perintah shell,
+  // dan kolom akan mengirim teks yang bukan diketik operator.
+  it("mematikan kapitalisasi, koreksi, dan saran papan ketik lunak", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    const el = composer();
+    expect(el.getAttribute("autocapitalize")).toBe("off");
+    expect(el.getAttribute("autocorrect")).toBe("off");
+    expect(el.getAttribute("spellcheck")).toBe("false");
+    expect(el.getAttribute("autocomplete")).toBe("off");
+    expect(el.getAttribute("enterkeyhint")).toBe("send");
+    expect(el.getAttribute("aria-label")).toBe("Ketik untuk sesi sesi-1");
+  });
+});

@@ -351,7 +351,7 @@ Komponen presentasional beserta CSS-nya, sudah dirender lewat `TerminalPane` sup
   - DOM: `<div class="hn-terminal-composer">` berisi `<input data-testid="terminal-composer">` dan (opsional) `<span data-testid="terminal-composer-status">`.
   - `TerminalPane` mengekspos ref `composerDrain: React.MutableRefObject<() => void>` ke komponen itu lewat prop `external`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di **akhir** `src/test/terminal-pane.test.tsx`:
 
@@ -399,12 +399,12 @@ describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia GAGAL**
+- [x] **Step 2: Jalankan test untuk memastikan ia GAGAL**
 
 Run: `pnpm --filter ./src exec vitest --run test/terminal-pane.test.tsx -t "SPEC-882"`
 Expected: FAIL — `Unable to find an element by: [data-testid="terminal-composer"]` pada tiga test terakhir.
 
-- [ ] **Step 3: Tulis komponennya**
+- [x] **Step 3: Tulis komponennya**
 
 Buat `src/src/screens/TerminalComposer.tsx` dengan isi persis:
 
@@ -494,7 +494,7 @@ export function TerminalComposer({ sessionId, send, external, linkState, queue }
 }
 ```
 
-- [ ] **Step 4: Tambahkan CSS-nya**
+- [x] **Step 4: Tambahkan CSS-nya**
 
 Di `src/src/app.css`, tepat SESUDAH baris `.hn-terminal-key:hover { background: var(--bone-200); color: var(--text-strong); }` dan SEBELUM blok `@media (max-width: 767px)`, sisipkan:
 
@@ -523,7 +523,7 @@ Di `src/src/app.css`, tepat SESUDAH baris `.hn-terminal-key:hover { background: 
 .hn-terminal-composer-status--held { color: var(--status-err); }
 ```
 
-- [ ] **Step 5: Sisipkan komponen ke `TerminalPane`**
+- [x] **Step 5: Sisipkan komponen ke `TerminalPane`**
 
 Di `src/src/screens/TerminalPane.tsx`:
 
@@ -550,22 +550,22 @@ import { TerminalComposer } from "./TerminalComposer";
 
 (`TerminalKeys` masih memakai `sendKey.current` di langkah ini; Task 3 yang memindahkannya ke pintu eksternal.)
 
-- [ ] **Step 6: Jalankan test untuk memastikan ia LULUS**
+- [x] **Step 6: Jalankan test untuk memastikan ia LULUS**
 
 Run: `pnpm --filter ./src exec vitest --run test/terminal-pane.test.tsx -t "SPEC-882"`
 Expected: PASS — 4 test lulus.
 
-- [ ] **Step 7: Jalankan kontrak placeholder dan test pane penuh**
+- [x] **Step 7: Jalankan kontrak placeholder dan test pane penuh**
 
 Run: `pnpm --filter ./src exec vitest --run test/placeholder-contract.test.ts test/terminal-pane.test.tsx`
 Expected: `terminal-pane.test.tsx` PASS seluruhnya. `placeholder-contract.test.ts` sudah merah di base pada tiga `<Input type="number">` milik `SettingsScreen.tsx` — itu **bukan** regresi task ini. Yang wajib dipastikan: daftar `missing` **tidak** memuat `TerminalComposer.tsx`. Bila ia muncul di sana, placeholder-nya hilang — kembalikan.
 
-- [ ] **Step 8: Typecheck paket `src`**
+- [x] **Step 8: Typecheck paket `src`**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/src/screens/TerminalComposer.tsx src/src/screens/TerminalPane.tsx src/src/app.css src/test/terminal-pane.test.tsx

@@ -458,6 +458,29 @@ textarea:focus-visible,
 
 .hn-terminal-key:hover { background: var(--bone-200); color: var(--text-strong); }
 
+/* SPEC-882 · kolom ketik perangkat sentuh: satu baris, penanda kejujuran pengiriman di kanannya.
+   Basis flex dinyatakan (bukan `auto`) karena `flex-wrap` memutus baris SEBELUM menyusut — pelajaran
+   SPEC-879: basis `auto` berarti lebar isi, jadi bentuk barisnya ditentukan isinya, bukan layout-nya. */
+.hn-terminal-composer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border-top: 1px solid var(--border-hair);
+}
+
+.hn-terminal-composer-status {
+  flex: 0 0 auto;
+  font: var(--text-xs)/1.2 var(--font-mono);
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+
+.hn-terminal-composer-status--queued { color: var(--status-warn); }
+.hn-terminal-composer-status--held { color: var(--status-err); }
+
 @media (max-width: 767px) {
   .hn-terminal-cell-header { flex-wrap: wrap; }
 }
