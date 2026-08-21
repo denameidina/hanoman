@@ -954,10 +954,20 @@ Tiga hal yang membuatnya bekerja:
   dengan `detail` = **stderr git**, sementara `ApiError.message` cuma `POST /api/… → 409`.
   `cloneErrorText` mengangkat keduanya; modal tetap terbuka dengan tombol "Coba lagi", dan project
   tak tersentuh sama sekali.
-- **Tanpa `useConfirm`.** Syarat ADR-0127 di sini ("menimpa/menulis ke folder tak kosong") tak bisa
-  terpenuhi: `git clone` menolak folder tak kosong, jadi ia tak pernah menimpa apa pun; dan klien
-  memang tak bisa menjawab "kosong?" — `GET /fs/browse` hanya melist **direktori**. "Pilih folder di
-  device" tak menyentuh disk sama sekali (hanya baris `LocalBinding`).
+- **Clone digerbangi `useConfirm`** (SPEC-847/ADR-0127). Klien tak bisa menjawab "folder ini
+  kosong?" — `GET /fs/browse` hanya melist **direktori**, bukan berkas — jadi tak ada cara
+  menggerbangi konfirmasi hanya pada folder tak kosong; ia dipasang di **setiap** clone, karena
+  menulis ke disk mesin ini dan mengunduh isi repo memang layak dinamai lebih dulu. Dialognya
+  menyebut folder tujuan, remote-nya, dan fakta bahwa **git yang menolak** folder berisi (terukur:
+  `fatal: destination path '…' already exists and is not an empty directory`, berkas yang sudah ada
+  tak tersentuh) — jadi pertanyaan "apa ini menimpa sesuatu?" dijawab di dalam dialog, bukan
+  digantung. Opsi `run:` dipakai supaya dialog tetap terbuka & `busy` selama `git clone` berjalan;
+  itulah yang menutup submit kedua, dan lemparannya diteruskan ke `catch` yang menampilkan stderr.
+  Dua gotcha: `{dialog}` dirender **di luar** `<Modal>` clone (focus trap & entri `modalStack`
+  sendiri; yang terakhir di DOM tampil paling atas), dan tombol ghost modal clone berbunyi
+  **"Tutup"**, bukan "Batal" — dua "Batal" yang bertumpuk tak bisa dibedakan operator maupun test.
+  "Pilih folder di device" **tak** dikonfirmasi: ia tak menyentuh disk sama sekali (hanya baris
+  `LocalBinding`).
 
 Binding hasil clone ditulis **oleh endpoint**; klien hanya memanggil `onProjectChanged` (jalur
 refetch VM SPEC-258). Toast kegagalan clone di modal Project baru karena itu berhenti menyebut

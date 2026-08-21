@@ -68,9 +68,29 @@ describe("project tanpa dir lokal (SPEC-867)", () => {
     expect((await screen.findByPlaceholderText("/path/ke/arta") as HTMLInputElement).value)
       .toBe("/home/dena/code/arta");
     fireEvent.click(screen.getByText("Clone"));
+    // SPEC-847 · ADR-0127 · clone menulis ke disk → dikonfirmasi, dan dialognya menyebut targetnya.
+    expect(await screen.findByText("Jalankan git clone di mesin ini?")).toBeInTheDocument();
+    expect(screen.getAllByText("/home/dena/code/arta").length).toBeGreaterThan(0);
+    expect((api.cloneProject as any)).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Jalankan git clone"));
     await waitFor(() => expect((api.cloneProject as any))
       .toHaveBeenCalledWith("arta", "/home/dena/code/arta"));
     await waitFor(() => expect((api.getProject as any)).toHaveBeenCalledWith("arta"));
+  });
+
+  it("membatalkan konfirmasi tak menyentuh disk sama sekali", async () => {
+    const { api } = await import("../src/api/client");
+    await openDetail(NO_DIR);
+    fireEvent.click(await screen.findByText("Clone dari git remote"));
+    fireEvent.change(await screen.findByPlaceholderText("/path/ke/arta"),
+      { target: { value: "/home/dena/code/arta" } });
+    fireEvent.click(screen.getByText("Clone"));
+    fireEvent.click(await screen.findByText("Batal"));
+    await waitFor(() => expect(screen.queryByText("Jalankan git clone di mesin ini?")).toBeNull());
+    expect((api.cloneProject as any)).not.toHaveBeenCalled();
+    // Modal clone tetap terbuka dengan path yang sudah diisi — membatalkan bukan menutup pekerjaan.
+    expect((screen.getByPlaceholderText("/path/ke/arta") as HTMLInputElement).value)
+      .toBe("/home/dena/code/arta");
   });
 
   it("clone gagal menampilkan stderr endpoint, project tetap ada, dan bisa dicoba ulang", async () => {
@@ -83,10 +103,13 @@ describe("project tanpa dir lokal (SPEC-867)", () => {
     fireEvent.change(await screen.findByPlaceholderText("/path/ke/arta"),
       { target: { value: "/home/dena/code/arta" } });
     fireEvent.click(screen.getByText("Clone"));
+    fireEvent.click(await screen.findByText("Jalankan git clone"));
     expect(await screen.findByText("git clone gagal")).toBeInTheDocument();
     expect(screen.getByText(/repository 'x' not found/)).toBeInTheDocument();
     expect(screen.getAllByText("arta").length).toBeGreaterThan(0);   // project tak terhapus
+    // Dialog konfirmasi ikut tertutup oleh kegagalan — percobaan kedua dikonfirmasi ulang.
     fireEvent.click(screen.getByText("Coba lagi"));
+    fireEvent.click(await screen.findByText("Jalankan git clone"));
     await waitFor(() => expect((api.cloneProject as any)).toHaveBeenCalledTimes(2));
   });
 

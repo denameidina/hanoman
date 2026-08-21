@@ -106,15 +106,27 @@ operator mendarat persis di kartu yang dimaksud toast-nya. Toast itu sekaligus b
 dua tempat yang bisa berbeda perilaku. Edit tetap jadi tempat mengisi `gitRemote` — cabang B
 mengantar ke sana, lalu operator kembali ke kartu yang kini menawarkan clone.
 
-**Tanpa `useConfirm` untuk clone.** Constraint SPEC-847/ADR-0127 di brief bersyarat: "bila
-menimpa/menulis ke folder tak kosong". Syarat itu **tak bisa terpenuhi** — `git clone` menolak
-folder tak kosong dan karena itu tak pernah menimpa apa pun; kegagalannya justru jalur yang sudah
-kita tangani (409 + stderr). Klien pun tak bisa menjawab "kosong?": `GET /fs/browse`
-(`server/src/routes/fs.ts:18`) hanya melist **direktori**, bukan berkas. Yang menggantikan
-konfirmasi adalah bentuknya: modal terpisah dengan target yang tampil utuh sebelum diklik, dan
-`cloneTargetInto` yang membuat target default selalu folder yang belum ada. "Pilih folder di
-device" tak menyentuh disk sama sekali (hanya baris `LocalBinding`), jadi ia memang di luar
-ADR-0127.
+**Clone digerbangi `useConfirm`, di setiap clone.** Constraint SPEC-847/ADR-0127 di brief
+bersyarat ("bila menimpa/menulis ke folder tak kosong"), tetapi syarat itu **tak bisa dievaluasi
+klien**: `GET /fs/browse` (`server/src/routes/fs.ts:18`) hanya melist **direktori**, bukan berkas,
+jadi "folder ini kosong?" tak punya jawaban di sisi UI. Karena itu konfirmasinya dipasang tanpa
+syarat — clone menulis ke disk mesin ini dan mengunduh isi repo, dan itu memang layak dinamai
+sebelum berjalan.
+
+Yang tetap benar, dan justru dipakai sebagai isi dialog: `git clone` **menolak** folder tak kosong
+(terukur di server hidup — `fatal: destination path '…' already exists and is not an empty
+directory`, dan berkas yang sudah ada di sana tak tersentuh). Jadi pertanyaan "apa ini menimpa
+sesuatu?" dijawab di dalam dialog alih-alih digantung. `cloneTargetInto` tetap membuat target
+default selalu folder yang belum ada.
+
+Bentuknya: `confirm({ …, run: () => api.cloneProject(id, target) })` — `run` menahan dialog terbuka
+& `busy` selama clone berjalan (itu yang menutup submit kedua) dan meneruskan lemparannya ke
+`catch` yang menampilkan stderr di dalam modal. `{dialog}` dirender **di luar** `<Modal>` clone
+supaya focus trap & `modalStack` (`ds/kit.tsx`) tak bertabrakan, dan tombol ghost modal clone
+berbunyi **"Tutup"** — dua "Batal" yang bertumpuk tak bisa dibedakan operator maupun test.
+
+"Pilih folder di device" tak menyentuh disk sama sekali (hanya baris `LocalBinding`), jadi ia
+memang di luar ADR-0127.
 
 **Tak ada endpoint/jalur clone kedua.** Semuanya lewat `api.cloneProject` → `POST
 /projects/:id/clone` yang sudah ada, termasuk penulisan binding-nya (endpoint yang melakukannya).
@@ -137,8 +149,11 @@ Frontend, mengikuti pola `src/test/new-project-clone.test.tsx` &
     **tak** dirender.
   - klik "Clone dari git remote" → picker → target terkomposisi `<induk>/<nama-repo>` → "Clone"
     memanggil `api.cloneProject(id, target)` lalu `getProject` (refresh).
-  - clone gagal → stderr endpoint tampil di modal, modal tetap terbuka, klik kedua memanggil
-    `cloneProject` lagi (bisa dicoba ulang) — dan project tak hilang dari daftar.
+  - clone digerbangi konfirmasi: dialog menyebut folder tujuan, dan `cloneProject` **belum**
+    dipanggil sebelum tombol konfirmasinya diklik; membatalkan tak memanggilnya sama sekali dan
+    modal clone tetap terbuka dengan path yang sudah diisi.
+  - clone gagal → stderr endpoint tampil di modal, modal tetap terbuka, percobaan kedua
+    dikonfirmasi ulang lalu memanggil `cloneProject` lagi — dan project tak hilang dari daftar.
   - tanpa `gitRemote` → tak ada tombol clone; ada "Isi git remote" yang membuka modal Edit.
   - "Pilih folder di device" → `api.putBinding(id, path)` lalu refresh.
 

@@ -842,3 +842,37 @@ itu apa adanya alih-alih mengklaim sudah diuji.
 git add docs/superpowers/plans/2026-08-21-spec-867-project-tanpa-dir-lokal.md
 git commit -m "chore(spec-867): centang checklist plan"
 ```
+
+---
+
+### Task 6: Gerbang `useConfirm` untuk clone (amandemen — keputusan operator)
+
+Task 3 sengaja TANPA konfirmasi, dengan alasan syarat ADR-0127 ("menimpa/menulis ke folder tak
+kosong") tak bisa terpenuhi. Operator menimbang ulang dan memilih tetap memasangnya sesuai
+constraint brief. Alasan yang menang: syarat itu tak bisa **dievaluasi klien** sama sekali
+(`GET /fs/browse` hanya melist direktori), jadi ia dipasang tanpa syarat — dan faktanya git menolak
+folder berisi justru jadi isi dialognya, bukan alasan meniadakannya.
+
+**Files:**
+- Modify: `src/src/screens/MissingRepoCard.tsx` (`CloneRepoModal.run`, footer, render `{dialog}`)
+- Modify: `src/test/project-missing-repo.test.tsx`
+- Modify: `internal/docs/frontend/frontend-implementation.md`
+- Modify: `docs/superpowers/specs/2026-08-21-spec-867-project-tanpa-dir-lokal-design.md`
+
+- [x] **Step 1: Test yang gagal** — dua assert baru: `cloneProject` **belum** dipanggil sesudah
+  klik "Clone" (baru dipanggil sesudah "Jalankan git clone"), dan test baru "membatalkan konfirmasi
+  tak menyentuh disk sama sekali".
+- [x] **Step 2: Jalankan, pastikan GAGAL** — tanpa gerbang, `cloneProject` sudah terpanggil di klik
+  pertama sehingga `not.toHaveBeenCalled()` merah.
+- [x] **Step 3: Pasang `useConfirm`** — `confirm({ title, message, impact[3], confirmLabel:
+  "Jalankan git clone", tone: "default", icon: "git-branch", run: () => api.cloneProject(id,
+  target) })`. `{dialog}` dirender DI LUAR `<Modal>` clone; tombol ghost modal jadi **"Tutup"**
+  supaya tak ada dua "Batal" bertumpuk.
+- [x] **Step 4: Jalankan test** — `pnpm vitest --run src/test/project-missing-repo.test.tsx` → 7 lulus.
+- [x] **Step 5: Penjaga khusus konfirmasi** —
+  `pnpm vitest --run src/test/confirm-inventory.test.ts src/test/confirm-dialog.test.tsx`.
+  Yang wajib hijau: "setiap `useConfirm()` punya `{dialog}` yang dirender" (hook tanpa dialog =
+  promise menggantung selamanya, tanpa error).
+- [x] **Step 6: Betulkan docs yang menyatakan kebalikannya** — butir "Tanpa `useConfirm`" di
+  `frontend-implementation.md` dan seksi keputusan di design doc.
+- [x] **Step 7: Typecheck + seluruh test tersentuh + commit.**

@@ -6,7 +6,7 @@
    Cloningnya lewat POST /projects/:id/clone yang sudah ada — endpoint itu pula yang menulis
    binding-nya, klien tak menulisnya lagi. */
 import React from "react";
-import { Callout, Button, Modal, Field, Input } from "../ds";
+import { Callout, Button, Modal, Field, Input, useConfirm } from "../ds";
 import { api } from "../api/client";
 import { FolderPicker } from "./FolderPicker";
 import { cloneErrorText, cloneTargetInto, repoBasename } from "./git-remote";
@@ -25,6 +25,8 @@ function CloneRepoModal({ open, p, onClose, onDone, onToast }:
   const [picker, setPicker] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState<{ error: string; stderr: string } | null>(null);
+  // SPEC-847 · ADR-0127 · clone menulis ke disk mesin ini, jadi ia dinamai lebih dulu.
+  const { confirm, dialog } = useConfirm();
   React.useEffect(() => {
     if (open) { setDir(""); setParent(""); setErr(null); setBusy(false); }
   }, [open]);
@@ -34,7 +36,23 @@ function CloneRepoModal({ open, p, onClose, onDone, onToast }:
     if (!target || busy) return;
     setBusy(true); setErr(null);
     try {
-      await api.cloneProject(p.id, target);
+      // `run` menahan dialog tetap terbuka & busy selama git clone berjalan — itu pula yang
+      // menutup submit kedua, dan lemparannya diteruskan ke catch di bawah apa adanya.
+      if (!await confirm({
+        title: "Jalankan git clone di mesin ini?",
+        message: <>Folder tujuan <code style={{ fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>{target}</code>.</>,
+        impact: [
+          <>Isi <code style={{ fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>{remote}</code> diunduh
+            ke disk mesin ini — repo besar berarti unduhan besar.</>,
+          // Jawaban atas kekhawatiran "menimpa folder tak kosong": git yang menolaknya, bukan kita.
+          <>Folder yang sudah berisi <b>ditolak git</b>, jadi tak ada berkas yang tertimpa.</>,
+          "Sesudah berhasil, project ini menunjuk hasil clone (binding lokal, tak disync).",
+        ],
+        confirmLabel: "Jalankan git clone",
+        tone: "default",
+        icon: "git-branch",
+        run: () => api.cloneProject(p.id, target),
+      })) return;
       await onDone();
       onToast(`Repo ${p.id} di-clone ke ${target}`, "ok", "git-branch");
       onClose();
@@ -46,9 +64,11 @@ function CloneRepoModal({ open, p, onClose, onDone, onToast }:
   }
 
   return (
+    <>
     <Modal open={open} onClose={onClose} icon="git-branch" eyebrow={p.id} title="Clone dari git remote"
       footer={<>
-        <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>Batal</Button>
+        {/* "Tutup", bukan "Batal": yang membatalkan clone adalah dialog konfirmasinya. */}
+        <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>Tutup</Button>
         <Button size="sm" leftIcon="git-branch" onClick={() => { void run(); }} disabled={!dir.trim() || busy}>
           {busy ? "Meng-clone…" : err ? "Coba lagi" : "Clone"}
         </Button>
@@ -80,6 +100,10 @@ function CloneRepoModal({ open, p, onClose, onDone, onToast }:
         </Callout>
       )}
     </Modal>
+    {/* Di LUAR <Modal> di atas: dialog konfirmasi punya focus trap & entri modalStack sendiri
+        (ds/kit.tsx), dan yang terakhir di DOM-lah yang tampil paling atas. */}
+    {dialog}
+    </>
   );
 }
 
