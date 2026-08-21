@@ -184,9 +184,12 @@ yang hari ini nol risiko.
 ### Sumber definisi
 
 `shared/src/builtin-agents.ts` — tabel konstanta, cermin registry `METHODS` (ADR-0113): bebas zod,
-satu-satunya tempat pengetahuan itu hidup, menambah agen kesembilan = satu entri. Diimpor server
-(seed) dan web (chip "bawaan"); **tidak** diimpor runner — runner tetap hanya melihat `AgentDef`
-yang sudah jadi.
+satu-satunya tempat pengetahuan itu hidup, menambah agen kesembilan = satu entri.
+
+**Data murni, tanpa I/O dan tanpa `node:crypto`** — ia dibaca paket yang juga dibundel untuk
+browser. Sidik jarinya dihitung di server (`node:crypto`), bukan di sini. Diimpor **server saja**;
+web tak perlu tabelnya karena status "bawaan" datang sebagai field turunan di response, dan runner
+tetap hanya melihat `AgentDef` yang sudah jadi.
 
 ### Penyemaian
 
