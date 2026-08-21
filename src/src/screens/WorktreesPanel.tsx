@@ -165,10 +165,12 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
                 onChange={() => setPicked(allPicked ? new Set<string>() : new Set(free))}
                 label={`Pilih semua yang boleh (${free.length})`} />
             </div>
+            {/* SPEC-879 · cermin BranchesPanel: tanpa wrap, tombol Hapus tiap baris terukur
+                145–192px di luar layar di 390px. */}
             {rows.map((w) => (
-              <div key={w.name} data-testid={`row-${w.name}`}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px",
-                  borderBottom: "1px solid var(--border-hair)",
+              <div key={w.name} data-testid={`row-${w.name}`} className="hn-dense-row"
+                style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                  padding: "8px 14px", borderBottom: "1px solid var(--border-hair)",
                   background: focus === w.name ? "var(--surface-sunken)" : undefined }}>
                 <Checkbox data-testid={`pick-${w.name}`} checked={picked.has(w.name)}
                   disabled={!w.deletable} onChange={() => toggle(w.name)} />
@@ -190,7 +192,8 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
                 {w.locked && <Badge size="sm" tone="warn">terkunci git</Badge>}
                 {w.blocked && <Badge size="sm" tone="warn">{w.blocked}</Badge>}
                 {!!stats[w.name]?.dirtyFiles && <Badge size="sm" tone="warn">{stats[w.name]!.dirtyFiles} kotor</Badge>}
-                <span style={{ fontSize: 11.5, color: "var(--text-subtle)", minWidth: 130, textAlign: "right" }}>
+                <span style={{ fontSize: 11.5, color: "var(--text-subtle)", minWidth: 130,
+                  marginLeft: "auto", textAlign: "right" }}>
                   {stats[w.name] ? size(stats[w.name]!.sizeBytes) : "…"} · {rel(w.createdAt)}
                 </span>
                 <Button size="sm" variant="ghost" leftIcon="trash-2" data-testid={`row-delete-${w.name}`}

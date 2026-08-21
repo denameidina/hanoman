@@ -115,3 +115,32 @@ describe("SPEC-879 · region baris Git Graph adalah scroller lokal yang HIDUP", 
     expect(rows.contains(footer)).toBe(false);
   });
 });
+
+describe("SPEC-879 · baris Branches & Worktrees membungkus sebelum memotong", () => {
+  const rows = [
+    ["BranchesPanel.tsx", "{visible.map((b) => ("],
+    ["WorktreesPanel.tsx", "{rows.map((w) => ("],
+  ] as const;
+
+  it.each(rows)("%s: baris memakai hn-dense-row dan boleh membungkus di tier mana pun", (file, anchor) => {
+    const src = source(file);
+    const at = src.indexOf(anchor);
+    expect(at).toBeGreaterThan(-1);
+    const row = src.slice(at, at + 700);
+    // `.hn-dense-row` memberi nama (anak ber-`flex: 1`) lebar minimum 220px di mobile; `flexWrap`
+    // inline berlaku di SEMUA tier karena yang bocor di 820px cuma 17px — membungkus satu tombol
+    // ke baris kedua jauh lebih baik daripada memotongnya.
+    expect(row).toContain('className="hn-dense-row"');
+    expect(row).toContain('flexWrap: "wrap"');
+  });
+
+  it.each(rows)("%s: kolom meta tetap rata kanan sesudah membungkus", (file) => {
+    // Sesudah baris membungkus, kolom meta mendarat di baris kedua; tanpa `margin-left: auto` ia
+    // menempel ke kiri dan barisnya kehilangan bentuknya.
+    expect(source(file)).toMatch(/minWidth:\s*\d+,\s*\n?\s*marginLeft:\s*"auto",\s*textAlign:\s*"right"/s);
+  });
+
+  it.each([["IdeScreen.tsx"], ["GitGraph.tsx"], ["BranchesPanel.tsx"], ["WorktreesPanel.tsx"]] as const)(
+    "%s: tak memakai `all: unset` (ia menang atas min-height target sentuh DAN atas flex-wrap)",
+    (file) => expect(source(file)).not.toContain('all: "unset"'));
+});

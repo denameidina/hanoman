@@ -386,7 +386,7 @@ Akar 3. Baris kedua panel adalah flex satu baris tanpa `flex-wrap`: di 390px tom
 - Consumes: `.hn-dense-row` (app.css, sudah ada: `align-items: flex-start !important; flex-wrap: wrap` + `> [style*="flex: 1"] { min-width: min(220px, 100%) }` di blok mobile).
 - Produces: tak ada API baru; hanya kelas & style pada baris yang sudah ada `data-testid="row-<name>"` (Worktrees) dan `data-testid="row-delete-<name>"` (keduanya).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `src/test/ide-responsive.test.tsx`:
 
@@ -422,7 +422,7 @@ describe("SPEC-879 · baris Branches & Worktrees membungkus sebelum memotong", (
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.test.tsx -t "membungkus sebelum memotong"
@@ -430,7 +430,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.te
 
 Harapan: FAIL — `expect(row).toContain('className="hn-dense-row"')`.
 
-- [ ] **Step 3: Ubah baris Branches**
+- [x] **Step 3: Ubah baris Branches**
 
 Di `src/src/screens/BranchesPanel.tsx:170`, ganti pembuka baris:
 
@@ -447,7 +447,7 @@ dan kolom meta (`:191`):
                   marginLeft: "auto", textAlign: "right" }}>
 ```
 
-- [ ] **Step 4: Ubah baris Worktrees**
+- [x] **Step 4: Ubah baris Worktrees**
 
 Di `src/src/screens/WorktreesPanel.tsx:169`, ganti pembuka baris:
 
@@ -465,7 +465,7 @@ dan kolom meta (`:193`):
                   marginLeft: "auto", textAlign: "right" }}>
 ```
 
-- [ ] **Step 5: Jalankan test sampai lulus**
+- [x] **Step 5: Jalankan test sampai lulus**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.test.tsx test/branches-panel.test.tsx test/worktrees-panel.test.tsx test/ide-worktrees-tab.test.tsx
@@ -473,7 +473,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.te
 
 Harapan: PASS semua.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/BranchesPanel.tsx src/src/screens/WorktreesPanel.tsx src/test/ide-responsive.test.tsx

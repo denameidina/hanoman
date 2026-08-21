@@ -166,9 +166,13 @@ export function BranchesPanel({ projectId, onOpenWorktree }: {
               <Checkbox data-testid="pick-all" checked={allPicked} onChange={toggleAll}
                 disabled={free.length === 0} label={`Pilih semua yang boleh (${free.length})`} />
             </div>
+            {/* SPEC-879 · baris ini dulu flex satu baris tanpa wrap: di 390px tombol Hapus tiap
+                baris terukur 145–363px DI LUAR layar, dan di 820px masih 17px. `hn-dense-row`
+                memberi nama branch lebar minimum di mobile; `flexWrap` berlaku di semua tier. */}
             {visible.map((b) => (
-              <div key={b.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px",
-                borderBottom: "1px solid var(--border-hair)" }}>
+              <div key={b.name} className="hn-dense-row"
+                style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                  padding: "8px 14px", borderBottom: "1px solid var(--border-hair)" }}>
                 <Checkbox data-testid={`pick-${b.name}`} checked={picked.has(b.name)}
                   disabled={!deletable(b)} onChange={() => toggle(b.name)} />
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", flex: 1 }}>
@@ -188,7 +192,8 @@ export function BranchesPanel({ projectId, onOpenWorktree }: {
                         <Badge size="sm" tone="warn">{LOCK_LABEL[l]} →</Badge>
                       </button>
                     : <Badge key={l} size="sm" tone="warn">{LOCK_LABEL[l]}</Badge>)}
-                <span style={{ fontSize: 11.5, color: "var(--text-subtle)", minWidth: 200, textAlign: "right" }}>
+                <span style={{ fontSize: 11.5, color: "var(--text-subtle)", minWidth: 200,
+                  marginLeft: "auto", textAlign: "right" }}>
                   {b.lastCommit ? `${b.lastCommit.subject} · ${rel(b.lastCommit.at)}` : "—"}
                 </span>
                 <Button size="sm" variant="ghost" leftIcon="trash-2" data-testid={`row-delete-${b.name}`}
