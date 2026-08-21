@@ -53,7 +53,7 @@ sisipan di `ProjectDetailScreen`, dan pembetulan janji "clone ulang dari Edit" d
   - `cloneTargetInto(parent: string, remote: string): string`
   - `cloneErrorText(e: unknown): { error: string; stderr: string }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/git-remote.test.ts`:
 
@@ -92,12 +92,12 @@ describe("git-remote (SPEC-867)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/git-remote.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/screens/git-remote"`.
 
-- [ ] **Step 3: Tulis implementasi minimal**
+- [x] **Step 3: Tulis implementasi minimal**
 
 Buat `src/src/screens/git-remote.ts`:
 
@@ -128,12 +128,12 @@ export function cloneErrorText(e: unknown): { error: string; stderr: string } {
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/git-remote.test.ts`
 Expected: PASS — 4 test.
 
-- [ ] **Step 5: Pakai helper di `App.tsx` (buang duplikat inline)**
+- [x] **Step 5: Pakai helper di `App.tsx` (buang duplikat inline)**
 
 Tambahkan ke blok impor `screens/*` di `src/src/App.tsx` (dekat `import { branchOptions } from "./screens/branch";`):
 
@@ -156,17 +156,17 @@ menjadi:
     const fromUrl = repoBasename(f.gitRemote);
 ```
 
-- [ ] **Step 6: Jalankan test yang menyentuh jalur itu**
+- [x] **Step 6: Jalankan test yang menyentuh jalur itu**
 
 Run: `pnpm vitest --run src/test/git-remote.test.ts src/test/new-project-clone.test.tsx src/test/new-project-reverse.test.tsx`
 Expected: PASS semua (3 berkas).
 
-- [ ] **Step 7: Typecheck paket frontend**
+- [x] **Step 7: Typecheck paket frontend**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0, tanpa error.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/screens/git-remote.ts src/test/git-remote.test.ts src/src/App.tsx
@@ -191,12 +191,12 @@ di berkas lain dan constraint melarang menyalin komponen ini.
 - Consumes: `api.browseFs` (sudah ada), komponen `ds`.
 - Produces: `export function FolderPicker({ open, onClose, onPick, start }: { open: boolean; onClose: () => void; onPick: (path: string) => void; start?: string }): JSX.Element`
 
-- [ ] **Step 1: Jalankan tiga test itu SEBELUM pindah (baseline hijau)**
+- [x] **Step 1: Jalankan tiga test itu SEBELUM pindah (baseline hijau)**
 
 Run: `pnpm vitest --run src/test/edit-project-folder-picker.test.tsx src/test/new-project-clone.test.tsx src/test/new-project-reverse.test.tsx`
 Expected: PASS semua. Kalau ada yang merah di sini, itu bukan akibat spec ini — catat dulu.
 
-- [ ] **Step 2: Buat `src/src/screens/FolderPicker.tsx`**
+- [x] **Step 2: Buat `src/src/screens/FolderPicker.tsx`**
 
 Isinya persis blok yang sekarang ada di `App.tsx` (`type FsEntry`, `FolderRow`, `FolderPicker`),
 plus impor yang dibutuhkan dan `export` pada `FolderPicker`:
@@ -268,7 +268,7 @@ export function FolderPicker({ open, onClose, onPick, start }:
 }
 ```
 
-- [ ] **Step 3: Hapus blok itu dari `App.tsx` dan impor gantinya**
+- [x] **Step 3: Hapus blok itu dari `App.tsx` dan impor gantinya**
 
 Hapus dari `src/src/App.tsx` seluruh `type FsEntry = …`, `function FolderRow(…) { … }`, dan
 `function FolderPicker(…) { … }` (termasuk komentar di atas `FolderPicker`, yang ikut pindah).
@@ -280,7 +280,7 @@ import { FolderPicker } from "./screens/FolderPicker";
 
 Tiga call site `<FolderPicker … />` di `App.tsx` tak berubah sedikit pun.
 
-- [ ] **Step 4: Rapikan impor yang mungkin jadi yatim**
+- [x] **Step 4: Rapikan impor yang mungkin jadi yatim**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0. Bila muncul error "declared but never read" untuk `Icon` atau `StateBlock` di
@@ -288,12 +288,12 @@ Expected: keluar 0. Bila muncul error "declared but never read" untuk `Icon` ata
 dilaporkan. (Cek dulu dengan `grep -c "<Icon\|StateBlock" src/src/App.tsx`; keduanya kemungkinan
 besar masih dipakai di tempat lain, jadi biasanya tak ada yang perlu dihapus.)
 
-- [ ] **Step 5: Jalankan jaring pengamannya**
+- [x] **Step 5: Jalankan jaring pengamannya**
 
 Run: `pnpm vitest --run src/test/edit-project-folder-picker.test.tsx src/test/new-project-clone.test.tsx src/test/new-project-reverse.test.tsx`
 Expected: PASS semua — sama persis dengan baseline Step 1.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/FolderPicker.tsx src/src/App.tsx
@@ -314,7 +314,7 @@ git commit -m "refactor(spec-867): FolderPicker pindah dari App.tsx ke modulnya 
   `api.cloneProject(id, dir)`, `api.putBinding(id, repoDir)`, `ProjectVM`.
 - Produces: `export function MissingRepoCard({ p, onEdit, onToast, onProjectChanged }: { p: ProjectVM; onEdit: () => void; onToast: (msg: string, kind?: string, icon?: string) => void; onProjectChanged?: (id: string) => void | Promise<void> }): JSX.Element | null`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/project-missing-repo.test.tsx`:
 
@@ -433,12 +433,12 @@ describe("project tanpa dir lokal (SPEC-867)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/project-missing-repo.test.tsx`
 Expected: FAIL — teks "Belum ada checkout di mesin ini" tak ditemukan.
 
-- [ ] **Step 3: Tulis `src/src/screens/MissingRepoCard.tsx`**
+- [x] **Step 3: Tulis `src/src/screens/MissingRepoCard.tsx`**
 
 ```tsx
 /* MissingRepoCard — project yang belum punya checkout di MESIN INI (SPEC-867). `Project.repoDir`
@@ -573,7 +573,7 @@ export function MissingRepoCard({ p, onEdit, onToast, onProjectChanged }:
 }
 ```
 
-- [ ] **Step 4: Sisipkan di `ProjectDetailScreen`**
+- [x] **Step 4: Sisipkan di `ProjectDetailScreen`**
 
 Di `src/src/screens/ProjectDetailScreen.tsx`, tambahkan impor di bawah `import { AutoMergeCard } …`:
 
@@ -589,12 +589,12 @@ lalu sisipkan tepat sebelum `<HelpCenterCard p={p} … />`:
       <MissingRepoCard p={p} onEdit={onEdit} onToast={onToast} onProjectChanged={onProjectChanged} />
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/project-missing-repo.test.tsx`
 Expected: PASS — 6 test.
 
-- [ ] **Step 6: Kontrak placeholder + typecheck**
+- [x] **Step 6: Kontrak placeholder + typecheck**
 
 Run: `pnpm vitest --run src/test/placeholder-contract.test.ts`
 Expected: PASS. Test ini bisa sudah merah di base karena sebab lain (`<Input type="number">` di
@@ -605,7 +605,7 @@ dengan sesi lain); baca saja daftar pelanggarnya.
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/MissingRepoCard.tsx src/src/screens/ProjectDetailScreen.tsx src/test/project-missing-repo.test.tsx
@@ -626,7 +626,7 @@ git commit -m "feat(spec-867): kartu tanpa-checkout di detail project — clone 
 - Consumes: `cloneErrorText` (Task 1), kartu dari Task 3.
 - Produces: tak ada API baru.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/new-project-clone.test.tsx`, di dalam `describe` yang sudah ada, sesudah
 test yang ada:
@@ -654,12 +654,12 @@ test yang ada:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/new-project-clone.test.tsx`
 Expected: FAIL — toast masih berbunyi "clone ulang dari Edit" dan memuat `POST /api/… → 409`.
 
-- [ ] **Step 3: Betulkan komentar & toast di `App.tsx`**
+- [x] **Step 3: Betulkan komentar & toast di `App.tsx`**
 
 Ganti komentar di atas `if (clone) {`:
 
@@ -703,7 +703,7 @@ menjadi:
       }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/new-project-clone.test.tsx`
 Expected: PASS — 2 test.
@@ -711,7 +711,7 @@ Expected: PASS — 2 test.
 Bila `ApiError` jadi impor yatim di `App.tsx`, `pnpm --filter ./src typecheck` akan mengatakannya —
 cek dulu `grep -c "ApiError" src/src/App.tsx` (ia masih dipakai `load()` untuk 401, jadi tetap ada).
 
-- [ ] **Step 5: Perbarui `internal/docs/frontend/frontend-implementation.md`**
+- [x] **Step 5: Perbarui `internal/docs/frontend/frontend-implementation.md`**
 
 Di seksi "## Path project dipilih, bukan diketik (SPEC-217/218 · SPEC-858)", ubah kalimat
 `memakai FolderPicker (App.tsx)` menjadi `memakai FolderPicker
@@ -763,7 +763,7 @@ refetch VM SPEC-258). Toast kegagalan clone di modal Project baru karena itu ber
 mendarat persis di sana.
 ```
 
-- [ ] **Step 6: Perbarui `internal/docs/architecture/api-contract.md`**
+- [x] **Step 6: Perbarui `internal/docs/architecture/api-contract.md`**
 
 Ganti baris `POST   /projects/:id/clone …` menjadi:
 
@@ -784,14 +784,14 @@ GET      /fs/browse?path=               # directory picker sisi server; menopang
 #   adalah INDUK folder clone). Hanya melist DIREKTORI, jadi ia tak bisa menjawab "folder ini kosong?".
 ```
 
-- [ ] **Step 7: Cek index docs masih utuh**
+- [x] **Step 7: Cek index docs masih utuh**
 
 Run: `node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli exec tsx src/index.ts docs index --check`
 Expected: index OK — tak ada doc baru, jadi tak ada yang perlu di-link. Bila CLI belum ter-build,
 verifikasi manual: kedua berkas sudah ter-link di `internal/docs/README.md` (kategori `frontend`
 dan `architecture`) dan tak ada berkas doc baru yang ditambahkan spec ini.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/App.tsx src/test/new-project-clone.test.tsx internal/docs/frontend/frontend-implementation.md internal/docs/architecture/api-contract.md
@@ -804,7 +804,7 @@ git commit -m "fix(spec-867): janji 'clone ulang' menunjuk detail project + pesa
 
 **Files:** tak ada perubahan; hanya menjalankan bukti.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
 
 Run: `pnpm vitest --run --changed "$HANOMAN_BASE_SHA"`
 Expected: PASS. **Pastikan test-nya benar-benar berjalan** — `--changed` menyalakan
@@ -816,12 +816,12 @@ minimal harus memuat `git-remote.test.ts`, `project-missing-repo.test.tsx`,
 Bila set-nya menyentuh test **server**, tambahkan `--no-file-parallelism` dan
 `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"`. Spec ini murni frontend, jadi normalnya tidak.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar 0. Jangan `pnpm -r typecheck`.
 
-- [ ] **Step 3: Smoke endpoint clone di server hidup**
+- [x] **Step 3: Smoke endpoint clone di server hidup**
 
 Spec ini tak mengubah server, tapi ia memindahkan pemakaian sebuah endpoint ke permukaan baru —
 sekali di akhir, buktikan endpoint-nya masih berperilaku seperti yang diandalkan UI:
@@ -836,7 +836,7 @@ Expected: `409` dengan `{"error":"project tidak punya gitRemote untuk clone"}` �
 dipetakan kartu ke pesan "clone tak mungkin". Bila tak ada server hidup yang aman dipakai, catat
 itu apa adanya alih-alih mengklaim sudah diuji.
 
-- [ ] **Step 4: Centang seluruh checklist plan ini & commit**
+- [x] **Step 4: Centang seluruh checklist plan ini & commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-21-spec-867-project-tanpa-dir-lokal.md
