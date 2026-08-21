@@ -19,6 +19,7 @@ import { ClientPortal } from "./portal/ClientPortal";
 import { AuthProvider } from "./auth/AuthContext";
 import type { ProjectVM } from "./screens/types";
 import { branchOptions } from "./screens/branch";
+import { repoBasename } from "./screens/git-remote";
 import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
@@ -865,7 +866,8 @@ export default function App() {
     const scratch = f.kind === "from-scratch";
     const clone = !scratch && f.mode === "clone";
     // SPEC-218 · mode clone: turunkan nama dari basename URL bila user tak isi (buang .git & host).
-    const fromUrl = f.gitRemote.trim().replace(/\.git$/, "").split(/[/:]/).filter(Boolean).pop() || "repo";
+    // SPEC-867 · perhitungan yang sama dipakai kartu tanpa-dir untuk menyusun folder tujuan clone.
+    const fromUrl = repoBasename(f.gitRemote);
     const name = f.name.trim() || (clone ? fromUrl : (f.dir.split("/").filter(Boolean).pop() || "repo"));
     let created;
     try {
