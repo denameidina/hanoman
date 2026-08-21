@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "../src/db";
 import { seedBuiltinAgents, builtinFingerprint } from "../src/services/builtin-agents";
 import { getSetting } from "../src/services/settings";
 import { writeTombstone } from "../src/services/tombstone";
+import { installCustomAgents, agentDefsFor } from "../src/services/custom-agents";
 import { BUILTIN_AGENTS, customAgentId } from "@hanoman/shared";
 
 // SPEC-881 · ADR-0136 · seed katalog agen bawaan. Yang diuji di sini bukan "barisnya lahir" —
@@ -136,8 +137,29 @@ describe("seedBuiltinAgents — upgrade", () => {
 
 describe("seedBuiltinAgents — tak pernah menggagalkan boot", () => {
   it("menelan galat DB dan kembali normal", async () => {
-    const spy = vi.spyOn(prisma.customAgent, "findUnique").mockRejectedValue(new Error("DB mati"));
-    await expect(seedBuiltinAgents()).resolves.toBeUndefined();
-    spy.mockRestore();
+    // SENGAJA bukan `vi.spyOn(...).mockRestore()`: pada klien Prisma, `mockRestore()` MENGHAPUS
+    // method-nya alih-alih memulihkannya, dan test berikutnya lalu berjalan tanpa `findUnique` —
+    // seed diam-diam mengembalikan katalog kosong dan kegagalannya muncul di test yang lain.
+    const asli = prisma.customAgent.findUnique;
+    (prisma.customAgent as unknown as Record<string, unknown>).findUnique =
+      () => Promise.reject(new Error("DB mati"));
+    try {
+      await expect(seedBuiltinAgents()).resolves.toBeUndefined();
+    } finally {
+      (prisma.customAgent as unknown as Record<string, unknown>).findUnique = asli;
+    }
+    // Pulih sungguhan — bukan sekadar tak melempar.
+    await expect(prisma.customAgent.findMany()).resolves.toBeDefined();
+  });
+});
+
+describe("installCustomAgents — urutan mengikat", () => {
+  // Urutan terbalik = sesi PERTAMA sesudah boot lahir tanpa agen bawaan, lalu gejalanya hilang
+  // sendiri di boot berikutnya. Bug yang tak bisa direproduksi kalau urutannya tak diuji.
+  it("cache sudah berisi agen bawaan begitu install selesai", async () => {
+    await prisma.project.create({ data: { id: "p1", name: "P1", desc: "", kind: "web" } });
+    await installCustomAgents();
+    const names = agentDefsFor("p1", "claude").map((a) => a.name).sort();
+    expect(names).toEqual(["blast-radius", "qa-verifier", "scout", "security-reviewer"]);
   });
 });

@@ -6,6 +6,7 @@ import {
 import type { AgentDef } from "@hanoman/runner";
 import { registerCustomAgentSource } from "./pty";
 import { agentToolIds } from "./agent-tool-catalog";
+import { seedBuiltinAgents } from "./builtin-agents";
 
 // SPEC-450 · ADR-0094 keputusan 7 · katalog custom agent untuk lapis proses.
 //
@@ -126,6 +127,10 @@ export function unknownMentions(row: CustomAgentRow, all: CustomAgentRow[]): str
 
 /** Dipanggil sekali dari server.ts, SEBELUM sesi pertama bisa lahir. */
 export async function installCustomAgents(): Promise<void> {
+  // SPEC-881 · ADR-0136 · urutannya MENGIKAT: seed dulu, baru cache. Terbalik berarti sesi pertama
+  // sesudah boot lahir tanpa agen bawaan — argv-nya sah, agennya cuma tak ada — dan gejalanya
+  // hilang sendiri di boot berikutnya.
+  await seedBuiltinAgents();
   await loadCustomAgents();
   registerCustomAgentSource((projectId, agent) => agentDefsFor(projectId, agent));
 }
