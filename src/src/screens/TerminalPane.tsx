@@ -20,6 +20,15 @@ import * as P from "./terminal-predict";
 const RECONNECT_BACKOFF_MS = [500, 1_000, 2_000, 4_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000];
 const RECONNECT_MAX = RECONNECT_BACKOFF_MS.length;
 
+// SPEC-878 · ADR-0134 · antrean adalah penyelamat ketikan (SPEC-800), bukan tempat penyimpanan.
+// 4 KiB memuat satu paragraf yang di-paste dan tetap menghentikan antrean yang lari.
+const MAX_PENDING_INPUT = 4_096;
+// Layar operator sudah basi berdetik-detik saat antrean mendarat, jadi `\r` di dalamnya adalah
+// jawaban atas pertanyaan yang mungkin bukan lagi yang ada di layar — `capture-pane` membuktikan
+// baris yang salah benar-benar ter-submit ke agen. Antrean karena itu tak pernah mengirim byte
+// yang men-submit sendiri; ia ditahan seluruhnya sampai operator memutuskan.
+const SUBMIT = /[\r\n]/;
+
 type LinkState =
   | { state: "connecting" | "open" | "gone" | "lost" }
   | { state: "retrying"; attempt: number };
@@ -52,8 +61,12 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   const phaseRef = React.useRef(onPhases);
   phaseRef.current = onPhases;
   const [link, setLink] = React.useState<LinkState>({ state: "connecting" });
+  const [queue, setQueue] = React.useState<{ n: number; held: boolean; full: boolean }>(
+    { n: 0, held: false, full: false });
   const retryNow = React.useRef<() => void>(() => {});
   const sendKey = React.useRef<(d: string) => void>(() => {});
+  const sendHeld = React.useRef<() => void>(() => {});
+  const dropHeld = React.useRef<() => void>(() => {});
 
   React.useEffect(() => {
     const el = host.current;
@@ -90,6 +103,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
     view.current = { term, fit, send };
     let pendingInput = "";
+    let held = false;
+    let full = false;
     // SPEC-878 · ADR-0134 · penomoran frame masuk. `unacked` satu-satunya hal yang boleh menyalakan
     // jam TTL prediksi: selama ia > 0, diamnya server tak memisahkan "pty bungkam" dari "byte
     // belum sampai".
@@ -103,12 +118,17 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       unacked += 1;
       send({ t: "in", d, seq });
     };
+    const publishQueue = () => setQueue({ n: pendingInput.length, held, full });
+    // Byte tak pernah menyalip antrean yang belum terkuras: FIFO secara konstruksi, bukan karena
+    // jendela 16 ms kebetulan tak kena.
     const sendInput = (d: string) => {
-      if (ws?.readyState === WebSocket.OPEN) { sendFrame(d); return; }
+      if (!held && !pendingInput && ws?.readyState === WebSocket.OPEN) { sendFrame(d); return; }
       // Balasan handshake milik sambungan yang sudah mati tak berarti apa pun bagi sambungan
       // berikutnya, dan blob campuran menembus gerbang `isTerminalResponse` di server (SPEC-860).
       if (gone || isTerminalResponse(d)) return;
+      if (pendingInput.length + d.length > MAX_PENDING_INPUT) { full = true; publishQueue(); return; }
       pendingInput += d;
+      publishQueue();
     };
 
     // SPEC-856 · echo prediktif.
@@ -123,7 +143,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const viewOf = (): P.View => {
       const buf = term.buffer.active;
       return {
-        cursorX: buf.cursorX, cols: term.cols, deliverable: !gone,
+        cursorX: buf.cursorX, cols: term.cols, deliverable: !gone && !full,
         line: buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "",
       };
     };
@@ -131,12 +151,24 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const clockIfDelivered = () => {
       if (unacked === 0 && ws?.readyState === WebSocket.OPEN) pred = P.onDelivered(pred, Date.now());
     };
-    const drainPending = () => {
-      if (!pendingInput) return;
+    const flushQueue = () => {
+      if (!pendingInput || ws?.readyState !== WebSocket.OPEN) { publishQueue(); return; }
       const d = pendingInput;
       pendingInput = "";
+      full = false;
+      publishQueue();
       sendFrame(d);
     };
+    const drainPending = () => {
+      // Apa pun yang masih ditahan jendela 16 ms milik antrean ini juga — menguras antrean
+      // sebelum batcher akan menukar urutannya.
+      batcher.flush();
+      if (!pendingInput) { publishQueue(); return; }
+      if (SUBMIT.test(pendingInput)) { held = true; publishQueue(); return; }
+      flushQueue();
+    };
+    sendHeld.current = () => { held = false; flushQueue(); };
+    dropHeld.current = () => { pendingInput = ""; held = false; full = false; publishQueue(); };
     const onTyped = (d: string) => {
       const wasPredicting = pred.pending.length > 0;
       const r = P.onInput(pred, d, viewOf(), Date.now(), predictRef.current);
@@ -234,6 +266,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
             if (back) term.write(back);
             pred = P.onReattach();
             pendingInput = "";
+            held = false;
+            full = false;
+            publishQueue();
             setLink({ state: "gone" });
             return;
           }
@@ -392,6 +427,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       clearTimeout(timer);
       retryNow.current = () => {};
       sendKey.current = () => {};
+      sendHeld.current = () => {};
+      dropHeld.current = () => {};
       view.current = null;
       el.removeEventListener("paste", onPaste);
       el.removeEventListener("dragover", onDragOver);
@@ -427,23 +464,35 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya. */}
-      {link.state !== "open" && link.state !== "connecting" && (
+      {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya.
+          SPEC-878 · strip juga bicara saat sambungan sehat: antrean yang ditahan karena memuat
+          Enter adalah keputusan yang menunggu operator, bukan keadaan koneksi. */}
+      {((link.state !== "open" && link.state !== "connecting") || queue.held || queue.full) && (
         <div data-testid="terminal-link" style={{
-          display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto",
+          display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto", flexWrap: "wrap",
           padding: "3px 8px", fontFamily: "var(--font-mono)", fontSize: 11,
-          background: link.state === "retrying" ? "var(--status-warn-tint)" : "var(--status-err-tint)",
+          background: link.state === "retrying" || queue.held
+            ? "var(--status-warn-tint)" : "var(--status-err-tint)",
           color: "var(--text-body)",
         }}>
-          {link.state === "retrying"
-            ? `menyambung ulang… (${link.attempt}/${RECONNECT_MAX})`
-            : link.state === "gone"
-              ? "sesi tidak ditemukan di tmux"
-              : <>
-                  <span>terputus</span>
-                  <button type="button" className="hn-terminal-action hn-terminal-action--text"
-                    onClick={() => retryNow.current()}>Sambungkan lagi</button>
-                </>}
+          {link.state === "retrying" && <span>menyambung ulang… ({link.attempt}/{RECONNECT_MAX})</span>}
+          {link.state === "gone" && <span>sesi tidak ditemukan di tmux</span>}
+          {link.state === "lost" && <>
+            <span>terputus</span>
+            <button type="button" className="hn-terminal-action hn-terminal-action--text"
+              onClick={() => retryNow.current()}>Sambungkan lagi</button>
+          </>}
+          {queue.n > 0 && !queue.held && (
+            <span data-testid="terminal-queue">{queue.n} ketikan diantre</span>
+          )}
+          {queue.held && <>
+            <span data-testid="terminal-held">{queue.n} ketikan tertahan — belum dikirim</span>
+            <button type="button" className="hn-terminal-action hn-terminal-action--text"
+              onClick={() => sendHeld.current()}>Kirim</button>
+            <button type="button" className="hn-terminal-action hn-terminal-action--text"
+              onClick={() => dropHeld.current()}>Buang</button>
+          </>}
+          {queue.full && <span data-testid="terminal-queue-full">antrean penuh</span>}
         </div>
       )}
       <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",

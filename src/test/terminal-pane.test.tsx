@@ -648,6 +648,97 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     await vi.waitFor(() => expect(inputsOf(sockets[0]).slice(before)).toEqual(["z", "/tmp/a.png "]));
   });
 
+  const reconnect = async () => {
+    await vi.waitFor(() => expect(sockets.length).toBeGreaterThan(1), { timeout: 3_000 });
+    act(() => { sockets[1]!.onopen?.(); });
+  };
+  const cut = () => act(() => {
+    sockets[0]!.readyState = 3;
+    sockets[0]!.onclose?.({ code: 1006 });
+  });
+
+  it("menguras antrean tanpa submit apa adanya, dan `resize` mendahuluinya", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 360, top: 0, right: 640, bottom: 360, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    for (const c of [..."hai"]) act(() => { xt.dataHandler?.(c); });
+    await reconnect();
+    const kinds = sockets[1]!.sent.map((m) => (JSON.parse(m) as { t: string }).t);
+    expect(kinds.indexOf("resize")).toBeLessThan(kinds.indexOf("in"));
+    expect(inputsOf(sockets[1])).toEqual(["hai"]);
+  });
+
+  // SPEC-878 · layar operator sudah basi berdetik-detik saat antrean mendarat, jadi `\r` di
+  // dalamnya adalah jawaban atas pertanyaan yang mungkin bukan lagi yang ada di layar —
+  // `capture-pane` membuktikan baris yang salah benar-benar ter-submit ke agen.
+  it("menahan antrean yang memuat Enter dan tak mengirim apa pun sampai operator memilih", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    for (const c of [..."rahasia"]) act(() => { xt.dataHandler?.(c); });
+    act(() => { xt.dataHandler?.("\r"); });
+    await reconnect();
+    expect(inputsOf(sockets[1])).toEqual([]);
+    expect(container.querySelector('[data-testid="terminal-held"]')).not.toBeNull();
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Kirim" })); });
+    expect(inputsOf(sockets[1])).toEqual(["rahasia\r"]);
+    expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull();
+  });
+
+  it("membuang antrean tertahan saat operator memilih Buang", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    act(() => { xt.dataHandler?.("\r"); });
+    await reconnect();
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Buang" })); });
+    expect(inputsOf(sockets[1])).toEqual([]);
+    expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull();
+  });
+
+  it("memperlihatkan jumlah ketikan yang sedang diantre", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    for (const c of [..."halo"]) act(() => { xt.dataHandler?.(c); });
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-testid="terminal-queue"]')?.textContent).toContain("4");
+    });
+  });
+
+  it("berhenti menerima ketikan saat antrean penuh, dan berhenti menjanjikannya di layar", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    act(() => { for (let i = 0; i < 4_097; i += 1) xt.dataHandler?.("x"); });
+    await wait(40);
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-testid="terminal-queue-full"]')).not.toBeNull();
+    });
+    xt.written = [];
+    act(() => { xt.dataHandler?.("a"); });
+    expect(glyphs()).toHaveLength(0);
+  });
+
+  it("tak mengantrekan balasan handshake terminal milik sambungan yang sudah mati", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    act(() => { xt.dataHandler?.("\x1b[?1;2c"); });
+    for (const c of [..."ya"]) act(() => { xt.dataHandler?.(c); });
+    await reconnect();
+    expect(inputsOf(sockets[1])).toEqual(["ya"]);
+  });
+
   it("berhenti memprediksi begitu sesi tmux-nya dinyatakan lenyap", async () => {
     render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
