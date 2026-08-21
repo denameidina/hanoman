@@ -8,6 +8,7 @@ import { api } from "../api/client";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
 import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
 import * as P from "./terminal-predict";
+import * as D from "./terminal-diag";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
 // (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
@@ -34,7 +35,7 @@ type LinkState =
   | { state: "retrying"; attempt: number };
 
 export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true }: {
+  predict = true, diag = false }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -45,6 +46,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   // SPEC-856 · sakelar echo prediktif, dipegang di ref bersama fontSize: mematikannya tak boleh
   // melahirkan socket baru.
   predict?: boolean;
+  // Perekam diagnostik jalur input. Opt-in, mati secara default: ia merekam SETIAP tombol yang
+  // ditekan di pane ini, jadi ia hanya boleh menyala saat operator memang sedang menyelidiki.
+  diag?: boolean;
 }) {
   const host = React.useRef<HTMLDivElement>(null);
   // Dipegang di ref supaya effect koneksi tetap hanya bergantung pada `sessionId`: mengubah
@@ -53,6 +57,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   fontSizeRef.current = fontSize;
   const predictRef = React.useRef(predict);
   predictRef.current = predict;
+  const diagRef = React.useRef(diag);
+  diagRef.current = diag;
   const view = React.useRef<{ term: Terminal; fit: FitAddon; send: (m: unknown) => void } | null>(null);
   // onExit boleh berubah tiap render; menaruhnya di ref menjaga effect ini
   // hanya bergantung pada sessionId — remount = sesi yang benar-benar berbeda.
@@ -102,6 +108,15 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     let finished = false;
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
     view.current = { term, fit, send };
+    // Perekam diagnostik. Selalu DIBUAT, tapi `rec` diam total selama sakelarnya mati — dengan
+    // begitu menyalakannya tak perlu melahirkan socket baru, sama seperti sakelar prediksi.
+    const diagRec = D.createDiagRecorder({
+      now: () => Date.now(),
+      send: (ev) => send({ t: "diag", ev }),
+    });
+    const rec = (k: D.DiagKind, v: string, n?: number) => {
+      if (diagRef.current) diagRec.record(k, v, n);
+    };
     let pendingInput = "";
     let held = false;
     let full = false;
@@ -113,9 +128,16 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     // 4004 = sesi tmux-nya memang sudah lenyap. Satu-satunya keadaan di mana byte yang diantre
     // TIDAK akan pernah terkirim — jadi satu-satunya yang menutup `deliverable`.
     let gone = false;
+    const sentAt = new Map<number, number>();
     const sendFrame = (d: string) => {
       seq += 1;
       unacked += 1;
+      if (diagRef.current) {
+        // Ack bisa tak pernah datang (socket mati di tengah). Peta ini hanya alat ukur, jadi
+        // yang tertua dibuang alih-alih menahan memori tab selama sesi berjam-jam.
+        if (sentAt.size > 256) for (const k of [...sentAt.keys()].slice(0, 128)) sentAt.delete(k);
+        sentAt.set(seq, Date.now());
+      }
       send({ t: "in", d, seq });
     };
     const publishQueue = () => setQueue({ n: pendingInput.length, held, full });
@@ -171,9 +193,15 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     dropHeld.current = () => { pendingInput = ""; held = false; full = false; publishQueue(); };
     const onTyped = (d: string) => {
       const wasPredicting = pred.pending.length > 0;
-      const r = P.onInput(pred, d, viewOf(), Date.now(), predictRef.current);
+      // Dicatat SEBELUM apa pun menyentuhnya: inilah byte yang benar-benar keluar dari browser,
+      // dan justru hulu titik ini yang belum pernah terukur.
+      rec("data", D.showBytes(d));
+      const view = viewOf();
+      const r = P.onInput(pred, d, view, Date.now(), predictRef.current);
       pred = r.state;
       if (r.write) term.write(r.write);
+      else rec("pred", `tolak cx=${view.cursorX}/${view.cols} alt=${pred.altScreen ? 1 : 0}`
+        + ` deliverable=${view.deliverable ? 1 : 0} suspend=${Math.max(0, pred.suspendedUntil - Date.now())}`);
       batcher.push(d, wasPredicting || r.write.length > 0);
     };
     // TTL adalah satu-satunya sinyal yang memisahkan "pty diam" — password dan tombol yang ditelan
@@ -240,7 +268,14 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
             clockIfDelivered();
           }
           // SPEC-878 · ADR-0134 · pengakuan pengiriman: satu-satunya titik nol jam TTL prediksi.
-          else if (f.t === "ack") { unacked = Math.max(0, unacked - 1); clockIfDelivered(); }
+          else if (f.t === "ack") {
+            unacked = Math.max(0, unacked - 1);
+            if (typeof f.seq === "number") {
+              const at = sentAt.get(f.seq);
+              if (at !== undefined) { sentAt.delete(f.seq); rec("ack", String(f.seq), Date.now() - at); }
+            }
+            clockIfDelivered();
+          }
           // Server menyiarkan fase saat attach dan setiap kali agen menutup satu (SPEC-162).
           // SPEC-433 · sejak sekarang juga saat `complete` berubah tanpa daftar fase berubah —
           // kotak `- [ ]` terakhir di plan dicentang sesudah `Execute done`.
@@ -329,6 +364,19 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       return false;
     });
     const typed = term.onData(onTyped);
+
+    // Hulu `term.onData`: peristiwa asli papan tombol/IME. Di papan tombol lunak tablet, satu
+    // "tombol" tak selalu satu keydown — IME memakai composition, dan teks yang benar-benar
+    // dikirim baru lahir di `compositionend`. Tanpa merekam keduanya, "browser mengirim huruf
+    // yang salah" tak bisa dibedakan dari "hanoman merusak huruf yang benar".
+    // `term.textarea` baru ada sesudah `term.open()`, yang sudah dipanggil di atas.
+    const ta = term.textarea;
+    const onDiagKey = (e: KeyboardEvent) => rec("key", e.key, e.keyCode);
+    const onDiagComp = (e: Event) => rec("comp", `${e.type}:${D.showBytes((e as CompositionEvent).data ?? "")}`);
+    ta?.addEventListener("keydown", onDiagKey);
+    ta?.addEventListener("compositionstart", onDiagComp);
+    ta?.addEventListener("compositionupdate", onDiagComp);
+    ta?.addEventListener("compositionend", onDiagComp);
 
     // SPEC-771 · viewport internal xterm 6 tak memiliki pemilik gesture touch. Tanpa handler
     // passive-false ini swipe bubble ke page scroller meski scrollback terminal masih tersedia.
@@ -440,6 +488,11 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       ro.disconnect();
       clearInterval(ttl);
       batcher.dispose();
+      diagRec.dispose();
+      ta?.removeEventListener("keydown", onDiagKey);
+      ta?.removeEventListener("compositionstart", onDiagComp);
+      ta?.removeEventListener("compositionupdate", onDiagComp);
+      ta?.removeEventListener("compositionend", onDiagComp);
       typed.dispose();
       ws?.close();
       term.dispose();

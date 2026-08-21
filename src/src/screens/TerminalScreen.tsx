@@ -54,6 +54,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
   // tombol (SPEC-740 · ADR-0115), bukan payload workspace kanonik per-user (ADR-0118) — dan
   // sekaligus alat ukur sebelum/sesudah: satu build, satu variabel.
   const [predict, setPredict] = usePersistedState("terminal", "predict", true, isBool);
+  // Perekam diagnostik jalur input. Default MATI dan sengaja tidak lengket ke ingatan operator
+  // sebagai fitur harian: ia merekam setiap tombol yang ditekan di pane, jadi ia alat investigasi
+  // yang dinyalakan saat dibutuhkan lalu dimatikan lagi.
+  const [diag, setDiag] = usePersistedState("terminal", "diag", false, isBool);
   const bumpFont = (delta: number) => setFontSize((n) => clampFontSize(n + delta));
   const [maxed, setMaxed] = React.useState(false);
   // SPEC-232 · id sesi yang sedang dilihat layar-penuh (satu terminal, sebagai modal).
@@ -294,6 +298,14 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
           aria-label={`${predict ? "Matikan" : "Nyalakan"} ketik responsif`}
           onClick={() => setPredict((on) => !on)}>{predict ? "Matikan" : "Nyalakan"}</Button>
       </div>
+      <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+          Rekam jalur ketik (diagnostik — merekam setiap tombol)
+        </span>
+        <Button size="sm" variant="secondary" aria-pressed={diag}
+          aria-label={`${diag ? "Matikan" : "Nyalakan"} rekam jalur ketik`}
+          onClick={() => setDiag((on) => !on)}>{diag ? "Matikan" : "Nyalakan"}</Button>
+      </div>
       {mobile && (
         <Select size="sm" aria-label="Project sesi baru" value={project}
           onChange={(e) => setProject(e.target.value)}
@@ -476,7 +488,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
                           canArrange={workspaceWritable} onDetach={() => detach(s.id)} onExit={(code) => markExited(s.id, code)} onReview={onOpenReview}
                           onSessionReview={onOpenSessionReview}
                           titleOf={titleOf} onIntegrate={onIntegrate} onIntegrateSession={onIntegrateSession} specOf={specOf}
-                          fontSize={fontSize} showKeys={keysOpen} predict={predict}
+                          fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
                           fullscreen={fullId === s.id} onFullscreen={() => setFullId(s.id)} />
                       : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
                   </div>
@@ -505,7 +517,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
       {fullId && byId(fullId) && (
         <FullscreenTerminal session={byId(fullId)!}
           label={cellLabel(byId(fullId)!, nameOf, titleOf)}
-          fontSize={fontSize} showKeys={keysOpen} predict={predict}
+          fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
           onClose={() => setFullId(null)} />
       )}
     </div>
@@ -737,7 +749,7 @@ export function PhaseStrip({ phases }: { phases: Phase[] | null }) {
   );
 }
 
-function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, fullscreen, onFullscreen }: {
+function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen }: {
   session: TerminalSession; nameOf: (pid: string) => string;
   onClose: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
   onReview?: (specId: string) => void;
@@ -746,7 +758,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
   onIntegrate?: (spec: Spec, op: "merge" | "rebase", target: string) => void;
   onIntegrateSession?: (session: TerminalSession, op: "merge" | "rebase", target: string) => void;
   specOf?: (specId: string) => Spec | undefined;
-  fontSize: number; showKeys: boolean; predict: boolean;
+  fontSize: number; showKeys: boolean; predict: boolean; diag: boolean;
   fullscreen: boolean; onFullscreen: () => void;
 }) {
   const [phases, setPhases] = React.useState<Phase[] | null>(null);
@@ -930,7 +942,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
                 Terbuka di layar penuh
               </div>
             : <TerminalPane key={session.id} sessionId={session.id} onExit={onExit} onPhases={onPhases}
-                fontSize={fontSize} showKeys={showKeys} predict={predict} />}
+                fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} />}
         </div>
       </div>
       {docs && session.specId && <SpecDocsModal specId={session.specId} onClose={() => setDocs(false)} />}
@@ -953,8 +965,8 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
 // menampilkan placeholder (lihat Cell) supaya tmux tetap satu attach. closeOnEscape=false:
 // Escape tombol tersibuk TUI Claude Code — keluar via × / backdrop saja (sejalan maximize-grid,
 // SPEC-163). Menutup modal memasang ulang pane di sel (reconnect murah; scrollback dari tmux).
-function FullscreenTerminal({ session, label, fontSize, showKeys, predict, onClose }: {
-  session: TerminalSession; label: string; fontSize: number; showKeys: boolean; predict: boolean;
+function FullscreenTerminal({ session, label, fontSize, showKeys, predict, diag, onClose }: {
+  session: TerminalSession; label: string; fontSize: number; showKeys: boolean; predict: boolean; diag: boolean;
   onClose: () => void;
 }) {
   return (
@@ -962,7 +974,7 @@ function FullscreenTerminal({ session, label, fontSize, showKeys, predict, onClo
       <div style={{ height: "min(72vh, calc(100dvh - 180px))", minHeight: 0, display: "flex", flexDirection: "column",
         opacity: session.exited ? 0.6 : 1 }}>
         <TerminalPane key={session.id} sessionId={session.id} onExit={() => {}}
-          fontSize={fontSize} showKeys={showKeys} predict={predict} />
+          fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} />
       </div>
     </Modal>
   );

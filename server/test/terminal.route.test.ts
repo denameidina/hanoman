@@ -37,6 +37,61 @@ function connect(id: string) {
   const data = () => frames.filter((f) => f.t === "data").map((f) => f.d ?? "").join("");
   return { ws, frames, opened, data };
 }
+// Perekam diagnostik jalur ketik: frame WS `diag` mendarat sebagai JSONL di $HANOMAN_HOME.
+// Diuji lewat socket sungguhan, bukan memanggil `appendDiag` langsung — yang perlu dikunci di sini
+// justru gerbangnya: hanya `t:"diag"` ber-`ev` array yang menulis, dan kegagalannya tak boleh
+// menjatuhkan sesi terminal.
+describe("frame WS diag", () => {
+  // $HANOMAN_HOME milik shell menunjuk data SUNGGUHAN operator (`~/.hanoman`). Tanpa override ini
+  // test menulis diagnostik ke sana — lihat juga catatan `.env` repo utama yang bocor ke worktree.
+  let prevHome: string | undefined;
+  let home = "";
+  beforeAll(() => {
+    prevHome = process.env.HANOMAN_HOME;
+    home = mkdtempSync(join(tmpdir(), "hanoman-diag-home-"));
+    process.env.HANOMAN_HOME = home;
+  });
+  afterAll(() => {
+    if (prevHome === undefined) delete process.env.HANOMAN_HOME;
+    else process.env.HANOMAN_HOME = prevHome;
+    rmSync(home, { recursive: true, force: true });
+  });
+  const diagHome = () => join(home, "diag");
+
+  it("menulis peristiwa yang sah ke $HANOMAN_HOME/diag/<id>.jsonl", async () => {
+    const id = await createSession();
+    const c = connect(id);
+    await c.opened;
+    c.ws.send(JSON.stringify({ t: "diag", ev: [
+      { t: 0, k: "key", v: "j", n: 74 },
+      { t: 8, k: "data", v: "j" },
+    ] }));
+    const file = join(diagHome(), `${id}.jsonl`);
+    await waitFor(() => existsSync(file));
+    await waitFor(() => readFileSync(file, "utf8").trim().split("\n").length === 2);
+    const rows = readFileSync(file, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    expect(rows[0]).toMatchObject({ k: "key", v: "j", n: 74 });
+    expect(rows[1]).toMatchObject({ k: "data", v: "j" });
+    c.ws.close();
+  });
+
+  // Muatannya datang dari klien. Frame cacat tak boleh menutup socket — kalau ia menutupnya,
+  // perekam diagnostik justru menjadi cara paling mudah menjatuhkan sesi kerja orang.
+  it("mengabaikan frame diag cacat tanpa menjatuhkan sesi", async () => {
+    const id = await createSession();
+    const c = connect(id);
+    await c.opened;
+    c.ws.send(JSON.stringify({ t: "diag" }));
+    c.ws.send(JSON.stringify({ t: "diag", ev: "bukan-array" }));
+    c.ws.send(JSON.stringify({ t: "diag", ev: [{ tak: "dikenal" }] }));
+    // Socket masih hidup dan masih melayani input sesudahnya.
+    c.ws.send(JSON.stringify({ t: "in", d: "halo", seq: 1 }));
+    await waitFor(() => c.frames.some((f) => f.t === "ack" && f.seq === 1));
+    expect(existsSync(join(diagHome(), `${id}.jsonl`))).toBe(false);
+    c.ws.close();
+  });
+});
+
 const createSession = async () => {
   const res = await app.inject({ method: "POST", url: "/api/terminal/sessions", payload: { project: "p1" } });
   expect(res.statusCode).toBe(201);

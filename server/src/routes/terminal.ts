@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { prisma } from "../db";
 import { zTerminalSession, zIntegrate, zTerminalSteerInput, METHODS, type Stage } from "@hanoman/shared";
-import { realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, type Flow } from "@hanoman/runner";
+import { resolveHome, realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, type Flow } from "@hanoman/runner";
 import { phaseFilePath, decisionFilePath, readPhases, stageForRun } from "../services/session-phases";
 import { specReview, reviewFile } from "../services/spec-review";
 import { downloadFormat, sendReviewDownload } from "../services/doc-export";
@@ -18,6 +18,7 @@ import { ownsWorktree } from "../services/session-worktree";
 import { listCleanups } from "../services/worktree-reaper";
 import { closeSession } from "../services/session-close";
 import { recordHeadSha } from "../services/spec-head";
+import { appendDiag } from "../services/terminal-diag";
 import { readPrd } from "../services/project-prds";
 import { readAuditDoc } from "../services/audit-escalation";
 import { recordSessionResult } from "../services/session-result";
@@ -450,7 +451,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       if (!verdict.ok) { socket.close(verdict.code, verdict.reason); return; }
       const valid = await revalidateWsPrincipal(req, principal).catch(() => false);
       if (!valid) { socket.close(1008, "session revoked"); return; }
-      let m: { t?: string; d?: string; cols?: number; rows?: number; seq?: number };
+      let m: { t?: string; d?: string; cols?: number; rows?: number; seq?: number; ev?: unknown[] };
       // ponytail: frame rusak dibuang diam-diam — pengirimnya UI kita sendiri.
       try { m = JSON.parse(raw.toString()); } catch { return; }
       if (m.t === "in" && typeof m.d === "string") {
@@ -462,6 +463,15 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         if (typeof m.seq === "number") socket.send(JSON.stringify({ t: "ack", seq: m.seq }));
       }
       else if (m.t === "resize" && m.cols && m.rows) resize(id, m.cols, m.rows);
+      // Perekam diagnostik jalur input (opt-in, dimatikan secara default di klien). Ia menutup satu
+      // batas yang tak bisa diukur dari sini: antara jari operator di kaca perangkat dan byte yang
+      // keluar dari `term.onData`. Sengaja BUKAN route REST — kanal ini sudah terautentikasi tiket
+      // sekali pakai dan sudah berlaju-batas, jadi tak ada permukaan auth baru yang dibuka.
+      // Kegagalan menulis TAK PERNAH menjatuhkan sesi terminal: diagnostik tak boleh lebih penting
+      // daripada pekerjaan yang sedang diselidikinya.
+      else if (m.t === "diag" && Array.isArray(m.ev)) {
+        try { appendDiag(resolveHome(), id, m.ev); } catch { /* diagnostik bukan alasan sesi mati */ }
+      }
     });
     const revalidate = setInterval(() => {
       void revalidateWsPrincipal(req, principal).then((ok) => { if (!ok) socket.close(1008, "session revoked"); });
