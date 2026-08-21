@@ -713,15 +713,15 @@ git commit -m "docs(spec-879): audit responsif IDE + kontrak layout kepala & scr
 
 ## Task 7: Laporan akhir
 
-- [ ] **Step 1: Centang seluruh checklist plan ini**
+- [x] **Step 1: Centang seluruh checklist plan ini**
 
 Setiap `- [ ]` di berkas ini jadi `- [x]`. hanoman menahan backlog di `executing` selama masih ada kotak kosong.
 
-- [ ] **Step 2: Rakit laporan berisi 12 tangkapan layar**
+- [x] **Step 2: Rakit laporan berisi 12 tangkapan layar**
 
 Terbitkan satu halaman laporan (Artifact) berisi tabel angka sebelum/sesudah **dan** 12 tangkapan layar sesudah perbaikan berdampingan dengan 12 sebelum, satu bagian per tab. Objektif menuntut gambar, bukan hanya tabel angka.
 
-- [ ] **Step 3: Bersihkan proses harness**
+- [x] **Step 3: Bersihkan proses harness**
 
 ```bash
 lsof -ti:8791 | xargs -r kill      # server harness
@@ -730,7 +730,7 @@ lsof -ti:9333 | xargs -r kill      # chrome debugging
 
 **Jangan** `pkill -f node` / `killall`: prompt tiap sesi hidup di ARGV proses agennya, jadi pola generik mematikan sesi tetangga di mesin ini.
 
-- [ ] **Step 4: Push**
+- [x] **Step 4: Push**
 
 ```bash
 git push origin HEAD:refs/heads/hanoman/spec-879
