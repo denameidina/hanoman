@@ -29,3 +29,4 @@ export * from "./auto-merge";
 export * from "./changelog";
 export * from "./cron-expr";
 export * from "./terminal-workspace";
+export * from "./terminal-io";

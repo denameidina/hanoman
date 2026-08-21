@@ -9,7 +9,7 @@ import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
   renderAgentsJson, agentRosterBlock, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
-import { coerceCodexEffort, resolveChoices, type SessionKind } from "@hanoman/shared";
+import { coerceCodexEffort, isTerminalResponse, resolveChoices, type SessionKind } from "@hanoman/shared";
 import { readPhases, sessionComplete, type Phase } from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
 import { dropSessionUploads } from "./uploads";
@@ -928,20 +928,10 @@ const TERMINAL_QUERY = new RegExp([
 
 export const stripTerminalQueries = (s: string): string => s.replace(TERMINAL_QUERY, "");
 
-// Bentuk balasan terminal. Tak satu pun beririsan dengan sekuens tombol (`\x1b[A`, `\x1bOA`,
-// `\x1b[3~`, laporan mouse `…M`), jadi ketikan manusia tak pernah tersentuh gerbangnya.
-const TERMINAL_RESPONSE = new RegExp([
-  "\\x1b\\[[?>][0-9;]*c",                   // balasan DA
-  "\\x1b\\[\\??[0-9]+;[0-9]+R",             // CPR / DECXCPR
-  "\\x1b\\[\\??[0-9;]*n",                   // balasan DSR
-  "\\x1b\\[\\??[0-9;]*\\$y",                // DECRPM
-  "\\x1b\\][0-9][0-9;]*;[^\\x07\\x1b]*(?:\\x07|\\x1b\\\\)",   // balasan warna OSC
-  "\\x1bP[0-9]*[$+>][a-z|][^\\x1b]*\\x1b\\\\",                // DECRPSS / XTGETTCAP / XTVERSION
-].join("|"), "g");
-
-/** Frame yang isinya SELURUHNYA balasan terminal — tak ada satu pun byte ketikan di dalamnya. */
-export const isTerminalResponse = (d: string): boolean =>
-  d.length > 0 && d.replace(TERMINAL_RESPONSE, "") === "";
+// SPEC-878 · definisinya pindah ke `@hanoman/shared` karena klien memakainya juga (balasan
+// handshake milik sambungan yang sudah mati tak boleh ikut mengantre di klien). Diekspor
+// ulang di sini supaya call site server dan test SPEC-860 tak bergeser.
+export { isTerminalResponse };
 
 export function attach(id: string, c: Client): void {
   const p = getSession(id);
