@@ -111,6 +111,26 @@ yang lahir dari audit SPEC-800:
   terhadap umur sesi. Pemilahan berkas dari `DataTransfer` murni di `screens/terminal-clipboard.ts`
   (`imageFilesFrom`, `hasImageDrag`); `dataTransfer.files` KOSONG selama `dragover` — baru terisi
   saat `drop` — jadi keputusan `preventDefault` di dragover dibaca dari `types`.
+- **Kolom ketik perangkat sentuh adalah jalur ketik KEDUA, bukan pengganti** (SPEC-882). Di bawah
+  setiap pane — mengikuti sakelar `showKeys` yang sudah ada, urutan `strip status → terminal →
+  kolom ketik → bar tombol` — ada satu `<input>` yang memberi umpan balik lokal **nol RTT**, lepas
+  dari kesehatan sambungan, lalu mengalirkan isinya ke pty secara **debounce 350 ms** (kuras paksa
+  tiap 1 dtk saat mengetik terus-menerus, kuras langsung saat kehilangan fokus, Enter = submit
+  seketika). Aritmetikanya murni di `screens/terminal-composer.ts`: **satu** aturan delta berbasis
+  backspace — `\x7f` sebanyak sisa `sentPrefix` sesudah awalan sama, lalu ekor teks baru, dihitung
+  **PER CODE POINT** (unit UTF-16 membuat satu emoji bernilai dua backspace dan merusak baris pty
+  sementara layar operator tetap terlihat benar). `\x15` (Ctrl-U) **ditolak** sebagai
+  selaraskan-ulang: artinya berbeda di readline vs `vim` mode sisip, dan pane tak selalu berisi
+  shell. Byte-nya keluar lewat `sendKey.current` yang sama dengan jalur lain, jadi FIFO, antrean
+  outage, dan penahanan `\r` (SPEC-878) berlaku tanpa kode baru; sebaliknya **setiap** byte yang
+  lahir di luar kolom (ketikan langsung, tombol Esc/Tab/panah, tap dialog, tempel, path lampiran)
+  menguras kolom **lebih dulu** — sinkron, sebelum `batcher.push`, karena membaliknya menukar urutan
+  byte di pty — lalu menihilkan `sentPrefix`: menebak isi baris pty sesudah byte asing masuk berarti
+  byte yang salah. Penanda `terkirim` / `diantre {n}` / `tertahan` menempel di kolom karena tanpa itu
+  ia terasa mulus persis ketika byte-nya tidak ke mana-mana (terukur: 26 glyph tampil ~21 ms
+  sementara `capture-pane` menunjukkan prompt kosong). Ini **bukan** perbaikan akar lag tablet —
+  `deliverable`, TTL prediksi, dan ADR-0134 tak disentuh; akarnya masih ditunggu dari perekam
+  diagnostik.
 
 **Dua agen didukung** (SPEC-338/ADR-0074): `Agent = "claude" | "codex"`. Default global
 `Setting.agent` berlaku untuk semua sesi yang men-spawn agen; sesi backlog bisa meng-override saat

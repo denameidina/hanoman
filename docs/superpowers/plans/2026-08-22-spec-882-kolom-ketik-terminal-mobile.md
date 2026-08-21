@@ -804,7 +804,7 @@ Docs yang tersentuh diperbarui dalam commit yang sama dan ter-link di index (AGE
 - Consumes: perilaku final dari Task 1–3.
 - Produces: tak ada simbol kode.
 
-- [ ] **Step 1: Tambahkan invariant baru di `stack.md`**
+- [x] **Step 1: Tambahkan invariant baru di `stack.md`**
 
 Di `internal/docs/architecture/stack.md`, di dalam daftar berpoin di bawah judul `### Chrome terminal (SPEC-800)`, tepat SESUDAH butir yang diawali `- **Lampiran gambar adalah BERKAS + PATH, bukan gambar inline** (SPEC-816).` (butir terakhir daftar itu), tambahkan:
 
@@ -829,7 +829,7 @@ Di `internal/docs/architecture/stack.md`, di dalam daftar berpoin di bawah judul
   dan ADR-0134 tak disentuh; akarnya masih ditunggu dari perekam diagnostik.
 ```
 
-- [ ] **Step 2: Tautkan rancangannya di index Source of Truth**
+- [x] **Step 2: Tautkan rancangannya di index Source of Truth**
 
 Di `internal/docs/README.md`, di dalam kategori `## research`, tepat SESUDAH baris yang memuat `audit-spec-879-ide-responsif-layar-sempit.md` (baris pertama daftar `research`), tambahkan satu baris:
 
@@ -837,12 +837,12 @@ Di `internal/docs/README.md`, di dalam kategori `## research`, tepat SESUDAH bar
 - [rancangan SPEC-882 — kolom ketik terminal untuk tablet & ponsel](../../docs/superpowers/specs/2026-08-22-spec-882-kolom-ketik-terminal-mobile-design.md) — jalur ketik kedua di bawah setiap pane sentuh: umpan balik lokal **nol RTT** lepas dari kesehatan sambungan, isinya mengalir ke pty **debounce 350 ms** lewat `sendKey.current` yang sama (FIFO, antrean outage, penahanan `\r` SPEC-878 berlaku gratis). **Satu** aturan delta berbasis backspace dihitung **per code point** — `\x15` ditolak karena artinya berbeda per program, dan unit UTF-16 membuat satu emoji bernilai dua backspace. Sengaja **bukan** perbaikan akar: `deliverable`, TTL prediksi, dan ADR-0134 tak disentuh, jadi penanda `terkirim`/`diantre`/`tertahan` di kolom itulah yang menjaga ia tak terasa mulus persis saat byte-nya tak ke mana-mana
 ```
 
-- [ ] **Step 3: Verifikasi integritas index**
+- [x] **Step 3: Verifikasi integritas index**
 
 Run: `node cli/dist/index.js docs index --check` (bila `cli/dist` belum ada, jalankan `pnpm --filter ./cli build` lebih dulu)
 Expected: index dinyatakan konsisten, atau — bila perintahnya tak tersedia di worktree ini — lewati langkah ini dan catat alasannya.
 
-- [ ] **Step 4: Jalankan seluruh test yang tersentuh perubahan**
+- [x] **Step 4: Jalankan seluruh test yang tersentuh perubahan**
 
 Run:
 ```bash
@@ -850,12 +850,12 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --changed "$HA
 ```
 Expected: berkas yang berjalan memuat **setidaknya** `src/test/terminal-composer.test.ts` dan `src/test/terminal-pane.test.tsx`, keduanya hijau. Jebakan: `--changed` menyalakan `passWithNoTests`, jadi "no test files" **bukan** bukti — pastikan kedua berkas itu benar-benar muncul di keluaran. Kegagalan yang sudah merah di base (mis. tiga `<Input type="number">` `SettingsScreen` pada `placeholder-contract`, atau `listChatSessions is not a function` di test portal) bukan regresi; buktikan dengan menjalankan berkas itu pada `git stash`-bebas hanya bila ragu, dan catat apa adanya.
 
-- [ ] **Step 5: Typecheck paket yang tersentuh**
+- [x] **Step 5: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa error. **Jangan** `pnpm -r typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs/architecture/stack.md internal/docs/README.md docs/superpowers/plans/2026-08-22-spec-882-kolom-ketik-terminal-mobile.md
