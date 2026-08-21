@@ -29,7 +29,14 @@ Primitive bersama:
   ke region aktif; grid satu panel selalu memakai lebar penuh.
 - `ResponsiveToolbar` membungkus kontrol secara alami; `LocalOverflow` menjadi pemilik overflow
   mendatar untuk tabel, kode, diff, graph, board, dan terminal. Shell/page sendiri selalu
-  `min-width:0` dan `overflow-x:hidden` — overflow lokal tidak boleh merambat ke halaman.
+  `min-width:0` dan `overflow-x:hidden` — overflow lokal tidak boleh merambat ke halaman. `LocalOverflow`
+  wajib membungkus konten yang punya lebar intrinsik: anak **blok** selalu selebar induknya, jadi
+  scroller yang membungkusnya tak pernah punya konten lebih lebar untuk digulir (SPEC-879).
+- `.hn-ide-head` + `.hn-ide-toolbar` adalah baris kepala layar IDE: strip tab `flex: 0 0 auto` di
+  samping toolbar ber-**basis dinyatakan** `flex: 1 1 480px`, yang turun ke barisnya sendiri dan
+  menggulir saat ruangnya kurang. Basis `auto` membuat pecah-baris ditentukan lebar isi, dan dengan
+  itu bentuk kepala berubah hanya karena label tab aktif ditebalkan atau nama project bertambah
+  panjang (SPEC-879).
 - `--page-gutter-x/y`, `--sidebar-w`, `--touch-target`, dan `--safe-*` adalah token lintas-screen.
   Semua kontrol utama memiliki area sentuh minimum 44×44px pada pointer kasar/mobile, meskipun
   kepadatan visual desktop boleh tetap lebih kecil.

@@ -41,7 +41,11 @@ Keluarga yang mengikuti kontrak itu:
   jalur button non-drag.
 - PRD, Docs, Review, Spec Docs, dan IDE Explorer memakai pemilih master/detail pada mobile lalu
   split-pane pada layar lebar. Git Graph memakai Graph/Detail; graph, kode, dan diff tetap memiliki
-  scroller lokal serta semua operasi yang dahulu kontekstual memiliki tombol touch/keyboard.
+  scroller lokal serta semua operasi yang dahulu kontekstual memiliki tombol touch/keyboard. Baris
+  kepala IDE (`.hn-ide-head`) menaruh strip tab dan toolbar dalam satu baris ber-basis dinyatakan:
+  satu baris di ~1100px, dua baris di 820px, dan di 390px toolbar turun ke barisnya sendiri sebagai
+  strip yang menggulir (`.hn-ide-toolbar`). Baris commit Git Graph hidup di scroller lokal
+  `ide-graph-rows`; baris Branches/Worktrees membungkus lewat `.hn-dense-row` (SPEC-879).
 - Terminal mobile memilih satu cell/panel aktif tanpa mengubah `{rows,cols,cells}` workspace yang
   dipersist untuk desktop. Semua `TerminalPane` tetap mounted; layar lebar kembali ke grid. Host
   yang berubah ukuran tetap menjalankan `ResizeObserver → FitAddon.fit() → resize` WebSocket.
@@ -89,6 +93,32 @@ dengan memotong atau menjepit, bukan dengan reflow. Ketiganya kini punya aturan:
   lebar berapa pun itu. Terukur di 390px: nama project di Overview jadi **3 baris (4
   karakter/baris)**, kalimat gerbang scheduler jadi **9 baris (8 karakter/baris)**. `.hn-dense-row`
   memberi anak `flex: 1` lebar minimum 220px sehingga tombolnya turun ke baris berikutnya.
+- **Baris kepala wajib punya `flex-basis` yang DINYATAKAN, bukan `auto` (SPEC-879).** `flex-wrap`
+  memutus baris memakai *hypothetical main size*, yaitu `flex-basis` — dengan basis `auto` itu
+  berarti **lebar isi**, jadi memberi salah satu item kemampuan menyusut tak pernah menolong dan
+  bentuk kepala ditentukan isinya, bukan layout-nya. Terukur pada baris kepala IDE di 1100px yang
+  sama: tab Explorer memberi **satu** baris sementara tab Worktrees memberi **dua**, semata karena
+  label tab aktif dirender `font-weight: 600`; dan menambahkan satu project bernama `probe-diff`
+  membuat **keempat** tab jadi dua baris, karena lebar `<select>` native mengikuti opsi
+  terpanjangnya. `.hn-ide-head` karena itu memberi toolbar basis 480px (`.hn-ide-toolbar`
+  `flex: 1 1 480px`): ≥480px ia tetap satu baris, kurang dari itu ia turun ke barisnya sendiri dan
+  menggulir di sana. Rata kanan lewat `margin-inline-start: auto` pada anak pertama, **bukan**
+  `justify-content: flex-end` — di kontainer yang menggulir, flex-end membuat awal konten tak
+  terjangkau.
+- **Scroller lokal wajib punya konten yang lebih lebar, dan anak BLOK tak pernah memberikannya
+  (SPEC-879).** Blok selalu selebar induknya, jadi `.hn-local-overflow` yang membungkus satu `<div>`
+  biasa adalah scroller mati persis seperti strip tab tanpa `flex-shrink: 0` — terukur pada kartu
+  Git Graph di 390px: `content = box = 362`, `canScroll: false`, dan **200 tombol subject commit
+  runtuh ke `0×44`** sementara pill ref meluber menimpa kolom author. Bungkus **region yang memang
+  butuh lebar intrinsik saja** (baris commit), beri anaknya `min-width`, dan beri lantai `min-width`
+  pada kolom yang boleh disantap tetangganya — pill ref `flex: 0 0 auto` memakan kolom subject lebih
+  dulu, jadi tanpa lantai itu baris HEAD menyisakan **24px** meski kartunya sudah punya lebar
+  minimum.
+- **Baris tabel reflow sebelum menggulir (SPEC-879).** Menggulir mendatar hanya sah untuk konten
+  yang tak bisa reflow (graph, diff, kode). Baris Branches/Worktrees bisa: tanpa `flex-wrap` mereka
+  menyembunyikan **tombol Hapus tiap baris** 193–364px di luar layar di 390px (18px di 820px) tanpa
+  satu pun scrollbar terlihat. `.hn-dense-row` + `flex-wrap: wrap` inline di semua tier, kolom meta
+  `margin-left: auto`; di ≥1200px barisnya muat sehingga bentuk desktop tak berubah.
 - **Baris di dalam daftar bertinggi terbatas wajib `flex: 0 0 auto`.** Daftar pemilih (Ambil
   backlog, Riwayat sesi) adalah `flex-direction: column` ber-`maxHeight`, jadi barisnya boleh
   diperas di bawah kontennya: terukur tombol **44px memuat isi 66px**, dan judul yang membungkus

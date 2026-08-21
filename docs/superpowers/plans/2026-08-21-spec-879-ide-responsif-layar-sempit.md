@@ -643,7 +643,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/<berkas-yang-mera
 - Consumes: harness scratchpad `cdp.mjs` + `audit.mjs` + `probe-src.js` (sudah ditulis saat audit sebelum), `data-testid` `ide-graph-rows`, `ide-tree-scroll`, `doc-preview-scroll`, `ide-entry-dest`.
 - Produces: `shots-after/report.json` + 12 PNG, dan tabel angka di dokumen audit.
 
-- [ ] **Step 1: Bangun ulang aset web dan boot instance terisolasi**
+- [x] **Step 1: Bangun ulang aset web dan boot instance terisolasi**
 
 ```bash
 env -u NODE_ENV -u DATABASE_URL pnpm --filter ./src build
@@ -651,7 +651,7 @@ env -u NODE_ENV -u DATABASE_URL pnpm --filter ./src build
 
 Server harness (`HANOMAN_HOME` + `DATABASE_URL` sendiri, `HANOMAN_WEB_DIR` menunjuk `src/dist`, tanpa `HANOMAN_CONTROL_ORIGINS` yang membuat setiap route 404) sudah berjalan dari fase audit; bila mati, jalankan ulang `scratchpad/boot.sh`.
 
-- [ ] **Step 2: Jalankan harness sesudah perbaikan**
+- [x] **Step 2: Jalankan harness sesudah perbaikan**
 
 ```bash
 cd <scratchpad> && node audit.mjs shots-after
@@ -659,7 +659,7 @@ cd <scratchpad> && node audit.mjs shots-after
 
 Harapan: 16 baris `. <tab>@<viewport>` lalu `selesai → …/shots-after`.
 
-- [ ] **Step 3: Bandingkan angkanya dengan target**
+- [x] **Step 3: Bandingkan angkanya dengan target**
 
 ```bash
 python3 summarize.py shots-after/report.json
@@ -674,25 +674,25 @@ Target (spec, bagian "Bukti"):
 
 Bila salah satu meleset, kembali ke task yang bersangkutan — **jangan** melonggarkan targetnya.
 
-- [ ] **Step 4: Lihat tangkapan layarnya**
+- [x] **Step 4: Lihat tangkapan layarnya**
 
 Buka minimal `graph-390.png`, `branches-390.png`, `worktrees-390.png`, `explorer-390.png`, dan `worktrees-1100.png`. Angka tak menangkap "pill menimpa author"; gambar menangkapnya.
 
-- [ ] **Step 5: Tulis dokumen audit**
+- [x] **Step 5: Tulis dokumen audit**
 
 Buat `internal/docs/research/audit-spec-879-ide-responsif-layar-sempit.md` berisi: cara mengukur (empat kelas cacat + kenapa ellipsis milik sendiri bukan pelanggaran), tabel sebelum/sesudah per tab × viewport, empat akar beserta angkanya, kontrol negatif (Explorer, DiffView, target sentuh pointer halus), dan bentuk perbaikannya.
 
-- [ ] **Step 6: Tautkan di index Source of Truth**
+- [x] **Step 6: Tautkan di index Source of Truth**
 
 Tambahkan satu baris di kategori `research` `internal/docs/README.md`, mengikuti bentuk baris audit yang sudah ada (judul + ringkasan satu paragraf yang memuat angka kuncinya).
 
-- [ ] **Step 7: Perbarui kontrak responsive & kosakata design system**
+- [x] **Step 7: Perbarui kontrak responsive & kosakata design system**
 
 Di `internal/docs/frontend/frontend-implementation.md`, bagian "Kontrak responsive seluruh frontend (SPEC-763)" → daftar aturan sesudah "Invariant halaman tidak menjamin layar terbaca": tambahkan tiga aturan SPEC-879 (kepala wajib punya pemilik sisa lebar; scroller lokal wajib punya konten yang lebih lebar — anak blok tak pernah memberikannya; baris tabel reflow sebelum menggulir).
 
 Di `internal/docs/design-system/design-system.md`, bagian sistem responsif bersama: tambahkan `.hn-ide-head` / `.hn-ide-toolbar` ke kosakata layout.
 
-- [ ] **Step 8: Verifikasi integritas index**
+- [x] **Step 8: Verifikasi integritas index**
 
 ```bash
 node cli/dist/hanoman.js docs index --check
@@ -702,7 +702,7 @@ Bila `cli/dist` belum ada: `env -u NODE_ENV pnpm build:cli` lebih dulu.
 
 Harapan: index konsisten (tak ada doc tanpa tautan).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add internal/docs
