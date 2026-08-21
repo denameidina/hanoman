@@ -36,11 +36,20 @@ vi.mock("../src/api/client", () => ({
     ideWorkingStatus: vi.fn(async () => ({ branch: "main", staged: [], unstaged: [] })),
     ideFile: vi.fn(async () => ({ path: "README.md", content: "# hi", binary: false, truncated: false })),
     ideFileDownloadUrl: () => "#",
+    getConfig: vi.fn(async () => ({ entries: [] })),
+    ideGraph: vi.fn(async () => ({ current: "main", commits: [
+      { sha: "aaaa111", parents: [], author: "Dena", at: "2026-01-02T00:00:00Z",
+        subject: "feat(terminal): perekam diagnostik jalur ketik", refs: ["main"], tags: [] },
+    ] })),
+    ideStatus: vi.fn(async () => ({ branch: "main", clean: true, ahead: 0, behind: 0,
+      staged: [], unstaged: [], untracked: [] })),
+    ideStashes: vi.fn(async () => []),
   },
   ApiError: class extends Error {},
 }));
 
 import { IdeScreen } from "../src/screens/IdeScreen";
+import { GitGraph } from "../src/screens/GitGraph";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -73,5 +82,36 @@ describe("SPEC-879 · baris kepala IDE punya pemilik sisa lebar", () => {
     expect(head.querySelector(":scope > .hn-ide-toolbar")).not.toBeNull();
     // `space-between` tak punya arti lagi begitu strip tab yang menyerap sisa lebar.
     expect(head.style.justifyContent).toBe("");
+  });
+});
+
+const renderGraph = () => render(
+  <GitGraph projectId="p1" onRunGit={async () => ({ ok: true } as never)}
+    onMerge={async () => {}} onRebase={async () => {}} onPull={async () => {}}
+    onDrop={async () => {}} onOpenFile={() => {}} />,
+);
+
+describe("SPEC-879 · region baris Git Graph adalah scroller lokal yang HIDUP", () => {
+  it("membungkus baris commit — bukan seluruh kartu — dengan scroller ber-lebar minimum", async () => {
+    renderGraph();
+    const rows = await screen.findByTestId("ide-graph-rows");
+    expect(rows).toHaveClass("hn-local-overflow");
+    // Anak blok selalu selebar induknya; tanpa `min-width` scroller ini tak pernah punya konten
+    // lebih lebar untuk digulir — terukur 362 = 362 di 390px, `canScroll: false`.
+    const inner = rows.firstElementChild as HTMLElement;
+    expect(Number.parseInt(inner.style.minWidth, 10)).toBeGreaterThanOrEqual(460);
+    // Kartunya sendiri TAK boleh lagi berada di dalam scroller mendatar.
+    expect(rows.closest(".hn-local-overflow")).toBe(rows);
+  });
+
+  it("menaruh baris commit di dalam scroller dan baris penutup SPEC-351 di luarnya", async () => {
+    renderGraph();
+    const rows = await screen.findByTestId("ide-graph-rows");
+    const subject = await screen.findByRole("button", { name: /Buka commit aaaa111/ });
+    expect(rows.contains(subject)).toBe(true);
+    // Sentinel IntersectionObserver menempel pada `<main>` yang menggulir tegak; menaruhnya di
+    // dalam scroller mendatar tak menambah apa pun kecuali risiko.
+    const footer = screen.getByText(/commit dimuat|dari \d+ commit/);
+    expect(rows.contains(footer)).toBe(false);
   });
 });

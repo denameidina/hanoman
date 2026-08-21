@@ -9,6 +9,10 @@ import { DiffView } from "./diff-view";
 import { emojify, renderMessage, gravatarUrl } from "./git-graph-render";
 
 const LANE_W = 14, ROW_H = 30, DOT = 4;
+// SPEC-879 · lebar minimum region baris: subject 238 + author 88 + tanggal 40 + aksi ⋮ 44 + gap &
+// padding 50. Di bawah ini kolom subject yang `flex: 1` runtuh ke 0px dan pill ref (yang
+// `flex: 0 0 auto`) meluber menimpa kolom author — terukur 200 tombol subject `0×44` di 390px.
+const GRAPH_ROW_MIN = 460;
 const POLL_MS = 4000; // SPEC-245 · kadens live-refresh git graph (HTTP polling, ADR-stack)
 const PAGE = 200;     // SPEC-351 · besar satu halaman commit; jendela tumbuh kelipatan ini
 const COLORS = ["#a9791c", "#3b7a57", "#8a5a44", "#4a6fa5", "#7d5ba6", "#b0503a"]; // brass-leaf-clay-ink
@@ -388,10 +392,9 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
       gap: 16, alignItems: "start", minWidth: 0 }}>
       <section data-panel="graph" aria-label="Graph" aria-hidden={narrow && hasDetail && panel !== "graph" ? "true" : "false"}
         style={{ display: narrow && hasDetail && panel !== "graph" ? "none" : "block", minWidth: 0 }}>
-      <LocalOverflow>
       <Card padding={0}>
         {/* SPEC-233 · find widget (Ctrl/Cmd-F) + center HEAD (Ctrl/Cmd-H) */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border-hair)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", borderBottom: "1px solid var(--border-hair)" }}>
           {findOpen ? (
             <>
               <Icon name="search" size={13} color="var(--text-subtle)" />
@@ -410,8 +413,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             <>
               <Button size="sm" variant="ghost" leftIcon="search" onClick={() => setFindOpen(true)}>Cari</Button>
               <Button size="sm" variant="ghost" leftIcon="crosshair" onClick={centerHead}>HEAD</Button>
-              <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>⌘F cari · ⌘H center HEAD</span>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-subtle)" }}>⌘F cari · ⌘H center HEAD</span>
             </>
           )}
         </div>
@@ -436,32 +438,6 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             style: {style}
           </button>
         </div>
-        {/* SPEC-233 · baris uncommitted changes (lingkaran terbuka) di puncak bila working tree kotor */}
-        {status && !status.clean && (() => {
-          const n = status.staged.length + status.unstaged.length + status.untracked.length;
-          const first = status.unstaged[0] ?? status.untracked[0] ?? status.staged[0];
-          return (
-            <div onClick={() => { if (first) onOpenFile(first, ""); }}
-              onContextMenu={(e) => { e.preventDefault(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bone-100)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-              style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
-                cursor: "pointer", borderBottom: "1px solid var(--border-hair)" }}>
-              <svg width={maxLanes * LANE_W} height={graphRowHeight} style={{ flex: "0 0 auto" }}>
-                <circle cx={LANE_W / 2} cy={graphRowHeight / 2} r={DOT} fill="none" stroke={laneColor(0)} strokeWidth={1.5} />
-              </svg>
-              <button type="button" onClick={(event) => { event.stopPropagation(); if (first) onOpenFile(first, ""); }}
-                style={{ border: 0, padding: 0, background: "transparent", textAlign: "left", cursor: first ? "pointer" : "default",
-                  fontSize: 12.5, fontStyle: "italic", color: "var(--text-muted)", flex: 1 }}>
-                Uncommitted changes · {n} file
-              </button>
-              <button type="button" className="hn-graph-action" aria-label="Aksi working tree"
-                onClick={(e) => { e.stopPropagation(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}>⋮</button>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", flex: "0 0 auto", width: 88, textAlign: "right" }}>working tree</span>
-              <span style={{ width: 40, flex: "0 0 auto" }} />
-            </div>
-          );
-        })()}
         {/* SPEC-233 · stash sebagai chip di puncak; klik-kanan → apply/pop/drop/branch/copy */}
         {stashes.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "6px 12px", borderBottom: "1px solid var(--border-hair)" }}>
@@ -477,58 +453,94 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             ))}
           </div>
         )}
-        {rows.map((r, i) => {
-          const c = r.commit;
-          const isHead = c.refs.includes(current);
-          const sel = detail?.sha === c.sha;
-          const hit = findHits.includes(c.sha);
-          const activeHit = findHits[findIdx] === c.sha;
-          const rowBg = sel ? "var(--brass-100)" : activeHit ? "var(--brass-200, #ecd9ac)" : hit ? "var(--bone-100)" : "transparent";
-          return (
-            <div key={c.sha} ref={(el) => { if (el) rowRefs.current.set(c.sha, el); }}
-              onClick={(e) => onRowClick(e, c.sha)}
-              onContextMenu={(e) => openMenu(e, c)}
-              title={compareFrom ? "Ctrl/Cmd-klik untuk bandingkan dengan commit pertama" : "Ctrl/Cmd-klik untuk mulai compare"}
-              onMouseEnter={(e) => { if (!sel && !activeHit) e.currentTarget.style.background = "var(--bone-100)"; }}
-              onMouseLeave={(e) => { if (!sel && !activeHit) e.currentTarget.style.background = hit ? "var(--bone-100)" : "transparent"; }}
-              style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
-                cursor: "pointer", borderBottom: "1px solid var(--border-hair)",
-                background: rowBg }}>
-              <RowSvg row={r} edges={allEdges[i] ?? []} maxLanes={maxLanes} style={style} palette={palette} height={graphRowHeight} />
-              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
-                {c.refs.map((ref) => (
-                  <button type="button" key={ref} title="branch — pilih untuk aksi"
-                    aria-label={`Aksi branch ${ref}`}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
-                    style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px", cursor: "pointer", border: "none",
-                    borderRadius: 999, background: isHead && ref === current ? "var(--brass-500)" : "var(--brass-100)",
-                    color: isHead && ref === current ? "#fff" : "var(--brass-700)", flex: "0 0 auto" }}>{ref}</button>
-                ))}
-                {/* SPEC-233 · tag = pill terpisah (warna leaf, ikon tag); klik-kanan → menu tag */}
-                {c.tags.map((t) => (
-                  <button type="button" key={`tag:${t}`} title="tag — pilih untuk aksi" aria-label={`Aksi tag ${t}`}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
-                    style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px 1px 4px", borderRadius: 999, border: "none",
-                      display: "inline-flex", alignItems: "center", gap: 3, background: "var(--leaf-100, #e6efe9)",
-                      color: "var(--leaf-600, #3b7a57)", flex: "0 0 auto" }}>⌂{t}</button>
-                ))}
-                <button type="button" aria-label={`Buka commit ${c.sha}`} onClick={(event) => { event.stopPropagation(); onRowClick(event, c.sha); }}
-                  style={{ minWidth: 0, padding: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left",
-                    fontSize: 12.5, color: muted && c.parents.length > 1 ? "var(--text-subtle)" : "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {msgOpts.emoji ? emojify(c.subject) : c.subject}
-                </button>
-              </div>
-              <button type="button" className="hn-graph-action" aria-label={`Aksi commit ${c.sha}`}
-                onClick={(e) => { e.stopPropagation(); openMenu(e, c); }}>⋮</button>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)",
-                flex: "0 0 auto", width: 88, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{c.author}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)",
-                flex: "0 0 auto", width: 40, textAlign: "right" }}>{rel(c.at)}</span>
-            </div>
-          );
-        })}
+        {/* SPEC-879 · baris commit tak bisa reflow: lane SVG-nya posisional dan kolomnya berlebar
+            tetap, jadi ia memiliki scroller mendatarnya sendiri — dengan lebar minimum, karena anak
+            BLOK selalu selebar induknya dan scroller tanpa konten yang lebih lebar tak pernah bisa
+            digulir (terukur 362 = 362 di 390px). Widget cari, kontrol tampilan, chip stash, dan
+            baris penutup sengaja DI LUAR: yang terakhir sentinel IntersectionObserver SPEC-351
+            yang menempel pada `<main>` yang menggulir tegak. */}
+        <LocalOverflow data-testid="ide-graph-rows">
+          <div style={{ minWidth: maxLanes * LANE_W + GRAPH_ROW_MIN }}>
+            {/* SPEC-233 · baris uncommitted changes (lingkaran terbuka) di puncak bila working tree kotor */}
+            {status && !status.clean && (() => {
+              const n = status.staged.length + status.unstaged.length + status.untracked.length;
+              const first = status.unstaged[0] ?? status.untracked[0] ?? status.staged[0];
+              return (
+                <div onClick={() => { if (first) onOpenFile(first, ""); }}
+                  onContextMenu={(e) => { e.preventDefault(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bone-100)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
+                    cursor: "pointer", borderBottom: "1px solid var(--border-hair)" }}>
+                  <svg width={maxLanes * LANE_W} height={graphRowHeight} style={{ flex: "0 0 auto" }}>
+                    <circle cx={LANE_W / 2} cy={graphRowHeight / 2} r={DOT} fill="none" stroke={laneColor(0)} strokeWidth={1.5} />
+                  </svg>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); if (first) onOpenFile(first, ""); }}
+                    style={{ border: 0, padding: 0, background: "transparent", textAlign: "left", cursor: first ? "pointer" : "default",
+                      fontSize: 12.5, fontStyle: "italic", color: "var(--text-muted)", flex: 1 }}>
+                    Uncommitted changes · {n} file
+                  </button>
+                  <button type="button" className="hn-graph-action" aria-label="Aksi working tree"
+                    onClick={(e) => { e.stopPropagation(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}>⋮</button>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", flex: "0 0 auto", width: 88, textAlign: "right" }}>working tree</span>
+                  <span style={{ width: 40, flex: "0 0 auto" }} />
+                </div>
+              );
+            })()}
+            {rows.map((r, i) => {
+              const c = r.commit;
+              const isHead = c.refs.includes(current);
+              const sel = detail?.sha === c.sha;
+              const hit = findHits.includes(c.sha);
+              const activeHit = findHits[findIdx] === c.sha;
+              const rowBg = sel ? "var(--brass-100)" : activeHit ? "var(--brass-200, #ecd9ac)" : hit ? "var(--bone-100)" : "transparent";
+              return (
+                <div key={c.sha} ref={(el) => { if (el) rowRefs.current.set(c.sha, el); }}
+                  onClick={(e) => onRowClick(e, c.sha)}
+                  onContextMenu={(e) => openMenu(e, c)}
+                  title={compareFrom ? "Ctrl/Cmd-klik untuk bandingkan dengan commit pertama" : "Ctrl/Cmd-klik untuk mulai compare"}
+                  onMouseEnter={(e) => { if (!sel && !activeHit) e.currentTarget.style.background = "var(--bone-100)"; }}
+                  onMouseLeave={(e) => { if (!sel && !activeHit) e.currentTarget.style.background = hit ? "var(--bone-100)" : "transparent"; }}
+                  style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
+                    cursor: "pointer", borderBottom: "1px solid var(--border-hair)",
+                    background: rowBg }}>
+                  <RowSvg row={r} edges={allEdges[i] ?? []} maxLanes={maxLanes} style={style} palette={palette} height={graphRowHeight} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
+                    {c.refs.map((ref) => (
+                      <button type="button" key={ref} title="branch — pilih untuk aksi"
+                        aria-label={`Aksi branch ${ref}`}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
+                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
+                        style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px", cursor: "pointer", border: "none",
+                        borderRadius: 999, background: isHead && ref === current ? "var(--brass-500)" : "var(--brass-100)",
+                        color: isHead && ref === current ? "#fff" : "var(--brass-700)", flex: "0 0 auto" }}>{ref}</button>
+                    ))}
+                    {/* SPEC-233 · tag = pill terpisah (warna leaf, ikon tag); klik-kanan → menu tag */}
+                    {c.tags.map((t) => (
+                      <button type="button" key={`tag:${t}`} title="tag — pilih untuk aksi" aria-label={`Aksi tag ${t}`}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
+                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
+                        style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px 1px 4px", borderRadius: 999, border: "none",
+                          display: "inline-flex", alignItems: "center", gap: 3, background: "var(--leaf-100, #e6efe9)",
+                          color: "var(--leaf-600, #3b7a57)", flex: "0 0 auto" }}>⌂{t}</button>
+                    ))}
+                    <button type="button" aria-label={`Buka commit ${c.sha}`} onClick={(event) => { event.stopPropagation(); onRowClick(event, c.sha); }}
+                      style={{ minWidth: 0, padding: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left",
+                        fontSize: 12.5, color: muted && c.parents.length > 1 ? "var(--text-subtle)" : "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {msgOpts.emoji ? emojify(c.subject) : c.subject}
+                    </button>
+                  </div>
+                  <button type="button" className="hn-graph-action" aria-label={`Aksi commit ${c.sha}`}
+                    onClick={(e) => { e.stopPropagation(); openMenu(e, c); }}>⋮</button>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)",
+                    flex: "0 0 auto", width: 88, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{c.author}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)",
+                    flex: "0 0 auto", width: 40, textAlign: "right" }}>{rel(c.at)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </LocalOverflow>
         {/* SPEC-351 · baris penutup: daftar tak pernah lagi berhenti tanpa kabar. Menyatakan
             berapa yang dimuat, apakah masih ada lanjutannya, dan jadi sentinel auto-load. */}
         <div ref={moreRef} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
@@ -546,7 +558,6 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           )}
         </div>
       </Card>
-      </LocalOverflow>
       </section>
 
       {detail && (

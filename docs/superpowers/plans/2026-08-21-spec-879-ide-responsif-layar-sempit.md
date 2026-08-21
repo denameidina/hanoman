@@ -243,7 +243,7 @@ Akar 2. `<LocalOverflow>` membungkus seluruh `<Card>`; anaknya blok, dan blok se
 - Consumes: `LANE_W = 14` (sudah ada di `GitGraph.tsx:11`), `maxLanes` (sudah dihitung di komponen), `.hn-local-overflow` (app.css).
 - Produces: `data-testid="ide-graph-rows"` — dipakai test Task 2 dan harness bukti Task 6.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `src/test/ide-responsive.test.tsx` (mock `api` di berkas itu perlu diperluas dulu — ganti blok `vi.mock` yang ada dengan versi berikut, yang menambahkan endpoint Git Graph):
 
@@ -302,7 +302,7 @@ describe("SPEC-879 · region baris Git Graph adalah scroller lokal yang HIDUP", 
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.test.tsx -t "Git Graph"
@@ -310,7 +310,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.te
 
 Harapan: FAIL — `Unable to find an element by: [data-testid="ide-graph-rows"]`.
 
-- [ ] **Step 3: Tambahkan konstanta lebar minimum**
+- [x] **Step 3: Tambahkan konstanta lebar minimum**
 
 Di `src/src/screens/GitGraph.tsx:11`, sesudah `const LANE_W = 14, ROW_H = 30, DOT = 4;`:
 
@@ -321,7 +321,7 @@ Di `src/src/screens/GitGraph.tsx:11`, sesudah `const LANE_W = 14, ROW_H = 30, DO
 const GRAPH_ROW_MIN = 460;
 ```
 
-- [ ] **Step 4: Pindahkan `<LocalOverflow>` ke dalam kartu**
+- [x] **Step 4: Pindahkan `<LocalOverflow>` ke dalam kartu**
 
 Di `src/src/screens/GitGraph.tsx`, hapus `<LocalOverflow>` yang membungkus `<Card padding={0}>` (baris `392`) dan `</LocalOverflow>` penutupnya (baris `546`), sehingga `<Card padding={0}>` menjadi anak langsung `<section data-panel="graph">`.
 
@@ -342,7 +342,7 @@ Lalu bungkus **region baris** — dari komentar `{/* SPEC-233 · baris uncommitt
 
 Chip stash tetap **di luar** `<LocalOverflow>` (ia sudah `flex-wrap: wrap` dan tak butuh lebar intrinsik). Urutan render tak berubah: cari → kontrol tampilan → chip stash → `<LocalOverflow>`(uncommitted + baris) → baris penutup.
 
-- [ ] **Step 5: Buat baris widget cari membungkus, bukan memotong**
+- [x] **Step 5: Buat baris widget cari membungkus, bukan memotong**
 
 Di baris widget cari (`src/src/screens/GitGraph.tsx:394`), tambahkan `flexWrap: "wrap"` dan ganti spacer hantu dengan `marginLeft`:
 
@@ -356,7 +356,7 @@ dan di cabang `!findOpen`, hapus `<span style={{ flex: 1 }} />` lalu beri teks p
               <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-subtle)" }}>⌘F cari · ⌘H center HEAD</span>
 ```
 
-- [ ] **Step 6: Jalankan test sampai lulus**
+- [x] **Step 6: Jalankan test sampai lulus**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.test.tsx test/git-graph-view.test.tsx test/scroll-chain.test.tsx
@@ -364,7 +364,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run test/ide-responsive.te
 
 Harapan: PASS semua. `scroll-chain.test.tsx` menguji modal berkas Git Graph — ia tak tersentuh perubahan ini, jadi ia wajib tetap hijau.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/GitGraph.tsx src/test/ide-responsive.test.tsx
