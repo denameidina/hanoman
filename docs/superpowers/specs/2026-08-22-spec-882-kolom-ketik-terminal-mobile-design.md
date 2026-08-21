@@ -1,4 +1,4 @@
-# SPEC-881 · Kolom ketik terminal untuk tablet & ponsel
+# SPEC-882 · Kolom ketik terminal untuk tablet & ponsel
 
 **Tanggal:** 2026-08-22
 **Status:** design, disetujui operator
@@ -139,7 +139,7 @@ tombol Esc/Tab/panah**. Tombol aksi turun ke paling bawah.
 - Atribut wajib: `autoCapitalize="off"`, `autoCorrect="off"`, `spellCheck={false}`,
   `autoComplete="off"`, `enterKeyHint="send"`. Tanpa ini papan ketik Android mengapitalkan dan
   mengoreksi otomatis perintah shell, dan fitur ini akan mengirim teks yang bukan diketik operator.
-- `aria-label` menyebut sesi yang dituju, mis. `Ketik untuk sesi spec-881`.
+- `aria-label` menyebut sesi yang dituju, mis. `Ketik untuk sesi spec-882`.
 - Menyalakan/mematikan kolom mengubah tinggi pane → wajib memicu `fit.fit()` **dan** frame
   `resize`. Tanpa itu tmux menggambar untuk geometri lama.
 - Mengikuti design system `internal/docs/design-system/**` (editorial, bone paper, brass accent).
