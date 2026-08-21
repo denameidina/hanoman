@@ -1384,7 +1384,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `<HandledByChips>` (Task 6); `api.listDeviceTokens()`; `api.updateProject(id, { handledBy })` (Task 6)
 - Produces: `EditProjectModal.onSave(f)` bertambah field `handledBy: HandledByEntry[] | undefined` — **`undefined` berarti "jangan sentuh"**, dipakai mode baca-saja.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `src/test/project-handled-by.test.tsx`. Mengimpor `EditProjectModal` menarik
 seluruh modul `App.tsx`; bila import itu meledak karena `api` yang di-mock kurang lengkap, tambahkan
@@ -1454,7 +1454,7 @@ describe("SPEC-880 · editor penanda di EditProjectModal", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TES src/test/project-handled-by.test.tsx
@@ -1462,7 +1462,7 @@ TES src/test/project-handled-by.test.tsx
 
 Expected: FAIL — `Unable to find an element with the text: Ditangani oleh · disync`.
 
-- [ ] **Step 3: Tampilkan penanda di `src/src/screens/ProjectDetailScreen.tsx`**
+- [x] **Step 3: Tampilkan penanda di `src/src/screens/ProjectDetailScreen.tsx`**
 
 Tambahkan import:
 
@@ -1482,7 +1482,7 @@ Di grid meta header, sisipkan sel baru tepat **sesudah** `<Meta label="Git remot
           </div>
 ```
 
-- [ ] **Step 4: Tambahkan editor di `EditProjectModal` (`src/src/App.tsx`)**
+- [x] **Step 4: Tambahkan editor di `EditProjectModal` (`src/src/App.tsx`)**
 
 Tambahkan `MultiSelect` ke import `./ds` dan `DeviceTokenView`/`HandledByEntry` ke import tipe `@hanoman/shared`.
 
@@ -1564,7 +1564,7 @@ Sisipkan Field baru tepat **sesudah** Field `Git remote`:
 
 Tambahkan `import { HandledByChips } from "./screens/HandledByChips";` di puncak `App.tsx`.
 
-- [ ] **Step 5: Teruskan nilainya di `updateProject` (`src/src/App.tsx`)**
+- [x] **Step 5: Teruskan nilainya di `updateProject` (`src/src/App.tsx`)**
 
 Ganti tanda tangan fungsi:
 
@@ -1585,7 +1585,7 @@ dan panggilan PATCH-nya:
       });
 ```
 
-- [ ] **Step 6: Jalankan test — pastikan HIJAU**
+- [x] **Step 6: Jalankan test — pastikan HIJAU**
 
 ```bash
 TES src/test/project-handled-by.test.tsx
@@ -1593,7 +1593,7 @@ TES src/test/project-handled-by.test.tsx
 
 Expected: PASS — 11 test.
 
-- [ ] **Step 7: Pastikan alur project lama tak pecah**
+- [x] **Step 7: Pastikan alur project lama tak pecah**
 
 ```bash
 TES src/test/projects-screen.test.tsx src/test/app-flows.test.tsx src/test/project-detail-changelog.test.tsx src/test/project-help-center.test.tsx src/test/missing-repo-card.test.tsx
@@ -1601,7 +1601,7 @@ TES src/test/projects-screen.test.tsx src/test/app-flows.test.tsx src/test/proje
 
 Expected: PASS semua. (Bila `missing-repo-card.test.tsx` tak ada, hilangkan dari daftar.)
 
-- [ ] **Step 8: Typecheck frontend**
+- [x] **Step 8: Typecheck frontend**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -1609,7 +1609,7 @@ pnpm --filter ./src typecheck
 
 Expected: keluar tanpa galat. (Bila nama filter itu salah, jalankan `node -e "console.log(require('./src/package.json').name)"` dan pakai `pnpm --filter <nama> typecheck`.)
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/src/screens/ProjectDetailScreen.tsx src/src/App.tsx src/test/project-handled-by.test.tsx

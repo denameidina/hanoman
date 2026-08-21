@@ -8,6 +8,7 @@ import type { ProjectVM } from "./types";
 import { CustomAgentsPanel } from "./CustomAgentsPanel";
 import { AutoMergeCard } from "./AutoMergeCard";
 import { MissingRepoCard } from "./MissingRepoCard";
+import { HandledByChips } from "./HandledByChips";
 
 const COV_TONE = (s: string) => (s === "broken" ? "err" : s === "drift" ? "warn" : "ok");
 
@@ -137,6 +138,13 @@ export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onG
           <Meta label={p.binding ? "Repo · mesin ini" : "Repo"} value={(p.binding ?? p.repoDir) || "—"} mono />
           {/* SPEC-218 · remote resmi untuk clone di device lain (— bila belum diset). */}
           <Meta label="Git remote" value={p.gitRemote || "—"} mono />
+          {/* SPEC-880 · ADR-0135 · penanda "ditangani oleh" = pernyataan yang DISYNC ke setiap
+              mesin; `Repo · mesin ini` di sebelahnya adalah fakta mesin ini saja. Pembedaan itu
+              dinyatakan di labelnya, bukan disiratkan. */}
+          <div>
+            <div className="hn-eyebrow">Ditangani oleh · disync</div>
+            <div style={{ marginTop: 4 }}><HandledByChips list={p.handledBy} /></div>
+          </div>
           <Meta label="Stack" value={p.stack || "—"} />
           <Meta label="Backlog terbuka" value={`${p.backlog} · ${p.topStage}`} />
         </div>

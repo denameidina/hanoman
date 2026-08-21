@@ -1,8 +1,15 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// `ProjectDetailScreen` merender AutoMergeCard & CustomAgentsPanel, jadi mock-nya harus memuat
+// jalur yang mereka panggil saat mount — kalau tidak, komponennya melempar sebelum sempat dirender.
 vi.mock("../src/api/client", () => ({
-  api: { listProjects: vi.fn(), listDeviceTokens: vi.fn() },
+  api: {
+    listProjects: vi.fn(), listDeviceTokens: vi.fn(),
+    listBranches: vi.fn().mockResolvedValue({ branches: [], remotes: [], defaultBranch: null }),
+    listCustomAgents: vi.fn().mockResolvedValue([]),
+    getCustomAgentCatalog: vi.fn().mockResolvedValue({ tools: [], models: [], runtimes: [] }),
+  },
   ApiError: class extends Error {},
 }));
 import { ProjectsScreen } from "../src/screens/ProjectsScreen";
@@ -71,5 +78,66 @@ describe("SPEC-880 · daftar project: kolom 'Ditangani'", () => {
     select.dispatchEvent(new Event("change", { bubbles: true }));
     await waitFor(() =>
       expect(vi.mocked(api.listProjects).mock.calls.at(-1)![0]).toMatchObject({ handledBy: "d1" }));
+  });
+});
+
+import { EditProjectModal } from "../src/App";
+import { ProjectDetailScreen } from "../src/screens/ProjectDetailScreen";
+
+const DETAIL_PROPS = {
+  onEdit: () => {}, onGotoDocs: () => {}, onGotoTerminal: () => {}, onGotoBacklog: () => {},
+  onGotoChangelog: () => {}, onDelete: () => {}, onToast: () => {},
+};
+
+describe("SPEC-880 · detail project", () => {
+  it("penanda tampil di panel info dan dinyatakan DISYNC", () => {
+    render(<ProjectDetailScreen p={P({
+      handledBy: [{ deviceId: "d1", name: "hm-dena", revoked: false }],
+    }) as never} {...DETAIL_PROPS} />);
+    expect(screen.getByText("Ditangani oleh · disync")).toBeInTheDocument();
+    expect(screen.getByText("hm-dena")).toBeInTheDocument();
+  });
+
+  it("repo tetap dinyatakan fakta mesin ini saja", () => {
+    render(<ProjectDetailScreen p={P({ binding: "/tmp/arta" }) as never} {...DETAIL_PROPS} />);
+    expect(screen.getByText("Repo · mesin ini")).toBeInTheDocument();
+  });
+});
+
+describe("SPEC-880 · editor penanda di EditProjectModal", () => {
+  it("dengan katalog device: multi-select dirender dan nilai tersimpan terpilih", async () => {
+    vi.mocked(api.listDeviceTokens).mockResolvedValue([
+      { id: "d1", name: "hm-dena", createdAt: "", lastSeenAt: null, revokedAt: null },
+    ] as never);
+    render(<EditProjectModal open project={P({
+      handledBy: [{ deviceId: "d1", name: "hm-dena", revoked: false }],
+    }) as never} onClose={() => {}} onSave={() => {}} />);
+    expect(await screen.findByLabelText("Pilih hanoman client")).toBeInTheDocument();
+    expect(screen.getByTestId("chip-d1")).toBeInTheDocument();
+  });
+
+  it("tanpa katalog device: baca-saja, nama tersimpan tetap terlihat, tak ada kontrol", async () => {
+    vi.mocked(api.listDeviceTokens).mockResolvedValue([] as never);
+    render(<EditProjectModal open project={P({
+      handledBy: [{ deviceId: "dev-hub", name: "hub-vps", revoked: false }],
+    }) as never} onClose={() => {}} onSave={() => {}} />);
+    await waitFor(() => expect(api.listDeviceTokens).toHaveBeenCalled());
+    expect(screen.getByText("hub-vps")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Pilih hanoman client")).toBeNull();
+    expect(screen.getByText(/hanya bisa diubah dari instance yang memegang katalog device/)).toBeInTheDocument();
+  });
+
+  // Inti K4: mengirim [] dari instance read-only akan MENGHAPUS nilai yang di-set di hub, dan
+  // penghapusannya menyeberang. `undefined` = jangan sentuh.
+  it("mode baca-saja menyimpan TANPA field handledBy", async () => {
+    vi.mocked(api.listDeviceTokens).mockResolvedValue([] as never);
+    const onSave = vi.fn();
+    render(<EditProjectModal open project={P({
+      handledBy: [{ deviceId: "dev-hub", name: "hub-vps", revoked: false }],
+    }) as never} onClose={() => {}} onSave={onSave} />);
+    await waitFor(() => expect(api.listDeviceTokens).toHaveBeenCalled());
+    screen.getByRole("button", { name: "Simpan" }).click();
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0]![0]).toHaveProperty("handledBy", undefined);
   });
 });

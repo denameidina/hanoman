@@ -4,11 +4,11 @@
 import React from "react";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
+import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
-import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem } from "@hanoman/shared";
+import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry } from "@hanoman/shared";
 import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
@@ -20,6 +20,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import type { ProjectVM } from "./screens/types";
 import { branchOptions } from "./screens/branch";
 import { FolderPicker } from "./screens/FolderPicker";
+import { HandledByChips } from "./screens/HandledByChips";
 import { repoBasename, cloneErrorText } from "./screens/git-remote";
 import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
@@ -573,16 +574,35 @@ function NewProjectModal({ open, onClose, onCreate }:
 }
 
 export function EditProjectModal({ open, project, onClose, onSave }:
-  { open: boolean; project?: ProjectVM; onClose: () => void; onSave: (f: { id: string; name: string; desc: string; dir: string; gitRemote: string }) => void }) {
+  { open: boolean; project?: ProjectVM; onClose: () => void;
+    onSave: (f: { id: string; name: string; desc: string; dir: string; gitRemote: string;
+      handledBy?: HandledByEntry[] }) => void }) {
   // SPEC-217 · `dir` = override path per-mesin (LocalBinding). Diisi dari binding project;
   // kosong = pakai path default project. Tak disync antar-mesin.
   // SPEC-218 · `gitRemote` = remote resmi (disync) agar device lain bisa clone.
   // SPEC-255 · `id` = slug renameable; ganti berdampak Help Center & sync ke server.
   const [f, setF] = React.useState({ id: "", name: "", desc: "", dir: "", gitRemote: "" });
   const [picker, setPicker] = React.useState(false);
+  // SPEC-880 · ADR-0135 · katalog device instance ini. `[]` = instance ini tak memegang katalognya
+  // (client) → editor jatuh ke BACA-SAJA dan `handledBy` tak ikut disimpan sama sekali: mengirim
+  // `[]` dari sini akan MENGHAPUS nilai yang di-set di hub, dan penghapusan itu menyeberang.
+  const [devices, setDevices] = React.useState<DeviceTokenView[] | null>(null);
+  const [handled, setHandled] = React.useState<HandledByEntry[]>([]);
+  const canEditHandled = !!devices?.length;
   React.useEffect(() => {
-    if (open && project) setF({ id: project.id, name: project.name, desc: project.desc, dir: project.binding ?? "", gitRemote: project.gitRemote ?? "" });
+    if (open && project) {
+      setF({ id: project.id, name: project.name, desc: project.desc, dir: project.binding ?? "", gitRemote: project.gitRemote ?? "" });
+      setHandled((project.handledBy ?? []).map((h) => ({ deviceId: h.deviceId, name: h.name })));
+    }
   }, [open, project]);
+  React.useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    api.listDeviceTokens?.()
+      .then((list) => { if (alive) setDevices(list); })
+      .catch(() => { if (alive) setDevices([]); });
+    return () => { alive = false; };
+  }, [open]);
   const slugOk = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(f.id.trim());
   const canSubmit = !!f.name.trim() && slugOk;
   return (
@@ -590,7 +610,9 @@ export function EditProjectModal({ open, project, onClose, onSave }:
       title="Edit project"
       footer={<>
         <Button variant="ghost" size="sm" onClick={onClose}>Batal</Button>
-        <Button size="sm" leftIcon="check" onClick={() => canSubmit && onSave(f)}>Simpan</Button>
+        <Button size="sm" leftIcon="check" onClick={() => canSubmit && onSave({
+          ...f, handledBy: canEditHandled ? handled : undefined,
+        })}>Simpan</Button>
       </>}>
       {/* SPEC-255 · ADR-0064 · `id` kini renameable lewat operasi khusus (cascade + rambat sync). */}
       <Field label="ID project" hint="slug unik · huruf-kecil/angka/hubung · ganti = pengaruh Help Center & sync ke server">
@@ -619,6 +641,30 @@ export function EditProjectModal({ open, project, onClose, onSave }:
       <Field label="Git remote" hint="opsional · remote resmi agar device lain bisa clone project ini · disync antar-device">
         <Input value={f.gitRemote} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, gitRemote: e.target.value }))}
           leftIcon="git-branch" mono placeholder="https://github.com/org/repo.git" style={{ width: "100%" }} />
+      </Field>
+      {/* SPEC-880 · ADR-0135 · "ditangani oleh" — pernyataan DISYNC, beda dari "Path (mesin ini)"
+          di atas. Nilai tersimpan yang device-nya tak ada di katalog mesin ini (dicabut, atau
+          milik instance lain) dirender MultiSelect sebagai chip bertanda, bukan dibuang senyap. */}
+      <Field label="Ditangani oleh"
+        hint={canEditHandled
+          ? "hanoman client yang memegang project ini · disync ke semua mesin · boleh kosong"
+          : "disync ke semua mesin · hanya bisa diubah dari instance yang memegang katalog device"}>
+        {canEditHandled ? (
+          <MultiSelect aria-label="Pilih hanoman client" placeholder="Pilih client…"
+            emptyText="Tak ada device terdaftar yang cocok."
+            value={handled.map((h) => h.deviceId)}
+            invalidValues={handled
+              .filter((h) => !devices!.some((d) => d.id === h.deviceId && !d.revokedAt))
+              .map((h) => h.deviceId)}
+            options={devices!.filter((d) => !d.revokedAt).map((d) => ({
+              value: d.id,
+              label: d.lastSeenAt ? `${d.name} · terakhir ${new Date(d.lastSeenAt).toLocaleDateString("id-ID")}` : d.name,
+            }))}
+            onChange={(next) => setHandled(next.map((id) => handled.find((h) => h.deviceId === id)
+              ?? { deviceId: id, name: devices!.find((d) => d.id === id)?.name ?? id }))} />
+        ) : (
+          <HandledByChips list={project?.handledBy} />
+        )}
       </Field>
     </Modal>
   );
@@ -768,7 +814,8 @@ export default function App() {
     setSection(t.section);
   }, [sessions]);
 
-  async function updateProject(f: { id: string; name: string; desc: string; dir: string; gitRemote: string }) {
+  async function updateProject(f: { id: string; name: string; desc: string; dir: string; gitRemote: string;
+    handledBy?: HandledByEntry[] }) {
     if (!proj) return;
     const newId = f.id.trim();
     try {
@@ -790,7 +837,12 @@ export default function App() {
       }
       const effId = newId && newId !== proj.id ? newId : proj.id;
       // SPEC-218 · gitRemote disync; "" = kosongkan (endpoint clone cek `!gitRemote`, falsy).
-      await api.updateProject(effId, { name: f.name.trim(), desc: f.desc.trim(), gitRemote: f.gitRemote.trim() });
+      // SPEC-880 · `handledBy` HANYA disertakan bila instance ini memegang katalog device —
+      // `undefined` di sini berarti "jangan sentuh", bukan "kosongkan".
+      await api.updateProject(effId, {
+        name: f.name.trim(), desc: f.desc.trim(), gitRemote: f.gitRemote.trim(),
+        ...(f.handledBy ? { handledBy: f.handledBy } : {}),
+      });
       // SPEC-217 · path per-mesin lewat binding (tak disync). Set bila berubah; kosong = hapus override.
       const dir = f.dir.trim();
       if (dir !== (proj.binding ?? "")) {
