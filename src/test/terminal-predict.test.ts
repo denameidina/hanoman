@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applySeq, canPredict, classifyInput, echoedPrefixLen, initialState, looksLikePasswordPrompt,
   COALESCE_IN_MS, createInputBatcher, onInput, onPaneAltScreen, onReattach, onServerData, onTick,
-  reapply, rollbackSeq,
+  onDelivered, reapply, rollbackSeq,
   SUSPEND_MS, TTL_MS, type PredictState, type View,
 } from "../src/screens/terminal-predict";
 
@@ -45,7 +45,7 @@ describe("applySeq / rollbackSeq", () => {
 });
 
 const view = (over: Partial<View> = {}): View =>
-  ({ cursorX: 4, cols: 100, line: "❯ h", connected: true, ...over });
+  ({ cursorX: 4, cols: 100, line: "❯ h", deliverable: true, ...over });
 const state = (over: Partial<PredictState> = {}): PredictState => ({ ...initialState(), ...over });
 
 // SPEC-863 · aliran byte klien tmux BUKAN sumber kebenaran soal keadaan pane. Terukur pada tmux
@@ -105,8 +105,8 @@ describe("canPredict", () => {
   it("menolak saat sakelar operator mati", () => {
     expect(canPredict(state(), "a", view(), 0, false)).toBe(false);
   });
-  it("menolak saat socket belum open", () => {
-    expect(canPredict(state(), "a", view({ connected: false }), 0, true)).toBe(false);
+  it("menolak saat byte tak akan pernah terkirimkan", () => {
+    expect(canPredict(state(), "a", view({ deliverable: false }), 0, true)).toBe(false);
   });
   it("menolak di alternate screen", () => {
     expect(canPredict(state({ altScreen: true }), "a", view(), 0, true)).toBe(false);
@@ -157,13 +157,15 @@ describe("onInput", () => {
     const r = onInput(initialState(), "a", view(), 1_000, true);
     expect(r.write).toBe("\x1b[4ma\x1b[24m");
     expect(r.state.pending).toBe("a");
-    expect(r.state.since).toBe(1_000);
+    // SPEC-878 · jam TTL berhenti di sini dan baru dinyalakan `onDelivered`.
+    expect(r.state.since).toBeNull();
   });
-  it("menumpuk karakter kedua tanpa memindahkan stempel TTL", () => {
+  it("menumpuk karakter kedua dan menghentikan lagi jam TTL yang mungkin sudah menyala", () => {
     const first = onInput(initialState(), "a", view(), 1_000, true);
-    const second = onInput(first.state, "b", view({ cursorX: 5 }), 1_100, true);
+    const armed = onDelivered(first.state, 1_050);
+    const second = onInput(armed, "b", view({ cursorX: 5 }), 1_100, true);
     expect(second.state.pending).toBe("ab");
-    expect(second.state.since).toBe(1_000);
+    expect(second.state.since).toBeNull();
   });
   it("tak menulis apa pun saat gerbang menolak", () => {
     const r = onInput(initialState(), "\r", view(), 1_000, true);
@@ -203,7 +205,7 @@ describe("reapply", () => {
     expect(r.state.pending).toBe("b");
   });
   it("membuang sisa tanpa menulis apa pun bila gerbang tak lagi lolos", () => {
-    const r = reapply(initialState(), "b", view({ connected: false }), 1_050, true);
+    const r = reapply(initialState(), "b", view({ deliverable: false }), 1_050, true);
     expect(r.write).toBe("");
     expect(r.state.pending).toBe("");
   });
@@ -294,5 +296,56 @@ describe("createInputBatcher", () => {
     expect(sent).toEqual(["a"]);
     vi.advanceTimersByTime(COALESCE_IN_MS * 4);
     expect(sent).toEqual(["a"]);
+  });
+});
+
+// SPEC-878 · ADR-0134 · jam TTL hanya boleh berjalan sejak byte diketahui SAMPAI. Selama ia belum
+// sampai, diamnya pty bukan bukti tentang apa pun — dan menghukumnya terukur membeli 30,5 detik
+// layar bisu untuk satu kedip jaringan 500 ms.
+describe("jam TTL berbasis pengiriman (SPEC-878)", () => {
+  it("menolak memprediksi saat byte tak akan terkirimkan", () => {
+    expect(canPredict(state(), "a", view({ deliverable: false }), 0, true)).toBe(false);
+  });
+
+  it("tetap memprediksi meski socket sedang mati, selama antrean akan terkuras", () => {
+    const r = onInput(state(), "a", view(), 1_000, true);
+    expect(r.write).toBe(applySeq("a"));
+    expect(r.state.pending).toBe("a");
+  });
+
+  it("onInput menghentikan jam — `since` null, betapa pun lamanya menunggu", () => {
+    const r = onInput(state(), "a", view(), 1_000, true);
+    expect(r.state.since).toBeNull();
+    const t = onTick(r.state, 1_000 + TTL_MS * 100);
+    expect(t.write).toBe("");
+    expect(t.missed).toBe(false);
+    expect(t.state.pending).toBe("a");
+    expect(t.state.suspendedUntil).toBe(0);
+  });
+
+  it("onDelivered menyalakan jam, dan TTL kembali menggigit sesudahnya", () => {
+    const typed = onInput(state(), "a", view(), 1_000, true).state;
+    const armed = onDelivered(typed, 5_000);
+    expect(armed.since).toBe(5_000);
+    expect(onTick(armed, 5_000 + TTL_MS - 1).write).toBe("");
+    const fired = onTick(armed, 5_000 + TTL_MS);
+    expect(fired.missed).toBe(true);
+    expect(fired.write).toBe(rollbackSeq(1));
+    expect(fired.state.suspendedUntil).toBe(5_000 + TTL_MS + SUSPEND_MS);
+  });
+
+  it("onDelivered tak menyentuh apa pun tanpa prediksi tertunda", () => {
+    expect(onDelivered(state(), 9_000).since).toBeNull();
+  });
+
+  it("onDelivered tak memundurkan jam yang sudah menyala", () => {
+    const armed = onDelivered(onInput(state(), "a", view(), 0, true).state, 100);
+    expect(onDelivered(armed, 400).since).toBe(100);
+  });
+
+  it("reapply menyerahkan penyalaan jam ke pemanggil, bukan menyetelnya sendiri", () => {
+    const r = reapply(state(), "ab", view({ cursorX: 2, line: "❯ " }), 7_000, true);
+    expect(r.state.pending).toBe("ab");
+    expect(r.state.since).toBeNull();
   });
 });
