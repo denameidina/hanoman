@@ -2,7 +2,7 @@ import React from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { paths } from "@hanoman/shared";
+import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
@@ -90,9 +90,25 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
     view.current = { term, fit, send };
     let pendingInput = "";
+    // SPEC-878 · ADR-0134 · penomoran frame masuk. `unacked` satu-satunya hal yang boleh menyalakan
+    // jam TTL prediksi: selama ia > 0, diamnya server tak memisahkan "pty bungkam" dari "byte
+    // belum sampai".
+    let seq = 0;
+    let unacked = 0;
+    // 4004 = sesi tmux-nya memang sudah lenyap. Satu-satunya keadaan di mana byte yang diantre
+    // TIDAK akan pernah terkirim — jadi satu-satunya yang menutup `deliverable`.
+    let gone = false;
+    const sendFrame = (d: string) => {
+      seq += 1;
+      unacked += 1;
+      send({ t: "in", d, seq });
+    };
     const sendInput = (d: string) => {
-      if (ws?.readyState === WebSocket.OPEN) send({ t: "in", d });
-      else pendingInput += d;
+      if (ws?.readyState === WebSocket.OPEN) { sendFrame(d); return; }
+      // Balasan handshake milik sambungan yang sudah mati tak berarti apa pun bagi sambungan
+      // berikutnya, dan blob campuran menembus gerbang `isTerminalResponse` di server (SPEC-860).
+      if (gone || isTerminalResponse(d)) return;
+      pendingInput += d;
     };
     sendKey.current = sendInput;
 
@@ -104,9 +120,19 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const viewOf = (): P.View => {
       const buf = term.buffer.active;
       return {
-        cursorX: buf.cursorX, cols: term.cols, connected: ws?.readyState === WebSocket.OPEN,
+        cursorX: buf.cursorX, cols: term.cols, deliverable: !gone,
         line: buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "",
       };
+    };
+    // Jam TTL baru boleh berjalan sesudah SELURUH frame yang sudah dikirim diakui server.
+    const clockIfDelivered = () => {
+      if (unacked === 0 && ws?.readyState === WebSocket.OPEN) pred = P.onDelivered(pred, Date.now());
+    };
+    const drainPending = () => {
+      if (!pendingInput) return;
+      const d = pendingInput;
+      pendingInput = "";
+      sendFrame(d);
     };
     const onTyped = (d: string) => {
       const wasPredicting = pred.pending.length > 0;
@@ -133,25 +159,34 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
 
         socket.onopen = () => {
           attempt = 0;
+          seq = 0;
+          unacked = 0;
+          // SPEC-878 · prediksi yang lahir selama outage adalah satu-satunya yang menulis ke
+          // terminal selama itu, jadi kursor duduk persis di ujungnya dan rollback CUB+`\x1b[K`
+          // masih sah — prasyarat yang sama yang sudah dipegang modul. Ia ditulis SEBELUM apa pun
+          // dari server; apa yang benar-benar ada di pty digambar ulang tmux sesudahnya.
+          const back = P.rollbackSeq(pred.pending.length);
+          if (back) term.write(back);
           // tmux memutar ulang layar penuh saat attach — tak ada prediksi yang boleh diwarisi.
           pred = P.onReattach();
           setLink({ state: "open" });
+          if (visibleRect()) {
+            const finePointer = typeof window.matchMedia !== "function"
+              || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+            if (finePointer) term.focus();
+            // Geometri yang berubah selagi putus hilang senyap (`send` no-op saat socket mati),
+            // jadi ia wajib mendahului byte antrean — kalau tidak TUI menggambar blob itu untuk
+            // geometri lama lalu me-rewrap seluruh layar.
+            send({ t: "resize", cols: term.cols, rows: term.rows });
+          }
           // Dikuras di SETIAP open, bukan hanya yang pertama: itu yang mengubah buffer SPEC-771
           // dari penyembunyi kegagalan menjadi penyelamat ketikan.
-          if (pendingInput) {
-            const d = pendingInput;
-            pendingInput = "";
-            send({ t: "in", d });
-          }
-          if (!visibleRect()) return;
-          const finePointer = typeof window.matchMedia !== "function"
-            || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-          if (finePointer) term.focus();
-          send({ t: "resize", cols: term.cols, rows: term.rows });
+          drainPending();
         };
         socket.onmessage = (ev) => {
           const f = JSON.parse(ev.data as string) as {
-            t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean; on?: boolean;
+            t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
+            on?: boolean; seq?: number;
           };
           if (f.t === "data") {
             const r = P.onServerData(pred, f.d ?? "", Date.now());
@@ -167,7 +202,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
               pred = back.state;
               if (back.write) term.write(back.write);
             }
+            clockIfDelivered();
           }
+          // SPEC-878 · ADR-0134 · pengakuan pengiriman: satu-satunya titik nol jam TTL prediksi.
+          else if (f.t === "ack") { unacked = Math.max(0, unacked - 1); clockIfDelivered(); }
           // Server menyiarkan fase saat attach dan setiap kali agen menutup satu (SPEC-162).
           // SPEC-433 · sejak sekarang juga saat `complete` berubah tanpa daftar fase berubah —
           // kotak `- [ ]` terakhir di plan dicentang sesudah `Execute done`.
@@ -185,7 +223,17 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         // 4004 = sesi tmux-nya memang sudah lenyap; menyambung ulang hanya menghasilkan badai 404.
         socket.onclose = (event) => {
           if (disposed || finished) return;
-          if (event.code === 4004) { setLink({ state: "gone" }); return; }
+          if (event.code === 4004) {
+            gone = true;
+            // Byte yang diantre tak akan pernah punya tujuan, jadi layar tak boleh terus
+            // menampilkannya seolah ia akan sampai.
+            const back = P.rollbackSeq(pred.pending.length);
+            if (back) term.write(back);
+            pred = P.onReattach();
+            pendingInput = "";
+            setLink({ state: "gone" });
+            return;
+          }
           retry();
         };
         socket.onerror = () => { /* onclose selalu menyusul; keputusannya cukup di satu tempat */ };
