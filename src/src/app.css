@@ -291,12 +291,18 @@ textarea:focus-visible,
   overscroll-behavior-inline: contain;
 }
 
-/* SPEC-879 · baris kepala IDE = strip tab + toolbar. Keduanya dulu `flex: 0 1 auto`, jadi tak ada
-   yang mengambil sisa lebar dan tak ada yang menyerap kekurangan: begitu jumlahnya melewati baris,
-   SELURUH toolbar turun. Terukur di ~1100px pada viewport yang sama, tab Explorer memberi kepala
-   satu baris sementara tab Worktrees memberi dua — semata karena label tab aktif dirender
-   `font-weight: 600`. Strip tab yang menyerap sisa lebar (dan sudah punya `overflow-x: auto`
-   sendiri) membuat kekurangan beberapa piksel dibayar dengan menggulir, bukan dengan wrap. */
+/* SPEC-879 · baris kepala IDE = strip tab + toolbar. `flex-wrap` MEMUTUS BARIS SEBELUM MENYUSUT:
+   keputusannya memakai hypothetical main size, yaitu `flex-basis`. Dengan basis `auto` itu berarti
+   LEBAR ISI (toolbar ≈ 570px), dan kepala ~1100px karena itu berdiri sejauh satu label tebal dari
+   pecah — terukur pada viewport yang sama, tab Explorer memberi satu baris sementara tab Worktrees
+   memberi dua, semata karena label tab aktif dirender `font-weight: 600`.
+
+   Basis yang DINYATAKAN memindahkan keputusan itu dari "kebetulan selebar apa isinya" ke "berapa
+   ruang yang toolbar minta di samping tab": ≥480px ia tetap satu baris, kurang dari itu ia turun ke
+   barisnya sendiri dan MENGGULIR di sana (cermin papan tombol terminal SPEC-800). Empat tab adalah
+   navigasi IDE, jadi merekalah yang tak boleh menyusut. `flex: 0 0 auto` pada item toolbar yang
+   membuat scroller itu hidup — tanpa itu item menyusut sampai labelnya tumpah dan strip-nya tak
+   pernah punya konten lebih lebar untuk digulir. */
 .hn-ide-head {
   display: flex;
   align-items: center;
@@ -305,32 +311,25 @@ textarea:focus-visible,
   min-width: 0;
 }
 
-.hn-ide-head > .hn-tabs { flex: 1 1 auto; min-width: 0; }
+.hn-ide-head > .hn-tabs { flex: 0 0 auto; }
 
 .hn-ide-toolbar {
   display: flex;
   align-items: center;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
+  flex: 1 1 480px;
+  flex-wrap: nowrap;
   gap: 10px;
   min-width: 0;
   max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
 }
 
-@media (max-width: 767px) {
-  /* Toolbar (dua `Select` + tiga tombol ≈ 570px) membungkus sendiri jadi dua baris di 390px →
-     kepala tiga baris. Di sini ia jadi SATU baris yang menggulir, cermin papan tombol terminal
-     SPEC-800; `flex: 0 0 auto` pada itemnya yang membuat scroller itu hidup. Sumbu-Y dikunci
-     dengan alasan yang sama seperti `.hn-tabs` di atas. */
-  .hn-ide-head > * { flex: 1 1 100%; min-width: 0; }
-  .hn-ide-toolbar {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-inline: contain;
-  }
-  .hn-ide-toolbar > * { flex: 0 0 auto; }
-}
+/* Rata kanan tanpa `justify-content: flex-end`: di kontainer yang menggulir, flex-end membuat awal
+   konten tak terjangkau. Margin auto runtuh jadi 0 begitu ruangnya habis. */
+.hn-ide-toolbar > * { flex: 0 0 auto; }
+.hn-ide-toolbar > :first-child { margin-inline-start: auto; }
 
 @media (pointer: coarse), (max-width: 767px) {
   button:not(.hn-shell-backdrop) { min-width: var(--touch-target); min-height: var(--touch-target); }

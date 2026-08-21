@@ -21,7 +21,7 @@
 import React from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const css = readFileSync(resolve(import.meta.dirname, "../src/app.css"), "utf8");
@@ -59,20 +59,27 @@ const renderIde = () => render(
 );
 
 describe("SPEC-879 · baris kepala IDE punya pemilik sisa lebar", () => {
-  it("memberi strip tab sisa lebar sehingga kekurangan dibayar gulir, bukan wrap", () => {
-    const rule = css.slice(css.indexOf(".hn-ide-head {"), css.indexOf(".hn-ide-toolbar {"));
-    expect(rule).toMatch(/\.hn-ide-head\s*\{[^}]*flex-wrap:\s*wrap/s);
-    expect(rule).toMatch(/\.hn-ide-head > \.hn-tabs\s*\{[^}]*flex:\s*1 1 auto/s);
-    expect(rule).toMatch(/\.hn-ide-head > \.hn-tabs\s*\{[^}]*min-width:\s*0/s);
+  it("memutuskan pecah-baris lewat flex-basis yang DINYATAKAN, bukan lebar isi", () => {
+    const head = css.slice(css.indexOf(".hn-ide-head {"), css.indexOf(".hn-ide-toolbar > *"));
+    expect(head).toMatch(/\.hn-ide-head\s*\{[^}]*flex-wrap:\s*wrap/s);
+    // Empat tab adalah navigasi IDE — merekalah yang tak boleh menyusut.
+    expect(head).toMatch(/\.hn-ide-head > \.hn-tabs\s*\{[^}]*flex:\s*0 0 auto/s);
+    // `flex-wrap` memutus baris memakai hypothetical main size = flex-basis. Basis `auto` berarti
+    // LEBAR ISI, dan itulah yang membuat kepala ~1100px berdiri sejauh satu label tebal dari pecah.
+    expect(head).toMatch(/\.hn-ide-toolbar\s*\{[^}]*flex:\s*1 1 \d+px/s);
+    expect(head).not.toMatch(/\.hn-ide-toolbar\s*\{[^}]*flex:\s*1 1 auto/s);
   });
 
-  it("menjadikan toolbar satu baris yang MENGGULIR di mobile, bukan dua baris yang membungkus", () => {
-    expect(mobile).toMatch(/\.hn-ide-head > \*\s*\{[^}]*flex:\s*1 1 100%/s);
-    expect(mobile).toMatch(/\.hn-ide-toolbar\s*\{[^}]*flex-wrap:\s*nowrap/s);
-    expect(mobile).toMatch(/\.hn-ide-toolbar\s*\{[^}]*overflow-x:\s*auto/s);
+  it("menjadikan toolbar scroller yang HIDUP saat ruangnya kurang", () => {
+    const bar = css.slice(css.indexOf(".hn-ide-toolbar {"), css.indexOf(".hn-ide-toolbar > *"));
+    expect(bar).toMatch(/flex-wrap:\s*nowrap/s);
+    expect(bar).toMatch(/overflow-x:\s*auto/s);
     // Scroller tanpa aturan ini adalah scroller MATI (akar SPEC-763): itemnya menyusut sampai
     // labelnya tumpah, dan strip-nya tak pernah punya konten lebih lebar untuk digulir.
-    expect(mobile).toMatch(/\.hn-ide-toolbar > \*\s*\{[^}]*flex:\s*0 0 auto/s);
+    expect(css).toMatch(/\.hn-ide-toolbar > \*\s*\{\s*flex:\s*0 0 auto/s);
+    // Rata kanan lewat margin auto: `justify-content: flex-end` membuat AWAL konten tak
+    // terjangkau begitu kontainernya menggulir.
+    expect(css).toMatch(/\.hn-ide-toolbar > :first-child\s*\{\s*margin-inline-start:\s*auto/s);
   });
 
   it("memasang kedua kelas itu di layar IDE, dengan strip tab sebagai anak langsung", () => {
@@ -92,27 +99,32 @@ const renderGraph = () => render(
 );
 
 describe("SPEC-879 · region baris Git Graph adalah scroller lokal yang HIDUP", () => {
+  // `getConfig` yang mendarat belakangan mengubah `gopts` → `load()` berjalan lagi dan
+  // `setState("loading")` MENGGANTI seluruh subtree. Setiap assert karena itu me-query ulang di
+  // dalam `waitFor`; simpul yang dipegang dari `find*` sebelumnya sudah basi.
   it("membungkus baris commit — bukan seluruh kartu — dengan scroller ber-lebar minimum", async () => {
     renderGraph();
-    const rows = await screen.findByTestId("ide-graph-rows");
-    expect(rows).toHaveClass("hn-local-overflow");
-    // Anak blok selalu selebar induknya; tanpa `min-width` scroller ini tak pernah punya konten
-    // lebih lebar untuk digulir — terukur 362 = 362 di 390px, `canScroll: false`.
-    const inner = rows.firstElementChild as HTMLElement;
-    expect(Number.parseInt(inner.style.minWidth, 10)).toBeGreaterThanOrEqual(460);
-    // Kartunya sendiri TAK boleh lagi berada di dalam scroller mendatar.
-    expect(rows.closest(".hn-local-overflow")).toBe(rows);
+    await waitFor(() => {
+      const rows = screen.getByTestId("ide-graph-rows");
+      expect(rows).toHaveClass("hn-local-overflow");
+      // Anak blok selalu selebar induknya; tanpa `min-width` scroller ini tak pernah punya konten
+      // lebih lebar untuk digulir — terukur 362 = 362 di 390px, `canScroll: false`.
+      const inner = rows.firstElementChild as HTMLElement;
+      expect(Number.parseInt(inner.style.minWidth, 10)).toBeGreaterThanOrEqual(460);
+      // Kartunya sendiri TAK boleh lagi berada di dalam scroller mendatar.
+      expect(rows.closest(".hn-local-overflow")).toBe(rows);
+    });
   });
 
   it("menaruh baris commit di dalam scroller dan baris penutup SPEC-351 di luarnya", async () => {
     renderGraph();
-    const rows = await screen.findByTestId("ide-graph-rows");
-    const subject = await screen.findByRole("button", { name: /Buka commit aaaa111/ });
-    expect(rows.contains(subject)).toBe(true);
-    // Sentinel IntersectionObserver menempel pada `<main>` yang menggulir tegak; menaruhnya di
-    // dalam scroller mendatar tak menambah apa pun kecuali risiko.
-    const footer = screen.getByText(/commit dimuat|dari \d+ commit/);
-    expect(rows.contains(footer)).toBe(false);
+    await waitFor(() => {
+      const rows = screen.getByTestId("ide-graph-rows");
+      expect(rows.contains(screen.getByRole("button", { name: /Buka commit aaaa111/ }))).toBe(true);
+      // Sentinel IntersectionObserver menempel pada `<main>` yang menggulir tegak; menaruhnya di
+      // dalam scroller mendatar tak menambah apa pun kecuali risiko.
+      expect(rows.contains(screen.getByText(/commit dimuat|dari \d+ commit/))).toBe(false);
+    });
   });
 });
 
@@ -148,13 +160,14 @@ describe("SPEC-879 · baris Branches & Worktrees membungkus sebelum memotong", (
 describe("SPEC-879 · kontrol IDE memakai primitive design system", () => {
   it("Git Graph tak lagi memakai <input type=checkbox> mentah", async () => {
     const { container } = renderGraph();
-    await screen.findByTestId("ide-graph-rows");
-    // `input { min-width/min-height: var(--touch-target) }` merentangkan checkbox mentah jadi kotak
-    // biru 44×44; `Checkbox` DS menaruh kotak 18×18 DI DALAM area sentuh itu.
-    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-    for (const name of ["remote", "tag", "muted merge"]) {
-      expect(screen.getByRole("checkbox", { name })).toBeInTheDocument();
-    }
+    await waitFor(() => {
+      // `input { min-width/min-height: var(--touch-target) }` merentangkan checkbox mentah jadi
+      // kotak biru 44×44; `Checkbox` DS menaruh kotak 18×18 DI DALAM area sentuh itu.
+      for (const name of ["remote", "tag", "muted merge"]) {
+        expect(screen.getByRole("checkbox", { name })).toBeInTheDocument();
+      }
+      expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    });
   });
 
   it("label tujuan Explorer menyerap sisa lebar, bukan bergantung pada spacer yang boleh runtuh", async () => {

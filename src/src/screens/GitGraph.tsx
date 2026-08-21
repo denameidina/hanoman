@@ -13,6 +13,11 @@ const LANE_W = 14, ROW_H = 30, DOT = 4;
 // padding 50. Di bawah ini kolom subject yang `flex: 1` runtuh ke 0px dan pill ref (yang
 // `flex: 0 0 auto`) meluber menimpa kolom author — terukur 200 tombol subject `0×44` di 390px.
 const GRAPH_ROW_MIN = 460;
+// Lebar minimum kolom subject. `GRAPH_ROW_MIN` saja tak cukup: pill ref `flex: 0 0 auto` memakan
+// kolom fleksibel lebih dulu, jadi baris HEAD (dua pill panjang) menyisakan 24px untuk subject-nya —
+// terukur di 390px SESUDAH scroller lokal dipasang. Dengan lantai ini baris yang pill-nya panjang
+// melebihi `GRAPH_ROW_MIN` dan scroller-nya ikut melebar, bukan memeras subject.
+const SUBJECT_MIN = 160;
 const POLL_MS = 4000; // SPEC-245 · kadens live-refresh git graph (HTTP polling, ADR-stack)
 const PAGE = 200;     // SPEC-351 · besar satu halaman commit; jendela tumbuh kelipatan ini
 const COLORS = ["#a9791c", "#3b7a57", "#8a5a44", "#4a6fa5", "#7d5ba6", "#b0503a"]; // brass-leaf-clay-ink
@@ -522,7 +527,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                           color: "var(--leaf-600, #3b7a57)", flex: "0 0 auto" }}>⌂{t}</button>
                     ))}
                     <button type="button" aria-label={`Buka commit ${c.sha}`} onClick={(event) => { event.stopPropagation(); onRowClick(event, c.sha); }}
-                      style={{ minWidth: 0, padding: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left",
+                      style={{ minWidth: SUBJECT_MIN, padding: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left",
                         fontSize: 12.5, color: muted && c.parents.length > 1 ? "var(--text-subtle)" : "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {msgOpts.emoji ? emojify(c.subject) : c.subject}
                     </button>

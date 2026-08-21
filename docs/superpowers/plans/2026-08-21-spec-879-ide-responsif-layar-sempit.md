@@ -597,7 +597,7 @@ git commit -m "fix(ide): checkbox DS di Git Graph, label tujuan & editor Explore
 
 **Files:** tak ada perubahan berkas — hanya menjalankan dan membaca hasilnya.
 
-- [ ] **Step 1: Jalankan seluruh test yang berkaitan dengan berkas yang berubah**
+- [x] **Step 1: Jalankan seluruh test yang berkaitan dengan berkas yang berubah**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/vitest run \
@@ -610,7 +610,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/vitest run \
 
 Harapan: PASS semua. Angka test yang berjalan **wajib > 0** — `--changed` menyalakan `passWithNoTests`, jadi nol test terlihat hijau; di sini path-nya disebut eksplisit supaya tak bisa terjadi.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 cd src && env -u NODE_ENV ../node_modules/.bin/tsc --noEmit
@@ -618,7 +618,7 @@ cd src && env -u NODE_ENV ../node_modules/.bin/tsc --noEmit
 
 Harapan: keluar tanpa error. **Jangan** jalankan `pnpm -r typecheck` (satu proses tsc per paket sekaligus).
 
-- [ ] **Step 3: Bandingkan berkas merah dengan baseline**
+- [x] **Step 3: Bandingkan berkas merah dengan baseline**
 
 Bila ada berkas yang gagal, verifikasi ia sudah merah di `$HANOMAN_BASE_SHA` sebelum menyebutnya regresi:
 
