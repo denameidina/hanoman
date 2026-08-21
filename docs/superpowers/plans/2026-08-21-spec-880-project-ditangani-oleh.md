@@ -1116,7 +1116,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `ProjectListParams` bertambah `handledBy?: string`
   - `api.updateProject(id, { …, handledBy?: HandledByEntry[] | null })`
 
-- [ ] **Step 1: Tulis test frontend yang gagal**
+- [x] **Step 1: Tulis test frontend yang gagal**
 
 Buat `src/test/project-handled-by.test.tsx`:
 
@@ -1198,7 +1198,7 @@ describe("SPEC-880 · daftar project: kolom 'Ditangani'", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TES src/test/project-handled-by.test.tsx
@@ -1206,7 +1206,7 @@ TES src/test/project-handled-by.test.tsx
 
 Expected: FAIL — `Unable to find an element with the text: hm-dena`.
 
-- [ ] **Step 3: Buat `src/src/screens/HandledByChips.tsx`**
+- [x] **Step 3: Buat `src/src/screens/HandledByChips.tsx`**
 
 ```tsx
 import React from "react";
@@ -1243,7 +1243,7 @@ export function HandledByChips({ list, size = "sm" }:
 }
 ```
 
-- [ ] **Step 4: Perluas kontrak api client (`src/src/api/client.ts`)**
+- [x] **Step 4: Perluas kontrak api client (`src/src/api/client.ts`)**
 
 Ganti `ProjectListParams` (baris ~151):
 
@@ -1263,7 +1263,7 @@ Tambahkan `handledBy` pada body `updateProject`:
 
 dan tambahkan `HandledByEntry` ke baris import tipe dari `@hanoman/shared` di puncak berkas.
 
-- [ ] **Step 5: Tambah kolom & filter di `src/src/screens/ProjectsScreen.tsx`**
+- [x] **Step 5: Tambah kolom & filter di `src/src/screens/ProjectsScreen.tsx`**
 
 Tambahkan import:
 
@@ -1345,7 +1345,7 @@ Render kontrolnya di dalam `FIXED_ROW_STYLE` bersama `StatStrip` — ganti baris
 
 Tambahkan `Select` ke import `../ds` di puncak berkas.
 
-- [ ] **Step 6: Jalankan test — pastikan HIJAU**
+- [x] **Step 6: Jalankan test — pastikan HIJAU**
 
 ```bash
 TES src/test/project-handled-by.test.tsx
@@ -1353,7 +1353,7 @@ TES src/test/project-handled-by.test.tsx
 
 Expected: PASS — 6 test.
 
-- [ ] **Step 7: Pastikan test daftar project lama tak pecah**
+- [x] **Step 7: Pastikan test daftar project lama tak pecah**
 
 ```bash
 TES src/test/projects-screen.test.tsx src/test/app-state-persist.test.tsx
@@ -1361,7 +1361,7 @@ TES src/test/projects-screen.test.tsx src/test/app-state-persist.test.tsx
 
 Expected: PASS semua.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/screens/HandledByChips.tsx src/src/screens/ProjectsScreen.tsx src/src/api/client.ts \

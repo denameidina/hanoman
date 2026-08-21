@@ -1,10 +1,12 @@
 /* ProjectsScreen — multi-project monitor. Kolom "trigger" hilang bersama subsistem
    trigger; yang berjalan adalah sesi claude di tmux (SPEC-162). */
 import React from "react";
-import { Card, StatusPill, Badge, ProgressBar, Icon, IconButton, StateBlock, serverPage, Pager,
+import { Card, StatusPill, Badge, ProgressBar, Icon, IconButton, Select, StateBlock, serverPage, Pager,
   LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE } from "../ds";
 import { api } from "../api/client";
-import { usePersistedState, useScrollRestore, isNum } from "../ui-state";
+import { usePersistedState, useScrollRestore, isNum, isStr } from "../ui-state";
+import { HandledByChips } from "./HandledByChips";
+import type { DeviceTokenView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 
 function hnCovTone(s: string) { return s === "broken" ? "err" : s === "drift" ? "warn" : "ok"; }
@@ -59,7 +61,7 @@ function ProjectRow({ p, onOpen, onDelete }:
       onClick={onOpen ? () => onOpen(p) : undefined}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
-        display: "grid", gridTemplateColumns: "1.7fr 1.2fr 1.5fr 1.1fr 1.4fr",
+        display: "grid", gridTemplateColumns: "1.6fr 1fr 1.2fr 0.9fr 1.3fr 1.2fr",
         alignItems: "center", gap: 12, padding: "11px 14px 11px 12px",
         borderBottom: "1px solid var(--border-hair)",
         borderLeft: `3px solid ${att === "none" ? "transparent" : HN_ATT[att]!.bar}`,
@@ -82,6 +84,8 @@ function ProjectRow({ p, onOpen, onDelete }:
       <div data-label="Status"><StatusPill status={p.session.status} size="sm">{running && p.session.phase ? p.session.phase : undefined}</StatusPill></div>
       <div data-label="Docs · SoT" style={{ paddingRight: 8 }}><ProgressBar value={p.coverage} showLabel tone={hnCovTone(p.docStatus)} size="sm" /></div>
       <div data-label="Backlog" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)" }}>{p.backlog} · {p.topStage}</div>
+      {/* SPEC-880 · ADR-0135 · penanda "ditangani oleh" — DISYNC, beda dari repoDir/binding. */}
+      <div data-label="Ditangani" style={{ minWidth: 0 }}><HandledByChips list={p.handledBy} /></div>
       <div data-label="Aktivitas" style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.activity}</span>
         {onDelete && (
@@ -99,8 +103,8 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
   { projects: ProjectVM[]; variant?: string; onOpen?: (p: ProjectVM) => void;
     onDelete?: (p: ProjectVM) => void; pageSize?: number;
     search?: string; dataVersion?: number; onClearSearch?: () => void }) {
-  const cols = ["Project", "Status", "Docs · SoT", "Backlog", "Aktivitas"];
-  const tmpl = "1.7fr 1.2fr 1.5fr 1.1fr 1.4fr";
+  const cols = ["Project", "Status", "Docs · SoT", "Backlog", "Ditangani", "Aktivitas"];
+  const tmpl = "1.6fr 1fr 1.2fr 0.9fr 1.3fr 1.2fr";
   // SPEC-198 · search + paginasi via API. StatStrip tetap dari `projects` PENUH (statistik global).
   // Baris = potongan server; seed dari prop utk render instan + tahan mock parsial di test.
   const [rows, setRows] = React.useState<ProjectVM[]>(projects);
@@ -108,18 +112,44 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
   // SPEC-740 · ADR-0115 · nomor halaman & posisi scroll bertahan; `pageSize` tetap prop.
   const [page, setPage] = usePersistedState("projects", "page", 1, isNum);
   const listRef = useScrollRestore("projects", "scroll", rows.length > 0);
-  React.useEffect(() => { setPage(1); }, [search]);
+  // SPEC-880 · ADR-0135 · katalog device instance ini. `[]` = instance ini bukan pemegang katalog
+  // (client) → filter tak punya arti di sini dan tak dirender. Panggilan opsional (`?.`) supaya
+  // test/mock lama yang cuma menyediakan `listProjects` tak jatuh.
+  const [devices, setDevices] = React.useState<DeviceTokenView[]>([]);
+  const [handledBy, setHandledBy] = usePersistedState("projects", "handledBy", "", isStr);
+  React.useEffect(() => {
+    let alive = true;
+    api.listDeviceTokens?.()
+      .then((list) => { if (alive) setDevices(list); })
+      .catch(() => { });
+    return () => { alive = false; };
+  }, []);
+  React.useEffect(() => { setPage(1); }, [search, handledBy]);
   React.useEffect(() => {
     if (!pageSize) { setRows(projects); setTotal(projects.length); return; }
     let alive = true;
-    const p = api.listProjects?.({ q: search || undefined, page, limit: pageSize });
+    const p = api.listProjects?.({ q: search || undefined, handledBy: handledBy || undefined, page, limit: pageSize });
     p?.then((r) => { if (alive) { setRows(r.items as ProjectVM[]); setTotal(r.total); } }).catch(() => { });
     return () => { alive = false; };
-  }, [search, page, pageSize, dataVersion, projects]);
+  }, [search, handledBy, page, pageSize, dataVersion, projects]);
   const sp = serverPage(total, page, pageSize || total || 1);
   return (
     <div style={LIST_SCREEN_STYLE}>
-      <div style={FIXED_ROW_STYLE}><StatStrip projects={projects} /></div>
+      <div style={FIXED_ROW_STYLE}>
+        <StatStrip projects={projects} />
+        {/* SPEC-880 · disembunyikan di instance tanpa katalog device: pilihan yang tak bisa diisi
+            lebih buruk daripada tak ada pilihan. Device dicabut tak ditawarkan sebagai pilihan
+            BARU, tapi nilai tersimpan tetap tampil sebagai chip di barisnya. */}
+        {devices.some((d) => !d.revokedAt) && (
+          <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <span className="hn-eyebrow">Ditangani oleh</span>
+            <Select aria-label="Saring per client" value={handledBy} style={{ minWidth: 180 }}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setHandledBy(e.target.value)}
+              options={[{ value: "", label: "Semua client" },
+                ...devices.filter((d) => !d.revokedAt).map((d) => ({ value: d.id, label: d.name }))]} />
+          </div>
+        )}
+      </div>
       {rows.length === 0 && search ? (
         <StateBlock kind="empty" icon="search" title={`Tidak ada project cocok dengan “${search}”`}
           hint="Coba kata kunci lain, atau kosongkan pencarian."

@@ -1,4 +1,4 @@
-import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView } from "@hanoman/shared";
+import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -148,7 +148,8 @@ export type SpecListParams = {
   // (bentuk yang dipancarkan `<input type="date">`), inklusif, boleh sendirian.
   dateField?: "created" | "started"; from?: string; to?: string;
 };
-export type ProjectListParams = { q?: string; page?: number; limit?: number };
+// SPEC-880 · `handledBy` = deviceId; menjawab "apa saja yang dipegang mesin X" dalam satu klik.
+export type ProjectListParams = { q?: string; handledBy?: string; page?: number; limit?: number };
 export const api = {
   issueWsTicket: (target: "events" | `terminal:${string}`) =>
     j<{ ticket: string }>(paths.wsTickets, { method: "POST", ...body({ target }) }),
@@ -166,7 +167,8 @@ export const api = {
   // SPEC-146 · hanya label. `id` tak pernah berubah, jadi respons selalu punya `id` yang sama.
   // SPEC-217 · `repoDir` = path default/server editable (null = kosongkan).
   updateProject: (id: string, b: { name?: string; desc?: string; gitRemote?: string; repoDir?: string | null; schedulerOptIn?: boolean; leadOptIn?: boolean;
-    autoMerge?: AutoMerge | null }) =>   // SPEC-486 · ADR-0103 · null = tanpa auto-merge
+    autoMerge?: AutoMerge | null;   // SPEC-486 · ADR-0103 · null = tanpa auto-merge
+    handledBy?: HandledByEntry[] | null }) =>   // SPEC-880 · ADR-0135 · null/[] = belum ditetapkan
     j<ProjectView>(paths.project(id), { method: "PATCH", ...body(b) }),
   // SPEC-255 · ADR-0064 · rename slug project. Balik: id baru + DSN/Help URL baru (bila aktif) + affected.
   renameProject: (id: string, newId: string) =>
