@@ -87,6 +87,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0135 — Penanda "ditangani oleh" pada Project: kolom `Json` yang MASUK sync, berisi snapshot device](adr/0135-penanda-project-ditangani-hanoman-client.md) — menegakkan 0043, 0044, 0045; kontras dengan 0072/0091/0103 (SPEC-880)
 - [0134 — Prediksi input dihakimi oleh pengakuan pengiriman (`in.seq` → frame `{t:"ack"}`), bukan oleh `readyState`](adr/0134-pengakuan-pengiriman-input-terminal.md) — menegakkan 0014, 0016, 0117, 0133 (SPEC-878)
 - [0133 — Keadaan pane datang dari tmux (`#{alternate_on}` → frame `{t:"alt"}`), bukan dari aliran byte klien](adr/0133-alternate-screen-pane-dari-tmux.md) — menegakkan 0014, 0016 (SPEC-863)
 - [0132 — Permukaan penghapusan worktree: tab Worktrees, daftar turunan git, hapus lewat `.trash`](adr/0132-permukaan-penghapusan-worktree.md) — menegakkan 0116, 0077, 0002/0015, 0018/0011, 0127 (SPEC-861)

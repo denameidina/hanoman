@@ -71,6 +71,21 @@ tiap berkas.
   editable via `PATCH /projects/:id` (digerbangi `checkAutoMerge`: 409 tanpa repoDir efektif, 400 branch
   karangan). **Tidak** masuk whitelist `FIELDS` sync → lokal per-instance (nama branch tujuan properti
   checkout mesin ini, cermin `repoDir`); **masuk** allowlist `WEBHOOK_ENTITIES`.
+- `handledBy` (Json?, SPEC-880 · [ADR-0135](../adr/0135-penanda-project-ditangani-hanoman-client.md)) —
+  penanda **"ditangani oleh"**: daftar hanoman client yang memegang project ini, bentuknya
+  `[{deviceId, name}]` (`zHandledBy`, `@hanoman/shared`). `null` = **belum ditetapkan** — default,
+  nol backfill. **MASUK whitelist `FIELDS` sync**, dan di situlah ia berbeda dari keempat butir di
+  atasnya: `repoDir`/`schedulerOptIn`/`leadOptIn`/`autoMerge` LOCAL-only karena masing-masing
+  properti MESIN ini, sedangkan `handledBy` adalah pernyataan tentang dunia — justru menyeberangnya
+  nilai itu yang jadi seluruh gunanya. Tiap entri **snapshot**, bukan FK: `DeviceToken` tak ikut
+  `SYNCED`, jadi client penerima tak punya baris device untuk di-join dan chip akan kosong tanpa
+  satu pun error kalau `name` tak ikut tersimpan (kelas ADR-0090/0093/0105). `revoked` **tidak**
+  disimpan — ia diturunkan `toProjectView` dari baris `DeviceToken` lokal; revoke device **tak
+  pernah** menghapus penanda. Diekspos `toProjectView` sebagai `handledBy: [{deviceId,name,revoked}]`
+  (`[]` bila kolomnya null), editable via `PATCH /projects/:id` (digerbangi `checkHandledBy`:
+  400 bila `deviceId` tak dikenal **dan** instance ini punya katalog device); **masuk** allowlist
+  `WEBHOOK_ENTITIES`. Murni informasional — tak menggerbangi sesi, worktree, auto-merge, scheduler,
+  maupun lead.
 - `docStatus` ("ok" | "drift" | "broken") + `coverage` (0–100) **bukan kolom** — diturunkan dari disk tiap `toProjectView` (ADR-0018).
 
 ## Spec (backlog item)

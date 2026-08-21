@@ -160,14 +160,23 @@ DELETE /client-accounts/:id    # 204; sesi & baris akses ikut cascade
 
 ## Projects
 ```
-GET  /projects?q=&page=&limit=      # -> { items: ProjectView[], total, page, pageSize } (SPEC-198)
+GET  /projects?q=&handledBy=&page=&limit=   # -> { items: ProjectView[], total, page, pageSize } (SPEC-198)
 #   q menyaring name+desc+stack; tanpa page/limit → seluruh item. coverage/docStatus tetap live-scan tiap panggil.
-POST /projects            { name, kind, repoDir?, desc, gitRemote? }   # repoDir OPSIONAL (SPEC-217)
+#   SPEC-880 · ADR-0135 · `handledBy=<deviceId>` menyaring ke project yang penandanya memuat device
+#   itu — "apa saja yang dipegang mesin X" dalam satu klik. Bergabung dengan `q`, bukan menggantikannya.
+POST /projects            { name, kind, repoDir?, desc, gitRemote?, handledBy? }   # repoDir OPSIONAL (SPEC-217)
 #   SPEC-222 · kind "from-scratch" + repoDir → hanoman `git init` + commit awal (siap scaffold); gagal init → 400
 GET  /projects/:id        # view memuat `repoDir` (default project) + `binding` (override per-mesin | null)
-PATCH /projects/:id       { name?, desc?, gitRemote?, repoDir?, schedulerOptIn?, leadOptIn?, autoMerge? }   # 200 view; 400 name kosong; 404 tak ada.
+PATCH /projects/:id       { name?, desc?, gitRemote?, handledBy?, repoDir?, schedulerOptIn?, leadOptIn?, autoMerge? }   # 200 view; 400 name kosong; 404 tak ada.
 #   `id` tak tersentuh oleh PATCH — rename lewat endpoint khusus di bawah (SPEC-255/ADR-0064).
 #   SPEC-217 · `repoDir` (path default/server) kini editable; `null` mengosongkan.
+#   SPEC-880 · ADR-0135 · `handledBy` = penanda "ditangani oleh", `[{deviceId,name}]` — DISYNC
+#   (beda dari repoDir/binding/schedulerOptIn/leadOptIn/autoMerge yang lokal per-instance).
+#   `null` maupun `[]` mengosongkan. 400 bila deviceId duplikat, > 32 entri, atau tak dikenal
+#   SEMENTARA instance ini punya katalog device; instance tanpa satu pun DeviceToken (client)
+#   menerima apa adanya. Device DICABUT tetap sah — revoke tak pernah menghapus penanda.
+#   View memulangkan `[{deviceId,name,revoked}]`: nama HIDUP bila barisnya ada di sini, snapshot
+#   bila tidak. Picker memakai `GET /device-tokens` yang sudah ada — tak ada endpoint baru.
 #   SPEC-486 · ADR-0103 · `autoMerge` = kebijakan auto-merge saat backlog selesai
 #   ({mode:"off"|"default-branch"|"branch", dest:"local"|"origin", branch, deleteBranch}); `null`
 #   mengosongkan → tanpa auto-merge. Digerbangi `checkAutoMerge` terhadap repo EFEKTIF:
@@ -876,6 +885,14 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > & `/sync/conflicts`) → `{ deletes: { entity, recordId, deletedAt }[], total }`: penghapusan lokal
 > yang tombstone-nya sudah tercatat tapi belum sempat ter-push (client offline). Dirender `SyncButton`
 > sebagai lencana **"N hapus menunggu"**.
+
+> **Hasil push dinilai PER RECORD** (SPEC-880 · ADR-0135): record yang ditolak — umumnya karena
+> membawa field dari instance yang lebih baru, dan `validateSyncData` melempar untuk field tak
+> dikenal — memulangkan `{ id, ok:false, error }` dan record lain di batch yang sama **tetap
+> diterima**. Sebelumnya lemparan itu keluar dari loop dan menjadikan **seluruh** batch `500`,
+> sehingga client membaca seluruh push-nya gagal dan mengulanginya tanpa ujung tanpa satu baris log.
+> Ini **tidak** membuat hub versi lama menerima kolom baru: `snapshot()` menyusun `data` dari
+> **seluruh** `FIELDS`, jadi menambah kolom ke whitelist tetap menuntut urutan rilis **HUB DULU**.
 
 > **Rekonsil konflik** (SPEC-270 · ADR-0067) — **cookie-only** (dikecualikan dari bypass `/api/sync`,
 > non-delegatable ke agent):

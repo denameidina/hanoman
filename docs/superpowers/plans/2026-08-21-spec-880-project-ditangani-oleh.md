@@ -1633,7 +1633,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: keputusan Task 1–7
 - Produces: — (docs)
 
-- [ ] **Step 1: Tulis ADR-0135**
+- [x] **Step 1: Tulis ADR-0135**
 
 Buat `internal/docs/adr/0135-penanda-project-ditangani-hanoman-client.md`:
 
@@ -1734,7 +1734,7 @@ yang tak punya baris device-nya; di mana pun barisnya ada, nama hidup yang menan
 eksekusi, dan tak boleh mulai dibaca tanpa ADR baru.
 ```
 
-- [ ] **Step 2: Tautkan ADR di `internal/docs/adr/README.md`**
+- [x] **Step 2: Tautkan ADR di `internal/docs/adr/README.md`**
 
 Buka berkasnya, temukan baris entri `0134`, dan sisipkan entri baru **di atasnya** (daftar terurut menurun) memakai format yang sama persis dengan tetangganya:
 
@@ -1742,7 +1742,7 @@ Buka berkasnya, temukan baris entri `0134`, dan sisipkan entri baru **di atasnya
 - [0135 — Penanda "ditangani oleh" pada Project: kolom `Json` yang MASUK sync, berisi snapshot device](0135-penanda-project-ditangani-hanoman-client.md) — menegakkan 0043/0044/0045, kontras dengan 0072/0091/0103 (SPEC-880)
 ```
 
-- [ ] **Step 3: Tautkan ADR di `internal/docs/README.md`**
+- [x] **Step 3: Tautkan ADR di `internal/docs/README.md`**
 
 Di seksi ADR (baris ~93, di atas entri `0131`… — daftarnya terurut menurun; sisipkan di puncak daftar ADR):
 
@@ -1750,7 +1750,7 @@ Di seksi ADR (baris ~93, di atas entri `0131`… — daftarnya terurut menurun; 
 - [0135 — Penanda "ditangani oleh" pada Project: kolom `Json` yang MASUK sync, berisi snapshot device](adr/0135-penanda-project-ditangani-hanoman-client.md) — menegakkan 0043/0044/0045 (SPEC-880)
 ```
 
-- [ ] **Step 4: Perbarui `internal/docs/architecture/data-model.md`**
+- [x] **Step 4: Perbarui `internal/docs/architecture/data-model.md`**
 
 Di seksi `## Project`, sisipkan butir baru tepat **sesudah** butir `autoMerge` dan **sebelum** butir `docStatus`:
 
@@ -1772,7 +1772,7 @@ Di seksi `## Project`, sisipkan butir baru tepat **sesudah** butir `autoMerge` d
   maupun lead.
 ```
 
-- [ ] **Step 5: Perbarui `internal/docs/architecture/api-contract.md`**
+- [x] **Step 5: Perbarui `internal/docs/architecture/api-contract.md`**
 
 Di seksi `## Projects`, ganti tiga baris berikut:
 
@@ -1819,7 +1819,7 @@ Terakhir, di seksi sync (cari baris `POST /sync/push`), sisipkan catatan:
 #   menuntut urutan rilis HUB DULU: hub lama tak punya perbaikan ini (ADR-0135).
 ```
 
-- [ ] **Step 6: Verifikasi integritas index docs**
+- [x] **Step 6: Verifikasi integritas index docs**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || npx tsx cli/src/index.ts docs index --check
@@ -1827,7 +1827,7 @@ node cli/dist/index.js docs index --check 2>/dev/null || npx tsx cli/src/index.t
 
 Expected: laporan tanpa entri hilang. (Bila kedua perintah tak jalan di worktree ini, verifikasi manual: `grep -c "0135-penanda-project-ditangani" internal/docs/README.md internal/docs/adr/README.md` harus memulangkan `1` untuk keduanya.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs/adr/0135-penanda-project-ditangani-hanoman-client.md \
