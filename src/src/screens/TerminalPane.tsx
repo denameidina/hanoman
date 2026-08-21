@@ -76,6 +76,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   const dropHeld = React.useRef<() => void>(() => {});
   // SPEC-882 · diisi `TerminalComposer`; dipanggil setiap kali byte lahir DI LUAR kolom ketik.
   const composerDrain = React.useRef<() => void>(() => {});
+  // SPEC-882 · pintu byte yang lahir DI LUAR kolom ketik: ia menguras kolom lebih dulu, lalu lewat
+  // pintu mentah yang sama. `sendKey` sengaja TIDAK dibungkus — itu pintu yang dipakai kolom ketik
+  // sendiri, dan membungkusnya akan membuatnya menguras dirinya sendiri.
+  const sendOuter = React.useRef<(d: string) => void>(() => {});
 
   React.useEffect(() => {
     const el = host.current;
@@ -165,6 +169,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     // frame, jadi "satu tekan = satu keystroke" (SPEC-452) dan "paste utuh" (SPEC-289) tak berubah.
     const sendRaw = (d: string) => batcher.push(d, false);
     sendKey.current = sendRaw;
+    // SPEC-882 · delta kolom yang belum melewati debounce wajib mendarat di pty MENDAHULUI byte
+    // ini — membaliknya menghasilkan baris yang salah di pty.
+    const sendExternal = (d: string) => { composerDrain.current(); sendRaw(d); };
+    sendOuter.current = sendExternal;
     const viewOf = (): P.View => {
       const buf = term.buffer.active;
       return {
@@ -195,6 +203,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     sendHeld.current = () => { held = false; flushQueue(); };
     dropHeld.current = () => { pendingInput = ""; held = false; full = false; publishQueue(); };
     const onTyped = (d: string) => {
+      // SPEC-882 · sinkron, sebelum apa pun menyentuh batcher: byte kolom masuk antrean FIFO
+      // mendahului byte eksternal ini.
+      composerDrain.current();
       const wasPredicting = pred.pending.length > 0;
       // Dicatat SEBELUM apa pun menyentuhnya: inilah byte yang benar-benar keluar dari browser,
       // dan justru hulu titik ini yang belum pernah terukur.
@@ -347,7 +358,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         return false;
       }
       if (intent === "paste") {
-        void navigator.clipboard?.readText().then((t) => { if (t) sendRaw(t); });
+        void navigator.clipboard?.readText().then((t) => { if (t) sendExternal(t); });
         return false;
       }
       return true;
@@ -424,7 +435,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       const lines = Array.from({ length: term.rows },
         (_, i) => buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? "");
       const choice = dialogChoiceAt(lines, row);
-      if (choice) sendRaw(choice);
+      if (choice) sendExternal(choice);
     };
     // SPEC-816 · lampiran gambar. Yang bisa dikirim ke PTY hanyalah teks, jadi berkasnya diunggah
     // lebih dulu dan yang masuk ke prompt adalah PATH-nya — agen membacanya sendiri dengan Read.
@@ -435,7 +446,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
           const { path } = await api.uploadTerminalAttachment(sessionId, file);
           // Spasi, bukan Enter: operator melanjutkan mengetik kalimatnya di sebelah path.
           // sendInput menampung ke `pendingInput` bila socket sedang menyambung ulang.
-          sendRaw(`${path} `);
+          sendExternal(`${path} `);
         } catch (e) {
           term.write(`\r\n\x1b[31mlampiran gagal: ${(e as Error).message}\x1b[0m\r\n`);
         }
@@ -478,6 +489,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       clearTimeout(timer);
       retryNow.current = () => {};
       sendKey.current = () => {};
+      sendOuter.current = () => {};
       sendHeld.current = () => {};
       dropHeld.current = () => {};
       view.current = null;
@@ -518,6 +530,19 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
   }, [fontSize]);
 
+  // SPEC-882 · kolom ketik & bar tombol memakan tinggi host, jadi `cols`/`rows` PTY ikut berubah
+  // saat sakelarnya digeser. ResizeObserver menangkapnya di browser, tapi frame `resize` wajib
+  // menyusul dari perubahan yang KITA lakukan juga — tanpa itu tmux menggambar untuk geometri lama.
+  React.useEffect(() => {
+    const current = view.current;
+    const el = host.current;
+    if (!current || !el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    current.fit.fit();
+    current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
+  }, [showKeys]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya.
@@ -556,7 +581,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
       {showKeys && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
         external={composerDrain} linkState={link.state} queue={queue} />}
-      {showKeys && <TerminalKeys onKey={(seq) => sendKey.current(seq)} />}
+      {showKeys && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
     </div>
   );
 }

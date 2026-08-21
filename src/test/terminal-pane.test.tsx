@@ -789,4 +789,108 @@ describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", () => {
     expect(el.getAttribute("enterkeyhint")).toBe("send");
     expect(el.getAttribute("aria-label")).toBe("Ketik untuk sesi sesi-1");
   });
+
+  const wait882 = (ms: number) => act(() => new Promise<void>((r) => { setTimeout(r, ms); }));
+  const type882 = (value: string) => act(() => { fireEvent.change(composer(), { target: { value } }); });
+  const enter882 = () => act(() => { fireEvent.keyDown(composer(), { key: "Enter" }); });
+
+  const openPane = async (props: Record<string, unknown> = {}) => {
+    const r = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys {...props} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    return r;
+  };
+
+  it("mengalirkan isi kolom ke pty sesudah debounce, sebagai delta bukan seluruh baris", async () => {
+    await openPane();
+    const before = inputsOf(sockets[0]).length;
+    type882("ls");
+    expect(inputsOf(sockets[0]).slice(before)).toEqual([]);
+    await wait882(400);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["ls"]);
+    type882("ls -l");
+    await wait882(400);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["ls", " -l"]);
+    type882("ls");
+    await wait882(400);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["ls", " -l", "\x7f\x7f\x7f"]);
+  });
+
+  it("mengosongkan kolom saat Enter, dan \\r menyusul di belakang deltanya", async () => {
+    await openPane();
+    const before = inputsOf(sockets[0]).length;
+    type882("halo");
+    enter882();
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["halo\r"]);
+    expect(composer().value).toBe("");
+    // Debounce yang tertinggal tak boleh mengirim ulang apa pun sesudah submit.
+    await wait882(400);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["halo\r"]);
+  });
+
+  it("menguras kolom saat ia kehilangan fokus", async () => {
+    await openPane();
+    const before = inputsOf(sockets[0]).length;
+    type882("git");
+    act(() => { fireEvent.blur(composer()); });
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["git"]);
+  });
+
+  // Membaliknya menukar urutan byte di pty.
+  it("mengirim delta kolom MENDAHULUI ketikan langsung ke pane, lalu mengosongkan kolom", async () => {
+    await openPane();
+    const before = inputsOf(sockets[0]).length;
+    type882("ls");
+    act(() => { xt.dataHandler?.("x"); });
+    await wait882(40);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["ls", "x"]);
+    expect(composer().value).toBe("");
+  });
+
+  it("mengirim delta kolom MENDAHULUI tombol Esc/Tab/panah", async () => {
+    await openPane();
+    const before = inputsOf(sockets[0]).length;
+    type882("ls");
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Kirim Escape ke terminal" })); });
+    await wait882(40);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["ls", "\x1b"]);
+    expect(composer().value).toBe("");
+  });
+
+  it("mengikuti keadaan sambungan dan antrean pada penanda status", async () => {
+    const { container } = await openPane();
+    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("terkirim");
+    act(() => { sockets[0]!.readyState = 3; sockets[0]!.onclose?.({ code: 1006 }); });
+    for (const c of [..."halo"]) act(() => { xt.dataHandler?.(c); });
+    await wait882(40);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("terminal-composer-status").textContent).toBe("diantre 4");
+    });
+    act(() => { xt.dataHandler?.("\r"); });
+    await vi.waitFor(() => expect(sockets.length).toBeGreaterThan(1), { timeout: 3_000 });
+    act(() => { sockets[1]!.onopen?.(); });
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("terminal-composer-status").textContent)
+        .toBe("tertahan — Kirim di atas");
+    });
+    expect(container.querySelector('[data-testid="terminal-held"]')).not.toBeNull();
+  });
+
+  it("menyesuaikan geometri pty saat kolom ketik muncul dan hilang", async () => {
+    const { container, rerender } = render(
+      <TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 360, top: 0, right: 640, bottom: 360, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+    act(() => { sockets[0]!.onopen?.(); });
+    const fitsBefore = xt.fitCount;
+    const resizesBefore = sockets[0]!.sent.filter((m) => m.includes('"resize"')).length;
+    rerender(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys />);
+    expect(xt.fitCount).toBe(fitsBefore + 1);
+    expect(sockets[0]!.sent.filter((m) => m.includes('"resize"')).length).toBe(resizesBefore + 1);
+    rerender(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    expect(xt.fitCount).toBe(fitsBefore + 2);
+    expect(sockets[0]!.sent.filter((m) => m.includes('"resize"')).length).toBe(resizesBefore + 2);
+  });
 });

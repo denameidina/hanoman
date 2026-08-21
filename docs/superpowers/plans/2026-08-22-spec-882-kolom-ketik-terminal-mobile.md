@@ -588,7 +588,7 @@ Yang membuat kolom ini benar dan bukan sekadar tampil: delta yang tertunda menda
   - `sendOuter: React.MutableRefObject<(d: string) => void>` — pintu byte **eksternal** di `TerminalPane`; menguras kolom lalu meneruskan ke `sendRaw`.
   - `sendKey.current` **tetap** `sendRaw` (pintu mentah SPEC-878) dan tetap milik kolom ketik.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di dalam `describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", …)` yang dibuat Task 2, setelah test terakhirnya:
 
@@ -700,12 +700,12 @@ Tambahkan di dalam `describe("TerminalPane · kolom ketik perangkat sentuh (SPEC
   });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia GAGAL**
+- [x] **Step 2: Jalankan test untuk memastikan ia GAGAL**
 
 Run: `pnpm --filter ./src exec vitest --run test/terminal-pane.test.tsx -t "SPEC-882"`
 Expected: FAIL. Yang gagal minimal: urutan `["ls", "x"]` (yang muncul justru `["x", "ls"]` atau `["x"]`), urutan `["ls", "\x1b"]`, dan test geometri (`xt.fitCount` tak bertambah).
 
-- [ ] **Step 3: Kuras kolom di setiap jalur byte eksternal**
+- [x] **Step 3: Kuras kolom di setiap jalur byte eksternal**
 
 Di `src/src/screens/TerminalPane.tsx`:
 
@@ -754,7 +754,7 @@ Di `src/src/screens/TerminalPane.tsx`:
       {showKeys && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
 ```
 
-- [ ] **Step 4: Picu `fit.fit()` + frame `resize` saat kolom muncul/hilang**
+- [x] **Step 4: Picu `fit.fit()` + frame `resize` saat kolom muncul/hilang**
 
 Di `src/src/screens/TerminalPane.tsx`, tepat SESUDAH effect `[fontSize]` yang sudah ada dan SEBELUM `return (`, tambahkan:
 
@@ -773,17 +773,17 @@ Di `src/src/screens/TerminalPane.tsx`, tepat SESUDAH effect `[fontSize]` yang su
   }, [showKeys]);
 ```
 
-- [ ] **Step 5: Jalankan test untuk memastikan ia LULUS**
+- [x] **Step 5: Jalankan test untuk memastikan ia LULUS**
 
 Run: `pnpm --filter ./src exec vitest --run test/terminal-pane.test.tsx`
 Expected: PASS — seluruh berkas hijau, termasuk test SPEC-800/816/856/878 yang sudah ada (kontrol negatif: mereka tak boleh berubah perilakunya).
 
-- [ ] **Step 6: Typecheck paket `src`**
+- [x] **Step 6: Typecheck paket `src`**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/TerminalPane.tsx src/test/terminal-pane.test.tsx
