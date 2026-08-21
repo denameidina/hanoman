@@ -345,7 +345,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `toProjectView(p: Project, sessions: SessionInfo[], devices?: DeviceIndex): Promise<ProjectView>`
   - `ProjectView.handledBy: HandledByView[]` (default `[]`)
 
-- [ ] **Step 1: Tulis test baca yang gagal**
+- [x] **Step 1: Tulis test baca yang gagal**
 
 Buat `server/test/project-handled-by.route.test.ts`:
 
@@ -418,7 +418,7 @@ describe("SPEC-880 · baca penanda 'ditangani oleh'", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TES server/test/project-handled-by.route.test.ts
@@ -426,7 +426,7 @@ TES server/test/project-handled-by.route.test.ts
 
 Expected: FAIL — `expected undefined to deeply equal []`.
 
-- [ ] **Step 3: Tambah `handledBy` ke `zProjectView`**
+- [x] **Step 3: Tambah `handledBy` ke `zProjectView`**
 
 Di `shared/src/dto.ts`, tambahkan import `zHandledByView` pada baris import `zAutoMerge`:
 
@@ -444,7 +444,7 @@ Lalu di `zProjectView`, sisipkan sebelum baris `autoMerge:`:
   handledBy: zHandledByView.array().default([]),
 ```
 
-- [ ] **Step 4: Perkaya di `server/src/services/project-view.ts`**
+- [x] **Step 4: Perkaya di `server/src/services/project-view.ts`**
 
 Tambahkan pada blok import:
 
@@ -504,7 +504,7 @@ Lalu di objek yang dikembalikan, sisipkan sebelum baris `autoMerge:`:
     handledBy: handledByView((p as { handledBy?: unknown }).handledBy, deviceIndex),
 ```
 
-- [ ] **Step 5: Muat indeks sekali per request di `server/src/routes/projects.ts`**
+- [x] **Step 5: Muat indeks sekali per request di `server/src/routes/projects.ts`**
 
 Tambahkan pada import `project-view`:
 
@@ -528,7 +528,7 @@ jadi:
     const views = await Promise.all(ps.map((p) => toProjectView(p, sessions, devices)));
 ```
 
-- [ ] **Step 6: Jalankan test — pastikan HIJAU**
+- [x] **Step 6: Jalankan test — pastikan HIJAU**
 
 ```bash
 TES server/test/project-handled-by.route.test.ts
@@ -536,7 +536,7 @@ TES server/test/project-handled-by.route.test.ts
 
 Expected: PASS — 5 test.
 
-- [ ] **Step 7: Pastikan view lama tak pecah**
+- [x] **Step 7: Pastikan view lama tak pecah**
 
 ```bash
 TES server/test/project-view.test.ts server/test/binding-aware.test.ts server/test/projects.route.test.ts server/test/project-gitremote.route.test.ts
@@ -544,7 +544,7 @@ TES server/test/project-view.test.ts server/test/binding-aware.test.ts server/te
 
 Expected: PASS semua.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add shared/src/dto.ts server/src/services/project-view.ts server/src/routes/projects.ts \

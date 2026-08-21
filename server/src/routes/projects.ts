@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { zCreateProject, zUpdateProject, zRenameProject } from "@hanoman/shared";
 import { prisma } from "../db";
 import { renameProject } from "../services/rename-project";
-import { toProjectView } from "../services/project-view";
+import { toProjectView, loadDeviceIndex } from "../services/project-view";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { listRepoBranches, listRepoRemoteBranches, defaultBranch } from "../services/branches";
@@ -22,7 +22,9 @@ export default async function (app: FastifyInstance) {
     // dan oper baris `p` yang sudah ada (bukan findUniqueOrThrow lagi = N+1).
     const ps = await prisma.project.findMany({ orderBy: { createdAt: "desc" } });
     const sessions = listSessions();
-    const views = await Promise.all(ps.map((p) => toProjectView(p, sessions)));
+    // SPEC-880 · satu query device untuk seluruh request (cermin listSessions), bukan N+1.
+    const devices = await loadDeviceIndex();
+    const views = await Promise.all(ps.map((p) => toProjectView(p, sessions, devices)));
     const needle = (q ?? "").trim().toLowerCase();
     const filtered = needle
       ? views.filter((v) => `${v.name} ${v.desc} ${v.stack}`.toLowerCase().includes(needle))

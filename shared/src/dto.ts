@@ -5,6 +5,7 @@ import {
   zLeadFlowStatus, zLeadSelect,
 } from "./lead";
 import { zAutoMerge } from "./auto-merge";
+import { zHandledBy, zHandledByView } from "./handled-by";
 import { zPrdStatus } from "./prd-status";
 import type { Spec, Notification } from "./entities";
 import { zProjectKind, zSpecSource, zPriority, zStage, zTicketCategory, zTicketStatus, zVerifyScope } from "./enums";
@@ -142,6 +143,10 @@ export const zProjectView = zProject.extend({
   helpEnabled: z.boolean().default(false),   // SPEC-253 · Help Center publik aktif
   schedulerOptIn: z.boolean().default(false),   // SPEC-294 · opt-in scheduler otonom
   leadOptIn: z.boolean().default(false),        // SPEC-409 · ADR-0091 · opt-in hanoman-lead
+  // SPEC-880 · ADR-0135 · penanda "ditangani oleh" yang SUDAH diperkaya: `name` = nama hidup bila
+  // baris DeviceToken-nya ada di instance ini, else snapshot tersimpan; `revoked` diturunkan.
+  // `[]` = belum ditetapkan — kolom NULL tak pernah bocor ke UI sebagai bentuk kedua "kosong".
+  handledBy: zHandledByView.array().default([]),
   autoMerge: zAutoMerge.nullable().default(null) });   // SPEC-486 · ADR-0103 · null = tanpa auto-merge
 export type ProjectView = z.infer<typeof zProjectView>;
 

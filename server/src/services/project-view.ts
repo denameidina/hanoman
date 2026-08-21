@@ -6,7 +6,7 @@ import { docStatusFor } from "./coverage";
 import { sessionPhases, type SessionInfo } from "./pty";
 import type { Project } from "@prisma/client";
 import type { ProjectView } from "@hanoman/shared";
-import { autoMergeOf } from "@hanoman/shared";
+import { autoMergeOf, handledByOf, type HandledByView } from "@hanoman/shared";
 
 const IDLE = { status: "idle" as const, phase: null as string | null, flow: null as string | null };
 
@@ -25,9 +25,33 @@ function sessionOf(projectId: string, sessions: SessionInfo[]) {
   };
 }
 
+// SPEC-880 · ADR-0135 · indeks device instance ini, dipakai memperkaya penanda "ditangani oleh".
+// `DeviceToken` TIDAK ikut SYNCED, jadi di client peta ini kosong dan `handledByView` jatuh ke
+// nama snapshot — itulah sebabnya `name` ikut tersimpan.
+export type DeviceIndex = Map<string, { name: string; revoked: boolean }>;
+
+export async function loadDeviceIndex(): Promise<DeviceIndex> {
+  const rows = await prisma.deviceToken.findMany({ select: { id: true, name: true, revokedAt: true } });
+  return new Map(rows.map((d) => [d.id, { name: d.name, revoked: d.revokedAt !== null }]));
+}
+
+// Nama HIDUP menang saat barisnya ada (rename device ikut terlihat); snapshot jadi jaring
+// pengamannya. `revoked` selalu false di instance yang tak memegang katalog device.
+function handledByView(raw: unknown, devices: DeviceIndex): HandledByView[] {
+  return handledByOf(raw).map((e) => {
+    const d = devices.get(e.deviceId);
+    return { deviceId: e.deviceId, name: d?.name ?? e.name, revoked: d?.revoked ?? false };
+  });
+}
+
 // SPEC-197 · terima baris project + snapshot sesi dari pemanggil: buang N+1 findUniqueOrThrow
 // (baris sudah ada di GET /projects) dan re-scan tmux per project.
-export async function toProjectView(p: Project, sessions: SessionInfo[]): Promise<ProjectView> {
+// SPEC-880 · `devices` OPSIONAL, cermin `sessions`: GET /projects memuat indeksnya SEKALI per
+// request; pemanggil satuan boleh mengabaikannya dan biarkan service memuatnya sendiri.
+export async function toProjectView(
+  p: Project, sessions: SessionInfo[], devices?: DeviceIndex,
+): Promise<ProjectView> {
+  const deviceIndex = devices ?? await loadDeviceIndex();
   const specs = await prisma.spec.findMany({ where: { projectId: p.id } });
   // Coverage adalah nilai turunan, bukan state tersimpan (ADR-0018). SPEC-217 · pindai path
   // EFEKTIF (binding lokal per-mesin ?? Project.repoDir), bukan repoDir mentah — agar dashboard
@@ -56,6 +80,9 @@ export async function toProjectView(p: Project, sessions: SessionInfo[]): Promis
     schedulerOptIn: p.schedulerOptIn,
     // SPEC-409 · ADR-0091 · opt-in hanoman-lead (lokal per-instance, cermin schedulerOptIn).
     leadOptIn: p.leadOptIn,
+    // SPEC-880 · ADR-0135 · penanda "ditangani oleh" (DISYNC — beda dari repoDir/binding di atas
+    // yang fakta mesin ini saja).
+    handledBy: handledByView((p as { handledBy?: unknown }).handledBy, deviceIndex),
     // SPEC-486 · ADR-0103 · kebijakan auto-merge (lokal per-instance, cermin schedulerOptIn).
     autoMerge: autoMergeOf((p as { autoMerge?: unknown }).autoMerge),
   };
