@@ -450,10 +450,17 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       if (!verdict.ok) { socket.close(verdict.code, verdict.reason); return; }
       const valid = await revalidateWsPrincipal(req, principal).catch(() => false);
       if (!valid) { socket.close(1008, "session revoked"); return; }
-      let m: { t?: string; d?: string; cols?: number; rows?: number };
+      let m: { t?: string; d?: string; cols?: number; rows?: number; seq?: number };
       // ponytail: frame rusak dibuang diam-diam — pengirimnya UI kita sendiri.
       try { m = JSON.parse(raw.toString()); } catch { return; }
-      if (m.t === "in" && typeof m.d === "string") writeTo(id, m.d, client);
+      if (m.t === "in" && typeof m.d === "string") {
+        writeTo(id, m.d, client);
+        // SPEC-878 · ADR-0134 · pengakuan pengiriman, dibalas SESUDAH writeTo. Klien memakainya
+        // sebagai satu-satunya titik nol jam TTL echo prediktif: sebelum bytenya sampai, diamnya
+        // pty tak memisahkan "pty bungkam" dari "jaringan lambat", dan menghukumnya terukur
+        // membeli 30,5 dtk layar bisu. `seq` opsional — klien lama tak mengirimnya.
+        if (typeof m.seq === "number") socket.send(JSON.stringify({ t: "ack", seq: m.seq }));
+      }
       else if (m.t === "resize" && m.cols && m.rows) resize(id, m.cols, m.rows);
     });
     const revalidate = setInterval(() => {
