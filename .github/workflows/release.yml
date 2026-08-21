@@ -47,7 +47,7 @@ jobs:
     environment: release
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Gerbang di bawah butuh riwayat penuh. Dengan default `fetch-depth: 1`, `merge-base`
           # menjawab SALAH satu jurusan — terukur: commit ke-6 dari ujung `main` ditolak walau
@@ -66,12 +66,12 @@ jobs:
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
           scripts/assert-release-ancestry.sh HEAD origin/main
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           # Root package.json tak punya field `packageManager`, jadi versinya dipatok di sini.
           version: 11
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org

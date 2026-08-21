@@ -120,7 +120,7 @@ describe("release.yml memasang gerbangnya", () => {
 
   // Tanpa ini checkout membawa `fetch-depth: 1` dan gerbangnya menolak rilis yang sah.
   it("checkout mengambil riwayat penuh", () => {
-    expect(wf).toMatch(/actions\/checkout@v4\s*\n\s*with:\s*\n\s*(#[^\n]*\n\s*)*fetch-depth:\s*0/);
+    expect(wf).toMatch(/actions\/checkout@v\d+\s*\n\s*with:\s*\n\s*(#[^\n]*\n\s*)*fetch-depth:\s*0/);
   });
 
   it("gerbang ancestry dipanggil", () => {
