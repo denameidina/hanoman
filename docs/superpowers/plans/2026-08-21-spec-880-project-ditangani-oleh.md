@@ -572,7 +572,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `GET /projects?handledBy=<deviceId>`
   - `POST /projects { …, handledBy? }` · `PATCH /projects/:id { …, handledBy? }`
 
-- [ ] **Step 1: Tulis test tulis yang gagal**
+- [x] **Step 1: Tulis test tulis yang gagal**
 
 Tambahkan blok berikut di akhir `server/test/project-handled-by.route.test.ts` (sesudah `describe` yang sudah ada):
 
@@ -690,7 +690,7 @@ describe("SPEC-880 · tulis & filter penanda 'ditangani oleh'", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH**
+- [x] **Step 2: Jalankan test — pastikan MERAH**
 
 ```bash
 TES server/test/project-handled-by.route.test.ts
@@ -698,7 +698,7 @@ TES server/test/project-handled-by.route.test.ts
 
 Expected: FAIL — PATCH memulangkan 200 dengan `handledBy: []` (zod membuang field tak dikenal), dan filter `?handledBy=` diabaikan.
 
-- [ ] **Step 3: Buat gerbang `server/src/services/handled-by.ts`**
+- [x] **Step 3: Buat gerbang `server/src/services/handled-by.ts`**
 
 ```ts
 import { prisma } from "../db";
@@ -723,7 +723,7 @@ export async function checkHandledBy(list: HandledByEntry[]): Promise<HandledByG
 }
 ```
 
-- [ ] **Step 4: Terima field di zod (`shared/src/dto.ts`)**
+- [x] **Step 4: Terima field di zod (`shared/src/dto.ts`)**
 
 Tambahkan import:
 
@@ -749,7 +749,7 @@ Di `zUpdateProject`, sisipkan sesudah baris `gitRemote:`:
   handledBy: zHandledBy.nullable().optional(),
 ```
 
-- [ ] **Step 5: Pasang gerbang, normalisasi kosong, dan filter di `server/src/routes/projects.ts`**
+- [x] **Step 5: Pasang gerbang, normalisasi kosong, dan filter di `server/src/routes/projects.ts`**
 
 Tambahkan import:
 
@@ -810,7 +810,7 @@ dan sesudah baris normalisasi `autoMerge`, sisipkan:
     if ("handledBy" in data && !(data.handledBy as unknown[] | null)?.length) data.handledBy = Prisma.DbNull;
 ```
 
-- [ ] **Step 6: Jalankan test — pastikan HIJAU**
+- [x] **Step 6: Jalankan test — pastikan HIJAU**
 
 ```bash
 TES server/test/project-handled-by.route.test.ts
@@ -818,7 +818,7 @@ TES server/test/project-handled-by.route.test.ts
 
 Expected: PASS — 15 test (5 dari Task 2 + 10 baru).
 
-- [ ] **Step 7: Typecheck paket yang tersentuh**
+- [x] **Step 7: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
@@ -826,7 +826,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 
 Expected: keluar tanpa galat.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/handled-by.ts shared/src/dto.ts server/src/routes/projects.ts \

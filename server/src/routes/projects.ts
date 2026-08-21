@@ -7,6 +7,7 @@ import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { listRepoBranches, listRepoRemoteBranches, defaultBranch } from "../services/branches";
 import { checkAutoMerge } from "../services/auto-merge-gate";
+import { checkHandledBy } from "../services/handled-by";
 import { Prisma } from "@prisma/client";
 import { resolveRepoDir } from "../services/local-binding";
 import { listSessions } from "../services/pty";
@@ -17,7 +18,8 @@ export default async function (app: FastifyInstance) {
   // SPEC-198 · envelope + filter q + paginasi via API. project-view dihitung penuh
   // (coverage/docStatus live per project), lalu filter q (name+desc+stack) + potong di memori.
   app.get("/projects", async (req) => {
-    const { q, page, limit } = req.query as { q?: string; page?: string; limit?: string };
+    const { q, handledBy, page, limit } = req.query as
+      { q?: string; handledBy?: string; page?: string; limit?: string };
     // SPEC-197 · satu listSessions untuk seluruh request (bukan re-scan tmux per project),
     // dan oper baris `p` yang sudah ada (bukan findUniqueOrThrow lagi = N+1).
     const ps = await prisma.project.findMany({ orderBy: { createdAt: "desc" } });
@@ -29,7 +31,13 @@ export default async function (app: FastifyInstance) {
     const filtered = needle
       ? views.filter((v) => `${v.name} ${v.desc} ${v.stack}`.toLowerCase().includes(needle))
       : views;
-    return paginate(filtered, page, limit);
+    // SPEC-880 · ADR-0135 · "apa saja yang dipegang mesin X" dalam satu klik. Disaring di memori
+    // bersama `q` — view sudah dihitung penuh, dan mem-filter JSON di SQLite tak memberi apa pun.
+    const device = (handledBy ?? "").trim();
+    const scoped = device
+      ? filtered.filter((v) => v.handledBy.some((h) => h.deviceId === device))
+      : filtered;
+    return paginate(scoped, page, limit);
   });
   app.get("/projects/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
@@ -44,6 +52,11 @@ export default async function (app: FastifyInstance) {
     const id = (b.name || b.repoDir?.split("/").pop() || "repo").trim().toLowerCase().replace(/\s+/g, "-");
     if (await prisma.project.findUnique({ where: { id } }))
       return reply.code(409).send({ error: `project "${id}" sudah ada` });
+    // SPEC-880 · ADR-0135 · deviceId divalidasi terhadap katalog device instance ini (bila ada).
+    if (b.handledBy?.length) {
+      const gate = await checkHandledBy(b.handledBy);
+      if (!gate.ok) return reply.code(gate.code).send({ error: gate.error });
+    }
     // SPEC-222 · project from-scratch butuh repo on-disk agar sesi scaffold bisa lahir (worktree
     // berbasis HEAD). git-init di sini membuatnya langsung runnable. Gagal init → 400, jangan
     // tinggalkan baris project setengah jadi. kind existing / tanpa repoDir tak tersentuh.
@@ -54,7 +67,8 @@ export default async function (app: FastifyInstance) {
     const created = await prisma.project.create({
       data: {
         id, name: id, desc: b.desc || "project baru", kind: b.kind, repoDir: b.repoDir ?? null,
-        gitRemote: b.gitRemote ?? null, stack: ""
+        gitRemote: b.gitRemote ?? null, stack: "",
+        ...(b.handledBy?.length ? { handledBy: b.handledBy } : {})
       }
     });
     await notifySynced("project", created.id); // SPEC-213/330 · sadar-peran: client antre push, hub publish ke feed
@@ -72,9 +86,16 @@ export default async function (app: FastifyInstance) {
       const gate = await checkAutoMerge(await resolveRepoDir(id), parsed.data.autoMerge);
       if (!gate.ok) return reply.code(gate.code).send({ error: gate.error });
     }
+    // SPEC-880 · ADR-0135 · deviceId divalidasi terhadap katalog device instance ini (bila ada).
+    if (parsed.data.handledBy?.length) {
+      const gate = await checkHandledBy(parsed.data.handledBy);
+      if (!gate.ok) return reply.code(gate.code).send({ error: gate.error });
+    }
     // Prisma `Json?` menolak `null` polos — `Prisma.DbNull` yang mengosongkan kolomnya.
     const data: Record<string, unknown> = { ...parsed.data };
     if ("autoMerge" in data && data.autoMerge === null) data.autoMerge = Prisma.DbNull;
+    // SPEC-880 · `null` dan `[]` sama-sama "belum ditetapkan" → satu representasi tersimpan.
+    if ("handledBy" in data && !(data.handledBy as unknown[] | null)?.length) data.handledBy = Prisma.DbNull;
     const updated = await prisma.project.update({ where: { id }, data });
     await notifySynced("project", id); // SPEC-213/330 · sadar-peran: client antre push, hub publish ke feed
     return toProjectView(updated, listSessions());

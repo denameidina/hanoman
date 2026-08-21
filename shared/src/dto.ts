@@ -45,6 +45,8 @@ export type SessionHistoryView = z.infer<typeof zSessionHistory>;
 export const zCreateProject = z.object({
   name: z.string().min(1), kind: zProjectKind, repoDir: z.string().optional(),
   gitRemote: z.string().optional(),
+  // SPEC-880 · ADR-0135 · penanda "ditangani oleh" boleh di-set sejak awal (disync).
+  handledBy: zHandledBy.optional(),
   desc: z.string().default("") });
 // SPEC-146: hanya label tampilan. `id` memikul kunci asing Spec; `kind`,
 // `repoDir` dan `stack` menentukan tempat sesi/scan/terminal hidup. Body
@@ -57,6 +59,10 @@ export const zUpdateProject = z.object({
   name: z.string().min(1).optional(),
   desc: z.string().optional(),
   gitRemote: z.string().optional(),   // SPEC-213 · set git remote resmi project
+  // SPEC-880 · ADR-0135 · daftar hanoman client pemegang project (DISYNC — beda dari repoDir &
+  // opt-in di bawah yang lokal per-instance). `null` maupun `[]` = kosongkan. Digerbangi
+  // `checkHandledBy`: deviceId wajib dikenal HANYA bila instance ini punya katalog device.
+  handledBy: zHandledBy.nullable().optional(),
   repoDir: z.string().nullable().optional(),   // SPEC-217 · path default/server editable (null = kosongkan)
   schedulerOptIn: z.boolean().optional(),   // SPEC-294 · opt-in scheduler otonom (lokal, tak disync)
   leadOptIn: z.boolean().optional(),        // SPEC-409 · ADR-0091 · opt-in hanoman-lead (lokal, tak disync)
