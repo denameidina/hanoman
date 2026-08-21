@@ -71,6 +71,12 @@ class FakeWebSocket {
 const paneHost = (container: HTMLElement): HTMLElement =>
   container.querySelector<HTMLElement>('[data-testid="terminal-host"]')!;
 
+// SPEC-878 · ADR-0134 · frame masuk kini bernomor (`seq`), jadi asersi berpegang pada MUATANNYA,
+// bukan pada bentuk JSON-nya.
+const inputsOf = (s?: FakeWebSocket): string[] => (s?.sent ?? [])
+  .map((m) => JSON.parse(m) as { t: string; d?: string })
+  .filter((f) => f.t === "in").map((f) => f.d ?? "");
+
 const keydown = (over: Partial<KeyboardEvent> & { key: string }): KeyboardEvent =>
   ({ type: "keydown", metaKey: false, ctrlKey: false, shiftKey: false, ...over } as KeyboardEvent);
 
@@ -130,11 +136,11 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
 
     xt.dataHandler?.("abc");
     xt.dataHandler?.("123");
-    expect(sockets[0]?.sent).not.toContain(JSON.stringify({ t: "in", d: "abc123" }));
+    expect(inputsOf(sockets[0])).not.toContain("abc123");
 
     sockets[0]!.readyState = FakeWebSocket.OPEN;
     act(() => { sockets[0]?.onopen?.(); });
-    expect(sockets[0]?.sent).toContain(JSON.stringify({ t: "in", d: "abc123" }));
+    expect(inputsOf(sockets[0])).toContain("abc123");
   });
 
   it("owns a vertical touch gesture and scrolls xterm scrollback instead of the page", () => {
@@ -206,7 +212,7 @@ describe("TerminalPane · liveness socket (SPEC-800)", () => {
       await vi.advanceTimersByTimeAsync(600);
       await vi.waitFor(() => expect(sockets).toHaveLength(2));
       act(() => { sockets[1]!.onopen?.(); });
-      expect(sockets[1]?.sent).toContain(JSON.stringify({ t: "in", d: "halo" }));
+      expect(inputsOf(sockets[1])).toContain("halo");
     } finally {
       vi.useRealTimers();
     }
@@ -312,15 +318,11 @@ describe("TerminalPane · papan tombol layar (SPEC-800)", () => {
     render(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     act(() => { sockets[0]?.onopen?.(); });
-    const before = sockets[0]!.sent.length;
+    const before = inputsOf(sockets[0]).length;
     fireEvent.click(screen.getByRole("button", { name: "Kirim panah bawah ke terminal" }));
     fireEvent.click(screen.getByRole("button", { name: "Kirim Enter ke terminal" }));
     fireEvent.click(screen.getByRole("button", { name: "Kirim Escape ke terminal" }));
-    expect(sockets[0]!.sent.slice(before)).toEqual([
-      JSON.stringify({ t: "in", d: "\x1b[B" }),
-      JSON.stringify({ t: "in", d: "\r" }),
-      JSON.stringify({ t: "in", d: "\x1b" }),
-    ]);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["\x1b[B", "\r", "\x1b"]);
   });
 });
 
@@ -354,9 +356,9 @@ describe("TerminalPane · tap memilih opsi dialog (SPEC-800)", () => {
       ...Array.from({ length: 20 }, () => ""),
       "Enter to select · ↑/↓ to navigate · Esc to cancel",
     ]);
-    const before = sockets[0]!.sent.length;
+    const before = inputsOf(sockets[0]).length;
     tap(paneHost(container), 15); // baris 1 (tinggi baris 240/24 = 10px)
-    expect(sockets[0]!.sent.slice(before)).toEqual([JSON.stringify({ t: "in", d: "2" })]);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["2"]);
   });
 
   it("tidak mengirim apa pun pada layar tanpa footer dialog", async () => {
@@ -417,8 +419,8 @@ describe("SPEC-816 · lampiran gambar", () => {
     act(() => { paneHost(container).dispatchEvent(event); });
 
     await vi.waitFor(() => expect(upload).toHaveBeenCalledWith("sesi-1", expect.anything()));
-    await vi.waitFor(() => expect(sockets[0]?.sent).toContain(
-      JSON.stringify({ t: "in", d: "/Users/d/.hanoman/uploads/terminal/sesi-1/abc.png " })));
+    await vi.waitFor(() => expect(inputsOf(sockets[0]))
+      .toContain("/Users/d/.hanoman/uploads/terminal/sesi-1/abc.png "));
     expect(event.defaultPrevented).toBe(true);
     // Tanpa Enter: operator melanjutkan mengetik kalimatnya di sebelah path.
     expect(sockets[0]?.sent.some((s) => s.includes("\\r"))).toBe(false);
@@ -453,8 +455,7 @@ describe("SPEC-816 · lampiran gambar", () => {
     });
     act(() => { paneHost(container).dispatchEvent(drop); });
     await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
-    await vi.waitFor(() => expect(sockets[0]?.sent)
-      .toContain(JSON.stringify({ t: "in", d: "/tmp/seret.webp " })));
+    await vi.waitFor(() => expect(inputsOf(sockets[0])).toContain("/tmp/seret.webp "));
   });
 
   // Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya.
@@ -541,6 +542,9 @@ describe("TerminalPane · echo prediktif (SPEC-856)", () => {
     lineIs("");
     await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     act(() => { xt.dataHandler?.("a"); });
+    // SPEC-878 · ADR-0134 · jam TTL baru berjalan sesudah server mengakui frame yang membawanya.
+    act(() => { vi.advanceTimersByTime(20); });
+    act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "ack", seq: 1 }) }); });
     xt.written.length = 0;
     act(() => { vi.advanceTimersByTime(700); });
     expect(xt.written).toEqual(["\x1b[1D\x1b[K"]);
@@ -556,5 +560,192 @@ describe("TerminalPane · echo prediktif (SPEC-856)", () => {
     act(() => { xt.dataHandler?.("s"); });
     expect(xt.written).toEqual([]);
     expect(sentInputs()).toEqual(["s"]);
+  });
+});
+
+// SPEC-878 · brief melaporkan "layar diam meski tombol ditekan". Yang membuatnya diam ada dua:
+// gerbang prediksi menolak saat socket mati, dan TTL menghapus + menyuspend 30 dtk saat pty diam
+// karena jaringan — terukur 9 glyph muncul lalu dihapus, lalu 0 tulis lokal, tanpa satu pun banner.
+describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", () => {
+  const glyphs = () => xt.written.filter((w) => w.startsWith("\x1b[4m"));
+  const wait = (ms: number) => act(() => new Promise<void>((r) => { setTimeout(r, ms); }));
+
+  it("tetap menggambar satu glyph per keystroke selagi socket putus", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    act(() => { sockets[0]!.readyState = 3; sockets[0]!.onclose?.({ code: 1006 }); });
+    xt.written = [];
+    for (const c of [..."halo"]) act(() => { xt.dataHandler?.(c); });
+    expect(glyphs()).toHaveLength(4);
+  });
+
+  it("tak menghapus glyph yang belum di-ack, betapa pun lama server diam", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    xt.written = [];
+    for (const c of [..."halo"]) act(() => { xt.dataHandler?.(c); });
+    await wait(800);
+    expect(xt.written.some((w) => w.includes("\x1b[K"))).toBe(false);
+    xt.written = [];
+    act(() => { xt.dataHandler?.("x"); });
+    expect(glyphs()).toHaveLength(1);
+  });
+
+  it("TTL tetap menggigit sesudah ack — jaminan SPEC-856 tak dilonggarkan", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    xt.written = [];
+    act(() => { xt.dataHandler?.("a"); });
+    await wait(40);
+    const seq = sockets[0]!.sent.map((m) => JSON.parse(m) as { t: string; seq?: number })
+      .find((f) => f.t === "in")?.seq;
+    expect(seq).toBe(1);
+    act(() => { sockets[0]!.onmessage?.({ data: JSON.stringify({ t: "ack", seq }) }); });
+    await wait(800);
+    expect(xt.written).toContain("\x1b[1D\x1b[K");
+  });
+
+  it("menggulung balik prediksi outage tepat sebelum sambungan baru menggambar", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    act(() => { sockets[0]!.readyState = 3; sockets[0]!.onclose?.({ code: 1006 }); });
+    for (const c of [..."abc"]) act(() => { xt.dataHandler?.(c); });
+    await vi.waitFor(() => expect(sockets.length).toBeGreaterThan(1), { timeout: 3_000 });
+    xt.written = [];
+    act(() => { sockets[1]!.onopen?.(); });
+    expect(xt.written[0]).toBe("\x1b[3D\x1b[K");
+  });
+
+  // SPEC-878 · transposisi harfiah: jalur mentah menyalip ketikan yang masih ditahan jendela 16 ms.
+  // Terukur di jalur nyata — pty menerima `["\x1b","z"]` untuk `z` lalu Escape.
+  it("mengirim tombol papan tombol SESUDAH ketikan yang masih ditahan batcher", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    const before = inputsOf(sockets[0]).length;
+    act(() => { xt.dataHandler?.("z"); });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Kirim Escape ke terminal" })); });
+    await wait(40);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["z", "\x1b"]);
+  });
+
+  it("mengirim path lampiran SESUDAH ketikan yang masih ditahan batcher", async () => {
+    vi.spyOn(api, "uploadTerminalAttachment").mockResolvedValue({ path: "/tmp/a.png" });
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    const before = inputsOf(sockets[0]).length;
+    act(() => { xt.dataHandler?.("z"); });
+    const drop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "dataTransfer", {
+      value: { types: ["Files"], files: [new File(["x"], "a.png", { type: "image/png" })] },
+    });
+    act(() => { paneHost(container).dispatchEvent(drop); });
+    await vi.waitFor(() => expect(inputsOf(sockets[0]).slice(before)).toEqual(["z", "/tmp/a.png "]));
+  });
+
+  const reconnect = async () => {
+    await vi.waitFor(() => expect(sockets.length).toBeGreaterThan(1), { timeout: 3_000 });
+    act(() => { sockets[1]!.onopen?.(); });
+  };
+  const cut = () => act(() => {
+    sockets[0]!.readyState = 3;
+    sockets[0]!.onclose?.({ code: 1006 });
+  });
+
+  it("menguras antrean tanpa submit apa adanya, dan `resize` mendahuluinya", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 360, top: 0, right: 640, bottom: 360, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    for (const c of [..."hai"]) act(() => { xt.dataHandler?.(c); });
+    await reconnect();
+    const kinds = sockets[1]!.sent.map((m) => (JSON.parse(m) as { t: string }).t);
+    expect(kinds.indexOf("resize")).toBeLessThan(kinds.indexOf("in"));
+    expect(inputsOf(sockets[1])).toEqual(["hai"]);
+  });
+
+  // SPEC-878 · layar operator sudah basi berdetik-detik saat antrean mendarat, jadi `\r` di
+  // dalamnya adalah jawaban atas pertanyaan yang mungkin bukan lagi yang ada di layar —
+  // `capture-pane` membuktikan baris yang salah benar-benar ter-submit ke agen.
+  it("menahan antrean yang memuat Enter dan tak mengirim apa pun sampai operator memilih", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    for (const c of [..."rahasia"]) act(() => { xt.dataHandler?.(c); });
+    act(() => { xt.dataHandler?.("\r"); });
+    await reconnect();
+    expect(inputsOf(sockets[1])).toEqual([]);
+    expect(container.querySelector('[data-testid="terminal-held"]')).not.toBeNull();
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Kirim" })); });
+    expect(inputsOf(sockets[1])).toEqual(["rahasia\r"]);
+    expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull();
+  });
+
+  it("membuang antrean tertahan saat operator memilih Buang", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    act(() => { xt.dataHandler?.("\r"); });
+    await reconnect();
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Buang" })); });
+    expect(inputsOf(sockets[1])).toEqual([]);
+    expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull();
+  });
+
+  it("memperlihatkan jumlah ketikan yang sedang diantre", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    for (const c of [..."halo"]) act(() => { xt.dataHandler?.(c); });
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-testid="terminal-queue"]')?.textContent).toContain("4");
+    });
+  });
+
+  it("berhenti menerima ketikan saat antrean penuh, dan berhenti menjanjikannya di layar", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    act(() => { for (let i = 0; i < 4_097; i += 1) xt.dataHandler?.("x"); });
+    await wait(40);
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-testid="terminal-queue-full"]')).not.toBeNull();
+    });
+    xt.written = [];
+    act(() => { xt.dataHandler?.("a"); });
+    expect(glyphs()).toHaveLength(0);
+  });
+
+  it("tak mengantrekan balasan handshake terminal milik sambungan yang sudah mati", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    act(() => { xt.dataHandler?.("\x1b[?1;2c"); });
+    for (const c of [..."ya"]) act(() => { xt.dataHandler?.(c); });
+    await reconnect();
+    expect(inputsOf(sockets[1])).toEqual(["ya"]);
+  });
+
+  it("berhenti memprediksi begitu sesi tmux-nya dinyatakan lenyap", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    act(() => { sockets[0]!.readyState = 3; sockets[0]!.onclose?.({ code: 4004 }); });
+    xt.written = [];
+    act(() => { xt.dataHandler?.("a"); });
+    expect(glyphs()).toHaveLength(0);
   });
 });

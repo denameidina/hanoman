@@ -28,7 +28,7 @@ const waitFor = async (ok: () => boolean, ms = 5000) => {
   }
 };
 
-type Frame = { t: string; d?: string; code?: number };
+type Frame = { t: string; d?: string; code?: number; seq?: number };
 function connect(id: string) {
   const ws = new WebSocket(`ws://${origin}/api/terminal/sessions/${id}/ws`);
   const frames: Frame[] = [];
@@ -98,6 +98,23 @@ describe("terminal routes", () => {
     const c = connect(id);
     await c.opened;
     expect(c.ws.extensions).toContain("permessage-deflate");
+    c.ws.close();
+  });
+
+  // SPEC-878 · ADR-0134 · ack adalah satu-satunya titik nol jam TTL echo prediktif di klien. Ia
+  // dibalas SESUDAH writeTo, jadi maknanya "server menerima frame ini dan menyerahkannya ke pty".
+  // `seq` opsional supaya klien lama tak berubah perilakunya.
+  it("mengakui frame input yang bernomor, dan hanya yang bernomor", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    const id = await createSession();
+    const c = connect(id);
+    await c.opened;
+    c.ws.send(JSON.stringify({ t: "in", d: "a", seq: 1 }));
+    c.ws.send(JSON.stringify({ t: "in", d: "b", seq: 2 }));
+    c.ws.send(JSON.stringify({ t: "in", d: "c" }));
+    c.ws.send(JSON.stringify({ t: "in", d: "\nACK-PROBE-OK\n" }));
+    await waitFor(() => c.data().includes("ACK-PROBE-OK"));
+    expect(c.frames.filter((f) => f.t === "ack").map((f) => f.seq)).toEqual([1, 2]);
     c.ws.close();
   });
 

@@ -2,7 +2,7 @@ import React from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { paths } from "@hanoman/shared";
+import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
@@ -19,6 +19,15 @@ import * as P from "./terminal-predict";
 // dari "generator koneksi" yang dilarang SPEC-761.
 const RECONNECT_BACKOFF_MS = [500, 1_000, 2_000, 4_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000];
 const RECONNECT_MAX = RECONNECT_BACKOFF_MS.length;
+
+// SPEC-878 · ADR-0134 · antrean adalah penyelamat ketikan (SPEC-800), bukan tempat penyimpanan.
+// 4 KiB memuat satu paragraf yang di-paste dan tetap menghentikan antrean yang lari.
+const MAX_PENDING_INPUT = 4_096;
+// Layar operator sudah basi berdetik-detik saat antrean mendarat, jadi `\r` di dalamnya adalah
+// jawaban atas pertanyaan yang mungkin bukan lagi yang ada di layar — `capture-pane` membuktikan
+// baris yang salah benar-benar ter-submit ke agen. Antrean karena itu tak pernah mengirim byte
+// yang men-submit sendiri; ia ditahan seluruhnya sampai operator memutuskan.
+const SUBMIT = /[\r\n]/;
 
 type LinkState =
   | { state: "connecting" | "open" | "gone" | "lost" }
@@ -52,8 +61,12 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   const phaseRef = React.useRef(onPhases);
   phaseRef.current = onPhases;
   const [link, setLink] = React.useState<LinkState>({ state: "connecting" });
+  const [queue, setQueue] = React.useState<{ n: number; held: boolean; full: boolean }>(
+    { n: 0, held: false, full: false });
   const retryNow = React.useRef<() => void>(() => {});
   const sendKey = React.useRef<(d: string) => void>(() => {});
+  const sendHeld = React.useRef<() => void>(() => {});
+  const dropHeld = React.useRef<() => void>(() => {});
 
   React.useEffect(() => {
     const el = host.current;
@@ -90,24 +103,72 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
     view.current = { term, fit, send };
     let pendingInput = "";
-    const sendInput = (d: string) => {
-      if (ws?.readyState === WebSocket.OPEN) send({ t: "in", d });
-      else pendingInput += d;
+    let held = false;
+    let full = false;
+    // SPEC-878 · ADR-0134 · penomoran frame masuk. `unacked` satu-satunya hal yang boleh menyalakan
+    // jam TTL prediksi: selama ia > 0, diamnya server tak memisahkan "pty bungkam" dari "byte
+    // belum sampai".
+    let seq = 0;
+    let unacked = 0;
+    // 4004 = sesi tmux-nya memang sudah lenyap. Satu-satunya keadaan di mana byte yang diantre
+    // TIDAK akan pernah terkirim — jadi satu-satunya yang menutup `deliverable`.
+    let gone = false;
+    const sendFrame = (d: string) => {
+      seq += 1;
+      unacked += 1;
+      send({ t: "in", d, seq });
     };
-    sendKey.current = sendInput;
+    const publishQueue = () => setQueue({ n: pendingInput.length, held, full });
+    // Byte tak pernah menyalip antrean yang belum terkuras: FIFO secara konstruksi, bukan karena
+    // jendela 16 ms kebetulan tak kena.
+    const sendInput = (d: string) => {
+      if (!held && !pendingInput && ws?.readyState === WebSocket.OPEN) { sendFrame(d); return; }
+      // Balasan handshake milik sambungan yang sudah mati tak berarti apa pun bagi sambungan
+      // berikutnya, dan blob campuran menembus gerbang `isTerminalResponse` di server (SPEC-860).
+      if (gone || isTerminalResponse(d)) return;
+      if (pendingInput.length + d.length > MAX_PENDING_INPUT) { full = true; publishQueue(); return; }
+      pendingInput += d;
+      publishQueue();
+    };
 
-    // SPEC-856 · echo prediktif. HANYA `term.onData` yang lewat sini; clipboard (SPEC-289), tap
-    // dialog (SPEC-452), lampiran (SPEC-816), dan papan tombol (SPEC-800) tetap memakai `sendInput`
-    // mentah, jadi jaminan "satu keystroke = satu frame" milik mereka tak berubah.
+    // SPEC-856 · echo prediktif.
     let pred = P.initialState();
     const batcher = P.createInputBatcher(sendInput);
+    // SPEC-878 · SATU pintu keluar untuk SEMUA jalur input. Yang melewati batcher bisa mendarat di
+    // pty SEBELUM ketikan yang masih ditahan jendela 16 ms — terukur `["\x1b","z"]` untuk `z` lalu
+    // Escape. `coalesce=false` menguras antrean lebih dulu lalu meneruskan payload UTUH dalam satu
+    // frame, jadi "satu tekan = satu keystroke" (SPEC-452) dan "paste utuh" (SPEC-289) tak berubah.
+    const sendRaw = (d: string) => batcher.push(d, false);
+    sendKey.current = sendRaw;
     const viewOf = (): P.View => {
       const buf = term.buffer.active;
       return {
-        cursorX: buf.cursorX, cols: term.cols, connected: ws?.readyState === WebSocket.OPEN,
+        cursorX: buf.cursorX, cols: term.cols, deliverable: !gone && !full,
         line: buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "",
       };
     };
+    // Jam TTL baru boleh berjalan sesudah SELURUH frame yang sudah dikirim diakui server.
+    const clockIfDelivered = () => {
+      if (unacked === 0 && ws?.readyState === WebSocket.OPEN) pred = P.onDelivered(pred, Date.now());
+    };
+    const flushQueue = () => {
+      if (!pendingInput || ws?.readyState !== WebSocket.OPEN) { publishQueue(); return; }
+      const d = pendingInput;
+      pendingInput = "";
+      full = false;
+      publishQueue();
+      sendFrame(d);
+    };
+    const drainPending = () => {
+      // Apa pun yang masih ditahan jendela 16 ms milik antrean ini juga — menguras antrean
+      // sebelum batcher akan menukar urutannya.
+      batcher.flush();
+      if (!pendingInput) { publishQueue(); return; }
+      if (SUBMIT.test(pendingInput)) { held = true; publishQueue(); return; }
+      flushQueue();
+    };
+    sendHeld.current = () => { held = false; flushQueue(); };
+    dropHeld.current = () => { pendingInput = ""; held = false; full = false; publishQueue(); };
     const onTyped = (d: string) => {
       const wasPredicting = pred.pending.length > 0;
       const r = P.onInput(pred, d, viewOf(), Date.now(), predictRef.current);
@@ -133,25 +194,34 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
 
         socket.onopen = () => {
           attempt = 0;
+          seq = 0;
+          unacked = 0;
+          // SPEC-878 · prediksi yang lahir selama outage adalah satu-satunya yang menulis ke
+          // terminal selama itu, jadi kursor duduk persis di ujungnya dan rollback CUB+`\x1b[K`
+          // masih sah — prasyarat yang sama yang sudah dipegang modul. Ia ditulis SEBELUM apa pun
+          // dari server; apa yang benar-benar ada di pty digambar ulang tmux sesudahnya.
+          const back = P.rollbackSeq(pred.pending.length);
+          if (back) term.write(back);
           // tmux memutar ulang layar penuh saat attach — tak ada prediksi yang boleh diwarisi.
           pred = P.onReattach();
           setLink({ state: "open" });
+          if (visibleRect()) {
+            const finePointer = typeof window.matchMedia !== "function"
+              || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+            if (finePointer) term.focus();
+            // Geometri yang berubah selagi putus hilang senyap (`send` no-op saat socket mati),
+            // jadi ia wajib mendahului byte antrean — kalau tidak TUI menggambar blob itu untuk
+            // geometri lama lalu me-rewrap seluruh layar.
+            send({ t: "resize", cols: term.cols, rows: term.rows });
+          }
           // Dikuras di SETIAP open, bukan hanya yang pertama: itu yang mengubah buffer SPEC-771
           // dari penyembunyi kegagalan menjadi penyelamat ketikan.
-          if (pendingInput) {
-            const d = pendingInput;
-            pendingInput = "";
-            send({ t: "in", d });
-          }
-          if (!visibleRect()) return;
-          const finePointer = typeof window.matchMedia !== "function"
-            || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-          if (finePointer) term.focus();
-          send({ t: "resize", cols: term.cols, rows: term.rows });
+          drainPending();
         };
         socket.onmessage = (ev) => {
           const f = JSON.parse(ev.data as string) as {
-            t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean; on?: boolean;
+            t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
+            on?: boolean; seq?: number;
           };
           if (f.t === "data") {
             const r = P.onServerData(pred, f.d ?? "", Date.now());
@@ -167,7 +237,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
               pred = back.state;
               if (back.write) term.write(back.write);
             }
+            clockIfDelivered();
           }
+          // SPEC-878 · ADR-0134 · pengakuan pengiriman: satu-satunya titik nol jam TTL prediksi.
+          else if (f.t === "ack") { unacked = Math.max(0, unacked - 1); clockIfDelivered(); }
           // Server menyiarkan fase saat attach dan setiap kali agen menutup satu (SPEC-162).
           // SPEC-433 · sejak sekarang juga saat `complete` berubah tanpa daftar fase berubah —
           // kotak `- [ ]` terakhir di plan dicentang sesudah `Execute done`.
@@ -185,7 +258,20 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         // 4004 = sesi tmux-nya memang sudah lenyap; menyambung ulang hanya menghasilkan badai 404.
         socket.onclose = (event) => {
           if (disposed || finished) return;
-          if (event.code === 4004) { setLink({ state: "gone" }); return; }
+          if (event.code === 4004) {
+            gone = true;
+            // Byte yang diantre tak akan pernah punya tujuan, jadi layar tak boleh terus
+            // menampilkannya seolah ia akan sampai.
+            const back = P.rollbackSeq(pred.pending.length);
+            if (back) term.write(back);
+            pred = P.onReattach();
+            pendingInput = "";
+            held = false;
+            full = false;
+            publishQueue();
+            setLink({ state: "gone" });
+            return;
+          }
           retry();
         };
         socket.onerror = () => { /* onclose selalu menyusul; keputusannya cukup di satu tempat */ };
@@ -223,7 +309,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         return false;
       }
       if (intent === "paste") {
-        void navigator.clipboard?.readText().then((t) => { if (t) sendInput(t); });
+        void navigator.clipboard?.readText().then((t) => { if (t) sendRaw(t); });
         return false;
       }
       return true;
@@ -287,7 +373,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       const lines = Array.from({ length: term.rows },
         (_, i) => buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? "");
       const choice = dialogChoiceAt(lines, row);
-      if (choice) sendInput(choice);
+      if (choice) sendRaw(choice);
     };
     // SPEC-816 · lampiran gambar. Yang bisa dikirim ke PTY hanyalah teks, jadi berkasnya diunggah
     // lebih dulu dan yang masuk ke prompt adalah PATH-nya — agen membacanya sendiri dengan Read.
@@ -298,7 +384,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
           const { path } = await api.uploadTerminalAttachment(sessionId, file);
           // Spasi, bukan Enter: operator melanjutkan mengetik kalimatnya di sebelah path.
           // sendInput menampung ke `pendingInput` bila socket sedang menyambung ulang.
-          sendInput(`${path} `);
+          sendRaw(`${path} `);
         } catch (e) {
           term.write(`\r\n\x1b[31mlampiran gagal: ${(e as Error).message}\x1b[0m\r\n`);
         }
@@ -341,6 +427,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       clearTimeout(timer);
       retryNow.current = () => {};
       sendKey.current = () => {};
+      sendHeld.current = () => {};
+      dropHeld.current = () => {};
       view.current = null;
       el.removeEventListener("paste", onPaste);
       el.removeEventListener("dragover", onDragOver);
@@ -376,23 +464,35 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya. */}
-      {link.state !== "open" && link.state !== "connecting" && (
+      {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya.
+          SPEC-878 · strip juga bicara saat sambungan sehat: antrean yang ditahan karena memuat
+          Enter adalah keputusan yang menunggu operator, bukan keadaan koneksi. */}
+      {((link.state !== "open" && link.state !== "connecting") || queue.held || queue.full) && (
         <div data-testid="terminal-link" style={{
-          display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto",
+          display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto", flexWrap: "wrap",
           padding: "3px 8px", fontFamily: "var(--font-mono)", fontSize: 11,
-          background: link.state === "retrying" ? "var(--status-warn-tint)" : "var(--status-err-tint)",
+          background: link.state === "retrying" || queue.held
+            ? "var(--status-warn-tint)" : "var(--status-err-tint)",
           color: "var(--text-body)",
         }}>
-          {link.state === "retrying"
-            ? `menyambung ulang… (${link.attempt}/${RECONNECT_MAX})`
-            : link.state === "gone"
-              ? "sesi tidak ditemukan di tmux"
-              : <>
-                  <span>terputus</span>
-                  <button type="button" className="hn-terminal-action hn-terminal-action--text"
-                    onClick={() => retryNow.current()}>Sambungkan lagi</button>
-                </>}
+          {link.state === "retrying" && <span>menyambung ulang… ({link.attempt}/{RECONNECT_MAX})</span>}
+          {link.state === "gone" && <span>sesi tidak ditemukan di tmux</span>}
+          {link.state === "lost" && <>
+            <span>terputus</span>
+            <button type="button" className="hn-terminal-action hn-terminal-action--text"
+              onClick={() => retryNow.current()}>Sambungkan lagi</button>
+          </>}
+          {queue.n > 0 && !queue.held && (
+            <span data-testid="terminal-queue">{queue.n} ketikan diantre</span>
+          )}
+          {queue.held && <>
+            <span data-testid="terminal-held">{queue.n} ketikan tertahan — belum dikirim</span>
+            <button type="button" className="hn-terminal-action hn-terminal-action--text"
+              onClick={() => sendHeld.current()}>Kirim</button>
+            <button type="button" className="hn-terminal-action hn-terminal-action--text"
+              onClick={() => dropHeld.current()}>Buang</button>
+          </>}
+          {queue.full && <span data-testid="terminal-queue-full">antrean penuh</span>}
         </div>
       )}
       <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",

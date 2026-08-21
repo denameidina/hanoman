@@ -29,8 +29,13 @@ export function rollbackSeq(n: number): string {
 }
 
 /** Pandangan layar pada saat keputusan diambil. Komponen membacanya dari xterm; modul ini tak
- *  pernah menyentuh xterm supaya seluruh keputusannya bisa diuji sebagai fungsi murni. */
-export type View = { cursorX: number; cols: number; line: string; connected: boolean };
+ *  pernah menyentuh xterm supaya seluruh keputusannya bisa diuji sebagai fungsi murni.
+ *
+ *  SPEC-878 · `deliverable` menggantikan `connected`: yang menentukan boleh-tidaknya memprediksi
+ *  adalah apakah byte ini akan SAMPAI, bukan apakah socketnya sedang hidup. Byte yang diantre untuk
+ *  sambungan yang masih akan pulih pasti terkirim — menolak memprediksinya membuat layar diam
+ *  persis saat operator paling butuh umpan balik (terukur: 0 tulis lokal untuk 14 keystroke). */
+export type View = { cursorX: number; cols: number; line: string; deliverable: boolean };
 
 export type PredictState = {
   /** karakter yang sudah di-echo lokal dan belum terkonfirmasi, berurutan */
@@ -73,7 +78,7 @@ export function looksLikePasswordPrompt(line: string): boolean {
 export function canPredict(
   state: PredictState, d: string, view: View, now: number, enabled: boolean,
 ): boolean {
-  if (!enabled || !view.connected || state.altScreen) return false;
+  if (!enabled || !view.deliverable || state.altScreen) return false;
   if (now < state.suspendedUntil) return false;
   if (classifyInput(d) !== "text") return false;
   // `view.cursorX` dibaca hidup dari xterm, jadi ia SUDAH memuat karakter yang sudah diprediksi —
@@ -94,12 +99,16 @@ export function echoedPrefixLen(before: string, pending: string): number {
   return 0;
 }
 
+// SPEC-878 · `since` dikosongkan setiap kali lahir prediksi baru: jam TTL milik `onDelivered`, dan
+// ia baru boleh berjalan sesudah byte-nya diketahui sampai di server (ADR-0134). Menyetelnya di
+// sini berarti mengukur "sudah berapa lama saya menunggu" — pertanyaan yang jawabannya sama dengan
+// "pty sengaja bungkam" hanya selama jaringan sehat.
 export function onInput(
   state: PredictState, d: string, view: View, now: number, enabled: boolean,
 ): { state: PredictState; write: string } {
   if (!canPredict(state, d, view, now, enabled)) return { state, write: "" };
   return {
-    state: { ...state, pending: state.pending + d, since: state.since ?? now },
+    state: { ...state, pending: state.pending + d, since: null },
     write: applySeq(d),
   };
 }
@@ -112,6 +121,15 @@ export function onServerData(
     write: rollbackSeq(state.pending.length) + data,
     tail: state.pending,
   };
+}
+
+/** SPEC-878 · ADR-0134 · satu-satunya penyala jam TTL: server mengakui sudah menerima frame yang
+ *  membawa prediksi ini dan menyerahkannya ke pty. Sesudah titik itu — dan hanya sesudahnya —
+ *  diamnya pty benar-benar berarti "pty memilih tak membalas" (`read -s`, tombol yang ditelan
+ *  dialog: keduanya terukur nol byte). Idempoten: jam yang sudah menyala tak pernah dimundurkan. */
+export function onDelivered(state: PredictState, now: number): PredictState {
+  if (!state.pending || state.since !== null) return state;
+  return { ...state, since: now };
 }
 
 export function reapply(
@@ -127,7 +145,7 @@ export function reapply(
       return { state, write: "" };
     }
   }
-  return { state: { ...state, pending: tail, since: now }, write: applySeq(tail) };
+  return { state: { ...state, pending: tail, since: null }, write: applySeq(tail) };
 }
 
 export function onTick(
