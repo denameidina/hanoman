@@ -9,8 +9,9 @@ import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   resolveHome, resolveDbUrl, dbFilePath, prismaCliPath, dbUrlNotice, repairSpawnHelper,
+  readConfigEnv,
 } from "@hanoman/runner";
-import { UPDATE_RESTART_EXIT } from "@hanoman/shared";
+import { CONFIG_RESTART_EXIT, UPDATE_RESTART_EXIT } from "@hanoman/shared";
 import type { Ctx } from "../router";
 import { resolveLayout } from "../layout";
 import { INSTALL_ARGS } from "./update";
@@ -146,7 +147,13 @@ function repairSpawnHelperEarly(ctx: Ctx): void {
  */
 export const MAX_UPDATE_RESTARTS = 5;
 
-export type SupervisorStep = { action: "exit"; code: number } | { action: "update" };
+export type SupervisorStep =
+  | { action: "exit"; code: number }
+  | { action: "update" }
+  | { action: "restart" };
+
+// SPEC-884 · jatah TERPISAH: menyelesaikan wizard tak boleh memakan jatah update, dan sebaliknya.
+export const MAX_CONFIG_RESTARTS = 5;
 
 /**
  * Murni. HANYA kode sentinel yang berarti "pasang lalu jalankan lagi" — kode lain diteruskan apa
@@ -157,7 +164,12 @@ export type SupervisorStep = { action: "exit"; code: number } | { action: "updat
  * dipicu manusia, jadi loop tak berujung bukan mode kegagalan otomatis — tapi batasnya murah dan
  * pemanggil WAJIB mencetak alasannya saat jatah habis (jangan pernah membatasi diam-diam).
  */
-export function planSupervisorStep(code: number, restartsUsed: number): SupervisorStep {
+export function planSupervisorStep(
+  code: number, restartsUsed: number, configRestartsUsed = 0,
+): SupervisorStep {
+  // SPEC-884 · ADR-0138 · "config berubah, jalankan ulang" — TANPA npm, TANPA prisma generate.
+  if (code === CONFIG_RESTART_EXIT)
+    return configRestartsUsed >= MAX_CONFIG_RESTARTS ? { action: "exit", code } : { action: "restart" };
   if (code !== UPDATE_RESTART_EXIT) return { action: "exit", code };
   if (restartsUsed >= MAX_UPDATE_RESTARTS) return { action: "exit", code };
   return { action: "update" };
@@ -197,8 +209,26 @@ export function installLatest(): InstallOutcome {
  * supervisor, memasangnya tanpa melepas akan menumpuk listener tiap restart sampai node
  * memperingatkan kebocoran.
  */
-function runServer(serverJs: string, env: Record<string, string>): Promise<number> {
-  const child = spawn(process.execPath, [serverJs], { stdio: "inherit", env: { ...process.env, ...env } });
+/**
+ * SPEC-884 · ADR-0138 · presedensi env proses anak, dibuat MURNI supaya urutannya bisa diuji
+ * alih-alih diandalkan dari pembacaan. `config.env` sengaja PALING LEMAH: `EnvironmentFile`
+ * systemd dan `export` di shell mengalahkannya, sehingga wizard di dashboard secara struktural tak
+ * bisa mematikan hardening yang dipasang operator. `serverEnv()` tetap paling kuat.
+ */
+export function spawnEnv(
+  fileEnv: Record<string, string>,
+  processEnv: NodeJS.ProcessEnv,
+  server: Record<string, string>,
+): NodeJS.ProcessEnv {
+  return { ...fileEnv, ...processEnv, ...server };
+}
+
+function runServer(
+  serverJs: string, env: Record<string, string>, fileEnv: Record<string, string>,
+): Promise<number> {
+  const child = spawn(process.execPath, [serverJs], {
+    stdio: "inherit", env: spawnEnv(fileEnv, process.env, env),
+  });
   const handlers = (["SIGINT", "SIGTERM"] as const).map((sig) => [sig, () => child.kill(sig)] as const);
   for (const [sig, h] of handlers) process.on(sig, h);
   return new Promise<number>((res) => child.on("exit", (code) => {
@@ -254,14 +284,24 @@ export default async function start(argv: string[], ctx: Ctx): Promise<number> {
   // SPEC-405 · ADR-0088 · loop supervisor. Tanpa permintaan update dari dashboard, ia berputar
   // tepat sekali dan berperilaku identik dengan sebelum SPEC-405.
   let restartsUsed = 0;
+  let configRestartsUsed = 0;
   for (;;) {
-    const code = await runServer(layout.server, env);
-    const step = planSupervisorStep(code, restartsUsed);
+    // SPEC-884 · dibaca ULANG tiap putaran: wizard menulis berkas ini TEPAT sebelum minta restart.
+    const code = await runServer(layout.server, env, readConfigEnv(home));
+    const step = planSupervisorStep(code, restartsUsed, configRestartsUsed);
     if (step.action === "exit") {
       if (code === UPDATE_RESTART_EXIT) {
         ctx.stderr(`hanoman: jatah update-restart (${MAX_UPDATE_RESTARTS}) habis — keluar tanpa memasang\n`);
       }
+      if (code === CONFIG_RESTART_EXIT) {
+        ctx.stderr(`hanoman: jatah restart-konfigurasi (${MAX_CONFIG_RESTARTS}) habis — keluar\n`);
+      }
       return step.code;
+    }
+    if (step.action === "restart") {
+      configRestartsUsed++;
+      ctx.stdout(`hanoman · konfigurasi berubah; menjalankan ulang (${configRestartsUsed}/${MAX_CONFIG_RESTARTS})\n`);
+      continue;
     }
 
     restartsUsed++;

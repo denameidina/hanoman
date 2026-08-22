@@ -1041,7 +1041,7 @@ git commit -m "feat(spec-884): kontrak setup — CONFIG_RESTART_EXIT, DTO, path"
 - Consumes: `readConfigEnv` (Task 1), `CONFIG_RESTART_EXIT` (Task 9)
 - Produces: `SupervisorStep` bertambah `{ action: "restart" }`; `planSupervisorStep(code, restartsUsed, configRestartsUsed?)`; `MAX_CONFIG_RESTARTS = 5`; `spawnEnv(fileEnv, processEnv, serverEnv)`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `cli/test/start-supervisor.test.ts`:
 
@@ -1091,12 +1091,12 @@ describe("presedensi env spawn (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run cli/test/start-supervisor.test.ts`
 Expected: FAIL — `spawnEnv` dan `MAX_CONFIG_RESTARTS` tak diekspor; `planSupervisorStep` menolak argumen ketiga
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `cli/src/commands/start.ts`:
 
@@ -1201,17 +1201,17 @@ Di loop supervisor (baris ~253), ganti awal iterasi dan tambahkan cabang `restar
 
 Sisa cabang `update` tidak diubah.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run cli/test/start-supervisor.test.ts cli/test/start-args.test.ts`
 Expected: PASS — kedua berkas
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `pnpm --filter ./cli typecheck`
 Expected: keluar 0
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add cli/src/commands/start.ts cli/test/start-supervisor.test.ts
