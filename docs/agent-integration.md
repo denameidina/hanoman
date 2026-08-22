@@ -100,7 +100,7 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 |---|---|---|
 | `projects` | `/api/projects*` | project, branch, binding, Help Center |
 | `backlog` | `/api/specs*` | spec/backlog, dokumen, review diff, integrate |
-| `sessions` | `/api/terminal*` (+ WS terminal) | jalankan sesi agen/shell, kirim input — **high-risk (RCE)** |
+| `sessions` | `/api/terminal*` (+ WS terminal) | jalankan sesi agen/shell, kirim input, baca & jawab dialog sesi (SPEC-899) — **high-risk (RCE)** |
 | `docs` | `/api/prds*`, `/api/projects/:id/{docs,prds}*` | dokumen SoT project & PRD |
 | `ide` | `/api/projects/:id/{tree,file,file-diff,working-status,graph,commit,git,status,stashes,remotes,compare,archive,pr-url}*` | tree/file working tree, operasi git |
 | `vps` | `/api/vps*` | kelola VPS, audit, harden, konsol — **high-risk (remote exec)** |
@@ -465,6 +465,14 @@ Membuat sesi terminal (`POST /api/terminal/sessions` — menjalankan agen di wor
 dan seluruh `/api/vps*` (remote exec) **tidak ikut**, begitu pula merge/rebase (`integrate`),
 penghapusan backlog, dan perubahan `stage`. Batasan ini ada di katalog toolnya, bukan di token:
 token yang punya `sessions:write` sekalipun tak akan menemukan tool untuk memakainya. Lihat §8.
+
+**Menjawab dialog sesi** (`GET /api/terminal/sessions/:id/dialog`,
+`POST /api/terminal/sessions/:id/dialog/answer`, SPEC-899 · ADR-0142) juga sengaja **tak punya
+tool** — dan alasannya lebih tajam dari sekadar "mengeksekusi": endpoint itu menjawab pertanyaan
+yang **secara desain ditujukan kepada manusia** (`AskUserQuestion`). Agen yang bisa memanggilnya
+bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang memutuskan" runtuh lewat
+pintu belakang. Capability-nya tetap ada (`sessions:read`/`sessions:write`) karena peta itu berlaku
+untuk seluruh permukaan HTTP, bukan hanya untuk yang muncul di MCP.
 
 **Lampiran backlog** (`/api/specs/:id/attachments*`, SPEC-843 · ADR-0124) juga sengaja **tak punya
 tool**: berkasnya lahir dari disk manusia, bukan dari model, dan tool MCP berbentuk JSON sehingga

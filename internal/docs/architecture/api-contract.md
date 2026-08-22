@@ -1078,6 +1078,38 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #     baca PRD (tersemat, freshest-wins) → manifest docs/prd/<slug>.breakdown.md, push branch breakdown/<slug>;
 #     400 PRD tak terbaca / path tak valid, 422 worktree gagal
 GET    /terminal/sessions/:id/phases # fase yang sudah dilaporkan sesi (dari $HANOMAN_PHASE_FILE) → stage live
+GET    /terminal/sessions/:id/dialog        # (SPEC-899, ADR-0142) 200 { dialog, screenHash } · 204 · 404
+#   Inbox keputusan: dialog `AskUserQuestion` yang sedang tampil di pane, dibaca `tui-dialog.ts`
+#   (SPEC-452/474/485). dialog = { title, multi, freeIndex, notes, options:[{n,label,checked}], tabs }.
+#   `title` ikut karena `ChoiceDialog` tak memuat pertanyaannya — panel yang hanya punya `options`
+#   menampilkan tombol tanpa satu kalimat yang menjelaskan sedang menjawab apa; `tabs` supaya panel
+#   bisa berkata "pertanyaan 2 dari 3".
+#   `screenHash` = sha256(dialogKey(paneText)).slice(0,16), gerbang kesegaran POST di bawah. Sengaja
+#   BUKAN hash teks pane mentah: pane memuat kursor berkedip & spinner, jadi hash atasnya berbeda
+#   antar dua capture berturut-turut dan setiap jawaban akan ditolak. `dialogKey` sudah membuang
+#   label kolom bebas (SPEC-474) dan `☐/☒` tab strip layar multi (gotcha ADR-0102 #1).
+#   204 = pane mati, layar bukan dialog, layar rekap rantai, ATAU dialog tanpa kolom bebas & tanpa
+#     kolom catatan. Yang terakhir itu dialog trust & prompt izin: `sendToPane` sengaja tak
+#     menyentuhnya, dan tombol dashboard yang menjawab prompt izin adalah kebalikan ADR-0037.
+#   Capability `sessions:read` — dari peta `rw("sessions")` yang sudah ada, nol perubahan peta.
+POST   /terminal/sessions/:id/dialog/answer { screenHash, choice?, choices?[], text? }
+#   (SPEC-899, ADR-0142) 202 { accepted:true }. `choice`/`choices` = NOMOR BARIS yang dipancarkan
+#   GET (`options[].n`), bukan indeks array; keduanya saling eksklusif; salah satu dari ketiganya
+#   wajib ada. Dispatch-nya CERMIN `sendToPane`, tanpa cabang baru: multi+Submit →
+#   `answerMultiSelectDialog`, freeIndex → `answerChoiceDialog`, notes → `answerNotesDialog`.
+#   Jawaban single-select disampaikan lewat KOLOM BEBAS berisi label opsi, bukan dengan menekan
+#   digitnya: jalur itu membuktikan teksnya mendarat sebelum menekan Enter, digit tak punya titik
+#   pembatalan sama sekali. Konsekuensinya jawaban tiba di agen sebagai teks kolom bebas.
+#   400 body tak valid · 404 sesi tak ada / pane mati
+#   409 { reason } — "deciding" (hanoman-lead memegang sesi ini, ADR-0091 ditegakkan apa adanya),
+#     "answering" (jawaban lain untuk sesi yang sama sedang berjalan; kunci in-memory, cermin
+#     lead/deciding.ts — dua POST berbarengan menyilangkan keystroke jadi sampah), "stale" (layar
+#     bukan lagi dialog yang bisa dijawab, atau screenHash tak cocok), "shape" (bentuk jawaban tak
+#     cocok layar), "not-landed" (primitif tui-dialog gagal membuktikan jawabannya mendarat — sesi
+#     TIDAK digerakkan). `reason` ada supaya klien tak perlu mem-parsing prosa.
+#   Capability `sessions:write`. SENGAJA DI LUAR katalog MCP (shared/src/mcp-catalog.ts): agen yang
+#     bisa memanggilnya bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang
+#     memutuskan" runtuh lewat pintu itu (memperluas ADR-0099 & SPEC-646/ADR-0112).
 GET    /terminal/sessions/:id/review        # (SPEC-230, ADR-0054) diff worktree HIDUP sesi project-level (PRD);
 #   bentuk = /specs/:id/review; kunci worktree = id sesi; 409 bila worktree lenyap (sesi ditutup) — bukan 500
 GET    /terminal/sessions/:id/review/*path  # { path, status, binary, truncated, diff, content } · 404 · 409

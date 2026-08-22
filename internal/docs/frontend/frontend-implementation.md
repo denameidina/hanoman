@@ -280,7 +280,7 @@ orientasi, dan alpha master **berikut** keberadaan, batas 768px, alpha, dan peng
 web-nya — master sehat yang turunannya hilang berarti layar kosong di dashboard, bukan sekadar aset
 besar.
 
-## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141)
+## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142)
 
 Widget maskot di tepi bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi & backlog,
 bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada skema,
@@ -447,7 +447,12 @@ memberi rect nol → jatuh ke posisi keadaan).
   `seenPulse`), jadi pet tak berteriak saat mount. Umur 5 dtk lewat satu `setTimeout`; gelembung
   baru menggantikan yang lama beserta timernya. Ia `aria-hidden` — region `role="status"` sudah
   membacakan pergantian pose, dan gelembung yang ikut diumumkan berarti kabar yang sama terdengar
-  dua kali dengan dua rumusan berbeda. Panel yang terbuka menelannya: daftarnya sudah di layar.
+  dua kali dengan dua rumusan berbeda. **Kecuali gelembung `waiting`** (SPEC-899): ia menumbuhkan
+  CTA "Jawab di sini", dan elemen di dalam `aria-hidden` tak bisa difokuskan sama sekali — jadi
+  yang `aria-hidden` pindah ke `<span data-testid="pet-bubble-text">`-nya, dan janjinya tetap
+  dipegang: region status tetap satu-satunya yang membacakan kabar, tombolnya membawa kalimatnya
+  di `aria-label` (pola yang sama dengan tombol `Lihat` milik rekap).
+  Panel yang terbuka menelannya: daftarnya sudah di layar.
 - **Rekap "selama kamu pergi".** Snapshot (`petSnapshot`: id sesi → kondisinya + `createdAt`
   notifikasi terbaru) dicap saat tab jadi **hidden**, dibandingkan saat ia terlihat lagi. Setelah
   `PET_AWAY_MS` = 5 menit, `petRecap` memberi satu kalimat berisi tiga angka — `2 selesai ·
@@ -473,6 +478,35 @@ memberi rect nol → jatuh ke posisi keadaan).
   itulah isi "tidak membuka/menutup panel berulang"; klik pertama & kedua tetap buka lalu tutup,
   karena itu perilaku normal dua klik dan tak boleh diubah demi easter egg. Reduced-motion tak
   memutar `thanks` maupun merender hati.
+
+**Inbox keputusan** (SPEC-899 · ADR-0142; `src/src/screens/PetAnswer.tsx`). Baris kondisi `waiting`
+di panel menumbuhkan **satu kotak jawaban per sesi**, bukan satu untuk kondisi. Daftar sesinya lahir
+dari `waitingSessions(sessions, backlog)` di `pet-state.ts`, yang memakai `sessionKind` yang sama
+dengan panel & rekap — predikat kedua (`decision && !deciding`) yang disalin ke pemakai ketiga
+adalah kelas bug SPEC-431/448, dan sesi yang sedang dipegang lead memang tak boleh muncul di sini.
+
+Komponen sendiri, bukan blok di `HanomanPet.tsx`: siklus hidupnya (muat → kirim → terkirim →
+`409` muat ulang) tak berhubungan dengan mesin berkeliaran, gelembung, dan a11y panggung yang
+dipegang komponen itu. Ia di-mount digerbangi **`open`**, bukan `panelMounted` — panel yang sedang
+beranimasi keluar masih ter-mount, dan kotak yang lahir di sana akan memanggil endpoint dialog
+untuk panel yang justru sedang ditutup.
+
+- **Memuat** saat mount → `api.sessionDialog(id)`. Tak ada polling dan tak ada channel baru
+  (ADR-0039 utuh): keadaan "sudah terjawab" datang dari siaran `sessions` yang sudah ada, yang
+  meng-unmount kotak ini begitu sesinya berhenti `waiting` (marker keputusan dikosongkan hook
+  `UserPromptSubmit`, SPEC-184 · ADR-0141).
+- **Single-select** = judul + satu tombol per opsi; satu klik mengirim `{ screenHash, choice }`.
+  **multiSelect** = `Checkbox` per opsi (nilai awal dari `checked` layar) + satu `Submit` yang
+  mengirim `{ screenHash, choices }`. **Kolom bebas** (`freeIndex !== null` atau `notes`) menambah
+  satu `<input>`; di layar single ia punya tombol `Kirim` sendiri, di layar multi ia ikut `Submit`.
+- **Terkirim** mengganti kotak dengan satu baris "Terkirim — menunggu <sesi> bergerak".
+- **`409`** dibedakan lewat `reason`, bukan lewat prosa: `stale` memuat ulang pertanyaannya satu
+  kali (layarnya memang sudah berganti), `deciding` berkata lead yang berhak, sisanya menyuruh
+  operator ke Terminal. `204` (tak ada dialog yang bisa dijawab di layar itu — termasuk dialog
+  trust & prompt izin, yang **sengaja** tak pernah dilaporkan) menjadi kalimat, bukan tombol.
+
+Gelembung pose `waiting` menawarkan **"Jawab di sini"** yang menutup gelembung lalu membuka panel —
+jalur yang sama persis dengan tombol `Lihat` milik rekap.
 
 **Penempatan & mount.** `HanomanPet` dipasang **sekali** di `App.tsx` sebagai saudara `{screen}`,
 bukan di dalam `Shell`: `<Shell>` ditulis ulang di tiap cabang `section`, jadi pet yang tinggal di

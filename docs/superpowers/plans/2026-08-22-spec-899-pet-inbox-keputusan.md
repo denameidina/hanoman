@@ -1284,7 +1284,7 @@ git commit -m "feat(pet): gelembung waiting menawarkan 'Jawab di sini' (SPEC-899
 - Consumes: kontrak yang sudah dikunci Task 1–4.
 - Produces: — (dokumen).
 
-- [ ] **Step 1: Tulis ADR-0142**
+- [x] **Step 1: Tulis ADR-0142**
 
 Buat `internal/docs/adr/0142-inbox-keputusan-dialog-sesi.md` mengikuti bentuk ADR tetangganya (`0141-onset-menunggu-di-marker-keputusan.md`). Isi wajib:
 
@@ -1295,7 +1295,7 @@ Buat `internal/docs/adr/0142-inbox-keputusan-dialog-sesi.md` mengikuti bentuk AD
 - **Alternatif yang ditolak**: menekan digit opsi (tak punya titik pembatalan); memperluas `POST /steer` (tak punya kontrak layar); menaruhnya di katalog MCP (agen bisa menjawab pertanyaannya sendiri, ADR-0099/0112 diperluas).
 - **Hubungan ADR lain**: menegakkan 0039, 0037, 0065, 0091, 0099, 0102; tak mencabut apa pun.
 
-- [ ] **Step 2: Tautkan di index**
+- [x] **Step 2: Tautkan di index**
 
 Di `internal/docs/README.md`, tepat di atas baris `- [0141 — …]`, tambahkan:
 
@@ -1307,24 +1307,24 @@ Perbarui juga baris `frontend-implementation` (baris ~245) supaya menyebut progr
 
 Tambahkan narasi ADR-0142 ke `internal/docs/adr/README.md` mengikuti bentuk entri 0141 di berkas itu.
 
-- [ ] **Step 3: Perbarui kontrak API**
+- [x] **Step 3: Perbarui kontrak API**
 
 Di `internal/docs/architecture/api-contract.md`, di seksi endpoint terminal (cari `terminal/sessions/:id/steer`), tambahkan dua endpoint beserta tabel status lengkap dari spec §5.2/§5.3, termasuk `reason` pada 409 dan catatan bahwa capability-nya `sessions:read`/`sessions:write` tanpa perubahan peta.
 
-- [ ] **Step 4: Perbarui naskah agent**
+- [x] **Step 4: Perbarui naskah agent**
 
 Di `docs/agent-integration.md`, pada baris domain `sessions` (baris ~103) tambahkan bahwa domain itu kini juga mencakup membaca & menjawab dialog sesi, dan tambahkan satu catatan di seksi yang mendaftar apa yang **tak** ada di MCP (dekat baris ~464, yang sudah menyebut `POST /api/terminal/sessions`) bahwa `POST /api/terminal/sessions/:id/dialog/answer` sengaja di luar katalog MCP.
 
-- [ ] **Step 5: Perbarui frontend-implementation**
+- [x] **Step 5: Perbarui frontend-implementation**
 
 Di `internal/docs/frontend/frontend-implementation.md`, seksi Pet, tambahkan sub-bagian **Inbox keputusan (SPEC-899)**: `PetAnswer.tsx` per sesi `waiting`, sumber daftarnya `waitingSessions` (klasifikasi `sessionKind` yang sama), tak ada polling, gelembung `waiting` ber-CTA "Jawab di sini", dan aturan a11y-nya (bungkus gelembung berhenti `aria-hidden` saat ia punya aksi; teksnya tetap `aria-hidden` supaya region `role="status"` tetap satu-satunya yang membacakan).
 
-- [ ] **Step 6: Verifikasi integritas index**
+- [x] **Step 6: Verifikasi integritas index**
 
 Run: `node cli/dist/index.js docs index --check` — atau, bila `cli/dist` belum terbangun di worktree ini, `pnpm --filter ./cli build && node cli/dist/index.js docs index --check`.
 Expected: index utuh (nol dokumen tak tertaut yang baru).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs docs/agent-integration.md
