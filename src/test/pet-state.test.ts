@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Notification, Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../src/api/client";
-import { derivePetState, PET_TRANSIENT_MS, POSE_ART, type PetInput } from "../src/screens/pet-state";
+import { derivePetState, PET_TRANSIENT_MS, loadPetRoam, savePetRoam, type PetInput } from "../src/screens/pet-state";
 
 const NOW = Date.parse("2026-08-08T10:00:00.000Z");
 
@@ -172,10 +172,14 @@ describe("derivePetState — prioritas saat beberapa kondisi menyala bersamaan",
   });
 });
 
-describe("POSE_ART", () => {
-  it("memetakan tiap pose ke satu ID sticker katalog yang unik", () => {
-    const ids = Object.values(POSE_ART);
-    expect(new Set(ids).size).toBe(ids.length);
-    for (const id of ids) expect(id).toMatch(/^STK-00[1-8]$/);
+describe("preferensi berkeliaran", () => {
+  it("default berkeliaran; pilihan tersimpan di hanoman.pet.roam dan terbaca kembali", () => {
+    localStorage.clear();
+    expect(loadPetRoam()).toBe(true);
+    savePetRoam(false);
+    expect(localStorage.getItem("hanoman.pet.roam")).toBe("0");
+    expect(loadPetRoam()).toBe(false);
+    savePetRoam(true);
+    expect(loadPetRoam()).toBe(true);
   });
 });

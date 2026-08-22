@@ -32,13 +32,6 @@
   --dur-base:   180ms; /* @kind other */
   --dur-slow:   280ms; /* @kind other */
 
-  /* Pet Hanoman: idle panjang + flourish semantik; interaksi/transisi memakai --dur-base/slow. */
-  --dur-pet-active:    2240ms; /* @kind other */
-  --dur-pet-attention: 5040ms; /* @kind other */
-  --dur-pet-calm:      5600ms; /* @kind other */
-  --dur-pet-heavy:     6720ms; /* @kind other */
-  --dur-pet-flourish:   840ms; /* @kind other */
-
   --transition-base: all var(--dur-base) var(--ease-out);
   --transition-fast: all var(--dur-fast) var(--ease-out);
 }

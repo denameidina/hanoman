@@ -6,20 +6,11 @@
 // rumus lain akan mengatakan hal yang berlawanan dengan sel di layar yang sama.
 import type { Notification, Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../api/client";
-import type { StickerIllustrationId } from "../ds/illustration-registry";
 
 export type PetPose = "ready" | "working" | "waiting" | "blocked" | "review" | "shipped" | "docs-updated";
 
-// STK-007 (`thanks`) sengaja tak dipakai: ia ungkapan terima kasih, bukan keadaan mesin.
-export const POSE_ART: Record<PetPose, StickerIllustrationId> = {
-  ready: "STK-001",
-  working: "STK-002",
-  waiting: "STK-003",
-  blocked: "STK-004",
-  shipped: "STK-005",
-  review: "STK-006",
-  "docs-updated": "STK-008",
-};
+// Artwork pose hidup di atlas sprite PET-001 (`pet-sprite.ts`, spec Pet hidup A); sticker STK-*
+// tak lagi dipakai pet.
 
 export const POSE_LABEL: Record<PetPose, string> = {
   ready: "siap",
@@ -35,6 +26,10 @@ export const POSE_LABEL: Record<PetPose, string> = {
 export const PET_TRANSIENT_MS = 45_000;
 
 export const PET_HIDDEN_KEY = "hanoman.pet.hidden";
+
+// Pet hidup A · berkeliaran di tepi bawah (desktop/tablet). "1" = berkeliaran (default), "0" = diam
+// di pojok. Tier mobile mengabaikannya: selalu diam (SPEC-763, tap nyasar).
+export const PET_ROAM_KEY = "hanoman.pet.roam";
 
 export type PetTarget = { section: "terminal" | "backlog"; sessionId?: string };
 
@@ -192,4 +187,12 @@ export function loadPetHidden(): boolean {
 
 export function savePetHidden(hidden: boolean): void {
   try { localStorage.setItem(PET_HIDDEN_KEY, hidden ? "1" : "0"); } catch { /* mode privat / kuota penuh */ }
+}
+
+export function loadPetRoam(): boolean {
+  try { return localStorage.getItem(PET_ROAM_KEY) !== "0"; } catch { return true; }
+}
+
+export function savePetRoam(roam: boolean): void {
+  try { localStorage.setItem(PET_ROAM_KEY, roam ? "1" : "0"); } catch { /* mode privat / kuota penuh */ }
 }

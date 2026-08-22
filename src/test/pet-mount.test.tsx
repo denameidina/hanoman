@@ -41,9 +41,13 @@ describe("kontrak design system pet", () => {
     expect(pet).not.toMatch(/boxShadow:\s*["'](?!var\()/);
   });
 
-  it("memanggil artwork lewat ID katalog, bukan filename", () => {
+  it("artwork pet datang dari atlas PET-001 lewat manifest, bukan sticker STK per pose", () => {
     const petState = read("src/screens/pet-state.ts");
     expect(petState).not.toContain(".webp");
-    expect(petState).toMatch(/STK-00\d/);
+    expect(petState).not.toMatch(/STK-00\d/);
+    const sprite = read("src/screens/pet-sprite.ts");
+    expect(sprite).toContain('from "../../../internal/assets/pet/pet.json"');
+    expect(sprite).toContain('from "../../../internal/assets/pet/hnm-pet-anoman-atlas-v01.webp?url"');
+    expect(read("src/screens/HanomanPet.tsx")).not.toContain("StickerIllustration");
   });
 });
