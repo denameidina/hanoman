@@ -9,15 +9,20 @@ import { isDeciding } from "./lead/deciding";
 import { listCleanups } from "./worktree-reaper";
 import { prisma } from "../db";
 import { effectiveInt } from "../config";
+import { subKey, type EventMsg, type EventTopic } from "@hanoman/shared";
+import { TOPICS, TOPIC_NAMES, isTopic, parseParams } from "./events-topics";
 
 // SPEC-199 · satu WebSocket siar untuk seluruh data real-time dashboard (ADR-0039). Meniru
 // pola siar services/pty.ts: satu Set klien, satu loop ref-counted, frame lahir hanya saat
 // isinya berubah. Sumber (tmux/berkas/DB) poll-only — server yang men-poll, klien didorong.
 //
-// Tipe frame di-longgar (bukan shared EventMsg) di sisi server: build memakai baris Prisma
-// (tanggal Date) yang JSON serialize jadi string sesuai wire type. Klien-lah yang menegakkan
-// `EventMsg`. Sama persis konvensi route lain yang mengembalikan baris Prisma mentah.
-type WireMsg = { t: string; [k: string]: unknown };
+// Badan frame tetap longgar di sisi server: build memakai baris Prisma (tanggal Date) yang JSON
+// serialize jadi string sesuai wire type. Sama persis konvensi route lain yang mengembalikan baris
+// Prisma mentah.
+// SPEC-908 · yang TIDAK lagi longgar adalah `t`-nya. Dulu `{ t: string; … }`, sehingga `t` salah
+// ketik lolos typecheck server lalu jatuh senyap di klien (`m.t === …` tak pernah cocok) — dan
+// migrasi ini menambah enam varian di bawah tipe yang sama.
+type WireMsg = { t: EventMsg["t"] } & Record<string, unknown>;
 
 const clients = new Set<Client>();
 // SPEC-215 · dibaca per-pakai (cfg live). Test menurunkan tick agar cepat; prod 1s. Loop cuma jalan saat ada klien.
@@ -63,6 +68,82 @@ function broadcast(msg: WireMsg): void {
   for (const c of clients) { try { c.send(s); } catch { clients.delete(c); } }
 }
 
+// SPEC-908 · langganan BERPARAMETER, mengamandemen ADR-0039. Berkunci `subKey(topic, params)`
+// yang dihitung fungsi yang SAMA di klien, sehingga N klien berparameter identik berbagi satu
+// entri: satu build, satu JSON.stringify, satu dedup signature.
+type SubEntry = {
+  topic: EventTopic;
+  params: unknown;
+  key: string;
+  subscribers: Set<Client>;
+  tick: number;
+  last: string;
+  inflight: boolean;
+  failing?: boolean;
+};
+const entries = new Map<string, SubEntry>();
+
+function sendTo(c: Client, s: string): void {
+  try { c.send(s); } catch { clients.delete(c); dropClientSubs(c); }
+}
+
+function dropClientSubs(c: Client): void {
+  for (const [key, e] of entries) {
+    if (!e.subscribers.delete(c)) continue;
+    if (e.subscribers.size === 0) entries.delete(key);
+  }
+}
+
+// Satu recompute untuk SEMUA pelanggan entri ini. TIDAK PERNAH di-await oleh __tick: satu
+// `git log` lambat tak boleh menunda grup `sessions`/`specs` yang berkadens 1 dtk — event loop
+// yang sama melayani PTY terminal (pelajaran terukur SPEC-479/812).
+async function runEntry(e: SubEntry): Promise<void> {
+  if (e.inflight) return;
+  e.inflight = true;
+  try {
+    const body = await (TOPICS[e.topic].build as (p: unknown) => Promise<object>)(e.params);
+    if (e.failing) { e.failing = false; console.log(`siar langganan pulih: ${e.key}`); }
+    const s = JSON.stringify({ t: e.topic, key: e.key, ...body });
+    if (s === e.last) return;
+    e.last = s;
+    for (const c of e.subscribers) sendTo(c, s);
+  } catch (err) {
+    // Frame lama SENGAJA tak dihapus: klien tak boleh di-blank karena satu build gagal.
+    if (!e.failing) { e.failing = true; console.error(`siar langganan gagal membangun ${e.key}:`, err); }
+  } finally { e.inflight = false; }
+}
+
+// Ganti-penuh: satu frame `sub` mengganti SELURUH himpunan langganan klien. Karena itu tak ada
+// frame `unsubscribe` yang bisa hilang, dan re-kirim saat reconnect identik dengan pemasangan
+// pertama (idempoten by construction).
+export function subscribeClient(c: Client, subs: { topic: string; params: unknown }[]): void {
+  const wanted = new Set<string>();
+  for (const s of subs) {
+    if (!isTopic(s.topic)) continue;                 // ADR-0087 · dashboard boleh lebih baru
+    const params = parseParams(s.topic, s.params);
+    if (params === undefined) continue;              // entri cacat dibuang, frame-nya tidak
+    const key = subKey(s.topic, params as Record<string, unknown>);
+    wanted.add(key);
+    let e = entries.get(key);
+    if (!e) {
+      e = { topic: s.topic, params, key, subscribers: new Set(), tick: 0, last: "", inflight: false };
+      entries.set(key, e);
+    }
+    if (e.subscribers.has(c)) continue;
+    e.subscribers.add(c);
+    // Muatan pertama SEGERA: dari cache bila entri sudah punya (nol biaya), atau satu build di
+    // luar jadwal bila belum. Tanpa ini, kembali dari tab tersembunyi — socket ditutup atas
+    // permintaan kita sendiri, api/events.ts:77 — berarti layar diam sampai tick berikutnya.
+    if (e.last) sendTo(c, e.last);
+    else void runEntry(e);
+  }
+  for (const [key, e] of entries) {
+    if (wanted.has(key) || !e.subscribers.has(c)) continue;
+    e.subscribers.delete(c);
+    if (e.subscribers.size === 0) entries.delete(key);
+  }
+}
+
 let tick = 0;
 let busy = false;
 let timer: NodeJS.Timeout | undefined;
@@ -87,6 +168,12 @@ export async function __tick(): Promise<void> {
       g.last = sig;
       broadcast(msg);
     }
+    // SPEC-908 · entri langganan ditick di loop yang sama tetapi TIDAK di-await (lihat runEntry).
+    for (const e of entries.values()) {
+      e.tick++;
+      if (e.tick % TOPICS[e.topic].everyTicks !== 0) continue;
+      void runEntry(e);
+    }
   } finally { busy = false; }
 }
 
@@ -106,6 +193,9 @@ function stopLoop(): void {
 export async function attach(c: Client): Promise<void> {
   clients.add(c);
   startLoop();
+  // SPEC-908 · advertensi kemampuan, dikirim PALING DULU. Server lama tak mengirim frame ini sama
+  // sekali — ketiadaannya itulah sinyal yang dipakai klien untuk tetap men-poll HTTP (ADR-0087).
+  try { c.send(JSON.stringify({ t: "hello", topics: TOPIC_NAMES } satisfies EventMsg)); } catch { return; }
   for (const g of GROUPS) {
     let msg: WireMsg;
     try { msg = await g.build(); } catch { continue; }
@@ -115,8 +205,9 @@ export async function attach(c: Client): Promise<void> {
 
 export function detach(c: Client): void {
   clients.delete(c);
+  dropClientSubs(c);
   if (clients.size === 0) stopLoop();
 }
 
 // Test-only: kosongkan klien + hentikan loop + reset signature.
-export function __reset(): void { clients.clear(); stopLoop(); }
+export function __reset(): void { clients.clear(); entries.clear(); stopLoop(); }
