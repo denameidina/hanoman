@@ -428,6 +428,15 @@ ada di database.
   **LOCAL-ONLY** — ketiganya sengaja di luar `FIELDS.vps`: `snapshot()` mengirim kolom baru di
   SETIAP push, jadi hub yang lebih tua akan menolak seluruh push entitas ini (terukur di SPEC-880).
   Status komponen juga milik mesin yang memegang key SSH-nya.
+- `lastPublishedAt?` — kapan baris ini TERAKHIR diterbitkan ke change-feed. SPEC-885,
+  [ADR-0138](../adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md). **LOCAL-ONLY**, alasan yang
+  sama seperti tiga kolom di atas. `runHealth` dulu memanggil `notifySynced` di setiap polling 5
+  menit — 2.469 baris feed untuk 9 record di hub produksi, 51% byte feed. Kini ia menerbitkan hanya
+  saat `health` **berubah**, atau saat kolom ini sudah lewat `PUBLISH_HEARTBEAT_MS` (1 jam).
+  Yang dibandingkan **hanya `health`**: `lastSeenAt` ditulis tiap polling dan IKUT `FIELDS.vps`, jadi
+  membandingkan seluruh snapshot akan selalu "berubah". Denyut berjangka itulah yang menjaga
+  `lastSeenAt` tak mendarat basi selamanya di tiap client. `lastSeenAt` sendiri tetap disegarkan di
+  **setiap** sapuan, publish atau tidak.
 
 ### VpsAuditSnapshot / VpsItemState (SPEC-220 · [ADR-0050](../adr/0050-vps-compliance-katalog-scoring.md))
 Kerangka kepatuhan checklist 232 item (katalog di git, lihat [vps-compliance.md](vps-compliance.md)).

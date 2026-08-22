@@ -89,6 +89,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0138 — Bootstrap sync, halaman ber-anggaran byte, dan feed yang berhenti berdenyut](adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md) — memperbaiki akibat susulan 0131; menegakkan 0043, 0045 & 0082; memperluas 0100 & 0135 (SPEC-885)
 - [0137 — Provisioning VPS berbasis katalog: probe sebagai sumber kebenaran, biner ≠ login](adr/0137-provisioning-vps-berbasis-katalog.md) — menegakkan 0117, 0042 & 0088, mengamandemen 0087 (SPEC-883)
 - [0136 — Agen bawaan sistem: katalog konstanta yang di-SEED sebagai baris, diperbarui hanya bila belum disunting](adr/0136-agen-bawaan-sistem-seed-idempoten.md) — memperluas 0094 & 0101, mengikuti 0113 & 0119 (SPEC-881)
 - [0135 — Penanda "ditangani oleh" pada Project: kolom `Json` yang MASUK sync, berisi snapshot device](adr/0135-penanda-project-ditangani-hanoman-client.md) — menegakkan 0043, 0044, 0045; kontras dengan 0072/0091/0103 (SPEC-880)
