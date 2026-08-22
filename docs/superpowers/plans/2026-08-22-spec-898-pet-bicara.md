@@ -996,7 +996,7 @@ git commit -m "feat(pet): gelembung bicara saat kabar berganti"
 - Consumes: `petSnapshot`, `petRecap`, `PET_AWAY_MS`, `PET_RECAP_MS` (Task 5); state `speech` (Task 6).
 - Produces: gelembung ber-`data-kind="recap"` yang berisi satu `<button>` pembuka panel.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `describe("HanomanPet — pet bicara (SPEC-898)")`:
 
@@ -1044,12 +1044,12 @@ Tambahkan di `describe("HanomanPet — pet bicara (SPEC-898)")`:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx -t "rekap muncul"`
 Expected: FAIL — `expected null to be 'recap'`
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/screens/HanomanPet.tsx`:
 
@@ -1124,12 +1124,12 @@ const RECAP_GRACE_MS = 5_000;
         )}
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx`
 Expected: PASS — seluruh berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/HanomanPet.tsx src/test/hanoman-pet.test.tsx

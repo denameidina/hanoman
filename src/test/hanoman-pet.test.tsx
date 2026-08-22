@@ -425,6 +425,47 @@ describe("HanomanPet — pet bicara (SPEC-898)", () => {
     expect(bubble()).toHaveStyle({ animation: "none" });
   });
 
+  // `document.hidden` adalah getter; test menukarnya lalu menembakkan visibilitychange, persis
+  // seperti browser.
+  function setHidden(value: boolean): void {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => value });
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+  }
+
+  it("rekap muncul sesudah tab tersembunyi ≥ 5 menit, dengan tombol yang membuka panel", () => {
+    const now = vi.spyOn(Date, "now");
+    const T0 = Date.parse("2026-08-22T10:00:00.000Z");
+    now.mockReturnValue(T0);
+    try {
+      const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+      setHidden(true);
+      now.mockReturnValue(T0 + 6 * 60_000);
+      rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
+      setHidden(false);
+      const el = screen.getByTestId("pet-bubble");
+      expect(el.getAttribute("data-kind")).toBe("recap");
+      expect(el.textContent).toContain("1 menunggu");
+      fireEvent.click(within(el).getByRole("button"));
+      expect(screen.getByTestId("pet-panel")).toBeTruthy();
+      expect(screen.queryByTestId("pet-bubble")).toBeNull();
+    } finally { now.mockRestore(); setHidden(false); }
+  });
+
+  it("absen singkat tak melahirkan rekap", () => {
+    const now = vi.spyOn(Date, "now");
+    const T0 = Date.parse("2026-08-22T10:00:00.000Z");
+    now.mockReturnValue(T0);
+    try {
+      const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+      setHidden(true);
+      now.mockReturnValue(T0 + 60_000);                    // 1 menit < PET_AWAY_MS
+      rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
+      setHidden(false);
+      // Boleh ada gelembung POSE (kondisi memang berubah), tapi tak boleh ada rekap.
+      expect(screen.queryByTestId("pet-bubble")?.getAttribute("data-kind")).not.toBe("recap");
+    } finally { now.mockRestore(); setHidden(false); }
+  });
+
   it("panel terbuka menelan gelembung — daftarnya sudah di layar", () => {
     const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
     fireEvent.click(hit());

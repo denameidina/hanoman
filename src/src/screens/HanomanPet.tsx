@@ -8,7 +8,10 @@ import {
   derivePetState, loadPetHidden, loadPetRoam, savePetHidden, savePetRoam, petPulse,
   KIND_NOUN, POSE_LABEL, type PetTarget,
 } from "./pet-state";
-import { PET_SPEECH_MS, speechFor, type PetSpeech } from "./pet-speech";
+import {
+  PET_AWAY_MS, PET_SPEECH_MS, petRecap, petSnapshot, speechFor,
+  type PetSnapshot, type PetSpeech,
+} from "./pet-speech";
 import {
   PET_ATLAS_URL, PET_MANIFEST, POSE_ROW, durationMs, rowIndex, rowOf, thenOf, type PetRowKey,
 } from "./pet-sprite";
@@ -26,6 +29,10 @@ const PANEL_EDGE = 12;
 // sedikit lebih ke dalam dari yang perlu — yang tak boleh terjadi adalah terpotong.
 const BUBBLE_W = 200;
 const BUBBLE_EDGE = 8;
+// Socket `events` ditutup saat tab hidden dan baru menyambung saat tab aktif lagi (api/events.ts),
+// jadi frame pertama belum tentu sudah tiba pada `visibilitychange`. Snapshot ditahan selama ini,
+// bukan dibuang pada render pertama yang datanya masih basi.
+const RECAP_GRACE_MS = 5_000;
 
 // jsdom tak punya matchMedia; ketiadaannya dibaca sebagai "tak ada preferensi", bukan "reduce".
 function usePrefersReducedMotion(): boolean {
@@ -122,6 +129,26 @@ export function HanomanPet({ sessions, backlog, onOpen }:
     const t = setTimeout(() => setSpeech(null), speech.ttl);
     return () => clearTimeout(t);
   }, [speech]);
+
+  // Rekap "selama kamu pergi": snapshot dicap saat tab jadi HIDDEN, dibandingkan saat ia terlihat
+  // lagi. Tak ada timer yang berjalan selama tab tersembunyi — di sana browser memang membekukannya.
+  const awayRef = React.useRef<PetSnapshot | null>(null);
+  const backAtRef = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    const input = { sessions, backlog, notifications: items, now: Date.now() };
+    if (documentHidden) {
+      if (!awayRef.current) awayRef.current = petSnapshot(input);
+      backAtRef.current = null;
+      return;
+    }
+    const away = awayRef.current;
+    if (!away) return;
+    if (backAtRef.current === null) backAtRef.current = input.now;
+    if (input.now - away.at < PET_AWAY_MS) { awayRef.current = null; return; }
+    const recap = petRecap(away, input);
+    if (recap) { awayRef.current = null; setSpeech({ ...recap, id: input.now }); return; }
+    if (input.now - backAtRef.current > RECAP_GRACE_MS) awayRef.current = null;
+  }, [documentHidden, sessions, backlog, items]);
 
   // Kalimat dibandingkan SAAT RENDER (pola yang sama dengan `seenPulse`): pet bicara saat kabarnya
   // berubah, bukan saat mount, dan `waiting` yang menua dari biasa ke mendesak dihitung sebagai
@@ -369,7 +396,8 @@ export function HanomanPet({ sessions, backlog, onOpen }:
           willChange: "transform",
         }}>
         {speech && !open && (
-          <div data-testid="pet-bubble" data-kind={speech.kind} aria-hidden="true" style={{
+          <div data-testid="pet-bubble" data-kind={speech.kind}
+            aria-hidden={speech.kind === "pose" ? "true" : undefined} style={{
             pointerEvents: "none", position: "absolute", left: bubbleLeft, bottom: cellH - 6,
             width: "max-content", maxWidth: BUBBLE_W, boxSizing: "border-box", padding: "6px 10px",
             fontFamily: "var(--font-ui)", fontSize: 12.5, lineHeight: 1.35,
@@ -377,7 +405,19 @@ export function HanomanPet({ sessions, backlog, onOpen }:
             border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)",
             boxShadow: "var(--shadow-sm)",
             animation: reduced ? "none" : "hn-pet-bubble-in var(--dur-base) var(--ease-out) both",
-          }}>{speech.text}</div>
+          }}>
+            {speech.text}
+            {speech.kind === "recap" && (
+              // Satu-satunya hit area tambahan di jalur pet, dan ia transient: kelas yang sama
+              // dengan panel, bukan pelebaran badan pet (SPEC-763).
+              <div style={{ marginTop: 6, pointerEvents: "auto" }}>
+                <Button size="sm" variant="ghost" leftIcon="list-checks"
+                  aria-label={`${speech.text} — buka ringkasan pet`}
+                  style={reduced ? { transition: "none", transform: "none" } : undefined}
+                  onClick={() => { setSpeech(null); showPanel(); }}>Lihat</Button>
+              </div>
+            )}
+          </div>
         )}
         {/* Live region membungkus kalimat status + panggung; atlas berisi 80 frame sehingga tak bisa
             diberi alt bermakna — kalimatnya hidup di span visually-hidden, satu sumber. */}
