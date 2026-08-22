@@ -48,9 +48,9 @@ pra-pin ≤ 0,15 (`stand`) / 0,30 (`walk`/`jump`). Bila gagal, ulangi `gen.py` d
   993 888 B (sisa **6 112 B**), `q76` = **952 452 B** (sisa 47 548 B), `q74` = 934 784 B. Dipilih
   **`q76`**, bukan q78 yang sebenarnya muat: sisa 6 KB berarti satu regenerasi baris rutin —
   operasi yang README ini sendiri dokumentasikan — akan menembus plafon dan menggagalkan
-  `atlas.py`. Delta visual 76 vs 78 pada seni datar berkontur tegas dapat diabaikan. Jangan
-  menaikkan plafon — satu `<img>` yang di-decode di setiap halaman adalah anggaran, bukan
-  preferensi.
+  `atlas.py`. Delta visual 76 vs 78 pada seni datar berkontur tegas dapat diabaikan. Atlas yang
+  benar-benar dikomit (baris `thanks` percobaan 3) = **950 480 B** pada `q76`. Jangan menaikkan
+  plafon — satu `<img>` yang di-decode di setiap halaman adalah anggaran, bukan preferensi.
 - Ambang residu pra-pin `stand` (0,15) diturunkan dari baris **berdiri**; untuk baris **duduk**
   (`sleep`) heuristik "kaki = run kolom paling kanan di 8 % baris terbawah" memilih pangkuan/sarung
   yang memang ikut bernapas, jadi angkanya tak sebanding. Ukur ulang, jangan asumsikan.

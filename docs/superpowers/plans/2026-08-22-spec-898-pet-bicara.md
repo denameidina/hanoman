@@ -1219,36 +1219,19 @@ git commit -m "feat(pet): baris waiting lebih mendesak saat pertanyaannya menua"
 - Consumes: —
 - Produces: `PetRowKey` `"thanks"` pada indeks 12, `loop: false`, `then: "idle"`, `fps: 10`. Dipakai Task 10 lewat `oneShot`.
 
-- [ ] **Step 1: Tulis naskah baris**
+- [x] **Step 1: Tulis naskah baris**
 
-Buat `internal/assets/pet/prompts/thanks.md`, mengikuti bentuk `prompts/wave.md`:
+Buat `internal/assets/pet/prompts/thanks.md` dalam bentuk yang dipakai prompt lain di direktori itu
+(satu paragraf `ROW "<key>" (8 frames, …)`, bukan markdown berjudul — `gen.py` menyambungnya
+dengan `common.md`). Isinya: sembah yang tenang & bermartabat, tetap **profil menghadap kanan**,
+kaki/kain tetap; frame 1 rest = idle frame 1; 2–3 kedua tangan naik ke dada; 4 telapak bertemu,
+kepala mulai menunduk, mata menyipit senang; 5 titik terdalam, mata terpejam; 6 kepala naik, tangan
+mulai membuka; 7 telapak terbuka ke bawah setinggi pinggang; 8 kembali PERSIS ke frame 1 supaya
+menyambung ke `idle`. Batas keras: kedua tangan selalu bergerak bersama & simetris dan **tak pernah
+melewati bahu** (itu yang membedakannya dari `wave`), ekor naik paling tinggi sepinggang dan tak
+pernah keluar sel, tanpa hati/kilau/gelembung/properti.
 
-```markdown
-# Row `thanks` — 8 frames, one-shot gratitude
-
-The character stands facing three-quarters toward the viewer and performs a single, calm
-gesture of thanks (STK-007: GST-02 open palm · EXP-08 grateful · TAL-01 neutral curve).
-
-Frame beats:
-1. Neutral standing pose, identical footing to `idle` frame 1.
-2. Both hands begin to rise toward the chest.
-3. Hands meet in front of the chest, palms together, elbows relaxed.
-4. Head dips slightly, eyes narrow into a pleased crescent (no emoji face).
-5. Deepest point of the bow — head lowest, tail curving gently upward.
-6. Head rises back, hands begin to open downward and outward.
-7. Palms open at waist height, tail settling.
-8. Back to the neutral standing pose of frame 1 so the row can chain into `idle`.
-
-Hard constraints for this row:
-- Feet stay in exactly the same place in all 8 frames — no stepping, no drifting.
-- Hands NEVER rise above the shoulders. `wave` is the row that lifts one hand to head height;
-  this row must be unmistakably different from it.
-- Both hands move together and symmetrically. One-handed gestures read as waving.
-- The tail stays inside the cell; it curves up at most to hip height.
-- No speech bubbles, no hearts, no props, no sparkles — the gratitude is in the body only.
-```
-
-- [ ] **Step 2: Daftarkan baris di pipeline & frontend**
+- [x] **Step 2: Daftarkan baris di pipeline & frontend**
 
 Di `internal/scripts/pet/petlib.py`, tambahkan di ekor `ROWS`:
 
@@ -1269,7 +1252,7 @@ export const PET_ROW_KEYS = [
 ] as const;
 ```
 
-- [ ] **Step 3: Perbarui test manifest (akan gagal sampai atlas dirakit)**
+- [x] **Step 3: Perbarui test manifest (akan gagal sampai atlas dirakit)**
 
 Di `src/test/pet-sprite.test.ts`, ganti `expect(PET_MANIFEST.rows.length).toBe(12);` menjadi `13`, dan tambahkan:
 
@@ -1281,7 +1264,7 @@ Di `src/test/pet-sprite.test.ts`, ganti `expect(PET_MANIFEST.rows.length).toBe(1
     expect(Object.values(POSE_ROW)).not.toContain("thanks");
 ```
 
-- [ ] **Step 4: Jalankan pipeline generasi**
+- [x] **Step 4: Jalankan pipeline generasi**
 
 ```bash
 python3 internal/scripts/pet/gen.py thanks        # ±3 menit, butuh Codex CLI
@@ -1291,21 +1274,28 @@ python3 internal/scripts/pet/qa.py thanks
 ```
 
 Expected: `qa.py` mencetak OK — 8 sprite, tumpahan sel 0 px, residu pra-pin ≤ 0,25 (`stand`).
-Bila gagal, ulangi `gen.py thanks --note "<koreksi>"` (mis. `"keep both hands below the shoulders"`,
-`"keep the feet identical in every frame"`) sampai gerbangnya lolos. Jangan menurunkan gerbang.
+Bila gagal, ulangi `gen.py thanks --note "<koreksi>"` sampai gerbangnya lolos. Jangan menurunkan
+gerbang. **Terjadi di jalan:** butuh tiga generasi, dan `--note` percobaan berikutnya harus
+mengulang SELURUH batasan yang sudah dipenuhi — percobaan 1 lolos gerbang numerik (residu maks
+0,144) tapi memutar badan keluar dari profil di frame 6–8 dan frame 8-nya bukan salinan frame 1;
+percobaan 2 memperbaiki keduanya lalu kehilangan registrasi (tumpah 123 & 305 px, residu
+0,259/0,296); percobaan 3 dengan catatan gabungan lolos keduanya (residu maks 0,176, nol tumpahan).
 
-- [ ] **Step 5: Rakit atlas dengan quality yang muat**
+- [x] **Step 5: Rakit atlas dengan quality yang muat**
 
-`quality=82` sudah memberi 975 484 B pada 12 baris; baris ke-13 melampaui `ATLAS_BUDGET`. Turunkan
-`quality` di `internal/scripts/pet/atlas.py` (mulai dari `78`, turunkan bertahap bila masih besar)
-dan tambahkan komentar alasannya:
+`quality=82` memberi 1 062 524 B untuk 13 baris — lewat plafon. Terukur di worktree ini: `q78` =
+993 888 B (sisa hanya 6 112 B), `q76` = 952 452 B (sisa 47 548 B), `q74` = 934 784 B. Pilih **`q76`**,
+bukan q78 yang sebenarnya muat: sisa 6 KB berarti satu regenerasi baris rutin akan menembus plafon.
+Ubah `internal/scripts/pet/atlas.py`:
 
 ```python
 def encode(atlas: Image.Image) -> bytes:
     buf = io.BytesIO()
-    # SPEC-898 · 13 baris tak muat di plafon 1 MB pada quality 82 (12 baris = 975 484 B). Plafonnya
-    # tidak dinaikkan: satu <img> yang di-decode di setiap halaman adalah anggaran, bukan preferensi.
-    atlas.save(buf, format="WEBP", quality=78, method=6, exact=False)
+    # SPEC-898 · 13 baris tak muat di plafon 1 MB pada quality 82 (1 062 524 B). Diukur ulang:
+    # q78 = 993 888 B (sisa 6 112 B — satu regenerasi baris rutin menembusnya), q76 = 952 452 B
+    # (sisa 47 548 B). Plafonnya TIDAK dinaikkan: satu <img> yang di-decode di setiap halaman
+    # adalah anggaran, bukan preferensi.
+    atlas.save(buf, format="WEBP", quality=76, method=6, exact=False)
     return buf.getvalue()
 ```
 
@@ -1315,10 +1305,9 @@ python3 internal/scripts/pet/verify.py
 python3 internal/scripts/pet/atlas.py --check
 ```
 
-Expected: `atlas.py` mencetak `13 baris` dan byte < 1 000 000; `verify.py` dan `--check` OK.
-**Catat angka nyata (quality final + byte final)** — dipakai di Task 11.
+Expected: `13 baris`, byte < 1 000 000, `--check` OK. Atlas final yang dikomit: **950 480 B**.
 
-- [ ] **Step 6: Jalankan test yang tersentuh**
+- [x] **Step 6: Jalankan test yang tersentuh**
 
 ```bash
 python3 internal/scripts/pet/test-petlib.py
@@ -1327,14 +1316,14 @@ env -u NODE_ENV pnpm vitest --run src/test/pet-sprite.test.ts src/test/hanoman-p
 
 Expected: PASS semuanya.
 
-- [ ] **Step 7: Review Gate 2 (mata manusia)**
+- [x] **Step 7: Review Gate 2 (mata manusia)**
 
 Lihat `internal/assets/pet/qa/thanks.gif` dan `qa/thanks-contact.png`: siluet profil satu mata,
 jamang, kain, ekor besar; kedua tangan bergerak simetris dan **tak pernah** melewati bahu; kaki
 tak bergeser; tak ada ornamen kedua yang berkedip (cacat yang lolos gerbang numerik pada `sleep`,
 SPEC-897). Bila cacat, kembali ke Step 4 dengan `--note`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add internal/assets/pet internal/scripts/pet src/src/screens/pet-sprite.ts src/test/pet-sprite.test.ts

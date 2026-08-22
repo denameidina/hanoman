@@ -25,80 +25,80 @@
     },
     {
       "frame": 2,
-      "dx": 43,
+      "dx": -1,
       "dy": 0,
       "scale": 1.0,
-      "residual_pre": 0.2367,
+      "residual_pre": 0.1133,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.2367
+      "residual_post": 0.1059
     },
     {
       "frame": 3,
-      "dx": -1,
-      "dy": -1,
-      "scale": 1.02,
-      "residual_pre": 0.1898,
+      "dx": 2,
+      "dy": 0,
+      "scale": 1.0,
+      "residual_pre": 0.1481,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.1964
+      "residual_post": 0.1417
     },
     {
       "frame": 4,
       "dx": 1,
-      "dy": 6,
+      "dy": 0,
       "scale": 1.0,
-      "residual_pre": 0.2039,
+      "residual_pre": 0.1693,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.2433
+      "residual_post": 0.1602
     },
     {
       "frame": 5,
-      "dx": -2,
-      "dy": 14,
-      "scale": 0.98,
-      "residual_pre": 0.2589,
-      "clipped": 123,
+      "dx": 1,
+      "dy": -4,
+      "scale": 1.02,
+      "residual_pre": 0.1755,
+      "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.3102
+      "residual_post": 0.1574
     },
     {
       "frame": 6,
-      "dx": -13,
-      "dy": 0,
-      "scale": 1.08,
-      "residual_pre": 0.2965,
-      "clipped": 305,
+      "dx": 2,
+      "dy": 1,
+      "scale": 0.98,
+      "residual_pre": 0.1728,
+      "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.3863
+      "residual_post": 0.1755
     },
     {
       "frame": 7,
-      "dx": -2,
-      "dy": 6,
+      "dx": -3,
+      "dy": 0,
       "scale": 0.98,
-      "residual_pre": 0.1476,
+      "residual_pre": 0.1763,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.1753
+      "residual_post": 0.1992
     },
     {
       "frame": 8,
-      "dx": 0,
-      "dy": 0,
+      "dx": 1,
+      "dy": -1,
       "scale": 1.0,
-      "residual_pre": 0.0196,
+      "residual_pre": 0.0286,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.0196
+      "residual_post": 0.0208
     }
   ]
 }
