@@ -209,7 +209,7 @@ git commit -m "feat(spec-884): berkas config.env sebagai tempat jawaban wizard s
 - Consumes: —
 - Produces: `type Deployment = "local" | "public"`, `resolveHardening(env: Record<string,string|undefined>): boolean`, `resolveDeployment(env: Record<string,string|undefined>): Deployment`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `runner/test/runtime-profile.test.ts`:
 
@@ -274,12 +274,12 @@ describe("profil runtime", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/test/runtime-profile.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/runtime-profile"`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `runner/src/runtime-profile.ts`:
 
@@ -325,12 +325,12 @@ Tambahkan di `runner/src/index.ts`, tepat di bawah `export * from "./config-env"
 export * from "./runtime-profile";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/test/runtime-profile.test.ts`
 Expected: PASS — 11 test (`it.each` menghasilkan 3)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/runtime-profile.ts runner/src/index.ts runner/test/runtime-profile.test.ts

@@ -15,3 +15,4 @@ export * from "./skills";
 export * from "./telegram-operator";
 export * from "./spawn-helper";
 export * from "./config-env";
+export * from "./runtime-profile";
