@@ -307,7 +307,7 @@ git commit -m "feat(pet): decisionAt di payload sesi, diturunkan dari onset mark
   - `export const newestNotifiedAt = (rows: Notification[]): string`
   - `export const SHIPPED_TYPES: ReadonlySet<string>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/pet-state.test.ts` (sesuaikan import: tambahkan `PET_URGENT_MS`, `sessionKind`, `doneSpecIds`):
 
@@ -359,12 +359,12 @@ describe("umur menunggu (SPEC-898)", () => {
 
 Bila helper `session()` di berkas itu belum menerima `decisionAt`, ia sudah `Partial<TerminalSession>` — tak perlu diubah setelah Task 2.
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-state.test.ts -t "SPEC-898"`
 Expected: FAIL — `PET_URGENT_MS`/`sessionKind`/`doneSpecIds` tak diekspor
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/screens/pet-state.ts`:
 
@@ -466,12 +466,12 @@ Ganti blok `if (rows("waiting").length) …` menjadi:
 
 10. Di `derivePetState`, lengkapi `floor` dengan `subject: null, since: null,`.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-state.test.ts`
 Expected: PASS — seluruh berkas (test SPEC-585/897 lama ikut hijau)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/pet-state.ts src/test/pet-state.test.ts

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Notification, Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../src/api/client";
 import {
-  derivePetConditions, derivePetState, petPulse, KIND_NOUN,
-  PET_OFFLINE_MS, PET_SLEEP_MS, PET_TRANSIENT_MS, loadPetRoam, savePetRoam,
+  derivePetConditions, derivePetState, doneSpecIds, petPulse, sessionKind, KIND_NOUN,
+  PET_OFFLINE_MS, PET_SLEEP_MS, PET_TRANSIENT_MS, PET_URGENT_MS, loadPetRoam, savePetRoam,
   type PetConnection, type PetInput,
 } from "../src/screens/pet-state";
 
@@ -379,5 +379,49 @@ describe("SPEC-897 — daftar kondisi & hitungan", () => {
     // grace terputus (NOW − 2 000 + 6 000) lebih awal dari luruh transient (NOW − 1 000 + 45 000)
     expect(view.pose).toBe("shipped");
     expect(view.recheckAt).toBe(NOW - 2_000 + PET_OFFLINE_MS);
+  });
+});
+
+describe("umur menunggu (SPEC-898)", () => {
+  const bl = [spec({ id: "SPEC-1", stage: "executing" }), spec({ id: "SPEC-2", stage: "executing" })];
+  const at = (msAgo: number) => new Date(NOW - msAgo).toISOString();
+
+  it("since kondisi waiting = decisionAt TERTUA di antara sesi yang menunggu", () => {
+    const sessions = [
+      session({ id: "b", specId: "SPEC-2", decision: true, decisionAt: at(2 * 60_000) }),
+      session({ id: "a", specId: "SPEC-1", decision: true, decisionAt: at(20 * 60_000) }),
+    ];
+    const v = derivePetState({ sessions, backlog: bl, notifications: [], now: NOW });
+    expect(v.kind).toBe("waiting");
+    expect(v.since).toBe(NOW - 20 * 60_000);
+  });
+
+  it("tanpa decisionAt, since null — pet tak pernah mengeskalasi tanpa stempel", () => {
+    const sessions = [session({ id: "a", specId: "SPEC-1", decision: true })];
+    expect(derivePetState({ sessions, backlog: bl, notifications: [], now: NOW }).since).toBeNull();
+  });
+
+  it("recheckAt memuat onset urgensi selama belum mendesak, lalu berhenti", () => {
+    const young = [session({ id: "a", specId: "SPEC-1", decision: true, decisionAt: at(60_000) })];
+    expect(derivePetState({ sessions: young, backlog: bl, notifications: [], now: NOW }).recheckAt)
+      .toBe(NOW - 60_000 + PET_URGENT_MS);
+    const old = [session({ id: "a", specId: "SPEC-1", decision: true, decisionAt: at(PET_URGENT_MS + 1) })];
+    expect(derivePetState({ sessions: old, backlog: bl, notifications: [], now: NOW }).recheckAt).toBeNull();
+  });
+
+  it("subject memberi pokok kalimat tanpa memparsing headline", () => {
+    const sessions = [session({ id: "a", specId: "SPEC-1", decision: true })];
+    expect(derivePetState({ sessions, backlog: bl, notifications: [], now: NOW }).subject).toBe("SPEC-1");
+    expect(derivePetState({ sessions: [], backlog: bl, notifications: [], now: NOW }).subject).toBeNull();
+  });
+
+  it("sessionKind adalah SATU klasifikasi sesi, dipakai daftar kondisi dan rekap", () => {
+    const done = doneSpecIds([spec({ id: "SPEC-9", stage: "done" })]);
+    expect(sessionKind(session({ id: "x", decision: true }), done)).toBe("waiting");
+    expect(sessionKind(session({ id: "x", decision: true, deciding: true }), done)).toBe("deciding");
+    expect(sessionKind(session({ id: "x", exited: true, exitCode: 1 }), done)).toBe("failed");
+    expect(sessionKind(session({ id: "x", exited: true, exitCode: 0 }), done)).toBeNull();
+    expect(sessionKind(session({ id: "x", specId: "SPEC-9" }), done)).toBe("review");
+    expect(sessionKind(session({ id: "x" }), done)).toBe("working");
   });
 });
