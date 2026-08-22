@@ -759,7 +759,7 @@ git commit -m "feat(dialog): endpoint GET dialog + POST jawaban sesi (SPEC-899)"
 - Consumes: `capabilityForRoute` dari `../src/services/agent-capabilities`; `MCP_TOOLS` dari `@hanoman/shared`.
 - Produces: — (hanya test).
 
-- [ ] **Step 1: Tulis test**
+- [x] **Step 1: Tulis test**
 
 Di `server/test/mcp-capability.test.ts`, di dalam `describe("kontrak capability katalog MCP", …)`, tambahkan setelah `it("tak ada tool yang bisa menjalankan sesi atau menyentuh VPS", …)`:
 
@@ -775,12 +775,12 @@ Di `server/test/mcp-capability.test.ts`, di dalam `describe("kontrak capability 
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan LULUS**
+- [x] **Step 2: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/mcp-capability.test.ts`
 Expected: PASS. (Test ini lulus tanpa perubahan kode produksi — itu memang tujuannya: ia mengunci sifat yang sudah benar supaya cabang `seg[1]` berikutnya di bawah `terminal` tak diam-diam melonggarkannya.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add server/test/mcp-capability.test.ts

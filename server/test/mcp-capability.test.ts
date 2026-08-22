@@ -39,6 +39,16 @@ describe("kontrak capability katalog MCP", () => {
     expect(capabilityForRoute("POST", "/api/vps/1/run")).toBe("vps:write");
   });
 
+  // SPEC-899 · ADR-0142 · inbox keputusan. Dua sifatnya dikunci sekaligus: capability-nya
+  // diturunkan dari METHOD (bukan dari prefix — kelas bug SPEC-405), dan ia TAK ADA di katalog MCP.
+  // Yang terakhir bukan kelalaian: agen yang bisa menjawab `AskUserQuestion` bisa menjawab
+  // pertanyaannya sendiri, dan gerbang "manusia terakhir yang memutuskan" runtuh lewat pintu itu.
+  it("dialog sesi memakai capability sessions menurut method, dan tak muncul di katalog MCP", () => {
+    expect(capabilityForRoute("GET", "/api/terminal/sessions/s1/dialog")).toBe("sessions:read");
+    expect(capabilityForRoute("POST", "/api/terminal/sessions/s1/dialog/answer")).toBe("sessions:write");
+    for (const t of MCP_TOOLS) expect(t.samplePath, t.name).not.toMatch(/\/dialog/);
+  });
+
   it("tak ada tool yang bisa merge/rebase, menghapus backlog, atau memundurkan stage", () => {
     for (const t of MCP_TOOLS) {
       expect(t.samplePath, t.name).not.toMatch(/integrate/);
