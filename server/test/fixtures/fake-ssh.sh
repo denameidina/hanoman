@@ -37,6 +37,40 @@ if [[ "$last" == *"HEALTH"* ]]; then
   echo "HEALTH uptime up 3 days"; echo "HEALTH disk 42%"
   echo "HEALTH mem 512/2048MB"; echo "HEALTH load 0.1 0.2 0.3"; exit 0
 fi
+# SPEC-883 · provision.sh: MODE=probe → COMP, MODE=apply → STEP (would bila DRY_RUN=1).
+if [[ "$input" == *"hanoman-provision"* ]]; then
+  if [[ "$last" == *"MODE=probe"* ]]; then
+    if [ "${FAKE_SSH_MODE:-}" = "probe-garbage" ]; then echo "sudo: a password is required"; exit 0; fi
+    echo "COMP base ok git+tmux+curl"
+    echo "COMP node ok v22.11.0"
+    case "${FAKE_SSH_MODE:-}" in
+      hanoman-present|setup-expired|setup-absent) echo "COMP hanoman ok 1.4.2" ;;
+      *) echo "COMP hanoman absent" ;;
+    esac
+    echo "COMP caddy absent"; echo "COMP podman absent"; echo "COMP agent-image absent"
+    echo "COMP claude partial not-logged-in 1.2.3"
+    echo "COMP codex absent"; echo "COMP gh absent"
+    exit 0
+  fi
+  items=$(echo "$last" | sed -n 's/.*ITEMS=\([^ ]*\).*/\1/p')
+  mode=ok; [[ "$last" == *"DRY_RUN=1"* ]] && mode=would
+  IFS=',' read -ra arr <<< "$items"
+  for it in "${arr[@]}"; do echo "STEP $it $mode dipasang(fake)"; done
+  exit 0
+fi
+
+# SPEC-883 · pembacaan setup token (perintah remote `sudo -n cat …/setup.token`).
+if [[ "$last" == *"setup.token"* ]]; then
+  case "${FAKE_SSH_MODE:-}" in
+    setup-expired) echo "tok-lama"; echo "2020-01-01T00:00:00.000Z"; exit 0 ;;
+    setup-absent)  echo "cat: setup.token: No such file" >&2; exit 1 ;;
+    *)             echo "tok-baru"
+                   date -u -v+15M +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null ||
+                     date -u -d "+15 minutes" +"%Y-%m-%dT%H:%M:%S.000Z"
+                   exit 0 ;;
+  esac
+fi
+
 # SPEC-220 · remediate.sh: emit STEP per item — would bila DRY_RUN=1 (preview), ok bila apply.
 if [[ "$input" == *"hanoman-remediate"* ]]; then
   items=$(echo "$last" | sed -n 's/.*ITEMS=\([^ ]*\).*/\1/p')

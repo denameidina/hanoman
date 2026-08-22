@@ -2,8 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { prisma } from "../db";
-import { zCreateVps, zPatchVps, zMarkNa, zMarkNaBulk, zAttest, zRemediate, type VpsCheck } from "@hanoman/shared";
+import { zCreateVps, zPatchVps, zMarkNa, zMarkNaBulk, zAttest, zRemediate, zProvision,
+  type VpsCheck, type ComponentId, type ProvisionProfile, type VpsComponents } from "@hanoman/shared";
 import { byId } from "../vps/catalog/catalog";
+import { COMPONENTS, componentById, resolveComponents } from "../vps/catalog/components";
+import { probeComponents, provision, readSetupToken } from "../services/vps-provision";
 import { remediate } from "../services/vps-remediate";
 import { sshExec, consoleArgv } from "../services/vps-ssh";
 import { runAudit, scriptPath } from "../services/vps-audit";
@@ -184,6 +187,101 @@ export default async function (app: FastifyInstance) {
     const audit = await runAudit(v);
     return { steps: r.steps, audit: audit.ok ? audit.audit : null,
       scoreTotal: audit.ok ? audit.scoreTotal : null, scoreBySection: audit.ok ? audit.scoreBySection : null };
+  });
+
+  // SPEC-883 · ADR-0137 · katalog komponen. GET statis: frontend tak mengimpor katalog server
+  // (pola checklist SPEC-220). Fastify memberi prioritas pada segmen statis atas parameter,
+  // jadi "components" tak pernah terbaca sebagai id VPS.
+  app.get("/vps/components", async () => ({ components: COMPONENTS }));
+
+  // Validasi seleksi: id dikenal, tersedia di profil, dependensi tertutup & terurut, dan
+  // `domain` hadir bila ada komponen yang menuntutnya.
+  function planItems(items: ComponentId[], profile: ProvisionProfile, domain?: string):
+    { ok: true; items: ComponentId[] } | { ok: false; error: string } {
+    const r = resolveComponents(items, profile);
+    if (!r.ok) return r;
+    const needsDomain = r.items.some((id) => componentById(id)?.needsDomain);
+    if (needsDomain && !domain) return { ok: false, error: "domain wajib untuk komponen ingress" };
+    return r;
+  }
+
+  // Probe = SATU-SATUNYA penulis `components`. Niat tak pernah menulis penandaan (SPEC-487).
+  async function runProbe(v: { id: string; host: string; port: number; user: string; keyPath: string | null }) {
+    const r = await probeComponents(v);
+    if (!r.ok) return r;
+    const map: VpsComponents = {};
+    for (const c of r.components) map[c.id] = { status: c.status, detail: c.detail };
+    const checkedAt = new Date();
+    await prisma.vps.update({ where: { id: v.id }, data: { components: map, componentsCheckedAt: checkedAt } });
+    return { ok: true as const, components: r.components, checkedAt };
+  }
+
+  app.post("/vps/:id/probe", async (req, reply) => {
+    const v = await prisma.vps.findUnique({ where: { id: (req.params as { id: string }).id } });
+    if (!v) return reply.code(404).send({ error: "not found" });
+    if (keyMissing(v)) return reply.code(409).send({ error: "key VPS tidak ada di mesin ini", keyMissing: true });
+    const r = await runProbe(v);
+    if (!r.ok) return reply.code(502).send({ error: "probe gagal lewat ssh", out: r.out });
+    return { components: r.components, checkedAt: r.checkedAt.toISOString() };
+  });
+
+  app.post("/vps/:id/provision/preview", async (req, reply) => {
+    const v = await prisma.vps.findUnique({ where: { id: (req.params as { id: string }).id } });
+    if (!v) return reply.code(404).send({ error: "not found" });
+    if (keyMissing(v)) return reply.code(409).send({ error: "key VPS tidak ada di mesin ini", keyMissing: true });
+    const p = zProvision.safeParse(req.body);
+    if (!p.success) return reply.code(400).send({ error: "invalid body" });
+    const plan = planItems(p.data.items, p.data.profile, p.data.domain);
+    if (!plan.ok) return reply.code(400).send({ error: plan.error });
+    const r = await provision(v, plan.items, { profile: p.data.profile, domain: p.data.domain, dryRun: true });
+    if (!r.ok) return reply.code(502).send({ error: "preview gagal lewat ssh", out: r.out });
+    return { steps: r.steps };
+  });
+
+  // Dua langkah seperti POST /api/update/apply (ADR-0088): tanpa `confirm` ia dry-run dan
+  // memulangkan 409 berisi langkah-langkahnya, jadi UI tak pernah meminta persetujuan atas
+  // rencana yang belum pernah dihitung.
+  app.post("/vps/:id/provision", async (req, reply) => {
+    const v = await prisma.vps.findUnique({ where: { id: (req.params as { id: string }).id } });
+    if (!v) return reply.code(404).send({ error: "not found" });
+    if (keyMissing(v)) return reply.code(409).send({ error: "key VPS tidak ada di mesin ini", keyMissing: true });
+    const p = zProvision.safeParse(req.body);
+    if (!p.success) return reply.code(400).send({ error: "invalid body" });
+    const plan = planItems(p.data.items, p.data.profile, p.data.domain);
+    if (!plan.ok) return reply.code(400).send({ error: plan.error });
+
+    if (!p.data.confirm) {
+      const dry = await provision(v, plan.items, { profile: p.data.profile, domain: p.data.domain, dryRun: true });
+      if (!dry.ok) return reply.code(502).send({ error: "dry-run gagal lewat ssh", out: dry.out });
+      return reply.code(409).send({ error: "confirm-required", steps: dry.steps });
+    }
+
+    // Menulis ulang /etc/hanoman.env dari lab ke production membuat service menolak boot sampai
+    // Podman siap — itu memutus instance yang sedang dipakai, bukan sekadar mengubah setelan.
+    const installed = (v.components as VpsComponents | null)?.hanoman?.status === "ok";
+    if (installed && v.provisionProfile && v.provisionProfile !== p.data.profile && !p.data.force) {
+      return reply.code(409).send({ error: "profile-mismatch", current: v.provisionProfile });
+    }
+
+    const r = await provision(v, plan.items, { profile: p.data.profile, domain: p.data.domain, dryRun: false });
+    if (!r.ok) return reply.code(502).send({ error: "provision gagal lewat ssh", transcript: r.out, steps: r.steps });
+
+    const probe = await runProbe(v);
+    if (!probe.ok) return reply.code(502).send({ error: "probe pasca-provision gagal", transcript: r.out, steps: r.steps });
+    await prisma.vps.update({ where: { id: v.id }, data: { provisionProfile: p.data.profile } });
+
+    // Serah-terima: token transien, hanya lewat sekali di badan respons ini. Tak pernah ke DB.
+    let setup: { url: string; expiresAt: string } | null = null;
+    const hanomanOk = probe.components.some((c) => c.id === "hanoman" && c.status === "ok");
+    if (hanomanOk) {
+      const token = await readSetupToken(v);
+      if (token) {
+        const base = p.data.domain ? `https://${p.data.domain}` : `http://${v.host}:8787`;
+        setup = { url: `${base}/setup?token=${encodeURIComponent(token)}`,
+          expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
+      }
+    }
+    return { steps: r.steps, components: probe.components, checkedAt: probe.checkedAt.toISOString(), setup };
   });
 
   // Harden TIDAK PERNAH terjadwal — hanya dari tombol (SPEC-164 §5). Urutan anti-lockout:
