@@ -4,6 +4,7 @@ import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import { basename, isAbsolute, join } from "node:path";
 import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
+import { resolveHardening } from "@hanoman/runner";
 import { prisma } from "../db";
 import { uploadDir } from "./uploads";
 
@@ -64,7 +65,12 @@ async function defaultUsage(projectId: string): Promise<{ project: number; globa
 export function scannerFromEnv(path: string): Promise<void> {
   const command = process.env.HANOMAN_UPLOAD_SCANNER?.trim();
   if (!command) {
-    if (process.env.NODE_ENV === "production") return Promise.reject(new UploadError("UPLOAD_SCAN", "scanner required"));
+    // SPEC-884 · ADR-0138 · fail-closed dipertahankan untuk instance yang minta dikeraskan. Di
+    // instalasi biasa scanner virus bukan prasyarat yang masuk akal, tapi ketiadaannya tak boleh
+    // senyap — lampiran diterima tanpa dipindai, dan itu harus terbaca di log.
+    if (resolveHardening(process.env))
+      return Promise.reject(new UploadError("UPLOAD_SCAN", "scanner required"));
+    console.warn("upload: HANOMAN_UPLOAD_SCANNER tak disetel — lampiran diterima tanpa dipindai");
     return Promise.resolve();
   }
   if (!isAbsolute(command)) return Promise.reject(new UploadError("UPLOAD_SCAN", "scanner path must be absolute"));

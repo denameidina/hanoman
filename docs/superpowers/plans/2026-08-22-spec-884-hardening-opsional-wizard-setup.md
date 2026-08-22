@@ -542,7 +542,7 @@ git commit -m "feat(spec-884): sandbox sesi, lead, dan chat portal ikut hardenin
 - Consumes: `resolveHardening` (Task 2)
 - Produces: `scannerFromEnv(path: string): Promise<void>` — tanda tangan tak berubah
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/upload-scanner-gate.test.ts`:
 
@@ -577,12 +577,12 @@ describe("gerbang scanner upload (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/upload-scanner-gate.test.ts`
 Expected: FAIL — test pertama menolak (`scanner required`) alih-alih resolve
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/upload-pipeline.ts`, tambahkan import `resolveHardening` dari `@hanoman/runner` dan ganti blok `if (!command)`:
 
@@ -598,12 +598,12 @@ Di `server/src/services/upload-pipeline.ts`, tambahkan import `resolveHardening`
   }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/upload-scanner-gate.test.ts`
 Expected: PASS — 3 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/upload-pipeline.ts server/test/upload-scanner-gate.test.ts
