@@ -234,7 +234,14 @@ dengan cara mengubah arti kolom yang dibaca dashboard — biaya yang salah tempa
 
 ### Fase 5 — gzip di kabel
 
-- Hub: `@fastify/compress`, dipasang **scoped ke `/api/sync/*`** (bukan global), threshold ~1 KB.
+- Hub: `zlib.gzipSync` **di dalam dua route** (`/sync/pull`, `/sync/bootstrap`) saat client mengirim
+  `accept-encoding: gzip`; balas `content-encoding: gzip` + `vary: accept-encoding`.
+
+  Bukan `@fastify/compress`: paket itu belum jadi dependency, menambahkannya menyentuh daftar
+  `--external` di skrip build esbuild `server/package.json`, dan ia memasang hook di seluruh
+  lifecycle. Yang dibutuhkan cuma dua endpoint mesin-ke-mesin yang payload-nya sudah dibatasi
+  ≤1 MB oleh Fase 1 dan sudah utuh di memori — `gzipSync` atasnya ~10 ms. Plugin sebesar itu
+  untuk permukaan sekecil itu adalah dependency yang harus dibayar tiap rilis tanpa alasan.
 - Client: `fetchTransport` mengirim `accept-encoding: gzip`.
 - `safeRequest` menangani `content-encoding: gzip` di `pinnedRequest` lewat `zlib.createGunzip()`.
 
@@ -332,7 +339,7 @@ sesuai AGENTS.md.
 | 2 | `server/src/services/sync-client.ts` (`syncOnce`, `syncNow`, `tick`) |
 | 3 | `server/src/services/sync.ts` (`bootstrapSnapshot`), `server/src/routes/sync.ts`, `server/src/services/sync-client.ts` |
 | 4 | `server/src/services/vps-audit.ts`, `server/prisma/schema.prisma` + migration |
-| 5 | `server/src/services/safe-outbound-request.ts`, `server/src/app.ts`, `server/package.json` |
+| 5 | `server/src/routes/sync.ts`, `server/src/services/safe-outbound-request.ts`, `server/src/services/sync-client.ts` |
 | docs | `internal/docs/adr/0137-*.md`, `internal/docs/README.md`, `internal/docs/architecture/api-contract.md` (endpoint bootstrap + `hasMore`), `internal/docs/architecture/data-model.md` (`Vps.lastPublishedAt`) |
 
 ## Urutan rilis
