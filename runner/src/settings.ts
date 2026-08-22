@@ -12,7 +12,9 @@ export const guardSettings = (decisionFile?: string, goal?: string) => {
     // SPEC-898 · ADR-0141 · isi marker = detik epoch ONSET episode ini, ditulis SEKALI. Notification
     // berulang (Claude idle lagi) tak boleh mencapnya ulang: kalau ia mencap ulang, "menunggu sejak"
     // selalu terbaca lebih muda dari satu putaran idle dan gerbang urgensi tak pernah menyala.
-    // `size > 0` tetap satu-satunya arti "menunggu manusia" (SPEC-184) — markerFilled tak berubah.
+    // `size > 0` tetap satu-satunya arti marker (SPEC-184) — markerFilled tak berubah. SPEC-903 ·
+    // ADR-0143 · artinya kini "pernah minta masukan", bukan "sedang menunggu": server menggerbanginya
+    // dengan keadaan pane. Hook di sini sengaja TIDAK ikut berubah.
     hooks.Notification = [{ hooks: [{ type: "command",
       command: `grep -qiE 'idle|permission|waiting for|needs.?input' && { [ -s ${f} ] || date +%s > ${f}; } || true` }] }];
     hooks.UserPromptSubmit = [{ hooks: [{ type: "command", command: `: > ${f}` }] }];

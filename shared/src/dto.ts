@@ -701,6 +701,8 @@ export type SessionDTO = {
   // membedakan sesi yang tuntas dari agen yang dihentikan di tengah kerja.
   exitCode?: number;
   // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia"; ada hanya saat `decision` true.
+  // SPEC-903 · ADR-0143 · onsetnya `max(stempel di marker, keluaran terakhir pane)` — awal episode
+  // yang SEDANG berlangsung. `decision` sendiri kini keadaan turunan, bukan isi marker apa adanya.
   decisionAt?: string;
 };
 

@@ -783,7 +783,7 @@ git commit -m "feat(dialog): jawaban lewat route mengosongkan marker keputusan (
 - Consumes: seluruh perubahan Task 1–5
 - Produces: doc-of-record
 
-- [ ] **Step 1: Periksa nomor ADR belum diambil sesi tetangga**
+- [x] **Step 1: Periksa nomor ADR belum diambil sesi tetangga**
 
 ```bash
 ls internal/docs/adr | tail -5
@@ -794,7 +794,7 @@ Expected: `0142-…` adalah yang terakhir → pakai `0143`. Bila `0143` sudah ad
 nomor bebas berikutnya dan **perbarui semua rujukan `ADR-0143` di kode & docs** yang ditulis Task
 1–5 (`grep -rn "ADR-0143" server/src docs internal/docs`).
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Buat `internal/docs/adr/0143-menunggu-keputusan-keadaan-turunan.md` mengikuti bentuk ADR tetangga
 (`internal/docs/adr/0141-onset-menunggu-di-marker-keputusan.md` sebagai contoh bentuk). Isinya wajib
@@ -824,14 +824,14 @@ memuat, dengan angka apa adanya dari audit:
    (`AGENT_TURN_LINE`, SPEC-487, pemisahan 6/6 vs 0/16); prioritas `deciding` (ADR-0091) dan gerbang
    `finished`/`complete` (SPEC-433) tetap berlaku di atas bit ini; skema/DTO/sync tak tersentuh.
 
-- [ ] **Step 3: Amandemen ADR-0141**
+- [x] **Step 3: Amandemen ADR-0141**
 
 Tambahkan satu blok "Amandemen 2026-08-22 (SPEC-903, ADR-0143)" di
 `internal/docs/adr/0141-onset-menunggu-di-marker-keputusan.md`: isi marker tetap "epoch onset,
 ditulis sekali" — yang berubah hanya turunannya, `decisionAt = max(onset, window_activity)`, karena
 satu episode marker kini bisa memuat beberapa episode menunggu.
 
-- [ ] **Step 4: Perbarui api-contract & frontend docs**
+- [x] **Step 4: Perbarui api-contract & frontend docs**
 
 - `internal/docs/architecture/api-contract.md` — pada deskripsi `GET /terminal/sessions`: `decision`
   bukan lagi "marker keputusan terisi" melainkan "marker terisi DAN pane diam ≥ 3 dtk (ADR-0143)";
@@ -840,7 +840,7 @@ satu episode marker kini bisa memuat beberapa episode menunggu.
   `!exited && decision`, tetapi `decision` kini keadaan turunan; tegaskan bahwa `TerminalScreen` dan
   `pet-state` **tidak boleh** menambah predikat sendiri di atasnya.
 
-- [ ] **Step 5: Tautkan di index**
+- [x] **Step 5: Tautkan di index**
 
 ```bash
 grep -n "0142" internal/docs/adr/README.md internal/docs/README.md
@@ -855,7 +855,7 @@ node dist/cli.js docs index --check 2>/dev/null || pnpm --filter ./runner exec t
 Bila perintah CLI tak tersedia di worktree ini, cukup pastikan kedua index memuat baris `0143` dan
 path-nya benar (`ls internal/docs/adr/0143-*`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs
@@ -871,7 +871,7 @@ git commit -m "docs(decision): ADR-0143 menunggu keputusan sebagai keadaan turun
 **Interfaces:**
 - Consumes: Task 1–6
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan, serial, DB terisolasi**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan, serial, DB terisolasi**
 
 ```bash
 export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
@@ -885,7 +885,7 @@ pnpm vitest --run --no-file-parallelism \
 
 Expected: semua PASS. Nol test berjalan = **bukan** hijau — periksa jumlah test yang dilaporkan.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -893,7 +893,7 @@ pnpm --filter ./server typecheck
 
 Expected: nol error. (`pnpm -r typecheck` **jangan** dijalankan — mesin ini menjalankan beberapa sesi.)
 
-- [ ] **Step 3: Smoke endpoint nyata sekali di akhir**
+- [x] **Step 3: Smoke endpoint nyata sekali di akhir**
 
 Task ini menyentuh dua endpoint (`GET /api/terminal/sessions`, `POST
 /api/terminal/sessions/:id/dialog/answer`), jadi satu smoke nyata wajib. Boot server dengan
@@ -959,3 +959,70 @@ git push origin HEAD:refs/heads/hanoman/spec-903
 | §6 frontend nihil | tak ada task — disengaja, dicatat di Global Constraints |
 | §7 test | Task 1–5, dijalankan bersama di Task 7 |
 | §9 docs | Task 6 |
+
+---
+
+## Hasil verifikasi (2026-08-22)
+
+### Test
+
+`TEST_DATABASE_URL` terisolasi, `--no-file-parallelism`, socket tmux `hanoman-t903`, dan env sesi
+agen dibersihkan (`SSH_ASKPASS`, `HANOMAN_CONTROL_ORIGINS`, `DATABASE_URL` — ketiganya mencemari
+suite ini; lihat catatan gagal palsu di bawah).
+
+| berkas | hasil |
+|---|---|
+| `server/test/pty.test.ts` | 65/65 lulus (termasuk 3 test SPEC-903 baru) |
+| `server/test/notifications.test.ts` | 12/12 lulus (2 test SPEC-903 baru) |
+| `server/test/terminal-dialog.route.test.ts` | 10/10 lulus (1 test SPEC-903 baru) |
+| `server/test/lead-detect.test.ts` | 50/50 lulus |
+| `server/test/terminal.route.test.ts` | 60 lulus, **21 gagal — IDENTIK di base** |
+| `pnpm --filter ./server typecheck` | nol error |
+
+**Gagal palsu yang sudah dibuktikan, bukan regresi:**
+
+- `server/test/terminal.route.test.ts`: 21 gagal. Diperiksa dengan `git checkout 5fe3c6ff -- server/src
+  server/test`, jalankan, lalu pulihkan: **21 gagal / 60 lulus di base juga**, dan daftar nama test
+  yang gagal `diff`-nya KOSONG (identik). Sebagian besar test WS/resize/socket. Test SPEC-903 di
+  berkas itu (`GET /terminal/sessions meneruskan decisionAt`) LULUS.
+- `pty.test.ts` `"sesi agen lahir tanpa jalan meminta ketikan kredensial"`: gagal hanya bila
+  `SSH_ASKPASS` ada di env sesi agen (SPEC-881). Dengan `env -u SSH_ASKPASS …` → lulus.
+- Seluruh route 404 bila `HANOMAN_CONTROL_ORIGINS` diwarisi dari shell operator.
+
+### Smoke endpoint nyata
+
+Server sungguhan (`tsx server/src/server.ts`) di `127.0.0.1:8913`, `HANOMAN_HOME` & DB terisolasi,
+socket tmux `hanoman-smoke903`, akun dibuat lewat `POST /api/auth/setup`.
+
+**1. Gerbang turunan — `GET /api/terminal/sessions`** (pane berisik 12 dtk lalu diam, marker terisi
+11 B sejak T+0):
+
+```
+marker=1787416293 (11 B)
+T+0s   [{"id":"smk1",…,"exited":false,"decision":false,"agent":"claude"}]
+T+5s   [{"id":"smk1",…,"exited":false,"decision":false,"agent":"claude"}]
+T+17s  [{"id":"smk1",…,"decision":true,…,"decisionAt":"2026-08-22T16:31:46.000Z"}]
+
+now=2026-08-22T16:31:56Z  marker_onset=1787416293 (16:31:33Z)  window_activity=1787416306 (16:31:46Z)
+```
+
+`decisionAt` = `max(onset, window_activity)` = `window_activity` — persis kontrak ADR-0143 §6, dan
+13 detik lebih muda dari onset marker.
+
+**2. Jalur (b) — jawaban dialog mengosongkan marker.** Pane menjalankan emulator widget
+`AskUserQuestion` (kolom bebas di baris 3, digit memfokuskannya, Enter mengirim), dijawab lewat HTTP:
+
+```
+GET  /api/terminal/sessions/smk3/dialog
+  → {"dialog":{"title":"Warna apa yang dipakai?","freeIndex":3,
+     "options":[{"n":1,"label":"merah"},{"n":2,"label":"biru"}]},"screenHash":"48dcef803f59e5c1"}
+
+sebelum: marker [1787416395] (11 B) · decision true · decisionAt 2026-08-22T16:33:15.000Z
+POST /api/terminal/sessions/smk3/dialog/answer {"screenHash":"48dcef803f59e5c1","choice":1}
+  → {"accepted":true}
+layar pane: "jawaban diterima: merah / kerja lagi..."
+sesudah: marker [] (0 B) · decision false · decisionAt absen
+```
+
+Bonus bukti negatif: pada pane yang layarnya TIDAK bergerak, jawaban dijawab
+`409 not-landed` dan marker **tidak** disentuh — pengosongan marker memang hanya menempel pada 202.
