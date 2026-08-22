@@ -38,6 +38,11 @@ def main() -> None:
             problems.append(f"f{fr['frame']} tumpah {fr['clipped']} px ke luar sel")
         if fr["residual_pre"] > gate:
             problems.append(f"f{fr['frame']} residu pra-pin {fr['residual_pre']:.3f} > {gate}")
+    steps = petlib.frame_steps(strip.convert("RGBA"))
+    ratio = max(steps) / max(min(steps), 1e-6)
+    if row.get("even") and max(steps) >= petlib.STEP_VISIBLE and ratio > petlib.STEP_RATIO_GATE:
+        problems.append(f"langkah tak rata: max {max(steps):.3f} / min {min(steps):.3f} "
+                        f"= {ratio:.2f} > {petlib.STEP_RATIO_GATE} — baris ini diputar berulang")
     qa = ASSETS / "qa"
     qa.mkdir(exist_ok=True)
     contact = Image.new("RGBA", (strip.size[0] // 2, strip.size[1] // 2), (250, 246, 236, 255))
@@ -46,6 +51,10 @@ def main() -> None:
     petlib.onion_skin(strip.convert("RGBA")).save(qa / f"{key}-onion.png")
     petlib.save_gif(strip.convert("RGBA"), qa / f"{key}.gif", row["fps"])
     print(f"qa/{key}-contact.png qa/{key}-onion.png qa/{key}.gif ditulis")
+    # Sambungan 8→1 adalah elemen TERAKHIR — satu-satunya langkah yang tak terlihat di contact
+    # sheet maupun onion-skin, dan yang menentukan apakah baris ini bisa diputar berulang.
+    print("  langkah " + " ".join(f"{i + 1}→{(i + 1) % 8 + 1}:{s:.3f}" for i, s in enumerate(steps))
+          + f"  rasio={ratio:.2f}")
     if problems:
         fail(f"{key}: " + "; ".join(problems))
     print(f"OK {key}: 8 frame, residu maks {max(f['residual_pre'] for f in report['frames']):.3f} ≤ {gate}")
