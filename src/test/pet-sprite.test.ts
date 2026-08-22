@@ -20,11 +20,16 @@ describe("manifest atlas pet (PET-001)", () => {
   });
 
   it("memuat dua baris SPEC-897 di ekor, indeks baris lama tak bergeser", () => {
-    expect(PET_MANIFEST.rows.length).toBe(12);
-    expect(PET_MANIFEST.rows.map((r) => r.key).slice(10)).toEqual(["deciding", "sleep"]);
+    expect(PET_MANIFEST.rows.length).toBe(13);
+    expect(PET_MANIFEST.rows.map((r) => r.key).slice(10)).toEqual(["deciding", "sleep", "thanks"]);
     expect(rowIndex("wave")).toBe(9);
     expect(rowIndex("deciding")).toBe(10);
     expect(rowIndex("sleep")).toBe(11);
+    // SPEC-898 · baris reaksi, bukan pose: ia hanya bisa dipilih oleh `oneShot`.
+    expect(rowIndex("thanks")).toBe(12);
+    expect(rowOf("thanks").loop).toBe(false);
+    expect(thenOf("thanks")).toBe("idle");
+    expect(Object.values(POSE_ROW)).not.toContain("thanks");
     expect(durationMs("deciding")).toBe(Math.round((8 / 6) * 1000));
     expect(durationMs("sleep")).toBe(2000);   // 8 frame @ 4 fps
     expect(rowOf("sleep").loop).toBe(true);
@@ -83,6 +88,7 @@ describe("CSS sprite pet (kontrak rule terparse)", () => {
   it("hanya keyframe interaksi + frame sprite yang tersisa; katalog idle/pose SPEC-648 dicabut", () => {
     expect(keyframes.map((rule) => rule.name)).toEqual([
       "hn-pet-frames", "hn-pet-click", "hn-pet-panel-in", "hn-pet-panel-out", "hn-pet-reveal",
+      "hn-pet-bubble-in",
     ]);
   });
 
