@@ -25,6 +25,11 @@ const xt = vi.hoisted(() => ({
     cursorY: 0,
     getLine: (_: number) => undefined as undefined | { translateToString: () => string },
   },
+  // Meniru WriteBuffer xterm: callback write baru dipanggil sesudah chunk-nya DIPARSE. Mode
+  // sinkron (default) cukup untuk kebanyakan test; mode tunda dipakai untuk skenario "frame
+  // server in flight" — di xterm nyata write server selalu diparse lewat setTimeout.
+  deferWrites: false,
+  parseQueue: [] as (() => void)[],
 }));
 
 vi.mock("@xterm/xterm", () => ({
@@ -36,7 +41,11 @@ vi.mock("@xterm/xterm", () => ({
     public loadAddon(): void { }
     public open(): void { }
     public focus(): void { xt.focused += 1; }
-    public write(d: string, cb?: () => void): void { xt.written.push(d); cb?.(); }
+    public write(d: string, cb?: () => void): void {
+      xt.written.push(d);
+      if (!cb) return;
+      if (xt.deferWrites) xt.parseQueue.push(cb); else cb();
+    }
     public scrollLines(amount: number): void { xt.scrolled.push(amount); }
     public dispose(): void { }
     public hasSelection(): boolean { return xt.selection.length > 0; }
@@ -492,7 +501,7 @@ describe("TerminalPane · echo prediktif (SPEC-856)", () => {
     act(() => { sockets[0]?.onopen?.(); });
     xt.written.length = 0;
   };
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(() => { vi.useRealTimers(); xt.deferWrites = false; xt.parseQueue.length = 0; });
 
   it("menulis karakter bergaris bawah lokal lalu mengirimnya setelah jendela 16 ms", async () => {
     lineIs("");
@@ -583,6 +592,63 @@ describe("TerminalPane · echo prediktif (SPEC-856)", () => {
     act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "data", d: "❯ ab" }) }); });
     act(() => { xt.dataHandler?.("c"); });
     expect(xt.written).toContain("\x1b[4mc\x1b[24m");
+  });
+
+  // Re-prediksi sisa sesudah frame tergambar. Dulu blok reapply membaca buffer tepat sesudah
+  // `term.write` — di browser nyata itu masih layar lama (glyph prediksi sendiri), jadi sisa yang
+  // belum ter-echo lenyap sekejap sampai repaint berikutnya. Kini keputusan diambil di callback
+  // write frame TERAKHIR, dan huruf yang diketik selama frame in flight ditangguhkan supaya tak
+  // mendarat di depan sisa lama di antrean xterm.
+  const flushParsed = () => {
+    const queue = xt.parseQueue.splice(0);
+    act(() => { for (const cb of queue) cb(); });
+  };
+  const underlined = () => xt.written.filter((w) => w.startsWith("\x1b[4m"));
+
+  it("sisa yang belum ter-echo digambar ulang SESUDAH frame tergambar, berurutan dengan yang diketik selagi in flight", async () => {
+    lineIs("❯ ", 2);
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    act(() => { xt.dataHandler?.("a"); });
+    act(() => { xt.dataHandler?.("b"); });
+    expect(underlined()).toEqual(["\x1b[4ma\x1b[24m", "\x1b[4mb\x1b[24m"]);
+    xt.deferWrites = true;
+    xt.written.length = 0;
+    // Frame server: TUI baru meng-echo `a`. Rollback `ab` + data dalam satu write, belum diparse.
+    act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "data", d: "❯ a" }) }); });
+    expect(xt.written).toEqual(["\x1b[2D\x1b[K❯ a"]);
+    // `c` diketik selagi frame in flight: terkirim, tapi TIDAK digambar sekarang.
+    act(() => { xt.dataHandler?.("c"); });
+    expect(underlined()).toEqual([]);
+    act(() => { vi.advanceTimersByTime(20); });
+    expect(sentInputs().join("")).toBe("abc");
+    // Frame tergambar; layar segar memperlihatkan `❯ a`. Sisa `b` + `c` digambar ulang berurutan.
+    lineIs("❯ a", 3);
+    flushParsed();
+    expect(underlined()).toEqual(["\x1b[4mbc\x1b[24m"]);
+    // Frame berikutnya membawa echo keduanya: rollback 2 glyph, lalu tak ada sisa.
+    xt.written.length = 0;
+    act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "data", d: "❯ abc" }) }); });
+    expect(xt.written).toEqual(["\x1b[2D\x1b[K❯ abc"]);
+    lineIs("❯ abc", 5);
+    flushParsed();
+    expect(underlined()).toEqual([]);
+    xt.deferWrites = false;
+  });
+
+  it("dua frame in flight: hanya callback frame terakhir yang memutuskan, frame kedua tanpa rollback", async () => {
+    lineIs("❯ ", 2);
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    act(() => { xt.dataHandler?.("a"); });
+    xt.deferWrites = true;
+    xt.written.length = 0;
+    act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "data", d: "❯ " }) }); });
+    act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "data", d: "❯ a" }) }); });
+    // Frame kedua tak me-rollback apa pun: tak ada glyph prediksi di layar selama in flight.
+    expect(xt.written).toEqual(["\x1b[1D\x1b[K❯ ", "❯ a"]);
+    lineIs("❯ a", 3);
+    flushParsed();
+    expect(underlined()).toEqual([]);   // callback pertama basi; yang kedua melihat semuanya ter-echo
+    xt.deferWrites = false;
   });
 
   it("tetap suspend selama frame server tak memperlihatkan ketikan — pty bungkam", async () => {

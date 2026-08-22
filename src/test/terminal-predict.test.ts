@@ -3,7 +3,8 @@ import {
   applySeq, canPredict, classifyInput, echoedPrefixLen, initialState, looksLikePasswordPrompt,
   COALESCE_IN_MS, createInputBatcher, onInput, onPaneAltScreen, onReattach, onServerData, onTick,
   onDelivered, reapply, rollbackSeq, echoEvidence, onEchoed, wantsEchoEvidence,
-  SUSPEND_MS, TTL_MS, TYPED_MAX, type PredictState, type View,
+  onFrameParsed, inFlight,
+  SUSPEND_MS, TTL_MS, TYPED_MAX, UNECHOED_MAX, type PredictState, type View,
 } from "../src/screens/terminal-predict";
 
 describe("classifyInput", () => {
@@ -181,12 +182,10 @@ describe("onServerData", () => {
     expect(r.write).toBe("\x1b[2D\x1b[KDATA");
     expect(r.state.pending).toBe("");
     expect(r.state.since).toBeNull();
-    expect(r.tail).toBe("ab");
   });
   it("melewatkan data apa adanya saat tak ada pending", () => {
     const r = onServerData(initialState(), "DATA", 0);
     expect(r.write).toBe("DATA");
-    expect(r.tail).toBe("");
   });
   // Frame nyata SPEC-856: satu keystroke di TUI claude membalas repaint layar penuh ber-posisi
   // absolut. Prediksi tetap harus dilepas lebih dulu, dan byte server lewat tanpa disunat.
@@ -244,7 +243,14 @@ describe("onTick", () => {
 
 describe("onReattach", () => {
   it("melupakan segalanya — tmux memutar ulang layar penuh saat attach", () => {
-    expect(onReattach()).toEqual(initialState());
+    const fresh = onReattach(state({ pending: "ab", unechoed: "ab", typed: "x", suspendedUntil: 9, since: 1, altScreen: true }));
+    const { gen, parsed, ...rest } = fresh;
+    const { gen: g0, parsed: p0, ...init } = initialState();
+    expect(rest).toEqual(init);
+    // Hanya nomor frame yang diteruskan, supaya callback sambungan lama basi; tak ada yang in flight.
+    expect(gen).toBe(parsed);
+    expect(gen).toBeGreaterThan(g0);
+    expect(p0).toBe(g0);
   });
 });
 
@@ -440,5 +446,131 @@ describe("suspend yang menyembuhkan diri", () => {
 
   it("onReattach membuang buku ketikan bersama sisa keadaan lain", () => {
     expect(onReattach().typed).toBe("");
+  });
+});
+
+// Re-prediksi sisa SESUDAH frame server tergambar. xterm memproses write server secara asinkron
+// (hanya write pertama sesudah input pengguna yang sinkron), jadi membaca layar tepat sesudah
+// `term.write` selalu melihat glyph prediksi sendiri — blok reapply lama karena itu tak pernah
+// bekerja di browser nyata: huruf yang belum ter-echo lenyap sekejap sampai repaint berikutnya.
+// Keputusan kini diambil di callback frame TERAKHIR yang in flight, dengan layar segar. Selama
+// ada frame in flight, huruf baru ditangguhkan (tak digambar, tak masuk `pending`) — kalau
+// digambar, ia mendarat DI DEPAN sisa lama di antrean xterm dan urutannya terbalik.
+describe("re-prediksi sisa sesudah frame tergambar", () => {
+  const typed = (s: PredictState, text: string, v: View = view()) =>
+    [...text].reduce((acc, c) => onInput(acc, c, v, 1_000, true).state, s);
+
+  it("prediksi yang digambar juga tercatat sebagai unechoed", () => {
+    const s = typed(state(), "ab");
+    expect(s.pending).toBe("ab");
+    expect(s.unechoed).toBe("ab");
+    expect(inFlight(s)).toBe(false);
+  });
+
+  it("frame server: rollback pending, naikkan gen, simpan unechoed untuk diputuskan nanti", () => {
+    const s = typed(state(), "ab");
+    const r = onServerData(s, "DATA", 1_050);
+    expect(r.write).toBe("\x1b[2D\x1b[KDATA");
+    expect(r.state.pending).toBe("");
+    expect(r.state.unechoed).toBe("ab");
+    expect(r.state.gen).toBe(s.gen + 1);
+    expect(inFlight(r.state)).toBe(true);
+  });
+
+  it("selama in flight, huruf baru ditangguhkan: tak digambar, tak pending, masuk unechoed", () => {
+    const s = onServerData(typed(state(), "ab"), "DATA", 1_050).state;
+    const r = onInput(s, "c", view(), 1_060, true);
+    expect(r.write).toBe("");
+    expect(r.deferred).toBe(true);
+    expect(r.state.pending).toBe("");
+    expect(r.state.unechoed).toBe("abc");
+  });
+
+  it("callback frame yang sudah disusul frame lebih baru tak memutuskan apa pun", () => {
+    const first = onServerData(typed(state(), "ab"), "A", 1_050).state;
+    const second = onServerData(first, "B", 1_060).state;
+    const r = onFrameParsed(second, first.gen, view({ line: "❯ a", cursorX: 3 }), 1_070, true);
+    expect(r.write).toBe("");
+    expect(r.state).toBe(second);
+    expect(inFlight(r.state)).toBe(true);
+  });
+
+  it("frame terakhir tergambar: sisa yang belum ter-echo (termasuk yang ditangguhkan) digambar ulang berurutan", () => {
+    const s = onInput(onServerData(typed(state(), "ab"), "A", 1_050).state, "c", view(), 1_060, true).state;
+    // Layar sesudah frame: TUI baru meng-echo `a`.
+    const r = onFrameParsed(s, s.gen, view({ line: "❯ a", cursorX: 3 }), 1_070, true);
+    expect(r.write).toBe(applySeq("bc"));
+    expect(r.state.pending).toBe("bc");
+    expect(r.state.unechoed).toBe("bc");
+    expect(r.state.since).toBeNull();           // jam TTL milik pemanggil (onDelivered)
+    expect(inFlight(r.state)).toBe(false);
+  });
+
+  it("layar sudah memuat semuanya: tak ada yang digambar ulang", () => {
+    const s = onServerData(typed(state(), "ab"), "A", 1_050).state;
+    const r = onFrameParsed(s, s.gen, view({ line: "❯ ab", cursorX: 4 }), 1_070, true);
+    expect(r.write).toBe("");
+    expect(r.state.pending).toBe("");
+    expect(r.state.unechoed).toBe("");
+    expect(inFlight(r.state)).toBe(false);
+  });
+
+  it("gerbang gagal pada layar segar: sisa dibuang, tak ada glyph tanpa pemilik", () => {
+    const s = onServerData(typed(state(), "ab"), "A", 1_050).state;
+    const r = onFrameParsed(s, s.gen, view({ line: "", cursorX: 99, cols: 100 }), 1_070, true);
+    expect(r.write).toBe("");
+    expect(r.state.pending).toBe("");
+    expect(r.state.unechoed).toBe("");
+  });
+
+  it("Backspace/control mengosongkan unechoed tapi pending tetap (masih butuh rollback)", () => {
+    const s = onInput(typed(state(), "ab"), "\x7f", view(), 1_010, true).state;
+    expect(s.pending).toBe("ab");
+    expect(s.unechoed).toBe("");
+    const t = onInput(typed(state(), "ab"), "tempelan", view(), 1_010, true).state;
+    expect(t.unechoed).toBe("");
+    // selama in flight pun sama: huruf yang ditangguhkan sebelum Backspace tak digambar ulang
+    const f = onServerData(typed(state(), "ab"), "A", 1_050).state;
+    const g = onInput(onInput(f, "c", view(), 1_060, true).state, "\x7f", view(), 1_070, true).state;
+    expect(g.unechoed).toBe("");
+    expect(onFrameParsed(g, g.gen, view({ line: "❯ a", cursorX: 3 }), 1_080, true).write).toBe("");
+  });
+
+  it("penolakan gerbang di luar flight memutus urutan: unechoed dikosongkan", () => {
+    const s = typed(state(), "ab");
+    const r = onInput(s, "c", view({ line: "❯ ab x", cursorX: 4 }), 1_010, true);   // ekor tak kosong
+    expect(r.write).toBe("");
+    expect(r.state.unechoed).toBe("");
+    expect(r.state.pending).toBe("ab");
+  });
+
+  it("TTL yang menggigit membuang unechoed juga", () => {
+    const s = onDelivered(typed(state(), "ab"), 1_000);
+    const r = onTick(s, 1_000 + TTL_MS);
+    expect(r.state.unechoed).toBe("");
+  });
+
+  it("onReattach menjaga kontinuitas gen: callback sambungan lama basi", () => {
+    const old = onServerData(typed(state(), "ab"), "A", 1_050).state;
+    const fresh = onReattach(old);
+    expect(fresh.unechoed).toBe("");
+    expect(fresh.gen).toBeGreaterThan(old.gen);
+    expect(inFlight(fresh)).toBe(false);
+    const r = onFrameParsed(fresh, old.gen, view({ line: "❯ a", cursorX: 3 }), 1_100, true);
+    expect(r.write).toBe("");
+    expect(r.state).toBe(fresh);
+  });
+
+  it("unechoed berbatas: huruf di luar batas tak ditangguhkan, bukan menggeser yang lama", () => {
+    let s = onServerData(state(), "A", 1_050).state;
+    for (let i = 0; i < UNECHOED_MAX + 3; i += 1) s = onInput(s, "x", view(), 1_060, true).state;
+    expect(s.unechoed.length).toBe(UNECHOED_MAX);
+  });
+
+  it("penyembuhan suspend tetap lewat callback yang sama", () => {
+    const s: PredictState = { ...onServerData(state(), "A", 1_050).state, suspendedUntil: 10_000, typed: "ab" };
+    const r = onFrameParsed(s, s.gen, view({ line: "❯ ab", cursorX: 4 }), 1_070, true);
+    expect(r.state.suspendedUntil).toBe(0);
+    expect(r.state.typed).toBe("");
   });
 });

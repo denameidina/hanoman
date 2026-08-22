@@ -49,6 +49,14 @@ export type PredictState = {
   /** Teks yang diketik SELAMA suspend dan tak diprediksi — bahan bukti bahwa pty membalas lagi.
    *  Kosong di luar suspend; dikosongkan oleh control/bulk karena barisnya sudah berubah. */
   typed: string;
+  /** Urutan huruf yang layak digambar ulang sesudah frame server tergambar: yang sudah diprediksi
+   *  (⊇ `pending`) plus yang DITANGGUHKAN selama frame in flight. Control/bulk/penolakan gerbang
+   *  memutus urutannya → dikosongkan; `pending` tetap karena glyph-nya masih butuh rollback. */
+  unechoed: string;
+  /** Nomor frame server terakhir yang write-nya sudah dipanggil, dan yang terakhir TERGAMBAR.
+   *  Berbeda = ada frame in flight; hanya callback frame ber-`gen` terakhir yang memutuskan. */
+  gen: number;
+  parsed: number;
 };
 
 export const TTL_MS = 500;
@@ -61,12 +69,19 @@ export const TTL_MS = 500;
 export const SUSPEND_MS = 5_000;
 /** Batas buku ketikan selama suspend: cukup untuk satu kata, tak pernah tumbuh tanpa batas. */
 export const TYPED_MAX = 32;
+/** Batas huruf yang ditangguhkan selama frame in flight (beberapa ms; parse xterm ber-jatah 12 ms).
+ *  Melewati batas: huruf baru tak ditangguhkan — menggeser yang lama akan merusak urutan. */
+export const UNECHOED_MAX = 64;
 /** Kolom cadangan di tepi kanan: prediksi yang membungkus baris tak bisa di-rollback dengan CUB. */
 const EDGE_MARGIN = 2;
 
 export function initialState(): PredictState {
-  return { pending: "", since: null, altScreen: false, suspendedUntil: 0, typed: "" };
+  return { pending: "", since: null, altScreen: false, suspendedUntil: 0, typed: "", unechoed: "", gen: 0, parsed: 0 };
 }
+
+/** Ada write frame server yang belum tergambar. Selama ini benar, tak ada glyph prediksi di layar
+ *  (`pending` kosong) dan huruf baru ditangguhkan ke `unechoed`. */
+export const inFlight = (state: PredictState): boolean => state.gen !== state.parsed;
 
 /** SPEC-863 · satu-satunya jalan masuk keadaan alternate screen: frame `alt` dari server, yang
  *  membacanya dari `#{alternate_on}` milik tmux. Aliran byte tak pernah dipindai lagi — tmux
@@ -116,16 +131,28 @@ export function echoedPrefixLen(before: string, pending: string): number {
 // "pty sengaja bungkam" hanya selama jaringan sehat.
 export function onInput(
   state: PredictState, d: string, view: View, now: number, enabled: boolean,
-): { state: PredictState; write: string } {
+): { state: PredictState; write: string; deferred?: boolean } {
+  const kind = classifyInput(d);
+  // Frame server masih in flight: layar yang terbaca sekarang masih layar LAMA, dan glyph yang
+  // digambar sekarang akan mendarat di depan sisa lama di antrean xterm — urutannya terbalik.
+  // Huruf ditangguhkan; gerbang layar penuh dijalankan `onFrameParsed` dengan layar segar.
+  // Gerbang yang tak butuh layar tetap ditegakkan di sini.
+  if (kind === "text" && inFlight(state) && enabled && view.deliverable && !state.altScreen
+    && now >= state.suspendedUntil) {
+    if (state.unechoed.length >= UNECHOED_MAX) return { state, write: "" };
+    return { state: { ...state, unechoed: state.unechoed + d, typed: "" }, write: "", deferred: true };
+  }
   if (!canPredict(state, d, view, now, enabled)) {
     // Buku ketikan hanya hidup selama suspend: teks dicatat sebagai bahan bukti echo, control/bulk
     // mengosongkannya (Enter/Backspace/panah mengubah baris; yang lama tak lagi di kiri kursor).
     const suspended = now < state.suspendedUntil;
-    const typed = suspended && classifyInput(d) === "text" ? (state.typed + d).slice(-TYPED_MAX) : "";
-    return { state: typed === state.typed ? state : { ...state, typed }, write: "" };
+    const typed = suspended && kind === "text" ? (state.typed + d).slice(-TYPED_MAX) : "";
+    // Apa pun alasannya, urutan huruf yang layak digambar ulang terputus di sini.
+    if (typed === state.typed && !state.unechoed) return { state, write: "" };
+    return { state: { ...state, typed, unechoed: "" }, write: "" };
   }
   return {
-    state: { ...state, pending: state.pending + d, since: null, typed: "" },
+    state: { ...state, pending: state.pending + d, unechoed: state.unechoed + d, since: null, typed: "" },
     write: applySeq(d),
   };
 }
@@ -157,12 +184,32 @@ export function onEchoed(state: PredictState, before: string, now: number): Pred
 
 export function onServerData(
   state: PredictState, data: string, _now: number,
-): { state: PredictState; write: string; tail: string } {
+): { state: PredictState; write: string } {
+  // `unechoed` tak disentuh: sisa yang belum ter-echo diputuskan `onFrameParsed` sesudah frame
+  // ini TERGAMBAR. Frame yang datang selagi frame lain in flight tak perlu rollback — tak ada
+  // glyph prediksi di layar selama itu.
   return {
-    state: { ...state, pending: "", since: null },
+    state: { ...state, pending: "", since: null, gen: state.gen + 1 },
     write: rollbackSeq(state.pending.length) + data,
-    tail: state.pending,
   };
+}
+
+/** Callback `term.write` frame server ber-`gen`: frame sudah tergambar, layar (`view`) segar.
+ *  Bila sudah ada frame yang lebih baru, keputusan diserahkan ke callback frame itu. Urutannya:
+ *  penyembuhan suspend (`onEchoed`), lalu sisa `unechoed` yang belum ter-echo digambar ulang
+ *  dalam SATU write — dengan gerbang layar penuh atas seluruh sisa, kalau tidak: dibuang. */
+export function onFrameParsed(
+  state: PredictState, gen: number, view: View, now: number, enabled: boolean,
+): { state: PredictState; write: string } {
+  if (gen !== state.gen) return { state, write: "" };
+  const before = view.line.slice(0, view.cursorX);
+  const s = onEchoed({ ...state, parsed: gen }, before, now);
+  if (!s.unechoed) return { state: s, write: "" };
+  const remaining = s.unechoed.slice(echoedPrefixLen(before, s.unechoed));
+  if (!remaining) return { state: { ...s, unechoed: "" }, write: "" };
+  const back = reapply({ ...s, pending: "" }, remaining, view, now, enabled);
+  if (!back.write) return { state: { ...s, pending: "", unechoed: "" }, write: "" };
+  return { state: { ...back.state, unechoed: remaining }, write: back.write };
 }
 
 /** SPEC-878 · ADR-0134 · satu-satunya penyala jam TTL: server mengakui sudah menerima frame yang
@@ -197,7 +244,7 @@ export function onTick(
     return { state, write: "", missed: false };
   }
   return {
-    state: { ...state, pending: "", since: null, suspendedUntil: now + SUSPEND_MS, typed: "" },
+    state: { ...state, pending: "", since: null, suspendedUntil: now + SUSPEND_MS, typed: "", unechoed: "" },
     write: rollbackSeq(state.pending.length),
     missed: true,
   };
@@ -206,8 +253,11 @@ export function onTick(
 /** tmux memutar ulang layar penuh saat attach — tak ada yang boleh diwarisi lintas sambungan.
  *  `altScreen` ikut kembali ke `false` dan itu aman: server mengirim frame `alt` berisi keadaan
  *  yang sedang berlaku ke setiap klien baru, di dalam `attach()` (SPEC-863). */
-export function onReattach(): PredictState {
-  return initialState();
+export function onReattach(prev?: PredictState): PredictState {
+  // `gen` diteruskan naik: callback write milik sambungan lama yang baru tergambar sesudah ini
+  // tak boleh cocok dengan frame mana pun dari sambungan baru.
+  const gen = (prev?.gen ?? 0) + 1;
+  return { ...initialState(), gen, parsed: gen };
 }
 
 /** Satu frame animasi, cermin `COALESCE_MS` arah keluar (SPEC-812). Terukur: TUI agen menggambar

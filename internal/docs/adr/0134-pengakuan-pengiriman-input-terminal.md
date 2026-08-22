@@ -121,3 +121,10 @@ yang menggambar ulang >500 ms saat mesin sibuk** — bukan jaringan. Satu repain
 Dikunci di `terminal-predict.test.ts` (buku ketikan, bukti echo, kasus ketikan menyusul frame,
 prompt bungkam tetap suspend) dan `terminal-pane.test.tsx` (bukti dibaca di callback write).
 
+Temuan yang sama memperbaiki jalur re-apply SPEC-856: blok yang menghidupkan ulang sisa prediksi
+membaca buffer tepat sesudah `term.write`, yakni layar lama, sehingga di browser nyata ia tak pernah
+menggambar ulang apa pun (sisa lenyap sekejap sampai repaint berikutnya). Kini `onFrameParsed`
+memutuskannya di callback frame terakhir, dan huruf yang diketik selagi frame in flight ditangguhkan
+(`unechoed`, `gen`/`parsed`) supaya tak mendahului sisa lama di antrean xterm — detailnya di
+`frontend-implementation.md`.
+

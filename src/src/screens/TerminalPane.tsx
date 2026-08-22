@@ -180,10 +180,6 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         line: buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "",
       };
     };
-    const lineBeforeCursor = (): string => {
-      const buf = term.buffer.active;
-      return (buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "").slice(0, buf.cursorX);
-    };
     // Jam TTL baru boleh berjalan sesudah SELURUH frame yang sudah dikirim diakui server.
     const clockIfDelivered = () => {
       if (unacked === 0 && ws?.readyState === WebSocket.OPEN) pred = P.onDelivered(pred, Date.now());
@@ -218,9 +214,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       const r = P.onInput(pred, d, view, Date.now(), predictRef.current);
       pred = r.state;
       if (r.write) term.write(r.write);
+      else if (r.deferred) rec("pred", "tangguh: frame server in flight");
       else rec("pred", `tolak cx=${view.cursorX}/${view.cols} alt=${pred.altScreen ? 1 : 0}`
         + ` deliverable=${view.deliverable ? 1 : 0} suspend=${Math.max(0, pred.suspendedUntil - Date.now())}`);
-      batcher.push(d, wasPredicting || r.write.length > 0);
+      batcher.push(d, wasPredicting || r.write.length > 0 || r.deferred === true);
     };
     // TTL adalah satu-satunya sinyal yang memisahkan "pty diam" — password dan tombol yang ditelan
     // dialog sama-sama terukur membalas NOL byte — dari "jaringan lambat".
@@ -249,7 +246,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
           const back = P.rollbackSeq(pred.pending.length);
           if (back) term.write(back);
           // tmux memutar ulang layar penuh saat attach — tak ada prediksi yang boleh diwarisi.
-          pred = P.onReattach();
+          // `pred` diteruskan supaya callback write sambungan lama yang baru tergambar sesudah ini
+          // basi, bukan dibaca sebagai frame sambungan baru.
+          pred = P.onReattach(pred);
           setLink({ state: "open" });
           if (visibleRect()) {
             const finePointer = typeof window.matchMedia !== "function"
@@ -272,25 +271,25 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
           if (f.t === "data") {
             const r = P.onServerData(pred, f.d ?? "", Date.now());
             pred = r.state;
-            // Suspend yang menyembuhkan diri: bukti "pty membalas ketikan lagi" dibaca di CALLBACK
-            // write, yakni SESUDAH frame ini tergambar — xterm memproses write server secara
-            // asinkron (hanya write pertama sesudah input pengguna yang sinkron), jadi buffer tepat
-            // sesudah pemanggilan `write` masih layar lama. `pred` dibaca ulang saat callback:
-            // ketikan yang menyusul selama frame menunggu ikut dinilai.
-            const heal = P.wantsEchoEvidence(pred, Date.now())
-              ? () => { pred = P.onEchoed(pred, lineBeforeCursor(), Date.now()); }
-              : undefined;
+            const gen = pred.gen;
             // Rollback dan data server WAJIB satu panggilan write: keadaan antara tak boleh pernah
             // dirender, dan itulah yang membuat layar byte-identik dengan tanpa prediksi.
-            term.write(r.write, heal);
-            if (r.tail) {
-              const buf = term.buffer.active;
-              const line = buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "";
-              const tail = r.tail.slice(P.echoedPrefixLen(line.slice(0, buf.cursorX), r.tail));
-              const back = P.reapply(pred, tail, viewOf(), Date.now(), predictRef.current);
+            //
+            // Semua yang membaca LAYAR sesudah frame ini — bukti "pty membalas ketikan lagi" untuk
+            // mencabut suspend, dan sisa prediksi yang belum ter-echo untuk digambar ulang — hidup
+            // di CALLBACK write, yakni sesudah frame TERGAMBAR. xterm memproses write server secara
+            // asinkron (hanya write pertama sesudah input pengguna yang sinkron), jadi buffer tepat
+            // sesudah pemanggilan `write` masih layar lama: blok reapply yang dulu berdiri di sini
+            // selalu melihat glyph prediksinya sendiri dan tak pernah menggambar ulang apa pun.
+            // Selama frame in flight, modul menangguhkan huruf baru (lihat `onInput`); callback
+            // frame terakhirlah yang menggambar sisa + yang ditangguhkan, berurutan, satu write.
+            term.write(r.write, () => {
+              if (disposed) return;
+              const back = P.onFrameParsed(pred, gen, viewOf(), Date.now(), predictRef.current);
               pred = back.state;
               if (back.write) term.write(back.write);
-            }
+              clockIfDelivered();
+            });
             clockIfDelivered();
           }
           // SPEC-878 · ADR-0134 · pengakuan pengiriman: satu-satunya titik nol jam TTL prediksi.
@@ -325,7 +324,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
             // menampilkannya seolah ia akan sampai.
             const back = P.rollbackSeq(pred.pending.length);
             if (back) term.write(back);
-            pred = P.onReattach();
+            pred = P.onReattach(pred);
             pendingInput = "";
             held = false;
             full = false;

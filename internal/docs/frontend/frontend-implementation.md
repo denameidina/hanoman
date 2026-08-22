@@ -590,7 +590,17 @@ input bukan teks tunggal (escape/panah/Enter/Tab/ctrl/paste/IME), kursor di dua
 kolom terakhir, ekor baris tak kosong, baris berpola password, dan begitu satu prediksi mencapai
 TTL 500 ms tanpa pernah ter-echo **sesudah frame yang membawanya diakui server** (`{t:"in", d, seq}` → `{t:"ack", seq}` — SPEC-878 · ADR-0134; sebelum pengakuan itu jam TTL **tak berjalan sama sekali**, karena diamnya server tak memisahkan "pty bungkam" dari "byte belum sampai", dan menghukumnya terukur membeli 30,5 detik layar bisu untuk satu kedip 500 ms). Suspend **menyembuhkan diri** (amandemen ADR-0134, 2026-08-22): teks yang diketik selama suspend dicatat, dan begitu sebuah frame server yang sudah **tergambar** (callback `term.write`) memperlihatkan ekor ketikan itu di kiri kursor, suspend dicabut seketika — pemicu palsunya adalah TUI agen yang menggambar ulang >500 ms saat mesin sibuk; fallback-nya 5 detik, hanya untuk konteks yang memang bungkam (`read -s` dan tombol yang ditelan dialog sama-sama terukur membalas nol byte). Sisa yang belum ter-echo dihidupkan ulang di kursor
 baru lewat `echoedPrefixLen`, atau dibuang bila gerbang tak lagi lolos — tak ada jalur yang
-meninggalkan karakter tanpa pemilik. Di atasnya, **semua** jalur input keluar lewat batcher
+meninggalkan karakter tanpa pemilik. **Keputusan itu diambil di callback `term.write` frame server
+(`onFrameParsed`), bukan tepat sesudah pemanggilannya** (2026-08-22): xterm hanya memproses write
+pertama sesudah input pengguna secara sinkron, sedangkan write frame server diparse lewat `setTimeout`,
+jadi buffer tepat sesudah `write` masih memuat glyph prediksi sendiri — terukur di xterm 6 asli, dan
+blok reapply lama karena itu tak pernah menggambar ulang apa pun. Selama sebuah frame masih in
+flight (`gen ≠ parsed`), huruf baru **ditangguhkan** ke `unechoed` alih-alih digambar: write yang
+dipanggil dari callback terukur mendarat SESUDAH chunk yang sudah antre, sehingga glyph yang digambar
+selagi in flight akan mendahului sisa lama dan membalik urutan. Callback frame terakhirlah yang
+menggambar sisa + yang ditangguhkan dalam satu write; callback frame yang sudah disusul frame lebih
+baru tak memutuskan apa pun, dan control/bulk/penolakan gerbang memutus urutan `unechoed`
+(Backspace tak pernah membuat huruf yang ia hapus diprediksi ulang). Di atasnya, **semua** jalur input keluar lewat batcher
 yang sama (SPEC-878): `term.onData` boleh ditahan 16 ms selagi prediksi aktif, sedangkan clipboard
 (SPEC-289), tap dialog (SPEC-452), lampiran (SPEC-816), dan papan tombol layar (SPEC-800) memakai
 `sendRaw` = `push(d, false)` yang **menguras antrean lebih dulu** lalu meneruskan payload utuh dalam
