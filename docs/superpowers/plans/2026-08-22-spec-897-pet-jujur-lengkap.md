@@ -1459,15 +1459,15 @@ git commit -m "docs(pet): SPEC-897 — status koneksi, daftar kondisi, deciding 
 - Consumes: seluruh hasil Task 1–7.
 - Produces: bukti bahwa atlas 12 baris benar-benar termuat dan pudar/lencana bekerja di browser nyata.
 
-- [ ] **Step 1: Boot dev server**
+- [x] **Step 1: Boot dev server**
 
-```bash
-env -u NODE_ENV TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm dev
-```
+Dijalankan **hanya frontend** (`env -u NODE_ENV pnpm --filter ./src dev`) dengan satu entry sekali
+pakai `src/smoke-pet.{html,tsx}` yang merender `HanomanPet` atas fixture, memuat `ds/styles.css` +
+`app.css`, dan memasang WebSocket + `fetch` palsu supaya modul `api/events` yang **nyata** menempuh
+jalur terhubung tanpa server/DB. Lebih murah **dan** lebih luas dari `pnpm dev` penuh: kedua jalur
+(terputus & terhubung) ikut terukur. Entry dihapus setelah smoke.
 
-Diharapkan: Vite mencetak URL dev (mis. `http://localhost:5173`).
-
-- [ ] **Step 2: Periksa atlas & baris di browser**
+- [x] **Step 2: Periksa atlas & baris di browser**
 
 Ikuti pola memori `hanoman-browser-smoke-via-cdp`: buka dashboard lewat CDP, lalu evaluasi di halaman:
 
@@ -1480,9 +1480,25 @@ JSON.stringify({
 });
 ```
 
-Diharapkan: `naturalW: 1536`, `naturalH: 2496`, `anim: "hn-pet-frames"`.
+Terukur (Chrome headless 1280×800, 2026-08-22):
 
-- [ ] **Step 3: Hentikan server per-PID**
+| yang diperiksa | hasil |
+|---|---|
+| atlas | `1536×2496`, `hn-pet-frames`, `1.333s`, `steps(8)` |
+| frame bergerak | `translateX` −256 → −512 px dalam 400 ms (2 frame @ 166 ms) |
+| baris pose | `waiting`, `rowshift` `translateY(-556)` = indeks 4 × 139 px |
+| lencana | teks `2`, latar `rgb(184,134,59)` = `--brass-500` = `--accent` |
+| kalimat status | `Hanoman menunggu jawabanmu · Menunggu jawabanmu · SPEC-1 · 2 sesi menunggu jawabanmu` |
+| panel | 2 baris (`waiting`, `review`), tombol per baris |
+| tanpa socket (jalur terputus) | `pet-viewport` opacity `0.45`, baris `idle`, panel 3 baris dengan baris `offline` **tanpa tombol** |
+| gerbang tap SPEC-763 | `elementFromPoint` di bawah jalur tetap mengenai tombol di bawahnya |
+
+Satu jebakan harness yang perlu dicatat: smoke pertama melaporkan latar lencana
+`rgba(0,0,0,0)` — token DS hidup di `ds/styles.css` yang hanya di-import `main.tsx`, jadi halaman
+smoke yang cuma memuat `app.css` membuat setiap `var(--…)` gagal resolve. Artefak harness, bukan
+lencana tak terlihat.
+
+- [x] **Step 3: Hentikan server per-PID**
 
 ```bash
 lsof -ti:5173 | xargs -r kill
@@ -1490,7 +1506,7 @@ lsof -ti:5173 | xargs -r kill
 
 **Jangan** `pkill -f`/`killall` — pola itu mematikan agen sesi tetangga (SPEC-402).
 
-- [ ] **Step 4: Commit (bila ada perbaikan dari smoke)**
+- [x] **Step 4: Commit (bila ada perbaikan dari smoke)**
 
 ```bash
 git add -A
