@@ -56,7 +56,9 @@ export type IdeUploadResult = {
   written: string[];
   skipped: { path: string; reason: "exists" | "too-large" | "budget" | "denied" }[];
 };
-export type GraphCommit = { sha: string; parents: string[]; author: string; at: string; subject: string; refs: string[]; tags: string[] };
+// SPEC-908 · satu definisi di @hanoman/shared; dulu kembar dengan server/src/services/git-ide.ts.
+import type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
+export type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 export type CommitDetail = { sha: string; parents: string[]; author: string; at: string; subject: string; body: string; changed: ChangedFile[]; signed: boolean; committer: string; committedAt: string; authorEmail: string };
 export type GitOp =
   | { op: "checkout"; ref: string; force?: boolean }
@@ -85,8 +87,6 @@ export type GitOp =
   | { op: "rename-branch"; from: string; to: string; force?: boolean }
   | { op: "push-branch"; name: string; setUpstream?: boolean; force?: boolean }
   | { op: "fetch"; prune?: boolean; pruneTags?: boolean; force?: boolean };
-export type RepoStatus = { branch: string; ahead: number; behind: number; staged: string[]; unstaged: string[]; untracked: string[]; clean: boolean };
-export type Stash = { ref: string; message: string; at: string };
 export type Remote = { name: string; fetch: string; push: string };
 export type GitOpResult = { ok: boolean; stdout: string; stderr: string; current: string; error?: string };
 // SPEC-229 · hasil merge via git graph: bersih → detail; konflik → sesi claude (sessionId).
