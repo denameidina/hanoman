@@ -4,16 +4,24 @@
    knob (PUT /api/scheduler/config), opt-in per project (pola helpEnabled → PATCH /projects/:id),
    dan rem darurat Pause/Stop. Konsumen API read-only GET /api/scheduler/state — tanpa endpoint baru. */
 import React from "react";
-import { Card, Button, Badge, Select, Switch, Input, StateBlock, Icon, Pager, serverPage } from "../ds";
+import { Card, Button, Badge, Select, Switch, Input, StateBlock, Icon, Pager, serverPage, LiveConnectionBadge } from "../ds";
 import { api } from "../api/client";
-import type { SchedulerStateView, SchedulerQueueItemView, SchedulerSessionView, SchedulerSourceView, Scheduler } from "@hanoman/shared";
+import { useLiveTopic } from "../api/live";
+import type {
+  SchedulerStateView, SchedulerQueueItemView, SchedulerSessionView, SchedulerSourceView, Scheduler,
+  TopicParams,
+} from "@hanoman/shared";
 import type { ProjectVM, Spec } from "./types";
 import { specDeepLink } from "./deeplink";
 import { SchedulerCrons } from "./SchedulerCrons";
 import { usePersistedState, isNum } from "../ui-state";
 
+// SPEC-908 · tinggal kadens FALLBACK; jalur normalnya langganan `/events/ws`.
 const POLL_MS = 5000;
 const QUEUE_PAGE = 10;
+// Status antrean yang punya seksinya sendiri — disempitkan dari `string` supaya cocok
+// dengan skema parameter topik `schedulerQueue`.
+type QueueStatus = TopicParams["schedulerQueue"]["status"];
 
 // Waktu relatif ringkas. null → "—".
 function ago(iso: string | null, now = Date.now()): string {
@@ -169,8 +177,8 @@ function Section({ title, count, empty, children }: { title: string; count: numb
 /* SPEC-523 · satu bagian antrean = satu daftar berhalaman yang memuat datanya sendiri.
    Sebelumnya ketiganya `filter()` di klien atas array `state.queue` yang tak berbatas — dan
    array itu ikut di setiap poll 5 detik, tumbuh seiring umur instalasi. */
-function QueueSection({ title, status, count, empty, nonce, render }: {
-  title: string; status: string; count: number; empty: string; nonce: number;
+function QueueSection({ title, status, count, empty, render }: {
+  title: string; status: QueueStatus; count: number; empty: string;
   render: (q: SchedulerQueueItemView) => React.ReactNode;
 }) {
   const [items, setItems] = React.useState<SchedulerQueueItemView[]>([]);
@@ -179,13 +187,21 @@ function QueueSection({ title, status, count, empty, nonce, render }: {
   // memuat `status`, kalau tidak ketiganya berbagi satu nomor halaman.
   const [page, setPage] = usePersistedState("scheduler", `queue-${status}-page`, 1, isNum);
 
-  React.useEffect(() => {
+  const load = React.useCallback(() => {
     let alive = true;
     api.getSchedulerQueue({ status, page, limit: QUEUE_PAGE })
       .then((r) => { if (alive) { setItems(r.items); setTotal(r.total); } })
       .catch(() => { if (alive) { setItems([]); setTotal(0); } });
     return () => { alive = false; };
-  }, [status, page, nonce]);
+  }, [status, page]);
+  React.useEffect(() => load(), [load]);
+  // SPEC-908 · tiap seksi berlangganan (status, halaman)-nya SENDIRI, jadi penanda muat-ulang
+  // `nonce` (SPEC-523) — yang dulu di-bump oleh poll state 5 dtk — tak punya pekerjaan lagi.
+  useLiveTopic({
+    topic: "schedulerQueue", params: { status, page, limit: QUEUE_PAGE },
+    apply: (m) => { setItems(m.data.items); setTotal(m.data.total); },
+    refetch: () => { load(); }, pollMs: POLL_MS,
+  });
 
   const sp = serverPage(total, page, QUEUE_PAGE);
   return (
@@ -212,6 +228,7 @@ function ControlBar({ cfg, cap, liveCount, onWrite, busy }:
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <Badge tone={tone as never}>{label}</Badge>
         <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>{liveCount} / {cap} sesi hidup</span>
+        <LiveConnectionBadge />
         <span style={{ flex: 1 }} />
         {cfg.enabled && (
           <Button size="sm" variant="secondary" leftIcon={cfg.paused ? "play" : "pause"} disabled={busy}
@@ -298,21 +315,20 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
   const [phase, setPhase] = React.useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = React.useState(false);
   const [busyId, setBusyId] = React.useState<string | null>(null);
-  // SPEC-523 · penanda muat-ulang untuk QueueSection. Poll state 5 detik ikut menyegarkan halaman
-  // antrean yang sedang tampil TANPA memindahkan operator dari halaman yang sedang dilihatnya.
-  const [nonce, setNonce] = React.useState(0);
-
   const load = React.useCallback((silent = false) => {
     if (!silent) setPhase("loading");
     api.getSchedulerState()
-      .then((s) => { setState(s); setPhase("ready"); setNonce((n) => n + 1); })
+      .then((s) => { setState(s); setPhase("ready"); })
       .catch(() => { if (!silent) setPhase("error"); });   // silent poll tak pernah mem-blank
   }, []);
   React.useEffect(() => { load(); }, [load]);
-  React.useEffect(() => {
-    const t = setInterval(() => { if (!document.hidden) load(true); }, POLL_MS);
-    return () => clearInterval(t);
-  }, [load]);
+  // SPEC-908 · state scheduler didorong lewat langganan `/events/ws`; POLL_MS tinggal kadens
+  // fallback saat server belum punya topiknya (ADR-0087) atau WS terhalang.
+  useLiveTopic({
+    topic: "schedulerState", params: {},
+    apply: (m) => { setState(m.state); setPhase("ready"); },
+    refetch: () => load(true), pollMs: POLL_MS,
+  });
 
   const writeConfig = React.useCallback(async (next: Scheduler) => {
     setBusy(true);
@@ -361,13 +377,13 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
       <SchedulerCrons projects={projects} onProjectChanged={onProjectChanged} onToast={onToast} />
 
       <QueueSection title="Antrean" status="queued" count={state.queueCounts.queued} empty="Antrean kosong."
-        nonce={nonce} render={(q) => <QueueRow key={q.id} q={q} backlog={backlog}
+        render={(q) => <QueueRow key={q.id} q={q} backlog={backlog}
           onCancel={(id) => void rowAction(id, "cancel")} busy={busyId === q.id} />} />
 
       {/* SPEC-522 · tombstone punya seksinya sendiri; SPEC-523 · dibaca berhalaman lewat
           `GET /scheduler/queue?status=canceled`, bukan dari `state`. */}
       <QueueSection title="Dibatalkan" status="canceled" count={state.queueCounts.canceled}
-        empty="Tak ada item yang dibatalkan." nonce={nonce}
+        empty="Tak ada item yang dibatalkan."
         render={(q) => <CanceledRow key={q.id} q={q} backlog={backlog}
           onRequeue={(id) => void rowAction(id, "requeue")} busy={busyId === q.id} />} />
 
@@ -376,10 +392,10 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
       </Section>
 
       <QueueSection title="Selesai (done)" status="done" count={state.queueCounts.done} empty="Belum ada hasil selesai."
-        nonce={nonce} render={(q) => <DoneRow key={q.id} q={q} backlog={backlog} onToast={onToast} />} />
+        render={(q) => <DoneRow key={q.id} q={q} backlog={backlog} onToast={onToast} />} />
 
       <QueueSection title="Gagal" status="failed" count={state.queueCounts.failed} empty="Tak ada sesi gagal."
-        nonce={nonce} render={(q) => <FailedRow key={q.id} q={q} backlog={backlog} />} />
+        render={(q) => <FailedRow key={q.id} q={q} backlog={backlog} />} />
 
       <SettingsPanel cfg={state.config} onWrite={writeConfig} busy={busy} />
       <OptInPanel projects={projects} onToggle={toggleOptIn} busyId={busyId} />
