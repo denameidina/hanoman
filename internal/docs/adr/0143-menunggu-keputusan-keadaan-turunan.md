@@ -57,10 +57,17 @@ panel pet SPEC-899, mesin agen ketiga).
 6. **`decisionAt = ISO(max(onset di marker, window_activity))`** saat `decision` true. **Isi marker
    tetap "detik epoch onset, ditulis sekali" — semantik ADR-0141 tak disentuh**; yang berubah hanya
    turunannya.
-7. **Satu sumber untuk empat permukaan.** `liveDecisions()` mengembalikan bit turunan yang sama
+7. **Satu sumber untuk semua permukaan.** `liveDecisions()` mengembalikan bit turunan yang sama
    (`waiting`), dipakai `scanDecisions()` (notifikasi) dan `GET /lead/status` (panel lead).
-   `TerminalScreen` dan `pet-state` sudah membaca `SessionInfo.decision` yang sama — kosakata sesi
-   tetap identik **secara konstruksi**, bukan lewat dua rumus yang harus dijaga tetap mirip.
+   `TerminalScreen`, `pet-state`, dan badge `SchedulerScreen` sudah membaca `SessionInfo.decision`
+   yang sama — kosakata sesi tetap identik **secara konstruksi**, bukan lewat rumus paralel yang
+   harus dijaga tetap mirip. Cacahan permukaan sengaja tak ditulis sebagai angka: pembaca berikutnya
+   mewarisi bit yang benar tanpa harus terdaftar di sini, dan itulah gunanya satu sumber.
+   **Konsekuensinya di frontend:** pil `deciding` (ADR-0091 AC-3) tak boleh lagi bersarang di dalam
+   `awaiting`. Sebelum ADR ini `decision` adalah latch yang menyala sepanjang episode lead, jadi
+   sarang itu aman; kini `decision` padam tiap kali pane mengeluarkan sesuatu — termasuk saat lead
+   sendiri mengetik jawabannya — dan sel Terminal akan DIAM justru pada sesi yang sedang dilayani,
+   sementara `sessionKind` pet (yang menguji `deciding` berdiri sendiri) tetap bicara.
 8. **Dedup notifikasi tetap dikunci pada marker, bukan pada bit turunan.** KAPAN menotifikasi
    memakai bit turunan (sehingga codex yang terus bekerja tak lagi menotifikasi di tiap akhir turn);
    BERAPA KALI dikunci pada marker terisi, karena manusia yang mengetik jawabannya membuat pane

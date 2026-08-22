@@ -916,7 +916,7 @@ Lalu, dengan sebuah sesi ber-`decisionFile` yang panenya berisik lalu diam, bukt
 Catat keluaran `curl` apa adanya di `docs/superpowers/plans/…` (blok hasil di ujung plan ini) atau di
 badan commit. Bereskan: `kill <pid>`, `tmux -L hanoman-smoke-903 kill-server`.
 
-- [ ] **Step 4: Sapu blast radius**
+- [x] **Step 4: Sapu blast radius**
 
 ```bash
 grep -rn "markerFilled" server/src src | grep -v node_modules
@@ -1040,3 +1040,42 @@ hanoman-vpsc-cms97gza2009im8avgbkal31n  umur=  0s BEKERJA  marker=-
 
 `hanoman-spec-902` adalah sesi claude yang **sedang bekerja** dengan marker **terisi** — hari ini ia
 menyalakan pil "Menunggu keputusan"; dengan gerbang SPEC-903 umurnya 1 dtk → `decision: false`.
+
+### Sapu blast radius
+
+Subagent `blast-radius` menyapu cermin tipe, konsumen `markerFilled`/`liveDecisions`, parser `FMT`,
+harness test, dan dokumen kontrak. **Dua belas temuan, semuanya ditindaklanjuti.** Satu di antaranya
+bukan prosa melainkan **cacat perilaku yang lahir dari perubahan ini**:
+
+> `TerminalScreen.tsx` menyarangkan pil "Lead memutuskan" **di dalam** `awaiting`
+> (`awaiting && (deciding ? … : …)`), sementara `pet-state.sessionKind` menguji `deciding` berdiri
+> sendiri. Sarang itu aman selama `decision` masih latch — komentar lamanya menyatakannya harfiah
+> ("marker tetap terisi selama lead berpikir"). Dengan `decision` turunan, `decision` padam tiap kali
+> pane mengeluarkan sesuatu — **termasuk saat lead sendiri mengetik jawabannya** — sehingga sel
+> Terminal DIAM justru pada sesi yang sedang dilayani, sementara pet berkata "sedang diputuskan
+> lead". Itu persis kegagalan yang ADR-0091 AC-3 ada untuk mencegah, dan ia memalsukan invarian
+> "kosakata kedua permukaan identik" yang SPEC-903 sendiri tulis ke docs.
+
+Ditutup dengan dua test baru di `src/test/terminal-screen.test.tsx` (merah lebih dulu) dan
+`deciding` dilepas dari sarangnya; tint header + ilustrasi kini memakai satu nama `attention`
+(`awaiting || deciding`) supaya tak bisa berselisih dengan pilnya.
+
+Temuan lain — semuanya cermin yang hanyut, nol error kompilasi:
+
+| # | tempat | yang dikoreksi |
+|---|---|---|
+| 1 | `pty.ts` komentar `markerFilled` | "marker terisi = sedang menunggu" (dua paruhnya sudah salah di berkas yang sama) |
+| 2 | `adr/0036` §Alternatif yang ditolak | menolak "heuristik idle pane" — ADR-0143 mengadopsinya sebagai **konjungsi**; tanpa rekonsiliasi, doc itu jadi otoritas tertulis untuk mencabut gerbangnya |
+| 3 | `runner/codex-settings.ts` | kembaran `settings.ts` yang tak ikut; justru berkas yang MEMPRODUKSI jalur (d) |
+| 4 | `shared/dto.ts` `zLeadStatusView.waiting` | "id sesi ber-marker terisi" → bit turunan |
+| 6 | `frontend-implementation.md` inbox SPEC-899 | unmount dijelaskan lewat hook `UserPromptSubmit` yang tak pernah menembak untuk jalur itu |
+| 7 | `api-contract.md` `dialog/answer` | efek samping `clearMarker` tak terdokumentasi → penulis marker ketiga bisa lahir tanpa melanggar apa pun yang tertulis |
+| 8 | `lead/detect.ts` `DetectDeps.live` | bentuk sempit tanpa `waiting` kini **dinyatakan** disengaja, bukan kelalaian tipe |
+| 9 | `adr/0143` keputusan #7 | "empat permukaan" melewatkan `SchedulerScreen`; cacahan angka diganti pernyataan + konsekuensi frontend |
+| 10 | `adr/README.md` entri 0141 | masih memuat klausa yang badan 0141 sudah cabut |
+| 11 | `data-model.md` notifikasi `decision` | syarat lahirnya |
+| 12 | `runner/settings.ts` baris kepala | bertentangan dengan catatan SPEC-903 enam baris di bawahnya |
+
+Kategori yang benar-benar bersih (dilaporkan nihil): konsumen `FMT`/parser tab-delimited (satu
+produsen, satu parser, nol fixture yang membangun barisnya), pembacaan marker langsung di luar
+`pty.ts`, bentuk wire/sync, dan katalog MCP.

@@ -1117,6 +1117,14 @@ POST   /terminal/sessions/:id/dialog/answer { screenHash, choice?, choices?[], t
 #     bukan lagi dialog yang bisa dijawab, atau screenHash tak cocok), "shape" (bentuk jawaban tak
 #     cocok layar), "not-landed" (primitif tui-dialog gagal membuktikan jawabannya mendarat — sesi
 #     TIDAK digerakkan). `reason` ada supaya klien tak perlu mem-parsing prosa.
+#   EFEK SAMPING (SPEC-903, ADR-0143): 202 MENGOSONGKAN marker keputusan sesi
+#     (.worktrees/.decisions/<id>) — jawaban dialog adalah tool result, bukan prompt, jadi hook
+#     `UserPromptSubmit` yang biasanya mengosongkannya tak pernah menembak untuk jalur ini. Ini satu
+#     dari HANYA DUA penulis marker dari sisi server (yang lain: rantai hanoman-lead yang tuntas,
+#     SPEC-452); keduanya bukti POSITIF manusia sudah menjawab. Penulis ketiga tak boleh lahir —
+#     khususnya bukan heuristik: hook Notification claude mengisi marker sekali per dialog dan tak
+#     pernah menembak lagi, jadi pengosongan yang salah menghilangkan pertanyaannya permanen.
+#     409 tak menyentuh marker.
 #   Capability `sessions:write`. SENGAJA DI LUAR katalog MCP (shared/src/mcp-catalog.ts): agen yang
 #     bisa memanggilnya bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang
 #     memutuskan" runtuh lewat pintu itu (memperluas ADR-0099 & SPEC-646/ADR-0112).

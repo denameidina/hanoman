@@ -3,8 +3,9 @@
 // hook dari `--settings` tetap BERGABUNG dengan milik pengguna, bukan menggantikannya.
 export const guardSettings = (decisionFile?: string, goal?: string) => {
   const hooks: Record<string, unknown[]> = {};
-  // SPEC-184 · sinyal "menunggu keputusan manusia" dari Claude sendiri. Notification idle/izin/
+  // SPEC-184 · sinyal "agen minta masukan manusia" dari Claude sendiri. Notification idle/izin/
   // agent_needs_input menandai marker; UserPromptSubmit (manusia menjawab) mengosongkannya.
+  // Apakah sesinya SEDANG menunggu diputuskan server, bukan di sini (SPEC-903, catatan di bawah).
   // Path dikutip-single agar aman terhadap spasi. ponytail: path dengan single-quote tak didukung
   // (bagian variabel hanya <sessionId> = [a-z0-9_-]); naikkan bila repoDir bisa memuat "'".
   if (decisionFile) {

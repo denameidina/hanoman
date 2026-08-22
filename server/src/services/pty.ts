@@ -40,8 +40,10 @@ export const MAX_SCROLLBACK = 256 * 1024;
 export const SCROLLBACK_SLACK = 64 * 1024;
 const POLL_MS = 500;
 
-// SPEC-196 · marker keputusan (.worktrees/.decisions/<id>) yang terisi = sesi sedang menunggu
-// manusia. Satu definisi dipakai listSessions (pembeda terminal) dan scanDecisions (notifikasi).
+// SPEC-196 · marker keputusan (.worktrees/.decisions/<id>) yang terisi = sesi PERNAH minta masukan
+// manusia. SPEC-903 · ADR-0143 · itu sinyal masuk, bukan keadaan: `listSessions` menambahkan gerbang
+// `paneQuiet` di atasnya, dan `scanDecisions` memakai fungsi ini hanya untuk MENDEDUP episode —
+// yang memutuskan kapan menotifikasi adalah bit turunan yang sama dengan pil terminal.
 // statSync gagal (berkas belum ada) → false.
 export const markerFilled = (f: string): boolean => {
   try { return statSync(f).size > 0; } catch { return false; }

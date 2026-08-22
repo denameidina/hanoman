@@ -176,6 +176,7 @@ export type SchedulerSourceView = z.infer<typeof zSchedulerSourceView>;
 export const zSchedulerSessionView = z.object({
   id: z.string(), projectId: z.string(), specId: z.string(),
   flow: z.string().optional(), branch: z.string().optional(),
+  // SPEC-903 · ADR-0143 · keadaan turunan yang sama dengan pil Terminal & pose pet, bukan isi marker.
   decision: z.boolean(), exited: z.boolean(),
 });
 export type SchedulerSessionView = z.infer<typeof zSchedulerSessionView>;
@@ -274,7 +275,10 @@ export const zLeadStatusView = z.object({
   queue: z.array(zSchedulerQueueItem),
   deciding: z.array(z.string()),      // id sesi yang sedang disusun keputusannya (AC-3)
   queued: z.array(z.string()).default([]),   // SPEC-479 · id sesi yang menunggu SLOT, bukan manusia
-  waiting: z.array(z.string()),       // id sesi ber-marker keputusan terisi
+  // SPEC-903 · ADR-0143 · id sesi yang bit "menunggu"-nya TURUNAN (marker terisi DAN pane diam),
+  // bukan daftar marker mentah — sumbernya `liveDecisions().waiting`, bit yang sama dengan pil
+  // Terminal. Membangunnya ulang dari marker menghasilkan superset yang berselisih tanpa error.
+  waiting: z.array(z.string()),
   lastPulseAt: z.string().nullable(),
   // SPEC-479 (QA) · keadaan gerbang konkurensi. Batas yang tak terlihat operator terbaca sebagai
   // "lead diam" — persis salah baca yang melahirkan tiket itu. `.default()` supaya klien lama

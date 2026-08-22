@@ -494,8 +494,11 @@ untuk panel yang justru sedang ditutup.
 
 - **Memuat** saat mount → `api.sessionDialog(id)`. Tak ada polling dan tak ada channel baru
   (ADR-0039 utuh): keadaan "sudah terjawab" datang dari siaran `sessions` yang sudah ada, yang
-  meng-unmount kotak ini begitu sesinya berhenti `waiting` (marker keputusan dikosongkan hook
-  `UserPromptSubmit`, SPEC-184 · ADR-0141).
+  meng-unmount kotak ini begitu sesinya berhenti `waiting`. **SPEC-903 · ADR-0143 ·** yang
+  memadamkannya BUKAN hook `UserPromptSubmit` — hook itu tak pernah menembak untuk jalur ini
+  (jawaban dialog adalah tool result, bukan prompt). Yang memadamkannya dua: route
+  `POST /terminal/sessions/:id/dialog/answer` yang berhasil mengosongkan marker, dan gerbang
+  `paneQuiet` begitu agen kembali mengeluarkan sesuatu.
 - **Single-select** = judul + satu tombol per opsi; satu klik mengirim `{ screenHash, choice }`.
   **multiSelect** = `Checkbox` per opsi (nilai awal dari `checked` layar) + satu `Submit` yang
   mengirim `{ screenHash, choices }`. **Kolom bebas** (`freeIndex !== null` atau `notes`) menambah

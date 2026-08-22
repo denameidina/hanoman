@@ -121,6 +121,10 @@ export function answerCount(sessionId: string): number { return answers.get(sess
 export function failureCount(sessionId: string): number { return failures.get(sessionId) ?? 0; }
 
 export type DetectDeps = {
+  // SPEC-903 · ADR-0143 · `liveDecisions()` juga mengembalikan `waiting` (bit turunan pil terminal);
+  // pintu ini SENGAJA tak memakainya — gerbangnya sendiri, `AGENT_TURN_LINE` di readPaneQuestion
+  // (SPEC-487, pemisahan terukur 6/6 vs 0/16), berbasis ISI layar dan lebih kuat. Bentuk yang lebih
+  // sempit di sini adalah pernyataan itu, bukan kelalaian.
   live: () => { id: string; specId?: string; projectId: string; decisionFile: string }[];
   filled: (file: string) => boolean;
   pane: (id: string) => string;

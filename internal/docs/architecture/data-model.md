@@ -400,7 +400,7 @@ token). **Server-local**, TANPA `version`/sync (cermin `DeviceToken` — kredens
 
 ## Notification (SPEC-180/184, [ADR-0033](../adr/0033-notifikasi-backlog-selesai.md), [ADR-0036](../adr/0036-notifikasi-human-decision.md))
 Dua tipe: `done` (backlog masuk `done`, dibuat di `advanceStage()` & write-through `GET /specs`)
-dan `decision` (sesi Claude menunggu keputusan manusia, dibuat `scanDecisions()` di `GET /notifications`).
+dan `decision` (sesi agen menunggu keputusan manusia, dibuat `scanDecisions()` — sejak SPEC-903/ADR-0143 syaratnya bit TURUNAN (marker terisi DAN pane diam), bukan marker terisi saja di `GET /notifications`).
 - `id` (cuid), `type` (`done|decision|drift|error|ticket|fail`, default `done`; `error` SPEC-249, `ticket`
   SPEC-253, `fail` SPEC-298 — grup error produksi baru / keluhan Help Center baru / sesi scheduler gagal-limit.
   Longgar String → tanpa migration kolom).

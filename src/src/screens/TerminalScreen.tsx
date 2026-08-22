@@ -794,10 +794,14 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
   // SPEC-196 · sesi yang berhenti menunggu keputusan manusia (marker) belum `exited` — beri
   // pembeda sendiri. `exited` menang bila keduanya benar (proses sudah beku).
   const awaiting = !session.exited && !!session.decision;
-  // SPEC-409 · ADR-0091 · AC-3 · lead sedang menyusun keputusannya. MENANG atas `awaiting`: keduanya
-  // benar bersamaan (marker tetap terisi selama lead berpikir), dan yang perlu dibaca operator adalah
-  // "sedang dilayani", bukan "mandek".
+  // SPEC-409 · ADR-0091 · AC-3 · lead sedang menyusun keputusannya. MENANG atas `awaiting`, dan
+  // BERDIRI SENDIRI: sejak SPEC-903/ADR-0143 `decision` padam tiap kali pane mengeluarkan sesuatu —
+  // termasuk saat lead mengetik jawabannya — jadi menyarangkannya di dalam `awaiting` membuat sel
+  // ini DIAM justru pada sesi yang sedang dilayani. Tabelnya cermin `sessionKind` milik pet-state.
   const deciding = !session.exited && !!session.deciding;
+  // Keduanya menuntut mata operator; hanya pilnya yang berbeda. Satu nama supaya tint header dan
+  // ilustrasi tak bisa berselisih dengan pil di sebelahnya.
+  const attention = awaiting || deciding;
   // SPEC-402 · pane mati berkode ≠ 0 = pekerjaan TERPUTUS (agen di-SIGTERM/crash), bukan tuntas.
   // `!!exitCode` sengaja: 0 dan undefined (sesi lama / daftar tanpa kode) tetap "Selesai".
   const failed = session.exited && !!session.exitCode;
@@ -808,7 +812,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
   const finished = !session.exited && complete;
   const stateIllustration = failed ? null
     : session.exited || finished ? "PST-005"
-      : awaiting ? "PST-004" : "PST-003";
+      : attention ? "PST-004" : "PST-003";
   // Aksi yang boleh runtuh; `Layar penuh` + `Tutup` sengaja di luar daftar ini karena keduanya
   // jalan keluar, bukan aksi tambahan. `render` = bentuk inline-nya, sisanya kontrak overflow.
   const collapsible: (OverflowItem & { render: React.ReactNode })[] = [
@@ -885,7 +889,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
         display: "flex", alignItems: "center", gap: 8, padding: "4px 8px", flex: "0 0 auto",
         background: failed ? "var(--status-err-tint)"
           : session.exited || finished ? "var(--status-ok-tint)"
-            : awaiting ? "var(--status-warn-tint)" : "var(--bone-200)",
+            : attention ? "var(--status-warn-tint)" : "var(--bone-200)",
         borderBottom: "1px solid var(--border-hair)",
         fontFamily: "var(--font-mono)", fontSize: 11, color: session.exited ? "var(--text-muted)" : "var(--text-body)",
       }}>
@@ -905,9 +909,8 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
         {/* SPEC-433 · `finished` membungkam marker: pada codex marker keputusan MENYALA saat sesi
             selesai wajar (tak ada event Notification → dipasang di Stop+UserPromptSubmit,
             ADR-0074), jadi membiarkan `awaiting` menang mengulang bug ini untuk separuh agen. */}
-        {awaiting && !finished && (deciding
-          ? <StatusPill status="running" size="sm">Lead memutuskan</StatusPill>
-          : <StatusPill status="awaiting" size="sm" />)}
+        {deciding && !finished && <StatusPill status="running" size="sm">Lead memutuskan</StatusPill>}
+        {awaiting && !deciding && !finished && <StatusPill status="awaiting" size="sm" />}
         {/* Aksi sel duduk di klaster ber-gap sendiri (lebih rapat dari gap header): tombolnya
             sudah punya target sentuh 28/44px, jadi jarak antar-tombol tak perlu selebar jarak
             label↔status. Angkanya dicerminkan `ACTION_GAP` supaya aritmetika kolaps ikut. */}
