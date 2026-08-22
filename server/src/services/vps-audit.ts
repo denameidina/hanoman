@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Prisma } from "@prisma/client";
 import type { VpsCheck, VpsHealth } from "@hanoman/shared";
 import { prisma } from "../db";
@@ -69,8 +70,24 @@ export function parseHealth(out: string): VpsHealth | null {
 
 export type VpsRow = { id: string; host: string; port: number; user: string; keyPath: string | null };
 const target = (v: VpsRow): SshTarget => ({ host: v.host, port: v.port, user: v.user, keyPath: v.keyPath });
-// Dijangkar ke root workspace (pola deps.ts) — benar dari tsx (cwd server/) maupun dist.
-export const scriptPath = (f: string): string => join(repoRoot(), "server", "scripts", "vps", f);
+// SPEC-883 · dua lokasi, terpaket lebih dulu. Di paket npm bundle hidup di <pkg>/dist/server.js
+// dan skrip di <pkg>/scripts/vps — `import.meta.url` satu-satunya jangkar yang benar di sana.
+// Di checkout, URL itu menunjuk server/src/services/, jadi kita jatuh ke repoRoot() (marker
+// pnpm-workspace.yaml). Urutan ini tak boleh dibalik: repoRoot() SELALU memulangkan string
+// (fallback process.cwd()), jadi ia tak pernah "gagal" — ia hanya memulangkan path yang salah,
+// dan di systemd (WorkingDirectory=/var/lib/hanoman) itu berarti ENOENT di setiap aksi VPS.
+const packagedScript = (f: string): string =>
+  fileURLToPath(new URL(`../scripts/vps/${f}`, import.meta.url));
+
+// Fallback checkout dijangkar ke DIREKTORI MODUL INI, bukan process.cwd(): repoRoot() memang
+// menaiki pohon mencari pnpm-workspace.yaml, tetapi titik awalnya default cwd — dan cwd bukan
+// milik kita (systemd, `hanoman` global, test yang chdir).
+const moduleDir = (): string => fileURLToPath(new URL(".", import.meta.url));
+
+export const scriptPath = (f: string): string => {
+  const packed = packagedScript(f);
+  return existsSync(packed) ? packed : join(repoRoot(moduleDir()), "server", "scripts", "vps", f);
+};
 
 export type AuditOk = {
   ok: true; audit: VpsCheck[]; hardened: boolean;

@@ -26,6 +26,12 @@ export const REQUIRED_ARTIFACTS = [
   // Tanpa gerbang ini paket bisa terbit tanpa dokumen dan endpoint-nya 404 di SETIAP instalasi npm,
   // sementara checkout dev terlihat sehat.
   "docs/agent-integration.md",
+  // SPEC-883 · skrip VPS dibaca runtime oleh scriptPath(). Sebelum spec ini keempatnya TIDAK
+  // ikut terpaket sementara scriptPath menjangkar ke repoRoot() — di instalasi npm marker
+  // pnpm-workspace.yaml tak ada, repoRoot jatuh ke cwd, dan audit/harden/remediate melempar
+  // ENOENT. Gerbang ini yang membuat kegagalan itu tak bisa terbit lagi.
+  "scripts/vps/audit.sh", "scripts/vps/harden.sh",
+  "scripts/vps/remediate.sh", "scripts/vps/provision.sh",
 ] as const;
 
 export function packageJsonFor(version: string, deps: Record<string, string>): object {
@@ -50,7 +56,7 @@ export function packageJsonFor(version: string, deps: Record<string, string>): o
       prepublishOnly: "node dist/cli.js __verify",
     },
     engines: { node: ">=20" },
-    files: ["bin", "dist", "web", "prisma", "docs", "README.md", "LICENSE"],
+    files: ["bin", "dist", "web", "prisma", "docs", "scripts", "README.md", "LICENSE"],
     dependencies: deps,
     // MIT: paket ini didistribusikan publik supaya orang `npm i -g`. `UNLICENSED` berarti "tak ada
     // izin pakai" — 0.1.0 terbit dengan kontradiksi itu, dan versi terbit tak bisa diperbaiki.
@@ -82,6 +88,8 @@ export function copyPlan(repo: string): Array<{ from: string; to: string; dir?: 
     // SPEC-489 · dibaca runtime oleh pickGuideFile (kandidat `<pkg>/docs/…`). Bukan README:
     // README paket adalah npm-readme.md (berhadapan-MANUSIA), ini naskah berhadapan-AGEN.
     { from: join(repo, "docs/agent-integration.md"), to: "docs/agent-integration.md" },
+    // SPEC-883 · skrip VPS (audit/harden/remediate/provision) dibaca runtime lewat scriptPath().
+    { from: join(repo, "server/scripts/vps"), to: "scripts/vps", dir: true },
     { from: join(repo, "LICENSE"), to: "LICENSE" },
   ];
 }
