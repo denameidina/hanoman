@@ -1292,7 +1292,7 @@ git commit -m "feat(pet): 10 baris sprite Anoman (proporsi pet) dari Codex + atl
 - Consumes: `internal/assets/pet/pet.json`, `internal/assets/pet/hnm-pet-anoman-atlas-v01.webp` (Task 5); `PetPose` dari `pet-state.ts`.
 - Produces: `PET_ROW_KEYS`, `type PetRowKey`, `type PetRow`, `type PetManifest`, `parsePetManifest(raw: unknown): PetManifest`, `PET_MANIFEST`, `PET_ATLAS_URL`, `POSE_ROW: Record<PetPose, PetRowKey>`, `rowOf(key)`, `rowIndex(key): number`, `durationMs(key): number`, `thenOf(key): PetRowKey | null`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `src/test/pet-sprite.test.ts` (bagian kontrak CSS di bawah `describe("CSS sprite pet …")` baru hijau di Task 8 — tak apa, tulis sekarang):
 
@@ -1389,12 +1389,12 @@ describe("CSS sprite pet (kontrak rule terparse)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-sprite.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/screens/pet-sprite"`.
 
-- [ ] **Step 3: Tulis modul**
+- [x] **Step 3: Tulis modul**
 
 `src/src/screens/pet-sprite.ts`:
 
@@ -1505,12 +1505,12 @@ export const thenOf = (key: PetRowKey, manifest: PetManifest = PET_MANIFEST): Pe
   rowOf(key, manifest).then ?? null;
 ```
 
-- [ ] **Step 4: Jalankan test**
+- [x] **Step 4: Jalankan test**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-sprite.test.ts`
 Expected: 4 test manifest lulus; 3 test `CSS sprite pet` **gagal** (keyframe lama masih ada) — diselesaikan Task 8.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/pet-sprite.ts src/test/pet-sprite.test.ts
@@ -1529,7 +1529,7 @@ git commit -m "feat(pet): pet-sprite.ts — manifest PET-001 tervalidasi, pose�
 - Consumes: `POSE_ROW`, `PetRowKey` (Task 6); `PetPose`; `ResponsiveTier` dari `../ds/responsive`.
 - Produces: `WALK_PX_PER_S = 40`, `STAND_MS = [4000, 12000]`, `WALK_MS = [2000, 6000]`, `LANE_MARGIN = 16`, `MIN_WALK_PX = 24`, `type PetFacing`, `type PetWalkMode = "stand" | "walk" | "home"`, `type PetWalkState = { x, facing, mode, until }`, `type PetWalkInput = { now, currentX, laneWidth, petWidth, pose, hovered, panelOpen, documentHidden, roam, reduced, tier }`, `type PetMove = { x, durationMs }`, `type PetWalkStep = { state, row, move }`, `homeX(laneWidth, petWidth)`, `clampX(x, laneWidth, petWidth)`, `anchored(input)`, `initialWalkState(laneWidth, petWidth, now)`, `stepWalk(state, input, rng)`.
 
-- [ ] **Step 1: Tulis test tabel yang gagal**
+- [x] **Step 1: Tulis test tabel yang gagal**
 
 `src/test/pet-walk.test.ts`:
 
@@ -1662,12 +1662,12 @@ describe("mesin berkeliaran pet", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-walk.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/screens/pet-walk"`.
 
-- [ ] **Step 3: Tulis modul**
+- [x] **Step 3: Tulis modul**
 
 `src/src/screens/pet-walk.ts`:
 
@@ -1785,12 +1785,12 @@ export function stepWalk(state: PetWalkState, input: PetWalkInput, rng: Rng): Pe
 }
 ```
 
-- [ ] **Step 4: Jalankan test**
+- [x] **Step 4: Jalankan test**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-walk.test.ts`
 Expected: `Tests  11 passed (11)`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/pet-walk.ts src/test/pet-walk.test.ts
