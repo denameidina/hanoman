@@ -119,8 +119,8 @@ describe("admitAsk — pagar lama, satu sesi per panggilan", () => {
     const d = deps();
     for (let i = 0; i < 3; i++) {
       const p = panggung();                       // satu event = satu dialog yang lahir dari awal
-      (d as { pane: () => string }).pane = p.pane;
-      (d as { send: unknown }).send = vi.fn(async () => { p.jawab(); return true; });
+      d.pane = p.pane;
+      d.send = async () => { p.jawab(); return true; };
       await answerAsk(ask({ askId: `t${i}` }), CTX, d);
     }
     expect(answerCount("s1")).toBe(3);
