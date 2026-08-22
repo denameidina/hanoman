@@ -339,6 +339,82 @@ export async function pull(
   return { cursor, records, hasMore: trimmed || rows.length === limit };
 }
 
+// SPEC-885 · ADR-0138 · urutan dependensi topologis, diturunkan dari `PARENTS`. Induk selalu
+// mendahului anaknya, jadi penerima tak pernah perlu menunda satu record pun — urutan FK benar
+// BY CONSTRUCTION, bukan diperbaiki oleh retry. `sessionResult` ditaruh terakhir karena
+// `projectId`-nya kolom polos TANPA @relation (lihat catatan di `PARENTS`).
+const BOOTSTRAP_ORDER: Entity[] = [
+  "project", "spec", "ticket", "customAgent", "githubIssue", "ticketAttachment", "sessionResult",
+];
+
+export type BootstrapPage = {
+  cursor: string; records: PulledRecord[]; hasMore: boolean; next: string | null;
+};
+
+// SPEC-885 · ADR-0138 · KEADAAN, bukan sejarah. Client dengan kursor 0 yang menarik lewat feed
+// harus memutar ulang setiap versi antara yang masih tersimpan: di hub produksi 3.637 baris /
+// 7,9 MB, hanya untuk mendarat jadi 889 record / ~2,5 MB. Membaca tabel langsung menghapus
+// kemubaziran itu SEKALIGUS masalah urutan yang ditinggalkan retensi ADR-0131.
+export async function bootstrapSnapshot(
+  after: string | null, maxBytes = PULL_MAX_BYTES,
+): Promise<BootstrapPage> {
+  // Kursor DULU, sebelum satu tabel pun dibaca — dan urutan ini yang harus dipertahankan.
+  //
+  // Akibatnya baris yang dibaca sesudah ini boleh LEBIH BARU daripada kursornya, sehingga client
+  // yang memutar ulang feed `> cursor` bisa sesaat menulis versi lama di atas versi baru
+  // (`upsertLocal` menulis apa adanya, tak melihat urutan versi). Itu konvergen: seluruh baris
+  // diputar berurutan dan berakhir di puncak yang benar.
+  //
+  // Kebalikannya TIDAK aman. Kursor yang diambil SESUDAH membaca membuat tulisan yang masuk di
+  // sela pembacaan ber-`seq` lebih kecil daripada kursor — jadi ia tak pernah ditarik, dan
+  // hilangnya permanen.
+  const tip = await prisma.syncLog.findFirst({ orderBy: { seq: "desc" }, select: { seq: true } });
+  const cursor = tip ? String(tip.seq) : "0";
+
+  const sep = after ? after.indexOf(":") : -1;
+  const afterEntity = sep > 0 ? after!.slice(0, sep) : null;
+  const afterId = sep > 0 ? after!.slice(sep + 1) : null;
+  const startAt = afterEntity ? BOOTSTRAP_ORDER.indexOf(afterEntity as Entity) : 0;
+  if (startAt < 0) throw new Error("bootstrap cursor tak dikenal");
+
+  const records: PulledRecord[] = [];
+  let bytes = 0;
+  let last: string | null = null;
+
+  for (let i = startAt; i < BOOTSTRAP_ORDER.length; i++) {
+    const entity = BOOTSTRAP_ORDER[i]!;
+    // Hanya entitas tempat kursor berhenti yang melanjutkan dari id tertentu; sesudahnya penuh.
+    const gt = i === startAt && afterId ? afterId : null;
+    const rows = await (DELEGATE[entity] as unknown as {
+      findMany: (a: object) => Promise<{ id: string }[]>;
+    }).findMany({
+      ...(gt ? { where: { id: { gt } } } : {}),
+      orderBy: { id: "asc" }, select: { id: true },
+    });
+    for (const row of rows) {
+      // Lewat `snapshot()` yang sama dengan feed: satu-satunya jalur proyeksi `FIELDS`, jadi tak
+      // ada bentuk kedua yang bisa menyimpang diam-diam saat kolom baru ikut menyeberang.
+      const snap = await snapshot(entity, row.id);
+      if (!snap) continue;
+      const rec: PulledRecord = {
+        entity, recordId: row.id, version: snap.version, op: "upsert", data: snap.data,
+      };
+      const size = recordBytes(rec);
+      if (records.length && bytes + size > maxBytes) {
+        return { cursor, records, hasMore: true, next: last };
+      }
+      bytes += size;
+      records.push(rec);
+      last = `${entity}:${row.id}`;
+    }
+  }
+  // Paginasi ini sengaja BUKAN snapshot berkonsistensi: record yang lahir di antara dua halaman
+  // dan ber-id lebih kecil dari kursor memang terlewat di sini. Ia tetap ada di feed pada
+  // `seq > cursor`, jadi drain sesudah bootstrap yang menjemputnya. Konvergensi tidak bergantung
+  // pada bootstrap yang lengkap — hanya pada kursornya yang tidak pernah melewati kenyataan.
+  return { cursor, records, hasMore: false, next: null };
+}
+
 // SPEC-268 · ADR-0066 · publish write LOKAL-asal ke change-feed (SyncLog) + siar. Melengkapi
 // applyPush (yang menangani write asal client-push): membuat write asal-hub (tiket
 // Help) menjadi bagian feed yang bisa di-pull client. Menaikkan version → optimistic-concurrency

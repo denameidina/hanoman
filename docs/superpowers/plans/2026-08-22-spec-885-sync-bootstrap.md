@@ -820,7 +820,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `export async function bootstrapSnapshot(after: string | null, maxBytes?: number): Promise<BootstrapPage>`
   - `GET /api/sync/bootstrap?after=<entity>:<id>` (device-token) — Task 6 memanggilnya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-bootstrap.test.ts`:
 
@@ -910,7 +910,7 @@ describe("SPEC-885 · GET /api/sync/bootstrap", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-bootstrap.test.ts
@@ -918,7 +918,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `bootstrapSnapshot is not exported` dan route 404.
 
-- [ ] **Step 3: Implementasi — service**
+- [x] **Step 3: Implementasi — service**
 
 Di `server/src/services/sync.ts`, tepat **di bawah** fungsi `pull`, tambahkan:
 
@@ -1000,7 +1000,7 @@ export async function bootstrapSnapshot(
 }
 ```
 
-- [ ] **Step 4: Implementasi — route**
+- [x] **Step 4: Implementasi — route**
 
 Di `server/src/routes/sync.ts`, ubah baris import service:
 
@@ -1020,7 +1020,7 @@ lalu tepat **di bawah** route `app.get("/sync/pull", ...)`, tambahkan:
   });
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-bootstrap.test.ts server/test/sync.route.test.ts server/test/sync-hub-origin-writes.test.ts
@@ -1028,7 +1028,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua.
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1036,7 +1036,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/sync.ts server/src/routes/sync.ts server/test/sync-bootstrap.test.ts

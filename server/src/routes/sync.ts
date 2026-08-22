@@ -5,7 +5,7 @@ import { requireDeviceToken } from "../services/device-auth";
 import { verifyDeviceToken } from "../services/device-token";
 import { attachSync, detachSync } from "../services/sync-hub";
 import type { Client } from "../services/pty";
-import { applyPush, pull, isEntity, type Entity } from "../services/sync";
+import { applyPush, pull, bootstrapSnapshot, isEntity, type Entity } from "../services/sync";
 import { syncNow, fetchTransport } from "../services/sync-client";
 import { listPendingDeletes } from "../services/sync-delete";
 import { listConflicts, resolveConflict } from "../services/conflicts";
@@ -32,6 +32,14 @@ export default async function (app: FastifyInstance) {
   app.get("/sync/pull", { preHandler: requireDeviceToken }, async (req) => {
     const since = (req.query as { since?: string }).since ?? "0";
     return pull(since);
+  });
+
+  // SPEC-885 · ADR-0138 · keadaan sekarang dalam urutan dependensi, untuk client yang kursornya
+  // masih 0. Tak ada gerbang tambahan di `app.ts`: path ini di bawah `/api/sync` dan bukan salah
+  // satu pengecualian cookie-only, jadi ia otomatis ikut jalur device-token seperti `/sync/pull`.
+  app.get("/sync/bootstrap", { preHandler: requireDeviceToken }, async (req) => {
+    const after = (req.query as { after?: string }).after ?? null;
+    return bootstrapSnapshot(after);
   });
 
   // SPEC-272 · ADR-0068 · byte lampiran untuk fetch-through client (device-token, bukan cookie).
