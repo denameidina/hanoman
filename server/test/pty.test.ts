@@ -693,32 +693,72 @@ describe("pty service", () => {
     expect(decisionOnset(join(repoDir, "marker-tak-ada"), NaN)).toBeUndefined();
   });
 
-  it("listSessions melaporkan decision saat marker keputusan terisi (SPEC-196)", () => {
-    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+  it("listSessions melaporkan decision saat marker keputusan terisi (SPEC-196)",
+    { timeout: 20_000 }, async () => {
     const decisionFile = join(repoDir, ".worktrees", ".decisions", "spec-d");
-    const s = createSession("p1", repoDir, { specId: "SPEC-D", flow: "feature", prompt: "x", decisionFile });
+    // SPEC-903 · pane mentah yang tak pernah bicara: `#{window_activity}` mematok waktu lahir pane,
+    // jadi gerbang diam baru lewat sesudah PANE_QUIET_MS — itu bagian dari kontraknya sekarang.
+    const s = createSession("p1", repoDir, { decisionFile, command: ["/bin/sleep", "300"] });
     const find = () => listSessions().find((x) => x.id === s.id)!;
-    expect(find().decision).toBe(false);        // sesi hidup, marker belum ditulis
-    appendFileSync(decisionFile, "menunggu\n");  // hook Notification menulis marker
-    expect(find().decision).toBe(true);
+    try {
+      expect(find().decision).toBe(false);        // sesi hidup, marker belum ditulis
+      appendFileSync(decisionFile, "menunggu\n");  // hook Notification menulis marker
+      await waitFor(() => find().decision === true, 15_000);
+    } finally {
+      killSession(s.id);
+    }
+  });
+
+  // SPEC-903 · ADR-0143 · marker DITULIS hook agen dan hanya dilepas UserPromptSubmit, jadi ia tetap
+  // terisi sepanjang agen bekerja sesudah pertanyaannya dijawab lewat TUI/route/Esc. Yang
+  // memadamkannya bukan tambalan per-jalur, tapi keadaan pane yang sebenarnya.
+  it("decision padam selama pane masih bicara, menyala saat pane diam (SPEC-903)",
+    { timeout: 40_000 }, async () => {
+    const decisionFile = join(repoDir, ".worktrees", ".decisions", "spec-903-noisy");
+    // Berisik ±5 dtk (25 × 0,2 dtk), lalu diam — satu pane membuktikan kedua arah transisinya.
+    const noisy = "i=0; while [ $i -lt 25 ]; do printf .; sleep 0.2; i=$((i+1)); done; sleep 300";
+    const s = createSession("p903", repoDir, {
+      id: "spec-903-noisy", decisionFile, command: ["/bin/sh", "-c", noisy],
+    });
+    const find = () => listSessions().find((x) => x.id === s.id)!;
+    try {
+      writeFileSync(decisionFile, `${Math.floor(Date.now() / 1000)}\n`);
+      expect(markerFilled(decisionFile)).toBe(true);
+      expect(find().decision).toBe(false);                       // marker terisi ≠ menunggu
+      await new Promise((r) => setTimeout(r, 2_000));
+      expect(find().decision).toBe(false);                       // masih bicara → masih bekerja
+      await waitFor(() => find().decision === true, 30_000);     // diam ≥ 3 dtk → menunggu
+    } finally {
+      killSession(s.id);
+    }
   });
 
   // SPEC-898 · ADR-0141 · umur "menunggu" datang dari ISI marker, bukan mtime-nya: hook Notification
   // yang berulang mencap ulang mtime, jadi umurnya tak pernah tumbuh.
-  it("listSessions memberi decisionAt dari epoch di marker; teks lama diabaikan", () => {
-    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+  // SPEC-903 · ADR-0143 · dan sejak `decision` jadi turunan, dari yang LEBIH BARU antara isi marker
+  // dan keluaran terakhir pane — kalau tidak, tunggu yang baru dimulai dilaporkan setua markernya.
+  it("listSessions memberi decisionAt dari episode yang sedang berlangsung",
+    { timeout: 20_000 }, async () => {
     const decisionFile = join(repoDir, ".worktrees", ".decisions", "spec-at");
-    const s = createSession("p1", repoDir, { specId: "SPEC-AT", flow: "feature", prompt: "x", decisionFile });
+    const bornMs = Date.now();
+    const s = createSession("p1", repoDir, { decisionFile, command: ["/bin/sleep", "300"] });
     const find = () => listSessions().find((x) => x.id === s.id)!;
-    expect(find().decisionAt).toBeUndefined();          // marker kosong
+    try {
+      expect(find().decisionAt).toBeUndefined();          // marker kosong
 
-    writeFileSync(decisionFile, "1755840000\n");
-    expect(find().decision).toBe(true);
-    expect(find().decisionAt).toBe(new Date(1755840000_000).toISOString());
+      writeFileSync(decisionFile, "1755840000\n");        // onset jauh lebih tua dari pane ini
+      await waitFor(() => find().decision === true, 15_000);
+      const at = Date.parse(find().decisionAt!);
+      expect(at).toBeGreaterThan(1755840000_000);
+      expect(at).toBeGreaterThanOrEqual(bornMs - 2_000);
+      expect(at).toBeLessThanOrEqual(Date.now());
 
-    writeFileSync(decisionFile, "waiting\n");           // marker sesi pra-ADR-0141
-    expect(find().decision).toBe(true);
-    expect(find().decisionAt).toBeUndefined();
+      writeFileSync(decisionFile, "waiting\n");           // marker sesi pra-ADR-0141
+      expect(find().decision).toBe(true);
+      expect(Date.parse(find().decisionAt!)).toBeGreaterThanOrEqual(bornMs - 2_000);
+    } finally {
+      killSession(s.id);
+    }
   });
 
   // SPEC-339 · koersi ditaruh di createSession, bukan di route: SEMUA kelahiran sesi lewat sini,

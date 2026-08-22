@@ -136,7 +136,7 @@ pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "paneQuiet"
 
 Expected: PASS, 2 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/test/pty.test.ts
@@ -156,7 +156,7 @@ git commit -m "feat(pty): gerbang paneQuiet dari window_activity (SPEC-903)"
 - Produces: `Pane.activityAt: number` (detik epoch, `NaN` bila tmux tak menjawab);
   `Pane.decision` kini `!exited && !!decisionFile && markerFilled(f) && paneQuiet(activityAt)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan di `server/test/pty.test.ts` sesudah test `"listSessions melaporkan decision saat marker
 keputusan terisi (SPEC-196)"` (±baris 666):
@@ -187,7 +187,7 @@ keputusan terisi (SPEC-196)"` (±baris 666):
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "SPEC-903"
@@ -196,7 +196,7 @@ pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "SPEC-903"
 Expected: FAIL pada asertion pertama — `expected true to be false`, karena `decision` hari ini hanya
 membaca marker.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 3a. `FMT` (`server/src/services/pty.ts:250`) — tambah satu kolom di **ujung**:
 
@@ -249,7 +249,7 @@ type Pane = SessionInfo & {
     }];
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "SPEC-903"
@@ -257,7 +257,7 @@ pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "SPEC-903"
 
 Expected: PASS.
 
-- [ ] **Step 5: Jalankan test pty yang tersentuh, pastikan tak ada yang jadi merah selain yang memang berubah artinya**
+- [x] **Step 5: Jalankan test pty yang tersentuh, pastikan tak ada yang jadi merah selain yang memang berubah artinya**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/pty.test.ts
@@ -268,7 +268,7 @@ Expected: satu-satunya kegagalan yang boleh ada adalah
 `"listSessions memberi decisionAt dari epoch di marker; teks lama diabaikan"` — keduanya diperbaiki
 di Step 6 & Task 3. Kegagalan lain = regresi, hentikan dan telusuri.
 
-- [ ] **Step 6: Sesuaikan test SPEC-196 yang artinya memang berubah**
+- [x] **Step 6: Sesuaikan test SPEC-196 yang artinya memang berubah**
 
 Ganti test `"listSessions melaporkan decision saat marker keputusan terisi (SPEC-196)"` di
 `server/test/pty.test.ts:657` menjadi (pane `/bin/sleep` tak pernah bicara sesudah lahir, jadi ia
@@ -292,7 +292,7 @@ diam sesudah `PANE_QUIET_MS`):
   });
 ```
 
-- [ ] **Step 7: Run test to verify it passes**
+- [x] **Step 7: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "SPEC-196"
@@ -300,7 +300,7 @@ pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "SPEC-196"
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/test/pty.test.ts
@@ -320,7 +320,7 @@ git commit -m "feat(pty): decision turunan dari keadaan pane, bukan latch marker
 - Produces: `export const decisionOnset(file: string, activityAt: number): string | undefined` —
   ISO 8601 dari `max(onset epoch di marker, activityAt)`; `undefined` bila keduanya nihil.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan `decisionOnset` ke import `../src/services/pty` di `server/test/pty.test.ts`, lalu
 tambahkan test murni sesudah test `paneQuiet` (Task 1):
@@ -350,7 +350,7 @@ tambahkan test murni sesudah test `paneQuiet` (Task 1):
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "decisionOnset"
@@ -358,7 +358,7 @@ pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "decisionOnse
 
 Expected: FAIL — `decisionOnset is not a function`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Ganti `markerOnset` di `server/src/services/pty.ts:52-62` dengan pasangan berikut:
 
@@ -409,7 +409,7 @@ Perbarui juga komentar `SessionInfo.decisionAt` (±baris 87):
   decisionAt?: string;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "decisionOnset"
@@ -417,7 +417,7 @@ pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "decisionOnse
 
 Expected: PASS.
 
-- [ ] **Step 5: Perbarui test integrasi `decisionAt` yang artinya berubah**
+- [x] **Step 5: Perbarui test integrasi `decisionAt` yang artinya berubah**
 
 Ganti test `"listSessions memberi decisionAt dari epoch di marker; teks lama diabaikan"` di
 `server/test/pty.test.ts:669-683` dengan:

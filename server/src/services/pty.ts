@@ -122,8 +122,9 @@ export type SessionInfo = {
   // `pkill -f` sesi tetangga → 143) sebagai "Selesai" hijau — persis keluhan SPEC-402.
   exitCode?: number;
   branch?: string; decision: boolean;
-  // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia". Ada HANYA saat `decision` true dan
-  // marker memuat stempel; absen untuk sesi yang lahir sebelum ADR-0141.
+  // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia". SPEC-903 · ADR-0143 · onsetnya kini
+  // yang lebih baru antara stempel di marker dan keluaran terakhir pane — awal episode yang SEDANG
+  // berlangsung, bukan episode marker yang bisa jauh lebih tua. Ada HANYA saat `decision` true.
   decisionAt?: string;
   // SPEC-338 · ADR-0074 · mesin sesi. Sesi lama (tanpa opsi tmux ini) dibaca sebagai "claude".
   agent: Agent;
@@ -132,6 +133,9 @@ type Pane = SessionInfo & {
   code: number; phaseFile?: string; decisionFile?: string;
   // SPEC-863 · `#{alternate_on}` pane — TUI layar penuh (vim) 1, shell dan TUI agen 0.
   altScreen: boolean;
+  // SPEC-903 · `#{window_activity}` — detik epoch keluaran TERAKHIR pane. Setiap sesi hanoman satu
+  // window satu pane, jadi ini aktivitas pane. NaN bila tmux tak menjawabnya (versi lama).
+  activityAt: number;
 };
 
 // Satu attachment per sesi: satu klien tmux melayani semua WebSocket yang menonton.
@@ -290,6 +294,7 @@ const FMT = [
   "#{session_name}", "#{@hanoman_project}", "#{@hanoman_spec}", "#{@hanoman_flow}",
   "#{@hanoman_phase_file}", "#{@hanoman_cwd}", "#{pane_dead}", "#{pane_dead_status}",
   "#{@hanoman_decision_file}", "#{@hanoman_branch}", "#{@hanoman_agent}", "#{alternate_on}",
+  "#{window_activity}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -321,9 +326,10 @@ async function listPanesAsync(): Promise<Pane[]> {
 function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
-      alternate] = line.split("\t");
+      alternate, activity] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
+    const activityAt = Number(activity);
     return [{
       id: n.slice(PREFIX.length), projectId: projectId ?? "", specId: specId || undefined,
       flow: (flow || undefined) as Flow | undefined, phaseFile: phaseFile || undefined,
@@ -331,22 +337,27 @@ function parsePanes(out: string): Pane[] {
       decisionFile: decisionFile || undefined,
       // SPEC-230 · branch integrasi sesi project-level (PRD: prd/<slug>). Kosong = tak ada.
       branch: branch || undefined,
-      // SPEC-196 · sesi hidup dengan marker keputusan terisi = menunggu manusia.
-      decision: !exited && !!decisionFile && markerFilled(decisionFile),
+      // SPEC-196 · sesi hidup dengan marker keputusan terisi = pernah minta masukan manusia.
+      // SPEC-903 · ADR-0143 · itu sinyal MASUK, bukan keadaan: marker hanya dilepas
+      // `UserPromptSubmit`, jadi ia tetap terisi sepanjang agen bekerja sesudah pertanyaannya
+      // dijawab lewat jalur lain (dialog di TUI, route SPEC-899, Esc, codex yang melanjutkan
+      // sendiri). Pane yang masih mengeluarkan sesuatu berarti agen sudah lanjut bekerja.
+      decision: !exited && !!decisionFile && markerFilled(decisionFile) && paneQuiet(activityAt),
       // SPEC-338 · sesi yang lahir sebelum ADR-0074 tak punya opsi ini → claude.
       agent: (agent === "codex" ? "codex" : "claude") as Agent,
       altScreen: alternate === "1",
+      activityAt,
     }];
   });
 }
 
 const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent,
-  decisionFile }: Pane): SessionInfo => ({
+  decisionFile, activityAt }: Pane): SessionInfo => ({
   id, projectId, specId, flow, cwd, exited, branch, decision, agent,
   // Hanya untuk pane mati: `pane_dead_status` kosong pada pane hidup, dan `exitCode: 0` di sana
   // akan terbaca sebagai "sudah berakhir sukses".
   ...(exited ? { exitCode: code } : {}),
-  ...(decision && decisionFile ? { decisionAt: markerOnset(decisionFile) } : {}),
+  ...(decision && decisionFile ? { decisionAt: decisionOnset(decisionFile, activityAt) } : {}),
 });
 
 export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
