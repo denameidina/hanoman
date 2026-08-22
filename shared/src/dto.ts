@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SessionAsk } from "./session-ask";
 import { zProject, zBriefPayload, zQaPayload, zGoalPayload, zSpec, zScheduler, zAgent, zLead } from "./entities";
 import {
   zLeadGate, zLeadKind, zLeadConfidence, zLeadAction, zLeadStatus, zLeadChoice,
@@ -723,6 +724,10 @@ export type EventMsg =
   | { t: "codexLimits"; limits: CodexLimitsDTO }   // SPEC-338 · ADR-0074 · grup terpisah dari `limits`
   | { t: "vps"; vps: VpsView[] }
   | { t: "cleanups"; cleanups: WorktreeCleanupView[] }   // SPEC-742 · ADR-0116
+  // SPEC-909 · ADR-0146 · pertanyaan sesi yang HIDUP, langsung dari payload hook agennya. Grup
+  // sendiri, bukan hiasan di `sessions`: frame itu sudah yang terbesar di dashboard dan
+  // menempelkan teks pertanyaan di sana membuatnya tumbuh untuk pembaca yang tak membutuhkannya.
+  | { t: "leadAsks"; asks: SessionAsk[] }
   | { t: "update"; update: UpdateStatus };
 
 // SPEC-742 · ADR-0116 · pembersihan worktree yang masih tertunda sesudah sebuah sesi ditutup.
