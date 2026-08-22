@@ -165,6 +165,44 @@ async function retryDeferred(rest: IncomingRecord[], stats: SyncStats): Promise<
   return [];
 }
 
+// SPEC-885 · ADR-0138 · instalasi baru menarik KEADAAN, bukan sejarah.
+//
+// Dua syarat, dan syarat kedua yang penting: kursor 0 saja tidak cukup, karena "Tarik ulang"
+// memundurkan kursor ke 0 di mesin yang bisa saja punya suntingan lokal belum terkirim. Outbox
+// kosong adalah bukti tak ada yang bisa ditimpa.
+//
+// Balikan `null` = "tidak berlaku di sini" ATAU "hub tak mendukung" — pemanggil jatuh ke drain
+// feed biasa dalam kedua hal. Kegagalan di tengah halaman juga `null`: record yang terlanjur
+// terpasang aman karena upsert idempoten dan kursor belum dimajukan, jadi drain berikutnya
+// sekadar menerapkannya ulang.
+export async function bootstrapOnce(transport: Transport): Promise<number | null> {
+  if (await getCursor() !== "0") return null;
+  if ((await listOutbox()).length) return null;
+
+  let after: string | null = null;
+  let cursor = "0";
+  let applied = 0;
+  for (let page = 0; page < MAX_DRAIN_PAGES; page++) {
+    const q = after ? `?after=${encodeURIComponent(after)}` : "";
+    const res = await transport("GET", `/api/sync/bootstrap${q}`);
+    if (res.status !== 200 || !Array.isArray(res.body?.records)) return null;
+    for (const raw of res.body.records as unknown[]) {
+      const rec = validateIncomingRecord(raw);
+      if (!rec.op) continue;
+      // Urutan dependensi dijamin hub, jadi tak ada `deferred` di sini: satu record yang gagal
+      // di jalur ini adalah kesalahan kontrak, bukan artefak urutan — dan harus terlihat.
+      await applyRemote(rec.entity, rec.recordId, rec.version, rec.data, rec.op);
+      applied++;
+    }
+    cursor = String(res.body.cursor ?? "0");
+    const next = res.body.next ? String(res.body.next) : null;
+    if (!res.body.hasMore || !next) break;
+    after = next;
+  }
+  await setCursor(cursor);
+  return applied;
+}
+
 // Satu siklus sync: kuras feed sampai habis (pull-apply berulang), lalu drain outbox sekali.
 //
 // SPEC-885 · ADR-0138 · dulu ia menarik SATU halaman per panggilan, dan pemanggilnya adalah tick
@@ -353,7 +391,12 @@ export async function syncNow(opts?: { full?: boolean }): Promise<SyncStats | nu
   if (!base || !token) return null;
   const transport = fetchTransport(base, token);
   if (opts?.full) await setCursor("0");
-  return syncOnce(transport);
+  // Menggerbangi dirinya sendiri (kursor 0 + outbox kosong), jadi memanggilnya tanpa syarat aman:
+  // di client yang sudah mapan ia langsung mengembalikan null.
+  const booted = await bootstrapOnce(transport).catch(() => null);
+  const stats = await syncOnce(transport);
+  if (booted) stats.pulled += booted;
+  return stats;
 }
 
 let timer: NodeJS.Timeout | undefined;
@@ -412,6 +455,9 @@ export async function startSyncClient(base: string, token: string, tickMs?: numb
     ws.on("error", () => { try { ws?.close(); } catch { /* noop */ } });
   };
 
+  // SPEC-885 · ADR-0138 · instalasi baru: satu tarikan keadaan sebelum drain feed. Gagal atau tak
+  // didukung → `null`, dan `tick()` di bawah menanganinya seperti biasa.
+  await bootstrapOnce(transport).catch(() => null);
   await tick();               // drain awal + pull awal
   void connectWs();           // realtime
   // Fallback tick: drain outbox yang lahir saat WS putus. Prod 15s; smoke/test bisa turunkan.

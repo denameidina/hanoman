@@ -3,6 +3,8 @@ import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { issueDeviceToken } from "../src/services/device-token";
 import { bootstrapSnapshot } from "../src/services/sync";
+import { bootstrapOnce, getCursor, setCursor, type Transport } from "../src/services/sync-client";
+import { enqueueOutbox } from "../src/services/outbox";
 
 const app = buildApp();
 const clean = async () => {
@@ -79,5 +81,50 @@ describe("SPEC-885 · GET /api/sync/bootstrap", () => {
     expect(body).toHaveProperty("cursor");
     expect(body).toHaveProperty("hasMore");
     expect(body.records.map((r: { recordId: string }) => r.recordId)).toContain("p1");
+  });
+});
+
+describe("SPEC-885 · bootstrapOnce (client)", () => {
+  const halaman = () => ({
+    cursor: "77", hasMore: false, next: null,
+    records: [
+      { entity: "project", recordId: "p1", version: 2, op: "upsert",
+        data: { name: "p1", desc: "d", kind: "existing", stack: "", gitRemote: null } },
+      { entity: "spec", recordId: "SPEC-1", version: 5, op: "upsert",
+        data: { projectId: "p1", title: "t", source: "brief", stage: "planned",
+                priority: "sedang", author: "a@b.co", objective: "o" } },
+    ],
+  });
+  const transportOk: Transport = async (_m, path) =>
+    path.startsWith("/api/sync/bootstrap")
+      ? { status: 200, body: halaman() }
+      : { status: 200, body: { results: [] } };
+
+  beforeEach(async () => {
+    await prisma.syncOutbox.deleteMany(); await prisma.syncState.deleteMany();
+  });
+
+  it("memasang seluruh record dan memajukan kursor ke puncak feed", async () => {
+    const n = await bootstrapOnce(transportOk);
+    expect(n).toBe(2);
+    expect(await prisma.spec.findUnique({ where: { id: "SPEC-1" } })).toBeTruthy();
+    expect(await getCursor()).toBe("77");
+  });
+
+  it("TIDAK berjalan bila kursor sudah maju (bukan instalasi baru)", async () => {
+    await setCursor("5");
+    expect(await bootstrapOnce(transportOk)).toBeNull();
+    expect(await prisma.spec.findUnique({ where: { id: "SPEC-1" } })).toBeNull();
+  });
+
+  it("TIDAK berjalan bila outbox berisi — suntingan lokal tak boleh ditimpa", async () => {
+    await enqueueOutbox("spec", "SPEC-LOKAL");
+    expect(await bootstrapOnce(transportOk)).toBeNull();
+  });
+
+  it("hub lama (404) → null, tanpa melempar; pemanggil jatuh ke drain feed", async () => {
+    const transport404: Transport = async () => ({ status: 404, body: { error: "not found" } });
+    expect(await bootstrapOnce(transport404)).toBeNull();
+    expect(await getCursor()).toBe("0");
   });
 });

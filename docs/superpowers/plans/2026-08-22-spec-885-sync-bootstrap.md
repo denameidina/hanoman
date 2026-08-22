@@ -1066,7 +1066,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: route `GET /api/sync/bootstrap` dari Task 5; `MAX_DRAIN_PAGES` dari Task 3.
 - Produces: `export async function bootstrapOnce(transport: Transport): Promise<number | null>` — jumlah record terpasang, atau `null` bila tak berlaku / hub tak mendukung.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/sync-bootstrap.test.ts` (tambahkan import):
 
@@ -1125,7 +1125,7 @@ describe("SPEC-885 · bootstrapOnce (client)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-bootstrap.test.ts
@@ -1133,7 +1133,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `bootstrapOnce is not exported`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/sync-client.ts`, tepat **di atas** `export async function syncOnce`, tambahkan:
 
@@ -1177,7 +1177,7 @@ export async function bootstrapOnce(transport: Transport): Promise<number | null
 }
 ```
 
-- [ ] **Step 4: Implementasi — panggil dari dua tempat**
+- [x] **Step 4: Implementasi — panggil dari dua tempat**
 
 Di `syncNow`, ganti dua baris terakhir:
 
@@ -1201,7 +1201,7 @@ Di `startSyncClient`, ganti baris `await tick();               // drain awal + p
   await tick();               // drain awal + pull awal
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-bootstrap.test.ts server/test/sync-client.test.ts server/test/sync-drain.test.ts
@@ -1209,7 +1209,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua.
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1217,7 +1217,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/sync-client.ts server/test/sync-bootstrap.test.ts
