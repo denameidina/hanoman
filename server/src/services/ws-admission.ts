@@ -119,6 +119,17 @@ export function admitBrowserWs(
   return principal;
 }
 
+// SPEC-908 · siapa yang boleh MENGIRIM frame `sub` di /events/ws. Bukan kehati-hatian umum:
+// `/events/ws` dipetakan ke capability GLOBAL_READ untuk agent token (`capabilityForRoute`,
+// ADR-0065), sementara topik langganan menyentuh domain `support` (tiket), `lead`, dan `ide`.
+// Tanpa gerbang ini satu agent token ber-read global memperoleh baca ke tiga domain yang tak
+// diberikan kepadanya. Dashboard (principal cookie) adalah satu-satunya konsumen → nol fungsi
+// hilang. Kedelapan grup siar global tetap dilayani untuk principal mana pun.
+export function canSubscribeTopics(principal: WsPrincipal): boolean {
+  if (principal.kind === "user") return true;
+  return principal.kind === "test" && process.env.NODE_ENV === "test";
+}
+
 export function openWsConnection(principal: WsPrincipal): () => void {
   const key = `${principal.kind}:${principal.id}`;
   const count = connections.get(key) ?? 0;
