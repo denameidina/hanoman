@@ -20,6 +20,20 @@ const app = buildApp({ requireAuth: false });
 let origin = "";
 let repoDir = "";
 
+// `createSession` memasang `default-shell` tmux dari `shellBin()` — opsi GLOBAL, dan tmux server
+// hidup lebih lama dari berkas ini (ADR-0016). `fake-shell.sh` sengaja MENGABAIKAN argumennya
+// (`echo …; exec cat`), jadi `HANOMAN_SHELL` yang tertinggal membuat setiap sesi berikutnya
+// membuang perintah agennya tanpa satu pun error: pane-nya hidup, isinya bukan prompt, dan yang
+// terlihat cuma timeout 5 dtk yang menyamar sebagai kelambatan mesin. Dipulihkan di dua tempat —
+// sesudah describe yang memakainya (melindungi sisa berkas ini) dan di ujung berkas: run
+// ber-`--no-file-parallelism` berbagi SATU proses, jadi env yang tertinggal menyeberang ke berkas
+// test berikutnya.
+const PREV_SHELL = process.env.HANOMAN_SHELL;
+const restoreShell = () => {
+  if (PREV_SHELL === undefined) delete process.env.HANOMAN_SHELL;
+  else process.env.HANOMAN_SHELL = PREV_SHELL;
+};
+
 const waitFor = async (ok: () => boolean, ms = 5000) => {
   const deadline = Date.now() + ms;
   while (!ok()) {
@@ -115,7 +129,7 @@ beforeAll(async () => {
   await app.listen({ port: 0, host: "127.0.0.1" });
   origin = `127.0.0.1:${(app.server.address() as AddressInfo).port}`;
 });
-afterAll(async () => { await app.close(); });
+afterAll(async () => { restoreShell(); await app.close(); });
 
 describe("terminal routes", () => {
   it("streams pty output and the exit code over the websocket", async () => {
@@ -342,6 +356,7 @@ describe("terminal routes", () => {
 // SPEC-236 · terminal biasa NON-claude: shell mentah di repoDir project (bukan TUI Claude).
 describe("terminal routes · shell non-claude (SPEC-236)", () => {
   const FAKE_SHELL = fileURLToPath(new URL("./fixtures/fake-shell.sh", import.meta.url));
+  afterAll(restoreShell);
   const startShell = (project: string) =>
     app.inject({ method: "POST", url: "/api/terminal/sessions", payload: { project, shell: true } });
 

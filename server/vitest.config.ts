@@ -39,6 +39,14 @@ process.env.HANOMAN_TMUX_SOCKET ??= "hanoman-test";
 // SPEC-215 · deteksi update kini dibaca via resolver config (default registry "1"). Test tak boleh
 // menyentuh jaringan → paksa OFF di sini (dulu tergantung server.ts yang tak dimuat test).
 process.env.HANOMAN_UPDATE_FETCH = "0";
+// SPEC-903 (QA) · `=`, bukan `??=`: vitest sendiri sudah `NODE_ENV ??= "test"`, jadi nilai yang
+// DIWARISI dari shell menang — dan shell sesi hanoman mengekspor `NODE_ENV=development`. Suite ini
+// tak bisa jalan di bawah nilai lain: `revalidateWsPrincipal` menerima principal `test` HANYA saat
+// `NODE_ENV === "test"` (ws-admission.ts), jadi setiap test WebSocket dijawab 401 dan merahnya
+// terbaca sebagai regresi. Terukur pada `terminal.route.test.ts`: **21 gagal → 9 gagal** semata
+// sebagai fungsi baris ini. Test yang memang menguji nilai lain menyuntikkannya sebagai ARGUMEN
+// (`assertRuntimeBoundary({ NODE_ENV: … })`) atau memulihkannya sendiri (`static.test.ts`).
+process.env.NODE_ENV = "test";
 
 export default defineConfig({
   test: {
