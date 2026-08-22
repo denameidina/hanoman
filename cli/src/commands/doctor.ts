@@ -4,7 +4,10 @@
 import { execFileSync } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { resolveDataDirs, resolveDbUrl, dbFilePath, dbUrlNotice, scanAgentSkills } from "@hanoman/runner";
+import {
+  resolveDataDirs, resolveDbUrl, dbFilePath, dbUrlNotice, scanAgentSkills,
+  resolveHardening, collectProbeFacts, prerequisites, allReady,
+} from "@hanoman/runner";
 import { DEFAULT_METHOD, METHODS, methodStatus, zAgent, type MethodSkillStatus } from "@hanoman/shared";
 import type { Ctx } from "../router";
 import { resolveLayout } from "../layout";
@@ -117,18 +120,14 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
       const s = scanAgentSkills(a, ctx.env);
       return methodStatus(method, a, { skills: s.skills.map((k) => k.id), packages: s.packages });
     });
-  const podman = version("podman", ["--version"]);
-  const sandboxRequired = ctx.env.NODE_ENV === "production" || !!ctx.env.HANOMAN_PUBLIC_ORIGINS;
-  const rootless = podman ? version("podman", ["info", "--format", "{{.Host.Security.Rootless}}"] ) === "true" : false;
-  const credentialDir = ctx.env.HANOMAN_AGENT_CREDENTIAL_DIR;
-  let credentialsReadable = false;
-  if (credentialDir) {
-    try { accessSync(credentialDir, constants.R_OK); credentialsReadable = true; } catch { /* tetap false */ }
-  }
-  const network = ctx.env.HANOMAN_SESSION_NETWORK ?? "hanoman-egress";
-  const networkReady = podman ? version("podman", ["network", "exists", network]) !== null : false;
-  const sandboxReady = ctx.env.HANOMAN_SESSION_SANDBOX === "podman" && rootless
-    && credentialsReadable && !!ctx.env.HANOMAN_EGRESS_PROXY && networkReady;
+  // SPEC-884 · ADR-0138 · probe dan penilaiannya hidup di @hanoman/runner supaya `doctor` dan
+  // wizard setup tak pernah menjawab berbeda tentang mesin yang sama. Sandbox hanya prasyarat bagi
+  // instance yang MINTA dikeraskan — menandainya ✗ fatal di laptop membuat doctor berkata hanoman
+  // tak bisa menjalankan sesi, padahal bisa.
+  const podmanFacts = collectProbeFacts(ctx.env);
+  const podman = podmanFacts.podman;
+  const sandboxRequired = resolveHardening(ctx.env);
+  const sandboxReady = allReady(prerequisites(ctx.env, podmanFacts));
 
   const r = doctorReport({
     node: process.version,

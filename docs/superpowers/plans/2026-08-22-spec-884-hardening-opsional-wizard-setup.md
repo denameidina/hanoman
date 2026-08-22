@@ -1421,7 +1421,7 @@ git commit -m "feat(spec-884): probe prasyarat hardening bersama CLI dan server"
 - Consumes: `resolveHardening` (Task 2), `collectProbeFacts`/`prerequisites`/`allReady` (Task 11)
 - Produces: `Probes.sandboxRequired` kini diturunkan dari hardening
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `cli/test/doctor.test.ts`:
 
@@ -1446,12 +1446,12 @@ Tambahkan ke `cli/test/doctor.test.ts`:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL atau LULUS**
+- [x] **Step 2: Jalankan test, pastikan GAGAL atau LULUS**
 
 Run: `pnpm vitest --run cli/test/doctor.test.ts`
 Expected: LULUS — `doctorReport` sudah murni dan sudah berperilaku begini. Test ini mengunci perilaku itu sebagai regresi sebelum pemicunya diganti di Step 3. Kalau merah, perbaiki dulu sebelum lanjut.
 
-- [ ] **Step 3: Ganti pemicunya**
+- [x] **Step 3: Ganti pemicunya**
 
 Di `cli/src/commands/doctor.ts`, ganti blok probe (baris 120-131) menjadi:
 
@@ -1475,12 +1475,12 @@ import {
 
 Hapus baris lama yang sudah tak dipakai: `const rootless = …`, `const credentialDir = …`, blok `if (credentialDir) { … }`, `const network = …`, `const networkReady = …`. Ganti pemakaian `podman` di `doctorReport({ … })` menjadi `podman: podmanFacts.podman`.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run cli/test/doctor.test.ts && pnpm --filter ./cli typecheck`
 Expected: PASS + typecheck 0
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cli/src/commands/doctor.ts cli/test/doctor.test.ts
