@@ -8,6 +8,7 @@ import { subscribe } from "../api/events";
 import type { VpsView } from "@hanoman/shared";
 import { VpsChecklistModal } from "./VpsChecklist";
 import { usePersistedState, nullableStr } from "../ui-state";
+import { VpsProvisionPanel, ComponentBadges } from "./VpsProvision";
 
 // reachable = healthcheck terakhir sukses dalam 2× interval 5 menit (SPEC-164 §4).
 export const isReachable = (v: VpsView, now: number = Date.now()): boolean =>
@@ -204,6 +205,9 @@ export function VpsScreen({ onToast, onGotoTerminal }:
               <StatusPill size="sm" status={isReachable(v) ? "ok" : "broken"}>
                 {isReachable(v) ? "reachable" : "unreachable"}</StatusPill>
               <StatusPill size="sm" status={h.status}>{h.label}</StatusPill>
+              {/* SPEC-883 · penandaan komponen: apa yang benar-benar ada di mesin itu, beserta
+                  kapan terakhir diperiksa. Tanpa waktu, lencana hanyalah klaim tanpa tanggal. */}
+              <ComponentBadges components={v.components ?? null} checkedAt={v.componentsCheckedAt ?? null} />
               <Button size="sm" variant="ghost" leftIcon="plug-zap" loading={busy === `test:${v.id}`}
                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); void testConn(v); }}>Test</Button>
               <Button size="sm" variant="ghost" leftIcon="terminal-square" loading={busy === `console:${v.id}`}
@@ -226,6 +230,9 @@ export function VpsScreen({ onToast, onGotoTerminal }:
       {detailVps && (
         <VpsChecklistModal vpsId={detailVps.id} vpsName={detailVps.name}
           lastAuditAt={detailVps.lastAuditAt} health={detailVps.health}
+          provisioning={
+            <VpsProvisionPanel vps={detailVps} onToast={onToast} onGotoTerminal={onGotoTerminal} />
+          }
           onClose={() => { setDetailVps(null); load(); }} onToast={onToast} />
       )}
       <VpsModal open={modal === "new"} title="Daftarkan VPS" submitLabel="Daftarkan"

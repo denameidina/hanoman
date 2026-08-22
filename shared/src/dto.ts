@@ -521,6 +521,11 @@ export type VpsView = {
   id: string; name: string; host: string; port: number; user: string; keyPath: string | null;
   createdAt: string; lastSeenAt: string | null; health: VpsHealth | null;
   lastAuditAt: string | null; audit: VpsCheck[] | null; hardened: boolean;
+  // SPEC-883 · penandaan komponen hasil probe. Opsional: baris yang belum pernah diprobe
+  // memulangkan null, dan "belum diperiksa" ≠ "tak ada komponen".
+  components?: VpsComponents | null;
+  componentsCheckedAt?: string | null;
+  provisionProfile?: string | null;
 };
 
 // SPEC-220 · checklist kepatuhan (katalog 232 item + status per VPS). Server menghidrasi penuh
@@ -555,6 +560,57 @@ export const zRemediate = z.object({ items: z.array(z.string()).min(1).max(64) }
 
 // SPEC-220 · satu langkah remediasi. `would` = dry-run (tak menyentuh VPS), ok/fail = apply.
 export type RemediateStep = { item: string; status: "would" | "ok" | "fail"; detail: string };
+
+// SPEC-883 · ADR-0137 · provisioning VPS berbasis katalog. Katalog hidup di server
+// (server/src/vps/catalog/components.ts) dan dikirim utuh lewat GET /vps/components —
+// frontend TIDAK mengimpor katalog server, pola yang sama dengan checklist SPEC-220.
+export const PROVISION_PROFILES = ["lab", "production"] as const;
+export type ProvisionProfile = (typeof PROVISION_PROFILES)[number];
+
+export const COMPONENT_IDS = [
+  "base", "node", "hanoman", "caddy", "podman", "agent-image", "claude", "codex", "gh",
+] as const;
+export type ComponentId = (typeof COMPONENT_IDS)[number];
+export type ComponentSection = "dasar" | "hanoman" | "ingress" | "sandbox" | "agen";
+
+export type ProvisionComponent = {
+  id: ComponentId;
+  label: string;
+  section: ComponentSection;
+  /** Prasyarat BERBEDA per profil: `claude` dipasang di host (lab) atau ke dalam image (production). */
+  requires: Record<ProvisionProfile, ComponentId[]>;
+  profiles: ProvisionProfile[];
+  /** true → probe tak pernah memulangkan `ok`; paling jauh `partial not-logged-in`. */
+  interactiveLogin: boolean;
+  needsDomain: boolean;
+};
+
+// `ok` = terpasang & siap · `partial` = terpasang, belum siap (belum login, service mati, tanpa
+// TLS) · `absent` = tak ada. Nilai ini HANYA lahir dari MODE=probe, tak pernah dari niat "kami
+// barusan memasang X" (SPEC-487, marker ≠ bukti).
+export type ComponentStatus = "ok" | "partial" | "absent";
+export type ComponentProbe = { id: ComponentId; status: ComponentStatus; detail: string };
+export type VpsComponents = Record<string, { status: ComponentStatus; detail: string }>;
+
+// `skip` adalah alasan tipe ini TERPISAH dari RemediateStep (SPEC-220): komponen yang
+// prasyaratnya gagal wajib tetap menerbitkan baris, kalau tidak UI menampilkan daftar langkah
+// lebih pendek dari yang dicentang dan itu terbaca seperti "berhasil".
+export type ProvisionStep = { item: string; status: "would" | "ok" | "fail" | "skip"; detail: string };
+
+export const zProvision = z.object({
+  items: z.array(z.enum(COMPONENT_IDS)).min(1).max(16),
+  profile: z.enum(PROVISION_PROFILES),
+  domain: z.string().min(1).regex(HOST_RE).optional(),
+  confirm: z.boolean().optional(),
+  force: z.boolean().optional(),
+});
+
+export type ProvisionResult = {
+  steps: ProvisionStep[];
+  components: ComponentProbe[];
+  checkedAt: string;
+  setup: { url: string; expiresAt: string } | null;
+};
 
 // SPEC-181 · limit langganan Claude realtime (dari GET /api/oauth/usage → limits[])
 export type LimitSeverity = "normal" | "warning" | "critical";

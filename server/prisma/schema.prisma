@@ -291,6 +291,12 @@ model Vps {
   lastAuditAt DateTime?
   audit       Json?     // VpsCheck[] — [{ check, status, detail }]
   hardened    Boolean   @default(false) // derived: semua check kritis pass
+  // SPEC-883 · ADR-0137 · hasil MODE=probe provision.sh: { [ComponentId]: { status, detail } }.
+  // DITULIS HANYA dari probe, tak pernah dari niat "kami barusan memasang X" (SPEC-487).
+  // LOCAL-ONLY: ketiganya sengaja di luar FIELDS.vps (pelajaran SPEC-880).
+  components          Json?
+  componentsCheckedAt DateTime?
+  provisionProfile    String? // "lab" | "production" — profil yang terakhir diterapkan
   version     Int       @default(0) // SPEC-213 · version-stamp sync (ADR-0045)
   updatedAt   DateTime  @updatedAt
   snapshots   VpsAuditSnapshot[] // SPEC-220 · riwayat audit kepatuhan

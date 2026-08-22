@@ -129,8 +129,10 @@ function SectionGroup({ section, items, expanded, onToggle, busy, selected, onTo
   );
 }
 
-export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, onClose, onToast }:
+export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisioning, onClose, onToast }:
   { vpsId: string; vpsName?: string; lastAuditAt?: string | null; health?: VpsHealth | null;
+    /** SPEC-883 · panel provisioning, disuntik VpsScreen supaya modal ini tetap soal kepatuhan saja. */
+    provisioning?: React.ReactNode;
     onClose: () => void; onToast: (msg: string, kind?: string, icon?: string) => void }) {
   const [view, setView] = React.useState<ChecklistView | null>(null);
   const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
@@ -302,6 +304,10 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, onClose
         {lastAuditAt ? `Audit terakhir ${new Date(lastAuditAt).toLocaleString()}` : "Belum pernah diaudit"}
         {health && ` · disk ${health.disk} · mem ${health.mem} · load ${health.load}`}
       </div>
+      {provisioning && (
+        <div data-testid="vps-provisioning" style={{ marginBottom: 12, paddingBottom: 10,
+          borderBottom: "1px solid var(--border-hair)" }}>{provisioning}</div>
+      )}
       {body()}
       {dialog}
     </Modal>

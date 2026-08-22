@@ -31,11 +31,28 @@ hanoman [start]                    jalankan (migrasi + server + dashboard)
   --port <n> --host <h> --db <file> --no-migrate
 hanoman doctor                     periksa prasyarat
 hanoman update [--check]           pasang versi terbaru dari npm
+hanoman provision [--with=a,b]     pasang komponen di MESIN INI (hanoman, caddy, claude, codex, gh)
+  [--profile=lab|production] [--domain=<d>] [--probe] [--dry-run] [--yes]
 hanoman migrate-from-postgres --from <url> [--to <file>] [--dry-run] [--force]
 hanoman mcp [--read-only]          MCP server stdio untuk klien AI
   [--host <url>] [--max-bytes <n>]
 hanoman docs scan | index | link   operasi index Source of Truth
 ```
+
+## Menyiapkan VPS
+
+`hanoman provision` memasang komponen di mesin tempat ia dijalankan; layar VPS di dashboard
+menjalankan skrip yang sama lewat SSH ke VPS terdaftar.
+
+```sh
+hanoman provision --probe                                        # laporkan apa yang ada, nol tulis
+hanoman provision --with=hanoman,caddy --domain=hn.contoh.id --dry-run
+hanoman provision --with=hanoman,caddy --domain=hn.contoh.id --yes
+```
+
+`claude`, `codex`, dan `gh` dipasang binernya saja — login-nya interaktif dan tetap kerjaan manusia;
+probe melaporkannya `partial not-logged-in` sampai kamu login sekali. hanoman tak pernah menyentuh
+kredensial agen. Bila `caddy` dipilih, A record domain harus sudah menunjuk ke IP mesin itu.
 
 ## Dipakai agen AI (MCP)
 

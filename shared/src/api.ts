@@ -139,6 +139,11 @@ export const paths = {
   vpsItemAttest: (id: string, itemId: string) => `${API}/vps/${id}/items/${itemId}/attest`,
   vpsRemediatePreview: (id: string) => `${API}/vps/${id}/remediate/preview`,
   vpsRemediate: (id: string) => `${API}/vps/${id}/remediate`,
+  // SPEC-883 · provisioning berbasis katalog
+  vpsComponents: () => `${API}/vps/components`,
+  vpsProbe: (id: string) => `${API}/vps/${id}/probe`,
+  vpsProvisionPreview: (id: string) => `${API}/vps/${id}/provision/preview`,
+  vpsProvision: (id: string) => `${API}/vps/${id}/provision`,
   // SPEC-169 · auth
   authStatus: `${API}/auth/status`,
   authSetup: `${API}/auth/setup`,

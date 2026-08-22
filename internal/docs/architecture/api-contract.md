@@ -1178,6 +1178,25 @@ POST   /vps/:id/items/na-bulk        # 200 { ok, count } {itemIds[],na,reason?} 
 POST   /vps/:id/remediate/preview    # 200 { steps:[{item,status:would,detail}] } {items[]} — dry-run · 404 · 502
 POST   /vps/:id/remediate            # 200 { steps, audit, scoreTotal, scoreBySection } {items[]}
                                      #   — apply item AUTO idempoten → verifikasi koneksi → re-audit · 404 · 502
+
+# SPEC-883 · ADR-0137 · provisioning berbasis katalog. Capability turun dari prefix `vps` per
+# METHOD — tak ada peta capability baru (kelas jebakan ADR-0088).
+GET    /vps/components               # 200 { components:[{id,label,section,requires:{lab,production},
+                                     #   profiles,interactiveLogin,needsDomain}] } — katalog, statis
+POST   /vps/:id/probe                # 200 { components:[{id,status:ok|partial|absent,detail}], checkedAt }
+                                     #   — SATU-SATUNYA penulis Vps.components. Keluaran tanpa satu pun
+                                     #   baris COMP = 502, BUKAN "semua absent" · 404 · 409 keyMissing
+POST   /vps/:id/provision/preview    # 200 { steps:[{item,status:would|skip,detail}] } — dry-run, nol tulis
+                                     #   {items[],profile,domain?} · 400 id asing / di luar profil /
+                                     #   domain absen untuk komponen ingress · 404 · 409 keyMissing · 502
+POST   /vps/:id/provision            # {items[],profile,domain?,confirm?,force?}
+                                     #   409 { error:"confirm-required", steps } bila `confirm` absen
+                                     #   409 { error:"profile-mismatch", current } bila hanoman sudah ok
+                                     #     dengan profil lain — kecuali `force`
+                                     #   200 { steps, components, checkedAt, setup }
+                                     #     setup = { url, expiresAt } | null. `url` memuat setup token
+                                     #     TRANSIEN: tak pernah masuk DB, log, maupun endpoint lain.
+                                     #   400 · 404 · 409 keyMissing · 502 { transcript, steps }
 ```
 
 > Audit/healthcheck/harden = script bash deterministik (`server/scripts/vps/*.sh`) dikirim

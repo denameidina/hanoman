@@ -113,3 +113,21 @@ describe("REQUIRED_ARTIFACTS", () => {
     expect(REQUIRED_ARTIFACTS).toContain("docs/agent-integration.md");
   });
 });
+
+// SPEC-883 · skrip VPS dibaca runtime oleh scriptPath(). Sebelum spec ini keempatnya TIDAK ikut
+// terpaket sementara scriptPath menjangkar ke repoRoot() — di instalasi npm marker
+// pnpm-workspace.yaml tak ada, repoRoot jatuh ke cwd, dan audit/harden/remediate melempar ENOENT.
+describe("SPEC-883 · skrip VPS ikut terpaket", () => {
+  it("copyPlan menyalin direktori scripts/vps", () => {
+    const item = copyPlan("/repo").find((i) => i.to === "scripts/vps");
+    expect(item).toBeDefined();
+    expect(item!.from).toBe("/repo/server/scripts/vps");
+    expect(item!.dir).toBe(true);
+  });
+
+  it("keempat skrip wajib ada di artefak", () => {
+    for (const f of ["audit.sh", "harden.sh", "remediate.sh", "provision.sh"]) {
+      expect(REQUIRED_ARTIFACTS).toContain(`scripts/vps/${f}`);
+    }
+  });
+});

@@ -8,8 +8,11 @@ const VPS = {
 };
 // vi.mock di-hoist ke atas berkas — factory-nya TIDAK boleh merujuk `const` biasa.
 // vi.hoisted menaikkan mock fn-nya bersama vi.mock, jadi test bisa memeriksanya.
-const { updateVps, testVps, vpsSession, vpsConsole, vpsChecklist } = vi.hoisted(() => ({
+const { updateVps, testVps, vpsSession, vpsConsole, vpsChecklist, listVpsComponents } = vi.hoisted(() => ({
   updateVps: vi.fn(),
+  // SPEC-883 · panel provisioning ikut ter-mount di modal detail; mock parsial tanpa entri ini
+  // membuat modal melempar "is not a function" dan test detail gagal tanpa menyebut sebabnya.
+  listVpsComponents: vi.fn(async () => ({ components: [] })),
   testVps: vi.fn(async () => ({ ok: true, out: "" })),
   vpsSession: vi.fn(async () => ({ id: "vps-v1" })),
   vpsConsole: vi.fn(async () => ({ id: "vpsc-v1" })),
@@ -22,7 +25,8 @@ const { updateVps, testVps, vpsSession, vpsConsole, vpsChecklist } = vi.hoisted(
   })),
 }));
 vi.mock("../src/api/client", () => ({
-  api: { listVps: vi.fn(async () => [VPS]), updateVps, testVps, vpsSession, vpsConsole, vpsChecklist },
+  api: { listVps: vi.fn(async () => [VPS]), updateVps, testVps, vpsSession, vpsConsole, vpsChecklist,
+    listVpsComponents },
   ApiError: class extends Error {},
 }));
 import { VpsScreen, isReachable, hardenedLabel, vpsFormToBody } from "../src/screens/VpsScreen";
