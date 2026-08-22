@@ -1,10 +1,14 @@
 /* DalangStage — hero Overview: Anoman sebagai DALANG yang mengendalikan wayang project.
-   Konsep: tiap sesi `claude` yang running = satu wayang yang sedang dimainkan di kelir
-   (panel gelap terminal + rim brass); project tanpa sesi = wayang parkir di debog.
-   Referensi visual: internal/assets/illustration/concepts/dalang/ (ADR-0140 pipeline Codex).
-   Murni presentasi — data dari props Overview, tanpa fetch sendiri. */
+   Konsep: tiap sesi `claude` hidup = satu wayang yang sedang dimainkan di kelir
+   (panel gelap terminal + rim brass); project tanpa sesi hidup = wayang parkir di debog.
+   Referensi visual: internal/assets/concepts/dalang/ (ADR-0140 pipeline Codex).
+   Sumber "hidup"-nya `sessions` (siaran WS `t:"sessions"`), BUKAN `ProjectView.session` —
+   yang terakhir hanya dimuat saat login dan basi berjam-jam (lihat catatan pet di
+   frontend-implementation.md); kosakata sesinya cermin pet-state.ts: hidup = `!exited`,
+   menunggu manusia = `decision && !deciding`. Murni presentasi, tanpa fetch sendiri. */
 import React from "react";
 import { MascotIllustration } from "../ds";
+import type { TerminalSession } from "../api/client";
 import type { ProjectVM, Spec } from "./types";
 
 // Batas hari LOKAL, komponen-per-komponen — `new Date("YYYY-MM-DD")` adalah tengah malam UTC
@@ -58,21 +62,35 @@ function WayangSilhouette({ height, color, rod }: { height: number; color: strin
   );
 }
 
-function LivePuppet({ p, index, onGoto }: { p: ProjectVM; index: number; onGoto: (s: string) => void }) {
+function LivePuppet({ s, projects, backlog, index, onOpenSession }: {
+  s: TerminalSession; projects: ProjectVM[]; backlog: Spec[]; index: number;
+  onOpenSession: (id: string) => void;
+}) {
+  const projectName = projects.find((p) => p.id === s.projectId)?.name ?? s.projectId;
+  const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
+  // Cermin sel Terminal & pet-state.ts: sesi hidup yang `decision && !deciding` sedang menunggu
+  // manusia — wayang-nya "menoleh" (goyangan berhenti) supaya yang minta tolong terbaca beda.
+  const waiting = !!s.decision && !s.deciding;
+  const sub = waiting ? "menunggu jawabanmu"
+    : spec ? `${spec.id} · ${spec.stage}` : (s.flow ?? "sesi terminal");
   return (
     <button
       type="button"
       className="hn-dalang-live"
+      data-waiting={waiting || undefined}
       style={{ animationDelay: `${(index % 5) * 0.5}s` }}
-      onClick={() => onGoto("terminal")}
-      aria-label={`Buka terminal — ${p.name}${p.session.phase ? `, fase ${p.session.phase}` : ""}`}
+      onClick={() => onOpenSession(s.id)}
+      aria-label={`Buka terminal — ${projectName}, ${sub}`}
     >
-      <span className="hn-dalang-puppet" style={{ animationDelay: `${(index % 5) * 0.7}s` }}>
-        <WayangSilhouette height={72} color="var(--brass-300)" rod="var(--brass-700)" />
+      <span className={waiting ? "hn-dalang-puppet hn-dalang-puppet--still" : "hn-dalang-puppet"}
+        style={{ animationDelay: `${(index % 5) * 0.7}s` }}>
+        <WayangSilhouette height={72}
+          color={waiting ? "var(--amber-500)" : "var(--brass-300)"}
+          rod={waiting ? "var(--amber-600)" : "var(--brass-700)"} />
       </span>
-      <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 500, color: "var(--term-fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-      <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--brass-400)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {p.session.phase ?? "berjalan"}{p.session.flow ? ` · ${p.session.flow}` : ""}
+      <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 500, color: "var(--term-fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{projectName}</span>
+      <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 10.5, color: waiting ? "var(--amber-500)" : "var(--brass-400)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {sub}
       </span>
     </button>
   );
@@ -90,12 +108,14 @@ function Stat({ value, label, dot }: { value: React.ReactNode; label: string; do
   );
 }
 
-export function DalangStage({ projects, backlog, onGoto, onOpenProject }: {
-  projects: ProjectVM[]; backlog: Spec[];
-  onGoto: (s: string) => void; onOpenProject: (p: ProjectVM) => void;
+export function DalangStage({ projects, backlog, sessions, onOpenSession, onOpenProject }: {
+  projects: ProjectVM[]; backlog: Spec[]; sessions: TerminalSession[];
+  onOpenSession: (id: string) => void; onOpenProject: (p: ProjectVM) => void;
 }) {
-  const live = projects.filter((p) => p.session.status === "running");
-  const parked = projects.filter((p) => p.session.status !== "running");
+  // Urutan tmux bisa bergeser tiap siaran — stabilkan per id (cermin pet-state.ts `byId`).
+  const live = sessions.filter((s) => !s.exited).sort((a, b) => a.id.localeCompare(b.id));
+  const liveProjects = new Set(live.map((s) => s.projectId));
+  const parked = projects.filter((p) => !liveProjects.has(p.id));
   const startedToday = backlog.filter((s) => isToday(s.startedAt)).length;
   const doneN = backlog.filter((s) => s.stage === "done").length;
   const waitingN = backlog.filter((s) => !s.startedAt && s.stage !== "done").length;
@@ -125,7 +145,8 @@ export function DalangStage({ projects, backlog, onGoto, onOpenProject }: {
         </div>
         {live.length > 0 ? (
           <div className="hn-dalang-troupe" role="list" aria-label="Sesi yang sedang berjalan">
-            {live.map((p, i) => <LivePuppet key={p.id} p={p} index={i} onGoto={onGoto} />)}
+            {live.map((s, i) => <LivePuppet key={s.id} s={s} projects={projects} backlog={backlog}
+              index={i} onOpenSession={onOpenSession} />)}
           </div>
         ) : (
           <div className="hn-dalang-empty">

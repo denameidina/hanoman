@@ -1283,8 +1283,9 @@ export default function App() {
   if (section === "overview") {
     screen = (
       <Shell active="overview" title="Overview" breadcrumb="nafanesia.id · ringkasan workspace" onNavigate={setSection}>
-        {gate(<OverviewScreen projects={projectsView} backlog={backlog}
-          onOpenProject={openProject} onGoto={setSection} />)}
+        {gate(<OverviewScreen projects={projectsView} backlog={backlog} sessions={sessions}
+          onOpenProject={openProject} onGoto={setSection}
+          onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
       </Shell>
     );
   } else if (section === "projects") {

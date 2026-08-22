@@ -713,6 +713,12 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   from { transform: rotate(-2.4deg); }
   to { transform: rotate(2.4deg); }
 }
+/* Sesi yang menunggu manusia: wayang diam menoleh — beda dari yang sedang dimainkan. */
+.hn-dalang-puppet--still { animation: none; transform: rotate(-3deg); }
+.hn-dalang-live[data-waiting] {
+  border-color: var(--amber-600);
+  box-shadow: var(--shadow-sm), 0 0 16px 0 color-mix(in srgb, var(--amber-500) 30%, transparent);
+}
 .hn-dalang-empty { flex: 1; padding: 22px 0 26px; }
 .hn-dalang-debog {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;

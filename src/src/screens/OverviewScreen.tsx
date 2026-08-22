@@ -2,6 +2,7 @@
    tmux, bukan baris Run (SPEC-162): tak ada progress %, tak ada estimasi biaya. */
 import React from "react";
 import { Card, StatusPill, Badge, ProgressBar, Icon, Button, StateBlock } from "../ds";
+import type { TerminalSession } from "../api/client";
 import type { ProjectVM, Spec } from "./types";
 import { LimitWindows } from "./LimitIndicator";
 import { DalangStage } from "./DalangStage";
@@ -63,14 +64,21 @@ function AttnRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }
   );
 }
 
-function LiveSessionRow({ p, onGoto }: { p: ProjectVM; onGoto: (s: string) => void }) {
+/* Baris = sesi tmux HIDUP dari siaran WS, bukan `ProjectView.session` yang hanya dimuat saat
+   login. Sub-label memakai `Spec.stage` (overlay live) — fase sesi tak ada di wire ini. */
+function LiveSessionRow({ s, projects, backlog, onOpenSession }: {
+  s: TerminalSession; projects: ProjectVM[]; backlog: Spec[]; onOpenSession: (id: string) => void;
+}) {
+  const name = projects.find((p) => p.id === s.projectId)?.name ?? s.projectId;
+  const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
+  const open = () => onOpenSession(s.id);
   return (
-    <div className="hn-dense-row" role="button" tabIndex={0} onClick={() => onGoto("terminal")}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGoto("terminal"); } }}
+    <div className="hn-dense-row" role="button" tabIndex={0} onClick={open}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
       style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 4px", borderBottom: "1px solid var(--border-hair)", cursor: "pointer" }}>
-      <StatusPill status="running" size="sm">{p.session.phase ?? "—"}</StatusPill>
-      <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{p.session.flow ?? ""}</span>
+      <StatusPill status="running" size="sm">{spec?.stage ?? (s.flow ?? "sesi")}</StatusPill>
+      <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{s.specId ?? ""}</span>
     </div>
   );
 }
@@ -103,12 +111,14 @@ function MiniStat({ icon, label, value, tone }: { icon: string; label: string; v
   );
 }
 
-export function OverviewScreen({ projects, backlog, onOpenProject, onGoto }:
-  { projects: ProjectVM[]; backlog: Spec[];
-    onOpenProject: (p: ProjectVM) => void; onGoto: (s: string) => void }) {
+export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onGoto, onOpenSession }:
+  { projects: ProjectVM[]; backlog: Spec[]; sessions: TerminalSession[];
+    onOpenProject: (p: ProjectVM) => void; onGoto: (s: string) => void;
+    onOpenSession: (id: string) => void }) {
   const limits = useLimits();
   const codexLimits = useCodexLimits();   // SPEC-338 · kartu limit codex (grup siar terpisah)
-  const live = projects.filter((p) => p.session.status === "running");
+  // Sesi hidup dari siaran WS `t:"sessions"` — `ProjectView.session` basi sejak login.
+  const live = sessions.filter((s) => !s.exited).sort((a, b) => a.id.localeCompare(b.id));
   const attention = projects.filter((p) => oAttention(p) !== "none")
     .sort((a, b) => (oAttention(a) === "high" ? 0 : 1) - (oAttention(b) === "high" ? 0 : 1));
   const onConv = projects.filter((p) => p.docStatus === "ok").length;
@@ -132,7 +142,8 @@ export function OverviewScreen({ projects, backlog, onOpenProject, onGoto }:
 
   return (
     <div>
-      <DalangStage projects={projects} backlog={backlog} onGoto={onGoto} onOpenProject={onOpenProject} />
+      <DalangStage projects={projects} backlog={backlog} sessions={sessions}
+        onOpenSession={onOpenSession} onOpenProject={onOpenProject} />
       <KpiStrip items={kpis} />
       <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 20, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -149,7 +160,8 @@ export function OverviewScreen({ projects, backlog, onOpenProject, onGoto }:
             {live.length === 0
               ? <StateBlock kind="empty" compact icon="terminal" title="Tidak ada sesi aktif"
                   hint="Mulai sebuah backlog item untuk membuka sesi Claude Code interaktif." />
-              : <div style={{ marginTop: 4 }}>{live.map((p) => <LiveSessionRow key={p.id} p={p} onGoto={onGoto} />)}</div>}
+              : <div style={{ marginTop: 4 }}>{live.map((s) => <LiveSessionRow key={s.id} s={s}
+                  projects={projects} backlog={backlog} onOpenSession={onOpenSession} />)}</div>}
           </Card>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

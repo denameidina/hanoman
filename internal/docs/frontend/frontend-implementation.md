@@ -709,18 +709,27 @@ artwork),
 
 Metafora produk dinaikkan ke permukaan: Overview dibuka `DalangStage`
 (`src/src/screens/DalangStage.tsx`), panel kelir tempat Anoman-dalang "memainkan" project.
-Tiap project ber-`session.status === "running"` dirender sebagai **wayang hidup** — kartu gelap
-`--term-bg` ber-rim brass (`color-mix` atas `--brass-500`, cermin `--ring`) berisi siluet wayang
-SVG yang bergoyang (`hn-dalang-sway`, transform-only → compositor, padam otomatis oleh blok
-`prefers-reduced-motion` global) plus nama + fase; klik → Terminal. Project tanpa sesi = chip
-**wayang parkir** di baris debog (`hn-dalang-debog`); klik → detail project. Maskot memakai
-registry katalog (`MPS-004` work saat ada sesi, `MPS-003` observe saat sunyi) — bukan aset baru.
+Sumber "hidup"-nya **`sessions` dari siaran WS `t:"sessions"`** — BUKAN `ProjectView.session`,
+yang hanya dimuat saat login dan basi berjam-jam (catatan pet di atas; versi pertama panel ini
+memakainya dan karena itu diam saja saat task berjalan). Kosakatanya cermin `pet-state.ts` &
+sel Terminal: hidup = `!exited` (diurutkan per id — urutan `tmux list-panes` bergeser tiap
+siaran), menunggu manusia = `decision && !deciding` → wayang **amber, diam menoleh**
+(`hn-dalang-puppet--still`, `data-waiting`), yang `deciding` dilayani lead tetap terbaca
+bekerja. Satu sesi hidup = satu **wayang dimainkan** — kartu gelap `--term-bg` ber-rim brass
+(`color-mix` atas `--brass-500`, cermin `--ring`) berisi siluet wayang SVG yang bergoyang
+(`hn-dalang-sway`, transform-only → compositor, padam otomatis oleh blok
+`prefers-reduced-motion` global) plus nama project + `Spec.stage` (overlay live; fase sesi tak
+ada di wire `TerminalSession`); klik → `setFocusSession(id)` + section terminal (jalur yang
+sama dengan pet). Project tanpa sesi hidup = chip **wayang parkir** di baris debog
+(`hn-dalang-debog`); klik → detail project. Kartu "Claude Code sedang jalan" + KPI "Sesi aktif"
+Overview ikut pindah ke sumber yang sama. Maskot memakai registry katalog (`MPS-004` work saat
+ada sesi, `MPS-003` observe saat sunyi) — bukan aset baru.
 Empat stat di header: **dikerjakan hari ini** (`Spec.startedAt` pada hari LOKAL ini —
 komponen-per-komponen, bukan parse `YYYY-MM-DD` yang jatuh ke UTC, gotcha ADR-0090), sesi
 berjalan, menunggu (`!startedAt && stage !== "done"`), dan total `done`. `doneAt` sengaja tak
 dipakai: ia tidak ada di wire `zSpec` (hanya kolom DB/portal, ADR-0105).
 
-Komponen murni presentasi — data dari props Overview yang sudah ada (`projects`, `backlog`),
+Komponen murni presentasi — data dari props Overview (`projects`, `backlog`, `sessions`),
 nol fetch baru, nol channel realtime baru (ADR-0039). Arah visualnya direkam sebagai concept art
 di `internal/assets/concepts/dalang/` (4 state, digenerate Codex/GPT Image dengan pola pipeline
 ADR-0140; enam lengan = pengecualian ikonografi sadar, dicatat di README direktori itu).
