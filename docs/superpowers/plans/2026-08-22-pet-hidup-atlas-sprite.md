@@ -36,7 +36,7 @@
 **Interfaces:**
 - Produces (dipakai Task 2–5): `petlib.ROWS` (urutan + `mode`), `petlib.chroma_key(im) -> Image`, `petlib.detect_sprites(im) -> list[Sprite]` (`Sprite(sheet_row, bbox, image)`), `petlib.touches_edge(sprite, size) -> bool`, `petlib.build_strip(sprites, mode, pin=None) -> (Image, report: list[dict])` dengan kunci laporan `frame, dx, dy, scale, residual_pre, clipped[, residual_post]`, `petlib.compose_atlas(rows_dir) -> Image`, `petlib.manifest(rows_dir) -> dict`, `petlib.write_json`, `petlib.onion_skin`, `petlib.save_gif`, `petlib.sha256`, konstanta `CELL_W, CELL_H, COLUMNS, ANCHOR_X, BASELINE, STAND_H, ATLAS_BUDGET, RESIDUAL_GATE, ROW_KEYS`; `common.ASSETS` (Path, `HANOMAN_PET_ASSETS` mengalihkan), `common.load_petlib()`, `common.fail(msg)`.
 
-- [ ] **Step 1: Tulis test sintetis yang gagal**
+- [x] **Step 1: Tulis test sintetis yang gagal**
 
 Buat `internal/scripts/pet/test-petlib.py`:
 
@@ -216,12 +216,12 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal karena pustaka belum ada**
+- [x] **Step 2: Jalankan, pastikan gagal karena pustaka belum ada**
 
 Run: `python3 internal/scripts/pet/test-petlib.py`
 Expected: `RuntimeError: cannot load .../petlib.py` (atau `FileNotFoundError`) — belum ada `petlib.py`.
 
-- [ ] **Step 3: Tulis `common.py` dan `petlib.py`**
+- [x] **Step 3: Tulis `common.py` dan `petlib.py`**
 
 `internal/scripts/pet/common.py`:
 
@@ -606,12 +606,12 @@ def save_gif(strip: Image.Image, path: Path, fps: int) -> None:
     bg[0].save(path, save_all=True, append_images=bg[1:], duration=int(1000 / fps), loop=0)
 ```
 
-- [ ] **Step 4: Jalankan test sampai hijau**
+- [x] **Step 4: Jalankan test sampai hijau**
 
 Run: `python3 internal/scripts/pet/test-petlib.py`
 Expected: `Ran 10 tests in ~0.5s` … `OK`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/scripts/pet/petlib.py internal/scripts/pet/common.py internal/scripts/pet/test-petlib.py
