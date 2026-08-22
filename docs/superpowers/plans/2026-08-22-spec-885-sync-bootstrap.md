@@ -1248,7 +1248,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `export function shouldPublishHealth(prev: { health: unknown; lastPublishedAt: Date | null } | null, next: unknown, now?: number): boolean`
 - `Vps.lastPublishedAt` **tidak** ditambahkan ke `FIELDS.vps` di `sync.ts` — ia LOCAL-only.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/vps-audit.test.ts` (tambahkan import `shouldPublishHealth, PUBLISH_HEARTBEAT_MS` dari `../src/services/vps-audit`):
 
@@ -1282,7 +1282,7 @@ describe("SPEC-885 · keputusan publish health", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-audit.test.ts
@@ -1290,7 +1290,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `shouldPublishHealth is not exported`.
 
-- [ ] **Step 3: Migration + schema**
+- [x] **Step 3: Migration + schema**
 
 Tambahkan ke model `Vps` di `server/prisma/schema.prisma`, tepat di bawah baris `hardened`:
 
@@ -1315,7 +1315,7 @@ Regenerate client:
 pnpm --filter ./server db:generate
 ```
 
-- [ ] **Step 4: Implementasi**
+- [x] **Step 4: Implementasi**
 
 Di `server/src/services/vps-audit.ts`, tepat **di atas** `export async function runHealth`, tambahkan:
 
@@ -1371,7 +1371,7 @@ export async function runHealth(v: VpsRow): Promise<boolean> {
 
 `runAudit` **tidak disentuh**: `AUDIT_MS = 24 jam` dan `auditSweep` melewati VPS yang `lastAuditAt`-nya < 24 jam, jadi ia paling banyak 1 baris/hari/vps — itu bukan denyut.
 
-- [ ] **Step 5: Buat health fixture bisa berubah**
+- [x] **Step 5: Buat health fixture bisa berubah**
 
 `shouldPublishHealth` menguji **keputusannya**; yang berikut menguji **pemasangannya** — dan justru di situ kelas bug ADR-0090/0093 hidup (lupa menggerbangi `notifySynced`, atau menulis `lastPublishedAt` di cabang yang salah). Untuk itu health palsu harus bisa berbeda antar-sapuan.
 
@@ -1386,7 +1386,7 @@ fi
 
 Default `42%` dipertahankan, jadi test lain yang memeriksa nilai itu tak berubah.
 
-- [ ] **Step 6: Tulis test pemasangan, jalankan, pastikan lulus**
+- [x] **Step 6: Tulis test pemasangan, jalankan, pastikan lulus**
 
 Tambahkan ke `server/test/vps-monitor.test.ts` (import `PUBLISH_HEARTBEAT_MS` dari `../src/services/vps-audit`):
 
@@ -1449,7 +1449,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS. Bila test pertama gagal dengan `2`, `notifySynced` belum digerbangi. Bila test terakhir gagal, `lastSeenAt` ikut terjatuh ke cabang bersyarat — kembalikan ia ke luar spread.
 
-- [ ] **Step 7: Jalankan test, pastikan LULUS**
+- [x] **Step 7: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-audit.test.ts server/test/vps-sync.test.ts server/test/vps-monitor.test.ts server/test/sync-exclusions.test.ts server/test/vps.route.test.ts
@@ -1457,7 +1457,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. `sync-exclusions.test.ts` ikut karena ia menegakkan kolom mana yang **tidak** menyeberang — `lastPublishedAt` harus tetap di luar `FIELDS.vps`. `vps.route.test.ts` ikut karena ia juga memakai fixture ssh yang barusan disentuh.
 
-- [ ] **Step 8: Typecheck**
+- [x] **Step 8: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1465,7 +1465,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations server/src/services/vps-audit.ts \

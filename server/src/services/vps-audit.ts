@@ -143,12 +143,48 @@ export async function runAudit(v: VpsRow): Promise<AuditOk | { ok: false; out: s
   return { ok: true, audit, hardened, scoreTotal: scored.total, scoreBySection: scored.bySection, drift };
 }
 
+// SPEC-885 · ADR-0138 · denyut berjangka. `runHealth` dulu memanggil `notifySynced` di SETIAP
+// polling 5 menit, dan itu menghasilkan 2.469 baris change-feed untuk 9 record vps di hub
+// produksi — 51% byte feed dan 68% barisnya, hanya untuk mendarat jadi 9 baris. ADR-0131
+// menyebutnya eksplisit sebagai optimasi terpisah; di sinilah tempatnya.
+export const PUBLISH_HEARTBEAT_MS = 3_600_000;
+
+// Jebakan yang harus dihindari: `runHealth` juga selalu menulis `lastSeenAt: new Date()`, dan
+// `lastSeenAt` ADA di `FIELDS.vps` — jadi membandingkan seluruh snapshot akan selalu "berubah"
+// dan denyut 5 menit itu justru yang sedang dicabut. Yang dibandingkan HANYA `health`.
+//
+// Tapi kalau `lastSeenAt` berhenti menyeberang sama sekali, ia mendarat basi selamanya di tiap
+// client tanpa satu pun error — kelas gagal-senyap ADR-0090/0093/0105. Denyut berjangka yang
+// menjaganya: 12 baris/hari/vps alih-alih 288, dan `lastSeenAt` akurat dalam ±1 jam.
+//
+// Perbandingan `JSON.stringify` stabil karena `parseHealth` membangun objeknya dengan urutan
+// kunci tetap, dan Prisma mengembalikan kolom Json dengan urutan yang sama seperti disimpan.
+export function shouldPublishHealth(
+  prev: { health: unknown; lastPublishedAt: Date | null } | null,
+  next: unknown,
+  now: number = Date.now(),
+): boolean {
+  if (JSON.stringify(prev?.health ?? null) !== JSON.stringify(next ?? null)) return true;
+  if (!prev?.lastPublishedAt) return true;
+  return now - prev.lastPublishedAt.getTime() >= PUBLISH_HEARTBEAT_MS;
+}
+
 export async function runHealth(v: VpsRow): Promise<boolean> {
   const r = await sshExec(target(v), HEALTH_CMD, { timeoutMs: 60_000 });
   const health = parseHealth(r.out);
   if (r.code !== 0 || !health) return false;
+  // Dibaca SEBELUM ditulis: sesudah update, `health` lama sudah tak ada untuk dibandingkan.
+  const prev = await prisma.vps.findUnique({
+    where: { id: v.id }, select: { health: true, lastPublishedAt: true },
+  });
+  const publish = shouldPublishHealth(prev, health);
+  // `lastSeenAt` sengaja DI LUAR cabang bersyarat: memangkas penerbitan tak boleh ikut memangkas
+  // pembaruan lokal "terakhir terlihat hidup", yang dibaca dashboard tiap 5 menit.
   await prisma.vps.update({ where: { id: v.id }, data: {
-    health: health as unknown as Prisma.InputJsonValue, lastSeenAt: new Date() } });
-  await notifySynced("vps", v.id); // SPEC-213/330 · health ikut disync (sadar-peran)
+    health: health as unknown as Prisma.InputJsonValue,
+    lastSeenAt: new Date(),
+    ...(publish ? { lastPublishedAt: new Date() } : {}),
+  } });
+  if (publish) await notifySynced("vps", v.id); // SPEC-213/330 · health ikut disync (sadar-peran)
   return true;
 }
