@@ -280,7 +280,7 @@ orientasi, dan alpha master **berikut** keberadaan, batas 768px, alpha, dan peng
 web-nya — master sehat yang turunannya hilang berarti layar kosong di dashboard, bukan sekadar aset
 besar.
 
-## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142 · Pet hidup E SPEC-904)
+## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142 · Pet hidup E SPEC-904 · Pet hidup F SPEC-905 ADR-0144)
 
 Widget maskot di tepi bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi & backlog,
 bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada skema,
@@ -393,7 +393,14 @@ membangun interaksinya, bukan oleh `POSE_ROW`. `wave` diregenerasi SPEC-904 supa
 **berulang** tanpa kedip sambungan: frame 8 kini satu langkah sebelum frame 1 (tangan di pinggul),
 bukan salinan pose istirahat, sementara manifestnya tetap `loop: false, then: "idle"` —
 `loop: true` akan membuat animasinya `infinite` sehingga `onAnimationEnd` tak pernah menyala dan
-`oneShot` tak pernah dibersihkan. Pipeline pembuatannya (Codex → key → registrasi → QA → atlas) di
+`oneShot` tak pernah dibersihkan. SPEC-905 memakai keleluasaan itu: selama pointer menempel (atau
+tombolnya fokus keyboard) `wave` diputar **berulang**, dan keputusan lanjut/berhenti hanya diambil
+di `animationend` — yaitu tepat di **batas putaran**, sehingga lepas hover tak pernah memotong
+lambaian di tengah. `oneShot.id` karena itu wajib **penghitung naik**, bukan `Date.now()`: `key`
+React pada `<img>` adalah `${row}:${id}`, dan dua putaran yang selesai di milidetik yang sama memberi
+`key` identik sehingga animasinya tak restart dan lambaian berhenti diam-diam. Gerbang barunya
+`isHandled(mode)` — melambai sambil diangkat, jatuh, atau pusing sama berbohongnya dengan melambai
+sambil tidur. Pipeline pembuatannya (Codex → key → registrasi → QA → atlas) di
 `internal/assets/pet/README.md`. Sticker `STK-*` tetap di katalog ilustrasi tetapi **tak lagi
 dipakai pet**.
 
@@ -403,7 +410,8 @@ rAF/interval.
 
 ```
 pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 sel × s · pointer-events:none · z 80
-└─ pet-actor   transform: translateX(var(--x)) · transition: transform <segmen> linear
+             SPEC-905 · selagi held/falling: top: max(0px, var(--safe-top)) menggantikan tingginya
+└─ pet-actor   transform: translate(var(--x), calc(-1 * var(--y))) · transition: transform <segmen> <linear|fall>
    ├─ pet-bubble  gelembung bicara · di LUAR live region · pointer-events:none (tombol rekap auto)
    ├─ pet-stage   role=status aria-live=polite · hn-pet-reveal
    │  ├─ pet-reactor   hover/klik
@@ -413,7 +421,7 @@ pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 
    │  ├─ span.hn-sr-only   kalimat status
    │  ├─ span.pet-badge   lencana hitungan · aria-hidden · pointer-events:none
    │  ├─ span.pet-hearts  3 hati saat dielus · aria-hidden · pointer-events:none
-   │  └─ button.hit   44×44 di kaki · pointer-events:auto
+   │  └─ button.hit   44×44 di kaki · pointer-events:auto · .hn-pet-hit (touch-action/user-select) · pegangan seret
    └─ panel   popover · dijangkar ke pet, di-clamp viewport · daftar SEMUA kondisi
 ```
 
@@ -433,18 +441,60 @@ masukan + `rng` dan mengembalikan keadaan baru, baris yang harus diputar, dan pe
 
 | kondisi | perilaku |
 |---|---|
-| `tier === "mobile"` ∨ `reduced` ∨ `!roam` | di **rumah** (`x = laneWidth − petWidth − margin`), menghadap kanan, `durationMs = 0` |
+| `dragging` (SPEC-905) | **menang atas semua baris di bawah** — `mode: "held"`, baris `held`, `x`/`y` = pointer di-clamp jalur & plafon angkat, `durationMs = 0` |
+| dilepas dari `held` (SPEC-905) | `mode: "falling"`, baris `falling`, `y → 0` dengan `ease: "fall"` selama `max(220, y/240 × 1000)` ms; `parkedX` dicap di sini |
+| mendarat (SPEC-905) | `mode: "dizzy"` selama `durationMs("dizzy")` = 1000 ms, lalu baris pose + jadwal **berdiri** baru — bukan langsung jalan lagi |
+| `tier === "mobile"` ∨ `reduced` ∨ `!roam` | di **`parkedX`** bila pernah diseret, selain itu di **rumah** (`x = laneWidth − petWidth − margin`), menghadap kanan, `durationMs = 0` |
 | `offline` ∨ `sleeping` | **diam di tempat** — transisi dipotong di posisi saat ini, arah hadap dipertahankan, tak pulang ke pojok |
-| pose tenang: `ready`, `working`, `deciding`, `review`, `docs-updated` | bergantian **berdiri 4–12 dtk** (baris pose) dan **jalan 2–6 dtk** @ 40 px/dtk ke target acak dalam `[margin, laneWidth − petWidth − margin]`; baris `walk-right`/`walk-left` sesuai arah; sampai → berdiri |
+| pose tenang: `ready`, `working`, `deciding`, `review`, `docs-updated` | bergantian **berdiri 1,2–4,5 dtk** (baris pose) dan **jalan 5–14 dtk** @ 40 px/dtk ke target acak dalam `[margin, laneWidth − petWidth − margin]`; baris `walk-right`/`walk-left` sesuai arah; sampai → berdiri |
 | pose perhatian: `waiting`, `blocked` | `mode: "home"` — jalan pulang ke pojok kanan bila belum di sana, lalu berdiri memutar baris pose; kabar penting selalu di tempat yang sama |
 | `shipped` | berhenti di tempat, baris `shipped` sekali → `idle` (lewat `then`), lalu aturan tenang |
-| `hovered` ∨ `panelOpen` ∨ `documentHidden` | berhenti (transisi dipotong di posisi saat ini); masuk hover → `wave` sekali lalu baris pose |
+| `hovered` ∨ `panelOpen` ∨ `documentHidden` | berhenti (transisi dipotong di posisi saat ini); masuk hover → `wave` **berulang** sampai hover lepas (SPEC-905) |
 | resize (`laneWidth` berubah) | `x` di-clamp; transisi yang sedang berjalan dipotong |
 
 Penjadwalan: **satu** `setTimeout` pada `state.until` + `transitionend` pada `pet-actor` (difilter
 `propertyName === "transform"`) + `visibilitychange` + `resize` (debounce 150 ms). Tanpa interval.
-`currentX` dibaca dari `getBoundingClientRect()` hanya pada peristiwa, bukan per frame (jsdom
-memberi rect nol → jatuh ke posisi keadaan).
+Sejak SPEC-905 `transitionend` yang sama juga menutup fase `falling` — pendaratannya tetap dinilai
+dari **jam** (`now ≥ state.until`), peristiwanya hanya membangunkan langkah. `currentX` dibaca dari
+`getBoundingClientRect()` hanya pada peristiwa, bukan per frame (jsdom memberi rect nol → jatuh ke
+posisi keadaan).
+
+**Pet diseret** (SPEC-905 · ADR-0144). `PetWalkState` bertambah `y` (px di atas lantai jalur) dan
+`parkedX`; `PetMove` menjadi `{ x, y, durationMs, ease }`; tiga mode `held`/`falling`/`dizzy` duduk
+di **kepala** `stepWalk`, di atas `anchored()` — fisika tak boleh diinterupsi pergantian pose.
+Gesturnya Pointer Events di tombol 44 px yang sudah ada (`pointerdown` + `setPointerCapture` +
+`pointermove`/`pointerup`/`pointercancel`); **bukan** drag-and-drop HTML5, dan tanpa listener di
+`document` — capture sudah mengarahkan seluruh peristiwa ke tombolnya. Delapan hal yang tak terbaca
+dari kodenya:
+
+- **Ambang 6 px memisahkan klik dari seret.** Di bawahnya gestur tetap klik → panel + elus SPEC-898
+  utuh; melewatinya ia seret dan `click` yang menyusul `pointerup` **ditelan** supaya `thanks` tak
+  ikut terpicu.
+- **Koordinat dihitung sebagai SELISIH, bukan dari `getBoundingClientRect()`**
+  (`dx = clientX − currentX()`, `dy = clientY + y`). Offset jalur saling menghilangkan, jadi rumus
+  yang sama benar di browser **dan** bisa di-assert di jsdom yang memberi rect nol.
+- **Plafon angkat dibaca dari jalur yang SUDAH melebar**, bukan diparsing dari custom property:
+  `getComputedStyle(...).getPropertyValue("--safe-top")` mengembalikan token `env(...)` yang belum
+  di-resolve. Terukur: 661 px di 1280×800, 725 px di 390×844 — persis `tinggi jalur − tinggi sel`.
+- **Jalur melebar HANYA selagi `held`/`falling`,** dan tepi **bawah**nya tak bergerak, jadi sprite,
+  panel, dan gelembung tak bergeser satu piksel pun. `pointer-events: none` tak disentuh; terukur,
+  `elementFromPoint` di tengah layar tetap mengembalikan konten dashboard selagi jalur melebar.
+  Alasannya **bukan** clipping — `pet-root` ber-`overflow: visible` dan sprite 300 px di atas jalur
+  tetap tergambar & tetap dijawab `elementFromPoint` (ADR-0144 Konsekuensi).
+- **Satu properti `transform` untuk kedua sumbu, juga saat `y = 0`.** Daftar properti yang
+  di-transisi tak boleh berganti di tengah rantai berjalan → diangkat → jatuh → mendarat.
+  `ease: "fall"` = `cubic-bezier(0.55, 0.085, 0.68, 0.53)` (easeInQuad — percepatan, bukan linear).
+- **`cut()` menyempit ke `walk`/`home`, dan `land()` selalu memancarkan `y → 0`.** Memotong transisi
+  pet yang sedang jatuh sama dengan menghapus jatuhnya; dan `move: null` pada jalur `reduced` yang
+  tak pernah melewati `falling` akan meninggalkan sprite **di udara**, karena komponen menyimpan
+  `move` terakhir.
+- **`dizzy` kembali ke pose lewat `until` mesin, bukan lewat `thenOf`.** Manifest menulis
+  `then: "idle"`, dan rantai itu berbohong saat pose mesinnya `working`.
+- **`parkedX` adalah titik jangkar; predikat `anchored()` tak berubah** dan **seret nyala di semua
+  tier, termasuk mobile** — `anchored()` melarang gerak *otonom*, bukan manipulasi langsung yang
+  diminta manusia. Tanpa `parkedX`, justru pengguna "Diam di pojok", `prefers-reduced-motion`, dan
+  mobile yang pet-nya melompat balik ke pojok begitu dilepas. `prefers-reduced-motion`: seret tetap
+  boleh, jatuh **seketika**, `dizzy` **dilewati**. Posisi **tidak** persisten antar-muat halaman.
 
 **Pet bicara** (SPEC-898; templat murni di `src/src/screens/pet-speech.ts`, tanpa LLM). Empat hal:
 

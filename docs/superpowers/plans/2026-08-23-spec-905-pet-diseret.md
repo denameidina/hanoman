@@ -1164,7 +1164,7 @@ git commit -m "feat(pet): lambaian menetap selama pointer menempel, berhenti di 
 - Consumes: seluruh perilaku Task 1–5.
 - Produces: —
 
-- [ ] **Step 1: Verifikasi nyata di browser (CDP), sebelum menulis docs**
+- [x] **Step 1: Verifikasi nyata di browser (CDP), sebelum menulis docs**
 
 Docs menuliskan angka; angkanya harus datang dari pengukuran, bukan dari plan ini. Jalankan
 dashboard dev dan ukur di Chrome headless lewat CDP (memori `hanoman-browser-smoke-via-cdp`;
@@ -1184,7 +1184,7 @@ Yang **wajib** diukur dan dicatat angkanya:
 6. Ulangi (1)–(4) pada emulasi 390×844 dengan `<meta name="viewport">` yang sama dengan
    `src/index.html`.
 
-- [ ] **Step 2: Tulis ADR-0144**
+- [x] **Step 2: Tulis ADR-0144**
 
 Buat `internal/docs/adr/0144-pet-diseret-sumbu-y-jalur-melebar.md` dengan bagian:
 judul + `Tanggal: 2026-08-23 · Status: diterima · Sumber: spec docs/superpowers/specs/2026-08-23-spec-905-pet-diseret-design.md`;
@@ -1204,7 +1204,7 @@ penghitung naik.
 `## Konsekuensi` memuat **angka hasil Step 1** apa adanya (termasuk hasil butir 5, walau ia
 membantah premis brief), plus dua jebakan jsdom §3 spec sebagai catatan untuk pembaca berikutnya.
 
-- [ ] **Step 3: Perbarui §Pet di `frontend-implementation.md`**
+- [x] **Step 3: Perbarui §Pet di `frontend-implementation.md`**
 
 Di `internal/docs/frontend/frontend-implementation.md`:
 - Judul §Pet (baris 283): tambahkan `· Pet hidup F SPEC-905 ADR-0144`.
@@ -1221,7 +1221,7 @@ Di `internal/docs/frontend/frontend-implementation.md`:
 - Paragraf `wave` (baris ±509–516): ganti "sekali" menjadi "berulang selama pointer menempel,
   berhenti di batas putaran", dan sebutkan `oneShot.id` sebagai penghitung naik.
 
-- [ ] **Step 4: Tautkan di index**
+- [x] **Step 4: Tautkan di index**
 
 Di `internal/docs/README.md`:
 - Tambahkan baris ADR baru **di atas** baris 0143:
@@ -1231,7 +1231,7 @@ Di `internal/docs/README.md`:
 
 Di `internal/docs/adr/README.md`: tambahkan narasi ADR-0144 mengikuti bentuk entri 0140–0143.
 
-- [ ] **Step 5: Periksa integritas index**
+- [x] **Step 5: Periksa integritas index**
 
 ```bash
 node cli/dist/index.js docs index --check || pnpm --filter ./cli build && node cli/dist/index.js docs index --check
@@ -1239,7 +1239,7 @@ node cli/dist/index.js docs index --check || pnpm --filter ./cli build && node c
 Expected: index konsisten (tak ada doc tak tertaut). Bila CLI belum terbangun di worktree ini,
 verifikasi manual bahwa berkas ADR baru muncul di `internal/docs/README.md`.
 
-- [ ] **Step 6: Jalankan ulang test yang tersentuh**
+- [x] **Step 6: Jalankan ulang test yang tersentuh**
 
 ```bash
 pnpm vitest --run --changed "$HANOMAN_BASE_SHA"
@@ -1247,7 +1247,7 @@ pnpm vitest --run --changed "$HANOMAN_BASE_SHA"
 Expected: PASS. Pastikan berkas test pet memang **berjalan** — `--changed` menyalakan
 `passWithNoTests`, jadi nol test terlihat hijau.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs docs/superpowers/plans/2026-08-23-spec-905-pet-diseret.md
