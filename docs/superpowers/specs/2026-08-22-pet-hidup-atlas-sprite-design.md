@@ -120,20 +120,26 @@ ilustrasi statis); ia di-import `pet-sprite.ts` lewat Vite `?url` (hash, cache p
 |---|---|---|
 | `gen.py <key> [--retry]` | `prompts/common.md` + `prompts/<key>.md` + `ref/*` → `codex exec --skip-git-repo-check -s workspace-write -C <tmp> -i ref/anoman-pet-model.png -i rows/idle.png …` → `raw/<key>.png` | kanvas 1536×1024, grid 4×2; "tubuh bawah dikunci"; latar hijau; Codex diminta **hanya menyimpan PNG mentah** (tanpa key sendiri); gagal bila Codex tak ada → pesan seperti `build-web.mjs` untuk `cwebp` |
 | `key.py` | `raw/<key>.png` → RGBA | key disampel dari tepi kanvas; ramp jarak RGB `lo=40, hi=110`; unmix hanya di pita parsial |
-| `register.py <key> [--no-pin]` | RGBA → `rows/<key>.png` + `rows/<key>.report.json` | deteksi celah (min gap 12/8 px, sprite ≥ 40×80); skala ke frame 1; pencarian offset ±24 & skala 0,92–1,08; wilayah statis baris ≥ 45 % & kolom ≥ kaki−12; **pin** feather 6 px untuk baris berdiri (`--no-pin` untuk `walk-*`, `shipped`); sel 192×208, jangkar kaki x 0,62, baseline 202 |
+| `register.py <key> [--no-pin]` | RGBA → `rows/<key>.png` + `rows/<key>.report.json` | deteksi celah (min gap 12/8 px, sprite ≥ 40×80); skala ke frame 1 = **168 px** (`character.h`, menyisakan 34 px ruang ekor/lompat — 192 px terbukti menumpahkan ekor f7–f8); **mode per baris** dari `petlib.ROWS`: `stand` = registrasi offset ±24 & skala 0,92–1,08 di wilayah baris ≥ 45 % & kolom ≥ kaki−12 (kaki = run kolom **paling kanan** di 8 % baris terbawah — bbox polos tertarik ekor) lalu **pin** feather 6 px; `walk` = registrasi dx di wilayah atas (≤ 55 %), kaki terendah menapak baseline; `jump` = dx wilayah atas, ketinggian lompat relatif tanah baris lembar dipertahankan; tiap frame **di-clip ke selnya** dan tumpahan dihitung; sel 192×208, jangkar kaki x 0,62, baseline 202 |
 | `atlas.py [--check]` | `rows/*.png` + urutan manifest → `hnm-pet-anoman-atlas-v01.webp` + `pet.json` | q80–85, alpha utuh, `--check` gagal bila baris/dimensi/hash/anggaran ≤ 1 MB meleset |
-| `qa.py <key>` | gerbang + artefak `qa/` | **gagal** bila sprite ≠ 8, sprite menyentuh tepi sel, residu pra-pin > 0,08, atau alpha hilang; tulis contact sheet, onion-skin, GIF |
+| `qa.py <key>` | gerbang + artefak `qa/` | **gagal** bila sprite ≠ 8, sprite menyentuh tepi lembar, tumpahan sel > 0 px, residu pra-pin > **0,15** (`stand`; idle yang disetujui mengukur 0,03–0,07 begitu ekor dikeluarkan dari wilayah) / **0,30** (`walk`/`jump`, wilayah atas), atau alpha hilang; tulis contact sheet, onion-skin, GIF |
 | `verify.py` | artefak yang dikomit | baris manifest = baris atlas, sel 192×208, hash `rows/` segar, ukuran ≤ 1 MB; dipanggil test |
 
-Setiap skrip punya `test-<nama>.py` atas lembar sintetis (bentuk digambar Pillow): deteksi 8
-sprite dari grid longgar, pemulihan offset/skala yang diketahui, pin membekukan wilayah statis
-(residu pasca-pin = 0), gerbang gagal pada kasus yang disebut.
+`pin` hanya untuk baris `stand` (idle, working, waiting, blocked, review, docs, wave) — baris
+`walk`/`jump` kakinya memang bergerak. Logika bersama hidup di `petlib.py` (+ `common.py`: pemuat
+dan lokasi aset, dapat dialihkan lewat `HANOMAN_PET_ASSETS` untuk test); CLI-nya tipis.
+`test-petlib.py` menguji pustaka atas lembar sintetis (bentuk digambar Pillow): chroma key
+mempertahankan warna interior, deteksi 8 sprite dari grid longgar + baris lembar, sprite di tepi
+terdeteksi, kaki mengabaikan ekor, pemulihan offset/skala yang diketahui, pin membekukan wilayah
+statis (residu pasca-pin ≈ 0) tanpa menyentuh kolom ekor, `walk` menapak & `jump` melayang,
+tolak ≠ 8 sprite, rakit atlas + manifest, tolak strip salah ukuran.
 
 ### 5.3 Kontrak `pet.json`
 
 ```json
 { "id": "PET-001", "version": 1, "cell": { "w": 192, "h": 208 }, "columns": 8,
   "anchor": { "x": 0.62, "baseline": 202 },
+  "character": { "h": 168 },
   "rows": [
     { "key": "idle",         "fps": 6,  "loop": true },
     { "key": "walk-right",   "fps": 10, "loop": true,  "dir": "right" },
@@ -148,9 +154,11 @@ sprite dari grid longgar, pemulihan offset/skala yang diketahui, pin membekukan 
   "sources": { "idle": "<sha256 rows/idle.png>" } }
 ```
 
-Indeks baris = urutan array (8 frame tiap baris; 10 baris → atlas 1536×2080). `sources` memuat satu
-entri per `key` baris — hash `rows/<key>.png` saat atlas dirakit — supaya `verify.py` tahu atlas
-basi. Isi baris mengikuti
+Indeks baris = urutan array (8 frame tiap baris; 10 baris → atlas 1536×2080). `character.h` = tinggi
+karakter berdiri di dalam sel (frontend menskalakan dari sini, bukan dari tinggi sel). `sources`
+memuat satu entri per `key` baris — hash `rows/<key>.png` saat atlas dirakit — supaya `verify.py`
+tahu atlas basi. Validasi di frontend ditulis tangan (`parsePetManifest`): `zod` hanya dependency
+`shared` dan tak bisa di-resolve dari paket `src`. Isi baris mengikuti
 kosakata brand (emosi lewat mata/alis, kepala, gestur, ekor; tanpa wajah emoji, tanpa slapstick):
 
 | baris | isi frame | dipakai oleh |
@@ -188,9 +196,11 @@ pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 
 - Baris `loop:false`: `animation-iteration-count: 1; animation-fill-mode: forwards`, `animationend`
   (difilter `animationName === "hn-pet-frames"` dan baris yang sedang aktif) → baris `then`.
   Pergantian baris one-shot memakai `key` React pada img agar animasi mulai dari frame 1.
-- `pet-sprite.ts` (murni): parse `pet.json` lewat zod, `rowIndex(key)`, `durationMs(key)`,
-  `POSE_ROW: Record<PetPose, RowKey>` (identitas kecuali `ready → idle`), `thenOf(key)`.
-- Skala `s`: 112/208 desktop & tablet, 96/208 mobile (`useResponsiveTier`).
+- `pet-sprite.ts` (murni): `parsePetManifest` (validator tangan), `rowOf`, `rowIndex(key)`,
+  `durationMs(key)` = `columns / fps × 1000`, `POSE_ROW: Record<PetPose, PetRowKey>` (identitas
+  kecuali `ready → idle`), `thenOf(key)`; `PET_MANIFEST` dan `PET_ATLAS_URL` sebagai konstanta.
+- Skala `s` = tinggi karakter / `character.h`: **112 px** desktop & tablet, **96 px** mobile
+  (`useResponsiveTier`); sel di layar = `cell × s` (≈128×139 px desktop).
 - `will-change: transform` pada `pet-actor` dan img; atlas satu `<img>` dengan `decoding="async"`.
 - `SIZE`/`HIT` SPEC-763 tetap 44 px di kaki sprite (jangkar x 0,62, baseline 202 dari manifest).
 - Tumpukan `seen`/`StickerIllustration`/`POSE_ART`/`pet-motion.ts` **dicabut** beserta keyframe
@@ -201,8 +211,10 @@ pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 
 
 `step(state, input, rng): { state, row, move? }` dengan
 `state = { x, facing, mode: "stand" | "walk" | "home", until }`,
-`input = { now, laneWidth, petWidth, pose, hovered, panelOpen, documentHidden, roam, reduced, tier }`
-(`hovered` = pointer hover ∨ fokus keyboard pada `button.hit`),
+`input = { now, currentX, laneWidth, petWidth, pose, hovered, panelOpen, documentHidden, roam, reduced, tier }`
+(`currentX` = posisi aktual yang dibaca komponen dari `getBoundingClientRect()` hanya pada
+peristiwa — jsdom memberi rect nol → jatuh ke posisi keadaan; `hovered` = pointer hover ∨ fokus
+keyboard pada `button.hit`),
 `move = { x, durationMs }` (diterjemahkan komponen ke `--x` + `transition-duration`).
 
 | kondisi | perilaku |
@@ -253,8 +265,8 @@ peristiwa potong, bukan per frame.
   merender hanya saat pose/baris/mode berubah.
 - Tak ada channel WS/poll baru; sumber data tetap `sessions`/`backlog`/`notifications` SPEC-585.
 - Atlas dimuat biasa dengan `decoding="async"` (tanpa preload, tanpa `loading="lazy"` — elemen
-  `fixed` selalu "terlihat"); `pet-stage` `opacity: 0` sampai `img.complete`, lalu `hn-pet-reveal`,
-  supaya tak pernah ada kotak kosong di jalur.
+  `fixed` selalu "terlihat"); tak perlu gerbang `img.complete`: viewport tak berlatar, jadi sebelum
+  termuat tak ada apa pun yang tergambar, bukan kotak kosong.
 
 ## 11. Pengujian
 
@@ -308,7 +320,7 @@ pet per project, tema gelap (aplikasi belum punya), mirror sprite, Rive/Lottie, 
 | berkas | perubahan |
 |---|---|
 | `internal/assets/pet/**` | keluarga aset baru (§5.1); `rows/idle.png`, `ref/`, `prompts/idle.md` sudah ada |
-| `internal/scripts/pet/{gen,key,register,atlas,qa,verify}.py` + `test-*.py` | pipeline (§5.2); `prototype/` dipindahkan ke sini lalu dihapus |
+| `internal/scripts/pet/{petlib,common,gen,key,register,atlas,qa,verify}.py` + `test-petlib.py` | pipeline (§5.2); `internal/assets/pet/prototype/` dihapus (digantikan `petlib.py`) |
 | `src/src/screens/pet-sprite.ts` | manifest zod, `POSE_ROW`, durasi, `then` |
 | `src/src/screens/pet-walk.ts` | mesin berkeliaran murni |
 | `src/src/screens/pet-state.ts` | + `loadPetRoam`/`savePetRoam`, `PET_ROAM_KEY` |
