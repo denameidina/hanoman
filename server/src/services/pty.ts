@@ -380,12 +380,16 @@ export const listSessionsAsync = async (): Promise<SessionInfo[]> => (await list
 // notifikasi dan panel lead tak punya rumus sendiri yang bisa berselisih dengan pil di layar.
 export const liveDecisions = (): {
   id: string; specId?: string; projectId: string; decisionFile: string; waiting: boolean;
+  eventHook: boolean;
 }[] =>
   listPanes()
     .filter((p) => !p.exited && p.decisionFile)
     .map((p) => ({
       id: p.id, specId: p.specId, projectId: p.projectId, decisionFile: p.decisionFile!,
       waiting: p.decision,
+      // SPEC-909 · ADR-0146 · sesi hidup TANPA penanda ini lahir sebelum pembaruan dan tak akan
+      // dijawab lead. Tick rumah tangga lead menotifikasinya sekali; pembaca lain mengabaikannya.
+      eventHook: p.eventHook,
     }));
 
 export const getSession = (id: string): Pane | undefined => listPanes().find((p) => p.id === id);
