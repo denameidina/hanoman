@@ -56,8 +56,11 @@ dipindahkan dengan tangan, dan hover hanya melambai **sekali** karena `onAnimati
    `translate(<x>px, <-y>px)`; daftar properti yang di-transisi tak boleh berganti di tengah rantai
    berjalan → diangkat → jatuh → mendarat. `move.durationMs === 0` tetap berarti `transition: none`,
    jalur "potong" yang sudah ada dan yang dipakai setiap potongan. `ease` hanya dua nilai:
-   `linear` untuk jalan kaki (lajunya memang tetap) dan `fall` = `cubic-bezier(0.55, 0.085, 0.68,
-   0.53)` (easeInQuad) — **percepatan, bukan linear**. Durasi jatuh
+   `linear` untuk jalan kaki (lajunya memang tetap) dan `fall` = **token `--ease-fall`**
+   (`cubic-bezier(0.55, 0.085, 0.68, 0.53)`, easeInQuad) — **percepatan, bukan linear**; `--ease-out`
+   bergerak ke arah sebaliknya. Ia token DS, bukan kurva harfiah di komponen: gerbang token yang ada
+   (`pet-mount.test.tsx`) memeriksa warna & bayangan, **bukan easing**, jadi nilai harfiah akan lolos
+   senyap dan luput dari tema yang mengubah kurva gerak. Durasi jatuh
    `max(FALL_MIN_MS 220, y / FALL_PX_PER_S 240 × 1000)`. Konsekuensi yang tak terbaca dari kodenya:
    `cut()` menyempit dari `mode !== "stand"` menjadi `walk|home` — memotong transisi pet yang sedang
    jatuh sama dengan **menghapus jatuhnya**; dan `land()` **selalu** memancarkan `y → 0`, termasuk di
@@ -86,7 +89,9 @@ dipindahkan dengan tangan, dan hover hanya melambai **sekali** karena `onAnimati
   tepat saat mendarat; `pointer-events: none` di setiap langkah. Plafon angkat berhenti persis di
   **661 px = 800 − 139**. Jatuh 300 px → `transform 1.25s cubic-bezier(0.55, 0.085, 0.68, 0.53)`
   dengan Y **298,7 → 280,9 → 0** (monoton, tak pernah menyusul balik) dan `transition: none` selama
-  diseret. Sesudah pusing pet berdiri di **x 888,0** — tempat ia dilepas — sementara pojoknya ada di
+  diseret; `var(--ease-fall)` terbukti **resolve** di jalur nyata — `getComputedStyle` mengembalikan
+  `transform 1.25s cubic-bezier(0.55, 0.085, 0.68, 0.53)`, bukan `initial` (token yang tak ter-import
+  akan membuat transisinya batal **tanpa satu pun error**, dan jatuhnya jadi seketika). Sesudah pusing pet berdiri di **x 888,0** — tempat ia dilepas — sementara pojoknya ada di
   1136; ia **tidak** melompat balik. Satu langkah jalan yang teramati: `transform 12,992s linear`
   = 519,7 px, konsisten dengan `WALK_MS` baru.
   **390×844 (emulasi ponsel, `<meta name="viewport">` sama dengan `src/index.html`):** rantai
