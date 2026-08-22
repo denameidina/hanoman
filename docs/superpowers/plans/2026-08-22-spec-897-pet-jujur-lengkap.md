@@ -1026,7 +1026,7 @@ git commit -m "feat(pet): mesin berkeliaran — terputus & tidur diam di tempat,
 - Consumes: `eventsStatus`/`subscribeStatus` (Task 1), `derivePetState`/`petPulse`/`KIND_NOUN`/`PetConnection` (Task 3), `POSE_ROW` (Task 3).
 - Produces: `data-testid="pet-badge"` (lencana sprite), `data-offline="true"` pada `data-testid="pet-viewport"`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/hanoman-pet.test.tsx` sebuah `describe` baru. Berkas itu sudah memakai `vi.mock` untuk beberapa modul; tambahkan mock `../src/api/events` di dekat mock lain yang sudah ada:
 
@@ -1114,12 +1114,12 @@ describe("SPEC-897 — pet jujur", () => {
 
 Sesuaikan helper `session()`/`spec()` dan import (`within`, `fireEvent`, `screen`, `render`, `beforeEach`) dengan yang sudah ada di berkas test itu; tambahkan `within` ke import `@testing-library/react` bila belum ada, dan salin helper `session`/`spec` dari `src/test/pet-state.test.ts` bila belum ada di berkas ini.
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx`
 Diharapkan: FAIL — `pet-badge`/`pet-condition` tak ditemukan.
 
-- [ ] **Step 3: Implementasi — hook status & tidur**
+- [x] **Step 3: Implementasi — hook status & tidur**
 
 Di `src/src/screens/HanomanPet.tsx`, tambahkan import:
 
@@ -1184,7 +1184,7 @@ Ganti komentar di atas `const [decay, setDecay]` menjadi:
   // tidur — tiga saat keadaan berubah tanpa data baru. Bukan denyut: satu timeout tepat waktu.
 ```
 
-- [ ] **Step 4: Implementasi — kalimat status, wave, lencana, pudar**
+- [x] **Step 4: Implementasi — kalimat status, wave, lencana, pudar**
 
 Ganti baris `const status = …`:
 
@@ -1230,7 +1230,7 @@ Tambahkan lencana **tepat setelah** `<span className="hn-sr-only" data-testid="p
           )}
 ```
 
-- [ ] **Step 5: Implementasi — panel multi-kondisi**
+- [x] **Step 5: Implementasi — panel multi-kondisi**
 
 Di dalam `<div ref={panelRef} data-testid="pet-panel" …>`, ganti keempat blok isi (eyebrow, headline, detail, baris tombol) dengan:
 
@@ -1284,12 +1284,12 @@ Di dalam `<div ref={panelRef} data-testid="pet-panel" …>`, ganti keempat blok 
           </div>
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan lulus**
+- [x] **Step 6: Jalankan test, pastikan lulus**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx src/test/pet-mount.test.tsx`
 Diharapkan: PASS. Test lama yang mencari tombol `Buka Terminal`/`Buka Backlog` tunggal mungkin perlu diarahkan ke baris pertama (`within(screen.getAllByTestId("pet-condition")[0]!)`); perbaiki bila gagal, **jangan** melemahkan assertion a11y/reduced-motion/pointer-containment.
 
-- [ ] **Step 7: Typecheck & commit**
+- [x] **Step 7: Typecheck & commit**
 
 ```bash
 pnpm --filter ./src typecheck

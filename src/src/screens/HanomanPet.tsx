@@ -1,11 +1,12 @@
 import React from "react";
 import type { Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../api/client";
+import { eventsStatus, subscribeStatus, type EventsStatus } from "../api/events";
 import { Button, Mark, useResponsiveTier } from "../ds";
 import { useNotifications } from "../notifications/NotificationsContext";
 import {
-  derivePetState, loadPetHidden, loadPetRoam, savePetHidden, savePetRoam,
-  POSE_LABEL, type PetTarget,
+  derivePetState, loadPetHidden, loadPetRoam, savePetHidden, savePetRoam, petPulse,
+  KIND_NOUN, POSE_LABEL, type PetTarget,
 } from "./pet-state";
 import {
   PET_ATLAS_URL, PET_MANIFEST, POSE_ROW, durationMs, rowIndex, rowOf, thenOf, type PetRowKey,
@@ -35,6 +36,16 @@ function usePrefersReducedMotion(): boolean {
     return () => mq.removeEventListener?.("change", on);
   }, []);
   return reduced;
+}
+
+// SPEC-897 · status socket `events` yang sudah ada — pengamat, tak membuka koneksi sendiri.
+function useEventsStatus(): EventsStatus {
+  const [status, setStatus] = React.useState(eventsStatus);
+  React.useEffect(() => {
+    setStatus(eventsStatus());   // bisa sudah berubah antara render pertama dan efek ini
+    return subscribeStatus(setStatus);
+  }, []);
+  return status;
 }
 
 function useDocumentHidden(): boolean {
@@ -69,8 +80,8 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   const [panelLeft, setPanelLeft] = React.useState(PANEL_EDGE);
   const [reacting, setReacting] = React.useState(false);
   const [hovered, setHovered] = React.useState(false);
-  // Dinaikkan HANYA oleh peluruhan keadaan transient — satu-satunya perubahan pose yang tak dibawa
-  // data baru. Bukan denyut: tak ada interval, hanya satu timeout tepat pada waktunya.
+  // Dinaikkan HANYA oleh `recheckAt`: peluruhan transient, habisnya grace terputus, dan onset
+  // tidur — tiga saat keadaan berubah tanpa data baru. Bukan denyut: satu timeout tepat waktu.
   const [decay, setDecay] = React.useState(0);
   const reduced = usePrefersReducedMotion();
   const tier = useResponsiveTier();
@@ -80,15 +91,24 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   const actorRef = React.useRef<HTMLDivElement>(null);
   const panelRef = React.useRef<HTMLDivElement>(null);
 
+  const connection = useEventsStatus();
+  // Denyut kehidupan dashboard; `quietSince` dicap ulang tiap kali ia berubah. Dibandingkan SAAT
+  // RENDER (pola "menyesuaikan state ketika prop berubah") supaya tak ada render perantara yang
+  // memperlihatkan pet masih tidur satu frame sesudah kabarnya datang.
+  const pulse = petPulse(sessions, items);
+  const [seenPulse, setSeenPulse] = React.useState(pulse);
+  const [quietSince, setQuietSince] = React.useState(() => Date.now());
+  if (seenPulse !== pulse) { setSeenPulse(pulse); setQuietSince(Date.now()); }
+
   const view = React.useMemo(
-    () => derivePetState({ sessions, backlog, notifications: items, now: Date.now() }),
-    [sessions, backlog, items, decay]);
+    () => derivePetState({ sessions, backlog, notifications: items, now: Date.now(), connection, quietSince }),
+    [sessions, backlog, items, connection, quietSince, decay]);
 
   React.useEffect(() => {
-    if (view.transientUntil === null) return;
-    const t = setTimeout(() => setDecay((n) => n + 1), Math.max(0, view.transientUntil - Date.now()));
+    if (view.recheckAt === null) return;
+    const t = setTimeout(() => setDecay((n) => n + 1), Math.max(0, view.recheckAt - Date.now()));
     return () => clearTimeout(t);
-  }, [view.transientUntil]);
+  }, [view.recheckAt]);
 
   // ---- geometri sprite
   const { cell, columns, anchor, character, rows } = PET_MANIFEST;
@@ -136,10 +156,11 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   const baseRow: PetRowKey = row === "shipped" && shippedDone ? (thenOf("shipped") ?? "idle") : row;
   const displayRow: PetRowKey = oneShot?.row ?? baseRow;
   const display = rowOf(displayRow);
+  // Melambai atas data basi, atau melambai sambil tidur, keduanya berbohong.
   const playWave = React.useCallback(() => {
-    if (reduced) return;
+    if (reduced || view.pose === "offline" || view.pose === "sleeping") return;
     setOneShot((o) => o ?? { row: "wave", id: Date.now() });
-  }, [reduced]);
+  }, [reduced, view.pose]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -231,7 +252,9 @@ export function HanomanPet({ sessions, backlog, onOpen }:
     );
   }
 
-  const status = `Hanoman ${POSE_LABEL[view.pose]} · ${view.headline}`;
+  const offline = view.pose === "offline";
+  const status = `Hanoman ${POSE_LABEL[view.pose]} · ${view.headline}`
+    + (view.count > 1 ? ` · ${view.count} ${KIND_NOUN[view.kind]}` : "");
   const frames = reduced
     ? "none"
     : `hn-pet-frames ${durationMs(displayRow)}ms steps(${columns}, end) ${display.loop ? "infinite" : "1 forwards"}`;
@@ -254,17 +277,47 @@ export function HanomanPet({ sessions, backlog, onOpen }:
             ? "none"
             : `${open ? "hn-pet-panel-in" : "hn-pet-panel-out"} var(--dur-slow) var(--ease-out) both`,
         }}>
-          <div className="hn-eyebrow" style={{ marginBottom: 6 }}>{POSE_LABEL[view.pose]}</div>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600,
-            color: "var(--text-strong)", lineHeight: 1.25 }}>{view.headline}</div>
-          <div style={{ marginTop: 4, fontFamily: "var(--font-ui)", fontSize: 12.5,
-            color: "var(--text-muted)", lineHeight: 1.45 }}>{view.detail}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
-            <Button size="sm" leftIcon={view.target.section === "terminal" ? "terminal" : "list-checks"}
-              style={reduced ? { transition: "none", transform: "none" } : undefined}
-              onClick={() => { closePanel(); onOpen(view.target); }}>
-              {view.target.section === "terminal" ? "Buka Terminal" : "Buka Backlog"}
-            </Button>
+          <div className="hn-eyebrow" style={{ marginBottom: 8 }}>{POSE_LABEL[view.pose]}</div>
+          {/* SELURUH kondisi aktif, tiap baris dengan aksinya sendiri. Puncaknya adalah baris
+              pertama dan memakai tipografi headline — blok headline terpisah akan menuliskannya
+              dua kali di panel selebar 268 px. */}
+          <ul data-testid="pet-conditions" style={{
+            listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10,
+          }}>
+            {view.conditions.map((c, i) => (
+              <li key={`${c.kind}:${i}`} data-testid="pet-condition" data-kind={c.kind}
+                style={i > 0 ? { borderTop: "1px solid var(--border-hair)", paddingTop: 10 } : undefined}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <span style={i === 0
+                    ? { fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600,
+                        color: "var(--text-strong)", lineHeight: 1.25 }
+                    : { fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600,
+                        color: "var(--text-strong)", lineHeight: 1.3 }}>{c.headline}</span>
+                  {c.count > 1 && (
+                    <span data-testid="pet-condition-count" title={`${c.count} ${KIND_NOUN[c.kind]}`} style={{
+                      flex: "0 0 auto", padding: "2px 6px", fontFamily: "var(--font-ui)", fontSize: 11,
+                      fontWeight: 700, lineHeight: 1, color: "var(--accent-on)", background: "var(--accent)",
+                      border: "1px solid var(--border-hair)", borderRadius: "var(--radius-pill)",
+                    }}>{c.count}</span>
+                  )}
+                </div>
+                <div style={{ marginTop: 3, fontFamily: "var(--font-ui)", fontSize: 12.5,
+                  color: "var(--text-muted)", lineHeight: 1.45 }}>{c.detail}</div>
+                {c.target && (
+                  <div style={{ marginTop: 7 }}>
+                    <Button size="sm" variant={i === 0 ? "primary" : "ghost"}
+                      leftIcon={c.target.section === "terminal" ? "terminal" : "list-checks"}
+                      style={reduced ? { transition: "none", transform: "none" } : undefined}
+                      onClick={() => { const target = c.target!; closePanel(); onOpen(target); }}>
+                      {c.target.section === "terminal" ? "Buka Terminal" : "Buka Backlog"}
+                    </Button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12,
+            borderTop: "1px solid var(--border-hair)", paddingTop: 10 }}>
             {tier !== "mobile" && (
               <Button size="sm" variant="ghost"
                 style={reduced ? { transition: "none", transform: "none" } : undefined}
@@ -291,6 +344,18 @@ export function HanomanPet({ sessions, backlog, onOpen }:
             animation: reduced ? "none" : "hn-pet-reveal var(--dur-slow) var(--ease-out) both",
           }}>
           <span className="hn-sr-only" data-testid="pet-status">{status}</span>
+          {view.count > 1 && (
+            <span data-testid="pet-badge" aria-hidden="true" title={`${view.count} ${KIND_NOUN[view.kind]}`}
+              style={{
+                pointerEvents: "none", position: "absolute", top: 4, right: 8, zIndex: 2,
+                minWidth: 18, height: 18, padding: "0 5px", boxSizing: "border-box",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                fontFamily: "var(--font-ui)", fontSize: 11, fontWeight: 700, lineHeight: 1,
+                color: "var(--accent-on)", background: "var(--accent)",
+                border: "1px solid var(--border-hair)", borderRadius: "var(--radius-pill)",
+                boxShadow: "var(--shadow-sm)",
+              }}>{view.count}</span>
+          )}
           <div data-testid="pet-reactor" className="hn-pet-reactor" style={{
             position: "relative", width: "100%", height: "100%",
             transition: reduced ? "none" : "transform var(--dur-base) var(--ease-out)",
@@ -300,7 +365,14 @@ export function HanomanPet({ sessions, backlog, onOpen }:
           }} onAnimationEnd={(event) => {
             if (event.animationName === "hn-pet-click") setReacting(false);
           }}>
-            <div data-testid="pet-viewport" style={{ position: "relative", overflow: "hidden", width: cellW, height: cellH }}>
+            {/* Pudar duduk DI SINI, bukan di pet-stage: stage memakai `hn-pet-reveal … both`, dan
+                `animation-fill-mode: forwards` menang atas `opacity` inline — fade di sana akan
+                diam-diam tak berpengaruh. */}
+            <div data-testid="pet-viewport" data-offline={offline ? "true" : undefined} style={{
+              position: "relative", overflow: "hidden", width: cellW, height: cellH,
+              opacity: offline ? 0.45 : 1,
+              transition: reduced ? "none" : "opacity var(--dur-slow) var(--ease-out)",
+            }}>
               <div data-testid="pet-rowshift" className="hn-pet-rowshift" data-row={displayRow}
                 style={{ width: cellW, height: cellH, ["--row" as string]: rowIndex(displayRow) } as React.CSSProperties}>
                 <img data-testid="pet-atlas" key={`${displayRow}:${oneShot?.id ?? 0}`}

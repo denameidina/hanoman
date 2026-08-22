@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Notification, Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../src/api/client";
@@ -8,6 +8,14 @@ import { PET_HIDDEN_KEY, PET_ROAM_KEY } from "../src/screens/pet-state";
 import { PET_MANIFEST, durationMs, rowIndex } from "../src/screens/pet-sprite";
 import { LANE_MARGIN, homeX } from "../src/screens/pet-walk";
 import { MOBILE_QUERY } from "../src/ds/responsive";
+
+// Status koneksi datang dari socket `events` yang sudah ada; test mendorongnya lewat `h.status`.
+const h = vi.hoisted(() => ({ status: { connected: true, since: 0, paused: false } }));
+vi.mock("../src/api/events", () => ({
+  subscribe: () => () => { },
+  eventsStatus: () => h.status,
+  subscribeStatus: () => () => { },
+}));
 
 function spec(over: Partial<Spec> & { id: string }): Spec {
   return {
@@ -52,7 +60,12 @@ const CELL_W = Math.round(PET_MANIFEST.cell.w * SCALE);
 const CELL_H = Math.round(PET_MANIFEST.cell.h * SCALE);
 const HOME = homeX(window.innerWidth, CELL_W);
 
-beforeEach(() => { localStorage.clear(); mockMatchMedia(() => false); });
+beforeEach(() => {
+  localStorage.clear();
+  mockMatchMedia(() => false);
+  h.status = { connected: true, since: 0, paused: false };
+});
+const conditions = () => screen.getAllByTestId("pet-condition");
 
 describe("HanomanPet (sprite)", () => {
   it("merender satu img atlas di viewport sel, baris dipilih --row, frame oleh steps(8)", () => {
@@ -259,5 +272,99 @@ describe("HanomanPet (sprite)", () => {
       left: `${Math.round(PET_MANIFEST.anchor.x * CELL_W - 22)}px`,
     });
     expect(LANE_MARGIN).toBe(16);
+  });
+});
+
+describe("HanomanPet — pet jujur & lengkap (SPEC-897)", () => {
+  const twoWaiting = {
+    sessions: [
+      session({ id: "a", specId: "SPEC-1", decision: true }),
+      session({ id: "b", specId: "SPEC-2", decision: true }),
+    ],
+    backlog: [spec({ id: "SPEC-1", stage: "executing" }), spec({ id: "SPEC-2", stage: "executing" })],
+  };
+
+  it("lencana hitungan muncul saat ada ≥2 kondisi sejenis, dan tak menerima pointer", () => {
+    render(<HanomanPet {...twoWaiting} onOpen={vi.fn()} />);
+    const badge = screen.getByTestId("pet-badge");
+    expect(badge.textContent).toBe("2");
+    expect(badge.getAttribute("aria-hidden")).toBe("true");
+    expect(badge).toHaveStyle({ pointerEvents: "none" });
+    // Angkanya punya satuan di kalimat status — satu sumber, lencananya sendiri aria-hidden.
+    expect(screen.getByTestId("pet-status").textContent).toContain("2 sesi menunggu jawabanmu");
+    // Warna lencana hanya token DS.
+    expect(styleOf(badge)).toContain("var(--accent)");
+    expect(styleOf(badge)).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
+  });
+
+  it("tak ada lencana saat hanya satu kondisi sejenis, maupun saat istirahat", () => {
+    const { unmount } = render(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]}
+      backlog={[spec({ id: "SPEC-1", stage: "executing" })]} onOpen={vi.fn()} />);
+    expect(screen.queryByTestId("pet-badge")).toBeNull();
+    unmount();
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" }), spec({ id: "SPEC-2" })]} onOpen={vi.fn()} />);
+    expect(screen.queryByTestId("pet-badge")).toBeNull();
+  });
+
+  it("panel mendaftar SEMUA kondisi aktif dengan aksi ke targetnya masing-masing", () => {
+    const onOpen = vi.fn();
+    render(<HanomanPet sessions={[
+      session({ id: "a", specId: "SPEC-1", decision: true }),
+      session({ id: "c", specId: "SPEC-3" }),
+    ]} backlog={[spec({ id: "SPEC-1", stage: "executing" }), spec({ id: "SPEC-3", stage: "done" })]}
+      onOpen={onOpen} />);
+    fireEvent.click(hit());
+    const rows = conditions();
+    expect(rows.map((r) => r.getAttribute("data-kind"))).toEqual(["waiting", "review"]);
+    // aksi baris KEDUA membuka sesi kedua, bukan puncak prioritas — inilah inti SPEC-897.
+    fireEvent.click(within(rows[1]!).getByRole("button", { name: "Buka Terminal" }));
+    expect(onOpen).toHaveBeenCalledWith({ section: "terminal", sessionId: "c" });
+  });
+
+  it("hitungan per baris muncul di baris yang punya lebih dari satu", () => {
+    render(<HanomanPet {...twoWaiting} onOpen={vi.fn()} />);
+    fireEvent.click(hit());
+    expect(within(conditions()[0]!).getByTestId("pet-condition-count").textContent).toBe("2");
+  });
+
+  it("pudar dan mengaku saat terputus; baris offline tanpa tombol", () => {
+    h.status = { connected: false, since: Date.now() - 60_000, paused: false };
+    render(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1" })]}
+      backlog={[spec({ id: "SPEC-1", stage: "executing" })]} onOpen={vi.fn()} />);
+    const viewport = screen.getByTestId("pet-viewport");
+    expect(viewport.getAttribute("data-offline")).toBe("true");
+    expect(viewport).toHaveStyle({ opacity: "0.45" });
+    expect(screen.getByTestId("pet-status").textContent).toContain("Tak terhubung sejak");
+    // Baris pose tetap `idle`: pudar + kalimat sudah mengatakan "aku tak tahu".
+    expect(rowshift()).toHaveAttribute("data-row", "idle");
+    fireEvent.click(hit());
+    const rows = conditions();
+    expect(rows[0]!.getAttribute("data-kind")).toBe("offline");
+    expect(within(rows[0]!).queryByRole("button")).toBeNull();
+    // kondisi lama tetap terdaftar sebagai data terakhir
+    expect(rows[1]!.getAttribute("data-kind")).toBe("working");
+  });
+
+  it("tak pudar saat tab hidden (paused): socket ditutup atas permintaan kita", () => {
+    h.status = { connected: false, since: Date.now() - 60_000, paused: true };
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    expect(screen.getByTestId("pet-viewport").getAttribute("data-offline")).toBeNull();
+    expect(screen.getByTestId("pet-viewport")).toHaveStyle({ opacity: "1" });
+  });
+
+  it("tak melambai saat terputus — melambai atas data basi adalah berbohong", () => {
+    h.status = { connected: false, since: Date.now() - 60_000, paused: false };
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    fireEvent.pointerEnter(hit());
+    expect(rowshift()).toHaveAttribute("data-row", "idle");   // bukan "wave"
+  });
+
+  it("reduced-motion mematikan transisi pudar dengan nilai persis `none`", () => {
+    mockMatchMedia((q) => q === REDUCED);
+    h.status = { connected: false, since: Date.now() - 60_000, paused: false };
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    expect(screen.getByTestId("pet-viewport")).toHaveStyle({ transition: "none" });
+    // lencana adalah informasi, bukan gerak: ia tetap tampil saat reduced-motion.
+    expect(screen.queryByTestId("pet-badge")).toBeNull();   // di sini count = 1
   });
 });
