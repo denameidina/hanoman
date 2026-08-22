@@ -1635,7 +1635,7 @@ Terukur 2026-08-22, ketiga keadaan marker atas pane hidup yang sama:
 | `1787408407\n` (epoch, 15 menit lalu) | `true` | `"2026-08-22T14:20:07.000Z"` |
 | kosong | `false` | **absen** |
 
-- [ ] **Step 6: Diff bersih & push**
+- [x] **Step 6: Diff bersih & push**
 
 ```bash
 git status --porcelain     # harus kosong
