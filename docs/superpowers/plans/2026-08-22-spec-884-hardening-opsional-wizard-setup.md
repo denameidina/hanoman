@@ -622,7 +622,7 @@ git commit -m "feat(spec-884): scanner upload jadi peringatan saat hardening mat
 - Consumes: `resolveHardening` (Task 2)
 - Produces: `GET /api/auth/status` mengembalikan `setupTokenRequired: false` di instalasi tanpa hardening
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/bootstrap.test.ts`, di dalam `describe("one-time bootstrap token", …)`:
 
@@ -652,12 +652,12 @@ Tambahkan ke `server/test/bootstrap.test.ts`, di dalam `describe("one-time boots
 
 > `buildApp` sudah menerima `{ env }` (`server/src/app.ts:78-80`); `resolveHome(env)` di baris 191 membaca `HANOMAN_HOME` dari env yang sama, jadi token mendarat di tmpdir dan bukan di home nyata (pelajaran SPEC-880).
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/bootstrap.test.ts`
 Expected: FAIL — test pertama merah: `setupTokenRequired` `true`, dan setup menjawab 400
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/app.ts`, ganti baris 191:
 
@@ -674,12 +674,12 @@ Ubah import di `server/src/app.ts:60`:
 import { resolveHardening, resolveHome } from "@hanoman/runner";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/bootstrap.test.ts server/test/auth-routes.test.ts`
 Expected: PASS — kedua berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/app.ts server/test/bootstrap.test.ts

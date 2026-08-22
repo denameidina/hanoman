@@ -57,7 +57,7 @@ import { stopTelegramRuntime } from "./services/telegram/runtime";
 import { actorFromRequest, setActor } from "./services/webhooks/actor";
 import { classifyIngress, loadIngressPolicy, trustProxyFromEnv } from "./services/ingress-policy";
 import { MAX_WS_MESSAGE_BYTES, wsControlOrigins } from "./services/ws-admission";
-import { resolveHome } from "@hanoman/runner";
+import { resolveHardening, resolveHome } from "@hanoman/runner";
 
 // Endpoint yang boleh diakses tanpa sesi (path lengkap termasuk prefix /api).
 const PUBLIC = new Set([
@@ -188,7 +188,10 @@ export function buildApp(
       setActor(actorFromRequest({ user: req.user ?? null, agent: req.agent ?? null }));
     });
     api.addHook("onResponse", auditTelegramGatewayResponse);
-    await api.register(authRoutes, { bootstrapRequired: env.NODE_ENV === "production", home: resolveHome(env) });
+    // SPEC-884 · ADR-0138 · bukti setup token menjaga instance yang minta dikeraskan. Di instalasi
+    // biasa ia justru menutup pintu terakhir: orang yang baru `npm i -g hanoman` harus membaca
+    // berkas di HANOMAN_HOME lewat shell sebelum bisa memakai dashboard-nya sendiri.
+    await api.register(authRoutes, { bootstrapRequired: resolveHardening(env), home: resolveHome(env) });
     await api.register(health);
     await api.register(agentDoc, { file: docFile });   // SPEC-489 · panduan AI agent (PUBLIC)
     await api.register(projects);
