@@ -1,7 +1,9 @@
 import React from "react";
 import type { Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../api/client";
-import { eventsStatus, subscribeStatus, type EventsStatus } from "../api/events";
+// SPEC-908 · `useEventsStatus` pindah ke api/live.ts — kini dipakai juga oleh indikator
+// koneksi keempat layar realtime, jadi definisinya tak boleh tinggal lokal di sini.
+import { useEventsStatus } from "../api/live";
 import { Button, Mark, useResponsiveTier } from "../ds";
 import { useNotifications } from "../notifications/NotificationsContext";
 import {
@@ -57,16 +59,6 @@ function usePrefersReducedMotion(): boolean {
     return () => mq.removeEventListener?.("change", on);
   }, []);
   return reduced;
-}
-
-// SPEC-897 · status socket `events` yang sudah ada — pengamat, tak membuka koneksi sendiri.
-function useEventsStatus(): EventsStatus {
-  const [status, setStatus] = React.useState(eventsStatus);
-  React.useEffect(() => {
-    setStatus(eventsStatus());   // bisa sudah berubah antara render pertama dan efek ini
-    return subscribeStatus(setStatus);
-  }, []);
-  return status;
 }
 
 function useDocumentHidden(): boolean {
