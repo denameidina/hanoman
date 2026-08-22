@@ -1,16 +1,19 @@
 /* LeadScreen — panel hanoman-lead (SPEC-409, ADR-0091). Screen mandiri (pola SchedulerScreen /
-   VpsScreen): memuat statusnya sendiri + silent poll HTTP; TIDAK menambah kanal WebSocket (AC-26).
+   VpsScreen): memuat statusnya sendiri lewat HTTP, lalu disegarkan langganan berparameter di
+   kanal `/events/ws` yang SUDAH ADA (SPEC-908) — tetap tanpa kanal WebSocket baru (AC-26).
 
    Isinya empat: rem darurat + setelan (ControlBar), status per project + opt-in, sesi yang sedang
    dilayani (menunggu / sedang diputuskan), dan jejak keputusan — pertanyaan → jawaban → alasan →
    rujukan — dengan tombol Timpa & Batalkan per baris (AC-27/28, US-2/3/4). */
 import React from "react";
-import { Card, Button, Badge, Input, Select, StateBlock, Icon, Checkbox, Radio, Pager, serverPage } from "../ds";
+import { Card, Button, Badge, Input, Select, StateBlock, Icon, Checkbox, Radio, Pager, serverPage, LiveConnectionBadge } from "../ds";
 import { api } from "../api/client";
+import { useLiveTopic } from "../api/live";
 import type { Lead, LeadStatusView, LeadDecisionView, LeadFlowView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 import { usePersistedState, ResetViewButton, isStr, isNum } from "../ui-state";
 
+// SPEC-908 · tinggal kadens FALLBACK; jalur normalnya langganan `/events/ws`.
 const POLL_MS = 5000;
 // SPEC-523 · ukuran halaman kedua daftar lead. 393 baris jejak di instalasi hidup dulu dibalas
 // tanpa `total` dan berplafon `take` 50 — data lama tak terjangkau dari layar.
@@ -306,10 +309,24 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
   // AC-15 · ganti penyaring = kembali ke halaman 1. Tanpa ini, halaman 5 dari filter lama
   // menjawab daftar filter baru yang cuma punya 2 halaman → daftar kosong tanpa sebab.
   React.useEffect(() => { setDecPage(1); setFlowPage(1); }, [filter]);
-  React.useEffect(() => {
-    const t = setInterval(() => { if (!document.hidden) load(true); }, POLL_MS);
-    return () => clearInterval(t);
-  }, [load]);
+  // SPEC-908 · satu topik untuk ketiga daftar — cermin `load()` yang memang sudah satu
+  // `Promise.all`. Memecahnya jadi tiga topik berarti tiga frame yang bisa mendarat terpisah, dan
+  // layar akan menampilkan campuran dua generasi data yang hari ini tak mungkin terjadi.
+  // POLL_MS tinggal kadens fallback (server lama / WS terhalang).
+  useLiveTopic({
+    topic: "lead",
+    params: {
+      projectId: filter === "all" ? undefined : filter,
+      decPage, flowPage, limit: LIST_PAGE,
+    },
+    apply: (m) => {
+      setState(m.status);
+      setDecisions(m.decisions.items); setDecTotal(m.decisions.total);
+      setFlows(m.flows.items); setFlowTotal(m.flows.total);
+      setPhase("ready");
+    },
+    refetch: () => load(true), pollMs: POLL_MS,
+  });
 
   const writeConfig = React.useCallback(async (next: Lead) => {
     setBusy(true);
@@ -468,6 +485,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
               options={[{ value: "all", label: "semua project" },
                 ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
             <ResetViewButton screen="lead" active={filter === "all" ? 0 : 1} />
+            <LiveConnectionBadge />
           </div>
         }>
         {decisions.length === 0
