@@ -23,6 +23,9 @@ export type TerminalSession = {
   // sama persis dengan "mandek menunggu manusia" (diam, marker terisi), jadi tanpa penanda ini
   // operator membaca sesi yang justru sedang dilayani sebagai sesi yang terbengkalai.
   deciding?: boolean;
+  // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia" (isi marker keputusan). Absen =
+  // tak diketahui (sesi yang lahir sebelum ADR-0141) — pet tak pernah mengeskalasi tanpa stempel.
+  decisionAt?: string;
 };
 // SPEC-167 · respons dry-run PATCH /specs/:id saat revert akan menghapus artefak.
 export type RevertPending = { pending: true; stage: string; wouldDelete: string[] };

@@ -664,6 +664,24 @@ describe("pty service", () => {
     expect(find().decision).toBe(true);
   });
 
+  // SPEC-898 · ADR-0141 · umur "menunggu" datang dari ISI marker, bukan mtime-nya: hook Notification
+  // yang berulang mencap ulang mtime, jadi umurnya tak pernah tumbuh.
+  it("listSessions memberi decisionAt dari epoch di marker; teks lama diabaikan", () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    const decisionFile = join(repoDir, ".worktrees", ".decisions", "spec-at");
+    const s = createSession("p1", repoDir, { specId: "SPEC-AT", flow: "feature", prompt: "x", decisionFile });
+    const find = () => listSessions().find((x) => x.id === s.id)!;
+    expect(find().decisionAt).toBeUndefined();          // marker kosong
+
+    writeFileSync(decisionFile, "1755840000\n");
+    expect(find().decision).toBe(true);
+    expect(find().decisionAt).toBe(new Date(1755840000_000).toISOString());
+
+    writeFileSync(decisionFile, "waiting\n");           // marker sesi pra-ADR-0141
+    expect(find().decision).toBe(true);
+    expect(find().decisionAt).toBeUndefined();
+  });
+
   // SPEC-339 · koersi ditaruh di createSession, bukan di route: SEMUA kelahiran sesi lewat sini,
   // termasuk POST ber-AgentToken yang tak pernah menyentuh picker UI.
   it("effort yang tak didukung model codex diturunkan sebelum masuk argv", async () => {

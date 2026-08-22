@@ -308,6 +308,19 @@ describe("terminal routes", () => {
     killSession("prd-branchtest");
     execFileSync("git", ["worktree", "remove", "--force", wt], { cwd: repoDir });
   });
+
+  // SPEC-898 · ADR-0141 · payload additif: kolom baru harus benar-benar menyeberang HTTP, bukan
+  // hanya ada di SessionInfo.
+  it("GET /terminal/sessions meneruskan decisionAt", async () => {
+    const decisionFile = join(repoDir, ".worktrees", ".decisions", "spec-route-at");
+    const s = createSessionSvc("p1", repoDir, { specId: "SPEC-AT", flow: "feature", prompt: "x", decisionFile });
+    writeFileSync(decisionFile, "1755840000\n");
+    const res = await app.inject({ method: "GET", url: "/api/terminal/sessions" });
+    expect(res.statusCode).toBe(200);
+    const row = (res.json() as { id: string; decisionAt?: string }[]).find((x) => x.id === s.id)!;
+    expect(row.decisionAt).toBe(new Date(1755840000_000).toISOString());
+    killSession(s.id);
+  });
 });
 
 // SPEC-236 · terminal biasa NON-claude: shell mentah di repoDir project (bukan TUI Claude).

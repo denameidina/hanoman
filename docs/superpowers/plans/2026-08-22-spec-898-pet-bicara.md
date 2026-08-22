@@ -141,7 +141,7 @@ git commit -m "feat(pet): marker keputusan menyimpan epoch onset, bukan baris wa
 - Consumes: kontrak isi marker dari Task 1.
 - Produces: `SessionInfo.decisionAt?: string` (ISO 8601), ada **hanya** saat `decision === true` **dan** isi marker adalah integer. Dipakai Task 3 lewat `TerminalSession.decisionAt`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `server/test/pty.test.ts`, tepat setelah test `"listSessions melaporkan decision saat marker keputusan terisi (SPEC-196)"`:
 
@@ -167,12 +167,12 @@ Tambahkan di `server/test/pty.test.ts`, tepat setelah test `"listSessions melapo
 
 Pastikan `writeFileSync` ada di import `node:fs` berkas itu; tambahkan bila belum.
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "decisionAt"`
 Expected: FAIL — `expected undefined to be '2025-…'` (properti belum ada)
 
-- [ ] **Step 3: Implementasi di `pty.ts`**
+- [x] **Step 3: Implementasi di `pty.ts`**
 
 Ganti `markerFilled` dan tetangganya:
 
@@ -229,12 +229,12 @@ const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch,
 
 Catatan: `{ decisionAt: undefined }` tetap hilang saat JSON serialize, jadi payload byte-identik dengan sebelumnya untuk marker legacy.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV pnpm vitest --run --no-file-parallelism server/test/pty.test.ts -t "decisionAt"`
 Expected: PASS
 
-- [ ] **Step 5: Tulis test route yang gagal**
+- [x] **Step 5: Tulis test route yang gagal**
 
 Tambahkan di `server/test/terminal.route.test.ts`, di dalam `describe` yang memuat test `"createSession menyimpan branch dan mengembalikannya di listSessions"`:
 
@@ -254,12 +254,12 @@ Tambahkan di `server/test/terminal.route.test.ts`, di dalam `describe` yang memu
   });
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan gagal lalu lulus**
+- [x] **Step 6: Jalankan test, pastikan gagal lalu lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV pnpm vitest --run --no-file-parallelism server/test/terminal.route.test.ts -t "decisionAt"`
 Expected: PASS langsung (route mengembalikan `listSessions()` apa adanya — test ini mengunci bahwa ia memang begitu). Bila FAIL, perbaiki route sebelum lanjut.
 
-- [ ] **Step 7: Rambatkan tipe ke wire & klien**
+- [x] **Step 7: Rambatkan tipe ke wire & klien**
 
 Di `shared/src/dto.ts`, `SessionDTO`, setelah `exitCode?: number;`:
 
@@ -276,12 +276,12 @@ Di `src/src/api/client.ts`, `TerminalSession`, setelah `deciding?: boolean;`:
   decisionAt?: string;
 ```
 
-- [ ] **Step 8: Typecheck paket yang tersentuh**
+- [x] **Step 8: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck`
 Expected: nol error
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/src/services/pty.ts shared/src/dto.ts src/src/api/client.ts server/test/pty.test.ts server/test/terminal.route.test.ts

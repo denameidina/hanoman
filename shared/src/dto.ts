@@ -700,6 +700,8 @@ export type SessionDTO = {
   // SPEC-402 · kode keluar pane MATI; undefined selama pane hidup. `exited` sendirian tak bisa
   // membedakan sesi yang tuntas dari agen yang dihentikan di tengah kerja.
   exitCode?: number;
+  // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia"; ada hanya saat `decision` true.
+  decisionAt?: string;
 };
 
 // SPEC-199 · frame siar dashboard (server → klien), lewat GET /events/ws (ADR-0039). Read-only

@@ -2,7 +2,7 @@ import { spawn, type IPty } from "node-pty";
 import { execFile, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -47,6 +47,19 @@ export const markerFilled = (f: string): boolean => {
   try { return statSync(f).size > 0; } catch { return false; }
 };
 
+// SPEC-898 · ADR-0141 · isi marker = detik epoch ONSET episode menunggu (ditulis sekali oleh hook,
+// lihat runner/src/settings.ts). Marker sesi yang lahir sebelum ADR-0141 berisi "waiting" — tak bisa
+// diparse, dan `undefined` di sana adalah jawaban yang benar: kita memang tak tahu sejak kapan.
+// Berkasnya dibaca HANYA untuk marker yang sudah terbukti terisi, jadi sesi yang tak menunggu
+// membayar nol I/O tambahan.
+const markerOnset = (f: string): string | undefined => {
+  let raw: string;
+  try { raw = readFileSync(f, "utf8"); } catch { return undefined; }
+  const secs = Number(raw.trim());
+  if (!Number.isInteger(secs) || secs <= 0) return undefined;
+  return new Date(secs * 1000).toISOString();
+};
+
 export type Frame =
   | { t: "data"; d: string }
   | { t: "exit"; code: number }
@@ -71,6 +84,9 @@ export type SessionInfo = {
   // `pkill -f` sesi tetangga → 143) sebagai "Selesai" hijau — persis keluhan SPEC-402.
   exitCode?: number;
   branch?: string; decision: boolean;
+  // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia". Ada HANYA saat `decision` true dan
+  // marker memuat stempel; absen untuk sesi yang lahir sebelum ADR-0141.
+  decisionAt?: string;
   // SPEC-338 · ADR-0074 · mesin sesi. Sesi lama (tanpa opsi tmux ini) dibaca sebagai "claude".
   agent: Agent;
 };
@@ -286,11 +302,13 @@ function parsePanes(out: string): Pane[] {
   });
 }
 
-const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent }: Pane): SessionInfo => ({
+const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent,
+  decisionFile }: Pane): SessionInfo => ({
   id, projectId, specId, flow, cwd, exited, branch, decision, agent,
   // Hanya untuk pane mati: `pane_dead_status` kosong pada pane hidup, dan `exitCode: 0` di sana
   // akan terbaca sebagai "sudah berakhir sukses".
   ...(exited ? { exitCode: code } : {}),
+  ...(decision && decisionFile ? { decisionAt: markerOnset(decisionFile) } : {}),
 });
 
 export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
