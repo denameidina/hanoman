@@ -59,6 +59,31 @@ Escape/outside-click menutup, fokus kembali, dan menu mendukung Arrow/Home/End.
 Target responsif bukan menyederhanakan fitur: data, status, field penting, dan aksi yang tersedia di
 desktop wajib tetap dapat dicapai di tablet/mobile; yang berubah hanya susunan dan cara berpindah panel.
 
+## Ikon (SPEC-906)
+
+Semua ikon dipanggil lewat `Icon` (`src/src/ds/icon.tsx`) dengan nama **kebab-case**, tak pernah
+dengan mengimpor komponen lucide langsung — itu yang membuat `data-icon={name}` selalu ada dan
+kontrak ikon bisa diuji tanpa menyentuh internal lucide (ADR-0127).
+
+Lookup-nya melihat peta `icons` lucide, lalu **peta alias `LEGACY`** di berkas yang sama. Sebabnya
+bukan gaya: lucide 0.400 memberi banyak ikon nama kanonik baru (`AlertTriangle` → `TriangleAlert`,
+`XCircle` → `CircleX`, `TerminalSquare` → `SquareTerminal`) dan menyimpan nama lamanya **hanya
+sebagai alias di level modul** — peta `icons` memuat yang kanonik saja. Selama lookup-nya `icons`,
+lima belas nama lama yang masih dipakai di UI ini jatuh ke `Circle` di ±123 call site, termasuk ikon
+**setiap toast error** (`x-circle`), spinner **setiap tombol loading** (`loader-2`), dan menu
+overflow (`more-horizontal`): ikon hilang, layout utuh, **nol error**, jadi tak ada yang
+menyadarinya.
+
+`LEGACY` dipetakan tangan, bukan `import * as lucide` yang juga akan menangkap semua alias:
+namespace dinamis memaksa Rollup membangun objek berisi ~2 000 getter — **+20 KB gzip terukur**
+(859 → 879 KB) untuk hasil yang identik. Peta itu sekaligus daftar utang migrasi; mengosongkannya
+berarti mengganti nama di call site, dan dua di antaranya **tertukar**: `check-circle` =
+`circle-check-big` (tebal), `check-circle-2` = `circle-check` (tipis).
+
+Nama yang tak dikenal keduanya tetap dirender sebagai lingkaran kosong — kali ini disertai
+`console.warn` sekali per nama di dev, supaya salah ketik berikutnya tak ikut senyap. Penjaganya
+`src/test/icon.test.tsx`.
+
 ## Ilustrasi produk
 
 Katalog authoritative berada di `internal/assets/illustration/inventory.json`: **41 master WebP**

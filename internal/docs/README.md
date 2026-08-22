@@ -240,7 +240,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [threat model deployment publik](security/threat-model.md) — asset, aktor, trust boundary, abuse case, kontrol, residual risk, invariant test, dan batas otorisasi DAST SPEC-761
 
 ## design-system
-- [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), ilustrasi (termasuk band **pet** 80–128 px), dan grammar motion Pet Hanoman: sprite atlas + `steps()` sejak Pet hidup A (SPEC-648 · ADR-0140)
+- [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), kontrak ikon lewat namespace lucide (SPEC-906), ilustrasi (termasuk band **pet** 80–128 px), dan grammar motion Pet Hanoman: sprite atlas + `steps()` sejak Pet hidup A (SPEC-648 · ADR-0140)
 
 ## frontend
 - [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan Pet Hanoman sebagai sprite hidup yang berkeliaran di tepi bawah, mengaku saat koneksi putus, mendaftar semua kondisi aktif, MENGUCAPKANNYA lewat gelembung ber-template + rekap "selama kamu pergi", lalu MENJAWAB pertanyaan agen langsung dari panelnya, plus pil topbar dua wajah yang selalu menyebut versi terpasang (SPEC-763 · SPEC-906 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142)
