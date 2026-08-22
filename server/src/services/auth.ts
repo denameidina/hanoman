@@ -1,6 +1,7 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
 import type { UserView } from "@hanoman/shared";
+import { resolveHardening } from "@hanoman/runner";
 import { prisma } from "../db";
 import { BoundedRateLimiter } from "./bounded-rate-limit";
 
@@ -77,11 +78,27 @@ export function noteLoginFail(ip: string): void {
 }
 export function clearLoginFails(ip: string): void { fails.clear(ip); loginStates.delete(ip); }
 
-export function cookieOpts() {
+/**
+ * SPEC-884 · ADR-0138 · `Secure` diturunkan dari SKEMA REQUEST, bukan dari `NODE_ENV`.
+ *
+ * `x-forwarded-proto` sengaja dibaca LANGSUNG dari header, bukan lewat `req.protocol`: Fastify
+ * hanya memercayai header itu bila `trustProxy` terisi, dan `trustProxyFromEnv` mengembalikan
+ * `false` tanpa `HANOMAN_TRUST_PROXY` (`services/ingress-policy.ts:55-57`). Instance di balik TLS
+ * yang tak menyetel variabel itu — bentuk hanoman lokal di balik Cloudflare Tunnel — karena itu
+ * akan KEHILANGAN `Secure` yang hari ini didapatnya dari `NODE_ENV`.
+ *
+ * Memercayai header ini aman karena arahnya satu: menyuntiknya hanya bisa membuat cookie lebih
+ * ketat. Melonggarkannya menuntut MENGHAPUS header, dan header yang absen memang berarti request
+ * polos. Yang mungkin terjadi hanyalah cookie `Secure` di koneksi http — cookie tak terkirim,
+ * gagal tertutup.
+ */
+export function cookieOpts(req: { protocol?: string; headers: Record<string, unknown> }) {
+  const forwarded = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0]?.trim();
+  const https = req.protocol === "https" || forwarded === "https";
   return {
     httpOnly: true,
     sameSite: "strict" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: https || resolveHardening(process.env),
     path: "/",
     maxAge: SESSION_TTL_MS / 1000,
   };

@@ -804,7 +804,7 @@ git commit -m "fix(spec-884): AuthScreen menghormati setupTokenRequired"
 - Consumes: `resolveHardening` (Task 2)
 - Produces: `cookieOpts(req: { protocol?: string; headers: Record<string, unknown> })` — **breaking**: sekarang wajib menerima request
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/auth-cookie-secure.test.ts`:
 
@@ -850,12 +850,12 @@ describe("cookie Secure (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/auth-cookie-secure.test.ts`
 Expected: FAIL — `Expected 0 arguments, but got 1` / `secure` selalu mengikuti `NODE_ENV`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/auth.ts`, ganti `cookieOpts` (baris 80-88):
 
@@ -910,17 +910,17 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 Lalu perbarui **tiga** pemanggil `issue(...)` di berkas itu (setup, login, change-password) menjadi `await issue(req, reply, user.id);`.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/auth-cookie-secure.test.ts server/test/auth-routes.test.ts server/test/bootstrap.test.ts`
 Expected: PASS — ketiganya
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: keluar 0
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/auth.ts server/src/routes/auth.ts server/test/auth-cookie-secure.test.ts
