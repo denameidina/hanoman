@@ -1,22 +1,27 @@
 import type { LeadDecision } from "@prisma/client";
-import { leadReplyText, type Agent, type Lead, type LeadDelivery } from "@hanoman/shared";
-import { capturePane, clearMarker, getSession, liveDecisions, markerFilled, sendToPane, submitPaneDialog } from "../pty";
+import { leadReplyText, type Lead, type LeadDelivery, type SessionAsk } from "@hanoman/shared";
+import { capturePane, clearMarker, getSession, sendToPane, submitPaneDialog } from "../pty";
 import { dialogKey, readDialogScreen } from "../tui-dialog";
 import { recordLeadDecision } from "../notifications";
+import { beginAnswer, endAnswer } from "../session-dialog";
 import { getLead, leadActive, leadProjects } from "./config";
+import { isTakenOver } from "./deciding";
 import { closeFlow, LeadFlowClosedError } from "./flow";
-import { readPaneQuestion } from "./pane";
+import { readCodexTurn } from "./pane";
 import { decide, prodDecideDeps, takeDelivery, type DecideDeps } from "./decide";
-import { LeadBusyError, runPool } from "./gate";
+import { LeadBusyError } from "./gate";
 import { recordDecision } from "./trail";
 
-// SPEC-409 · ADR-0091 · PINTU KEPUTUSAN #2 — deteksi otomatis.
+// SPEC-409 · ADR-0091 · SPEC-909 · ADR-0146 · PINTU KEPUTUSAN #2 — deteksi otomatis.
 //
 // Melayani sesi APA ADANYA: tak ada prompt baru, tak ada kontrak baru, tak ada perubahan pada
-// mekanisme fase. Lead melihat sesi hidup ber-marker keputusan terisi (mekanisme SPEC-184/196 yang
-// sudah ada — pintu ini MEMBANGUN DI ATASNYA, bukan membuat deteksi baru), membaca layarnya,
-// memutuskan, lalu mengetik jawabannya ke pane. Sesi melanjutkan pekerjaannya tanpa tahu siapa yang
-// menjawab (US-6).
+// mekanisme fase. Sesi melanjutkan pekerjaannya tanpa tahu siapa yang menjawab (US-6).
+//
+// SPEC-909 mengubah PEMICUNYA, bukan pagarnya. Dulu modul ini PEMINDAI: `scanAndAnswer` menyapu
+// semua sesi hidup tiap 5 detik, membaca marker, lalu men-`capture-pane` untuk menebak apa yang
+// ditanyakan. Sekarang ia PENERIMA: hook agen menembak tepat pada `AskUserQuestion` (claude) atau
+// akhir-turn (codex), dan `lead/ask.ts` memanggil `admitAsk` + `answerAsk` untuk SATU sesi. Yang
+// diketik ke pane, dan setiap pagar yang menahannya, tak berubah sedikit pun.
 
 /**
  * AC-11 / OQ-10 · berapa jawaban otomatis BERTURUT-TURUT sudah diberikan untuk satu sesi.
@@ -94,19 +99,14 @@ const CHAIN_POLL_MS = 300;
 const CHAIN_POLL_TRIES = 20;
 
 /**
- * SPEC-487 (QA) · berapa tangkapan layar dibutuhkan sebelum "rantainya sudah tuntas" boleh
- * dipercaya (±1,5 dtk).
+ * SPEC-909 · ADR-0146 · berapa lama menunggu dialognya TERGAMBAR sesudah lead selesai memutuskan.
  *
- * Vonis itu MENGOSONGKAN marker, dan marker sebuah dialog hanya terisi SEKALI (SPEC-474: 0 B
- * selama 120 dtk dengan dialognya masih terbuka) — jadi vonis yang salah membuat sisa rantainya
- * tak terjangkau siapa pun. Sementara itu `waitScreenChange` pulang begitu `dialogKey` berubah,
- * termasuk berubah jadi `"none"` pada satu frame setengah-render di antara dua pertanyaan. Satu
- * tangkapan karena itu bukan bukti; beberapa tangkapan berturut-turut baru bukti.
- *
- * Cermin `SUBMIT_TRIES` (tui-dialog.ts): yang mahal bukan jedanya, melainkan salah membaca layar
- * setengah jadi.
+ * `PreToolUse` menembak SEBELUM tool-nya jalan, jadi pada saat event tiba dialognya belum ada di
+ * layar. Menunggunya praktis gratis: `decide()` sudah memakan detik sampai menit lebih dulu.
+ * Habis tanpa dialog = BATAL, bukan jatuh ke jalur prosa — `sendToPane` akan mengetik prosa +
+ * `Enter` ke kolom chat yang sudah normal, dan itu persis pesan liar yang diukur SPEC-487.
  */
-const CHAIN_END_TRIES = 5;
+const DIALOG_WAIT_TRIES = 20;
 
 export function resetSession(sessionId: string): void {
   answers.delete(sessionId); capped.delete(sessionId);
@@ -121,14 +121,7 @@ export function answerCount(sessionId: string): number { return answers.get(sess
 export function failureCount(sessionId: string): number { return failures.get(sessionId) ?? 0; }
 
 export type DetectDeps = {
-  // SPEC-903 · ADR-0143 · `liveDecisions()` juga mengembalikan `waiting` (bit turunan pil terminal);
-  // pintu ini SENGAJA tak memakainya — gerbangnya sendiri, `AGENT_TURN_LINE` di readPaneQuestion
-  // (SPEC-487, pemisahan terukur 6/6 vs 0/16), berbasis ISI layar dan lebih kuat. Bentuk yang lebih
-  // sempit di sini adalah pernyataan itu, bukan kelalaian.
-  live: () => { id: string; specId?: string; projectId: string; decisionFile: string }[];
-  filled: (file: string) => boolean;
   pane: (id: string) => string;
-  agentOf: (id: string) => Agent | null;
   exited: (id: string) => boolean;
   /**
    * SPEC-485 · pilihan lead ikut sebagai DATA, bukan hanya prosa: dialog `multiSelect` dijawab
@@ -179,17 +172,26 @@ export type DetectDeps = {
 };
 
 export const prodDetectDeps: DetectDeps = {
-  live: () => { try { return liveDecisions(); } catch { return []; } },
-  filled: markerFilled,
   pane: (id) => capturePane(id),
-  agentOf: (id) => { try { return getSession(id)?.agent ?? null; } catch { return null; } },
   // SPEC-402 · tmux tak terbaca ≠ pane mati. Ragu → perlakukan sebagai mati: yang hilang cuma satu
   // jawaban otomatis (sesi jatuh ke perilaku hari ini), sementara salah arah membuat lead mengetik
   // ke pane yang sudah tak ada.
   exited: (id) => { try { return getSession(id)?.exited ?? true; } catch { return true; } },
-  send: (id, text, choices) => sendToPane(id, text, 50, choices),
+  // SPEC-909 · ADR-0146 · jalur lead ikut masuk ke penjaga yang SAMA dengan jalur manusia
+  // (`beginAnswer`, ADR-0142 §5). Dua penulis pane yang tak sepakat menyilangkan keystroke jadi
+  // sampah yang tak bisa ditarik kembali — dan sejak operator bisa MENGAMBIL ALIH (AC-6), kedua
+  // penulis itu memang bisa aktif bersamaan.
+  send: async (id, text, choices) => {
+    if (!beginAnswer(id)) return false;
+    try { return await sendToPane(id, text, 50, choices); }
+    finally { endAnswer(id); }
+  },
   clearMarker,
-  submit: (id) => submitPaneDialog(id),
+  submit: async (id) => {
+    if (!beginAnswer(id)) return false;
+    try { return await submitPaneDialog(id); }
+    finally { endAnswer(id); }
+  },
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
   // Alur yang gagal ditutup bukan alasan menggagalkan rantai yang sudah berhasil: penyapu TTL
   // (ADR-0102) tetap menutupnya.
@@ -203,294 +205,257 @@ export const prodDetectDeps: DetectDeps = {
   cfg: getLead,
 };
 
-export type DetectResult = { answered: string[]; skipped: { id: string; reason: string }[] };
+export type AdmitResult = { ok: true } | { ok: false; reason: string };
+export type AskCtx = { projectId: string; specId?: string; decisionFile?: string };
+export type AnswerAskResult = {
+  answered: boolean; reason: string; at: number; flowId: string | null; step: number | null;
+};
 
-/** Satu putaran pintu deteksi. Dipanggil denyut (engine.ts); tak pernah melempar ke pemanggil. */
-export async function scanAndAnswer(deps: DetectDeps = prodDetectDeps): Promise<DetectResult> {
-  const out: DetectResult = { answered: [], skipped: [] };
+/**
+ * SPEC-909 · ADR-0146 · seluruh pagar tahap 1 `scanAndAnswer` yang lama, dinilai untuk SATU sesi.
+ *
+ * Kalimat, `kind`, dan `weighty` baris jejaknya sengaja tak berubah sehuruf pun: pagar yang "masih
+ * menggigit" harus menggigit dengan bunyi yang sama, dan operator membaca jejak itu sebagai bukti.
+ */
+export async function admitAsk(
+  s: { id: string; specId?: string; projectId: string },
+  deps: DetectDeps = prodDetectDeps,
+): Promise<AdmitResult> {
   const cfg = await deps.cfg();
-  if (!cfg.enabled || cfg.paused) return out;
-  const optIn = new Set(await deps.optIn());
+  const no = (reason: string): AdmitResult => ({ ok: false, reason });
+  if (!cfg.enabled || cfg.paused) return no("lead tidak aktif");        // AC-27/AC-30
+  if (!(await deps.optIn()).includes(s.projectId)) return no("project tak opt-in lead");
+  if (!leadActive(cfg, s.projectId)) return no("lead dijeda untuk project ini");   // AC-15
+  if (deps.exited(s.id)) return no("pane mati");                        // AC-10
 
-  const sessions = deps.live();
-  sweep(sessions.map((s) => s.id));
-
-  // SPEC-479 (QA) · DUA TAHAP, dan pemisahannya adalah seluruh perbaikannya.
-  //
-  // Tahap 1 (di bawah) hanya menyaring dan — untuk sesi yang menabrak pagar — menulis satu baris
-  // + notifikasi. Semuanya murah dan berurutan, jadi jejak & `skipped` tetap deterministik.
-  // Tahap 2 menjalankan rantai dialognya BERBARENGAN, berbatas `maxConcurrent`.
-  //
-  // Sebelumnya keduanya satu loop `for`+`await`, dan itu membuat "berapa sesi dilayani sekaligus"
-  // dijawab oleh bentuk kode: SATU. Terukur `maxInFlight = 1` dengan tangga tunggu linier
-  // 0/204/407/614/832/1035 ms untuk 6 sesi, dan karena urutan `tmux list-panes -a` stabil, ekor
-  // daftar selalu di ekor. Ditambah `busyDetect` (engine.ts) yang memulangkan tiap tick 5 detik
-  // selama satu rantai berjalan — pada anggaran penuh satu sesi boleh memegang pintu ini 60,6 menit.
-  const ready: { s: (typeof sessions)[number]; agent: Agent }[] = [];
-
-  for (const s of sessions) {
-    const skip = (reason: string) => out.skipped.push({ id: s.id, reason });
-    if (!optIn.has(s.projectId)) { skip("project tak opt-in lead"); continue; }
-    if (!leadActive(cfg, s.projectId)) { skip("lead dijeda untuk project ini"); continue; }
-    // SPEC-487 (QA) · marker adalah PEMBERITAHUAN; layar adalah BUKTI. Hook `Notification` claude
-    // mengisi marker sekali per dialog dan tak pernah menembak lagi (SPEC-474: 0 B / 120 dtk dengan
-    // dialognya masih terbuka), jadi selama marker adalah satu-satunya kunci pintu ini, marker yang
-    // dikosongkan lebih awal — oleh sebab apa pun — membuat dialognya tak terlihat SELAMANYA.
-    // Terukur in-vivo: dialog terbuka + marker kosong = 0 percobaan dalam 20 denyut / 100 dtk, dan
-    // sesinya tak muncul bahkan di `skipped`.
-    //
-    // Kunci kedua fail-closed secara konstruksi: `readDialogScreen` menuntut footer chord claude,
-    // yang tak pernah dirender codex — AC-9 tetap utuh. Ongkosnya satu `capture-pane` per sesi
-    // hidup per denyut untuk sesi ber-marker kosong (terukur 6,28 ms/panggilan, SPEC-479 temuan E).
-    if (!deps.filled(s.decisionFile)
-      && !(!deps.exited(s.id) && readDialogScreen(deps.pane(s.id)))) continue;   // tak menunggu apa-apa
-    if (deps.exited(s.id)) { skip("pane mati"); continue; }   // AC-10
-
-    if ((answers.get(s.id) ?? 0) >= cfg.maxAutoAnswers) {     // AC-11
-      if (!capped.has(s.id)) {
-        capped.add(s.id);
-        const row = await recordDecision({
-          projectId: s.projectId, specId: s.specId, sessionId: s.id,
-          gate: "detected", kind: "quality",
-          question: `Sesi ${s.id} sudah dijawab otomatis ${cfg.maxAutoAnswers}× berturut-turut.`,
-          answer: "Berhenti menjawab sesi ini; serahkan ke operator.",
-          reason: "Batas jawaban otomatis per sesi tercapai — pengulangan menandakan lead tak benar-benar membuka jalan buntunya (AC-11).",
-          refs: [], confidence: "tinggi", action: "none", weighty: true,
-        });
-        await deps.notify(row.id, `Lead berhenti menjawab sesi ${s.id} (batas ${cfg.maxAutoAnswers}× tercapai)`,
-          s.projectId, s.specId ?? null, s.id);
-      }
-      skip("batas jawaban otomatis tercapai");
-      continue;
+  if ((answers.get(s.id) ?? 0) >= cfg.maxAutoAnswers) {                 // AC-11
+    if (!capped.has(s.id)) {
+      capped.add(s.id);
+      const row = await recordDecision({
+        projectId: s.projectId, specId: s.specId, sessionId: s.id,
+        gate: "detected", kind: "quality",
+        question: `Sesi ${s.id} sudah dijawab otomatis ${cfg.maxAutoAnswers}× berturut-turut.`,
+        answer: "Berhenti menjawab sesi ini; serahkan ke operator.",
+        reason: "Batas jawaban otomatis per sesi tercapai — pengulangan menandakan lead tak benar-benar membuka jalan buntunya (AC-11).",
+        refs: [], confidence: "tinggi", action: "none", weighty: true,
+      });
+      await deps.notify(row.id, `Lead berhenti menjawab sesi ${s.id} (batas ${cfg.maxAutoAnswers}× tercapai)`,
+        s.projectId, s.specId ?? null, s.id);
     }
-
-    // SPEC-487 · deret kegagalan PUTUS sesudah `FAIL_COOLDOWN_MS` tanpa kegagalan baru. Tanpa ini
-    // `failCapped` adalah keadaan menyerap dan tiga lonjakan beban menutup lead bagi sesi ini
-    // selamanya (temuan C audit SPEC-479, yang perbaikannya hanya menyentuh `LeadBusyError`).
-    const lastFail = failedAt.get(s.id);
-    if (lastFail !== undefined && deps.now() - lastFail > FAIL_COOLDOWN_MS) {
-      failures.delete(s.id); failCapped.delete(s.id); failedAt.delete(s.id);
-    }
-
-    // SPEC-472 · pagar kedua: menyerah sesudah sederet kegagalan. Ditempatkan SEBELUM `decide()`
-    // karena yang mahal justru panggilannya — satu proses agen per percobaan.
-    if ((failures.get(s.id) ?? 0) >= cfg.maxAutoAnswers) {
-      if (!failCapped.has(s.id)) {
-        failCapped.add(s.id);
-        const row = await recordDecision({
-          projectId: s.projectId, specId: s.specId, sessionId: s.id,
-          gate: "detected", kind: "quality",
-          question: `Keputusan untuk sesi ${s.id} gagal disusun ${cfg.maxAutoAnswers}× berturut-turut.`,
-          answer: "Berhenti mencoba; serahkan ke operator.",
-          reason: "Kegagalan beruntun menandakan sebab yang tak hilang dengan mengulang (kunci/kuota agen, biner tak terpasang) — mencoba lagi tiap denyut hanya membakar kuota. Alasan percobaan terakhir ada di baris jejak `gagal` tepat di atas ini.",
-          refs: [], confidence: "tinggi", action: "none", weighty: true,
-        });
-        await deps.notify(row.id, `Lead berhenti mencoba sesi ${s.id} (${cfg.maxAutoAnswers}× gagal berturut-turut)`,
-          s.projectId, s.specId ?? null, s.id);
-      }
-      skip("batas kegagalan beruntun tercapai");
-      continue;
-    }
-
-    const agent = deps.agentOf(s.id) ?? "claude";
-    const read = readPaneQuestion(deps.pane(s.id), agent);
-    if (!read.asking) { skip(read.reason); continue; }        // AC-9
-
-    ready.push({ s, agent });
+    return no("batas jawaban otomatis tercapai");
   }
 
-  await runPool(ready, cfg.maxConcurrent, async ({ s, agent }) => {
-    const chain = await runChain(s, agent, deps);
-    if (chain.acted && chain.done) {
-      // SPEC-452/474 · marker dikosongkan HANYA sesudah layarnya bukan dialog lagi. Mengosongkannya
-      // di tengah rantai (perilaku sebelum spec ini) membuat sisa rantai tak terlihat oleh siapa
-      // pun: hook `Notification` claude mengisi marker SEKALI per dialog dan tak pernah menembak
-      // lagi — terukur 0 B selama 120 dtk dengan dialognya masih terbuka.
-      deps.clearMarker(s.decisionFile);
-      answers.set(s.id, (answers.get(s.id) ?? 0) + 1);   // satu RANTAI = satu jawaban otomatis
-      failures.delete(s.id);   // SPEC-472 · "beruntun" — satu keberhasilan memutus rantainya
-      out.answered.push(s.id);
-      return;
+  // SPEC-487 · deret kegagalan PUTUS sesudah `FAIL_COOLDOWN_MS` tanpa kegagalan baru. Tanpa ini
+  // `failCapped` adalah keadaan menyerap dan tiga lonjakan beban menutup lead bagi sesi ini
+  // selamanya (temuan C audit SPEC-479, yang perbaikannya hanya menyentuh `LeadBusyError`).
+  const lastFail = failedAt.get(s.id);
+  if (lastFail !== undefined && deps.now() - lastFail > FAIL_COOLDOWN_MS) {
+    failures.delete(s.id); failCapped.delete(s.id); failedAt.delete(s.id);
+  }
+
+  // SPEC-472 · pagar kedua: menyerah sesudah sederet kegagalan. Ditempatkan SEBELUM `decide()`
+  // karena yang mahal justru panggilannya — satu proses agen per percobaan.
+  if ((failures.get(s.id) ?? 0) >= cfg.maxAutoAnswers) {
+    if (!failCapped.has(s.id)) {
+      failCapped.add(s.id);
+      const row = await recordDecision({
+        projectId: s.projectId, specId: s.specId, sessionId: s.id,
+        gate: "detected", kind: "quality",
+        question: `Keputusan untuk sesi ${s.id} gagal disusun ${cfg.maxAutoAnswers}× berturut-turut.`,
+        answer: "Berhenti mencoba; serahkan ke operator.",
+        reason: "Kegagalan beruntun menandakan sebab yang tak hilang dengan mengulang (kunci/kuota agen, biner tak terpasang) — mencoba lagi tiap denyut hanya membakar kuota. Alasan percobaan terakhir ada di baris jejak `gagal` tepat di atas ini.",
+        refs: [], confidence: "tinggi", action: "none", weighty: true,
+      });
+      await deps.notify(row.id, `Lead berhenti mencoba sesi ${s.id} (${cfg.maxAutoAnswers}× gagal berturut-turut)`,
+        s.projectId, s.specId ?? null, s.id);
     }
-    if (chain.failed) {
-      failures.set(s.id, (failures.get(s.id) ?? 0) + 1);
-      failedAt.set(s.id, deps.now());
-    }
-    out.skipped.push({ id: s.id, reason: chain.reason });
-  });
-  return out;
+    return no("batas kegagalan beruntun tercapai");
+  }
+  return { ok: true };
+}
+
+/**
+ * Layani SATU event. Dipanggil pekerja `lead/ask.ts`; tak pernah melempar ke pemanggil.
+ *
+ * Penghitungnya persis seperti jalur lama: satu PANGGILAN `AskUserQuestion` = satu jawaban otomatis
+ * (AC-11), keberhasilan memutus deret `failures` (SPEC-472), dan marker dikosongkan HANYA saat
+ * seluruh rantainya tuntas (SPEC-452/474 — marker sebuah dialog hanya terisi sekali).
+ */
+export async function answerAsk(
+  ask: SessionAsk, s: AskCtx, deps: DetectDeps = prodDetectDeps,
+): Promise<AnswerAskResult> {
+  const chain = await runChain(ask, s, deps);
+  const out = { at: chain.at, flowId: chain.flowId, step: chain.step };
+  if (chain.acted && chain.done) {
+    if (s.decisionFile) deps.clearMarker(s.decisionFile);
+    answers.set(ask.sessionId, (answers.get(ask.sessionId) ?? 0) + 1);
+    failures.delete(ask.sessionId);
+    return { answered: true, reason: "", ...out };
+  }
+  if (chain.failed) {
+    failures.set(ask.sessionId, (failures.get(ask.sessionId) ?? 0) + 1);
+    failedAt.set(ask.sessionId, deps.now());
+  }
+  return { answered: false, reason: chain.reason, ...out };
 }
 
 type ChainResult = {
   /** Minimal satu jawaban terkirim atau satu submit berhasil. */
   acted: boolean;
-  /** Layarnya sudah bukan dialog lagi — rantainya benar-benar tuntas. */
+  /** Seluruh pertanyaan panggilan ini terjawab dan dialognya ditutup. */
   done: boolean;
-  /** Kegagalan yang layak dihitung (bukan sekadar lead dijeda di tengah panggilan). */
+  /** Kegagalan yang layak dihitung (bukan sekadar lead dijeda/penuh di tengah panggilan). */
   failed: boolean;
   reason: string;
+  /** Langkah terakhir yang dikerjakan (0-based) — dipancarkan ke pet sebagai "ke-berapa dari". */
+  at: number;
+  flowId: string | null;
+  step: number | null;
 };
 
 /**
- * SPEC-474 · satu RANTAI `AskUserQuestion`: jawab pertanyaan yang tampil, tunggu layarnya
- * berganti, ulangi, lalu tutup dengan submit.
+ * SPEC-474 · SPEC-909 · ADR-0146 · satu panggilan `AskUserQuestion` = satu rantai = satu `LeadFlow`.
  *
- * Semuanya dalam SATU putaran deteksi. Menunggu denyut berikutnya bukan pilihan: begitu marker
- * dikosongkan ia tak pernah terisi lagi, dan membiarkannya terisi pun tak menolong karena setiap
- * mata rantai baru akan membayar satu jatah `maxAutoAnswers` — dialog 4 pertanyaan (maksimum yang
- * diizinkan kontrak tool) menjadi mustahil selesai pada setelan default.
+ * Berapa langkahnya DIKETAHUI dari payload (`questions.length`, ≤ 4 per kontrak tool), bukan
+ * ditebak dari layar — itulah yang mencabut `CHAIN_END_TRIES`/`settledPane`. Yang tersisa dari
+ * layar hanya dua, keduanya di DALAM satu rantai yang sudah dipicu event: menunggu dialognya
+ * tergambar (`waitDialog` — `PreToolUse` menembak sebelum tool-nya jalan) dan berpindah antar-tab
+ * (`waitScreenChange` — terukur tak ada event di antara tab, satu panggilan 3 pertanyaan
+ * menerbitkan 1 event).
+ *
+ * Panggilan `AskUserQuestion` BERIKUTNYA tiba sebagai event berikutnya, jadi rantai lintas-panggilan
+ * tak pernah lagi ditunggu di layar.
  */
-async function runChain(
-  s: { id: string; specId?: string; projectId: string },
-  agent: Agent,
-  deps: DetectDeps,
-): Promise<ChainResult> {
+async function runChain(ask: SessionAsk, s: AskCtx, deps: DetectDeps): Promise<ChainResult> {
+  const sid = ask.sessionId;
+  let flowId: string | null = chainFlows.get(sid) ?? null;
+  let step: number | null = null;
   let acted = false;
-  // SPEC-487 · seluruh rantai duduk di SATU `LeadFlow` (ADR-0102), termasuk saat ia menyeberangi
-  // beberapa denyut. `done()` menutupnya; jalan keluar lain sengaja meninggalkannya terbuka supaya
-  // lanjutannya menyusul ke alur yang sama.
-  const done = async (r: ChainResult): Promise<ChainResult> => {
-    const flowId = chainFlows.get(s.id);
-    if (flowId) { chainFlows.delete(s.id); await deps.closeChain(flowId).catch(() => {}); }
-    return r;
+  let at = 0;
+
+  const close = async (r: Omit<ChainResult, "flowId" | "step">): Promise<ChainResult> => {
+    const f = chainFlows.get(sid);
+    if (f) { chainFlows.delete(sid); await deps.closeChain(f).catch(() => {}); }
+    return { ...r, flowId, step };
   };
-  for (let step = 0; step < MAX_CHAIN_STEPS; step++) {
-    // SPEC-487 · di langkah > 0, "layarnya bukan dialog lagi" adalah VONIS yang mengosongkan marker
-    // — dan marker sebuah dialog hanya terisi sekali. Karena itu ia dibaca dari tangkapan yang
-    // sudah TENANG, bukan dari satu tangkapan yang bisa saja mendarat di frame setengah-render.
-    // Langkah 0 tak butuh itu: di sana layar memang boleh bukan dialog (jalur kolom chat lama).
-    const text = step === 0 ? deps.pane(s.id) : await settledPane(s.id, deps);
-    const screen = readDialogScreen(text);
+  const stop = (reason: string, failed = false): ChainResult =>
+    ({ acted, done: false, failed, reason, at, flowId, step });
 
-    // Layar rekap: langkah MEKANIS, tanpa agen. Menekan `Submit answers` tak butuh pertimbangan —
-    // seluruh jawabannya sudah masuk, yang tersisa hanya menutup dialognya.
-    if (screen?.kind === "review") {
-      if (!(await deps.submit(s.id)))
-        return { acted, done: false, failed: true, reason: "gagal menekan Submit answers" };
-      acted = true;
-      continue;
-    }
+  // codex: satu langkah prosa ke kolom chat. Gerbangnya PESAN GILIRAN, bukan layar — teks penuh,
+  // tak dipotong lebar pane, dan nol invokasi tmux. Ambangnya sama persis (AC-9 utuh).
+  if (ask.source === "turn-end") {
+    const read = readCodexTurn(ask.message);
+    if (!read.asking) return stop(read.reason);
+  }
 
-    // Layarnya sudah bukan dialog → rantai tuntas. Langkah 0 sengaja dikecualikan: di sana layar
-    // memang boleh berupa kolom chat biasa, dan itu jalur lama yang harus tetap dilayani.
-    //
-    if (step > 0 && !screen) return done({ acted, done: true, failed: false, reason: "" });
+  const steps: (SessionAsk["questions"][number] | null)[] =
+    ask.source === "ask-tool" ? ask.questions : [null];
+  if (steps.length > MAX_CHAIN_STEPS) return stop("payload melebihi batas langkah rantai dialog");
 
-    const read = readPaneQuestion(text, agent);
-    if (!read.asking) {
-      return step === 0
-        ? { acted, done: false, failed: false, reason: read.reason }
-        : done({ acted, done: true, failed: false, reason: "" });
-    }
+  for (let i = 0; i < steps.length; i++) {
+    at = i;
+    if (isTakenOver(sid)) return stop("diambil alih operator");
+    const q = steps[i] ?? null;
 
-    // SPEC-452 · saat layarnya dialog pilihan, jawaban lead dimasukkan lewat KOLOM JAWABAN BEBAS
-    // dialog itu ("Type something.") — bukan dengan menekan nomor opsi. Jadi lead diminta menulis
-    // jawaban yang berdiri sendiri (boleh menyebut opsi yang dipilihnya), bukan nomor telanjang.
-    const notes = [`Sesi ini menunggu di terminal; teks di bawah adalah layar terakhirnya. Jawablah sebagai masukan yang bisa langsung diketik ke terminal itu (isi \`reply\`).`];
-    if (read.choices.length) {
-      // SPEC-480 · yang dituntut sekarang `choice`, bukan prosa yang menyebut opsinya: server
-      // yang merangkai kalimat jawabannya dari label opsi verbatim.
+    const notes = ["Sesi ini menunggu di terminal. Jawablah sebagai masukan yang bisa langsung diketik ke terminal itu (isi `reply`)."];
+    if (q?.options.length) {
+      // SPEC-480 · yang dituntut `choice`, bukan prosa yang menyebut opsinya: server yang merangkai
+      // kalimat jawabannya dari label opsi verbatim.
       notes.push("Layarnya adalah dialog pilihan. Isi `choice` dengan nomor atau label opsi yang kamu pilih — server yang merangkai kalimat jawabannya dari label itu, jadi `reply` tak perlu mengulanginya.");
     }
-    // SPEC-474 · dialog berantai menampilkan SATU pertanyaan pada satu waktu. Tanpa keterangan ini
-    // lead melihat layar yang seolah berdiri sendiri dan bisa mencoba menjawab semuanya sekaligus.
-    if (screen?.kind === "question" && screen.tabs.length > 1) {
-      const at = screen.tabs.findIndex((t) => !t.answered);
+    if (steps.length > 1) {
+      // SPEC-474 · dialog berantai menampilkan SATU pertanyaan pada satu waktu. Bedanya dengan
+      // jalur lama: daftar headernya datang dari payload, bukan dari strip tab yang di-scrape.
       notes.push(
-        `Dialog ini BERANTAI: ${screen.tabs.length} pertanyaan dalam satu tanya `
-        + `(${screen.tabs.map((t) => `${t.answered ? "sudah" : "belum"}: ${t.header}`).join(", ")}). `
-        + `Yang sedang tampil pertanyaan ke-${at + 1}; jawab HANYA pertanyaan itu — sisanya akan `
-        + `ditanyakan sesudah ini.`,
+        `Dialog ini BERANTAI: ${steps.length} pertanyaan dalam satu tanya `
+        + `(${ask.questions.map((x) => x.header || x.question.slice(0, 24)).join(", ")}). `
+        + `Yang sedang tampil pertanyaan ke-${i + 1}; jawab HANYA pertanyaan itu — sisanya akan `
+        + "ditanyakan sesudah ini.",
       );
     }
 
-    // SPEC-479 (QA) · gerbang penuh BUKAN kegagalan lead (`failed: false`). Pagar `failures`
-    // SPEC-472 dibuat untuk sebab yang TAK HILANG dengan mengulang — kunci ditolak, kuota habis,
-    // biner tak terpasang. Penuh adalah kebalikannya: ia hilang begitu slot bebas. Menghitungnya
-    // membuat tiga lonjakan beban menutup lead bagi sesi ini selamanya, karena `failCapped` adalah
-    // keadaan MENYERAP (tanpa percobaan tak ada keberhasilan, tanpa keberhasilan tak ada reset) —
-    // terukur nol percobaan baru dalam 10 denyut sesudah bebannya hilang.
-    //
-    // Rantai yang terputus di tengah aman ditinggalkan: markernya belum dikosongkan, jadi denyut
-    // berikutnya membaca layar dialog apa adanya dan melanjutkan dari pertanyaan yang tampil.
-    //
-    // SPEC-487 · `chain: true` SELALU dikirim: `runChain` — bukan agen peminta mana pun — adalah
-    // penggerak rantai yang sesungguhnya di produksi, dan tanpa bendera itu `decide()` menutup
-    // alurnya sebagai `tunggal` di tiap langkah. Terukur sebelum perbaikan ini: 22 dari 22 baris
-    // `gate="detected"` ber-`step = 1` dan ketiga alurnya `tunggal`, padahal ketiganya satu dialog
-    // 3-pertanyaan. Konsekuensinya `chainSteps` selalu kosong, dan tiap langkah memutuskan tanpa
-    // tahu langkah sebelumnya — persis "konteks hilang di antaranya" yang ADR-0102 ada untuk
-    // menutupnya.
-    const ask = {
-      projectId: s.projectId, specId: s.specId, sessionId: s.id,
+    const req = {
+      projectId: s.projectId, specId: s.specId, sessionId: sid,
       gate: "detected" as const, kind: "answer" as const,
-      question: read.question,
-      options: read.choices.length ? read.choices : undefined,
-      notes, chain: true,
+      question: q ? q.question : ask.message,
+      options: q?.options.length ? q.options.map((o) => o.label) : undefined,
+      // SPEC-485 · ADR-0102 · `multiSelect` datang dari payload, jadi bentuk pilihannya tak perlu
+      // disimpulkan dari kotak centang di layar lagi.
+      select: q?.multiSelect ? { mode: "multi" as const, min: 1, max: null } : undefined,
+      notes,
+      // SPEC-487 · `chain: true` SELALU dikirim: penggerak rantai di produksi adalah fungsi ini,
+      // bukan agen peminta mana pun, dan tanpa bendera itu `decide()` menutup alurnya sebagai
+      // `tunggal` di tiap langkah — `chainSteps` kosong tepat di tempat yang paling membutuhkannya.
+      chain: true,
     };
+
     let row: LeadDecision | null;
     try {
-      row = await deps.decide({ ...ask, flowId: chainFlows.get(s.id) ?? null }, deps.decideDeps);
+      row = await deps.decide({ ...req, flowId }, deps.decideDeps);
     } catch (e) {
-      if (e instanceof LeadBusyError) return { acted, done: false, failed: false, reason: `lead penuh — ${e.message}` };
-      // Alur yang kedaluwarsa di tengah rantai panjang (`flowTtlMin`) tak boleh menjatuhkan
-      // rantainya: lepaskan ingatannya dan mulai alur baru dari langkah ini.
+      // SPEC-479 · gerbang penuh BUKAN kegagalan lead: ia hilang begitu slot bebas, sementara
+      // `failures` dibuat untuk sebab yang TAK hilang dengan mengulang.
+      if (e instanceof LeadBusyError) return stop(`lead penuh — ${e.message}`);
+      // Alur yang kedaluwarsa di tengah rantai (`flowTtlMin`) tak boleh menjatuhkan rantainya.
       if (!(e instanceof LeadFlowClosedError)) throw e;
-      chainFlows.delete(s.id);
-      try { row = await deps.decide({ ...ask, flowId: null }, deps.decideDeps); }
+      chainFlows.delete(sid); flowId = null;
+      try { row = await deps.decide({ ...req, flowId: null }, deps.decideDeps); }
       catch (e2) {
-        if (e2 instanceof LeadBusyError) return { acted, done: false, failed: false, reason: `lead penuh — ${e2.message}` };
+        if (e2 instanceof LeadBusyError) return stop(`lead penuh — ${e2.message}`);
         throw e2;
       }
     }
-    if (row?.flowId) chainFlows.set(s.id, row.flowId);
-    // `null` = lead baru saja dijeda/dimatikan di tengah panggilan — bukan kegagalan lead, jadi tak
-    // dihitung. Baris ber-status `gagal` ADALAH kegagalan: ia yang harus punya ujung (SPEC-472).
-    if (!row) return { acted, done: false, failed: false, reason: "lead tak menghasilkan keputusan yang berlaku" };
-    if (row.status !== "berlaku")
-      return { acted, done: false, failed: true, reason: "lead tak menghasilkan keputusan yang berlaku" };
+    if (row?.flowId) { flowId = row.flowId; chainFlows.set(sid, row.flowId); }
+    if (row?.step != null) step = row.step;
+    // `null` = lead baru saja dijeda/dimatikan di tengah panggilan — bukan kegagalan lead.
+    if (!row) return stop("lead tak menghasilkan keputusan yang berlaku");
+    if (row.status !== "berlaku") return stop("lead tak menghasilkan keputusan yang berlaku", true);
 
-    // SPEC-480 · teks yang diketik DIRAKIT dari putusan terstruktur, bukan dipungut dari prosa:
-    // pilihan yang terselesaikan disebut dengan LABEL VERBATIM, konteks yang kurang disebut apa
-    // adanya, dan panjangnya sudah dipagari sebelum menyentuh `goalChunks`. Saluran pengiriman
-    // hidup di memori dan berumur satu ketikan, jadi ia bisa saja meleset: yang selalu ada adalah
-    // `answer`. Jangan pernah mengetik string kosong ke pane hanya karena saluran itu kosong.
+    // Dialognya baru tergambar SESUDAH tool-nya jalan; untuk codex tak ada dialog sama sekali.
+    let before = "";
+    if (ask.source === "ask-tool") {
+      const text = await waitDialog(sid, deps);
+      if (text === null) return stop("dialog tak muncul di pane — tak ada yang diketik", true);
+      before = dialogKey(text);
+    }
+    if (isTakenOver(sid)) return stop("diambil alih operator");
+
+    // SPEC-480 · teks yang diketik DIRAKIT dari putusan terstruktur. Saluran pengiriman hidup di
+    // memori dan berumur satu ketikan, jadi ia bisa meleset: yang selalu ada adalah `answer`.
+    // Jangan pernah mengetik string kosong ke pane hanya karena saluran itu kosong.
     const sent = deps.delivery(row.id);
     const reply = (sent ? leadReplyText(sent) : "") || row.answer;
     // SPEC-485 · label opsi terpilih diteruskan apa adanya; `sendToPane` yang memetakannya ke nomor
-    // baris terhadap opsi LAYAR ITU. Dialog non-multi mengabaikannya — jalur SPEC-452/474 utuh.
+    // baris terhadap opsi LAYAR ITU.
     const picked = sent?.choices.map((c) => c.option) ?? [];
-    if (!(await deps.send(s.id, reply, picked)))
-      return { acted, done: false, failed: true, reason: "gagal mengetik ke pane" };
+    if (!(await deps.send(sid, reply, picked))) return stop("gagal mengetik ke pane", true);
     acted = true;
 
-    // Kolom chat biasa: satu jawaban lalu selesai — perilaku persis sebelum spec ini.
-    if (!screen) return done({ acted, done: true, failed: false, reason: "" });
-
-    // Dialog: tunggu layarnya BENAR-BENAR berganti sebelum mata rantai berikutnya dibaca. Tanpa
-    // jeda ini tangkapan berikutnya masih layar yang sama, dan gerbang anti-loop akan menutup
-    // rantai yang sebenarnya sehat.
-    if (!(await waitScreenChange(s.id, dialogKey(text), deps)))
-      return { acted, done: false, failed: true, reason: "layar dialog tak berubah sesudah dijawab" };
+    if (ask.source === "turn-end") return close({ acted, done: true, failed: false, reason: "", at });
+    if (i < steps.length - 1 && !(await waitScreenChange(sid, before, deps)))
+      return stop("layar dialog tak berubah sesudah dijawab", true);
   }
-  return { acted, done: false, failed: true, reason: "batas langkah rantai dialog tercapai" };
+
+  // Layar rekap: langkah MEKANIS, tanpa agen — seluruh jawabannya sudah masuk, yang tersisa hanya
+  // menutup dialognya.
+  if (!(await deps.submit(sid))) return stop("gagal menekan Submit answers", true);
+  return close({ acted: true, done: true, failed: false, reason: "", at });
 }
 
 /**
- * SPEC-487 · tangkapan layar yang sudah TENANG: kembalikan tangkapan pertama yang berupa dialog,
- * atau — bila memang tak ada lagi — tangkapan terakhir sesudah `CHAIN_END_TRIES` percobaan.
+ * SPEC-909 · tangkapan pertama yang berupa dialog, atau `null` bila ia tak pernah muncul.
  *
- * Bukan `waitScreenChange` yang lain: yang itu menunggu layar BERGANTI (dan karena itu puas oleh
- * frame apa pun yang berbeda), yang ini menunggu layar BERHENTI berubah bentuk. Keduanya dibutuhkan
- * di tempat yang berbeda, dan menggabungkannya akan membuat salah satunya kehilangan artinya.
+ * Bukan `waitScreenChange`: yang itu menunggu layar BERGANTI, yang ini menunggu layar MENJADI
+ * dialog. Keduanya dibutuhkan di tempat yang berbeda, dan menggabungkannya akan membuat salah
+ * satunya kehilangan artinya.
  */
-async function settledPane(id: string, deps: DetectDeps): Promise<string> {
-  let text = deps.pane(id);
-  for (let i = 0; i < CHAIN_END_TRIES && !readDialogScreen(text); i++) {
+async function waitDialog(id: string, deps: DetectDeps): Promise<string | null> {
+  for (let i = 0; i < DIALOG_WAIT_TRIES; i++) {
+    const text = deps.pane(id);
+    if (readDialogScreen(text)) return text;
     await deps.sleep(CHAIN_POLL_MS);
-    text = deps.pane(id);
   }
-  return text;
+  return null;
 }
 
 async function waitScreenChange(id: string, before: string, deps: DetectDeps): Promise<boolean> {
@@ -499,17 +464,4 @@ async function waitScreenChange(id: string, before: string, deps: DetectDeps): P
     if (dialogKey(deps.pane(id)) !== before) return true;
   }
   return false;
-}
-
-/** Buang penghitung sesi yang sudah tak ada — id sesi spec deterministik dan bisa lahir lagi. */
-function sweep(liveIds: string[]): void {
-  const live = new Set(liveIds);
-  for (const id of [...answers.keys()]) if (!live.has(id)) answers.delete(id);
-  for (const id of [...capped]) if (!live.has(id)) capped.delete(id);
-  for (const id of [...failures.keys()]) if (!live.has(id)) failures.delete(id);
-  for (const id of [...failCapped]) if (!live.has(id)) failCapped.delete(id);
-  for (const id of [...failedAt.keys()]) if (!live.has(id)) failedAt.delete(id);
-  // Alur rantainya sendiri tak ikut ditutup di sini: penyapu TTL (ADR-0102) yang mengurusnya, dan
-  // "peminta mati di tengah rantai" memang tepat keadaan yang `kedaluwarsa` ada untuk menamainya.
-  for (const id of [...chainFlows.keys()]) if (!live.has(id)) chainFlows.delete(id);
 }

@@ -105,3 +105,22 @@ export function readPaneQuestion(text: string, agent: Agent): PaneRead {
   }
   return { asking: true, question, reason: "", choices };
 }
+
+/**
+ * SPEC-909 · ADR-0146 · gerbang "codex benar-benar bertanya", dinilai atas `last_assistant_message`
+ * dari payload hook `Stop` — bukan atas `capture-pane`.
+ *
+ * Sumber yang lebih baik untuk pertanyaan yang sama: pesan giliran tak dipotong lebar pane (pane
+ * sesi di mesin dev 52 kolom) dan tak tercampur sisa scrollback. Nol invokasi tmux. Ambangnya
+ * TIDAK berubah — `CODEX_FINISHED` dan `ASK_SIGNALS` yang sama, supaya cakupan codex sesudah SPEC
+ * ini setara dengan sebelumnya, bukan lebih longgar.
+ */
+export function readCodexTurn(message: string): { asking: boolean; reason: string } {
+  const body = message.trim();
+  if (!body) return { asking: false, reason: "giliran codex berakhir tanpa pesan" };
+  if (CODEX_FINISHED.some((re) => re.test(body)))
+    return { asking: false, reason: "sesi codex selesai wajar (ADR-0074)" };
+  if (!ASK_SIGNALS.some((re) => re.test(body)))
+    return { asking: false, reason: "tak ada sinyal pertanyaan di pesan giliran codex" };
+  return { asking: true, reason: "" };
+}

@@ -32,4 +32,20 @@ export function markQueued(sessionId: string): void { queued.add(sessionId); }
 export function clearQueued(sessionId: string): void { queued.delete(sessionId); }
 export function queuedIds(): string[] { return [...queued]; }
 
-export function __resetDeciding(): void { deciding.clear(); queued.clear(); }
+/**
+ * SPEC-909 · ADR-0146 · AC-6 · sesi yang DIREBUT operator dari lead.
+ *
+ * Keadaan KEEMPAT di modul ini, dan rumahnya di sini bukan di `lead/ask.ts` karena `detect.ts`
+ * harus membacanya di tengah rantai — sementara `ask.ts` sudah mengimpor `detect.ts`. Menaruhnya
+ * di sana melahirkan siklus impor; menaruhnya di sini tidak.
+ *
+ * In-memory dengan alasan yang sama seperti `deciding`/`queued`: ia berumur satu episode dan mati
+ * bersama proses lead. Single-process (ADR-0024).
+ */
+const takenOver = new Set<string>();
+
+export function markTakenOver(sessionId: string): void { takenOver.add(sessionId); }
+export function isTakenOver(sessionId: string): boolean { return takenOver.has(sessionId); }
+export function clearTakeover(sessionId: string): void { takenOver.delete(sessionId); }
+
+export function __resetDeciding(): void { deciding.clear(); queued.clear(); takenOver.clear(); }
