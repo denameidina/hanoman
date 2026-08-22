@@ -47,7 +47,7 @@ describe("kontrak design system pet", () => {
     expect(petState).not.toMatch(/STK-00\d/);
     const sprite = read("src/screens/pet-sprite.ts");
     expect(sprite).toContain('from "../../../internal/assets/pet/pet.json"');
-    expect(sprite).toContain('from "../../../internal/assets/pet/hnm-pet-anoman-atlas-v01.webp?url"');
+    expect(sprite).toContain('from "../../../internal/assets/pet/hnm-pet-anoman-atlas-v02.webp?url"');
     expect(read("src/screens/HanomanPet.tsx")).not.toContain("StickerIllustration");
   });
 });
