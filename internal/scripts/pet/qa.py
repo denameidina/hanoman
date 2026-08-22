@@ -38,6 +38,11 @@ def main() -> None:
             problems.append(f"f{fr['frame']} tumpah {fr['clipped']} px ke luar sel")
         if fr["residual_pre"] > gate:
             problems.append(f"f{fr['frame']} residu pra-pin {fr['residual_pre']:.3f} > {gate}")
+    body = petlib.body_ratio(strip.convert("RGBA"))
+    if body < petlib.BODY_RATIO_GATE:
+        problems.append(f"badan hanya {body:.3f} dari tinggi frame 1 (< {petlib.BODY_RATIO_GATE}) — "
+                        "anggota tipis yang menjuntai memperpanjang bbox, jadi karakternya "
+                        "diskalakan lebih kecil daripada baris lain")
     steps = petlib.frame_steps(strip.convert("RGBA"))
     ratio = max(steps) / max(min(steps), 1e-6)
     if row.get("even") and max(steps) >= petlib.STEP_VISIBLE and ratio > petlib.STEP_RATIO_GATE:
@@ -54,7 +59,7 @@ def main() -> None:
     # Sambungan 8→1 adalah elemen TERAKHIR — satu-satunya langkah yang tak terlihat di contact
     # sheet maupun onion-skin, dan yang menentukan apakah baris ini bisa diputar berulang.
     print("  langkah " + " ".join(f"{i + 1}→{(i + 1) % 8 + 1}:{s:.3f}" for i, s in enumerate(steps))
-          + f"  rasio={ratio:.2f}")
+          + f"  rasio={ratio:.2f}  badan={body:.3f}")
     if problems:
         fail(f"{key}: " + "; ".join(problems))
     print(f"OK {key}: 8 frame, residu maks {max(f['residual_pre'] for f in report['frames']):.3f} ≤ {gate}")

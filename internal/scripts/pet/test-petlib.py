@@ -118,6 +118,16 @@ class FrameStepsTest(unittest.TestCase):
         for s in steps:
             self.assertAlmostEqual(s, steps[0], delta=0.01)
 
+    def test_body_ratio_separates_a_dangling_tail_from_the_body(self) -> None:
+        # Badan pejal saja → nyaris seluruh tinggi bbox adalah badan.
+        solid = self.block(60, 70)
+        self.assertGreater(petlib.body_ratio(self.strip_of([solid] * 8)), petlib.BODY_RATIO_GATE)
+        # Badan yang sama + ekor SETIPIS garis menjuntai jauh di bawahnya → rasio ambruk, persis
+        # bentuk `held` percobaan 1 (0,661) yang lolos semua gerbang lain sambil mengecilkan badan.
+        tailed = solid.copy()
+        tailed[180:206, 90:96] = True
+        self.assertLess(petlib.body_ratio(self.strip_of([tailed] * 8)), petlib.BODY_RATIO_GATE)
+
     def test_twin_frames_at_the_seam_make_the_ratio_explode(self) -> None:
         # Frame 7, 8 dan 1 nyaris kembar (langkah 0), frame 3..5 melompat jauh — persis bentuk
         # `wave` v01 (rasio terukur 7,07).

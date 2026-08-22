@@ -88,6 +88,15 @@ RESIDUAL_GATE = {"stand": 0.25, "walk": 0.30, "jump": 0.50, "float": 0.35}
 # nyata yang sudah lolos Gate 2: walk-left 2,06 · walk-right 2,33 · waiting 3,18 · deciding 3,43.
 STEP_VISIBLE = 0.10      # di bawah ini gerak baris dianggap terlalu halus untuk dinilai rata
 STEP_RATIO_GATE = 3.5    # max(langkah) / min(langkah), termasuk sambungan 8→1
+# SPEC-904 · gerbang SKALA KARAKTER. `build_strip` menskalakan bbox frame 1 menjadi STAND_H, jadi
+# apa pun yang ikut memperpanjang bbox — ekor yang menjuntai lurus ke bawah pada baris `held` —
+# MENGECILKAN badannya diam-diam: percobaan pertama `held` menggambar kepala 63 px vs 79 px milik
+# `idle`, lolos setiap gerbang lain (residu 0,021, tumpahan 0, langkah rata 2,43) sambil melanggar
+# "skala WAJIB identik dengan v01". Ukurannya: tinggi bbox SESUDAH erosi (ekor tipis lenyap, badan
+# bertahan) dibagi tinggi bbox utuh. Ketigabelas baris v01 duduk rapat di 0,839–0,911 (terendah
+# `blocked`); `held` percobaan 1 = 0,661.
+BODY_ERODE = 5
+BODY_RATIO_GATE = 0.80
 
 
 def row_def(key: str) -> dict:
@@ -475,6 +484,22 @@ def write_json(path: Path, data: dict) -> None:
 
 
 # ---------------------------------------------------------------- QA artefak
+
+def body_ratio(strip: Image.Image) -> float:
+    """Berapa banyak tinggi frame 1 yang benar-benar BADAN, bukan anggota tipis yang menjuntai.
+
+    `build_strip` menskalakan bbox frame 1 ke `STAND_H`; kalau bbox itu diperpanjang ekor yang
+    menggantung, badannya mengecil tanpa satu pun gerbang lain menyadarinya. Erosi memisahkan
+    keduanya: ekor selebar seutas garis lenyap, badan bertahan."""
+    a = np.asarray(strip.crop((0, 0, CELL_W, CELL_H)).getchannel("A")) > 64
+    ys = np.where(a.any(axis=1))[0]
+    if len(ys) == 0:
+        return 0.0
+    body = _erode(a, BODY_ERODE)
+    yb = np.where(body.any(axis=1))[0]
+    return round(float(len(range(yb.min(), yb.max() + 1)) if len(yb) else 0)
+                 / float(ys.max() - ys.min() + 1), 4)
+
 
 def frame_steps(strip: Image.Image) -> list[float]:
     """Delapan langkah antar-frame sebuah strip, dinormalkan ke massa frame 1.
