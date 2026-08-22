@@ -1308,7 +1308,7 @@ git commit -m "feat(pet): lencana hitungan, panel multi-kondisi, pudar saat terp
 - Consumes: seluruh keluaran Task 1–5.
 - Produces: bukti hijau untuk klaim selesai.
 
-- [ ] **Step 1: Jalankan seluruh test frontend yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test frontend yang tersentuh**
 
 Jalankan:
 
@@ -1320,7 +1320,7 @@ env -u NODE_ENV pnpm vitest --run \
 
 Diharapkan: PASS, 6 berkas, **nol** "no test files".
 
-- [ ] **Step 2: Jalankan test yang memakai mock `api/events`**
+- [x] **Step 2: Jalankan test yang memakai mock `api/events`**
 
 Perubahan `events.ts` menambah dua export; berkas yang mem-`vi.mock` modul itu harus ikut menyediakannya bila komponennya memanggilnya. `HanomanPet` dipasang oleh `App`, jadi test App ikut terdampak. Jalankan:
 
@@ -1337,7 +1337,7 @@ env -u NODE_ENV pnpm vitest --run \
 
 Diharapkan: PASS. Bila sebuah berkas gagal dengan `eventsStatus is not a function`, tambahkan `eventsStatus: () => ({ connected: true, since: 0, paused: false })` dan `subscribeStatus: () => () => {}` ke factory `vi.mock("../src/api/events", …)` di berkas itu.
 
-- [ ] **Step 3: Pipeline Python**
+- [x] **Step 3: Pipeline Python**
 
 ```bash
 python3 internal/scripts/pet/test-petlib.py
@@ -1347,12 +1347,12 @@ python3 internal/scripts/pet/atlas.py --check
 
 Diharapkan: PASS semuanya; `atlas.py --check` mencetak `OK atlas segar, <N> B, 12 baris` dengan `<N> ≤ 1000000`.
 
-- [ ] **Step 4: Typecheck paket `src`**
+- [x] **Step 4: Typecheck paket `src`**
 
 Jalankan: `pnpm --filter ./src typecheck`
 Diharapkan: exit 0, nol error.
 
-- [ ] **Step 5: Commit perbaikan mock bila ada**
+- [x] **Step 5: Commit perbaikan mock bila ada**
 
 ```bash
 git add -A src/test

@@ -25,7 +25,12 @@ vi.mock("../src/screens/TerminalScreen", () => ({
 }));
 // AutoMergeCard (SPEC-486) self-fetch `listBranches` saat detail project di-mount — bukan subjek.
 vi.mock("../src/screens/AutoMergeCard", () => ({ AutoMergeCard: () => null }));
-vi.mock("../src/api/events", () => ({ subscribe: () => () => {} }));
+vi.mock("../src/api/events", () => ({
+  subscribe: () => () => {},
+  // SPEC-897 · HanomanPet membaca status koneksi dari socket `events` yang sama.
+  eventsStatus: () => ({ connected: true, since: 0, paused: false }),
+  subscribeStatus: () => () => {},
+}));
 vi.mock("../src/api/client", () => ({
   api: {
     authStatus: vi.fn(async () => ({ needsSetup: false, user: { id: "u1", email: "a@b.co", createdAt: "" } })),

@@ -16,7 +16,12 @@ vi.mock("../src/api/client", async () => {
     },
   };
 });
-vi.mock("../src/api/events", () => ({ subscribe: () => () => {} }));
+vi.mock("../src/api/events", () => ({
+  subscribe: () => () => {},
+  // SPEC-897 · HanomanPet membaca status koneksi dari socket `events` yang sama.
+  eventsStatus: () => ({ connected: true, since: 0, paused: false }),
+  subscribeStatus: () => () => {},
+}));
 
 function mobileViewport() {
   Object.defineProperty(window, "matchMedia", {

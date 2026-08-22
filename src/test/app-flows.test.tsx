@@ -10,7 +10,12 @@ const { listSpecs, listTerminals } = vi.hoisted(() => ({
 vi.mock("../src/screens/TerminalPane", () => ({
   TerminalPane: ({ sessionId }: { sessionId: string }) => <div data-testid={`pane-${sessionId}`}>{sessionId}</div>,
 }));
-vi.mock("../src/api/events", () => ({ subscribe: () => () => {} }));
+vi.mock("../src/api/events", () => ({
+  subscribe: () => () => {},
+  // SPEC-897 · HanomanPet membaca status koneksi dari socket `events` yang sama.
+  eventsStatus: () => ({ connected: true, since: 0, paused: false }),
+  subscribeStatus: () => () => {},
+}));
 vi.mock("../src/api/client", () => ({
   api: {
     authStatus: vi.fn(async () => ({ needsSetup: false, user: { id: "u1", email: "a@b.co", createdAt: "" } })),

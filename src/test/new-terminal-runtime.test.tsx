@@ -21,7 +21,12 @@ vi.mock("../src/api/client", () => ({
     })),
   },
 }));
-vi.mock("../src/api/events", () => ({ subscribe: () => () => {} }));
+vi.mock("../src/api/events", () => ({
+  subscribe: () => () => {},
+  // SPEC-897 · HanomanPet membaca status koneksi dari socket `events` yang sama.
+  eventsStatus: () => ({ connected: true, since: 0, paused: false }),
+  subscribeStatus: () => () => {},
+}));
 vi.mock("../src/screens/TerminalPane", () => ({
   TerminalPane: ({ sessionId }: { sessionId: string }) => <div data-testid="pane">{sessionId}</div>,
 }));
