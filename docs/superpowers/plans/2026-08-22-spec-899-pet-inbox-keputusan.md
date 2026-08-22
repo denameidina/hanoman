@@ -913,7 +913,7 @@ git commit -m "feat(pet): klien API dialog sesi + daftar sesi waiting (SPEC-899)
 - Consumes: `api.sessionDialog`, `api.answerSessionDialog`, `ApiError` dari `../api/client`; `Button`, `Checkbox`, `Input` dari `../ds`; `waitingSessions` dari `./pet-state`.
 - Produces: `<PetAnswer sessionId={string} label={string} reduced={boolean} />`; test id `pet-answer`, `pet-answer-option`, `pet-answer-text`, `pet-answer-submit`, `pet-answer-sent`, `pet-answer-note`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `src/test/hanoman-pet.test.tsx`, tambahkan di akhir berkas:
 
@@ -984,12 +984,12 @@ describe("Pet · inbox keputusan", () => {
 
 Catatan untuk implementer: `Wrapper` adalah pembungkus render yang sudah dipakai berkas ini (`HanomanPet` di dalam `NotificationsContext.Provider`). Bila berkas ini merender `<HanomanPet …>` langsung, pakai bentuk yang sama seperti test tetangganya alih-alih memperkenalkan `Wrapper` baru. Tambahkan import `api`, `ApiError` dari `../src/api/client` dan tipe `SessionDialog`, `SessionDialogPayload` dari `@hanoman/shared`; tambahkan `vi.restoreAllMocks()` di `beforeEach` bila berkas belum melakukannya.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/hanoman-pet.test.tsx`
 Expected: FAIL — `api.sessionDialog` tak pernah dipanggil / `pet-answer` tak ditemukan.
 
-- [ ] **Step 3: Tulis komponen**
+- [x] **Step 3: Tulis komponen**
 
 Buat `src/src/screens/PetAnswer.tsx`:
 
@@ -1138,7 +1138,7 @@ export function PetAnswer({ sessionId, label, reduced }:
 }
 ```
 
-- [ ] **Step 4: Pasang di panel pet**
+- [x] **Step 4: Pasang di panel pet**
 
 Di `src/src/screens/HanomanPet.tsx`:
 
@@ -1159,17 +1159,17 @@ Di `src/src/screens/HanomanPet.tsx`:
                 ))}
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/hanoman-pet.test.tsx`
 Expected: PASS — termasuk seluruh test Pet yang sudah ada (SPEC-585/896/897/898) tanpa satu pun regresi.
 
-- [ ] **Step 6: Typecheck frontend**
+- [x] **Step 6: Typecheck frontend**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/PetAnswer.tsx src/src/screens/HanomanPet.tsx src/test/hanoman-pet.test.tsx

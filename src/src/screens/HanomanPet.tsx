@@ -6,7 +6,7 @@ import { Button, Mark, useResponsiveTier } from "../ds";
 import { useNotifications } from "../notifications/NotificationsContext";
 import {
   derivePetState, loadPetHidden, loadPetRoam, savePetHidden, savePetRoam, petPulse,
-  KIND_NOUN, POSE_LABEL, type PetTarget,
+  KIND_NOUN, POSE_LABEL, waitingSessions, type PetTarget,
 } from "./pet-state";
 import {
   isUrgent, PET_AWAY_MS, PET_SPEECH_MS, petRecap, petSnapshot, speechFor,
@@ -16,6 +16,7 @@ import {
   PET_ATLAS_URL, PET_MANIFEST, POSE_ROW, durationMs, rowIndex, rowOf, thenOf, type PetRowKey,
 } from "./pet-sprite";
 import { initialWalkState, stepWalk, type PetMove, type PetWalkState } from "./pet-walk";
+import { PetAnswer } from "./PetAnswer";
 
 // Tinggi karakter berdiri di layar (band "pet" 80–128 px, amandemen sistem maskot). Skala sel
 // diturunkan dari `character.h` manifest, bukan dari tinggi sel — sel menyisakan ruang ekor/lompat.
@@ -125,6 +126,10 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   const view = React.useMemo(
     () => derivePetState({ sessions, backlog, notifications: items, now: Date.now(), connection, quietSince }),
     [sessions, backlog, items, connection, quietSince, decay]);
+
+  // SPEC-899 · satu kotak jawaban per sesi `waiting`. Daftarnya memakai klasifikasi yang sama
+  // dengan panel (`sessionKind`), jadi sesi yang sedang dipegang lead memang tak muncul di sini.
+  const waiting = React.useMemo(() => waitingSessions(sessions, backlog), [sessions, backlog]);
 
   React.useEffect(() => {
     if (view.recheckAt === null) return;
@@ -398,6 +403,12 @@ export function HanomanPet({ sessions, backlog, onOpen }:
                     </Button>
                   </div>
                 )}
+                {/* SPEC-899 · inbox keputusan. Digerbangi `open`, bukan `panelMounted`: panel yang
+                    sedang beranimasi keluar masih ter-mount, dan kotak yang lahir di sana akan
+                    memanggil endpoint dialog untuk panel yang justru sedang ditutup. */}
+                {c.kind === "waiting" && open && waiting.map((s) => (
+                  <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id} reduced={reduced} />
+                ))}
               </li>
             ))}
           </ul>

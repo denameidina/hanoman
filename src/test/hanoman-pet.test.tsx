@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, act, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Notification, Spec } from "@hanoman/shared";
-import type { TerminalSession } from "../src/api/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Notification, SessionDialog, SessionDialogPayload, Spec } from "@hanoman/shared";
+import { api, ApiError, type TerminalSession } from "../src/api/client";
 import { HanomanPet } from "../src/screens/HanomanPet";
 import { NotificationsContext } from "../src/notifications/NotificationsContext";
 import { PET_HIDDEN_KEY, PET_ROAM_KEY } from "../src/screens/pet-state";
@@ -516,5 +516,73 @@ describe("HanomanPet — pet bicara (SPEC-898)", () => {
     fireEvent.click(hit());
     rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
     expect(bubble()).toBeNull();
+  });
+});
+
+// SPEC-899 · ADR-0142 · inbox keputusan: pertanyaan agen dijawab dari panel, bukan dari pane.
+describe("Pet · inbox keputusan", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  const payload = (over: Partial<SessionDialog> = {}): SessionDialogPayload => ({
+    screenHash: "deadbeef",
+    dialog: {
+      title: "Warna apa yang dipakai?", multi: false, freeIndex: 3, notes: false,
+      options: [{ n: 1, label: "merah", checked: null }, { n: 2, label: "biru", checked: null }],
+      tabs: [], ...over,
+    },
+  });
+
+  const waitingProps = () => ({
+    sessions: [session({ id: "s1", specId: "SPEC-1", decision: true })],
+    backlog: [spec({ id: "SPEC-1", stage: "executing" })],
+    onOpen: vi.fn(),
+  });
+
+  it("merender pertanyaan + opsi untuk sesi waiting, lalu mengirim nomor barisnya", async () => {
+    const get = vi.spyOn(api, "sessionDialog").mockResolvedValue(payload());
+    const post = vi.spyOn(api, "answerSessionDialog").mockResolvedValue({ accepted: true });
+    render(<HanomanPet {...waitingProps()} />);
+    await act(async () => { fireEvent.click(hit()); });
+    expect(await screen.findByText("Warna apa yang dipakai?")).toBeTruthy();
+    expect(get).toHaveBeenCalledWith("s1");
+    expect(screen.getAllByTestId("pet-answer-option")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "merah" })).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "biru" })); });
+    expect(post).toHaveBeenCalledWith("s1", { screenHash: "deadbeef", choice: 2 });
+    expect(screen.getByTestId("pet-answer-sent").textContent).toContain("Terkirim");
+  });
+
+  it("multiSelect mengirim centang lewat choices dan satu tombol Submit", async () => {
+    vi.spyOn(api, "sessionDialog").mockResolvedValue(payload({
+      multi: true, freeIndex: null,
+      options: [{ n: 1, label: "alpha", checked: false }, { n: 2, label: "beta", checked: true }],
+    }));
+    const post = vi.spyOn(api, "answerSessionDialog").mockResolvedValue({ accepted: true });
+    render(<HanomanPet {...waitingProps()} />);
+    await act(async () => { fireEvent.click(hit()); });
+    await screen.findByTestId("pet-answer");
+    fireEvent.click(screen.getAllByRole("checkbox")[0]!);   // centang alpha; beta sudah tercentang
+    await act(async () => { fireEvent.click(screen.getByTestId("pet-answer-submit")); });
+    expect(post).toHaveBeenCalledWith("s1", { screenHash: "deadbeef", choices: [1, 2] });
+  });
+
+  it("409 stale memuat ulang pertanyaannya alih-alih mengaku terkirim", async () => {
+    const get = vi.spyOn(api, "sessionDialog").mockResolvedValue(payload());
+    vi.spyOn(api, "answerSessionDialog").mockRejectedValue(new ApiError(409, "409", { reason: "stale" }));
+    render(<HanomanPet {...waitingProps()} />);
+    await act(async () => { fireEvent.click(hit()); });
+    await screen.findByTestId("pet-answer");
+    await act(async () => { fireEvent.click(screen.getAllByTestId("pet-answer-option")[0]!); });
+    expect(screen.queryByTestId("pet-answer-sent")).toBeNull();
+    expect(screen.getByTestId("pet-answer-note").textContent).toContain("berubah");
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it("tak ada dialog di layar → panel mengatakannya, tak ada tombol jawaban", async () => {
+    vi.spyOn(api, "sessionDialog").mockResolvedValue(null);
+    render(<HanomanPet {...waitingProps()} />);
+    await act(async () => { fireEvent.click(hit()); });
+    expect(await screen.findByTestId("pet-answer-note")).toBeTruthy();
+    expect(screen.queryAllByTestId("pet-answer-option")).toHaveLength(0);
   });
 });
