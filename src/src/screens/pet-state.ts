@@ -7,23 +7,52 @@
 import type { Notification, Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../api/client";
 
-export type PetPose = "ready" | "working" | "waiting" | "blocked" | "review" | "shipped" | "docs-updated";
+export type PetPose = "ready" | "sleeping" | "working" | "deciding" | "waiting" | "blocked"
+  | "review" | "shipped" | "docs-updated" | "offline";
 
 // Artwork pose hidup di atlas sprite PET-001 (`pet-sprite.ts`, spec Pet hidup A); sticker STK-*
 // tak lagi dipakai pet.
 
 export const POSE_LABEL: Record<PetPose, string> = {
   ready: "siap",
+  sleeping: "tidur",
   working: "sedang bekerja",
+  deciding: "sedang diputuskan lead",
   waiting: "menunggu jawabanmu",
   blocked: "tertahan",
   shipped: "baru saja selesai",
   review: "menunggu review",
   "docs-updated": "dokumen baru terbit",
+  offline: "tak terhubung",
+};
+
+// SPEC-897 · `kind` BUKAN `pose`: sesi gagal dan backlog tertahan dependency memakai pose `blocked`
+// yang sama tetapi dihitung, didaftar, dan dibuka secara berbeda.
+export type PetConditionKind = "offline" | "failed" | "blocked" | "waiting" | "deciding"
+  | "shipped" | "docs-updated" | "working" | "review" | "ready";
+
+// Satuan untuk angka di lencana: "2" telanjang di pojok sprite tak punya makna bagi pembaca layar.
+export const KIND_NOUN: Record<PetConditionKind, string> = {
+  offline: "koneksi terputus",
+  failed: "sesi gagal",
+  blocked: "backlog tertahan dependency",
+  waiting: "sesi menunggu jawabanmu",
+  deciding: "sesi sedang diputuskan lead",
+  shipped: "kabar selesai",
+  "docs-updated": "dokumen terbit",
+  working: "sesi berjalan",
+  review: "sesi menunggu review",
+  ready: "backlog siap dikerjakan",
 };
 
 // Umur keadaan transient (`shipped`/`docs-updated`) sejak notifikasinya lahir.
 export const PET_TRANSIENT_MS = 45_000;
+
+// SPEC-897 · backoff reconnect `events` mulai 500 ms dan berlipat sampai 10 dtk; tanpa jeda ini
+// satu blip jaringan memudarkan pet dan membuat lencana berkedip.
+export const PET_OFFLINE_MS = 6_000;
+// Sepi selama ini = tidur. Bukan denyut: komponen memakai `recheckAt` untuk satu timeout.
+export const PET_SLEEP_MS = 30 * 60_000;
 
 export const PET_HIDDEN_KEY = "hanoman.pet.hidden";
 
@@ -33,26 +62,41 @@ export const PET_ROAM_KEY = "hanoman.pet.roam";
 
 export type PetTarget = { section: "terminal" | "backlog"; sessionId?: string };
 
-export type PetView = {
+// SPEC-897 · status socket `events` yang sudah ada — bukan channel baru (lihat api/events.ts).
+export type PetConnection = { connected: boolean; since: number; paused: boolean };
+
+export type PetCondition = {
+  kind: PetConditionKind;
   pose: PetPose;
   headline: string;
   detail: string;
-  target: PetTarget;
-  // Non-null HANYA saat pose-nya sendiri transient: itulah satu-satunya saat keadaan bisa berubah
-  // tanpa data baru, jadi itu satu-satunya saat komponen perlu menjadwalkan hitung ulang.
-  transientUntil: number | null;
+  // Berapa hal sejenis; dibawa lencana & daftar panel, bukan lagi sufiks "+N lainnya" di `detail`.
+  count: number;
+  // null = tak ada yang bisa dibuka (kondisi `offline`); memberinya target palsu berarti tombol
+  // yang membuka layar yang salah.
+  target: PetTarget | null;
+  // Kapan kondisi INI berhenti benar tanpa data baru. Menggantikan `transientUntil`: tiga hal
+  // memakainya sekarang (luruh transient, habisnya grace terputus, onset tidur) dan ketiganya
+  // dilayani satu `setTimeout` di komponen.
+  recheckAt: number | null;
 };
+
+export type PetView = PetCondition & { conditions: PetCondition[] };
 
 export type PetInput = {
   sessions: TerminalSession[];
   backlog: Spec[];
   notifications: Notification[];
   now: number;
+  connection?: PetConnection;   // kosong = dianggap terhubung
+  quietSince?: number;          // kosong = tak pernah tidur
 };
 
 // `automerge` tak ada di enum `zNotification` walau server menulisnya, jadi perbandingannya lewat
 // Set<string> — bukan penyempitan tipe yang justru akan menolak nilai yang benar-benar datang.
 const SHIPPED_TYPES = new Set<string>(["done", "automerge"]);
+
+const ONLINE: PetConnection = { connected: true, since: 0, paused: false };
 
 // Urutan daftar sesi datang dari `tmux list-panes -a`; menstabilkannya di sini membuat headline
 // tak berganti nama tiap frame siar hanya karena urutan pane bergeser.
@@ -63,122 +107,172 @@ const sessionName = (s: TerminalSession): string => s.specId ?? s.id;
 const specOf = (backlog: Spec[], s: TerminalSession): Spec | undefined =>
   (s.specId ? backlog.find((x) => x.id === s.specId) : undefined);
 
-const others = (count: number): string => (count > 1 ? ` · +${count - 1} lainnya` : "");
+const hhmm = (t: number): string =>
+  new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
-export function derivePetState({ sessions, backlog, notifications, now }: PetInput): PetView {
+const newestAt = (rows: Notification[]): string =>
+  rows.reduce((m, n) => (n.createdAt > m ? n.createdAt : m), "");
+
+// Tanda tangan "ada kehidupan" di dashboard: id sesi hidup + notifikasi terbaru. Komponen mencap
+// ulang `quietSince` tiap kali nilai ini berubah — itulah seluruh mekanisme bangun tidur.
+export const petPulse = (sessions: TerminalSession[], notifications: Notification[]): string =>
+  `${sessions.filter((s) => !s.exited).map((s) => s.id).sort().join(",")}|${newestAt(notifications)}`;
+
+export function derivePetConditions(input: PetInput): PetCondition[] {
+  const { sessions, backlog, notifications, now } = input;
+  const conn = input.connection ?? ONLINE;
+  const out: PetCondition[] = [];
+
+  // 1 · terputus menang atas segalanya: apa pun di bawahnya adalah data terakhir, dan pet yang
+  // tetap berkata "sedang bekerja" atas data beku adalah bentuk paling murni dari berbohong.
+  // `paused` (tab hidden) sengaja BUKAN gangguan — socket ditutup atas permintaan kita sendiri.
+  if (!conn.connected && !conn.paused && now - conn.since >= PET_OFFLINE_MS) {
+    out.push({
+      kind: "offline", pose: "offline",
+      headline: `Tak terhubung sejak ${hhmm(conn.since)}`,
+      detail: "Dashboard menyambung ulang sendiri; yang tertulis di bawah adalah data terakhir.",
+      count: 1, target: null, recheckAt: null,
+    });
+  }
+
   const done = new Set(backlog.filter((s) => s.stage === "done").map((s) => s.id));
   const audit = new Set(backlog.filter((s) => s.source === "audit").map((s) => s.id));
 
-  const live = byId(sessions.filter((s) => !s.exited));
-  const failed = byId(sessions.filter((s) => s.exited && !!s.exitCode));
-  const waiting = live.filter((s) => !!s.decision && !s.deciding);
-  const reviewing = byId(sessions.filter((s) => !!s.specId && done.has(s.specId)));
-  const working = live.filter((s) => !(s.specId && done.has(s.specId)));
+  const live = sessions.filter((s) => !s.exited);
+
+  // Tiap sesi tepat SATU kondisi: panel yang mendaftar semuanya akan menyebut sesi yang sama dua
+  // kali kalau himpunannya tumpang tindih (sesi ber-`decision` juga memenuhi syarat `working`).
+  // Urutan di sini ADALAH urutan spesifisitas, dan ia cermin sel Terminal.
+  const kindOf = (s: TerminalSession): PetConditionKind | null => {
+    const reviewable = !!s.specId && done.has(s.specId);
+    if (s.exited) return s.exitCode ? "failed" : reviewable ? "review" : null;
+    if (s.decision && !s.deciding) return "waiting";
+    if (s.deciding) return "deciding";
+    return reviewable ? "review" : "working";
+  };
+  const grouped = new Map<PetConditionKind, TerminalSession[]>();
+  for (const s of byId(sessions)) {
+    const k = kindOf(s);
+    if (k) grouped.set(k, [...(grouped.get(k) ?? []), s]);
+  }
+  const rows = (k: PetConditionKind): TerminalSession[] => grouped.get(k) ?? [];
 
   const blockedSpecs = byId(backlog.filter((s) => s.stage !== "done" && (s.blockedBy?.length ?? 0) > 0));
-  const readySpecs = backlog.filter((s) => s.stage !== "done" && (s.blockedBy?.length ?? 0) === 0);
 
+  const sessionCond = (kind: PetConditionKind, pose: PetPose, of: TerminalSession[],
+    headline: (first: TerminalSession) => string): PetCondition => ({
+    kind, pose, headline: headline(of[0]!),
+    detail: specOf(backlog, of[0]!)?.title ?? "Sesi terminal",
+    count: of.length, target: { section: "terminal", sessionId: of[0]!.id }, recheckAt: null,
+  });
+
+  // 2 · sesi gagal. Ia meminta ditengok; backlog yang menunggu giliran tidak.
+  const failed = rows("failed");
+  const dead = failed[0];
+  if (dead) {
+    out.push({
+      kind: "failed", pose: "blocked",
+      headline: `${sessionName(dead)} · sesi gagal`,
+      detail: `Keluar dengan exit ${dead.exitCode}`,
+      count: failed.length, target: { section: "terminal", sessionId: dead.id }, recheckAt: null,
+    });
+  }
+
+  const stuck = blockedSpecs[0];
+  const blockedCond = (): PetCondition => ({
+    kind: "blocked", pose: "blocked",
+    headline: `${stuck!.id} · tertahan dependency`,
+    detail: `Menunggu ${(stuck!.blockedBy ?? []).map((b) => b.id).join(", ")}`,
+    count: blockedSpecs.length, target: { section: "backlog" }, recheckAt: null,
+  });
+  // 3 · gerbang SPEC-585 dipertahankan: `blockedBy` adalah keadaan normal & berumur panjang di
+  // project ber-`dependsOn` (ADR-0093), jadi ia hanya boleh jadi POSE saat tak ada sesi hidup.
+  // Saat ada, ia turun ke EKOR daftar — tetap terlihat di panel, tak pernah memimpin.
+  if (stuck && live.length === 0) out.push(blockedCond());
+
+  // 4–5 · sesi yang memang menunggu manusia, lalu sesi yang sedang dilayani lead. Yang kedua tak
+  // meminta apa-apa darimu (`TerminalSession.deciding`, ADR-0091) — karena itu ia di bawah, dan
+  // karena itu pula ia tak boleh menyamar jadi `working` seperti sebelum SPEC-897.
+  if (rows("waiting").length)
+    out.push(sessionCond("waiting", "waiting", rows("waiting"), (s) => `Menunggu jawabanmu · ${sessionName(s)}`));
+  if (rows("deciding").length)
+    out.push(sessionCond("deciding", "deciding", rows("deciding"), (s) => `${sessionName(s)} · lead sedang memutuskan`));
+
+  // 6–7 · kabar yang meluruh. Menang atas keadaan mapan (kabar baru lebih informatif), kalah dari
+  // gagal & menunggu — perayaan tak boleh menutupi permintaan tolong.
   const fresh = notifications.filter((n) => Date.parse(n.createdAt) + PET_TRANSIENT_MS > now);
   const newest = (rows: Notification[]): Notification | undefined =>
     [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-  const shipped = newest(fresh.filter((n) =>
-    SHIPPED_TYPES.has(n.type) && !(n.specId && audit.has(n.specId))));
-  const docs = newest(fresh.filter((n) => n.type === "done" && !!n.specId && audit.has(n.specId)));
-
-  // 1 · sesi gagal selalu menang. Backlog yang tertahan dependency HANYA memblokir saat tak ada
-  // sesi hidup: `blockedBy` adalah keadaan normal & berumur panjang di project ber-`dependsOn`
-  // (ADR-0093), dan tanpa gerbang itu pet terkunci di satu pose selamanya lalu berhenti memberi
-  // tahu apa pun. Backlog yang menunggu giliran tak sedang meminta apa-apa dari manusia.
-  const dead = failed[0];
-  if (dead) {
-    return {
-      pose: "blocked",
-      headline: `${sessionName(dead)} · sesi gagal`,
-      detail: `Keluar dengan exit ${dead.exitCode}${others(failed.length)}`,
-      target: { section: "terminal", sessionId: dead.id },
-      transientUntil: null,
-    };
-  }
-  const stuck = blockedSpecs[0];
-  if (live.length === 0 && stuck) {
-    return {
-      pose: "blocked",
-      headline: `${stuck.id} · tertahan dependency`,
-      detail: `Menunggu ${(stuck.blockedBy ?? []).map((b) => b.id).join(", ")}${others(blockedSpecs.length)}`,
-      target: { section: "backlog" },
-      transientUntil: null,
-    };
-  }
-
-  // 2 · sesi yang memang menunggu manusia. `deciding` dikecualikan: sesi yang sedang disusunkan
-  // keputusannya oleh hanoman-lead terlihat identik di layar (diam, marker terisi), dan membacanya
-  // sebagai "butuh kamu" adalah alarm palsu.
-  const asks = waiting[0];
-  if (asks) {
-    return {
-      pose: "waiting",
-      headline: `Menunggu jawabanmu · ${sessionName(asks)}`,
-      detail: `${specOf(backlog, asks)?.title ?? "Sesi terminal"}${others(waiting.length)}`,
-      target: { section: "terminal", sessionId: asks.id },
-      transientUntil: null,
-    };
-  }
-
-  // 3–4 · kabar yang meluruh. Menang atas keadaan mapan (kabar baru lebih informatif), kalah dari
-  // gagal & menunggu — perayaan tak boleh menutupi permintaan tolong.
+  const shippedRows = fresh.filter((n) =>
+    SHIPPED_TYPES.has(n.type) && !(n.specId && audit.has(n.specId)));
+  const docRows = fresh.filter((n) => n.type === "done" && !!n.specId && audit.has(n.specId));
+  const shipped = newest(shippedRows);
+  const docs = newest(docRows);
   if (shipped) {
-    return {
-      pose: "shipped",
-      headline: `${shipped.specId ?? "Backlog"} · selesai`,
-      detail: shipped.title,
-      target: { section: "backlog" },
-      transientUntil: Date.parse(shipped.createdAt) + PET_TRANSIENT_MS,
-    };
+    out.push({
+      kind: "shipped", pose: "shipped",
+      headline: `${shipped.specId ?? "Backlog"} · selesai`, detail: shipped.title,
+      count: shippedRows.length, target: { section: "backlog" },
+      recheckAt: Date.parse(shipped.createdAt) + PET_TRANSIENT_MS,
+    });
   }
   if (docs) {
-    return {
-      pose: "docs-updated",
-      headline: `${docs.specId ?? "Audit"} · dokumen terbit`,
-      detail: docs.title,
-      target: { section: "backlog" },
-      transientUntil: Date.parse(docs.createdAt) + PET_TRANSIENT_MS,
-    };
+    out.push({
+      kind: "docs-updated", pose: "docs-updated",
+      headline: `${docs.specId ?? "Audit"} · dokumen terbit`, detail: docs.title,
+      count: docRows.length, target: { section: "backlog" },
+      recheckAt: Date.parse(docs.createdAt) + PET_TRANSIENT_MS,
+    });
   }
 
-  // 5 · sesi hidup yang backlog-nya BELUM done. Pengecualian itu yang membuat pintu `review` di
-  // bawah bisa menyala sama sekali: pada jalur sukses pane agen tak pernah mati (SPEC-433), jadi
-  // "selesai" hanya terbaca dari `Spec.stage` — yang diturunkan server dari bukti yang sama
-  // (fase terminal + plan terceklist, ADR-0029).
-  const busy = working[0];
-  if (busy) {
-    return {
-      pose: "working",
-      headline: `${sessionName(busy)} · sedang berjalan`,
-      detail: `${specOf(backlog, busy)?.title ?? "Sesi terminal"}${others(working.length)}`,
-      target: { section: "terminal", sessionId: busy.id },
-      transientUntil: null,
-    };
-  }
+  // 8–9 · sesi hidup yang backlog-nya BELUM done. Pengecualian itu yang membuat pintu `review` di
+  // bawahnya bisa menyala sama sekali: pada jalur sukses pane agen tak pernah mati (SPEC-433), jadi
+  // "selesai" hanya terbaca dari `Spec.stage` — yang diturunkan server dari bukti yang sama (fase
+  // terminal + plan terceklist, ADR-0029).
+  if (rows("working").length)
+    out.push(sessionCond("working", "working", rows("working"), (s) => `${sessionName(s)} · sedang berjalan`));
+  if (rows("review").length)
+    out.push(sessionCond("review", "review", rows("review"), (s) => `${sessionName(s)} · menunggu review`));
 
-  const ready = reviewing[0];
-  if (ready) {
-    return {
-      pose: "review",
-      headline: `${sessionName(ready)} · menunggu review`,
-      detail: `${specOf(backlog, ready)?.title ?? "Sesi terminal"}${others(reviewing.length)}`,
-      target: { section: "terminal", sessionId: ready.id },
-      transientUntil: null,
-    };
-  }
+  // 10 · ekor: lihat gerbang di #3.
+  if (stuck && live.length > 0) out.push(blockedCond());
 
-  // 7 · lantai. Selalu benar, jadi pet tak pernah kehabisan pose.
-  return {
-    pose: "ready",
-    headline: readySpecs.length > 0 ? `${readySpecs.length} backlog siap dikerjakan` : "Tidak ada pekerjaan siap",
-    detail: "Tak ada sesi yang berjalan",
-    target: { section: "backlog" },
-    transientUntil: null,
+  return out;
+}
+
+// Yang paling awal di antara kandidat yang masih di depan; null bila tak ada.
+const earliest = (now: number, ...cands: (number | null)[]): number | null => {
+  const future = cands.filter((c): c is number => c !== null && c > now);
+  return future.length > 0 ? Math.min(...future) : null;
+};
+
+export function derivePetState(input: PetInput): PetView {
+  const { backlog, now, quietSince } = input;
+  const conn = input.connection ?? ONLINE;
+  const conditions = derivePetConditions(input);
+
+  // Lantai. Selalu benar, jadi pet tak pernah kehabisan pose. `count` sengaja 1: jumlah backlog
+  // siap sudah ada di headline, dan lencana adalah alarm — ia tak boleh menyala saat istirahat.
+  const readySpecs = backlog.filter((s) => s.stage !== "done" && (s.blockedBy?.length ?? 0) === 0);
+  const asleep = quietSince !== undefined && now - quietSince >= PET_SLEEP_MS;
+  const floor: PetCondition = {
+    kind: "ready", pose: asleep ? "sleeping" : "ready",
+    headline: asleep
+      ? "Tidur — tak ada kabar 30 menit terakhir"
+      : readySpecs.length > 0 ? `${readySpecs.length} backlog siap dikerjakan` : "Tidak ada pekerjaan siap",
+    detail: asleep ? "Bangun sendiri begitu ada sesi atau notifikasi baru." : "Tak ada sesi yang berjalan",
+    count: 1, target: { section: "backlog" }, recheckAt: null,
   };
+
+  const list = conditions.length > 0 ? conditions : [floor];
+  const top = list[0]!;
+  // Selama grace berjalan pose tetap yang lama, tapi kita harus bangun tepat saat ia habis.
+  const offlineAt = !conn.connected && !conn.paused ? conn.since + PET_OFFLINE_MS : null;
+  // Tidur HANYA menggantikan lantai: selama satu kondisi masih terdaftar, ada yang meminta.
+  const sleepAt = conditions.length === 0 && quietSince !== undefined && !asleep
+    ? quietSince + PET_SLEEP_MS : null;
+
+  return { ...top, recheckAt: earliest(now, top.recheckAt, offlineAt, sleepAt), conditions: list };
 }
 
 export function loadPetHidden(): boolean {

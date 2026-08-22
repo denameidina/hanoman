@@ -2,11 +2,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  PET_ATLAS_URL, PET_MANIFEST, PET_ROW_KEYS, POSE_ROW, durationMs, parsePetManifest, rowIndex, thenOf,
+  PET_ATLAS_URL, PET_MANIFEST, PET_ROW_KEYS, POSE_ROW, durationMs, parsePetManifest, rowIndex, rowOf, thenOf,
 } from "../src/screens/pet-sprite";
 import type { PetPose } from "../src/screens/pet-state";
 
-const POSES: PetPose[] = ["ready", "working", "waiting", "blocked", "review", "shipped", "docs-updated"];
+const POSES: PetPose[] = ["ready", "sleeping", "working", "deciding", "waiting", "blocked", "review",
+  "shipped", "docs-updated", "offline"];
 
 describe("manifest atlas pet (PET-001)", () => {
   it("pet.json yang dikomit lolos validasi dan barisnya berurutan", () => {
@@ -16,6 +17,18 @@ describe("manifest atlas pet (PET-001)", () => {
     expect(PET_MANIFEST.columns).toBe(8);
     expect(PET_MANIFEST.character.h).toBeLessThanOrEqual(PET_MANIFEST.cell.h);
     expect(PET_ATLAS_URL).toMatch(/\.webp$/);
+  });
+
+  it("memuat dua baris SPEC-897 di ekor, indeks baris lama tak bergeser", () => {
+    expect(PET_MANIFEST.rows.length).toBe(12);
+    expect(PET_MANIFEST.rows.map((r) => r.key).slice(10)).toEqual(["deciding", "sleep"]);
+    expect(rowIndex("wave")).toBe(9);
+    expect(rowIndex("deciding")).toBe(10);
+    expect(rowIndex("sleep")).toBe(11);
+    expect(durationMs("deciding")).toBe(Math.round((8 / 6) * 1000));
+    expect(durationMs("sleep")).toBe(2000);   // 8 frame @ 4 fps
+    expect(rowOf("sleep").loop).toBe(true);
+    expect(thenOf("sleep")).toBeNull();
   });
 
   it("indeks baris, durasi satu putaran, dan rantai then", () => {
@@ -28,15 +41,19 @@ describe("manifest atlas pet (PET-001)", () => {
     expect(thenOf("idle")).toBeNull();
   });
 
-  it("ketujuh pose punya baris, dan hanya ready yang berganti nama", () => {
+  it("POSE_ROW total atas sepuluh pose; hanya ready, sleeping, dan offline berganti nama", () => {
     for (const pose of POSES) expect(PET_ROW_KEYS).toContain(POSE_ROW[pose]);
+    expect(Object.keys(POSE_ROW).sort()).toEqual([...POSES].sort());
+    expect(POSES.filter((p) => POSE_ROW[p] !== p)).toEqual(["ready", "sleeping", "offline"]);
     expect(POSE_ROW.ready).toBe("idle");
-    expect(POSES.filter((p) => POSE_ROW[p] !== p)).toEqual(["ready"]);
+    expect(POSE_ROW.sleeping).toBe("sleep");
+    // `offline` sengaja menumpang `idle`: pudar + kalimat sudah mengatakan "aku tak tahu".
+    expect(POSE_ROW.offline).toBe("idle");
   });
 
   it("menolak manifest yang barisnya kurang, salah urutan, atau then pada baris loop", () => {
     const ok = JSON.parse(JSON.stringify(PET_MANIFEST)) as { rows: Record<string, unknown>[] };
-    expect(() => parsePetManifest({ ...ok, rows: ok.rows.slice(1) })).toThrow(/butuh 10 baris/);
+    expect(() => parsePetManifest({ ...ok, rows: ok.rows.slice(1) })).toThrow(new RegExp(`butuh ${PET_ROW_KEYS.length} baris`));
     const swapped = { ...ok, rows: [ok.rows[1], ok.rows[0], ...ok.rows.slice(2)] };
     expect(() => parsePetManifest(swapped)).toThrow(/rows\[0\]/);
     const badThen = { ...ok, rows: ok.rows.map((r, i) => (i === 0 ? { ...r, then: "wave" } : r)) };

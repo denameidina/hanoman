@@ -10,7 +10,8 @@ import type { PetPose } from "./pet-state";
 
 export const PET_ROW_KEYS = [
   "idle", "walk-right", "walk-left", "working", "waiting", "blocked", "review", "shipped",
-  "docs-updated", "wave",
+  // SPEC-897 · dua baris baru di EKOR: indeks baris lama tak bergeser, diff atlas minimal.
+  "docs-updated", "wave", "deciding", "sleep",
 ] as const;
 export type PetRowKey = typeof PET_ROW_KEYS[number];
 
@@ -76,10 +77,15 @@ export function parsePetManifest(raw: unknown): PetManifest {
 export const PET_MANIFEST: PetManifest = parsePetManifest(manifestJson);
 export const PET_ATLAS_URL: string = atlasUrl;
 
-// `ready` adalah satu-satunya pose yang namanya berbeda dari barisnya: pose lantai memutar idle.
+// `ready` dan `offline` adalah pose yang namanya berbeda dari barisnya. `offline` sengaja menumpang
+// `idle`: yang dikatakan pet saat terputus adalah "aku tak tahu", dan itu diucapkan oleh pudar +
+// kalimat — baris ke-13 berarti ±80 KB atlas untuk informasi yang sudah tersampaikan.
 export const POSE_ROW: Record<PetPose, PetRowKey> = {
   ready: "idle",
+  sleeping: "sleep",
+  offline: "idle",
   working: "working",
+  deciding: "deciding",
   waiting: "waiting",
   blocked: "blocked",
   review: "review",

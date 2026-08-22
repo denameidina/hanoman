@@ -1,0 +1,104 @@
+{
+  "key": "sleep",
+  "mode": "stand",
+  "pinned": true,
+  "edge": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+  ],
+  "frames": [
+    {
+      "frame": 1,
+      "dx": 0,
+      "dy": 0,
+      "scale": 1.0,
+      "residual_pre": 0.0,
+      "clipped": 0,
+      "fit_dx": 0,
+      "lift_fit": 1.0
+    },
+    {
+      "frame": 2,
+      "dx": -1,
+      "dy": 0,
+      "scale": 1.0,
+      "residual_pre": 0.0306,
+      "clipped": 0,
+      "fit_dx": 0,
+      "lift_fit": 1.0,
+      "residual_post": 0.0154
+    },
+    {
+      "frame": 3,
+      "dx": -3,
+      "dy": 4,
+      "scale": 1.02,
+      "residual_pre": 0.0759,
+      "clipped": 0,
+      "fit_dx": 0,
+      "lift_fit": 1.0,
+      "residual_post": 0.0353
+    },
+    {
+      "frame": 4,
+      "dx": -1,
+      "dy": 4,
+      "scale": 0.98,
+      "residual_pre": 0.0573,
+      "clipped": 0,
+      "fit_dx": 0,
+      "lift_fit": 1.0,
+      "residual_post": 0.0319
+    },
+    {
+      "frame": 5,
+      "dx": -1,
+      "dy": 1,
+      "scale": 1.0,
+      "residual_pre": 0.0472,
+      "clipped": 0,
+      "fit_dx": 0,
+      "lift_fit": 1.0,
+      "residual_post": 0.0173
+    },
+    {
+      "frame": 6,
+      "dx": -2,
+      "dy": 1,
+      "scale": 1.0,
+      "residual_pre": 0.05,
+      "clipped": 0,
+      "fit_dx": 0,
+      "lift_fit": 1.0,
+      "residual_post": 0.0196
+    },
+    {
+      "frame": 7,
+      "dx": -2,
+      "dy": 1,
+      "scale": 1.0,
+      "residual_pre": 0.0587,
+      "clipped": 0,
+      "fit_dx": 0,
+      "lift_fit": 1.0,
+      "residual_post": 0.0202
+    },
+    {
+      "frame": 8,
+      "dx": -2,
+      "dy": 1,
+      "scale": 1.0,
+      "residual_pre": 0.0541,
+      "clipped": 0,
+      "fit_dx": 0,
+      "lift_fit": 1.0,
+      "residual_post": 0.0209
+    }
+  ]
+}

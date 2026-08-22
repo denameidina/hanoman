@@ -302,7 +302,7 @@ Di `internal/scripts/pet/petlib.py`, ganti dua baris terakhir array `ROWS` sehin
 Jalankan: `python3 internal/scripts/pet/test-petlib.py`
 Diharapkan: PASS (semua assert komposisi memakai `len(petlib.ROWS)`, bukan angka). Bila ada assert yang mem-hardcode 10, ganti jadi `len(petlib.ROWS)`.
 
-- [ ] **Step 5: Generate baris `deciding` lewat Codex**
+- [x] **Step 5: Generate baris `deciding` lewat Codex**
 
 Jalankan (±3 menit):
 
@@ -317,7 +317,7 @@ Diharapkan: `qa.py` mencetak OK dan menulis `internal/assets/pet/qa/deciding.gif
 Bila `qa.py` gagal (sprite ≠ 8, menyentuh tepi, tumpahan sel, residu pra-pin > 0,15), ulangi dari `gen.py` dengan catatan reviewer, mis.:
 `python3 internal/scripts/pet/gen.py deciding --note "keep the feet, legs and sarong identical in every cell; leave clear empty space between cells"`
 
-- [ ] **Step 6: Generate baris `sleep` lewat Codex**
+- [x] **Step 6: Generate baris `sleep` lewat Codex**
 
 ```bash
 python3 internal/scripts/pet/gen.py sleep
@@ -328,11 +328,11 @@ python3 internal/scripts/pet/qa.py sleep
 
 Diharapkan: sama seperti Step 5, untuk `sleep`.
 
-- [ ] **Step 7: Review manusia (Gate 2 brand)**
+- [x] **Step 7: Review manusia (Gate 2 brand)**
 
 Lihat `internal/assets/pet/qa/deciding-contact.png` dan `internal/assets/pet/qa/sleep-contact.png` (buka gambarnya, jangan hanya percaya gerbang numerik). Yang harus benar: siluet profil satu mata, jamang, kain merah-emas, ekor besar berornamen, tak ada mirror, tak ada prop selain yang disebut naskah, `sleep` benar-benar duduk dengan mata terpejam, `deciding` benar-benar menengadah (bukan condong ke kanan seperti `review`). Bila salah, ulangi Step 5/6 dengan `--note`.
 
-- [ ] **Step 8: Rakit atlas & manifest**
+- [x] **Step 8: Rakit atlas & manifest**
 
 ```bash
 python3 internal/scripts/pet/atlas.py
@@ -342,7 +342,7 @@ python3 internal/scripts/pet/verify.py
 Diharapkan: `atlas.py` mencetak `ditulis hnm-pet-anoman-atlas-v01.webp (<N> B, 1536×2496) + pet.json`, dengan `<N> ≤ 1000000`; `verify.py` OK.
 **Bila `atlas.py` gagal dengan "atlas … > anggaran":** ubah `quality=82` menjadi `quality=78` di `internal/scripts/pet/atlas.py` `encode()`, jalankan ulang, dan catat angka barunya di Task 7 (`internal/assets/pet/README.md`). Jangan menaikkan `ATLAS_BUDGET`.
 
-- [ ] **Step 9: Tulis test manifest 12 baris yang gagal**
+- [x] **Step 9: Tulis test manifest 12 baris yang gagal**
 
 Di `src/test/pet-sprite.test.ts`, tambahkan di dalam blok `describe` yang sudah ada:
 
@@ -362,12 +362,12 @@ Di `src/test/pet-sprite.test.ts`, tambahkan di dalam blok `describe` yang sudah 
 
 Pastikan `PET_MANIFEST`, `rowIndex`, `rowOf`, `durationMs`, `thenOf` sudah ada di baris `import` berkas itu; tambahkan yang belum.
 
-- [ ] **Step 10: Jalankan test, pastikan gagal**
+- [x] **Step 10: Jalankan test, pastikan gagal**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/pet-sprite.test.ts`
 Diharapkan: FAIL — `parsePetManifest` melempar `pet.json tidak sah: rows: butuh 10 baris` (manifest sudah 12, `PET_ROW_KEYS` masih 10).
 
-- [ ] **Step 11: Tambah dua key di `PET_ROW_KEYS`**
+- [x] **Step 11: Tambah dua key di `PET_ROW_KEYS`**
 
 Di `src/src/screens/pet-sprite.ts`:
 
@@ -379,12 +379,12 @@ export const PET_ROW_KEYS = [
 ] as const;
 ```
 
-- [ ] **Step 12: Jalankan test, pastikan lulus**
+- [x] **Step 12: Jalankan test, pastikan lulus**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/pet-sprite.test.ts`
 Diharapkan: PASS.
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 git add internal/assets/pet internal/scripts/pet/petlib.py internal/scripts/pet/atlas.py \
@@ -415,7 +415,7 @@ git commit -m "feat(pet): baris atlas deciding & sleep (PET-001 → 12 baris)"
   - `PetInput` bertambah `connection?: PetConnection` dan `quietSince?: number`
   - **Dicabut:** field `transientUntil` (diganti `recheckAt`) dan sufiks `+N lainnya` di `detail`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `src/test/pet-state.test.ts`, ganti baris `import` teratas menjadi:
 
@@ -605,12 +605,12 @@ describe("SPEC-897 — daftar kondisi & hitungan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/pet-state.test.ts`
 Diharapkan: FAIL — `derivePetConditions is not a function`, `petPulse is not a function`.
 
-- [ ] **Step 3: Tulis ulang `pet-state.ts`**
+- [x] **Step 3: Tulis ulang `pet-state.ts`**
 
 Ganti bagian dari deklarasi `export type PetPose` sampai akhir `derivePetState` di `src/src/screens/pet-state.ts` dengan:
 
@@ -869,7 +869,7 @@ export function derivePetState(input: PetInput): PetView {
 
 Hapus helper `others()` yang tak lagi dipakai. `loadPetHidden`/`savePetHidden`/`loadPetRoam`/`savePetRoam` di bawahnya tak berubah.
 
-- [ ] **Step 4: Lengkapi `POSE_ROW` untuk tiga pose baru**
+- [x] **Step 4: Lengkapi `POSE_ROW` untuk tiga pose baru**
 
 Di `src/src/screens/pet-sprite.ts`, ganti `POSE_ROW`:
 
@@ -906,12 +906,12 @@ Di `src/test/pet-sprite.test.ts`, tambahkan:
 
 Tambahkan `POSE_ROW`, `PET_ROW_KEYS` ke `import` dari `../src/screens/pet-sprite` dan `type PetPose` dari `../src/screens/pet-state` di berkas test itu.
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/pet-state.test.ts src/test/pet-sprite.test.ts`
 Diharapkan: PASS keduanya.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/pet-state.ts src/src/screens/pet-sprite.ts \
