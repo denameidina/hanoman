@@ -705,6 +705,28 @@ angkat, ambang klik-vs-seret, lambaian menetap), `pet-mount.test.tsx` (mount tun
 artwork),
 `internal/scripts/pet/test-petlib.py` (pipeline atas lembar sintetis).
 
+## DalangStage — hero Overview: Anoman sebagai dalang
+
+Metafora produk dinaikkan ke permukaan: Overview dibuka `DalangStage`
+(`src/src/screens/DalangStage.tsx`), panel kelir tempat Anoman-dalang "memainkan" project.
+Tiap project ber-`session.status === "running"` dirender sebagai **wayang hidup** — kartu gelap
+`--term-bg` ber-rim brass (`color-mix` atas `--brass-500`, cermin `--ring`) berisi siluet wayang
+SVG yang bergoyang (`hn-dalang-sway`, transform-only → compositor, padam otomatis oleh blok
+`prefers-reduced-motion` global) plus nama + fase; klik → Terminal. Project tanpa sesi = chip
+**wayang parkir** di baris debog (`hn-dalang-debog`); klik → detail project. Maskot memakai
+registry katalog (`MPS-004` work saat ada sesi, `MPS-003` observe saat sunyi) — bukan aset baru.
+Empat stat di header: **dikerjakan hari ini** (`Spec.startedAt` pada hari LOKAL ini —
+komponen-per-komponen, bukan parse `YYYY-MM-DD` yang jatuh ke UTC, gotcha ADR-0090), sesi
+berjalan, menunggu (`!startedAt && stage !== "done"`), dan total `done`. `doneAt` sengaja tak
+dipakai: ia tidak ada di wire `zSpec` (hanya kolom DB/portal, ADR-0105).
+
+Komponen murni presentasi — data dari props Overview yang sudah ada (`projects`, `backlog`),
+nol fetch baru, nol channel realtime baru (ADR-0039). Arah visualnya direkam sebagai concept art
+di `internal/assets/concepts/dalang/` (4 state, digenerate Codex/GPT Image dengan pola pipeline
+ADR-0140; enam lengan = pengecualian ikonografi sadar, dicatat di README direktori itu).
+Pengujian: `src/test/dalang-stage.test.tsx` (state sunyi/running, hitung stat hari lokal,
+navigasi klik, kontrak token warna).
+
 ## Tinggi & scrolling: rantai flex, bukan angka ajaib
 `#root` memakai `100vh` sebagai fallback lalu dikunci `100dvh; overflow: hidden`, jadi tinggi yang
 tersedia mengikuti dynamic viewport tanpa menyerahkan scroll kepada body.

@@ -4,6 +4,7 @@ import React from "react";
 import { Card, StatusPill, Badge, ProgressBar, Icon, Button, StateBlock } from "../ds";
 import type { ProjectVM, Spec } from "./types";
 import { LimitWindows } from "./LimitIndicator";
+import { DalangStage } from "./DalangStage";
 import { useLimits } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
 
@@ -131,6 +132,7 @@ export function OverviewScreen({ projects, backlog, onOpenProject, onGoto }:
 
   return (
     <div>
+      <DalangStage projects={projects} backlog={backlog} onGoto={onGoto} onOpenProject={onOpenProject} />
       <KpiStrip items={kpis} />
       <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 20, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

@@ -667,3 +667,70 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   30% { opacity: 1; transform: translateY(-8px) scale(1); }
   100% { opacity: 0; transform: translateY(-26px) scale(0.9); }
 }
+
+/* ---- DalangStage (Overview hero) — Anoman dalang mengendalikan wayang project. ----
+   Kelir = gradasi bone; sesi running = wayang di panel gelap terminal ber-rim brass;
+   project idle = wayang parkir di debog. Sway hanya transform → compositor; padam
+   otomatis oleh blok prefers-reduced-motion global. */
+.hn-dalang {
+  border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
+  background: var(--surface-card); overflow: hidden; margin-bottom: 20px;
+}
+.hn-dalang-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 16px 20px 10px;
+}
+.hn-dalang-stats { display: flex; gap: 22px; flex-wrap: wrap; }
+.hn-dalang-stat { text-align: right; }
+.hn-dalang-stat > div:first-child { justify-content: flex-end; }
+.hn-dalang-stage {
+  display: flex; align-items: flex-end; gap: 12px; min-height: 132px;
+  padding: 6px 20px 0; background: linear-gradient(180deg, var(--bone-000), var(--bone-200));
+}
+.hn-dalang-mascot { width: 132px; flex: 0 0 auto; }
+.hn-dalang-troupe {
+  flex: 1; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+  padding: 4px 0 14px;
+}
+.hn-dalang-live {
+  appearance: none; font: inherit; text-align: left; cursor: pointer; width: 168px;
+  background: var(--term-bg); border: 1px solid var(--term-line);
+  border-radius: var(--radius-md); padding: 8px 12px 10px;
+  box-shadow: var(--shadow-sm), 0 0 16px 0 color-mix(in srgb, var(--brass-500) 28%, transparent);
+  transition: box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+.hn-dalang-live:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), 0 0 22px 0 color-mix(in srgb, var(--brass-500) 42%, transparent);
+}
+.hn-dalang-live:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.hn-dalang-puppet {
+  display: block; width: fit-content; margin: 0 auto 6px;
+  transform-origin: 50% 100%;
+  animation: hn-dalang-sway 3.8s var(--ease-inout) infinite alternate;
+}
+@keyframes hn-dalang-sway {
+  from { transform: rotate(-2.4deg); }
+  to { transform: rotate(2.4deg); }
+}
+.hn-dalang-empty { flex: 1; padding: 22px 0 26px; }
+.hn-dalang-debog {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 10px 20px 12px; border-top: 1px solid var(--border-hair); background: var(--bone-100);
+}
+.hn-dalang-parked {
+  appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center;
+  gap: 7px; padding: 4px 12px 4px 8px; background: var(--surface-card);
+  border: 1px solid var(--border-hair); border-radius: var(--radius-pill);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.hn-dalang-parked:hover { border-color: var(--bone-400); }
+.hn-dalang-parked:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+@media (max-width: 767px) {
+  .hn-dalang-head { flex-direction: column; }
+  .hn-dalang-stats { gap: 16px; }
+  .hn-dalang-stat { text-align: left; }
+  .hn-dalang-stat > div:first-child { justify-content: flex-start; }
+  .hn-dalang-mascot { width: 96px; }
+  .hn-dalang-live { width: 100%; }
+}
