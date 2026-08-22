@@ -365,13 +365,33 @@ export function syncStatus(): { running: boolean; connected: boolean } {
   return { running: started, connected: ws?.readyState === 1 /* OPEN */ };
 }
 
+// SPEC-885 · ADR-0138 · kegagalan pull dulu ditelan `catch { }` tanpa satu baris pun. Itulah yang
+// membuat mandek total (halaman 2,51 MB melewati cap byte) tak bisa dibedakan dari sepi, dan
+// karena itu insiden ini butuh investigasi penuh untuk sekadar DIKENALI. Digerbangi flag: tick
+// berjalan tiap 15 detik, jadi log per-kegagalan akan jadi hujan log saat hub tak terjangkau —
+// yang dicatat adalah TRANSISI, pola yang sama dengan siar dashboard di ADR-0131 §3.
+let pullSehat = true;
+export function __resetSyncHealth(): void { pullSehat = true; }
+
+export async function syncTick(transport: Transport): Promise<void> {
+  try {
+    await syncOnce(transport);
+    if (!pullSehat) { console.info("sync: pull pulih"); pullSehat = true; }
+  } catch (e) {
+    if (pullSehat) {
+      console.warn(`sync: pull gagal — ${(e as Error).message}`);
+      pullSehat = false;
+    }
+  }
+}
+
 // Jalankan client sync: syncOnce awal + WS siar (apply + drain saat frame) + reconnect backoff +
 // tick fallback berkala (drain outbox yang lahir saat offline). Dipanggil dari server.ts bila
 // SYNC_SERVER_URL + SYNC_DEVICE_TOKEN di-set.
 export async function startSyncClient(base: string, token: string, tickMs?: number): Promise<void> {
   started = true;
   const transport = fetchTransport(base, token);
-  const tick = async () => { try { await syncOnce(transport); } catch { /* offline — coba lagi nanti */ } };
+  const tick = () => syncTick(transport);
 
   const connectWs = async () => {
     const { WebSocket } = await import("ws");

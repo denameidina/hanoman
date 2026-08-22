@@ -706,7 +706,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Mengapa ini task sendiri:** kalau tidak dikerjakan, kegagalan sync **berikutnya** — apa pun bentuknya — akan kembali menyamar sebagai "lambat". Yang membuat insiden ini butuh investigasi penuh bukan cap byte-nya, melainkan `catch { }` kosong yang membuat mandek total tak terlihat berbeda dari sepi.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/sync-drain.test.ts` (tambahkan `syncTick` dan `__resetSyncHealth` ke import dari `../src/services/sync-client`):
 
@@ -740,7 +740,7 @@ describe("SPEC-885 · kegagalan pull tak boleh senyap", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-drain.test.ts
@@ -748,7 +748,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `syncTick is not exported` / `__resetSyncHealth is not exported`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/sync-client.ts`, tepat **di atas** `export async function startSyncClient`, sisipkan:
 
@@ -782,7 +782,7 @@ Lalu di dalam `startSyncClient`, ganti definisi `tick` lokal:
 
 (Baris lama `const tick = async () => { try { await syncOnce(transport); } catch { /* offline — coba lagi nanti */ } };` dihapus.)
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-drain.test.ts server/test/sync-ws.test.ts
@@ -790,7 +790,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/sync-client.ts server/test/sync-drain.test.ts

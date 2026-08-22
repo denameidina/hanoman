@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { prisma } from "../src/db";
-import { syncOnce, getCursor, setCursor, type Transport } from "../src/services/sync-client";
+import {
+  syncOnce, syncTick, getCursor, setCursor, __resetSyncHealth, type Transport,
+} from "../src/services/sync-client";
 
 const clean = async () => {
   await prisma.syncLog.deleteMany(); await prisma.syncOutbox.deleteMany();
@@ -113,5 +115,33 @@ describe("SPEC-885 · drain berkelanjutan", () => {
     await syncOnce(transport);
 
     expect(calls).toBe(1);
+  });
+});
+
+describe("SPEC-885 · kegagalan pull tak boleh senyap", () => {
+  it("mencatat sekali saat mulai gagal dan sekali saat pulih, bukan tiap tick", async () => {
+    __resetSyncHealth();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    let sehat = false;
+    const transport: Transport = async (method, path) => {
+      if (method === "GET" && path.startsWith("/api/sync/pull")) {
+        if (!sehat) throw new Error("outbound response terlalu besar");
+        return { status: 200, body: { cursor: "1", hasMore: false, records: [] } };
+      }
+      return { status: 200, body: { results: [] } };
+    };
+
+    // Tiga siklus gagal berturut-turut → satu baris log, bukan tiga.
+    for (let i = 0; i < 3; i++) await syncTick(transport);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![0]).toMatch(/sync: pull gagal/);
+
+    sehat = true;
+    await syncTick(transport);
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(info.mock.calls[0]![0]).toMatch(/sync: pull pulih/);
+
+    warn.mockRestore(); info.mockRestore();
   });
 });
