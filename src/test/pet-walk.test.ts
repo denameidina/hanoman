@@ -79,29 +79,36 @@ describe("mesin berkeliaran pet", () => {
     expect(step.move).toEqual({ x: 350, durationMs: 0 });
   });
 
-  it("pose tenang: berdiri 4–12 dtk, lalu jalan 2–6 dtk @ 40 px/s ke arah acak di dalam jalur", () => {
-    // berdiri sampai `until`; rng pertama (0.5) → jalan 4 dtk = 160 px; rng kedua (0.9) → ke kanan
-    const wait = stepWalk(standing(500, 100_500), input({ currentX: 500 }), seq(0.5, 0.9));
+  it("pose tenang: berdiri 1,2–4,5 dtk, lalu jalan 5–14 dtk @ 40 px/s ke arah acak di dalam jalur", () => {
+    // berdiri sampai `until`; rng pertama (0.5) → jalan 9,5 dtk = 380 px; rng kedua (0.9) → ke kanan
+    const wait = stepWalk(standing(300, 100_500), input({ currentX: 300 }), seq(0.5, 0.9));
     expect(wait.move).toBeNull();
     expect(wait.row).toBe("idle");
-    const go = stepWalk(standing(500, 100_000), input({ currentX: 500 }), seq(0.5, 0.9));
+    const go = stepWalk(standing(300, 100_000), input({ currentX: 300 }), seq(0.5, 0.9));
     expect(go.row).toBe("walk-right");
-    expect(go.move).toEqual({ x: 660, durationMs: 4000 });
-    expect(go.state).toEqual({ x: 660, facing: "right", mode: "walk", until: 104_000 });
-    // jalan sampai tiba, lalu berdiri STAND_MS[0]..[1] (rng 0 → 4 dtk)
-    const onTheWay = stepWalk(go.state, input({ currentX: 600, now: 102_000 }), seq(0));
+    expect(go.move).toEqual({ x: 680, y: 0, durationMs: 9500, ease: "linear" });
+    expect(go.state).toEqual({ x: 680, y: 0, facing: "right", mode: "walk", until: 109_500, parkedX: null });
+    // jalan sampai tiba, lalu berdiri STAND_MS[0]..[1] (rng 0 → 1,2 dtk)
+    const onTheWay = stepWalk(go.state, input({ currentX: 500, now: 105_000 }), seq(0));
     expect(onTheWay.move).toBeNull();
     expect(onTheWay.row).toBe("walk-right");
-    const arrived = stepWalk(go.state, input({ currentX: 660, now: 104_000 }), seq(0));
-    expect(arrived.state).toEqual({ x: 660, facing: "right", mode: "stand", until: 104_000 + STAND_MS[0] });
+    const arrived = stepWalk(go.state, input({ currentX: 680, now: 109_500 }), seq(0));
+    expect(arrived.state).toEqual({ x: 680, y: 0, facing: "right", mode: "stand", until: 109_500 + STAND_MS[0], parkedX: null });
     expect(arrived.row).toBe("idle");
   });
 
+  it("berjalan lebih sering daripada berdiri — itulah isi perubahan angkanya", () => {
+    // Rata-rata satu siklus tenang: berdiri (1,2+4,5)/2 = 2,85 dtk, jalan (5+14)/2 = 9,5 dtk.
+    const standAvg = (STAND_MS[0] + STAND_MS[1]) / 2;
+    const walkAvg = (WALK_MS[0] + WALK_MS[1]) / 2;
+    expect(walkAvg / (walkAvg + standAvg)).toBeGreaterThan(0.7);
+  });
+
   it("di tepi jalur membalik arah; jalur yang terlalu sempit membuatnya diam", () => {
-    // di rumah, rng arah 0.9 (kanan) → tak ada ruang → balik ke kiri sejauh 160 px
+    // di rumah, rng arah 0.9 (kanan) → tak ada ruang → balik ke kiri sejauh 380 px
     const flip = stepWalk(standing(HOME, 100_000), input({ currentX: HOME }), seq(0.5, 0.9));
     expect(flip.row).toBe("walk-left");
-    expect(flip.move).toEqual({ x: HOME - 160, durationMs: 4000 });
+    expect(flip.move).toEqual({ x: HOME - 380, y: 0, durationMs: 9500, ease: "linear" });
     // jalur selebar pet + 2 margin + sedikit: tak ada arah yang memberi ≥ MIN_WALK_PX
     const narrow = LANE_MARGIN * 2 + PET + MIN_WALK_PX - 1;
     const stuck = stepWalk(standing(LANE_MARGIN, 100_000), input({ laneWidth: narrow, currentX: LANE_MARGIN }), seq(0.5, 0.9));
@@ -117,11 +124,11 @@ describe("mesin berkeliaran pet", () => {
   });
 
   it("durasi jalan mengikuti jarak sebenarnya setelah clamp, bukan angka acak", () => {
-    // rng: jalan 6 dtk (0.999… → ~240 px) ke kanan dari 700 → clamp ke HOME (856): 156 px = 3900 ms
+    // rng: jalan 14 dtk (0.999… → ~560 px) ke kanan dari 700 → clamp ke HOME (856): 156 px = 3900 ms
     const step = stepWalk(standing(700, 100_000), input({ currentX: 700 }), seq(1 - 1e-9, 0.9));
     expect(step.move!.x).toBe(HOME);
     expect(step.move!.durationMs).toBe(Math.round(((HOME - 700) / WALK_PX_PER_S) * 1000));
-    expect(WALK_MS[1] * WALK_PX_PER_S / 1000).toBe(240);
+    expect(WALK_MS[1] * WALK_PX_PER_S / 1000).toBe(560);
   });
 });
 

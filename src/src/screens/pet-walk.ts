@@ -7,8 +7,12 @@ import type { PetPose } from "./pet-state";
 import { POSE_ROW, type PetRowKey } from "./pet-sprite";
 
 export const WALK_PX_PER_S = 40;
-export const STAND_MS: readonly [number, number] = [4000, 12000];
-export const WALK_MS: readonly [number, number] = [2000, 6000];
+// SPEC-905 · pet berjalan LEBIH SERING daripada berdiri. Rasionya disengaja, bukan selera: satu
+// siklus tenang rata-rata kini 2,85 dtk berdiri + 9,5 dtk jalan (±72 % berjalan), kebalikan dari
+// ±33 % milik [4000,12000]/[2000,6000] milik ADR-0140 — yang membuat sprite berjalan jarang
+// terlihat berjalan. `WALK_PX_PER_S` tak ikut naik: yang kurang adalah DURASInya, bukan lajunya.
+export const STAND_MS: readonly [number, number] = [1200, 4500];
+export const WALK_MS: readonly [number, number] = [5000, 14000];
 export const LANE_MARGIN = 16;
 // Perpindahan lebih pendek dari ini bukan "jalan-jalan", cuma geser — arah dibalik atau diam.
 export const MIN_WALK_PX = 24;

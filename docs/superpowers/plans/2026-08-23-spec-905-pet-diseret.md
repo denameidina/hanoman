@@ -55,7 +55,7 @@ Spec: `docs/superpowers/specs/2026-08-23-spec-905-pet-diseret-design.md`.
 - Produces: `STAND_MS: readonly [1200, 4500]`, `WALK_MS: readonly [5000, 14000]` (nama & tipe tak
   berubah, hanya nilainya).
 
-- [ ] **Step 1: Perbarui test yang mengunci angkanya**
+- [x] **Step 1: Perbarui test yang mengunci angkanya**
 
 Di `src/test/pet-walk.test.ts`, ganti test "pose tenang…" (baris 82–98) dengan:
 
@@ -108,14 +108,14 @@ Ganti pula dua angka di test "di tepi jalur membalik arah…" (baris 100–111) 
 > karena itu **merah dua kali** — sekali karena angkanya, sekali karena bentuknya. Itu disengaja:
 > Step 2 memastikan kegagalannya memang soal angka.
 
-- [ ] **Step 2: Jalankan test — pastikan MERAH karena angkanya**
+- [x] **Step 2: Jalankan test — pastikan MERAH karena angkanya**
 
 ```bash
 pnpm vitest --run --root src test/pet-walk.test.ts -t "pose tenang"
 ```
 Expected: FAIL — `expected { x: 300 + 160 … } to equal { x: 680 … }` (angka lama 160 px vs 380 px).
 
-- [ ] **Step 3: Ganti kedua konstanta**
+- [x] **Step 3: Ganti kedua konstanta**
 
 Di `src/src/screens/pet-walk.ts` ganti baris 10–11 dengan:
 
@@ -128,14 +128,14 @@ export const STAND_MS: readonly [number, number] = [1200, 4500];
 export const WALK_MS: readonly [number, number] = [5000, 14000];
 ```
 
-- [ ] **Step 4: Jalankan test — angkanya lulus, bentuknya masih merah**
+- [x] **Step 4: Jalankan test — angkanya lulus, bentuknya masih merah**
 
 ```bash
 pnpm vitest --run --root src test/pet-walk.test.ts -t "berjalan lebih sering"
 ```
 Expected: PASS. Test "pose tenang" masih FAIL pada `y`/`ease`/`parkedX` — itu pekerjaan Task 2/3.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/pet-walk.ts src/test/pet-walk.test.ts
