@@ -1,5 +1,5 @@
 import React from "react";
-import type { Spec } from "@hanoman/shared";
+import type { SessionAsk, Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../api/client";
 import { eventsStatus, subscribeStatus, type EventsStatus } from "../api/events";
 import { Button, Mark, useResponsiveTier } from "../ds";
@@ -91,8 +91,8 @@ function useLaneWidth(): number {
   return width;
 }
 
-export function HanomanPet({ sessions, backlog, onOpen }:
-  { sessions: TerminalSession[]; backlog: Spec[]; onOpen: (target: PetTarget) => void }) {
+export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
+  { sessions: TerminalSession[]; backlog: Spec[]; asks?: SessionAsk[]; onOpen: (target: PetTarget) => void }) {
   const { items } = useNotifications();
   const [hidden, setHidden] = React.useState(loadPetHidden);
   const [roam, setRoam] = React.useState(loadPetRoam);
@@ -407,7 +407,8 @@ export function HanomanPet({ sessions, backlog, onOpen }:
                     sedang beranimasi keluar masih ter-mount, dan kotak yang lahir di sana akan
                     memanggil endpoint dialog untuk panel yang justru sedang ditutup. */}
                 {c.kind === "waiting" && open && waiting.map((s) => (
-                  <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id} reduced={reduced} />
+                  <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id} reduced={reduced}
+                    ask={asks.find((a) => a.sessionId === s.id)} />
                 ))}
               </li>
             ))}

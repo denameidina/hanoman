@@ -6,6 +6,7 @@ import { getLimits } from "./limits";
 import { getCodexLimits } from "./codex-limits";
 import { getUpdateStatus } from "./update";
 import { isDeciding } from "./lead/deciding";
+import { liveAsks } from "./lead/ask";
 import { listCleanups } from "./worktree-reaper";
 import { prisma } from "../db";
 import { effectiveInt } from "../config";
@@ -46,6 +47,12 @@ const GROUPS: Group[] = [
   // memori, bukan disk — nol I/O per tick, dan dedup signature membuat frame lahir hanya saat
   // daftarnya berubah (nyaris selalu kosong).
   { everyTicks: 3,  last: "", build: async () => ({ t: "cleanups", cleanups: listCleanups() }) },
+  // SPEC-909 · ADR-0146 · pertanyaan sesi yang HIDUP, langsung dari payload hook agennya — bukan
+  // dari scrape layar saat panel pet dibuka. Membaca peta di memori (`lead/ask.ts`): nol I/O, nol
+  // tmux, nol DB per tick, dan dedup signature membuat frame lahir hanya saat daftarnya berubah
+  // (nyaris selalu kosong). Grup SENDIRI, bukan hiasan di `sessions`: frame itu sudah yang terbesar
+  // di dashboard dan pembacanya jauh lebih banyak daripada pembaca daftar pendek ini.
+  { everyTicks: 1,  last: "", build: async () => ({ t: "leadAsks", asks: liveAsks() }) },
   // ponytail: cermin GET /vps (orderBy createdAt asc). Query sepele — tak diekstrak.
   { everyTicks: 15, last: "", build: async () => ({ t: "vps", vps: await prisma.vps.findMany({ orderBy: { createdAt: "asc" } }) }) },
   { everyTicks: 30, last: "", build: async () => ({ t: "limits", limits: await getLimits() }) },

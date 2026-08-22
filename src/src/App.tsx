@@ -8,7 +8,7 @@ import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, 
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
-import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus } from "@hanoman/shared";
+import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk } from "@hanoman/shared";
 import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
@@ -687,6 +687,10 @@ export default function App() {
   const [dataVersion, setDataVersion] = React.useState(0);
   // Pekerjaan yang berjalan adalah sesi tmux, bukan baris Run (SPEC-162).
   const [sessions, setSessions] = React.useState<TerminalSession[]>([]);
+  // SPEC-909 · ADR-0146 · pertanyaan sesi yang hidup, langsung dari payload hook agennya. Server
+  // yang lebih tua tak pernah mengirim frame ini (ADR-0087) → daftarnya tetap kosong, dan pet jatuh
+  // ke perilaku sebelum SPEC ini.
+  const [leadAsks, setLeadAsks] = React.useState<SessionAsk[]>([]);
   const [projectId, setProjectId] = usePersistedState("app", "projectId", "", isStr);
   // SPEC-171/230 · target review: backlog item (spec) atau sesi project-level PRD (session).
   const [review, setReview] = React.useState<{ id: string; kind: "spec" | "session"; title: string } | null>(null);
@@ -798,6 +802,7 @@ export default function App() {
   React.useEffect(() => subscribe((m) => {
     if (m.t === "specs") { setBacklog(m.specs); setDataVersion((v) => v + 1); }
     else if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
+    else if (m.t === "leadAsks") setLeadAsks(m.asks);
   }), []);
 
   const proj = projectsView.find((p) => p.id === projectId) || projectsView[0];
@@ -1481,7 +1486,7 @@ export default function App() {
             punya kuasa mengubahnya, jadi baginya ini cuma kecemasan tanpa tombol. */}
         <UnhardenedBanner status={setupStatus} />
         {screen}
-        <HanomanPet sessions={sessions} backlog={backlog}
+        <HanomanPet sessions={sessions} backlog={backlog} asks={leadAsks}
           onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
         <NewSpecModal open={modal === "brief"} onClose={() => { setModal(null); setSpecPrefill(null); }}
           projects={projectsView} defaultProject={proj ? proj.id : ""} onCreate={createSpec}
