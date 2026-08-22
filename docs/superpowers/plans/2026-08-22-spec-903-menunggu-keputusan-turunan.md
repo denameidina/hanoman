@@ -1026,3 +1026,17 @@ sesudah: marker [] (0 B) · decision false · decisionAt absen
 
 Bonus bukti negatif: pada pane yang layarnya TIDAK bergerak, jawaban dijawab
 `409 not-landed` dan marker **tidak** disentuh — pengosongan marker memang hanya menempel pada 202.
+
+**3. Bug aslinya, diperiksa ulang pada sesi kerja yang sungguhan.** Predikat baru dievaluasi apa
+adanya terhadap pane hidup di socket `hanoman` (tanpa menyentuh apa pun milik sesi tetangga):
+
+```
+hanoman-12addc68                        umur=  1s BEKERJA  marker=-
+hanoman-spec-902                        umur=  1s BEKERJA  marker=terisi   ← persis kasus laporan
+hanoman-spec-903                        umur=  0s BEKERJA  marker=kosong
+hanoman-spec-904                        umur=  1s BEKERJA  marker=kosong
+hanoman-vpsc-cms97gza2009im8avgbkal31n  umur=  0s BEKERJA  marker=-
+```
+
+`hanoman-spec-902` adalah sesi claude yang **sedang bekerja** dengan marker **terisi** — hari ini ia
+menyalakan pil "Menunggu keputusan"; dengan gerbang SPEC-903 umurnya 1 dtk → `decision: false`.
