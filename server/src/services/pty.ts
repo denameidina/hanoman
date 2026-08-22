@@ -47,17 +47,55 @@ export const markerFilled = (f: string): boolean => {
   try { return statSync(f).size > 0; } catch { return false; }
 };
 
+// SPEC-903 · ADR-0143 · dua penulis marker dari sisi server, dan hanya dua: rantai lead yang tuntas
+// (SPEC-452) dan jawaban dialog yang mendarat lewat route (SPEC-899). Keduanya bukti POSITIF manusia
+// sudah menjawab — kembaran `UserPromptSubmit` untuk jalur yang tak pernah dilihat hook agen.
+// Gerbang `paneQuiet` di bawah TIDAK boleh memanggilnya: hook Notification claude mengisi marker
+// sekali per dialog dan tak pernah menembak lagi (terukur 0 B selama 120 dtk dengan dialog masih
+// terbuka), jadi menghapusnya karena pane kebetulan berisik menghilangkan pertanyaan itu permanen.
+export const clearMarker = (f: string): void => {
+  try { writeFileSync(f, ""); } catch { /* marker lenyap = sudah kosong */ }
+};
+
+// SPEC-903 · ADR-0143 · "menunggu manusia" adalah keadaan TURUNAN, bukan latch. Marker tetap sinyal
+// masuk yang durable, tapi membacanya digerbangi: pane yang masih mengeluarkan sesuatu berarti agen
+// sedang bekerja, bukan menunggu. Sumbernya `#{window_activity}` yang ikut di FMT, jadi nol invokasi
+// tmux tambahan (pola `#{alternate_on}`, SPEC-863).
+//
+// Ambangnya diukur (audit SPEC-903 §3.1): pane claude yang bekerja punya `window_activity == now`
+// pada 22/22 sampel 1 Hz — timer giliran berdetak tiap detik — sementara pane yang diam di prompt
+// beku 317 dtk. 3 dtk = 3x margin di atas jeda keluaran terukur (<= 1 dtk) dan di atas lag
+// pembulatan detik tmux (<= 1 dtk).
+export const PANE_QUIET_MS = 3_000;
+
+// `activityAt` = detik epoch `#{window_activity}`. Nol/NaN = tmux tak menjawabnya (versi lama,
+// format kosong) → dibaca sebagai diam: ragu selalu berarti pil TETAP menyala, karena pil yang
+// padam saat ada pertanyaan sungguhan membuat manusia kehilangan pertanyaannya.
+export const paneQuiet = (activityAt: number, now: number = Date.now()): boolean =>
+  !(activityAt > 0) || now - activityAt * 1000 >= PANE_QUIET_MS;
+
 // SPEC-898 · ADR-0141 · isi marker = detik epoch ONSET episode menunggu (ditulis sekali oleh hook,
 // lihat runner/src/settings.ts). Marker sesi yang lahir sebelum ADR-0141 berisi "waiting" — tak bisa
-// diparse, dan `undefined` di sana adalah jawaban yang benar: kita memang tak tahu sejak kapan.
+// diparse, dan 0 di sana adalah jawaban yang benar: markernya sendiri tak tahu sejak kapan.
 // Berkasnya dibaca HANYA untuk marker yang sudah terbukti terisi, jadi sesi yang tak menunggu
 // membayar nol I/O tambahan.
-const markerOnset = (f: string): string | undefined => {
+const markerOnset = (f: string): number => {
   let raw: string;
-  try { raw = readFileSync(f, "utf8"); } catch { return undefined; }
+  try { raw = readFileSync(f, "utf8"); } catch { return 0; }
   const secs = Number(raw.trim());
-  if (!Number.isInteger(secs) || secs <= 0) return undefined;
-  return new Date(secs * 1000).toISOString();
+  return Number.isInteger(secs) && secs > 0 ? secs : 0;
+};
+
+// SPEC-903 · ADR-0143 · awal episode menunggu yang SEDANG berlangsung. Dengan `decision` menjadi
+// turunan, satu episode marker bisa memuat beberapa episode menunggu (dijawab di TUI → agen bekerja
+// 20 menit → diam lagi); onset di marker hanya menandai yang pertama, dan `decisionAt` yang tetap
+// menunjuk ke sana melaporkan "menunggu 20 menit" untuk tunggu yang baru berumur semenit —
+// PET_URGENT_MS menjerit palsu. Detik terakhir pane mengeluarkan sesuatu ADALAH awal episode yang
+// sekarang. `max`, bukan "pakai aktivitas saja", supaya kasus langka hook-menembak-sesudah-keluaran-
+// terakhir tetap memberi angka yang lebih benar.
+export const decisionOnset = (f: string, activityAt: number): string | undefined => {
+  const secs = Math.max(markerOnset(f), activityAt > 0 ? Math.floor(activityAt) : 0);
+  return secs > 0 ? new Date(secs * 1000).toISOString() : undefined;
 };
 
 export type Frame =

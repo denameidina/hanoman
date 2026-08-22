@@ -12,7 +12,7 @@ import {
   sessionPhases, sessionFinished, markerFilled, promptFilePath, armGoalInTui, goalGatePath,
   sessionKind, registerSessionHooks, rootBypassEnv, noTtyPromptEnv, askpassDenyPath,
   sendToPane, shellBin, listSessionsAsync,
-  MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback,
+  MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback, PANE_QUIET_MS, paneQuiet, decisionOnset,
   type SessionBirth, type SessionDeath,
 } from "../src/services/pty";
 import { phaseFilePath, type Phase } from "../src/services/session-phases";
@@ -652,6 +652,45 @@ describe("pty service", () => {
     expect(markerFilled(f)).toBe(false);        // berkas belum ada
     appendFileSync(f, "menunggu");
     expect(markerFilled(f)).toBe(true);
+  });
+
+  // SPEC-903 · ADR-0143 · marker terisi bukan bukti sesi menunggu; yang menggerbanginya adalah
+  // pane yang benar-benar diam. Ambang 3 dtk diukur di audit §3.1, bukan ditebak.
+  it("paneQuiet: aktivitas tak terbaca dibaca sebagai diam (fail-open, SPEC-903)", () => {
+    const now = 1_800_000_000_000;
+    expect(paneQuiet(NaN, now)).toBe(true);
+    expect(paneQuiet(0, now)).toBe(true);
+  });
+
+  it("paneQuiet: keluaran lebih baru dari PANE_QUIET_MS = tidak diam (SPEC-903)", () => {
+    const now = 1_800_000_000_000;
+    expect(paneQuiet(now / 1000, now)).toBe(false);
+    expect(paneQuiet((now - PANE_QUIET_MS + 1_000) / 1000, now)).toBe(false);
+    expect(paneQuiet((now - PANE_QUIET_MS) / 1000, now)).toBe(true);
+    expect(paneQuiet((now - 300_000) / 1000, now)).toBe(true);
+  });
+
+  // SPEC-903 · ADR-0143 · satu episode marker bisa memuat beberapa episode menunggu (dijawab di TUI
+  // → agen bekerja 20 menit → diam lagi). Onset di marker hanya menandai yang PERTAMA; kalau ia
+  // dipakai apa adanya, PET_URGENT_MS (10 menit) menjerit untuk tunggu yang baru berumur semenit.
+  it("decisionOnset memakai yang lebih baru antara onset marker dan aktivitas pane (SPEC-903)", () => {
+    const f = join(repoDir, "marker-onset");
+    const older = 1_755_840_000;   // 2025-08-22
+    const newer = 1_787_400_000;   // 2026-08-22
+
+    writeFileSync(f, `${older}\n`);
+    expect(decisionOnset(f, newer)).toBe(new Date(newer * 1000).toISOString());
+    expect(decisionOnset(f, NaN)).toBe(new Date(older * 1000).toISOString());
+
+    writeFileSync(f, `${newer}\n`);
+    expect(decisionOnset(f, older)).toBe(new Date(newer * 1000).toISOString());
+
+    // Marker pra-ADR-0141 (isi `waiting`) tak bisa diparse; aktivitas pane tetap memberi jawaban.
+    writeFileSync(f, "waiting\n");
+    expect(decisionOnset(f, newer)).toBe(new Date(newer * 1000).toISOString());
+    expect(decisionOnset(f, NaN)).toBeUndefined();
+
+    expect(decisionOnset(join(repoDir, "marker-tak-ada"), NaN)).toBeUndefined();
   });
 
   it("listSessions melaporkan decision saat marker keputusan terisi (SPEC-196)", () => {
