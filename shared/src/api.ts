@@ -147,6 +147,9 @@ export const paths = {
   authUsers: `${API}/auth/users`,
   authUser: (id: string) => `${API}/auth/users/${id}`,
   authChangePassword: `${API}/auth/change-password`,
+  // SPEC-884 · ADR-0138 · wizard setup awal
+  setupStatus: `${API}/setup/status`,
+  setupApply: `${API}/setup`,
   // SPEC-213 · device token + activity log
   deviceTokens: `${API}/device-tokens`,
   deviceToken: (id: string) => `${API}/device-tokens/${id}`,

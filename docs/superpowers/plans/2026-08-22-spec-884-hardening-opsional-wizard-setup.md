@@ -940,7 +940,7 @@ git commit -m "feat(spec-884): cookie Secure dari skema request, bukan NODE_ENV"
 - Consumes: —
 - Produces: `CONFIG_RESTART_EXIT = 76`, `type PrerequisiteId`, `type SetupPrerequisite`, `type SetupStatus`, `zSetupApply`, `paths.setupStatus`, `paths.setupApply`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/test/setup-dto.test.ts`:
 
@@ -968,12 +968,12 @@ describe("kontrak setup (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/test/setup-dto.test.ts`
 Expected: FAIL — `CONFIG_RESTART_EXIT` dan `zSetupApply` tak diekspor
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `shared/src/dto.ts`, tepat di bawah `export const UPDATE_RESTART_EXIT = 75;` (baris 607):
 
@@ -1017,12 +1017,12 @@ Di `shared/src/api.ts`, setelah baris `authChangePassword: …` (baris 149):
   setupApply: `${API}/setup`,
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run shared/test/setup-dto.test.ts`
 Expected: PASS — 3 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/dto.ts shared/src/api.ts shared/test/setup-dto.test.ts
