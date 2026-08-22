@@ -992,7 +992,7 @@ git commit -m "feat(pet): atlas.py merakit atlas + manifest ber-hash; verify.py 
 - Consumes: `common.ASSETS`, `common.fail`.
 - Produces: `raw/<key>.png` (mentah, latar hijau) + `raw/<key>.log`; `gen.py <key> --print` mencetak perintah + prompt tanpa memanggil Codex.
 
-- [ ] **Step 1: Tulis `gen.py`**
+- [x] **Step 1: Tulis `gen.py`**
 
 ```python
 #!/usr/bin/env python3
@@ -1089,7 +1089,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 2: Tulis naskah prompt**
+- [x] **Step 2: Tulis naskah prompt**
 
 `internal/assets/pet/prompts/common.md`:
 
@@ -1168,7 +1168,7 @@ ROW "docs-updated" (8 frames, loops): new documents were published — he carrie
 ROW "wave" (8 frames, plays ONCE): a friendly greeting to the viewer when they hover or click. Feet, legs and sarong fixed. Frame 1: rest pose like idle frame 1. Frames 2-3: the far hand rises up beside the head, palm open toward the viewer, head turning a little toward the viewer with a warm expression. Frames 4-6: the raised hand waves left-right (frame 4 left, frame 5 right, frame 6 left), eye bright and friendly. Frame 7: hand coming down. Frame 8: back to the rest pose (equal to frame 1). Tail tip gives one happy flick on frames 4-5.
 ```
 
-- [ ] **Step 3: Tulis README aset**
+- [x] **Step 3: Tulis README aset**
 
 `internal/assets/pet/README.md`:
 
@@ -1220,12 +1220,12 @@ mata, jamang, kain, ekor besar; tak ada mirror; gerak sesuai naskah. Band "pet" 
 pengecualian resmi atas "no chibi inflation" (`internal/docs/brand/illustration/03-mascot-system.md`).
 ```
 
-- [ ] **Step 4: Dry-run prompt**
+- [x] **Step 4: Dry-run prompt**
 
 Run: `python3 internal/scripts/pet/gen.py walk-left --print | head -3`
 Expected: baris pertama perintah `codex exec --skip-git-repo-check -s workspace-write -C /var/folders/.../hanoman-pet-walk-left-... --add-dir /Users/<user>/.codex/generated_images -i .../ref/anoman-pet-model.png -i .../rows/idle.png -`, lalu `---`, lalu `ROW "walk-left" (8 frames, loops): …`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/scripts/pet/gen.py internal/assets/pet/prompts internal/assets/pet/README.md
