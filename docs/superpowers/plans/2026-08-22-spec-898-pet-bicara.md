@@ -811,7 +811,7 @@ git commit -m "feat(pet): rekap 'selama kamu pergi' dari diff snapshot"
 - Consumes: `speechFor`, `PetSpeech`, `PET_SPEECH_MS` (Task 4); `view.subject`/`view.since` (Task 3).
 - Produces: elemen `data-testid="pet-bubble"` di dalam `pet-actor`, di luar `pet-stage`; state `speech` + satu `setTimeout` yang dipakai ulang Task 7 & seterusnya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan `describe` baru di akhir `src/test/hanoman-pet.test.tsx` (tambahkan `PET_SPEECH_MS` ke import dari `../src/screens/pet-speech`):
 
@@ -880,12 +880,12 @@ describe("HanomanPet — pet bicara (SPEC-898)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx -t "SPEC-898"`
 Expected: FAIL — `expected null not to be null` (pet-bubble belum ada)
 
-- [ ] **Step 3: Tambah keyframe**
+- [x] **Step 3: Tambah keyframe**
 
 Di `src/src/app.css`, setelah blok `@keyframes hn-pet-reveal { … }`:
 
@@ -897,7 +897,7 @@ Di `src/src/app.css`, setelah blok `@keyframes hn-pet-reveal { … }`:
 }
 ```
 
-- [ ] **Step 4: Implementasi renderer**
+- [x] **Step 4: Implementasi renderer**
 
 Di `src/src/screens/HanomanPet.tsx`:
 
@@ -972,12 +972,12 @@ const BUBBLE_EDGE = 8;
         )}
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx`
 Expected: PASS — seluruh berkas, termasuk test SPEC-585/648/897 lama
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/HanomanPet.tsx src/src/app.css src/test/hanoman-pet.test.tsx

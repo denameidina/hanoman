@@ -630,3 +630,9 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   70% { opacity: 1; transform: translateY(-1px) scale(1.035); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* SPEC-898 · gelembung bicara pet. Hanya opacity + transform → compositor. */
+@keyframes hn-pet-bubble-in {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}

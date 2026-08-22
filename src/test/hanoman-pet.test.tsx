@@ -7,6 +7,7 @@ import { NotificationsContext } from "../src/notifications/NotificationsContext"
 import { PET_HIDDEN_KEY, PET_ROAM_KEY } from "../src/screens/pet-state";
 import { PET_MANIFEST, durationMs, rowIndex } from "../src/screens/pet-sprite";
 import { LANE_MARGIN, homeX } from "../src/screens/pet-walk";
+import { PET_SPEECH_MS } from "../src/screens/pet-speech";
 import { MOBILE_QUERY } from "../src/ds/responsive";
 
 // Status koneksi datang dari socket `events` yang sudah ada; test mendorongnya lewat `h.status`.
@@ -366,5 +367,68 @@ describe("HanomanPet — pet jujur & lengkap (SPEC-897)", () => {
     expect(screen.getByTestId("pet-viewport")).toHaveStyle({ transition: "none" });
     // lencana adalah informasi, bukan gerak: ia tetap tampil saat reduced-motion.
     expect(screen.queryByTestId("pet-badge")).toBeNull();   // di sini count = 1
+  });
+});
+
+describe("HanomanPet — pet bicara (SPEC-898)", () => {
+  const bl = [spec({ id: "SPEC-1", stage: "executing" })];
+  const bubble = () => screen.queryByTestId("pet-bubble");
+
+  it("gelembung lahir saat pose berganti ke kabar yang tak lewat Toast", () => {
+    const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+    expect(bubble()).toBeNull();                                   // mount tak berteriak
+    rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
+    expect(bubble()!.textContent).toBe("SPEC-1 butuh jawabanmu");
+  });
+
+  it("keadaan mapan tak bergelembung", () => {
+    const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+    rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1" })]} backlog={bl} onOpen={vi.fn()} />);
+    expect(bubble()).toBeNull();
+  });
+
+  it("gelembung pose tak menerima pointer dan tak diumumkan dua kali", () => {
+    const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+    rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
+    const el = bubble()!;
+    expect(el).toHaveStyle({ pointerEvents: "none" });
+    expect(el.getAttribute("aria-hidden")).toBe("true");
+    // Kalimat status tetap SATU sumber untuk pembaca layar.
+    expect(screen.getByTestId("pet-status").textContent).toContain("menunggu jawabanmu");
+    expect(styleOf(el)).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
+  });
+
+  it("gelembung hilang sendiri lewat satu timeout", () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+      rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
+      expect(bubble()).not.toBeNull();
+      act(() => { vi.advanceTimersByTime(PET_SPEECH_MS + 50); });
+      expect(bubble()).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("gelembung di-clamp ke viewport walau pet di tepi kanan", () => {
+    const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+    rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
+    const left = Number(/left:\s*(-?\d+)px/.exec(styleOf(bubble()!))![1]);
+    // Pet berdiri di rumah (tepi kanan): tepi kanan gelembung harus tetap di dalam viewport.
+    expect(HOME + left).toBeGreaterThanOrEqual(0);
+    expect(HOME + left + 200).toBeLessThanOrEqual(window.innerWidth);
+  });
+
+  it("reduced-motion: gelembung tetap tampil, tanpa animasi", () => {
+    mockMatchMedia((q) => q === REDUCED);
+    const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+    rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
+    expect(bubble()).toHaveStyle({ animation: "none" });
+  });
+
+  it("panel terbuka menelan gelembung — daftarnya sudah di layar", () => {
+    const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+    fireEvent.click(hit());
+    rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
+    expect(bubble()).toBeNull();
   });
 });

@@ -12,6 +12,8 @@ export const PET_ROW_KEYS = [
   "idle", "walk-right", "walk-left", "working", "waiting", "blocked", "review", "shipped",
   // SPEC-897 · dua baris baru di EKOR: indeks baris lama tak bergeser, diff atlas minimal.
   "docs-updated", "wave", "deciding", "sleep",
+  // SPEC-898 · reaksi elus. BUKAN pose — `POSE_ROW` tak menyentuhnya.
+  "thanks",
 ] as const;
 export type PetRowKey = typeof PET_ROW_KEYS[number];
 

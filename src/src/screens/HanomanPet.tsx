@@ -8,6 +8,7 @@ import {
   derivePetState, loadPetHidden, loadPetRoam, savePetHidden, savePetRoam, petPulse,
   KIND_NOUN, POSE_LABEL, type PetTarget,
 } from "./pet-state";
+import { PET_SPEECH_MS, speechFor, type PetSpeech } from "./pet-speech";
 import {
   PET_ATLAS_URL, PET_MANIFEST, POSE_ROW, durationMs, rowIndex, rowOf, thenOf, type PetRowKey,
 } from "./pet-sprite";
@@ -21,6 +22,10 @@ const HIT = 44;
 const PANEL_W = 268;
 const PANEL_GAP = 10;
 const PANEL_EDGE = 12;
+// Lebar terburuk gelembung. Clamp memakainya sebagai lebar, jadi gelembung pendek di dekat tepi
+// sedikit lebih ke dalam dari yang perlu — yang tak boleh terjadi adalah terpotong.
+const BUBBLE_W = 200;
+const BUBBLE_EDGE = 8;
 
 // jsdom tak punya matchMedia; ketiadaannya dibaca sebagai "tak ada preferensi", bukan "reduce".
 function usePrefersReducedMotion(): boolean {
@@ -83,6 +88,8 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   // Dinaikkan HANYA oleh `recheckAt`: peluruhan transient, habisnya grace terputus, dan onset
   // tidur — tiga saat keadaan berubah tanpa data baru. Bukan denyut: satu timeout tepat waktu.
   const [decay, setDecay] = React.useState(0);
+  // Satu gelembung pada satu waktu; yang baru menggantikan yang lama beserta timer-nya.
+  const [speech, setSpeech] = React.useState<(PetSpeech & { id: number }) | null>(null);
   const reduced = usePrefersReducedMotion();
   const tier = useResponsiveTier();
   const documentHidden = useDocumentHidden();
@@ -110,6 +117,22 @@ export function HanomanPet({ sessions, backlog, onOpen }:
     return () => clearTimeout(t);
   }, [view.recheckAt]);
 
+  React.useEffect(() => {
+    if (!speech) return;
+    const t = setTimeout(() => setSpeech(null), speech.ttl);
+    return () => clearTimeout(t);
+  }, [speech]);
+
+  // Kalimat dibandingkan SAAT RENDER (pola yang sama dengan `seenPulse`): pet bicara saat kabarnya
+  // berubah, bukan saat mount, dan `waiting` yang menua dari biasa ke mendesak dihitung sebagai
+  // kabar baru — karena itu pembandingnya teks, bukan `kind`.
+  const line = speechFor(view, Date.now());
+  const [saidLine, setSaidLine] = React.useState<string | null>(line?.text ?? null);
+  if ((line?.text ?? null) !== saidLine) {
+    setSaidLine(line?.text ?? null);
+    if (line) setSpeech({ ...line, id: Date.now() });
+  }
+
   // ---- geometri sprite
   const { cell, columns, anchor, character, rows } = PET_MANIFEST;
   const scale = PET_HEIGHT[tier] / character.h;
@@ -129,6 +152,15 @@ export function HanomanPet({ sessions, backlog, onOpen }:
     const root = rootRef.current?.getBoundingClientRect();
     return actor && root && actor.width > 0 ? actor.left - root.left : walkRef.current.x;
   }, []);
+
+  // Gelembung hidup DI DALAM actor supaya ia ikut posisi pet tanpa kode posisi; yang dihitung di
+  // sini hanya pergeseran agar ia tak keluar viewport saat pet berada di tepi.
+  const bubbleLeft = React.useMemo(() => {
+    const vw = typeof window !== "undefined" ? window.innerWidth : laneWidth;
+    const want = move.x + anchor.x * cellW - BUBBLE_W / 2;
+    const clamped = Math.min(Math.max(want, BUBBLE_EDGE), Math.max(BUBBLE_EDGE, vw - BUBBLE_W - BUBBLE_EDGE));
+    return Math.round(anchor.x * cellW - BUBBLE_W / 2 + (clamped - want));
+  }, [move.x, cellW, anchor.x, laneWidth]);
 
   const tick = React.useCallback(() => {
     const step = stepWalk(walkRef.current, {
@@ -336,6 +368,17 @@ export function HanomanPet({ sessions, backlog, onOpen }:
           transition: reduced || move.durationMs === 0 ? "none" : `transform ${move.durationMs}ms linear`,
           willChange: "transform",
         }}>
+        {speech && !open && (
+          <div data-testid="pet-bubble" data-kind={speech.kind} aria-hidden="true" style={{
+            pointerEvents: "none", position: "absolute", left: bubbleLeft, bottom: cellH - 6,
+            width: "max-content", maxWidth: BUBBLE_W, boxSizing: "border-box", padding: "6px 10px",
+            fontFamily: "var(--font-ui)", fontSize: 12.5, lineHeight: 1.35,
+            color: "var(--text-strong)", background: "var(--surface-card)",
+            border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)",
+            boxShadow: "var(--shadow-sm)",
+            animation: reduced ? "none" : "hn-pet-bubble-in var(--dur-base) var(--ease-out) both",
+          }}>{speech.text}</div>
+        )}
         {/* Live region membungkus kalimat status + panggung; atlas berisi 80 frame sehingga tak bisa
             diberi alt bermakna — kalimatnya hidup di span visually-hidden, satu sumber. */}
         <div data-testid="pet-stage" role="status" aria-live="polite"

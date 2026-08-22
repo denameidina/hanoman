@@ -49,6 +49,8 @@ ROWS: list[dict] = [
     # memakai urutan array sebagai indeks baris).
     {"key": "deciding",     "fps": 6,  "loop": True,  "mode": "stand"},
     {"key": "sleep",        "fps": 4,  "loop": True,  "mode": "stand"},
+    # SPEC-898 · reaksi saat pet dielus (STK-007). Sekali-putar seperti `wave`, bukan pose mesin.
+    {"key": "thanks",       "fps": 10, "loop": False, "mode": "stand", "then": "idle"},
 ]
 ROW_KEYS = [r["key"] for r in ROWS]
 # Gerbang residu PRA-pin; generasi rusak (frame tak sejajar / pose lain) mengukur ≥ 0,5. Angka

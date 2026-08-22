@@ -19,7 +19,11 @@ MANIFEST = ASSETS / "pet.json"
 
 def encode(atlas: Image.Image) -> bytes:
     buf = io.BytesIO()
-    atlas.save(buf, format="WEBP", quality=82, method=6, exact=False)
+    # SPEC-898 · 13 baris tak muat di plafon 1 MB pada quality 82 (1 062 524 B). Diukur ulang:
+    # q78 = 993 888 B (sisa 6 112 B — satu regenerasi baris rutin menembusnya), q76 = 952 452 B
+    # (sisa 47 548 B). Plafonnya TIDAK dinaikkan: satu <img> yang di-decode di setiap halaman
+    # adalah anggaran, bukan preferensi.
+    atlas.save(buf, format="WEBP", quality=76, method=6, exact=False)
     return buf.getvalue()
 
 
