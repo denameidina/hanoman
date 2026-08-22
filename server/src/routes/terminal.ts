@@ -28,7 +28,7 @@ import { recordCompletion } from "../services/notifications";
 import { STAGES } from "../services/stage-machine";
 import {
   createSession, getSession, listSessions, killSession, sessionPhases,
-  attach, detach, writeTo, resize, shellBin, sendToPane, interruptPane, type Client,
+  attach, detach, writeTo, resize, shellBin, sendToPane, interruptPane, clearMarker, type Client,
 } from "../services/pty";
 import { saveSessionUpload } from "../services/uploads";
 import {
@@ -377,6 +377,11 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     try {
       const r = await answerSessionDialog(sessionPaneIO(id), parsed.data);
       if (!r.ok) return reply.code(409).send({ error: DIALOG_ANSWER_ERROR[r.reason], reason: r.reason });
+      // SPEC-903 · ADR-0143 · jawaban dialog adalah tool result, bukan prompt, jadi hook pengosong
+      // marker (`UserPromptSubmit`, SPEC-184) tak pernah menembak untuk jalur ini. Ini bukti POSITIF
+      // manusia sudah menjawab — kembarannya untuk jalur SPEC-899. Tanpa baris ini pil hanya padam
+      // saat pane kebetulan diam (gerbang `paneQuiet`), bukan saat jawabannya mendarat.
+      if (s.decisionFile) clearMarker(s.decisionFile);
       return reply.code(202).send({ accepted: true });
     } finally {
       endAnswer(id);

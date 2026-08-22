@@ -1,7 +1,6 @@
-import { writeFileSync } from "node:fs";
 import type { LeadDecision } from "@prisma/client";
 import { leadReplyText, type Agent, type Lead, type LeadDelivery } from "@hanoman/shared";
-import { capturePane, getSession, liveDecisions, markerFilled, sendToPane, submitPaneDialog } from "../pty";
+import { capturePane, clearMarker, getSession, liveDecisions, markerFilled, sendToPane, submitPaneDialog } from "../pty";
 import { dialogKey, readDialogScreen } from "../tui-dialog";
 import { recordLeadDecision } from "../notifications";
 import { getLead, leadActive, leadProjects } from "./config";
@@ -185,7 +184,7 @@ export const prodDetectDeps: DetectDeps = {
   // ke pane yang sudah tak ada.
   exited: (id) => { try { return getSession(id)?.exited ?? true; } catch { return true; } },
   send: (id, text, choices) => sendToPane(id, text, 50, choices),
-  clearMarker: (file) => { try { writeFileSync(file, ""); } catch { /* marker lenyap = sudah kosong */ } },
+  clearMarker,
   submit: (id) => submitPaneDialog(id),
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
   // Alur yang gagal ditutup bukan alasan menggagalkan rantai yang sudah berhasil: penyapu TTL

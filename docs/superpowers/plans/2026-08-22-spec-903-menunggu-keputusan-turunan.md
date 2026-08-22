@@ -661,7 +661,7 @@ git commit -m "feat(decision): notifikasi & panel lead memakai bit menunggu turu
 - Consumes: —
 - Produces: `export const clearMarker(f: string): void` di `server/src/services/pty.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan di `server/test/terminal-dialog.route.test.ts`, di dalam
 `describe("SPEC-899 · POST /terminal/sessions/:id/dialog/answer")` (atau sebagai `describe` sendiri
@@ -700,7 +700,7 @@ import { join } from "node:path";
 > ada di berkas itu (skema `zSessionDialogAnswer`). Salin bentuknya dari test tetangga yang
 > menghasilkan `202`, jangan menebak nama fieldnya.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/terminal-dialog.route.test.ts -t "SPEC-903"
@@ -708,7 +708,7 @@ pnpm vitest --run --no-file-parallelism server/test/terminal-dialog.route.test.t
 
 Expected: FAIL — `expected '1787400000\n' to be ''`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 3a. `server/src/services/pty.ts`, tepat sesudah `markerFilled` (±baris 49):
 
@@ -745,7 +745,7 @@ di handler `dialog/answer` (±baris 380), sesudah pengecekan `r.ok`:
 - baris 188: `clearMarker: (file) => { try { writeFileSync(file, ""); } catch { … } },` menjadi
   `clearMarker,`
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/terminal-dialog.route.test.ts
@@ -753,7 +753,7 @@ pnpm vitest --run --no-file-parallelism server/test/terminal-dialog.route.test.t
 
 Expected: PASS semuanya.
 
-- [ ] **Step 5: Test lead tetap hijau (jalur `clearMarker` yang di-de-dup)**
+- [x] **Step 5: Test lead tetap hijau (jalur `clearMarker` yang di-de-dup)**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/lead-detect.test.ts
@@ -762,7 +762,7 @@ pnpm --filter ./server typecheck
 
 Expected: PASS, nol error typecheck.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/src/routes/terminal.ts server/src/services/lead/detect.ts server/test/terminal-dialog.route.test.ts
