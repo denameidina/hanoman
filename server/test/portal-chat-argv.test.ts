@@ -57,10 +57,19 @@ describe("argv chat portal (SPEC-854 · ADR-0129 huruf E)", () => {
     expect(p.file).toBe("claude");
   });
 
-  // Produksi: fail closed. Boundary OS wajib ada di sana (cermin assertRuntimeBoundary).
-  it("produksi tanpa sandbox: MENOLAK jalan", () => {
-    expect(() => portalChatProcess({ ...O, workspace: "/tmp/ws" }, { NODE_ENV: "production" }))
-      .toThrow(/sandbox/i);
+  // SPEC-884 · ADR-0139 · fail-closed dipertahankan, tetapi terhadap HARDENING — bukan terhadap
+  // "terpaket". Sebelum ini `NODE_ENV=production` sendirian sudah cukup untuk menolak, dan itu
+  // berarti chat portal mati di setiap instalasi `npm i -g hanoman` yang tak pernah punya podman.
+  it("terpaket tanpa hardening: proses langsung di workspace (SPEC-884)", () => {
+    const p = portalChatProcess({ ...O, workspace: "/tmp/ws" }, { NODE_ENV: "production" });
+    expect(p.cwd).toBe("/tmp/ws");
+    expect(p.file).toBe("claude");
+  });
+
+  // Hardening menyala tanpa sandbox terkonfigurasi: fail closed (cermin assertRuntimeBoundary).
+  it("hardening tanpa sandbox: MENOLAK jalan (SPEC-884)", () => {
+    expect(() => portalChatProcess({ ...O, workspace: "/tmp/ws" },
+      { NODE_ENV: "production", HANOMAN_HARDENING: "1" })).toThrow(/sandbox/i);
   });
 
   it("dengan sandbox: workspace dimount read-only", () => {

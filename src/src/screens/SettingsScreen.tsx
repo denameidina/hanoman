@@ -4,7 +4,7 @@ import React from "react";
 import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier } from "../ds";
 import { api, ApiError } from "../api/client";
 import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, PORTAL_CHAT_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
-import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus } from "@hanoman/shared";
+import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus, SetupStatus } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
 import { CustomAgentsPanel } from "./CustomAgentsPanel";
@@ -12,6 +12,7 @@ import { ClientAccessPanel } from "./ClientAccessPanel";   // SPEC-617 · ADR-01
 import { WebhooksPanel } from "./WebhooksPanel";
 import { WebhookDocs } from "./WebhookDocs";
 import { McpPanel } from "./McpPanel";   // SPEC-482 · ADR-0099 · pemasangan MCP siap salin
+import { SetupWizard } from "./SetupWizard";   // SPEC-884 · ADR-0139 · setup awal, bisa diulang
 import { AgentDocCard } from "./AgentDocCard";   // SPEC-489 · halaman dokumentasi AI Agent
 import { usePersistedState, isStr } from "../ui-state";
 
@@ -49,6 +50,9 @@ const S_DEFAULTS: Setting = {
   telegram: TELEGRAM_DEFAULTS,     // SPEC-476 · ADR-0096 · gateway Telegram opt-in
   changelog: CHANGELOG_ENGINE_DEFAULTS, // SPEC-518 · agen pembuat changelog (opt-in, mati)
   portalChat: PORTAL_CHAT_DEFAULTS, // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
+  // SPEC-881 · stempel suntingan agen bawaan. Wajib di tipe `Setting` (entities.ts:374) tapi
+  // terlewat di default ini, jadi `pnpm --filter ./src typecheck` merah di base sebelum SPEC-884.
+  builtinAgents: {},
 };
 
 // SPEC-383 · label agen dipakai di judul grup model DAN di baris warisan kartu konflik — satu
@@ -523,6 +527,34 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
 
 // Grup navigasi settings — sidebar kiri. Akun & Users tak bergantung GET /settings; umum/model/
 // sesi bergantung dan menampilkan loading/error-nya sendiri.
+/**
+ * SPEC-884 · ADR-0139 · setup awal bisa ditinjau & diubah kapan saja. Jalur ini TAK PERNAH
+ * menyentuh akun — hanya peruntukan dan hardening; akun tetap lahir sekali di AuthScreen.
+ */
+function SetupPanel() {
+  const [setup, setSetup] = React.useState<SetupStatus | null>(null);
+  const [rerun, setRerun] = React.useState(false);
+  const load = React.useCallback(() => {
+    api.setupStatus().then(setSetup).catch(() => setSetup(null));
+  }, []);
+  React.useEffect(load, [load]);
+  if (!setup) return <StateBlock kind="loading" title="Memuat setup…" />;
+  if (rerun) return <SetupWizard status={setup} onDone={() => { setRerun(false); load(); }} />;
+  return (
+    <div data-testid="setup-card">
+      <Card eyebrow="setup" title="Setup awal">
+        <div style={{ fontSize: 12.5, lineHeight: 1.6, marginBottom: 12 }}>
+          Peruntukan: {setup.deployment === "local" ? "Device saya sendiri" : "Diakses orang lain"}
+          <br />
+          {setup.hardening ? "Hardening menyala" : "Hardening mati"}
+          {setup.hardeningLocked ? " — dipasang lewat env, tak bisa diubah dari sini" : ""}
+        </div>
+        <Button onClick={() => setRerun(true)}>Jalankan ulang setup</Button>
+      </Card>
+    </div>
+  );
+}
+
 const S_SECTIONS = [
   { key: "akun", label: "Akun", icon: "user-round" },
   { key: "users", label: "Users", icon: "users" },
@@ -532,6 +564,7 @@ const S_SECTIONS = [
   { key: "custom-agent", label: "Custom agent", icon: "bot" },   // SPEC-450 · ADR-0094 · katalog agen global
   { key: "aktivitas", label: "Aktivitas", icon: "activity" },    // SPEC-213 · activity log
   { key: "konfigurasi", label: "Konfigurasi", icon: "sliders" }, // SPEC-215 · env runtime
+  { key: "setup", label: "Setup awal", icon: "shield" },         // SPEC-884 · ADR-0139 · profil & hardening
   { key: "telegram", label: "Telegram", icon: "send" },          // SPEC-476 · operator gateway
   { key: "webhook", label: "Webhook", icon: "webhook" },         // SPEC-481 · ADR-0100 · webhook keluar
   { key: "umum", label: "Umum", icon: "sliders-horizontal" },
@@ -1404,7 +1437,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
     );
   }
 
-  const content = tab === "akun" ? <AccountPanel me={me} onLoggedOut={onLoggedOut} onToast={onToast} />
+  const content = tab === "setup" ? <SetupPanel />
+    : tab === "akun" ? <AccountPanel me={me} onLoggedOut={onLoggedOut} onToast={onToast} />
     : tab === "users" ? <UsersPanel me={me} onToast={onToast} />
     : tab === "akses-klien" ? <ClientAccessPanel />
     : tab === "perangkat" ? <DeviceTokensPanel onToast={onToast} />

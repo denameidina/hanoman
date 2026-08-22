@@ -1,6 +1,7 @@
 import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry,
   type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
-  type ProvisionStep, type ProvisionResult } from "@hanoman/shared";
+  type ProvisionStep, type ProvisionResult,
+  type SetupStatus, type SetupApplyResult } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -475,6 +476,10 @@ export const api = {
   vpsConsole: (id: string) => j<{ id: string }>(paths.vpsConsole(id), { method: "POST" }),
   // SPEC-169 · auth. Cookie sesi ikut otomatis (same-origin). 401 dari mana pun → App balik ke Login.
   authStatus: () => j<AuthStatus>(paths.authStatus),
+  // SPEC-884 · ADR-0139 · wizard setup awal
+  setupStatus: () => j<SetupStatus>(paths.setupStatus),
+  applySetup: (b: { deployment: "local" | "public"; hardening: boolean; acknowledgedUnhardened?: boolean }) =>
+    j<SetupApplyResult>(paths.setupApply, { method: "POST", ...body(b) }),
   setup: (b: { email: string; password: string; setupToken?: string }) => j<{ user: UserView }>(paths.authSetup, { method: "POST", ...body(b) }),
   login: (b: { email: string; password: string }) => j<{ user: UserView }>(paths.authLogin, { method: "POST", ...body(b) }),
   logout: () => j<void>(paths.authLogout, { method: "POST" }),

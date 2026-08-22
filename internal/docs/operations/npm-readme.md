@@ -11,8 +11,18 @@ hanoman doctor     # periksa prasyarat
 hanoman            # jalan di http://127.0.0.1:8787
 ```
 
-Buka URL-nya, buat akun pertama, selesai. Datanya di `~/.hanoman/` (SQLite — **tanpa Docker,
-tanpa Postgres, tanpa Redis**).
+Buka URL-nya. Pada pemakaian pertama hanoman menyajikan **wizard setup dua langkah** — peruntukan
+(device sendiri / diakses orang lain) lalu keamanan — kemudian meminta akun pertama. Datanya di
+`~/.hanoman/` (SQLite — **tanpa Docker, tanpa Postgres, tanpa Redis**).
+
+**Hardening bersifat opsional dan default MATI** (SPEC-884/ADR-0139): tanpa `HANOMAN_HARDENING=1`,
+hanoman jalan di device mana pun tanpa podman, tanpa reverse proxy, tanpa setup token — termasuk
+sebagai root. Nyalakan hardening dari wizard (atau Settings → Setup awal) begitu prasyaratnya hijau.
+
+> Instance yang diakses orang lain tanpa hardening hanya dijaga password akun hanoman — sesi agen
+> berjalan langsung di mesin itu. Kalau instance akan dibuka ke internet, **selesaikan wizard di
+> `localhost` dulu, baru sambungkan domain**: selama akun pertama belum ada, wizard bisa diklaim
+> siapa pun yang membukanya.
 
 ## Prasyarat yang tidak dibawa npm
 

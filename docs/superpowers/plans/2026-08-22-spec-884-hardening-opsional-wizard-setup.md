@@ -12,7 +12,7 @@
 
 - **Spec acuan:** `docs/superpowers/specs/2026-08-22-spec-884-mode-hardening-opsional-wizard-setup-design.md`. Baca K1–K10 sebelum mulai.
 - **Nomor spec sementara.** SPEC-884 menunggu id backlog dari server. Bila server memberi nomor lain, selaraskan nama berkas, judul, komentar `SPEC-884 ·`, dan pesan commit dalam satu commit (preseden SPEC-882/883).
-- **ADR-0138** adalah nomor yang dialokasikan (0136 = SPEC-881, 0137 = SPEC-883). Jangan memakai nomor lain tanpa memeriksa `internal/docs/adr/`.
+- **ADR-0139** adalah nomor yang dialokasikan (0136 = SPEC-881, 0137 = SPEC-883). Jangan memakai nomor lain tanpa memeriksa `internal/docs/adr/`.
 - **Perintah verifikasi setiap task** (SPEC-376/ADR-0080, SPEC-479):
   `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism <path-test>`
   `--no-file-parallelism` **wajib** untuk test server; `TEST_DATABASE_URL` **wajib** karena `~/.hanoman/hanoman.test.db` dibagi semua worktree dan dihapus di awal tiap run.
@@ -39,7 +39,7 @@
 
 **Diubah:** `runner/src/index.ts` · `server/src/services/session-sandbox.ts` · `server/src/services/lead/brain.ts` · `server/src/services/portal-chat/argv.ts` · `server/src/services/upload-pipeline.ts` · `server/src/services/auth.ts` · `server/src/routes/auth.ts` · `server/src/app.ts` · `cli/src/commands/start.ts` · `cli/src/commands/doctor.ts` · `shared/src/dto.ts` · `shared/src/api.ts` · `src/src/api/client.ts` · `src/src/screens/AuthScreen.tsx` · `src/src/App.tsx` · `src/src/screens/SettingsScreen.tsx`
 
-**Kenapa `runner`, bukan `server/src/services` seperti tertulis di spec:** `cli/package.json:13-21` tidak memuat `@hanoman/server`. `hanoman doctor` harus memakai resolver dan probe yang sama persis dengan route setup; menaruhnya di `server` akan memaksa CLI menyalin logikanya — drift menunggu terjadi. Ini penyimpangan sadar dari daftar "Menyentuh" di spec; catat di ADR-0138.
+**Kenapa `runner`, bukan `server/src/services` seperti tertulis di spec:** `cli/package.json:13-21` tidak memuat `@hanoman/server`. `hanoman doctor` harus memakai resolver dan probe yang sama persis dengan route setup; menaruhnya di `server` akan memaksa CLI menyalin logikanya — drift menunggu terjadi. Ini penyimpangan sadar dari daftar "Menyentuh" di spec; catat di ADR-0139.
 
 ---
 
@@ -54,7 +54,7 @@
 - Consumes: —
 - Produces: `CONFIG_ENV_FILE: string`, `configEnvPath(home: string): string`, `parseConfigEnv(text: string): Record<string,string>`, `formatConfigEnv(values: Record<string,string>): string`, `readConfigEnv(home: string): Record<string,string>`, `writeConfigEnv(home: string, values: Record<string,string>): void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `runner/test/config-env.test.ts`:
 
@@ -117,17 +117,17 @@ describe("config.env", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/test/config-env.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/config-env"`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `runner/src/config-env.ts`:
 
 ```ts
-// SPEC-884 · ADR-0138 · jawaban wizard setup awal hidup di berkas ini, BUKAN di `RuntimeConfig`.
+// SPEC-884 · ADR-0139 · jawaban wizard setup awal hidup di berkas ini, BUKAN di `RuntimeConfig`.
 // Resolver config server presedensinya DB → env (`server/src/config.ts:31`), jadi lewat sana siapa
 // pun yang bisa menulis config bisa MEMATIKAN hardening — jebakan yang sama yang sudah dihindari
 // ADR-0088 untuk `HANOMAN_SUPERVISOR`. Berkas ini sebaliknya digabung PALING LEMAH saat CLI
@@ -184,12 +184,12 @@ Tambahkan di `runner/src/index.ts`, setelah baris `export * from "./paths";`:
 export * from "./config-env";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/test/config-env.test.ts`
 Expected: PASS — 7 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/config-env.ts runner/src/index.ts runner/test/config-env.test.ts
@@ -209,7 +209,7 @@ git commit -m "feat(spec-884): berkas config.env sebagai tempat jawaban wizard s
 - Consumes: —
 - Produces: `type Deployment = "local" | "public"`, `resolveHardening(env: Record<string,string|undefined>): boolean`, `resolveDeployment(env: Record<string,string|undefined>): Deployment`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `runner/test/runtime-profile.test.ts`:
 
@@ -274,17 +274,17 @@ describe("profil runtime", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/test/runtime-profile.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/runtime-profile"`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `runner/src/runtime-profile.ts`:
 
 ```ts
-// SPEC-884 · ADR-0138 · dua nilai eksplisit menggantikan `NODE_ENV` sebagai penentu hardening.
+// SPEC-884 · ADR-0139 · dua nilai eksplisit menggantikan `NODE_ENV` sebagai penentu hardening.
 //
 // Sebelum ini `NODE_ENV=production` merangkap TIGA peran: runtime terpaket (`web-dir.ts`), cookie
 // `Secure` (`auth.ts`), dan seluruh gerbang ADR-0117. Akibatnya `npm i -g hanoman` polos — yang
@@ -325,12 +325,12 @@ Tambahkan di `runner/src/index.ts`, tepat di bawah `export * from "./config-env"
 export * from "./runtime-profile";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/test/runtime-profile.test.ts`
 Expected: PASS — 11 test (`it.each` menghasilkan 3)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/runtime-profile.ts runner/src/index.ts runner/test/runtime-profile.test.ts
@@ -349,12 +349,12 @@ git commit -m "feat(spec-884): resolver profil runtime (deployment + hardening)"
 - Consumes: `resolveHardening` (Task 2)
 - Produces: `assertRuntimeBoundary(env, runtime)` dengan tanda tangan **tidak berubah**
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan blok ini ke `server/test/session-sandbox.test.ts`, **di dalam** `describe("production session sandbox", …)`, setelah test `"accepts single origin only when acknowledged explicitly (SPEC-805)"`. Jangan mengubah test yang sudah ada:
 
 ```ts
-  // SPEC-884 · ADR-0138 · hardening jadi opt-in. Semua assertion di atas tetap berlaku apa adanya
+  // SPEC-884 · ADR-0139 · hardening jadi opt-in. Semua assertion di atas tetap berlaku apa adanya
   // karena env-nya memuat penanda ADR-0117 (sandbox/origin/proxy) yang dibaca `resolveHardening`
   // sebagai "menyala". Yang baru: instalasi polos tak lagi menabrak satu pun gerbang ini.
   it("tanpa hardening, instalasi npm polos boot — termasuk sebagai root (SPEC-884)", () => {
@@ -383,12 +383,12 @@ Tambahkan blok ini ke `server/test/session-sandbox.test.ts`, **di dalam** `descr
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-sandbox.test.ts`
 Expected: FAIL — 3 test baru merah dengan `production Hanoman harus berjalan sebagai user non-root` / `HANOMAN_SESSION_SANDBOX=podman wajib di production`. Tiga test lama tetap hijau.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/session-sandbox.ts`, ganti baris 1-7 (import + dua baris pertama fungsi):
 
@@ -398,7 +398,7 @@ import { resolveHardening } from "@hanoman/runner";
 type Env = Record<string, string | undefined>;
 
 export function assertRuntimeBoundary(env: Env, runtime: { uid: number | undefined; host: string }): void {
-  // SPEC-884 · ADR-0138 · satu-satunya perubahan pada gerbang ini: ia berhenti diturunkan dari
+  // SPEC-884 · ADR-0139 · satu-satunya perubahan pada gerbang ini: ia berhenti diturunkan dari
   // `NODE_ENV` dan mulai diturunkan dari hardening yang diminta eksplisit. Isinya di bawah TIDAK
   // disentuh — begitu hardening menyala, perilakunya identik dengan sebelum SPEC-884.
   if (!resolveHardening(env)) return;
@@ -409,17 +409,17 @@ export function assertRuntimeBoundary(env: Env, runtime: { uid: number | undefin
 
 Sisa fungsi (cek origin, trust proxy, bind loopback) **tidak diubah sama sekali**.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-sandbox.test.ts`
 Expected: PASS — 6 test (3 lama + 3 baru)
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: keluar 0, tanpa error
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/session-sandbox.ts server/test/session-sandbox.test.ts
@@ -441,7 +441,7 @@ git commit -m "feat(spec-884): gerbang boot digerbangi hardening, bukan NODE_ENV
 - Consumes: `resolveHardening` (Task 2)
 - Produces: tak ada API baru — hanya pemicu tiga gerbang yang berubah
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/portal-chat-argv.test.ts`, di dalam `describe` teratas:
 
@@ -477,12 +477,12 @@ Tambahkan ke `server/test/lead-brain.test.ts`, di dalam `describe` teratas:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-argv.test.ts server/test/lead-brain.test.ts`
 Expected: FAIL — `chat portal menolak jalan: sandbox sesi wajib di production` dan `session sandbox production tidak dikonfigurasi`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 `server/src/services/session-sandbox.ts` — di `sandboxArgvFromEnv`, ganti baris `const mode = …`:
 
@@ -518,12 +518,12 @@ import { resolveHardening } from "@hanoman/runner";
 
 Perbarui juga komentar blok di atas fungsi (`argv.ts:60-64`): ganti kata "Di produksi" menjadi "Saat hardening menyala".
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-argv.test.ts server/test/lead-brain.test.ts server/test/session-sandbox.test.ts`
 Expected: PASS — semua, termasuk test lama kedua berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/session-sandbox.ts server/src/services/lead/brain.ts server/src/services/portal-chat/argv.ts server/test/portal-chat-argv.test.ts server/test/lead-brain.test.ts
@@ -542,7 +542,7 @@ git commit -m "feat(spec-884): sandbox sesi, lead, dan chat portal ikut hardenin
 - Consumes: `resolveHardening` (Task 2)
 - Produces: `scannerFromEnv(path: string): Promise<void>` — tanda tangan tak berubah
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/upload-scanner-gate.test.ts`:
 
@@ -577,18 +577,18 @@ describe("gerbang scanner upload (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/upload-scanner-gate.test.ts`
 Expected: FAIL — test pertama menolak (`scanner required`) alih-alih resolve
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/upload-pipeline.ts`, tambahkan import `resolveHardening` dari `@hanoman/runner` dan ganti blok `if (!command)`:
 
 ```ts
   if (!command) {
-    // SPEC-884 · ADR-0138 · fail-closed dipertahankan untuk instance yang minta dikeraskan. Di
+    // SPEC-884 · ADR-0139 · fail-closed dipertahankan untuk instance yang minta dikeraskan. Di
     // instalasi biasa scanner virus bukan prasyarat yang masuk akal, tapi ketiadaannya tak boleh
     // senyap — lampiran diterima tanpa dipindai, dan itu harus terbaca di log.
     if (resolveHardening(process.env))
@@ -598,12 +598,12 @@ Di `server/src/services/upload-pipeline.ts`, tambahkan import `resolveHardening`
   }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/upload-scanner-gate.test.ts`
 Expected: PASS — 3 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/upload-pipeline.ts server/test/upload-scanner-gate.test.ts
@@ -622,7 +622,7 @@ git commit -m "feat(spec-884): scanner upload jadi peringatan saat hardening mat
 - Consumes: `resolveHardening` (Task 2)
 - Produces: `GET /api/auth/status` mengembalikan `setupTokenRequired: false` di instalasi tanpa hardening
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/bootstrap.test.ts`, di dalam `describe("one-time bootstrap token", …)`:
 
@@ -652,17 +652,17 @@ Tambahkan ke `server/test/bootstrap.test.ts`, di dalam `describe("one-time boots
 
 > `buildApp` sudah menerima `{ env }` (`server/src/app.ts:78-80`); `resolveHome(env)` di baris 191 membaca `HANOMAN_HOME` dari env yang sama, jadi token mendarat di tmpdir dan bukan di home nyata (pelajaran SPEC-880).
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/bootstrap.test.ts`
 Expected: FAIL — test pertama merah: `setupTokenRequired` `true`, dan setup menjawab 400
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/app.ts`, ganti baris 191:
 
 ```ts
-    // SPEC-884 · ADR-0138 · bukti setup token menjaga instance yang minta dikeraskan. Di instalasi
+    // SPEC-884 · ADR-0139 · bukti setup token menjaga instance yang minta dikeraskan. Di instalasi
     // biasa ia justru menutup pintu terakhir: orang yang baru `npm i -g hanoman` harus membaca
     // berkas di HANOMAN_HOME lewat shell sebelum bisa memakai dashboard-nya sendiri.
     await api.register(authRoutes, { bootstrapRequired: resolveHardening(env), home: resolveHome(env) });
@@ -674,12 +674,12 @@ Ubah import di `server/src/app.ts:60`:
 import { resolveHardening, resolveHome } from "@hanoman/runner";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/bootstrap.test.ts server/test/auth-routes.test.ts`
 Expected: PASS — kedua berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/app.ts server/test/bootstrap.test.ts
@@ -699,7 +699,7 @@ git commit -m "feat(spec-884): setup token hanya diminta saat hardening menyala"
 - Consumes: `AuthStatus.setupTokenRequired` (sudah ada, `shared/src/dto.ts:497`)
 - Produces: `<AuthScreen needsSetup setupTokenRequired onDone />` — prop baru `setupTokenRequired?: boolean`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/auth-screen-token.test.tsx`:
 
@@ -741,12 +741,12 @@ describe("AuthScreen · setup token (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/auth-screen-token.test.tsx`
 Expected: FAIL — test pertama: field "Setup token" masih ada dan tombol disabled
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `src/src/screens/AuthScreen.tsx`, ganti tanda tangan komponen (baris 9), `canSubmit` (baris 16-17), pemanggilan `api.setup` (baris 23), dan render field token (baris 58-61):
 
@@ -756,7 +756,7 @@ export function AuthScreen({ needsSetup, setupTokenRequired = false, onDone }: {
 }) {
 ```
 ```tsx
-  // SPEC-884 · ADR-0138 · sebelum ini form mengunci tombol setiap kali `needsSetup` benar, tanpa
+  // SPEC-884 · ADR-0139 · sebelum ini form mengunci tombol setiap kali `needsSetup` benar, tanpa
   // pernah membaca `setupTokenRequired` yang sudah dikirim /auth/status — jadi walau server tak
   // meminta token, akun pertama TAK BISA dibuat dari UI. Server tetap otoritasnya; ini cuma cermin.
   const needsToken = needsSetup && setupTokenRequired;
@@ -779,12 +779,12 @@ Di `src/src/App.tsx:1256`, teruskan prop-nya:
     onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/auth-screen-token.test.tsx src/test/auth-responsive.test.tsx`
 Expected: PASS — kedua berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/AuthScreen.tsx src/src/App.tsx src/test/auth-screen-token.test.tsx
@@ -804,7 +804,7 @@ git commit -m "fix(spec-884): AuthScreen menghormati setupTokenRequired"
 - Consumes: `resolveHardening` (Task 2)
 - Produces: `cookieOpts(req: { protocol?: string; headers: Record<string, unknown> })` — **breaking**: sekarang wajib menerima request
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/auth-cookie-secure.test.ts`:
 
@@ -850,18 +850,18 @@ describe("cookie Secure (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/auth-cookie-secure.test.ts`
 Expected: FAIL — `Expected 0 arguments, but got 1` / `secure` selalu mengikuti `NODE_ENV`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/auth.ts`, ganti `cookieOpts` (baris 80-88):
 
 ```ts
 /**
- * SPEC-884 · ADR-0138 · `Secure` diturunkan dari SKEMA REQUEST, bukan dari `NODE_ENV`.
+ * SPEC-884 · ADR-0139 · `Secure` diturunkan dari SKEMA REQUEST, bukan dari `NODE_ENV`.
  *
  * `x-forwarded-proto` sengaja dibaca LANGSUNG dari header, bukan lewat `req.protocol`: Fastify
  * hanya memercayai header itu bila `trustProxy` terisi, dan `trustProxyFromEnv` mengembalikan
@@ -910,17 +910,17 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 Lalu perbarui **tiga** pemanggil `issue(...)` di berkas itu (setup, login, change-password) menjadi `await issue(req, reply, user.id);`.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/auth-cookie-secure.test.ts server/test/auth-routes.test.ts server/test/bootstrap.test.ts`
 Expected: PASS — ketiganya
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: keluar 0
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/auth.ts server/src/routes/auth.ts server/test/auth-cookie-secure.test.ts
@@ -940,7 +940,7 @@ git commit -m "feat(spec-884): cookie Secure dari skema request, bukan NODE_ENV"
 - Consumes: —
 - Produces: `CONFIG_RESTART_EXIT = 76`, `type PrerequisiteId`, `type SetupPrerequisite`, `type SetupStatus`, `zSetupApply`, `paths.setupStatus`, `paths.setupApply`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/test/setup-dto.test.ts`:
 
@@ -968,17 +968,17 @@ describe("kontrak setup (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/test/setup-dto.test.ts`
 Expected: FAIL — `CONFIG_RESTART_EXIT` dan `zSetupApply` tak diekspor
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `shared/src/dto.ts`, tepat di bawah `export const UPDATE_RESTART_EXIT = 75;` (baris 607):
 
 ```ts
-// SPEC-884 · ADR-0138 · "tulis config lalu jalankan ulang", TANPA memasang apa pun. Memakai ulang
+// SPEC-884 · ADR-0139 · "tulis config lalu jalankan ulang", TANPA memasang apa pun. Memakai ulang
 // UPDATE_RESTART_EXIT akan menjalankan `npm i -g hanoman@latest` setiap kali seseorang
 // menyelesaikan wizard — akibat yang sama sekali tak diminta.
 export const CONFIG_RESTART_EXIT = 76;
@@ -987,7 +987,7 @@ export const CONFIG_RESTART_EXIT = 76;
 Di `shared/src/dto.ts`, tepat di bawah `zSetup` (baris 493):
 
 ```ts
-// SPEC-884 · ADR-0138 · wizard setup awal.
+// SPEC-884 · ADR-0139 · wizard setup awal.
 export type PrerequisiteId =
   | "podman" | "network" | "egress-proxy" | "credential-dir"
   | "control-origin" | "trust-proxy" | "upload-scanner";
@@ -1017,12 +1017,12 @@ Di `shared/src/api.ts`, setelah baris `authChangePassword: …` (baris 149):
   setupApply: `${API}/setup`,
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run shared/test/setup-dto.test.ts`
 Expected: PASS — 3 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/dto.ts shared/src/api.ts shared/test/setup-dto.test.ts
@@ -1041,7 +1041,7 @@ git commit -m "feat(spec-884): kontrak setup — CONFIG_RESTART_EXIT, DTO, path"
 - Consumes: `readConfigEnv` (Task 1), `CONFIG_RESTART_EXIT` (Task 9)
 - Produces: `SupervisorStep` bertambah `{ action: "restart" }`; `planSupervisorStep(code, restartsUsed, configRestartsUsed?)`; `MAX_CONFIG_RESTARTS = 5`; `spawnEnv(fileEnv, processEnv, serverEnv)`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `cli/test/start-supervisor.test.ts`:
 
@@ -1091,12 +1091,12 @@ describe("presedensi env spawn (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run cli/test/start-supervisor.test.ts`
 Expected: FAIL — `spawnEnv` dan `MAX_CONFIG_RESTARTS` tak diekspor; `planSupervisorStep` menolak argumen ketiga
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `cli/src/commands/start.ts`:
 
@@ -1129,7 +1129,7 @@ export type SupervisorStep =
 export function planSupervisorStep(
   code: number, restartsUsed: number, configRestartsUsed = 0,
 ): SupervisorStep {
-  // SPEC-884 · ADR-0138 · "config berubah, jalankan ulang" — TANPA npm, TANPA prisma generate.
+  // SPEC-884 · ADR-0139 · "config berubah, jalankan ulang" — TANPA npm, TANPA prisma generate.
   if (code === CONFIG_RESTART_EXIT)
     return configRestartsUsed >= MAX_CONFIG_RESTARTS ? { action: "exit", code } : { action: "restart" };
   if (code !== UPDATE_RESTART_EXIT) return { action: "exit", code };
@@ -1142,7 +1142,7 @@ Tambahkan fungsi murni tepat di bawahnya:
 
 ```ts
 /**
- * SPEC-884 · ADR-0138 · presedensi env proses anak, dibuat MURNI supaya urutannya bisa diuji
+ * SPEC-884 · ADR-0139 · presedensi env proses anak, dibuat MURNI supaya urutannya bisa diuji
  * alih-alih diandalkan dari pembacaan. `config.env` sengaja PALING LEMAH: `EnvironmentFile`
  * systemd dan `export` di shell mengalahkannya, sehingga wizard di dashboard secara struktural tak
  * bisa mematikan hardening yang dipasang operator. `serverEnv()` tetap paling kuat.
@@ -1201,17 +1201,17 @@ Di loop supervisor (baris ~253), ganti awal iterasi dan tambahkan cabang `restar
 
 Sisa cabang `update` tidak diubah.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run cli/test/start-supervisor.test.ts cli/test/start-args.test.ts`
 Expected: PASS — kedua berkas
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `pnpm --filter ./cli typecheck`
 Expected: keluar 0
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add cli/src/commands/start.ts cli/test/start-supervisor.test.ts
@@ -1231,7 +1231,7 @@ git commit -m "feat(spec-884): supervisor membaca config.env dan menangani exit 
 - Consumes: `SetupPrerequisite`, `PrerequisiteId` (Task 9)
 - Produces: `type ProbeFacts = { podman: string|null; rootless: boolean; networkExists: boolean; credentialDirReadable: boolean }`, `prerequisites(env, facts): SetupPrerequisite[]`, `allReady(rows): boolean`, `collectProbeFacts(env): ProbeFacts`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `runner/test/sandbox-probe.test.ts`:
 
@@ -1291,17 +1291,17 @@ describe("prasyarat hardening (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run runner/test/sandbox-probe.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/sandbox-probe"`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `runner/src/sandbox-probe.ts`:
 
 ```ts
-// SPEC-884 · ADR-0138 · prasyarat hardening ADR-0117, dinilai di SATU tempat supaya
+// SPEC-884 · ADR-0139 · prasyarat hardening ADR-0117, dinilai di SATU tempat supaya
 // `hanoman doctor` dan wizard setup tak pernah menjawab berbeda tentang mesin yang sama.
 // Keputusannya murni (fakta → baris); IO-nya dipisah di `collectProbeFacts`.
 import { execFileSync } from "node:child_process";
@@ -1397,12 +1397,12 @@ Tambahkan di `runner/src/index.ts`:
 export * from "./sandbox-probe";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run runner/test/sandbox-probe.test.ts`
 Expected: PASS — 6 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/sandbox-probe.ts runner/src/index.ts runner/test/sandbox-probe.test.ts
@@ -1421,7 +1421,7 @@ git commit -m "feat(spec-884): probe prasyarat hardening bersama CLI dan server"
 - Consumes: `resolveHardening` (Task 2), `collectProbeFacts`/`prerequisites`/`allReady` (Task 11)
 - Produces: `Probes.sandboxRequired` kini diturunkan dari hardening
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `cli/test/doctor.test.ts`:
 
@@ -1446,19 +1446,19 @@ Tambahkan ke `cli/test/doctor.test.ts`:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL atau LULUS**
+- [x] **Step 2: Jalankan test, pastikan GAGAL atau LULUS**
 
 Run: `pnpm vitest --run cli/test/doctor.test.ts`
 Expected: LULUS — `doctorReport` sudah murni dan sudah berperilaku begini. Test ini mengunci perilaku itu sebagai regresi sebelum pemicunya diganti di Step 3. Kalau merah, perbaiki dulu sebelum lanjut.
 
-- [ ] **Step 3: Ganti pemicunya**
+- [x] **Step 3: Ganti pemicunya**
 
 Di `cli/src/commands/doctor.ts`, ganti blok probe (baris 120-131) menjadi:
 
 ```ts
   const podmanFacts = collectProbeFacts(ctx.env);
   const prereq = prerequisites(ctx.env, podmanFacts);
-  // SPEC-884 · ADR-0138 · sandbox hanya prasyarat bagi instance yang MINTA dikeraskan. Menandainya
+  // SPEC-884 · ADR-0139 · sandbox hanya prasyarat bagi instance yang MINTA dikeraskan. Menandainya
   // ✗ fatal di laptop membuat `doctor` berkata hanoman tak bisa menjalankan sesi — padahal bisa.
   const sandboxRequired = resolveHardening(ctx.env);
   const sandboxReady = allReady(prereq);
@@ -1475,12 +1475,12 @@ import {
 
 Hapus baris lama yang sudah tak dipakai: `const rootless = …`, `const credentialDir = …`, blok `if (credentialDir) { … }`, `const network = …`, `const networkReady = …`. Ganti pemakaian `podman` di `doctorReport({ … })` menjadi `podman: podmanFacts.podman`.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run cli/test/doctor.test.ts && pnpm --filter ./cli typecheck`
 Expected: PASS + typecheck 0
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cli/src/commands/doctor.ts cli/test/doctor.test.ts
@@ -1501,7 +1501,7 @@ git commit -m "feat(spec-884): doctor menandai sandbox fatal hanya saat hardenin
 - Consumes: `readConfigEnv`/`writeConfigEnv` (Task 1), `resolveHardening`/`resolveDeployment` (Task 2), `collectProbeFacts`/`prerequisites`/`allReady` (Task 11), `SetupStatus`/`zSetupApply`/`CONFIG_RESTART_EXIT` (Task 9)
 - Produces: `SETUP_ALLOWED_KEYS: readonly string[]`, `hardeningLocked(home: string, env: Env): boolean`, `setupDone(home: string): boolean`, `applySetup(home: string, input: { deployment: "local"|"public"; hardening: boolean }): Record<string,string>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/setup-route.test.ts`:
 
@@ -1595,24 +1595,24 @@ describe("route setup (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/setup-route.test.ts`
 Expected: FAIL — semua 404 (`/api/setup/status` belum ada)
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `server/src/services/setup-config.ts`:
 
 ```ts
-// SPEC-884 · ADR-0138 · menulis jawaban wizard ke $HANOMAN_HOME/config.env lewat allowlist.
+// SPEC-884 · ADR-0139 · menulis jawaban wizard ke $HANOMAN_HOME/config.env lewat allowlist.
 import { readConfigEnv, resolveHardening, writeConfigEnv } from "@hanoman/runner";
 
 type Env = Record<string, string | undefined>;
 
 /**
  * Berkas ini BUKAN pintu belakang untuk menyuntik env sembarang ke proses sesi: kunci di luar
- * daftar ini ditolak. Setiap penambahan wajib punya alasan di ADR-0138.
+ * daftar ini ditolak. Setiap penambahan wajib punya alasan di ADR-0139.
  */
 export const SETUP_ALLOWED_KEYS = [
   "HANOMAN_DEPLOYMENT", "HANOMAN_HARDENING", "HANOMAN_SETUP_DONE", "HANOMAN_SESSION_SANDBOX",
@@ -1658,7 +1658,7 @@ export function applySetup(
 Buat `server/src/routes/setup.ts`:
 
 ```ts
-// SPEC-884 · ADR-0138 · wizard setup awal. Permukaan tak ber-auth SELAMA belum ada satu pun user —
+// SPEC-884 · ADR-0139 · wizard setup awal. Permukaan tak ber-auth SELAMA belum ada satu pun user —
 // gerbangnya sama persis dengan `needsSetup` di /auth/status. Konsekuensi yang diterima sadar:
 // instance yang sudah terjangkau internet sebelum wizard selesai bisa diklaim orang pertama yang
 // membukanya. Urutan amannya: selesaikan wizard di localhost, baru sambungkan domain.
@@ -1726,17 +1726,17 @@ Di `server/src/app.ts`: tambah import `import setup from "./routes/setup";`, tam
 
 > **Gerbang "publik hanya selama belum ada user":** set `PUBLIC` melewatkan route ini tanpa syarat, jadi tambahkan pemeriksaan di gate auth `onRequest` (`app.ts`, blok yang menangani `PUBLIC`): untuk kedua path setup, lewatkan **hanya bila** `(await prisma.user.count()) === 0`; selain itu jatuhkan ke jalur cookie biasa. Test terakhir di Step 1 mengunci perilaku ini — kalau ia hijau tanpa perubahan itu, periksa lagi: berarti route-nya terbuka selamanya.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/setup-route.test.ts server/test/auth-routes.test.ts`
 Expected: PASS — 6 test setup + auth-routes tetap hijau
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: keluar 0
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/setup.ts server/src/services/setup-config.ts server/src/app.ts server/test/setup-route.test.ts
@@ -1757,9 +1757,9 @@ git commit -m "feat(spec-884): route setup — status probe dan apply ke config.
 - Consumes: `paths.setupStatus`/`paths.setupApply`, `SetupStatus`, `SetupApplyResult` (Task 9)
 - Produces: `api.setupStatus()`, `api.applySetup(b)`, `<SetupWizard status onDone />`
 
-> **Penyimpangan sadar dari spec K5:** spec menyebut wizard **tiga** langkah dengan akun pertama sebagai langkah 3. Plan ini membuatnya **dua** langkah, dan akun pertama tetap di `AuthScreen` yang sudah ada. Alasannya: hanya boleh ada **satu** tempat yang melahirkan akun (`POST /api/auth/setup` dengan aturan token-nya sendiri, Task 6-7); menyalinnya ke dalam wizard berarti dua jalur yang harus dijaga sepakat soal token, limiter, dan 409. Urutan yang dilihat operator tetap persis seperti spec: peruntukan → keamanan → buat akun. Catat penyimpangan ini di ADR-0138.
+> **Penyimpangan sadar dari spec K5:** spec menyebut wizard **tiga** langkah dengan akun pertama sebagai langkah 3. Plan ini membuatnya **dua** langkah, dan akun pertama tetap di `AuthScreen` yang sudah ada. Alasannya: hanya boleh ada **satu** tempat yang melahirkan akun (`POST /api/auth/setup` dengan aturan token-nya sendiri, Task 6-7); menyalinnya ke dalam wizard berarti dua jalur yang harus dijaga sepakat soal token, limiter, dan 409. Urutan yang dilihat operator tetap persis seperti spec: peruntukan → keamanan → buat akun. Catat penyimpangan ini di ADR-0139.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/setup-wizard.test.tsx`:
 
@@ -1842,17 +1842,17 @@ describe("SetupWizard (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/setup-wizard.test.tsx`
 Expected: FAIL — `Failed to resolve import "../src/screens/SetupWizard"`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Tambahkan ke `src/src/api/client.ts`, tepat di bawah `authStatus` (baris 466):
 
 ```ts
-  // SPEC-884 · ADR-0138 · wizard setup awal
+  // SPEC-884 · ADR-0139 · wizard setup awal
   setupStatus: () => j<SetupStatus>(paths.setupStatus),
   applySetup: (b: { deployment: "local" | "public"; hardening: boolean; acknowledgedUnhardened?: boolean }) =>
     j<SetupApplyResult>(paths.setupApply, { method: "POST", ...body(b) }),
@@ -1863,7 +1863,7 @@ Tambahkan `SetupStatus, SetupApplyResult` ke import type dari `@hanoman/shared` 
 Buat `src/src/screens/SetupWizard.tsx`:
 
 ```tsx
-/* SetupWizard — SPEC-884 · ADR-0138 · setup awal tiga langkah.
+/* SetupWizard — SPEC-884 · ADR-0139 · setup awal tiga langkah.
    Langkah 3 (akun pertama) TIDAK di sini: ia tetap AuthScreen, supaya hanya ada satu tempat yang
    membuat akun. Wizard ini berhenti sesudah menyimpan pilihan dan meminta restart. */
 import React from "react";
@@ -1980,7 +1980,7 @@ export function SetupWizard({ status, onDone }: { status: SetupStatus; onDone: (
 Di `src/src/App.tsx`, tambahkan state dan gerbang. Setelah baris 719:
 
 ```tsx
-  // SPEC-884 · ADR-0138 · wizard setup awal berdiri DI DEPAN AuthScreen: pilihannya menentukan
+  // SPEC-884 · ADR-0139 · wizard setup awal berdiri DI DEPAN AuthScreen: pilihannya menentukan
   // apakah akun pertama nanti diminta setup token.
   const [setupStatus, setSetupStatus] = React.useState<SetupStatus | null>(null);
   React.useEffect(() => {
@@ -1999,12 +1999,12 @@ Ganti baris 1255-1256:
     onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/setup-wizard.test.tsx src/test/app-flows.test.tsx`
 Expected: PASS — kedua berkas. Bila `app-flows` merah karena `api.setupStatus` tak ada di mock parsialnya, tambahkan `setupStatus: vi.fn(async () => ({ needed: false }))` ke mock — jebakan mock parsial yang sama yang sudah dicatat SPEC-739/786 di berkas itu.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SetupWizard.tsx src/src/App.tsx src/src/api/client.ts src/test/setup-wizard.test.tsx
@@ -2023,7 +2023,7 @@ git commit -m "feat(spec-884): wizard setup awal dua langkah di browser"
 - Consumes: `api.setupStatus()` (Task 14)
 - Produces: elemen ber-`data-testid="unhardened-banner"`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/unhardened-banner.test.tsx`:
 
@@ -2056,18 +2056,18 @@ describe("penanda instance tanpa hardening (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/unhardened-banner.test.tsx`
 Expected: FAIL — `UnhardenedBanner` tak diekspor
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Tambahkan di akhir `src/src/screens/SetupWizard.tsx`:
 
 ```tsx
 /**
- * SPEC-884 · ADR-0138 · kalau perlindungan sebuah instance publik turun jadi satu password, keadaan
+ * SPEC-884 · ADR-0139 · kalau perlindungan sebuah instance publik turun jadi satu password, keadaan
  * itu tidak boleh tak terlihat. Tak bisa ditutup permanen — ia padam saat hardening menyala.
  */
 export function UnhardenedBanner({ status }: { status: SetupStatus | null }) {
@@ -2093,12 +2093,12 @@ Di `src/src/App.tsx`, ganti efek pemuat status (Task 14) supaya juga berjalan se
 
 Render `<UnhardenedBanner status={setupStatus} />` sebagai elemen pertama di dalam pembungkus utama dashboard operator (tepat sebelum `Shell`/`body`), bukan di dalam `ClientPortal`.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/unhardened-banner.test.tsx src/test/app-flows.test.tsx`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SetupWizard.tsx src/src/App.tsx src/test/unhardened-banner.test.tsx
@@ -2117,7 +2117,7 @@ git commit -m "feat(spec-884): penanda permanen instance publik tanpa hardening"
 - Consumes: `api.setupStatus()` (Task 14), `SetupWizard` (Task 14)
 - Produces: kartu ber-`data-testid="setup-card"`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/settings-setup-card.test.tsx`:
 
@@ -2167,17 +2167,17 @@ describe("kartu Setup awal (SPEC-884)", () => {
 
 > Kartu ini hidup di sub-tab Settings; `tab` bertahan lewat `usePersistedState` (`SettingsScreen.tsx:547`). Taruh kartunya di sub-tab yang sama dengan kartu config lain, dan bila test tak menemukannya, klik dulu tab itu di test (pola yang sudah dipakai `src/test/config-panel.test.tsx`).
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/settings-setup-card.test.tsx`
 Expected: FAIL — `setup-card` tak ditemukan
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `src/src/screens/SettingsScreen.tsx`, tambahkan state + kartu di dekat kartu setting lain:
 
 ```tsx
-  // SPEC-884 · ADR-0138 · setup awal bisa ditinjau & diubah kapan saja; jalur ini TAK PERNAH
+  // SPEC-884 · ADR-0139 · setup awal bisa ditinjau & diubah kapan saja; jalur ini TAK PERNAH
   // menyentuh akun — hanya peruntukan dan hardening.
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
   const [rerun, setRerun] = React.useState(false);
@@ -2205,12 +2205,12 @@ Di `src/src/screens/SettingsScreen.tsx`, tambahkan state + kartu di dekat kartu 
 
 Impor `SetupWizard` dan tipe `SetupStatus` di berkas itu.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/settings-setup-card.test.tsx src/test/config-panel.test.tsx`
 Expected: PASS — kedua berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SettingsScreen.tsx src/test/settings-setup-card.test.tsx
@@ -2219,10 +2219,10 @@ git commit -m "feat(spec-884): kartu Setup awal di Settings"
 
 ---
 
-### Task 17: ADR-0138 dan docs Source of Truth
+### Task 17: ADR-0139 dan docs Source of Truth
 
 **Files:**
-- Create: `internal/docs/adr/0138-hardening-opsional-dan-wizard-setup.md`
+- Create: `internal/docs/adr/0139-hardening-opsional-dan-wizard-setup.md`
 - Modify: `internal/docs/README.md` · `internal/docs/operations/deploy-vps.md` · `internal/docs/operations/production.md` · `internal/docs/operations/npm-readme.md` · `internal/docs/product/onboarding.md` · `internal/docs/security/threat-model.md` · `internal/docs/architecture/stack.md` · `internal/docs/architecture/api-contract.md`
 - Modify: `docs/superpowers/plans/2026-08-22-spec-883-provisioning-vps-satu-perintah.md`
 
@@ -2230,9 +2230,9 @@ git commit -m "feat(spec-884): kartu Setup awal di Settings"
 - Consumes: seluruh task sebelumnya
 - Produces: —
 
-- [ ] **Step 1: Tulis ADR-0138**
+- [x] **Step 1: Tulis ADR-0139**
 
-Buat `internal/docs/adr/0138-hardening-opsional-dan-wizard-setup.md`, mengikuti bentuk ADR lain (Status/Tanggal/SPEC/Terkait · Konteks · Keputusan · Alternatif yang ditolak · Konsekuensi · Invariant). Isi yang wajib ada:
+Buat `internal/docs/adr/0139-hardening-opsional-dan-wizard-setup.md`, mengikuti bentuk ADR lain (Status/Tanggal/SPEC/Terkait · Konteks · Keputusan · Alternatif yang ditolak · Konsekuensi · Invariant). Isi yang wajib ada:
 
 - **Terkait:** mengamandemen [0117](0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md) — invariant-nya **tetap utuh, tetapi berlaku saat hardening menyala** — dan [0087](0087-distribusi-npm-global.md): instalasi npm polos wajib bisa boot. Menegaskan ulang pelajaran [0088](0088-tombol-update-npm-supervisor.md) tentang nilai keamanan yang tak boleh lewat config DB.
 - **Konteks:** bukti terukur bahwa `npm i -g hanoman && hanoman` menolak boot (dua pesan galat, uid 1000 dan uid 0); env hardening tak pernah lahir dari instalasi npm, hanya dari `EnvironmentFile` systemd; `NODE_ENV` merangkap tiga peran.
@@ -2242,9 +2242,9 @@ Buat `internal/docs/adr/0138-hardening-opsional-dan-wizard-setup.md`, mengikuti 
 - **Konsekuensi yang diterima sadar:** instance publik tanpa hardening hanya dijaga password; wizard bisa diklaim orang pertama bila instance sudah terjangkau internet sebelum selesai; urutan aman = wizard di localhost dulu.
 - **Invariant baru:** (1) `config.env` tak pernah mengalahkan env proses; (2) hardening yang dinyalakan di luar `config.env` tak bisa dimatikan dari dashboard; (3) `hardening=on` tak pernah ditulis saat prasyarat merah; (4) invariant 1–7 ADR-0117 tetap berlaku penuh setiap kali hardening menyala.
 
-- [ ] **Step 2: Perbarui docs yang tersentuh**
+- [x] **Step 2: Perbarui docs yang tersentuh**
 
-- `internal/docs/README.md` — tautkan ADR-0138 di daftar ADR.
+- `internal/docs/README.md` — tautkan ADR-0139 di daftar ADR.
 - `internal/docs/operations/deploy-vps.md` — dua jalur: default longgar (tanpa env apa pun) vs `HANOMAN_HARDENING=1` + prasyarat; sebutkan bahwa env ADR-0117 lama tetap dibaca sebagai hardening menyala.
 - `internal/docs/operations/production.md` — `NODE_ENV=production` kini hanya berarti "terpaket".
 - `internal/docs/operations/npm-readme.md` — alur baru: `npm i -g hanoman` → `hanoman` → buka browser → wizard → akun pertama tanpa token.
@@ -2253,7 +2253,7 @@ Buat `internal/docs/adr/0138-hardening-opsional-dan-wizard-setup.md`, mengikuti 
 - `internal/docs/architecture/stack.md` — dua nilai profil, `config.env`, presedensi.
 - `internal/docs/architecture/api-contract.md` — `GET /api/setup/status`, `POST /api/setup`, kode `400 prerequisites-missing` / `409 hardening-locked` / `429`.
 
-- [ ] **Step 3: Sesuaikan plan SPEC-883**
+- [x] **Step 3: Sesuaikan plan SPEC-883**
 
 Di `docs/superpowers/plans/2026-08-22-spec-883-provisioning-vps-satu-perintah.md`, perbarui bagian profil:
 
@@ -2261,23 +2261,23 @@ Di `docs/superpowers/plans/2026-08-22-spec-883-provisioning-vps-satu-perintah.md
 - profil `production` → tulis `HANOMAN_HARDENING=1` beserta env ADR-0117 lengkap;
 - cabut catatan konsekuensi "cookie lahir tanpa `Secure`" — sudah tak berlaku sejak K7 SPEC-884.
 
-- [ ] **Step 4: Verifikasi integritas index docs**
+- [x] **Step 4: Verifikasi integritas index docs**
 
 Run: `node cli/dist/cli.js docs index --check` (atau `pnpm --filter ./cli build` dulu bila `dist` belum ada)
 Expected: keluar 0, tanpa entri yatim
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs docs/superpowers/plans/2026-08-22-spec-883-provisioning-vps-satu-perintah.md
-git commit -m "docs(spec-884): ADR-0138 hardening opsional + wizard setup awal"
+git commit -m "docs(spec-884): ADR-0139 hardening opsional + wizard setup awal"
 ```
 
 ---
 
 ## Verifikasi akhir (sekali, setelah semua task)
 
-- [ ] **Test yang tersentuh, serial, DB terisolasi**
+- [x] **Test yang tersentuh, serial, DB terisolasi**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -2291,14 +2291,14 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
   src/test/unhardened-banner.test.tsx src/test/settings-setup-card.test.tsx src/test/app-flows.test.tsx
 ```
 
-- [ ] **Typecheck paket yang tersentuh**
+- [x] **Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck \
   && pnpm --filter ./server typecheck && pnpm --filter ./cli typecheck
 ```
 
-- [ ] **Uji endpoint nyata di local** (task ini menyentuh endpoint — wajib, sekali di akhir)
+- [x] **Uji endpoint nyata di local** (task ini menyentuh endpoint — wajib, sekali di akhir)
 
 ```bash
 # Home terpisah supaya tak menyentuh ~/.hanoman yang dipakai instance nyata.
@@ -2320,4 +2320,4 @@ Yang harus terlihat: `needed: true`, `deployment: "local"`, `hardening: false`, 
 
 > **Jangan jalankan smoke tanpa `HANOMAN_HOME`** — `ensureSetupToken` dan `writeConfigEnv` akan menulis ke `~/.hanoman` yang nyata (pelajaran SPEC-880). Bersihkan sesudahnya: `rm -rf "$SMOKE_HOME"`.
 
-- [ ] **Centang checklist plan ini** (`- [ ]` → `- [x]`) untuk task yang selesai, dalam commit yang sama dengan task itu.
+- [x] **Centang checklist plan ini** (`- [ ]` → `- [x]`) untuk task yang selesai, dalam commit yang sama dengan task itu.

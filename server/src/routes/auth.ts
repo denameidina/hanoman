@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { zLogin, zSetup, zSignup, zChangePassword, type UserView } from "@hanoman/shared";
 import { prisma } from "../db";
 import * as auth from "../services/auth";
@@ -10,9 +10,9 @@ const BOOTSTRAP_USER_ID = "bootstrap-admin";
 const view = (u: { id: string; email: string; role: string; createdAt: Date }): UserView =>
   ({ id: u.id, email: u.email, role: u.role as UserView["role"], createdAt: u.createdAt.toISOString() });
 
-async function issue(reply: FastifyReply, userId: string) {
+async function issue(req: FastifyRequest, reply: FastifyReply, userId: string) {
   const token = await auth.createSession(userId);
-  reply.setCookie(auth.COOKIE_NAME, token, auth.cookieOpts());
+  reply.setCookie(auth.COOKIE_NAME, token, auth.cookieOpts(req));
 }
 
 export default async function (app: FastifyInstance, opts: { bootstrapRequired?: boolean; home?: string }) {
@@ -49,7 +49,7 @@ export default async function (app: FastifyInstance, opts: { bootstrapRequired?:
     }
     if (opts.bootstrapRequired) await consumeSetupToken(opts.home!);
     setupAttempts.clear(req.ip);
-    await issue(reply, user.id);
+    await issue(req, reply, user.id);
     return { user: view(user) };
   });
 
@@ -65,7 +65,7 @@ export default async function (app: FastifyInstance, opts: { bootstrapRequired?:
       return reply.code(401).send({ error: "email atau password salah" });
     }
     auth.clearLoginFails(req.ip);
-    await issue(reply, user.id);
+    await issue(req, reply, user.id);
     return { user: view(user) };
   });
 
@@ -117,7 +117,7 @@ export default async function (app: FastifyInstance, opts: { bootstrapRequired?:
       data: { passwordHash: await auth.hashPassword(p.data.newPassword) },
     });
     await auth.deleteUserSessions(user.id); // cabut semua sesi lama (termasuk yang sekarang)
-    await issue(reply, user.id);            // re-issue sesi sekarang → perangkat lain ter-logout
+    await issue(req, reply, user.id);            // re-issue sesi sekarang → perangkat lain ter-logout
     return { user: view(user) };
   });
 }

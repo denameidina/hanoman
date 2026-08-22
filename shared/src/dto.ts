@@ -491,6 +491,27 @@ export const zUserRole = z.enum(USER_ROLES);
 export const zLogin = z.object({ email: z.string().email(), password: z.string().min(1) });
 export const zSignup = z.object({ email: z.string().email(), password: z.string().min(8) });
 export const zSetup = zSignup.extend({ setupToken: z.string().min(1) });
+
+// SPEC-884 · ADR-0139 · wizard setup awal.
+export type PrerequisiteId =
+  | "podman" | "network" | "egress-proxy" | "credential-dir"
+  | "control-origin" | "trust-proxy" | "upload-scanner";
+export type SetupPrerequisite = { id: PrerequisiteId; label: string; ok: boolean; detail: string | null };
+export type SetupStatus = {
+  needed: boolean;                 // belum ada user DAN wizard belum pernah dijawab
+  deployment: "local" | "public";
+  hardening: boolean;
+  hardeningLocked: boolean;        // dinyalakan di luar config.env (systemd/shell) → UI tak boleh mematikannya
+  supervised: boolean;             // HANOMAN_SUPERVISOR === "1" → server bisa menjalankan ulang dirinya
+  setupTokenRequired: boolean;
+  prerequisites: SetupPrerequisite[];
+};
+export const zSetupApply = z.object({
+  deployment: z.enum(["local", "public"]),
+  hardening: z.boolean(),
+  acknowledgedUnhardened: z.boolean().optional(),
+});
+export type SetupApplyResult = { restart: "self" | "manual" };
 export const zChangePassword = z.object({
   currentPassword: z.string().min(1), newPassword: z.string().min(8) });
 export type UserView = { id: string; email: string; role: UserRole; createdAt: string };
@@ -661,6 +682,11 @@ export type UpdateStatus = {
 // supervisor `hanoman start` yang membacanya lalu memasang + menjalankan ulang. 75 = EX_TEMPFAIL —
 // non-zero, jadi `Restart=on-failure` di unit systemd yang didokumentasikan tetap masuk akal.
 export const UPDATE_RESTART_EXIT = 75;
+
+// SPEC-884 · ADR-0139 · "tulis config lalu jalankan ulang", TANPA memasang apa pun. Memakai ulang
+// UPDATE_RESTART_EXIT akan menjalankan `npm i -g hanoman@latest` setiap kali seseorang
+// menyelesaikan wizard — akibat yang sama sekali tak diminta.
+export const CONFIG_RESTART_EXIT = 76;
 
 // Dua langkah sengaja: tanpa `confirm` endpoint hanya melapor (dry-run), dengan `confirm` ia
 // benar-benar keluar. Nilai non-boolean DITOLAK — "ya"/1 tak boleh terbaca sebagai persetujuan.

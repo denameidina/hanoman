@@ -1,7 +1,12 @@
+import { resolveHardening } from "@hanoman/runner";
+
 type Env = Record<string, string | undefined>;
 
 export function assertRuntimeBoundary(env: Env, runtime: { uid: number | undefined; host: string }): void {
-  if (env.NODE_ENV !== "production") return;
+  // SPEC-884 · ADR-0139 · satu-satunya perubahan pada gerbang ini: ia berhenti diturunkan dari
+  // `NODE_ENV` dan mulai diturunkan dari hardening yang diminta eksplisit. Isinya di bawah TIDAK
+  // disentuh — begitu hardening menyala, perilakunya identik dengan sebelum SPEC-884.
+  if (!resolveHardening(env)) return;
   if (runtime.uid === 0) throw new Error("production Hanoman harus berjalan sebagai user non-root");
   if (env.HANOMAN_SESSION_SANDBOX !== "podman")
     throw new Error("HANOMAN_SESSION_SANDBOX=podman wajib di production");
@@ -54,7 +59,9 @@ export function sandboxArgvFromEnv(input: {
   phaseFile?: string; promptFile?: string; attachmentsDir?: string; env?: Env;
 }): string[] | null {
   const env = input.env ?? process.env;
-  const mode = env.HANOMAN_SESSION_SANDBOX ?? (env.NODE_ENV === "production" ? "required" : "off");
+  // SPEC-884 · pemicunya hardening, bukan NODE_ENV. Operator yang menyetel HANOMAN_SESSION_SANDBOX
+  // secara eksplisit tetap menang atas keduanya (termasuk "off" untuk mematikannya sementara).
+  const mode = env.HANOMAN_SESSION_SANDBOX ?? (resolveHardening(env) ? "required" : "off");
   if (mode === "off") return null;
   if (mode !== "podman") throw new Error("session sandbox production tidak dikonfigurasi");
   const credentialDir = env.HANOMAN_AGENT_CREDENTIAL_DIR;

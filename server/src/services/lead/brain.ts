@@ -4,6 +4,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Agent } from "@hanoman/shared";
+import { resolveHardening } from "@hanoman/runner";
 import { effectiveStr } from "../../config";
 import { rootBypassEnv } from "../pty";
 import { sandboxArgvFromEnv } from "../session-sandbox";
@@ -94,7 +95,8 @@ export function leadProcess(
 ): LeadProcess {
   const file = binFor(o.agent);
   const directArgs = leadArgv({ agent: o.agent, model: o.model, effort: o.effort, prompt });
-  const mode = env.HANOMAN_SESSION_SANDBOX ?? (env.NODE_ENV === "production" ? "required" : "off");
+  // SPEC-884 · ADR-0139 · pemicunya hardening, bukan NODE_ENV (cermin `sandboxArgvFromEnv`).
+  const mode = env.HANOMAN_SESSION_SANDBOX ?? (resolveHardening(env) ? "required" : "off");
   if (mode === "off") return { file, args: directArgs, cwd: o.cwd, cleanup: () => {} };
 
   const promptDir = join(tmpdir(), "hanoman-prompts");

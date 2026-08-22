@@ -14,6 +14,10 @@ vi.mock("../src/api/events", () => ({ subscribe: () => () => {} }));
 vi.mock("../src/api/client", () => ({
   api: {
     authStatus: vi.fn(async () => ({ needsSetup: false, user: { id: "u1", email: "a@b.co", createdAt: "" } })),
+    // SPEC-884 · App memuat status setup begitu auth diketahui; mock `api` parsial tanpa ini
+    // melempar di efek dan terbaca seperti App-nya yang rusak (jebakan yang sama SPEC-739/786).
+    setupStatus: vi.fn(async () => ({ needed: false, deployment: "local", hardening: false,
+      hardeningLocked: false, supervised: false, setupTokenRequired: false, prerequisites: [] })),
     listProjects: vi.fn(async () => ({ items: [{ id: "arta", name: "arta", desc: "", kind: "existing", stack: "Go",
       docStatus: "ok", coverage: 94, createdAt: "", backlog: 2, topStage: "execute",
       session: { status: "running", phase: "Execute", flow: "feature" }, activity: "x", commit: "y" }], total: 1, page: 1, pageSize: 20 })),

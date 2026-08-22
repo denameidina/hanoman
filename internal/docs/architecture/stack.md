@@ -217,8 +217,13 @@ berubah** — metode mengganti CARA sebuah fase dikerjakan, bukan fase apa yang 
 eksplisit, prompt byte-identik dengan sebelum spec ini.
 
 Sesi memakai `--dangerously-skip-permissions`/padanan codex tanpa hook deny perintah; guardrail itu
-dicabut ADR-0037. Sejak ADR-0117, worktree hanya boundary Git dan production menjalankan semua agen
-di rootless Podman dengan mount/secret/egress minimum. Telegram tidak menambah executor:
+dicabut ADR-0037. Sejak ADR-0117, worktree hanya boundary Git dan instance ber-hardening menjalankan
+semua agen di rootless Podman dengan mount/secret/egress minimum. Sejak SPEC-884/ADR-0139 hardening
+itu **opt-in**: penentunya `HANOMAN_HARDENING=1` (atau env ADR-0117 lama yang sudah terisi), bukan
+lagi `NODE_ENV=production` — yang kini hanya berarti "runtime terpaket". Tanpa hardening sesi agen
+berjalan di host, dan `NODE_ENV` tak lagi memaksa apa pun soal boundary. Profil dan probe
+prasyaratnya murni di `@hanoman/runner` (`runtime-profile.ts`, `sandbox-probe.ts`) supaya
+`hanoman doctor` dan wizard setup tak pernah menjawab berbeda tentang mesin yang sama. Telegram tidak menambah executor:
 session operator memakai API ber-AgentToken/capability, dan confirmation inline menjadi syarat
 tambahan khusus action sulit dibatalkan dari identitas token gateway (ADR-0096).
 Production menolak API/worker uid 0. `rootBypassEnv` tersisa hanya untuk kompatibilitas local/test

@@ -7,7 +7,7 @@
 `server/src/services/auth.ts`, `server/src/services/upload-pipeline.ts`, `cli/src/commands/start.ts`,
 `cli/src/commands/doctor.ts`, `runner/src/config-env.ts` (baru), `shared/src/dto.ts`,
 `src/src/screens/SetupWizard.tsx` (baru), `src/src/screens/AuthScreen.tsx`, `src/src/App.tsx`.
-ADR baru: **ADR-0138** (mengamandemen ADR-0117 dan ADR-0087).
+ADR baru: **ADR-0139** (mengamandemen ADR-0117 dan ADR-0087).
 
 > Nomor spec ini menunggu id backlog yang diterbitkan server. Bila server memberi nomor lain,
 > selaraskan nama berkas, judul, dan seluruh rujukan dalam satu commit (preseden SPEC-882/883).
@@ -385,7 +385,7 @@ Perintah verifikasi (SPEC-376, ADR-0080):
 
 ## Docs yang tersentuh (commit yang sama)
 
-- `internal/docs/adr/0138-hardening-opsional-dan-wizard-setup.md` (baru) — mengamandemen ADR-0117
+- `internal/docs/adr/0139-hardening-opsional-dan-wizard-setup.md` (baru) — mengamandemen ADR-0117
   (invariant-nya tetap utuh, tetapi **berlaku saat hardening menyala**; hardening jadi opt-in dengan
   kompatibilitas mundur env) dan ADR-0087 (instalasi npm polos wajib bisa boot).
 - `internal/docs/operations/deploy-vps.md` — dua jalur: default longgar vs `HANOMAN_HARDENING=1`.
@@ -393,7 +393,7 @@ Perintah verifikasi (SPEC-376, ADR-0080):
 - `internal/docs/product/onboarding.md` — langkah 1 diganti wizard.
 - `internal/docs/security/threat-model.md` — model ancaman instance tanpa hardening + klaimabilitas wizard.
 - `internal/docs/architecture/stack.md`, `internal/docs/architecture/api-contract.md`.
-- `internal/docs/README.md` — tautkan ADR-0138.
+- `internal/docs/README.md` — tautkan ADR-0139.
 - `docs/superpowers/plans/2026-08-22-spec-883-provisioning-vps-satu-perintah.md` — profil `lab` jadi
   `HANOMAN_DEPLOYMENT=public` + hardening mati; `production` jadi hardening menyala. Catatan
   "cookie tanpa `Secure`" dicabut (K7).

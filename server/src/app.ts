@@ -46,6 +46,7 @@ import clientAccounts from "./routes/client-accounts";
 import wsTickets from "./routes/ws-tickets";
 import fastifyMultipart from "@fastify/multipart";
 import authRoutes from "./routes/auth";
+import setupRoutes from "./routes/setup";
 import agentTokens from "./routes/agent-tokens";
 import { COOKIE_NAME, lookupSession } from "./services/auth";
 import { agentTokenFromReq, authenticateAgent } from "./services/agent-auth";
@@ -57,7 +58,8 @@ import { stopTelegramRuntime } from "./services/telegram/runtime";
 import { actorFromRequest, setActor } from "./services/webhooks/actor";
 import { classifyIngress, loadIngressPolicy, trustProxyFromEnv } from "./services/ingress-policy";
 import { MAX_WS_MESSAGE_BYTES, wsControlOrigins } from "./services/ws-admission";
-import { resolveHome } from "@hanoman/runner";
+import { resolveHardening, resolveHome } from "@hanoman/runner";
+import { prisma } from "./db";
 
 // Endpoint yang boleh diakses tanpa sesi (path lengkap termasuk prefix /api).
 const PUBLIC = new Set([
@@ -70,6 +72,14 @@ const PUBLIC = new Set([
   // menggerbanginya berarti agen yang capability-nya kurang menerima 403 pada dokumen yang
   // justru menjelaskan arti 403 itu.
   "GET /api/agent-integration.md",
+]);
+
+// SPEC-884 · ADR-0139 · publik BERSYARAT: hanya selama `prisma.user.count() === 0`. Sengaja tak
+// digabung ke PUBLIC di atas — daftar itu berarti "publik tanpa syarat", dan mencampurnya akan
+// membuat permukaan setup terbuka selamanya.
+const SETUP_PUBLIC = new Set([
+  "GET /api/setup/status",
+  "POST /api/setup",
 ]);
 
 // requireAuth default true: prod (server.ts) selalu tergerbang. Test route yang tak
@@ -140,6 +150,11 @@ export function buildApp(
         if (user) req.user = user;
         const path = req.url.split("?")[0] ?? req.url;
         if (PUBLIC.has(`${req.method} ${path}`)) return;
+        // SPEC-884 · ADR-0139 · wizard setup awal harus bisa dijangkau SEBELUM ada akun — ia yang
+        // mendahului kelahiran akun pertama. Begitu satu akun ada ia jatuh ke gate cookie biasa;
+        // syaratnya sama persis dengan `needsSetup`, jangan menambah gerbang kedua yang bisa
+        // melenceng darinya. COUNT hanya dijalankan untuk dua path ini, bukan tiap request.
+        if (SETUP_PUBLIC.has(`${req.method} ${path}`) && (await prisma.user.count()) === 0) return;
         // SPEC-617 · ADR-0110 · di bawah ini dulu berdiri satu baris tanpa syarat: "cookie sesi
         // = akses penuh". Letak gerbang klien paling awal DISENGAJA — dengan begitu allowlist
         // adalah pernyataan LENGKAP tentang apa yang boleh disentuh klien, tak ada urutan cabang
@@ -188,7 +203,11 @@ export function buildApp(
       setActor(actorFromRequest({ user: req.user ?? null, agent: req.agent ?? null }));
     });
     api.addHook("onResponse", auditTelegramGatewayResponse);
-    await api.register(authRoutes, { bootstrapRequired: env.NODE_ENV === "production", home: resolveHome(env) });
+    // SPEC-884 · ADR-0139 · bukti setup token menjaga instance yang minta dikeraskan. Di instalasi
+    // biasa ia justru menutup pintu terakhir: orang yang baru `npm i -g hanoman` harus membaca
+    // berkas di HANOMAN_HOME lewat shell sebelum bisa memakai dashboard-nya sendiri.
+    await api.register(authRoutes, { bootstrapRequired: resolveHardening(env), home: resolveHome(env) });
+    await api.register(setupRoutes, { home: resolveHome(env), env });
     await api.register(health);
     await api.register(agentDoc, { file: docFile });   // SPEC-489 · panduan AI agent (PUBLIC)
     await api.register(projects);
