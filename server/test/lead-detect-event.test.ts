@@ -23,6 +23,39 @@ const DIALOG = [
   "Enter to select · ↑/↓ to navigate · Esc to cancel",
 ].join("\n");
 
+/** Layar rekap SPEC-474 — satu-satunya bentuk yang `submitPaneDialog` mau tekan. */
+const REVIEW = [
+  "←  ☒ Basis  ☒ Auth  ☒ Deploy  ✔ Submit  →", "", "Review your answers", "",
+  "Ready to submit your answers?", "", "❯ 1. Submit answers", "  2. Cancel",
+].join("\n");
+
+/** Layar sesudah dialog benar-benar tertutup. */
+const SELESAI = "⏺ User answered Claude's questions:\n\n❯\n  ⏵⏵ bypass permissions on";
+
+/**
+ * Panggung yang MAJU saat dijawab lalu BERAKHIR — bentuk yang sama dengan TUI sungguhan.
+ *
+ * Panggung yang tak pernah berakhir menyembunyikan dua hal sekaligus: dialog satu pertanyaan yang
+ * menutup sendiri (dan karena itu tak boleh di-Submit) dan rantai yang berujung layar rekap.
+ */
+const dialogBerjudul = (title: string): string => [
+  "←  ☐ Basis  ☐ Auth  ☐ Deploy  ✔ Submit  →", "", title, "",
+  "❯ 1. SQLite", "  2. Postgres", "  3. Type something.", "  4. Chat about this", "",
+  "Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
+].join("\n");
+
+function panggung(total = 1, akhir: "rekap" | "tertutup" = total > 1 ? "rekap" : "tertutup") {
+  let n = 0;
+  return {
+    jawab: () => { n++; },
+    // JUDUL yang berganti, bukan suffix: `dialogKey` sengaja kebal terhadap kursor, spinner, dan
+    // tab tercentang (ADR-0142 keputusan 2), jadi hanya judul yang benar-benar memajukan rantai.
+    pane: () => (n < total
+      ? (total > 1 ? dialogBerjudul(`Pertanyaan ke-${n}?`) : DIALOG)
+      : akhir === "rekap" ? REVIEW : SELESAI),
+  };
+}
+
 const ask = (over: Partial<SessionAsk> = {}): SessionAsk => ({
   sessionId: "s1", agent: "claude", source: "ask-tool", askId: "toolu_1",
   askedAt: new Date().toISOString(),
@@ -84,7 +117,12 @@ describe("admitAsk — pagar lama, satu sesi per panggilan", () => {
 
   it("menolak + menotifikasi SEKALI saat maxAutoAnswers tercapai (AC-11)", async () => {
     const d = deps();
-    for (let i = 0; i < 3; i++) await answerAsk(ask({ askId: `t${i}` }), CTX, d);
+    for (let i = 0; i < 3; i++) {
+      const p = panggung();                       // satu event = satu dialog yang lahir dari awal
+      (d as { pane: () => string }).pane = p.pane;
+      (d as { send: unknown }).send = vi.fn(async () => { p.jawab(); return true; });
+      await answerAsk(ask({ askId: `t${i}` }), CTX, d);
+    }
     expect(answerCount("s1")).toBe(3);
     const first = await admitAsk(S, d);
     const second = await admitAsk(S, d);
@@ -114,16 +152,10 @@ describe("answerAsk — rantai disuapi payload", () => {
   });
 
   it("satu panggilan 3 pertanyaan = 3 decide dalam SATU alur, lalu Submit & marker dikosongkan", async () => {
-    // Layar sungguhan MAJU antar-tab: judulnya berganti, jadi `dialogKey` — dan karena itu
-    // `waitScreenChange` — ikut berganti. Suffix kosmetik saja tak cukup: `dialogKey` sengaja
-    // stabil terhadap kursor & spinner (ADR-0142 keputusan 2).
-    let n = 0;
-    const paneAt = (t: number) => [
-      "☐ Basis", `Pertanyaan ke-${t}?`, "❯ 1. SQLite", "  2. Postgres",
-      "  3. Type something.", "  4. Chat about this",
-      "Enter to select · ↑/↓ to navigate · Esc to cancel",
-    ].join("\n");
-    const d = deps({ pane: () => paneAt(n++) });
+    // Layar sungguhan MAJU antar-tab (judulnya berganti, jadi `dialogKey` ikut berganti — suffix
+    // kosmetik tak pernah cukup, ADR-0142 keputusan 2) lalu BERAKHIR di layar rekap.
+    const p = panggung(3);
+    const d = deps({ pane: p.pane, send: vi.fn(async () => { p.jawab(); return true; }) });
     const three = ask({
       total: 3,
       questions: [
@@ -141,6 +173,32 @@ describe("answerAsk — rantai disuapi payload", () => {
     expect(d.closeChain).toHaveBeenCalledWith("f1");
     expect(r.answered).toBe(true);
     expect(answerCount("s1")).toBe(1);       // satu PANGGILAN = satu jawaban otomatis
+  });
+
+  it("dialog SATU pertanyaan yang menutup sendiri tak pernah menekan Submit", async () => {
+    // Regresi yang nyaris lolos: `submitPaneDialog` fail-closed untuk layar yang bukan rekap, dan
+    // dialog satu pertanyaan claude memang tak punya layar rekap. Submit tanpa syarat membuat kasus
+    // PALING UMUM dilaporkan `gagal` — marker tak dikosongkan, `failures` naik.
+    let answered = false;
+    const d = deps({
+      pane: () => (answered ? SELESAI : DIALOG),
+      send: vi.fn(async () => { answered = true; return true; }),
+    });
+    const r = await answerAsk(ask(), CTX, d);
+    expect(d.submit).not.toHaveBeenCalled();
+    expect(r.answered).toBe(true);
+    expect(d.clearMarker).toHaveBeenCalledWith("/m");
+    expect(failureCount("s1")).toBe(0);
+  });
+
+  it("layar yang tak kunjung tertutup: tak mengetik lagi, marker TETAP terisi", async () => {
+    // Sesi itu memang masih menunggu. Mengosongkan markernya akan menghapusnya dari pil, notifikasi,
+    // dan panel pet — dan tak ada yang akan menulisnya kembali (SPEC-474).
+    const d = deps();
+    const r = await answerAsk(ask(), CTX, d);
+    expect(d.clearMarker).not.toHaveBeenCalled();
+    expect(r.answered).toBe(false);
+    expect(failureCount("s1")).toBe(0);   // bukan kegagalan lead: jawabannya mendarat
   });
 
   it("dialog tak pernah muncul → TIDAK mengetik apa pun (anti pesan liar SPEC-487)", async () => {

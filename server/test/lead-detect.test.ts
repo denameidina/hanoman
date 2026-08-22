@@ -1,12 +1,32 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "../src/db";
-import { LEAD_DEFAULTS, type Lead, type LeadDelivery } from "@hanoman/shared";
+import { LEAD_DEFAULTS, type Lead, type LeadDelivery, type SessionAsk } from "@hanoman/shared";
 import type { LeadDecision } from "@prisma/client";
-import { scanAndAnswer, __resetDetect, resetSession, answerCount, failureCount, FAIL_COOLDOWN_MS, type DetectDeps } from "../src/services/lead/detect";
+import {
+  admitAsk, answerAsk, __resetDetect, resetSession, answerCount, failureCount, FAIL_COOLDOWN_MS,
+  type AskCtx, type DetectDeps,
+} from "../src/services/lead/detect";
 import { recordDecision } from "../src/services/lead/trail";
 import { LeadBusyError } from "../src/services/lead/gate";
 
 // SPEC-409 · ADR-0091 · pintu #2 (deteksi otomatis). Semua deps disuntik: nol tmux, nol agen.
+//
+// SPEC-909 · ADR-0146 · berkas ini dulu menguji `scanAndAnswer`, si PEMINDAI: satu denyut menyapu
+// semua sesi hidup, membaca marker, lalu men-`capture-pane` untuk menebak apa yang ditanyakan.
+// Penggantinya dua fungsi PER SESI yang disuapi payload hook (`admitAsk` + `answerAsk`), dan
+// sekelas kasus di sini kehilangan artinya bersama pemindainya — dihapus, bukan dilonggarkan:
+//
+// - gerbang `live`/`filled`/`agentOf`: marker & daftar sesi bukan lagi pemicu. Pagar yang MASIH
+//   menggigit (master switch, jeda per-project, opt-in, pane mati, codex selesai wajar) sudah
+//   diuji di `lead-detect-event.test.ts`; menyalinnya ke sini melahirkan dua definisi.
+// - "dialog di layar adalah kunci kedua" & "rantai tuntas harus dibuktikan" (SPEC-487): layar tak
+//   lagi memicu apa pun, dan berapa langkah satu rantai kini DIKETAHUI dari payload — itulah yang
+//   mencabut `CHAIN_END_TRIES`/`settledPane` yang dua describe itu kunci.
+// - "banyak sesi menunggu bersamaan" (SPEC-479): batas konkurensi pindah ke `lead/ask.ts`. Satu
+//   kasusnya TETAP di sini, di describe SPEC-472 — "gerbang penuh bukan kegagalan lead" mengukur
+//   penghitung `failures` milik `runChain`, bukan konkurensinya.
+// - kasus ber-`sweep()` ("melupakan penghitung begitu sesinya tak ada lagi", "sesi yang sudah tak
+//   ada melepas ingatan alurnya"): penyapunya dicabut; pemangkasan sesi mati jadi urusan `ask.ts`.
 
 const clean = async () => {
   await prisma.leadDecision.deleteMany();
@@ -18,26 +38,139 @@ afterAll(clean);
 
 const cfg = (over: Partial<Lead> = {}): Lead => ({ ...LEAD_DEFAULTS, enabled: true, ...over });
 
+/** Sesi yang dinilai `admitAsk` — cermin baris `Session` yang dipegang pekerja `lead/ask.ts`. */
+const S = { id: "s1", specId: "spec-1", projectId: "demo" };
+/** Konteks satu tanya: project, backlog, dan marker yang dikosongkan di ujung rantai. */
+const CTX: AskCtx = { projectId: "demo", specId: "spec-1", decisionFile: "/marker" };
+
+/**
+ * SPEC-909 · payload hook apa adanya. Pertanyaan & opsinya datang DARI SINI sekarang, bukan dari
+ * `capture-pane`; layar tinggal dipakai untuk dua hal, keduanya di dalam satu rantai yang sudah
+ * dipicu event: membuktikan dialognya sudah tergambar, dan membuktikan ia BERGANTI antar-pertanyaan.
+ */
+const ask = (over: Partial<SessionAsk> = {}): SessionAsk => ({
+  sessionId: "s1", agent: "claude", source: "ask-tool", askId: "toolu_1",
+  askedAt: "2026-01-01T00:00:00.000Z",
+  questions: [{
+    header: "Cache", question: "Mana yang kamu mau?", multiSelect: false,
+    options: [{ label: "In-memory" }, { label: "Redis" }, { label: "Tanpa cache" }],
+  }],
+  message: "", at: 0, total: 1, state: "queued", flowId: null, step: null, ...over,
+});
+
+/** Payload DUA pertanyaan dalam satu panggilan — bentuk rantai SPEC-474 sesudah SPEC-909. */
+const rantai = (over: Partial<SessionAsk> = {}): SessionAsk => ask({
+  total: 2,
+  questions: [
+    { header: "Warna", question: "Pilih warna tema?", multiSelect: false,
+      options: [{ label: "Merah" }, { label: "Biru" }] },
+    { header: "Ukuran", question: "Pilih ukuran font?", multiSelect: false,
+      options: [{ label: "Kecil" }, { label: "Besar" }] },
+  ],
+  ...over,
+});
+
+/** Giliran codex yang benar-benar bertanya — gerbangnya `readCodexTurn(ask.message)`, bukan layar. */
+const codex = (message: string): SessionAsk =>
+  ask({ agent: "codex", source: "turn-end", questions: [], message });
+
+// Layar dialog satu pertanyaan (tanpa tab strip): bentuk yang ditunggu `waitDialog` sebelum satu
+// huruf pun diketik. Sesudah SPEC-909 ia bukan lagi SUMBER pertanyaannya — cuma buktinya.
+const ASKQ_PANE = `
+Mau pakai strategi cache yang mana?
+
+❯ 1. In-memory
+  2. Redis
+  3. Tanpa cache
+  4. Type something.
+  5. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+`;
+
+/** Satu layar dialog berantai; JUDUL-nya yang membedakan satu tangkapan dari tangkapan berikutnya. */
+const dialogPane = (title: string): string => [
+  "←  ☐ Warna  ☐ Ukuran  ✔ Submit  →", "", title, "",
+  "❯ 1. Merah", "  2. Biru", "  3. Type something.", "  4. Chat about this", "",
+  "Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
+].join("\n");
+
+/**
+ * Pane yang benar-benar MAJU: tiap pembacaan mengganti judul dialognya.
+ *
+ * `waitScreenChange` menuntut `dialogKey` berganti, dan `dialogKey` sengaja kebal terhadap kursor,
+ * spinner, tab yang tercentang, dan label kolom bebas yang berubah begitu prosa lead mendarat
+ * (ADR-0142 keputusan 2) — jadi suffix kosmetik tak pernah cukup memajukan rantai, di test maupun
+ * di produksi. Yang menggerakkannya cuma judul yang berganti, layar rekap, atau layar yang berhenti
+ * jadi dialog.
+ */
+const paneMaju = (): (() => string) => {
+  let n = 0;
+  return () => dialogPane(`Pertanyaan ke-${n++}?`);
+};
+
+/** Layar rekap SPEC-474: bentuk yang dituntut `submitPaneDialog` (`kind === "review"`). */
+const REVIEW_PANE = [
+  "←  ☒ Warna  ☒ Ukuran  ✔ Submit  →", "", "Review your answers", "",
+  "Ready to submit your answers?", "", "❯ 1. Submit answers", "  2. Cancel",
+].join("\n");
+
+/** Layar sesudah dialog benar-benar tertutup — bukan dialog lagi. */
+const SELESAI_PANE = "⏺ User answered Claude's questions:\n\n❯\n  ⏵⏵ bypass permissions on";
+
+/**
+ * Panggung yang meniru TUI sungguhan: dialognya MAJU saat dijawab, lalu BERAKHIR.
+ *
+ * Akhirnya penting, bukan detail fixture. `submitPaneDialog` fail-closed untuk layar yang bukan
+ * rekap, dan dialog SATU pertanyaan claude tak pernah menampilkan layar rekap sama sekali — jadi
+ * panggung yang tak pernah berakhir akan membuat kasus paling umum terbaca "gagal" di test
+ * sekaligus menyembunyikan kalau produksi benar-benar menekan Submit di layar yang salah.
+ */
+type Panggung = {
+  total?: number;
+  akhir?: "rekap" | "tertutup" | "macet";
+  /** Gerbang "dialognya sudah tergambar di pane". Palsu = event yang tak berujung jawaban. */
+  tergambar?: () => boolean;
+};
+function panggung(o: Panggung = {}): { pane: () => string; jawab: () => void; mulai: () => void } {
+  const total = o.total ?? 1;
+  const akhir = o.akhir ?? (total > 1 ? "rekap" : "tertutup");
+  let n = 0;
+  return {
+    jawab: () => { n++; },
+    mulai: () => { n = 0; },
+    pane: () => {
+      // `PreToolUse` menembak SEBELUM tool-nya jalan, jadi ada jendela nyata di mana dialognya
+      // belum ada di layar sama sekali — dan `waitDialog` menolak mengetik apa pun di sana.
+      if (o.tergambar && !o.tergambar()) return "✻ Cooked for 40m 4s\n> ";
+      if (n < total) return total > 1 ? dialogPane(`Pertanyaan ke-${n}?`) : ASKQ_PANE;
+      if (akhir === "rekap") return REVIEW_PANE;
+      if (akhir === "tertutup") return SELESAI_PANE;
+      return dialogPane("Layar yang tak kunjung menutup?");
+    },
+  };
+}
+
 type Harness = {
   deps: DetectDeps;
   sent: { id: string; text: string }[];
   asked: string[];
   notes: string[];
   submits: string[];
+  /** Setel ulang panggung: satu EVENT = satu dialog yang lahir dari awal. */
+  mulai: () => void;
 };
 
-function harness(over: Partial<DetectDeps> = {}, conf: Lead = cfg()): Harness {
+function harness(over: Partial<DetectDeps> = {}, conf: Lead = cfg(), stage: Panggung = {}): Harness {
   const sent: { id: string; text: string }[] = [];
   const asked: string[] = [];
   const notes: string[] = [];
   const submits: string[] = [];
+  const p = panggung(stage);
   const deps: DetectDeps = {
-    live: () => [{ id: "s1", specId: "spec-1", projectId: "demo", decisionFile: "/marker" }],
-    filled: () => true,
-    pane: () => "Saya butuh keputusan.\nMana yang kamu mau?",
-    agentOf: () => "claude",
+    pane: p.pane,
     exited: () => false,
-    send: async (id, text) => { sent.push({ id, text }); return true; },
+    send: async (id, text) => { sent.push({ id, text }); p.jawab(); return true; },
     clearMarker: () => {},
     decide: (async (req: { question: string; projectId: string; specId?: string | null; sessionId?: string | null }) => {
       asked.push(req.question);
@@ -58,69 +191,42 @@ function harness(over: Partial<DetectDeps> = {}, conf: Lead = cfg()): Harness {
     // bisa diuji tanpa waktu nyata.
     submit: async (id) => { submits.push(id); return true; },
     sleep: async () => {},
-    // SPEC-487 · rantai deteksi kini hidup di dalam satu `LeadFlow`; penutupnya disuntik supaya
-    // bisa diperiksa tanpa menyentuh DB.
+    // SPEC-487 · rantai deteksi hidup di dalam satu `LeadFlow`; penutupnya disuntik supaya bisa
+    // diperiksa tanpa menyentuh DB.
     closeChain: async () => {},
     now: () => Date.now(),
     ...over,
   };
-  return { deps, sent, asked, notes, submits };
+  return { deps, sent, asked, notes, submits, mulai: p.mulai };
 }
 
-describe("scanAndAnswer · gerbang", () => {
-  it("does nothing while the master switch is off", async () => {
-    const h = harness({}, { ...LEAD_DEFAULTS, enabled: false });
-    expect((await scanAndAnswer(h.deps)).answered).toEqual([]);
-    expect(h.sent).toEqual([]);
-  });
-  it("does nothing while paused (AC-15)", async () => {
-    const h = harness({}, cfg({ paused: true }));
-    expect((await scanAndAnswer(h.deps)).answered).toEqual([]);
-  });
-  it("skips a project that never opted in", async () => {
-    const h = harness({ optIn: async () => [] });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual([]);
-    expect(r.skipped[0]!.reason).toContain("opt-in");
-  });
-  it("skips a project paused individually", async () => {
-    const h = harness({}, cfg({ pausedProjects: ["demo"] }));
-    expect((await scanAndAnswer(h.deps)).skipped[0]!.reason).toContain("dijeda");
-  });
-  it("ignores sessions whose marker is empty — mereka tak menunggu apa-apa", async () => {
-    const h = harness({ filled: () => false });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual([]);
-    expect(r.skipped).toEqual([]);
-  });
-  // AC-10 · `remain-on-exit on` menahan pane mati; mengetik ke sana tak menghidupkan apa pun.
-  it("never types into a dead pane (AC-10)", async () => {
-    const h = harness({ exited: () => true });
-    expect((await scanAndAnswer(h.deps)).skipped[0]!.reason).toBe("pane mati");
-    expect(h.sent).toEqual([]);
-  });
-  // AC-9 · marker codex menyala juga saat sesi selesai wajar (ADR-0074).
-  it("never types into a codex session that merely finished (AC-9)", async () => {
-    const h = harness({ agentOf: () => "codex", pane: () => "Goal achieved\n42k tokens used" });
-    expect(h.sent).toEqual([]);
-    expect((await scanAndAnswer(h.deps)).skipped[0]!.reason).toContain("selesai wajar");
-  });
-});
+/**
+ * Urutan yang dipakai pekerja `lead/ask.ts`: pagar dulu (`admitAsk`), baru rantainya (`answerAsk`).
+ *
+ * Test pagar beruntun butuh KEDUANYA — `answerAsk` sendirian melewati setiap pagar, sementara yang
+ * diukur SPEC-472/AC-11 justru "agennya tak lagi dipanggil sama sekali".
+ */
+async function layani(h: Harness, a: SessionAsk = ask()): Promise<{ answered: boolean; reason: string }> {
+  h.mulai();          // satu event = satu dialog baru; panggung tak boleh membawa sisa event lalu
+  const gate = await admitAsk(S, h.deps);
+  if (!gate.ok) return { answered: false, reason: gate.reason };
+  const r = await answerAsk(a, CTX, h.deps);
+  return { answered: r.answered, reason: r.reason };
+}
 
-describe("scanAndAnswer · menjawab (AC-7/AC-8)", () => {
-  it("reads the pane, decides, and types the answer back", async () => {
+describe("answerAsk · menjawab (AC-7/AC-8)", () => {
+  it("membaca payload, memutuskan, dan mengetik jawabannya kembali", async () => {
     const h = harness();
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual(["s1"]);
+    expect((await layani(h)).answered).toBe(true);
     expect(h.asked[0]).toContain("Mana yang kamu mau?");
     expect(h.sent).toEqual([{ id: "s1", text: "opsi 1" }]);
   });
   it("does not count an answer that never reached the pane", async () => {
     const h = harness({ send: async () => false });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual([]);
+    const r = await layani(h);
+    expect(r.answered).toBe(false);
     expect(answerCount("s1")).toBe(0);
-    expect(r.skipped[0]!.reason).toContain("mengetik");
+    expect(r.reason).toContain("mengetik");
   });
   it("does not type when lead failed to produce a valid decision", async () => {
     const h = harness({
@@ -129,17 +235,18 @@ describe("scanAndAnswer · menjawab (AC-7/AC-8)", () => {
         answer: "", reason: "timeout", refs: [], confidence: "ragu", action: "none", status: "gagal",
       })) as unknown as DetectDeps["decide"],
     });
-    expect((await scanAndAnswer(h.deps)).answered).toEqual([]);
+    expect((await layani(h)).answered).toBe(false);
     expect(h.sent).toEqual([]);
   });
 });
 
 // SPEC-472 (QA) · pagar AC-11 menghitung jawaban yang BERHASIL diberikan, jadi sesi yang
-// keputusannya selalu gagal tak pernah mendekatinya: `engine.ts` TICK_MS = 5 dtk menjadwalkan
-// percobaan berikutnya, selamanya. Terukur di produksi — 152 keputusan `gagal` untuk tiga sesi yang
-// sama dalam ±13 menit, satu proses agen (dan kuota langganan yang sama dengan sesi pekerja) untuk
-// masing-masing, tanpa satu pun jalan berhenti.
-describe("scanAndAnswer · batas kegagalan beruntun (SPEC-472)", () => {
+// keputusannya selalu gagal tak pernah mendekatinya. Terukur di produksi — 152 keputusan `gagal`
+// untuk tiga sesi yang sama dalam ±13 menit, satu proses agen (dan kuota langganan yang sama dengan
+// sesi pekerja) untuk masing-masing, tanpa satu pun jalan berhenti. Pemicunya berganti di SPEC-909
+// (event, bukan denyut 5 detik), tetapi bentuk badainya tak: satu sesi yang terus bertanya
+// menerbitkan event terus juga.
+describe("admitAsk · batas kegagalan beruntun (SPEC-472)", () => {
   const failing = (): Partial<DetectDeps> => ({
     decide: (async (req: { projectId: string; specId?: string | null; sessionId?: string | null; question: string }) =>
       recordDecision({
@@ -156,22 +263,22 @@ describe("scanAndAnswer · batas kegagalan beruntun (SPEC-472)", () => {
     const h = harness({
       decide: (async (...a: Parameters<DetectDeps["decide"]>) => { calls++; return (base.decide as DetectDeps["decide"])(...a); }) as DetectDeps["decide"],
     }, cfg({ maxAutoAnswers: 2 }));
-    await scanAndAnswer(h.deps);
-    await scanAndAnswer(h.deps);
+    await layani(h);
+    await layani(h);
     expect(calls).toBe(2);
     expect(failureCount("s1")).toBe(2);
 
-    const third = await scanAndAnswer(h.deps);
+    const third = await layani(h);
     expect(calls).toBe(2);                       // tak ada agen ketiga yang di-spawn
-    expect(third.answered).toEqual([]);
-    expect(third.skipped[0]!.reason).toContain("gagal");
+    expect(third.answered).toBe(false);
+    expect(third.reason).toContain("gagal");
   });
 
   it("menotifikasi operator tepat sekali saat menyerah", async () => {
     const h = harness(failing(), cfg({ maxAutoAnswers: 1 }));
-    await scanAndAnswer(h.deps);
-    await scanAndAnswer(h.deps);
-    await scanAndAnswer(h.deps);
+    await layani(h);
+    await layani(h);
+    await layani(h);
     expect(h.notes.filter((t) => t.includes("gagal"))).toHaveLength(1);
   });
 
@@ -183,27 +290,18 @@ describe("scanAndAnswer · batas kegagalan beruntun (SPEC-472)", () => {
       decide: (async (...a: Parameters<DetectDeps["decide"]>) =>
         broken ? (base.decide as DetectDeps["decide"])(...a) : harness().deps.decide(...a)) as DetectDeps["decide"],
     }, cfg({ maxAutoAnswers: 2 }));
-    await scanAndAnswer(h.deps);
+    await layani(h);
     expect(failureCount("s1")).toBe(1);
     broken = false;
-    expect((await scanAndAnswer(h.deps)).answered).toEqual(["s1"]);
+    expect((await layani(h)).answered).toBe(true);
     expect(failureCount("s1")).toBe(0);
   });
 
   it("campur tangan operator memulihkan sesi yang sudah menyerah", async () => {
     const h = harness(failing(), cfg({ maxAutoAnswers: 1 }));
-    await scanAndAnswer(h.deps);
-    expect((await scanAndAnswer(h.deps)).skipped[0]!.reason).toContain("gagal");
+    await layani(h);
+    expect((await layani(h)).reason).toContain("gagal");
     resetSession("s1");
-    expect(failureCount("s1")).toBe(0);
-  });
-
-  it("melupakan penghitung begitu sesinya tak ada lagi", async () => {
-    const h = harness(failing(), cfg({ maxAutoAnswers: 2 }));
-    await scanAndAnswer(h.deps);
-    expect(failureCount("s1")).toBe(1);
-    const gone = harness({ ...failing(), live: () => [] }, cfg({ maxAutoAnswers: 2 }));
-    await scanAndAnswer(gone.deps);
     expect(failureCount("s1")).toBe(0);
   });
 
@@ -215,14 +313,14 @@ describe("scanAndAnswer · batas kegagalan beruntun (SPEC-472)", () => {
   it("kegagalan yang berjauhan waktu tidak lagi dihitung beruntun", async () => {
     let clock = 1_000_000;
     const h = harness({ ...failing(), now: () => clock }, cfg({ maxAutoAnswers: 2 }));
-    await scanAndAnswer(h.deps);
-    await scanAndAnswer(h.deps);
+    await layani(h);
+    await layani(h);
     expect(failureCount("s1")).toBe(2);
-    expect((await scanAndAnswer(h.deps)).skipped[0]!.reason).toContain("gagal");
+    expect((await layani(h)).reason).toContain("gagal");
 
     clock += FAIL_COOLDOWN_MS + 1;                  // bebannya sudah lama hilang
-    const after = await scanAndAnswer(h.deps);
-    expect(after.skipped[0]!.reason).not.toContain("batas kegagalan");
+    const after = await layani(h);
+    expect(after.reason).not.toContain("batas kegagalan");
     expect(failureCount("s1")).toBe(1);             // dihitung ulang dari nol, bukan dari 3
   });
 
@@ -234,518 +332,15 @@ describe("scanAndAnswer · batas kegagalan beruntun (SPEC-472)", () => {
       now: () => clock,
       decide: (async (...a: Parameters<DetectDeps["decide"]>) => { calls++; return (base.decide as DetectDeps["decide"])(...a); }) as DetectDeps["decide"],
     }, cfg({ maxAutoAnswers: 2 }));
-    for (let i = 0; i < 6; i++) { clock += 5_000; await scanAndAnswer(h.deps); }
+    for (let i = 0; i < 6; i++) { clock += 5_000; await layani(h); }
     expect(calls).toBe(2);
   });
-});
 
-describe("scanAndAnswer · batas jawaban otomatis (AC-11 / OQ-10)", () => {
-  it("stops after maxAutoAnswers and notifies exactly once", async () => {
-    const h = harness({}, cfg({ maxAutoAnswers: 2 }));
-    await scanAndAnswer(h.deps);
-    await scanAndAnswer(h.deps);
-    expect(answerCount("s1")).toBe(2);
-    const third = await scanAndAnswer(h.deps);
-    expect(third.answered).toEqual([]);
-    expect(third.skipped[0]!.reason).toContain("batas");
-    expect(h.notes.filter((t) => t.includes("berhenti menjawab"))).toHaveLength(1);
-    await scanAndAnswer(h.deps);   // putaran berikutnya tak menotifikasi ulang
-    expect(h.notes.filter((t) => t.includes("berhenti menjawab"))).toHaveLength(1);
-    expect(h.sent).toHaveLength(2);
-  });
-  // Marker memang kosong sesaat setelah lead mengetik (hook UserPromptSubmit menjalankan `: >`).
-  // Kalau penghitung di-reset di sana, pagarnya tak pernah tercapai — loop tanpa ujung.
-  it("keeps counting across the marker going empty and filling again", async () => {
-    let filled = true;
-    const h = harness({ filled: () => filled }, cfg({ maxAutoAnswers: 2 }));
-    await scanAndAnswer(h.deps);
-    filled = false; await scanAndAnswer(h.deps);   // agen sedang bekerja
-    filled = true; await scanAndAnswer(h.deps);    // bertanya lagi
-    expect(answerCount("s1")).toBe(2);
-    expect((await scanAndAnswer(h.deps)).answered).toEqual([]);
-  });
-  // OQ-8 · manusia menang: campur tangan operator memutus rantai "berturut-turut".
-  it("resets the counter when the operator steps in", async () => {
-    const h = harness({}, cfg({ maxAutoAnswers: 1 }));
-    await scanAndAnswer(h.deps);
-    expect((await scanAndAnswer(h.deps)).answered).toEqual([]);
-    resetSession("s1");
-    expect((await scanAndAnswer(h.deps)).answered).toEqual(["s1"]);
-  });
-  it("forgets the counter once the session is gone", async () => {
-    const h = harness({}, cfg({ maxAutoAnswers: 1 }));
-    await scanAndAnswer(h.deps);
-    expect(answerCount("s1")).toBe(1);
-    const gone = harness({ live: () => [] }, cfg({ maxAutoAnswers: 1 }));
-    await scanAndAnswer(gone.deps);
-    expect(answerCount("s1")).toBe(0);
-  });
-});
-
-describe("scanAndAnswer · jejak", () => {
-  it("leaves one trail row per answer, linked to the session", async () => {
-    const h = harness();
-    await scanAndAnswer(h.deps);
-    const rows: LeadDecision[] = await prisma.leadDecision.findMany();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ sessionId: "s1", specId: "spec-1", gate: "detected" });
-  });
-});
-
-// SPEC-452 · dua cacat di ujung pintu deteksi: opsi dialog tak pernah sampai ke lead, dan marker
-// tak pernah dikosongkan sesudah dialog dijawab (menjawab dialog BUKAN `UserPromptSubmit`, jadi
-// hook pengosongnya tak menembak) — lead lalu mengetik lagi ke sesi yang sudah kembali bekerja.
-const ASKQ_PANE = `
-Mau pakai strategi cache yang mana?
-
-❯ 1. In-memory
-  2. Redis
-  3. Tanpa cache
-  4. Type something.
-  5. Chat about this
-
-Enter to select · ↑/↓ to navigate · Esc to cancel
-`;
-
-describe("scanAndAnswer · dialog pilihan (SPEC-452)", () => {
-  it("meneruskan opsi dialog ke lead, bukan hanya teks layarnya", async () => {
-    const opts: (string[] | undefined)[] = [];
-    const h = harness({
-      pane: () => ASKQ_PANE,
-      decide: (async (req: { question: string; options?: string[]; projectId: string; specId?: string | null; sessionId?: string | null }) => {
-        opts.push(req.options);
-        return recordDecision({
-          projectId: req.projectId, specId: req.specId, sessionId: req.sessionId,
-          gate: "detected", kind: "answer", question: req.question,
-          answer: "Tanpa cache", reason: "r", refs: [], confidence: "tinggi", action: "none",
-        });
-      }) as unknown as DetectDeps["decide"],
-    });
-    await scanAndAnswer(h.deps);
-    expect(opts[0]).toEqual(["In-memory", "Redis", "Tanpa cache"]);
-  });
-
-  it("mengosongkan marker sesudah jawaban benar-benar mendarat", async () => {
-    const cleared: string[] = [];
-    const h = harness({ clearMarker: (f: string) => { cleared.push(f); } });
-    await scanAndAnswer(h.deps);
-    expect(cleared).toEqual(["/marker"]);
-  });
-
-  it("TIDAK mengosongkan marker saat pengetikan gagal — sesi memang masih menunggu", async () => {
-    const cleared: string[] = [];
-    const h = harness({ send: async () => false, clearMarker: (f: string) => { cleared.push(f); } });
-    await scanAndAnswer(h.deps);
-    expect(cleared).toEqual([]);
-  });
-});
-
-// SPEC-474 · dialog `AskUserQuestion` BERANTAI: satu tool call, beberapa pertanyaan berturut-turut.
-// Menjawab satu pertanyaan hanya MEMAJUKAN dialog; yang menutupnya adalah layar rekap. Sampai spec
-// ini, lead menjawab pertanyaan pertama lalu mengosongkan marker — dan marker itu TAK PERNAH terisi
-// lagi (hook `Notification` menembak sekali per dialog; terukur 0 B selama 120 dtk dengan dialog
-// masih terbuka), jadi sisa rantainya tak terlihat oleh siapa pun dan panenya menahan satu slot
-// governor selamanya.
-const RANTAI_Q1 = [
-  "←  ☐ Warna  ☐ Ukuran  ✔ Submit  →", "", "Pilih warna tema?", "",
-  "❯ 1. Merah", "  2. Biru", "  3. Type something.", "  4. Chat about this", "",
-  "Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
-].join("\n");
-
-const RANTAI_Q2 = [
-  "←  ☒ Warna  ☐ Ukuran  ✔ Submit  →", "", "Pilih ukuran font?", "",
-  "❯ 1. Kecil", "  2. Besar", "  3. Type something.", "  4. Chat about this", "",
-  "Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
-].join("\n");
-
-const RANTAI_REVIEW = [
-  "←  ☒ Warna  ☒ Ukuran  ✔ Submit  →", "", "Review your answers", "",
-  "Ready to submit your answers?", "", "❯ 1. Submit answers", "  2. Cancel",
-].join("\n");
-
-const SELESAI = "⏺ User answered Claude's questions:\n\n❯\n  ⏵⏵ bypass permissions on";
-
-/** `decide` yang menjawab berbeda tiap panggilan — supaya urutan jawabannya bisa diperiksa. */
-const menjawab = (counter: { n: number }): Partial<DetectDeps> => ({
-  decide: (async (req: { question: string; projectId: string; specId?: string | null; sessionId?: string | null; notes?: string[] }) => {
-    counter.n += 1;
-    return recordDecision({
-      projectId: req.projectId, specId: req.specId, sessionId: req.sessionId,
-      gate: "detected", kind: "answer", question: req.question,
-      answer: `jawab-${counter.n}`, reason: "r", refs: [], confidence: "tinggi", action: "none",
-    });
-  }) as unknown as DetectDeps["decide"],
-});
-
-describe("scanAndAnswer · rantai dialog sampai submit (SPEC-474)", () => {
-  it("menjawab tiap pertanyaan lalu MENEKAN submit, satu keputusan per pertanyaan", async () => {
-    const screens = [RANTAI_Q1, RANTAI_Q2, RANTAI_REVIEW, SELESAI];
-    let idx = 0;
-    const counter = { n: 0 };
-    const cleared: string[] = [];
-    const h = harness({
-      ...menjawab(counter),
-      pane: () => screens[Math.min(idx, screens.length - 1)]!,
-      send: async (id, text) => { idx++; return (h.sent.push({ id, text }), true); },
-      submit: async (id) => { idx++; return (h.submits.push(id), true); },
-      clearMarker: (f: string) => { cleared.push(f); },
-    });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual(["s1"]);
-    expect(counter.n).toBe(2);                       // dua pertanyaan, dua keputusan
-    expect(h.submits).toEqual(["s1"]);               // submit TIDAK memanggil agen
-    expect(h.sent.map((s) => s.text)).toEqual(["jawab-1", "jawab-2"]);
-    expect(cleared).toEqual(["/marker"]);            // marker dikosongkan SEKALI, di ujung rantai
-    expect(answerCount("s1")).toBe(1);               // satu rantai = SATU jawaban otomatis
-  });
-
-  it("memberi tahu lead posisi pertanyaannya di dalam rantai", async () => {
-    const screens = [RANTAI_Q1, RANTAI_Q2, RANTAI_REVIEW, SELESAI];
-    let idx = 0;
-    const seen: string[] = [];
-    const h = harness({
-      pane: () => screens[Math.min(idx, screens.length - 1)]!,
-      send: async () => { idx++; return true; },
-      submit: async () => { idx++; return true; },
-      decide: (async (req: { question: string; projectId: string; notes?: string[] }) => {
-        seen.push((req.notes ?? []).join(" "));
-        return recordDecision({
-          projectId: req.projectId, gate: "detected", kind: "answer", question: req.question,
-          answer: "ok", reason: "r", refs: [], confidence: "tinggi", action: "none",
-        });
-      }) as unknown as DetectDeps["decide"],
-    });
-    await scanAndAnswer(h.deps);
-    expect(seen[0]).toContain("pertanyaan ke-1");
-    expect(seen[1]).toContain("pertanyaan ke-2");
-  });
-
-  // Kebalikan dari perilaku hari ini: rantai yang putus HARUS tetap terlihat menunggu.
-  it("rantai putus TIDAK mengosongkan marker dan dihitung sebagai kegagalan", async () => {
-    const screens = [RANTAI_Q1, RANTAI_Q2];
-    let idx = 0, calls = 0;
-    const cleared: string[] = [];
-    const h = harness({
-      pane: () => screens[Math.min(idx, screens.length - 1)]!,
-      send: async () => { idx++; return true; },
-      clearMarker: (f: string) => { cleared.push(f); },
-      decide: (async (req: { question: string; projectId: string }) => {
-        calls++;
-        return recordDecision({
-          projectId: req.projectId, gate: "detected", kind: "answer", question: req.question,
-          answer: calls === 1 ? "ok" : "", reason: "r", refs: [], confidence: "tinggi",
-          action: "none", ...(calls === 1 ? {} : { status: "gagal" as const }),
-        });
-      }) as unknown as DetectDeps["decide"],
-    });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual([]);
-    expect(cleared).toEqual([]);                     // operator tetap melihat sesi MENUNGGU
-    expect(failureCount("s1")).toBe(1);
-    expect(answerCount("s1")).toBe(0);
-  });
-
-  // Pane yang tak pernah maju tak boleh membuat lead mengetik berulang-ulang ke layar yang sama.
-  it("berhenti bila layar dialog tak berubah sesudah dijawab (anti-loop)", async () => {
-    const counter = { n: 0 };
-    const cleared: string[] = [];
-    const h = harness({
-      ...menjawab(counter),
-      pane: () => RANTAI_Q1,                          // layar MACET
-      clearMarker: (f: string) => { cleared.push(f); },
-    });
-    await scanAndAnswer(h.deps);
-    expect(counter.n).toBe(1);                        // tak mengulang keputusan untuk layar yang sama
-    expect(cleared).toEqual([]);
-    expect(failureCount("s1")).toBe(1);
-  });
-
-  it("submit yang gagal tak pernah dilaporkan sebagai rantai tuntas", async () => {
-    const cleared: string[] = [];
-    const h = harness({
-      pane: () => RANTAI_REVIEW,
-      submit: async () => false,
-      clearMarker: (f: string) => { cleared.push(f); },
-    });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual([]);
-    expect(cleared).toEqual([]);
-    expect(r.skipped[0]!.reason).toContain("Submit");
-  });
-
-  // Layar rekap adalah langkah MEKANIS: menutup dialog yang jawabannya sudah masuk tak butuh
-  // pertimbangan apa pun, jadi tak boleh membakar satu giliran agen.
-  it("layar rekap ditutup tanpa memanggil agen sama sekali", async () => {
-    const screens = [RANTAI_REVIEW, SELESAI];
-    let idx = 0;
-    const counter = { n: 0 };
-    const h = harness({
-      ...menjawab(counter),
-      pane: () => screens[Math.min(idx, screens.length - 1)]!,
-      submit: async (id) => { idx++; return (h.submits.push(id), true); },
-    });
-    const r = await scanAndAnswer(h.deps);
-    expect(counter.n).toBe(0);
-    expect(h.submits).toEqual(["s1"]);
-    expect(r.answered).toEqual(["s1"]);
-  });
-
-  // Jalur lama (kolom chat biasa) tak boleh berubah sedikit pun.
-  it("kolom chat biasa tetap satu jawaban lalu selesai", async () => {
-    const cleared: string[] = [];
-    const counter = { n: 0 };
-    const h = harness({ ...menjawab(counter), clearMarker: (f: string) => { cleared.push(f); } });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual(["s1"]);
-    expect(counter.n).toBe(1);
-    expect(cleared).toEqual(["/marker"]);
-    expect(answerCount("s1")).toBe(1);
-  });
-
-  // Dialog satu pertanyaan: menjawabnya SUDAH men-submit (claude menyembunyikan tab Submit), jadi
-  // layar berikutnya bukan dialog lagi dan rantainya berhenti di situ — tanpa keputusan kedua.
-  it("dialog satu pertanyaan tetap selesai dalam satu jawaban", async () => {
-    const screens = [ASKQ_PANE, SELESAI];
-    let idx = 0;
-    const counter = { n: 0 };
-    const cleared: string[] = [];
-    const h = harness({
-      ...menjawab(counter),
-      pane: () => screens[Math.min(idx, screens.length - 1)]!,
-      send: async () => { idx++; return true; },
-      clearMarker: (f: string) => { cleared.push(f); },
-    });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual(["s1"]);
-    expect(counter.n).toBe(1);
-    expect(h.submits).toEqual([]);
-    expect(cleared).toEqual(["/marker"]);
-  });
-});
-
-// SPEC-487 (QA) · marker adalah PEMBERITAHUAN; layar adalah BUKTI.
-//
-// Hook `Notification` claude mengisi marker SEKALI per dialog (terukur SPEC-474: 0 B selama 120 dtk
-// dengan dialognya masih terbuka), jadi begitu marker sebuah dialog dikosongkan lebih awal — oleh
-// sebab apa pun — dialog itu jadi tak terlihat oleh siapa pun. Terukur in-vivo: dialog terbuka +
-// marker kosong = 0 percobaan dalam 20 denyut / 100 dtk, dan sesinya tak muncul bahkan di `skipped`.
-describe("scanAndAnswer · dialog di layar adalah kunci kedua (SPEC-487)", () => {
-  it("melayani sesi ber-marker KOSONG yang panenya menampilkan dialog", async () => {
-    const screens = [ASKQ_PANE, SELESAI];
-    let idx = 0;
-    const h = harness({
-      filled: () => false,
-      pane: () => screens[Math.min(idx, screens.length - 1)]!,
-      send: async (id, text) => { idx++; return (h.sent.push({ id, text }), true); },
-    });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual(["s1"]);
-    expect(h.sent).toHaveLength(1);
-  });
-
-  it("sesi ber-marker kosong TANPA dialog tetap tak disentuh sama sekali", async () => {
-    const h = harness({ filled: () => false });   // pane default: prosa biasa, bukan dialog
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual([]);
-    expect(r.skipped).toEqual([]);
-    expect(h.sent).toEqual([]);
-  });
-
-  it("pane MATI ber-dialog tak dibangunkan lewat pintu ini (AC-10 utuh)", async () => {
-    const h = harness({ filled: () => false, exited: () => true, pane: () => ASKQ_PANE });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual([]);
-    expect(h.sent).toEqual([]);
-  });
-
-  // Fail-closed secara konstruksi: `readDialogScreen` menuntut footer chord claude, yang tak pernah
-  // dirender codex — jadi AC-9 tak bisa ditembus lewat pintu baru ini.
-  it("layar codex tak pernah lolos lewat pintu layar", async () => {
-    const h = harness({ filled: () => false, agentOf: () => "codex", pane: () => "Pilihan:\n1) tambah kolom\n2) turunkan saja" });
-    expect((await scanAndAnswer(h.deps)).answered).toEqual([]);
-  });
-});
-
-// SPEC-487 (QA) · "rantai tuntas" adalah vonis yang MENGOSONGKAN marker, jadi ia harus dibuktikan.
-// Dua cabang `done: true` di `runChain` menyimpulkannya dari SATU tangkapan layar, sementara
-// `waitScreenChange` pulang begitu `dialogKey` berubah — termasuk berubah jadi "none" pada satu
-// frame di antara dua pertanyaan.
-describe("scanAndAnswer · rantai tuntas harus dibuktikan (SPEC-487)", () => {
-  it("satu frame non-dialog di tengah rantai tidak menutup rantainya", async () => {
-    const screens = [RANTAI_Q1, RANTAI_Q2, RANTAI_REVIEW, SELESAI];
-    let idx = 0;
-    // Layar setengah-render bertahan beberapa tangkapan: satu ditelan `waitScreenChange` (yang
-    // pulang begitu `dialogKey` berubah — termasuk berubah jadi "none"), yang berikutnya jatuh
-    // tepat di pembacaan langkah berikutnya. Di sanalah rantai sehat divonis tuntas.
-    let transient = 2;
-    const counter = { n: 0 };
-    const cleared: string[] = [];
-    const h = harness({
-      ...menjawab(counter),
-      pane: () => {
-        if (idx === 1 && transient > 0) { transient--; return "⏺ Memproses jawaban…\n\n❯\n  ⏵⏵ bypass permissions on"; }
-        return screens[Math.min(idx, screens.length - 1)]!;
-      },
-      send: async (id, text) => { idx++; return (h.sent.push({ id, text }), true); },
-      submit: async (id) => { idx++; return (h.submits.push(id), true); },
-      clearMarker: (f: string) => { cleared.push(f); },
-    });
-    const r = await scanAndAnswer(h.deps);
-    expect(counter.n).toBe(2);                    // KEDUA pertanyaan dijawab
-    expect(h.submits).toEqual(["s1"]);
-    expect(r.answered).toEqual(["s1"]);
-    expect(cleared).toEqual(["/marker"]);         // dikosongkan sekali, di ujung yang sebenarnya
-  });
-
-  it("layar yang benar-benar berhenti jadi dialog tetap menutup rantai", async () => {
-    const screens = [RANTAI_Q1, SELESAI];
-    let idx = 0;
-    const counter = { n: 0 };
-    const cleared: string[] = [];
-    const h = harness({
-      ...menjawab(counter),
-      pane: () => screens[Math.min(idx, screens.length - 1)]!,
-      send: async () => { idx++; return true; },
-      clearMarker: (f: string) => { cleared.push(f); },
-    });
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual(["s1"]);
-    expect(counter.n).toBe(1);
-    expect(cleared).toEqual(["/marker"]);
-  });
-});
-
-// SPEC-487 (QA) · ADR-0102 menaruh mesin rantainya di `decide()` dan menyerahkan penggeraknya ke
-// "agen peminta" — tapi peminta yang sesungguhnya menggerakkan rantai di produksi adalah `runChain`
-// di dalam hanoman sendiri, dan ia memanggil `decide()` tanpa `chain` maupun `flowId`. Terukur di
-// DB hidup: 22 dari 22 baris `gate="detected"` ber-`step = 1`, dan 3 alur yang ada ketiganya
-// `tunggal` padahal ketiganya SATU dialog 3-pertanyaan. `chainSteps` karena itu selalu kosong, dan
-// konteks langkah sebelumnya jatuh ke `priorDecisions` — 10 baris terakhir SE-PROJECT, yang saat 4
-// sesi paralel berjalan menyisakan 2 dari 10 slot untuk rantainya sendiri.
-type AskSpy = { chain?: boolean; flowId?: string | null };
-describe("scanAndAnswer · satu rantai = satu LeadFlow (SPEC-487)", () => {
-  /** `decide` yang mengaku lahir di alur `F1`, dan merekam apa yang diminta pemanggilnya. */
-  const berantai = (seen: AskSpy[]): Partial<DetectDeps> => ({
-    decide: (async (req: { question: string; projectId: string; chain?: boolean; flowId?: string | null }) => {
-      seen.push({ chain: req.chain, flowId: req.flowId ?? null });
-      return recordDecision({
-        projectId: req.projectId, gate: "detected", kind: "answer", question: req.question,
-        answer: `jawab-${seen.length}`, reason: "r", refs: [], confidence: "tinggi", action: "none",
-        flowId: "F1", step: seen.length,
-      });
-    }) as unknown as DetectDeps["decide"],
-  });
-
-  it("langkah kedua meneruskan flowId langkah pertama, dan alurnya ditutup di ujung rantai", async () => {
-    const screens = [RANTAI_Q1, RANTAI_Q2, RANTAI_REVIEW, SELESAI];
-    let idx = 0;
-    const seen: AskSpy[] = [];
-    const closed: string[] = [];
-    const h = harness({
-      ...berantai(seen),
-      pane: () => screens[Math.min(idx, screens.length - 1)]!,
-      send: async () => { idx++; return true; },
-      submit: async () => { idx++; return true; },
-      closeChain: async (id: string) => { closed.push(id); },
-    });
-    expect((await scanAndAnswer(h.deps)).answered).toEqual(["s1"]);
-    expect(seen).toEqual([{ chain: true, flowId: null }, { chain: true, flowId: "F1" }]);
-    expect(closed).toEqual(["F1"]);
-  });
-
-  // Rantai boleh terputus di tengah (gerbang penuh, agen gagal). Denyut berikutnya harus MELANJUTKAN
-  // alur yang sama — kalau tidak, konteks yang baru saja dibangun ADR-0102 hilang tepat di tempat
-  // yang paling membutuhkannya.
-  it("rantai yang tertunda melanjutkan alur yang sama pada denyut berikutnya", async () => {
-    const screens = [RANTAI_Q1, RANTAI_Q2];       // tak pernah maju ke review → rantai putus
-    let idx = 0;
-    const seen: AskSpy[] = [];
-    const closed: string[] = [];
-    const h = harness({
-      ...berantai(seen),
-      pane: () => screens[Math.min(idx, screens.length - 1)]!,
-      send: async () => { idx++; return true; },
-      closeChain: async (id: string) => { closed.push(id); },
-    });
-    await scanAndAnswer(h.deps);
-    await scanAndAnswer(h.deps);
-    expect(seen[0]).toEqual({ chain: true, flowId: null });
-    for (const ask of seen.slice(1)) expect(ask).toEqual({ chain: true, flowId: "F1" });
-    expect(closed).toEqual([]);                    // belum tuntas → alurnya tetap terbuka
-  });
-
-  it("sesi yang sudah tak ada melepas ingatan alurnya", async () => {
-    const seen: AskSpy[] = [];
-    const h = harness(berantai(seen));
-    await scanAndAnswer(h.deps);                   // kolom chat biasa: satu langkah, tuntas
-    const gone = harness({ ...berantai(seen), live: () => [] });
-    await scanAndAnswer(gone.deps);
-    const next = harness(berantai(seen));
-    await scanAndAnswer(next.deps);
-    expect(seen[seen.length - 1]).toEqual({ chain: true, flowId: null });
-  });
-});
-
-// SPEC-479 (QA) · pintu deteksi melayani sesi BERBARENGAN, berbatas.
-//
-// Sebelum ini loop-nya `for (const s of sessions) { await … }` — serial mutlak, terukur
-// `maxInFlight = 1` dengan tangga tunggu linier 0/204/407/614/832/1035 ms untuk 6 sesi. Karena
-// urutan `tmux list-panes -a` stabil, ekor daftar selalu di ekor: kelaparan yang bisa
-// direproduksi, bukan antrean yang kebetulan lambat.
-describe("SPEC-479 · banyak sesi menunggu bersamaan", () => {
-  const many = (n: number) => Array.from({ length: n }, (_, i) => ({
-    id: `s${i}`, specId: `spec-${i}`, projectId: "demo", decisionFile: `/marker-${i}`,
-  }));
-
-  it("melayani beberapa sesi sekaligus, dibatasi maxConcurrent", async () => {
-    let inFlight = 0, max = 0;
-    const h = harness({
-      live: () => many(6),
-      decide: (async (req: { question: string; projectId: string; specId?: string | null; sessionId?: string | null }) => {
-        inFlight++; max = Math.max(max, inFlight);
-        await new Promise((r) => setTimeout(r, 30));
-        inFlight--;
-        return recordDecision({
-          projectId: req.projectId, specId: req.specId, sessionId: req.sessionId,
-          gate: "detected", kind: "answer", question: req.question,
-          answer: "opsi 1", reason: "r", refs: [], confidence: "tinggi", action: "none",
-        });
-      }) as unknown as DetectDeps["decide"],
-    }, cfg({ maxConcurrent: 3 }));
-
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered.sort()).toEqual(["s0", "s1", "s2", "s3", "s4", "s5"]);
-    expect(max).toBe(3);          // bukan 1 (serial) dan bukan 6 (tanpa batas)
-  });
-
-  it("satu sesi lambat tak lagi menahan sesi di belakangnya (head-of-line)", async () => {
-    const done = new Map<string, number>();
-    const t0 = Date.now();
-    const h = harness({
-      live: () => [
-        { id: "lambat", specId: "spec-a", projectId: "demo", decisionFile: "/m0" },
-        { id: "cepat", specId: "spec-b", projectId: "demo", decisionFile: "/m1" },
-      ],
-      decide: (async (req: { question: string; projectId: string; specId?: string | null; sessionId?: string | null }) => {
-        await new Promise((r) => setTimeout(r, req.sessionId === "lambat" ? 300 : 10));
-        done.set(req.sessionId!, Date.now() - t0);
-        return recordDecision({
-          projectId: req.projectId, specId: req.specId, sessionId: req.sessionId,
-          gate: "detected", kind: "answer", question: req.question,
-          answer: "opsi 1", reason: "r", refs: [], confidence: "tinggi", action: "none",
-        });
-      }) as unknown as DetectDeps["decide"],
-    }, cfg({ maxConcurrent: 2 }));
-
-    await scanAndAnswer(h.deps);
-    // Sebelum perbaikan: `cepat` selesai SESUDAH `lambat` (terukur 1028 ms di belakang 1003 ms).
-    expect(done.get("cepat")!).toBeLessThan(done.get("lambat")!);
-  });
-
+  // SPEC-479 (QA) · satu-satunya kasus describe "banyak sesi menunggu bersamaan" yang TIDAK ikut
+  // pindah ke `lead-ask.test.ts`: yang diukurnya penghitung `failures` milik `runChain`, bukan
+  // batas konkurensinya. Inti temuan C: `failures`/`failCapped` SPEC-472 dibuat untuk sebab yang
+  // tak hilang dengan mengulang. Penuh adalah kebalikannya — ia hilang begitu slot bebas.
   it("gerbang penuh BUKAN kegagalan lead: tak menambah penghitung, sesinya tetap layak dicoba lagi", async () => {
-    // Inti temuan C: `failures`/`failCapped` SPEC-472 dibuat untuk sebab yang tak hilang dengan
-    // mengulang. Penuh adalah kebalikannya — ia hilang begitu slot bebas. Menghitungnya membuat
-    // tiga lonjakan beban menutup lead bagi sesi itu SELAMANYA (keadaan menyerap, terukur).
     let penuh = true;
     let percobaan = 0;
     const h = harness({
@@ -761,27 +356,334 @@ describe("SPEC-479 · banyak sesi menunggu bersamaan", () => {
     });
 
     for (let i = 0; i < 5; i++) {
-      const r = await scanAndAnswer(h.deps);
-      expect(r.answered).toEqual([]);
-      expect(r.skipped[0]!.reason).toContain("penuh");
+      const r = await layani(h);
+      expect(r.answered).toBe(false);
+      expect(r.reason).toContain("penuh");
     }
     expect(failureCount("s1")).toBe(0);
     expect(await prisma.leadDecision.count()).toBe(0);   // tak ada jejak `gagal` yang menyesatkan
 
     // Beban hilang → sesi yang sama langsung terlayani lagi, tanpa campur tangan operator.
     penuh = false;
-    const r = await scanAndAnswer(h.deps);
-    expect(r.answered).toEqual(["s1"]);
+    expect((await layani(h)).answered).toBe(true);
     expect(percobaan).toBe(6);
+  });
+});
+
+describe("admitAsk · batas jawaban otomatis (AC-11 / OQ-10)", () => {
+  it("stops after maxAutoAnswers and notifies exactly once", async () => {
+    const h = harness({}, cfg({ maxAutoAnswers: 2 }));
+    await layani(h);
+    await layani(h);
+    expect(answerCount("s1")).toBe(2);
+    const third = await layani(h);
+    expect(third.answered).toBe(false);
+    expect(third.reason).toContain("batas");
+    expect(h.notes.filter((t) => t.includes("berhenti menjawab"))).toHaveLength(1);
+    await layani(h);   // event berikutnya tak menotifikasi ulang
+    expect(h.notes.filter((t) => t.includes("berhenti menjawab"))).toHaveLength(1);
+    expect(h.sent).toHaveLength(2);
+  });
+
+  // Versi SPEC-909 dari "keeps counting across the marker going empty": markernya bukan lagi
+  // pemicu, jadi yang harus dibuktikan sekarang adalah penghitung yang SELAMAT dari event antara
+  // yang tak berujung jawaban. Kalau ia di-reset di sana, pagarnya tak pernah tercapai — persis
+  // loop tak berujung yang ingin dicegah AC-11.
+  it("penghitung selamat dari event antara yang tak berujung jawaban", async () => {
+    let bergambar = true;
+    const h = harness({}, cfg({ maxAutoAnswers: 2 }), { tergambar: () => bergambar });
+    await layani(h);
+    expect(answerCount("s1")).toBe(1);
+    bergambar = false;
+    expect((await layani(h)).answered).toBe(false);   // dialognya tak pernah muncul
+    expect(answerCount("s1")).toBe(1);
+    bergambar = true;
+    await layani(h);
+    expect(answerCount("s1")).toBe(2);
+    expect((await layani(h)).answered).toBe(false);
+  });
+
+  // OQ-8 · manusia menang: campur tangan operator memutus rantai "berturut-turut".
+  it("resets the counter when the operator steps in", async () => {
+    const h = harness({}, cfg({ maxAutoAnswers: 1 }));
+    await layani(h);
+    expect((await layani(h)).answered).toBe(false);
+    resetSession("s1");
+    expect((await layani(h)).answered).toBe(true);
+  });
+});
+
+describe("answerAsk · jejak", () => {
+  it("leaves one trail row per answer, linked to the session", async () => {
+    const h = harness();
+    await layani(h);
+    const rows: LeadDecision[] = await prisma.leadDecision.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ sessionId: "s1", specId: "spec-1", gate: "detected" });
+  });
+});
+
+// SPEC-452 · dua cacat di ujung pintu deteksi: opsi dialog tak pernah sampai ke lead, dan marker
+// tak pernah dikosongkan sesudah dialog dijawab (menjawab dialog BUKAN `UserPromptSubmit`, jadi
+// hook pengosongnya tak menembak) — lead lalu mengetik lagi ke sesi yang sudah kembali bekerja.
+// Sesudah SPEC-909 opsinya datang dari payload; yang dijaga di sini tetap dua hal yang sama.
+describe("answerAsk · dialog pilihan (SPEC-452)", () => {
+  it("meneruskan opsi dialog ke lead, bukan hanya teks pertanyaannya", async () => {
+    const opts: (string[] | undefined)[] = [];
+    const h = harness({
+      decide: (async (req: { question: string; options?: string[]; projectId: string; specId?: string | null; sessionId?: string | null }) => {
+        opts.push(req.options);
+        return recordDecision({
+          projectId: req.projectId, specId: req.specId, sessionId: req.sessionId,
+          gate: "detected", kind: "answer", question: req.question,
+          answer: "Tanpa cache", reason: "r", refs: [], confidence: "tinggi", action: "none",
+        });
+      }) as unknown as DetectDeps["decide"],
+    });
+    await layani(h);
+    expect(opts[0]).toEqual(["In-memory", "Redis", "Tanpa cache"]);
+  });
+
+  it("mengosongkan marker sesudah jawaban benar-benar mendarat", async () => {
+    const cleared: string[] = [];
+    const h = harness({ clearMarker: (f: string) => { cleared.push(f); } });
+    await layani(h);
+    expect(cleared).toEqual(["/marker"]);
+  });
+
+  it("TIDAK mengosongkan marker saat pengetikan gagal — sesi memang masih menunggu", async () => {
+    const cleared: string[] = [];
+    const h = harness({ send: async () => false, clearMarker: (f: string) => { cleared.push(f); } });
+    await layani(h);
+    expect(cleared).toEqual([]);
+  });
+});
+
+// SPEC-474 · dialog `AskUserQuestion` BERANTAI: satu tool call, beberapa pertanyaan berturut-turut.
+// Menjawab satu pertanyaan hanya MEMAJUKAN dialog; yang menutupnya adalah layar rekap. Sampai spec
+// itu, lead menjawab pertanyaan pertama lalu mengosongkan marker — dan marker itu TAK PERNAH terisi
+// lagi, jadi sisa rantainya tak terlihat oleh siapa pun. Sesudah SPEC-909 panjang rantainya datang
+// dari `questions.length`; yang masih dibaca dari layar cuma "dialognya sudah tergambar" dan
+// "layarnya sudah berganti".
+describe("answerAsk · rantai dialog sampai submit (SPEC-474)", () => {
+  /** `decide` yang menjawab berbeda tiap panggilan — supaya urutan jawabannya bisa diperiksa. */
+  const menjawab = (counter: { n: number }): Partial<DetectDeps> => ({
+    decide: (async (req: { question: string; projectId: string; specId?: string | null; sessionId?: string | null }) => {
+      counter.n += 1;
+      return recordDecision({
+        projectId: req.projectId, specId: req.specId, sessionId: req.sessionId,
+        gate: "detected", kind: "answer", question: req.question,
+        answer: `jawab-${counter.n}`, reason: "r", refs: [], confidence: "tinggi", action: "none",
+      });
+    }) as unknown as DetectDeps["decide"],
+  });
+
+  it("menjawab tiap pertanyaan lalu MENEKAN submit, satu keputusan per pertanyaan", async () => {
+    const counter = { n: 0 };
+    const cleared: string[] = [];
+    const h = harness({
+      ...menjawab(counter),
+      clearMarker: (f: string) => { cleared.push(f); },
+    }, cfg(), { total: 2 });
+    expect((await layani(h, rantai())).answered).toBe(true);
+    expect(counter.n).toBe(2);                       // dua pertanyaan, dua keputusan
+    expect(h.submits).toEqual(["s1"]);               // submit TIDAK memanggil agen ketiga
+    expect(h.sent.map((s) => s.text)).toEqual(["jawab-1", "jawab-2"]);
+    expect(cleared).toEqual(["/marker"]);            // marker dikosongkan SEKALI, di ujung rantai
+    expect(answerCount("s1")).toBe(1);               // satu rantai = SATU jawaban otomatis
+  });
+
+  // Layar rekap adalah langkah MEKANIS: menutup dialog yang jawabannya sudah masuk tak butuh
+  // pertimbangan apa pun, jadi ia tak boleh membakar satu giliran agen. Dulu dibuktikan lewat pane
+  // yang SUDAH berada di layar rekap saat denyut tiba; sesudah SPEC-909 rekap bukan pemicu, jadi
+  // yang dibuktikan adalah jumlah panggilan agen di dalam satu rantai yang berujung submit.
+  it("menekan submit tak pernah membakar giliran agen", async () => {
+    const counter = { n: 0 };
+    const h = harness({ ...menjawab(counter) }, cfg(), { total: 2 });
+    await layani(h, rantai());
+    expect(counter.n).toBe(2);                       // dua pertanyaan → dua panggilan, bukan tiga
+    expect(h.submits).toEqual(["s1"]);
+  });
+
+  it("memberi tahu lead posisi pertanyaannya di dalam rantai", async () => {
+    const seen: string[] = [];
+    const h = harness({
+      decide: (async (req: { question: string; projectId: string; notes?: string[] }) => {
+        seen.push((req.notes ?? []).join(" "));
+        return recordDecision({
+          projectId: req.projectId, gate: "detected", kind: "answer", question: req.question,
+          answer: "ok", reason: "r", refs: [], confidence: "tinggi", action: "none",
+        });
+      }) as unknown as DetectDeps["decide"],
+    }, cfg(), { total: 2 });
+    await layani(h, rantai());
+    expect(seen[0]).toContain("pertanyaan ke-1");
+    expect(seen[1]).toContain("pertanyaan ke-2");
+  });
+
+  // Kebalikan dari perilaku sebelum SPEC-474: rantai yang putus HARUS tetap terlihat menunggu.
+  it("rantai putus TIDAK mengosongkan marker dan dihitung sebagai kegagalan", async () => {
+    let calls = 0;
+    const cleared: string[] = [];
+    const h = harness({
+      clearMarker: (f: string) => { cleared.push(f); },
+      decide: (async (req: { question: string; projectId: string }) => {
+        calls++;
+        return recordDecision({
+          projectId: req.projectId, gate: "detected", kind: "answer", question: req.question,
+          answer: calls === 1 ? "ok" : "", reason: "r", refs: [], confidence: "tinggi",
+          action: "none", ...(calls === 1 ? {} : { status: "gagal" as const }),
+        });
+      }) as unknown as DetectDeps["decide"],
+    }, cfg(), { total: 2 });
+    const r = await layani(h, rantai());
+    expect(r.answered).toBe(false);
+    expect(cleared).toEqual([]);                     // operator tetap melihat sesi MENUNGGU
+    expect(failureCount("s1")).toBe(1);
+    expect(answerCount("s1")).toBe(0);
+  });
+
+  // Pane yang tak pernah maju tak boleh membuat lead mengetik berulang-ulang ke layar yang sama.
+  it("berhenti bila layar dialog tak berubah sesudah dijawab (anti-loop)", async () => {
+    const counter = { n: 0 };
+    const cleared: string[] = [];
+    const h = harness({
+      ...menjawab(counter),
+      pane: () => dialogPane("Pilih warna tema?"),   // layar MACET: judulnya tak pernah berganti
+      clearMarker: (f: string) => { cleared.push(f); },
+    });
+    await layani(h, rantai());
+    expect(counter.n).toBe(1);                        // tak mengulang keputusan untuk layar yang sama
+    expect(h.sent).toHaveLength(1);
+    expect(cleared).toEqual([]);
+    expect(failureCount("s1")).toBe(1);
+  });
+
+  it("submit yang gagal tak pernah dilaporkan sebagai rantai tuntas", async () => {
+    const cleared: string[] = [];
+    const h = harness(
+      { submit: async () => false, clearMarker: (f: string) => { cleared.push(f); } },
+      cfg(), { total: 2 });
+    const r = await layani(h, rantai());
+    expect(r.answered).toBe(false);
+    expect(cleared).toEqual([]);
+    expect(r.reason).toContain("Submit");
+  });
+
+  // SPEC-909 · regresi yang nyaris lolos: `submitPaneDialog` fail-closed untuk layar yang bukan
+  // rekap, dan dialog SATU pertanyaan claude tak pernah menampilkan layar rekap. Menekan Submit
+  // tanpa syarat membuat kasus PALING UMUM dilaporkan `gagal` — marker tak dikosongkan, `answers`
+  // tak naik, `failures` naik, dan sesudah `maxAutoAnswers` dialog sehat sesi itu kena `failCapped`.
+  it("dialog yang menutup sendiri tak pernah menekan Submit", async () => {
+    const h = harness({}, cfg(), { total: 1, akhir: "tertutup" });
+    expect((await layani(h)).answered).toBe(true);
+    expect(h.submits).toEqual([]);
+    expect(failureCount("s1")).toBe(0);
+  });
+
+  // Sesi itu memang masih menunggu. Mengosongkan markernya menghapusnya dari pil, notifikasi, dan
+  // panel pet — dan tak ada yang akan menulisnya kembali (SPEC-474).
+  it("dialog yang tak kunjung menutup: marker TETAP terisi, bukan kegagalan lead", async () => {
+    const cleared: string[] = [];
+    const h = harness({ clearMarker: (f: string) => { cleared.push(f); } },
+      cfg(), { total: 1, akhir: "macet" });
+    const r = await layani(h);
+    expect(r.answered).toBe(false);
+    expect(cleared).toEqual([]);
+    expect(failureCount("s1")).toBe(0);              // jawabannya mendarat; yang belum cuma layarnya
+  });
+
+  // Jalur kolom chat biasa = giliran codex sesudah SPEC-909: gerbangnya `last_assistant_message`,
+  // tak ada dialog, tak ada submit.
+  it("kolom chat biasa tetap satu jawaban lalu selesai", async () => {
+    const cleared: string[] = [];
+    const counter = { n: 0 };
+    const h = harness({
+      ...menjawab(counter),
+      pane: () => "> ",                               // codex: tak ada dialog untuk ditunggu
+      clearMarker: (f: string) => { cleared.push(f); },
+    });
+    const r = await layani(h, codex("Pakai Redis atau in-memory?"));
+    expect(r.answered).toBe(true);
+    expect(counter.n).toBe(1);
+    expect(h.submits).toEqual([]);                    // tak ada dialog → tak ada yang di-submit
+    expect(cleared).toEqual(["/marker"]);
+    expect(answerCount("s1")).toBe(1);
+  });
+
+  // Satu pertanyaan = satu keputusan, satu ketikan. Panjang rantainya kini diketahui dari payload
+  // dan bukan disimpulkan dari layar; yang masih dibaca dari layar hanya apakah dialognya menutup
+  // sendiri atau menyisakan layar rekap untuk ditekan.
+  it("dialog satu pertanyaan tetap selesai dalam satu jawaban", async () => {
+    const counter = { n: 0 };
+    const cleared: string[] = [];
+    const h = harness({ ...menjawab(counter), clearMarker: (f: string) => { cleared.push(f); } });
+    const r = await layani(h);
+    expect(r.answered).toBe(true);
+    expect(counter.n).toBe(1);
+    expect(h.sent.map((s) => s.text)).toEqual(["jawab-1"]);
+    expect(cleared).toEqual(["/marker"]);
+  });
+});
+
+// SPEC-487 (QA) · ADR-0102 menaruh mesin rantainya di `decide()` dan menyerahkan penggeraknya ke
+// "agen peminta" — tapi peminta yang sesungguhnya menggerakkan rantai di produksi adalah `runChain`
+// di dalam hanoman sendiri, dan ia dulu memanggil `decide()` tanpa `chain` maupun `flowId`. Terukur
+// di DB hidup: 22 dari 22 baris `gate="detected"` ber-`step = 1`, dan 3 alur yang ada ketiganya
+// `tunggal` padahal ketiganya SATU dialog 3-pertanyaan. `chainSteps` karena itu selalu kosong.
+type AskSpy = { chain?: boolean; flowId?: string | null };
+describe("answerAsk · satu rantai = satu LeadFlow (SPEC-487)", () => {
+  /** `decide` yang mengaku lahir di alur `F1`, dan merekam apa yang diminta pemanggilnya. */
+  const berantai = (seen: AskSpy[]): Partial<DetectDeps> => ({
+    decide: (async (req: { question: string; projectId: string; chain?: boolean; flowId?: string | null }) => {
+      seen.push({ chain: req.chain, flowId: req.flowId ?? null });
+      return recordDecision({
+        projectId: req.projectId, gate: "detected", kind: "answer", question: req.question,
+        answer: `jawab-${seen.length}`, reason: "r", refs: [], confidence: "tinggi", action: "none",
+        flowId: "F1", step: seen.length,
+      });
+    }) as unknown as DetectDeps["decide"],
+  });
+
+  it("langkah kedua meneruskan flowId langkah pertama, dan alurnya ditutup di ujung rantai", async () => {
+    const seen: AskSpy[] = [];
+    const closed: string[] = [];
+    const h = harness({
+      ...berantai(seen),
+      closeChain: async (id: string) => { closed.push(id); },
+    }, cfg(), { total: 2 });
+    expect((await layani(h, rantai())).answered).toBe(true);
+    expect(seen).toEqual([{ chain: true, flowId: null }, { chain: true, flowId: "F1" }]);
+    expect(closed).toEqual(["F1"]);
+  });
+
+  // Rantai boleh terputus di tengah (gerbang penuh, agen gagal, layar tak maju). Versi SPEC-909
+  // dari "denyut berikutnya": tak ada denyut lagi, jadi yang harus melanjutkan alur yang sama
+  // adalah EVENT BERIKUTNYA untuk sesi itu — `chainFlows` diingat lintas panggilan justru untuk
+  // itu. Kalau tidak, lanjutannya lahir sebagai alur BARU dan `chainSteps` kosong lagi tepat di
+  // tempat yang paling membutuhkannya.
+  it("event berikutnya untuk sesi yang sama melanjutkan alur yang sama", async () => {
+    const seen: AskSpy[] = [];
+    const closed: string[] = [];
+    const h = harness({
+      ...berantai(seen),
+      pane: () => dialogPane("Pilih warna tema?"),   // layar tak pernah maju → rantai putus
+      closeChain: async (id: string) => { closed.push(id); },
+    });
+    await layani(h, rantai());
+    await layani(h, rantai());
+    expect(seen[0]).toEqual({ chain: true, flowId: null });
+    expect(seen).toHaveLength(2);
+    for (const a of seen.slice(1)) expect(a).toEqual({ chain: true, flowId: "F1" });
+    expect(closed).toEqual([]);                      // belum tuntas → alurnya tetap terbuka
   });
 });
 
 // SPEC-480 · ADR-0098 · yang diketik ke kolom jawaban bebas DIRAKIT dari putusan terstruktur.
 // Sebelum spec ini, prosa lead adalah satu-satunya jembatan: model di seberang harus menafsirkan
 // kalimatnya untuk menebak opsi mana yang dipilih — dan SPEC-452 sudah mengukur ongkos salah tebak.
-describe("scanAndAnswer · teks jawaban dirakit dari pilihan (SPEC-480)", () => {
+describe("answerAsk · teks jawaban dirakit dari pilihan (SPEC-480)", () => {
   const withDelivery = (d: Partial<LeadDelivery>): Partial<DetectDeps> => ({
-    pane: () => ASKQ_PANE,
     // SPEC-485 · `choices` adalah bentuk yang berlaku; fixture SPEC-480 memakai `choice` tunggal
     // dan tetap sah — `leadReplyText` jatuh ke sana saat daftarnya kosong.
     delivery: () => ({ decision: "d", reason: "Redis sudah dipakai modul lain.", reply: "", choices: [], choice: null, missing: [], ...d }),
@@ -789,13 +691,13 @@ describe("scanAndAnswer · teks jawaban dirakit dari pilihan (SPEC-480)", () => 
 
   it("types the chosen option verbatim instead of the raw prose", async () => {
     const h = harness(withDelivery({ choice: { index: 2, option: "Redis" } }));
-    await scanAndAnswer(h.deps);
+    await layani(h);
     expect(h.sent[0]!.text).toBe("Pilih: Redis. Redis sudah dipakai modul lain.");
   });
 
   it("says what is missing when lead declared the context insufficient", async () => {
     const h = harness(withDelivery({ missing: ["versi Redis yang dipakai produksi"] }));
-    await scanAndAnswer(h.deps);
+    await layani(h);
     expect(h.sent[0]!.text).toContain("Belum bisa kuputuskan");
     expect(h.sent[0]!.text).toContain("versi Redis yang dipakai produksi");
   });
@@ -803,15 +705,15 @@ describe("scanAndAnswer · teks jawaban dirakit dari pilihan (SPEC-480)", () => 
   // Saluran pengiriman boleh meleset — yang selalu ada adalah `answer`, dan mengetik string kosong
   // ke pane tak pernah boleh terjadi.
   it("falls back to the trail answer when the delivery channel misses", async () => {
-    const h = harness({ pane: () => ASKQ_PANE, delivery: () => null });
-    await scanAndAnswer(h.deps);
+    const h = harness({ delivery: () => null });
+    await layani(h);
     expect(h.sent[0]!.text).toBe("opsi 1");
   });
 });
 
 // SPEC-485 · ADR-0102 · pilihan lead menyeberang sebagai DATA. Tanpa ini dialog `multiSelect`
 // hanya menerima prosanya dan kotak-kotaknya tetap kosong — maksudnya sampai, pilihannya tidak.
-describe("scanAndAnswer · pilihan diteruskan ke pane (SPEC-485)", () => {
+describe("answerAsk · pilihan diteruskan ke pane (SPEC-485)", () => {
   it("mengirim label opsi terpilih apa adanya ke `send`", async () => {
     const seen: string[][] = [];
     const h = harness({
@@ -822,7 +724,7 @@ describe("scanAndAnswer · pilihan diteruskan ke pane (SPEC-485)", () => {
       }) as LeadDelivery,
       send: async (_id, _text, choices) => { seen.push(choices); return true; },
     });
-    await scanAndAnswer(h.deps);
+    await layani(h);
     expect(seen[0]).toEqual(["alpha", "gamma"]);
   });
 
@@ -832,7 +734,7 @@ describe("scanAndAnswer · pilihan diteruskan ke pane (SPEC-485)", () => {
       delivery: () => null,
       send: async (_id, _text, choices) => { seen.push(choices); return true; },
     });
-    await scanAndAnswer(h.deps);
+    await layani(h);
     expect(seen[0]).toEqual([]);
   });
 });

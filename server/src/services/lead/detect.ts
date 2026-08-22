@@ -29,8 +29,8 @@ import { recordDecision } from "./trail";
  * Sengaja TIDAK di-reset saat marker kosong: marker memang kosong sesaat setelah lead mengetik
  * (hook `UserPromptSubmit` menjalankan `: > <marker>`), jadi reset di sana akan membuat pagarnya
  * tak pernah tercapai — persis loop tak berujung yang ingin dicegah AC-11. Yang mereset hanyalah
- * sesi yang benar-benar berakhir (`sweep`) dan campur tangan manusia (`resetSession`, dipanggil
- * route saat operator menimpa keputusan).
+ * sesi yang benar-benar berakhir (`pruneAsks`, lead/ask.ts) dan campur tangan manusia
+ * (`resetSession`, dipanggil route saat operator menimpa keputusan).
  */
 const answers = new Map<string, number>();
 const capped = new Set<string>();
@@ -47,7 +47,7 @@ const capped = new Set<string>();
  * sendiri sebelum menyerah ke operator", dan kegagalan adalah percobaan juga.
  *
  * Dikosongkan oleh keputusan yang BERHASIL (lead terbukti sanggup lagi), oleh campur tangan
- * operator (`resetSession`), dan oleh sesi yang berakhir (`sweep`) — sama seperti `answers`.
+ * operator (`resetSession`), dan oleh sesi yang berakhir (`pruneAsks`) — sama seperti `answers`.
  */
 const failures = new Map<string, number>();
 const failCapped = new Set<string>();
@@ -82,7 +82,7 @@ export const FAIL_COOLDOWN_MS = 15 * 60_000;
  * `chainSteps` — satu-satunya alasan ADR-0102 ada — kosong lagi tepat di tempat yang paling
  * membutuhkannya.
  *
- * Dibersihkan oleh yang sama dengan penghitung lain: rantai tuntas, `sweep`, dan `resetSession`.
+ * Dibersihkan oleh yang sama dengan penghitung lain: rantai tuntas, `pruneAsks`, dan `resetSession`.
  */
 const chainFlows = new Map<string, string>();
 
@@ -436,10 +436,42 @@ async function runChain(ask: SessionAsk, s: AskCtx, deps: DetectDeps): Promise<C
       return stop("layar dialog tak berubah sesudah dijawab", true);
   }
 
-  // Layar rekap: langkah MEKANIS, tanpa agen — seluruh jawabannya sudah masuk, yang tersisa hanya
-  // menutup dialognya.
-  if (!(await deps.submit(sid))) return stop("gagal menekan Submit answers", true);
-  return close({ acted: true, done: true, failed: false, reason: "", at });
+  // SPEC-474 · layar rekap ditutup sebagai langkah MEKANIS, tanpa agen. Tapi keberadaannya harus
+  // DIBUKTIKAN dulu: `submitPaneDialog` fail-closed untuk layar yang bukan rekap (pty.ts), dan
+  // dialog SATU pertanyaan claude tak pernah menampilkan layar rekap sama sekali. Menekannya tanpa
+  // syarat membuat kasus paling umum — satu pertanyaan, dijawab benar — dilaporkan `gagal`:
+  // marker tak dikosongkan, `answers` tak naik, `failures` naik, dan sesudah `maxAutoAnswers`
+  // dialog sehat sesi itu kena `failCapped`.
+  switch (await afterLastAnswer(sid, deps)) {
+    case "closed":
+      return close({ acted: true, done: true, failed: false, reason: "", at });
+    case "review":
+      if (!(await deps.submit(sid))) return stop("gagal menekan Submit answers", true);
+      return close({ acted: true, done: true, failed: false, reason: "", at });
+    default:
+      // Masih dialog pertanyaan padahal payload bilang semuanya sudah dijawab. JANGAN mengetik apa
+      // pun dan JANGAN mengosongkan marker: sesi itu memang masih menunggu, dan marker adalah
+      // satu-satunya yang membuatnya terlihat di pil, notifikasi, dan panel pet.
+      return stop("dialog belum tertutup sesudah pertanyaan terakhir dijawab");
+  }
+}
+
+/**
+ * Apa yang terjadi pada layar sesudah pertanyaan TERAKHIR dijawab.
+ *
+ * Ini bukan `CHAIN_END_TRIES` yang dicabut: yang itu menebak BERAPA pertanyaan tersisa, dan
+ * tebakannya mengosongkan marker. Yang ini cuma menanyakan satu hal mekanis pada dialog yang
+ * jumlah pertanyaannya sudah diketahui dari payload — apakah ia menutup sendiri atau menyisakan
+ * layar rekap untuk ditekan.
+ */
+async function afterLastAnswer(id: string, deps: DetectDeps): Promise<"review" | "closed" | "pending"> {
+  for (let i = 0; i < CHAIN_POLL_TRIES; i++) {
+    await deps.sleep(CHAIN_POLL_MS);
+    const screen = readDialogScreen(deps.pane(id));
+    if (!screen) return "closed";
+    if (screen.kind === "review") return "review";
+  }
+  return "pending";
 }
 
 /**

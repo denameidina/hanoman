@@ -214,6 +214,7 @@ async function run(sessionId: string, deps: AskDeps): Promise<void> {
         return { answered: false, reason: "kesalahan tak terduga", at: 0, flowId: null, step: null };
       });
       clearDeciding(sessionId);
+      if (!r.answered) console.log(`lead ask ${sessionId}: tak terjawab — ${r.reason}`);
       e.ask = {
         ...e.ask, at: r.at, flowId: r.flowId, step: r.step,
         state: r.answered ? "answered" : "failed",
