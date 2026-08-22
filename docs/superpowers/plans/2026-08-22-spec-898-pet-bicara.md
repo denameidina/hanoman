@@ -495,7 +495,7 @@ git commit -m "feat(pet): PetCondition membawa subject & since; urgensi lewat re
   - `export function humanAge(ms: number): string`
   - `export function isUrgent(c: Pick<PetCondition, "kind" | "since">, now: number): boolean`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/pet-speech.test.ts`:
 
@@ -583,12 +583,12 @@ describe("humanAge & isUrgent (SPEC-898)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-speech.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/screens/pet-speech"`
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `src/src/screens/pet-speech.ts`:
 
@@ -646,12 +646,12 @@ export function speechFor(view: PetView, now: number): PetSpeech | null {
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-speech.test.ts`
 Expected: PASS (9 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/pet-speech.ts src/test/pet-speech.test.ts
