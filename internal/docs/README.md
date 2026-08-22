@@ -241,6 +241,6 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), ilustrasi (termasuk band **pet** 80–128 px), dan grammar motion Pet Hanoman: sprite atlas + `steps()` sejak Pet hidup A (SPEC-648 · ADR-0140)
 
 ## frontend
-- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan Pet Hanoman sebagai sprite hidup yang berkeliaran di tepi bawah (SPEC-763 · Pet hidup A, ADR-0140)
+- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan Pet Hanoman sebagai sprite hidup yang berkeliaran di tepi bawah, mengaku saat koneksi putus, dan mendaftar semua kondisi aktif (SPEC-763 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897)
 
 > Chiranjivi — docs bertahan lebih lama dari satu commit atau sesi. Jaga index ini tetap sinkron.

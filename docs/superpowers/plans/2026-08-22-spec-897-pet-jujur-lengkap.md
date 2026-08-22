@@ -1374,7 +1374,7 @@ git commit -m "test(pet): lengkapi mock api/events dengan status koneksi"
 - Consumes: perilaku final Task 1–5.
 - Produces: docs SoT yang cocok dengan kode.
 
-- [ ] **Step 1: Perbarui judul & tabel prioritas seksi Pet**
+- [x] **Step 1: Perbarui judul & tabel prioritas seksi Pet**
 
 Di `internal/docs/frontend/frontend-implementation.md`, ganti judul seksi menjadi:
 
@@ -1394,7 +1394,7 @@ Panel dan pose karena itu tak bisa saling bertentangan secara konstruksi. Kosaka
 tertahan dependency memakai pose `blocked` yang sama tetapi dihitung, didaftar, dan dibuka berbeda.
 ```
 
-- [ ] **Step 2: Tambahkan empat paragraf baru**
+- [x] **Step 2: Tambahkan empat paragraf baru**
 
 Sisipkan setelah daftar "Empat keputusan di dalam tabel itu" (perbarui judulnya jadi "Tujuh keputusan di dalam tabel itu") empat butir:
 
@@ -1421,7 +1421,7 @@ Sisipkan setelah daftar "Empat keputusan di dalam tabel itu" (perbarui judulnya 
   Tak ada interval, tak ada denyut.
 ```
 
-- [ ] **Step 3: Perbarui paragraf atlas, DOM, mesin, a11y**
+- [x] **Step 3: Perbarui paragraf atlas, DOM, mesin, a11y**
 
 - Paragraf "**Atlas & manifest**": `10 baris` → `12 baris`, tambahkan `deciding, sleep` ke daftar key, dan tambahkan kalimat: *"`POSE_ROW` memetakan sepuluh pose ke dua belas baris; `offline` sengaja memakai baris `idle` — yang dikatakan pet saat terputus adalah "aku tak tahu", dan itu diucapkan oleh pudar + kalimat, bukan oleh gerak baru."*
 - Blok DOM: tambahkan `│  ├─ span.pet-badge   lencana hitungan · aria-hidden · pointer-events:none` setelah baris `span.hn-sr-only`, dan tambahkan `← opacity 0,45 saat pose offline` pada baris `pet-viewport`.
@@ -1430,19 +1430,19 @@ Sisipkan setelah daftar "Empat keputusan di dalam tabel itu" (perbarui judulnya 
 - Paragraf "**Aksesibilitas & reduced motion**": tambahkan bahwa kalimat sr-only membawa `· <count> <KIND_NOUN[kind]>` saat `count > 1` dan bahwa lencana `aria-hidden`-lah yang menjaga kalimat itu tetap satu-satunya sumber.
 - Paragraf "**Pengujian**": tambahkan `events.test.ts` (status koneksi) dan `pet-state.test.ts` ke daftar.
 
-- [ ] **Step 4: Perbarui `internal/assets/pet/README.md`**
+- [x] **Step 4: Perbarui `internal/assets/pet/README.md`**
 
 - Kalimat pembuka: `8 kolom × 10 baris` → `8 kolom × 12 baris`.
 - Tambahkan baris di bawah judul: *"Spec B: `docs/superpowers/specs/2026-08-22-spec-897-pet-jujur-lengkap-design.md` menambahkan baris `deciding` & `sleep` (tanpa ADR baru)."*
 - Tambahkan ke seksi "Yang dikunci pengukuran": *"12 baris pada `quality=<nilai final>` = `<N>` B — plafon `ATLAS_BUDGET` 1 MB. Bila baris ke-13 diperlukan, turunkan `quality` lagi; jangan naikkan plafon: satu `<img>` yang di-decode di setiap halaman adalah anggaran, bukan preferensi."* Isi `<nilai final>` dan `<N>` dengan angka nyata dari Task 2 Step 8.
 - Tambahkan ke seksi "Review manusia": *"`deciding` harus menengadah (bukan condong memindai seperti `review`); `sleep` harus duduk dengan mata terpejam (bukan berdiri lesu seperti `blocked`)."*
 
-- [ ] **Step 5: Verifikasi index Source of Truth**
+- [x] **Step 5: Verifikasi index Source of Truth**
 
 Jalankan: `rtk proxy grep -n "frontend-implementation\|assets/pet" internal/docs/README.md`
 Diharapkan: kedua path sudah terdaftar (ditambahkan spec A). Bila `internal/assets/pet/README.md` belum ada di index, tambahkan lewat `node cli/dist/index.js docs link internal/assets/pet/README.md` atau sunting index secara manual mengikuti format baris di sekitarnya.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs/frontend/frontend-implementation.md internal/assets/pet/README.md internal/docs/README.md

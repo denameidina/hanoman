@@ -280,7 +280,7 @@ orientasi, dan alpha master **berikut** keberadaan, batas 768px, alpha, dan peng
 web-nya — master sehat yang turunannya hilang berarti layar kosong di dashboard, bukan sekadar aset
 besar.
 
-## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A, ADR-0140)
+## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897)
 
 Widget maskot di tepi bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi & backlog,
 bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada skema,
@@ -291,24 +291,41 @@ tak ada channel realtime baru (ADR-0024 & ADR-0039 utuh).
 | `sessions: TerminalSession[]` | `sessions` | `exited`, `exitCode`, `decision`, `deciding`, `specId` |
 | `backlog: Spec[]` | `specs` | `stage`, `blockedBy`, `source`, `title` |
 | `useNotifications().items` | `notifications` | `type` + `createdAt` keadaan transient |
+| `subscribeStatus()` dari `api/events` | — (socket itu sendiri) | apakah ketiga sumber di atas masih segar (SPEC-897) |
 
-**Kontrak status** (tak berubah sejak SPEC-585): `derivePetState` di `src/src/screens/pet-state.ts`
-(murni & bertest). Kosakata sesinya **identik** dengan sel Terminal (`awaiting` = hidup &&
-`decision`, `deciding` menang atasnya, `failed` = `exited` && `exitCode` bukan nol). Urutan tabel
-**adalah** urutan prioritas: kandidat pertama yang menyala menang, dan itu satu-satunya mekanisme
-anti-kedip — tak ada timer dwell.
+**Kontrak status.** Sumber tunggalnya `derivePetConditions` di `src/src/screens/pet-state.ts`
+(murni & bertest): ia mengembalikan **daftar** kondisi terurut prioritas, dan `derivePetState`
+mengembalikan `conditions[0]` beserta seluruh daftarnya (`PetView = PetCondition & { conditions }`).
+Panel dan pose karena itu tak bisa saling bertentangan secara konstruksi. Kosakata sesinya
+**identik** dengan sel Terminal (`awaiting` = hidup && `decision`, `deciding` menang atasnya,
+`failed` = `exited` && `exitCode` bukan nol). Urutan tabel **adalah** urutan prioritas: kandidat
+pertama yang menyala menang, dan itu satu-satunya mekanisme anti-kedip — tak ada timer dwell.
+`kind` **bukan** `pose`: sesi gagal dan backlog tertahan dependency memakai pose `blocked` yang
+sama tetapi dihitung, didaftar, dan dibuka berbeda.
 
-| # | pose | baris atlas | menyala saat |
-|---|---|---|---|
-| 1 | `blocked` | `blocked` | ada sesi gagal — atau tak ada sesi hidup **dan** ada backlog ber-`blockedBy` |
-| 2 | `waiting` | `waiting` | sesi hidup ber-`decision` yang **tidak** sedang dilayani lead |
-| 3 | `shipped` | `shipped` | notifikasi `done`/`automerge` non-audit, masih di dalam window transient |
-| 4 | `docs-updated` | `docs-updated` | notifikasi `done` untuk backlog ber-`source: "audit"`, masih transient |
-| 5 | `working` | `working` | sesi hidup yang backlog-nya belum `done` |
-| 6 | `review` | `review` | sesi terdaftar yang backlog-nya sudah `stage: "done"` |
-| 7 | `ready` | `idle` | lantai — selalu benar |
+| # | kind | pose | baris atlas | menyala saat | count |
+|---|---|---|---|---|---|
+| 1 | `offline` | `offline` | `idle` (pudar) | `!connected && !paused` dan sudah lewat `PET_OFFLINE_MS` sejak `since` | 1 |
+| 2 | `failed` | `blocked` | `blocked` | ada sesi `exited` ber-`exitCode` bukan nol | jumlah sesi gagal |
+| 3 | `blocked` | `blocked` | `blocked` | **hanya bila tak ada sesi hidup** dan ada backlog belum-`done` ber-`blockedBy` | jumlah backlog tertahan |
+| 4 | `waiting` | `waiting` | `waiting` | sesi hidup ber-`decision` yang **tidak** sedang dilayani lead | jumlah sesi |
+| 5 | `deciding` | `deciding` | `deciding` | sesi hidup ber-`deciding` (lead sedang menyusun keputusan) | jumlah sesi |
+| 6 | `shipped` | `shipped` | `shipped` | notifikasi `done`/`automerge` non-audit, masih di dalam window transient | jumlah notifikasi segar |
+| 7 | `docs-updated` | `docs-updated` | `docs-updated` | notifikasi `done` untuk backlog ber-`source: "audit"`, masih transient | jumlah notifikasi segar |
+| 8 | `working` | `working` | `working` | sesi hidup, backlog belum `done`, **bukan** `deciding` | jumlah sesi |
+| 9 | `review` | `review` | `review` | sesi terdaftar yang backlog-nya sudah `stage: "done"` | jumlah sesi |
+| 10 | `blocked` | `blocked` | `blocked` | backlog tertahan dependency **saat ada sesi hidup** — ekor daftar, tak pernah jadi pose | jumlah backlog tertahan |
+| — | `ready` | `ready` / `sleeping` | `idle` / `sleep` | lantai: daftar kosong | 1 |
 
-Empat keputusan di dalam tabel itu yang tak terbaca dari kodenya:
+Baris 3 dan 10 adalah **kondisi yang sama** di dua tempat: gerbang "tak ada sesi hidup" memutuskan
+apakah ia boleh menjadi **pose** (naik ke #3) atau hanya boleh **didaftar** (turun ke #10).
+
+**Tiap sesi tepat satu kondisi.** Himpunan lama tumpang tindih — sesi ber-`decision` juga memenuhi
+syarat `working` — yang tak terlihat selama hanya puncak yang ditampilkan, tetapi akan menyebut
+sesi yang sama dua kali begitu panel mendaftar semuanya. Klasifikasinya karena itu satu jalur:
+`failed` → `waiting` → `deciding` → `review` → `working`, dan urutan itu ADALAH urutan spesifisitas.
+
+Delapan keputusan di dalam tabel itu yang tak terbaca dari kodenya:
 
 - **`blocked` karena dependency digerbangi "tak ada sesi hidup".** `blockedBy` adalah keadaan normal
   & berumur panjang di project ber-`dependsOn` (ADR-0093). Tanpa gerbang itu pet terkunci di pose
@@ -321,6 +338,27 @@ Empat keputusan di dalam tabel itu yang tak terbaca dari kodenya:
   informatif daripada keadaan mapan, tetapi perayaan tak boleh menutupi permintaan tolong. Window
   `PET_TRANSIENT_MS` = 45 dtk sejak `createdAt` notifikasinya; komponen menjadwalkan **satu**
   `setTimeout` tepat pada saat luruhnya, bukan denyut.
+- **Terputus adalah kondisi, bukan ketiadaan kondisi.** `api/events.ts` mengekspos `eventsStatus`
+  / `subscribeStatus` di atas socket `events` yang sudah ada — tanpa channel, endpoint, atau poll
+  baru (ADR-0039). `connected` menyala pada **frame pertama**, bukan pada `onopen`: socket terbuka
+  adalah fakta transport, bukan fakta pengiriman (pelajaran terukur SPEC-878/ADR-0134). `paused`
+  terpisah karena tab hidden menutup socket **atas permintaan kita**; menyebutnya gangguan berarti
+  tiap kembali dari tab lain memudarkan pet, dan jam "tak terhubung sejak" karena itu **dinolkan**
+  saat tab aktif lagi. Grace `PET_OFFLINE_MS` = 6 dtk menelan tiga percobaan reconnect (backoff
+  0,5 → 1 → 2 → 4 → 8 → 10 dtk) supaya satu blip tak memudarkan pet. Sebelum SPEC-897 status ini
+  tak ada sama sekali: `sessions`/`backlog` membeku dan pet tetap memamerkan "sedang bekerja".
+- **`deciding` di bawah `waiting`, bukan di atasnya.** Sesi yang dilayani hanoman-lead tak meminta
+  apa-apa dari manusia; sesi ber-`decision` meminta. Sebelum SPEC-897 keadaan ini menyamar jadi
+  `working`, sehingga "agen sedang mengetik" dan "lead sedang memutuskan untuknya" terlihat sama.
+- **Tidur hanya menggantikan lantai.** `PET_SLEEP_MS` = 30 menit sejak `quietSince`, yang dicap
+  ulang tiap kali `petPulse` (id sesi hidup + `createdAt` notifikasi terbaru) berubah. Selama satu
+  saja kondisi masih terdaftar pet **tetap terjaga** — termasuk atas sesi gagal yang tak ditengok
+  dan backlog yang tertahan dependency. Tidur berarti "tak ada yang meminta apa pun darimu".
+  `quietSince` disemai saat mount: membuka dashboard membuat pet terjaga 30 menit lagi.
+- **`transientUntil` menjadi `recheckAt`.** Maknanya melebar dari "kapan pose transient luruh"
+  menjadi "kapan pandangan ini berhenti benar **tanpa data baru**" — tiga hal memakainya (luruh
+  transient, habisnya grace terputus, onset tidur) dan ketiganya dilayani **satu** `setTimeout`.
+  Tak ada interval, tak ada denyut.
 - **`review` memakai `stage === "done"`, bukan `exited`.** Agen adalah TUI interaktif: pada jalur
   sukses pane **tak pernah** mati (SPEC-433), jadi `exited` sendirian adalah gerbang yang nyaris
   tak pernah menyala. `Spec.stage` diturunkan server dari bukti yang sama (fase terminal + plan
@@ -328,12 +366,17 @@ Empat keputusan di dalam tabel itu yang tak terbaca dari kodenya:
   `done`: pane hidup di atas backlog selesai bukan sedang bekerja, ia menunggu dilihat.
 
 **Atlas & manifest.** `internal/assets/pet/hnm-pet-anoman-atlas-v01.webp` + `pet.json` (PET-001):
-sel 192×208, 8 kolom, 10 baris (`idle, walk-right, walk-left, working, waiting, blocked, review,
-shipped, docs-updated, wave`), karakter berdiri 168 px, jangkar kaki x 0,62 / baseline 202.
+sel 192×208, 8 kolom, **12 baris** (`idle, walk-right, walk-left, working, waiting, blocked,
+review, shipped, docs-updated, wave, deciding, sleep` — dua terakhir dari SPEC-897, ditambahkan di
+EKOR supaya indeks baris lama tak bergeser), karakter berdiri 168 px, jangkar kaki x 0,62 /
+baseline 202.
 `pet-sprite.ts` memvalidasi manifest (validator tangan — `zod` tak bisa di-resolve dari paket
 `src`), memetakan pose → baris (`POSE_ROW`; hanya `ready → idle` yang berganti nama),
 `durationMs = columns / fps × 1000`, dan rantai `then` untuk baris sekali-putar (`shipped`, `wave`
-→ `idle`). Pipeline pembuatannya (Codex → key → registrasi → QA → atlas) di
+→ `idle`). `POSE_ROW` memetakan **sepuluh** pose ke dua belas baris; `offline` sengaja menumpang
+baris `idle` — yang dikatakan pet saat terputus adalah "aku tak tahu", dan itu diucapkan oleh pudar
++ kalimat, bukan oleh gerak baru; baris ke-13 berarti ±80 KB atlas untuk informasi yang sudah
+tersampaikan. Pipeline pembuatannya (Codex → key → registrasi → QA → atlas) di
 `internal/assets/pet/README.md`. Sticker `STK-*` tetap di katalog ilustrasi tetapi **tak lagi
 dipakai pet**.
 
@@ -346,12 +389,13 @@ pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 
 └─ pet-actor   transform: translateX(var(--x)) · transition: transform <segmen> linear
    ├─ pet-stage   role=status aria-live=polite · hn-pet-reveal
    │  ├─ pet-reactor   hover/klik
-   │  │  └─ pet-viewport   overflow:hidden · width 192s · height 208s
+   │  │  └─ pet-viewport   overflow:hidden · width 192s · height 208s · opacity 0,45 saat pose offline
    │  │     └─ pet-rowshift   height 208s · transform: translateY(calc(var(--row) * -100%))
    │  │        └─ img.hn-pet-atlas   width 1536s · animation: hn-pet-frames var(--dur) steps(8,end) <count> <fill>
    │  ├─ span.hn-sr-only   kalimat status
+   │  ├─ span.pet-badge   lencana hitungan · aria-hidden · pointer-events:none
    │  └─ button.hit   44×44 di kaki · pointer-events:auto
-   └─ panel   popover · dijangkar ke pet, di-clamp viewport
+   └─ panel   popover · dijangkar ke pet, di-clamp viewport · daftar SEMUA kondisi
 ```
 
 Satu `<img>` atlas; frame oleh `steps(8, end)` atas `translateX(-100%)` (`-100%` = lebar img = 8
@@ -371,7 +415,8 @@ masukan + `rng` dan mengembalikan keadaan baru, baris yang harus diputar, dan pe
 | kondisi | perilaku |
 |---|---|
 | `tier === "mobile"` ∨ `reduced` ∨ `!roam` | di **rumah** (`x = laneWidth − petWidth − margin`), menghadap kanan, `durationMs = 0` |
-| pose tenang: `ready`, `working`, `review`, `docs-updated` | bergantian **berdiri 4–12 dtk** (baris pose) dan **jalan 2–6 dtk** @ 40 px/dtk ke target acak dalam `[margin, laneWidth − petWidth − margin]`; baris `walk-right`/`walk-left` sesuai arah; sampai → berdiri |
+| `offline` ∨ `sleeping` | **diam di tempat** — transisi dipotong di posisi saat ini, arah hadap dipertahankan, tak pulang ke pojok |
+| pose tenang: `ready`, `working`, `deciding`, `review`, `docs-updated` | bergantian **berdiri 4–12 dtk** (baris pose) dan **jalan 2–6 dtk** @ 40 px/dtk ke target acak dalam `[margin, laneWidth − petWidth − margin]`; baris `walk-right`/`walk-left` sesuai arah; sampai → berdiri |
 | pose perhatian: `waiting`, `blocked` | `mode: "home"` — jalan pulang ke pojok kanan bila belum di sana, lalu berdiri memutar baris pose; kabar penting selalu di tempat yang sama |
 | `shipped` | berhenti di tempat, baris `shipped` sekali → `idle` (lewat `then`), lalu aturan tenang |
 | `hovered` ∨ `panelOpen` ∨ `documentHidden` | berhenti (transisi dipotong di posisi saat ini); masuk hover → `wave` sekali lalu baris pose |
@@ -388,9 +433,16 @@ sana lahir kembali tiap navigasi (animasi mulai dari nol, keadaan transient hila
 operator pindah layar untuk melihatnya). Jalur `position: fixed` selebar viewport di tepi bawah,
 `z-index: 80` → di bawah header (90), terminal fullscreen (100), Modal (150), Toast (200).
 
-**Interaksi & preferensi.** Klik = panel + `wave` + berhenti; hover/fokus = berhenti + `wave`.
-Panel dijangkar ke posisi pet saat buka (`left = clamp(pusat − 134, 12, vw − 268 − 12)`) dan duduk
-di atas jalur. Klik memasang `hn-pet-click` sekali dan membersihkan state melalui `animationend`
+**Interaksi & preferensi.** Klik = panel + `wave` + berhenti; hover/fokus = berhenti + `wave` —
+kecuali pose `offline`/`sleeping`, yang tak pernah melambai (melambai atas data basi, atau sambil
+tidur, sama-sama berbohong). Panel dijangkar ke posisi pet saat buka
+(`left = clamp(pusat − 134, 12, vw − 268 − 12)`) dan duduk di atas jalur. Isinya **daftar seluruh
+kondisi aktif**, bukan hanya puncaknya: satu baris per kondisi, masing-masing dengan detail,
+lencana hitungan kecil saat `count > 1`, dan tombol `Buka Terminal`/`Buka Backlog` ke **targetnya
+sendiri** — sebelum SPEC-897, operator dengan satu sesi gagal dan dua sesi menunggu hanya punya
+satu tombol, dan tombol itu membuka sesi yang gagal. Baris pertama memakai tipografi headline
+alih-alih diberi blok terpisah di atas daftar: blok terpisah menuliskan kondisi puncak dua kali di
+panel selebar 268 px. Baris ber-`target: null` (yakni `offline`) tak punya tombol. Klik memasang `hn-pet-click` sekali dan membersihkan state melalui `animationend`
 yang difilter menurut nama, bukan timer. Ringkasan memisahkan `open` dari `panelMounted`:
 tutup/Escape/klik-luar membuat panel `aria-hidden`, inert, dan tidak menerima pointer selama
 `hn-pet-panel-out`, lalu unmount pada `animationend`. Tombol `Diam di pojok`/`Berkeliaran`
@@ -401,7 +453,11 @@ disembunyikan). `hanoman.pet.hidden` + pegangan buntut 44 px tak berubah: disemb
 **Aksesibilitas & reduced motion.** Atlas `alt=""` + `aria-hidden`; kalimat status (`Hanoman
 <label> · <headline>`) hidup di `span.hn-sr-only` di dalam `role="status" aria-live="polite"` —
 menggantikan "alt bermakna di gambar" SPEC-585, karena satu gambar yang isinya berganti-frame tak
-punya alt yang jujur. Satu sumber kalimat, tanpa teks tersembunyi kembar. Panel yang sedang keluar
+punya alt yang jujur. Saat `count > 1` kalimat itu bertambah ` · <count> <KIND_NOUN[kind]>` —
+lencananya sendiri `aria-hidden` dan `pointer-events: none`, dan justru itulah yang menjaga kalimat
+tetap satu-satunya sumber (angka telanjang di pojok sprite tak punya satuan bagi pembaca layar,
+dan hit area kedua akan melanggar gerbang tap SPEC-763). Satu sumber kalimat, tanpa teks
+tersembunyi kembar. Panel yang sedang keluar
 inert agar kontrol tersembunyi tidak dapat menerima fokus. `prefers-reduced-motion: reduce` dibaca
 di JS (`window.matchMedia`, ikut mendengarkan perubahan; ketiadaannya berarti tidak reduce): saat
 aktif, `animation` dan `transition` menulis nilai eksak `none`, pet diam di rumah, dan `wave` tak
@@ -412,15 +468,24 @@ harus ditegakkan struktur, bukan koordinat: `pet-root` dan seluruh pembungkusnya
 `pointer-events: none`; hanya tombol 44 px di kaki sprite (ikut berpindah bersama pet), pegangan,
 dan panel yang `auto`. Terukur lewat CDP: 1280×800 jalur 1265 px: atlas termuat, `animation-name: hn-pet-frames`, transform frame −256 → −640 px dalam 400 ms, actor 1136 → 1027,4 px (`mode: walk`, baris `working` lalu `walk-left`), dan tombol di bawah jalur tetap dijawab `elementFromPoint`; 390×844: actor diam di rumah 264 px, `mode: stand`, tak satu pun baris walk muncul, frame tetap berjalan, tap tetap tembus.
 
+**Tanpa ADR untuk SPEC-897, dan itu disengaja.** Tak ada endpoint, skema, poll, atau channel yang
+berubah; status koneksi adalah pengamat socket `events` yang sudah ada, dan dua baris atlas
+menumpang keluarga aset & pipeline yang sudah ditetapkan ADR-0140. Yang bertambah adalah isi tabel
+prioritas dan bentuk panel — konvensi, bukan arsitektur. ADR-0039 (tanpa realtime baru), ADR-0093
+(dependency berumur panjang), ADR-0134 (fakta pengiriman ≠ fakta transport), dan ADR-0140 semuanya
+**ditegakkan**.
+
 **Yang tak dikerjakan, berikut alasannya.** Fase sesi tak masuk headline karena
 `ProjectView.session.phase` hanya dimuat sekali saat login (`projects` tak didorong WS) sehingga
 bisa basi berjam-jam — `Spec.stage` menjawab pertanyaan yang sama dan hidup. Pet berskop workspace
 dan sengaja **tak** mengikuti `projectFilter`: ia hadir juga di halaman yang tak punya filter itu.
 
-**Pengujian.** `pet-sprite.test.ts` (manifest + kontrak CSS terparse), `pet-walk.test.ts` (tabel
-mesin), `hanoman-pet.test.tsx` (render/interaksi/reduced/roam/mobile/jalan), `pet-mount.test.tsx`
-(mount tunggal + sumber artwork), `internal/scripts/pet/test-petlib.py` (pipeline atas lembar
-sintetis).
+**Pengujian.** `pet-state.test.ts` (tabel prioritas, eksklusivitas kondisi, terputus, deciding,
+tidur, `recheckAt`), `events.test.ts` (status koneksi: frame pertama vs `onopen`, `paused`, jam
+putus), `pet-sprite.test.ts` (manifest 12 baris + `POSE_ROW` + kontrak CSS terparse),
+`pet-walk.test.ts` (tabel mesin), `hanoman-pet.test.tsx` (render/interaksi/reduced/roam/mobile/
+jalan + lencana/panel berdaftar/pudar), `pet-mount.test.tsx` (mount tunggal + sumber artwork),
+`internal/scripts/pet/test-petlib.py` (pipeline atas lembar sintetis).
 
 ## Tinggi & scrolling: rantai flex, bukan angka ajaib
 `#root` memakai `100vh` sebagai fallback lalu dikunci `100dvh; overflow: hidden`, jadi tinggi yang
