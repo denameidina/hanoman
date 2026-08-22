@@ -21,6 +21,8 @@ export type Probes = {
   node: string; git: string | null; tmux: string | null;
   claude: string | null; codex: string | null;
   gh: string | null;   // SPEC-471 · opsional: tanpa gh, tarik issue lewat REST + GITHUB_TOKEN
+  // SPEC-909 · ADR-0146 · hook sesi mengirim pertanyaan agen ke server lewat `curl`.
+  curl: string | null;
   dirs: DirProbe[]; web: boolean; db: string;
   podman: string | null; sandboxRequired: boolean; sandboxReady: boolean;
   // SPEC-739 · ADR-0114 · kesiapan metode DEFAULT untuk tiap agen yang CLI-nya benar-benar ada.
@@ -39,6 +41,14 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
     // SPEC-471 · ADR-0095 · `gh` opsional: tanpa dia tarik issue jatuh ke HTTPS + GITHUB_TOKEN.
     { mark: p.gh ? "✓" : "·",
       text: p.gh ? `gh ${p.gh}` : "gh — tak ada (tarik issue akan lewat HTTP + GITHUB_TOKEN)",
+      fatal: false },
+    // SPEC-909 · ADR-0146 · NON-FATAL dan itu disengaja: tanpa `curl` hook tetap `exit 0` — ia tak
+    // pernah memblokir agen — tapi hanoman-lead tak akan menerima SATU PUN pertanyaan sesi, dan tak
+    // ada error di mana pun yang akan mengatakannya. Kegagalan senyap justru yang layak dilaporkan.
+    { mark: p.curl ? "✓" : "!",
+      text: p.curl
+        ? `curl ${p.curl}`
+        : "curl — TAK ADA: hanoman-lead tak akan menerima pertanyaan sesi (SPEC-909)",
       fatal: false },
     // Direktori turunan lahir saat dipakai, jadi izin tulis yang belum ada di situ adalah
     // peringatan — bukan alasan menyatakan hanoman tak bisa menjalankan sesi. Home tetap fatal.
@@ -135,6 +145,7 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
     tmux: version("tmux", ["-V"]),
     claude, codex,
     gh: version(ctx.env.HANOMAN_GH_BIN ?? "gh", ["--version"]),
+    curl: version("curl", ["--version"]),
     dirs, web: layout.web !== null, db, methods,
     podman, sandboxRequired, sandboxReady,
   });
