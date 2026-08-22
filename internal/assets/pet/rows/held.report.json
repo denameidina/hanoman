@@ -1,7 +1,7 @@
 {
-  "key": "wave",
-  "mode": "stand",
-  "pinned": true,
+  "key": "held",
+  "mode": "float",
+  "pinned": false,
   "edge": [
     false,
     false,
@@ -25,80 +25,73 @@
     },
     {
       "frame": 2,
-      "dx": 1,
+      "dx": 0,
       "dy": 0,
       "scale": 1.0,
-      "residual_pre": 0.0711,
+      "residual_pre": 0.0239,
       "clipped": 0,
       "fit_dx": 0,
-      "lift_fit": 1.0,
-      "residual_post": 0.0643
+      "lift_fit": 1.0
     },
     {
       "frame": 3,
-      "dx": 0,
+      "dx": 4,
       "dy": 0,
       "scale": 1.0,
-      "residual_pre": 0.1193,
+      "residual_pre": 0.0221,
       "clipped": 0,
       "fit_dx": 0,
-      "lift_fit": 1.0,
-      "residual_post": 0.1049
+      "lift_fit": 1.0
     },
     {
       "frame": 4,
-      "dx": 2,
+      "dx": -1,
       "dy": 0,
       "scale": 1.0,
-      "residual_pre": 0.1112,
+      "residual_pre": 0.0088,
       "clipped": 0,
       "fit_dx": 0,
-      "lift_fit": 1.0,
-      "residual_post": 0.1078
+      "lift_fit": 1.0
     },
     {
       "frame": 5,
-      "dx": 4,
-      "dy": 1,
+      "dx": -12,
+      "dy": 0,
       "scale": 1.0,
-      "residual_pre": 0.113,
+      "residual_pre": 0.0197,
       "clipped": 0,
       "fit_dx": 0,
-      "lift_fit": 1.0,
-      "residual_post": 0.1069
+      "lift_fit": 1.0
     },
     {
       "frame": 6,
-      "dx": 0,
+      "dx": -6,
       "dy": 1,
       "scale": 1.0,
-      "residual_pre": 0.1168,
+      "residual_pre": 0.0236,
       "clipped": 0,
       "fit_dx": 0,
-      "lift_fit": 1.0,
-      "residual_post": 0.1041
+      "lift_fit": 1.0
     },
     {
       "frame": 7,
-      "dx": 0,
+      "dx": -9,
       "dy": 1,
       "scale": 1.0,
-      "residual_pre": 0.1154,
+      "residual_pre": 0.0186,
       "clipped": 0,
       "fit_dx": 0,
-      "lift_fit": 1.0,
-      "residual_post": 0.1049
+      "lift_fit": 1.0
     },
     {
       "frame": 8,
       "dx": 1,
       "dy": 1,
       "scale": 1.0,
-      "residual_pre": 0.0778,
+      "residual_pre": 0.0252,
       "clipped": 0,
       "fit_dx": 0,
-      "lift_fit": 1.0,
-      "residual_post": 0.0645
+      "lift_fit": 1.0
     }
   ]
 }

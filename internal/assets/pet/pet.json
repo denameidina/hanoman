@@ -1,6 +1,6 @@
 {
   "id": "PET-001",
-  "version": 1,
+  "version": 2,
   "cell": {
     "w": 192,
     "h": 208
@@ -83,6 +83,22 @@
       "fps": 10,
       "loop": false,
       "then": "idle"
+    },
+    {
+      "key": "held",
+      "fps": 8,
+      "loop": true
+    },
+    {
+      "key": "falling",
+      "fps": 8,
+      "loop": true
+    },
+    {
+      "key": "dizzy",
+      "fps": 8,
+      "loop": false,
+      "then": "idle"
     }
   ],
   "sources": {
@@ -95,9 +111,12 @@
     "review": "77c865ff6d49a8bbf3db4e0d7b91ce4663a1e3acef5d072ddd65eac9479b232c",
     "shipped": "d32653efa6a64eb4d00fb63a6e8c0a7dc24de63ecd5a6cfda36f32b584de00b8",
     "docs-updated": "2b3a01ddd640efd6e65d61c6ad4980da3a9fbceff251f1b42ce13389c02bb19c",
-    "wave": "5ea5c1a6ccf3d3bc88f02f72061af405db414acc8baca947b55f078ceb658e37",
+    "wave": "4153420063211e6d196219b89c572f43f96ec32f28c63a1159e6d98630e0ed73",
     "deciding": "6309ab706c8430cf97b187f353fd2d447ba729f6e0764efef1b75a3c96168984",
     "sleep": "40f1fd6e27ddddb13a5702c05a03f5e015e44e7e77e96c4e1ed52a5d7741f2ec",
-    "thanks": "0f59f2c042b25ff47a7022d4452bf0dc433dcea796d90bf47d95a5c8ca359d8d"
+    "thanks": "0f59f2c042b25ff47a7022d4452bf0dc433dcea796d90bf47d95a5c8ca359d8d",
+    "held": "8de04ba258b30acb105a27a81ed400b66f3b68953042957a75e63ebe8efe7c89",
+    "falling": "8bc3429c44ef4ba257da895080fa6458c3a66e51cebe103e09cd8bac25be5363",
+    "dizzy": "3e8c2072e2aa652e204e3c6b041cb6c9487d8dca1649b52f9695600880a94e49"
   }
 }

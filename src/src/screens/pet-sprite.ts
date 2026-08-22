@@ -5,7 +5,7 @@
 // rantai `then` untuk baris sekali-putar. Validasi ditulis tangan: `zod` tak bisa di-resolve dari
 // paket `src` (hanya dependency `shared`).
 import manifestJson from "../../../internal/assets/pet/pet.json";
-import atlasUrl from "../../../internal/assets/pet/hnm-pet-anoman-atlas-v01.webp?url";
+import atlasUrl from "../../../internal/assets/pet/hnm-pet-anoman-atlas-v02.webp?url";
 import type { PetPose } from "./pet-state";
 
 export const PET_ROW_KEYS = [
@@ -14,6 +14,9 @@ export const PET_ROW_KEYS = [
   "docs-updated", "wave", "deciding", "sleep",
   // SPEC-898 · reaksi elus. BUKAN pose — `POSE_ROW` tak menyentuhnya.
   "thanks",
+  // SPEC-904 · pet yang diseret: terangkat, jatuh perlahan, pusing sesaat. Di EKOR seperti dua
+  // preseden di atas. Juga BUKAN pose — interaksinya dibangun backlog penerus, bukan `POSE_ROW`.
+  "held", "falling", "dizzy",
 ] as const;
 export type PetRowKey = typeof PET_ROW_KEYS[number];
 
@@ -81,7 +84,8 @@ export const PET_ATLAS_URL: string = atlasUrl;
 
 // `ready` dan `offline` adalah pose yang namanya berbeda dari barisnya. `offline` sengaja menumpang
 // `idle`: yang dikatakan pet saat terputus adalah "aku tak tahu", dan itu diucapkan oleh pudar +
-// kalimat — baris ke-13 berarti ±80 KB atlas untuk informasi yang sudah tersampaikan.
+// kalimat — satu baris atlas lagi berarti ±70 KB (SPEC-904: 1 165 556 B untuk 16 baris) untuk
+// informasi yang sudah tersampaikan.
 export const POSE_ROW: Record<PetPose, PetRowKey> = {
   ready: "idle",
   sleeping: "sleep",

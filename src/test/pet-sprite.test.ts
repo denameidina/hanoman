@@ -19,9 +19,11 @@ describe("manifest atlas pet (PET-001)", () => {
     expect(PET_ATLAS_URL).toMatch(/\.webp$/);
   });
 
-  it("memuat dua baris SPEC-897 di ekor, indeks baris lama tak bergeser", () => {
-    expect(PET_MANIFEST.rows.length).toBe(13);
-    expect(PET_MANIFEST.rows.map((r) => r.key).slice(10)).toEqual(["deciding", "sleep", "thanks"]);
+  it("memuat baris SPEC-897/898/904 di ekor, indeks baris lama tak bergeser", () => {
+    expect(PET_MANIFEST.version).toBe(2);
+    expect(PET_MANIFEST.rows.length).toBe(16);
+    expect(PET_MANIFEST.rows.map((r) => r.key).slice(10)).toEqual(
+      ["deciding", "sleep", "thanks", "held", "falling", "dizzy"]);
     expect(rowIndex("wave")).toBe(9);
     expect(rowIndex("deciding")).toBe(10);
     expect(rowIndex("sleep")).toBe(11);
@@ -34,6 +36,26 @@ describe("manifest atlas pet (PET-001)", () => {
     expect(durationMs("sleep")).toBe(2000);   // 8 frame @ 4 fps
     expect(rowOf("sleep").loop).toBe(true);
     expect(thenOf("sleep")).toBeNull();
+  });
+
+  it("tiga baris SPEC-904 duduk di ekor dan bukan pose", () => {
+    expect(rowIndex("held")).toBe(13);
+    expect(rowIndex("falling")).toBe(14);
+    expect(rowIndex("dizzy")).toBe(15);
+    // `held`/`falling` diputar selama seretan berlangsung → loop tanpa `then`.
+    for (const key of ["held", "falling"] as const) {
+      expect(rowOf(key).loop).toBe(true);
+      expect(thenOf(key)).toBeNull();
+      expect(durationMs(key)).toBe(1000);     // 8 frame @ 8 fps
+    }
+    // `dizzy` sekali putar lalu pet BERDIRI LAGI.
+    expect(rowOf("dizzy").loop).toBe(false);
+    expect(thenOf("dizzy")).toBe("idle");
+    expect(durationMs("dizzy")).toBe(1000);
+    // Ketiganya baris interaksi, bukan pose mesin: `POSE_ROW` tak menyentuhnya.
+    for (const key of ["held", "falling", "dizzy"] as const) {
+      expect(Object.values(POSE_ROW)).not.toContain(key);
+    }
   });
 
   it("indeks baris, durasi satu putaran, dan rantai then", () => {

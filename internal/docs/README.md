@@ -15,7 +15,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 
 ## brand
 - [Hanoman brand book](brand/README.md) — filosofi story-led/product-grounded, empat lakon, voice bilingual, messaging, identitas visual, dan contoh penerapan untuk produk open-source
-  - [Illustration system](brand/illustration/README.md) — art direction Surakarta, model karakter/mascot (termasuk band **pet** 80–128 px, ADR-0140), katalog 41 aset, hybrid briefs, prompt library, dan delivery QA
+  - [Illustration system](brand/illustration/README.md) — art direction Surakarta, model karakter/mascot (termasuk band **pet** 80–128 px, ADR-0140; atlas pet v02 16 baris sejak SPEC-904), katalog 41 aset, hybrid briefs, prompt library, dan delivery QA
 
 ## requirements
 - [prd](requirements/prd.md) · [frd](requirements/frd.md) · [rd](requirements/rd.md) · [acceptance-criteria (EARS)](requirements/acceptance-criteria-ears-standard.md)
@@ -92,7 +92,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [0143 — "Menunggu keputusan" adalah keadaan TURUNAN dari keadaan pane, bukan latch marker](adr/0143-menunggu-keputusan-keadaan-turunan.md) — mengamandemen SPEC-184 pada arti marker & 0141 pada turunan `decisionAt`; menegakkan 0039, 0024, 0091 & 0037 (SPEC-903)
 - [0142 — Inbox keputusan: dialog sesi dibaca & dijawab lewat HTTP bergerbang `screenHash`, di luar katalog MCP](adr/0142-inbox-keputusan-dialog-sesi.md) — menegakkan 0039, 0037, 0065, 0091, 0099 & 0102 (SPEC-899)
 - [0141 — Onset "menunggu manusia" hidup di ISI marker keputusan, dan menyeberang sebagai `decisionAt`](adr/0141-onset-menunggu-di-marker-keputusan.md) — mengamandemen SPEC-184 pada isi marker; menegakkan 0039, 0024 & 0091 (SPEC-898)
-- [0140 — Pet dashboard sebagai sprite beranimasi: aset dibuat AI lewat Codex, pipeline registrasi, renderer frame, berkeliaran di tepi bawah](adr/0140-pet-sprite-codex-pipeline-berkeliaran.md) — menegakkan 0039, mengamandemen konvensi SPEC-585/648 & sistem maskot brand (SPEC-896)
+- [0140 — Pet dashboard sebagai sprite beranimasi: aset dibuat AI lewat Codex, pipeline registrasi, renderer frame, berkeliaran di tepi bawah](adr/0140-pet-sprite-codex-pipeline-berkeliaran.md) — menegakkan 0039, mengamandemen konvensi SPEC-585/648 & sistem maskot brand (SPEC-896); **diamandemen SPEC-904** — mode registrasi `float`, gerbang kerataan langkah & skala karakter, plafon atlas 1,3 MB, atlas **v02** 16 baris (v01 dibuang)
 - [0139 — Hardening ADR-0117 jadi opt-in (`HANOMAN_HARDENING`), setup awal dipandu wizard di browser](adr/0139-hardening-opsional-dan-wizard-setup.md) — mengamandemen 0117 & 0087, mengikuti 0088 (SPEC-884)
 - [0138 — Bootstrap sync, halaman ber-anggaran byte, dan feed yang berhenti berdenyut](adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md) — memperbaiki akibat susulan 0131; menegakkan 0043, 0045 & 0082; memperluas 0100 & 0135 (SPEC-885)
 - [0137 — Provisioning VPS berbasis katalog: probe sebagai sumber kebenaran, biner ≠ login](adr/0137-provisioning-vps-berbasis-katalog.md) — menegakkan 0117, 0042 & 0088, mengamandemen 0087 (SPEC-883)
@@ -241,9 +241,9 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [threat model deployment publik](security/threat-model.md) — asset, aktor, trust boundary, abuse case, kontrol, residual risk, invariant test, dan batas otorisasi DAST SPEC-761
 
 ## design-system
-- [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), kontrak ikon lewat namespace lucide (SPEC-906), ilustrasi (termasuk band **pet** 80–128 px), dan grammar motion Pet Hanoman: sprite atlas + `steps()` sejak Pet hidup A (SPEC-648 · ADR-0140)
+- [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), kontrak ikon lewat namespace lucide (SPEC-906), ilustrasi (termasuk band **pet** 80–128 px), dan grammar motion Pet Hanoman: sprite atlas v02 16 baris + `steps()` sejak Pet hidup A (SPEC-648 · ADR-0140 · SPEC-904)
 
 ## frontend
-- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan Pet Hanoman sebagai sprite hidup yang berkeliaran di tepi bawah, mengaku saat koneksi putus, mendaftar semua kondisi aktif, MENGUCAPKANNYA lewat gelembung ber-template + rekap "selama kamu pergi", lalu MENJAWAB pertanyaan agen langsung dari panelnya, plus pil topbar dua wajah yang selalu menyebut versi terpasang (SPEC-763 · SPEC-906 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142)
+- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan Pet Hanoman sebagai sprite hidup yang berkeliaran di tepi bawah, mengaku saat koneksi putus, mendaftar semua kondisi aktif, MENGUCAPKANNYA lewat gelembung ber-template + rekap "selama kamu pergi", lalu MENJAWAB pertanyaan agen langsung dari panelnya, plus pil topbar dua wajah yang selalu menyebut versi terpasang (SPEC-763 · SPEC-906 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142 · Pet hidup E SPEC-904 atlas v02 `held`/`falling`/`dizzy` + `wave` yang bisa diulang)
 
 > Chiranjivi — docs bertahan lebih lama dari satu commit atau sesi. Jaga index ini tetap sinkron.

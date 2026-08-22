@@ -23,7 +23,21 @@ ANCHOR_X = 0.62        # pusat kaki di 62 % lebar sel → ruang ekor di kiri
 BASELINE = 202         # baris y (dari atas sel) tempat kaki berdiri
 HEAD_MARGIN = 34       # ruang di atas frame 1: ayunan ekor/kepala + ketinggian lompat `shipped`
 STAND_H = BASELINE - HEAD_MARGIN   # 168 — tinggi karakter berdiri; frontend menskalakan dari sini
-ATLAS_BUDGET = 1_000_000
+# SPEC-904 · 1 MB tak bisa menampung 16 baris pada kualitas mana pun yang layak. Terukur atas atlas
+# 16 baris yang sebenarnya: q76 = 1 165 556 B · q60 = 1 058 832 · q40 = 929 558 · q20 = 768 780 —
+# `quality` adalah tuas yang LEMAH di sini (q76 → q20 hanya −34 %) karena atlas ini didominasi kanal
+# alpha lossless di atas seni datar berkontur tegas. Turun ke bawah 1 MB butuh ±q48, dan atlas
+# dirakit ulang dari rows/, jadi ketigabelas baris yang sudah lolos Gate 2 ikut turun kualitas.
+# `alpha_quality=60` (951 074 B) ditolak: alpha lossy di siluet potong, dan sisanya hanya 49 KB.
+# Premis plafon lama ("satu <img> di-decode di setiap halaman") juga tak dilayani `quality`: biaya
+# decode adalah PIKSEL (19,5 MiB RGBA pada 16 baris vs 15,8 MiB pada 13), bukan byte. 1 300 000 =
+# +37 % vs atlas v01 (950 480 B) — di dalam batas +40 % SPEC-904 — dan atlas yang benar-benar
+# dikomit 1 165 556 B (+22,6 %) menyisakan 134 444 B untuk satu regenerasi baris rutin.
+ATLAS_BUDGET = 1_300_000
+# Versi manifest = KONSTANTA, bukan literal di dalam `manifest()`: sejak SPEC-904 ia nilai yang
+# bergerak, dan satu-satunya yang memakukannya dulu adalah test frontend. `verify.py` kini
+# membandingkannya, jadi bump yang lupa dikomit ke pet.json tertangkap di pipeline pet sendiri.
+MANIFEST_VERSION = 2
 SEARCH_PX = 24
 SCALES = (0.92, 0.94, 0.96, 0.98, 1.0, 1.02, 1.04, 1.06, 1.08)
 STATIC_FROM = 0.45     # stand: baris ≥ 45 % tinggi frame 1 = wilayah statis (kaki, kain, torso bawah)
@@ -44,13 +58,20 @@ ROWS: list[dict] = [
     {"key": "review",       "fps": 6,  "loop": True,  "mode": "stand"},
     {"key": "shipped",      "fps": 10, "loop": False, "mode": "jump", "then": "idle"},
     {"key": "docs-updated", "fps": 6,  "loop": True,  "mode": "stand"},
-    {"key": "wave",         "fps": 10, "loop": False, "mode": "stand", "then": "idle"},
+    {"key": "wave",         "fps": 10, "loop": False, "mode": "stand", "then": "idle", "even": True},
     # SPEC-897 · ditambahkan di EKOR supaya indeks baris lama tak bergeser (atlas & pet.json
     # memakai urutan array sebagai indeks baris).
     {"key": "deciding",     "fps": 6,  "loop": True,  "mode": "stand"},
     {"key": "sleep",        "fps": 4,  "loop": True,  "mode": "stand"},
     # SPEC-898 · reaksi saat pet dielus (STK-007). Sekali-putar seperti `wave`, bukan pose mesin.
     {"key": "thanks",       "fps": 10, "loop": False, "mode": "stand", "then": "idle"},
+    # SPEC-904 · tiga baris untuk pet yang DISERET, tetap di EKOR seperti preseden SPEC-897/898.
+    # `held` & `falling` tak menapak tanah → mode `float`; keduanya diputar berulang selama seretan
+    # berlangsung → `even: True`. `dizzy` berdiri (kaki tertanam, torso sempoyongan) dan sekali-putar
+    # supaya pet BERDIRI LAGI sesudah mendarat, jadi frame 8-nya pose istirahat seperti `wave`.
+    {"key": "held",         "fps": 8,  "loop": True,  "mode": "float", "even": True},
+    {"key": "falling",      "fps": 8,  "loop": True,  "mode": "float", "even": True},
+    {"key": "dizzy",        "fps": 8,  "loop": False, "mode": "stand", "then": "idle"},
 ]
 ROW_KEYS = [r["key"] for r in ROWS]
 # Gerbang residu PRA-pin; generasi rusak (frame tak sejajar / pose lain) mengukur ≥ 0,5. Angka
@@ -64,7 +85,25 @@ ROW_KEYS = [r["key"] for r in ROWS]
 #          membedakan apa pun: seluruh tubuh atas memang berubah total (jongkok → melayang →
 #          mendarat). Yang benar-benar menjaga baris ini adalah tumpahan sel, jumlah sprite, dan
 #          review Gate 2 atas `qa/shipped.gif` — bukan angka ini.
-RESIDUAL_GATE = {"stand": 0.25, "walk": 0.30, "jump": 0.50}
+RESIDUAL_GATE = {"stand": 0.25, "walk": 0.30, "jump": 0.50, "float": 0.35}
+# SPEC-904 · kerataan langkah untuk baris yang DIPUTAR BERULANG (`even: True`). Yang membuat sebuah
+# loop tersendat bukan besar-kecilnya gerak, melainkan langkah besar yang bertetangga dengan langkah
+# nyaris nol — `wave` v01 mengukur max 0,201 (tangan turun) di sebelah 0,028/0,031 (dua frame
+# nyaris kembar di sambungan), rasio 7,07. Gerbang karena itu RASIO, bukan nilai mutlak, dan hanya
+# berlaku saat geraknya memang terlihat: baris bernapas halus (`sleep` 21,3 · `blocked` 6,9) punya
+# rasio besar tanpa pernah terbaca tersendat karena SELURUH langkahnya kecil. Dikalibrasi atas baris
+# nyata yang sudah lolos Gate 2: walk-left 2,06 · walk-right 2,33 · waiting 3,18 · deciding 3,43.
+STEP_VISIBLE = 0.10      # di bawah ini gerak baris dianggap terlalu halus untuk dinilai rata
+STEP_RATIO_GATE = 3.5    # max(langkah) / min(langkah), termasuk sambungan 8→1
+# SPEC-904 · gerbang SKALA KARAKTER. `build_strip` menskalakan bbox frame 1 menjadi STAND_H, jadi
+# apa pun yang ikut memperpanjang bbox — ekor yang menjuntai lurus ke bawah pada baris `held` —
+# MENGECILKAN badannya diam-diam: percobaan pertama `held` menggambar kepala 63 px vs 79 px milik
+# `idle`, lolos setiap gerbang lain (residu 0,021, tumpahan 0, langkah rata 2,43) sambil melanggar
+# "skala WAJIB identik dengan v01". Ukurannya: tinggi bbox SESUDAH erosi (ekor tipis lenyap, badan
+# bertahan) dibagi tinggi bbox utuh. Ketigabelas baris v01 duduk rapat di 0,839–0,911 (terendah
+# `blocked`); `held` percobaan 1 = 0,661.
+BODY_ERODE = 5
+BODY_RATIO_GATE = 0.80
 
 
 def row_def(key: str) -> dict:
@@ -284,7 +323,15 @@ def _fit_dx(placed: list[tuple[int, int, float, float, Image.Image]], ref_x: flo
 
 
 def build_strip(sprites: list[Sprite], mode: str, pin: bool | None = None) -> tuple[Image.Image, list[dict]]:
-    """8 sprite → strip 8 × (CELL_W×CELL_H) terregistrasi. Laporan per frame untuk gerbang QA."""
+    """8 sprite → strip 8 × (CELL_W×CELL_H) terregistrasi. Laporan per frame untuk gerbang QA.
+
+    Empat mode: `stand` (registrasi wilayah BAWAH + pin), `walk` (wilayah ATAS, dasar dipaksa
+    menapak baseline), `jump` (wilayah ATAS, ketinggian busur dipertahankan), dan `float` —
+    SPEC-904, untuk baris yang tak menapak tanah sama sekali (`held` tergantung dari atas,
+    `falling` meringkuk di udara). `float` meminjam wilayah ATAS seperti `walk` karena yang statis
+    di sana adalah kepala/torso, tetapi `dy` diambil apa adanya dari registrasi: memaksa piksel
+    terendah ke baseline akan mendorong seluruh badan naik-turun mengikuti kaki yang menjuntai.
+    Tanpa pin — tak ada wilayah bawah yang statis untuk dibekukan."""
     if len(sprites) != 8:
         raise ValueError(f"butuh 8 sprite, terdeteksi {len(sprites)}")
     if pin is None:
@@ -428,11 +475,13 @@ def compose_atlas(rows_dir: Path) -> Image.Image:
 
 def manifest(rows_dir: Path) -> dict:
     return {
-        "id": "PET-001", "version": 1,
+        "id": "PET-001", "version": MANIFEST_VERSION,
         "cell": {"w": CELL_W, "h": CELL_H}, "columns": COLUMNS,
         "anchor": {"x": ANCHOR_X, "baseline": BASELINE},
         "character": {"h": STAND_H},
-        "rows": [{k: v for k, v in r.items() if k != "mode"} for r in ROWS],
+        # `mode` dan `even` adalah kunci PIPELINE (registrasi & gerbang QA); frontend tak
+        # memakainya, jadi keduanya tak pernah ikut ke pet.json.
+        "rows": [{k: v for k, v in r.items() if k not in ("mode", "even")} for r in ROWS],
         "sources": {r["key"]: sha256(rows_dir / f"{r['key']}.png") for r in ROWS},
     }
 
@@ -442,6 +491,34 @@ def write_json(path: Path, data: dict) -> None:
 
 
 # ---------------------------------------------------------------- QA artefak
+
+def body_ratio(strip: Image.Image) -> float:
+    """Berapa banyak tinggi frame 1 yang benar-benar BADAN, bukan anggota tipis yang menjuntai.
+
+    `build_strip` menskalakan bbox frame 1 ke `STAND_H`; kalau bbox itu diperpanjang ekor yang
+    menggantung, badannya mengecil tanpa satu pun gerbang lain menyadarinya. Erosi memisahkan
+    keduanya: ekor selebar seutas garis lenyap, badan bertahan."""
+    a = np.asarray(strip.crop((0, 0, CELL_W, CELL_H)).getchannel("A")) > 64
+    ys = np.where(a.any(axis=1))[0]
+    if len(ys) == 0:
+        return 0.0
+    body = _erode(a, BODY_ERODE)
+    yb = np.where(body.any(axis=1))[0]
+    return round(float(len(range(yb.min(), yb.max() + 1)) if len(yb) else 0)
+                 / float(ys.max() - ys.min() + 1), 4)
+
+
+def frame_steps(strip: Image.Image) -> list[float]:
+    """Delapan langkah antar-frame sebuah strip, dinormalkan ke massa frame 1.
+
+    Elemen TERAKHIR adalah sambungan 8→1 — justru langkah yang tak terlihat di contact sheet
+    maupun onion-skin, dan satu-satunya yang menentukan apakah baris ini bisa diputar berulang."""
+    masks = [np.asarray(strip.crop((i * CELL_W, 0, (i + 1) * CELL_W, CELL_H)).getchannel("A")) > 64
+             for i in range(COLUMNS)]
+    base = max(float(masks[0].sum()), 1.0)
+    return [round(float(np.count_nonzero(masks[i] ^ masks[(i + 1) % COLUMNS])) / base, 4)
+            for i in range(COLUMNS)]
+
 
 def onion_skin(strip: Image.Image) -> Image.Image:
     acc = np.zeros((CELL_H, CELL_W), np.float32)

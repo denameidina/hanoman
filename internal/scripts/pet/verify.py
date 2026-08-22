@@ -14,7 +14,7 @@ petlib = load_petlib()
 
 
 def main() -> None:
-    atlas_path = ASSETS / "hnm-pet-anoman-atlas-v01.webp"
+    atlas_path = ASSETS / "hnm-pet-anoman-atlas-v02.webp"
     manifest_path = ASSETS / "pet.json"
     problems: list[str] = []
     if not atlas_path.exists():
@@ -27,6 +27,13 @@ def main() -> None:
         problems.append(f"baris manifest {keys} ≠ {petlib.ROW_KEYS}")
     if m.get("cell") != {"w": petlib.CELL_W, "h": petlib.CELL_H} or m.get("columns") != petlib.COLUMNS:
         problems.append("sel/kolom manifest tak sesuai petlib")
+    # SPEC-904 · `version` dan `anchor` dulu tak pernah dibandingkan. `version` kini nilai yang
+    # bergerak, dan `anchor` adalah jangkar yang dibagi SELURUH baris — menggesernya membuat setiap
+    # pose lama melompat sesaat saat berganti baris, tanpa satu pun error.
+    if m.get("id") != "PET-001" or m.get("version") != petlib.MANIFEST_VERSION:
+        problems.append(f"id/version manifest {m.get('id')}/{m.get('version')} ≠ PET-001/{petlib.MANIFEST_VERSION}")
+    if m.get("anchor") != {"x": petlib.ANCHOR_X, "baseline": petlib.BASELINE}:
+        problems.append(f"anchor manifest {m.get('anchor')} tak sesuai petlib")
     if m.get("character") != {"h": petlib.STAND_H}:
         problems.append("character.h manifest tak sesuai petlib")
     im = Image.open(atlas_path)

@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Gerbang kualitas satu baris + artefak review manusia di qa/ (contact sheet, onion-skin, GIF).
 Keluar 1 bila gerbang gagal: sprite menyentuh tepi lembar, tumpahan sel, residu pra-pin di atas
-petlib.RESIDUAL_GATE[mode], atau alpha hilang."""
+petlib.RESIDUAL_GATE[mode], alpha hilang, skala karakter di bawah petlib.BODY_RATIO_GATE, atau —
+untuk baris ber-`even` — langkah antar-frame yang tak rata (petlib.STEP_RATIO_GATE).
+
+Dua gerbang terakhir ditambahkan SPEC-904 dan daftar ini WAJIB ikut bertambah setiap kali ada
+gerbang baru: `held` percobaan 1 lolos setiap gerbang yang ada saat itu sambil menggambar
+karakternya 20 % lebih kecil, dan daftar yang lebih pendek dari gerbangnya mengundang kelas
+kegagalan yang sama terulang."""
 from __future__ import annotations
 
 import json
@@ -38,6 +44,16 @@ def main() -> None:
             problems.append(f"f{fr['frame']} tumpah {fr['clipped']} px ke luar sel")
         if fr["residual_pre"] > gate:
             problems.append(f"f{fr['frame']} residu pra-pin {fr['residual_pre']:.3f} > {gate}")
+    body = petlib.body_ratio(strip.convert("RGBA"))
+    if body < petlib.BODY_RATIO_GATE:
+        problems.append(f"badan hanya {body:.3f} dari tinggi frame 1 (< {petlib.BODY_RATIO_GATE}) — "
+                        "anggota tipis yang menjuntai memperpanjang bbox, jadi karakternya "
+                        "diskalakan lebih kecil daripada baris lain")
+    steps = petlib.frame_steps(strip.convert("RGBA"))
+    ratio = max(steps) / max(min(steps), 1e-6)
+    if row.get("even") and max(steps) >= petlib.STEP_VISIBLE and ratio > petlib.STEP_RATIO_GATE:
+        problems.append(f"langkah tak rata: max {max(steps):.3f} / min {min(steps):.3f} "
+                        f"= {ratio:.2f} > {petlib.STEP_RATIO_GATE} — baris ini diputar berulang")
     qa = ASSETS / "qa"
     qa.mkdir(exist_ok=True)
     contact = Image.new("RGBA", (strip.size[0] // 2, strip.size[1] // 2), (250, 246, 236, 255))
@@ -46,6 +62,10 @@ def main() -> None:
     petlib.onion_skin(strip.convert("RGBA")).save(qa / f"{key}-onion.png")
     petlib.save_gif(strip.convert("RGBA"), qa / f"{key}.gif", row["fps"])
     print(f"qa/{key}-contact.png qa/{key}-onion.png qa/{key}.gif ditulis")
+    # Sambungan 8→1 adalah elemen TERAKHIR — satu-satunya langkah yang tak terlihat di contact
+    # sheet maupun onion-skin, dan yang menentukan apakah baris ini bisa diputar berulang.
+    print("  langkah " + " ".join(f"{i + 1}→{(i + 1) % 8 + 1}:{s:.3f}" for i, s in enumerate(steps))
+          + f"  rasio={ratio:.2f}  badan={body:.3f}")
     if problems:
         fail(f"{key}: " + "; ".join(problems))
     print(f"OK {key}: 8 frame, residu maks {max(f['residual_pre'] for f in report['frames']):.3f} ≤ {gate}")
