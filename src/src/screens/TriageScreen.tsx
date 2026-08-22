@@ -1,14 +1,17 @@
 /* TriageScreen — antrean triase keluhan Help Center (SPEC-253). Screen mandiri (pola VpsScreen):
    memuat datanya sendiri + silent poll (pola GitGraph). Master (daftar tiket) → detail dengan
    lampiran + aksi Terima (→ Spec, source mengikuti kategori: bug→qa, fitur→brief, pertanyaan→audit,
-   lainnya→brief — SPEC-291) / Tolak. Realtime via HTTP polling (ADR-0062), bukan WS.
+   lainnya→brief — SPEC-291) / Tolak.
+   SPEC-908 · realtime kini lewat langganan berparameter di `/events/ws`; HTTP tinggal muat
+   awal + fallback saat server belum punya topiknya.
    SPEC-293 · detail tiket tertaut: badge status penyelesaian turunan dari stage backlog +
    tombol buka/salin link backlog (deep-link #spec=, ADR-0071) + buka/salin link publik status
    tiket (shareToken) untuk dibagikan ke pelapor. */
 import React from "react";
-import { Button, Badge, Select, StateBlock, Icon, Input, Field, HnTextarea, ConfirmDialog, useConfirm, Pager, ResponsivePanels, serverPage } from "../ds";
+import { Button, Badge, Select, StateBlock, Icon, Input, Field, HnTextarea, ConfirmDialog, useConfirm, Pager, ResponsivePanels, serverPage, LiveConnectionBadge } from "../ds";
 import { paths, publicStatus, type TicketView, type TicketDetail, type Spec, type GithubIssueView } from "@hanoman/shared";
 import { api } from "../api/client";
+import { useLiveTopic } from "../api/live";
 import { specDeepLink } from "./deeplink";
 import { SyncButton } from "./SyncButton";
 import {
@@ -370,10 +373,22 @@ export function TriageScreen({ projects, onAccepted, onToast }:
   // AC-15 · ganti penyaring = kembali ke halaman 1. Tanpa ini, halaman 5 dari penyaring lama
   // menjawab daftar penyaring baru yang cuma punya 2 halaman → daftar kosong tanpa sebab.
   React.useEffect(() => { setPage(1); }, [project, status, q]);
-  React.useEffect(() => {
-    const t = setInterval(() => { if (!document.hidden) load(true); }, POLL_MS);
-    return () => clearInterval(t);
-  }, [load]);
+  // SPEC-908 · pembaruan didorong lewat langganan `/events/ws`, bukan poll 5 dtk. Params = state
+  // layar yang SEDANG aktif, jadi halaman & penyaring yang berjalan dihormati secara konstruksi:
+  // frame halaman lain punya `key` lain dan tak mungkin mendarat di sini. POLL_MS tinggal kadens
+  // fallback saat server belum punya topiknya (ADR-0087) atau WS terhalang.
+  useLiveTopic({
+    topic: "tickets",
+    params: {
+      project: project || undefined, status: status || undefined, q: q || undefined,
+      page, limit: TICKET_PAGE,
+    },
+    apply: (m) => {
+      setList(m.data.items); setTotal(m.data.total); setUnreviewed(m.data.unreviewed); setState("ready");
+    },
+    refetch: () => load(true),
+    pollMs: POLL_MS,
+  });
 
   // SPEC-471 · tab issue butuh SATU project (issue milik satu repo). Selama "Semua project"
   // dipilih, jelaskan itu alih-alih menampilkan daftar kosong tanpa sebab.
@@ -418,6 +433,7 @@ export function TriageScreen({ projects, onAccepted, onToast }:
           {unreviewed > 0 && <Badge tone="warn">{unreviewed} belum ditinjau</Badge>}
           <SyncButton onDone={() => load(true)} onToast={onToast} />
           <ResetViewButton screen="triage" active={activeFilters} />
+          <LiveConnectionBadge />
         </>}
       </div>
       {tab === "issue" ? issueTab : (
