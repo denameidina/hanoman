@@ -96,7 +96,7 @@ tidak dipaksakan masuk instrument panel operasional. Motif tanpa makna status se
 
 Motion Pet adalah bahasa status, bukan hiasan yang sama untuk semua artwork — tetapi sejak Pet hidup
 A identitas tiap pose **digambar sebagai frame**, bukan disusun dari transform di atas satu raster.
-Sumbernya satu atlas WebP (sel 192×208, 8 kolom, 10 baris) plus manifest `pet.json`; artwork-nya
+Sumbernya satu atlas WebP v02 (sel 192×208, 8 kolom, 16 baris) plus manifest `pet.json`; artwork-nya
 dibuat lewat pipeline `internal/scripts/pet/` dan direview di `internal/assets/pet/qa/`.
 
 Grammar render: satu `<img>` atlas di dalam viewport ber-`overflow: hidden`; baris dipilih

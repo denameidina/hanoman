@@ -370,20 +370,30 @@ Delapan keputusan di dalam tabel itu yang tak terbaca dari kodenya:
   terceklist, ADR-0029) dan memang bergerak. Karena itu pula `working` mengecualikan sesi ber-spec
   `done`: pane hidup di atas backlog selesai bukan sedang bekerja, ia menunggu dilihat.
 
-**Atlas & manifest.** `internal/assets/pet/hnm-pet-anoman-atlas-v01.webp` + `pet.json` (PET-001):
-sel 192×208, 8 kolom, **13 baris** (`idle, walk-right, walk-left, working, waiting, blocked,
-review, shipped, docs-updated, wave, deciding, sleep, thanks` — tiga terakhir dari SPEC-897/898,
-ditambahkan di EKOR supaya indeks baris lama tak bergeser), karakter berdiri 168 px, jangkar kaki
-x 0,62 / baseline 202. Baris ke-13 memaksa `quality` WebP turun 82 → 76 untuk **seluruh** atlas
-(952 452 B, plafon `ATLAS_BUDGET` 1 MB tak dinaikkan); angka pengukurannya di
-`internal/assets/pet/README.md`.
+**Atlas & manifest.** `internal/assets/pet/hnm-pet-anoman-atlas-v02.webp` + `pet.json` (PET-001,
+`version: 2`): sel 192×208, 8 kolom, **16 baris** (`idle, walk-right, walk-left, working, waiting,
+blocked, review, shipped, docs-updated, wave, deciding, sleep, thanks, held, falling, dizzy` — enam
+terakhir dari SPEC-897/898/904, ditambahkan di EKOR supaya indeks baris lama tak bergeser),
+karakter berdiri 168 px, jangkar kaki x 0,62 / baseline 202. Baris ke-13 memaksa `quality` WebP
+turun 82 → 76 untuk **seluruh** atlas; baris ke-14–16 (SPEC-904) memaksa **plafon**-nya naik 1 MB →
+1,3 MB dengan `quality` tetap 76, karena `quality` adalah tuas yang lemah di atlas ini (q76 → q20
+hanya −34 %) dan biaya decode mengikuti **piksel**, bukan byte. Atlas yang dikomit 1 165 556 B
+(1536×3328); angka pengukurannya di `internal/assets/pet/README.md`. Atlas v01 **dihapus**, tidak
+disimpan berdampingan.
 `pet-sprite.ts` memvalidasi manifest (validator tangan — `zod` tak bisa di-resolve dari paket
 `src`), memetakan pose → baris (`POSE_ROW`; hanya `ready → idle` yang berganti nama),
 `durationMs = columns / fps × 1000`, dan rantai `then` untuk baris sekali-putar (`shipped`, `wave`,
-`thanks` → `idle`). `POSE_ROW` memetakan **sepuluh** pose ke tiga belas baris; `offline` sengaja
+`thanks` → `idle`). `POSE_ROW` memetakan **sepuluh** pose ke enam belas baris; `offline` sengaja
 menumpang baris `idle` — yang dikatakan pet saat terputus adalah "aku tak tahu", dan itu diucapkan
 oleh pudar + kalimat, bukan oleh gerak baru. `thanks` **bukan** pose sama sekali: ia baris reaksi
-yang hanya bisa dipilih `oneShot`, jadi ia tak muncul di `POSE_ROW` dan tak menambah `PetPose`. Pipeline pembuatannya (Codex → key → registrasi → QA → atlas) di
+yang hanya bisa dipilih `oneShot`, jadi ia tak muncul di `POSE_ROW` dan tak menambah `PetPose`.
+`held`, `falling`, dan `dizzy` (SPEC-904) sama: ketiganya baris interaksi untuk pet yang **diseret**
+— terangkat, turun perlahan, pusing sesaat lalu berdiri lagi — dan dipakai backlog penerus yang
+membangun interaksinya, bukan oleh `POSE_ROW`. `wave` diregenerasi SPEC-904 supaya bisa diputar
+**berulang** tanpa kedip sambungan: frame 8 kini satu langkah sebelum frame 1 (tangan di pinggul),
+bukan salinan pose istirahat, sementara manifestnya tetap `loop: false, then: "idle"` —
+`loop: true` akan membuat animasinya `infinite` sehingga `onAnimationEnd` tak pernah menyala dan
+`oneShot` tak pernah dibersihkan. Pipeline pembuatannya (Codex → key → registrasi → QA → atlas) di
 `internal/assets/pet/README.md`. Sticker `STK-*` tetap di katalog ilustrasi tetapi **tak lagi
 dipakai pet**.
 

@@ -23,13 +23,16 @@ ANCHOR_X = 0.62        # pusat kaki di 62 % lebar sel → ruang ekor di kiri
 BASELINE = 202         # baris y (dari atas sel) tempat kaki berdiri
 HEAD_MARGIN = 34       # ruang di atas frame 1: ayunan ekor/kepala + ketinggian lompat `shipped`
 STAND_H = BASELINE - HEAD_MARGIN   # 168 — tinggi karakter berdiri; frontend menskalakan dari sini
-# SPEC-904 · 1 MB tak bisa menampung 16 baris pada kualitas mana pun yang layak: q76 = 1 191 960 B,
-# dan `quality` adalah tuas yang LEMAH di sini (q76 → q20 hanya −34 %) karena atlas ini didominasi
-# kanal alpha lossless di atas seni datar berkontur tegas. Turun ke bawah 1 MB butuh ±q45 — dan
-# atlas dirakit ulang dari rows/, jadi ketigabelas baris yang sudah lolos Gate 2 ikut turun.
+# SPEC-904 · 1 MB tak bisa menampung 16 baris pada kualitas mana pun yang layak. Terukur atas atlas
+# 16 baris yang sebenarnya: q76 = 1 165 556 B · q60 = 1 058 832 · q40 = 929 558 · q20 = 768 780 —
+# `quality` adalah tuas yang LEMAH di sini (q76 → q20 hanya −34 %) karena atlas ini didominasi kanal
+# alpha lossless di atas seni datar berkontur tegas. Turun ke bawah 1 MB butuh ±q48, dan atlas
+# dirakit ulang dari rows/, jadi ketigabelas baris yang sudah lolos Gate 2 ikut turun kualitas.
+# `alpha_quality=60` (951 074 B) ditolak: alpha lossy di siluet potong, dan sisanya hanya 49 KB.
 # Premis plafon lama ("satu <img> di-decode di setiap halaman") juga tak dilayani `quality`: biaya
-# decode adalah PIKSEL (19,5 MiB RGBA pada 16 baris), bukan byte. 1 300 000 = +30 % vs atlas v01
-# (950 480 B) — di dalam batas +40 % SPEC-904 — dengan sisa ±108 KB untuk satu regenerasi rutin.
+# decode adalah PIKSEL (19,5 MiB RGBA pada 16 baris vs 15,8 MiB pada 13), bukan byte. 1 300 000 =
+# +37 % vs atlas v01 (950 480 B) — di dalam batas +40 % SPEC-904 — dan atlas yang benar-benar
+# dikomit 1 165 556 B (+22,6 %) menyisakan 134 444 B untuk satu regenerasi baris rutin.
 ATLAS_BUDGET = 1_300_000
 SEARCH_PX = 24
 SCALES = (0.92, 0.94, 0.96, 0.98, 1.0, 1.02, 1.04, 1.06, 1.08)

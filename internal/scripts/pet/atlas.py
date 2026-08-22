@@ -21,7 +21,7 @@ def encode(atlas: Image.Image) -> bytes:
     buf = io.BytesIO()
     # SPEC-898 · 13 baris tak muat di plafon 1 MB pada quality 82 (1 062 524 B) → q76.
     # SPEC-904 · `quality` DIPERTAHANKAN di 76 dan plafonnya yang naik (petlib.ATLAS_BUDGET).
-    # Terukur atas 16 baris: q76 = 1 191 960 B, q60 = 1 081 404 B, q40 = 946 588 B, q20 = 784 084 B
+    # Terukur atas 16 baris: q76 = 1 165 556 B, q60 = 1 058 832 B, q40 = 929 558 B, q20 = 768 780 B
     # — q76 → q20 hanya −34 %, karena atlas ini didominasi kanal alpha lossless di atas seni datar
     # berkontur tegas. Menurunkan quality demi plafon lama berarti menurunkan kualitas ketigabelas
     # baris yang sudah lolos Gate 2, untuk menghemat byte yang tak menyentuh biaya decode.
