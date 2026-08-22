@@ -1476,6 +1476,10 @@ export default function App() {
   return (
     <AuthProvider user={me} onLoggedOut={onLoggedOut}>
       <NotificationsProvider showToast={showToast} onOpen={openNotification}>
+        {/* SPEC-884 · ADR-0138 · instance publik yang perlindungannya turun jadi satu password
+            tidak boleh terlihat sama dengan yang dikeraskan. Di luar ClientPortal: klien tak
+            punya kuasa mengubahnya, jadi baginya ini cuma kecemasan tanpa tombol. */}
+        <UnhardenedBanner status={setupStatus} />
         {screen}
         <HanomanPet sessions={sessions} backlog={backlog}
           onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />

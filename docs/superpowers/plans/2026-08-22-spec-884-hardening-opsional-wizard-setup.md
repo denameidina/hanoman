@@ -2023,7 +2023,7 @@ git commit -m "feat(spec-884): wizard setup awal dua langkah di browser"
 - Consumes: `api.setupStatus()` (Task 14)
 - Produces: elemen ber-`data-testid="unhardened-banner"`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/unhardened-banner.test.tsx`:
 
@@ -2056,12 +2056,12 @@ describe("penanda instance tanpa hardening (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/unhardened-banner.test.tsx`
 Expected: FAIL — `UnhardenedBanner` tak diekspor
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Tambahkan di akhir `src/src/screens/SetupWizard.tsx`:
 
@@ -2093,12 +2093,12 @@ Di `src/src/App.tsx`, ganti efek pemuat status (Task 14) supaya juga berjalan se
 
 Render `<UnhardenedBanner status={setupStatus} />` sebagai elemen pertama di dalam pembungkus utama dashboard operator (tepat sebelum `Shell`/`body`), bukan di dalam `ClientPortal`.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/unhardened-banner.test.tsx src/test/app-flows.test.tsx`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SetupWizard.tsx src/src/App.tsx src/test/unhardened-banner.test.tsx
