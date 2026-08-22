@@ -1806,7 +1806,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Modify: `internal/docs/architecture/api-contract.md` (endpoint bootstrap, field `hasMore`/`next`, gzip)
 - Modify: `internal/docs/architecture/data-model.md` (`Vps.lastPublishedAt` sebagai LOCAL-only)
 
-- [ ] **Step 1: Pastikan nomor ADR-nya masih bebas**
+- [x] **Step 1: Pastikan nomor ADR-nya masih bebas**
 
 ```bash
 ls internal/docs/adr/ | tail -2
@@ -1814,7 +1814,7 @@ ls internal/docs/adr/ | tail -2
 
 Plan ini memakai **0138**. Nomornya semula 0137 dan sudah harus digeser sekali karena SPEC-883 menerbitkan `0137-provisioning-vps-berbasis-katalog.md` ke `main` selagi spec ini ditulis — tabrakan nomor antar-sesi paralel adalah kejadian berulang di repo ini. Bila `0138` sudah terpakai saat task ini dikerjakan, ambil nomor bebas berikutnya dan **ganti semua rujukan `ADR-0138` di kode yang sudah ditulis Task 1–9** (`grep -rn "ADR-0138" server/src`).
 
-- [ ] **Step 2: Tulis ADR-nya**
+- [x] **Step 2: Tulis ADR-nya**
 
 Buat `internal/docs/adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md` mengikuti bentuk ADR-0131 (Konteks dengan angka terukur → Keputusan bernomor → Konsekuensi → Alternatif yang ditolak). Isi wajib:
 
@@ -1827,17 +1827,17 @@ Buat `internal/docs/adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md` meng
 - **Konsekuensi:** client baru selesai dalam ~3 request alih-alih mandek; client yang tertinggal >7 hari ikut sembuh; feed vps mengecil dan penghematannya akan **tumbuh** saat VPS lain kembali sehat.
 - **Alternatif yang ditolak:** menahan kursor pada record yang gagal (livelock); tabel `SyncDeferred` durable (tak perlu setelah drain utuh); membuang `lastSeenAt` dari `FIELDS.vps`; `@fastify/compress`; batching apply dalam satu `$transaction`.
 
-- [ ] **Step 3: Tautkan di index**
+- [x] **Step 3: Tautkan di index**
 
 Tambahkan satu baris di bagian `## adr` pada `internal/docs/README.md`, mengikuti format baris tetangganya.
 
-- [ ] **Step 4: Perbarui docs arsitektur**
+- [x] **Step 4: Perbarui docs arsitektur**
 
 Di `internal/docs/architecture/api-contract.md`, di bagian sync: dokumentasikan `GET /api/sync/bootstrap` (query `after`, balikan `{ cursor, records, hasMore, next }`, auth device-token), field `hasMore` baru pada `GET /api/sync/pull`, dan negosiasi gzip pada keduanya.
 
 Di `internal/docs/architecture/data-model.md`, pada model `Vps`: catat `lastPublishedAt` sebagai kolom **LOCAL-only** yang sengaja di luar `FIELDS.vps`, sejajar `keyPath`.
 
-- [ ] **Step 5: Verifikasi index docs**
+- [x] **Step 5: Verifikasi index docs**
 
 ```bash
 hanoman docs index --check
@@ -1845,7 +1845,7 @@ hanoman docs index --check
 
 Diharapkan: laporan tanpa entri hilang. Perintah ini milik CLI produk (AGENTS.md §Eksekusi & Perintah) dan bersifat read-only. Bila `hanoman` global lebih tua dari checkout ini, pakai salinan repo: `pnpm --filter ./cli build && node cli/dist/index.js docs index --check`.
 
-- [ ] **Step 6: Verifikasi endpoint nyata di local**
+- [x] **Step 6: Verifikasi endpoint nyata di local**
 
 Wajib menurut AGENTS.md karena task ini menyentuh endpoint — sekali di akhir, bukan tiap task.
 
@@ -1868,7 +1868,7 @@ curl -s -H "authorization: Bearer $TOKEN" -H 'accept-encoding: gzip' \
 
 Diharapkan: dua yang pertama JSON ber-`cursor`/`records`/`hasMore`; yang ketiga memperlihatkan header `content-encoding: gzip` dan `vary: accept-encoding`.
 
-- [ ] **Step 7: Reproduksi end-to-end dengan data hub nyata**
+- [x] **Step 7: Reproduksi end-to-end dengan data hub nyata**
 
 Ini gerbang sebenarnya untuk spec ini. Ambil salinan DB hub **tanpa menyentuh produksi**:
 
@@ -1890,7 +1890,7 @@ sqlite3 "file:<home-client>/hanoman.db?mode=ro" \
 
 Diharapkan: `spec` mencapai jumlah di hub salinan (~724 pada snapshot 2026-08-22) dan `cursor` sampai di puncak feed. Sebelum spec ini, client yang sama berhenti di ~500 record total dengan kursor macet.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add internal/docs

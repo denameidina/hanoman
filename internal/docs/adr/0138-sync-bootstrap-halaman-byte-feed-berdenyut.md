@@ -129,6 +129,27 @@ kenyataan.
 **Tombstone tidak ikut**, sengaja: record yang sudah dihapus cukup absen dari snapshot, dan kursor =
 puncak berarti tak ada baris `op: "delete"` lama yang akan ditarik.
 
+**Bootstrap bukan sekadar lebih cepat — ia satu-satunya jalur yang LENGKAP.** Terukur saat spec ini
+diverifikasi terhadap salinan DB hub produksi: client yang memakai bootstrap mendarat di **727 spec,
+14 project, 9 vps, 37 tiket — cocok persis dengan hub**, dalam 930 ms. Client yang jatuh ke drain
+feed murni (mensimulasikan hub lama) mendarat di **698 spec** dan membuang 7 tiket, meski seluruh
+3.712 baris feed terterapkan dan kursornya sampai di puncak.
+
+Sebabnya bukan drain-nya, melainkan feed itu sendiri. `renameProjectCore`
+([ADR-0064](0064-project-id-renameable.md), SPEC-255) memindahkan anak sebuah project secara
+**borongan** dan hanya menerbitkan baris feed untuk record **project**-nya. Jadi baris feed terakhir
+`SPEC-150` (seq 8456) masih menyebut `projectId = base.tumbuh.ai` sementara tabelnya sudah
+`erp-tumbuh-ai`, dan id lama itu kemudian menerima tombstone (seq 124457). Penerima yang memutar feed
+dengan benar akan **cascade-menghapus** spec-spec itu — dan ia benar menurut feed, sekaligus salah
+menurut kenyataan.
+
+Feed karena itu **lossy melewati rename project**, dan tak ada perbaikan pada `syncOnce` yang bisa
+menutupnya: informasinya memang tak pernah ditulis. Sebelum ADR ini hal itu tak pernah terlihat
+karena client baru bahkan tak sampai ke halaman kedua. Menerbitkan ulang baris anak saat rename
+adalah perbaikan tersendiri di luar lingkup SPEC-885; yang ditegakkan di sini adalah bahwa jalur
+fallback (hub lama → 404 → drain feed) **konvergen tetapi tidak lengkap**, dan bahwa jalur yang benar
+untuk instalasi baru adalah bootstrap.
+
 Client memakainya hanya bila `cursor === "0"` **dan outbox kosong**. Syarat kedua yang penting:
 "Tarik ulang" memundurkan kursor ke 0 di mesin yang bisa saja punya suntingan lokal belum terkirim,
 dan outbox kosong adalah bukti tak ada yang bisa ditimpa. Hub lama menjawab 404 → jatuh ke drain feed

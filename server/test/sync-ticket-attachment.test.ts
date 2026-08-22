@@ -7,7 +7,10 @@ import { join } from "node:path";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { pull } from "../src/services/sync";
-import { syncOnce, syncNow, setCursor, getCursor, applyFeedFrame, type Transport } from "../src/services/sync-client";
+import {
+  syncOnce, syncNow, setCursor, getCursor, applyFeedFrame, fetchTransport, type Transport,
+} from "../src/services/sync-client";
+import { enqueueOutbox } from "../src/services/outbox";
 import { issueDeviceToken } from "../src/services/device-token";
 import { acceptTicket } from "../src/services/ticket-accept";
 import { setConfig, clearConfig } from "../src/config";
@@ -151,8 +154,17 @@ describe("SPEC-382 · lampiran tiket menyeberang sync", () => {
 // SPEC-382 · pemulihan data lama: baris feed yang terlanjur dilompati kursor (jalur WS) ada di
 // BELAKANG kursor dan takkan pernah tertarik lagi oleh siklus normal. Satu-satunya jalan pulang
 // adalah menarik ulang feed dari awal — pull server-authoritative & idempoten, jadi aman diulang.
+// SPEC-885 · ADR-0138 · dua test di bawah dulu menggerakkan jaminan ini lewat `syncNow({full:true})`.
+// Sejak `full` LEBIH DULU mencoba `/api/sync/bootstrap` (yang membaca TABEL hub), jalur itu tak lagi
+// bisa dipakai untuk menguji replay feed di harness ini: hub dan client adalah SATU database, jadi
+// "baris ada di feed tapi tak ada di tabel" — justru kondisi rusak yang sedang diuji — adalah keadaan
+// yang tak mungkin ada di hub sungguhan, dan bootstrap benar melaporkan "tak ada lampiran".
+//
+// Jaminannya sendiri TIDAK dicabut: ia hidup di mesin drain feed, yang tetap menjadi jalur bagi hub
+// lama (404 di bootstrap) dan bagi client yang punya suntingan lokal tertunda. Kedua test digerakkan
+// lewat jalur itu sekarang — assertion-nya tak diubah.
 describe("SPEC-382 · tarik ulang penuh memulihkan baris yang terlewat", () => {
-  it("syncNow({ full: true }) mengulang feed dari kursor 0 dan mengembalikan lampiran yang hilang", async () => {
+  it("drain feed dari kursor 0 mengembalikan lampiran yang hilang", async () => {
     await ensureListening();
     const u = await prisma.user.create({ data: { email: "d382@x.co", passwordHash: "x:y" } });
     const tok = await issueDeviceToken(u.id, "laptop");
@@ -168,10 +180,14 @@ describe("SPEC-382 · tarik ulang penuh memulihkan baris yang terlewat", () => {
     await setCursor(String(attLog.seq));
     expect(await prisma.ticketAttachment.count()).toBe(0);
 
-    expect(await syncNow()).toMatchObject({ pulled: 0 }); // siklus normal tak bisa memulihkannya
-    const stats = await syncNow({ full: true });
+    const port = (app.server.address() as AddressInfo).port;
+    const transport = fetchTransport(`http://127.0.0.1:${port}`, tok.token);
+    expect(await syncOnce(transport)).toMatchObject({ pulled: 0 }); // siklus normal tak memulihkannya
 
-    expect(stats!.pulled).toBeGreaterThanOrEqual(2);
+    await setCursor("0");
+    const stats = await syncOnce(transport);
+
+    expect(stats.pulled).toBeGreaterThanOrEqual(2);
     expect(await prisma.ticketAttachment.findUnique({ where: { id: "ATT-1" } }))
       .toMatchObject({ ticketId: "TCK-1", filename: "shot.png" });
     expect(await getCursor()).toBe(String(attLog.seq));
@@ -189,6 +205,11 @@ describe("SPEC-382 · tarik ulang penuh memulihkan baris yang terlewat", () => {
     await prisma.ticket.create({ data: { id: "TCK-1", projectId: "p1", number: 1, category: "bug",
       title: "Tak bisa login", detail: "d", reporterEmail: "r@e.co", accessKeyHash: "hash-1" } });
     await setCursor(String(attLog.seq));
+    // SPEC-885 · outbox berisi = ada suntingan lokal yang belum menyeberang, dan itulah gerbang yang
+    // membuat `full` MELEWATI bootstrap (bootstrap menimpa dari hub; suntingan lokal tak boleh
+    // ditimpa). Kondisi produksi yang nyata: "Tarik ulang" ditekan di mesin yang sedang punya
+    // perubahan tertunda. Di situ `full` tetap berarti replay feed dari kursor 0.
+    await enqueueOutbox("ticket", "TCK-1");
 
     const res = await app.inject({ method: "POST", url: "/api/sync/now", payload: { full: true } });
 

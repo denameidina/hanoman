@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { issueDeviceToken } from "../src/services/device-token";
-import { bootstrapSnapshot } from "../src/services/sync";
+import { bootstrapSnapshot, BOOTSTRAP_ORDER, SYNCED, PARENTS } from "../src/services/sync";
 import { bootstrapOnce, getCursor, setCursor, type Transport } from "../src/services/sync-client";
 import { enqueueOutbox } from "../src/services/outbox";
 
@@ -20,6 +20,25 @@ async function seed() {
     id: "SPEC-1", projectId: "p1", title: "t", source: "brief", stage: "planned",
     priority: "sedang", author: "a@b.co", objective: "o" } });
 }
+
+describe("SPEC-885 · BOOTSTRAP_ORDER adalah KONTRAK atas SYNCED", () => {
+  // Entitas yang terlewat dari BOOTSTRAP_ORDER tidak menghasilkan satu pun error — ia hanya
+  // TIDAK IKUT ke client baru, dan itu baru terlihat berbulan-bulan kemudian sebagai "kok vps-nya
+  // kosong". Terjadi betulan saat SPEC-885 dikerjakan: `vps` terlewat, dan test yang hanya
+  // menyemai project+spec tak bisa menangkapnya. Ditegakkan dari SYNCED, bukan dari daftar kedua.
+  it("memuat setiap entitas SYNCED, tepat sekali", () => {
+    expect([...BOOTSTRAP_ORDER].sort()).toEqual([...SYNCED].sort());
+    expect(new Set(BOOTSTRAP_ORDER).size).toBe(BOOTSTRAP_ORDER.length);
+  });
+
+  it("menempatkan setiap induk SEBELUM anaknya", () => {
+    for (const [anak, induk] of Object.entries(PARENTS)) {
+      for (const p of induk ?? []) {
+        expect(BOOTSTRAP_ORDER.indexOf(p.entity)).toBeLessThan(BOOTSTRAP_ORDER.indexOf(anak as never));
+      }
+    }
+  });
+});
 
 describe("SPEC-885 · bootstrapSnapshot (hub)", () => {
   it("mengirim keadaan TABEL dalam urutan dependensi: induk selalu mendahului anaknya", async () => {

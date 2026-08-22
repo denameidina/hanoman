@@ -341,10 +341,17 @@ export async function pull(
 
 // SPEC-885 · ADR-0138 · urutan dependensi topologis, diturunkan dari `PARENTS`. Induk selalu
 // mendahului anaknya, jadi penerima tak pernah perlu menunda satu record pun — urutan FK benar
-// BY CONSTRUCTION, bukan diperbaiki oleh retry. `sessionResult` ditaruh terakhir karena
-// `projectId`-nya kolom polos TANPA @relation (lihat catatan di `PARENTS`).
-const BOOTSTRAP_ORDER: Entity[] = [
-  "project", "spec", "ticket", "customAgent", "githubIssue", "ticketAttachment", "sessionResult",
+// BY CONSTRUCTION, bukan diperbaiki oleh retry. `vps` dan `sessionResult` tak punya induk
+// (`sessionResult.projectId` kolom polos TANPA @relation, lihat catatan di `PARENTS`), jadi
+// letaknya bebas — tapi mereka tetap WAJIB ADA.
+//
+// Daftar ini adalah SALINAN dari `SYNCED` yang diurutkan ulang, dan karena itu ia basi diam-diam
+// begitu entitas baru lahir: entitas yang terlewat tidak menghasilkan satu pun error, ia hanya
+// TIDAK IKUT ke client baru. `sync-bootstrap.test.ts` menegakkan cakupannya (preseden PARENTS ×
+// DMMF di `sync-parents-dmmf.test.ts`).
+export const BOOTSTRAP_ORDER: Entity[] = [
+  "project", "spec", "ticket", "customAgent", "githubIssue", "ticketAttachment",
+  "vps", "sessionResult",
 ];
 
 export type BootstrapPage = {

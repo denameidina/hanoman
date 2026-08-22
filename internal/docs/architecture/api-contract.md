@@ -867,7 +867,10 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > instance non-client (hub) → `200 { ok:false, reason:"not-configured" }`. Tombol muncul hanya di client
 > (`GET /config`.`sync.running`).
 > **Tarik ulang penuh** (SPEC-382 · ADR-0082): body opsional `{ full: true }` → kursor `SyncState`
-> dikembalikan ke `0` lalu feed di-drain sampai habis →
+> dikembalikan ke `0`. **SPEC-885 · ADR-0138:** sesudah itu client mencoba `/api/sync/bootstrap` lebih
+> dulu — ia membaca TABEL hub dan karena itu lebih lengkap daripada replay feed (feed lossy melewati
+> rename project, terukur 727 vs 698 spec). Bootstrap dilewati bila **outbox berisi** (suntingan lokal
+> tak boleh ditimpa) atau hub menjawab `404`; di kedua hal itu feed di-drain sampai habis dari kursor 0 →
 > `200 { ok:true, full:true, pulled, pushed, conflicts, deleted, dropped }`. Satu-satunya jalan pulang
 > bagi baris feed yang terlanjur **dilompati** kursor sebelum kontrak apply ADR-0082; aman diulang
 > karena pull server-authoritative & `upsertLocal` idempoten. Body absen/`{ full:false }` = perilaku lama.
