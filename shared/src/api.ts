@@ -114,6 +114,8 @@ export const paths = {
   // baris pun perubahan di services/agent-capabilities.ts.
   terminalDialog: (id: string) => `${API}/terminal/sessions/${id}/dialog`,
   terminalDialogAnswer: (id: string) => `${API}/terminal/sessions/${id}/dialog/answer`,
+  // SPEC-909 · ADR-0146 · hentikan hanoman-lead untuk sesi ini sebelum ia mengetik ke pane.
+  terminalDialogTakeover: (id: string) => `${API}/terminal/sessions/${id}/dialog/takeover`,
   terminalPhases: (id: string) => `${API}/terminal/sessions/${id}/phases`,
   // SPEC-230 · review + integrate ber-skop sesi (sesi project-level PRD, tanpa Spec).
   sessionReview: (id: string) => `${API}/terminal/sessions/${id}/review`,

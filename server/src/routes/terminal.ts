@@ -34,7 +34,8 @@ import { saveSessionUpload } from "../services/uploads";
 import {
   readSessionDialog, answerSessionDialog, sessionPaneIO, beginAnswer, endAnswer,
 } from "../services/session-dialog";
-import { isDeciding } from "../services/lead/deciding";
+import { isDeciding, isTakenOver } from "../services/lead/deciding";
+import { takeOverAsk } from "../services/lead/ask";
 
 // SPEC-816 · lampiran gambar sesi terminal. Berkas + path, bukan gambar inline: yang bisa dikirim
 // ke PTY hanyalah teks, dan CLI-lah yang menyusun blok image dari berkas yang dibacanya.
@@ -369,7 +370,9 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     const s = getSession(id);
     if (!s || s.exited) return reply.code(404).send({ error: "live session not found" });
     // ADR-0091 ditegakkan apa adanya: selama lead memegang sesi ini, dialah yang berhak menjawab.
-    if (isDeciding(id))
+    // SPEC-909 · ADR-0146 · KECUALI sesudah operator mengambil alih — di situ lead sudah dibatalkan,
+    // dan menolak operator berarti tak ada satu pun pihak yang bisa menjawab pertanyaannya.
+    if (isDeciding(id) && !isTakenOver(id))
       return reply.code(409)
         .send({ error: "hanoman-lead sedang menyusun keputusan untuk sesi ini", reason: "deciding" });
     if (!beginAnswer(id))
@@ -386,6 +389,22 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     } finally {
       endAnswer(id);
     }
+  });
+
+  // SPEC-909 · ADR-0146 · AC-6 · operator merebut sesi dari hanoman-lead SEBELUM lead mengetik ke
+  // pane. Di bawah prefix `terminal` supaya capability-nya turun dari peta yang sudah ada
+  // (`rw("sessions")` → sessions:write, sama dengan menjawab dialog): siapa yang boleh menjawab,
+  // boleh mengambil alih. Pemenang perebutannya ditentukan `beginAnswer()` — Set sinkron yang sama
+  // yang mencegah dua POST manusia menyilangkan keystroke, dan yang sejak SPEC ini juga dilewati
+  // jalur lead. Jadi tak pernah ada dua jawaban terketik ke pane yang sama.
+  app.post("/terminal/sessions/:id/dialog/takeover", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const r = takeOverAsk(id);
+    if (r === "none") return reply.code(404).send({ error: "tak ada pertanyaan hidup untuk sesi ini" });
+    if (r === "answering")
+      return reply.code(409)
+        .send({ error: "hanoman-lead sudah mengirim jawabannya ke pane", reason: "answering" });
+    return reply.code(202).send({ accepted: true });
   });
 
   // SPEC-230 · review diff worktree hidup sebuah sesi project-level (PRD). Kunci worktree = id
