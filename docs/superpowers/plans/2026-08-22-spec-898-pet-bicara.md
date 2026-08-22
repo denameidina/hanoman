@@ -1148,7 +1148,7 @@ git commit -m "feat(pet): rekap 'selama kamu pergi' saat tab aktif lagi"
 - Consumes: `isUrgent` (Task 4), `view.since` (Task 3).
 - Produces: durasi animasi baris `waiting` dibagi `PET_URGENT_RATE` saat mendesak.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `describe("HanomanPet — pet bicara (SPEC-898)")` (tambahkan `durationMs` ke import bila belum ada — sudah ada di berkas ini):
 
@@ -1164,12 +1164,12 @@ Tambahkan di `describe("HanomanPet — pet bicara (SPEC-898)")` (tambahkan `dura
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx -t "berdenyut lebih cepat"`
 Expected: FAIL — durasi tetap `durationMs("waiting")`
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 1. Import `isUrgent` dari `./pet-speech`.
 
@@ -1191,12 +1191,12 @@ const PET_URGENT_RATE = 1.5;
     : `hn-pet-frames ${frameMs}ms steps(${columns}, end) ${display.loop ? "infinite" : "1 forwards"}`;
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx`
 Expected: PASS — seluruh berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/HanomanPet.tsx src/test/hanoman-pet.test.tsx

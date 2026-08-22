@@ -466,6 +466,16 @@ describe("HanomanPet — pet bicara (SPEC-898)", () => {
     } finally { now.mockRestore(); setHidden(false); }
   });
 
+  it("baris waiting berdenyut lebih cepat saat pertanyaannya menua", () => {
+    const young = [session({ id: "a", specId: "SPEC-1", decision: true, decisionAt: new Date(Date.now() - 60_000).toISOString() })];
+    const { rerender } = render(<HanomanPet sessions={young} backlog={bl} onOpen={vi.fn()} />);
+    expect(styleOf(atlas())).toContain(`${durationMs("waiting")}ms`);
+
+    const old = [session({ id: "a", specId: "SPEC-1", decision: true, decisionAt: new Date(Date.now() - 20 * 60_000).toISOString() })];
+    rerender(<HanomanPet sessions={old} backlog={bl} onOpen={vi.fn()} />);
+    expect(styleOf(atlas())).toContain(`${Math.round(durationMs("waiting") / 1.5)}ms`);
+  });
+
   it("panel terbuka menelan gelembung — daftarnya sudah di layar", () => {
     const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
     fireEvent.click(hit());

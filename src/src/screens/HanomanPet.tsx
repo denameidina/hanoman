@@ -9,7 +9,7 @@ import {
   KIND_NOUN, POSE_LABEL, type PetTarget,
 } from "./pet-state";
 import {
-  PET_AWAY_MS, PET_SPEECH_MS, petRecap, petSnapshot, speechFor,
+  isUrgent, PET_AWAY_MS, PET_SPEECH_MS, petRecap, petSnapshot, speechFor,
   type PetSnapshot, type PetSpeech,
 } from "./pet-speech";
 import {
@@ -33,6 +33,9 @@ const BUBBLE_EDGE = 8;
 // jadi frame pertama belum tentu sudah tiba pada `visibilitychange`. Snapshot ditahan selama ini,
 // bukan dibuang pada render pertama yang datanya masih basi.
 const RECAP_GRACE_MS = 5_000;
+// SPEC-898 · fps baris `waiting` saat pertanyaannya sudah menua (6 → 9). Digerbangi BARIS, bukan
+// pose: `wave`/`thanks` yang menumpang di atasnya tetap berirama normal.
+const PET_URGENT_RATE = 1.5;
 
 // jsdom tak punya matchMedia; ketiadaannya dibaca sebagai "tak ada preferensi", bukan "reduce".
 function usePrefersReducedMotion(): boolean {
@@ -314,9 +317,11 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   const offline = view.pose === "offline";
   const status = `Hanoman ${POSE_LABEL[view.pose]} · ${view.headline}`
     + (view.count > 1 ? ` · ${view.count} ${KIND_NOUN[view.kind]}` : "");
+  const urgent = displayRow === "waiting" && isUrgent(view, Date.now());
+  const frameMs = Math.round(durationMs(displayRow) / (urgent ? PET_URGENT_RATE : 1));
   const frames = reduced
     ? "none"
-    : `hn-pet-frames ${durationMs(displayRow)}ms steps(${columns}, end) ${display.loop ? "infinite" : "1 forwards"}`;
+    : `hn-pet-frames ${frameMs}ms steps(${columns}, end) ${display.loop ? "infinite" : "1 forwards"}`;
   return (
     <div data-testid="pet-root" ref={rootRef} style={root}>
       {panelMounted && (
