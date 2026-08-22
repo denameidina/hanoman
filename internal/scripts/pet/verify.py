@@ -14,7 +14,7 @@ petlib = load_petlib()
 
 
 def main() -> None:
-    atlas_path = ASSETS / "hnm-pet-anoman-atlas-v01.webp"
+    atlas_path = ASSETS / "hnm-pet-anoman-atlas-v02.webp"
     manifest_path = ASSETS / "pet.json"
     problems: list[str] = []
     if not atlas_path.exists():
