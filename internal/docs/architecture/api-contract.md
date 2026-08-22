@@ -1505,6 +1505,14 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 # Katalog persona yang dipakai SETIAP sesi baru. Capability agent-token: domain `agents`,
 # dipetakan MENURUT METHOD (baca → agents:read, tulis → agents:write) — bukan per prefix,
 # karena menulis definisi agen mengubah apa yang dilihat semua sesi berikutnya (kelas bug SPEC-405).
+# SPEC-881 · ADR-0136 · setiap CustomAgentView membawa dua field TURUNAN (dihitung di lapis
+# response, BUKAN kolom — kolom baru menyeberang changefeed dan hub versi lama menolak seluruh
+# push yang membawanya, kelas SPEC-880):
+#   builtin       : true bila baris GLOBAL dan namanya dikenal BUILTIN_AGENTS
+#   builtinEdited : true bila isi baris tak lagi cocok sidik jari yang terakhir ditulis seed DI
+#                   MESIN INI (stempel hidup di Setting.data, lokal, tak disync). Sidik jari yang
+#                   tak tercatat dibaca sebagai "disunting" — menandai berlebih lebih baik daripada
+#                   menjanjikan "asli bawaan" untuk isi yang tak bisa dibuktikan.
 GET    /api/custom-agents                 -> CustomAgentView[]        # agen GLOBAL saja
 GET    /api/custom-agents?projectId=<id>  -> CustomAgentView[]        # himpunan EFEKTIF (global+project),
 #                                            baris global bertanda `inherited: true`; nama yang ditimpa

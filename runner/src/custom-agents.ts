@@ -104,3 +104,33 @@ export function agentRosterBlock(defs: AgentDef[]): string {
   }
   return lines.join("\n");
 }
+
+/**
+ * SPEC-881 · ADR-0136 · klausa untuk jalur CLAUDE. Codex sudah menerima `agentRosterBlock` yang
+ * menyuruhnya MENGADOPSI peran; claude menerima definisinya lewat `--agents` tapi tak menerima
+ * satu pun dorongan untuk menoleh ke sana — dan katalog yang tak pernah dipanggil sama saja dengan
+ * katalog kosong.
+ *
+ * Menyebut agen yang BENAR-BENAR ada di roster sesi ini, bukan daftar statis: operator yang
+ * mematikan sebuah agen tak boleh menerima prompt yang menyuruh memanggilnya.
+ *
+ * Kosong saat roster kosong — invarian "prompt byte-identik saat katalog kosong" (ADR-0094).
+ */
+export function agentDelegationClause(defs: AgentDef[]): string {
+  if (defs.length === 0) return "";
+  return [
+    "",
+    "## Subagent yang tersedia",
+    "",
+    "Sesi ini punya subagent berikut. Delegasikan saat tugasnya cocok — konteks mereka TERPISAH",
+    "dari milikmu, jadi menyerahkan penyapuan & verifikasi ke mereka MENGHEMAT konteksmu sendiri,",
+    "bukan memboroskannya.",
+    "",
+    ...defs.map((d) => `- **${d.name}** — ${d.description}`),
+    "",
+    `Panggil lewat tool ${MENTION_TOOL} dengan nama agennya. Mereka tak bisa mendelegasikan lagi,`,
+    "jadi tak ada rantai panggilan yang perlu kamu jaga. Laporan mereka adalah MASUKAN — kamu yang",
+    "memutuskan, dan kamu yang bertanggung jawab atas hasilnya.",
+    "",
+  ].join("\n");
+}

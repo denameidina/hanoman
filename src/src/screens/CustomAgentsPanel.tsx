@@ -191,6 +191,12 @@ export function CustomAgentsPanel({ projectId, onToast }: CustomAgentsPanelProps
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
               <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-strong)" }}>{a.name}</span>
               {readOnly && <Badge tone="neutral" size="sm">warisan global</Badge>}
+              {/* SPEC-881 · ADR-0136 · keduanya field TURUNAN dari response, bukan kolom skema. */}
+              {a.builtin && (
+                <Badge tone="neutral" size="sm" data-testid={`builtin-${a.name}`}>
+                  {a.builtinEdited ? "bawaan · disunting" : "bawaan"}
+                </Badge>
+              )}
               {!a.enabled && <Badge tone="warn" size="sm">nonaktif</Badge>}
               {a.runtime && <Badge tone="neutral" size="sm" data-testid={`runtime-${a.name}`}>{a.runtime}</Badge>}
               <span style={{ flex: 1 }} />

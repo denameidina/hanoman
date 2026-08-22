@@ -7,6 +7,7 @@ export * from "./agent-engine";
 export * from "./entities";
 export * from "./agent";
 export * from "./custom-agent";
+export * from "./builtin-agents";
 export * from "./agent-catalog";
 export * from "./github";
 export * from "./lead";

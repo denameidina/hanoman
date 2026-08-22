@@ -142,6 +142,14 @@ export type CustomAgentView = {
   /** SPEC-484 · ADR-0101 · null = ikut sesi induk (dipakai sesi claude MAUPUN codex). */
   runtime: AgentRuntime | null;
   enabled: boolean;
+  /**
+   * SPEC-881 · ADR-0136 · DITURUNKAN di lapis response, BUKAN kolom. Kolom baru berarti kolom baru
+   * di changefeed sync, dan hub versi lama menolak SELURUH push yang membawanya (kelas SPEC-880).
+   * Pola yang sama dengan `inherited` di bawah.
+   */
+  builtin?: boolean;
+  /** Isi baris tak lagi cocok dengan sidik jari yang terakhir ditulis seed DI MESIN INI. */
+  builtinEdited?: boolean;
   inherited?: boolean;
 };
 
