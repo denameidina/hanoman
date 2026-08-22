@@ -1546,12 +1546,12 @@ review manusia bahwa `thanks` harus dibedakan dari `wave` (kedua tangan, tak per
 
 - [x] **Step 5: Cek index Source of Truth**
 
-Run: `node dist/cli.js docs index --check 2>/dev/null || pnpm --filter ./runner exec tsx src/cli.ts docs index --check`
+Run: `pnpm --filter ./cli exec tsx src/hanoman.ts docs index --check` → `index ok`
 Jika CLI tak tersedia di worktree, cukup pastikan `internal/docs/README.md` memuat tautan ADR-0141
 (kategori `adr`) — `frontend-implementation.md` dan `internal/assets/pet/README.md` sudah ter-link
 sejak spec A.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs internal/assets/pet/README.md
@@ -1568,7 +1568,7 @@ git commit -m "docs(pet): ADR-0141 onset menunggu di marker + docs SPEC-898"
 - Consumes: seluruh task sebelumnya.
 - Produces: bukti hijau untuk `Execute done`.
 
-- [ ] **Step 1: Test paket `src` yang tersentuh**
+- [x] **Step 1: Test paket `src` yang tersentuh**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run \
@@ -1579,7 +1579,7 @@ env -u NODE_ENV pnpm vitest --run \
 Expected: seluruh berkas PASS, dan jumlah test **bukan** nol (`--changed` tak dipakai di sini justru
 supaya "no test files" tak bisa terbaca hijau).
 
-- [ ] **Step 2: Test paket `runner` & `server` yang tersentuh**
+- [x] **Step 2: Test paket `runner` & `server` yang tersentuh**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run runner/test/settings.test.ts runner/test/codex-settings.test.ts
@@ -1588,7 +1588,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" env -u NODE_ENV \
 ```
 Expected: PASS.
 
-- [ ] **Step 3: Pipeline atlas**
+- [x] **Step 3: Pipeline atlas**
 
 ```bash
 python3 internal/scripts/pet/test-petlib.py
@@ -1597,7 +1597,7 @@ python3 internal/scripts/pet/atlas.py --check
 ```
 Expected: OK, `13 baris`, byte < 1 000 000.
 
-- [ ] **Step 4: Typecheck paket yang tersentuh**
+- [x] **Step 4: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck
@@ -1607,16 +1607,33 @@ pnpm --filter ./src typecheck
 ```
 Expected: nol error. (Empat paket memang tersentuh — `pnpm -r typecheck` tetap tidak dipakai.)
 
-- [ ] **Step 5: Uji endpoint nyata sekali di akhir**
+- [x] **Step 5: Uji endpoint nyata sekali di akhir**
 
 ```bash
-HANOMAN_HOME="$(mktemp -d)" DATABASE_URL="file:$(mktemp -d)/smoke.db" \
+SP=$(mktemp -d)
+DATABASE_URL="file:$SP/smoke.db" pnpm --filter ./server exec prisma migrate deploy
+HANOMAN_HOME="$SP" DATABASE_URL="file:$SP/smoke.db" HANOMAN_PORT=8891 \
+  HANOMAN_TMUX_SOCKET=hanoman-smoke-898 \
+  env -u NODE_ENV -u HANOMAN_CONTROL_ORIGINS -u HANOMAN_SUPERVISOR -u HANOMAN_WEB_DIR \
   pnpm --filter ./server exec tsx src/server.ts &
-# tunggu port siap, lalu:
-curl -s localhost:8787/api/terminal/sessions | head -c 400
+curl -s -c "$SP/j" -X POST localhost:8891/api/auth/setup -H 'content-type: application/json' \
+  -d '{"email":"smoke@example.test","password":"Rahasia-Smoke-898!"}'
+curl -s -b "$SP/j" localhost:8891/api/terminal/sessions
 ```
-Expected: 200 dengan array JSON. Bila ada sesi yang markernya terisi, barisnya memuat `decisionAt`
-ISO. Matikan server per-PID (`lsof -ti:8787` → `kill <pid>`), **jangan** `pkill -f`.
+
+Prasyarat yang mudah terlewat: DB kosong harus **dimigrasi lebih dulu** (tanpa itu boot mati
+`P2021 main.User`), dan endpointnya butuh cookie sesi (`{"error":"unauthorized"}` tanpa itu).
+Pane uji dilahirkan langsung di socket tmux yang sama (`tmux -L hanoman-smoke-898 new-session`
++ `set-option @hanoman_decision_file`). Matikan per-PID (`lsof -ti:8891` → `kill`) dan
+`tmux -L hanoman-smoke-898 kill-server`; **jangan** `pkill -f`.
+
+Terukur 2026-08-22, ketiga keadaan marker atas pane hidup yang sama:
+
+| isi marker | `decision` | `decisionAt` |
+|---|---|---|
+| `waiting\n` (pra-ADR-0141) | `true` | **absen** |
+| `1787408407\n` (epoch, 15 menit lalu) | `true` | `"2026-08-22T14:20:07.000Z"` |
+| kosong | `false` | **absen** |
 
 - [ ] **Step 6: Diff bersih & push**
 
