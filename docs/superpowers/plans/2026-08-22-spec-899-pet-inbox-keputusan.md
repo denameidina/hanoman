@@ -801,7 +801,7 @@ git commit -m "test(dialog): kunci capability sessions + batas MCP untuk dialog 
 - Consumes: `paths.terminalDialog`, `paths.terminalDialogAnswer`, tipe `SessionDialogAnswer`, `SessionDialogPayload` dari `@hanoman/shared`.
 - Produces: `api.sessionDialog(id): Promise<SessionDialogPayload | null>`; `api.answerSessionDialog(id, body): Promise<{ accepted: true }>`; `waitingSessions(sessions: TerminalSession[], backlog: Spec[]): TerminalSession[]`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `src/test/api-client.test.ts`, tambahkan di akhir berkas:
 
@@ -856,12 +856,12 @@ describe("waitingSessions", () => {
 
 Tambahkan `waitingSessions` ke daftar import dari `../src/screens/pet-state` di berkas itu. Bila helper `spec()`/`session()` belum ada di `pet-state.test.ts`, pakai bentuk yang sudah dipakai berkas itu untuk membangun `Spec`/`TerminalSession`.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/api-client.test.ts src/test/pet-state.test.ts`
 Expected: FAIL — `api.sessionDialog is not a function` dan `waitingSessions is not exported`.
 
-- [ ] **Step 3: Tambah entri klien API**
+- [x] **Step 3: Tambah entri klien API**
 
 Di `src/src/api/client.ts`, tambahkan tipe pada blok import dari `@hanoman/shared` (`SessionDialogAnswer`, `SessionDialogPayload`) dan sisipkan tepat setelah `listTerminals: () => j<TerminalSession[]>(paths.terminalSessions),`:
 
@@ -874,7 +874,7 @@ Di `src/src/api/client.ts`, tambahkan tipe pada blok import dari `@hanoman/share
     j<{ accepted: true }>(paths.terminalDialogAnswer(id), { method: "POST", ...body(b) }),
 ```
 
-- [ ] **Step 4: Tambah helper `waitingSessions`**
+- [x] **Step 4: Tambah helper `waitingSessions`**
 
 Di `src/src/screens/pet-state.ts`, tepat setelah fungsi `sessionKind`, sisipkan:
 
@@ -888,12 +888,12 @@ export const waitingSessions = (sessions: TerminalSession[], backlog: Spec[]): T
 };
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/api-client.test.ts src/test/pet-state.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/api/client.ts src/src/screens/pet-state.ts src/test/api-client.test.ts src/test/pet-state.test.ts

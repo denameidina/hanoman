@@ -1,6 +1,7 @@
 import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry,
   type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
   type ProvisionStep, type ProvisionResult,
+  type SessionDialogAnswer, type SessionDialogPayload,
   type SetupStatus, type SetupApplyResult } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
@@ -368,6 +369,12 @@ export const api = {
   browseFs: (path?: string) =>
     j<{ path: string; parent: string | null; entries: { name: string; path: string }[] }>(paths.fsBrowse(path)),
   listTerminals: () => j<TerminalSession[]>(paths.terminalSessions),
+  // SPEC-899 · ADR-0142 · inbox keputusan. `204` (pane tak menampilkan dialog yang bisa dijawab)
+  // dinormalkan ke `null` supaya pemanggil tak perlu membedakannya dari "belum dimuat".
+  sessionDialog: (id: string) =>
+    j<SessionDialogPayload | undefined>(paths.terminalDialog(id)).then((p) => p ?? null),
+  answerSessionDialog: (id: string, b: SessionDialogAnswer) =>
+    j<{ accepted: true }>(paths.terminalDialogAnswer(id), { method: "POST", ...body(b) }),
   getTerminalWorkspace: () => j<TerminalWorkspaceSnapshot>(paths.terminalWorkspace),
   putTerminalWorkspace: (input: TerminalWorkspaceWrite) =>
     j<TerminalWorkspaceSnapshot>(paths.terminalWorkspace, { method: "PUT", ...body(input) }),

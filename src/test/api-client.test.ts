@@ -156,3 +156,31 @@ describe("api client · operasi berkas IDE", () => {
     expect([...form.keys()]).toEqual(["dir", "manifest", "file"]);
   });
 });
+
+// SPEC-899 · ADR-0142 · inbox keputusan pet.
+describe("api client · dialog sesi", () => {
+  it("sessionDialog memetakan 204 jadi null, bukan undefined", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
+    await expect(api.sessionDialog("s1")).resolves.toBeNull();
+  });
+
+  it("sessionDialog mengembalikan payload pada 200", async () => {
+    const payload = {
+      screenHash: "deadbeef",
+      dialog: { title: "Warna?", multi: false, freeIndex: 3, notes: false, options: [], tabs: [] },
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } }));
+    await expect(api.sessionDialog("s1")).resolves.toEqual(payload);
+    expect(fetchMock).toHaveBeenCalledWith(paths.terminalDialog("s1"), expect.anything());
+  });
+
+  it("answerSessionDialog mem-POST screenHash + pilihan ke path jawaban", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ accepted: true }), { status: 202, headers: { "content-type": "application/json" } }));
+    await api.answerSessionDialog("s1", { screenHash: "deadbeef", choice: 2 });
+    expect(fetchMock).toHaveBeenCalledWith(paths.terminalDialogAnswer("s1"), expect.objectContaining({
+      method: "POST", body: JSON.stringify({ screenHash: "deadbeef", choice: 2 }),
+    }));
+  });
+});

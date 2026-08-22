@@ -142,6 +142,14 @@ export function sessionKind(s: TerminalSession, doneSpecs: ReadonlySet<string>):
   return reviewable ? "review" : "working";
 }
 
+// SPEC-899 · sesi yang benar-benar meminta jawaban manusia. Sengaja lewat `sessionKind` yang sama
+// dengan panel & rekap, bukan lewat predikat kedua (`decision && !deciding`) yang bisa berselisih
+// dengannya — tabel yang disalin ke pemakai kedua adalah kelas bug SPEC-431/448.
+export const waitingSessions = (sessions: TerminalSession[], backlog: Spec[]): TerminalSession[] => {
+  const done = doneSpecIds(backlog);
+  return byId(sessions).filter((s) => sessionKind(s, done) === "waiting");
+};
+
 export function derivePetConditions(input: PetInput): PetCondition[] {
   const { sessions, backlog, notifications, now } = input;
   const conn = input.connection ?? ONLINE;

@@ -4,6 +4,7 @@ import type { TerminalSession } from "../src/api/client";
 import {
   derivePetConditions, derivePetState, doneSpecIds, petPulse, sessionKind, KIND_NOUN,
   PET_OFFLINE_MS, PET_SLEEP_MS, PET_TRANSIENT_MS, PET_URGENT_MS, loadPetRoam, savePetRoam,
+  waitingSessions,
   type PetConnection, type PetInput,
 } from "../src/screens/pet-state";
 
@@ -423,5 +424,20 @@ describe("umur menunggu (SPEC-898)", () => {
     expect(sessionKind(session({ id: "x", exited: true, exitCode: 0 }), done)).toBeNull();
     expect(sessionKind(session({ id: "x", specId: "SPEC-9" }), done)).toBe("review");
     expect(sessionKind(session({ id: "x" }), done)).toBe("working");
+  });
+});
+
+// SPEC-899 · daftar sesi yang benar-benar meminta jawaban manusia — dipakai panel inbox keputusan.
+describe("waitingSessions", () => {
+  it("hanya sesi hidup ber-marker keputusan, dan sesi yang dipegang lead tak ikut", () => {
+    const backlog = [spec({ id: "SPEC-1" })];
+    const rows = waitingSessions([
+      session({ id: "b", specId: "SPEC-1", decision: true }),
+      session({ id: "a", specId: "SPEC-1", decision: true }),
+      session({ id: "c", specId: "SPEC-1", decision: true, deciding: true }),
+      session({ id: "d", specId: "SPEC-1" }),
+      session({ id: "e", specId: "SPEC-1", decision: true, exited: true }),
+    ], backlog);
+    expect(rows.map((s) => s.id)).toEqual(["a", "b"]);   // stabil menurut id, bukan urutan tmux
   });
 });
