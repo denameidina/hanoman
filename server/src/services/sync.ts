@@ -289,21 +289,54 @@ export async function applyPush(
 
 export type PulledRecord = { entity: string; recordId: string; version: number; op: SyncOp; data: unknown };
 
-export async function pull(sinceCursor: string, limit = 500): Promise<{ cursor: string; records: PulledRecord[] }> {
+// SPEC-885 · ADR-0138 · anggaran byte satu halaman pull. Sebelum ini `pull` memotong per JUMLAH
+// baris (`limit`) sementara client memotong per BYTE (`maxResponseBytes` di `fetchTransport`), dan
+// dua satuan itu tak pernah bisa sepakat: baris feed berkisar 100 B–29 KB, jadi halaman 500-baris
+// bisa 0,2 MB atau 2,5 MB tergantung komposisinya. Di hub produksi halaman KEDUA berukuran 2,51 MB
+// (348 jendela 500-baris melewati 2 MB) → response di-destroy client → pull melempar → `tick()`
+// menelannya tanpa log → halaman yang sama diulang tiap 15 detik selamanya. Client baru berhenti
+// di 500 dari 3.637 record tanpa satu pun jejak.
+export const PULL_MAX_BYTES = 1024 * 1024;
+
+// Ukuran record persis seperti yang akan dikirim. Sengaja men-serialize dua kali (di sini dan oleh
+// Fastify): anggaran yang ditaksir tidak menjaga apa pun, dan biayanya ~ms untuk halaman 1 MB.
+export function recordBytes(rec: PulledRecord): number {
+  return Buffer.byteLength(JSON.stringify(rec));
+}
+
+export async function pull(
+  sinceCursor: string, limit = 500, maxBytes = PULL_MAX_BYTES,
+): Promise<{ cursor: string; records: PulledRecord[]; hasMore: boolean }> {
   // SPEC-398 · ADR-0086 · `SyncLog.seq` kini `Int` (SQLite hanya meng-auto-isi alias rowid ber-tipe
   // deklarasi tepat `INTEGER`). Kursor tetap STRING di wire — jangan ubah bentuk itu.
   const since = Number(sinceCursor || "0");
   const rows = await prisma.syncLog.findMany({
     where: { seq: { gt: since } }, orderBy: { seq: "asc" }, take: limit,
   });
-  const cursor = rows.length ? String(rows[rows.length - 1]!.seq) : sinceCursor || "0";
-  return {
-    cursor,
-    records: rows.map((r) => ({
+
+  const records: PulledRecord[] = [];
+  let bytes = 0;
+  let trimmed = false;
+  for (const r of rows) {
+    const rec: PulledRecord = {
       entity: r.entity, recordId: r.recordId, version: r.version,
       op: r.op === "delete" ? "delete" : "upsert", data: r.data,
-    })),
-  };
+    };
+    const size = recordBytes(rec);
+    // Minimal satu baris SELALU dikirim: satu record raksasa tak boleh membekukan feed di
+    // tempatnya. Cap `MAX_SYNC_RECORD_BYTES` (1 MB) di sisi client yang menjaga batas atasnya.
+    if (records.length && bytes + size > maxBytes) { trimmed = true; break; }
+    bytes += size;
+    records.push(rec);
+  }
+
+  // Kursor menunjuk baris terakhir yang BENAR-BENAR dikirim — bukan baris terakhir yang dibaca.
+  // Kalau ia menunjuk lebih jauh, baris yang tak terkirim tertinggal di belakang kursor dan tak
+  // akan pernah ditarik lagi (akar hilangnya lampiran, audit SPEC-382).
+  const cursor = records.length ? String(rows[records.length - 1]!.seq) : sinceCursor || "0";
+  // `rows.length === limit` = mungkin masih ada di balik batas baris. Melebihkan `hasMore` hanya
+  // memicu satu pull kosong; mengurangkannya membuat client berhenti di tengah feed.
+  return { cursor, records, hasMore: trimmed || rows.length === limit };
 }
 
 // SPEC-268 · ADR-0066 · publish write LOKAL-asal ke change-feed (SyncLog) + siar. Melengkapi
