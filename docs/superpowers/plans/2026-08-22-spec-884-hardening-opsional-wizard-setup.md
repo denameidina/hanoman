@@ -349,7 +349,7 @@ git commit -m "feat(spec-884): resolver profil runtime (deployment + hardening)"
 - Consumes: `resolveHardening` (Task 2)
 - Produces: `assertRuntimeBoundary(env, runtime)` dengan tanda tangan **tidak berubah**
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan blok ini ke `server/test/session-sandbox.test.ts`, **di dalam** `describe("production session sandbox", …)`, setelah test `"accepts single origin only when acknowledged explicitly (SPEC-805)"`. Jangan mengubah test yang sudah ada:
 
@@ -383,12 +383,12 @@ Tambahkan blok ini ke `server/test/session-sandbox.test.ts`, **di dalam** `descr
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-sandbox.test.ts`
 Expected: FAIL — 3 test baru merah dengan `production Hanoman harus berjalan sebagai user non-root` / `HANOMAN_SESSION_SANDBOX=podman wajib di production`. Tiga test lama tetap hijau.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/session-sandbox.ts`, ganti baris 1-7 (import + dua baris pertama fungsi):
 
@@ -409,17 +409,17 @@ export function assertRuntimeBoundary(env: Env, runtime: { uid: number | undefin
 
 Sisa fungsi (cek origin, trust proxy, bind loopback) **tidak diubah sama sekali**.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-sandbox.test.ts`
 Expected: PASS — 6 test (3 lama + 3 baru)
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: keluar 0, tanpa error
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/session-sandbox.ts server/test/session-sandbox.test.ts

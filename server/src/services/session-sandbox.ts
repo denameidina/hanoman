@@ -1,7 +1,12 @@
+import { resolveHardening } from "@hanoman/runner";
+
 type Env = Record<string, string | undefined>;
 
 export function assertRuntimeBoundary(env: Env, runtime: { uid: number | undefined; host: string }): void {
-  if (env.NODE_ENV !== "production") return;
+  // SPEC-884 · ADR-0138 · satu-satunya perubahan pada gerbang ini: ia berhenti diturunkan dari
+  // `NODE_ENV` dan mulai diturunkan dari hardening yang diminta eksplisit. Isinya di bawah TIDAK
+  // disentuh — begitu hardening menyala, perilakunya identik dengan sebelum SPEC-884.
+  if (!resolveHardening(env)) return;
   if (runtime.uid === 0) throw new Error("production Hanoman harus berjalan sebagai user non-root");
   if (env.HANOMAN_SESSION_SANDBOX !== "podman")
     throw new Error("HANOMAN_SESSION_SANDBOX=podman wajib di production");

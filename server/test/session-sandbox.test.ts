@@ -25,6 +25,34 @@ describe("production session sandbox", () => {
       { uid: 1000, host: "127.0.0.1" })).toThrow(/proxy/);
   });
 
+  // SPEC-884 · ADR-0138 · hardening jadi opt-in. Semua assertion di atas tetap berlaku apa adanya
+  // karena env-nya memuat penanda ADR-0117 (sandbox/origin/proxy) yang dibaca `resolveHardening`
+  // sebagai "menyala". Yang baru: instalasi polos tak lagi menabrak satu pun gerbang ini.
+  it("tanpa hardening, instalasi npm polos boot — termasuk sebagai root (SPEC-884)", () => {
+    const plain = {
+      NODE_ENV: "production", DATABASE_URL: "file:/h/hanoman.db", PORT: "8787",
+      HOST: "127.0.0.1", HANOMAN_HOME: "/h", HANOMAN_SUPERVISOR: "1", HANOMAN_WEB_DIR: "/w",
+    };
+    expect(() => assertRuntimeBoundary(plain, { uid: 1000, host: "127.0.0.1" })).not.toThrow();
+    expect(() => assertRuntimeBoundary(plain, { uid: 0, host: "127.0.0.1" })).not.toThrow();
+    expect(() => assertRuntimeBoundary(plain, { uid: 0, host: "0.0.0.0" })).not.toThrow();
+  });
+
+  it("HANOMAN_HARDENING=1 menegakkan seluruh gerbang lama (SPEC-884)", () => {
+    const on = { NODE_ENV: "production", HANOMAN_HARDENING: "1" };
+    expect(() => assertRuntimeBoundary(on, { uid: 0, host: "127.0.0.1" })).toThrow(/non-root/);
+    expect(() => assertRuntimeBoundary(on, { uid: 1000, host: "127.0.0.1" })).toThrow(/SESSION_SANDBOX/);
+  });
+
+  it("hardening tak lagi diturunkan dari NODE_ENV (SPEC-884)", () => {
+    // Dev/test yang menyalakan hardening secara sadar TETAP tergerbang…
+    expect(() => assertRuntimeBoundary({ NODE_ENV: "test", HANOMAN_HARDENING: "1" },
+      { uid: 0, host: "127.0.0.1" })).toThrow(/non-root/);
+    // …dan production yang tidak menyalakannya TIDAK tergerbang.
+    expect(() => assertRuntimeBoundary({ NODE_ENV: "production" },
+      { uid: 0, host: "0.0.0.0" })).not.toThrow();
+  });
+
   it("builds a rootless, narrow-mount, internal-network Podman invocation", () => {
     const argv = sandboxArgv({
       command: "claude --dangerously-skip-permissions", worktree: "/srv/repo/.worktrees/spec-1",
