@@ -2117,7 +2117,7 @@ git commit -m "feat(spec-884): penanda permanen instance publik tanpa hardening"
 - Consumes: `api.setupStatus()` (Task 14), `SetupWizard` (Task 14)
 - Produces: kartu ber-`data-testid="setup-card"`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/settings-setup-card.test.tsx`:
 
@@ -2167,12 +2167,12 @@ describe("kartu Setup awal (SPEC-884)", () => {
 
 > Kartu ini hidup di sub-tab Settings; `tab` bertahan lewat `usePersistedState` (`SettingsScreen.tsx:547`). Taruh kartunya di sub-tab yang sama dengan kartu config lain, dan bila test tak menemukannya, klik dulu tab itu di test (pola yang sudah dipakai `src/test/config-panel.test.tsx`).
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/settings-setup-card.test.tsx`
 Expected: FAIL — `setup-card` tak ditemukan
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `src/src/screens/SettingsScreen.tsx`, tambahkan state + kartu di dekat kartu setting lain:
 
@@ -2205,12 +2205,12 @@ Di `src/src/screens/SettingsScreen.tsx`, tambahkan state + kartu di dekat kartu 
 
 Impor `SetupWizard` dan tipe `SetupStatus` di berkas itu.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/settings-setup-card.test.tsx src/test/config-panel.test.tsx`
 Expected: PASS — kedua berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SettingsScreen.tsx src/test/settings-setup-card.test.tsx
