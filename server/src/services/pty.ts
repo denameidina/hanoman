@@ -64,8 +64,8 @@ export const clearMarker = (f: string): void => {
 //
 // Ambangnya diukur (audit SPEC-903 §3.1): pane claude yang bekerja punya `window_activity == now`
 // pada 22/22 sampel 1 Hz — timer giliran berdetak tiap detik — sementara pane yang diam di prompt
-// beku 317 dtk. 3 dtk = 3x margin di atas jeda keluaran terukur (<= 1 dtk) dan di atas lag
-// pembulatan detik tmux (<= 1 dtk).
+// beku 317 dtk. 3 dtk = 3× margin di atas jeda keluaran terukur (≤ 1 dtk) dan di atas lag
+// pembulatan detik tmux (≤ 1 dtk).
 export const PANE_QUIET_MS = 3_000;
 
 // `activityAt` = detik epoch `#{window_activity}`. Nol/NaN = tmux tak menjawabnya (versi lama,
