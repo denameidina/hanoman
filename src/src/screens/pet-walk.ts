@@ -39,6 +39,9 @@ export type PetWalkStep = { state: PetWalkState; row: PetRowKey; move: PetMove |
 export type Rng = () => number;
 
 const ATTENTION: ReadonlySet<PetPose> = new Set(["waiting", "blocked"]);
+// SPEC-897 · terputus & tidur = berhenti di tempat. Pulang ke pojok adalah gestur "kabar penting
+// selalu di tempat yang sama"; di dua keadaan ini justru ketiadaan kabar yang sedang dikatakan.
+const STILL: ReadonlySet<PetPose> = new Set(["offline", "sleeping"]);
 const between = (rng: Rng, [lo, hi]: readonly [number, number]): number => lo + rng() * (hi - lo);
 const walkRow = (facing: PetFacing): PetRowKey => (facing === "right" ? "walk-right" : "walk-left");
 
@@ -77,7 +80,11 @@ export function stepWalk(state: PetWalkState, input: PetWalkInput, rng: Rng): Pe
   if (input.hovered || input.panelOpen || input.documentHidden)
     return { state: stand(cur, Infinity), row: poseRow, move: moving ? { x: cur, durationMs: 0 } : null };
 
-  // 3 · pose perhatian: pulang ke pojok kanan dulu, lalu berdiri memutar baris pose.
+  // 3 · terputus / tidur: berhenti di tempat, baris pose diputar.
+  if (STILL.has(pose))
+    return { state: stand(cur, Infinity), row: poseRow, move: moving ? { x: cur, durationMs: 0 } : null };
+
+  // 4 · pose perhatian: pulang ke pojok kanan dulu, lalu berdiri memutar baris pose.
   if (ATTENTION.has(pose)) {
     if (Math.abs(cur - home) > 1) {
       if (state.mode === "home" && now < state.until) return { state, row: walkRow(state.facing), move: null };
@@ -86,11 +93,11 @@ export function stepWalk(state: PetWalkState, input: PetWalkInput, rng: Rng): Pe
     return { state: stand(home, Infinity, "right"), row: poseRow, move: moving ? { x: home, durationMs: 0 } : null };
   }
 
-  // 4 · shipped: berhenti di tempat; baris sekali-putarnya diurus komponen.
+  // 5 · shipped: berhenti di tempat; baris sekali-putarnya diurus komponen.
   if (pose === "shipped")
     return { state: stand(cur, Infinity), row: poseRow, move: moving ? { x: cur, durationMs: 0 } : null };
 
-  // 5 · pose tenang: bergantian berdiri / jalan.
+  // 6 · pose tenang: bergantian berdiri / jalan.
   if (moving) {
     if (now < state.until) return { state, row: walkRow(state.facing), move: null };
     return { state: stand(state.x, now + between(rng, STAND_MS)), row: poseRow, move: null };   // tiba

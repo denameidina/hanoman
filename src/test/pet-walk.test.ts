@@ -124,3 +124,30 @@ describe("mesin berkeliaran pet", () => {
     expect(WALK_MS[1] * WALK_PX_PER_S / 1000).toBe(240);
   });
 });
+
+describe("SPEC-897 — pose baru", () => {
+  it.each([["offline", "idle"], ["sleeping", "sleep"]] as const)(
+    "`%s` diam di tempat: tak pulang ke pojok, transisi dipotong", (pose, row) => {
+      const step = stepWalk(walking(300, 200_000), input({ pose, currentX: 420 }), seq(0.5));
+      expect(step.state).toEqual(standing(420, Infinity, "left"));   // berhenti mid-stride, tak berbalik
+      expect(step.row).toBe(row);
+      expect(step.move).toEqual({ x: 420, durationMs: 0 });
+    });
+
+  it("tak bergerak lagi saat sudah berdiri terputus/tidur", () => {
+    const step = stepWalk(standing(420), input({ pose: "sleeping", currentX: 420 }), seq(0.5));
+    expect(step.move).toBeNull();
+    expect(step.state.until).toBe(Infinity);
+  });
+
+  it("`deciding` ikut aturan pose tenang: boleh jalan-jalan", () => {
+    const step = stepWalk(standing(600, 99_000), input({ pose: "deciding", currentX: 600 }), seq(0.9, 0.1));
+    expect(step.state.mode).toBe("walk");
+    expect(step.row).toMatch(/^walk-/);
+  });
+
+  it("`deciding` memutar barisnya sendiri saat berdiri", () => {
+    const step = stepWalk(standing(600, 200_000), input({ pose: "deciding", currentX: 600 }), seq(0.5));
+    expect(step.row).toBe("deciding");
+  });
+});

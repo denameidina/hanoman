@@ -931,7 +931,7 @@ git commit -m "feat(pet): derivePetConditions — kondisi terputus, deciding, ti
 - Consumes: `PetPose` (Task 3), `POSE_ROW` (Task 3).
 - Produces: perilaku `stepWalk` untuk `offline`/`sleeping` (diam di tempat) dan `deciding` (pose tenang). Tak ada tipe baru.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `src/test/pet-walk.test.ts` (di dalam `describe` terluar yang sudah ada, atau sebagai `describe` baru — sesuaikan dengan helper `input()`/`rng()` yang sudah ada di berkas itu):
 
@@ -977,12 +977,12 @@ describe("SPEC-897 — pose baru", () => {
 
 Sesuaikan nama konstanta `NOW` dengan yang sudah ada di berkas test itu; bila belum ada, tambahkan `const NOW = 1_000_000;` di atas.
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/pet-walk.test.ts`
 Diharapkan: FAIL pada test `offline` — pose tak dikenal jatuh ke cabang pose tenang sehingga `mode` menjadi `"walk"`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/screens/pet-walk.ts`, tepat di bawah `const ATTENTION: ReadonlySet<PetPose> = new Set(["waiting", "blocked"]);` tambahkan:
 
@@ -1002,12 +1002,12 @@ Lalu sisipkan cabang baru **tepat setelah** cabang jeda (`if (input.hovered || i
 
 Perbarui penomoran komentar cabang di bawahnya (`3 →` `4`, `4 →` `5`, `5 →` `6`).
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/pet-walk.test.ts`
 Diharapkan: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/pet-walk.ts src/test/pet-walk.test.ts
