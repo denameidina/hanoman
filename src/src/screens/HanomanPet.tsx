@@ -36,6 +36,11 @@ const RECAP_GRACE_MS = 5_000;
 // SPEC-898 · fps baris `waiting` saat pertanyaannya sudah menua (6 → 9). Digerbangi BARIS, bukan
 // pose: `wave`/`thanks` yang menumpang di atasnya tetap berirama normal.
 const PET_URGENT_RATE = 1.5;
+// SPEC-898 · elus = tiga klik dalam dua detik. Klik ke-3 TIDAK menyentuh panel: itulah isi
+// "tidak membuka/menutup panel berulang". Klik pertama & kedua tetap buka lalu tutup — itu
+// perilaku normal dua klik dan tak boleh diubah demi easter egg.
+const PET_CLICK_WINDOW_MS = 2_000;
+const PET_CLICK_BURST = 3;
 
 // jsdom tak punya matchMedia; ketiadaannya dibaca sebagai "tak ada preferensi", bukan "reduce".
 function usePrefersReducedMotion(): boolean {
@@ -213,6 +218,8 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   // ---- baris sekali-putar: `wave` (hover/klik) menumpuk di atas baris mesin; `shipped` main
   // sekali lalu `then` sampai pose berganti.
   const [oneShot, setOneShot] = React.useState<{ row: PetRowKey; id: number } | null>(null);
+  const clicksRef = React.useRef<number[]>([]);
+  const [hearts, setHearts] = React.useState(0);
   const [shippedDone, setShippedDone] = React.useState(false);
   React.useEffect(() => { setShippedDone(false); }, [view.pose]);
   const baseRow: PetRowKey = row === "shipped" && shippedDone ? (thenOf("shipped") ?? "idle") : row;
@@ -223,6 +230,12 @@ export function HanomanPet({ sessions, backlog, onOpen }:
     if (reduced || view.pose === "offline" || view.pose === "sleeping") return;
     setOneShot((o) => o ?? { row: "wave", id: Date.now() });
   }, [reduced, view.pose]);
+
+  const playThanks = React.useCallback(() => {
+    if (reduced) return;
+    setOneShot({ row: "thanks", id: Date.now() });   // menggantikan `wave` yang mungkin sedang main
+    setHearts((n) => n + 1);
+  }, [reduced]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -271,6 +284,14 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   }
 
   function reactAndToggle() {
+    const now = Date.now();
+    const burst = [...clicksRef.current.filter((at) => now - at < PET_CLICK_WINDOW_MS), now];
+    if (burst.length >= PET_CLICK_BURST) {
+      clicksRef.current = [];        // satu terima kasih per rentetan
+      playThanks();
+      return;
+    }
+    clicksRef.current = burst;
     if (!reduced) setReacting(true);
     playWave();
     togglePanel();
@@ -443,6 +464,22 @@ export function HanomanPet({ sessions, backlog, onOpen }:
                 border: "1px solid var(--border-hair)", borderRadius: "var(--radius-pill)",
                 boxShadow: "var(--shadow-sm)",
               }}>{view.count}</span>
+          )}
+          {hearts > 0 && !reduced && (
+            <span data-testid="pet-hearts" key={hearts} aria-hidden="true" style={{
+              pointerEvents: "none", position: "absolute", zIndex: 2,
+              left: Math.round(anchor.x * cellW), bottom: Math.round(cellH * 0.55),
+            }} onAnimationEnd={(event) => {
+              if ((event.target as HTMLElement).dataset.last === "1") setHearts(0);
+            }}>
+              {[0, 1, 2].map((i) => (
+                <span key={i} data-last={i === 2 ? "1" : undefined} style={{
+                  position: "absolute", left: i * 9 - 9, fontFamily: "var(--font-ui)", fontSize: 12,
+                  color: "var(--accent)",
+                  animation: `hn-pet-heart 900ms var(--ease-out) ${i * 120}ms both`,
+                }}>♥</span>
+              ))}
+            </span>
           )}
           <div data-testid="pet-reactor" className="hn-pet-reactor" style={{
             position: "relative", width: "100%", height: "100%",

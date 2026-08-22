@@ -636,3 +636,11 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   0% { opacity: 0; transform: translateY(4px); }
   100% { opacity: 1; transform: translateY(0); }
 }
+
+/* SPEC-898 · hati kecil saat pet dielus. Transform + opacity saja; reduced-motion tak merender
+   elemennya sama sekali. */
+@keyframes hn-pet-heart {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  30% { opacity: 1; transform: translateY(-8px) scale(1); }
+  100% { opacity: 0; transform: translateY(-26px) scale(0.9); }
+}

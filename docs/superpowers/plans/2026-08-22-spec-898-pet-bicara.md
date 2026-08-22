@@ -1354,7 +1354,7 @@ git commit -m "feat(pet): baris atlas thanks (13 baris, quality diturunkan agar 
 - Consumes: baris `thanks` (Task 9), `oneShot` yang sudah ada.
 - Produces: `data-testid="pet-hearts"`; perilaku klik ke-3 yang **tidak** menyentuh panel.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `describe("HanomanPet — pet bicara (SPEC-898)")`:
 
@@ -1395,12 +1395,12 @@ Tambahkan di `describe("HanomanPet — pet bicara (SPEC-898)")`:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx -t "tiga klik"`
 Expected: FAIL — `expected data-row "idle" to be "thanks"`
 
-- [ ] **Step 3: Tambah keyframe hati**
+- [x] **Step 3: Tambah keyframe hati**
 
 Di `src/src/app.css`, setelah `@keyframes hn-pet-bubble-in`:
 
@@ -1414,7 +1414,7 @@ Di `src/src/app.css`, setelah `@keyframes hn-pet-bubble-in`:
 }
 ```
 
-- [ ] **Step 4: Implementasi**
+- [x] **Step 4: Implementasi**
 
 Di `src/src/screens/HanomanPet.tsx`:
 
@@ -1484,12 +1484,12 @@ const PET_CLICK_BURST = 3;
           )}
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx`
 Expected: PASS — seluruh berkas
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/HanomanPet.tsx src/src/app.css src/test/hanoman-pet.test.tsx

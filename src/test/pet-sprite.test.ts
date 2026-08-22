@@ -88,7 +88,7 @@ describe("CSS sprite pet (kontrak rule terparse)", () => {
   it("hanya keyframe interaksi + frame sprite yang tersisa; katalog idle/pose SPEC-648 dicabut", () => {
     expect(keyframes.map((rule) => rule.name)).toEqual([
       "hn-pet-frames", "hn-pet-click", "hn-pet-panel-in", "hn-pet-panel-out", "hn-pet-reveal",
-      "hn-pet-bubble-in",
+      "hn-pet-bubble-in", "hn-pet-heart",
     ]);
   });
 

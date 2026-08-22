@@ -476,6 +476,41 @@ describe("HanomanPet — pet bicara (SPEC-898)", () => {
     expect(styleOf(atlas())).toContain(`${Math.round(durationMs("waiting") / 1.5)}ms`);
   });
 
+  it("tiga klik dalam 2 dtk memutar baris thanks + hati, tanpa mengubah panel", () => {
+    render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+    fireEvent.click(hit());                                   // buka
+    expect(screen.getByTestId("pet-panel")).toBeTruthy();
+    fireEvent.click(hit());                                   // tutup
+    fireEvent.click(hit());                                   // elus — panel TIDAK dibuka lagi
+    expect(rowshift()).toHaveAttribute("data-row", "thanks");
+    expect(screen.getByTestId("pet-hearts").getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByTestId("pet-hearts")).toHaveStyle({ pointerEvents: "none" });
+    expect(screen.getByTestId("pet-panel")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("klik yang berjauhan tetap membuka/menutup panel seperti biasa", () => {
+    vi.useFakeTimers();
+    try {
+      render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+      fireEvent.click(hit());
+      act(() => { vi.advanceTimersByTime(2_500); });
+      fireEvent.click(hit());
+      act(() => { vi.advanceTimersByTime(2_500); });
+      fireEvent.click(hit());
+      expect(rowshift()).not.toHaveAttribute("data-row", "thanks");
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("reduced-motion: elus tak memutar apa pun dan tak memunculkan hati", () => {
+    mockMatchMedia((q) => q === REDUCED);
+    render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
+    fireEvent.click(hit());
+    fireEvent.click(hit());
+    fireEvent.click(hit());
+    expect(rowshift()).not.toHaveAttribute("data-row", "thanks");
+    expect(screen.queryByTestId("pet-hearts")).toBeNull();
+  });
+
   it("panel terbuka menelan gelembung — daftarnya sudah di layar", () => {
     const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
     fireEvent.click(hit());
