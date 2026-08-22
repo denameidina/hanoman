@@ -1,8 +1,8 @@
 # Pet hidup — atlas sprite dari Codex, renderer frame, dan berkeliaran di tepi bawah (spec A)
 
-Tanggal: 2026-08-22 · Sumber: brainstorm enhancement pet · Prioritas: sedang · Nomor SPEC diterbitkan
-server saat backlog dibuat; ADR berikutnya **0140** (verifikasi ulang saat execute — nomor ADR/SPEC
-pernah tabrakan antar-sesi).
+Tanggal: 2026-08-22 · Sumber: brainstorm enhancement pet · Prioritas: sedang · Backlog **SPEC-896**
+(project `hanoman`); ADR berikutnya **0140** (verifikasi ulang saat execute — nomor ADR pernah
+tabrakan antar-sesi).
 
 Spec pertama dari program **"Pet hidup"** (A→B→C→D, lihat §13). Ia mengganti fondasi visual pet
 SPEC-585/648 — sticker raster yang digoyang CSS — dengan **karakter beranimasi frame** yang

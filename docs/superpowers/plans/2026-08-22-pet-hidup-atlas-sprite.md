@@ -1,4 +1,4 @@
-# Pet hidup (spec A) — atlas sprite dari Codex, renderer frame, berkeliaran · Implementation Plan
+# SPEC-896 — Pet hidup (spec A): atlas sprite dari Codex, renderer frame, berkeliaran · Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
