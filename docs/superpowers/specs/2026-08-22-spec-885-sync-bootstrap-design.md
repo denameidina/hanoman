@@ -1,6 +1,11 @@
 # SPEC-885 — Sync hub → client baru: dari mandek jadi satu tarikan
 
-Tanggal: 2026-08-22 · ADR: 0137 (ditulis bersama implementasi) · Status: rancangan
+Tanggal: 2026-08-22 · ADR: 0138 (ditulis bersama implementasi) · Status: rancangan
+
+> Nomor ADR semula 0137 dan digeser ke 0138: SPEC-883 menerbitkan `0137-provisioning-vps-berbasis-katalog.md`
+> ke `main` sementara spec ini ditulis. Tabrakan nomor ADR/SPEC antar-sesi paralel adalah kejadian
+> berulang di repo ini — periksa `ls internal/docs/adr/ | tail -1` tepat sebelum menulis ADR-nya,
+> bukan saat merancang.
 
 ## Masalah
 
@@ -340,7 +345,7 @@ sesuai AGENTS.md.
 | 3 | `server/src/services/sync.ts` (`bootstrapSnapshot`), `server/src/routes/sync.ts`, `server/src/services/sync-client.ts` |
 | 4 | `server/src/services/vps-audit.ts`, `server/prisma/schema.prisma` + migration |
 | 5 | `server/src/routes/sync.ts`, `server/src/services/safe-outbound-request.ts`, `server/src/services/sync-client.ts` |
-| docs | `internal/docs/adr/0137-*.md`, `internal/docs/README.md`, `internal/docs/architecture/api-contract.md` (endpoint bootstrap + `hasMore`), `internal/docs/architecture/data-model.md` (`Vps.lastPublishedAt`) |
+| docs | `internal/docs/adr/0138-*.md`, `internal/docs/README.md`, `internal/docs/architecture/api-contract.md` (endpoint bootstrap + `hasMore`), `internal/docs/architecture/data-model.md` (`Vps.lastPublishedAt`) |
 
 ## Urutan rilis
 

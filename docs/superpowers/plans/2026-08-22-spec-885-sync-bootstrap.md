@@ -37,7 +37,7 @@
 | `server/test/vps-monitor.test.ts` | tambahan — pemasangan: berapa baris SyncLog yang benar-benar lahir | 4 |
 | `server/test/fixtures/fake-ssh.sh` | `FAKE_SSH_DISK` agar health palsu bisa berubah antar-sapuan | 4 |
 | `server/test/safe-outbound-request.test.ts` | tambahan — gunzip opt-in + penjaga bom | 5 |
-| `internal/docs/adr/0137-*.md` | ADR keputusan | 6 |
+| `internal/docs/adr/0138-*.md` | ADR keputusan | 6 |
 
 ---
 
@@ -114,7 +114,7 @@ Diharapkan: FAIL. Test pertama gagal di `expect(page.records).toHaveLength(2)` (
 Di `server/src/services/sync.ts`, ganti seluruh fungsi `pull` dengan:
 
 ```ts
-// SPEC-885 · ADR-0137 · anggaran byte satu halaman pull. Sebelum ini `pull` memotong per JUMLAH
+// SPEC-885 · ADR-0138 · anggaran byte satu halaman pull. Sebelum ini `pull` memotong per JUMLAH
 // baris (`limit`) sementara client memotong per BYTE (`maxResponseBytes` di `fetchTransport`), dan
 // dua satuan itu tak pernah bisa sepakat: baris feed berkisar 100 B–29 KB, jadi halaman 500-baris
 // bisa 0,2 MB atau 2,5 MB tergantung komposisinya. Di hub produksi halaman KEDUA berukuran 2,51 MB
@@ -267,7 +267,7 @@ Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`, ganti baris 
 ```ts
       allowPrivate: process.env.NODE_ENV !== "production" && loopback,
       connectMs: 5_000, totalMs: 15_000,
-      // SPEC-885 · ADR-0137 · cap ini dulu 2 MB, dan halaman feed 2,51 MB di hub produksi
+      // SPEC-885 · ADR-0138 · cap ini dulu 2 MB, dan halaman feed 2,51 MB di hub produksi
       // membuat setiap client baru MANDEK di situ selamanya — bukan lambat, mandek, dan tanpa
       // satu baris log. Hub yang sudah membawa Fase 1 memotong halamannya di 1 MB, jadi cap ini
       // tak akan tersentuh olehnya. Ia dinaikkan justru untuk hub yang BELUM naik versi, yang
@@ -457,7 +457,7 @@ Di `server/src/services/sync-client.ts`, tepat **di atas** deklarasi `export typ
 ```ts
 type IncomingRecord = ReturnType<typeof validateIncomingRecord>;
 
-// SPEC-885 · ADR-0137 · jaring pengaman lingkaran drain, BUKAN kuota. Feed hub produksi 3.637
+// SPEC-885 · ADR-0138 · jaring pengaman lingkaran drain, BUKAN kuota. Feed hub produksi 3.637
 // baris; batas ini hanya mencegah lingkaran tak berujung bila kursor gagal maju.
 const MAX_DRAIN_PAGES = 500;
 
@@ -496,7 +496,7 @@ Ganti seluruh fungsi `syncOnce` (dari `export async function syncOnce` sampai `r
 ```ts
 // Satu siklus sync: kuras feed sampai habis (pull-apply berulang), lalu drain outbox sekali.
 //
-// SPEC-885 · ADR-0137 · dulu ia menarik SATU halaman per panggilan, dan pemanggilnya adalah tick
+// SPEC-885 · ADR-0138 · dulu ia menarik SATU halaman per panggilan, dan pemanggilnya adalah tick
 // 15 detik — jadi laju tarik client dipatok 500 baris / 15 detik oleh timer, bukan oleh jaringan
 // maupun CPU, yang menganggur hampir sepanjang waktu itu.
 export async function syncOnce(transport: Transport): Promise<SyncStats> {
@@ -753,7 +753,7 @@ Diharapkan: FAIL dengan `syncTick is not exported` / `__resetSyncHealth is not e
 Di `server/src/services/sync-client.ts`, tepat **di atas** `export async function startSyncClient`, sisipkan:
 
 ```ts
-// SPEC-885 · ADR-0137 · kegagalan pull dulu ditelan `catch { }` tanpa satu baris pun. Itulah yang
+// SPEC-885 · ADR-0138 · kegagalan pull dulu ditelan `catch { }` tanpa satu baris pun. Itulah yang
 // membuat mandek total (halaman 2,51 MB melewati cap byte) tak bisa dibedakan dari sepi, dan
 // karena itu insiden ini butuh investigasi penuh untuk sekadar DIKENALI. Digerbangi flag: tick
 // berjalan tiap 15 detik, jadi log per-kegagalan akan jadi hujan log saat hub tak terjangkau —
@@ -923,7 +923,7 @@ Diharapkan: FAIL dengan `bootstrapSnapshot is not exported` dan route 404.
 Di `server/src/services/sync.ts`, tepat **di bawah** fungsi `pull`, tambahkan:
 
 ```ts
-// SPEC-885 · ADR-0137 · urutan dependensi topologis, diturunkan dari `PARENTS`. Induk selalu
+// SPEC-885 · ADR-0138 · urutan dependensi topologis, diturunkan dari `PARENTS`. Induk selalu
 // mendahului anaknya, jadi penerima tak pernah perlu menunda satu record pun — urutan FK benar
 // BY CONSTRUCTION, bukan diperbaiki oleh retry. `sessionResult` ditaruh terakhir karena
 // `projectId`-nya kolom polos TANPA @relation (lihat catatan di `PARENTS`).
@@ -935,7 +935,7 @@ export type BootstrapPage = {
   cursor: string; records: PulledRecord[]; hasMore: boolean; next: string | null;
 };
 
-// SPEC-885 · ADR-0137 · KEADAAN, bukan sejarah. Client dengan kursor 0 yang menarik lewat feed
+// SPEC-885 · ADR-0138 · KEADAAN, bukan sejarah. Client dengan kursor 0 yang menarik lewat feed
 // harus memutar ulang setiap versi antara yang masih tersimpan: di hub produksi 3.637 baris /
 // 7,9 MB, hanya untuk mendarat jadi 889 record / ~2,5 MB. Membaca tabel langsung menghapus
 // kemubaziran itu SEKALIGUS masalah urutan yang ditinggalkan retensi ADR-0131.
@@ -1011,7 +1011,7 @@ import { applyPush, pull, bootstrapSnapshot, isEntity, type Entity } from "../se
 lalu tepat **di bawah** route `app.get("/sync/pull", ...)`, tambahkan:
 
 ```ts
-  // SPEC-885 · ADR-0137 · keadaan sekarang dalam urutan dependensi, untuk client yang kursornya
+  // SPEC-885 · ADR-0138 · keadaan sekarang dalam urutan dependensi, untuk client yang kursornya
   // masih 0. Tak ada gerbang tambahan di `app.ts`: path ini di bawah `/api/sync` dan bukan salah
   // satu pengecualian cookie-only, jadi ia otomatis ikut jalur device-token seperti `/sync/pull`.
   app.get("/sync/bootstrap", { preHandler: requireDeviceToken }, async (req) => {
@@ -1138,7 +1138,7 @@ Diharapkan: FAIL dengan `bootstrapOnce is not exported`.
 Di `server/src/services/sync-client.ts`, tepat **di atas** `export async function syncOnce`, tambahkan:
 
 ```ts
-// SPEC-885 · ADR-0137 · instalasi baru menarik KEADAAN, bukan sejarah.
+// SPEC-885 · ADR-0138 · instalasi baru menarik KEADAAN, bukan sejarah.
 //
 // Dua syarat, dan syarat kedua yang penting: kursor 0 saja tidak cukup, karena "Tarik ulang"
 // memundurkan kursor ke 0 di mesin yang bisa saja punya suntingan lokal belum terkirim. Outbox
@@ -1295,7 +1295,7 @@ Diharapkan: FAIL dengan `shouldPublishHealth is not exported`.
 Tambahkan ke model `Vps` di `server/prisma/schema.prisma`, tepat di bawah baris `hardened`:
 
 ```prisma
-  // SPEC-885 · ADR-0137 · kapan baris ini TERAKHIR diterbitkan ke change-feed. LOCAL-only —
+  // SPEC-885 · ADR-0138 · kapan baris ini TERAKHIR diterbitkan ke change-feed. LOCAL-only —
   // sengaja TIDAK masuk FIELDS sync, cermin repoDir/keyPath: ia properti mesin ini, bukan
   // pernyataan bersama. Dipakai `runHealth` untuk denyut berjangka saat `health` tak berubah.
   lastPublishedAt DateTime?
@@ -1304,7 +1304,7 @@ Tambahkan ke model `Vps` di `server/prisma/schema.prisma`, tepat di bawah baris 
 Buat `server/prisma/migrations/20260822090000_vps_last_published_at/migration.sql`:
 
 ```sql
--- SPEC-885 · ADR-0137 · aditif, nullable, tanpa default: nol backfill dan aman untuk hub
+-- SPEC-885 · ADR-0138 · aditif, nullable, tanpa default: nol backfill dan aman untuk hub
 -- produksi yang sedang berjalan (memori: hub = live, migrate additif saja).
 ALTER TABLE "Vps" ADD COLUMN "lastPublishedAt" DATETIME;
 ```
@@ -1320,7 +1320,7 @@ pnpm --filter ./server db:generate
 Di `server/src/services/vps-audit.ts`, tepat **di atas** `export async function runHealth`, tambahkan:
 
 ```ts
-// SPEC-885 · ADR-0137 · denyut berjangka. `runHealth` dulu memanggil `notifySynced` di SETIAP
+// SPEC-885 · ADR-0138 · denyut berjangka. `runHealth` dulu memanggil `notifySynced` di SETIAP
 // polling 5 menit, dan itu menghasilkan 2.469 baris change-feed untuk 9 record vps di hub
 // produksi — 51% byte feed dan 68% barisnya, hanya untuk mendarat jadi 9 baris. ADR-0131
 // menyebutnya eksplisit sebagai optimasi terpisah; di sinilah tempatnya.
@@ -1549,7 +1549,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 lalu tepat **di atas** `export default async function (app: FastifyInstance) {`, tambahkan:
 
 ```ts
-// SPEC-885 · ADR-0137 · gzip DUA endpoint sync saja, bukan plugin lifecycle global.
+// SPEC-885 · ADR-0138 · gzip DUA endpoint sync saja, bukan plugin lifecycle global.
 //
 // `@fastify/compress` sengaja tidak dipakai: ia belum jadi dependency, menambahkannya menyentuh
 // daftar `--external` di skrip build esbuild, dan ia memasang hook di seluruh lifecycle. Yang
@@ -1684,7 +1684,7 @@ import { createGunzip } from "node:zlib";
 export type SafeRequestOptions = {
   url: URL; method: "GET" | "POST"; headers: Record<string, string>; body?: Buffer;
   allowPrivate: boolean; connectMs: number; totalMs: number; maxResponseBytes: number;
-  // SPEC-885 · ADR-0137 · dekompresi OPT-IN, default MATI. Modul ini juga melayani webhook keluar
+  // SPEC-885 · ADR-0138 · dekompresi OPT-IN, default MATI. Modul ini juga melayani webhook keluar
   // (ADR-0100) di balik penjaga SSRF; menyalakan gunzip untuk semua pemanggil memperlebar
   // permukaan serang tanpa ada satu pun yang memintanya.
   acceptEncoding?: "gzip";
@@ -1748,7 +1748,7 @@ Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`:
       url, method,
       headers: {
         authorization: `Bearer ${token}`,
-        // SPEC-885 · ADR-0137 · hub lama mengabaikan header ini dan membalas polos; `safeRequest`
+        // SPEC-885 · ADR-0138 · hub lama mengabaikan header ini dan membalas polos; `safeRequest`
         // hanya men-decompress bila balasannya benar-benar ber-`content-encoding: gzip`.
         "accept-encoding": "gzip",
         ...(body ? { "content-type": "application/json" } : {}),
@@ -1798,17 +1798,25 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 10: ADR-0137 + docs + verifikasi end-to-end
+### Task 10: ADR-0138 + docs + verifikasi end-to-end
 
 **Files:**
-- Create: `internal/docs/adr/0137-sync-bootstrap-halaman-byte-feed-berdenyut.md`
+- Create: `internal/docs/adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md`
 - Modify: `internal/docs/README.md` (tautkan ADR baru)
 - Modify: `internal/docs/architecture/api-contract.md` (endpoint bootstrap, field `hasMore`/`next`, gzip)
 - Modify: `internal/docs/architecture/data-model.md` (`Vps.lastPublishedAt` sebagai LOCAL-only)
 
-- [ ] **Step 1: Tulis ADR-0137**
+- [ ] **Step 1: Pastikan nomor ADR-nya masih bebas**
 
-Buat `internal/docs/adr/0137-sync-bootstrap-halaman-byte-feed-berdenyut.md` mengikuti bentuk ADR-0131 (Konteks dengan angka terukur → Keputusan bernomor → Konsekuensi → Alternatif yang ditolak). Isi wajib:
+```bash
+ls internal/docs/adr/ | tail -2
+```
+
+Plan ini memakai **0138**. Nomornya semula 0137 dan sudah harus digeser sekali karena SPEC-883 menerbitkan `0137-provisioning-vps-berbasis-katalog.md` ke `main` selagi spec ini ditulis — tabrakan nomor antar-sesi paralel adalah kejadian berulang di repo ini. Bila `0138` sudah terpakai saat task ini dikerjakan, ambil nomor bebas berikutnya dan **ganti semua rujukan `ADR-0138` di kode yang sudah ditulis Task 1–9** (`grep -rn "ADR-0138" server/src`).
+
+- [ ] **Step 2: Tulis ADR-nya**
+
+Buat `internal/docs/adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md` mengikuti bentuk ADR-0131 (Konteks dengan angka terukur → Keputusan bernomor → Konsekuensi → Alternatif yang ditolak). Isi wajib:
 
 - **Konteks:** angka hub produksi 2026-08-22 dari §Global Constraints, dan dua kegagalan senyapnya. Sebutkan eksplisit bahwa akar kedua (urutan induk→anak) adalah **akibat susulan ADR-0131**, bukan regresi kode sync — retensi menghapus properti yang diam-diam diandalkan `syncOnce`.
 - **Keputusan 1:** halaman `pull` dipotong per anggaran byte; kursor menunjuk baris yang benar-benar dikirim; minimal satu baris selalu dikirim.
@@ -1819,17 +1827,17 @@ Buat `internal/docs/adr/0137-sync-bootstrap-halaman-byte-feed-berdenyut.md` meng
 - **Konsekuensi:** client baru selesai dalam ~3 request alih-alih mandek; client yang tertinggal >7 hari ikut sembuh; feed vps mengecil dan penghematannya akan **tumbuh** saat VPS lain kembali sehat.
 - **Alternatif yang ditolak:** menahan kursor pada record yang gagal (livelock); tabel `SyncDeferred` durable (tak perlu setelah drain utuh); membuang `lastSeenAt` dari `FIELDS.vps`; `@fastify/compress`; batching apply dalam satu `$transaction`.
 
-- [ ] **Step 2: Tautkan di index**
+- [ ] **Step 3: Tautkan di index**
 
 Tambahkan satu baris di bagian `## adr` pada `internal/docs/README.md`, mengikuti format baris tetangganya.
 
-- [ ] **Step 3: Perbarui docs arsitektur**
+- [ ] **Step 4: Perbarui docs arsitektur**
 
 Di `internal/docs/architecture/api-contract.md`, di bagian sync: dokumentasikan `GET /api/sync/bootstrap` (query `after`, balikan `{ cursor, records, hasMore, next }`, auth device-token), field `hasMore` baru pada `GET /api/sync/pull`, dan negosiasi gzip pada keduanya.
 
 Di `internal/docs/architecture/data-model.md`, pada model `Vps`: catat `lastPublishedAt` sebagai kolom **LOCAL-only** yang sengaja di luar `FIELDS.vps`, sejajar `keyPath`.
 
-- [ ] **Step 4: Verifikasi index docs**
+- [ ] **Step 5: Verifikasi index docs**
 
 ```bash
 hanoman docs index --check
@@ -1837,7 +1845,7 @@ hanoman docs index --check
 
 Diharapkan: laporan tanpa entri hilang. Perintah ini milik CLI produk (AGENTS.md §Eksekusi & Perintah) dan bersifat read-only. Bila `hanoman` global lebih tua dari checkout ini, pakai salinan repo: `pnpm --filter ./cli build && node cli/dist/index.js docs index --check`.
 
-- [ ] **Step 5: Verifikasi endpoint nyata di local**
+- [ ] **Step 6: Verifikasi endpoint nyata di local**
 
 Wajib menurut AGENTS.md karena task ini menyentuh endpoint — sekali di akhir, bukan tiap task.
 
@@ -1860,7 +1868,7 @@ curl -s -H "authorization: Bearer $TOKEN" -H 'accept-encoding: gzip' \
 
 Diharapkan: dua yang pertama JSON ber-`cursor`/`records`/`hasMore`; yang ketiga memperlihatkan header `content-encoding: gzip` dan `vary: accept-encoding`.
 
-- [ ] **Step 6: Reproduksi end-to-end dengan data hub nyata**
+- [ ] **Step 7: Reproduksi end-to-end dengan data hub nyata**
 
 Ini gerbang sebenarnya untuk spec ini. Ambil salinan DB hub **tanpa menyentuh produksi**:
 
@@ -1882,11 +1890,11 @@ sqlite3 "file:<home-client>/hanoman.db?mode=ro" \
 
 Diharapkan: `spec` mencapai jumlah di hub salinan (~724 pada snapshot 2026-08-22) dan `cursor` sampai di puncak feed. Sebelum spec ini, client yang sama berhenti di ~500 record total dengan kursor macet.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add internal/docs
-git commit -m "docs(spec-885): ADR-0137 sync bootstrap, halaman byte, feed berdenyut
+git commit -m "docs(spec-885): ADR-0138 sync bootstrap, halaman byte, feed berdenyut
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
