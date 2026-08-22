@@ -93,3 +93,31 @@ Ini pasangan ADR-0133: di sana keadaan **pane** berhenti ditebak dari aliran byt
   di kasus yang memang benar.
 - **Ack per byte alih-alih per frame.** Tak menambah informasi apa pun — batcher sudah membuat frame
   jadi satuan pengiriman yang tepat — dan mengalikan ongkos kawat tanpa hasil.
+
+## Amandemen — suspend menyembuhkan diri lewat bukti echo; fallback 5 detik (2026-08-22)
+
+Alternatif "memperpendek `SUSPEND_MS`" di atas ditolak karena ia meredakan gejala **tanpa menyentuh
+sebabnya**: suspend tak punya jalur pulih selain menunggu. Amandemen ini menyentuh sebabnya, dan baru
+sesudah itu memperpendek angkanya.
+
+**Yang berubah di medan.** Sesudah jalur server dibuat sinkron (frame `in` tak lagi menunggu query
+Prisma; poll tmux tak lagi memblokir event loop), pemicu palsu TTL yang tersisa adalah **TUI agen
+yang menggambar ulang >500 ms saat mesin sibuk** — bukan jaringan. Satu repaint lambat membeli
+**30 detik tanpa echo lokal** pada `suspendedUntil` yang hanya direset saat reconnect.
+
+**Keputusan.**
+1. Selama suspend, teks yang diketik (dan tak diprediksi) dicatat sebagai `typed` (berbatas
+   `TYPED_MAX`; control/bulk mengosongkannya karena barisnya berubah). Sesudah setiap frame server
+   **tergambar** — dibaca di callback `term.write`, karena xterm memproses write server secara
+   asinkron — bila teks di kiri kursor berakhir dengan ekor `typed` (≥2 huruf bila ada), itu bukti
+   pty membalas ketikan lagi dan suspend **dicabut seketika** (`onEchoed`). Di prompt password dan
+   dialog yang menelan tombol tak pernah ada bukti, jadi suspend bertahan persis seperti sebelumnya.
+2. `SUSPEND_MS` 30 000 → **5 000**. Ia kini hanya fallback untuk konteks yang memang bungkam atau
+   yang echonya tak terbaca di kiri kursor. Harga di `read -s` yang lolos `looksLikePasswordPrompt`:
+   paling banyak **satu huruf berkedip 500 ms per 5 detik** (dulu per 30 detik) — huruf pertama
+   selalu berkedip di kedua versi.
+3. `TTL_MS` **tak berubah**: ia tetap satu-satunya perlindungan kebocoran layar.
+
+Dikunci di `terminal-predict.test.ts` (buku ketikan, bukti echo, kasus ketikan menyusul frame,
+prompt bungkam tetap suspend) dan `terminal-pane.test.tsx` (bukti dibaca di callback write).
+

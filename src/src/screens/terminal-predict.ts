@@ -46,15 +46,26 @@ export type PredictState = {
   altScreen: boolean;
   /** prediksi mati sampai stempel ini (0 = tidak disuspend) */
   suspendedUntil: number;
+  /** Teks yang diketik SELAMA suspend dan tak diprediksi — bahan bukti bahwa pty membalas lagi.
+   *  Kosong di luar suspend; dikosongkan oleh control/bulk karena barisnya sudah berubah. */
+  typed: string;
 };
 
 export const TTL_MS = 500;
-export const SUSPEND_MS = 30_000;
+// Suspend lahir dari TTL yang lewat tanpa echo. Itu sah untuk prompt password dan dialog yang
+// menelan tombol (keduanya terukur membalas NOL byte), tapi pemicu palsunya nyata: TUI agen yang
+// menggambar ulang >500 ms saat mesin sibuk. Dulu hukumannya rata 30 dtk tanpa jalan pulih —
+// setiap huruf menunggu RTT penuh. Kini suspend DICABUT begitu ada bukti pty membalas ketikan
+// lagi (`onEchoed`), dan angka ini tinggal fallback untuk konteks yang memang bungkam: di prompt
+// password paling banyak satu huruf berkedip 500 ms per jendela ini.
+export const SUSPEND_MS = 5_000;
+/** Batas buku ketikan selama suspend: cukup untuk satu kata, tak pernah tumbuh tanpa batas. */
+export const TYPED_MAX = 32;
 /** Kolom cadangan di tepi kanan: prediksi yang membungkus baris tak bisa di-rollback dengan CUB. */
 const EDGE_MARGIN = 2;
 
 export function initialState(): PredictState {
-  return { pending: "", since: null, altScreen: false, suspendedUntil: 0 };
+  return { pending: "", since: null, altScreen: false, suspendedUntil: 0, typed: "" };
 }
 
 /** SPEC-863 · satu-satunya jalan masuk keadaan alternate screen: frame `alt` dari server, yang
@@ -106,11 +117,42 @@ export function echoedPrefixLen(before: string, pending: string): number {
 export function onInput(
   state: PredictState, d: string, view: View, now: number, enabled: boolean,
 ): { state: PredictState; write: string } {
-  if (!canPredict(state, d, view, now, enabled)) return { state, write: "" };
+  if (!canPredict(state, d, view, now, enabled)) {
+    // Buku ketikan hanya hidup selama suspend: teks dicatat sebagai bahan bukti echo, control/bulk
+    // mengosongkannya (Enter/Backspace/panah mengubah baris; yang lama tak lagi di kiri kursor).
+    const suspended = now < state.suspendedUntil;
+    const typed = suspended && classifyInput(d) === "text" ? (state.typed + d).slice(-TYPED_MAX) : "";
+    return { state: typed === state.typed ? state : { ...state, typed }, write: "" };
+  }
   return {
-    state: { ...state, pending: state.pending + d, since: null },
+    state: { ...state, pending: state.pending + d, since: null, typed: "" },
     write: applySeq(d),
   };
+}
+
+/** Apakah komponen perlu membaca layar sesudah frame server tergambar: hanya selama suspend dan
+ *  hanya bila ada ketikan yang bisa dibuktikan echonya. Di luar itu nol biaya. */
+export function wantsEchoEvidence(state: PredictState, now: number): boolean {
+  return now < state.suspendedUntil && state.typed.length > 0;
+}
+
+/** Bukti pty membalas ketikan lagi: teks di kiri kursor SESUDAH frame server tergambar berakhir
+ *  dengan ekor `typed`. Ekornya ≥2 huruf bila ada — satu huruf yang kebetulan sama (spasi di
+ *  prompt password) tak boleh mengangkat suspend; bila hanya satu huruf yang diketik, satu cukup.
+ *  Ketikan yang menyusul SESUDAH frame dibuat server (huruf ketiga saat frame baru memuat dua)
+ *  tak cocok di frame ini dan cocok di frame berikutnya — benar, hanya tertunda satu repaint. */
+export function echoEvidence(before: string, typed: string): boolean {
+  if (!typed) return false;
+  const tail = typed.slice(-Math.min(2, typed.length));
+  return before.endsWith(tail);
+}
+
+/** Dipanggil dengan teks di kiri kursor sesudah frame server TERGAMBAR (callback `term.write`,
+ *  bukan tepat sesudah pemanggilannya — xterm memproses write server secara asinkron). */
+export function onEchoed(state: PredictState, before: string, now: number): PredictState {
+  if (now >= state.suspendedUntil) return state.typed ? { ...state, typed: "" } : state;
+  if (!echoEvidence(before, state.typed)) return state;
+  return { ...state, suspendedUntil: 0, typed: "" };
 }
 
 export function onServerData(
@@ -155,7 +197,7 @@ export function onTick(
     return { state, write: "", missed: false };
   }
   return {
-    state: { ...state, pending: "", since: null, suspendedUntil: now + SUSPEND_MS },
+    state: { ...state, pending: "", since: null, suspendedUntil: now + SUSPEND_MS, typed: "" },
     write: rollbackSeq(state.pending.length),
     missed: true,
   };

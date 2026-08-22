@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applySeq, canPredict, classifyInput, echoedPrefixLen, initialState, looksLikePasswordPrompt,
   COALESCE_IN_MS, createInputBatcher, onInput, onPaneAltScreen, onReattach, onServerData, onTick,
-  onDelivered, reapply, rollbackSeq,
-  SUSPEND_MS, TTL_MS, type PredictState, type View,
+  onDelivered, reapply, rollbackSeq, echoEvidence, onEchoed, wantsEchoEvidence,
+  SUSPEND_MS, TTL_MS, TYPED_MAX, type PredictState, type View,
 } from "../src/screens/terminal-predict";
 
 describe("classifyInput", () => {
@@ -347,5 +347,98 @@ describe("jam TTL berbasis pengiriman (SPEC-878)", () => {
     const r = reapply(state(), "ab", view({ cursorX: 2, line: "❯ " }), 7_000, true);
     expect(r.state.pending).toBe("ab");
     expect(r.state.since).toBeNull();
+  });
+});
+
+// Suspend yang menyembuhkan diri. Suspend lahir dari TTL yang lewat tanpa echo — sah untuk prompt
+// password dan dialog yang menelan tombol, tapi pemicu palsunya nyata: TUI agen yang menggambar
+// ulang >500 ms saat mesin sibuk. Dulu hukumannya rata 30 dtk tanpa jalan pulih; kini suspend
+// dicabut begitu ada BUKTI pty membalas ketikan lagi (ekor teks yang diketik muncul di kiri
+// kursor sesudah frame server tergambar), dan fallback-nya jauh lebih pendek.
+describe("suspend yang menyembuhkan diri", () => {
+  const suspended = (over: Partial<PredictState> = {}): PredictState =>
+    state({ suspendedUntil: 10_000, ...over });
+
+  it("fallback suspend jauh lebih pendek dari 30 dtk", () => {
+    expect(SUSPEND_MS).toBeLessThanOrEqual(5_000);
+  });
+
+  it("onTick yang menyuspend memulai buku ketikan yang kosong", () => {
+    const fired = onTick(state({ pending: "a", since: 1_000, typed: "sisa" }), 1_000 + TTL_MS);
+    expect(fired.state.typed).toBe("");
+    expect(fired.state.suspendedUntil).toBe(1_000 + TTL_MS + SUSPEND_MS);
+  });
+
+  it("mencatat teks yang diketik selama suspend, tanpa memprediksinya", () => {
+    let s = suspended();
+    for (const c of [..."ab"]) {
+      const r = onInput(s, c, view(), 5_000, true);
+      expect(r.write).toBe("");
+      s = r.state;
+    }
+    expect(s.typed).toBe("ab");
+    expect(wantsEchoEvidence(s, 5_000)).toBe(true);
+  });
+
+  it("control dan bulk mengosongkan buku ketikan — barisnya sudah berubah", () => {
+    const s = onInput(suspended({ typed: "ab" }), "\x7f", view(), 5_000, true).state;
+    expect(s.typed).toBe("");
+    const t = onInput(suspended({ typed: "ab" }), "tempelan", view(), 5_000, true).state;
+    expect(t.typed).toBe("");
+  });
+
+  it("buku ketikan berbatas, menyimpan ekor terbaru", () => {
+    let s = suspended();
+    for (let i = 0; i < TYPED_MAX + 5; i += 1) s = onInput(s, String(i % 10), view(), 5_000, true).state;
+    expect(s.typed.length).toBe(TYPED_MAX);
+    expect(s.typed.endsWith(String((TYPED_MAX + 4) % 10))).toBe(true);
+  });
+
+  it("di luar suspend buku ketikan tak pernah terisi", () => {
+    const r = onInput(state({ typed: "basi" }), "a", view(), 20_000, true);
+    expect(r.state.typed).toBe("");
+    expect(wantsEchoEvidence(r.state, 20_000)).toBe(false);
+  });
+
+  it("bukti echo = ekor ketikan (≥2 huruf bila ada) persis di kiri kursor", () => {
+    expect(echoEvidence("❯ ab", "ab")).toBe(true);
+    expect(echoEvidence("❯ halo ab", "ab")).toBe(true);
+    expect(echoEvidence("❯ b", "b")).toBe(true);          // hanya satu huruf diketik
+    expect(echoEvidence("❯ a", "ab")).toBe(false);        // echo baru sampai huruf pertama
+    expect(echoEvidence("Password: ", "ab")).toBe(false); // pty bungkam
+    expect(echoEvidence("❯ b", "ab")).toBe(false);        // satu huruf kebetulan tak cukup
+    expect(echoEvidence("", "")).toBe(false);
+  });
+
+  it("mencabut suspend begitu bukti echo tiba", () => {
+    const s = suspended({ typed: "ab" });
+    const healed = onEchoed(s, "❯ ab", 5_000);
+    expect(healed.suspendedUntil).toBe(0);
+    expect(healed.typed).toBe("");
+    expect(canPredict(healed, "c", view({ line: "❯ ab", cursorX: 4 }), 5_000, true)).toBe(true);
+  });
+
+  it("tetap suspend selama pty bungkam — prompt password tak bocor lebih dari satu kedip", () => {
+    const s = suspended({ typed: "s3" });
+    const same = onEchoed(s, "Password: ", 5_000);
+    expect(same.suspendedUntil).toBe(10_000);
+    expect(same.typed).toBe("s3");
+  });
+
+  it("ketikan yang menyusul frame tak mengacaukan bukti — frame berikutnya yang mengangkatnya", () => {
+    const s = suspended({ typed: "abc" });   // `c` diketik sesudah frame "ab" dibuat server
+    expect(onEchoed(s, "❯ ab", 5_000).suspendedUntil).toBe(10_000);
+    expect(onEchoed(s, "❯ abc", 5_000).suspendedUntil).toBe(0);
+  });
+
+  it("sesudah suspend kedaluwarsa, onEchoed hanya membersihkan buku ketikan", () => {
+    const s = suspended({ typed: "ab" });
+    const later = onEchoed(s, "Password: ", 10_000);
+    expect(later.suspendedUntil).toBe(10_000);
+    expect(later.typed).toBe("");
+  });
+
+  it("onReattach membuang buku ketikan bersama sisa keadaan lain", () => {
+    expect(onReattach().typed).toBe("");
   });
 });

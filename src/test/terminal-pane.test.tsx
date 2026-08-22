@@ -36,7 +36,7 @@ vi.mock("@xterm/xterm", () => ({
     public loadAddon(): void { }
     public open(): void { }
     public focus(): void { xt.focused += 1; }
-    public write(d: string): void { xt.written.push(d); }
+    public write(d: string, cb?: () => void): void { xt.written.push(d); cb?.(); }
     public scrollLines(amount: number): void { xt.scrolled.push(amount); }
     public dispose(): void { }
     public hasSelection(): boolean { return xt.selection.length > 0; }
@@ -560,6 +560,38 @@ describe("TerminalPane · echo prediktif (SPEC-856)", () => {
     act(() => { xt.dataHandler?.("s"); });
     expect(xt.written).toEqual([]);
     expect(sentInputs()).toEqual(["s"]);
+  });
+
+  // Suspend yang menyembuhkan diri. Pemicu palsunya nyata — TUI agen yang menggambar ulang >500 ms
+  // saat mesin sibuk — dan dulu hukumannya 30 dtk tanpa echo lokal. Buktinya dibaca di CALLBACK
+  // `term.write`: xterm memproses frame server secara asinkron, jadi buffer tepat sesudah
+  // pemanggilan `write` masih berisi layar lama.
+  const suspendViaTtl = async () => {
+    lineIs("");
+    await mount(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    act(() => { xt.dataHandler?.("a"); });
+    act(() => { vi.advanceTimersByTime(20); });
+    act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "ack", seq: 1 }) }); });
+    act(() => { vi.advanceTimersByTime(700); });           // TTL lewat tanpa echo → suspend
+    act(() => { xt.dataHandler?.("b"); });                 // tak diprediksi, hanya dicatat
+    xt.written.length = 0;
+  };
+
+  it("mencabut suspend begitu frame server memperlihatkan ketikan di kiri kursor", async () => {
+    await suspendViaTtl();
+    lineIs("❯ ab", 4);                                      // layar SESUDAH frame tergambar
+    act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "data", d: "❯ ab" }) }); });
+    act(() => { xt.dataHandler?.("c"); });
+    expect(xt.written).toContain("\x1b[4mc\x1b[24m");
+  });
+
+  it("tetap suspend selama frame server tak memperlihatkan ketikan — pty bungkam", async () => {
+    await suspendViaTtl();
+    lineIs("Enter token: ", 13);                            // bukan pola password; pty menelan `b`
+    act(() => { sockets[0]?.onmessage?.({ data: JSON.stringify({ t: "data", d: "Enter token: " }) }); });
+    act(() => { xt.dataHandler?.("c"); });
+    expect(xt.written.some((w) => w.startsWith("\x1b[4m"))).toBe(false);
+    expect(sentInputs()).toEqual(["a", "b", "c"]);
   });
 });
 

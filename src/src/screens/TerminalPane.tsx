@@ -180,6 +180,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         line: buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "",
       };
     };
+    const lineBeforeCursor = (): string => {
+      const buf = term.buffer.active;
+      return (buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "").slice(0, buf.cursorX);
+    };
     // Jam TTL baru boleh berjalan sesudah SELURUH frame yang sudah dikirim diakui server.
     const clockIfDelivered = () => {
       if (unacked === 0 && ws?.readyState === WebSocket.OPEN) pred = P.onDelivered(pred, Date.now());
@@ -268,9 +272,17 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
           if (f.t === "data") {
             const r = P.onServerData(pred, f.d ?? "", Date.now());
             pred = r.state;
+            // Suspend yang menyembuhkan diri: bukti "pty membalas ketikan lagi" dibaca di CALLBACK
+            // write, yakni SESUDAH frame ini tergambar — xterm memproses write server secara
+            // asinkron (hanya write pertama sesudah input pengguna yang sinkron), jadi buffer tepat
+            // sesudah pemanggilan `write` masih layar lama. `pred` dibaca ulang saat callback:
+            // ketikan yang menyusul selama frame menunggu ikut dinilai.
+            const heal = P.wantsEchoEvidence(pred, Date.now())
+              ? () => { pred = P.onEchoed(pred, lineBeforeCursor(), Date.now()); }
+              : undefined;
             // Rollback dan data server WAJIB satu panggilan write: keadaan antara tak boleh pernah
             // dirender, dan itulah yang membuat layar byte-identik dengan tanpa prediksi.
-            term.write(r.write);
+            term.write(r.write, heal);
             if (r.tail) {
               const buf = term.buffer.active;
               const line = buf.getLine(buf.viewportY + buf.cursorY)?.translateToString(true) ?? "";
