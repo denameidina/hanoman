@@ -834,7 +834,7 @@ git commit -m "feat(pet): CLI key/register/qa; baris idle dirakit ulang dengan r
 - Consumes: `petlib.compose_atlas`, `petlib.manifest`, `petlib.ATLAS_BUDGET`, `petlib.ROWS`.
 - Produces: `internal/assets/pet/hnm-pet-anoman-atlas-v01.webp` + `internal/assets/pet/pet.json` (Task 5 yang merakitnya); `atlas.py --check` dan `verify.py` keluar 1 bila basi/rusak.
 
-- [ ] **Step 1: Tulis kedua skrip**
+- [x] **Step 1: Tulis kedua skrip**
 
 `internal/scripts/pet/atlas.py`:
 
@@ -948,7 +948,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 2: Pastikan keduanya menolak keadaan sekarang (baris belum lengkap)**
+- [x] **Step 2: Pastikan keduanya menolak keadaan sekarang (baris belum lengkap)**
 
 Run: `python3 internal/scripts/pet/atlas.py; echo "exit=$?"`
 Expected: `FAIL: baris belum ada: walk-right, walk-left, working, waiting, blocked, review, shipped, docs-updated, wave` lalu `exit=1`.
@@ -956,7 +956,7 @@ Expected: `FAIL: baris belum ada: walk-right, walk-left, working, waiting, block
 Run: `python3 internal/scripts/pet/verify.py; echo "exit=$?"`
 Expected: `FAIL: atlas tak ada` lalu `exit=1`.
 
-- [ ] **Step 3: Uji rakit dengan baris tiruan di direktori sementara (tak menyentuh repo)**
+- [x] **Step 3: Uji rakit dengan baris tiruan di direktori sementara (tak menyentuh repo)**
 
 Run:
 ```bash
@@ -971,7 +971,7 @@ OK PET-001: 10 baris, 1536×2080, 6xxxxx B
 ```
 (≈ 630 KB untuk 10× idle; di bawah anggaran 1 000 000 B.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/scripts/pet/atlas.py internal/scripts/pet/verify.py
