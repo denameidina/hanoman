@@ -8,13 +8,14 @@ import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, 
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
-import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry } from "@hanoman/shared";
+import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus } from "@hanoman/shared";
 import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
 import { AttachmentPicker } from "./screens/SpecAttachments";
 import { AuthScreen } from "./screens/AuthScreen";
+import { SetupWizard, UnhardenedBanner } from "./screens/SetupWizard";
 import { ClientPortal } from "./portal/ClientPortal";
 import { AuthProvider } from "./auth/AuthContext";
 import type { ProjectVM } from "./screens/types";
@@ -717,6 +718,14 @@ export default function App() {
   const [auth, setAuth] = React.useState<AuthStatus | null>(null);
   const onLoggedOut = React.useCallback(() => setAuth({ needsSetup: false, user: null }), []);
   React.useEffect(() => { api.authStatus().then(setAuth).catch(() => setAuth({ needsSetup: false, user: null })); }, []);
+  // SPEC-884 · ADR-0138 · wizard setup awal berdiri DI DEPAN AuthScreen: pilihannya menentukan
+  // apakah akun pertama nanti diminta setup token. Status yang sama juga menyalakan penanda
+  // permanen sesudah login, jadi ia dimuat pada kedua keadaan.
+  const [setupStatus, setSetupStatus] = React.useState<SetupStatus | null>(null);
+  const [setupDone, setSetupDone] = React.useState(false);
+  React.useEffect(() => {
+    if (auth?.needsSetup || auth?.user) api.setupStatus().then(setSetupStatus).catch(() => setSetupStatus(null));
+  }, [auth?.needsSetup, auth?.user?.id]);
   // SPEC-740 · ADR-0115 · state dari versi kunci lama tak pernah dibaca lagi (versi hidup
   // di dalam kunci) — disapu sekali di sini supaya storage tak tumbuh selamanya.
   React.useEffect(() => { pruneUiState(); }, []);
@@ -1253,6 +1262,8 @@ export default function App() {
 
   // SPEC-169 · gerbang auth: splash → Setup/Login → app.
   if (!auth) return <StateBlock kind="loading" title="Memuat hanoman…" />;
+  if (auth.needsSetup && setupStatus?.needed && !setupDone)
+    return <SetupWizard status={setupStatus} onDone={() => setSetupDone(true)} />;
   if (!auth.user) return <AuthScreen needsSetup={auth.needsSetup}
     setupTokenRequired={auth.setupTokenRequired ?? false}
     onDone={(u) => setAuth({ needsSetup: false, user: u })} />;

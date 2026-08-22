@@ -15,6 +15,10 @@ vi.mock("../src/screens/AutoMergeCard", () => ({ AutoMergeCard: () => null }));
 vi.mock("../src/api/client", () => ({
   api: {
     authStatus: vi.fn(async () => ({ needsSetup: false, user: { id: "u1", email: "a@b.co", createdAt: "" } })),
+    // SPEC-884 · App memuat status setup begitu auth diketahui; mock `api` parsial tanpa ini
+    // melempar di efek dan terbaca seperti App-nya yang rusak (jebakan yang sama SPEC-739/786).
+    setupStatus: vi.fn(async () => ({ needed: false, deployment: "local", hardening: false,
+      hardeningLocked: false, supervised: false, setupTokenRequired: false, prerequisites: [] })),
     listProjects: vi.fn(async () => ({ items: [PROJECT], total: 1, page: 1, pageSize: 20 })),
     listSpecs: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 20 })),
     listTerminals: vi.fn(async () => []),

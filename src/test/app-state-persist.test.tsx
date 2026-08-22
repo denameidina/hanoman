@@ -9,6 +9,10 @@ vi.mock("../src/api/client", async () => {
     ...actual,
     api: {
       authStatus: vi.fn().mockResolvedValue({ needsSetup: false, user: { id: "u1", email: "a@b.c", role: "admin" } }),
+    // SPEC-884 · App memuat status setup begitu auth diketahui; mock `api` parsial tanpa ini
+    // melempar di efek dan terbaca seperti App-nya yang rusak (jebakan yang sama SPEC-739/786).
+    setupStatus: vi.fn(async () => ({ needed: false, deployment: "local", hardening: false,
+      hardeningLocked: false, supervised: false, setupTokenRequired: false, prerequisites: [] })),
       listProjects: vi.fn().mockResolvedValue({ items: [], total: 0 }),
       listSpecs: vi.fn().mockResolvedValue({ items: [], total: 0 }),
       listTerminals: vi.fn().mockResolvedValue([]),

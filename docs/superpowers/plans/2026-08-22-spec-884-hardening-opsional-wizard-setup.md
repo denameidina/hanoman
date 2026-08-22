@@ -1759,7 +1759,7 @@ git commit -m "feat(spec-884): route setup — status probe dan apply ke config.
 
 > **Penyimpangan sadar dari spec K5:** spec menyebut wizard **tiga** langkah dengan akun pertama sebagai langkah 3. Plan ini membuatnya **dua** langkah, dan akun pertama tetap di `AuthScreen` yang sudah ada. Alasannya: hanya boleh ada **satu** tempat yang melahirkan akun (`POST /api/auth/setup` dengan aturan token-nya sendiri, Task 6-7); menyalinnya ke dalam wizard berarti dua jalur yang harus dijaga sepakat soal token, limiter, dan 409. Urutan yang dilihat operator tetap persis seperti spec: peruntukan → keamanan → buat akun. Catat penyimpangan ini di ADR-0138.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/setup-wizard.test.tsx`:
 
@@ -1842,12 +1842,12 @@ describe("SetupWizard (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/setup-wizard.test.tsx`
 Expected: FAIL — `Failed to resolve import "../src/screens/SetupWizard"`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Tambahkan ke `src/src/api/client.ts`, tepat di bawah `authStatus` (baris 466):
 
@@ -1999,12 +1999,12 @@ Ganti baris 1255-1256:
     onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/setup-wizard.test.tsx src/test/app-flows.test.tsx`
 Expected: PASS — kedua berkas. Bila `app-flows` merah karena `api.setupStatus` tak ada di mock parsialnya, tambahkan `setupStatus: vi.fn(async () => ({ needed: false }))` ke mock — jebakan mock parsial yang sama yang sudah dicatat SPEC-739/786 di berkas itu.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SetupWizard.tsx src/src/App.tsx src/src/api/client.ts src/test/setup-wizard.test.tsx
