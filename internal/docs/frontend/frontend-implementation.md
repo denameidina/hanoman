@@ -280,7 +280,7 @@ orientasi, dan alpha master **berikut** keberadaan, batas 768px, alpha, dan peng
 web-nya — master sehat yang turunannya hilang berarti layar kosong di dashboard, bukan sekadar aset
 besar.
 
-## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142)
+## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142 · Pet hidup E SPEC-904)
 
 Widget maskot di tepi bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi & backlog,
 bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada skema,
@@ -575,7 +575,7 @@ dan sengaja **tak** mengikuti `projectFilter`: ia hadir juga di halaman yang tak
 
 **Pengujian.** `pet-state.test.ts` (tabel prioritas, eksklusivitas kondisi, terputus, deciding,
 tidur, `recheckAt`), `events.test.ts` (status koneksi: frame pertama vs `onopen`, `paused`, jam
-putus), `pet-sprite.test.ts` (manifest 12 baris + `POSE_ROW` + kontrak CSS terparse),
+putus), `pet-sprite.test.ts` (manifest 16 baris + `POSE_ROW` + kontrak CSS terparse),
 `pet-walk.test.ts` (tabel mesin), `hanoman-pet.test.tsx` (render/interaksi/reduced/roam/mobile/
 jalan + lencana/panel berdaftar/pudar), `pet-mount.test.tsx` (mount tunggal + sumber artwork),
 `internal/scripts/pet/test-petlib.py` (pipeline atas lembar sintetis).

@@ -88,7 +88,7 @@ backlog, bukan hiasan — memakai band ilustrasi tersendiri: **pet** 80–128 px
 digambar sebagai atlas sprite PET-001 (`internal/assets/pet/`, ADR-0140) dan bukan lagi family
 `sticker` (`STK-001…008`, yang tetap di katalog untuk pemakaian lain). Tabel
 status → pose beserta urutan prioritasnya ada di
-[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140).
+[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140--pet-hidup-b-spec-897--pet-hidup-c-spec-898-adr-0141--pet-hidup-d-spec-899-adr-0142--pet-hidup-e-spec-904).
 Model sheet serta template sosial tetap frontend-addressable melalui registry tetapi
 tidak dipaksakan masuk instrument panel operasional. Motif tanpa makna status selalu dekoratif.
 
@@ -117,7 +117,7 @@ mempunyai enter/exit sendiri. Semua amplitudo tetap kecil agar terminal menjadi 
 `prefers-reduced-motion: reduce`, setiap animation **dan** transition dimatikan (`none`), pet diam
 di pojok, selector hover tidak berlaku, dan keadaan akhir tetap terbaca penuh. Kontrak DOM,
 lifecycle panel, mesin berkeliaran, dan pengujiannya dijelaskan di
-[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140).
+[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140--pet-hidup-b-spec-897--pet-hidup-c-spec-898-adr-0141--pet-hidup-d-spec-899-adr-0142--pet-hidup-e-spec-904).
 
 ## Placeholder: contoh nilai, bukan pengulangan label (SPEC-490)
 

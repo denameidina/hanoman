@@ -228,6 +228,7 @@ class AtlasTest(unittest.TestCase):
             self.assertEqual(atlas.size, (1536, petlib.CELL_H * len(petlib.ROWS)))
             m = petlib.manifest(rows)
             self.assertEqual(m["version"], 2)
+            self.assertEqual(m["version"], petlib.MANIFEST_VERSION)   # satu sumber, dibaca verify.py
             self.assertEqual([r["key"] for r in m["rows"]], petlib.ROW_KEYS)
             self.assertNotIn("mode", m["rows"][0])
             self.assertEqual(m["rows"][7], {"key": "shipped", "fps": 10, "loop": False, "then": "idle"})

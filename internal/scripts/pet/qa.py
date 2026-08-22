@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Gerbang kualitas satu baris + artefak review manusia di qa/ (contact sheet, onion-skin, GIF).
 Keluar 1 bila gerbang gagal: sprite menyentuh tepi lembar, tumpahan sel, residu pra-pin di atas
-petlib.RESIDUAL_GATE[mode], atau alpha hilang."""
+petlib.RESIDUAL_GATE[mode], alpha hilang, skala karakter di bawah petlib.BODY_RATIO_GATE, atau —
+untuk baris ber-`even` — langkah antar-frame yang tak rata (petlib.STEP_RATIO_GATE).
+
+Dua gerbang terakhir ditambahkan SPEC-904 dan daftar ini WAJIB ikut bertambah setiap kali ada
+gerbang baru: `held` percobaan 1 lolos setiap gerbang yang ada saat itu sambil menggambar
+karakternya 20 % lebih kecil, dan daftar yang lebih pendek dari gerbangnya mengundang kelas
+kegagalan yang sama terulang."""
 from __future__ import annotations
 
 import json

@@ -84,7 +84,8 @@ export const PET_ATLAS_URL: string = atlasUrl;
 
 // `ready` dan `offline` adalah pose yang namanya berbeda dari barisnya. `offline` sengaja menumpang
 // `idle`: yang dikatakan pet saat terputus adalah "aku tak tahu", dan itu diucapkan oleh pudar +
-// kalimat — baris ke-13 berarti ±80 KB atlas untuk informasi yang sudah tersampaikan.
+// kalimat — satu baris atlas lagi berarti ±70 KB (SPEC-904: 1 165 556 B untuk 16 baris) untuk
+// informasi yang sudah tersampaikan.
 export const POSE_ROW: Record<PetPose, PetRowKey> = {
   ready: "idle",
   sleeping: "sleep",

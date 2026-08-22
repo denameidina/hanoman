@@ -44,7 +44,7 @@ pra-pin ≤ 0,25 (`stand`) / 0,30 (`walk`) / 0,35 (`float`) / 0,50 (`jump`), **k
 "keep the feet identical in every frame", "do not let the tail cross into the next cell").
 `--note` wajib mengulang **seluruh** batasan yang sudah dipenuhi, bukan hanya yang baru gagal.
 
-## Yang dikunci pengukuran (2026-08-22)
+## Yang dikunci pengukuran (2026-08-22, diperluas 2026-08-23)
 
 - Model tak menaati grid sel → sprite dideteksi dari celah transparan, bukan dipotong per grid.
 - Jangkar kaki tertarik ujung ekor → kaki = run kolom paling kanan; registrasi + pin wilayah statis.
@@ -90,7 +90,9 @@ pra-pin ≤ 0,25 (`stand`) / 0,30 (`walk`) / 0,35 (`float`) / 0,50 (`jump`), **k
 - **`detect_sprites` membuang blob kecil yang terpisah tanpa suara** (celah ≥ 8 kolom memisahkan,
   bbox < 40×80 px dibuang). Ornamen yang melayang lepas — bintang pusing `dizzy` — karena itu wajib
   **menyentuh** siluet karakter; kalau tidak ia hilang dari strip, atau membuat jumlah sprite ≠ 8.
-- Ambang residu pra-pin `stand` (0,15) diturunkan dari baris **berdiri**; untuk baris **duduk**
+- Ambang residu pra-pin `stand` (kini **0,25** — dinaikkan SPEC-897 dari 0,15 saat dikalibrasi ulang
+  atas sepuluh baris nyata; angka yang mengikat ada di `petlib.RESIDUAL_GATE`) diturunkan dari baris
+  **berdiri**; untuk baris **duduk**
   (`sleep`) heuristik "kaki = run kolom paling kanan di 8 % baris terbawah" memilih pangkuan/sarung
   yang memang ikut bernapas, jadi angkanya tak sebanding. Ukur ulang, jangan asumsikan.
 

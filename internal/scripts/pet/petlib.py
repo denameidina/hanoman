@@ -34,6 +34,10 @@ STAND_H = BASELINE - HEAD_MARGIN   # 168 — tinggi karakter berdiri; frontend m
 # +37 % vs atlas v01 (950 480 B) — di dalam batas +40 % SPEC-904 — dan atlas yang benar-benar
 # dikomit 1 165 556 B (+22,6 %) menyisakan 134 444 B untuk satu regenerasi baris rutin.
 ATLAS_BUDGET = 1_300_000
+# Versi manifest = KONSTANTA, bukan literal di dalam `manifest()`: sejak SPEC-904 ia nilai yang
+# bergerak, dan satu-satunya yang memakukannya dulu adalah test frontend. `verify.py` kini
+# membandingkannya, jadi bump yang lupa dikomit ke pet.json tertangkap di pipeline pet sendiri.
+MANIFEST_VERSION = 2
 SEARCH_PX = 24
 SCALES = (0.92, 0.94, 0.96, 0.98, 1.0, 1.02, 1.04, 1.06, 1.08)
 STATIC_FROM = 0.45     # stand: baris ≥ 45 % tinggi frame 1 = wilayah statis (kaki, kain, torso bawah)
@@ -471,7 +475,7 @@ def compose_atlas(rows_dir: Path) -> Image.Image:
 
 def manifest(rows_dir: Path) -> dict:
     return {
-        "id": "PET-001", "version": 2,
+        "id": "PET-001", "version": MANIFEST_VERSION,
         "cell": {"w": CELL_W, "h": CELL_H}, "columns": COLUMNS,
         "anchor": {"x": ANCHOR_X, "baseline": BASELINE},
         "character": {"h": STAND_H},

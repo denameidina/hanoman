@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """raw/<key>.keyed.png → rows/<key>.png (strip 8×192×208 terregistrasi) + rows/<key>.report.json.
-Mode (stand/walk/jump) dan pin mengikuti petlib.ROWS; `--no-pin` memaksa tanpa pin."""
+Mode (stand/walk/jump/float) dan pin mengikuti petlib.ROWS; `--no-pin` memaksa tanpa pin.
+`float` (SPEC-904) untuk baris yang tak menapak tanah — jangan menggantinya `walk` secara
+manual: `walk` memaksa piksel terendah ke baseline, jadi badan ikut naik-turun mengikuti kaki."""
 from __future__ import annotations
 
 import json
