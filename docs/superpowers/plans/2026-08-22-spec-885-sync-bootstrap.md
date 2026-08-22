@@ -1495,7 +1495,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: route `/sync/pull` dan `/sync/bootstrap` menjawab `content-encoding: gzip` bila request membawa `accept-encoding: gzip`; selalu menyetel `vary: accept-encoding`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/sync-page-budget.test.ts` (tambahkan import `buildApp`, `issueDeviceToken`, `gunzipSync` dari `node:zlib`):
 
@@ -1529,7 +1529,7 @@ describe("SPEC-885 · gzip endpoint sync (hub)", () => {
 
 Catatan: `clean` di berkas ini hanya menghapus `syncLog` — tambahkan `deviceToken`, `session`, dan `user` ke `clean` agar test ini tak bocor antar-run.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts
@@ -1537,7 +1537,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL — `content-encoding` `undefined`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/routes/sync.ts`, tambahkan import di atas:
 
@@ -1582,7 +1582,7 @@ Ubah dua route menjadi:
   });
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts server/test/sync-bootstrap.test.ts server/test/sync-client.test.ts
@@ -1590,7 +1590,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. `sync-client.test.ts` penting di sini: `realTransport()`-nya memakai `app.inject` **tanpa** `accept-encoding`, jadi ia membuktikan jalur polos tetap utuh.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/sync.ts server/test/sync-page-budget.test.ts

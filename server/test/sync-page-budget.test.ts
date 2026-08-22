@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { createServer } from "node:http";
+import { gunzipSync } from "node:zlib";
+import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
+import { issueDeviceToken } from "../src/services/device-token";
 import { pull } from "../src/services/sync";
 import { fetchTransport } from "../src/services/sync-client";
 
-const clean = async () => { await prisma.syncLog.deleteMany(); };
+const clean = async () => {
+  await prisma.syncLog.deleteMany();
+  await prisma.deviceToken.deleteMany(); await prisma.session.deleteMany(); await prisma.user.deleteMany();
+};
 beforeEach(clean); afterAll(clean);
 
 const feedRow = (recordId: string, bytes: number) => prisma.syncLog.create({
@@ -64,5 +70,31 @@ describe("SPEC-885 · cap byte client terhadap hub lama", () => {
     } finally {
       await new Promise<void>((r) => srv.close(() => r()));
     }
+  });
+});
+
+describe("SPEC-885 · gzip endpoint sync (hub)", () => {
+  it("membalas gzip saat diminta, plain saat tidak", async () => {
+    const app = buildApp();
+    const u = await prisma.user.create({ data: { email: "g@g.co", passwordHash: "x:y" } });
+    const t = await issueDeviceToken(u.id, "laptop");
+    await feedRow("SPEC-1", 5_000);
+
+    const dimampat = await app.inject({
+      method: "GET", url: "/api/sync/pull?since=0",
+      headers: { authorization: `Bearer ${t.token}`, "accept-encoding": "gzip" },
+    });
+    expect(dimampat.headers["content-encoding"]).toBe("gzip");
+    expect(dimampat.headers["vary"]).toBe("accept-encoding");
+    const isi = JSON.parse(gunzipSync(dimampat.rawPayload).toString("utf8"));
+    expect(isi.records[0].recordId).toBe("SPEC-1");
+    expect(dimampat.rawPayload.length).toBeLessThan(1_000); // 5 KB "x" berulang mampat jauh
+
+    const polos = await app.inject({
+      method: "GET", url: "/api/sync/pull?since=0",
+      headers: { authorization: `Bearer ${t.token}` },
+    });
+    expect(polos.headers["content-encoding"]).toBeUndefined();
+    expect(polos.json().records[0].recordId).toBe("SPEC-1");
   });
 });

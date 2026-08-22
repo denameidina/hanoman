@@ -1,4 +1,5 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { gzipSync } from "node:zlib";
 import { z } from "zod";
 import { prisma } from "../db";
 import { requireDeviceToken } from "../services/device-auth";
@@ -28,18 +29,36 @@ const zPush = z.object({
 // Entitas ber-`author`: bila klien tak mengirim author, atribusikan ke user pemilik token (AC-4).
 const AUTHORED: Entity[] = ["spec", "sessionResult"];
 
+// SPEC-885 · ADR-0138 · gzip DUA endpoint sync saja, bukan plugin lifecycle global.
+//
+// `@fastify/compress` sengaja tidak dipakai: ia belum jadi dependency, menambahkannya menyentuh
+// daftar `--external` di skrip build esbuild, dan ia memasang hook di seluruh lifecycle. Yang
+// dibutuhkan hanya dua endpoint mesin-ke-mesin yang payload-nya sudah dibatasi ≤1 MB oleh
+// anggaran byte dan sudah utuh di memori — `gzipSync` atasnya ~10 ms. Plugin sebesar itu untuk
+// permukaan sekecil itu adalah dependency yang harus dibayar tiap rilis tanpa alasan.
+function maybeGzip(req: FastifyRequest, reply: FastifyReply, payload: unknown): unknown {
+  // `vary` disetel TANPA syarat: ia menerangkan bahwa balasan berbeda menurut accept-encoding,
+  // dan itu benar juga bagi balasan yang kebetulan tidak dimampatkan. Menyetelnya hanya di
+  // cabang gzip adalah cara klasik meracuni cache perantara.
+  reply.header("vary", "accept-encoding");
+  if (!/\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""))) return payload;
+  reply.header("content-type", "application/json; charset=utf-8");
+  reply.header("content-encoding", "gzip");
+  return gzipSync(Buffer.from(JSON.stringify(payload)));
+}
+
 export default async function (app: FastifyInstance) {
-  app.get("/sync/pull", { preHandler: requireDeviceToken }, async (req) => {
+  app.get("/sync/pull", { preHandler: requireDeviceToken }, async (req, reply) => {
     const since = (req.query as { since?: string }).since ?? "0";
-    return pull(since);
+    return maybeGzip(req, reply, await pull(since));
   });
 
   // SPEC-885 · ADR-0138 · keadaan sekarang dalam urutan dependensi, untuk client yang kursornya
   // masih 0. Tak ada gerbang tambahan di `app.ts`: path ini di bawah `/api/sync` dan bukan salah
   // satu pengecualian cookie-only, jadi ia otomatis ikut jalur device-token seperti `/sync/pull`.
-  app.get("/sync/bootstrap", { preHandler: requireDeviceToken }, async (req) => {
+  app.get("/sync/bootstrap", { preHandler: requireDeviceToken }, async (req, reply) => {
     const after = (req.query as { after?: string }).after ?? null;
-    return bootstrapSnapshot(after);
+    return maybeGzip(req, reply, await bootstrapSnapshot(after));
   });
 
   // SPEC-272 · ADR-0068 · byte lampiran untuk fetch-through client (device-token, bukan cookie).
