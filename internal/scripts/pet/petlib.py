@@ -45,6 +45,10 @@ ROWS: list[dict] = [
     {"key": "shipped",      "fps": 10, "loop": False, "mode": "jump", "then": "idle"},
     {"key": "docs-updated", "fps": 6,  "loop": True,  "mode": "stand"},
     {"key": "wave",         "fps": 10, "loop": False, "mode": "stand", "then": "idle"},
+    # SPEC-897 · ditambahkan di EKOR supaya indeks baris lama tak bergeser (atlas & pet.json
+    # memakai urutan array sebagai indeks baris).
+    {"key": "deciding",     "fps": 6,  "loop": True,  "mode": "stand"},
+    {"key": "sleep",        "fps": 4,  "loop": True,  "mode": "stand"},
 ]
 ROW_KEYS = [r["key"] for r in ROWS]
 # Gerbang residu PRA-pin; generasi rusak (frame tak sejajar / pose lain) mengukur ≥ 0,5. Angka

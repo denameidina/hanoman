@@ -38,7 +38,7 @@
   - `export function eventsStatus(): EventsStatus`
   - `export function subscribeStatus(handler: (s: EventsStatus) => void): () => void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Ganti seluruh isi `src/test/events.test.ts` dengan:
 
@@ -163,12 +163,12 @@ describe("status koneksi events (SPEC-897)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/events.test.ts`
 Diharapkan: FAIL — `subscribeStatus is not a function` / `eventsStatus is not a function`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/api/events.ts`, tepat di bawah blok deklarasi `let opening = false;`, sisipkan:
 
@@ -240,12 +240,12 @@ function onVisibility(): void {
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Jalankan: `env -u NODE_ENV pnpm vitest --run src/test/events.test.ts`
 Diharapkan: PASS, 6 test.
 
-- [ ] **Step 5: Typecheck & commit**
+- [x] **Step 5: Typecheck & commit**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -268,7 +268,7 @@ git commit -m "feat(pet): events.ts mengekspos status koneksi (connected pada fr
 - Consumes: pipeline spec A (`gen.py`, `key.py`, `register.py`, `qa.py`, `atlas.py`, `verify.py`).
 - Produces: `PET_ROW_KEYS` 12 elemen dengan `"deciding"` dan `"sleep"` di ekor (indeks 10 & 11); `PET_MANIFEST.rows.length === 12`; atlas 1536×2496.
 
-- [ ] **Step 1: Tulis naskah `prompts/deciding.md`**
+- [x] **Step 1: Tulis naskah `prompts/deciding.md`**
 
 Buat `internal/assets/pet/prompts/deciding.md` (satu paragraf, pola persis `review.md`/`blocked.md`):
 
@@ -276,7 +276,7 @@ Buat `internal/assets/pet/prompts/deciding.md` (satu paragraf, pola persis `revi
 ROW "deciding" (8 frames, loops): he is DELIBERATING — someone else is making the call and he is turning it over in his mind. He is NOT looking at anything: unlike the "review" row he does not lean forward and does not scan to the right. He stands upright with his weight settled back, feet, legs and sarong fixed. One hand is raised to his chin in a thinking gesture, the elbow tucked in; the other arm hangs relaxed. His gaze goes UP and away, eyebrow raised: frames 1-2 looking up-right, frames 3-4 drifting up and further away, frames 5-6 drifting back, frame 7 a slow blink, frame 8 back to frame 1. The head tilts a few degrees with the gaze, never snapping. The tail rises behind him in a slow, big curve that curls at the tip like a question mark and uncurls again over the 8 frames — it is the clearest sign that he is thinking. No props, no speech bubble, no question mark drawn in the air.
 ```
 
-- [ ] **Step 2: Tulis naskah `prompts/sleep.md`**
+- [x] **Step 2: Tulis naskah `prompts/sleep.md`**
 
 Buat `internal/assets/pet/prompts/sleep.md`:
 
@@ -284,7 +284,7 @@ Buat `internal/assets/pet/prompts/sleep.md`:
 ROW "sleep" (8 frames, loops): nothing is happening and he has fallen asleep, peacefully and with dignity — no snot bubble, no "Z" letters, no pillow, no blanket, no props at all. He is SITTING on the ground, curled small: hips and folded legs on the baseline, back gently rounded, both arms resting loosely in his lap. His single eye is CLOSED throughout — a calm curved line with the lashes down, the eyebrow relaxed. The long tail is curled all the way around his seated body, its golden tip resting near his feet. The hips, folded legs, sarong and tail are drawn at exactly the same position and size in all 8 frames. The only motion is a very slow sleeping breath: frames 1-4 the head and shoulders sink a little lower and the chin comes closer to the chest, frames 5-8 they rise back up; the very tip of the tail lifts a few pixels on frame 3 and settles again on frame 6. Everything is small and unhurried — this row plays at 4 fps.
 ```
 
-- [ ] **Step 3: Daftarkan dua baris di `petlib.ROWS`**
+- [x] **Step 3: Daftarkan dua baris di `petlib.ROWS`**
 
 Di `internal/scripts/pet/petlib.py`, ganti dua baris terakhir array `ROWS` sehingga daftarnya berakhir:
 
@@ -297,7 +297,7 @@ Di `internal/scripts/pet/petlib.py`, ganti dua baris terakhir array `ROWS` sehin
 ]
 ```
 
-- [ ] **Step 4: Pastikan pipeline Python masih hijau dengan 12 baris**
+- [x] **Step 4: Pastikan pipeline Python masih hijau dengan 12 baris**
 
 Jalankan: `python3 internal/scripts/pet/test-petlib.py`
 Diharapkan: PASS (semua assert komposisi memakai `len(petlib.ROWS)`, bukan angka). Bila ada assert yang mem-hardcode 10, ganti jadi `len(petlib.ROWS)`.
