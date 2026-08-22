@@ -187,7 +187,7 @@ git commit -m "feat(dialog): kontrak shared inbox keputusan sesi (SPEC-899)"
 - Consumes: `PaneIO`, `readDialogScreen`, `dialogKey`, `answerChoiceDialog`, `answerMultiSelectDialog`, `answerNotesDialog` dari `./tui-dialog`; `SessionDialog`, `SessionDialogAnswer`, `SessionDialogPayload` dari `@hanoman/shared`.
 - Produces: `screenHashOf(paneText: string): string`; `readSessionDialog(io: PaneIO): SessionDialogPayload | null`; `answerSessionDialog(io: PaneIO, input: SessionDialogAnswer, chunkMs?: number): Promise<AnswerResult>` dengan `AnswerResult = { ok: true } | { ok: false; reason: "stale" | "shape" | "not-landed" }`; `sessionPaneIO(id: string): PaneIO`; `beginAnswer(id): boolean`; `endAnswer(id): void`; `__setPaneIO(fn)`, `__resetPaneIO()`, `__resetAnswering()`; `paneIO(id: string): PaneIO` (dari `pty.ts`).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/session-dialog.test.ts`:
 
@@ -354,12 +354,12 @@ describe("SPEC-899 · menjawab dialog sesi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-dialog.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/services/session-dialog"`.
 
-- [ ] **Step 3: Ekspor primitif pane dari `pty.ts`**
+- [x] **Step 3: Ekspor primitif pane dari `pty.ts`**
 
 Di `server/src/services/pty.ts`, ganti deklarasi `const dialogIO = (id: string): PaneIO => ({` menjadi `export const paneIO = (id: string): PaneIO => ({` dan perbarui komentar di atasnya menjadi:
 
@@ -371,7 +371,7 @@ Di `server/src/services/pty.ts`, ganti deklarasi `const dialogIO = (id: string):
 
 Lalu ganti dua pemakaiannya (`const io = dialogIO(id);` di dalam `sendToPane` dan di dalam `submitPaneDialog`) menjadi `const io = paneIO(id);`. Tidak ada perubahan perilaku — hanya nama & visibilitas.
 
-- [ ] **Step 4: Tulis service**
+- [x] **Step 4: Tulis service**
 
 Buat `server/src/services/session-dialog.ts`:
 
@@ -496,17 +496,17 @@ export function __resetPaneIO(): void { paneIOFactory = paneIO; }
 export function __resetAnswering(): void { answering.clear(); }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-dialog.test.ts`
 Expected: PASS — 15 test. Bila `not-landed` lulus tapi `single-select` gagal, periksa urutan layar `fakeIO`: `answerChoiceDialog` memanggil `capture()` sekali sesudah mengetik prosa.
 
-- [ ] **Step 6: Jalankan test dialog yang sudah ada — pastikan rename `dialogIO` tak merusak apa pun**
+- [x] **Step 6: Jalankan test dialog yang sudah ada — pastikan rename `dialogIO` tak merusak apa pun**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tui-dialog.test.ts`
 Expected: PASS, jumlah test sama seperti sebelum perubahan.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/src/services/session-dialog.ts server/test/session-dialog.test.ts

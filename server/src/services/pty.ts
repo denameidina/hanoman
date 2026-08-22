@@ -649,7 +649,7 @@ export async function sendToPane(id: string, text: string, chunkMs = 50, choices
   const line = text.replace(/\s*\r?\n\s*/g, " ").trim();
   if (!line) return false;
   try {
-    const io = dialogIO(id);
+    const io = paneIO(id);
     const screen = readDialogScreen(io.capture());
     // SPEC-474 · layar rekap dialog berantai: tak ada yang perlu diketik, ia tinggal ditutup.
     // Prosa di sini ditelan tanpa jejak dan `Enter` kebetulan juga men-submit — menekan
@@ -705,17 +705,17 @@ export async function submitPaneDialog(id: string): Promise<boolean> {
   const p = getSession(id);
   if (!p || p.exited) return false;
   try {
-    const io = dialogIO(id);
+    const io = paneIO(id);
     const screen = readDialogScreen(io.capture());
     if (screen?.kind !== "review") return false;
     return await submitReview(io, screen.submitRow);
   } catch { return false; }
 }
 
-// Primitif pane untuk SELURUH interaksi dialog. Satu tempat supaya `sendToPane` dan
-// `submitPaneDialog` tak bisa berselisih soal cara mengetik (dua titik tulis yang tak sepakat
-// adalah pola kegagalan SPEC-431/448).
-const dialogIO = (id: string): PaneIO => ({
+// Primitif pane untuk SELURUH interaksi dialog. Satu tempat supaya `sendToPane`,
+// `submitPaneDialog`, dan (SPEC-899) jalur jawaban manusia tak bisa berselisih soal cara mengetik
+// — dua titik tulis yang tak sepakat adalah pola kegagalan SPEC-431/448.
+export const paneIO = (id: string): PaneIO => ({
   capture: () => capturePane(id, DIALOG_CAPTURE_LINES),
   literal: (s) => { tmux("send-keys", "-t", name(id), "-l", s); },
   enter: () => { tmux("send-keys", "-t", name(id), "Enter"); },
