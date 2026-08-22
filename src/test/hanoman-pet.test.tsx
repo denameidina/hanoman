@@ -1,9 +1,13 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Spec } from "@hanoman/shared";
+import type { Notification, Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../src/api/client";
 import { HanomanPet } from "../src/screens/HanomanPet";
-import { PET_HIDDEN_KEY } from "../src/screens/pet-state";
+import { NotificationsContext } from "../src/notifications/NotificationsContext";
+import { PET_HIDDEN_KEY, PET_ROAM_KEY } from "../src/screens/pet-state";
+import { PET_MANIFEST, durationMs, rowIndex } from "../src/screens/pet-sprite";
+import { LANE_MARGIN, homeX } from "../src/screens/pet-walk";
+import { MOBILE_QUERY } from "../src/ds/responsive";
 
 function spec(over: Partial<Spec> & { id: string }): Spec {
   return {
@@ -18,19 +22,23 @@ function session(over: Partial<TerminalSession> & { id: string }): TerminalSessi
   return { projectId: "hanoman", cwd: "/tmp", exited: false, ...over };
 }
 
-function mockMatchMedia(reduced: boolean): void {
+// `matches` per query: reduced-motion dan tier dibaca dari matchMedia yang sama.
+function mockMatchMedia(matching: (query: string) => boolean): void {
   Object.defineProperty(window, "matchMedia", {
     writable: true, configurable: true,
     value: (query: string) => ({
-      matches: reduced, media: query, onchange: null,
+      matches: matching(query), media: query, onchange: null,
       addEventListener: vi.fn(), removeEventListener: vi.fn(),
       addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
     }),
   });
 }
+const REDUCED = "(prefers-reduced-motion: reduce)";
 
 const styleOf = (el: HTMLElement): string => el.getAttribute("style") ?? "";
 const hit = () => screen.getByRole("button", { name: "Ringkasan status Hanoman" });
+const atlas = () => screen.getByTestId("pet-atlas");
+const rowshift = () => screen.getByTestId("pet-rowshift");
 
 function animationEnd(element: HTMLElement, animationName: string): void {
   const event = new Event("animationend", { bubbles: true });
@@ -38,122 +46,126 @@ function animationEnd(element: HTMLElement, animationName: string): void {
   fireEvent(element, event);
 }
 
-beforeEach(() => { localStorage.clear(); mockMatchMedia(false); });
+// Skala desktop: karakter 112 px dari character.h manifest.
+const SCALE = 112 / PET_MANIFEST.character.h;
+const CELL_W = Math.round(PET_MANIFEST.cell.w * SCALE);
+const CELL_H = Math.round(PET_MANIFEST.cell.h * SCALE);
+const HOME = homeX(window.innerWidth, CELL_W);
 
-describe("HanomanPet", () => {
-  it("uses safe-area offsets, clamps its panel, and keeps the hidden handle 44px", () => {
-    const { rerender } = render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-    expect(screen.getByTestId("pet-root")).toHaveStyle({
-      right: "max(22px, var(--safe-right))",
-      bottom: "max(22px, var(--safe-bottom))",
-    });
-    fireEvent.click(hit());
-    expect(screen.getByTestId("pet-panel")).toHaveStyle({
-      maxWidth: "calc(100vw - var(--safe-left) - var(--safe-right) - 24px)",
-      maxHeight: "calc(100dvh - var(--safe-top) - var(--safe-bottom) - 120px)",
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Sembunyikan" }));
-    rerender(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Tampilkan pet Hanoman" })).toHaveStyle({ width: "44px", height: "44px" });
-  });
-  it("merender pose `ready` sebagai status yang terbaca screen reader", () => {
+beforeEach(() => { localStorage.clear(); mockMatchMedia(() => false); });
+
+describe("HanomanPet (sprite)", () => {
+  it("merender satu img atlas di viewport sel, baris dipilih --row, frame oleh steps(8)", () => {
     render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
 
-    const art = screen.getByTestId("illustration-STK-001");
-    expect(art.getAttribute("alt")).toContain("Hanoman");
-    expect(art.getAttribute("alt")).toContain("1 backlog siap dikerjakan");
-    expect(art).not.toHaveAttribute("aria-hidden");
-    const status = screen.getByRole("status");
-    expect(status).toHaveAttribute("aria-live", "polite");
-    expect(status).toContainElement(art);
+    expect(screen.getByTestId("pet-viewport")).toHaveStyle({ overflow: "hidden", width: `${CELL_W}px`, height: `${CELL_H}px` });
+    expect(rowshift()).toHaveClass("hn-pet-rowshift");
+    expect(rowshift()).toHaveAttribute("data-row", "idle");
+    expect(styleOf(rowshift())).toContain(`--row: ${rowIndex("idle")}`);
+    const img = atlas();
+    expect(img.getAttribute("src")).toMatch(/\.webp$/);
+    expect(img).toHaveAttribute("alt", "");
+    expect(img).toHaveAttribute("aria-hidden", "true");
+    expect(img).toHaveStyle({
+      width: `${CELL_W * PET_MANIFEST.columns}px`,
+      height: `${CELL_H * PET_MANIFEST.rows.length}px`,
+      animation: `hn-pet-frames ${durationMs("idle")}ms steps(8, end) infinite`,
+    });
   });
 
-  it("berpindah pose saat sesi hidup muncul, pose lama tinggal sebagai lapisan bisu", () => {
+  it("kalimat status hidup di span visually-hidden di dalam region status, bukan di alt", () => {
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    const text = screen.getByTestId("pet-status");
+    expect(status).toContainElement(text);
+    expect(text).toHaveClass("hn-sr-only");
+    expect(text.textContent).toBe("Hanoman siap · 1 backlog siap dikerjakan");
+  });
+
+  it("berpindah baris saat sesi hidup muncul dan memperbarui kalimat status", () => {
     const backlog = [spec({ id: "SPEC-1", stage: "executing" })];
     const { rerender } = render(<HanomanPet sessions={[]} backlog={backlog} onOpen={vi.fn()} />);
     rerender(<HanomanPet sessions={[session({ id: "spec-1", specId: "SPEC-1" })]}
       backlog={backlog} onOpen={vi.fn()} />);
 
-    const working = screen.getByTestId("illustration-STK-002");
-    expect(working).toHaveStyle({
-      opacity: "1",
-      animation: "hn-pet-pose-in var(--dur-slow) var(--ease-out) both",
-    });
-    expect(working.getAttribute("alt")).toContain("sedang berjalan");
-
-    const ready = screen.getByTestId("illustration-STK-001");
-    expect(ready).toHaveStyle({
-      opacity: "0",
-      animation: "hn-pet-pose-out var(--dur-slow) var(--ease-out) both",
-    });
-    expect(styleOf(working)).not.toContain("transition: opacity");
-    expect(ready).toHaveAttribute("aria-hidden", "true");
-    expect(ready).toHaveAttribute("alt", "");
+    expect(rowshift()).toHaveAttribute("data-row", "working");
+    expect(styleOf(rowshift())).toContain(`--row: ${rowIndex("working")}`);
+    expect(atlas()).toHaveStyle({ animation: `hn-pet-frames ${durationMs("working")}ms steps(8, end) infinite` });
+    expect(screen.getByTestId("pet-status").textContent).toContain("sedang berjalan");
   });
 
-  it("memilih idle working yang berbeda dari ready", () => {
-    render(<HanomanPet backlog={[spec({ id: "SPEC-1", stage: "executing" })]}
-      sessions={[session({ id: "spec-1", specId: "SPEC-1" })]} onOpen={vi.fn()} />);
-
-    expect(screen.getByTestId("pet-idle")).toHaveStyle({
-      animation: "hn-pet-idle-working var(--dur-pet-active) var(--ease-inout) infinite",
-    });
-    expect(styleOf(screen.getByTestId("pet-idle"))).not.toContain("hn-pet-idle-ready");
-  });
-
-  it("bereaksi sekali saat diklik dan selesai lewat animationend", () => {
+  it("klik memutar wave sekali lalu kembali ke baris pose lewat animationend", () => {
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
     fireEvent.click(hit());
 
-    const reactor = screen.getByTestId("pet-reactor");
-    expect(reactor).toHaveStyle({
-      animation: "hn-pet-click var(--dur-slow) var(--ease-out) both",
-    });
-    animationEnd(reactor, "hn-pet-click");
-    expect(reactor).toHaveStyle({ animation: "none" });
+    expect(rowshift()).toHaveAttribute("data-row", "wave");
+    expect(atlas()).toHaveStyle({ animation: `hn-pet-frames ${durationMs("wave")}ms steps(8, end) 1 forwards` });
+    expect(screen.getByTestId("pet-reactor")).toHaveStyle({ animation: "hn-pet-click var(--dur-slow) var(--ease-out) both" });
+
+    animationEnd(atlas(), "hn-pet-frames");
+    expect(rowshift()).toHaveAttribute("data-row", "idle");
+    animationEnd(screen.getByTestId("pet-reactor"), "hn-pet-click");
+    expect(screen.getByTestId("pet-reactor")).toHaveStyle({ animation: "none" });
   });
 
-  it("menganimasi panel masuk dan keluar sebelum unmount", () => {
+  it("shipped main sekali (1 forwards) lalu idle sampai pose berganti", () => {
+    const backlog = [spec({ id: "SPEC-9", stage: "done" })];
+    const fresh: Notification = {
+      id: "n1", type: "done", specId: "SPEC-9", sessionId: null, title: "judul SPEC-9",
+      projectId: "hanoman", createdAt: new Date().toISOString(), readAt: null,
+    };
+    render(
+      <NotificationsContext.Provider value={{ items: [fresh], unread: 1, total: 1, markAllRead: () => {}, clear: () => {} }}>
+        <HanomanPet sessions={[]} backlog={backlog} onOpen={vi.fn()} />
+      </NotificationsContext.Provider>,
+    );
+    expect(rowshift()).toHaveAttribute("data-row", "shipped");
+    expect(atlas()).toHaveStyle({ animation: `hn-pet-frames ${durationMs("shipped")}ms steps(8, end) 1 forwards` });
+    animationEnd(atlas(), "hn-pet-frames");
+    expect(rowshift()).toHaveAttribute("data-row", "idle");
+    expect(screen.getByTestId("pet-status").textContent).toContain("baru saja selesai");   // pose tetap shipped
+  });
+
+  it("menganimasi panel masuk dan keluar, dijangkar & di-clamp di atas pet", () => {
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
     fireEvent.click(hit());
 
     const panel = screen.getByTestId("pet-panel");
     expect(panel).toHaveStyle({
       animation: "hn-pet-panel-in var(--dur-slow) var(--ease-out) both",
+      bottom: `${CELL_H + 10}px`, width: "268px",
+      maxWidth: "calc(100vw - var(--safe-left) - var(--safe-right) - 24px)",
+      maxHeight: "calc(100dvh - var(--safe-top) - var(--safe-bottom) - 120px)",
     });
+    // jsdom: rect nol → pusat dari posisi keadaan (rumah) → di-clamp ke tepi kanan viewport
+    const center = HOME + PET_MANIFEST.anchor.x * CELL_W;
+    const expected = Math.round(Math.min(Math.max(center - 134, 12), window.innerWidth - 268 - 12));
+    expect(panel).toHaveStyle({ left: `${expected}px` });
+
     fireEvent.keyDown(document, { key: "Escape" });
     expect(panel).toHaveAttribute("aria-hidden", "true");
     expect(panel).toHaveAttribute("inert");
-    expect(panel).toHaveStyle({
-      pointerEvents: "none",
-      animation: "hn-pet-panel-out var(--dur-slow) var(--ease-out) both",
-    });
+    expect(panel).toHaveStyle({ pointerEvents: "none", animation: "hn-pet-panel-out var(--dur-slow) var(--ease-out) both" });
     animationEnd(panel, "hn-pet-panel-out");
     expect(screen.queryByTestId("pet-panel")).toBeNull();
   });
 
-  it("mematikan seluruh gerak saat prefers-reduced-motion: reduce", () => {
-    mockMatchMedia(true);
+  it("mematikan seluruh gerak saat prefers-reduced-motion: reduce dan diam di rumah", () => {
+    mockMatchMedia((q) => q === REDUCED);
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
 
     expect(screen.getByTestId("pet-stage")).toHaveStyle({ animation: "none" });
-    expect(screen.getByTestId("pet-reactor")).toHaveStyle({
-      animation: "none", transition: "none",
-    });
-    expect(screen.getByTestId("pet-idle")).toHaveStyle({ animation: "none" });
-    expect(screen.getByTestId("illustration-STK-001")).toHaveStyle({
-      animation: "none", transition: "none", opacity: "1",
-    });
+    expect(screen.getByTestId("pet-reactor")).toHaveStyle({ animation: "none", transition: "none" });
+    expect(atlas()).toHaveStyle({ animation: "none" });
+    const actor = screen.getByTestId("pet-actor");
+    expect(actor).toHaveStyle({ transition: "none", transform: `translateX(${HOME}px)` });
+    expect(actor).toHaveAttribute("data-mode", "stand");
 
     fireEvent.click(hit());
+    expect(rowshift()).toHaveAttribute("data-row", "idle");          // tanpa wave
     expect(screen.getByTestId("pet-panel")).toHaveStyle({ animation: "none" });
-    expect(screen.getByTestId("pet-reactor")).toHaveStyle({ animation: "none" });
-    expect(screen.getByRole("button", { name: "Buka Backlog" })).toHaveStyle({
-      transition: "none", transform: "none",
-    });
-    expect(screen.getByRole("button", { name: "Sembunyikan" })).toHaveStyle({
-      transition: "none", transform: "none",
-    });
+    expect(screen.getByRole("button", { name: "Buka Backlog" })).toHaveStyle({ transition: "none", transform: "none" });
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByTestId("pet-panel")).toBeNull();
   });
@@ -177,23 +189,75 @@ describe("HanomanPet", () => {
     fireEvent.click(hit());
     fireEvent.click(screen.getByRole("button", { name: "Sembunyikan" }));
 
-    expect(screen.queryByTestId("illustration-STK-001")).toBeNull();
+    expect(screen.queryByTestId("pet-atlas")).toBeNull();
     expect(localStorage.getItem(PET_HIDDEN_KEY)).toBe("1");
+    expect(screen.getByRole("button", { name: "Tampilkan pet Hanoman" })).toHaveStyle({ width: "44px", height: "44px" });
     unmount();
 
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-    expect(screen.queryByTestId("illustration-STK-001")).toBeNull();
+    expect(screen.queryByTestId("pet-atlas")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Tampilkan pet Hanoman" }));
-    expect(screen.getByTestId("illustration-STK-001")).toBeInTheDocument();
-    expect(screen.getByTestId("pet-stage")).toHaveStyle({
-      animation: "hn-pet-reveal var(--dur-slow) var(--ease-out) both",
-    });
+    expect(atlas()).toBeInTheDocument();
+    expect(screen.getByTestId("pet-stage")).toHaveStyle({ animation: "hn-pet-reveal var(--dur-slow) var(--ease-out) both" });
     expect(localStorage.getItem(PET_HIDDEN_KEY)).toBe("0");
   });
 
-  it("tidak menangkap klik di area kosong sekitarnya", () => {
+  it("toggle berkeliaran bertahan lintas remount dan menjangkarkan pet ke rumah", () => {
+    const { unmount } = render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    fireEvent.click(hit());
+    fireEvent.click(screen.getByRole("button", { name: "Diam di pojok" }));
+    expect(localStorage.getItem(PET_ROAM_KEY)).toBe("0");
+    expect(screen.getByTestId("pet-actor")).toHaveStyle({ transform: `translateX(${HOME}px)` });
+    unmount();
+
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-    expect(screen.getByTestId("pet-root")).toHaveStyle({ pointerEvents: "none" });
-    expect(hit()).toHaveStyle({ pointerEvents: "auto" });
+    fireEvent.click(hit());
+    expect(screen.getByRole("button", { name: "Berkeliaran" })).toBeInTheDocument();
+  });
+
+  it("di tier mobile pet 96 px, selalu diam di pojok, dan toggle berkeliaran disembunyikan", () => {
+    mockMatchMedia((q) => q === MOBILE_QUERY);
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    const scale = 96 / PET_MANIFEST.character.h;
+    const cellW = Math.round(PET_MANIFEST.cell.w * scale);
+    expect(screen.getByTestId("pet-viewport")).toHaveStyle({ width: `${cellW}px` });
+    expect(screen.getByTestId("pet-actor")).toHaveStyle({ transform: `translateX(${homeX(window.innerWidth, cellW)}px)` });
+    fireEvent.click(hit());
+    expect(screen.queryByRole("button", { name: "Diam di pojok" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Berkeliaran" })).toBeNull();
+  });
+
+  it("berjalan di jalur saat jadwal berdiri habis: transisi transform linear ke target", () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(Math, "random").mockReturnValue(0.5);   // jalan 4 dtk = 160 px; arah: 0.5 → kanan → balik kiri dari rumah
+      render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+      const actor = screen.getByTestId("pet-actor");
+      expect(actor).toHaveAttribute("data-mode", "stand");
+      act(() => { vi.advanceTimersByTime(4_100); });     // STAND_MS[0] = 4 dtk
+      expect(actor).toHaveAttribute("data-mode", "walk");
+      expect(actor).toHaveAttribute("data-facing", "left");
+      expect(actor).toHaveStyle({ transform: `translateX(${HOME - 160}px)`, transition: "transform 4000ms linear" });
+      expect(rowshift()).toHaveAttribute("data-row", "walk-left");
+      // tiba (transitionend) → berdiri di target, baris pose
+      const end = new Event("transitionend", { bubbles: true });
+      Object.defineProperty(end, "propertyName", { value: "transform" });
+      act(() => { vi.advanceTimersByTime(4_000); fireEvent(actor, end); });
+      expect(actor).toHaveAttribute("data-mode", "stand");
+      expect(rowshift()).toHaveAttribute("data-row", "idle");
+    } finally {
+      vi.restoreAllMocks();
+      vi.useRealTimers();
+    }
+  });
+
+  it("tidak menangkap klik di area kosong jalur; hanya tombol 44 px di kaki", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    expect(screen.getByTestId("pet-root")).toHaveStyle({ pointerEvents: "none", left: "0px", right: "0px", bottom: "max(0px, var(--safe-bottom))" });
+    expect(hit()).toHaveStyle({
+      pointerEvents: "auto", width: "44px", height: "44px", bottom: "0px",
+      left: `${Math.round(PET_MANIFEST.anchor.x * CELL_W - 22)}px`,
+    });
+    expect(LANE_MARGIN).toBe(16);
   });
 });
