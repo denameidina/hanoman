@@ -673,7 +673,7 @@ git commit -m "feat(pet): pet-speech.ts — templat kalimat gelembung"
   - `export function petSnapshot(input: PetInput): PetSnapshot`
   - `export function petRecap(before: PetSnapshot, input: PetInput): PetSpeech | null`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `src/test/pet-speech.test.ts` (tambahkan `petRecap`, `petSnapshot`, `PET_RECAP_MS` ke import; tambahkan import `type Notification` dari `@hanoman/shared`):
 
@@ -732,12 +732,12 @@ describe("rekap selama kamu pergi (SPEC-898)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-speech.test.ts -t "rekap"`
 Expected: FAIL — `petSnapshot is not a function`
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Tambahkan di `src/src/screens/pet-speech.ts` (perluas import dari `./pet-state`):
 
@@ -786,12 +786,12 @@ export function petRecap(before: PetSnapshot, input: PetInput): PetSpeech | null
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-speech.test.ts`
 Expected: PASS (14 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/pet-speech.ts src/test/pet-speech.test.ts

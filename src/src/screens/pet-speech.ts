@@ -5,9 +5,15 @@
 // Himpunan kabar yang bergelembung SENGAJA tertutup: `Toast` design system sudah melaporkan aksi
 // pengguna di tengah-bawah, dan keadaan mapan (`working`/`review`/`blocked`/`deciding`/`ready`)
 // yang bergelembung tiap kali sebuah sesi lahir adalah kebisingan, bukan kabar.
-import { PET_URGENT_MS, type PetCondition, type PetConditionKind, type PetView } from "./pet-state";
+import {
+  doneSpecIds, newestNotifiedAt, PET_URGENT_MS, sessionKind, SHIPPED_TYPES,
+  type PetCondition, type PetConditionKind, type PetInput, type PetView,
+} from "./pet-state";
 
 export const PET_SPEECH_MS = 5_000;
+// Rekap hidup lebih lama: ia membawa aksi, dan operator yang baru kembali belum tentu sedang melihat.
+export const PET_RECAP_MS = 12_000;
+export const PET_AWAY_MS = 5 * 60_000;
 
 export type PetSpeech = { kind: "pose" | "recap"; text: string; ttl: number };
 
@@ -45,4 +51,44 @@ export function speechFor(view: PetView, now: number): PetSpeech | null {
   if (view.count > 1) text += ` · ${view.count} ${SPEECH_NOUN[view.kind]}`;
   if (isUrgent(view, now)) text += ` — ${humanAge(now - view.since!)}`;
   return { kind: "pose", text, ttl: PET_SPEECH_MS };
+}
+
+// Dicap saat tab jadi HIDDEN, dibandingkan saat tab terlihat lagi. Mengambilnya saat visible berarti
+// ia dicap ulang tiap render dan diff-nya selalu kosong.
+export type PetSnapshot = {
+  at: number;
+  sessions: Record<string, PetConditionKind>;   // id sesi → kondisinya saat snapshot
+  notifiedAt: string;                           // createdAt notifikasi terbaru saat snapshot
+};
+
+export function petSnapshot(input: PetInput): PetSnapshot {
+  const done = doneSpecIds(input.backlog);
+  const sessions: Record<string, PetConditionKind> = {};
+  for (const s of input.sessions) {
+    const kind = sessionKind(s, done);
+    if (kind) sessions[s.id] = kind;
+  }
+  return { at: input.now, sessions, notifiedAt: newestNotifiedAt(input.notifications) };
+}
+
+/**
+ * Rekap perubahan sejak snapshot; `null` bila tak ada yang berubah.
+ *
+ * Kabar "selesai" dihitung dari FEED, bukan dari kondisi yang sedang menyala: `shipped` meluruh
+ * 45 detik (PET_TRANSIENT_MS) dan operator yang pergi 20 menit tak akan pernah melihatnya.
+ */
+export function petRecap(before: PetSnapshot, input: PetInput): PetSpeech | null {
+  const after = petSnapshot(input);
+  const fresh = (kind: PetConditionKind): number =>
+    Object.entries(after.sessions).filter(([id, k]) => k === kind && before.sessions[id] !== kind).length;
+  const shipped = input.notifications
+    .filter((n) => SHIPPED_TYPES.has(n.type) && n.createdAt > before.notifiedAt).length;
+  const waiting = fresh("waiting");
+  const failed = fresh("failed");
+  const parts = [
+    shipped > 0 ? `${shipped} selesai` : "",
+    waiting > 0 ? `${waiting} menunggu` : "",
+    failed > 0 ? `${failed} gagal` : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? { kind: "recap", text: parts.join(" · "), ttl: PET_RECAP_MS } : null;
 }

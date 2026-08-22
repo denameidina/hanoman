@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { Spec } from "@hanoman/shared";
+import type { Notification, Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../src/api/client";
 import { derivePetState, PET_URGENT_MS, type PetView } from "../src/screens/pet-state";
-import { humanAge, isUrgent, PET_SPEECH_MS, speechFor } from "../src/screens/pet-speech";
+import {
+  humanAge, isUrgent, petRecap, petSnapshot, PET_RECAP_MS, PET_SPEECH_MS, speechFor,
+} from "../src/screens/pet-speech";
 
 const NOW = Date.parse("2026-08-22T10:00:00.000Z");
 
@@ -80,5 +82,59 @@ describe("humanAge & isUrgent (SPEC-898)", () => {
     expect(isUrgent({ kind: "waiting", since: NOW - PET_URGENT_MS + 1 }, NOW)).toBe(false);
     expect(isUrgent({ kind: "waiting", since: null }, NOW)).toBe(false);
     expect(isUrgent({ kind: "failed", since: NOW - 60 * 60_000 }, NOW)).toBe(false);
+  });
+});
+
+// `type` sengaja longgar: server menulis `automerge` yang belum masuk enum `zNotification`.
+const notif = (over: Partial<Omit<Notification, "type">> & { id: string; type?: string }): Notification => ({
+  type: "done", title: "judul", specId: null, projectId: "hanoman", sessionId: null,
+  readAt: null, createdAt: new Date(NOW).toISOString(), ...over,
+} as Notification);
+
+describe("rekap selama kamu pergi (SPEC-898)", () => {
+  const bl = [spec({ id: "SPEC-1", stage: "executing" }), spec({ id: "SPEC-2", stage: "executing" })];
+
+  it("tanpa perubahan → null (tab sepi tak disambut '0 selesai')", () => {
+    const input = { sessions: [], backlog: bl, notifications: [], now: NOW };
+    expect(petRecap(petSnapshot(input), { ...input, now: NOW + 60_000 })).toBeNull();
+  });
+
+  it("menghitung selesai · menunggu · gagal", () => {
+    const before = petSnapshot({ sessions: [session({ id: "a", specId: "SPEC-1" })], backlog: bl, notifications: [], now: NOW });
+    const after = {
+      sessions: [
+        session({ id: "a", specId: "SPEC-1", decision: true }),        // working → waiting
+        session({ id: "b", exited: true, exitCode: 1 }),               // gagal, baru
+      ],
+      backlog: bl,
+      notifications: [
+        notif({ id: "n1", type: "done", createdAt: new Date(NOW + 60_000).toISOString() }),
+        notif({ id: "n2", type: "automerge", createdAt: new Date(NOW + 90_000).toISOString() }),
+      ],
+      now: NOW + 20 * 60_000,
+    };
+    expect(petRecap(before, after)).toEqual({ kind: "recap", text: "2 selesai · 1 menunggu · 1 gagal", ttl: PET_RECAP_MS });
+  });
+
+  it("kabar yang lahir SAAT pergi terhitung walau transient-nya sudah luruh", () => {
+    const before = petSnapshot({ sessions: [], backlog: bl, notifications: [], now: NOW });
+    const after = {
+      sessions: [], backlog: bl,
+      notifications: [notif({ id: "n1", createdAt: new Date(NOW + 60_000).toISOString() })],
+      now: NOW + 40 * 60_000,     // jauh di luar PET_TRANSIENT_MS
+    };
+    expect(petRecap(before, after)!.text).toBe("1 selesai");
+  });
+
+  it("sesi yang SUDAH menunggu sebelum pergi tak dihitung ulang", () => {
+    const waiting = [session({ id: "a", specId: "SPEC-1", decision: true })];
+    const before = petSnapshot({ sessions: waiting, backlog: bl, notifications: [], now: NOW });
+    expect(petRecap(before, { sessions: waiting, backlog: bl, notifications: [], now: NOW + 20 * 60_000 })).toBeNull();
+  });
+
+  it("notifikasi yang sudah ada sebelum pergi tak dihitung", () => {
+    const notifications = [notif({ id: "n0", createdAt: new Date(NOW - 60_000).toISOString() })];
+    const before = petSnapshot({ sessions: [], backlog: bl, notifications, now: NOW });
+    expect(petRecap(before, { sessions: [], backlog: bl, notifications, now: NOW + 20 * 60_000 })).toBeNull();
   });
 });
