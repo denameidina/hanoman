@@ -95,8 +95,8 @@ describe("SPEC-908 · LeadScreen live", () => {
 
   it("frame yang mendarat di halaman aktif tak melempar operator ke halaman 1", async () => {
     setTopics(["lead"]);
-    // Halaman 2 dicapai lewat jalur operator, bukan lewat state tersimpan: `useEffect([filter])`
-    // milik AC-15 juga menyala saat mount, jadi `decPage` tersimpan selalu dipulihkan ke 1.
+    // Halaman 2 dicapai lewat jalur operator supaya pager ikut teruji; persistensinya sendiri
+    // dijaga scheduler-lead-state-persist.test.tsx.
     getLeadDecisions.mockResolvedValue(
       { items: [decision("d5", "Keputusan halaman satu?")], total: 60, page: 1, pageSize: 20 });
     render(view());

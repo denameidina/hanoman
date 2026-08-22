@@ -2337,9 +2337,13 @@ Serahkan diff lengkap + hasil Step 1. Mintalah ia membuktikan bahwa test yang lu
   `TicketView` masih kembar; tujuh impor mati + komentar kontrak basi di `routes/lead.ts`; header
   `SchedulerScreen`; sembilan stub `../src/api/events` yang kehilangan ekspor baru; enam doc
   kontrak yang masih menyebut "HTTP polling"; dan tiga test invariant halaman yang belum ada.
-- **Dilaporkan, TIDAK diperbaiki (di luar scope, pra-ada di base):** `LeadScreen.tsx`
+- **Ditemukan pra-ada di base, lalu DIPERBAIKI atas permintaan:** `LeadScreen.tsx`
   `useEffect(() => { setDecPage(1); setFlowPage(1) }, [filter])` juga menyala saat **mount**, jadi
-  nomor halaman yang dipersistensi SPEC-740 selalu dipulihkan ke 1 tiap layar Lead dibuka.
+  nomor halaman yang dipersistensi SPEC-740 selalu dipulihkan ke 1 tiap layar Lead dibuka. Kini
+  berpagar pembanding penyaring-yang-sedang-ditampilkan; AC-15 (ganti penyaring → halaman 1) tetap
+  berlaku dan punya test-nya sendiri. Bentuk tanpa pagar yang sama **masih ada** di
+  `TriageScreen.tsx:377`, `ProjectsScreen.tsx:127`, dan `BacklogScreen.tsx:915` — dicatat sebagai
+  gotcha #8 di ADR-0115.
 
 - [x] **Step 6: Centang seluruh kotak plan & commit terakhir**
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
-import { uiKey, readUiState } from "../src/ui-state";
+import { uiKey, readUiState, writeUiState } from "../src/ui-state";
 
 vi.mock("../src/api/client", async () => {
   const actual = await vi.importActual<any>("../src/api/client");
@@ -22,6 +22,7 @@ vi.mock("../src/api/client", async () => {
 });
 
 import { LeadScreen } from "../src/screens/LeadScreen";
+import { api } from "../src/api/client";
 
 const projects = [{ id: "erp", name: "ERP" }] as any[];
 const props = { projects, onProjectChanged: () => {}, onToast: () => {}, onGotoTerminal: () => {} };
@@ -36,6 +37,31 @@ describe("state tampilan Lead", () => {
     cleanup();
     render(<LeadScreen {...(props as any)} />);
     expect(((await screen.findByLabelText("saring project")) as HTMLSelectElement).value).toBe("erp");
+  });
+
+  it("nomor halaman kedua daftar bertahan lintas remount — mount bukan ganti penyaring", async () => {
+    writeUiState(uiKey("lead", "decPage"), 2);
+    writeUiState(uiKey("lead", "flowPage"), 3);
+    vi.mocked(api.getLeadDecisions).mockClear();
+    vi.mocked(api.getLeadFlows).mockClear();
+    render(<LeadScreen {...(props as any)} />);
+    await screen.findByLabelText("saring project");
+    await waitFor(() => expect(api.getLeadDecisions).toHaveBeenCalled());
+    expect(vi.mocked(api.getLeadDecisions).mock.calls.at(-1)![0]).toMatchObject({ page: 2 });
+    expect(vi.mocked(api.getLeadFlows).mock.calls.at(-1)![0]).toMatchObject({ page: 3 });
+    expect(readUiState(uiKey("lead", "decPage"), 1)).toBe(2);
+    expect(readUiState(uiKey("lead", "flowPage"), 1)).toBe(3);
+  });
+
+  it("ganti penyaring TETAP mengembalikan kedua daftar ke halaman 1 (AC-15)", async () => {
+    writeUiState(uiKey("lead", "decPage"), 2);
+    writeUiState(uiKey("lead", "flowPage"), 3);
+    vi.mocked(api.getLeadDecisions).mockClear();
+    render(<LeadScreen {...(props as any)} />);
+    fireEvent.change(await screen.findByLabelText("saring project"), { target: { value: "erp" } });
+    await waitFor(() =>
+      expect(vi.mocked(api.getLeadDecisions).mock.calls.at(-1)![0]).toMatchObject({ page: 1, projectId: "erp" }));
+    expect(readUiState(uiKey("lead", "flowPage"), 99)).toBe(1);
   });
 
   it("Reset tampilan mengembalikan penyaring ke semua project", async () => {

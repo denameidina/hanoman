@@ -306,9 +306,17 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
       .catch(() => { if (!silent) setPhase("error"); });   // silent poll tak pernah mem-blank layar
   }, [filter, decPage, flowPage]);
   React.useEffect(() => { load(); }, [load]);
-  // AC-15 · ganti penyaring = kembali ke halaman 1. Tanpa ini, halaman 5 dari filter lama
+  // AC-15 · GANTI penyaring = kembali ke halaman 1. Tanpa ini, halaman 5 dari filter lama
   // menjawab daftar filter baru yang cuma punya 2 halaman → daftar kosong tanpa sebab.
-  React.useEffect(() => { setDecPage(1); setFlowPage(1); }, [filter]);
+  // Pagarnya wajib: effect ber-`[filter]` juga menyala saat MOUNT, dan tanpa pembanding ini ia
+  // menghapus nomor halaman yang justru dipersistensi SPEC-740/ADR-0115 setiap layar dibuka —
+  // "bertahan lintas remount" jadi janji yang tak pernah bisa ditepati.
+  const shownFilter = React.useRef(filter);
+  React.useEffect(() => {
+    if (shownFilter.current === filter) return;
+    shownFilter.current = filter;
+    setDecPage(1); setFlowPage(1);
+  }, [filter]);
   // SPEC-908 · satu topik untuk ketiga daftar — cermin `load()` yang memang sudah satu
   // `Promise.all`. Memecahnya jadi tiga topik berarti tiga frame yang bisa mendarat terpisah, dan
   // layar akan menampilkan campuran dua generasi data yang hari ini tak mungkin terjadi.

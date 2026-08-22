@@ -137,6 +137,14 @@ menyimpan **id/slug**-nya saja lalu meresolusi ulang dari daftar hidup.
    `shell.tsx` mengimpor dari `../ui-state/hooks`, bukan `../ui-state`.
 7. **Reset berskop satu layar.** State yang dipakai sebuah layar tapi dimiliki App (`projectFilter` di
    Backlog) di luar jangkauan `resetUiState(screen)` — layar menanganinya lewat prop `onReset`.
+8. **`useEffect(() => setPage(1), [filter])` MEMBATALKAN `page` yang dipersistensi.** Effect
+   ber-dependensi juga menyala saat **mount**, jadi pola "ganti penyaring → halaman 1" yang ditulis
+   tanpa pagar menghapus nomor halaman tersimpan setiap layar dibuka — barisnya tetap ada di tabel
+   Cakupan, tetapi janjinya tak pernah bisa ditepati dan tak ada satu pun error yang muncul.
+   Pagarnya: bandingkan penyaring yang SEDANG ditampilkan (ref) dengan yang baru, dan reset hanya
+   saat keduanya berbeda. Diperbaiki di `LeadScreen` (SPEC-908); **`TriageScreen.tsx`,
+   `ProjectsScreen.tsx`, dan `BacklogScreen.tsx` masih memakai bentuk tanpa pagar** — layar dengan
+   `page` transien (`SessionHistoryModal`, `PortalChatPanel`, `ClientPortal`) tak terdampak.
 
 ## Yang tidak berubah (dengan amandemen ADR-0118)
 
