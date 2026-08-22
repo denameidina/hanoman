@@ -109,6 +109,11 @@ export const paths = {
   terminalSession: (id: string) => `${API}/terminal/sessions/${id}`,
   terminalSteer: (id: string) => `${API}/terminal/sessions/${id}/steer`,
   terminalInterrupt: (id: string) => `${API}/terminal/sessions/${id}/interrupt`,
+  // SPEC-899 · ADR-0142 · inbox keputusan. Di bawah prefix /terminal supaya ikut capability
+  // `sessions` yang sudah ada — GET menurunkan cabang bacanya, POST cabang tulisnya, tanpa satu
+  // baris pun perubahan di services/agent-capabilities.ts.
+  terminalDialog: (id: string) => `${API}/terminal/sessions/${id}/dialog`,
+  terminalDialogAnswer: (id: string) => `${API}/terminal/sessions/${id}/dialog/answer`,
   terminalPhases: (id: string) => `${API}/terminal/sessions/${id}/phases`,
   // SPEC-230 · review + integrate ber-skop sesi (sesi project-level PRD, tanpa Spec).
   sessionReview: (id: string) => `${API}/terminal/sessions/${id}/review`,

@@ -33,7 +33,7 @@
 - Consumes: `z` dari `zod` (sudah dipakai `shared/src/telegram.ts`).
 - Produces: tipe `SessionDialogOption`, `SessionDialog`, `SessionDialogPayload`, `SessionDialogAnswer`; skema `zSessionDialogAnswer`; `paths.terminalDialog(id)`, `paths.terminalDialogAnswer(id)`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/session-dialog.test.ts`:
 
@@ -81,12 +81,12 @@ describe("SPEC-899 · kontrak jawaban dialog sesi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/session-dialog.test.ts`
 Expected: FAIL — `Failed to resolve import "./session-dialog"`.
 
-- [ ] **Step 3: Tulis modul shared**
+- [x] **Step 3: Tulis modul shared**
 
 Buat `shared/src/session-dialog.ts`:
 
@@ -137,7 +137,7 @@ export const zSessionDialogAnswer = z.object({
 export type SessionDialogAnswer = z.infer<typeof zSessionDialogAnswer>;
 ```
 
-- [ ] **Step 4: Ekspor dari index shared**
+- [x] **Step 4: Ekspor dari index shared**
 
 Di `shared/src/index.ts`, setelah baris `export * from "./terminal-io";`, tambahkan:
 
@@ -145,7 +145,7 @@ Di `shared/src/index.ts`, setelah baris `export * from "./terminal-io";`, tambah
 export * from "./session-dialog";
 ```
 
-- [ ] **Step 5: Tambah path builder**
+- [x] **Step 5: Tambah path builder**
 
 Di `shared/src/api.ts`, tepat setelah baris `terminalInterrupt: (id: string) => …`, sisipkan:
 
@@ -157,17 +157,17 @@ Di `shared/src/api.ts`, tepat setelah baris `terminalInterrupt: (id: string) => 
   terminalDialogAnswer: (id: string) => `${API}/terminal/sessions/${id}/dialog/answer`,
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run shared/src/session-dialog.test.ts`
 Expected: PASS — 8 test.
 
-- [ ] **Step 7: Typecheck paket shared**
+- [x] **Step 7: Typecheck paket shared**
 
 Run: `pnpm --filter ./shared typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add shared/src/session-dialog.ts shared/src/session-dialog.test.ts shared/src/index.ts shared/src/api.ts
