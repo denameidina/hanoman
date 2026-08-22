@@ -297,6 +297,11 @@ model Vps {
   components          Json?
   componentsCheckedAt DateTime?
   provisionProfile    String? // "lab" | "production" — profil yang terakhir diterapkan
+  // SPEC-885 · ADR-0138 · kapan baris ini TERAKHIR diterbitkan ke change-feed. LOCAL-ONLY dengan
+  // alasan yang sama seperti tiga kolom di atas: ia properti mesin ini, bukan pernyataan bersama.
+  // Dipakai `runHealth` untuk denyut berjangka saat `health` tak berubah — tanpa itu `lastSeenAt`
+  // (yang IKUT menyeberang) akan mendarat basi selamanya di tiap client.
+  lastPublishedAt     DateTime?
   version     Int       @default(0) // SPEC-213 · version-stamp sync (ADR-0045)
   updatedAt   DateTime  @updatedAt
   snapshots   VpsAuditSnapshot[] // SPEC-220 · riwayat audit kepatuhan

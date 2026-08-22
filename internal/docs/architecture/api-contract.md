@@ -877,10 +877,36 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > instance non-client (hub) → `200 { ok:false, reason:"not-configured" }`. Tombol muncul hanya di client
 > (`GET /config`.`sync.running`).
 > **Tarik ulang penuh** (SPEC-382 · ADR-0082): body opsional `{ full: true }` → kursor `SyncState`
-> dikembalikan ke `0` lalu feed di-drain halaman demi halaman (`pull` ber-`limit` 500) →
+> dikembalikan ke `0`. **SPEC-885 · ADR-0138:** sesudah itu client mencoba `/api/sync/bootstrap` lebih
+> dulu — ia membaca TABEL hub dan karena itu lebih lengkap daripada replay feed (feed lossy melewati
+> rename project, terukur 727 vs 698 spec). Bootstrap dilewati bila **outbox berisi** (suntingan lokal
+> tak boleh ditimpa) atau hub menjawab `404`; di kedua hal itu feed di-drain sampai habis dari kursor 0 →
 > `200 { ok:true, full:true, pulled, pushed, conflicts, deleted, dropped }`. Satu-satunya jalan pulang
 > bagi baris feed yang terlanjur **dilompati** kursor sebelum kontrak apply ADR-0082; aman diulang
 > karena pull server-authoritative & `upsertLocal` idempoten. Body absen/`{ full:false }` = perilaku lama.
+
+> **Halaman `pull` dipotong per BYTE, dan `hasMore` yang mengakhiri drain** (SPEC-885 · ADR-0138):
+> `GET /api/sync/pull?since=<cursor>` → `{ cursor, records, hasMore }`. `limit` baris (500) tetap ada,
+> tetapi halaman juga dipangkas di **1 MB** (`PULL_MAX_BYTES`) — dulu ia dipotong per jumlah baris saja
+> sementara client memotong per byte, dan halaman 2,51 MB di hub produksi membuat setiap client baru
+> mandek selamanya di situ. **`cursor` menunjuk baris terakhir yang BENAR-BENAR dikirim**, tak pernah
+> lebih jauh; minimal satu baris selalu dikirim supaya satu record raksasa tak membekukan feed.
+> `hasMore` aditif — client versi lama mengabaikannya dan memperlakukan halaman tak kosong sebagai
+> "mungkin masih ada". `syncOnce` kini menguras seluruh feed dalam satu panggilan, bukan satu halaman
+> per tick.
+>
+> **`GET /api/sync/bootstrap?after=<entity>:<id>`** (**device-token**, sama seperti `/sync/pull`) →
+> `{ cursor, records, hasMore, next }`. Mengirim **keadaan tabel** dalam urutan dependensi
+> (`project` → `spec`/`ticket`/`customAgent`/`githubIssue` → `ticketAttachment` → `sessionResult`),
+> bukan sejarah feed — di hub produksi 3.637 baris/7,9 MB menyusut jadi 889 record/~2,5 MB, dan urutan
+> FK benar *by construction*. `cursor` = puncak `SyncLog` yang diambil **sebelum** tabel dibaca (urutan
+> sebaliknya membuat tulisan di sela pembacaan hilang permanen). `next` = `"<entity>:<id>"` record
+> terakhir yang dikirim; halaman berikutnya melanjutkan tepat sesudahnya. Tombstone **tidak** ikut.
+> Dipakai client hanya bila kursornya `0` **dan** outbox kosong; hub lama menjawab `404` → client
+> jatuh ke drain feed biasa.
+>
+> **gzip** pada kedua endpoint itu: kirim `accept-encoding: gzip` → balasan `content-encoding: gzip`.
+> `vary: accept-encoding` disetel pada **semua** balasan keduanya, termasuk yang polos.
 
 > **Tombstone di feed** (SPEC-799 · ADR-0119): tiap record `pull` membawa `op: "upsert" | "delete"`
 > (**top-level**, absen = `"upsert"` → hub versi lama tetap dipahami). Baris `op:"delete"` tetap

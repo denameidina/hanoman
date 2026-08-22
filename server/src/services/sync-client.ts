@@ -132,12 +132,85 @@ export async function applyFeedFrame(msg: {
 
 export type SyncStats = { pulled: number; pushed: number; conflicts: number; deleted: number; dropped: number };
 
-// Satu siklus sync: pull (skip record yang punya edit lokal pending agar tak menimpanya),
-// lalu drain outbox dengan baseVersion = versi lokal saat ini.
-export async function syncOnce(transport: Transport): Promise<SyncStats> {
-  let pulled = 0, pushed = 0, conflicts = 0, deleted = 0, dropped = 0;
+type IncomingRecord = ReturnType<typeof validateIncomingRecord>;
 
-  const cursor = await getCursor();
+// SPEC-885 · ADR-0138 · jaring pengaman lingkaran drain, BUKAN kuota. Feed hub produksi 3.637
+// baris; batas ini hanya mencegah lingkaran tak berujung bila kursor gagal maju.
+const MAX_DRAIN_PAGES = 500;
+
+// Satu pass atas record tertunda; kembalikan yang MASIH belum bisa diterapkan. Sengaja TIDAK
+// membuang apa pun.
+//
+// Sesudah retensi ADR-0131 memangkas baris penciptaan induk, "tak bisa diterapkan di halaman ini"
+// berhenti menjadi bukti yatim: yang tersisa di feed hanyalah baris TERAKHIR tiap record, dan
+// baris terakhir sebuah project bisa ber-`seq` jauh lebih besar daripada baris spec anaknya. Di
+// hub produksi itu berlaku untuk 510 dari 728 spec, 508 di antaranya di halaman berbeda. Kode
+// lama membuangnya di sini dan tetap memajukan kursor — jadi 70% spec hilang tanpa satu pun error.
+async function retryDeferred(rest: IncomingRecord[], stats: SyncStats): Promise<IncomingRecord[]> {
+  while (rest.length) {
+    const still: IncomingRecord[] = [];
+    for (const rec of rest) {
+      try {
+        const r = await applyRemote(rec.entity, rec.recordId, rec.version, rec.data, rec.op ?? "upsert");
+        if (r === "dropped") stats.dropped++;
+        else if (rec.op === "delete") stats.deleted++;
+        else stats.pulled++;
+      } catch { still.push(rec); }
+    }
+    // Satu putaran penuh tanpa kemajuan: induknya belum tiba. Tunggu halaman berikutnya, jangan
+    // buang — pembuangan hanya sah setelah SELURUH feed habis.
+    if (still.length === rest.length) return still;
+    rest = still;
+  }
+  return [];
+}
+
+// SPEC-885 · ADR-0138 · instalasi baru menarik KEADAAN, bukan sejarah.
+//
+// Dua syarat, dan syarat kedua yang penting: kursor 0 saja tidak cukup, karena "Tarik ulang"
+// memundurkan kursor ke 0 di mesin yang bisa saja punya suntingan lokal belum terkirim. Outbox
+// kosong adalah bukti tak ada yang bisa ditimpa.
+//
+// Balikan `null` = "tidak berlaku di sini" ATAU "hub tak mendukung" — pemanggil jatuh ke drain
+// feed biasa dalam kedua hal. Kegagalan di tengah halaman juga `null`: record yang terlanjur
+// terpasang aman karena upsert idempoten dan kursor belum dimajukan, jadi drain berikutnya
+// sekadar menerapkannya ulang.
+export async function bootstrapOnce(transport: Transport): Promise<number | null> {
+  if (await getCursor() !== "0") return null;
+  if ((await listOutbox()).length) return null;
+
+  let after: string | null = null;
+  let cursor = "0";
+  let applied = 0;
+  for (let page = 0; page < MAX_DRAIN_PAGES; page++) {
+    const q = after ? `?after=${encodeURIComponent(after)}` : "";
+    const res = await transport("GET", `/api/sync/bootstrap${q}`);
+    if (res.status !== 200 || !Array.isArray(res.body?.records)) return null;
+    for (const raw of res.body.records as unknown[]) {
+      const rec = validateIncomingRecord(raw);
+      if (!rec.op) continue;
+      // Urutan dependensi dijamin hub, jadi tak ada `deferred` di sini: satu record yang gagal
+      // di jalur ini adalah kesalahan kontrak, bukan artefak urutan — dan harus terlihat.
+      await applyRemote(rec.entity, rec.recordId, rec.version, rec.data, rec.op);
+      applied++;
+    }
+    cursor = String(res.body.cursor ?? "0");
+    const next = res.body.next ? String(res.body.next) : null;
+    if (!res.body.hasMore || !next) break;
+    after = next;
+  }
+  await setCursor(cursor);
+  return applied;
+}
+
+// Satu siklus sync: kuras feed sampai habis (pull-apply berulang), lalu drain outbox sekali.
+//
+// SPEC-885 · ADR-0138 · dulu ia menarik SATU halaman per panggilan, dan pemanggilnya adalah tick
+// 15 detik — jadi laju tarik client dipatok 500 baris / 15 detik oleh timer, bukan oleh jaringan
+// maupun CPU, yang menganggur hampir sepanjang waktu itu.
+export async function syncOnce(transport: Transport): Promise<SyncStats> {
+  const stats: SyncStats = { pulled: 0, pushed: 0, conflicts: 0, deleted: 0, dropped: 0 };
+
   const outbox = await listOutbox();
   const pending = new Set(outbox.map((o) => `${o.entity}:${o.recordId}`));
   // SPEC-270 · dedupe hitungan konflik per record (feed bisa punya banyak baris satu recordId).
@@ -146,67 +219,60 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
     server: { version: number; data: Record<string, unknown> }) => {
     await recordConflict(entity, recordId, local, server);
     const key = `${entity}:${recordId}`;
-    if (!conflicted.has(key)) { conflicted.add(key); conflicts++; }
+    if (!conflicted.has(key)) { conflicted.add(key); stats.conflicts++; }
   };
 
-  const pullRes = await transport("GET", `/api/sync/pull?since=${cursor}`);
-  const rawRecords: unknown[] = Array.isArray(pullRes.body?.records) ? pullRes.body.records : [];
-  const records = rawRecords.map(validateIncomingRecord);
-  // SPEC-382 · record yang gagal diterapkan (umumnya anak mendahului induknya → FK) ditunda, bukan
-  // dilempar. Dulu satu record bermasalah membatalkan SELURUH siklus: `setCursor` di bawah tak
-  // pernah tercapai, jadi client mandek di kursor itu selamanya (bukan cuma lampiran yang hilang).
-  const deferred: typeof records = [];
-  for (const rec of records) {
-    if (!isEntity(rec.entity)) continue;
-    // SPEC-799 · jenis peristiwa dari hub yang lebih baru — dilewati, bukan ditunda & bukan melempar.
-    if (!rec.op) { dropped++; continue; }
-    // SPEC-270 · anti-clobber HANYA untuk upsert. SPEC-799: delete menang tanpa syarat, jadi edit
-    // lokal pending justru bukan alasan menundanya — di situlah keputusannya harus berlaku.
-    if (rec.op === "upsert" && pending.has(`${rec.entity}:${rec.recordId}`)) {
-      // SPEC-270 · ada edit lokal pending — klasifikasi: data sama → biarkan (push nanti),
-      // beda → catat konflik untuk keputusan manusia. Jangan clobber edit lokal.
-      const local = await snapshot(rec.entity as Entity, rec.recordId);
-      if (local && JSON.stringify(local.data) !== JSON.stringify(rec.data)) {
-        await markConflict(rec.entity, rec.recordId,
-          { version: local.version, data: local.data }, { version: rec.version, data: rec.data });
+  let deferred: IncomingRecord[] = [];
+  for (let page = 0; page < MAX_DRAIN_PAGES; page++) {
+    const cursor = await getCursor();
+    const pullRes = await transport("GET", `/api/sync/pull?since=${cursor}`);
+    const rawRecords: unknown[] = Array.isArray(pullRes.body?.records) ? pullRes.body.records : [];
+    const records = rawRecords.map(validateIncomingRecord);
+
+    for (const rec of records) {
+      if (!isEntity(rec.entity)) continue;
+      // SPEC-799 · jenis peristiwa dari hub yang lebih baru — dilewati, bukan ditunda & bukan melempar.
+      if (!rec.op) { stats.dropped++; continue; }
+      // SPEC-270 · anti-clobber HANYA untuk upsert. SPEC-799: delete menang tanpa syarat, jadi edit
+      // lokal pending justru bukan alasan menundanya — di situlah keputusannya harus berlaku.
+      if (rec.op === "upsert" && pending.has(`${rec.entity}:${rec.recordId}`)) {
+        const local = await snapshot(rec.entity as Entity, rec.recordId);
+        if (local && JSON.stringify(local.data) !== JSON.stringify(rec.data)) {
+          await markConflict(rec.entity, rec.recordId,
+            { version: local.version, data: local.data }, { version: rec.version, data: rec.data });
+        }
+        continue;
       }
-      continue;
-    }
-    try {
-      const r = await applyRemote(rec.entity, rec.recordId, rec.version, rec.data, rec.op);
-      if (r === "dropped") dropped++;
-      else if (rec.op === "delete") deleted++;
-      else pulled++;
-    } catch { deferred.push(rec); }
-  }
-  // Pass ulang selama masih ada kemajuan: induk yang menyusul di batch yang sama membuka anaknya
-  // (rantai berapa pun dalam). Berhenti saat satu putaran penuh tak menerapkan apa pun.
-  let rest = deferred;
-  while (rest.length) {
-    const still: typeof rest = [];
-    for (const rec of rest) {
       try {
-        const r = await applyRemote(rec.entity, rec.recordId, rec.version, rec.data, rec.op ?? "upsert");
-        if (r === "dropped") dropped++;
-        else if (rec.op === "delete") deleted++;
-        else pulled++;
-      } catch { still.push(rec); }
+        const r = await applyRemote(rec.entity, rec.recordId, rec.version, rec.data, rec.op);
+        if (r === "dropped") stats.dropped++;
+        else if (rec.op === "delete") stats.deleted++;
+        else stats.pulled++;
+      } catch { deferred.push(rec); }
     }
-    if (still.length === rest.length) {
-      // SPEC-799 · yatim yang induknya BERTOMBSTONE sudah dibuang sengaja oleh `applyRemote`, jadi
-      // sisa di sini benar-benar tak bisa dijelaskan. Dilewati dengan jejak, bukan didiamkan:
-      // menahan kursor di sini = livelock (ADR-0082).
-      for (const rec of still) {
-        console.warn(`sync: record ${rec.entity}:${rec.recordId} tak bisa diterapkan — dilewati`);
-        dropped++;
-      }
-      break;
-    }
-    rest = still;
+
+    // Induk yang menyusul di halaman ini membuka anaknya yang tertunda dari halaman SEBELUMNYA.
+    deferred = await retryDeferred(deferred, stats);
+
+    const next = pullRes.body?.cursor ? String(pullRes.body.cursor) : cursor;
+    if (next !== cursor) await setCursor(next);
+    // Pull sudah melewati rentang yang menahan kursor WS → lubangnya tertambal (atau sengaja dilewati).
+    feedHole = false;
+
+    // Hub lama tak mengirim `hasMore` → "mungkin masih ada" selama halamannya tak kosong. Itu
+    // menutup kombinasi client-baru/hub-lama tanpa memaksa hub naik versi lebih dulu.
+    const more = (pullRes.body?.hasMore as boolean | undefined) ?? records.length > 0;
+    // Kursor yang tak maju berarti menarik lagi hanya mengulang halaman yang sama.
+    if (!more || next === cursor) break;
   }
-  if (pullRes.body?.cursor) await setCursor(String(pullRes.body.cursor));
-  // Pull sudah melewati rentang yang menahan kursor WS → lubangnya tertambal (atau sengaja dilewati).
-  feedHole = false;
+
+  // Feed habis. Yang masih tak bisa diterapkan di sini memang yatim — dan kini kalimat itu jujur,
+  // bukan artefak paginasi. Dilewati dengan jejak, bukan didiamkan: menahan kursor di sini =
+  // livelock (ADR-0082), dan induknya justru ada di halaman berikutnya yang takkan pernah ditarik.
+  for (const rec of deferred) {
+    console.warn(`sync: record ${rec.entity}:${rec.recordId} tak bisa diterapkan — dilewati`);
+    stats.dropped++;
+  }
 
   for (const item of outbox) {
     // SPEC-255 · ADR-0064 · operasi rename project: recordId = "<oldId> <newId>". Push satu record
@@ -219,8 +285,8 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
         records: [{ entity: "project", id: newId, baseVersion: 0, data: { ...snap.data, renamedFrom: oldId } }],
       });
       const r = res.body?.results?.[0];
-      if (r?.ok) { await clearOutbox(item.entity, item.recordId); pushed++; }
-      else if (r?.conflict) { conflicts++; }
+      if (r?.ok) { await clearOutbox(item.entity, item.recordId); stats.pushed++; }
+      else if (r?.conflict) { stats.conflicts++; }
       continue;
     }
     if (!isEntity(item.entity)) { await clearOutbox(item.entity, item.recordId); continue; }
@@ -240,7 +306,7 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
           baseVersion: Math.max(tomb.version - 1, 0), op: "delete", data: tomb.data,
         }],
       });
-      if (res.body?.results?.[0]?.ok) { await clearOutbox(item.entity, item.recordId); pushed++; }
+      if (res.body?.results?.[0]?.ok) { await clearOutbox(item.entity, item.recordId); stats.pushed++; }
       continue;
     }
     const res = await transport("POST", "/api/sync/push", {
@@ -262,7 +328,7 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
         const delegate = (prisma as unknown as Record<string, { update: (a: unknown) => Promise<unknown> } | undefined>)[item.entity];
         await delegate?.update({ where: { id: item.recordId }, data: { version: r.version } }).catch(() => {});
       }
-      await clearOutbox(item.entity, item.recordId); pushed++;
+      await clearOutbox(item.entity, item.recordId); stats.pushed++;
     } else if (r?.conflict) {
       // SPEC-799 · ADR-0119 · hub sudah menghapusnya. Delete menang: adopsi tombstone-nya, buang
       // edit lokal, berhenti mendorong. Tanpa lapis ini record bertombstone di-push selamanya.
@@ -270,7 +336,7 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
         await applyRemote(item.entity, item.recordId,
           Number(r.deletedVersion ?? snap.version + 1), snap.data, "delete");
         await clearOutbox(item.entity, item.recordId);
-        deleted++;
+        stats.deleted++;
         continue;
       }
       // SPEC-270 · hub menolak → catat konflik dua-sisi bila datanya beda; else konvergen (adopsi hub).
@@ -284,7 +350,7 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
       }
     }
   }
-  return { pulled, pushed, conflicts, deleted, dropped };
+  return stats;
 }
 
 // Transport HTTP nyata ke hub remote (server-to-server): Bearer device token.
@@ -294,10 +360,25 @@ export function fetchTransport(base: string, token: string): Transport {
     const loopback = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
     const res = await safeRequest({
       url, method,
-      headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) },
+      headers: {
+        authorization: `Bearer ${token}`,
+        // SPEC-885 · ADR-0138 · hub lama mengabaikan header ini dan membalas polos; `safeRequest`
+        // hanya men-decompress bila balasannya benar-benar ber-`content-encoding: gzip`.
+        "accept-encoding": "gzip",
+        ...(body ? { "content-type": "application/json" } : {}),
+      },
       ...(body ? { body: Buffer.from(JSON.stringify(body)) } : {}),
       allowPrivate: process.env.NODE_ENV !== "production" && loopback,
-      connectMs: 5_000, totalMs: 15_000, maxResponseBytes: 2 * 1024 * 1024,
+      connectMs: 5_000, totalMs: 15_000,
+      // SPEC-885 · ADR-0138 · cap ini dulu 2 MB, dan halaman feed 2,51 MB di hub produksi
+      // membuat setiap client baru MANDEK di situ selamanya — bukan lambat, mandek, dan tanpa
+      // satu baris log. Hub yang sudah membawa anggaran byte memotong halamannya di 1 MB, jadi
+      // cap ini tak akan tersentuh olehnya. Ia dinaikkan justru untuk hub yang BELUM naik versi,
+      // yang tetap mengirim 500 baris apa adanya — kombinasi yang dialami tiap
+      // `npm i -g hanoman` sebelum hub-nya diperbarui (urutan rilis hub-duluan, ADR-0135).
+      maxResponseBytes: 8 * 1024 * 1024,
+      acceptEncoding: "gzip",
+      maxDecodedBytes: 16 * 1024 * 1024,
     });
     let parsed: any = null;
     try { parsed = JSON.parse(res.body.toString("utf8")); } catch { /* body kosong */ }
@@ -307,29 +388,23 @@ export function fetchTransport(base: string, token: string): Transport {
 
 // SPEC-268 · ADR-0066 · pemicu manual (tombol UI): satu siklus syncOnce memakai config efektif.
 // null bila instance bukan client (tak ada hub tujuan) → endpoint/tombol melapor "not-configured".
-// SPEC-382 · `full` → tarik ulang feed dari awal: kursor balik ke 0 lalu drain halaman demi halaman
-// (pull ber-`limit`, jadi satu siklus saja tak cukup). Ini satu-satunya jalan pulang bagi baris yang
-// terlanjur dilompati kursor sebelum kontrak apply diperbaiki; aman karena pull server-authoritative
-// dan upsert idempoten. Batas putaran = jaring pengaman, bukan kuota.
-const FULL_PULL_MAX_PAGES = 200;
+// SPEC-382 · `full` → tarik ulang feed dari awal (pemulihan baris yang terlanjur dilompati kursor);
+// aman karena pull server-authoritative dan upsert idempoten.
+// SPEC-885 · ADR-0138 · lingkaran 200-halaman yang dulu berdiri di sini sudah pindah ke `syncOnce`,
+// yang kini menguras sampai habis dengan sendirinya — jadi `full` tinggal "mundurkan kursor lalu
+// jalankan", dan penjumlahan stats antar-putaran tak lagi punya alasan untuk ada.
 export async function syncNow(opts?: { full?: boolean }): Promise<SyncStats | null> {
   const base = effectiveStr("SYNC_SERVER_URL");
   const token = effectiveStr("SYNC_DEVICE_TOKEN");
   if (!base || !token) return null;
   const transport = fetchTransport(base, token);
-  if (!opts?.full) return syncOnce(transport);
-  await setCursor("0");
-  const total: SyncStats = { pulled: 0, pushed: 0, conflicts: 0, deleted: 0, dropped: 0 };
-  let seen = "0";
-  for (let page = 0; page < FULL_PULL_MAX_PAGES; page++) {
-    const s = await syncOnce(transport);
-    total.pulled += s.pulled; total.pushed += s.pushed; total.conflicts += s.conflicts;
-    total.deleted += s.deleted; total.dropped += s.dropped;
-    const now = await getCursor();
-    if (now === seen) break; // kursor berhenti bergerak → feed habis
-    seen = now;
-  }
-  return total;
+  if (opts?.full) await setCursor("0");
+  // Menggerbangi dirinya sendiri (kursor 0 + outbox kosong), jadi memanggilnya tanpa syarat aman:
+  // di client yang sudah mapan ia langsung mengembalikan null.
+  const booted = await bootstrapOnce(transport).catch(() => null);
+  const stats = await syncOnce(transport);
+  if (booted) stats.pulled += booted;
+  return stats;
 }
 
 let timer: NodeJS.Timeout | undefined;
@@ -341,13 +416,33 @@ export function syncStatus(): { running: boolean; connected: boolean } {
   return { running: started, connected: ws?.readyState === 1 /* OPEN */ };
 }
 
+// SPEC-885 · ADR-0138 · kegagalan pull dulu ditelan `catch { }` tanpa satu baris pun. Itulah yang
+// membuat mandek total (halaman 2,51 MB melewati cap byte) tak bisa dibedakan dari sepi, dan
+// karena itu insiden ini butuh investigasi penuh untuk sekadar DIKENALI. Digerbangi flag: tick
+// berjalan tiap 15 detik, jadi log per-kegagalan akan jadi hujan log saat hub tak terjangkau —
+// yang dicatat adalah TRANSISI, pola yang sama dengan siar dashboard di ADR-0131 §3.
+let pullSehat = true;
+export function __resetSyncHealth(): void { pullSehat = true; }
+
+export async function syncTick(transport: Transport): Promise<void> {
+  try {
+    await syncOnce(transport);
+    if (!pullSehat) { console.info("sync: pull pulih"); pullSehat = true; }
+  } catch (e) {
+    if (pullSehat) {
+      console.warn(`sync: pull gagal — ${(e as Error).message}`);
+      pullSehat = false;
+    }
+  }
+}
+
 // Jalankan client sync: syncOnce awal + WS siar (apply + drain saat frame) + reconnect backoff +
 // tick fallback berkala (drain outbox yang lahir saat offline). Dipanggil dari server.ts bila
 // SYNC_SERVER_URL + SYNC_DEVICE_TOKEN di-set.
 export async function startSyncClient(base: string, token: string, tickMs?: number): Promise<void> {
   started = true;
   const transport = fetchTransport(base, token);
-  const tick = async () => { try { await syncOnce(transport); } catch { /* offline — coba lagi nanti */ } };
+  const tick = () => syncTick(transport);
 
   const connectWs = async () => {
     const { WebSocket } = await import("ws");
@@ -368,6 +463,9 @@ export async function startSyncClient(base: string, token: string, tickMs?: numb
     ws.on("error", () => { try { ws?.close(); } catch { /* noop */ } });
   };
 
+  // SPEC-885 · ADR-0138 · instalasi baru: satu tarikan keadaan sebelum drain feed. Gagal atau tak
+  // didukung → `null`, dan `tick()` di bawah menanganinya seperti biasa.
+  await bootstrapOnce(transport).catch(() => null);
   await tick();               // drain awal + pull awal
   void connectWs();           // realtime
   // Fallback tick: drain outbox yang lahir saat WS putus. Prod 15s; smoke/test bisa turunkan.

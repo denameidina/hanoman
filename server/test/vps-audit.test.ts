@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { parseAudit, isHardened, parseHealth, CRITICAL, mapToCatalog, parseStack, scriptPath } from "../src/services/vps-audit";
+import {
+  parseAudit, isHardened, parseHealth, CRITICAL, mapToCatalog, parseStack, scriptPath,
+  shouldPublishHealth, PUBLISH_HEARTBEAT_MS,
+} from "../src/services/vps-audit";
 import { CATALOG } from "../src/vps/catalog/catalog";
 
 const PASS_ALL = [
@@ -75,5 +78,33 @@ describe("parseStack (SPEC-221)", () => {
   });
   it("output tanpa STACK → objek kosong", () => {
     expect(parseStack("CHECK fw-b1 pass\n")).toEqual({});
+  });
+});
+
+describe("SPEC-885 · keputusan publish health", () => {
+  const now = Date.parse("2026-08-22T12:00:00.000Z");
+  const health = { uptime: "1d", disk: "40%", mem: "50%", load: "0.1" };
+
+  it("health identik + baru saja dipublish → JANGAN publish", () => {
+    expect(shouldPublishHealth(
+      { health, lastPublishedAt: new Date(now - 60_000) }, health, now,
+    )).toBe(false);
+  });
+
+  it("health berubah → publish, seberapa pun baru publikasi terakhir", () => {
+    expect(shouldPublishHealth(
+      { health, lastPublishedAt: new Date(now - 1_000) }, { ...health, disk: "91%" }, now,
+    )).toBe(true);
+  });
+
+  it("health identik tapi publikasi terakhir sudah lewat ambang → publish (denyut berjangka)", () => {
+    expect(shouldPublishHealth(
+      { health, lastPublishedAt: new Date(now - PUBLISH_HEARTBEAT_MS - 1) }, health, now,
+    )).toBe(true);
+  });
+
+  it("belum pernah dipublish → publish", () => {
+    expect(shouldPublishHealth({ health, lastPublishedAt: null }, health, now)).toBe(true);
+    expect(shouldPublishHealth(null, health, now)).toBe(true);
   });
 });

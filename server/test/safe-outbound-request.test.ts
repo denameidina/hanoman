@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer, type RequestListener, type Server } from "node:http";
+import { gzipSync } from "node:zlib";
 import { safeRequest } from "../src/services/safe-outbound-request";
 
 const servers: Server[] = [];
@@ -60,5 +61,43 @@ describe("safe outbound request", () => {
     }, { lookupAll: async () => [
       { address: "93.184.216.34", family: 4 }, { address: "127.0.0.1", family: 4 },
     ] })).rejects.toThrow(/internal/);
+  });
+});
+
+describe("SPEC-885 · dekompresi gzip opt-in", () => {
+  const opts = (base: string) => ({
+    url: new URL(`${base}/x`), method: "GET" as const, headers: {},
+    allowPrivate: true, connectMs: 2_000, totalMs: 5_000, maxResponseBytes: 1024 * 1024,
+  });
+
+  it("men-decompress hanya saat diminta", async () => {
+    const isi = gzipSync(Buffer.from(JSON.stringify({ ok: true })));
+    const base = await listen((_req, res) => {
+      res.setHeader("content-encoding", "gzip");
+      res.end(isi);
+    });
+
+    const diminta = await safeRequest({ ...opts(base), acceptEncoding: "gzip" });
+    expect(JSON.parse(diminta.body.toString("utf8"))).toEqual({ ok: true });
+
+    // Tanpa opt-in body dikembalikan APA ADANYA (byte gzip mentah) — pemanggil lain seperti
+    // webhook keluar tak boleh berubah perilakunya karena fitur ini.
+    const tanpa = await safeRequest(opts(base));
+    expect(tanpa.body.equals(isi)).toBe(true);
+  });
+
+  it("menolak bom dekompresi: cap kedua atas byte TERURAI", async () => {
+    // 40 MB nol mampat jadi ~40 KB — lolos maxResponseBytes, dan itulah kenapa satu cap saja
+    // tidak cukup begitu dekompresi menyala.
+    const bom = gzipSync(Buffer.alloc(40 * 1024 * 1024));
+    expect(bom.length).toBeLessThan(1024 * 1024);
+    const base = await listen((_req, res) => {
+      res.setHeader("content-encoding", "gzip");
+      res.end(bom);
+    });
+
+    await expect(safeRequest({
+      ...opts(base), acceptEncoding: "gzip", maxDecodedBytes: 1024 * 1024,
+    })).rejects.toThrow(/terurai terlalu besar/);
   });
 });

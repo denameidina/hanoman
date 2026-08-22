@@ -34,7 +34,9 @@ if [ "${FAKE_SSH_MODE:-}" = "verify-fail" ] && [[ "$input" != *"hanoman-harden"*
 fi
 
 if [[ "$last" == *"HEALTH"* ]]; then
-  echo "HEALTH uptime up 3 days"; echo "HEALTH disk 42%"
+  # SPEC-885 · FAKE_SSH_DISK: health harus bisa BERBEDA antar-sapuan untuk menguji
+  # publish-on-change. Default 42% dipertahankan supaya test lain tak berubah.
+  echo "HEALTH uptime up 3 days"; echo "HEALTH disk ${FAKE_SSH_DISK:-42%}"
   echo "HEALTH mem 512/2048MB"; echo "HEALTH load 0.1 0.2 0.3"; exit 0
 fi
 # SPEC-883 · provision.sh: MODE=probe → COMP, MODE=apply → STEP (would bila DRY_RUN=1).

@@ -54,7 +54,7 @@
   - `export const PULL_MAX_BYTES: number` (1.048.576)
   - `pull(sinceCursor: string, limit?: number, maxBytes?: number): Promise<{ cursor: string; records: PulledRecord[]; hasMore: boolean }>` — **`hasMore` adalah field baru**; Task 3 mengandalkannya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-page-budget.test.ts`:
 
@@ -101,7 +101,7 @@ describe("SPEC-885 · anggaran byte halaman pull", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts
@@ -109,7 +109,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL. Test pertama gagal di `expect(page.records).toHaveLength(2)` (dapat 5, karena `pull` belum mengenal anggaran byte) dan `page.hasMore` `undefined`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/sync.ts`, ganti seluruh fungsi `pull` dengan:
 
@@ -165,7 +165,7 @@ export async function pull(
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts server/test/sync.service.test.ts server/test/sync.route.test.ts
@@ -173,7 +173,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. `sync.service.test.ts` dan `sync.route.test.ts` ikut karena keduanya memanggil `pull` — bentuk balikannya bertambah satu field, jadi harus dipastikan tak ada yang memeriksa bentuk objek secara ketat.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -181,7 +181,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0. Bila ada pemanggil `pull` yang men-destructure secara ketat, perbaiki di sini.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/sync.ts server/test/sync-page-budget.test.ts
@@ -211,7 +211,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Mengapa terpisah dari Task 1:** Task 1 menolong client mana pun terhadap **hub baru**. Task ini satu-satunya yang menolong **client baru terhadap hub lama** — dan justru itulah kombinasi yang dialami setiap orang yang baru `npm i -g hanoman` sebelum hub-nya naik versi.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/sync-page-budget.test.ts` — di bagian atas berkas tambahkan import:
 
@@ -252,7 +252,7 @@ describe("SPEC-885 · cap byte client terhadap hub lama", () => {
 
 Catatan: `fetchTransport` menyalakan `allowPrivate` untuk loopback selama `NODE_ENV !== "production"`. Vitest berjalan di `NODE_ENV=test`, jadi permintaan ke `127.0.0.1` diizinkan.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts
@@ -260,7 +260,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `outbound response terlalu besar`. **Inilah kegagalan produksi yang sedang direproduksi** — kalau test ini tidak gagal dengan pesan itu, hentikan dan cari tahu kenapa sebelum lanjut.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`, ganti baris `maxResponseBytes`:
 
@@ -276,7 +276,7 @@ Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`, ganti baris 
       maxResponseBytes: 8 * 1024 * 1024,
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts server/test/sync-client.test.ts
@@ -284,7 +284,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/sync-client.ts server/test/sync-page-budget.test.ts
@@ -318,7 +318,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Ini task terbesar di plan.** Ia memperbaiki dua gejala dengan satu obat: laju yang dipatok timer (satu halaman per tick 15 detik), dan 510 dari 728 spec yang hilang senyap karena `deferred` hanya di-retry di dalam satu halaman.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-drain.test.ts`:
 
@@ -442,7 +442,7 @@ describe("SPEC-885 · drain berkelanjutan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-drain.test.ts
@@ -450,7 +450,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL. Test pertama gagal dengan `stats.dropped` = 1 dan `Spec SPEC-1` `null` — persis bug produksinya. Test kedua dan ketiga gagal karena `syncOnce` hanya menarik satu halaman.
 
-- [ ] **Step 3: Implementasi — helper `retryDeferred`**
+- [x] **Step 3: Implementasi — helper `retryDeferred`**
 
 Di `server/src/services/sync-client.ts`, tepat **di atas** deklarasi `export type SyncStats`, sisipkan:
 
@@ -489,7 +489,7 @@ async function retryDeferred(rest: IncomingRecord[], stats: SyncStats): Promise<
 }
 ```
 
-- [ ] **Step 4: Implementasi — `syncOnce`**
+- [x] **Step 4: Implementasi — `syncOnce`**
 
 Ganti seluruh fungsi `syncOnce` (dari `export async function syncOnce` sampai `return { pulled, pushed, conflicts, deleted, dropped };`) dengan:
 
@@ -638,7 +638,7 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
 }
 ```
 
-- [ ] **Step 5: Implementasi — sederhanakan `syncNow`**
+- [x] **Step 5: Implementasi — sederhanakan `syncNow`**
 
 Ganti konstanta `FULL_PULL_MAX_PAGES` dan seluruh fungsi `syncNow` dengan:
 
@@ -658,7 +658,7 @@ export async function syncNow(opts?: { full?: boolean }): Promise<SyncStats | nu
 }
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-drain.test.ts server/test/sync-client.test.ts server/test/sync-tombstone.client.test.ts server/test/sync-push-partial-failure.test.ts server/test/sync-pending.route.test.ts
@@ -666,7 +666,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. Bila ada test lama yang berasumsi "satu pull per `syncOnce`", periksa apakah asumsinya masih sah — jangan longgarkan test baru untuk mengakomodasinya tanpa memahami kenapa.
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -674,7 +674,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/sync-client.ts server/test/sync-drain.test.ts
@@ -706,7 +706,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Mengapa ini task sendiri:** kalau tidak dikerjakan, kegagalan sync **berikutnya** — apa pun bentuknya — akan kembali menyamar sebagai "lambat". Yang membuat insiden ini butuh investigasi penuh bukan cap byte-nya, melainkan `catch { }` kosong yang membuat mandek total tak terlihat berbeda dari sepi.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/sync-drain.test.ts` (tambahkan `syncTick` dan `__resetSyncHealth` ke import dari `../src/services/sync-client`):
 
@@ -740,7 +740,7 @@ describe("SPEC-885 · kegagalan pull tak boleh senyap", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-drain.test.ts
@@ -748,7 +748,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `syncTick is not exported` / `__resetSyncHealth is not exported`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/sync-client.ts`, tepat **di atas** `export async function startSyncClient`, sisipkan:
 
@@ -782,7 +782,7 @@ Lalu di dalam `startSyncClient`, ganti definisi `tick` lokal:
 
 (Baris lama `const tick = async () => { try { await syncOnce(transport); } catch { /* offline — coba lagi nanti */ } };` dihapus.)
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-drain.test.ts server/test/sync-ws.test.ts
@@ -790,7 +790,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/sync-client.ts server/test/sync-drain.test.ts
@@ -820,7 +820,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `export async function bootstrapSnapshot(after: string | null, maxBytes?: number): Promise<BootstrapPage>`
   - `GET /api/sync/bootstrap?after=<entity>:<id>` (device-token) — Task 6 memanggilnya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-bootstrap.test.ts`:
 
@@ -910,7 +910,7 @@ describe("SPEC-885 · GET /api/sync/bootstrap", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-bootstrap.test.ts
@@ -918,7 +918,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `bootstrapSnapshot is not exported` dan route 404.
 
-- [ ] **Step 3: Implementasi — service**
+- [x] **Step 3: Implementasi — service**
 
 Di `server/src/services/sync.ts`, tepat **di bawah** fungsi `pull`, tambahkan:
 
@@ -1000,7 +1000,7 @@ export async function bootstrapSnapshot(
 }
 ```
 
-- [ ] **Step 4: Implementasi — route**
+- [x] **Step 4: Implementasi — route**
 
 Di `server/src/routes/sync.ts`, ubah baris import service:
 
@@ -1020,7 +1020,7 @@ lalu tepat **di bawah** route `app.get("/sync/pull", ...)`, tambahkan:
   });
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-bootstrap.test.ts server/test/sync.route.test.ts server/test/sync-hub-origin-writes.test.ts
@@ -1028,7 +1028,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua.
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1036,7 +1036,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/sync.ts server/src/routes/sync.ts server/test/sync-bootstrap.test.ts
@@ -1066,7 +1066,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: route `GET /api/sync/bootstrap` dari Task 5; `MAX_DRAIN_PAGES` dari Task 3.
 - Produces: `export async function bootstrapOnce(transport: Transport): Promise<number | null>` — jumlah record terpasang, atau `null` bila tak berlaku / hub tak mendukung.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/sync-bootstrap.test.ts` (tambahkan import):
 
@@ -1125,7 +1125,7 @@ describe("SPEC-885 · bootstrapOnce (client)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-bootstrap.test.ts
@@ -1133,7 +1133,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `bootstrapOnce is not exported`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/sync-client.ts`, tepat **di atas** `export async function syncOnce`, tambahkan:
 
@@ -1177,7 +1177,7 @@ export async function bootstrapOnce(transport: Transport): Promise<number | null
 }
 ```
 
-- [ ] **Step 4: Implementasi — panggil dari dua tempat**
+- [x] **Step 4: Implementasi — panggil dari dua tempat**
 
 Di `syncNow`, ganti dua baris terakhir:
 
@@ -1201,7 +1201,7 @@ Di `startSyncClient`, ganti baris `await tick();               // drain awal + p
   await tick();               // drain awal + pull awal
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-bootstrap.test.ts server/test/sync-client.test.ts server/test/sync-drain.test.ts
@@ -1209,7 +1209,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua.
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1217,7 +1217,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/sync-client.ts server/test/sync-bootstrap.test.ts
@@ -1248,7 +1248,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `export function shouldPublishHealth(prev: { health: unknown; lastPublishedAt: Date | null } | null, next: unknown, now?: number): boolean`
 - `Vps.lastPublishedAt` **tidak** ditambahkan ke `FIELDS.vps` di `sync.ts` — ia LOCAL-only.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/vps-audit.test.ts` (tambahkan import `shouldPublishHealth, PUBLISH_HEARTBEAT_MS` dari `../src/services/vps-audit`):
 
@@ -1282,7 +1282,7 @@ describe("SPEC-885 · keputusan publish health", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-audit.test.ts
@@ -1290,7 +1290,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `shouldPublishHealth is not exported`.
 
-- [ ] **Step 3: Migration + schema**
+- [x] **Step 3: Migration + schema**
 
 Tambahkan ke model `Vps` di `server/prisma/schema.prisma`, tepat di bawah baris `hardened`:
 
@@ -1315,7 +1315,7 @@ Regenerate client:
 pnpm --filter ./server db:generate
 ```
 
-- [ ] **Step 4: Implementasi**
+- [x] **Step 4: Implementasi**
 
 Di `server/src/services/vps-audit.ts`, tepat **di atas** `export async function runHealth`, tambahkan:
 
@@ -1371,7 +1371,7 @@ export async function runHealth(v: VpsRow): Promise<boolean> {
 
 `runAudit` **tidak disentuh**: `AUDIT_MS = 24 jam` dan `auditSweep` melewati VPS yang `lastAuditAt`-nya < 24 jam, jadi ia paling banyak 1 baris/hari/vps — itu bukan denyut.
 
-- [ ] **Step 5: Buat health fixture bisa berubah**
+- [x] **Step 5: Buat health fixture bisa berubah**
 
 `shouldPublishHealth` menguji **keputusannya**; yang berikut menguji **pemasangannya** — dan justru di situ kelas bug ADR-0090/0093 hidup (lupa menggerbangi `notifySynced`, atau menulis `lastPublishedAt` di cabang yang salah). Untuk itu health palsu harus bisa berbeda antar-sapuan.
 
@@ -1386,7 +1386,7 @@ fi
 
 Default `42%` dipertahankan, jadi test lain yang memeriksa nilai itu tak berubah.
 
-- [ ] **Step 6: Tulis test pemasangan, jalankan, pastikan lulus**
+- [x] **Step 6: Tulis test pemasangan, jalankan, pastikan lulus**
 
 Tambahkan ke `server/test/vps-monitor.test.ts` (import `PUBLISH_HEARTBEAT_MS` dari `../src/services/vps-audit`):
 
@@ -1449,7 +1449,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS. Bila test pertama gagal dengan `2`, `notifySynced` belum digerbangi. Bila test terakhir gagal, `lastSeenAt` ikut terjatuh ke cabang bersyarat — kembalikan ia ke luar spread.
 
-- [ ] **Step 7: Jalankan test, pastikan LULUS**
+- [x] **Step 7: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-audit.test.ts server/test/vps-sync.test.ts server/test/vps-monitor.test.ts server/test/sync-exclusions.test.ts server/test/vps.route.test.ts
@@ -1457,7 +1457,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. `sync-exclusions.test.ts` ikut karena ia menegakkan kolom mana yang **tidak** menyeberang — `lastPublishedAt` harus tetap di luar `FIELDS.vps`. `vps.route.test.ts` ikut karena ia juga memakai fixture ssh yang barusan disentuh.
 
-- [ ] **Step 8: Typecheck**
+- [x] **Step 8: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1465,7 +1465,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations server/src/services/vps-audit.ts \
@@ -1495,7 +1495,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: route `/sync/pull` dan `/sync/bootstrap` menjawab `content-encoding: gzip` bila request membawa `accept-encoding: gzip`; selalu menyetel `vary: accept-encoding`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/sync-page-budget.test.ts` (tambahkan import `buildApp`, `issueDeviceToken`, `gunzipSync` dari `node:zlib`):
 
@@ -1529,7 +1529,7 @@ describe("SPEC-885 · gzip endpoint sync (hub)", () => {
 
 Catatan: `clean` di berkas ini hanya menghapus `syncLog` — tambahkan `deviceToken`, `session`, dan `user` ke `clean` agar test ini tak bocor antar-run.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts
@@ -1537,7 +1537,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL — `content-encoding` `undefined`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/routes/sync.ts`, tambahkan import di atas:
 
@@ -1582,7 +1582,7 @@ Ubah dua route menjadi:
   });
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts server/test/sync-bootstrap.test.ts server/test/sync-client.test.ts
@@ -1590,7 +1590,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. `sync-client.test.ts` penting di sini: `realTransport()`-nya memakai `app.inject` **tanpa** `accept-encoding`, jadi ia membuktikan jalur polos tetap utuh.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/sync.ts server/test/sync-page-budget.test.ts
@@ -1618,7 +1618,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `SafeRequestOptions` bertambah dua field opsional — `acceptEncoding?: "gzip"` dan `maxDecodedBytes?: number`. Keduanya **default mati/`maxResponseBytes`**, jadi tiap pemanggil lain (webhook keluar, ADR-0100) tak berubah perilakunya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/safe-outbound-request.test.ts` (import `createServer` dari `node:http`, `gzipSync` dari `node:zlib`, dan `safeRequest`):
 
@@ -1664,7 +1664,7 @@ describe("SPEC-885 · dekompresi gzip opt-in", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/safe-outbound-request.test.ts
@@ -1672,7 +1672,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL — test pertama gagal saat `JSON.parse` byte gzip mentah; test kedua tak melempar.
 
-- [ ] **Step 3: Implementasi — tipe**
+- [x] **Step 3: Implementasi — tipe**
 
 Di `server/src/services/safe-outbound-request.ts`, tambahkan import dan perluas tipe:
 
@@ -1694,7 +1694,7 @@ export type SafeRequestOptions = {
 };
 ```
 
-- [ ] **Step 4: Implementasi — `pinnedRequest`**
+- [x] **Step 4: Implementasi — `pinnedRequest`**
 
 Ganti seluruh callback response di `pinnedRequest` (dari `}, (response) => {` sampai penutup callback itu) dengan:
 
@@ -1739,7 +1739,7 @@ Ganti seluruh callback response di `pinnedRequest` (dari `}, (response) => {` sa
     });
 ```
 
-- [ ] **Step 5: Implementasi — `fetchTransport` meminta gzip**
+- [x] **Step 5: Implementasi — `fetchTransport` meminta gzip**
 
 Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`:
 
@@ -1764,7 +1764,7 @@ Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`:
 
 (Komentar panjang tentang cap 8 MB dari Task 2 dipertahankan di atas `maxResponseBytes`.)
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/safe-outbound-request.test.ts server/test/sync-page-budget.test.ts server/test/webhook-tap.test.ts
@@ -1772,7 +1772,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. `webhook-tap.test.ts` ikut karena webhook keluar berbagi `safeRequest` — ia membuktikan pemanggil non-opt-in tak berubah. Bila berkas itu gagal ramai dan mesin sedang sibuk, jalankan ulang sendirian sebelum menyimpulkan regresi (memori: webhook-tap gagal palsu saat mesin sibuk).
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1780,7 +1780,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/safe-outbound-request.ts server/src/services/sync-client.ts server/test/safe-outbound-request.test.ts
@@ -1806,7 +1806,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Modify: `internal/docs/architecture/api-contract.md` (endpoint bootstrap, field `hasMore`/`next`, gzip)
 - Modify: `internal/docs/architecture/data-model.md` (`Vps.lastPublishedAt` sebagai LOCAL-only)
 
-- [ ] **Step 1: Pastikan nomor ADR-nya masih bebas**
+- [x] **Step 1: Pastikan nomor ADR-nya masih bebas**
 
 ```bash
 ls internal/docs/adr/ | tail -2
@@ -1814,7 +1814,7 @@ ls internal/docs/adr/ | tail -2
 
 Plan ini memakai **0138**. Nomornya semula 0137 dan sudah harus digeser sekali karena SPEC-883 menerbitkan `0137-provisioning-vps-berbasis-katalog.md` ke `main` selagi spec ini ditulis — tabrakan nomor antar-sesi paralel adalah kejadian berulang di repo ini. Bila `0138` sudah terpakai saat task ini dikerjakan, ambil nomor bebas berikutnya dan **ganti semua rujukan `ADR-0138` di kode yang sudah ditulis Task 1–9** (`grep -rn "ADR-0138" server/src`).
 
-- [ ] **Step 2: Tulis ADR-nya**
+- [x] **Step 2: Tulis ADR-nya**
 
 Buat `internal/docs/adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md` mengikuti bentuk ADR-0131 (Konteks dengan angka terukur → Keputusan bernomor → Konsekuensi → Alternatif yang ditolak). Isi wajib:
 
@@ -1827,17 +1827,17 @@ Buat `internal/docs/adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md` meng
 - **Konsekuensi:** client baru selesai dalam ~3 request alih-alih mandek; client yang tertinggal >7 hari ikut sembuh; feed vps mengecil dan penghematannya akan **tumbuh** saat VPS lain kembali sehat.
 - **Alternatif yang ditolak:** menahan kursor pada record yang gagal (livelock); tabel `SyncDeferred` durable (tak perlu setelah drain utuh); membuang `lastSeenAt` dari `FIELDS.vps`; `@fastify/compress`; batching apply dalam satu `$transaction`.
 
-- [ ] **Step 3: Tautkan di index**
+- [x] **Step 3: Tautkan di index**
 
 Tambahkan satu baris di bagian `## adr` pada `internal/docs/README.md`, mengikuti format baris tetangganya.
 
-- [ ] **Step 4: Perbarui docs arsitektur**
+- [x] **Step 4: Perbarui docs arsitektur**
 
 Di `internal/docs/architecture/api-contract.md`, di bagian sync: dokumentasikan `GET /api/sync/bootstrap` (query `after`, balikan `{ cursor, records, hasMore, next }`, auth device-token), field `hasMore` baru pada `GET /api/sync/pull`, dan negosiasi gzip pada keduanya.
 
 Di `internal/docs/architecture/data-model.md`, pada model `Vps`: catat `lastPublishedAt` sebagai kolom **LOCAL-only** yang sengaja di luar `FIELDS.vps`, sejajar `keyPath`.
 
-- [ ] **Step 5: Verifikasi index docs**
+- [x] **Step 5: Verifikasi index docs**
 
 ```bash
 hanoman docs index --check
@@ -1845,7 +1845,7 @@ hanoman docs index --check
 
 Diharapkan: laporan tanpa entri hilang. Perintah ini milik CLI produk (AGENTS.md §Eksekusi & Perintah) dan bersifat read-only. Bila `hanoman` global lebih tua dari checkout ini, pakai salinan repo: `pnpm --filter ./cli build && node cli/dist/index.js docs index --check`.
 
-- [ ] **Step 6: Verifikasi endpoint nyata di local**
+- [x] **Step 6: Verifikasi endpoint nyata di local**
 
 Wajib menurut AGENTS.md karena task ini menyentuh endpoint — sekali di akhir, bukan tiap task.
 
@@ -1868,7 +1868,7 @@ curl -s -H "authorization: Bearer $TOKEN" -H 'accept-encoding: gzip' \
 
 Diharapkan: dua yang pertama JSON ber-`cursor`/`records`/`hasMore`; yang ketiga memperlihatkan header `content-encoding: gzip` dan `vary: accept-encoding`.
 
-- [ ] **Step 7: Reproduksi end-to-end dengan data hub nyata**
+- [x] **Step 7: Reproduksi end-to-end dengan data hub nyata**
 
 Ini gerbang sebenarnya untuk spec ini. Ambil salinan DB hub **tanpa menyentuh produksi**:
 
@@ -1890,7 +1890,7 @@ sqlite3 "file:<home-client>/hanoman.db?mode=ro" \
 
 Diharapkan: `spec` mencapai jumlah di hub salinan (~724 pada snapshot 2026-08-22) dan `cursor` sampai di puncak feed. Sebelum spec ini, client yang sama berhenti di ~500 record total dengan kursor macet.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add internal/docs
