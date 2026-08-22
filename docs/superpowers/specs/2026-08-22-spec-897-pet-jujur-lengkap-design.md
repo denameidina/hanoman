@@ -181,7 +181,10 @@ Tiga hal yang tak terbaca dari kodenya:
   kini punya wajah sendiri alih-alih menyamar jadi `working`.
 - **`sleeping` adalah sub-keadaan lantai, bukan kondisi.** Ia tak pernah masuk `conditions`; ia
   mengganti pose & baris dari kondisi lantai `ready`. Karena itu tidur tak pernah bisa menutupi
-  sesuatu yang sedang terjadi — kalau ada satu saja kondisi, lantai tak dipakai.
+  sesuatu yang sedang terjadi — kalau ada satu saja kondisi, lantai tak dipakai. Konsekuensinya
+  disengaja dan perlu disebut: sesi gagal yang tak ditengok dan backlog yang tertahan dependency
+  **menahan pet tetap terjaga**, walau keduanya bisa berumur berjam-jam. Tidur berarti "tak ada
+  yang meminta apa pun darimu"; selama sebuah kondisi masih terdaftar, ada yang meminta.
 
 ### 5.3 Tidur
 
