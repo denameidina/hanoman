@@ -297,7 +297,14 @@ export function fetchTransport(base: string, token: string): Transport {
       headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) },
       ...(body ? { body: Buffer.from(JSON.stringify(body)) } : {}),
       allowPrivate: process.env.NODE_ENV !== "production" && loopback,
-      connectMs: 5_000, totalMs: 15_000, maxResponseBytes: 2 * 1024 * 1024,
+      connectMs: 5_000, totalMs: 15_000,
+      // SPEC-885 · ADR-0138 · cap ini dulu 2 MB, dan halaman feed 2,51 MB di hub produksi
+      // membuat setiap client baru MANDEK di situ selamanya — bukan lambat, mandek, dan tanpa
+      // satu baris log. Hub yang sudah membawa anggaran byte memotong halamannya di 1 MB, jadi
+      // cap ini tak akan tersentuh olehnya. Ia dinaikkan justru untuk hub yang BELUM naik versi,
+      // yang tetap mengirim 500 baris apa adanya — kombinasi yang dialami tiap
+      // `npm i -g hanoman` sebelum hub-nya diperbarui (urutan rilis hub-duluan, ADR-0135).
+      maxResponseBytes: 8 * 1024 * 1024,
     });
     let parsed: any = null;
     try { parsed = JSON.parse(res.body.toString("utf8")); } catch { /* body kosong */ }

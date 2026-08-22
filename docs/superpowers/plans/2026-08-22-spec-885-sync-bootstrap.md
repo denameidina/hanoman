@@ -54,7 +54,7 @@
   - `export const PULL_MAX_BYTES: number` (1.048.576)
   - `pull(sinceCursor: string, limit?: number, maxBytes?: number): Promise<{ cursor: string; records: PulledRecord[]; hasMore: boolean }>` — **`hasMore` adalah field baru**; Task 3 mengandalkannya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-page-budget.test.ts`:
 
@@ -101,7 +101,7 @@ describe("SPEC-885 · anggaran byte halaman pull", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts
@@ -109,7 +109,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL. Test pertama gagal di `expect(page.records).toHaveLength(2)` (dapat 5, karena `pull` belum mengenal anggaran byte) dan `page.hasMore` `undefined`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/sync.ts`, ganti seluruh fungsi `pull` dengan:
 
@@ -165,7 +165,7 @@ export async function pull(
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts server/test/sync.service.test.ts server/test/sync.route.test.ts
@@ -173,7 +173,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. `sync.service.test.ts` dan `sync.route.test.ts` ikut karena keduanya memanggil `pull` — bentuk balikannya bertambah satu field, jadi harus dipastikan tak ada yang memeriksa bentuk objek secara ketat.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -181,7 +181,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0. Bila ada pemanggil `pull` yang men-destructure secara ketat, perbaiki di sini.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/sync.ts server/test/sync-page-budget.test.ts

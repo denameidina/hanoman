@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { createServer } from "node:http";
 import { prisma } from "../src/db";
 import { pull } from "../src/services/sync";
+import { fetchTransport } from "../src/services/sync-client";
 
 const clean = async () => { await prisma.syncLog.deleteMany(); };
 beforeEach(clean); afterAll(clean);
@@ -36,5 +38,31 @@ describe("SPEC-885 · anggaran byte halaman pull", () => {
     await feedRow("SPEC-1", 10);
     const page = await pull("0", 500, 120_000);
     expect(page.hasMore).toBe(false);
+  });
+});
+
+describe("SPEC-885 · cap byte client terhadap hub lama", () => {
+  it("halaman pull 3 MB tak lagi ditolak (reproduksi mandek hub produksi)", async () => {
+    const body = JSON.stringify({
+      cursor: "9",
+      records: [{
+        entity: "spec", recordId: "SPEC-1", version: 1, op: "upsert",
+        data: { title: "x".repeat(3_000_000) },
+      }],
+    });
+    const srv = createServer((_req, res) => {
+      res.setHeader("content-type", "application/json");
+      res.end(body);
+    });
+    await new Promise<void>((r) => srv.listen(0, "127.0.0.1", () => r()));
+    const port = (srv.address() as { port: number }).port;
+    try {
+      const transport = fetchTransport(`http://127.0.0.1:${port}`, "token-uji");
+      const res = await transport("GET", "/api/sync/pull?since=0");
+      expect(res.status).toBe(200);
+      expect(res.body.records).toHaveLength(1);
+    } finally {
+      await new Promise<void>((r) => srv.close(() => r()));
+    }
   });
 });
