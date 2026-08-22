@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_WS_MESSAGE_BYTES,
+  WS_REVALIDATE_EVERY_MS,
   WsMessageGuard,
+  createPrincipalWatch,
   assertWsOrigin,
   consumeWsTicket,
   issueWsTicket,
@@ -63,5 +65,105 @@ describe("WebSocket admission", () => {
 
     const other = new WsMessageGuard();
     expect(other.accept(Buffer.alloc(MAX_WS_MESSAGE_BYTES + 1))).toEqual({ ok: false, code: 1009, reason: "message too large" });
+  });
+
+  // Pengawas principal per socket. Terukur di jalur lama: `await revalidateWsPrincipal` per frame
+  // membuat dua frame beruntun berlomba di Prisma dan `writeTo` kedua mendahului yang pertama
+  // (`bcdef` mendarat `bdcef` di tmux), dan satu query yang tertahan pool (5 dtk terukur) atau
+  // melempar P1008 menahan lalu menutup socket yang sah. Keputusan admit karena itu sinkron:
+  // ia hanya membaca verdict terakhir, dan pemeriksaannya berjalan di latar.
+  describe("createPrincipalWatch", () => {
+    type Deferred = { resolve: (ok: boolean) => void; reject: (e: Error) => void };
+    const harness = (everyMs = WS_REVALIDATE_EVERY_MS) => {
+      let now = 10_000;
+      const checks: Deferred[] = [];
+      let revoked = 0;
+      const watch = createPrincipalWatch({
+        check: () => new Promise<boolean>((resolve, reject) => { checks.push({ resolve, reject }); }),
+        onRevoked: () => { revoked += 1; },
+        now: () => now,
+        everyMs,
+      });
+      const tick = () => new Promise((r) => setTimeout(r, 0));
+      return { watch, checks, tick, revoked: () => revoked, advance: (ms: number) => { now += ms; } };
+    };
+
+    it("admits frames synchronously while the first check is still in flight", async () => {
+      const h = harness();
+      expect(h.watch.admit()).toBe(true);
+      expect(h.watch.admit()).toBe(true);
+      expect(h.checks.length).toBe(1);           // satu pemeriksaan, bukan satu per frame
+      h.checks[0]!.resolve(true);
+      await h.tick();
+      expect(h.revoked()).toBe(0);
+    });
+
+    it("re-checks at most once per interval while frames keep arriving", async () => {
+      const h = harness(1_000);
+      h.watch.admit();
+      h.checks[0]!.resolve(true);
+      await h.tick();
+      for (let i = 0; i < 50; i += 1) { h.advance(10); expect(h.watch.admit()).toBe(true); }
+      expect(h.checks.length).toBe(1);           // 500 ms berlalu: masih di dalam jendela
+      h.advance(600);
+      expect(h.watch.admit()).toBe(true);
+      expect(h.checks.length).toBe(2);           // jendela habis → satu pemeriksaan baru
+      for (let i = 0; i < 5; i += 1) h.watch.admit();
+      expect(h.checks.length).toBe(2);           // yang sedang berjalan tak digandakan
+    });
+
+    it("revokes once and refuses every frame after the verdict", async () => {
+      const h = harness();
+      h.watch.admit();
+      h.checks[0]!.resolve(false);
+      await h.tick();
+      expect(h.revoked()).toBe(1);
+      expect(h.watch.admit()).toBe(false);
+      h.advance(5_000);
+      expect(h.watch.admit()).toBe(false);
+      expect(h.checks.length).toBe(1);           // sudah dicabut: tak ada pemeriksaan lagi
+      expect(h.revoked()).toBe(1);
+    });
+
+    it("treats a failing check as no verdict: the socket stays open and is re-checked after the interval", async () => {
+      const h = harness(1_000);
+      h.watch.admit();
+      h.checks[0]!.reject(new Error("P1008"));
+      await h.tick();
+      expect(h.revoked()).toBe(0);
+      h.advance(500);
+      expect(h.watch.admit()).toBe(true);
+      expect(h.checks.length).toBe(1);           // DB yang sakit tak dihujani satu query per frame
+      h.advance(600);
+      expect(h.watch.admit()).toBe(true);
+      expect(h.checks.length).toBe(2);           // jendela habis → dicoba lagi
+      h.checks[1]!.resolve(false);
+      await h.tick();
+      expect(h.revoked()).toBe(1);               // pencabutan sungguhan tetap sampai
+    });
+
+    it("refresh forces a check regardless of the interval, without duplicating one in flight", async () => {
+      const h = harness(1_000);
+      h.watch.admit();
+      h.checks[0]!.resolve(true);
+      await h.tick();
+      h.advance(10);
+      h.watch.refresh();
+      expect(h.checks.length).toBe(2);
+      h.watch.refresh();
+      expect(h.checks.length).toBe(2);
+      h.checks[1]!.resolve(false);
+      await h.tick();
+      expect(h.revoked()).toBe(1);
+    });
+
+    it("dispose silences a verdict that lands after the socket is gone", async () => {
+      const h = harness();
+      h.watch.admit();
+      h.watch.dispose();
+      h.checks[0]!.resolve(false);
+      await h.tick();
+      expect(h.revoked()).toBe(0);
+    });
   });
 });

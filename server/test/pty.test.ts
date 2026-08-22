@@ -11,7 +11,7 @@ import {
   createSession, getSession, listSessions, killSession, killAll, detachAll, attach, writeTo,
   sessionPhases, sessionFinished, markerFilled, promptFilePath, armGoalInTui, goalGatePath,
   sessionKind, registerSessionHooks, rootBypassEnv, noTtyPromptEnv, askpassDenyPath,
-  sendToPane, shellBin,
+  sendToPane, shellBin, listSessionsAsync,
   MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback,
   type SessionBirth, type SessionDeath,
 } from "../src/services/pty";
@@ -220,6 +220,24 @@ describe("pty service", () => {
     expect(s.agent).toBe("codex");
     expect(getSession("cx2")?.agent).toBe("codex");
     expect(listSessions().find((x) => x.id === "cx2")?.agent).toBe("codex");
+  });
+
+  // Dua loop per detik (poll pty 500 ms, siar events 1 dtk) bertanya ke tmux lewat `execFileSync`
+  // dan memblokir SELURUH event loop selama spawn — terukur 7–9 ms saat mesin tenang, tapi
+  // avg 80–256 ms dan maks 916 ms saat mesin sibuk (load 28): selama itu tak satu pun frame ketikan
+  // dibaca maupun echo ditulis. Varian asinkron membaca hal yang sama tanpa menahan loop.
+  it("listSessionsAsync memberi daftar yang sama dengan listSessions tanpa memblokir event loop", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    createSession("p-async", process.cwd(), { id: "async1" });
+    let interleaved = false;
+    const pending = listSessionsAsync();
+    // Timer 0 ms hanya sempat berjalan bila tmux ditanya tanpa menahan loop.
+    const timer = new Promise<void>((r) => setTimeout(() => { interleaved = true; r(); }, 0));
+    const sessions = await pending;
+    await timer;
+    expect(interleaved).toBe(true);
+    expect(sessions).toEqual(listSessions());
+    expect(sessions.find((x) => x.id === "async1")).toBeTruthy();
   });
 
   it("tanpa opts.agent sesi tetap claude (default historis)", async () => {

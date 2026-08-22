@@ -143,6 +143,71 @@ export async function revalidateWsPrincipal(req: FastifyRequest, principal: WsPr
   return req.agent?.id === principal.id;
 }
 
+// Jendela revalidasi per socket saat frame terus berdatangan. Satu query `lookupSession` per
+// detik per socket, bukan satu per keystroke; sesi yang dicabut tetap terputus dalam ≤ 1 dtk
+// sejak frame berikutnya — jauh di bawah interval 60 dtk yang menjaga socket diam.
+export const WS_REVALIDATE_EVERY_MS = 1_000;
+
+export type PrincipalWatch = {
+  /** Keputusan per frame, SINKRON: `false` hanya sesudah verdict "dicabut" benar-benar terbit. */
+  admit(): boolean;
+  /** Pemeriksaan paksa (interval 60 dtk), tanpa menggandakan yang sedang berjalan. */
+  refresh(): void;
+  dispose(): void;
+};
+
+/**
+ * Pengawas principal satu socket terminal. Verdict dibaca SINKRON oleh `admit()`; pemeriksaannya
+ * (`revalidateWsPrincipal` → Prisma) berjalan di latar dan di-throttle `everyMs`.
+ *
+ * Terukur di jalur lama (`await revalidateWsPrincipal` per frame, SPEC-761): dua frame beruntun
+ * berlomba di Prisma dan `writeTo` kedua mendahului yang pertama — `bcdef` mendarat `bdcef` di
+ * tmux pada 200 keystroke beruntun, 3 dari 3 run; satu query yang tertahan pool memakan 5 dtk dan
+ * P1008 menutup socket yang sah dengan "session revoked". Urutan ke pty wajib sama dengan urutan
+ * kedatangan frame, dan itu hanya terjamin bila tak ada satu pun `await` di antara keduanya.
+ *
+ * Pemeriksaan yang GAGAL (DB tak terjangkau, pool habis) bukan verdict: socket tetap dilayani dan
+ * diperiksa lagi di frame berikutnya. Ini cermin perilaku nyata interval 60 dtk yang sudah ada —
+ * penolakannya tak pernah ditangkap, hanya tercetak lewat `unhandledRejection` di server.ts —
+ * jadi jendela pencabutan saat DB tumbang tak berubah, sementara terminal tak lagi mati karena
+ * P1008 milik sync.
+ */
+export function createPrincipalWatch(opts: {
+  check: () => Promise<boolean>;
+  onRevoked: () => void;
+  now?: () => number;
+  everyMs?: number;
+}): PrincipalWatch {
+  const now = opts.now ?? Date.now;
+  const everyMs = opts.everyMs ?? WS_REVALIDATE_EVERY_MS;
+  let revoked = false;
+  let disposed = false;
+  let inFlight = false;
+  // Jendela dihitung dari PERCOBAAN terakhir, bukan verdict terakhir: pemeriksaan yang gagal pun
+  // menunggu jendelanya — DB yang sedang sakit tak boleh dihujani satu query per keystroke.
+  let attemptedAt: number | null = null;
+  const run = (): void => {
+    if (revoked || disposed || inFlight) return;
+    inFlight = true;
+    attemptedAt = now();
+    opts.check().then((ok) => {
+      inFlight = false;
+      if (disposed || revoked || ok) return;
+      revoked = true;
+      opts.onRevoked();
+    }, () => { inFlight = false; });
+  };
+  return {
+    admit() {
+      if (revoked) return false;
+      if (attemptedAt === null || now() - attemptedAt >= everyMs) run();
+      return true;
+    },
+    refresh() { run(); },
+    dispose() { disposed = true; },
+  };
+}
+
 export function bearerToken(req: FastifyRequest): string | null {
   const value = req.headers.authorization;
   return typeof value === "string" && value.startsWith("Bearer ") ? value.slice(7) : null;

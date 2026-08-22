@@ -1127,7 +1127,11 @@ GET    /terminal/sessions/:id/ws     # WebSocket; close 4004 bila sesi tak ada
 #   target-specific, one-use, hidup 30 dtk, store bounded. `/events/ws` memakai target `events`.
 #   Payload maksimum 64 KiB dan 8 koneksi/principal. Guard default = 120 pesan/menit, sedangkan
 #   terminal = 6.000 frame/menit karena tiap ketikan xterm adalah satu frame. Principal diverifikasi
-#   ulang tiap 60 dtk dan SEBELUM input/resize terminal diterapkan; revoke menutup 1008.
+#   ulang tiap 60 dtk dan, selama frame berdatangan, paling banyak 1×/dtk — DI LATAR, tanpa menahan
+#   frame: `in`/`resize` diterapkan sinkron dalam urutan kedatangan (ack `{t:"ack",seq}` menyusul
+#   writeTo), revoke menutup 1008 pada verdict berikutnya, dan query yang gagal (pool/P1008) bukan
+#   verdict. Sebelumnya tiap frame menunggu satu query Prisma sebelum writeTo: dua frame beruntun
+#   berlomba dan mendarat terbalik di pty (terukur), dan P1008 milik sync menutup socket yang sah.
 #   Klien menahan input yang lahir selama ticket/upgrade masih CONNECTING, lalu mengirim gabungannya
 #   secara berurutan saat open; ketikan awal tidak boleh hilang hanya karena tunnel belum siap.
 #   SPEC-433 · `complete` = seluruh fase pipeline tercatat (done|skipped) DAN plan spec-nya tak

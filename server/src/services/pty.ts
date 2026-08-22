@@ -1,5 +1,5 @@
 import { spawn, type IPty } from "node-pty";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
@@ -201,6 +201,27 @@ function tmux(...args: string[]): string {
   }
 }
 
+// Kembaran asinkron `tmux()` untuk pemanggil yang berjalan TERUS-MENERUS (loop poll 500 ms dan
+// siar events 1 dtk). `execFileSync` memblokir seluruh event loop selama spawn: terukur 7–9 ms
+// saat mesin tenang, tapi avg 80–256 ms dan maks 916 ms saat mesin sibuk (load 28) — dan selama
+// itu tak satu pun frame ketikan terminal dibaca maupun echo-nya ditulis. Pemetaan error identik
+// dengan `tmux()`; pemanggil sekali-jalan (route, launch) tetap memakai yang sinkron.
+function tmuxAsync(...args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile("tmux", ["-L", socket(), "-f", "/dev/null", ...args], { encoding: "utf8" },
+      (e, stdout, stderr) => {
+        if (!e) { resolve(stdout); return; }
+        const err = e as NodeJS.ErrnoException;
+        if (err.code === "ENOENT") {
+          reject(new TmuxError("tmux tidak ada di PATH — sesi terminal hanoman hidup di dalam tmux (ADR-0016). Pasang: brew install tmux", false));
+          return;
+        }
+        const detail = (stderr || err.message).trim();
+        reject(new TmuxError(`tmux ${args[0]} gagal: ${detail}`, NO_SERVER.test(detail)));
+      });
+  });
+}
+
 // tmux menyatukan sisa argv-nya jadi satu string lalu menyerahkannya ke shell. Tanpa
 // kutip, JSON `--settings` pecah di setiap spasi dan claude mati sebelum lahir.
 const sq = (s: string): string => `'${s.split("'").join("'\\''")}'`;
@@ -228,6 +249,22 @@ function listPanes(): Pane[] {
     if (e instanceof TmuxError && e.noServer) return [];
     throw e;
   }
+  return parsePanes(out);
+}
+
+// Kembaran asinkron `listPanes()` — semantik kegagalan SAMA PERSIS (server belum jalan → [],
+// kegagalan lain dilempar), hanya tak menahan event loop selama tmux menjawab.
+async function listPanesAsync(): Promise<Pane[]> {
+  let out: string;
+  try { out = await tmuxAsync("list-panes", "-a", "-F", FMT); }
+  catch (e) {
+    if (e instanceof TmuxError && e.noServer) return [];
+    throw e;
+  }
+  return parsePanes(out);
+}
+
+function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
       alternate] = line.split("\t");
@@ -249,13 +286,17 @@ function listPanes(): Pane[] {
   });
 }
 
-export const listSessions = (): SessionInfo[] =>
-  listPanes().map(({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent }) => ({
-    id, projectId, specId, flow, cwd, exited, branch, decision, agent,
-    // Hanya untuk pane mati: `pane_dead_status` kosong pada pane hidup, dan `exitCode: 0` di sana
-    // akan terbaca sebagai "sudah berakhir sukses".
-    ...(exited ? { exitCode: code } : {}),
-  }));
+const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent }: Pane): SessionInfo => ({
+  id, projectId, specId, flow, cwd, exited, branch, decision, agent,
+  // Hanya untuk pane mati: `pane_dead_status` kosong pada pane hidup, dan `exitCode: 0` di sana
+  // akan terbaca sebagai "sudah berakhir sukses".
+  ...(exited ? { exitCode: code } : {}),
+});
+
+export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
+
+// Untuk siar events (tiap detik): daftar yang sama, tanpa memblokir event loop — lihat `tmuxAsync`.
+export const listSessionsAsync = async (): Promise<SessionInfo[]> => (await listPanesAsync()).map(toSessionInfo);
 
 // SPEC-184 · sesi hidup yang punya marker keputusan — masukan scanDecisions().
 export const liveDecisions = (): { id: string; specId?: string; projectId: string; decisionFile: string }[] =>
@@ -886,28 +927,39 @@ let poll: NodeJS.Timeout | undefined;
 // ponytail: satu `tmux list-panes` + satu bacaan berkas fase per 500ms untuk semua sesi
 // terbuka. Ganti dengan hook `pane-died` + `wait-for` kalau terminal yang terbuka bersamaan
 // pernah sampai puluhan.
+let polling = false;
 function startPoll(): void {
   if (poll) return;
   poll = setInterval(() => {
+    // Tick yang masih menunggu jawaban tmux tak ditumpuk: saat mesin sibuk satu jawaban terukur
+    // sampai 916 ms, dan tick berikutnya hanya akan menanyakan hal yang sama.
+    if (polling) return;
+    polling = true;
+    // Snapshot attachment diambil SEBELUM tmux ditanya: attachment yang lahir atau diganti selagi
+    // jawaban dalam perjalanan tak boleh dinilai dengan daftar pane yang lebih tua darinya — sesi
+    // yang baru dilahirkan ulang dengan id yang sama akan terbaca "sudah mati".
+    const snapshot = [...attached.entries()];
     // SPEC-402 · tick yang tak bisa bertanya ke tmux DILEWATI. Sebelumnya kegagalan invokasi
     // dibaca sebagai daftar kosong → `end(id, 0)` untuk setiap sesi yang sedang ditonton, yaitu
     // "— sesi berakhir (exit 0) —" pada agen yang masih bekerja. Diperparah dedup siaran di
     // services/events.ts: kebenaran (`exited:false`) tak pernah dikirim ulang, jadi pil "Selesai"
     // palsu itu LENGKET. Keadaan tak diketahui bukan bukti kematian.
-    let panes: Pane[];
-    try { panes = listPanes(); } catch { return; }
-    const live = new Map(panes.map((p) => [p.id, p]));
-    for (const id of [...attached.keys()]) {
-      const p = live.get(id);
-      if (!p) end(id, 0);            // sesinya dibunuh dari luar
-      else if (p.exited) end(id, p.code);
-      else {
-        const a = attached.get(id)!;
-        pollPhases(p, a);
-        pollAlt(p, a);
+    listPanesAsync().then((panes) => {
+      const live = new Map(panes.map((p) => [p.id, p]));
+      for (const [id, a] of snapshot) {
+        if (attached.get(id) !== a) continue;   // dilepas atau diganti selagi tmux ditanya
+        const p = live.get(id);
+        if (!p) end(id, 0);            // sesinya dibunuh dari luar
+        else if (p.exited) end(id, p.code);
+        else {
+          pollPhases(p, a);
+          pollAlt(p, a);
+        }
       }
-    }
-    if (attached.size === 0 && poll) { clearInterval(poll); poll = undefined; }
+    }, () => { /* tak bisa bertanya ke tmux: tick dilewati (SPEC-402) */ }).finally(() => {
+      polling = false;
+      if (attached.size === 0 && poll) { clearInterval(poll); poll = undefined; }
+    });
   }, POLL_MS);
   poll.unref();
 }

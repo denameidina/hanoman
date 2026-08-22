@@ -11,7 +11,7 @@ import { sessionAgentDefaults, conflictSessionDefaults, terminalAgentDefaults } 
 import { ensureCodexTrust } from "../services/codex-trust";
 import { startSpecSession, LaunchError } from "../services/session-launch";
 import { approveLaunch, launchPrincipal } from "../services/launch-authority";
-import { admitBrowserWs, openWsConnection, revalidateWsPrincipal, WsMessageGuard } from "../services/ws-admission";
+import { admitBrowserWs, openWsConnection, revalidateWsPrincipal, createPrincipalWatch, WsMessageGuard } from "../services/ws-admission";
 import { installCommand } from "../services/method-status";
 import { resolveRepoDir } from "../services/local-binding";
 import { ownsWorktree } from "../services/session-worktree";
@@ -446,11 +446,20 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     const guard = new WsMessageGuard({ perWindow: TERMINAL_WS_MESSAGES_PER_MINUTE });
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     attach(id, client);
-    socket.on("message", async (raw: Buffer) => {
+    // Revalidasi principal (SPEC-761) berjalan di LATAR, dipicu frame yang datang (≤ 1×/dtk) dan
+    // interval 60 dtk di bawah. Sebelumnya setiap frame `in` di-`await` di belakang satu query
+    // Prisma sebelum `writeTo`: dua frame beruntun berlomba dan mendarat terbalik di pty (terukur
+    // `bcdef` → `bdcef`, 3/3 run), satu query yang tertahan pool menahan ketikan 5 dtk, dan P1008
+    // milik sync menutup socket yang sah dengan "session revoked". Handler di bawah karena itu
+    // SINKRON dari ujung ke ujung — urutan ke pty = urutan kedatangan frame, tanpa satu `await` pun.
+    const watch = createPrincipalWatch({
+      check: () => revalidateWsPrincipal(req, principal),
+      onRevoked: () => socket.close(1008, "session revoked"),
+    });
+    socket.on("message", (raw: Buffer) => {
       const verdict = guard.accept(raw);
       if (!verdict.ok) { socket.close(verdict.code, verdict.reason); return; }
-      const valid = await revalidateWsPrincipal(req, principal).catch(() => false);
-      if (!valid) { socket.close(1008, "session revoked"); return; }
+      if (!watch.admit()) return;
       let m: { t?: string; d?: string; cols?: number; rows?: number; seq?: number; ev?: unknown[] };
       // ponytail: frame rusak dibuang diam-diam — pengirimnya UI kita sendiri.
       try { m = JSON.parse(raw.toString()); } catch { return; }
@@ -473,10 +482,8 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         try { appendDiag(resolveHome(), id, m.ev); } catch { /* diagnostik bukan alasan sesi mati */ }
       }
     });
-    const revalidate = setInterval(() => {
-      void revalidateWsPrincipal(req, principal).then((ok) => { if (!ok) socket.close(1008, "session revoked"); });
-    }, 60_000);
+    const revalidate = setInterval(() => watch.refresh(), 60_000);
     revalidate.unref?.();
-    socket.on("close", () => { clearInterval(revalidate); release(); detach(id, client); });
+    socket.on("close", () => { clearInterval(revalidate); watch.dispose(); release(); detach(id, client); });
   });
 }

@@ -1,5 +1,5 @@
 import type { Client } from "./pty";
-import { listSessions } from "./pty";
+import { listSessionsAsync } from "./pty";
 import { liveSpecs } from "./live-specs";
 import { notificationsFeed } from "./notifications";
 import { getLimits } from "./limits";
@@ -36,7 +36,9 @@ const GROUPS: Group[] = [
   // service itu sengaja tak tahu apa-apa soal lead maupun DB.
   { everyTicks: 1,  last: "", build: async () => ({
     t: "sessions",
-    sessions: listSessions().map((s) => (isDeciding(s.id) ? { ...s, deciding: true } : s)),
+    // Asinkron: grup ini di-recompute tiap detik, dan `execFileSync` tmux memblokir seluruh event
+    // loop — termasuk frame ketikan terminal — selama spawn (terukur sampai 916 ms saat mesin sibuk).
+    sessions: (await listSessionsAsync()).map((s) => (isDeciding(s.id) ? { ...s, deciding: true } : s)),
   }) },
   { everyTicks: 1,  last: "", build: async () => ({ t: "specs", specs: await liveSpecs() }) },
   { everyTicks: 3,  last: "", build: async () => ({ t: "notifications", ...(await notificationsFeed()) }) },
