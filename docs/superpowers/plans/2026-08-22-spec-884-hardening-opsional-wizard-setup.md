@@ -54,7 +54,7 @@
 - Consumes: —
 - Produces: `CONFIG_ENV_FILE: string`, `configEnvPath(home: string): string`, `parseConfigEnv(text: string): Record<string,string>`, `formatConfigEnv(values: Record<string,string>): string`, `readConfigEnv(home: string): Record<string,string>`, `writeConfigEnv(home: string, values: Record<string,string>): void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `runner/test/config-env.test.ts`:
 
@@ -117,12 +117,12 @@ describe("config.env", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/test/config-env.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/config-env"`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `runner/src/config-env.ts`:
 
@@ -184,12 +184,12 @@ Tambahkan di `runner/src/index.ts`, setelah baris `export * from "./paths";`:
 export * from "./config-env";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run --no-file-parallelism runner/test/config-env.test.ts`
 Expected: PASS — 7 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/config-env.ts runner/src/index.ts runner/test/config-env.test.ts

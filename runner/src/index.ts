@@ -14,3 +14,4 @@ export * from "./paths";
 export * from "./skills";
 export * from "./telegram-operator";
 export * from "./spawn-helper";
+export * from "./config-env";
