@@ -38,7 +38,7 @@
 - Consumes: —
 - Produces: kontrak isi marker — berkas `.worktrees/.decisions/<id>` berisi **detik epoch** onset episode "menunggu manusia" selama `size > 0`; kosong = tak menunggu. Dibaca Task 2.
 
-- [ ] **Step 1: Tulis test yang gagal (claude)**
+- [x] **Step 1: Tulis test yang gagal (claude)**
 
 Tambahkan di `runner/test/settings.test.ts`, di dalam `describe("guardSettings")`:
 
@@ -57,12 +57,12 @@ Tambahkan di `runner/test/settings.test.ts`, di dalam `describe("guardSettings")
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run runner/test/settings.test.ts`
 Expected: FAIL — `expected '…echo waiting >> …' to contain "[ -s '/tmp/dec' ]"`
 
-- [ ] **Step 3: Implementasi (claude)**
+- [x] **Step 3: Implementasi (claude)**
 
 Di `runner/src/settings.ts`, ganti blok `if (decisionFile) { … }` menjadi:
 
@@ -79,12 +79,12 @@ Di `runner/src/settings.ts`, ganti blok `if (decisionFile) { … }` menjadi:
   }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `env -u NODE_ENV pnpm vitest --run runner/test/settings.test.ts`
 Expected: PASS (7 test)
 
-- [ ] **Step 5: Tulis test yang gagal (codex)**
+- [x] **Step 5: Tulis test yang gagal (codex)**
 
 Tambahkan di `runner/test/codex-settings.test.ts`, di dalam `describe("codexHookArgs")`:
 
@@ -98,12 +98,12 @@ Tambahkan di `runner/test/codex-settings.test.ts`, di dalam `describe("codexHook
   });
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan gagal**
+- [x] **Step 6: Jalankan test, pastikan gagal**
 
 Run: `env -u NODE_ENV pnpm vitest --run runner/test/codex-settings.test.ts`
 Expected: FAIL — `expected '…echo waiting >> …' to contain "[ -s '/tmp/d1' ]"`
 
-- [ ] **Step 7: Implementasi (codex)**
+- [x] **Step 7: Implementasi (codex)**
 
 Di `runner/src/codex-settings.ts`, ganti baris `stop.push(...)` di blok `if (o.decisionFile)`:
 
@@ -115,12 +115,12 @@ Di `runner/src/codex-settings.ts`, ganti baris `stop.push(...)` di blok `if (o.d
   }
 ```
 
-- [ ] **Step 8: Jalankan kedua berkas test**
+- [x] **Step 8: Jalankan kedua berkas test**
 
 Run: `env -u NODE_ENV pnpm vitest --run runner/test/settings.test.ts runner/test/codex-settings.test.ts`
 Expected: PASS — kedua berkas hijau, termasuk assert lama `expect(joined).not.toContain("prompt")`
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add runner/src/settings.ts runner/src/codex-settings.ts runner/test/settings.test.ts runner/test/codex-settings.test.ts

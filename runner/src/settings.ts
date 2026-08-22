@@ -9,8 +9,12 @@ export const guardSettings = (decisionFile?: string, goal?: string) => {
   // (bagian variabel hanya <sessionId> = [a-z0-9_-]); naikkan bila repoDir bisa memuat "'".
   if (decisionFile) {
     const f = `'${decisionFile.split("'").join("'\\''")}'`;
+    // SPEC-898 · ADR-0141 · isi marker = detik epoch ONSET episode ini, ditulis SEKALI. Notification
+    // berulang (Claude idle lagi) tak boleh mencapnya ulang: kalau ia mencap ulang, "menunggu sejak"
+    // selalu terbaca lebih muda dari satu putaran idle dan gerbang urgensi tak pernah menyala.
+    // `size > 0` tetap satu-satunya arti "menunggu manusia" (SPEC-184) — markerFilled tak berubah.
     hooks.Notification = [{ hooks: [{ type: "command",
-      command: `grep -qiE 'idle|permission|waiting for|needs.?input' && echo waiting >> ${f} || true` }] }];
+      command: `grep -qiE 'idle|permission|waiting for|needs.?input' && { [ -s ${f} ] || date +%s > ${f}; } || true` }] }];
     hooks.UserPromptSubmit = [{ hooks: [{ type: "command", command: `: > ${f}` }] }];
   }
   // SPEC-332 · ADR-0073 · mode goal: mesin yang SAMA dipasang `/goal` di dalam sesi

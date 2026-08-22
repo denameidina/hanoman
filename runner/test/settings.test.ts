@@ -5,6 +5,19 @@ describe("guardSettings", () => {
   it("tanpa decisionFile: tak ada hook (guardrail dicabut, ADR-0037)", () => {
     expect(guardSettings().hooks).toEqual({});
   });
+  // SPEC-898 · ADR-0141 · hook menulis STEMPEL, dan hanya bila marker masih kosong. `echo waiting >>`
+  // yang lama mencap ulang mtime tiap notifikasi idle, jadi umur "menunggu" tak pernah tumbuh.
+  it("Notification menulis epoch sekali saja; marker terisi tak ditimpa", () => {
+    const cmd = (guardSettings("/tmp/dec") as any).hooks.Notification[0].hooks[0].command as string;
+    expect(cmd).toContain("[ -s '/tmp/dec' ]");
+    expect(cmd).toContain("date +%s > '/tmp/dec'");
+    expect(cmd).not.toContain("echo waiting");
+  });
+  it("UserPromptSubmit tetap mengosongkan marker (episode berikutnya dapat stempel baru)", () => {
+    const cmd = (guardSettings("/tmp/dec") as any).hooks.UserPromptSubmit[0].hooks[0].command as string;
+    expect(cmd).toBe(": > '/tmp/dec'");
+  });
+
   it("dengan decisionFile: Notification + UserPromptSubmit menunjuk berkasnya", () => {
     const s = guardSettings("/repo/.worktrees/.decisions/sess1") as any;
     expect(Object.keys(s.hooks).sort()).toEqual(["Notification", "UserPromptSubmit"]);

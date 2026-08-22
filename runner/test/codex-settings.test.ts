@@ -41,6 +41,14 @@ describe("codexHookArgs", () => {
     expect(joined).not.toContain("prompt");
   });
 
+  // SPEC-898 · ADR-0141 · cermin guardSettings: Stop menulis stempel sekali, bukan menumpuk baris.
+  it("Stop menulis epoch hanya saat marker kosong", () => {
+    const stop = codexHookArgs({ decisionFile: "/tmp/d1" }).find((a) => a.startsWith("hooks.Stop="))!;
+    expect(stop).toContain("[ -s '/tmp/d1' ]");
+    expect(stop).toContain("date +%s > '/tmp/d1'");
+    expect(stop).not.toContain("echo waiting");
+  });
+
   it("tanpa decisionFile & tanpa goalGate tak menghasilkan argumen hook", () => {
     expect(codexHookArgs({})).toEqual([]);
   });
