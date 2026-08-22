@@ -67,8 +67,10 @@ beforeEach(() => {
   mockMatchMedia(() => false);
   h.status = { connected: true, since: 0, paused: false };
   // SPEC-899 · kotak jawaban memanggil endpoint dialog begitu panel terbuka. Test yang tak
-  // membahasnya tak boleh menembak `fetch` sungguhan — default-nya "tak ada dialog di layar".
-  vi.spyOn(api, "sessionDialog").mockResolvedValue(null);
+  // membahasnya tak boleh menembak `fetch` sungguhan — dan promise yang RESOLVE akan menyelesaikan
+  // dirinya sesudah badan test berakhir, yaitu di luar act(). Default-nya karena itu menggantung:
+  // kotaknya berhenti di "Membaca layar sesi…" dan tak ada satu pun setState yang bocor.
+  vi.spyOn(api, "sessionDialog").mockReturnValue(new Promise(() => { }));
 });
 const conditions = () => screen.getAllByTestId("pet-condition");
 

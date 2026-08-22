@@ -1342,7 +1342,7 @@ git commit -m "docs(dialog): ADR-0142 inbox keputusan + api-contract, agent-inte
 - Consumes: seluruh task sebelumnya.
 - Produces: bukti terukur bahwa endpoint bekerja terhadap pane tmux sungguhan.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -1358,7 +1358,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: seluruhnya PASS. **Jangan** menerima "no test files" sebagai bukti — pastikan jumlah test yang berjalan masuk akal.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
@@ -1366,7 +1366,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --f
 
 Expected: ketiganya keluar tanpa error. (Tiga paket, bukan `-r`: perubahan ini memang menyentuh ketiganya lewat tipe shared.)
 
-- [ ] **Step 3: Boot server dengan DB & HOME khusus**
+- [x] **Step 3: Boot server dengan DB & HOME khusus**
 
 ```bash
 export SMOKE_HOME="$(mktemp -d)"
@@ -1378,7 +1378,7 @@ HANOMAN_HOME="$SMOKE_HOME" DATABASE_URL="file:$SMOKE_HOME/smoke.db" \
 `HANOMAN_HOME` & `DATABASE_URL` wajib: tanpa keduanya smoke menulis ke `~/.hanoman` milik operator. `HANOMAN_TMUX_SOCKET` khusus menjaga pane uji tak bercampur dengan sesi tetangga di mesin ini.
 Expected: `curl -s localhost:4899/api/health` menjawab.
 
-- [ ] **Step 4: Buat pane tmux yang MENAMPILKAN dialog tiruan**
+- [x] **Step 4: Buat pane tmux yang MENAMPILKAN dialog tiruan**
 
 Bukan `POST /terminal/sessions` — itu melahirkan agen sungguhan. Buat pane lewat tmux langsung dengan nama ber-prefix `hanoman-` dan opsi yang dibaca `parsePanes`:
 
@@ -1401,7 +1401,7 @@ tmux -L hanoman-smoke-899 set-option -t hanoman-smoke1 @hanoman_cwd /tmp
 
 Expected: `tmux -L hanoman-smoke-899 capture-pane -p -t hanoman-smoke1` menampilkan dialognya.
 
-- [ ] **Step 5: `curl` GET lalu POST**
+- [x] **Step 5: `curl` GET lalu POST**
 
 ```bash
 curl -s localhost:4899/api/terminal/sessions/smoke1/dialog | tee "$SMOKE_HOME/get.json"
@@ -1417,7 +1417,7 @@ curl -s -X POST -H 'content-type: application/json' \
 
 Expected: GET → `200` dengan `dialog.options` = merah/biru dan `dialog.freeIndex` = 3. POST ber-hash basi → `409` `reason: "stale"`. POST ber-hash benar → `409` `reason: "not-landed"` — **itu hasil yang BENAR** terhadap `cat`: layarnya statis, jadi `freeTextFilled` tak pernah benar dan `Enter` sengaja tak ditekan (fail-closed SPEC-452). Jalur sukses dikunci test ber-`PaneIO` palsu di Task 2 & 3.
 
-- [ ] **Step 6: Bereskan proses uji per-PID**
+- [x] **Step 6: Bereskan proses uji per-PID**
 
 ```bash
 tmux -L hanoman-smoke-899 kill-server
@@ -1427,7 +1427,7 @@ rm -rf "$SMOKE_HOME"
 
 **Jangan** `pkill -f`/`killall` — pola seperti itu mematikan agen sesi tetangga di mesin ini (SPEC-402).
 
-- [ ] **Step 7: Catat hasilnya di plan ini & commit**
+- [x] **Step 7: Catat hasilnya di plan ini & commit**
 
 Tulis hasil terukur Step 5 (kode status + potongan payload) sebagai blok di bawah task ini, lalu:
 
@@ -1437,6 +1437,35 @@ git commit -m "docs(dialog): hasil smoke endpoint dialog sesi (SPEC-899)"
 ```
 
 ---
+
+
+#### Hasil smoke (2026-08-22, terukur)
+
+Server `tsx src/server.ts` pada `PORT=4899` dengan `HANOMAN_HOME`/`DATABASE_URL` sementara dan
+socket tmux `hanoman-smoke-899`. Dua koreksi terhadap langkah yang ditulis di atas, keduanya
+kondisi lingkungan, bukan produk:
+
+- DB baru **wajib** `prisma migrate deploy` lebih dulu — tanpa itu boot mati `P2021 main.User does
+  not exist` sebelum listen.
+- Seluruh `/api/*` menuntut sesi: admin pertama dibuat lewat `POST /api/auth/setup`
+  (`{email,password}`) dan cookie-nya dipakai `curl -b`. Tanpa cookie semuanya `401`.
+
+| Panggilan | Hasil |
+|---|---|
+| `GET /api/terminal/sessions/smoke1/dialog` | `200` · `{"dialog":{"title":"Warna apa yang dipakai?","multi":false,"freeIndex":3,"notes":false,"options":[{"n":1,"label":"merah","checked":null},{"n":2,"label":"biru","checked":null}],"tabs":[{"header":"Warna","answered":false}]},"screenHash":"48dcef803f59e5c1"}` |
+| `GET …/smoke2/dialog` (pane non-dialog) | `204` |
+| `GET …/tak-ada/dialog` | `404 {"error":"not found"}` |
+| `POST …/dialog/answer` `{screenHash:"basi",choice:1}` | `409 reason:"stale"` |
+| `POST …/dialog/answer` `{screenHash:"48dcef…",choice:2}` | `409 reason:"not-landed"` |
+| `POST …/dialog/answer` `{screenHash:"48dcef…"}` (tanpa bentuk jawaban) | `400 {"error":"invalid body"}` |
+
+`not-landed` pada hash yang BENAR adalah hasil yang diharapkan terhadap `cat`: layarnya statis, jadi
+`freeTextFilled` tak pernah benar. Buktinya terbaca di pane sesudah percobaan — baris terakhirnya
+`3biru`, yaitu digit kolom bebas lalu prosanya, **tanpa** `Enter`. Fail-closed SPEC-452 terbukti
+in-vivo, bukan hanya di test ber-`PaneIO` palsu.
+
+Pembersihan per-PID: `tmux -L hanoman-smoke-899 kill-server`, `lsof -ti:4899 | kill`, `rm -rf`
+direktori sementara. Tanpa `pkill -f` (SPEC-402).
 
 ## Self-review — cakupan spec
 
