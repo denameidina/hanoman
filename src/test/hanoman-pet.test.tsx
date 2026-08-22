@@ -746,6 +746,35 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
     expect(hit()).toHaveStyle({ cursor: "grabbing" });
   });
 
+  it("hover memutar wave BERULANG; lepas hover menyelesaikan putaran lalu berhenti", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    fireEvent.pointerEnter(hit());
+    expect(rowshift()).toHaveAttribute("data-row", "wave");
+    const first = atlas();
+
+    animationEnd(atlas(), "hn-pet-frames");
+    expect(rowshift()).toHaveAttribute("data-row", "wave");   // putaran ke-2
+    expect(atlas()).not.toBe(first);                          // `key` baru → animasi restart
+    animationEnd(atlas(), "hn-pet-frames");
+    expect(rowshift()).toHaveAttribute("data-row", "wave");   // putaran ke-3
+
+    fireEvent.pointerLeave(hit());
+    expect(rowshift()).toHaveAttribute("data-row", "wave");   // TIDAK dipotong di tengah
+    animationEnd(atlas(), "hn-pet-frames");
+    expect(rowshift()).toHaveAttribute("data-row", "idle");   // baru berhenti di batas putaran
+  });
+
+  it("tidak melambai selagi diangkat, jatuh, atau pusing", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 460, 460);
+    fireEvent.pointerEnter(hit());
+    expect(rowshift()).toHaveAttribute("data-row", "held");
+    pointer(hit(), "pointerup", 460, 460);
+    fireEvent.pointerEnter(hit());
+    expect(rowshift()).toHaveAttribute("data-row", "falling");
+  });
+
   it("reduced-motion: seret tetap boleh, jatuh seketika, pusing dilewati", () => {
     mockMatchMedia((q) => q === REDUCED);
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);

@@ -1033,7 +1033,7 @@ git commit -m "feat(pet): pet bisa diseret — Pointer Events, sumbu Y, jalur me
 - Consumes: `isHandled` (Task 2), `oneShot` state yang sudah ada.
 - Produces: `oneShot.id` menjadi **penghitung naik** (bukan `Date.now()`).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di dalam `describe("HanomanPet — pet diseret (SPEC-905)", …)`:
 
@@ -1068,14 +1068,14 @@ Tambahkan di dalam `describe("HanomanPet — pet diseret (SPEC-905)", …)`:
   });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan gagal**
+- [x] **Step 2: Jalankan test — pastikan gagal**
 
 ```bash
 pnpm vitest --run --root src test/hanoman-pet.test.tsx -t "wave BERULANG"
 ```
 Expected: FAIL — `expected data-row "idle" to be "wave"` pada putaran ke-2.
 
-- [ ] **Step 3: Implementasikan**
+- [x] **Step 3: Implementasikan**
 
 Di `src/src/screens/HanomanPet.tsx`:
 
@@ -1128,7 +1128,7 @@ Di `src/src/screens/HanomanPet.tsx`:
                   }}
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan hijau**
+- [x] **Step 4: Jalankan test — pastikan hijau**
 
 ```bash
 pnpm vitest --run --root src test/hanoman-pet.test.tsx
@@ -1136,14 +1136,14 @@ pnpm vitest --run --root src test/hanoman-pet.test.tsx
 Expected: PASS untuk seluruh berkas, termasuk test lama "klik memutar wave sekali lalu kembali ke
 baris pose lewat animationend" (klik tak menyalakan `hovered`, jadi ia tetap sekali putar).
 
-- [ ] **Step 5: Jalankan seluruh test yang tersentuh perubahan ini**
+- [x] **Step 5: Jalankan seluruh test yang tersentuh perubahan ini**
 
 ```bash
 pnpm vitest --run --root src test/pet-walk.test.ts test/hanoman-pet.test.tsx test/pet-mount.test.tsx test/pet-state.test.ts test/pet-sprite.test.ts test/pet-speech.test.ts
 ```
 Expected: PASS, dan jumlah test yang berjalan **bukan nol** (jangan terima "no test files").
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/HanomanPet.tsx src/test/hanoman-pet.test.tsx

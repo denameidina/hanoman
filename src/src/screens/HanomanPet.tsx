@@ -251,6 +251,10 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   // ---- baris sekali-putar: `wave` (hover/klik) menumpuk di atas baris mesin; `shipped` main
   // sekali lalu `then` sampai pose berganti.
   const [oneShot, setOneShot] = React.useState<{ row: PetRowKey; id: number } | null>(null);
+  // `key` React pada <img> adalah `${displayRow}:${id}`. Dua putaran `wave` yang selesai di
+  // milidetik yang sama memberi `key` identik sehingga animasinya TAK restart — lambaian berhenti
+  // diam-diam. Penghitung naik tak bisa bertabrakan; `Date.now()` bisa.
+  const oneShotSeq = React.useRef(0);
   const clicksRef = React.useRef<number[]>([]);
   const [hearts, setHearts] = React.useState(0);
   const [shippedDone, setShippedDone] = React.useState(false);
@@ -258,15 +262,20 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   const baseRow: PetRowKey = row === "shipped" && shippedDone ? (thenOf("shipped") ?? "idle") : row;
   const displayRow: PetRowKey = oneShot?.row ?? baseRow;
   const display = rowOf(displayRow);
-  // Melambai atas data basi, atau melambai sambil tidur, keduanya berbohong.
+  // Melambai atas data basi, atau melambai sambil tidur, keduanya berbohong — dan sejak SPEC-905
+  // melambai sambil diangkat/jatuh/pusing juga: tiga baris itu memegang panggung sendiri.
+  const canWave = React.useCallback((): boolean =>
+    !reduced && view.pose !== "offline" && view.pose !== "sleeping"
+    && drag === null && !isHandled(walkRef.current.mode), [reduced, view.pose, drag]);
+
   const playWave = React.useCallback(() => {
-    if (reduced || view.pose === "offline" || view.pose === "sleeping") return;
-    setOneShot((o) => o ?? { row: "wave", id: Date.now() });
-  }, [reduced, view.pose]);
+    if (!canWave()) return;
+    setOneShot((o) => o ?? { row: "wave", id: ++oneShotSeq.current });
+  }, [canWave]);
 
   const playThanks = React.useCallback(() => {
     if (reduced) return;
-    setOneShot({ row: "thanks", id: Date.now() });   // menggantikan `wave` yang mungkin sedang main
+    setOneShot({ row: "thanks", id: ++oneShotSeq.current });   // menggantikan `wave` yang mungkin sedang main
     setHearts((n) => n + 1);
   }, [reduced]);
 
@@ -599,7 +608,14 @@ export function HanomanPet({ sessions, backlog, onOpen }:
                   src={PET_ATLAS_URL} alt="" aria-hidden="true" draggable={false} decoding="async"
                   onAnimationEnd={(event) => {
                     if (event.animationName !== "hn-pet-frames") return;
-                    if (oneShot) { setOneShot(null); return; }
+                    if (oneShot) {
+                      // Hover yang masih menempel memulai putaran BERIKUTNYA di batas putaran, jadi
+                      // lambaian tak pernah terpotong di tengah — dan lepas hover pun tak memotongnya.
+                      if (oneShot.row === "wave" && hovered && canWave())
+                        setOneShot({ row: "wave", id: ++oneShotSeq.current });
+                      else setOneShot(null);
+                      return;
+                    }
                     if (displayRow === "shipped") setShippedDone(true);
                   }}
                   style={{
