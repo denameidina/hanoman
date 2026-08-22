@@ -89,6 +89,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0145 — Data realtime berparameter lewat langganan di `/events/ws`, bukan polling klien](adr/0145-langganan-berparameter-events-ws.md) — **mengamandemen 0039** (kanal siar tak lagi read-only; grup global tetap, langganan berparameter berdampingan); menegakkan 0024, 0087, 0107, 0115, 0134, 0014/0016 & 0065 (SPEC-908)
 - [0143 — "Menunggu keputusan" adalah keadaan TURUNAN dari keadaan pane, bukan latch marker](adr/0143-menunggu-keputusan-keadaan-turunan.md) — mengamandemen SPEC-184 pada arti marker & 0141 pada turunan `decisionAt`; menegakkan 0039, 0024, 0091 & 0037 (SPEC-903)
 - [0142 — Inbox keputusan: dialog sesi dibaca & dijawab lewat HTTP bergerbang `screenHash`, di luar katalog MCP](adr/0142-inbox-keputusan-dialog-sesi.md) — menegakkan 0039, 0037, 0065, 0091, 0099 & 0102 (SPEC-899)
 - [0141 — Onset "menunggu manusia" hidup di ISI marker keputusan, dan menyeberang sebagai `decisionAt`](adr/0141-onset-menunggu-di-marker-keputusan.md) — mengamandemen SPEC-184 pada isi marker; menegakkan 0039, 0024 & 0091 (SPEC-898)

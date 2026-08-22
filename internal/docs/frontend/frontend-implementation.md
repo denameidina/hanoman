@@ -219,6 +219,29 @@ kegagalannya terbaca seperti regresi komponen.
   singleton (`api/events.ts`, ref-count) yang di-`subscribe` tiap consumer. HTTP GET hanya untuk
   paint pertama (projects tetap HTTP — bukan data real-time). Tidak ada SSE, tidak ada poll
   `setInterval`. Optimistic UI untuk kontrol lokal.
+- **Data BERPARAMETER ikut lewat socket yang sama** (SPEC-908/**ADR-0145**, mengamandemen ADR-0039;
+  **tak ada koneksi kedua** — kuota `MAX_CONNECTIONS_PER_PRINCIPAL` = 8 tak boleh naik). Empat layar
+  yang dulu men-poll sendiri (Scheduler 5 dtk + `nonce`, Triage 5 dtk, Lead 5 dtk, GitGraph 4 dtk)
+  kini berlangganan: `subscribeTopic(topic, params, onData)` di `api/events.ts` mendaftarkan minat,
+  frame `{t:"sub", subs}` **ter-coalesce di microtask** (empat `QueueSection` yang mount bersamaan =
+  satu frame) dan **dikirim ulang UTUH tiap `onopen`**. Frame masuk dicocokkan `msg.key ===
+  subKey(topic, params)` — fungsi murni di `@hanoman/shared` yang dihitung kedua sisi, jadi muatan
+  halaman lain **tak mungkin mendarat** di layar yang sedang di halaman lain, dan dua tab
+  berparameter identik menerima string yang sama persis.
+- **`useLiveTopic` (`api/live.ts`) adalah satu-satunya tempat "kapan menyegarkan".** Layar tetap
+  memanggil `load()`-nya sendiri untuk muat awal; hook ini hanya mendorong pembaruan. `apply` sengaja
+  **tak diberi akses** ke state `loading`/`error` layar — sifat silent refresh karena itu dijaga
+  secara konstruksi, bukan oleh disiplin pemanggil. `setInterval` fallback menyala HANYA pada dua
+  keadaan yang bisa dibuktikan: (1) frame `hello` sudah tiba dan topiknya tak ada di dalamnya —
+  server lama tak mengirim `hello` sama sekali, dan ketiadaannya itulah sinyalnya (ADR-0087); (2)
+  socket bisu 15 dtk tanpa satu pun frame — WS terhalang proxy padahal HTTP hidup. Selama WS sehat:
+  **nol `setInterval`, nol request HTTP berkala**. Gotcha React yang mengunci ini: daftar topik wajib
+  disimpan sebagai **state**, bukan dibaca dari modul saat render — kalau hanya "didukung/tidak" yang
+  di-state-kan, transisi `[] → ["git"]` pada layar `tickets` tak mengubah nilainya, React membatalkan
+  render, dan keputusan fallback membeku.
+- **`q` pencarian Triase di-debounce 400 ms sebelum mengubah kunci langganan** (bukan sebelum muat
+  HTTP-nya). Tiap huruf mengubah kunci → entri baru di server yang dibangun di luar jadwal, dan
+  sebelas dari dua belas hasilnya langsung dibuang karena entrinya sudah tergantikan huruf berikutnya.
 - Tidak ada layar Runs, biaya, maupun anggaran: run + queue dicabut (ADR-0024). Kuota model dipantau
   lewat **LimitIndicator** (badge topbar + kartu Overview) yang membaca `GET /limits` dari OAuth usage
   API Anthropic (SPEC-181/ADR-0024). Settings tak punya `dailyBudget`/`maxConcurrent`. Label reset tiap
@@ -345,7 +368,11 @@ Delapan keputusan di dalam tabel itu yang tak terbaca dari kodenya:
   `setTimeout` tepat pada saat luruhnya, bukan denyut.
 - **Terputus adalah kondisi, bukan ketiadaan kondisi.** `api/events.ts` mengekspos `eventsStatus`
   / `subscribeStatus` di atas socket `events` yang sudah ada — tanpa channel, endpoint, atau poll
-  baru (ADR-0039). `connected` menyala pada **frame pertama**, bukan pada `onopen`: socket terbuka
+  baru (ADR-0039). Hook pembacanya `useEventsStatus` hidup di **`api/live.ts`** sejak SPEC-908 (dulu
+  lokal di `screens/HanomanPet.tsx`): ia kini dipakai juga oleh `LiveConnectionBadge`
+  (`ds/components/live.tsx`) yang dipasang di keempat layar realtime — lencana `warn` ber-ikon
+  `wifi-off` yang muncul hanya setelah putus melewati grace **6 dtk**, dan **tak pernah** saat
+  `paused`. `connected` menyala pada **frame pertama**, bukan pada `onopen`: socket terbuka
   adalah fakta transport, bukan fakta pengiriman (pelajaran terukur SPEC-878/ADR-0134). `paused`
   terpisah karena tab hidden menutup socket **atas permintaan kita**; menyebutnya gangguan berarti
   tiap kembali dari tab lain memudarkan pet, dan jam "tak terhubung sejak" karena itu **dinolkan**
