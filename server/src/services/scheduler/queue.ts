@@ -1,5 +1,6 @@
 import { prisma } from "../../db";
 import type { SchedulerQueueItem } from "@prisma/client";
+import type { Paginated, SchedulerQueueItemView } from "@hanoman/shared";
 
 const RANK: Record<string, number> = { tinggi: 0, sedang: 1, rendah: 2 };
 
@@ -49,6 +50,27 @@ export async function listQueuePage(f: { status?: string; page?: string; limit?:
     where, orderBy: { enqueuedAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize,
   });
   return { items, total, page, pageSize };
+}
+
+// SPEC-908 · amplop view (tanggal ISO) untuk GET /scheduler/queue dan topik siar
+// `schedulerQueue`. Satu definisi: sebelumnya serializer ini inline di routes/scheduler.ts.
+export async function buildQueuePage(
+  f: { status?: string; page?: number; limit?: number },
+): Promise<Paginated<SchedulerQueueItemView>> {
+  const r = await listQueuePage({
+    status: f.status,
+    page: f.page ? String(f.page) : undefined,
+    limit: f.limit ? String(f.limit) : undefined,
+  });
+  return {
+    items: r.items.map((q) => ({
+      id: q.id, specId: q.specId, projectId: q.projectId, source: q.source,
+      priority: q.priority, status: q.status, sessionId: q.sessionId, note: q.note,
+      enqueuedAt: q.enqueuedAt.toISOString(),
+      launchedAt: q.launchedAt ? q.launchedAt.toISOString() : null,
+    })),
+    total: r.total, page: r.page, pageSize: r.pageSize,
+  };
 }
 
 // SPEC-523 · hitungan per status untuk `GET /scheduler/state`. Kunci ditulis apa adanya (bukan

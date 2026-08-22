@@ -6,7 +6,7 @@ import { changedFiles, withTempIndex, type ChangedFile, type ReviewFile } from "
 import { assertSafeRepoPathSync, readRepoFile as readSafeRepoFile, writeRepoFileAtomic } from "./safe-repo-path";
 // SPEC-908 · tiga tipe ini dulu dideklarasikan KEMBAR di sini dan di src/src/api/client.ts.
 // Frame `git` di EventMsg memaksa keduanya jadi satu definisi di @hanoman/shared.
-import type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
+import type { GraphCommit, RepoStatus, Stash, TopicParams } from "@hanoman/shared";
 export type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 
 const exec = promisify(execFile);
@@ -483,4 +483,22 @@ export async function workingFileDiff(
     diff: diffRaw.slice(0, MAX),
     content: contentRaw === null ? null : contentRaw.slice(0, MAX),
   };
+}
+
+// SPEC-908 · muatan layar GitGraph dalam SATU tarikan — cermin `load()`-nya. Dibundel karena
+// ketiganya hari ini satu render: tiga frame terpisah akan menampilkan campuran dua generasi data.
+export async function buildGitLive(repoDir: string | null, p: TopicParams["git"]): Promise<{
+  graph: { commits: GraphCommit[]; current: string; total: number };
+  status: RepoStatus; stashes: Stash[];
+}> {
+  const [graph, status, stashes] = await Promise.all([
+    listGraph(repoDir, p.limit, {
+      branches: p.branch ? [p.branch] : undefined,
+      showRemote: p.showRemote ? undefined : false,
+      showTags: p.showTags ? undefined : false,
+    }),
+    repoStatus(repoDir),
+    listStashes(repoDir),
+  ]);
+  return { graph, status, stashes };
 }
