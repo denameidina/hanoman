@@ -50,6 +50,17 @@ describe("SPEC-908 · hub langganan berparameter", () => {
     detach(c);
   });
 
+  it("`hello` mengiklankan daftar KOSONG ke koneksi yang tak boleh berlangganan", async () => {
+    // `canSubscribeTopics` membuang frame `sub` dari principal non-cookie DIAM-DIAM. Kalau `hello`
+    // tetap menyebut kelima topik, klien menyimpulkan "didukung", tak pernah menyalakan fallback,
+    // dan layarnya diam selamanya tanpa satu pun error.
+    const c = fakeClient();
+    await attach(c, { maySubscribe: false });
+    expect(c.frames[0]!.t).toBe("hello");
+    expect(c.frames[0]!.topics).toEqual([]);
+    detach(c);
+  });
+
   it("entri tanpa pelanggan TIDAK PERNAH dihitung", async () => {
     const spy = vi.spyOn(TOPICS.tickets, "build");
     const c = fakeClient();

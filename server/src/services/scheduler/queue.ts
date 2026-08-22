@@ -57,11 +57,10 @@ export async function listQueuePage(f: { status?: string; page?: string; limit?:
 export async function buildQueuePage(
   f: { status?: string; page?: number; limit?: number },
 ): Promise<Paginated<SchedulerQueueItemView>> {
-  const r = await listQueuePage({
-    status: f.status,
-    page: f.page ? String(f.page) : undefined,
-    limit: f.limit ? String(f.limit) : undefined,
-  });
+  // `?:` menjadikan `limit=0`/`limit=abc` (NaN) terbaca "tanpa limit" — cermin bug terukur di
+  // services/tickets-list.ts. `listQueuePage` sendiri sudah menjepit nilai tak sah ke 1.
+  const str = (v: number | undefined): string | undefined => (v === undefined ? undefined : String(v));
+  const r = await listQueuePage({ status: f.status, page: str(f.page), limit: str(f.limit) });
   return {
     items: r.items.map((q) => ({
       id: q.id, specId: q.specId, projectId: q.projectId, source: q.source,

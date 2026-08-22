@@ -224,7 +224,8 @@ docs/              spec & plan kerja (superpowers) + aset README
 ```
 
 Stack: React + Vite · **Fastify** · SQLite (**Prisma 6**) · **node-pty + tmux** · xterm.js.
-Realtime: WebSocket untuk terminal PTY, HTTP polling untuk sisanya.
+Realtime: WebSocket untuk terminal PTY, plus satu kanal siar `/api/events/ws` per tab untuk
+data dashboard — snapshot global maupun langganan berparameter, tanpa polling HTTP di klien.
 Eksekusi adalah sesi agen interaktif per backlog di git worktree — tanpa message queue, worker,
 maupun webhook GitHub (semuanya dicabut di
 [ADR-0024](internal/docs/adr/0024-sesi-interaktif-menggantikan-run.md); scheduler kembali sebagai

@@ -28,8 +28,8 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     try { release = openWsConnection(principal); }
     catch { socket.close(1008, "connection limit"); return; }
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
-    void attach(client);
     const maySubscribe = canSubscribeTopics(principal);
+    void attach(client, { maySubscribe });
     const guard = new WsMessageGuard({ perWindow: SUB_FRAMES_PER_MINUTE });
     socket.on("message", (raw: Buffer) => {
       const verdict = guard.accept(raw);

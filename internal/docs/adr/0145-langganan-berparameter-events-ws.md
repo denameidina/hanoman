@@ -154,6 +154,13 @@ ditutup **atas permintaan kita**) bukan gangguan dan tak pernah memunculkan indi
   email), jadi ia butuh keputusannya sendiri.
 - Satu layar Scheduler membuka **lima** langganan (state + empat seksi antrean). Plafon 16 memberi
   ruang; frame `sub` yang ter-coalesce di microtask menjaga jumlah frame masuk tetap satu.
+- **`branch` diwakili skalar di topik `git` (`shared/src/dto.ts`) tetapi array di route HTTP-nya**
+  (`routes/ide.ts`, `q.branches.split(",")`). Setara hari ini karena UI hanya pernah mengirim satu;
+  begitu pemilih multi-branch lahir, `load()` dan `apply()` akan menggambar graph yang berbeda tanpa
+  ada yang gagal. Sekelas dengan itu: kosakata status antrean kini punya salinan **ketiga**
+  (`zTopicParams.schedulerQueue.status`, di samping `queueCounts()` dan seksi-seksi di
+  `SchedulerScreen`) tanpa ikatan tipe — status keenam kelak membuat seksinya berhenti hidup
+  tanpa satu pun error.
 - `WsMessageGuard` memakai jendela **fixed**, bukan sliding, dan `POST /api/ws-tickets` tak
   dibatasi laju — jadi 120 frame/menit adalah polisi tidur, bukan plafon keras. Yang benar-benar
   mengikat kerja adalah pagar 6 & 7 di atas.

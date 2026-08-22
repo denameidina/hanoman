@@ -61,6 +61,16 @@ describe("SPEC-908 · buildTicketsPage", () => {
     expect((await buildTicketsPage({ project: "bld-proj", status: "new", page: 1, limit: 20 })).total).toBe(7);
   });
 
+  it("`limit` tak sah MENJEPIT ke satu baris — bukan berarti seluruh tabel", async () => {
+    // Route menyerahkan `Number(limit)`: `limit=abc` jadi NaN dan `limit=0` jadi 0, dan keduanya
+    // falsy. Membacanya sebagai "tanpa limit" mengubah GET /tickets jadi dump tabel penuh ber-200,
+    // melanggar ADR-0107 tanpa satu pun sinyal. MCP, agent token, dan portal memakai endpoint ini.
+    expect((await buildTicketsPage({ project: "bld-proj", page: 1, limit: Number("abc") })).items).toHaveLength(1);
+    expect((await buildTicketsPage({ project: "bld-proj", page: 1, limit: 0 })).items).toHaveLength(1);
+    // Tanpa `limit` sama sekali tetap berarti seluruh set (pola `paginate` sejak SPEC-198).
+    expect((await buildTicketsPage({ project: "bld-proj" })).items).toHaveLength(25);
+  });
+
   it("memancarkan createdAt sebagai string ISO, bukan Date", async () => {
     const r = await buildTicketsPage({ project: "bld-proj", page: 1, limit: 1 });
     expect(typeof r.items[0]!.createdAt).toBe("string");
@@ -79,5 +89,10 @@ describe("SPEC-908 · buildQueuePage", () => {
 
   it("menyaring per status", async () => {
     expect((await buildQueuePage({ status: "failed", page: 1, limit: 10 })).total).toBe(0);
+  });
+
+  it("`limit` tak sah MENJEPIT ke satu baris — cermin buildTicketsPage", async () => {
+    expect((await buildQueuePage({ status: "queued", page: 1, limit: Number("abc") })).pageSize).toBe(1);
+    expect((await buildQueuePage({ status: "queued", page: 1, limit: 0 })).pageSize).toBe(1);
   });
 });

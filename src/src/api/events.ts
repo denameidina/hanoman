@@ -1,4 +1,4 @@
-import { paths, subKey, type EventMsg, type EventTopic, type TopicParams } from "@hanoman/shared";
+import { paths, subKey, MAX_SUBS, type EventMsg, type EventTopic, type TopicParams } from "@hanoman/shared";
 import { api } from "./client";
 
 // SPEC-199 · satu koneksi WS dibagi semua consumer (ref-count, pola api/limits.ts). Server
@@ -61,8 +61,13 @@ export const eventsSilentSince = (): number | null => lastFrameAt;
 // server yang sama akan mengirim `hello` lagi saat reconnect, dan mengosongkannya di antara
 // menyalakan fallback poll tanpa sebab.
 let topics: EventTopic[] = [];
+// Daftar KOSONG adalah jawaban yang sah — server memberikannya kepada koneksi yang tak boleh
+// berlangganan. Tanpa bit terpisah, "hello tiba tapi kosong" tak bisa dibedakan dari "belum ada
+// hello", dan fallback poll tak pernah menyala.
+let helloSeen = false;
 const topicsSubs = new Set<(t: EventTopic[]) => void>();
 export const eventsTopics = (): EventTopic[] => topics;
+export const eventsHelloSeen = (): boolean => helloSeen;
 export function subscribeTopics(cb: (t: EventTopic[]) => void): () => void {
   topicsSubs.add(cb);
   return () => { topicsSubs.delete(cb); };
@@ -72,7 +77,12 @@ export function subscribeTopics(cb: (t: EventTopic[]) => void): () => void {
 function flushSubs(): void {
   subsDirty = false;
   if (!ws || !wsOpen) return;
-  const subs = [...topicSubs.values()].map((s) => ({ topic: s.topic, params: s.params }));
+  // Plafon ditegakkan di sini juga, bukan hanya di zod server: frame yang melewatinya GAGAL
+  // parse seutuhnya dan dibuang senyap, server menahan himpunan lama, dan karena `hello` sudah
+  // menyatakan topiknya didukung, fallback poll tetap mati — SEMUA layar realtime membeku
+  // sekaligus. Memotong ekornya membuat sebagian besar tetap hidup.
+  const subs = [...topicSubs.values()].slice(0, MAX_SUBS)
+    .map((s) => ({ topic: s.topic, params: s.params }));
   try { ws.send(JSON.stringify({ t: "sub", subs })); } catch { /* onclose yang menangani */ }
 }
 function markSubsDirty(): void {
@@ -124,6 +134,7 @@ async function open(): Promise<void> {
     if (!status.connected) setStatus({ connected: true, since: Date.now() });
     if (m.t === "hello") {
       topics = m.topics;
+      helloSeen = true;
       for (const cb of topicsSubs) cb(topics);
     }
     for (const s of subs) s(m);

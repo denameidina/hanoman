@@ -40,6 +40,7 @@ beforeEach(() => {
   resetEventsStub();
   // `mockResolvedValue` di sebuah test bertahan ke test berikutnya — reset implementasinya, bukan
   // sekadar riwayat panggilannya.
+  localStorage.clear();
   listTickets.mockReset();
   listTickets.mockResolvedValue(page([TICKET]));
   vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -86,6 +87,29 @@ describe("SPEC-908 · TriageScreen live", () => {
     expect(lastSubParams("tickets")).toMatchObject({ page: 1 });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Berikutnya" })); });
     expect(lastSubParams("tickets")).toMatchObject({ page: 2 });
+  });
+
+  it("frame yang mendarat di halaman aktif tak melempar operator ke halaman 1", async () => {
+    setTopics(["tickets"]);
+    const rows = (gen: number) => Array.from({ length: 20 }, (_, i) =>
+      ({ ...TICKET, id: `g${gen}-${i}`, number: gen * 100 + i, title: `Tiket ${gen}-${i}` }));
+    listTickets.mockResolvedValue(page(rows(1), { total: 60 }));
+    render(view());
+    await screen.findByRole("button", { name: "Berikutnya" });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Berikutnya" })); });
+    expect(allSubs("tickets")).toEqual([expect.objectContaining({ page: 2 })]);
+
+    await act(async () => {
+      emitTopic({
+        t: "tickets", key: subKey("tickets", { page: 2, limit: 20 }),
+        data: page(rows(2), { total: 60, page: 2 }) as never,
+      });
+    });
+    expect(screen.getByText("Tiket 2-0")).toBeTruthy();
+    // `apply` adalah closure layar: ia PUNYA akses ke `setPage`. Yang menahannya cuma disiplin
+    // penulis, jadi invariant SPEC-523/ADR-0107 ini butuh penegaknya sendiri.
+    expect(allSubs("tickets")).toEqual([expect.objectContaining({ page: 2 })]);
+    expect(screen.getByText(/21.40 dari 60/)).toBeTruthy();
   });
 
   it("frame untuk halaman LAIN tak mendarat — operator tak dilempar keluar halamannya", async () => {

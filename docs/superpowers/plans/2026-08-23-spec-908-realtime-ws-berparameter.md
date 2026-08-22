@@ -92,7 +92,7 @@ pnpm --filter ./shared typecheck    # atau ./server, ./src
 **Interfaces:**
 - Produces: `EventTopic`, `TopicParams`, `zTopicParams`, `subKey(topic, params): string`, `MAX_SUBS`, `zEventsClientMsg`, `EventsClientMsg`, dan enam varian `EventMsg` baru (`hello`, `schedulerState`, `schedulerQueue`, `tickets`, `lead`, `git`). Juga memindahkan `GraphCommit`, `RepoStatus`, `Stash` ke `@hanoman/shared`.
 
-- [ ] **Step 1: Buktikan ketiga tipe git memang kembar identik sebelum dipindah**
+- [x] **Step 1: Buktikan ketiga tipe git memang kembar identik sebelum dipindah**
 
 Run:
 ```bash
@@ -100,7 +100,7 @@ diff <(sed -n '59p;88p;89p' src/src/api/client.ts) <(sed -n '53p;95p' server/src
 ```
 Ini pembanding kasar; yang mengikat adalah `pnpm --filter ./src typecheck` di Step 8. Catat: `GraphCommit` dan `Stash` byte-identik; `RepoStatus` identik isinya, hanya beda pembungkus baris.
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 Create `shared/test/events-topics.test.ts`:
 
@@ -178,12 +178,12 @@ describe("SPEC-908 · setiap topik punya skema", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL**
+- [x] **Step 3: Jalankan test, pastikan GAGAL**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run shared/test/events-topics.test.ts`
 Expected: FAIL — `subKey`, `zTopicParams`, `zEventsClientMsg`, `MAX_SUBS` tak diekspor dari `../src/dto`.
 
-- [ ] **Step 4: Pindahkan tiga tipe git ke `shared/src/dto.ts`**
+- [x] **Step 4: Pindahkan tiga tipe git ke `shared/src/dto.ts`**
 
 Tambahkan di `shared/src/dto.ts`, tepat sebelum blok `EventMsg` (cari `export type EventMsg`):
 
@@ -199,7 +199,7 @@ export type RepoStatus = {
 export type Stash = { ref: string; message: string; at: string };
 ```
 
-- [ ] **Step 5: Tambahkan kontrak topik di `shared/src/dto.ts`**
+- [x] **Step 5: Tambahkan kontrak topik di `shared/src/dto.ts`**
 
 Tambahkan setelah blok Step 4:
 
@@ -265,7 +265,7 @@ export const zEventsClientMsg = z.object({
 export type EventsClientMsg = z.infer<typeof zEventsClientMsg>;
 ```
 
-- [ ] **Step 6: Tambahkan enam varian `EventMsg`**
+- [x] **Step 6: Tambahkan enam varian `EventMsg`**
 
 Di `shared/src/dto.ts`, pada union `EventMsg` (setelah `| { t: "update"; update: UpdateStatus };` — ubah titik-koma jadi lanjutan union):
 
@@ -284,12 +284,12 @@ Di `shared/src/dto.ts`, pada union `EventMsg` (setelah `| { t: "update"; update:
       status: RepoStatus; stashes: Stash[] };
 ```
 
-- [ ] **Step 7: Jalankan test, pastikan LULUS**
+- [x] **Step 7: Jalankan test, pastikan LULUS**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run shared/test/events-topics.test.ts`
 Expected: PASS — 11 test.
 
-- [ ] **Step 8: Buang definisi kembar di server & klien**
+- [x] **Step 8: Buang definisi kembar di server & klien**
 
 Di `server/src/services/git-ide.ts`, ganti baris 53, blok 60-63, dan baris 95 dengan satu re-export dekat impor teratas:
 
@@ -307,7 +307,7 @@ export type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck`
 Expected: nol error. Kalau ada `Cannot find name 'RepoStatus'` di `git-ide.ts`, itu karena `import type` di atas terlewat — fungsi `repoStatus` memakainya sebagai anotasi.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add shared/src/dto.ts shared/test/events-topics.test.ts server/src/services/git-ide.ts src/src/api/client.ts
@@ -341,7 +341,7 @@ menerima string yang sama persis dan dedup signature ADR-0039 tetap berlaku."
 
 > **Kenapa ekstraksi ini wajib, bukan kenyamanan:** kalau hub menyalin serializer route, frame dan respons HTTP jadi dua bentuk yang bisa berselisih diam-diam — persis kelas bug SPEC-431/448/475. Satu definisi, dua pemanggil.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/events-builders.test.ts`:
 
@@ -399,7 +399,7 @@ describe("SPEC-908 · builder dipakai bersama route & hub", () => {
 
 > Sebelum menulis, buka satu test server yang sudah ada (mis. `server/test/tickets.test.ts`) dan **tiru cara ia menyiapkan DB** — nama helper reset dan field wajib `Ticket`/`SchedulerQueueItem` diambil dari sana, bukan ditebak. Kalau helper `resetDb` bernama lain, pakai nama yang dipakai suite itu.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run:
 ```bash
@@ -408,7 +408,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — modul `../src/services/tickets-list` tak ada.
 
-- [ ] **Step 3: Ekstrak `buildTicketsPage`**
+- [x] **Step 3: Ekstrak `buildTicketsPage`**
 
 Create `server/src/services/tickets-list.ts`:
 
@@ -464,7 +464,7 @@ Ganti body `GET /tickets` di `server/src/routes/tickets.ts:22-36` menjadi:
 
 Tambahkan `import { buildTicketsPage } from "../services/tickets-list";` dan **hapus** const `view` lokal beserta impor `paginate`/`Ticket` **hanya jika** tak ada pemakai lain di berkas itu — periksa dengan `grep -n "view(\|paginate(\|Ticket\b" server/src/routes/tickets.ts` sebelum menghapus.
 
-- [ ] **Step 4: Ekstrak `buildQueuePage`**
+- [x] **Step 4: Ekstrak `buildQueuePage`**
 
 Tambahkan di `server/src/services/scheduler/queue.ts`, tepat setelah `listQueuePage`:
 
@@ -501,7 +501,7 @@ Ganti body `GET /scheduler/queue` di `server/src/routes/scheduler.ts:86-98`:
   });
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run:
 ```bash
@@ -510,7 +510,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: PASS — 3 test.
 
-- [ ] **Step 6: Ekstrak `buildSchedulerState` (dan singkirkan `listSessions` sinkron dari jalur ini)**
+- [x] **Step 6: Ekstrak `buildSchedulerState` (dan singkirkan `listSessions` sinkron dari jalur ini)**
 
 Create `server/src/services/scheduler/state.ts`, salin **apa adanya** isi handler `GET /scheduler/state` (`server/src/routes/scheduler.ts:58-83`) dengan **satu** perubahan: `listSessions()` → `await listSessionsAsync()`.
 
@@ -547,7 +547,7 @@ export async function buildSchedulerState(): Promise<SchedulerStateView> {
 
 Ganti body route menjadi `app.get("/scheduler/state", () => buildSchedulerState());`.
 
-- [ ] **Step 7: Ekstrak view lead**
+- [x] **Step 7: Ekstrak view lead**
 
 Create `server/src/services/lead/views.ts` dengan tiga fungsi yang menyalin `server/src/routes/lead.ts:34-68`, `:72-84`, `:89-99` **apa adanya**, kecuali `listSessions()` → `await listSessionsAsync()` di `buildLeadStatus`:
 
@@ -569,7 +569,7 @@ export async function buildLeadFlows(f: { projectId?: string; page?: number; lim
 
 Ganti ketiga body route dengan pemanggilan service.
 
-- [ ] **Step 8: Pindahkan `repoOf` + tambahkan `buildGitLive`**
+- [x] **Step 8: Pindahkan `repoOf` + tambahkan `buildGitLive`**
 
 Create `server/src/services/repo-dir.ts`:
 
@@ -613,7 +613,7 @@ export async function buildGitLive(repoDir: string | null, p: TopicParams["git"]
 
 Tambahkan `import type { TopicParams } from "@hanoman/shared";`.
 
-- [ ] **Step 9: Jalankan test route yang tersentuh**
+- [x] **Step 9: Jalankan test route yang tersentuh**
 
 Run:
 ```bash
@@ -626,7 +626,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: semua PASS. **Kalau `scheduler.route` atau `lead-routes` merah dengan "listSessions is not a function"**, itu karena test-nya men-stub `listSessions` sementara service kini memanggil `listSessionsAsync` — perbarui stub-nya ke `listSessionsAsync`. Itu perubahan yang benar, bukan gejala regresi.
 
-- [ ] **Step 10: Typecheck & commit**
+- [x] **Step 10: Typecheck & commit**
 
 Run: `pnpm --filter ./server typecheck`
 
@@ -653,7 +653,7 @@ ber-execFileSync, yang memblokir event loop yang dibagi dengan PTY terminal."
 - Consumes: builder Task 2, kontrak Task 1.
 - Produces: `subscribeClient(c: Client, subs: { topic: string; params: unknown }[]): void`, `TOPICS` (registry), dan `attach()` yang kini mengirim frame `hello` lebih dulu.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/events-subscriptions.test.ts`:
 
@@ -831,7 +831,7 @@ describe("SPEC-908 · hub langganan berparameter", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run:
 ```bash
@@ -840,7 +840,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — `subscribeClient` tak diekspor, modul `events-topics` tak ada.
 
-- [ ] **Step 3: Tulis registry topik**
+- [x] **Step 3: Tulis registry topik**
 
 Create `server/src/services/events-topics.ts`:
 
@@ -893,7 +893,7 @@ export function parseParams<T extends EventTopic>(topic: T, params: unknown): To
 }
 ```
 
-- [ ] **Step 4: Tambahkan bookkeeping langganan di `services/events.ts`**
+- [x] **Step 4: Tambahkan bookkeeping langganan di `services/events.ts`**
 
 Ubah `server/src/services/events.ts`:
 
@@ -1033,7 +1033,7 @@ export function detach(c: Client): void {
 export function __reset(): void { clients.clear(); entries.clear(); stopLoop(); }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run:
 ```bash
@@ -1042,7 +1042,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: PASS — 12 test baru + `events.test.ts` yang ada tetap hijau. Kalau `events.test.ts` merah karena kini ada frame `hello` di awal, perbaiki **assertion-nya** (frame pertama bukan lagi `sessions`) — itu perubahan kontrak yang disengaja, bukan regresi.
 
-- [ ] **Step 6: Typecheck & commit**
+- [x] **Step 6: Typecheck & commit**
 
 Run: `pnpm --filter ./server typecheck`
 
@@ -1072,7 +1072,7 @@ server lalu jatuh senyap di klien."
 - Consumes: `subscribeClient` (Task 3), `zEventsClientMsg`/`MAX_SUBS` (Task 1), `WsMessageMeter`/`MAX_WS_MESSAGE_BYTES` (`server/src/services/ws-admission.ts:7,227`).
 - Produces: kanal `/events/ws` yang membaca frame `sub` **hanya** dari principal `kind === "user"` / `"test"`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/events-sub-frame.test.ts`. Tiru **cara `server/test/events.route.test.ts` membangun app dan membuka WS** (boot Fastify + `@fastify/websocket`, tiket, subprotocol) — jangan menebak bentuknya.
 
@@ -1139,7 +1139,7 @@ describe("SPEC-908 · gerbang frame masuk /events/ws", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run:
 ```bash
@@ -1148,7 +1148,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — belum ada handler `"message"`, jadi `subscribeClient` tak pernah dipanggil.
 
-- [ ] **Step 3: Implementasi handler**
+- [x] **Step 3: Implementasi handler**
 
 Ubah `server/src/routes/events.ts`. Ganti komentar "Read-only feed: frame masuk diabaikan" pada baris 6-7 dan tambahkan handler setelah `void attach(client)`:
 
@@ -1184,7 +1184,7 @@ import { attach, detach, subscribeClient } from "../services/events";
 import { zEventsClientMsg } from "@hanoman/shared";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run:
 ```bash
@@ -1198,11 +1198,11 @@ Expected: semua PASS.
 
 > Kalau `vi.spyOn(events, "subscribeClient")` tak mempan (modul ESM read-only), ganti strateginya: jangan mem-spy, melainkan berlangganan sungguhan dan **assert frame `tickets` yang diterima** (atau tidak diterima) di socket. Yang diuji adalah perilaku gerbang, bukan pemanggilan fungsi.
 
-- [ ] **Step 5: Review keamanan**
+- [x] **Step 5: Review keamanan**
 
 Jalankan agen `security-reviewer` atas diff `server/src/routes/events.ts` + `server/src/services/events.ts` + `server/src/services/events-topics.ts`, dengan pertanyaan eksplisit: **bisakah principal non-cookie mencapai `subscribeClient`, dan bisakah `params` mencapai argv/path tanpa validasi?** Perbaiki temuan yang jalurnya terbukti sebelum lanjut.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/events.ts server/test/events-sub-frame.test.ts
@@ -1229,7 +1229,7 @@ global memperoleh baca ke tiga domain yang tak diberikan kepadanya."
   - `subscribeTopics(cb: (topics: EventTopic[]) => void): () => void`
   - `eventsSilentSince(): number | null` — stempel kapan socket terakhir mengantar frame; `null` bila belum pernah
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/events-topics.test.ts`. **Tiru `FakeWS` di `src/test/events.test.ts:10`** — jangan menulis fake baru.
 
@@ -1315,12 +1315,12 @@ describe("SPEC-908 · langganan topik di klien", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run src/test/events-topics.test.ts`
 Expected: FAIL — `subscribeTopic` tak diekspor.
 
-- [ ] **Step 3: Implementasi di `src/src/api/events.ts`**
+- [x] **Step 3: Implementasi di `src/src/api/events.ts`**
 
 Tambahkan (jangan mengubah `subscribe`/`open`/`close` yang ada selain tiga sisipan yang disebut):
 
@@ -1394,12 +1394,12 @@ Tiga sisipan pada kode yang sudah ada:
 
 3. Di dekat `status`, tambahkan `let lastFrameAt: number | null = null;` dan `export const eventsSilentSince = (): number | null => lastFrameAt;`. Di `close()` dan `onVisibility()` **jangan** mereset `topics` — server yang sama akan mengirim `hello` lagi saat reconnect, dan mengosongkannya di antara akan menyalakan fallback poll tanpa sebab.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run src/test/events-topics.test.ts src/test/events.test.ts`
 Expected: PASS — 5 test baru + `events.test.ts` yang ada tetap hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/events.ts src/test/events-topics.test.ts
@@ -1427,7 +1427,7 @@ tak mungkin mendarat di layar yang sedang di halaman lain."
   - `useEventsStatus(): EventsStatus` (diekspor dari `src/src/api/live.ts`; `screens/HanomanPet.tsx:63` memakai versi ini dan definisi lokalnya dihapus)
   - `<LiveConnectionBadge />` dari `../ds`
 
-- [ ] **Step 1: Tulis stub `../src/api/events` yang dipakai Task 6–10**
+- [x] **Step 1: Tulis stub `../src/api/events` yang dipakai Task 6–10**
 
 Create `src/test/helpers/events-stub.ts`. Tanpa berkas ini, lima berkas test berikutnya akan
 menulis lima stub yang berselisih — dan `setTopics`/`emitTopic`/`lastSubParams`/`setStatus`
@@ -1524,7 +1524,7 @@ beforeEach(() => { resetEventsStub(); localStorage.clear(); });
 > `vi.mock` di-hoist ke puncak berkas, jadi `eventsStub` harus berupa objek modul-level (bukan
 > dibangun di dalam `beforeEach`) — itulah kenapa reset-nya fungsi terpisah.
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 Create `src/test/use-live-topic.test.tsx`:
 
@@ -1620,12 +1620,12 @@ describe("SPEC-908 · LiveConnectionBadge", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL**
+- [x] **Step 3: Jalankan test, pastikan GAGAL**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run src/test/use-live-topic.test.tsx`
 Expected: FAIL — modul `../src/api/live` tak ada.
 
-- [ ] **Step 4: Implementasi `useLiveTopic`**
+- [x] **Step 4: Implementasi `useLiveTopic`**
 
 Create `src/src/api/live.ts`:
 
@@ -1705,7 +1705,7 @@ export function useLiveTopic<T extends EventTopic>(o: {
 
 Hapus `useEventsStatus` lokal di `src/src/screens/HanomanPet.tsx:63-70` dan impor dari `../api/live` — satu definisi.
 
-- [ ] **Step 5: Implementasi `LiveConnectionBadge`**
+- [x] **Step 5: Implementasi `LiveConnectionBadge`**
 
 Create `src/src/ds/components/live.tsx`:
 
@@ -1744,12 +1744,12 @@ export function LiveConnectionBadge({ className = "" }: { className?: string }) 
 
 Tambahkan `export { LiveConnectionBadge } from "./components/live";` di `src/src/ds/index.ts`.
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run src/test/use-live-topic.test.tsx src/test/hanoman-pet.test.tsx`
 Expected: PASS. `hanoman-pet.test.tsx` ikut karena `useEventsStatus` pindah berkas.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/api/live.ts src/src/ds/components/live.tsx src/src/ds/index.ts src/src/screens/HanomanPet.tsx src/test/use-live-topic.test.tsx src/test/helpers/events-stub.ts
@@ -1772,7 +1772,7 @@ secara konstruksi, bukan oleh disiplin pemanggil."
 **Interfaces:**
 - Consumes: `useLiveTopic`, `LiveConnectionBadge` (Task 6).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/triage-live.test.tsx`:
 
@@ -1829,12 +1829,12 @@ describe("SPEC-908 · TriageScreen live", () => {
 
 > Bentuk `localStorage` untuk `usePersistedState` **disalin dari `src/test/triage-state-persist.test.tsx`** — kunci dan encoding-nya diambil dari sana, jangan ditebak.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run src/test/triage-live.test.tsx`
 Expected: FAIL — `listTickets` dipanggil berkali-kali (interval masih ada), `lastSubParams` kosong.
 
-- [ ] **Step 3: Ganti `setInterval` dengan `useLiveTopic`**
+- [x] **Step 3: Ganti `setInterval` dengan `useLiveTopic`**
 
 Di `src/src/screens/TriageScreen.tsx`, ganti blok `:373-377`:
 
@@ -1865,7 +1865,7 @@ dengan:
 
 Tambahkan `import { useLiveTopic } from "../api/live";` dan `LiveConnectionBadge` ke impor `../ds`. Pasang `<LiveConnectionBadge />` di baris header layar, di samping `ResetViewButton`. **Jangan** hapus `POLL_MS` — ia kini kadens fallback.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run:
 ```bash
@@ -1875,7 +1875,7 @@ env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run \
 ```
 Expected: semua PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TriageScreen.tsx src/test/triage-live.test.tsx
@@ -1890,7 +1890,7 @@ git commit -m "feat(triage): pembaruan lewat langganan WS, bukan poll 5 dtk (SPE
 - Modify: `src/src/screens/SchedulerScreen.tsx:15,172-195,301-317,363-383`
 - Test: `src/test/scheduler-live.test.tsx` (create); `src/test/scheduler-screen.test.tsx`, `src/test/scheduler-queue-pager.test.tsx`, `src/test/scheduler-nav.test.tsx`, `src/test/scheduler-lead-state-persist.test.tsx` tetap hijau
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/scheduler-live.test.tsx`:
 
@@ -1934,12 +1934,12 @@ describe("SPEC-908 · SchedulerScreen live", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run src/test/scheduler-live.test.tsx`
 Expected: FAIL.
 
-- [ ] **Step 3: Cabut `nonce` dari SchedulerScreen**
+- [x] **Step 3: Cabut `nonce` dari SchedulerScreen**
 
 Hapus `const [nonce, setNonce] = React.useState(0);` (`:303`) dan `setNonce((n) => n + 1)` di dalam `load` (`:308`). Ganti blok interval (`:311-315`) dengan:
 
@@ -1955,7 +1955,7 @@ Hapus `const [nonce, setNonce] = React.useState(0);` (`:303`) dan `setNonce((n) 
 
 Hapus prop `nonce` dari keempat pemanggilan `<QueueSection …>` (`:363`, `:369`, `:378`, `:381`) dan dari signature-nya (`:172`).
 
-- [ ] **Step 4: Buat QueueSection berlangganan sendiri**
+- [x] **Step 4: Buat QueueSection berlangganan sendiri**
 
 Ganti effect `:182-195` di `QueueSection`:
 
@@ -1977,7 +1977,7 @@ Ganti effect `:182-195` di `QueueSection`:
 
 `status` di `QueueSection` bertipe string; sempitkan prop-nya ke `TopicParams["schedulerQueue"]["status"]` supaya cocok dengan skema.
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run:
 ```bash
@@ -1988,7 +1988,7 @@ env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run \
 ```
 Expected: semua PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/SchedulerScreen.tsx src/test/scheduler-live.test.tsx
@@ -2006,7 +2006,7 @@ muat-ulang yang dulu di-bump poll state tak punya pekerjaan lagi."
 - Modify: `src/src/screens/LeadScreen.tsx:14,287-314`
 - Test: `src/test/lead-live.test.tsx` (create); `src/test/lead-screen.test.tsx`, `src/test/lead-pager.test.tsx` tetap hijau
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/lead-live.test.tsx`:
 
@@ -2046,12 +2046,12 @@ describe("SPEC-908 · LeadScreen live", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run src/test/lead-live.test.tsx`
 Expected: FAIL.
 
-- [ ] **Step 3: Ganti interval**
+- [x] **Step 3: Ganti interval**
 
 Di `src/src/screens/LeadScreen.tsx`, ganti blok `:310-313` dengan:
 
@@ -2077,7 +2077,7 @@ Di `src/src/screens/LeadScreen.tsx`, ganti blok `:310-313` dengan:
 
 Pasang `<LiveConnectionBadge />` di header layar, di samping `ResetViewButton`.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run:
 ```bash
@@ -2087,7 +2087,7 @@ env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run \
 ```
 Expected: semua PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/LeadScreen.tsx src/test/lead-live.test.tsx
@@ -2102,7 +2102,7 @@ git commit -m "feat(lead): status + decisions + flows lewat satu frame langganan
 - Modify: `src/src/screens/GitGraph.tsx:21,306-350`
 - Test: `src/test/git-graph-live.test.tsx` (create); `src/test/git-graph-view.test.tsx`, `src/test/git-graph-render.test.tsx`, `src/test/git-graph.test.ts` tetap hijau
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/git-graph-live.test.tsx`:
 
@@ -2159,12 +2159,12 @@ describe("SPEC-908 · GitGraph live", () => {
 
 > Nama tombol "muat lebih" dan fixture commit **disalin dari `src/test/git-graph-view.test.tsx`** — jangan menebak label UI.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run src/test/git-graph-live.test.tsx`
 Expected: FAIL.
 
-- [ ] **Step 3: Ganti interval**
+- [x] **Step 3: Ganti interval**
 
 Di `src/src/screens/GitGraph.tsx`, ganti blok `:346-349` dengan:
 
@@ -2194,7 +2194,7 @@ Di `src/src/screens/GitGraph.tsx`, ganti blok `:346-349` dengan:
 
 Pasang `<LiveConnectionBadge />` di toolbar graph.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run:
 ```bash
@@ -2204,7 +2204,7 @@ env -u HANOMAN_CONTROL_ORIGINS pnpm vitest --run \
 ```
 Expected: semua PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/GitGraph.tsx src/test/git-graph-live.test.tsx
@@ -2222,7 +2222,7 @@ Satu \`git log\` per PARAMETER yang benar-benar ditonton, bukan per klien per
 - Create: `internal/docs/adr/<NNNN>-langganan-berparameter-events-ws.md`
 - Modify: `internal/docs/README.md`, `internal/docs/architecture/api-contract.md:1228-1234,1365,1507`, `internal/docs/architecture/stack.md:6,33`, `internal/docs/frontend/frontend-implementation.md:216-221,346`
 
-- [ ] **Step 1: Tentukan nomor ADR yang belum terpakai**
+- [x] **Step 1: Tentukan nomor ADR yang belum terpakai**
 
 Run:
 ```bash
@@ -2232,7 +2232,7 @@ git log --oneline -30 --all -- internal/docs/adr | head -20
 ```
 Ambil nomor **satu di atas** yang tertinggi dari ketiganya. Nomor ADR bertabrakan antar-sesi konkuren — periksa ketiga sumber, bukan hanya `ls`.
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Create `internal/docs/adr/<NNNN>-langganan-berparameter-events-ws.md` dengan struktur ADR repo (Konteks / Keputusan / Konsekuensi), memuat:
 
@@ -2244,7 +2244,7 @@ Create `internal/docs/adr/<NNNN>-langganan-berparameter-events-ws.md` dengan str
 - **Degradasi** lewat frame `hello` (ADR-0087) dan dua keadaan fallback yang bisa dibuktikan.
 - **Konsekuensi & plafon:** permukaan masuk bertambah (dibatasi 64 KiB / 16 subs / zod `.strict()`); `tickets` masih men-scan tabel penuh dan `take` di query adalah perbaikan terpisah; empat `QueueSection` = empat entri per layar Scheduler.
 
-- [ ] **Step 3: Perbarui doc arsitektur**
+- [x] **Step 3: Perbarui doc arsitektur**
 
 `internal/docs/architecture/api-contract.md` §Events (`:1228-1234`) — ganti baris `klien->server: — (read-only feed; frame masuk diabaikan)` dengan blok frame masuk, daftar topik, `key`, kadens, dan gerbang principal.
 
@@ -2256,13 +2256,13 @@ Create `internal/docs/adr/<NNNN>-langganan-berparameter-events-ws.md` dengan str
 
 `internal/docs/frontend/frontend-implementation.md:216-221` — `useLiveTopic`, `subscribeTopic`, degradasi `hello`, `LiveConnectionBadge`; `:346` — tambahkan bahwa `useEventsStatus` kini hidup di `api/live.ts` dan dipakai indikator keempat layar, bukan hanya pet.
 
-- [ ] **Step 4: Tautkan ADR di index**
+- [x] **Step 4: Tautkan ADR di index**
 
 Tambahkan satu baris di `internal/docs/README.md` pada blok ADR (mengikuti format tetangganya, paling atas karena nomornya tertinggi).
 
 Run: `pnpm hanoman docs index --check` (atau `node cli/dist/index.js docs index --check` bila CLI belum ter-build). Expected: index utuh.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs
@@ -2275,7 +2275,7 @@ git commit -m "docs(events): ADR-<NNNN> langganan berparameter mengamandemen ADR
 
 **Files:** tak ada perubahan kode kecuali perbaikan temuan.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS \
@@ -2286,18 +2286,18 @@ Expected: hijau. **Jangan terima "no test files" sebagai bukti** — `--changed`
 
 Kegagalan yang **bukan** regresi dan sudah terukur sebelumnya: 20 gagal `listChatSessions is not a function` di test portal (mock SPEC-854 ketinggalan di base), dan `placeholder-contract` merah karena tiga `<Input type="number">` di SettingsScreen. Verifikasi keduanya juga merah di `$HANOMAN_BASE_SHA` sebelum menyalahkan perubahan ini.
 
-- [ ] **Step 2: Typecheck ketiga paket yang tersentuh**
+- [x] **Step 2: Typecheck ketiga paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
 ```
 Expected: nol error. (Tiga paket, bukan `-r`: `runner`/`cli` tak tersentuh.)
 
-- [ ] **Step 3: Jalankan agen `blast-radius`**
+- [x] **Step 3: Jalankan agen `blast-radius`**
 
 Minta ia memeriksa tempat lain yang seharusnya ikut berubah tapi tidak: cermin tipe `GraphCommit`/`RepoStatus`/`Stash` yang tersisa, konsumen `EventMsg` yang belum menangani `t` baru (`switch` tanpa `default`), berkas test yang men-stub `../src/api/events` (scout mendaftar enam: `terminal-history-button`, `new-project-reverse`, `workspace-state-persist`, `responsive-shell-modal`, `hanoman-pet`, `new-terminal-runtime`) dan kini kehilangan ekspor baru, serta doc kontrak yang masih menyebut `/events/ws` read-only. Perbaiki temuan yang nyata.
 
-- [ ] **Step 4: Smoke endpoint nyata di local**
+- [x] **Step 4: Smoke endpoint nyata di local**
 
 Task ini menyentuh perilaku runtime endpoint, jadi sekali di akhir:
 
@@ -2314,11 +2314,34 @@ curl -s "localhost:<port>/api/projects/<id>/graph?limit=5" | head -c 200
 
 > `HANOMAN_HOME` ke direktori sementara adalah **wajib**: smoke tanpa itu menulis `setup.token` ke home nyata, dan `.env` repo utama bisa bocor ke worktree sehingga server membuka DB yang salah. Bunuh server **per-PID** (`kill <pid>`), jangan `pkill -f`.
 
-- [ ] **Step 5: Jalankan agen `qa-verifier`**
+- [x] **Step 5: Jalankan agen `qa-verifier`**
 
 Serahkan diff lengkap + hasil Step 1. Mintalah ia membuktikan bahwa test yang lulus benar-benar menguji perubahannya — khususnya bahwa test "nol poll HTTP" akan **merah** bila `setInterval` dikembalikan (scout memastikan **tak satu pun** test lama menegakkan kadens poll, jadi ini satu-satunya pengaman).
 
-- [ ] **Step 6: Centang seluruh kotak plan & commit terakhir**
+### Hasil verifikasi (dijalankan)
+
+- **Test:** shared 26 berkas/190 · server 270 berkas/2 700 · src 165 berkas/1 151 · runner 11/175 · cli 15/124.
+  Merah yang **bukan** regresi & terbukti pra-ada: `client-portal` + `portal-scroll` (21 gagal
+  `portalApi.listChatSessions is not a function`, mock SPEC-854 ketinggalan di base; diff ini nol
+  menyentuh portal), `pty.test.ts` (hijau lagi begitu `SSH_ASKPASS_REQUIRE=force` ambient di-unset),
+  dan `notifications.route` "terbaru dulu" (dua `notification.create` beruntun bertabrakan di
+  milidetik yang sama → `orderBy createdAt desc` seri; 1 lulus dari 3 run, tak tersentuh diff).
+- **Typecheck:** shared + server + src nol error.
+- **Smoke nyata:** sembilan endpoint HTTP lama tetap 200 dengan bentuk yang sama; `limit=abc`/`limit=0`
+  kembali `pageSize: 1`. WS: satu socket, `hello` lalu keempat frame berparameter dalam 4–103 ms,
+  `key` = `subKey` kanonik, topik tak dikenal dilewati per-entri; 20 dtk diam = **tepat 1 frame**
+  per topik berparameter (dedup signature bekerja).
+- **Temuan yang diperbaiki di task ini** (dari `blast-radius` + `qa-verifier`): regresi `limit` tak
+  sah jadi dump tabel penuh; `hello` mengiklankan topik ke principal yang gerbangnya menolak;
+  `broadcast()` tak menyapu langganan klien mati; `MAX_SUBS` tak ditegakkan di pengirim; serializer
+  `TicketView` masih kembar; tujuh impor mati + komentar kontrak basi di `routes/lead.ts`; header
+  `SchedulerScreen`; sembilan stub `../src/api/events` yang kehilangan ekspor baru; enam doc
+  kontrak yang masih menyebut "HTTP polling"; dan tiga test invariant halaman yang belum ada.
+- **Dilaporkan, TIDAK diperbaiki (di luar scope, pra-ada di base):** `LeadScreen.tsx`
+  `useEffect(() => { setDecPage(1); setFlowPage(1) }, [filter])` juga menyala saat **mount**, jadi
+  nomor halaman yang dipersistensi SPEC-740 selalu dipulihkan ke 1 tiap layar Lead dibuka.
+
+- [x] **Step 6: Centang seluruh kotak plan & commit terakhir**
 
 ```bash
 grep -c '^- \[ \]' docs/superpowers/plans/2026-08-23-spec-908-realtime-ws-berparameter.md   # harus 0

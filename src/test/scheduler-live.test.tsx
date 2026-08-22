@@ -56,6 +56,7 @@ const view = () => (
 );
 beforeEach(() => {
   resetEventsStub();
+  localStorage.clear();
   getSchedulerState.mockReset();
   getSchedulerState.mockResolvedValue(STATE);
   getSchedulerQueue.mockReset();
@@ -107,6 +108,30 @@ describe("SPEC-908 · SchedulerScreen live", () => {
     });
     expect(screen.getByText(/7 \/ 2 sesi hidup/)).toBeTruthy();
     expect(screen.queryByText(/Memuat/i)).toBeNull();
+  });
+
+  it("frame yang mendarat di halaman aktif tak melempar seksi ke halaman 1", async () => {
+    setTopics(["schedulerState", "schedulerQueue"]);
+    localStorage.setItem("hn.ui.v1.scheduler.queue-queued-page", "2");
+    getSchedulerQueue.mockImplementation(async (p: { status?: string } = {}) => {
+      const items = QUEUE_ROWS[p.status ?? ""] ?? [];
+      return { items, total: p.status === "queued" ? 60 : items.length, page: 1, pageSize: 10 };
+    });
+    render(view());
+    await screen.findByText(/Judul satu/);
+    const queued = () => allSubs("schedulerQueue").filter((s) => s.status === "queued");
+    expect(queued()).toEqual([expect.objectContaining({ page: 2 })]);
+
+    await act(async () => {
+      emitTopic({
+        t: "schedulerQueue",
+        key: subKey("schedulerQueue", { status: "queued", page: 2, limit: 10 }),
+        data: { items: [row("q9", "SPEC-9", "queued")], total: 60, page: 2, pageSize: 10 } as never,
+      });
+    });
+    expect(screen.getByText(/Judul sembilan/)).toBeTruthy();
+    expect(queued()).toEqual([expect.objectContaining({ page: 2 })]);
+    expect(screen.getByText(/11.20 dari 60 item/)).toBeTruthy();
   });
 
   it("frame schedulerQueue hanya mendarat di seksi yang kuncinya cocok", async () => {

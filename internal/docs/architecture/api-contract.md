@@ -1507,8 +1507,10 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 > governor — satu-satunya cara ia tetap tunduk cap, Pause, dan master switch tanpa menyalin gerbangnya.
 >
 > **Panel Scheduler (SPEC-299, daun #6):** screen mandiri `SchedulerScreen.tsx` + nav item `ds/shell.tsx`
-> (`key:"scheduler"`), **murni konsumen read-only** — tak menambah endpoint/skema/ADR. Self-poll `GET
-> /api/scheduler/state` (5 dtk, pola GitGraph) merender: status per source (enable/last-run/next-run),
+> (`key:"scheduler"`), **murni konsumen read-only** — tak menambah endpoint/skema/ADR. Sejak SPEC-908/ADR-0145 ia
+> **berlangganan** topik `schedulerState` (2 dtk) dan `schedulerQueue` per seksi (3 dtk) di
+> `/api/events/ws`, bukan lagi self-poll `GET /api/scheduler/state` 5 dtk; endpoint HTTP-nya tetap
+> ada sebagai muat awal + fallback. Yang dirender: status per source (enable/last-run/next-run),
 > antrean (`status:"queued"`), sesi berjalan (`state.sessions`, indikator `decision`=menunggu keputusan),
 > selesai (`status:"done"`, tombol **Buka review** deep-link `#spec=<id>` → diff/ringkasan di Review yang ada),
 > gagal (`status:"failed"` + `note` alasan). Panel setelan menulis semua knob via `PUT /api/scheduler/config`

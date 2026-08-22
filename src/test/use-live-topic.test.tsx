@@ -62,7 +62,7 @@ describe("SPEC-908 · useLiveTopic", () => {
   });
 
   it("`hello` yang tiba SESUDAH mount mematikan fallback yang sempat menyala", async () => {
-    setTopics([]); setSilentSince(null);
+    setSilentSince(null);   // belum ada `hello` sama sekali — jangan panggil setTopics
     const refetch = vi.fn();
     render(<Probe onRefetch={refetch} />);
     // Dua jendela terpisah: update state dari timer baru di-flush saat `act` KELUAR, jadi
@@ -77,7 +77,7 @@ describe("SPEC-908 · useLiveTopic", () => {
   });
 
   it("socket BISU 15 dtk tanpa `hello` → fallback poll menyala (WS terhalang proxy)", async () => {
-    setTopics([]); setSilentSince(null);
+    setSilentSince(null);   // belum ada `hello` sama sekali — jangan panggil setTopics
     const refetch = vi.fn();
     render(<Probe onRefetch={refetch} />);
     await act(async () => { await vi.advanceTimersByTimeAsync(14_000); });
@@ -88,6 +88,17 @@ describe("SPEC-908 · useLiveTopic", () => {
     expect(refetch).not.toHaveBeenCalled();
     await act(async () => { await vi.advanceTimersByTimeAsync(6_000); });
     expect(refetch).toHaveBeenCalled();
+  });
+
+  it("`hello` berdaftar KOSONG tetap jawaban — fallback menyala tanpa menunggu 15 dtk bisu", async () => {
+    // Koneksi yang tak boleh berlangganan (bukan principal cookie) menerima `hello` kosong sambil
+    // tetap dibanjiri frame grup global — jadi jalur "socket bisu" tak akan pernah menolongnya.
+    setTopics([]);
+    setSilentSince(Date.now());
+    const refetch = vi.fn();
+    render(<Probe onRefetch={refetch} />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(11_000); });
+    expect(refetch).toHaveBeenCalledTimes(2);
   });
 
   it("tab tersembunyi tak pernah memicu refetch fallback", async () => {

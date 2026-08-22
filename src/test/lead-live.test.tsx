@@ -1,7 +1,7 @@
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { subKey } from "@hanoman/shared";
-import { eventsStub, resetEventsStub, setTopics, emitTopic, lastSubParams } from "./helpers/events-stub";
+import { eventsStub, resetEventsStub, setTopics, emitTopic, lastSubParams, allSubs } from "./helpers/events-stub";
 
 // SPEC-908 · LeadScreen berhenti men-poll HTTP. Satu topik membawa status + decisions + flows
 // sekaligus, cermin `load()` yang memang sudah satu `Promise.all`.
@@ -49,6 +49,7 @@ const view = () => (
 
 beforeEach(() => {
   resetEventsStub();
+  localStorage.clear();
   getLeadStatus.mockReset(); getLeadStatus.mockResolvedValue(STATUS);
   getLeadDecisions.mockReset(); getLeadDecisions.mockResolvedValue(paged([decision("d1", "Pertanyaan awal?")]));
   getLeadFlows.mockReset(); getLeadFlows.mockResolvedValue(paged([]));
@@ -90,6 +91,34 @@ describe("SPEC-908 · LeadScreen live", () => {
     render(view());
     await act(async () => {});
     expect(lastSubParams("lead")).toMatchObject({ projectId: "a", decPage: 1, flowPage: 1, limit: 20 });
+  });
+
+  it("frame yang mendarat di halaman aktif tak melempar operator ke halaman 1", async () => {
+    setTopics(["lead"]);
+    // Halaman 2 dicapai lewat jalur operator, bukan lewat state tersimpan: `useEffect([filter])`
+    // milik AC-15 juga menyala saat mount, jadi `decPage` tersimpan selalu dipulihkan ke 1.
+    getLeadDecisions.mockResolvedValue(
+      { items: [decision("d5", "Keputusan halaman satu?")], total: 60, page: 1, pageSize: 20 });
+    render(view());
+    await screen.findByText(/Keputusan halaman satu\?/);
+    getLeadDecisions.mockResolvedValue(
+      { items: [decision("d6", "Keputusan halaman dua?")], total: 60, page: 2, pageSize: 20 });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Berikutnya" })); });
+    await screen.findByText(/Keputusan halaman dua\?/);
+    expect(allSubs("lead")).toEqual([expect.objectContaining({ decPage: 2, flowPage: 1 })]);
+
+    await act(async () => {
+      emitTopic({
+        t: "lead", key: subKey("lead", { decPage: 2, flowPage: 1, limit: 20 }),
+        status: STATUS as never,
+        decisions: { items: [decision("d7", "Keputusan halaman dua, diperbarui?")], total: 60, page: 2, pageSize: 20 } as never,
+        flows: paged([]) as never,
+      });
+    });
+    expect(screen.getByText(/Keputusan halaman dua, diperbarui\?/)).toBeTruthy();
+    // Satu frame menyetel tiga state sekaligus; nomor halaman KEDUA daftar wajib selamat.
+    expect(allSubs("lead")).toEqual([expect.objectContaining({ decPage: 2, flowPage: 1 })]);
+    expect(screen.getByText(/21.40 dari 60 keputusan/)).toBeTruthy();
   });
 
   it("frame berkunci lain tak mendarat", async () => {

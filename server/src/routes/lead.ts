@@ -2,21 +2,21 @@ import type { FastifyInstance } from "fastify";
 import type { LeadDecision } from "@prisma/client";
 import { zLead, zLeadAsk, zLeadOverride, type LeadAnswer, type LeadStatusView } from "@hanoman/shared";
 import { prisma } from "../db";
-import { listSessions, liveDecisions, sendToPane } from "../services/pty";
-import { listQueue } from "../services/scheduler/queue";
+import { sendToPane } from "../services/pty";
 import { getLead, setLead, leadActive } from "../services/lead/config";
 import { decide, takeDelivery } from "../services/lead/decide";
 import { applyAction } from "../services/lead/apply";
 import { listDecisions, overrideDecision, cancelDecision, toDecisionView } from "../services/lead/trail";
-import { listFlows, closeFlow, toFlowView, LeadFlowClosedError } from "../services/lead/flow";
-import { decidingIds, queuedIds } from "../services/lead/deciding";
-import { LeadBusyError, leadGateStats } from "../services/lead/gate";
+import { closeFlow, toFlowView, LeadFlowClosedError } from "../services/lead/flow";
+import { LeadBusyError } from "../services/lead/gate";
 import { resetSession } from "../services/lead/detect";
-import { lastPulse } from "../services/lead/engine";
 import { buildLeadStatus, buildLeadDecisions, buildLeadFlows } from "../services/lead/views";
 
-// SPEC-409 · ADR-0091 · permukaan HTTP hanoman-lead. Semuanya polling (AC-26) — tak ada kanal
-// WebSocket baru; ADR-0039 tetap utuh.
+// SPEC-409 · ADR-0091 · permukaan HTTP hanoman-lead.
+// SPEC-908 · ADR-0145 · dashboard tak lagi men-poll ketiga endpoint ini: ia berlangganan topik
+// `lead` di kanal `/events/ws` yang sudah ada (tetap tanpa koneksi WS baru). Route-nya TIDAK
+// dihapus — MCP, agent token, portal, dan dashboard lama memakainya, dan ia tetap jalur muat awal
+// serta fallback. Badan ketiganya dipanggil bersama hub lewat services/lead/views.ts.
 //
 // Peta capability ada di services/agent-capabilities.ts: prefix `lead` → `lead:read`/`lead:write`
 // MENURUT METHOD. Itu bukan detail: SPEC-405 membuktikan apa yang terjadi saat sebuah prefix

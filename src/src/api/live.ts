@@ -1,7 +1,7 @@
 import React from "react";
 import type { EventMsg, EventTopic, TopicParams } from "@hanoman/shared";
 import {
-  subscribeTopic, eventsTopics, subscribeTopics, eventsSilentSince,
+  subscribeTopic, eventsTopics, subscribeTopics, eventsSilentSince, eventsHelloSeen,
   eventsStatus, subscribeStatus, type EventsStatus,
 } from "./events";
 
@@ -57,14 +57,17 @@ export function useLiveTopic<T extends EventTopic>(o: {
     [topic, paramsKey],
   );
 
+  // `hello` yang TIBA adalah jawabannya, bukan isinya: daftar kosong sah (koneksi yang tak boleh
+  // berlangganan), dan membacanya sebagai "belum menjawab" membuat layar diam selamanya.
+  const answered = eventsHelloSeen() || topics.length > 0;
   const [blind, setBlind] = React.useState(false);
   React.useEffect(() => {
-    if (supported || topics.length > 0) { setBlind(false); return; }   // server sudah menjawab
+    if (supported || answered) { setBlind(false); return; }
     const t = setTimeout(() => { if (eventsSilentSince() === null) setBlind(true); }, FALLBACK_AFTER_MS);
     return () => clearTimeout(t);
-  }, [supported, topics.length]);
+  }, [supported, answered]);
 
-  const polling = !supported && (blind || topics.length > 0);
+  const polling = !supported && (blind || answered);
   React.useEffect(() => {
     if (!polling) return;
     const t = setInterval(() => { if (!document.hidden) refetchRef.current(); }, pollMs);

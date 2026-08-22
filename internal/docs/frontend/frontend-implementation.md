@@ -1452,7 +1452,7 @@ force (op menyentuh working tree) atau worktree isolasi + handoff sesi claude (o
   `Muat 200 lagi`; baris itu sekaligus **sentinel `IntersectionObserver`** yang memuat halaman berikutnya begitu
   tergulir masuk viewport (tombol = jalur manual + fallback tanpa `IntersectionObserver`). Penambahan halaman
   dimuat **diam** (`pagingRef`) supaya baris yang sudah tampil tak diganti StateBlock dan posisi guliran bertahan;
-  silent poll SPEC-245 ikut memakai `limit` berjalan sehingga jendela tak pernah menyusut tiap tick.
+  pembaruan diam SPEC-245 ikut memakai `limit` berjalan sehingga jendela tak pernah menyusut.
 - **Modal Remotes** (`IdeScreen`): list/add/hapus remote (`api.ideRemotes`/`ideAddRemote`/`ideDeleteRemote`); tombol **Fetch** (`--prune`).
 
 ## Help Center — halaman publik + Triase + kartu link (SPEC-253 · ADR-0062)
@@ -1469,8 +1469,10 @@ menampilkan **nomor tiket + link status berkode** (Salin); `/help/:slug/status/:
 terpetakan otomatis. Layout minimal (bone paper, `Card`/`Button`/`Select`/`StateBlock` DS tanpa context auth).
 
 **Triase** (nav `triage` "Triase" `inbox` di `HN_NAV`; cabang `section === "triage"` di `App.tsx`, pola VPS
-— screen mandiri, tak lewat `gate`). `screens/TriageScreen.tsx`: **self-fetch + silent poll 5s** (pola
-`GitGraph`, `!document.hidden`). Master→detail: daftar tiket (Badge status + kategori, judul, email, waktu
+— screen mandiri, tak lewat `gate`). `screens/TriageScreen.tsx`: **muat awal lewat HTTP + pembaruan diam lewat langganan
+`tickets` di `/api/events/ws`** (SPEC-908/ADR-0145, `useLiveTopic`) — kunci langganannya memuat
+filter, `q` (di-debounce 400 ms), dan nomor halaman yang sedang aktif, jadi frame halaman lain tak
+mendarat; `setInterval` hanya menyala sebagai fallback saat server belum punya topiknya. Master→detail: daftar tiket (Badge status + kategori, judul, email, waktu
 relatif, badge **"belum ditinjau"** dari `unreviewed`) + filter project/status + cari; detail = isi penuh +
 **lampiran** (thumbnail via `GET /tickets/:id/attachments/:attId`, ber-auth same-origin) + email + tombol
 **Terima** (Select prioritas → `api.acceptTicket`) & **Tolak** (`useConfirm` → `api.rejectTicket`) + tautan

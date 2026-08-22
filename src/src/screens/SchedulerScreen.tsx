@@ -1,8 +1,11 @@
 /* SchedulerScreen — panel scheduler otonom (SPEC-299, daun #6 ADR-0072). Screen mandiri (pola
-   VpsScreen): memuat state fondasi sendiri + silent poll. Menampilkan status per
+   VpsScreen): memuat state fondasi sendiri lewat HTTP. Menampilkan status per
    source, antrean, sesi berjalan, done + link review, gagal + alasan; panel setelan menulis semua
    knob (PUT /api/scheduler/config), opt-in per project (pola helpEnabled → PATCH /projects/:id),
-   dan rem darurat Pause/Stop. Konsumen API read-only GET /api/scheduler/state — tanpa endpoint baru. */
+   dan rem darurat Pause/Stop.
+   SPEC-908 · realtime kini lewat langganan berparameter di `/events/ws` — topik `schedulerState`
+   untuk layar dan `schedulerQueue` per seksi antrean; HTTP tinggal muat awal + fallback saat
+   server belum punya topiknya. Penanda `nonce` SPEC-523 dicabut bersamanya. */
 import React from "react";
 import { Card, Button, Badge, Select, Switch, Input, StateBlock, Icon, Pager, serverPage, LiveConnectionBadge } from "../ds";
 import { api } from "../api/client";

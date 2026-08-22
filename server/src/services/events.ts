@@ -63,9 +63,12 @@ const GROUPS: Group[] = [
   { everyTicks: 300, last: "", build: async () => ({ t: "update", update: await getUpdateStatus() }) },
 ];
 
+// SPEC-908 · klien yang `send`-nya melempar harus dilepas dari `clients` DAN dari peta langganan.
+// Menyapu `clients` saja meninggalkan entri hidup untuk penonton yang sudah tak ada — dan entri
+// `git` berarti `git log` + `git status` + `git stash list` tiap 4 dtk untuk nol pembaca.
 function broadcast(msg: WireMsg): void {
   const s = JSON.stringify(msg);
-  for (const c of clients) { try { c.send(s); } catch { clients.delete(c); } }
+  for (const c of clients) sendTo(c, s);
 }
 
 // SPEC-908 · langganan BERPARAMETER, mengamandemen ADR-0039. Berkunci `subKey(topic, params)`
@@ -216,12 +219,16 @@ function stopLoop(): void {
 
 // Klien baru dapat snapshot penuh SEGERA (tak menunggu tick) — late joiner langsung tersinkron,
 // persis scrollback di pty.attach. Dibangun fresh, lepas dari dedup broadcast.
-export async function attach(c: Client): Promise<void> {
+export async function attach(c: Client, o: { maySubscribe?: boolean } = {}): Promise<void> {
   clients.add(c);
   startLoop();
   // SPEC-908 · advertensi kemampuan, dikirim PALING DULU. Server lama tak mengirim frame ini sama
   // sekali — ketiadaannya itulah sinyal yang dipakai klien untuk tetap men-poll HTTP (ADR-0087).
-  try { c.send(JSON.stringify({ t: "hello", topics: TOPIC_NAMES } satisfies EventMsg)); } catch { return; }
+  // Daftarnya per-KONEKSI, bukan per-server: principal yang frame `sub`-nya akan dibuang gerbang
+  // `canSubscribeTopics` harus melihat daftar KOSONG, kalau tidak ia menyimpulkan "didukung" dan
+  // tak pernah menyalakan fallback-nya — layar diam selamanya tanpa satu pun error.
+  const topics = o.maySubscribe === false ? [] : TOPIC_NAMES;
+  try { c.send(JSON.stringify({ t: "hello", topics } satisfies EventMsg)); } catch { return; }
   for (const g of GROUPS) {
     let msg: WireMsg;
     try { msg = await g.build(); } catch { continue; }

@@ -9,6 +9,7 @@ type Status = { connected: boolean; since: number; paused: boolean };
 
 const state = {
   topics: [] as EventTopic[],
+  helloSeen: false,
   topicsSubs: new Set<(t: EventTopic[]) => void>(),
   frameSubs: new Map<string, Set<Handler>>(),
   subs: [] as { key: string; topic: EventTopic; params: Record<string, unknown> }[],
@@ -19,6 +20,7 @@ const state = {
 
 export function resetEventsStub(): void {
   state.topics = [];
+  state.helloSeen = false;
   state.topicsSubs.clear();
   state.frameSubs.clear();
   state.subs = [];
@@ -30,6 +32,7 @@ export function resetEventsStub(): void {
 /** Menyalakan frame `hello` — daftar topik yang "server" dalam test ini dukung. */
 export function setTopics(t: EventTopic[]): void {
   state.topics = t;
+  state.helloSeen = true;
   for (const cb of [...state.topicsSubs]) cb(t);
 }
 
@@ -71,6 +74,7 @@ export const eventsStub = {
     };
   },
   eventsTopics: () => state.topics,
+  eventsHelloSeen: () => state.helloSeen,
   subscribeTopics: (cb: (t: EventTopic[]) => void) => {
     state.topicsSubs.add(cb);
     return () => { state.topicsSubs.delete(cb); };
