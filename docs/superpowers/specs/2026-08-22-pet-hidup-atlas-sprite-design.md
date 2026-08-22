@@ -304,11 +304,16 @@ Dijalankan `env -u NODE_ENV pnpm vitest --run <path>` (prod bikin RTL `act` gaga
 
 ## 13. Roadmap program (di luar spec ini, dicatat agar tak hilang)
 
+Backlog sudah dibuat berantai (`dependsOn`, ADR-0093 — tiap item menunggu pendahulunya selesai
+**dan** ter-merge): **SPEC-896** (A, spec ini) → **SPEC-897** (B) → **SPEC-898** (C) → **SPEC-899** (D).
+Urutan berantai adalah keputusan pemilik produk 2026-08-22 (satu per satu), menggantikan catatan
+sebelumnya bahwa D bisa paralel dengan B/C.
+
 | # | spec | isi | butuh |
 |---|---|---|---|
-| **B** | Pet jujur & lengkap | kondisi **terputus** (ekspos status koneksi dari `api/events.ts` — hari ini nol; pet membeku di data basi saat WS putus/backoff 10 dtk/tab hidden), **lencana hitungan**, **panel multi-kondisi** (semua kondisi aktif + aksi per baris, bukan hanya puncak prioritas), pose `deciding` dan **tidur** (2 baris atlas lewat pipeline A) | tanpa ADR |
-| **C** | Pet bicara | **gelembung** ber-template saat pose berubah (transient & waiting saja, agar tak mengulang Toast), **rekap "selama kamu pergi"** saat tab aktif lagi (`visibilitychange`), **urgensi menurut umur** (perlu `decisionAt` di payload sesi — `TerminalSession` tak punya stempel waktu), pose **thanks** (STK-007) saat dielus | ADR kecil bila `decisionAt` masuk payload |
-| **D** | Inbox keputusan | `GET /sessions/:id/dialog` + `POST /sessions/:id/dialog/answer` membungkus `server/src/services/tui-dialog.ts` (parser + `answerChoiceDialog`/`answerMultiSelectDialog` yang sudah dipakai lead); panel pet menampilkan pertanyaan + opsi dan menjawab tanpa membuka terminal | ADR (endpoint baru) |
+| **B** | SPEC-897 · Pet jujur & lengkap | kondisi **terputus** (ekspos status koneksi dari `api/events.ts` — hari ini nol; pet membeku di data basi saat WS putus/backoff 10 dtk/tab hidden), **lencana hitungan**, **panel multi-kondisi** (semua kondisi aktif + aksi per baris, bukan hanya puncak prioritas), pose `deciding` dan **tidur** (2 baris atlas lewat pipeline A) | tanpa ADR |
+| **C** | SPEC-898 · Pet bicara | **gelembung** ber-template saat pose berubah (transient & waiting saja, agar tak mengulang Toast), **rekap "selama kamu pergi"** saat tab aktif lagi (`visibilitychange`), **urgensi menurut umur** (perlu `decisionAt` di payload sesi — `TerminalSession` tak punya stempel waktu), pose **thanks** (STK-007) saat dielus | ADR kecil bila `decisionAt` masuk payload |
+| **D** | SPEC-899 · Inbox keputusan | `GET /sessions/:id/dialog` + `POST /sessions/:id/dialog/answer` membungkus `server/src/services/tui-dialog.ts` (parser + `answerChoiceDialog`/`answerMultiSelectDialog` yang sudah dipakai lead); panel pet menampilkan pertanyaan + opsi dan menjawab tanpa membuka terminal | ADR (endpoint baru) |
 
 ## 14. Di luar scope
 
