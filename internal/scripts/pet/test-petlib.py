@@ -25,16 +25,18 @@ BODY = (240, 236, 220, 255)
 GOLD = (184, 134, 59, 255)
 
 
-def draw_character(size: tuple[int, int] = (260, 340), tail_lift: int = 0, lift: int = 0,
-                   scale: float = 1.0) -> Image.Image:
+def draw_character(size: tuple[int, int] = (260, 384), tail_lift: int = 0, lift: int = 0,
+                   scale: float = 1.0, leg_drop: int = 0) -> Image.Image:
     """Karakter menghadap kanan: kaki+torso (kotak di kanan), kepala (lingkaran), ekor di kiri yang
-    ujungnya naik sebesar `tail_lift`. `lift` mengangkat seluruh tubuh (lompat)."""
+    ujungnya naik sebesar `tail_lift`. `lift` mengangkat seluruh tubuh (lompat), `leg_drop`
+    memanjangkan kaki ke bawah tanpa menggeser kepala — bentuk baris `held`/`falling` (mode
+    `float`). Margin 30 px di bawah baseline karakter menyediakan ruang untuk `leg_drop`."""
     im = Image.new("RGBA", size, (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     w, h = size
-    base = h - 6 - lift
-    # kaki + torso: kolom 150..230
-    d.rectangle((150, base - 220, 230, base), fill=BODY)
+    base = h - 30 - lift
+    # kaki + torso: kolom 150..230; `leg_drop` memanjangkan kaki KE BAWAH tanpa menyentuh kepala
+    d.rectangle((150, base - 220, 230, base + leg_drop), fill=BODY)
     # kepala
     d.ellipse((140, base - 330, 250, base - 220), fill=BODY)
     d.ellipse((215, base - 300, 235, base - 280), fill=(20, 18, 12, 255))
@@ -93,6 +95,38 @@ class FeetTest(unittest.TestCase):
         self.assertLessEqual(x1, 235)
 
 
+class FrameStepsTest(unittest.TestCase):
+    def strip_of(self, masks: list[np.ndarray]) -> Image.Image:
+        strip = Image.new("RGBA", (petlib.CELL_W * 8, petlib.CELL_H), (0, 0, 0, 0))
+        for i, m in enumerate(masks):
+            cell = Image.fromarray(np.dstack([np.full(m.shape + (3,), 200, np.uint8),
+                                              (m * 255).astype(np.uint8)]), "RGBA")
+            strip.alpha_composite(cell, (i * petlib.CELL_W, 0))
+        return strip
+
+    def block(self, x0: int, w: int) -> np.ndarray:
+        m = np.zeros((petlib.CELL_H, petlib.CELL_W), bool)
+        m[40:180, x0:x0 + w] = True
+        return m
+
+    def test_returns_eight_steps_and_the_last_one_is_the_seam(self) -> None:
+        # Frame 1..8 = balok yang bergeser 4 px per frame lalu kembali: langkah 8→1 sama besarnya
+        # dengan langkah lain, sehingga rasio kerataannya 1.
+        xs = [40, 44, 48, 52, 56, 52, 48, 44]
+        steps = petlib.frame_steps(self.strip_of([self.block(x, 60) for x in xs]))
+        self.assertEqual(len(steps), 8)
+        for s in steps:
+            self.assertAlmostEqual(s, steps[0], delta=0.01)
+
+    def test_twin_frames_at_the_seam_make_the_ratio_explode(self) -> None:
+        # Frame 7, 8 dan 1 nyaris kembar (langkah 0), frame 3..5 melompat jauh — persis bentuk
+        # `wave` v01 (rasio terukur 7,07).
+        xs = [40, 40, 90, 90, 40, 40, 40, 40]
+        steps = petlib.frame_steps(self.strip_of([self.block(x, 60) for x in xs]))
+        self.assertEqual(min(steps), 0.0)
+        self.assertGreater(max(steps), petlib.STEP_VISIBLE)
+
+
 class BuildStripTest(unittest.TestCase):
     def sprites(self, frames, shifts):
         return petlib.detect_sprites(sheet(frames, shifts))
@@ -138,6 +172,36 @@ class BuildStripTest(unittest.TestCase):
         self.assertEqual(bottom(jump, 0), petlib.BASELINE - 1)
         self.assertLess(bottom(jump, 3), bottom(jump, 0) - 20)   # frame 4 melayang (lift 50 px)
 
+    def test_float_registers_the_upper_body_and_never_forces_feet_to_the_baseline(self) -> None:
+        # Kepala DIAM, kaki menjuntai berbeda panjang tiap frame — bentuk baris `held`/`falling`.
+        drops = [0, 8, 16, 20, 16, 8, 0, 4]
+        frames = [draw_character(leg_drop=d) for d in drops]
+        shifts = [(0, 0)] * 8
+        sprites = self.sprites(frames, shifts)
+        walk, _ = petlib.build_strip(sprites, "walk")
+        float_strip, report = petlib.build_strip(sprites, "float")
+
+        def top(strip, i):
+            a = np.asarray(strip.crop((i * petlib.CELL_W, 0, (i + 1) * petlib.CELL_W,
+                                       petlib.CELL_H)).getchannel("A")) > 64
+            return int(np.where(a.any(axis=1))[0].min())
+
+        def bottom(strip, i):
+            a = np.asarray(strip.crop((i * petlib.CELL_W, 0, (i + 1) * petlib.CELL_W,
+                                       petlib.CELL_H)).getchannel("A")) > 64
+            return int(np.where(a.any(axis=1))[0].max())
+
+        # `walk` memaksa SETIAP dasar ke baseline → kepala ikut naik-turun.
+        self.assertEqual({bottom(walk, i) for i in range(8)}, {petlib.BASELINE - 1})
+        self.assertGreater(len({top(walk, i) for i in range(8)}), 3)
+        # `float` menjangkarkan tubuh ATAS → kepala sejajar, dasar bebas mengikuti kaki.
+        self.assertLessEqual(max(top(float_strip, i) for i in range(8))
+                             - min(top(float_strip, i) for i in range(8)), 2)
+        self.assertGreater(len({bottom(float_strip, i) for i in range(8)}), 3)
+        # `float` tak di-pin: tak ada `residual_post` sama sekali.
+        self.assertTrue(all("residual_post" not in r for r in report), report)
+        self.assertIn("float", petlib.RESIDUAL_GATE)
+
     def test_requires_exactly_eight_sprites(self) -> None:
         frames = [draw_character() for _ in range(7)]
         with self.assertRaises(ValueError):
@@ -153,11 +217,25 @@ class AtlasTest(unittest.TestCase):
             atlas = petlib.compose_atlas(rows)
             self.assertEqual(atlas.size, (1536, petlib.CELL_H * len(petlib.ROWS)))
             m = petlib.manifest(rows)
+            self.assertEqual(m["version"], 2)
             self.assertEqual([r["key"] for r in m["rows"]], petlib.ROW_KEYS)
             self.assertNotIn("mode", m["rows"][0])
             self.assertEqual(m["rows"][7], {"key": "shipped", "fps": 10, "loop": False, "then": "idle"})
             self.assertEqual(set(m["sources"]), set(petlib.ROW_KEYS))
             self.assertEqual(m["character"], {"h": petlib.STAND_H})
+            # SPEC-904 · tiga baris baru DI EKOR; indeks baris lama tak bergeser.
+            self.assertEqual(petlib.ROW_KEYS[:13], [
+                "idle", "walk-right", "walk-left", "working", "waiting", "blocked", "review",
+                "shipped", "docs-updated", "wave", "deciding", "sleep", "thanks"])
+            self.assertEqual(petlib.ROW_KEYS[13:], ["held", "falling", "dizzy"])
+            self.assertEqual(m["rows"][13], {"key": "held", "fps": 8, "loop": True})
+            self.assertEqual(m["rows"][14], {"key": "falling", "fps": 8, "loop": True})
+            self.assertEqual(m["rows"][15], {"key": "dizzy", "fps": 8, "loop": False, "then": "idle"})
+            # `mode` dan `even` adalah kunci PIPELINE — keduanya tak boleh bocor ke pet.json.
+            self.assertTrue(all("even" not in r for r in m["rows"]), m["rows"])
+            self.assertEqual([r["key"] for r in petlib.ROWS if r.get("even")],
+                             ["wave", "held", "falling"])
+            self.assertEqual(petlib.ATLAS_BUDGET, 1_300_000)
 
     def test_compose_atlas_rejects_wrong_strip_size(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
