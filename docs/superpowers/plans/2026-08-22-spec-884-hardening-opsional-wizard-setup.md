@@ -1501,7 +1501,7 @@ git commit -m "feat(spec-884): doctor menandai sandbox fatal hanya saat hardenin
 - Consumes: `readConfigEnv`/`writeConfigEnv` (Task 1), `resolveHardening`/`resolveDeployment` (Task 2), `collectProbeFacts`/`prerequisites`/`allReady` (Task 11), `SetupStatus`/`zSetupApply`/`CONFIG_RESTART_EXIT` (Task 9)
 - Produces: `SETUP_ALLOWED_KEYS: readonly string[]`, `hardeningLocked(home: string, env: Env): boolean`, `setupDone(home: string): boolean`, `applySetup(home: string, input: { deployment: "local"|"public"; hardening: boolean }): Record<string,string>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/setup-route.test.ts`:
 
@@ -1595,12 +1595,12 @@ describe("route setup (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/setup-route.test.ts`
 Expected: FAIL — semua 404 (`/api/setup/status` belum ada)
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `server/src/services/setup-config.ts`:
 
@@ -1726,17 +1726,17 @@ Di `server/src/app.ts`: tambah import `import setup from "./routes/setup";`, tam
 
 > **Gerbang "publik hanya selama belum ada user":** set `PUBLIC` melewatkan route ini tanpa syarat, jadi tambahkan pemeriksaan di gate auth `onRequest` (`app.ts`, blok yang menangani `PUBLIC`): untuk kedua path setup, lewatkan **hanya bila** `(await prisma.user.count()) === 0`; selain itu jatuhkan ke jalur cookie biasa. Test terakhir di Step 1 mengunci perilaku ini — kalau ia hijau tanpa perubahan itu, periksa lagi: berarti route-nya terbuka selamanya.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/setup-route.test.ts server/test/auth-routes.test.ts`
 Expected: PASS — 6 test setup + auth-routes tetap hijau
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: keluar 0
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/setup.ts server/src/services/setup-config.ts server/src/app.ts server/test/setup-route.test.ts
