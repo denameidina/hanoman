@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { LeadDecision } from "@prisma/client";
 import { zLead, zLeadAsk, zLeadOverride, type LeadAnswer, type LeadStatusView } from "@hanoman/shared";
 import { prisma } from "../db";
-import { listSessions, liveDecisions, markerFilled, sendToPane } from "../services/pty";
+import { listSessions, liveDecisions, sendToPane } from "../services/pty";
 import { listQueue } from "../services/scheduler/queue";
 import { getLead, setLead, leadActive } from "../services/lead/config";
 import { decide, takeDelivery } from "../services/lead/decide";
@@ -41,7 +41,7 @@ export default async function (app: FastifyInstance) {
     let live: ReturnType<typeof listSessions> = [];
     try { live = listSessions().filter((s) => !s.exited); } catch { /* tmux tak terbaca */ }
     let waiting: string[] = [];
-    try { waiting = liveDecisions().filter((d) => markerFilled(d.decisionFile)).map((d) => d.id); }
+    try { waiting = liveDecisions().filter((d) => d.waiting).map((d) => d.id); }
     catch { /* idem */ }
     const rows = await Promise.all(projects.map(async (p) => ({
       projectId: p.id, name: p.name,

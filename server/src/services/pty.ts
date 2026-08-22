@@ -366,10 +366,17 @@ export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
 export const listSessionsAsync = async (): Promise<SessionInfo[]> => (await listPanesAsync()).map(toSessionInfo);
 
 // SPEC-184 · sesi hidup yang punya marker keputusan — masukan scanDecisions().
-export const liveDecisions = (): { id: string; specId?: string; projectId: string; decisionFile: string }[] =>
+// SPEC-903 · ADR-0143 · `waiting` adalah bit turunan yang SAMA dengan `SessionInfo.decision`, supaya
+// notifikasi dan panel lead tak punya rumus sendiri yang bisa berselisih dengan pil di layar.
+export const liveDecisions = (): {
+  id: string; specId?: string; projectId: string; decisionFile: string; waiting: boolean;
+}[] =>
   listPanes()
     .filter((p) => !p.exited && p.decisionFile)
-    .map((p) => ({ id: p.id, specId: p.specId, projectId: p.projectId, decisionFile: p.decisionFile! }));
+    .map((p) => ({
+      id: p.id, specId: p.specId, projectId: p.projectId, decisionFile: p.decisionFile!,
+      waiting: p.decision,
+    }));
 
 export const getSession = (id: string): Pane | undefined => listPanes().find((p) => p.id === id);
 

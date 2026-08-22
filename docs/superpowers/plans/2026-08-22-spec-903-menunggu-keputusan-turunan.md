@@ -518,7 +518,7 @@ git commit -m "feat(pty): decisionAt menunjuk episode menunggu yang sedang berla
   waiting: boolean }[]` — `waiting` adalah `Pane.decision` yang sama;
   `DecisionSession` di `notifications.ts` bertambah `waiting: boolean`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Di `server/test/notifications.test.ts`, tambahkan `waiting: true` ke tiga stub yang sudah ada
 (baris 81, 92, 101 — bentuk `{ id: …, specId: …, projectId: …, decisionFile: f }`), lalu tambahkan
@@ -556,7 +556,7 @@ dua test baru di dalam `describe("scanDecisions")`:
 > sama dengan test tetangga di `describe("scanDecisions")`. Bila nama variabel direktori temporernya
 > berbeda, ikuti yang ada di berkas, jangan membuat yang baru.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/notifications.test.ts -t "scanDecisions"
@@ -564,7 +564,7 @@ pnpm vitest --run --no-file-parallelism server/test/notifications.test.ts -t "sc
 
 Expected: FAIL — test pertama mendapat 1 notifikasi (bukan 0), karena `waiting` belum dipakai.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 3a. `server/src/services/pty.ts:319-323`:
 
@@ -624,7 +624,7 @@ import { listSessions, liveDecisions, sendToPane } from "../services/pty";
     try { waiting = liveDecisions().filter((d) => d.waiting).map((d) => d.id); }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/notifications.test.ts
@@ -632,7 +632,7 @@ pnpm vitest --run --no-file-parallelism server/test/notifications.test.ts
 
 Expected: PASS semuanya.
 
-- [ ] **Step 5: Typecheck paket server**
+- [x] **Step 5: Typecheck paket server**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -641,7 +641,7 @@ pnpm --filter ./server typecheck
 Expected: nol error. (`DetectDeps.live` di `lead/detect.ts` bertipe struktural yang lebih sempit,
 jadi bentuk baru `liveDecisions()` tetap cocok tanpa perubahan di sana.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/src/services/notifications.ts server/src/routes/lead.ts server/test/notifications.test.ts
