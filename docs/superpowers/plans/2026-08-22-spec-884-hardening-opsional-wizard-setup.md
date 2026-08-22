@@ -1231,7 +1231,7 @@ git commit -m "feat(spec-884): supervisor membaca config.env dan menangani exit 
 - Consumes: `SetupPrerequisite`, `PrerequisiteId` (Task 9)
 - Produces: `type ProbeFacts = { podman: string|null; rootless: boolean; networkExists: boolean; credentialDirReadable: boolean }`, `prerequisites(env, facts): SetupPrerequisite[]`, `allReady(rows): boolean`, `collectProbeFacts(env): ProbeFacts`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `runner/test/sandbox-probe.test.ts`:
 
@@ -1291,12 +1291,12 @@ describe("prasyarat hardening (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run runner/test/sandbox-probe.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/sandbox-probe"`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `runner/src/sandbox-probe.ts`:
 
@@ -1397,12 +1397,12 @@ Tambahkan di `runner/src/index.ts`:
 export * from "./sandbox-probe";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run runner/test/sandbox-probe.test.ts`
 Expected: PASS — 6 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/sandbox-probe.ts runner/src/index.ts runner/test/sandbox-probe.test.ts
