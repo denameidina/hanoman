@@ -22,6 +22,8 @@ import type { ProjectVM } from "./types";
 const POLL_MS = 5000;
 // SPEC-523 · ukuran halaman daftar triase (tiket & issue). Sebelumnya keduanya memuat SELURUH baris.
 const TICKET_PAGE = 20;
+// SPEC-908 · jeda sebelum ketikan pencarian mengubah KUNCI langganan (lihat useLiveTopic).
+const Q_DEBOUNCE_MS = 400;
 
 /* SPEC-523 · Pager DS untuk daftar triase. `unreviewed` tetap datang dari server yang
    menghitungnya atas SET PENUH, jadi lencana "belum ditinjau" tak ikut mengecil per halaman. */
@@ -373,14 +375,24 @@ export function TriageScreen({ projects, onAccepted, onToast }:
   // AC-15 · ganti penyaring = kembali ke halaman 1. Tanpa ini, halaman 5 dari penyaring lama
   // menjawab daftar penyaring baru yang cuma punya 2 halaman → daftar kosong tanpa sebab.
   React.useEffect(() => { setPage(1); }, [project, status, q]);
-  // SPEC-908 · pembaruan didorong lewat langganan `/events/ws`, bukan poll 5 dtk. Params = state
-  // layar yang SEDANG aktif, jadi halaman & penyaring yang berjalan dihormati secara konstruksi:
-  // frame halaman lain punya `key` lain dan tak mungkin mendarat di sini. POLL_MS tinggal kadens
+  // SPEC-908 · `q` yang menyuapi LANGGANAN ditahan sebentar. Tiap huruf mengubah kunci langganan,
+  // dan tiap kunci baru melahirkan entri baru di server yang dibangun di luar jadwal — mengetik 12
+  // huruf berarti 12 pembangunan yang sebelas di antaranya langsung dibuang. Muat HTTP di atas
+  // tetap per-ketikan seperti sebelumnya; yang di-debounce hanya kuncinya.
+  const [liveQ, setLiveQ] = React.useState(q);
+  React.useEffect(() => {
+    const t = setTimeout(() => setLiveQ(q), Q_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  // Pembaruan didorong lewat langganan `/events/ws`, bukan poll 5 dtk. Params = state layar yang
+  // SEDANG aktif, jadi halaman & penyaring yang berjalan dihormati secara konstruksi: frame
+  // halaman lain punya `key` lain dan tak mungkin mendarat di sini. POLL_MS tinggal kadens
   // fallback saat server belum punya topiknya (ADR-0087) atau WS terhalang.
   useLiveTopic({
     topic: "tickets",
     params: {
-      project: project || undefined, status: status || undefined, q: q || undefined,
+      project: project || undefined, status: status || undefined, q: liveQ || undefined,
       page, limit: TICKET_PAGE,
     },
     apply: (m) => {

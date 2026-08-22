@@ -23,16 +23,21 @@ const view = () => (
     onPull={vi.fn()} onDrop={vi.fn()} onOpenFile={vi.fn()} />
 );
 
-let ideGraph: ReturnType<typeof vi.spyOn>;
-let ideStatus: ReturnType<typeof vi.spyOn>;
-let ideStashes: ReturnType<typeof vi.spyOn>;
+// Tipe spy di-INFER dari pabriknya; anotasi `ReturnType<typeof vi.spyOn>` polos kehilangan
+// signature fungsinya dan ditolak tsc.
+const makeSpies = () => ({
+  ideGraph: vi.spyOn(api, "ideGraph").mockResolvedValue({ commits, current: "main", total: 2 }),
+  ideStatus: vi.spyOn(api, "ideStatus").mockResolvedValue(STATUS),
+  ideStashes: vi.spyOn(api, "ideStashes").mockResolvedValue([]),
+});
+let ideGraph: ReturnType<typeof makeSpies>["ideGraph"];
+let ideStatus: ReturnType<typeof makeSpies>["ideStatus"];
+let ideStashes: ReturnType<typeof makeSpies>["ideStashes"];
 
 beforeEach(() => {
   vi.restoreAllMocks();
   resetEventsStub();
-  ideGraph = vi.spyOn(api, "ideGraph").mockResolvedValue({ commits, current: "main", total: 2 });
-  ideStatus = vi.spyOn(api, "ideStatus").mockResolvedValue(STATUS);
-  ideStashes = vi.spyOn(api, "ideStashes").mockResolvedValue([]);
+  ({ ideGraph, ideStatus, ideStashes } = makeSpies());
   vi.spyOn(api, "getConfig").mockResolvedValue({ entries: [] } as never);
   vi.useFakeTimers({ shouldAdvanceTime: true });
 });

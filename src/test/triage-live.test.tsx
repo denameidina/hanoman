@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { subKey } from "@hanoman/shared";
 import {
   eventsStub, resetEventsStub, setTopics, emitTopic, setStatus, lastSubParams,
+  allSubs,
 } from "./helpers/events-stub";
 
 // SPEC-908 · TriageScreen berhenti men-poll HTTP. Scout memastikan TAK SATU pun test lama
@@ -99,6 +100,23 @@ describe("SPEC-908 · TriageScreen live", () => {
     });
     expect(screen.queryByText("Graph kosong")).toBeNull();
     expect(screen.getByText("Tak bisa login")).toBeTruthy();
+  });
+
+  it("mengetik pencarian tak melahirkan satu kunci langganan per huruf", async () => {
+    setTopics(["tickets"]);
+    render(view());
+    await screen.findByText("Tak bisa login");
+    const box = screen.getByLabelText("Cari tiket");
+    const before = allSubs("tickets").length;
+    for (const v of ["t", "te", "ter", "term"]) {
+      await act(async () => { fireEvent.change(box, { target: { value: v } }); });
+    }
+    // Debounce belum jatuh tempo: kuncinya masih yang lama, nol langganan tambahan.
+    expect(allSubs("tickets")).toHaveLength(before);
+    expect(lastSubParams("tickets")).not.toHaveProperty("q", "term");
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+    expect(lastSubParams("tickets")).toMatchObject({ q: "term" });
+    expect(allSubs("tickets")).toHaveLength(before);   // tetap satu langganan, bukan lima
   });
 
   it("koneksi putus: data lama tetap terpampang dan indikator muncul sesudah grace", async () => {

@@ -94,12 +94,37 @@ function dropClientSubs(c: Client): void {
   }
 }
 
+// SPEC-908 · dua pagar kerja, keduanya lahir dari review keamanan yang MENGUKUR jalurnya.
+//
+// (1) `MAX_INFLIGHT` membatasi berapa build boleh berjalan bersamaan di seluruh hub. `e.inflight`
+// sendirian hanya men-dedup DI DALAM satu entri, dan entri baru selalu lahir `inflight:false` —
+// terukur, 32 `buildGitLive` serentak (5 spawn git masing-masing) menahan event loop **505 ms**,
+// event loop yang sama yang melayani PTY terminal (kelas regresi SPEC-812/878).
+//
+// (2) `IMMEDIATE_PER_MIN` membatasi build DI LUAR JADWAL per klien. Semantik ganti-penuh membuat
+// tiap frame `sub` bisa memperkenalkan 16 kunci "baru" lagi, dan kuota 120 frame/menit karena itu
+// terukur menjadi **1 920 build/menit dari satu socket** (≈160 fork `git`/dtk). Entri yang
+// kehabisan jatah tidak hilang — ia hanya menunggu slot `everyTicks`-nya seperti entri lain.
+const MAX_INFLIGHT = 4;
+const IMMEDIATE_PER_MIN = 30;
+let inflight = 0;
+
+const immediateBudget = new WeakMap<Client, { left: number; resetAt: number }>();
+function takeImmediate(c: Client, now = Date.now()): boolean {
+  let b = immediateBudget.get(c);
+  if (!b || now >= b.resetAt) { b = { left: IMMEDIATE_PER_MIN, resetAt: now + 60_000 }; immediateBudget.set(c, b); }
+  if (b.left <= 0) return false;
+  b.left--;
+  return true;
+}
+
 // Satu recompute untuk SEMUA pelanggan entri ini. TIDAK PERNAH di-await oleh __tick: satu
 // `git log` lambat tak boleh menunda grup `sessions`/`specs` yang berkadens 1 dtk — event loop
 // yang sama melayani PTY terminal (pelajaran terukur SPEC-479/812).
 async function runEntry(e: SubEntry): Promise<void> {
-  if (e.inflight) return;
+  if (e.inflight || inflight >= MAX_INFLIGHT) return;   // yang terlewat ikut tick berikutnya
   e.inflight = true;
+  inflight++;
   try {
     const body = await (TOPICS[e.topic].build as (p: unknown) => Promise<object>)(e.params);
     if (e.failing) { e.failing = false; console.log(`siar langganan pulih: ${e.key}`); }
@@ -110,7 +135,7 @@ async function runEntry(e: SubEntry): Promise<void> {
   } catch (err) {
     // Frame lama SENGAJA tak dihapus: klien tak boleh di-blank karena satu build gagal.
     if (!e.failing) { e.failing = true; console.error(`siar langganan gagal membangun ${e.key}:`, err); }
-  } finally { e.inflight = false; }
+  } finally { e.inflight = false; inflight--; }
 }
 
 // Ganti-penuh: satu frame `sub` mengganti SELURUH himpunan langganan klien. Karena itu tak ada
@@ -131,11 +156,12 @@ export function subscribeClient(c: Client, subs: { topic: string; params: unknow
     }
     if (e.subscribers.has(c)) continue;
     e.subscribers.add(c);
-    // Muatan pertama SEGERA: dari cache bila entri sudah punya (nol biaya), atau satu build di
-    // luar jadwal bila belum. Tanpa ini, kembali dari tab tersembunyi — socket ditutup atas
-    // permintaan kita sendiri, api/events.ts:77 — berarti layar diam sampai tick berikutnya.
+    // Muatan pertama SEGERA: dari cache bila entri sudah punya (NOL biaya, jadi tak memakai
+    // jatah), atau satu build di luar jadwal bila belum. Tanpa ini, kembali dari tab tersembunyi —
+    // socket ditutup atas permintaan kita sendiri, api/events.ts — berarti layar diam sampai tick
+    // berikutnya. Yang kehabisan jatah tetap terpasang; ia cuma menunggu tick.
     if (e.last) sendTo(c, e.last);
-    else void runEntry(e);
+    else if (takeImmediate(c)) void runEntry(e);
   }
   for (const [key, e] of entries) {
     if (wanted.has(key) || !e.subscribers.has(c)) continue;
@@ -210,4 +236,4 @@ export function detach(c: Client): void {
 }
 
 // Test-only: kosongkan klien + hentikan loop + reset signature.
-export function __reset(): void { clients.clear(); entries.clear(); stopLoop(); }
+export function __reset(): void { clients.clear(); entries.clear(); inflight = 0; stopLoop(); }

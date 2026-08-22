@@ -180,6 +180,44 @@ describe("SPEC-908 · hub langganan berparameter", () => {
     detach(keep);
   });
 
+  // Kedua test berikut mengunci pagar yang lahir dari review keamanan SPEC-908 (terukur:
+  // 1 920 build/menit dari satu socket, dan 32 build serentak menahan event loop 505 ms).
+  it("build di luar jadwal berbatas per klien — sisanya menunggu tick, bukan menghilang", async () => {
+    const spy = vi.spyOn(TOPICS.tickets, "build").mockResolvedValue(ticketsBody(0));
+    const c = fakeClient();
+    await attach(c);
+    // 40 kunci distinct, dikirim 16-per-frame (plafon MAX_SUBS) dengan semantik ganti-penuh.
+    for (let i = 0; i < 40; i++) {
+      subscribeClient(c, [{ topic: "tickets", params: { page: i + 1, limit: 20 } }]);
+      await flush();
+    }
+    // Jatah build seketika 30/menit; sisanya tak dibangun di luar jadwal.
+    expect(spy.mock.calls.length).toBeLessThanOrEqual(30);
+    // Langganan TERAKHIR tetap terpasang: ia terbangun di tick berikutnya.
+    spy.mockClear();
+    for (let i = 0; i < 6; i++) { await __tick(); await flush(); }
+    expect(spy.mock.calls.length).toBeGreaterThan(0);
+    for (const call of spy.mock.calls) expect((call[0] as { page: number }).page).toBe(40);
+    detach(c);
+  });
+
+  it("build serentak berbatas — satu socket tak bisa memfork tanpa plafon", async () => {
+    let peak = 0, live = 0;
+    vi.spyOn(TOPICS.git, "build").mockImplementation(() => {
+      live++; peak = Math.max(peak, live);
+      return new Promise((r) => setTimeout(() => { live--; r(gitBody()); }, 30));
+    });
+    const c = fakeClient();
+    await attach(c);
+    const subs = Array.from({ length: 16 }, (_, i) => ({
+      topic: "git", params: { ...GIT_PARAMS, limit: 100 + i },
+    }));
+    subscribeClient(c, subs);
+    await new Promise((r) => setTimeout(r, 120));
+    expect(peak).toBeLessThanOrEqual(4);
+    detach(c);
+  });
+
   it("build lambat tak menunda __tick — grup 1 dtk tetap terbit tepat waktu", async () => {
     vi.spyOn(TOPICS.git, "build").mockImplementation(
       () => new Promise((r) => setTimeout(() => r(gitBody()), 120)),
