@@ -65,7 +65,7 @@ Temuan yang memaksa task ini duluan: `copyPlan()` tak menyalin `server/scripts/v
 - Consumes: —
 - Produces: `scriptPath(f: string): string` yang benar di checkout **dan** di paket npm. Task 3–5 memakainya.
 
-- [ ] **Step 1: Tulis test packing yang gagal**
+- [x] **Step 1: Tulis test packing yang gagal**
 
 Tambahkan ke `cli/test/pack.test.ts`:
 
@@ -88,14 +88,14 @@ describe("SPEC-883 · skrip VPS ikut terpaket", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 pnpm vitest --run cli/test/pack.test.ts
 ```
 Expected: FAIL — `expect(item).toBeDefined()` menerima `undefined`.
 
-- [ ] **Step 3: Perbaiki `copyPlan` dan `REQUIRED_ARTIFACTS`**
+- [x] **Step 3: Perbaiki `copyPlan` dan `REQUIRED_ARTIFACTS`**
 
 Di `cli/src/release/pack.ts`, tambahkan ke array `REQUIRED_ARTIFACTS` (sesudah `"docs/agent-integration.md"`):
 
@@ -120,14 +120,14 @@ Di `packageJsonFor`, tambahkan `"scripts"` ke daftar `files`:
     files: ["bin", "dist", "web", "prisma", "docs", "scripts", "README.md", "LICENSE"],
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 pnpm vitest --run cli/test/pack.test.ts
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Tulis test resolusi path yang gagal**
+- [x] **Step 5: Tulis test resolusi path yang gagal**
 
 Buat `server/test/vps-script-path.test.ts`:
 
@@ -153,14 +153,14 @@ describe("SPEC-883 · scriptPath", () => {
 });
 ```
 
-- [ ] **Step 6: Jalankan, pastikan test kedua gagal**
+- [x] **Step 6: Jalankan, pastikan test kedua gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-script-path.test.ts
 ```
 Expected: FAIL pada test kedua — `repoRoot()` jatuh ke `/` dan berkas tak ada. (Ini persis kegagalan produksi, direproduksi.)
 
-- [ ] **Step 7: Ubah `scriptPath` — lokasi terpaket lebih dulu**
+- [x] **Step 7: Ubah `scriptPath` — lokasi terpaket lebih dulu**
 
 Di `server/src/services/vps-audit.ts`, ganti baris `export const scriptPath = …` dengan:
 
@@ -188,14 +188,14 @@ import { fileURLToPath } from "node:url";
 
 (`readFileSync` dan `join` sudah diimpor; periksa jangan menduplikasi impor `node:fs`.)
 
-- [ ] **Step 8: Jalankan, pastikan lulus**
+- [x] **Step 8: Jalankan, pastikan lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-script-path.test.ts cli/test/pack.test.ts
 ```
 Expected: PASS semua.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add cli/src/release/pack.ts cli/test/pack.test.ts server/src/services/vps-audit.ts server/test/vps-script-path.test.ts
@@ -221,7 +221,7 @@ git commit -m "fix(spec-883): skrip VPS ikut terpaket & scriptPath tak lagi berg
   - `zProvision` (zod body)
   - `COMPONENTS: ProvisionComponent[]`, `componentById(id)`, `resolveComponents(ids, profile)`
 
-- [ ] **Step 1: Tulis test katalog yang gagal**
+- [x] **Step 1: Tulis test katalog yang gagal**
 
 Buat `server/test/vps-catalog-components.test.ts`:
 
@@ -286,14 +286,14 @@ describe("SPEC-883 · katalog komponen", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-catalog-components.test.ts
 ```
 Expected: FAIL — `Cannot find module '../src/vps/catalog/components'`.
 
-- [ ] **Step 3: Tambahkan tipe & zod ke `shared/src/dto.ts`**
+- [x] **Step 3: Tambahkan tipe & zod ke `shared/src/dto.ts`**
 
 Sisipkan sesudah `export type RemediateStep = …`:
 
@@ -349,7 +349,7 @@ export type ProvisionResult = {
 };
 ```
 
-- [ ] **Step 4: Tulis katalog**
+- [x] **Step 4: Tulis katalog**
 
 Buat `server/src/vps/catalog/components.ts`:
 
@@ -419,14 +419,14 @@ export function resolveComponents(ids: readonly ComponentId[], profile: Provisio
 }
 ```
 
-- [ ] **Step 5: Jalankan, pastikan lulus**
+- [x] **Step 5: Jalankan, pastikan lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-catalog-components.test.ts
 ```
 Expected: PASS (8 test).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/dto.ts server/src/vps/catalog/components.ts server/test/vps-catalog-components.test.ts
@@ -445,7 +445,7 @@ git commit -m "feat(spec-883): katalog komponen provisioning + DTO"
 - Consumes: —
 - Produces: kontrak baris `COMP <id> <ok|partial|absent> <detail>` di stdout saat `MODE=probe`. Task 5 mem-parse-nya.
 
-- [ ] **Step 1: Tulis test skrip yang gagal**
+- [x] **Step 1: Tulis test skrip yang gagal**
 
 Buat `server/test/vps-provision-script.test.ts`. Test menjalankan skrip **sungguhan** di mesin test dengan `PATH` fixture, jadi ia tak pernah menyentuh mesin nyata:
 
@@ -510,14 +510,14 @@ describe("SPEC-883 · provision.sh MODE=probe", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision-script.test.ts
 ```
 Expected: FAIL — `ENOENT` pada `server/scripts/vps/provision.sh`.
 
-- [ ] **Step 3: Tulis kerangka skrip + mode probe**
+- [x] **Step 3: Tulis kerangka skrip + mode probe**
 
 Buat `server/scripts/vps/provision.sh`:
 
@@ -594,7 +594,7 @@ case "$MODE" in
 esac
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 chmod +x server/scripts/vps/provision.sh
@@ -602,7 +602,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS (4 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/scripts/vps/provision.sh server/test/vps-provision-script.test.ts
@@ -622,7 +622,7 @@ git commit -m "feat(spec-883): provision.sh mode probe"
 - Consumes: kontrak `COMP` dari Task 3.
 - Produces: kontrak `STEP <id> <would|ok|fail|skip> <detail>`; `skip blocked-by <id>` untuk komponen yang prasyaratnya gagal; `fail dns-mismatch` untuk `caddy`.
 
-- [ ] **Step 1: Tulis test apply yang gagal**
+- [x] **Step 1: Tulis test apply yang gagal**
 
 Tambahkan ke `server/test/vps-provision-script.test.ts`:
 
@@ -679,14 +679,14 @@ describe("SPEC-883 · provision.sh MODE=apply", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision-script.test.ts
 ```
 Expected: FAIL — semua test apply, karena mode apply masih stub.
 
-- [ ] **Step 3: Ganti cabang `apply` di `provision.sh`**
+- [x] **Step 3: Ganti cabang `apply` di `provision.sh`**
 
 Ganti blok `case "$MODE"` di akhir berkas dengan implementasi berikut (letakkan fungsi-fungsi di atasnya, sesudah blok probe):
 
@@ -884,7 +884,7 @@ case "$MODE" in
 esac
 ```
 
-- [ ] **Step 4: Tulis `agent.Containerfile`**
+- [x] **Step 4: Tulis `agent.Containerfile`**
 
 Buat `server/scripts/vps/agent.Containerfile`:
 
@@ -901,14 +901,14 @@ RUN npm i -g @anthropic-ai/claude-code @openai/codex
 WORKDIR /workspace
 ```
 
-- [ ] **Step 5: Jalankan, pastikan lulus**
+- [x] **Step 5: Jalankan, pastikan lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision-script.test.ts
 ```
 Expected: PASS (9 test — 4 dari Task 3 + 5 baru).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/scripts/vps/provision.sh server/scripts/vps/agent.Containerfile server/test/vps-provision-script.test.ts
@@ -933,7 +933,7 @@ git commit -m "feat(spec-883): provision.sh mode apply, dry-run, gerbang DNS"
   - `readSetupToken(v: VpsRow): Promise<string | null>`
   - `PROVISION_TIMEOUT_MS = 900_000`
 
-- [ ] **Step 1: Tulis test parser yang gagal**
+- [x] **Step 1: Tulis test parser yang gagal**
 
 Buat `server/test/vps-provision-parse.test.ts`:
 
@@ -980,14 +980,14 @@ describe("SPEC-883 · parseProvisionSteps", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision-parse.test.ts
 ```
 Expected: FAIL — modul tak ada.
 
-- [ ] **Step 3: Tulis service**
+- [x] **Step 3: Tulis service**
 
 Buat `server/src/services/vps-provision.ts`:
 
@@ -1072,14 +1072,14 @@ export async function readSetupToken(v: VpsRow, home = "/var/lib/hanoman"): Prom
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision-parse.test.ts
 ```
 Expected: PASS (6 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/vps-provision.ts server/test/vps-provision-parse.test.ts
@@ -1099,7 +1099,7 @@ git commit -m "feat(spec-883): service vps-provision (parser, probe, apply, setu
 - Consumes: —
 - Produces: `Vps.components` (Json?), `Vps.componentsCheckedAt` (DateTime?), `Vps.provisionProfile` (String?). Task 7 menulisnya.
 
-- [ ] **Step 1: Tulis test kontrak yang gagal**
+- [x] **Step 1: Tulis test kontrak yang gagal**
 
 Buat `server/test/vps-provision-contract.test.ts`:
 
@@ -1128,14 +1128,14 @@ describe("SPEC-883 · kolom provisioning", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision-contract.test.ts
 ```
 Expected: FAIL — `field("components")` `undefined`.
 
-- [ ] **Step 3: Tambahkan kolom ke schema**
+- [x] **Step 3: Tambahkan kolom ke schema**
 
 Di `server/prisma/schema.prisma`, di dalam `model Vps`, sesudah baris `hardened`:
 
@@ -1148,7 +1148,7 @@ Di `server/prisma/schema.prisma`, di dalam `model Vps`, sesudah baris `hardened`
   provisionProfile    String? // "lab" | "production" — profil yang terakhir diterapkan
 ```
 
-- [ ] **Step 4: Tulis migration tangan**
+- [x] **Step 4: Tulis migration tangan**
 
 Buat `server/prisma/migrations/20260822120000_vps_provision/migration.sql`:
 
@@ -1165,21 +1165,21 @@ ALTER TABLE "Vps" ADD COLUMN "componentsCheckedAt" DATETIME;
 ALTER TABLE "Vps" ADD COLUMN "provisionProfile" TEXT;
 ```
 
-- [ ] **Step 5: Terapkan migrasi & generate client**
+- [x] **Step 5: Terapkan migrasi & generate client**
 
 ```bash
 cd server && pnpm prisma migrate deploy && pnpm prisma generate && cd ..
 ```
 Expected: `1 migration applied` lalu `Generated Prisma Client`.
 
-- [ ] **Step 6: Jalankan, pastikan lulus**
+- [x] **Step 6: Jalankan, pastikan lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision-contract.test.ts
 ```
 Expected: PASS (2 test).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations/20260822120000_vps_provision server/test/vps-provision-contract.test.ts
@@ -1200,7 +1200,7 @@ git commit -m "feat(spec-883): kolom components/componentsCheckedAt/provisionPro
 - Consumes: `resolveComponents`, `COMPONENTS` (Task 2); `probeComponents`, `provision`, `readSetupToken` (Task 5); kolom DB (Task 6).
 - Produces: empat endpoint + path helper `vpsComponents`, `vpsProbe`, `vpsProvisionPreview`, `vpsProvision`.
 
-- [ ] **Step 1: Ajari fixture ssh mengenali provision.sh**
+- [x] **Step 1: Ajari fixture ssh mengenali provision.sh**
 
 Di `server/test/fixtures/fake-ssh.sh`, sisipkan **sebelum** cabang `hanoman-remediate`:
 
@@ -1235,7 +1235,7 @@ if [[ "$last" == *"setup.token"* ]]; then
 fi
 ```
 
-- [ ] **Step 2: Tulis test route yang gagal**
+- [x] **Step 2: Tulis test route yang gagal**
 
 Buat `server/test/vps-provision.route.test.ts`:
 
@@ -1381,14 +1381,14 @@ describe("SPEC-883 · POST /vps/:id/provision", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan, pastikan gagal**
+- [x] **Step 3: Jalankan, pastikan gagal**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision.route.test.ts
 ```
 Expected: FAIL — semua route 404.
 
-- [ ] **Step 4: Tambahkan path helper**
+- [x] **Step 4: Tambahkan path helper**
 
 Di `shared/src/api.ts`, sesudah `vpsRemediate`:
 
@@ -1400,7 +1400,7 @@ Di `shared/src/api.ts`, sesudah `vpsRemediate`:
   vpsProvision: (id: string) => `${API}/vps/${id}/provision`,
 ```
 
-- [ ] **Step 5: Tulis endpoint**
+- [x] **Step 5: Tulis endpoint**
 
 Di `server/src/routes/vps.ts`, tambahkan impor:
 
@@ -1511,14 +1511,14 @@ Lalu sisipkan sesudah endpoint `remediate` (sebelum komentar `// Harden TIDAK PE
   });
 ```
 
-- [ ] **Step 6: Jalankan, pastikan lulus**
+- [x] **Step 6: Jalankan, pastikan lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision.route.test.ts
 ```
 Expected: PASS (13 test).
 
-- [ ] **Step 7: Tulis test serah-terima**
+- [x] **Step 7: Tulis test serah-terima**
 
 Buat `server/test/vps-provision-setup.test.ts`:
 
@@ -1577,14 +1577,14 @@ describe("SPEC-883 · serah-terima setup token", () => {
 
 Catatan untuk pelaksana: `FAKE_SSH_MODE` di fixture mengontrol **satu** cabang pada satu waktu. Cabang `setup-expired`/`setup-absent` di Step 1 tak memengaruhi cabang probe, jadi `COMP hanoman` di kedua test itu memulangkan `absent` — sesuaikan fixture bila test menuntut keduanya sekaligus (tambahkan `hanoman-present` ke daftar `case` yang menerbitkan `COMP hanoman ok`).
 
-- [ ] **Step 8: Jalankan, pastikan lulus**
+- [x] **Step 8: Jalankan, pastikan lulus**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/vps-provision-setup.test.ts server/test/vps-provision.route.test.ts server/test/vps-remediate.route.test.ts server/test/vps.route.test.ts
 ```
 Expected: PASS semua — termasuk suite VPS lama, yang membuktikan fixture baru tak merusak cabang lama.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/src/routes/vps.ts shared/src/api.ts server/test/fixtures/fake-ssh.sh server/test/vps-provision.route.test.ts server/test/vps-provision-setup.test.ts
@@ -1604,7 +1604,7 @@ git commit -m "feat(spec-883): endpoint katalog, probe, preview, provision + ser
 - Consumes: `paths.vpsComponents/vpsProbe/vpsProvisionPreview/vpsProvision` (Task 7); tipe dari `@hanoman/shared` (Task 2).
 - Produces: `<VpsProvisionPanel vps={v} onToast={…} onGotoTerminal={…} />`, `<ComponentBadges components={…} checkedAt={…} />`.
 
-- [ ] **Step 1: Tambahkan metode API client**
+- [x] **Step 1: Tambahkan metode API client**
 
 Di `src/src/api/client.ts`, sesudah `remediate`:
 
@@ -1620,7 +1620,7 @@ Di `src/src/api/client.ts`, sesudah `remediate`:
 
 Tambahkan tipe-tipe itu ke blok `import type { … } from "@hanoman/shared"` di kepala berkas.
 
-- [ ] **Step 2: Tulis test UI yang gagal**
+- [x] **Step 2: Tulis test UI yang gagal**
 
 Buat `src/test/vps-provision.test.tsx`:
 
@@ -1707,14 +1707,14 @@ describe("SPEC-883 · panel provisioning", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan, pastikan gagal**
+- [x] **Step 3: Jalankan, pastikan gagal**
 
 ```bash
 pnpm vitest --run src/test/vps-provision.test.tsx
 ```
 Expected: FAIL — modul `../src/screens/VpsProvision` tak ada.
 
-- [ ] **Step 4: Tulis komponen**
+- [x] **Step 4: Tulis komponen**
 
 Buat `src/src/screens/VpsProvision.tsx`:
 
@@ -1923,14 +1923,14 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
 }
 ```
 
-- [ ] **Step 5: Jalankan, pastikan lulus**
+- [x] **Step 5: Jalankan, pastikan lulus**
 
 ```bash
 pnpm vitest --run src/test/vps-provision.test.tsx
 ```
 Expected: PASS (6 test). Bila `Field`/`StateBlock`/`Icon` menuntut prop lain, sesuaikan pemakaiannya dengan `src/src/ds` — jangan mengubah design system.
 
-- [ ] **Step 6: Sisipkan ke `VpsScreen`**
+- [x] **Step 6: Sisipkan ke `VpsScreen`**
 
 Di `src/src/screens/VpsScreen.tsx`, tambahkan impor `import { VpsProvisionPanel, ComponentBadges } from "./VpsProvision";` lalu render `<VpsProvisionPanel vps={detailVps} onToast={onToast} onGotoTerminal={onGotoTerminal} />` di dalam modal detail (di bawah checklist), dan `<ComponentBadges components={v.components ?? null} checkedAt={v.componentsCheckedAt ?? null} />` di baris kartu daftar.
 
@@ -1942,14 +1942,14 @@ Di `src/src/screens/VpsScreen.tsx`, tambahkan impor `import { VpsProvisionPanel,
   provisionProfile?: string | null;
 ```
 
-- [ ] **Step 7: Jalankan test layar VPS lama**
+- [x] **Step 7: Jalankan test layar VPS lama**
 
 ```bash
 pnpm vitest --run src/test/vps-screen.test.tsx src/test/vps-checklist.test.tsx src/test/vps-apply-confirm.test.tsx src/test/vps-provision.test.tsx
 ```
 Expected: PASS semua.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/screens/VpsProvision.tsx src/src/screens/VpsScreen.tsx src/src/api/client.ts shared/src/dto.ts src/test/vps-provision.test.tsx
@@ -1969,7 +1969,7 @@ git commit -m "feat(spec-883): panel provisioning, lencana komponen, kartu serah
 - Consumes: `Ctx` (`cli/src/router.ts`); `provision.sh` (Task 3–4).
 - Produces: `parseProvisionArgs(args: string[]): { mode: "probe"|"apply"; items: string[]; profile: string; domain?: string; dryRun: boolean; yes: boolean } | { error: string }` dan default export `(args, ctx) => Promise<number>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `cli/test/provision.test.ts`:
 
@@ -2009,14 +2009,14 @@ describe("SPEC-883 · argv provision", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 pnpm vitest --run cli/test/provision.test.ts
 ```
 Expected: FAIL — modul tak ada, `route` memulangkan `unknown`.
 
-- [ ] **Step 3: Tulis perintah**
+- [x] **Step 3: Tulis perintah**
 
 Buat `cli/src/commands/provision.ts`:
 
@@ -2097,7 +2097,7 @@ export default async function provisionCmd(args: string[], ctx: Ctx): Promise<nu
 }
 ```
 
-- [ ] **Step 4: Daftarkan di router**
+- [x] **Step 4: Daftarkan di router**
 
 Di `cli/src/router.ts`, tambahkan ke `HELP` sesudah baris `doctor`:
 
@@ -2119,14 +2119,14 @@ Di `run`, tambahkan:
   if (cmd === "provision") return (await import("./commands/provision")).default(args, ctx);
 ```
 
-- [ ] **Step 5: Jalankan, pastikan lulus**
+- [x] **Step 5: Jalankan, pastikan lulus**
 
 ```bash
 pnpm vitest --run cli/test/provision.test.ts cli/test/router.test.ts
 ```
 Expected: PASS. Bila `cli/test/router.test.ts` menegakkan isi `HELP` secara harfiah, perbarui ekspektasinya.
 
-- [ ] **Step 6: Uji nyata sekali di mesin ini (probe saja — nol tulis)**
+- [x] **Step 6: Uji nyata sekali di mesin ini (probe saja — nol tulis)**
 
 ```bash
 pnpm --filter @hanoman/cli build 2>/dev/null || pnpm -r build
@@ -2134,7 +2134,7 @@ MODE=probe bash server/scripts/vps/provision.sh
 ```
 Expected: sembilan baris `COMP …` yang menggambarkan mesin ini apa adanya. **Jangan** menjalankan `MODE=apply` di mesin ini.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add cli/src/commands/provision.ts cli/src/router.ts cli/test/provision.test.ts
@@ -2153,7 +2153,7 @@ git commit -m "feat(spec-883): subperintah hanoman provision"
 - Consumes: seluruh task sebelumnya.
 - Produces: dokumentasi Source of Truth yang selaras.
 
-- [ ] **Step 1: Tulis ADR-0137**
+- [x] **Step 1: Tulis ADR-0137**
 
 Buat `internal/docs/adr/0137-provisioning-vps-berbasis-katalog.md` dengan struktur ADR yang sudah dipakai (`Status`, `Konteks`, `Keputusan`, `Konsekuensi`, `Alternatif yang ditolak`). Isi wajibnya:
 
@@ -2164,7 +2164,7 @@ Buat `internal/docs/adr/0137-provisioning-vps-berbasis-katalog.md` dengan strukt
 
 Tambahkan barisnya ke `internal/docs/adr/README.md` mengikuti format entri di sekitarnya.
 
-- [ ] **Step 2: Perbarui `deploy-vps.md`**
+- [x] **Step 2: Perbarui `deploy-vps.md`**
 
 Sisipkan seksi **0** di atas seksi 1, sebelum prosedur manual:
 
@@ -2173,11 +2173,11 @@ Sisipkan seksi **0** di atas seksi 1, sebelum prosedur manual:
 - kalimat eksplisit bahwa prosedur manual di bawahnya **tetap acuan kebenaran** skrip — bila keduanya berbeda, dokumen yang benar,
 - batas jujur profil lab (cookie tanpa `Secure`, sesi tak ber-sandbox).
 
-- [ ] **Step 3: Perbarui `api-contract.md` & `data-model.md`**
+- [x] **Step 3: Perbarui `api-contract.md` & `data-model.md`**
 
 Di `api-contract.md`, seksi VPS: empat endpoint beserta bentuk 400/409/502-nya. Di `data-model.md`, seksi Vps: tiga kolom baru + catatan **local-only, di luar `FIELDS.vps`** dengan alasan SPEC-880.
 
-- [ ] **Step 4: Perbarui `npm-readme.md`**
+- [x] **Step 4: Perbarui `npm-readme.md`**
 
 Tambahkan `provision` ke daftar subperintah beserta contoh:
 
@@ -2186,11 +2186,11 @@ hanoman provision --with=hanoman,caddy --domain=hanoman.contoh.id --yes
 hanoman provision --probe
 ```
 
-- [ ] **Step 5: Tambahkan entri index**
+- [x] **Step 5: Tambahkan entri index**
 
 Tambahkan ADR-0137 ke `internal/docs/README.md` mengikuti format entri ADR di sekitarnya. (Entri rancangan SPEC-883 sudah ada sejak commit spec.)
 
-- [ ] **Step 6: Jalankan seluruh test yang tersentuh**
+- [x] **Step 6: Jalankan seluruh test yang tersentuh**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -2203,7 +2203,7 @@ pnpm vitest --run src/test/vps-provision.test.tsx src/test/vps-screen.test.tsx c
 ```
 Expected: PASS semua.
 
-- [ ] **Step 7: Uji endpoint nyata di local (wajib, CLAUDE.md)**
+- [x] **Step 7: Uji endpoint nyata di local (wajib, CLAUDE.md)**
 
 Boot server lalu curl keempat endpoint:
 
@@ -2217,14 +2217,14 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST localhost:8787/api/vps/hantu/pr
 ```
 Expected: katalog terbit sebagai JSON; `404` untuk id yang tak ada.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add internal/docs
 git commit -m "docs(spec-883): ADR-0137 + deploy-vps, api-contract, data-model, npm-readme"
 ```
 
-- [ ] **Step 9: Centang seluruh checklist plan ini**
+- [x] **Step 9: Centang seluruh checklist plan ini**
 
 Ubah setiap `- [ ]` yang sudah selesai menjadi `- [x]` di berkas plan ini, lalu commit.
 
@@ -2239,3 +2239,31 @@ git commit -m "chore(spec-883): centang seluruh checklist plan"
 
 1. **`parseSteps` tidak dipakai ulang.** Spec menulis "protokolnya identik `remediate.sh`, jadi `parseSteps` dipakai ulang apa adanya". `RemediateStep["status"]` tak memuat `"skip"`, dan `skip` wajib ada (K3). Yang dipakai ulang adalah **polanya**, lewat `parseProvisionSteps` terpisah; `vps-remediate.ts` tak disentuh.
 2. **`deps_of` di `provision.sh` menduplikasi tabel dependensi katalog.** Sengaja: server sudah mengirim daftar lengkap & terurut, tabel di skrip hanya dipakai menerbitkan `blocked-by` yang benar saat sebuah prasyarat gagal di tengah jalan. Jaga keduanya selaras; test route Task 7 yang menangkap kalau melenceng.
+
+## Catatan pelaksanaan (diisi saat eksekusi, 2026-08-22)
+
+1. **`scriptPath` fallback dijangkar ke direktori modul, bukan `process.cwd()`.** Plan menulis
+   `join(repoRoot(), …)` apa adanya — itu **tetap gagal** pada test `chdir("/")`, karena `repoRoot()`
+   default-nya mulai dari cwd. Yang dipakai: `repoRoot(moduleDir())`, dengan `moduleDir()` =
+   `fileURLToPath(new URL(".", import.meta.url))`.
+2. **Gerbang idempotensi berjalan sebelum dry-run.** Komponen yang sudah ada dilaporkan
+   `skip already-present` **juga di pratinjau** — itu jujur dan berguna, jadi ekspektasi test yang
+   disesuaikan, bukan skripnya. Konsekuensi kedua: `have()` memakai `command -v`, jadi ia menilai
+   **keberadaan berkas** — stub `exit 127` tetap terhitung "ada". Test butuh `unstub()` (hapus
+   berkasnya) untuk membuat sebuah biner benar-benar absen.
+3. **Panel disuntik ke `VpsChecklistModal` lewat prop `provisioning`,** bukan ditulis ke dalam
+   modal itu. Modal tetap soal kepatuhan; `VpsScreen` yang merakit keduanya.
+4. **Kontrol memakai `Checkbox`/`Radio` design system** (`role="checkbox"`/`"radio"` +
+   `aria-checked`), jadi query test memakai `getByRole`, bukan `getByLabelText` atas input native.
+5. **`src/test/vps-screen.test.tsx` memakai mock `api` PARSIAL** — panel yang ikut ter-mount di modal
+   detail melempar `listVpsComponents is not a function` sampai entri itu ditambahkan. Kelas
+   kegagalan yang sama dengan `listChatSessions` di SPEC-854.
+6. **Test route server di shell ini wajib `unset HANOMAN_CONTROL_ORIGINS`.** Sesi agen mewarisi env
+   itu dari instance hanoman yang menjalankannya; ingress policy lalu menjawab **404 untuk seluruh
+   `/api`** — terbaca persis seperti "route-ku tak terdaftar", termasuk untuk suite VPS lama.
+7. **`pnpm --filter ./src exec tsc` merah di base**, pada `SettingsScreen.tsx:35`
+   (`builtinAgents` hilang dari default) — bawaan SPEC-881 di commit dasar worktree ini, bukan dari
+   pekerjaan SPEC-883.
+8. **Smoke endpoint nyata dijalankan** (server tsx di port 8791, `HANOMAN_HOME` + `DATABASE_URL`
+   sementara): 401 tanpa auth · katalog terbit · 404 id asing · 400 `caddy` tanpa domain · 502
+   membawa transcript ssh asli saat host tak terjangkau.
