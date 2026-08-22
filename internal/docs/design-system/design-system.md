@@ -113,11 +113,11 @@ backlog, bukan hiasan — memakai band ilustrasi tersendiri: **pet** 80–128 px
 digambar sebagai atlas sprite PET-001 (`internal/assets/pet/`, ADR-0140) dan bukan lagi family
 `sticker` (`STK-001…008`, yang tetap di katalog untuk pemakaian lain). Tabel
 status → pose beserta urutan prioritasnya ada di
-[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140--pet-hidup-b-spec-897--pet-hidup-c-spec-898-adr-0141--pet-hidup-d-spec-899-adr-0142--pet-hidup-e-spec-904).
+[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140--pet-hidup-b-spec-897--pet-hidup-c-spec-898-adr-0141--pet-hidup-d-spec-899-adr-0142--pet-hidup-e-spec-904--pet-hidup-f-spec-905-adr-0144).
 Model sheet serta template sosial tetap frontend-addressable melalui registry tetapi
 tidak dipaksakan masuk instrument panel operasional. Motif tanpa makna status selalu dekoratif.
 
-### Grammar motion Pet Hanoman (SPEC-648 · sprite: Pet hidup A, ADR-0140)
+### Grammar motion Pet Hanoman (SPEC-648 · sprite: Pet hidup A, ADR-0140 · diseret: Pet hidup F, ADR-0144)
 
 Motion Pet adalah bahasa status, bukan hiasan yang sama untuk semua artwork — tetapi sejak Pet hidup
 A identitas tiap pose **digambar sebagai frame**, bukan disusun dari transform di atas satu raster.
@@ -130,7 +130,12 @@ Grammar render: satu `<img>` atlas di dalam viewport ber-`overflow: hidden`; bar
 **tidak** memakai token durasi: satu putaran = `columns / fps` dari manifest, jadi tempo animasi
 adalah properti aset, bukan properti tema. Token `--dur-base`/`--dur-slow` dan
 `--ease-out`/`--ease-inout` tetap dipakai one-shot interaksi/transisi (hover, klik, panel, reveal);
-katalog `--dur-pet-*` SPEC-648 dicabut bersama keyframe `hn-pet-idle-*`/`hn-pet-pose-*`.
+katalog `--dur-pet-*` SPEC-648 dicabut bersama keyframe `hn-pet-idle-*`/`hn-pet-pose-*`. Sejak
+ADR-0144 ada **satu** kurva gerak tambahan, `--ease-fall` (easeInQuad), dipakai HANYA saat pet yang
+dilepas jatuh ke jalur: perpindahan berkeliaran `linear` karena lajunya memang tetap, sedangkan
+jatuh harus **mempercepat**, dan `--ease-out` bergerak ke arah sebaliknya. Ia token seperti yang
+lain — bukan `cubic-bezier` harfiah di komponen — supaya tema yang mengubah kurva gerak ikut
+menyentuh pet.
 
 Pemilik `transform` tetap terpisah per elemen — actor untuk perpindahan berkeliaran, stage untuk
 reveal, reactor untuk hover/klik, rowshift untuk baris, img untuk frame. Keyframe hanya boleh
@@ -139,10 +144,14 @@ atau merender React per-frame.
 
 Hover hanya berupa pendekatan kecil, klik berupa squash/pantul one-shot, dan kartu ringkasan
 mempunyai enter/exit sendiri. Semua amplitudo tetap kecil agar terminal menjadi fokus utama. Pada
-`prefers-reduced-motion: reduce`, setiap animation **dan** transition dimatikan (`none`), pet diam
-di pojok, selector hover tidak berlaku, dan keadaan akhir tetap terbaca penuh. Kontrak DOM,
+`prefers-reduced-motion: reduce`, setiap animation **dan** transition dimatikan (`none`), pet tak
+berkeliaran, selector hover tidak berlaku, dan keadaan akhir tetap terbaca penuh. **Menyeret pet
+tetap boleh di sana** (ADR-0144): ia manipulasi langsung yang diminta manusia, bukan gerak yang
+terjadi padanya — yang dimatikan adalah jatuhnya (seketika) dan pusingnya (dilewati). Tempat pet
+berhenti karena itu bukan selalu pojok: ia berdiri di tempat terakhir manusia meletakkannya, atau
+di pojok bila belum pernah diseret. Kontrak DOM,
 lifecycle panel, mesin berkeliaran, dan pengujiannya dijelaskan di
-[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140--pet-hidup-b-spec-897--pet-hidup-c-spec-898-adr-0141--pet-hidup-d-spec-899-adr-0142--pet-hidup-e-spec-904).
+[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140--pet-hidup-b-spec-897--pet-hidup-c-spec-898-adr-0141--pet-hidup-d-spec-899-adr-0142--pet-hidup-e-spec-904--pet-hidup-f-spec-905-adr-0144).
 
 ## Placeholder: contoh nilai, bukan pengulangan label (SPEC-490)
 

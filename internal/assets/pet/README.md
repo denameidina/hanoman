@@ -13,7 +13,8 @@ berdampingan, karena ia turunan murni dari `rows/` + `petlib.ROWS` yang tak bisa
 sesudah `ROWS` bertambah. Semuanya di **ekor** array — indeks baris lama tak bergeser, jadi diff
 atlasnya minimal. `thanks` BUKAN pose: ia baris reaksi sekali-putar (`then: idle`, seperti `wave`)
 yang hanya dipilih saat pet dielus, jadi ia tak masuk `POSE_ROW`. `held`, `falling`, dan `dizzy`
-juga bukan pose — ketiganya baris interaksi untuk pet yang **diseret**, dipakai backlog penerus.
+juga bukan pose — ketiganya baris interaksi untuk pet yang **diseret**, dan sejak SPEC-905/ADR-0144
+dipakai oleh mode `held`/`falling`/`dizzy` di `pet-walk.ts`, bukan oleh `POSE_ROW`.
 
 ## Isi
 

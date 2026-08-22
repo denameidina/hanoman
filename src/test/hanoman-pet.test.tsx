@@ -646,13 +646,24 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
     expect(laneOf().style.height).toBe("");
   });
 
-  it("plafon angkat menghormati tinggi jalur; jalur tak pernah dilewati ke bawah", () => {
+  it("plafon angkat jatuh ke viewport selama jalur belum melebar; jalur tak dilewati ke bawah", () => {
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
     pointer(hit(), "pointerdown", 500, 700);
     pointer(hit(), "pointermove", 500, -9_000);
     expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, -${CEILING}px)` });
     pointer(hit(), "pointermove", 500, 9_000);
     expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, 0px)` });
+  });
+
+  it("plafon angkat MENGIKUTI tinggi jalur yang sudah melebar, bukan viewport", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    // jsdom memberi rect nol untuk semua elemen, jadi cabang "baca jalur yang sudah melebar" hanya
+    // bisa dijalankan dengan memalsukan rect-nya — tanpa ini yang teruji cuma fallback viewport.
+    vi.spyOn(laneOf(), "getBoundingClientRect")
+      .mockReturnValue({ height: 500, width: 1024, top: 268, bottom: 768, left: 0, right: 1024, x: 0, y: 268, toJSON: () => ({}) } as DOMRect);
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 500, -9_000);
+    expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, -${500 - CELL_H}px)` });
   });
 
   it("dilepas: jatuh dengan easing percepatan, lalu pusing, lalu baris pose — jalur menyusut lagi", () => {
@@ -666,7 +677,7 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
       expect(rowshift()).toHaveAttribute("data-row", "falling");
       expect(actor()).toHaveStyle({
         transform: `translate(${HOME - 40}px, 0px)`,
-        transition: "transform 1000ms cubic-bezier(0.55, 0.085, 0.68, 0.53)",
+        transition: "transform 1000ms var(--ease-fall)",
       });
       expect(laneOf()).toHaveStyle({ top: "max(0px, var(--safe-top))" });   // masih melebar selagi jatuh
 
@@ -727,6 +738,39 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
     expect(screen.queryByTestId("pet-hearts")).toBeNull();
   });
 
+  it("seret yang dimulai SESUDAH hover memutar wave tetap memperlihatkan held, bukan wave", () => {
+    // Urutan nyata di desktop: pointer masuk (wave mulai) → tekan → seret. `oneShot` menumpuk DI ATAS
+    // baris mesin, jadi tanpa membersihkannya pet akan terlihat melambai selagi diangkat.
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    fireEvent.pointerEnter(hit());
+    expect(rowshift()).toHaveAttribute("data-row", "wave");
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 460, 500);
+    expect(rowshift()).toHaveAttribute("data-row", "held");
+  });
+
+  it("seret menutup panel yang terbuka — jangkarnya dibaca saat panel dibuka, pet sedang pergi", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    fireEvent.click(hit());
+    expect(screen.getByTestId("pet-panel")).not.toHaveAttribute("aria-hidden");
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 460, 500);
+    expect(screen.getByTestId("pet-panel")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("jari kedua mengambil alih seret tanpa menjatuhkan pet", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    pointer(hit(), "pointerdown", 500, 700, 1);
+    pointer(hit(), "pointermove", 500, 500, 1);          // terangkat 200 px
+    expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, -200px)` });
+    // Jari kedua mencengkeram di titik lain lalu naik 50 px. X tak boleh bergerak (ia hanya naik),
+    // dan Y harus MENAMBAH dari 200 ke 250 — tanpa suku `+ walkRef.current.y` di titik pegang, pet
+    // akan terjun ke 50 px karena ketinggian yang sedang berjalan hilang dari perhitungan.
+    pointer(hit(), "pointerdown", 300, 400, 2);
+    pointer(hit(), "pointermove", 300, 350, 2);
+    expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, -250px)` });
+  });
+
   it("pointercancel dilayani seperti pointerup: pet tidak tertinggal di udara", () => {
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
     pointer(hit(), "pointerdown", 500, 700);
@@ -747,6 +791,11 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
   });
 
   it("hover memutar wave BERULANG; lepas hover menyelesaikan putaran lalu berhenti", () => {
+    // Waktu DIBEKUKAN dengan sengaja: `oneShot.id` yang diturunkan dari `Date.now()` akan memberi
+    // `key` React yang identik di sini, sehingga `not.toBe(first)` di bawah menangkapnya SETIAP run
+    // alih-alih hanya saat dua putaran kebetulan jatuh di milidetik yang sama.
+    vi.useFakeTimers();
+    try {
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
     fireEvent.pointerEnter(hit());
     expect(rowshift()).toHaveAttribute("data-row", "wave");
@@ -762,6 +811,9 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
     expect(rowshift()).toHaveAttribute("data-row", "wave");   // TIDAK dipotong di tengah
     animationEnd(atlas(), "hn-pet-frames");
     expect(rowshift()).toHaveAttribute("data-row", "idle");   // baru berhenti di batas putaran
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("tidak melambai selagi diangkat, jatuh, atau pusing", () => {

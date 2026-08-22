@@ -97,3 +97,22 @@ Keputusan 1 & 3 dan butir pertama Konsekuensi diamandemen; sisanya ditegakkan.
   (`--row` + `steps(8)`), grammar SPEC-648, dan mesin berkeliaran. `held`/`falling`/`dizzy` **bukan
   pose**: `POSE_ROW`, `PetPose`, `HanomanPet.tsx`, dan `pet-walk.ts` tak disentuh SPEC-904 — baris
   itu dipakai backlog penerus yang membangun interaksi seretnya.
+
+## Amandemen 2026-08-23 — SPEC-905 (Pet hidup F): pet DISERET, dan berjalan mayoritas waktunya
+
+Keputusan 5 (perilaku) dan butir DOM keputusan 4 diamandemen oleh **ADR-0144**; sisanya ditegakkan.
+
+- **Angka berkeliaran dibalik:** berdiri **1,2–4,5 dtk** / jalan **5–14 dtk** (dulu 4–12 / 2–6), yaitu
+  ±72 % berjalan alih-alih ±33 %. `WALK_PX_PER_S` tetap 40 — yang kurang adalah durasinya, bukan
+  lajunya, dan menaikkan laju mengubah karakter berjalan yang sudah lolos Gate 2.
+- **Jangkarnya bukan selalu pojok lagi.** "mobile, reduced-motion, dan `hanoman.pet.roam=0`
+  menjangkar ke pojok" kini berbunyi: menjangkar ke **`parkedX ?? pojok`** — tempat terakhir manusia
+  meletakkan pet. Predikat `anchored()` sendiri tak berubah satu karakter pun.
+- **Mesin memegang tiga mode fisika** (`held`/`falling`/`dizzy`) di kepala `stepWalk`, di atas
+  `anchored()`, dan `PetWalkState`/`PetMove` bertambah sumbu **Y**. Ia tetap MURNI: keadaan seret
+  masuk sebagai masukan, komponen tetap satu-satunya yang menjadwalkan timeout.
+- **Jalur boleh melebar ke atas — hanya selagi `held`/`falling`.** Tepi bawahnya tak bergerak.
+  `pointer-events: none` (butir gerbang tap SPEC-763) ditegakkan apa adanya.
+- **`held`/`falling`/`dizzy` kini PUNYA pemakai.** Kalimat "dipakai backlog penerus yang membangun
+  interaksi seretnya" di amandemen SPEC-904 sudah selesai dieksekusi; ketiganya tetap **bukan** pose
+  dan `POSE_ROW`/`PetPose` tetap tak disentuh.

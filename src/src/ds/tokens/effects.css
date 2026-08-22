@@ -28,6 +28,9 @@
   /* ---- Motion: wind-quick, never bouncy ---- */
   --ease-out:   cubic-bezier(0.22, 0.61, 0.36, 1); /* @kind other */
   --ease-inout: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
+  /* SPEC-905 · satu-satunya kurva yang MEMPERCEPAT: pet yang dilepas jatuh ke jalurnya. easeInQuad —
+     `--ease-out` bergerak ke arah sebaliknya, dan perpindahan berkeliaran memang `linear`. */
+  --ease-fall:  cubic-bezier(0.55, 0.085, 0.68, 0.53); /* @kind other */
   --dur-fast:   120ms; /* @kind other */
   --dur-base:   180ms; /* @kind other */
   --dur-slow:   280ms; /* @kind other */

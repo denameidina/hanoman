@@ -47,10 +47,11 @@ const PET_CLICK_BURST = 3;
 // SPEC-905 · di bawah ambang ini gestur masih KLIK (panel + elus SPEC-898); melewatinya ia seret,
 // dan `click` yang menyusul `pointerup` ditelan supaya `thanks` tak ikut terpicu.
 const DRAG_SLOP_PX = 6;
-// Percepatan, bukan linear (easeInQuad). `linear` tetap untuk jalan kaki, yang lajunya memang tetap.
+// Percepatan, bukan linear (easeInQuad, token `--ease-fall`). `linear` tetap untuk jalan kaki, yang
+// lajunya memang tetap — dan kurva harfiah di sini akan luput dari tema yang mengubah gerak.
 const PET_EASE_CSS: Record<PetEase, string> = {
   linear: "linear",
-  fall: "cubic-bezier(0.55, 0.085, 0.68, 0.53)",
+  fall: "var(--ease-fall)",
 };
 
 // jsdom tak punya matchMedia; ketiadaannya dibaca sebagai "tak ada preferensi", bukan "reduce".
@@ -496,7 +497,11 @@ export function HanomanPet({ sessions, backlog, onOpen }:
             {tier !== "mobile" && (
               <Button size="sm" variant="ghost"
                 style={reduced ? { transition: "none", transform: "none" } : undefined}
-                onClick={() => setRoaming(!roam)}>{roam ? "Diam di pojok" : "Berkeliaran"}</Button>
+                // Label menyebut tempat pet AKAN berhenti, dan sejak SPEC-905 itu belum tentu
+                // pojok: `parkedX` membuat jangkarnya jadi tempat terakhir manusia meletakkannya.
+                onClick={() => setRoaming(!roam)}>
+                {roam ? (walk.parkedX === null ? "Diam di pojok" : "Diam di sini") : "Berkeliaran"}
+              </Button>
             )}
             <Button size="sm" variant="ghost"
               style={reduced ? { transition: "none", transform: "none" } : undefined}

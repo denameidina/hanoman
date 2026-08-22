@@ -132,4 +132,15 @@ describe("CSS sprite pet (kontrak rule terparse)", () => {
       '.hn-pet-stage:not([data-reduced-motion="true"]):hover .hn-pet-reactor');
     expect(styleRules.some((rule) => rule.selectorText === ".hn-sr-only")).toBe(true);
   });
+
+  it("pegangan seret menolak gulir & seleksi lewat .hn-pet-hit, bukan lewat inline style", () => {
+    // SPEC-905 · jsdom menjatuhkan `touch-action`/`user-select` dari inline style secara SENYAP,
+    // jadi aturan ini satu-satunya tempat keduanya bisa dibuktikan ada. Stylesheet yang diparse
+    // memang mempertahankannya — yang lumpuh hanya jalur inline.
+    const styleRules = rules.filter((rule): rule is CSSStyleRule => rule.type === CSSRule.STYLE_RULE);
+    const handle = styleRules.find((rule) => rule.selectorText === ".hn-pet-hit");
+    expect(handle?.style.getPropertyValue("touch-action")).toBe("none");
+    expect(handle?.style.getPropertyValue("user-select")).toBe("none");
+    expect(handle?.style.getPropertyValue("-webkit-user-select")).toBe("none");
+  });
 });

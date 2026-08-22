@@ -388,8 +388,8 @@ menumpang baris `idle` — yang dikatakan pet saat terputus adalah "aku tak tahu
 oleh pudar + kalimat, bukan oleh gerak baru. `thanks` **bukan** pose sama sekali: ia baris reaksi
 yang hanya bisa dipilih `oneShot`, jadi ia tak muncul di `POSE_ROW` dan tak menambah `PetPose`.
 `held`, `falling`, dan `dizzy` (SPEC-904) sama: ketiganya baris interaksi untuk pet yang **diseret**
-— terangkat, turun perlahan, pusing sesaat lalu berdiri lagi — dan dipakai backlog penerus yang
-membangun interaksinya, bukan oleh `POSE_ROW`. `wave` diregenerasi SPEC-904 supaya bisa diputar
+— terangkat, turun perlahan, pusing sesaat lalu berdiri lagi — dan sejak SPEC-905/ADR-0144 dipakai
+oleh **mode** bernama sama di `pet-walk.ts`, bukan oleh `POSE_ROW`. `wave` diregenerasi SPEC-904 supaya bisa diputar
 **berulang** tanpa kedip sambungan: frame 8 kini satu langkah sebelum frame 1 (tangan di pinggul),
 bukan salinan pose istirahat, sementara manifestnya tetap `loop: false, then: "idle"` —
 `loop: true` akan membuat animasinya `infinite` sehingga `onAnimationEnd` tak pernah menyala dan
@@ -575,12 +575,15 @@ jalur yang sama persis dengan tombol `Lihat` milik rekap.
 **Penempatan & mount.** `HanomanPet` dipasang **sekali** di `App.tsx` sebagai saudara `{screen}`,
 bukan di dalam `Shell`: `<Shell>` ditulis ulang di tiap cabang `section`, jadi pet yang tinggal di
 sana lahir kembali tiap navigasi (animasi mulai dari nol, keadaan transient hilang persis saat
-operator pindah layar untuk melihatnya). Jalur `position: fixed` selebar viewport di tepi bawah,
-`z-index: 80` → di bawah header (90), terminal fullscreen (100), Modal (150), Toast (200).
+operator pindah layar untuk melihatnya). Jalur `position: fixed` selebar viewport di tepi bawah —
+dan sejak SPEC-905 setinggi **seluruh** viewport selagi pet diangkat/jatuh — `z-index: 80` → di
+bawah header (90), terminal fullscreen (100), Modal (150), Toast (200).
 
-**Interaksi & preferensi.** Klik = panel + `wave` + berhenti; hover/fokus = berhenti + `wave` —
-kecuali pose `offline`/`sleeping`, yang tak pernah melambai (melambai atas data basi, atau sambil
-tidur, sama-sama berbohong). Panel dijangkar ke posisi pet saat buka
+**Interaksi & preferensi.** Klik = panel + `wave` sekali + berhenti; hover/fokus = berhenti +
+`wave` **berulang** sampai hover lepas (SPEC-905). Gerbangnya `canWave()`, dan daftarnya jangan
+disalin: ia `!reduced ∧ pose ∉ {offline, sleeping} ∧ !dragging ∧ !isHandled(mode)` — melambai atas
+data basi, sambil tidur, atau sambil diangkat/jatuh/pusing sama-sama berbohong, dan `isHandled`
+adalah satu-satunya tempat ketiga mode fisika itu dinamai (mode keempat cukup ditambahkan di sana). Panel dijangkar ke posisi pet saat buka
 (`left = clamp(pusat − 134, 12, vw − 268 − 12)`) dan duduk di atas jalur. Isinya **daftar seluruh
 kondisi aktif**, bukan hanya puncaknya: satu baris per kondisi, masing-masing dengan detail,
 lencana hitungan kecil saat `count > 1`, dan tombol `Buka Terminal`/`Buka Backlog` ke **targetnya
@@ -605,15 +608,21 @@ dan hit area kedua akan melanggar gerbang tap SPEC-763). Satu sumber kalimat, ta
 tersembunyi kembar. Panel yang sedang keluar
 inert agar kontrol tersembunyi tidak dapat menerima fokus. `prefers-reduced-motion: reduce` dibaca
 di JS (`window.matchMedia`, ikut mendengarkan perubahan; ketiadaannya berarti tidak reduce): saat
-aktif, `animation` dan `transition` menulis nilai eksak `none`, pet diam di rumah, dan `wave`/
-`thanks` tak pernah dipasang — motion mati total tanpa membuat status hilang. Gelembung bicara
+aktif, `animation` dan `transition` menulis nilai eksak `none`, pet tak berkeliaran, dan `wave`/
+`thanks` tak pernah dipasang — motion mati total tanpa membuat status hilang. **Menyeret tetap
+boleh** (SPEC-905): ia manipulasi langsung yang diminta manusia; yang dimatikan adalah jatuhnya
+(seketika) dan pusingnya (dilewati), dan pet berhenti di tempat terakhir ia diletakkan — belum
+tentu pojok. Gelembung bicara
 tetap **tampil** di sana (ia informasi, bukan gerak) hanya tanpa `hn-pet-bubble-in`; hati tak
 dirender sama sekali.
 
-**Gerbang tap (SPEC-763, diperluas).** Jalur pet kini selebar viewport, jadi "tak menutupi kontrol"
-harus ditegakkan struktur, bukan koordinat: `pet-root` dan seluruh pembungkusnya
-`pointer-events: none`; hanya tombol 44 px di kaki sprite (ikut berpindah bersama pet), pegangan,
-dan panel yang `auto`. Terukur lewat CDP: 1280×800 jalur 1265 px: atlas termuat, `animation-name: hn-pet-frames`, transform frame −256 → −640 px dalam 400 ms, actor 1136 → 1027,4 px (`mode: walk`, baris `working` lalu `walk-left`), dan tombol di bawah jalur tetap dijawab `elementFromPoint`; 390×844: actor diam di rumah 264 px, `mode: stand`, tak satu pun baris walk muncul, frame tetap berjalan, tap tetap tembus.
+**Gerbang tap (SPEC-763, diperluas).** Jalur pet kini selebar viewport — dan selagi pet
+diangkat/jatuh **setinggi viewport juga** (SPEC-905) — jadi "tak menutupi kontrol" harus ditegakkan
+struktur, bukan koordinat: `pet-root` dan seluruh pembungkusnya `pointer-events: none`; hanya tombol
+44 px di kaki sprite (ikut berpindah bersama pet), pegangan, dan panel yang `auto`. Pelebaran
+vertikal itu karena itu **tak boleh** dijadikan permanen dan tak boleh membawa satu pun anak
+ber-`pointer-events: auto` baru; terukur SPEC-905, `elementFromPoint` di tengah layar tetap
+mengembalikan konten dashboard di setiap langkah seret. Terukur lewat CDP: 1280×800 jalur 1265 px: atlas termuat, `animation-name: hn-pet-frames`, transform frame −256 → −640 px dalam 400 ms, actor 1136 → 1027,4 px (`mode: walk`, baris `working` lalu `walk-left`), dan tombol di bawah jalur tetap dijawab `elementFromPoint`; 390×844: actor diam di rumah 264 px, `mode: stand`, tak satu pun baris walk muncul, frame tetap berjalan, tap tetap tembus.
 
 **Tanpa ADR untuk SPEC-897, dan itu disengaja.** Tak ada endpoint, skema, poll, atau channel yang
 berubah; status koneksi adalah pengamat socket `events` yang sudah ada, dan dua baris atlas
@@ -630,8 +639,10 @@ dan sengaja **tak** mengikuti `projectFilter`: ia hadir juga di halaman yang tak
 **Pengujian.** `pet-state.test.ts` (tabel prioritas, eksklusivitas kondisi, terputus, deciding,
 tidur, `recheckAt`), `events.test.ts` (status koneksi: frame pertama vs `onopen`, `paused`, jam
 putus), `pet-sprite.test.ts` (manifest 16 baris + `POSE_ROW` + kontrak CSS terparse),
-`pet-walk.test.ts` (tabel mesin), `hanoman-pet.test.tsx` (render/interaksi/reduced/roam/mobile/
-jalan + lencana/panel berdaftar/pudar), `pet-mount.test.tsx` (mount tunggal + sumber artwork),
+`pet-walk.test.ts` (tabel mesin + seret/jatuh/pusing/`parkedX`), `hanoman-pet.test.tsx`
+(render/interaksi/reduced/roam/mobile/jalan + lencana/panel berdaftar/pudar + gestur seret, plafon
+angkat, ambang klik-vs-seret, lambaian menetap), `pet-mount.test.tsx` (mount tunggal + sumber
+artwork),
 `internal/scripts/pet/test-petlib.py` (pipeline atas lembar sintetis).
 
 ## Tinggi & scrolling: rantai flex, bukan angka ajaib
