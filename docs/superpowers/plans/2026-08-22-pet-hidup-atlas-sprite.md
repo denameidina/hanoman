@@ -1811,7 +1811,7 @@ git commit -m "feat(pet): pet-walk.ts — mesin berkeliaran murni: berdiri/jalan
 **Interfaces:**
 - Produces: `PET_ROAM_KEY = "hanoman.pet.roam"`, `loadPetRoam(): boolean` (default `true`), `savePetRoam(roam: boolean)`; kelas CSS `.hn-pet-rowshift`, `.hn-sr-only`; keyframe `hn-pet-frames`.
 
-- [ ] **Step 1: Perbarui test `pet-state` dan `pet-mount` (gagal dulu)**
+- [x] **Step 1: Perbarui test `pet-state` dan `pet-mount` (gagal dulu)**
 
 Di `src/test/pet-state.test.ts` ganti import baris 4 dan blok `describe("POSE_ART", …)` di akhir berkas:
 
@@ -1850,7 +1850,7 @@ Di `src/test/pet-mount.test.tsx` ganti test `"memanggil artwork lewat ID katalog
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-state.test.ts src/test/pet-mount.test.tsx`
 Expected: FAIL — `loadPetRoam is not a function` / `expected … not to match /STK-00\d/`.
 
-- [ ] **Step 2: Ubah `pet-state.ts`**
+- [x] **Step 2: Ubah `pet-state.ts`**
 
 Hapus import `StickerIllustrationId` (baris 9) dan seluruh blok `POSE_ART` (baris 14–23), ganti dengan komentar:
 
@@ -1879,7 +1879,7 @@ export function savePetRoam(roam: boolean): void {
 }
 ```
 
-- [ ] **Step 3: Ubah CSS**
+- [x] **Step 3: Ubah CSS**
 
 Di `src/src/app.css` ganti komentar blok SPEC-648 (baris 597–598) menjadi:
 
@@ -1905,16 +1905,16 @@ Hapus seluruh `@keyframes hn-pet-idle-ready` … `@keyframes hn-pet-pose-out` (b
 
 Di `src/src/ds/tokens/effects.css` hapus enam baris `--dur-pet-*` beserta komentarnya (baris 35–40).
 
-- [ ] **Step 4: Cabut katalog motion**
+- [x] **Step 4: Cabut katalog motion**
 
 Run: `git rm -q src/src/screens/pet-motion.ts src/test/pet-motion.test.ts`
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-state.test.ts src/test/pet-mount.test.tsx src/test/pet-sprite.test.ts`
 Expected: `pet-state` & `pet-sprite` (7/7, termasuk kontrak CSS) lulus; `pet-mount` masih gagal pada `HanomanPet.tsx … StickerIllustration` — diselesaikan Task 9. `grep -rn "dur-pet\|hn-pet-idle\|POSE_ART\|pet-motion" src/src src/test` harus kosong.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/pet-state.ts src/src/app.css src/src/ds/tokens/effects.css src/test/pet-state.test.ts src/test/pet-mount.test.tsx
@@ -1933,7 +1933,7 @@ git commit -m "refactor(pet): preferensi roam; CSS sprite (rowshift, hn-pet-fram
 - Consumes: Task 6–8; `useResponsiveTier` dari `../ds`; `NotificationsContext` (test).
 - Produces: komponen `HanomanPet({ sessions, backlog, onOpen })` dengan `data-testid` `pet-root, pet-actor (data-facing, data-mode), pet-stage, pet-status, pet-reactor, pet-viewport, pet-rowshift (data-row, --row), pet-atlas, pet-hit, pet-panel`; tombol panel `Buka Terminal|Buka Backlog`, `Diam di pojok|Berkeliaran` (bukan di mobile), `Sembunyikan`; pegangan `Tampilkan pet Hanoman`.
 
-- [ ] **Step 1: Tulis ulang test komponen (gagal dulu)**
+- [x] **Step 1: Tulis ulang test komponen (gagal dulu)**
 
 `src/test/hanoman-pet.test.tsx`:
 
@@ -2206,7 +2206,7 @@ describe("HanomanPet (sprite)", () => {
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx`
 Expected: FAIL (komponen lama masih merender `StickerIllustration`, tak ada `pet-atlas`).
 
-- [ ] **Step 2: Tulis ulang komponen**
+- [x] **Step 2: Tulis ulang komponen**
 
 `src/src/screens/HanomanPet.tsx`:
 
@@ -2548,7 +2548,7 @@ export function HanomanPet({ sessions, backlog, onOpen }:
 }
 ```
 
-- [ ] **Step 3: Jalankan semua test pet + typecheck `src`**
+- [x] **Step 3: Jalankan semua test pet + typecheck `src`**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/hanoman-pet.test.tsx src/test/pet-mount.test.tsx src/test/pet-state.test.ts src/test/pet-sprite.test.ts src/test/pet-walk.test.ts`
 Expected: `Test Files  5 passed (5)`, `Tests  53 passed (53)`.
@@ -2556,7 +2556,7 @@ Expected: `Test Files  5 passed (5)`, `Tests  53 passed (53)`.
 Run: `pnpm --filter ./src exec tsc --noEmit -p tsconfig.json; echo "tsc exit=$?"`
 Expected: tanpa keluaran error, `tsc exit=0`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/src/screens/HanomanPet.tsx src/test/hanoman-pet.test.tsx
@@ -2574,7 +2574,7 @@ git commit -m "feat(pet): HanomanPet sprite — atlas steps(8), actor berkeliara
 - Consumes: komponen Task 9, atlas Task 5.
 - Produces: bukti terukur untuk §11 spec (dicatat di pesan commit Task 11).
 
-- [ ] **Step 1: Harness Vite yang hanya me-mount komponen**
+- [x] **Step 1: Harness Vite yang hanya me-mount komponen**
 
 `src/harness/pet.html`:
 
@@ -2610,7 +2610,7 @@ createRoot(document.getElementById("root")!).render(
 Run (latar): `cd src && pnpm exec vite --port 5199 --strictPort`
 Expected: `Local: http://localhost:5199/`; buka `http://localhost:5199/harness/pet.html` — pet terlihat di tepi bawah.
 
-- [ ] **Step 2: Skrip CDP**
+- [x] **Step 2: Skrip CDP**
 
 `<scratchpad>/pet-cdp.mjs` (Node 24, tanpa dependency):
 
@@ -2653,7 +2653,7 @@ kontrol di bawah jalur tetap menerima tap: true
 ```
 Bila `actor berpindah` `false`, tunggu 8 dtk lagi (berdiri pertama 4 dtk + transisi). Ulangi dengan `--window-size=390,844` dan pastikan `mode: stand` serta `actor` tetap `translateX(home)`.
 
-- [ ] **Step 3: Bersihkan harness**
+- [x] **Step 3: Bersihkan harness**
 
 Run: `rm -rf src/harness; pkill -f "vite --port 5199" || true` (hanya proses vite port 5199 milik harness ini — jangan `pkill` pola lain, SPEC-402). Catat angka hasil CDP untuk pesan commit Task 11.
 
@@ -2665,7 +2665,7 @@ Run: `rm -rf src/harness; pkill -f "vite --port 5199" || true` (hanya proses vit
 - Create: `internal/docs/adr/0140-pet-sprite-codex-pipeline-berkeliaran.md`
 - Modify: `internal/docs/frontend/frontend-implementation.md` (seksi "Pet Hanoman", mulai baris ~283), `internal/docs/design-system/design-system.md` (grammar motion pet + band pet), `internal/docs/brand/illustration/03-mascot-system.md` (band "pet"), `internal/docs/adr/README.md`, `internal/docs/README.md`
 
-- [ ] **Step 1: ADR-0140**
+- [x] **Step 1: ADR-0140**
 
 Verifikasi nomor: `ls internal/docs/adr | tail -3` — bila `0140-*` sudah ada (sesi lain), pakai nomor bebas berikutnya dan ganti semua rujukan `ADR-0140` di spec, README aset, dan docs di bawah.
 
@@ -2715,7 +2715,7 @@ layer animasi. Referensi produk (Codex Pets, `/buddy` Claude Code) memakai frame
   jalur tetap sampai, ukuran atlas … B>.
 ```
 
-- [ ] **Step 2: `frontend-implementation.md` — tulis ulang seksi Pet**
+- [x] **Step 2: `frontend-implementation.md` — tulis ulang seksi Pet**
 
 Ganti isi seksi `## Pet Hanoman: status sesi sebagai pose (SPEC-585)` sampai sebelum seksi berikutnya dengan struktur:
 
@@ -2762,15 +2762,15 @@ gambar" SPEC-585. Reduced-motion: `animation: none`, `transition: none`, pet di 
 
 Hapus paragraf SPEC-648 tentang `pet-motion.ts`, `hn-pet-idle-*`, `hn-pet-pose-*`, `--dur-pet-*`; sebutkan sekali bahwa katalog itu dicabut oleh Pet hidup A.
 
-- [ ] **Step 3: `design-system.md`**
+- [x] **Step 3: `design-system.md`**
 
 Di bagian motion pet: ganti tabel keyframe idle SPEC-648 dengan paragraf "grammar sprite": satu img, `steps`, token `--dur-base/slow` untuk interaksi, frame tak memakai token durasi (durasi = `columns/fps` dari manifest). Di bagian ilustrasi produk tambahkan band **pet** (80–128 px, ±2,5 head unit, hanya pet dashboard, ADR-0140) di samping family `sticker`.
 
-- [ ] **Step 4: `03-mascot-system.md`**
+- [x] **Step 4: `03-mascot-system.md`**
 
 Di `## Scale bands` tambahkan: `Pet (dashboard) 80–128 px — ±2,5 head unit, proporsi ringkas; satu-satunya pengecualian atas "don't use chibi inflation" (ADR-0140), ekspresi lewat mata/kepala/ekor, tanpa emoji face.` Di `## Parts, do/don't, Gate 2` tambahkan kalimat: `Atlas pet direview lewat internal/assets/pet/qa/ (GIF + contact sheet per baris); walk-left digambar, bukan mirror.`
 
-- [ ] **Step 5: Index**
+- [x] **Step 5: Index**
 
 `internal/docs/adr/README.md`: tambah baris `- [0140 — Pet dashboard sebagai sprite beranimasi …](0140-pet-sprite-codex-pipeline-berkeliaran.md) — menegakkan 0039, mengamandemen konvensi SPEC-585/648 & sistem maskot (Pet hidup A)` di posisi teratas daftar.
 `internal/docs/README.md`: perbarui deskripsi link `frontend-implementation.md`, `design-system.md`, `03-mascot-system.md` (sebut Pet hidup A/ADR-0140) dan tambah link ADR-0140 di daftar ADR.
@@ -2778,7 +2778,7 @@ Di `## Scale bands` tambahkan: `Pet (dashboard) 80–128 px — ±2,5 head unit,
 Run: `hanoman docs index --check` (CLI produk, read-only; bila `hanoman` global lebih tua dari checkout ini: `pnpm build:cli && node cli/dist/hanoman.js docs index --check`)
 Expected: laporan tanpa entri hilang / tak ter-link.
 
-- [ ] **Step 6: Test tersentuh + commit**
+- [x] **Step 6: Test tersentuh + commit**
 
 Run: `env -u NODE_ENV pnpm vitest --run src/test/pet-mount.test.tsx src/test/pet-sprite.test.ts`
 Expected: lulus (docs tak mengubah kode; ini pengaman terakhir).

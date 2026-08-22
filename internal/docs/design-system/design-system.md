@@ -83,36 +83,41 @@ API komponen:
 
 Penempatan mengikuti kegunaan, bukan kewajiban memajang semuanya. Enam product-state dipakai pada
 onboarding, backlog sungguh kosong, sesi aktif, menunggu keputusan, sukses, dan error yang bisa
-dipulihkan. Family **sticker** (`STK-001…008`) ditempatkan sebagai **Pet Hanoman**: maskot
-persisten di sudut dashboard yang pose-nya turunan status sesi & backlog, bukan hiasan — tabel
+dipulihkan. **Pet Hanoman** — maskot persisten di tepi bawah dashboard yang pose-nya turunan status sesi &
+backlog, bukan hiasan — memakai band ilustrasi tersendiri: **pet** 80–128 px, ±2,5 head unit,
+digambar sebagai atlas sprite PET-001 (`internal/assets/pet/`, ADR-0140) dan bukan lagi family
+`sticker` (`STK-001…008`, yang tetap di katalog untuk pemakaian lain). Tabel
 status → pose beserta urutan prioritasnya ada di
-[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-pose-spec-585).
+[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140).
 Model sheet serta template sosial tetap frontend-addressable melalui registry tetapi
 tidak dipaksakan masuk instrument panel operasional. Motif tanpa makna status selalu dekoratif.
 
-### Grammar motion Pet Hanoman (SPEC-648)
+### Grammar motion Pet Hanoman (SPEC-648 · sprite: Pet hidup A, ADR-0140)
 
-Motion Pet adalah bahasa status, bukan hiasan yang sama untuk semua artwork. Tujuh pose yang dipakai
-produk mempunyai identitas idle sendiri: `ready` bernapas tenang, `working` bob berirama,
-`waiting` diam lalu bergoyang berkala, `blocked` berat dan lambat, `review` condong memperhatikan,
-`shipped` flourish satu kali lalu menenang, dan `docs-updated` flutter ringan berkala. Pemetaan murni
-pose → shorthand animation hidup di `src/src/screens/pet-motion.ts`; pemilihan status tetap milik
-`pet-state.ts`.
+Motion Pet adalah bahasa status, bukan hiasan yang sama untuk semua artwork — tetapi sejak Pet hidup
+A identitas tiap pose **digambar sebagai frame**, bukan disusun dari transform di atas satu raster.
+Sumbernya satu atlas WebP (sel 192×208, 8 kolom, 10 baris) plus manifest `pet.json`; artwork-nya
+dibuat lewat pipeline `internal/scripts/pet/` dan direview di `internal/assets/pet/qa/`.
 
-Empat layer compositor memisahkan pemilik `transform`: stage untuk reveal, reactor untuk hover/klik,
-idle untuk karakter pose, dan image layer untuk enter/exit pose. Keyframe hanya boleh mengubah
-`transform` dan/atau `opacity`; tidak boleh menganimasikan layout, memakai timer denyut, atau
-merender React per-frame. Durasi idle memakai token `--dur-pet-active`,
-`--dur-pet-attention`, `--dur-pet-calm`, dan `--dur-pet-heavy`; flourish shipped memakai
-`--dur-pet-flourish`. One-shot interaksi/transisi memakai `--dur-base`/`--dur-slow`, sedangkan
-easing memakai `--ease-out`/`--ease-inout`.
+Grammar render: satu `<img>` atlas di dalam viewport ber-`overflow: hidden`; baris dipilih
+`--row` pada pembungkus (`translateY(calc(var(--row) * -100%))`), frame diputar
+`@keyframes hn-pet-frames { to { transform: translateX(-100%) } }` dengan `steps(8, end)`. Frame
+**tidak** memakai token durasi: satu putaran = `columns / fps` dari manifest, jadi tempo animasi
+adalah properti aset, bukan properti tema. Token `--dur-base`/`--dur-slow` dan
+`--ease-out`/`--ease-inout` tetap dipakai one-shot interaksi/transisi (hover, klik, panel, reveal);
+katalog `--dur-pet-*` SPEC-648 dicabut bersama keyframe `hn-pet-idle-*`/`hn-pet-pose-*`.
 
-Hover hanya berupa pendekatan kecil, klik berupa squash/pantul one-shot, pergantian pose berupa
-kompresi lalu overshoot singkat, dan kartu ringkasan mempunyai enter/exit sendiri. Semua amplitudo
-tetap kecil agar terminal menjadi fokus utama. Pada `prefers-reduced-motion: reduce`, setiap
-animation **dan** transition dimatikan (`none`), selector hover tidak berlaku, dan keadaan akhir
-tetap terbaca penuh. Kontrak DOM, lifecycle panel, dan pengujiannya dijelaskan di
-[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-pose-spec-585).
+Pemilik `transform` tetap terpisah per elemen — actor untuk perpindahan berkeliaran, stage untuk
+reveal, reactor untuk hover/klik, rowshift untuk baris, img untuk frame. Keyframe hanya boleh
+mengubah `transform` dan/atau `opacity`; tidak boleh menganimasikan layout, memakai timer denyut,
+atau merender React per-frame.
+
+Hover hanya berupa pendekatan kecil, klik berupa squash/pantul one-shot, dan kartu ringkasan
+mempunyai enter/exit sendiri. Semua amplitudo tetap kecil agar terminal menjadi fokus utama. Pada
+`prefers-reduced-motion: reduce`, setiap animation **dan** transition dimatikan (`none`), pet diam
+di pojok, selector hover tidak berlaku, dan keadaan akhir tetap terbaca penuh. Kontrak DOM,
+lifecycle panel, mesin berkeliaran, dan pengujiannya dijelaskan di
+[frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140).
 
 ## Placeholder: contoh nilai, bukan pengulangan label (SPEC-490)
 

@@ -15,7 +15,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 
 ## brand
 - [Hanoman brand book](brand/README.md) — filosofi story-led/product-grounded, empat lakon, voice bilingual, messaging, identitas visual, dan contoh penerapan untuk produk open-source
-  - [Illustration system](brand/illustration/README.md) — art direction Surakarta, model karakter/mascot, katalog 41 aset, hybrid briefs, prompt library, dan delivery QA
+  - [Illustration system](brand/illustration/README.md) — art direction Surakarta, model karakter/mascot (termasuk band **pet** 80–128 px, ADR-0140), katalog 41 aset, hybrid briefs, prompt library, dan delivery QA
 
 ## requirements
 - [prd](requirements/prd.md) · [frd](requirements/frd.md) · [rd](requirements/rd.md) · [acceptance-criteria (EARS)](requirements/acceptance-criteria-ears-standard.md)
@@ -89,6 +89,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0140 — Pet dashboard sebagai sprite beranimasi: aset dibuat AI lewat Codex, pipeline registrasi, renderer frame, berkeliaran di tepi bawah](adr/0140-pet-sprite-codex-pipeline-berkeliaran.md) — menegakkan 0039, mengamandemen konvensi SPEC-585/648 & sistem maskot brand (SPEC-896)
 - [0139 — Hardening ADR-0117 jadi opt-in (`HANOMAN_HARDENING`), setup awal dipandu wizard di browser](adr/0139-hardening-opsional-dan-wizard-setup.md) — mengamandemen 0117 & 0087, mengikuti 0088 (SPEC-884)
 - [0138 — Bootstrap sync, halaman ber-anggaran byte, dan feed yang berhenti berdenyut](adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md) — memperbaiki akibat susulan 0131; menegakkan 0043, 0045 & 0082; memperluas 0100 & 0135 (SPEC-885)
 - [0137 — Provisioning VPS berbasis katalog: probe sebagai sumber kebenaran, biner ≠ login](adr/0137-provisioning-vps-berbasis-katalog.md) — menegakkan 0117, 0042 & 0088, mengamandemen 0087 (SPEC-883)
@@ -237,9 +238,9 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [threat model deployment publik](security/threat-model.md) — asset, aktor, trust boundary, abuse case, kontrol, residual risk, invariant test, dan batas otorisasi DAST SPEC-761
 
 ## design-system
-- [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), ilustrasi, dan grammar motion Pet Hanoman (SPEC-648)
+- [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), ilustrasi (termasuk band **pet** 80–128 px), dan grammar motion Pet Hanoman: sprite atlas + `steps()` sejak Pet hidup A (SPEC-648 · ADR-0140)
 
 ## frontend
-- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan motion Pet Hanoman (SPEC-763)
+- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan Pet Hanoman sebagai sprite hidup yang berkeliaran di tepi bawah (SPEC-763 · Pet hidup A, ADR-0140)
 
 > Chiranjivi — docs bertahan lebih lama dari satu commit atau sesi. Jaga index ini tetap sinkron.

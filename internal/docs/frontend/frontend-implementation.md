@@ -280,11 +280,11 @@ orientasi, dan alpha master **berikut** keberadaan, batas 768px, alpha, dan peng
 web-nya — master sehat yang turunannya hilang berarti layar kosong di dashboard, bukan sekadar aset
 besar.
 
-## Pet Hanoman: status sesi sebagai pose (SPEC-585)
+## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A, ADR-0140)
 
-Widget maskot di sudut kanan-bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi &
-backlog, bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada
-skema, tak ada channel realtime baru (ADR-0024 & ADR-0039 utuh).
+Widget maskot di tepi bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi & backlog,
+bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada skema,
+tak ada channel realtime baru (ADR-0024 & ADR-0039 utuh).
 
 | sumber | frame WS | dipakai untuk |
 |---|---|---|
@@ -292,23 +292,21 @@ skema, tak ada channel realtime baru (ADR-0024 & ADR-0039 utuh).
 | `backlog: Spec[]` | `specs` | `stage`, `blockedBy`, `source`, `title` |
 | `useNotifications().items` | `notifications` | `type` + `createdAt` keadaan transient |
 
-Kosakata sesinya **identik** dengan sel Terminal (`awaiting` = hidup && `decision`, `deciding`
-menang atasnya, `failed` = `exited` && `exitCode` bukan nol). Pet yang memakai rumus lain akan
-mengatakan hal yang berlawanan dengan sel di layar yang sama.
+**Kontrak status** (tak berubah sejak SPEC-585): `derivePetState` di `src/src/screens/pet-state.ts`
+(murni & bertest). Kosakata sesinya **identik** dengan sel Terminal (`awaiting` = hidup &&
+`decision`, `deciding` menang atasnya, `failed` = `exited` && `exitCode` bukan nol). Urutan tabel
+**adalah** urutan prioritas: kandidat pertama yang menyala menang, dan itu satu-satunya mekanisme
+anti-kedip — tak ada timer dwell.
 
-Pemetaan pose hidup di `src/src/screens/pet-state.ts` (murni & bertest). Urutan tabel **adalah**
-urutan prioritas: kandidat pertama yang menyala menang, dan itu satu-satunya mekanisme anti-kedip —
-tak ada timer dwell.
-
-| # | pose | ID katalog | menyala saat |
+| # | pose | baris atlas | menyala saat |
 |---|---|---|---|
-| 1 | `blocked` | `STK-004` | ada sesi gagal — atau tak ada sesi hidup **dan** ada backlog ber-`blockedBy` |
-| 2 | `waiting` | `STK-003` | sesi hidup ber-`decision` yang **tidak** sedang dilayani lead |
-| 3 | `shipped` | `STK-005` | notifikasi `done`/`automerge` non-audit, masih di dalam window transient |
-| 4 | `docs-updated` | `STK-008` | notifikasi `done` untuk backlog ber-`source: "audit"`, masih transient |
-| 5 | `working` | `STK-002` | sesi hidup yang backlog-nya belum `done` |
-| 6 | `review` | `STK-006` | sesi terdaftar yang backlog-nya sudah `stage: "done"` |
-| 7 | `ready` | `STK-001` | lantai — selalu benar |
+| 1 | `blocked` | `blocked` | ada sesi gagal — atau tak ada sesi hidup **dan** ada backlog ber-`blockedBy` |
+| 2 | `waiting` | `waiting` | sesi hidup ber-`decision` yang **tidak** sedang dilayani lead |
+| 3 | `shipped` | `shipped` | notifikasi `done`/`automerge` non-audit, masih di dalam window transient |
+| 4 | `docs-updated` | `docs-updated` | notifikasi `done` untuk backlog ber-`source: "audit"`, masih transient |
+| 5 | `working` | `working` | sesi hidup yang backlog-nya belum `done` |
+| 6 | `review` | `review` | sesi terdaftar yang backlog-nya sudah `stage: "done"` |
+| 7 | `ready` | `idle` | lantai — selalu benar |
 
 Empat keputusan di dalam tabel itu yang tak terbaca dari kodenya:
 
@@ -329,65 +327,100 @@ Empat keputusan di dalam tabel itu yang tak terbaca dari kodenya:
   terceklist, ADR-0029) dan memang bergerak. Karena itu pula `working` mengecualikan sesi ber-spec
   `done`: pane hidup di atas backlog selesai bukan sedang bekerja, ia menunggu dilihat.
 
-`STK-007` (`thanks`) sengaja tak dipakai — ungkapan terima kasih, bukan keadaan mesin. Kedelapan
-turunan web sticker sudah ikut ke bundle sejak sebelum SPEC-585 (glob registry eager atas seluruh
-`web/`), jadi pet menambah **0 byte** aset — terukur: 8 berkas sticker di `src/dist/assets`
-sebelum maupun sesudah.
+**Atlas & manifest.** `internal/assets/pet/hnm-pet-anoman-atlas-v01.webp` + `pet.json` (PET-001):
+sel 192×208, 8 kolom, 10 baris (`idle, walk-right, walk-left, working, waiting, blocked, review,
+shipped, docs-updated, wave`), karakter berdiri 168 px, jangkar kaki x 0,62 / baseline 202.
+`pet-sprite.ts` memvalidasi manifest (validator tangan — `zod` tak bisa di-resolve dari paket
+`src`), memetakan pose → baris (`POSE_ROW`; hanya `ready → idle` yang berganti nama),
+`durationMs = columns / fps × 1000`, dan rantai `then` untuk baris sekali-putar (`shipped`, `wave`
+→ `idle`). Pipeline pembuatannya (Codex → key → registrasi → QA → atlas) di
+`internal/assets/pet/README.md`. Sticker `STK-*` tetap di katalog ilustrasi tetapi **tak lagi
+dipakai pet**.
+
+**DOM & kepemilikan transform.** Grammar SPEC-648 dipertahankan: tiap pemilik `transform` adalah
+elemen sendiri, keyframe hanya menulis `transform`/`opacity`, tanpa JS per frame, tanpa
+rAF/interval.
+
+```
+pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 sel × s · pointer-events:none · z 80
+└─ pet-actor   transform: translateX(var(--x)) · transition: transform <segmen> linear
+   ├─ pet-stage   role=status aria-live=polite · hn-pet-reveal
+   │  ├─ pet-reactor   hover/klik
+   │  │  └─ pet-viewport   overflow:hidden · width 192s · height 208s
+   │  │     └─ pet-rowshift   height 208s · transform: translateY(calc(var(--row) * -100%))
+   │  │        └─ img.hn-pet-atlas   width 1536s · animation: hn-pet-frames var(--dur) steps(8,end) <count> <fill>
+   │  ├─ span.hn-sr-only   kalimat status
+   │  └─ button.hit   44×44 di kaki · pointer-events:auto
+   └─ panel   popover · dijangkar ke pet, di-clamp viewport
+```
+
+Satu `<img>` atlas; frame oleh `steps(8, end)` atas `translateX(-100%)` (`-100%` = lebar img = 8
+sel, jadi bebas skala dan bebas `var()` di keyframe), baris oleh `--row` pada `.hn-pet-rowshift`.
+Baris `loop: false` memakai `animation-iteration-count: 1` + `forwards`; `animationend` (difilter
+`animationName === "hn-pet-frames"` dan baris yang sedang aktif) mengganti ke baris `then` atau
+melepas `wave`. Pergantian baris sekali-putar memakai `key` React pada img agar animasi mulai dari
+frame 1. Skala `s` = tinggi karakter / `character.h`: **112 px** desktop & tablet, **96 px** mobile
+(`useResponsiveTier`). Katalog motion SPEC-648 (`pet-motion.ts`, `hn-pet-idle-*`, `hn-pet-pose-*`,
+`hn-pet-celebrate`, token `--dur-pet-*`) **dicabut** oleh Pet hidup A — gerak pose kini datang dari
+frame yang digambar, bukan dari transform di atas satu raster; `hn-pet-reveal`, `hn-pet-click`, dan
+`hn-pet-panel-*` tetap.
+
+**Mesin berkeliaran** (`pet-walk.ts`, murni: `stepWalk(state, input, rng)` menerima keadaan +
+masukan + `rng` dan mengembalikan keadaan baru, baris yang harus diputar, dan perpindahan):
+
+| kondisi | perilaku |
+|---|---|
+| `tier === "mobile"` ∨ `reduced` ∨ `!roam` | di **rumah** (`x = laneWidth − petWidth − margin`), menghadap kanan, `durationMs = 0` |
+| pose tenang: `ready`, `working`, `review`, `docs-updated` | bergantian **berdiri 4–12 dtk** (baris pose) dan **jalan 2–6 dtk** @ 40 px/dtk ke target acak dalam `[margin, laneWidth − petWidth − margin]`; baris `walk-right`/`walk-left` sesuai arah; sampai → berdiri |
+| pose perhatian: `waiting`, `blocked` | `mode: "home"` — jalan pulang ke pojok kanan bila belum di sana, lalu berdiri memutar baris pose; kabar penting selalu di tempat yang sama |
+| `shipped` | berhenti di tempat, baris `shipped` sekali → `idle` (lewat `then`), lalu aturan tenang |
+| `hovered` ∨ `panelOpen` ∨ `documentHidden` | berhenti (transisi dipotong di posisi saat ini); masuk hover → `wave` sekali lalu baris pose |
+| resize (`laneWidth` berubah) | `x` di-clamp; transisi yang sedang berjalan dipotong |
+
+Penjadwalan: **satu** `setTimeout` pada `state.until` + `transitionend` pada `pet-actor` (difilter
+`propertyName === "transform"`) + `visibilitychange` + `resize` (debounce 150 ms). Tanpa interval.
+`currentX` dibaca dari `getBoundingClientRect()` hanya pada peristiwa, bukan per frame (jsdom
+memberi rect nol → jatuh ke posisi keadaan).
 
 **Penempatan & mount.** `HanomanPet` dipasang **sekali** di `App.tsx` sebagai saudara `{screen}`,
 bukan di dalam `Shell`: `<Shell>` ditulis ulang di tiap cabang `section`, jadi pet yang tinggal di
 sana lahir kembali tiap navigasi (animasi mulai dari nol, keadaan transient hilang persis saat
-operator pindah layar untuk melihatnya) — dan dari dalam `Shell` ia butuh prop baru di sembilan
-call site untuk menjangkau `sessions`/`setSection`/`setFocusSession`. Overlay `position: fixed`
-kanan-bawah, `z-index: 80` → di bawah header (90), terminal fullscreen (100), Modal (150), Toast
-(200). Pembungkusnya `pointer-events: none` dan hanya tombolnya `auto`, jadi "tak menutupi kontrol"
-ditegakkan struktur, bukan koordinat.
+operator pindah layar untuk melihatnya). Jalur `position: fixed` selebar viewport di tepi bawah,
+`z-index: 80` → di bawah header (90), terminal fullscreen (100), Modal (150), Toast (200).
 
-**Animasi (SPEC-648).** `motionForPose()` di `pet-motion.ts` memberi tujuh pose tujuh identitas idle:
-`ready` tenang, `working` giat berirama, `waiting` memanggil perhatian secara berkala, `blocked`
-berat/lambat, `review` condong memperhatikan, `shipped` flourish satu kali lalu tenang, dan
-`docs-updated` flutter ringan. Fungsi ini murni presentasi; urutan status dan `derivePetState()` di
-atas tidak berubah. Durasi idle dan flourish memakai token semantik `--dur-pet-*`, sedangkan
-one-shot interaksi/transisi dan easing memakai token design system yang sudah ada.
+**Interaksi & preferensi.** Klik = panel + `wave` + berhenti; hover/fokus = berhenti + `wave`.
+Panel dijangkar ke posisi pet saat buka (`left = clamp(pusat − 134, 12, vw − 268 − 12)`) dan duduk
+di atas jalur. Klik memasang `hn-pet-click` sekali dan membersihkan state melalui `animationend`
+yang difilter menurut nama, bukan timer. Ringkasan memisahkan `open` dari `panelMounted`:
+tutup/Escape/klik-luar membuat panel `aria-hidden`, inert, dan tidak menerima pointer selama
+`hn-pet-panel-out`, lalu unmount pada `animationend`. Tombol `Diam di pojok`/`Berkeliaran`
+menyimpan `hanoman.pet.roam` (default berkeliaran; tier mobile dipaksa diam dan tombolnya
+disembunyikan). `hanoman.pet.hidden` + pegangan buntut 44 px tak berubah: disembunyikan berarti
+**menyusut**, bukan lenyap.
 
-Stage mempunyai empat pemilik `transform` terpisah: `pet-stage` untuk reveal, `pet-reactor` untuk
-hover/klik, `pet-idle` untuk karakter pose, dan image layer untuk enter/exit. Pemisahan ini membuat
-gerak dapat berkomposisi tanpa satu animation menimpa animation lain. Pose yang **pernah** terjadi
-tetap dirender bertumpuk agar layer lama sempat memainkan `hn-pet-pose-out`, tetapi artwork lain
-tidak dimuat sebelum dipakai. Pose baru memainkan kompresi/overshoot `hn-pet-pose-in`, bukan
-crossfade datar. Seluruh keyframe di `app.css` hanya mengubah `transform`/`opacity`; tidak ada
-interval, `requestAnimationFrame`, pengukuran DOM, atau render React per-frame.
+**Aksesibilitas & reduced motion.** Atlas `alt=""` + `aria-hidden`; kalimat status (`Hanoman
+<label> · <headline>`) hidup di `span.hn-sr-only` di dalam `role="status" aria-live="polite"` —
+menggantikan "alt bermakna di gambar" SPEC-585, karena satu gambar yang isinya berganti-frame tak
+punya alt yang jujur. Satu sumber kalimat, tanpa teks tersembunyi kembar. Panel yang sedang keluar
+inert agar kontrol tersembunyi tidak dapat menerima fokus. `prefers-reduced-motion: reduce` dibaca
+di JS (`window.matchMedia`, ikut mendengarkan perubahan; ketiadaannya berarti tidak reduce): saat
+aktif, `animation` dan `transition` menulis nilai eksak `none`, pet diam di rumah, dan `wave` tak
+pernah dipasang — motion mati total tanpa membuat status hilang.
 
-Hover memakai transition kecil yang dikecualikan saat reduced-motion. Klik memasang
-`hn-pet-click` sekali dan membersihkan state melalui `animationend` yang difilter menurut nama,
-bukan timer. Ringkasan memisahkan `open` dari `panelMounted`: tutup/Escape/klik-luar membuat panel
-`aria-hidden`, inert, dan tidak menerima pointer selama `hn-pet-panel-out`, lalu unmount pada
-`animationend`. Saat reduced-motion, unmount berlangsung sinkron karena tak ada event animation.
-Memanggil kembali pet dari handle buntut me-mount stage dengan `hn-pet-reveal`.
+**Gerbang tap (SPEC-763, diperluas).** Jalur pet kini selebar viewport, jadi "tak menutupi kontrol"
+harus ditegakkan struktur, bukan koordinat: `pet-root` dan seluruh pembungkusnya
+`pointer-events: none`; hanya tombol 44 px di kaki sprite (ikut berpindah bersama pet), pegangan,
+dan panel yang `auto`. Terukur lewat CDP: 1280×800 jalur 1265 px: atlas termuat, `animation-name: hn-pet-frames`, transform frame −256 → −640 px dalam 400 ms, actor 1136 → 1027,4 px (`mode: walk`, baris `working` lalu `walk-left`), dan tombol di bawah jalur tetap dijawab `elementFromPoint`; 390×844: actor diam di rumah 264 px, `mode: stand`, tak satu pun baris walk muncul, frame tetap berjalan, tap tetap tembus.
 
-`prefers-reduced-motion: reduce` dibaca di JS (`window.matchMedia`, ikut mendengarkan perubahan;
-ketiadaannya berarti tidak reduce). Saat aktif, stage, reactor, idle, image, panel, serta transition
-kontrol terkait menulis nilai eksak `none`; hover dikecualikan dan klik tidak memasang reaksi.
-Opacity statis, alt, live region, dan kontrol tetap utuh sehingga motion mati total tanpa membuat
-status hilang.
-
-**Aksesibilitas.** `role="status" aria-live="polite"` membungkus gambarnya, dan tombolnya adalah
-**overlay transparan di dalam** region itu — bukan sebaliknya: gambar di dalam `<button>`
-diperlakukan sebagian screen reader sebagai presentasional sehingga perubahan alt tak pernah
-diumumkan. Pose aktif membawa alt bermakna berisi kalimat statusnya; lapisan pose lain `alt=""` +
-`aria-hidden`. Satu sumber kalimat, tanpa teks tersembunyi kembar. Hover mengekspos ringkasan yang
-sama lewat `title`; klik membuka kartunya. Panel yang sedang keluar inert agar kontrol tersembunyi
-tidak dapat menerima fokus.
-
-**Sembunyikan** disimpan di `localStorage` `hanoman.pet.hidden` sebagai state presentasional lokal
-— preferensi per-browser, tanpa skema & tanpa endpoint. Disembunyikan berarti **menyusut** jadi
-pegangan bundar 44 px ber-`Mark` buntut, bukan lenyap: tanpa itu operator tak punya jalan kembali
-selain membersihkan `localStorage`.
-
-Yang tak dikerjakan, berikut alasannya: fase sesi tak masuk headline karena
+**Yang tak dikerjakan, berikut alasannya.** Fase sesi tak masuk headline karena
 `ProjectView.session.phase` hanya dimuat sekali saat login (`projects` tak didorong WS) sehingga
 bisa basi berjam-jam — `Spec.stage` menjawab pertanyaan yang sama dan hidup. Pet berskop workspace
 dan sengaja **tak** mengikuti `projectFilter`: ia hadir juga di halaman yang tak punya filter itu.
+
+**Pengujian.** `pet-sprite.test.ts` (manifest + kontrak CSS terparse), `pet-walk.test.ts` (tabel
+mesin), `hanoman-pet.test.tsx` (render/interaksi/reduced/roam/mobile/jalan), `pet-mount.test.tsx`
+(mount tunggal + sumber artwork), `internal/scripts/pet/test-petlib.py` (pipeline atas lembar
+sintetis).
 
 ## Tinggi & scrolling: rantai flex, bukan angka ajaib
 `#root` memakai `100vh` sebagai fallback lalu dikunci `100dvh; overflow: hidden`, jadi tinggi yang
