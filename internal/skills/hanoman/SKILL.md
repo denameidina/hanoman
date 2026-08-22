@@ -587,6 +587,24 @@ Pakai skill lebih sempit saat task cocok:
   `complete` (prosesnya masih hidup & bisa diketik); peredupan tetap milik `exited` (SPEC-188).
   `exited` sendiri **tak disentuh** — ia tetap menggerbangi re-attach (ADR-0084), "Lanjutkan",
   `startable`, `liveDecisions`, dan penutupan `SessionHistory`, yang memang bertanya soal proses.
+- **"Menunggu keputusan" adalah keadaan TURUNAN, bukan isi marker** (SPEC-903/ADR-0143):
+  `decision = !exited && markerFilled(.worktrees/.decisions/<id>) && paneQuiet(#{window_activity})`,
+  `PANE_QUIET_MS = 3000`. Marker dipasang hook agen dan dilepas **hanya** `UserPromptSubmit` + rantai
+  lead, jadi tanpa gerbang ini ia tetap menyala sepanjang agen bekerja sesudah pertanyaannya dijawab
+  lewat dialog TUI (tool result, bukan prompt), lewat `POST /terminal/sessions/:id/dialog/answer`,
+  lewat Esc, atau saat codex melanjutkan sendiri — terukur pada dua pane yang memutar
+  `✢ Creating… (28m 3s)` / `✶ Manifesting… (25m 12s)` dengan marker keduanya terisi. **Empat aturan
+  mengikat:** (1) `#{window_activity}` **wajib** menumpang `FMT` `list-panes` yang sudah ada — pane
+  read per-poll pernah memblokir event loop 916 ms, dan gerbang ini tak boleh menambah satu pun
+  invokasi tmux; (2) **fail-open** — aktivitas tak terbaca dibaca "diam", karena pil yang padam saat
+  ada pertanyaan sungguhan jauh lebih mahal daripada pil yang menyala kelewat lama; (3) **jangan
+  pernah** mengosongkan marker karena pane terbaca sibuk — `Notification` mengisi marker SEKALI per
+  dialog dan tak pernah menembak lagi (terukur 0 B selama 120 dtk dengan dialog terbuka), jadi
+  pertanyaannya hilang permanen; penulis marker dari server tetap hanya dua bukti positif jawaban
+  manusia (`clearMarker()`, satu definisi); (4) `TerminalScreen` & `pet-state` **tak boleh** menambah
+  predikat sendiri di atas `session.decision` — itu satu-satunya sebab kosakata keduanya identik.
+  `decisionAt` ikut turunan: `max(onset marker, window_activity)` = awal episode yang SEDANG
+  berlangsung (isi marker sendiri tetap ADR-0141 apa adanya).
 - **Kegagalan `tmux` BUKAN "tak ada sesi"** (SPEC-402): `listPanes()` mengembalikan `[]` hanya untuk
   `no server running`/`error connecting to` (`TmuxError.noServer`); kegagalan lain **dilempar**.
   Dulu `catch { return []; }` menelan semuanya, dan loop poll 500 ms membacanya sebagai "semua sesi
