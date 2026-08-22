@@ -360,7 +360,13 @@ export function fetchTransport(base: string, token: string): Transport {
     const loopback = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
     const res = await safeRequest({
       url, method,
-      headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) },
+      headers: {
+        authorization: `Bearer ${token}`,
+        // SPEC-885 · ADR-0138 · hub lama mengabaikan header ini dan membalas polos; `safeRequest`
+        // hanya men-decompress bila balasannya benar-benar ber-`content-encoding: gzip`.
+        "accept-encoding": "gzip",
+        ...(body ? { "content-type": "application/json" } : {}),
+      },
       ...(body ? { body: Buffer.from(JSON.stringify(body)) } : {}),
       allowPrivate: process.env.NODE_ENV !== "production" && loopback,
       connectMs: 5_000, totalMs: 15_000,
@@ -371,6 +377,8 @@ export function fetchTransport(base: string, token: string): Transport {
       // yang tetap mengirim 500 baris apa adanya — kombinasi yang dialami tiap
       // `npm i -g hanoman` sebelum hub-nya diperbarui (urutan rilis hub-duluan, ADR-0135).
       maxResponseBytes: 8 * 1024 * 1024,
+      acceptEncoding: "gzip",
+      maxDecodedBytes: 16 * 1024 * 1024,
     });
     let parsed: any = null;
     try { parsed = JSON.parse(res.body.toString("utf8")); } catch { /* body kosong */ }

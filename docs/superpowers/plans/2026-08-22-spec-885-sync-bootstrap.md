@@ -1618,7 +1618,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `SafeRequestOptions` bertambah dua field opsional — `acceptEncoding?: "gzip"` dan `maxDecodedBytes?: number`. Keduanya **default mati/`maxResponseBytes`**, jadi tiap pemanggil lain (webhook keluar, ADR-0100) tak berubah perilakunya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/safe-outbound-request.test.ts` (import `createServer` dari `node:http`, `gzipSync` dari `node:zlib`, dan `safeRequest`):
 
@@ -1664,7 +1664,7 @@ describe("SPEC-885 · dekompresi gzip opt-in", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/safe-outbound-request.test.ts
@@ -1672,7 +1672,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL — test pertama gagal saat `JSON.parse` byte gzip mentah; test kedua tak melempar.
 
-- [ ] **Step 3: Implementasi — tipe**
+- [x] **Step 3: Implementasi — tipe**
 
 Di `server/src/services/safe-outbound-request.ts`, tambahkan import dan perluas tipe:
 
@@ -1694,7 +1694,7 @@ export type SafeRequestOptions = {
 };
 ```
 
-- [ ] **Step 4: Implementasi — `pinnedRequest`**
+- [x] **Step 4: Implementasi — `pinnedRequest`**
 
 Ganti seluruh callback response di `pinnedRequest` (dari `}, (response) => {` sampai penutup callback itu) dengan:
 
@@ -1739,7 +1739,7 @@ Ganti seluruh callback response di `pinnedRequest` (dari `}, (response) => {` sa
     });
 ```
 
-- [ ] **Step 5: Implementasi — `fetchTransport` meminta gzip**
+- [x] **Step 5: Implementasi — `fetchTransport` meminta gzip**
 
 Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`:
 
@@ -1764,7 +1764,7 @@ Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`:
 
 (Komentar panjang tentang cap 8 MB dari Task 2 dipertahankan di atas `maxResponseBytes`.)
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/safe-outbound-request.test.ts server/test/sync-page-budget.test.ts server/test/webhook-tap.test.ts
@@ -1772,7 +1772,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. `webhook-tap.test.ts` ikut karena webhook keluar berbagi `safeRequest` — ia membuktikan pemanggil non-opt-in tak berubah. Bila berkas itu gagal ramai dan mesin sedang sibuk, jalankan ulang sendirian sebelum menyimpulkan regresi (memori: webhook-tap gagal palsu saat mesin sibuk).
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -1780,7 +1780,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/safe-outbound-request.ts server/src/services/sync-client.ts server/test/safe-outbound-request.test.ts
