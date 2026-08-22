@@ -256,6 +256,37 @@ describe("SPEC-905 — pet diseret", () => {
     expect(drop.state.parkedX).toBe(420);
   });
 
+  it("terjangkar berdiri di tempat manusia meletakkannya, bukan melompat balik ke pojok", () => {
+    const parked: PetWalkState = { x: 240, y: 0, facing: "right", mode: "stand", until: Infinity, parkedX: 240 };
+    for (const over of [{ roam: false }, { reduced: true }, { tier: "mobile" as const }]) {
+      const step = stepWalk(parked, input({ ...over, currentX: 240 }), seq(0.5));
+      expect(anchored(input(over))).toBe(true);
+      expect(step.state.x).toBe(240);
+      expect(step.move).toBeNull();          // sudah di sana → tak ada perpindahan
+    }
+    // belum pernah diseret → tetap rumah (perilaku ADR-0140, tak berubah)
+    expect(stepWalk(standing(300), input({ roam: false, currentX: 300 }), seq(0.5)).state.x).toBe(HOME);
+  });
+
+  it("jangkar mengikuti seret walau terjangkar: seret → lepas → berdiri di sana", () => {
+    const dragged = stepWalk(standing(HOME), input({ tier: "mobile", dragging: true, pointerX: 200, pointerY: 300 }), seq(0.5));
+    expect(dragged.state.mode).toBe("held");
+    const dropped = stepWalk(dragged.state, input({ tier: "mobile", currentX: 200 }), seq(0.5));
+    expect(dropped.state.parkedX).toBe(200);
+    const next = stepWalk({ ...dropped.state, mode: "stand", until: Infinity }, input({ tier: "mobile", currentX: 200 }), seq(0.5));
+    expect(next.state.x).toBe(200);
+    expect(next.move).toBeNull();
+  });
+
+  it("jangkar yang keluar jalur sesudah resize di-clamp, tidak menggantung", () => {
+    // Jalur menyempit 1000 → 400 sesudah pet diparkir di 900. `currentX` di dalam jalur baru supaya
+    // yang diuji memang clamp-nya `parkedX`, bukan clamp `currentX` yang sudah dilakukan lebih dulu.
+    const parked: PetWalkState = { x: 900, y: 0, facing: "right", mode: "stand", until: Infinity, parkedX: 900 };
+    const step = stepWalk(parked, input({ roam: false, laneWidth: 400, currentX: 100 }), seq(0.5));
+    expect(step.state.x).toBe(homeX(400, PET));
+    expect(step.move).toEqual({ x: homeX(400, PET), y: 0, durationMs: 0, ease: "linear" });
+  });
+
   it("isHandled menamai tiga mode yang memegang panggung sendiri", () => {
     expect((["held", "falling", "dizzy"] as const).every(isHandled)).toBe(true);
     expect((["stand", "walk", "home"] as const).some(isHandled)).toBe(false);

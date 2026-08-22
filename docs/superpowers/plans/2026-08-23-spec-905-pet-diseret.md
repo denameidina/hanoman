@@ -577,7 +577,7 @@ git commit -m "feat(pet): mesin memegang held/falling/dizzy + sumbu Y, tetap mur
 - Consumes: `PetWalkState.parkedX`, `anchored`, `homeX`, `clampX` dari Task 2.
 - Produces: —
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di dalam `describe("SPEC-905 — pet diseret", …)`:
 
@@ -612,7 +612,7 @@ Tambahkan di dalam `describe("SPEC-905 — pet diseret", …)`:
   });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan hasilnya sesuai**
+- [x] **Step 2: Jalankan test — pastikan hasilnya sesuai**
 
 ```bash
 pnpm vitest --run --root src test/pet-walk.test.ts -t "SPEC-905"
@@ -620,14 +620,14 @@ pnpm vitest --run --root src test/pet-walk.test.ts -t "SPEC-905"
 Expected: PASS (cabang 1 sudah ditulis di Task 2). Bila salah satu MERAH, cabang 1 belum memakai
 `state.parkedX ?? home` — perbaiki di `pet-walk.ts`, bukan di test.
 
-- [ ] **Step 3: Jalankan seluruh berkas test mesin**
+- [x] **Step 3: Jalankan seluruh berkas test mesin**
 
 ```bash
 pnpm vitest --run --root src test/pet-walk.test.ts
 ```
 Expected: PASS, tanpa "no test files".
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/test/pet-walk.test.ts
