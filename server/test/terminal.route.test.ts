@@ -313,13 +313,22 @@ describe("terminal routes", () => {
   // hanya ada di SessionInfo.
   it("GET /terminal/sessions meneruskan decisionAt", async () => {
     const decisionFile = join(repoDir, ".worktrees", ".decisions", "spec-route-at");
-    const s = createSessionSvc("p1", repoDir, { specId: "SPEC-AT", flow: "feature", prompt: "x", decisionFile });
-    writeFileSync(decisionFile, "1755840000\n");
-    const res = await app.inject({ method: "GET", url: "/api/terminal/sessions" });
-    expect(res.statusCode).toBe(200);
-    const row = (res.json() as { id: string; decisionAt?: string }[]).find((x) => x.id === s.id)!;
-    expect(row.decisionAt).toBe(new Date(1755840000_000).toISOString());
-    killSession(s.id);
+    // Perintah mentah, bukan agen: `decisionAt` hanya lahir untuk pane HIDUP, dan biner claude
+    // yang diwariskan test tetangga bisa mati seketika (`decision` false → kolomnya absen).
+    const s = createSessionSvc("p1", repoDir, {
+      id: "spec-route-at", decisionFile, command: ["/bin/sleep", "30"],
+    });
+    try {
+      writeFileSync(decisionFile, "1755840000\n");
+      const res = await app.inject({ method: "GET", url: "/api/terminal/sessions" });
+      expect(res.statusCode).toBe(200);
+      const row = (res.json() as { id: string; decision: boolean; decisionAt?: string }[])
+        .find((x) => x.id === s.id)!;
+      expect(row.decision).toBe(true);
+      expect(row.decisionAt).toBe(new Date(1755840000_000).toISOString());
+    } finally {
+      killSession(s.id);
+    }
   });
 });
 
