@@ -451,7 +451,7 @@ Ganti test `"listSessions memberi decisionAt dari epoch di marker; teks lama dia
   });
 ```
 
-- [ ] **Step 6: Perbarui test route `decisionAt`**
+- [x] **Step 6: Perbarui test route `decisionAt`**
 
 Ganti isi test `"GET /terminal/sessions meneruskan decisionAt"` di
 `server/test/terminal.route.test.ts:314-332` dengan:
@@ -487,7 +487,7 @@ Ganti isi test `"GET /terminal/sessions meneruskan decisionAt"` di
 
 Tambahkan `PANE_QUIET_MS` ke import dari `../src/services/pty` di berkas test itu.
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 ```bash
 pnpm vitest --run --no-file-parallelism server/test/pty.test.ts server/test/terminal.route.test.ts
@@ -495,7 +495,7 @@ pnpm vitest --run --no-file-parallelism server/test/pty.test.ts server/test/term
 
 Expected: PASS semuanya.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/test/pty.test.ts server/test/terminal.route.test.ts
