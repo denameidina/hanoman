@@ -1,4 +1,6 @@
-import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry } from "@hanoman/shared";
+import { paths, type Paginated, type ProjectView, type Spec, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry,
+  type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
+  type ProvisionStep, type ProvisionResult } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -456,6 +458,15 @@ export const api = {
   remediate: (id: string, items: string[]) =>
     j<{ steps: RemediateStep[]; audit: VpsCheck[] | null; scoreTotal: number; scoreBySection: Record<string, number> }>(
       paths.vpsRemediate(id), { method: "POST", ...body({ items }) }),
+  // SPEC-883 · provisioning berbasis katalog
+  listVpsComponents: () => j<{ components: ProvisionComponent[] }>(paths.vpsComponents()),
+  probeVps: (id: string) =>
+    j<{ components: ComponentProbe[]; checkedAt: string }>(paths.vpsProbe(id), { method: "POST" }),
+  provisionPreview: (id: string, b: { items: ComponentId[]; profile: ProvisionProfile; domain?: string }) =>
+    j<{ steps: ProvisionStep[] }>(paths.vpsProvisionPreview(id), { method: "POST", ...body(b) }),
+  provisionVps: (id: string, b: {
+    items: ComponentId[]; profile: ProvisionProfile; domain?: string; confirm: boolean; force?: boolean }) =>
+    j<ProvisionResult>(paths.vpsProvision(id), { method: "POST", ...body(b) }),
   hardenVps: (id: string) => j<{ transcript: string; audit: VpsCheck[] | null; hardened: boolean }>(
     paths.vpsHarden(id), { method: "POST" }),
   vpsSession: (id: string) => j<{ id: string }>(paths.vpsSession(id), { method: "POST" }),

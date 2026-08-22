@@ -521,6 +521,11 @@ export type VpsView = {
   id: string; name: string; host: string; port: number; user: string; keyPath: string | null;
   createdAt: string; lastSeenAt: string | null; health: VpsHealth | null;
   lastAuditAt: string | null; audit: VpsCheck[] | null; hardened: boolean;
+  // SPEC-883 · penandaan komponen hasil probe. Opsional: baris yang belum pernah diprobe
+  // memulangkan null, dan "belum diperiksa" ≠ "tak ada komponen".
+  components?: VpsComponents | null;
+  componentsCheckedAt?: string | null;
+  provisionProfile?: string | null;
 };
 
 // SPEC-220 · checklist kepatuhan (katalog 232 item + status per VPS). Server menghidrasi penuh
