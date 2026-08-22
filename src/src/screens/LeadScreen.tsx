@@ -11,7 +11,7 @@ import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
 import type { Lead, LeadStatusView, LeadDecisionView, LeadFlowView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
-import { usePersistedState, ResetViewButton, isStr, isNum } from "../ui-state";
+import { usePersistedState, useResetOnChange, ResetViewButton, isStr, isNum } from "../ui-state";
 
 // SPEC-908 · tinggal kadens FALLBACK; jalur normalnya langganan `/events/ws`.
 const POLL_MS = 5000;
@@ -308,15 +308,9 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
   React.useEffect(() => { load(); }, [load]);
   // AC-15 · GANTI penyaring = kembali ke halaman 1. Tanpa ini, halaman 5 dari filter lama
   // menjawab daftar filter baru yang cuma punya 2 halaman → daftar kosong tanpa sebab.
-  // Pagarnya wajib: effect ber-`[filter]` juga menyala saat MOUNT, dan tanpa pembanding ini ia
-  // menghapus nomor halaman yang justru dipersistensi SPEC-740/ADR-0115 setiap layar dibuka —
-  // "bertahan lintas remount" jadi janji yang tak pernah bisa ditepati.
-  const shownFilter = React.useRef(filter);
-  React.useEffect(() => {
-    if (shownFilter.current === filter) return;
-    shownFilter.current = filter;
-    setDecPage(1); setFlowPage(1);
-  }, [filter]);
+  // `useResetOnChange`, bukan `useEffect([filter])`: effect ber-dependensi juga menyala saat
+  // MOUNT dan akan menghapus nomor halaman yang dipersistensi SPEC-740/ADR-0115.
+  useResetOnChange(filter, () => { setDecPage(1); setFlowPage(1); });
   // SPEC-908 · satu topik untuk ketiga daftar — cermin `load()` yang memang sudah satu
   // `Promise.all`. Memecahnya jadi tiga topik berarti tiga frame yang bisa mendarat terpisah, dan
   // layar akan menampilkan campuran dua generasi data yang hari ini tak mungkin terjadi.

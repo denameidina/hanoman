@@ -8,6 +8,7 @@ vi.mock("../src/api/client", () => ({
 }));
 import { ProjectsScreen } from "../src/screens/ProjectsScreen";
 import { api } from "../src/api/client";
+import { uiKey, readUiState, writeUiState } from "../src/ui-state";
 
 const P = (over: Record<string, unknown> = {}) => ({
   id: "arta", name: "arta", desc: "", kind: "existing", stack: "",
@@ -15,7 +16,7 @@ const P = (over: Record<string, unknown> = {}) => ({
   session: { status: "idle", phase: "", flow: "feature" }, activity: "", commit: "", ...over,
 });
 const envelope = (items: unknown[]): any => ({ items, total: items.length, page: 1, pageSize: 20 });
-beforeEach(() => { vi.mocked(api.listProjects).mockReset(); });
+beforeEach(() => { localStorage.clear(); vi.mocked(api.listProjects).mockReset(); });
 
 describe("ProjectsScreen via API (SPEC-198)", () => {
   it("marks the project opener as a coarse-pointer touch target", () => {
@@ -54,5 +55,27 @@ describe("ProjectsScreen via API (SPEC-198)", () => {
     expect(screen.getByRole("button", { name: "Hapus project arta" })).toBeInTheDocument();
     fireEvent.click(open);
     expect(onOpen).toHaveBeenCalledOnce();
+  });
+});
+
+describe("state tampilan Projects (SPEC-740 · ADR-0115)", () => {
+  it("nomor halaman bertahan lintas remount — mount bukan ganti penyaring", async () => {
+    vi.mocked(api.listProjects).mockResolvedValue(envelope([P()]));
+    writeUiState(uiKey("projects", "page"), 2);
+    render(<ProjectsScreen projects={[P()] as never} search="" pageSize={20} dataVersion={0} />);
+    await waitFor(() => expect(api.listProjects).toHaveBeenCalled());
+    expect(vi.mocked(api.listProjects).mock.calls.at(-1)![0]).toMatchObject({ page: 2 });
+    expect(readUiState(uiKey("projects", "page"), 1)).toBe(2);
+  });
+
+  it("ganti pencarian TETAP mengembalikan daftar ke halaman 1 (AC-15)", async () => {
+    vi.mocked(api.listProjects).mockResolvedValue(envelope([P()]));
+    writeUiState(uiKey("projects", "page"), 2);
+    const { rerender } = render(
+      <ProjectsScreen projects={[P()] as never} search="" pageSize={20} dataVersion={0} />);
+    await waitFor(() => expect(api.listProjects).toHaveBeenCalled());
+    rerender(<ProjectsScreen projects={[P()] as never} search="beta" pageSize={20} dataVersion={0} />);
+    await waitFor(() =>
+      expect(vi.mocked(api.listProjects).mock.calls.at(-1)![0]).toMatchObject({ q: "beta", page: 1 }));
   });
 });

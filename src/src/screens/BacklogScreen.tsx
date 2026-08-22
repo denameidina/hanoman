@@ -17,7 +17,8 @@ import {
 import { ChangeSourceDialog } from "./ChangeSourceDialog";
 import { MarkDoneDialog, type MarkDoneResult } from "./MarkDoneDialog";
 import {
-  usePersistedState, useScrollRestore, ResetViewButton, oneOf, isStr, isNum, nullableStr,
+  usePersistedState, useScrollRestore, useResetOnChange, ResetViewButton,
+  oneOf, isStr, isNum, nullableStr,
 } from "../ui-state";
 import type { Spec } from "./types";
 import type { ProjectVM } from "./types";
@@ -890,7 +891,10 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // Yang dipulihkan `page`, BUKAN `limit` — `limit` tanpa `page` berperilaku sebagai
   // PLAFON (SPEC-523 · ADR-0107). `pageSize` tetap prop konstanta.
   const [page, setPage] = usePersistedState("backlog", "page", 1, isNum);
-  const [dq, setDq] = React.useState("");
+  // Di-seed dari `q` yang DIPULIHKAN, bukan dari string kosong: `dq` yang menyusul 250 ms
+  // kemudian akan terbaca sebagai pergantian penyaring dan menghapus halaman tersimpan — dan
+  // sebelum itu layar sempat menampilkan hasil TANPA filter yang sedang menyala.
+  const [dq, setDq] = React.useState(() => q.trim());
   // SPEC-857 · ADR-0131 · kegagalan refetch dulu ditelan `.catch(() => { })`: `data` bertahan pada
   // nilai terakhir yang BERHASIL dan layar menyajikan jumlah basi seolah itu kebenaran, tanpa satu
   // pun tanda. Itulah bentuk keluhan "backlog saya berkurang" — hub yang tercekik `P1008 Socket
@@ -912,7 +916,9 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // `proj` dimiliki App (SPEC-146) sehingga di luar jangkauan resetUiState("backlog").
   const resetView = () => setProj("all");
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
-  React.useEffect(() => { setPage(1); }, [tab, proj, stageFilter, prioFilter, dq, view, dateField, from, to]);
+  useResetOnChange(
+    JSON.stringify([tab, proj, stageFilter, prioFilter, dq, view, dateField, from, to]),
+    () => setPage(1));
   React.useEffect(() => {
     let alive = true;
     // sentinel "all" → undefined di call-site; server yang menyaring/memotong.

@@ -141,10 +141,17 @@ menyimpan **id/slug**-nya saja lalu meresolusi ulang dari daftar hidup.
    ber-dependensi juga menyala saat **mount**, jadi pola "ganti penyaring → halaman 1" yang ditulis
    tanpa pagar menghapus nomor halaman tersimpan setiap layar dibuka — barisnya tetap ada di tabel
    Cakupan, tetapi janjinya tak pernah bisa ditepati dan tak ada satu pun error yang muncul.
-   Pagarnya: bandingkan penyaring yang SEDANG ditampilkan (ref) dengan yang baru, dan reset hanya
-   saat keduanya berbeda. Diperbaiki di `LeadScreen` (SPEC-908); **`TriageScreen.tsx`,
-   `ProjectsScreen.tsx`, dan `BacklogScreen.tsx` masih memakai bentuk tanpa pagar** — layar dengan
-   `page` transien (`SessionHistoryModal`, `PortalChatPanel`, `ClientPortal`) tak terdampak.
+   Pakai **`useResetOnChange(key, reset)`** (`ui-state/hooks.ts`): ia membandingkan penyaring yang
+   SEDANG ditampilkan dengan yang baru dan menjalankan `reset` hanya saat keduanya berbeda. `key`
+   disatukan pemanggil (`JSON.stringify([...])`) supaya panjang dep array-nya konstan. Dipasang di
+   keempat layar yang `page`-nya persisten — Lead, Triase, Projects, Backlog (SPEC-908); layar
+   dengan `page` transien (`SessionHistoryModal`, `PortalChatPanel`, `ClientPortal`) tak terdampak
+   dan sengaja dibiarkan memakai `useEffect` biasa.
+9. **Penyaring ber-debounce wajib DI-SEED dari nilai yang dipulihkan.** `BacklogScreen` menurunkan
+   `dq` dari `q` lewat `setTimeout` 250 ms. Lahir dari string kosong, `dq` menyusul sesudah mount
+   dan gotcha #8 menyala lagi lewat pintu belakang: halaman tersimpan selamat dari mount, lalu
+   dihapus seperempat detik kemudian. Sebelum itu layar juga sempat menyajikan hasil **tanpa**
+   filter yang sedang menyala. Karena itu `React.useState(() => q.trim())`, bukan `useState("")`.
 
 ## Yang tidak berubah (dengan amandemen ADR-0118)
 

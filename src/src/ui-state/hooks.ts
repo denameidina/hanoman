@@ -33,6 +33,30 @@ export function usePersistedState<T>(
   return [snap.value, set];
 }
 
+/**
+ * Jalankan `reset` saat penyaring BERGANTI — bukan saat mount.
+ *
+ * `React.useEffect(() => setPage(1), [filter])` adalah pola yang benar niatnya dan salah
+ * akibatnya: effect ber-dependensi juga menyala di render pertama, jadi ia menghapus nomor
+ * halaman yang justru dipersistensi SPEC-740/ADR-0115 setiap layar dibuka. Barisnya tetap ada
+ * di tabel Cakupan, janjinya tak pernah bisa ditepati, dan tak ada satu pun error yang muncul.
+ *
+ * `key` = penyaring yang sedang aktif, disatukan jadi satu string oleh pemanggil (biasanya
+ * `JSON.stringify([...])`) supaya panjang dep array-nya tetap konstan.
+ */
+export function useResetOnChange(key: string, reset: () => void): void {
+  const shown = React.useRef(key);
+  // `reset` hampir selalu arrow inline di call site; memasukkannya ke deps akan menjalankan
+  // effect ini tiap render dan mengembalikan bug yang justru ditutupnya.
+  const run = React.useRef(reset);
+  run.current = reset;
+  React.useEffect(() => {
+    if (shown.current === key) return;
+    shown.current = key;
+    run.current();
+  }, [key]);
+}
+
 // Berapa frame pemulihan boleh menunggu tinggi konten jadi final. Daftar yang datanya
 // baru tiba tumbuh beberapa frame; daftar yang memang lebih pendek tak boleh membuat
 // loop abadi.

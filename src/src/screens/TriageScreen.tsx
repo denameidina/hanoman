@@ -15,7 +15,7 @@ import { useLiveTopic } from "../api/live";
 import { specDeepLink } from "./deeplink";
 import { SyncButton } from "./SyncButton";
 import {
-  usePersistedState, useScrollRestore, ResetViewButton, oneOf, isStr, isNum, nullableStr,
+  usePersistedState, useScrollRestore, useResetOnChange, ResetViewButton, oneOf, isStr, isNum, nullableStr,
 } from "../ui-state";
 import type { ProjectVM } from "./types";
 
@@ -374,7 +374,7 @@ export function TriageScreen({ projects, onAccepted, onToast }:
   React.useEffect(() => { load(); }, [load]);
   // AC-15 · ganti penyaring = kembali ke halaman 1. Tanpa ini, halaman 5 dari penyaring lama
   // menjawab daftar penyaring baru yang cuma punya 2 halaman → daftar kosong tanpa sebab.
-  React.useEffect(() => { setPage(1); }, [project, status, q]);
+  useResetOnChange(JSON.stringify([project, status, q]), () => setPage(1));
   // SPEC-908 · `q` yang menyuapi LANGGANAN ditahan sebentar. Tiap huruf mengubah kunci langganan,
   // dan tiap kunci baru melahirkan entri baru di server yang dibangun di luar jadwal — mengetik 12
   // huruf berarti 12 pembangunan yang sebelas di antaranya langsung dibuang. Muat HTTP di atas
