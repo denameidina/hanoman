@@ -22,9 +22,18 @@ const clean = async () => {
 beforeEach(clean); afterAll(clean);
 
 // Transport palsu: isi feed dikarang langsung, jadi kedua sisi bisa diuji dalam satu proses.
+//
+// SPEC-885 · stub ini kini MENGHORMATI `since`, seperti hub sungguhan (`pull` menyaring
+// `seq > since`). Dulu ia menyajikan isi yang sama untuk kursor mana pun, dan itu tak berbahaya
+// selama `syncOnce` menarik tepat satu halaman. Sejak ia menguras feed sampai habis, stub yang
+// mengabaikan `since` menyajikan halaman yang sama DUA KALI dan menggandakan setiap hitungan —
+// artefak stub, bukan perilaku hub.
 function fakeTransport(records: unknown[], cursor = "99", onPush?: (body: any) => any): Transport {
-  return async (method, _path, body) => {
-    if (method === "GET") return { status: 200, body: { cursor, records } };
+  return async (method, path, body) => {
+    if (method === "GET") {
+      const since = new URL(path, "http://x").searchParams.get("since") ?? "0";
+      return { status: 200, body: { cursor, records: since === cursor ? [] : records } };
+    }
     return { status: 200, body: onPush ? onPush(body) : { results: [{ ok: true, version: 1 }] } };
   };
 }

@@ -211,7 +211,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Mengapa terpisah dari Task 1:** Task 1 menolong client mana pun terhadap **hub baru**. Task ini satu-satunya yang menolong **client baru terhadap hub lama** — dan justru itulah kombinasi yang dialami setiap orang yang baru `npm i -g hanoman` sebelum hub-nya naik versi.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/sync-page-budget.test.ts` — di bagian atas berkas tambahkan import:
 
@@ -252,7 +252,7 @@ describe("SPEC-885 · cap byte client terhadap hub lama", () => {
 
 Catatan: `fetchTransport` menyalakan `allowPrivate` untuk loopback selama `NODE_ENV !== "production"`. Vitest berjalan di `NODE_ENV=test`, jadi permintaan ke `127.0.0.1` diizinkan.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts
@@ -260,7 +260,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL dengan `outbound response terlalu besar`. **Inilah kegagalan produksi yang sedang direproduksi** — kalau test ini tidak gagal dengan pesan itu, hentikan dan cari tahu kenapa sebelum lanjut.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`, ganti baris `maxResponseBytes`:
 
@@ -276,7 +276,7 @@ Di `server/src/services/sync-client.ts`, di dalam `fetchTransport`, ganti baris 
       maxResponseBytes: 8 * 1024 * 1024,
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-page-budget.test.ts server/test/sync-client.test.ts
@@ -284,7 +284,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/sync-client.ts server/test/sync-page-budget.test.ts
@@ -318,7 +318,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Ini task terbesar di plan.** Ia memperbaiki dua gejala dengan satu obat: laju yang dipatok timer (satu halaman per tick 15 detik), dan 510 dari 728 spec yang hilang senyap karena `deferred` hanya di-retry di dalam satu halaman.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-drain.test.ts`:
 
@@ -442,7 +442,7 @@ describe("SPEC-885 · drain berkelanjutan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-drain.test.ts
@@ -450,7 +450,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: FAIL. Test pertama gagal dengan `stats.dropped` = 1 dan `Spec SPEC-1` `null` — persis bug produksinya. Test kedua dan ketiga gagal karena `syncOnce` hanya menarik satu halaman.
 
-- [ ] **Step 3: Implementasi — helper `retryDeferred`**
+- [x] **Step 3: Implementasi — helper `retryDeferred`**
 
 Di `server/src/services/sync-client.ts`, tepat **di atas** deklarasi `export type SyncStats`, sisipkan:
 
@@ -489,7 +489,7 @@ async function retryDeferred(rest: IncomingRecord[], stats: SyncStats): Promise<
 }
 ```
 
-- [ ] **Step 4: Implementasi — `syncOnce`**
+- [x] **Step 4: Implementasi — `syncOnce`**
 
 Ganti seluruh fungsi `syncOnce` (dari `export async function syncOnce` sampai `return { pulled, pushed, conflicts, deleted, dropped };`) dengan:
 
@@ -638,7 +638,7 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
 }
 ```
 
-- [ ] **Step 5: Implementasi — sederhanakan `syncNow`**
+- [x] **Step 5: Implementasi — sederhanakan `syncNow`**
 
 Ganti konstanta `FULL_PULL_MAX_PAGES` dan seluruh fungsi `syncNow` dengan:
 
@@ -658,7 +658,7 @@ export async function syncNow(opts?: { full?: boolean }): Promise<SyncStats | nu
 }
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-drain.test.ts server/test/sync-client.test.ts server/test/sync-tombstone.client.test.ts server/test/sync-push-partial-failure.test.ts server/test/sync-pending.route.test.ts
@@ -666,7 +666,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Diharapkan: PASS semua. Bila ada test lama yang berasumsi "satu pull per `syncOnce`", periksa apakah asumsinya masih sah — jangan longgarkan test baru untuk mengakomodasinya tanpa memahami kenapa.
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -674,7 +674,7 @@ pnpm --filter ./server typecheck
 
 Diharapkan: keluar 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/sync-client.ts server/test/sync-drain.test.ts
