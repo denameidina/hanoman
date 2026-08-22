@@ -1,4 +1,5 @@
 import { PORTAL_CHAT_REPLY_SCHEMA } from "@hanoman/shared";
+import { resolveHardening } from "@hanoman/runner";
 import { effectiveStr } from "../../config";
 import { sandboxArgvFromEnv } from "../session-sandbox";
 
@@ -57,10 +58,10 @@ const shellQuote = (v: string): string => `'${v.replace(/'/g, `'"'"'`)}'`;
 export type ChatProcess = { file: string; args: string[]; cwd?: string };
 
 /**
- * Proses yang benar-benar dijalankan. Di produksi sandbox OS WAJIB (fail closed) — cermin
- * `assertRuntimeBoundary`, dan justru KEBALIKAN jalur sesi pty yang jatuh ke `mode "off"` di luar
- * produksi. Di luar produksi chat tetap boleh jalan karena penjaganya bukan podman melainkan
- * workspace dokumen + tool set di atas. Jangan menyeragamkan keduanya "demi konsistensi".
+ * Proses yang benar-benar dijalankan. Saat HARDENING menyala sandbox OS WAJIB (fail closed) —
+ * cermin `assertRuntimeBoundary`, dan justru KEBALIKAN jalur sesi pty yang jatuh ke `mode "off"`
+ * saat hardening mati. Tanpa hardening chat tetap boleh jalan karena penjaganya bukan podman
+ * melainkan workspace dokumen + tool set di atas. Jangan menyeragamkan keduanya "demi konsistensi".
  */
 export function portalChatProcess(
   o: ChatArgvInput & { workspace: string },
@@ -68,10 +69,13 @@ export function portalChatProcess(
 ): ChatProcess {
   const file = effectiveStr("HANOMAN_CLAUDE_BIN") ?? "claude";
   const args = portalChatArgv(o);
-  const mode = env.HANOMAN_SESSION_SANDBOX ?? (env.NODE_ENV === "production" ? "required" : "off");
+  const mode = env.HANOMAN_SESSION_SANDBOX ?? (resolveHardening(env) ? "required" : "off");
   if (mode === "off") {
-    if (env.NODE_ENV === "production")
-      throw new Error("chat portal menolak jalan: sandbox sesi wajib di production");
+    // SPEC-884 · ADR-0138 · fail-closed dipertahankan, tetapi terhadap hardening — bukan terhadap
+    // "terpaket". Instalasi npm biasa tak pernah punya podman, dan chat portal tak boleh mati
+    // hanya karena itu; penjaganya di sana tetap workspace + tool set di atas.
+    if (resolveHardening(env))
+      throw new Error("chat portal menolak jalan: sandbox sesi wajib saat hardening menyala");
     return { file, args, cwd: o.workspace };
   }
   const command = [file, ...args].map(shellQuote).join(" ");

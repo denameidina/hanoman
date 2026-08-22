@@ -59,7 +59,9 @@ export function sandboxArgvFromEnv(input: {
   phaseFile?: string; promptFile?: string; attachmentsDir?: string; env?: Env;
 }): string[] | null {
   const env = input.env ?? process.env;
-  const mode = env.HANOMAN_SESSION_SANDBOX ?? (env.NODE_ENV === "production" ? "required" : "off");
+  // SPEC-884 · pemicunya hardening, bukan NODE_ENV. Operator yang menyetel HANOMAN_SESSION_SANDBOX
+  // secara eksplisit tetap menang atas keduanya (termasuk "off" untuk mematikannya sementara).
+  const mode = env.HANOMAN_SESSION_SANDBOX ?? (resolveHardening(env) ? "required" : "off");
   if (mode === "off") return null;
   if (mode !== "podman") throw new Error("session sandbox production tidak dikonfigurasi");
   const credentialDir = env.HANOMAN_AGENT_CREDENTIAL_DIR;

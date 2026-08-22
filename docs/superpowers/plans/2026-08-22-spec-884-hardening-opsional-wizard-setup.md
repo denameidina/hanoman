@@ -441,7 +441,7 @@ git commit -m "feat(spec-884): gerbang boot digerbangi hardening, bukan NODE_ENV
 - Consumes: `resolveHardening` (Task 2)
 - Produces: tak ada API baru — hanya pemicu tiga gerbang yang berubah
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/portal-chat-argv.test.ts`, di dalam `describe` teratas:
 
@@ -477,12 +477,12 @@ Tambahkan ke `server/test/lead-brain.test.ts`, di dalam `describe` teratas:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-argv.test.ts server/test/lead-brain.test.ts`
 Expected: FAIL — `chat portal menolak jalan: sandbox sesi wajib di production` dan `session sandbox production tidak dikonfigurasi`
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 `server/src/services/session-sandbox.ts` — di `sandboxArgvFromEnv`, ganti baris `const mode = …`:
 
@@ -518,12 +518,12 @@ import { resolveHardening } from "@hanoman/runner";
 
 Perbarui juga komentar blok di atas fungsi (`argv.ts:60-64`): ganti kata "Di produksi" menjadi "Saat hardening menyala".
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/portal-chat-argv.test.ts server/test/lead-brain.test.ts server/test/session-sandbox.test.ts`
 Expected: PASS — semua, termasuk test lama kedua berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/session-sandbox.ts server/src/services/lead/brain.ts server/src/services/portal-chat/argv.ts server/test/portal-chat-argv.test.ts server/test/lead-brain.test.ts
