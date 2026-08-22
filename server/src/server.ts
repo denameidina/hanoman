@@ -15,7 +15,7 @@ import { startAutoMerge } from "./services/auto-merge";
 import { startWorktreeReaper } from "./services/worktree-reaper";
 import type { AddressInfo } from "node:net";
 import { assertRuntimeBoundary } from "./services/session-sandbox";
-import { dbFilePath, resolveHome } from "@hanoman/runner";
+import { dbFilePath, resolveHardening, resolveHome } from "@hanoman/runner";
 import { ensureSetupToken } from "./services/bootstrap";
 import { secureHanomanHome } from "./services/secure-home";
 import { startRetentionSweep } from "./services/retention";
@@ -56,6 +56,13 @@ const bootstrapReady = secureHanomanHome({
 }).then(() => prisma.user.count()).then(async (count) => {
   await secureHanomanHome({ home, files: [dbFilePath(process.env.DATABASE_URL!)] });
   if (count > 0) return;
+  // SPEC-884 · ADR-0138 · token hanya lahir bila memang akan diminta. Sebelum ini ia dibuat dan
+  // diumumkan tanpa syarat, jadi instalasi tanpa hardening menyuruh operator mencari berkas yang
+  // tak pernah ditanyakan siapa pun — dan berkas rahasia itu tetap ditulis ke home tanpa guna.
+  if (!resolveHardening(process.env)) {
+    console.log("setup awal: buka dashboard dan ikuti wizard — tanpa hardening, akun pertama tak butuh token");
+    return;
+  }
   const proof = await ensureSetupToken(resolveHome());
   console.log(`setup admin memerlukan token di ${proof.path}; kedaluwarsa ${new Date(proof.expiresAt).toISOString()}`);
 });
