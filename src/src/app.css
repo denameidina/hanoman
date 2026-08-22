@@ -606,6 +606,10 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 /* Pet hidup (spec A) · satu <img> atlas: baris dipilih --row pada pembungkus (persen dari
    tinggi satu sel), frame oleh steps(8) atas translateX(-100%) (lebar img = 8 sel). */
 .hn-pet-rowshift { transform: translateY(calc(var(--row, 0) * -100%)); }
+/* SPEC-905 · pegangan seret. `touch-action`/`user-select` hidup di sini, bukan inline: jsdom
+   menjatuhkan keduanya dari CSSStyleDeclaration secara senyap, jadi inline berarti tak ada satu pun
+   test yang bisa membuktikannya ada. `cursor` tetap inline — ia berganti grab/grabbing. */
+.hn-pet-hit { touch-action: none; user-select: none; -webkit-user-select: none; }
 @keyframes hn-pet-frames { to { transform: translateX(-100%); } }
 .hn-sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;

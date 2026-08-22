@@ -15,7 +15,9 @@ import {
 import {
   PET_ATLAS_URL, PET_MANIFEST, POSE_ROW, durationMs, rowIndex, rowOf, thenOf, type PetRowKey,
 } from "./pet-sprite";
-import { initialWalkState, stepWalk, type PetMove, type PetWalkState } from "./pet-walk";
+import {
+  initialWalkState, isHandled, stepWalk, type PetEase, type PetMove, type PetWalkState,
+} from "./pet-walk";
 import { PetAnswer } from "./PetAnswer";
 
 // Tinggi karakter berdiri di layar (band "pet" 80–128 px, amandemen sistem maskot). Skala sel
@@ -42,6 +44,14 @@ const PET_URGENT_RATE = 1.5;
 // perilaku normal dua klik dan tak boleh diubah demi easter egg.
 const PET_CLICK_WINDOW_MS = 2_000;
 const PET_CLICK_BURST = 3;
+// SPEC-905 · di bawah ambang ini gestur masih KLIK (panel + elus SPEC-898); melewatinya ia seret,
+// dan `click` yang menyusul `pointerup` ditelan supaya `thanks` tak ikut terpicu.
+const DRAG_SLOP_PX = 6;
+// Percepatan, bukan linear (easeInQuad). `linear` tetap untuk jalan kaki, yang lajunya memang tetap.
+const PET_EASE_CSS: Record<PetEase, string> = {
+  linear: "linear",
+  fall: "cubic-bezier(0.55, 0.085, 0.68, 0.53)",
+};
 
 // jsdom tak punya matchMedia; ketiadaannya dibaca sebagai "tak ada preferensi", bukan "reduce".
 function usePrefersReducedMotion(): boolean {
@@ -183,7 +193,11 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   const walkRef = React.useRef<PetWalkState>(initialWalkState(laneWidth, cellW, Date.now()));
   const [walk, setWalk] = React.useState<PetWalkState>(walkRef.current);
   const [row, setRow] = React.useState<PetRowKey>(POSE_ROW[view.pose]);
-  const [move, setMove] = React.useState<PetMove>({ x: walkRef.current.x, durationMs: 0 });
+  const [move, setMove] = React.useState<PetMove>({ x: walkRef.current.x, y: 0, durationMs: 0, ease: "linear" });
+  // Posisi yang diminta pointer, dalam koordinat jalur; `null` = tidak sedang diseret.
+  const [drag, setDrag] = React.useState<{ x: number; y: number } | null>(null);
+  const dragRef = React.useRef<{ id: number; dx: number; dy: number; x0: number; y0: number; moved: boolean } | null>(null);
+  const swallowClickRef = React.useRef(false);
 
   // Posisi aktual hanya dibaca pada peristiwa (potong/jeda), bukan per frame; jsdom memberi rect
   // nol → pakai posisi keadaan.
@@ -192,6 +206,17 @@ export function HanomanPet({ sessions, backlog, onOpen }:
     const root = rootRef.current?.getBoundingClientRect();
     return actor && root && actor.width > 0 ? actor.left - root.left : walkRef.current.x;
   }, []);
+
+  // Plafon angkat = tinggi jalur yang SUDAH melebar; jalur itu sendiri dibatasi `var(--safe-top)` /
+  // `var(--safe-bottom)`, jadi ia dibaca dari elemen yang memakainya alih-alih memparsing custom
+  // property (yang mengembalikan token `env(...)` yang belum di-resolve). Sebelum jalur melebar —
+  // dan di jsdom yang memberi rect nol — viewport dipakai apa adanya; di sana `y` masih 0 sehingga
+  // clamp-nya memang tak berpengaruh.
+  const laneHeight = React.useCallback((): number => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (rect && rect.height > cellH) return rect.height;
+    return typeof window !== "undefined" ? window.innerHeight : cellH;
+  }, [cellH]);
 
   // Gelembung hidup DI DALAM actor supaya ia ikut posisi pet tanpa kode posisi; yang dihitung di
   // sini hanya pergeseran agar ia tak keluar viewport saat pet berada di tepi.
@@ -204,14 +229,17 @@ export function HanomanPet({ sessions, backlog, onOpen }:
 
   const tick = React.useCallback(() => {
     const step = stepWalk(walkRef.current, {
-      now: Date.now(), currentX: currentX(), laneWidth, petWidth: cellW, pose: view.pose,
+      now: Date.now(), currentX: currentX(), laneWidth, laneHeight: laneHeight(),
+      petWidth: cellW, petHeight: cellH, pose: view.pose,
       hovered, panelOpen: open, documentHidden, roam, reduced, tier,
+      dragging: drag !== null, pointerX: drag?.x ?? 0, pointerY: drag?.y ?? 0,
     }, Math.random);
     walkRef.current = step.state;
     setWalk(step.state);
     setRow(step.row);
     if (step.move) setMove(step.move);
-  }, [currentX, laneWidth, cellW, view.pose, hovered, open, documentHidden, roam, reduced, tier]);
+  }, [currentX, laneHeight, laneWidth, cellW, cellH, view.pose, hovered, open, documentHidden,
+      roam, reduced, tier, drag]);
 
   React.useEffect(() => { tick(); }, [tick]);                       // masukan berubah → langkah
   React.useEffect(() => {                                           // satu timeout pada `until`
@@ -302,6 +330,41 @@ export function HanomanPet({ sessions, backlog, onOpen }:
     togglePanel();
   }
 
+  // Titik pegang disimpan sebagai SELISIH, bukan rect: `getBoundingClientRect()` memberi nol di
+  // jsdom, dan pada aritmetika selisih offset jalur (`root.left`/`root.bottom`) saling menghilangkan
+  // — jadi rumus yang sama benar di browser dan bisa di-assert di test.
+  function beginGesture(event: React.PointerEvent<HTMLButtonElement>) {
+    // jsdom 24 tak punya pointer capture; tanpa penjaga ini SETIAP test seret melempar TypeError.
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = {
+      id: event.pointerId, dx: event.clientX - currentX(), dy: event.clientY + walkRef.current.y,
+      x0: event.clientX, y0: event.clientY, moved: false,
+    };
+  }
+
+  function moveGesture(event: React.PointerEvent<HTMLButtonElement>) {
+    const d = dragRef.current;
+    if (!d || d.id !== event.pointerId) return;
+    if (!d.moved) {
+      if (Math.hypot(event.clientX - d.x0, event.clientY - d.y0) <= DRAG_SLOP_PX) return;
+      d.moved = true;
+      // Panel dijangkar ke posisi pet saat dibuka; pet yang sedang pergi membuatnya berbohong.
+      if (open) closePanel();
+      setOneShot(null);   // `wave` yang menumpang akan menutupi baris `held`
+    }
+    setDrag({ x: event.clientX - d.dx, y: d.dy - event.clientY });
+  }
+
+  function endGesture(event: React.PointerEvent<HTMLButtonElement>) {
+    const d = dragRef.current;
+    if (!d || d.id !== event.pointerId) return;
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (!d.moved) return;
+    swallowClickRef.current = true;   // `click` menyusul `pointerup` di elemen yang sama
+    setDrag(null);
+  }
+
   function setVisibility(next: boolean) {
     setHidden(next);
     savePetHidden(next);
@@ -319,8 +382,15 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   // Jalur: selebar viewport di tepi bawah, setinggi satu sel. z 80: di bawah header (90), overlay
   // terminal fullscreen (100), Modal (150), Toast (200). `pointerEvents: none` di seluruh jalur —
   // konten di bawah jalur tetap menerima tap; yang `auto` hanya tombol 44 px, pegangan, dan panel.
+  // SPEC-905 · selagi pet terangkat jalur memanjang ke atas sampai `var(--safe-top)`, dan HANYA
+  // selagi itu. Tepi BAWAHnya tak bergerak, jadi sprite, panel, dan gelembung tak bergeser satu
+  // piksel pun saat ia melebar. Bukan soal clipping (`pet-root` tak punya `overflow`): yang dibeli
+  // adalah plafon angkat yang bisa DIUKUR dari CSS-nya sendiri, plus hit-test yang tetap benar bila
+  // kelak sebuah ancestor memperoleh `transform`/`contain`.
+  const lifted = walk.mode === "held" || walk.mode === "falling";
   const root: React.CSSProperties = {
-    position: "fixed", left: 0, right: 0, bottom: "max(0px, var(--safe-bottom))", height: cellH,
+    position: "fixed", left: 0, right: 0, bottom: "max(0px, var(--safe-bottom))",
+    ...(lifted ? { top: "max(0px, var(--safe-top))" } : { height: cellH }),
     zIndex: 80, pointerEvents: "none",
   };
 
@@ -428,8 +498,12 @@ export function HanomanPet({ sessions, backlog, onOpen }:
       <div data-testid="pet-actor" ref={actorRef} data-facing={walk.facing} data-mode={walk.mode}
         onTransitionEnd={(event) => { if (event.propertyName === "transform") tick(); }} style={{
           position: "absolute", left: 0, bottom: 0, width: cellW, height: cellH,
-          transform: `translateX(${move.x}px)`,
-          transition: reduced || move.durationMs === 0 ? "none" : `transform ${move.durationMs}ms linear`,
+          // Satu properti untuk kedua sumbu, JUGA saat y = 0: daftar properti yang di-transisi tak
+          // boleh berganti di tengah rantai berjalan → diangkat → jatuh → mendarat.
+          transform: `translate(${move.x}px, ${-move.y}px)`,
+          transition: reduced || move.durationMs === 0
+            ? "none"
+            : `transform ${move.durationMs}ms ${PET_EASE_CSS[move.ease]}`,
           willChange: "transform",
         }}>
         {speech && !open && (
@@ -535,8 +609,16 @@ export function HanomanPet({ sessions, backlog, onOpen }:
               </div>
             </div>
           </div>
-          <button data-testid="pet-hit" aria-label="Ringkasan status Hanoman" title={`${view.headline} — ${view.detail}`}
-            onClick={reactAndToggle}
+          <button data-testid="pet-hit" className="hn-pet-hit"
+            aria-label="Ringkasan status Hanoman" title={`${view.headline} — ${view.detail}`}
+            onClick={() => {
+              if (swallowClickRef.current) { swallowClickRef.current = false; return; }
+              reactAndToggle();
+            }}
+            onPointerDown={beginGesture}
+            onPointerMove={moveGesture}
+            onPointerUp={endGesture}
+            onPointerCancel={endGesture}
             onPointerEnter={() => { setHovered(true); playWave(); }}
             onPointerLeave={() => setHovered(false)}
             onFocus={() => setHovered(true)}
@@ -544,7 +626,10 @@ export function HanomanPet({ sessions, backlog, onOpen }:
             style={{
               pointerEvents: "auto", position: "absolute", zIndex: 3,
               left: Math.round(anchor.x * cellW - HIT / 2), bottom: 0, width: HIT, height: HIT,
-              padding: 0, border: "none", background: "transparent", cursor: "pointer",
+              padding: 0, border: "none", background: "transparent",
+              // Afordansi seret. Penolakan gulir & seleksi ada di `.hn-pet-hit`; permukaannya tetap
+              // 44×44 px (SPEC-763) — tak ada pelebaran badan pet.
+              cursor: lifted ? "grabbing" : "grab",
             }} />
         </div>
       </div>

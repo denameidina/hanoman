@@ -648,7 +648,7 @@ git commit -m "test(pet): kunci parkedX sebagai jangkar sesudah pet diletakkan (
   `[data-testid="pet-actor"]` ber-`transform: translate(<x>px, <-y>px)`; `[data-testid="pet-root"]`
   ber-`top` hanya selagi terangkat.
 
-- [ ] **Step 1: Tulis helper + test yang gagal**
+- [x] **Step 1: Tulis helper + test yang gagal**
 
 Tambahkan helper di kepala `src/test/hanoman-pet.test.tsx`, di bawah `animationEnd`:
 
@@ -825,7 +825,7 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan gagal**
+- [x] **Step 2: Jalankan test — pastikan gagal**
 
 ```bash
 pnpm vitest --run --root src test/hanoman-pet.test.tsx -t "pet diseret"
@@ -833,7 +833,7 @@ pnpm vitest --run --root src test/hanoman-pet.test.tsx -t "pet diseret"
 Expected: FAIL — `expected "translateX(880px)" to equal "translate(840px, -200px)"`; jalur tak pernah
 memperoleh `top`.
 
-- [ ] **Step 3: Implementasikan komponen**
+- [x] **Step 3: Implementasikan komponen**
 
 Di `src/src/screens/HanomanPet.tsx`:
 
@@ -998,7 +998,7 @@ tambahkan state seret:
             }} />
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan hijau**
+- [x] **Step 4: Jalankan test — pastikan hijau**
 
 ```bash
 pnpm vitest --run --root src test/hanoman-pet.test.tsx
@@ -1007,14 +1007,14 @@ Expected: PASS untuk seluruh berkas (blok lama + blok "pet diseret"). Jika
 `expect(hit()).toHaveStyle({ userSelect: "none" })` merah, periksa bahwa **kedua** properti
 (`userSelect` dan `WebkitUserSelect`) ditulis — jsdom hanya memantulkan yang pertama.
 
-- [ ] **Step 5: Typecheck paket yang tersentuh**
+- [x] **Step 5: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./src typecheck
 ```
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/HanomanPet.tsx src/test/hanoman-pet.test.tsx

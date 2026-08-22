@@ -55,6 +55,17 @@ function animationEnd(element: HTMLElement, animationName: string): void {
   fireEvent(element, event);
 }
 
+// jsdom 24 tak punya `PointerEvent`, jadi `fireEvent.pointerDown(el, { clientX })` jatuh ke `Event`
+// polos dan handler menerima `clientX === null` — test seret yang memakainya HIJAU PALSU. `MouseEvent`
+// membawa koordinatnya, dan React memetakan tipe `pointer*` apa adanya.
+function pointer(el: HTMLElement, type: string, clientX: number, clientY: number, pointerId = 1): void {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX, clientY });
+  Object.defineProperty(event, "pointerId", { value: pointerId });
+  fireEvent(el, event);
+}
+const actor = () => screen.getByTestId("pet-actor");
+const laneOf = () => screen.getByTestId("pet-root");
+
 // Skala desktop: karakter 112 px dari character.h manifest.
 const SCALE = 112 / PET_MANIFEST.character.h;
 const CELL_W = Math.round(PET_MANIFEST.cell.w * SCALE);
@@ -179,7 +190,7 @@ describe("HanomanPet (sprite)", () => {
     expect(screen.getByTestId("pet-reactor")).toHaveStyle({ animation: "none", transition: "none" });
     expect(atlas()).toHaveStyle({ animation: "none" });
     const actor = screen.getByTestId("pet-actor");
-    expect(actor).toHaveStyle({ transition: "none", transform: `translateX(${HOME}px)` });
+    expect(actor).toHaveStyle({ transition: "none", transform: `translate(${HOME}px, 0px)` });
     expect(actor).toHaveAttribute("data-mode", "stand");
 
     fireEvent.click(hit());
@@ -227,7 +238,7 @@ describe("HanomanPet (sprite)", () => {
     fireEvent.click(hit());
     fireEvent.click(screen.getByRole("button", { name: "Diam di pojok" }));
     expect(localStorage.getItem(PET_ROAM_KEY)).toBe("0");
-    expect(screen.getByTestId("pet-actor")).toHaveStyle({ transform: `translateX(${HOME}px)` });
+    expect(screen.getByTestId("pet-actor")).toHaveStyle({ transform: `translate(${HOME}px, 0px)` });
     unmount();
 
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
@@ -241,7 +252,7 @@ describe("HanomanPet (sprite)", () => {
     const scale = 96 / PET_MANIFEST.character.h;
     const cellW = Math.round(PET_MANIFEST.cell.w * scale);
     expect(screen.getByTestId("pet-viewport")).toHaveStyle({ width: `${cellW}px` });
-    expect(screen.getByTestId("pet-actor")).toHaveStyle({ transform: `translateX(${homeX(window.innerWidth, cellW)}px)` });
+    expect(screen.getByTestId("pet-actor")).toHaveStyle({ transform: `translate(${homeX(window.innerWidth, cellW)}px, 0px)` });
     fireEvent.click(hit());
     expect(screen.queryByRole("button", { name: "Diam di pojok" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Berkeliaran" })).toBeNull();
@@ -250,20 +261,19 @@ describe("HanomanPet (sprite)", () => {
   it("berjalan di jalur saat jadwal berdiri habis: transisi transform linear ke target", () => {
     vi.useFakeTimers();
     try {
-      vi.spyOn(Math, "random").mockReturnValue(0.5);   // jalan 4 dtk = 160 px; arah: 0.5 → kanan → balik kiri dari rumah
+      vi.spyOn(Math, "random").mockReturnValue(0.5);   // jalan 9,5 dtk = 380 px; arah kanan → balik kiri dari rumah
       render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-      const actor = screen.getByTestId("pet-actor");
-      expect(actor).toHaveAttribute("data-mode", "stand");
-      act(() => { vi.advanceTimersByTime(4_100); });     // STAND_MS[0] = 4 dtk
-      expect(actor).toHaveAttribute("data-mode", "walk");
-      expect(actor).toHaveAttribute("data-facing", "left");
-      expect(actor).toHaveStyle({ transform: `translateX(${HOME - 160}px)`, transition: "transform 4000ms linear" });
+      expect(actor()).toHaveAttribute("data-mode", "stand");
+      act(() => { vi.advanceTimersByTime(1_300); });     // STAND_MS[0] = 1,2 dtk
+      expect(actor()).toHaveAttribute("data-mode", "walk");
+      expect(actor()).toHaveAttribute("data-facing", "left");
+      expect(actor()).toHaveStyle({ transform: `translate(${HOME - 380}px, 0px)`, transition: "transform 9500ms linear" });
       expect(rowshift()).toHaveAttribute("data-row", "walk-left");
       // tiba (transitionend) → berdiri di target, baris pose
       const end = new Event("transitionend", { bubbles: true });
       Object.defineProperty(end, "propertyName", { value: "transform" });
-      act(() => { vi.advanceTimersByTime(4_000); fireEvent(actor, end); });
-      expect(actor).toHaveAttribute("data-mode", "stand");
+      act(() => { vi.advanceTimersByTime(9_500); fireEvent(actor(), end); });
+      expect(actor()).toHaveAttribute("data-mode", "stand");
       expect(rowshift()).toHaveAttribute("data-row", "idle");
     } finally {
       vi.restoreAllMocks();
@@ -614,5 +624,136 @@ describe("Pet · inbox keputusan", () => {
     await act(async () => { fireEvent.click(hit()); });
     expect(await screen.findByTestId("pet-answer-note")).toBeTruthy();
     expect(screen.queryAllByTestId("pet-answer-option")).toHaveLength(0);
+  });
+});
+
+describe("HanomanPet — pet diseret (SPEC-905)", () => {
+  const CEILING = window.innerHeight - CELL_H;
+
+  it("seret mengangkat pet di dua sumbu, memutar baris held, tanpa transisi menyusul", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    expect(laneOf()).toHaveStyle({ height: `${CELL_H}px` });
+
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 460, 500);
+
+    expect(rowshift()).toHaveAttribute("data-row", "held");
+    expect(actor()).toHaveAttribute("data-mode", "held");
+    // selisih: x −40, y +200 dari HOME/0
+    expect(actor()).toHaveStyle({ transform: `translate(${HOME - 40}px, -200px)`, transition: "none" });
+    // jalur melebar HANYA sekarang, dan tetap tak menangkap pointer
+    expect(laneOf()).toHaveStyle({ top: "max(0px, var(--safe-top))", pointerEvents: "none" });
+    expect(laneOf().style.height).toBe("");
+  });
+
+  it("plafon angkat menghormati tinggi jalur; jalur tak pernah dilewati ke bawah", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 500, -9_000);
+    expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, -${CEILING}px)` });
+    pointer(hit(), "pointermove", 500, 9_000);
+    expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, 0px)` });
+  });
+
+  it("dilepas: jatuh dengan easing percepatan, lalu pusing, lalu baris pose — jalur menyusut lagi", () => {
+    vi.useFakeTimers();
+    try {
+      render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+      pointer(hit(), "pointerdown", 500, 700);
+      pointer(hit(), "pointermove", 460, 460);          // terangkat 240 px
+      pointer(hit(), "pointerup", 460, 460);
+
+      expect(rowshift()).toHaveAttribute("data-row", "falling");
+      expect(actor()).toHaveStyle({
+        transform: `translate(${HOME - 40}px, 0px)`,
+        transition: "transform 1000ms cubic-bezier(0.55, 0.085, 0.68, 0.53)",
+      });
+      expect(laneOf()).toHaveStyle({ top: "max(0px, var(--safe-top))" });   // masih melebar selagi jatuh
+
+      // Mendarat. Waktu dimajukan LEBIH DULU: `transitionend` di browser tiba tepat saat durasinya
+      // habis, dan mesin menilai pendaratan dari jam, bukan dari peristiwanya (pola test jalan kaki).
+      const end = new Event("transitionend", { bubbles: true });
+      Object.defineProperty(end, "propertyName", { value: "transform" });
+      act(() => { vi.advanceTimersByTime(1_000); fireEvent(actor(), end); });
+
+      expect(rowshift()).toHaveAttribute("data-row", "dizzy");
+      expect(atlas()).toHaveStyle({ animation: `hn-pet-frames ${durationMs("dizzy")}ms steps(8, end) 1 forwards` });
+      expect(laneOf()).toHaveStyle({ height: `${CELL_H}px` });   // menyusut kembali begitu mendarat
+
+      act(() => { vi.advanceTimersByTime(durationMs("dizzy") + 50); });
+      expect(rowshift()).toHaveAttribute("data-row", "idle");
+      expect(actor()).toHaveStyle({ transform: `translate(${HOME - 40}px, 0px)` });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("mesin berkeliaran melanjutkan dari x tempat pet dilepas, tidak melompat ke pojok", () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
+      render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+      pointer(hit(), "pointerdown", 500, 700);
+      pointer(hit(), "pointermove", 300, 700);        // geser 200 px ke kiri, tetap di lantai
+      pointer(hit(), "pointerup", 300, 700);
+      act(() => { vi.advanceTimersByTime(durationMs("dizzy") + 50); });   // pusing selesai
+      expect(actor()).toHaveStyle({ transform: `translate(${HOME - 200}px, 0px)` });
+      expect(actor()).toHaveAttribute("data-mode", "stand");
+    } finally {
+      vi.restoreAllMocks();
+      vi.useRealTimers();
+    }
+  });
+
+  it("ambang 6 px memisahkan klik dari seret: di bawahnya panel terbuka, di atasnya tidak", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 504, 700);          // 4 px → masih klik
+    pointer(hit(), "pointerup", 504, 700);
+    fireEvent.click(hit());
+    expect(screen.getByTestId("pet-panel")).toBeInTheDocument();
+    expect(rowshift()).toHaveAttribute("data-row", "wave");
+  });
+
+  it("seret tidak membuka panel dan tidak memicu thanks walau tiga kali berturut-turut", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    for (let i = 0; i < 3; i++) {
+      pointer(hit(), "pointerdown", 500, 700);
+      pointer(hit(), "pointermove", 460, 660);
+      pointer(hit(), "pointerup", 460, 660);
+      fireEvent.click(hit());                        // `click` menyusul `pointerup` di elemen yang sama
+    }
+    expect(screen.queryByTestId("pet-panel")).toBeNull();
+    expect(screen.queryByTestId("pet-hearts")).toBeNull();
+  });
+
+  it("pointercancel dilayani seperti pointerup: pet tidak tertinggal di udara", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 460, 460);
+    pointer(hit(), "pointercancel", 460, 460);
+    expect(rowshift()).toHaveAttribute("data-row", "falling");
+  });
+
+  it("tombol pet menolak gulir & seleksi selama gestur seret", () => {
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    // `touch-action`/`user-select` hidup di `.hn-pet-hit` (app.css): jsdom menjatuhkan keduanya dari
+    // inline style secara senyap, jadi kelasnya adalah satu-satunya yang bisa dibuktikan di sini.
+    expect(hit()).toHaveClass("hn-pet-hit");
+    expect(hit()).toHaveStyle({ cursor: "grab" });
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 460, 500);
+    expect(hit()).toHaveStyle({ cursor: "grabbing" });
+  });
+
+  it("reduced-motion: seret tetap boleh, jatuh seketika, pusing dilewati", () => {
+    mockMatchMedia((q) => q === REDUCED);
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    pointer(hit(), "pointerdown", 500, 700);
+    pointer(hit(), "pointermove", 460, 460);
+    expect(rowshift()).toHaveAttribute("data-row", "held");
+    pointer(hit(), "pointerup", 460, 460);
+    expect(rowshift()).toHaveAttribute("data-row", "idle");
+    expect(actor()).toHaveStyle({ transform: `translate(${HOME - 40}px, 0px)`, transition: "none" });
   });
 });
