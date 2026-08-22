@@ -87,6 +87,10 @@ pra-pin ≤ 0,25 (`stand`) / 0,30 (`walk`) / 0,35 (`float`) / 0,50 (`jump`), **k
   turun ke 0,075, **di bawah ambang 0,10**, jadi gerbangnya lolos secara **hampa** — rasio 2,27
   dibuktikan pengukuran langsung, bukan oleh gerbang yang menyala. Amplitudo dan kerataan memang
   saling menukar di baris 8 frame yang harus mulai dan berakhir dekat pose istirahat.
+- **Tripwire terukur, bukan cacat:** `dizzy` mengukur rasio langkah **5,44** dan `idle` **3,31**,
+  keduanya di atas atau dekat gerbang 3,5 — lolos hanya karena keduanya **tidak** ber-`even`.
+  Busur `dizzy` memang sengaja tak rata (pusing lalu pulih). Siapa pun yang kelak membuat salah satu
+  dari keduanya diputar berulang harus meregenerasinya lebih dulu, bukan melonggarkan gerbangnya.
 - **`detect_sprites` membuang blob kecil yang terpisah tanpa suara** (celah ≥ 8 kolom memisahkan,
   bbox < 40×80 px dibuang). Ornamen yang melayang lepas — bintang pusing `dizzy` — karena itu wajib
   **menyentuh** siluet karakter; kalau tidak ia hilang dari strip, atau membuat jumlah sprite ≠ 8.
