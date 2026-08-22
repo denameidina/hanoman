@@ -1,24 +1,32 @@
 import { describe, expect, it } from "vitest";
+import { durationMs } from "../src/screens/pet-sprite";
 import {
-  LANE_MARGIN, MIN_WALK_PX, STAND_MS, WALK_MS, WALK_PX_PER_S, anchored, clampX, homeX, initialWalkState,
-  stepWalk, type PetWalkInput, type PetWalkState,
+  FALL_MIN_MS, FALL_PX_PER_S, LANE_MARGIN, MIN_WALK_PX, STAND_MS, WALK_MS, WALK_PX_PER_S,
+  anchored, clampX, clampY, homeX, initialWalkState, isHandled, stepWalk,
+  type PetWalkInput, type PetWalkState,
 } from "../src/screens/pet-walk";
 
 const LANE = 1000;
+const LANE_H = 800;
 const PET = 128;
+const PET_H = 139;
 const HOME = LANE - PET - LANE_MARGIN;
+const CEILING = LANE_H - PET_H;
 
 function input(over: Partial<PetWalkInput> = {}): PetWalkInput {
   return {
-    now: 100_000, currentX: HOME, laneWidth: LANE, petWidth: PET, pose: "ready",
-    hovered: false, panelOpen: false, documentHidden: false, roam: true, reduced: false, tier: "desktop",
+    now: 100_000, currentX: HOME, laneWidth: LANE, laneHeight: LANE_H, petWidth: PET, petHeight: PET_H,
+    pose: "ready", hovered: false, panelOpen: false, documentHidden: false, roam: true, reduced: false,
+    tier: "desktop", dragging: false, pointerX: 0, pointerY: 0,
     ...over,
   };
 }
 const standing = (x: number, until = Infinity, facing: "right" | "left" = "right"): PetWalkState =>
-  ({ x, facing, mode: "stand", until });
+  ({ x, y: 0, facing, mode: "stand", until, parkedX: null });
 const walking = (x: number, until: number, facing: "right" | "left" = "left"): PetWalkState =>
-  ({ x, facing, mode: "walk", until });
+  ({ x, y: 0, facing, mode: "walk", until, parkedX: null });
+const held = (x: number, y: number): PetWalkState =>
+  ({ x, y, facing: "right", mode: "held", until: Infinity, parkedX: null });
 // rng deterministik: urutan nilai yang ditentukan test.
 const seq = (...values: number[]) => { let i = 0; return () => values[i++ % values.length]!; };
 
@@ -27,7 +35,9 @@ describe("mesin berkeliaran pet", () => {
     expect(homeX(LANE, PET)).toBe(HOME);
     expect(clampX(-50, LANE, PET)).toBe(LANE_MARGIN);
     expect(clampX(5000, LANE, PET)).toBe(HOME);
-    expect(initialWalkState(LANE, PET, 0)).toEqual({ x: HOME, facing: "right", mode: "stand", until: STAND_MS[0] });
+    expect(initialWalkState(LANE, PET, 0)).toEqual({
+      x: HOME, y: 0, facing: "right", mode: "stand", until: STAND_MS[0], parkedX: null,
+    });
   });
 
   it.each([
@@ -39,7 +49,7 @@ describe("mesin berkeliaran pet", () => {
     const step = stepWalk(walking(300, 200_000), input({ ...over, currentX: 420 }), seq(0.5));
     expect(step.state).toEqual(standing(HOME));
     expect(step.row).toBe("idle");
-    expect(step.move).toEqual({ x: HOME, durationMs: 0 });
+    expect(step.move).toEqual({ x: HOME, y: 0, durationMs: 0, ease: "linear" });
     // sudah di rumah & berdiri → tak ada perpindahan
     expect(stepWalk(standing(HOME), input(over), seq(0.5)).move).toBeNull();
   });
@@ -49,7 +59,7 @@ describe("mesin berkeliaran pet", () => {
       const step = stepWalk(walking(300, 200_000), input({ ...over, currentX: 412, pose: "working" }), seq(0.5));
       expect(step.state).toEqual(standing(412, Infinity, "left"));   // arah jalan dipertahankan
       expect(step.row).toBe("working");
-      expect(step.move).toEqual({ x: 412, durationMs: 0 });
+      expect(step.move).toEqual({ x: 412, y: 0, durationMs: 0, ease: "linear" });
     }
     // sudah berdiri → jeda tak memindahkan apa pun
     expect(stepWalk(standing(412), input({ hovered: true, currentX: 412 }), seq(0.5)).move).toBeNull();
@@ -60,7 +70,8 @@ describe("mesin berkeliaran pet", () => {
     expect(away.state.mode).toBe("home");
     expect(away.state.facing).toBe("right");
     expect(away.row).toBe("walk-right");
-    expect(away.move).toEqual({ x: HOME, durationMs: Math.round(((HOME - 300) / WALK_PX_PER_S) * 1000) });
+    expect(away.move).toEqual({ x: HOME, y: 0, ease: "linear",
+      durationMs: Math.round(((HOME - 300) / WALK_PX_PER_S) * 1000) });
     expect(away.state.until).toBe(100_000 + away.move!.durationMs);
     // di tengah jalan pulang: lanjut, tanpa perpindahan baru
     const mid = stepWalk(away.state, input({ pose: "waiting", currentX: 500, now: 101_000 }), seq(0.5));
@@ -76,7 +87,7 @@ describe("mesin berkeliaran pet", () => {
     const step = stepWalk(walking(300, 200_000), input({ pose: "shipped", currentX: 350 }), seq(0.5));
     expect(step.state).toEqual(standing(350, Infinity, "left"));
     expect(step.row).toBe("shipped");
-    expect(step.move).toEqual({ x: 350, durationMs: 0 });
+    expect(step.move).toEqual({ x: 350, y: 0, durationMs: 0, ease: "linear" });
   });
 
   it("pose tenang: berdiri 1,2–4,5 dtk, lalu jalan 5–14 dtk @ 40 px/s ke arah acak di dalam jalur", () => {
@@ -119,7 +130,10 @@ describe("mesin berkeliaran pet", () => {
 
   it("berdiri tanpa batas (sehabis jeda) mendapat jadwal baru saat jeda berakhir", () => {
     const step = stepWalk(standing(420), input({ currentX: 420 }), seq(0.25));
-    expect(step.state).toEqual({ x: 420, facing: "right", mode: "stand", until: 100_000 + STAND_MS[0] + 0.25 * (STAND_MS[1] - STAND_MS[0]) });
+    expect(step.state).toEqual({
+      x: 420, y: 0, facing: "right", mode: "stand", parkedX: null,
+      until: 100_000 + STAND_MS[0] + 0.25 * (STAND_MS[1] - STAND_MS[0]),
+    });
     expect(step.move).toBeNull();
   });
 
@@ -138,7 +152,7 @@ describe("SPEC-897 — pose baru", () => {
       const step = stepWalk(walking(300, 200_000), input({ pose, currentX: 420 }), seq(0.5));
       expect(step.state).toEqual(standing(420, Infinity, "left"));   // berhenti mid-stride, tak berbalik
       expect(step.row).toBe(row);
-      expect(step.move).toEqual({ x: 420, durationMs: 0 });
+      expect(step.move).toEqual({ x: 420, y: 0, durationMs: 0, ease: "linear" });
     });
 
   it("tak bergerak lagi saat sudah berdiri terputus/tidur", () => {
@@ -156,5 +170,94 @@ describe("SPEC-897 — pose baru", () => {
   it("`deciding` memutar barisnya sendiri saat berdiri", () => {
     const step = stepWalk(standing(600, 200_000), input({ pose: "deciding", currentX: 600 }), seq(0.5));
     expect(step.row).toBe("deciding");
+  });
+});
+
+describe("SPEC-905 — pet diseret", () => {
+  it("diseret menang atas SEMUA cabang lain: terjangkar, jeda hover, pose perhatian, tidur", () => {
+    for (const over of [
+      { roam: false }, { reduced: true }, { tier: "mobile" as const },
+      { hovered: true }, { panelOpen: true }, { documentHidden: true },
+      { pose: "waiting" as const }, { pose: "sleeping" as const },
+    ]) {
+      const step = stepWalk(standing(300), input({ ...over, dragging: true, pointerX: 420, pointerY: 260 }), seq(0.5));
+      expect(step.row).toBe("held");
+      expect(step.state.mode).toBe("held");
+      expect(step.state.until).toBe(Infinity);
+      expect(step.move).toEqual({ x: 420, y: 260, durationMs: 0, ease: "linear" });
+    }
+  });
+
+  it("mengikuti pointer di dua sumbu, di-clamp jalur dan plafon angkat", () => {
+    expect(clampY(-40, LANE_H, PET_H)).toBe(0);
+    expect(clampY(5_000, LANE_H, PET_H)).toBe(CEILING);
+    const high = stepWalk(held(300, 100), input({ dragging: true, pointerX: 5_000, pointerY: 5_000 }), seq(0.5));
+    expect(high.state.x).toBe(HOME);
+    expect(high.state.y).toBe(CEILING);
+    const low = stepWalk(held(300, 100), input({ dragging: true, pointerX: -900, pointerY: -900 }), seq(0.5));
+    expect(low.state.x).toBe(LANE_MARGIN);
+    expect(low.state.y).toBe(0);
+  });
+
+  it("dilepas dari ketinggian: jatuh dengan easing percepatan, durasi dari jaraknya", () => {
+    const drop = stepWalk(held(420, 480), input({ currentX: 420 }), seq(0.5));
+    expect(drop.row).toBe("falling");
+    expect(drop.state.mode).toBe("falling");
+    expect(drop.state.y).toBe(0);
+    expect(drop.state.until).toBe(100_000 + 2_000);
+    expect(drop.move).toEqual({ x: 420, y: 0, durationMs: 2_000, ease: "fall" });
+    expect(Math.round((480 / FALL_PX_PER_S) * 1000)).toBe(2_000);
+    // jatuhan sependek 20 px tetap terbaca sebagai jatuh
+    expect(stepWalk(held(420, 20), input({ currentX: 420 }), seq(0.5)).move!.durationMs).toBe(FALL_MIN_MS);
+  });
+
+  it("selagi jatuh tak ada perpindahan baru, dan pergantian pose tak memotongnya", () => {
+    const falling: PetWalkState = { x: 420, y: 0, facing: "right", mode: "falling", until: 102_000, parkedX: 420 };
+    for (const over of [{}, { pose: "waiting" as const }, { hovered: true }, { roam: false }]) {
+      const step = stepWalk(falling, input({ ...over, currentX: 420, now: 101_000 }), seq(0.5));
+      expect(step.state).toBe(falling);
+      expect(step.row).toBe("falling");
+      expect(step.move).toBeNull();
+    }
+  });
+
+  it("mendarat → pusing sekali putar → pose mesin dengan jadwal berdiri baru, di x tempat dilepas", () => {
+    const falling: PetWalkState = { x: 420, y: 0, facing: "right", mode: "falling", until: 102_000, parkedX: 420 };
+    const landed = stepWalk(falling, input({ currentX: 420, now: 102_000 }), seq(0.5));
+    expect(landed.row).toBe("dizzy");
+    expect(landed.state.mode).toBe("dizzy");
+    expect(landed.state.until).toBe(102_000 + durationMs("dizzy"));
+    expect(landed.move).toEqual({ x: 420, y: 0, durationMs: 0, ease: "linear" });
+    // selagi pusing: tetap pusing, tak ada perpindahan
+    const mid = stepWalk(landed.state, input({ currentX: 420, now: 102_500 }), seq(0.5));
+    expect(mid.state).toBe(landed.state);
+    expect(mid.row).toBe("dizzy");
+    // selesai: baris pose mesin, berdiri di 420 — BUKAN melompat ke pojok, BUKAN langsung jalan lagi
+    const done = stepWalk(landed.state, input({ currentX: 420, now: 103_100, pose: "working" }), seq(0.5));
+    expect(done.row).toBe("working");
+    expect(done.state).toEqual({
+      x: 420, y: 0, facing: "right", mode: "stand", until: 103_100 + 1200 + 0.5 * 3300, parkedX: 420,
+    });
+    expect(done.move).toBeNull();
+  });
+
+  it("reduced-motion: jatuh seketika dan pusing DILEWATI", () => {
+    const drop = stepWalk(held(420, 480), input({ currentX: 420, reduced: true }), seq(0.5));
+    expect(drop.row).toBe("idle");                 // baris pose, bukan falling/dizzy
+    expect(drop.state.mode).toBe("stand");
+    expect(drop.state.y).toBe(0);
+    expect(drop.state.parkedX).toBe(420);
+    expect(drop.move).toEqual({ x: 420, y: 0, durationMs: 0, ease: "linear" });
+  });
+
+  it("dilepas tanpa terangkat (y = 0) melewati jatuh dan langsung pusing", () => {
+    const drop = stepWalk(held(420, 0), input({ currentX: 420 }), seq(0.5));
+    expect(drop.row).toBe("dizzy");
+    expect(drop.state.parkedX).toBe(420);
+  });
+
+  it("isHandled menamai tiga mode yang memegang panggung sendiri", () => {
+    expect((["held", "falling", "dizzy"] as const).every(isHandled)).toBe(true);
+    expect((["stand", "walk", "home"] as const).some(isHandled)).toBe(false);
   });
 });

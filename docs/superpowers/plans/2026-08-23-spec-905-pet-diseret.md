@@ -162,7 +162,7 @@ git commit -m "feat(pet): berkeliaran lebih sering — STAND_MS/WALK_MS dibalik 
   - `isHandled(mode: PetWalkMode): boolean`
   - `FALL_PX_PER_S = 240`, `FALL_MIN_MS = 220`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `src/test/pet-walk.test.ts`, perbarui helper di kepala berkas:
 
@@ -318,7 +318,7 @@ describe("SPEC-905 — pet diseret", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan gagal**
+- [x] **Step 2: Jalankan test — pastikan gagal**
 
 ```bash
 pnpm vitest --run --root src test/pet-walk.test.ts
@@ -326,7 +326,7 @@ pnpm vitest --run --root src test/pet-walk.test.ts
 Expected: FAIL — `clampY is not a function` / `isHandled is not a function`, dan seluruh test seret
 gagal karena `dragging` belum dibaca `stepWalk`.
 
-- [ ] **Step 3: Implementasikan mesin**
+- [x] **Step 3: Implementasikan mesin**
 
 Ganti seluruh isi `src/src/screens/pet-walk.ts` mulai dari header komentar sampai akhir dengan:
 
@@ -550,7 +550,7 @@ export function stepWalk(state: PetWalkState, input: PetWalkInput, rng: Rng): Pe
 > dan **menambah** satu kasus yang sebelumnya tak ada: berdiri di tempat yang BUKAN posisi
 > sekarang — persis yang terjadi sesudah dizzy pada mesin ini.
 
-- [ ] **Step 4: Jalankan test — pastikan hijau**
+- [x] **Step 4: Jalankan test — pastikan hijau**
 
 ```bash
 pnpm vitest --run --root src test/pet-walk.test.ts
@@ -558,7 +558,7 @@ pnpm vitest --run --root src test/pet-walk.test.ts
 Expected: PASS, **kecuali** blok `parkedX` di jangkar (Task 3) yang belum ditulis. Semua test lama +
 blok "SPEC-905 — pet diseret" lulus.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/pet-walk.ts src/test/pet-walk.test.ts
