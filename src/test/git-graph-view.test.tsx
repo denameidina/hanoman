@@ -105,10 +105,12 @@ describe("GitGraph", () => {
     expect(onRunGit).not.toHaveBeenCalled();
   });
 
-  // SPEC-245 · live-refresh: graph mem-poll ideGraph ulang tanpa aksi manual
-  // supaya perubahan async (sesi claude commit, konflik diselesaikan di Terminal,
-  // commit terminal) tampil tanpa refresh halaman.
-  it("mem-poll ideGraph ulang secara live tanpa aksi manual (SPEC-245)", async () => {
+  // SPEC-245 · live-refresh: perubahan async (sesi claude commit, konflik diselesaikan di
+  // Terminal, commit terminal) tampil tanpa refresh halaman.
+  // SPEC-908 · jalurnya kini langganan `/events/ws`, dan polling 4 dtk ini tinggal FALLBACK —
+  // menyala hanya setelah socket terbukti bisu melewati ambangnya (WS terhalang proxy). Yang
+  // diuji di sini justru jaminan degradasi itu: layar tak pernah membeku saat WS tak sampai.
+  it("kembali men-poll ideGraph saat socket events bisu (SPEC-245 · SPEC-908)", async () => {
     vi.useFakeTimers();
     try {
       const graph = vi.spyOn(api, "ideGraph").mockResolvedValue({ commits, current: "main", total: 250 });
@@ -118,7 +120,10 @@ describe("GitGraph", () => {
       await act(async () => { await vi.advanceTimersByTimeAsync(0); }); // flush effect mount + initial load
       const before = graph.mock.calls.length;
       expect(before).toBeGreaterThanOrEqual(1);
-      await act(async () => { await vi.advanceTimersByTimeAsync(4100); }); // satu tick poll
+      // Ambang bisu 15 dtk; interval-nya baru terpasang saat `act` keluar, jadi denyut pertamanya
+      // jatuh di jendela BERIKUTNYA.
+      await act(async () => { await vi.advanceTimersByTimeAsync(16_000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(4_100); });
       expect(graph.mock.calls.length).toBeGreaterThan(before);
     } finally {
       vi.useRealTimers();

@@ -1,8 +1,9 @@
 /* GitGraph — DAG commit read + aksi (SPEC-182). Lane dihitung computeLanes (nol dep).
    Baris = grid [svg lane | subject | refs | meta]; klik = detail; klik-kanan = context-menu. */
 import React from "react";
-import { Card, Button, Checkbox, StateBlock, Badge, Icon, DocDownload, MarkdownView, isMarkdownPath, Tabs, LocalOverflow, Modal, useCoarsePointer, useResponsiveTier } from "../ds";
+import { Card, Button, Checkbox, StateBlock, Badge, Icon, DocDownload, MarkdownView, isMarkdownPath, Tabs, LocalOverflow, Modal, useCoarsePointer, useResponsiveTier, LiveConnectionBadge } from "../ds";
 import { api, type GraphCommit, type CommitDetail, type GitOp, type RepoStatus, type Stash, type ReviewFile } from "../api/client";
+import { useLiveTopic } from "../api/live";
 import { computeLanes, rowEdges, type GraphRow, type Edge } from "./git-graph";
 import { buildFileTree, TreeRow } from "./file-tree";
 import { DiffView } from "./diff-view";
@@ -18,7 +19,9 @@ const GRAPH_ROW_MIN = 460;
 // terukur di 390px SESUDAH scroller lokal dipasang. Dengan lantai ini baris yang pill-nya panjang
 // melebihi `GRAPH_ROW_MIN` dan scroller-nya ikut melebar, bukan memeras subject.
 const SUBJECT_MIN = 160;
-const POLL_MS = 4000; // SPEC-245 · kadens live-refresh git graph (HTTP polling, ADR-stack)
+// SPEC-245 · kadens live-refresh git graph. SPEC-908 · tinggal kadens FALLBACK; jalur
+// normalnya langganan berparameter di `/events/ws`.
+const POLL_MS = 4000;
 const PAGE = 200;     // SPEC-351 · besar satu halaman commit; jendela tumbuh kelipatan ini
 const COLORS = ["#a9791c", "#3b7a57", "#8a5a44", "#4a6fa5", "#7d5ba6", "#b0503a"]; // brass-leaf-clay-ink
 const laneColor = (i: number, palette: string[] = COLORS) => palette[i % palette.length];
@@ -342,10 +345,29 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
   // (sesi claude yang commit, konflik merge/rebase diselesaikan di Terminal, commit
   // dari terminal) muncul tanpa refresh manual. Poll diam tiap POLL_MS; berhenti saat
   // tab browser tak aktif (hemat) dan saat unmount.
-  React.useEffect(() => {
-    const t = setInterval(() => { if (!document.hidden) load(true); }, POLL_MS);
-    return () => clearInterval(t);
-  }, [load]);
+  // SPEC-908 · perubahan repo yang datang di luar aksi sinkron sendiri (sesi claude yang commit,
+  // konflik merge/rebase diselesaikan di Terminal) kini DIDORONG lewat langganan `/events/ws`,
+  // bukan poll 4 dtk per klien. `apply` sengaja tak menyentuh `state`/`paging`: pembaruan yang
+  // datang tak boleh membuat graph berkedip maupun melempar posisi gulir operator (SPEC-245/351).
+  // Satu `git log` dihitung per PARAMETER yang benar-benar ditonton dan dibagi semua tab yang
+  // melihat project & opsi yang sama; POLL_MS tinggal kadens fallback.
+  useLiveTopic({
+    topic: "git",
+    params: {
+      projectId, limit: gopts.limit, branch: gopts.branch,
+      showRemote: gopts.showRemote, showTags: gopts.showTags,
+    },
+    apply: (m) => {
+      setRows(computeLanes(m.graph.commits));
+      setCurrent(m.graph.current);
+      setTotal(m.graph.total ?? 0);
+      setHasMore(m.graph.commits.length >= gopts.limit);
+      setState("ready");
+      setStatus(m.status);
+      setStashes(m.stashes);
+    },
+    refetch: () => load(true), pollMs: POLL_MS,
+  });
   // SPEC-233 · shortcut: Esc tutup panel; Ctrl/Cmd-F find; Ctrl/Cmd-H center HEAD.
   React.useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -439,6 +461,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             style={{ border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", cursor: "pointer", padding: "3px 8px", fontSize: 12, color: "var(--text-muted)" }}>
             style: {style}
           </button>
+          <LiveConnectionBadge />
         </div>
         {/* SPEC-233 · stash sebagai chip di puncak; klik-kanan → apply/pop/drop/branch/copy */}
         {stashes.length > 0 && (
