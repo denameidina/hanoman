@@ -433,8 +433,12 @@ export function HanomanPet({ sessions, backlog, onOpen }:
           willChange: "transform",
         }}>
         {speech && !open && (
+          // SPEC-899 · gelembung `waiting` menumbuhkan satu aksi, dan elemen di dalam `aria-hidden`
+          // tak bisa difokuskan sama sekali — jadi bungkusnya berhenti `aria-hidden` begitu ia
+          // punya tombol, sementara TEKS-nya tetap disembunyikan supaya region `role="status"` di
+          // pet-stage tetap satu-satunya yang membacakan kabar (keputusan SPEC-898 #3 ditegakkan).
           <div data-testid="pet-bubble" data-kind={speech.kind}
-            aria-hidden={speech.kind === "pose" ? "true" : undefined} style={{
+            aria-hidden={speech.kind === "pose" && view.kind !== "waiting" ? "true" : undefined} style={{
             pointerEvents: "none", position: "absolute", left: bubbleLeft, bottom: cellH - 6,
             width: "max-content", maxWidth: BUBBLE_W, boxSizing: "border-box", padding: "6px 10px",
             fontFamily: "var(--font-ui)", fontSize: 12.5, lineHeight: 1.35,
@@ -443,15 +447,21 @@ export function HanomanPet({ sessions, backlog, onOpen }:
             boxShadow: "var(--shadow-sm)",
             animation: reduced ? "none" : "hn-pet-bubble-in var(--dur-base) var(--ease-out) both",
           }}>
-            {speech.text}
-            {speech.kind === "recap" && (
+            <span data-testid="pet-bubble-text"
+              aria-hidden={speech.kind === "pose" ? "true" : undefined}>{speech.text}</span>
+            {(speech.kind === "recap" || view.kind === "waiting") && (
               // Satu-satunya hit area tambahan di jalur pet, dan ia transient: kelas yang sama
               // dengan panel, bukan pelebaran badan pet (SPEC-763).
               <div style={{ marginTop: 6, pointerEvents: "auto" }}>
-                <Button size="sm" variant="ghost" leftIcon="list-checks"
-                  aria-label={`${speech.text} — buka ringkasan pet`}
+                <Button size="sm" variant="ghost"
+                  leftIcon={speech.kind === "recap" ? "list-checks" : "terminal"}
+                  aria-label={speech.kind === "recap"
+                    ? `${speech.text} — buka ringkasan pet`
+                    : `${speech.text} — jawab di sini`}
                   style={reduced ? { transition: "none", transform: "none" } : undefined}
-                  onClick={() => { setSpeech(null); showPanel(); }}>Lihat</Button>
+                  onClick={() => { setSpeech(null); showPanel(); }}>
+                  {speech.kind === "recap" ? "Lihat" : "Jawab di sini"}
+                </Button>
               </div>
             )}
           </div>

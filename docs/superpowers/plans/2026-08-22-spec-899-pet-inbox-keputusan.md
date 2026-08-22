@@ -1188,7 +1188,7 @@ git commit -m "feat(pet): panel menjawab dialog sesi waiting (SPEC-899)"
 - Consumes: `view.kind`, `speech`, `showPanel()`, `setSpeech()` yang sudah ada di komponen.
 - Produces: tombol ber-teks "Jawab di sini" di dalam `pet-bubble` untuk kondisi `waiting`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `src/test/hanoman-pet.test.tsx`, tambahkan di dalam `describe("Pet · inbox keputusan", …)`:
 
@@ -1210,12 +1210,12 @@ Di `src/test/hanoman-pet.test.tsx`, tambahkan di dalam `describe("Pet · inbox k
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/hanoman-pet.test.tsx -t "Jawab di sini"`
 Expected: FAIL — tombol tak ditemukan.
 
-- [ ] **Step 3: Ubah blok gelembung**
+- [x] **Step 3: Ubah blok gelembung**
 
 Di `src/src/screens/HanomanPet.tsx`, ganti seluruh blok `{speech && !open && ( … )}` menjadi:
 
@@ -1256,12 +1256,12 @@ Di `src/src/screens/HanomanPet.tsx`, ganti seluruh blok `{speech && !open && ( �
         )}
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/hanoman-pet.test.tsx`
 Expected: PASS — seluruh berkas, termasuk test gelembung SPEC-898 yang sudah ada.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/HanomanPet.tsx src/test/hanoman-pet.test.tsx

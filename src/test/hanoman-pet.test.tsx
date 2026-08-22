@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, act, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Notification, SessionDialog, SessionDialogPayload, Spec } from "@hanoman/shared";
 import { api, ApiError, type TerminalSession } from "../src/api/client";
 import { HanomanPet } from "../src/screens/HanomanPet";
@@ -62,9 +62,13 @@ const CELL_H = Math.round(PET_MANIFEST.cell.h * SCALE);
 const HOME = homeX(window.innerWidth, CELL_W);
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   localStorage.clear();
   mockMatchMedia(() => false);
   h.status = { connected: true, since: 0, paused: false };
+  // SPEC-899 · kotak jawaban memanggil endpoint dialog begitu panel terbuka. Test yang tak
+  // membahasnya tak boleh menembak `fetch` sungguhan — default-nya "tak ada dialog di layar".
+  vi.spyOn(api, "sessionDialog").mockResolvedValue(null);
 });
 const conditions = () => screen.getAllByTestId("pet-condition");
 
@@ -378,7 +382,9 @@ describe("HanomanPet — pet bicara (SPEC-898)", () => {
     const { rerender } = render(<HanomanPet sessions={[]} backlog={bl} onOpen={vi.fn()} />);
     expect(bubble()).toBeNull();                                   // mount tak berteriak
     rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
-    expect(bubble()!.textContent).toBe("SPEC-1 butuh jawabanmu");
+    // SPEC-899 · teksnya kini hidup di span-nya sendiri: gelembung `waiting` menumbuhkan CTA
+    // "Jawab di sini", jadi textContent gelembung memuat label tombol itu juga.
+    expect(within(bubble()!).getByTestId("pet-bubble-text").textContent).toBe("SPEC-1 butuh jawabanmu");
   });
 
   it("keadaan mapan tak bergelembung", () => {
@@ -392,7 +398,10 @@ describe("HanomanPet — pet bicara (SPEC-898)", () => {
     rerender(<HanomanPet sessions={[session({ id: "a", specId: "SPEC-1", decision: true })]} backlog={bl} onOpen={vi.fn()} />);
     const el = bubble()!;
     expect(el).toHaveStyle({ pointerEvents: "none" });
-    expect(el.getAttribute("aria-hidden")).toBe("true");
+    // SPEC-899 · bungkusnya berhenti `aria-hidden` begitu ia punya tombol — elemen di dalam
+    // `aria-hidden` tak bisa difokuskan sama sekali. Yang disembunyikan kini TEKS-nya, dan
+    // janji "tak diumumkan dua kali" tetap dipegang region status di bawah.
+    expect(within(el).getByTestId("pet-bubble-text").getAttribute("aria-hidden")).toBe("true");
     // Kalimat status tetap SATU sumber untuk pembaca layar.
     expect(screen.getByTestId("pet-status").textContent).toContain("menunggu jawabanmu");
     expect(styleOf(el)).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
@@ -521,8 +530,6 @@ describe("HanomanPet — pet bicara (SPEC-898)", () => {
 
 // SPEC-899 · ADR-0142 · inbox keputusan: pertanyaan agen dijawab dari panel, bukan dari pane.
 describe("Pet · inbox keputusan", () => {
-  afterEach(() => { vi.restoreAllMocks(); });
-
   const payload = (over: Partial<SessionDialog> = {}): SessionDialogPayload => ({
     screenHash: "deadbeef",
     dialog: {
@@ -576,6 +583,27 @@ describe("Pet · inbox keputusan", () => {
     expect(screen.queryByTestId("pet-answer-sent")).toBeNull();
     expect(screen.getByTestId("pet-answer-note").textContent).toContain("berubah");
     expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it("gelembung waiting menawarkan 'Jawab di sini' dan membuka panel", async () => {
+    vi.spyOn(api, "sessionDialog").mockResolvedValue(payload());
+    const props = waitingProps();
+    // Gelembung lahir saat kabarnya BERGANTI (SPEC-898), bukan saat mount.
+    const { rerender } = render(<HanomanPet {...props} sessions={[]} />);
+    rerender(<HanomanPet {...props} />);
+    const cta = await screen.findByRole("button", { name: /jawab di sini/i });
+    expect(screen.getByTestId("pet-bubble").getAttribute("aria-hidden")).toBeNull();
+    await act(async () => { fireEvent.click(cta); });
+    expect(await screen.findByTestId("pet-answer")).toBeTruthy();
+  });
+
+  it("teks gelembung tetap aria-hidden — region status pet-stage yang membacakannya", async () => {
+    vi.spyOn(api, "sessionDialog").mockResolvedValue(payload());
+    const props = waitingProps();
+    const { rerender } = render(<HanomanPet {...props} sessions={[]} />);
+    rerender(<HanomanPet {...props} />);
+    const bubble = await screen.findByTestId("pet-bubble");
+    expect(within(bubble).getByTestId("pet-bubble-text").getAttribute("aria-hidden")).toBe("true");
   });
 
   it("tak ada dialog di layar → panel mengatakannya, tak ada tombol jawaban", async () => {
