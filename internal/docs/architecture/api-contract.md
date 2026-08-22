@@ -959,6 +959,16 @@ GET    /terminal/sessions            # [{ id, projectId, specId?, flow?, cwd, br
 #   branch? (SPEC-230): branch integrasi sesi project-level (PRD = prd/<slug>) — menyalakan review+merge di sel
 #   agent (SPEC-338/ADR-0074): "claude" | "codex" — mesin sesi, dibaca dari opsi tmux @hanoman_agent.
 #     Sesi yang lahir sebelum ADR-0074 (tanpa opsi itu) dilaporkan sebagai "claude".
+#   decision (SPEC-196 · SPEC-903/ADR-0143): KEADAAN TURUNAN, bukan isi marker apa adanya —
+#     marker .worktrees/.decisions/<id> terisi DAN pane tak mengeluarkan apa pun selama >= 3 dtk
+#     (PANE_QUIET_MS, dari #{window_activity} yang menumpang FMT list-panes; nol invokasi tmux
+#     tambahan). Marker dipasang hook agen dan hanya dilepas UserPromptSubmit, jadi tanpa gerbang
+#     ini ia tetap menyala sepanjang agen bekerja sesudah pertanyaannya dijawab lewat dialog TUI,
+#     lewat POST /terminal/sessions/:id/dialog/answer, lewat Esc, atau saat codex melanjutkan
+#     sendiri. Aktivitas pane tak terbaca => dibaca "diam" (fail-open, perilaku pra-ADR-0143).
+#   decisionAt? (SPEC-898/ADR-0141 · SPEC-903/ADR-0143): ISO awal episode menunggu yang SEDANG
+#     berlangsung = max(onset di isi marker, #{window_activity}). Ada HANYA saat decision true.
+#     Isi marker sendiri tetap "detik epoch onset, ditulis sekali" — ADR-0141 tak diubah.
 #   exitCode? (SPEC-402): kode keluar pane MATI (#{pane_dead_status}); ABSEN selama pane hidup.
 #     ≠ 0 = pekerjaan TERPUTUS (mis. 143 = agen di-SIGTERM), bukan tuntas → UI memberi pil
 #     "Gagal · exit <n>", bukan "Selesai". Endpoint ini & frame siar `sessions` membawa nilai yang sama.
@@ -1107,6 +1117,14 @@ POST   /terminal/sessions/:id/dialog/answer { screenHash, choice?, choices?[], t
 #     bukan lagi dialog yang bisa dijawab, atau screenHash tak cocok), "shape" (bentuk jawaban tak
 #     cocok layar), "not-landed" (primitif tui-dialog gagal membuktikan jawabannya mendarat — sesi
 #     TIDAK digerakkan). `reason` ada supaya klien tak perlu mem-parsing prosa.
+#   EFEK SAMPING (SPEC-903, ADR-0143): 202 MENGOSONGKAN marker keputusan sesi
+#     (.worktrees/.decisions/<id>) — jawaban dialog adalah tool result, bukan prompt, jadi hook
+#     `UserPromptSubmit` yang biasanya mengosongkannya tak pernah menembak untuk jalur ini. Ini satu
+#     dari HANYA DUA penulis marker dari sisi server (yang lain: rantai hanoman-lead yang tuntas,
+#     SPEC-452); keduanya bukti POSITIF manusia sudah menjawab. Penulis ketiga tak boleh lahir —
+#     khususnya bukan heuristik: hook Notification claude mengisi marker sekali per dialog dan tak
+#     pernah menembak lagi, jadi pengosongan yang salah menghilangkan pertanyaannya permanen.
+#     409 tak menyentuh marker.
 #   Capability `sessions:write`. SENGAJA DI LUAR katalog MCP (shared/src/mcp-catalog.ts): agen yang
 #     bisa memanggilnya bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang
 #     memutuskan" runtuh lewat pintu itu (memperluas ADR-0099 & SPEC-646/ADR-0112).

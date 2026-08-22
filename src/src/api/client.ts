@@ -17,15 +17,21 @@ export type { PrdDoc };
 export type Phase = { name: string; state: "done" | "skipped" | "active" | "pending" };
 export type TerminalSession = {
   id: string; projectId: string; specId?: string; flow?: Flow; cwd: string; exited: boolean;
-  branch?: string; decision?: boolean;   // SPEC-230 · branch integrasi sesi (PRD: prd/<slug>)
+  branch?: string;   // SPEC-230 · branch integrasi sesi (PRD: prd/<slug>)
+  // SPEC-903 · ADR-0143 · KEADAAN TURUNAN: marker keputusan terisi DAN pane sudah diam. Jangan
+  // menambah predikat kedua di atasnya — kosakata TerminalScreen & pet-state identik justru karena
+  // keduanya membaca bit yang sama ini.
+  decision?: boolean;
   // SPEC-402 · kode keluar pane mati (undefined selama hidup) — pembeda "Selesai" vs "Gagal".
   exitCode?: number;
   // SPEC-409 · ADR-0091 · hanoman-lead sedang MENYUSUN keputusan untuk sesi ini. Bentuknya di layar
   // sama persis dengan "mandek menunggu manusia" (diam, marker terisi), jadi tanpa penanda ini
   // operator membaca sesi yang justru sedang dilayani sebagai sesi yang terbengkalai.
   deciding?: boolean;
-  // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia" (isi marker keputusan). Absen =
-  // tak diketahui (sesi yang lahir sebelum ADR-0141) — pet tak pernah mengeskalasi tanpa stempel.
+  // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia". SPEC-903 · ADR-0143 · = `max(stempel
+  // di marker, keluaran terakhir pane)`, yakni awal episode yang SEDANG berlangsung — satu episode
+  // marker bisa memuat beberapa episode menunggu. Absen = tak diketahui; pet tak pernah
+  // mengeskalasi tanpa stempel.
   decisionAt?: string;
 };
 // SPEC-167 · respons dry-run PATCH /specs/:id saat revert akan menghapus artefak.

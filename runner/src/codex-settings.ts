@@ -8,8 +8,11 @@ import type { Flow } from "./types";
 // dengan menjalankan `codex exec` sungguhan, bukan dari ingatan):
 //   1. Codex tak punya `--settings <json>`. Hook disuntik lewat `-c hooks.<Event>=<toml>`,
 //      satu flag `-c` per event; nilainya di-parse sebagai TOML.
-//   2. Codex TIDAK punya event `Notification`. Padanan "sesi menunggu manusia" yang tersedia
-//      adalah `Stop` (right before Codex ends its turn) — turn berakhir = giliran manusia.
+//   2. Codex TIDAK punya event `Notification`. Padanan "agen minta masukan" yang tersedia adalah
+//      `Stop` (right before Codex ends its turn) — turn berakhir = giliran manusia. Karena `Stop`
+//      menembak di TIAP akhir turn, marker codex menyala juga saat codex melanjutkan sendiri;
+//      sejak SPEC-903/ADR-0143 itu tak lagi berarti "menunggu" — server menggerbanginya dengan
+//      keadaan pane (`paneQuiet`). Hook di sini sengaja TIDAK ikut berubah.
 //   3. Handler bertipe `prompt` DIDIAMKAN codex; hanya `type="command"` yang benar-benar
 //      terpasang. Karena itu mode goal di sini deterministik (skrip sh), bukan evaluator prosa.
 //

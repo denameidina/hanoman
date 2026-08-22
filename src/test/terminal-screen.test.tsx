@@ -475,6 +475,33 @@ describe("TerminalScreen (grid)", () => {
     expect(screen.queryByText("Selesai")).toBeNull();
   });
 
+  // SPEC-903 · ADR-0143 · `decision` kini padam tiap kali pane mengeluarkan sesuatu — termasuk saat
+  // lead sendiri mengetik jawabannya. Sebelum ini pil "Lead memutuskan" bersarang di dalam
+  // `awaiting` karena marker memang tetap terisi selama lead berpikir; sarang itu kini membuat sel
+  // Terminal DIAM di sesi yang justru sedang dilayani, sementara pet mengatakan "sedang diputuskan
+  // lead" (`sessionKind` menguji `deciding` berdiri sendiri). Kosakata kedua permukaan wajib sama.
+  it("deciding menyalakan pil Lead memutuskan meski decision sedang padam (SPEC-903)", async () => {
+    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 1, cells: ["lead5555"] }));
+    listTerminals.mockResolvedValue([{
+      id: "lead5555", projectId: "p1", cwd: "/repo", exited: false, decision: false, deciding: true,
+    }]);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByTestId("pane");
+    expect(screen.getByText("Lead memutuskan")).toBeInTheDocument();
+    expect(screen.queryByText("Menunggu keputusan")).toBeNull();
+  });
+
+  it("deciding tetap menang atas awaiting saat keduanya menyala (ADR-0091 AC-3)", async () => {
+    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 1, cells: ["lead6666"] }));
+    listTerminals.mockResolvedValue([{
+      id: "lead6666", projectId: "p1", cwd: "/repo", exited: false, decision: true, deciding: true,
+    }]);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByTestId("pane");
+    expect(screen.getByText("Lead memutuskan")).toBeInTheDocument();
+    expect(screen.queryByText("Menunggu keputusan")).toBeNull();
+  });
+
   // SPEC-433 · keluhan: "status selesai di terminal tidak pernah terjadi". Benar — pil hijau
   // digerbangi `exited` (⇐ #{pane_dead}) sementara agen adalah TUI interaktif yang kembali ke
   // prompt-nya sesudah fase terakhir. Terukur: spec-431/432 berkas fasenya lengkap, commit-nya

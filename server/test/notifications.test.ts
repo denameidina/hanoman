@@ -78,7 +78,7 @@ describe("scanDecisions", () => {
 
   it("marker terisi → satu notif decision (sessionId+projectId); scan ulang tak menambah", async () => {
     const f = marker();
-    const read = () => [{ id: "sess1", specId: undefined, projectId: "p1", decisionFile: f }];
+    const read = () => [{ id: "sess1", specId: undefined, projectId: "p1", decisionFile: f, waiting: true }];
     await scanDecisions(read);
     await scanDecisions(read);
     const rows = await prisma.notification.findMany({ where: { type: "decision" } });
@@ -89,7 +89,7 @@ describe("scanDecisions", () => {
 
   it("dikosongkan (manusia menjawab) lalu terisi lagi → notif kedua", async () => {
     const f = marker();
-    const read = () => [{ id: "sess1", specId: undefined, projectId: "p1", decisionFile: f }];
+    const read = () => [{ id: "sess1", specId: undefined, projectId: "p1", decisionFile: f, waiting: true }];
     await scanDecisions(read);
     truncateSync(f, 0); await scanDecisions(read);
     writeFileSync(f, "waiting\n"); await scanDecisions(read);
@@ -98,7 +98,31 @@ describe("scanDecisions", () => {
 
   it("marker kosong diabaikan", async () => {
     const f = marker("");
-    await scanDecisions(() => [{ id: "x", specId: undefined, projectId: "p1", decisionFile: f }]);
+    await scanDecisions(() => [{ id: "x", specId: undefined, projectId: "p1", decisionFile: f, waiting: true }]);
     expect(await prisma.notification.count({ where: { type: "decision" } })).toBe(0);
+  });
+
+  // SPEC-903 · ADR-0143 · marker codex dipasang di TIAP akhir turn, jadi sesi yang melanjutkan
+  // sendiri hari ini menotifikasi "menunggu keputusan" berulang kali tanpa ada yang ditanyakan.
+  it("tak menotifikasi selama agen masih bekerja, lalu satu kali saat benar-benar menunggu", async () => {
+    const f = marker("1787400000\n");
+    const row = (waiting: boolean) =>
+      [{ id: "s903", specId: undefined, projectId: "p1", decisionFile: f, waiting }];
+    await scanDecisions(() => row(false));
+    expect(await prisma.notification.count({ where: { type: "decision" } })).toBe(0);
+    await scanDecisions(() => row(true));
+    expect(await prisma.notification.count({ where: { type: "decision" } })).toBe(1);
+  });
+
+  // Manusia yang mengetik jawabannya membuat pane berisik sebentar-sebentar. Dedup karena itu tetap
+  // dikunci pada MARKER, bukan pada bit turunan — kalau tidak tiap kedipan melahirkan notif kedua.
+  it("kedipan sibuk di tengah satu episode marker tak melahirkan notifikasi kedua", async () => {
+    const f = marker("1787400000\n");
+    const row = (waiting: boolean) =>
+      [{ id: "s903b", specId: undefined, projectId: "p1", decisionFile: f, waiting }];
+    await scanDecisions(() => row(true));
+    await scanDecisions(() => row(false));
+    await scanDecisions(() => row(true));
+    expect(await prisma.notification.count({ where: { type: "decision" } })).toBe(1);
   });
 });

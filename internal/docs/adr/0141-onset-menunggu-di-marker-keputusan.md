@@ -49,6 +49,20 @@ muda dari satu putaran idle: gerbang 10 menit tak akan pernah menyala.
   Memperbaikinya butuh pintu jawaban yang mengosongkan marker — pekerjaan SPEC-899, bukan ini.
 - `date +%s` berpresisi detik. Cukup: ambang yang memakainya berorde menit.
 
+## Amandemen 2026-08-22 (SPEC-903, ADR-0143)
+
+Cacat yang dinamai di atas ("`decision` lengket **dan** umurnya terus tumbuh") ditutup ADR-0143,
+bukan oleh SPEC-899. **Isi marker tak berubah**: tetap detik epoch onset, ditulis sekali, dan
+`size > 0` tetap satu-satunya arti "pernah minta masukan". Yang berubah adalah **turunannya**:
+
+- `decision` kini digerbangi keadaan pane (`markerFilled && paneQuiet(#{window_activity})`), jadi
+  marker terisi tak lagi berarti "sedang menunggu" bagi konsumen mana pun.
+- Karena itu satu episode marker bisa memuat beberapa episode menunggu, dan onset di marker hanya
+  menandai yang pertama. `decisionAt` karena itu menjadi `ISO(max(onset marker, window_activity))` —
+  awal episode yang SEDANG berlangsung. Keputusan #3 di atas ("ada hanya saat isi marker bisa
+  diparse") tidak lagi berlaku: marker pra-ADR-0141 yang berisi `waiting` kini punya `decisionAt`
+  dari aktivitas pane.
+
 ## Alternatif yang ditolak
 
 - **`mtime` marker** — tercap ulang tiap notifikasi idle (lihat Konteks). Gratis, dan salah.

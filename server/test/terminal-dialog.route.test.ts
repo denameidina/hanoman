@@ -6,6 +6,9 @@ import {
 } from "../src/services/session-dialog";
 import { markDeciding, __resetDeciding } from "../src/services/lead/deciding";
 import { createSession, killSession } from "../src/services/pty";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // Pane tmux SUNGGUHAN dipakai hanya sebagai "sesi ini ada"; layarnya datang dari `PaneIO` palsu.
 // Memisahkan keduanya membuat berkas ini menguji ROUTE (gerbang, status, bentuk respons), bukan
@@ -143,5 +146,27 @@ describe("SPEC-899 · POST /terminal/sessions/:id/dialog/answer", () => {
     expect(second.json().reason).toBe("answering");
     release();
     await first;
+  });
+});
+
+// SPEC-903 · ADR-0143 · jawaban dialog adalah TOOL RESULT, bukan prompt, jadi hook pengosong marker
+// (`UserPromptSubmit`, SPEC-184) tak pernah menembak untuk jalur ini. Tanpa langkah eksplisit di
+// route, pil "Menunggu keputusan" hanya padam saat pane kebetulan diam ≥ PANE_QUIET_MS.
+describe("SPEC-903 · jawaban yang mendarat mengosongkan marker keputusan", () => {
+  it("marker dikosongkan sesudah 202", async () => {
+    const decisionFile = join(mkdtempSync(join(tmpdir(), "hanoman-903-")), "spec-903");
+    writeFileSync(decisionFile, "1787400000\n");
+    screens = [SINGLE, SINGLE, SINGLE.replace("3. Type something.", "3. merah")];
+    const s = createSession("p903", "/tmp", { decisionFile, command: ["/bin/cat"] });
+    try {
+      const r = await app.inject({
+        method: "POST", url: `/api/terminal/sessions/${s.id}/dialog/answer`,
+        payload: { screenHash: screenHashOf(SINGLE), choice: 1 },
+      });
+      expect(r.statusCode).toBe(202);
+      expect(readFileSync(decisionFile, "utf8")).toBe("");
+    } finally {
+      killSession(s.id);
+    }
   });
 });

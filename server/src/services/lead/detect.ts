@@ -1,7 +1,6 @@
-import { writeFileSync } from "node:fs";
 import type { LeadDecision } from "@prisma/client";
 import { leadReplyText, type Agent, type Lead, type LeadDelivery } from "@hanoman/shared";
-import { capturePane, getSession, liveDecisions, markerFilled, sendToPane, submitPaneDialog } from "../pty";
+import { capturePane, clearMarker, getSession, liveDecisions, markerFilled, sendToPane, submitPaneDialog } from "../pty";
 import { dialogKey, readDialogScreen } from "../tui-dialog";
 import { recordLeadDecision } from "../notifications";
 import { getLead, leadActive, leadProjects } from "./config";
@@ -122,6 +121,10 @@ export function answerCount(sessionId: string): number { return answers.get(sess
 export function failureCount(sessionId: string): number { return failures.get(sessionId) ?? 0; }
 
 export type DetectDeps = {
+  // SPEC-903 · ADR-0143 · `liveDecisions()` juga mengembalikan `waiting` (bit turunan pil terminal);
+  // pintu ini SENGAJA tak memakainya — gerbangnya sendiri, `AGENT_TURN_LINE` di readPaneQuestion
+  // (SPEC-487, pemisahan terukur 6/6 vs 0/16), berbasis ISI layar dan lebih kuat. Bentuk yang lebih
+  // sempit di sini adalah pernyataan itu, bukan kelalaian.
   live: () => { id: string; specId?: string; projectId: string; decisionFile: string }[];
   filled: (file: string) => boolean;
   pane: (id: string) => string;
@@ -185,7 +188,7 @@ export const prodDetectDeps: DetectDeps = {
   // ke pane yang sudah tak ada.
   exited: (id) => { try { return getSession(id)?.exited ?? true; } catch { return true; } },
   send: (id, text, choices) => sendToPane(id, text, 50, choices),
-  clearMarker: (file) => { try { writeFileSync(file, ""); } catch { /* marker lenyap = sudah kosong */ } },
+  clearMarker,
   submit: (id) => submitPaneDialog(id),
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
   // Alur yang gagal ditutup bukan alasan menggagalkan rantai yang sudah berhasil: penyapu TTL

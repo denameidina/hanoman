@@ -471,7 +471,8 @@ memberi rect nol → jatuh ke posisi keadaan).
   `PET_URGENT_RATE` = 1,5 (fps 6 → 9), digerbangi **baris** supaya `wave`/`thanks` yang menumpang
   tetap berirama normal. Onsetnya dilayani `recheckAt` yang sudah ada — pemakaian **keempat** field
   itu — jadi pet berubah tepat pada menit ke-10 tanpa satu pun denyut. `since` diturunkan dari
-  `decisionAt` (ADR-0141): absen berarti tak diketahui, dan pet **tak pernah** mengeskalasi tanpa
+  `decisionAt` (ADR-0141; sejak ADR-0143 = awal episode yang SEDANG berlangsung, bukan onset marker
+  yang bisa jauh lebih tua): absen berarti tak diketahui, dan pet **tak pernah** mengeskalasi tanpa
   stempel.
 - **Dielus.** Tiga klik dalam 2 dtk memutar baris `thanks` sekali (lewat `oneShot`, mekanisme
   `wave`) plus tiga hati `♥` ber-`hn-pet-heart`. Klik ke-3 **tidak** menyentuh panel sama sekali —
@@ -493,8 +494,11 @@ untuk panel yang justru sedang ditutup.
 
 - **Memuat** saat mount → `api.sessionDialog(id)`. Tak ada polling dan tak ada channel baru
   (ADR-0039 utuh): keadaan "sudah terjawab" datang dari siaran `sessions` yang sudah ada, yang
-  meng-unmount kotak ini begitu sesinya berhenti `waiting` (marker keputusan dikosongkan hook
-  `UserPromptSubmit`, SPEC-184 · ADR-0141).
+  meng-unmount kotak ini begitu sesinya berhenti `waiting`. **SPEC-903 · ADR-0143 ·** yang
+  memadamkannya BUKAN hook `UserPromptSubmit` — hook itu tak pernah menembak untuk jalur ini
+  (jawaban dialog adalah tool result, bukan prompt). Yang memadamkannya dua: route
+  `POST /terminal/sessions/:id/dialog/answer` yang berhasil mengosongkan marker, dan gerbang
+  `paneQuiet` begitu agen kembali mengeluarkan sesuatu.
 - **Single-select** = judul + satu tombol per opsi; satu klik mengirim `{ screenHash, choice }`.
   **multiSelect** = `Checkbox` per opsi (nilai awal dari `checked` layar) + satu `Submit` yang
   mengirim `{ screenHash, choices }`. **Kolom bebas** (`freeIndex !== null` atau `notes`) menambah
@@ -932,10 +936,16 @@ Sesi yang **berakhir** (`exited`) ditandai kontras di header cell dengan `Status
 hijau **"Selesai"**, dan badan terminalnya diredupkan (`opacity: 0.6`) untuk menandakan
 proses sudah beku — menggantikan suffix teks `· berakhir` yang lama (SPEC-188).
 
-Sesi yang **berhenti menunggu keputusan manusia** (marker `.worktrees/.decisions/<id>` terisi,
-disurface `listSessions().decision`) ditandai pill amber berdenyut **"Menunggu keputusan"**
+Sesi yang **berhenti menunggu keputusan manusia** (`listSessions().decision`) ditandai pill amber
+berdenyut **"Menunggu keputusan"**
 (`StatusPill status="awaiting"`). Header cell diberi tint sesuai state — hijau untuk `exited`,
 amber untuk menunggu keputusan — supaya pembeda terbaca sekilas, bukan hanya dari pill.
+SPEC-903 · ADR-0143 · `decision` adalah **keadaan turunan**, bukan isi marker apa adanya: marker
+`.worktrees/.decisions/<id>` terisi **dan** pane tak mengeluarkan apa pun selama ≥ 3 dtk. Gerbang itu
+hidup di server (`pty.ts`), dan tak boleh dicermin di sini: `TerminalScreen` maupun `pet-state`
+**tidak** menambah predikat sendiri di atas `session.decision` — satu-satunya alasan kosakata kedua
+permukaan itu tetap identik adalah karena keduanya membaca bit yang sama.
+
 `TerminalScreen` menerima daftar sesi lewat WS siar `/events/ws` (grup `sessions`, SPEC-199) —
 bukan lagi poll 8s. Transisi ke/keluar "menunggu keputusan" dan `exited` datang sebagai push;
 server men-poll tmux di satu loop dan menyiarkan saat berubah (dedup signature).

@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import type { AddressInfo } from "node:net";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
-import { killAll, killSession, listSessions, promptFilePath, createSession as createSessionSvc } from "../src/services/pty";
+import { killAll, killSession, listSessions, promptFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
 import { phaseFilePath } from "../src/services/session-phases";
 import { sweepRepo, __resetReaper } from "../src/services/worktree-reaper";
 import { resetDb, makeProject, makeSpec } from "./factory";
@@ -311,21 +311,28 @@ describe("terminal routes", () => {
 
   // SPEC-898 · ADR-0141 · payload additif: kolom baru harus benar-benar menyeberang HTTP, bukan
   // hanya ada di SessionInfo.
-  it("GET /terminal/sessions meneruskan decisionAt", async () => {
+  it("GET /terminal/sessions meneruskan decisionAt", { timeout: 20_000 }, async () => {
     const decisionFile = join(repoDir, ".worktrees", ".decisions", "spec-route-at");
     // Perintah mentah, bukan agen: `decisionAt` hanya lahir untuk pane HIDUP, dan biner claude
     // yang diwariskan test tetangga bisa mati seketika (`decision` false → kolomnya absen).
+    const bornMs = Date.now();
     const s = createSessionSvc("p1", repoDir, {
       id: "spec-route-at", decisionFile, command: ["/bin/sleep", "30"],
     });
     try {
       writeFileSync(decisionFile, "1755840000\n");
+      // SPEC-903 · pil menyala hanya sesudah pane terbukti diam (PANE_QUIET_MS); pane mentah
+      // mematok `#{window_activity}` pada waktu lahirnya.
+      await new Promise((r) => setTimeout(r, PANE_QUIET_MS + 750));
       const res = await app.inject({ method: "GET", url: "/api/terminal/sessions" });
       expect(res.statusCode).toBe(200);
       const row = (res.json() as { id: string; decision: boolean; decisionAt?: string }[])
         .find((x) => x.id === s.id)!;
       expect(row.decision).toBe(true);
-      expect(row.decisionAt).toBe(new Date(1755840000_000).toISOString());
+      // SPEC-903 · ADR-0143 · yang menyeberang adalah awal episode yang SEDANG berlangsung, bukan
+      // onset marker yang lebih tua.
+      expect(Date.parse(row.decisionAt!)).toBeGreaterThan(1755840000_000);
+      expect(Date.parse(row.decisionAt!)).toBeGreaterThanOrEqual(bornMs - 2_000);
     } finally {
       killSession(s.id);
     }

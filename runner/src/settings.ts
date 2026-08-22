@@ -3,8 +3,9 @@
 // hook dari `--settings` tetap BERGABUNG dengan milik pengguna, bukan menggantikannya.
 export const guardSettings = (decisionFile?: string, goal?: string) => {
   const hooks: Record<string, unknown[]> = {};
-  // SPEC-184 · sinyal "menunggu keputusan manusia" dari Claude sendiri. Notification idle/izin/
+  // SPEC-184 · sinyal "agen minta masukan manusia" dari Claude sendiri. Notification idle/izin/
   // agent_needs_input menandai marker; UserPromptSubmit (manusia menjawab) mengosongkannya.
+  // Apakah sesinya SEDANG menunggu diputuskan server, bukan di sini (SPEC-903, catatan di bawah).
   // Path dikutip-single agar aman terhadap spasi. ponytail: path dengan single-quote tak didukung
   // (bagian variabel hanya <sessionId> = [a-z0-9_-]); naikkan bila repoDir bisa memuat "'".
   if (decisionFile) {
@@ -12,7 +13,9 @@ export const guardSettings = (decisionFile?: string, goal?: string) => {
     // SPEC-898 · ADR-0141 · isi marker = detik epoch ONSET episode ini, ditulis SEKALI. Notification
     // berulang (Claude idle lagi) tak boleh mencapnya ulang: kalau ia mencap ulang, "menunggu sejak"
     // selalu terbaca lebih muda dari satu putaran idle dan gerbang urgensi tak pernah menyala.
-    // `size > 0` tetap satu-satunya arti "menunggu manusia" (SPEC-184) — markerFilled tak berubah.
+    // `size > 0` tetap satu-satunya arti marker (SPEC-184) — markerFilled tak berubah. SPEC-903 ·
+    // ADR-0143 · artinya kini "pernah minta masukan", bukan "sedang menunggu": server menggerbanginya
+    // dengan keadaan pane. Hook di sini sengaja TIDAK ikut berubah.
     hooks.Notification = [{ hooks: [{ type: "command",
       command: `grep -qiE 'idle|permission|waiting for|needs.?input' && { [ -s ${f} ] || date +%s > ${f}; } || true` }] }];
     hooks.UserPromptSubmit = [{ hooks: [{ type: "command", command: `: > ${f}` }] }];

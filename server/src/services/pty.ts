@@ -40,24 +40,64 @@ export const MAX_SCROLLBACK = 256 * 1024;
 export const SCROLLBACK_SLACK = 64 * 1024;
 const POLL_MS = 500;
 
-// SPEC-196 · marker keputusan (.worktrees/.decisions/<id>) yang terisi = sesi sedang menunggu
-// manusia. Satu definisi dipakai listSessions (pembeda terminal) dan scanDecisions (notifikasi).
+// SPEC-196 · marker keputusan (.worktrees/.decisions/<id>) yang terisi = sesi PERNAH minta masukan
+// manusia. SPEC-903 · ADR-0143 · itu sinyal masuk, bukan keadaan: `listSessions` menambahkan gerbang
+// `paneQuiet` di atasnya, dan `scanDecisions` memakai fungsi ini hanya untuk MENDEDUP episode —
+// yang memutuskan kapan menotifikasi adalah bit turunan yang sama dengan pil terminal.
 // statSync gagal (berkas belum ada) → false.
 export const markerFilled = (f: string): boolean => {
   try { return statSync(f).size > 0; } catch { return false; }
 };
 
+// SPEC-903 · ADR-0143 · dua penulis marker dari sisi server, dan hanya dua: rantai lead yang tuntas
+// (SPEC-452) dan jawaban dialog yang mendarat lewat route (SPEC-899). Keduanya bukti POSITIF manusia
+// sudah menjawab — kembaran `UserPromptSubmit` untuk jalur yang tak pernah dilihat hook agen.
+// Gerbang `paneQuiet` di bawah TIDAK boleh memanggilnya: hook Notification claude mengisi marker
+// sekali per dialog dan tak pernah menembak lagi (terukur 0 B selama 120 dtk dengan dialog masih
+// terbuka), jadi menghapusnya karena pane kebetulan berisik menghilangkan pertanyaan itu permanen.
+export const clearMarker = (f: string): void => {
+  try { writeFileSync(f, ""); } catch { /* marker lenyap = sudah kosong */ }
+};
+
+// SPEC-903 · ADR-0143 · "menunggu manusia" adalah keadaan TURUNAN, bukan latch. Marker tetap sinyal
+// masuk yang durable, tapi membacanya digerbangi: pane yang masih mengeluarkan sesuatu berarti agen
+// sedang bekerja, bukan menunggu. Sumbernya `#{window_activity}` yang ikut di FMT, jadi nol invokasi
+// tmux tambahan (pola `#{alternate_on}`, SPEC-863).
+//
+// Ambangnya diukur (audit SPEC-903 §3.1): pane claude yang bekerja punya `window_activity == now`
+// pada 22/22 sampel 1 Hz — timer giliran berdetak tiap detik — sementara pane yang diam di prompt
+// beku 317 dtk. 3 dtk = 3× margin di atas jeda keluaran terukur (≤ 1 dtk) dan di atas lag
+// pembulatan detik tmux (≤ 1 dtk).
+export const PANE_QUIET_MS = 3_000;
+
+// `activityAt` = detik epoch `#{window_activity}`. Nol/NaN = tmux tak menjawabnya (versi lama,
+// format kosong) → dibaca sebagai diam: ragu selalu berarti pil TETAP menyala, karena pil yang
+// padam saat ada pertanyaan sungguhan membuat manusia kehilangan pertanyaannya.
+export const paneQuiet = (activityAt: number, now: number = Date.now()): boolean =>
+  !(activityAt > 0) || now - activityAt * 1000 >= PANE_QUIET_MS;
+
 // SPEC-898 · ADR-0141 · isi marker = detik epoch ONSET episode menunggu (ditulis sekali oleh hook,
 // lihat runner/src/settings.ts). Marker sesi yang lahir sebelum ADR-0141 berisi "waiting" — tak bisa
-// diparse, dan `undefined` di sana adalah jawaban yang benar: kita memang tak tahu sejak kapan.
+// diparse, dan 0 di sana adalah jawaban yang benar: markernya sendiri tak tahu sejak kapan.
 // Berkasnya dibaca HANYA untuk marker yang sudah terbukti terisi, jadi sesi yang tak menunggu
 // membayar nol I/O tambahan.
-const markerOnset = (f: string): string | undefined => {
+const markerOnset = (f: string): number => {
   let raw: string;
-  try { raw = readFileSync(f, "utf8"); } catch { return undefined; }
+  try { raw = readFileSync(f, "utf8"); } catch { return 0; }
   const secs = Number(raw.trim());
-  if (!Number.isInteger(secs) || secs <= 0) return undefined;
-  return new Date(secs * 1000).toISOString();
+  return Number.isInteger(secs) && secs > 0 ? secs : 0;
+};
+
+// SPEC-903 · ADR-0143 · awal episode menunggu yang SEDANG berlangsung. Dengan `decision` menjadi
+// turunan, satu episode marker bisa memuat beberapa episode menunggu (dijawab di TUI → agen bekerja
+// 20 menit → diam lagi); onset di marker hanya menandai yang pertama, dan `decisionAt` yang tetap
+// menunjuk ke sana melaporkan "menunggu 20 menit" untuk tunggu yang baru berumur semenit —
+// PET_URGENT_MS menjerit palsu. Detik terakhir pane mengeluarkan sesuatu ADALAH awal episode yang
+// sekarang. `max`, bukan "pakai aktivitas saja", supaya kasus langka hook-menembak-sesudah-keluaran-
+// terakhir tetap memberi angka yang lebih benar.
+export const decisionOnset = (f: string, activityAt: number): string | undefined => {
+  const secs = Math.max(markerOnset(f), activityAt > 0 ? Math.floor(activityAt) : 0);
+  return secs > 0 ? new Date(secs * 1000).toISOString() : undefined;
 };
 
 export type Frame =
@@ -84,8 +124,9 @@ export type SessionInfo = {
   // `pkill -f` sesi tetangga → 143) sebagai "Selesai" hijau — persis keluhan SPEC-402.
   exitCode?: number;
   branch?: string; decision: boolean;
-  // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia". Ada HANYA saat `decision` true dan
-  // marker memuat stempel; absen untuk sesi yang lahir sebelum ADR-0141.
+  // SPEC-898 · ADR-0141 · ISO onset episode "menunggu manusia". SPEC-903 · ADR-0143 · onsetnya kini
+  // yang lebih baru antara stempel di marker dan keluaran terakhir pane — awal episode yang SEDANG
+  // berlangsung, bukan episode marker yang bisa jauh lebih tua. Ada HANYA saat `decision` true.
   decisionAt?: string;
   // SPEC-338 · ADR-0074 · mesin sesi. Sesi lama (tanpa opsi tmux ini) dibaca sebagai "claude".
   agent: Agent;
@@ -94,6 +135,9 @@ type Pane = SessionInfo & {
   code: number; phaseFile?: string; decisionFile?: string;
   // SPEC-863 · `#{alternate_on}` pane — TUI layar penuh (vim) 1, shell dan TUI agen 0.
   altScreen: boolean;
+  // SPEC-903 · `#{window_activity}` — detik epoch keluaran TERAKHIR pane. Setiap sesi hanoman satu
+  // window satu pane, jadi ini aktivitas pane. NaN bila tmux tak menjawabnya (versi lama).
+  activityAt: number;
 };
 
 // Satu attachment per sesi: satu klien tmux melayani semua WebSocket yang menonton.
@@ -252,6 +296,7 @@ const FMT = [
   "#{session_name}", "#{@hanoman_project}", "#{@hanoman_spec}", "#{@hanoman_flow}",
   "#{@hanoman_phase_file}", "#{@hanoman_cwd}", "#{pane_dead}", "#{pane_dead_status}",
   "#{@hanoman_decision_file}", "#{@hanoman_branch}", "#{@hanoman_agent}", "#{alternate_on}",
+  "#{window_activity}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -283,9 +328,10 @@ async function listPanesAsync(): Promise<Pane[]> {
 function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
-      alternate] = line.split("\t");
+      alternate, activity] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
+    const activityAt = Number(activity);
     return [{
       id: n.slice(PREFIX.length), projectId: projectId ?? "", specId: specId || undefined,
       flow: (flow || undefined) as Flow | undefined, phaseFile: phaseFile || undefined,
@@ -293,22 +339,27 @@ function parsePanes(out: string): Pane[] {
       decisionFile: decisionFile || undefined,
       // SPEC-230 · branch integrasi sesi project-level (PRD: prd/<slug>). Kosong = tak ada.
       branch: branch || undefined,
-      // SPEC-196 · sesi hidup dengan marker keputusan terisi = menunggu manusia.
-      decision: !exited && !!decisionFile && markerFilled(decisionFile),
+      // SPEC-196 · sesi hidup dengan marker keputusan terisi = pernah minta masukan manusia.
+      // SPEC-903 · ADR-0143 · itu sinyal MASUK, bukan keadaan: marker hanya dilepas
+      // `UserPromptSubmit`, jadi ia tetap terisi sepanjang agen bekerja sesudah pertanyaannya
+      // dijawab lewat jalur lain (dialog di TUI, route SPEC-899, Esc, codex yang melanjutkan
+      // sendiri). Pane yang masih mengeluarkan sesuatu berarti agen sudah lanjut bekerja.
+      decision: !exited && !!decisionFile && markerFilled(decisionFile) && paneQuiet(activityAt),
       // SPEC-338 · sesi yang lahir sebelum ADR-0074 tak punya opsi ini → claude.
       agent: (agent === "codex" ? "codex" : "claude") as Agent,
       altScreen: alternate === "1",
+      activityAt,
     }];
   });
 }
 
 const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent,
-  decisionFile }: Pane): SessionInfo => ({
+  decisionFile, activityAt }: Pane): SessionInfo => ({
   id, projectId, specId, flow, cwd, exited, branch, decision, agent,
   // Hanya untuk pane mati: `pane_dead_status` kosong pada pane hidup, dan `exitCode: 0` di sana
   // akan terbaca sebagai "sudah berakhir sukses".
   ...(exited ? { exitCode: code } : {}),
-  ...(decision && decisionFile ? { decisionAt: markerOnset(decisionFile) } : {}),
+  ...(decision && decisionFile ? { decisionAt: decisionOnset(decisionFile, activityAt) } : {}),
 });
 
 export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
@@ -317,10 +368,17 @@ export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
 export const listSessionsAsync = async (): Promise<SessionInfo[]> => (await listPanesAsync()).map(toSessionInfo);
 
 // SPEC-184 · sesi hidup yang punya marker keputusan — masukan scanDecisions().
-export const liveDecisions = (): { id: string; specId?: string; projectId: string; decisionFile: string }[] =>
+// SPEC-903 · ADR-0143 · `waiting` adalah bit turunan yang SAMA dengan `SessionInfo.decision`, supaya
+// notifikasi dan panel lead tak punya rumus sendiri yang bisa berselisih dengan pil di layar.
+export const liveDecisions = (): {
+  id: string; specId?: string; projectId: string; decisionFile: string; waiting: boolean;
+}[] =>
   listPanes()
     .filter((p) => !p.exited && p.decisionFile)
-    .map((p) => ({ id: p.id, specId: p.specId, projectId: p.projectId, decisionFile: p.decisionFile! }));
+    .map((p) => ({
+      id: p.id, specId: p.specId, projectId: p.projectId, decisionFile: p.decisionFile!,
+      waiting: p.decision,
+    }));
 
 export const getSession = (id: string): Pane | undefined => listPanes().find((p) => p.id === id);
 

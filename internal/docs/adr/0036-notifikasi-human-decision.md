@@ -44,13 +44,21 @@ masih hidup, kalau tidak Backlog item-nya. Nada decision default `alert`, beda d
 
 - **Heuristik idle pane server** (sesi diam >N detik = menunggu): tak bisa membedakan "menunggu
   keputusan" dari "tool jalan senyap"; rapuh seperti sentinel yang ditolak ADR-0020/0022.
+  **Amandemen 2026-08-22 (SPEC-903, ADR-0143):** penolakan ini tetap berlaku untuk heuristik idle
+  sebagai **sumber** — ia masih tak bisa melahirkan "menunggu" sendirian, dan ADR-0143 tak
+  memakainya begitu. Yang diadopsi ADR-0143 adalah idle sebagai **konjungsi**: marker (sinyal dari
+  agen) DAN pane diam. Keberatan "tool jalan senyap" gugur di sana karena TUI agen tak pernah
+  benar-benar senyap saat bekerja — timer gilirannya berdetak tiap detik, terukur `window_activity ==
+  now` pada 22/22 sampel 1 Hz vs pane diam yang beku 317 dtk.
 - **Filter notification_type lebih halus dari grep**: tak sepadan; grep substring cukup dan
   bebas dependency.
 
 ## Pembaruan SPEC-196
 
 - State decision kini juga **disurface ke grid terminal**: `listSessions()` mengisi `decision`
-  (`!exited && marker terisi`, cek `markerFilled` yang sama dgn `scanDecisions`), dirender sebagai
+  (`!exited && marker terisi`, cek `markerFilled` yang sama dgn `scanDecisions` — **sejak ADR-0143
+  ditambah gerbang `paneQuiet`, dan `scanDecisions` memakai `markerFilled` hanya untuk dedup**),
+  dirender sebagai
   pill `awaiting` "Menunggu keputusan" di `Cell`. Additif pada respons `GET /terminal/sessions`,
   tanpa perubahan skema. `TerminalScreen` mem-poll list ~8s (guard signature) agar transisinya live.
 - **Notifikasi OS lintas tab**: `done` & `decision` juga menembak `new Notification` (Web Notifications

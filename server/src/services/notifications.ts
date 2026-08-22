@@ -145,7 +145,11 @@ export async function recordCronRun(
   }).catch(() => { /* P2002: sudah ada untuk jatuh tempo ini */ });
 }
 
-type DecisionSession = { id: string; specId?: string; projectId: string; decisionFile: string };
+type DecisionSession = {
+  id: string; specId?: string; projectId: string; decisionFile: string;
+  // SPEC-903 · ADR-0143 · bit "sedang menunggu" yang sama dengan pil terminal & pose pet.
+  waiting: boolean;
+};
 
 // SPEC-184 · episode per-sesi. Di-rebuild tiap scan dari kondisi marker: sesi mati hilang dari
 // liveDecisions() → otomatis ter-prune. Transisi kosong→terisi = satu notif; idle Claude yang
@@ -160,8 +164,15 @@ export async function scanDecisions(read: () => DecisionSession[] = liveDecision
   const fresh: DecisionSession[] = [];
   for (const s of read()) {
     if (!markerFilled(s.decisionFile)) continue;
+    // SPEC-903 · ADR-0143 · dua peran dipisah. KAPAN menotifikasi memakai bit turunan: marker codex
+    // dipasang di tiap akhir turn, jadi sesi yang melanjutkan sendiri tak boleh menotifikasi.
+    // BERAPA KALI tetap dikunci pada marker terisi — manusia yang mengetik jawabannya membuat pane
+    // berisik sebentar-sebentar, dan tiap kedipan akan melahirkan notifikasi kedua untuk pertanyaan
+    // yang sama. Id keluar dari set hanya saat markernya kosong atau sesinya hilang.
+    if (awaiting.has(s.id)) { next.add(s.id); continue; }
+    if (!s.waiting) continue;
     next.add(s.id);
-    if (!awaiting.has(s.id)) fresh.push(s);
+    fresh.push(s);
   }
   awaiting = next;
   for (const s of fresh) {
