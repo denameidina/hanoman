@@ -36,6 +36,76 @@ operator ─ SSO/MFA/VPN ─ admin.example ┘                         │
 - Caddy harus menjadi satu-satunya proxy ke origin. `HANOMAN_TRUST_PROXY=1` berarti tepat satu hop;
   gunakan CIDR bila ada lebih dari satu proxy yang diketahui. Jangan mempercayai semua forwarded IP.
 
+## 0. Provisioning satu perintah (SPEC-883 · [ADR-0137](../adr/0137-provisioning-vps-berbasis-katalog.md))
+
+Prosedur manual di bagian 1–5 di bawah **tetap acuan kebenaran**: `provision.sh` mengeksekusi apa
+yang ditulis di sana, dan bila keduanya berbeda, dokumen inilah yang benar.
+
+Dua jalur, satu skrip (`server/scripts/vps/provision.sh`, ikut terpaket sebagai
+`<pkg>/scripts/vps/provision.sh`):
+
+- **Dari dashboard** — layar VPS → buka detail → panel *Pasang komponen*: pilih profil, centang
+  komponen, **Pratinjau** (dry-run), lalu **Pasang**. hanoman mengirim skrip lewat SSH dengan key
+  yang sudah dibootstrap (SPEC-165), lalu memprobe ulang dan menampilkan tautan setup.
+- **Di mesin itu sendiri** — `hanoman provision --with=… [--profile=…] [--domain=…]`. Butuh Node +
+  paket `hanoman` sudah ada di mesin itu; untuk mesin kosong pakai jalur dashboard.
+
+```sh
+hanoman provision --probe                                   # laporkan apa yang ada, nol tulis
+hanoman provision --with=hanoman,caddy --domain=hn.contoh.id --dry-run
+hanoman provision --with=hanoman,caddy --domain=hn.contoh.id --yes
+```
+
+### Komponen
+
+| id | isi | prasyarat (lab) | prasyarat (production) | login manual |
+|---|---|---|---|---|
+| `base` | curl, git, tmux, ca-certificates, toolchain `node-pty` | — | — | — |
+| `node` | Node.js 22 LTS | `base` | `base` | — |
+| `hanoman` | `npm i -g hanoman`, user service, `/etc/hanoman.env`, unit systemd, `enable --now` | `node` | `node`, `podman` | — |
+| `caddy` | Caddy + `reverse_proxy 127.0.0.1:8787` + TLS otomatis (butuh `--domain`) | — | — | — |
+| `podman` | Podman rootless + network internal `hanoman-egress` | `base` | `base` | — |
+| `agent-image` | build `hanoman-agent:latest` dari `agent.Containerfile` | *(production saja)* | `podman` | — |
+| `claude` | Claude Code CLI | `node` | `agent-image` | ya |
+| `codex` | Codex CLI | `node` | `agent-image` | ya |
+| `gh` | GitHub CLI | `base` | `base` | ya |
+
+Komponen ber-login berhenti di **biner terpasang + `--version` terbukti**; probe melaporkannya
+`partial not-logged-in` dan **tak pernah** `ok`. Login dilakukan sekali lewat Console
+([ADR-0042](../adr/0042-vps-console-ssh-tmux-lokal.md)). hanoman tak pernah menyentuh kredensial agen.
+
+### Dua profil
+
+- **`lab`** — `NODE_ENV` tidak diset production. Sesi agen berjalan di host, `claude`/`codex`
+  dipasang di host. Siap dipakai satu operator dalam hitungan menit. **Batasnya jujur:** karena
+  `NODE_ENV` bukan production, cookie sesi lahir **tanpa flag `Secure`**
+  (`server/src/services/auth.ts`). Di balik Caddy yang memaksa HTTPS ini tak membuka apa pun ke
+  jaringan, tetapi profil ini **tidak boleh** melayani permukaan Help publik — untuk itu pakai
+  `production`.
+- **`production`** — memenuhi gerbang `assertRuntimeBoundary`
+  ([ADR-0117](../adr/0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md)) utuh: Podman rootless, credential dir,
+  egress proxy, trusted proxy, `HANOMAN_SINGLE_ORIGIN=1` + `HANOMAN_CONTROL_ORIGINS`. `claude` dan
+  `codex` dipasang **ke dalam image agen**, dan login-nya mendarat di `HANOMAN_AGENT_CREDENTIAL_DIR`
+  yang di-mount RO oleh sesi.
+
+Provision ulang dengan profil berbeda pada instance yang `hanoman`-nya sudah `ok` ditolak
+`409 profile-mismatch` kecuali `force` — menulis ulang `/etc/hanoman.env` dari lab ke production
+membuat service menolak boot sampai Podman siap.
+
+### Penandaan komponen
+
+`Vps.components` **hanya** ditulis dari keluaran probe, tak pernah dari niat; apply yang sukses pun
+diakhiri probe ulang. Nilai `null` berarti **belum diperiksa**, bukan "tak ada komponen".
+Ketiga kolomnya (`components`, `componentsCheckedAt`, `provisionProfile`) local-only dan tak ikut
+sync.
+
+### Gerbang domain
+
+Bila `caddy` dipilih, skrip membandingkan A record domain dengan alamat publik mesin **sebelum**
+memasang apa pun. Tak cocok → `STEP caddy fail dns-mismatch`, komponen lain tetap berjalan.
+Sertifikat ACME yang gagal terbit meninggalkan Caddy hidup tanpa TLS sekaligus membakar rate-limit
+Let's Encrypt.
+
 ## 1. User, paket, dan direktori private
 
 Prasyarat: Node ≥20, git, tmux, toolchain native `node-pty`, Podman rootless, satu CLI agen di image

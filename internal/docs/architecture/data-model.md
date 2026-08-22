@@ -420,6 +420,14 @@ ada di database.
 - `lastSeenAt?` (healthcheck sukses terakhir), `health?` (Json `{ uptime, disk, mem, load }`)
 - `lastAuditAt?`, `audit?` (Json `VpsCheck[]` — `[{ check, status, detail }]`)
 - `hardened` (default false) — derived: semua check kritis pass pada audit terakhir
+- `components?` (Json `{ [ComponentId]: { status: ok|partial|absent, detail } }`),
+  `componentsCheckedAt?`, `provisionProfile?` (`"lab"|"production"`) — SPEC-883,
+  [ADR-0137](../adr/0137-provisioning-vps-berbasis-katalog.md). `components` **hanya** ditulis dari
+  keluaran `MODE=probe` `provision.sh`, tak pernah dari niat "kami barusan memasang X" (SPEC-487).
+  `null` = **belum diperiksa**, bukan "tak ada komponen".
+  **LOCAL-ONLY** — ketiganya sengaja di luar `FIELDS.vps`: `snapshot()` mengirim kolom baru di
+  SETIAP push, jadi hub yang lebih tua akan menolak seluruh push entitas ini (terukur di SPEC-880).
+  Status komponen juga milik mesin yang memegang key SSH-nya.
 
 ### VpsAuditSnapshot / VpsItemState (SPEC-220 · [ADR-0050](../adr/0050-vps-compliance-katalog-scoring.md))
 Kerangka kepatuhan checklist 232 item (katalog di git, lihat [vps-compliance.md](vps-compliance.md)).
