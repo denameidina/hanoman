@@ -750,17 +750,26 @@ apply_hanoman() {
   systemctl enable --now hanoman >/dev/null 2>&1
 }
 
-# Profil lab TIDAK menyetel NODE_ENV=production: gerbang assertRuntimeBoundary menuntut Podman,
-# credential dir, dan egress proxy di sana. Konsekuensinya cookie sesi lahir tanpa flag `Secure`
-# (server/src/services/auth.ts) — itu sebabnya profil lab tak boleh melayani permukaan Help publik.
+# KOREKSI SPEC-884/ADR-0138 — rancangan lama di sini TIDAK BISA BEKERJA. Profil lab didefinisikan
+# sebagai "tak menyetel NODE_ENV=production", tetapi `serverEnv()` (cli/src/commands/start.ts:177)
+# menuliskannya HARDCODED dan `runServer` men-spawn dengan `{ ...process.env, ...env }` (:201) —
+# objek itu ditumpuk BELAKANGAN, jadi ia mengalahkan EnvironmentFile systemd. Menulis NODE_ENV apa
+# pun ke berkas env tak berpengaruh sama sekali.
+#
+# Sejak SPEC-884 penentu boundary adalah `HANOMAN_HARDENING`, bukan NODE_ENV; NODE_ENV kini hanya
+# berarti "runtime terpaket". Karena itu: lab = HANOMAN_DEPLOYMENT=public tanpa HANOMAN_HARDENING,
+# production = HANOMAN_HARDENING=1 + env ADR-0117 lengkap. Konsekuensi "cookie lahir tanpa Secure"
+# juga TIDAK berlaku lagi: flag itu kini diturunkan dari skema request (x-forwarded-proto), jadi di
+# balik Caddy yang memaksa HTTPS cookie tetap Secure di kedua profil.
 write_env() {
   umask 077
   { echo "HANOMAN_HOME=$HANOMAN_DATA"
     echo "PORT=$HANOMAN_PORT"
     echo "HOST=127.0.0.1"
     echo "HANOMAN_TMUX_SOCKET=hanoman-prod"
+    echo "HANOMAN_DEPLOYMENT=public"
     if [ "$PROFILE" = production ]; then
-      echo "NODE_ENV=production"
+      echo "HANOMAN_HARDENING=1"
       echo "HANOMAN_SESSION_SANDBOX=podman"
       echo "HANOMAN_SESSION_IMAGE=$IMAGE"
       echo "HANOMAN_SESSION_NETWORK=hanoman-egress"
@@ -2158,7 +2167,7 @@ git commit -m "feat(spec-883): subperintah hanoman provision"
 Buat `internal/docs/adr/0137-provisioning-vps-berbasis-katalog.md` dengan struktur ADR yang sudah dipakai (`Status`, `Konteks`, `Keputusan`, `Konsekuensi`, `Alternatif yang ditolak`). Isi wajibnya:
 
 - **Keputusan:** komponen adalah data (katalog server), skrip hanya mengeksekusi daftar terurut; `COMP` dari probe adalah **satu-satunya** penulis `Vps.components`; komponen ber-login berhenti di `partial`; dua profil `lab`/`production`; kolom baru local-only.
-- **Konsekuensi:** provisioning bisa diulang & dibandingkan; penandaan tetap jujur saat mesin diubah di luar hanoman; profil lab menjalankan server tanpa `NODE_ENV=production` sehingga cookie sesi lahir tanpa `Secure` dan profil itu tak boleh melayani permukaan Help publik.
+- **Konsekuensi:** provisioning bisa diulang & dibandingkan; penandaan tetap jujur saat mesin diubah di luar hanoman; profil lab menjalankan sesi agen di host tanpa `HANOMAN_HARDENING` (KOREKSI SPEC-884: bukan lewat `NODE_ENV`, yang hardcoded di `serverEnv()` dan mengalahkan EnvironmentFile). Cookie `Secure` tak lagi jadi konsekuensinya — sejak ADR-0138 flag itu diturunkan dari skema request. Yang tetap berlaku: profil lab tak boleh melayani permukaan Help publik.
 - **Alternatif yang ditolak:** (a) mencatat apa yang hanoman pasang (marker ≠ bukti, SPEC-487); (b) menyalin kredensial agen antar mesin; (c) sesi Claude sebagai mesin provisioning (tak deterministik, tak bisa dry-run); (d) menyertakan `components` ke sync (SPEC-880: hub lama menolak seluruh push).
 - **Amandemen:** ADR-0087 (packing) — skrip VPS kini bagian paket npm; ADR-0117 ditegakkan, tak dilonggarkan.
 

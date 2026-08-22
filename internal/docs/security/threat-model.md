@@ -5,6 +5,25 @@ Status: normatif sejak SPEC-761 · keputusan arsitektur:
 [audit SPEC-761](../research/audit-spec-761-hardening-public-deployment.md) · rujukan primer:
 [primary security sources](../research/spec-761-primary-security-sources.md).
 
+> **Amandemen SPEC-884/ADR-0138 — hardening opt-in.** Seluruh model di bawah menggambarkan
+> instance dengan **hardening menyala**. Sejak SPEC-884 hardening bersifat opt-in dan **default
+> mati**, jadi instance yang tak menyalakannya punya model ancaman yang berbeda dan lebih kecil
+> perlindungannya:
+>
+> - sesi agen berjalan **di host**, bukan di rootless Podman — worktree mengisolasi Git, bukan
+>   filesystem, credential, proses, atau jaringan host;
+> - satu-satunya penghalang antara pemanggil dan eksekusi perintah penuh di mesin itu adalah
+>   **password akun hanoman**; tak ada split origin, tak ada access proxy yang diwajibkan;
+> - lampiran diterima **tanpa dipindai** bila `HANOMAN_UPLOAD_SCANNER` kosong (dicatat di log,
+>   bukan ditolak);
+> - akun pertama dibuat **tanpa setup token**, sehingga **wizard setup bisa diklaim oleh orang
+>   pertama yang membukanya** selama belum ada akun. Instance yang akan dipublikkan wajib
+>   menyelesaikan wizard di `localhost` lebih dulu, baru disambungkan ke domain/tunnel.
+>
+> Keadaan itu dibuat terlihat, bukan disembunyikan: dashboard menampilkan penanda permanen selama
+> peruntukannya publik dan hardening mati. Env ADR-0117 yang sudah terisi tetap dibaca sebagai
+> hardening menyala, jadi deployment yang sudah berdiri tak berubah sedikit pun.
+
 ## Scope dan asumsi
 
 Scope mencakup public Help/status portal, reverse/access proxy, Fastify control plane, SQLite dan

@@ -20,6 +20,15 @@ operator ─ SSO/MFA/VPN ─ admin.example ┘                         │
                                                                       └─ internal net → egress proxy allowlist
 ```
 
+> **SPEC-884 / ADR-0138 — hardening kini opt-in.** Seluruh syarat di bawah (podman rootless, split
+> origin, trusted proxy, non-root, setup token, scanner upload) ditegakkan **hanya bila
+> `HANOMAN_HARDENING=1`**, atau bila salah satu env ADR-0117 lama sudah terisi
+> (`HANOMAN_SESSION_SANDBOX=podman`, `HANOMAN_PUBLIC_ORIGINS`, `HANOMAN_TRUST_PROXY`) — deployment
+> yang sudah berdiri karena itu tetap keras tanpa disentuh. Tanpa satu pun dari itu hanoman boot
+> longgar: sesi agen berjalan di host, `hanoman doctor` menandai sandbox `!` bukan `✗`, dan akun
+> pertama dibuat tanpa membaca `setup.token`. Pilih jalur itu **hanya** untuk host yang tak
+> menghadap publik.
+
 - `help.example` hanya boleh mencapai static UI, `/api/health`, dan `/api/help/**`.
 - `admin.example` wajib berada di belakang SSO/MFA, VPN, atau access proxy dan menolak Help publik.
 - **`HANOMAN_PUBLIC_ORIGINS` wajib benar-benar ada**: DNS ter-resolve + vhost proxy-nya berdiri.

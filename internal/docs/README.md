@@ -89,6 +89,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0138 — Hardening ADR-0117 jadi opt-in (`HANOMAN_HARDENING`), setup awal dipandu wizard di browser](adr/0138-hardening-opsional-dan-wizard-setup.md) — mengamandemen 0117 & 0087, mengikuti 0088 (SPEC-884)
 - [0136 — Agen bawaan sistem: katalog konstanta yang di-SEED sebagai baris, diperbarui hanya bila belum disunting](adr/0136-agen-bawaan-sistem-seed-idempoten.md) — memperluas 0094 & 0101, mengikuti 0113 & 0119 (SPEC-881)
 - [0135 — Penanda "ditangani oleh" pada Project: kolom `Json` yang MASUK sync, berisi snapshot device](adr/0135-penanda-project-ditangani-hanoman-client.md) — menegakkan 0043, 0044, 0045; kontras dengan 0072/0091/0103 (SPEC-880)
 - [0134 — Prediksi input dihakimi oleh pengakuan pengiriman (`in.seq` → frame `{t:"ack"}`), bukan oleh `readyState`](adr/0134-pengakuan-pengiriman-input-terminal.md) — menegakkan 0014, 0016, 0117, 0133 (SPEC-878)

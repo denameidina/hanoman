@@ -2230,7 +2230,7 @@ git commit -m "feat(spec-884): kartu Setup awal di Settings"
 - Consumes: seluruh task sebelumnya
 - Produces: —
 
-- [ ] **Step 1: Tulis ADR-0138**
+- [x] **Step 1: Tulis ADR-0138**
 
 Buat `internal/docs/adr/0138-hardening-opsional-dan-wizard-setup.md`, mengikuti bentuk ADR lain (Status/Tanggal/SPEC/Terkait · Konteks · Keputusan · Alternatif yang ditolak · Konsekuensi · Invariant). Isi yang wajib ada:
 
@@ -2242,7 +2242,7 @@ Buat `internal/docs/adr/0138-hardening-opsional-dan-wizard-setup.md`, mengikuti 
 - **Konsekuensi yang diterima sadar:** instance publik tanpa hardening hanya dijaga password; wizard bisa diklaim orang pertama bila instance sudah terjangkau internet sebelum selesai; urutan aman = wizard di localhost dulu.
 - **Invariant baru:** (1) `config.env` tak pernah mengalahkan env proses; (2) hardening yang dinyalakan di luar `config.env` tak bisa dimatikan dari dashboard; (3) `hardening=on` tak pernah ditulis saat prasyarat merah; (4) invariant 1–7 ADR-0117 tetap berlaku penuh setiap kali hardening menyala.
 
-- [ ] **Step 2: Perbarui docs yang tersentuh**
+- [x] **Step 2: Perbarui docs yang tersentuh**
 
 - `internal/docs/README.md` — tautkan ADR-0138 di daftar ADR.
 - `internal/docs/operations/deploy-vps.md` — dua jalur: default longgar (tanpa env apa pun) vs `HANOMAN_HARDENING=1` + prasyarat; sebutkan bahwa env ADR-0117 lama tetap dibaca sebagai hardening menyala.
@@ -2253,7 +2253,7 @@ Buat `internal/docs/adr/0138-hardening-opsional-dan-wizard-setup.md`, mengikuti 
 - `internal/docs/architecture/stack.md` — dua nilai profil, `config.env`, presedensi.
 - `internal/docs/architecture/api-contract.md` — `GET /api/setup/status`, `POST /api/setup`, kode `400 prerequisites-missing` / `409 hardening-locked` / `429`.
 
-- [ ] **Step 3: Sesuaikan plan SPEC-883**
+- [x] **Step 3: Sesuaikan plan SPEC-883**
 
 Di `docs/superpowers/plans/2026-08-22-spec-883-provisioning-vps-satu-perintah.md`, perbarui bagian profil:
 
@@ -2261,12 +2261,12 @@ Di `docs/superpowers/plans/2026-08-22-spec-883-provisioning-vps-satu-perintah.md
 - profil `production` → tulis `HANOMAN_HARDENING=1` beserta env ADR-0117 lengkap;
 - cabut catatan konsekuensi "cookie lahir tanpa `Secure`" — sudah tak berlaku sejak K7 SPEC-884.
 
-- [ ] **Step 4: Verifikasi integritas index docs**
+- [x] **Step 4: Verifikasi integritas index docs**
 
 Run: `node cli/dist/cli.js docs index --check` (atau `pnpm --filter ./cli build` dulu bila `dist` belum ada)
 Expected: keluar 0, tanpa entri yatim
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs docs/superpowers/plans/2026-08-22-spec-883-provisioning-vps-satu-perintah.md
@@ -2277,7 +2277,7 @@ git commit -m "docs(spec-884): ADR-0138 hardening opsional + wizard setup awal"
 
 ## Verifikasi akhir (sekali, setelah semua task)
 
-- [ ] **Test yang tersentuh, serial, DB terisolasi**
+- [x] **Test yang tersentuh, serial, DB terisolasi**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -2291,14 +2291,14 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
   src/test/unhardened-banner.test.tsx src/test/settings-setup-card.test.tsx src/test/app-flows.test.tsx
 ```
 
-- [ ] **Typecheck paket yang tersentuh**
+- [x] **Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck \
   && pnpm --filter ./server typecheck && pnpm --filter ./cli typecheck
 ```
 
-- [ ] **Uji endpoint nyata di local** (task ini menyentuh endpoint — wajib, sekali di akhir)
+- [x] **Uji endpoint nyata di local** (task ini menyentuh endpoint — wajib, sekali di akhir)
 
 ```bash
 # Home terpisah supaya tak menyentuh ~/.hanoman yang dipakai instance nyata.
@@ -2320,4 +2320,4 @@ Yang harus terlihat: `needed: true`, `deployment: "local"`, `hardening: false`, 
 
 > **Jangan jalankan smoke tanpa `HANOMAN_HOME`** — `ensureSetupToken` dan `writeConfigEnv` akan menulis ke `~/.hanoman` yang nyata (pelajaran SPEC-880). Bersihkan sesudahnya: `rm -rf "$SMOKE_HOME"`.
 
-- [ ] **Centang checklist plan ini** (`- [ ]` → `- [x]`) untuk task yang selesai, dalam commit yang sama dengan task itu.
+- [x] **Centang checklist plan ini** (`- [ ]` → `- [x]`) untuk task yang selesai, dalam commit yang sama dengan task itu.

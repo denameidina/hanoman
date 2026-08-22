@@ -43,8 +43,18 @@ WebSocket per-sesi tersendiri. Endpoint HTTP GET tiap sumber tetap ada untuk pai
 ## Auth
 ```
 GET  /auth/status         -> { needsSetup: bool, user: {id,email,role,createdAt}|null }   # control host
-POST /auth/setup          { email, password, setupToken } # control host; 403 proof salah/expired;
+POST /auth/setup          { email, password, setupToken? } # control host; 403 proof salah/expired;
 #   HANYA saat 0 user; tepat satu create atomik menang; set cookie; token one-use 15 mnt; 409 sesudah tertutup
+#   SPEC-884 · `setupToken` WAJIB hanya saat hardening menyala; /auth/status membawa setupTokenRequired
+
+# SPEC-884 · ADR-0138 · wizard setup awal. Publik BERSYARAT: hanya selama 0 user; sesudah itu cookie.
+GET  /setup/status        -> { needed, deployment: "local"|"public", hardening, hardeningLocked,
+#                              supervised, setupTokenRequired, prerequisites: [{id,label,ok,detail}] }
+POST /setup               { deployment, hardening, acknowledgedUnhardened? }
+#   -> { restart: "self"|"manual" }   # "self" hanya bila HANOMAN_SUPERVISOR=1
+#   400 prerequisites-missing + missing[] bila hardening diminta tapi prasyarat merah (tak menulis apa pun)
+#   409 hardening-locked  bila hardening dipasang di luar config.env (systemd/shell)
+#   429 too many attempts (limiter sama dengan /auth/setup)
 POST /auth/login          { email, password }   # set cookie; 401 generic; 429 throttled; 400 body cacat
 POST /auth/logout         # 204; hapus sesi + clear cookie
 GET  /auth/users          -> UserView[]                          # sesi
