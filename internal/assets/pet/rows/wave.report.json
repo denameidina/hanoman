@@ -25,80 +25,80 @@
     },
     {
       "frame": 2,
-      "dx": 0,
-      "dy": -1,
+      "dx": 1,
+      "dy": 0,
       "scale": 1.0,
-      "residual_pre": 0.1343,
+      "residual_pre": 0.0711,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.1217
+      "residual_post": 0.0643
     },
     {
       "frame": 3,
       "dx": 0,
       "dy": 0,
       "scale": 1.0,
-      "residual_pre": 0.1231,
+      "residual_pre": 0.1193,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.1164
+      "residual_post": 0.1049
     },
     {
       "frame": 4,
-      "dx": 12,
+      "dx": 2,
       "dy": 0,
       "scale": 1.0,
-      "residual_pre": 0.1284,
+      "residual_pre": 0.1112,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.1194
+      "residual_post": 0.1078
     },
     {
       "frame": 5,
-      "dx": 2,
-      "dy": -1,
+      "dx": 4,
+      "dy": 1,
       "scale": 1.0,
-      "residual_pre": 0.1298,
+      "residual_pre": 0.113,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.1188
+      "residual_post": 0.1069
     },
     {
       "frame": 6,
-      "dx": 5,
-      "dy": -1,
+      "dx": 0,
+      "dy": 1,
       "scale": 1.0,
-      "residual_pre": 0.1363,
+      "residual_pre": 0.1168,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.1176
+      "residual_post": 0.1041
     },
     {
       "frame": 7,
       "dx": 0,
-      "dy": -1,
+      "dy": 1,
       "scale": 1.0,
-      "residual_pre": 0.02,
+      "residual_pre": 0.1154,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.0043
+      "residual_post": 0.1049
     },
     {
       "frame": 8,
       "dx": 1,
-      "dy": -1,
+      "dy": 1,
       "scale": 1.0,
-      "residual_pre": 0.0214,
+      "residual_pre": 0.0778,
       "clipped": 0,
       "fit_dx": 0,
       "lift_fit": 1.0,
-      "residual_post": 0.0085
+      "residual_post": 0.0645
     }
   ]
 }
