@@ -525,7 +525,7 @@ git commit -m "feat(dialog): service baca+jawab dialog sesi lewat PaneIO (SPEC-8
 - Consumes: `readSessionDialog`, `answerSessionDialog`, `sessionPaneIO`, `beginAnswer`, `endAnswer` dari `../services/session-dialog`; `isDeciding` dari `../services/lead/deciding`; `zSessionDialogAnswer` dari `@hanoman/shared`; `getSession` dari `../services/pty` (sudah diimpor).
 - Produces: `GET /api/terminal/sessions/:id/dialog`, `POST /api/terminal/sessions/:id/dialog/answer`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/terminal-dialog.route.test.ts`:
 
@@ -665,12 +665,12 @@ describe("SPEC-899 · POST /terminal/sessions/:id/dialog/answer", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/terminal-dialog.route.test.ts`
 Expected: FAIL — GET menjawab `404` dari handler catch-all Fastify (route belum ada).
 
-- [ ] **Step 3: Tambah import di route**
+- [x] **Step 3: Tambah import di route**
 
 Di `server/src/routes/terminal.ts`, tambahkan ke daftar import dari `@hanoman/shared` (baris 4) simbol `zSessionDialogAnswer`, lalu tambahkan dua import baru di bawah blok import service yang sudah ada:
 
@@ -681,7 +681,7 @@ import {
 import { isDeciding } from "../services/lead/deciding";
 ```
 
-- [ ] **Step 4: Tambah kedua route**
+- [x] **Step 4: Tambah kedua route**
 
 Di `server/src/routes/terminal.ts`, tepat setelah route `/interrupt` (yang berakhir dengan `return reply.code(202).send({ accepted: true });`), sisipkan:
 
@@ -731,17 +731,17 @@ Di `server/src/routes/terminal.ts`, tepat setelah route `/interrupt` (yang berak
   });
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/terminal-dialog.route.test.ts`
 Expected: PASS — 9 test.
 
-- [ ] **Step 6: Typecheck server**
+- [x] **Step 6: Typecheck server**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: keluar tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/routes/terminal.ts server/test/terminal-dialog.route.test.ts

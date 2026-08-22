@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { prisma } from "../db";
-import { zTerminalSession, zIntegrate, zTerminalSteerInput, METHODS, type Stage } from "@hanoman/shared";
+import {
+  zTerminalSession, zIntegrate, zTerminalSteerInput, zSessionDialogAnswer, METHODS, type Stage,
+} from "@hanoman/shared";
 import { resolveHome, realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, type Flow } from "@hanoman/runner";
 import { phaseFilePath, decisionFilePath, readPhases, stageForRun } from "../services/session-phases";
 import { specReview, reviewFile } from "../services/spec-review";
@@ -29,12 +31,25 @@ import {
   attach, detach, writeTo, resize, shellBin, sendToPane, interruptPane, type Client,
 } from "../services/pty";
 import { saveSessionUpload } from "../services/uploads";
+import {
+  readSessionDialog, answerSessionDialog, sessionPaneIO, beginAnswer, endAnswer,
+} from "../services/session-dialog";
+import { isDeciding } from "../services/lead/deciding";
 
 // SPEC-816 · lampiran gambar sesi terminal. Berkas + path, bukan gambar inline: yang bisa dikirim
 // ke PTY hanyalah teks, dan CLI-lah yang menyusun blok image dari berkas yang dibacanya.
 // Allowlist ini CERMIN kunci `EXT` di services/uploads.ts — `image/gif` sengaja di luar karena
 // `extFor` memetakannya ke `.bin`.
 const ATTACHMENT_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+// SPEC-899 · prosa 409 dipisah dari kodenya supaya klien bisa membedakan "muat ulang lalu
+// tampilkan lagi" (`stale`) dari "jangan sentuh, lead yang berhak" (`deciding`) tanpa
+// mem-parsing kalimat.
+const DIALOG_ANSWER_ERROR = {
+  stale: "layar dialog sudah berubah — muat ulang pertanyaannya",
+  shape: "bentuk jawaban tak cocok dengan dialog di layar",
+  "not-landed": "jawaban tak mendarat di pane — sesi tidak digerakkan",
+} as const;
 
 // SPEC-771 · input xterm berbingkai per keystroke; default 120/menit menutup koneksi pada dua
 // karakter/detik. 100/detik tetap bounded tetapi berada di atas key-repeat browser yang wajar.
@@ -329,6 +344,43 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     const ok = interruptPane((req.params as { id: string }).id);
     if (!ok) return reply.code(404).send({ error: "live session not found" });
     return reply.code(202).send({ accepted: true });
+  });
+
+  // SPEC-899 · ADR-0142 · inbox keputusan: dialog `AskUserQuestion` sebuah sesi dijawab dari panel
+  // pet, bukan dengan pindah layar ke pane-nya. Membungkus tui-dialog.ts apa adanya — yang baru di
+  // sini hanya tiga gerbang: sesi hidup, lead tak sedang memutuskan, dan layar yang dijawab masih
+  // layar yang ditampilkan (`screenHash`). Capability datang dari peta yang sudah ada
+  // (`rw("sessions")` untuk seluruh prefix /terminal), dan endpoint ini sengaja DI LUAR katalog
+  // MCP: agen yang bisa memanggilnya bisa menjawab pertanyaannya sendiri.
+  app.get("/terminal/sessions/:id/dialog", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const s = getSession(id);
+    if (!s) return reply.code(404).send({ error: "not found" });
+    if (s.exited) return reply.code(204).send();
+    const found = readSessionDialog(sessionPaneIO(id));
+    if (!found) return reply.code(204).send();
+    return found;
+  });
+
+  app.post("/terminal/sessions/:id/dialog/answer", async (req, reply) => {
+    const parsed = zSessionDialogAnswer.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid body" });
+    const { id } = req.params as { id: string };
+    const s = getSession(id);
+    if (!s || s.exited) return reply.code(404).send({ error: "live session not found" });
+    // ADR-0091 ditegakkan apa adanya: selama lead memegang sesi ini, dialah yang berhak menjawab.
+    if (isDeciding(id))
+      return reply.code(409)
+        .send({ error: "hanoman-lead sedang menyusun keputusan untuk sesi ini", reason: "deciding" });
+    if (!beginAnswer(id))
+      return reply.code(409).send({ error: "jawaban lain sedang dikirim ke sesi ini", reason: "answering" });
+    try {
+      const r = await answerSessionDialog(sessionPaneIO(id), parsed.data);
+      if (!r.ok) return reply.code(409).send({ error: DIALOG_ANSWER_ERROR[r.reason], reason: r.reason });
+      return reply.code(202).send({ accepted: true });
+    } finally {
+      endAnswer(id);
+    }
   });
 
   // SPEC-230 · review diff worktree hidup sebuah sesi project-level (PRD). Kunci worktree = id
