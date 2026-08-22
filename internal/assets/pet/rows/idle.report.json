@@ -1,0 +1,88 @@
+{
+  "key": "idle",
+  "mode": "stand",
+  "pinned": true,
+  "edge": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+  ],
+  "frames": [
+    {
+      "frame": 1,
+      "dx": 0,
+      "dy": 0,
+      "scale": 1.0,
+      "residual_pre": 0.0,
+      "clipped": 0
+    },
+    {
+      "frame": 2,
+      "dx": 3,
+      "dy": 0,
+      "scale": 1.0,
+      "residual_pre": 0.0264,
+      "clipped": 0,
+      "residual_post": 0.002
+    },
+    {
+      "frame": 3,
+      "dx": 7,
+      "dy": 3,
+      "scale": 0.98,
+      "residual_pre": 0.0424,
+      "clipped": 0,
+      "residual_post": 0.0014
+    },
+    {
+      "frame": 4,
+      "dx": 10,
+      "dy": 3,
+      "scale": 0.98,
+      "residual_pre": 0.0307,
+      "clipped": 0,
+      "residual_post": 0.0012
+    },
+    {
+      "frame": 5,
+      "dx": 1,
+      "dy": -1,
+      "scale": 1.02,
+      "residual_pre": 0.0313,
+      "clipped": 0,
+      "residual_post": 0.0016
+    },
+    {
+      "frame": 6,
+      "dx": -1,
+      "dy": -1,
+      "scale": 1.02,
+      "residual_pre": 0.0394,
+      "clipped": 0,
+      "residual_post": 0.0024
+    },
+    {
+      "frame": 7,
+      "dx": -21,
+      "dy": -2,
+      "scale": 1.08,
+      "residual_pre": 0.0694,
+      "clipped": 0,
+      "residual_post": 0.0022
+    },
+    {
+      "frame": 8,
+      "dx": -14,
+      "dy": -3,
+      "scale": 1.06,
+      "residual_pre": 0.0315,
+      "clipped": 0,
+      "residual_post": 0.0008
+    }
+  ]
+}

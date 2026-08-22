@@ -632,7 +632,7 @@ git commit -m "feat(pet): pustaka pipeline atlas — chroma key, deteksi celah, 
 - Consumes: `petlib`, `common` (Task 1).
 - Produces: `rows/<key>.png` (1536×208 RGBA), `rows/<key>.report.json` `{ key, mode, pinned, edge: bool[8], frames: [...] }`, artefak `qa/<key>-contact.png`, `qa/<key>-onion.png`, `qa/<key>.gif`; exit 1 pada gerbang gagal.
 
-- [ ] **Step 1: Tulis ketiga CLI**
+- [x] **Step 1: Tulis ketiga CLI**
 
 `internal/scripts/pet/key.py`:
 
@@ -778,7 +778,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 2: Rakit ulang baris idle dari gambar mentah yang disetujui**
+- [x] **Step 2: Rakit ulang baris idle dari gambar mentah yang disetujui**
 
 `raw/` di-gitignore; `raw/idle.magenta.png` (keluaran Codex 2026-08-22, latar magenta — `chroma_key` menyampel warna tepi, jadi tetap bekerja) ada di mesin ini dari sesi brainstorm. Bila hilang, jalankan Task 4 lalu `python3 internal/scripts/pet/gen.py idle` untuk membuatnya lagi (latar hijau).
 
@@ -803,11 +803,11 @@ OK idle: 8 frame, residu maks 0.069 ≤ 0.15
 ```
 Tak boleh ada `TUMPAH=` pada baris mana pun.
 
-- [ ] **Step 3: Periksa artefak dengan mata**
+- [x] **Step 3: Periksa artefak dengan mata**
 
 Buka `internal/assets/pet/qa/idle.gif` (mis. `open internal/assets/pet/qa/idle.gif`) dan `qa/idle-onion.png`: badan bawah harus padat hitam di onion-skin, hanya ekor & kepala yang berbayang; GIF bernapas, kedip di frame 4, ekor mengayun, tanpa sentakan badan.
 
-- [ ] **Step 4: Hapus prototipe dan perbarui gitignore**
+- [x] **Step 4: Hapus prototipe dan perbarui gitignore**
 
 Run:
 ```bash
@@ -815,7 +815,7 @@ git rm -q internal/assets/pet/prototype/register.py internal/assets/pet/prototyp
 printf 'raw/\n' > internal/assets/pet/.gitignore
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/scripts/pet/key.py internal/scripts/pet/register.py internal/scripts/pet/qa.py \
