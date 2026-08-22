@@ -699,7 +699,7 @@ git commit -m "feat(spec-884): setup token hanya diminta saat hardening menyala"
 - Consumes: `AuthStatus.setupTokenRequired` (sudah ada, `shared/src/dto.ts:497`)
 - Produces: `<AuthScreen needsSetup setupTokenRequired onDone />` — prop baru `setupTokenRequired?: boolean`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/auth-screen-token.test.tsx`:
 
@@ -741,12 +741,12 @@ describe("AuthScreen · setup token (SPEC-884)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/auth-screen-token.test.tsx`
 Expected: FAIL — test pertama: field "Setup token" masih ada dan tombol disabled
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `src/src/screens/AuthScreen.tsx`, ganti tanda tangan komponen (baris 9), `canSubmit` (baris 16-17), pemanggilan `api.setup` (baris 23), dan render field token (baris 58-61):
 
@@ -779,12 +779,12 @@ Di `src/src/App.tsx:1256`, teruskan prop-nya:
     onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/auth-screen-token.test.tsx src/test/auth-responsive.test.tsx`
 Expected: PASS — kedua berkas
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/AuthScreen.tsx src/src/App.tsx src/test/auth-screen-token.test.tsx

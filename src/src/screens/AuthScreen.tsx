@@ -6,21 +6,29 @@ import { Wordmark } from "../ds/marks";
 import { api, ApiError } from "../api/client";
 import type { UserView } from "@hanoman/shared";
 
-export function AuthScreen({ needsSetup, onDone }: { needsSetup: boolean; onDone: (u: UserView) => void }) {
+export function AuthScreen({ needsSetup, setupTokenRequired = false, onDone }: {
+  needsSetup: boolean; setupTokenRequired?: boolean; onDone: (u: UserView) => void;
+}) {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [setupToken, setSetupToken] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState("");
 
+  // SPEC-884 · ADR-0138 · sebelum ini form mengunci tombol setiap kali `needsSetup` benar, tanpa
+  // pernah membaca `setupTokenRequired` yang sudah dikirim /auth/status — jadi walau server tak
+  // meminta token, akun pertama TAK BISA dibuat dari UI. Server tetap otoritasnya; ini cuma cermin.
+  const needsToken = needsSetup && setupTokenRequired;
   const canSubmit = /\S+@\S+\.\S+/.test(email) && password.length >= (needsSetup ? 8 : 1)
-    && (!needsSetup || setupToken.trim().length > 0);
+    && (!needsToken || setupToken.trim().length > 0);
 
   async function submit() {
     if (!canSubmit || busy) return;
     setBusy(true); setErr("");
     try {
-      const { user } = await (needsSetup ? api.setup({ email, password, setupToken: setupToken.trim() }) : api.login({ email, password }));
+      const { user } = await (needsSetup
+        ? api.setup(needsToken ? { email, password, setupToken: setupToken.trim() } : { email, password })
+        : api.login({ email, password }));
       onDone(user);
     } catch (e) {
       setErr(needsSetup
@@ -55,7 +63,7 @@ export function AuthScreen({ needsSetup, onDone }: { needsSetup: boolean; onDone
                 value={password} placeholder="••••••••"
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} style={{ width: "100%" }} />
             </Field>
-            {needsSetup && <Field label="Setup token" hint="baca setup.token di HANOMAN_HOME pada host server">
+            {needsToken && <Field label="Setup token" hint="baca setup.token di HANOMAN_HOME pada host server">
               <Input type="password" autoComplete="off" value={setupToken} placeholder="••••••••"
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSetupToken(e.target.value)} style={{ width: "100%" }} />
             </Field>}

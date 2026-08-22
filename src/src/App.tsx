@@ -1253,7 +1253,9 @@ export default function App() {
 
   // SPEC-169 · gerbang auth: splash → Setup/Login → app.
   if (!auth) return <StateBlock kind="loading" title="Memuat hanoman…" />;
-  if (!auth.user) return <AuthScreen needsSetup={auth.needsSetup} onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
+  if (!auth.user) return <AuthScreen needsSetup={auth.needsSetup}
+    setupTokenRequired={auth.setupTokenRequired ?? false}
+    onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
   // SPEC-617 · ADR-0110 · akun klien mendarat di permukaannya sendiri, bukan dashboard operator.
   // Percabangan di SINI (bukan di dalam Shell) supaya tak satu pun state/efek dashboard operator
   // pernah berjalan untuk klien — termasuk poll yang endpointnya memang 403 baginya.
