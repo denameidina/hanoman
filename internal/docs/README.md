@@ -89,6 +89,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 > **Narasi tiap keputusan — apa yang diperluas/dicabut/diamandemen, berikut gotcha-nya — ada di
 > [adr/README.md](adr/README.md).** Daftar di bawah sengaja satu baris per ADR: index ini dibaca
 > setiap sesi agen, sub-index hanya saat butuh riwayatnya (SPEC-386).
+- [0141 — Onset "menunggu manusia" hidup di ISI marker keputusan, dan menyeberang sebagai `decisionAt`](adr/0141-onset-menunggu-di-marker-keputusan.md) — mengamandemen SPEC-184 pada isi marker; menegakkan 0039, 0024 & 0091 (SPEC-898)
 - [0140 — Pet dashboard sebagai sprite beranimasi: aset dibuat AI lewat Codex, pipeline registrasi, renderer frame, berkeliaran di tepi bawah](adr/0140-pet-sprite-codex-pipeline-berkeliaran.md) — menegakkan 0039, mengamandemen konvensi SPEC-585/648 & sistem maskot brand (SPEC-896)
 - [0139 — Hardening ADR-0117 jadi opt-in (`HANOMAN_HARDENING`), setup awal dipandu wizard di browser](adr/0139-hardening-opsional-dan-wizard-setup.md) — mengamandemen 0117 & 0087, mengikuti 0088 (SPEC-884)
 - [0138 — Bootstrap sync, halaman ber-anggaran byte, dan feed yang berhenti berdenyut](adr/0138-sync-bootstrap-halaman-byte-feed-berdenyut.md) — memperbaiki akibat susulan 0131; menegakkan 0043, 0045 & 0082; memperluas 0100 & 0135 (SPEC-885)
@@ -241,6 +242,6 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), ilustrasi (termasuk band **pet** 80–128 px), dan grammar motion Pet Hanoman: sprite atlas + `steps()` sejak Pet hidup A (SPEC-648 · ADR-0140)
 
 ## frontend
-- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan Pet Hanoman sebagai sprite hidup yang berkeliaran di tepi bawah, mengaku saat koneksi putus, dan mendaftar semua kondisi aktif (SPEC-763 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897)
+- [frontend-implementation](frontend/frontend-implementation.md) — kontrak implementasi UI, termasuk drawer/rail/sidebar, panel responsif, local overflow, state → pose, dan Pet Hanoman sebagai sprite hidup yang berkeliaran di tepi bawah, mengaku saat koneksi putus, mendaftar semua kondisi aktif, lalu MENGUCAPKANNYA lewat gelembung ber-template + rekap "selama kamu pergi" (SPEC-763 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141)
 
 > Chiranjivi — docs bertahan lebih lama dari satu commit atau sesi. Jaga index ini tetap sinkron.

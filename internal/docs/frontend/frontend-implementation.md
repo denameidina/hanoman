@@ -280,7 +280,7 @@ orientasi, dan alpha master **berikut** keberadaan, batas 768px, alpha, dan peng
 web-nya — master sehat yang turunannya hilang berarti layar kosong di dashboard, bukan sekadar aset
 besar.
 
-## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897)
+## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141)
 
 Widget maskot di tepi bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi & backlog,
 bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada skema,
@@ -288,10 +288,11 @@ tak ada channel realtime baru (ADR-0024 & ADR-0039 utuh).
 
 | sumber | frame WS | dipakai untuk |
 |---|---|---|
-| `sessions: TerminalSession[]` | `sessions` | `exited`, `exitCode`, `decision`, `deciding`, `specId` |
+| `sessions: TerminalSession[]` | `sessions` | `exited`, `exitCode`, `decision`, `deciding`, `decisionAt`, `specId` |
 | `backlog: Spec[]` | `specs` | `stage`, `blockedBy`, `source`, `title` |
 | `useNotifications().items` | `notifications` | `type` + `createdAt` keadaan transient |
 | `subscribeStatus()` dari `api/events` | — (socket itu sendiri) | apakah ketiga sumber di atas masih segar (SPEC-897) |
+| `document.hidden` | — | snapshot rekap "selama kamu pergi" (SPEC-898) |
 
 **Kontrak status.** Sumber tunggalnya `derivePetConditions` di `src/src/screens/pet-state.ts`
 (murni & bertest): ia mengembalikan **daftar** kondisi terurut prioritas, dan `derivePetState`
@@ -309,6 +310,10 @@ sama tetapi dihitung, didaftar, dan dibuka berbeda.
 | 2 | `failed` | `blocked` | `blocked` | ada sesi `exited` ber-`exitCode` bukan nol | jumlah sesi gagal |
 | 3 | `blocked` | `blocked` | `blocked` | **hanya bila tak ada sesi hidup** dan ada backlog belum-`done` ber-`blockedBy` | jumlah backlog tertahan |
 | 4 | `waiting` | `waiting` | `waiting` | sesi hidup ber-`decision` yang **tidak** sedang dilayani lead | jumlah sesi |
+
+Kondisi juga membawa `subject` (pokok kalimat — id backlog/sesi) dan `since` (ms epoch onset bila
+diketahui: `decisionAt` **tertua** untuk `waiting`, `conn.since` untuk `offline`, `null` selebihnya).
+Keduanya ada supaya `pet-speech.ts` tak perlu memparsing `headline`, yang ditulis untuk daftar panel.
 | 5 | `deciding` | `deciding` | `deciding` | sesi hidup ber-`deciding` (lead sedang menyusun keputusan) | jumlah sesi |
 | 6 | `shipped` | `shipped` | `shipped` | notifikasi `done`/`automerge` non-audit, masih di dalam window transient | jumlah notifikasi segar |
 | 7 | `docs-updated` | `docs-updated` | `docs-updated` | notifikasi `done` untuk backlog ber-`source: "audit"`, masih transient | jumlah notifikasi segar |
@@ -366,17 +371,19 @@ Delapan keputusan di dalam tabel itu yang tak terbaca dari kodenya:
   `done`: pane hidup di atas backlog selesai bukan sedang bekerja, ia menunggu dilihat.
 
 **Atlas & manifest.** `internal/assets/pet/hnm-pet-anoman-atlas-v01.webp` + `pet.json` (PET-001):
-sel 192×208, 8 kolom, **12 baris** (`idle, walk-right, walk-left, working, waiting, blocked,
-review, shipped, docs-updated, wave, deciding, sleep` — dua terakhir dari SPEC-897, ditambahkan di
-EKOR supaya indeks baris lama tak bergeser), karakter berdiri 168 px, jangkar kaki x 0,62 /
-baseline 202.
+sel 192×208, 8 kolom, **13 baris** (`idle, walk-right, walk-left, working, waiting, blocked,
+review, shipped, docs-updated, wave, deciding, sleep, thanks` — tiga terakhir dari SPEC-897/898,
+ditambahkan di EKOR supaya indeks baris lama tak bergeser), karakter berdiri 168 px, jangkar kaki
+x 0,62 / baseline 202. Baris ke-13 memaksa `quality` WebP turun 82 → 76 untuk **seluruh** atlas
+(952 452 B, plafon `ATLAS_BUDGET` 1 MB tak dinaikkan); angka pengukurannya di
+`internal/assets/pet/README.md`.
 `pet-sprite.ts` memvalidasi manifest (validator tangan — `zod` tak bisa di-resolve dari paket
 `src`), memetakan pose → baris (`POSE_ROW`; hanya `ready → idle` yang berganti nama),
-`durationMs = columns / fps × 1000`, dan rantai `then` untuk baris sekali-putar (`shipped`, `wave`
-→ `idle`). `POSE_ROW` memetakan **sepuluh** pose ke dua belas baris; `offline` sengaja menumpang
-baris `idle` — yang dikatakan pet saat terputus adalah "aku tak tahu", dan itu diucapkan oleh pudar
-+ kalimat, bukan oleh gerak baru; baris ke-13 berarti ±80 KB atlas untuk informasi yang sudah
-tersampaikan. Pipeline pembuatannya (Codex → key → registrasi → QA → atlas) di
+`durationMs = columns / fps × 1000`, dan rantai `then` untuk baris sekali-putar (`shipped`, `wave`,
+`thanks` → `idle`). `POSE_ROW` memetakan **sepuluh** pose ke tiga belas baris; `offline` sengaja
+menumpang baris `idle` — yang dikatakan pet saat terputus adalah "aku tak tahu", dan itu diucapkan
+oleh pudar + kalimat, bukan oleh gerak baru. `thanks` **bukan** pose sama sekali: ia baris reaksi
+yang hanya bisa dipilih `oneShot`, jadi ia tak muncul di `POSE_ROW` dan tak menambah `PetPose`. Pipeline pembuatannya (Codex → key → registrasi → QA → atlas) di
 `internal/assets/pet/README.md`. Sticker `STK-*` tetap di katalog ilustrasi tetapi **tak lagi
 dipakai pet**.
 
@@ -387,6 +394,7 @@ rAF/interval.
 ```
 pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 sel × s · pointer-events:none · z 80
 └─ pet-actor   transform: translateX(var(--x)) · transition: transform <segmen> linear
+   ├─ pet-bubble  gelembung bicara · di LUAR live region · pointer-events:none (tombol rekap auto)
    ├─ pet-stage   role=status aria-live=polite · hn-pet-reveal
    │  ├─ pet-reactor   hover/klik
    │  │  └─ pet-viewport   overflow:hidden · width 192s · height 208s · opacity 0,45 saat pose offline
@@ -394,6 +402,7 @@ pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 
    │  │        └─ img.hn-pet-atlas   width 1536s · animation: hn-pet-frames var(--dur) steps(8,end) <count> <fill>
    │  ├─ span.hn-sr-only   kalimat status
    │  ├─ span.pet-badge   lencana hitungan · aria-hidden · pointer-events:none
+   │  ├─ span.pet-hearts  3 hati saat dielus · aria-hidden · pointer-events:none
    │  └─ button.hit   44×44 di kaki · pointer-events:auto
    └─ panel   popover · dijangkar ke pet, di-clamp viewport · daftar SEMUA kondisi
 ```
@@ -426,6 +435,44 @@ Penjadwalan: **satu** `setTimeout` pada `state.until` + `transitionend` pada `pe
 `propertyName === "transform"`) + `visibilitychange` + `resize` (debounce 150 ms). Tanpa interval.
 `currentX` dibaca dari `getBoundingClientRect()` hanya pada peristiwa, bukan per frame (jsdom
 memberi rect nol → jatuh ke posisi keadaan).
+
+**Pet bicara** (SPEC-898; templat murni di `src/src/screens/pet-speech.ts`, tanpa LLM). Empat hal:
+
+- **Gelembung pose.** Satu baris di atas kepala saat kalimat pet berubah. Himpunannya **tertutup**:
+  `shipped`, `docs-updated`, `waiting`, `offline` — dan hanya itu. `Toast` design system sudah
+  duduk di tengah-bawah untuk aksi pengguna, sedangkan keadaan mapan (`working`/`review`/`blocked`/
+  `deciding`/`ready`) yang bergelembung tiap kali sebuah sesi lahir adalah kebisingan, bukan kabar.
+  Pembandingnya **teks kalimat**, bukan `kind`: `waiting` yang menua dari biasa ke mendesak adalah
+  kabar baru walau `kind`-nya sama. Perbandingan dilakukan **saat render** (pola yang sama dengan
+  `seenPulse`), jadi pet tak berteriak saat mount. Umur 5 dtk lewat satu `setTimeout`; gelembung
+  baru menggantikan yang lama beserta timernya. Ia `aria-hidden` — region `role="status"` sudah
+  membacakan pergantian pose, dan gelembung yang ikut diumumkan berarti kabar yang sama terdengar
+  dua kali dengan dua rumusan berbeda. Panel yang terbuka menelannya: daftarnya sudah di layar.
+- **Rekap "selama kamu pergi".** Snapshot (`petSnapshot`: id sesi → kondisinya + `createdAt`
+  notifikasi terbaru) dicap saat tab jadi **hidden**, dibandingkan saat ia terlihat lagi. Setelah
+  `PET_AWAY_MS` = 5 menit, `petRecap` memberi satu kalimat berisi tiga angka — `2 selesai ·
+  1 menunggu · 1 gagal` — dan bagian bernilai nol dibuang (kembali ke tab yang sepi tak boleh
+  disambut "0 selesai"). "Selesai" dihitung dari **feed** notifikasi, bukan dari kondisi yang
+  sedang menyala: `shipped` meluruh 45 dtk dan operator yang pergi 20 menit tak akan pernah
+  melihatnya. Snapshot **wajib** dicap saat hidden; mengambilnya saat visible berarti ia dicap
+  ulang tiap render dan diff-nya selalu kosong. Karena `api/events.ts` baru menyambung ulang saat
+  tab aktif, snapshot ditahan `RECAP_GRACE_MS` = 5 dtk sesudah kembali sampai frame pertama tiba.
+  Gelembung ini hidup 12 dtk, **tidak** `aria-hidden`, dan membawa satu tombol `Lihat` yang membuka
+  panel — satu-satunya hit area tambahan di jalur pet, transient, kelas yang sama dengan panel dan
+  bukan pelebaran badan pet (SPEC-763).
+- **Urgensi menurut umur.** `isUrgent` = `kind === "waiting"` ∧ `since !== null` ∧
+  `now − since ≥ PET_URGENT_MS` (10 menit). Efeknya dua: gelembung menyebut durasinya
+  (`SPEC-612 butuh jawabanmu — 12 menit`) dan durasi animasi baris `waiting` dibagi
+  `PET_URGENT_RATE` = 1,5 (fps 6 → 9), digerbangi **baris** supaya `wave`/`thanks` yang menumpang
+  tetap berirama normal. Onsetnya dilayani `recheckAt` yang sudah ada — pemakaian **keempat** field
+  itu — jadi pet berubah tepat pada menit ke-10 tanpa satu pun denyut. `since` diturunkan dari
+  `decisionAt` (ADR-0141): absen berarti tak diketahui, dan pet **tak pernah** mengeskalasi tanpa
+  stempel.
+- **Dielus.** Tiga klik dalam 2 dtk memutar baris `thanks` sekali (lewat `oneShot`, mekanisme
+  `wave`) plus tiga hati `♥` ber-`hn-pet-heart`. Klik ke-3 **tidak** menyentuh panel sama sekali —
+  itulah isi "tidak membuka/menutup panel berulang"; klik pertama & kedua tetap buka lalu tutup,
+  karena itu perilaku normal dua klik dan tak boleh diubah demi easter egg. Reduced-motion tak
+  memutar `thanks` maupun merender hati.
 
 **Penempatan & mount.** `HanomanPet` dipasang **sekali** di `App.tsx` sebagai saudara `{screen}`,
 bukan di dalam `Shell`: `<Shell>` ditulis ulang di tiap cabang `section`, jadi pet yang tinggal di
@@ -460,8 +507,10 @@ dan hit area kedua akan melanggar gerbang tap SPEC-763). Satu sumber kalimat, ta
 tersembunyi kembar. Panel yang sedang keluar
 inert agar kontrol tersembunyi tidak dapat menerima fokus. `prefers-reduced-motion: reduce` dibaca
 di JS (`window.matchMedia`, ikut mendengarkan perubahan; ketiadaannya berarti tidak reduce): saat
-aktif, `animation` dan `transition` menulis nilai eksak `none`, pet diam di rumah, dan `wave` tak
-pernah dipasang — motion mati total tanpa membuat status hilang.
+aktif, `animation` dan `transition` menulis nilai eksak `none`, pet diam di rumah, dan `wave`/
+`thanks` tak pernah dipasang — motion mati total tanpa membuat status hilang. Gelembung bicara
+tetap **tampil** di sana (ia informasi, bukan gerak) hanya tanpa `hn-pet-bubble-in`; hati tak
+dirender sama sekali.
 
 **Gerbang tap (SPEC-763, diperluas).** Jalur pet kini selebar viewport, jadi "tak menutupi kontrol"
 harus ditegakkan struktur, bukan koordinat: `pet-root` dan seluruh pembungkusnya

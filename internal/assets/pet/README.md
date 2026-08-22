@@ -1,11 +1,14 @@
 # Pet Hanoman — atlas sprite PET-001
 
-Satu atlas WebP 8 kolom × 12 baris (sel 192×208, karakter berdiri 168 px) + `pet.json`. Frame dibuat
+Satu atlas WebP 8 kolom × 13 baris (sel 192×208, karakter berdiri 168 px) + `pet.json`. Frame dibuat
 Codex (GPT Image) dari `prompts/`, dipisah dan diregistrasi `internal/scripts/pet/`, dikomit sebagai
 turunan (runner CI tak punya Codex). Spec: `docs/superpowers/specs/2026-08-22-pet-hidup-atlas-sprite-design.md`;
 ADR-0140. Spec B `docs/superpowers/specs/2026-08-22-spec-897-pet-jujur-lengkap-design.md` (SPEC-897,
-tanpa ADR baru) menambahkan baris `deciding` dan `sleep` di **ekor** array — indeks baris lama tak
-bergeser, jadi diff atlasnya minimal.
+tanpa ADR baru) menambahkan baris `deciding` dan `sleep`; spec C
+`docs/superpowers/specs/2026-08-22-spec-898-pet-bicara-design.md` (SPEC-898, ADR-0141) menambahkan
+`thanks`. Ketiganya di **ekor** array — indeks baris lama tak bergeser, jadi diff atlasnya minimal.
+`thanks` BUKAN pose: ia baris reaksi sekali-putar (`then: idle`, seperti `wave`) yang hanya dipilih
+saat pet dielus, jadi ia tak masuk `POSE_ROW`.
 
 ## Isi
 
@@ -40,9 +43,14 @@ pra-pin ≤ 0,15 (`stand`) / 0,30 (`walk`/`jump`). Bila gagal, ulangi `gen.py` d
 - Latar magenta + despill memotong merah (emas → olive) → latar hijau; key di pipeline, bukan oleh Codex.
 - Karakter 192 px menumpahkan ekor ke sel tetangga → karakter berdiri 168 px (`character.h`).
 - 12 baris pada `quality=82` = **975 484 B**, muat di plafon `ATLAS_BUDGET` 1 MB dengan sisa 24,5 KB
-  (2026-08-22, SPEC-897). Baris ke-13 **tidak** akan muat pada quality itu: turunkan `quality` di
-  `atlas.py` dan catat angkanya di sini. Jangan menaikkan plafon — satu `<img>` yang di-decode di
-  setiap halaman adalah anggaran, bukan preferensi.
+  (2026-08-22, SPEC-897). Ramalan "baris ke-13 tak akan muat" terbukti: **13 baris pada `quality=82`
+  = 1 062 524 B**. Diukur ulang atas atlas 13 baris yang sama (2026-08-22, SPEC-898): `q78` =
+  993 888 B (sisa **6 112 B**), `q76` = **952 452 B** (sisa 47 548 B), `q74` = 934 784 B. Dipilih
+  **`q76`**, bukan q78 yang sebenarnya muat: sisa 6 KB berarti satu regenerasi baris rutin —
+  operasi yang README ini sendiri dokumentasikan — akan menembus plafon dan menggagalkan
+  `atlas.py`. Delta visual 76 vs 78 pada seni datar berkontur tegas dapat diabaikan. Jangan
+  menaikkan plafon — satu `<img>` yang di-decode di setiap halaman adalah anggaran, bukan
+  preferensi.
 - Ambang residu pra-pin `stand` (0,15) diturunkan dari baris **berdiri**; untuk baris **duduk**
   (`sleep`) heuristik "kaki = run kolom paling kanan di 8 % baris terbawah" memilih pangkuan/sarung
   yang memang ikut bernapas, jadi angkanya tak sebanding. Ukur ulang, jangan asumsikan.
@@ -54,6 +62,17 @@ mata, jamang, kain, ekor besar; tak ada mirror; gerak sesuai naskah. Gerbang num
 menangkap semuanya: `sleep` lolos `qa.py` pada percobaan pertama (residu 0,084) sambil memunculkan
 ornamen ekor KEDUA yang berkedip di sebagian frame — cacat yang hanya terlihat mata. Yang harus
 dibedakan secara sadar: `deciding` menengadah dengan ekor melengkung seperti tanda tanya (bukan
-condong memindai ke kanan seperti `review`), dan `sleep` duduk dengan mata terpejam (bukan berdiri
-lesu seperti `blocked`). Band "pet" 80–128 px adalah
-pengecualian resmi atas "no chibi inflation" (`internal/docs/brand/illustration/03-mascot-system.md`).
+condong memindai ke kanan seperti `review`), `sleep` duduk dengan mata terpejam (bukan berdiri
+lesu seperti `blocked`), dan `thanks` menyatukan **kedua** telapak di depan dada tanpa pernah
+mengangkat tangan di atas bahu (bukan satu tangan setinggi kepala seperti `wave`). Band "pet"
+80–128 px adalah pengecualian resmi atas "no chibi inflation"
+(`internal/docs/brand/illustration/03-mascot-system.md`).
+
+`thanks` butuh **tiga** generasi dan tiap kegagalannya berbeda kelas — dicatat karena polanya akan
+terulang: percobaan 1 lolos `qa.py` (residu maks 0,144) tetapi memutar badan KELUAR dari profil di
+frame 6–8 (dua mata terlihat) dan frame 8-nya bukan salinan frame 1, jadi baris sekali-putarnya tak
+menyambung ke `idle` — dua cacat yang hanya terlihat mata. Percobaan 2 memperbaiki keduanya lalu
+gagal gerbang numerik: karakter berubah ukuran & posisi antar-frame (tumpah 123 dan 305 px ke sel
+tetangga, residu 0,259/0,296). Pelajarannya: koreksi komposisi yang diminta lewat `--note` membuat
+model MELUPAKAN registrasi yang sebelumnya sudah benar, jadi `--note` percobaan berikutnya harus
+mengulang **seluruh** batasan yang sudah dipenuhi, bukan hanya yang baru gagal.

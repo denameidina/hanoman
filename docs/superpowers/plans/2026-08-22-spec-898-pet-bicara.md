@@ -1511,7 +1511,7 @@ git commit -m "feat(pet): dielus tiga klik memutar thanks + hati"
 - Consumes: angka nyata quality + byte atlas dari Task 9 Step 5.
 - Produces: —
 
-- [ ] **Step 1: Tulis ADR-0141**
+- [x] **Step 1: Tulis ADR-0141**
 
 Buat `internal/docs/adr/0141-onset-menunggu-di-marker-keputusan.md`, mengikuti bentuk ADR-0140
 (judul, `Tanggal · Status · Sumber`, Konteks, Keputusan bernomor, Konsekuensi, Alternatif ditolak).
@@ -1533,7 +1533,7 @@ Isi yang wajib ada:
   restart & saat dashboard tutup), `createdAt` notifikasi `decision` (benar, tapi `pty.ts` sengaja
   nol dependensi DB dan grup siar `sessions` di-recompute tiap detik).
 
-- [ ] **Step 2: Tautkan ADR di index**
+- [x] **Step 2: Tautkan ADR di index**
 
 Di `internal/docs/adr/README.md`, tambahkan baris paling atas daftar:
 
@@ -1541,7 +1541,7 @@ Di `internal/docs/adr/README.md`, tambahkan baris paling atas daftar:
 - [0141 — Onset "menunggu" hidup di isi marker keputusan](0141-onset-menunggu-di-marker-keputusan.md) — *mengamandemen SPEC-184 pada isi marker; menegakkan 0039/0024*
 ```
 
-- [ ] **Step 3: Perbarui `frontend-implementation.md`**
+- [x] **Step 3: Perbarui `frontend-implementation.md`**
 
 Di seksi "Pet Hanoman", perbarui judul seksi menjadi menyebut `Pet hidup C SPEC-898`, tambahkan
 `decisionAt` sebagai baris tabel sumber, dan tambahkan paragraf yang menjelaskan: himpunan tertutup
@@ -1549,13 +1549,13 @@ kabar yang bergelembung, gelembung pose `aria-hidden` vs gelembung rekap ber-tom
 saat hidden, ambang `PET_AWAY_MS`/`PET_URGENT_MS`, fps `waiting` yang naik, elus tiga klik, dan
 atlas 13 baris.
 
-- [ ] **Step 4: Perbarui `internal/assets/pet/README.md`**
+- [x] **Step 4: Perbarui `internal/assets/pet/README.md`**
 
 Ubah "12 baris" → "13 baris"; tambahkan baris `thanks` pada penjelasan; ganti catatan anggaran
 dengan angka nyata dari Task 9 (quality final, byte final, sisa terhadap 1 MB); tambahkan ke seksi
 review manusia bahwa `thanks` harus dibedakan dari `wave` (kedua tangan, tak pernah di atas bahu).
 
-- [ ] **Step 5: Cek index Source of Truth**
+- [x] **Step 5: Cek index Source of Truth**
 
 Run: `node dist/cli.js docs index --check 2>/dev/null || pnpm --filter ./runner exec tsx src/cli.ts docs index --check`
 Jika CLI tak tersedia di worktree, cukup pastikan `internal/docs/README.md` memuat tautan ADR-0141
