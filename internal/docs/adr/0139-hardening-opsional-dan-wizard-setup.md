@@ -1,4 +1,4 @@
-# ADR-0138 — Hardening jadi opt-in, dan setup awal dipandu wizard di browser
+# ADR-0139 — Hardening jadi opt-in, dan setup awal dipandu wizard di browser
 
 - Status: Accepted
 - Tanggal: 2026-08-22

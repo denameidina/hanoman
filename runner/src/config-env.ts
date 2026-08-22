@@ -1,4 +1,4 @@
-// SPEC-884 · ADR-0138 · jawaban wizard setup awal hidup di berkas ini, BUKAN di `RuntimeConfig`.
+// SPEC-884 · ADR-0139 · jawaban wizard setup awal hidup di berkas ini, BUKAN di `RuntimeConfig`.
 // Resolver config server presedensinya DB → env (`server/src/config.ts:31`), jadi lewat sana siapa
 // pun yang bisa menulis config bisa MEMATIKAN hardening — jebakan yang sama yang sudah dihindari
 // ADR-0088 untuk `HANOMAN_SUPERVISOR`. Berkas ini sebaliknya digabung PALING LEMAH saat CLI

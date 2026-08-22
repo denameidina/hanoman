@@ -95,7 +95,7 @@ export function leadProcess(
 ): LeadProcess {
   const file = binFor(o.agent);
   const directArgs = leadArgv({ agent: o.agent, model: o.model, effort: o.effort, prompt });
-  // SPEC-884 · ADR-0138 · pemicunya hardening, bukan NODE_ENV (cermin `sandboxArgvFromEnv`).
+  // SPEC-884 · ADR-0139 · pemicunya hardening, bukan NODE_ENV (cermin `sandboxArgvFromEnv`).
   const mode = env.HANOMAN_SESSION_SANDBOX ?? (resolveHardening(env) ? "required" : "off");
   if (mode === "off") return { file, args: directArgs, cwd: o.cwd, cleanup: () => {} };
 

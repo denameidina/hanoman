@@ -17,7 +17,7 @@ const ok = {
 };
 
 describe("doctorReport", () => {
-  // SPEC-884 · ADR-0138 · sandbox hanya prasyarat bagi instance yang MINTA dikeraskan. Menandainya
+  // SPEC-884 · ADR-0139 · sandbox hanya prasyarat bagi instance yang MINTA dikeraskan. Menandainya
   // ✗ fatal di laptop membuat `doctor` berkata hanoman tak bisa menjalankan sesi — padahal bisa.
   it("sandbox non-fatal saat hardening mati (SPEC-884)", () => {
     const r = doctorReport({ ...ok, podman: null, sandboxRequired: false, sandboxReady: false });

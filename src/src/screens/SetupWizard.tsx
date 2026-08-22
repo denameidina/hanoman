@@ -1,4 +1,4 @@
-/* SetupWizard — SPEC-884 · ADR-0138 · setup awal di browser.
+/* SetupWizard — SPEC-884 · ADR-0139 · setup awal di browser.
 
    DUA langkah, bukan tiga: akun pertama tetap lahir di `AuthScreen`, supaya hanya ada SATU jalur
    yang membuat akun (`POST /api/auth/setup` beserta aturan token, limiter, dan 409-nya). Urutan
@@ -114,7 +114,7 @@ export function SetupWizard({ status, onDone }: { status: SetupStatus; onDone: (
 }
 
 /**
- * SPEC-884 · ADR-0138 · kalau perlindungan sebuah instance publik turun jadi satu password, keadaan
+ * SPEC-884 · ADR-0139 · kalau perlindungan sebuah instance publik turun jadi satu password, keadaan
  * itu tidak boleh tak terlihat. Tak bisa ditutup permanen — ia padam saat hardening menyala.
  */
 export function UnhardenedBanner({ status }: { status: SetupStatus | null }) {

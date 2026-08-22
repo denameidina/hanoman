@@ -5,7 +5,7 @@ Status: normatif sejak SPEC-761 · keputusan arsitektur:
 [audit SPEC-761](../research/audit-spec-761-hardening-public-deployment.md) · rujukan primer:
 [primary security sources](../research/spec-761-primary-security-sources.md).
 
-> **Amandemen SPEC-884/ADR-0138 — hardening opt-in.** Seluruh model di bawah menggambarkan
+> **Amandemen SPEC-884/ADR-0139 — hardening opt-in.** Seluruh model di bawah menggambarkan
 > instance dengan **hardening menyala**. Sejak SPEC-884 hardening bersifat opt-in dan **default
 > mati**, jadi instance yang tak menyalakannya punya model ancaman yang berbeda dan lebih kecil
 > perlindungannya:

@@ -167,7 +167,7 @@ export const MAX_CONFIG_RESTARTS = 5;
 export function planSupervisorStep(
   code: number, restartsUsed: number, configRestartsUsed = 0,
 ): SupervisorStep {
-  // SPEC-884 · ADR-0138 · "config berubah, jalankan ulang" — TANPA npm, TANPA prisma generate.
+  // SPEC-884 · ADR-0139 · "config berubah, jalankan ulang" — TANPA npm, TANPA prisma generate.
   if (code === CONFIG_RESTART_EXIT)
     return configRestartsUsed >= MAX_CONFIG_RESTARTS ? { action: "exit", code } : { action: "restart" };
   if (code !== UPDATE_RESTART_EXIT) return { action: "exit", code };
@@ -210,7 +210,7 @@ export function installLatest(): InstallOutcome {
  * memperingatkan kebocoran.
  */
 /**
- * SPEC-884 · ADR-0138 · presedensi env proses anak, dibuat MURNI supaya urutannya bisa diuji
+ * SPEC-884 · ADR-0139 · presedensi env proses anak, dibuat MURNI supaya urutannya bisa diuji
  * alih-alih diandalkan dari pembacaan. `config.env` sengaja PALING LEMAH: `EnvironmentFile`
  * systemd dan `export` di shell mengalahkannya, sehingga wizard di dashboard secara struktural tak
  * bisa mematikan hardening yang dipasang operator. `serverEnv()` tetap paling kuat.

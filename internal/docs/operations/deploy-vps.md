@@ -20,7 +20,7 @@ operator ─ SSO/MFA/VPN ─ admin.example ┘                         │
                                                                       └─ internal net → egress proxy allowlist
 ```
 
-> **SPEC-884 / ADR-0138 — hardening kini opt-in.** Seluruh syarat di bawah (podman rootless, split
+> **SPEC-884 / ADR-0139 — hardening kini opt-in.** Seluruh syarat di bawah (podman rootless, split
 > origin, trusted proxy, non-root, setup token, scanner upload) ditegakkan **hanya bila
 > `HANOMAN_HARDENING=1`**, atau bila salah satu env ADR-0117 lama sudah terisi
 > (`HANOMAN_SESSION_SANDBOX=podman`, `HANOMAN_PUBLIC_ORIGINS`, `HANOMAN_TRUST_PROXY`) — deployment

@@ -25,7 +25,7 @@ describe("production session sandbox", () => {
       { uid: 1000, host: "127.0.0.1" })).toThrow(/proxy/);
   });
 
-  // SPEC-884 · ADR-0138 · hardening jadi opt-in. Semua assertion di atas tetap berlaku apa adanya
+  // SPEC-884 · ADR-0139 · hardening jadi opt-in. Semua assertion di atas tetap berlaku apa adanya
   // karena env-nya memuat penanda ADR-0117 (sandbox/origin/proxy) yang dibaca `resolveHardening`
   // sebagai "menyala". Yang baru: instalasi polos tak lagi menabrak satu pun gerbang ini.
   it("tanpa hardening, instalasi npm polos boot — termasuk sebagai root (SPEC-884)", () => {

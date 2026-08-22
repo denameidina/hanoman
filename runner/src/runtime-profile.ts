@@ -1,4 +1,4 @@
-// SPEC-884 · ADR-0138 · dua nilai eksplisit menggantikan `NODE_ENV` sebagai penentu hardening.
+// SPEC-884 · ADR-0139 · dua nilai eksplisit menggantikan `NODE_ENV` sebagai penentu hardening.
 //
 // Sebelum ini `NODE_ENV=production` merangkap TIGA peran: runtime terpaket (`web-dir.ts`), cookie
 // `Secure` (`auth.ts`), dan seluruh gerbang ADR-0117. Akibatnya `npm i -g hanoman` polos — yang

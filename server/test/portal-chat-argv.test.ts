@@ -57,7 +57,7 @@ describe("argv chat portal (SPEC-854 · ADR-0129 huruf E)", () => {
     expect(p.file).toBe("claude");
   });
 
-  // SPEC-884 · ADR-0138 · fail-closed dipertahankan, tetapi terhadap HARDENING — bukan terhadap
+  // SPEC-884 · ADR-0139 · fail-closed dipertahankan, tetapi terhadap HARDENING — bukan terhadap
   // "terpaket". Sebelum ini `NODE_ENV=production` sendirian sudah cukup untuk menolak, dan itu
   // berarti chat portal mati di setiap instalasi `npm i -g hanoman` yang tak pernah punya podman.
   it("terpaket tanpa hardening: proses langsung di workspace (SPEC-884)", () => {

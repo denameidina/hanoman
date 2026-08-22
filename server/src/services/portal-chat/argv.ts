@@ -71,7 +71,7 @@ export function portalChatProcess(
   const args = portalChatArgv(o);
   const mode = env.HANOMAN_SESSION_SANDBOX ?? (resolveHardening(env) ? "required" : "off");
   if (mode === "off") {
-    // SPEC-884 · ADR-0138 · fail-closed dipertahankan, tetapi terhadap hardening — bukan terhadap
+    // SPEC-884 · ADR-0139 · fail-closed dipertahankan, tetapi terhadap hardening — bukan terhadap
     // "terpaket". Instalasi npm biasa tak pernah punya podman, dan chat portal tak boleh mati
     // hanya karena itu; penjaganya di sana tetap workspace + tool set di atas.
     if (resolveHardening(env))

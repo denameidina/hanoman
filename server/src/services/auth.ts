@@ -79,7 +79,7 @@ export function noteLoginFail(ip: string): void {
 export function clearLoginFails(ip: string): void { fails.clear(ip); loginStates.delete(ip); }
 
 /**
- * SPEC-884 · ADR-0138 · `Secure` diturunkan dari SKEMA REQUEST, bukan dari `NODE_ENV`.
+ * SPEC-884 · ADR-0139 · `Secure` diturunkan dari SKEMA REQUEST, bukan dari `NODE_ENV`.
  *
  * `x-forwarded-proto` sengaja dibaca LANGSUNG dari header, bukan lewat `req.protocol`: Fastify
  * hanya memercayai header itu bila `trustProxy` terisi, dan `trustProxyFromEnv` mengembalikan

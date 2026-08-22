@@ -12,7 +12,7 @@ import { requestConfigRestart } from "../src/services/restart";
 // tetap terlihat hijau.
 vi.mock("../src/services/restart", () => ({ requestConfigRestart: vi.fn() }));
 
-// SPEC-884 · ADR-0138 · HANOMAN_HOME WAJIB menunjuk tmpdir di setiap test ini: `applySetup`
+// SPEC-884 · ADR-0139 · HANOMAN_HOME WAJIB menunjuk tmpdir di setiap test ini: `applySetup`
 // menulis berkas nyata, dan tanpa itu ia mendarat di ~/.hanoman milik instance sungguhan
 // (pelajaran SPEC-880).
 const home = () => mkdtempSync(join(tmpdir(), "hanoman-setup-"));

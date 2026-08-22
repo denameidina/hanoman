@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { scannerFromEnv } from "../src/services/upload-pipeline";
 
-// SPEC-884 · ADR-0138 · gerbang scanner berpindah pemicu dari NODE_ENV ke hardening. Instalasi
+// SPEC-884 · ADR-0139 · gerbang scanner berpindah pemicu dari NODE_ENV ke hardening. Instalasi
 // biasa tak punya scanner virus, dan menolak setiap lampiran karena itu bukan perilaku yang bisa
 // dipakai siapa pun — tapi ketiadaannya juga tak boleh senyap.
 const saved = { ...process.env };

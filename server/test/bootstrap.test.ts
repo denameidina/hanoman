@@ -71,7 +71,7 @@ describe("one-time bootstrap token", () => {
     await app.close();
   });
 
-  // SPEC-884 · ADR-0138 · di instalasi biasa, token justru menutup pintu terakhir: orang yang baru
+  // SPEC-884 · ADR-0139 · di instalasi biasa, token justru menutup pintu terakhir: orang yang baru
   // `npm i -g hanoman` harus membaca berkas di HANOMAN_HOME lewat shell sebelum bisa memakai
   // dashboard-nya sendiri.
   it("tanpa hardening, akun pertama dibuat tanpa setup token (SPEC-884)", async () => {

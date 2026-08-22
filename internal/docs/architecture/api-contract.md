@@ -47,7 +47,7 @@ POST /auth/setup          { email, password, setupToken? } # control host; 403 p
 #   HANYA saat 0 user; tepat satu create atomik menang; set cookie; token one-use 15 mnt; 409 sesudah tertutup
 #   SPEC-884 · `setupToken` WAJIB hanya saat hardening menyala; /auth/status membawa setupTokenRequired
 
-# SPEC-884 · ADR-0138 · wizard setup awal. Publik BERSYARAT: hanya selama 0 user; sesudah itu cookie.
+# SPEC-884 · ADR-0139 · wizard setup awal. Publik BERSYARAT: hanya selama 0 user; sesudah itu cookie.
 GET  /setup/status        -> { needed, deployment: "local"|"public", hardening, hardeningLocked,
 #                              supervised, setupTokenRequired, prerequisites: [{id,label,ok,detail}] }
 POST /setup               { deployment, hardening, acknowledgedUnhardened? }

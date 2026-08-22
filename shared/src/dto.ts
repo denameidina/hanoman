@@ -492,7 +492,7 @@ export const zLogin = z.object({ email: z.string().email(), password: z.string()
 export const zSignup = z.object({ email: z.string().email(), password: z.string().min(8) });
 export const zSetup = zSignup.extend({ setupToken: z.string().min(1) });
 
-// SPEC-884 · ADR-0138 · wizard setup awal.
+// SPEC-884 · ADR-0139 · wizard setup awal.
 export type PrerequisiteId =
   | "podman" | "network" | "egress-proxy" | "credential-dir"
   | "control-origin" | "trust-proxy" | "upload-scanner";
@@ -627,7 +627,7 @@ export type UpdateStatus = {
 // non-zero, jadi `Restart=on-failure` di unit systemd yang didokumentasikan tetap masuk akal.
 export const UPDATE_RESTART_EXIT = 75;
 
-// SPEC-884 · ADR-0138 · "tulis config lalu jalankan ulang", TANPA memasang apa pun. Memakai ulang
+// SPEC-884 · ADR-0139 · "tulis config lalu jalankan ulang", TANPA memasang apa pun. Memakai ulang
 // UPDATE_RESTART_EXIT akan menjalankan `npm i -g hanoman@latest` setiap kali seseorang
 // menyelesaikan wizard — akibat yang sama sekali tak diminta.
 export const CONFIG_RESTART_EXIT = 76;

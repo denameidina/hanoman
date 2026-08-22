@@ -65,7 +65,7 @@ async function defaultUsage(projectId: string): Promise<{ project: number; globa
 export function scannerFromEnv(path: string): Promise<void> {
   const command = process.env.HANOMAN_UPLOAD_SCANNER?.trim();
   if (!command) {
-    // SPEC-884 · ADR-0138 · fail-closed dipertahankan untuk instance yang minta dikeraskan. Di
+    // SPEC-884 · ADR-0139 · fail-closed dipertahankan untuk instance yang minta dikeraskan. Di
     // instalasi biasa scanner virus bukan prasyarat yang masuk akal, tapi ketiadaannya tak boleh
     // senyap — lampiran diterima tanpa dipindai, dan itu harus terbaca di log.
     if (resolveHardening(process.env))

@@ -464,7 +464,7 @@ export const api = {
   vpsConsole: (id: string) => j<{ id: string }>(paths.vpsConsole(id), { method: "POST" }),
   // SPEC-169 · auth. Cookie sesi ikut otomatis (same-origin). 401 dari mana pun → App balik ke Login.
   authStatus: () => j<AuthStatus>(paths.authStatus),
-  // SPEC-884 · ADR-0138 · wizard setup awal
+  // SPEC-884 · ADR-0139 · wizard setup awal
   setupStatus: () => j<SetupStatus>(paths.setupStatus),
   applySetup: (b: { deployment: "local" | "public"; hardening: boolean; acknowledgedUnhardened?: boolean }) =>
     j<SetupApplyResult>(paths.setupApply, { method: "POST", ...body(b) }),

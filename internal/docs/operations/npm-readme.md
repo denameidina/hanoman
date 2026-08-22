@@ -15,7 +15,7 @@ Buka URL-nya. Pada pemakaian pertama hanoman menyajikan **wizard setup dua langk
 (device sendiri / diakses orang lain) lalu keamanan — kemudian meminta akun pertama. Datanya di
 `~/.hanoman/` (SQLite — **tanpa Docker, tanpa Postgres, tanpa Redis**).
 
-**Hardening bersifat opsional dan default MATI** (SPEC-884/ADR-0138): tanpa `HANOMAN_HARDENING=1`,
+**Hardening bersifat opsional dan default MATI** (SPEC-884/ADR-0139): tanpa `HANOMAN_HARDENING=1`,
 hanoman jalan di device mana pun tanpa podman, tanpa reverse proxy, tanpa setup token — termasuk
 sebagai root. Nyalakan hardening dari wizard (atau Settings → Setup awal) begitu prasyaratnya hijau.
 

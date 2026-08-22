@@ -15,7 +15,7 @@ export function AuthScreen({ needsSetup, setupTokenRequired = false, onDone }: {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState("");
 
-  // SPEC-884 · ADR-0138 · sebelum ini form mengunci tombol setiap kali `needsSetup` benar, tanpa
+  // SPEC-884 · ADR-0139 · sebelum ini form mengunci tombol setiap kali `needsSetup` benar, tanpa
   // pernah membaca `setupTokenRequired` yang sudah dikirim /auth/status — jadi walau server tak
   // meminta token, akun pertama TAK BISA dibuat dari UI. Server tetap otoritasnya; ini cuma cermin.
   const needsToken = needsSetup && setupTokenRequired;

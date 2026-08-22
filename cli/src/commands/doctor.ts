@@ -120,7 +120,7 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
       const s = scanAgentSkills(a, ctx.env);
       return methodStatus(method, a, { skills: s.skills.map((k) => k.id), packages: s.packages });
     });
-  // SPEC-884 · ADR-0138 · probe dan penilaiannya hidup di @hanoman/runner supaya `doctor` dan
+  // SPEC-884 · ADR-0139 · probe dan penilaiannya hidup di @hanoman/runner supaya `doctor` dan
   // wizard setup tak pernah menjawab berbeda tentang mesin yang sama. Sandbox hanya prasyarat bagi
   // instance yang MINTA dikeraskan — menandainya ✗ fatal di laptop membuat doctor berkata hanoman
   // tak bisa menjalankan sesi, padahal bisa.

@@ -12,7 +12,7 @@ import { ClientAccessPanel } from "./ClientAccessPanel";   // SPEC-617 · ADR-01
 import { WebhooksPanel } from "./WebhooksPanel";
 import { WebhookDocs } from "./WebhookDocs";
 import { McpPanel } from "./McpPanel";   // SPEC-482 · ADR-0099 · pemasangan MCP siap salin
-import { SetupWizard } from "./SetupWizard";   // SPEC-884 · ADR-0138 · setup awal, bisa diulang
+import { SetupWizard } from "./SetupWizard";   // SPEC-884 · ADR-0139 · setup awal, bisa diulang
 import { AgentDocCard } from "./AgentDocCard";   // SPEC-489 · halaman dokumentasi AI Agent
 import { usePersistedState, isStr } from "../ui-state";
 
@@ -528,7 +528,7 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
 // Grup navigasi settings — sidebar kiri. Akun & Users tak bergantung GET /settings; umum/model/
 // sesi bergantung dan menampilkan loading/error-nya sendiri.
 /**
- * SPEC-884 · ADR-0138 · setup awal bisa ditinjau & diubah kapan saja. Jalur ini TAK PERNAH
+ * SPEC-884 · ADR-0139 · setup awal bisa ditinjau & diubah kapan saja. Jalur ini TAK PERNAH
  * menyentuh akun — hanya peruntukan dan hardening; akun tetap lahir sekali di AuthScreen.
  */
 function SetupPanel() {
@@ -564,7 +564,7 @@ const S_SECTIONS = [
   { key: "custom-agent", label: "Custom agent", icon: "bot" },   // SPEC-450 · ADR-0094 · katalog agen global
   { key: "aktivitas", label: "Aktivitas", icon: "activity" },    // SPEC-213 · activity log
   { key: "konfigurasi", label: "Konfigurasi", icon: "sliders" }, // SPEC-215 · env runtime
-  { key: "setup", label: "Setup awal", icon: "shield" },         // SPEC-884 · ADR-0138 · profil & hardening
+  { key: "setup", label: "Setup awal", icon: "shield" },         // SPEC-884 · ADR-0139 · profil & hardening
   { key: "telegram", label: "Telegram", icon: "send" },          // SPEC-476 · operator gateway
   { key: "webhook", label: "Webhook", icon: "webhook" },         // SPEC-481 · ADR-0100 · webhook keluar
   { key: "umum", label: "Umum", icon: "sliders-horizontal" },

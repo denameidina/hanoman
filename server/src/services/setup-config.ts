@@ -1,11 +1,11 @@
-// SPEC-884 · ADR-0138 · menulis jawaban wizard ke $HANOMAN_HOME/config.env lewat allowlist.
+// SPEC-884 · ADR-0139 · menulis jawaban wizard ke $HANOMAN_HOME/config.env lewat allowlist.
 import { readConfigEnv, resolveHardening, writeConfigEnv } from "@hanoman/runner";
 
 type Env = Record<string, string | undefined>;
 
 /**
  * Berkas ini BUKAN pintu belakang untuk menyuntik env sembarang ke proses sesi: kunci di luar
- * daftar ini ditolak. Setiap penambahan wajib punya alasan di ADR-0138.
+ * daftar ini ditolak. Setiap penambahan wajib punya alasan di ADR-0139.
  */
 export const SETUP_ALLOWED_KEYS = [
   "HANOMAN_DEPLOYMENT", "HANOMAN_HARDENING", "HANOMAN_SETUP_DONE", "HANOMAN_SESSION_SANDBOX",

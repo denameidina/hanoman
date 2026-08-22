@@ -74,7 +74,7 @@ const PUBLIC = new Set([
   "GET /api/agent-integration.md",
 ]);
 
-// SPEC-884 · ADR-0138 · publik BERSYARAT: hanya selama `prisma.user.count() === 0`. Sengaja tak
+// SPEC-884 · ADR-0139 · publik BERSYARAT: hanya selama `prisma.user.count() === 0`. Sengaja tak
 // digabung ke PUBLIC di atas — daftar itu berarti "publik tanpa syarat", dan mencampurnya akan
 // membuat permukaan setup terbuka selamanya.
 const SETUP_PUBLIC = new Set([
@@ -150,7 +150,7 @@ export function buildApp(
         if (user) req.user = user;
         const path = req.url.split("?")[0] ?? req.url;
         if (PUBLIC.has(`${req.method} ${path}`)) return;
-        // SPEC-884 · ADR-0138 · wizard setup awal harus bisa dijangkau SEBELUM ada akun — ia yang
+        // SPEC-884 · ADR-0139 · wizard setup awal harus bisa dijangkau SEBELUM ada akun — ia yang
         // mendahului kelahiran akun pertama. Begitu satu akun ada ia jatuh ke gate cookie biasa;
         // syaratnya sama persis dengan `needsSetup`, jangan menambah gerbang kedua yang bisa
         // melenceng darinya. COUNT hanya dijalankan untuk dua path ini, bukan tiap request.
@@ -203,7 +203,7 @@ export function buildApp(
       setActor(actorFromRequest({ user: req.user ?? null, agent: req.agent ?? null }));
     });
     api.addHook("onResponse", auditTelegramGatewayResponse);
-    // SPEC-884 · ADR-0138 · bukti setup token menjaga instance yang minta dikeraskan. Di instalasi
+    // SPEC-884 · ADR-0139 · bukti setup token menjaga instance yang minta dikeraskan. Di instalasi
     // biasa ia justru menutup pintu terakhir: orang yang baru `npm i -g hanoman` harus membaca
     // berkas di HANOMAN_HOME lewat shell sebelum bisa memakai dashboard-nya sendiri.
     await api.register(authRoutes, { bootstrapRequired: resolveHardening(env), home: resolveHome(env) });

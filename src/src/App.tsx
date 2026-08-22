@@ -718,7 +718,7 @@ export default function App() {
   const [auth, setAuth] = React.useState<AuthStatus | null>(null);
   const onLoggedOut = React.useCallback(() => setAuth({ needsSetup: false, user: null }), []);
   React.useEffect(() => { api.authStatus().then(setAuth).catch(() => setAuth({ needsSetup: false, user: null })); }, []);
-  // SPEC-884 · ADR-0138 · wizard setup awal berdiri DI DEPAN AuthScreen: pilihannya menentukan
+  // SPEC-884 · ADR-0139 · wizard setup awal berdiri DI DEPAN AuthScreen: pilihannya menentukan
   // apakah akun pertama nanti diminta setup token. Status yang sama juga menyalakan penanda
   // permanen sesudah login, jadi ia dimuat pada kedua keadaan.
   const [setupStatus, setSetupStatus] = React.useState<SetupStatus | null>(null);
@@ -1476,7 +1476,7 @@ export default function App() {
   return (
     <AuthProvider user={me} onLoggedOut={onLoggedOut}>
       <NotificationsProvider showToast={showToast} onOpen={openNotification}>
-        {/* SPEC-884 · ADR-0138 · instance publik yang perlindungannya turun jadi satu password
+        {/* SPEC-884 · ADR-0139 · instance publik yang perlindungannya turun jadi satu password
             tidak boleh terlihat sama dengan yang dikeraskan. Di luar ClientPortal: klien tak
             punya kuasa mengubahnya, jadi baginya ini cuma kecemasan tanpa tombol. */}
         <UnhardenedBanner status={setupStatus} />

@@ -1,10 +1,10 @@
-// SPEC-884 · ADR-0138 · wizard setup awal. Permukaan tak ber-auth SELAMA belum ada satu pun user —
+// SPEC-884 · ADR-0139 · wizard setup awal. Permukaan tak ber-auth SELAMA belum ada satu pun user —
 // gerbangnya di `app.ts` dan syaratnya sama persis dengan `needsSetup` di /auth/status.
 //
 // Konsekuensi yang diterima sadar: instance yang sudah terjangkau internet sebelum wizard selesai
 // bisa diklaim orang pertama yang membukanya. Urutan amannya: selesaikan wizard di localhost, baru
 // sambungkan domain. Ini bukan regresi — sebelum SPEC-884 pintu itu ditutup setup token; menjadikan
-// token opsional membukanya, dan itu harga yang disebut eksplisit di ADR-0138.
+// token opsional membukanya, dan itu harga yang disebut eksplisit di ADR-0139.
 import type { FastifyInstance } from "fastify";
 import {
   allReady, collectProbeFacts, prerequisites, resolveDeployment, resolveHardening,

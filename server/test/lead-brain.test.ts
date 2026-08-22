@@ -83,7 +83,7 @@ describe("think · stdin ditutup, env sampai ke proses", () => {
 });
 
 describe("leadProcess · boundary agen one-shot", () => {
-  // SPEC-884 · ADR-0138 · lead berhenti menuntut sandbox hanya karena paketnya production.
+  // SPEC-884 · ADR-0139 · lead berhenti menuntut sandbox hanya karena paketnya production.
   it("terpaket tanpa hardening: lead one-shot jalan langsung (SPEC-884)", () => {
     const p = leadProcess("halo", {
       agent: "claude", model: "", effort: "", cwd: "/srv/repo", timeoutMs: 1_500,

@@ -29,7 +29,7 @@ sehingga ia menyajikan dashboard dari `web/` di dalam paket sekaligus API
 systemd — lihat [deploy-vps](deploy-vps.md).
 
 `/etc/hanoman-prod.env` wajib memuat seluruh boundary dari runbook deploy-vps, bukan hanya home/port.
-Sejak SPEC-884/ADR-0138 yang menegakkan boundary itu adalah **`HANOMAN_HARDENING=1`**, bukan lagi
+Sejak SPEC-884/ADR-0139 yang menegakkan boundary itu adalah **`HANOMAN_HARDENING=1`**, bukan lagi
 `NODE_ENV=production` — `NODE_ENV` kini hanya berarti "runtime terpaket" (sajikan dashboard dari dist).
 Env ADR-0117 lama tetap dibaca sebagai hardening menyala (`HANOMAN_SESSION_SANDBOX=podman`,
 `HANOMAN_PUBLIC_ORIGINS`, `HANOMAN_TRUST_PROXY`), jadi instance yang sudah berdiri tak berubah.

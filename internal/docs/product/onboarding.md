@@ -2,7 +2,7 @@
 
 Operator baru harus bisa memantau dalam < 10 menit.
 
-1. **Wizard setup awal** (SPEC-884/ADR-0138, hanya pada pemakaian pertama): peruntukan instance
+1. **Wizard setup awal** (SPEC-884/ADR-0139, hanya pada pemakaian pertama): peruntukan instance
    (device sendiri / diakses orang lain) lalu keamanan (hardening — **default mati**, dan tak bisa
    dinyalakan selama prasyaratnya masih merah). Bisa dibuka lagi kapan saja di **Settings → Setup
    awal**; jalur itu tak pernah menyentuh akun.

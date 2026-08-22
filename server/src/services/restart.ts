@@ -1,4 +1,4 @@
-// SPEC-884 · ADR-0138 · satu-satunya tempat server meminta dirinya dijalankan ulang.
+// SPEC-884 · ADR-0139 · satu-satunya tempat server meminta dirinya dijalankan ulang.
 //
 // Dipisah ke modul sendiri BUKAN demi kerapian: `process.exit` yang dipanggil langsung dari handler
 // route membuat setiap test yang menyentuh POST /api/setup menjadwalkan exit di dalam worker vitest

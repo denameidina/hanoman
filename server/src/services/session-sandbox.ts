@@ -3,7 +3,7 @@ import { resolveHardening } from "@hanoman/runner";
 type Env = Record<string, string | undefined>;
 
 export function assertRuntimeBoundary(env: Env, runtime: { uid: number | undefined; host: string }): void {
-  // SPEC-884 · ADR-0138 · satu-satunya perubahan pada gerbang ini: ia berhenti diturunkan dari
+  // SPEC-884 · ADR-0139 · satu-satunya perubahan pada gerbang ini: ia berhenti diturunkan dari
   // `NODE_ENV` dan mulai diturunkan dari hardening yang diminta eksplisit. Isinya di bawah TIDAK
   // disentuh — begitu hardening menyala, perilakunya identik dengan sebelum SPEC-884.
   if (!resolveHardening(env)) return;

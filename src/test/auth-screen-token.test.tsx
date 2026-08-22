@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AuthScreen } from "../src/screens/AuthScreen";
 import { api } from "../src/api/client";
 
-// SPEC-884 · ADR-0138 · sebelum spec ini form mengunci tombol setiap kali `needsSetup` benar, tanpa
+// SPEC-884 · ADR-0139 · sebelum spec ini form mengunci tombol setiap kali `needsSetup` benar, tanpa
 // pernah membaca `setupTokenRequired` yang SUDAH dikirim /auth/status — jadi walau server tak
 // meminta token, akun pertama tak bisa dibuat dari UI sama sekali.
 vi.mock("../src/api/client", () => ({

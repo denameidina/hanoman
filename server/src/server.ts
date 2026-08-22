@@ -56,7 +56,7 @@ const bootstrapReady = secureHanomanHome({
 }).then(() => prisma.user.count()).then(async (count) => {
   await secureHanomanHome({ home, files: [dbFilePath(process.env.DATABASE_URL!)] });
   if (count > 0) return;
-  // SPEC-884 · ADR-0138 · token hanya lahir bila memang akan diminta. Sebelum ini ia dibuat dan
+  // SPEC-884 · ADR-0139 · token hanya lahir bila memang akan diminta. Sebelum ini ia dibuat dan
   // diumumkan tanpa syarat, jadi instalasi tanpa hardening menyuruh operator mencari berkas yang
   // tak pernah ditanyakan siapa pun — dan berkas rahasia itu tetap ditulis ke home tanpa guna.
   if (!resolveHardening(process.env)) {

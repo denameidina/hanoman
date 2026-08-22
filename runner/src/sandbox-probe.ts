@@ -1,4 +1,4 @@
-// SPEC-884 · ADR-0138 · prasyarat hardening ADR-0117, dinilai di SATU tempat supaya
+// SPEC-884 · ADR-0139 · prasyarat hardening ADR-0117, dinilai di SATU tempat supaya
 // `hanoman doctor` dan wizard setup tak pernah menjawab berbeda tentang mesin yang sama.
 // Keputusannya murni (fakta → baris); IO-nya dipisah di `collectProbeFacts`.
 import { execFileSync } from "node:child_process";
