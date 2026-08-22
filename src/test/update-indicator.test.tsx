@@ -22,8 +22,23 @@ const avail = (o: Partial<UpdateStatus> = {}) =>
 beforeEach(() => applySpy.mockReset());
 
 describe("UpdateBadge", () => {
-  it("tak render saat up-to-date", () => {
-    hook = mk({});
+  // SPEC-906 · up-to-date bukan lagi keadaan diam: pil netral memikul versi terpasang, karena
+  // sebelumnya tak ada satu pun tempat di UI yang menyebut versi yang sedang dipakai instance ini.
+  it("up-to-date dengan currentVersion → pil versi + popover ringkas (tanpa perintah/pasang)", () => {
+    hook = mk({ currentVersion: "0.1.56", latestVersion: "0.1.56", canApply: true });
+    render(<UpdateBadge />);
+    const btn = screen.getByTitle("Versi terpasang");
+    expect(btn.textContent).toContain("v0.1.56");
+    fireEvent.click(btn);
+    expect(screen.getByRole("dialog", { name: "Versi terpasang" })).toBeInTheDocument();
+    expect(screen.getByText(/terpasang 0\.1\.56 · tersedia 0\.1\.56/)).toBeTruthy();
+    expect(screen.getByText(/Registry npm/)).toBeTruthy();
+    expect(screen.queryByText("Pasang & mulai ulang")).toBeNull();
+    expect(screen.queryByTitle("Salin perintah")).toBeNull();
+  });
+
+  it("currentVersion kosong (dev/belum ter-stamp) tak memunculkan pil `v` telanjang", () => {
+    hook = mk({ currentVersion: "", latestVersion: null, registry: { status: "unavailable", checkedAt: null } });
     const { container } = render(<UpdateBadge />);
     expect(container.firstChild).toBeNull();
   });

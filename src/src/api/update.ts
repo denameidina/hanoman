@@ -53,6 +53,15 @@ export function updateBadgeLabelShort(u: UpdateStatus): string {
 export function updateVersionLine(u: UpdateStatus): string {
   return `terpasang ${u.currentVersion || "?"} · tersedia ${u.latestVersion ?? "?"}`;
 }
+// SPEC-906 · kaki popover keadaan up-to-date. Ia menjawab pertanyaan yang muncul justru saat tak ada
+// update: "sudah terbaru menurut siapa, dan sejak kapan?". `unavailable` BUKAN error — offline,
+// opt-out, dan paket yang belum terbit semuanya mendarat di sana, jadi "tersedia ?" pada baris versi
+// tak boleh dibaca sebagai "tak ada versi baru".
+export function updateRegistryLine(u: UpdateStatus): string {
+  if (u.registry.status !== "ok") return "Registry npm belum terbaca — versi tersedia tak bisa dipastikan.";
+  if (!u.registry.checkedAt) return "Registry npm terbaca.";
+  return `Registry npm diperiksa ${new Date(u.registry.checkedAt).toLocaleString("id-ID")}.`;
+}
 
 // ── SPEC-405 · ADR-0088 · memasang lalu menjalankan ulang dari dashboard ────────────────────────
 export type ApplyOutcome =

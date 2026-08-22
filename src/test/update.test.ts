@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  updateHeadline, updateBadgeLabel, updateVersionLine,
+  updateHeadline, updateBadgeLabel, updateVersionLine, updateRegistryLine,
   applyConfirmMessage, applyErrorMessage,
 } from "../src/api/update";
 import type { UpdateStatus } from "@hanoman/shared";
@@ -30,6 +30,17 @@ describe("updateVersionLine", () => {
   it("versi kosong jadi '?', bukan string kosong yang membingungkan", () =>
     expect(updateVersionLine(mk({ currentVersion: "", latestVersion: null })))
       .toBe("terpasang ? · tersedia ?"));
+});
+
+describe("updateRegistryLine (SPEC-906)", () => {
+  it("registry terbaca tanpa stempel waktu → kalimat polos, bukan 'Invalid Date'", () =>
+    expect(updateRegistryLine(mk({}))).toBe("Registry npm terbaca."));
+  it("registry terbaca dengan stempel waktu → menyebut kapan diperiksa", () =>
+    expect(updateRegistryLine(mk({ registry: { status: "ok", checkedAt: "2026-08-22T03:00:00.000Z" } })))
+      .toMatch(/^Registry npm diperiksa .+\.$/));
+  it("registry tak terbaca → bilang versi tersedia tak bisa dipastikan", () =>
+    expect(updateRegistryLine(mk({ registry: { status: "unavailable", checkedAt: null } })))
+      .toMatch(/tak bisa dipastikan/));
 });
 
 describe("applyConfirmMessage (SPEC-405 · ADR-0088)", () => {

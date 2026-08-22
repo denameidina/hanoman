@@ -1174,9 +1174,12 @@ lama adalah JS di tab yang sudah terbuka — lihat
 Frontend disajikan dari paket npm yang sama dengan server, jadi restart update (ADR-0088) mengganti
 bundle yang dilayani — tetapi **tab yang sudah ter-load tak memuat ulang apa pun**. Ia terus polling
 `/api/*` dengan sukses karena API kompatibel mundur, jadi tak ada yang terlihat rusak; pengguna
-hanya tak punya UI yang baru dirilis. Yang membuatnya tak terdiagnosis: `UpdateBadge` dirender
-**hanya saat `updateAvailable`**, dan tepat sesudah update terpasang nilai itu kembali `false` —
-**tab paling basi justru terlihat paling terkini**.
+hanya tak punya UI yang baru dirilis. Yang membuatnya tak terdiagnosis: `UpdateBadge` waktu itu
+dirender **hanya saat `updateAvailable`**, dan tepat sesudah update terpasang nilai itu kembali
+`false` — **tab paling basi justru terlihat paling terkini**. (SPEC-906 mencabut kepadaman itu: pil
+versi netral kini tetap ada saat up-to-date. Yang ia tampilkan adalah `currentVersion` **milik
+server**, jadi ia tak menggantikan `ReloadBadge` — tab basi tetap butuh perbandingan boot vs
+sekarang di bawah untuk tahu dirinya ketinggalan.)
 
 `UpdateStatus.currentVersion` (versi proses server) sudah tiba tiap frame WS grup `update`; yang
 kurang cuma membandingkannya dengan versi saat tab ini memuat. `trackServerVersion`
@@ -1191,7 +1194,8 @@ referensial stabil.
 
 `ReloadBadge` (`screens/UpdateIndicator.tsx`) menghuni slot topbar yang sama dengan `UpdateBadge` dan
 merupakan pasangan arah sebaliknya — `UpdateBadge` = "server ketinggalan npm", `ReloadBadge` = "tab
-ini ketinggalan server"; keduanya hampir tak pernah muncul bersamaan. Label panjang/ringkas mengikuti
+ini ketinggalan server". Sejak SPEC-906 keduanya bisa tampil bersamaan (pil versi netral + ajakan
+muat ulang) — itu justru keadaan yang benar sesudah update terpasang. Label panjang/ringkas mengikuti
 kontrak topbar mobile SPEC-763. Ia **mengajak**, tak pernah memuat ulang sendiri: refresh tanpa
 diminta membuang apa yang sedang diketik operator.
 
@@ -1262,10 +1266,20 @@ bersandar pada notifikasi yang **dibuat server-side** (`GET /notifications`) —
   tombol lonceng + badge unread (`--clay-500`), dropdown daftar (`SPEC-x · judul`, "selesai · Xm lalu",
   dot unread). Membuka dropdown = `POST /notifications/read` (unread → 0). Tombol "Bersihkan" =
   `DELETE /notifications`.
-- **`UpdateBadge`** (`screens/UpdateIndicator.tsx`) — pill topbar "Update", muncul **hanya** saat
-  `useUpdate().updateAvailable` (store WS grup `update`, pola `useLimits`). Klik → popover: heading per
-  reason (local/remote/both), perintah update dalam blok mono + tombol **Salin**, daftar commit baru,
-  baris `terpasang <sha> · tersedia <sha>`. Read-only: server tak pull/build/restart (SPEC-214, ADR-0048).
+- **`UpdateBadge`** (`screens/UpdateIndicator.tsx`) — pil topbar **dua wajah dalam satu kontrol**
+  (SPEC-906), keduanya bersumber dari `useUpdate()` (store WS grup `update`, pola `useLimits`).
+  `updateAvailable` → pil **brass** `Update · <latest>`; popover: heading, perintah update dalam blok
+  mono + tombol **Salin**, tombol **Pasang & mulai ulang** bila `canApply` (SPEC-405 · ADR-0088),
+  baris `terpasang X · tersedia Y`. Sudah terkini → pil **netral** (`--bone-100`/`--border-hair`,
+  bukan brass: keadaan ini tak meminta apa pun) berlabel `v<currentVersion>`; popover ringkas berisi
+  baris versi yang sama + `updateRegistryLine(u)` — sebab "sudah terbaru" hanya berarti sesuatu bila
+  jelas menurut registry mana dan kapan diperiksa, dan `registry.status: "unavailable"` (offline,
+  opt-out, paket belum terbit) **bukan** error. Sebelum SPEC-906 pil ini padam total saat up-to-date
+  dan versi yang sedang dipakai instance tak tersebut di satu tempat pun di UI. Satu gerbang tersisa:
+  `currentVersion` kosong (dev/bundle belum ter-stamp) tetap tak merender apa-apa — pil `v` telanjang
+  lebih buruk daripada topbar kosong. Label panjang/ringkas mengikuti kontrak topbar mobile SPEC-763
+  (`.hn-topbar-label`/`-short`): di layar sempit yang tersisa nomor versinya saja, nama kontrolnya
+  dipikul `aria-label`/`title`.
 - **`AccountMenu`** (`auth/AccountMenu.tsx`) — widget topbar `Shell` paling kanan (SPEC-216): tombol
   avatar (inisial huruf pertama email, lingkaran brass) yang membuka popover berisi email pengguna +
   tombol **Keluar**. Konsumsi `AuthContext` (`auth/AuthContext.tsx`, provider `AuthProvider` di `App`,
