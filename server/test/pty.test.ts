@@ -11,7 +11,7 @@ import {
   createSession, getSession, listSessions, killSession, killAll, detachAll, attach, writeTo,
   sessionPhases, sessionFinished, markerFilled, promptFilePath, armGoalInTui, goalGatePath,
   sessionKind, registerSessionHooks, rootBypassEnv, noTtyPromptEnv, askpassDenyPath,
-  sendToPane, shellBin, listSessionsAsync,
+  sendToPane, shellBin, listSessionsAsync, liveDecisions,
   MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback, PANE_QUIET_MS, paneQuiet, decisionOnset,
   type SessionBirth, type SessionDeath,
 } from "../src/services/pty";
@@ -728,6 +728,30 @@ describe("pty service", () => {
       await new Promise((r) => setTimeout(r, 2_000));
       expect(find().decision).toBe(false);                       // masih bicara → masih bekerja
       await waitFor(() => find().decision === true, 30_000);     // diam ≥ 3 dtk → menunggu
+    } finally {
+      killSession(s.id);
+    }
+  });
+
+  // SPEC-903 · ADR-0143 · seluruh premis ADR ini adalah SATU bit untuk semua permukaan: notifikasi
+  // dan panel lead membacanya lewat `liveDecisions().waiting`, terminal & pet lewat
+  // `SessionInfo.decision`. Kalau keduanya boleh berselisih, "identik secara konstruksi" cuma klaim.
+  it("liveDecisions().waiting adalah bit yang SAMA dengan SessionInfo.decision (SPEC-903)",
+    { timeout: 40_000 }, async () => {
+    const decisionFile = join(repoDir, ".worktrees", ".decisions", "spec-903-satu-bit");
+    const noisy = "i=0; while [ $i -lt 25 ]; do printf .; sleep 0.2; i=$((i+1)); done; sleep 300";
+    const s = createSession("p903", repoDir, {
+      id: "spec-903-satu-bit", decisionFile, command: ["/bin/sh", "-c", noisy],
+    });
+    const both = () => [
+      listSessions().find((x) => x.id === s.id)!.decision,
+      liveDecisions().find((x) => x.id === s.id)!.waiting,
+    ];
+    try {
+      writeFileSync(decisionFile, `${Math.floor(Date.now() / 1000)}\n`);
+      expect(both()).toEqual([false, false]);        // pane bicara
+      await waitFor(() => both()[1] === true, 30_000);
+      expect(both()).toEqual([true, true]);          // pane diam
     } finally {
       killSession(s.id);
     }

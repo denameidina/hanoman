@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { createHash } from "node:crypto";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createSession, killSession } from "../src/services/pty";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { LEAD_DEFAULTS } from "@hanoman/shared";
@@ -264,6 +268,34 @@ describe("GET /api/lead/status", () => {
     expect(Array.isArray(b.deciding)).toBe(true);
   });
   // Jejak keputusan hidup di HTTP polling; tak ada kanal WebSocket baru (AC-26, ADR-0039).
+  // SPEC-903 · ADR-0143 · daftar `waiting` panel lead memakai bit TURUNAN, bukan marker mentah.
+  // Sesi yang panenya masih bicara tak boleh muncul di sana walau markernya terisi — kalau tidak,
+  // panel lead dan pil Terminal menyebut himpunan yang berbeda.
+  it("waiting hanya memuat sesi yang panenya sudah diam, bukan tiap marker terisi (SPEC-903)",
+    { timeout: 40_000 }, async () => {
+    const cookie = await login();
+    await setLead({ ...LEAD_DEFAULTS, enabled: true });
+    const decisionFile = join(mkdtempSync(join(tmpdir(), "hanoman-lead903-")), "spec-903");
+    const noisy = "i=0; while [ $i -lt 25 ]; do printf .; sleep 0.2; i=$((i+1)); done; sleep 300";
+    const s = createSession("demo", "/tmp", { decisionFile, command: ["/bin/sh", "-c", noisy] });
+    const waiting = async () => {
+      const r = await app.inject({ method: "GET", url: "/api/lead/status", headers: { cookie } });
+      return (r.json().waiting as string[]);
+    };
+    try {
+      writeFileSync(decisionFile, `${Math.floor(Date.now() / 1000)}\n`);
+      expect(await waiting()).not.toContain(s.id);   // marker terisi, tapi pane masih bicara
+      const deadline = Date.now() + 30_000;
+      while (!(await waiting()).includes(s.id)) {
+        if (Date.now() > deadline) throw new Error("pane tak pernah terbaca diam");
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      expect(await waiting()).toContain(s.id);
+    } finally {
+      killSession(s.id);
+    }
+  });
+
   it("counts the last 24 hours of decisions per project", async () => {
     const cookie = await login();
     await setLead({ ...LEAD_DEFAULTS, enabled: true });

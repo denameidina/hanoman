@@ -928,7 +928,7 @@ turunan (pty `parsePanes`, `notifications.scanDecisions` sebagai penjaga episode
 `lead/detect.ts` yang sengaja dibiarkan); setiap pembaca `.decision` di frontend tak menambah
 predikat sendiri.
 
-- [ ] **Step 5: Commit sisa & push**
+- [x] **Step 5: Commit sisa & push**
 
 ```bash
 git status --porcelain
@@ -972,22 +972,33 @@ suite ini; lihat catatan gagal palsu di bawah).
 
 | berkas | hasil |
 |---|---|
-| `server/test/pty.test.ts` | 65/65 lulus (termasuk 3 test SPEC-903 baru) |
+| `server/test/pty.test.ts` | 66/66 lulus (5 test SPEC-903 baru) |
 | `server/test/notifications.test.ts` | 12/12 lulus (2 test SPEC-903 baru) |
 | `server/test/terminal-dialog.route.test.ts` | 10/10 lulus (1 test SPEC-903 baru) |
+| `server/test/lead-routes.test.ts` | 35/35 lulus (1 test SPEC-903 baru) |
 | `server/test/lead-detect.test.ts` | 50/50 lulus |
-| `server/test/terminal.route.test.ts` | 60 lulus, **21 gagal — IDENTIK di base** |
-| `pnpm --filter ./server typecheck` | nol error |
+| `server/test/pty-altscreen.test.ts` | 3/3 lulus |
+| `src/test/terminal-screen.test.tsx` | 69/69 lulus (2 test SPEC-903 baru) |
+| `src/test/pet-state.test.ts` | 38/38 lulus |
+| `server/test/terminal.route.test.ts` | 72 lulus, **9 gagal — IDENTIK di base** |
+| typecheck `server`, `shared`, `runner`, `src` | nol error |
 
 **Gagal palsu yang sudah dibuktikan, bukan regresi:**
 
-- `server/test/terminal.route.test.ts`: 21 gagal. Diperiksa dengan `git checkout 5fe3c6ff -- server/src
-  server/test`, jalankan, lalu pulihkan: **21 gagal / 60 lulus di base juga**, dan daftar nama test
-  yang gagal `diff`-nya KOSONG (identik). Sebagian besar test WS/resize/socket. Test SPEC-903 di
-  berkas itu (`GET /terminal/sessions meneruskan decisionAt`) LULUS.
+- `server/test/terminal.route.test.ts`. Diperiksa dua kali dengan `git checkout 5fe3c6ff -- server/src
+  server/test`, jalankan, lalu pulihkan — daftar **nama** test yang gagal `diff`-nya KOSONG (identik
+  base vs HEAD) di kedua putaran. Test SPEC-903 di berkas itu (`GET /terminal/sessions meneruskan
+  decisionAt`) LULUS.
+  Angkanya bergantung env, dan itu sendiri temuan: **`NODE_ENV=development` yang diekspor shell sesi
+  agen** membuat `ws-admission.ts:134` (`principal.kind === "test"` hanya sah bila
+  `NODE_ENV === "test"`) menolak SEMUA test WebSocket dengan 401 → 21 gagal. Dengan `NODE_ENV`
+  ikut dibersihkan: **9 gagal / 72 lulus**, base maupun HEAD, nama identik. Sisa 9 = 7 timeout
+  5000 ms pada test yang menunggu keluaran pane + 2 kaskade `readPrd` "freshest-wins" yang memungut
+  worktree sisa test sebelumnya. Semuanya pra-ada.
 - `pty.test.ts` `"sesi agen lahir tanpa jalan meminta ketikan kredensial"`: gagal hanya bila
   `SSH_ASKPASS` ada di env sesi agen (SPEC-881). Dengan `env -u SSH_ASKPASS …` → lulus.
 - Seluruh route 404 bila `HANOMAN_CONTROL_ORIGINS` diwarisi dari shell operator.
+- 12 test WebSocket di `terminal.route.test.ts` merah bila `NODE_ENV` shell (bukan `test`) diwarisi.
 
 ### Smoke endpoint nyata
 
@@ -1079,3 +1090,31 @@ Temuan lain — semuanya cermin yang hanyut, nol error kompilasi:
 Kategori yang benar-benar bersih (dilaporkan nihil): konsumen `FMT`/parser tab-delimited (satu
 produsen, satu parser, nol fixture yang membangun barisnya), pembacaan marker langsung di luar
 `pty.ts`, bentuk wire/sync, dan katalog MCP.
+
+### Verifikasi relevansi test (qa-verifier)
+
+Setiap test SPEC-903 diuji dengan merusak implementasinya lalu memulihkannya. Semua **merah** di
+bawah mutasinya:
+
+| test | mutasi yang membuatnya merah |
+|---|---|
+| `decision padam selama pane masih bicara…` | `paneQuiet` dipaksa selalu `true` |
+| `decisionOnset memakai yang lebih baru…` | `Math.max(…)` → `markerOnset(f)` saja |
+| `paneQuiet: fail-open` / `paneQuiet: PANE_QUIET_MS` | implementasi base (fungsi tak ada) |
+| `listSessions memberi decisionAt dari episode yang sedang berlangsung` | implementasi base |
+| `GET /terminal/sessions meneruskan decisionAt` | implementasi base |
+| `tak menotifikasi selama agen masih bekerja…` | `if (!s.waiting) continue;` dihapus |
+| `kedipan sibuk…tak melahirkan notifikasi kedua` | dedup naif (`if (awaiting.has(s.id))` dihapus) |
+| `marker dikosongkan sesudah 202` | `clearMarker(s.decisionFile)` dihapus |
+| `deciding menyalakan pil Lead memutuskan…` | sarang `{deciding && awaiting && …}` dikembalikan |
+| `liveDecisions().waiting adalah bit yang SAMA…` | `waiting: p.decision` → `markerFilled(...)` |
+| `waiting hanya memuat sesi yang panenya sudah diam…` | idem |
+
+Rollback implementasi penuh (base `server/src` + `src/src`, test HEAD) memberi **tepat 8 merah, dan
+kedelapannya test SPEC-903** — tak ada satu pun yang bertahan hijau tanpa perubahannya.
+
+Dua lubang yang dilaporkan qa-verifier **ditutup di commit ini**, bukan dicatat sebagai hutang:
+`liveDecisions().waiting` semula tak punya satu pun assertion (padahal seluruh premis ADR-0143
+adalah "satu bit, semua permukaan"), dan filter `waiting` di `routes/lead.ts` bisa dimatikan tanpa
+satu test pun merah (terukur: 84 hijau dengan `true || d.waiting`). Keduanya kini punya test yang
+terbukti merah di bawah mutasi.
