@@ -1,0 +1,104 @@
+{
+  "key": "working",
+  "mode": "stand",
+  "pinned": true,
+  "edge": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+  ],
+  "frames": [
+    {
+      "frame": 1,
+      "dx": 0,
+      "dy": 0,
+      "scale": 1.0,
+      "residual_pre": 0.0,
+      "clipped": 0,
+      "fit_dx": -30,
+      "lift_fit": 1.0
+    },
+    {
+      "frame": 2,
+      "dx": -1,
+      "dy": -2,
+      "scale": 1.02,
+      "residual_pre": 0.0284,
+      "clipped": 0,
+      "fit_dx": -30,
+      "lift_fit": 1.0,
+      "residual_post": 0.0
+    },
+    {
+      "frame": 3,
+      "dx": -9,
+      "dy": -2,
+      "scale": 1.02,
+      "residual_pre": 0.0323,
+      "clipped": 0,
+      "fit_dx": -30,
+      "lift_fit": 1.0,
+      "residual_post": 0.0
+    },
+    {
+      "frame": 4,
+      "dx": -9,
+      "dy": -1,
+      "scale": 1.02,
+      "residual_pre": 0.0469,
+      "clipped": 0,
+      "fit_dx": -30,
+      "lift_fit": 1.0,
+      "residual_post": 0.0
+    },
+    {
+      "frame": 5,
+      "dx": -2,
+      "dy": 0,
+      "scale": 1.0,
+      "residual_pre": 0.0273,
+      "clipped": 0,
+      "fit_dx": -30,
+      "lift_fit": 1.0,
+      "residual_post": 0.0
+    },
+    {
+      "frame": 6,
+      "dx": -5,
+      "dy": -3,
+      "scale": 1.02,
+      "residual_pre": 0.0373,
+      "clipped": 0,
+      "fit_dx": -30,
+      "lift_fit": 1.0,
+      "residual_post": 0.0
+    },
+    {
+      "frame": 7,
+      "dx": -4,
+      "dy": -3,
+      "scale": 1.02,
+      "residual_pre": 0.0386,
+      "clipped": 0,
+      "fit_dx": -30,
+      "lift_fit": 1.0,
+      "residual_post": 0.0
+    },
+    {
+      "frame": 8,
+      "dx": -7,
+      "dy": -2,
+      "scale": 1.02,
+      "residual_pre": 0.0454,
+      "clipped": 0,
+      "fit_dx": -30,
+      "lift_fit": 1.0,
+      "residual_post": 0.0
+    }
+  ]
+}

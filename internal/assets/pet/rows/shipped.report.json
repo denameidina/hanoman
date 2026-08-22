@@ -1,0 +1,97 @@
+{
+  "key": "shipped",
+  "mode": "jump",
+  "pinned": false,
+  "edge": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+  ],
+  "frames": [
+    {
+      "frame": 1,
+      "dx": 0,
+      "dy": 0,
+      "scale": 1.0,
+      "residual_pre": 0.0,
+      "clipped": 0,
+      "fit_dx": 1,
+      "lift_fit": 0.386
+    },
+    {
+      "frame": 2,
+      "dx": -21,
+      "dy": 10,
+      "scale": 1.02,
+      "residual_pre": 0.4235,
+      "clipped": 0,
+      "fit_dx": 1,
+      "lift_fit": 0.386
+    },
+    {
+      "frame": 3,
+      "dx": -13,
+      "dy": -18,
+      "scale": 0.98,
+      "residual_pre": 0.0996,
+      "clipped": 0,
+      "fit_dx": 1,
+      "lift_fit": 0.386
+    },
+    {
+      "frame": 4,
+      "dx": -12,
+      "dy": -27,
+      "scale": 0.96,
+      "residual_pre": 0.1078,
+      "clipped": 0,
+      "fit_dx": 1,
+      "lift_fit": 0.386
+    },
+    {
+      "frame": 5,
+      "dx": -13,
+      "dy": -21,
+      "scale": 1.02,
+      "residual_pre": 0.2063,
+      "clipped": 0,
+      "fit_dx": 1,
+      "lift_fit": 0.386
+    },
+    {
+      "frame": 6,
+      "dx": -24,
+      "dy": 24,
+      "scale": 1.02,
+      "residual_pre": 0.2186,
+      "clipped": 0,
+      "fit_dx": 1,
+      "lift_fit": 0.386
+    },
+    {
+      "frame": 7,
+      "dx": -4,
+      "dy": -4,
+      "scale": 1.02,
+      "residual_pre": 0.0446,
+      "clipped": 0,
+      "fit_dx": 1,
+      "lift_fit": 0.386
+    },
+    {
+      "frame": 8,
+      "dx": -1,
+      "dy": 1,
+      "scale": 1.0,
+      "residual_pre": 0.0283,
+      "clipped": 0,
+      "fit_dx": 1,
+      "lift_fit": 0.386
+    }
+  ]
+}

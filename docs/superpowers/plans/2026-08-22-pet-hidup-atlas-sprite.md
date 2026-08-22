@@ -1248,7 +1248,7 @@ Prasyarat: `codex --version` ≥ 0.147 dan image generation aktif (`ls ~/.codex/
 
 Catatan: `raw/wave.png` sudah ada di worktree (dibuat saat plan divalidasi, 191 dtk, lulus gerbang dengan residu maks 0,113) — untuk `wave` lewati `gen.py` dan mulai dari `key.py`; `raw/idle.magenta.png` adalah sumber baris idle (Task 2).
 
-- [ ] **Step 1: Generasi + key + register + qa per baris**
+- [x] **Step 1: Generasi + key + register + qa per baris**
 
 Untuk setiap `key` dalam `walk-right walk-left working waiting blocked review shipped docs-updated wave`:
 
@@ -1260,11 +1260,11 @@ python3 internal/scripts/pet/gen.py "$K" && python3 internal/scripts/pet/key.py 
 Expected per baris: `[<key>] … → raw/<key>.png (…B, ~190s)`, laporan 8 frame tanpa `TUMPAH=`, `OK <key>: 8 frame, residu maks … ≤ 0.15` (atau `≤ 0.3` untuk walk/shipped). Bila `FAIL`, baca pesannya lalu ulangi dengan catatan, mis.:
 `python3 internal/scripts/pet/gen.py "$K" --note "Frames 3 and 4 merged into one drawing — keep every frame fully inside its own cell with clear empty space between cells."`
 
-- [ ] **Step 2: Review manusia (Gate 2)**
+- [x] **Step 2: Review manusia (Gate 2)**
 
 Buka semua `internal/assets/pet/qa/*.gif` dan `qa/*-contact.png` (mis. `open internal/assets/pet/qa/`). Periksa tiap baris terhadap naskahnya: `walk-left` benar-benar profil kiri (jamang & ekor di sisi kanan badan), `shipped` melayang di frame 4, `docs-updated` memegang lontar, `blocked` tanpa slapstick. **Minta pemilik produk melihatnya** sebelum lanjut; baris yang ditolak diulang lewat Step 1 dengan `--note`.
 
-- [ ] **Step 3: Rakit atlas dan verifikasi**
+- [x] **Step 3: Rakit atlas dan verifikasi**
 
 Run:
 ```bash
@@ -1273,7 +1273,7 @@ ls -la internal/assets/pet/hnm-pet-anoman-atlas-v01.webp
 ```
 Expected: `ditulis hnm-pet-anoman-atlas-v01.webp (<1000000 B, 1536×2080) + pet.json`, `OK atlas segar …`, `OK PET-001: 10 baris, 1536×2080, … B`. Bila `FAIL: atlas … > anggaran`, turunkan `quality=82` di `atlas.py` menjadi 78 dan catat di commit.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/assets/pet/rows internal/assets/pet/qa internal/assets/pet/hnm-pet-anoman-atlas-v01.webp internal/assets/pet/pet.json

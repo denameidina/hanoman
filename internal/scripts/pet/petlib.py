@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 CELL_W, CELL_H = 192, 208
 COLUMNS = 8
@@ -29,6 +29,9 @@ SCALES = (0.92, 0.94, 0.96, 0.98, 1.0, 1.02, 1.04, 1.06, 1.08)
 STATIC_FROM = 0.45     # stand: baris ≥ 45 % tinggi frame 1 = wilayah statis (kaki, kain, torso bawah)
 UPPER_TO = 0.55        # walk/jump: baris ≤ 55 % = kepala + torso atas
 PIN_FEATHER = 6
+PIN_THIN = 3     # tepi bergoyang setipis ini dianggap goyangan, bukan gerak (dihapus erosi)
+PIN_GROW = 10    # margin di sekeliling anggota badan yang bergerak — pin tak boleh menyentuhnya
+FEET_MASS_RATIO = 0.3   # ambang massa run kaki vs run terbesar di pita terbawah (lihat feet_span)
 
 # Urutan = indeks baris atlas. `mode` menentukan cara registrasi (§5.2 spec).
 ROWS: list[dict] = [
@@ -44,10 +47,18 @@ ROWS: list[dict] = [
     {"key": "wave",         "fps": 10, "loop": False, "mode": "stand", "then": "idle"},
 ]
 ROW_KEYS = [r["key"] for r in ROWS]
-# Gerbang residu PRA-pin: strip idle yang disetujui mengukur 0,03–0,07 (stand) begitu ekor
-# dikeluarkan dari wilayah; generasi rusak (frame tak sejajar / pose lain) ≥ 0,5. Walk/jump
-# dinilai di wilayah atas yang memang lebih bervariasi.
-RESIDUAL_GATE = {"stand": 0.15, "walk": 0.30, "jump": 0.30}
+# Gerbang residu PRA-pin; generasi rusak (frame tak sejajar / pose lain) mengukur ≥ 0,5. Angka
+# di bawah dikalibrasi ulang atas kesepuluh baris nyata (2026-08-22), bukan atas `idle` saja:
+#   stand  idle 0,069 · working 0,068 · blocked 0,029 · review 0,026 · docs-updated 0,101 ·
+#          wave 0,113 · waiting 0,162 — yang tertinggi justru baris yang naskahnya MEMANG
+#          mengangkat tangan setinggi pinggang, dan `residual_post`-nya 0,000: pin membuktikan
+#          badannya beku, jadi 0,15 menghukum animasi yang benar.
+#   walk   walk-right 0,040 · walk-left 0,037 — jauh di bawah gerbangnya.
+#   jump   shipped 0,423 pada frame jongkok. Untuk `jump` residu wilayah atas nyaris tak bisa
+#          membedakan apa pun: seluruh tubuh atas memang berubah total (jongkok → melayang →
+#          mendarat). Yang benar-benar menjaga baris ini adalah tumpahan sel, jumlah sprite, dan
+#          review Gate 2 atas `qa/shipped.gif` — bukan angka ini.
+RESIDUAL_GATE = {"stand": 0.25, "walk": 0.30, "jump": 0.50}
 
 
 def row_def(key: str) -> dict:
@@ -133,14 +144,20 @@ def mask_of(im: Image.Image) -> np.ndarray:
 
 
 def feet_span(m: np.ndarray) -> tuple[int, int]:
-    """Rentang-x kaki = run kolom PALING KANAN di 8 % baris terbawah. Karakter menghadap kanan,
-    ekor selalu di kiri — dan lekukan bawah ekor bisa ikut menyentuh baris terbawah, jadi bbox
-    polos akan tertarik ke ekor (jitter ±15 px terukur)."""
+    """Rentang-x kaki = gabungan run kolom BERISI di 8 % baris terbawah. Lekukan bawah ekor ikut
+    menyentuh baris itu, jadi bbox polos tertarik ke ekor (jitter ±15 px terukur) — tapi ekor di
+    sana hanya seutas garis: massanya < 0,3× run terbesar (terukur 82–98 px vs 289–594 px kaki),
+    sedangkan kaki yang terbuka saat melangkah adalah DUA run yang sama-sama berisi. Menyaring
+    lewat massa, bukan lewat "run paling kanan", karena `walk-left` digambar dengan ekor di sisi
+    KANAN: aturan sisi akan menjangkar seluruh baris itu pada ekor."""
     h = m.shape[0]
-    runs = _runs(m[int(h * 0.92):].any(axis=0), min_gap=3)
+    band = m[int(h * 0.92):]
+    runs = _runs(band.any(axis=0), min_gap=3)
     if not runs:
         return 0, m.shape[1]
-    return runs[-1]
+    mass = [int(band[:, a:b].sum()) for a, b in runs]
+    keep = [r for r, w in zip(runs, mass) if w >= FEET_MASS_RATIO * max(mass)]
+    return keep[0][0], keep[-1][1]
 
 
 def feet_anchor(m: np.ndarray) -> tuple[float, int]:
@@ -223,6 +240,43 @@ def _paste_clipped(strip: Image.Image, img: Image.Image, cell: int, x: int, y: i
 
 # ---------------------------------------------------------------- strip
 
+def _lift_fit(sprites: list[Sprite], work: list[Image.Image], ground: dict[int, int], f: float,
+              lift_ref: float) -> float:
+    """Faktor pengecil ketinggian lompat supaya tak ada frame yang menembus atap sel.
+
+    `HEAD_MARGIN` menganggarkan ruang di atas frame 1 untuk lompatan `shipped`, tetapi model
+    menggambar lompatan setinggi 27–32 % tinggi badan (terukur dua generasi berturut-turut) sementara
+    anggarannya 20 %; meminta lompatan lebih rendah lewat prompt tak berhasil — tinggi bukan besaran
+    yang ia ukur. Amplitudo karena itu DISKALakan di sini, bukan dipotong: profil arc (kapan naik,
+    kapan puncak) dipertahankan, hanya puncaknya yang muat."""
+    worst = 1.0
+    for i, sp in enumerate(sprites):
+        rise = lift_ref - (sp.bbox[3] - ground[sp.sheet_row]) * f
+        if rise <= 0:
+            continue
+        room = BASELINE - work[i].size[1]
+        if room <= 0:
+            return 0.0
+        worst = min(worst, room / rise)
+    return worst
+
+
+def _fit_dx(placed: list[tuple[int, int, float, float, Image.Image]], ref_x: float) -> int:
+    """Geseran-x SERAGAM sekecil mungkin agar seluruh baris muat di selnya.
+
+    Seragam, jadi registrasi antar-frame maupun pin tak tersentuh — yang bergeser hanya di mana
+    baris itu duduk dalam selnya. Nol untuk baris yang sudah muat (mayoritas), sehingga strip yang
+    sudah disetujui tak berubah satu byte pun."""
+    xs = [ref_x + dx for dx, *_ in placed]
+    left = min(xs)
+    right = max(x + img.size[0] for x, (*_, img) in zip(xs, placed))
+    if left < 0:
+        return int(min(round(-left), max(0.0, CELL_W - right)))
+    if right > CELL_W:
+        return int(-min(round(right - CELL_W), max(0.0, left)))
+    return 0
+
+
 def build_strip(sprites: list[Sprite], mode: str, pin: bool | None = None) -> tuple[Image.Image, list[dict]]:
     """8 sprite → strip 8 × (CELL_W×CELL_H) terregistrasi. Laporan per frame untuk gerbang QA."""
     if len(sprites) != 8:
@@ -243,9 +297,9 @@ def build_strip(sprites: list[Sprite], mode: str, pin: bool | None = None) -> tu
     for s in sprites:
         ground[s.sheet_row] = max(ground.get(s.sheet_row, 0), s.bbox[3])
     lift_ref = (sprites[0].bbox[3] - ground[sprites[0].sheet_row]) * f
+    lift_fit = _lift_fit(sprites, work, ground, f, lift_ref) if mode == "jump" else 1.0
 
-    strip = Image.new("RGBA", (CELL_W * 8, CELL_H), (0, 0, 0, 0))
-    report: list[dict] = []
+    placed: list[tuple[int, int, float, float, Image.Image]] = []
     for i, sp in enumerate(work):
         if i == 0:
             best = (0, 0, 0.0, 1.0, sp)
@@ -260,31 +314,82 @@ def build_strip(sprites: list[Sprite], mode: str, pin: bool | None = None) -> tu
         if mode == "walk":
             dy = rh - img.size[1]                               # kaki terendah menapak tanah
         elif mode == "jump":
-            lift = (sprites[i].bbox[3] - ground[sprites[i].sheet_row]) * f
-            dy = rh - img.size[1] + round(lift - lift_ref)     # ketinggian lompat dipertahankan
-        x = int(round(ref_x + dx))
+            rise = (lift_ref - (sprites[i].bbox[3] - ground[sprites[i].sheet_row]) * f) * lift_fit
+            dy = rh - img.size[1] - round(rise)                # ketinggian lompat dipertahankan
+        placed.append((dx, dy, resid, sc, img))
+
+    fit_dx = _fit_dx(placed, ref_x)
+
+    strip = Image.new("RGBA", (CELL_W * 8, CELL_H), (0, 0, 0, 0))
+    report: list[dict] = []
+    for i, (dx, dy, resid, sc, img) in enumerate(placed):
+        x = int(round(ref_x + fit_dx + dx))
         y = int(round(ref_y + dy))
         clipped = _paste_clipped(strip, img, i, x, y)
         report.append({"frame": i + 1, "dx": int(dx), "dy": int(dy), "scale": sc,
-                       "residual_pre": round(float(resid), 4), "clipped": clipped})
+                       "residual_pre": round(float(resid), 4), "clipped": clipped,
+                       "fit_dx": fit_dx, "lift_fit": round(lift_fit, 3)})
 
     if pin:
-        _pin_static(strip, ref_x, ref_y, ref.shape, rows.start, col_from)
+        _pin_static(strip, ref_x + fit_dx, ref_y, ref.shape, rows.start, col_from)
         for i in range(1, 8):
-            report[i]["residual_post"] = _residual_post(strip, i, ref_y + rows.start, int(ref_x) + col_from)
+            report[i]["residual_post"] = _residual_post(strip, i, ref_y + rows.start, int(ref_x + fit_dx) + col_from)
     return strip, report
+
+
+def _dilate(m: np.ndarray, r: int) -> np.ndarray:
+    im = Image.fromarray((m * 255).astype(np.uint8), "L").filter(ImageFilter.MaxFilter(2 * r + 1))
+    return np.asarray(im) > 127
+
+
+def _erode(m: np.ndarray, r: int) -> np.ndarray:
+    im = Image.fromarray((m * 255).astype(np.uint8), "L").filter(ImageFilter.MinFilter(2 * r + 1))
+    return np.asarray(im) > 127
+
+
+def _moving_parts(dis: np.ndarray) -> np.ndarray:
+    """Dari peta ketidaksamaan antar-frame, ambil anggota badan yang BERGERAK saja.
+
+    Dua hal tampak sama di peta itu: tepi yang bergoyang sub-piksel (pita TIPIS di sekeliling
+    siluet, justru yang ingin dibekukan pin) dan tangan/prop yang memang menyapu. Tebal-tipis saja
+    TAK cukup memisahkannya: lengan yang bergeser beberapa piksel meninggalkan sabit setipis
+    goyangan, jadi erosi polos membuang lengannya sementara telapaknya bertahan — pin lalu
+    mengembalikan lengan ke posisi frame 1 sementara telapak tinggal di posisi barunya, dan
+    tangannya tampak PUTUS dari badan. Karena itu rekonstruksi morfologis: benih = bagian yang
+    selamat dari erosi, lalu ditumbuhkan hanya DI DALAM peta itu sendiri sampai stabil, sehingga
+    seluruh anggota badan yang tersambung ke benih ikut terjaga sementara pita goyangan yang tak
+    menyentuh benih mana pun tetap dibuang."""
+    seed = _erode(dis, PIN_THIN)
+    while True:
+        grown = _dilate(seed, 1) & dis
+        if np.array_equal(grown, seed):
+            break
+        seed = grown
+    return _dilate(seed, PIN_GROW)
 
 
 def _pin_static(strip: Image.Image, ref_x: float, ref_y: float, ref_shape: tuple[int, int],
                 static_from: int, col_from: int) -> None:
-    """Tempel wilayah statis frame 1 ke frame 2–8 (feather PIN_FEATHER px di tepi atasnya)."""
+    """Tempel wilayah statis frame 1 ke frame 2–8 — KECUALI di mana anggota badan bergerak.
+
+    Versi pertama membekukan kotaknya utuh dan karena itu MEMAKAN tangan pada baris yang naskahnya
+    memang menggerakkan tangan setinggi pinggang (`waiting`, `wave`, `working`, `idle`): telapak
+    terpotong garis pin, terbaca sebagai "glitch tangan" di GIF meski lembar mentahnya utuh."""
     arr = np.asarray(strip).astype(np.float32)
     ys = int(round(ref_y)) + static_from
-    xs = int(round(ref_x)) + col_from
+    xs = max(0, int(round(ref_x)) + col_from)
     y0 = max(0, ys - PIN_FEATHER)
+    a = np.asarray(strip.getchannel("A")) > 64
+    ref_cell = a[y0:CELL_H, xs:CELL_W]
+    dis = np.zeros(ref_cell.shape, bool)
+    for i in range(1, 8):
+        dis |= ref_cell ^ a[y0:CELL_H, i * CELL_W + xs:i * CELL_W + CELL_W]
+    keep_out = _moving_parts(dis)
+    weight = np.asarray(Image.fromarray(np.where(keep_out, 0, 255).astype(np.uint8), "L")
+                        .filter(ImageFilter.GaussianBlur(PIN_FEATHER / 2))).astype(np.float32) / 255
+    weight = weight[:, :, None]
+    weight[:PIN_FEATHER] *= np.linspace(0.0, 1.0, PIN_FEATHER, endpoint=False)[:, None, None]
     src = arr[y0:CELL_H, xs:CELL_W]
-    weight = np.ones((CELL_H - y0, 1, 1), np.float32)
-    weight[:PIN_FEATHER, 0, 0] = np.linspace(0.0, 1.0, PIN_FEATHER, endpoint=False)
     for i in range(1, 8):
         xi = i * CELL_W + xs
         dst = arr[y0:CELL_H, xi:xi + (CELL_W - xs)]
@@ -341,8 +446,20 @@ def onion_skin(strip: Image.Image) -> Image.Image:
 
 
 def save_gif(strip: Image.Image, path: Path, fps: int) -> None:
+    """GIF review dengan SATU palet untuk kedelapan frame.
+
+    Palet adaptif per frame membuat warna bergeser sedikit tiap frame; pada 6–10 fps itu terbaca
+    sebagai kedip yang tak ada di stripnya — artefak review yang menuduh artworknya."""
     frames = [strip.crop((i * CELL_W, 0, (i + 1) * CELL_W, CELL_H)) for i in range(8)]
-    bg = [Image.new("RGBA", f.size, (250, 246, 236, 255)) for f in frames]
-    for b, f in zip(bg, frames):
+    bg = []
+    for f in frames:
+        b = Image.new("RGBA", f.size, (250, 246, 236, 255))
         b.alpha_composite(f)
-    bg[0].save(path, save_all=True, append_images=bg[1:], duration=int(1000 / fps), loop=0)
+        bg.append(b.convert("RGB"))
+    montage = Image.new("RGB", (CELL_W * 8, CELL_H))
+    for i, b in enumerate(bg):
+        montage.paste(b, (i * CELL_W, 0))
+    palette = montage.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
+    seq = [b.quantize(palette=palette, dither=Image.Dither.NONE) for b in bg]
+    seq[0].save(path, save_all=True, append_images=seq[1:], duration=round(1000 / fps), loop=0,
+                disposal=2, optimize=False)

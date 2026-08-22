@@ -6,6 +6,14 @@ LAYOUT: landscape canvas 1536x1024. A 4-column x 2-row grid of 8 equal cells (38
 
 REGISTRATION (critical): treat the character as a puppet on a fixed pin. Unless this row says otherwise, in ALL 8 frames the feet, legs, sarong hem and lower torso are drawn at EXACTLY the same position and size — trace them identically. Only the parts named for this row move. Nothing else changes between frames.
 
+SMOOTHNESS (critical): the 8 frames are played as a loop at 4-10 fps, so any inconsistency between
+neighbouring frames reads as a glitch — a limb that changes size, a hand whose fingers are drawn
+differently, a head that snaps. Move each part in SMALL, EVEN steps from one frame to the next, and
+draw every part that moves at the SAME size and with the SAME shape in every frame — only its
+position or angle changes. A hand keeps the same hand: same fingers, same size, same style, rotating
+around the elbow or wrist rather than being redrawn. For a looping row, frame 8 must lead back into
+frame 1 with a step no larger than the steps between the other frames.
+
 BACKGROUND: flat, pure, uniform green #00FF00 over the whole canvas — no halo, no anti-aliased fringe, no gradient, no shadow. Do NOT remove the background, do NOT post-process, do NOT crop or resize: the pipeline keys the green out itself.
 
 OUTPUT: use your image generation tool to produce exactly ONE image. Do not write code or create any files. Your final message must be the absolute path of the generated PNG (it lives under ~/.codex/generated_images/) and its pixel size. If the first generation breaks the grid (merged frames, drifting scale, wrong facing), generate once more with a stricter prompt and report the better one.

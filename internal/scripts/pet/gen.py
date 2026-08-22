@@ -34,6 +34,10 @@ def references(key: str) -> list[Path]:
     refs = [ASSETS / "ref" / "anoman-pet-model.png"]
     if key != "idle" and (ASSETS / "rows" / "idle.png").exists():
         refs.append(ASSETS / "rows" / "idle.png")
+    # `walk-left` adalah gambar BARU sisi lain, bukan cermin — satu-satunya cara memintanya seirama
+    # dengan `walk-right` adalah melampirkan strip itu sebagai acuan irama.
+    if key == "walk-left" and (ASSETS / "rows" / "walk-right.png").exists():
+        refs.append(ASSETS / "rows" / "walk-right.png")
     return refs
 
 

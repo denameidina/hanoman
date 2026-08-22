@@ -1,0 +1,84 @@
+{
+  "id": "PET-001",
+  "version": 1,
+  "cell": {
+    "w": 192,
+    "h": 208
+  },
+  "columns": 8,
+  "anchor": {
+    "x": 0.62,
+    "baseline": 202
+  },
+  "character": {
+    "h": 168
+  },
+  "rows": [
+    {
+      "key": "idle",
+      "fps": 6,
+      "loop": true
+    },
+    {
+      "key": "walk-right",
+      "fps": 10,
+      "loop": true,
+      "dir": "right"
+    },
+    {
+      "key": "walk-left",
+      "fps": 10,
+      "loop": true,
+      "dir": "left"
+    },
+    {
+      "key": "working",
+      "fps": 8,
+      "loop": true
+    },
+    {
+      "key": "waiting",
+      "fps": 6,
+      "loop": true
+    },
+    {
+      "key": "blocked",
+      "fps": 4,
+      "loop": true
+    },
+    {
+      "key": "review",
+      "fps": 6,
+      "loop": true
+    },
+    {
+      "key": "shipped",
+      "fps": 10,
+      "loop": false,
+      "then": "idle"
+    },
+    {
+      "key": "docs-updated",
+      "fps": 6,
+      "loop": true
+    },
+    {
+      "key": "wave",
+      "fps": 10,
+      "loop": false,
+      "then": "idle"
+    }
+  ],
+  "sources": {
+    "idle": "4a0f06cacdad0fa8e0b0a369628e383fc2cb54cbdd5297285c88d1a33bd686ac",
+    "walk-right": "7bdfb2786b2b1c899fb7b170ce2cf5d1e3a922e251cbaca9600c210262629a52",
+    "walk-left": "c53c6f7b980d4179b45d55160145df73eb629ccbb809ce2b19946045e388ce60",
+    "working": "2ec0d0d4565eced3c55c32603c2b1c6fe9ff93f13f2a1061bc7d2e8d8864aa6f",
+    "waiting": "8bb1595bf280040e101949392c1048330c19142d7b5a1d6b74918734f72287e3",
+    "blocked": "134f48c60fa6fef038da266be7fb2a69755ecb9123d23dc4e270b14d7d077da6",
+    "review": "77c865ff6d49a8bbf3db4e0d7b91ce4663a1e3acef5d072ddd65eac9479b232c",
+    "shipped": "d32653efa6a64eb4d00fb63a6e8c0a7dc24de63ecd5a6cfda36f32b584de00b8",
+    "docs-updated": "2b3a01ddd640efd6e65d61c6ad4980da3a9fbceff251f1b42ce13389c02bb19c",
+    "wave": "5ea5c1a6ccf3d3bc88f02f72061af405db414acc8baca947b55f078ceb658e37"
+  }
+}
