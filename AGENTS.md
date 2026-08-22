@@ -70,6 +70,13 @@ hanoman --version | --help
   `pnpm -r typecheck`, atau build penuh sebagai rutinitas — mesin ini menjalankan beberapa sesi
   sekaligus. Perluas scope hanya bila perubahannya memang berdampak luas, dan katakan alasannya.
   Jebakan: `--changed` menyalakan `passWithNoTests`, jadi nol test **terlihat hijau**.
+  Jebakan kedua, **env sesi mencemari suite** (SPEC-903 QA). `HANOMAN_CONTROL_ORIGINS` yang
+  diekspor shell operator membuat SELURUH `/api` dijawab 404 sebelum satu pun route dinilai, dan
+  `SSH_ASKPASS` membuat `pty.test.ts` merah (SPEC-881). Keduanya bukan regresi — bersihkan
+  env-nya (`env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS …`) sebelum menyalahkan kode.
+  `NODE_ENV` sudah **dipatok `test`** oleh `server/vitest.config.ts` sejak SPEC-903 (vitest sendiri
+  hanya `??=`, jadi `NODE_ENV=development` dari shell menang dan menjatuhkan setiap test WebSocket
+  jadi 401 lewat `revalidateWsPrincipal`).
 - Suite penuh (`vitest run --no-file-parallelism`) dijalankan **manusia** sebelum merge, bukan sesi
   dan bukan CI. Sejak amandemen ADR-0128 tanggal 2026-08-20, `.github/workflows/validate.yml` hanya
   menjalankan `pnpm typecheck`; job `publish` di `release.yml` tetap ber-`needs: validate`.

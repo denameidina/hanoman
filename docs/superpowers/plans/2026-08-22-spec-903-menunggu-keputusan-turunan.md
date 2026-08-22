@@ -980,21 +980,20 @@ suite ini; lihat catatan gagal palsu di bawah).
 | `server/test/pty-altscreen.test.ts` | 3/3 lulus |
 | `src/test/terminal-screen.test.tsx` | 69/69 lulus (2 test SPEC-903 baru) |
 | `src/test/pet-state.test.ts` | 38/38 lulus |
-| `server/test/terminal.route.test.ts` | 72 lulus, **9 gagal — IDENTIK di base** |
+| `server/test/terminal.route.test.ts` | **81/81 lulus** — 9 gagal pra-ada ikut diperbaiki, lihat adendum audit 2026-08-23 |
 | typecheck `server`, `shared`, `runner`, `src` | nol error |
 
 **Gagal palsu yang sudah dibuktikan, bukan regresi:**
 
-- `server/test/terminal.route.test.ts`. Diperiksa dua kali dengan `git checkout 5fe3c6ff -- server/src
-  server/test`, jalankan, lalu pulihkan — daftar **nama** test yang gagal `diff`-nya KOSONG (identik
-  base vs HEAD) di kedua putaran. Test SPEC-903 di berkas itu (`GET /terminal/sessions meneruskan
-  decisionAt`) LULUS.
-  Angkanya bergantung env, dan itu sendiri temuan: **`NODE_ENV=development` yang diekspor shell sesi
-  agen** membuat `ws-admission.ts:134` (`principal.kind === "test"` hanya sah bila
-  `NODE_ENV === "test"`) menolak SEMUA test WebSocket dengan 401 → 21 gagal. Dengan `NODE_ENV`
-  ikut dibersihkan: **9 gagal / 72 lulus**, base maupun HEAD, nama identik. Sisa 9 = 7 timeout
-  5000 ms pada test yang menunggu keluaran pane + 2 kaskade `readPrd` "freshest-wins" yang memungut
-  worktree sisa test sebelumnya. Semuanya pra-ada.
+- `server/test/terminal.route.test.ts` semula 21 gagal (9 sesudah `NODE_ENV` dibersihkan), terbukti
+  pra-ada: daftar **nama** test yang gagal `diff`-nya KOSONG antara base dan HEAD di dua putaran.
+  **Keduanya kini nol** — ditelusuri sampai akar dan diperbaiki di repo, bukan di env operator;
+  rinciannya di adendum audit 2026-08-23. Ringkas: (A) `HANOMAN_SHELL` yang tertinggal dari describe
+  `shell non-claude` membuat `createSession` memasang `default-shell` tmux GLOBAL ke
+  `fake-shell.sh`, yang mengabaikan argumennya — setiap sesi berikutnya membuang perintah agennya
+  tanpa error, jadi 7 test menggantung 5 dtk dan 2 test breakdown gagal 400 sebagai kaskade;
+  (B) `NODE_ENV` warisan shell menjatuhkan tiap test WebSocket jadi 401 lewat
+  `revalidateWsPrincipal`, kini dipatok `test` di `server/vitest.config.ts`.
 - `pty.test.ts` `"sesi agen lahir tanpa jalan meminta ketikan kredensial"`: gagal hanya bila
   `SSH_ASKPASS` ada di env sesi agen (SPEC-881). Dengan `env -u SSH_ASKPASS …` → lulus.
 - Seluruh route 404 bila `HANOMAN_CONTROL_ORIGINS` diwarisi dari shell operator.

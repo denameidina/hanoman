@@ -266,3 +266,63 @@ tmux -L probe list-panes -a -F '#{window_activity}'
 # biaya format
 time (for i in $(seq 1 50); do tmux -L hanoman list-panes -a -F "$FMT" >/dev/null; done)
 ```
+
+---
+
+## Adendum 2026-08-23 — 9 gagal "pra-ada" di `terminal.route.test.ts` ditelusuri sampai akar
+
+Laporan verifikasi SPEC-903 menyebut berkas ini punya **21 gagal pra-ada** (9 sesudah `NODE_ENV`
+dibersihkan). Keduanya kini **nol**; keduanya punya akar yang bisa diperbaiki di repo, bukan sekadar
+"lingkungan mesin ini".
+
+### Akar A — `HANOMAN_SHELL` yang tertinggal membuang perintah agen tanpa satu pun error
+
+Gejalanya 7 timeout 5000 ms + 2 × `expected 400 to be 201`. Semua test-nya **lulus bila dijalankan
+sendirian**, jadi ini pencemaran urutan, bukan cacat produk. Bisect atas `-t` per-describe
+menunjuk satu pencemar: `terminal routes · shell non-claude (SPEC-236)`.
+
+Rantainya:
+
+1. Tiga test di describe itu menyetel `process.env.HANOMAN_SHELL = fake-shell.sh` dan **tak pernah
+   memulihkannya** (satu lagi di ujung berkas, describe SPEC-742).
+2. `createSession` memasang `set-option -g default-shell $(shellBin())` — opsi **global** tmux —
+   pada SETIAP kelahiran sesi (`server/src/services/pty.ts`).
+3. `server/test/fixtures/fake-shell.sh` berbunyi `echo "SHELL-BIASA-SIAP"; exec cat`: ia
+   **mengabaikan argumennya**. tmux menyerahkan seluruh baris perintah agen ke `default-shell`, jadi
+   perintah itu dibuang diam-diam.
+4. Hasilnya pane yang **hidup dan sehat** tapi isinya bukan prompt agen. Setiap test yang menunggu
+   teks prompt karena itu menggantung sampai batas 5 dtk, dan dua test breakdown gagal 400 sebagai
+   kaskade dari worktree/state yang ditinggalkan test-test gagal itu.
+
+Diverifikasi langsung, bukan disimpulkan:
+
+```
+$ /tmp/…/t.sh terminal.route.test.ts -t "^terminal routes (· shell non-claude|· sesi backlog)"
+      Tests  4 failed | 17 passed        # backlog SENDIRIAN: 16 passed
+$ tmux -L hanoman-t903 show-options -g default-shell
+default-shell …/server/test/fixtures/fake-shell.sh
+```
+
+Perbaikannya memulihkan env-nya, bukan menambal test-test korbannya: satu `restoreShell()` di
+tingkat berkas, dipanggil dari `afterAll` describe SPEC-236 (melindungi sisa berkas) **dan** dari
+`afterAll` tingkat berkas — run ber-`--no-file-parallelism` berbagi satu proses, jadi env yang
+tertinggal menyeberang ke berkas test berikutnya.
+
+Uji mutasi: hapus `afterAll(restoreShell)` → **tepat 9 gagal itu kembali**. 81/81 dengan perbaikannya.
+
+### Akar B — `NODE_ENV` warisan shell menjatuhkan tiap test WebSocket jadi 401
+
+12 gagal sisanya (21 → 9) bukan kelemahan mesin: shell sesi hanoman mengekspor
+`NODE_ENV=development`, dan `revalidateWsPrincipal` (`server/src/services/ws-admission.ts`) menerima
+principal `test` **hanya** saat `NODE_ENV === "test"`. Vitest sendiri hanya `NODE_ENV ??= "test"`,
+jadi nilai warisan menang.
+
+Dipatok di `server/vitest.config.ts` — tempat yang sudah memagari `HANOMAN_TMUX_SOCKET` (SPEC-861)
+dan `HANOMAN_UPDATE_FETCH` (SPEC-215) untuk kelas masalah yang sama. `=`, bukan `??=`, tepat karena
+warisan itulah yang harus kalah. Test yang memang menguji nilai NODE_ENV lain menyuntikkannya
+sebagai **argumen** (`assertRuntimeBoundary({ NODE_ENV: … })`) atau memulihkannya sendiri
+(`static.test.ts`), jadi tak ada yang tersinggung.
+
+Terukur dengan `NODE_ENV=development` sengaja diwariskan: `terminal.route.test.ts` **81/81**, dan
+lima berkas WS lain (`events-ws`, `events-ws-default-origin`, `sync-ws`, `events.route`,
+`terminal-input-order`) 11/11.
