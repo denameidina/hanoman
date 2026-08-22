@@ -591,6 +591,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     const flags = agentFlags({
       agent, model: opts.model, effort,
       decisionFile: opts.decisionFile, goal: opts.goal, goalGate,
+      // SPEC-909 · ADR-0146 · sesi ber-`opts.command` tak pernah sampai ke sini (cabang shell
+      // mentah di atas), jadi hook event hanya pernah terpasang di sesi agen.
+      eventHook: true,
     }).map(sq).join(" ");
     // GOTCHA ADR-0094 #4: `--agents` TIDAK boleh ikut `.map(sq)` seperti flag lain — ia harus tetap
     // berbentuk `"$(cat …)"` supaya `sh -c` yang melahirkan sesi meng-expand-nya. Di-`sq` sekali
