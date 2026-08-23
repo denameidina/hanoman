@@ -1,0 +1,9 @@
+ASSET "hero-cinematic": the centerpiece hero artwork for a dark futuristic AI-orchestrator dashboard, in CINEMATIC SEMI-REALISTIC digital painting style (NOT flat illustration this time — think epic game key art: detailed painterly rendering, dramatic warm rim light, rich material detail).
+
+SUBJECT: Hanoman the white monkey god as a mighty PUPPET MASTER: powerful muscular body covered in silvery-white fur, noble monkey face with golden eyes looking slightly downward with calm command, magnificent tall golden Javanese crown (jamang) with intricate ornament, gold necklace, chest ornament and armbands with red jewels, red-and-gold royal kain around his waist. He has SIX ARMS fanned symmetrically — three per side, like a deity mudra: each of the four upper/middle hands holds slender GOLDEN PUPPET STRINGS/control bars angled outward and downward (the strings extend toward the lower corners and simply end — the puppets are NOT in this image), the lowest pair of hands rests calm near his lap. Upper body composition from mid-torso up, centered, facing forward, about 900 px tall of the canvas.
+
+LIGHTING: dramatic warm golden key light from above (like an oil lamp), subtle cool blue fill from below-front, glowing gold particles/dust around him allowed if SMALL and sparse.
+
+BACKGROUND: flat, pure, uniform green #00FF00 over the whole canvas — no scenery, no gradient, no vignette, no shadow cast on background. The subject must not touch the canvas edges; keep at least 40 px clear green margin all around. Do NOT remove the background yourself; the pipeline keys the green out.
+
+OUTPUT: square canvas 1024x1024. Use your image generation tool to produce exactly ONE image. Do not write code or create files. Your final message must be ONLY the absolute path of the generated PNG (under ~/.codex/generated_images/) and its pixel size.
