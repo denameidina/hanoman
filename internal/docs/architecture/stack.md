@@ -21,11 +21,21 @@ lewat `setInterval` yang di-`start` dari `server.ts` saja (`app.ts` bebas-timer)
 **engine scheduler otonom** (tick governor: checker source enable+cadence → antrean durable
 `SchedulerQueueItem` → drain di bawah cap). Scheduler **membalik sebagian ADR-0024** (menghidupkan kembali
 antrean durable + cap concurrency), tetap **tanpa** broker eksternal: "antrean durable" = tabel DB hanoman. Sejak
-SPEC-409/[ADR-0091](../adr/0091-hanoman-lead-agen-pemimpin.md) ada timer ketiga: **denyut hanoman-lead**
-(tick 5 dtk untuk pintu deteksi keputusan; denyut proaktif tiap `Setting.lead.everyMin`). Ia mengikuti
-pola yang sama persis — in-process, `.unref`, di-`start` dari `server.ts` — dan **tak menambah
-infrastruktur apa pun**: urutan kerja yang ia putuskan diserahkan ke antrean & governor scheduler yang
-sudah ada, bukan antrean kedua.
+SPEC-409/[ADR-0091](../adr/0091-hanoman-lead-agen-pemimpin.md) ada timer ketiga: **denyut hanoman-lead**.
+Ia mengikuti pola yang sama persis — in-process, `.unref`, di-`start` dari `server.ts` — dan **tak
+menambah infrastruktur apa pun**: urutan kerja yang ia putuskan diserahkan ke antrean & governor
+scheduler yang sudah ada, bukan antrean kedua.
+
+Sejak SPEC-909/[ADR-0146](../adr/0146-lead-dipicu-event-hook.md) timer itu **melambat, dan jumlah
+timer BERKURANG**. Dulu ia dua irama: tick **5 detik** untuk pintu deteksi keputusan (menyapu semua
+sesi hidup, satu `capture-pane` per sesi) plus denyut proaktif tiap `Setting.lead.everyMin`. Irama
+pertama dicabut — pertanyaan sesi kini tiba sebagai **event hook** (`POST /api/session-events`,
+dipanggil hook `PreToolUse`/`Stop` sesi) dan tak pernah lagi menunggu giliran timer mana pun.
+Yang tersisa satu irama RUMAH TANGGA (`HOUSEKEEPING_MS` **60 detik**): menyapu rantai kedaluwarsa,
+memangkas penghitung sesi mati, memberi tahu sesi pra-pembaruan, dan menagih denyut proaktif yang
+jatuh tempo. Terukur: `AskUserQuestion` → lead mulai menyusun turun dari lantai **6 023 ms** (+ ½
+tick) ke **32–164 ms**, dan `capture-pane` saat tak ada yang bertanya jadi **nol**. Tak ada kanal
+WebSocket baru: keadaan tanya untuk pet menumpang frame `leadAsks` di `/api/events/ws` (ADR-0039).
 
 ## Bentuk sistem
 ```

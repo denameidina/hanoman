@@ -280,7 +280,7 @@ orientasi, dan alpha master **berikut** keberadaan, batas 768px, alpha, dan peng
 web-nya — master sehat yang turunannya hilang berarti layar kosong di dashboard, bukan sekadar aset
 besar.
 
-## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142 · Pet hidup E SPEC-904)
+## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142 · Pet hidup E SPEC-904 · Pet hidup G SPEC-909 ADR-0146)
 
 Widget maskot di tepi bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi & backlog,
 bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada skema,
@@ -518,6 +518,39 @@ untuk panel yang justru sedang ditutup.
   kali (layarnya memang sudah berganti), `deciding` berkata lead yang berhak, sisanya menyuruh
   operator ke Terminal. `204` (tak ada dialog yang bisa dijawab di layar itu — termasuk dialog
   trust & prompt izin, yang **sengaja** tak pernah dilaporkan) menjadi kalimat, bukan tombol.
+
+**Pertanyaan dari payload event, bukan dari scrape** (SPEC-909 · ADR-0146). `PetAnswer` menerima
+prop `ask?: SessionAsk` yang datang dari frame siar **`leadAsks`** — kanal `/api/events/ws` yang
+sudah ada, tanpa WebSocket kedua (ADR-0039 utuh). Pembagian dua sumbernya tegas, dan itu yang
+membuat keduanya tak pernah berselisih:
+
+- **`ask` menjawab "APA pertanyaannya"** — payload tool `AskUserQuestion` apa adanya, bukti dari
+  agennya sendiri, tiba seketika (terukur 32–164 ms sesudah agen bertanya), tak pernah terpotong
+  lebar pane. Ia dirender **di atas** ketiga cabang keluar, termasuk saat `GET …/dialog` menyerah —
+  itulah kasus yang dulu melahirkan `"Pertanyaannya tak terbaca dari sini"`.
+- **`payload` menjawab "BARIS MANA yang ditekan"** — `screenHash` + nomor opsi, yang memang hanya
+  ada di layar. Tombol, checkbox, kotak teks, dan `send()` tetap memakainya apa adanya; pagar
+  SPEC-899/ADR-0142 berdiri utuh.
+
+Yang ditampilkan `ask`: **status lead** (`hanoman-lead mengantre` / `sedang menyusun` / `sudah
+menjawab` / `Kamu yang menjawab sesi ini` / `tak sanggup`, satu tabel kalimat di satu tempat),
+**langkah rantai** (`Pertanyaan n dari N` dari `at`/`total` — untuk `ask` yang ada, rumus lama
+berbasis `dialog.tabs` sengaja dimatikan supaya barisnya tak dobel), dan **pertanyaan aslinya**.
+
+Sesi **codex** tak punya `AskUserQuestion`: `questions` kosong dan yang ada cuma `message` = teks
+giliran terakhirnya. Pet mengatakannya apa adanya lewat eyebrow `Giliran terakhir sesi`, bukan
+merendernya sebagai pertanyaan berpilihan yang opsinya tak ada.
+
+**Ambil alih** (AC-6). Tombol `pet-answer-takeover` memanggil
+`POST /terminal/sessions/:id/dialog/takeover` dan menghentikan lead **sebelum** ia mengetik ke pane;
+`409 answering` berarti terlambat dan dikatakan begitu ("hanoman-lead sudah mengirim jawabannya ke
+pane"), bukan diam. Sesudah `state = "taken-over"` tombolnya hilang — tak ada lagi yang bisa
+direbut. Satu baris catatan saja yang dirender, dan hasil aksi terakhir MENANG atas kalimat
+keadaan: dua `pet-answer-note` sekaligus membuat operator membaca yang salah.
+
+Tanpa `ask` — server yang lebih tua (ADR-0087 mengizinkan dashboard lebih baru), sesi pra-pembaruan,
+atau frame yang belum tiba — seluruh blok ini tak dirender dan kotaknya berperilaku **persis seperti
+sebelum SPEC-909**, termasuk kalimat `"Pertanyaannya tak terbaca dari sini"`.
 
 Gelembung pose `waiting` menawarkan **"Jawab di sini"** yang menutup gelembung lalu membuka panel —
 jalur yang sama persis dengan tombol `Lihat` milik rekap.
