@@ -1,0 +1,7 @@
+ASSET 1 of 3 — "dalang-six-arms": the ORCHESTRATOR figure, to be composited into a dashboard UI (puppets are separate assets, so his hands hold rods that end in EMPTY air).
+
+SUBJECT: Anoman (Hanoman) exactly as in the attached model sheet — white rewanda monkey hero in PROFILE with ONE visible eye facing RIGHT, tall golden jamang crown, curly white hair at the back of the head, gold necklace and armbands, red-and-gold kain (sarong), ONE long curling tail with a golden ornament tip. Keep this character, costume, colours and proportions faithful to the model sheet.
+
+POSE (follow the attached six-armed concept painting for the pose idea, but the flat style comes from the model sheet): Anoman sits cross-legged (bersila) as a DALANG — a wayang puppet master — with SIX arms, three per side, fanned elegantly like a dance mudra. This is a deliberate mythic exaggeration; draw each arm clearly with a well-formed readable hand. FOUR upper hands each grip a slender wooden gapit rod, held up and outward at different angles — the rods end in empty air (nothing attached; the puppets are separate assets). ONE lower hand rests on a small stack of folio documents beside his knee. ONE lower hand reaches down-and-out, open, about to pick something up. The long tail sweeps out behind him in one grand curve, golden tip raised. Composition: full body centred, roughly 850 px tall on the 1024 canvas.
+
+Only Anoman, the six arms, the four bare rods, the folio stack, and his tail — no puppets, no lamp, no screen, no text, no border.

@@ -36,7 +36,9 @@ describe("DalangStage — panggung dalang di Overview", () => {
       onOpenSession={noop} onOpenProject={noop} />);
     expect(screen.getByText("Anoman siaga di balik kelir")).toBeTruthy();
     expect(screen.getByText(/Panggung sunyi/)).toBeTruthy();
-    expect(document.querySelector('[data-illustration-id="MPS-003"]')).toBeTruthy();
+    // Sang dalang (aset Codex) selalu hadir; blencong tak menyala saat kelir sunyi.
+    expect(document.querySelector('img[src*="dalang-six-arms"]')).toBeTruthy();
+    expect(document.querySelector(".hn-dalang-blencong[data-lit]")).toBeNull();
     expect(screen.getByRole("button", { name: "Buka project alpha" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Buka project beta" })).toBeTruthy();
   });
@@ -52,9 +54,11 @@ describe("DalangStage — panggung dalang di Overview", () => {
       ]}
       onOpenSession={onOpenSession} onOpenProject={noop} />);
     expect(screen.getByText("Anoman sedang memainkan lakon")).toBeTruthy();
-    expect(document.querySelector('[data-illustration-id="MPS-004"]')).toBeTruthy();
+    expect(document.querySelector('img[src*="dalang-six-arms"]')).toBeTruthy();
+    expect(document.querySelector(".hn-dalang-blencong[data-lit]")).toBeTruthy();
     const liveList = screen.getByRole("list", { name: "Sesi yang sedang berjalan" });
     expect(liveList.querySelectorAll(".hn-dalang-live")).toHaveLength(2);
+    expect(liveList.querySelectorAll('img[src*="wayang-project"]')).toHaveLength(2);
     // sub-label memakai Spec.stage yang hidup, bukan ProjectView.session yang basi
     fireEvent.click(screen.getByRole("button", { name: "Buka terminal — alpha, SPEC-1 · execute" }));
     expect(onOpenSession).toHaveBeenCalledWith("s-alpha");

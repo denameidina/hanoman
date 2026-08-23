@@ -684,10 +684,16 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 .hn-dalang-stat { text-align: right; }
 .hn-dalang-stat > div:first-child { justify-content: flex-end; }
 .hn-dalang-stage {
-  display: flex; align-items: flex-end; gap: 12px; min-height: 132px;
+  position: relative; display: flex; align-items: flex-end; gap: 16px; min-height: 148px;
   padding: 6px 20px 0; background: linear-gradient(180deg, var(--bone-000), var(--bone-200));
 }
-.hn-dalang-mascot { width: 132px; flex: 0 0 auto; }
+.hn-dalang-mascot { width: 172px; flex: 0 0 auto; }
+/* Blencong di header panel; "menyala" (drop-shadow hangat) hanya saat ada wayang dimainkan.
+   Digambar Codex tanpa glow — cahayanya urusan UI (prompt aset). */
+.hn-dalang-blencong { height: 44px; width: auto; flex: 0 0 auto; pointer-events: none; }
+.hn-dalang-blencong[data-lit] {
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--brass-400) 65%, transparent));
+}
 .hn-dalang-troupe {
   flex: 1; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
   padding: 4px 0 14px;
@@ -737,6 +743,7 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   .hn-dalang-stats { gap: 16px; }
   .hn-dalang-stat { text-align: left; }
   .hn-dalang-stat > div:first-child { justify-content: flex-start; }
-  .hn-dalang-mascot { width: 96px; }
+  .hn-dalang-mascot { width: 116px; }
+  .hn-dalang-blencong { display: none; }
   .hn-dalang-live { width: 100%; }
 }

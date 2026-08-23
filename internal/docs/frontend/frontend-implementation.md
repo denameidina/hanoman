@@ -722,8 +722,14 @@ bekerja. Satu sesi hidup = satu **wayang dimainkan** — kartu gelap `--term-bg`
 ada di wire `TerminalSession`); klik → `setFocusSession(id)` + section terminal (jalur yang
 sama dengan pet). Project tanpa sesi hidup = chip **wayang parkir** di baris debog
 (`hn-dalang-debog`); klik → detail project. Kartu "Claude Code sedang jalan" + KPI "Sesi aktif"
-Overview ikut pindah ke sumber yang sama. Maskot memakai registry katalog (`MPS-004` work saat
-ada sesi, `MPS-003` observe saat sunyi) — bukan aset baru.
+Overview ikut pindah ke sumber yang sama. **Figurnya keluarga aset sendiri** sejak aset Codex
+menggantikan maskot registry (MPS-004/003): `internal/assets/dalang/` — sang dalang **enam
+lengan** ber-gapit kosong (wayang-nya kartu sesi), satu wayang project per kartu hidup, dan
+blencong di header yang "menyala" lewat `data-lit` + drop-shadow CSS hanya saat ada sesi
+(asetnya sengaja digambar tanpa glow). Frontend mengimpor **versi display** (512/384/256,
+±134 KB total) — master q90 tinggal di `master/` dan tak pernah masuk bundel (pelajaran 5,5 →
+46,1 MB registry illustration). Rekaman produksi + prompt + cara regenerasi (chroma key
+`petlib.chroma_key`) di README direktori aset itu.
 Empat stat di header: **dikerjakan hari ini** (`Spec.startedAt` pada hari LOKAL ini —
 komponen-per-komponen, bukan parse `YYYY-MM-DD` yang jatuh ke UTC, gotcha ADR-0090), sesi
 berjalan, menunggu (`!startedAt && stage !== "done"`), dan total `done`. `doneAt` sengaja tak

@@ -7,9 +7,14 @@
    frontend-implementation.md); kosakata sesinya cermin pet-state.ts: hidup = `!exited`,
    menunggu manusia = `decision && !deciding`. Murni presentasi, tanpa fetch sendiri. */
 import React from "react";
-import { MascotIllustration } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, Spec } from "./types";
+// Aset dalang digenerate Codex/GPT Image (chroma key hijau → transparan), master + rekaman
+// produksi di internal/assets/dalang/. Ukuran display (512/384/256) supaya bundle tak bengkak —
+// pelajaran registry illustration (master 1,5 MB per berkas dilarang masuk glob bundel).
+import dalangUrl from "../../../internal/assets/dalang/hnm-dalang-six-arms-v01.webp?url";
+import wayangUrl from "../../../internal/assets/dalang/hnm-wayang-project-v01.webp?url";
+import blencongUrl from "../../../internal/assets/dalang/hnm-blencong-v01.webp?url";
 
 // Batas hari LOKAL, komponen-per-komponen — `new Date("YYYY-MM-DD")` adalah tengah malam UTC
 // dan menggeser hari di WIB (gotcha ADR-0090/0105).
@@ -84,9 +89,8 @@ function LivePuppet({ s, projects, backlog, index, onOpenSession }: {
     >
       <span className={waiting ? "hn-dalang-puppet hn-dalang-puppet--still" : "hn-dalang-puppet"}
         style={{ animationDelay: `${(index % 5) * 0.7}s` }}>
-        <WayangSilhouette height={72}
-          color={waiting ? "var(--amber-500)" : "var(--brass-300)"}
-          rod={waiting ? "var(--amber-600)" : "var(--brass-700)"} />
+        <img src={wayangUrl} alt="" aria-hidden="true" height={78}
+          style={{ display: "block", width: "auto" }} />
       </span>
       <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 500, color: "var(--term-fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{projectName}</span>
       <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 10.5, color: waiting ? "var(--amber-500)" : "var(--brass-400)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -123,13 +127,18 @@ export function DalangStage({ projects, backlog, sessions, onOpenSession, onOpen
   return (
     <section className="hn-dalang" aria-label="Panggung dalang — status orkestrasi workspace">
       <div className="hn-dalang-head hn-wrap-mobile">
-        <div>
-          <div className="hn-eyebrow" style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "var(--tracking-caps)", color: "var(--text-subtle)" }}>
-            panggung dalang · {live.length > 0 ? `${live.length} wayang dimainkan` : "kelir sunyi"}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {/* Blencong di header — di kelir ia menabrak kartu wayang; "menyala" saat ada sesi. */}
+          <img className="hn-dalang-blencong" src={blencongUrl} alt="" aria-hidden="true"
+            data-lit={live.length > 0 || undefined} />
+          <div>
+            <div className="hn-eyebrow" style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "var(--tracking-caps)", color: "var(--text-subtle)" }}>
+              panggung dalang · {live.length > 0 ? `${live.length} wayang dimainkan` : "kelir sunyi"}
+            </div>
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, color: "var(--text-strong)", margin: "5px 0 0" }}>
+              {live.length > 0 ? "Anoman sedang memainkan lakon" : "Anoman siaga di balik kelir"}
+            </h2>
           </div>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, color: "var(--text-strong)", margin: "5px 0 0" }}>
-            {live.length > 0 ? "Anoman sedang memainkan lakon" : "Anoman siaga di balik kelir"}
-          </h2>
         </div>
         <div className="hn-dalang-stats">
           <Stat value={startedToday} label="dikerjakan hari ini" dot="var(--brass-500)" />
@@ -141,7 +150,9 @@ export function DalangStage({ projects, backlog, sessions, onOpenSession, onOpen
 
       <div className="hn-dalang-stage">
         <div className="hn-dalang-mascot">
-          <MascotIllustration id={live.length > 0 ? "MPS-004" : "MPS-003"} decorative />
+          {/* Sang dalang sendiri: enam lengan, empat gapit kosong — wayang-nya kartu di kelir.
+              Aset yang sama untuk idle & running; yang bercerita adalah kelir di sebelahnya. */}
+          <img src={dalangUrl} alt="" aria-hidden="true" style={{ display: "block", width: "100%", height: "auto" }} />
         </div>
         {live.length > 0 ? (
           <div className="hn-dalang-troupe" role="list" aria-label="Sesi yang sedang berjalan">
