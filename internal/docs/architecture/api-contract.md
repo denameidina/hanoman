@@ -1614,12 +1614,15 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 > ditinggalkan ditutup penyapu (`Setting.lead.flowTtlMin`, default 60 menit) yang menumpang tick
 > lead — tanpa timer baru (ADR-0024 utuh).
 >
-> **Pintu #2 — deteksi otomatis** (tanpa endpoint): lead melihat sesi hidup ber-marker keputusan
-> terisi (mekanisme SPEC-184/196 yang sudah ada), `capture-pane`, menyimpulkan pertanyaannya, lalu
-> **mengetik jawabannya ke pane** (`pty.sendToPane`, dipotong `goalChunks` — burst ≥1024 char jadi
-> `[Pasted Content]` secara senyap, ADR-0085). Pane MATI tak pernah dijawab; marker sesi **codex**
-> yang sebenarnya selesai wajar (ADR-0074) juga tidak. Batasnya `maxAutoAnswers` berturut-turut per
-> sesi → sesudah itu lead berhenti & menotifikasi.
+> **Pintu #2 — deteksi otomatis.** Sejak SPEC-909/[ADR-0146](../adr/0146-lead-dipicu-event-hook.md)
+> ia punya endpoint: **`POST /api/session-events`** (lihat §Event hook sesi di atas), dipanggil hook
+> sesi. Sebelumnya "tanpa endpoint" — lead memindai sesi hidup ber-marker terisi tiap 5 detik,
+> `capture-pane`, lalu MENYIMPULKAN pertanyaannya; kini pertanyaan & opsinya datang TERSTRUKTUR dari
+> payload tool `AskUserQuestion` (codex: `last_assistant_message` dari hook `Stop`). Yang tak
+> berubah: jawabannya tetap **diketik ke pane** (`pty.sendToPane`, dipotong `goalChunks` — burst
+> ≥1024 char jadi `[Pasted Content]` secara senyap, ADR-0085); pane MATI tak pernah dijawab; giliran
+> **codex** yang sebenarnya selesai wajar (ADR-0074) juga tidak; batasnya tetap `maxAutoAnswers`
+> berturut-turut per sesi → sesudah itu lead berhenti & menotifikasi.
 >
 > **Pintu #3 — denyut proaktif** (`setInterval` in-process, cermin engine scheduler — tanpa queue/
 > worker/cron, ADR-0024 utuh): menata urutan backlog siap-kerja (**diserahkan ke antrean & governor
@@ -1642,7 +1645,9 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 > `tmux list-panes -a` stabil, jadi gerbang "siapa cepat" melaparkan ekor daftar persis seperti loop
 > serial yang digantikannya. Slot yang tak didapat dalam `queueWaitSec` (default 120) → penolakan
 > **eksplisit yang bisa diulang**: `503 { retryable:true }` + `Retry-After` di pintu kontrak, lewati-
-> dan-coba-lagi di pintu deteksi & denyut. Penuh **bukan** kegagalan lead — ia tak menulis baris
+> dan-coba-lagi di pintu deteksi & denyut. **SPEC-909:** loop `for`+`await` pintu deteksi sudah tak
+> ada — batasnya kini kolam pekerja di `lead/ask.ts` dengan angka yang SAMA (`maxConcurrent`), plus
+> ember token per sesi (5 @ 1/10 dtk) & global (20 @ 2/dtk) di depan gerbang itu. Penuh **bukan** kegagalan lead — ia tak menulis baris
 > jejak dan tak menambah penghitung `maxAutoAnswers`, sebab pagar itu (SPEC-472) dibuat untuk sebab
 > yang tak hilang dengan mengulang sementara penuh hilang begitu slot bebas.
 >

@@ -470,15 +470,30 @@ describe("pty service", () => {
 
   // Guardrail deny PreToolUse dicabut (SPEC-197, ADR-0037): sesi tetap membawa `--settings`
   // (untuk marker keputusan SPEC-184) tapi TAK ada lagi hook deny `hook pretooluse`.
-  it("tidak lagi mendaftarkan guard hook PreToolUse (ADR-0037)", async () => {
+  // ADR-0037 · guardrail DENY dicabut: tak satu pun hook menolak tool call. SPEC-909 · ADR-0146
+  // menambahkan `PreToolUse` ber-matcher `AskUserQuestion`, dan itu BUKAN pembalikan ADR-0037 —
+  // ia tak pernah menolak apa pun, cuma mengirim pertanyaannya ke server lalu `exit 0`. Yang
+  // dijaga test ini karena itu berubah bentuk: bukan lagi "tak ada PreToolUse sama sekali",
+  // melainkan "tak ada PreToolUse yang bisa MEMBLOKIR".
+  it("hook `--settings`: event AskUserQuestion terpasang, guard deny tetap tak ada (ADR-0037 · SPEC-909)", async () => {
     process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
     const s = createSession("p1", process.cwd());
     await waitFor(() => exited(s.id));
     const c = fakeClient();
     attach(s.id, c);
-    expect(allData(c)).toContain("--settings");
-    expect(allData(c)).not.toContain("hook pretooluse");
-    expect(allData(c)).not.toContain("PreToolUse");
+    const argv = allData(c);
+    expect(argv).toContain("--settings");
+    // SPEC-909 · ADR-0146 · hook event WAJIB terpasang di sesi agen, dan wajib selalu `exit 0`:
+    // `PreToolUse` yang keluar dengan kode 2 MEMBLOKIR tool-nya.
+    expect(argv).toContain("PreToolUse");
+    expect(argv).toContain("AskUserQuestion");
+    expect(argv).toContain("exit 0");
+    // ADR-0037 · dan ia BUKAN pembalikan guardrail yang dicabut: tak satu pun hook menolak tool
+    // call. Dulu test ini menuntut "tak ada PreToolUse sama sekali"; yang dijaganya sebenarnya
+    // "tak ada PreToolUse yang bisa MEMBLOKIR", dan itulah bentuknya sekarang.
+    expect(argv).not.toContain("hook pretooluse");
+    expect(argv.toLowerCase()).not.toContain("permissiondecision");
+    expect(argv).not.toContain("deny");
   });
 
   it("sesi backlog membawa specId + flow, dan id-nya diturunkan dari spec", () => {

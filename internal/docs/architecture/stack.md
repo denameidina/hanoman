@@ -47,7 +47,9 @@ Server (Fastify, bind 127.0.0.1:8787)
    ├─ PTY/tmux  ─► sesi `claude` interaktif per backlog, di git worktree terisolasi
    ├─ VPS monitor (setInterval: health 5 mnt · audit 24 jam)
    ├─ Scheduler engine (setInterval tick: source enable+cadence → antrean durable → rekonsil akhir sesi + scanDecisions → drain di bawah cap · SPEC-294/ADR-0072; checker konkret: backlog SPEC-295, errors SPEC-296 — grup produksi berulang → escalate → antrean, satu grup = satu backlog, triase SPEC-297 — tiket bug/fitur eligible → accept → antrean, satu tiket = satu backlog; SPEC-298 — klausa autonomy per mode saat launch [full-control tembus sampai done / butuh-keputusan berhenti→notif decision, slot tetap] + akhir sesi: done→ringkasan `SessionResult`+notif done tanpa auto-merge, gagal/limit→notif fail tanpa retry)
-   ├─ Lead engine (setInterval: 5 dtk pintu deteksi keputusan [pane ber-marker → capture → putuskan → ketik jawabannya];
+   ├─ Lead engine (pintu deteksi keputusan = EVENT, bukan timer: hook sesi → POST /api/session-events
+   │                → lead/ask.ts → putuskan → ketik jawabannya · SPEC-909/ADR-0146;
+   │                setInterval 60 dtk hanya RUMAH TANGGA: rantai kedaluwarsa, pangkas penghitung, sesi tanpa jalur event;
    │                denyut proaktif tiap Setting.lead.everyMin: urutan kerja → antrean scheduler yang SUDAH ADA,
    │                tabrakan area kerja dari diff worktree, tindak lanjut sesi exitCode≠0 / plan bersisa `- [ ]` · SPEC-409/ADR-0091;
    │                default MATI, opt-in per project lewat Project.leadOptIn)

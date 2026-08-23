@@ -150,6 +150,20 @@ export const waitingSessions = (sessions: TerminalSession[], backlog: Spec[]): T
   return byId(sessions).filter((s) => sessionKind(s, done) === "waiting");
 };
 
+/**
+ * SPEC-909 · ADR-0146 · sesi yang keputusannya SEDANG disusun lead.
+ *
+ * Kotak jawab harus ikut lahir di sini, bukan hanya di `waiting`, dan itu bukan detail tata letak:
+ * sejak pertanyaan tiba sebagai EVENT, `deciding` menyala ±50 ms sesudah agen bertanya sementara
+ * marker (`decision`) baru terisi ±6 detik kemudian. `sessionKind` memberi tiap sesi tepat SATU
+ * kondisi dan `deciding` menang atas `waiting`, jadi kotak yang hanya digantung di `waiting` tak
+ * pernah muncul di jendela yang justru dituju AC-6 — "ambil alih SEBELUM lead mengetik ke pane".
+ */
+export const decidingSessions = (sessions: TerminalSession[], backlog: Spec[]): TerminalSession[] => {
+  const done = doneSpecIds(backlog);
+  return byId(sessions).filter((s) => sessionKind(s, done) === "deciding");
+};
+
 export function derivePetConditions(input: PetInput): PetCondition[] {
   const { sessions, backlog, notifications, now } = input;
   const conn = input.connection ?? ONLINE;

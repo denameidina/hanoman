@@ -174,8 +174,13 @@ export function buildApp(
         // SPEC-253 · ADR-0062 · halaman/submit/status Help Center dipanggil pengguna akhir tanpa sesi
         // login; route /api/help di-otorisasi helpEnabled + kunci opaque tiket sendiri (pengecualian sah).
         // SPEC-909 · ADR-0146 · event hook sesi: kredensialnya token turunan per sesi, di-enforce
-        // route-nya sendiri (pola /api/sync device token). `capabilityForRoute` memetakannya ke
-        // COOKIE_ONLY, jadi agent token tetap 403 — memalsukan pertanyaan bukan capability apa pun.
+        // route-nya sendiri (pola /api/sync device token).
+        //
+        // Bypass ini mendahului cabang agent token di bawah, jadi `capabilityForRoute` TAK PERNAH
+        // dieksekusi untuk path ini: agent token ditolak route-nya dengan **401** (token sesi tak
+        // cocok), bukan 403 "cookie session required". Petanya tetap `COOKIE_ONLY` supaya jawabannya
+        // benar bila urutan cabang ini kelak berubah — tapi jangan mengandalkannya sebagai lapis
+        // kedua yang aktif hari ini. Yang menutup pintunya adalah HMAC di route.
         if (path === "/api/session-events") return;
         if (path.startsWith("/api/help")) return;
         if (user) return; // cookie sesi = akses penuh (tak ada RBAC, konsisten model sekarang)

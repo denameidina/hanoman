@@ -6,7 +6,7 @@ import {
   markTakenOver, isTakenOver, clearTakeover,
 } from "./deciding";
 import { beginAnswer, endAnswer } from "../session-dialog";
-import { listSessions } from "../pty";
+import { listSessionsAsync } from "../pty";
 
 // SPEC-909 · ADR-0146 · SATU-SATUNYA pemilik keadaan event pintu deteksi.
 //
@@ -57,7 +57,7 @@ export type AskDeps = {
     answered: boolean; reason: string; at: number; flowId: string | null; step: number | null;
   }>;
   reset: (sessionId: string) => void;
-  live: () => string[];
+  live: () => string[] | Promise<string[]>;
   maxConcurrent: () => Promise<number>;
   now: () => number;
 };
@@ -68,8 +68,13 @@ export const prodAskDeps: AskDeps = {
   reset: resetSession,
   // SPEC-402 · bacaan tmux yang gagal tak boleh berarti "semua sesi berakhir": daftar kosong akan
   // memangkas penghitung sesi yang sebenarnya hidup, dan pagar AC-11 lahir kembali dari nol.
-  live: () => {
-    try { return listSessions().filter((s) => !s.exited).map((s) => s.id); }
+  //
+  // ASINKRON, dan itu bukan gaya: `listSessions()` memakai `execFileSync` yang memblokir event loop
+  // sampai 916 ms saat mesin sibuk (SPEC-878) — persis biaya yang route event hindari dengan
+  // memilih `getSessionAsync`. Memanggil versi sinkronnya tiga baris kemudian membatalkan pilihan
+  // itu.
+  live: async () => {
+    try { return (await listSessionsAsync()).filter((s) => !s.exited).map((s) => s.id); }
     catch { return [...entries.keys()]; }
   },
   maxConcurrent: async () => (await getLead()).maxConcurrent,
@@ -146,9 +151,6 @@ export async function intakeAsk(
 
   seenSet.add(key); seen.push(key);
   while (seen.length > SEEN_MAX) { const old = seen.shift()!; seenSet.delete(old); }
-  // Pertanyaan BARU membatalkan takeover pertanyaan sebelumnya: operator merebut satu episode,
-  // bukan sesi itu selamanya.
-  clearTakeover(input.sessionId);
 
   const ctx: AskCtx = {
     projectId: input.projectId, specId: input.specId, decisionFile: input.decisionFile,
@@ -159,9 +161,16 @@ export async function intakeAsk(
   // dan dijalankan sesudahnya — itulah yang membuat "event kembar tak melahirkan dua keputusan
   // paralel" benar secara KONSTRUKSI, bukan lewat penjagaan yang harus diingat.
   if (cur?.running) { cur.pending = { ask, ctx }; return { status: "accepted" }; }
+
+  // Takeover dilepas HANYA di sini — sesudah gerbang `running` di atas, bukan sebelumnya.
+  // Operator merebut satu EPISODE, dan episode berikutnya memang miliknya lead lagi; tapi kalau
+  // pelepasannya berjalan tanpa syarat, event kedua yang tiba selagi lead masih di tengah rantai
+  // (mis. menunggu di `waitScreenChange`, sampai 6 dtk) akan MENCABUT takeover yang baru saja
+  // dimenangkan operator — dan pemicunya milik sesi, bukan operator.
+  clearTakeover(input.sessionId);
   entries.set(input.sessionId, { ask, ctx, pending: null, running: false });
 
-  prune(deps);
+  void prune(deps);
   void run(input.sessionId, deps);
   return { status: "accepted" };
 }
@@ -175,10 +184,10 @@ export async function intakeAsk(
  * sebelum ia sempat bertanya sekali pun. Tick rumah tangga lead (engine.ts) memanggilnya sekali per
  * menit justru untuk menutup celah itu; dulu `sweep()` tiap 5 detik yang melakukannya.
  */
-export function pruneAsks(deps: AskDeps = prodAskDeps): void { prune(deps); }
+export function pruneAsks(deps: AskDeps = prodAskDeps): void { void prune(deps); }
 
-function prune(deps: AskDeps): void {
-  const live = new Set(deps.live());
+async function prune(deps: AskDeps): Promise<void> {
+  const live = new Set(await deps.live());
   for (const id of [...entries.keys()]) {
     if (live.has(id)) continue;
     entries.delete(id); perSession.delete(id); clearTakeover(id);

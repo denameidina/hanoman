@@ -91,7 +91,7 @@ Cakupan: **satu workspace** (`nafanesia`), **satu lead per project** (lead linta
 - Dipakai sesi internal **dan** agen eksternal ber-`AgentToken`, dengan capability tulis tersendiri (bukan menumpang prefix baca).
 
 **C. Pintu keputusan #2 — deteksi otomatis**
-- Lead memantau sesi hidup ber-marker keputusan terisi, membaca layar pane-nya, menyimpulkan pertanyaannya, lalu **mengetik jawaban ke pane** sehingga agen lanjut tanpa tahu siapa yang menjawab.
+- Lead menerima event pertanyaan dari hook sesi (SPEC-909/ADR-0146; sebelumnya: memantau sesi hidup ber-marker keputusan terisi lalu membaca layar pane-nya), lalu **mengetik jawaban ke pane** sehingga agen lanjut tanpa tahu siapa yang menjawab.
 - Membedakan marker "benar-benar bertanya" dari marker "sesi codex selesai wajar".
 - Melayani sesi lama & agen yang tak tahu kontrak apa pun.
 
@@ -179,7 +179,7 @@ Cakupan: **satu workspace** (`nafanesia`), **satu lead per project** (lead linta
 
 ### B. Deteksi otomatis
 
-- **AC-7** — WHEN sebuah sesi hidup menunjukkan marker keputusan terisi dan lead aktif untuk project itu, THE SYSTEM SHALL membaca layar pane sesi tersebut dan menurunkan pertanyaannya tanpa campur tangan manusia.
+- **AC-7** — WHEN sebuah sesi hidup meminta masukan manusia dan lead aktif untuk project itu, THE SYSTEM SHALL menurunkan pertanyaannya tanpa campur tangan manusia. *(Diamandemen SPEC-909/[ADR-0146](../../internal/docs/adr/0146-lead-dipicu-event-hook.md): sumbernya kini **event hook** yang membawa pertanyaan & opsi terstruktur — `AskUserQuestion` untuk claude, akhir-turn untuk codex — bukan lagi "marker keputusan terisi → baca layar pane". Marker tetap ada dan tetap milik pil/notifikasi/pet, tapi ia bukan lagi pemicu lead. Konsekuensi yang diterima sadar: prompt IZIN dan pertanyaan PROSA tanpa tool tak lagi dijemput lead.)*
 - **AC-8** — WHEN hanoman-lead telah memutuskan jawaban untuk sesi yang terdeteksi menunggu, THE SYSTEM SHALL mengirimkan jawaban itu ke pane sesi sebagai masukan, dan sesi SHALL melanjutkan pekerjaannya tanpa perubahan apa pun pada prompt atau kontrak sesi.
 - **AC-9** — IF marker keputusan berasal dari sesi `codex` yang sebenarnya telah selesai wajar, THEN THE SYSTEM SHALL TIDAK mengirim masukan apa pun ke pane itu.
 - **AC-10** — IF sebuah pane sudah mati, THEN THE SYSTEM SHALL TIDAK memperlakukannya sebagai sesi yang menunggu keputusan.

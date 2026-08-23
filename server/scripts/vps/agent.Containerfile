@@ -3,8 +3,10 @@
 # sebagai /agent-home:ro dan menyetel HOME=/agent-home.
 FROM docker.io/library/node:22-bookworm-slim
 
+# SPEC-909 · ADR-0146 · `curl` dipakai hook sesi untuk mengirim pertanyaan agen ke server.
+# Tanpanya hook diam & `exit 0` — tak pernah memblokir agen, tapi juga tak pernah sampai.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      git ca-certificates ripgrep && rm -rf /var/lib/apt/lists/*
+      git ca-certificates ripgrep curl && rm -rf /var/lib/apt/lists/*
 RUN npm i -g @anthropic-ai/claude-code @openai/codex
 
 WORKDIR /workspace

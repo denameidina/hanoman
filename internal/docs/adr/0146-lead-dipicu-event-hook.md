@@ -84,6 +84,20 @@ mengistimewakan `127.0.0.1` di sana akan membuka permukaan control lewat reverse
 menerima `HANOMAN_EVENT_HOST` = host control pertama saat origin dipisah, dan hook mengirimkannya
 sebagai header `Host` di atas koneksi **loopback** — tanpa DNS, tanpa TLS.
 
+### 4b · Sesi ber-SANDBOX tak terjangkau, dan itu dinyatakan alih-alih disembunyikan
+
+Profil production ADR-0117 menjalankan sesi di dalam `podman run --network <bridge>`
+(`services/session-sandbox.ts`), sementara server WAJIB bind loopback host. Di dalam container
+`127.0.0.1` adalah loopback **container**, dan `NO_PROXY=localhost,127.0.0.1,::1` memastikan curl tak
+mencoba egress proxy — jadi hook di sana **tak akan pernah** mencapai server. (Penghalang kedua,
+`curl` yang absen dari `agent.Containerfile`, ditutup ADR ini; yang pertama tidak.)
+
+Menutupnya menuntut server yang terjangkau dari jaringan sesi — melebarkan bind dari loopback, yaitu
+keputusan keamanan tersendiri dengan ADR-nya sendiri. Yang dilakukan di sini adalah **berhenti
+berbohong tentangnya**: sesi ber-sandbox sengaja TIDAK menyandang `@hanoman_event_hook`, sehingga
+jalur "sesi tanpa jalur event" (keputusan 10) menotifikasinya sekali alih-alih membiarkannya
+menggantung senyap. Tanpa itu penandanya sendiri yang mematikan satu-satunya peringatan yang tersisa.
+
 ### 5 · `scanAndAnswer` → `admitAsk` + antrean berpekerja
 
 Seluruh pagar tahap 1 pindah UTUH ke `admitAsk(sessionId)`, dinilai satu sesi per event: opt-in ·
@@ -202,6 +216,20 @@ sama (ADR-0102 utuh di produksi, tanpa satu pun tebakan atas layar); `Bearer` sa
   kredensial apa pun tak punya jalan masuk, dan sesi yang tak berniat mencuri tak bisa memalsukan
   pertanyaan hanya karena kebetulan tahu id sesi tetangganya.
 
+- **Token tak punya kedaluwarsa dan tak bisa dicabut,** dan karena id sesi spec deterministik ia
+  **stabil lintas kelahiran-ulang** sesi itu. Rotasinya berarti merotasi `secret.key`, yang juga
+  memegang enkripsi at-rest RuntimeConfig — jadi tak ada pencabutan per sesi. Diterima karena
+  jangkauan yang dilindunginya sudah dibatasi hal lain: sesi harus HIDUP (404 kalau tidak), ember
+  token mengikat, dan `maxAutoAnswers` mengunci sesi sesudah 3 percobaan.
+- **Permukaan terimanya bukan cuma loopback.** Terukur: `Host` = origin **publik** → 404
+  (`publicPath()` menolak seluruh `/api/…` selain health & help), tapi `Host` = origin **control** →
+  sampai ke handler. Di VPS host control ada di balik reverse proxy yang menghadap internet, jadi
+  yang menutup pintunya adalah token, bukan topologi. Itu memang desainnya — dinyatakan di sini
+  supaya tak ada yang mengira ada lapis kedua.
+- **Body diparse sebelum kredensial dicek** untuk route yang di-bypass (Fastify memparse body
+  sesudah `onRequest`). Sama seperti `/api/sync`. Ongkosnya dibatasi `bodyLimit` 1 MiB dan — sejak
+  pagar biaya `parseHookEvent` — linear.
+
 **Gotcha yang mahal kalau dilupakan:**
 
 1. **`PreToolUse` menembak SEBELUM tool-nya jalan.** Dialognya belum ada di layar saat event tiba.
@@ -229,6 +257,23 @@ sama (ADR-0102 utuh di produksi, tanpa satu pun tebakan atas layar); `Bearer` sa
    `answers`/`failures` nyawa sebelumnya, dan AC-11 menutupnya sebelum ia sempat bertanya sekali pun.
    Intake memangkas, dan tick rumah tangga memangkas lagi — dulu `sweep()` tiap 5 detik yang
    melakukannya.
-8. **`DATABASE_URL` ambient menang atas `HANOMAN_HOME`.** Harness pengukuran yang hanya menyetel
+8. **`clip()` WAJIB memotong sebelum merapikan.** `s.replace(/\s+$/g, "").slice(0, max)` menjalankan
+   regex atas string PENUH, dan `/\s+$/` pada whitespace yang tak berakhir di ujung adalah
+   backtracking KUADRATIK — terukur 556 ms @ 30 kB, 2 195 ms @ 60 kB, ekstrapolasi ±11 menit pada
+   batas body 1 MiB, sinkron, **di depan ember token**. Satu request membekukan seluruh event loop.
+9. **Yang dibatasi JUMLAH, bukan panjang.** Teks kepanjangan DIPOTONG (`clip`); menolaknya membuat
+   pertanyaan sah yang kebetulan panjang hilang diam-diam dan sesinya menggantung. Jumlah tak boleh
+   diperlakukan begitu — terukur, satu payload 863 kB dengan 46 000 opsi melahirkan prompt agen
+   627 kB (satu elemen argv; `MAX_ARG_STRLEN` Linux 128 kB), frame siar 863 kB yang
+   di-`JSON.stringify` ulang TIAP DETIK, dan kolom jejak 403 kB.
+10. **`clearTakeover` harus di BAWAH gerbang `running`.** Pemicu event milik SESI, bukan operator:
+   event kedua yang tiba selagi lead masih di tengah rantai akan mencabut takeover yang baru saja
+   dimenangkan operator, dan kendali kembali ke lead tanpa satu pun pesan.
+11. **Kotak jawab pet harus lahir untuk kondisi `deciding`, bukan hanya `waiting`.** `sessionKind`
+   memberi tiap sesi tepat SATU kondisi dan `deciding` menang; sejak pertanyaan tiba sebagai event,
+   `deciding` menyala ±50 ms sesudah agen bertanya sementara marker baru ±6 detik kemudian. Kotak
+   yang hanya digantung di `waiting` karena itu tak pernah muncul di jendela yang justru dituju AC-6.
+   Test yang me-render `PetAnswer` langsung tak bisa melihat ini — gerbangnya ada di `HanomanPet`.
+12. **`DATABASE_URL` ambient menang atas `HANOMAN_HOME`.** Harness pengukuran yang hanya menyetel
    `HANOMAN_HOME` akan menyentuh database dev sungguhan (terjadi saat mengukur ADR ini; lihat audit
    §7). Bersihkan `DATABASE_URL`/`HANOMAN_DATABASE_URL` bersama `HANOMAN_CONTROL_ORIGINS`/`NODE_ENV`.

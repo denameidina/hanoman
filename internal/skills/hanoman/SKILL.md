@@ -761,7 +761,9 @@ Pakai skill lebih sempit saat task cocok:
   (`services/lead/decide.ts`, urutan wajib bukti → putusan → saring rujukan → gerbang tindakan →
   **TULIS JEJAK** → notifikasi): kontrak eksplisit `POST /api/lead/decisions` (agen internal &
   eksternal ber-`AgentToken`, capability domain **`lead`** dipetakan MENURUT METHOD — kelas bug
-  SPEC-405), deteksi otomatis (baca pane ber-marker → ketik jawabannya lewat `pty.sendToPane`), dan
+  SPEC-405), deteksi otomatis (**SPEC-909/ADR-0146: dipicu EVENT hook `AskUserQuestion`, bukan lagi
+  memindai pane ber-marker** — payloadnya membawa pertanyaan & opsi terstruktur, jawabannya tetap
+  diketik lewat `pty.sendToPane`), dan
   denyut proaktif `setInterval` in-process (urutan kerja diserahkan ke antrean+governor ADR-0072,
   bukan antrean kedua; tabrakan area kerja dari diff worktree; tindak lanjut sesi ber-`exitCode ≠ 0`
   atau plan bersisa `- [ ]`). **Batas kerasnya di permukaan tindakan LEAD** (`LEAD_ACTIONS` =
@@ -911,8 +913,8 @@ Pakai skill lebih sempit saat task cocok:
   semuanya identik, dan `journalctl` bisu karena `decide()` memang menjadikannya baris jejak, bukan
   `console.error`. **(B) Ujung.** `detect.ts` punya penghitung **kedua** (`failures`, ambang
   `maxAutoAnswers` yang sama) karena pagar AC-11 mengukur jawaban yang BERHASIL diberikan dan karena
-  itu tak pernah bergerak untuk sesi yang keputusannya selalu gagal — `engine.ts` `TICK_MS = 5_000`
-  lalu men-spawn agen lead baru selamanya (terukur 152 percobaan / ±13 menit atas tiga sesi, kuota
+  itu tak pernah bergerak untuk sesi yang keputusannya selalu gagal — denyut 5 detik waktu itu
+  (`engine.ts` `TICK_MS`, dicabut SPEC-909) lalu men-spawn agen lead baru selamanya (terukur 152 percobaan / ±13 menit atas tiga sesi, kuota
   langganan yang sama dengan sesi pekerja). Gerbangnya **sebelum** `decide()` — yang mahal adalah
   panggilannya. `null` dari `decide()` (lead dijeda di tengah panggilan) **bukan** kegagalan dan tak
   dihitung; keberhasilan mengosongkan rantainya ("beruntun"), begitu pula `resetSession`/`sweep`.
@@ -1016,6 +1018,29 @@ Pakai skill lebih sempit saat task cocok:
   menutup pintu deteksi selama satu putaran berjalan, jadi penunggu baru menunggu putaran
   berikutnya (kini hitungan menit, bukan puluhan menit) — mengubahnya menyentuh semantik
   re-entrancy `engine.ts` (SPEC-432) dan pantas dapat spec sendiri.
+- **SPEC-909 · ADR-0146 · pintu deteksi dipicu EVENT, bukan denyut.** Seluruh paragraf di atas
+  menggambarkan pintu deteksi sebagai **pemindai**; sejak SPEC-909 ia **penerima**. Yang berubah dan
+  yang tidak, supaya paragraf lama tetap bisa dibaca sebagai riwayat: `scanAndAnswer`/`sweep`/
+  `settledPane`/`CHAIN_END_TRIES`/`busyDetect`/`runPool`/`readPaneQuestion` **DICABUT**; `TICK_MS`
+  5 dtk → `HOUSEKEEPING_MS` 60 dtk (rantai kedaluwarsa, pemangkas penghitung, sesi tanpa jalur
+  event, jatuh tempo `pulse`). Penggantinya `admitAsk` + `answerAsk` per sesi (`lead/detect.ts`) di
+  belakang registry `lead/ask.ts` (idempotensi `tool_use_id`/`turn_id`, ember token 5 @ 1/10 dtk per
+  sesi + 20 @ 2/dtk global, kolam pekerja `cfg.maxConcurrent` — angka yang SAMA dengan `runPool`
+  yang digantikannya, satu sesi = satu pekerjaan). Pintu masuknya `POST /api/session-events`,
+  bertoken **HMAC turunan per sesi** (stateless, id sesi saja tak cukup), prefix sendiri karena
+  `/api/lead` dipetakan `rw("lead")` — agent token pemegang `lead:write` di sana bisa MEMALSUKAN
+  pertanyaan. Yang membuatnya sepadan: hook `Notification` claude ternyata lahir dari pengait **idle
+  6 detik**, jadi lantainya **6 023 ms** + ½ tick, bukan ½ tick — terukur turun ke **32–164 ms**,
+  dengan **nol** `capture-pane` saat tak ada yang bertanya. Rantai tetap satu `LeadFlow`: payload
+  menyebut berapa pertanyaannya, jadi tak ada lagi yang perlu ditebak dari layar. **Tiga gotcha yang
+  mahal:** `PreToolUse` menembak **sebelum** tool-nya jalan (dialognya belum tergambar → `decide()`
+  dulu, `waitDialog` belakangan, dan `waitDialog` yang habis berarti BATAL bukan jatuh ke prosa);
+  hook berkode keluar 2 **memblokir** tool-nya (`exit 0` itu syarat); dan `submitPaneDialog`
+  fail-closed untuk layar bukan-rekap sementara dialog SATU pertanyaan claude tak pernah punya layar
+  rekap — menekan Submit tanpa syarat membuat kasus paling umum dilaporkan `gagal` sampai
+  `failCapped`. **Batas yang belum tertutup:** sesi ber-sandbox podman (profil production ADR-0117)
+  tak bisa menjangkau server dari dalam container, jadi ia sengaja TIDAK menyandang penanda
+  `@hanoman_event_hook` dan dilaporkan sekali lewat notifikasi alih-alih menggantung senyap.
 - **Pilihan lead JAMAK & rantai keputusan** (SPEC-485/**ADR-0102**, **memperluas ADR-0098** &
   SPEC-452/474; ADR-0091 ditegakkan, ADR-0024/0037/0039 tak disentuh): dua batas yang tak pernah
   dinyatakan, dan seperti SPEC-479 keduanya jatuh ke **bentuk kode**. **(A)** `choice` satu `string`

@@ -12,6 +12,10 @@ import { intakeAsk } from "../services/lead/ask";
 // dipetakan eksplisit ke `COOKIE_ONLY`; kredensialnya bukan cookie dan bukan agent token melainkan
 // token turunan per sesi, jadi gate cookie di app.ts mem-bypass-nya — pola yang sama dengan
 // `/api/sync` (device token) dan `/api/help` (kunci tiket).
+//
+// Karena bypass itu MENDAHULUI cabang agent token, peta capability tak pernah dieksekusi di sini:
+// agent token ditolak oleh HMAC di bawah dengan 401, bukan 403. Petanya tetap ada supaya jawabannya
+// benar bila urutan cabang di app.ts kelak berubah, bukan sebagai lapis kedua yang aktif hari ini.
 
 const bearer = (h: string | undefined): string => /^Bearer (.+)$/.exec(h ?? "")?.[1] ?? "";
 

@@ -103,7 +103,7 @@ describe("intakeAsk", () => {
     // s2 mati; event berikutnya untuk sesi lain memangkasnya.
     const later = deps({ ...d, live: () => ["s1"] });
     await intakeAsk(IN({ event: { ...EV, askId: "b" } }), later);
-    expect(later.reset).toHaveBeenCalledWith("s2");
+    await vi.waitFor(() => expect(later.reset).toHaveBeenCalledWith("s2"));
   });
 
   it("pruneAsks menutup celah sesi yang mati lalu LAHIR LAGI dengan id yang sama", async () => {
@@ -113,7 +113,7 @@ describe("intakeAsk", () => {
     // Tanpa jalur ini, penghitung nyawa sebelumnya ikut ke sesi baru dan AC-11 menutupnya sebelum
     // ia sempat bertanya sekali pun — id sesi spec deterministik, jadi ini bukan kasus teoretis.
     pruneAsks({ ...d, live: () => [] });
-    expect(d.reset).toHaveBeenCalledWith("s1");
+    await vi.waitFor(() => expect(d.reset).toHaveBeenCalledWith("s1"));
   });
 
   it("membatasi berapa sesi dilayani sekaligus (cfg.maxConcurrent, SPEC-479)", async () => {
@@ -177,5 +177,18 @@ describe("takeOverAsk", () => {
 
   it("sesi tanpa tanya hidup → none", () => {
     expect(takeOverAsk("entah")).toBe("none");
+  });
+
+  it("event yang tiba selagi lead berjalan TIDAK mencabut takeover operator", async () => {
+    // Pemicunya milik SESI (agennya bertanya lagi), bukan operator. Kalau `clearTakeover` berjalan
+    // tanpa syarat, event kedua yang tiba selagi lead masih di tengah rantai akan mengembalikan
+    // kendali ke lead tanpa satu pun pesan — dan pane menerima dua jawaban.
+    const d = deps({ answer: vi.fn(() => new Promise<never>(() => {})) as unknown as AskDeps["answer"] });
+    await intakeAsk(IN({ event: { ...EV, askId: "a" } }), d);
+    await vi.waitFor(() => expect(d.answer).toHaveBeenCalled());   // lead benar-benar BERJALAN
+    expect(takeOverAsk("s1")).toBe("taken");
+    await intakeAsk(IN({ event: { ...EV, askId: "b" } }), d);
+    expect(isTakenOver("s1")).toBe(true);
+    expect(liveAsks().find((x) => x.sessionId === "s1")!.state).toBe("taken-over");
   });
 });

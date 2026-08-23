@@ -79,7 +79,7 @@
 - Consumes: `Agent` dari `./entities` (sudah ada).
 - Produces: `SessionAskQuestion`, `SessionAskOption`, `SessionAsk`, `HookEvent`, `parseHookEvent(body: unknown): HookEvent | null`, `ASK_QUESTION_MAX = 2000`, `ASK_MESSAGE_MAX = 4000`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `shared/src/session-ask.test.ts`:
 
@@ -143,12 +143,12 @@ describe("parseHookEvent", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/session-ask.test.ts`
 Expected: FAIL — `Failed to resolve import "./session-ask"`.
 
-- [ ] **Step 3: Tulis `shared/src/session-ask.ts`**
+- [x] **Step 3: Tulis `shared/src/session-ask.ts`**
 
 ```ts
 import { z } from "zod";
@@ -263,7 +263,7 @@ export function parseHookEvent(body: unknown): HookEvent | null {
 }
 ```
 
-- [ ] **Step 4: Sambungkan ke barrel & DTO**
+- [x] **Step 4: Sambungkan ke barrel & DTO**
 
 `shared/src/index.ts` — tambahkan di antara re-export lain:
 
@@ -285,17 +285,17 @@ import type { SessionAsk } from "./session-ask";
   | { t: "leadAsks"; asks: SessionAsk[] }
 ```
 
-- [ ] **Step 5: Jalankan test — pastikan LULUS**
+- [x] **Step 5: Jalankan test — pastikan LULUS**
 
 Run: `pnpm vitest --run shared/src/session-ask.test.ts`
 Expected: PASS, 5 test.
 
-- [ ] **Step 6: Typecheck paket yang tersentuh**
+- [x] **Step 6: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck`
 Expected: keluar 0, tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/session-ask.ts shared/src/session-ask.test.ts shared/src/index.ts shared/src/dto.ts
@@ -314,7 +314,7 @@ git commit -m "feat(lead): tipe & parser payload hook AskUserQuestion/Stop (SPEC
 - Consumes: `secretKey()` dari `./secret-box` (sudah ada — 32 byte di `$HANOMAN_HOME/secret.key`).
 - Produces: `sessionEventToken(sessionId: string): string`, `verifySessionEventToken(sessionId: string, given: string): boolean`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/session-event-token.test.ts`:
 
@@ -351,12 +351,12 @@ describe("token event sesi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-event-token.test.ts`
 Expected: FAIL — modul tak ditemukan.
 
-- [ ] **Step 3: Tulis implementasinya**
+- [x] **Step 3: Tulis implementasinya**
 
 `server/src/services/session-event-token.ts`:
 
@@ -400,12 +400,12 @@ export function verifySessionEventToken(sessionId: string, given: string): boole
 }
 ```
 
-- [ ] **Step 4: Jalankan test — pastikan LULUS**
+- [x] **Step 4: Jalankan test — pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-event-token.test.ts`
 Expected: PASS, 6 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/session-event-token.ts server/test/session-event-token.test.ts
@@ -428,7 +428,7 @@ git commit -m "feat(lead): token event sesi turunan HMAC, stateless lintas resta
   - `sessionEventEnv(sessionId: string, env?: NodeJS.ProcessEnv): Record<string, string>` di `pty.ts` — `{HANOMAN_SESSION_ID, HANOMAN_EVENT_URL, HANOMAN_EVENT_TOKEN, HANOMAN_EVENT_HOST?}`
   - `controlHost(policy: IngressPolicy): string | null` di `ingress-policy.ts`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/session-event-env.test.ts`:
 
@@ -469,12 +469,12 @@ describe("env event sesi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-event-env.test.ts`
 Expected: FAIL — `sessionEventEnv is not a function`.
 
-- [ ] **Step 3: Tambahkan `controlHost` di `ingress-policy.ts`**
+- [x] **Step 3: Tambahkan `controlHost` di `ingress-policy.ts`**
 
 Sesudah `loadIngressPolicy`:
 
@@ -493,7 +493,7 @@ export function controlHost(policy: IngressPolicy): string | null {
 }
 ```
 
-- [ ] **Step 4: Tambahkan `sessionEventEnv` + `getSessionAsync` di `pty.ts`**
+- [x] **Step 4: Tambahkan `sessionEventEnv` + `getSessionAsync` di `pty.ts`**
 
 Impor di kepala berkas, di kelompok impor service lokal (sejajar `import { effectiveStr } from "../config";`):
 
@@ -538,7 +538,7 @@ export function sessionEventEnv(
 }
 ```
 
-- [ ] **Step 5: Pasang env & penanda hook di `createSession`**
+- [x] **Step 5: Pasang env & penanda hook di `createSession`**
 
 Di `createSession`, tepat SESUDAH blok `noTtyPromptEnv()` dan SEBELUM `if (opts.phaseFile)`:
 
@@ -584,12 +584,12 @@ const FMT = [
 dan di `type Pane` tambahkan `eventHook: boolean;`. **Jangan** masukkan ke `SessionInfo`
 (`toSessionInfo`): ia detail internal, bukan bagian DTO yang disync/disiarkan.
 
-- [ ] **Step 6: Jalankan test — pastikan LULUS**
+- [x] **Step 6: Jalankan test — pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-event-env.test.ts server/test/pty.test.ts`
 Expected: PASS. `pty.test.ts` ikut karena `FMT`/`parsePanes` berubah — bila ia merah dengan `SSH_ASKPASS`, bersihkan env dulu (Global Constraints), itu gagal palsu SPEC-881.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/src/services/ingress-policy.ts server/test/session-event-env.test.ts
@@ -611,7 +611,7 @@ git commit -m "feat(lead): env event sesi + penanda @hanoman_event_hook + getSes
 - Consumes: env `HANOMAN_EVENT_URL` / `HANOMAN_EVENT_TOKEN` / `HANOMAN_SESSION_ID` / `HANOMAN_EVENT_HOST` (Task 3).
 - Produces: `EVENT_HOOK_COMMAND` (konstanta string, diekspor dari `runner/src/settings.ts` supaya kedua mesin memakai satu definisi), `guardSettings(decisionFile?, goal?, eventHook?)`, `codexHookArgs({decisionFile?, goalGate?, eventHook?})`, `agentFlags({..., eventHook?})`.
 
-- [ ] **Step 1: Tulis test yang gagal (claude)**
+- [x] **Step 1: Tulis test yang gagal (claude)**
 
 Tambahkan di `runner/test/settings.test.ts`:
 
@@ -651,7 +651,7 @@ describe("SPEC-909 · hook pengirim event", () => {
 });
 ```
 
-- [ ] **Step 2: Tulis test yang gagal (codex)**
+- [x] **Step 2: Tulis test yang gagal (codex)**
 
 Tambahkan di `runner/test/codex-settings.test.ts`:
 
@@ -682,12 +682,12 @@ describe("SPEC-909 · hook pengirim event codex", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan kedua test — pastikan GAGAL**
+- [x] **Step 3: Jalankan kedua test — pastikan GAGAL**
 
 Run: `pnpm vitest --run runner/test/settings.test.ts runner/test/codex-settings.test.ts`
 Expected: FAIL — `EVENT_HOOK_COMMAND` tak diekspor.
 
-- [ ] **Step 4: Implementasi claude (`runner/src/settings.ts`)**
+- [x] **Step 4: Implementasi claude (`runner/src/settings.ts`)**
 
 Tambahkan sebelum `guardSettings`:
 
@@ -741,7 +741,7 @@ Sesudah blok `if (decisionFile) { … }`, sebelum blok `goal`:
   }
 ```
 
-- [ ] **Step 5: Implementasi codex (`runner/src/codex-settings.ts`)**
+- [x] **Step 5: Implementasi codex (`runner/src/codex-settings.ts`)**
 
 Impor konstanta:
 
@@ -765,7 +765,7 @@ Sesudah blok `if (o.decisionFile) { … }`, sebelum `if (o.goalGate)`:
   if (o.eventHook) stop.push(EVENT_HOOK_COMMAND);
 ```
 
-- [ ] **Step 6: Teruskan bendera lewat `agentFlags` (`runner/src/agent-cli.ts`)**
+- [x] **Step 6: Teruskan bendera lewat `agentFlags` (`runner/src/agent-cli.ts`)**
 
 Tambahkan `eventHook?: boolean;` ke `AgentFlagsOpts`, lalu:
 
@@ -777,7 +777,7 @@ Tambahkan `eventHook?: boolean;` ke `AgentFlagsOpts`, lalu:
     "--settings", JSON.stringify(guardSettings(o.decisionFile, o.goal, o.eventHook)),
 ```
 
-- [ ] **Step 7: Nyalakan dari `pty.ts`**
+- [x] **Step 7: Nyalakan dari `pty.ts`**
 
 Di `createSession`, pada pemanggilan `agentFlags({ … })`:
 
@@ -790,17 +790,17 @@ Di `createSession`, pada pemanggilan `agentFlags({ … })`:
     }).map(sq).join(" ");
 ```
 
-- [ ] **Step 8: Jalankan test — pastikan LULUS**
+- [x] **Step 8: Jalankan test — pastikan LULUS**
 
 Run: `pnpm vitest --run runner/test/settings.test.ts runner/test/codex-settings.test.ts`
 Expected: PASS — seluruh test lama plus 9 test baru.
 
-- [ ] **Step 9: Typecheck runner**
+- [x] **Step 9: Typecheck runner**
 
 Run: `pnpm --filter ./runner typecheck`
 Expected: keluar 0.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add runner/src/settings.ts runner/src/codex-settings.ts runner/src/agent-cli.ts \
@@ -846,7 +846,7 @@ git commit -m "feat(lead): hook AskUserQuestion (claude) & Stop (codex) mengirim
 5. **`CHAIN_END_TRIES` & `settledPane` dicabut**: keduanya ada semata untuk menebak berapa langkah
    rantai itu, dan payload sekarang menyebutnya (`questions.length`).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/lead-detect-event.test.ts`:
 
@@ -1012,12 +1012,12 @@ describe("answerAsk — rantai disuapi payload", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/lead-detect-event.test.ts`
 Expected: FAIL — `admitAsk`/`answerAsk` belum diekspor.
 
-- [ ] **Step 3: Tambahkan `readCodexTurn` di `pane.ts`**
+- [x] **Step 3: Tambahkan `readCodexTurn` di `pane.ts`**
 
 Sesudah `readPaneQuestion`:
 
@@ -1042,7 +1042,7 @@ export function readCodexTurn(message: string): { asking: boolean; reason: strin
 }
 ```
 
-- [ ] **Step 4: Rombak `detect.ts`**
+- [x] **Step 4: Rombak `detect.ts`**
 
 **4a. Impor & pemangkasan.** Hapus `liveDecisions`, `markerFilled`, `getSession` dari impor `../pty`
 (yang tersisa: `capturePane`, `clearMarker`, `sendToPane`, `submitPaneDialog`). Hapus `readPaneQuestion`
@@ -1292,12 +1292,12 @@ async function waitDialog(id: string, deps: DetectDeps): Promise<string | null> 
 **4g. `resetSession`/`__resetDetect`** tetap apa adanya (mereka juga mengosongkan `chainFlows`).
 Karena `sweep()` hilang, pemangkasan sesi mati dilakukan `lead/ask.ts` (Task 6) lewat `resetSession`.
 
-- [ ] **Step 5: Jalankan test baru — pastikan LULUS**
+- [x] **Step 5: Jalankan test baru — pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/lead-detect-event.test.ts server/test/lead-pane.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Perbaiki `server/test/lead-detect.test.ts`**
+- [x] **Step 6: Perbaiki `server/test/lead-detect.test.ts`**
 
 Test lama menguji `scanAndAnswer`. Pindahkan tiap kasusnya ke `admitAsk`/`answerAsk` — jangan
 dihapus: kasusnya (rantai dialog, `maxAutoAnswers`, kegagalan beruntun, gerbang penuh) adalah pagar
@@ -1308,7 +1308,7 @@ SPEC-909 di kepala berkas.
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/lead-detect.test.ts`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/lead/detect.ts server/src/services/lead/pane.ts \
@@ -1342,7 +1342,7 @@ sudah jadi rumah keadaan in-memory lead dan tak mengimpor apa pun dari `detect.t
     `deciding.ts` — keadaannya, bukan aksinya)
   - `__resetAsks(): void`, `ASK_BUCKET`, `GLOBAL_BUCKET` (konstanta diekspor untuk test)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/lead-ask.test.ts`:
 
@@ -1490,12 +1490,12 @@ describe("takeOverAsk", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/lead-ask.test.ts`
 Expected: FAIL — modul `lead/ask` tak ada.
 
-- [ ] **Step 3: Tambahkan keadaan takeover di `deciding.ts`**
+- [x] **Step 3: Tambahkan keadaan takeover di `deciding.ts`**
 
 Sesudah blok `queued`:
 
@@ -1519,7 +1519,7 @@ export function clearTakeover(sessionId: string): void { takenOver.delete(sessio
 
 dan tambahkan `takenOver.clear();` ke `__resetDeciding()`.
 
-- [ ] **Step 4: Tulis `server/src/services/lead/ask.ts`**
+- [x] **Step 4: Tulis `server/src/services/lead/ask.ts`**
 
 ```ts
 import type { Agent, HookEvent, SessionAsk } from "@hanoman/shared";
@@ -1725,12 +1725,12 @@ async function run(sessionId: string, deps: AskDeps): Promise<void> {
 }
 ```
 
-- [ ] **Step 5: Jalankan test — pastikan LULUS**
+- [x] **Step 5: Jalankan test — pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/lead-ask.test.ts server/test/lead-deciding.test.ts`
 Expected: PASS, 13 test baru + test `lead-deciding` yang lama tetap hijau.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/lead/ask.ts server/src/services/lead/deciding.ts server/test/lead-ask.test.ts
@@ -1752,7 +1752,7 @@ git commit -m "feat(lead): registry tanya — idempotensi, batas laju, antrean b
 - Consumes: `parseHookEvent` (Task 1), `verifySessionEventToken` (Task 2), `getSessionAsync` (Task 3), `intakeAsk` (Task 6).
 - Produces: `POST /api/session-events` → `202 {accepted:true}` · `202 {ignored:true}` · `202 {duplicate:true}` · `202 {rejected:true, reason}` · `400` · `401` · `404` · `429`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/session-events.route.test.ts`:
 
@@ -1849,12 +1849,12 @@ describe("POST /api/session-events", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-events.route.test.ts`
 Expected: FAIL — 404 untuk semuanya (route belum ada).
 
-- [ ] **Step 3: Tulis route**
+- [x] **Step 3: Tulis route**
 
 `server/src/routes/session-events.ts`:
 
@@ -1904,7 +1904,7 @@ export default async function (app: FastifyInstance) {
 }
 ```
 
-- [ ] **Step 4: Daftarkan route & bypass gate**
+- [x] **Step 4: Daftarkan route & bypass gate**
 
 `server/src/app.ts` — impor + registrasi bersama route lain di scope `/api`:
 
@@ -1932,7 +1932,7 @@ Di hook `onRequest` gate, tepat SESUDAH baris bypass `/api/sync` dan SEBELUM `/a
     || top === "portal" || top === "client-accounts" || top === "session-events") return "COOKIE_ONLY";
 ```
 
-- [ ] **Step 5: Perbarui tiga allowlist yang harus tetap sepakat**
+- [x] **Step 5: Perbarui tiga allowlist yang harus tetap sepakat**
 
 Route baru gagal senyap kalau salah satu ketinggalan:
 
@@ -1940,12 +1940,12 @@ Route baru gagal senyap kalau salah satu ketinggalan:
 - `server/test/parity-endpoints.test.ts` — daftarkan route baru sesuai bentuk berkas itu.
 - `server/test/client-route-allowed.test.ts` — pastikan akun `client` **tidak** boleh (deny-by-default sudah berlaku; test menegaskannya).
 
-- [ ] **Step 6: Jalankan test — pastikan LULUS**
+- [x] **Step 6: Jalankan test — pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-events.route.test.ts server/test/agent-capabilities.test.ts server/test/parity-endpoints.test.ts server/test/client-route-allowed.test.ts`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/routes/session-events.ts server/src/app.ts server/src/services/agent-capabilities.ts \
@@ -1967,7 +1967,7 @@ git commit -m "feat(lead): POST /api/session-events bertoken sesi, di luar jangk
 - Consumes: `expireFlows`, `pulse` (sudah ada); `liveDecisions` dari `../pty`.
 - Produces: `HOUSEKEEPING_MS` (menggantikan `TICK_MS`), `LeadTickDeps.legacy?`, `recordLegacySession(sessionId, projectId, specId)`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `server/test/lead-engine.test.ts`:
 
@@ -2003,18 +2003,18 @@ describe("SPEC-909 · tick tak lagi memindai sesi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/lead-engine.test.ts`
 Expected: FAIL — `HOUSEKEEPING_MS` tak diekspor.
 
-- [ ] **Step 3: `liveDecisions` ikut membawa `eventHook`**
+- [x] **Step 3: `liveDecisions` ikut membawa `eventHook`**
 
 `server/src/services/pty.ts` — tambahkan `eventHook: p.eventHook` ke objek yang dipancarkan
 `liveDecisions()`, dan ke tipe kembaliannya. `notifications.ts` `DecisionSession` boleh tetap
 tak mengenalnya (field ekstra tak mengganggu structural typing).
 
-- [ ] **Step 4: Tulis `recordLegacySession` di `notifications.ts`**
+- [x] **Step 4: Tulis `recordLegacySession` di `notifications.ts`**
 
 Sesudah `recordLeadDecision`:
 
@@ -2038,7 +2038,7 @@ export async function recordLegacySession(
 }
 ```
 
-- [ ] **Step 5: Rombak `engine.ts`**
+- [x] **Step 5: Rombak `engine.ts`**
 
 Ganti kepala berkas & tick:
 
@@ -2094,12 +2094,12 @@ export type LeadTickDeps = {
 
 `startLead` memakai `HOUSEKEEPING_MS`; `stopLead` tak berubah.
 
-- [ ] **Step 6: Jalankan test — pastikan LULUS**
+- [x] **Step 6: Jalankan test — pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/lead-engine.test.ts server/test/lead-engine-argv.test.ts`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/lead/engine.ts server/src/services/notifications.ts \
@@ -2124,7 +2124,7 @@ git commit -m "feat(lead): tick berhenti memindai sesi; sesi pra-pembaruan dinya
   - `POST /api/terminal/sessions/:id/dialog/takeover` → `202 {accepted:true}` · `409 {reason:"answering"}` · `404`
   - `paths.terminalDialogTakeover(id)`, `api.takeoverSessionDialog(id)`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/terminal-takeover.route.test.ts`:
 
@@ -2185,12 +2185,12 @@ describe("POST /terminal/sessions/:id/dialog/takeover", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/terminal-takeover.route.test.ts`
 Expected: FAIL — 404 pada semua kasus (route belum ada).
 
-- [ ] **Step 3: Tulis route**
+- [x] **Step 3: Tulis route**
 
 `server/src/routes/terminal.ts`, tepat sesudah `POST …/dialog/answer`:
 
@@ -2225,7 +2225,7 @@ gerbang `deciding` untuk sesi yang sudah diambil alih:
         .send({ error: "hanoman-lead sedang menyusun keputusan untuk sesi ini", reason: "deciding" });
 ```
 
-- [ ] **Step 4: Bungkus jalur lead dengan `beginAnswer`**
+- [x] **Step 4: Bungkus jalur lead dengan `beginAnswer`**
 
 `server/src/services/lead/detect.ts` — `prodDetectDeps.send` menjadi:
 
@@ -2251,7 +2251,7 @@ Di `runChain`, sebelum setiap `deps.send`, hormati bendera takeover:
 Impor `isTakenOver` dari `./deciding` (Task 6 sudah menaruhnya di sana justru supaya baris ini
 tak melahirkan siklus impor — `ask.ts` mengimpor `detect.ts`, jadi arah sebaliknya tertutup).
 
-- [ ] **Step 5: Path & klien**
+- [x] **Step 5: Path & klien**
 
 `shared/src/api.ts`, sesudah `terminalDialogAnswer`:
 
@@ -2267,12 +2267,12 @@ tak melahirkan siklus impor — `ask.ts` mengimpor `detect.ts`, jadi arah sebali
     j<{ accepted: true }>(paths.terminalDialogTakeover(id), { method: "POST" }),
 ```
 
-- [ ] **Step 6: Jalankan test — pastikan LULUS**
+- [x] **Step 6: Jalankan test — pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/terminal-takeover.route.test.ts server/test/terminal-dialog.route.test.ts server/test/lead-ask.test.ts server/test/lead-detect-event.test.ts`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/routes/terminal.ts server/src/services/lead/detect.ts \
@@ -2297,7 +2297,7 @@ git commit -m "feat(lead): operator bisa mengambil alih sesi dari lead, pemenang
 - Consumes: `liveAsks()` (Task 6), `SessionAsk` (Task 1), `api.takeoverSessionDialog` (Task 9).
 - Produces: frame `{ t: "leadAsks", asks: SessionAsk[] }`; prop `ask?: SessionAsk` pada `PetAnswer`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `src/test/pet-answer.test.tsx`:
 
@@ -2382,12 +2382,12 @@ describe("PetAnswer dengan payload event", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test — pastikan GAGAL**
+- [x] **Step 2: Jalankan test — pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/pet-answer.test.tsx`
 Expected: FAIL — `PetAnswer` belum menerima prop `ask`.
 
-- [ ] **Step 3: Grup siar `leadAsks` + testnya**
+- [x] **Step 3: Grup siar `leadAsks` + testnya**
 
 Tambahkan di `server/test/events-ws.test.ts`:
 
@@ -2433,7 +2433,7 @@ Lalu implementasinya:
   { everyTicks: 1, last: "", build: async () => ({ t: "leadAsks", asks: liveAsks() }) },
 ```
 
-- [ ] **Step 4: Jahit frame ke state frontend**
+- [x] **Step 4: Jahit frame ke state frontend**
 
 `src/src/App.tsx` — state baru di sebelah `sessions`:
 
@@ -2474,7 +2474,7 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
 server yang dilayaninya, dan server yang belum punya grup `leadAsks` cuma tak pernah mengirim
 frame itu — pet harus tetap masuk akal, bukan kosong.
 
-- [ ] **Step 5: Ubah `PetAnswer.tsx`**
+- [x] **Step 5: Ubah `PetAnswer.tsx`**
 
 Tanda tangan & konstanta:
 
@@ -2595,14 +2595,14 @@ Design system: `hn-eyebrow`, `var(--bone-100)`, `var(--border-hair)`, `var(--tex
 `var(--text-strong)` — semuanya sudah dipakai berkas ini. Setiap `Button` baru memakai
 `style={flat}` yang sudah ada supaya `prefers-reduced-motion` tetap dihormati.
 
-- [ ] **Step 6: Jalankan test — pastikan LULUS**
+- [x] **Step 6: Jalankan test — pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/pet-answer.test.tsx src/test/hanoman-pet.test.tsx`
 Expected: PASS.
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/events-ws.test.ts server/test/events.route.test.ts`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/events.ts src/src/screens/PetAnswer.tsx src/src/screens/HanomanPet.tsx \
@@ -2623,7 +2623,7 @@ git commit -m "feat(pet): pertanyaan asli dari payload event, langkah rantai, st
 - Consumes: seluruh jalur Task 3–8, berjalan sungguhan.
 - Produces: satu dokumen berisi ANGKA sebelum/sesudah, dirujuk ADR-0146 dan spec §6.6.
 
-- [ ] **Step 1: Tambahkan `curl` ke doctor**
+- [x] **Step 1: Tambahkan `curl` ke doctor**
 
 Ikuti bentuk pemeriksaan yang sudah ada di `runner/src/doctor.ts` (node/git/tmux/CLI agen). Baris
 yang ditambahkan menjelaskan AKIBATNYA, bukan cuma "tak ada":
@@ -2636,7 +2636,7 @@ yang ditambahkan menjelaskan AKIBATNYA, bukan cuma "tak ada":
 
 Pesan gagal: `"curl tak ditemukan — hanoman-lead tak akan menerima pertanyaan sesi (SPEC-909)"`.
 
-- [ ] **Step 2: Test doctor**
+- [x] **Step 2: Test doctor**
 
 Tambahkan satu kasus di test doctor yang ada: `curl` hilang → laporan memuat baris itu, dan
 `doctor` tidak melempar.
@@ -2644,7 +2644,7 @@ Tambahkan satu kasus di test doctor yang ada: `curl` hilang → laporan memuat b
 Run: `pnpm vitest --run runner/test/doctor.test.ts`
 Expected: PASS.
 
-- [ ] **Step 3: Siapkan harness pengukuran**
+- [x] **Step 3: Siapkan harness pengukuran**
 
 Boot server dari terminal MANUSIA (bukan dari sesi agen — server yang di-boot dari sesi Claude Code
 tak bisa membaca kredensial claude dan setiap spawn agen 401; itu bukan bug produk):
@@ -2656,7 +2656,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u NODE_ENV -u DATABASE_URL -u HAN
 
 Nyalakan lead: `Setting.lead.enabled = true`, project `leadOptIn = true`, `maxAutoAnswers` ≥ 1.
 
-- [ ] **Step 4: Ukur SESUDAH**
+- [x] **Step 4: Ukur SESUDAH**
 
 Stempel di tiga titik, satu sesi diam, tanpa beban lain:
 
@@ -2668,7 +2668,7 @@ Stempel di tiga titik, satu sesi diam, tanpa beban lain:
 Ulangi **5 kali** dengan `AskUserQuestion` 1 pertanyaan pada sesi yang diam. Catat median dan
 maksimum `t_decide − t_ask`.
 
-- [ ] **Step 5: Ukur `capture-pane` sebelum vs sesudah**
+- [x] **Step 5: Ukur `capture-pane` sebelum vs sesudah**
 
 Dengan N sesi hidup yang sama (N ≥ 3) dan **tak ada** yang bertanya, hitung invokasi
 `tmux capture-pane` selama 60 detik:
@@ -2682,12 +2682,12 @@ Hitung dengan membungkus biner tmux sementara:
 lalu `HANOMAN_TMUX_SOCKET` tetap, dan arahkan PATH ke shim itu. Angka yang dilaporkan: jumlah
 `capture-pane` / 60 dtk / N sesi.
 
-- [ ] **Step 6: Ukur stall hook**
+- [x] **Step 6: Ukur stall hook**
 
 `t_hookdone − t_ask` di dalam hook saat server sehat (5 sampel), dan sekali lagi dengan server
 dimatikan (harus ≈ 2 000 ms, batas `-m 2`).
 
-- [ ] **Step 7: Tulis audit**
+- [x] **Step 7: Tulis audit**
 
 `docs/superpowers/audits/2026-08-23-spec-909-latensi-event-vs-denyut.md` — tabel tiga baris:
 
@@ -2701,7 +2701,7 @@ Baris "sebelum" untuk kolom pertama **wajib diukur ulang di harness yang sama**,
 spec §6.5: §6.5 mengukur jarak hook→hook, sedangkan yang ini jarak hook→lead. Kalau salah satu tak
 bisa diukur, tulis alasannya apa adanya — jangan mengarang angka.
 
-- [ ] **Step 8: Cabut instrumentasi sementara**
+- [x] **Step 8: Cabut instrumentasi sementara**
 
 Hapus ketiga stempel dari Step 4 dan shim tmux dari Step 5. Yang tinggal di kode hanya satu baris
 log permanen di `lead/ask.ts` yang menyebut selisih `askedAt → decide`:
@@ -2712,7 +2712,7 @@ log permanen di `lead/ask.ts` yang menyebut selisih `askedAt → decide`:
 console.log(`lead ask ${sessionId}: ${deps.now() - Date.parse(e.ask.askedAt)} ms sampai mulai menyusun`);
 ```
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add runner/src/doctor.ts runner/test/doctor.test.ts \
@@ -2733,7 +2733,7 @@ git commit -m "measure(lead): latensi event vs denyut, capture-pane idle, stall 
 - Modify: `internal/docs/frontend/frontend-implementation.md` (§Pet: pertanyaan dari payload, langkah rantai, status lead, ambil alih)
 - Modify: `internal/docs/architecture/stack.md` (irama lead: satu tick rumah tangga, jalur event)
 
-- [ ] **Step 1: Tulis ADR-0146**
+- [x] **Step 1: Tulis ADR-0146**
 
 Judul: `# ADR-0146 — Pintu deteksi hanoman-lead dipicu event hook, bukan denyut`
 
@@ -2756,38 +2756,38 @@ spec §9 · **Gotcha** minimal:
 6. Sesi yang lahir sebelum pembaruan **tidak** dilayani — dan penandanya opsi window tmux, bukan
    berkas, supaya restart server tak menghapusnya.
 
-- [ ] **Step 2: Tautkan di `internal/docs/adr/README.md`**
+- [x] **Step 2: Tautkan di `internal/docs/adr/README.md`**
 
 Tambahkan baris ADR-0146 di puncak daftar (urutan menurun), dan **sunting baris ADR-0091** supaya
 menyebut amandemennya — pola yang sama dengan ADR-0140 yang menyebut amandemen SPEC-904/ADR-0144.
 
-- [ ] **Step 3: Tautkan di `internal/docs/README.md`**
+- [x] **Step 3: Tautkan di `internal/docs/README.md`**
 
 Tambahkan ADR-0146 di seksi `adr`. Perbarui kalimat deskripsi `api-contract` dan
 `frontend-implementation` supaya menyebut permukaan baru.
 
-- [ ] **Step 4: Perbarui `api-contract.md`**
+- [x] **Step 4: Perbarui `api-contract.md`**
 
 Dua endpoint + satu frame siar, dengan kode status lengkap dari §5 spec dan catatan bahwa
 `session-events` **di luar** jangkauan agent token.
 
-- [ ] **Step 5: Perbarui `frontend-implementation.md`**
+- [x] **Step 5: Perbarui `frontend-implementation.md`**
 
 Di §Pet Hanoman, tambahkan "Pet hidup G — SPEC-909 ADR-0146": pertanyaan dari payload event
 (bukan scrape), "Pertanyaan _n_ dari _N_", tiga status lead, tombol Ambil alih dan dua hasilnya.
 
-- [ ] **Step 6: Perbarui `stack.md`**
+- [x] **Step 6: Perbarui `stack.md`**
 
 Satu paragraf: irama lead sekarang satu tick rumah tangga 60 detik + jalur event hook; sebut bahwa
 jumlah timer berkurang (ADR-0024 utuh) dan tak ada kanal WS baru (ADR-0039 utuh).
 
-- [ ] **Step 7: Verifikasi integritas index**
+- [x] **Step 7: Verifikasi integritas index**
 
 Run: `node runner/dist/cli.js docs index --check` (atau `pnpm hanoman docs index --check` sesuai
 skrip yang ada di repo).
 Expected: keluar 0, "index utuh".
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add internal/docs

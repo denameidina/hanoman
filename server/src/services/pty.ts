@@ -636,10 +636,21 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // Env tambahan dari pemanggil lewat jalur yang sama.
   for (const [k, v] of Object.entries(opts.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
   let cmd = envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
-  if (!opts.command) cmd = sandboxCommand({
-    command: cmd, worktree: cwd, phaseFile: opts.phaseFile, promptFile,
-    attachmentsDir: opts.attachmentsDir,
-  });
+  // SPEC-909 · ADR-0146 · sesi ber-sandbox TAK BISA mengirim event: `sandboxArgv` menjalankan
+  // perintahnya di dalam `podman run --network <bridge>`, jadi `127.0.0.1` di sana adalah loopback
+  // CONTAINER sementara server wajib bind loopback HOST (ADR-0117) — dan `NO_PROXY` memastikan curl
+  // tak mencoba egress proxy. Menutupnya butuh server yang terjangkau dari jaringan sesi, dan itu
+  // keputusan tersendiri. Yang bisa dilakukan di sini: JANGAN mengaku punya hook event, supaya
+  // engine menotifikasinya sekali alih-alih membiarkannya menggantung tanpa siapa pun tahu.
+  let sandboxed = false;
+  if (!opts.command) {
+    const wrapped = sandboxCommand({
+      command: cmd, worktree: cwd, phaseFile: opts.phaseFile, promptFile,
+      attachmentsDir: opts.attachmentsDir,
+    });
+    sandboxed = wrapped !== cmd;
+    cmd = wrapped;
+  }
   // SPEC-184 · direktori marker keputusan; hook Notification menulis absolute path di dalamnya.
   if (opts.decisionFile) mkdirSync(dirname(opts.decisionFile), { recursive: true });
 
@@ -677,11 +688,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   tmux("set-option", "-t", name(id), "@hanoman_agent", agent);
   if (opts.phaseFile) tmux("set-option", "-t", name(id), "@hanoman_phase_file", opts.phaseFile);
   if (opts.decisionFile) tmux("set-option", "-t", name(id), "@hanoman_decision_file", opts.decisionFile);
-  // SPEC-909 · ADR-0146 · penanda "sesi ini lahir dengan hook event". Sesi hidup TANPA penanda ini
-  // lahir sebelum pembaruan dan tak akan dijawab lead — engine menotifikasinya sekali. Opsi window,
-  // bukan berkas: sumber kebenaran sesi tetap tmux (pola @hanoman_agent, SPEC-338), jadi ia selamat
-  // dari restart server tanpa registry apa pun.
-  if (!opts.command) tmux("set-option", "-t", name(id), "@hanoman_event_hook", "1");
+  // SPEC-909 · ADR-0146 · penanda "sesi ini bisa mengirim event". Sesi hidup TANPA penanda ini tak
+  // akan dijawab lead — engine menotifikasinya sekali. Opsi window, bukan berkas: sumber kebenaran
+  // sesi tetap tmux (pola @hanoman_agent, SPEC-338), jadi ia selamat dari restart server tanpa
+  // registry apa pun. Sesi ber-sandbox sengaja TIDAK menyandangnya (lihat catatan di atas).
+  if (!opts.command && !sandboxed) tmux("set-option", "-t", name(id), "@hanoman_event_hook", "1");
   // SPEC-332 · fire-and-forget: respons HTTP tak boleh menunggu TUI siap. Gagal = diam, karena
   // jaminan mode goal sudah dipegang hook Stop di argv di atas.
   // SPEC-397 · ADR-0085 · kedua agen: codex-cli ≥ 0.146 punya mode goal native yang di-arm lewat

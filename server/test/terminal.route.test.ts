@@ -595,20 +595,22 @@ describe("terminal routes · sesi backlog", () => {
     await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-920" });
   });
 
+  // startPrompt menggiring pipeline penuh — skill Brainstorm hanya muncul di startPrompt
+  // (continuePrompt cuma emit skill Execute).
+  //
+  // Dinilai dari ARGV, bukan dari layar. Versi lama menunggu penanda muncul di pane tmux 80×24 dan
+  // karena itu bergantung pada berapa baris yang kebetulan tersisa di viewport: SPEC-909 menambah
+  // tiga pasang env (`HANOMAN_SESSION_ID`/`HANOMAN_EVENT_URL`/`HANOMAN_EVENT_TOKEN`, ±140 karakter)
+  // di depan perintah, dan dua baris tambahan itu sudah cukup mendorong penandanya keluar layar
+  // sementara PROMPT-nya sendiri tak berubah sedikit pun. `recordingClaude()` sudah dipakai di
+  // berkas ini untuk alasan yang persis sama (lihat blok SPEC-252 di bawah).
   it("spec non-done → tetap startPrompt (tanpa marker MELANJUTKAN)", async () => {
-    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    const out = recordingClaude();
     await makeSpec({ id: "SPEC-921", projectId: "p1", stage: "planned", objective: "kerja biasa" });
     const res = await start("SPEC-921");
     expect(res.statusCode).toBe(201);
-    const c = connect("spec-921");
-    await c.opened;
-    // startPrompt menggiring pipeline penuh — skill Brainstorm hanya muncul di startPrompt
-    // (continuePrompt cuma emit skill Execute). Penanda teratas "Kerjakan fase berurutan" bisa
-    // ter-scroll keluar layar tmux 80×24 karena prompt feature panjang (SPEC-173 menambah
-    // paragraf plan-gate); pakai penanda startPrompt-unik yang tetap dalam viewport.
-    await waitFor(() => c.data().includes("superpowers:brainstorming"));
-    expect(c.data()).not.toContain("MELANJUTKAN");
-    c.ws.close();
+    await waitFor(() => existsSync(out) && readFileSync(out, "utf8").includes("superpowers:brainstorming"));
+    expect(readFileSync(out, "utf8")).not.toContain("MELANJUTKAN");
     await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-921" });
   });
 

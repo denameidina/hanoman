@@ -144,7 +144,7 @@ export async function recordLegacySession(
   await prisma.notification.create({
     data: {
       type: "lead", key: `lead-legacy:${sessionId}`, sessionId, specId, projectId,
-      title: `Sesi ${sessionId} lahir sebelum pembaruan dan tak memasang hook event — hanoman-lead tak akan menjawabnya. Jawab dari panel pet atau terminal, atau mulai ulang sesinya.`,
+      title: `Sesi ${sessionId} tak punya jalur event ke server — hanoman-lead tak akan menjawabnya. Sebabnya salah satu dari dua: ia lahir sebelum pembaruan (mulai ulang sesinya), atau ia berjalan di dalam sandbox yang tak bisa menjangkau server (ADR-0146). Jawab dari panel pet atau terminal.`,
     },
   }).catch(() => { /* P2002: sudah pernah diberitahukan untuk sesi ini */ });
 }

@@ -6,7 +6,7 @@ import { Button, Mark, useResponsiveTier } from "../ds";
 import { useNotifications } from "../notifications/NotificationsContext";
 import {
   derivePetState, loadPetHidden, loadPetRoam, savePetHidden, savePetRoam, petPulse,
-  KIND_NOUN, POSE_LABEL, waitingSessions, type PetTarget,
+  KIND_NOUN, POSE_LABEL, decidingSessions, waitingSessions, type PetTarget,
 } from "./pet-state";
 import {
   isUrgent, PET_AWAY_MS, PET_SPEECH_MS, petRecap, petSnapshot, speechFor,
@@ -130,6 +130,10 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
   // SPEC-899 · satu kotak jawaban per sesi `waiting`. Daftarnya memakai klasifikasi yang sama
   // dengan panel (`sessionKind`), jadi sesi yang sedang dipegang lead memang tak muncul di sini.
   const waiting = React.useMemo(() => waitingSessions(sessions, backlog), [sessions, backlog]);
+  // SPEC-909 · ADR-0146 · dan sesi yang sedang DIPUTUSKAN lead: di sanalah jendela "ambil alih
+  // sebelum lead mengetik ke pane" berada (`deciding` menyala ±50 ms sesudah agen bertanya, marker
+  // baru ±6 dtk kemudian).
+  const deciding = React.useMemo(() => decidingSessions(sessions, backlog), [sessions, backlog]);
 
   React.useEffect(() => {
     if (view.recheckAt === null) return;
@@ -410,6 +414,17 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
                   <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id} reduced={reduced}
                     ask={asks.find((a) => a.sessionId === s.id)} />
                 ))}
+                {/* SPEC-909 · ADR-0146 · kotak yang sama untuk sesi yang sedang diputuskan lead,
+                    tapi HANYA bila payload eventnya ada: tanpa `ask` tak ada pertanyaan untuk
+                    ditampilkan dan tak ada apa pun untuk direbut, dan `GET …/dialog` di sana
+                    memang dijawab `409 deciding`. */}
+                {c.kind === "deciding" && open && deciding.map((s) => {
+                  const ask = asks.find((a) => a.sessionId === s.id);
+                  return ask
+                    ? <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id}
+                        reduced={reduced} ask={ask} />
+                    : null;
+                })}
               </li>
             ))}
           </ul>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseHookEvent, ASK_MESSAGE_MAX } from "./session-ask";
+import { parseHookEvent, ASK_MESSAGE_MAX, ASK_QUESTION_MAX } from "./session-ask";
 
 // Payload di bawah adalah TANGKAPAN NYATA (spec SPEC-909 §6.1/§6.4), bukan karangan: claude 2.1.240
 // & codex-cli 0.147.0. Kalau bentuknya berubah, test ini yang harus jadi tempat pertama tahu.
@@ -53,5 +53,50 @@ describe("parseHookEvent", () => {
 
   it("menolak AskUserQuestion tanpa satu pun pertanyaan", () => {
     expect(parseHookEvent({ ...CLAUDE, tool_input: { questions: [] } })).toBeNull();
+  });
+});
+
+// SPEC-909 (tinjauan keamanan) · payload hook adalah input TAK TERPERCAYA, dan `parseHookEvent`
+// duduk SEBELUM ember token — jadi biayanya harus berbatas di sini, bukan di hilir.
+describe("parseHookEvent · pagar biaya", () => {
+  const ask = (q: unknown) => ({
+    hook_event_name: "PreToolUse", tool_name: "AskUserQuestion", tool_use_id: "t1",
+    tool_input: { questions: q },
+  });
+
+  it("linear terhadap panjang — bukan kuadratik (regresi ReDoS `clip`)", () => {
+    // `/\s+$/` atas string PENUH memberi 556 ms @ 30 kB dan 2 195 ms @ 60 kB (terukur). Yang
+    // dijaga di sini bukan angka absolutnya, melainkan bahwa menggandakan input tak melipat
+    // waktunya jauh lebih dari dua kali.
+    const run = (n: number) => {
+      const body = ask([{ question: `${" ".repeat(n)}x${" ".repeat(n)}`, header: "h" }]);
+      const t0 = performance.now();
+      expect(parseHookEvent(body)).not.toBeNull();
+      return performance.now() - t0;
+    };
+    run(1_000);                                    // pemanasan JIT
+    const kecil = Math.max(run(20_000), 0.05);
+    const besar = run(80_000);
+    expect(besar / kecil).toBeLessThan(20);        // kuadratik akan ≈ 16× per 4× panjang, dan naik
+    expect(besar).toBeLessThan(500);
+  });
+
+  it("menolak payload yang jumlahnya di luar akal — bukan memangkasnya diam-diam", () => {
+    const banyakOpsi = [{ question: "q", header: "h",
+      options: Array.from({ length: 5_000 }, (_, i) => ({ label: `o${i}` })) }];
+    expect(parseHookEvent(ask(banyakOpsi))).toBeNull();
+    const banyakPertanyaan = Array.from({ length: 64 }, (_, i) => ({ question: `q${i}`, header: "h" }));
+    expect(parseHookEvent(ask(banyakPertanyaan))).toBeNull();
+  });
+
+  it("memotong tiap teks, jadi satu payload tak bisa membengkakkan prompt/frame/kolom jejak", () => {
+    const e = parseHookEvent(ask([{
+      question: "q".repeat(50_000), header: "h".repeat(50_000),
+      options: [{ label: "l".repeat(50_000), description: "d".repeat(50_000) }],
+    }]))!;
+    expect(e.questions[0]!.question.length).toBeLessThanOrEqual(ASK_QUESTION_MAX);
+    expect(e.questions[0]!.header.length).toBeLessThanOrEqual(200);
+    expect(e.questions[0]!.options[0]!.label.length).toBeLessThanOrEqual(200);
+    expect(e.questions[0]!.options[0]!.description!.length).toBeLessThanOrEqual(400);
   });
 });

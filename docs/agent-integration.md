@@ -149,6 +149,11 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
   tak ada capability yang bisa berarti apa pun di sana. Backlog & tiket yang sama tersedia lewat
   `/api/specs` dan `/api/tickets` dengan capability `backlog`/`support` (ADR-0110)
 - `/api/client-accounts*` — membuat & mencabut akun klien beserta password awalnya (ADR-0110)
+- `/api/session-events` — event pertanyaan sesi untuk hanoman-lead (SPEC-909/ADR-0146). Pemanggilnya
+  **hook sesi**, bukan manusia dan bukan agen: kredensialnya token turunan per sesi, dan agen yang
+  bisa memalsukan "sesi X bertanya Y" bisa menggerakkan lead atas nama sesi mana pun — itu peniruan
+  identitas, bukan capability. Agent token di sini menerima **401** (token sesi tak cocok), bukan
+  403: gate cookie mem-bypass path-nya dan route menegakkan tokennya sendiri
 - `POST /api/update/apply` dan tulis lain di bawah prefix status (`/api/limits`, `/api/update`,
   `/api/events`, `/api/fs`, `/api/health`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya
   cookie-only
@@ -467,8 +472,9 @@ penghapusan backlog, dan perubahan `stage`. Batasan ini ada di katalog toolnya, 
 token yang punya `sessions:write` sekalipun tak akan menemukan tool untuk memakainya. Lihat §8.
 
 **Menjawab dialog sesi** (`GET /api/terminal/sessions/:id/dialog`,
-`POST /api/terminal/sessions/:id/dialog/answer`, SPEC-899 · ADR-0142) juga sengaja **tak punya
-tool** — dan alasannya lebih tajam dari sekadar "mengeksekusi": endpoint itu menjawab pertanyaan
+`POST /api/terminal/sessions/:id/dialog/answer`, dan sejak SPEC-909 · ADR-0146 juga
+`POST /api/terminal/sessions/:id/dialog/takeover` — merebut sesi dari hanoman-lead) sengaja **tak
+punya tool** — dan alasannya lebih tajam dari sekadar "mengeksekusi": endpoint itu menjawab pertanyaan
 yang **secara desain ditujukan kepada manusia** (`AskUserQuestion`). Agen yang bisa memanggilnya
 bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang memutuskan" runtuh lewat
 pintu belakang. Capability-nya tetap ada (`sessions:read`/`sessions:write`) karena peta itu berlaku
