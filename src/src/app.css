@@ -687,6 +687,32 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   position: relative; display: flex; align-items: flex-end; gap: 16px; min-height: 148px;
   padding: 6px 20px 0; background: linear-gradient(180deg, var(--bone-000), var(--bone-200));
 }
+/* Saat ada wayang dimainkan, kelir berubah jadi panggung gelap (permukaan gelap yang memang
+   disediakan sistem untuk kerja aktif) dengan pendar blencong dari atas — bahasa visual
+   concept art #4. Idle tetap bone: tenang. */
+.hn-dalang-stage[data-live] {
+  min-height: 196px; padding-top: 30px;
+  background: radial-gradient(ellipse 85% 130% at 50% -25%,
+    color-mix(in srgb, var(--brass-400) 24%, var(--term-bg)), var(--term-bg) 64%);
+}
+.hn-dalang-stage[data-live] .hn-dalang-mascot img {
+  filter: drop-shadow(0 0 20px color-mix(in srgb, var(--bone-000) 32%, transparent));
+}
+.hn-dalang-stage[data-live] .hn-dalang-live {
+  border-color: color-mix(in srgb, var(--brass-500) 45%, var(--term-line));
+}
+.hn-dalang-stage[data-live] .hn-dalang-live[data-waiting] { border-color: var(--amber-600); }
+.hn-dalang-stage[data-live] .hn-dalang-puppet img {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--brass-300) 55%, transparent));
+}
+/* Benang gapit: energi mengalir dari tangan dalang ke tiap wayang (stroke-dashoffset —
+   dekoratif; padam total oleh blok prefers-reduced-motion global). */
+.hn-dalang-threads { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.hn-dalang-threads path {
+  fill: none; stroke: var(--brass-400); stroke-width: 1.5; stroke-linecap: round;
+  stroke-dasharray: 5 9; opacity: 0.75; animation: hn-dalang-flow 1.4s linear infinite;
+}
+@keyframes hn-dalang-flow { to { stroke-dashoffset: -28; } }
 .hn-dalang-mascot { width: 172px; flex: 0 0 auto; }
 /* Blencong di header panel; "menyala" (drop-shadow hangat) hanya saat ada wayang dimainkan.
    Digambar Codex tanpa glow — cahayanya urusan UI (prompt aset). */

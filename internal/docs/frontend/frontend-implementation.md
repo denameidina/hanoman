@@ -729,7 +729,14 @@ blencong di header yang "menyala" lewat `data-lit` + drop-shadow CSS hanya saat 
 (asetnya sengaja digambar tanpa glow). Frontend mengimpor **versi display** (512/384/256,
 ±134 KB total) — master q90 tinggal di `master/` dan tak pernah masuk bundel (pelajaran 5,5 →
 46,1 MB registry illustration). Rekaman produksi + prompt + cara regenerasi (chroma key
-`petlib.chroma_key`) di README direktori aset itu.
+`petlib.chroma_key`) di README direktori aset itu. **Mode orkestrasi**: saat ada sesi hidup,
+`.hn-dalang-stage[data-live]` membalik kelir jadi panggung GELAP (permukaan gelap yang memang
+milik kerja aktif) ber-pendar radial blencong, dan **benang gapit** — kurva brass ber-dash yang
+mengalir (`hn-dalang-flow`) — digambar dari kipas tangan dalang ke tiap kartu wayang. Path-nya
+DIUKUR dari `getBoundingClientRect` kartu nyata (kartu wrap, lebar berubah) via
+`useLayoutEffect` + `ResizeObserver` (di-guard `typeof` — jsdom tak punya keduanya bermakna:
+rect 0 → benang kosong, svg kontraknya tetap dirender dan itu yang dikunci test). Idle tetap
+bone yang tenang — kontras itulah yang membuat momen orkestrasi terbaca.
 Empat stat di header: **dikerjakan hari ini** (`Spec.startedAt` pada hari LOKAL ini —
 komponen-per-komponen, bukan parse `YYYY-MM-DD` yang jatuh ke UTC, gotcha ADR-0090), sesi
 berjalan, menunggu (`!startedAt && stage !== "done"`), dan total `done`. `doneAt` sengaja tak

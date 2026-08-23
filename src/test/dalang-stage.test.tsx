@@ -39,6 +39,8 @@ describe("DalangStage — panggung dalang di Overview", () => {
     // Sang dalang (aset Codex) selalu hadir; blencong tak menyala saat kelir sunyi.
     expect(document.querySelector('img[src*="dalang-six-arms"]')).toBeTruthy();
     expect(document.querySelector(".hn-dalang-blencong[data-lit]")).toBeNull();
+    expect(document.querySelector(".hn-dalang-stage[data-live]")).toBeNull();
+    expect(document.querySelector("svg.hn-dalang-threads")).toBeNull();
     expect(screen.getByRole("button", { name: "Buka project alpha" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Buka project beta" })).toBeTruthy();
   });
@@ -56,6 +58,10 @@ describe("DalangStage — panggung dalang di Overview", () => {
     expect(screen.getByText("Anoman sedang memainkan lakon")).toBeTruthy();
     expect(document.querySelector('img[src*="dalang-six-arms"]')).toBeTruthy();
     expect(document.querySelector(".hn-dalang-blencong[data-lit]")).toBeTruthy();
+    // Mode orkestrasi: kelir gelap (data-live) + lapisan benang gapit ada. Path-nya diukur
+    // dari rect nyata, jadi di jsdom (rect 0) sengaja kosong — yang dikunci kontraknya.
+    expect(document.querySelector(".hn-dalang-stage[data-live]")).toBeTruthy();
+    expect(document.querySelector("svg.hn-dalang-threads")).toBeTruthy();
     const liveList = screen.getByRole("list", { name: "Sesi yang sedang berjalan" });
     expect(liveList.querySelectorAll(".hn-dalang-live")).toHaveLength(2);
     expect(liveList.querySelectorAll('img[src*="wayang-project"]')).toHaveLength(2);

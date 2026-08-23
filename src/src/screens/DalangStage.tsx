@@ -82,6 +82,7 @@ function LivePuppet({ s, projects, backlog, index, onOpenSession }: {
     <button
       type="button"
       className="hn-dalang-live"
+      data-puppet
       data-waiting={waiting || undefined}
       style={{ animationDelay: `${(index % 5) * 0.5}s` }}
       onClick={() => onOpenSession(s.id)}
@@ -124,6 +125,39 @@ export function DalangStage({ projects, backlog, sessions, onOpenSession, onOpen
   const doneN = backlog.filter((s) => s.stage === "done").length;
   const waitingN = backlog.filter((s) => !s.startedAt && s.stage !== "done").length;
 
+  // Benang gapit: kurva dari kipas tangan sang dalang ke tiap kartu wayang, DIUKUR dari layout
+  // nyata (kartu wrap & lebar berubah-ubah) — bukan koordinat tebakan. jsdom memberi rect 0
+  // → benang kosong, svg-nya tetap dirender supaya kontraknya bisa diuji.
+  const liveKey = live.map((s) => s.id).join("|");
+  const stageRef = React.useRef<HTMLDivElement | null>(null);
+  const [threads, setThreads] = React.useState<string[]>([]);
+  React.useLayoutEffect(() => {
+    const el = stageRef.current;
+    if (!el || live.length === 0) { setThreads([]); return; }
+    const measure = () => {
+      const host = el.getBoundingClientRect();
+      if (host.width < 60) return;
+      const m = el.querySelector<HTMLElement>(".hn-dalang-mascot")?.getBoundingClientRect();
+      // Jangkar = ujung kipas gapit di kanan-atas figur dalang.
+      const hx = m ? m.right - host.left - m.width * 0.2 : 150;
+      const hy = m ? m.top - host.top + m.height * 0.28 : host.height * 0.35;
+      const ds: string[] = [];
+      el.querySelectorAll<HTMLElement>("[data-puppet]").forEach((c) => {
+        const r = c.getBoundingClientRect();
+        const tx = r.left + r.width / 2 - host.left;
+        const ty = r.top - host.top + 2;
+        const my = Math.min(hy, ty) - 26;
+        ds.push(`M ${hx.toFixed(1)} ${hy.toFixed(1)} Q ${((hx + tx) / 2).toFixed(1)} ${my.toFixed(1)}, ${tx.toFixed(1)} ${ty.toFixed(1)}`);
+      });
+      setThreads(ds);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [liveKey, live.length]);
+
   return (
     <section className="hn-dalang" aria-label="Panggung dalang — status orkestrasi workspace">
       <div className="hn-dalang-head hn-wrap-mobile">
@@ -148,7 +182,12 @@ export function DalangStage({ projects, backlog, sessions, onOpenSession, onOpen
         </div>
       </div>
 
-      <div className="hn-dalang-stage">
+      <div className="hn-dalang-stage" ref={stageRef} data-live={live.length > 0 || undefined}>
+        {live.length > 0 && (
+          <svg className="hn-dalang-threads" aria-hidden="true" focusable="false">
+            {threads.map((d, i) => <path key={i} d={d} style={{ animationDelay: `${(i % 5) * 0.35}s` }} />)}
+          </svg>
+        )}
         <div className="hn-dalang-mascot">
           {/* Sang dalang sendiri: enam lengan, empat gapit kosong — wayang-nya kartu di kelir.
               Aset yang sama untuk idle & running; yang bercerita adalah kelir di sebelahnya. */}
