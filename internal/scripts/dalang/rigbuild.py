@@ -7,6 +7,9 @@ import petlib
 
 SRC = sys.argv[1]
 OUT = sys.argv[2] if len(sys.argv) > 2 else "/tmp/hanoman-dalang/rig2"
+# Skala lengan relatif badan (generasi cenderung menggambar lengan terlalu tebal/besar).
+# Murni memengaruhi GEOMETRI CSS yang di-print — berkas aset tak disentuh.
+ARM_SCALE = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
 
 def despill(im):
     a = np.asarray(im, dtype=np.float32)
@@ -61,20 +64,22 @@ for name, z in armzone.items():
     hy0, hy1 = (0, h//2) if "B" in z else (h//2, h)
     hd[name] = centroid(p, hx0, hy0, hx1, hy1)
 
-# rakit: badan di B=(0,0); lengan offset agar cakramnya menimpa cakram badan
+# rakit: badan di B=(0,0); lengan (terskala ARM_SCALE) offset agar cakramnya menimpa
+# cakram badan — pos = cakramBadan - pusatCakramLengan*skala.
 pair = {"arm-ul": "UL", "arm-ur": "UR", "arm-ml": "LL", "arm-mr": "LR"}
+scale = {n: (1.0 if n == "body" else ARM_SCALE) for n in parts}
 pos = {"body": (0.0, 0.0)}
 for name, bkey in pair.items():
     bx, by, _ = bd[bkey]; axc, ayc, _ = ad[name]
-    pos[name] = (bx - axc, by - ayc)
-xs = [pos[n][0] for n in pos] + [pos[n][0] + parts[n].width for n in pos]
-ys = [pos[n][1] for n in pos] + [pos[n][1] + parts[n].height for n in pos]
+    pos[name] = (bx - axc * ARM_SCALE, by - ayc * ARM_SCALE)
+xs = [pos[n][0] for n in pos] + [pos[n][0] + parts[n].width * scale[n] for n in pos]
+ys = [pos[n][1] for n in pos] + [pos[n][1] + parts[n].height * scale[n] for n in pos]
 X0, Y0, X1, Y1 = min(xs), min(ys), max(xs), max(ys)
 CW, CH = X1 - X0, Y1 - Y0
-print(f"/* kanvas {CW:.0f} x {CH:.0f} — aspect-ratio: {CW:.0f} / {CH:.0f} */")
+print(f"/* kanvas {CW:.0f} x {CH:.0f} (ARM_SCALE={ARM_SCALE}) — aspect-ratio: {CW:.0f} / {CH:.0f} */")
 for n in ["body", "arm-ul", "arm-ur", "arm-ml", "arm-mr"]:
     px, py = pos[n][0] - X0, pos[n][1] - Y0
-    L, T, Wd = px/CW*100, py/CH*100, parts[n].width/CW*100
+    L, T, Wd = px/CW*100, py/CH*100, parts[n].width*scale[n]/CW*100
     if n == "body":
         print(f".hn-dlg-rig-body {{ left: {L:.2f}%; top: {T:.2f}%; width: {Wd:.2f}%; }}")
     else:
@@ -82,7 +87,7 @@ for n in ["body", "arm-ul", "arm-ur", "arm-ml", "arm-mr"]:
         print(f".hn-dlg-rig-arm--{n[4:]} {{ left: {L:.2f}%; top: {T:.2f}%; width: {Wd:.2f}%; transform-origin: {ox/parts[n].width*100:.1f}% {oy/parts[n].height*100:.1f}%; }}")
 for n, key in [("arm-ul","ul"),("arm-ur","ur"),("arm-ml","ml"),("arm-mr","mr")]:
     hx, hy, cnt = hd[n]
-    gx = (pos[n][0] - X0 + hx) / CW * 100
-    gy = (pos[n][1] - Y0 + hy) / CH * 100
+    gx = (pos[n][0] - X0 + hx * ARM_SCALE) / CW * 100
+    gy = (pos[n][1] - Y0 + hy * ARM_SCALE) / CH * 100
     print(f'.hn-dlg-hand[data-hand="{key}"] {{ left: {gx:.1f}%; top: {gy:.1f}%; }} /* n={cnt} */')
 print(json.dumps({n: parts[n].size for n in parts}))

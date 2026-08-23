@@ -847,28 +847,30 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 /* Rig hero ber-sendi: kanvas komposisi 1003x757 unit sheet; badan + 4 lengan absolut,
    tiap lengan berputar pada cakram pivot bahunya (transform-origin = pusat cakram,
    koordinat diukur dari aset — lihat internal/assets/dalang/README.md). */
+/* Geometri dari internal/scripts/dalang/rigbuild.py (ARM_SCALE=0.78 — lengan generasi
+   terlalu tebal relatif badan; skala murni CSS, aset tak disentuh). */
 .hn-dlg-hero-art {
-  position: relative; width: min(640px, 94%); aspect-ratio: 994 / 664;
+  position: relative; width: min(540px, 94%); aspect-ratio: 835 / 582;
   margin: 0 auto; animation: hn-dlg-float 6s ease-in-out infinite;
 }
 .hn-dlg-hero-art img {
   position: absolute; display: block; height: auto;
   filter: drop-shadow(0 0 18px rgba(212,164,60,0.35));
 }
-.hn-dlg-rig-body { left: 29.66%; top: 26.70%; width: 40.96%; z-index: 2; }
+.hn-dlg-rig-body { left: 25.88%; top: 16.32%; width: 48.73%; z-index: 2; }
 .hn-dlg-rig-arm { z-index: 1; will-change: transform; }
-.hn-dlg-rig-arm--ul { left: 6.02%;  top: 0.38%;  width: 34.52%; transform-origin: 85.5% 86.8%; animation: hn-dlg-arm-a 5s   ease-in-out infinite; }
-.hn-dlg-rig-arm--ur { left: 58.62%; top: 0%;     width: 33.21%; transform-origin: 15.1% 87.1%; animation: hn-dlg-arm-b 5.6s ease-in-out infinite; }
-.hn-dlg-rig-arm--ml { left: 0%;     top: 62.34%; width: 40.25%; transform-origin: 89.2% 24.2%; animation: hn-dlg-arm-b 6.4s ease-in-out infinite; }
-.hn-dlg-rig-arm--mr { left: 58.84%; top: 61.89%; width: 41.16%; transform-origin: 11.1% 24.3%; animation: hn-dlg-arm-a 7s   ease-in-out infinite; }
+.hn-dlg-rig-arm--ul { left: 5.48%;  top: 0.39%;  width: 32.03%; transform-origin: 85.5% 86.8%; animation: hn-dlg-arm-a 5s   ease-in-out infinite; }
+.hn-dlg-rig-arm--ur { left: 61.65%; top: 0%;     width: 30.82%; transform-origin: 15.1% 87.1%; animation: hn-dlg-arm-b 5.6s ease-in-out infinite; }
+.hn-dlg-rig-arm--ml { left: 0%;     top: 58.84%; width: 37.36%; transform-origin: 89.2% 24.2%; animation: hn-dlg-arm-b 6.4s ease-in-out infinite; }
+.hn-dlg-rig-arm--mr { left: 61.80%; top: 58.32%; width: 38.20%; transform-origin: 11.1% 24.3%; animation: hn-dlg-arm-a 7s   ease-in-out infinite; }
 @keyframes hn-dlg-arm-a { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(3deg); } }
 @keyframes hn-dlg-arm-b { 0%, 100% { transform: rotate(2.5deg); } 50% { transform: rotate(-3deg); } }
 /* Jangkar benang: titik gapit di tiap tangan (centroid emas terukur → %). */
 .hn-dlg-hand { position: absolute; width: 2px; height: 2px; pointer-events: none; }
-.hn-dlg-hand[data-hand="ul"] { left: 16.8%; top: 11.1%; }
-.hn-dlg-hand[data-hand="ur"] { left: 81.2%; top: 10.8%; }
-.hn-dlg-hand[data-hand="ml"] { left: 11.0%; top: 81.7%; }
-.hn-dlg-hand[data-hand="mr"] { left: 88.7%; top: 81.2%; }
+.hn-dlg-hand[data-hand="ul"] { left: 15.5%; top: 9.9%; }
+.hn-dlg-hand[data-hand="ur"] { left: 82.7%; top: 9.6%; }
+.hn-dlg-hand[data-hand="ml"] { left: 10.2%; top: 76.1%; }
+.hn-dlg-hand[data-hand="mr"] { left: 89.5%; top: 75.5%; }
 @keyframes hn-dlg-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 .hn-dlg-cards { position: relative; display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; justify-content: center; padding: 18px 0 16px; }
 .hn-dlg-prj {

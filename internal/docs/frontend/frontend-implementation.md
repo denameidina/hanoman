@@ -759,7 +759,8 @@ tombol ✕ atau Escape → `setSection("overview")`; pet z-80 otomatis tertutup)
 ber-sendi** — Hanoman dirakit dari 5 bagian (`internal/assets/dalang/hnm-hero-rig-*.webp`,
 badan + 4 lengan **tanpa rantai tergambar** — semua tali digambar SVG oleh aplikasi,
 bukan aset; geometri diukur otomatis `internal/scripts/dalang/rigbuild.py`) dalam kanvas
-`aspect-ratio: 994/664`,
+`aspect-ratio: 835/582` (ARM_SCALE 0.78 — lengan generasi terlalu tebal, dikecilkan murni
+lewat geometri CSS),
 tiap lengan `rotate` ±3° pada `transform-origin` cakram bahunya dengan durasi berbeda
 (5–7 s) sehingga geraknya organik, bukan satu gambar mengambang — melayang di atas
 **SEMUA project**: yang ber-sesi hidup jadi wayang menyala (satu kartu per sesi WS, klik →
