@@ -755,13 +755,19 @@ Menu `dalang` ("Dalang Hanoman", ikon `drama`) membuka
 `src/src/screens/DalangHanomanScreen.tsx` — implementasi layar dari konsep Claude Design
 "Dashboard Futuristik" dengan **data nyata**, dirender **TANPA Shell sebagai takeover layar
 penuh** (`position: fixed; inset: 0; z-index: 100` — kelas fullscreen Terminal; keluar via
-tombol ✕ atau Escape → `setSection("overview")`; pet z-80 otomatis tertutup): hero sinematik
-Hanoman enam lengan (`internal/assets/dalang/hnm-hero-cinematic-v01.webp`, aset Codex)
-melayang di atas **SEMUA project** — yang ber-sesi hidup jadi wayang menyala ber-benang
-(satu kartu per sesi WS, klik → fokus terminal; `decision && !deciding` = amber), yang tanpa
-sesi tetap tampil sebagai **wayang redup** (`.hn-dlg-prj--off`, grayscale, tanpa goyang,
-klik → detail project),
-**benang gapit terukur** dari dada hero ke tiap kartu (pola pengukuran DalangStage), KPI
+tombol ✕ atau Escape → `setSection("overview")`; pet z-80 otomatis tertutup): **hero RIG
+ber-sendi** — Hanoman dirakit dari 5 bagian (`internal/assets/dalang/hnm-hero-rig-*.webp`,
+badan + 4 lengan; koordinat pivot di README aset) dalam kanvas `aspect-ratio: 1003/757`,
+tiap lengan `rotate` ±3° pada `transform-origin` cakram bahunya dengan durasi berbeda
+(5–7 s) sehingga geraknya organik, bukan satu gambar mengambang — melayang di atas
+**SEMUA project**: yang ber-sesi hidup jadi wayang menyala (satu kartu per sesi WS, klik →
+fokus terminal; `decision && !deciding` = amber), yang tanpa sesi tetap tampil sebagai
+**wayang redup** (`.hn-dlg-prj--off`, grayscale, tanpa goyang, klik → detail project).
+**Benang gapit ke SEMUA wayang** — jangkar benang = 4 anchor `[data-hand]` di titik gapit
+tiap tangan rig: lengan ATAS → benang emas mengalir ke wayang hidup, lengan TENGAH
+(menjuntai) → benang kendur redup (`.hn-dlg-thread--slack`, utuh tanpa dash, melengkung ke
+bawah, tanpa animasi) ke wayang diam — sang dalang selalu memegang seluruh panggung
+walau nol sesi (pola pengukuran DalangStage), KPI
 count-up, ticker boot yang mengetik fakta nyata, jam hidup per detik, donut distribusi
 backlog per `zStage` (dirangkum done/executing/planned/sisanya→spec — kosakata stage BUKAN
 "execute/plan", gotcha typecheck), dan chart "dimulai 7 hari" dari `startedAt` hari LOKAL.

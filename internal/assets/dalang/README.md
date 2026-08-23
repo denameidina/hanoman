@@ -10,6 +10,7 @@ Tiga aset transparan yang dipakai panel `DalangStage` di Overview (`src/src/scre
 | `hnm-hero-cinematic-v01.webp` (301×300, alpha lossy q50) | `master/hnm-hero-cinematic-master-v01.webp` (1254×1248) | hero SINEMATIK — Hanoman realistik enam lengan memegang string emas (gaya referensi mockup dark/gold; BUKAN gaya editorial brand — khusus konsep "Dashboard Futuristik" di Claude Design) |
 | `hnm-logo-head-v01.webp` (60×96) | `master/hnm-logo-head-master-v01.webp` | emblem kepala Hanoman emas untuk logo sidebar konsep futuristik |
 | `hnm-wayang-satria-alus-v01.webp` · `-satria-gagah-` · `-putri-` · `-panakawan-` (h416, gaya sinematik, benang gantung di puncak) | `master/hnm-wayang-var-{a..d}-master-v01.webp` | empat tokoh wayang untuk layar Dalang Hanoman — tiap project dapat tokohnya lewat hash stabil id (`wayangFor`); prompt di `prompts/wy-*.md` |
+| `hnm-hero-rig-{body,arm-ul,arm-ur,arm-ml,arm-mr}-v01.webp` (badan 408×487; lengan ±340–410 per sisi) | `master/hnm-hero-rig-*-master-v01.webp` | **rig hero ber-sendi** layar Dalang Hanoman: badan tanpa lengan atas (cakram pivot emas di bahu) + 4 lengan terpisah masing-masing memegang gapit; dirakit CSS absolut dalam kanvas 1003×757 unit, tiap lengan beranimasi `rotate` pada `transform-origin` = pusat cakramnya. Prompt `prompts/rig-sheet.md` (sheet 1536×1024, grid 3×2 sel 512). Pusat cakram diukur otomatis (centroid piksel emas per kuadran): badan UL(57,197) LL(60,280) UR(338,196) LR(339,279); lengan ul(293,374) ur(49,377) ml(358,50) mr(44,49) |
 
 Frontend mengimpor **versi display saja** (total ±134 KB) — pelajaran registry illustration: master
 near-lossless dilarang masuk bundel (5,5 MB → 46,1 MB terukur di SPEC pack npm).
@@ -31,7 +32,10 @@ negative_block: NEGATIVE_CORE (minus "extra limb" untuk dalang — pengecualian 
   yang sama dengan internal/assets/concepts/dalang/README.md)
 selected_output: "generasi pertama tiap prompt, tanpa retry"
 manual_changes: "chroma key hijau→alpha (petlib.chroma_key, key=median tepi), crop bbox+8px,
-  resize display (512/384/256), WebP q82; master WebP q90 dari keyed penuh"
+  resize display (512/384/256), WebP q82; master WebP q90 dari keyed penuh.
+  Khusus rig sheet: crop per sel grid 512, lalu despill dua tahap (clamp g→max(r,b);
+  piksel kuning-kehijauan b<0.62g ditarik ke rasio emas g=0.8r — rantai emas tipis
+  terkontaminasi latar hijau, terukur olive tanpa tahap kedua)"
 reviewer: "belum direview manusia (Gate 2 menyusul bila naik kelas jadi aset brand resmi)"
 ```
 

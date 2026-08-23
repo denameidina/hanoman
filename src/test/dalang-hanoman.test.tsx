@@ -47,10 +47,13 @@ describe("Dalang Hanoman — menu & layar panggung orkestrasi", () => {
         session({ id: "s3", projectId: "c", exited: true, exitCode: 0 }),
       ]}
       onOpenSession={onOpenSession} onOpenProject={onOpenProject} onGoto={noop} onExit={noop} />);
-    expect(document.querySelector('img[src*="hero-cinematic"]')).toBeTruthy();
+    // Hero rig ber-sendi: badan + 4 lengan terpisah + 4 jangkar tangan untuk benang.
+    expect(document.querySelector('img[src*="hero-rig-body"]')).toBeTruthy();
+    expect(document.querySelectorAll(".hn-dlg-rig-arm")).toHaveLength(4);
+    expect(document.querySelectorAll("[data-hand]")).toHaveLength(4);
     const list = screen.getByRole("list", { name: "Wayang project" });
     expect(list.querySelectorAll(".hn-dlg-prj")).toHaveLength(3);          // semua tampil
-    expect(list.querySelectorAll("[data-puppet]")).toHaveLength(2);        // benang hanya ke yang hidup
+    expect(list.querySelectorAll("[data-puppet]")).toHaveLength(2);        // benang emas mengalir ke yang hidup; sisanya benang kendur
     expect(list.querySelectorAll('.hn-dlg-prj[data-waiting]')).toHaveLength(1);
     expect(list.querySelectorAll(".hn-dlg-prj--off")).toHaveLength(1);     // gamma redup, tetap wayang
     fireEvent.click(screen.getByRole("button", { name: /Buka terminal — alpha, SPEC-1 · executing/ }));

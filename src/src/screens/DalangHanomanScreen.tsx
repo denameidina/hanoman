@@ -9,7 +9,13 @@ import { Icon } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, Spec } from "./types";
 import { isToday } from "./DalangStage";
-import heroUrl from "../../../internal/assets/dalang/hnm-hero-cinematic-v01.webp?url";
+// Hero dirakit dari 5 bagian ber-sendi (rig sheet Codex): badan + 4 lengan berputar
+// di cakram pivot bahunya masing-masing — animasi jauh lebih hidup dari satu gambar statis.
+import rigBodyUrl from "../../../internal/assets/dalang/hnm-hero-rig-body-v01.webp?url";
+import rigArmUlUrl from "../../../internal/assets/dalang/hnm-hero-rig-arm-ul-v01.webp?url";
+import rigArmUrUrl from "../../../internal/assets/dalang/hnm-hero-rig-arm-ur-v01.webp?url";
+import rigArmMlUrl from "../../../internal/assets/dalang/hnm-hero-rig-arm-ml-v01.webp?url";
+import rigArmMrUrl from "../../../internal/assets/dalang/hnm-hero-rig-arm-mr-v01.webp?url";
 import blencongUrl from "../../../internal/assets/dalang/hnm-blencong-v01.webp?url";
 // Empat varian wayang sinematik (aset GPT Image via Codex, benang gantung di puncak) —
 // tiap project dapat tokohnya sendiri lewat hash stabil dari id.
@@ -176,31 +182,50 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
   const maxDay = Math.max(1, ...days.map((d) => d.n));
   const pts = days.map((d, i) => `${32 + i * 35},${78 - (d.n / maxDay) * 60}`).join(" ");
 
-  // Benang gapit: diukur dari layout nyata (cermin DalangStage); jsdom rect 0 → kosong.
-  const liveKey = live.map((s) => s.id).join("|");
+  // Benang gapit ke SEMUA wayang: yang hidup = emas mengalir, yang diam = benang kendur
+  // redup — sang dalang selalu memegang seluruh panggungnya. Diukur dari layout nyata;
+  // jsdom rect 0 → kosong.
+  const threadKey = `${live.map((s) => s.id).join("|")}#${parked.map((p) => p.id).join("|")}`;
   const stageRef = React.useRef<HTMLDivElement | null>(null);
-  const [threads, setThreads] = React.useState<string[]>([]);
+  const [threads, setThreads] = React.useState<{ d: string; slack: boolean }[]>([]);
   React.useLayoutEffect(() => {
     const el = stageRef.current;
-    if (!el || live.length === 0) { setThreads([]); return; }
+    if (!el || (live.length === 0 && parked.length === 0)) { setThreads([]); return; }
     const measure = () => {
       const host = el.getBoundingClientRect();
       if (host.width < 60) return;
       const art = el.querySelector<HTMLElement>(".hn-dlg-hero-art")?.getBoundingClientRect();
       const cx = art ? art.left + art.width / 2 - host.left : host.width / 2;
-      // Dua jangkar = dua kelompok tangan hero (kiri/kanan), cermin komposisi referensi.
-      const hy = art ? art.top - host.top + art.height * 0.36 : host.height * 0.35;
-      const spread = art ? art.width * 0.34 : 60;
-      const ds: string[] = [];
-      el.querySelectorAll<HTMLElement>("[data-puppet]").forEach((c) => {
+      // Jangkar = gapit di tiap tangan rig: lengan ATAS memainkan wayang hidup,
+      // lengan TENGAH (menjuntai) memegangi wayang diam.
+      const hands: Record<string, { x: number; y: number }> = {};
+      el.querySelectorAll<HTMLElement>("[data-hand]").forEach((h) => {
+        const r = h.getBoundingClientRect();
+        hands[h.dataset.hand ?? ""] = {
+          x: r.left + r.width / 2 - host.left,
+          y: r.top + r.height / 2 - host.top,
+        };
+      });
+      const fallback = {
+        x: cx,
+        y: art ? art.top - host.top + art.height * 0.36 : host.height * 0.35,
+      };
+      const ds: { d: string; slack: boolean }[] = [];
+      el.querySelectorAll<HTMLElement>(".hn-dlg-prj").forEach((c) => {
         // Ujung benang = puncak WAYANG-nya (tempat string emas di aset), bukan tepi kartu.
         const img = c.querySelector<HTMLElement>(".hn-dlg-puppet img") ?? c;
         const r = img.getBoundingClientRect();
         const tx = r.left + r.width / 2 - host.left;
         const ty = r.top - host.top + 1;
-        const hx = tx < cx ? cx - spread : cx + spread;
-        const my = Math.min(hy, ty) - 16;
-        ds.push(`M ${hx.toFixed(1)} ${hy.toFixed(1)} Q ${((hx + tx) / 2).toFixed(1)} ${my.toFixed(1)}, ${tx.toFixed(1)} ${ty.toFixed(1)}`);
+        const slack = !c.hasAttribute("data-puppet");
+        const side = tx < cx ? "l" : "r";
+        const hand = hands[(slack ? "m" : "u") + side] ?? fallback;
+        // Benang kendur melengkung ke BAWAH (beban wayang diam); benang hidup tegang ke atas.
+        const my = slack ? Math.max(hand.y, ty) + 26 : Math.min(hand.y, ty) - 16;
+        ds.push({
+          d: `M ${hand.x.toFixed(1)} ${hand.y.toFixed(1)} Q ${((hand.x + tx) / 2).toFixed(1)} ${my.toFixed(1)}, ${tx.toFixed(1)} ${ty.toFixed(1)}`,
+          slack,
+        });
       });
       setThreads(ds);
     };
@@ -209,7 +234,7 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [liveKey, live.length]);
+  }, [threadKey, live.length, parked.length]);
 
   const activity = projects.slice(0, 6).map((p) => ({
     id: p.id, name: p.name, text: p.activity, commit: p.commit, live: liveProjects.has(p.id),
@@ -251,12 +276,24 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
             </svg>
             {threads.length > 0 && (
               <svg className="hn-dlg-threads" aria-hidden="true" focusable="false">
-                {threads.map((d, i) => <path key={i} d={d} style={{ animationDelay: `${(i % 6) * 0.3}s` }} />)}
+                {threads.map((t, i) => (
+                  <path key={i} d={t.d} className={t.slack ? "hn-dlg-thread--slack" : undefined}
+                    style={t.slack ? undefined : { animationDelay: `${(i % 6) * 0.3}s` }} />
+                ))}
               </svg>
             )}
             <div className="hn-dlg-scan" aria-hidden="true" />
-            <div className="hn-dlg-hero-art">
-              <img src={heroUrl} alt="" aria-hidden="true" />
+            <div className="hn-dlg-hero-art" aria-hidden="true">
+              <img className="hn-dlg-rig-arm hn-dlg-rig-arm--ul" src={rigArmUlUrl} alt="" />
+              <img className="hn-dlg-rig-arm hn-dlg-rig-arm--ur" src={rigArmUrUrl} alt="" />
+              <img className="hn-dlg-rig-arm hn-dlg-rig-arm--ml" src={rigArmMlUrl} alt="" />
+              <img className="hn-dlg-rig-arm hn-dlg-rig-arm--mr" src={rigArmMrUrl} alt="" />
+              <img className="hn-dlg-rig-body" src={rigBodyUrl} alt="" />
+              {/* Jangkar benang = posisi gapit di tiap tangan (diukur dari rig sheet). */}
+              <span className="hn-dlg-hand" data-hand="ul" />
+              <span className="hn-dlg-hand" data-hand="ur" />
+              <span className="hn-dlg-hand" data-hand="ml" />
+              <span className="hn-dlg-hand" data-hand="mr" />
             </div>
             {(live.length > 0 || parked.length > 0) ? (
               <div className="hn-dlg-cards" role="list" aria-label="Wayang project">
