@@ -4,7 +4,7 @@ import React from "react";
 import { Card, StatusPill, Badge, ProgressBar, Icon, IconButton, Select, StateBlock, serverPage, Pager,
   LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE } from "../ds";
 import { api } from "../api/client";
-import { usePersistedState, useScrollRestore, isNum, isStr } from "../ui-state";
+import { usePersistedState, useScrollRestore, useResetOnChange, isNum, isStr } from "../ui-state";
 import { HandledByChips } from "./HandledByChips";
 import type { DeviceTokenView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
@@ -124,7 +124,9 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
       .catch(() => { });
     return () => { alive = false; };
   }, []);
-  React.useEffect(() => { setPage(1); }, [search, handledBy]);
+  // AC-15 · ganti pencarian/penyaring = kembali ke halaman 1, TAPI tidak saat mount: `page`
+  // ikut dipersistensi (SPEC-740 · ADR-0115).
+  useResetOnChange(JSON.stringify([search, handledBy]), () => setPage(1));
   React.useEffect(() => {
     if (!pageSize) { setRows(projects); setTotal(projects.length); return; }
     let alive = true;

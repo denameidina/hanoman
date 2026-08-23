@@ -4,6 +4,10 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { changedFiles, withTempIndex, type ChangedFile, type ReviewFile } from "./spec-review";
 import { assertSafeRepoPathSync, readRepoFile as readSafeRepoFile, writeRepoFileAtomic } from "./safe-repo-path";
+// SPEC-908 · tiga tipe ini dulu dideklarasikan KEMBAR di sini dan di src/src/api/client.ts.
+// Frame `git` di EventMsg memaksa keduanya jadi satu definisi di @hanoman/shared.
+import type { GraphCommit, RepoStatus, Stash, TopicParams } from "@hanoman/shared";
+export type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 
 const exec = promisify(execFile);
 const GIT = { maxBuffer: 1 << 24 } as const;
@@ -50,17 +54,11 @@ export async function readRepoFile(repoDir: string | null, rel: string, ref = ""
 
 const US = "\x1f"; // unit separator dalam satu baris commit
 
-export type GraphCommit = { sha: string; parents: string[]; author: string; at: string; subject: string; refs: string[]; tags: string[] };
 
 async function currentBranch(repoDir: string): Promise<string> {
   return exec("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: repoDir, ...GIT })
     .then((r) => r.stdout.trim()).catch(() => "");
 }
-
-export type RepoStatus = {
-  branch: string; ahead: number; behind: number;
-  staged: string[]; unstaged: string[]; untracked: string[]; clean: boolean;
-};
 
 // SPEC-233 · status working tree untuk baris "uncommitted changes" di graph. `git status --porcelain=v1
 // -z -b`: record `## <branch>...<up> [ahead N, behind M]` lalu tiap entri `XY<space>path` (rename →
@@ -91,8 +89,6 @@ export async function repoStatus(repoDir: string | null): Promise<RepoStatus> {
     return { branch, ahead, behind, staged, unstaged, untracked, clean: !staged.length && !unstaged.length && !untracked.length };
   } catch { return empty; }
 }
-
-export type Stash = { ref: string; message: string; at: string };
 
 // SPEC-233 · daftar stash. %gd = selektor reflog (stash@{0}); %s = subjek; %aI = tanggal ISO.
 export async function listStashes(repoDir: string | null): Promise<Stash[]> {
@@ -487,4 +483,22 @@ export async function workingFileDiff(
     diff: diffRaw.slice(0, MAX),
     content: contentRaw === null ? null : contentRaw.slice(0, MAX),
   };
+}
+
+// SPEC-908 · muatan layar GitGraph dalam SATU tarikan — cermin `load()`-nya. Dibundel karena
+// ketiganya hari ini satu render: tiga frame terpisah akan menampilkan campuran dua generasi data.
+export async function buildGitLive(repoDir: string | null, p: TopicParams["git"]): Promise<{
+  graph: { commits: GraphCommit[]; current: string; total: number };
+  status: RepoStatus; stashes: Stash[];
+}> {
+  const [graph, status, stashes] = await Promise.all([
+    listGraph(repoDir, p.limit, {
+      branches: p.branch ? [p.branch] : undefined,
+      showRemote: p.showRemote ? undefined : false,
+      showTags: p.showTags ? undefined : false,
+    }),
+    repoStatus(repoDir),
+    listStashes(repoDir),
+  ]);
+  return { graph, status, stashes };
 }

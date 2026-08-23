@@ -3,7 +3,7 @@
 | Lapis | Pilihan | Alasan |
 |---|---|---|
 | Dashboard | React + TypeScript + Vite | UI cepat, tim familiar |
-| Realtime | WebSocket (terminal) + HTTP polling | terminal butuh stream dua arah; sisanya cukup poll |
+| Realtime | WebSocket: PTY terminal + satu kanal siar dashboard | siar membawa grup global (ADR-0039) **dan** langganan berparameter (SPEC-908/ADR-0145); HTTP tinggal muat awal & fallback |
 | Server | Node.js + TypeScript (Fastify) | satu bahasa lintas stack; `@fastify/websocket`, `cookie`, `static` |
 | DB | **SQLite (Prisma 6)** | embedded, nol proses eksternal; berkas di `~/.hanoman/hanoman.db` ([ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md)), dibuka `journal_mode=WAL` ([ADR-0131](../adr/0131-retensi-change-feed-sync.md) §4) |
 | Distribusi | **paket npm global `hanoman`** | `npm i -g hanoman` → `hanoman`; update `hanoman update` ([ADR-0087](../adr/0087-distribusi-npm-global-satu-perintah.md)) |
@@ -30,7 +30,8 @@ sudah ada, bukan antrean kedua.
 ## Bentuk sistem
 ```
 Dashboard (React + xterm.js)
-   │  WebSocket (PTY terminal)  +  HTTP polling (projects, backlog, notifications, limits, vps)
+   │  WebSocket: PTY terminal  +  /events/ws (grup global + langganan berparameter)
+   │  HTTP: muat awal & fallback (projects tetap HTTP — bukan data real-time)
    ▼
 Server (Fastify, bind 127.0.0.1:8787)
    ├─ routes: auth · projects · specs · docs · terminal · vps · fs · settings · notifications · limits · health

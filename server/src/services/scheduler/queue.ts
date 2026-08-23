@@ -1,5 +1,6 @@
 import { prisma } from "../../db";
 import type { SchedulerQueueItem } from "@prisma/client";
+import type { Paginated, SchedulerQueueItemView } from "@hanoman/shared";
 
 const RANK: Record<string, number> = { tinggi: 0, sedang: 1, rendah: 2 };
 
@@ -49,6 +50,26 @@ export async function listQueuePage(f: { status?: string; page?: string; limit?:
     where, orderBy: { enqueuedAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize,
   });
   return { items, total, page, pageSize };
+}
+
+// SPEC-908 · amplop view (tanggal ISO) untuk GET /scheduler/queue dan topik siar
+// `schedulerQueue`. Satu definisi: sebelumnya serializer ini inline di routes/scheduler.ts.
+export async function buildQueuePage(
+  f: { status?: string; page?: number; limit?: number },
+): Promise<Paginated<SchedulerQueueItemView>> {
+  // `?:` menjadikan `limit=0`/`limit=abc` (NaN) terbaca "tanpa limit" — cermin bug terukur di
+  // services/tickets-list.ts. `listQueuePage` sendiri sudah menjepit nilai tak sah ke 1.
+  const str = (v: number | undefined): string | undefined => (v === undefined ? undefined : String(v));
+  const r = await listQueuePage({ status: f.status, page: str(f.page), limit: str(f.limit) });
+  return {
+    items: r.items.map((q) => ({
+      id: q.id, specId: q.specId, projectId: q.projectId, source: q.source,
+      priority: q.priority, status: q.status, sessionId: q.sessionId, note: q.note,
+      enqueuedAt: q.enqueuedAt.toISOString(),
+      launchedAt: q.launchedAt ? q.launchedAt.toISOString() : null,
+    })),
+    total: r.total, page: r.page, pageSize: r.pageSize,
+  };
 }
 
 // SPEC-523 · hitungan per status untuk `GET /scheduler/state`. Kunci ditulis apa adanya (bukan

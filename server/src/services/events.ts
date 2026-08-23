@@ -9,15 +9,20 @@ import { isDeciding } from "./lead/deciding";
 import { listCleanups } from "./worktree-reaper";
 import { prisma } from "../db";
 import { effectiveInt } from "../config";
+import { subKey, type EventMsg, type EventTopic } from "@hanoman/shared";
+import { TOPICS, TOPIC_NAMES, isTopic, parseParams } from "./events-topics";
 
 // SPEC-199 · satu WebSocket siar untuk seluruh data real-time dashboard (ADR-0039). Meniru
 // pola siar services/pty.ts: satu Set klien, satu loop ref-counted, frame lahir hanya saat
 // isinya berubah. Sumber (tmux/berkas/DB) poll-only — server yang men-poll, klien didorong.
 //
-// Tipe frame di-longgar (bukan shared EventMsg) di sisi server: build memakai baris Prisma
-// (tanggal Date) yang JSON serialize jadi string sesuai wire type. Klien-lah yang menegakkan
-// `EventMsg`. Sama persis konvensi route lain yang mengembalikan baris Prisma mentah.
-type WireMsg = { t: string; [k: string]: unknown };
+// Badan frame tetap longgar di sisi server: build memakai baris Prisma (tanggal Date) yang JSON
+// serialize jadi string sesuai wire type. Sama persis konvensi route lain yang mengembalikan baris
+// Prisma mentah.
+// SPEC-908 · yang TIDAK lagi longgar adalah `t`-nya. Dulu `{ t: string; … }`, sehingga `t` salah
+// ketik lolos typecheck server lalu jatuh senyap di klien (`m.t === …` tak pernah cocok) — dan
+// migrasi ini menambah enam varian di bawah tipe yang sama.
+type WireMsg = { t: EventMsg["t"] } & Record<string, unknown>;
 
 const clients = new Set<Client>();
 // SPEC-215 · dibaca per-pakai (cfg live). Test menurunkan tick agar cepat; prod 1s. Loop cuma jalan saat ada klien.
@@ -58,9 +63,114 @@ const GROUPS: Group[] = [
   { everyTicks: 300, last: "", build: async () => ({ t: "update", update: await getUpdateStatus() }) },
 ];
 
+// SPEC-908 · klien yang `send`-nya melempar harus dilepas dari `clients` DAN dari peta langganan.
+// Menyapu `clients` saja meninggalkan entri hidup untuk penonton yang sudah tak ada — dan entri
+// `git` berarti `git log` + `git status` + `git stash list` tiap 4 dtk untuk nol pembaca.
 function broadcast(msg: WireMsg): void {
   const s = JSON.stringify(msg);
-  for (const c of clients) { try { c.send(s); } catch { clients.delete(c); } }
+  for (const c of clients) sendTo(c, s);
+}
+
+// SPEC-908 · langganan BERPARAMETER, mengamandemen ADR-0039. Berkunci `subKey(topic, params)`
+// yang dihitung fungsi yang SAMA di klien, sehingga N klien berparameter identik berbagi satu
+// entri: satu build, satu JSON.stringify, satu dedup signature.
+type SubEntry = {
+  topic: EventTopic;
+  params: unknown;
+  key: string;
+  subscribers: Set<Client>;
+  tick: number;
+  last: string;
+  inflight: boolean;
+  failing?: boolean;
+};
+const entries = new Map<string, SubEntry>();
+
+function sendTo(c: Client, s: string): void {
+  try { c.send(s); } catch { clients.delete(c); dropClientSubs(c); }
+}
+
+function dropClientSubs(c: Client): void {
+  for (const [key, e] of entries) {
+    if (!e.subscribers.delete(c)) continue;
+    if (e.subscribers.size === 0) entries.delete(key);
+  }
+}
+
+// SPEC-908 · dua pagar kerja, keduanya lahir dari review keamanan yang MENGUKUR jalurnya.
+//
+// (1) `MAX_INFLIGHT` membatasi berapa build boleh berjalan bersamaan di seluruh hub. `e.inflight`
+// sendirian hanya men-dedup DI DALAM satu entri, dan entri baru selalu lahir `inflight:false` —
+// terukur, 32 `buildGitLive` serentak (5 spawn git masing-masing) menahan event loop **505 ms**,
+// event loop yang sama yang melayani PTY terminal (kelas regresi SPEC-812/878).
+//
+// (2) `IMMEDIATE_PER_MIN` membatasi build DI LUAR JADWAL per klien. Semantik ganti-penuh membuat
+// tiap frame `sub` bisa memperkenalkan 16 kunci "baru" lagi, dan kuota 120 frame/menit karena itu
+// terukur menjadi **1 920 build/menit dari satu socket** (≈160 fork `git`/dtk). Entri yang
+// kehabisan jatah tidak hilang — ia hanya menunggu slot `everyTicks`-nya seperti entri lain.
+const MAX_INFLIGHT = 4;
+const IMMEDIATE_PER_MIN = 30;
+let inflight = 0;
+
+const immediateBudget = new WeakMap<Client, { left: number; resetAt: number }>();
+function takeImmediate(c: Client, now = Date.now()): boolean {
+  let b = immediateBudget.get(c);
+  if (!b || now >= b.resetAt) { b = { left: IMMEDIATE_PER_MIN, resetAt: now + 60_000 }; immediateBudget.set(c, b); }
+  if (b.left <= 0) return false;
+  b.left--;
+  return true;
+}
+
+// Satu recompute untuk SEMUA pelanggan entri ini. TIDAK PERNAH di-await oleh __tick: satu
+// `git log` lambat tak boleh menunda grup `sessions`/`specs` yang berkadens 1 dtk — event loop
+// yang sama melayani PTY terminal (pelajaran terukur SPEC-479/812).
+async function runEntry(e: SubEntry): Promise<void> {
+  if (e.inflight || inflight >= MAX_INFLIGHT) return;   // yang terlewat ikut tick berikutnya
+  e.inflight = true;
+  inflight++;
+  try {
+    const body = await (TOPICS[e.topic].build as (p: unknown) => Promise<object>)(e.params);
+    if (e.failing) { e.failing = false; console.log(`siar langganan pulih: ${e.key}`); }
+    const s = JSON.stringify({ t: e.topic, key: e.key, ...body });
+    if (s === e.last) return;
+    e.last = s;
+    for (const c of e.subscribers) sendTo(c, s);
+  } catch (err) {
+    // Frame lama SENGAJA tak dihapus: klien tak boleh di-blank karena satu build gagal.
+    if (!e.failing) { e.failing = true; console.error(`siar langganan gagal membangun ${e.key}:`, err); }
+  } finally { e.inflight = false; inflight--; }
+}
+
+// Ganti-penuh: satu frame `sub` mengganti SELURUH himpunan langganan klien. Karena itu tak ada
+// frame `unsubscribe` yang bisa hilang, dan re-kirim saat reconnect identik dengan pemasangan
+// pertama (idempoten by construction).
+export function subscribeClient(c: Client, subs: { topic: string; params: unknown }[]): void {
+  const wanted = new Set<string>();
+  for (const s of subs) {
+    if (!isTopic(s.topic)) continue;                 // ADR-0087 · dashboard boleh lebih baru
+    const params = parseParams(s.topic, s.params);
+    if (params === undefined) continue;              // entri cacat dibuang, frame-nya tidak
+    const key = subKey(s.topic, params as Record<string, unknown>);
+    wanted.add(key);
+    let e = entries.get(key);
+    if (!e) {
+      e = { topic: s.topic, params, key, subscribers: new Set(), tick: 0, last: "", inflight: false };
+      entries.set(key, e);
+    }
+    if (e.subscribers.has(c)) continue;
+    e.subscribers.add(c);
+    // Muatan pertama SEGERA: dari cache bila entri sudah punya (NOL biaya, jadi tak memakai
+    // jatah), atau satu build di luar jadwal bila belum. Tanpa ini, kembali dari tab tersembunyi —
+    // socket ditutup atas permintaan kita sendiri, api/events.ts — berarti layar diam sampai tick
+    // berikutnya. Yang kehabisan jatah tetap terpasang; ia cuma menunggu tick.
+    if (e.last) sendTo(c, e.last);
+    else if (takeImmediate(c)) void runEntry(e);
+  }
+  for (const [key, e] of entries) {
+    if (wanted.has(key) || !e.subscribers.has(c)) continue;
+    e.subscribers.delete(c);
+    if (e.subscribers.size === 0) entries.delete(key);
+  }
 }
 
 let tick = 0;
@@ -87,6 +197,12 @@ export async function __tick(): Promise<void> {
       g.last = sig;
       broadcast(msg);
     }
+    // SPEC-908 · entri langganan ditick di loop yang sama tetapi TIDAK di-await (lihat runEntry).
+    for (const e of entries.values()) {
+      e.tick++;
+      if (e.tick % TOPICS[e.topic].everyTicks !== 0) continue;
+      void runEntry(e);
+    }
   } finally { busy = false; }
 }
 
@@ -103,9 +219,16 @@ function stopLoop(): void {
 
 // Klien baru dapat snapshot penuh SEGERA (tak menunggu tick) — late joiner langsung tersinkron,
 // persis scrollback di pty.attach. Dibangun fresh, lepas dari dedup broadcast.
-export async function attach(c: Client): Promise<void> {
+export async function attach(c: Client, o: { maySubscribe?: boolean } = {}): Promise<void> {
   clients.add(c);
   startLoop();
+  // SPEC-908 · advertensi kemampuan, dikirim PALING DULU. Server lama tak mengirim frame ini sama
+  // sekali — ketiadaannya itulah sinyal yang dipakai klien untuk tetap men-poll HTTP (ADR-0087).
+  // Daftarnya per-KONEKSI, bukan per-server: principal yang frame `sub`-nya akan dibuang gerbang
+  // `canSubscribeTopics` harus melihat daftar KOSONG, kalau tidak ia menyimpulkan "didukung" dan
+  // tak pernah menyalakan fallback-nya — layar diam selamanya tanpa satu pun error.
+  const topics = o.maySubscribe === false ? [] : TOPIC_NAMES;
+  try { c.send(JSON.stringify({ t: "hello", topics } satisfies EventMsg)); } catch { return; }
   for (const g of GROUPS) {
     let msg: WireMsg;
     try { msg = await g.build(); } catch { continue; }
@@ -115,8 +238,9 @@ export async function attach(c: Client): Promise<void> {
 
 export function detach(c: Client): void {
   clients.delete(c);
+  dropClientSubs(c);
   if (clients.size === 0) stopLoop();
 }
 
 // Test-only: kosongkan klien + hentikan loop + reset signature.
-export function __reset(): void { clients.clear(); stopLoop(); }
+export function __reset(): void { clients.clear(); entries.clear(); inflight = 0; stopLoop(); }

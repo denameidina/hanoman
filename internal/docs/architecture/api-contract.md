@@ -1223,20 +1223,47 @@ DELETE /terminal/history?projectId&before
 > (socket `-L hanoman`) sehingga sesi hidup melewati restart API (ADR-0016); scrollback 256 KB terakhir
 > di-replay saat klien reconnect. RCE by design — server bind `127.0.0.1` secara default, lihat ADR-0014.
 
-## Events (SPEC-199 · ADR-0039)
+## Events (SPEC-199 · ADR-0039 · SPEC-908/ADR-0145)
 ```
 GET    /events/ws                    # WebSocket siar dashboard (global). Auth = gate /api (cookie).
-#   server->klien (per-grup, saat berubah; snapshot penuh saat connect):
+#   server->klien, GRUP GLOBAL (per-grup, saat berubah; snapshot penuh saat connect):
 #     { t:"specs", specs } · { t:"sessions", sessions } · { t:"notifications", items, unread }
 #     { t:"limits", limits } · { t:"codexLimits", limits } (SPEC-338, tiap 30s, grup TERPISAH dari
 #       `limits` karena sumber & semantik kesegarannya beda) · { t:"vps", vps } ·
 #       { t:"cleanups", cleanups } (SPEC-742, tiap 3s — dibangun dari peta memori, nol I/O) ·
 #       { t:"update", update } (SPEC-214, tiap 300s)
-#   klien->server: — (read-only feed; frame masuk diabaikan)
+#
+#   SPEC-908 · ADR-0145 · LANGGANAN BERPARAMETER (mengamandemen ADR-0039: kanal tak lagi read-only)
+#   klien->server, SATU jenis frame, semantik GANTI-PENUH (mengganti seluruh himpunan langganan):
+#     { t:"sub", subs:[{ topic, params }] }        # subs <= 16; frame > 64 KiB → close 1009;
+#                                                  # params zod .strict(); topik tak dikenal
+#                                                  # DILEWATI per-entri (ADR-0087), frame tak jatuh.
+#                                                  # HANYA principal cookie (kind:"user") dilayani —
+#                                                  # /events/ws = GLOBAL_READ bagi agent token,
+#                                                  # sedangkan topik menyentuh support/lead/ide.
+#   server->klien, saat connect + per topik (cadence per-topik, dedup signature per KUNCI):
+#     { t:"hello", topics[] }                                        # advertensi kemampuan
+#     { t:"schedulerState",  key, state }                            # params {}                 2s
+#     { t:"schedulerQueue",  key, data }                             # {status,page,limit}       3s
+#     { t:"tickets",         key, data }                             # {project?,status?,q?,     3s
+#                                                                    #  page,limit}
+#     { t:"lead",  key, status, decisions, flows }                   # {projectId?,decPage,      4s
+#                                                                    #  flowPage,limit}
+#     { t:"git",   key, graph, status, stashes }                     # {projectId,limit,branch,  4s
+#                                                                    #  showRemote,showTags}
+#   `key` = subKey(topic, params) — fungsi murni di @hanoman/shared, dihitung KEDUA sisi. Klien
+#   membuang frame yang kuncinya bukan miliknya, jadi halaman/filter aktif tak bisa ditimpa.
 ```
 
 > Satu loop server (cadence per-grup, dedup signature) menggantikan N-klien × poll. Endpoint HTTP
-> GET tiap sumber tetap ada untuk paint pertama.
+> GET tiap sumber **tetap ada** untuk paint pertama — dan sejak SPEC-908 juga sebagai jalur fallback
+> saat server belum punya topiknya (tak mengirim `hello`) atau WS terhalang proxy.
+
+> Biaya per-tick dipagari: entri hanya lahir untuk parameter yang benar-benar ada pelanggannya dan
+> mati saat pelanggan terakhirnya lepas; N klien berparameter identik berbagi satu build; maksimum
+> **4 build serentak** di seluruh hub dan **30 build di luar jadwal per menit per klien** (terukur:
+> tanpa keduanya, satu socket memaksa 1 920 build/menit dan 32 build serentak menahan event loop
+> 505 ms — event loop yang sama yang melayani PTY terminal).
 
 ## VPS (SPEC-164 · ADR-0025 · SPEC-211/ADR-0042)
 ```
@@ -1362,7 +1389,10 @@ DELETE /tickets/:id                       # 200 { ok:true } — hapus tiket; Tic
 > disajikan **hanya ber-auth** ke triase —
 > halaman status publik tak menampilkannya balik. **Halaman publik** `/help/*` di-mount SPA (routing baru,
 > `main.tsx`) tanpa auth; fallback `index.html` existing → nol perubahan server untuk menyajikan halaman.
-> Realtime area Triase = **HTTP polling** (pola GitGraph), bukan kanal WS baru (ADR-0039).
+> Realtime area Triase = topik langganan `tickets` di kanal `/events/ws` yang SUDAH ADA
+> (SPEC-908/ADR-0145) — tetap **tanpa kanal WS baru**. HTTP `GET /tickets` tetap jalur muat awal
+> dan fallback. `q` yang menyuapi kunci langganan di-debounce 400 ms (tiap huruf = kunci baru =
+> satu scan tabel yang langsung dibuang).
 
 ## Issue GitHub (SPEC-471 · ADR-0095)
 ```
@@ -1477,8 +1507,10 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 > governor — satu-satunya cara ia tetap tunduk cap, Pause, dan master switch tanpa menyalin gerbangnya.
 >
 > **Panel Scheduler (SPEC-299, daun #6):** screen mandiri `SchedulerScreen.tsx` + nav item `ds/shell.tsx`
-> (`key:"scheduler"`), **murni konsumen read-only** — tak menambah endpoint/skema/ADR. Self-poll `GET
-> /api/scheduler/state` (5 dtk, pola GitGraph) merender: status per source (enable/last-run/next-run),
+> (`key:"scheduler"`), **murni konsumen read-only** — tak menambah endpoint/skema/ADR. Sejak SPEC-908/ADR-0145 ia
+> **berlangganan** topik `schedulerState` (2 dtk) dan `schedulerQueue` per seksi (3 dtk) di
+> `/api/events/ws`, bukan lagi self-poll `GET /api/scheduler/state` 5 dtk; endpoint HTTP-nya tetap
+> ada sebagai muat awal + fallback. Yang dirender: status per source (enable/last-run/next-run),
 > antrean (`status:"queued"`), sesi berjalan (`state.sessions`, indikator `decision`=menunggu keputusan),
 > selesai (`status:"done"`, tombol **Buka review** deep-link `#spec=<id>` → diff/ringkasan di Review yang ada),
 > gagal (`status:"failed"` + `note` alasan). Panel setelan menulis semua knob via `PUT /api/scheduler/config`
@@ -1504,7 +1536,9 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 
 ## hanoman-lead (SPEC-409 · ADR-0091) — LOCAL per-instance
 ```
-# Semua HTTP (polling) — TAK ADA kanal WebSocket baru (ADR-0039 utuh). Semua default MATI.
+# Semua HTTP. TAK ADA kanal WebSocket baru: sejak SPEC-908/ADR-0145 panel lead disegarkan lewat
+# topik langganan `lead` di kanal `/events/ws` yang sudah ada (ADR-0039 diamandemen pada bentuk
+# frame, bukan pada jumlah kanal). HTTP di bawah tetap jalur muat awal + fallback. Default MATI.
 # Capability agent-token: domain `lead`, dipetakan MENURUT METHOD (baca → lead:read, tulis → lead:write).
 GET  /api/lead/config      -> Lead (zLead: enabled, paused, pausedProjects[], everyMin, timeoutSec,
 #                                    maxAutoAnswers, maxConcurrent, queueWaitSec,

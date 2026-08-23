@@ -6,7 +6,7 @@ import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { listRemotes, addRemote, setRemoteUrl, removeRemote, prUrl } from "../services/git-remotes";
 import { downloadFormat, sendDocDownload, sendReviewDownload } from "../services/doc-export";
 import { prisma } from "../db";
-import { resolveRepoDir } from "../services/local-binding";
+import { repoOf } from "../services/repo-dir";
 import { listSessions, createSession } from "../services/pty";
 import { conflictSessionDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
@@ -26,13 +26,6 @@ import {
   EntryExistsError, EntryMissingError, EntryTargetInsideError,
 } from "../services/repo-fs";
 
-// undefined = project tak ada (→404); null = ada tapi tanpa checkout lokal; string = repoDir.
-// SPEC-213 · binding lokal per-device menang atas Project.repoDir (AC-6).
-async function repoOf(id: string): Promise<string | null | undefined> {
-  const p = await prisma.project.findUnique({ where: { id } });
-  if (!p) return undefined;
-  return (await resolveRepoDir(id)) ?? null;
-}
 const activeSessions = (id: string) => listSessions().filter((s) => s.projectId === id && !s.exited).length;
 
 // SPEC-360 · ADR-0077 · sinyal NON-git yang mengunci sebuah branch dari penghapusan. Dikumpulkan

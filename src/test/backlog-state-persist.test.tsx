@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
-import { uiKey, readUiState } from "../src/ui-state";
+import { uiKey, readUiState, writeUiState } from "../src/ui-state";
 
 vi.mock("../src/api/client", async () => {
   const actual = await vi.importActual<any>("../src/api/client");
@@ -15,6 +15,7 @@ vi.mock("../src/api/client", async () => {
 });
 
 import { BacklogScreen } from "../src/screens/BacklogScreen";
+import { api } from "../src/api/client";
 
 const projects = [{ id: "erp", name: "ERP" }] as any[];
 const props = {
@@ -25,6 +26,36 @@ const props = {
 beforeEach(() => localStorage.clear());
 
 describe("state tampilan Backlog", () => {
+  it("nomor halaman bertahan lintas remount — mount bukan ganti penyaring", async () => {
+    writeUiState(uiKey("backlog", "page"), 3);
+    vi.mocked(api.listSpecs).mockClear();
+    render(<BacklogScreen {...(props as any)} />);
+    await waitFor(() => expect(api.listSpecs).toHaveBeenCalled());
+    expect(vi.mocked(api.listSpecs).mock.calls.at(-1)![0]).toMatchObject({ page: 3 });
+    expect(readUiState(uiKey("backlog", "page"), 1)).toBe(3);
+  });
+
+  it("kata kunci tersimpan tak menghapus halaman lewat debounce `dq`", async () => {
+    // `dq` lahir kosong lalu menyusul 250 ms kemudian; tanpa seed dari `q` tersimpan, ia terbaca
+    // sebagai PERGANTIAN penyaring dan menghapus halaman yang baru saja selamat dari mount.
+    writeUiState(uiKey("backlog", "q"), "invoice");
+    writeUiState(uiKey("backlog", "page"), 3);
+    vi.mocked(api.listSpecs).mockClear();
+    render(<BacklogScreen {...(props as any)} />);
+    await waitFor(() => expect(api.listSpecs).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 400));
+    expect(vi.mocked(api.listSpecs).mock.calls.at(-1)![0]).toMatchObject({ q: "invoice", page: 3 });
+  });
+
+  it("ganti penyaring TETAP mengembalikan daftar ke halaman 1 (AC-15)", async () => {
+    writeUiState(uiKey("backlog", "page"), 3);
+    vi.mocked(api.listSpecs).mockClear();
+    render(<BacklogScreen {...(props as any)} />);
+    fireEvent.change(screen.getByLabelText("Filter stage"), { target: { value: "executing" } });
+    await waitFor(() =>
+      expect(vi.mocked(api.listSpecs).mock.calls.at(-1)![0]).toMatchObject({ page: 1, stage: "executing" }));
+  });
+
   it("kata kunci, stage, dan prioritas bertahan lintas unmount/remount", async () => {
     render(<BacklogScreen {...(props as any)} />);
     fireEvent.change(screen.getByLabelText("Cari backlog"), { target: { value: "invoice" } });

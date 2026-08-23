@@ -2,37 +2,24 @@
 // (isolasi antar-project). Accept = jembatan ke Spec (source help) — cermin errors/escalate.
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db";
-import { paginate } from "../services/paginate";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { readUploadOrFetch, deleteUpload } from "../services/uploads";
 import { generateShareToken } from "../services/ticket";
 import { acceptTicket } from "../services/ticket-accept";
+import { buildTicketsPage, ticketView } from "../services/tickets-list";
 import { zTicketEditInput } from "@hanoman/shared";
-import type { Ticket } from "@prisma/client";
 import { launchPrincipal } from "../services/launch-authority";
-
-const view = (t: Ticket & { _count?: { attachments: number } }) => ({
-  id: t.id, projectId: t.projectId, number: t.number, category: t.category, title: t.title,
-  reporterEmail: t.reporterEmail, status: t.status, specId: t.specId,
-  attachmentCount: t._count?.attachments ?? 0, createdAt: t.createdAt.toISOString(),
-});
 
 export default async function (app: FastifyInstance, opts: { publicBase?: string | null } = {}) {
   app.get("/tickets", async (req) => {
     const { project, status, q, page, limit } = req.query as Record<string, string | undefined>;
-    const where: { projectId?: string; status?: string } = {};
-    if (project) where.projectId = project;
-    if (status) where.status = status;
-    let rows = await prisma.ticket.findMany({
-      where, orderBy: { createdAt: "desc" }, include: { _count: { select: { attachments: true } } },
+    // SPEC-908 · satu definisi dipakai bersama topik siar `tickets` (services/tickets-list.ts).
+    return buildTicketsPage({
+      project, status, q,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
     });
-    if (q) {
-      const n = q.toLowerCase();
-      rows = rows.filter((t) => `${t.title} ${t.reporterEmail}`.toLowerCase().includes(n));
-    }
-    const unreviewed = rows.filter((t) => t.status === "new").length;
-    return { ...paginate(rows.map(view), page, limit), unreviewed };
   });
 
   app.get("/tickets/:id", async (req, reply) => {
@@ -55,7 +42,7 @@ export default async function (app: FastifyInstance, opts: { publicBase?: string
     const base = opts.publicBase ?? `${req.protocol}://${req.headers.host ?? "localhost"}`;
     const publicStatusUrl = `${base}/help/${encodeURIComponent(t.projectId)}/status/${shareToken}`;
     return {
-      ...view(t), detail: t.detail,
+      ...ticketView(t), detail: t.detail,
       attachments: t.attachments.map((a) => ({ id: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size })),
       spec, publicStatusUrl,
     };
@@ -124,7 +111,7 @@ export default async function (app: FastifyInstance, opts: { publicBase?: string
     });
     const spec = updated.specId ? await prisma.spec.findUnique({ where: { id: updated.specId } }) : null;
     return {
-      ...view(updated), detail: updated.detail,
+      ...ticketView(updated), detail: updated.detail,
       attachments: updated.attachments.map((a) => ({ id: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size })),
       spec,
     };

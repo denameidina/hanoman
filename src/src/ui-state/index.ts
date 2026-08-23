@@ -5,5 +5,5 @@ export {
   isStr, isNum, isBool, nullableStr, strList, oneOf,
 } from "./store";
 export type { Accept } from "./store";
-export { usePersistedState, useScrollRestore } from "./hooks";
+export { usePersistedState, useScrollRestore, useResetOnChange } from "./hooks";
 export { ResetViewButton } from "./ResetViewButton";

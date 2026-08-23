@@ -2,20 +2,21 @@ import type { FastifyInstance } from "fastify";
 import type { LeadDecision } from "@prisma/client";
 import { zLead, zLeadAsk, zLeadOverride, type LeadAnswer, type LeadStatusView } from "@hanoman/shared";
 import { prisma } from "../db";
-import { listSessions, liveDecisions, sendToPane } from "../services/pty";
-import { listQueue } from "../services/scheduler/queue";
+import { sendToPane } from "../services/pty";
 import { getLead, setLead, leadActive } from "../services/lead/config";
 import { decide, takeDelivery } from "../services/lead/decide";
 import { applyAction } from "../services/lead/apply";
 import { listDecisions, overrideDecision, cancelDecision, toDecisionView } from "../services/lead/trail";
-import { listFlows, closeFlow, toFlowView, LeadFlowClosedError } from "../services/lead/flow";
-import { decidingIds, queuedIds } from "../services/lead/deciding";
-import { LeadBusyError, leadGateStats } from "../services/lead/gate";
+import { closeFlow, toFlowView, LeadFlowClosedError } from "../services/lead/flow";
+import { LeadBusyError } from "../services/lead/gate";
 import { resetSession } from "../services/lead/detect";
-import { lastPulse } from "../services/lead/engine";
+import { buildLeadStatus, buildLeadDecisions, buildLeadFlows } from "../services/lead/views";
 
-// SPEC-409 · ADR-0091 · permukaan HTTP hanoman-lead. Semuanya polling (AC-26) — tak ada kanal
-// WebSocket baru; ADR-0039 tetap utuh.
+// SPEC-409 · ADR-0091 · permukaan HTTP hanoman-lead.
+// SPEC-908 · ADR-0145 · dashboard tak lagi men-poll ketiga endpoint ini: ia berlangganan topik
+// `lead` di kanal `/events/ws` yang sudah ada (tetap tanpa koneksi WS baru). Route-nya TIDAK
+// dihapus — MCP, agent token, portal, dan dashboard lama memakainya, dan ia tetap jalur muat awal
+// serta fallback. Badan ketiganya dipanggil bersama hub lewat services/lead/views.ts.
 //
 // Peta capability ada di services/agent-capabilities.ts: prefix `lead` → `lead:read`/`lead:write`
 // MENURUT METHOD. Itu bukan detail: SPEC-405 membuktikan apa yang terjadi saat sebuah prefix
@@ -31,47 +32,14 @@ export default async function (app: FastifyInstance) {
     return setLead(parsed.data);   // ganti blok penuh (pola PUT /scheduler/config). Pause = { paused:true }.
   });
 
-  app.get("/lead/status", async (): Promise<LeadStatusView> => {
-    const cfg = await getLead();
-    const projects = await prisma.project.findMany({
-      where: { leadOptIn: true }, select: { id: true, name: true }, orderBy: { id: "asc" },
-    });
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    // SPEC-402 · bacaan tmux yang gagal MELEMPAR; layar status tak boleh ikut 500 karenanya.
-    let live: ReturnType<typeof listSessions> = [];
-    try { live = listSessions().filter((s) => !s.exited); } catch { /* tmux tak terbaca */ }
-    let waiting: string[] = [];
-    try { waiting = liveDecisions().filter((d) => d.waiting).map((d) => d.id); }
-    catch { /* idem */ }
-    const rows = await Promise.all(projects.map(async (p) => ({
-      projectId: p.id, name: p.name,
-      optIn: true,
-      paused: !leadActive(cfg, p.id),
-      decisions24h: await prisma.leadDecision.count({ where: { projectId: p.id, createdAt: { gte: since } } }),
-      openSessions: live.filter((s) => s.projectId === p.id).length,
-    })));
-    const last = lastPulse();
-    return {
-      config: cfg, projects: rows,
-      queue: (await listQueue()).map((q) => ({
-        id: q.id, specId: q.specId, projectId: q.projectId, source: q.source,
-        priority: q.priority, status: q.status, sessionId: q.sessionId, note: q.note,
-        enqueuedAt: q.enqueuedAt.toISOString(),
-        launchedAt: q.launchedAt ? q.launchedAt.toISOString() : null,
-      })),
-      deciding: decidingIds(), queued: queuedIds(), waiting,
-      lastPulseAt: last ? new Date(last).toISOString() : null,
-      // SPEC-479 · keadaan gerbang konkurensi. Tanpa ini "lead sedang penuh" dan "lead diam"
-      // terlihat identik di layar, dan salah baca itulah yang melahirkan tiketnya.
-      gate: { ...leadGateStats(), capacity: cfg.maxConcurrent },
-    };
-  });
+  // SPEC-908 · satu definisi dipakai bersama topik siar `lead` (services/lead/views.ts).
+  app.get("/lead/status", (): Promise<LeadStatusView> => buildLeadStatus());
 
   // AC-24 · jejak urut waktu, disaring per project & per backlog.
   // SPEC-523 · amplop `Paginated`. `take`/`skip` lama tetap diterima; `page`/`limit` menang.
   app.get("/lead/decisions", async (req) => {
     const q = req.query as Record<string, string | undefined>;
-    const r = await listDecisions({
+    return buildLeadDecisions({
       projectId: q.projectId, specId: q.specId, sessionId: q.sessionId, status: q.status,
       // SPEC-485 · satu rantai dibaca lewat filter ini, urut NAIK (lihat `listDecisions`).
       flowId: q.flowId,
@@ -80,7 +48,6 @@ export default async function (app: FastifyInstance) {
       page: q.page ? Number(q.page) : undefined,
       limit: q.limit ? Number(q.limit) : undefined,
     });
-    return { items: r.rows.map(toDecisionView), total: r.total, page: r.page, pageSize: r.pageSize };
   });
 
   // SPEC-485 · ADR-0102 · daftar RANTAI. Langkahnya dibaca lewat `GET /lead/decisions?flowId=`,
@@ -88,14 +55,13 @@ export default async function (app: FastifyInstance) {
   // serializer kedua berarti dua bentuk yang bisa berselisih diam-diam.
   app.get("/lead/flows", async (req) => {
     const q = req.query as Record<string, string | undefined>;
-    const r = await listFlows({
+    return buildLeadFlows({
       projectId: q.projectId, status: q.status,
       take: q.take ? Number(q.take) : undefined,
       skip: q.skip ? Number(q.skip) : undefined,
       page: q.page ? Number(q.page) : undefined,
       limit: q.limit ? Number(q.limit) : undefined,
     });
-    return { items: r.rows.map(toFlowView), total: r.total, page: r.page, pageSize: r.pageSize };
   });
 
   // Submit akhir: rantai ditutup dan tak menerima pertanyaan lanjutan lagi. 409 (bukan 404) saat ia

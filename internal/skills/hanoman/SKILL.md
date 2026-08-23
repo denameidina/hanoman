@@ -82,7 +82,7 @@ Pakai skill lebih sempit saat task cocok:
   ADR-0087); dan `capabilityForRoute` dulu memetakan prefix status (`update`/`limits`/`events`/`fs`/
   `health`) ke `GLOBAL_READ` **tanpa melihat method**, jadi menambah endpoint tulis di bawahnya
   berarti setiap agent token bisa me-restart instance — kini `GLOBAL_READ` hanya untuk method baca.
-- Realtime: **WebSocket hanya untuk terminal PTY**; sisanya **HTTP polling** (projects, backlog, notifications, limits, vps). Jaga UI responsif — log sesi streaming, jangan blok main thread.
+- Realtime: **satu WebSocket siar `/api/events/ws`** per tab di samping WS terminal PTY (ADR-0039, diamandemen **ADR-0145**). Delapan grup snapshot GLOBAL disiarkan tanpa diminta (sessions, specs, notifications, cleanups, vps, limits, codexLimits, update); empat layar berparameter — Scheduler, Triase, Lead, GitGraph — **berlangganan** lewat frame `{t:"sub"}` di socket yang sama. Klien **tak** men-poll HTTP: endpoint HTTP-nya tinggal muat awal + fallback saat server belum punya topiknya. Jaga UI responsif — log sesi streaming, jangan blok main thread.
 - **State tampilan tiap halaman persisten di storage, berkunci per layar** (SPEC-740/**ADR-0115**;
   ADR-0107 & ADR-0071 **ditegakkan**, tak ada yang dicabut): filter & pencarian, paginasi, posisi
   scroll, item terpilih & panel terbuka bertahan lintas navigasi **dan** refresh/buka-ulang browser.
@@ -771,8 +771,9 @@ Pakai skill lebih sempit saat task cocok:
   `killSession()` LANGSUNG — bukan `DELETE /terminal/sessions/:id` yang memang menghapus worktree
   (SPEC-362). Jejaknya model **`LeadDecision`** (migration tulis tangan, LOCAL-only, ikut `PG_ORDER`;
   `trail.ts` sengaja **tak punya fungsi hapus**) + `Setting.lead` (kolom `Json` → tanpa migration) +
-  `Project.leadOptIn` (cermin `schedulerOptIn`). Jejak & status lewat **HTTP polling** — tanpa kanal
-  WS baru (ADR-0039 utuh). **Semua default MATI.** **Enam gotcha:** penghitung jawaban otomatis TAK
+  `Project.leadOptIn` (cermin `schedulerOptIn`). Jejak & status kini lewat **topik langganan `lead`**
+  di kanal `/events/ws` yang sudah ada (SPEC-908/**ADR-0145**) — tetap tanpa koneksi WS baru; HTTP
+  tinggal muat awal + fallback. **Semua default MATI.** **Enam gotcha:** penghitung jawaban otomatis TAK
   BOLEH di-reset saat marker kosong (marker memang kosong sesaat sesudah lead mengetik — hook
   `UserPromptSubmit` menjalankan `: >` — jadi reset di sana membuat pagar AC-11 tak pernah tercapai);
   idempotensi denyut lewat **jejak** bukan `Set` memori (pane mati bertahan berhari-hari, `Set`

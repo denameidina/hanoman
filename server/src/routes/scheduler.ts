@@ -3,10 +3,9 @@ import { z } from "zod";
 import { zScheduler, zCreateCron, zPatchCron } from "@hanoman/shared";
 import { prisma } from "../db";
 import { getScheduler, setScheduler } from "../services/scheduler/config";
-import { listQueue, listQueuePage, queueCounts, markCanceled, markRequeued } from "../services/scheduler/queue";
+import { buildQueuePage, markCanceled, markRequeued } from "../services/scheduler/queue";
 import { computeNextRun, listCronRunsPage } from "../services/scheduler/cron";
-import { getLastRun } from "../services/scheduler/registry";
-import { listSessions } from "../services/pty";
+import { buildSchedulerState } from "../services/scheduler/state";
 
 // SPEC-294 · ADR-0072 · config (knob) + state (antrean/sesi/cadence) scheduler. Di belakang gate cookie.
 // SPEC-522 · ADR-0106 · + pembatalan satu baris antrean. Sengaja di bawah prefix `/scheduler` supaya
@@ -55,46 +54,15 @@ export default async function (app: FastifyInstance) {
     return prisma.schedulerQueueItem.findUnique({ where: { id } });
   });
 
-  app.get("/scheduler/state", async () => {
-    const cfg = await getScheduler();
-    const live = listSessions().filter((s) => !s.exited);
-    // Akses kunci source tetap (backlog/errors/triase) langsung — bukan index dinamis — agar
-    // tetap tertype di bawah noUncheckedIndexedAccess. minCount hanya milik errors.
-    const srcView = (id: string, sc: { enabled: boolean; everyMin: number }, minCount?: number) => {
-      const last = getLastRun(id);
-      return {
-        id, enabled: sc.enabled, everyMin: sc.everyMin, minCount,
-        lastRunAt: last ? new Date(last).toISOString() : null,
-        nextRunAt: last ? new Date(last + sc.everyMin * 60_000).toISOString() : null,
-      };
-    };
-    const sources = [
-      srcView("backlog", cfg.sources.backlog),
-      srcView("triase", cfg.sources.triase),
-    ];
-    // SPEC-523 · `queue` tak lagi ikut respons: ia daftar tanpa batas dan sudah punya endpoint
-    // sendiri (`GET /scheduler/queue`). Kandidat "kirim yang dipotong diam-diam" DITOLAK —
-    // daftar terpotong yang tampak utuh persis kelas bug SPEC-431/451/475.
-    const counts = await queueCounts();
-    // Sesi scheduler = sesi live yang punya item antrean 'launched' (marker asal-scheduler).
-    const launchedSpecs = new Set((await listQueue("launched")).map((q) => q.specId));
-    const sessions = live.filter((s) => s.specId && launchedSpecs.has(s.specId));
-    return { config: cfg, cap: cfg.maxConcurrent, liveCount: live.length, sources, queueCounts: counts, sessions };
-  });
+  // SPEC-908 · satu definisi dipakai bersama topik siar `schedulerState`
+  // (services/scheduler/state.ts).
+  app.get("/scheduler/state", () => buildSchedulerState());
 
   // SPEC-523 · daftar antrean berhalaman. Penyaring `status` diterapkan di query DB, bukan di klien.
   app.get("/scheduler/queue", async (req) => {
     const { status, page, limit } = req.query as Record<string, string | undefined>;
-    const r = await listQueuePage({ status, page, limit });
-    return {
-      items: r.items.map((q) => ({
-        id: q.id, specId: q.specId, projectId: q.projectId, source: q.source,
-        priority: q.priority, status: q.status, sessionId: q.sessionId, note: q.note,
-        enqueuedAt: q.enqueuedAt.toISOString(),
-        launchedAt: q.launchedAt ? q.launchedAt.toISOString() : null,
-      })),
-      total: r.total, page: r.page, pageSize: r.pageSize,
-    };
+    // SPEC-908 · satu definisi dipakai bersama topik siar `schedulerQueue`.
+    return buildQueuePage({ status, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined });
   });
 
   // SPEC-646 · ADR-0112 · CRUD cronjob per project. Semua di bawah prefix `/scheduler` seperti

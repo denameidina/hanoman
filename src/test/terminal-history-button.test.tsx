@@ -1,3 +1,6 @@
+// Stub `../src/api/events` diimpor PALING DULU: factory `vi.mock` di bawah membacanya saat
+// modul yang di-mock pertama kali dievaluasi — itu terjadi sebelum import di bawahnya selesai.
+import { eventsStub } from "./helpers/events-stub";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
@@ -23,8 +26,12 @@ vi.mock("../src/api/client", () => ({
   },
   ApiError: class extends Error { status = 0; detail: unknown = null; },
 }));
+
 vi.mock("../src/api/events", () => ({
-  subscribe: () => () => {},
+  // SPEC-908 · stub terpusat, bukan tiga ekspor tangan: modul ini kini juga punya
+  // `subscribeTopic`/`eventsTopics`/`eventsHelloSeen`, dan ekspor yang hilang baru
+  // meledak saat sebuah layar realtime kebetulan ikut ter-render.
+  ...eventsStub,
   // SPEC-897 · HanomanPet membaca status koneksi dari socket `events` yang sama.
   eventsStatus: () => ({ connected: true, since: 0, paused: false }),
   subscribeStatus: () => () => {},

@@ -710,9 +710,80 @@ export type SessionDTO = {
   decisionAt?: string;
 };
 
-// SPEC-199 · frame siar dashboard (server → klien), lewat GET /events/ws (ADR-0039). Read-only
-// feed: tak ada frame klien → server. Per-grup, bukan snapshot monolitik — perubahan satu grup
-// tak mengirim ulang yang lain.
+// SPEC-908 · dipindah dari server/src/services/git-ide.ts + src/src/api/client.ts, yang dulu
+// mendeklarasikannya KEMBAR tanpa ikatan tipe apa pun. Frame `git` di EventMsg memaksa keduanya
+// jadi satu definisi; kedua berkas lama kini me-re-export dari sini.
+export type GraphCommit = { sha: string; parents: string[]; author: string; at: string; subject: string; refs: string[]; tags: string[] };
+export type RepoStatus = {
+  branch: string; ahead: number; behind: number;
+  staged: string[]; unstaged: string[]; untracked: string[]; clean: boolean;
+};
+export type Stash = { ref: string; message: string; at: string };
+
+// SPEC-908 · topik langganan BERPARAMETER di /events/ws, mengamandemen ADR-0039 (yang hanya
+// mengenal snapshot global tanpa parameter). Nama topik SENGAJA identik dengan `t` frame keluarnya:
+// satu-ke-satu, jadi tak ada peta kedua yang bisa berselisih diam-diam.
+export type EventTopic = "schedulerState" | "schedulerQueue" | "tickets" | "lead" | "git";
+
+/** Plafon jumlah langganan per klien. Satu layar Scheduler = 5 (state + 4 QueueSection). */
+export const MAX_SUBS = 16;
+
+const zSubPage = z.number().int().min(1).max(10_000);
+// ADR-0107 · `limit` adalah PLAFON, bukan preferensi: dijepit di sini persis seperti di route HTTP.
+const zSubLimit = z.number().int().min(1).max(200);
+
+export const zTopicParams = {
+  schedulerState: z.object({}).strict(),
+  schedulerQueue: z.object({
+    status: z.enum(["queued", "launched", "done", "failed", "canceled"]),
+    page: zSubPage, limit: zSubLimit,
+  }).strict(),
+  tickets: z.object({
+    project: z.string().max(120).optional(),
+    status: z.string().max(40).optional(),
+    q: z.string().max(200).optional(),
+    page: zSubPage, limit: zSubLimit,
+  }).strict(),
+  lead: z.object({
+    projectId: z.string().max(120).optional(),
+    decPage: zSubPage, flowPage: zSubPage, limit: zSubLimit,
+  }).strict(),
+  git: z.object({
+    projectId: z.string().max(120),
+    limit: z.number().int().min(1).max(20_000),
+    branch: z.string().max(200),
+    showRemote: z.boolean(), showTags: z.boolean(),
+  }).strict(),
+} as const;
+
+export type TopicParams = { [K in EventTopic]: z.infer<(typeof zTopicParams)[K]> };
+
+// Kunci kanonik sebuah langganan, dihitung fungsi yang SAMA di server dan klien. Kalau id datang
+// dari klien, dua tab berparameter identik menerima frame yang berbeda byte dan dedup signature
+// ADR-0039 hilang — di sini keduanya menerima string yang sama persis.
+export function subKey(topic: EventTopic, params: Record<string, unknown>): string {
+  const canon: Record<string, unknown> = {};
+  for (const k of Object.keys(params).sort()) if (params[k] !== undefined) canon[k] = params[k];
+  return `${topic}|${JSON.stringify(canon)}`;
+}
+
+// Satu-satunya frame klien → server. Semantik GANTI-PENUH: frame ini mengganti seluruh himpunan
+// langganan klien, jadi tak ada frame `unsubscribe` dan re-kirim saat reconnect identik dengan
+// pemasangan pertama. `topic` sengaja `string`, bukan enum: dashboard boleh lebih baru daripada
+// server (ADR-0087), jadi topik masa depan harus DILEWATI per-entri, bukan menjatuhkan frame.
+export const zEventsClientMsg = z.object({
+  t: z.literal("sub"),
+  subs: z.array(z.object({
+    topic: z.string().max(40),
+    params: z.record(z.unknown()),
+  })).max(MAX_SUBS),
+}).strict();
+export type EventsClientMsg = z.infer<typeof zEventsClientMsg>;
+
+// SPEC-199 · frame siar dashboard (server → klien), lewat GET /events/ws (ADR-0039). Per-grup,
+// bukan snapshot monolitik — perubahan satu grup tak mengirim ulang yang lain.
+// SPEC-908 · delapan grup pertama tetap GLOBAL tanpa parameter; enam varian terakhir milik
+// langganan berparameter (`zEventsClientMsg` di atas), yang membuat kanal ini tak lagi read-only.
 export type EventMsg =
   | { t: "specs"; specs: Spec[] }
   | { t: "sessions"; sessions: SessionDTO[] }
@@ -723,7 +794,18 @@ export type EventMsg =
   | { t: "codexLimits"; limits: CodexLimitsDTO }   // SPEC-338 · ADR-0074 · grup terpisah dari `limits`
   | { t: "vps"; vps: VpsView[] }
   | { t: "cleanups"; cleanups: WorktreeCleanupView[] }   // SPEC-742 · ADR-0116
-  | { t: "update"; update: UpdateStatus };
+  | { t: "update"; update: UpdateStatus }
+  // SPEC-908 · frame langganan berparameter. `key` = subKey(topic, params) yang dihitung KEDUA
+  // sisi; klien membuang frame yang kuncinya bukan miliknya, jadi halaman/filter yang sedang
+  // aktif tak mungkin ditimpa muatan halaman lain.
+  | { t: "hello"; topics: EventTopic[] }
+  | { t: "schedulerState"; key: string; state: SchedulerStateView }
+  | { t: "schedulerQueue"; key: string; data: Paginated<SchedulerQueueItemView> }
+  | { t: "tickets"; key: string; data: Paginated<TicketView> & { unreviewed: number } }
+  | { t: "lead"; key: string; status: LeadStatusView;
+      decisions: Paginated<LeadDecisionView>; flows: Paginated<LeadFlowView> }
+  | { t: "git"; key: string; graph: { commits: GraphCommit[]; current: string; total: number };
+      status: RepoStatus; stashes: Stash[] };
 
 // SPEC-742 · ADR-0116 · pembersihan worktree yang masih tertunda sesudah sebuah sesi ditutup.
 // Sesinya SUDAH lenyap saat baris ini lahir — yang bisa diamati adalah pembersihannya, berkunci

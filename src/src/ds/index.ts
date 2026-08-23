@@ -2,6 +2,7 @@
 export { Icon } from "./icon";
 export { Badge, Callout, ProgressBar, StatusPill, Tooltip } from "./components/feedback";
 export { StateBlock } from "./components/state";
+export { LiveConnectionBadge } from "./components/live";
 export { Button, IconButton, Input, Select, Checkbox, Radio, Switch, MultiSelect } from "./components/forms";
 export { Card } from "./components/surfaces";
 export { Tabs, OverflowActions } from "./components/ui";
