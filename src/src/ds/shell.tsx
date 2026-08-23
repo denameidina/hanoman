@@ -20,6 +20,7 @@ import { useScrollRestore } from "../ui-state/hooks";
 export type NavItem = { key: string; label: string; icon: string };
 export const HN_NAV: NavItem[] = [
   { key: "overview", label: "Overview", icon: "layout-dashboard" },
+  { key: "dalang", label: "Dalang Hanoman", icon: "drama" },   // panggung orkestrasi sinematik
   { key: "projects", label: "Projects", icon: "layout-grid" },
   { key: "prd", label: "PRD", icon: "scroll-text" },
   { key: "backlog", label: "Backlog", icon: "list-checks" },

@@ -17,8 +17,8 @@ import wayangUrl from "../../../internal/assets/dalang/hnm-wayang-project-v01.we
 import blencongUrl from "../../../internal/assets/dalang/hnm-blencong-v01.webp?url";
 
 // Batas hari LOKAL, komponen-per-komponen — `new Date("YYYY-MM-DD")` adalah tengah malam UTC
-// dan menggeser hari di WIB (gotcha ADR-0090/0105).
-function isToday(iso: string | null | undefined): boolean {
+// dan menggeser hari di WIB (gotcha ADR-0090/0105). Dipakai juga DalangHanomanScreen.
+export function isToday(iso: string | null | undefined): boolean {
   if (!iso) return false;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return false;

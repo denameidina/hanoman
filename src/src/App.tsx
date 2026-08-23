@@ -25,6 +25,7 @@ import { HandledByChips } from "./screens/HandledByChips";
 import { repoBasename, cloneErrorText } from "./screens/git-remote";
 import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
+import { DalangHanomanScreen } from "./screens/DalangHanomanScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
 import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
 import { BacklogScreen } from "./screens/BacklogScreen";
@@ -1284,6 +1285,14 @@ export default function App() {
     screen = (
       <Shell active="overview" title="Overview" breadcrumb="nafanesia.id · ringkasan workspace" onNavigate={setSection}>
         {gate(<OverviewScreen projects={projectsView} backlog={backlog} sessions={sessions}
+          onOpenProject={openProject} onGoto={setSection}
+          onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
+      </Shell>
+    );
+  } else if (section === "dalang") {
+    screen = (
+      <Shell active="dalang" title="Dalang Hanoman" breadcrumb="nafanesia.id · panggung orkestrasi" onNavigate={setSection}>
+        {gate(<DalangHanomanScreen projects={projectsView} backlog={backlog} sessions={sessions}
           onOpenProject={openProject} onGoto={setSection}
           onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
       </Shell>

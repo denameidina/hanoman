@@ -749,6 +749,24 @@ ADR-0140; enam lengan = pengecualian ikonografi sadar, dicatat di README direkto
 Pengujian: `src/test/dalang-stage.test.tsx` (state sunyi/running, hitung stat hari lokal,
 navigasi klik, kontrak token warna).
 
+## Dalang Hanoman — layar panggung orkestrasi sinematik
+
+Menu `dalang` ("Dalang Hanoman", ikon `drama`) membuka
+`src/src/screens/DalangHanomanScreen.tsx` — implementasi layar dari konsep Claude Design
+"Dashboard Futuristik" dengan **data nyata**: hero sinematik Hanoman enam lengan
+(`internal/assets/dalang/hnm-hero-cinematic-v01.webp`, aset Codex) melayang di atas kartu
+sesi hidup (satu kartu per sesi WS, klik → fokus terminal; `decision && !deciding` = amber),
+**benang gapit terukur** dari dada hero ke tiap kartu (pola pengukuran DalangStage), KPI
+count-up, ticker boot yang mengetik fakta nyata, jam hidup per detik, donut distribusi
+backlog per `zStage` (dirangkum done/executing/planned/sisanya→spec — kosakata stage BUKAN
+"execute/plan", gotcha typecheck), dan chart "dimulai 7 hari" dari `startedAt` hari LOKAL.
+Ini **satu-satunya layar gelap penuh** — dibenarkan peran warna DS "dark terminal = kerja
+aktif": seluruh layar adalah panggung kerja aktif; aksen tetap brass, nol neon. Semua warna
+lewat kelas `.hn-dlg-*` di `app.css`/token (dikunci test kontrak
+`src/test/dalang-hanoman.test.tsx`; cabang section dijaga `changelog-nav.test.tsx`). Animasi
+transform/opacity + drop-shadow, padam di blok `prefers-reduced-motion` global; ticker &
+count-up cek `matchMedia` sendiri karena berbasis JS.
+
 ## Tinggi & scrolling: rantai flex, bukan angka ajaib
 `#root` memakai `100vh` sebagai fallback lalu dikunci `100dvh; overflow: hidden`, jadi tinggi yang
 tersedia mengikuti dynamic viewport tanpa menyerahkan scroll kepada body.
