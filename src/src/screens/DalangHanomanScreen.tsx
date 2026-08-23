@@ -10,8 +10,17 @@ import type { TerminalSession } from "../api/client";
 import type { ProjectVM, Spec } from "./types";
 import { isToday } from "./DalangStage";
 import heroUrl from "../../../internal/assets/dalang/hnm-hero-cinematic-v01.webp?url";
-import wayangUrl from "../../../internal/assets/dalang/hnm-wayang-project-v01.webp?url";
 import blencongUrl from "../../../internal/assets/dalang/hnm-blencong-v01.webp?url";
+// Empat varian wayang sinematik (aset GPT Image via Codex, benang gantung di puncak) —
+// tiap project dapat tokohnya sendiri lewat hash stabil dari id.
+import wayangAlusUrl from "../../../internal/assets/dalang/hnm-wayang-satria-alus-v01.webp?url";
+import wayangGagahUrl from "../../../internal/assets/dalang/hnm-wayang-satria-gagah-v01.webp?url";
+import wayangPutriUrl from "../../../internal/assets/dalang/hnm-wayang-putri-v01.webp?url";
+import wayangPanakawanUrl from "../../../internal/assets/dalang/hnm-wayang-panakawan-v01.webp?url";
+
+const WAYANG_VARIANTS = [wayangAlusUrl, wayangGagahUrl, wayangPutriUrl, wayangPanakawanUrl];
+const wayangFor = (projectId: string): string =>
+  WAYANG_VARIANTS[[...projectId].reduce((n, c) => n + c.charCodeAt(0), 0) % WAYANG_VARIANTS.length]!;
 
 const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -178,14 +187,19 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
       const host = el.getBoundingClientRect();
       if (host.width < 60) return;
       const art = el.querySelector<HTMLElement>(".hn-dlg-hero-art")?.getBoundingClientRect();
-      const hx = art ? art.left + art.width / 2 - host.left : host.width / 2;
-      const hy = art ? art.bottom - host.top - art.height * 0.28 : host.height * 0.4;
+      const cx = art ? art.left + art.width / 2 - host.left : host.width / 2;
+      // Dua jangkar = dua kelompok tangan hero (kiri/kanan), cermin komposisi referensi.
+      const hy = art ? art.top - host.top + art.height * 0.36 : host.height * 0.35;
+      const spread = art ? art.width * 0.34 : 60;
       const ds: string[] = [];
       el.querySelectorAll<HTMLElement>("[data-puppet]").forEach((c) => {
-        const r = c.getBoundingClientRect();
+        // Ujung benang = puncak WAYANG-nya (tempat string emas di aset), bukan tepi kartu.
+        const img = c.querySelector<HTMLElement>(".hn-dlg-puppet img") ?? c;
+        const r = img.getBoundingClientRect();
         const tx = r.left + r.width / 2 - host.left;
-        const ty = r.top - host.top + 2;
-        const my = Math.min(hy, ty) - 18;
+        const ty = r.top - host.top + 1;
+        const hx = tx < cx ? cx - spread : cx + spread;
+        const my = Math.min(hy, ty) - 16;
         ds.push(`M ${hx.toFixed(1)} ${hy.toFixed(1)} Q ${((hx + tx) / 2).toFixed(1)} ${my.toFixed(1)}, ${tx.toFixed(1)} ${ty.toFixed(1)}`);
       });
       setThreads(ds);
@@ -259,7 +273,7 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
                       aria-label={`Buka terminal — ${name}, ${sub}`}>
                       <span className={waiting ? "hn-dlg-puppet hn-dlg-puppet--still" : "hn-dlg-puppet"}
                         style={{ animationDelay: `${(i % 6) * 0.6}s` }}>
-                        <img src={wayangUrl} alt="" aria-hidden="true" />
+                        <img src={wayangFor(s.projectId)} alt="" aria-hidden="true" />
                       </span>
                       <span className="hn-dlg-prj-name">{name}</span>
                       <span className={waiting ? "hn-dlg-prj-sub hn-dlg-prj-sub--amber" : "hn-dlg-prj-sub"}>{sub}</span>
@@ -272,7 +286,7 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
                     onClick={() => onOpenProject(p)}
                     aria-label={`Buka project ${p.name}`}>
                     <span className="hn-dlg-puppet hn-dlg-puppet--still">
-                      <img src={wayangUrl} alt="" aria-hidden="true" />
+                      <img src={wayangFor(p.id)} alt="" aria-hidden="true" />
                     </span>
                     <span className="hn-dlg-prj-name">{p.name}</span>
                     <span className="hn-dlg-prj-sub hn-dlg-prj-sub--off">tersandar di debog</span>

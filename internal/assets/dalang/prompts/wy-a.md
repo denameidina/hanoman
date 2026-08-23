@@ -1,0 +1,1 @@
+PUPPET VARIANT A — "satria alus": a refined noble hero puppet, slender elegant body, tall slim ornate headdress sweeping back, serene downcast profile face, one arm raised gracefully on its rod, flowing patterned kain. Predominantly warm gold with deep red jewel accents.

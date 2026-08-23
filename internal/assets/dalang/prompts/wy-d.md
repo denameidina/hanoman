@@ -1,0 +1,1 @@
+PUPPET VARIANT D — "panakawan": a stout comic servant puppet (Semar-like build), round belly, short body, big warm smiling profile face, simple topknot, one hand raised as if speaking, checkered kain hint at the waist. Still rendered as luminous gilded leather — dignified, not cartoonish. Predominantly warm gold with darker bronze and a touch of red.

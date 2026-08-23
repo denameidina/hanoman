@@ -1,0 +1,1 @@
+PUPPET VARIANT C — "putri": a graceful princess puppet, delicate slender silhouette, fine low chignon headdress with gilded flower ornament, gentle downturned profile, long sash (sampur) trailing from one raised hand, intricate lace-like tatahan skirt. Predominantly warm gold with ivory highlights and red accents.

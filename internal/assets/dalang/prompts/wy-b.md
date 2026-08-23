@@ -1,0 +1,1 @@
+PUPPET VARIANT B — "satria gagah": a strong proud warrior puppet, broader chest, bold round eyes, magnificent wide crown with wing ornaments (garuda mungkur), arm bent forward holding its rod high, richly gilded armor-like torso detail. Predominantly warm gold with darker bronze depth and red accents.

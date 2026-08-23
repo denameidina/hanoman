@@ -9,6 +9,7 @@ Tiga aset transparan yang dipakai panel `DalangStage` di Overview (`src/src/scre
 | `hnm-blencong-v01.webp` (160×256) | `master/hnm-blencong-master-v01.webp` | lampu blencong di header panel — glow ditambahkan CSS saat ada sesi (`data-lit`), asetnya sengaja digambar TANPA glow |
 | `hnm-hero-cinematic-v01.webp` (301×300, alpha lossy q50) | `master/hnm-hero-cinematic-master-v01.webp` (1254×1248) | hero SINEMATIK — Hanoman realistik enam lengan memegang string emas (gaya referensi mockup dark/gold; BUKAN gaya editorial brand — khusus konsep "Dashboard Futuristik" di Claude Design) |
 | `hnm-logo-head-v01.webp` (60×96) | `master/hnm-logo-head-master-v01.webp` | emblem kepala Hanoman emas untuk logo sidebar konsep futuristik |
+| `hnm-wayang-satria-alus-v01.webp` · `-satria-gagah-` · `-putri-` · `-panakawan-` (h416, gaya sinematik, benang gantung di puncak) | `master/hnm-wayang-var-{a..d}-master-v01.webp` | empat tokoh wayang untuk layar Dalang Hanoman — tiap project dapat tokohnya lewat hash stabil id (`wayangFor`); prompt di `prompts/wy-*.md` |
 
 Frontend mengimpor **versi display saja** (total ±134 KB) — pelajaran registry illustration: master
 near-lossless dilarang masuk bundel (5,5 MB → 46,1 MB terukur di SPEC pack npm).
