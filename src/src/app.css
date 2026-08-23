@@ -115,6 +115,22 @@ textarea:focus-visible,
 .hn-dense-row,
 .hn-vps-row { min-width: 0; }
 
+/* Baris VPS · baris atas (identitas · pil status · aksi) dan baris bawah (status instalasi).
+   Aksi dikunci ke kanan lewat margin-left auto supaya kolom tombol tetap sejajar antar-baris
+   meski panjang nama & host berbeda-beda. */
+.hn-vps-row:hover { background: var(--surface-sunken); }
+.hn-vps-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
+.hn-vps-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex-shrink: 0; }
+.hn-vps-sep {
+  width: 1px; height: 18px; margin: 0 4px;
+  background: var(--border-hair);
+}
+
+@media (max-width: 1199px) {
+  /* Sempit: label tombol jadi mahal, tapi jangan sampai baris atas ikut membungkus. */
+  .hn-vps-actions { flex-wrap: wrap; justify-content: flex-end; }
+}
+
 @media (min-width: 768px) and (max-width: 1199px) {
   .hn-shell-sidebar { width: var(--sidebar-w); padding: 14px 8px; }
   .hn-shell-sidebar .hn-nav-label,
@@ -216,10 +232,13 @@ textarea:focus-visible,
   .hn-grid-mobile { grid-template-columns: minmax(0, 1fr) !important; }
   .hn-stack-mobile { align-items: stretch !important; flex-direction: column; }
   .hn-wrap-mobile,
-  .hn-dense-row,
-  .hn-vps-row { align-items: flex-start !important; flex-wrap: wrap; }
-  .hn-vps-row > div { flex-basis: calc(100% - 32px); }
-  .hn-vps-row > button { flex: 1 1 auto; }
+  .hn-dense-row { align-items: flex-start !important; flex-wrap: wrap; }
+  .hn-vps-main { align-items: flex-start; gap: 8px; }
+  .hn-vps-main > button { flex: 1 1 100%; }
+  .hn-vps-pills { flex-wrap: wrap; }
+  .hn-vps-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
+  .hn-vps-actions > button { flex: 1 1 auto; }
+  .hn-vps-sep { display: none; }
   .hn-dense-row > [style*="flex: 1"] { min-width: min(220px, 100%); }
   /* SPEC-763 · baris pemilih (Ambil backlog, Riwayat sesi): judul adalah satu-satunya pembeda
      antar-baris, tapi `flex-basis: 0` membuatnya kalah dari tetangga yang basis-nya selebar isi —

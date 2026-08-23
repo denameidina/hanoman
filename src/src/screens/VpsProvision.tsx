@@ -24,6 +24,24 @@ export function badgeText(id: string, entry: { status: string; detail: string })
   return `${id} · ${STATUS_LABEL[entry.status] ?? entry.status}${suffix}`;
 }
 
+// Satu kosakata untuk dua tampilan: chip di panel detail, dan ringkasan di baris daftar.
+const STATUS_SHORT: Record<string, string> = {
+  ok: "terpasang", partial: "belum siap", absent: "belum ada" };
+
+function Chip({ status, children, title }:
+  { status: string; children: React.ReactNode; title?: string }) {
+  const color = STATUS_COLOR[status] ?? "var(--text-subtle)";
+  return (
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 5,
+      fontSize: 11, lineHeight: "18px", color: "var(--text-primary)", background: "var(--surface-sunken)",
+      border: "1px solid var(--border-hair)", borderRadius: 999, padding: "0 8px", whiteSpace: "nowrap" }}>
+      <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", background: color, flex: "0 0 auto" }} />
+      {children}
+    </span>
+  );
+}
+
+// Chip lengkap — dipakai di panel detail, tempat satu-per-satu memang yang dicari.
 export function ComponentBadges({ components, checkedAt }:
   { components: VpsComponents | null; checkedAt: string | null }) {
   // Nol data ≠ nol komponen. Deretan strip akan terbaca sebagai "sudah dicek, semuanya kosong".
@@ -33,12 +51,54 @@ export function ComponentBadges({ components, checkedAt }:
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
       {Object.entries(components).map(([id, entry]) => (
-        <span key={id} style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em",
-          color: STATUS_COLOR[entry.status], border: `1px solid ${STATUS_COLOR[entry.status]}`,
-          borderRadius: 3, padding: "0 4px", whiteSpace: "nowrap" }}>{badgeText(id, entry)}</span>
+        <Chip key={id} status={entry.status}>{badgeText(id, entry)}</Chip>
       ))}
       <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>
         diperiksa {new Date(checkedAt).toLocaleString("id-ID")}
+      </span>
+    </div>
+  );
+}
+
+const shortTime = (iso: string) =>
+  new Date(iso).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+// Ringkasan satu baris — dipakai di daftar VPS. Deretan penuh lencana di sana memakan sampai
+// delapan baris dan membuat tinggi tiap baris berbeda-beda; yang dicari mata di daftar cuma dua
+// hal: berapa yang sudah beres, dan APA yang belum. Rinciannya tetap ada di modal detail.
+export function ComponentSummary({ components, checkedAt }:
+  { components: VpsComponents | null; checkedAt: string | null }) {
+  if (!components || !checkedAt) {
+    return (
+      <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>
+        Komponen belum diperiksa — buka detail untuk memeriksa
+      </span>
+    );
+  }
+  const entries = Object.entries(components);
+  const problems = entries.filter(([, e]) => e.status !== "ok");
+  const okCount = entries.length - problems.length;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", minWidth: 0 }}>
+      {/* Meter: satu segmen per komponen, warnanya status. Bentuk keseluruhan terbaca sebelum
+          satu kata pun dibaca. */}
+      <span aria-hidden style={{ display: "flex", gap: 2, alignItems: "center" }}>
+        {entries.map(([id, e]) => (
+          <span key={id} style={{ width: 12, height: 4, borderRadius: 2,
+            background: e.status === "absent" ? "var(--border-strong)" : STATUS_COLOR[e.status] }} />
+        ))}
+      </span>
+      <span style={{ fontSize: 11, color: "var(--text-subtle)", whiteSpace: "nowrap" }}>
+        <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>{okCount}/{entries.length}</strong> terpasang
+      </span>
+      {problems.map(([id, e]) => (
+        <Chip key={id} status={e.status} title={badgeText(id, e)}>
+          {id} · {e.status === "partial" && e.detail.startsWith("not-logged-in")
+            ? "belum login" : STATUS_SHORT[e.status] ?? e.status}
+        </Chip>
+      ))}
+      <span style={{ fontSize: 11, color: "var(--text-subtle)", whiteSpace: "nowrap" }}>
+        diperiksa {shortTime(checkedAt)}
       </span>
     </div>
   );

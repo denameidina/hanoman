@@ -2,7 +2,7 @@
 // mengunci checkbox; server tetap menghitung ulang lewat resolveComponents.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { VpsProvisionPanel, ComponentBadges } from "../src/screens/VpsProvision";
+import { VpsProvisionPanel, ComponentBadges, ComponentSummary } from "../src/screens/VpsProvision";
 import { api } from "../src/api/client";
 import type { ProvisionComponent, VpsView } from "@hanoman/shared";
 
@@ -46,6 +46,31 @@ describe("SPEC-883 · lencana komponen", () => {
     render(<ComponentBadges checkedAt="2026-08-22T00:00:00.000Z"
       components={{ claude: { status: "partial", detail: "not-logged-in 1.2.3" } }} />);
     expect(screen.getByText(/belum login/i)).toBeTruthy();
+  });
+});
+
+describe("ringkasan komponen di daftar VPS", () => {
+  const PROBED = {
+    base: { status: "ok", detail: "git+tmux+curl" },
+    node: { status: "ok", detail: "v24.15.0" },
+    hanoman: { status: "ok", detail: "0.1.47" },
+    claude: { status: "partial", detail: "not-logged-in 1.2.3" },
+    gh: { status: "absent", detail: "" },
+  } as const;
+
+  it("meringkas yang beres jadi hitungan, dan hanya memunculkan yang bermasalah", () => {
+    render(<ComponentSummary components={PROBED} checkedAt="2026-08-22T18:14:31.000Z" />);
+    expect(screen.getByText("3/5")).toBeTruthy();
+    // Yang ok tak lagi jadi lencana sendiri-sendiri — itulah yang dulu membungkus 8 baris.
+    expect(screen.queryByText(/terpasang v24\.15\.0/i)).toBeNull();
+    expect(screen.getByText(/claude · belum login/i)).toBeTruthy();
+    expect(screen.getByText(/gh · belum ada/i)).toBeTruthy();
+    expect(screen.getByText(/diperiksa/i)).toBeTruthy();
+  });
+
+  it("belum pernah diprobe → kalimat, bukan meter kosong", () => {
+    render(<ComponentSummary components={null} checkedAt={null} />);
+    expect(screen.getByText(/belum diperiksa/i)).toBeTruthy();
   });
 });
 

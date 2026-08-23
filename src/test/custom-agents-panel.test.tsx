@@ -143,6 +143,39 @@ describe("CustomAgentsPanel", () => {
     expect((screen.getByLabelText("Nama") as HTMLInputElement).disabled).toBe(true);
   });
 
+  // Form agen hidup di modal: tujuh field + textarea sebagai kartu inline mendorong Simpan
+  // ke luar viewport, dan dari kartu terbawah operator harus menggulir lagi mencari formnya.
+  it("form agen dibuka sebagai modal, bukan kartu di bawah daftar", async () => {
+    render(<CustomAgentsPanel projectId={null} />);
+    await screen.findByText("rev");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /agen baru/i }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.contains(screen.getByLabelText("Nama"))).toBe(true);
+    expect(dialog.contains(screen.getByRole("button", { name: /simpan/i }))).toBe(true);
+  });
+
+  it("Batal menutup modal tanpa menyimpan", async () => {
+    render(<CustomAgentsPanel projectId={null} />);
+    await screen.findByText("rev");
+    fireEvent.click(screen.getAllByRole("button", { name: /ubah/i })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: /batal/i }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(updateCustomAgent).not.toHaveBeenCalled();
+  });
+
+  // Penolakan server harus terbaca DI TEMPAT operator berada — di dalam modal, bukan di
+  // halaman di belakangnya.
+  it("pesan penolakan server tampil di dalam modal", async () => {
+    createCustomAgent.mockRejectedValue(new FakeApiError(400, "400", { error: "nama sudah dipakai" }));
+    render(<CustomAgentsPanel projectId={null} />);
+    fireEvent.click(await screen.findByRole("button", { name: /agen baru/i }));
+    fireEvent.change(screen.getByLabelText("Nama"), { target: { value: "agn-a" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan/i }));
+    await waitFor(() => expect(screen.getByText(/nama sudah dipakai/i)).toBeTruthy());
+    expect(screen.getByRole("dialog").contains(screen.getByText(/nama sudah dipakai/i))).toBe(true);
+  });
+
   it("menolak simpan saat nama bukan slug yang sah", async () => {
     render(<CustomAgentsPanel projectId={null} />);
     fireEvent.click(await screen.findByRole("button", { name: /agen baru/i }));

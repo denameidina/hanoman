@@ -8,7 +8,7 @@ import { subscribe } from "../api/events";
 import type { VpsView } from "@hanoman/shared";
 import { VpsChecklistModal } from "./VpsChecklist";
 import { usePersistedState, nullableStr } from "../ui-state";
-import { VpsProvisionPanel, ComponentBadges } from "./VpsProvision";
+import { VpsProvisionPanel, ComponentSummary } from "./VpsProvision";
 
 // reachable = healthcheck terakhir sukses dalam 2× interval 5 menit (SPEC-164 §4).
 export const isReachable = (v: VpsView, now: number = Date.now()): boolean =>
@@ -186,42 +186,58 @@ export function VpsScreen({ onToast, onGotoTerminal }:
           return (
             <div key={v.id} className="hn-vps-row"
               onClick={() => setDetailVps(v)}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", cursor: "pointer",
+              style={{ padding: "10px 12px", cursor: "pointer",
                 border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", marginBottom: 8 }}>
-              <button type="button" aria-label={`Buka detail ${v.name}`}
-                onClick={(event) => { event.stopPropagation(); setDetailVps(v); }}
-                // SPEC-763 · `all: "unset"` inline mengalahkan aturan target sentuh mobile
-                // (`button { min-height: var(--touch-target) }`); reset eksplisit menyisakannya hidup.
-                style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer",
-                  font: "inherit", color: "inherit", textAlign: "left", background: "transparent",
-                  padding: 0, border: "none" }}>
-                <Icon name="server" size={16} color="var(--brass-700)" />
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 13, fontWeight: 600 }}>{v.name}</span>
-                  <span style={{ display: "block", fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--text-subtle)" }}>
-                    {v.user}@{v.host}{v.port !== 22 ? `:${v.port}` : ""}</span>
-                </span>
-              </button>
-              <StatusPill size="sm" status={isReachable(v) ? "ok" : "broken"}>
-                {isReachable(v) ? "reachable" : "unreachable"}</StatusPill>
-              <StatusPill size="sm" status={h.status}>{h.label}</StatusPill>
+              {/* Baris atas: identitas + status + aksi. Baris bawah: status instalasi.
+                  Dulu keduanya satu baris — deretan lencana komponen membungkus sampai delapan
+                  baris dan mendorong tombol-tombolnya ke tengah ruang kosong. */}
+              <div className="hn-vps-main">
+                <button type="button" aria-label={`Buka detail ${v.name}`}
+                  onClick={(event) => { event.stopPropagation(); setDetailVps(v); }}
+                  // SPEC-763 · `all: "unset"` inline mengalahkan aturan target sentuh mobile
+                  // (`button { min-height: var(--touch-target) }`); reset eksplisit menyisakannya hidup.
+                  style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 220px", minWidth: 0,
+                    cursor: "pointer", font: "inherit", color: "inherit", textAlign: "left",
+                    background: "transparent", padding: 0, border: "none" }}>
+                  <Icon name="server" size={16} color="var(--brass-700)" />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 13, fontWeight: 600, overflow: "hidden",
+                      textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</span>
+                    <span style={{ display: "block", fontSize: 12, fontFamily: "var(--font-mono)",
+                      color: "var(--text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {v.user}@{v.host}{v.port !== 22 ? `:${v.port}` : ""}</span>
+                  </span>
+                </button>
+                <div className="hn-vps-pills" style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                  <StatusPill size="sm" status={isReachable(v) ? "ok" : "broken"}>
+                    {isReachable(v) ? "reachable" : "unreachable"}</StatusPill>
+                  <StatusPill size="sm" status={h.status}>{h.label}</StatusPill>
+                </div>
+                <div className="hn-vps-actions">
+                  <Button size="sm" variant="ghost" leftIcon="plug-zap" loading={busy === `test:${v.id}`}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void testConn(v); }}>Test</Button>
+                  <Button size="sm" variant="ghost" leftIcon="terminal-square" loading={busy === `console:${v.id}`}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void openConsole(v); }}>Console</Button>
+                  <Button size="sm" variant="ghost" leftIcon="terminal" loading={busy === `sesi:${v.id}`}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void session(v); }}>Sesi Claude</Button>
+                  <Button size="sm" variant="secondary" leftIcon="radar" loading={busy === `audit:${v.id}`}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void audit(v); }}>Audit</Button>
+                  <Button size="sm" leftIcon="shield" loading={busy === `harden:${v.id}`}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void harden(v); }}>Harden</Button>
+                  {/* Pemisah tipis: dua tombol terakhir mengubah/menghapus pendaftaran, bukan
+                      menjalankan sesuatu di mesinnya. */}
+                  <span aria-hidden className="hn-vps-sep" />
+                  <Button size="sm" variant="ghost" leftIcon="pencil" title={`Edit ${v.name}`}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); setModal(v); }} />
+                  <Button size="sm" variant="ghost" leftIcon="trash-2" title={`Hapus ${v.name}`}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void remove(v); }} />
+                </div>
+              </div>
               {/* SPEC-883 · penandaan komponen: apa yang benar-benar ada di mesin itu, beserta
                   kapan terakhir diperiksa. Tanpa waktu, lencana hanyalah klaim tanpa tanggal. */}
-              <ComponentBadges components={v.components ?? null} checkedAt={v.componentsCheckedAt ?? null} />
-              <Button size="sm" variant="ghost" leftIcon="plug-zap" loading={busy === `test:${v.id}`}
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); void testConn(v); }}>Test</Button>
-              <Button size="sm" variant="ghost" leftIcon="terminal-square" loading={busy === `console:${v.id}`}
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); void openConsole(v); }}>Console</Button>
-              <Button size="sm" variant="secondary" leftIcon="radar" loading={busy === `audit:${v.id}`}
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); void audit(v); }}>Audit</Button>
-              <Button size="sm" leftIcon="shield" loading={busy === `harden:${v.id}`}
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); void harden(v); }}>Harden</Button>
-              <Button size="sm" variant="ghost" leftIcon="terminal" loading={busy === `sesi:${v.id}`}
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); void session(v); }}>Sesi Claude</Button>
-              <Button size="sm" variant="ghost" leftIcon="pencil" title={`Edit ${v.name}`}
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); setModal(v); }} />
-              <Button size="sm" variant="ghost" leftIcon="trash-2"
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); void remove(v); }} />
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-hair)" }}>
+                <ComponentSummary components={v.components ?? null} checkedAt={v.componentsCheckedAt ?? null} />
+              </div>
             </div>
           );
         })}

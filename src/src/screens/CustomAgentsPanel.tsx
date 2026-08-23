@@ -7,7 +7,7 @@
    bukan ketikan operator — jadi pencabutan `Task` untuk agen daun TERLIHAT, bukan tersembunyi.
    Itu lapis 2 anti-loop, dan lapis yang tak terlihat adalah lapis yang dikira tak ada. */
 import React from "react";
-import { Card, Button, Badge, Input, Switch, MultiSelect, Select, Field, HnTextarea, StateBlock, Callout } from "../ds";
+import { Card, Button, Badge, Input, Switch, MultiSelect, Select, Field, HnTextarea, StateBlock, Callout, Modal } from "../ds";
 import { api, ApiError } from "../api/client";
 import {
   AGENT_NAME_RE, DEFAULT_AGENT_TOOLS, ALL_TOOLS, resolveTools, modelsForRuntime,
@@ -171,9 +171,9 @@ export function CustomAgentsPanel({ projectId, onToast }: CustomAgentsPanelProps
         </Button>
       </div>
 
-      {err && <Callout tone="err">{err}</Callout>}
+      {err && !editing && <Callout tone="err">{err}</Callout>}
 
-      {rows.length === 0 && !editing && (
+      {rows.length === 0 && (
         <StateBlock kind="empty" compact title="Belum ada custom agent"
           hint="Custom agent adalah persona yang bisa dipilih sesi claude & codex — misalnya peninjau keamanan atau penulis migration." />
       )}
@@ -221,24 +221,36 @@ export function CustomAgentsPanel({ projectId, onToast }: CustomAgentsPanelProps
         );
       })}
 
+      {/* Form agen sebagai MODAL, bukan kartu yang tumbuh di bawah daftar. Formnya tujuh field
+          (satu di antaranya textarea enam baris): sebagai kartu inline ia mendorong tombol Simpan
+          ke luar viewport, dan dari kartu "Ubah" paling bawah operator harus menggulir ke bawah
+          lagi untuk menemukan formnya. Modal memberi isian yang menggulir sendiri dengan aksi
+          yang tetap terlihat di footer. */}
       {editing && (
-        <Card padding={16}>
+        <Modal open onClose={() => { setEditing(null); setErr(""); }}
+          icon="bot" eyebrow={projectId ? "agen project" : "agen global"}
+          title={editing.id ? `Ubah ${editing.draft.name}` : "Agen baru"} width={640}
+          footer={<>
+            <Button variant="ghost" onClick={() => { setEditing(null); setErr(""); }}>Batal</Button>
+            <Button onClick={() => void save()} loading={busy} disabled={!nameValid || blocked}>Simpan</Button>
+          </>}>
+          {err && <Callout tone="err">{err}</Callout>}
           <Field label="Nama" hint={editing.id
             ? "Nama tak bisa diubah — hapus lalu buat baru (definisi ini menyeberang lewat sync)."
             : "huruf kecil, angka, dan tanda hubung; minimal 2 karakter"}>
             <Input value={editing.draft.name} aria-label="Nama" disabled={Boolean(editing.id)}
-              invalid={!nameValid} placeholder="mis. peninjau-keamanan"
+              invalid={!nameValid} placeholder="mis. peninjau-keamanan" style={{ width: "100%" }}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setEditing({ ...editing, draft: { ...editing.draft, name: e.target.value } })} />
           </Field>
           <Field label="Deskripsi" hint="Kapan agen ini dipakai — inilah yang dibaca agen untuk MEMILIH.">
-            <Input value={editing.draft.description} aria-label="Deskripsi"
+            <Input value={editing.draft.description} aria-label="Deskripsi" style={{ width: "100%" }}
               placeholder="mis. Dipakai saat meninjau perubahan yang menyentuh auth"
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setEditing({ ...editing, draft: { ...editing.draft, description: e.target.value } })} />
           </Field>
           <Field label="Instruksi" hint="System prompt agen.">
-            <HnTextarea value={editing.draft.instructions} aria-label="Instruksi" rows={6}
+            <HnTextarea value={editing.draft.instructions} aria-label="Instruksi" rows={8}
               placeholder="mis. Kamu peninjau keamanan. Baca diff, laporkan temuan berurut dari yang paling berbahaya, sebut file:line."
               onChange={(e) => setEditing({ ...editing, draft: { ...editing.draft, instructions: e.target.value } })} />
           </Field>
@@ -247,19 +259,22 @@ export function CustomAgentsPanel({ projectId, onToast }: CustomAgentsPanelProps
               invalidValues={invalidTools} onChange={setTools}
               placeholder="Pilih tools…" searchPlaceholder="mis. Read atau Bash" />
           </Field>
-          <Field label="Runtime agent" hint="Mesin sesi yang memakai agen ini. Kosongkan untuk ikut sesi induk — dipakai sesi claude maupun codex.">
-            <Select aria-label="Runtime agent" value={editing.draft.runtime}
-              options={[{ value: "", label: "Ikut sesi induk" },
-                ...(catalog?.runtimes ?? []).map((r) => ({ value: r.id, label: r.label }))]}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRuntime(e.target.value)} />
-          </Field>
-          <Field label="Model" hint="Kosongkan untuk mewarisi model sesi.">
-            <Select aria-label="Model" value={editing.draft.model} invalid={modelInvalid}
-              options={[{ value: "", label: "Ikut sesi induk" }, ...modelOptions,
-                ...(modelInvalid ? [{ value: editing.draft.model, label: `⚠ ${editing.draft.model} — tak ada di katalog` }] : [])]}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                setEditing({ ...editing, draft: { ...editing.draft, model: e.target.value } })} />
-          </Field>
+          {/* Runtime menyetir Model — berdampingan supaya penyempitannya terlihat saat terjadi. */}
+          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Runtime agent" hint="Mesin sesi yang memakai agen ini. Kosongkan untuk ikut sesi induk.">
+              <Select aria-label="Runtime agent" value={editing.draft.runtime}
+                options={[{ value: "", label: "Ikut sesi induk" },
+                  ...(catalog?.runtimes ?? []).map((r) => ({ value: r.id, label: r.label }))]}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRuntime(e.target.value)} />
+            </Field>
+            <Field label="Model" hint="Kosongkan untuk mewarisi model sesi.">
+              <Select aria-label="Model" value={editing.draft.model} invalid={modelInvalid}
+                options={[{ value: "", label: "Ikut sesi induk" }, ...modelOptions,
+                  ...(modelInvalid ? [{ value: editing.draft.model, label: `⚠ ${editing.draft.model} — tak ada di katalog` }] : [])]}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setEditing({ ...editing, draft: { ...editing.draft, model: e.target.value } })} />
+            </Field>
+          </div>
           <Field label="Mention" hint="Agen yang boleh dipanggil agen ini. Graf mention wajib asiklik — server menolak yang membentuk lingkaran.">
             <MultiSelect aria-label="Mention" options={mentionOptions} value={editing.draft.mentions}
               invalidValues={invalidMentions}
@@ -273,11 +288,7 @@ export function CustomAgentsPanel({ projectId, onToast }: CustomAgentsPanelProps
               server menolak nilai yang tak dikenal.
             </Callout>
           )}
-          <div style={{ display: "flex", gap: 8 }}>
-            <Button onClick={() => void save()} loading={busy} disabled={!nameValid || blocked}>Simpan</Button>
-            <Button variant="ghost" onClick={() => { setEditing(null); setErr(""); }}>Batal</Button>
-          </div>
-        </Card>
+        </Modal>
       )}
     </div>
   );
