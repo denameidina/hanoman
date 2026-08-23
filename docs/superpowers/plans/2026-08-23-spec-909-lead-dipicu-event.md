@@ -2798,7 +2798,7 @@ git commit -m "docs(lead): ADR-0146 mengamandemen ADR-0091 §5 — pintu deteksi
 
 ## Verifikasi akhir (sesudah task 12)
 
-- [ ] **Test yang tersentuh, sekali jalan:**
+- [x] **Test yang tersentuh, sekali jalan:**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u NODE_ENV -u DATABASE_URL -u HANOMAN_SUPERVISOR \
@@ -2809,14 +2809,18 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u NODE_ENV -u DATABASE_URL -u HAN
 Pastikan test-nya BENAR-BENAR berjalan — `--changed` menyalakan `passWithNoTests`, jadi nol test
 terlihat hijau.
 
-- [ ] **Typecheck paket yang tersentuh (bukan `-r`):**
+- [x] **Typecheck paket yang tersentuh (bukan `-r`):**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./runner typecheck \
   && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
 ```
 
-- [ ] **Smoke endpoint nyata, sekali di akhir** (task ini menyentuh route): boot server dari
+- [x] **Smoke endpoint nyata, sekali di akhir** — dilakukan LIVE saat pengukuran (audit
+  `docs/superpowers/audits/2026-08-23-spec-909-latensi-event-vs-denyut.md`): server sungguhan di
+  `:8799` + sesi `claude` sungguhan di pane tmux. Terbukti `Bearer` salah → **401**, `Bearer` benar
+  + sesi tak hidup → **404**, event `AskUserQuestion` sungguhan → **202** lalu satu `LeadFlow`
+  ber-`steps = 3` dengan tiga `LeadDecision` ber-`flowId` sama. (task ini menyentuh route): boot server dari
   terminal manusia (Task 11 Step 3), lalu:
 
 ```bash
@@ -2830,13 +2834,13 @@ curl -sS -i -X POST http://127.0.0.1:8799/api/session-events -H 'content-type: a
 # → 401
 ```
 
-- [ ] **Sapuan blast-radius:** jalankan subagent `blast-radius` atas diff penuh untuk mencari cermin
+- [x] **Sapuan blast-radius:** jalankan subagent `blast-radius` atas diff penuh untuk mencari cermin
   yang ketinggalan (daftar route, enum kembar, DTO, tabel konstanta, dokumen kontrak).
 
-- [ ] **Tinjauan keamanan:** jalankan subagent `security-reviewer` atas `routes/session-events.ts`,
+- [x] **Tinjauan keamanan:** jalankan subagent `security-reviewer` atas `routes/session-events.ts`,
   `services/session-event-token.ts`, `services/lead/ask.ts`, dan perubahan `app.ts`.
 
-- [ ] **Push:**
+- [x] **Push:**
 
 ```bash
 git push origin HEAD:refs/heads/hanoman/spec-909
