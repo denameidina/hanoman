@@ -26,8 +26,11 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // SPEC-617 · ADR-0110 · `portal` & `client-accounts` ikut: portal adalah permukaan SESI COOKIE
   // ber-scope akun (respons bergantung `req.user`, jadi tak ada capability yang bisa berarti
   // apa pun di sana), dan client-accounts memegang kredensial (preseden /agent-tokens).
+  // SPEC-909 · ADR-0146 · `session-events` ikut: pemanggilnya hook sesi ber-token turunan, bukan
+  // manusia dan bukan agen. Agen yang bisa memalsukan "sesi X bertanya Y" bisa menggerakkan lead
+  // atas nama sesi mana pun — itu bukan capability, itu peniruan identitas.
   if (top === "auth" || top === "agent-tokens" || top === "device-tokens" || top === "sync"
-    || top === "portal" || top === "client-accounts") return "COOKIE_ONLY";
+    || top === "portal" || top === "client-accounts" || top === "session-events") return "COOKIE_ONLY";
   // read-only global (status). SPEC-405 · ADR-0088 · `GLOBAL_READ` HANYA untuk method baca:
   // `POST /update/apply` me-restart instance, dan itu tak pernah boleh lolos hanya karena
   // prefix-nya kebetulan sama dengan endpoint status. Cookie = akses penuh, seperti sebelumnya.

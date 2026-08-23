@@ -55,6 +55,8 @@ describe("capabilityForRoute", () => {
     ["POST", "/api/agent-tokens", "COOKIE_ONLY"],
     ["GET", "/api/device-tokens", "COOKIE_ONLY"],
     ["GET", "/api/sync/pull", "COOKIE_ONLY"],
+    // SPEC-909 · ADR-0146 · memalsukan "sesi X bertanya Y" bukan capability, itu peniruan identitas.
+    ["POST", "/api/session-events", "COOKIE_ONLY"],
     ["GET", "/api/nonsense", null],
   ];
   it.each(cases)("%s %s → %s", (m, p, want) => {

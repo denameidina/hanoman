@@ -158,7 +158,9 @@ tanpa Postgres, tanpa Redis** ([ADR-0086](internal/docs/adr/0086-sqlite-satu-sat
 atau tombol update di dashboard.
 
 Yang npm **tidak** bisa bawa, karena itu inti produknya: `git` (worktree per sesi), `tmux` (sesi agen
-selamat dari restart API, [ADR-0016](internal/docs/adr/0016-sesi-terminal-hidup-di-tmux.md)), dan CLI
+selamat dari restart API, [ADR-0016](internal/docs/adr/0016-sesi-terminal-hidup-di-tmux.md)), `curl`
+(hook sesi mengirim pertanyaan agen ke server — tanpanya hanoman-lead diam,
+[ADR-0146](internal/docs/adr/0146-lead-dipicu-event-hook.md)), dan CLI
 agen `claude` dan/atau `codex` yang sudah login. `hanoman doctor` melaporkan mana yang belum ada.
 Detail perintah & konfigurasi: [operations/npm-readme](internal/docs/operations/npm-readme.md).
 

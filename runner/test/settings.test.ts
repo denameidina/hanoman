@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { guardSettings } from "../src/settings";
+import { guardSettings, EVENT_HOOK_COMMAND } from "../src/settings";
 
 describe("guardSettings", () => {
   it("tanpa decisionFile: tak ada hook (guardrail dicabut, ADR-0037)", () => {
@@ -45,5 +45,38 @@ describe("guardSettings", () => {
   });
   it("goal kosong tidak memasang hook", () => {
     expect((guardSettings("/tmp/dec", "") as any).hooks.Stop).toBeUndefined();
+  });
+});
+
+// SPEC-909 · ADR-0146 · hook pengirim event. Pintu deteksi lead tak lagi memindai; ia menunggu ini.
+describe("SPEC-909 · hook pengirim event", () => {
+  it("memasang PreToolUse ber-matcher AskUserQuestion", () => {
+    const h = guardSettings("/w/.decisions/s1", undefined, true).hooks as Record<string, any[] | undefined>;
+    expect(h.PreToolUse).toHaveLength(1);
+    expect(h.PreToolUse![0].matcher).toBe("AskUserQuestion");
+    expect(h.PreToolUse![0].hooks[0]).toEqual({ type: "command", command: EVENT_HOOK_COMMAND });
+  });
+
+  it("SELALU exit 0 — PreToolUse berkode 2 memblokir tool-nya", () => {
+    expect(EVENT_HOOK_COMMAND.trimEnd().endsWith("exit 0")).toBe(true);
+  });
+
+  it("membuang stdout — keluaran hook command dibaca claude sebagai kendali izin", () => {
+    expect(EVENT_HOOK_COMMAND).toContain(">/dev/null 2>&1");
+  });
+
+  it("membatasi tunggu supaya server mati tak menggantungkan agen", () => {
+    expect(EVENT_HOOK_COMMAND).toContain("-m 2");
+  });
+
+  it("tanpa eventHook, settings byte-identik seperti sebelum SPEC-909", () => {
+    expect(guardSettings("/w/.decisions/s1")).toEqual(guardSettings("/w/.decisions/s1", undefined, false));
+    expect((guardSettings("/w/.decisions/s1").hooks as Record<string, unknown>).PreToolUse).toBeUndefined();
+  });
+
+  it("penulis & pengosong marker TIDAK berubah (ADR-0141/0143)", () => {
+    const h = guardSettings("/w/.decisions/s1", undefined, true).hooks as Record<string, any[] | undefined>;
+    expect(h.Notification![0].hooks[0].command).toContain("date +%s >");
+    expect(h.UserPromptSubmit![0].hooks[0].command).toContain(": >");
   });
 });

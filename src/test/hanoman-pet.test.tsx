@@ -3,7 +3,7 @@
 import { eventsStub } from "./helpers/events-stub";
 import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Notification, SessionDialog, SessionDialogPayload, Spec } from "@hanoman/shared";
+import type { Notification, SessionAsk, SessionDialog, SessionDialogPayload, Spec } from "@hanoman/shared";
 import { api, ApiError, type TerminalSession } from "../src/api/client";
 import { HanomanPet } from "../src/screens/HanomanPet";
 import { NotificationsContext } from "../src/notifications/NotificationsContext";
@@ -562,6 +562,44 @@ describe("Pet · inbox keputusan", () => {
     sessions: [session({ id: "s1", specId: "SPEC-1", decision: true })],
     backlog: [spec({ id: "SPEC-1", stage: "executing" })],
     onOpen: vi.fn(),
+  });
+
+  // SPEC-909 · ADR-0146 · AC-6 · jendela "ambil alih SEBELUM lead mengetik ke pane" ada saat sesi
+  // ber-`deciding`, bukan `waiting`: sejak pertanyaan tiba sebagai EVENT, `deciding` menyala ±50 ms
+  // sesudah agen bertanya sementara marker (`decision`) baru terisi ±6 detik kemudian. `sessionKind`
+  // memberi tiap sesi tepat SATU kondisi dan `deciding` menang, jadi kotak yang hanya digantung di
+  // `waiting` tak pernah muncul justru di jendela yang dituju AC-6.
+  //
+  // Test ini sengaja lewat `HanomanPet`, bukan me-render `PetAnswer` langsung: yang rusak dulu
+  // adalah GERBANG mount-nya, dan test yang melewati gerbang itu tak bisa melihatnya.
+  const ask = (over: Partial<SessionAsk> = {}): SessionAsk => ({
+    sessionId: "s1", agent: "claude", source: "ask-tool", askId: "t1",
+    askedAt: "2026-08-23T00:00:00.000Z",
+    questions: [{ header: "Warna", question: "Warna apa yang dipakai?", multiSelect: false,
+      options: [{ label: "merah" }, { label: "biru" }] }],
+    message: "", at: 0, total: 1, state: "deciding", flowId: null, step: null, ...over,
+  });
+
+  it("sesi yang SEDANG diputuskan lead tetap menumbuhkan kotak + tombol Ambil alih (SPEC-909)", async () => {
+    vi.spyOn(api, "sessionDialog").mockResolvedValue(null);   // scrape 409/204 — payload harus menang
+    render(<HanomanPet
+      sessions={[session({ id: "s1", specId: "SPEC-1", decision: false, deciding: true })]}
+      backlog={[spec({ id: "SPEC-1", stage: "executing" })]}
+      asks={[ask()]} onOpen={vi.fn()} />);
+    await act(async () => { fireEvent.click(hit()); });
+    expect(await screen.findByText("Warna apa yang dipakai?")).toBeTruthy();
+    expect(screen.getByTestId("pet-answer-takeover")).toBeInTheDocument();
+  });
+
+  it("tanpa payload event, sesi deciding TIDAK menumbuhkan kotak (tak ada yang bisa direbut)", async () => {
+    const get = vi.spyOn(api, "sessionDialog").mockResolvedValue(null);
+    render(<HanomanPet
+      sessions={[session({ id: "s1", specId: "SPEC-1", decision: false, deciding: true })]}
+      backlog={[spec({ id: "SPEC-1", stage: "executing" })]}
+      onOpen={vi.fn()} />);
+    await act(async () => { fireEvent.click(hit()); });
+    expect(screen.queryByTestId("pet-answer-takeover")).toBeNull();
+    expect(get).not.toHaveBeenCalled();
   });
 
   it("merender pertanyaan + opsi untuk sesi waiting, lalu mengirim nomor barisnya", async () => {

@@ -130,6 +130,25 @@ export async function recordLeadDecision(
   }).catch(() => { /* P2002: sudah ada untuk keputusan ini */ });
 }
 
+// SPEC-909 · ADR-0146 · sesi yang lahir SEBELUM pembaruan tak punya hook event, dan pemindainya
+// sudah dicabut — jadi hanoman-lead tak akan menjawabnya. Menyisakan pemindai "hanya untuk sesi
+// lama" berarti mempertahankan persis biaya yang dicabut SPEC ini, untuk populasi yang menyusut
+// sendiri. Yang tak boleh terjadi adalah sesi menggantung tanpa siapa pun tahu.
+//
+// `key` unik → P2002 mendedup SEKALI SEUMUR SESI, termasuk lintas restart server. Itu sebabnya
+// dedupnya di DB, bukan `Set` di memori: pane mati bertahan berhari-hari di tmux sementara `Set`
+// memori kosong tepat sesudah restart (gotcha 2 ADR-0091).
+export async function recordLegacySession(
+  sessionId: string, projectId: string | null, specId: string | null,
+): Promise<void> {
+  await prisma.notification.create({
+    data: {
+      type: "lead", key: `lead-legacy:${sessionId}`, sessionId, specId, projectId,
+      title: `Sesi ${sessionId} tak punya jalur event ke server — hanoman-lead tak akan menjawabnya. Sebabnya salah satu dari dua: ia lahir sebelum pembaruan (mulai ulang sesinya), atau ia berjalan di dalam sandbox yang tak bisa menjangkau server (ADR-0146). Jawab dari panel pet atau terminal.`,
+    },
+  }).catch(() => { /* P2002: sudah pernah diberitahukan untuk sesi ini */ });
+}
+
 // SPEC-646 · ADR-0112 · hasil satu eksekusi cron. `key` diturunkan dari (cronId, dueAt) — stempel
 // yang STABIL lintas restart, jadi tick berulang tak bisa menduplikasinya (P2002 diabaikan, pola
 // recordCompletion). `skipped` ikut dinotifikasi dengan sengaja: "cek pagi tak jalan karena cap

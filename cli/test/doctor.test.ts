@@ -4,7 +4,7 @@ import { doctorReport } from "../src/commands/doctor";
 
 const ok = {
   node: "v22.0.0", git: "git version 2.44.0", tmux: "tmux 3.4",
-  claude: "1.0.0", codex: null, gh: null, web: true, db: "/h/.hanoman/hanoman.db",
+  claude: "1.0.0", codex: null, gh: null, curl: "curl 8.7.1", web: true, db: "/h/.hanoman/hanoman.db",
   // SPEC-846 · path data efektif dilaporkan satu per satu; home fatal, turunannya memperingatkan.
   dirs: [
     { label: "data dir", path: "/h/.hanoman", writable: true, fatal: true },
@@ -94,6 +94,16 @@ describe("doctorReport", () => {
     const dengan = doctorReport({ ...ok, gh: "gh version 2.96.0" });
     expect(dengan.ok).toBe(true);
     expect(dengan.lines.join("\n")).toContain("gh version 2.96.0");
+  });
+
+  // SPEC-909 · ADR-0146 · tanpa `curl` hook tetap `exit 0` (tak pernah memblokir agen), tapi lead
+  // berhenti menerima pertanyaan sesi TANPA satu pun error di mana pun. Kegagalan senyap justru
+  // yang layak dilaporkan — dan justru karena senyap, ia tak boleh fatal.
+  it("SPEC-909 · curl absen = peringatan yang menyebut akibatnya, BUKAN fatal", () => {
+    const tanpa = doctorReport({ ...ok, curl: null });
+    expect(tanpa.ok).toBe(true);
+    expect(tanpa.lines.join("\n")).toContain("hanoman-lead tak akan menerima pertanyaan sesi");
+    expect(doctorReport({ ...ok, curl: "curl 8.7.1" }).lines.join("\n")).toContain("curl 8.7.1");
   });
 });
 

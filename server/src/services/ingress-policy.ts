@@ -32,6 +32,19 @@ export function loadIngressPolicy(env: Env): IngressPolicy {
   };
 }
 
+/**
+ * Host control pertama, atau `null` bila deployment ini tak memisahkan origin.
+ *
+ * SPEC-909 · dipakai hook sesi sebagai header `Host` di atas koneksi loopback. `classifyIngress`
+ * SENGAJA tak diberi pengecualian loopback: ia menilai `Host`, dan `Host` dikendalikan pemanggil —
+ * mengistimewakan `127.0.0.1` di sana akan membuka seluruh permukaan control lewat reverse proxy
+ * publik, yaitu persis pemisahan yang gerbang itu ada untuk menegakkan.
+ */
+export function controlHost(policy: IngressPolicy): string | null {
+  for (const host of policy.controlHosts) return host;
+  return null;
+}
+
 function publicPath(method: string, path: string): boolean {
   if (method === "GET" && path === "/api/health") return true;
   if (path === "/api/help" || path.startsWith("/api/help/")) return true;

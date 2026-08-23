@@ -14,6 +14,8 @@ export type AgentFlagsOpts = {
   goal?: string;
   /** codex: path skrip gate mode goal (ditulis pemanggil). */
   goalGate?: string;
+  /** SPEC-909 · ADR-0146 · pasang hook pengirim event pertanyaan sesi. Sesi agen saja. */
+  eventHook?: boolean;
 };
 
 /** Flag agen TANPA binary dan TANPA prompt positional — pemanggil yang mengutip tiap elemen. */
@@ -28,7 +30,7 @@ export function agentFlags(o: AgentFlagsOpts): string[] {
       // Hook kita disuntik saat lahir, jadi ia belum pernah "di-trust" manusia. Tanpa flag ini
       // TUI berhenti di layar "Hooks need review" dan sesi tak pernah mulai.
       "--dangerously-bypass-hook-trust",
-      ...codexHookArgs({ decisionFile: o.decisionFile, goalGate: o.goalGate }),
+      ...codexHookArgs({ decisionFile: o.decisionFile, goalGate: o.goalGate, eventHook: o.eventHook }),
     ];
   }
   // SPEC-450 · ADR-0094 · `--agents` SENGAJA tidak dirakit di sini: seluruh keluaran fungsi ini
@@ -38,6 +40,6 @@ export function agentFlags(o: AgentFlagsOpts): string[] {
     ...(o.model ? ["--model", o.model] : []),
     ...(o.effort ? ["--effort", o.effort] : []),
     "--dangerously-skip-permissions",
-    "--settings", JSON.stringify(guardSettings(o.decisionFile, o.goal)),
+    "--settings", JSON.stringify(guardSettings(o.decisionFile, o.goal, o.eventHook)),
   ];
 }

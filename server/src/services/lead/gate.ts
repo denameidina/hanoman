@@ -96,22 +96,3 @@ export async function runGated<T>(o: { capacity: number; waitMs: number }, fn: (
   try { return await fn(); }
   finally { inFlight--; pump(); }
 }
-
-/**
- * Jalankan `fn` untuk tiap item dengan paling banyak `limit` yang berjalan bersamaan.
- *
- * Terpisah dari `runGated` dan sengaja begitu: gerbang di atas membatasi **proses agen**, sedangkan
- * ini membatasi **pekerjaan yang mengelilinginya**. Pintu deteksi memakainya untuk melayani sesi
- * berbarengan tanpa berubah jadi tak-berbatas — satu rantai dialog mem-*poll* `capturePane` sampai
- * 20 kali per langkah, dan `tmux()` memakai `execFileSync` yang membekukan event loop 6,28 ms per
- * panggilan (terukur). Fan-out tanpa batas menukar kelaparan dengan server yang tersendat; angkanya
- * `maxConcurrent` yang sama, jadi satu knob menutup kedua sisinya.
- */
-export async function runPool<T>(items: readonly T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    while (next < items.length) await fn(items[next++]!);
-  };
-  const workers = Math.min(Math.max(1, limit), items.length);
-  await Promise.all(Array.from({ length: workers }, worker));
-}

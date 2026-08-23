@@ -18,6 +18,8 @@ import {
   type PaneIO,
 } from "./tui-dialog";
 import { effectiveStr } from "../config";
+import { controlHost, loadIngressPolicy } from "./ingress-policy";
+import { sessionEventToken } from "./session-event-token";
 import { sandboxCommand } from "./session-sandbox";
 
 // Sesi hidup di dalam tmux server, bukan di proses API (ADR-0016). Restart `pnpm dev`
@@ -138,6 +140,10 @@ type Pane = SessionInfo & {
   // SPEC-903 · `#{window_activity}` — detik epoch keluaran TERAKHIR pane. Setiap sesi hanoman satu
   // window satu pane, jadi ini aktivitas pane. NaN bila tmux tak menjawabnya (versi lama).
   activityAt: number;
+  // SPEC-909 · `@hanoman_event_hook` — sesi ini lahir dengan hook pengirim event. Sesi tanpa
+  // penanda ini lahir sebelum pembaruan dan tak akan dijawab lead (engine menotifikasinya sekali).
+  // SENGAJA di luar `SessionInfo`: ia detail internal, bukan bagian DTO yang disiarkan/disync.
+  eventHook: boolean;
 };
 
 // Satu attachment per sesi: satu klien tmux melayani semua WebSocket yang menonton.
@@ -296,7 +302,7 @@ const FMT = [
   "#{session_name}", "#{@hanoman_project}", "#{@hanoman_spec}", "#{@hanoman_flow}",
   "#{@hanoman_phase_file}", "#{@hanoman_cwd}", "#{pane_dead}", "#{pane_dead_status}",
   "#{@hanoman_decision_file}", "#{@hanoman_branch}", "#{@hanoman_agent}", "#{alternate_on}",
-  "#{window_activity}",
+  "#{window_activity}", "#{@hanoman_event_hook}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -328,7 +334,7 @@ async function listPanesAsync(): Promise<Pane[]> {
 function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
-      alternate, activity] = line.split("\t");
+      alternate, activity, eventHook] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -349,6 +355,8 @@ function parsePanes(out: string): Pane[] {
       agent: (agent === "codex" ? "codex" : "claude") as Agent,
       altScreen: alternate === "1",
       activityAt,
+      // SPEC-909 · ADR-0146 · sesi yang lahir sebelum pembaruan tak punya opsi ini → false.
+      eventHook: eventHook === "1",
     }];
   });
 }
@@ -372,15 +380,47 @@ export const listSessionsAsync = async (): Promise<SessionInfo[]> => (await list
 // notifikasi dan panel lead tak punya rumus sendiri yang bisa berselisih dengan pil di layar.
 export const liveDecisions = (): {
   id: string; specId?: string; projectId: string; decisionFile: string; waiting: boolean;
+  eventHook: boolean;
 }[] =>
   listPanes()
     .filter((p) => !p.exited && p.decisionFile)
     .map((p) => ({
       id: p.id, specId: p.specId, projectId: p.projectId, decisionFile: p.decisionFile!,
       waiting: p.decision,
+      // SPEC-909 · ADR-0146 · sesi hidup TANPA penanda ini lahir sebelum pembaruan dan tak akan
+      // dijawab lead. Tick rumah tangga lead menotifikasinya sekali; pembaca lain mengabaikannya.
+      eventHook: p.eventHook,
     }));
 
 export const getSession = (id: string): Pane | undefined => listPanes().find((p) => p.id === id);
+
+// SPEC-909 · ADR-0146 · kembaran asinkron `getSession`. Jalur event hook WAJIB memakai ini:
+// `listPanes()` memakai `execFileSync` dan memblokir event loop sampai 916 ms saat mesin sibuk
+// (terukur SPEC-878), dan constraint SPEC-909 melarang jalur itu menahan loop.
+export const getSessionAsync = async (id: string): Promise<Pane | undefined> =>
+  (await listPanesAsync()).find((p) => p.id === id);
+
+/**
+ * SPEC-909 · ADR-0146 · env yang membuat hook sesi bisa mengirim event ke server.
+ *
+ * Lewat env, bukan lewat argv `--settings`: settings claude adalah JSON inline di argv, dan token
+ * di sana ikut ke `ps` milik proses agennya sendiri. Env tetap terbaca uid yang sama lewat `sh -c`
+ * yang melahirkan pane — batas ADR-0037, dinyatakan di ADR-0146, tidak dilebarkan di sini.
+ *
+ * Preseden bentuknya `HANOMAN_API_BASE` gateway Telegram (services/telegram/session.ts).
+ */
+export function sessionEventEnv(
+  sessionId: string, env: NodeJS.ProcessEnv = process.env,
+): Record<string, string> {
+  const port = Number(env.PORT ?? 8787);
+  const host = controlHost(loadIngressPolicy(env));
+  return {
+    HANOMAN_SESSION_ID: sessionId,
+    HANOMAN_EVENT_URL: `http://127.0.0.1:${port}/api/session-events`,
+    HANOMAN_EVENT_TOKEN: sessionEventToken(sessionId),
+    ...(host ? { HANOMAN_EVENT_HOST: host } : {}),
+  };
+}
 
 // SPEC-362 · ADR-0079 · riwayat sesi. pty.ts sengaja TETAP nol dependensi DB: ia hanya menembakkan
 // dua peristiwa, dan services/session-history.ts yang mendaftarkan diri lewat server.ts (pola
@@ -555,6 +595,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     const flags = agentFlags({
       agent, model: opts.model, effort,
       decisionFile: opts.decisionFile, goal: opts.goal, goalGate,
+      // SPEC-909 · ADR-0146 · sesi ber-`opts.command` tak pernah sampai ke sini (cabang shell
+      // mentah di atas), jadi hook event hanya pernah terpasang di sesi agen.
+      eventHook: true,
     }).map(sq).join(" ");
     // GOTCHA ADR-0094 #4: `--agents` TIDAK boleh ikut `.map(sq)` seperti flag lain — ia harus tetap
     // berbentuk `"$(cat …)"` supaya `sh -c` yang melahirkan sesi meng-expand-nya. Di-`sq` sekali
@@ -579,6 +622,12 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   if (!opts.command) {
     for (const [k, v] of Object.entries(noTtyPromptEnv())) envPairs.push(`${k}=${sq(v)}`);
   }
+  // SPEC-909 · ADR-0146 · kredensial & alamat pengirim event, hanya untuk sesi AGEN. Console VPS &
+  // terminal biasa (`opts.command`) adalah shell mentah: tak ada hook di sana, jadi tak ada gunanya
+  // membawa kredensialnya. Dipasang sebelum env pemanggil supaya tetap bisa ditimpa.
+  if (!opts.command) {
+    for (const [k, v] of Object.entries(sessionEventEnv(id))) envPairs.push(`${k}=${sq(v)}`);
+  }
   if (opts.phaseFile) {
     mkdirSync(dirname(opts.phaseFile), { recursive: true });
     envPairs.push(`HANOMAN_PHASE_FILE=${sq(opts.phaseFile)}`);
@@ -587,10 +636,21 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // Env tambahan dari pemanggil lewat jalur yang sama.
   for (const [k, v] of Object.entries(opts.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
   let cmd = envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
-  if (!opts.command) cmd = sandboxCommand({
-    command: cmd, worktree: cwd, phaseFile: opts.phaseFile, promptFile,
-    attachmentsDir: opts.attachmentsDir,
-  });
+  // SPEC-909 · ADR-0146 · sesi ber-sandbox TAK BISA mengirim event: `sandboxArgv` menjalankan
+  // perintahnya di dalam `podman run --network <bridge>`, jadi `127.0.0.1` di sana adalah loopback
+  // CONTAINER sementara server wajib bind loopback HOST (ADR-0117) — dan `NO_PROXY` memastikan curl
+  // tak mencoba egress proxy. Menutupnya butuh server yang terjangkau dari jaringan sesi, dan itu
+  // keputusan tersendiri. Yang bisa dilakukan di sini: JANGAN mengaku punya hook event, supaya
+  // engine menotifikasinya sekali alih-alih membiarkannya menggantung tanpa siapa pun tahu.
+  let sandboxed = false;
+  if (!opts.command) {
+    const wrapped = sandboxCommand({
+      command: cmd, worktree: cwd, phaseFile: opts.phaseFile, promptFile,
+      attachmentsDir: opts.attachmentsDir,
+    });
+    sandboxed = wrapped !== cmd;
+    cmd = wrapped;
+  }
   // SPEC-184 · direktori marker keputusan; hook Notification menulis absolute path di dalamnya.
   if (opts.decisionFile) mkdirSync(dirname(opts.decisionFile), { recursive: true });
 
@@ -628,6 +688,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   tmux("set-option", "-t", name(id), "@hanoman_agent", agent);
   if (opts.phaseFile) tmux("set-option", "-t", name(id), "@hanoman_phase_file", opts.phaseFile);
   if (opts.decisionFile) tmux("set-option", "-t", name(id), "@hanoman_decision_file", opts.decisionFile);
+  // SPEC-909 · ADR-0146 · penanda "sesi ini bisa mengirim event". Sesi hidup TANPA penanda ini tak
+  // akan dijawab lead — engine menotifikasinya sekali. Opsi window, bukan berkas: sumber kebenaran
+  // sesi tetap tmux (pola @hanoman_agent, SPEC-338), jadi ia selamat dari restart server tanpa
+  // registry apa pun. Sesi ber-sandbox sengaja TIDAK menyandangnya (lihat catatan di atas).
+  if (!opts.command && !sandboxed) tmux("set-option", "-t", name(id), "@hanoman_event_hook", "1");
   // SPEC-332 · fire-and-forget: respons HTTP tak boleh menunggu TUI siap. Gagal = diam, karena
   // jaminan mode goal sudah dipegang hook Stop di argv di atas.
   // SPEC-397 · ADR-0085 · kedua agen: codex-cli ≥ 0.146 punya mode goal native yang di-arm lewat

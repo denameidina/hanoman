@@ -2,12 +2,19 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "../src/db";
 import { LEAD_DEFAULTS, SCHEDULER_DEFAULTS, type Lead } from "@hanoman/shared";
 import { setLead } from "../src/services/lead/config";
-import { tick, __resetEngine, lastPulse, type LeadTickDeps } from "../src/services/lead/engine";
-import type { DetectDeps } from "../src/services/lead/detect";
+import {
+  tick, __resetEngine, lastPulse, HOUSEKEEPING_MS, type LeadTickDeps,
+} from "../src/services/lead/engine";
 import type { PulseDeps } from "../src/services/lead/pulse";
 
 // SPEC-409 · ADR-0091 · AC-12 · denyut in-process. `now` di-parameter agar cadence teruji
 // deterministik (pola scheduler engine, SPEC-294).
+//
+// SPEC-909 · ADR-0146 · irama PINTU DETEKSI dicabut: pertanyaan sesi tiba sebagai event hook dan
+// tak pernah lagi menunggu timer. Yang tersisa satu irama rumah tangga — penyapu rantai, pemangkas
+// penghitung, sesi pra-pembaruan, dan jatuh tempo denyut proaktif. Test yang dulu menghitung
+// "berapa kali pintu deteksi dipanggil per tick" karena itu hilang; penggantinya di
+// `lead-ask.test.ts` (satu pekerjaan per sesi) dan `lead-detect-event.test.ts` (pagarnya).
 
 const clean = async () => { await prisma.setting.deleteMany(); await prisma.leadDecision.deleteMany(); };
 beforeEach(async () => { await clean(); __resetEngine(); });
@@ -19,22 +26,8 @@ const cfg = (over: Partial<Lead> = {}): Lead => ({ ...LEAD_DEFAULTS, enabled: tr
 // yang menstempel akhir denyut — kalau keduanya berjalan di jam berbeda, "jeda sejak denyut
 // selesai" tak bisa diuji sama sekali.
 function counters() {
-  const c = { detect: 0, pulse: 0 };
+  const c = { legacy: 0, prune: 0, pulse: 0 };
   const clock = { t: 0 };
-  const detect = {
-    live: () => { c.detect++; return []; },
-    filled: () => false, pane: () => "", agentOf: () => "claude", exited: () => true,
-    send: async () => true, clearMarker: () => { /* diam */ },
-    submit: async () => true, sleep: async () => { /* tanpa waktu nyata */ },
-    // SPEC-487 · rantai deteksi hidup di dalam satu `LeadFlow`, dan masa dingin `failures` punya
-    // jamnya sendiri. Denyut ini tak pernah menyentuh keduanya — cukup bentuknya yang sah.
-    closeChain: async () => { /* diam */ }, now: () => clock.t,
-    decide: (async () => null) as unknown as DetectDeps["decide"],
-    decideDeps: {} as DetectDeps["decideDeps"],
-    delivery: () => null,   // SPEC-480 · denyut ini tak pernah sampai ke perakitan teks jawaban
-    optIn: async () => [], notify: async () => { /* diam */ },
-    cfg: async () => cfg(),
-  } as DetectDeps;
   const pulse = {
     sessions: () => [], areas: async () => [], planDone: () => true, finished: () => false,
     decide: (async () => null) as unknown as PulseDeps["decide"],
@@ -46,7 +39,14 @@ function counters() {
     cfg: async () => cfg(),
     scheduler: async () => SCHEDULER_DEFAULTS,
   } as PulseDeps;
-  const deps: LeadTickDeps = { detect, pulse, now: () => clock.t };
+  const deps: LeadTickDeps = {
+    pulse, now: () => clock.t,
+    // SPEC-909 · tick membaca sesi hidup SEKALI untuk dua pekerjaan: sesi pra-pembaruan dan
+    // pemangkasan penghitung. Default di sini kosong; test yang memang mengujinya menimpanya.
+    live: () => [],
+    legacy: async () => { c.legacy++; },
+    prune: () => { c.prune++; },
+  };
   /** Majukan jam ke `t` lalu jalankan satu tick di sana. */
   const at = (t: number) => { clock.t = t; return tick(t, deps); };
   return { c, deps, clock, at };
@@ -57,17 +57,21 @@ describe("lead engine tick", () => {
     await setLead({ ...LEAD_DEFAULTS, enabled: false });
     const { c, at } = counters();
     await at(1_000_000);
-    expect(c).toEqual({ detect: 0, pulse: 0 });
+    expect(c).toEqual({ legacy: 0, prune: 0, pulse: 0 });
   });
 
-  // Sesi mandek diukur dalam MENIT (M1), jadi pintu deteksi jalan tiap tick; denyut proaktif
-  // menyentuh git & bisa memanggil agen, jadi ia mengikuti `everyMin`.
-  it("scans for waiting sessions on every tick", async () => {
+  // SPEC-909 · ADR-0146 · iramanya RUMAH TANGGA, bukan lagi 5 detik: tak ada lagi yang menunggu
+  // giliran tick untuk dijawab.
+  it("beriramakan rumah tangga, bukan denyut deteksi", () => {
+    expect(HOUSEKEEPING_MS).toBe(60_000);
+  });
+
+  it("memangkas penghitung sesi mati tiap tick", async () => {
     await setLead(cfg());
     const { c, at } = counters();
     await at(1_000_000);
-    await at(1_005_000);
-    expect(c.detect).toBe(2);
+    await at(1_000_000 + HOUSEKEEPING_MS);
+    expect(c.prune).toBe(2);
   });
 
   it("runs the proactive pulse only once per everyMin window", async () => {
@@ -94,10 +98,10 @@ describe("lead engine tick", () => {
 
   // AC-37 · lead yang mati (agennya crash, kuota habis, git gagal) tak boleh menjatuhkan proses
   // server maupun menghentikan sesi yang berjalan.
-  it("survives a detect door that throws, and still runs the pulse", async () => {
+  it("survives a housekeeping job that throws, and still runs the pulse", async () => {
     await setLead(cfg());
     const { c, deps, at } = counters();
-    deps.detect!.live = () => { throw new Error("tmux tak terbaca"); };
+    deps.live = () => { throw new Error("tmux tak terbaca"); };
     await expect(at(1_000_000)).resolves.toBeUndefined();
     expect(c.pulse).toBe(1);
   });
@@ -116,8 +120,8 @@ describe("lead engine tick", () => {
 // lewat SATU flag `busy`: di mesin operator satu denyut = 3 project × 120 dtk timeout = 360 dtk,
 // dan selama itu setiap tick 5 detik langsung `return` — pintu yang justru menjawab sesi mandek
 // mati berkala oleh pekerjaan yang sudah terbukti nihil.
-describe("lead engine · dua irama tak boleh saling melaparkan (audit SPEC-432)", () => {
-  it("keeps scanning for waiting sessions while a slow pulse is still in flight", async () => {
+describe("lead engine · denyut lambat tak boleh melaparkan rumah tangga (audit SPEC-432)", () => {
+  it("keeps doing housekeeping while a slow pulse is still in flight", async () => {
     await setLead(cfg());
     const { c, deps, at } = counters();
     let release: () => void = () => { /* diisi saat denyut mulai */ };
@@ -128,8 +132,8 @@ describe("lead engine · dua irama tak boleh saling melaparkan (audit SPEC-432)"
     };
     const slow = at(1_000_000);                       // denyut yang menggantung
     await new Promise((r) => setTimeout(r, 10));      // biarkan denyut benar-benar mulai
-    await at(1_005_000);                              // tick berikutnya, 5 detik kemudian
-    expect(c.detect).toBe(2);                         // pintu deteksi TETAP jalan
+    await at(1_000_000 + HOUSEKEEPING_MS);            // tick berikutnya
+    expect(c.prune).toBe(2);                          // rumah tangga TETAP jalan
     expect(c.pulse).toBe(1);                          // tapi denyut tak dimulai dua kali
     release();
     await slow;
@@ -192,5 +196,34 @@ describe("lead engine · penyapu rantai kedaluwarsa (SPEC-485)", () => {
     const { deps } = counters();
     await tick(Date.now(), { ...deps, expire: async () => { called++; return []; } });
     expect(called).toBe(0);
+  });
+});
+
+// SPEC-909 · ADR-0146 · sesi yang lahir SEBELUM pembaruan tak punya hook event, jadi lead tak akan
+// menjawabnya. Yang tak boleh terjadi adalah ia menggantung tanpa siapa pun tahu.
+describe("lead engine · sesi pra-pembaruan (SPEC-909)", () => {
+  const LAMA = { id: "lama", projectId: "p1", specId: "SPEC-1", waiting: true, eventHook: false };
+  const BARU = { id: "baru", projectId: "p1", specId: "SPEC-2", waiting: true, eventHook: true };
+
+  it("menotifikasi sesi tanpa hook event, dan hanya sesi itu", async () => {
+    await setLead(cfg());
+    const seen: string[] = [];
+    const { deps } = counters();
+    await tick(1_000_000, {
+      ...deps, live: () => [LAMA, BARU],
+      legacy: async (id) => { seen.push(id); },
+    });
+    expect(seen).toEqual(["lama"]);
+  });
+
+  it("tak menotifikasi sesi yang memang tidak sedang menunggu", async () => {
+    await setLead(cfg());
+    const seen: string[] = [];
+    const { deps } = counters();
+    await tick(1_000_000, {
+      ...deps, live: () => [{ ...LAMA, waiting: false }],
+      legacy: async (id) => { seen.push(id); },
+    });
+    expect(seen).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 import React from "react";
-import type { Spec } from "@hanoman/shared";
+import type { SessionAsk, Spec } from "@hanoman/shared";
 import type { TerminalSession } from "../api/client";
 // SPEC-908 · `useEventsStatus` pindah ke api/live.ts — kini dipakai juga oleh indikator
 // koneksi keempat layar realtime, jadi definisinya tak boleh tinggal lokal di sini.
@@ -8,7 +8,7 @@ import { Button, Mark, useResponsiveTier } from "../ds";
 import { useNotifications } from "../notifications/NotificationsContext";
 import {
   derivePetState, loadPetHidden, loadPetRoam, savePetHidden, savePetRoam, petPulse,
-  KIND_NOUN, POSE_LABEL, waitingSessions, type PetTarget,
+  KIND_NOUN, POSE_LABEL, decidingSessions, waitingSessions, type PetTarget,
 } from "./pet-state";
 import {
   isUrgent, PET_AWAY_MS, PET_SPEECH_MS, petRecap, petSnapshot, speechFor,
@@ -94,8 +94,8 @@ function useLaneWidth(): number {
   return width;
 }
 
-export function HanomanPet({ sessions, backlog, onOpen }:
-  { sessions: TerminalSession[]; backlog: Spec[]; onOpen: (target: PetTarget) => void }) {
+export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
+  { sessions: TerminalSession[]; backlog: Spec[]; asks?: SessionAsk[]; onOpen: (target: PetTarget) => void }) {
   const { items } = useNotifications();
   const [hidden, setHidden] = React.useState(loadPetHidden);
   const [roam, setRoam] = React.useState(loadPetRoam);
@@ -133,6 +133,10 @@ export function HanomanPet({ sessions, backlog, onOpen }:
   // SPEC-899 · satu kotak jawaban per sesi `waiting`. Daftarnya memakai klasifikasi yang sama
   // dengan panel (`sessionKind`), jadi sesi yang sedang dipegang lead memang tak muncul di sini.
   const waiting = React.useMemo(() => waitingSessions(sessions, backlog), [sessions, backlog]);
+  // SPEC-909 · ADR-0146 · dan sesi yang sedang DIPUTUSKAN lead: di sanalah jendela "ambil alih
+  // sebelum lead mengetik ke pane" berada (`deciding` menyala ±50 ms sesudah agen bertanya, marker
+  // baru ±6 dtk kemudian).
+  const deciding = React.useMemo(() => decidingSessions(sessions, backlog), [sessions, backlog]);
 
   React.useEffect(() => {
     if (view.recheckAt === null) return;
@@ -479,8 +483,20 @@ export function HanomanPet({ sessions, backlog, onOpen }:
                     sedang beranimasi keluar masih ter-mount, dan kotak yang lahir di sana akan
                     memanggil endpoint dialog untuk panel yang justru sedang ditutup. */}
                 {c.kind === "waiting" && open && waiting.map((s) => (
-                  <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id} reduced={reduced} />
+                  <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id} reduced={reduced}
+                    ask={asks.find((a) => a.sessionId === s.id)} />
                 ))}
+                {/* SPEC-909 · ADR-0146 · kotak yang sama untuk sesi yang sedang diputuskan lead,
+                    tapi HANYA bila payload eventnya ada: tanpa `ask` tak ada pertanyaan untuk
+                    ditampilkan dan tak ada apa pun untuk direbut, dan `GET …/dialog` di sana
+                    memang dijawab `409 deciding`. */}
+                {c.kind === "deciding" && open && deciding.map((s) => {
+                  const ask = asks.find((a) => a.sessionId === s.id);
+                  return ask
+                    ? <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id}
+                        reduced={reduced} ask={ask} />
+                    : null;
+                })}
               </li>
             ))}
           </ul>

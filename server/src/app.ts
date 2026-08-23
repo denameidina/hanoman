@@ -29,6 +29,7 @@ import bindings from "./routes/bindings";
 import sync from "./routes/sync";
 import sessionResults from "./routes/session-results";
 import sessionHistory from "./routes/session-history";
+import sessionEvents from "./routes/session-events";
 import config from "./routes/config";
 import help from "./routes/help";
 import tickets from "./routes/tickets";
@@ -172,6 +173,15 @@ export function buildApp(
           && !path.startsWith("/api/sync/conflicts")) return;
         // SPEC-253 · ADR-0062 · halaman/submit/status Help Center dipanggil pengguna akhir tanpa sesi
         // login; route /api/help di-otorisasi helpEnabled + kunci opaque tiket sendiri (pengecualian sah).
+        // SPEC-909 · ADR-0146 · event hook sesi: kredensialnya token turunan per sesi, di-enforce
+        // route-nya sendiri (pola /api/sync device token).
+        //
+        // Bypass ini mendahului cabang agent token di bawah, jadi `capabilityForRoute` TAK PERNAH
+        // dieksekusi untuk path ini: agent token ditolak route-nya dengan **401** (token sesi tak
+        // cocok), bukan 403 "cookie session required". Petanya tetap `COOKIE_ONLY` supaya jawabannya
+        // benar bila urutan cabang ini kelak berubah — tapi jangan mengandalkannya sebagai lapis
+        // kedua yang aktif hari ini. Yang menutup pintunya adalah HMAC di route.
+        if (path === "/api/session-events") return;
         if (path.startsWith("/api/help")) return;
         if (user) return; // cookie sesi = akses penuh (tak ada RBAC, konsisten model sekarang)
         // SPEC-257 · ADR-0065 · jalur auth kedua: agent token Bearer. WS browser memakai tiket sekali pakai.
@@ -231,6 +241,7 @@ export function buildApp(
     await api.register(sync);
     await api.register(sessionResults);
     await api.register(sessionHistory);  // SPEC-362 · riwayat sesi terminal (di belakang gate cookie)
+    await api.register(sessionEvents);   // SPEC-909 · event hook sesi (token sesi, gate di-bypass di atas)
     await api.register(config);
     await api.register(help);     // SPEC-253 · Help Center publik (gate di-bypass di atas)
     await api.register(tickets, { publicBase: ingress.publicBase });  // SPEC-253 · triase (di belakang gate cookie)

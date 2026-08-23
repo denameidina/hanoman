@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { codexHookArgs, codexGoalScript, GOAL_MAX_BLOCKS } from "../src/codex-settings";
+import { EVENT_HOOK_COMMAND } from "../src/settings";
 import { PLAN_DIRS } from "@hanoman/shared";
 
 let dir = "";
@@ -136,5 +137,28 @@ describe("SPEC-734 · gate plan lintas metode", () => {
   it("flow tanpa Plan+Execute tak punya gate plan sama sekali", () => {
     const sh = codexGoalScript({ ...base, flow: "audit" });
     expect(sh).not.toContain("for f in");
+  });
+});
+
+// SPEC-909 · ADR-0146 · padanan hook AskUserQuestion untuk codex (akhir-turn).
+describe("SPEC-909 · hook pengirim event codex", () => {
+  it("menambahkan perintah kedua di Stop, berdampingan dengan penulis marker", () => {
+    const args = codexHookArgs({ decisionFile: "/w/.decisions/s1", eventHook: true });
+    const stop = args[args.indexOf("-c") + 1]!;
+    expect(stop.startsWith("hooks.Stop=")).toBe(true);
+    expect(stop).toContain("date +%s >");        // penulis marker tetap ada …
+    expect(stop).toContain("curl");              // … dan pengirim event menyusul
+  });
+
+  it("tanpa eventHook, argv byte-identik seperti sebelum SPEC-909", () => {
+    expect(codexHookArgs({ decisionFile: "/w/.decisions/s1" }))
+      .toEqual(codexHookArgs({ decisionFile: "/w/.decisions/s1", eventHook: false }));
+  });
+
+  it("memakai definisi perintah yang SAMA dengan claude — bukan salinan", () => {
+    const stop = codexHookArgs({ eventHook: true })[1]!;
+    // Perintahnya di-escape TOML, jadi cocokkan potongan yang tak mengandung kutip.
+    expect(stop).toContain("$HANOMAN_EVENT_URL");
+    expect(EVENT_HOOK_COMMAND).toContain("$HANOMAN_EVENT_URL");
   });
 });

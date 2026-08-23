@@ -31,6 +31,7 @@ sebagai root. Nyalakan hardening dari wizard (atau Settings → Setup awal) begi
 | `git` | tiap sesi jalan di git worktree terisolasi |
 | `tmux` | sesi agen hidup di tmux, selamat dari restart server |
 | `claude` **atau** `codex` | agen yang mengerjakan backlog |
+| `curl` | hook sesi mengirim pertanyaan agen ke server — tanpanya **hanoman-lead tak menerima satu pun pertanyaan** (SPEC-909/ADR-0146). Tidak fatal: hook selalu `exit 0` dan tak pernah memblokir agen, jadi sesi cuma kembali menunggu manusia — dan justru karena senyap, `doctor` menandainya `!` alih-alih `✗` |
 
 `hanoman doctor` melaporkan mana yang belum ada, dan keluar dengan kode ≠ 0 bila ada yang wajib.
 

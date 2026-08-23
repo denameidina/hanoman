@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SessionAsk } from "./session-ask";
 import { zProject, zBriefPayload, zQaPayload, zGoalPayload, zSpec, zScheduler, zAgent, zLead } from "./entities";
 import {
   zLeadGate, zLeadKind, zLeadConfidence, zLeadAction, zLeadStatus, zLeadChoice,
@@ -795,6 +796,10 @@ export type EventMsg =
   | { t: "vps"; vps: VpsView[] }
   | { t: "cleanups"; cleanups: WorktreeCleanupView[] }   // SPEC-742 · ADR-0116
   | { t: "update"; update: UpdateStatus }
+  // SPEC-909 · ADR-0146 · pertanyaan sesi yang HIDUP, langsung dari payload hook agennya. Grup
+  // sendiri, bukan hiasan di `sessions`: frame itu sudah yang terbesar di dashboard dan
+  // menempelkan teks pertanyaan di sana membuatnya tumbuh untuk pembaca yang tak membutuhkannya.
+  | { t: "leadAsks"; asks: SessionAsk[] }
   // SPEC-908 · frame langganan berparameter. `key` = subKey(topic, params) yang dihitung KEDUA
   // sisi; klien membuang frame yang kuncinya bukan miliknya, jadi halaman/filter yang sedang
   // aktif tak mungkin ditimpa muatan halaman lain.

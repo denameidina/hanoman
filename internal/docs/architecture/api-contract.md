@@ -1117,6 +1117,17 @@ POST   /terminal/sessions/:id/dialog/answer { screenHash, choice?, choices?[], t
 #     bukan lagi dialog yang bisa dijawab, atau screenHash tak cocok), "shape" (bentuk jawaban tak
 #     cocok layar), "not-landed" (primitif tui-dialog gagal membuktikan jawabannya mendarat — sesi
 #     TIDAK digerakkan). `reason` ada supaya klien tak perlu mem-parsing prosa.
+POST   /terminal/sessions/:id/dialog/takeover
+#   (SPEC-909, ADR-0146) AC-6 · operator merebut sesi dari hanoman-lead SEBELUM lead mengetik ke
+#   pane. Prefix `terminal` dengan sengaja: capability-nya turun dari peta yang sudah ada
+#   (`rw("sessions")` → sessions:write, SAMA dengan menjawab dialog) — siapa yang boleh menjawab,
+#   boleh mengambil alih. 202 { accepted:true } · 404 tak ada pertanyaan hidup untuk sesi itu ·
+#   409 { reason:"answering" } lead sudah mengirim jawabannya ke pane.
+#   Pemenang perebutannya ditentukan `beginAnswer()` — Set sinkron yang SAMA yang mencegah dua POST
+#   manusia menyilangkan keystroke, dan yang sejak SPEC-909 juga dilewati jalur lead. Jadi tak
+#   pernah ada dua jawaban terketik ke pane yang sama.
+#   Sesudah 202, gerbang 409 `deciding` di POST …/dialog/answer LEPAS untuk sesi itu: menolak
+#   operator di sana berarti tak ada satu pun pihak yang bisa menjawab pertanyaannya.
 #   EFEK SAMPING (SPEC-903, ADR-0143): 202 MENGOSONGKAN marker keputusan sesi
 #     (.worktrees/.decisions/<id>) — jawaban dialog adalah tool result, bukan prompt, jadi hook
 #     `UserPromptSubmit` yang biasanya mengosongkannya tak pernah menembak untuk jalur ini. Ini satu
@@ -1231,7 +1242,15 @@ GET    /events/ws                    # WebSocket siar dashboard (global). Auth =
 #     { t:"limits", limits } · { t:"codexLimits", limits } (SPEC-338, tiap 30s, grup TERPISAH dari
 #       `limits` karena sumber & semantik kesegarannya beda) · { t:"vps", vps } ·
 #       { t:"cleanups", cleanups } (SPEC-742, tiap 3s — dibangun dari peta memori, nol I/O) ·
-#       { t:"update", update } (SPEC-214, tiap 300s)
+#       { t:"update", update } (SPEC-214, tiap 300s) ·
+#       { t:"leadAsks", asks } (SPEC-909/ADR-0146, tiap 1s — pertanyaan sesi HIDUP langsung dari
+#         payload hook agennya, dibangun dari peta memori `lead/ask.ts`: nol I/O, nol tmux, nol DB.
+#         Grup SENDIRI, bukan hiasan di `sessions`: frame itu sudah yang terbesar di dashboard.
+#         `asks[] = { sessionId, agent, source:"ask-tool"|"turn-end", askId, askedAt, questions[],
+#         message, at, total, state:"queued"|"deciding"|"answered"|"taken-over"|"failed",
+#         flowId, step }`. `state` diturunkan dari `queuedIds()`/`decidingIds()` yang sudah ada —
+#         "mengantre" & "menyusun" tak pernah punya dua definisi. `questions` KOSONG untuk codex,
+#         yang tak punya `AskUserQuestion`; di sana `message` = teks giliran terakhirnya.)
 #
 #   SPEC-908 · ADR-0145 · LANGGANAN BERPARAMETER (mengamandemen ADR-0039: kanal tak lagi read-only)
 #   klien->server, SATU jenis frame, semantik GANTI-PENUH (mengganti seluruh himpunan langganan):
@@ -1264,6 +1283,30 @@ GET    /events/ws                    # WebSocket siar dashboard (global). Auth =
 > **4 build serentak** di seluruh hub dan **30 build di luar jadwal per menit per klien** (terukur:
 > tanpa keduanya, satu socket memaksa 1 920 build/menit dan 32 build serentak menahan event loop
 > 505 ms — event loop yang sama yang melayani PTY terminal).
+
+## Event hook sesi (SPEC-909 · [ADR-0146](../adr/0146-lead-dipicu-event-hook.md)) — **DI LUAR jangkauan agent token**
+```
+POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bukan agen ber-token.
+#   Body = payload hook agen APA ADANYA (`--data-binary @-`); server yang memarsenya, karena
+#   bentuknya kontrak AGEN yang bertambah field tiap rilis. Dua bentuk yang dilayani:
+#     PreToolUse + tool_name="AskUserQuestion" → questions[] dari tool_input, askId = tool_use_id
+#     Stop (codex, stop_hook_active falsy)     → message = last_assistant_message, askId = turn_id
+#   Header WAJIB: `authorization: Bearer <token>` + `x-hanoman-session: <id sesi hanoman>`.
+#   Identitas datang dari HEADER, bukan dari body: `session_id` di dalam payload adalah id internal
+#   AGEN dan tak pernah berarti sesi hanoman.
+#   Token = base64url(HMAC(HMAC(secretKey(),"hanoman:session-event:v1"), sessionId)) — turunan, jadi
+#   verifikasinya stateless dan selamat dari restart server. **Id sesi saja tak pernah cukup.**
+#   202 { accepted:true } · 202 { ignored:true } event yang bukan pertanyaan ·
+#   202 { duplicate:true } askId sudah dikenal · 202 { rejected:true, reason } pagar lead menolak ·
+#   401 token salah/absen · 404 sesi tak hidup · 429 batas laju
+#   Batas laju: ember per sesi 5 @ 1/10 dtk (≤ 6/menit), ember global 20 @ 2/dtk. Ditolak batas laju
+#   TIDAK dihitung sebagai kegagalan lead — ia hilang dengan menunggu (alasan yang sama SPEC-479).
+#   `capabilityForRoute` memetakan prefix ini ke COOKIE_ONLY: agen yang bisa memalsukan "sesi X
+#   bertanya Y" bisa menggerakkan lead atas nama sesi mana pun — itu peniruan identitas, bukan
+#   capability. Gate cookie mem-bypass path-nya (pola /api/sync device token, /api/help kunci tiket).
+#   Ingress: `classifyIngress` TAK disentuh. Hook memanggil loopback (`http://127.0.0.1:<port>`) dan
+#   mengirim header `Host` = host control pertama saat origin dipisah (`HANOMAN_EVENT_HOST`).
+```
 
 ## VPS (SPEC-164 · ADR-0025 · SPEC-211/ADR-0042)
 ```
@@ -1605,12 +1648,15 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 > ditinggalkan ditutup penyapu (`Setting.lead.flowTtlMin`, default 60 menit) yang menumpang tick
 > lead — tanpa timer baru (ADR-0024 utuh).
 >
-> **Pintu #2 — deteksi otomatis** (tanpa endpoint): lead melihat sesi hidup ber-marker keputusan
-> terisi (mekanisme SPEC-184/196 yang sudah ada), `capture-pane`, menyimpulkan pertanyaannya, lalu
-> **mengetik jawabannya ke pane** (`pty.sendToPane`, dipotong `goalChunks` — burst ≥1024 char jadi
-> `[Pasted Content]` secara senyap, ADR-0085). Pane MATI tak pernah dijawab; marker sesi **codex**
-> yang sebenarnya selesai wajar (ADR-0074) juga tidak. Batasnya `maxAutoAnswers` berturut-turut per
-> sesi → sesudah itu lead berhenti & menotifikasi.
+> **Pintu #2 — deteksi otomatis.** Sejak SPEC-909/[ADR-0146](../adr/0146-lead-dipicu-event-hook.md)
+> ia punya endpoint: **`POST /api/session-events`** (lihat §Event hook sesi di atas), dipanggil hook
+> sesi. Sebelumnya "tanpa endpoint" — lead memindai sesi hidup ber-marker terisi tiap 5 detik,
+> `capture-pane`, lalu MENYIMPULKAN pertanyaannya; kini pertanyaan & opsinya datang TERSTRUKTUR dari
+> payload tool `AskUserQuestion` (codex: `last_assistant_message` dari hook `Stop`). Yang tak
+> berubah: jawabannya tetap **diketik ke pane** (`pty.sendToPane`, dipotong `goalChunks` — burst
+> ≥1024 char jadi `[Pasted Content]` secara senyap, ADR-0085); pane MATI tak pernah dijawab; giliran
+> **codex** yang sebenarnya selesai wajar (ADR-0074) juga tidak; batasnya tetap `maxAutoAnswers`
+> berturut-turut per sesi → sesudah itu lead berhenti & menotifikasi.
 >
 > **Pintu #3 — denyut proaktif** (`setInterval` in-process, cermin engine scheduler — tanpa queue/
 > worker/cron, ADR-0024 utuh): menata urutan backlog siap-kerja (**diserahkan ke antrean & governor
@@ -1633,7 +1679,9 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 > `tmux list-panes -a` stabil, jadi gerbang "siapa cepat" melaparkan ekor daftar persis seperti loop
 > serial yang digantikannya. Slot yang tak didapat dalam `queueWaitSec` (default 120) → penolakan
 > **eksplisit yang bisa diulang**: `503 { retryable:true }` + `Retry-After` di pintu kontrak, lewati-
-> dan-coba-lagi di pintu deteksi & denyut. Penuh **bukan** kegagalan lead — ia tak menulis baris
+> dan-coba-lagi di pintu deteksi & denyut. **SPEC-909:** loop `for`+`await` pintu deteksi sudah tak
+> ada — batasnya kini kolam pekerja di `lead/ask.ts` dengan angka yang SAMA (`maxConcurrent`), plus
+> ember token per sesi (5 @ 1/10 dtk) & global (20 @ 2/dtk) di depan gerbang itu. Penuh **bukan** kegagalan lead — ia tak menulis baris
 > jejak dan tak menambah penghitung `maxAutoAnswers`, sebab pagar itu (SPEC-472) dibuat untuk sebab
 > yang tak hilang dengan mengulang sementara penuh hilang begitu slot bebas.
 >

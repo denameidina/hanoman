@@ -16,6 +16,10 @@ const BASELINE = [
   "/api/fs/browse", "/api/terminal/sessions", "/api/vps", "/api/limits", "/api/events/ws",
 ];
 const NEW_SYNC = ["/api/device-tokens", "/api/sync/pull", "/api/sync/push", "/api/sync/ws", "/api/session-results"];
+// SPEC-909 · ADR-0146 · permukaan event hook sesi. Terdaftar di daftar ini karena route baru yang
+// lupa di-`register` gagal SENYAP: gate cookie sudah di-bypass untuk path-nya, jadi hook cuma
+// menerima 404 tanpa satu pun jejak.
+const NEW_SESSION_EVENTS = ["/api/session-events"];
 
 describe("parity: endpoint baseline preserved (SPEC-213 AC-23)", () => {
   it("every baseline endpoint still registered", () => {
@@ -23,5 +27,8 @@ describe("parity: endpoint baseline preserved (SPEC-213 AC-23)", () => {
   });
   it("new sync surface registered", () => {
     for (const p of NEW_SYNC) expect(routes, `belum ada: ${p}`).toContain(p);
+  });
+  it("session events surface registered (SPEC-909)", () => {
+    for (const p of NEW_SESSION_EVENTS) expect(routes, `belum ada: ${p}`).toContain(p);
   });
 });

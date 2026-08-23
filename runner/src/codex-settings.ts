@@ -1,6 +1,7 @@
 import { PLAN_DIRS } from "@hanoman/shared";
 import { PIPELINES } from "./prompt";
 import type { Flow } from "./types";
+import { EVENT_HOOK_COMMAND } from "./settings";
 
 // SPEC-338 · ADR-0074 — padanan `guardSettings()` milik claude untuk Codex CLI.
 //
@@ -31,7 +32,7 @@ const group = (commands: string[]): string =>
  * Argumen argv hook codex — daftar datar `["-c", "hooks.X=…", "-c", "hooks.Y=…"]`.
  * Pemanggil (pty) yang mengutipnya untuk tmux. Kosong bila tak ada yang perlu dipasang.
  */
-export function codexHookArgs(o: { decisionFile?: string; goalGate?: string }): string[] {
+export function codexHookArgs(o: { decisionFile?: string; goalGate?: string; eventHook?: boolean }): string[] {
   const stop: string[] = [];
   const submit: string[] = [];
   // SPEC-184 · marker keputusan. Berbeda dari claude, tak ada teks notifikasi untuk di-grep:
@@ -41,6 +42,11 @@ export function codexHookArgs(o: { decisionFile?: string; goalGate?: string }): 
     stop.push(`[ -s ${shq(o.decisionFile)} ] || date +%s > ${shq(o.decisionFile)}`);
     submit.push(`: > ${shq(o.decisionFile)}`);
   }
+  // SPEC-909 · ADR-0146 · padanan hook `AskUserQuestion` untuk codex. Codex tak punya tool itu;
+  // yang tersedia adalah akhir-turn, dan payload `Stop`-nya membawa `last_assistant_message` —
+  // teks penuh giliran terakhir, TANPA dipotong lebar pane. Bukti yang lebih kuat daripada
+  // `capture-pane` yang dipakai jalur lama, dengan nol invokasi tmux.
+  if (o.eventHook) stop.push(EVENT_HOOK_COMMAND);
   // SPEC-332/338 · gate mode goal — entri Stop kedua, berdampingan dengan marker.
   if (o.goalGate) stop.push(`sh ${shq(o.goalGate)}`);
   const args: string[] = [];

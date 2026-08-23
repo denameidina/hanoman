@@ -381,6 +381,10 @@ export const api = {
     j<SessionDialogPayload | undefined>(paths.terminalDialog(id)).then((p) => p ?? null),
   answerSessionDialog: (id: string, b: SessionDialogAnswer) =>
     j<{ accepted: true }>(paths.terminalDialogAnswer(id), { method: "POST", ...body(b) }),
+  // SPEC-909 · ADR-0146 · AC-6 · ambil alih dari hanoman-lead. `409 reason:"answering"` = terlambat:
+  // lead sudah mengirim jawabannya ke pane.
+  takeoverSessionDialog: (id: string) =>
+    j<{ accepted: true }>(paths.terminalDialogTakeover(id), { method: "POST" }),
   getTerminalWorkspace: () => j<TerminalWorkspaceSnapshot>(paths.terminalWorkspace),
   putTerminalWorkspace: (input: TerminalWorkspaceWrite) =>
     j<TerminalWorkspaceSnapshot>(paths.terminalWorkspace, { method: "PUT", ...body(input) }),
