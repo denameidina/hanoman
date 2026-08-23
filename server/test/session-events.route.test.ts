@@ -102,22 +102,17 @@ describe("POST /api/session-events", () => {
   });
 
   it("429 saat ember token per sesi habis", async () => {
-    // Jam DIBEKUKAN, bukan diandalkan. Ember isi ulang 1 token per 10 detik, dan delapan `inject`
-    // berurutan bisa memakan lebih dari itu saat suite penuh berjalan di mesin sibuk — test yang
-    // memakai jam dinding karena itu hijau sendirian dan merah di bawah beban. Yang diuji di sini
-    // adalah PEMETAAN 429-nya; perilaku embernya sendiri diuji ber-`now` suntikan di lead-ask.
-    const clock = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
-    try {
-      const app = buildApp();
-      const codes: number[] = [];
-      for (let i = 0; i < 8; i++)
-        codes.push((await post(app, { ...CLAUDE, tool_use_id: `t${i}` }, auth("s1"))).statusCode);
-      expect(codes.filter((c) => c === 202)).toHaveLength(5);   // kapasitas ember
-      expect(codes.filter((c) => c === 429)).toHaveLength(3);
-      await app.close();
-    } finally {
-      clock.mockRestore();
-    }
+    // JANGAN membekukan `Date.now`: spy atas global itu bocor ke berkas test lain saat suite
+    // berjalan berurutan (terukur — ia menabrak urutan `createdAt` di notifications.route).
+    // Determinismenya dibuat dari VOLUME: ember kapasitas 5, isi ulang 1 per 10 detik, jadi 30
+    // permintaan berurutan tak mungkin lolos semua kecuali test-nya memakan 250 detik.
+    const app = buildApp();
+    const codes: number[] = [];
+    for (let i = 0; i < 30; i++)
+      codes.push((await post(app, { ...CLAUDE, tool_use_id: `t${i}` }, auth("s1"))).statusCode);
+    expect(codes.slice(0, 5)).toEqual([202, 202, 202, 202, 202]);   // ember penuh saat mulai
+    expect(codes.filter((c) => c === 429).length).toBeGreaterThanOrEqual(10);
+    await app.close();
   });
 
   it("403 untuk agent token — memalsukan pertanyaan bukan capability apa pun", () => {
