@@ -102,12 +102,22 @@ describe("POST /api/session-events", () => {
   });
 
   it("429 saat ember token per sesi habis", async () => {
-    const app = buildApp();
-    const codes: number[] = [];
-    for (let i = 0; i < 8; i++)
-      codes.push((await post(app, { ...CLAUDE, tool_use_id: `t${i}` }, auth("s1"))).statusCode);
-    expect(codes).toContain(429);
-    await app.close();
+    // Jam DIBEKUKAN, bukan diandalkan. Ember isi ulang 1 token per 10 detik, dan delapan `inject`
+    // berurutan bisa memakan lebih dari itu saat suite penuh berjalan di mesin sibuk — test yang
+    // memakai jam dinding karena itu hijau sendirian dan merah di bawah beban. Yang diuji di sini
+    // adalah PEMETAAN 429-nya; perilaku embernya sendiri diuji ber-`now` suntikan di lead-ask.
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    try {
+      const app = buildApp();
+      const codes: number[] = [];
+      for (let i = 0; i < 8; i++)
+        codes.push((await post(app, { ...CLAUDE, tool_use_id: `t${i}` }, auth("s1"))).statusCode);
+      expect(codes.filter((c) => c === 202)).toHaveLength(5);   // kapasitas ember
+      expect(codes.filter((c) => c === 429)).toHaveLength(3);
+      await app.close();
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("403 untuk agent token — memalsukan pertanyaan bukan capability apa pun", () => {
