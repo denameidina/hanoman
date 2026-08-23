@@ -753,9 +753,14 @@ navigasi klik, kontrak token warna).
 
 Menu `dalang` ("Dalang Hanoman", ikon `drama`) membuka
 `src/src/screens/DalangHanomanScreen.tsx` — implementasi layar dari konsep Claude Design
-"Dashboard Futuristik" dengan **data nyata**: hero sinematik Hanoman enam lengan
-(`internal/assets/dalang/hnm-hero-cinematic-v01.webp`, aset Codex) melayang di atas kartu
-sesi hidup (satu kartu per sesi WS, klik → fokus terminal; `decision && !deciding` = amber),
+"Dashboard Futuristik" dengan **data nyata**, dirender **TANPA Shell sebagai takeover layar
+penuh** (`position: fixed; inset: 0; z-index: 100` — kelas fullscreen Terminal; keluar via
+tombol ✕ atau Escape → `setSection("overview")`; pet z-80 otomatis tertutup): hero sinematik
+Hanoman enam lengan (`internal/assets/dalang/hnm-hero-cinematic-v01.webp`, aset Codex)
+melayang di atas **SEMUA project** — yang ber-sesi hidup jadi wayang menyala ber-benang
+(satu kartu per sesi WS, klik → fokus terminal; `decision && !deciding` = amber), yang tanpa
+sesi tetap tampil sebagai **wayang redup** (`.hn-dlg-prj--off`, grayscale, tanpa goyang,
+klik → detail project),
 **benang gapit terukur** dari dada hero ke tiap kartu (pola pengukuran DalangStage), KPI
 count-up, ticker boot yang mengetik fakta nyata, jam hidup per detik, donut distribusi
 backlog per `zStage` (dirangkum done/executing/planned/sisanya→spec — kosakata stage BUKAN

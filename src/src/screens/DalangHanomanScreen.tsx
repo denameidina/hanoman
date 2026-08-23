@@ -95,13 +95,20 @@ function Kpi({ icon, tone, label, value, sub }: {
   );
 }
 
-export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession, onOpenProject, onGoto }: {
+export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession, onOpenProject, onGoto, onExit }: {
   projects: ProjectVM[]; backlog: Spec[]; sessions: TerminalSession[];
   onOpenSession: (id: string) => void; onOpenProject: (p: ProjectVM) => void;
-  onGoto: (s: string) => void;
+  onGoto: (s: string) => void; onExit: () => void;
 }) {
   const reduced = useReducedMotion();
   const now = useClock();
+
+  // Layar penuh (takeover): Escape = keluar, cermin kebiasaan fullscreen Terminal.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onExit(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onExit]);
 
   const live = sessions.filter((s) => !s.exited).sort((a, b) => a.id.localeCompare(b.id));
   const liveProjects = new Set(live.map((s) => s.projectId));
@@ -208,6 +215,9 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
         <div className="hn-dlg-chips">
           <span className="hn-dlg-chip"><Icon name="calendar" size={13} />{now.getDate()} {BULAN[now.getMonth()]} {now.getFullYear()}</span>
           <span className="hn-dlg-chip"><Icon name="clock" size={13} />{pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}</span>
+          <button type="button" className="hn-dlg-exit" onClick={onExit} aria-label="Keluar dari panggung (Esc)">
+            <Icon name="x" size={14} />
+          </button>
         </div>
       </div>
 
@@ -234,8 +244,8 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
             <div className="hn-dlg-hero-art">
               <img src={heroUrl} alt="" aria-hidden="true" />
             </div>
-            {live.length > 0 ? (
-              <div className="hn-dlg-cards" role="list" aria-label="Sesi yang sedang berjalan">
+            {(live.length > 0 || parked.length > 0) ? (
+              <div className="hn-dlg-cards" role="list" aria-label="Wayang project">
                 {live.map((s, i) => {
                   const name = projects.find((p) => p.id === s.projectId)?.name ?? s.projectId;
                   const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
@@ -256,20 +266,23 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
                     </button>
                   );
                 })}
+                {/* Semua project tampil — yang tanpa sesi hidup jadi wayang redup tersandar. */}
+                {parked.map((p) => (
+                  <button key={p.id} type="button" className="hn-dlg-prj hn-dlg-prj--off"
+                    onClick={() => onOpenProject(p)}
+                    aria-label={`Buka project ${p.name}`}>
+                    <span className="hn-dlg-puppet hn-dlg-puppet--still">
+                      <img src={wayangUrl} alt="" aria-hidden="true" />
+                    </span>
+                    <span className="hn-dlg-prj-name">{p.name}</span>
+                    <span className="hn-dlg-prj-sub hn-dlg-prj-sub--off">tersandar di debog</span>
+                  </button>
+                ))}
               </div>
             ) : (
               <div className="hn-dlg-empty">
-                <div>Panggung sunyi — sang dalang siaga, semua wayang tersandar di debog.</div>
-                <div>Mulai sebuah backlog item dan string emasnya menegang.</div>
-              </div>
-            )}
-            {parked.length > 0 && (
-              <div className="hn-dlg-debog" aria-label="Project tanpa sesi aktif">
-                <span className="hn-dlg-debog-l">debog ·</span>
-                {parked.map((p) => (
-                  <button key={p.id} type="button" className="hn-dlg-parked" onClick={() => onOpenProject(p)}
-                    aria-label={`Buka project ${p.name}`}>{p.name}</button>
-                ))}
+                <div>Panggung sunyi — belum ada project di workspace.</div>
+                <div>Tambahkan project dan sang dalang mengangkat wayangnya.</div>
               </div>
             )}
           </div>

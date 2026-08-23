@@ -36,34 +36,42 @@ describe("Dalang Hanoman — menu & layar panggung orkestrasi", () => {
     expect(item?.label).toBe("Dalang Hanoman");
   });
 
-  it("sesi hidup → hero sinematik, kartu per sesi (klik → fokus sesi), yang decision amber", () => {
+  it("SEMUA project tampil: sesi hidup menyala (klik → fokus sesi), tanpa sesi = wayang redup", () => {
     const onOpenSession = vi.fn();
+    const onOpenProject = vi.fn();
     render(<DalangHanomanScreen projects={projects}
-      backlog={[spec({ id: "SPEC-1", stage: "execute", startedAt: new Date() })]}
+      backlog={[spec({ id: "SPEC-1", stage: "executing", startedAt: new Date() })]}
       sessions={[
         session({ id: "s1", projectId: "a", specId: "SPEC-1" }),
         session({ id: "s2", projectId: "b", decision: true }),
         session({ id: "s3", projectId: "c", exited: true, exitCode: 0 }),
       ]}
-      onOpenSession={onOpenSession} onOpenProject={noop} onGoto={noop} />);
+      onOpenSession={onOpenSession} onOpenProject={onOpenProject} onGoto={noop} onExit={noop} />);
     expect(document.querySelector('img[src*="hero-cinematic"]')).toBeTruthy();
-    const list = screen.getByRole("list", { name: "Sesi yang sedang berjalan" });
-    expect(list.querySelectorAll(".hn-dlg-prj")).toHaveLength(2);
+    const list = screen.getByRole("list", { name: "Wayang project" });
+    expect(list.querySelectorAll(".hn-dlg-prj")).toHaveLength(3);          // semua tampil
+    expect(list.querySelectorAll("[data-puppet]")).toHaveLength(2);        // benang hanya ke yang hidup
     expect(list.querySelectorAll('.hn-dlg-prj[data-waiting]')).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: /Buka terminal — alpha, SPEC-1 · execute/ }));
+    expect(list.querySelectorAll(".hn-dlg-prj--off")).toHaveLength(1);     // gamma redup, tetap wayang
+    fireEvent.click(screen.getByRole("button", { name: /Buka terminal — alpha, SPEC-1 · executing/ }));
     expect(onOpenSession).toHaveBeenCalledWith("s1");
-    // gamma exited → parkir di debog
-    expect(screen.getByRole("button", { name: "Buka project gamma" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Buka project gamma" }));
+    expect(onOpenProject).toHaveBeenCalled();
   });
 
-  it("kelir sunyi → pesan sunyi, blencong tak menyala, tombol perintah → terminal", () => {
+  it("kelir sunyi → semua wayang redup tampil, blencong padam, ✕/Esc keluar, perintah → terminal", () => {
     const onGoto = vi.fn();
+    const onExit = vi.fn();
     render(<DalangHanomanScreen projects={projects} backlog={[]} sessions={[]}
-      onOpenSession={noop} onOpenProject={noop} onGoto={onGoto} />);
-    expect(screen.getByText(/Panggung sunyi/)).toBeTruthy();
+      onOpenSession={noop} onOpenProject={noop} onGoto={onGoto} onExit={onExit} />);
+    expect(document.querySelectorAll(".hn-dlg-prj--off")).toHaveLength(3);
     expect(document.querySelector(".hn-dlg-blencong[data-lit]")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /pusat kendali sesi/ }));
     expect(onGoto).toHaveBeenCalledWith("terminal");
+    fireEvent.click(screen.getByRole("button", { name: /Keluar dari panggung/ }));
+    expect(onExit).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onExit).toHaveBeenCalledTimes(2);
   });
 
   it("donut distribusi backlog dihitung dari stage nyata", () => {
@@ -72,7 +80,7 @@ describe("Dalang Hanoman — menu & layar panggung orkestrasi", () => {
         spec({ id: "s1", stage: "done" }), spec({ id: "s2", stage: "done" }),
         spec({ id: "s3", stage: "executing" }), spec({ id: "s4", stage: "planned" }), spec({ id: "s5" }),
       ]}
-      onOpenSession={noop} onOpenProject={noop} onGoto={noop} />);
+      onOpenSession={noop} onOpenProject={noop} onGoto={noop} onExit={noop} />);
     const leg = document.querySelector(".hn-dlg-leg")!;
     expect(leg.textContent).toContain("Done 2");
     expect(leg.textContent).toContain("Execute 1");

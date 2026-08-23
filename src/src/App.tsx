@@ -1290,13 +1290,11 @@ export default function App() {
       </Shell>
     );
   } else if (section === "dalang") {
-    screen = (
-      <Shell active="dalang" title="Dalang Hanoman" breadcrumb="nafanesia.id · panggung orkestrasi" onNavigate={setSection}>
-        {gate(<DalangHanomanScreen projects={projectsView} backlog={backlog} sessions={sessions}
-          onOpenProject={openProject} onGoto={setSection}
-          onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
-      </Shell>
-    );
+    // Takeover layar penuh — sengaja TANPA Shell: panggung memenuhi viewport, keluar via ✕/Esc.
+    screen = gate(<DalangHanomanScreen projects={projectsView} backlog={backlog} sessions={sessions}
+      onOpenProject={openProject} onGoto={setSection}
+      onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }}
+      onExit={() => setSection("overview")} />);
   } else if (section === "projects") {
     screen = (
       <Shell active="projects" title="Projects" breadcrumb="nafanesia.id · workspace"
