@@ -70,7 +70,8 @@ memisahkan sync dari `/events/ws`). Di sana pemisahan dibayar karena **otorisasi
   di sana socket-nya milik dashboard, di sini ia mengangkut changefeed sync;
 - laju frame dibatasi (`PRESENCE_MAX_FRAMES_PER_MIN` = 60); kelebihannya dibuang, socket tetap;
 - pengirim di sisi klien mem-*budget* dirinya sendiri: daftar sesi dipotong di
-  `MAX_PRESENCE_SESSIONS` = 200 sebelum dikirim.
+  `MAX_PRESENCE_SESSIONS` = 100 sebelum dikirim — 100 × ±200 B ≈ 20 KB, margin 3× di bawah
+  `maxPayload` 64 KiB yang ditegakkan `ws` **sebelum** handler kita sempat mengabaikan apa pun.
 
 **Reconnect ber-backoff** menggantikan `setTimeout(connectWs, 3000)` datar yang ada sekarang:
 1 s → 2 → 4 → 8 → 16 → 30 s (plafon), jitter ±20 %, reset saat `open`. Ini juga menambal cacat
@@ -90,7 +91,9 @@ dan hub tercekik `P1008 Socket timeout`. Presence berdenyut **tiap 30 detik per 
 orde lebih sering. Satu tabel "local-only" pun akan menulis ke berkas SQLite yang sama pada
 kadens itu.
 
-`services/presence/registry.ts` menyimpan `Map<deviceId, { name, sessions, lastFrameAt }>`.
+`services/presence/registry.ts` menyimpan `Map<deviceId, { sessions, lastFrameAt }>` — **tanpa**
+nama device: nama sudah hidup di `DeviceToken` dan mengambilnya dari satu tempat saja meniadakan
+pertanyaan "salinan mana yang benar sesudah rename".
 Restart hub = registry kosong; klien mengisinya kembali dalam satu siklus reconnect (≤ 30 s).
 Itu **fitur**, bukan kerugian: keadaan basi punah dengan sendirinya, persis yang diminta poin 3.
 
@@ -153,9 +156,9 @@ ke `FMT` (`pty.ts:301`), persis cara `#{window_activity}` masuk di SPEC-903: **n
 tambahan**, satu field lagi di panggilan yang sama. Ia diekspos sebagai `SessionInfo.startedAt?`
 (aditif; `SessionInfo` tak pernah disync).
 
-### E. Jalan ke layar — grup siar kesembilan, nol polling baru
+### E. Jalan ke layar — grup siar kesepuluh, nol polling baru
 
-`services/events.ts` mendapat grup global ke-9, `presence`, `everyTicks: 3`:
+`services/events.ts` mendapat grup global ke-10, `presence`, `everyTicks: 3`:
 
 ```
 { t: "presence", enabled: boolean, devices: PresenceDeviceView[] }

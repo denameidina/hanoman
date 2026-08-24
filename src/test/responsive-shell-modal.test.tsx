@@ -4,7 +4,7 @@ import { eventsStub } from "./helpers/events-stub";
 import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HN_NAV, Modal, Shell } from "../src/ds";
+import { HN_NAV, Modal, NavGate, Shell } from "../src/ds";
 
 vi.mock("../src/api/client", async () => {
   const actual = await vi.importActual<any>("../src/api/client");
@@ -65,14 +65,37 @@ describe("responsive Shell", () => {
 
     const nav = screen.getByRole("navigation", { name: "Navigasi utama" });
     const buttons = Array.from(nav.querySelectorAll("button"));
-    expect(buttons).toHaveLength(HN_NAV.length);
-    for (const item of HN_NAV) expect(screen.getByRole("button", { name: item.label })).toBeInTheDocument();
+    // SPEC-919 · entri ber-`gate` hanya muncul saat gerbangnya disediakan (context `NavGate`,
+    // default kosong). Drawer tetap wajib memuat SELURUH entri yang berlaku bagi instance ini.
+    const visible = HN_NAV.filter((n) => !n.gate);
+    expect(buttons).toHaveLength(visible.length);
+    for (const item of visible) expect(screen.getByRole("button", { name: item.label })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-current", "page");
 
     fireEvent.click(screen.getByRole("button", { name: "Projects" }));
     expect(onNavigate).toHaveBeenCalledWith("projects");
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveFocus();
+  });
+
+  it("SPEC-919 · entri bergerbang muncul hanya saat gerbangnya menyala", () => {
+    mobileViewport();
+    const gated = HN_NAV.filter((n) => n.gate);
+    expect(gated.length).toBeGreaterThan(0);
+
+    const { unmount } = render(<Shell active="overview" title="Overview" onNavigate={() => {}}>Isi</Shell>);
+    fireEvent.click(screen.getByRole("button", { name: "Buka navigasi" }));
+    for (const item of gated) expect(screen.queryByRole("button", { name: item.label })).toBeNull();
+    unmount();
+
+    const gates = Object.fromEntries(gated.map((n) => [n.gate!, true]));
+    render(
+      <NavGate.Provider value={gates}>
+        <Shell active="overview" title="Overview" onNavigate={() => {}}>Isi</Shell>
+      </NavGate.Provider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Buka navigasi" }));
+    for (const item of gated) expect(screen.getByRole("button", { name: item.label })).toBeInTheDocument();
   });
 
   it("closes the drawer with Escape and returns focus to its toggle", () => {

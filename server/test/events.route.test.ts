@@ -39,7 +39,10 @@ describe("events WS route", () => {
     // Snapshot attach mengirim tiap grup berurutan (sessions→specs→notifications→vps→limits→update);
     // pengiriman WS async, jadi tunggu SEMUA jenis frame tiba, bukan hanya `notifications`
     // (limits/vps/update datang belakangan → race di bawah beban suite penuh). SPEC-214 menambah "update".
-    const want = ["sessions", "specs", "notifications", "vps", "limits", "update"];
+    // SPEC-919 · `presence` ikut: `attach()` melewati grup yang `build()`-nya melempar lewat
+    // `catch { continue; }` TANPA log sama sekali, dan `presenceView()` menyentuh Prisma — tanpa
+    // baris ini satu kedipan DB menghapus grup itu dari snapshot pertama tanpa jejak apa pun.
+    const want = ["sessions", "specs", "notifications", "vps", "limits", "update", "presence"];
     await waitFor(() => want.every((t) => c.frames.some((f) => f.t === t)));
     for (const t of want) expect(c.frames.some((f) => f.t === t)).toBe(true);
     c.ws.close();

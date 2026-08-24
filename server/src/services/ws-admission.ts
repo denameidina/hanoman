@@ -124,7 +124,8 @@ export function admitBrowserWs(
 // ADR-0065), sementara topik langganan menyentuh domain `support` (tiket), `lead`, dan `ide`.
 // Tanpa gerbang ini satu agent token ber-read global memperoleh baca ke tiga domain yang tak
 // diberikan kepadanya. Dashboard (principal cookie) adalah satu-satunya konsumen → nol fungsi
-// hilang. Kedelapan grup siar global tetap dilayani untuk principal mana pun.
+// hilang. Grup siar global tetap dilayani untuk principal mana pun — KECUALI yang ditandai
+// `cookieOnly` di `services/events.ts` (SPEC-919: `presence`), yang memakai bit yang SAMA ini.
 export function canSubscribeTopics(principal: WsPrincipal): boolean {
   if (principal.kind === "user") return true;
   return principal.kind === "test" && process.env.NODE_ENV === "test";

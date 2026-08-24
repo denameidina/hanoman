@@ -29,7 +29,10 @@ function SessionRow({ s, title, onOpenSpec, now }:
   const clickable = !!s.specId;
   const st = STATUS[s.status];
   return (
-    <div data-testid={`presence-session-${s.sessionId}`}
+    /* SPEC-763 · `hn-dense-row`: bentuk baris ini persis yang class itu layani —
+       [id mono][judul flex:1][badge…]. Tanpanya, di ≤767px badge menahan lebarnya dan judul
+       tersisa beberapa karakter per baris. */
+    <div data-testid={`presence-session-${s.sessionId}`} className="hn-dense-row"
       role={clickable ? "button" : undefined} tabIndex={clickable ? 0 : undefined}
       onClick={clickable ? () => onOpenSpec(s.specId!) : undefined}
       onKeyDown={clickable ? (e) => {
@@ -43,7 +46,8 @@ function SessionRow({ s, title, onOpenSpec, now }:
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)" }}>
         {s.specId ?? s.sessionId}
       </span>
-      <span style={{ flex: 1, minWidth: 120, fontSize: 13.5, color: "var(--text-strong)" }}>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "var(--text-strong)",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {title ?? s.projectId}
       </span>
       <Badge tone="neutral" size="sm" icon="box">{s.projectId}</Badge>

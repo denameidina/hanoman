@@ -22,8 +22,10 @@ describe("naskah panduan AI agent", () => {
     // SPEC-617 · ADR-0110 · `portal` & `client-accounts` ikut: keduanya permukaan sesi cookie
     // (portal ber-scope akun, client-accounts memegang kredensial), jadi agen yang mencobanya
     // selalu 403 dan naskah harus mengatakannya.
+    // SPEC-919 · ADR-0147 · `presence` ikut: naskah ini ada untuk MENJELASKAN arti 403, jadi 403
+    // yang baru tanpa penjelasan meninggalkan agen eksternal tanpa rujukan sama sekali.
     const kandidat = ["auth", "agent-tokens", "device-tokens", "sync", "webhooks",
-      "portal", "client-accounts"];
+      "portal", "client-accounts", "presence"];
     for (const seg of kandidat) expect(capabilityForRoute("GET", `/api/${seg}`)).toBe("COOKIE_ONLY");
     const hilang = kandidat.filter((s) => !doc.includes(`/api/${s}`));
     expect(hilang).toEqual([]);

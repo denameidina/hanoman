@@ -15,7 +15,7 @@
   dirender di belasan cabang `App`, jadi gerbangnya context — prop akan meninggalkan cabang yang
   terlewat. Default context kosong = entri bergerbang **tersembunyi**; entri `clients` menyala hanya
   saat `presence.enabled` (hub punya ≥1 `DeviceToken` belum dicabut), sehingga instalasi satu mesin
-  tetap melihat ke-13 layar yang sama seperti sebelumnya.
+  tetap melihat **14** entri nav yang sama seperti sebelum SPEC-919 (`HN_NAV` kini 15, satu bergerbang).
 - **`PresenceChip`** (SPEC-919) — penanda "dikerjakan di `<device>`" di baris/kartu backlog, kartu
   board, dan baris project (sel Status). Satu komponen untuk ketiganya, disuapi indeks murni
   `screens/presence-map.ts`. Ia **beda** dari `HandledByChips` (ADR-0135): yang itu penetapan MANUAL
@@ -214,6 +214,7 @@ menyapu sisanya. Nilai yang gagal di-parse atau salah bentuk jatuh ke default, t
 | terminal | — | `project`; mapping grid kanonik di server per user (ADR-0118) |
 | ide | project | `tab`, `viewRef`, `selected`, `selKind`, `mdView`, `stagedView`, `changedView`, `diffTab` |
 | vps | — | `detailId` |
+| clients | — | *(tak ada)* — SPEC-919: layar ini tak punya filter, paginasi, maupun pilihan; seluruh isinya didorong grup siar `presence` (cermin Overview) |
 | docs | project | `selected` |
 | changelog | project | `q`, `page`, `selectedId` |
 | settings | — | `tab` |

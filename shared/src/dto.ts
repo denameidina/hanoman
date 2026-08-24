@@ -784,7 +784,7 @@ export type EventsClientMsg = z.infer<typeof zEventsClientMsg>;
 
 // SPEC-199 · frame siar dashboard (server → klien), lewat GET /events/ws (ADR-0039). Per-grup,
 // bukan snapshot monolitik — perubahan satu grup tak mengirim ulang yang lain.
-// SPEC-908 · delapan grup pertama tetap GLOBAL tanpa parameter; enam varian terakhir milik
+// SPEC-908 · grup GLOBAL tanpa parameter di depan (sepuluh sejak SPEC-919); enam varian terakhir milik
 // langganan berparameter (`zEventsClientMsg` di atas), yang membuat kanal ini tak lagi read-only.
 export type EventMsg =
   | { t: "specs"; specs: Spec[] }
@@ -801,7 +801,7 @@ export type EventMsg =
   // sendiri, bukan hiasan di `sessions`: frame itu sudah yang terbesar di dashboard dan
   // menempelkan teks pertanyaan di sana membuatnya tumbuh untuk pembaca yang tak membutuhkannya.
   | { t: "leadAsks"; asks: SessionAsk[] }
-  // SPEC-919 · ADR-0147 · grup GLOBAL ke-9: sesi hidup di semua device yang tersambung ke hub ini.
+  // SPEC-919 · ADR-0147 · grup GLOBAL ke-10: sesi hidup di semua device yang tersambung ke hub ini.
   // Grup, bukan topik berlangganan (ADR-0145): muatannya tak berparameter — satu snapshot yang
   // sama untuk semua penonton.
   | { t: "presence"; enabled: boolean; devices: PresenceDeviceView[] }

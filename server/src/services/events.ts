@@ -27,6 +27,9 @@ import { TOPICS, TOPIC_NAMES, isTopic, parseParams } from "./events-topics";
 type WireMsg = { t: EventMsg["t"] } & Record<string, unknown>;
 
 const clients = new Set<Client>();
+// SPEC-919 · klien yang principal-nya cookie. `WeakSet` karena keanggotaannya properti KONEKSI,
+// bukan daftar kedua yang harus disapu saat detach.
+const cookieClients = new WeakSet<Client>();
 // SPEC-215 · dibaca per-pakai (cfg live). Test menurunkan tick agar cepat; prod 1s. Loop cuma jalan saat ada klien.
 const tickMs = () => effectiveInt("HANOMAN_EVENTS_TICK_MS") ?? 1000;
 
@@ -34,7 +37,15 @@ const tickMs = () => effectiveInt("HANOMAN_EVENTS_TICK_MS") ?? 1000;
 // journal: grup `specs` di-recompute tiap detik, jadi hub yang tercekik `P1008 Socket timeout`
 // dulu melahirkan `catch { continue; }` senyap 86.400 kali sehari — klien membeku pada snapshot
 // terakhir tanpa satu pun jejak kenapa. Dicatat sekali saat mulai gagal, sekali saat pulih.
-type Group = { everyTicks: number; last: string; build: () => Promise<WireMsg>; failing?: boolean };
+/* SPEC-919 · `cookieOnly` menandai grup yang TIDAK boleh mengalir ke principal non-cookie.
+   Alasannya sama persis dengan `canSubscribeTopics` (ADR-0145) satu lapis di atasnya: `/events/ws`
+   dipetakan ke capability GLOBAL_READ bagi agent token, sementara `presence` memaparkan peta
+   pekerjaan lintas mesin yang `capabilityForRoute` nyatakan COOKIE_ONLY. Hari ini agent token tak
+   bisa menjangkaunya karena `POST /ws-tickets` jatuh ke default cookie-only — tapi itu ketiadaan
+   entri di sebuah peta, bukan keputusan; satu cabang `ws-tickets` yang lahir nanti akan membukanya
+   tanpa satu pun test merah. */
+type Group = { everyTicks: number; last: string; build: () => Promise<WireMsg>; failing?: boolean;
+  cookieOnly?: boolean };
 // everyTicks = recompute tiap N detik: board 1s, notif 3s, vps 15s, limits 30s (cache 30s service).
 const GROUPS: Group[] = [
   // SPEC-409 · ADR-0091 · AC-3 · `deciding` menandai sesi yang sedang DISUSUN keputusannya oleh
@@ -69,18 +80,22 @@ const GROUPS: Group[] = [
   // SPEC-214 · deteksi update jarang berubah; recompute tiap 300 dtk, dedup signature → siar hanya
   // saat status berubah. getUpdateStatus cache 15s + fetch ter-gate (server.ts) → attach tak menahan.
   { everyTicks: 300, last: "", build: async () => ({ t: "update", update: await getUpdateStatus() }) },
-  // SPEC-919 · ADR-0147 · sesi hidup lintas device. 3 dtk: presence berdenyut 30 dtk, jadi kadens
+  // SPEC-919 · ADR-0147 · sesi hidup lintas device (grup GLOBAL ke-10 — `leadAsks` SPEC-909 ikut
+  // dihitung). 3 dtk: presence berdenyut 30 dtk, jadi kadens
   // lebih rapat hanya menambah build tanpa menambah informasi. `presenceView` menyegarkan sesi
   // mesin ini sendiri di dalamnya — satu `tmux list-panes` asinkron, tak menahan event loop.
-  { everyTicks: 3, last: "", build: async () => ({ t: "presence", ...(await presenceView()) }) },
+  { everyTicks: 3, cookieOnly: true, last: "", build: async () => ({ t: "presence", ...(await presenceView()) }) },
 ];
 
 // SPEC-908 · klien yang `send`-nya melempar harus dilepas dari `clients` DAN dari peta langganan.
 // Menyapu `clients` saja meninggalkan entri hidup untuk penonton yang sudah tak ada — dan entri
 // `git` berarti `git log` + `git status` + `git stash list` tiap 4 dtk untuk nol pembaca.
-function broadcast(msg: WireMsg): void {
+function broadcast(msg: WireMsg, cookieOnly = false): void {
   const s = JSON.stringify(msg);
-  for (const c of clients) sendTo(c, s);
+  for (const c of clients) {
+    if (cookieOnly && !cookieClients.has(c)) continue;
+    sendTo(c, s);
+  }
 }
 
 // SPEC-908 · langganan BERPARAMETER, mengamandemen ADR-0039. Berkunci `subKey(topic, params)`
@@ -207,7 +222,7 @@ export async function __tick(): Promise<void> {
       const sig = JSON.stringify(msg);
       if (sig === g.last) continue;
       g.last = sig;
-      broadcast(msg);
+      broadcast(msg, g.cookieOnly);
     }
     // SPEC-908 · entri langganan ditick di loop yang sama tetapi TIDAK di-await (lihat runEntry).
     for (const e of entries.values()) {
@@ -233,6 +248,9 @@ function stopLoop(): void {
 // persis scrollback di pty.attach. Dibangun fresh, lepas dari dedup broadcast.
 export async function attach(c: Client, o: { maySubscribe?: boolean } = {}): Promise<void> {
   clients.add(c);
+  // Gerbang yang sama dengan `sub`: principal yang tak boleh berlangganan juga tak boleh menerima
+  // grup `cookieOnly`. Satu bit, dua tempat yang dibacanya — bukan dua predikat yang bisa berselisih.
+  if (o.maySubscribe !== false) cookieClients.add(c);
   startLoop();
   // SPEC-908 · advertensi kemampuan, dikirim PALING DULU. Server lama tak mengirim frame ini sama
   // sekali — ketiadaannya itulah sinyal yang dipakai klien untuk tetap men-poll HTTP (ADR-0087).
@@ -242,6 +260,7 @@ export async function attach(c: Client, o: { maySubscribe?: boolean } = {}): Pro
   const topics = o.maySubscribe === false ? [] : TOPIC_NAMES;
   try { c.send(JSON.stringify({ t: "hello", topics } satisfies EventMsg)); } catch { return; }
   for (const g of GROUPS) {
+    if (g.cookieOnly && !cookieClients.has(c)) continue;
     let msg: WireMsg;
     try { msg = await g.build(); } catch { continue; }
     try { c.send(JSON.stringify(msg)); } catch { return; }
@@ -250,6 +269,7 @@ export async function attach(c: Client, o: { maySubscribe?: boolean } = {}): Pro
 
 export function detach(c: Client): void {
   clients.delete(c);
+  cookieClients.delete(c);
   dropClientSubs(c);
   if (clients.size === 0) stopLoop();
 }

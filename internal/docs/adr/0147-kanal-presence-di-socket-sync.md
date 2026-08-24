@@ -115,9 +115,9 @@ dibatalkan**: `stopSyncClient()` menyetel `started=false` tetapi ketukan yang te
 sehingga `applySyncConfig()` (stop lalu start) meninggalkan satu socket yatim yang menyambung
 memakai token **lama**. Timer kini disimpan dan dibersihkan.
 
-### 6. Jalan ke layar: grup siar ke-9, nol polling baru
+### 6. Jalan ke layar: grup siar ke-10, nol polling baru
 
-`services/events.ts` mendapat grup **GLOBAL** ke-9 `presence` (kadens 3 detik, dedup signature
+`services/events.ts` mendapat grup **GLOBAL** ke-10 `presence` (kadens 3 detik, dedup signature
 yang sudah ada). Grup, bukan topik berlangganan ADR-0145: muatannya **tak berparameter** — satu
 snapshot yang sama untuk semua penonton, persis kriteria kedelapan grup lama. `attach()` mengirim
 snapshot penuh tiap connect, jadi layar terisi seketika tanpa satu request pun.

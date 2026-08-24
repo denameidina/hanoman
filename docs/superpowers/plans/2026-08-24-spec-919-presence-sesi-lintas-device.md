@@ -4,7 +4,7 @@
 
 **Goal:** Hub hanoman menampilkan sesi agen yang sedang berjalan di **semua** instance klien, bukan hanya di mesin hub sendiri.
 
-**Architecture:** Klien menaikkan frame `{t:"presence"}` di atas **socket sync yang sudah ada** (`/api/sync/ws`, Bearer device token). Hub menyimpannya di **registry di memori** — nol tabel, nol kolom, nol `SyncLog`. Sesi mesin hub sendiri masuk registry yang sama lewat pintu yang sama, sehingga hanya ada satu sumber kebenaran. Dashboard menerimanya lewat grup siar ke-9 di `/api/events/ws`.
+**Architecture:** Klien menaikkan frame `{t:"presence"}` di atas **socket sync yang sudah ada** (`/api/sync/ws`, Bearer device token). Hub menyimpannya di **registry di memori** — nol tabel, nol kolom, nol `SyncLog`. Sesi mesin hub sendiri masuk registry yang sama lewat pintu yang sama, sehingga hanya ada satu sumber kebenaran. Dashboard menerimanya lewat grup siar ke-10 di `/api/events/ws`.
 
 **Tech Stack:** TypeScript strict · Fastify + `@fastify/websocket` · `ws` (klien) · zod · React 18 · vitest.
 
@@ -36,7 +36,7 @@
 | `server/src/services/presence/registry.ts` (baru) | peta memori + stempel transisi + ambang offline |
 | `server/src/services/presence/view.ts` (baru) | registry + `DeviceToken` + sesi lokal → `PresenceView` |
 | `server/src/services/presence/sender.ts` (baru) | sisi klien: dedup signature + denyut |
-| `server/src/services/events.ts` (ubah) | grup siar ke-9 |
+| `server/src/services/events.ts` (ubah) | grup siar ke-10 |
 | `server/src/routes/sync.ts` (ubah) | `socket.on("message")` |
 | `server/src/routes/presence.ts` (baru) | `GET /api/presence` |
 | `server/src/app.ts` (ubah) | registrasi route |
@@ -965,7 +965,7 @@ Expected: FAIL — `paths.presence` tak ada.
 `shared/src/dto.ts` — tambahkan import tipe di kepala berkas (gabungkan ke baris import `./presence` bila sudah ada) dan varian baru di union `EventMsg`, tepat sesudah varian `leadAsks`:
 
 ```ts
-  // SPEC-919 · ADR-0147 · grup GLOBAL ke-9: sesi hidup di semua device yang tersambung ke hub ini.
+  // SPEC-919 · ADR-0147 · grup GLOBAL ke-10: sesi hidup di semua device yang tersambung ke hub ini.
   // Grup, bukan topik berlangganan (ADR-0145): muatannya tak berparameter — satu snapshot yang
   // sama untuk semua penonton.
   | { t: "presence"; enabled: boolean; devices: PresenceDeviceView[] }
