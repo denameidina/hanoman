@@ -11,7 +11,7 @@ export { useToast, Toast, Modal, Field, HnTextarea, serverPage, Pager, LIST_SCRO
 export type { ToastData, ShowToast } from "./kit";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { useConfirm, type ConfirmOptions } from "./useConfirm";
-export { Shell, HN_NAV, NAV_KEYS } from "./shell";
+export { Shell, HN_NAV, NAV_KEYS, NavGate } from "./shell";
 export {
   DESKTOP_QUERY,
   LocalOverflow,

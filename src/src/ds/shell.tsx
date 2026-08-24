@@ -17,7 +17,7 @@ import { useScrollRestore } from "../ui-state/hooks";
 // null dan App merender kosong — sidebar ikut hilang, pengguna terjebak sampai reload.
 // `runs` dan `triggers` pernah begitu: screen-nya lenyap bersama subsistem run (SPEC-162),
 // entri navnya tertinggal. Kontraknya kini dijaga test: `src/test/changelog-nav.test.tsx`.
-export type NavItem = { key: string; label: string; icon: string };
+export type NavItem = { key: string; label: string; icon: string; gate?: string };
 export const HN_NAV: NavItem[] = [
   { key: "overview", label: "Overview", icon: "layout-dashboard" },
   { key: "dalang", label: "Dalang Hanoman", icon: "drama" },   // panggung orkestrasi sinematik
@@ -30,6 +30,9 @@ export const HN_NAV: NavItem[] = [
   { key: "terminal", label: "Terminal", icon: "terminal" },
   { key: "ide", label: "IDE", icon: "code-2" },
   { key: "vps", label: "VPS", icon: "server" },
+  // SPEC-919 · ADR-0147 · device yang sinkron ke hub ini + sesi hidupnya. Digerbangi supaya
+  // instalasi satu mesin (nol device token) tak berubah tampilannya sama sekali.
+  { key: "clients", label: "Klien", icon: "monitor", gate: "clients" },
   { key: "docs", label: "Docs · SoT", icon: "book-open" },
   { key: "changelog", label: "Changelog", icon: "megaphone" },   // SPEC-519 · rilis untuk pemakai
   { key: "settings", label: "Settings", icon: "settings" },
@@ -94,6 +97,12 @@ function HnSidebarItem({ item, active, onNavigate }: { item: NavItem; active?: s
   );
 }
 
+/* SPEC-919 · gerbang nav berbasis kemampuan instance. Context, bukan prop: `Shell` dirender di
+   belasan cabang `App`, dan menambah prop ke semuanya adalah undangan bagi cabang yang terlewat.
+   Default kosong = entri bergerbang TERSEMBUNYI — layar yang tak menyediakan gerbangnya tak
+   pernah menampilkan halaman yang tak bisa ia isi. */
+export const NavGate = React.createContext<Record<string, boolean>>({});
+
 export function Shell({ active, title, breadcrumb, actions, showSearch = false, searchValue = "", onSearchChange, onNavigate, wide = false, children }:
   { active?: string; title?: React.ReactNode; breadcrumb?: React.ReactNode; actions?: React.ReactNode;
     showSearch?: boolean; searchValue?: string; onSearchChange?: (v: string) => void;
@@ -101,6 +110,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
   // SPEC-740 · ADR-0115 · scroll tingkat-halaman dipulihkan dari SATU titik: tiap layar —
   // termasuk yang belum ada — ikut dapat perilakunya tanpa menyentuh kodenya. Kunci per
   // `active` supaya posisi Backlog tak terbawa ke Triase.
+  const gates = React.useContext(NavGate);
   const mainRef = useScrollRestore(`page@${active ?? "-"}`, "scroll");
   const tier = useResponsiveTier();
   const mobile = tier === "mobile";
@@ -172,7 +182,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
 
         <div className="hn-eyebrow hn-shell-workspace">Workspace</div>
         <nav className="hn-shell-nav" aria-label="Navigasi utama">
-          {HN_NAV.map((n) => (
+          {HN_NAV.filter((n) => !n.gate || gates[n.gate]).map((n) => (
             <HnSidebarItem
               key={n.key}
               item={n}

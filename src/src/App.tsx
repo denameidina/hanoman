@@ -4,11 +4,11 @@
 import React from "react";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, NAV_KEYS, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
+import { Shell, NAV_KEYS, NavGate, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession } from "./api/client";
 import { subscribe } from "./api/events";
-import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk } from "@hanoman/shared";
+import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView } from "@hanoman/shared";
 import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
@@ -22,6 +22,8 @@ import type { ProjectVM } from "./screens/types";
 import { branchOptions } from "./screens/branch";
 import { FolderPicker } from "./screens/FolderPicker";
 import { HandledByChips } from "./screens/HandledByChips";
+import { ClientsScreen } from "./screens/ClientsScreen";
+import { presenceIndex } from "./screens/presence-map";
 import { repoBasename, cloneErrorText } from "./screens/git-remote";
 import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
@@ -759,8 +761,13 @@ export default function App() {
     }
   }, []);
 
+  // SPEC-919 · ADR-0147 · sesi hidup lintas device. Didorong lewat grup siar `presence`;
+  // `api.presence()` di `load()` hanya muat awal (dan satu-satunya jalur saat WS terhalang proxy).
+  const [presence, setPresence] = React.useState<PresenceView>({ enabled: false, devices: [] });
+
   const load = React.useCallback(() => {
     setStatus("loading");
+    api.presence().then(setPresence).catch(() => { /* server lama / WS yang mengisi */ });
     Promise.all([api.listProjects(), api.listSpecs(), api.listTerminals()])
       .then(([p, s, t]) => {
         setProjects(p.items); setBacklog(s.items); setSessions(t);
@@ -795,6 +802,10 @@ export default function App() {
     () => new Set(sessions.filter((s) => s.specId && !s.exited).map((s) => s.specId as string)),
     [sessions]);
 
+  const presenceMap = React.useMemo(() => presenceIndex(presence), [presence]);
+  const specTitles = React.useMemo(
+    () => Object.fromEntries(backlog.map((s) => [s.id, s.title])), [backlog]);
+
   // SPEC-199 · board didorong lewat WebSocket siar (ADR-0039), bukan poll 3s. `load()` awal
   // tetap (muat projects). Server kirim snapshot penuh tiap connect → state re-sync sendiri.
   // Stage tetap forward-only & write-through di server (liveSpecs) — board hanya menampilkan.
@@ -804,6 +815,7 @@ export default function App() {
     if (m.t === "specs") { setBacklog(m.specs); setDataVersion((v) => v + 1); }
     else if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
     else if (m.t === "leadAsks") setLeadAsks(m.asks);
+    else if (m.t === "presence") setPresence({ enabled: m.enabled, devices: m.devices });
   }), []);
 
   const proj = projectsView.find((p) => p.id === projectId) || projectsView[0];
@@ -1408,6 +1420,15 @@ export default function App() {
         <VpsScreen onToast={showToast} onGotoTerminal={openTerminal} />
       </Shell>
     );
+  } else if (section === "clients") {
+    // SPEC-919 · ADR-0147 · halaman Klien: device + sesi hidupnya. Datanya didorong grup siar
+    // `presence`, jadi layar ini tak memuat apa pun sendiri.
+    screen = (
+      <Shell active="clients" title="Klien" breadcrumb="device · sesi yang sedang berjalan"
+        onNavigate={setSection}>
+        <ClientsScreen view={presence} specTitles={specTitles} onOpenSpec={openReviewSpecId} />
+      </Shell>
+    );
   } else if (section === "scheduler") {
     // SPEC-299 · Panel Scheduler otonom: observabilitas + setelan + opt-in + rem darurat.
     // Screen mandiri (pola VPS) — memuat state fondasi sendiri (HTTP polling), tak lewat `gate`.
@@ -1493,7 +1514,7 @@ export default function App() {
             tidak boleh terlihat sama dengan yang dikeraskan. Di luar ClientPortal: klien tak
             punya kuasa mengubahnya, jadi baginya ini cuma kecemasan tanpa tombol. */}
         <UnhardenedBanner status={setupStatus} />
-        {screen}
+        <NavGate.Provider value={{ clients: presence.enabled }}>{screen}</NavGate.Provider>
         <HanomanPet sessions={sessions} backlog={backlog} asks={leadAsks}
           onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
         <NewSpecModal open={modal === "brief"} onClose={() => { setModal(null); setSpecPrefill(null); }}
