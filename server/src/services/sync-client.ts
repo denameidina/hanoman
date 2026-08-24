@@ -10,6 +10,7 @@ import { listOutbox, clearOutbox } from "./outbox";
 import { RENAME_SEP } from "./rename-project";
 import { effectiveStr, effectiveInt } from "../config";
 import { safeRequest } from "./safe-outbound-request";
+import { startPresenceSender } from "./presence/sender";
 
 // SPEC-213 · ADR-0043 · sisi CLIENT: instance lokal menyinkron (server-to-server) ke hub.
 // Disiplin pull-before-push (AC-18): tarik dulu (server-authoritative), lalu push antre lokal.
@@ -411,6 +412,21 @@ let timer: NodeJS.Timeout | undefined;
 let ws: import("ws").WebSocket | undefined;
 let started = false;
 
+/* SPEC-919 · ADR-0147 · reconnect dulu `setTimeout(…, 3000)` datar: terhadap hub yang mati ia
+   mengetuk 20×/menit selamanya, dan timernya TAK PERNAH dibatalkan — `stopSyncClient()` menyetel
+   `started=false` tapi ketukan yang tertunda tetap jalan, sehingga `applySyncConfig()` (stop lalu
+   start) meninggalkan satu socket yatim yang menyambung memakai token LAMA. */
+export const RECONNECT_MIN_MS = 1_000;
+export const RECONNECT_MAX_MS = 30_000;
+export const nextBackoff = (prev: number): number =>
+  prev <= 0 ? RECONNECT_MIN_MS : Math.min(RECONNECT_MAX_MS, prev * 2);
+export const withJitter = (ms: number, rnd: () => number = Math.random): number =>
+  Math.round(ms * (0.8 + rnd() * 0.4));
+
+let reconnectTimer: NodeJS.Timeout | undefined;
+let reconnectDelay = 0;
+let presence: { stop(): void } | undefined;
+
 // SPEC-215 · status sync client aktif (indikator UI di GET /api/config).
 export function syncStatus(): { running: boolean; connected: boolean } {
   return { running: started, connected: ws?.readyState === 1 /* OPEN */ };
@@ -448,7 +464,13 @@ export async function startSyncClient(base: string, token: string, tickMs?: numb
     const { WebSocket } = await import("ws");
     const wsUrl = base.replace(/^http/, "ws").replace(/\/$/, "") + "/api/sync/ws";
     ws = new WebSocket(wsUrl, { headers: { authorization: `Bearer ${token}` } });
-    ws.on("open", () => { void tick(); });
+    ws.on("open", () => {
+      reconnectDelay = 0;
+      void tick();
+      // SPEC-919 · ADR-0147 · arah naik. Hub versi lama tak memasang `socket.on("message")`,
+      // jadi frame-frame ini jatuh ke lantai di sana tanpa merusak apa pun.
+      presence = startPresenceSender({ send: (json) => ws?.send(json) });
+    });
     ws.on("message", async (raw: Buffer) => {
       try {
         const msg = JSON.parse(raw.toString());
@@ -458,8 +480,13 @@ export async function startSyncClient(base: string, token: string, tickMs?: numb
         if (!(await applyFeedFrame(msg))) void tick();
       } catch { /* frame rusak — abaikan */ }
     });
-    const reconnect = () => { setTimeout(() => { void connectWs(); }, 3000); };
-    ws.on("close", reconnect);
+    ws.on("close", () => {
+      presence?.stop(); presence = undefined;
+      if (!started) return;
+      reconnectDelay = nextBackoff(reconnectDelay);
+      reconnectTimer = setTimeout(() => { void connectWs(); }, withJitter(reconnectDelay));
+      reconnectTimer.unref?.();
+    });
     ws.on("error", () => { try { ws?.close(); } catch { /* noop */ } });
   };
 
@@ -477,6 +504,9 @@ export async function startSyncClient(base: string, token: string, tickMs?: numb
 export function stopSyncClient(): void {
   started = false;
   if (timer) { clearInterval(timer); timer = undefined; }
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = undefined; }
+  reconnectDelay = 0;
+  presence?.stop(); presence = undefined;
   try { ws?.close(); } catch { /* noop */ }
   ws = undefined;
 }
