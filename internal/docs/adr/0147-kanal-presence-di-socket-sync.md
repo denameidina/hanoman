@@ -183,3 +183,15 @@ yang sudah dibayar loop siar saat dashboard terbuka.
   yang sama dengan ADR-0135 §6).
 - `WsMessageGuard` memakai jendela **fixed**, bukan sliding — 60 frame/menit adalah polisi tidur,
   bukan plafon keras. Yang benar-benar mengikat adalah `MAX_PRESENCE_SESSIONS` dan `maxPayload`.
+- **Kegagalan `build()` saat `attach()` ditelan tanpa satu baris log** (`events.ts`, `catch { continue; }`)
+  — sifat lama yang berlaku untuk **semua** grup, tetapi presence mewarisi konsekuensinya penuh:
+  `presenceView()` menyentuh Prisma, jadi satu kedipan DB tepat saat sebuah tab attach membuat tab
+  itu tak menerima snapshot pertamanya, dan dedup `Group.last` kemudian **menahan** frame berikutnya
+  selama isinya tak berubah. Di hub yang sepi tab itu bisa diam lama. Yang menutup kelasnya bukan
+  ADR ini melainkan membuat `attach` mencatat kegagalannya seperti `__tick` sudah lakukan —
+  perbaikan terpisah, dan sengaja tak diselundupkan ke sini. Sementara itu `events.route.test.ts`
+  mengunci bahwa `presence` memang ada di snapshot attach pada jalur sehat.
+- **Gerbang `cookieOnly` hidup di `events.ts`, bukan di peta capability.** `capabilityForRoute` tak
+  punya cabang untuk `/api/ws-tickets` sehingga ia jatuh ke default cookie-only — itu yang menahan
+  agent token hari ini, dan itu **ketiadaan entri**, bukan keputusan. Karena itu grupnya digerbangi
+  sendiri; kalau cabang `ws-tickets` kelak lahir, presence tetap tertutup.
