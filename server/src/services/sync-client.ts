@@ -463,15 +463,18 @@ export async function startSyncClient(base: string, token: string, tickMs?: numb
   const connectWs = async () => {
     const { WebSocket } = await import("ws");
     const wsUrl = base.replace(/^http/, "ws").replace(/\/$/, "") + "/api/sync/ws";
-    ws = new WebSocket(wsUrl, { headers: { authorization: `Bearer ${token}` } });
-    ws.on("open", () => {
+    const sock = new WebSocket(wsUrl, { headers: { authorization: `Bearer ${token}` } });
+    ws = sock;
+    sock.on("open", () => {
       reconnectDelay = 0;
       void tick();
       // SPEC-919 · ADR-0147 · arah naik. Hub versi lama tak memasang `socket.on("message")`,
       // jadi frame-frame ini jatuh ke lantai di sana tanpa merusak apa pun.
-      presence = startPresenceSender({ send: (json) => ws?.send(json) });
+      // Menutup atas `sock`, bukan `ws`: pengirim ini milik SATU socket, dan mengikatnya ke
+      // variabel modul berarti tick yang tertinggal bisa mendarat di socket penggantinya.
+      presence = startPresenceSender({ send: (json) => sock.send(json) });
     });
-    ws.on("message", async (raw: Buffer) => {
+    sock.on("message", async (raw: Buffer) => {
       try {
         const msg = JSON.parse(raw.toString());
         if (msg.t !== "sync") return;
@@ -480,14 +483,14 @@ export async function startSyncClient(base: string, token: string, tickMs?: numb
         if (!(await applyFeedFrame(msg))) void tick();
       } catch { /* frame rusak — abaikan */ }
     });
-    ws.on("close", () => {
+    sock.on("close", () => {
       presence?.stop(); presence = undefined;
       if (!started) return;
       reconnectDelay = nextBackoff(reconnectDelay);
       reconnectTimer = setTimeout(() => { void connectWs(); }, withJitter(reconnectDelay));
       reconnectTimer.unref?.();
     });
-    ws.on("error", () => { try { ws?.close(); } catch { /* noop */ } });
+    sock.on("error", () => { try { sock.close(); } catch { /* noop */ } });
   };
 
   // SPEC-885 · ADR-0138 · instalasi baru: satu tarikan keadaan sebelum drain feed. Gagal atau tak

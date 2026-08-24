@@ -65,7 +65,7 @@
 - Consumes: —
 - Produces: `PRESENCE_PROTOCOL`, `MAX_PRESENCE_SESSIONS`, `PRESENCE_HEARTBEAT_MS`, `PRESENCE_OFFLINE_MS`, `PRESENCE_TICK_MS`, `PRESENCE_MAX_FRAMES_PER_MIN`, `LOCAL_DEVICE_ID`, `PresenceStatus`, `PresenceSession`, `zPresenceSession`, `zPresenceFrame`, `PresenceFrame`, `PresenceSessionView`, `PresenceDeviceView`, `PresenceView`, `presenceSignature(sessions: PresenceSession[]): string`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/presence.test.ts`:
 
@@ -122,14 +122,14 @@ describe("kontrak wire presence", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 pnpm vitest --run --no-file-parallelism shared/src/presence.test.ts
 ```
 Expected: FAIL — `Failed to resolve import "./presence"`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `shared/src/presence.ts`:
 
@@ -224,21 +224,21 @@ Tambahkan ke `shared/src/index.ts`, mengikuti gaya baris ekspor di sekitarnya:
 export * from "./presence";
 ```
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 pnpm vitest --run --no-file-parallelism shared/src/presence.test.ts
 ```
 Expected: PASS — 7 test.
 
-- [ ] **Step 5: Typecheck paket shared**
+- [x] **Step 5: Typecheck paket shared**
 
 ```bash
 pnpm --filter ./shared typecheck
 ```
 Expected: keluar 0, tanpa output error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/presence.ts shared/src/presence.test.ts shared/src/index.ts
@@ -257,7 +257,7 @@ git commit -m "feat(spec-919): kontrak wire presence sesi lintas device"
 - Consumes: —
 - Produces: `export type Pane` (kini punya `startedAt: number` = detik epoch), `export const FMT`, `export function parsePanes(out: string): Pane[]`, `export async function listPanesAsync(): Promise<Pane[]>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/pty-parse.test.ts`:
 
@@ -311,7 +311,7 @@ describe("parsePanes", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -319,7 +319,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — `FMT` dan `parsePanes` bukan ekspor `../src/services/pty`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/pty.ts`, tambahkan field ke tipe `Pane` (tepat sesudah `activityAt`):
 
@@ -368,7 +368,7 @@ export async function listPanesAsync(): Promise<Pane[]> {
 
 (hapus `const listPanesAsync = ...`-nya yang lama bila bentuknya berbeda; deklarasi `function` yang sudah ada tinggal diberi `export`.)
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -376,14 +376,14 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: PASS — 4 test.
 
-- [ ] **Step 5: Typecheck server**
+- [x] **Step 5: Typecheck server**
 
 ```bash
 pnpm --filter ./server typecheck
 ```
 Expected: keluar 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/test/pty-parse.test.ts
@@ -402,7 +402,7 @@ git commit -m "feat(spec-919): stempel mulai sesi dari #{session_created}"
 - Consumes: `Pane`, `listPanesAsync` (Task 2); `PresenceSession`, `MAX_PRESENCE_SESSIONS` (Task 1)
 - Produces: `paneToPresence(p: Pane, phase?: string): PresenceSession`, `buildLocalPresence(): Promise<PresenceSession[]>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/presence-snapshot.test.ts`:
 
@@ -455,7 +455,7 @@ describe("paneToPresence", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -463,7 +463,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — modul `presence/snapshot` belum ada.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `server/src/services/presence/snapshot.ts`:
 
@@ -506,7 +506,7 @@ export async function buildLocalPresence(): Promise<PresenceSession[]> {
 }
 ```
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -514,7 +514,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: PASS — 6 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/presence/snapshot.ts server/test/presence-snapshot.test.ts
@@ -533,7 +533,7 @@ git commit -m "feat(spec-919): proyeksi pane tmux jadi snapshot presence"
 - Consumes: `PresenceSession`, `PresenceSessionView`, `PRESENCE_OFFLINE_MS` (Task 1)
 - Produces: `recordPresence(deviceId: string, sessions: PresenceSession[], now?: number): void`, `dropPresence(deviceId: string): void`, `presenceEntries(now?: number): PresenceEntry[]`, `type PresenceEntry = { deviceId: string; sessions: PresenceSessionView[] }`, `__resetPresence(): void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/presence-registry.test.ts`:
 
@@ -615,7 +615,7 @@ describe("registry presence", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -623,7 +623,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — modul `presence/registry` belum ada.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `server/src/services/presence/registry.ts`:
 
@@ -686,7 +686,7 @@ export function presenceEntries(now = Date.now()): PresenceEntry[] {
 export function __resetPresence(): void { devices.clear(); }
 ```
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -694,7 +694,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: PASS — 9 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/presence/registry.ts server/test/presence-registry.test.ts
@@ -713,7 +713,7 @@ git commit -m "feat(spec-919): registry presence di memori, nol tabel"
 - Consumes: `presenceEntries`, `recordPresence` (Task 4); `buildLocalPresence` (Task 3); `PresenceView`, `LOCAL_DEVICE_ID` (Task 1)
 - Produces: `presenceView(o?: { local?: () => Promise<PresenceSession[]>; now?: number }): Promise<PresenceView>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/presence-view.test.ts`:
 
@@ -803,7 +803,7 @@ describe("presenceView", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -811,7 +811,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — modul `presence/view` belum ada.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `server/src/services/presence/view.ts`:
 
@@ -867,7 +867,7 @@ export async function presenceView(
 }
 ```
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -875,7 +875,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: PASS — 8 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/presence/view.ts server/test/presence-view.test.ts
@@ -895,7 +895,7 @@ git commit -m "feat(spec-919): view presence gabung katalog device dan keadaan h
 - Consumes: `presenceView` (Task 5)
 - Produces: `EventMsg` varian `{ t: "presence"; enabled: boolean; devices: PresenceDeviceView[] }`, `paths.presence`, route `GET /api/presence`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/presence.route.test.ts`:
 
@@ -945,7 +945,7 @@ describe("GET /api/presence", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -953,7 +953,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — `paths.presence` tak ada.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 `shared/src/api.ts` — tambahkan tepat sesudah baris `eventsWs`:
 
@@ -1023,7 +1023,7 @@ import presence from "./routes/presence";
     await api.register(presence);   // SPEC-919 · ADR-0147 · muat awal halaman Klien
 ```
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1031,14 +1031,14 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: PASS — 3 test baru + suite capability yang sudah ada tetap hijau.
 
-- [ ] **Step 5: Typecheck shared + server**
+- [x] **Step 5: Typecheck shared + server**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 ```
 Expected: keluar 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/dto.ts shared/src/api.ts server/src/services/events.ts \
@@ -1059,7 +1059,7 @@ git commit -m "feat(spec-919): grup siar presence + GET /api/presence"
 - Consumes: `recordPresence`, `dropPresence` (Task 4); `zPresenceFrame`, `PRESENCE_MAX_FRAMES_PER_MIN` (Task 1); `WsMessageGuard` (`server/src/services/ws-admission.ts:227`)
 - Produces: — (perilaku route)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/sync-ws-presence.test.ts`:
 
@@ -1166,7 +1166,7 @@ describe("frame presence di /api/sync/ws", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1174,7 +1174,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — registry tetap kosong (`timeout`), karena route belum membaca frame masuk.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/routes/sync.ts`, tambahkan import:
 
@@ -1213,7 +1213,7 @@ dan lengkapi handler `close` yang sudah ada:
     socket.on("close", () => { clearInterval(revalidate); release(); detachSync(client); dropPresence(principal.id); });
 ```
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1221,7 +1221,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: PASS — 5 test baru + suite `sync-ws` yang sudah ada tetap hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/sync.ts server/test/sync-ws-presence.test.ts
@@ -1244,7 +1244,7 @@ git commit -m "feat(spec-919): hub membaca frame presence di kanal sync"
   - `startPresenceSender(o: { send: (json: string) => void; build?: () => Promise<PresenceSession[]>; tickMs?: number; heartbeatMs?: number }): { stop(): void }`
   - `nextBackoff(prev: number): number`, `withJitter(ms: number, rnd?: () => number): number`, `RECONNECT_MIN_MS`, `RECONNECT_MAX_MS` (dari `sync-client.ts`)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/presence-sender.test.ts`:
 
@@ -1349,7 +1349,7 @@ describe("backoff reconnect sync", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1357,7 +1357,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: FAIL — `createPresenceSender` dan `nextBackoff` belum ada.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `server/src/services/presence/sender.ts`:
 
@@ -1499,7 +1499,7 @@ export function stopSyncClient(): void {
 }
 ```
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1508,14 +1508,14 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: PASS — 10 test baru + suite `sync-client` yang sudah ada tetap hijau.
 
-- [ ] **Step 5: Typecheck server**
+- [x] **Step 5: Typecheck server**
 
 ```bash
 pnpm --filter ./server typecheck
 ```
 Expected: keluar 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/presence/sender.ts server/src/services/sync-client.ts \
@@ -1536,7 +1536,7 @@ git commit -m "feat(spec-919): klien menyiarkan presence + reconnect ber-backoff
 - Consumes: `PresenceView`, `PresenceDeviceView` (Task 1); `paths.presence` (Task 6)
 - Produces: `presenceIndex(view: PresenceView): { bySpec: Map<string, string[]>; byProject: Map<string, string[]> }`, `<ClientsScreen view onOpenSpec />`, `api.presence()`, `NavGate` context, `NavItem.gate`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/presence-map.test.ts`:
 
@@ -1652,14 +1652,14 @@ describe("ClientsScreen", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 pnpm vitest --run --no-file-parallelism src/test/presence-map.test.ts src/test/clients-screen.test.tsx
 ```
 Expected: FAIL — modul `presence-map` dan `ClientsScreen` belum ada.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `src/src/screens/presence-map.ts`:
 
@@ -1905,7 +1905,7 @@ Bungkus `{screen}` dengan providernya:
         <NavGate.Provider value={{ clients: presence.enabled }}>{screen}</NavGate.Provider>
 ```
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 pnpm vitest --run --no-file-parallelism src/test/presence-map.test.ts \
@@ -1913,14 +1913,14 @@ pnpm vitest --run --no-file-parallelism src/test/presence-map.test.ts \
 ```
 Expected: PASS — 9 test baru + kontrak nav (`setiap key HN_NAV punya cabang section di App.tsx`) tetap hijau.
 
-- [ ] **Step 5: Typecheck frontend**
+- [x] **Step 5: Typecheck frontend**
 
 ```bash
 pnpm --filter ./src typecheck
 ```
 Expected: keluar 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/presence-map.ts src/src/screens/ClientsScreen.tsx src/src/api/client.ts \
@@ -1941,7 +1941,7 @@ git commit -m "feat(spec-919): halaman Klien + gerbang navigasi"
 - Consumes: `presenceIndex` (Task 9)
 - Produces: `<PresenceChip names={string[] | undefined} />`; prop `presenceBySpec?: Map<string, string[]>` di `BacklogScreen`; field `presenceOn?: string[]` di `ProjectVM`-row
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/presence-chip.test.tsx`:
 
@@ -1975,14 +1975,14 @@ describe("PresenceChip", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan ia gagal**
+- [x] **Step 2: Jalankan test untuk memastikan ia gagal**
 
 ```bash
 pnpm vitest --run --no-file-parallelism src/test/presence-chip.test.tsx
 ```
 Expected: FAIL — modul `PresenceChip` belum ada.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `src/src/screens/PresenceChip.tsx`:
 
@@ -2092,7 +2092,7 @@ pada `<BacklogScreen …>`, dan
 ```
 pada `<ProjectsScreen …>`.
 
-- [ ] **Step 4: Jalankan test untuk memastikan ia lulus**
+- [x] **Step 4: Jalankan test untuk memastikan ia lulus**
 
 ```bash
 pnpm vitest --run --no-file-parallelism src/test/presence-chip.test.tsx \
@@ -2100,14 +2100,14 @@ pnpm vitest --run --no-file-parallelism src/test/presence-chip.test.tsx \
 ```
 Expected: PASS — 4 test baru + yang sebelumnya tetap hijau.
 
-- [ ] **Step 5: Typecheck frontend**
+- [x] **Step 5: Typecheck frontend**
 
 ```bash
 pnpm --filter ./src typecheck
 ```
 Expected: keluar 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/PresenceChip.tsx src/src/screens/BacklogScreen.tsx \
@@ -2127,7 +2127,7 @@ git commit -m "feat(spec-919): penanda device di baris backlog dan project"
 - Consumes: seluruh keputusan Task 1–10
 - Produces: — (dokumentasi)
 
-- [ ] **Step 1: Tulis ADR-0147 (transport)**
+- [x] **Step 1: Tulis ADR-0147 (transport)**
 
 Buat `internal/docs/adr/0147-kanal-presence-di-socket-sync.md` dengan struktur yang sama seperti ADR tetangganya (`0145`): judul, Status/Tanggal/SPEC, "Menegakkan"/"Mengamandemen", Konteks, Keputusan, Alternatif yang ditolak, Pagar, Konsekuensi, Plafon yang diketahui.
 
@@ -2144,7 +2144,7 @@ Isi yang wajib ada, diambil dari rancangan `docs/superpowers/specs/2026-08-24-sp
 - Gerbang `enabled` = ada ≥1 `DeviceToken` belum dicabut → instalasi satu mesin nol perubahan tampilan.
 - Plafon: arah data **satu arah** klien→hub; client tak bisa menampilkan sesi hub. Menempel terminal klien dari hub di luar lingkup.
 
-- [ ] **Step 2: Tulis ADR-0148 (status hidup tidak disync)**
+- [x] **Step 2: Tulis ADR-0148 (status hidup tidak disync)**
 
 Buat `internal/docs/adr/0148-status-hidup-tidak-disync.md`. Isi wajib, dari §B rancangan:
 
@@ -2155,11 +2155,11 @@ Buat `internal/docs/adr/0148-status-hidup-tidak-disync.md`. Isi wajib, dari §B 
 - Konsekuensi: restart hub = registry kosong, terisi lagi ≤ 30 s. Keadaan basi punah dengan sendirinya.
 - Batas: presence **murni informasional** — tak menggerbangi start sesi, worktree, auto-merge, scheduler, atau lead (cermin batas ADR-0135 §6).
 
-- [ ] **Step 3: Tautkan di index**
+- [x] **Step 3: Tautkan di index**
 
 `internal/docs/README.md` — tambahkan dua baris di daftar ADR, tepat di atas baris `0146`, mengikuti format satu-baris berisi ringkasan yang dipakai tetangganya, lalu tambahkan satu baris rancangan di daftar spec (paling atas) yang menunjuk `../../docs/superpowers/specs/2026-08-24-spec-919-presence-sesi-lintas-device-design.md`.
 
-- [ ] **Step 4: Perbarui doc arsitektur**
+- [x] **Step 4: Perbarui doc arsitektur**
 
 `internal/docs/architecture/api-contract.md` — di blok "Sync mesin-ke-mesin", tambahkan paragraf `>` baru: frame masuk `{t:"presence"}` di `GET /api/sync/ws`, semantik ganti-penuh, `deviceId` dari token, kegagalan dibuang tanpa menutup socket, hub lama mengabaikannya. Tambahkan juga `GET /api/presence` (cookie-only, non-delegatable) dan grup siar `presence` di seksi realtime di kepala berkas (yang menyebut delapan grup → sembilan).
 
@@ -2169,7 +2169,7 @@ Buat `internal/docs/adr/0148-status-hidup-tidak-disync.md`. Isi wajib, dari §B 
 
 `internal/skills/hanoman/SKILL.md` — tambahkan satu butir di daftar "Aturan Arsitektur", setelah butir ADR-0145, meringkas SPEC-919/ADR-0147/0148 dalam bentuk yang sama dengan butir tetangganya (keputusan + gotcha terukur).
 
-- [ ] **Step 5: Verifikasi integritas index**
+- [x] **Step 5: Verifikasi integritas index**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli build && node cli/dist/index.js docs index --check
@@ -2181,7 +2181,7 @@ grep -c "0147-kanal-presence-di-socket-sync\|0148-status-hidup-tidak-disync" int
 ```
 Expected: `2`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs internal/skills
@@ -2198,7 +2198,7 @@ git commit -m "docs(spec-919): ADR-0147/0148 + api-contract, data-model, fronten
 - Consumes: seluruh task sebelumnya
 - Produces: bukti hijau
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -2215,30 +2215,59 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -
 ```
 Expected: semua PASS. Nol "no test files" — bila ada, path-nya salah dan itu bukan bukti hijau.
 
-- [ ] **Step 2: Typecheck ketiga paket yang tersentuh**
+- [x] **Step 2: Typecheck ketiga paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
 ```
 Expected: keluar 0.
 
-- [ ] **Step 3: Smoke endpoint nyata**
+- [x] **Step 3: Smoke endpoint nyata**
+
+`HANOMAN_HOME` sementara WAJIB — smoke tanpa itu menulis `setup.token` ke home nyata (pelajaran
+SPEC-880) dan bisa membuka DB dev sungguhan lewat `DATABASE_URL` ambient. Port sendiri supaya tak
+menabrak instance dev yang sedang jalan.
 
 ```bash
-export HANOMAN_HOME="$(mktemp -d)"
-export DATABASE_URL="file:$HANOMAN_HOME/hanoman.db"
+SMOKE_HOME=$(mktemp -d)
+export HANOMAN_HOME="$SMOKE_HOME" DATABASE_URL="file:$SMOKE_HOME/hanoman.db" \
+       HANOMAN_DATABASE_URL="file:$SMOKE_HOME/hanoman.db" NODE_ENV=development PORT=8919
 pnpm --filter ./server exec prisma migrate deploy
-pnpm dev:api &
-sleep 6
-curl -s localhost:8787/api/health
-curl -s localhost:8787/api/presence
+env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS ./server/node_modules/.bin/tsx server/src/server.ts &
+# bootstrap user pertama → cookie
+curl -s -X POST localhost:8919/api/auth/setup -H 'content-type: application/json' \
+  -d '{"email":"smoke@919.test","password":"smoke-pass-919"}' -c /tmp/c.txt
+curl -s -b /tmp/c.txt localhost:8919/api/presence
 ```
-Expected: `/api/health` menjawab; `/api/presence` menjawab JSON ber-`{"enabled":false,"devices":[{"deviceId":"local",…}]}` dengan `sessions` berisi sesi tmux mesin ini (boleh kosong). `HANOMAN_HOME` sementara wajib — smoke tanpa itu menulis `setup.token` ke home nyata (pelajaran SPEC-880).
 
-- [ ] **Step 4: Matikan server smoke per-PID**
+Yang harus terlihat: `enabled:false` (belum ada device token), device `local` bernama hostname,
+dan `sessions` berisi sesi tmux NYATA mesin ini — termasuk sesi SPEC-919 sendiri, lengkap dengan
+`flow:"feature"`, `phase:"Execute"`, dan `startedAt` yang masuk akal. Itu satu-satunya bukti bahwa
+`#{session_created}` dan `readPhases` benar-benar terbaca dari tmux, bukan dari fixture.
+
+- [x] **Step 4: Smoke jalur klien→hub end-to-end**
 
 ```bash
-lsof -ti:8787 | xargs -r kill
+curl -s -b /tmp/c.txt -X POST localhost:8919/api/device-tokens \
+  -H 'content-type: application/json' -d '{"name":"laptop-smoke"}'   # simpan .token
+# klien: buka ws://localhost:8919/api/sync/ws ber-Bearer, kirim frame presence,
+# lalu kirim "{bukan json" dan frame ber-field `cwd` — socket harus TETAP OPEN.
+curl -s -b /tmp/c.txt localhost:8919/api/presence
+```
+
+Yang harus terlihat: `enabled:true`, `laptop-smoke` `online:true` dengan sesinya, `statusAt` dicap
+hub, dan frame buruk **tidak** menutup socket maupun menimpa daftar yang sah. Sesudah socket
+ditutup: `online:false`, `sessions:[]`, `lastSeenAt` tetap ada.
+
+Frame siar diperiksa terpisah — tiket WS + cookie ke `/api/events/ws` (subprotocol
+`hanoman-ticket.<tiket>`; **cookie tetap wajib di upgrade**, tiket saja → 401) harus mengantar
+`{t:"presence", …}` seketika saat attach.
+
+- [x] **Step 4b: Matikan server smoke per-PID**
+
+```bash
+kill <pid>          # ATAU: lsof -ti:8919 | xargs kill
+rm -rf "$SMOKE_HOME"
 ```
 Jangan `pkill -f` — pola itu mematikan agen sesi tetangga (SPEC-402).
 
