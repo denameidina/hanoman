@@ -5,6 +5,9 @@ import { prisma } from "../db";
 import { requireDeviceToken } from "../services/device-auth";
 import { verifyDeviceToken } from "../services/device-token";
 import { attachSync, detachSync } from "../services/sync-hub";
+import { PRESENCE_MAX_FRAMES_PER_MIN, zPresenceFrame } from "@hanoman/shared";
+import { WsMessageGuard } from "../services/ws-admission";
+import { recordPresence, dropPresence } from "../services/presence/registry";
 import type { Client } from "../services/pty";
 import { applyPush, pull, bootstrapSnapshot, isEntity, type Entity } from "../services/sync";
 import { syncNow, fetchTransport } from "../services/sync-client";
@@ -154,10 +157,30 @@ export default async function (app: FastifyInstance) {
     catch { socket.close(1008, "connection limit"); return; }
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     attachSync(client);
+
+    /* SPEC-919 · ADR-0147 · arah naik kanal ini. Sebelumnya `/sync/ws` tak pernah memasang
+       `socket.on("message")` sama sekali — dan justru itulah yang membuat hub versi LAMA
+       mengabaikan frame presence tanpa satu pun error, sehingga klien baru tetap sync normal.
+
+       Semua kegagalan di sini DIBUANG, tak pernah menutup socket: kanal yang sama mengangkut
+       changefeed sync, dan kegagalan status tak boleh menjatuhkannya. Itu sebabnya verdict
+       `WsMessageGuard` di sini diabaikan alih-alih diterjemahkan jadi close 1008/1009 seperti
+       di `/events/ws`, yang socket-nya milik dashboard. */
+    const guard = new WsMessageGuard({ perWindow: PRESENCE_MAX_FRAMES_PER_MIN });
+    socket.on("message", (raw: Buffer) => {
+      try {
+        if (!guard.accept(raw).ok) return;
+        const parsed = zPresenceFrame.safeParse(JSON.parse(raw.toString("utf8")));
+        if (!parsed.success) return;
+        // deviceId SELALU dari token terverifikasi — payload tak pernah boleh menamai dirinya.
+        recordPresence(principal.id, parsed.data.sessions);
+      } catch { /* frame rusak — dibuang */ }
+    });
+
     const revalidate = setInterval(() => {
       void revalidateWsPrincipal(req, principal).then((ok) => { if (!ok) socket.close(1008, "token revoked"); });
     }, 60_000);
     revalidate.unref?.();
-    socket.on("close", () => { clearInterval(revalidate); release(); detachSync(client); });
+    socket.on("close", () => { clearInterval(revalidate); release(); detachSync(client); dropPresence(principal.id); });
   });
 }
