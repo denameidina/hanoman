@@ -2271,13 +2271,52 @@ rm -rf "$SMOKE_HOME"
 ```
 Jangan `pkill -f` — pola itu mematikan agen sesi tetangga (SPEC-402).
 
-- [ ] **Step 5: Centang seluruh checkbox plan dan commit**
+- [x] **Step 5: Centang seluruh checkbox plan dan commit**
 
 ```bash
 git add -A && git commit -m "chore(spec-919): verifikasi hijau"
 ```
 
 ---
+
+---
+
+### Task 13: Pengerasan sesudah uji mutasi (tak ada di rencana awal)
+
+Verifikasi menyatakan set test hijau, lalu **uji mutasi** membuktikan hijau itu tak menyatakan
+apa-apa untuk empat gerbang inti. Dicatat di sini karena plan yang menyembunyikan pekerjaan yang
+benar-benar terjadi tak berguna bagi siapa pun yang membacanya nanti.
+
+- [x] **Insiden yang harus dicatat.** Sebuah agen uji-mutasi bekerja di worktree yang **sama**;
+  dua commit menyapu berkasnya, sehingga HEAD sempat membawa `recordPresence("spoofed-from-payload", …)`
+  dan `zPresenceFrame` **tanpa** `.strict()` (malah menerima `deviceId` dari payload). Yang
+  menyembunyikannya: `git status` di sesi ini dilewatkan hook `rtk` dan melapor **bersih** untuk
+  working tree yang berubah. Pelajaran operasional: pakai `/usr/bin/git` untuk setiap pemeriksaan
+  yang jadi bukti, dan jangan `git add -A` saat ada agen lain menyentuh worktree yang sama.
+
+- [x] **Cacat nyata yang ditemukan test baru.** `MAX_PRESENCE_SESSIONS` = 100 adalah pagar
+  **jumlah**, dan panjang id yang masih **sah** membuat 100 sesi menjadi **86 035 byte** — terukur
+  di kawat: `ws` menutup socket dengan **1009**, dan socket itu mengangkut changefeed sync. Pagar
+  itu melahirkan persis kegagalan yang ia ada untuk mencegah. Diganti `trimPresenceToBudget()` per
+  BYTE (32 KiB; pola `PULL_MAX_BYTES` ADR-0138) — terukur sesudahnya: 100 sesi → 25 sesi /
+  21 535 byte, socket tetap `OPEN`.
+
+- [x] **Tujuh lubang uji ditutup, tiap satu dibuktikan dengan mutasinya sendiri** (mutasi dipasang,
+  test dijalankan sampai merah, lalu dikembalikan):
+  1. nilai konstanta presence — semua test memakai simbolnya → `shared/src/presence-budget.test.ts`
+     mengikat ambang offline = 3× denyut, anggaran byte < ½ `maxPayload`, dan jatah laju.
+  2. polisi laju bisa dicabut habis: assertion lama `readyState === OPEN` **selalu** benar tanpa
+     guard → kini frame di luar jatah dibuktikan **tak pernah tercatat** di registry.
+  3. gerbang `cookieOnly` hanya diuji di `attach`, bukan di siar 3-detik yang justru terus
+     mengalir → test siar berkala di `events-presence-gate.test.ts`.
+  4. seluruh wiring klien nol coverage → `sync-client-presence-wiring.test.ts` mengikat bahwa
+     `startSyncClient` memasang pengirimnya dan `stopSyncClient` **membatalkan** ketukan reconnect
+     (cacat "socket yatim ber-token lama" yang jadi alasan jalur ini disentuh).
+  5. `Number(created) || 0` & `(s || 0) * 1000` — test lama memberi kolom **kosong**, bukan kolom
+     **hilang**. Baris terpotong → `NaN` → `new Date(NaN).toISOString()` **melempar**, dan lemparan
+     itu ditelan `catch` di view & sender → presence mati **senyap**.
+  6. `sinceLabel()` nol coverage, termasuk guard stempel-masa-depan dan stempel rusak.
+  7. nol test spoofing tingkat socket → `deviceId` di payload dibuktikan diabaikan di kawat.
 
 ## Self-review
 
