@@ -4,6 +4,23 @@
 - Layout responsif (SPEC-763): drawer mobile `<768px`, rail 72px pada tablet `768–1199px`, sidebar
   248px pada desktop `≥1200px`; topbar minimum 56px dan dapat wrap; konten maks 1200px (Docs full-width).
 - Bagian: Overview, Projects (list + pagination + cari + hapus project per baris) → **detail project** (identitas, coverage, edit `name`/`desc` lewat `PATCH /projects/:id`, dan pintu: Source of Truth, Terminal, Backlog, Changelog, Reverse docs). `id` tak pernah dapat diubah — ia kunci asing spec (SPEC-146). Hapus project ada di detail dan di header Docs — konfirmasi dulu, ditolak bila ada sesi tmux aktif; rename tidak ditolak, karena `id` tak bergerak. **PRD** (SPEC-210 · ADR-0041 — layar nav sebelum Backlog, **two-pane**: sidebar kiri daftar dokumen PRD yang bisa diklik + pane kanan preview `MarkdownView` inline. Filter project punya opsi **"Semua project"** → `GET /prds` lintas-project (item dikelompokkan per project); satu project terpilih → `GET /projects/:id/prds`; keduanya freshest-wins. **PRD baru** membuka sesi `flow:"prd"` project-level; project target dipilih **di dalam modal** (field `Select` project, default ikut filter aktif atau project pertama saat "Semua project") — tombol selalu aktif, tak perlu memfilter daftar dulu (SPEC-212); **Take ke backlog** membuka `NewSpecModal` ter-prefill dengan tautan PRD di teks Konteks, ke project asal PRD), Backlog (cari teks + filter project/stage/prioritas + tab sumber + tiga mode tampilan grid/list/board + aksi per spec + detail spec via modal: judul, stage bar, objective, field brief/QA), Terminal (sesi Claude Code interaktif di tmux), Docs (tree realtime semua `.md` di repo via `GET /docs`, dikelompokkan per direktori; kategori di luar `docsDir` masuk grup **Lainnya (tidak dinilai)** tanpa status linked — hanya kategori berskor yang masuk coverage, lihat ADR-0013; tombol **Muat ulang** membaca ulang tree, **Hapus** menghapus file asli, path ditampilkan repo-relative tanpa prefix `internal/docs`), VPS (daftar + audit/harden + Test connection + Open Console shell ssh + buka sesi Claude, SPEC-211; **klik baris membuka satu modal** berisi detail VPS — last audit + health disk/mem/load — menyatu dengan checklist kepatuhan 232 item, SPEC-220/221; tak ada lagi side panel terpisah), Settings (model & effort sesi — **default global**; model/effort dipilih **per sesi saat Start** lewat picker `StartSessionModal`, matrix per-fase dicabut, SPEC-252/ADR-0061; notifikasi, akun, users).
+- **Klien** (SPEC-919 · [ADR-0147](../adr/0147-kanal-presence-di-socket-sync.md)) — `ClientsScreen`:
+  satu kartu per device (nama, `hub ini` untuk mesin lokal, online/offline, terakhir terlihat) berisi
+  sesi hidupnya (SPEC-nnn + judul dari backlog, project, fase, status, sudah berjalan berapa lama);
+  baris ber-`specId` **bisa diklik** ke detail backlognya. Digerakkan grup siar `presence`; jalur
+  HTTP `api.presence()` hanya menutup keadaan WS terhalang proxy dan duduk **di layar ini**, bukan
+  di muat awal `App` — menambah satu panggilan `api` ke `load()` mematahkan 20 test ber-mock parsial
+  sekaligus (kelas jebakan SPEC-884).
+- **Entri nav bergerbang** (SPEC-919): `NavItem.gate` + context `NavGate` di `ds/shell.tsx`. `Shell`
+  dirender di belasan cabang `App`, jadi gerbangnya context — prop akan meninggalkan cabang yang
+  terlewat. Default context kosong = entri bergerbang **tersembunyi**; entri `clients` menyala hanya
+  saat `presence.enabled` (hub punya ≥1 `DeviceToken` belum dicabut), sehingga instalasi satu mesin
+  tetap melihat ke-13 layar yang sama seperti sebelumnya.
+- **`PresenceChip`** (SPEC-919) — penanda "dikerjakan di `<device>`" di baris/kartu backlog, kartu
+  board, dan baris project (sel Status). Satu komponen untuk ketiganya, disuapi indeks murni
+  `screens/presence-map.ts`. Ia **beda** dari `HandledByChips` (ADR-0135): yang itu penetapan MANUAL
+  yang menyeberang sync, yang ini keadaan LIVE yang tak pernah masuk DB. Daftar nama kosong →
+  **nol elemen**, ujung terakhir gerbang "instance tanpa sync tak berubah tampilannya".
 - **Start dari Backlog tetap di Backlog** setelah sesi berhasil dibuat; modal tertutup dan toast sukses
   tampil. Operator berpindah ke Terminal hanya lewat aksi eksplisit **Buka sesi** (SPEC-341).
 - Filter project di Backlog **dan PRD** dibaca dari satu state `projectFilter` milik `App`, bukan state

@@ -5,6 +5,8 @@ ada SSE, tidak ada `/runs`, `/triggers`, maupun `/webhooks` — dicabut bersama 
 (ADR-0024). Data real-time dashboard (backlog/sesi/notifikasi/limits/vps) **didorong** lewat satu
 WebSocket siar `GET /events/ws` (SPEC-199, ADR-0039) — bukan lagi polling. Terminal PTY punya
 WebSocket per-sesi tersendiri. Endpoint HTTP GET tiap sumber tetap ada untuk paint pertama.
+Kanal sync `GET /api/sync/ws` juga tak lagi satu arah sejak SPEC-919/ADR-0147: klien menaikkan
+snapshot sesi hidupnya di atas socket yang sama.
 
 > **MCP adalah KLIEN kontrak ini, bukan permukaan kedua** (SPEC-482 · ADR-0099). `hanoman mcp`
 > memanggil endpoint di dokumen ini lewat HTTP dengan agent token yang sama, jadi tak ada satu pun
@@ -866,6 +868,23 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 
 > **Sync mesin-ke-mesin** (SPEC-213/761 · ADR-0043/0117): surface `/api/sync/{pull,push,ws}` diotorisasi
 > **device token Bearer header**, di-**bypass** gate cookie. Credential query selalu 401.
+
+> **Arah NAIK di `/api/sync/ws`** (SPEC-919 · ADR-0147, **mengamandemen ADR-0046**): klien mengirim
+> satu jenis frame ke atas socket sync yang sudah dipegangnya —
+> `{ t:"presence", v:1, sessions:[{ sessionId, projectId, specId?, flow?, phase?, agent,
+> status:"working"|"waiting"|"exited", startedAt }] }`, semantik **ganti-penuh**, zod `.strict()`
+> (kunci asing DITOLAK — itulah yang menegakkan "tak ada isi terminal"), `sessions` ≤ 100.
+> `deviceId` **selalu** dari token terverifikasi (`req.wsPrincipal.id`), tak pernah dari payload.
+> Frame rusak / di atas jatah laju (60/menit) **DIBUANG tanpa menutup socket** — berbeda sadar dari
+> `/events/ws` yang menutup 1008/1009, karena socket ini mengangkut changefeed sync. Hub versi lama
+> tak memasang `socket.on("message")` sama sekali, jadi ia mengabaikan frame ini tanpa satu pun
+> error dan sync tetap normal. Keadaannya disimpan **di memori** dan tak pernah masuk `SyncLog`
+> (ADR-0148); ia punah sendiri saat socket putus atau denyut berhenti > 90 dtk.
+>
+> **`GET /api/presence`** (**cookie-only**, non-delegatable ke agent token — ia memaparkan peta
+> pekerjaan lintas mesin) → `{ enabled, devices }`, bentuk yang sama dengan frame siar `presence`.
+> **Muat awal + fallback saja**, tak ada yang men-poll-nya selama WS sehat; dipanggil dari layar
+> Klien, bukan dari muat awal App.
 > **Byte lampiran** (SPEC-272 · ADR-0068): `GET /api/sync/attachments/:storageKey` — **device-token**
 > (bukan cookie), stream byte biner lampiran (`Content-Type` mime) untuk fetch-through client → `200` |
 > `404` (storageKey bukan milik `TicketAttachment`/file hilang) | `401` (tanpa device token). Metadata
@@ -1250,7 +1269,14 @@ GET    /events/ws                    # WebSocket siar dashboard (global). Auth =
 #         message, at, total, state:"queued"|"deciding"|"answered"|"taken-over"|"failed",
 #         flowId, step }`. `state` diturunkan dari `queuedIds()`/`decidingIds()` yang sudah ada —
 #         "mengantre" & "menyusun" tak pernah punya dua definisi. `questions` KOSONG untuk codex,
-#         yang tak punya `AskUserQuestion`; di sana `message` = teks giliran terakhirnya.)
+#         yang tak punya `AskUserQuestion`; di sana `message` = teks giliran terakhirnya.) ·
+#       { t:"presence", enabled, devices } (SPEC-919/ADR-0147, tiap 3s — sesi hidup di SELURUH
+#         device yang tersambung ke hub ini, termasuk mesin hub sendiri. Grup GLOBAL, bukan topik
+#         berlangganan: muatannya tak berparameter. `devices[] = { deviceId, name, local, online,
+#         lastSeenAt, sessions[] }`, `sessions[] = { sessionId, projectId, specId?, flow?, phase?,
+#         agent, status:"working"|"waiting"|"exited", startedAt, statusAt }`. `enabled` = hub ini
+#         punya >=1 DeviceToken belum dicabut; false → dashboard tak menampilkan apa pun soal ini.
+#         Nol isi terminal, nol `cwd`: lihat ADR-0147 §3.)
 #
 #   SPEC-908 · ADR-0145 · LANGGANAN BERPARAMETER (mengamandemen ADR-0039: kanal tak lagi read-only)
 #   klien->server, SATU jenis frame, semantik GANTI-PENUH (mengganti seluruh himpunan langganan):

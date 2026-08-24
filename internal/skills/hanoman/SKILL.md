@@ -82,7 +82,34 @@ Pakai skill lebih sempit saat task cocok:
   ADR-0087); dan `capabilityForRoute` dulu memetakan prefix status (`update`/`limits`/`events`/`fs`/
   `health`) ke `GLOBAL_READ` **tanpa melihat method**, jadi menambah endpoint tulis di bawahnya
   berarti setiap agent token bisa me-restart instance — kini `GLOBAL_READ` hanya untuk method baca.
-- Realtime: **satu WebSocket siar `/api/events/ws`** per tab di samping WS terminal PTY (ADR-0039, diamandemen **ADR-0145**). Delapan grup snapshot GLOBAL disiarkan tanpa diminta (sessions, specs, notifications, cleanups, vps, limits, codexLimits, update); empat layar berparameter — Scheduler, Triase, Lead, GitGraph — **berlangganan** lewat frame `{t:"sub"}` di socket yang sama. Klien **tak** men-poll HTTP: endpoint HTTP-nya tinggal muat awal + fallback saat server belum punya topiknya. Jaga UI responsif — log sesi streaming, jangan blok main thread.
+- Realtime: **satu WebSocket siar `/api/events/ws`** per tab di samping WS terminal PTY (ADR-0039, diamandemen **ADR-0145**). **Sepuluh** grup snapshot GLOBAL disiarkan tanpa diminta (sessions, specs, notifications, cleanups, leadAsks (SPEC-909), vps, limits, codexLimits, update, presence (SPEC-919)); empat layar berparameter — Scheduler, Triase, Lead, GitGraph — **berlangganan** lewat frame `{t:"sub"}` di socket yang sama. Klien **tak** men-poll HTTP: endpoint HTTP-nya tinggal muat awal + fallback saat server belum punya topiknya. Jaga UI responsif — log sesi streaming, jangan blok main thread.
+- **Presence sesi lintas device — arah NAIK di socket sync yang sudah ada, keadaan di MEMORI**
+  (SPEC-919/**ADR-0147**+**ADR-0148**, mengamandemen ADR-0046; menegakkan 0043/0044/0117, 0024,
+  0039/0145, 0131, dan kontras dengan 0135): klien mengirim `{t:"presence",v:1,sessions[]}` ke atas
+  `ws://<hub>/api/sync/ws` yang **sudah dipegangnya** — bukan kanal kedua. Yang menentukan bukan
+  hemat koneksi: hub versi lama **tak memasang `socket.on("message")` sama sekali**, jadi
+  kompatibilitas mundur terpenuhi *by construction*, bukan oleh kode versi yang harus dirawat.
+  Muatannya RINGKAS dan `.strict()` — `{sessionId, projectId, specId?, flow?, phase?, agent,
+  status:"working"|"waiting"|"exited", startedAt}`, **tanpa `cwd`** (itulah yang membuat
+  `SessionHistory` LOCAL-only) dan tanpa judul/nama (hub sudah memegang `Spec`/`Project` tersync —
+  kebalikan sadar dari `HandledByEntry` yang HARUS membawa `name`). Keadaannya `Map` **di memori**,
+  nol tabel & nol kolom: denyut 30 dtk/device dua orde lebih sering daripada `pollHealth()` yang di
+  ADR-0131 terukur jadi 83 % isi DB hub, dan baris yang tak pernah lahir tak bisa masuk `SyncLog`
+  walau kelak ada yang menambah entitas ke `SYNCED`. **Enam gotcha:** (1) `deviceId` **selalu** dari
+  `req.wsPrincipal.id`, tak pernah dari payload; (2) frame rusak/di atas jatah laju **DIBUANG tanpa
+  menutup socket** — berbeda sadar dari `/events/ws` yang menutup 1008/1009, karena socket ini
+  mengangkut changefeed sync, dan `MAX_PRESENCE_SESSIONS`=100 dipotong di PENGIRIM karena
+  `maxPayload` 64 KiB ditegakkan `ws` sebelum handler kita sempat mengabaikan apa pun; (3) `statusAt`
+  dicap HUB, bukan klien — satu-satunya bahan klien adalah aktivitas pane yang bergerak tiap detik,
+  jadi pengirim yang seharusnya diam berubah jadi banjir frame; (4) sesi mesin hub masuk lewat pintu
+  `recordPresence` yang **sama** supaya tak ada rumus kedua; (5) `#{session_created}` ditambahkan di
+  **ujung** FMT `pty.ts` (posisi kolom lama tak bergeser — `pty-parse.test.ts` menguncinya) dan
+  mendarat di `Pane`, **bukan** `SessionInfo`; (6) muat awal `GET /api/presence` duduk di
+  `ClientsScreen`, **bukan** `load()` App — menambah satu panggilan `api` di sana mematahkan **20
+  test ber-mock parsial** sekaligus (kelas jebakan SPEC-884). Gerbang `enabled` = ada ≥1
+  `DeviceToken` belum dicabut → instalasi satu mesin nol perubahan tampilan. Reconnect sync ikut naik
+  jadi backoff 1→30 dtk ber-jitter, sekaligus menambal timer reconnect yang **tak pernah dibatalkan**
+  `stopSyncClient()` (socket yatim ber-token lama sesudah `applySyncConfig()`).
 - **State tampilan tiap halaman persisten di storage, berkunci per layar** (SPEC-740/**ADR-0115**;
   ADR-0107 & ADR-0071 **ditegakkan**, tak ada yang dicabut): filter & pencarian, paginasi, posisi
   scroll, item terpilih & panel terbuka bertahan lintas navigasi **dan** refresh/buka-ulang browser.

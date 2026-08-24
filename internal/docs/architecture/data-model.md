@@ -14,6 +14,20 @@ bersama error monitoring & cross-audit (migrasi `drop_errors_sdk_crossaudit`). E
 stage/source/priority/ticket-status/ticket-category disimpan sebagai `String` dan divalidasi zod di
 `@hanoman/shared` (`enums.ts`), bukan enum Prisma.
 
+**Presence sesi lintas device TIDAK punya model** (SPEC-919 ·
+[ADR-0148](../adr/0148-status-hidup-tidak-disync.md)). "Sesi apa yang hidup di device mana" hidup di
+`Map` memori (`server/src/services/presence/registry.ts`) dan tak pernah menyentuh Prisma — bukan
+tabel LOCAL-only seperti `LocalBinding`/`SessionHistory`, melainkan baris yang tak pernah lahir.
+Alasannya kadens: presence berdenyut 30 dtk per device, dua orde lebih sering daripada
+`pollHealth()` yang di [ADR-0131](../adr/0131-retensi-change-feed-sync.md) terukur menjadi 83 % isi
+DB hub. "Terakhir terlihat" tetap dibaca dari `DeviceToken.lastSeenAt` yang sudah ada — kanal
+presence sendiri sengaja tak menulisnya per denyut. Konsekuensinya: presence **tak** ada di
+`SYNCED`/`FIELDS`/`PG_ORDER`/`WEBHOOK_ENTITIES`, dan tak ada migrasi untuknya.
+
+`Pane.startedAt` (SPEC-919) juga **bukan kolom DB**: ia `#{session_created}` dari `tmux list-panes`,
+sekamar dengan `activityAt`/`altScreen`/`eventHook` — tmux adalah satu-satunya sumber kebenaran soal
+sesi, dan tak ada peta yang perlu dihidrasi ulang saat server restart.
+
 **Provider & migrasi.** Riwayat 32 migrasi Postgres diganti satu init SQLite
 (`20260730000000_init_sqlite`) — migrasi lama tak bisa di-*replay* di SQLite, dan jalan pindah bagi
 data lama bukan riwayat migrasi melainkan `hanoman migrate-from-postgres --from <pg-url>` (26 model
