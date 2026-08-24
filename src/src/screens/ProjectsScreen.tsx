@@ -6,6 +6,7 @@ import { Card, StatusPill, Badge, ProgressBar, Icon, IconButton, Select, StateBl
 import { api } from "../api/client";
 import { usePersistedState, useScrollRestore, useResetOnChange, isNum, isStr } from "../ui-state";
 import { HandledByChips } from "./HandledByChips";
+import { PresenceChip } from "./PresenceChip";
 import type { DeviceTokenView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 
@@ -50,8 +51,9 @@ function StatStrip({ projects }: { projects: ProjectVM[] }) {
   );
 }
 
-function ProjectRow({ p, onOpen, onDelete }:
-  { p: ProjectVM; onOpen?: (p: ProjectVM) => void; onDelete?: (p: ProjectVM) => void }) {
+function ProjectRow({ p, onOpen, onDelete, presenceOn }:
+  { p: ProjectVM; onOpen?: (p: ProjectVM) => void; onDelete?: (p: ProjectVM) => void;
+    presenceOn?: string[] }) {
   const att = hnAttention(p);
   const running = p.session.status === "running";
   const [hover, setHover] = React.useState(false);
@@ -81,7 +83,12 @@ function ProjectRow({ p, onOpen, onDelete }:
           <span style={{ display: "block", fontSize: 11.5, color: "var(--text-subtle)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.desc}</span>
         </button>
       </div>
-      <div data-label="Status"><StatusPill status={p.session.status} size="sm">{running && p.session.phase ? p.session.phase : undefined}</StatusPill></div>
+      <div data-label="Status" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, minWidth: 0 }}>
+        <StatusPill status={p.session.status} size="sm">{running && p.session.phase ? p.session.phase : undefined}</StatusPill>
+        {/* SPEC-919 · ADR-0147 · penanda LIVE lintas device — beda dari "Ditangani" (ADR-0135)
+            yang penetapan MANUAL dan menyeberang sync. */}
+        <PresenceChip names={presenceOn} />
+      </div>
       <div data-label="Docs · SoT" style={{ paddingRight: 8 }}><ProgressBar value={p.coverage} showLabel tone={hnCovTone(p.docStatus)} size="sm" /></div>
       <div data-label="Backlog" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)" }}>{p.backlog} · {p.topStage}</div>
       {/* SPEC-880 · ADR-0135 · penanda "ditangani oleh" — DISYNC, beda dari repoDir/binding. */}
@@ -99,10 +106,11 @@ function ProjectRow({ p, onOpen, onDelete }:
   );
 }
 
-export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = "", dataVersion, onClearSearch }:
+export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = "", dataVersion, onClearSearch, presenceByProject }:
   { projects: ProjectVM[]; variant?: string; onOpen?: (p: ProjectVM) => void;
     onDelete?: (p: ProjectVM) => void; pageSize?: number;
-    search?: string; dataVersion?: number; onClearSearch?: () => void }) {
+    search?: string; dataVersion?: number; onClearSearch?: () => void;
+    presenceByProject?: Map<string, string[]> }) {
   const cols = ["Project", "Status", "Docs · SoT", "Backlog", "Ditangani", "Aktivitas"];
   const tmpl = "1.6fr 1fr 1.2fr 0.9fr 1.3fr 1.2fr";
   // SPEC-198 · search + paginasi via API. StatStrip tetap dari `projects` PENUH (statistik global).
@@ -162,7 +170,8 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
             {cols.map((c) => <span key={c} className="hn-eyebrow">{c}</span>)}
           </div>
           <div ref={listRef} data-testid="projects-scroll" style={LIST_SCROLL_STYLE}>
-            {rows.map((p) => <ProjectRow key={p.id} p={p} onOpen={onOpen} onDelete={onDelete} />)}
+            {rows.map((p) => <ProjectRow key={p.id} p={p} onOpen={onOpen} onDelete={onDelete}
+              presenceOn={presenceByProject?.get(p.id)} />)}
           </div>
           {pageSize && <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to} onPage={setPage} unit="project" />}
         </Card>

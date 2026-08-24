@@ -761,13 +761,15 @@ export default function App() {
     }
   }, []);
 
-  // SPEC-919 · ADR-0147 · sesi hidup lintas device. Didorong lewat grup siar `presence`;
-  // `api.presence()` di `load()` hanya muat awal (dan satu-satunya jalur saat WS terhalang proxy).
+  /* SPEC-919 · ADR-0147 · sesi hidup lintas device, didorong grup siar `presence` — `attach()`
+     mengirim seluruh grup begitu socket terbuka, jadi state ini terisi tanpa satu request pun.
+     Muat awal HTTP-nya SENGAJA tidak di sini melainkan di `ClientsScreen`: `load()` adalah efek
+     yang dijalankan SETIAP test yang me-mount App, dan menambah satu panggilan `api` di sana
+     mematahkan 20 test ber-mock parsial sekaligus (kelas jebakan SPEC-884). */
   const [presence, setPresence] = React.useState<PresenceView>({ enabled: false, devices: [] });
 
   const load = React.useCallback(() => {
     setStatus("loading");
-    api.presence().then(setPresence).catch(() => { /* server lama / WS yang mengisi */ });
     Promise.all([api.listProjects(), api.listSpecs(), api.listTerminals()])
       .then(([p, s, t]) => {
         setProjects(p.items); setBacklog(s.items); setSessions(t);
@@ -1318,7 +1320,8 @@ export default function App() {
                 hint="Mulai dari nol atau tambahkan codebase yang sudah ada — hanoman menyusun Source of Truth-nya."
                 action={() => setModal("project")} actionLabel="Project baru" />
             : <ProjectsScreen projects={projectsView} variant="list" onOpen={openProject} onDelete={deleteProject}
-                pageSize={20} search={search} dataVersion={dataVersion} onClearSearch={() => setSearch("")} />)}
+                pageSize={20} search={search} dataVersion={dataVersion} onClearSearch={() => setSearch("")}
+                presenceByProject={presenceMap.byProject} />)}
       </Shell>
     );
   } else if (section === "project") {
@@ -1349,7 +1352,8 @@ export default function App() {
       <Shell active="backlog" title="Backlog" breadcrumb="specs · brainstorm → execute" onNavigate={setSection}
         actions={<Button size="sm" leftIcon="plus" onClick={() => setModal("brief")}>Tambah</Button>}>
         {gate(<BacklogScreen backlog={backlog} projects={projectsView} pageSize={20}
-          onStart={startSession} activeSpecs={activeSpecs} onNew={() => setModal("brief")}
+          onStart={startSession} activeSpecs={activeSpecs} presenceBySpec={presenceMap.bySpec}
+          onNew={() => setModal("brief")}
           onDelete={deleteSpec}
           onOpenRun={(spec) => openTerminal(sessions.find((s) => s.specId === spec.id && !s.exited)?.id)}
           onOpenReview={openReview}

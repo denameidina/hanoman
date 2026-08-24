@@ -1,7 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ClientsScreen } from "../src/screens/ClientsScreen";
+import { api } from "../src/api/client";
 import type { PresenceView } from "@hanoman/shared";
+
+vi.mock("../src/api/client", () => ({ api: { presence: vi.fn() } }));
 
 const view: PresenceView = {
   enabled: true,
@@ -63,5 +66,32 @@ describe("ClientsScreen", () => {
     render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={onOpenSpec} />);
     fireEvent.click(screen.getByTestId("presence-session-prd-abc"));
     expect(onOpenSpec).not.toHaveBeenCalled();
+  });
+});
+
+describe("ClientsScreen muat awal HTTP", () => {
+  beforeEach(() => { vi.mocked(api.presence).mockReset(); });
+
+  it("menarik /api/presence hanya saat frame siar belum membawa apa pun", async () => {
+    vi.mocked(api.presence).mockResolvedValue({
+      enabled: true,
+      devices: [{
+        deviceId: "d9", name: "dari-http", local: false, online: true,
+        lastSeenAt: null, sessions: [],
+      }],
+    });
+    render(<ClientsScreen view={{ enabled: false, devices: [] }} specTitles={{}} onOpenSpec={() => {}} />);
+    await waitFor(() => expect(screen.getByText("dari-http")).toBeTruthy());
+  });
+
+  it("tidak menarik apa pun saat frame siar sudah membawa device", () => {
+    render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
+    expect(api.presence).not.toHaveBeenCalled();
+  });
+
+  it("server lama (fetch gagal) tetap merender keadaan kosong, bukan melempar", async () => {
+    vi.mocked(api.presence).mockRejectedValue(new Error("404"));
+    render(<ClientsScreen view={{ enabled: false, devices: [] }} specTitles={{}} onOpenSpec={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Belum ada device")).toBeTruthy());
   });
 });

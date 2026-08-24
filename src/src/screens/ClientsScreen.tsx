@@ -1,5 +1,6 @@
 import React from "react";
 import { Card, Badge, StateBlock } from "../ds";
+import { api } from "../api/client";
 import { Icon } from "../ds/icon";
 import type { PresenceDeviceView, PresenceSessionView, PresenceView } from "@hanoman/shared";
 
@@ -91,10 +92,25 @@ function DeviceCard({ d, specTitles, onOpenSpec, now }:
 
 export function ClientsScreen({ view, specTitles, onOpenSpec }:
   { view: PresenceView; specTitles: Record<string, string>; onOpenSpec: (specId: string) => void }) {
+  /* ADR-0145 · muat awal + fallback. Frame siar biasanya SUDAH tiba sebelum layar ini dibuka
+     (`attach()` mengirim seluruh grup saat socket terbuka), jadi jalur HTTP ini hanya menutup satu
+     keadaan: WS terhalang proxy yang menolak upgrade padahal HTTP hidup. Ia duduk di sini, bukan
+     di `load()` App, supaya satu-satunya layar yang benar-benar membutuhkannya yang membayarnya. */
+  const [fallback, setFallback] = React.useState<PresenceView | null>(null);
+  const empty = view.devices.length === 0;
+  React.useEffect(() => {
+    if (!empty) return;
+    let alive = true;
+    api.presence().then((v) => { if (alive) setFallback(v); })
+      .catch(() => { /* server lama: layar tetap pada keadaan kosongnya */ });
+    return () => { alive = false; };
+  }, [empty]);
+
+  const shown = empty && fallback ? fallback : view;
   // Satu stempel per render: dua baris yang lahir dari render yang sama tak boleh menghitung
   // "sudah berapa lama" dari dua titik waktu berbeda.
   const now = Date.now();
-  if (view.devices.length === 0) {
+  if (shown.devices.length === 0) {
     return (
       <StateBlock kind="empty" icon="monitor" title="Belum ada device"
         hint="Device muncul di sini sesudah sebuah instance hanoman menerbitkan device token dan menyinkron ke hub ini." />
@@ -102,7 +118,7 @@ export function ClientsScreen({ view, specTitles, onOpenSpec }:
   }
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {view.devices.map((d) => (
+      {shown.devices.map((d) => (
         <DeviceCard key={d.deviceId} d={d} specTitles={specTitles} onOpenSpec={onOpenSpec} now={now} />
       ))}
     </div>

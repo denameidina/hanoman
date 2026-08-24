@@ -24,6 +24,7 @@ import type { Spec } from "./types";
 import type { ProjectVM } from "./types";
 import type { AuditEscalation } from "@hanoman/shared";
 import { AUTO_MERGE_OFF, autoMergeSummary, resolveAutoMerge, payloadShapeFor, type AutoMerge } from "@hanoman/shared";
+import { PresenceChip } from "./PresenceChip";
 
 // Kosakata stage frontend (key → label). Di-reuse oleh BacklogPicker di TerminalScreen (SPEC-179).
 export const B_STAGES = [
@@ -607,12 +608,12 @@ function TitleButton({ spec, onOpenDetail, size = 15 }:
   );
 }
 
-function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running }:
+function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running, presenceOn }:
   {
     spec: Spec; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
     onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
     onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
-    running?: boolean
+    running?: boolean; presenceOn?: string[]
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
   return (
@@ -626,6 +627,8 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
             </Badge>
             {spec.branchFrom && <Badge tone="neutral" size="sm" icon="git-branch">{spec.branchFrom}</Badge>}
             <BlockedBadge spec={spec} />
+            {/* SPEC-919 · ADR-0147 · penanda LIVE lintas device. */}
+            <PresenceChip names={presenceOn} />
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>· {spec.projectId}</span>
           </div>
           <div style={{ marginTop: 8 }}><TitleButton spec={spec} onOpenDetail={onOpenDetail} /></div>
@@ -646,12 +649,12 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
 
 /* ── List view ─────────────────────────────────────────────────────────────
    Baris padat: satu spec per baris, stage bar inline, aksi di kanan. */
-function SpecRow({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running }:
+function SpecRow({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running, presenceOn }:
   {
     spec: Spec; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
     onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
     onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
-    running?: boolean
+    running?: boolean; presenceOn?: string[]
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
   return (
@@ -671,6 +674,8 @@ function SpecRow({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetai
       {spec.branchFrom && <Badge tone="neutral" size="sm" icon="git-branch">{spec.branchFrom}</Badge>}
       <BlockedBadge spec={spec} />
       <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"}>{prio.label}</Badge>
+      {/* SPEC-919 · ADR-0147 · penanda LIVE lintas device — beda dari StageBar yang stage tersimpan. */}
+      <PresenceChip names={presenceOn} />
       <div style={{ flex: "0 0 auto" }}><StageBar stage={spec.stage} /></div>
       <SpecActions spec={spec} onStart={onStart} onDelete={onDelete} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onMarkDone={onMarkDone} running={running} />
     </div>
@@ -713,12 +718,12 @@ export function specColumn(spec: Spec, hasSession?: boolean): string {
 export const canDrop = (from: string, to: string): boolean =>
   from === BACKLOG_COL && to === FIRST_STAGE;
 
-function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, onMarkDone, running, onDragStart, onDragEnd, dragging }:
+function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, onMarkDone, running, presenceOn, onDragStart, onDragEnd, dragging }:
   {
     spec: Spec; col: string; onOpenDetail?: (s: Spec) => void; onStart?: (s: Spec) => void;
     onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void;
     onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
-    running?: boolean;
+    running?: boolean; presenceOn?: string[];
     onDragStart: () => void; onDragEnd: () => void; dragging: boolean
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
@@ -749,6 +754,9 @@ function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, 
       {(spec.blockedBy ?? []).length > 0 && (
         <div style={{ marginTop: 6 }}><BlockedBadge spec={spec} /></div>
       )}
+      {presenceOn?.length ? (
+        <div style={{ marginTop: 6 }}><PresenceChip names={presenceOn} /></div>
+      ) : null}
       {/* HTML5 drag-and-drop mati di keyboard dan di layar sentuh. Tombol ini jalur
           satu-satunya di sana — termasuk retry spec di kolom Failed. */}
       <div style={{ marginTop: 8 }}>
@@ -758,9 +766,9 @@ function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, 
   );
 }
 
-function Board({ specs, activeSpecs, onStart, onOpenRun, onOpenReview, onOpenDetail, onMarkDone }:
+function Board({ specs, activeSpecs, presenceBySpec, onStart, onOpenRun, onOpenReview, onOpenDetail, onMarkDone }:
   {
-    specs: Spec[]; activeSpecs?: Set<string>;
+    specs: Spec[]; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
     onStart?: (s: Spec) => void; onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
     onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
   }) {
@@ -812,6 +820,7 @@ function Board({ specs, activeSpecs, onStart, onOpenRun, onOpenReview, onOpenDet
                 <BoardCard key={s.id} spec={s} col={c.key} onOpenDetail={onOpenDetail}
                   onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview}
                   onMarkDone={onMarkDone} running={activeSpecs?.has(s.id)}
+                  presenceOn={presenceBySpec?.get(s.id)}
                   dragging={drag?.spec.id === s.id}
                   onDragStart={() => setDrag({ spec: s, from: c.key })}
                   onDragEnd={() => { setDrag(null); setOver(null); }} />
@@ -830,10 +839,10 @@ const VIEWS = [
   { value: "board", label: "Board", icon: "kanban" },
 ];
 
-export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onMarkDone, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
+export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, presenceBySpec, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onMarkDone, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
   {
     backlog: Spec[]; projects: ProjectVM[]; pageSize?: number;
-    onStart?: (s: Spec) => void; activeSpecs?: Set<string>;
+    onStart?: (s: Spec) => void; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
     onDelete?: (s: Spec) => void; onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onNew?: () => void;
     onEditBranch?: (s: Spec, b: string | null) => void;
     onRevertStage?: (s: Spec, target: string, confirmDelete?: boolean) => Promise<any>;
@@ -1026,7 +1035,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             action={() => { setTab("all"); setProj("all"); setQ(""); setStageFilter("all"); setPrioFilter("all"); setDateField("created"); setFrom(""); setTo(""); }} actionLabel="Reset filter" actionIcon="rotate-ccw" />
       ) : view === "board" ? (
         // Board tak dipaginasi: minta set terfilter penuh dari server (fetch tanpa page/limit).
-        <Board specs={items} activeSpecs={activeSpecs} onMarkDone={onMarkDone}
+        <Board specs={items} activeSpecs={activeSpecs} presenceBySpec={presenceBySpec} onMarkDone={onMarkDone}
           onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onOpenDetail={(x) => setDetailId(x.id)} />
       ) : (
         <>
@@ -1037,7 +1046,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
               borderRadius: "var(--radius-lg)", overflowX: "hidden"
             }}>
               {items.map((s) => <SpecRow key={s.id} spec={s} onStart={onStart}
-                running={activeSpecs?.has(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
+                running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
                 onOpenReview={onOpenReview} onMarkDone={onMarkDone}
                 onOpenDetail={(x) => setDetailId(x.id)} />)}
             </div>
@@ -1047,7 +1056,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
               gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))"
             }}>
               {items.map((s) => <SpecCard key={s.id} spec={s} onStart={onStart}
-                running={activeSpecs?.has(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
+                running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
                 onOpenReview={onOpenReview} onMarkDone={onMarkDone}
                 onOpenDetail={(x) => setDetailId(x.id)} />)}
             </div>
