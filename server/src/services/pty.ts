@@ -133,13 +133,17 @@ export type SessionInfo = {
   // SPEC-338 · ADR-0074 · mesin sesi. Sesi lama (tanpa opsi tmux ini) dibaca sebagai "claude".
   agent: Agent;
 };
-type Pane = SessionInfo & {
+export type Pane = SessionInfo & {
   code: number; phaseFile?: string; decisionFile?: string;
   // SPEC-863 · `#{alternate_on}` pane — TUI layar penuh (vim) 1, shell dan TUI agen 0.
   altScreen: boolean;
   // SPEC-903 · `#{window_activity}` — detik epoch keluaran TERAKHIR pane. Setiap sesi hanoman satu
   // window satu pane, jadi ini aktivitas pane. NaN bila tmux tak menjawabnya (versi lama).
   activityAt: number;
+  // SPEC-919 · `#{session_created}` — detik epoch saat sesi tmux dibuat, yaitu awal sesi hanoman
+  // ini. Nol bila tmux tak menjawabnya. SENGAJA di luar `SessionInfo`, cermin `activityAt`/
+  // `eventHook`: ia bahan presence, bukan bagian DTO yang disiarkan ke dashboard.
+  startedAt: number;
   // SPEC-909 · `@hanoman_event_hook` — sesi ini lahir dengan hook pengirim event. Sesi tanpa
   // penanda ini lahir sebelum pembaruan dan tak akan dijawab lead (engine menotifikasinya sekali).
   // SENGAJA di luar `SessionInfo`: ia detail internal, bukan bagian DTO yang disiarkan/disync.
@@ -298,11 +302,13 @@ export { sessionIdForSpec };
 const idFor = (specId?: string) =>
   specId ? sessionIdForSpec(specId) : randomUUID().slice(0, 8);
 
-const FMT = [
+export const FMT = [
   "#{session_name}", "#{@hanoman_project}", "#{@hanoman_spec}", "#{@hanoman_flow}",
   "#{@hanoman_phase_file}", "#{@hanoman_cwd}", "#{pane_dead}", "#{pane_dead_status}",
   "#{@hanoman_decision_file}", "#{@hanoman_branch}", "#{@hanoman_agent}", "#{alternate_on}",
-  "#{window_activity}", "#{@hanoman_event_hook}",
+  // SPEC-919 · field baru ditambahkan di UJUNG: posisi kolom lama tak bergeser, dan
+  // `pty-parse.test.ts` mengunci panjang FMT terhadap destructuring `parsePanes`.
+  "#{window_activity}", "#{@hanoman_event_hook}", "#{session_created}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -321,7 +327,7 @@ function listPanes(): Pane[] {
 
 // Kembaran asinkron `listPanes()` — semantik kegagalan SAMA PERSIS (server belum jalan → [],
 // kegagalan lain dilempar), hanya tak menahan event loop selama tmux menjawab.
-async function listPanesAsync(): Promise<Pane[]> {
+export async function listPanesAsync(): Promise<Pane[]> {
   let out: string;
   try { out = await tmuxAsync("list-panes", "-a", "-F", FMT); }
   catch (e) {
@@ -331,10 +337,10 @@ async function listPanesAsync(): Promise<Pane[]> {
   return parsePanes(out);
 }
 
-function parsePanes(out: string): Pane[] {
+export function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
-      alternate, activity, eventHook] = line.split("\t");
+      alternate, activity, eventHook, created] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -355,6 +361,8 @@ function parsePanes(out: string): Pane[] {
       agent: (agent === "codex" ? "codex" : "claude") as Agent,
       altScreen: alternate === "1",
       activityAt,
+      // SPEC-919 · sesi yang lahir di tmux yang tak menjawab field ini → 0 (epoch).
+      startedAt: Number(created) || 0,
       // SPEC-909 · ADR-0146 · sesi yang lahir sebelum pembaruan tak punya opsi ini → false.
       eventHook: eventHook === "1",
     }];
