@@ -96,10 +96,12 @@ function DeviceCard({ d, specTitles, onOpenSpec, now }:
 
 export function ClientsScreen({ view, specTitles, onOpenSpec }:
   { view: PresenceView; specTitles: Record<string, string>; onOpenSpec: (specId: string) => void }) {
-  /* ADR-0145 · muat awal + fallback. Frame siar biasanya SUDAH tiba sebelum layar ini dibuka
-     (`attach()` mengirim seluruh grup saat socket terbuka), jadi jalur HTTP ini hanya menutup satu
-     keadaan: WS terhalang proxy yang menolak upgrade padahal HTTP hidup. Ia duduk di sini, bukan
-     di `load()` App, supaya satu-satunya layar yang benar-benar membutuhkannya yang membayarnya. */
+  /* ADR-0145 · muat awal. Yang benar-benar memicunya bukan proxy yang menolak upgrade melainkan
+     kasus sehari-hari: `section` dipulihkan dari storage (ADR-0115, `clients` ada di `NAV_KEYS`),
+     jadi refresh saat sedang membuka layar ini mendaratkan kita di sini SEBELUM socket sempat
+     mengantar frame pertamanya — dan `App` sengaja tak menariknya di `load()` (satu panggilan `api`
+     di sana mematahkan 20 test ber-mock parsial, kelas jebakan SPEC-884). Ia berhenti begitu frame
+     tiba; tak ada polling. */
   const [fallback, setFallback] = React.useState<PresenceView | null>(null);
   const empty = view.devices.length === 0;
   React.useEffect(() => {

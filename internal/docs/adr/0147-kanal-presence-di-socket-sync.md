@@ -191,6 +191,12 @@ yang sudah dibayar loop siar saat dashboard terbuka.
   ADR ini melainkan membuat `attach` mencatat kegagalannya seperti `__tick` sudah lakukan —
   perbaikan terpisah, dan sengaja tak diselundupkan ke sini. Sementara itu `events.route.test.ts`
   mengunci bahwa `presence` memang ada di snapshot attach pada jalur sehat.
+- **Entri nav bergerbang oleh frame, jadi WS yang terhalang proxy menyembunyikan halamannya.**
+  `enabled` hanya tiba lewat grup siar; kalau upgrade WS ditolak proxy, entri "Klien" tak pernah
+  muncul walau `GET /api/presence` hidup. Layarnya sendiri tetap terjangkau lewat `section` yang
+  dipulihkan dari storage (ADR-0115) — dan justru itu pemicu nyata muat-awal HTTP-nya, bukan proxy.
+  Menyalakan nav tanpa WS berarti menarik presence di muat awal `App`, yang punya harganya sendiri
+  (20 test ber-mock parsial); keputusan itu ditunda sampai ada yang benar-benar terhalang proxy.
 - **Gerbang `cookieOnly` hidup di `events.ts`, bukan di peta capability.** `capabilityForRoute` tak
   punya cabang untuk `/api/ws-tickets` sehingga ia jatuh ke default cookie-only — itu yang menahan
   agent token hari ini, dan itu **ketiadaan entri**, bukan keputusan. Karena itu grupnya digerbangi

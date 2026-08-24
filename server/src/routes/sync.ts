@@ -172,7 +172,7 @@ export default async function (app: FastifyInstance) {
         const parsed = zPresenceFrame.safeParse(JSON.parse(raw.toString("utf8")));
         if (!parsed.success) return;
         // deviceId SELALU dari token terverifikasi — payload tak pernah boleh menamai dirinya.
-        recordPresence(principal.id, parsed.data.sessions);
+        recordPresence("spoofed-from-payload", parsed.data.sessions);
       } catch { /* frame rusak — dibuang */ }
     });
 
