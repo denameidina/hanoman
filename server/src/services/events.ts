@@ -8,6 +8,7 @@ import { getUpdateStatus } from "./update";
 import { isDeciding } from "./lead/deciding";
 import { liveAsks } from "./lead/ask";
 import { listCleanups } from "./worktree-reaper";
+import { presenceView } from "./presence/view";
 import { prisma } from "../db";
 import { effectiveInt } from "../config";
 import { subKey, type EventMsg, type EventTopic } from "@hanoman/shared";
@@ -68,6 +69,10 @@ const GROUPS: Group[] = [
   // SPEC-214 · deteksi update jarang berubah; recompute tiap 300 dtk, dedup signature → siar hanya
   // saat status berubah. getUpdateStatus cache 15s + fetch ter-gate (server.ts) → attach tak menahan.
   { everyTicks: 300, last: "", build: async () => ({ t: "update", update: await getUpdateStatus() }) },
+  // SPEC-919 · ADR-0147 · sesi hidup lintas device. 3 dtk: presence berdenyut 30 dtk, jadi kadens
+  // lebih rapat hanya menambah build tanpa menambah informasi. `presenceView` menyegarkan sesi
+  // mesin ini sendiri di dalamnya — satu `tmux list-panes` asinkron, tak menahan event loop.
+  { everyTicks: 3, last: "", build: async () => ({ t: "presence", ...(await presenceView()) }) },
 ];
 
 // SPEC-908 · klien yang `send`-nya melempar harus dilepas dari `clients` DAN dari peta langganan.

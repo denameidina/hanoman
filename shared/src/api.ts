@@ -131,6 +131,8 @@ export const paths = {
   sessionHistoryItem: (id: string) => `${API}/terminal/history/${encodeURIComponent(id)}`,
   sessionTranscript: (id: string) => `${API}/terminal/history/${encodeURIComponent(id)}/transcript`,
   eventsWs: `${API}/events/ws`,   // SPEC-199 · WebSocket siar dashboard (global, bukan per-sesi)
+  // SPEC-919 · ADR-0147 · muat awal + fallback halaman Klien. Selama WS sehat tak ada yang men-poll-nya.
+  presence: `${API}/presence`,
   wsTickets: `${API}/ws-tickets`,
   vps: `${API}/vps`,
   vpsOne: (id: string) => `${API}/vps/${id}`,

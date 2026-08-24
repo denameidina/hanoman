@@ -1,3 +1,4 @@
+import type { PresenceDeviceView } from "./presence";
 import { z } from "zod";
 import type { SessionAsk } from "./session-ask";
 import { zProject, zBriefPayload, zQaPayload, zGoalPayload, zSpec, zScheduler, zAgent, zLead } from "./entities";
@@ -800,6 +801,10 @@ export type EventMsg =
   // sendiri, bukan hiasan di `sessions`: frame itu sudah yang terbesar di dashboard dan
   // menempelkan teks pertanyaan di sana membuatnya tumbuh untuk pembaca yang tak membutuhkannya.
   | { t: "leadAsks"; asks: SessionAsk[] }
+  // SPEC-919 · ADR-0147 · grup GLOBAL ke-9: sesi hidup di semua device yang tersambung ke hub ini.
+  // Grup, bukan topik berlangganan (ADR-0145): muatannya tak berparameter — satu snapshot yang
+  // sama untuk semua penonton.
+  | { t: "presence"; enabled: boolean; devices: PresenceDeviceView[] }
   // SPEC-908 · frame langganan berparameter. `key` = subKey(topic, params) yang dihitung KEDUA
   // sisi; klien membuang frame yang kuncinya bukan miliknya, jadi halaman/filter yang sedang
   // aktif tak mungkin ditimpa muatan halaman lain.

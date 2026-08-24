@@ -29,7 +29,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // SPEC-909 · ADR-0146 · `session-events` ikut: pemanggilnya hook sesi ber-token turunan, bukan
   // manusia dan bukan agen. Agen yang bisa memalsukan "sesi X bertanya Y" bisa menggerakkan lead
   // atas nama sesi mana pun — itu bukan capability, itu peniruan identitas.
+  // SPEC-919 · ADR-0147 · `presence` memaparkan peta pekerjaan yang sedang berjalan di SELURUH
+  // mesin operator. Tak ada capability yang berarti apa pun untuk itu (preseden /device-tokens).
   if (top === "auth" || top === "agent-tokens" || top === "device-tokens" || top === "sync"
+    || top === "presence"
     || top === "portal" || top === "client-accounts" || top === "session-events") return "COOKIE_ONLY";
   // read-only global (status). SPEC-405 · ADR-0088 · `GLOBAL_READ` HANYA untuk method baca:
   // `POST /update/apply` me-restart instance, dan itu tak pernah boleh lolos hanya karena

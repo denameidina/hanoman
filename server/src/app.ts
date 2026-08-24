@@ -27,6 +27,7 @@ import events from "./routes/events";
 import deviceTokens from "./routes/device-tokens";
 import bindings from "./routes/bindings";
 import sync from "./routes/sync";
+import presence from "./routes/presence";
 import sessionResults from "./routes/session-results";
 import sessionHistory from "./routes/session-history";
 import sessionEvents from "./routes/session-events";
@@ -239,6 +240,7 @@ export function buildApp(
     await api.register(agentTokens);   // SPEC-257 · kelola agent token (cookie-only)
     await api.register(bindings);
     await api.register(sync);
+    await api.register(presence);   // SPEC-919 · ADR-0147 · muat awal halaman Klien
     await api.register(sessionResults);
     await api.register(sessionHistory);  // SPEC-362 · riwayat sesi terminal (di belakang gate cookie)
     await api.register(sessionEvents);   // SPEC-909 · event hook sesi (token sesi, gate di-bypass di atas)
