@@ -27,6 +27,14 @@ vi.mock("../src/api/client", async () => {
       getLimits: vi.fn().mockResolvedValue(null),
       getCodexLimits: vi.fn().mockResolvedValue(null),
       getUpdateStatus: vi.fn().mockResolvedValue({ current: "0.0.0", latest: null, canApply: false }),
+      // SPEC-919 · `ClientsScreen` menariknya saat mendarat sebelum frame siar pertama.
+      presence: vi.fn().mockResolvedValue({
+        enabled: true,
+        devices: [{
+          deviceId: "local", name: "mesin-uji", local: true, online: true,
+          lastSeenAt: null, sessions: [],
+        }],
+      }),
     },
   };
 });
@@ -67,6 +75,15 @@ describe("state nav App", () => {
     window.location.hash = "#spec=SPEC-1";
     render(<App />);
     await waitFor(() => expect(screen.getByText("specs · brainstorm → execute")).toBeTruthy());
+  });
+
+  /* SPEC-919 · alasan jalur HTTP `ClientsScreen` bukan kode mati: `clients` ada di `NAV_KEYS`,
+     jadi refresh saat layar itu terbuka mendarat di sana SEBELUM socket mengantar frame pertama —
+     dan entri navnya sendiri masih tersembunyi pada saat itu (gerbang `presence.enabled`). */
+  it("mendarat di Klien dari state tersimpan dan memuat lewat HTTP sebelum frame pertama", async () => {
+    writeUiState(uiKey("app", "section"), "clients");
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("mesin-uji")).toBeTruthy());
   });
 
   it("membuang state dari versi kunci lama saat mount", async () => {

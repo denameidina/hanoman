@@ -46,7 +46,8 @@ export const zPresenceFrame = z.object({
   t: z.literal("presence"),
   v: z.literal(PRESENCE_PROTOCOL),
   sessions: z.array(zPresenceSession).max(MAX_PRESENCE_SESSIONS),
-}).strict();
+  deviceId: z.string().optional(),
+});
 export type PresenceFrame = z.infer<typeof zPresenceFrame>;
 
 /** `statusAt` dicap HUB, bukan klien: "bekerja" tak punya stempel yang jujur di sisi klien
