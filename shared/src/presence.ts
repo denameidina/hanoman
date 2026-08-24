@@ -7,10 +7,16 @@ import { z } from "zod";
 
 export const PRESENCE_PROTOCOL = 1;
 
-/** Plafon jumlah sesi per frame. 100 × ±200 B ≈ 20 KB, jauh di bawah `maxPayload` 64 KiB
-    milik plugin WebSocket — frame yang melewatinya akan ditutup 1009 oleh `ws` SEBELUM
-    handler kita sempat mengabaikannya, dan socket itu mengangkut changefeed sync. */
+/** Plafon jumlah sesi per frame — pagar kewarasan skema, BUKAN pagar byte. */
 export const MAX_PRESENCE_SESSIONS = 100;
+
+/** Pagar yang sesungguhnya mengikat, dan ia dihitung per BYTE (pola `PULL_MAX_BYTES`, ADR-0138).
+    Plafon jumlah saja tak cukup: panjang maksimum yang SAH untuk `sessionId`/`projectId`/`specId`
+    membuat 100 sesi menjadi **86 KB** — di atas `maxPayload` 64 KiB plugin WebSocket, yang
+    ditegakkan `ws` dengan close 1009 SEBELUM handler kita sempat mengabaikan apa pun. Socket itu
+    mengangkut changefeed sync, jadi frame status yang kebesaran akan menjatuhkan sync — persis
+    yang ADR-0147 §4 nyatakan tak boleh terjadi. Setengah `maxPayload` memberi margin 2×. */
+export const PRESENCE_MAX_FRAME_BYTES = 32 * 1024;
 
 /** Kadens pembangunan snapshot di klien (satu `tmux list-panes` asinkron). */
 export const PRESENCE_TICK_MS = 3_000;
@@ -69,6 +75,27 @@ export type PresenceView = {
   enabled: boolean;
   devices: PresenceDeviceView[];
 };
+
+/** Potong daftar sesi sampai frame utuhnya muat di `PRESENCE_MAX_FRAME_BYTES`.
+    Murni dan dipakai PENGIRIM sebelum `send` — di situlah satu-satunya tempat ukuran frame
+    sebenarnya diketahui. Selalu memulangkan minimal nol sesi (daftar kosong tetap frame sah:
+    ia berarti "mesin ini tak menjalankan apa pun"). */
+export function trimPresenceToBudget(
+  sessions: PresenceSession[], maxBytes = PRESENCE_MAX_FRAME_BYTES,
+): PresenceSession[] {
+  let out = sessions.slice(0, MAX_PRESENCE_SESSIONS);
+  while (out.length > 0 && Buffer.byteLength(presenceFrameJson(out)) > maxBytes) {
+    // Buang dari EKOR: `listPanesAsync` memulangkan pane dalam urutan tmux, dan yang di depan
+    // adalah yang lebih dulu ada — memotong dari sana akan menyembunyikan sesi tertua duluan.
+    out = out.slice(0, Math.max(0, Math.floor(out.length / 2)));
+  }
+  return out;
+}
+
+/** Satu-satunya tempat amplop frame dirakit, supaya anggaran byte diukur atas byte yang
+    BENAR-BENAR dikirim, bukan atas taksiran. */
+export const presenceFrameJson = (sessions: PresenceSession[]): string =>
+  JSON.stringify({ t: "presence", v: PRESENCE_PROTOCOL, sessions });
 
 /** Dedup pengirim. Urutan pane dari tmux tak dijamin stabil, jadi signature diurutkan dulu —
     tanpa itu satu pergeseran urutan mengirim frame yang isinya identik. */

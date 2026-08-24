@@ -99,9 +99,15 @@ Socket yang sama mengangkut changefeed sync, jadi handler `message` seluruhnya d
 - frame rusak atau tak lolos `zPresenceFrame` → diabaikan;
 - verdict `WsMessageGuard` (`PRESENCE_MAX_FRAMES_PER_MIN` = 60) → **diabaikan**, bukan
   diterjemahkan jadi `close 1008/1009` seperti di `/events/ws`; di sana socket-nya milik dashboard;
-- `MAX_PRESENCE_SESSIONS` = 100 dipotong **di sisi pengirim**, karena 64 KiB `maxPayload` plugin
-  WebSocket ditegakkan oleh `ws` **sebelum** handler kita sempat mengabaikan apa pun. 100 × ±200 B
-  ≈ 20 KB memberi margin 3×.
+- pemotongan di sisi pengirim dihitung **per BYTE**, bukan per jumlah (pola `PULL_MAX_BYTES`,
+  ADR-0138). Plafon jumlah sendirian tak cukup dan angkanya terukur: panjang maksimum yang **sah**
+  untuk `sessionId`/`projectId`/`specId` membuat 100 sesi menjadi **86 KB**, di atas `maxPayload`
+  64 KiB yang ditegakkan `ws` dengan close 1009 **sebelum** handler kita sempat mengabaikan apa pun
+  — dan socket itu mengangkut changefeed sync, jadi plafon-jumlah saja justru melahirkan kegagalan
+  yang pagar ini ada untuk mencegah. `trimPresenceToBudget()` memotong sampai frame utuhnya muat di
+  `PRESENCE_MAX_FRAME_BYTES` = 32 KiB (margin 2×); `MAX_PRESENCE_SESSIONS` = 100 tinggal pagar
+  kewarasan skema. Signature dedup dihitung atas daftar yang **sudah** dipotong — kalau tidak, mesin
+  di atas anggaran mengirim ulang byte identik tiap tick.
 
 Pengirim di klien (`presence/sender.ts`) menerima `send` sebagai **argumen**, bukan mengimpor
 socket: modul itu tak memegang socket dan karena itu tak bisa menutupnya — properti yang terbaca

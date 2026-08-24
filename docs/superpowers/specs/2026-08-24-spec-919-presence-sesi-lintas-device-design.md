@@ -69,9 +69,10 @@ memisahkan sync dari `/events/ws`). Di sana pemisahan dibayar karena **otorisasi
 - frame > `MAX_WS_MESSAGE_BYTES` (64 KiB) **diabaikan**, bukan `close 1009` seperti `/events/ws` —
   di sana socket-nya milik dashboard, di sini ia mengangkut changefeed sync;
 - laju frame dibatasi (`PRESENCE_MAX_FRAMES_PER_MIN` = 60); kelebihannya dibuang, socket tetap;
-- pengirim di sisi klien mem-*budget* dirinya sendiri: daftar sesi dipotong di
-  `MAX_PRESENCE_SESSIONS` = 100 sebelum dikirim — 100 × ±200 B ≈ 20 KB, margin 3× di bawah
-  `maxPayload` 64 KiB yang ditegakkan `ws` **sebelum** handler kita sempat mengabaikan apa pun.
+- pengirim di sisi klien mem-*budget* dirinya sendiri **per BYTE** (`trimPresenceToBudget`,
+  32 KiB — pola `PULL_MAX_BYTES` ADR-0138). Plafon jumlah sendirian tak cukup: 100 sesi berpanjang
+  id maksimum yang **sah** = 86 KB, di atas `maxPayload` 64 KiB yang ditegakkan `ws` dengan close
+  1009 **sebelum** handler kita sempat mengabaikan apa pun.
 
 **Reconnect ber-backoff** menggantikan `setTimeout(connectWs, 3000)` datar yang ada sekarang:
 1 s → 2 → 4 → 8 → 16 → 30 s (plafon), jitter ±20 %, reset saat `open`. Ini juga menambal cacat

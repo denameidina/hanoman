@@ -41,6 +41,18 @@ describe("parsePanes", () => {
     expect(p!.startedAt).toBe(0);
   });
 
+  /* Kolom KOSONG dan kolom HILANG adalah dua hal berbeda: `Number("")` = 0, `Number(undefined)`
+     = NaN. Baris terpotong bisa datang dari tmux versi lama yang tak mengenal `#{session_created}`,
+     dan NaN yang lolos ke `new Date(NaN).toISOString()` MELEMPAR — lemparan yang lalu ditelan
+     `.catch(() => [])` di view dan `catch { return; }` di sender, jadi presence mati SENYAP. */
+  it("baris terpotong (kolom tak ada sama sekali) tetap memberi startedAt 0, bukan NaN", () => {
+    const potong = (n: number) => line().split("\t").slice(0, n).join("\t");
+    const [p] = parsePanes(potong(FIELDS.length - 1));
+    expect(p!.startedAt).toBe(0);
+    expect(Number.isNaN(p!.startedAt)).toBe(false);
+    expect(() => new Date(p!.startedAt * 1000).toISOString()).not.toThrow();
+  });
+
   it("baris di luar prefix hanoman dibuang", () => {
     expect(parsePanes(line({ "#{session_name}": "lain" }))).toHaveLength(0);
   });

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { ClientsScreen } from "../src/screens/ClientsScreen";
+import { ClientsScreen, sinceLabel } from "../src/screens/ClientsScreen";
 import { api } from "../src/api/client";
 import type { PresenceView } from "@hanoman/shared";
 
@@ -94,4 +94,23 @@ describe("ClientsScreen muat awal HTTP", () => {
     render(<ClientsScreen view={{ enabled: false, devices: [] }} specTitles={{}} onOpenSpec={() => {}} />);
     await waitFor(() => expect(screen.getByText("Belum ada device")).toBeTruthy());
   });
+});
+
+describe("sinceLabel", () => {
+  const T = Date.parse("2026-08-24T12:00:00.000Z");
+  const lalu = (ms: number) => new Date(T - ms).toISOString();
+
+  it("di bawah satu menit", () => expect(sinceLabel(lalu(30_000), T)).toBe("baru saja"));
+  it("menit", () => expect(sinceLabel(lalu(42 * 60_000), T)).toBe("42 mnt"));
+  it("jam + sisa menit", () => expect(sinceLabel(lalu(3 * 3_600_000 + 7 * 60_000), T)).toBe("3 jam 7 mnt"));
+  it("hari", () => expect(sinceLabel(lalu(50 * 3_600_000), T)).toBe("2 hari"));
+  it("batas 60 menit naik ke jam", () => expect(sinceLabel(lalu(60 * 60_000), T)).toBe("1 jam 0 mnt"));
+
+  /* Dua guard yang tak akan pernah tersentuh render normal — dan keduanya menutupi keadaan yang
+     BISA terjadi: jam device klien berbeda dari jam hub (stempel di masa depan), dan stempel
+     rusak yang lolos dari instance versi lain. */
+  it("stempel di masa depan tak menghasilkan angka negatif", () =>
+    expect(sinceLabel(new Date(T + 60_000).toISOString(), T)).toBe("—"));
+  it("stempel tak terbaca tak menghasilkan NaN", () =>
+    expect(sinceLabel("bukan-tanggal", T)).toBe("—"));
 });

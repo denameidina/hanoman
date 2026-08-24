@@ -14,7 +14,9 @@ const STATUS: Record<PresenceSessionView["status"], { label: string; tone: "ok" 
   exited: { label: "selesai", tone: "neutral" },
 };
 
-function sinceLabel(iso: string, now: number): string {
+/** Diekspor karena ia fungsi MURNI dan satu-satunya penerjemah angka waktu di layar ini —
+    menguji lewat render hanya menyentuh satu cabangnya. */
+export function sinceLabel(iso: string, now: number): string {
   const ms = now - Date.parse(iso);
   if (!Number.isFinite(ms) || ms < 0) return "—";
   const m = Math.floor(ms / 60_000);

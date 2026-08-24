@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { issueDeviceToken } from "../src/services/device-token";
-import { PRESENCE_PROTOCOL, type PresenceSession } from "@hanoman/shared";
+import { PRESENCE_MAX_FRAMES_PER_MIN, PRESENCE_PROTOCOL, type PresenceSession } from "@hanoman/shared";
 import { presenceEntries, __resetPresence } from "../src/services/presence/registry";
 
 const app = buildApp({ requireAuth: false });
@@ -81,12 +81,41 @@ describe("frame presence di /api/sync/ws", () => {
     ws.close();
   });
 
-  it("frame di atas jatah laju dibuang tanpa menutup socket", async () => {
+  /* Assertion `readyState === OPEN` sendirian SELALU benar — juga tanpa polisi laju. Yang
+     membuktikan gerbangnya hidup adalah frame ke-N+1 yang isinya BERBEDA tak pernah tercatat. */
+  it("frame di atas jatah laju dibuang — isinya tak pernah tercatat — dan socket tetap hidup", async () => {
     const t = await token();
     const ws = await open(t.token);
-    for (let i = 0; i < 80; i++) ws.send(frame([{ ...session, sessionId: `s${i}` }]));
+    for (let i = 0; i < PRESENCE_MAX_FRAMES_PER_MIN; i++) {
+      ws.send(frame([{ ...session, sessionId: `dalam-jatah-${i}` }]));
+    }
+    await waitFor(() => presenceEntries()[0]?.sessions[0]?.sessionId
+      === `dalam-jatah-${PRESENCE_MAX_FRAMES_PER_MIN - 1}`);
+
+    ws.send(frame([{ ...session, sessionId: "di-luar-jatah" }]));
     await new Promise((r) => setTimeout(r, 250));
     expect(ws.readyState).toBe(WebSocket.OPEN);
+    // Frame terakhir DIBUANG: registry masih memegang frame terakhir yang masih dalam jatah.
+    expect(presenceEntries()[0]!.sessions[0]!.sessionId)
+      .toBe(`dalam-jatah-${PRESENCE_MAX_FRAMES_PER_MIN - 1}`);
+    ws.close();
+  });
+
+  /* Gerbang identitas diuji dari KAWAT, bukan hanya lewat skema: hub yang membaca `deviceId`
+     dari payload akan lolos setiap test skema di `shared` tanpa satu pun merah di sini. */
+  it("deviceId di payload diabaikan sepenuhnya — atribusi tetap dari token", async () => {
+    const t = await token();
+    const ws = await open(t.token);
+    ws.send(JSON.stringify({
+      t: "presence", v: PRESENCE_PROTOCOL, deviceId: "device-lain", sessions: [session],
+    }));
+    await new Promise((r) => setTimeout(r, 200));
+    // Amplop `.strict()` menolak `deviceId`, jadi frame ini bahkan tak pernah tercatat.
+    expect(presenceEntries()).toHaveLength(0);
+
+    ws.send(frame([session]));
+    await waitFor(() => presenceEntries().length > 0);
+    expect(presenceEntries()[0]!.deviceId).toBe(t.id);
     ws.close();
   });
 

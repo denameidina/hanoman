@@ -98,8 +98,10 @@ Pakai skill lebih sempit saat task cocok:
   walau kelak ada yang menambah entitas ke `SYNCED`. **Enam gotcha:** (1) `deviceId` **selalu** dari
   `req.wsPrincipal.id`, tak pernah dari payload; (2) frame rusak/di atas jatah laju **DIBUANG tanpa
   menutup socket** — berbeda sadar dari `/events/ws` yang menutup 1008/1009, karena socket ini
-  mengangkut changefeed sync, dan `MAX_PRESENCE_SESSIONS`=100 dipotong di PENGIRIM karena
-  `maxPayload` 64 KiB ditegakkan `ws` sebelum handler kita sempat mengabaikan apa pun; (3) `statusAt`
+  mengangkut changefeed sync, dan pemotongan di PENGIRIM dihitung per BYTE
+  (`trimPresenceToBudget`, 32 KiB) — plafon JUMLAH sendirian tak cukup, terukur: panjang maksimum
+  yang SAH untuk id membuat 100 sesi jadi **86 KB**, di atas `maxPayload` 64 KiB yang ditegakkan
+  `ws` dengan close 1009 sebelum handler kita sempat mengabaikan apa pun; (3) `statusAt`
   dicap HUB, bukan klien — satu-satunya bahan klien adalah aktivitas pane yang bergerak tiap detik,
   jadi pengirim yang seharusnya diam berubah jadi banjir frame; (4) sesi mesin hub masuk lewat pintu
   `recordPresence` yang **sama** supaya tak ada rumus kedua; (5) `#{session_created}` ditambahkan di

@@ -43,4 +43,13 @@ describe("paneToPresence", () => {
   it("startedAt 0 (tmux lama) jatuh ke epoch, bukan Invalid Date", () => {
     expect(paneToPresence(pane({ startedAt: 0 })).startedAt).toBe(new Date(0).toISOString());
   });
+
+  /* `new Date(NaN).toISOString()` MELEMPAR, dan lemparan itu ditelan `.catch(() => [])` di
+     `view.ts` serta `catch { return; }` di `sender.ts` — presence mati tanpa satu baris log.
+     Karena itu NaN harus mati di sini, di fungsi murninya. */
+  it("startedAt NaN tak melempar dan tak menghasilkan Invalid Date", () => {
+    let out: ReturnType<typeof paneToPresence>;
+    expect(() => { out = paneToPresence(pane({ startedAt: Number.NaN })); }).not.toThrow();
+    expect(out!.startedAt).toBe(new Date(0).toISOString());
+  });
 });

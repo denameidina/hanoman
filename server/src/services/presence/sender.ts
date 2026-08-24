@@ -1,6 +1,6 @@
 import {
-  PRESENCE_HEARTBEAT_MS, PRESENCE_PROTOCOL, PRESENCE_TICK_MS, presenceSignature,
-  type PresenceSession,
+  PRESENCE_HEARTBEAT_MS, PRESENCE_TICK_MS, presenceFrameJson, presenceSignature,
+  trimPresenceToBudget, type PresenceSession,
 } from "@hanoman/shared";
 import { buildLocalPresence } from "./snapshot";
 
@@ -25,8 +25,10 @@ export function createPresenceSender(o: {
     async tick(now: number): Promise<void> {
       let sessions: PresenceSession[];
       // tmux mati / belum jalan bukan alasan untuk mengganggu socket sync.
-      try { sessions = await o.build(); } catch { return; }
+      try { sessions = trimPresenceToBudget(await o.build()); } catch { return; }
 
+      // Signature dihitung atas daftar yang SUDAH dipotong — kalau tidak, mesin di atas anggaran
+      // akan mengirim ulang byte yang identik tiap tick karena signature-nya terus berubah.
       const signature = presenceSignature(sessions);
       const due = lastSignature === null
         || signature !== lastSignature
@@ -35,7 +37,7 @@ export function createPresenceSender(o: {
 
       lastSignature = signature;
       lastSentAt = now;
-      try { o.send(JSON.stringify({ t: "presence", v: PRESENCE_PROTOCOL, sessions })); }
+      try { o.send(presenceFrameJson(sessions)); }
       catch { /* socket sudah tertutup — siklus reconnect yang mengurusnya */ }
     },
   };
