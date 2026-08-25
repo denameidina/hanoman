@@ -52,13 +52,21 @@ describe("kontrak capability katalog MCP", () => {
     for (const t of MCP_TOOLS) expect(t.samplePath, t.name).not.toMatch(/\/dialog/);
   });
 
-  it("tak ada tool yang bisa merge/rebase, menghapus backlog, atau memundurkan stage", () => {
+  // ADR-0099 §4 dulu melarang tool merge/rebase/hapus/stage hadir sama sekali; ADR-0155
+  // membalikkannya. Yang menggantikan larangan itu adalah DUA hal yang lebih kuat, dan keduanya
+  // diuji di sini karena berkas inilah tempat katalog bertemu peta capability server:
+  //   1. tiap tool semacam itu menuntut capability berakses `danger` — yang tak diimplikasikan
+  //      `:write` mana pun, sehingga token lama TIDAK diam-diam mewarisinya;
+  //   2. `hanoman_backlog_update` tetap tak bisa menyentuh stage, jadi jalur "tulis biasa" tak
+  //      pernah menjadi jalur belakang menuju penghapusan artefak.
+  it("tool yang mengeksekusi menuntut capability danger, dan jalur tulis biasa tak jadi pintu belakang", () => {
+    const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"]);
     for (const t of MCP_TOOLS) {
-      expect(t.samplePath, t.name).not.toMatch(/integrate/);
-      // ADR-0155 · PUT & DELETE kini sah: menulis & menghapus dokumen memakai keduanya. Yang dulu
-      // dijaga baris ini — "tak ada method yang merusak" — sudah pindah ke gerbang mode⇔capability
-      // (shared) dan ke pemetaan capabilityForRoute (test di berkas ini), bukan ke daftar method.
-      expect(["GET", "POST", "PATCH", "PUT", "DELETE"], t.name).toContain(t.sampleMethod);
+      if (!/integrate|\/git(\/|$)|^\/vps/.test(t.samplePath)) continue;
+      // `stage_set` adalah pengecualian yang DISENGAJA: gerbangnya di handler, bukan di peta.
+      if (t.name === "hanoman_backlog_stage_set") continue;
+      expect(DANGER_CAPS.has(t.capability ?? ""), t.name).toBe(true);
+      expect(t.mode, t.name).toBe("danger");
     }
     const update = MCP_TOOLS.find((t) => t.name === "hanoman_backlog_update")!;
     const body = update.build({ spec: "SPEC-1", title: "x", stage: "objective", confirmDelete: true })?.body as Record<string, unknown>;

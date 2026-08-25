@@ -29,6 +29,10 @@ const UNWRAPPED = new Map<string, string>([
   ["POST /projects/:id/upload", "multipart"],
   ["GET /projects/:id/archive", "biner (zip)"],
   ["GET /terminal/sessions/:id/ws", "WebSocket, bukan request-response"],
+  // Byte mentah dengan content-disposition: lampiran bisa berupa gambar, dan tool teks akan
+  // mengembalikan sampah. Sekelas dengan `archive` di atas.
+  ["GET /specs/:id/attachments/:attId", "biner (unduhan lampiran)"],
+  ["GET /tickets/:id/attachments/:attId", "biner (unduhan lampiran)"],
 ]);
 
 /** Path route Fastify (`/specs/:id`) → regex yang mencocokkan samplePath katalog (`/specs/SPEC-1`). */

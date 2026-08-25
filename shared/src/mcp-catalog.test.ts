@@ -17,13 +17,21 @@ describe("katalog tool MCP", () => {
     expect(ro.map((t) => t.name)).not.toContain("hanoman_backlog_create");
   });
 
-  it("tak ada tool yang mengeksekusi: /terminal hanya GET, /vps tak ada sama sekali", () => {
-    for (const t of MCP_TOOLS) {
-      expect(t.samplePath, t.name).not.toMatch(/^\/vps/);
-      if (t.samplePath.startsWith("/terminal")) expect(t.sampleMethod, t.name).toBe("GET");
-    }
-    const paths = MCP_TOOLS.map((t) => t.samplePath);
-    expect(paths.some((p) => p.includes("integrate"))).toBe(false);
+  // ADR-0099 §4 dulu melarang tool yang mengeksekusi hadir SAMA SEKALI. ADR-0155 membalikkannya:
+  // permukaan itu sudah terjangkau agent token lewat REST, jadi larangan di katalog tak menutup apa
+  // pun — ia hanya memaksa agen memakai curl tanpa skema. Yang menggantikan invarian lama BUKAN
+  // "tak ada", melainkan "tak ada yang lolos tanpa penandaan": setiap tool yang mengeksekusi wajib
+  // bermode `danger` sehingga hilang dari tingkat default, dan wajib menuntut capability yang tak
+  // diimplikasikan `:write`.
+  it("tool yang MENGEKSEKUSI selalu bermode danger — tak ada yang lolos ke tingkat default", () => {
+    const executing = MCP_TOOLS.filter((t) =>
+      /^\/vps/.test(t.samplePath)
+      || t.samplePath.includes("integrate")
+      || (t.samplePath.startsWith("/terminal") && t.sampleMethod !== "GET")
+      || /\/git(\/|$)/.test(t.samplePath));
+    for (const t of executing) expect(t.mode, t.name).toBe("danger");
+    const visible = new Set(mcpToolsFor("default").map((t) => t.name));
+    for (const t of executing) expect(visible.has(t.name), t.name).toBe(false);
   });
 
   it("tak ada tool yang menyentuh route cookie-only", () => {
@@ -197,6 +205,11 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   "hanoman_docs_delete",       // menghapus berkas .md; capability tetap docs:write
   "hanoman_changelog_delete",  // menghapus entri changelog; capability tetap docs:write
   "hanoman_ide_entry_delete",  // menghapus berkas/folder working tree; capability tetap ide:write
+  // Gerbang `backlog:lifecycle`-nya hidup di HANDLER (routes/specs.ts), bukan di
+  // capabilityForRoute, karena keputusannya bergantung body. Katalog karena itu wajib
+  // menyebut `backlog:write` agar uji kontrak hijau — deskripsi tool yang memberitahu
+  // agen capability apa yang sebenarnya dituntut server.
+  "hanoman_backlog_stage_set",
 ]);
 
 describe("mode ⇔ capability", () => {
