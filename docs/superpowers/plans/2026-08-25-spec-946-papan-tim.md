@@ -2107,11 +2107,35 @@ curl -s 'http://127.0.0.1:5174/api/tasks?q=desain' | head -c 400
 
 Diharapkan: respons `Paginated<TaskView>` (atau `401` bila auth cookie diminta — dalam hal itu buktikan lewat test route saja dan catat alasannya). Bunuh server **per-PID** (`lsof -ti:5174` → `kill <pid>`), JANGAN `pkill -f node`.
 
-- [ ] **Step 4: Centang seluruh kotak plan ini**
+- [x] **Step 4: Centang seluruh kotak plan ini**
 
 Pastikan tak ada `- [ ]` tersisa di berkas ini sebelum menyatakan Execute selesai.
 
-- [ ] **Step 5: Commit & push**
+> **Pekerjaan tambahan di luar sepuluh task, dari dua penyapuan subagent.**
+>
+> **qa-verifier** membuktikan kelima berkas merah di run `--changed` **nol regresi**: tiga
+> gagal-palsu (socket tmux `hanoman-test` yang dipakai bersama antar-worktree, `SSH_ASKPASS_REQUIRE`
+> ambient yang belum ikut di-`env -u`, kontensi CPU — `lead-routes` 8,3 dtk lawan plafon 30 dtk) dan
+> dua sudah merah di base (`notifications.route` flake intrinsik ~⅓ karena `orderBy` tanpa
+> tiebreaker; portal sejak `f2775068`). Test baru terbukti **menggigit dua arah**: merah saat
+> dipasang di worktree base (5 berkas gagal), dan merah di bawah empat mutasi bermakna. Satu
+> assertion `team-nav` ternyata **LULUS di base** (`find` → `undefined`, `?.gate` → `undefined`) —
+> dibuang, kontraknya sudah ditutup `toEqual` eksak.
+>
+> **blast-radius** menemukan satu **bug perilaku** dan empat cermin dokumen yang hanyut:
+> `TaskModal` tak pernah mengirim `order`, jadi kartu dari modal lahir `order: 0` dan urutan runtuh
+> ke `id asc` sejak kartu kedua — "buat" menaruh di ATAS sementara "drag" menaruh di BAWAH, padahal
+> ADR-0151 sudah menjanjikan monotonisitas yang akan dibaca item D/E. Diperbaiki lewat `orderFor`
+> (perhitungan yang SAMA dengan drag) + 3 test.
+>
+> **Temuan proses yang paling berharga:** seluruh test berbasis **pemindai teks**
+> (`placeholder-contract`, `confirm-inventory`, `form-field-scanner`, `icon`) **tak pernah terpilih
+> `--changed`** — mereka membaca pohon lewat `readdirSync` saat runtime, jadi berkas `.tsx` baru tak
+> masuk graf impor vitest. Perintah alur kerja standar di CLAUDE.md **tidak akan pernah**
+> memilihnya, dan dua pelanggaran SPEC-490 milik spec ini lolos karenanya. Jalankan keempatnya
+> secara eksplisit setiap kali menambah berkas `.tsx` baru.
+
+- [x] **Step 5: Commit & push**
 
 ```bash
 git add -A && git commit -m "docs(946): centang plan tuntas + bukti verifikasi"
