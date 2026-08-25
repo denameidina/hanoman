@@ -34,9 +34,12 @@ const formOf = (t: TaskView | null, defaultProjectId: string | null): Form => ({
   dueDate: dateInputValue(t?.dueDate ?? null),
 });
 
-export function TaskModal({ open, task, projects, members, defaultProjectId, onClose, onSaved, onToast }: {
+export function TaskModal({ open, task, projects, members, defaultProjectId, orderFor, onClose, onSaved, onToast }: {
   open: boolean; task: TaskView | null; projects: ProjectVM[]; members: MemberView[];
   defaultProjectId: string | null;
+  /** `order` ujung kolom tujuan — perhitungan yang SAMA dengan drag (`nextOrder`), disuplai
+      pemanggil karena papanlah yang tahu isi kolomnya. */
+  orderFor: (status: TaskStatus) => number;
   onClose: () => void; onSaved: () => void;
   onToast: (msg: string, kind?: string, icon?: string) => void;
 }) {
@@ -60,6 +63,14 @@ export function TaskModal({ open, task, projects, members, defaultProjectId, onC
   async function save() {
     if (!form.title.trim()) { onToast("Judul tugas wajib diisi", "err", "x-circle"); return; }
     setBusy(true);
+    // ADR-0151 · kartu mendarat di UJUNG kolom tujuan, dan `order` naik monoton per kolom. Drag
+    // sudah menghitungnya lewat `nextOrder`; kalau modal tak ikut, kartu baru lahir `order: 0`
+    // sehingga urutan runtuh ke `id asc` sejak kartu KEDUA — "buat" menaruh di atas sementara
+    // "drag" menaruh di bawah, dua aturan untuk satu tindakan, nol error.
+    //
+    // Dikirim HANYA saat kartu benar-benar mendarat di kolom lain (atau baru lahir): mengirimnya
+    // saat kolomnya tak berubah melempar kartu yang cuma diganti judulnya ke ujung kolomnya sendiri.
+    const landsInNewColumn = !task || task.status !== form.status;
     // `null` berarti "kosongkan", `undefined` berarti "jangan sentuh" — route membedakan keduanya,
     // dan form ini SELALU mengirim keadaan penuh, jadi yang kosong memang harus jadi null.
     const payload = {
@@ -71,6 +82,7 @@ export function TaskModal({ open, task, projects, members, defaultProjectId, onC
       memberId: form.memberId || null,
       startDate: dateInputToIso(form.startDate),
       dueDate: dateInputToIso(form.dueDate),
+      ...(landsInNewColumn ? { order: orderFor(form.status) } : {}),
     };
     try {
       if (task) await api.patchTask(task.id, payload);
@@ -149,6 +161,7 @@ export function TaskModal({ open, task, projects, members, defaultProjectId, onC
         </div>
         <Field label="Detail" hint="Opsional — konteks yang tak muat di judul.">
           <HnTextarea value={form.detail} aria-label="Detail tugas" rows={4}
+            placeholder="mis. tunggu aset dari klien, deadline ikut jadwal kampanye"
             onChange={(e) => set({ detail: e.target.value })} />
         </Field>
       </Modal>

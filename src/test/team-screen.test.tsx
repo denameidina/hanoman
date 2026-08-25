@@ -144,6 +144,49 @@ describe("TeamScreen · modal", () => {
   });
 });
 
+/* Invariant yang dijanjikan spec & ADR-0151: kartu mendarat di UJUNG kolom tujuan, dan `order`
+   naik monoton per kolom supaya item D/E bisa membacanya apa adanya. Drag menghitungnya lewat
+   `nextOrder`; modal HARUS memakai perhitungan yang sama, kalau tidak "buat" menaruh kartu di ATAS
+   sementara "drag" menaruhnya di BAWAH — dua aturan untuk satu tindakan, nol error. */
+describe("TeamScreen · order kartu dari modal", () => {
+  it("tugas baru mendarat di UJUNG kolom tujuan, bukan di order 0", async () => {
+    // Kolom backlog sudah berisi satu kartu ber-order 4 → kartu baru harus lahir ber-order 5.
+    vi.mocked(api.listTasks).mockImplementation(async (p) =>
+      p?.status === "backlog" ? page([task({ order: 4 })]) : page([]));
+    vi.mocked(api.createTask).mockResolvedValue(task({ id: "baru" }));
+    view();
+    await screen.findByTestId("team-board");
+    fireEvent.click(screen.getByRole("button", { name: /tugas baru/i }));
+    fireEvent.change(await screen.findByLabelText("Judul tugas"), { target: { value: "Kartu baru" } });
+    fireEvent.click(screen.getByRole("button", { name: /buat tugas/i }));
+    await waitFor(() => expect(api.createTask).toHaveBeenCalled());
+    expect(vi.mocked(api.createTask).mock.calls[0]![0]).toMatchObject({ status: "backlog", order: 5 });
+  });
+
+  it("ganti kolom lewat modal memakai order kolom BARU, bukan order kolom lama", async () => {
+    vi.mocked(api.listTasks).mockImplementation(async (p) =>
+      p?.status === "backlog" ? page([task({ order: 4 })])
+        : p?.status === "done" ? page([task({ id: "d1", title: "Sudah beres", status: "done", order: 9 })])
+        : page([]));
+    view();
+    fireEvent.click(await screen.findByRole("button", { name: "Desain" }));
+    fireEvent.change(await screen.findByLabelText("Kolom tugas"), { target: { value: "done" } });
+    fireEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
+    await waitFor(() => expect(api.patchTask).toHaveBeenCalled());
+    expect(vi.mocked(api.patchTask).mock.calls[0]![1]).toMatchObject({ status: "done", order: 10 });
+  });
+
+  it("menyimpan tanpa memindah kolom TIDAK menyentuh order", async () => {
+    view();
+    fireEvent.click(await screen.findByRole("button", { name: "Desain" }));
+    fireEvent.change(await screen.findByLabelText("Judul tugas"), { target: { value: "Desain v2" } });
+    fireEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
+    await waitFor(() => expect(api.patchTask).toHaveBeenCalled());
+    // Kartu yang cuma diganti judulnya tak boleh terlempar ke ujung kolomnya sendiri.
+    expect(vi.mocked(api.patchTask).mock.calls[0]![1]).not.toHaveProperty("order");
+  });
+});
+
 describe("TeamScreen · keadaan", () => {
   it("papan kosong menawarkan pintu masuk, bukan layar kosong", async () => {
     vi.mocked(api.listTasks).mockResolvedValue(page([]));

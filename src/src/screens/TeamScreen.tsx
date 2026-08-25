@@ -10,7 +10,7 @@ import { SyncButton } from "./SyncButton";
 import { TeamBoard } from "./team-board";
 import { TaskModal } from "./TaskModal";
 import { MembersPanel } from "./MembersPanel";
-import { TEAM_COLUMNS, emptyBoard, moveCard, replaceCard, type Board } from "./team-rules";
+import { TEAM_COLUMNS, emptyBoard, moveCard, nextOrder, replaceCard, type Board } from "./team-rules";
 import { usePersistedState, ResetViewButton, isStr, oneOf } from "../ui-state";
 import type { ProjectVM } from "./types";
 
@@ -250,6 +250,7 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
 
       <TaskModal open={taskOpen} task={editing} projects={projects} members={members}
         defaultProjectId={projectFilter === "all" ? null : projectFilter}
+        orderFor={(s) => nextOrder(board[s])}
         onClose={() => { setTaskOpen(false); setEditing(null); }}
         onSaved={refetchSilently} onToast={onToast} />
       <MembersPanel open={membersOpen} onClose={() => setMembersOpen(false)}

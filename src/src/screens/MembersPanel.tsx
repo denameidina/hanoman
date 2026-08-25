@@ -24,7 +24,7 @@ function MemberRow({ m, busy, onSave, onToggle, onDelete }: {
         border: "1px solid var(--border-strong)", borderRadius: "var(--radius-md)",
         background: "var(--surface-card)",
       }}>
-        <Input size="sm" value={name} aria-label={`Nama ${m.name}`}
+        <Input size="sm" value={name} aria-label={`Nama ${m.name}`} placeholder="mis. Dena Meidina"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} />
         <Input size="sm" value={role} aria-label={`Peran ${m.name}`} placeholder="mis. desainer"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRole(e.target.value)} />

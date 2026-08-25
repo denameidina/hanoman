@@ -1,5 +1,5 @@
 import React from "react";
-import type { MemberView, TaskStatus, TaskView } from "@hanoman/shared";
+import type { CreateTaskInput, MemberView, TaskStatus, TaskView } from "@hanoman/shared";
 import { Badge, Icon, Select, LIST_SCROLL_STYLE, FIXED_ROW_STYLE } from "../ds";
 import { TEAM_COLUMNS, canDropTask, type Board } from "./team-rules";
 
@@ -7,8 +7,18 @@ import { TEAM_COLUMNS, canDropTask, type Board } from "./team-rules";
    yang diturunkan dari fase sesi (ADR-0008/0024). Konsekuensinya keempat kolom saling menerima
    drop, kebalikan board Backlog yang hampir seluruhnya menolaknya. */
 
-const PRIO_TONE: Record<string, "err" | "warn" | "neutral"> = {
-  tinggi: "err", sedang: "warn", rendah: "neutral",
+/* `Record<Priority, …>` — bukan `Record<string, …>` seperti dua cermin yang sudah ada
+   (`BacklogScreen.tsx` `B_PRIO`, `SchedulerScreen.tsx` `PRIO_TONE`): dengan kunci `string`,
+   nilai prioritas baru jatuh ke default tanpa satu pun galat kompilasi.
+
+   `sedang` sengaja `neutral`, mengikuti `B_PRIO` board Backlog — bukan `warn` seperti
+   SchedulerScreen. Dua alasan: ia nilai BAWAAN `zCreateTask`, jadi mewarnainya amber membuat
+   hampir seluruh papan berteriak; dan prioritas yang sama harus terbaca sama di dua papan yang
+   dibolak-balik operator. (Kedua cermin lama sudah berselisih di nilai ini sebelum SPEC-946;
+   menyelaraskan keduanya di luar lingkup spec ini.) */
+type Priority = NonNullable<CreateTaskInput["priority"]>;
+const PRIO_TONE: Record<Priority, "err" | "warn" | "neutral"> = {
+  tinggi: "err", sedang: "neutral", rendah: "neutral",
 };
 
 const DATE_FMT = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" });
@@ -51,7 +61,7 @@ function TaskCard({ task, members, dragging, onDragStart, onDragEnd, onOpen, onM
         cursor: "grab", opacity: dragging ? 0.4 : 1,
       }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-        <Badge tone={PRIO_TONE[task.priority] ?? "neutral"} size="sm"
+        <Badge tone={PRIO_TONE[task.priority as Priority] ?? "neutral"} size="sm"
           variant={task.priority === "tinggi" ? "soft" : "outline"}>{task.priority}</Badge>
         <span style={{ flex: 1 }} />
         <span style={{
