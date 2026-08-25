@@ -31,6 +31,7 @@ import { DalangHanomanScreen } from "./screens/DalangHanomanScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
 import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
 import { BacklogScreen } from "./screens/BacklogScreen";
+import { TeamScreen } from "./screens/TeamScreen";
 import { TriageScreen } from "./screens/TriageScreen";
 import { PrdScreen, NewPrdModal, type PrdPrefill, type PrdBriefForm } from "./screens/PrdScreen";
 import type { AuditEscalation } from "@hanoman/shared";
@@ -1369,6 +1370,16 @@ export default function App() {
           onPromoteToQa={promoteToQa} onPromoteToBrief={promoteToBrief} onPromoteToPrd={promoteToPrd}
           onToast={showToast} initialDetailId={openSpecId}
           projectFilter={projectFilter} onProjectFilter={setProjectFilter} dataVersion={dataVersion} />)}
+      </Shell>
+    );
+  } else if (section === "team") {
+    // SPEC-946 · ADR-0150/0151 · papan kerja MANUSIA. Screen mandiri (pola TriageScreen): memuat
+    // datanya sendiri lewat langganan per kolom, jadi ia TIDAK lewat `gate` — `gate` menahan render
+    // sampai muatan backlog/sessions App selesai, dan layar ini tak memakai satu pun dari keduanya.
+    screen = (
+      <Shell active="team" title="Tim" breadcrumb="tugas manusia · backlog → selesai" onNavigate={setSection}>
+        <TeamScreen projects={projectsView} projectFilter={projectFilter}
+          onProjectFilter={setProjectFilter} onToast={showToast} />
       </Shell>
     );
   } else if (section === "triage") {
