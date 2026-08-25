@@ -228,6 +228,9 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   "hanoman_session_close", "hanoman_session_history_purge", "hanoman_session_integrate",
   "hanoman_agent_delete", "hanoman_lead_flow_submit",
   "hanoman_ticket_delete", "hanoman_notifications_clear",
+  // Mengirim pesan ke MANUSIA di luar hanoman: tak ada undo, tapi domainnya tak punya
+  // pecahan `danger`.
+  "hanoman_telegram_reply_send",
 ]);
 
 describe("mode ⇔ capability", () => {

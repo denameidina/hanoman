@@ -73,7 +73,9 @@ describe("kontrak capability katalog MCP", () => {
   it("tool yang mengeksekusi menuntut capability danger, dan jalur tulis biasa tak jadi pintu belakang", () => {
     const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"]);
     for (const t of MCP_TOOLS) {
-      if (!/integrate|\/git(\/|$)|^\/vps/.test(t.samplePath)) continue;
+      // Regex vps dipersempit ke sub-path yang benar-benar menyentuh mesin remote: `^/vps`
+      // polos ikut mencocokkan daftar & checklist, yang tak mengeksekusi apa pun.
+      if (!/integrate|\/git(\/|$)|^\/vps\/[^/]+\/(console|session|audit|probe|test|harden|provision|remediate)/.test(t.samplePath)) continue;
       // DUA pengecualian yang disengaja, keduanya karena capability-nya ditentukan PETA, bukan
       // katalog: `stage_set` digerbangi di handler (bergantung body), dan `session_integrate`
       // hidup di bawah prefix `terminal` sehingga petanya memberi `sessions:write` — tak ada

@@ -10,6 +10,8 @@ import { DOCS_TOOLS } from "./docs";
 import { IDE_TOOLS } from "./ide";
 import { SETTINGS_TOOLS } from "./settings";
 import { AGENTS_TOOLS } from "./agents";
+import { TELEGRAM_TOOLS } from "./telegram";
+import { VPS_TOOLS } from "./vps";
 import { SESSIONS_TOOLS } from "./sessions";
 import { NOTIFICATIONS_TOOLS } from "./notifications";
 import { SUPPORT_TOOLS } from "./support";
@@ -24,6 +26,8 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   ...IDE_TOOLS,
   ...SETTINGS_TOOLS,
   ...AGENTS_TOOLS,
+  ...TELEGRAM_TOOLS,
+  ...VPS_TOOLS,
   ...SESSIONS_TOOLS,
   ...NOTIFICATIONS_TOOLS,
   ...SUPPORT_TOOLS,

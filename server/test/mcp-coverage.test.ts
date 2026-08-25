@@ -33,6 +33,28 @@ const UNWRAPPED = new Map<string, string>([
   // mengembalikan sampah. Sekelas dengan `archive` di atas.
   ["GET /specs/:id/attachments/:attId", "biner (unduhan lampiran)"],
   ["GET /tickets/:id/attachments/:attId", "biner (unduhan lampiran)"],
+  ["POST /terminal/sessions/:id/attachments", "multipart"],
+  // SPEC-899 · ADR-0142 · BUKAN kelalaian: agen yang bisa menjawab `AskUserQuestion` bisa menjawab
+  // pertanyaannya SENDIRI, dan gerbang "manusia yang terakhir memutuskan" runtuh lewat pintu itu.
+  // Assert terpisah di mcp-capability.test.ts menjaga agar tak ada samplePath yang memuat /dialog.
+  ["GET /terminal/sessions/:id/dialog", "gerbang keputusan manusia (SPEC-899)"],
+  ["POST /terminal/sessions/:id/dialog/answer", "gerbang keputusan manusia (SPEC-899)"],
+  ["POST /terminal/sessions/:id/dialog/takeover", "gerbang keputusan manusia (SPEC-899)"],
+]);
+
+// Route yang TERCAKUP tool bercabang. Tool semacam itu memilih endpoint menurut argumen (isi `q` →
+// /graph/search; isi `path` → /commit/:sha/file), dan `samplePath` hanya bisa menyebut SATU cabang.
+// Dicatat di sini dengan NAMA tool-nya, bukan sekadar di-skip: bila tool-nya berganti nama atau
+// hilang, assert di bawah merah — jadi daftar ini tak bisa jadi tempat menyembunyikan route.
+const COVERED_BY_BRANCH = new Map<string, string>([
+  ["GET /projects/:id/prds", "hanoman_prds_list"],
+  ["GET /projects/:id/graph/search", "hanoman_ide_graph"],
+  ["GET /projects/:id/compare/file", "hanoman_ide_compare"],
+  ["GET /projects/:id/commit/:sha/file", "hanoman_ide_commit"],
+  ["GET /projects/:id/worktrees/stats", "hanoman_ide_worktrees_list"],
+  ["GET /specs/:id/review/*", "hanoman_backlog_review"],
+  ["GET /terminal/sessions/:id/review/*", "hanoman_session_review"],
+  ["POST /vps/:id/items/na-bulk", "hanoman_vps_item_na"],
 ]);
 
 /** Path route Fastify (`/specs/:id`) → regex yang mencocokkan samplePath katalog (`/specs/SPEC-1`). */
@@ -47,15 +69,13 @@ describe("cakupan katalog MCP", () => {
     expect(inv).toContainEqual({ method: "POST", path: "/terminal/sessions" });
   });
 
-  // Dinyalakan (skip dibuang) di rencana katalog terakhir, saat 135 tool sudah lahir.
-  // MELONGGARKAN assert-nya alih-alih men-skip akan membuat gerbang ini bohong selamanya.
-  it.skip("setiap route yang TERJANGKAU agent token punya tool, atau terdaftar dikecualikan", () => {
+  it("setiap route yang TERJANGKAU agent token punya tool, atau terdaftar dikecualikan", () => {
     const missing: string[] = [];
     for (const r of routeInventory()) {
       const cap = capabilityForRoute(r.method, r.path);
       if (cap === null || cap === "COOKIE_ONLY" || cap === "GLOBAL_READ") continue;
       const key = `${r.method} ${r.path}`;
-      if (UNWRAPPED.has(key)) continue;
+      if (UNWRAPPED.has(key) || COVERED_BY_BRANCH.has(key)) continue;
       const re = toPattern(r.path);
       if (!MCP_TOOLS.some((t) => t.sampleMethod === r.method && re.test(t.samplePath))) missing.push(key);
     }
@@ -72,6 +92,12 @@ describe("cakupan katalog MCP", () => {
   it("daftar dikecualikan tak memuat route yang sudah tak ada", () => {
     const keys = new Set(routeInventory().map((r) => `${r.method} ${r.path}`));
     for (const k of UNWRAPPED.keys()) expect(keys.has(k), k).toBe(true);
+    for (const k of COVERED_BY_BRANCH.keys()) expect(keys.has(k), k).toBe(true);
+  });
+
+  it("setiap route bercabang benar-benar punya tool yang diklaimnya", () => {
+    const names = new Set(MCP_TOOLS.map((t) => t.name));
+    for (const [route, tool] of COVERED_BY_BRANCH) expect(names.has(tool), `${route} → ${tool}`).toBe(true);
   });
 
   it("gerbang cakupan benar-benar mendeteksi route yang lupa dibungkus", () => {
