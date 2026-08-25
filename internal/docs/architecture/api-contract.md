@@ -1562,6 +1562,41 @@ PATCH  /api/tasks/:id  { …semua field di atas, semuanya opsional }  -> TaskVie
 #   PATCH {status} tak diam-diam menghapus tanggal yang sudah diisi. 404 id tak ada.
 DELETE /api/tasks/:id  -> 204   # menulis tombstone sync (ADR-0119). 404 id tak ada.
 
+POST   /api/tasks/:id/escalate   { source, priority, projectId? }   # SPEC-947 · ADR-0152
+#   -> 201 { created: true,  spec, task }   kartu belum tertaut
+#   -> 200 { created: false, spec, task }   sudah tertaut → Spec yang SAMA, tak pernah yang kedua
+#   `task` = TaskView penuh berikut cermin `spec`-nya, jadi papan tak perlu menunggu frame WS.
+#   `source` EKSPLISIT tiga: brief (default) | qa | audit. `goal`/`no_effort` butuh bentuk payload
+#   `goal` (goal + done) yang hanya operator bisa tulis; `help` menjanjikan asal-usul Help Center.
+#   Enum sendiri (ESCALATE_SOURCES), bukan zSpecSource yang disaring: source ketujuh yang kelak
+#   ditambahkan tak boleh diam-diam jadi tujuan eskalasi.
+#   `priority` = kosakata zPriority, default "sedang"; UI mem-prefill dari `task.priority`.
+#   `projectId` dipakai HANYA saat kartunya belum punya project — dan kartu itu IKUT pindah ke
+#   sana (`task.projectId` diisi). 400 { error, projectId } bila body menyebut project LAIN:
+#   kartu tak boleh berpindah project sebagai efek samping yang tak diminta. Project yang SAMA
+#   diterima. 400 { error, projectId } bila project itu tak ada.
+#   400 kartu tanpa project & tanpa projectId — SEBABNYA disebut, tak ditolak dengan diam
+#   (nextSpecId butuh repo, repoDir milik project). repoDir yang null TIDAK ditolak: itu keadaan
+#   sah project from-scratch, dan nextSpecId(null) punya lantai-140-nya sendiri.
+#   Spec lahir stage "brainstorming", author "Tim · <email>", objective = judul kartu + backlink.
+#   Bentuk payload mengikuti source (zCreateSpec.superRefine): qa → severity DITURUNKAN dari
+#   prioritas (severityFromPriority, ADR-0109), bukan hardcode "major" seperti acceptTicket/
+#   acceptGithubIssue yang memang tak punya nilai itu di tangan. brief/audit →
+#   { context, outcome, constraints, priority } — `priority` WAJIB di zBriefPayload.
+#   Teks kartu TIDAK dibungkus UNTRUSTED_*: pembungkus itu ada karena tiket datang dari PUBLIK,
+#   sementara kartu ditulis anggota tim di dashboard ber-auth (route COOKIE_ONLY dua arah).
+#   Yang ikut: detail, kolom papan, prioritas kartu, assignee (NAMANYA), rentang tanggal.
+#   `launchApprovedBy` = launchPrincipal(req) (SPEC-761); tanpa principal ia null & author jatuh
+#   ke "Tim · system" — stempel yang tak ada tak dikarang. Retry P2002 ≤3× (SPEC-197).
+#   `specId` menunjuk Spec TERHAPUS → membuat Spec BARU (cermin acceptGithubIssue; `spec!` milik
+#   acceptTicket akan mengembalikan undefined): API tak boleh punya keadaan buntu. 404 id tak ada.
+#   Stage TIDAK pernah ditulis balik ke Task (ADR-0090 · ADR-0150 keputusan 4).
+DELETE /api/tasks/:id/escalate   -> 200 TaskView (specId: null)
+#   Lepas tautan untuk salah-eskalasi. NON-DESTRUKTIF: Spec dibiarkan (dihapus manual dari
+#   Backlog). IDEMPOTEN: kartu yang belum tertaut menjawab 200, bukan 404 — "tak ada yang perlu
+#   dilepas" bukan galat, dan klien papan bisa mengirim dua kali. Melepas tautan PUTUS juga.
+#   Kartu TETAP di papan — eskalasi tak pernah memindahkannya keluar. 404 id kartu tak ada.
+
 # `specId` TIDAK ada di body create maupun patch: tautan ke backlog lahir dari eskalasi, bukan dari
 # ketikan. CRUD yang bisa mengarangnya berarti kartu bisa mengaku tertaut pada Spec yang tak pernah
 # menyetujuinya. Field itu DIBUANG senyap oleh zod (mode strip), bukan ditolak 400.
@@ -1582,6 +1617,11 @@ DELETE /api/tasks/:id  -> 204   # menulis tombstone sync (ADR-0119). 404 id tak 
 > menunjuk dua induk, dan `BOOTSTRAP_ORDER` menaruh `member` **sebelum** `task`.
 > **Webhook:** sengaja TIDAK didaftarkan — lihat ADR-0150 keputusan 11 berikut konsekuensinya pada
 > `data.cascade` milik `project.deleted`.
+> **Eskalasi (SPEC-947 · [ADR-0152](../adr/0152-eskalasi-kartu-tim-ke-backlog.md)):** nol kolom,
+> nol migration, **nol entri sync/capability baru**. `Task.specId` sudah ada sejak ADR-0150 dan
+> sengaja absen dari `zCreateTask`/`zPatchTask`; jalur ini satu-satunya yang mengisinya. Satu
+> operasi mengubah dua baris, jadi ia memanggil `notifySynced("spec", …)` **dan**
+> `notifySynced("task", …)` — keduanya.
 
 ## Scheduler (SPEC-294 · ADR-0072) — LOCAL per-instance
 ```

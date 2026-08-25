@@ -189,7 +189,7 @@ Pakai skill lebih sempit saat task cocok:
   repoDir/cwd datang apa adanya, jadi tanpa `realpath` baris tak pernah cocok dengan sesinya —
   **senyap**; dan entri `.trash` tak bisa di-assert keberadaannya di test karena `releaseWorktree`
   menendang penyapunya seketika — yang membuktikan ia dipindah adalah bentuk namanya `<sesi>.<stempel>`.
-- **Papan Tim — kerja MANUSIA, papan LAIN** (SPEC-945/946 · **ADR-0150**+**ADR-0151**; menegakkan
+- **Papan Tim — kerja MANUSIA, papan LAIN** (SPEC-945/946/947 · **ADR-0150**+**ADR-0151**+**ADR-0152**; menegakkan
   ADR-0008/0024, 0145/0039, 0107, 0115, 0094, 0127; **nol kolom** ditambahkan ke `Spec`, jadi
   larangan tenggat/estimasi SPEC-162 utuh): dua entity tersync `Task` & `Member`, plus layar `Tim`
   ber-mode Papan. Kolomnya `Task.status` (`backlog·doing·review·done`) — **milik manusia**, jadi
@@ -207,6 +207,21 @@ Pakai skill lebih sempit saat task cocok:
   boleh mengosongkan layar. `GET /api/tasks` punya `q` yang disaring **sebelum** paginasi, di memori
   seperti `buildTicketsPage` (SQLite peka huruf besar-kecil untuk non-ASCII; `mode:"insensitive"`
   tak didukung). Anggota dikelola di modal layar Tim, **bukan** `SettingsScreen.tsx` (93 KB).
+  **Eskalasi (SPEC-947/ADR-0152)** adalah satu-satunya jembatan papan ini ke dunia agen: `POST`/
+  `DELETE /tasks/:id/escalate`, operasi khusus karena `specId` sengaja absen dari CRUD. Idempoten
+  lewat `task.specId` (`created:false`, bukan Spec kedua) dan retry `P2002` ≤3× — call site
+  `prisma.spec.create` **kelima**. Kartu **tanpa project** ditolak dengan SEBAB yang disebut
+  (`nextSpecId` butuh repo, repoDir milik project), dan `projectId` di body **memindahkan kartu**
+  ke project itu — kartu yang mengaku "tanpa project" sambil menunjuk Spec di dalam project adalah
+  kebenaran kedua yang langsung drift. Source **enum eksplisit tiga** (`brief`/`qa`/`audit`), bukan
+  `zSpecSource` yang disaring: anggota ketujuh tak boleh diam-diam jadi tujuan eskalasi. `severity`
+  payload qa DITURUNKAN dari prioritas yang baru dipilih operator, bukan hardcode `major`, dan teks
+  kartu **tak** dibungkus `UNTRUSTED_*` — pembungkus itu milik tiket publik, dan memakainya di sini
+  melatih agen mengabaikan konteks yang justru sengaja diberikan. `specId` menunjuk Spec terhapus =
+  **tautan putus**: `POST` membuat yang baru (cermin `acceptGithubIssue`; `spec!` milik
+  `acceptTicket` akan mengembalikan `undefined`), `DELETE` membersihkannya, **idempoten** dan
+  non-destruktif. Nol kolom, nol migration, dan **nol** entri `capabilityForRoute`/
+  `clientRouteAllowed` — yang terakhir keputusan, bukan kelalaian: keduanya deny-by-default.
   Item **D** (Linimasa) & **E** (Lintas project) **tak bisa** menumpang topik ini apa adanya —
   sumbunya tanggal, bukan `order`.
 - **Backlog bisa ditandai selesai MANUAL** (SPEC-804/**ADR-0120**; ADR-0008 & ADR-0047 & ADR-0099 &
