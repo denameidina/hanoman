@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import { zCreateTask, zPatchTask } from "@hanoman/shared";
+import { zCreateTask, zEscalateTask, zPatchTask } from "@hanoman/shared";
 import { prisma } from "../db";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { buildTasksPage, taskView } from "../services/tasks-list";
+import { launchPrincipal } from "../services/launch-authority";
+import { escalateTask } from "../services/task-escalate";
 
 // SPEC-945 · ADR-0150 · CRUD kartu kerja MANUSIA. Bukan backlog: `status` di sini milik manusia dan
 // bebas dipindah, sementara `Spec.stage` diturunkan dari fase sesi (ADR-0008/0024).
@@ -82,6 +84,39 @@ export default async function (app: FastifyInstance) {
         })
       : null;
     return taskView(row, spec);
+  });
+
+  // SPEC-947 · eskalasi kartu → backlog item. Operasi khusus, bukan field `zPatchTask`: `specId`
+  // sengaja absen dari CRUD (ADR-0150 keputusan 5) supaya kartu tak bisa mengaku tertaut pada Spec
+  // yang tak pernah menyetujuinya. Cermin POST /tickets/:id/accept.
+  app.post("/tasks/:id/escalate", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = zEscalateTask.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const { source, priority, projectId: wanted } = parsed.data;
+
+    const task = await prisma.task.findUnique({ where: { id } });
+    if (!task) return reply.code(404).send({ error: "not found" });
+
+    // Kartu yang sudah punya project tak boleh berpindah sebagai efek samping eskalasi. "Diterima
+    // lalu terjadi hal lain" adalah bug yang tak terlihat operator.
+    if (wanted && task.projectId && wanted !== task.projectId)
+      return reply.code(400).send({ error: "kartu ini milik project lain", projectId: task.projectId });
+
+    const projectId = task.projectId ?? wanted ?? null;
+    // `nextSpecId(repoDir)` butuh repo dan repoDir milik project (ADR-0150 keputusan 3). Sebabnya
+    // DISEBUT, tak ditolak dengan diam (kelas bug SPEC-546); dialog mendahuluinya dengan gerbang.
+    if (!projectId)
+      return reply.code(400).send({ error: "kartu tanpa project tak bisa dieskalasi — pilih project dulu" });
+    if (!(await prisma.project.findUnique({ where: { id: projectId } })))
+      return reply.code(400).send({ error: "project tak ditemukan", projectId });
+
+    const r = await escalateTask(task, {
+      projectId, source, priority,
+      author: req.user?.email ?? "system", launchApprovedBy: launchPrincipal(req),
+    });
+    const view = taskView(r.task, { id: r.spec.id, stage: r.spec.stage, priority: r.spec.priority });
+    return reply.code(r.created ? 201 : 200).send({ created: r.created, spec: r.spec, task: view });
   });
 
   app.delete("/tasks/:id", async (req, reply) => {
