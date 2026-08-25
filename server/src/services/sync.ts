@@ -14,7 +14,10 @@ import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
 // SPEC-471 · ADR-0095 · `githubIssue` ikut menyeberang: cermin issue adalah pengetahuan
 // bersama tim, bukan setelan mesin. Id-nya deterministik ("<projectId>:<slug>#<n>") justru
 // supaya dua mesin yang menarik repo yang sama bertemu sebagai SATU baris di sini.
-export const SYNCED = ["project", "spec", "vps", "sessionResult", "ticket", "ticketAttachment", "customAgent", "githubIssue"] as const;
+// SPEC-945 · ADR-0150 · `member` & `task` ikut menyeberang: papan kerja tim adalah pengetahuan
+// bersama, bukan setelan mesin. `Member.id` deterministik (email ternormalisasi) justru supaya dua
+// mesin yang mencatat orang yang sama bertemu sebagai SATU baris di sini.
+export const SYNCED = ["project", "spec", "vps", "sessionResult", "ticket", "ticketAttachment", "customAgent", "githubIssue", "member", "task"] as const;
 export type Entity = (typeof SYNCED)[number];
 
 type Delegate = {
@@ -32,6 +35,8 @@ const DELEGATE: Record<Entity, Delegate> = {
   ticketAttachment: prisma.ticketAttachment as unknown as Delegate,
   customAgent: prisma.customAgent as unknown as Delegate,
   githubIssue: prisma.githubIssue as unknown as Delegate,
+  member: prisma.member as unknown as Delegate,
+  task: prisma.task as unknown as Delegate,
 };
 
 // Whitelist field bisnis per entitas — SENGAJA mengecualikan never-sync (Project.repoDir,
@@ -80,6 +85,16 @@ const FIELDS: Record<Entity, string[]> = {
   // mesin bisa menerima ulang issue yang di mesin lain sudah jadi backlog.
   githubIssue: ["projectId", "repoSlug", "number", "title", "body", "authorLogin", "labels", "url",
     "issueState", "status", "specId", "issueCreatedAt", "issueUpdatedAt", "pulledAt", "createdAt", "updatedAt"],
+  // SPEC-945 · ADR-0150 · SELURUH kolom bermakna ikut menyeberang. `active` wajib ada: `upsert`
+  // yang tak menyebut kolom ber-default TETAP berhasil, jadi anggota nonaktif akan hidup lagi di
+  // setiap mesin lain tanpa satu pun error (kelas ADR-0090/0093/0105). `email` ikut meski id sudah
+  // diturunkan darinya — id menyimpan bentuk ternormalisasi, kolom ini yang diketik operator.
+  member: ["name", "email", "role", "active", "createdAt", "updatedAt"],
+  // `specId` ikut: tautan eskalasi adalah bagian keadaan yang harus dilihat sama oleh semua mesin —
+  // tanpa itu satu mesin bisa mengeskalasi ulang kartu yang di mesin lain sudah jadi backlog
+  // (cermin githubIssue.specId). `order` ikut supaya urutan kolom tidak acak di mesin lain.
+  task: ["projectId", "title", "detail", "status", "priority", "memberId", "startDate", "dueDate",
+    "order", "specId", "createdAt", "updatedAt"],
 };
 // Field yang JSONB-nya string ISO tapi kolomnya DateTime — dikonversi balik saat menulis.
 const DATE_FIELDS: Record<Entity, string[]> = {
@@ -89,6 +104,8 @@ const DATE_FIELDS: Record<Entity, string[]> = {
   ticketAttachment: ["createdAt", "updatedAt"],
   customAgent: ["createdAt", "updatedAt"],
   githubIssue: ["issueCreatedAt", "issueUpdatedAt", "pulledAt", "createdAt", "updatedAt"],
+  member: ["createdAt", "updatedAt"],
+  task: ["startDate", "dueDate", "createdAt", "updatedAt"],
 };
 
 // SPEC-799 · ADR-0119 · relasi FK antar entitas SYNCED. Dipakai penerima untuk MEMBUANG record anak
@@ -105,6 +122,10 @@ export const PARENTS: Partial<Record<Entity, { field: string; entity: Entity }[]
   ticketAttachment: [{ field: "ticketId", entity: "ticket" }],
   customAgent: [{ field: "projectId", entity: "project" }],
   githubIssue: [{ field: "projectId", entity: "project" }],
+  // SPEC-945 · ADR-0150 · DUA induk. `projectId` nullable (cermin customAgent) dan `memberId`
+  // nullable juga — `parentTombstoned` melewati nilai kosong, jadi nullable aman apa adanya.
+  // `member` sendiri sengaja ABSEN: direktori orang global, tanpa satu pun FK keluar.
+  task: [{ field: "projectId", entity: "project" }, { field: "memberId", entity: "member" }],
 };
 
 // Ekspor test-only: kontrak "setiap kolom bermakna ikut menyeberang" hanya bisa diuji dari
@@ -114,8 +135,10 @@ export const __DATE_FIELDS = DATE_FIELDS;
 
 const NUMBER_FIELDS = new Set([
   "vps:port", "ticket:number", "ticketAttachment:size", "githubIssue:number",
+  // SPEC-945 · tanpa ini urutan kartu di kolom jadi acak di mesin lain.
+  "task:order",
 ]);
-const BOOLEAN_FIELDS = new Set(["vps:hardened", "customAgent:enabled"]);
+const BOOLEAN_FIELDS = new Set(["vps:hardened", "customAgent:enabled", "member:active"]);
 const JSON_FIELDS = new Set([
   "project:handledBy",
   "spec:payload", "spec:dependsOn", "spec:sourceHistory", "spec:manualDone",
@@ -351,6 +374,9 @@ export async function pull(
 // DMMF di `sync-parents-dmmf.test.ts`).
 export const BOOTSTRAP_ORDER: Entity[] = [
   "project", "spec", "ticket", "customAgent", "githubIssue", "ticketAttachment",
+  // SPEC-945 · ADR-0150 · `member` WAJIB mendahului `task` (FK memberId). Urutan yang salah
+  // bootstrap SUKSES tanpa error tapi assignee kosong — kelas SPEC-885 "lupa vps".
+  "member", "task",
   "vps", "sessionResult",
 ];
 

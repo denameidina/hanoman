@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../src/db";
 import { PG_ORDER } from "../../cli/src/commands/migrate-pg";
 import { resetDb, makeProject } from "./factory";
+import { SYNCED, PARENTS, BOOTSTRAP_ORDER, __FIELDS, __DATE_FIELDS } from "../src/services/sync";
 
 const models = new Map(Prisma.dmmf.datamodel.models.map((m) => [m.name, m]));
 const colsOf = (n: string) =>
@@ -70,5 +71,49 @@ describe("SPEC-945 · ADR-0150 · model Member & Task", () => {
     expect(t.projectId).toBeNull();
     expect(t.priority).toBe("sedang");
     expect(t.order).toBe(0);
+  });
+});
+
+// Kolom bermakna — `id` (PK, di where) & `version` (stempel mekanisme sync) dikecualikan.
+// Dibandingkan dengan `toEqual` atas himpunan DMMF, bukan `toContain` per kolom: yang terakhir
+// lolos untuk kolom yang belum pernah terpikirkan, dan kolom yang terlewat di FIELDS mendarat
+// sebagai null palsu di tiap client TANPA satu pun error (kelas ADR-0090/0093/0105).
+const meaningful = (model: string): string[] =>
+  [...colsOf(model)].filter((c) => c !== "id" && c !== "version").sort();
+
+describe("SPEC-945 · member & task ikut record-sync", () => {
+  it("keduanya terdaftar di SYNCED", () => {
+    expect(SYNCED as readonly string[]).toContain("member");
+    expect(SYNCED as readonly string[]).toContain("task");
+  });
+
+  it("FIELDS.member = SETIAP kolom bermakna Member, tak lebih tak kurang", () => {
+    expect([...__FIELDS.member].sort()).toEqual(meaningful("Member"));
+  });
+
+  it("FIELDS.task = SETIAP kolom bermakna Task, tak lebih tak kurang", () => {
+    expect([...__FIELDS.task].sort()).toEqual(meaningful("Task"));
+  });
+
+  it("DATE_FIELDS memuat setiap kolom DateTime kedua model", () => {
+    expect([...__DATE_FIELDS.member].sort()).toEqual(["createdAt", "updatedAt"]);
+    expect([...__DATE_FIELDS.task].sort()).toEqual(["createdAt", "dueDate", "startDate", "updatedAt"]);
+  });
+
+  it("PARENTS.task memuat KEDUA induknya", () => {
+    expect(PARENTS.task).toEqual(expect.arrayContaining([
+      { field: "projectId", entity: "project" },
+      { field: "memberId", entity: "member" },
+    ]));
+  });
+
+  it("member TIDAK punya induk — direktori orang global, bukan anak project", () => {
+    expect(PARENTS.member).toBeUndefined();
+  });
+
+  // Kelas SPEC-885 "lupa vps": urutan yang salah bootstrap SUKSES tanpa error, tapi assignee kosong.
+  it("BOOTSTRAP_ORDER menaruh member SEBELUM task", () => {
+    expect(BOOTSTRAP_ORDER.indexOf("member")).toBeGreaterThanOrEqual(0);
+    expect(BOOTSTRAP_ORDER.indexOf("member")).toBeLessThan(BOOTSTRAP_ORDER.indexOf("task"));
   });
 });

@@ -549,7 +549,7 @@ git commit -m "feat(945): kontrak murni papan tim di shared/src/team.ts"
 - Consumes: model `Member`/`Task` dari Task 1.
 - Produces: `Entity` union memuat `"member" | "task"`. Dipakai Task 5 & 6 (`notifySynced`/`deleteSynced`).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `server/test/team-schema.test.ts`, tambahkan **satu baris ke blok impor di kepala berkas** (bukan di akhir — impor yang tercecer di bawah kode terbaca seperti kekeliruan meski ESM meng-hoist-nya):
 
@@ -622,7 +622,7 @@ Perbarui juga `server/test/sync-exclusions.test.ts:20-27` — snapshot literalny
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/team-schema.test.ts server/test/sync-exclusions.test.ts
@@ -630,7 +630,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `expected [ … ] to contain 'member'` dan `__FIELDS.member` `undefined`.
 
-- [ ] **Step 3: Daftarkan di `sync.ts`**
+- [x] **Step 3: Daftarkan di `sync.ts`**
 
 **a.** `SYNCED` (`:17`) — tambahkan komentar di atasnya lalu dua entri:
 
@@ -702,7 +702,7 @@ export const BOOTSTRAP_ORDER: Entity[] = [
 ];
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -712,7 +712,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS semua empat berkas.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 ```bash
 pnpm --filter ./server typecheck
@@ -720,7 +720,7 @@ pnpm --filter ./server typecheck
 
 Expected: nol error. (`DELEGATE`/`FIELDS`/`DATE_FIELDS` ber-`Record<Entity,…>`, jadi entri yang terlewat justru ditangkap di sini.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/sync.ts server/test/team-schema.test.ts server/test/sync-exclusions.test.ts
@@ -742,7 +742,7 @@ git commit -m "feat(945): daftarkan member & task ke mesin sync"
   - `buildTasksPage(f: { projectId?: string; status?: string; memberId?: string; page?: number; limit?: number }): Promise<Paginated<TaskView>>`
   - Dipakai Task 6 (route) dan Task 7 (topik).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/tasks-list.test.ts`:
 
