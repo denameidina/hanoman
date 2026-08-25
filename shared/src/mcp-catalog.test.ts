@@ -11,10 +11,10 @@ describe("katalog tool MCP", () => {
   });
 
   it("mode baca-saja MENGHILANGKAN tool tulis, bukan menolaknya saat dipanggil", () => {
-    const ro = mcpToolsFor(true);
+    const ro = mcpToolsFor("read-only");
     expect(ro.every((t) => t.mode === "read")).toBe(true);
     expect(ro).toHaveLength(13);
-    expect(mcpToolsFor(false)).toHaveLength(17);
+    expect(mcpToolsFor("default")).toHaveLength(17);
     expect(ro.map((t) => t.name)).not.toContain("hanoman_backlog_create");
   });
 
@@ -129,5 +129,36 @@ describe("SPEC-485 · lead_ask menerima pilihan jamak", () => {
 
   it("tak ada tool baru untuk rantai — permukaannya tetap 17", () => {
     expect(MCP_TOOLS.filter((t) => t.name.includes("flow"))).toHaveLength(0);
+  });
+});
+
+// ADR-0155 · tingkat mode ketiga. Tiga sifat dikunci: yang lebih sempit MENGHILANGKAN tool (bukan
+// menolaknya saat dipanggil — ADR-0099 §5), `danger` memuat semuanya, dan instruksi menyatakan
+// terang-terangan bahwa tingkat ini BUKAN kontrol keamanan. Yang terakhir bukan kosmetik: menyebut
+// `--danger` sebagai gerbang keamanan di dokumen mana pun adalah kekeliruan yang menular.
+describe("tingkat mode", () => {
+  it("read-only hanya tool baca", () => {
+    expect(mcpToolsFor("read-only").every((t) => t.mode === "read")).toBe(true);
+  });
+
+  it("default menyembunyikan danger tapi menyimpan write", () => {
+    const t = mcpToolsFor("default");
+    expect(t.some((x) => x.mode === "danger")).toBe(false);
+    expect(t.some((x) => x.mode === "write")).toBe(true);
+  });
+
+  it("danger memuat semuanya", () => {
+    expect(mcpToolsFor("danger")).toHaveLength(MCP_TOOLS.length);
+  });
+
+  it("tingkat yang lebih longgar tak pernah MENGHILANGKAN tool yang lebih sempit sudah punya", () => {
+    const names = (l: Parameters<typeof mcpToolsFor>[0]) => new Set(mcpToolsFor(l).map((t) => t.name));
+    const ro = names("read-only"), def = names("default"), dg = names("danger");
+    for (const n of ro) expect(def.has(n), n).toBe(true);
+    for (const n of def) expect(dg.has(n), n).toBe(true);
+  });
+
+  it("instruksi menyatakan tingkat ini BUKAN kontrol keamanan", () => {
+    expect(MCP_INSTRUCTIONS).toMatch(/bukan kontrol keamanan/i);
   });
 });
