@@ -1485,7 +1485,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: seluruh perubahan Task 1-6.
 - Produces: —
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 Run:
 ```bash
@@ -1495,20 +1495,20 @@ cd src && env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS \
 ```
 Expected: seluruh berkas PASS, dan jumlah test **naik** dibanding sebelum SPEC-948. Jangan menerima "no test files" sebagai bukti.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 Run: `cd src && pnpm typecheck`
 Expected: nol error. **Jangan** `pnpm -r typecheck`.
 
-- [ ] **Step 3: Penyapuan blast-radius**
+- [x] **Step 3: Penyapuan blast-radius**
 
 Dispatch subagent `blast-radius` dengan lingkup: "SPEC-948 memindahkan `taskDates` dari `team-board.tsx` ke `team-rules.ts` dan menambah entri kedua ke `TEAM_VIEWS` di `TeamScreen.tsx`. Cari tempat LAIN yang seharusnya ikut berubah tapi tidak: cermin daftar mode tampilan, doc yang menyebut layar Tim hanya punya satu mode, test kontrak nav, daftar kunci `uiKey`, dan pemakaian `taskDates` yang tertinggal." Terapkan temuan yang benar-benar berlaku.
 
-- [ ] **Step 4: Verifikasi bahwa test yang lulus memang menguji perubahannya**
+- [x] **Step 4: Verifikasi bahwa test yang lulus memang menguji perubahannya**
 
 Dispatch subagent `qa-verifier` dengan lingkup berkas di Task 1-5. Ia harus membuktikan test barunya benar-benar berjalan (bukan `passWithNoTests`) dan memisahkan gagal palsu (env sesi, Node 25/jsdom) dari regresi.
 
-- [ ] **Step 5: Centang plan & commit penutup**
+- [x] **Step 5: Centang plan & commit penutup**
 
 Pastikan setiap `- [ ]` di berkas plan ini sudah `- [x]`, lalu:
 
