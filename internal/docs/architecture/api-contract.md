@@ -1536,8 +1536,12 @@ PATCH  /api/members/:id   { name?, role?, active? }  -> MemberView
 DELETE /api/members/:id   -> 204
 #   Task-nya JATUH ke memberId: null (onDelete: SetNull), tidak ikut terhapus. 404 id tak ada.
 
-GET    /api/tasks?projectId&status&memberId&page&limit  -> Paginated<TaskView>
+GET    /api/tasks?projectId&status&memberId&q&page&limit  -> Paginated<TaskView>
 #   Urut `order` menaik, seri dipecah `id`. Berhalaman (ADR-0107).
+#   `q` (SPEC-946 · ADR-0151) = substring CASE-INSENSITIVE atas `title + detail`, disaring SEBELUM
+#   paginasi sehingga pencarian menjangkau seluruh tabel dan plafon halaman berlaku pada HASIL-nya.
+#   Di memori, bukan `contains` Prisma: SQLite peka huruf besar-kecil untuk non-ASCII dan
+#   `mode: "insensitive"` tak didukung provider ini (cermin buildTicketsPage).
 #   TaskView = { id, projectId, title, detail, status, priority, memberId,
 #                startDate, dueDate, order, specId, spec, createdAt, updatedAt }
 #   status = backlog|doing|review|done · priority = tinggi|sedang|rendah (kosakata zPriority)
@@ -1565,7 +1569,11 @@ DELETE /api/tasks/:id  -> 204   # menulis tombstone sync (ADR-0119). 404 id tak 
 # Realtime: topik BERPARAMETER `tasks` di /events/ws (ADR-0145), everyTicks 3 — bukan grup global
 # ke-11 di GROUPS. `GROUPS` di-recompute untuk SETIAP klien tiap N detik; papan tim punya sedikit
 # penonton dan banyak parameter, jadi biayanya harus lahir hanya untuk yang benar-benar ditonton.
-# params: { projectId?, status?, memberId?, page, limit } — sama dengan query GET /tasks.
+# params: { projectId?, status?, memberId?, q?, page, limit } — sama dengan query GET /tasks.
+# Papan Tim memasang EMPAT langganan, satu per KOLOM (SPEC-946 · ADR-0151): `limit` dijepit
+# `zSubLimit` ke 200 dan `order` bermakna DI DALAM kolom, jadi satu langganan untuk seluruh papan
+# memotong himpunan gabungan empat kolom di titik yang sewenang-wenang. Tiap kolom karena itu punya
+# `total`-nya sendiri, dan UI merender plafonnya ("menampilkan N dari M") alih-alih memotong senyap.
 # `buildTasksPage` (services/tasks-list.ts) dipakai BERSAMA route & topik: satu serializer.
 ```
 

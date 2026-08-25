@@ -189,6 +189,26 @@ Pakai skill lebih sempit saat task cocok:
   repoDir/cwd datang apa adanya, jadi tanpa `realpath` baris tak pernah cocok dengan sesinya —
   **senyap**; dan entri `.trash` tak bisa di-assert keberadaannya di test karena `releaseWorktree`
   menendang penyapunya seketika — yang membuktikan ia dipindah adalah bentuk namanya `<sesi>.<stempel>`.
+- **Papan Tim — kerja MANUSIA, papan LAIN** (SPEC-945/946 · **ADR-0150**+**ADR-0151**; menegakkan
+  ADR-0008/0024, 0145/0039, 0107, 0115, 0094, 0127; **nol kolom** ditambahkan ke `Spec`, jadi
+  larangan tenggat/estimasi SPEC-162 utuh): dua entity tersync `Task` & `Member`, plus layar `Tim`
+  ber-mode Papan. Kolomnya `Task.status` (`backlog·doing·review·done`) — **milik manusia**, jadi
+  `canDropTask` **membalik** `canDrop` board Backlog alih-alih menyempitkannya: keempat kolom saling
+  menerima dan yang tersisa satu larangan (`from !== to`). `Member.id` **deterministik dari email
+  ternormalisasi** (pola ADR-0094) → `email` **immutable**, ditegakkan dua lapis karena `.omit()`
+  sendirian membuangnya senyap, dan UI-nya karena itu **tak punya field email sama sekali** di form
+  ubah. **Gotcha yang mengunci bentuk UI:** papan tak dipaginasi tapi topik `tasks` mewajibkan
+  `page`/`limit` dengan `zSubLimit` dijepit **200**, dan `order` bermakna DI DALAM kolom — jadi satu
+  langganan untuk seluruh papan memotong himpunan gabungan empat kolom di titik **sewenang-wenang**.
+  Papan memasang **empat langganan, satu per kolom**, tiap kolom ber-`total` sendiri, dan plafonnya
+  **dirender** (`menampilkan N dari M`) — papan yang diam-diam memotong terbaca sebagai papan yang
+  lengkap. Muat awal HTTP wajib berparameter **identik** dengan langganannya (muat tak-berbatas +
+  langganan berplafon = kartu lenyap 3 dtk kemudian, nol error), dan hanya muat **pertama** yang
+  boleh mengosongkan layar. `GET /api/tasks` punya `q` yang disaring **sebelum** paginasi, di memori
+  seperti `buildTicketsPage` (SQLite peka huruf besar-kecil untuk non-ASCII; `mode:"insensitive"`
+  tak didukung). Anggota dikelola di modal layar Tim, **bukan** `SettingsScreen.tsx` (93 KB).
+  Item **D** (Linimasa) & **E** (Lintas project) **tak bisa** menumpang topik ini apa adanya —
+  sumbunya tanggal, bukan `order`.
 - **Backlog bisa ditandai selesai MANUAL** (SPEC-804/**ADR-0120**; ADR-0008 & ADR-0047 & ADR-0099 &
   ADR-0105 ditegakkan, **ADR-0103 diamandemen**): `POST /specs/:id/done` `{reason?, confirm?}`
   memajukan satu item ke `done` tanpa sesi — untuk pekerjaan yang beres DI LUAR sesi (dikerjakan

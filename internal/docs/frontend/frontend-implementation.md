@@ -951,6 +951,101 @@ Memulai sesi **tidak** memindahkan layar — operator tetap di Backlog dengan fi
 utuh. Yang menandai sesi sudah jalan adalah kartunya sendiri: `activeSpecs` (diturunkan dari
 `listSessions()` tmux) menyegar, tombolnya berubah, dan toast muncul.
 
+## Tim — papan kerja manusia (SPEC-946 · ADR-0150/0151)
+`TeamScreen` adalah papan kanban untuk pekerjaan **manusia** di sekitar sesi agen: desain, meeting
+klien, deploy, nego, urusan internal. Ia **bukan** mode keempat `BacklogScreen`. Kolom board
+Backlog adalah `Spec.stage` yang diturunkan dari fase sesi (ADR-0008/0024); kolom di sini adalah
+`Task.status`, yang memang milik manusia.
+
+Konsekuensinya aturan drag **berbalik**, bukan menyempit. Di Backlog hanya satu drop yang sah
+(`Backlog → Brainstorm`, dan ia bermuara ke `POST /terminal/sessions`). Di sini keempat kolom
+saling menerima, dan yang tersisa satu larangan — `canDropTask(from, to) = from !== to`, karena
+drop ke kolom asal bukan perpindahan dan hanya melahirkan satu `PATCH` yang menulis nilai yang
+sudah ada plus satu baris `SyncLog` tanpa pembaca (ADR-0131). Kartu mendarat di **ujung** kolom
+tujuan (`order = max + 1`); menyusun ulang di dalam kolom lewat drag bukan bagian item ini.
+
+Kolomnya empat dan lahir dari `TASK_STATUSES`, bukan daftar literal baru: `Backlog · Dikerjakan ·
+Review · Selesai`. Rantai flex-nya persis board Backlog — barisnya menggulir **mendatar**
+(`overflow-x:auto`, `overflow-y:hidden`, `.hn-board-local-overflow`) dan tiap **kolom** menggulir
+tegak sendiri, dengan kartu `flex: 0 0 auto` supaya kolomnya yang menggulir, bukan kartunya yang
+menyusut.
+
+**Langganan PER KOLOM, dan plafonnya terlihat.** Papan tak dipaginasi — kolom yang terpotong
+halaman bukan board — tapi topik `tasks` mewajibkan `page`/`limit` dan `zSubLimit` menjepit `limit`
+ke 200. Satu langganan untuk seluruh papan salah dan bisa dibuktikan salah: `buildTasksPage`
+mengurutkan `order asc`, sementara `order` bermakna **di dalam** kolom, jadi potongan 200 memotong
+himpunan gabungan empat kolom di titik yang sewenang-wenang. Papan karena itu memasang **empat**
+langganan `{projectId?, status, memberId?, q?, page: 1, limit: 200}` (4 dari `MAX_SUBS = 16`), tiap
+kolom membawa `total`-nya sendiri, dan begitu `total > items.length` kaki kolom merender
+`menampilkan N dari M — persempit penyaring`. Muat awal HTTP memakai parameter **identik** dengan
+langganannya: muat tak-berbatas lalu langganan berplafon membuat kartu lenyap tiga detik setelah
+muncul, tanpa satu pun tindakan operator dan tanpa satu pun error.
+
+Hanya muat **pertama** yang boleh merender blok `loading`. Tanpa pemisahan itu tiap huruf di kotak
+cari membuat keempat kolom lenyap sekejap. Refetch yang gagal sesudah papan tampil menandai
+hitungan **"basi"** (pola SPEC-857), bukan menimpa papan yang sudah benar dengan layar galat. Dan
+kolom kosong **di bawah penyaring** tetap dirender sebagai kolom: "Dikerjakan 0" adalah jawaban,
+sedangkan blok "tak ada hasil" justru menyembunyikan tiga kolom lain yang mungkin berisi. Yang
+layak menggantikan papan hanya papan yang benar-benar kosong tanpa penyaring aktif — di sana blok
+kosongnya membawa pintu masuk "Tugas baru".
+
+Toolbar dua baris cermin `BacklogScreen`: baris atas toggle mode tampilan (`Tabs variant="pill"`),
+**Tugas baru**, **Anggota**, `SyncButton`, `ResetViewButton`, hitungan ber-`role="status"`, dan
+`LiveConnectionBadge`; baris bawah **Cari tugas** + penyaring project, kolom, dan anggota. Kelas
+responsifnya dinamai sendiri (`.hn-team-topline` dkk.) dan didaftarkan ke grup selector yang sama
+di `app.css` — layar yang meminjam nama layar lain adalah cara aturan mulai berubah untuk satu
+layar dan diam-diam ikut mengubah yang lain.
+
+Penyaring project memakai **`App.projectFilter`** (SPEC-146: App pemilik tunggal "daftar disaring
+ke project mana"), jadi berpindah dari Backlog ke Tim tak mengganti project yang sedang dilihat —
+dan karena state itu di luar jangkauan `resetUiState("team")`, `ResetViewButton` diberi `onReset`.
+Penyaring **kolom** mempersempit kolom yang tampil, dan hanya kolom yang tampil yang dimuat &
+dilanggan, jadi biaya servernya ikut mengecil. Tak ada sentinel "Tanpa project": `where.projectId`
+di server hanya dipasang saat nilainya truthy, jadi `projectId: null` tak bisa dinyatakan sebagai
+query tanpa menambah sentinel ke kontrak — kartu tanpa project tetap terlihat di "Semua project"
+dan diberi label `tanpa project`. Sisa state tampilan (`view`, `q`, `col`, `member`) persisten
+berkunci `team` (SPEC-740/ADR-0115); tak ada `page`, papan tak dipaginasi.
+
+`TEAM_VIEWS` hari ini berisi **satu** entri (`board` · "Papan") dan tetap dirender sebagai tablist
+ber-`usePersistedState`, karena mode Linimasa & Lintas project menambahkan entri ke array yang
+**sama** — bukan memasang mekanisme baru pada layar yang sudah dipakai orang.
+
+**Kartu membawa aksi eksplisit karena drag mati di keyboard dan di layar sentuh.** Tiap kartu punya
+dua `Select` di kakinya — *Pindah kolom* dan *Tugaskan* — ber-`aria-label` yang memuat judul
+tugasnya, supaya papan berisi banyak kartu tetap punya nama unik bagi pembaca layar dan bagi test.
+Isinya: prioritas, project (atau `tanpa project`), judul yang membuka `TaskModal`, assignee, dan
+rentang `startDate → dueDate`; kartu tanpa tanggal tak merender barisnya sama sekali. `specId`
+terisi dengan `spec: null` dirender **"tautan putus"**, bukan disamarkan jadi "tak pernah
+dieskalasi" (ADR-0150) — aksinya milik spec eskalasi berikutnya.
+
+Anggota dikelola di **modal dalam layar Tim**, bukan `SettingsScreen.tsx` yang sudah 93 KB. Form
+ubahnya **tak punya field email sama sekali**: `Member.id` diturunkan dari email dan changefeed
+sync tak punya operasi rename (ADR-0094/0150), jadi emailnya dirender sebagai teks plus kalimat
+"ganti email berarti hapus lalu buat baru". Menghapus lewat `useConfirm` (ADR-0127), dan dialognya
+menyebut bahwa tugasnya **tidak** ikut terhapus (`onDelete: SetNull`).
+
+Berkasnya dipecah **sejak awal** — `BacklogScreen` 63 KB dan `TerminalScreen` 57 KB adalah
+pelajaran yang tak perlu diulang:
+
+| Berkas | Tanggung jawab |
+|---|---|
+| `screens/team-rules.ts` | fungsi **murni**: `TEAM_COLUMNS`, `emptyBoard`, `canDropTask`, `nextOrder`, `moveCard`, `replaceCard`, konversi tanggal. Nol React, nol I/O |
+| `screens/team-board.tsx` | `TeamBoard` + `TaskCard` — render & event drag |
+| `screens/TaskModal.tsx` | satu form untuk buat DAN ubah, plus hapus |
+| `screens/MembersPanel.tsx` | modal kelola anggota |
+| `screens/TeamScreen.tsx` | toolbar, fetch & langganan per kolom, state, mutasi optimistis |
+
+`<input type="date">` memancarkan `YYYY-MM-DD` sementara `zCreateTask` menuntut ISO 8601
+**ber-offset** — mengirim nilai input apa adanya dijawab `400` oleh route. Konversinya dua fungsi
+murni di `team-rules.ts`, dan nilainya **tengah hari UTC**: `T00:00:00Z` mundur ke tanggal
+sebelumnya di zona waktu barat, dan tanggal yang bergeser sehari saat dibaca kembali adalah bug
+yang tak memunculkan satu pun error.
+
+Aturannya diuji dua lapis, dan lapis pertama **tidak cukup**: `from`/`to` yang tertukar saat
+dipasang lolos dari unit test aturannya sendiri. `src/test/team-board.test.tsx` karena itu men-drag
+kartu sungguhan di jsdom (`fireEvent.dragStart` + `fireEvent.drop`, dengan `DataTransfer` palsu),
+persis pola `src/test/backlog-board.test.tsx`.
+
 ## Terminal (sesi Claude Code interaktif)
 `TerminalScreen` menampilkan sesi dalam **grid `rows × cols`** (CSS Grid): `+ Kolom` menambah
 kolom (kiri↔kanan), `+ Baris` menambah baris (atas↔bawah); tiap kolom dan baris punya `×` di gutter
