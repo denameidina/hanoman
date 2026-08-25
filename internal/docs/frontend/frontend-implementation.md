@@ -1012,12 +1012,24 @@ ber-`usePersistedState`, karena mode Linimasa & Lintas project menambahkan entri
 **sama** — bukan memasang mekanisme baru pada layar yang sudah dipakai orang.
 
 **Kartu membawa aksi eksplisit karena drag mati di keyboard dan di layar sentuh.** Tiap kartu punya
-dua `Select` di kakinya — *Pindah kolom* dan *Tugaskan* — ber-`aria-label` yang memuat judul
-tugasnya, supaya papan berisi banyak kartu tetap punya nama unik bagi pembaca layar dan bagi test.
-Isinya: prioritas, project (atau `tanpa project`), judul yang membuka `TaskModal`, assignee, dan
-rentang `startDate → dueDate`; kartu tanpa tanggal tak merender barisnya sama sekali. `specId`
-terisi dengan `spec: null` dirender **"tautan putus"**, bukan disamarkan jadi "tak pernah
-dieskalasi" (ADR-0150) — aksinya milik spec eskalasi berikutnya.
+dua `Select` di kakinya — *Pindah kolom* dan *Tugaskan* — plus satu baris aksi backlog, semuanya
+ber-`aria-label` yang memuat judul tugasnya supaya papan berisi banyak kartu tetap punya nama unik
+bagi pembaca layar dan bagi test. Isinya: prioritas, project (atau `tanpa project`), judul yang
+membuka `TaskModal`, assignee, dan rentang `startDate → dueDate`; kartu tanpa tanggal tak merender
+barisnya sama sekali.
+
+Baris aksi backlog punya **dua keadaan** (SPEC-947 · ADR-0152). `specId` kosong → tombol
+*Eskalasi*, yang membuka `EscalateDialog`. `specId` terisi → lencana cermin (`SPEC-nnn · stage`,
+atau **"tautan putus"** bila `spec` null — bukan disamarkan jadi "tak pernah dieskalasi", ADR-0150)
+plus tombol *Lepas tautan*. Tautan putus menawarkan **lepas tautan**, bukan eskalasi ulang:
+keadaan itu perlu dilihat operator dulu, meski server sendiri sanggup menyembuhkannya.
+
+`EscalateDialog` merender pemilih **project hanya bila kartunya belum punya**, dan tombol kirimnya
+mati sampai project dipilih — **dengan sebabnya tertulis** ("Nomor SPEC diambil dari repo project"),
+karena tombol mati tanpa penjelasan adalah bentuk lain dari menolak dengan diam (SPEC-546). Label
+source datang dari `sourceMeta()` (`source-meta.ts`) dan prioritasnya **prefilled dari kartu**.
+Galat API meninggalkan dialog **terbuka** beserta isiannya. Lepas tautan tak berdialog konfirmasi:
+ia non-destruktif dan reversibel, jadi `useConfirm` di sana hanya menambah klik.
 
 Anggota dikelola di **modal dalam layar Tim**, bukan `SettingsScreen.tsx` yang sudah 93 KB. Form
 ubahnya **tak punya field email sama sekali**: `Member.id` diturunkan dari email dan changefeed
@@ -1034,6 +1046,7 @@ pelajaran yang tak perlu diulang:
 | `screens/team-board.tsx` | `TeamBoard` + `TaskCard` — render & event drag |
 | `screens/TaskModal.tsx` | satu form untuk buat DAN ubah, plus hapus |
 | `screens/MembersPanel.tsx` | modal kelola anggota |
+| `screens/EscalateDialog.tsx` | dialog eskalasi kartu → backlog (project bila perlu · source · prioritas) |
 | `screens/TeamScreen.tsx` | toolbar, fetch & langganan per kolom, state, mutasi optimistis |
 
 `<input type="date">` memancarkan `YYYY-MM-DD` sementara `zCreateTask` menuntut ISO 8601

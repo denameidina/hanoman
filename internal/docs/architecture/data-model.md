@@ -903,7 +903,7 @@ nanti adalah migration additif biasa.
 login. String, bukan FK — jadi tak ada masalah `User` yang LOCAL-only dan tak perlu role baru.
 
 **Sync.** Keduanya **ikut menyeberang** (`SYNCED`), dengan seluruh kolom bermakna di `FIELDS`
-(`version` tak pernah ikut — ia stempel mekanismenya sendiri), `task:order` di `NUMBER_FIELDS`,
+(`version` tak pernah ikut — ia stempel mekanismenya sendiri), `task:order` di **`FLOAT_FIELDS`** (BUKAN `NUMBER_FIELDS` — ADR-0150 keputusan 13),
 `member:active` di `BOOLEAN_FIELDS`, `PARENTS.task` menunjuk **dua** induk (`project` & `member`),
 dan `BOOTSTRAP_ORDER` menaruh `member` **sebelum** `task` — urutan yang salah bootstrap sukses
 tanpa error tapi assignee kosong (kelas SPEC-885). `Member` sendiri tak punya induk. Di luar

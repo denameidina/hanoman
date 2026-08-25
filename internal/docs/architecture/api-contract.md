@@ -1613,7 +1613,8 @@ DELETE /api/tasks/:id/escalate   -> 200 TaskView (specId: null)
 ```
 
 > **Sync:** `member` & `task` masuk `SYNCED` (ADR-0045) dengan **seluruh** kolom bermakna di
-> `FIELDS`; `task:order` di `NUMBER_FIELDS`, `member:active` di `BOOLEAN_FIELDS`, `PARENTS.task`
+> `FIELDS`; `task:order` di **`FLOAT_FIELDS`** (BUKAN `NUMBER_FIELDS`: yang itu divalidasi
+> `Number.isSafeInteger` dan pecahan `order` justru alasan keberadaannya — ADR-0150 keputusan 13), `member:active` di `BOOLEAN_FIELDS`, `PARENTS.task`
 > menunjuk dua induk, dan `BOOTSTRAP_ORDER` menaruh `member` **sebelum** `task`.
 > **Webhook:** sengaja TIDAK didaftarkan — lihat ADR-0150 keputusan 11 berikut konsekuensinya pada
 > `data.cascade` milik `project.deleted`.

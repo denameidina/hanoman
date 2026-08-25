@@ -93,7 +93,7 @@ export const WEBHOOK_ENTITIES: WebhookEntityDef[] = [
       "manualDone", "updatedAt"],
     projectIdField: "projectId",
     events: {
-      created: { type: "spec.created", label: "Backlog dibuat", when: "Sebuah item backlog difilekan — lewat UI, POST /specs, breakdown PRD, triase tiket, atau tarik issue GitHub." },
+      created: { type: "spec.created", label: "Backlog dibuat", when: "Sebuah item backlog difilekan — lewat UI, POST /specs, breakdown PRD, triase tiket, tarik issue GitHub, atau eskalasi kartu papan tim." },
       updated: { type: "spec.updated", label: "Backlog diubah", when: "Field backlog selain stage berubah: judul, objective, prioritas, dependency, branch, atau SHA basis/ujung." },
       deleted: { type: "spec.deleted", label: "Backlog dihapus", when: "Item backlog dihapus operator." },
     },
