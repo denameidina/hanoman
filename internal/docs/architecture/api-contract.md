@@ -1558,8 +1558,14 @@ POST   /api/tasks   { title, projectId?, detail?, status?, priority?, memberId?,
 #   P2003 Prisma menyebut nama constraint, bukan nilai yang salah. 400 status di luar empat kolom.
 PATCH  /api/tasks/:id  { …semua field di atas, semuanya opsional }  -> TaskView
 #   Termasuk { status, order } untuk drop kanban. Field yang TIDAK dikirim tak tersentuh; `null`
-#   eksplisit mengosongkan (memberId/projectId/tanggal) — keduanya harus tetap berbeda supaya
-#   PATCH {status} tak diam-diam menghapus tanggal yang sudah diisi. 404 id tak ada.
+#   eksplisit mengosongkan (memberId/tanggal) — keduanya harus tetap berbeda supaya PATCH {status}
+#   tak diam-diam menghapus tanggal yang sudah diisi. 404 id tak ada.
+#   SPEC-947 · ADR-0152 keputusan 13 · kartu yang TERTAUT ke backlog menolak 400 { error, specId,
+#   projectId } untuk `projectId` yang berbeda — TERMASUK null. Invariant "kartu tertaut hidup di
+#   project Spec-nya" ditegakkan route escalate, dan PATCH adalah pintu tulis KEDUA ke kolom yang
+#   sama: tanpa pagar ini papan project lain merender lencana SPEC milik project asal (join
+#   `specId` tak berpredikat project), 200 dan nol error — kelas dua-jalur-tulis ADR-0151.
+#   Pagarnya LEPAS sesudah DELETE …/escalate; kartu tak tertaut bebas pindah project seperti biasa.
 DELETE /api/tasks/:id  -> 204   # menulis tombstone sync (ADR-0119). 404 id tak ada.
 
 POST   /api/tasks/:id/escalate   { source, priority, projectId? }   # SPEC-947 · ADR-0152

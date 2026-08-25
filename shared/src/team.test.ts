@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { memberId, zCreateMember, zPatchMember, zCreateTask, zPatchTask, zEscalateTask, TASK_STATUSES } from "./team";
+import { memberId, zCreateMember, zPatchMember, zCreateTask, zPatchTask, zEscalateTask, ESCALATE_SOURCES, TASK_STATUSES } from "./team";
+import { zSpecSource } from "./enums";
 
 describe("SPEC-945 · memberId deterministik", () => {
   it("menormalkan kapitalisasi & spasi tepi", () => {
@@ -103,5 +104,15 @@ describe("zEscalateTask", () => {
   it("projectId opsional", () => {
     expect(zEscalateTask.safeParse({ projectId: "hanoman" }).success).toBe(true);
     expect(zEscalateTask.safeParse({}).success).toBe(true);
+  });
+});
+
+// `ESCALATE_SOURCES` adalah subset `zSpecSource` yang DITULIS ULANG, dan `escalateTask` menulis
+// `source` langsung ke `prisma.spec.create` tanpa lewat `zCreateSpec`. `Spec.source` kolom TEXT,
+// jadi nama yang melenceng melahirkan Spec ber-source tak dikenal: `sourceMeta()` jatuh ke
+// "feature brief", `flowForSource` ikut jatuh — nol error kompilasi, nol test merah.
+describe("ESCALATE_SOURCES", () => {
+  it("setiap anggotanya benar-benar ada di zSpecSource", () => {
+    for (const s of ESCALATE_SOURCES) expect(zSpecSource.options).toContain(s);
   });
 });

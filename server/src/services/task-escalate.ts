@@ -47,7 +47,18 @@ export async function escalateTask(
     // `specId` terisi TANPA Spec = tautan putus (ADR-0150 keputusan 5) — jatuh ke pembuatan baru,
     // cermin acceptGithubIssue. `spec!` seperti acceptTicket akan mengembalikan undefined sebagai
     // Spec dan meledak di pemanggil, bukan di sini.
-    if (spec) return { spec, task, created: false };
+    if (spec) {
+      // Kartu tertaut yang projectnya kosong hanya bisa lahir dari sync atau dari baris sebelum
+      // gerbang PATCH ada. Dipulihkan ke project SPEC-nya — BUKAN ke project yang diminta
+      // pemanggil: tautannya sudah menetapkan jawabannya, dan memakai `opts.projectId` di sini
+      // akan memindahkan kartu ke project yang Spec-nya tak pernah tinggali.
+      if (task.projectId === spec.projectId) return { spec, task, created: false };
+      const repaired = await prisma.task.update({
+        where: { id: task.id }, data: { projectId: spec.projectId },
+      });
+      await notifySynced("task", task.id);
+      return { spec, task: repaired, created: false };
+    }
   }
 
   const member = task.memberId

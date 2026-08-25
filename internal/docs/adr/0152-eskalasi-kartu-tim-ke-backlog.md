@@ -153,6 +153,32 @@ Tak ada entri baru di `sync.ts`: `task` & `spec` sudah di `SYNCED`, dan `specId`
 
 Nol kolom, nol migration.
 
+**13. `PATCH /tasks/:id` menegakkan invariant keputusan 5 — pintu tulis KEDUA ikut dijaga.**
+
+Keputusan 5 menetapkan "kartu tertaut hidup di project `Spec`-nya", dan route eskalasi menjaganya.
+`PATCH` menulis kolom yang **sama** tanpa mengetahuinya, jadi tanpa gerbang kedua invariant itu
+hanya berlaku di satu pintu. Terukur: kartu ber-`specId` di `p1` di-`PATCH {projectId:"p2"}` →
+`200`, dan `buildTasksPage` men-join `specId` **tanpa predikat project**, sehingga papan project
+`p2` merender lencana `SPEC-nnn` milik backlog item `p1` — keputusan "siapa mengerjakan apa"
+diambil dari lencana itu. `TaskModal` mengirim `projectId` di **setiap** simpan, jadi jaraknya satu
+klik, bukan skenario API-only.
+
+Kartu tertaut karena itu menjawab `400 { error, specId, projectId }` untuk `projectId` yang berbeda
+— termasuk `null`. Pagarnya **lepas begitu tautannya dilepas**; kalau tidak, "salah-eskalasi" jadi
+kandang. Kartu **tak** tertaut tetap bebas berpindah project seperti sebelumnya.
+
+Ini kelas jebakan yang sama persis dengan dua jalur tulis `order` (ADR-0151): satu invariant, dua
+handler, dan yang kedua tak pernah diberi tahu.
+
+**14. Cabang idempoten MEMULIHKAN kartu tertaut yang project-nya kosong.**
+
+Keadaan itu hanya bisa lahir dari sync atau dari baris yang sudah ada sebelum keputusan 13. Eskalasi
+ulang mengembalikan kartu ke `spec.projectId` — **bukan** ke `opts.projectId` yang diminta
+pemanggil: tautannya sudah menetapkan jawabannya, dan memakai project yang diminta akan memindahkan
+kartu ke tempat yang `Spec`-nya tak pernah tinggali. Tanpa ini cabang idempoten menjawab `200`,
+dialog menampilkan toast sukses, dan kartunya tidak bergerak — "diterima lalu tak terjadi apa-apa",
+kelas yang ADR-0094 keputusan 2 larang. Bila project-nya sudah cocok, tak ada tulisan sama sekali.
+
 ## Konsekuensi
 
 - **Kartu tanpa project BERPINDAH project saat dieskalasi.** Efek yang dinyatakan (keputusan 5),

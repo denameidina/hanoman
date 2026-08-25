@@ -35,7 +35,7 @@ Spec: [`docs/superpowers/specs/2026-08-25-spec-947-eskalasi-kartu-tim-design.md`
 - Consumes: `zPriority` dari `./enums` (sudah diimpor di `team.ts`)
 - Produces: `ESCALATE_SOURCES`, `EscalateSource`, `zEscalateTask`, `EscalateTask`, `EscalateTaskInput`, `paths.taskEscalate(id)`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Append ke `shared/src/team.test.ts` (impor `zEscalateTask` di baris impor teratas berkas itu):
 
@@ -70,12 +70,12 @@ describe("zEscalateTask", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/team.test.ts`
 Expected: FAIL — `zEscalateTask is not exported` / import error.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Append ke `shared/src/team.ts`:
 
@@ -111,12 +111,12 @@ Tambahkan di `shared/src/api.ts`, tepat sesudah baris `task: (id: string) => …
   taskEscalate: (id: string) => `${API}/tasks/${encodeURIComponent(id)}/escalate`,
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run shared/src/team.test.ts`
 Expected: PASS (semua `describe` di berkas itu hijau, termasuk lima kasus baru).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/team.ts shared/src/api.ts shared/src/team.test.ts
@@ -136,7 +136,7 @@ git commit -m "feat(947): kontrak zEscalateTask + path escalate"
 - Consumes: `zEscalateTask`, `EscalateSource` (Task 1) · `taskView` dari `../services/tasks-list` · `nextSpecId` dari `./id` · `resolveRepoDir` dari `./local-binding` · `notifySynced` dari `./sync-notify` · `launchPrincipal` dari `../services/launch-authority` · `severityFromPriority`, `payloadShapeFor` dari `@hanoman/shared`
 - Produces: `escalateTask(task, opts) => Promise<{ spec: Spec; task: Task; created: boolean }>` dengan `opts: { projectId: string; source: EscalateSource; priority: Priority; author: string; launchApprovedBy?: string | null }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/tasks-escalate.route.test.ts`:
 
@@ -325,12 +325,12 @@ describe("POST /tasks/:id/escalate · tautan putus", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tasks-escalate.route.test.ts`
 Expected: FAIL — seluruh kasus `404` karena route belum terdaftar (Fastify menjawab 404 untuk path tak dikenal).
 
-- [ ] **Step 3: Implementasi service**
+- [x] **Step 3: Implementasi service**
 
 Create `server/src/services/task-escalate.ts`:
 
@@ -436,7 +436,7 @@ export async function escalateTask(
 }
 ```
 
-- [ ] **Step 4: Daftarkan route**
+- [x] **Step 4: Daftarkan route**
 
 Di `server/src/routes/tasks.ts`, tambahkan ke baris impor teratas:
 
@@ -483,17 +483,17 @@ Lalu tambahkan route ini SEBELUM `app.delete("/tasks/:id", …)` di dalam `expor
   });
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tasks-escalate.route.test.ts`
 Expected: PASS — 18 test hijau, nol skip.
 
-- [ ] **Step 6: Typecheck paket yang tersentuh**
+- [x] **Step 6: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck`
 Expected: exit 0, tanpa output error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/task-escalate.ts server/src/routes/tasks.ts server/test/tasks-escalate.route.test.ts
@@ -512,7 +512,7 @@ git commit -m "feat(947): POST /tasks/:id/escalate — kartu tim jadi backlog it
 - Consumes: `taskView` (sudah diimpor), `notifySynced` (sudah diimpor)
 - Produces: `DELETE /api/tasks/:id/escalate -> 200 TaskView`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Append ke `server/test/tasks-escalate.route.test.ts`:
 
@@ -576,12 +576,12 @@ describe("DELETE /tasks/:id/escalate", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tasks-escalate.route.test.ts -t "DELETE /tasks/:id/escalate"`
 Expected: FAIL — `expected 404 to be 200` (route belum ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/routes/tasks.ts`, tepat sesudah `app.post("/tasks/:id/escalate", …)`:
 
@@ -601,17 +601,17 @@ Di `server/src/routes/tasks.ts`, tepat sesudah `app.post("/tasks/:id/escalate", 
   });
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tasks-escalate.route.test.ts`
 Expected: PASS — 25 test hijau (18 dari Task 2 + 7 baru).
 
-- [ ] **Step 5: Test regresi CRUD `Task` tak berubah**
+- [x] **Step 5: Test regresi CRUD `Task` tak berubah**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tasks.route.test.ts server/test/tasks-list.test.ts`
 Expected: PASS, nol gagal. (Route `/tasks/:id` dan `/tasks/:id/escalate` berbeda path — bila ada yang merah, urutan pendaftaran route-lah tersangkanya.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/tasks.ts server/test/tasks-escalate.route.test.ts
@@ -634,7 +634,7 @@ git commit -m "feat(947): DELETE /tasks/:id/escalate — lepas tautan, idempoten
   - `api.unlinkTaskSpec(id) => Promise<TaskView>`
   - `<EscalateDialog task projects onClose onDone onToast />`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/team-escalate.test.tsx`:
 
@@ -739,12 +739,12 @@ describe("EscalateDialog", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/team-escalate.test.tsx`
 Expected: FAIL — `Failed to resolve import "../src/screens/EscalateDialog"`.
 
-- [ ] **Step 3: Tambahkan klien API**
+- [x] **Step 3: Tambahkan klien API**
 
 Di `src/src/api/client.ts`, tambahkan `type EscalateTaskInput` ke daftar impor dari `@hanoman/shared` (baris 1), lalu sisipkan tepat sesudah `deleteTask:`:
 
@@ -756,7 +756,7 @@ Di `src/src/api/client.ts`, tambahkan `type EscalateTaskInput` ke daftar impor d
   unlinkTaskSpec: (id: string) => j<TaskView>(paths.taskEscalate(id), { method: "DELETE" }),
 ```
 
-- [ ] **Step 4: Implementasi dialog**
+- [x] **Step 4: Implementasi dialog**
 
 Create `src/src/screens/EscalateDialog.tsx`:
 
@@ -859,17 +859,17 @@ export function EscalateDialog({ task, projects, onClose, onDone, onToast }: {
 }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/team-escalate.test.tsx`
 Expected: PASS — 7 test hijau.
 
-- [ ] **Step 6: Typecheck frontend**
+- [x] **Step 6: Typecheck frontend**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/api/client.ts src/src/screens/EscalateDialog.tsx src/test/team-escalate.test.tsx
@@ -889,7 +889,7 @@ git commit -m "feat(947): EscalateDialog + klien escalate/unlink"
 - Consumes: `EscalateDialog` (Task 4), `api.unlinkTaskSpec` (Task 4), `replaceCard` dari `./team-rules`
 - Produces: prop baru `onEscalate: (t: TaskView) => void` dan `onUnlink: (t: TaskView) => void` pada `TeamBoard`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Append ke `src/test/team-board.test.tsx` (tambahkan `onEscalate`/`onUnlink` ke helper `board()` dulu — ganti fungsi `board` yang ada dengan versi ini):
 
@@ -936,12 +936,12 @@ describe("TeamBoard · eskalasi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/team-board.test.tsx`
 Expected: FAIL — `Unable to find an accessible element with the role "button" and name /eskalasi/i`.
 
-- [ ] **Step 3: Implementasi kartu**
+- [x] **Step 3: Implementasi kartu**
 
 Di `src/src/screens/team-board.tsx`:
 
@@ -998,12 +998,12 @@ dan teruskan ke `<TaskCard …>`:
                   onEscalate={onEscalate} onUnlink={onUnlink} />
 ```
 
-- [ ] **Step 4: Jalankan test papan, pastikan LULUS**
+- [x] **Step 4: Jalankan test papan, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/team-board.test.tsx`
 Expected: PASS — test lama + 3 baru hijau.
 
-- [ ] **Step 5: Wiring `TeamScreen`**
+- [x] **Step 5: Wiring `TeamScreen`**
 
 Di `src/src/screens/TeamScreen.tsx`:
 
@@ -1058,7 +1058,7 @@ Render dialognya di samping `<TaskModal …>`:
       )}
 ```
 
-- [ ] **Step 6: Tulis test wiring layar**
+- [x] **Step 6: Tulis test wiring layar**
 
 Append ke `src/test/team-escalate.test.tsx`:
 
@@ -1096,17 +1096,17 @@ describe("TeamScreen · wiring eskalasi", () => {
 });
 ```
 
-- [ ] **Step 7: Jalankan test, pastikan LULUS**
+- [x] **Step 7: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/team-escalate.test.tsx src/test/team-board.test.tsx src/test/team-screen.test.tsx`
 Expected: PASS — nol gagal. (Bila `team-screen.test.tsx` merah karena mock parsial `api`, tambahkan mock `unlinkTaskSpec`/`escalateTask` di sana — kelas jebakan SPEC-884: satu panggilan `api` baru mematahkan test ber-mock parsial.)
 
-- [ ] **Step 8: Typecheck frontend**
+- [x] **Step 8: Typecheck frontend**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: exit 0.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/src/screens/team-board.tsx src/src/screens/TeamScreen.tsx src/test/team-board.test.tsx src/test/team-escalate.test.tsx
@@ -1128,12 +1128,12 @@ git commit -m "feat(947): aksi Eskalasi & Lepas tautan di kartu papan tim"
 - Consumes: keputusan 1–12 dari spec SPEC-947
 - Produces: nomor ADR **0152** (verifikasi belum dipakai sebelum menulis — nomor bertabrakan antar-worktree konkuren)
 
-- [ ] **Step 1: Pastikan nomor ADR belum dipakai**
+- [x] **Step 1: Pastikan nomor ADR belum dipakai**
 
 Run: `ls internal/docs/adr | grep -c '^0152' ; grep -c 'ADR-0152' internal/docs/README.md`
 Expected: `0` dan `0`. Bila bukan nol, pakai nomor bebas berikutnya dan ganti SELURUH rujukan `0152` di plan ini serta di berkas spec.
 
-- [ ] **Step 2: Tulis ADR-0152**
+- [x] **Step 2: Tulis ADR-0152**
 
 Create `internal/docs/adr/0152-eskalasi-kartu-tim-ke-backlog.md` — struktur mengikuti `0151-papan-tim-langganan-per-kolom.md`: judul, `Status: berlaku`, `Tanggal: 2026-08-25`, `SPEC: SPEC-947`, `Memperluas: ADR-0150`, `Menegakkan: ADR-0062, ADR-0095, ADR-0109, ADR-0110/ADR-0065, ADR-0119`, lalu `## Konteks` dan `## Keputusan` bernomor. Isi keputusan diambil apa adanya dari §1–§12 spec:
 
@@ -1152,7 +1152,7 @@ Create `internal/docs/adr/0152-eskalasi-kartu-tim-ke-backlog.md` — struktur me
 
 Tutup dengan `## Konsekuensi` yang menyebut: kartu tanpa project **berpindah** project saat dieskalasi (efek yang dinyatakan, bukan tersembunyi); `Spec` hasil eskalasi tak punya penanda asal-usul selain `author: "Tim · …"` dan backlink di `objective`.
 
-- [ ] **Step 3: Perbarui api-contract**
+- [x] **Step 3: Perbarui api-contract**
 
 Di `internal/docs/architecture/api-contract.md`, di dalam blok berpagar ```` ``` ```` bagian "Papan tim", tepat sesudah baris `DELETE /api/tasks/:id  -> 204 …`, sisipkan:
 
@@ -1192,7 +1192,7 @@ Lalu tambahkan sesudah baris `> **Webhook:** sengaja TIDAK didaftarkan …`:
 > sengaja absen dari `zCreateTask`/`zPatchTask`; jalur ini satu-satunya yang mengisinya.
 ```
 
-- [ ] **Step 4: Perbarui index & skill**
+- [x] **Step 4: Perbarui index & skill**
 
 Di `internal/docs/README.md`, tambahkan baris ADR-0152 tepat sesudah baris ADR-0151, memakai format baris di sekitarnya (`[ADR-0152](adr/0152-eskalasi-kartu-tim-ke-backlog.md) — …`).
 
@@ -1211,12 +1211,12 @@ Di `internal/skills/hanoman/SKILL.md`, di paragraf "Papan Tim — kerja MANUSIA,
   **tak** dibungkus `UNTRUSTED_*` — pembungkus itu milik tiket publik.
 ```
 
-- [ ] **Step 5: Verifikasi tautan index terjangkau**
+- [x] **Step 5: Verifikasi tautan index terjangkau**
 
 Run: `grep -c "0152-eskalasi-kartu-tim-ke-backlog" internal/docs/README.md internal/docs/architecture/api-contract.md`
 Expected: masing-masing `1`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs internal/skills
@@ -1245,7 +1245,7 @@ Expected: semua PASS. **Jangan** terima "no test files" sebagai bukti — pastik
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck`
 Expected: exit 0 bertiga. (Bukan `pnpm -r typecheck` — itu menyalakan satu proses tsc per paket sekaligus.)
 
-- [ ] **Step 3: Smoke endpoint di server hidup**
+- [x] **Step 3: Smoke endpoint di server hidup**
 
 Boot server lalu:
 ```bash
@@ -1256,7 +1256,25 @@ curl -s -X POST localhost:3001/api/tasks/<id>/escalate -H 'content-type: applica
 curl -s "localhost:3001/api/tasks?q=smoke%20947"
 curl -s -X DELETE localhost:3001/api/tasks/<id>/escalate
 ```
-Expected: `201` dengan `spec.id` `SPEC-nnn`; `GET` memperlihatkan `spec.stage: "brainstorming"`; `DELETE` mengembalikan `specId: null`. Bersihkan kartunya (`DELETE /api/tasks/<id>`) dan hapus `Spec`-nya dari Backlog sesudahnya.
+Expected: `201` dengan `spec.id` `SPEC-nnn`; `GET` memperlihatkan `spec.stage: "brainstorming"`; `DELETE` mengembalikan `specId: null`.
+
+**Hasil terukur (2026-08-25, server `tsx server/src/server.ts` di port 3947, `HANOMAN_HOME` & DB sementara):**
+`POST` tanpa project → `400 {"error":"kartu tanpa project tak bisa dieskalasi — pilih project dulu"}`;
+dengan `projectId` → `SPEC-948` `qa`/`brainstorming`/`rendah`, `author: "Tim · smoke@x.id"`,
+`launchApprovedBy: "user:smoke@x.id"`, `payload.severity: "minor"` (turunan prioritas), nol
+`UNTRUSTED`, `task.projectId` **ikut pindah**; panggilan kedua `200 created:false`; body ber-project
+lain → `400 {"error":"kartu ini milik project lain","projectId":"smoke-947"}`; `GET /tasks?q=`
+merender cermin `{id, stage, priority}`; `DELETE` → `200 specId:null` dan `200` lagi (idempoten),
+`SPEC-948` **masih ada** di backlog.
+
+**Dua jebakan env yang menghabiskan waktu, catat untuk lain kali:** (1) `HANOMAN_CONTROL_ORIGINS`
+ambient membuat `classifyIngress` menjawab `denied` → **setiap** route test 404, terukur di BASE
+(`tasks.route.test.ts` 22 gagal/24 dengan var itu, 24 lulus tanpanya); (2) `server/src/env.ts`
+menaiki **enam** level dan menemukan `.env` checkout UTAMA, yang berisi
+`DATABASE_URL=file:../../hanoman-dev.db` relatif terhadap `server/prisma` — jadi **meng-`unset`
+`DATABASE_URL` justru MEMPERBURUK**: `.env` hanya mengisi var yang `undefined`, sehingga server boot
+ke DB dev kosong dan menjawab `P2021 table main.User does not exist` padahal DB smoke-nya bermigrasi
+sempurna. Sebutkan `DATABASE_URL` **eksplisit** — env nyata menang atas `.env`.
 
 - [ ] **Step 4: Centang seluruh kotak plan ini**
 

@@ -222,6 +222,12 @@ Pakai skill lebih sempit saat task cocok:
   `acceptTicket` akan mengembalikan `undefined`), `DELETE` membersihkannya, **idempoten** dan
   non-destruktif. Nol kolom, nol migration, dan **nol** entri `capabilityForRoute`/
   `clientRouteAllowed` — yang terakhir keputusan, bukan kelalaian: keduanya deny-by-default.
+  **Pintu tulis KEDUA wajib ikut dijaga** (kelas ADR-0151, terukur lagi di sini): `PATCH /tasks/:id`
+  menulis `projectId` yang sama, jadi tanpa pagarnya kartu tertaut bisa dipindah ke project lain
+  lewat `TaskModal` — dan `buildTasksPage` men-join `specId` **tanpa predikat project**, sehingga
+  papan project lain merender lencana `SPEC-nnn` milik project asal, 200 dan nol error. Kartu
+  tertaut karena itu menolak `400` untuk `projectId` berbeda (termasuk `null`), dan pagarnya
+  **lepas** begitu tautannya dilepas.
   Item **D** (Linimasa) & **E** (Lintas project) **tak bisa** menumpang topik ini apa adanya —
   sumbunya tanggal, bukan `order`.
 - **Backlog bisa ditandai selesai MANUAL** (SPEC-804/**ADR-0120**; ADR-0008 & ADR-0047 & ADR-0099 &

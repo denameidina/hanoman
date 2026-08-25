@@ -100,8 +100,12 @@ describe("POST /tasks/:id/escalate", () => {
     expect((await escalate("t1", { source: "goal" })).statusCode).toBe(400);
   });
 
+  // Badan galat ikut di-assert: Fastify menjawab 404 juga untuk route yang BELUM ADA, jadi
+  // `toBe(404)` sendirian tak bisa membedakan "kartu tak ada ditangani" dari "endpoint tak lahir".
   it("404 untuk kartu yang tak ada", async () => {
-    expect((await escalate("hantu")).statusCode).toBe(404);
+    const res = await escalate("hantu");
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: "not found" });
   });
 });
 
@@ -229,17 +233,23 @@ describe("DELETE /tasks/:id/escalate", () => {
   });
 
   it("404 untuk kartu yang tak ada", async () => {
-    expect((await unlink("hantu")).statusCode).toBe(404);
+    const res = await unlink("hantu");
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: "not found" });
   });
 
   // Kartu tetap DI PAPAN sesudah lepas tautan — eskalasi tak pernah memindahkannya keluar.
   it("kartu tetap ada di papan", async () => {
     await makeTask();
-    await escalate("t1");
+    const specId = (await escalate("t1")).json().spec.id;
+    // Dilewati lencananya: sesudah eskalasi kartu membawa `spec` terisi, sesudah lepas tautan ia
+    // kosong lagi — tanpa langkah tengah ini, endpoint yang tak berbuat apa-apa juga lulus.
+    const linked = await app.inject({ method: "GET", url: "/api/tasks" });
+    expect(linked.json().items[0].spec).toMatchObject({ id: specId });
     await unlink("t1");
     const list = await app.inject({ method: "GET", url: "/api/tasks" });
     expect(list.json().items).toHaveLength(1);
-    expect(list.json().items[0]).toMatchObject({ id: "t1", status: "doing" });
+    expect(list.json().items[0]).toMatchObject({ id: "t1", status: "doing", specId: null, spec: null });
   });
 });
 
@@ -266,5 +276,75 @@ describe("POST /tasks/:id/escalate · principal", () => {
     expect(spec!.launchApprovedBy).toBe("user:dena@x.id");
     expect(spec!.launchApprovedAt).not.toBeNull();
     expect(spec!.author).toBe("Tim · dena@x.id");
+  });
+});
+
+// ADR-0152 keputusan 5 menetapkan "kartu tertaut hidup di project Spec-nya". Route escalate
+// menjaganya; PATCH adalah pintu tulis KEDUA ke kolom yang sama — kelas jebakan ADR-0151.
+describe("PATCH /tasks/:id · pagar project untuk kartu tertaut", () => {
+  const patch = (id: string, payload: Record<string, unknown>) =>
+    app.inject({ method: "PATCH", url: `/api/tasks/${id}`, payload });
+
+  it("menolak 400 memindahkan kartu tertaut ke project lain", async () => {
+    await makeTask();
+    const specId = (await escalate("t1")).json().spec.id;
+    const res = await patch("t1", { projectId: "p2" });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ specId, projectId: "p1" });
+    expect((await prisma.task.findUnique({ where: { id: "t1" } }))!.projectId).toBe("p1");
+  });
+
+  it("menolak 400 MENGOSONGKAN project kartu tertaut", async () => {
+    await makeTask();
+    await escalate("t1");
+    expect((await patch("t1", { projectId: null })).statusCode).toBe(400);
+    expect((await prisma.task.findUnique({ where: { id: "t1" } }))!.projectId).toBe("p1");
+  });
+
+  it("mengizinkan project yang SAMA — PATCH lain tak ikut terkunci", async () => {
+    await makeTask();
+    await escalate("t1");
+    expect((await patch("t1", { projectId: "p1", title: "judul baru" })).statusCode).toBe(200);
+    expect((await patch("t1", { status: "review" })).statusCode).toBe(200);
+  });
+
+  it("kartu TAK tertaut tetap bebas pindah project", async () => {
+    await makeTask();
+    expect((await patch("t1", { projectId: "p2" })).statusCode).toBe(200);
+    expect((await patch("t1", { projectId: null })).statusCode).toBe(200);
+  });
+
+  // Sesudah lepas tautan pagar itu harus lepas juga — kalau tidak, "salah-eskalasi" jadi kandang.
+  it("pagar lepas sesudah lepas tautan", async () => {
+    await makeTask();
+    await escalate("t1");
+    await unlink("t1");
+    expect((await patch("t1", { projectId: "p2" })).statusCode).toBe(200);
+  });
+});
+
+// Kartu tertaut yang project-nya kosong hanya bisa lahir dari sync atau baris pra-gerbang. Eskalasi
+// ulang MEMULIHKANNYA — "diterima lalu tak terjadi apa-apa" adalah bug yang tak terlihat operator.
+describe("POST /tasks/:id/escalate · memulihkan kartu tertaut tanpa project", () => {
+  it("mengembalikan kartu ke project SPEC-nya, bukan ke project yang diminta", async () => {
+    await makeTask();
+    const specId = (await escalate("t1")).json().spec.id;
+    await prisma.task.update({ where: { id: "t1" }, data: { projectId: null } });
+
+    const res = await escalate("t1", { projectId: "p2" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().created).toBe(false);
+    expect(res.json().spec.id).toBe(specId);
+    // p1 — project Spec-nya. Bukan p2: tautannya sudah menetapkan jawabannya.
+    expect(res.json().task.projectId).toBe("p1");
+    expect((await prisma.task.findUnique({ where: { id: "t1" } }))!.projectId).toBe("p1");
+  });
+
+  it("tak menulis apa pun bila project kartu sudah cocok", async () => {
+    await makeTask();
+    await escalate("t1");
+    const before = (await prisma.task.findUnique({ where: { id: "t1" } }))!.updatedAt;
+    await escalate("t1");
+    expect((await prisma.task.findUnique({ where: { id: "t1" } }))!.updatedAt).toEqual(before);
   });
 });

@@ -132,7 +132,10 @@ describe("status global read-only tak boleh tembus lewat method tulis (SPEC-405 
 // jadi ia jatuh ke `null` → cookie-only. Ini keputusan, bukan kelalaian — dan test ini yang
 // membuatnya tetap begitu bila suatu hari seseorang menambahkan cabang tanpa memikirkannya.
 describe("papan tim tertutup bagi agent token", () => {
-  for (const p of ["/api/members", "/api/members/a@x.id", "/api/tasks", "/api/tasks/t1"])
+  // SPEC-947 · bentuk 3-SEGMEN ikut dicacah: cabang ber-sub-segmen (pola `IDE_SUBS`,
+  // `seg[1] === "crons"`) adalah cara paling lazim sebuah permukaan diam-diam terbuka.
+  for (const p of ["/api/members", "/api/members/a@x.id", "/api/tasks", "/api/tasks/t1",
+    "/api/tasks/t1/escalate"])
     for (const m of ["GET", "POST", "PATCH", "DELETE"])
       it(`${m} ${p} → cookie-only`, () => {
         expect(capabilityForRoute(m, p)).toBeNull();

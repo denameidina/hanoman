@@ -248,6 +248,8 @@ Sesudah sukses: toast menyebut nomor SPEC yang lahir, dialog tutup, papan menyeg
 | `specId` menunjuk `Spec` terhapus | `POST` membuat baru; `DELETE` mengosongkan |
 | `DELETE` pada kartu tak tertaut | `200`, bukan `404` — idempoten |
 | Kartu terhapus di mesin lain | `404` |
+| `PATCH` memindahkan kartu TERTAUT ke project lain | `400 { error, specId, projectId }` — pintu tulis kedua, ADR-0152 kep. 13 |
+| Kartu tertaut tanpa project (dari sync) | eskalasi ulang memulihkannya ke `spec.projectId`, ADR-0152 kep. 14 |
 | Jaringan gagal di dialog | Toast galat, dialog **tetap terbuka** dengan isian utuh |
 
 ## Test

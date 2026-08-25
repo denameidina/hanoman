@@ -63,11 +63,22 @@ export default async function (app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const p = parsed.data;
 
-    if (!(await prisma.task.findUnique({ where: { id } })))
-      return reply.code(404).send({ error: "not found" });
+    const existing = await prisma.task.findUnique({ where: { id } });
+    if (!existing) return reply.code(404).send({ error: "not found" });
 
     const bad = await refProblem(p.projectId, p.memberId);
     if (bad) return reply.code(400).send(bad);
+
+    // SPEC-947 · ADR-0152 keputusan 5 menetapkan invariant "kartu tertaut hidup di project Spec-nya",
+    // dan route escalate menjaganya. PATCH adalah pintu tulis KEDUA ke kolom yang sama — tanpa
+    // gerbang ini `TaskModal` (yang selalu mengirim `projectId` di tiap simpan) memindahkan kartu
+    // ke project lain sambil tetap merender lencana Spec milik project lama, 200 dan nol error.
+    // Pelajaran yang sama persis dengan dua jalur tulis `order` (ADR-0151).
+    if (existing.specId && p.projectId !== undefined && p.projectId !== existing.projectId)
+      return reply.code(400).send({
+        error: "kartu tertaut ke backlog tak bisa pindah project — lepas tautannya dulu",
+        specId: existing.specId, projectId: existing.projectId,
+      });
 
     // Hanya field yang BENAR-BENAR dikirim yang ditulis: `undefined` di Prisma berarti "jangan
     // sentuh", sementara `null` berarti "kosongkan" — dan keduanya harus tetap berbeda supaya

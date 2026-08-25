@@ -27,7 +27,8 @@ const NEW_PRESENCE = ["/api/presence"];
 // SPEC-945 · ADR-0150 · alasan yang sama sekali lagi: papan tim adalah permukaan yang HANYA
 // dijangkau lewat cookie, jadi route yang lupa di-`register` terbaca sebagai 401/404 yang
 // tak terbedakan dari "belum login" — bukan sebagai kesalahan pemasangan.
-const NEW_TEAM = ["/api/members", "/api/tasks"];
+const NEW_TEAM = ["/api/members", "/api/tasks",
+  "/escalate"];   // SPEC-947 · ADR-0152 · di bawah /api/tasks/:id, cermin bentuk ide di BASELINE
 
 describe("parity: endpoint baseline preserved (SPEC-213 AC-23)", () => {
   it("every baseline endpoint still registered", () => {
