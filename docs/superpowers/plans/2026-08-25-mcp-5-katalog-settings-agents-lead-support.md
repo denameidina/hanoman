@@ -44,7 +44,7 @@
 
 Nol tool bermode `danger` di domain ini.
 
-- [ ] **Step 1: Baca handler**
+- [x] **Step 1: Baca handler**
 
 ```bash
 sed -n '1,20p' server/src/routes/settings.ts
@@ -54,7 +54,7 @@ sed -n '25,70p' server/src/routes/scheduler.ts
 
 Perhatikan: `config.ts:11` mencatat bahwa `capabilityForRoute` tak pernah melihat isi — sebagian kunci config memuat kredensial. Deskripsi `hanoman_config_get` **wajib** menyebut bahwa nilai rahasia diredaksi server, dan bila ternyata tidak diredaksi, **hentikan task ini dan laporkan** alih-alih membungkusnya.
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 describe("katalog settings", () => {
@@ -74,9 +74,9 @@ describe("katalog settings", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.settings.test.ts`
+- [x] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.settings.test.ts`
 
-- [ ] **Step 4: Tulis `settings.ts`.** Kepala berkas:
+- [x] **Step 4: Tulis `settings.ts`.** Kepala berkas:
 
 ```ts
 // ADR-0099 · ADR-0155 · katalog tool domain `settings`: setelan instance, config runtime, dan
@@ -85,14 +85,14 @@ describe("katalog settings", () => {
 // cron membuka sesi agen berulang tanpa manusia di pane (agent-capabilities.ts:44).
 ```
 
-- [ ] **Step 5: Rangkai di `index.ts`, jalankan test, pastikan LULUS**
+- [x] **Step 5: Rangkai di `index.ts`, jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run shared/src/mcp-catalog.settings.test.ts shared/src/mcp-catalog.test.ts
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/mcp-coverage.test.ts
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/settings.ts shared/src/mcp-catalog/index.ts shared/src/mcp-catalog.settings.test.ts
@@ -113,11 +113,11 @@ git commit -m "feat(mcp): 11 tool settings/config/scheduler, tanpa cron"
 
 `hanoman_agent_delete` masuk `DESTRUCTIVE_BUT_WRITE` (Task 5).
 
-- [ ] **Step 1: Baca handler** — `sed -n '82,230p' server/src/routes/custom-agents.ts`
+- [x] **Step 1: Baca handler** — `sed -n '82,230p' server/src/routes/custom-agents.ts`
 
 Catat: mana yang global dan mana yang per-project, dan apakah agen bawaan sistem (delapan persona yang di-seed) bisa dihapus. Bila tak bisa, deskripsi `hanoman_agent_delete` wajib menyebutnya — kalau tidak, agen akan mencoba dan mendapat error yang membingungkan.
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 describe("katalog agents", () => {
@@ -134,13 +134,13 @@ describe("katalog agents", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.agents.test.ts`
+- [x] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.agents.test.ts`
 
-- [ ] **Step 4: Tulis `agents.ts` dan rangkai di `index.ts`.**
+- [x] **Step 4: Tulis `agents.ts` dan rangkai di `index.ts`.**
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS** — perintah sama seperti Task 1 Step 5.
+- [x] **Step 5: Jalankan test, pastikan LULUS** — perintah sama seperti Task 1 Step 5.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/agents.ts shared/src/mcp-catalog/index.ts shared/src/mcp-catalog.agents.test.ts
@@ -164,9 +164,9 @@ git commit -m "feat(mcp): 5 tool custom agent"
 
 `hanoman_lead_flow_submit` bermode `danger` karena submit alur lead **menggerakkan sesi** — masuk `DESTRUCTIVE_BUT_WRITE`.
 
-- [ ] **Step 1: Baca handler** — `sed -n '25,200p' server/src/routes/lead.ts`
+- [x] **Step 1: Baca handler** — `sed -n '25,200p' server/src/routes/lead.ts`
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 describe("katalog lead", () => {
@@ -182,18 +182,18 @@ describe("katalog lead", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.lead.test.ts`
+- [x] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.lead.test.ts`
 
-- [ ] **Step 4: Tambahkan delapan entri.** Deskripsi `flow_submit`:
+- [x] **Step 4: Tambahkan delapan entri.** Deskripsi `flow_submit`:
 
 ```ts
     description:
       "BERBAHAYA — mengirim alur lead untuk diputuskan. Putusan lead bisa MENGGERAKKAN SESI: ia dapat membuka, mengarahkan, atau menutup sesi agen tanpa manusia di pane. Pakai hanoman_lead_flows_list lebih dulu untuk melihat isi alurnya. Hanya muncul saat tingkat `--danger` menyala.",
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS** — perintah sama seperti Task 1 Step 5.
+- [x] **Step 5: Jalankan test, pastikan LULUS** — perintah sama seperti Task 1 Step 5.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/lead.ts shared/src/mcp-catalog.lead.test.ts
@@ -221,7 +221,7 @@ git commit -m "feat(mcp): 8 tool lead termasuk flow_submit di balik --danger"
 
 Dua tool `danger`, keduanya bercapability `:write` → `DESTRUCTIVE_BUT_WRITE`.
 
-- [ ] **Step 1: Baca handler**
+- [x] **Step 1: Baca handler**
 
 ```bash
 sed -n '45,140p' server/src/routes/tickets.ts
@@ -231,7 +231,7 @@ sed -n '1,25p' server/src/routes/notifications.ts
 
 Perhatikan: `accept` melahirkan backlog. Bila handler-nya menerima parameter yang menentukan bentuk backlog (priority, project, goal), semuanya wajib muncul di skema — menerima tiket tanpa kendali atas backlog yang lahir adalah persis kelas kejutan yang katalog ini ada untuk mencegahnya.
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 describe("katalog support", () => {
@@ -256,13 +256,13 @@ describe("katalog notifications", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.support.test.ts`
+- [x] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.support.test.ts`
 
-- [ ] **Step 4: Tambahkan dua belas entri.**
+- [x] **Step 4: Tambahkan dua belas entri.**
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS** — perintah sama seperti Task 1 Step 5.
+- [x] **Step 5: Jalankan test, pastikan LULUS** — perintah sama seperti Task 1 Step 5.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/support.ts shared/src/mcp-catalog/notifications.ts shared/src/mcp-catalog.support.test.ts
@@ -273,14 +273,14 @@ git commit -m "feat(mcp): 12 tool support & notifications"
 
 ### Task 5: Daftar-kecuali & verifikasi
 
-- [ ] **Step 1: Tambahkan lima nama ke `DESTRUCTIVE_BUT_WRITE`**
+- [x] **Step 1: Tambahkan lima nama ke `DESTRUCTIVE_BUT_WRITE`**
 
 ```ts
   "hanoman_agent_delete", "hanoman_lead_flow_submit",
   "hanoman_ticket_delete", "hanoman_notifications_clear",
 ```
 
-- [ ] **Step 2: Jalankan seluruh test katalog**
+- [x] **Step 2: Jalankan seluruh test katalog**
 
 ```bash
 pnpm vitest --run shared/src/
@@ -288,7 +288,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS.
 
-- [ ] **Step 3: Hitung tool nyata lewat CLI**
+- [x] **Step 3: Hitung tool nyata lewat CLI**
 
 ```bash
 pnpm -F hanoman build
@@ -298,9 +298,28 @@ HANOMAN_HOST=http://localhost:8787 HANOMAN_AGENT_TOKEN=hnm_agt_… \
 ```
 Expected: **103** tanpa `--danger` (126 tool sudah lahir, 23 di antaranya danger). Dengan `HANOMAN_MCP_DANGER=1`: **126**.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add shared/src/mcp-catalog.test.ts docs/superpowers/plans/2026-08-25-mcp-5-katalog-settings-agents-lead-support.md
 git commit -m "test(mcp): daftar destruktif settings/agents/lead/support"
 ```
+
+---
+
+## Catatan pelaksanaan (2026-08-25)
+
+- **Assertion SPEC-485 ditulis ulang sesuai MAKSUDNYA.** Ia berbunyi "tak ada tool baru untuk rantai
+  — permukaannya tetap 17", tapi yang sebenarnya dijaga adalah larangan tool BERSARANG untuk LANGKAH
+  rantai (serializer kedua yang berselisih diam-diam). Tool untuk rantai itu sendiri
+  (daftar/batal/submit) permukaan berbeda, dan route-nya terjangkau agent token.
+- **`flowId` ditambahkan sebagai parameter OPSIONAL** ke `hanoman_lead_decisions_list` — aditif
+  menurut kontrak versi skema, dan tanpa itu deskripsi `flows_list` menunjuk ke sesuatu yang tak
+  bisa dilakukan.
+- **`PUT /settings` & `PUT /scheduler/config` mengganti blok penuh.** Skema menerima objek utuh
+  alih-alih mencacah tiap field: mencacahnya berarti menduplikasi `zSetting` di dua tempat, dan
+  duplikat itu drift tanpa suara.
+- **`config` punya gerbang per-entri** (`agentBlocked`) yang menolak agent token untuk entri
+  kredensial, dan me-mask rahasia di GET. Keduanya disebut di deskripsi tool.
+- **`hanoman_github_issues_accept_bulk` sengaja tool terpisah**: jalur massal tak boleh tersembunyi,
+  dan balasannya membawa `failed` yang wajib diperiksa meski status 201.

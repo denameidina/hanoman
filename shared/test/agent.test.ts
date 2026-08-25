@@ -6,13 +6,29 @@ import {
 
 describe("agent capabilities", () => {
   // SPEC-476 · ADR-0096 · +domain `telegram` untuk context/memory/reply/audit gateway → 12 domain.
-  it("has 12 domains × read/write = 24 capability ids, all in metadata", () => {
-    expect(CAPABILITY_IDS.length).toBe(24);
-    expect(new Set(CAPABILITY_IDS).size).toBe(24);
+  // ADR-0155 · domain tak lagi selalu berpasangan read/write: empat domain mendapat akses KETIGA
+  // `danger` (sessions, ide, backlog, vps) → 24 + 4 = 28. Karena itu jumlahnya tak bisa lagi
+  // diturunkan dari "domain × 2"; ia dihitung dari akses yang benar-benar ada.
+  it("has 12 domains, 28 capability ids across three access levels, all in metadata", () => {
+    expect(CAPABILITY_IDS.length).toBe(28);
+    expect(new Set(CAPABILITY_IDS).size).toBe(28);
+    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(12);
+    expect(CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id).sort())
+      .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "vps:exec"]);
     expect(CAPABILITIES.map((c) => c.id).sort()).toEqual([...CAPABILITY_IDS].sort());
     expect(zCapability.safeParse("projects:read").success).toBe(true);
     expect(zCapability.safeParse("telegram:write").success).toBe(true);
     expect(zCapability.safeParse("nope:read").success).toBe(false);
+  });
+
+  it("danger is granted by NOTHING but itself — write must not imply it", () => {
+    expect(grantsCapability(["sessions:write"], "sessions:spawn")).toBe(false);
+    expect(grantsCapability(["ide:write"], "ide:git")).toBe(false);
+    expect(grantsCapability(["backlog:write"], "backlog:lifecycle")).toBe(false);
+    expect(grantsCapability(["vps:write"], "vps:exec")).toBe(false);
+    expect(grantsCapability(["vps:exec"], "vps:exec")).toBe(true);
+    // dan sebaliknya: danger tak memberi baca.
+    expect(grantsCapability(["vps:exec"], "vps:read")).toBe(false);
   });
 
   it("write implies read; unrelated caps do not grant", () => {
@@ -47,6 +63,10 @@ describe("agent capabilities", () => {
     const risky = CAPABILITIES.filter((c) => c.risk).map((c) => c.id);
     expect(risky).toContain("sessions:write");
     expect(risky).toContain("vps:write");
+    // ADR-0155 · keempat capability `danger` wajib bertanda risk; tanpa itu grid Settings
+    // merendernya tanpa ⚠ dan pemecahannya kehilangan separuh gunanya.
+    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"])
+      expect(risky, id).toContain(id);
   });
 
   it("zAgentTokenCreate rejects unknown capability and empty name", () => {

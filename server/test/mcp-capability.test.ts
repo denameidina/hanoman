@@ -29,13 +29,27 @@ describe("kontrak capability katalog MCP", () => {
     expect(capabilityForRoute("GET", "/api/health")).toBe("GLOBAL_READ");
   });
 
-  it("tak ada tool yang bisa menjalankan sesi atau menyentuh VPS", () => {
+  // ADR-0099 §4 melarang tool yang menjalankan sesi / menyentuh VPS hadir sama sekali; ADR-0155
+  // membalikkannya. Penggantinya bukan pelonggaran, melainkan invarian yang lebih tepat: yang
+  // MEMULAI pekerjaan di luar proses hanoman wajib menuntut capability berakses `danger` — yang
+  // tak diimplikasikan `:write` mana pun, sehingga token lama tak diam-diam mewarisinya.
+  //
+  // Mengendalikan sesi yang SUDAH ada (steer/interrupt) sengaja TIDAK termasuk: ia tak memulai apa
+  // pun, dan menahannya di `sessions:write` justru inti pemecahan ADR-0155.
+  it("yang MEMULAI pekerjaan di luar proses hanoman menuntut capability danger", () => {
     for (const t of MCP_TOOLS) {
-      expect(t.samplePath, t.name).not.toMatch(/^\/vps/);
-      if (t.samplePath.startsWith("/terminal")) expect(t.sampleMethod, t.name).toBe("GET");
+      const startsWork =
+        t.samplePath === "/terminal/sessions" && t.sampleMethod === "POST" ? "sessions:spawn"
+        : /^\/vps\/[^/]+\/(console|session|audit|probe|test|harden|provision|remediate)/.test(t.samplePath) ? "vps:exec"
+        : /\/git(\/|$)/.test(t.samplePath) || /branches\/delete|worktrees\/delete/.test(t.samplePath) ? "ide:git"
+        : null;
+      if (!startsWork) continue;
+      expect(t.capability, t.name).toBe(startsWork);
+      expect(t.mode, t.name).toBe("danger");
     }
-    // Kontrol positif: kalau seseorang menambahkannya kelak, peta memang menuntut sessions:write.
-    expect(capabilityForRoute("POST", "/api/terminal/sessions")).toBe("sessions:write");
+    // Kontrol positif: peta memang menuntut capability itu, bukan sekadar katalog yang mengklaim.
+    expect(capabilityForRoute("POST", "/api/terminal/sessions")).toBe("sessions:spawn");
+    expect(capabilityForRoute("POST", "/api/vps/1/console")).toBe("vps:exec");
     expect(capabilityForRoute("POST", "/api/vps/1/run")).toBe("vps:write");
   });
 
@@ -49,10 +63,30 @@ describe("kontrak capability katalog MCP", () => {
     for (const t of MCP_TOOLS) expect(t.samplePath, t.name).not.toMatch(/\/dialog/);
   });
 
-  it("tak ada tool yang bisa merge/rebase, menghapus backlog, atau memundurkan stage", () => {
+  // ADR-0099 §4 dulu melarang tool merge/rebase/hapus/stage hadir sama sekali; ADR-0155
+  // membalikkannya. Yang menggantikan larangan itu adalah DUA hal yang lebih kuat, dan keduanya
+  // diuji di sini karena berkas inilah tempat katalog bertemu peta capability server:
+  //   1. tiap tool semacam itu menuntut capability berakses `danger` — yang tak diimplikasikan
+  //      `:write` mana pun, sehingga token lama TIDAK diam-diam mewarisinya;
+  //   2. `hanoman_backlog_update` tetap tak bisa menyentuh stage, jadi jalur "tulis biasa" tak
+  //      pernah menjadi jalur belakang menuju penghapusan artefak.
+  it("tool yang mengeksekusi menuntut capability danger, dan jalur tulis biasa tak jadi pintu belakang", () => {
+    const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"]);
     for (const t of MCP_TOOLS) {
-      expect(t.samplePath, t.name).not.toMatch(/integrate/);
-      expect(["GET", "POST", "PATCH"], t.name).toContain(t.sampleMethod);
+      // Regex vps dipersempit ke sub-path yang benar-benar menyentuh mesin remote: `^/vps`
+      // polos ikut mencocokkan daftar & checklist, yang tak mengeksekusi apa pun.
+      if (!/integrate|\/git(\/|$)|^\/vps\/[^/]+\/(console|session|audit|probe|test|harden|provision|remediate)/.test(t.samplePath)) continue;
+      // DUA pengecualian yang disengaja, keduanya karena capability-nya ditentukan PETA, bukan
+      // katalog: `stage_set` digerbangi di handler (bergantung body), dan `session_integrate`
+      // hidup di bawah prefix `terminal` sehingga petanya memberi `sessions:write` — tak ada
+      // `sessions:integrate`, dan membuatnya akan memecah domain untuk satu endpoint.
+      // Keduanya tetap bermode `danger`, jadi tetap hilang dari tingkat default.
+      if (t.name === "hanoman_backlog_stage_set" || t.name === "hanoman_session_integrate") {
+        expect(t.mode, t.name).toBe("danger");
+        continue;
+      }
+      expect(DANGER_CAPS.has(t.capability ?? ""), t.name).toBe(true);
+      expect(t.mode, t.name).toBe("danger");
     }
     const update = MCP_TOOLS.find((t) => t.name === "hanoman_backlog_update")!;
     const body = update.build({ spec: "SPEC-1", title: "x", stage: "objective", confirmDelete: true })?.body as Record<string, unknown>;

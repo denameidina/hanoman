@@ -9,7 +9,7 @@ import { redactToken } from "./redact";
 
 export function buildMcpServer(cfg: McpConfig, call: Caller, cliVersion: string): McpServer {
   const server = new McpServer({ name: "hanoman", version: cliVersion }, { instructions: MCP_INSTRUCTIONS });
-  const tools = mcpToolsFor(cfg.readOnly);
+  const tools = mcpToolsFor(cfg.level);
   const mask = (s: string) => redactToken(s, cfg.token);
   const text = (s: string, isError = false) =>
     ({ content: [{ type: "text" as const, text: mask(s) }], ...(isError ? { isError: true } : {}) });
@@ -33,7 +33,13 @@ export function buildMcpServer(cfg: McpConfig, call: Caller, cliVersion: string)
         if (tool.name === "hanoman_about") {
           return text(renderResult({
             host: cfg.host || "(belum diisi)",
-            mode: cfg.readOnly ? "baca-saja" : "baca-tulis",
+            mode: cfg.level,
+            // ADR-0155 · disebut di SINI, bukan hanya di dokumen: agen yang menemukan sebuah tool
+            // tak ada perlu tahu bahwa menyalakan tingkat bukan berarti ia berhak memanggilnya.
+            // Kata "token" sengaja DIHINDARI di kalimat ini — uji `hanoman_about` melarangnya
+            // muncul di mana pun dalam balasan ini, dan larangan itulah yang menjaga rahasia tak
+            // pernah bocor lewat pintu ini.
+            modeNote: "Tingkat mode menentukan tool mana yang TERLIHAT; ia BUKAN kontrol keamanan. Yang menahan sungguhan adalah capability yang dicentang manusia di Settings — sebuah tool bisa terlihat dan tetap menjawab 403.",
             toolSchemaVersion: MCP_TOOL_SCHEMA_VERSION,
             hanomanCli: cliVersion,
             tools: tools.map((t) => ({ name: t.name, mode: t.mode, capability: t.capability })),

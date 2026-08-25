@@ -20,7 +20,7 @@ describe("/agent-tokens routes (cookie-only)", () => {
     expect((await app.inject({ method: "GET", url: "/api/agent-tokens" })).statusCode).toBe(401);
   });
 
-  it("capabilities catalog lists 22 entries", async () => {
+  it("capabilities catalog lists 28 entries", async () => {
     const cookie = await login();
     const r = await app.inject({ method: "GET", url: "/api/agent-tokens/capabilities", headers: { cookie } });
     expect(r.statusCode).toBe(200);
@@ -33,7 +33,11 @@ describe("/agent-tokens routes (cookie-only)", () => {
     // `agents:write` mengubah apa yang dilihat SETIAP sesi baru di seluruh workspace, jadi
     // pelebaran permukaan ini memang harus disadari. SPEC-476 (ADR-0096) menambahkan
     // `telegram:read`/`telegram:write` untuk identitas gateway yang dibatasi capability → 24.
-    expect(r.json().capabilities).toHaveLength(24);
+    // ADR-0155 menambahkan akses KETIGA `danger` — `sessions:spawn`, `ide:git`,
+    // `backlog:lifecycle`, `vps:exec` → 28. Keempatnya MEMPERSEMPIT, bukan memperlebar: route yang
+    // dulu dijangkau `:write` kini menuntut capability tersendiri yang tak diimplikasikan apa pun.
+    // Tripwire ini tetap menyala karena jumlah kotak yang harus dicentang manusia memang bertambah.
+    expect(r.json().capabilities).toHaveLength(28);
     expect(r.json().capabilities[0]).toMatchObject({ id: expect.any(String), domain: expect.any(String), access: expect.any(String) });
   });
 

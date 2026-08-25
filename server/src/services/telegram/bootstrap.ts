@@ -22,6 +22,14 @@ export const TELEGRAM_REQUIRED_CAPABILITIES = [
   "settings:read", "settings:write", "support:read", "support:write",
   "notifications:read", "notifications:write", "lead:read", "lead:write",
   "agents:read", "telegram:read", "telegram:write",
+  // ADR-0155 · empat capability berbahaya yang dipecah dari `:write`. Gateway menjalankan pekerjaan
+  // operator PENUH — termasuk membuka sesi — jadi ia menuntut semuanya.
+  //
+  // Konsekuensi yang DISENGAJA: token gateway lama berhenti menyalakan gateway sampai manusia
+  // mencentang keempatnya, karena `credentials.ts` menolak start bila satu pun kurang (bukan 403
+  // per-panggilan). Itu kelas kegagalan SPEC-491, jadi panel Settings menampilkan daftar yang
+  // kurang dan release note menyebutnya breaking change.
+  "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec",
 ] as const;
 
 type RuntimeAgent = { id: string; capabilities: string[] };

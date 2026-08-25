@@ -31,7 +31,7 @@ export default async function mcp(argv: string[], ctx: Ctx): Promise<number> {
   const cfg = resolveMcpConfig(argv, ctx.env, () => tokenFile(ctx.env));
   const say = (s: string) => ctx.stderr(redactToken(s, cfg.token) + "\n");
 
-  say(`hanoman mcp ${currentVersion()} · host ${cfg.host || "(belum diisi)"} · mode ${cfg.readOnly ? "baca-saja" : "baca-tulis"}`);
+  say(`hanoman mcp ${currentVersion()} · host ${cfg.host || "(belum diisi)"} · tingkat ${cfg.level}`);
   for (const p of cfg.problems) say(`peringatan: ${p}`);
 
   const call = createCaller(cfg, fetch);

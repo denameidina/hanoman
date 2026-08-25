@@ -290,7 +290,10 @@ Pakai skill lebih sempit saat task cocok:
   dan pane MATI bukan sesi hidup; (5) `manualDone` **ditimpa** tiap penandaan dan revert stage sengaja
   **tidak** mengosongkannya (cermin `doneAt`; riwayat transisinya di `SessionResult`). Konfirmasi dua
   langkah (`409 confirm-required` + `session`) cermin ADR-0088, dan sesinya **tidak** dibunuh. Tool
-  MCP sengaja **tak** ditambahkan — ADR-0099 meniadakan tool yang memindahkan stage.
+  MCP sengaja **tak** ditambahkan — ADR-0099 meniadakan tool yang memindahkan stage. **Dibalik
+  ADR-0155**: `hanoman_backlog_stage_set` kini ada, di balik tingkat `--danger` DAN capability
+  `backlog:lifecycle` yang digerbangi di handler (bukan di `capabilityForRoute`, yang sengaja tetap
+  murni `(method, path)`).
 - **Stempel waktu backlog** (SPEC-408/ADR-0090): `Spec` punya `createdAt` (NOT NULL, `@default(now())`,
   **tak pernah ditulis route**) dan `startedAt` (nullable). `startedAt` ditulis di **titik cekik yang
   sama dengan `baseSha`** (`session-launch.ts`, cabang `if (!resume)`) → maknanya **mulai pertama**,
@@ -497,14 +500,27 @@ Pakai skill lebih sempit saat task cocok:
 - **MCP server = `hanoman mcp`, KLIEN REST, bukan permukaan kedua** (SPEC-482/ADR-0099, memperluas
   ADR-0065): subcommand stdio di CLI yang memanggil `/api` dengan agent token yang sama, sehingga
   gate `onRequest` tetap satu-satunya otorisasi dan route cookie-only tak terjangkau **secara
-  struktural**. **Tanpa endpoint baru, tanpa skema, tanpa migration.** Katalog **17 tool** hidup di
-  `shared/src/mcp-{schema,shape,catalog}.ts` sebagai data murni yang dipakai runtime CLI **dan**
-  panel Settings — dan diikat ke gate oleh `server/test/mcp-capability.test.ts`
-  (`capabilityForRoute(sampleMethod, samplePath) === capability`, plus larangan cookie-only/`/vps`/
-  `/terminal` non-GET). **Tool yang mengeksekusi sengaja tak ada:** `POST /terminal/sessions`,
-  `/vps*`, `integrate`, `DELETE /specs/:id`, `PATCH stage`. Mode `--read-only` **menghilangkan**
-  keempat tool tulis dari `tools/list`, bukan menolaknya saat dipanggil. `MCP_TOOL_SCHEMA_VERSION`
-  aditif-dalam-versi, dijaga test snapshot. **Tiga gotcha wajib:** (1) **stdout milik JSON-RPC** —
+  struktural**. **Tanpa endpoint baru, tanpa skema, tanpa migration.** Katalog hidup di
+  `shared/src/mcp-schema.ts`, `mcp-shape.ts`, dan direktori `shared/src/mcp-catalog/` (satu berkas
+  per domain sejak ADR-0155) sebagai data murni yang dipakai runtime CLI **dan** panel Settings —
+  diikat ke gate oleh `server/test/mcp-capability.test.ts`
+  (`capabilityForRoute(sampleMethod, samplePath) === capability`).
+  **ADR-0155 membalik batas ADR-0099 §4.** Katalog kini **151 tool** dengan cakupan PENUH atas
+  seluruh route yang terjangkau agent token, termasuk spawn sesi, VPS, integrate, delete, dan stage.
+  Alasannya: kelima permukaan itu SUDAH terjangkau agent token lewat REST, jadi larangan di katalog
+  memasang gerbang di tempat yang tak dilewati siapa pun. Batasnya pindah ke **capability berakses
+  ketiga `danger`** (`sessions:spawn`, `ide:git`, `backlog:lifecycle`, `vps:exec`) yang **tak
+  diimplikasikan `:write` mana pun**. **TIGA tingkat mode:** `--read-only` (62 tool) →
+  *(default)* (117) → `--danger` (151); yang lebih sempit **menghilangkan** tool, bukan menolaknya
+  saat dipanggil, dan yang lebih sempit selalu menang. Tingkat itu **BUKAN kontrol keamanan** —
+  ia mencegah salah pilih; yang menahan sungguhan adalah capability pada token.
+  **Yang tetap di luar katalog, dan alasannya:** empat route kredensial Telegram (ADR-0097), tiga
+  route dialog sesi (SPEC-899 — agen yang bisa menjawab `AskUserQuestion` bisa menjawab
+  pertanyaannya sendiri), enam route `scheduler/crons` (ADR-0112 — cron adalah
+  `POST /terminal/sessions` yang ditunda), multipart/biner, dan `password` VPS.
+  `server/test/mcp-coverage.test.ts` membaca inventaris route dari **sumber** dan menolak endpoint
+  baru yang terjangkau tapi lupa dibungkus. `MCP_TOOL_SCHEMA_VERSION` aditif-dalam-versi: yang
+  dijaga adalah tanda tangan v1 tetap utuh, bukan daftar penuh yang harus disunting tiap kali. **Tiga gotcha wajib:** (1) **stdout milik JSON-RPC** —
   perintah `mcp` tak pernah memanggil `ctx.stdout`, satu byte diagnostik di sana merusak protokol
   dan klien melaporkannya sebagai "server rusak" tanpa sebab; (2) `allOf`/`if`/`then` di JSON Schema
   **ditegakkan validator SDK**, jadi `source:"qa"` + payload brief ditolak **di klien** dan 400

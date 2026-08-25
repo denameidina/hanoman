@@ -24,12 +24,18 @@ export const CAPABILITY_IDS = [
   // SPEC-476 · ADR-0096 · context/memory/reply/audit kanal Telegram. Aksi produk tetap memakai
   // capability domain produk masing-masing; domain ini tidak memberi akses shell atau sesi.
   "telegram:read", "telegram:write",
+  // ADR-0155 · akses KETIGA: `danger`. Dipecah dari `:write` karena keempat operasi ini bukan
+  // "menulis lebih banyak", melainkan menjalankan sesuatu di luar proses hanoman — sesi agen di
+  // worktree, perintah di VPS, git yang mengubah sejarah, penghapusan artefak dokumen.
+  // `:write` TIDAK mengimplikasikannya (lihat grantsCapability di bawah): kalau diimplikasikan,
+  // pemecahan ini kosmetik dan tak menghasilkan batas apa pun.
+  "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
 
 export const zCapabilityInfo = z.object({
-  id: zCapability, domain: z.string(), access: z.enum(["read", "write"]),
+  id: zCapability, domain: z.string(), access: z.enum(["read", "write", "danger"]),
   label: z.string(), desc: z.string(), risk: z.enum(["rce", "exec"]).optional(),
 });
 export type CapabilityInfo = z.infer<typeof zCapabilityInfo>;
@@ -60,6 +66,12 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "agents:write", domain: "agents", access: "write", label: "Custom agent — tulis", desc: "Buat/ubah/hapus custom agent; definisinya dipakai setiap sesi baru.", risk: "exec" },
   { id: "telegram:read", domain: "telegram", access: "read", label: "Telegram — baca", desc: "Baca status gateway, binding, memory, dan audit Telegram." },
   { id: "telegram:write", domain: "telegram", access: "write", label: "Telegram — tulis", desc: "Perbarui context/memory dan terbitkan reply sesi operator Telegram." },
+  // ADR-0155 · akses `danger`. Tak satu pun diimplikasikan `:write` di domainnya; manusia harus
+  // mencentangnya sendiri di Settings → Akses AI Agent.
+  { id: "sessions:spawn", domain: "sessions", access: "danger", label: "Sesi — buka sesi baru", desc: "Membuka sesi agen BARU di worktree (menjalankan claude/codex dengan izin penuh). Dipisah dari Sesi — tulis: mengendalikan sesi yang sudah ada tak lagi cukup untuk membuka yang baru.", risk: "rce" },
+  { id: "ide:git", domain: "ide", access: "danger", label: "IDE/Git — operasi git", desc: "merge, rebase, pull, drop, hapus branch, hapus worktree. Mengubah sejarah dan menghapus pekerjaan yang tak dipegang berkas mana pun; dipisah dari menulis berkas working tree.", risk: "exec" },
+  { id: "backlog:lifecycle", domain: "backlog", access: "danger", label: "Backlog — siklus hidup", desc: "Integrate, hapus backlog, dan geser stage. Ketiganya menghapus artefak dokumen; dipisah dari menyunting isi backlog.", risk: "exec" },
+  { id: "vps:exec", domain: "vps", access: "danger", label: "VPS — remote exec", desc: "console, session, provision, harden, remediate, probe, test, audit. Menjalankan perintah di VPS produksi; dipisah dari mengelola daftar VPS & checklist kepatuhan.", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).

@@ -6,7 +6,7 @@ const noFile = () => null;
 describe("resolveMcpConfig", () => {
   it("membaca host & token dari env", () => {
     const c = resolveMcpConfig([], { HANOMAN_HOST: "http://localhost:8787", HANOMAN_AGENT_TOKEN: "hnm_agt_x" }, noFile);
-    expect(c).toMatchObject({ host: "http://localhost:8787", token: "hnm_agt_x", readOnly: false, problems: [] });
+    expect(c).toMatchObject({ host: "http://localhost:8787", token: "hnm_agt_x", level: "default", problems: [] });
   });
 
   it("flag --host mengalahkan env", () => {
@@ -42,10 +42,39 @@ describe("resolveMcpConfig", () => {
     expect(c.problems.join(" ")).toMatch(/http:\/\/ atau https:\/\//);
   });
 
+  // ADR-0155 · TIGA tingkat. Yang lebih sempit selalu menang, apa pun urutan argumen: memilih yang
+  // lebih longgar diam-diam adalah cara paling mudah membuat seseorang menyalakan permukaan
+  // berbahaya tanpa sadar.
+  const base = { HANOMAN_HOST: "http://x", HANOMAN_AGENT_TOKEN: "t" };
+  const lvl = (argv: string[], env: Record<string, string> = {}) =>
+    resolveMcpConfig(argv, { ...base, ...env }, noFile).level;
+
   it("mode baca-saja dari flag maupun env", () => {
-    expect(resolveMcpConfig(["--read-only"], { HANOMAN_HOST: "http://x", HANOMAN_AGENT_TOKEN: "t" }, noFile).readOnly).toBe(true);
-    expect(resolveMcpConfig([], { HANOMAN_HOST: "http://x", HANOMAN_AGENT_TOKEN: "t", HANOMAN_MCP_READ_ONLY: "1" }, noFile).readOnly).toBe(true);
-    expect(resolveMcpConfig([], { HANOMAN_HOST: "http://x", HANOMAN_AGENT_TOKEN: "t", HANOMAN_MCP_READ_ONLY: "0" }, noFile).readOnly).toBe(false);
+    expect(lvl(["--read-only"])).toBe("read-only");
+    expect(lvl([], { HANOMAN_MCP_READ_ONLY: "1" })).toBe("read-only");
+    expect(lvl([], { HANOMAN_MCP_READ_ONLY: "0" })).toBe("default");
+  });
+
+  it("tingkat danger dari flag maupun env", () => {
+    expect(lvl([])).toBe("default");
+    expect(lvl(["--danger"])).toBe("danger");
+    expect(lvl([], { HANOMAN_MCP_DANGER: "1" })).toBe("danger");
+    expect(lvl([], { HANOMAN_MCP_DANGER: "true" })).toBe("danger");
+    expect(lvl([], { HANOMAN_MCP_DANGER: "0" })).toBe("default");
+  });
+
+  it("read-only MENANG atas danger, apa pun urutannya, lewat flag maupun env", () => {
+    expect(lvl(["--danger", "--read-only"])).toBe("read-only");
+    expect(lvl(["--read-only", "--danger"])).toBe("read-only");
+    expect(lvl(["--read-only"], { HANOMAN_MCP_DANGER: "1" })).toBe("read-only");
+    expect(lvl(["--danger"], { HANOMAN_MCP_READ_ONLY: "1" })).toBe("read-only");
+  });
+
+  it("keduanya sekaligus MENGELUH, bukan diam", () => {
+    const c = resolveMcpConfig(["--danger", "--read-only"], base, noFile);
+    expect(c.problems.join(" ")).toMatch(/--danger diabaikan/i);
+    // Tingkat yang lebih sempit tetap berlaku; keluhan bukan galat.
+    expect(c.level).toBe("read-only");
   });
 
   it("maxBytes bisa disetel, nilai ngawur jatuh ke default", () => {

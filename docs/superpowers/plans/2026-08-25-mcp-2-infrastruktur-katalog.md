@@ -69,12 +69,12 @@
 
 **Catatan penting:** `McpRequest.method` melebar dari `"GET" | "POST" | "PATCH"` menjadi lima method. `PUT` dan `DELETE` belum dipakai satu tool pun sampai Rencana 3 — tapi tipenya dipasang sekarang supaya `client.ts` tak perlu disentuh lagi kemudian.
 
-- [ ] **Step 1: Jalankan test katalog SEBELUM menyentuh apa pun, catat hasilnya**
+- [x] **Step 1: Jalankan test katalog SEBELUM menyentuh apa pun, catat hasilnya**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.test.ts`
 Expected: PASS. Ini garis dasar — task ini murni pemindahan, jadi test yang sama harus tetap hijau di akhir tanpa satu baris pun diubah.
 
-- [ ] **Step 2: Buat `types.ts` dan `helpers.ts`**
+- [x] **Step 2: Buat `types.ts` dan `helpers.ts`**
 
 `shared/src/mcp-catalog/types.ts` memuat blok tipe di **Interfaces** di atas, ditambah `import type { JsonSchemaObject } from "../mcp-schema";` dan komentar kepala:
 
@@ -90,7 +90,7 @@ Expected: PASS. Ini garis dasar — task ini murni pemindahan, jadi test yang sa
 
 `shared/src/mcp-catalog/helpers.ts` memuat, **dipindahkan apa adanya** dari `shared/src/mcp-catalog.ts` baris 38–72: `s`, `n`, `enc`, `query`, `reshapePage`, `localPage`, `ID_HINT`. Semuanya di-`export` (sebelumnya modul-lokal).
 
-- [ ] **Step 3: Pindahkan 17 tool ke tujuh berkas domain**
+- [x] **Step 3: Pindahkan 17 tool ke tujuh berkas domain**
 
 Salin entri dari `shared/src/mcp-catalog.ts` **tanpa mengubah satu properti pun** — nama, deskripsi, skema, `build`, `shape` semuanya identik:
 
@@ -117,7 +117,7 @@ export const BACKLOG_TOOLS: readonly McpToolDef[] = [
 ];
 ```
 
-- [ ] **Step 4: Buat `index.ts`**
+- [x] **Step 4: Buat `index.ts`**
 
 ```ts
 // ADR-0099 · ADR-0155 · perakitan katalog. Urutan domain di sini = urutan tool di `tools/list`,
@@ -145,7 +145,7 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
 ];
 ```
 
-- [ ] **Step 5: Hapus berkas lama**
+- [x] **Step 5: Hapus berkas lama**
 
 ```bash
 git rm shared/src/mcp-catalog.ts
@@ -153,7 +153,7 @@ git rm shared/src/mcp-catalog.ts
 
 `shared/src/mcp.ts:4` sudah menulis `export * from "./mcp-catalog";` — resolusi direktori menemukan `index.ts`, jadi baris itu **tak perlu diubah**.
 
-- [ ] **Step 6: Jalankan test yang SAMA, pastikan tetap LULUS**
+- [x] **Step 6: Jalankan test yang SAMA, pastikan tetap LULUS**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.test.ts`
 Expected: PASS, identik dengan Step 1. Satu pun assert tak boleh diubah — kalau ada yang merah, itu berarti pemindahan mengubah perilaku, dan itu bug.
@@ -161,7 +161,7 @@ Expected: PASS, identik dengan Step 1. Satu pun assert tak boleh diubah — kala
 Run: `pnpm -F @hanoman/shared typecheck` (atau `npx tsc --noEmit -p shared`)
 Expected: nol error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/mcp-catalog shared/src/mcp-catalog.ts
@@ -180,7 +180,7 @@ git commit -m "refactor(mcp): pecah katalog jadi direktori per domain"
 - Consumes: `McpLevel`, `McpMode` dari Task 1.
 - Produces: `mcpToolsFor(level: McpLevel): readonly McpToolDef[]`. **Tanda tangan lama `(readOnly: boolean)` hilang** — pemanggilnya hanya `cli/src/mcp/server.ts:12` dan test.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `shared/src/mcp-catalog.test.ts`:
 
@@ -209,12 +209,12 @@ describe("tingkat mode", () => {
 
 Perbarui juga test lama yang memanggil `mcpToolsFor(true)` / `mcpToolsFor(false)` menjadi `"read-only"` / `"default"`.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.test.ts`
 Expected: FAIL — `mcpToolsFor("read-only")` tak dikenal tipenya, dan instruksi belum memuat kalimat itu.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `shared/src/mcp.ts`, ganti `mcpToolsFor`:
 
@@ -241,12 +241,12 @@ Tambahkan import `McpLevel` dari `./mcp-catalog`, dan ganti paragraf ketiga `MCP
   "Sebagian tool berbahaya (membuka sesi agen di worktree, perintah VPS, merge/rebase, penghapusan backlog, perubahan stage) hanya muncul bila manusia menyalakan tingkat `--danger` di konfigurasi klien MCP ini. Tingkat itu BUKAN kontrol keamanan — ia mencegah salah pilih tool; yang menahan sungguhan adalah capability pada agent token.",
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/mcp.ts shared/src/mcp-catalog.test.ts
@@ -266,7 +266,7 @@ git commit -m "feat(mcp): tingkat mode ketiga danger di mcpToolsFor"
 - Consumes: `McpLevel` dari Task 1, `mcpToolsFor(level)` dari Task 2.
 - Produces: `McpConfig.level: McpLevel` menggantikan `McpConfig.readOnly: boolean`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `cli/test/mcp-config.test.ts`:
 
@@ -292,12 +292,12 @@ describe("tingkat mode", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run cli/test/mcp-config.test.ts`
 Expected: FAIL — `level` tak ada di `McpConfig`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `cli/src/mcp/config.ts`, ganti field `readOnly` di `McpConfig`:
 
@@ -330,16 +330,16 @@ Di `cli/src/mcp/server.ts`, ganti `const tools = mcpToolsFor(cfg.readOnly);` men
             modeNote: "Tingkat mode menyembunyikan tool; ia BUKAN kontrol keamanan. Yang menahan sungguhan adalah capability pada agent token.",
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run cli/test/`
 Expected: PASS. Perbarui test lama yang menyebut `cfg.readOnly`.
 
-- [ ] **Step 5: Perbarui snippet pemasangan di panel Settings**
+- [x] **Step 5: Perbarui snippet pemasangan di panel Settings**
 
 Kartu "MCP server" di `src/src/screens/SettingsScreen.tsx:521` memuat snippet konfigurasi per klien. Tambahkan baris komentar yang menyebut `"HANOMAN_MCP_DANGER": "1"` sebagai opsi, dengan kalimat bahwa ia menampilkan tool berbahaya dan **bukan** pengganti mencentang capability.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add cli/src/mcp/ cli/test/ src/src/screens/SettingsScreen.tsx
@@ -357,7 +357,7 @@ git commit -m "feat(mcp): tingkat --danger di CLI + laporkan di hanoman_about"
 - Consumes: `MCP_TOOLS`, `mcpToolsFor` dari Task 1–2.
 - Produces: `DESTRUCTIVE_BUT_WRITE` — daftar-kecuali eksplisit yang dibaca Rencana 3–6.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // ADR-0155 · tool yang DESTRUKTIF tapi capability-nya tetap `:write` — bukan karena ringan,
@@ -397,12 +397,12 @@ describe("mode ⇔ capability", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.test.ts`
 Expected: FAIL pada assert "daftar-kecuali tak memuat nama yang sudah tak ada" — sepuluh nama itu belum ada (baru lahir di Rencana 3–6). Ini kegagalan yang BENAR.
 
-- [ ] **Step 3: Kosongkan daftar sementara**
+- [x] **Step 3: Kosongkan daftar sementara**
 
 Ganti isi `DESTRUCTIVE_BUT_WRITE` menjadi `new Set([])`, dan tulis komentar tepat di atasnya:
 
@@ -411,12 +411,12 @@ Ganti isi `DESTRUCTIVE_BUT_WRITE` menjadi `new Set([])`, dan tulis komentar tepa
 // assert terakhir menolak nama yang tak punya tool, jadi daftar ini tak bisa mendahului katalognya.
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.test.ts`
 Expected: PASS, keempat assert.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/mcp-catalog.test.ts
@@ -436,7 +436,7 @@ git commit -m "test(mcp): gerbang mode ⇔ capability dan kebocoran tingkat"
 
 **Kenapa di paket server:** test ini butuh **dua** hal yang tak pernah bertemu di paket lain — sumber route Fastify dan katalog MCP. Menaruhnya di `shared` memaksa paket data membaca sumber server.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 import { readdirSync, readFileSync } from "node:fs";
@@ -499,19 +499,19 @@ describe("cakupan katalog MCP", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL dengan daftar panjang**
+- [x] **Step 2: Jalankan test, pastikan GAGAL dengan daftar panjang**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/mcp-coverage.test.ts`
 Expected: FAIL, pesan memuat ±135 route tanpa tool. **Ini keluaran yang paling berguna di seluruh rencana** — ia adalah daftar kerja Rencana 3–6, diturunkan dari sumber, bukan dari ingatan.
 
-- [ ] **Step 3: Simpan daftar itu sebagai bahan rencana berikutnya**
+- [x] **Step 3: Simpan daftar itu sebagai bahan rencana berikutnya**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
   server/test/mcp-coverage.test.ts 2>&1 | tee /tmp/mcp-uncovered.txt
 ```
 
-- [ ] **Step 4: Buat test hijau sementara dengan cara yang JUJUR**
+- [x] **Step 4: Buat test hijau sementara dengan cara yang JUJUR**
 
 Tambahkan `it.todo` alih-alih melonggarkan assert:
 
@@ -529,12 +529,12 @@ dan bungkus assert pertama dengan `it.skip` **berikut komentar yang menyebut ren
 
 Assert kedua dan ketiga **tetap aktif** — keduanya sudah benar hari ini.
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/mcp-coverage.test.ts`
 Expected: PASS (1 skipped, 1 todo).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/test/mcp-coverage.test.ts
@@ -545,7 +545,7 @@ git commit -m "test(mcp): gerbang cakupan route, di-skip sampai katalog lengkap"
 
 ### Task 6: Verifikasi menyeluruh rencana 2
 
-- [ ] **Step 1: Jalankan test yang tersentuh**
+- [x] **Step 1: Jalankan test yang tersentuh**
 
 ```bash
 pnpm vitest --run shared/src/mcp-catalog.test.ts cli/test/
@@ -553,7 +553,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS semua.
 
-- [ ] **Step 2: Buktikan MCP masih hidup dari ujung ke ujung**
+- [x] **Step 2: Buktikan MCP masih hidup dari ujung ke ujung**
 
 ```bash
 pnpm -F hanoman build
@@ -562,13 +562,38 @@ HANOMAN_HOST=http://localhost:8787 HANOMAN_AGENT_TOKEN=hnm_agt_… \
 ```
 Expected: JSON-RPC sah berisi 17 tool. Ulangi dengan `--danger`: tetap 17 (belum ada tool danger). Ulangi dengan `--read-only`: 13.
 
-- [ ] **Step 3: ADR & docs**
+- [x] **Step 3: ADR & docs**
 
 Tambahkan bagian "Tingkat mode ketiga" ke ADR-0155 (dibuat di Rencana 1 Task 6): tiga tingkat, aturan "yang lebih sempit menang", dan kalimat bahwa ia bukan kontrol keamanan. Tautkan di `internal/docs/README.md` bila belum.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/docs/ docs/superpowers/plans/2026-08-25-mcp-2-infrastruktur-katalog.md
 git commit -m "docs(mcp): rencana 2 selesai + tingkat mode di ADR-0155"
 ```
+
+---
+
+## Catatan pelaksanaan (2026-08-25)
+
+- Pemecahan katalog dilakukan **lewat skrip**, bukan diketik ulang. 17 test lulus tanpa satu assert
+  pun diubah — itulah bukti pemindahannya tak mengubah perilaku.
+- `helpers.ts` butuh `import type { Args }` yang tak disebut rencana (typecheck menangkapnya).
+- `McpPanel` ternyata memuat kalimat **"tidak tersedia lewat MCP"** yang sudah tidak benar. Dibuang
+  dan diganti; test-nya diubah untuk menjaga kalimat pengganti, bukan kalimat yang berbohong.
+- `modeNote` sempat memakai frasa "capability pada agent token" dan **menggagalkan uji kebocoran**
+  `hanoman_about` yang melarang kata "token" muncul di balasannya. Kalimatnya yang diubah, bukan
+  guard-nya — guard itu benar.
+- `leftIcon="triangle-alert"` **salah**; registry DS memetakan `alert-triangle` (`icon.tsx:20`), dan
+  nama yang salah jatuh SENYAP ke `Circle` (SPEC-906). Diperbaiki.
+- Test `settings-agent-danger` sempat merah karena `AgentAccessPanel` ikut merender `<McpPanel/>`,
+  sehingga kata "berbahaya" muncul dua kali dan query jadi ambigu — bukan kode yang salah.
+
+Gerbang cakupan langsung membayar dirinya: ia menemukan route yang **tak ada di tabel rencana mana
+pun** — `/projects/:id/binding` (GET/PUT/DELETE), `POST /projects/:id/clone`, dan `breakdown` yang
+ternyata `projects:read`, bukan `docs:read`.
+
+Verifikasi CLI nyata (`node cli/dist/hanoman.js mcp`, `tools/list`):
+`default=17 · --danger=17 · --read-only=13` — default sama dengan danger karena belum ada tool
+bermode `danger`; itu benar, bukan bug.

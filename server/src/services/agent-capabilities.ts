@@ -16,6 +16,13 @@ const IDE_SUBS = new Set([
   "worktrees",
 ]);
 
+// ADR-0155 · aksi VPS yang MENJALANKAN perintah di mesin remote. Sisanya (CRUD, checklist,
+// components, items/na, items/attest) tetap `vps:read|write`. Dicocokkan ke seg[2] — segmen
+// sesudah `:id` — jadi `remediate/preview` dan `provision/preview` ikut induknya.
+const VPS_EXEC_SUBS = new Set([
+  "console", "session", "audit", "probe", "test", "harden", "provision", "remediate",
+]);
+
 export function capabilityForRoute(method: string, path: string): Resolved {
   const read = method === "GET" || method === "HEAD";
   const rw = (d: string): Capability => `${d}:${read ? "read" : "write"}` as Capability;
@@ -71,19 +78,35 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // apa pun methodnya (preseden /telegram/{settings,test,credentials}, ADR-0097).
   if (top === "webhooks") return "COOKIE_ONLY";
   if (top === "settings" || top === "config") return rw("settings");
-  if (top === "specs") return rw("backlog");
+  if (top === "specs") {
+    // ADR-0155 · integrate & hapus backlog menghapus artefak dokumen. `PATCH /specs/:id {stage}`
+    // juga — tapi keputusannya bergantung BODY, dan fungsi ini sengaja tak pernah melihat body
+    // (kemurnian (method, path) itulah yang membuat uji kontrak katalog MCP mungkin). Gerbang
+    // stage-nya hidup di handler `PATCH /specs/:id` di routes/specs.ts.
+    if (method === "DELETE" && seg.length === 2) return "backlog:lifecycle";
+    if (seg[2] === "integrate") return "backlog:lifecycle";
+    return rw("backlog");
+  }
   if (top === "notifications") return rw("notifications");
   if (top === "tickets") return rw("support");   // SPEC-384 · `errors` dicabut (ADR-0092)
   // SPEC-471 · ADR-0095 · triase issue GitHub satu domain dengan tiket: keduanya permukaan
   // masuk yang melahirkan backlog. `rw()` menurunkannya dari method (kelas bug SPEC-405).
   if (top === "github-issues") return rw("support");
-  if (top === "vps") return rw("vps");
+  if (top === "vps") {
+    // seg = ["vps", ":id", sub, …]. `GET /vps/components` tak punya seg[2] → jatuh ke rw("vps").
+    if (VPS_EXEC_SUBS.has(seg[2] ?? "")) return "vps:exec";
+    return rw("vps");
+  }
   if (top === "prds") return rw("docs");
   if (top === "terminal") {
     // SPEC-786 · workspace memuat preferensi per akun dan diturunkan dari req.user.id;
     // capability sesi tak membawa identitas admin yang diperlukan untuk isolasi row ini.
     if (seg[1] === "workspace") return "COOKIE_ONLY";
     if (seg[seg.length - 1] === "ws") return "sessions:write"; // WS = kontrol interaktif
+    // ADR-0155 · membuka sesi BARU ≠ mengendalikan sesi yang sudah ada. Dicocokkan ke panjang
+    // segmen PERSIS (`/terminal/sessions`), bukan prefix: `/terminal/sessions/:id/steer`
+    // berawalan sama, dan memetakannya lewat prefix mengulang kelas bug SPEC-405.
+    if (!read && seg.length === 2 && seg[1] === "sessions") return "sessions:spawn";
     return rw("sessions");
   }
   if (top === "projects") {
@@ -93,6 +116,12 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     // hanya untuk membaca changelog-nya.
     if (sub === "docs" || sub === "prds" || sub === "changelog") return rw("docs");
     if (sub === "github") return rw("support");   // SPEC-471 · ADR-0095 · tarik/daftar issue
+    // ADR-0155 · HANYA tulisan yang merusak yang pindah ke `ide:git`; seluruh pembacaan tetap
+    // di tempatnya. `branches` sengaja TIDAK dijadikan anggota IDE_SUBS: daftar branch adalah
+    // permukaan project (routes/projects.ts) dan tetap `projects:read` — yang pindah cuma
+    // `branches/delete`. Dicocokkan ke method DAN sub-segmen, bukan prefix (kelas bug SPEC-405).
+    if (!read && sub === "git") return "ide:git";
+    if (!read && (sub === "branches" || sub === "worktrees") && seg[3] === "delete") return "ide:git";
     if (sub && IDE_SUBS.has(sub)) return rw("ide");
     return rw("projects");
   }

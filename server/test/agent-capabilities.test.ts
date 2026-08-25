@@ -11,14 +11,17 @@ describe("capabilityForRoute", () => {
     // SPEC-360 · `branches` SENGAJA bukan anggota IDE_SUBS: baris di atas sudah memetakan ke
     // projects:read, dan memasukkannya ke IDE_SUBS akan diam-diam mengubah endpoint lama itu.
     ["GET", "/api/projects/foo/branches/unused", "projects:read"],
-    ["POST", "/api/projects/foo/branches/delete", "projects:write"],
+    // ADR-0155 · PINDAH dari projects:write → ide:git: menghapus branch menghancurkan pekerjaan
+    // yang tak dipegang berkas mana pun. Daftar branch di atas TETAP projects:read.
+    ["POST", "/api/projects/foo/branches/delete", "ide:git"],
     ["PUT", "/api/projects/foo/binding", "projects:write"],
     ["GET", "/api/projects/foo/docs/README.md", "docs:read"],
     ["PUT", "/api/projects/foo/docs/x.md", "docs:write"],
     ["GET", "/api/projects/foo/prds", "docs:read"],
     ["GET", "/api/prds", "docs:read"],
     ["GET", "/api/projects/foo/tree", "ide:read"],
-    ["POST", "/api/projects/foo/git", "ide:write"],
+    // ADR-0155 · PINDAH dari ide:write → ide:git.
+    ["POST", "/api/projects/foo/git", "ide:git"],
     ["GET", "/api/projects/foo/status", "ide:read"],
     ["POST", "/api/projects/foo/remotes", "ide:write"],
     // ADR-0121 · operasi berkas Explorer. Diturunkan DARI METHOD, bukan dari prefix.
@@ -28,9 +31,11 @@ describe("capabilityForRoute", () => {
     ["POST", "/api/projects/foo/upload", "ide:write"],
     ["GET", "/api/specs", "backlog:read"],
     ["POST", "/api/specs", "backlog:write"],
-    ["POST", "/api/specs/SPEC-1/integrate", "backlog:write"],
+    // ADR-0155 · PINDAH dari backlog:write → backlog:lifecycle.
+    ["POST", "/api/specs/SPEC-1/integrate", "backlog:lifecycle"],
     ["GET", "/api/terminal/sessions", "sessions:read"],
-    ["POST", "/api/terminal/sessions", "sessions:write"],
+    // ADR-0155 · PINDAH dari sessions:write → sessions:spawn. Baris GET di atas tak tersentuh.
+    ["POST", "/api/terminal/sessions", "sessions:spawn"],
     ["GET", "/api/terminal/sessions/abc/ws", "sessions:write"], // WS = kontrol interaktif
     ["GET", "/api/terminal/workspace", "COOKIE_ONLY"],
     ["PUT", "/api/terminal/workspace", "COOKIE_ONLY"],
@@ -38,7 +43,8 @@ describe("capabilityForRoute", () => {
     // ada — nol domain baru, nol perubahan gerbang. Diikat di sini supaya tetap begitu.
     ["GET", "/api/terminal/cleanups", "sessions:read"],
     ["GET", "/api/vps", "vps:read"],
-    ["POST", "/api/vps/v1/harden", "vps:write"],
+    // ADR-0155 · PINDAH dari vps:write → vps:exec: harden menjalankan perintah di mesin remote.
+    ["POST", "/api/vps/v1/harden", "vps:exec"],
     ["GET", "/api/settings", "settings:read"],
     ["PUT", "/api/settings", "settings:write"],
     ["GET", "/api/config", "settings:read"],
@@ -143,4 +149,81 @@ describe("papan tim tertutup bagi agent token", () => {
         expect(r.ok).toBe(false);
         expect(!r.ok && r.reason).toBe("cookie-only");
       });
+});
+
+// ADR-0155 · empat operasi dipecah dari `:write` ke capability berakses `danger`. Test ini menjaga
+// DUA sisi sekaligus: yang berbahaya benar-benar pindah, DAN tetangganya yang tak berbahaya tidak
+// ikut pindah. Sisi kedua itu yang paling mudah rusak — cabang berbasis prefix (kelas bug SPEC-405)
+// selalu menyeret lebih banyak dari yang dimaksud.
+describe("route berbahaya pindah ke capability danger", () => {
+  it("membuka sesi BARU ≠ mengendalikan sesi yang sudah ada", () => {
+    expect(capabilityForRoute("POST", "/api/terminal/sessions")).toBe("sessions:spawn");
+    expect(capabilityForRoute("GET", "/api/terminal/sessions")).toBe("sessions:read");
+    for (const sub of ["steer", "interrupt", "dialog/answer", "dialog/takeover", "integrate"])
+      expect(capabilityForRoute("POST", `/api/terminal/sessions/s1/${sub}`), sub).toBe("sessions:write");
+    expect(capabilityForRoute("DELETE", "/api/terminal/sessions/s1")).toBe("sessions:write");
+    // Panjang segmen PERSIS, bukan prefix: `/terminal/sessions/:id/…` berawalan sama.
+    expect(capabilityForRoute("POST", "/api/terminal/sessions/s1/attachments")).toBe("sessions:write");
+  });
+
+  it("git yang mengubah sejarah / menghapus ≠ menulis berkas working tree", () => {
+    for (const p of ["git", "git/merge", "git/rebase", "git/pull", "git/drop"])
+      expect(capabilityForRoute("POST", `/api/projects/p/${p}`), p).toBe("ide:git");
+    expect(capabilityForRoute("POST", "/api/projects/p/branches/delete")).toBe("ide:git");
+    expect(capabilityForRoute("POST", "/api/projects/p/worktrees/delete")).toBe("ide:git");
+    // Menulis berkas TIDAK ikut pindah.
+    expect(capabilityForRoute("PUT", "/api/projects/p/file")).toBe("ide:write");
+    expect(capabilityForRoute("POST", "/api/projects/p/entry")).toBe("ide:write");
+    expect(capabilityForRoute("POST", "/api/projects/p/remotes")).toBe("ide:write");
+  });
+
+  it("SELURUH pembacaan tak tersentuh pemecahan ini", () => {
+    expect(capabilityForRoute("GET", "/api/projects/p/worktrees")).toBe("ide:read");
+    expect(capabilityForRoute("GET", "/api/projects/p/worktrees/stats")).toBe("ide:read");
+    expect(capabilityForRoute("GET", "/api/projects/p/status")).toBe("ide:read");
+    // `branches` BUKAN anggota IDE_SUBS dan tak dijadikan anggota: daftar branch adalah permukaan
+    // project (projects.ts), bukan IDE. Hanya `branches/delete` yang pindah, karena ia merusak.
+    expect(capabilityForRoute("GET", "/api/projects/p/branches")).toBe("projects:read");
+    expect(capabilityForRoute("GET", "/api/projects/p/branches/unused")).toBe("projects:read");
+  });
+
+  it("siklus hidup backlog ≠ menyunting backlog", () => {
+    expect(capabilityForRoute("DELETE", "/api/specs/SPEC-1")).toBe("backlog:lifecycle");
+    expect(capabilityForRoute("POST", "/api/specs/SPEC-1/integrate")).toBe("backlog:lifecycle");
+    expect(capabilityForRoute("POST", "/api/specs")).toBe("backlog:write");
+    expect(capabilityForRoute("POST", "/api/specs/SPEC-1/done")).toBe("backlog:write");
+    expect(capabilityForRoute("DELETE", "/api/specs/SPEC-1/attachments/a1")).toBe("backlog:write");
+    // PATCH tetap `backlog:write` DI SINI. Cabang `{stage}` hidup di handler routes/specs.ts,
+    // karena keputusannya bergantung body dan fungsi ini sengaja tak pernah melihat body.
+    expect(capabilityForRoute("PATCH", "/api/specs/SPEC-1")).toBe("backlog:write");
+  });
+
+  it("remote exec VPS ≠ mengelola daftar & checklist VPS", () => {
+    for (const p of ["console", "session", "harden", "test", "probe", "audit",
+      "provision", "provision/preview", "remediate", "remediate/preview"])
+      expect(capabilityForRoute("POST", `/api/vps/v1/${p}`), p).toBe("vps:exec");
+    expect(capabilityForRoute("GET", "/api/vps")).toBe("vps:read");
+    expect(capabilityForRoute("POST", "/api/vps")).toBe("vps:write");
+    expect(capabilityForRoute("PATCH", "/api/vps/v1")).toBe("vps:write");
+    expect(capabilityForRoute("DELETE", "/api/vps/v1")).toBe("vps:write");
+    expect(capabilityForRoute("GET", "/api/vps/components")).toBe("vps:read");
+    expect(capabilityForRoute("GET", "/api/vps/v1/checklist")).toBe("vps:read");
+    expect(capabilityForRoute("POST", "/api/vps/v1/items/i1/na")).toBe("vps:write");
+    expect(capabilityForRoute("POST", "/api/vps/v1/items/na-bulk")).toBe("vps:write");
+    expect(capabilityForRoute("POST", "/api/vps/v1/items/i1/attest")).toBe("vps:write");
+  });
+
+  it("403 menyebut capability yang kurang, bukan sekadar cookie-only", () => {
+    const r = checkAgentCapability(["sessions:write"], "POST", "/api/terminal/sessions");
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.reason).toBe("capability");
+    expect(!r.ok && r.need).toBe("sessions:spawn");
+  });
+
+  it("capability danger memang membuka pintunya", () => {
+    expect(checkAgentCapability(["sessions:spawn"], "POST", "/api/terminal/sessions").ok).toBe(true);
+    expect(checkAgentCapability(["ide:git"], "POST", "/api/projects/p/git/merge").ok).toBe(true);
+    expect(checkAgentCapability(["vps:exec"], "POST", "/api/vps/v1/console").ok).toBe(true);
+    expect(checkAgentCapability(["backlog:lifecycle"], "DELETE", "/api/specs/SPEC-1").ok).toBe(true);
+  });
 });
