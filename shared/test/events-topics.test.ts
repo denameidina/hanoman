@@ -68,7 +68,8 @@ describe("SPEC-908 · frame masuk", () => {
 
 describe("SPEC-908 · setiap topik punya skema", () => {
   it("kunci zTopicParams menutupi seluruh EventTopic", () => {
-    const topics: EventTopic[] = ["schedulerState", "schedulerQueue", "tickets", "lead", "git"];
+    // SPEC-945 · ADR-0150 · `tasks` = papan tim, topik berparameter (bukan grup global).
+    const topics: EventTopic[] = ["schedulerState", "schedulerQueue", "tickets", "lead", "git", "tasks"];
     expect(Object.keys(zTopicParams).sort()).toEqual([...topics].sort());
   });
 });
