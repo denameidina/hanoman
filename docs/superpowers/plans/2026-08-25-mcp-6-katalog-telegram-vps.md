@@ -42,9 +42,9 @@
 
 `hanoman_telegram_reply_send` bermode `danger` bukan karena merusak data, melainkan karena **mengirim pesan ke manusia di luar hanoman** — tak ada undo, dan agen yang salah memanggilnya menghasilkan pesan yang dibaca orang. Masuk `DESTRUCTIVE_BUT_WRITE`.
 
-- [ ] **Step 1: Baca handler** — `sed -n '44,140p' server/src/routes/telegram.ts`
+- [x] **Step 1: Baca handler** — `sed -n '44,140p' server/src/routes/telegram.ts`
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 describe("katalog telegram", () => {
@@ -66,9 +66,9 @@ describe("katalog telegram", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.telegram.test.ts`
+- [x] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.telegram.test.ts`
 
-- [ ] **Step 4: Tulis `telegram.ts`.** Kepala berkas:
+- [x] **Step 4: Tulis `telegram.ts`.** Kepala berkas:
 
 ```ts
 // ADR-0099 · ADR-0155 · katalog tool domain `telegram`: status gateway, context & memory per chat,
@@ -84,7 +84,7 @@ Deskripsi `reply_send`:
       "BERBAHAYA — mengirim pesan ke chat Telegram operator. Pesannya dibaca MANUSIA di luar hanoman dan tak bisa ditarik kembali. Pakai hanoman_telegram_status untuk memastikan gateway hidup sebelum mengirim. Hanya muncul saat tingkat `--danger` menyala.",
 ```
 
-- [ ] **Step 5: Tambahkan `reply_send` ke `DESTRUCTIVE_BUT_WRITE`**
+- [x] **Step 5: Tambahkan `reply_send` ke `DESTRUCTIVE_BUT_WRITE`**
 
 Di `shared/src/mcp-catalog.test.ts`, tambahkan entri terakhir daftar itu:
 
@@ -97,13 +97,13 @@ Sesudah baris ini daftarnya berisi **14 nama**, dan bersama 20 tool bercapabilit
 34 tool bermode `danger`. Bila jumlahnya tak cocok, ada tool yang modenya salah — jangan
 menyesuaikan angkanya, cari toolnya.
 
-- [ ] **Step 6: Rangkai di `index.ts`, jalankan test, pastikan LULUS**
+- [x] **Step 6: Rangkai di `index.ts`, jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run shared/src/mcp-catalog.telegram.test.ts shared/src/mcp-catalog.test.ts
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/telegram.ts shared/src/mcp-catalog/index.ts \
@@ -140,7 +140,7 @@ Sepuluh tool bercapability `vps:exec`, semuanya **wajib** bermode `danger` — g
 
 **`hanoman_vps_audit` masuk `vps:exec`, bukan `vps:read`,** meski namanya terdengar pasif: ia menjalankan probe di mesin remote. Bila pembacaan handler di Step 1 ternyata membuktikan sebaliknya — bahwa `audit` hanya membaca hasil tersimpan tanpa menyentuh mesin — **hentikan dan laporkan**, karena `capabilityForRoute` di Rencana 1 juga perlu diubah.
 
-- [ ] **Step 1: Baca handler**
+- [x] **Step 1: Baca handler**
 
 ```bash
 sed -n '28,200p' server/src/routes/vps.ts
@@ -149,7 +149,7 @@ sed -n '215,345p' server/src/routes/vps.ts
 
 Perhatikan khusus `POST /vps/:id/console` (`vps.ts:321`): parameter perintahnya wajib **wajib** (bukan opsional dengan default), dan deskripsinya wajib menyebut bahwa perintahnya berjalan sebagai pengguna remote apa adanya.
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 describe("katalog vps", () => {
@@ -183,9 +183,9 @@ describe("katalog vps", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.vps.test.ts`
+- [x] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.vps.test.ts`
 
-- [ ] **Step 4: Tulis `vps.ts`.** Kepala berkas:
+- [x] **Step 4: Tulis `vps.ts`.** Kepala berkas:
 
 ```ts
 // ADR-0099 · ADR-0155 · katalog tool domain `vps`. DUA capability: mengelola daftar VPS & checklist
@@ -202,13 +202,13 @@ Deskripsi `console`:
       "BERBAHAYA — menjalankan perintah shell di VPS produksi sebagai pengguna remote, apa adanya. Tak ada sandbox, tak ada dry-run, dan hanoman tidak menyaring perintahnya. Menuntut capability `vps:exec`; `vps:write` tidak cukup. Hanya muncul saat tingkat `--danger` menyala. Pertimbangkan hanoman_vps_remediate_preview lebih dulu bila yang kamu inginkan adalah perbaikan kepatuhan.",
 ```
 
-- [ ] **Step 5: Rangkai di `index.ts`, jalankan test, pastikan LULUS**
+- [x] **Step 5: Rangkai di `index.ts`, jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run shared/src/mcp-catalog.vps.test.ts shared/src/mcp-catalog.test.ts
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/vps.ts shared/src/mcp-catalog/index.ts shared/src/mcp-catalog.vps.test.ts
@@ -224,11 +224,11 @@ git commit -m "feat(mcp): 18 tool vps, sepuluh di antaranya menuntut vps:exec"
 
 Ini task paling penting di seluruh enam rencana. Sampai `it.skip` dibuang, katalog masih bisa tertinggal diam-diam.
 
-- [ ] **Step 1: Buang `it.skip` dan `it.todo`**
+- [x] **Step 1: Buang `it.skip` dan `it.todo`**
 
 Ganti `it.skip("setiap route yang TERJANGKAU agent token punya tool…"` menjadi `it(`, buang baris `it.todo`, dan buang komentar "Dinyalakan (skip dibuang) di Task terakhir Rencana 6".
 
-- [ ] **Step 2: Jalankan test**
+- [x] **Step 2: Jalankan test**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/mcp-coverage.test.ts`
 
@@ -238,7 +238,7 @@ Expected: PASS. **Bila MERAH**, pesannya menyebut route mana yang tertinggal. Du
 
 **Jangan** melonggarkan pola pencocokan `toPattern` untuk membuatnya hijau. Kalau pencocokannya salah, perbaiki pencocokannya dan buktikan dengan test unit atasnya.
 
-- [ ] **Step 3: Tambahkan test yang menjaga gerbangnya sendiri**
+- [x] **Step 3: Tambahkan test yang menjaga gerbangnya sendiri**
 
 ```ts
 it("gerbang cakupan benar-benar mendeteksi route yang lupa dibungkus", () => {
@@ -251,7 +251,7 @@ it("gerbang cakupan benar-benar mendeteksi route yang lupa dibungkus", () => {
 });
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/test/mcp-coverage.test.ts
@@ -262,7 +262,7 @@ git commit -m "test(mcp): nyalakan gerbang cakupan route"
 
 ### Task 4: Verifikasi akhir & dokumentasi
 
-- [ ] **Step 1: Angka akhir, dihitung dari katalog nyata**
+- [x] **Step 1: Angka akhir, dihitung dari katalog nyata**
 
 ```bash
 pnpm vitest --run shared/src/
@@ -270,7 +270,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS. Test `shared/src/mcp-catalog.test.ts` yang menyebut "17 tool" sejak SPEC-482 harus diperbarui ke **152**, dan yang menyebut "13" untuk read-only diperbarui ke angka nyata yang dihitung dari katalog — jangan menuliskan angka yang tak kamu hitung.
 
-- [ ] **Step 2: Hitung lewat CLI, bandingkan dengan test**
+- [x] **Step 2: Hitung lewat CLI, bandingkan dengan test**
 
 ```bash
 pnpm -F hanoman build
@@ -284,11 +284,11 @@ count env HANOMAN_MCP_READ_ONLY=1  # → jumlah tool bermode read
 
 Bila angkanya berbeda dari test, **test yang benar** — CLI membaca katalog yang sama, jadi selisih berarti ada yang salah di jalur `mcpToolsFor`.
 
-- [ ] **Step 3: Uji satu tool berbahaya dari tiap capability baru, terhadap server hidup**
+- [x] **Step 3: Uji satu tool berbahaya dari tiap capability baru, terhadap server hidup**
 
 Dengan token yang **tidak** memegang capability berbahayanya, panggil `hanoman_session_create`, `hanoman_ide_git_merge`, `hanoman_backlog_delete`, `hanoman_vps_console`. Keempatnya harus `isError` dengan nama capability yang tepat, dan **tak satu pun** boleh menghasilkan efek samping: tak ada sesi tmux baru (`tmux ls`), tak ada branch yang bergerak (`git log --oneline -1`), backlog masih ada, tak ada koneksi SSH keluar.
 
-- [ ] **Step 4: Perbarui ADR-0155 dan docs**
+- [x] **Step 4: Perbarui ADR-0155 dan docs**
 
 - Tambahkan bagian "Katalog: 152 tool" ke ADR-0155 dengan tabel per-domain dari spec.
 - Tambahkan daftar `UNWRAPPED` beserta alasannya — supaya "kok tidak ada" tak jadi pertanyaan berulang.
@@ -296,16 +296,49 @@ Dengan token yang **tidak** memegang capability berbahayanya, panggil `hanoman_s
 - Perbarui `internal/skills/hanoman/SKILL.md` bila ia mendaftar tool MCP.
 - Perbarui `MCP_INSTRUCTIONS` (`shared/src/mcp.ts`): paragraf "Tool yang MENJALANKAN sesuatu sengaja tidak ada di sini" **sudah tidak benar** sejak Rencana 3 dan wajib diganti di Rencana 2 Task 2 — pastikan penggantinya masih akurat sesudah semua tool lahir.
 
-- [ ] **Step 5: Release note breaking change**
+- [x] **Step 5: Release note breaking change**
 
 Tulis catatan rilis yang menyebut:
 - empat capability baru dan bahwa token lama **kehilangan** hak berbahaya;
 - gateway Telegram **tidak akan menyala** sampai keempatnya dicentang;
 - `--danger` dan bahwa ia bukan kontrol keamanan.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs/ internal/skills/ shared/src/mcp.ts docs/superpowers/plans/
 git commit -m "docs(mcp): katalog 152 tool lengkap, ADR-0155 & release note"
 ```
+
+---
+
+## Catatan pelaksanaan (2026-08-25)
+
+- **`password` VPS tidak diekspos.** Ia kredensial transien, dan ADR-0097 sudah menetapkan permukaan
+  kredensial bukan wilayah agent token (preseden `/telegram/credentials`). Agen memakai `keyPath`;
+  bootstrap dengan password tetap pekerjaan manusia lewat cookie.
+- **Gerbang cakupan DINYALAKAN dan hijau tanpa skip.** Saat pertama dinyalakan ia menyisakan 12
+  route, semuanya jatuh ke dua kategori jujur: tercakup tool BERCABANG (samplePath hanya bisa
+  menyebut satu cabang) dan sengaja dikecualikan. Yang pertama dicatat di `COVERED_BY_BRANCH`
+  **dengan nama tool-nya**, dan nama itu diverifikasi ada — jadi daftar itu tak bisa jadi tempat
+  menyembunyikan route.
+- **Regex `^/vps` di uji kontrak terlalu luas** — ia ikut mencocokkan `hanoman_vps_list` yang tak
+  mengeksekusi apa pun. Dipersempit ke sub-path yang benar-benar menyentuh mesin remote.
+- **Angka tool di test CLI dibuang**, diganti invarian: tingkat yang lebih sempit adalah HIMPUNAN
+  BAGIAN. Angka mati hanya membuat berkas itu disunting berulang tanpa menjaga apa pun.
+
+Verifikasi akhir lewat MCP nyata terhadap server hidup, token 12×`:write` tanpa satu pun capability
+`danger`:
+
+```
+hanoman_session_create      isError | kurang capability `sessions:spawn`
+hanoman_ide_git_merge       isError | kurang capability `ide:git`
+hanoman_backlog_delete      isError | kurang capability `backlog:lifecycle`
+hanoman_vps_console         isError | kurang capability `vps:exec`
+hanoman_backlog_stage_set   isError | kurang capability `backlog:lifecycle`   ← gerbang HANDLER
+hanoman_projects_list       ok      | {"items":[],"total":0,...}
+```
+
+Nol sesi tmux baru, nol proses ssh keluar. Baris `stage_set` adalah buktinya: katalognya mengklaim
+`backlog:write`, server menjawab `backlog:lifecycle` — gerbang yang hidup di handler bekerja lewat
+MCP persis seperti yang dirancang.
