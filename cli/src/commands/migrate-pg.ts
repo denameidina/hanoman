@@ -49,6 +49,10 @@ export const PG_ORDER = [
   // memang tanpa FK, tapi memindahkannya lebih awal membuat urutan tabel tak lagi mencerminkan
   // arah tautannya bagi pembaca berikutnya.
   "GithubIssue",
+  // SPEC-945 · ADR-0150 · Member SEBELUM Task (FK memberId, SetNull) dan Task sesudah Project
+  // (FK projectId, cascade). `Task.specId` memang tanpa FK, tapi urutan tabel tetap harus
+  // mencerminkan arah tautannya bagi pembaca berikutnya.
+  "Member", "Task",
   // SPEC-481 · ADR-0100 · WebhookDelivery WAJIB sesudah WebhookEndpoint (FK endpointId).
   "WebhookEndpoint", "WebhookDelivery",
 ] as const;

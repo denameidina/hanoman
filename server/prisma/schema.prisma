@@ -35,6 +35,7 @@ model Project {
   changelogs   Changelog[]   // SPEC-516 · ADR-0105 · changelog tersimpan project ini
   clientAccess ClientProjectAccess[] // SPEC-617 · ADR-0110 · akun klien yang boleh melihat project ini
   portalChats  PortalChatSession[]   // SPEC-854 · ADR-0129 · percakapan portal klien project ini
+  tasks        Task[]                // SPEC-945 · ADR-0150 · kartu kerja manusia di project ini
 }
 
 model Spec {
@@ -174,6 +175,68 @@ model CustomAgent {
 
   @@unique([projectId, name])
   @@index([projectId])
+}
+
+// SPEC-945 · ADR-0150 · direktori orang untuk papan tim. GLOBAL, bukan per project: Task boleh
+// tanpa project, jadi direktori orang tak bisa digantung pada project — dan orang yang sama lazim
+// melintasi beberapa project.
+//
+// `id` DETERMINISTIK dari email ternormalisasi (lowercase + trim) ditulis aplikasi, bukan default
+// DB — alasan yang sama dengan CustomAgent (ADR-0094): dengan id acak, dua mesin yang sama-sama
+// membuat "Dena" melahirkan dua baris yang keduanya menyeberang changefeed, dan salah satunya
+// lenyap tanpa jejak begitu papan menyaring per-assignee.
+//
+// Konsekuensinya `email` IMMUTABLE, ditegakkan di boundary route: ganti email = hapus + buat baru.
+// `@unique` di sini bukan redundansi terhadap PK — id menyimpan bentuk ternormalisasi, kolom ini
+// menyimpan yang diketik operator.
+model Member {
+  id        String   @id
+  name      String
+  email     String   @unique
+  role      String?  // label bebas: "desainer", "backend" — BUKAN RBAC
+  active    Boolean  @default(true)
+  version   Int      @default(0) // SPEC-213 · version-stamp sync (ADR-0045)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tasks     Task[]
+}
+
+// SPEC-945 · ADR-0150 · satuan kerja MANUSIA. Bukan Spec: kolomnya milik manusia dan bebas
+// di-drag, sementara `Spec.stage` diturunkan dari fase sesi (ADR-0008/0024).
+//
+// `specId` sengaja TANPA FK (cermin Ticket.specId, ADR-0062): changefeed bisa memancarkan Task
+// sebelum Spec-nya mendarat (kelas SPEC-382) dan FK akan menolaknya.
+//
+// TIDAK ada kolom `stage`: cermin stage backlog dihitung saat baca lewat join specId → Spec.stage.
+// Aturan ADR-0090 bukan "selalu simpan" melainkan bisakah dihitung ulang dari sumber lain; di sini
+// bisa, jadi kolom kedua hanya menciptakan dua kebenaran yang bisa drift.
+//
+// TIDAK ada `doneAt` dan tak ada stempel transisi kolom: Gantt yang dipilih rencana-saja, jadi
+// tanggal aktual belum punya pembaca. Dihilangkan dengan sengaja, bukan terlupa.
+//
+// `order` Float, bukan Int: drop di antara dua kartu menulis titik tengah tetangganya — tak ada
+// reindex seluruh kolom, dan dua mesin yang menulis bersamaan menghasilkan nilai yang tetap
+// terurut. Seri dipecah oleh `id`.
+model Task {
+  id        String    @id @default(cuid())
+  projectId String?   // null = tugas internal tim, tanpa project
+  title     String
+  detail    String?
+  status    String    // backlog | doing | review | done (zTaskStatus)
+  priority  String    @default("sedang") // zPriority — kosakata yang sama dengan Spec
+  memberId  String?   // null = belum ditugaskan
+  startDate DateTime?
+  dueDate   DateTime?
+  order     Float     @default(0)
+  specId    String?   // soft-link Spec hasil eskalasi
+  version   Int       @default(0) // SPEC-213 · version-stamp sync (ADR-0045)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  member    Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@index([memberId])
 }
 
 // SPEC-471 · ADR-0095 · cermin issue GitHub sebagai record lokal, pola Ticket (ADR-0062).

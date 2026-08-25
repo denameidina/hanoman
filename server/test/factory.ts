@@ -150,6 +150,8 @@ export async function resetDb(): Promise<void> {
   await prisma.$transaction([
     prisma.changelog.deleteMany(),   // SPEC-516 · ADR-0105
     prisma.notification.deleteMany(),
+    prisma.task.deleteMany(),     // SPEC-945 · ADR-0150 · sebelum member (FK memberId)
+    prisma.member.deleteMany(),
     prisma.spec.deleteMany(), prisma.setting.deleteMany(), prisma.project.deleteMany(),
     prisma.vps.deleteMany(),
   ]);
