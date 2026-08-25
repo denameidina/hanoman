@@ -907,7 +907,7 @@ git commit -m "feat(945): buildTasksPage — halaman task + cermin spec baca-saj
 - Consumes: `zCreateMember`, `zPatchMember`, `memberId`, `MemberView` (Task 2); `notifySynced`/`deleteSynced` (sudah ada); `paginate`.
 - Produces: route `GET|POST /api/members`, `PATCH|DELETE /api/members/:id`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/members.route.test.ts`:
 
@@ -1022,7 +1022,7 @@ describe("DELETE /members/:id", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/members.route.test.ts
@@ -1030,7 +1030,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — seluruh request menjawab `404` (route belum terdaftar).
 
-- [ ] **Step 3: Tulis `server/src/routes/members.ts`**
+- [x] **Step 3: Tulis `server/src/routes/members.ts`**
 
 ```ts
 import type { FastifyInstance } from "fastify";
@@ -1109,7 +1109,7 @@ export default async function (app: FastifyInstance) {
 }
 ```
 
-- [ ] **Step 4: Daftarkan di `app.ts`**
+- [x] **Step 4: Daftarkan di `app.ts`**
 
 Import, sesudah `import customAgents from "./routes/custom-agents";` (`:40`):
 
@@ -1123,7 +1123,7 @@ Register, sesudah `await api.register(clientAccounts);` (±`:261`):
     await api.register(members);      // SPEC-945 · ADR-0150 · direktori orang papan tim (cookie-only)
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/members.route.test.ts
@@ -1131,7 +1131,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS (12 test).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/members.ts server/src/app.ts server/test/members.route.test.ts
