@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { memberId, zCreateMember, zPatchMember, zCreateTask, zPatchTask, TASK_STATUSES } from "./team";
+import { memberId, zCreateMember, zPatchMember, zCreateTask, zPatchTask, zEscalateTask, TASK_STATUSES } from "./team";
 
 describe("SPEC-945 · memberId deterministik", () => {
   it("menormalkan kapitalisasi & spasi tepi", () => {
@@ -74,5 +74,34 @@ describe("zPatchTask", () => {
   });
   it("memberId & projectId boleh dikosongkan eksplisit", () => {
     expect(zPatchTask.safeParse({ memberId: null, projectId: null }).success).toBe(true);
+  });
+});
+
+describe("zEscalateTask", () => {
+  it("default brief + sedang; body kosong sah", () => {
+    const r = zEscalateTask.safeParse({});
+    expect(r.success).toBe(true);
+    expect(r.success && r.data).toMatchObject({ source: "brief", priority: "sedang" });
+  });
+
+  // Enum EKSPLISIT tiga: `goal`/`no_effort` butuh bentuk payload `goal` (goal + done) yang hanya
+  // operator bisa tulis, dan `help` menjanjikan asal-usul Help Center yang bukan ini.
+  it("menolak source di luar tiga", () => {
+    for (const s of ["goal", "no_effort", "help", "apa saja"])
+      expect(zEscalateTask.safeParse({ source: s }).success).toBe(false);
+  });
+
+  it("menerima ketiga source yang sah", () => {
+    for (const s of ["brief", "qa", "audit"])
+      expect(zEscalateTask.safeParse({ source: s }).success).toBe(true);
+  });
+
+  it("menolak prioritas di luar kosakata zPriority", () => {
+    expect(zEscalateTask.safeParse({ priority: "normal" }).success).toBe(false);
+  });
+
+  it("projectId opsional", () => {
+    expect(zEscalateTask.safeParse({ projectId: "hanoman" }).success).toBe(true);
+    expect(zEscalateTask.safeParse({}).success).toBe(true);
   });
 });

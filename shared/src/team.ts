@@ -93,3 +93,26 @@ export type CreateTaskInput = z.input<typeof zCreateTask>;
 export type PatchTaskInput = z.input<typeof zPatchTask>;
 export type CreateMemberInput = z.input<typeof zCreateMember>;
 export type PatchMemberInput = z.input<typeof zPatchMember>;
+
+/**
+ * SPEC-947 · tiga dari enam `zSpecSource`. `goal`/`no_effort` memakai bentuk payload `goal` yang
+ * mewajibkan `goal` + `done` — dua kalimat yang hanya operator bisa tulis, dan menurunkannya dari
+ * judul kartu berarti mengarang. `help` milik tiket Help Center dan lencananya menjanjikan
+ * asal-usul yang bukan ini.
+ *
+ * Enum EKSPLISIT, bukan `zSpecSource` yang disaring belakangan: source ketujuh yang kelak
+ * ditambahkan tak boleh diam-diam menjadi tujuan eskalasi.
+ */
+export const ESCALATE_SOURCES = ["brief", "qa", "audit"] as const;
+export type EscalateSource = (typeof ESCALATE_SOURCES)[number];
+
+export const zEscalateTask = z.object({
+  source: z.enum(ESCALATE_SOURCES).default("brief"),
+  priority: zPriority.default("sedang"),
+  // Dipakai HANYA saat kartunya belum punya project (`nextSpecId` butuh repo, dan repo milik
+  // project). Route menolak 400 bila ia menyebut project LAIN — kartu tak boleh berpindah project
+  // sebagai efek samping yang tak diminta.
+  projectId: z.string().max(120).optional(),
+});
+export type EscalateTask = z.infer<typeof zEscalateTask>;
+export type EscalateTaskInput = z.input<typeof zEscalateTask>;

@@ -216,6 +216,8 @@ export const paths = {
   member: (id: string) => `${API}/members/${encodeURIComponent(id)}`,
   tasks: `${API}/tasks`,
   task: (id: string) => `${API}/tasks/${encodeURIComponent(id)}`,
+  // SPEC-947 · eskalasi kartu → backlog. POST membuat Spec & mengisi specId; DELETE melepasnya.
+  taskEscalate: (id: string) => `${API}/tasks/${encodeURIComponent(id)}/escalate`,
   // SPEC-476 · ADR-0096 · observability/context/reply kanal Telegram.
   telegramStatus: `${API}/telegram/status`,
   telegramContext: (chatId: string) => `${API}/telegram/chats/${encodeURIComponent(chatId)}/context`,
