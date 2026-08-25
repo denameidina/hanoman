@@ -341,7 +341,7 @@ git commit -m "feat(945): model Member & Task + migration + PG_ORDER"
   - `zCreateTask`, `zPatchTask`, `type TaskView`
   - Dipakai Task 4, 5, 6, 7.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `shared/src/team.test.ts`:
 
@@ -423,7 +423,7 @@ describe("zPatchTask", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 pnpm vitest --run shared/src/team.test.ts
@@ -431,7 +431,7 @@ pnpm vitest --run shared/src/team.test.ts
 
 Expected: FAIL — `Failed to resolve import "./team"`.
 
-- [ ] **Step 3: Tulis `shared/src/team.ts`**
+- [x] **Step 3: Tulis `shared/src/team.ts`**
 
 ```ts
 import { z } from "zod";
@@ -513,7 +513,7 @@ export type TaskView = {
 };
 ```
 
-- [ ] **Step 4: Re-export dari index**
+- [x] **Step 4: Re-export dari index**
 
 Di `shared/src/index.ts`, tambahkan sesudah `export * from "./presence";`:
 
@@ -521,7 +521,7 @@ Di `shared/src/index.ts`, tambahkan sesudah `export * from "./presence";`:
 export * from "./team";
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run shared/src/team.test.ts
@@ -529,7 +529,7 @@ pnpm vitest --run shared/src/team.test.ts
 
 Expected: PASS (16 test).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/team.ts shared/src/team.test.ts shared/src/index.ts

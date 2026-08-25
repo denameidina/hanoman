@@ -35,3 +35,4 @@ export * from "./terminal-io";
 export * from "./session-dialog";
 export * from "./session-ask";
 export * from "./presence";
+export * from "./team";
