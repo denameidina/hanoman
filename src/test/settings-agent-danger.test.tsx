@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+// Catatan: AgentAccessPanel ikut merender <McpPanel/>, yang punya tombol "Tampilkan tool
+// berbahaya". Query header kolom karena itu dipersempit ke <div> ber-teks PERSIS "berbahaya" —
+// findByText yang longgar akan cocok dua elemen dan gagal karena ambigu, bukan karena kode salah.
 import { render, screen } from "@testing-library/react";
 import { CAPABILITIES } from "@hanoman/shared";
 
@@ -34,14 +37,14 @@ beforeEach(() => {
 describe("grid capability — kolom berbahaya", () => {
   it("kolomnya ada, dengan checkbox terpisah per capability danger", async () => {
     render(<AgentAccessPanel />);
-    expect(await screen.findByText("berbahaya")).toBeInTheDocument();
+    expect(await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya")).toBeInTheDocument();
     for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"])
       expect(screen.getByLabelText(id), id).toBeInTheDocument();
   });
 
   it("domain tanpa capability danger tak mendapat checkbox liar di kolom itu", async () => {
     render(<AgentAccessPanel />);
-    await screen.findByText("berbahaya");
+    await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya");
     const danger = CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id);
     expect(danger).toHaveLength(4);
     expect(screen.queryByLabelText("docs:danger")).toBeNull();
@@ -59,7 +62,7 @@ describe("grid capability — kolom berbahaya", () => {
     vi.mocked(api.listAgentTokens).mockResolvedValue(
       { items: [token({ capabilities: ["sessions:write", "sessions:spawn"] })] } as any);
     render(<AgentAccessPanel />);
-    await screen.findByText("berbahaya");
+    await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya");
     expect(screen.queryByText(/dulu bisa membuka sesi baru/i)).toBeNull();
   });
 

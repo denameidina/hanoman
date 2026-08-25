@@ -1,11 +1,12 @@
 // SPEC-482 · ADR-0099 · resolusi konfigurasi `hanoman mcp`. Murni: argv + env + pembaca berkas
 // disuntikkan, jadi seluruh percabangan bisa diuji tanpa filesystem.
-import { DEFAULT_MAX_BYTES } from "@hanoman/shared";
+import { DEFAULT_MAX_BYTES, type McpLevel } from "@hanoman/shared";
 
 export type McpConfig = {
   host: string;
   token: string;
-  readOnly: boolean;
+  /** ADR-0155 · tingkat mode. Yang lebih sempit selalu menang, apa pun urutan argumen. */
+  level: McpLevel;
   maxBytes: number;
   /** Keluhan konfigurasi. Non-kosong = setiap panggilan tool menjawab dengan kalimat ini. */
   problems: string[];
@@ -46,12 +47,22 @@ export function resolveMcpConfig(
     );
   }
 
-  const roEnv = env.HANOMAN_MCP_READ_ONLY;
-  const readOnly = argv.includes("--read-only") || roEnv === "1" || roEnv === "true";
+  // ADR-0155 · TIGA tingkat. `--danger` MENAMPILKAN tool berbahaya di tools/list; ia BUKAN
+  // gerbang keamanan — yang menahan sungguhan adalah capability pada agent token. Yang lebih
+  // sempit selalu menang: memilih yang lebih longgar diam-diam adalah cara paling mudah membuat
+  // seseorang menyalakan permukaan berbahaya tanpa sadar.
+  const flagOrEnv = (flag: string, v: string | undefined) =>
+    argv.includes(flag) || v === "1" || v === "true";
+  const readOnly = flagOrEnv("--read-only", env.HANOMAN_MCP_READ_ONLY);
+  const danger = flagOrEnv("--danger", env.HANOMAN_MCP_DANGER);
+  if (readOnly && danger) {
+    problems.push("--danger diabaikan karena mode baca-saja juga aktif. Tingkat yang lebih sempit selalu menang.");
+  }
+  const level: McpLevel = readOnly ? "read-only" : danger ? "danger" : "default";
 
   const rawMax = flagValue(argv, "--max-bytes") ?? env.HANOMAN_MCP_MAX_BYTES;
   const parsed = rawMax === undefined ? NaN : Number(rawMax);
   const maxBytes = Number.isFinite(parsed) && parsed >= 512 ? Math.floor(parsed) : DEFAULT_MAX_BYTES;
 
-  return { host, token, readOnly, maxBytes, problems };
+  return { host, token, level, maxBytes, problems };
 }

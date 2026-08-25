@@ -20,8 +20,14 @@ const CLIENTS: { id: Client; label: string; hint: string }[] = [
   { id: "cursor", label: "Cursor / Copilot", hint: "~/.cursor/mcp.json atau .vscode/mcp.json di project." },
 ];
 
-export function snippetFor(client: Client, host: string, readOnly: boolean): string {
-  const args = readOnly ? '["mcp", "--read-only"]' : '["mcp"]';
+// ADR-0155 · TIGA tingkat, dan snippet ini disalin bulat-bulat oleh manusia — flag yang tak ikut
+// tersalin berarti tingkat yang tak pernah aktif. `default` sengaja tanpa flag apa pun.
+export type SnippetLevel = "read-only" | "default" | "danger";
+const FLAG: Record<SnippetLevel, string> = { "read-only": "--read-only", default: "", danger: "--danger" };
+
+export function snippetFor(client: Client, host: string, level: SnippetLevel): string {
+  const flag = FLAG[level];
+  const args = flag ? `["mcp", "${flag}"]` : '["mcp"]';
   const json = `{
   "mcpServers": {
     "hanoman": {
@@ -44,7 +50,7 @@ env = { HANOMAN_HOST = "${host}", HANOMAN_AGENT_TOKEN = "hnm_agt_…" }`;
     return `${json}
 
 # atau, sekali jalan:
-claude mcp add hanoman --env HANOMAN_HOST=${host} --env HANOMAN_AGENT_TOKEN=hnm_agt_… -- hanoman mcp${readOnly ? " --read-only" : ""}`;
+claude mcp add hanoman --env HANOMAN_HOST=${host} --env HANOMAN_AGENT_TOKEN=hnm_agt_… -- hanoman mcp${flag ? " " + flag : ""}`;
   }
   if (client === "cursor") return json.replace('"mcpServers"', '"servers"');
   return json;
@@ -60,10 +66,10 @@ const CELL: React.CSSProperties = { padding: "6px 10px 6px 0", borderBottom: "1p
 
 export function McpPanel(): React.ReactElement {
   const [client, setClient] = React.useState<Client>("claude-code");
-  const [readOnly, setReadOnly] = React.useState(false);
+  const [level, setLevel] = React.useState<SnippetLevel>("default");
   const [copied, setCopied] = React.useState(false);
   const host = typeof window === "undefined" ? "http://localhost:8787" : window.location.origin;
-  const snippet = snippetFor(client, host, readOnly);
+  const snippet = snippetFor(client, host, level);
   const active = CLIENTS.find((c) => c.id === client)!;
 
   const copy = () => {
@@ -88,9 +94,14 @@ export function McpPanel(): React.ReactElement {
           diisi otomatis dengan instance ini — <b>agent token diterbitkan per-instance</b>, jadi token
           dari instance lain akan selalu ditolak 401 di sini.
         </div>
+        {/* ADR-0155 · kalimat lama di sini berkata permukaan berbahaya "tidak tersedia lewat MCP".
+            Itu sudah tidak benar, dan kalimat yang berbohong lebih buruk daripada tak ada. */}
         <div style={MUTED}>
-          Membuat sesi terminal dan perintah VPS <b>tidak tersedia lewat MCP</b>, begitu pula
-          merge/rebase, penghapusan backlog, dan perubahan stage.
+          Tool berbahaya — membuka sesi agen di worktree, perintah VPS, merge/rebase, penghapusan
+          backlog, perubahan stage — <b>hanya muncul</b> pada tingkat <code>--danger</code>. Tingkat
+          itu <b>bukan kontrol keamanan</b>: ia menentukan tool mana yang terlihat, sementara yang
+          menahan sungguhan adalah capability berlabel <b>berbahaya</b> yang kamu centang di kartu
+          di atas. Sebuah tool bisa terlihat dan tetap menjawab 403.
         </div>
 
         <div role="group" aria-label="Klien MCP" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
@@ -99,8 +110,15 @@ export function McpPanel(): React.ReactElement {
               {c.label}
             </Button>
           ))}
-          <Button size="sm" variant={readOnly ? "primary" : "ghost"} leftIcon="eye" onClick={() => setReadOnly((v) => !v)}>
+          <Button size="sm" variant={level === "read-only" ? "primary" : "ghost"} leftIcon="eye"
+            onClick={() => setLevel((v) => (v === "read-only" ? "default" : "read-only"))}>
             Mode baca-saja
+          </Button>
+          {/* Ketiganya saling meniadakan: snippet yang memuat --read-only DAN --danger sekaligus
+              akan menyuruh manusia memasang konfigurasi yang justru dikeluhkan CLI. */}
+          <Button size="sm" variant={level === "danger" ? "primary" : "ghost"} leftIcon="alert-triangle"
+            onClick={() => setLevel((v) => (v === "danger" ? "default" : "danger"))}>
+            Tampilkan tool berbahaya
           </Button>
         </div>
 

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createCaller } from "../src/mcp/client";
 import type { McpConfig } from "../src/mcp/config";
 
-const cfg: McpConfig = { host: "http://h:8787", token: "hnm_agt_secret", readOnly: false, maxBytes: 24576, problems: [] };
+const cfg: McpConfig = { host: "http://h:8787", token: "hnm_agt_secret", level: "default", maxBytes: 24576, problems: [] };
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 

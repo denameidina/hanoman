@@ -16,7 +16,7 @@ class PairedTransport {
   feed(m: unknown): void { this.onmessage?.(m); }
 }
 
-const cfg: McpConfig = { host: "http://h", token: "hnm_agt_secret", readOnly: false, maxBytes: 24576, problems: [] };
+const cfg: McpConfig = { host: "http://h", token: "hnm_agt_secret", level: "default", maxBytes: 24576, problems: [] };
 const tick = () => new Promise((r) => setTimeout(r, 40));
 type CallArgs = Parameters<Caller>;
 const okCall = () =>
@@ -38,13 +38,13 @@ describe("buildMcpServer", () => {
     expect(reply(t, 1)?.result.serverInfo.name).toBe("hanoman");
   });
 
-  it("tools/list: 17 tool di mode penuh, 13 di baca-saja", async () => {
+  it("tools/list: 17 tool di tingkat default, 13 di baca-saja", async () => {
     const { t } = await boot();
     t.feed({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
     await tick();
     expect(reply(t, 2)?.result.tools).toHaveLength(17);
 
-    const ro = await boot({ readOnly: true });
+    const ro = await boot({ level: "read-only" });
     ro.t.feed({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
     await tick();
     const names = reply(ro.t, 2) as { result: { tools: { name: string }[] } };
@@ -102,7 +102,10 @@ describe("buildMcpServer", () => {
     await tick();
     const text = reply(t, 7)?.result.content[0].text as string;
     const about = JSON.parse(text) as Record<string, unknown>;
-    expect(about).toMatchObject({ host: "http://h", mode: "baca-tulis", toolSchemaVersion: 1, hanomanCli: "9.9.9" });
+    expect(about).toMatchObject({ host: "http://h", mode: "default", toolSchemaVersion: 1, hanomanCli: "9.9.9" });
+    // ADR-0155 · `hanoman_about` wajib menyatakan bahwa tingkat mode bukan gerbang keamanan:
+    // agen yang menemukan sebuah tool tak ada tak boleh menyimpulkan ia berhak memanggilnya.
+    expect(String(about.modeNote)).toMatch(/bukan kontrol keamanan/i);
     expect(text).not.toContain("hnm_agt_secret");
     expect(JSON.stringify(about)).not.toMatch(/token/i);
   });
