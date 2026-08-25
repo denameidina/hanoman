@@ -38,18 +38,31 @@ describe("buildMcpServer", () => {
     expect(reply(t, 1)?.result.serverInfo.name).toBe("hanoman");
   });
 
-  it("tools/list: 17 tool di tingkat default, 13 di baca-saja", async () => {
-    const { t } = await boot();
-    t.feed({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
-    await tick();
-    expect(reply(t, 2)?.result.tools).toHaveLength(17);
+  // Angka tool TIDAK di-hardcode di sini: katalog memang tumbuh, dan angka mati hanya membuat
+  // berkas ini disunting berulang tanpa menjaga apa pun. Yang dijaga adalah SIFATNYA — tingkat
+  // yang lebih sempit adalah HIMPUNAN BAGIAN yang lebih kecil, dan tool tulis benar-benar HILANG
+  // dari baca-saja alih-alih hanya menolak saat dipanggil (ADR-0099 §5).
+  it("tools/list menyusut menurut tingkat, dan tool tulis HILANG di baca-saja", async () => {
+    const listAt = async (over: Partial<McpConfig>) => {
+      const { t } = await boot(over);
+      t.feed({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
+      await tick();
+      return (reply(t, 2) as { result: { tools: { name: string }[] } }).result.tools.map((x) => x.name);
+    };
+    const ro = await listAt({ level: "read-only" });
+    const def = await listAt({ level: "default" });
+    const dg = await listAt({ level: "danger" });
 
-    const ro = await boot({ level: "read-only" });
-    ro.t.feed({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
-    await tick();
-    const names = reply(ro.t, 2) as { result: { tools: { name: string }[] } };
-    expect(names.result.tools).toHaveLength(13);
-    expect(names.result.tools.map((x) => x.name)).not.toContain("hanoman_backlog_create");
+    expect(ro.length).toBeLessThan(def.length);
+    expect(def.length).toBeLessThan(dg.length);
+    for (const n of ro) expect(def, n).toContain(n);
+    for (const n of def) expect(dg, n).toContain(n);
+
+    expect(ro).not.toContain("hanoman_backlog_create");
+    expect(def).toContain("hanoman_backlog_create");
+    // Tool berbahaya hanya ada di tingkat danger.
+    expect(def).not.toContain("hanoman_session_create");
+    expect(dg).toContain("hanoman_session_create");
   });
 
   it("tools/call menerjemahkan argumen jadi permintaan REST yang benar", async () => {
