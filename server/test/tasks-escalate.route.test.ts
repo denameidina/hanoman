@@ -5,7 +5,12 @@ import { prisma } from "../src/db";
 import { resetDb, makeProject } from "./factory";
 import { COOKIE_NAME, createSession } from "../src/services/auth";
 
-const app = buildApp({ requireAuth: false });
+// Gerbang ingress SPEC-761/ADR-0117 berdiri SEBELUM route dinilai, jadi `HANOMAN_CONTROL_ORIGINS`
+// yang diwarisi sesi membuat SETIAP path di berkas ini menjawab 404 — termasuk yang seharusnya 400.
+// Terukur di base sebelum berkas ini ada: `tasks.route.test.ts` 22 merah dari 24 dengan var itu,
+// 24 hijau tanpanya. Dikebalkan di sini alih-alih menuntut pemanggil memakai `env -u`.
+const cleanEnv = { ...process.env, HANOMAN_CONTROL_ORIGINS: undefined, HANOMAN_PUBLIC_ORIGINS: undefined };
+const app = buildApp({ requireAuth: false, env: cleanEnv });
 
 const makeTask = (over: Record<string, unknown> = {}) =>
   prisma.task.create({ data: {
@@ -257,7 +262,7 @@ describe("DELETE /tasks/:id/escalate", () => {
 // cermin POST /tickets/:id/accept. Butuh app ber-auth: `requireAuth: false` tak pernah memasang
 // hook yang mengisi `req.user`, jadi harness papan di atas tak bisa membuktikannya.
 describe("POST /tasks/:id/escalate · principal", () => {
-  const authed = buildApp({ requireAuth: true });
+  const authed = buildApp({ requireAuth: true, env: cleanEnv });
 
   it("mengisi launchApprovedBy & author dari operator yang login", async () => {
     await prisma.session.deleteMany({});
