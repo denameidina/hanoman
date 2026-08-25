@@ -51,4 +51,15 @@ describe("SPEC-546 · bentuk payload per source (satu predikat)", () => {
     expect(zChangeSpecSource.safeParse({ source: "qa", payload: brief }).success).toBe(false);
     expect(zChangeSpecSource.safeParse({ source: "bukan-source" }).success).toBe(false);
   });
+
+  // ADR-0149 · perpindahan LINTAS-ALUR pada item yang sudah dimulai mengembalikan item ke
+  // `brainstorming`; server menjawab dry-run sampai flag ini dikirim. Diuji di batas kontrak
+  // karena zod object default STRIP: tanpa field ini, `confirmReset` apa pun lolos diam-diam
+  // dan klien tak pernah tahu bahwa konfirmasinya tak sampai ke gerbang.
+  it("zChangeSpecSource: confirmReset boolean opsional", () => {
+    expect(zChangeSpecSource.safeParse({ source: "qa" }).success).toBe(true);
+    const ok = zChangeSpecSource.safeParse({ source: "qa", confirmReset: true });
+    expect(ok.success && ok.data.confirmReset).toBe(true);
+    expect(zChangeSpecSource.safeParse({ source: "qa", confirmReset: "ya" }).success).toBe(false);
+  });
 });
