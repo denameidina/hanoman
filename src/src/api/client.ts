@@ -3,7 +3,7 @@ import { paths, type Paginated, type ProjectView, type Spec, type Setting, type 
   type ProvisionStep, type ProvisionResult,
   type SessionDialogAnswer, type SessionDialogPayload,
   type SetupStatus, type SetupApplyResult,
-  type TaskView, type MemberView, type CreateTaskInput, type PatchTaskInput,
+  type TaskView, type MemberView, type CreateTaskInput, type EscalateTaskInput, type PatchTaskInput,
   type CreateMemberInput, type PatchMemberInput } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
@@ -576,6 +576,11 @@ export const api = {
   createTask: (b: CreateTaskInput) => j<TaskView>(paths.tasks, { method: "POST", ...body(b) }),
   patchTask: (id: string, b: PatchTaskInput) => j<TaskView>(paths.task(id), { method: "PATCH", ...body(b) }),
   deleteTask: (id: string) => j<void>(paths.task(id), { method: "DELETE" }),
+  // SPEC-947 · eskalasi kartu → backlog. `specId` sengaja tak bisa ditulis lewat patchTask
+  // (ADR-0150 keputusan 5), jadi ini satu-satunya jalur yang mengisinya.
+  escalateTask: (id: string, b: EscalateTaskInput) =>
+    j<{ created: boolean; spec: Spec; task: TaskView }>(paths.taskEscalate(id), { method: "POST", ...body(b) }),
+  unlinkTaskSpec: (id: string) => j<TaskView>(paths.taskEscalate(id), { method: "DELETE" }),
   listMembers: (p: { active?: boolean; page?: number; limit?: number } = {}) =>
     j<Paginated<MemberView>>(paths.members + qs(p)),
   createMember: (b: CreateMemberInput) => j<MemberView>(paths.members, { method: "POST", ...body(b) }),
