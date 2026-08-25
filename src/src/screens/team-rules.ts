@@ -360,3 +360,84 @@ export function timelineRows(tasks: TaskView[], window: TimelineWindow): {
     || a.task.id.localeCompare(b.task.id));
   return { rows: scheduled.map(({ task, geometry }) => ({ task, geometry })), unscheduled, outside };
 }
+
+/* ── SPEC-949 · agregasi lintas project ───────────────────────────────────────────────────────── */
+
+export type ProjectGroup = {
+  /** `null` = "Tanpa project" — tugas internal tim (ADR-0150). */
+  projectId: string | null;
+  span: TaskSpan | null;
+  /** `null` = tak ada amplop: `span` null, atau `span` di luar jendela. Bedanya dibaca dari `span`. */
+  geometry: BarGeometry | null;
+  /** Bertanggal lebih dulu (mulai paling awal), tak bertanggal di ekor. */
+  tasks: TaskView[];
+};
+
+/** Pemecah seri yang dipakai DI DALAM grup dan di antara grup, supaya dua permukaan tak bisa
+    menyusun daftar yang sama dengan urutan berbeda. */
+const byTitleThenId = (a: TaskView, b: TaskView): number =>
+  a.title.localeCompare(b.title, "id") || a.id.localeCompare(b.id);
+
+/**
+ * Satu-satunya tempat task dibagi per project, jadi tak ada task yang bisa jatuh keluar — invarian
+ * "tiap id muncul tepat sekali" diuji langsung, cermin `timelineRows`.
+ *
+ * `name` adalah ARGUMEN, bukan impor: `team-rules.ts` tak boleh tahu apa itu `ProjectVM`, dan urutan
+ * baris yang tak bertanggal harus mengikuti nama yang dilihat operator — bukan `id` yang kebetulan
+ * cuid. Fungsinya tetap murni; pemanggil yang merakit resolvernya.
+ *
+ * Urutannya berjenjang: yang TERLIHAT di kanvas naik ke atas, karena baris tanpa batang tak punya
+ * apa pun untuk dibandingkan di sumbu waktu dan mendorongnya ke bawah menjaga bagian atas kanvas
+ * tetap padat.
+ */
+export function projectGroups(
+  tasks: TaskView[], window: TimelineWindow, name: (projectId: string | null) => string,
+): ProjectGroup[] {
+  // Kunci "tanpa project" adalah `Symbol`, bukan string sentinel: sentinel apa pun — `"null"`,
+  // `"__none__"` — adalah `projectId` yang SAH dan akan menggabungkan dua grup diam-diam kalau
+  // seseorang menamai projectnya begitu (`Project.id` renameable sejak SPEC-255).
+  const NO_PROJECT = Symbol("no-project");
+  const buckets = new Map<string | symbol, { projectId: string | null; tasks: TaskView[] }>();
+  for (const t of tasks) {
+    const key = t.projectId ?? NO_PROJECT;
+    const hit = buckets.get(key);
+    if (hit) hit.tasks.push(t);
+    else buckets.set(key, { projectId: t.projectId, tasks: [t] });
+  }
+
+  const groups: ProjectGroup[] = [...buckets.values()].map(({ projectId, tasks: ts }) => {
+    const span = projectSpan(ts);
+    const dated: { task: TaskView; start: number }[] = [];
+    const undated: TaskView[] = [];
+    for (const t of ts) {
+      const s = taskSpan(t);
+      if (s) dated.push({ task: t, start: s.start });
+      else undated.push(t);
+    }
+    // Diurutkan oleh `span.start`, BUKAN `geometry.left`: batang yang terpotong di kiri semuanya
+    // ber-`left` 0 dan urutannya akan runtuh jadi urutan kedatangan (pelajaran `timelineRows`).
+    dated.sort((a, b) => a.start - b.start || byTitleThenId(a.task, b.task));
+    undated.sort(byTitleThenId);
+    return {
+      projectId, span,
+      geometry: span ? spanGeometry(span, window) : null,
+      tasks: [...dated.map((d) => d.task), ...undated],
+    };
+  });
+
+  const rank = (g: ProjectGroup): number => (g.geometry ? 0 : g.span ? 1 : 2);
+  // "Tanpa project" terakhir di antara yang seri: nilainya bukan id, jadi ia tak punya tempat
+  // alami di urutan string.
+  const idKey = (g: ProjectGroup): [number, string] =>
+    (g.projectId === null ? [1, ""] : [0, g.projectId]);
+  groups.sort((a, b) => {
+    const [an, ai] = idKey(a);
+    const [bn, bi] = idKey(b);
+    return rank(a) - rank(b)
+      || (a.span && b.span ? a.span.start - b.span.start : 0)
+      || name(a.projectId).localeCompare(name(b.projectId), "id")
+      || an - bn
+      || ai.localeCompare(bi);
+  });
+  return groups;
+}

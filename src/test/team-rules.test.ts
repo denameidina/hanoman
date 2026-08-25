@@ -4,7 +4,7 @@ import {
   TEAM_COLUMNS, emptyBoard, canDropTask, nextOrder, moveCard, replaceCard,
   dateInputValue, dateInputToIso, taskSpan, taskDates,
   timelineWindow, zoomCell, MAX_TICKS, barGeometry, todayOffset, timelineRows,
-  spanGeometry, projectSpan,
+  spanGeometry, projectSpan, projectGroups,
 } from "../src/screens/team-rules";
 
 const task = (over: Partial<TaskView> = {}): TaskView => ({
@@ -468,5 +468,108 @@ describe("projectSpan", () => {
   it("seluruhnya sah → invalid false", () => {
     expect(projectSpan([task({ startDate: iso("2026-09-10"), dueDate: iso("2026-09-12") })])!.invalid)
       .toBe(false);
+  });
+});
+
+/* SPEC-949 · satu-satunya tempat task dibagi per project. Ember yang bocor di sini menghilangkan
+   pekerjaan dari layar tanpa satu pun galat — jadi invariannya diuji langsung. */
+describe("projectGroups", () => {
+  const TODAY = at("2026-09-10");
+  const win = (tasks: TaskView[], zoom: "day" | "week" | "month" = "day") =>
+    timelineWindow(tasks.map(taskSpan).filter((s): s is NonNullable<typeof s> => s !== null),
+      zoom, TODAY);
+  // Nama sengaja BERLAWANAN urutan dengan id: yang menguji bahwa seri dipecah oleh NAMA, bukan
+  // oleh id yang kebetulan cuid.
+  const name = (id: string | null) =>
+    id === null ? "Tanpa project" : ({ pa: "Zeta", pb: "Alfa" } as Record<string, string>)[id] ?? id;
+
+  it("invarian: tiap task muncul TEPAT SEKALI, dan tak ada ember keempat", () => {
+    const tasks = [
+      task({ id: "a", projectId: "pa", startDate: iso("2026-09-10") }),
+      task({ id: "b", projectId: "pb" }),
+      task({ id: "c", projectId: null, startDate: iso("2026-09-11") }),
+      task({ id: "d", projectId: "pa" }),
+    ];
+    const gs = projectGroups(tasks, win(tasks), name);
+    expect(gs.flatMap((g) => g.tasks.map((t) => t.id)).sort()).toEqual(["a", "b", "c", "d"]);
+    expect(gs.reduce((n, g) => n + g.tasks.length, 0)).toBe(tasks.length);
+  });
+
+  it("task tanpa project menjadi grup ber-projectId null", () => {
+    const tasks = [task({ id: "c", projectId: null, startDate: iso("2026-09-11") })];
+    const gs = projectGroups(tasks, win(tasks), name);
+    expect(gs).toHaveLength(1);
+    expect(gs[0]!.projectId).toBeNull();
+    expect(gs[0]!.geometry).not.toBeNull();
+  });
+
+  // Project yang id-nya kebetulan sama dengan sentinel apa pun tak boleh menyatu dengan "tanpa
+  // project" — `Project.id` renameable sejak SPEC-255.
+  it("project ber-id yang menyerupai sentinel tetap grup SENDIRI", () => {
+    const tasks = [
+      task({ id: "a", projectId: null, startDate: iso("2026-09-11") }),
+      task({ id: "b", projectId: "__none__", startDate: iso("2026-09-11") }),
+      task({ id: "c", projectId: "null", startDate: iso("2026-09-11") }),
+    ];
+    const gs = projectGroups(tasks, win(tasks), (id) => id ?? "Tanpa project");
+    expect(gs).toHaveLength(3);
+    expect(gs.map((g) => g.tasks.length)).toEqual([1, 1, 1]);
+  });
+
+  it("project yang seluruh task-nya tanpa tanggal: span null, geometry null, baris tetap ada", () => {
+    const tasks = [task({ id: "a", projectId: "pa" }), task({ id: "b", projectId: "pa" })];
+    const gs = projectGroups(tasks, win(tasks), name);
+    expect(gs).toHaveLength(1);
+    expect(gs[0]!.span).toBeNull();
+    expect(gs[0]!.geometry).toBeNull();
+    expect(gs[0]!.tasks).toHaveLength(2);
+  });
+
+  it("urutan berjenjang: terlihat → di luar jendela → tanpa jadwal", () => {
+    const tasks = [
+      task({ id: "n", projectId: "pn" }),
+      task({ id: "f", projectId: "pf", startDate: iso("2031-01-01") }),
+      task({ id: "v", projectId: "pv", startDate: iso("2026-09-11") }),
+    ];
+    const gs = projectGroups(tasks, win(tasks), (id) => id ?? "Tanpa project");
+    expect(gs.map((g) => g.projectId)).toEqual(["pv", "pf", "pn"]);
+    expect(gs[0]!.geometry).not.toBeNull();
+    expect(gs[1]!.geometry).toBeNull();
+    expect(gs[1]!.span).not.toBeNull();
+    expect(gs[2]!.span).toBeNull();
+  });
+
+  it("dalam satu jenjang, mulai paling awal lebih dulu", () => {
+    const tasks = [
+      task({ id: "a", projectId: "pa", startDate: iso("2026-09-14") }),
+      task({ id: "b", projectId: "pb", startDate: iso("2026-09-11") }),
+    ];
+    expect(projectGroups(tasks, win(tasks), name).map((g) => g.projectId)).toEqual(["pb", "pa"]);
+  });
+
+  it("seri dipecah oleh NAMA, bukan id", () => {
+    const tasks = [task({ id: "a", projectId: "pa" }), task({ id: "b", projectId: "pb" })];
+    expect(projectGroups(tasks, win(tasks), name).map((g) => g.projectId)).toEqual(["pb", "pa"]);
+  });
+
+  it("stabil terhadap urutan masukan — empat langganan mendarat kapan saja", () => {
+    const tasks = [
+      task({ id: "a", projectId: "pa", startDate: iso("2026-09-14") }),
+      task({ id: "b", projectId: "pb", startDate: iso("2026-09-11") }),
+      task({ id: "c", projectId: null }),
+    ];
+    const w = win(tasks);
+    const forward = projectGroups(tasks, w, name).map((g) => g.projectId);
+    expect(projectGroups([...tasks].reverse(), w, name).map((g) => g.projectId)).toEqual(forward);
+  });
+
+  it("di dalam grup: bertanggal lebih dulu (mulai paling awal), tak bertanggal di ekor", () => {
+    const tasks = [
+      task({ id: "kosong", projectId: "pa", title: "Kosong" }),
+      task({ id: "akhir", projectId: "pa", title: "Akhir", startDate: iso("2026-09-14") }),
+      task({ id: "awal", projectId: "pa", title: "Awal", startDate: iso("2026-09-11") }),
+    ];
+    expect(projectGroups(tasks, win(tasks), name)[0]!.tasks.map((t) => t.id))
+      .toEqual(["awal", "akhir", "kosong"]);
   });
 });
