@@ -1,6 +1,6 @@
 # Ubah type backlog lintas-alur — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Item backlog yang sudah dimulai bisa pindah type ke alur kerja mana pun, dengan konsekuensi eksplisit berkonfirmasi: item kembali ke `brainstorming` dan jejak sesi lamanya dibuang.
 
@@ -46,7 +46,7 @@
 - Consumes: `flowForSource`, `convertPayload`, `payloadMatchesSource` dari `@hanoman/shared` (sudah diimpor di berkas itu).
 - Produces: `SourceGate` dengan field baru `reset: boolean` pada cabang `ok: true`. Dipakai Task 3.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `server/test/spec-source-gate.test.ts`, **ganti** test `"item yang sudah dimulai DITOLAK ke source ber-flow lain"` (baris ~42) dengan:
 
@@ -107,7 +107,7 @@ Di blok `describe("SPEC-825 · no_effort")` (baris ~74), **ganti** test `"item y
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-source-gate.test.ts
@@ -115,7 +115,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `expected false to be true` pada `g.ok` untuk `qa/audit/goal/no_effort`, dan `g.reset` `undefined`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/spec-source.ts`, ganti tipe dan fungsi:
 
@@ -167,7 +167,7 @@ Ganti juga blok komentar doc di atasnya (baris 14-25) dengan:
  */
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-source-gate.test.ts
@@ -175,7 +175,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS, semua test di berkas itu hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/spec-source.ts server/test/spec-source-gate.test.ts
@@ -193,7 +193,7 @@ git commit -m "feat(spec-source): gerbang menjawab rencana reset, bukan penolaka
 **Interfaces:**
 - Produces: `zChangeSpecSource` menerima `confirmReset?: boolean`. Dipakai Task 3 (route) dan Task 4 (klien).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di `shared/src/spec-source.test.ts`:
 
@@ -209,7 +209,7 @@ describe("ADR-0149 · confirmReset", () => {
 
 Pastikan `zChangeSpecSource` ikut diimpor di berkas itu; kalau belum, tambahkan ke daftar import yang ada.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 pnpm vitest --run shared/src/spec-source.test.ts
@@ -217,7 +217,7 @@ pnpm vitest --run shared/src/spec-source.test.ts
 
 Expected: FAIL pada baris `confirmReset: "ya"` — zod object default **strip**, jadi field tak dikenal lolos diam-diam dan `success` bernilai `true`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `shared/src/dto.ts`, tambahkan field ke `zChangeSpecSource`:
 
@@ -233,7 +233,7 @@ export const zChangeSpecSource = z.object({
 }).superRefine((o, ctx) => {
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run shared/src/spec-source.test.ts
@@ -241,7 +241,7 @@ pnpm vitest --run shared/src/spec-source.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/dto.ts shared/src/spec-source.test.ts
@@ -266,7 +266,7 @@ git commit -m "feat(dto): confirmReset pada zChangeSpecSource"
   ```
   Keduanya dipakai Task 4 (route).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/spec-reset.test.ts`:
 
@@ -352,7 +352,7 @@ describe("ADR-0149 · reset item saat type pindah lintas-alur", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-reset.test.ts
@@ -360,7 +360,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `Failed to resolve import "../src/services/spec-reset"`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Buat `server/src/services/spec-reset.ts`:
 
@@ -448,7 +448,7 @@ export async function applySpecReset(
 
 `Interfaces` di atas menyebut `runGitOp` untuk **menghapus** branch (`op: "delete-branch"`, varian yang memang ada) dan `shaResolvable` untuk **membaca** keberadaannya.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-reset.test.ts
@@ -456,7 +456,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS, 4 test hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/spec-reset.ts server/test/spec-reset.test.ts
@@ -475,7 +475,7 @@ git commit -m "feat(spec-reset): rencana & eksekusi pembuangan jejak sesi saat t
 - Consumes: `checkSourceChange` (Task 1, kini membawa `reset`), `planSpecReset`/`applySpecReset` (Task 3), `zChangeSpecSource` (Task 2), `listSessions` (sudah diimpor di berkas ini).
 - Produces: balasan `{ pending: true, wouldDelete, worktree, branch }` untuk dry-run; `409 { error: "session-live", session }` saat ada sesi hidup. Dipakai Task 5 (klien).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `server/test/spec-source.route.test.ts`, **ganti** test `"item yang SUDAH DIMULAI: brief→help 200, brief→qa 409, brief→help+payload 409"` dengan:
 
@@ -545,7 +545,7 @@ Tambahkan `vi` ke import vitest di baris 1 berkas itu.
 
 > **Catatan pemasangan spy:** kalau `listSessions` dipanggil lewat binding impor statis di `specs.ts`, `vi.spyOn` pada modulnya tak akan tertangkap. Bila test sesi-hidup gagal karena itu, pakai `vi.mock("../src/services/pty", async (orig) => ({ ...(await orig()), listSessions: () => [...] }))` di puncak berkas dan aktifkan per-test lewat variabel modul — jangan mengubah kode produksi hanya supaya bisa di-spy.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-source.route.test.ts
@@ -553,7 +553,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — dry-run menjawab 409 (`sudah dimulai — type hanya bisa pindah…`) alih-alih `pending`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/routes/specs.ts`, tambahkan import:
 
@@ -613,7 +613,7 @@ Ganti isi handler `POST /specs/:id/source` mulai dari baris `const gate = checkS
 
 Sisanya (`recordSourceChange`, `notifySynced`, `return updated`) tak berubah.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/spec-source.route.test.ts server/test/spec-source-gate.test.ts server/test/spec-reset.test.ts server/test/spec-source-contract.test.ts
@@ -621,7 +621,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS semuanya. Kalau `spec-source-contract.test.ts` merah pada `eventTypeFor`, jangan ubah asersinya tanpa membaca Step 5 di bawah.
 
-- [ ] **Step 5: Catat perilaku webhook yang berubah**
+- [x] **Step 5: Catat perilaku webhook yang berubah**
 
 Reset mengubah `source` **dan** `stage` dalam satu update, sehingga `eventTypeFor(spec, "updated", ["source", "stage"])` hanya memancarkan satu jenis event — yang pertama cocok di daftar `derived`. Tambahkan test yang **mengunci** perilaku itu supaya ia jadi keputusan, bukan kebetulan, di `server/test/spec-source-contract.test.ts`:
 
@@ -634,7 +634,7 @@ Reset mengubah `source` **dan** `stage` dalam satu update, sehingga `eventTypeFo
 
 Jalankan; kalau hasilnya `spec.stage_changed`, **jangan** balikkan asersinya — urutkan `derived` di `shared/src/webhook.ts` supaya `source` menang, karena perpindahan type adalah peristiwa yang menyebabkan mundurnya stage, bukan sebaliknya.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/specs.ts server/test/spec-source.route.test.ts server/test/spec-source-contract.test.ts
@@ -659,7 +659,7 @@ git commit -m "feat(specs): POST /specs/:id/source dua fase untuk perpindahan li
   ```
   Dipakai Task 6 (dialog).
 
-- [ ] **Step 1: Ubah tipe klien**
+- [x] **Step 1: Ubah tipe klien**
 
 Di `src/src/api/client.ts`, di dekat `RevertPending` (baris 38) tambahkan:
 
@@ -681,7 +681,7 @@ dan ganti `changeSpecSource`:
     j<Spec | SourceResetPending>(paths.specSource(id), { method: "POST", ...body(b) }),
 ```
 
-- [ ] **Step 2: Ubah handler App**
+- [x] **Step 2: Ubah handler App**
 
 Di `src/src/App.tsx`, ganti `changeSourceOfSpec`:
 
@@ -712,7 +712,7 @@ Di `src/src/App.tsx`, ganti `changeSourceOfSpec`:
 
 Tambahkan `SourceResetPending` ke daftar import dari `./api/client` di puncak `App.tsx`.
 
-- [ ] **Step 3: Sesuaikan prop `onChangeSource`**
+- [x] **Step 3: Sesuaikan prop `onChangeSource`**
 
 Di `src/src/screens/BacklogScreen.tsx:137`, ubah tipe prop supaya membawa hasil:
 
@@ -735,7 +735,7 @@ Impor `SourceResetPending` di berkas itu dari `../api/client`. Teruskan argumen 
 
 Perhatikan: `setShowSource(false)` **tidak** lagi dipanggil di sini — dialog yang menutup dirinya sendiri lewat `onClose` setelah submit berhasil (Task 6), karena submit pertama pada jalur reset justru harus membuat dialog tetap terbuka.
 
-- [ ] **Step 4: Verifikasi kompilasi**
+- [x] **Step 4: Verifikasi kompilasi**
 
 ```bash
 pnpm --filter hanoman-web exec tsc --noEmit -p tsconfig.json
@@ -743,7 +743,7 @@ pnpm --filter hanoman-web exec tsc --noEmit -p tsconfig.json
 
 Expected: nol error. Kalau nama paket berbeda, jalankan `pnpm -C src exec tsc --noEmit`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/client.ts src/src/App.tsx src/src/screens/BacklogScreen.tsx
@@ -761,7 +761,7 @@ git commit -m "feat(web): jalur data rencana reset dari route ke dialog ubah typ
 **Interfaces:**
 - Consumes: `SourceResetPending` dan `onSubmit(source, payload?, confirmReset?) => Promise<SourceResetPending | null>` dari Task 5.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `src/test/change-source.test.tsx`, **ganti** test `"item yang sudah dimulai hanya menawarkan source se-flow dan tak menampilkan form"` dengan:
 
@@ -824,7 +824,7 @@ Tambahkan test regresi untuk keluhan aslinya di blok `describe("SPEC-546 · back
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 pnpm vitest --run src/test/change-source.test.tsx
@@ -832,7 +832,7 @@ pnpm vitest --run src/test/change-source.test.tsx
 
 Expected: FAIL — opsi item berjalan hanya `["help"]`, `source-reset-warning` tak ada, dan test regresi gagal karena dialog `return null` (tepat bug yang dilaporkan).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Ganti `src/src/screens/ChangeSourceDialog.tsx` menjadi:
 
@@ -990,7 +990,7 @@ export function ChangeSourceDialog({ spec, onClose, onSubmit }: {
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run src/test/change-source.test.tsx
@@ -998,7 +998,7 @@ pnpm vitest --run src/test/change-source.test.tsx
 
 Expected: PASS. Kalau `variant="danger"` tak ada di `Button` DS, periksa `src/src/ds/components/forms.tsx` dan pakai varian yang benar-benar tersedia — `ConfirmDialog.tsx:34` sudah memakai `danger`, jadi seharusnya ada.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/ChangeSourceDialog.tsx src/test/change-source.test.tsx
@@ -1014,7 +1014,7 @@ git commit -m "fix(backlog): dialog Ubah type tak lagi menolak dengan diam; tawa
 - Modify: `internal/docs/README.md`
 - Modify: `internal/docs/adr/0109-*.md` (tautan amandemen)
 
-- [ ] **Step 1: Konfirmasi nomor ADR belum dipakai**
+- [x] **Step 1: Konfirmasi nomor ADR belum dipakai**
 
 ```bash
 ls internal/docs/adr | tail -3
@@ -1022,7 +1022,7 @@ ls internal/docs/adr | tail -3
 
 Expected: nomor tertinggi `0148`. Kalau sudah ada `0149` (worktree tetangga menerbitkannya lebih dulu), pakai nomor berikutnya yang bebas dan **sesuaikan seluruh rujukan ADR-0149** di kode yang sudah ditulis task-task sebelumnya.
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Buat `internal/docs/adr/0149-ubah-type-lintas-alur-dengan-reset.md` mengikuti bentuk ADR tetangganya (baca `0147-kanal-presence-di-socket-sync.md` untuk formatnya). Isi wajib:
 
@@ -1031,11 +1031,11 @@ Buat `internal/docs/adr/0149-ubah-type-lintas-alur-dengan-reset.md` mengikuti be
 - **Konsekuensi:** premis "stage hanya maju" (ADR-0008) ditembus lewat pintu eksplisit kedua — yang pertama revert stage SPEC-167. Sesi hidup menolak operasi (409). Branch remote tak disentuh. Webhook memancarkan `spec.source_changed`, bukan `spec.stage_changed`, untuk update gabungan ini.
 - **Alternatif yang ditolak:** (a) tetap melarang dan hanya memperbaiki umpan baliknya — menyelesaikan gejala bisu tapi membiarkan operator tanpa jalan sama sekali; (b) izinkan lintas-alur tanpa reset — mengembalikan persis kelas bug yang melahirkan ADR-0109.
 
-- [ ] **Step 3: Tautkan**
+- [x] **Step 3: Tautkan**
 
 Tambahkan barisnya di `internal/docs/README.md` pada daftar ADR, dan tambahkan satu baris "Diamandemen ADR-0149" di kepala `internal/docs/adr/0109-*.md`.
 
-- [ ] **Step 4: Verifikasi tautan terjangkau**
+- [x] **Step 4: Verifikasi tautan terjangkau**
 
 ```bash
 grep -n "0149" internal/docs/README.md internal/docs/adr/0109-*.md
@@ -1043,7 +1043,7 @@ grep -n "0149" internal/docs/README.md internal/docs/adr/0109-*.md
 
 Expected: kedua berkas menyebut 0149.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs
@@ -1054,7 +1054,7 @@ git commit -m "docs(adr-0149): amandemen ADR-0109 — lintas-alur boleh, dengan 
 
 ### Task 8: Verifikasi menyeluruh
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -1065,7 +1065,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: seluruhnya PASS.
 
-- [ ] **Step 2: Cari pemakai lama yang ikut patah**
+- [x] **Step 2: Cari pemakai lama yang ikut patah**
 
 ```bash
 grep -rn "checkSourceChange\|changeSpecSource\|onChangeSource" --include='*.ts' --include='*.tsx' \
@@ -1074,7 +1074,7 @@ grep -rn "checkSourceChange\|changeSpecSource\|onChangeSource" --include='*.ts' 
 
 Setiap call site harus sudah cocok dengan tanda tangan barunya. Perhatikan `cli/` dan `sdk/` — kalau ada pemakai di sana, sesuaikan dan jalankan test-nya.
 
-- [ ] **Step 3: Uji endpoint sungguhan di lokal**
+- [x] **Step 3: Uji endpoint sungguhan di lokal**
 
 Boot server, lalu terhadap sebuah item `qa` yang sudah `done` di DB dev:
 
@@ -1087,11 +1087,47 @@ Expected: `{"pending":true,"wouldDelete":[...],"worktree":...,"branch":...}` —
 
 > Pakai DB dev, bukan `~/.hanoman/hanoman.db` produksi operator — operasi ini menghapus berkas.
 
-- [ ] **Step 4: Centang plan & commit**
+- [x] **Step 4: Centang plan & commit**
 
-Centang seluruh `- [ ]` yang selesai di berkas plan ini, lalu:
+Centang seluruh `- [x]` yang selesai di berkas plan ini, lalu:
 
 ```bash
 git add docs/superpowers/plans/2026-08-25-ubah-type-lintas-alur.md
 git commit -m "docs(plan): centang penyelesaian ubah type lintas-alur"
 ```
+
+---
+
+## Catatan pelaksanaan (2026-08-25)
+
+Tiga hal berbeda dari rencana. Semuanya ditemukan oleh test, bukan oleh pembacaan ulang.
+
+1. **`git worktree prune` harus disisipkan** antara pelepasan worktree dan penghapusan branch
+   (Task 3). Rencana mengasumsikan `releaseWorktree` cukup; ternyata `trashWorktree` hanya
+   me-*rename* direktorinya, registrasi di `.git/worktrees/` tetap hidup, dan selama itu git
+   menolak menghapus branch yang masih terhitung ter-checkout. Test `applySpecReset membuang
+   ketiganya` merah tepat di asersi branch. `addWorktree` (runner/src/git.ts:84) memanggil prune
+   di titik yang sama karena alasan yang sama.
+
+2. **Urutan `derived` webhook dibalik**, sesuai instruksi Task 4 Step 5: `eventTypeFor` menjawab
+   `spec.stage_changed` untuk update gabungan, dan asersinya TIDAK dibalik — `source_changed` yang
+   dinaikkan ke urutan pertama.
+
+3. **Prop `onChangeSource` di lapisan LUAR `BacklogScreen` (`:862`) ikut diperbarui.** Rencana
+   hanya menyebut `:137`. Tipe 3-argumen yang lama tetap lolos `tsc` (arity lebih sedikit
+   assignable) sambil berbohong tentang `confirmReset` — kegagalan senyap yang cuma ketahuan lewat
+   sapuan call site di Task 8 Step 2.
+
+Dua test lama ikut diperbarui karena maknanya berubah, bukan karena rusak: `"stage maju tanpa
+baseSha pun terhitung sudah dimulai"` (kini dibuktikan lewat `reset: true`, bukan penolakan) dan
+`"item yang sudah dimulai ditolak 409 ke no_effort"` di blok SPEC-825.
+
+**Verifikasi akhir:** 105 test hijau di sepuluh berkas yang tersentuh; `tsc --noEmit` bersih untuk
+`src` dan `server`; endpoint diuji di server sungguhan (port 3999, DB & repo khusus smoke) — fase
+dry-run mengembalikan daftar konkret dengan nol mutasi, fase konfirmasi memindahkan type,
+mengembalikan item ke `brainstorming`, mengosongkan `baseSha`/`headSha`/`startedAt`, dan benar-benar
+menghapus dokumen fase, worktree, serta branch lokal.
+
+**Catatan lingkungan:** suite ini gagal palsu 8 test (semuanya 404) bila dijalankan dengan env
+warisan shell sesi agen. `NODE_ENV`, `HANOMAN_CONTROL_ORIGINS`, dan `DATABASE_URL` harus di-unset;
+`TEST_DATABASE_URL` per-run tetap wajib.

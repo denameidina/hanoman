@@ -36,6 +36,12 @@ export type TerminalSession = {
 };
 // SPEC-167 · respons dry-run PATCH /specs/:id saat revert akan menghapus artefak.
 export type RevertPending = { pending: true; stage: string; wouldDelete: string[] };
+// ADR-0149 · dry-run perpindahan type LINTAS-ALUR: apa saja yang hilang bila operator lanjut.
+// Daftarnya boleh kosong bertiga — konfirmasi tetap diminta, karena yang disetujui bukan cuma
+// penghapusan melainkan mundurnya item ke `brainstorming`.
+export type SourceResetPending = {
+  pending: true; wouldDelete: string[]; worktree: string | null; branch: string | null;
+};
 // SPEC-170 · dokumen backlog item
 export type DocKind = "audit" | "spec" | "plan" | "objective" | "brainstorm" | "other";
 export type SpecDoc = { kind: DocKind; path: string; name: string };
@@ -223,9 +229,11 @@ export const api = {
     autoMerge?: AutoMerge | null }) =>   // SPEC-486 · ADR-0103 · null = kembali ikut project
     j<Spec | RevertPending>(paths.spec(id), { method: "PATCH", ...body(b) }),
   // SPEC-546 · ADR-0109 · ubah type/source item in-place. `payload` dihilangkan untuk item yang
-  // sudah dimulai (server memakai payload lama apa adanya); 409 = gerbang flow.
-  changeSpecSource: (id: string, b: { source: string; payload?: unknown }) =>
-    j<Spec>(paths.specSource(id), { method: "POST", ...body(b) }),
+  // sudah dimulai & SE-ALUR (server memakai payload lama apa adanya).
+  // ADR-0149 · lintas-alur pada item yang sudah dimulai menjawab `SourceResetPending` sampai
+  // `confirmReset: true` dikirim; 409 `session-live` = ada sesi yang masih berjalan.
+  changeSpecSource: (id: string, b: { source: string; payload?: unknown; confirmReset?: boolean }) =>
+    j<Spec | SourceResetPending>(paths.specSource(id), { method: "POST", ...body(b) }),
   // SPEC-804 · ADR-0120 · tandai item selesai manual. 409 `confirm-required` (detail memuat
   // `session`) = ada sesi hidup; kirim ulang dengan `confirm: true`.
   markSpecDone: (id: string, b: { reason?: string; confirm?: boolean }) =>

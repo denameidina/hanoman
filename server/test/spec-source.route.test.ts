@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
+import * as pty from "../src/services/pty";
 import { resetDb, makeProject, makeSpec } from "./factory";
 
 const app = buildApp({ requireAuth: false });
@@ -63,15 +64,65 @@ describe("SPEC-546 · ADR-0109 · POST /specs/:id/source", () => {
     expect((await post("SPEC-803", { source: "cross-audit" })).statusCode).toBe(400);
   });
 
-  it("item yang SUDAH DIMULAI: brief→help 200, brief→qa 409, brief→help+payload 409", async () => {
+  it("item yang SUDAH DIMULAI: brief→help tetap in-place tanpa konfirmasi apa pun", async () => {
     await makeSpec({ id: "SPEC-804", projectId: "ps", source: "brief", stage: "executing",
       baseSha: "deadbeef", payload: brief });
-    expect((await post("SPEC-804", { source: "qa" })).statusCode).toBe(409);
     expect((await post("SPEC-804", { source: "help", payload: brief })).statusCode).toBe(409);
     const ok = await post("SPEC-804", { source: "help" });
     expect(ok.statusCode).toBe(200);
     expect(ok.json().source).toBe("help");
-    expect(ok.json().payload).toEqual(brief);   // isi tak tersentuh
+    expect(ok.json().payload).toEqual(brief);      // isi tak tersentuh
+    expect(ok.json().stage).toBe("executing");     // ADR-0149 · se-alur TIDAK mereset
+    expect(ok.json().baseSha).toBe("deadbeef");
+  });
+
+  // ADR-0149 · dua fase, cermin `confirmDelete` revert stage SPEC-167.
+  it("lintas-alur tanpa confirmReset = dry-run: pending, dan NOL mutasi", async () => {
+    await makeSpec({ id: "SPEC-820", projectId: "ps", source: "brief", stage: "executing",
+      baseSha: "deadbeef", payload: brief });
+    const r = await post("SPEC-820", { source: "qa" });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().pending).toBe(true);
+    expect(Array.isArray(r.json().wouldDelete)).toBe(true);
+    const row = await prisma.spec.findUnique({ where: { id: "SPEC-820" } });
+    expect(row!.source).toBe("brief");             // belum berpindah
+    expect(row!.stage).toBe("executing");
+    expect(row!.baseSha).toBe("deadbeef");
+    expect(row!.sourceHistory).toBeNull();         // belum ada jejak sama sekali
+  });
+
+  it("lintas-alur dengan confirmReset: type pindah DAN item kembali ke brainstorming", async () => {
+    await makeSpec({ id: "SPEC-821", projectId: "ps", source: "brief", stage: "executing",
+      baseSha: "deadbeef", headSha: "cafe", startedAt: new Date(), payload: brief });
+    const r = await post("SPEC-821", { source: "qa", confirmReset: true });
+    expect(r.statusCode).toBe(200);
+    const body = r.json();
+    expect(body.source).toBe("qa");
+    expect(body.stage).toBe("brainstorming");
+    // baseSha bukan sekadar catatan: ia penanda RESUME sesi berikutnya DAN kunci edit SPEC-186.
+    expect(body.baseSha).toBeNull();
+    expect(body.headSha).toBeNull();
+    expect(body.startedAt).toBeNull();
+    expect(body.payload.actual).toBe("operator buka tiga layar");   // isi ikut dikonversi
+    expect(body.sourceHistory).toHaveLength(1);
+    expect(body.sourceHistory[0]).toMatchObject({ from: "brief", to: "qa" });
+    expect(body.sourceHistory[0].payload).toEqual(brief);           // bentuk lama utuh
+  });
+
+  it("sesi hidup menolak reset — worktree tak boleh lepas di bawah kaki agen", async () => {
+    await makeSpec({ id: "SPEC-822", projectId: "ps", source: "brief", stage: "executing",
+      baseSha: "deadbeef", payload: brief });
+    const spy = vi.spyOn(pty, "listSessions").mockReturnValue(
+      [{ id: "spec_822", specId: "SPEC-822", exited: false, agent: "claude" }] as never);
+    try {
+      const r = await post("SPEC-822", { source: "qa", confirmReset: true });
+      expect(r.statusCode).toBe(409);
+      expect(r.json().error).toBe("session-live");
+      const row = await prisma.spec.findUnique({ where: { id: "SPEC-822" } });
+      expect(row!.source).toBe("brief");   // nol mutasi
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("goal ↔ brief bolak-balik: objective ikut bentuk yang berlaku", async () => {

@@ -39,23 +39,54 @@ describe("SPEC-546 · ADR-0109 · gerbang konversi", () => {
     expect(g.ok && g.payload).toEqual(brief);   // payload tak disentuh
   });
 
-  it("item yang sudah dimulai DITOLAK ke source ber-flow lain", () => {
-    for (const to of ["qa", "audit", "goal"]) {
+  it("item yang sudah dimulai kini BOLEH lintas-alur, ditandai reset", () => {
+    for (const to of ["qa", "audit", "goal", "no_effort"]) {
       const g = checkSourceChange(started, to);
-      expect(g.ok).toBe(false);
-      expect(!g.ok && g.code).toBe(409);
+      expect(g.ok).toBe(true);
+      expect(g.ok && g.reset).toBe(true);
     }
   });
 
-  it("item yang sudah dimulai tak boleh sekalian mengubah payload", () => {
+  it("lintas-alur mengonversi isi seperti item yang belum dimulai", () => {
+    const g = checkSourceChange(started, "qa");
+    expect(g.ok && g.payload).toEqual({
+      severity: "minor", steps: "", expected: "o", actual: "c", env: "", constraints: "k",
+    });
+  });
+
+  it("se-alur TIDAK mereset — brief ↔ help tetap in-place, isi tak tersentuh", () => {
+    const g = checkSourceChange(started, "help");
+    expect(g.ok).toBe(true);
+    expect(g.ok && g.reset).toBe(false);
+    expect(g.ok && g.payload).toEqual(brief);
+  });
+
+  it("item yang belum dimulai tak pernah mereset apa pun", () => {
+    for (const to of ["qa", "audit", "help", "goal", "no_effort"]) {
+      const g = checkSourceChange(fresh, to);
+      expect(g.ok && g.reset).toBe(false);
+    }
+  });
+
+  it("se-alur tetap menolak payload eksplisit — isinya memang tak berpindah", () => {
     const g = checkSourceChange(started, "help", brief);
     expect(g.ok).toBe(false);
     expect(!g.ok && g.code).toBe(409);
   });
 
+  it("lintas-alur MENERIMA payload eksplisit bila bentuknya cocok", () => {
+    const qa = { severity: "critical", steps: "1", expected: "e", actual: "a", env: "prod" };
+    const g = checkSourceChange(started, "qa", qa);
+    expect(g.ok && g.payload).toEqual(qa);
+    expect(g.ok && g.reset).toBe(true);
+  });
+
   it("stage maju tanpa baseSha pun terhitung sudah dimulai (cermin SPEC-186)", () => {
+    // ADR-0149 · "sudah dimulai" tak lagi berarti DITOLAK; ia berarti perpindahan lintas-alur
+    // membawa harga — reset. Yang diuji di sini tetap definisi "sudah dimulai"-nya.
     const g = checkSourceChange({ ...fresh, stage: "planned" }, "qa");
-    expect(g.ok).toBe(false);
+    expect(g.ok).toBe(true);
+    expect(g.ok && g.reset).toBe(true);
   });
 
   it("entri jejak membawa payload LAMA utuh dan menumpuk append-only", () => {
@@ -70,22 +101,22 @@ describe("SPEC-546 · ADR-0109 · gerbang konversi", () => {
   });
 });
 
-// SPEC-825 · gerbang ADR-0109 mengunci FLOW, dan `no_effort` punya flow sendiri — jadi item yang
-// sudah dimulai terkunci dari/ke sana TANPA satu baris gerbang baru. Diuji, bukan diasumsikan:
-// berkas fase item feature tak akan pernah memuaskan phasesComplete(["Kerjakan"]) (bentuk SPEC-433).
+// SPEC-825 · `no_effort` punya flow SENDIRI, jadi perpindahan dari/ke sana pada item berjalan
+// selalu lintas-alur TANPA satu baris gerbang baru. ADR-0149 · akibatnya bukan lagi penolakan
+// melainkan reset — berkas fase item feature yang tak akan pernah memuaskan
+// phasesComplete(["Kerjakan"]) (bentuk SPEC-433) memang dibuang, bukan dibiarkan mengganjal.
 describe("SPEC-825 · no_effort", () => {
   const goal = { goal: "g", done: "d", constraints: "", priority: "sedang" };
 
-  it("item yang sudah dimulai ditolak 409 ke no_effort", () => {
-    expect(checkSourceChange(started, "no_effort")).toEqual({
-      ok: false, code: 409,
-      error: "backlog item sudah dimulai — type hanya bisa pindah ke source dengan flow yang sama",
-    });
+  it("item yang sudah dimulai boleh ke no_effort, dan itu selalu mereset — flow-nya sendiri", () => {
+    const g = checkSourceChange(started, "no_effort");
+    expect(g.ok && g.reset).toBe(true);
   });
 
-  it("item no_effort yang sudah dimulai ditolak ke goal — flow-nya berbeda", () => {
+  it("item no_effort yang sudah dimulai mereset saat ke goal — flow-nya berbeda", () => {
     const startedNoEffort = { source: "no_effort", stage: "executing", baseSha: "abc123", payload: goal };
-    expect(checkSourceChange(startedNoEffort, "goal").ok).toBe(false);
+    const g = checkSourceChange(startedNoEffort, "goal");
+    expect(g.ok && g.reset).toBe(true);
   });
 
   it("item belum dimulai brief → no_effort mengkonversi ke bentuk goal", () => {

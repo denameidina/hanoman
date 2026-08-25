@@ -120,6 +120,11 @@ export const zPatchSpec = z.object({
 export const zChangeSpecSource = z.object({
   source: zSpecSource,
   payload: z.union([zBriefPayload, zQaPayload, zGoalPayload]).optional(),
+  // ADR-0149 · perpindahan LINTAS-ALUR pada item yang sudah dimulai mengembalikan item ke
+  // `brainstorming` dan membuang jejak sesi lamanya. Tanpa flag ini server menjawab dry-run
+  // (`pending` + daftar apa yang hilang) alih-alih mengeksekusi — cermin `confirmDelete` revert
+  // stage SPEC-167. Diabaikan bila perpindahannya memang tak butuh reset.
+  confirmReset: z.boolean().optional(),
 }).superRefine((o, ctx) => {
   if (o.payload !== undefined && !payloadMatchesSource(o.source, o.payload))
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["payload"], message: "bentuk payload tak cocok dengan source" });

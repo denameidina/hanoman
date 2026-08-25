@@ -1,6 +1,10 @@
 # ADR-0109 — Ubah type/source backlog item: operasi khusus, gerbang mengunci flow, jejak berpayload
 
-- Status: accepted
+- Status: accepted, **diamandemen [ADR-0149](0149-ubah-type-lintas-alur-dengan-reset.md)** —
+  kunci flow di bawah ini DICABUT. Item yang sudah dimulai boleh pindah ke type mana pun; yang
+  lintas-alur dikembalikan ke `brainstorming` dan jejak sesi lamanya dibuang, di belakang
+  konfirmasi. Alasan kunci ini (berkas fase yang tak akan pernah memuaskan `phasesComplete`) tetap
+  berlaku — yang berubah obatnya: berkas itu dihapus alih-alih perpindahannya dilarang.
 - Tanggal: 2026-08-06
 - Konteks: SPEC-546
 - Menegakkan: ADR-0018/0019 (turunan vs tersimpan) · ADR-0038 · ADR-0045 · ADR-0064 · ADR-0090 · ADR-0100

@@ -5,7 +5,7 @@ import {
   Card, Badge, Tabs, Select, Button, IconButton, Icon, Checkbox, serverPage, Pager, Modal, StateBlock, Input,
   Field, HnTextarea, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE
 } from "../ds";
-import { api } from "../api/client";
+import { api, type SourceResetPending } from "../api/client";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { SpecAttachmentsPanel, type AttachmentToast } from "./SpecAttachments";
 import { IntegrateDialog } from "./IntegrateDialog";
@@ -133,8 +133,11 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
     // Alasan yang sama dengan onEditDeps: ia menggerbangi apa yang terjadi SESUDAH kerja.
     onEditAutoMerge?: (s: Spec, v: AutoMerge | null) => void;
     // SPEC-546 · ADR-0109 · ubah type/source item in-place. Boleh ditawarkan kapan saja:
-    // gerbangnya (flow, bukan label) ditegakkan server, dan dialog mencerminkannya.
-    onChangeSource?: (s: Spec, source: string, payload?: unknown) => void;
+    // gerbangnya ditegakkan server, dan dialog mencerminkannya.
+    // ADR-0149 · mengembalikan rencana reset (atau null) supaya dialog bisa menampilkan daftar
+    // apa yang hilang dan meminta konfirmasi sebelum satu byte pun terhapus.
+    onChangeSource?: (s: Spec, source: string, payload?: unknown, confirmReset?: boolean)
+      => Promise<SourceResetPending | null> | void;
     projectPolicy?: unknown;   // Project.autoMerge — untuk label "Ikut project (…)"
     allSpecs?: Spec[];
     // SPEC-843 · ADR-0124 · hasil unggah/hapus lampiran. Bentuknya `AttachmentToast`, bukan
@@ -541,11 +544,11 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
       )}
       {/* SPEC-546 · ADR-0109 · dialog pilih source tujuan + form field bentuk barunya. */}
       {showSource && onChangeSource && (
+        // ADR-0149 · dialog yang menutup dirinya sendiri lewat `onClose`: submit PERTAMA pada
+        // jalur reset justru harus membuatnya tetap terbuka untuk menampilkan daftar konfirmasi.
         <ChangeSourceDialog spec={spec} onClose={() => setShowSource(false)}
-          onSubmit={(source, payload) => {
-            setShowSource(false);
-            onChangeSource(spec, source, payload);
-          }} />
+          onSubmit={(source, payload, confirmReset) =>
+            Promise.resolve(onChangeSource(spec, source, payload, confirmReset) ?? null)} />
       )}
     </Modal>
   );
@@ -856,7 +859,11 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     // SPEC-486 · ADR-0103 · ubah kebijakan auto-merge item (null = kembali ikut project).
     onEditAutoMerge?: (s: Spec, v: AutoMerge | null) => void;
     // SPEC-546 · ADR-0109 · ubah type/source item in-place (id/riwayat/dependency tetap).
-    onChangeSource?: (s: Spec, source: string, payload?: unknown) => void;
+    // ADR-0149 · signature harus SAMA dengan yang dipakai `SpecDetail`: tipe 3-argumen tetap
+    // lolos tsc (arity lebih sedikit assignable), jadi ia berbohong tanpa satu pun error —
+    // dan `confirmReset` yang tak terbaca berarti konfirmasi operator tak pernah sampai.
+    onChangeSource?: (s: Spec, source: string, payload?: unknown, confirmReset?: boolean)
+      => Promise<SourceResetPending | null> | void;
     // SPEC-237 · naikkan audit → Finding QA. SPEC-340 · ADR-0076 · + feature brief & PRD;
     // argumen kedua = rekomendasi hanoman yang terbaca dari dokumen audit (bisa null).
     onPromoteToQa?: (s: Spec, e: AuditEscalation | null) => void;

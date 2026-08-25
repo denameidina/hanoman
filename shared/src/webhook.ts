@@ -97,15 +97,20 @@ export const WEBHOOK_ENTITIES: WebhookEntityDef[] = [
       updated: { type: "spec.updated", label: "Backlog diubah", when: "Field backlog selain stage berubah: judul, objective, prioritas, dependency, branch, atau SHA basis/ujung." },
       deleted: { type: "spec.deleted", label: "Backlog dihapus", when: "Item backlog dihapus operator." },
     },
+    // URUTAN BERARTI: `eventTypeFor` memakai yang PERTAMA cocok, dan sejak ADR-0149 sebuah update
+    // bisa mengubah `source` dan `stage` sekaligus (perpindahan type lintas-alur mengembalikan
+    // item ke `brainstorming`). Untuk update gabungan itu jawabannya harus `source_changed`:
+    // perpindahan type-lah yang MENYEBABKAN stage mundur, bukan sebaliknya, dan penerima yang
+    // cuma diberi tahu "stage berpindah" akan mengira item ini di-revert manual.
     derived: [{
-      type: "spec.stage_changed", label: "Stage backlog berpindah", changed: ["stage"],
-      when: "Stage berpindah — baik oleh fase sesi yang tercatat (otomatis) maupun revert manual operator. Menggantikan spec.updated untuk perubahan itu.",
-    }, {
       // SPEC-546 · ADR-0109 · konversi type item. Pola yang sama dengan stage_changed: peristiwa
       // turunan MENGGANTIKAN spec.updated, supaya penerima bisa bereaksi pada "type berpindah"
       // tanpa mendiff dua amplop.
       type: "spec.source_changed", label: "Type backlog berpindah", changed: ["source"],
-      when: "Type/source item backlog dikonversi lewat POST /specs/:id/source (mis. brief → qa). Menggantikan spec.updated untuk perubahan itu.",
+      when: "Type/source item backlog dikonversi lewat POST /specs/:id/source (mis. brief → qa). Menggantikan spec.updated untuk perubahan itu, dan menang atas spec.stage_changed bila konversinya sekalian mengembalikan item ke brainstorming (ADR-0149).",
+    }, {
+      type: "spec.stage_changed", label: "Stage backlog berpindah", changed: ["stage"],
+      when: "Stage berpindah — baik oleh fase sesi yang tercatat (otomatis) maupun revert manual operator. Menggantikan spec.updated untuk perubahan itu.",
     }],
     sample: {
       id: "SPEC-481", projectId: "hanoman", title: "Webhook keluar untuk setiap perubahan",

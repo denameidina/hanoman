@@ -14,6 +14,9 @@ import { nextSpecId } from "../services/id";
 import { deriveSpecFields } from "../services/spec-fields";
 // SPEC-546 · ADR-0109 · gerbang & perakit jejak konversi type (murni, teruji tanpa harness).
 import { checkSourceChange, sourceChangeEntry, appendSourceHistory } from "../services/spec-source";
+// ADR-0149 · efek samping reset lintas-alur (dokumen fase, worktree, branch) — urutannya mengikat
+// dan hidup di sana, bukan di sini.
+import { planSpecReset, applySpecReset, type ResetPlan } from "../services/spec-reset";
 import { recordSourceChange } from "../services/notifications";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
@@ -260,6 +263,27 @@ export default async function (app: FastifyInstance) {
     if (to === spec.source) return reply.code(400).send({ error: "source tak berubah" });
     const gate = checkSourceChange(spec, to, parsed.data.payload);
     if (!gate.ok) return reply.code(gate.code).send({ error: gate.error });
+
+    // ADR-0149 · perpindahan LINTAS-ALUR pada item yang sudah dimulai mengembalikannya ke titik
+    // nol. Dua langkah, cermin `confirmDelete` revert stage SPEC-167: operator harus melihat
+    // daftar konkret apa yang hilang sebelum satu byte pun tersentuh.
+    let plan: ResetPlan | null = null;
+    if (gate.reset) {
+      // Yang ditanya: adakah pane yang MENGAKU mengerjakan item ini — properti `specId` pane,
+      // bukan tebakan atas nama sesinya (pola `POST /specs/:id/done`). Melepas worktree di bawah
+      // agen yang sedang mengetik adalah kelas bug "worktree pruned mid-run".
+      const live = listSessions().find((s) => s.specId === id && !s.exited);
+      if (live)
+        return reply.code(409).send({ error: "session-live", session: { id: live.id, agent: live.agent } });
+      plan = await planSpecReset(spec);
+      // Konfirmasi diminta WALAU ketiga daftarnya kosong: yang dikonfirmasi bukan cuma
+      // penghapusan, melainkan mundurnya stage.
+      if (parsed.data.confirmReset !== true)
+        return reply.send({
+          pending: true, wouldDelete: plan.wouldDelete, worktree: plan.worktree, branch: plan.branch,
+        });
+    }
+
     const by = req.user?.email ?? "system";
     const history = appendSourceHistory(
       spec.sourceHistory, sourceChangeEntry(spec, to, by, new Date()));
@@ -267,6 +291,9 @@ export default async function (app: FastifyInstance) {
     // prioritas ke `severity`, konversi ke goal membuat objective = goal-nya.
     const { priority, objective } = deriveSpecFields(
       to, gate.payload, (gate.payload.priority as string) ?? spec.priority);
+    // ADR-0149 · git & disk dibereskan SEBELUM baris DB berubah: begitu stage jadi
+    // `brainstorming`, kunci `spec-open` menyala dan branch sesi tak bisa dihapus jalur mana pun.
+    if (plan) await applySpecReset(spec, plan);
     // `author` SENGAJA tak disentuh: prefix `QA ·`/`Audit ·`/`Goal ·` menjawab *siapa yang
     // memfilekan item ini dan lewat pintu mana* — fakta historis, cermin `createdAt` ADR-0090
     // yang tak pernah ditulis route. Lencana type yang dilihat operator memang berpindah.
@@ -275,6 +302,11 @@ export default async function (app: FastifyInstance) {
       data: {
         source: to, payload: gate.payload as Prisma.InputJsonValue, priority, objective,
         sourceHistory: history as unknown as Prisma.InputJsonValue,
+        // ADR-0149 · `baseSha` bukan sekadar catatan: `session-launch.ts` memakainya sebagai
+        // penanda RESUME, dan `PATCH /specs/:id` sebagai kunci edit konten SPEC-186.
+        // Meninggalkannya berarti item "yang sudah kembali ke brainstorming" tetap melanjutkan
+        // worktree lama dan tetap tak bisa diedit isinya — reset yang cuma kelihatan.
+        ...(plan ? { stage: "brainstorming", baseSha: null, headSha: null, startedAt: null } : {}),
       },
     });
     await recordSourceChange(spec.id, spec.projectId, spec.title, spec.source, to, history.length);
