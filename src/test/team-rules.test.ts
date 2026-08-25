@@ -3,6 +3,7 @@ import type { TaskView } from "@hanoman/shared";
 import {
   TEAM_COLUMNS, emptyBoard, canDropTask, nextOrder, moveCard, replaceCard,
   dateInputValue, dateInputToIso, taskSpan, taskDates,
+  timelineWindow, zoomCell, MAX_TICKS,
 } from "../src/screens/team-rules";
 
 const task = (over: Partial<TaskView> = {}): TaskView => ({
@@ -162,5 +163,90 @@ describe("taskDates", () => {
     expect(taskDates(task({ dueDate: "2026-09-03T12:00:00.000Z" }))).toBe("→ 3 Sep");
     expect(taskDates(task({ startDate: "2026-09-01T12:00:00.000Z" }))).toBe("1 Sep");
     expect(taskDates(task())).toBeNull();
+  });
+});
+
+describe("timelineWindow", () => {
+  const DAY = 86_400_000;
+  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  // 2026-09-12 adalah SABTU — dipilih supaya pembulatan ke Senin benar-benar bergerak.
+  const TODAY = at("2026-09-12");
+  const span = (a: string, b: string) => ({ start: at(a), end: at(b) + DAY, invalid: false });
+
+  it("papan tanpa tanggal tetap punya sumbu, dan sumbu itu memuat HARI INI", () => {
+    const w = timelineWindow([], "day", TODAY);
+    expect(w.ticks.length).toBe(14);
+    expect(w.from).toBeLessThanOrEqual(TODAY);
+    expect(w.to).toBeGreaterThan(TODAY);
+  });
+
+  it("zoom hari: tick minimum 14, satu tick = satu hari", () => {
+    const w = timelineWindow([span("2026-09-10", "2026-09-11")], "day", TODAY);
+    expect(w.ticks.length).toBe(14);
+    expect(w.ticks[1]!.start - w.ticks[0]!.start).toBe(DAY);
+  });
+
+  it("zoom minggu dibulatkan ke SENIN, bukan ke hari data", () => {
+    const w = timelineWindow([span("2026-09-12", "2026-09-12")], "week", TODAY);
+    // 2026-09-12 Sabtu → Senin sebelumnya 2026-09-07.
+    expect(w.from).toBe(at("2026-09-07"));
+    expect(new Date(w.from).getUTCDay()).toBe(1);
+    expect(w.ticks[1]!.start - w.ticks[0]!.start).toBe(7 * DAY);
+  });
+
+  it("zoom bulan dibulatkan ke tanggal 1 dan ticknya satuan KALENDER", () => {
+    const w = timelineWindow([span("2026-09-20", "2026-12-05")], "month", TODAY);
+    expect(w.from).toBe(at("2026-09-01"));
+    expect(w.ticks[0]!.start).toBe(at("2026-09-01"));
+    expect(w.ticks[1]!.start).toBe(at("2026-10-01"));
+    // Sep 30 hari, Okt 31 — tick bulan memang TIDAK sama lebar dalam hari.
+    expect(w.ticks[1]!.start - w.ticks[0]!.start).toBe(30 * DAY);
+    expect(w.ticks[2]!.start - w.ticks[1]!.start).toBe(31 * DAY);
+  });
+
+  it("jendela MENUTUPI seluruh data, bukan cuma tick minimum", () => {
+    const w = timelineWindow([span("2026-09-01", "2026-11-30")], "day", TODAY);
+    expect(w.from).toBeLessThanOrEqual(at("2026-09-01"));
+    expect(w.to).toBeGreaterThan(at("2026-11-30"));
+  });
+
+  it("hari ini selalu termuat meski seluruh tugas di masa lalu", () => {
+    const w = timelineWindow([span("2026-06-01", "2026-06-05")], "week", TODAY);
+    expect(w.from).toBeLessThanOrEqual(at("2026-06-01"));
+    expect(w.to).toBeGreaterThan(TODAY);
+  });
+
+  /* Tanpa plafon, satu task bertanggal 2031 di zoom hari melahirkan ±2 000 sel header dan kanvas
+     selebar 70 000 px. Yang jatuh di luar DIDAFTAR oleh `timelineRows`, bukan dihilangkan. */
+  it("plafon tick melindungi DOM, jendela tetap berjangkar di mulai paling awal", () => {
+    const w = timelineWindow([span("2026-09-01", "2031-01-01")], "day", TODAY);
+    expect(w.ticks.length).toBe(MAX_TICKS);
+    expect(w.from).toBe(at("2026-09-01"));
+    expect(w.to).toBeLessThan(at("2031-01-01"));
+  });
+
+  it("`to` adalah akhir tick terakhir — 100% kanvas persis sepanjang tick", () => {
+    const w = timelineWindow([], "week", TODAY);
+    expect(w.to).toBe(w.ticks[w.ticks.length - 1]!.start + 7 * DAY);
+  });
+
+  it("tick major menandai awal bulan di zoom hari dan awal tahun di zoom bulan", () => {
+    const d = timelineWindow([span("2026-09-25", "2026-10-05")], "day", at("2026-09-25"));
+    expect(d.ticks.find((t) => t.start === at("2026-10-01"))!.major).toBe(true);
+    expect(d.ticks.find((t) => t.start === at("2026-09-26"))!.major).toBe(false);
+    const m = timelineWindow([span("2026-11-01", "2027-03-01")], "month", at("2026-11-01"));
+    expect(m.ticks.find((t) => t.start === at("2027-01-01"))!.major).toBe(true);
+    expect(m.ticks.find((t) => t.start === at("2026-12-01"))!.major).toBe(false);
+  });
+
+  it("label tick tak bergeser sehari — dibentuk di UTC", () => {
+    const w = timelineWindow([span("2026-09-01", "2026-09-02")], "day", at("2026-09-01"));
+    expect(w.ticks[0]!.label).toContain("1");
+    expect(w.ticks[0]!.label).toContain("Sep");
+  });
+
+  it("zoom mengembalikan lebar sel yang berbeda per satuan", () => {
+    expect(zoomCell("day")).toBeLessThan(zoomCell("week"));
+    expect(zoomCell("week")).toBeLessThan(zoomCell("month"));
   });
 });

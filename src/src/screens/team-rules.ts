@@ -142,3 +142,101 @@ export function taskDates(t: Pick<TaskView, "startDate" | "dueDate">): string | 
   if (b) return `→ ${b}`;
   return a;
 }
+
+export const TIMELINE_ZOOMS = ["day", "week", "month"] as const;
+export type TimelineZoom = (typeof TIMELINE_ZOOMS)[number];
+
+/** Lebar sel & panjang sumbu minimum per zoom. Minimum ada supaya papan yang seluruh tugasnya
+    jatuh di satu minggu tetap punya sumbu yang bisa dibaca, bukan satu sel selebar layar. */
+const ZOOM: Record<TimelineZoom, { cell: number; minTicks: number }> = {
+  day: { cell: 34, minTicks: 14 },
+  week: { cell: 56, minTicks: 8 },
+  month: { cell: 84, minTicks: 6 },
+};
+export const zoomCell = (zoom: TimelineZoom): number => ZOOM[zoom].cell;
+
+/**
+ * Plafon jumlah sel header. Tanpa ini satu task bertanggal 2031 di zoom hari melahirkan ±2 000 sel
+ * dan kanvas selebar 70 000 px. Task yang lalu jatuh di luar jendela **didaftar** di bawah kanvas
+ * (`timelineRows`) — plafon yang menghilangkan baris tanpa jejak adalah kelas bug yang sudah
+ * dijawab ADR-0151 dengan "menampilkan N dari M".
+ */
+export const MAX_TICKS = 120;
+
+export type TimelineTick = { start: number; label: string; major: boolean };
+export type TimelineWindow = {
+  from: number; to: number; zoom: TimelineZoom; ticks: TimelineTick[];
+};
+
+/** Awal satuan zoom yang MEMUAT `ms`. Minggu mulai **Senin** (ISO, dan konvensi kerja di sini);
+    `getUTCDay()` memberi 0 untuk Minggu, jadi pergeserannya `(hari + 6) % 7`. */
+const unitStart = (ms: number, zoom: TimelineZoom): number => {
+  const d = dayStart(ms);
+  if (zoom === "day") return d;
+  if (zoom === "week") return d - ((new Date(d).getUTCDay() + 6) % 7) * DAY;
+  const t = new Date(d);
+  return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1);
+};
+
+/** Satuan bulan adalah satuan **kalender**, bukan 30 hari — jadi tick bulan tak sama lebar dalam
+    hari. Itulah sebabnya batang diposisikan oleh WAKTU (persen) sementara gridline oleh PIKSEL:
+    di zoom bulan, garis grid adalah penanda bulan, bukan koordinat presisi batang. */
+const nextUnit = (ms: number, zoom: TimelineZoom): number => {
+  if (zoom === "day") return ms + DAY;
+  if (zoom === "week") return ms + 7 * DAY;
+  const t = new Date(ms);
+  return Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 1);
+};
+
+// `timeZone: "UTC"` di keempatnya: tanpa itu label bergeser sehari di zona barat, dan sumbu yang
+// menyebut tanggal yang salah adalah bug yang tak memunculkan satu pun error.
+const TICK_D = new Intl.DateTimeFormat("id-ID", { day: "numeric", timeZone: "UTC" });
+const TICK_DM = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "UTC" });
+const TICK_M = new Intl.DateTimeFormat("id-ID", { month: "short", timeZone: "UTC" });
+const TICK_MY = new Intl.DateTimeFormat("id-ID", { month: "short", year: "2-digit", timeZone: "UTC" });
+
+/** Tick yang mendapat garis lebih tegas — satu-satunya cara membaca sumbu panjang tanpa menghitung
+    sel satu per satu. Di zoom minggu penandanya "minggu yang memuat tanggal 1". */
+const tickMajor = (ms: number, zoom: TimelineZoom): boolean => {
+  const d = new Date(ms);
+  if (zoom === "day") return d.getUTCDate() === 1;
+  if (zoom === "week") return d.getUTCDate() <= 7;
+  return d.getUTCMonth() === 0;
+};
+
+const tickLabel = (ms: number, zoom: TimelineZoom, major: boolean): string => {
+  const d = new Date(ms);
+  if (zoom === "day") return (major ? TICK_DM : TICK_D).format(d);
+  if (zoom === "week") return TICK_DM.format(d);
+  return (major ? TICK_MY : TICK_M).format(d);
+};
+
+/**
+ * Jendela lahir dari **data ∪ hari ini**, dibulatkan keluar ke batas satuan zoom.
+ *
+ * Jendela tetap ("hari ini ± N") membuat papan berisi rencana kuartal depan tampak kosong; jendela
+ * dari data saja membuat papan yang seluruh tugasnya bulan lalu tak memperlihatkan "sekarang".
+ */
+export function timelineWindow(
+  spans: TaskSpan[], zoom: TimelineZoom, today: number,
+): TimelineWindow {
+  const t = dayStart(today);
+  let lo = t;
+  let hi = t + DAY;
+  for (const s of spans) {
+    if (s.start < lo) lo = s.start;
+    if (s.end > hi) hi = s.end;
+  }
+  const from = unitStart(lo, zoom);
+  const { minTicks } = ZOOM[zoom];
+  const ticks: TimelineTick[] = [];
+  let cur = from;
+  // Berhenti saat sumbu sudah MENUTUPI `hi` DAN sudah mencapai tick minimum — jendela sempit tetap
+  // terbaca, jendela lebar tetap memuat seluruh data sampai plafon.
+  while (ticks.length < MAX_TICKS && (cur < hi || ticks.length < minTicks)) {
+    const major = tickMajor(cur, zoom);
+    ticks.push({ start: cur, label: tickLabel(cur, zoom, major), major });
+    cur = nextUnit(cur, zoom);
+  }
+  return { from, to: cur, zoom, ticks };
+}

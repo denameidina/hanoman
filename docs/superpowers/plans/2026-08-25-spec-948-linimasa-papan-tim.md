@@ -251,7 +251,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `zoomCell(zoom: TimelineZoom): number`
   - `MAX_TICKS: number` (nilainya `120`)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan `timelineWindow, zoomCell, MAX_TICKS` ke impor `src/test/team-rules.test.ts`, lalu tambahkan di akhir berkas:
 
@@ -342,12 +342,12 @@ describe("timelineWindow", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `cd src && pnpm vitest --run test/team-rules.test.ts`
 Expected: FAIL — `timelineWindow is not a function`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Tambahkan di akhir `src/src/screens/team-rules.ts`:
 
@@ -451,12 +451,12 @@ export function timelineWindow(
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `cd src && pnpm vitest --run test/team-rules.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/team-rules.ts src/test/team-rules.test.ts
