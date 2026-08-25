@@ -217,14 +217,25 @@ textarea:focus-visible,
     text-transform: uppercase;
   }
   .hn-project-row > [data-label="Aktivitas"] { white-space: normal !important; }
+  /* SPEC-946 · toolbar papan Tim memakai aturan yang SAMA. Kelasnya dinamai sendiri, bukan
+     meminjam `.hn-backlog-*`: layar yang meminjam nama layar lain adalah cara aturan mulai
+     berubah untuk satu layar dan diam-diam ikut mengubah yang lain. */
   .hn-backlog-topline,
+  .hn-team-topline,
   .hn-backlog-view-actions,
-  .hn-backlog-filters { align-items: stretch !important; }
+  .hn-team-view-actions,
+  .hn-backlog-filters,
+  .hn-team-filters { align-items: stretch !important; }
   .hn-backlog-topline > *,
+  .hn-team-topline > *,
   .hn-backlog-view-actions > *,
-  .hn-backlog-filters > * { max-width: 100%; }
-  .hn-backlog-view-actions { flex-wrap: wrap; }
-  .hn-backlog-filters .hn-touch-target { flex: 1 1 145px !important; width: auto !important; }
+  .hn-team-view-actions > *,
+  .hn-backlog-filters > *,
+  .hn-team-filters > * { max-width: 100%; }
+  .hn-backlog-view-actions,
+  .hn-team-view-actions { flex-wrap: wrap; }
+  .hn-backlog-filters .hn-touch-target,
+  .hn-team-filters .hn-touch-target { flex: 1 1 145px !important; width: auto !important; }
   .hn-backlog-grid { grid-template-columns: minmax(0, 1fr) !important; }
   .hn-backlog-row { align-items: flex-start !important; flex-wrap: wrap; }
   .hn-backlog-row > div { flex-basis: 100% !important; }
