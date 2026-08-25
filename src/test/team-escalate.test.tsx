@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { TaskView } from "@hanoman/shared";
 import { EscalateDialog } from "../src/screens/EscalateDialog";
+import { TeamScreen } from "../src/screens/TeamScreen";
 import { api } from "../src/api/client";
 
 const task = (over: Partial<TaskView> = {}): TaskView => ({
@@ -93,5 +94,35 @@ describe("EscalateDialog", () => {
     expect(onToast.mock.calls[0]![1]).toBe("err");
     expect(onClose).not.toHaveBeenCalled();
     expect(submit()).toBeInTheDocument();
+  });
+});
+
+const page = (items: TaskView[]) => ({ items, total: items.length, page: 1, pageSize: 200 });
+
+describe("TeamScreen · wiring eskalasi", () => {
+  beforeEach(() => {
+    vi.spyOn(api, "listMembers").mockResolvedValue(page([]) as any);
+  });
+
+  it("klik Eskalasi membuka dialog untuk kartu itu", async () => {
+    vi.spyOn(api, "listTasks").mockImplementation(async (p: any) =>
+      page(p.status === "doing" ? [task()] : []) as any);
+    render(<TeamScreen projects={projects} projectFilter="all"
+      onProjectFilter={() => {}} onToast={() => {}} />);
+    fireEvent.click(await screen.findByRole("button", { name: /eskalasi ke backlog/i }));
+    expect(await screen.findByLabelText(/source/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/prioritas/i)).toBeInTheDocument();
+  });
+
+  it("klik Lepas tautan memanggil API dan mengosongkan lencana di papan", async () => {
+    const linked = task({ specId: "SPEC-9", spec: { id: "SPEC-9", stage: "executing", priority: "tinggi" } });
+    vi.spyOn(api, "listTasks").mockImplementation(async (p: any) =>
+      page(p.status === "doing" ? [linked] : []) as any);
+    const spy = vi.spyOn(api, "unlinkTaskSpec").mockResolvedValue(task({ specId: null }));
+    render(<TeamScreen projects={projects} projectFilter="all"
+      onProjectFilter={() => {}} onToast={() => {}} />);
+    fireEvent.click(await screen.findByRole("button", { name: /lepas tautan/i }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith("t1"));
+    await waitFor(() => expect(screen.queryByText("SPEC-9 · executing")).toBeNull());
   });
 });

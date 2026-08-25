@@ -1,6 +1,6 @@
 import React from "react";
 import type { CreateTaskInput, MemberView, TaskStatus, TaskView } from "@hanoman/shared";
-import { Badge, Icon, Select, LIST_SCROLL_STYLE, FIXED_ROW_STYLE } from "../ds";
+import { Badge, Button, Icon, Select, LIST_SCROLL_STYLE, FIXED_ROW_STYLE } from "../ds";
 import { TEAM_COLUMNS, canDropTask, type Board } from "./team-rules";
 
 /* SPEC-946 · papan kanban MANUSIA. Kolomnya `Task.status` — milik manusia — bukan `Spec.stage`
@@ -34,12 +34,15 @@ export function taskDates(t: TaskView): string | null {
   return a;
 }
 
-function TaskCard({ task, members, dragging, onDragStart, onDragEnd, onOpen, onMove, onAssign }: {
+function TaskCard({ task, members, dragging, onDragStart, onDragEnd, onOpen, onMove, onAssign,
+  onEscalate, onUnlink }: {
   task: TaskView; members: MemberView[]; dragging: boolean;
   onDragStart: () => void; onDragEnd: () => void;
   onOpen: (t: TaskView) => void;
   onMove: (t: TaskView, to: TaskStatus) => void;
   onAssign: (t: TaskView, memberId: string | null) => void;
+  onEscalate: (t: TaskView) => void;
+  onUnlink: (t: TaskView) => void;
 }) {
   // Anggota bisa lenyap dari daftar sebelum kartunya menyusul (frame sync mendahului). Yang
   // dirender tetap kalimat manusia, bukan id mentah.
@@ -82,15 +85,27 @@ function TaskCard({ task, members, dragging, onDragStart, onDragEnd, onOpen, onM
         <span>{assignee}</span>
         {dates && <><span aria-hidden="true">·</span><span>{dates}</span></>}
       </div>
-      {task.specId && (
-        <div style={{ marginTop: 6 }}>
-          {/* ADR-0150 keputusan 5 · `specId` terisi tanpa `spec` = tautan putus. Bedanya dengan
-              "tak pernah dieskalasi" harus terlihat; aksinya milik item C. */}
-          <Badge tone={task.spec ? "ok" : "warn"} size="sm" icon={task.spec ? "link" : "unlink"}>
-            {task.spec ? `${task.spec.id} · ${task.spec.stage}` : "tautan putus"}
-          </Badge>
-        </div>
-      )}
+      {/* SPEC-947 · satu baris, dua keadaan. `aria-label` memuat judul supaya papan berisi banyak
+          kartu tetap punya nama yang unik bagi pembaca layar DAN bagi test — cermin dua Select
+          di bawah. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+        {task.specId ? (
+          <>
+            {/* ADR-0150 keputusan 5 · `specId` terisi tanpa `spec` = tautan putus. Bedanya dengan
+                "tak pernah dieskalasi" harus terlihat, bukan diam-diam kosong. */}
+            <Badge tone={task.spec ? "ok" : "warn"} size="sm" icon={task.spec ? "link" : "unlink"}>
+              {task.spec ? `${task.spec.id} · ${task.spec.stage}` : "tautan putus"}
+            </Badge>
+            <Button size="sm" variant="ghost" leftIcon="unlink"
+              aria-label={`Lepas tautan: ${task.title}`}
+              onClick={() => onUnlink(task)}>Lepas tautan</Button>
+          </>
+        ) : (
+          <Button size="sm" variant="ghost" leftIcon="git-branch"
+            aria-label={`Eskalasi ke backlog: ${task.title}`}
+            onClick={() => onEscalate(task)}>Eskalasi</Button>
+        )}
+      </div>
       {/* Drag HTML5 mati total di keyboard dan di layar sentuh. Dua Select ini bukan hiasan —
           di sana merekalah satu-satunya jalan. `aria-label` memuat judul supaya papan berisi
           banyak kartu tetap punya nama yang unik bagi pembaca layar DAN bagi test. */}
@@ -109,13 +124,16 @@ function TaskCard({ task, members, dragging, onDragStart, onDragEnd, onOpen, onM
   );
 }
 
-export function TeamBoard({ board, totals, columns, members, onMove, onAssign, onOpen }: {
+export function TeamBoard({ board, totals, columns, members, onMove, onAssign, onOpen,
+  onEscalate, onUnlink }: {
   board: Board; totals: Record<TaskStatus, number>;
   columns: { key: TaskStatus; label: string }[];
   members: MemberView[];
   onMove: (t: TaskView, to: TaskStatus) => void;
   onAssign: (t: TaskView, memberId: string | null) => void;
   onOpen: (t: TaskView) => void;
+  onEscalate: (t: TaskView) => void;
+  onUnlink: (t: TaskView) => void;
 }) {
   const [drag, setDrag] = React.useState<{ task: TaskView; from: TaskStatus } | null>(null);
   const [over, setOver] = React.useState<TaskStatus | null>(null);
@@ -169,7 +187,8 @@ export function TeamBoard({ board, totals, columns, members, onMove, onAssign, o
                   dragging={drag?.task.id === t.id}
                   onDragStart={() => setDrag({ task: t, from: c.key })}
                   onDragEnd={() => { setDrag(null); setOver(null); }}
-                  onOpen={onOpen} onMove={onMove} onAssign={onAssign} />
+                  onOpen={onOpen} onMove={onMove} onAssign={onAssign}
+                  onEscalate={onEscalate} onUnlink={onUnlink} />
               ))}
             </div>
             {/* Plafon langganan 200/kolom (ADR-0151). Papan yang diam-diam memotong terbaca

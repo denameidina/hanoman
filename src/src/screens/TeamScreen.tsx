@@ -9,6 +9,7 @@ import { useLiveTopic } from "../api/live";
 import { SyncButton } from "./SyncButton";
 import { TeamBoard } from "./team-board";
 import { TaskModal } from "./TaskModal";
+import { EscalateDialog } from "./EscalateDialog";
 import { MembersPanel } from "./MembersPanel";
 import { TEAM_COLUMNS, emptyBoard, moveCard, nextOrder, replaceCard, type Board } from "./team-rules";
 import { usePersistedState, ResetViewButton, isStr, oneOf } from "../ui-state";
@@ -73,6 +74,7 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
   const [editing, setEditing] = React.useState<TaskView | null>(null);
   const [taskOpen, setTaskOpen] = React.useState(false);
   const [membersOpen, setMembersOpen] = React.useState(false);
+  const [escalating, setEscalating] = React.useState<TaskView | null>(null);
 
   // SPEC-740 · ADR-0115 · state tampilan layar ini persisten berkunci `team`. Tak ada `page`:
   // papan tidak dipaginasi.
@@ -182,6 +184,21 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
     }
   }
 
+  // SPEC-947 · lepas tautan tak butuh konfirmasi: ia non-destruktif (Spec dibiarkan) dan
+  // reversibel lewat eskalasi ulang, jadi dialog di sini hanya menambah klik untuk tindakan
+  // yang murah.
+  async function unlink(task: TaskView) {
+    const before = board;
+    setBoard(replaceCard(board, { ...task, specId: null, spec: null }));
+    try {
+      await api.unlinkTaskSpec(task.id);
+      onToast("Tautan backlog dilepas", "ok", "unlink");
+    } catch {
+      setBoard(before);
+      onToast("Gagal melepas tautan", "err", "x-circle");
+    }
+  }
+
   const empty = columns.every((c) => board[c.key].length === 0);
 
   return (
@@ -245,7 +262,7 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
             hint="Catat pekerjaan manusia di sekitar sesi agen — desain, meeting klien, deploy, nego."
             action={() => { setEditing(null); setTaskOpen(true); }} actionLabel="Tugas baru" actionIcon="plus" />
         : <TeamBoard board={board} totals={totals} columns={columns} members={members}
-            onMove={move} onAssign={assign}
+            onMove={move} onAssign={assign} onEscalate={setEscalating} onUnlink={unlink}
             onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />}
 
       <TaskModal open={taskOpen} task={editing} projects={projects} members={members}
@@ -253,6 +270,14 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
         orderFor={(s) => nextOrder(board[s])}
         onClose={() => { setTaskOpen(false); setEditing(null); }}
         onSaved={refetchSilently} onToast={onToast} />
+      {escalating && (
+        <EscalateDialog task={escalating} projects={projects}
+          onClose={() => setEscalating(null)}
+          // Kartu dari server dipakai LANGSUNG: `projectId` bisa ikut berubah (kartu tanpa project
+          // yang dieskalasi ikut pindah), jadi menambal `specId` saja akan meleset.
+          onDone={(t) => setBoard((b) => replaceCard(b, t))}
+          onToast={onToast} />
+      )}
       <MembersPanel open={membersOpen} onClose={() => setMembersOpen(false)}
         onChanged={setMembers} onToast={onToast} />
     </div>

@@ -21,10 +21,11 @@ const zeros = { backlog: 0, doing: 0, review: 0, done: 0 } as Record<TaskStatus,
 
 function board(over: Partial<Board>, totals: Partial<Record<TaskStatus, number>> = {}) {
   const b = { ...emptyBoard(), ...over };
-  const onMove = vi.fn(), onAssign = vi.fn(), onOpen = vi.fn();
+  const onMove = vi.fn(), onAssign = vi.fn(), onOpen = vi.fn(), onEscalate = vi.fn(), onUnlink = vi.fn();
   render(<TeamBoard board={b} totals={{ ...zeros, ...totals }} columns={TEAM_COLUMNS}
-    members={[member("a@x.id", "Dena")]} onMove={onMove} onAssign={onAssign} onOpen={onOpen} />);
-  return { onMove, onAssign, onOpen };
+    members={[member("a@x.id", "Dena")]} onMove={onMove} onAssign={onAssign} onOpen={onOpen}
+    onEscalate={onEscalate} onUnlink={onUnlink} />);
+  return { onMove, onAssign, onOpen, onEscalate, onUnlink };
 }
 const column = (key: TaskStatus) => screen.getByTestId(`team-col-${key}`);
 
@@ -129,5 +130,33 @@ describe("TeamBoard · isi kartu", () => {
     ] });
     expect(screen.getByTestId("team-card-a")).toHaveTextContent("SPEC-1");
     expect(screen.getByTestId("team-card-b")).toHaveTextContent("tautan putus");
+  });
+});
+
+/* SPEC-947 · jembatan ke dunia agen. Aksi eksplisit, bukan menu: drag mati di keyboard dan layar
+   sentuh, dan alasan itu pula yang sudah melahirkan dua Select di kartu. */
+describe("TeamBoard · eskalasi", () => {
+  it("kartu belum tertaut membawa aksi Eskalasi", () => {
+    const { onEscalate } = board({ backlog: [task({ id: "a" })] });
+    fireEvent.click(screen.getByRole("button", { name: /eskalasi.*desain/i }));
+    expect(onEscalate).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+  });
+
+  it("kartu tertaut merender lencana SPEC + aksi Lepas tautan, TANPA aksi eskalasi", () => {
+    const { onUnlink } = board({ backlog: [task({
+      id: "a", specId: "SPEC-9", spec: { id: "SPEC-9", stage: "executing", priority: "tinggi" } })] });
+    expect(screen.getByText("SPEC-9 · executing")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /eskalasi/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /lepas tautan.*desain/i }));
+    expect(onUnlink).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+  });
+
+  // `specId` terisi + `spec` null = tautan putus. Yang ditawarkan lepas tautan, bukan eskalasi
+  // ulang: operator perlu melihat keadaan itu dulu.
+  it("tautan putus merender lencananya + aksi Lepas tautan", () => {
+    const { onUnlink } = board({ backlog: [task({ id: "a", specId: "SPEC-hantu", spec: null })] });
+    expect(screen.getByText(/tautan putus/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /lepas tautan.*desain/i }));
+    expect(onUnlink).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
   });
 });
