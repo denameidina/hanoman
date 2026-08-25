@@ -253,11 +253,12 @@ export type BarGeometry = {
 };
 
 /**
- * Tanggal menjadi `{left%, width%}` dengan clamping di kedua tepi jendela.
+ * Rentang menjadi `{left%, width%}` dengan clamping di kedua tepi jendela.
  *
- * `null` berarti **tak ada batang di jendela ini** — task tanpa tanggal, atau rentangnya tak
- * beririsan sama sekali. Pemanggil yang membedakan keduanya lewat `taskSpan`, jadi tak ada
- * informasi yang hilang di sini.
+ * Menerima `TaskSpan`, bukan task: rentang sebuah PROJECT (`projectSpan`) tak punya `startDate`,
+ * dan sebelum pemisahan ini satu-satunya jalan menuju persen mensyaratkan satu task.
+ *
+ * `null` berarti **tak ada batang di jendela ini** — rentangnya tak beririsan sama sekali.
  *
  * `clippedStart`/`clippedEnd` menyala saat rentang aslinya melewati tepi. Batang terpotong yang
  * tak mengaku terpotong berbohong tentang tenggat.
@@ -266,11 +267,7 @@ export type BarGeometry = {
  * dalam persen membuat batang satu hari di zoom bulan tampak lebih panjang dari waktunya, dan itu
  * kebohongan yang sama jenisnya.
  */
-export function barGeometry(
-  task: Pick<TaskView, "startDate" | "dueDate">, window: TimelineWindow,
-): BarGeometry | null {
-  const span = taskSpan(task);
-  if (!span) return null;
+export function spanGeometry(span: TaskSpan, window: TimelineWindow): BarGeometry | null {
   const total = window.to - window.from;
   if (total <= 0) return null;
   // Irisan SETENGAH TERBUKA: rentang yang berakhir tepat di tepi kiri tak beririsan. Tanpa aturan
@@ -285,6 +282,44 @@ export function barGeometry(
     clippedEnd: span.end > window.to,
     invalid: span.invalid,
   };
+}
+
+/** Tanggal sebuah task menjadi geometri. `null` juga untuk task tanpa tanggal — pemanggil yang
+    membedakannya dari "di luar jendela" lewat `taskSpan`, jadi tak ada informasi yang hilang. */
+export function barGeometry(
+  task: Pick<TaskView, "startDate" | "dueDate">, window: TimelineWindow,
+): BarGeometry | null {
+  const span = taskSpan(task);
+  return span ? spanGeometry(span, window) : null;
+}
+
+/**
+ * Rentang gabungan sebuah project: `min` dari mulai, `max` dari akhir seluruh task-nya.
+ *
+ * `null` bila **tak satu pun** task punya tanggal sah — termasuk daftar kosong. Ini satu-satunya
+ * pintu yang menutup batasan objective "project tanpa task bertanggal tak boleh menghasilkan
+ * batang selebar nol atau NaN": baris tanpa rentang tak punya jalan menuju `NaN%`.
+ *
+ * Akhir tetap inklusif karena `taskSpan` SUDAH menambahkan satu hari (ADR-0153) — menambahkannya
+ * lagi di sini membuat setiap project satu hari lebih panjang dari task-nya.
+ *
+ * `invalid` menular dari task mana pun yang tenggatnya mendahului mulainya. Artinya di baris
+ * project adalah "berisi rentang yang tak sah", bukan "tenggat project mendahului mulainya" — yang
+ * mustahil, `min <= max` selalu. Nada galat itulah yang membuat operator membuka barisnya dan
+ * menemukan kartunya; tanpa itu tanggal terbalik hanya bisa ditemukan dengan membuka semua baris.
+ */
+export function projectSpan(tasks: Pick<TaskView, "startDate" | "dueDate">[]): TaskSpan | null {
+  let start = Infinity;
+  let end = -Infinity;
+  let invalid = false;
+  for (const t of tasks) {
+    const s = taskSpan(t);
+    if (!s) continue;
+    if (s.start < start) start = s.start;
+    if (s.end > end) end = s.end;
+    if (s.invalid) invalid = true;
+  }
+  return start === Infinity ? null : { start, end, invalid };
 }
 
 /** Persen posisi hari ini, atau `null` bila di luar jendela — garis "hari ini" yang dijepit ke

@@ -4,6 +4,7 @@ import {
   TEAM_COLUMNS, emptyBoard, canDropTask, nextOrder, moveCard, replaceCard,
   dateInputValue, dateInputToIso, taskSpan, taskDates,
   timelineWindow, zoomCell, MAX_TICKS, barGeometry, todayOffset, timelineRows,
+  spanGeometry, projectSpan,
 } from "../src/screens/team-rules";
 
 const task = (over: Partial<TaskView> = {}): TaskView => ({
@@ -12,6 +13,9 @@ const task = (over: Partial<TaskView> = {}): TaskView => ({
   specId: null, spec: null, createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:00.000Z",
   ...over,
 });
+
+const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+const iso = (d: string) => `${d}T12:00:00.000Z`;
 
 describe("TEAM_COLUMNS", () => {
   it("empat kolom, urutannya TASK_STATUSES", () => {
@@ -107,7 +111,6 @@ describe("konversi tanggal", () => {
    tak bertanggal padahal bertanggal, tanpa satu pun galat. */
 describe("taskSpan", () => {
   const DAY = 86_400_000;
-  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
 
   it("tanpa tanggal sama sekali = null — satu-satunya arti 'belum dijadwalkan'", () => {
     expect(taskSpan(task())).toBeNull();
@@ -168,7 +171,6 @@ describe("taskDates", () => {
 
 describe("timelineWindow", () => {
   const DAY = 86_400_000;
-  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
   // 2026-09-12 adalah SABTU — dipilih supaya pembulatan ke Senin benar-benar bergerak.
   const TODAY = at("2026-09-12");
   const span = (a: string, b: string) => ({ start: at(a), end: at(b) + DAY, invalid: false });
@@ -259,8 +261,6 @@ describe("timelineWindow", () => {
 
 describe("barGeometry", () => {
   const DAY = 86_400_000;
-  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
-  const iso = (d: string) => `${d}T12:00:00.000Z`;
   // Jendela 10 hari yang dibuat tangan: aritmetikanya jadi bisa dihitung di kepala.
   const win = {
     from: at("2026-09-01"), to: at("2026-09-11"), zoom: "day" as const,
@@ -333,7 +333,6 @@ describe("barGeometry", () => {
 
 describe("todayOffset", () => {
   const DAY = 86_400_000;
-  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
   const win = {
     from: at("2026-09-01"), to: at("2026-09-11"), zoom: "day" as const,
     ticks: Array.from({ length: 10 }, (_, i) => ({ start: at("2026-09-01") + i * DAY, label: `${i + 1}`, major: false })),
@@ -352,8 +351,6 @@ describe("todayOffset", () => {
 
 describe("timelineRows", () => {
   const DAY = 86_400_000;
-  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
-  const iso = (d: string) => `${d}T12:00:00.000Z`;
   const win = {
     from: at("2026-09-01"), to: at("2026-09-11"), zoom: "day" as const,
     ticks: Array.from({ length: 10 }, (_, i) => ({ start: at("2026-09-01") + i * DAY, label: `${i + 1}`, major: false })),
@@ -395,5 +392,81 @@ describe("timelineRows", () => {
   it("baris membawa geometrinya, bukan menghitungnya lagi di layar", () => {
     const r = timelineRows([task({ startDate: iso("2026-09-03"), dueDate: iso("2026-09-04") })], win);
     expect(r.rows[0]!.geometry.left).toBeCloseTo(20, 6);
+  });
+});
+
+/* SPEC-949 · geometri yang menerima RENTANG, bukan hanya task: rentang sebuah project tak punya
+   `startDate`, jadi sebelum pemisahan ini ia tak punya jalan menuju persen. */
+describe("spanGeometry", () => {
+  const win = timelineWindow([], "day", at("2026-09-10"));
+
+  it("menerima rentang yang TIDAK berasal dari satu task", () => {
+    const g = spanGeometry({ start: at("2026-09-10"), end: at("2026-09-12"), invalid: false }, win)!;
+    expect(g).not.toBeNull();
+    expect(g.left).toBeGreaterThanOrEqual(0);
+    expect(g.left + g.width).toBeLessThanOrEqual(100);
+  });
+
+  it("barGeometry adalah spanGeometry(taskSpan(task)) — bukan rumus kedua", () => {
+    const t = task({ startDate: iso("2026-09-11"), dueDate: iso("2026-09-14") });
+    expect(barGeometry(t, win)).toEqual(spanGeometry(taskSpan(t)!, win));
+  });
+});
+
+/* SPEC-949 · `null` di sini adalah satu-satunya pintu yang menutup batasan objective "project tanpa
+   task bertanggal tak boleh menghasilkan batang selebar nol atau NaN". */
+describe("projectSpan", () => {
+  it("null untuk daftar kosong", () => {
+    expect(projectSpan([])).toBeNull();
+  });
+
+  it("null bila TIDAK SATU PUN task punya tanggal sah", () => {
+    expect(projectSpan([task(), task({ id: "t2" })])).toBeNull();
+    expect(projectSpan([task({ startDate: "besok" })])).toBeNull();
+  });
+
+  it("min dari mulai, max dari akhir", () => {
+    const s = projectSpan([
+      task({ startDate: iso("2026-09-10"), dueDate: iso("2026-09-12") }),
+      task({ id: "t2", startDate: iso("2026-09-08"), dueDate: iso("2026-09-09") }),
+    ])!;
+    expect(s.start).toBe(at("2026-09-08"));
+    expect(s.end).toBe(at("2026-09-13"));
+  });
+
+  it("satu task saja identik dengan taskSpan-nya — akhir inklusif tak ditambahkan DUA kali", () => {
+    const t = task({ startDate: iso("2026-09-10"), dueDate: iso("2026-09-10") });
+    expect(projectSpan([t])).toEqual(taskSpan(t));
+  });
+
+  it("task tanpa tanggal DIABAIKAN, bukan membatalkan rentangnya", () => {
+    const s = projectSpan([task({ startDate: iso("2026-09-10") }), task({ id: "t2" })])!;
+    expect(s.start).toBe(at("2026-09-10"));
+    expect(s.end).toBe(at("2026-09-11"));
+  });
+
+  it("tanggal tak sah tak mencemari min/max", () => {
+    const s = projectSpan([
+      task({ startDate: iso("2026-09-10") }),
+      task({ id: "t2", startDate: "besok", dueDate: "kemarin" }),
+    ])!;
+    expect(Number.isFinite(s.start)).toBe(true);
+    expect(Number.isFinite(s.end)).toBe(true);
+    expect(s.start).toBe(at("2026-09-10"));
+  });
+
+  it("satu task terbalik menular ke invalid project — barisnya harus mengaku", () => {
+    const s = projectSpan([
+      task({ startDate: iso("2026-09-10"), dueDate: iso("2026-09-12") }),
+      task({ id: "t2", startDate: iso("2026-09-20"), dueDate: iso("2026-09-15") }),
+    ])!;
+    expect(s.invalid).toBe(true);
+    expect(s.start).toBe(at("2026-09-10"));
+    expect(s.end).toBe(at("2026-09-21"));
+  });
+
+  it("seluruhnya sah → invalid false", () => {
+    expect(projectSpan([task({ startDate: iso("2026-09-10"), dueDate: iso("2026-09-12") })])!.invalid)
+      .toBe(false);
   });
 });
