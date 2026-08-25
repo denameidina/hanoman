@@ -41,7 +41,7 @@
 - Consumes: —
 - Produces: `Capability` kini memuat `"sessions:spawn" | "ide:git" | "backlog:lifecycle" | "vps:exec"`. `CapabilityInfo.access: "read" | "write" | "danger"`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `shared/src/agent.test.ts`:
 
@@ -76,12 +76,12 @@ describe("capability berbahaya", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/agent.test.ts`
 Expected: FAIL — `CAPABILITY_IDS` tak memuat `sessions:spawn`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `shared/src/agent.ts`, tambahkan ke akhir `CAPABILITY_IDS` (sebelum `] as const;`):
 
@@ -111,12 +111,12 @@ Tambahkan ke akhir array `CAPABILITIES`:
   { id: "vps:exec", domain: "vps", access: "danger", label: "VPS — remote exec", desc: "console, session, provision, harden, remediate, probe, test. Menjalankan perintah di VPS produksi; dipisah dari mengelola daftar VPS & checklist.", risk: "exec" },
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run shared/src/agent.test.ts`
 Expected: PASS. `grantsCapability` tak disentuh — ia sudah mengembalikan `false` untuk `need` yang tak berakhiran `:read` dan tak ada di `granted`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/agent.ts shared/src/agent.test.ts
@@ -135,7 +135,7 @@ git commit -m "feat(mcp): empat capability berbahaya dengan akses ketiga danger"
 - Consumes: `Capability` dari Task 1.
 - Produces: `capabilityForRoute("POST", "/api/terminal/sessions") === "sessions:spawn"`, dst. Tanda tangan fungsi **tak berubah**: `(method: string, path: string) => Resolved`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `server/test/agent-capabilities.test.ts`:
 
@@ -184,12 +184,12 @@ describe("route berbahaya pindah ke capability danger", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/agent-capabilities.test.ts`
 Expected: FAIL — `POST /api/terminal/sessions` masih `sessions:write`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/agent-capabilities.ts`, tambahkan konstanta di dekat `IDE_SUBS`:
 
@@ -251,17 +251,17 @@ Di dalam cabang `projects`, sisipkan **sebelum** `if (sub && IDE_SUBS.has(sub))`
     if (sub && IDE_GIT_SUBS.has(sub)) return read ? "ide:read" : "ide:git";
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/agent-capabilities.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Jalankan seluruh test server yang tersentuh**
+- [x] **Step 5: Jalankan seluruh test server yang tersentuh**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/`
 Expected: PASS. Bila ada test lama yang mengasumsikan `sessions:write` cukup untuk `POST /terminal/sessions`, perbarui test itu — asumsinya memang sudah tidak benar.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/agent-capabilities.ts server/test/agent-capabilities.test.ts
@@ -282,7 +282,7 @@ git commit -m "feat(mcp): route berbahaya pindah ke capability danger"
 
 **Kenapa di sini, bukan di `capabilityForRoute`:** fungsi itu murni `(method, path)`, dan kemurnian itulah yang membuat uji kontrak katalog MCP (`samplePath`/`sampleMethod`) mungkin. Konsekuensi yang harus disadari: gerbang ini **tak terlihat** uji kontrak, jadi ia wajib punya test sendiri.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan ke `server/test/specs.route.test.ts`:
 
@@ -332,12 +332,12 @@ describe("PATCH /specs/:id — {stage} menuntut backlog:lifecycle", () => {
 
 Bila helper `mintAgentToken` / `adminCookie` belum ada di berkas itu, pakai helper yang sudah dipakai test route lain di `server/test/` — cari dengan `grep -rn "mintAgentToken\|adminCookie" server/test/ | head`.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/specs.route.test.ts`
 Expected: FAIL — kasus pertama menjawab 200, bukan 403.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/routes/specs.ts`, di awal handler `PATCH /specs/:id`, sebelum validasi payload:
 
@@ -360,12 +360,12 @@ Di `server/src/routes/specs.ts`, di awal handler `PATCH /specs/:id`, sebelum val
 
 Periksa nama field request yang membawa agent token di `server/src/app.ts:191` (`agentTokenFromReq`) dan sesuaikan `req.agentToken` dengan yang benar-benar dipasang di sana — jangan menebak namanya.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/specs.route.test.ts`
 Expected: PASS, keempat kasus.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/specs.ts server/test/specs.route.test.ts
@@ -386,7 +386,7 @@ git commit -m "feat(mcp): gerbang backlog:lifecycle untuk PATCH /specs/:id {stag
 
 **Radius ledakan yang disengaja:** `credentials.ts:60` menolak menyalakan gateway bila **satu pun** capability kurang — bukan 403 per-panggilan, tapi gateway tak jalan. Ini kelas kegagalan SPEC-491 ("Telegram diam total"). Karena itu Task 5 harus menampilkan `missingCapabilities` di panel Settings, dan release note harus menyebutnya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -414,12 +414,12 @@ describe("gateway Telegram menuntut capability berbahaya", () => {
 
 Sesuaikan bentuk `deps` yang disuntikkan dengan `TelegramGateDeps` yang nyata di `server/src/services/telegram/credentials.ts:39` — baca dulu, jangan menebak.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/telegram-credentials.test.ts`
 Expected: FAIL — daftar belum memuat keempatnya.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/telegram/bootstrap.ts`, tambahkan sebelum `] as const;`:
 
@@ -431,12 +431,12 @@ Di `server/src/services/telegram/bootstrap.ts`, tambahkan sebelum `] as const;`:
   "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec",
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/telegram-credentials.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/telegram/bootstrap.ts server/test/telegram-credentials.test.ts
@@ -455,7 +455,7 @@ git commit -m "feat(mcp): gateway Telegram menuntut empat capability berbahaya"
 - Consumes: `CAPABILITIES` (dengan `access: "danger"`) dan `CAPABILITY_DOMAINS` dari `@hanoman/shared`.
 - Produces: —
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 import { render, screen } from "@testing-library/react";
@@ -479,12 +479,12 @@ describe("grid capability", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run src/test/SettingsScreen.agent.test.tsx`
 Expected: FAIL — teks "berbahaya" tak ada.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Ubah grid (`SettingsScreen.tsx:496`) dari tiga kolom jadi empat:
 
@@ -542,12 +542,12 @@ Render di dalam `SettingRow` tiap token aktif:
               )}
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run src/test/SettingsScreen.agent.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SettingsScreen.tsx src/test/SettingsScreen.agent.test.tsx
@@ -562,12 +562,12 @@ git commit -m "feat(mcp): kolom capability berbahaya + peringatan hak yang menye
 - Create: `internal/docs/adr/0155-mcp-cakupan-penuh-capability-danger.md`
 - Modify: `internal/docs/README.md` (tautkan ADR baru), `internal/docs/architecture/stack.md` (bila menyebut kosakata capability)
 
-- [ ] **Step 1: Periksa nomor ADR belum dipakai**
+- [x] **Step 1: Periksa nomor ADR belum dipakai**
 
 Run: `ls internal/docs/adr/ | grep -E "^015[0-9]"`
 Bila `0155` sudah ada, pakai nomor bebas berikutnya dan **ganti seluruh rujukan `ADR-0155` di komentar kode yang sudah ditulis Task 1–5**. Tabrakan nomor ADR pernah terjadi di repo ini saat beberapa sesi berjalan bersamaan.
 
-- [ ] **Step 2: Tulis ADR**
+- [x] **Step 2: Tulis ADR**
 
 Isinya menyalin bagian **Keputusan 1, 2, 3, 4, 6** dari spec `docs/superpowers/specs/2026-08-25-mcp-cakupan-penuh-design.md`, ditambah:
 - kalimat eksplisit bahwa ADR ini **mengamandemen ADR-0099 §4** dan **ADR-0065**;
@@ -575,11 +575,11 @@ Isinya menyalin bagian **Keputusan 1, 2, 3, 4, 6** dari spec `docs/superpowers/s
 - catatan bahwa gerbang `{stage}` tak terlihat uji kontrak katalog dan karena itu punya test sendiri;
 - catatan bahwa **tak ada Prisma migration** — `capabilities` bertipe `Json` dan tak ada baris yang disentuh.
 
-- [ ] **Step 3: Tautkan di index**
+- [x] **Step 3: Tautkan di index**
 
 Tambahkan satu baris ke `internal/docs/README.md` di bagian ADR, mengikuti format baris tetangganya persis.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/docs/
@@ -590,7 +590,7 @@ git commit -m "docs(mcp): ADR-0155 capability berbahaya + index"
 
 ### Task 7: Verifikasi menyeluruh rencana 1
 
-- [ ] **Step 1: Jalankan test yang tersentuh**
+- [x] **Step 1: Jalankan test yang tersentuh**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -598,7 +598,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS. Kegagalan ramai dengan 404/P2022 hampir selalu isolasi DB, bukan regresi — periksa `TEST_DATABASE_URL` sebelum menuduh kode.
 
-- [ ] **Step 2: Uji nyata terhadap server hidup**
+- [x] **Step 2: Uji nyata terhadap server hidup**
 
 ```bash
 pnpm dev        # di terminal lain
@@ -608,9 +608,55 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8787/api/terminal/ses
 ```
 Expected: `403`. Badan responsnya memuat `"need":"sessions:spawn"`.
 
-- [ ] **Step 3: Centang task di rencana ini dan commit**
+- [x] **Step 3: Centang task di rencana ini dan commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-25-mcp-1-fondasi-capability.md
 git commit -m "docs(mcp): rencana 1 selesai"
 ```
+
+---
+
+## Catatan pelaksanaan (2026-08-25)
+
+Lima penyimpangan dari rencana, semuanya karena rencana menebak dan kode berkata lain:
+
+1. **`req.agent`, bukan `req.agentToken`** (`server/src/services/agent-auth.ts:6`).
+2. **Bentuk 403 mengikuti yang sudah ada** — `{ error: "capability required", need }` (`app.ts:200`),
+   bukan bentuk baru ber-`reason`/`message` yang ditulis rencana.
+3. **`shared/src/agent.test.ts` tak ada**; yang ada `shared/test/agent.test.ts`, dan assertion-nya
+   "12 domain × read/write = 24" — premis yang memang runtuh oleh akses ketiga. Diperluas di sana,
+   dan berkas test baru yang sempat saya buat dibuang karena redundan.
+4. **`branches` bukan permukaan `ide`.** Rencana 3 menulis `branches_unused → ide:read`; nyatanya
+   `capabilityForRoute` memetakan seluruh `branches/*` ke `projects:*` (SPEC-360 sengaja menjauhkannya
+   dari `IDE_SUBS`). Yang dipindahkan hanya `POST /branches/delete`; pembacaannya tetap `projects:read`.
+   **Rencana 3 harus dikoreksi sebelum dieksekusi.**
+5. **Berkas test Settings** bernama `src/test/settings-agent*.tsx`; `AgentAccessPanel` diekspor
+   sendiri, jadi dirender langsung tanpa seluruh `SettingsScreen`.
+
+Kegagalan test yang BUKAN regresi, semuanya dibuktikan bukan ditebak:
+
+- `pty.test.ts` & `vps-ssh.test.ts` (3 gagal) — `SSH_ASKPASS`/`SSH_ASKPASS_REQUIRE` bocor dari shell
+  sesi ini. Dilepas → 75/75 lulus.
+- `agent-tokens.route.test.ts` 404-bukan-401 — `HANOMAN_CONTROL_ORIGINS` bocor, mematikan pendaftaran
+  route. `NODE_ENV=development` juga menang atas `??= "test"` milik vitest.
+- `notifications.route.test.ts` — flaky urutan `createdAt`; di base 7/7 gagal, di sini 1/7.
+- 26 gagal suite frontend — identik dengan base (`portalApi.listChatSessions`, `placeholder-contract`).
+- `git-graph-live.test.tsx` — flaky di bawah beban suite; 3/3 lulus terisolasi di base MAUPUN di sini.
+
+Verifikasi terhadap server hidup (instance terpisah, port 8799, HANOMAN_HOME & DB sendiri):
+
+```
+GET  /terminal/sessions              → 200
+POST /terminal/sessions              → 403 need sessions:spawn
+POST /projects/p/git/merge           → 403 need ide:git
+DELETE /specs/SPEC-1                 → 403 need backlog:lifecycle
+POST /vps/v1/console                 → 403 need vps:exec
+POST /terminal/sessions (punya spawn)→ 400 invalid body   ← gerbang dilewati, bukan 403
+PATCH {title} · backlog:write        → 200
+PATCH {stage} · backlog:write        → 403 need backlog:lifecycle
+PATCH {stage} · +backlog:lifecycle   → 422 aturan bisnis  ← gerbang dilewati
+stage di DB sesudah percobaan 403    → tak bergeser
+```
+
+Suite server akhir: **3200/3201 lulus** (satu merah = `notifications.route`, merah juga di base).
