@@ -260,7 +260,10 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
             <Button size="sm" leftIcon="plus" onClick={() => { setEditing(null); setTaskOpen(true); }}>Tugas baru</Button>
             <Button size="sm" variant="secondary" leftIcon="users" onClick={() => setMembersOpen(true)}>Anggota</Button>
             <SyncButton onDone={refetchSilently} onToast={onToast} />
-            <ResetViewButton screen="team" active={activeFilters} onReset={() => onProjectFilter("all")} />
+            {/* `onReset` mengikuti `activeFilters`: tombol yang mengaku memegang N filter lalu
+                menghapus filter ke-N+1 mengubah apa yang dilihat Backlog (SPEC-146). */}
+            <ResetViewButton screen="team" active={activeFilters}
+              onReset={cross ? undefined : () => onProjectFilter("all")} />
             {/* `role="status"` supaya perubahannya juga terdengar pembaca layar. */}
             <span className="hn-eyebrow" role="status"
               style={stale ? { color: "var(--amber-600)" } : undefined}
@@ -279,10 +282,20 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
               Backlog ke Tim tak mengganti project yang sedang dilihat. */}
           <Select size="sm" aria-label="Filter project" value={projectFilter}
             disabled={cross}
-            title={cross ? "Mode Lintas project melintasi semua project — penyaring ini tak berlaku di sini" : undefined}
             onChange={(e) => onProjectFilter(e.target.value)}
             options={[{ value: "all", label: "Semua project" },
               ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
+          {/* Sebabnya DIRENDER, bukan `title`: `Select` menyebar prop sisa ke `<select>` di dalam
+              pembungkusnya, dan kontrol form yang `disabled` menekan pointer event — tooltipnya tak
+              pernah muncul di browser mana pun. Yang tersisa bagi operator persis alternatif yang
+              ditolak ADR-0154: kontrol mati tanpa sebab (kelas SPEC-546). Pola teks-terlihat ini
+              cermin `EscalateDialog`. */}
+          {cross && (
+            <span data-testid="project-filter-note"
+              style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
+              Mode ini melintasi semua project
+            </span>
+          )}
           {/* Menyaring kolom di sebuah PAPAN = mempersempit kolom yang tampil. Hanya kolom yang
               tampil yang dimuat & dilanggan, jadi biaya servernya ikut mengecil. */}
           <Select size="sm" aria-label="Filter kolom" value={colFilter}
@@ -326,7 +339,7 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
               onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />}
 
       <TaskModal open={taskOpen} task={editing} projects={projects} members={members}
-        defaultProjectId={projectFilter === "all" ? null : projectFilter}
+        defaultProjectId={effectiveProject ?? null}
         orderFor={(s) => nextOrder(board[s])}
         onClose={() => { setTaskOpen(false); setEditing(null); }}
         onSaved={refetchSilently} onToast={onToast} />

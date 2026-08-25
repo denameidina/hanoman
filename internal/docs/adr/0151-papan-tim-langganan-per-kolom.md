@@ -7,6 +7,7 @@
 - Menegakkan: ADR-0145/ADR-0039 (topik berparameter), ADR-0107 (limit adalah plafon), ADR-0115 (state tampilan persisten), ADR-0127 (konfirmasi destruktif), ADR-0094 (id deterministik)
 - Mengamandemen: ADR-0150 pada permukaan `GET /api/tasks` (parameter `q`)
 - **Diamandemen: ADR-0153** — konsekuensi "Linimasa (item D) tidak bisa menumpang topik `tasks`" di bawah **terbantah**; item D memakai `board` yang sudah dilanggan apa adanya
+- **Diamandemen: ADR-0154** — paragraf item **E** di bawah ikut **terbantah**; Lintas project juga membaca `board`, dan plafon 200/kolom justru **berlaku** di sana
 
 ## Konteks
 
@@ -176,6 +177,14 @@ tanpa langganan. Keputusan itu **tidak** dibuat di sini.
 **Lintas project (item E)** menghitung `min(startDate)`/`max(dueDate)` per project — agregat, jadi
 plafon 200 per kolom sama sekali bukan bahan yang benar. Ia hampir pasti butuh permukaan sendiri.
 
+> **TERBANTAH oleh ADR-0154 (2026-08-25).** Bukti yang diminta paragraf di atas sudah ada: item E
+> membaca `board` yang sama — nol topik, nol langganan, nol fetch baru — dan agregatnya lahir di
+> klien (`projectSpan`) dari tanggal yang memang sudah ikut di tiap baris `TaskView`. Plafon
+> 200/kolom bukan cuma "bahan yang benar", ia **mengikat**: task yang terpotong plafon membuat
+> amplop project lebih pendek dari rentang sebenarnya, jadi kewajiban "plafon yang memotong wajib
+> mengaku" berlaku di sini dengan taruhan yang lebih tinggi — spanduknya menyebutkan konsekuensi itu
+> secara eksplisit. Yang berubah bukan cuma jawabannya, melainkan arah biayanya.
+
 ## Alternatif yang ditolak
 
 **Menaikkan `zSubLimit` untuk topik `tasks`.** Plafon 200 adalah keputusan ADR-0107 yang berlaku
@@ -194,8 +203,13 @@ nilainya truthy, jadi `projectId: null` tak bisa dinyatakan sebagai query tanpa 
 ke kontrak. Kartu tanpa project tetap terlihat di "Semua project" dan diberi label `tanpa project`;
 barisnya sendiri adalah item **E**, yang memang memerlukannya.
 
+> **Dikoreksi ADR-0154.** Item E mendarat **tanpa** sentinel di kontrak: barisnya lahir dari
+> pengelompokan di **klien** (`projectGroups`), berkunci `Symbol` justru supaya tak ada string yang
+> bisa bertabrakan dengan `projectId` yang sah — `Project.id` renameable (SPEC-255). Penolakan di
+> atas tetap berlaku; yang gugur hanya ramalannya bahwa item E akan memaksa sentinel itu masuk.
+
 **Mode tampilan tanpa mekanisme.** `TEAM_VIEWS` berisi satu entri (`board`) saat ADR ini ditulis —
-ADR-0153 menambahkan `timeline` — dan tetap dirender sebagai tablist ber-`usePersistedState`
-(ADR-0115). Item D dan E menambahkan entri ke array yang **sama** — bukan memasang mekanisme baru
-pada layar yang sudah dipakai orang. Sejak entri kedua, cermin `TEAM_VIEWS` ↔ cabang render dijaga
+ADR-0153 menambahkan `timeline`, ADR-0154 menambahkan `projects` — dan tetap dirender sebagai
+tablist ber-`usePersistedState` (ADR-0115). Item D dan E memang menambahkan entri ke array yang
+**sama** — bukan memasang mekanisme baru pada layar yang sudah dipakai orang. Sejak entri kedua, cermin `TEAM_VIEWS` ↔ cabang render dijaga
 test kontrak di `src/test/team-screen.test.tsx`.

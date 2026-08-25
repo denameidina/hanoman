@@ -231,9 +231,11 @@ Pakai skill lebih sempit saat task cocok:
   **Dikoreksi ADR-0153:** dugaan bahwa item **D**/**E** butuh topik sendiri karena "sumbunya
   tanggal, bukan `order`" **terbantah** — item D memakai `board` yang sudah dilanggan apa adanya,
   nol topik baru dan nol fetch baru. Yang menumpang bukan sumbunya, melainkan **himpunan
-  task**-nya; sumbu waktu lahir di klien dari tanggal yang sudah ikut di tiap baris. Jangan
-  membangun parameter rentang tanggal untuk item E sebelum membuktikan `board` benar-benar tak
-  cukup.
+  task**-nya; sumbu waktu lahir di klien dari tanggal yang sudah ikut di tiap baris. **ADR-0154
+  menutup pertanyaannya untuk item E juga:** `board` memang cukup — agregat per project lahir di
+  klien (`projectSpan`), nol topik & nol fetch baru. Jangan membangun parameter rentang tanggal
+  untuk layar Tim; yang justru perlu diingat sebaliknya, plafon 200/kolom **mengikat** di sana —
+  task yang terpotong memendekkan amplop project, jadi spanduknya wajib menyebut konsekuensi itu.
   Mode **Linimasa** (SPEC-948 · **ADR-0153**) menghamparkan task yang sama di sumbu waktu, dan
   seluruh aritmetikanya fungsi **murni** di `team-rules.ts` dengan `today` **selalu argumen**.
   Empat aturan yang gagal **senyap** kalau dilupakan: akhir tanggal **inklusif** (tanpa `+1 hari`

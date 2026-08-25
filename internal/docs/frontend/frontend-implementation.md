@@ -1001,11 +1001,19 @@ layar dan diam-diam ikut mengubah yang lain.
 Penyaring project memakai **`App.projectFilter`** (SPEC-146: App pemilik tunggal "daftar disaring
 ke project mana"), jadi berpindah dari Backlog ke Tim tak mengganti project yang sedang dilihat —
 dan karena state itu di luar jangkauan `resetUiState("team")`, `ResetViewButton` diberi `onReset`.
-Di mode **Lintas project** penyaring itu `disabled` dan `title`-nya menyebut sebabnya, sementara
-nilainya **tidak** ditulis — mode yang gunanya membandingkan antar-project tak boleh mendarat
+Di mode **Lintas project** penyaring itu `disabled` dan sebabnya **dirender sebagai teks** di
+sebelahnya — bukan `title`: `Select` menyebar prop sisa ke `<select>` di dalam pembungkusnya, dan
+kontrol form yang `disabled` menekan pointer event, jadi tooltipnya tak pernah muncul di browser
+mana pun dan yang tersisa bagi operator justru kontrol mati tanpa sebab (kelas SPEC-546). Nilainya
+**tidak** ditulis — mode yang gunanya membandingkan antar-project tak boleh mendarat
 menampilkan satu baris, dan menyetelnya ke `"all"` sendiri akan mengubah apa yang dilihat Backlog.
 Ia juga tak ikut `activeFilters` di mode itu: lencana "N filter aktif" yang menghitung penyaring
-yang tak berlaku sama menyesatkannya dengan mengabaikannya diam-diam. Konsekuensinya jujur dan
+yang tak berlaku sama menyesatkannya dengan mengabaikannya diam-diam — dan `ResetViewButton`
+**ikut** dimode-kan (`onReset` jadi `undefined`), sebab tombol yang mengaku memegang N filter lalu
+menghapus filter ke-N+1 mengubah apa yang dilihat Backlog. Untuk alasan yang sama
+`defaultProjectId` milik `TaskModal` dibaca dari nilai **efektif**, bukan `projectFilter` mentah:
+"Tugas baru" yang memilih-awal project yang UI-nya baru saja menyatakan tak berlaku melahirkan
+kartu di project yang tak pernah dipilih siapa pun. Konsekuensinya jujur dan
 diuji dua arah — mode ini **satu-satunya** yang memuat ulang saat berpindah, dan hanya saat
 penyaringnya memang sedang aktif.
 

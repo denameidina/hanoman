@@ -1138,7 +1138,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: keputusan Task 1–4 apa adanya.
 - Produces: tak ada kode.
 
-- [ ] **Step 1: Tulis ADR-0154**
+- [x] **Step 1: Tulis ADR-0154**
 
 Buat `internal/docs/adr/0154-linimasa-lintas-project.md` mengikuti bentuk `0153-linimasa-gantt-papan-tim.md` (judul · Tanggal · Status · SPEC · relasi · Konteks · Keputusan bernomor · Konsekuensi · Alternatif yang ditolak). Isinya **enam** keputusan, masing-masing dengan sebab yang bisa diuji:
 
@@ -1153,29 +1153,29 @@ Bagian **Konsekuensi** wajib menyebut: nol kolom, nol route, nol entri sync; `da
 
 Bagian **Alternatif yang ditolak** wajib memuat: penyaring diabaikan diam-diam; amplop polos tanpa segmen; menyalin `team-timeline.tsx`; dan menempelkan mode ini ke `OverviewScreen`.
 
-- [ ] **Step 2: Tautkan di index**
+- [x] **Step 2: Tautkan di index**
 
 Di `internal/docs/README.md`:
 
 - Tambahkan baris ringkas layar `Tim` tepat **sesudah** baris "Layar `Tim` — mode Linimasa (ADR-0153)" (sekitar baris 83), dengan bentuk yang sama: `- **Layar \`Tim\` — mode Lintas project (ADR-0154)** — …` menyebut amplop + segmen, `projectSpan` → `null`, penyaring project yang dimatikan, dan `TimelineCanvas` yang dipakai ulang.
 - Tambahkan entri ADR di daftar ADR (sekitar baris 98, **sebelum** entri 0153 supaya urutannya tetap menurun): `- [0154 — Linimasa lintas project: amplop yang tak berbohong tentang okupansi](adr/0154-linimasa-lintas-project.md) — **memperluas 0150 & 0153** …`
 
-- [ ] **Step 3: Perbarui frontend-implementation.md**
+- [x] **Step 3: Perbarui frontend-implementation.md**
 
 Cari bagian layar Tim (`grep -n "Linimasa\|TEAM_VIEWS\|team-timeline" internal/docs/frontend/frontend-implementation.md`) dan tambahkan mode ketiga di daftar mode tampilan: baris per project, amplop + segmen, buka baris, penyaring project yang mati, dan berkas `team-timeline.tsx` yang dipakai ulang (bukan berkas baru).
 
-- [ ] **Step 4: Perbarui SKILL.md**
+- [x] **Step 4: Perbarui SKILL.md**
 
 Di `internal/skills/hanoman/SKILL.md`, klausa "**Papan Tim — kerja MANUSIA, papan LAIN**" (sekitar baris 192): tambahkan `SPEC-949` ke daftar SPEC dan `**ADR-0154**` ke daftar ADR di kepala klausa, lalu satu kalimat padat tentang mode ketiga — amplop yang berbohong tanpa segmen, `projectSpan` → `null` sebagai pintu anti-NaN, dan penyaring project yang dimatikan alih-alih diabaikan.
 
-- [ ] **Step 5: Verifikasi integritas index**
+- [x] **Step 5: Verifikasi integritas index**
 
 Run: `pnpm --filter ./cli exec tsx src/hanoman.ts docs index --check`
 Expected: keluar tanpa galat integritas. Bila perintah itu tak tersedia di worktree ini, jalankan sebagai gantinya:
 `grep -c "0154-linimasa-lintas-project.md" internal/docs/README.md`
 Expected: `1` atau lebih.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs/adr/0154-linimasa-lintas-project.md internal/docs/README.md \
@@ -1191,7 +1191,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Files:** tak ada yang diubah kecuali temuan menuntutnya.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS \
@@ -1200,30 +1200,30 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS \
     test/team-screen.test.tsx test/team-board.test.tsx test/team-escalate.test.tsx \
     test/team-nav.test.tsx
 ```
-Expected: **7 berkas lulus**, **152 test** (114 baseline atas ketujuh berkas + 10 Task 1 + 9 Task 2 + 13 Task 3 + 6 Task 4). Nol "no test files" — `--changed` menyalakan `passWithNoTests`, jadi nol test terlihat hijau; di sini path-nya disebut eksplisit sehingga jebakan itu tertutup.
+Expected: **7 berkas lulus**, **158 test** (114 baseline atas ketujuh berkas + 10 Task 1 + 9 Task 2 + 13 Task 3 + 6 Task 4, plus 6 yang lahir dari dua penyapuan di Step 3–4). Nol "no test files" — `--changed` menyalakan `passWithNoTests`, jadi nol test terlihat hijau; di sini path-nya disebut eksplisit sehingga jebakan itu tertutup.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 Run: `pnpm --filter ./src typecheck`
 Expected: keluar tanpa galat. **Jangan** `pnpm -r typecheck` — mesin ini menjalankan beberapa sesi sekaligus (SPEC-376/ADR-0080).
 
-- [ ] **Step 3: Penyapuan cermin senyap**
+- [x] **Step 3: Penyapuan cermin senyap**
 
 Dispatch subagent **blast-radius** dengan perintah: "SPEC-949 menambahkan mode tampilan ketiga di layar Tim. Cari tempat LAIN yang seharusnya ikut berubah tapi tidak: daftar `TEAM_VIEWS` dan cerminnya di test, daftar `SURFACES`, nada `TimelineBarSpec['tone']` dan `TONE`, kunci `hn.ui.v1.team.*` di test/docs, daftar mode tampilan di `internal/docs/**`, dan tempat mana pun yang mengasumsikan layar Tim punya DUA mode."
 
 Perbaiki temuannya, lalu jalankan ulang Step 1.
 
-- [ ] **Step 4: Verifikasi bahwa test benar-benar menguji perubahannya**
+- [x] **Step 4: Verifikasi bahwa test benar-benar menguji perubahannya**
 
 Dispatch subagent **qa-verifier** dengan perintah: "Buktikan bahwa test yang lulus di `src/test/team-projects.test.tsx`, `team-rules.test.ts`, dan `team-screen.test.tsx` benar-benar menguji perubahan SPEC-949 — bukan lulus karena mock, karena assertion yang selalu benar, atau karena berkas test-nya tak pernah dijalankan. Pisahkan gagal palsu dari regresi."
 
 Perbaiki temuannya, lalu jalankan ulang Step 1.
 
-- [ ] **Step 5: Centang seluruh checklist plan ini**
+- [x] **Step 5: Centang seluruh checklist plan ini**
 
 Pastikan **tak ada** `- [ ]` yang tersisa di berkas plan ini — hanoman menahan backlog di `executing` selama masih ada satu pun.
 
-- [ ] **Step 6: Commit hasil penyapuan (bila ada) dan push**
+- [x] **Step 6: Commit hasil penyapuan (bila ada) dan push**
 
 ```bash
 git add -A && git commit -m "docs(plan-949): centang tuntas + hasil dua penyapuan subagent

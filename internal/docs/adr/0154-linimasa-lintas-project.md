@@ -34,12 +34,22 @@ penyaring yang disetel di layar lain masih menempel. Tiga jalan, dan dua di anta
 - **Diabaikan diam-diam** → `Select` menyala menyebut "Project X" sementara kanvas menampilkan
   semuanya. Penyaring yang tampak aktif tapi tak berlaku adalah kebohongan UI dengan kelas yang
   sama seperti plafon yang memotong senyap (ADR-0151).
-- **Dipilih:** `disabled` + `title` yang menyebut sebabnya, `projectId` dilepas dari `filters`, dan
-  ia **tidak** ikut dihitung `activeFilters` — lencana "N filter aktif" (ADR-0115) yang menghitung
-  penyaring yang tak berlaku sama menyesatkannya.
+- **Dipilih:** `disabled` + sebabnya **dirender sebagai teks** di sebelahnya, `projectId` dilepas
+  dari `filters`, dan ia **tidak** ikut dihitung `activeFilters` — lencana "N filter aktif"
+  (ADR-0115) yang menghitung penyaring yang tak berlaku sama menyesatkannya.
 
 **Nilainya tidak ditulis.** `projectFilter` milik App dan dipakai bersama Backlog; menyetelnya ke
-`"all"` saat mode dibuka mengubah apa yang dilihat layar **lain**.
+`"all"` saat mode dibuka mengubah apa yang dilihat layar **lain**. Konsekuensinya berlaku untuk
+**setiap** konsumennya, bukan cuma query: `ResetViewButton` kehilangan `onReset`-nya di mode ini
+(tombol yang mengaku memegang N filter lalu menghapus filter ke-N+1 mengubah layar lain), dan
+`defaultProjectId` milik `TaskModal` dibaca dari nilai **efektif** — "Tugas baru" yang memilih-awal
+project yang baru saja dinyatakan tak berlaku melahirkan kartu di project yang tak pernah dipilih.
+
+**Sebabnya DIRENDER, bukan `title`.** `Select` menyebar prop sisa ke `<select>` di dalam
+pembungkusnya, dan kontrol form yang `disabled` menekan pointer event — tooltipnya tak pernah muncul
+di browser mana pun. `title` di sini karena itu bukan versi lebih murah dari penjelasan, melainkan
+**tak ada penjelasan sama sekali**, yang persis alternatif "kontrol mati tanpa sebab" yang ditolak
+di atas (kelas SPEC-546). Polanya cermin `EscalateDialog`: kalimatnya dirender.
 
 **Konsekuensi yang dinyatakan terang-terangan:** berbeda dari ADR-0153, berpindah ke/dari mode ini
 **mengganti kunci langganan** saat penyaring project sedang aktif — empat request baru. Klaim "nol
@@ -145,8 +155,15 @@ bukan senyap, dan tak menghilangkan data.
   `hn.ui.v1.team.expanded` menyimpan baris yang terbuka; nilai rusak jatuh ke `[]` tanpa melempar,
   dan project yang sudah lenyap tinggal di sana tanpa efek — tak ada sweep pembersih, karena tak
   ada baris yang bisa dibukanya.
-- **Plafon 200/kolom (ADR-0151) tetap berlaku dan tetap dirender.** Mode ini membaca `board` yang
-  sama, jadi ia mewarisi plafon itu berikut kewajiban mengakuinya.
+- **Plafon 200/kolom (ADR-0151) MENGIKAT lebih keras di sini, dan spanduknya berbeda.** Mode ini
+  membaca `board` yang sama, jadi ia mewarisi plafon itu — tapi `projectSpan` hanya melihat task
+  yang **termuat**, sehingga project yang task-nya terpotong menggambar **amplop yang lebih pendek
+  dari rentang sebenarnya**, dan satu-satunya sinyal adalah spanduk agregat yang tak bisa menyebut
+  project mana. Spanduknya karena itu menyatakan konsekuensi itu terang-terangan dan menyarankan
+  penyaring yang **masih hidup** (kolom, anggota, pencarian) — menyalin teks mode Linimasa
+  ("persempit penyaring") akan menunjuk penyaring project yang justru sedang `disabled`. Ini
+  membalik ramalan ADR-0151 bahwa plafon per-kolom "sama sekali bukan bahan yang benar" untuk item
+  E: ia bahan yang benar, dan taruhannya lebih tinggi.
 - **Rantai ADR-0150 tertutup.** Item A→B→{C,D}→E selesai: fondasi (0150), papan (0151), eskalasi
   (0152), linimasa papan (0153), linimasa lintas project (0154).
 

@@ -58,6 +58,10 @@ function Bar({ spec }: { spec: TimelineBarSpec }) {
   const tone = TONE[spec.tone];
   return (
     <button type="button" data-testid={`timeline-bar-${spec.key}`}
+      // SPEC-949 · nada dipancarkan sebagai atribut karena warnanya lahir dari `TONE` di sini, bukan
+      // dari geometri: amplop yang jatuh ke nada task selesai (`muted`) lolos dari SETIAP assertion
+      // berbasis `data-invalid`, terukur.
+      data-tone={spec.tone}
       data-invalid={g.invalid ? "true" : "false"}
       data-clipped-start={g.clippedStart ? "true" : "false"}
       data-clipped-end={g.clippedEnd ? "true" : "false"}
@@ -425,7 +429,8 @@ export function TeamProjectTimeline({
         <div data-testid="projects-truncated" style={{
           ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--amber-600)",
         }}>
-          {hidden} tugas tak termuat karena plafon 200 per kolom — persempit penyaring
+          {hidden} tugas tak termuat karena plafon 200 per kolom — amplop project bisa
+          lebih pendek dari rentang sebenarnya; persempit kolom, anggota, atau pencarian
         </div>
       )}
     </>

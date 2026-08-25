@@ -226,13 +226,18 @@ describe("TeamScreen · mode Linimasa", () => {
     expect(api.listTasks).not.toHaveBeenCalled();
   });
 
-  it("Select zoom hanya hidup di mode Linimasa", async () => {
+  it("Select zoom mati di Papan, hidup di Linimasa DAN Lintas project", async () => {
     view();
     await screen.findByTestId("team-board");
     expect(screen.queryByLabelText("Zoom linimasa")).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: /linimasa/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^linimasa$/i }));
     const zoom = await screen.findByLabelText("Zoom linimasa");
     expect((zoom as HTMLSelectElement).value).toBe("week");
+    // Mode ketiga memakai kanvas yang sama, jadi zoom-nya bermakna di sana juga — dan satu state
+    // `zoom` yang sama (ADR-0115), bukan salinan kedua.
+    fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
+    await screen.findByTestId("team-projects");
+    expect((screen.getByLabelText("Zoom linimasa") as HTMLSelectElement).value).toBe("week");
   });
 
   it("ganti zoom mengubah kerapatan sumbu tanpa menyentuh server", async () => {
@@ -336,11 +341,42 @@ describe("TeamScreen · mode Lintas project", () => {
     expect(api.listTasks).not.toHaveBeenCalled();
   });
 
-  it("Select zoom hidup di mode ini juga", async () => {
-    view();
-    fireEvent.click(await screen.findByRole("tab", { name: /lintas project/i }));
+  it("sebab penyaring mati DIRENDER, bukan disembunyikan di title yang tak pernah muncul", async () => {
+    view("p1");
+    await screen.findByTestId("team-board");
+    expect(screen.queryByTestId("project-filter-note")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
     await screen.findByTestId("team-projects");
-    expect(screen.getByLabelText("Zoom linimasa")).toBeInTheDocument();
+    // `title` pada `<select disabled>` ditekan browser — kontrol mati tanpa sebab persis alternatif
+    // yang ditolak ADR-0154.
+    expect(screen.getByTestId("project-filter-note")).toBeInTheDocument();
+    expect(projectSelect()).not.toHaveAttribute("title");
+  });
+
+  it("Reset tak menyeberang ke penyaring yang tak ikut dihitungnya", async () => {
+    const { onProjectFilter } = view("p1");
+    await screen.findByTestId("team-board");
+    // Penyaring anggota, bukan kotak cari: `q` ditahan 400 ms sebelum menyentuh langganan, dan
+    // timer yang jatuh tempo sesudah test berakhir memunculkan peringatan `act()` yang tak ada
+    // hubungannya dengan apa yang diuji di sini.
+    fireEvent.change(screen.getByLabelText("Filter anggota"), { target: { value: "dena@x.id" } });
+    fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
+    await screen.findByTestId("team-projects");
+    fireEvent.click(screen.getByRole("button", { name: /reset tampilan/i }));
+    // Lencana mengaku hanya memegang penyaring anggota; menghapus penyaring project juga akan
+    // mengubah apa yang dilihat Backlog (SPEC-146).
+    await waitFor(() =>
+      expect((screen.getByLabelText("Filter anggota") as HTMLSelectElement).value).toBe("all"));
+    expect(onProjectFilter).not.toHaveBeenCalled();
+  });
+
+  it("Tugas baru TIDAK memilih-awal project yang penyaringnya sedang tak berlaku", async () => {
+    view("p1");
+    await screen.findByTestId("team-board");
+    fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
+    await screen.findByTestId("team-projects");
+    fireEvent.click(screen.getByRole("button", { name: /tugas baru/i }));
+    expect((await screen.findByLabelText("Project tugas") as HTMLSelectElement).value).toBe("");
   });
 
   it("buka baris project memunculkan task-nya", async () => {

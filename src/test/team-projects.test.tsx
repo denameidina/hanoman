@@ -99,8 +99,11 @@ describe("TeamProjectTimeline · baris per project", () => {
 });
 
 describe("TeamProjectTimeline · buka baris", () => {
+  // Tanggal SEBELUM `today` disengaja: jendela lahir dari data ∪ hari ini, jadi task yang seluruhnya
+  // sesudah hari ini membuat kedua rumus (seluruh task vs baris terlihat) menjawab jangkar yang SAMA
+  // — dan test "jendela tidak bergeser" yang memakainya tak bisa gagal. Terukur.
   const tasks = () => [
-    task({ id: "a", projectId: "p1", title: "Awal", startDate: iso("2026-09-11") }),
+    task({ id: "a", projectId: "p1", title: "Awal", startDate: iso("2026-06-01") }),
     task({ id: "kosong", projectId: "p1", title: "Kosong" }),
   ];
 
@@ -123,14 +126,19 @@ describe("TeamProjectTimeline · buka baris", () => {
 
   it("dibuka: baris anak muncul, dan JENDELA tidak bergeser", () => {
     const t = tasks();
+    const ticks = () => screen.getAllByTestId("timeline-tick");
     const { unmount } = view(t);
-    const tutup = screen.getAllByTestId("timeline-tick").length;
+    const tutup = ticks().length;
+    // Label tick PERTAMA ikut dibandingkan, bukan cuma jumlahnya: jendela yang jangkarnya bergeser
+    // sambil panjangnya kebetulan sama lolos dari perbandingan jumlah.
+    const jangkar = ticks()[0]!.textContent;
     unmount();
     view(t, { expanded: ["p1"] });
     expect(screen.getByTestId("timeline-row-t:a")).toBeInTheDocument();
     // Task tanpa tanggal tetap punya BARIS — di situlah operator melihatnya — tanpa batang.
     expect(barsOf("t:kosong")).toHaveLength(0);
-    expect(screen.getAllByTestId("timeline-tick").length).toBe(tutup);
+    expect(ticks().length).toBe(tutup);
+    expect(ticks()[0]!.textContent).toBe(jangkar);
   });
 
   it("klik segmen membuka task yang benar", () => {
@@ -140,14 +148,54 @@ describe("TeamProjectTimeline · buka baris", () => {
     expect(onOpen.mock.calls[0]![0].id).toBe("a");
   });
 
-  it("tanggal terbalik: amplop project ikut bernada galat", () => {
+  it("tanggal terbalik: amplop project ikut bernada GALAT, bukan sekadar ditandai", () => {
     view([task({ id: "x", projectId: "p1", startDate: iso("2026-09-20"), dueDate: iso("2026-09-15") })]);
-    expect(screen.getByTestId("timeline-bar-span:p1").dataset.invalid).toBe("true");
+    const env = screen.getByTestId("timeline-bar-span:p1");
+    expect(env.dataset.invalid).toBe("true");
+    expect(env.dataset.tone).toBe("err");
   });
 
   it("projectId yang tak ada di daftar tetap punya baris, label jatuh ke id mentah", () => {
     view([task({ id: "a", projectId: "phantom", startDate: iso("2026-09-11") })]);
     expect(screen.getByTestId("timeline-row-p:phantom")).toBeInTheDocument();
     expect(screen.getByText("phantom")).toBeInTheDocument();
+  });
+});
+
+/* Tiga hal yang dinyatakan sebagai invarian di komentar sumber tapi sebelumnya tak punya penjaga
+   satu pun — ditemukan dengan memutasi sumbernya dan mendapati suite tetap hijau. */
+describe("TeamProjectTimeline · kontrak yang gagal senyap", () => {
+  it("amplop memakai nada RESESIF sendiri, bukan nada task selesai", () => {
+    view([
+      task({ id: "a", projectId: "p1", startDate: iso("2026-09-11") }),
+      task({ id: "b", projectId: "p1", status: "done", startDate: iso("2026-09-12") }),
+    ]);
+    const tone = (k: string) => screen.getByTestId(`timeline-bar-${k}`).dataset.tone;
+    // `muted` sudah dipakai task selesai; amplop yang sewarna dengannya membuat dua hal berbeda
+    // tampak sama.
+    expect(tone("span:p1")).toBe("envelope");
+    expect(tone("seg:b")).toBe("muted");
+    expect(tone("seg:a")).toBe("brass");
+  });
+
+  it("rentang yang DITAMPILKAN berakhir di hari task terakhir, bukan sehari sesudahnya", () => {
+    view([
+      task({ id: "a", projectId: "p1", startDate: iso("2026-09-11") }),
+      task({ id: "b", projectId: "p1", startDate: iso("2026-09-14") }),
+    ]);
+    // `span.end` EKSKLUSIF — merendernya apa adanya membuat SETIAP project berakhir sehari lebih
+    // lambat dari task terakhirnya, dan tak ada satu pun galat yang muncul.
+    expect(screen.getByText("11 Sep → 14 Sep")).toBeInTheDocument();
+  });
+
+  it("kepala kolom label berbunyi Project, bukan Tugas", () => {
+    view([task({ startDate: iso("2026-09-11") })]);
+    expect(screen.getByText("Project")).toBeInTheDocument();
+    expect(screen.queryByText("Tugas")).toBeNull();
+  });
+
+  it("plafon 200/kolom tetap DIRENDER di mode ini juga (ADR-0151)", () => {
+    view([task({ startDate: iso("2026-09-11") })], { hidden: 3 });
+    expect(screen.getByTestId("projects-truncated")).toHaveTextContent("3 tugas tak termuat");
   });
 });
