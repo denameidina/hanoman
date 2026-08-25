@@ -106,6 +106,14 @@ textarea:focus-visible,
 .hn-modal-panel { min-width: 0; }
 .hn-modal-footer { flex-wrap: wrap; padding-bottom: calc(14px + var(--safe-bottom)); }
 .hn-board-local-overflow { max-width: 100%; overscroll-behavior-inline: contain; }
+/* SPEC-948 · kanvas linimasa. Gulir mendatar hidup DI SINI, tak pernah di badan halaman
+   (SPEC-879), dan `overscroll-behavior` menahannya agar tak merembet keluar saat kanvas mentok. */
+.hn-timeline-scroll {
+  max-width: 100%;
+  min-width: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 .hn-row-actions { flex-wrap: wrap; }
 /* SPEC-763 · pasangan label topbar: bentuk panjang default, bentuk ringkas hanya di mobile. */
 .hn-topbar-label-short { display: none; }

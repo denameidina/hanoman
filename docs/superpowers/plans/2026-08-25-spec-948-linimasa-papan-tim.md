@@ -767,7 +767,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `TimelineCanvas(props: { window: TimelineWindow; rows: TimelineRowSpec[]; today: number; emptyHint?: string }): JSX.Element`
   - `TeamTimeline(props: { tasks: TaskView[]; members: MemberView[]; zoom: TimelineZoom; today: number; hidden: number; onOpen: (t: TaskView) => void }): JSX.Element`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/test/team-timeline.test.tsx`:
 
@@ -906,12 +906,12 @@ describe("TeamTimeline · kejujuran batang", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `cd src && pnpm vitest --run test/team-timeline.test.tsx`
 Expected: FAIL — `Failed to resolve import "../src/screens/team-timeline"`.
 
-- [ ] **Step 3: Tambahkan CSS**
+- [x] **Step 3: Tambahkan CSS**
 
 Di `src/src/app.css`, tepat **di bawah** baris 108 (`.hn-board-local-overflow { … }`), tambahkan:
 
@@ -927,7 +927,7 @@ Di `src/src/app.css`, tepat **di bawah** baris 108 (`.hn-board-local-overflow { 
 }
 ```
 
-- [ ] **Step 4: Tulis `team-timeline.tsx`**
+- [x] **Step 4: Tulis `team-timeline.tsx`**
 
 Create `src/src/screens/team-timeline.tsx`:
 
@@ -1183,12 +1183,12 @@ export function TeamTimeline({ tasks, members, zoom, today, hidden, onOpen }: {
 
 **Catatan impor:** `StateBlock` **tidak** dipakai di berkas ini — hapus dari daftar impor sebelum commit bila linter/typecheck mengeluh `noUnusedLocals`.
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 Run: `cd src && pnpm vitest --run test/team-timeline.test.tsx`
 Expected: PASS (18 test).
 
-- [ ] **Step 6: Verifikasi nama ikon benar-benar ada di lucide**
+- [x] **Step 6: Verifikasi nama ikon benar-benar ada di lucide**
 
 Run:
 ```bash
@@ -1198,12 +1198,12 @@ for (const n of ['CalendarOff','ChevronsLeftRight','ChevronLeft','ChevronRight',
 ```
 Expected: kelimanya `OK`. SPEC-906 menunjukkan nama yang salah jatuh ke `Circle` tanpa satu pun galat — nama baru tak boleh masuk tanpa dicek.
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 Run: `cd src && pnpm typecheck`
 Expected: nol error.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/screens/team-timeline.tsx src/src/app.css src/test/team-timeline.test.tsx
