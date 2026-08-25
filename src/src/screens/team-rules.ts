@@ -240,3 +240,86 @@ export function timelineWindow(
   }
   return { from, to: cur, zoom, ticks };
 }
+
+export type BarGeometry = {
+  /** Persen `0..100` terhadap `[window.from, window.to)`. */
+  left: number;
+  width: number;
+  clippedStart: boolean;
+  clippedEnd: boolean;
+  invalid: boolean;
+};
+
+/**
+ * Tanggal menjadi `{left%, width%}` dengan clamping di kedua tepi jendela.
+ *
+ * `null` berarti **tak ada batang di jendela ini** — task tanpa tanggal, atau rentangnya tak
+ * beririsan sama sekali. Pemanggil yang membedakan keduanya lewat `taskSpan`, jadi tak ada
+ * informasi yang hilang di sini.
+ *
+ * `clippedStart`/`clippedEnd` menyala saat rentang aslinya melewati tepi. Batang terpotong yang
+ * tak mengaku terpotong berbohong tentang tenggat.
+ *
+ * Lebar PIKSEL minimum sengaja **tidak** ada di sini — itu urusan CSS. Memaksa lebar minimum ke
+ * dalam persen membuat batang satu hari di zoom bulan tampak lebih panjang dari waktunya, dan itu
+ * kebohongan yang sama jenisnya.
+ */
+export function barGeometry(
+  task: Pick<TaskView, "startDate" | "dueDate">, window: TimelineWindow,
+): BarGeometry | null {
+  const span = taskSpan(task);
+  if (!span) return null;
+  const total = window.to - window.from;
+  if (total <= 0) return null;
+  // Irisan SETENGAH TERBUKA: rentang yang berakhir tepat di tepi kiri tak beririsan. Tanpa aturan
+  // ini, task yang berakhir kemarin muncul sebagai garis rambut selebar nol di tepi kiri.
+  if (span.end <= window.from || span.start >= window.to) return null;
+  const left = Math.max(span.start, window.from);
+  const right = Math.min(span.end, window.to);
+  return {
+    left: ((left - window.from) / total) * 100,
+    width: ((right - left) / total) * 100,
+    clippedStart: span.start < window.from,
+    clippedEnd: span.end > window.to,
+    invalid: span.invalid,
+  };
+}
+
+/** Persen posisi hari ini, atau `null` bila di luar jendela — garis "hari ini" yang dijepit ke
+    tepi menandai hari yang salah. */
+export function todayOffset(window: TimelineWindow, today: number): number | null {
+  const t = dayStart(today);
+  if (t < window.from || t >= window.to) return null;
+  return ((t - window.from) / (window.to - window.from)) * 100;
+}
+
+export type TimelineTaskRow = { task: TaskView; geometry: BarGeometry };
+
+/**
+ * Satu-satunya tempat ketiga ember dibagi, jadi tak ada task yang bisa jatuh di luar ketiganya —
+ * invarian `rows + unscheduled + outside === tasks` diuji langsung.
+ *
+ * `outside` ada karena jendela berplafon (`MAX_TICKS`): task yang tak muat **didaftar**, bukan
+ * dihilangkan.
+ */
+export function timelineRows(tasks: TaskView[], window: TimelineWindow): {
+  rows: TimelineTaskRow[]; unscheduled: TaskView[]; outside: TaskView[];
+} {
+  const scheduled: (TimelineTaskRow & { start: number })[] = [];
+  const unscheduled: TaskView[] = [];
+  const outside: TaskView[] = [];
+  for (const task of tasks) {
+    const span = taskSpan(task);
+    if (!span) { unscheduled.push(task); continue; }
+    const geometry = barGeometry(task, window);
+    if (!geometry) { outside.push(task); continue; }
+    scheduled.push({ task, geometry, start: span.start });
+  }
+  // Diurutkan oleh `span.start`, BUKAN oleh `geometry.left`: batang yang terpotong di kiri
+  // semuanya ber-`left` 0 dan urutannya akan runtuh jadi urutan kedatangan.
+  scheduled.sort((a, b) =>
+    a.start - b.start
+    || a.task.title.localeCompare(b.task.title, "id")
+    || a.task.id.localeCompare(b.task.id));
+  return { rows: scheduled.map(({ task, geometry }) => ({ task, geometry })), unscheduled, outside };
+}

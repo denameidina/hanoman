@@ -486,7 +486,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `type TimelineTaskRow = { task: TaskView; geometry: BarGeometry }`
   - `timelineRows(tasks: TaskView[], window: TimelineWindow): { rows: TimelineTaskRow[]; unscheduled: TaskView[]; outside: TaskView[] }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan `barGeometry, todayOffset, timelineRows` ke impor, lalu tambahkan di akhir `src/test/team-rules.test.ts`:
 
@@ -633,12 +633,12 @@ describe("timelineRows", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `cd src && pnpm vitest --run test/team-rules.test.ts`
 Expected: FAIL — `barGeometry is not a function`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Tambahkan di akhir `src/src/screens/team-rules.ts`:
 
@@ -727,17 +727,17 @@ export function timelineRows(tasks: TaskView[], window: TimelineWindow): {
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `cd src && pnpm vitest --run test/team-rules.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `cd src && pnpm typecheck`
 Expected: nol error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/team-rules.ts src/test/team-rules.test.ts

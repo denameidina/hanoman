@@ -3,7 +3,7 @@ import type { TaskView } from "@hanoman/shared";
 import {
   TEAM_COLUMNS, emptyBoard, canDropTask, nextOrder, moveCard, replaceCard,
   dateInputValue, dateInputToIso, taskSpan, taskDates,
-  timelineWindow, zoomCell, MAX_TICKS,
+  timelineWindow, zoomCell, MAX_TICKS, barGeometry, todayOffset, timelineRows,
 } from "../src/screens/team-rules";
 
 const task = (over: Partial<TaskView> = {}): TaskView => ({
@@ -248,5 +248,146 @@ describe("timelineWindow", () => {
   it("zoom mengembalikan lebar sel yang berbeda per satuan", () => {
     expect(zoomCell("day")).toBeLessThan(zoomCell("week"));
     expect(zoomCell("week")).toBeLessThan(zoomCell("month"));
+  });
+});
+
+describe("barGeometry", () => {
+  const DAY = 86_400_000;
+  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  const iso = (d: string) => `${d}T12:00:00.000Z`;
+  // Jendela 10 hari yang dibuat tangan: aritmetikanya jadi bisa dihitung di kepala.
+  const win = {
+    from: at("2026-09-01"), to: at("2026-09-11"), zoom: "day" as const,
+    ticks: Array.from({ length: 10 }, (_, i) => ({ start: at("2026-09-01") + i * DAY, label: `${i + 1}`, major: false })),
+  };
+
+  it("tanpa tanggal = null — pemanggil yang memutuskan ia 'belum dijadwalkan'", () => {
+    expect(barGeometry(task(), win)).toBeNull();
+  });
+
+  it("batang di tengah jendela: persen dihitung dari rentang WAKTU", () => {
+    // 3 Sep s/d 4 Sep inklusif = hari ke-2 dan ke-3 dari 10 → left 20%, width 20%.
+    const g = barGeometry(task({ startDate: iso("2026-09-03"), dueDate: iso("2026-09-04") }), win)!;
+    expect(g.left).toBeCloseTo(20, 6);
+    expect(g.width).toBeCloseTo(20, 6);
+    expect(g.clippedStart).toBe(false);
+    expect(g.clippedEnd).toBe(false);
+  });
+
+  it("batang satu hari selebar satu sel, bukan nol", () => {
+    const g = barGeometry(task({ dueDate: iso("2026-09-01") }), win)!;
+    expect(g.left).toBeCloseTo(0, 6);
+    expect(g.width).toBeCloseTo(10, 6);
+  });
+
+  /* `clippedStart`/`clippedEnd` yang TERTUKAR lolos sempurna dari uji "batang terpotong" —
+     karena itu keduanya diuji terpisah, dengan sisi yang lain dipastikan MATI. */
+  it("terpotong di kiri menyalakan clippedStart saja", () => {
+    const g = barGeometry(task({ startDate: iso("2026-08-20"), dueDate: iso("2026-09-03") }), win)!;
+    expect(g.left).toBeCloseTo(0, 6);
+    expect(g.clippedStart).toBe(true);
+    expect(g.clippedEnd).toBe(false);
+  });
+
+  it("terpotong di kanan menyalakan clippedEnd saja", () => {
+    const g = barGeometry(task({ startDate: iso("2026-09-08"), dueDate: iso("2026-09-30") }), win)!;
+    expect(g.clippedEnd).toBe(true);
+    expect(g.clippedStart).toBe(false);
+    expect(g.left + g.width).toBeCloseTo(100, 6);
+  });
+
+  it("batang tak pernah melewati tepi kanvas", () => {
+    const g = barGeometry(task({ startDate: iso("2026-01-01"), dueDate: iso("2027-01-01") }), win)!;
+    expect(g.left).toBeCloseTo(0, 6);
+    expect(g.width).toBeCloseTo(100, 6);
+    expect(g.clippedStart && g.clippedEnd).toBe(true);
+  });
+
+  it("di luar jendela = null di kedua arah", () => {
+    expect(barGeometry(task({ dueDate: iso("2026-08-01") }), win)).toBeNull();
+    expect(barGeometry(task({ startDate: iso("2026-12-01") }), win)).toBeNull();
+  });
+
+  /* Irisan SETENGAH TERBUKA. Tanpa aturan ini, task yang berakhir tepat sebelum jendela muncul
+     sebagai garis rambut selebar nol di tepi kiri — kartu yang seolah dijadwalkan hari ini. */
+  it("rentang yang berakhir tepat di tepi kiri tidak beririsan", () => {
+    expect(barGeometry(task({ dueDate: iso("2026-08-31") }), win)).toBeNull();
+  });
+
+  it("rentang yang mulai tepat di tepi kanan tidak beririsan", () => {
+    expect(barGeometry(task({ startDate: iso("2026-09-11") }), win)).toBeNull();
+  });
+
+  it("tanggal terbalik tetap punya batang, dan batangnya MENGAKU salah", () => {
+    const g = barGeometry(task({ startDate: iso("2026-09-05"), dueDate: iso("2026-09-02") }), win)!;
+    expect(g.invalid).toBe(true);
+    expect(g.width).toBeGreaterThan(0);
+  });
+});
+
+describe("todayOffset", () => {
+  const DAY = 86_400_000;
+  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  const win = {
+    from: at("2026-09-01"), to: at("2026-09-11"), zoom: "day" as const,
+    ticks: Array.from({ length: 10 }, (_, i) => ({ start: at("2026-09-01") + i * DAY, label: `${i + 1}`, major: false })),
+  };
+
+  it("persen hari ini di dalam jendela", () => {
+    expect(todayOffset(win, at("2026-09-06") + 3_600_000)).toBeCloseTo(50, 6);
+  });
+
+  // Garis "hari ini" yang dipaksa menempel di tepi menandai hari yang SALAH.
+  it("null di luar jendela, bukan dijepit ke tepi", () => {
+    expect(todayOffset(win, at("2026-08-01"))).toBeNull();
+    expect(todayOffset(win, at("2026-09-11"))).toBeNull();
+  });
+});
+
+describe("timelineRows", () => {
+  const DAY = 86_400_000;
+  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  const iso = (d: string) => `${d}T12:00:00.000Z`;
+  const win = {
+    from: at("2026-09-01"), to: at("2026-09-11"), zoom: "day" as const,
+    ticks: Array.from({ length: 10 }, (_, i) => ({ start: at("2026-09-01") + i * DAY, label: `${i + 1}`, major: false })),
+  };
+
+  it("tiga ember, dan tak satu pun task boleh jatuh di luar ketiganya", () => {
+    const tasks = [
+      task({ id: "a", startDate: iso("2026-09-03") }),
+      task({ id: "b" }),
+      task({ id: "c", dueDate: iso("2027-01-01") }),
+    ];
+    const r = timelineRows(tasks, win);
+    expect(r.rows.map((x) => x.task.id)).toEqual(["a"]);
+    expect(r.unscheduled.map((x) => x.id)).toEqual(["b"]);
+    expect(r.outside.map((x) => x.id)).toEqual(["c"]);
+    expect(r.rows.length + r.unscheduled.length + r.outside.length).toBe(tasks.length);
+  });
+
+  /* Urutan harus STABIL: empat langganan per kolom mendarat kapan saja, jadi urutan masukan
+     bukan sesuatu yang boleh dipercaya. */
+  it("baris urut mulai paling awal, tak peduli urutan masukan", () => {
+    const tasks = [
+      task({ id: "c", title: "C", startDate: iso("2026-09-08") }),
+      task({ id: "a", title: "A", startDate: iso("2026-09-02") }),
+      task({ id: "b", title: "B", startDate: iso("2026-09-05") }),
+    ];
+    expect(timelineRows(tasks, win).rows.map((x) => x.task.id)).toEqual(["a", "b", "c"]);
+    expect(timelineRows([...tasks].reverse(), win).rows.map((x) => x.task.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("mulai yang sama dipecah judul lalu id", () => {
+    const tasks = [
+      task({ id: "z", title: "Beta", startDate: iso("2026-09-02") }),
+      task({ id: "y", title: "Alfa", startDate: iso("2026-09-02") }),
+    ];
+    expect(timelineRows(tasks, win).rows.map((x) => x.task.id)).toEqual(["y", "z"]);
+  });
+
+  it("baris membawa geometrinya, bukan menghitungnya lagi di layar", () => {
+    const r = timelineRows([task({ startDate: iso("2026-09-03"), dueDate: iso("2026-09-04") })], win);
+    expect(r.rows[0]!.geometry.left).toBeCloseTo(20, 6);
   });
 });
