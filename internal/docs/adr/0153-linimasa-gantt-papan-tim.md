@@ -151,6 +151,13 @@ memakai lebar eksplisit `LABEL_W + N × cell`: anak **blok** di dalam container 
 menyusut mengikuti containernya, dan scroller-nya lalu tak punya apa pun untuk digulir — kegagalan
 yang sudah terukur di SPEC-879 (`.hn-local-overflow` beranak blok memberi tombol 0 × 44 px).
 
+`overflow-x`, `min-width: 0`, dan `max-width: 100%` duduk di **gaya inline**, bukan di kelasnya.
+Sebabnya bisa diukur: jsdom tak memuat stylesheet, jadi properti yang hanya hidup di `app.css`
+dijaga **nol test** — mengosongkan isi `.hn-timeline-scroll` membuat 110 test tetap hijau. Karena
+`min-width: 0` justru properti yang menahan flex item ini melar mengikuti isinya (kelas bug
+SPEC-879 itu sendiri), ia dipindah ke tempat yang bisa diuji. Yang tertinggal di kelasnya hanya
+yang memang tak berarti di jsdom: `overscroll-behavior` dan `-webkit-overflow-scrolling`.
+
 Kolom label `position: sticky; left: 0` dengan latar padat: nama tugas yang tergulir keluar membuat
 batang di sebelah kanan kehilangan pemiliknya.
 

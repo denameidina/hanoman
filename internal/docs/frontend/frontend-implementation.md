@@ -1053,9 +1053,13 @@ dan jendela berplafon 120 tick sehingga task yang tak muat mendarat di daftar **
 alih-alih hilang. Kedua daftar di bawah kanvas ("Belum dijadwalkan", "Di luar jendela") hanya
 dirender saat berisi.
 
-Gulir mendatarnya hidup di `.hn-timeline-scroll`, tak pernah di badan halaman (SPEC-879), dan
-pembungkus di dalamnya berlebar **eksplisit** — anak blok di container `overflow: auto` menyusut
-mengikuti containernya dan scroller-nya lalu tak punya apa pun untuk digulir. Kolom label
+Gulir mendatarnya hidup di kanvas, tak pernah di badan halaman (SPEC-879), dan pembungkus di
+dalamnya berlebar **eksplisit** — anak blok di container `overflow: auto` menyusut mengikuti
+containernya dan scroller-nya lalu tak punya apa pun untuk digulir. `overflow-x`, `min-width: 0`,
+dan `max-width: 100%` sengaja di **gaya inline** dan bukan di `.hn-timeline-scroll`: jsdom tak
+memuat stylesheet, jadi properti yang hanya hidup di `app.css` dijaga nol test — terukur, kelasnya
+bisa dikosongkan tanpa satu pun test merah. Kelasnya menyimpan sisanya (`overscroll-behavior`,
+`-webkit-overflow-scrolling`), yang memang tak berarti di jsdom. Kolom label
 `position: sticky; left: 0`; gridline baris digambar `repeating-linear-gradient`, bukan satu div
 per sel (40 baris × 120 tick = 4 800 node kosong). `TimelineCanvas` sengaja **tak menyebut `Task`**
 dan menerima `bars` **jamak**, karena mode Lintas project memakainya dengan baris per project.
