@@ -162,3 +162,45 @@ describe("tingkat mode", () => {
     expect(MCP_INSTRUCTIONS).toMatch(/bukan kontrol keamanan/i);
   });
 });
+
+// ADR-0155 · gerbang anti-drift #1. 152 tool tak bisa dijaga dengan ketelitian manusia; yang bisa
+// dijaga adalah INVARIANNYA. Dua arah dikunci, dan arah kedua yang paling mudah lolos: sebuah tool
+// bisa bermode `danger` sambil menuntut capability yang lemah, dan tak ada yang menyadarinya sampai
+// seseorang memakainya.
+const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"]);
+
+// Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak
+// ada capability `danger` di domainnya. Mode `danger`-nya murni ergonomi (mencegah salah pilih),
+// bukan gerbang. Daftar ini sengaja EKSPLISIT: menambahnya menuntut seseorang mengetik namanya.
+// Diisi bertahap oleh rencana katalog per domain; kosong sekarang BUKAN kelalaian — assert
+// terakhir menolak nama yang tak punya tool, jadi daftar ini tak bisa mendahului katalognya.
+const DESTRUCTIVE_BUT_WRITE = new Set<string>([]);
+
+describe("mode ⇔ capability", () => {
+  it("tool bercapability danger WAJIB bermode danger", () => {
+    for (const t of MCP_TOOLS)
+      if (t.capability && DANGER_CAPS.has(t.capability)) expect(t.mode, t.name).toBe("danger");
+  });
+
+  it("tool bermode danger WAJIB bercapability danger, kecuali yang terdaftar", () => {
+    for (const t of MCP_TOOLS) {
+      if (t.mode !== "danger" || DESTRUCTIVE_BUT_WRITE.has(t.name)) continue;
+      expect(DANGER_CAPS.has(t.capability ?? ""), t.name).toBe(true);
+    }
+  });
+
+  it("daftar-kecuali tak memuat nama yang sudah tak ada — tool dihapus, daftarnya ikut", () => {
+    const names = new Set(MCP_TOOLS.map((t) => t.name));
+    for (const n of DESTRUCTIVE_BUT_WRITE) expect(names.has(n), n).toBe(true);
+  });
+
+  it("nol tool danger yang bocor ke tingkat default, nol non-read yang bocor ke read-only", () => {
+    expect(mcpToolsFor("default").filter((t) => t.mode === "danger")).toHaveLength(0);
+    expect(mcpToolsFor("read-only").filter((t) => t.mode !== "read")).toHaveLength(0);
+  });
+
+  it("setiap tool danger membuka deskripsinya dengan penandaan yang terbaca agen", () => {
+    for (const t of MCP_TOOLS.filter((x) => x.mode === "danger"))
+      expect(t.description.slice(0, 12), t.name).toMatch(/BERBAHAYA/);
+  });
+});
