@@ -46,14 +46,14 @@
 
 **Tidak dibungkus:** `POST /specs/:id/attachments` (`specs.ts:357`) — multipart, sudah di `UNWRAPPED`.
 
-- [ ] **Step 1: Baca handler**
+- [x] **Step 1: Baca handler**
 
 ```bash
 sed -n '151,200p' server/src/routes/specs.ts
 sed -n '254,270p;323,345p;348,410p;428,480p;521,545p' server/src/routes/specs.ts
 ```
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 `shared/src/mcp-catalog.backlog.test.ts`:
 
@@ -92,12 +92,12 @@ describe("katalog backlog", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL**
+- [x] **Step 3: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.backlog.test.ts`
 Expected: FAIL — masih 6 tool.
 
-- [ ] **Step 4: Tambahkan sebelas entri**
+- [x] **Step 4: Tambahkan sebelas entri**
 
 Entri `stage_set` **wajib** membawa komentar ini tepat di atasnya:
 
@@ -131,7 +131,7 @@ Entri `stage_set` **wajib** membawa komentar ini tepat di atasnya:
 
 Sepuluh entri lain mengikuti pola yang sama; isi `inputSchema` dari Step 1.
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run shared/src/mcp-catalog.backlog.test.ts shared/src/mcp-catalog.test.ts
@@ -139,7 +139,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/backlog.ts shared/src/mcp-catalog.backlog.test.ts
@@ -165,13 +165,13 @@ Dua tool `danger` di sini bercapability `:write` — keduanya masuk `DESTRUCTIVE
 
 **`hanoman_project_rename` layak `danger` meski hanya mengganti nama:** `Project.id` adalah kunci yang menyeberang sync antar-instance. Deskripsinya wajib menyebut itu.
 
-- [ ] **Step 1: Baca handler**
+- [x] **Step 1: Baca handler**
 
 ```bash
 sed -n '42,180p' server/src/routes/projects.ts
 ```
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 describe("katalog projects", () => {
@@ -188,18 +188,18 @@ describe("katalog projects", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.projects.test.ts`
+- [x] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.projects.test.ts`
 
-- [ ] **Step 4: Tambahkan delapan entri.** Deskripsi `rename`:
+- [x] **Step 4: Tambahkan delapan entri.** Deskripsi `rename`:
 
 ```ts
     description:
       "BERBAHAYA — mengganti id project. Id project adalah kunci yang menyeberang sync antar-instance hanoman: instance lain yang belum melihat rename akan memperlakukan project ini sebagai project BARU, dan riwayat sync-nya tak menyatu kembali sendiri. Hanya muncul saat tingkat `--danger` menyala.",
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS** — Run: `pnpm vitest --run shared/src/mcp-catalog.projects.test.ts shared/src/mcp-catalog.test.ts`
+- [x] **Step 5: Jalankan test, pastikan LULUS** — Run: `pnpm vitest --run shared/src/mcp-catalog.projects.test.ts shared/src/mcp-catalog.test.ts`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/projects.ts shared/src/mcp-catalog.projects.test.ts
@@ -230,7 +230,7 @@ git commit -m "feat(mcp): 8 tool projects termasuk rename & delete di balik --da
 
 **Tidak dibungkus:** `POST /terminal/sessions/:id/attachments` (`terminal.ts:490`, multipart) dan `GET /terminal/sessions/:id/ws` (`terminal.ts:508`, WebSocket) — keduanya sudah di `UNWRAPPED`.
 
-- [ ] **Step 1: Baca handler**
+- [x] **Step 1: Baca handler**
 
 ```bash
 sed -n '78,120p;326,500p' server/src/routes/terminal.ts
@@ -239,7 +239,7 @@ sed -n '1,40p' server/src/routes/session-history.ts
 
 Perhatikan khusus body `POST /terminal/sessions` (`terminal.ts:80`): ia menentukan project, backlog, runtime, model, dan effort. Setiap parameter itu harus muncul di `inputSchema` dengan deskripsi yang menyebut nilainya yang sah — jangan mengandalkan default senyap.
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 describe("katalog sessions", () => {
@@ -265,23 +265,23 @@ describe("katalog sessions", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.sessions.test.ts`
+- [x] **Step 3: Jalankan test, pastikan GAGAL** — Run: `pnpm vitest --run shared/src/mcp-catalog.sessions.test.ts`
 
-- [ ] **Step 4: Tambahkan lima belas entri.** Deskripsi `session_create`:
+- [x] **Step 4: Tambahkan lima belas entri.** Deskripsi `session_create`:
 
 ```ts
     description:
       "BERBAHAYA — membuka sesi agen BARU: hanoman menjalankan claude/codex dengan izin penuh di worktree project, dan sesi itu bisa menulis berkas, menjalankan perintah, serta membuat commit tanpa manusia di pane. Menuntut capability `sessions:spawn`; `sessions:write` (yang cukup untuk mengendalikan sesi yang SUDAH ada) tidak cukup. Hanya muncul saat tingkat `--danger` menyala. Pakai hanoman_sessions_list untuk melihat sesi yang sudah berjalan sebelum membuka yang baru.",
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run shared/src/mcp-catalog.sessions.test.ts shared/src/mcp-catalog.test.ts
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/mcp-coverage.test.ts
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/sessions.ts shared/src/mcp-catalog.sessions.test.ts
@@ -292,7 +292,7 @@ git commit -m "feat(mcp): 15 tool sessions termasuk session_create di balik sess
 
 ### Task 4: Daftar-kecuali & bukti ujung-ke-ujung
 
-- [ ] **Step 1: Tambahkan enam nama ke `DESTRUCTIVE_BUT_WRITE`**
+- [x] **Step 1: Tambahkan enam nama ke `DESTRUCTIVE_BUT_WRITE`**
 
 ```ts
   "hanoman_project_delete", "hanoman_project_rename",
@@ -300,9 +300,9 @@ git commit -m "feat(mcp): 15 tool sessions termasuk session_create di balik sess
   "hanoman_backlog_stage_set",   // gerbang lifecycle-nya di handler, bukan capabilityForRoute
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan LULUS** — Run: `pnpm vitest --run shared/src/mcp-catalog.test.ts`
+- [x] **Step 2: Jalankan test, pastikan LULUS** — Run: `pnpm vitest --run shared/src/mcp-catalog.test.ts`
 
-- [ ] **Step 3: Buktikan `sessions:spawn` menahan, dengan server hidup**
+- [x] **Step 3: Buktikan `sessions:spawn` menahan, dengan server hidup**
 
 ```bash
 pnpm dev   # terminal lain
@@ -315,9 +315,38 @@ Expected: `isError: true`, pesan menyebut `sessions:spawn`. **Tak boleh ada sesi
 
 Lalu ulangi dengan token yang punya `sessions:spawn`: sesi lahir. Tutup lagi dengan `hanoman_session_delete`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add shared/src/mcp-catalog.test.ts docs/superpowers/plans/2026-08-25-mcp-4-katalog-sessions-backlog-projects.md
 git commit -m "test(mcp): daftar destruktif sessions/backlog/projects + bukti gerbang spawn"
 ```
+
+---
+
+## Catatan pelaksanaan (2026-08-25)
+
+**Tabel rencana ini memuat tiga tool yang TIDAK BOLEH dibuat.** `session_dialog_get`,
+`session_dialog_answer`, dan `session_dialog_takeover` sengaja di luar katalog MCP — SPEC-899 ·
+ADR-0142 menuliskannya di route-nya sendiri (`terminal.ts:352`): *agen yang bisa menjawab
+`AskUserQuestion` bisa menjawab pertanyaannya sendiri, dan gerbang "manusia yang terakhir
+memutuskan" runtuh lewat pintu itu.* `mcp-capability.test.ts` sudah menegakkannya dengan assert
+bahwa tak ada `samplePath` yang memuat `/dialog`. Ketiganya tidak dibungkus; sessions = 12, bukan 15.
+
+Penyimpangan lain:
+
+- **`binding` (GET/PUT/DELETE) dan `POST /clone` tak ada di tabel rencana** — gerbang cakupan yang
+  menemukannya. Projects = 12, bukan 8.
+- **Unduhan lampiran (`/specs/:id/attachments/:attId`, `/tickets/:id/attachments/:attId`) masuk
+  daftar dikecualikan**: byte mentah ber-`content-disposition`, sekelas `archive`.
+- **Dua invarian ADR-0099 §4 ditulis ulang, bukan dilonggarkan.** Yang lama berbunyi "tak ada tool
+  yang mengeksekusi"; penggantinya "yang MEMULAI pekerjaan di luar proses hanoman wajib menuntut
+  capability `danger` dan bermode `danger`". Mengendalikan sesi yang SUDAH ada (steer/interrupt)
+  sengaja tak termasuk — menahannya di `sessions:write` justru inti pemecahan ADR-0155.
+- **`session_integrate` bercapability `sessions:write`, bukan pecahan `danger`.** Ia hidup di bawah
+  prefix `terminal` sehingga petanya memberi `sessions:write`; tak ada `sessions:integrate`, dan
+  membuatnya berarti memecah domain demi satu endpoint. Ia tetap bermode `danger`.
+- `PRIORITY` di `mcp-schema` sudah berupa NODE skema, bukan array enum — `enumStr([...PRIORITY])`
+  melempar saat modul dimuat.
+
+Terukur sesudah rencana ini: **90 tool**, **79 route belum terbungkus**.
