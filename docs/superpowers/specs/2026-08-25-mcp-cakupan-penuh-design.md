@@ -97,10 +97,10 @@ agen yang **berniat** — token yang sama tetap bisa memanggil REST langsung. Ge
 adalah capability pada token (keputusan 2). Menyebut `--danger` sebagai kontrol keamanan di dokumen
 mana pun adalah kekeliruan yang harus dikoreksi.
 
-### 5. Katalog: 153 tool, dipecah per domain
+### 5. Katalog: 152 tool, dipecah per domain
 
 Satu tool per **niat kerja**, bukan per endpoint. Enumerasi penuh dari tabel route menghasilkan
-**153**. Dua perkiraan awal (~75, lalu 113) keliru dan tak berlaku; 153 adalah hasil enumerasi
+**152**. Dua perkiraan awal (~75, lalu 113) keliru dan tak berlaku; 152 adalah hasil enumerasi
 endpoint demi endpoint, dan lampiran di akhir dokumen ini memuat daftarnya.
 
 | Domain | Ada | Baru | Total | `danger` |
@@ -109,7 +109,7 @@ endpoint demi endpoint, dan lampiran di akhir dokumen ini memuat daftarnya.
 | docs/prd/changelog | 0 | +12 | 12 | 2 |
 | ide | 0 | +27 | 27 | 8 |
 | projects | 2 | +8 | 10 | 2 |
-| sessions | 1 | +16 | 17 | 4 |
+| sessions | 1 | +15 | 16 | 4 |
 | settings/config/scheduler | 0 | +11 | 11 | 0 |
 | agents | 0 | +5 | 5 | 1 |
 | lead | 2 | +8 | 10 | 1 |
@@ -118,9 +118,9 @@ endpoint demi endpoint, dan lampiran di akhir dokumen ini memuat daftarnya.
 | vps | 0 | +18 | 18 | 10 |
 | notifications | 2 | +1 | 3 | 1 |
 | `hanoman_about` | 1 | — | 1 | — |
-| **Total** | **17** | **+136** | **153** | **34** |
+| **Total** | **17** | **+135** | **152** | **34** |
 
-Dengan `--danger` mati, `tools/list` menampilkan **119 tool**.
+Dengan `--danger` mati, `tools/list` menampilkan **118 tool**.
 
 Penggabungan yang dipakai, dan hanya ini — semuanya menggabungkan endpoint yang berbeda hanya pada
 ada/tidaknya satu argumen, bukan yang berbeda niat: `GET /commit/:sha` + `/commit/:sha/file` → satu
@@ -172,7 +172,7 @@ Urutan langkah yang menjinakkannya:
 
 ### 7. Gerbang anti-drift: tiga assert baru di uji kontrak
 
-153 tool tak bisa dijaga dengan ketelitian manusia. `shared/src/mcp-catalog.test.ts` sudah menguji
+152 tool tak bisa dijaga dengan ketelitian manusia. `shared/src/mcp-catalog.test.ts` sudah menguji
 `samplePath`/`sampleMethod` tiap tool terhadap `capabilityForRoute` (ADR-0099 §3). Tiga assert baru:
 
 1. **Mode ⇔ capability.** Setiap tool yang menuntut capability pecahan (`*:spawn`, `ide:git`,
@@ -202,12 +202,12 @@ Plus test unit untuk gerbang body-aware keputusan 3.
 | Risiko | Mitigasi |
 |---|---|
 | Gateway Telegram mati saat upgrade | Urutan langkah keputusan 6 + kartu peringatan Settings + release note |
-| `tools/list` 119 tool membebani konteks klien | `--read-only` menyusutkannya; per-domain split memudahkan pemangkasan kelak |
+| `tools/list` 118 tool membebani konteks klien | `--read-only` menyusutkannya; per-domain split memudahkan pemangkasan kelak |
 | Gerbang body-aware `{stage}` luput dari uji kontrak | Test unit khusus, ditulis di ADR sebagai utang yang disadari |
 | `--danger` disalahpahami sebagai kontrol keamanan | Dinyatakan eksplisit di ADR, deskripsi tool, dan `hanoman_about` |
 | Integrasi pihak ketiga yang memakai token lama patah senyap | Breaking change diumumkan; 403 menyebut capability yang kurang (`checkAgentCapability` sudah mengembalikan `need`) |
 
-## Lampiran — daftar 153 tool
+## Lampiran — daftar 152 tool
 
 `D` = mode `danger`. `✓` = sudah ada hari ini.
 
@@ -234,11 +234,10 @@ Plus test unit untuk gerbang body-aware keputusan 3.
 `project_branches`, `help_center_get`, `help_center_set`, `help_center_delete`,
 `project_rename` D, `project_delete` D
 
-**sessions (17)** — `sessions_list` ✓, `session_phases`, `session_steer`, `session_interrupt`,
+**sessions (16)** — `sessions_list` ✓, `session_phases`, `session_steer`, `session_interrupt`,
 `session_dialog_get`, `session_dialog_answer`, `session_dialog_takeover`, `session_review`,
 `session_cleanups`, `session_history_list`, `session_history_get`, `session_history_transcript`,
-`session_create` D, `session_integrate` D, `session_delete` D, `session_history_clear` D,
-`session_attachments_list`
+`session_create` D, `session_integrate` D, `session_delete` D, `session_history_clear` D
 
 **settings (11)** — `settings_get`, `settings_set`, `config_get`, `config_set`, `config_unset`,
 `scheduler_state`, `scheduler_queue`, `scheduler_config_get`, `scheduler_config_set`,
