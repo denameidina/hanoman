@@ -11,7 +11,7 @@ import type { McpToolDef } from "./types";
  * menjadi `%2F` dan route wildcard Fastify tak lagi cocok — jebakan yang sama sudah ada di
  * `hanoman_backlog_doc_read`.
  */
-const encPath = (p: string) => String(p).split("/").map(enc).join("/");
+const encPath = (p: unknown) => String(p).split("/").map(enc).join("/");
 
 const PROJECT = str("Id project, mis. `hanoman`. Dapatkan dari hanoman_projects_list.");
 

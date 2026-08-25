@@ -196,6 +196,7 @@ const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "
 const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   "hanoman_docs_delete",       // menghapus berkas .md; capability tetap docs:write
   "hanoman_changelog_delete",  // menghapus entri changelog; capability tetap docs:write
+  "hanoman_ide_entry_delete",  // menghapus berkas/folder working tree; capability tetap ide:write
 ]);
 
 describe("mode ⇔ capability", () => {

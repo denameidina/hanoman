@@ -7,6 +7,7 @@ import { ABOUT_TOOLS } from "./about";
 import { PROJECTS_TOOLS } from "./projects";
 import { BACKLOG_TOOLS } from "./backlog";
 import { DOCS_TOOLS } from "./docs";
+import { IDE_TOOLS } from "./ide";
 import { SESSIONS_TOOLS } from "./sessions";
 import { NOTIFICATIONS_TOOLS } from "./notifications";
 import { SUPPORT_TOOLS } from "./support";
@@ -18,6 +19,7 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   ...PROJECTS_TOOLS,
   ...BACKLOG_TOOLS,
   ...DOCS_TOOLS,
+  ...IDE_TOOLS,
   ...SESSIONS_TOOLS,
   ...NOTIFICATIONS_TOOLS,
   ...SUPPORT_TOOLS,
