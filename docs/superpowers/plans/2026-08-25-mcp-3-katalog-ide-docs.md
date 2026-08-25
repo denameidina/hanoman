@@ -59,7 +59,7 @@
 
 `hanoman_docs_delete` dan `hanoman_changelog_delete` bermode `danger` **tanpa** capability `danger` — keduanya masuk `DESTRUCTIVE_BUT_WRITE` di Task 3.
 
-- [ ] **Step 1: Baca handler, turunkan parameter**
+- [x] **Step 1: Baca handler, turunkan parameter**
 
 ```bash
 sed -n '1,90p' server/src/routes/docs.ts
@@ -68,7 +68,7 @@ sed -n '20,95p' server/src/routes/changelog.ts
 
 Catat untuk tiap route: nama query string yang dibaca, bentuk body yang divalidasi, dan bentuk balasan. **Jangan lanjut sebelum ini dilakukan** — sisa task ini menuliskan apa yang kamu baca.
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 `shared/src/mcp-catalog.docs.test.ts`:
 
@@ -106,12 +106,12 @@ describe("katalog docs", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL**
+- [x] **Step 3: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.docs.test.ts`
 Expected: FAIL — modul `./mcp-catalog/docs` belum ada.
 
-- [ ] **Step 4: Tulis `docs.ts`**
+- [x] **Step 4: Tulis `docs.ts`**
 
 Kepala berkas:
 
@@ -162,7 +162,7 @@ Untuk dua tool `danger`, deskripsi **wajib** dibuka dengan penandaan:
       "BERBAHAYA — menghapus berkas dokumen secara permanen dari working tree project. Tak ada undo lewat hanoman; pemulihannya lewat git. Hanya muncul saat manusia menyalakan tingkat `--danger` di klien MCP ini.",
 ```
 
-- [ ] **Step 5: Rangkai di `index.ts`**
+- [x] **Step 5: Rangkai di `index.ts`**
 
 ```ts
 import { DOCS_TOOLS } from "./docs";
@@ -170,7 +170,7 @@ import { DOCS_TOOLS } from "./docs";
   ...DOCS_TOOLS,
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run shared/src/mcp-catalog.docs.test.ts shared/src/mcp-catalog.test.ts
@@ -178,7 +178,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS. Assert "setiap samplePath katalog memang menuntut capability yang diakui tool-nya" di `mcp-coverage.test.ts` adalah gerbang sesungguhnya di sini — ia membuktikan dua belas tool ini memang menuntut apa yang mereka klaim.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/docs.ts shared/src/mcp-catalog/index.ts shared/src/mcp-catalog.docs.test.ts
@@ -239,7 +239,7 @@ Tujuh tool bercapability `ide:git` **wajib** bermode `danger` — gerbang Rencan
 
 **Tidak dibungkus:** `POST /projects/:id/upload` (`ide.ts:183`) dan `GET /projects/:id/archive` (`ide.ts:321`) — sudah terdaftar di `UNWRAPPED` pada `server/test/mcp-coverage.test.ts`.
 
-- [ ] **Step 1: Baca handler, turunkan parameter**
+- [x] **Step 1: Baca handler, turunkan parameter**
 
 ```bash
 sed -n '82,200p'  server/src/routes/ide.ts
@@ -249,7 +249,7 @@ sed -n '371,540p' server/src/routes/ide.ts
 
 Perhatikan khusus: nama query pada `/file`, `/file-diff`, `/compare`, `/graph/search`; bentuk body pada `/entry`, `/git/*`, `/branches/delete`, `/worktrees/delete`. Beberapa handler menuntut konfirmasi eksplisit di body — kalau ada, jadikan ia parameter **wajib** bertipe boolean dengan deskripsi yang menyebut akibatnya, jangan diisi otomatis oleh `build`.
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 `shared/src/mcp-catalog.ide.test.ts`:
 
@@ -302,12 +302,12 @@ describe("katalog ide", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan GAGAL**
+- [x] **Step 3: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.ide.test.ts`
 Expected: FAIL — modul belum ada.
 
-- [ ] **Step 4: Tulis `ide.ts`**
+- [x] **Step 4: Tulis `ide.ts`**
 
 Kepala berkas:
 
@@ -375,7 +375,7 @@ Contoh entri `danger` — pola yang dipakai ketujuh tool `ide:git`:
   },
 ```
 
-- [ ] **Step 5: Rangkai di `index.ts`**
+- [x] **Step 5: Rangkai di `index.ts`**
 
 ```ts
 import { IDE_TOOLS } from "./ide";
@@ -383,7 +383,7 @@ import { IDE_TOOLS } from "./ide";
   ...IDE_TOOLS,
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan LULUS**
+- [x] **Step 6: Jalankan test, pastikan LULUS**
 
 ```bash
 pnpm vitest --run shared/src/mcp-catalog.ide.test.ts shared/src/mcp-catalog.test.ts
@@ -391,7 +391,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/ide.ts shared/src/mcp-catalog/index.ts shared/src/mcp-catalog.ide.test.ts
@@ -405,7 +405,7 @@ git commit -m "feat(mcp): 27 tool domain ide, tujuh di antaranya menuntut ide:gi
 **Files:**
 - Modify: `shared/src/mcp-catalog.test.ts` (`DESTRUCTIVE_BUT_WRITE`)
 
-- [ ] **Step 1: Tambahkan tiga nama ke daftar**
+- [x] **Step 1: Tambahkan tiga nama ke daftar**
 
 ```ts
 const DESTRUCTIVE_BUT_WRITE = new Set([
@@ -417,7 +417,7 @@ const DESTRUCTIVE_BUT_WRITE = new Set([
 
 Buang komentar "Diisi bertahap oleh Rencana 3–6 … Kosong sekarang BUKAN kelalaian" — ia sudah tak benar.
 
-- [ ] **Step 2: Tambahkan test tingkat mode dengan angka nyata**
+- [x] **Step 2: Tambahkan test tingkat mode dengan angka nyata**
 
 ```ts
 it("tingkat default menyembunyikan sepuluh tool berbahaya dari ide & docs", () => {
@@ -432,12 +432,12 @@ it("tingkat default menyembunyikan sepuluh tool berbahaya dari ide & docs", () =
 });
 ```
 
-- [ ] **Step 3: Jalankan test, pastikan LULUS**
+- [x] **Step 3: Jalankan test, pastikan LULUS**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.test.ts`
 Expected: PASS.
 
-- [ ] **Step 4: Uji ujung-ke-ujung terhadap server hidup**
+- [x] **Step 4: Uji ujung-ke-ujung terhadap server hidup**
 
 ```bash
 pnpm dev   # terminal lain
@@ -455,9 +455,32 @@ HANOMAN_MCP_DANGER=1 HANOMAN_HOST=… HANOMAN_AGENT_TOKEN=… node cli/dist/hano
 ```
 Expected: `isError: true`, pesannya menyebut `ide:git`. **Ini bukti bahwa tingkat mode bukan gerbangnya — capability-lah gerbangnya.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/mcp-catalog.test.ts docs/superpowers/plans/2026-08-25-mcp-3-katalog-ide-docs.md
 git commit -m "test(mcp): daftar destruktif ide & docs + bukti gerbang capability"
 ```
+
+---
+
+## Catatan pelaksanaan (2026-08-25)
+
+- **`GET /projects/:id/breakdown` ternyata `projects:read`, bukan `docs:read`.** Ia hidup di berkas
+  route `docs.ts`, tapi `capabilityForRoute` hanya memetakan sub-path `docs`/`prds`/`changelog` ke
+  `docs:*`. Ketahuan sebagai **test merah dari gerbang cakupan**, bukan sebagai 403 di produksi —
+  ini pembayaran pertama gerbang itu.
+- **Snapshot kontrak dikerjakan ulang.** Assertion lama memakai `toEqual` atas seluruh daftar tool,
+  sehingga memperlakukan PENAMBAHAN sebagai pemutusan — lebih ketat daripada kontrak
+  `MCP_TOOL_SCHEMA_VERSION` sendiri, yang menyebut penambahan bersifat aditif. Satu-satunya cara
+  melewatinya adalah menyunting daftar itu tiap kali, yang justru melatih orang mengabaikannya.
+  Sekarang yang dijaga persis yang memutus klien lama: tiap tanda tangan v1 masih ada dengan
+  parameter wajib yang sama.
+- **Assertion method lama dilonggarkan dengan sengaja.** `mcp-capability.test.ts` membatasi
+  `sampleMethod` ke GET/POST/PATCH; menulis & menghapus dokumen memakai PUT/DELETE. Yang dulu
+  dijaga baris itu sudah pindah ke gerbang mode⇔capability dan ke pemetaan `capabilityForRoute`.
+- Angka tool total di test tak lagi hardcode — ia diturunkan dari katalog, karena katalog memang
+  akan terus tumbuh.
+- `encPath` sempat bertipe `string` padahal menerima `unknown`; typecheck yang menangkapnya, bukan test.
+
+Terukur sesudah rencana ini: **56 tool**, 166 route terjangkau, **112 belum terbungkus**.
