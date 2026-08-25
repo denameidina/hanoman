@@ -64,6 +64,12 @@ function Bar({ spec }: { spec: TimelineBarSpec }) {
         // Minimum PIKSEL, bukan persen: memaksanya ke persen membuat batang satu hari di zoom
         // bulan tampak lebih panjang dari waktunya.
         minWidth: 3,
+        // `minHeight` WAJIB dinyatakan: di `pointer: coarse` dan di bawah 768 px, `app.css`
+        // menaikkan setiap `button` ke `min-height: var(--touch-target)` (44 px). Batang 44 px di
+        // baris 34 px meluber menimpa baris berikutnya, dan jsdom tak memuat stylesheet — nol
+        // test akan merah. Inline menang atas selector mana pun; pola yang sama sudah dipakai
+        // `SessionHistoryModal.tsx`, `TerminalScreen.tsx`, `GitGraph.tsx`, `VpsScreen.tsx`.
+        minHeight: ROW_H - BAR_INSET * 2,
         display: "flex", alignItems: "center", padding: 0, overflow: "hidden",
         background: tone.bg, border: `1px solid ${tone.border}`,
         // Sudut SIKU di sisi yang terpotong — batang terpotong yang tak mengaku terpotong

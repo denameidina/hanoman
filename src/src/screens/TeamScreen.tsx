@@ -37,8 +37,11 @@ const COLUMN_LIMIT = 200;
 // dibangun server di luar jadwal, dan sebelas dari dua belas langsung dibuang.
 const Q_DEBOUNCE_MS = 400;
 
-// Item E (Lintas project) menambahkan entri ke array yang SAMA — bukan memasang mekanisme baru.
-const TEAM_VIEWS = [
+/* Item E (Lintas project) menambahkan entri ke array yang SAMA — bukan memasang mekanisme baru.
+   Diekspor supaya `team-screen.test.tsx` bisa menegakkan cermin `TEAM_VIEWS` ↔ cabang render:
+   entri yang tak punya cabangnya sendiri merender permukaan mode LAIN di bawah pilnya, 200 dan
+   nol error — kelas bug yang sama yang dijaga `changelog-nav.test.tsx` untuk `HN_NAV`. */
+export const TEAM_VIEWS = [
   { value: "board", label: "Papan", icon: "kanban" },
   // SPEC-948 · `gantt-chart` → `GanttChart` DIVERIFIKASI ada di lucide 0.400.0: SPEC-906
   // menunjukkan nama yang salah jatuh ke `Circle` tanpa satu pun galat, di ±123 call site sekaligus.

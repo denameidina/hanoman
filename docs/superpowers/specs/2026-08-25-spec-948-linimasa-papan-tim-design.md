@@ -58,6 +58,7 @@ Yang senyap harus bisa diuji tanpa jsdom.
 
 ```
 team-rules.ts        aritmetika: taskSpan · timelineWindow · barGeometry · todayOffset · timelineRows
+                     (plus taskDates, dipindah ke sini dari team-board.tsx)
 team-timeline.tsx    piksel: TimelineCanvas (generik) + TeamTimeline (mode task)
 TeamScreen.tsx       toolbar: satu entri TEAM_VIEWS + satu Select zoom + satu cabang render
 ```
@@ -249,7 +250,8 @@ pengetahuan tentang task hidup di `TeamTimeline` yang membungkusnya.
   `--radius-*`, `--text-*`). Nol nilai hex baru.
 
 **`TeamTimeline`** membangun `rows` dari task: label = judul + assignee, `meta` = rentang tanggal
-(memakai `taskDates()` yang sudah ada di `team-board.tsx`, diekspor ulang — bukan disalin), batang
+(memakai `taskDates()`, yang **dipindah** dari `team-board.tsx` ke `team-rules.ts` supaya kanvas tak
+perlu mengimpor papan — dipindah, bukan disalin), batang
 ber-`tone: "err"` bila `invalid`, `onClick` membuka `TaskModal`. Di bawah kanvas, dua daftar yang
 hanya muncul saat berisi: **"Belum dijadwalkan (N)"** dan **"Di luar jendela (N)"** — keduanya
 memakai baris ringkas yang bisa diklik, dan yang kedua membawa saran zoom yang lebih lebar.

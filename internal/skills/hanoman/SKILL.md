@@ -189,10 +189,10 @@ Pakai skill lebih sempit saat task cocok:
   repoDir/cwd datang apa adanya, jadi tanpa `realpath` baris tak pernah cocok dengan sesinya —
   **senyap**; dan entri `.trash` tak bisa di-assert keberadaannya di test karena `releaseWorktree`
   menendang penyapunya seketika — yang membuktikan ia dipindah adalah bentuk namanya `<sesi>.<stempel>`.
-- **Papan Tim — kerja MANUSIA, papan LAIN** (SPEC-945/946/947 · **ADR-0150**+**ADR-0151**+**ADR-0152**; menegakkan
+- **Papan Tim — kerja MANUSIA, papan LAIN** (SPEC-945/946/947/948 · **ADR-0150**+**ADR-0151**+**ADR-0152**+**ADR-0153**; menegakkan
   ADR-0008/0024, 0145/0039, 0107, 0115, 0094, 0127; **nol kolom** ditambahkan ke `Spec`, jadi
   larangan tenggat/estimasi SPEC-162 utuh): dua entity tersync `Task` & `Member`, plus layar `Tim`
-  ber-mode Papan. Kolomnya `Task.status` (`backlog·doing·review·done`) — **milik manusia**, jadi
+  ber-mode **Papan dan Linimasa**. Kolomnya `Task.status` (`backlog·doing·review·done`) — **milik manusia**, jadi
   `canDropTask` **membalik** `canDrop` board Backlog alih-alih menyempitkannya: keempat kolom saling
   menerima dan yang tersisa satu larangan (`from !== to`). `Member.id` **deterministik dari email
   ternormalisasi** (pola ADR-0094) → `email` **immutable**, ditegakkan dua lapis karena `.omit()`
@@ -228,8 +228,22 @@ Pakai skill lebih sempit saat task cocok:
   papan project lain merender lencana `SPEC-nnn` milik project asal, 200 dan nol error. Kartu
   tertaut karena itu menolak `400` untuk `projectId` berbeda (termasuk `null`), dan pagarnya
   **lepas** begitu tautannya dilepas.
-  Item **D** (Linimasa) & **E** (Lintas project) **tak bisa** menumpang topik ini apa adanya —
-  sumbunya tanggal, bukan `order`.
+  **Dikoreksi ADR-0153:** dugaan bahwa item **D**/**E** butuh topik sendiri karena "sumbunya
+  tanggal, bukan `order`" **terbantah** — item D memakai `board` yang sudah dilanggan apa adanya,
+  nol topik baru dan nol fetch baru. Yang menumpang bukan sumbunya, melainkan **himpunan
+  task**-nya; sumbu waktu lahir di klien dari tanggal yang sudah ikut di tiap baris. Jangan
+  membangun parameter rentang tanggal untuk item E sebelum membuktikan `board` benar-benar tak
+  cukup.
+  Mode **Linimasa** (SPEC-948 · **ADR-0153**) menghamparkan task yang sama di sumbu waktu, dan
+  seluruh aritmetikanya fungsi **murni** di `team-rules.ts` dengan `today` **selalu argumen**.
+  Empat aturan yang gagal **senyap** kalau dilupakan: akhir tanggal **inklusif** (tanpa `+1 hari`
+  task sehari berlebar NOL dan kartunya seolah tak bertanggal); "belum dijadwalkan" berarti
+  **kedua** tanggal null, satu tanggal saja tetap batang sehari; tenggat yang mendahului mulai
+  **digambar + ditandai**, bukan ditukar; dan tick berplafon 120 dengan task di luar jendela
+  **DIDAFTAR**, bukan dihilangkan. Batangnya `<button>`, jadi `minHeight` **wajib** inline —
+  `app.css` menaikkan tiap `button` ke 44 px di layar sentuh dan jsdom tak memuat stylesheet, jadi
+  nol test akan merah. `TimelineCanvas` sengaja tak menyebut `Task` dan menerima `bars` **jamak**
+  supaya item E memakainya ulang.
 - **Backlog bisa ditandai selesai MANUAL** (SPEC-804/**ADR-0120**; ADR-0008 & ADR-0047 & ADR-0099 &
   ADR-0105 ditegakkan, **ADR-0103 diamandemen**): `POST /specs/:id/done` `{reason?, confirm?}`
   memajukan satu item ke `done` tanpa sesi — untuk pekerjaan yang beres DI LUAR sesi (dikerjakan

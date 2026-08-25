@@ -6,6 +6,7 @@
 - Memperluas: ADR-0150 (fondasi `Task`/`Member`)
 - Menegakkan: ADR-0145/ADR-0039 (topik berparameter), ADR-0107 (limit adalah plafon), ADR-0115 (state tampilan persisten), ADR-0127 (konfirmasi destruktif), ADR-0094 (id deterministik)
 - Mengamandemen: ADR-0150 pada permukaan `GET /api/tasks` (parameter `q`)
+- **Diamandemen: ADR-0153** — konsekuensi "Linimasa (item D) tidak bisa menumpang topik `tasks`" di bawah **terbantah**; item D memakai `board` yang sudah dilanggan apa adanya
 
 ## Konteks
 
@@ -148,9 +149,10 @@ ikut terhapus (`onDelete: SetNull`).
 - Papan hidup di atas langganan berbatas tanpa pernah berbohong tentang batasnya.
 - `GET /api/tasks` dan topik `tasks` punya satu parameter tambahan; keduanya tetap satu serializer
   (`buildTasksPage`), jadi tak ada kebenaran kedua yang bisa drift.
-- Empat berkas UI terpisah sejak awal (`team-rules.ts` · `team-board.tsx` · `TaskModal.tsx` ·
-  `MembersPanel.tsx` · `TeamScreen.tsx`) — `BacklogScreen` 63 KB dan `TerminalScreen` 57 KB adalah
-  pelajaran yang tak perlu diulang.
+- Berkas UI terpisah sejak awal (`team-rules.ts` · `team-board.tsx` · `TaskModal.tsx` ·
+  `MembersPanel.tsx` · `TeamScreen.tsx`; ADR-0152 menambah `EscalateDialog.tsx` dan ADR-0153
+  `team-timeline.tsx`) — `BacklogScreen` 63 KB dan `TerminalScreen` 57 KB adalah pelajaran yang
+  tak perlu diulang.
 - `HN_NAV` bertambah satu entri, dan cabang `section === "team"` di `App.tsx` **wajib** menyertainya
   dalam commit yang sama: tanpa itu App merender kosong dan sidebar ikut lenyap (kelas bug
   `runs`/`triggers`, SPEC-162). Dijaga `src/test/changelog-nav.test.tsx`.
@@ -162,6 +164,14 @@ bertanggal dalam satu jendela waktu, bukan 200 teratas per kolom — dan sumbuny
 `order`, sehingga potongan `order asc` memotong justru di dimensi yang salah. Item D harus memilih
 salah satu dengan sadar: parameter rentang tanggal pada topik yang sama, topik baru, atau muat HTTP
 tanpa langganan. Keputusan itu **tidak** dibuat di sini.
+
+> **TERBANTAH oleh ADR-0153 (2026-08-25).** Paragraf di atas salah menempatkan masalahnya di
+> **sumbu**, padahal yang menumpang adalah **himpunan task**-nya: sumbu waktu lahir di klien dari
+> `startDate`/`dueDate` yang sudah ikut di tiap baris `TaskView`. Item D karena itu memilih
+> opsi **keempat** yang tak terdaftar di sini — membaca `board` yang sudah dilanggan per kolom,
+> nol topik baru, nol langganan baru, nol fetch baru. Plafon 200/kolom tetap berlaku dan tetap
+> dirender. Yang masih berdiri hanya paragraf item **E** di bawah, dan itu pun perlu dibuktikan
+> sebelum permukaan baru dibangun.
 
 **Lintas project (item E)** menghitung `min(startDate)`/`max(dueDate)` per project — agregat, jadi
 plafon 200 per kolom sama sekali bukan bahan yang benar. Ia hampir pasti butuh permukaan sendiri.
@@ -184,6 +194,8 @@ nilainya truthy, jadi `projectId: null` tak bisa dinyatakan sebagai query tanpa 
 ke kontrak. Kartu tanpa project tetap terlihat di "Semua project" dan diberi label `tanpa project`;
 barisnya sendiri adalah item **E**, yang memang memerlukannya.
 
-**Mode tampilan tanpa mekanisme.** `TEAM_VIEWS` hari ini berisi satu entri (`board`) dan tetap
-dirender sebagai tablist ber-`usePersistedState` (ADR-0115). Item D dan E menambahkan entri ke array
-yang **sama** — bukan memasang mekanisme baru pada layar yang sudah dipakai orang.
+**Mode tampilan tanpa mekanisme.** `TEAM_VIEWS` berisi satu entri (`board`) saat ADR ini ditulis —
+ADR-0153 menambahkan `timeline` — dan tetap dirender sebagai tablist ber-`usePersistedState`
+(ADR-0115). Item D dan E menambahkan entri ke array yang **sama** — bukan memasang mekanisme baru
+pada layar yang sudah dipakai orang. Sejak entri kedua, cermin `TEAM_VIEWS` ↔ cabang render dijaga
+test kontrak di `src/test/team-screen.test.tsx`.

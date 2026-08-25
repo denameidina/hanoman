@@ -16,7 +16,7 @@ vi.mock("../src/api/live", () => ({
   useEventsStatus: () => ({ connected: true, since: 0, paused: false }),
 }));
 
-import { TeamScreen } from "../src/screens/TeamScreen";
+import { TeamScreen, TEAM_VIEWS } from "../src/screens/TeamScreen";
 import { api } from "../src/api/client";
 
 const task = (over: Partial<TaskView> = {}): TaskView => ({
@@ -272,5 +272,29 @@ describe("TeamScreen · mode Linimasa", () => {
     fireEvent.click(await screen.findByRole("tab", { name: /linimasa/i }));
     fireEvent.click(await screen.findByTestId("timeline-bar-t1"));
     expect(await screen.findByLabelText("Judul tugas")).toHaveValue("Desain");
+  });
+});
+
+/* Cermin `TEAM_VIEWS` ↔ cabang render. Kelas bug yang dijaga `changelog-nav.test.tsx` untuk
+   `HN_NAV`: entri yang tak punya cabangnya sendiri merender permukaan mode LAIN di bawah pilnya —
+   200, nol error, dan tak ada yang menyadarinya. SPEC-948 adalah entri KEDUA, yaitu saat cermin
+   ini lahir; item E yang menambahkan entri ketiga harus lewat sini dengan sadar. */
+describe("TeamScreen · kontrak mode tampilan", () => {
+  const SURFACES = ["team-board", "team-timeline"];
+
+  it("tiap mode TEAM_VIEWS merender permukaannya SENDIRI, tak ada dua yang berbagi", async () => {
+    view();
+    await screen.findByTestId("team-board");
+    const rendered = new Map<string, string>();
+    for (const v of TEAM_VIEWS) {
+      fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${v.label}$`, "i") }));
+      const hit = SURFACES.filter((id) => screen.queryByTestId(id));
+      expect(hit, `mode "${v.value}" tak merender satu pun permukaan yang dikenal — `
+        + "tambahkan cabangnya di TeamScreen DAN testid-nya ke SURFACES").toHaveLength(1);
+      rendered.set(v.value, hit[0]!);
+    }
+    expect(new Set(rendered.values()).size,
+      `dua mode berbagi permukaan yang sama: ${JSON.stringify([...rendered])}`)
+      .toBe(TEAM_VIEWS.length);
   });
 });

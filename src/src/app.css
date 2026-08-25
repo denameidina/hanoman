@@ -107,11 +107,15 @@ textarea:focus-visible,
 .hn-modal-footer { flex-wrap: wrap; padding-bottom: calc(14px + var(--safe-bottom)); }
 .hn-board-local-overflow { max-width: 100%; overscroll-behavior-inline: contain; }
 /* SPEC-948 · kanvas linimasa. Gulir mendatar hidup DI SINI, tak pernah di badan halaman
-   (SPEC-879), dan `overscroll-behavior` menahannya agar tak merembet keluar saat kanvas mentok. */
+   (SPEC-879); `overflow-x`, `min-width`, dan `max-width` justru dinyatakan INLINE karena jsdom tak
+   memuat stylesheet dan properti yang hanya hidup di sini dijaga nol test.
+
+   `-inline`, bukan shorthand dua sumbu: kanvas ini `overflow-y: auto` DAN punya saudara di
+   bawahnya ("belum dijadwalkan", "di luar jendela") yang digulir `.hn-shell-main`. Menahan sumbu-Y
+   memutus rantai gulir ke daftar yang justru ada supaya baris yang tak muat tidak hilang — cermin
+   `.hn-board-local-overflow`, `.hn-local-overflow`, `.hn-tabs`, `.hn-ide-toolbar`. */
 .hn-timeline-scroll {
-  max-width: 100%;
-  min-width: 0;
-  overscroll-behavior: contain;
+  overscroll-behavior-inline: contain;
   -webkit-overflow-scrolling: touch;
 }
 .hn-row-actions { flex-wrap: wrap; }

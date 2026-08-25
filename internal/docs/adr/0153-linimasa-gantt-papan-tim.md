@@ -3,7 +3,8 @@
 Tanggal: 2026-08-25
 Status: diterima
 SPEC: SPEC-948 (item **D** dari design induk ADR-0150)
-Terkait: ADR-0150 (fondasi `Task`/`Member`) · ADR-0151 (papan, langganan per kolom) · ADR-0152 (eskalasi) · SPEC-879 (gulir lokal) · SPEC-906 (nama ikon lucide)
+**Mengamandemen ADR-0151** (konsekuensi "item D tak bisa menumpang topik `tasks`" — lihat keputusan 10)
+Terkait: ADR-0150 (fondasi `Task`/`Member`) · ADR-0152 (eskalasi) · ADR-0115 (state tampilan persisten) · ADR-0131 (nilai basi, bukan layar galat) · SPEC-879 (gulir lokal) · SPEC-906 (nama ikon lucide)
 
 ## Konteks
 
