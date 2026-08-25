@@ -6,7 +6,7 @@ import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
 import { Shell, NAV_KEYS, NavGate, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
-import { api, ApiError, type TerminalSession } from "./api/client";
+import { api, ApiError, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView } from "@hanoman/shared";
 import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
@@ -1143,18 +1143,25 @@ export default function App() {
   }
 
   // SPEC-546 · ADR-0109 · ubah type/source item in-place — id SPEC-nnn, riwayat, dan dependency
-  // tetap. 409 = gerbang flow (item sudah dimulai, tujuannya beda alur kerja); 400 = bentuk
-  // payload tak cocok source tujuan.
-  async function changeSourceOfSpec(spec: Spec, source: string, payload?: unknown) {
+  // tetap. 400 = bentuk payload tak cocok source tujuan.
+  // ADR-0149 · perpindahan LINTAS-ALUR pada item yang sudah dimulai menjawab rencana reset. Ia
+  // DIKEMBALIKAN ke dialog alih-alih ditelan toast: yang perlu dilihat operator adalah daftar
+  // konkret apa yang hilang, dan itu tak muat di toast. 409 = sesi masih berjalan.
+  async function changeSourceOfSpec(
+    spec: Spec, source: string, payload?: unknown, confirmReset?: boolean,
+  ): Promise<SourceResetPending | null> {
     try {
-      const updated = await api.changeSpecSource(spec.id, { source, payload });
-      setBacklog((b) => b.map((s) => (s.id === updated.id ? updated : s)));
+      const res = await api.changeSpecSource(spec.id, { source, payload, confirmReset });
+      if ("pending" in res) return res;
+      setBacklog((b) => b.map((s) => (s.id === res.id ? res : s)));
       showToast(`${spec.id} · type ${spec.source} → ${source}`, "ok", "shuffle");
+      return null;
     } catch (e) {
-      const locked = e instanceof ApiError && e.status === 409;
-      showToast(locked
-        ? `${spec.id} sudah dimulai — type hanya bisa pindah ke alur kerja yang sama`
+      const live = e instanceof ApiError && e.status === 409;
+      showToast(live
+        ? `${spec.id} punya sesi yang masih berjalan — tutup dulu sesinya`
         : `Gagal mengubah type ${spec.id}`, "warn", "x-circle");
+      return null;
     }
   }
 
