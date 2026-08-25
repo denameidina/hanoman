@@ -184,3 +184,38 @@ describe("api client · dialog sesi", () => {
     }));
   });
 });
+
+// SPEC-946 · papan tim. Path-nya sudah ada sejak SPEC-945 (`shared/src/api.ts`); yang belum ada
+// fungsi klien yang memakainya.
+describe("api client · papan tim", () => {
+  const stub = (payload: unknown) => vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+    new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } }));
+
+  it("listTasks membuang penyaring kosong dari query", async () => {
+    const f = stub({ items: [], total: 0, page: 1, pageSize: 0 });
+    await api.listTasks({ projectId: "p1", status: "doing", q: "", page: 1, limit: 200 });
+    expect(f.mock.calls[0]![0]).toBe(`${paths.tasks}?projectId=p1&status=doing&page=1&limit=200`);
+  });
+
+  it("createTask mem-POST body apa adanya", async () => {
+    const f = stub({ id: "t1" });
+    await api.createTask({ title: "Desain", projectId: "p1" });
+    expect(f.mock.calls[0]![0]).toBe(paths.tasks);
+    expect(JSON.parse(f.mock.calls[0]![1]!.body as string)).toEqual({ title: "Desain", projectId: "p1" });
+  });
+
+  it("patchTask memakai id ter-encode", async () => {
+    const f = stub({ id: "t 1" });
+    await api.patchTask("t 1", { status: "done" });
+    expect(f.mock.calls[0]![0]).toBe("/api/tasks/t%201");
+    expect(f.mock.calls[0]![1]!.method).toBe("PATCH");
+  });
+
+  // `Member.id` adalah email ternormalisasi, jadi ia SELALU memuat "@" — path yang tak di-encode
+  // adalah cara id anggota mulai hilang di tengah URL.
+  it("patchMember meng-encode id yang berupa email", async () => {
+    const f = stub({ id: "a@x.id" });
+    await api.patchMember("a@x.id", { name: "A" });
+    expect(f.mock.calls[0]![0]).toBe("/api/members/a%40x.id");
+  });
+});

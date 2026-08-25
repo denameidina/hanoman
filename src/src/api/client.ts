@@ -2,7 +2,9 @@ import { paths, type Paginated, type ProjectView, type Spec, type Setting, type 
   type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
   type ProvisionStep, type ProvisionResult,
   type SessionDialogAnswer, type SessionDialogPayload,
-  type SetupStatus, type SetupApplyResult } from "@hanoman/shared";
+  type SetupStatus, type SetupApplyResult,
+  type TaskView, type MemberView, type CreateTaskInput, type PatchTaskInput,
+  type CreateMemberInput, type PatchMemberInput } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -566,6 +568,21 @@ export const api = {
   editTicket: (id: string, input: TicketEditInput) =>
     j<TicketDetail & { spec: Spec | null }>(paths.ticket(id), { method: "PATCH", ...body(input) }),
   deleteTicket: (id: string) => j<{ ok: boolean }>(paths.ticket(id), { method: "DELETE" }),
+  // SPEC-945 · ADR-0150 · papan kerja MANUSIA. Bukan backlog: `status` di sini milik manusia,
+  // sementara `Spec.stage` diturunkan dari fase sesi. `members` GLOBAL, bukan per project —
+  // task boleh tanpa project (ADR-0150 keputusan 3).
+  listTasks: (p: { projectId?: string; status?: string; memberId?: string; q?: string; page?: number; limit?: number } = {}) =>
+    j<Paginated<TaskView>>(paths.tasks + qs(p)),
+  createTask: (b: CreateTaskInput) => j<TaskView>(paths.tasks, { method: "POST", ...body(b) }),
+  patchTask: (id: string, b: PatchTaskInput) => j<TaskView>(paths.task(id), { method: "PATCH", ...body(b) }),
+  deleteTask: (id: string) => j<void>(paths.task(id), { method: "DELETE" }),
+  listMembers: (p: { active?: boolean; page?: number; limit?: number } = {}) =>
+    j<Paginated<MemberView>>(paths.members + qs(p)),
+  createMember: (b: CreateMemberInput) => j<MemberView>(paths.members, { method: "POST", ...body(b) }),
+  // `email` sengaja tak ada di `PatchMemberInput`: id diturunkan darinya dan changefeed sync tak
+  // punya operasi rename (ADR-0094/ADR-0150). Route menolaknya lagi dengan 400.
+  patchMember: (id: string, b: PatchMemberInput) => j<MemberView>(paths.member(id), { method: "PATCH", ...body(b) }),
+  deleteMember: (id: string) => j<void>(paths.member(id), { method: "DELETE" }),
   // SPEC-471 · ADR-0095 · tarik & triase issue GitHub. hanoman tak pernah menulis ke GitHub.
   // SPEC-523 · amplop Paginated (cermin listTickets).
   listGithubIssues: (projectId: string, p: { status?: string; page?: number; limit?: number } = {}) =>
