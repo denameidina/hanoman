@@ -854,6 +854,65 @@ Cermin lokal issue GitHub sebuah project — **pola `Ticket`** (ADR-0062): siste
   mesin. Kolom yang terlewat di `FIELDS` mendarat sebagai **default palsu** tanpa satu pun error
   (kelas ADR-0090/0093/0094).
 
+## Member / Task (SPEC-945 · [ADR-0150](../adr/0150-fondasi-papan-tim-task-member.md))
+
+Lapisan kerja **manusia** di sekitar pekerjaan agen: desain, meeting klien, deploy, nego, tulis
+konten, urusan internal tim. Sengaja **bukan** `Spec` — kolom papan di sini milik manusia dan bebas
+dipindah, sementara `Spec.stage` diturunkan dari fase sesi
+([ADR-0008](../adr/0008-stage-mirrors-run.md)/[ADR-0024](../adr/0024-sesi-interaktif-menggantikan-run.md))
+dan karena itu hampir seluruhnya menolak drag. Larangan estimasi & tenggat di `Spec` (SPEC-162)
+tetap berlaku utuh: yang dilonggarkan hanya untuk pekerjaan manusia, di tabel yang berbeda. Tak satu
+kolom pun ditambahkan ke `Spec`.
+
+`Member` — direktori orang, **GLOBAL** (bukan per project: `Task` boleh tanpa project, dan orang
+yang sama lazim melintasi beberapa project):
+
+| Kolom | Arti |
+|---|---|
+| `id` | **DETERMINISTIK**: email ternormalisasi `lowercase + trim`. Pola `CustomAgent` ([ADR-0094](../adr/0094-custom-agent-katalog-materialisasi-native.md)) |
+| `name` | bebas diedit |
+| `email` | **IMMUTABLE** — ganti email = hapus + buat baru. `@unique`; menyimpan yang diketik operator, bukan bentuk ternormalisasi |
+| `role` | label bebas ("desainer", "backend") — **BUKAN RBAC** |
+| `active` | nonaktif tetap terlihat, cuma di urutan bawah: kartu lama yang ditugaskan padanya harus tetap punya nama |
+| `version` | version-stamp sync ([ADR-0045](../adr/0045-skema-sync-synclog-version-stamp.md)) |
+
+`Task` — satuan kerja manusia:
+
+| Kolom | Arti |
+|---|---|
+| `projectId` | **NULLABLE**. `null` = tugas internal tim, tanpa project. FK `onDelete: Cascade` |
+| `status` | `backlog` · `doing` · `review` · `done` — empat kolom papan, tetap |
+| `priority` | kosakata yang SAMA dengan `Spec`: `tinggi` · `sedang` · `rendah` (default `sedang`) |
+| `memberId` | `null` = belum ditugaskan. FK `onDelete: **SetNull**` — menghapus anggota tak menghapus pekerjaannya |
+| `startDate` / `dueDate` | rencana yang diisi manusia; batang Gantt. **Tak ada tanggal aktual** |
+| `order` | `Float`. Drop di antara dua kartu menulis titik tengah tetangganya — tak ada reindex kolom, dan dua mesin yang menulis bersamaan tetap menghasilkan urutan yang sama. Seri dipecah `id` |
+| `specId` | soft-link hasil eskalasi, **TANPA FK** (cermin `Ticket.specId`, [ADR-0062](../adr/0062-help-center-tiket-publik-triase.md)): changefeed bisa memancarkan `Task` sebelum `Spec`-nya mendarat (kelas SPEC-382) dan FK akan menolaknya. **Tak bisa ditulis lewat CRUD** |
+
+Indeks: `[projectId, status]` (papan per project) dan `[memberId]` ("tugas saya").
+
+**Tak ada kolom `stage`.** Cermin stage backlog dihitung **saat baca** lewat join `specId → Spec.stage`.
+Aturan [ADR-0090](../adr/0090-stempel-waktu-backlog-created-started.md) bukan "selalu simpan"
+melainkan *bisakah dihitung ulang dari sumber lain*; di sini bisa, jadi kolom kedua hanya
+menciptakan dua kebenaran yang bisa drift.
+
+**Tak ada `doneAt` dan tak ada stempel transisi kolom.** Gantt yang dipilih rencana-saja, jadi
+tanggal aktual belum punya pembaca. Dihilangkan dengan sengaja, bukan terlupa — menambahkannya
+nanti adalah migration additif biasa.
+
+**"Tugas saya" tanpa menautkan tabel:** `Member.email` dicocokkan dengan `User.email` akun yang
+login. String, bukan FK — jadi tak ada masalah `User` yang LOCAL-only dan tak perlu role baru.
+
+**Sync.** Keduanya **ikut menyeberang** (`SYNCED`), dengan seluruh kolom bermakna di `FIELDS`
+(`version` tak pernah ikut — ia stempel mekanismenya sendiri), `task:order` di `NUMBER_FIELDS`,
+`member:active` di `BOOLEAN_FIELDS`, `PARENTS.task` menunjuk **dua** induk (`project` & `member`),
+dan `BOOTSTRAP_ORDER` menaruh `member` **sebelum** `task` — urutan yang salah bootstrap sukses
+tanpa error tapi assignee kosong (kelas SPEC-885). `Member` sendiri tak punya induk. Di luar
+`sync.ts`, `PG_ORDER` (`cli/src/commands/migrate-pg.ts`) juga wajib memuat keduanya.
+
+**Webhook keluar sengaja tidak memancarkan keduanya**: `WEBHOOK_ENTITIES` adalah registry eksplisit.
+Konsekuensinya `data.cascade` pada `project.deleted` **kurang melaporkan** task yang ikut terhapus —
+dinyatakan, bukan terlupa (lihat ADR-0150 keputusan 11).
+
 ## Changelog (SPEC-516 · [ADR-0105](../adr/0105-changelog-per-project.md))
 Changelog naratif per project yang **sudah dibangkitkan** — teks pendek berorientasi pemakai, hasil
 dari salah satu tiga mode: rentang tanggal atas backlog `done` (`Spec.doneAt`), rentang SHA commit,

@@ -1506,6 +1506,74 @@ POST /api/github-issues/:id/unlink  -> 200 { id, status:"new", specId:null } · 
 > (`kind: secret`, melayani jalur `gh` **dan** REST) + `HANOMAN_GH_BIN` (default `gh`); `hanoman doctor`
 > melaporkan `gh` sebagai probe **non-fatal**. **UI:** tab kedua di layar Triase, bukan layar baru.
 
+## Papan tim (SPEC-945 · [ADR-0150](../adr/0150-fondasi-papan-tim-task-member.md)) — **COOKIE_ONLY**
+```
+# Kerja MANUSIA di sekitar pekerjaan agen. `Task.status` milik manusia dan bebas dipindah, beda
+# dari `Spec.stage` yang diturunkan dari fase sesi (ADR-0008/0024). Tak satu kolom pun ditambahkan
+# ke `Spec` — larangan estimasi/tenggat SPEC-162 utuh.
+#
+# Tak ada entri di `capabilityForRoute` maupun `clientRouteAllowed` — KEDUANYA deny-by-default
+# (ADR-0065 · ADR-0110), jadi papan tim tertutup bagi agent token DAN role `client` tanpa satu
+# baris pun. Itu keputusan, bukan kelalaian; ditegakkan test, bukan diasumsikan.
+
+GET    /api/members?active&page&limit   -> Paginated<MemberView>
+#   Urutan: aktif dulu, lalu nama asc. Nonaktif TETAP terlihat — kartu lama yang ditugaskan
+#   padanya harus tetap punya nama, dan menyembunyikannya membuat assignee terbaca sebagai id.
+#   Beramplop `Paginated` seperti daftar lain (ADR-0107); tanpa `limit` ia satu halaman berisi
+#   semuanya (pageSize = total), jadi pemilih assignee tetap dapat daftar penuh.
+#   MemberView = { id, name, email, role, active, createdAt, updatedAt }
+POST   /api/members       { name, email, role? }  -> 201 MemberView
+#   `id` DITURUNKAN dari email ternormalisasi (lowercase+trim), bukan dikirim klien — pola
+#   CustomAgent (ADR-0094). 409 { error, id } bila email itu sudah terdaftar, TERMASUK bila
+#   ejaannya beda kapitalisasi: dua baris untuk satu orang adalah persis yang dicegah id ini.
+#   400 email cacat / nama kosong.
+PATCH  /api/members/:id   { name?, role?, active? }  -> MemberView
+#   `email` DITOLAK 400 secara eksplisit, bukan diabaikan: id diturunkan darinya dan changefeed
+#   tak punya operasi rename, jadi id yang berubah meninggalkan baris yatim di setiap mesin lain
+#   (ADR-0094 keputusan 2). "Diterima lalu tak terjadi apa-apa" adalah bug yang tak terlihat
+#   operator — itu sebabnya penolakannya lapis kedua di ATAS `.omit()` skemanya. 404 id tak ada.
+DELETE /api/members/:id   -> 204
+#   Task-nya JATUH ke memberId: null (onDelete: SetNull), tidak ikut terhapus. 404 id tak ada.
+
+GET    /api/tasks?projectId&status&memberId&page&limit  -> Paginated<TaskView>
+#   Urut `order` menaik, seri dipecah `id`. Berhalaman (ADR-0107).
+#   TaskView = { id, projectId, title, detail, status, priority, memberId,
+#                startDate, dueDate, order, specId, spec, createdAt, updatedAt }
+#   status = backlog|doing|review|done · priority = tinggi|sedang|rendah (kosakata zPriority)
+#   `spec` = { id, stage, priority } | null — hasil join `specId`, BACA-SAJA, tak pernah ditulis
+#   balik ke Task. Stage backlog tak disimpan di Task (ADR-0090): kolom kedua hanya menciptakan
+#   dua kebenaran yang bisa drift. `specId` TANPA FK, jadi join-nya satu query terpisah untuk
+#   SELURUH halaman — bukan satu per kartu.
+#   `specId` terisi DENGAN `spec: null` = TAUTAN PUTUS (Spec-nya dihapus). Keadaan itu jujur dan
+#   murah untuk ditampilkan; ia sengaja tidak disamarkan jadi "tak pernah dieskalasi" (specId null).
+POST   /api/tasks   { title, projectId?, detail?, status?, priority?, memberId?, startDate?, dueDate?, order? }
+#   -> 201 TaskView. Hanya `title` yang wajib; status default "backlog", priority default "sedang".
+#   projectId null/absen = tugas internal tim, tanpa project. Tanggal ISO 8601 ("besok" ditolak).
+#   400 { error, memberId } / { error, projectId } bila rujukannya tak ada — FK memang ada, tapi
+#   P2003 Prisma menyebut nama constraint, bukan nilai yang salah. 400 status di luar empat kolom.
+PATCH  /api/tasks/:id  { …semua field di atas, semuanya opsional }  -> TaskView
+#   Termasuk { status, order } untuk drop kanban. Field yang TIDAK dikirim tak tersentuh; `null`
+#   eksplisit mengosongkan (memberId/projectId/tanggal) — keduanya harus tetap berbeda supaya
+#   PATCH {status} tak diam-diam menghapus tanggal yang sudah diisi. 404 id tak ada.
+DELETE /api/tasks/:id  -> 204   # menulis tombstone sync (ADR-0119). 404 id tak ada.
+
+# `specId` TIDAK ada di body create maupun patch: tautan ke backlog lahir dari eskalasi, bukan dari
+# ketikan. CRUD yang bisa mengarangnya berarti kartu bisa mengaku tertaut pada Spec yang tak pernah
+# menyetujuinya. Field itu DIBUANG senyap oleh zod (mode strip), bukan ditolak 400.
+
+# Realtime: topik BERPARAMETER `tasks` di /events/ws (ADR-0145), everyTicks 3 — bukan grup global
+# ke-11 di GROUPS. `GROUPS` di-recompute untuk SETIAP klien tiap N detik; papan tim punya sedikit
+# penonton dan banyak parameter, jadi biayanya harus lahir hanya untuk yang benar-benar ditonton.
+# params: { projectId?, status?, memberId?, page, limit } — sama dengan query GET /tasks.
+# `buildTasksPage` (services/tasks-list.ts) dipakai BERSAMA route & topik: satu serializer.
+```
+
+> **Sync:** `member` & `task` masuk `SYNCED` (ADR-0045) dengan **seluruh** kolom bermakna di
+> `FIELDS`; `task:order` di `NUMBER_FIELDS`, `member:active` di `BOOLEAN_FIELDS`, `PARENTS.task`
+> menunjuk dua induk, dan `BOOTSTRAP_ORDER` menaruh `member` **sebelum** `task`.
+> **Webhook:** sengaja TIDAK didaftarkan — lihat ADR-0150 keputusan 11 berikut konsekuensinya pada
+> `data.cascade` milik `project.deleted`.
+
 ## Scheduler (SPEC-294 · ADR-0072) — LOCAL per-instance
 ```
 # Fondasi scheduler otonom (di belakang gate cookie; agent-token → domain `settings`). Semua default MATI.

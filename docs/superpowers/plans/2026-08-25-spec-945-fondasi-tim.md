@@ -1697,7 +1697,7 @@ Buat `internal/docs/adr/0150-fondasi-papan-tim-task-member.md` dengan struktur y
 11. **Webhook sengaja tidak disentuh**, berikut konsekuensi `cascade` pada `project.deleted` yang kurang melaporkan task — dinyatakan, bukan terlupa.
 12. **Amandemen kecil atas dokumen induk:** `priority` memakai `zPriority` (`tinggi|sedang|rendah`, default `sedang`), bukan `"normal"` yang bukan anggota kosakata repo ini.
 
-- [ ] **Step 3: Seksi `Member` & `Task` di `data-model.md`**
+- [x] **Step 3: Seksi `Member` & `Task` di `data-model.md`**
 
 Sisipkan **sesudah** seksi `## GithubIssue` (±:828-856), sebelum `## Changelog`:
 
