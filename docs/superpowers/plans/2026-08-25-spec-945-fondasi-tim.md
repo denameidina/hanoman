@@ -1456,7 +1456,7 @@ git commit -m "feat(945): route CRUD /api/tasks + cermin spec baca-saja"
 - Consumes: `buildTasksPage` (Task 4), `TaskView` (Task 2).
 - Produces: topik `"tasks"` dengan `everyTicks: 3`; frame `{ t: "tasks"; key: string; data: Paginated<TaskView> }`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/team-topic.test.ts`:
 
@@ -1502,7 +1502,7 @@ describe("SPEC-945 · ADR-0150 · topik `tasks`", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/team-topic.test.ts
@@ -1510,7 +1510,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — tsc/vitest menolak `TOPICS.tasks` (properti tak ada di tipe).
 
-- [ ] **Step 3: Tambah topik di `shared/src/dto.ts`**
+- [x] **Step 3: Tambah topik di `shared/src/dto.ts`**
 
 **a.** `EventTopic` (`:733`):
 
@@ -1543,7 +1543,7 @@ Dan tambahkan `TaskView` ke impor tipe di kepala berkas bila `dto.ts` belum meng
 import type { TaskView } from "./team";
 ```
 
-- [ ] **Step 4: Tambah entri `TOPICS`**
+- [x] **Step 4: Tambah entri `TOPICS`**
 
 Di `server/src/services/events-topics.ts`, impor:
 
@@ -1559,7 +1559,7 @@ lalu entri sesudah `git`:
   tasks: { everyTicks: 3, build: async (p) => ({ data: await buildTasksPage(p) }) },
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/team-topic.test.ts
@@ -1568,7 +1568,7 @@ pnpm --filter ./server typecheck && pnpm --filter ./shared typecheck
 
 Expected: PASS (5 test), typecheck nol error.
 
-- [ ] **Step 6: Pastikan `GROUPS` tak tersentuh**
+- [x] **Step 6: Pastikan `GROUPS` tak tersentuh**
 
 ```bash
 git diff --stat "$HANOMAN_BASE_SHA" -- server/src/services/events.ts
@@ -1576,7 +1576,7 @@ git diff --stat "$HANOMAN_BASE_SHA" -- server/src/services/events.ts
 
 Expected: keluaran KOSONG. Bila ada isinya, kembalikan berkas itu — papan tim tak boleh jadi grup global.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/dto.ts server/src/services/events-topics.ts server/test/team-topic.test.ts
@@ -1596,7 +1596,7 @@ git commit -m "feat(945): topik realtime berparameter tasks (everyTicks 3)"
 - Produces: `paths.members`, `paths.member(id)`, `paths.tasks`, `paths.task(id)` — dipakai UI item B.
 - Tidak ada perubahan produksi pada gerbang: keduanya deny-by-default. Yang ditambahkan hanya buktinya.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `server/test/client-route-allowed.test.ts`, dalam array `paths` pada test `"seluruh permukaan operator tertutup"`, tambahkan:
 

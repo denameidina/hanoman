@@ -3,6 +3,7 @@ import { zTopicParams } from "@hanoman/shared";
 import { buildSchedulerState } from "./scheduler/state";
 import { buildQueuePage } from "./scheduler/queue";
 import { buildTicketsPage } from "./tickets-list";
+import { buildTasksPage } from "./tasks-list";
 import { buildLeadStatus, buildLeadDecisions, buildLeadFlows } from "./lead/views";
 import { buildGitLive } from "./git-ide";
 import { repoOf } from "./repo-dir";
@@ -34,6 +35,9 @@ export const TOPICS: { [K in EventTopic]: Topic<K> } = {
     }),
   },
   git: { everyTicks: 4, build: async (p) => buildGitLive((await repoOf(p.projectId)) ?? null, p) },
+  // SPEC-945 · ADR-0150 · papan tim. Kadens sama dengan `tickets`: daftar yang dibaca manusia,
+  // bukan aliran terminal.
+  tasks: { everyTicks: 3, build: async (p) => ({ data: await buildTasksPage(p) }) },
 };
 
 export const TOPIC_NAMES = Object.keys(TOPICS) as EventTopic[];

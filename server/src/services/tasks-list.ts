@@ -43,7 +43,7 @@ export async function buildTasksPage(f: TasksFilter): Promise<Paginated<TaskView
         where: { id: { in: specIds } }, select: { id: true, stage: true, priority: true },
       })
     : [];
-  const byId = new Map(specs.map((s) => [s.id, s as TaskSpecMirror]));
+  const byId = new Map<string, TaskSpecMirror>(specs.map((s) => [s.id, s]));
 
   return paginate(
     rows.map((t) => taskView(t, t.specId ? byId.get(t.specId) ?? null : null)),

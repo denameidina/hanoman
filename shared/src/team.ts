@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zPriority, zStage } from "./enums";
+import { zPriority } from "./enums";
 
 // SPEC-945 · ADR-0150 · kontrak murni papan tim. Nol I/O: dipakai server (validasi route +
 // serialisasi), topik siar, dan UI (bentuk form) dari satu sumber.
@@ -66,8 +66,15 @@ export type CreateTask = z.infer<typeof zCreateTask>;
 export const zPatchTask = zCreateTask.partial();
 export type PatchTask = z.infer<typeof zPatchTask>;
 
-/** Cermin backlog, BACA-SAJA — dihitung saat baca lewat join `specId`, tak pernah ditulis balik. */
-export type TaskSpecMirror = { id: string; stage: z.infer<typeof zStage>; priority: string };
+/**
+ * Cermin backlog, BACA-SAJA — dihitung saat baca lewat join `specId`, tak pernah ditulis balik.
+ *
+ * `stage` & `priority` sengaja `string`, bukan `zStage`/`zPriority`: keduanya kolom TEXT yang
+ * menyeberang sync dari mesin yang boleh lebih baru (ADR-0087), jadi menyempitkannya di sini hanya
+ * bisa dilakukan lewat cast — dan cast itu berbohong tentang nilai yang tak bisa kita buktikan
+ * (pelajaran `runtimeOf`, ADR-0101). Ini muatan untuk dirender, bukan untuk dicabangi.
+ */
+export type TaskSpecMirror = { id: string; stage: string; priority: string };
 
 export type TaskView = {
   id: string; projectId: string | null; title: string; detail: string | null;

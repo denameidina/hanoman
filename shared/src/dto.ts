@@ -1,6 +1,7 @@
 import type { PresenceDeviceView } from "./presence";
 import { z } from "zod";
 import type { SessionAsk } from "./session-ask";
+import type { TaskView } from "./team";
 import { zProject, zBriefPayload, zQaPayload, zGoalPayload, zSpec, zScheduler, zAgent, zLead } from "./entities";
 import {
   zLeadGate, zLeadKind, zLeadConfidence, zLeadAction, zLeadStatus, zLeadChoice,
@@ -730,7 +731,7 @@ export type Stash = { ref: string; message: string; at: string };
 // SPEC-908 · topik langganan BERPARAMETER di /events/ws, mengamandemen ADR-0039 (yang hanya
 // mengenal snapshot global tanpa parameter). Nama topik SENGAJA identik dengan `t` frame keluarnya:
 // satu-ke-satu, jadi tak ada peta kedua yang bisa berselisih diam-diam.
-export type EventTopic = "schedulerState" | "schedulerQueue" | "tickets" | "lead" | "git";
+export type EventTopic = "schedulerState" | "schedulerQueue" | "tickets" | "lead" | "git" | "tasks";
 
 /** Plafon jumlah langganan per klien. Satu layar Scheduler = 5 (state + 4 QueueSection). */
 export const MAX_SUBS = 16;
@@ -760,6 +761,14 @@ export const zTopicParams = {
     limit: z.number().int().min(1).max(20_000),
     branch: z.string().max(200),
     showRemote: z.boolean(), showTags: z.boolean(),
+  }).strict(),
+  // SPEC-945 · ADR-0150 · papan tim. Berparameter (project × status × assignee × halaman), bukan
+  // grup global: biayanya hanya lahir untuk parameter yang benar-benar ada yang menonton.
+  tasks: z.object({
+    projectId: z.string().max(120).optional(),
+    status: z.string().max(40).optional(),
+    memberId: z.string().max(200).optional(),
+    page: zSubPage, limit: zSubLimit,
   }).strict(),
 } as const;
 
@@ -817,6 +826,8 @@ export type EventMsg =
   | { t: "schedulerState"; key: string; state: SchedulerStateView }
   | { t: "schedulerQueue"; key: string; data: Paginated<SchedulerQueueItemView> }
   | { t: "tickets"; key: string; data: Paginated<TicketView> & { unreviewed: number } }
+  // SPEC-945 · ADR-0150 · papan tim, `everyTicks: 3`.
+  | { t: "tasks"; key: string; data: Paginated<TaskView> }
   | { t: "lead"; key: string; status: LeadStatusView;
       decisions: Paginated<LeadDecisionView>; flows: Paginated<LeadFlowView> }
   | { t: "git"; key: string; graph: { commits: GraphCommit[]; current: string; total: number };
