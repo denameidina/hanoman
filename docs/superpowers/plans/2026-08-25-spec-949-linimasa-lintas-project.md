@@ -44,7 +44,7 @@
   ): BarGeometry | null;
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di ekor `src/test/team-rules.test.ts`. Blok impor di baris 3–7 bertambah `spanGeometry, projectSpan` (tulis ulang blok itu dengan dua nama tambahan; jangan menambah statement impor kedua dari modul yang sama).
 
@@ -134,12 +134,12 @@ const iso = (d: string) => `${d}T12:00:00.000Z`;
 
 Bila `at`/`iso` ternyata SUDAH ada di berkas itu, jangan menambahkan salinan kedua — pakai yang ada.
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm --filter ./src exec vitest run test/team-rules.test.ts`
 Expected: FAIL — `spanGeometry is not a function` / `projectSpan is not a function` (atau galat impor dari `team-rules`).
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `src/src/screens/team-rules.ts`, **ganti** badan `barGeometry` (baris ~269–288) dengan pasangan berikut. Seluruh komentar `barGeometry` yang menjelaskan clamping, irisan setengah terbuka, dan lebar piksel **ikut pindah** ke `spanGeometry` — itu tempat aturannya sekarang hidup:
 
@@ -221,12 +221,12 @@ export function projectSpan(
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm --filter ./src exec vitest run test/team-rules.test.ts`
 Expected: PASS. Jumlahnya **≥ 58** (49 baseline + 9 baru). Seluruh 49 test lama — termasuk blok `barGeometry` — harus lulus **tanpa disentuh**; itulah bukti langkah ini pemisahan, bukan penulisan ulang. Bila ada test `barGeometry` lama yang merah, jangan menyesuaikan test-nya: `spanGeometry` yang salah.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/team-rules.ts src/test/team-rules.test.ts
@@ -263,7 +263,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   ): ProjectGroup[];
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di ekor `src/test/team-rules.test.ts`; tambahkan `projectGroups` ke blok impor yang sudah ada.
 
@@ -361,12 +361,12 @@ describe("projectGroups", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm --filter ./src exec vitest run test/team-rules.test.ts`
 Expected: FAIL — `projectGroups is not a function`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Tambahkan di ekor `src/src/screens/team-rules.ts`:
 
@@ -403,11 +403,13 @@ const byTitleThenId = (a: TaskView, b: TaskView): number =>
 export function projectGroups(
   tasks: TaskView[], window: TimelineWindow, name: (projectId: string | null) => string,
 ): ProjectGroup[] {
-  const buckets = new Map<string, { projectId: string | null; tasks: TaskView[] }>();
+  // Kunci "tanpa project" adalah `Symbol`, bukan string sentinel: sentinel apa pun — `"null"`,
+  // `"__none__"` — adalah `projectId` yang SAH dan menggabungkan dua grup diam-diam kalau seseorang
+  // menamai projectnya begitu (`Project.id` renameable sejak SPEC-255).
+  const NO_PROJECT = Symbol("no-project");
+  const buckets = new Map<string | symbol, { projectId: string | null; tasks: TaskView[] }>();
   for (const t of tasks) {
-    // Kunci Map dipisah dari `projectId` karena `null` dan string `"null"` adalah dua project
-    // berbeda; menyatukannya lewat `String(projectId)` menggabungkan keduanya diam-diam.
-    const key = t.projectId ?? " none";
+    const key = t.projectId ?? NO_PROJECT;
     const hit = buckets.get(key);
     if (hit) hit.tasks.push(t);
     else buckets.set(key, { projectId: t.projectId, tasks: [t] });
@@ -450,12 +452,12 @@ export function projectGroups(
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm --filter ./src exec vitest run test/team-rules.test.ts`
 Expected: PASS, **≥ 66** test (58 sesudah Task 1 + 8 baru).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/team-rules.ts src/test/team-rules.test.ts
@@ -499,7 +501,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   ```
   Kunci baris & batang (dipakai test dan Task 4): baris project `p:<projectId>` / `p:__none__`; amplop `span:<projectId>` / `span:__none__`; segmen `seg:<taskId>`; baris anak `t:<taskId>` dengan batang `t:<taskId>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/team-projects.test.tsx`:
 
@@ -659,12 +661,12 @@ describe("TeamProjectTimeline · buka baris", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm --filter ./src exec vitest run test/team-projects.test.tsx`
 Expected: FAIL — `TeamProjectTimeline is not a function` / gagal impor.
 
-- [ ] **Step 3a: Tambahkan nada `envelope` dan dua prop ke kanvas**
+- [x] **Step 3a: Tambahkan nada `envelope` dan dua prop ke kanvas**
 
 Di `src/src/screens/team-timeline.tsx`, ganti konstanta `TONE` (baris ~36–40):
 
@@ -700,7 +702,7 @@ export function TimelineCanvas({ window: win, rows, today, emptyHint, testId, la
 
 Ganti `data-testid="team-timeline"` (baris ~109) menjadi `data-testid={testId ?? "team-timeline"}`, dan teks header `Tugas` (baris ~125) menjadi `{labelHead ?? "Tugas"}`.
 
-- [ ] **Step 3b: Tulis `TeamProjectTimeline` di ekor `team-timeline.tsx`**
+- [x] **Step 3b: Tulis `TeamProjectTimeline` di ekor `team-timeline.tsx`**
 
 Tambahkan `barGeometry` dan `projectGroups` ke blok impor dari `./team-rules` di baris 4–7 (tulis ulang blok itu; jangan menambah statement impor kedua dari modul yang sama). `taskDates`, `taskSpan`, `timelineWindow`, `TaskSpan`, `BarGeometry`, `TimelineWindow`, dan `TimelineZoom` sudah ada di sana — jangan menduplikasinya. Lalu tambahkan di ekor berkas:
 
@@ -867,12 +869,12 @@ export function TeamProjectTimeline({
 
 Catatan implementasi: `meta` untuk baris yang terlihat memanggil `taskDates` dengan `span.end - 1` karena `end` **eksklusif** (`taskSpan` menambahkan satu hari) — mengirim `end` apa adanya membuat setiap project berakhir sehari lebih lambat dari task terakhirnya.
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm --filter ./src exec vitest run test/team-projects.test.tsx test/team-timeline.test.tsx`
 Expected: PASS. `team-projects.test.tsx` **13 lulus**, dan `team-timeline.test.tsx` tetap **16 lulus tanpa disentuh** — itulah bukti prop barunya opsional dan `TimelineCanvas` tidak di-fork.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/team-timeline.tsx src/test/team-projects.test.tsx
@@ -898,7 +900,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `TeamProjectTimeline` (Task 3), `strList` dari `../ui-state` (sudah diekspor).
 - Produces: `TEAM_VIEWS` bertiga entri; permukaan `data-testid="team-projects"`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Di `src/test/team-screen.test.tsx`, **ganti** baris `const SURFACES = ["team-board", "team-timeline"];` (di dalam `describe("TeamScreen · kontrak mode tampilan")`) menjadi:
 
@@ -990,12 +992,12 @@ describe("TeamScreen · mode Lintas project", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `pnpm --filter ./src exec vitest run test/team-screen.test.tsx`
 Expected: FAIL — `Unable to find role="tab" with name /lintas project/i`, dan test cermin gagal dengan pesan "mode ... tak merender satu pun permukaan yang dikenal".
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/screens/TeamScreen.tsx`:
 
@@ -1098,17 +1100,17 @@ dan gerbang `Select` zoom (baris ~273) menjadi `{(timeline || cross) && (`.
               onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />}
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `pnpm --filter ./src exec vitest run test/team-screen.test.tsx test/team-projects.test.tsx test/team-timeline.test.tsx test/team-board.test.tsx test/team-rules.test.ts test/team-escalate.test.tsx test/team-nav.test.tsx`
 Expected: PASS di ketujuh berkas. `team-screen.test.tsx` **28 lulus** (22 baseline + 6 baru).
 
-- [ ] **Step 5: Typecheck paket `src`**
+- [x] **Step 5: Typecheck paket `src`**
 
 Run: `pnpm --filter ./src exec tsc --noEmit -p tsconfig.json`
 Expected: keluar tanpa galat. (Bila `tsconfig.json` tak punya target `noEmit`, pakai `pnpm --filter ./src typecheck`.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/TeamScreen.tsx src/test/team-screen.test.tsx
@@ -1198,7 +1200,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS \
     test/team-screen.test.tsx test/team-board.test.tsx test/team-escalate.test.tsx \
     test/team-nav.test.tsx
 ```
-Expected: **7 berkas lulus**, **123 test** (87 baseline + 9 Task 1 + 8 Task 2 + 13 Task 3 + 6 Task 4). Nol "no test files" — `--changed` menyalakan `passWithNoTests`, jadi nol test terlihat hijau; di sini path-nya disebut eksplisit sehingga jebakan itu tertutup.
+Expected: **7 berkas lulus**, **152 test** (114 baseline atas ketujuh berkas + 10 Task 1 + 9 Task 2 + 13 Task 3 + 6 Task 4). Nol "no test files" — `--changed` menyalakan `passWithNoTests`, jadi nol test terlihat hijau; di sini path-nya disebut eksplisit sehingga jebakan itu tertutup.
 
 - [ ] **Step 2: Typecheck paket yang tersentuh**
 

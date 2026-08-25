@@ -275,12 +275,92 @@ describe("TeamScreen · mode Linimasa", () => {
   });
 });
 
+/* SPEC-949 · mode ketiga. Berbeda dari mode Linimasa, mode ini MELEPAS penyaring project — jadi
+   satu-satunya mode yang boleh melahirkan request saat berpindah, dan hanya saat penyaringnya
+   memang sedang aktif. */
+describe("TeamScreen · mode Lintas project", () => {
+  const dated = () => task({ id: "t1", title: "Desain", startDate: "2026-09-10T12:00:00.000Z" });
+  const projectSelect = () => screen.getByLabelText("Filter project") as HTMLSelectElement;
+
+  it("tab Lintas project ada dan memilihnya mengganti papan dengan kanvasnya", async () => {
+    vi.mocked(api.listTasks).mockImplementation(async (p) =>
+      p?.status === "backlog" ? page([dated()]) : page([]));
+    view();
+    await screen.findByTestId("team-board");
+    fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
+    expect(await screen.findByTestId("team-projects")).toBeInTheDocument();
+    expect(screen.queryByTestId("team-board")).toBeNull();
+    expect(screen.queryByTestId("team-timeline")).toBeNull();
+  });
+
+  it("penyaring project MATI di mode ini dan hidup lagi saat pindah, nilainya tak berubah", async () => {
+    const { onProjectFilter } = view("p1");
+    await screen.findByTestId("team-board");
+    expect(projectSelect().disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
+    await screen.findByTestId("team-projects");
+    expect(projectSelect().disabled).toBe(true);
+    // Nilainya milik App dan dipakai bersama Backlog (SPEC-146) — menulisnya di sini mengubah apa
+    // yang dilihat layar LAIN.
+    expect(projectSelect().value).toBe("p1");
+    expect(onProjectFilter).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^papan$/i }));
+    await screen.findByTestId("team-board");
+    expect(projectSelect().disabled).toBe(false);
+  });
+
+  it("dengan penyaring project aktif, masuk ke mode ini memuat ulang TANPA projectId", async () => {
+    view("p1");
+    await screen.findByTestId("team-board");
+    await waitFor(() => expect(api.listTasks).toHaveBeenCalledTimes(4));
+    expect(vi.mocked(api.listTasks).mock.calls[0]![0]!.projectId).toBe("p1");
+
+    vi.mocked(api.listTasks).mockClear();
+    fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
+    await screen.findByTestId("team-projects");
+    await waitFor(() => expect(api.listTasks).toHaveBeenCalledTimes(4));
+    for (const c of vi.mocked(api.listTasks).mock.calls) {
+      expect(c[0]!.projectId).toBeUndefined();
+    }
+  });
+
+  it("tanpa penyaring project aktif, berpindah ke mode ini TIDAK memuat ulang", async () => {
+    view();
+    await screen.findByTestId("team-board");
+    await waitFor(() => expect(api.listTasks).toHaveBeenCalledTimes(4));
+    vi.mocked(api.listTasks).mockClear();
+    fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
+    await screen.findByTestId("team-projects");
+    expect(api.listTasks).not.toHaveBeenCalled();
+  });
+
+  it("Select zoom hidup di mode ini juga", async () => {
+    view();
+    fireEvent.click(await screen.findByRole("tab", { name: /lintas project/i }));
+    await screen.findByTestId("team-projects");
+    expect(screen.getByLabelText("Zoom linimasa")).toBeInTheDocument();
+  });
+
+  it("buka baris project memunculkan task-nya", async () => {
+    vi.mocked(api.listTasks).mockImplementation(async (p) =>
+      p?.status === "backlog" ? page([dated()]) : page([]));
+    view();
+    fireEvent.click(await screen.findByRole("tab", { name: /lintas project/i }));
+    await screen.findByTestId("timeline-row-p:p1");
+    expect(screen.queryByTestId("timeline-row-t:t1")).toBeNull();
+    fireEvent.click(screen.getByTestId("expand-p1"));
+    expect(await screen.findByTestId("timeline-row-t:t1")).toBeInTheDocument();
+  });
+});
+
 /* Cermin `TEAM_VIEWS` ↔ cabang render. Kelas bug yang dijaga `changelog-nav.test.tsx` untuk
    `HN_NAV`: entri yang tak punya cabangnya sendiri merender permukaan mode LAIN di bawah pilnya —
    200, nol error, dan tak ada yang menyadarinya. SPEC-948 adalah entri KEDUA, yaitu saat cermin
    ini lahir; item E yang menambahkan entri ketiga harus lewat sini dengan sadar. */
 describe("TeamScreen · kontrak mode tampilan", () => {
-  const SURFACES = ["team-board", "team-timeline"];
+  const SURFACES = ["team-board", "team-timeline", "team-projects"];
 
   it("tiap mode TEAM_VIEWS merender permukaannya SENDIRI, tak ada dua yang berbagi", async () => {
     view();

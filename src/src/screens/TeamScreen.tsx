@@ -8,7 +8,7 @@ import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
 import { SyncButton } from "./SyncButton";
 import { TeamBoard } from "./team-board";
-import { TeamTimeline } from "./team-timeline";
+import { TeamTimeline, TeamProjectTimeline } from "./team-timeline";
 import { TaskModal } from "./TaskModal";
 import { EscalateDialog } from "./EscalateDialog";
 import { MembersPanel } from "./MembersPanel";
@@ -16,7 +16,7 @@ import {
   TEAM_COLUMNS, TIMELINE_ZOOMS, emptyBoard, moveCard, nextOrder, replaceCard,
   type Board, type TimelineZoom,
 } from "./team-rules";
-import { usePersistedState, ResetViewButton, isStr, oneOf } from "../ui-state";
+import { usePersistedState, ResetViewButton, isStr, oneOf, strList } from "../ui-state";
 import type { ProjectVM } from "./types";
 
 /* TeamScreen — papan kerja MANUSIA (SPEC-946 · ADR-0150/ADR-0151). Screen mandiri (pola
@@ -37,8 +37,7 @@ const COLUMN_LIMIT = 200;
 // dibangun server di luar jadwal, dan sebelas dari dua belas langsung dibuang.
 const Q_DEBOUNCE_MS = 400;
 
-/* Item E (Lintas project) menambahkan entri ke array yang SAMA — bukan memasang mekanisme baru.
-   Diekspor supaya `team-screen.test.tsx` bisa menegakkan cermin `TEAM_VIEWS` ↔ cabang render:
+/* Diekspor supaya `team-screen.test.tsx` bisa menegakkan cermin `TEAM_VIEWS` ↔ cabang render:
    entri yang tak punya cabangnya sendiri merender permukaan mode LAIN di bawah pilnya, 200 dan
    nol error — kelas bug yang sama yang dijaga `changelog-nav.test.tsx` untuk `HN_NAV`. */
 export const TEAM_VIEWS = [
@@ -46,6 +45,8 @@ export const TEAM_VIEWS = [
   // SPEC-948 · `gantt-chart` → `GanttChart` DIVERIFIKASI ada di lucide 0.400.0: SPEC-906
   // menunjukkan nama yang salah jatuh ke `Circle` tanpa satu pun galat, di ±123 call site sekaligus.
   { value: "timeline", label: "Linimasa", icon: "gantt-chart" },
+  // SPEC-949 · `layers` → `Layers`, diverifikasi di lucide yang sama.
+  { value: "projects", label: "Lintas project", icon: "layers" },
 ];
 
 const ZOOM_LABEL: Record<TimelineZoom, string> = { day: "Hari", week: "Minggu", month: "Bulan" };
@@ -100,7 +101,15 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
   // melihat tenggat. Zoom bukan PENYARING — ia tak ikut `activeFilters` dan tak menyentuh server.
   const [zoom, setZoom] = usePersistedState<TimelineZoom>("team", "zoom", "week",
     oneOf(...TIMELINE_ZOOMS));
+  // SPEC-949 · baris project yang sedang dibuka. `strList` menolak nilai rusak → jatuh ke `[]`, tak
+  // pernah melempar (ADR-0115). Project yang sudah lenyap tinggal di sini tanpa efek: tak ada baris
+  // yang bisa dibukanya, jadi tak ada sweep pembersih.
+  const [expanded, setExpanded] = usePersistedState<string[]>("team", "expanded", [], strList);
+  const toggleProject = React.useCallback((key: string) => {
+    setExpanded((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }, [setExpanded]);
   const timeline = view === "timeline";
+  const cross = view === "projects";
   // Dibekukan sekali per mount: jendela yang bergeser di tengah interaksi lebih membingungkan
   // daripada tanggal yang basi satu hari sampai tab dimuat ulang.
   const today = React.useRef(Date.now()).current;
@@ -111,14 +120,26 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
   );
   // Larik baru tiap render; yang stabil kuncinya, bukan referensinya.
   const columnsKey = columns.map((c) => c.key).join(",");
-  const activeFilters = [projectFilter !== "all", colFilter !== "all", memberFilter !== "all", q.trim() !== ""]
-    .filter(Boolean).length;
+  // `projectFilter` tak berlaku di mode Lintas project, jadi menghitungnya di lencana "N filter
+  // aktif" sama menyesatkannya dengan mengabaikannya diam-diam.
+  const activeFilters = [projectFilter !== "all" && !cross, colFilter !== "all",
+    memberFilter !== "all", q.trim() !== ""].filter(Boolean).length;
+
+  // Mode yang gunanya membandingkan antar-project tak boleh mendarat menampilkan satu baris karena
+  // penyaring yang disetel di layar lain masih menempel. Ia DILEPAS di sini dan `disabled` di
+  // toolbar — penyaring yang tampak aktif tapi tak berlaku adalah kebohongan UI.
+  //
+  // Diturunkan SEBELUM `useMemo` dan dipakai sebagai dependensinya, bukan `cross` + `projectFilter`
+  // mentah: dengan dua dep mentah, berpindah mode saat penyaring `all` melahirkan objek `filters`
+  // baru yang ISINYA identik, dan `load` yang bergantung padanya menembakkan empat request yang tak
+  // mengubah apa pun.
+  const effectiveProject = cross || projectFilter === "all" ? undefined : projectFilter;
 
   const filters = React.useMemo(() => ({
-    projectId: projectFilter === "all" ? undefined : projectFilter,
+    projectId: effectiveProject,
     memberId: memberFilter === "all" ? undefined : memberFilter,
     q: q.trim() || undefined,
-  }), [projectFilter, memberFilter, q]);
+  }), [effectiveProject, memberFilter, q]);
 
   // Muat PERTAMA boleh mengosongkan layar; yang berikutnya tidak. Tanpa pemisahan ini tiap huruf
   // di kotak cari — dan tiap ganti penyaring — membuat keempat kolom lenyap sekejap.
@@ -257,6 +278,8 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
           {/* SPEC-146 · App pemilik tunggal "daftar disaring ke project mana", jadi berpindah dari
               Backlog ke Tim tak mengganti project yang sedang dilihat. */}
           <Select size="sm" aria-label="Filter project" value={projectFilter}
+            disabled={cross}
+            title={cross ? "Mode Lintas project melintasi semua project — penyaring ini tak berlaku di sini" : undefined}
             onChange={(e) => onProjectFilter(e.target.value)}
             options={[{ value: "all", label: "Semua project" },
               ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
@@ -270,7 +293,7 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
             onChange={(e) => setMemberFilter(e.target.value)}
             options={[{ value: "all", label: "Semua anggota" },
               ...members.map((m) => ({ value: m.id, label: m.name }))]} />
-          {timeline && (
+          {(timeline || cross) && (
             <Select size="sm" aria-label="Zoom linimasa" value={zoom}
               onChange={(e) => setZoom(e.target.value as TimelineZoom)}
               options={TIMELINE_ZOOMS.map((z) => ({ value: z, label: ZOOM_LABEL[z] }))} />
@@ -291,6 +314,10 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
         : empty && activeFilters === 0 ? <StateBlock kind="empty" icon="users" title="Papan tim masih kosong"
             hint="Catat pekerjaan manusia di sekitar sesi agen — desain, meeting klien, deploy, nego."
             action={() => { setEditing(null); setTaskOpen(true); }} actionLabel="Tugas baru" actionIcon="plus" />
+        : cross
+          ? <TeamProjectTimeline tasks={tasks} projects={projects} members={members}
+              zoom={zoom} today={today} hidden={hiddenTasks} expanded={expanded}
+              onToggle={toggleProject} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
         : timeline
           ? <TeamTimeline tasks={tasks} members={members} zoom={zoom} today={today}
               hidden={hiddenTasks} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
