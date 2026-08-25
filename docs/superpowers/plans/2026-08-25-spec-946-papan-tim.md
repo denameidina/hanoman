@@ -65,7 +65,7 @@
 - Consumes: `buildTasksPage(f: TasksFilter)` yang sudah ada.
 - Produces: `TasksFilter` bertambah `q?: string`; `zTopicParams.tasks` menerima `q` opsional (≤200 karakter). Klien (Task 6) mengirim `q` lewat `api.listTasks` dan lewat `params` langganan.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `describe("buildTasksPage", …)` pada `server/test/tasks-list.test.ts`:
 
@@ -108,7 +108,7 @@ Tambahkan di `server/test/team-topic.test.ts`, di dalam `describe` yang sama:
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u DATABASE_URL -u NODE_ENV \
@@ -118,7 +118,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u DATABASE_URL -u NODE_ENV \
 
 Diharapkan: GAGAL. `buildTasksPage({ q: … })` menolak properti `q` di tipe (`Object literal may only specify known properties`), dan `parseParams("tasks", { q: … })` mengembalikan `undefined` karena `.strict()`.
 
-- [ ] **Step 3: Implementasi minimal**
+- [x] **Step 3: Implementasi minimal**
 
 Di `server/src/services/tasks-list.ts`, tambahkan `q` ke tipe:
 
@@ -148,7 +148,7 @@ Di `shared/src/dto.ts`, di dalam `zTopicParams.tasks`, tambahkan satu baris sesu
     q: z.string().max(200).optional(),
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u DATABASE_URL -u NODE_ENV \
@@ -158,7 +158,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u DATABASE_URL -u NODE_ENV \
 
 Diharapkan: seluruhnya PASS.
 
-- [ ] **Step 5: Typecheck server & shared**
+- [x] **Step 5: Typecheck server & shared**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
@@ -166,7 +166,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck
 
 Diharapkan: nol galat.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/tasks-list.ts shared/src/dto.ts server/test/tasks-list.test.ts server/test/team-topic.test.ts
@@ -196,7 +196,7 @@ git commit -m "feat(946): q pada GET /api/tasks dan topik tasks"
   - `dateInputToIso(v: string): string | null`
   - dari `@hanoman/shared`: `CreateTaskInput`, `PatchTaskInput`, `CreateMemberInput`, `PatchMemberInput`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/team-rules.test.ts`:
 
@@ -305,7 +305,7 @@ describe("konversi tanggal", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/team-rules.test.ts
@@ -313,7 +313,7 @@ env -u NODE_ENV pnpm vitest --run src/test/team-rules.test.ts
 
 Diharapkan: GAGAL — `Failed to resolve import "../src/screens/team-rules"`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `src/src/screens/team-rules.ts`:
 
@@ -406,7 +406,7 @@ export type CreateMemberInput = z.input<typeof zCreateMember>;
 export type PatchMemberInput = z.input<typeof zPatchMember>;
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/team-rules.test.ts
@@ -414,7 +414,7 @@ env -u NODE_ENV pnpm vitest --run src/test/team-rules.test.ts
 
 Diharapkan: PASS, 14 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/team-rules.ts src/test/team-rules.test.ts shared/src/team.ts
@@ -441,7 +441,7 @@ git commit -m "feat(946): aturan papan tim sebagai fungsi murni"
   - `api.patchMember(id: string, b: PatchMemberInput): Promise<MemberView>`
   - `api.deleteMember(id: string): Promise<void>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan `describe` baru di akhir `src/test/api-client.test.ts` (ikuti pola stub `fetch` yang sudah dipakai berkas itu — baca 20 baris pertamanya lebih dulu dan pakai helper yang sama):
 
@@ -477,7 +477,7 @@ describe("SPEC-946 · papan tim", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/api-client.test.ts
@@ -485,7 +485,7 @@ env -u NODE_ENV pnpm vitest --run src/test/api-client.test.ts
 
 Diharapkan: GAGAL — `api.listTasks is not a function`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/api/client.ts`, tambahkan ke daftar impor tipe di baris 1:
 `type TaskView, type MemberView, type CreateTaskInput, type PatchTaskInput, type CreateMemberInput, type PatchMemberInput`.
@@ -510,7 +510,7 @@ Lalu sisipkan di objek `api`, tepat sesudah blok tiket/issue GitHub:
   deleteMember: (id: string) => j<void>(paths.member(id), { method: "DELETE" }),
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/api-client.test.ts
@@ -518,7 +518,7 @@ env -u NODE_ENV pnpm vitest --run src/test/api-client.test.ts
 
 Diharapkan: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/client.ts src/test/api-client.test.ts
@@ -548,7 +548,7 @@ git commit -m "feat(946): fungsi api untuk /tasks dan /members"
   }): JSX.Element
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/team-board.test.tsx`:
 
@@ -688,7 +688,7 @@ describe("TeamBoard · isi kartu", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/team-board.test.tsx
@@ -696,7 +696,7 @@ env -u NODE_ENV pnpm vitest --run src/test/team-board.test.tsx
 
 Diharapkan: GAGAL — `Failed to resolve import "../src/screens/team-board"`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `src/src/screens/team-board.tsx`:
 
@@ -882,7 +882,7 @@ export function TeamBoard({ board, totals, columns, members, onMove, onAssign, o
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/team-board.test.tsx
@@ -890,7 +890,7 @@ env -u NODE_ENV pnpm vitest --run src/test/team-board.test.tsx
 
 Diharapkan: PASS, 13 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/team-board.tsx src/test/team-board.test.tsx
@@ -921,7 +921,7 @@ git commit -m "feat(946): papan tim empat kolom, semua kolom menerima drop"
   }): JSX.Element | null
   ```
 
-- [ ] **Step 1: Implementasi**
+- [x] **Step 1: Implementasi**
 
 Buat `src/src/screens/TaskModal.tsx`:
 
@@ -1076,7 +1076,7 @@ export function TaskModal({ open, task, projects, members, defaultProjectId, onC
 }
 ```
 
-- [ ] **Step 2: Typecheck frontend**
+- [x] **Step 2: Typecheck frontend**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -1084,7 +1084,7 @@ pnpm --filter ./src typecheck
 
 Diharapkan: nol galat. (Test perilakunya menyusul di Task 7 — modal ini tak punya jalan masuk sampai `TeamScreen` ada.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/src/screens/TaskModal.tsx
@@ -1111,7 +1111,7 @@ git commit -m "feat(946): modal buat/ubah/hapus tugas"
   }): JSX.Element | null
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/members-panel.test.tsx`:
 
@@ -1208,7 +1208,7 @@ describe("MembersPanel", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/members-panel.test.tsx
@@ -1216,7 +1216,7 @@ env -u NODE_ENV pnpm vitest --run src/test/members-panel.test.tsx
 
 Diharapkan: GAGAL — `Failed to resolve import "../src/screens/MembersPanel"`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `src/src/screens/MembersPanel.tsx`:
 
@@ -1391,7 +1391,7 @@ export function MembersPanel({ open, onClose, onChanged, onToast }: {
 }
 ```
 
-- [ ] **Step 4: Verifikasi nama ikon baru ada di lucide**
+- [x] **Step 4: Verifikasi nama ikon baru ada di lucide**
 
 `user-minus` dan `user-check` dipakai di berkas ini dan belum ada di daftar yang diverifikasi. Jalankan:
 
@@ -1404,7 +1404,7 @@ for (const n of ['UserMinus','UserCheck','ClipboardList','Pencil']) console.log(
 
 Diharapkan: keempatnya `true`. Bila ada yang `false`, ganti dengan nama yang ada — nama yang salah jatuh ke `Circle` tanpa satu pun error (SPEC-906).
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/members-panel.test.tsx
@@ -1412,7 +1412,7 @@ env -u NODE_ENV pnpm vitest --run src/test/members-panel.test.tsx
 
 Diharapkan: PASS, 6 test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/MembersPanel.tsx src/test/members-panel.test.tsx
@@ -1440,7 +1440,7 @@ git commit -m "feat(946): modal kelola anggota di layar Tim"
   }): JSX.Element
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/team-screen.test.tsx`:
 
@@ -1601,7 +1601,7 @@ describe("TeamScreen · keadaan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/team-screen.test.tsx
@@ -1609,7 +1609,7 @@ env -u NODE_ENV pnpm vitest --run src/test/team-screen.test.tsx
 
 Diharapkan: GAGAL — `Failed to resolve import "../src/screens/TeamScreen"`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `src/src/screens/TeamScreen.tsx`:
 
@@ -1847,7 +1847,7 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
 }
 ```
 
-- [ ] **Step 4: Daftarkan kelas toolbar ke aturan responsif**
+- [x] **Step 4: Daftarkan kelas toolbar ke aturan responsif**
 
 `.hn-backlog-controls` **tak punya aturan CSS sama sekali** — ia cuma penanda yang dipegang test responsif. Yang benar-benar punya aturan adalah tiga selector di `src/src/app.css:220-227`, di dalam media query mobile. Tambahkan padanan Tim ke ketiganya supaya toolbar layar ini menumpuk sama rapinya di 390 px, tanpa meminjam nama layar lain:
 
@@ -1872,7 +1872,7 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
 
 Catatan: `useResetOnChange` **tidak** dipakai di layar ini — papan tak dipaginasi, jadi tak ada nomor halaman yang harus di-reset saat penyaring berganti. Jangan mengimpornya.
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/team-screen.test.tsx src/test/team-board.test.tsx src/test/team-rules.test.ts src/test/members-panel.test.tsx
@@ -1880,7 +1880,7 @@ env -u NODE_ENV pnpm vitest --run src/test/team-screen.test.tsx src/test/team-bo
 
 Diharapkan: seluruhnya PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/TeamScreen.tsx src/src/app.css src/test/team-screen.test.tsx
@@ -1900,7 +1900,7 @@ git commit -m "feat(946): layar Tim — toolbar, fetch & langganan per kolom"
 - Consumes: `TeamScreen` (Task 7); `projectFilter`/`setProjectFilter`/`showToast`/`projectsView` yang sudah ada di `App`.
 - Produces: entri `HN_NAV` `{ key: "team", label: "Tim", icon: "users" }`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `src/test/team-nav.test.tsx`:
 
@@ -1928,7 +1928,7 @@ describe("SPEC-946 · entri nav Tim", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/team-nav.test.tsx
@@ -1936,7 +1936,7 @@ env -u NODE_ENV pnpm vitest --run src/test/team-nav.test.tsx
 
 Diharapkan: GAGAL — `expected undefined to equal { key: 'team', … }`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `src/src/ds/shell.tsx`, sisipkan tepat sesudah baris `backlog`:
 
@@ -1961,7 +1961,7 @@ Di `src/src/App.tsx`, tambahkan impor `TeamScreen` bersama impor screen lainnya,
     );
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 env -u NODE_ENV pnpm vitest --run src/test/team-nav.test.tsx src/test/changelog-nav.test.tsx src/test/responsive-shell-modal.test.tsx src/test/app-state-persist.test.tsx
@@ -1969,7 +1969,7 @@ env -u NODE_ENV pnpm vitest --run src/test/team-nav.test.tsx src/test/changelog-
 
 Diharapkan: seluruhnya PASS. `changelog-nav.test.tsx` adalah gerbangnya — ia membaca `App.tsx` sebagai teks dan menuntut literal `section === "team"` ada di sana.
 
-- [ ] **Step 5: Typecheck frontend**
+- [x] **Step 5: Typecheck frontend**
 
 ```bash
 pnpm --filter ./src typecheck
@@ -1977,7 +1977,7 @@ pnpm --filter ./src typecheck
 
 Diharapkan: nol galat.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/ds/shell.tsx src/src/App.tsx src/test/team-nav.test.tsx
@@ -1995,7 +1995,7 @@ git commit -m "feat(946): entri nav Tim + cabang section di App"
 - Modify: `internal/docs/README.md` (tautan ADR-0151)
 - Modify: `internal/skills/hanoman/SKILL.md` (satu alinea papan tim di bagian Aturan Arsitektur)
 
-- [ ] **Step 1: Konfirmasi nomor ADR belum dipakai**
+- [x] **Step 1: Konfirmasi nomor ADR belum dipakai**
 
 ```bash
 ls internal/docs/adr/ | grep -c '^0151' || true
@@ -2003,7 +2003,7 @@ ls internal/docs/adr/ | grep -c '^0151' || true
 
 Diharapkan: `0`. Bila bukan nol, pakai nomor bebas berikutnya dan ganti seluruh rujukan `ADR-0151` di kode, spec, dan plan ini.
 
-- [ ] **Step 2: Tulis ADR-0151**
+- [x] **Step 2: Tulis ADR-0151**
 
 Buat `internal/docs/adr/0151-papan-tim-langganan-per-kolom.md` dengan kerangka ADR repo ini (Status / Tanggal / SPEC / Memperluas / Menegakkan / Konteks / Keputusan / Konsekuensi / Alternatif yang ditolak). Isinya **empat** keputusan:
 
@@ -2014,11 +2014,11 @@ Buat `internal/docs/adr/0151-papan-tim-langganan-per-kolom.md` dengan kerangka A
 
 Sebutkan juga **konsekuensi bagi item D & E**: linimasa butuh SELURUH task bertanggal, bukan 200 per kolom — jadi ia tak bisa menumpang topik `tasks` apa adanya dan harus memutuskan bentuknya sendiri.
 
-- [ ] **Step 3: Tulis seksi frontend**
+- [x] **Step 3: Tulis seksi frontend**
 
 Di `internal/docs/frontend/frontend-implementation.md`, tambahkan seksi `## Tim — papan kerja manusia (SPEC-946 · ADR-0150/0151)` tepat sesudah seksi Backlog. Isinya: empat kolom dari `TASK_STATUSES`, semua kolom menerima drop (kebalikan board Backlog dan alasannya), rantai flex kolom/baris yang sama, aksi eksplisit kartu karena drag mati di keyboard & sentuh, langganan per kolom + plafon terlihat, toolbar dua baris, penyaring kolom = mempersempit kolom yang tampil, `email` anggota immutable, dan pemecahan berkas berikut tanggung jawab tiap berkas.
 
-- [ ] **Step 4: Perbarui kontrak API**
+- [x] **Step 4: Perbarui kontrak API**
 
 Di `internal/docs/architecture/api-contract.md:1539`, ubah baris `GET /api/tasks` menjadi:
 
@@ -2028,11 +2028,11 @@ GET    /api/tasks?projectId&status&memberId&q&page&limit  -> Paginated<TaskView>
 
 dan tambahkan satu baris penjelas di bawah blok itu: `q` = substring case-insensitive pada `title + detail`, disaring **sebelum** paginasi (SPEC-946); parameter yang sama tersedia di topik siar `tasks`.
 
-- [ ] **Step 5: Perbarui skill project**
+- [x] **Step 5: Perbarui skill project**
 
 Di `internal/skills/hanoman/SKILL.md`, bagian "Aturan Arsitektur", tambahkan satu alinea papan tim sesudah alinea state tampilan persisten: layar `Tim` sebagai papan kerja manusia di atas `Task`/`Member` (ADR-0150), berlangganan **per kolom** dengan plafon 200 yang **terlihat** (ADR-0151), `Task.status` milik manusia sehingga keempat kolom menerima drop — kebalikan board Backlog — dan `Member.email` immutable karena id diturunkan darinya.
 
-- [ ] **Step 6: Tautkan di index**
+- [x] **Step 6: Tautkan di index**
 
 ```bash
 pnpm --silent hanoman docs index --check || true
@@ -2040,7 +2040,7 @@ pnpm --silent hanoman docs index --check || true
 
 Tambahkan baris ADR-0151 di `internal/docs/README.md` mengikuti bentuk baris ADR-0150 tepat di atasnya, lalu jalankan lagi perintah di atas dan pastikan tak ada keluhan tentang berkas yang tak ter-link.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs/adr/0151-papan-tim-langganan-per-kolom.md internal/docs/frontend/frontend-implementation.md internal/docs/architecture/api-contract.md internal/docs/README.md internal/skills/hanoman/SKILL.md
@@ -2053,7 +2053,7 @@ git commit -m "docs(946): ADR-0151 + frontend, kontrak API, index"
 
 **Files:** tak ada perubahan kode; hanya menjalankan bukti.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u DATABASE_URL -u NODE_ENV \
@@ -2063,7 +2063,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u DATABASE_URL -u NODE_ENV \
 
 **Jebakan:** `--changed` menyalakan `passWithNoTests`, jadi nol test **terlihat hijau**. Baca jumlah berkas & test yang berjalan; bila nol, sebut path test-nya langsung.
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck
@@ -2071,7 +2071,30 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --f
 
 JANGAN `pnpm -r typecheck` — mesin ini menjalankan beberapa sesi sekaligus.
 
-- [ ] **Step 3: Uji endpoint nyata di local**
+- [x] **Step 3: Uji endpoint nyata di local**
+
+> **Hasil (2026-08-25).** Smoke ini **menangkap satu bug nyata yang lolos seluruh test tingkat
+> service**: `GET /api/tasks` tak pernah mendestruktur `q` dari query, jadi `?q=desain` menjawab
+> `200` berisi SELURUH tabel — nol error. `tasks-list.test.ts` tak bisa melihatnya karena ia
+> memanggil `buildTasksPage` langsung, melewati lapisan yang justru menjatuhkan parameternya.
+> Diperbaiki, dan test barunya lewat `app.inject` (HTTP), bukan lewat service.
+>
+> Terbukti hidup di server nyata: `?q=DESAIN` (tak peka huruf besar-kecil) → 1 dari 4;
+> `?q=anggaran` (hanya ada di `detail`) → 1; `?q=de&limit=1` → `total: 2` dengan 1 item, yakni
+> penyaring berjalan **sebelum** paginasi; empat muat per-kolom `?status=…&limit=200` menjawab
+> `3/1/0/0`; `PATCH {status, order}` (drop kanban) mendarat; `PATCH {status}` **tidak** menghapus
+> `dueDate`/`memberId` yang sudah diisi; `DELETE /members/:id` → task jatuh ke `memberId: null`
+> tanpa ikut terhapus; `/tasks` tanpa cookie → `401`; `PATCH /members/:id` ber-`email` → `400`;
+> dan `Member.id` mendarat sebagai `dena@nafanesia.id` sementara kolom `email` menyimpan
+> `Dena@Nafanesia.ID` seperti yang diketik — kontrak ADR-0094 apa adanya.
+>
+> **Dua jebakan harness yang perlu dicatat:** (1) `HANOMAN_HOME` saja **tidak cukup** untuk
+> mengarahkan server ke DB smoke — `DATABASE_URL` absolut harus diberikan eksplisit, kalau tidak
+> server membuka berkas lain dan menjawab `P2021 main.User does not exist` padahal tabelnya ada
+> di berkas yang baru dimigrasi; (2) `curl -c <jar>` **menulis ulang jar tiap request**, jadi satu
+> request yang tak menerima cookie (mis. `400` dari gerbang Origin) **mengosongkan sesi** dan
+> semua request berikutnya jadi `unauthorized` — kirim cookie lewat header, jangan pakai `-c`
+> pada request mutasi.
 
 Task ini menyentuh satu endpoint (`GET /api/tasks?q=`), jadi sekali di akhir:
 
