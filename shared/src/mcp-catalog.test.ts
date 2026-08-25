@@ -158,8 +158,14 @@ describe("SPEC-485 · lead_ask menerima pilihan jamak", () => {
       .toMatchObject({ select: { mode: "multi", min: 0, max: null } });
   });
 
-  it("tak ada tool baru untuk rantai — permukaannya tetap 17", () => {
-    expect(MCP_TOOLS.filter((t) => t.name.includes("flow"))).toHaveLength(0);
+  // SPEC-485 melarang tool BERSARANG untuk langkah rantai: langkah adalah baris jejak biasa, dan
+  // menyalinnya ke serializer kedua berarti dua bentuk yang bisa berselisih diam-diam. ADR-0155
+  // menambah tool untuk rantai ITU SENDIRI (daftar/batal/submit) — itu permukaan yang berbeda, dan
+  // route-nya memang terjangkau agent token. Yang dijaga di sini tetap larangan aslinya.
+  it("langkah rantai tetap dibaca lewat decisions?flowId, bukan tool bersarang sendiri", () => {
+    expect(MCP_TOOLS.filter((t) => /flow.*(step|decision)|decision.*flow/.test(t.name))).toHaveLength(0);
+    const list = MCP_TOOLS.find((t) => t.name === "hanoman_lead_decisions_list")!;
+    expect(Object.keys(list.inputSchema.properties)).toContain("flow");
   });
 });
 
@@ -220,7 +226,8 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // Menutup sesi & menghapus riwayat destruktif, tapi `sessions:spawn` hanya untuk MEMBUKA
   // sesi baru — menahannya di sini akan salah alamat. `integrate` sesi sama halnya.
   "hanoman_session_close", "hanoman_session_history_purge", "hanoman_session_integrate",
-  "hanoman_agent_delete",
+  "hanoman_agent_delete", "hanoman_lead_flow_submit",
+  "hanoman_ticket_delete", "hanoman_notifications_clear",
 ]);
 
 describe("mode ⇔ capability", () => {

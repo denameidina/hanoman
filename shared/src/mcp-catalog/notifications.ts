@@ -5,7 +5,7 @@ import { shapeNotification } from "../mcp-shape";
 import { localPage } from "./helpers";
 import type { McpToolDef } from "./types";
 
-export const NOTIFICATIONS_TOOLS: readonly McpToolDef[] = [
+const CORE: readonly McpToolDef[] = [
   {
     name: "hanoman_notifications_list",
     title: "Notifikasi",
@@ -26,3 +26,21 @@ export const NOTIFICATIONS_TOOLS: readonly McpToolDef[] = [
     shape: (raw) => raw,
   },
 ];
+
+// ADR-0155 · pembersihan notifikasi. Destruktif tapi capability-nya tetap `notifications:write`:
+// tak ada pecahan `danger` di domain ini, jadi mode `danger`-nya murni ergonomi.
+const MORE: readonly McpToolDef[] = [
+  {
+    name: "hanoman_notifications_clear",
+    title: "Bersihkan notifikasi (BERBAHAYA)",
+    description:
+      "BERBAHAYA — menghapus SELURUH notifikasi secara permanen, bukan sekadar menandainya terbaca. Untuk menandai terbaca tanpa menghapus, pakai hanoman_notifications_mark_read. Hanya muncul saat tingkat `--danger` menyala.",
+    inputSchema: obj({ properties: {} }),
+    mode: "danger", capability: "notifications:write",
+    samplePath: "/notifications", sampleMethod: "DELETE",
+    build: () => ({ method: "DELETE", path: "/notifications" }),
+    shape: (raw) => raw,
+  },
+];
+
+export const NOTIFICATIONS_TOOLS: readonly McpToolDef[] = [...CORE, ...MORE];
