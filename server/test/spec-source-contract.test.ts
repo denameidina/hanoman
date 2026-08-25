@@ -28,6 +28,14 @@ describe("SPEC-546 · ADR-0109 · kontrak kolom sourceHistory", () => {
     expect(eventTypeFor(spec, "updated", ["title"])).toBe("spec.updated");
   });
 
+  // ADR-0149 · reset mengubah `source` DAN `stage` dalam satu update, dan `eventTypeFor` hanya
+  // memancarkan satu jenis. Dikunci di sini supaya itu jadi keputusan, bukan kebetulan urutan:
+  // perpindahan type-lah yang MENYEBABKAN stage mundur, bukan sebaliknya.
+  it("reset mengubah source+stage sekaligus: satu event, dan itu source_changed", () => {
+    const spec = WEBHOOK_ENTITIES.find((d) => d.entity === "spec")!;
+    expect(eventTypeFor(spec, "updated", ["source", "stage"])).toBe("spec.source_changed");
+  });
+
   it("kolomnya benar-benar ada di DB dan menerima array objek", async () => {
     await resetDb();
     await makeProject({ id: "psh" });
