@@ -119,6 +119,20 @@ export default async function (app: FastifyInstance) {
     return reply.code(r.created ? 201 : 200).send({ created: r.created, spec: r.spec, task: view });
   });
 
+  // SPEC-947 · lepas tautan (kebalikan eskalasi, cermin POST /tickets/:id/unlink). Non-destruktif:
+  // Spec dibiarkan — dihapus manual dari Backlog bila memang salah-eskalasi.
+  app.delete("/tasks/:id/escalate", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const task = await prisma.task.findUnique({ where: { id } });
+    if (!task) return reply.code(404).send({ error: "not found" });
+    // Idempoten: "tak ada yang perlu dilepas" bukan galat, dan klien papan bisa mengirim dua kali
+    // karena frame WS memperbarui kartu tepat sebelum jawaban pertama mendarat.
+    if (!task.specId) return taskView(task, null);
+    const row = await prisma.task.update({ where: { id }, data: { specId: null } });
+    await notifySynced("task", id);
+    return taskView(row, null);
+  });
+
   app.delete("/tasks/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!(await deleteSynced("task", id))) return reply.code(404).send({ error: "not found" });
