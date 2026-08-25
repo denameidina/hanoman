@@ -1850,7 +1850,7 @@ git commit -m "docs(945): ADR-0150 + data-model, api-contract, index"
 
 **Files:** tak ada perubahan kode kecuali perbaikan yang muncul.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1860,7 +1860,20 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
 
 Expected: hijau. **Jangan menerima "no test files" sebagai bukti** — `--changed` menyalakan `passWithNoTests`. Pastikan berkas `team-schema`, `team-topic`, `tasks-list`, `tasks.route`, `members.route`, `sync-*`, `cli/test/migrate-pg` benar-benar berjalan dan hitungannya masuk akal.
 
-Gagal palsu yang sudah dikenal dan **bukan** regresi dari task ini: `404`/`P2022` ramai (DB tetangga terhapus — pastikan `TEST_DATABASE_URL` terpasang), `listChatSessions is not a function` di test portal (merah di base), dan tiga `<Input type="number">` di `placeholder-contract` (merah di base).
+Gagal palsu yang sudah dikenal dan **bukan** regresi dari task ini, semuanya terbukti terhadap worktree di base SHA:
+
+- **`src/test/client-portal.test.tsx` (15) & `src/test/portal-scroll.test.tsx` (4)** — `portalApi.listChatSessions is not a function`. **BASE-RED** sejak `f2775068` (SPEC-854): `vi.mock("../src/api/portal")` di kedua berkas ketinggalan method itu. Frontend nol berkas tersentuh SPEC-945 (`git diff --name-only "$HANOMAN_BASE_SHA" -- src/` → kosong).
+- **`server/test/notifications.route.test.ts`** — `expected 'SPEC-1' to be 'SPEC-2'`. **Flake intrinsik, ada juga di base** (terukur 4/12 merah di HEAD *dan* 4/12 di base). Akarnya `notificationsFeed` mengurutkan `createdAt desc` **tanpa tiebreaker**; dua notifikasi yang lahir di milidetik yang sama jatuh ke urutan rowid.
+- **`server/test/pty.test.ts`** — hijau 66/66 dengan env bersih; merah HANYA bila `SSH_ASKPASS`/`SSH_ASKPASS_REQUIRE` bocor dari shell, karena sesi argv mentah memang sengaja mewarisi env induk (SPEC-862).
+- **Berkas server yang merah BERPINDAH tiap run penuh** (`notifications`+`pty` → `events-presence-gate` → `notifications` pada tiga run berturut-turut), dan tiap berkas hijau saat dijalankan sendirian. Itu tanda kontensi beban/DB pada run serial 516 berkas, bukan regresi. Jangan mengejar satu nama berkas; jalankan berkas itu sendirian dulu.
+
+**Env WAJIB dibersihkan**, kalau tidak run berikutnya merah pada test yang sama dan terbaca seperti regresi baru:
+
+```bash
+TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
+  env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u SSH_ASKPASS_REQUIRE -u DATABASE_URL -u NODE_ENV \
+  pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism
+```
 
 - [x] **Step 2: Typecheck paket yang tersentuh**
 
@@ -1909,7 +1922,7 @@ Expected berurutan: `201` dengan `"id":"dena@nafanesia.id"` · `409` · `400` me
 
 Port sesuaikan bila `HANOMAN_PORT` berbeda. **Jangan** membunuh proses dengan `pkill -f` — matikan per-PID seperti di atas.
 
-- [ ] **Step 5: Diff bersih & push**
+- [x] **Step 5: Diff bersih & push**
 
 ```bash
 git status --porcelain           # harus kosong
@@ -1917,6 +1930,6 @@ git diff --stat "$HANOMAN_BASE_SHA"...HEAD
 git push origin HEAD:refs/heads/hanoman/spec-945
 ```
 
-- [ ] **Step 6: Centang seluruh kotak plan ini**
+- [x] **Step 6: Centang seluruh kotak plan ini**
 
 Pastikan tak ada `- [ ]` tersisa di berkas ini sebelum menulis `Execute done` ke `$HANOMAN_PHASE_FILE`.
