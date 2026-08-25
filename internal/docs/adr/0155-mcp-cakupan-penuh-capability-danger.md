@@ -92,6 +92,46 @@ kepada orang yang tak membaca release note.
 pecahannya; delapan domain lain kosong di sana. Merender checkbox yang tak memetakan ke capability
 mana pun akan membuat grid berbohong tentang apa yang bisa diberikan.
 
+### 6. Tiga tingkat mode CLI, dan ia BUKAN kontrol keamanan
+
+`--read-only` → *(default)* → `--danger` / `HANOMAN_MCP_DANGER=1`. Yang lebih sempit selalu menang
+apa pun urutan argumen, dan memberi keduanya sekaligus **mengeluh** alih-alih diam — memilih yang
+lebih longgar diam-diam adalah cara paling mudah membuat seseorang menyalakan permukaan berbahaya
+tanpa sadar.
+
+Mengikuti ADR-0099 §5: tingkat yang lebih rendah **menghilangkan** tool dari `tools/list`, bukan
+menolaknya saat dipanggil. Tool yang tak terlihat tak bisa dicoba.
+
+**Ditulis di tiga tempat sekaligus** karena kekeliruan ini menular: di `MCP_INSTRUCTIONS`, di
+keluaran `hanoman_about` (`modeNote`), dan di kartu "MCP server" panel Settings — tingkat mode
+menentukan tool mana yang **terlihat**; yang menahan sungguhan adalah capability pada token. Sebuah
+tool bisa terlihat dan tetap menjawab 403.
+
+Catatan kecil yang mudah dilanggar: kalimat `modeNote` sengaja **tak memuat kata "token"**. Uji
+`hanoman_about` melarang kata itu muncul di mana pun dalam balasannya, dan larangan itulah yang
+menjaga rahasia tak pernah bocor lewat pintu tersebut.
+
+### 7. Katalog dipecah per domain, dan dua gerbang menjaganya
+
+`shared/src/mcp-catalog.ts` (378 baris) menjadi `shared/src/mcp-catalog/` dengan satu berkas per
+domain. Entri dipindahkan **apa adanya lewat skrip**, bukan diketik ulang: 17 test katalog lulus
+tanpa satu assert pun diubah, dan itulah buktinya perilaku tak berubah.
+
+Dua gerbang anti-drift lahir bersamanya:
+
+1. **mode ⇔ capability** (`shared/src/mcp-catalog.test.ts`) — tool bercapability `danger` wajib
+   bermode `danger`, dan sebaliknya kecuali daftar-kecuali eksplisit `DESTRUCTIVE_BUT_WRITE` untuk
+   tool yang destruktif tapi domainnya tak punya pecahan `danger`.
+2. **cakupan** (`server/test/mcp-coverage.test.ts`) — inventaris route dibaca dari **sumber**
+   `server/src/routes/**`, bukan dari daftar tangan, lalu dicocokkan dengan katalog. Endpoint baru
+   yang terjangkau agent token tapi lupa dibungkus akan menggagalkan test. Berkas ini satu-satunya
+   tempat katalog (`shared`), peta capability (`server`), dan route itu sendiri bertemu.
+
+Terukur saat gerbang kedua dipasang: **258 route, 166 terjangkau agent token, 86 cookie-only, 151
+belum terbungkus**. Assert utamanya di-skip sampai katalog lengkap — melonggarkannya alih-alih
+men-skip akan membuat gerbang itu bohong selamanya. Kontrol negatifnya tetap aktif, jadi gerbang
+yang berhenti mendeteksi apa pun akan ketahuan.
+
 ## Konsekuensi
 
 - **Breaking change bagi setiap agent token yang sudah terbit** yang mengandalkan `sessions:write`,
