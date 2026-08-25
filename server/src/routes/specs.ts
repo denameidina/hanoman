@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
-import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, type Stage } from "@hanoman/shared";
+import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, grantsCapability, type Stage } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { integrate, sourceBranch } from "../services/integrate";
 import { createSession, listSessions } from "../services/pty";
@@ -192,6 +192,20 @@ export default async function (app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const parsed = zPatchSpec.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    // ADR-0155 · gerbang KEDUA, sadar-body. `capabilityForRoute` memetakan PATCH /specs/:id ke
+    // `backlog:write` dan sengaja TAK PERNAH melihat body: kemurnian (method, path) itulah yang
+    // membuat uji kontrak katalog MCP (samplePath/sampleMethod) mungkin. Menggeser stage menghapus
+    // artefak dokumen tahap yang dilewati, jadi ia menuntut `backlog:lifecycle` — dan satu-satunya
+    // tempat yang tahu itu adalah di sini, sesudah body diparse.
+    //
+    // Konsekuensi yang disadari: gerbang ini TAK TERLIHAT uji kontrak mana pun. Penjaganya adalah
+    // server/test/specs-stage-gate.test.ts; jangan hapus berkas itu.
+    //
+    // Sesi cookie tak tersentuh (req.agent undefined) — konsisten dengan model "cookie = akses
+    // penuh" di app.ts. Dipasang SEBELUM query apa pun supaya penolakan tak punya efek samping.
+    if (parsed.data.stage !== undefined && req.agent
+      && !grantsCapability(req.agent.capabilities, "backlog:lifecycle"))
+      return reply.code(403).send({ error: "capability required", need: "backlog:lifecycle" });
     const spec = await prisma.spec.findUnique({ where: { id } });
     if (!spec) return reply.code(404).send({ error: "not found" });
     const { branchFrom, stage, confirmDelete, title, priority: newPriority, payload, dependsOn, autoMerge } = parsed.data;
