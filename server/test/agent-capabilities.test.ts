@@ -127,3 +127,17 @@ describe("status global read-only tak boleh tembus lewat method tulis (SPEC-405 
     expect(capabilityForRoute("GET", "/api/telegram/audit")).toBe("telegram:read");
   });
 });
+
+// SPEC-945 · ADR-0150 · papan tim adalah permukaan MANUSIA. Tak ada entri di `capabilityForRoute`,
+// jadi ia jatuh ke `null` → cookie-only. Ini keputusan, bukan kelalaian — dan test ini yang
+// membuatnya tetap begitu bila suatu hari seseorang menambahkan cabang tanpa memikirkannya.
+describe("papan tim tertutup bagi agent token", () => {
+  for (const p of ["/api/members", "/api/members/a@x.id", "/api/tasks", "/api/tasks/t1"])
+    for (const m of ["GET", "POST", "PATCH", "DELETE"])
+      it(`${m} ${p} → cookie-only`, () => {
+        expect(capabilityForRoute(m, p)).toBeNull();
+        const r = checkAgentCapability(["backlog:write", "support:write"], m, p);
+        expect(r.ok).toBe(false);
+        expect(!r.ok && r.reason).toBe("cookie-only");
+      });
+});

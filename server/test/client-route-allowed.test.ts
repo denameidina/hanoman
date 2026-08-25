@@ -41,6 +41,8 @@ describe("clientRouteAllowed (SPEC-617)", () => {
       "/api/config", "/api/fs", "/api/limits", "/api/update/apply", "/api/ide",
       "/api/session-results", "/api/docs", "/api/codex/version", "/api/prds",
       "/api/session-events",   // SPEC-909 · ADR-0146
+      "/api/members", "/api/members/a@x.id",   // SPEC-945 · ADR-0150
+      "/api/tasks", "/api/tasks/t1",
     ];
     for (const p of paths)
       for (const m of ["GET", "POST", "PATCH", "DELETE"])

@@ -210,6 +210,12 @@ export const paths = {
   webhookDeliveries: (id: string) => `${API}/webhooks/${encodeURIComponent(id)}/deliveries`,
   webhookDeliveryRetry: (id: string) => `${API}/webhooks/deliveries/${encodeURIComponent(id)}/retry`,
   customAgent: (id: string) => `${API}/custom-agents/${encodeURIComponent(id)}`,
+  // SPEC-945 · ADR-0150 · papan tim. `members` GLOBAL (bukan per project) — task boleh tanpa
+  // project, jadi direktori orang tak bisa digantung pada project.
+  members: `${API}/members`,
+  member: (id: string) => `${API}/members/${encodeURIComponent(id)}`,
+  tasks: `${API}/tasks`,
+  task: (id: string) => `${API}/tasks/${encodeURIComponent(id)}`,
   // SPEC-476 · ADR-0096 · observability/context/reply kanal Telegram.
   telegramStatus: `${API}/telegram/status`,
   telegramContext: (chatId: string) => `${API}/telegram/chats/${encodeURIComponent(chatId)}/context`,

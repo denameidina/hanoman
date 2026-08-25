@@ -1623,7 +1623,7 @@ describe("papan tim tertutup bagi agent token", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan LULUS langsung**
+- [x] **Step 2: Jalankan test, pastikan LULUS langsung**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism \
@@ -1632,7 +1632,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS. Ini test **karakterisasi**: ia mendokumentasikan perilaku deny-by-default yang sudah benar, dan akan merah bila seseorang membukanya tanpa sengaja. Bila `agent-capabilities.test.ts` belum mengimpor `checkAgentCapability`, tambahkan ke impor di kepala berkas.
 
-- [ ] **Step 3: Tambah entri `paths`**
+- [x] **Step 3: Tambah entri `paths`**
 
 Di `shared/src/api.ts`, sesudah entri `customAgent: (id) => …`:
 
@@ -1645,7 +1645,7 @@ Di `shared/src/api.ts`, sesudah entri `customAgent: (id) => …`:
   task: (id: string) => `${API}/tasks/${encodeURIComponent(id)}`,
 ```
 
-- [ ] **Step 4: Typecheck**
+- [x] **Step 4: Typecheck**
 
 ```bash
 pnpm --filter ./shared typecheck
@@ -1653,7 +1653,7 @@ pnpm --filter ./shared typecheck
 
 Expected: nol error.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/api.ts server/test/client-route-allowed.test.ts server/test/agent-capabilities.test.ts
@@ -1672,7 +1672,7 @@ git commit -m "test(945): buktikan papan tim tertutup bagi client & agent token"
 
 **Interfaces:** tak ada kode.
 
-- [ ] **Step 1: Konfirmasi nomor ADR belum dipakai**
+- [x] **Step 1: Konfirmasi nomor ADR belum dipakai**
 
 ```bash
 ls internal/docs/adr/ | grep '^0150' || echo "0150 bebas"
@@ -1680,7 +1680,7 @@ ls internal/docs/adr/ | grep '^0150' || echo "0150 bebas"
 
 Expected: `0150 bebas`. Bila terisi, naikkan ke nomor berikutnya yang kosong dan **perbarui setiap rujukan `ADR-0150`** di kode, spec, dan plan ini.
 
-- [ ] **Step 2: Tulis ADR-0150**
+- [x] **Step 2: Tulis ADR-0150**
 
 Buat `internal/docs/adr/0150-fondasi-papan-tim-task-member.md` dengan struktur yang sama dengan ADR tetangga (Konteks → Keputusan → Konsekuensi → Alternatif yang ditolak). Isi wajib:
 
