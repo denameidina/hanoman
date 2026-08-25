@@ -103,6 +103,16 @@ Kartu mendarat di **ujung** kolom tujuan (`order = max + 1`). Menyusun ulang kar
 lewat drag bukan bagian item B: ia butuh indikator sisip antar-kartu. `Task.order` tetap bermakna
 — naik monoton per kolom — jadi item D/E membacanya apa adanya.
 
+**Gotcha yang sudah terjadi sekali dalam spec ini:** invariant itu punya DUA jalur masuk, bukan
+satu. Drag menghitung `order` lewat `nextOrder`; `TaskModal` sempat tak mengirimnya sama sekali,
+jadi tiap kartu yang lahir dari modal ber-`order: 0` dan urutan di dalam kolom runtuh ke `id asc`
+sejak kartu **kedua** — "buat" menaruh kartu di ATAS sementara "drag" menaruhnya di BAWAH, dan
+ganti kolom lewat modal membawa `order` kolom LAMA. Route menyambutnya tanpa keluhan
+(`order: p.order ?? 0` saat create, `undefined` = jangan sentuh saat patch), jadi nol error dan
+nol test merah — sementara ADR ini sudah menjanjikan monotonisitas yang akan dibaca item D/E.
+Siapa pun yang menambah jalur tulis ketiga (eskalasi item C, impor massal) wajib melewatkan
+`order` lewat perhitungan yang **sama**, bukan menyalin rumusnya.
+
 **7. Aturan hidup sebagai fungsi MURNI, dan unit test-nya tidak cukup.**
 
 `src/src/screens/team-rules.ts` nol React & nol I/O: `canDropTask`, `nextOrder`, `moveCard`,
