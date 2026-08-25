@@ -116,16 +116,26 @@ const DATE_FIELDS: Record<Entity, string[]> = {
 // `sessionResult` sengaja ABSEN: `projectId`-nya kolom polos TANPA @relation, jadi menghapus project
 // memang tak merambat ke sana. `ticketAttachment.projectId` juga bukan FK (denormal untuk query
 // murah) — yang FK hanyalah `ticketId`.
-export const PARENTS: Partial<Record<Entity, { field: string; entity: Entity }[]>> = {
-  spec: [{ field: "projectId", entity: "project" }],
-  ticket: [{ field: "projectId", entity: "project" }],
-  ticketAttachment: [{ field: "ticketId", entity: "ticket" }],
-  customAgent: [{ field: "projectId", entity: "project" }],
-  githubIssue: [{ field: "projectId", entity: "project" }],
+//
+// SPEC-945 · ADR-0150 · `onDelete` ikut dicatat karena tak semua FK berarti hal yang sama saat
+// induknya bertombstone. `cascade` = anak ikut lenyap, jadi record yang datang untuknya memang
+// harus DIBUANG. `setNull` = anak SELAMAT dengan kolom itu dikosongkan — membuangnya membuat
+// kartu yang assignee-nya pernah dihapus tak pernah mendarat di mesin yang belum memilikinya,
+// senyap, melanggar kontrak yang ditulis route-nya sendiri.
+export type ParentRef = { field: string; entity: Entity; onDelete: "cascade" | "setNull" };
+export const PARENTS: Partial<Record<Entity, ParentRef[]>> = {
+  spec: [{ field: "projectId", entity: "project", onDelete: "cascade" }],
+  ticket: [{ field: "projectId", entity: "project", onDelete: "cascade" }],
+  ticketAttachment: [{ field: "ticketId", entity: "ticket", onDelete: "cascade" }],
+  customAgent: [{ field: "projectId", entity: "project", onDelete: "cascade" }],
+  githubIssue: [{ field: "projectId", entity: "project", onDelete: "cascade" }],
   // SPEC-945 · ADR-0150 · DUA induk. `projectId` nullable (cermin customAgent) dan `memberId`
   // nullable juga — `parentTombstoned` melewati nilai kosong, jadi nullable aman apa adanya.
   // `member` sendiri sengaja ABSEN: direktori orang global, tanpa satu pun FK keluar.
-  task: [{ field: "projectId", entity: "project" }, { field: "memberId", entity: "member" }],
+  task: [
+    { field: "projectId", entity: "project", onDelete: "cascade" },
+    { field: "memberId", entity: "member", onDelete: "setNull" },
+  ],
 };
 
 // Ekspor test-only: kontrak "setiap kolom bermakna ikut menyeberang" hanya bisa diuji dari
@@ -135,9 +145,14 @@ export const __DATE_FIELDS = DATE_FIELDS;
 
 const NUMBER_FIELDS = new Set([
   "vps:port", "ticket:number", "ticketAttachment:size", "githubIssue:number",
-  // SPEC-945 · tanpa ini urutan kartu di kolom jadi acak di mesin lain.
-  "task:order",
 ]);
+// SPEC-945 · ADR-0150 · TERPISAH dari NUMBER_FIELDS, yang menuntut `Number.isSafeInteger`.
+// `Task.order` adalah Float, dan pecahan itu justru ALASAN keberadaannya: drop di antara dua kartu
+// menulis titik tengah tetangganya. Menaruhnya di NUMBER_FIELDS lolos selama nilainya masih 0
+// (default), lalu kartu PERTAMA yang benar-benar diseret menjatuhkan seluruh sync client —
+// `validateIncomingRecord` melempar di LUAR try/catch per-record (`sync-client.ts`), kursor tak
+// pernah maju, dan `pullSehat` membungkam log ulangannya. Terukur sebelum perbaikan ini.
+const FLOAT_FIELDS = new Set(["task:order"]);
 const BOOLEAN_FIELDS = new Set(["vps:hardened", "customAgent:enabled", "member:active"]);
 const JSON_FIELDS = new Set([
   "project:handledBy",
@@ -163,6 +178,11 @@ export function validateSyncData(
         || Number.isNaN(Date.parse(value)))) {
         throw new Error(`sync tanggal invalid: ${entity}.${field}`);
       }
+      continue;
+    }
+    if (FLOAT_FIELDS.has(key)) {
+      if (typeof value !== "number" || !Number.isFinite(value))
+        throw new Error(`sync tipe invalid: ${entity}.${field}`);
       continue;
     }
     if (NUMBER_FIELDS.has(key)) {

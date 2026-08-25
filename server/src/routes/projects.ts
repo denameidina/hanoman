@@ -126,8 +126,9 @@ export default async function (app: FastifyInstance) {
     const active = listSessions().filter((s) => s.projectId === id && !s.exited).length;
     if (active) return reply.code(409).send({ error: `project "${id}" masih punya ${active} sesi aktif` });
     // ponytail: worktree di .worktrees/ tidak ikut dibersihkan; tambahkan kalau disknya penuh.
-    // SPEC-799 · ADR-0119 · spec/ticket/customAgent/githubIssue ikut lewat onDelete: Cascade di SINI
-    // maupun di setiap penerima — karena itu tombstone hanya untuk INDUK, bukan per anak.
+    // SPEC-799 · ADR-0119 · spec/ticket/customAgent/githubIssue/task (SPEC-945) ikut lewat
+    // onDelete: Cascade di SINI maupun di setiap penerima — karena itu tombstone hanya untuk
+    // INDUK, bukan per anak.
     await deleteSynced("project", id);
     return reply.code(204).send();
   });

@@ -446,7 +446,7 @@ Pakai skill lebih sempit saat task cocok:
   saat boot, atau tombol Tarik ulang) dan hapus di hub (`applyPush` menerima id yang absen sebagai
   INSERT BARU yang **selalu** diterima). Bentuknya **hard-delete + tabel `SyncTombstone`**
   (`entity, recordId, version, data, deletedAt, deviceId`), **bukan** soft-delete `deletedAt` per
-  entitas: bentuk itu menyentuh SETIAP query baca delapan entitas SYNCED (satu penyaring terlewat =
+  entitas: bentuk itu menyentuh SETIAP query baca sepuluh entitas SYNCED (satu penyaring terlewat =
   bug yang sedang diperbaiki, gagal SENYAP), menggugurkan `onDelete: Cascade`, menabrak
   `@@unique([projectId, number])` saat pembuatan ulang, dan membuat tap Prisma ADR-0100 membaca hapus
   sebagai `update`. Ide intinya: **tombstone ADALAH versi record itu sendiri, berkeadaan dihapus** —
@@ -454,7 +454,7 @@ Pakai skill lebih sempit saat task cocok:
   jatuh dari optimistic-concurrency yang sudah ada, tanpa cabang khusus. Peristiwanya mengalir lewat
   kolom **`SyncLog.op`** (`"upsert"|"delete"`, `@default`). Penghapusannya satu panggilan
   **`deleteSynced()`** (`services/sync-delete.ts`: baca versi+snapshot → hapus → tulis tombstone →
-  terbitkan sadar-peran) yang dipakai **enam** route DELETE; retensi otomatis sengaja **tidak** ikut
+  terbitkan sadar-peran) yang dipakai **delapan** route DELETE; retensi otomatis sengaja **tidak** ikut
   (ia memang sudah di luar permukaan `notifySynced`). **Delete menang TANPA SYARAT** supaya hasil
   hapus-vs-edit independen urutan tiba; edit pending yang tergilas melahirkan `Notification`
   `sync-delete:<entity>:<id>:<version>`. Anak yatim bagi induk bertombstone dibuang **sengaja** lewat

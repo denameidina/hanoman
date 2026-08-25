@@ -9,7 +9,7 @@ const modelOf = (e: Entity) => e.charAt(0).toUpperCase() + e.slice(1);
 describe("PARENTS = himpunan FK antar model SYNCED", () => {
   it("tak ada relasi FK antar entitas SYNCED yang terlewat", () => {
     const modelToEntity = new Map(SYNCED.map((e) => [modelOf(e), e] as const));
-    const expected: Record<string, { field: string; entity: string }[]> = {};
+    const expected: Record<string, { field: string; entity: string; onDelete: string }[]> = {};
 
     for (const entity of SYNCED) {
       const model = Prisma.dmmf.datamodel.models.find((m) => m.name === modelOf(entity))!;
@@ -17,13 +17,19 @@ describe("PARENTS = himpunan FK antar model SYNCED", () => {
         if (f.kind !== "object" || !f.relationFromFields?.length) continue;
         const parent = modelToEntity.get(f.type);
         if (!parent) continue; // relasi ke model di luar SYNCED — bukan urusan mesin sync
-        (expected[entity] ??= []).push({ field: f.relationFromFields[0]!, entity: parent });
+        // SPEC-945 · ADR-0150 · `onDelete` ikut ditegakkan: `cascade` membuang record anak yang
+        // datang untuk induk bertombstone, `setNull` justru menerapkannya dengan kolom itu
+        // dikosongkan. Menyalinnya salah tak menghasilkan satu pun error — kartu hanya lenyap.
+        (expected[entity] ??= []).push({
+          field: f.relationFromFields[0]!, entity: parent,
+          onDelete: f.relationOnDelete === "Cascade" ? "cascade" : "setNull",
+        });
       }
     }
 
-    const norm = (v: Record<string, { field: string; entity: string }[]>) =>
+    const norm = (v: Record<string, { field: string; entity: string; onDelete: string }[]>) =>
       Object.fromEntries(Object.entries(v)
-        .map(([k, arr]) => [k, arr.map((x) => `${x.field}->${x.entity}`).sort()])
+        .map(([k, arr]) => [k, arr.map((x) => `${x.field}->${x.entity}:${x.onDelete}`).sort()])
         .sort(([a], [b]) => String(a).localeCompare(String(b))));
 
     expect(norm(PARENTS as never)).toEqual(norm(expected));

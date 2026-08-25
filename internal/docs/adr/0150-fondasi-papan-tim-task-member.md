@@ -95,7 +95,7 @@ Drop di antara dua kartu menulis titik tengah tetangganya — tak ada reindex se
 mesin yang menulis bersamaan menghasilkan nilai yang tetap terurut. Seri dipecah oleh `id`, jadi
 urutan yang dilihat dua mesin identik.
 
-**8. Keduanya IKUT record-sync, terdaftar di sembilan tempat.**
+**8. Keduanya IKUT record-sync, terdaftar di sepuluh tempat.**
 
 `Member` dan `Task` punya `version` dan masuk `SYNCED`: papan kerja tim adalah pengetahuan bersama,
 bukan setelan mesin. Konflik mengikuti LWW + antrean rekonsil yang sudah ada (ADR-0067); tak ada
@@ -109,9 +109,9 @@ Setiap baris di tabel ini punya kelas gagal-senyap yang sudah pernah terjadi di 
 | `DELEGATE` | dua entri `prisma.*` | tsc (`Record<Entity,…>`) | — |
 | `FIELDS` | seluruh kolom bermakna + `updatedAt` | tsc hanya untuk *kunci* | kolom terlewat mendarat **null palsu tanpa satu pun error** (ADR-0090/0093/0105) |
 | `DATE_FIELDS` | `task:{startDate,dueDate,createdAt,updatedAt}`, `member:{createdAt,updatedAt}` | tsc untuk kunci | tanggal mendarat sebagai string |
-| `NUMBER_FIELDS` | `task:order` | — | urutan kartu acak di mesin lain |
+| **`FLOAT_FIELDS`** (baru) | `task:order` | — | lihat keputusan 13 |
 | `BOOLEAN_FIELDS` | `member:active` | — | anggota nonaktif hidup lagi di mesin lain |
-| `PARENTS` | `task → project`, `task → member` | `sync-parents-dmmf.test.ts` | anak yatim saat induk bertombstone (ADR-0119) |
+| `PARENTS` | `task → project` (cascade), `task → member` (**setNull**) | `sync-parents-dmmf.test.ts` | anak yatim saat induk bertombstone (ADR-0119) — dan lihat keputusan 14 |
 | `BOOTSTRAP_ORDER` | `member` **sebelum** `task` | `sync-bootstrap.test.ts` | bootstrap sukses tanpa error tapi **assignee kosong** (kelas SPEC-885 "lupa `vps`") |
 | **`PG_ORDER`** (`cli/src/commands/migrate-pg.ts`) | `Member` sebelum `Task`, keduanya sesudah `Project` | `cli/test/migrate-pg.test.ts` | test merah — daftar wajib memuat setiap model DMMF tepat sekali |
 
@@ -168,9 +168,47 @@ dipakai `Spec`, PRD, dan tiket; `"normal"` bukan anggotanya. `Task.priority` kar
 `zPriority` dengan default `"sedang"`. Kartu tim duduk bersebelahan dengan backlog item di layar
 yang sama, dan dua kosakata untuk satu konsep adalah cara keduanya mulai berbeda.
 
+**13. `FLOAT_FIELDS` terpisah dari `NUMBER_FIELDS` — memperluas ADR-0045.**
+
+`validateSyncData` memvalidasi `NUMBER_FIELDS` dengan `Number.isSafeInteger`, dan keempat penghuni
+lamanya (`vps:port`, `ticket:number`, `ticketAttachment:size`, `githubIssue:number`) memang `Int`.
+`Task.order` adalah `Float`, dan **pecahan itu justru alasan keberadaannya** (keputusan 7).
+
+Menaruhnya di `NUMBER_FIELDS` lolos setiap test berbasis daftar dan setiap kartu ber-`order: 0`
+(default), lalu kartu **pertama** yang benar-benar diseret ke antara dua kartu lain meledak — dan
+tidak di tempat yang bisa ditebak. Di arah pull, `validateIncomingRecord` dipanggil lewat `.map()`
+**di luar** try/catch per-record (`sync-client.ts`), jadi satu baris `task` pecahan di halaman feed
+melempar `syncOnce` seutuhnya; kursor tak pernah maju, `pullSehat` membungkam log ulangannya, dan
+**seluruh sync client mesin itu mandek permanen** — bukan hanya task, tapi juga spec, tiket, dan
+project. Di arah push, item outbox gagal per-record tanpa menyalakan peringatan SPEC-880 (`r` ada,
+`r.ok` false) dan diulang selamanya tanpa satu baris log.
+
+`FLOAT_FIELDS` divalidasi `Number.isFinite`, jadi `NaN`/`Infinity`/string tetap ditolak. Terukur
+sebelum dan sesudah perbaikan; ditemukan dua kali secara terpisah dalam review yang sama.
+
+**14. `PARENTS` mencatat `onDelete`, dan `setNull` MENGOSONGKAN alih-alih membuang.**
+
+`parentTombstoned` dulu memperlakukan setiap induk sama: induk bertombstone → record anak
+**dibuang**. Itu benar selama seluruh isi `PARENTS` ber-`onDelete: Cascade`, dan sampai spec ini
+memang begitu. `Task.member` adalah induk **`SetNull` pertama** di peta itu, dan kontraknya justru
+kebalikannya — "task jadi belum ditugaskan, **tidak** ikut terhapus", kalimat yang ditulis route-nya
+sendiri dan `api-contract.md`.
+
+Tanpa perbedaan itu, kartu yang assignee-nya pernah dihapus **tak pernah mendarat** di mesin yang
+belum memilikinya: `applyFeedFrame` menjawab `true`, kursor maju, `stats.dropped++`, nol log. Di
+mesin asal kartunya selamat; di mesin lain lenyap.
+
+Karena itu `ParentRef` kini membawa `onDelete: "cascade" | "setNull"`. `cascade` membuang seperti
+sebelumnya (ADR-0119 utuh); `setNull` menerapkan record dengan kolom itu dikosongkan — persis yang
+dilakukan DB di mesin asalnya. Nilainya **tidak** disalin tangan: `sync-parents-dmmf.test.ts`
+menurunkannya dari `f.relationOnDelete` milik DMMF, jadi peta ini tak bisa lagi hanyut dari skema
+pada arah mana pun.
+
 ## Konsekuensi
 
 - Dua tabel baru, satu migration aditif tulis-tangan, tanpa backfill. Tak ada tabel diredefinisi.
+- `PARENTS` berubah bentuk (`ParentRef` ber-`onDelete`); seluruh entri lama ditandai `cascade`,
+  jadi perilakunya identik dengan sebelumnya.
 - `resetDb()` di harness test menyapu `task` lalu `member` — tanpa itu baris tim bocor antar-berkas
   test yang berbagi satu DB.
 - `Spec` tak tersentuh sama sekali; SPEC-162 utuh.

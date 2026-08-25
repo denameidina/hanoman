@@ -96,11 +96,19 @@ async function applyRemoteDelete(
 // SPEC-799 · ADR-0119 · anak yatim BUKAN anomali: induknya memang dihapus, dan penerima sudah punya
 // keadaan itu. Dulu ia jatuh ke `console.warn("induk absen?")` — sebuah tebakan yang tak bisa
 // dibedakan dari kegagalan sungguhan.
+//
+// SPEC-945 · ADR-0150 · hanya induk `cascade` yang menjatuhkan anaknya. Induk `setNull` (`Task.member`)
+// justru menjanjikan sebaliknya — "task jadi belum ditugaskan, TIDAK ikut terhapus" — jadi record
+// itu tetap diterapkan dengan kolomnya dikosongkan, persis yang dilakukan DB di mesin asalnya.
+// Membuangnya membuat kartu yang assignee-nya pernah dihapus lenyap senyap di mesin yang belum
+// memilikinya: `applyFeedFrame` menjawab `true`, kursor maju, nol log.
 async function parentTombstoned(entity: Entity, data: Record<string, unknown>): Promise<boolean> {
   for (const p of PARENTS[entity] ?? []) {
     const v = data[p.field];
     if (typeof v !== "string" || !v) continue;
-    if (await findTombstone(p.entity, v)) return true;
+    if (!(await findTombstone(p.entity, v))) continue;
+    if (p.onDelete === "cascade") return true;
+    data[p.field] = null;
   }
   return false;
 }

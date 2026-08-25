@@ -917,7 +917,8 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 >
 > **`GET /api/sync/bootstrap?after=<entity>:<id>`** (**device-token**, sama seperti `/sync/pull`) →
 > `{ cursor, records, hasMore, next }`. Mengirim **keadaan tabel** dalam urutan dependensi
-> (`project` → `spec`/`ticket`/`customAgent`/`githubIssue` → `ticketAttachment` → `sessionResult`),
+> (`project` → `spec`/`ticket`/`customAgent`/`githubIssue` → `ticketAttachment` → `member` → `task`
+> → `sessionResult`; `member` WAJIB mendahului `task`, SPEC-945),
 > bukan sejarah feed — di hub produksi 3.637 baris/7,9 MB menyusut jadi 889 record/~2,5 MB, dan urutan
 > FK benar *by construction*. `cursor` = puncak `SyncLog` yang diambil **sebelum** tabel dibaca (urutan
 > sebaliknya membuat tulisan di sela pembacaan hilang permanen). `next` = `"<entity>:<id>"` record

@@ -100,15 +100,22 @@ describe("SPEC-945 · member & task ikut record-sync", () => {
     expect([...__DATE_FIELDS.task].sort()).toEqual(["createdAt", "dueDate", "startDate", "updatedAt"]);
   });
 
-  it("PARENTS.task memuat KEDUA induknya", () => {
+  // `onDelete` bukan hiasan: `cascade` MEMBUANG record anak yang datang untuk induk bertombstone,
+  // `setNull` justru menerapkannya dengan kolom itu dikosongkan. Menyalinnya salah membuat kartu
+  // yang assignee-nya pernah dihapus lenyap senyap di mesin lain.
+  it("PARENTS.task memuat KEDUA induknya, berikut perilaku hapusnya", () => {
     expect(PARENTS.task).toEqual(expect.arrayContaining([
-      { field: "projectId", entity: "project" },
-      { field: "memberId", entity: "member" },
+      { field: "projectId", entity: "project", onDelete: "cascade" },
+      { field: "memberId", entity: "member", onDelete: "setNull" },
     ]));
   });
 
-  it("member TIDAK punya induk — direktori orang global, bukan anak project", () => {
-    expect(PARENTS.member).toBeUndefined();
+  // Ditulis lewat `Object.keys`, bukan `PARENTS.member === undefined`: yang terakhir juga lulus di
+  // pohon tempat `member` belum terdaftar sama sekali, jadi ia tak membuktikan apa pun. Menuntut
+  // `task` HADIR di keping yang sama mengikat assertion ini pada perubahan yang benar.
+  it("task punya induk, member tidak — direktori orang global tanpa satu pun FK keluar", () => {
+    expect(Object.keys(PARENTS)).toContain("task");
+    expect(Object.keys(PARENTS)).not.toContain("member");
   });
 
   // Kelas SPEC-885 "lupa vps": urutan yang salah bootstrap SUKSES tanpa error, tapi assignee kosong.

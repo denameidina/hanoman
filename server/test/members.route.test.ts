@@ -86,9 +86,13 @@ describe("PATCH /members/:id", () => {
     expect((await prisma.member.findUnique({ where: { id: "dena@x.id" } }))!.name).toBe("Dena");
   });
 
-  it("404 untuk id yang tak ada", async () => {
+  // Badan responsnya ikut diperiksa: 404 telanjang juga muncul di pohon yang BELUM punya route
+  // ini, dan `{"error":"Not Found"}` bawaan Fastify tak sama dengan `{"error":"not found"}` milik
+  // handler. Tanpa assertion ini, test lulus justru saat route-nya hilang.
+  it("404 untuk id yang tak ada — dari handler, bukan dari router", async () => {
     const res = await app.inject({ method: "PATCH", url: "/api/members/hantu@x.id", payload: { name: "X" } });
     expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: "not found" });
   });
 });
 
@@ -103,7 +107,9 @@ describe("DELETE /members/:id", () => {
     expect(t!.memberId).toBeNull();
   });
 
-  it("404 untuk id yang tak ada", async () => {
-    expect((await app.inject({ method: "DELETE", url: "/api/members/hantu@x.id" })).statusCode).toBe(404);
+  it("404 untuk id yang tak ada — dari handler, bukan dari router", async () => {
+    const res = await app.inject({ method: "DELETE", url: "/api/members/hantu@x.id" });
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: "not found" });
   });
 });

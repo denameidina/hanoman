@@ -150,7 +150,9 @@ export async function resetDb(): Promise<void> {
   await prisma.$transaction([
     prisma.changelog.deleteMany(),   // SPEC-516 · ADR-0105
     prisma.notification.deleteMany(),
-    prisma.task.deleteMany(),     // SPEC-945 · ADR-0150 · sebelum member (FK memberId)
+    // SPEC-945 · ADR-0150 · urutan task→member bukan keharusan FK (relasinya SetNull, bukan
+    // Cascade); ia sekadar mengikuti arah induk→anak yang dipakai baris-baris di sekitarnya.
+    prisma.task.deleteMany(),
     prisma.member.deleteMany(),
     prisma.spec.deleteMany(), prisma.setting.deleteMany(), prisma.project.deleteMany(),
     prisma.vps.deleteMany(),

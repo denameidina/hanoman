@@ -24,6 +24,10 @@ const NEW_SESSION_EVENTS = ["/api/session-events"];
 // dengan `.catch(() => {})` (server lama menjawab 404 di sana), jadi route yang lupa di-`register`
 // hanya terlihat sebagai halaman Klien yang diam kosong.
 const NEW_PRESENCE = ["/api/presence"];
+// SPEC-945 · ADR-0150 · alasan yang sama sekali lagi: papan tim adalah permukaan yang HANYA
+// dijangkau lewat cookie, jadi route yang lupa di-`register` terbaca sebagai 401/404 yang
+// tak terbedakan dari "belum login" — bukan sebagai kesalahan pemasangan.
+const NEW_TEAM = ["/api/members", "/api/tasks"];
 
 describe("parity: endpoint baseline preserved (SPEC-213 AC-23)", () => {
   it("every baseline endpoint still registered", () => {
@@ -37,5 +41,8 @@ describe("parity: endpoint baseline preserved (SPEC-213 AC-23)", () => {
   });
   it("presence surface registered (SPEC-919)", () => {
     for (const p of NEW_PRESENCE) expect(routes, `belum ada: ${p}`).toContain(p);
+  });
+  it("team surface registered (SPEC-945)", () => {
+    for (const p of NEW_TEAM) expect(routes, `belum ada: ${p}`).toContain(p);
   });
 });
