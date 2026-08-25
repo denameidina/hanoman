@@ -220,6 +220,7 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // Menutup sesi & menghapus riwayat destruktif, tapi `sessions:spawn` hanya untuk MEMBUKA
   // sesi baru — menahannya di sini akan salah alamat. `integrate` sesi sama halnya.
   "hanoman_session_close", "hanoman_session_history_purge", "hanoman_session_integrate",
+  "hanoman_agent_delete",
 ]);
 
 describe("mode ⇔ capability", () => {
