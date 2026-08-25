@@ -768,6 +768,8 @@ export const zTopicParams = {
     projectId: z.string().max(120).optional(),
     status: z.string().max(40).optional(),
     memberId: z.string().max(200).optional(),
+    // SPEC-946 · pencarian papan tim. Cermin `tickets` di atas — disaring server SEBELUM paginasi.
+    q: z.string().max(200).optional(),
     page: zSubPage, limit: zSubLimit,
   }).strict(),
 } as const;

@@ -28,6 +28,14 @@ describe("SPEC-945 · ADR-0150 · topik `tasks`", () => {
       .toEqual({ projectId: "p1", status: "doing", memberId: "a@x.id", page: 1, limit: 20 });
   });
 
+  // SPEC-946 · pencarian papan tim menyeberang sebagai parameter langganan supaya plafon 200
+  // berlaku pada HASIL pencarian, bukan pada potongan pertama tabel.
+  it("menerima q opsional", () => {
+    expect(parseParams("tasks", { q: "desain", page: 1, limit: 20 }))
+      .toEqual({ q: "desain", page: 1, limit: 20 });
+    expect(parseParams("tasks", { q: "x".repeat(201), page: 1, limit: 20 })).toBeUndefined();
+  });
+
   it("build mengembalikan BADAN frame tanpa t/key", async () => {
     await resetDb();
     await makeProject({ id: "p1" });

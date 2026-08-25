@@ -19,7 +19,7 @@ export const taskView = (t: Task, spec: TaskSpecMirror | null): TaskView => ({
 });
 
 export type TasksFilter = {
-  projectId?: string; status?: string; memberId?: string; page?: number; limit?: number;
+  projectId?: string; status?: string; memberId?: string; q?: string; page?: number; limit?: number;
 };
 
 // `?:` di sini adalah bug yang terukur di tickets-list.ts: route menyerahkan `Number(limit)`, jadi
@@ -33,7 +33,16 @@ export async function buildTasksPage(f: TasksFilter): Promise<Paginated<TaskView
   if (f.memberId) where.memberId = f.memberId;
   // `order` menaik = urutan dalam kolom; `id` memecah seri supaya dua mesin yang menulis nilai
   // yang sama tetap menghasilkan urutan yang identik di mana pun.
-  const rows = await prisma.task.findMany({ where, orderBy: [{ order: "asc" }, { id: "asc" }] });
+  let rows = await prisma.task.findMany({ where, orderBy: [{ order: "asc" }, { id: "asc" }] });
+
+  // SPEC-946 · cermin `buildTicketsPage`: disaring di MEMORI, bukan lewat `contains` Prisma —
+  // `contains` di SQLite peka huruf besar-kecil untuk non-ASCII, dan `mode: "insensitive"` tak
+  // didukung provider ini. Di SINI, sebelum `paginate`, supaya plafon halaman berlaku pada HASIL
+  // pencarian: menyaring sesudahnya membuat pencarian buta terhadap baris di luar potongan pertama.
+  if (f.q) {
+    const n = f.q.toLowerCase();
+    rows = rows.filter((t) => `${t.title} ${t.detail ?? ""}`.toLowerCase().includes(n));
+  }
 
   // `specId` TANPA FK, jadi tak ada `include` Prisma yang bisa dipakai. Satu query untuk seluruh
   // himpunan — bukan satu per kartu (N+1) — lalu dipetakan di memori.

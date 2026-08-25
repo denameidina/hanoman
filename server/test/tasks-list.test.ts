@@ -66,4 +66,29 @@ describe("buildTasksPage", () => {
     expect(t1.dueDate).toBe("2026-09-01T00:00:00.000Z");
     expect(t1.startDate).toBeNull();
   });
+
+  // SPEC-946 · cermin `buildTicketsPage`: disaring DI MEMORI, bukan lewat `contains` Prisma —
+  // `contains` di SQLite peka huruf besar-kecil untuk non-ASCII dan `mode: "insensitive"` tak
+  // didukung provider ini. Disaring SEBELUM paginasi, jadi pencarian menjangkau seluruh tabel.
+  it("q mencocoki judul, tak peka huruf besar-kecil", async () => {
+    expect((await buildTasksPage({ q: "desain" })).items.map((t) => t.id)).toEqual(["t1"]);
+    expect((await buildTasksPage({ q: "DESAIN" })).items.map((t) => t.id)).toEqual(["t1"]);
+  });
+
+  it("q mencocoki detail", async () => {
+    await prisma.task.update({ where: { id: "t3" }, data: { detail: "bahas ANGGARAN kuartal" } });
+    expect((await buildTasksPage({ q: "anggaran" })).items.map((t) => t.id)).toEqual(["t3"]);
+  });
+
+  it("q disaring sebelum paginasi — total = jumlah yang cocok, bukan jumlah tabel", async () => {
+    const p = await buildTasksPage({ q: "de", page: 1, limit: 1 });
+    expect(p.total).toBe(2);              // Desain + Deploy
+    expect(p.items).toHaveLength(1);
+  });
+
+  it("q tanpa kecocokan mengembalikan halaman kosong, bukan seluruh tabel", async () => {
+    const p = await buildTasksPage({ q: "tidak-ada-ini" });
+    expect(p.items).toEqual([]);
+    expect(p.total).toBe(0);
+  });
 });
