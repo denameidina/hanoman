@@ -34,8 +34,11 @@ describe("kontrak capability katalog MCP", () => {
       expect(t.samplePath, t.name).not.toMatch(/^\/vps/);
       if (t.samplePath.startsWith("/terminal")) expect(t.sampleMethod, t.name).toBe("GET");
     }
-    // Kontrol positif: kalau seseorang menambahkannya kelak, peta memang menuntut sessions:write.
-    expect(capabilityForRoute("POST", "/api/terminal/sessions")).toBe("sessions:write");
+    // Kontrol positif: kalau seseorang menambahkannya kelak, peta memang menuntutnya.
+    // ADR-0155 · sejak pemecahan akses `danger`, yang dituntut BUKAN lagi `sessions:write` —
+    // `sessions:write` hanya cukup untuk mengendalikan sesi yang SUDAH ada. Membuka sesi baru
+    // menuntut `sessions:spawn`, yang tak diimplikasikan capability mana pun.
+    expect(capabilityForRoute("POST", "/api/terminal/sessions")).toBe("sessions:spawn");
     expect(capabilityForRoute("POST", "/api/vps/1/run")).toBe("vps:write");
   });
 
