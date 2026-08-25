@@ -210,6 +210,9 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // menyebut `backlog:write` agar uji kontrak hijau — deskripsi tool yang memberitahu
   // agen capability apa yang sebenarnya dituntut server.
   "hanoman_backlog_stage_set",
+  // `projects:destroy` sengaja TIDAK dibuat (ADR-0155), jadi kedua tool ini destruktif dengan
+  // capability `projects:write` biasa. Mode `danger`-nya murni ergonomi.
+  "hanoman_project_rename", "hanoman_project_delete",
 ]);
 
 describe("mode ⇔ capability", () => {
