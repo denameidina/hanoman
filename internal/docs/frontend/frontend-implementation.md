@@ -952,7 +952,7 @@ Memulai sesi **tidak** memindahkan layar — operator tetap di Backlog dengan fi
 utuh. Yang menandai sesi sudah jalan adalah kartunya sendiri: `activeSpecs` (diturunkan dari
 `listSessions()` tmux) menyegar, tombolnya berubah, dan toast muncul.
 
-## Tim — papan kerja manusia (SPEC-946 · ADR-0150/0151)
+## Tim — papan kerja manusia (SPEC-946/948 · ADR-0150/0151/0153)
 `TeamScreen` adalah papan kanban untuk pekerjaan **manusia** di sekitar sesi agen: desain, meeting
 klien, deploy, nego, urusan internal. Ia **bukan** mode keempat `BacklogScreen`. Kolom board
 Backlog adalah `Spec.stage` yang diturunkan dari fase sesi (ADR-0008/0024); kolom di sini adalah
@@ -992,7 +992,8 @@ kosongnya membawa pintu masuk "Tugas baru".
 
 Toolbar dua baris cermin `BacklogScreen`: baris atas toggle mode tampilan (`Tabs variant="pill"`),
 **Tugas baru**, **Anggota**, `SyncButton`, `ResetViewButton`, hitungan ber-`role="status"`, dan
-`LiveConnectionBadge`; baris bawah **Cari tugas** + penyaring project, kolom, dan anggota. Kelas
+`LiveConnectionBadge`; baris bawah **Cari tugas** + penyaring project, kolom, anggota, dan — hanya
+di mode Linimasa — **Zoom linimasa**. Kelas
 responsifnya dinamai sendiri (`.hn-team-topline` dkk.) dan didaftarkan ke grup selector yang sama
 di `app.css` — layar yang meminjam nama layar lain adalah cara aturan mulai berubah untuk satu
 layar dan diam-diam ikut mengubah yang lain.
@@ -1037,13 +1038,36 @@ sync tak punya operasi rename (ADR-0094/0150), jadi emailnya dirender sebagai te
 "ganti email berarti hapus lalu buat baru". Menghapus lewat `useConfirm` (ADR-0127), dan dialognya
 menyebut bahwa tugasnya **tidak** ikut terhapus (`onDelete: SetNull`).
 
+**Mode Linimasa** (SPEC-948 · ADR-0153) menghamparkan tugas yang sama di sumbu waktu: baris = task,
+batang = `startDate → dueDate`, zoom `Hari · Minggu · Bulan` yang persisten lewat `uiKey("team","zoom")`
+dengan bawaan `week`. Zoom **bukan** penyaring — ia tak ikut `activeFilters`. Datanya `board` yang
+**sudah** dimuat mode Papan, jadi berpindah mode maupun mengganti zoom tak melahirkan satu pun
+request, dan plafon 200/kolom berlaku di sini juga (dirender sebagai satu baris "N tugas tak
+termuat"). Penyaring kolom karena itu ikut mempersempit linimasa.
+
+Aritmetikanya seluruhnya fungsi murni di `team-rules.ts` dan `today` selalu argumen. Yang perlu
+diketahui saat menyentuhnya: akhir tanggal **inklusif** (tanpa itu task sehari berlebar nol dan
+kartunya seolah tak bertanggal); "belum dijadwalkan" berarti **kedua** tanggal null, satu tanggal
+saja tetap batang satu hari; tenggat yang mendahului mulai digambar bernada galat, bukan ditukar;
+dan jendela berplafon 120 tick sehingga task yang tak muat mendarat di daftar **"Di luar jendela"**
+alih-alih hilang. Kedua daftar di bawah kanvas ("Belum dijadwalkan", "Di luar jendela") hanya
+dirender saat berisi.
+
+Gulir mendatarnya hidup di `.hn-timeline-scroll`, tak pernah di badan halaman (SPEC-879), dan
+pembungkus di dalamnya berlebar **eksplisit** — anak blok di container `overflow: auto` menyusut
+mengikuti containernya dan scroller-nya lalu tak punya apa pun untuk digulir. Kolom label
+`position: sticky; left: 0`; gridline baris digambar `repeating-linear-gradient`, bukan satu div
+per sel (40 baris × 120 tick = 4 800 node kosong). `TimelineCanvas` sengaja **tak menyebut `Task`**
+dan menerima `bars` **jamak**, karena mode Lintas project memakainya dengan baris per project.
+
 Berkasnya dipecah **sejak awal** — `BacklogScreen` 63 KB dan `TerminalScreen` 57 KB adalah
 pelajaran yang tak perlu diulang:
 
 | Berkas | Tanggung jawab |
 |---|---|
-| `screens/team-rules.ts` | fungsi **murni**: `TEAM_COLUMNS`, `emptyBoard`, `canDropTask`, `nextOrder`, `moveCard`, `replaceCard`, konversi tanggal. Nol React, nol I/O |
+| `screens/team-rules.ts` | fungsi **murni**: `TEAM_COLUMNS`, `emptyBoard`, `canDropTask`, `nextOrder`, `moveCard`, `replaceCard`, konversi tanggal, dan seluruh aritmetika linimasa (`taskSpan`, `timelineWindow`, `barGeometry`, `todayOffset`, `timelineRows`). Nol React, nol I/O |
 | `screens/team-board.tsx` | `TeamBoard` + `TaskCard` — render & event drag |
+| `screens/team-timeline.tsx` | `TimelineCanvas` (generik, tak menyebut `Task`) + `TeamTimeline` (mode task) |
 | `screens/TaskModal.tsx` | satu form untuk buat DAN ubah, plus hapus |
 | `screens/MembersPanel.tsx` | modal kelola anggota |
 | `screens/EscalateDialog.tsx` | dialog eskalasi kartu → backlog (project bila perlu · source · prioritas) |
@@ -1058,7 +1082,10 @@ yang tak memunculkan satu pun error.
 Aturannya diuji dua lapis, dan lapis pertama **tidak cukup**: `from`/`to` yang tertukar saat
 dipasang lolos dari unit test aturannya sendiri. `src/test/team-board.test.tsx` karena itu men-drag
 kartu sungguhan di jsdom (`fireEvent.dragStart` + `fireEvent.drop`, dengan `DataTransfer` palsu),
-persis pola `src/test/backlog-board.test.tsx`.
+persis pola `src/test/backlog-board.test.tsx`. Linimasa mengikuti pembagian yang sama:
+`team-rules.test.ts` menguji aritmetikanya langsung, sementara `team-timeline.test.tsx` merender
+kanvasnya dan membandingkan `left`/`width` batang dengan `barGeometry` untuk masukan yang sama —
+`left`/`width` yang tertukar lolos sempurna dari uji aritmetikanya sendiri.
 
 ## Terminal (sesi Claude Code interaktif)
 `TerminalScreen` menampilkan sesi dalam **grid `rows × cols`** (CSS Grid): `+ Kolom` menambah

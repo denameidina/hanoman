@@ -1418,12 +1418,12 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: keputusan yang sudah dikunci Task 1-5.
 - Produces: —
 
-- [ ] **Step 1: Konfirmasi nomor ADR masih bebas**
+- [x] **Step 1: Konfirmasi nomor ADR masih bebas**
 
 Run: `ls internal/docs/adr/ | grep -c '^0153'`
 Expected: `0`. Bila bukan nol, ADR/SPEC bentrok antar-worktree — ambil nomor bebas berikutnya dan pakai nomor itu di seluruh langkah berikut.
 
-- [ ] **Step 2: Tulis ADR-0153**
+- [x] **Step 2: Tulis ADR-0153**
 
 Create `internal/docs/adr/0153-linimasa-gantt-papan-tim.md` mengikuti struktur ADR-0151 (Status · Konteks · Keputusan · Konsekuensi · Alternatif yang ditolak). Isi yang **wajib** tercatat, karena semuanya adalah keputusan yang tak terbaca dari kode:
 
@@ -1440,7 +1440,7 @@ Create `internal/docs/adr/0153-linimasa-gantt-papan-tim.md` mengikuti struktur A
 11. **Gridline sebagai gradien, bukan div per sel** (40 × 120 = 4 800 node kosong).
 12. **Alternatif yang ditolak:** library Gantt (dependency + tak bisa memakai token DS); menyeret batang untuk mengubah tanggal (butuh kuantisasi, snapping, undo — `TaskModal` tetap satu-satunya penulis tanggal); menyimpan geometri di state (dua kebenaran yang bisa drift); jendela tetap "hari ini ± N" (papan berisi rencana kuartal depan tampak kosong).
 
-- [ ] **Step 3: Tautkan di index**
+- [x] **Step 3: Tautkan di index**
 
 Tambahkan satu butir di `internal/docs/README.md`, **tepat setelah** butir ADR-0152, dengan bentuk yang sama seperti tetangganya (judul tebal + nomor ADR, tautan doc yang tersentuh, lalu ringkasan keputusan yang padat):
 
@@ -1448,7 +1448,7 @@ Tambahkan satu butir di `internal/docs/README.md`, **tepat setelah** butir ADR-0
 - **Layar `Tim` — mode Linimasa (ADR-0153)** — mode tampilan kedua di atas papan yang sama ([frontend-implementation](frontend/frontend-implementation.md)). Baris = task, batang = `startDate → dueDate`, zoom hari/minggu/bulan, digambar CSS grid + token DS **tanpa library chart**. Seluruh aritmetikanya fungsi MURNI di `team-rules.ts` (`taskSpan` · `timelineWindow` · `barGeometry` · `todayOffset` · `timelineRows`) dan `today` **selalu argumen**. Akhir tanggal **inklusif** — tanpa itu task sehari berlebar nol dan kartunya seolah tak bertanggal; "belum dijadwalkan" karena itu berarti **kedua** tanggal null, satu tanggal saja tetap batang satu hari. Tenggat yang mendahului mulai **digambar + ditandai**, tidak ditukar diam-diam. Jendela lahir dari **data ∪ hari ini** dibulatkan ke batas satuan zoom; tick berplafon **120** untuk melindungi DOM dan yang jatuh di luar **didaftar** ("Di luar jendela"), cermin "menampilkan N dari M" ADR-0151. Tick bulan satuan **kalender** → batang diposisikan oleh WAKTU (persen), gridline oleh PIKSEL. Aritmetika & label **UTC** di kedua sisi (`dateInputToIso` menulis tengah hari UTC). **Nol fetch baru**: linimasa membaca `board` yang sudah dilanggan per kolom. `TimelineCanvas` generik ber-`bars` **jamak** dan tak menyebut `Task` sama sekali — kontrak yang dipakai ulang mode Lintas project
 ```
 
-- [ ] **Step 4: Perbarui `frontend-implementation.md`**
+- [x] **Step 4: Perbarui `frontend-implementation.md`**
 
 Run: `grep -n "Tim\b\|team-board\|TeamScreen" internal/docs/frontend/frontend-implementation.md`
 
@@ -1460,13 +1460,13 @@ team-timeline.tsx   kanvas Gantt generik (TimelineCanvas) + mode task (TeamTimel
 
 sebutkan bahwa mode Linimasa memakai data papan yang sama (nol fetch), zoom persisten lewat `uiKey("team","zoom")`, dan dua daftar di bawah kanvas ("Belum dijadwalkan", "Di luar jendela"). Cocokkan gaya & tingkat detail dengan paragraf tetangganya — jangan menyalin isi ADR ke sini.
 
-- [ ] **Step 5: Verifikasi integritas index**
+- [x] **Step 5: Verifikasi integritas index**
 
 Run: `node dist/cli.js docs index --check 2>/dev/null || pnpm --filter ./runner exec tsx src/cli.ts docs index --check`
 Expected: index konsisten. Bila perintahnya tak tersedia di worktree ini, cukup pastikan tautan relatif di butir baru menunjuk berkas yang benar-benar ada:
 `ls internal/docs/frontend/frontend-implementation.md internal/docs/adr/0153-linimasa-gantt-papan-tim.md`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs/adr/0153-linimasa-gantt-papan-tim.md internal/docs/README.md internal/docs/frontend/frontend-implementation.md
