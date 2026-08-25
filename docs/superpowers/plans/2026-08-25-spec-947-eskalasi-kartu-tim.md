@@ -1,6 +1,6 @@
 # SPEC-947 — Eskalasi kartu tim ke backlog · Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use markdown checkbox syntax for tracking.
 
 **Goal:** Kartu papan tim bisa dieskalasi jadi backlog item hanoman (`POST /api/tasks/:id/escalate`) dan dilepas lagi (`DELETE`), lewat dialog di kartu yang meminta source + prioritas + project bila perlu.
 
@@ -1229,7 +1229,7 @@ git commit -m "docs(947): ADR-0152 + api-contract + index + skill"
 
 **Files:** tak ada perubahan kode — hanya menjalankan & melaporkan.
 
-- [ ] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
+- [x] **Step 1: Jalankan seluruh test yang tersentuh perubahan**
 
 Run:
 ```bash
@@ -1240,7 +1240,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 ```
 Expected: semua PASS. **Jangan** terima "no test files" sebagai bukti — pastikan jumlah test yang berjalan bukan nol.
 
-- [ ] **Step 2: Typecheck tiga paket yang tersentuh**
+- [x] **Step 2: Typecheck tiga paket yang tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck`
 Expected: exit 0 bertiga. (Bukan `pnpm -r typecheck` — itu menyalakan satu proses tsc per paket sekaligus.)
@@ -1276,14 +1276,46 @@ menaiki **enam** level dan menemukan `.env` checkout UTAMA, yang berisi
 ke DB dev kosong dan menjawab `P2021 table main.User does not exist` padahal DB smoke-nya bermigrasi
 sempurna. Sebutkan `DATABASE_URL` **eksplisit** — env nyata menang atas `.env`.
 
-- [ ] **Step 4: Centang seluruh kotak plan ini**
+- [x] **Step 4: Centang seluruh kotak plan ini**
 
-Setiap `- [ ]` di berkas ini jadi `- [x]`. hanoman menahan backlog di `executing` selama masih ada kotak kosong.
+Setiap kotak yang masih kosong di berkas ini dicentang. hanoman menahan backlog di `executing` selama masih ada kotak kosong.
 
-- [ ] **Step 5: Commit & push**
+- [x] **Step 5: Commit & push**
 
 ```bash
 git add docs/superpowers/plans/2026-08-25-spec-947-eskalasi-kartu-tim.md
 git commit -m "docs(plan-947): centang tuntas"
 git push origin HEAD:refs/heads/hanoman/spec-947
 ```
+
+
+---
+
+## Hasil sapuan sesudah plan (di luar tujuh task)
+
+Dua subagent disapukan sesudah kode mendarat. Ringkasannya di sini supaya tak hilang bersama sesi.
+
+**qa-verifier — nol regresi.** Set `--changed` penuh: `4659 test, 4640 lulus, 19 gagal`. Ke-19-nya
+berasal dari dua berkas portal (`client-portal.test.tsx`, `portal-scroll.test.tsx`) yang **merah di
+base dengan status per-test IDENTIK** — mock `portalApi` ketinggalan `listChatSessions` sejak
+SPEC-854, nol baris diff terhadap `bf0208d2`. `notifications.route.test.ts` flake sendirian:
+`notificationsFeed` mengurutkan `createdAt desc` **tanpa tiebreaker** dan dua baris `beforeEach`
+berbagi milidetik yang sama pada **25 dari 30** iterasi. Empat berkas test SPEC-947 terbukti relevan
+(31 test merah di base, satu berkas bahkan gagal dimuat), dan mutasi sementara `if (spec) return` →
+`if (false && spec) return` menjatuhkan **tepat** test idempotensi, tanpa kerusakan menyebar.
+
+**blast-radius — dua lubang kode, empat cermin dokumen.** Semua sudah ditutup di commit `64978b23`
+dan `1d258f24`; keputusannya dinaikkan ke ADR-0152 keputusan 13 & 14. Yang paling mahal: `PATCH
+/tasks/:id` adalah **pintu tulis kedua** ke `projectId` dan tak tahu apa-apa tentang invariant yang
+dipasang route escalate — kelas yang sama persis dengan dua jalur tulis `order` (ADR-0151), lahir
+lagi satu commit sesudahnya.
+
+**Dilaporkan, sengaja TIDAK diubah:**
+
+- `specId` di body `PATCH` dibuang senyap alih-alih ditolak `400`, padahal `PATCH /members/:id`
+  menolak `email` demi alasan yang identik. Strip-senyap itu **tertulis eksplisit** di
+  `api-contract.md` sebagai keputusan SPEC-945/ADR-0150 — membaliknya butuh amandemen ADR.
+- `docs/agent-integration.md` tak pernah menyebut `/api/tasks` maupun `/api/members`, dan array
+  kandidat di `agent-doc-contract.test.ts` yang seharusnya memaksanya adalah daftar tangan. Utang
+  SPEC-945.
+- Mock `portalApi` basi & `notificationsFeed` tanpa tiebreaker — keduanya mendahului SPEC-947.
