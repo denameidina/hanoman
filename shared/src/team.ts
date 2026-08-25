@@ -85,3 +85,11 @@ export type TaskView = {
   spec: TaskSpecMirror | null;
   createdAt: string; updatedAt: string;
 };
+
+// Tipe MASUKAN zod — bentuk yang dikirim pemanggil, bukan bentuk sesudah `.default()` diterapkan.
+// Klien memakainya supaya `status`/`priority` tetap opsional dan tak ada cermin bentuk keempat;
+// tipe-saja, jadi zod tak ikut terbundel ke frontend.
+export type CreateTaskInput = z.input<typeof zCreateTask>;
+export type PatchTaskInput = z.input<typeof zPatchTask>;
+export type CreateMemberInput = z.input<typeof zCreateMember>;
+export type PatchMemberInput = z.input<typeof zPatchMember>;
