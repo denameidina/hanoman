@@ -1,7 +1,7 @@
 import React from "react";
 import type { CreateTaskInput, MemberView, TaskStatus, TaskView } from "@hanoman/shared";
 import { Badge, Button, Icon, Select, LIST_SCROLL_STYLE, FIXED_ROW_STYLE } from "../ds";
-import { TEAM_COLUMNS, canDropTask, type Board } from "./team-rules";
+import { TEAM_COLUMNS, canDropTask, taskDates, type Board } from "./team-rules";
 
 /* SPEC-946 · papan kanban MANUSIA. Kolomnya `Task.status` — milik manusia — bukan `Spec.stage`
    yang diturunkan dari fase sesi (ADR-0008/0024). Konsekuensinya keempat kolom saling menerima
@@ -20,19 +20,6 @@ type Priority = NonNullable<CreateTaskInput["priority"]>;
 const PRIO_TONE: Record<Priority, "err" | "warn" | "neutral"> = {
   tinggi: "err", sedang: "neutral", rendah: "neutral",
 };
-
-const DATE_FMT = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" });
-const shortDate = (iso: string | null): string | null => (iso ? DATE_FMT.format(new Date(iso)) : null);
-
-/** Rentang yang boleh setengah terisi. Kartu tanpa tanggal tak merender barisnya sama sekali —
-    "—" adalah ruang yang terpakai untuk mengatakan "tidak ada". */
-export function taskDates(t: TaskView): string | null {
-  const a = shortDate(t.startDate);
-  const b = shortDate(t.dueDate);
-  if (a && b) return `${a} → ${b}`;
-  if (b) return `→ ${b}`;
-  return a;
-}
 
 function TaskCard({ task, members, dragging, onDragStart, onDragEnd, onOpen, onMove, onAssign,
   onEscalate, onUnlink }: {

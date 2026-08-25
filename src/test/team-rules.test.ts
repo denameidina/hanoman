@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { TaskView } from "@hanoman/shared";
 import {
   TEAM_COLUMNS, emptyBoard, canDropTask, nextOrder, moveCard, replaceCard,
-  dateInputValue, dateInputToIso,
+  dateInputValue, dateInputToIso, taskSpan, taskDates,
 } from "../src/screens/team-rules";
 
 const task = (over: Partial<TaskView> = {}): TaskView => ({
@@ -98,5 +98,69 @@ describe("konversi tanggal", () => {
   it("kosong & bentuk asing jadi null, bukan Invalid Date", () => {
     expect(dateInputToIso("")).toBeNull();
     expect(dateInputToIso("besok")).toBeNull();
+  });
+});
+
+/* SPEC-948 · rentang task. Akhir INKLUSIF: task yang mulai dan selesai di hari yang sama harus
+   selebar satu hari, bukan nol — batang selebar nol tak terlihat sama sekali dan kartunya seolah
+   tak bertanggal padahal bertanggal, tanpa satu pun galat. */
+describe("taskSpan", () => {
+  const DAY = 86_400_000;
+  const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+
+  it("tanpa tanggal sama sekali = null — satu-satunya arti 'belum dijadwalkan'", () => {
+    expect(taskSpan(task())).toBeNull();
+  });
+
+  it("mulai dan tenggat di hari yang SAMA selebar satu hari, bukan nol", () => {
+    const s = taskSpan(task({ startDate: "2026-09-12T12:00:00.000Z", dueDate: "2026-09-12T12:00:00.000Z" }))!;
+    expect(s.start).toBe(at("2026-09-12"));
+    expect(s.end - s.start).toBe(DAY);
+    expect(s.invalid).toBe(false);
+  });
+
+  it("rentang penuh berakhir di AKHIR hari tenggat", () => {
+    const s = taskSpan(task({ startDate: "2026-09-01T12:00:00.000Z", dueDate: "2026-09-03T12:00:00.000Z" }))!;
+    expect(s.start).toBe(at("2026-09-01"));
+    expect(s.end).toBe(at("2026-09-04"));
+  });
+
+  // Kartu ber-`dueDate` saja adalah TENGGAT, dan tenggat justru hal yang dicari linimasa.
+  it("satu tanggal saja tetap terjadwal — batang satu hari", () => {
+    const only = taskSpan(task({ dueDate: "2026-09-12T12:00:00.000Z" }))!;
+    expect(only.end - only.start).toBe(DAY);
+    expect(only.start).toBe(at("2026-09-12"));
+    expect(taskSpan(task({ startDate: "2026-09-12T12:00:00.000Z" }))!.start).toBe(at("2026-09-12"));
+  });
+
+  // Ditukar diam-diam = layar menampilkan rencana yang tak pernah diketik siapa pun.
+  it("tenggat mendahului mulai digambar apa adanya dan DITANDAI", () => {
+    const s = taskSpan(task({ startDate: "2026-09-10T12:00:00.000Z", dueDate: "2026-09-02T12:00:00.000Z" }))!;
+    expect(s.invalid).toBe(true);
+    expect(s.start).toBe(at("2026-09-02"));
+    expect(s.end).toBe(at("2026-09-11"));
+  });
+
+  // `NaN` yang lolos meracuni Math.min seluruh papan — jendela jadi NaN dan kanvasnya kosong.
+  it("tanggal tak sah jadi null, bukan NaN", () => {
+    expect(taskSpan(task({ startDate: "besok", dueDate: null } as never))).toBeNull();
+    expect(taskSpan(task({ startDate: "besok", dueDate: "2026-09-02T12:00:00.000Z" } as never))!.start)
+      .toBe(at("2026-09-02"));
+  });
+
+  // Stempel ditulis TENGAH HARI UTC (`dateInputToIso`), jadi pembulatan harus UTC di kedua sisi.
+  it("tengah hari UTC dibulatkan ke awal hari UTC yang sama", () => {
+    expect(taskSpan(task({ startDate: "2026-09-12T12:00:00.000Z" }))!.start).toBe(at("2026-09-12"));
+  });
+});
+
+/* Dipindah dari `team-board.tsx` supaya kanvas linimasa bisa memakainya tanpa mengimpor papan. */
+describe("taskDates", () => {
+  it("rentang penuh, tenggat saja, mulai saja, dan tanpa tanggal", () => {
+    expect(taskDates(task({ startDate: "2026-09-01T12:00:00.000Z", dueDate: "2026-09-03T12:00:00.000Z" })))
+      .toBe("1 Sep → 3 Sep");
+    expect(taskDates(task({ dueDate: "2026-09-03T12:00:00.000Z" }))).toBe("→ 3 Sep");
+    expect(taskDates(task({ startDate: "2026-09-01T12:00:00.000Z" }))).toBe("1 Sep");
+    expect(taskDates(task())).toBeNull();
   });
 });

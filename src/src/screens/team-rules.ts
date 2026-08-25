@@ -75,3 +75,70 @@ export const dateInputValue = (iso: string | null): string => (iso ? iso.slice(0
     satu pun error. */
 export const dateInputToIso = (v: string): string | null =>
   /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T12:00:00.000Z` : null;
+
+/* ── SPEC-948 · aritmetika linimasa ───────────────────────────────────────────────────────────
+   Nol React, nol I/O, dan `today` SELALU argumen: fungsi yang membaca jam sistem sendiri hanya
+   bisa diuji dengan membekukan waktu global, dan membekukan `Date.now` di repo ini sudah pernah
+   menjatuhkan test lain. */
+
+const DAY = 86_400_000;
+
+/** Awal hari **UTC**. UTC di kedua sisi karena `dateInputToIso` menulis tengah hari UTC: menghitung
+    dengan awal hari LOKAL berarti membandingkan tengah hari dengan tengah malam, dan selisih 12
+    jam itu cukup untuk menggeser batang setengah sel di zoom hari. */
+const dayStart = (ms: number): number => Math.floor(ms / DAY) * DAY;
+
+/** `new Date("besok").getTime()` adalah `NaN`, dan satu `NaN` yang lolos ke `Math.min` jendela
+    membuat SELURUH kanvas kosong tanpa satu pun galat. Disaring di satu pintu masuk. */
+const stamp = (iso: string | null | undefined): number | null => {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms) ? ms : null;
+};
+
+export type TaskSpan = { start: number; end: number; invalid: boolean };
+
+/**
+ * Dua tanggal menjadi satu rentang setengah terbuka `[start, end)` dalam epoch ms.
+ *
+ * Akhir **inklusif**: task yang mulai dan selesai di hari yang sama punya `end - start === DAY`,
+ * bukan 0. Ini kesalahan Gantt paling senyap — batang selebar nol tak terlihat sama sekali, jadi
+ * kartunya seolah tak bertanggal padahal bertanggal.
+ *
+ * `null` HANYA untuk "tak punya tanggal sah sama sekali" — satu-satunya arti "belum dijadwalkan".
+ * Satu tanggal saja tetap terjadwal (batang 1 hari): kartu ber-`dueDate` saja adalah tenggat, dan
+ * tenggat justru yang dicari linimasa. `taskDates` di bawah sudah merender rentang setengah terisi
+ * sejak SPEC-946; menyembunyikannya di sini membuat dua permukaan berselisih tentang apa artinya
+ * "punya tanggal".
+ *
+ * Tenggat yang mendahului mulai **digambar**, tidak ditukar: `zCreateTask` tak memaksa
+ * `due >= start` dan `TaskModal` tak memvalidasinya, jadi keadaan ini bisa ada di DB. Menukarnya
+ * diam-diam membuat layar menampilkan rencana yang tak pernah diketik siapa pun; menolak
+ * menggambarnya membuat kartunya lenyap tanpa sebab. `invalid` yang membuat barisnya mengaku.
+ */
+export function taskSpan(task: Pick<TaskView, "startDate" | "dueDate">): TaskSpan | null {
+  const a = stamp(task.startDate);
+  const b = stamp(task.dueDate);
+  if (a === null && b === null) return null;
+  const lo = a ?? b!;
+  const hi = b ?? a!;
+  return {
+    start: dayStart(Math.min(lo, hi)),
+    end: dayStart(Math.max(lo, hi)) + DAY,
+    invalid: hi < lo,
+  };
+}
+
+const DATE_FMT = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "UTC" });
+const shortDate = (iso: string | null): string | null => (iso ? DATE_FMT.format(new Date(iso)) : null);
+
+/** Rentang yang boleh setengah terisi. Tanpa tanggal tak merender barisnya sama sekali — "—"
+    adalah ruang yang terpakai untuk mengatakan "tidak ada". Dipindah ke sini dari `team-board.tsx`
+    (SPEC-948) supaya kanvas linimasa memakainya tanpa mengimpor papan. */
+export function taskDates(t: Pick<TaskView, "startDate" | "dueDate">): string | null {
+  const a = shortDate(t.startDate);
+  const b = shortDate(t.dueDate);
+  if (a && b) return `${a} → ${b}`;
+  if (b) return `→ ${b}`;
+  return a;
+}

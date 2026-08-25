@@ -38,7 +38,7 @@
   - `taskDates(t: Pick<TaskView,"startDate"|"dueDate">): string | null` (dipindah dari `team-board.tsx`, tanda tangannya dilonggarkan dari `TaskView` ke `Pick<…>`)
   - `DAY: number` (tidak diekspor — internal modul)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `src/test/team-rules.test.ts`, dan tambahkan `taskSpan, taskDates` ke daftar impor di baris 4-7 berkas itu:
 
@@ -108,12 +108,12 @@ describe("taskDates", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `cd src && pnpm vitest --run test/team-rules.test.ts`
 Expected: FAIL — `taskSpan is not a function` / `taskDates is not a function` (impor tak ada).
 
-- [ ] **Step 3: Pindahkan `taskDates` ke `team-rules.ts` dan tulis `taskSpan`**
+- [x] **Step 3: Pindahkan `taskDates` ke `team-rules.ts` dan tulis `taskSpan`**
 
 Hapus dari `src/src/screens/team-board.tsx` blok berikut (baris ±24-36):
 
@@ -209,17 +209,17 @@ export function taskDates(t: Pick<TaskView, "startDate" | "dueDate">): string | 
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `cd src && pnpm vitest --run test/team-rules.test.ts test/team-board.test.tsx`
 Expected: PASS — seluruh test lama `team-board.test.tsx` tetap hijau (`taskDates` cuma pindah rumah).
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `cd src && pnpm typecheck`
 Expected: nol error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/team-rules.ts src/src/screens/team-board.tsx src/test/team-rules.test.ts
