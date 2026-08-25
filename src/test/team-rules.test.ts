@@ -223,6 +223,12 @@ describe("timelineWindow", () => {
     expect(w.ticks.length).toBe(MAX_TICKS);
     expect(w.from).toBe(at("2026-09-01"));
     expect(w.to).toBeLessThan(at("2031-01-01"));
+    // `toBe(MAX_TICKS)` sendirian membandingkan kode dengan dirinya sendiri: ia membuktikan loop
+    // menghormati plafon, TIDAK bahwa plafonnya angka yang waras. Sifat yang sebenarnya dijanjikan
+    // — kanvas tetap kecil meski data lebar — diuji terhadap rentang datanya, bukan konstantanya.
+    const hariData = (at("2031-01-01") + DAY - at("2026-09-01")) / DAY;
+    expect(hariData).toBeGreaterThan(1500);
+    expect(w.ticks.length).toBeLessThan(hariData / 10);
   });
 
   it("`to` adalah akhir tick terakhir — 100% kanvas persis sepanjang tick", () => {

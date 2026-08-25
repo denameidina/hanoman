@@ -64,8 +64,7 @@ function Bar({ spec }: { spec: TimelineBarSpec }) {
         // Minimum PIKSEL, bukan persen: memaksanya ke persen membuat batang satu hari di zoom
         // bulan tampak lebih panjang dari waktunya.
         minWidth: 3,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: 0, overflow: "hidden",
+        display: "flex", alignItems: "center", padding: 0, overflow: "hidden",
         background: tone.bg, border: `1px solid ${tone.border}`,
         // Sudut SIKU di sisi yang terpotong — batang terpotong yang tak mengaku terpotong
         // berbohong tentang tenggat.
@@ -97,8 +96,15 @@ export function TimelineCanvas({ window: win, rows, today, emptyHint }: {
       `repeating-linear-gradient(to right, var(--border-hair) 0 1px, transparent 1px ${cell}px)`,
   };
   return (
+    /* `minWidth: 0` DI SINI, bukan hanya di `.hn-timeline-scroll`: ia satu-satunya yang menahan
+       flex item ini melar mengikuti isinya alih-alih menggulir (kelas SPEC-879), dan jsdom tak
+       memuat stylesheet — properti yang hanya hidup di CSS dijaga nol test. Yang tertinggal di
+       kelasnya hanya yang memang tak bisa diuji di jsdom (`overscroll-behavior`, `-webkit-*`). */
     <div data-testid="team-timeline" className="hn-timeline-scroll"
-      style={{ flex: "1 1 auto", minHeight: 0, overflowX: "auto", overflowY: "auto" }}>
+      style={{
+        flex: "1 1 auto", minHeight: 0, minWidth: 0, maxWidth: "100%",
+        overflowX: "auto", overflowY: "auto",
+      }}>
       {/* Lebar EKSPLISIT: anak blok di dalam container `overflow: auto` menyusut mengikuti
           containernya, dan scroller-nya lalu tak punya apa pun untuk digulir (SPEC-879). */}
       <div data-testid="timeline-canvas"

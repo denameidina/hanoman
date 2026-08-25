@@ -196,7 +196,9 @@ const TICK_M = new Intl.DateTimeFormat("id-ID", { month: "short", timeZone: "UTC
 const TICK_MY = new Intl.DateTimeFormat("id-ID", { month: "short", year: "2-digit", timeZone: "UTC" });
 
 /** Tick yang mendapat garis lebih tegas — satu-satunya cara membaca sumbu panjang tanpa menghitung
-    sel satu per satu. Di zoom minggu penandanya "minggu yang memuat tanggal 1". */
+    sel satu per satu. Di zoom minggu penandanya **Senin pertama** bulan itu, bukan "minggu yang
+    memuat tanggal 1": saat tanggal 1 bukan Senin ia jatuh di minggu sebelumnya. Yang dijanjikan
+    penanda ini adalah "tepat satu per bulan", dan `getUTCDate() <= 7` memberikannya. */
 const tickMajor = (ms: number, zoom: TimelineZoom): boolean => {
   const d = new Date(ms);
   if (zoom === "day") return d.getUTCDate() === 1;
