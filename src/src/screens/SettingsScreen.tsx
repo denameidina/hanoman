@@ -392,6 +392,21 @@ function ConfigField({ entry, draft, onDraft, onSave, onReset }: {
     {entry.source === "db" && <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={onReset}>Reset</Button>}</div>;
 }
 
+// ADR-0155 · token yang HAKNYA MENYEMPIT saat empat capability berbahaya dipecah dari `:write`.
+// Data murni, bukan logika tersebar: menambah pecahan berikutnya = menambah satu baris di sini.
+// Kalimatnya menyebut HAK YANG HILANG — checkbox kosong baru tak berbicara apa-apa kepada orang
+// yang tak membaca release note, dan diamnya integrasi yang patah adalah kelas kegagalan SPEC-491.
+const LOST_RIGHTS: { had: string; needs: string; sentence: string }[] = [
+  { had: "sessions:write", needs: "sessions:spawn", sentence: "dulu bisa membuka sesi baru" },
+  { had: "ide:write", needs: "ide:git", sentence: "dulu bisa merge/rebase & menghapus branch" },
+  { had: "backlog:write", needs: "backlog:lifecycle", sentence: "dulu bisa integrate & menghapus backlog" },
+  { had: "vps:write", needs: "vps:exec", sentence: "dulu bisa menjalankan perintah di VPS" },
+];
+
+function lostRights(caps: string[]): string[] {
+  return LOST_RIGHTS.filter((l) => caps.includes(l.had) && !caps.includes(l.needs)).map((l) => l.sentence);
+}
+
 // SPEC-257 · ADR-0065 · Akses AI Agent: master switch + agent token + capability per-domain.
 export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   const { confirm, dialog } = useConfirm();
@@ -480,7 +495,13 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
           : active.length === 0 ? <div style={{ fontSize: 13, color: "var(--text-subtle)", padding: "8px 0" }}>Belum ada agent token.</div>
           : active.map((t, i) => (
             <SettingRow key={t.id} title={t.name} last={i === active.length - 1}
-              desc={`${t.tokenPrefix}… · ${t.capabilities.length} capability · ` + (t.lastUsedAt ? "terpakai " + new Date(t.lastUsedAt).toLocaleString("id-ID") : "belum dipakai")}>
+              desc={`${t.tokenPrefix}… · ${t.capabilities.length} capability · `
+                + (t.lastUsedAt ? "terpakai " + new Date(t.lastUsedAt).toLocaleString("id-ID") : "belum dipakai")
+                // ADR-0155 · peringatan hak yang menyempit ikut di `desc` supaya ia terbaca di
+                // baris yang sama dengan tokennya, bukan sebagai blok terpisah yang mudah dilewati.
+                + (lostRights(t.capabilities).length
+                  ? ` — token ini ${lostRights(t.capabilities).join(", ")}; sekarang tidak, sampai capability berbahayanya dicentang. Cabut lalu buat ulang bila memang perlu.`
+                  : "")}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <Switch size="sm" checked={t.enabled} onChange={(v: boolean) => void setEnabled(t, v)} />
                 <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => revoke(t)}>Cabut</Button>
@@ -492,21 +513,28 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
           <Field label="Nama token"><Input value={name} placeholder="mis. agent-ci"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} style={{ width: "100%" }} /></Field>
           <div style={{ marginTop: 12, fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)" }}>Capability</div>
-          <div className="hn-grid-mobile" style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr auto auto", gap: "6px 14px", alignItems: "center" }}>
+          {/* ADR-0155 · TIGA tingkat akses, bukan dua. Kolom `berbahaya` hanya terisi untuk empat
+              domain yang punya pecahannya; sisanya sengaja kosong — sel kosong lebih jujur daripada
+              checkbox yang tak memetakan ke capability mana pun. */}
+          <div className="hn-grid-mobile" style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "6px 14px", alignItems: "center" }}>
             <div /><div style={{ fontSize: 11.5, color: "var(--text-subtle)", textAlign: "center" }}>baca</div>
             <div style={{ fontSize: 11.5, color: "var(--text-subtle)", textAlign: "center" }}>tulis</div>
+            <div style={{ fontSize: 11.5, color: "var(--status-err)", textAlign: "center" }}>berbahaya</div>
             {domains.map((d) => {
               const r = caps.find((c) => c.domain === d && c.access === "read");
               const w = caps.find((c) => c.domain === d && c.access === "write");
+              const x = caps.find((c) => c.domain === d && c.access === "danger");
               const meta = CAPABILITY_DOMAINS.find((m) => m.domain === d);
               return (
                 <React.Fragment key={d}>
                   <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                    <div style={{ fontWeight: 600, color: "var(--text-strong)" }}>{meta?.label ?? d}{w?.risk ? " ⚠" : ""}</div>
+                    <div style={{ fontWeight: 600, color: "var(--text-strong)" }}>{meta?.label ?? d}{w?.risk || x?.risk ? " ⚠" : ""}</div>
                     {meta?.desc && <div style={{ fontSize: 11.5, color: "var(--text-subtle)", lineHeight: 1.4, marginTop: 1 }}>{meta.desc}</div>}
+                    {x && <div style={{ fontSize: 11.5, color: "var(--status-err)", lineHeight: 1.4, marginTop: 2 }}>{x.label.replace(/^[^—]+—\s*/, "berbahaya: ")} — {x.desc}</div>}
                   </div>
                   <div style={{ textAlign: "center" }}>{r && <input type="checkbox" aria-label={r.id} checked={picked.includes(r.id)} onChange={() => toggleCap(r.id)} />}</div>
                   <div style={{ textAlign: "center" }}>{w && <input type="checkbox" aria-label={w.id} checked={picked.includes(w.id)} onChange={() => toggleCap(w.id)} />}</div>
+                  <div style={{ textAlign: "center" }}>{x && <input type="checkbox" aria-label={x.id} checked={picked.includes(x.id)} onChange={() => toggleCap(x.id)} />}</div>
                 </React.Fragment>
               );
             })}
