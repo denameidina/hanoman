@@ -218,7 +218,7 @@ git commit -m "feat(mcp): 12 tool domain docs (dokumen, PRD, changelog)"
 | `hanoman_ide_pr_url` | GET `/projects/:id/pr-url` | `ide.ts:311` | read | `ide:read` |
 | `hanoman_ide_commit` | GET `/projects/:id/commit/:sha` (+`/file` bila `path` diisi) | `ide.ts:335`, `:371` | read | `ide:read` |
 | `hanoman_ide_compare` | GET `/projects/:id/compare` (+`/file` bila `path` diisi) | `ide.ts:344`, `:352` | read | `ide:read` |
-| `hanoman_ide_branches_unused` | GET `/projects/:id/branches/unused` | `ide.ts:463` | read | `ide:read` |
+| `hanoman_ide_branches_unused` | GET `/projects/:id/branches/unused` | `ide.ts:463` | read | **`projects:read`** ⚠ |
 | `hanoman_ide_worktrees_list` | GET `/projects/:id/worktrees` (+`stats` bila `stats: true`) | `ide.ts:500`, `:510` | read | `ide:read` |
 | `hanoman_ide_git_run` | POST `/projects/:id/git` | `ide.ts:390` | **danger** | `ide:git` |
 | `hanoman_ide_git_merge` | POST `/projects/:id/git/merge` | `ide.ts:411` | **danger** | `ide:git` |
@@ -227,6 +227,13 @@ git commit -m "feat(mcp): 12 tool domain docs (dokumen, PRD, changelog)"
 | `hanoman_ide_git_drop` | POST `/projects/:id/git/drop` | `ide.ts:449` | **danger** | `ide:git` |
 | `hanoman_ide_branch_delete` | POST `/projects/:id/branches/delete` | `ide.ts:477` | **danger** | `ide:git` |
 | `hanoman_ide_worktree_delete` | POST `/projects/:id/worktrees/delete` | `ide.ts:526` | **danger** | `ide:git` |
+
+⚠ **`hanoman_ide_branches_unused` menuntut `projects:read`, bukan `ide:read`** — diverifikasi
+terhadap kode saat Rencana 1 dieksekusi. `branches` sengaja bukan anggota `IDE_SUBS` (SPEC-360),
+jadi seluruh `branches/*` yang membaca tetap permukaan `projects`; hanya `branches/delete` yang
+pindah ke `ide:git` (ADR-0155). Asimetri ini disengaja, dan uji kontrak `mcp-coverage.test.ts`
+akan menolak katalog yang mengklaim sebaliknya. Namanya tetap berprefix `ide_` karena UI-nya
+memang hidup di layar IDE — nama tool tak wajib mencerminkan domain capability.
 
 Tujuh tool bercapability `ide:git` **wajib** bermode `danger` — gerbang Rencana 2 Task 4 menolak kalau tidak. `hanoman_ide_entry_delete` bermode `danger` dengan capability `ide:write`, jadi ia masuk `DESTRUCTIVE_BUT_WRITE`.
 
@@ -267,7 +274,14 @@ describe("katalog ide", () => {
 
   it("membaca daftar worktree TIDAK menuntut ide:git", () => {
     expect(by("hanoman_ide_worktrees_list").capability).toBe("ide:read");
-    expect(by("hanoman_ide_branches_unused").capability).toBe("ide:read");
+  });
+
+  // Diverifikasi terhadap kode saat Rencana 1 dieksekusi: `branches` BUKAN anggota `IDE_SUBS`
+  // (SPEC-360 sengaja menjauhkannya), jadi seluruh `branches/*` yang MEMBACA dipetakan ke
+  // `projects:*`. Menuliskannya `ide:read` di katalog akan membuat uji kontrak merah.
+  it("membaca daftar branch adalah permukaan project, bukan ide", () => {
+    expect(by("hanoman_ide_branches_unused").capability).toBe("projects:read");
+    expect(by("hanoman_ide_branch_delete").capability).toBe("ide:git");
   });
 
   it("graph memilih /graph/search hanya saat q diisi", () => {
