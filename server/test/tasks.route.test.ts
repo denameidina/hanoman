@@ -157,3 +157,41 @@ describe("DELETE /tasks/:id", () => {
     expect((await app.inject({ method: "DELETE", url: "/api/tasks/hantu" })).statusCode).toBe(404);
   });
 });
+
+// SPEC-946 · lewat HTTP, bukan lewat `buildTasksPage` langsung: penyaring yang benar di service
+// tapi TIDAK diteruskan route menjawab 200 berisi SELURUH tabel — nol error, dan test tingkat
+// service tak bisa melihatnya karena ia melewati lapisan yang justru menjatuhkannya.
+describe("GET /tasks?q", () => {
+  beforeEach(async () => {
+    await create({ title: "Desain landing", projectId: "p1" });
+    await create({ title: "Rapat klien", detail: "bahas ANGGARAN kuartal" });
+    await create({ title: "Deploy staging" });
+  });
+
+  it("menyaring judul, tak peka huruf besar-kecil", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/tasks?q=DESAIN" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().items.map((t: { title: string }) => t.title)).toEqual(["Desain landing"]);
+    expect(res.json().total).toBe(1);
+  });
+
+  it("menyaring detail juga", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/tasks?q=anggaran" });
+    expect(res.json().items.map((t: { title: string }) => t.title)).toEqual(["Rapat klien"]);
+  });
+
+  it("disaring SEBELUM paginasi — halaman 1 dari dua kecocokan, bukan dari tiga baris", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/tasks?q=de&page=1&limit=1" });
+    expect(res.json().total).toBe(2);
+    expect(res.json().items).toHaveLength(1);
+  });
+
+  it("q kosong tak menyaring apa pun", async () => {
+    expect((await app.inject({ method: "GET", url: "/api/tasks?q=" })).json().total).toBe(3);
+  });
+
+  it("q berdampingan dengan penyaring lain", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/tasks?q=de&projectId=p1" });
+    expect(res.json().items.map((t: { title: string }) => t.title)).toEqual(["Desain landing"]);
+  });
+});

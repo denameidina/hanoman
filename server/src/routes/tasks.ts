@@ -27,10 +27,10 @@ const dateOf = (v: string | null | undefined): Date | null | undefined =>
 
 export default async function (app: FastifyInstance) {
   app.get("/tasks", async (req) => {
-    const { projectId, status, memberId, page, limit } = req.query as Record<string, string | undefined>;
+    const { projectId, status, memberId, q, page, limit } = req.query as Record<string, string | undefined>;
     // SPEC-908 · satu definisi dipakai bersama topik siar `tasks` (services/tasks-list.ts).
     return buildTasksPage({
-      projectId, status, memberId,
+      projectId, status, memberId, q,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });
