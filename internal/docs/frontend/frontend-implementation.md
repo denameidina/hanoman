@@ -15,7 +15,7 @@
   dirender di belasan cabang `App`, jadi gerbangnya context — prop akan meninggalkan cabang yang
   terlewat. Default context kosong = entri bergerbang **tersembunyi**; entri `clients` menyala hanya
   saat `presence.enabled` (hub punya ≥1 `DeviceToken` belum dicabut), sehingga instalasi satu mesin
-  tetap melihat **14** entri nav yang sama seperti sebelum SPEC-919 (`HN_NAV` kini 15, satu bergerbang).
+  tetap melihat **15** entri nav yang sama seperti sebelum SPEC-919 (`HN_NAV` kini 16, satu bergerbang).
 - **`PresenceChip`** (SPEC-919) — penanda "dikerjakan di `<device>`" di baris/kartu backlog, kartu
   board, dan baris project (sel Status). Satu komponen untuk ketiganya, disuapi indeks murni
   `screens/presence-map.ts`. Ia **beda** dari `HandledByChips` (ADR-0135): yang itu penetapan MANUAL
@@ -209,6 +209,7 @@ menyapu sisanya. Nilai yang gagal di-parse atau salah bentuk jatuh ke default, t
 | prd | — | `status`, `sel` |
 | backlog | — | `tab`, `view`, `q`, `stage`, `prio`, `dateField`, `from`, `to`, `page`, `detailId`, scroll |
 | triage | — | `tab`, `project`, `status`, `q`, `page`, `openId`, scroll |
+| team | — | `view`, `q`, `col`, `member` — **tanpa `page`**: papan tim tak dipaginasi (ADR-0151) |
 | scheduler | — | `queue-<status>-page`, `cronRunsPage`, `cronProject`, `cronOpenRuns` |
 | lead | — | `filter`, `decPage`, `flowPage` |
 | terminal | — | `project`; mapping grid kanonik di server per user (ADR-0118) |

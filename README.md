@@ -102,6 +102,7 @@ awal sampai selesai.
 | **Projects** | daftar project + binding repo lokal, rename, konfigurasi per project |
 | **PRD** | dokumen produk level project; bisa dipecah otomatis jadi backlog paralel |
 | **Backlog** | antrean spec (brief · QA · audit · goal · issue), dependency, dan stage tiap item |
+| **Tim** | papan kanban kerja **manusia** di sekitar sesi agen: empat kolom milik manusia, assignee, tenggat |
 | **Triase** | tiket Help Center & issue GitHub masuk → diputuskan → jadi backlog |
 | **Scheduler** | otonomi terjadwal: antrean durable, cap concurrency, pembatalan |
 | **Lead** | `hanoman-lead` — agen pemimpin yang memutuskan lalu melapor; manusia jadi pembatal |
