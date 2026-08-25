@@ -55,7 +55,10 @@ describe("kontrak capability katalog MCP", () => {
   it("tak ada tool yang bisa merge/rebase, menghapus backlog, atau memundurkan stage", () => {
     for (const t of MCP_TOOLS) {
       expect(t.samplePath, t.name).not.toMatch(/integrate/);
-      expect(["GET", "POST", "PATCH"], t.name).toContain(t.sampleMethod);
+      // ADR-0155 · PUT & DELETE kini sah: menulis & menghapus dokumen memakai keduanya. Yang dulu
+      // dijaga baris ini — "tak ada method yang merusak" — sudah pindah ke gerbang mode⇔capability
+      // (shared) dan ke pemetaan capabilityForRoute (test di berkas ini), bukan ke daftar method.
+      expect(["GET", "POST", "PATCH", "PUT", "DELETE"], t.name).toContain(t.sampleMethod);
     }
     const update = MCP_TOOLS.find((t) => t.name === "hanoman_backlog_update")!;
     const body = update.build({ spec: "SPEC-1", title: "x", stage: "objective", confirmDelete: true })?.body as Record<string, unknown>;

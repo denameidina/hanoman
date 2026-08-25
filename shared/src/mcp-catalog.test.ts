@@ -4,17 +4,16 @@ import { MCP_TOOLS, MCP_TOOL_SCHEMA_VERSION, mcpToolsFor, MCP_INSTRUCTIONS } fro
 const byName = (n: string) => MCP_TOOLS.find((t) => t.name === n)!;
 
 describe("katalog tool MCP", () => {
-  it("17 tool, semuanya berprefix hanoman_ dan namanya unik", () => {
-    expect(MCP_TOOLS).toHaveLength(17);
-    expect(new Set(MCP_TOOLS.map((t) => t.name)).size).toBe(17);
+  it("nama tool unik dan semuanya berprefix hanoman_", () => {
+    expect(new Set(MCP_TOOLS.map((t) => t.name)).size).toBe(MCP_TOOLS.length);
     for (const t of MCP_TOOLS) expect(t.name).toMatch(/^hanoman_[a-z0-9_]+$/);
   });
 
   it("mode baca-saja MENGHILANGKAN tool tulis, bukan menolaknya saat dipanggil", () => {
     const ro = mcpToolsFor("read-only");
     expect(ro.every((t) => t.mode === "read")).toBe(true);
-    expect(ro).toHaveLength(13);
-    expect(mcpToolsFor("default")).toHaveLength(17);
+    expect(ro.length).toBe(MCP_TOOLS.filter((t) => t.mode === "read").length);
+    expect(mcpToolsFor("default").length).toBe(MCP_TOOLS.filter((t) => t.mode !== "danger").length);
     expect(ro.map((t) => t.name)).not.toContain("hanoman_backlog_create");
   });
 
@@ -77,27 +76,47 @@ describe("katalog tool MCP", () => {
     expect(MCP_INSTRUCTIONS).toContain(String(MCP_TOOL_SCHEMA_VERSION));
   });
 
-  it("SNAPSHOT KONTRAK — nama tool + parameter wajib. Berubah = klien lama patah = WAJIB naik versi", () => {
-    const snapshot = MCP_TOOLS.map((t) => `${t.name}(${[...(t.inputSchema.required ?? [])].sort().join(",")})`).sort();
-    expect(snapshot).toEqual([
-      "hanoman_about()",
-      "hanoman_backlog_create(payload,priority,project,source,title)",
-      "hanoman_backlog_doc_read(path,spec)",
-      "hanoman_backlog_docs_list(spec)",
-      "hanoman_backlog_get(spec)",
-      "hanoman_backlog_search()",
-      "hanoman_backlog_update(spec)",
-      "hanoman_github_issues_list(project)",
-      "hanoman_lead_ask(project,question)",
-      "hanoman_lead_decisions_list()",
-      "hanoman_notifications_list()",
-      "hanoman_notifications_mark_read()",
-      "hanoman_project_get(project)",
-      "hanoman_projects_list()",
-      "hanoman_sessions_list()",
-      "hanoman_ticket_get(ticket)",
-      "hanoman_tickets_list()",
-    ]);
+  // SNAPSHOT KONTRAK v1. Kontrak `MCP_TOOL_SCHEMA_VERSION` (mcp.ts) menyebutnya sendiri:
+  // MENAMBAH tool bersifat ADITIF dalam satu versi; yang menuntut naik versi adalah mengganti atau
+  // MENGHAPUS nama tool, dan menjadikan parameter opsional jadi WAJIB. Assertion lama memakai
+  // `toEqual` atas seluruh daftar, sehingga ia memperlakukan penambahan sebagai pemutusan — lebih
+  // ketat daripada kontraknya, dan satu-satunya cara melewatinya adalah menyunting daftar ini
+  // setiap kali, yang justru melatih orang mengabaikannya.
+  //
+  // Yang dijaga sekarang persis yang memutus klien lama: tiap entri v1 masih ADA, dengan himpunan
+  // parameter wajib yang SAMA PERSIS. Tool baru bebas menyusul.
+  const V1_CONTRACT = [
+    "hanoman_about()",
+    "hanoman_backlog_create(payload,priority,project,source,title)",
+    "hanoman_backlog_doc_read(path,spec)",
+    "hanoman_backlog_docs_list(spec)",
+    "hanoman_backlog_get(spec)",
+    "hanoman_backlog_search()",
+    "hanoman_backlog_update(spec)",
+    "hanoman_github_issues_list(project)",
+    "hanoman_lead_ask(project,question)",
+    "hanoman_lead_decisions_list()",
+    "hanoman_notifications_list()",
+    "hanoman_notifications_mark_read()",
+    "hanoman_project_get(project)",
+    "hanoman_projects_list()",
+    "hanoman_sessions_list()",
+    "hanoman_ticket_get(ticket)",
+    "hanoman_tickets_list()",
+  ];
+  const signature = (t: (typeof MCP_TOOLS)[number]) =>
+    `${t.name}(${[...(t.inputSchema.required ?? [])].sort().join(",")})`;
+
+  it("KONTRAK v1 — tiap tool v1 masih ada dengan parameter wajib yang sama persis", () => {
+    const now = new Set(MCP_TOOLS.map(signature));
+    const broken = V1_CONTRACT.filter((sig) => !now.has(sig));
+    expect(broken, `tanda tangan v1 yang patah (rename, hapus, atau parameter wajib berubah):\n${broken.join("\n")}`)
+      .toEqual([]);
+  });
+
+  it("penambahan tool TIDAK menaikkan versi skema — ia aditif menurut kontraknya sendiri", () => {
+    expect(MCP_TOOL_SCHEMA_VERSION).toBe(1);
+    expect(MCP_TOOLS.length).toBeGreaterThanOrEqual(V1_CONTRACT.length);
   });
 });
 
@@ -172,9 +191,12 @@ const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "
 // Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak
 // ada capability `danger` di domainnya. Mode `danger`-nya murni ergonomi (mencegah salah pilih),
 // bukan gerbang. Daftar ini sengaja EKSPLISIT: menambahnya menuntut seseorang mengetik namanya.
-// Diisi bertahap oleh rencana katalog per domain; kosong sekarang BUKAN kelalaian — assert
-// terakhir menolak nama yang tak punya tool, jadi daftar ini tak bisa mendahului katalognya.
-const DESTRUCTIVE_BUT_WRITE = new Set<string>([]);
+// Diisi bertahap oleh rencana katalog per domain. Assert terakhir menolak nama yang tak punya
+// tool, jadi daftar ini tak bisa mendahului katalognya.
+const DESTRUCTIVE_BUT_WRITE = new Set<string>([
+  "hanoman_docs_delete",       // menghapus berkas .md; capability tetap docs:write
+  "hanoman_changelog_delete",  // menghapus entri changelog; capability tetap docs:write
+]);
 
 describe("mode ⇔ capability", () => {
   it("tool bercapability danger WAJIB bermode danger", () => {
