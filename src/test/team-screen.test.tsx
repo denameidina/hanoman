@@ -200,3 +200,77 @@ describe("TeamScreen · keadaan", () => {
     expect(await screen.findByRole("button", { name: /coba lagi/i })).toBeInTheDocument();
   });
 });
+
+/* SPEC-948 · mode kedua. Datanya `board` yang SUDAH dimuat mode Papan — berpindah mode tak boleh
+   melahirkan satu pun request baru. */
+describe("TeamScreen · mode Linimasa", () => {
+  const dated = () => task({ id: "t1", title: "Desain", startDate: "2026-09-10T12:00:00.000Z" });
+
+  it("tab Linimasa ada dan memilihnya mengganti papan dengan kanvas", async () => {
+    vi.mocked(api.listTasks).mockImplementation(async (p) =>
+      p?.status === "backlog" ? page([dated()]) : page([]));
+    view();
+    await screen.findByTestId("team-board");
+    fireEvent.click(screen.getByRole("tab", { name: /linimasa/i }));
+    expect(await screen.findByTestId("team-timeline")).toBeInTheDocument();
+    expect(screen.queryByTestId("team-board")).toBeNull();
+  });
+
+  it("berpindah mode tidak memuat ulang data", async () => {
+    view();
+    await screen.findByTestId("team-board");
+    await waitFor(() => expect(api.listTasks).toHaveBeenCalledTimes(4));
+    vi.mocked(api.listTasks).mockClear();
+    fireEvent.click(screen.getByRole("tab", { name: /linimasa/i }));
+    await screen.findByTestId("team-timeline");
+    expect(api.listTasks).not.toHaveBeenCalled();
+  });
+
+  it("Select zoom hanya hidup di mode Linimasa", async () => {
+    view();
+    await screen.findByTestId("team-board");
+    expect(screen.queryByLabelText("Zoom linimasa")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /linimasa/i }));
+    const zoom = await screen.findByLabelText("Zoom linimasa");
+    expect((zoom as HTMLSelectElement).value).toBe("week");
+  });
+
+  it("ganti zoom mengubah kerapatan sumbu tanpa menyentuh server", async () => {
+    vi.mocked(api.listTasks).mockImplementation(async (p) =>
+      p?.status === "backlog"
+        ? page([task({ startDate: "2026-09-01T12:00:00.000Z", dueDate: "2026-11-30T12:00:00.000Z" })])
+        : page([]));
+    view();
+    fireEvent.click(await screen.findByRole("tab", { name: /linimasa/i }));
+    await screen.findByTestId("team-timeline");
+    const minggu = screen.getAllByTestId("timeline-tick").length;
+    vi.mocked(api.listTasks).mockClear();
+    fireEvent.change(screen.getByLabelText("Zoom linimasa"), { target: { value: "day" } });
+    await waitFor(() => expect(screen.getAllByTestId("timeline-tick").length).toBeGreaterThan(minggu));
+    expect(api.listTasks).not.toHaveBeenCalled();
+  });
+
+  it("penyaring kolom ikut mempersempit linimasa", async () => {
+    vi.mocked(api.listTasks).mockImplementation(async (p) =>
+      p?.status === "backlog"
+        ? page([task({ id: "b1", title: "Di backlog", startDate: "2026-09-10T12:00:00.000Z" })])
+        : p?.status === "doing"
+          ? page([task({ id: "d1", title: "Dikerjakan", status: "doing", startDate: "2026-09-10T12:00:00.000Z" })])
+          : page([]));
+    view();
+    fireEvent.click(await screen.findByRole("tab", { name: /linimasa/i }));
+    await screen.findByTestId("timeline-bar-b1");
+    fireEvent.change(screen.getByLabelText("Filter kolom"), { target: { value: "doing" } });
+    await waitFor(() => expect(screen.queryByTestId("timeline-bar-b1")).toBeNull());
+    expect(screen.getByTestId("timeline-bar-d1")).toBeInTheDocument();
+  });
+
+  it("klik batang membuka kartunya di modal yang sama", async () => {
+    vi.mocked(api.listTasks).mockImplementation(async (p) =>
+      p?.status === "backlog" ? page([dated()]) : page([]));
+    view();
+    fireEvent.click(await screen.findByRole("tab", { name: /linimasa/i }));
+    fireEvent.click(await screen.findByTestId("timeline-bar-t1"));
+    expect(await screen.findByLabelText("Judul tugas")).toHaveValue("Desain");
+  });
+});

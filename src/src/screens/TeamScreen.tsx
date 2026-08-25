@@ -8,10 +8,14 @@ import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
 import { SyncButton } from "./SyncButton";
 import { TeamBoard } from "./team-board";
+import { TeamTimeline } from "./team-timeline";
 import { TaskModal } from "./TaskModal";
 import { EscalateDialog } from "./EscalateDialog";
 import { MembersPanel } from "./MembersPanel";
-import { TEAM_COLUMNS, emptyBoard, moveCard, nextOrder, replaceCard, type Board } from "./team-rules";
+import {
+  TEAM_COLUMNS, TIMELINE_ZOOMS, emptyBoard, moveCard, nextOrder, replaceCard,
+  type Board, type TimelineZoom,
+} from "./team-rules";
 import { usePersistedState, ResetViewButton, isStr, oneOf } from "../ui-state";
 import type { ProjectVM } from "./types";
 
@@ -33,9 +37,15 @@ const COLUMN_LIMIT = 200;
 // dibangun server di luar jadwal, dan sebelas dari dua belas langsung dibuang.
 const Q_DEBOUNCE_MS = 400;
 
-// Item B hanya membawa mode Papan. Item D (Linimasa) dan E (Lintas project) menambahkan entri ke
-// array yang SAMA — bukan memasang mekanisme baru.
-const TEAM_VIEWS = [{ value: "board", label: "Papan", icon: "kanban" }];
+// Item E (Lintas project) menambahkan entri ke array yang SAMA — bukan memasang mekanisme baru.
+const TEAM_VIEWS = [
+  { value: "board", label: "Papan", icon: "kanban" },
+  // SPEC-948 · `gantt-chart` → `GanttChart` DIVERIFIKASI ada di lucide 0.400.0: SPEC-906
+  // menunjukkan nama yang salah jatuh ke `Circle` tanpa satu pun galat, di ±123 call site sekaligus.
+  { value: "timeline", label: "Linimasa", icon: "gantt-chart" },
+];
+
+const ZOOM_LABEL: Record<TimelineZoom, string> = { day: "Hari", week: "Minggu", month: "Bulan" };
 
 type Totals = Record<TaskStatus, number>;
 const zeroTotals = (): Totals =>
@@ -83,6 +93,14 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
   const [q, setQ] = usePersistedState("team", "q", "", isStr);
   const [colFilter, setColFilter] = usePersistedState("team", "col", "all", isStr);
   const [memberFilter, setMemberFilter] = usePersistedState("team", "member", "all", isStr);
+  // SPEC-948 · bawaan `week`: hari terlalu sempit untuk melihat tabrakan, bulan terlalu kasar untuk
+  // melihat tenggat. Zoom bukan PENYARING — ia tak ikut `activeFilters` dan tak menyentuh server.
+  const [zoom, setZoom] = usePersistedState<TimelineZoom>("team", "zoom", "week",
+    oneOf(...TIMELINE_ZOOMS));
+  const timeline = view === "timeline";
+  // Dibekukan sekali per mount: jendela yang bergeser di tengah interaksi lebih membingungkan
+  // daripada tanggal yang basi satu hari sampai tab dimuat ulang.
+  const today = React.useRef(Date.now()).current;
 
   const columns = React.useMemo(
     () => (colFilter === "all" ? TEAM_COLUMNS : TEAM_COLUMNS.filter((c) => c.key === colFilter)),
@@ -200,6 +218,10 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
   }
 
   const empty = columns.every((c) => board[c.key].length === 0);
+  // Linimasa membaca papan yang SAMA — nol fetch dan nol langganan tambahan (ADR-0151).
+  const tasks = React.useMemo(() => columns.flatMap((c) => board[c.key]), [board, columns]);
+  const hiddenTasks = columns.reduce(
+    (n, c) => n + Math.max(0, (totals[c.key] ?? 0) - board[c.key].length), 0);
 
   return (
     <div style={LIST_SCREEN_STYLE}>
@@ -245,6 +267,11 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
             onChange={(e) => setMemberFilter(e.target.value)}
             options={[{ value: "all", label: "Semua anggota" },
               ...members.map((m) => ({ value: m.id, label: m.name }))]} />
+          {timeline && (
+            <Select size="sm" aria-label="Zoom linimasa" value={zoom}
+              onChange={(e) => setZoom(e.target.value as TimelineZoom)}
+              options={TIMELINE_ZOOMS.map((z) => ({ value: z, label: ZOOM_LABEL[z] }))} />
+          )}
         </div>
       </div>
 
@@ -261,9 +288,12 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
         : empty && activeFilters === 0 ? <StateBlock kind="empty" icon="users" title="Papan tim masih kosong"
             hint="Catat pekerjaan manusia di sekitar sesi agen — desain, meeting klien, deploy, nego."
             action={() => { setEditing(null); setTaskOpen(true); }} actionLabel="Tugas baru" actionIcon="plus" />
-        : <TeamBoard board={board} totals={totals} columns={columns} members={members}
-            onMove={move} onAssign={assign} onEscalate={setEscalating} onUnlink={unlink}
-            onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />}
+        : timeline
+          ? <TeamTimeline tasks={tasks} members={members} zoom={zoom} today={today}
+              hidden={hiddenTasks} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
+          : <TeamBoard board={board} totals={totals} columns={columns} members={members}
+              onMove={move} onAssign={assign} onEscalate={setEscalating} onUnlink={unlink}
+              onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />}
 
       <TaskModal open={taskOpen} task={editing} projects={projects} members={members}
         defaultProjectId={projectFilter === "all" ? null : projectFilter}

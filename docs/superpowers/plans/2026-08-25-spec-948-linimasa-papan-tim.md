@@ -1229,7 +1229,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `TeamTimeline` dari `./team-timeline`; `TIMELINE_ZOOMS`, `type TimelineZoom` dari `./team-rules`; `usePersistedState`, `oneOf` dari `../ui-state`.
 - Produces: (tak ada yang dikonsumsi task lain)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `src/test/team-screen.test.tsx`:
 
@@ -1305,12 +1305,12 @@ describe("TeamScreen · mode Linimasa", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `cd src && pnpm vitest --run test/team-screen.test.tsx`
 Expected: FAIL — `Unable to find an accessible element with the role "tab" and name /linimasa/i`.
 
-- [ ] **Step 3: Ubah `TeamScreen.tsx`**
+- [x] **Step 3: Ubah `TeamScreen.tsx`**
 
 **(a)** Ganti impor `team-rules` dan tambahkan impor `team-timeline` (baris ±13-16):
 
@@ -1382,17 +1382,17 @@ const ZOOM_LABEL: Record<TimelineZoom, string> = { day: "Hari", week: "Minggu", 
 
 **(g)** Perbarui komentar `usePersistedState` di atasnya agar menyebut zoom, dan pastikan `oneOf` sudah ada di impor `../ui-state` (sudah ada sejak SPEC-946).
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `cd src && pnpm vitest --run test/team-screen.test.tsx test/team-timeline.test.tsx test/team-rules.test.ts test/team-board.test.tsx test/team-escalate.test.tsx test/team-nav.test.tsx`
 Expected: PASS semua — termasuk seluruh test SPEC-946/947 yang lama.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `cd src && pnpm typecheck`
 Expected: nol error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/TeamScreen.tsx src/test/team-screen.test.tsx
