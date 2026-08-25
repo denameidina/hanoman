@@ -24,10 +24,14 @@ describe("katalog tool MCP", () => {
   // bermode `danger` sehingga hilang dari tingkat default, dan wajib menuntut capability yang tak
   // diimplikasikan `:write`.
   it("tool yang MENGEKSEKUSI selalu bermode danger — tak ada yang lolos ke tingkat default", () => {
+    // "Mengeksekusi" = memulai pekerjaan baru di luar proses hanoman, atau memindahkan ref git.
+    // MENGENDALIKAN sesi yang sudah ada (steer, interrupt) sengaja TIDAK termasuk: ia tak memulai
+    // apa pun, dan ADR-0155 menahannya di `sessions:write`. Membuatnya `danger` akan mengaburkan
+    // batas yang justru jadi inti pemecahan itu.
     const executing = MCP_TOOLS.filter((t) =>
-      /^\/vps/.test(t.samplePath)
+      /^\/vps\/[^/]+\/(console|session|audit|probe|test|harden|provision|remediate)/.test(t.samplePath)
       || t.samplePath.includes("integrate")
-      || (t.samplePath.startsWith("/terminal") && t.sampleMethod !== "GET")
+      || (t.samplePath === "/terminal/sessions" && t.sampleMethod === "POST")
       || /\/git(\/|$)/.test(t.samplePath));
     for (const t of executing) expect(t.mode, t.name).toBe("danger");
     const visible = new Set(mcpToolsFor("default").map((t) => t.name));
@@ -213,6 +217,9 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // `projects:destroy` sengaja TIDAK dibuat (ADR-0155), jadi kedua tool ini destruktif dengan
   // capability `projects:write` biasa. Mode `danger`-nya murni ergonomi.
   "hanoman_project_rename", "hanoman_project_delete",
+  // Menutup sesi & menghapus riwayat destruktif, tapi `sessions:spawn` hanya untuk MEMBUKA
+  // sesi baru — menahannya di sini akan salah alamat. `integrate` sesi sama halnya.
+  "hanoman_session_close", "hanoman_session_history_purge", "hanoman_session_integrate",
 ]);
 
 describe("mode ⇔ capability", () => {
