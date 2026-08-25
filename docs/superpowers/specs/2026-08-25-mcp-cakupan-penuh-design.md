@@ -265,3 +265,22 @@ Plus test unit untuk gerbang body-aware keputusan 3.
 
 **notifications (3)** — `notifications_list` ✓, `notifications_mark_read` ✓,
 `notifications_clear` D
+
+
+---
+
+## Hasil pelaksanaan (2026-08-25)
+
+Katalog akhir **151 tool**, bukan 152 — perkiraan spec ini meleset satu, dan angka nyatanya diukur
+dari `tools/list` CLI: `--read-only` 62 · default 117 · `--danger` 151 (34 tool berbahaya).
+
+Yang berbeda dari rencana, semuanya karena kode berkata lain:
+
+- **Tiga tool dialog sesi TIDAK dibuat** (SPEC-899 · ADR-0142): agen yang bisa menjawab
+  `AskUserQuestion` bisa menjawab pertanyaannya sendiri. Sudah ada assert yang menegakkannya.
+- **`branches/*` yang membaca adalah `projects:read`**, bukan `ide:read` (SPEC-360).
+- **`breakdown` adalah `projects:read`**, bukan `docs:read` — ketahuan sebagai test merah.
+- **`binding` (3 route) dan `clone` tak ada di tabel mana pun** — gerbang cakupan yang menemukannya.
+- **`password` VPS tak diekspos**: kredensial transien, preseden ADR-0097.
+- **Dua invarian ADR-0099 §4 ditulis ulang**, bukan dilonggarkan; penggantinya "yang MEMULAI
+  pekerjaan di luar proses hanoman wajib bercapability `danger` dan bermode `danger`".

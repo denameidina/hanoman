@@ -132,6 +132,41 @@ belum terbungkus**. Assert utamanya di-skip sampai katalog lengkap — melonggar
 men-skip akan membuat gerbang itu bohong selamanya. Kontrol negatifnya tetap aktif, jadi gerbang
 yang berhenti mendeteksi apa pun akan ketahuan.
 
+### 8. Katalog: 151 tool, cakupan PENUH, dan yang tetap di luar
+
+Terukur dari CLI nyata (`tools/list`): **`--read-only` 62 · default 117 · `--danger` 151**, jadi
+**34 tool bermode `danger`**. Gerbang cakupan `server/test/mcp-coverage.test.ts` hijau **tanpa
+skip**: setiap route yang terjangkau agent token punya tool, tercakup tool bercabang (dicatat
+dengan NAMA tool-nya, dan nama itu diverifikasi ada), atau terdaftar dikecualikan dengan alasan.
+
+**Yang tetap di luar katalog, dan alasannya masing-masing:**
+
+| Yang dikecualikan | Alasan |
+|---|---|
+| `GET`/`PUT /telegram/settings`, `POST /telegram/test`, `DELETE /telegram/credentials` | permukaan kredensial, COOKIE_ONLY (ADR-0097) |
+| `GET /terminal/sessions/:id/dialog`, `dialog/answer`, `dialog/takeover` | gerbang keputusan MANUSIA (SPEC-899 · ADR-0142): agen yang bisa menjawab `AskUserQuestion` bisa menjawab pertanyaannya sendiri |
+| enam route `scheduler/crons*` | COOKIE_ONLY (ADR-0112): cron adalah `POST /terminal/sessions` yang ditunda |
+| `POST /specs/:id/attachments`, `POST /projects/:id/upload`, `POST /terminal/sessions/:id/attachments` | multipart |
+| `GET /projects/:id/archive`, dua unduhan lampiran | biner |
+| `GET /terminal/sessions/:id/ws` | WebSocket, bukan request-response |
+| field `password` pada VPS create/update | kredensial transien; ADR-0097 menetapkan permukaan kredensial bukan wilayah agent token |
+
+Satu asimetri yang mudah "diperbaiki" keliru: `hanoman_ide_branches_unused` menuntut
+`projects:read`, bukan `ide:read`. `branches` sengaja bukan anggota `IDE_SUBS` (SPEC-360) — daftar
+branch adalah permukaan project, dan hanya `branches/delete` yang pindah ke `ide:git`.
+
+Dua tool menuntut capability yang BERBEDA dari yang ditegakkan server, dan keduanya disengaja
+karena gerbangnya tak hidup di `capabilityForRoute`:
+
+- `hanoman_backlog_stage_set` → katalog menyebut `backlog:write`; server menuntut
+  `backlog:lifecycle` lewat gerbang handler. Terbukti ujung-ke-ujung: dipanggil lewat MCP dengan
+  token ber-`backlog:write`, balasannya menyebut `backlog:lifecycle`.
+- `hanoman_session_integrate` → `sessions:write`, karena ia hidup di bawah prefix `terminal` dan
+  tak ada `sessions:integrate`.
+
+Menaikkan nilai capability keduanya di katalog akan MEMBUAT uji kontrak merah, bukan memperbaiki
+keamanan. Deskripsi tool-lah yang memberitahu agen capability apa yang sebenarnya dituntut.
+
 ## Konsekuensi
 
 - **Breaking change bagi setiap agent token yang sudah terbit** yang mengandalkan `sessions:write`,
@@ -143,6 +178,9 @@ yang berhenti mendeteksi apa pun akan ketahuan.
 - `zCapabilityInfo.access` melebar, jadi konsumen mana pun yang mengasumsikan dua nilai akan
   terkoreksi oleh tipe.
 - Tak ada endpoint REST baru, tak ada migration, tak ada perubahan skema.
+- `McpConfig.readOnly` → `McpConfig.level`; `mcpToolsFor(readOnly: boolean)` → `mcpToolsFor(level)`.
+  Pemanggilnya hanya CLI dan test.
+- `McpRequest.method` melebar ke PUT & DELETE; `zCapabilityInfo.access` melebar ke tiga nilai.
 
 ## Yang TIDAK diputuskan di sini
 
