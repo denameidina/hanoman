@@ -818,7 +818,7 @@ describe("buildTasksPage", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tasks-list.test.ts
@@ -826,7 +826,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — `Cannot find module '../src/services/tasks-list'`.
 
-- [ ] **Step 3: Tulis `server/src/services/tasks-list.ts`**
+- [x] **Step 3: Tulis `server/src/services/tasks-list.ts`**
 
 ```ts
 import type { Task } from "@prisma/client";
@@ -879,7 +879,7 @@ export async function buildTasksPage(f: TasksFilter): Promise<Paginated<TaskView
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tasks-list.test.ts
@@ -887,7 +887,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS (8 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/tasks-list.ts server/test/tasks-list.test.ts
