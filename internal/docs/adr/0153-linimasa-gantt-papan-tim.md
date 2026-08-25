@@ -4,6 +4,7 @@ Tanggal: 2026-08-25
 Status: diterima
 SPEC: SPEC-948 (item **D** dari design induk ADR-0150)
 **Mengamandemen ADR-0151** (konsekuensi "item D tak bisa menumpang topik `tasks`" — lihat keputusan 10)
+**Diperluas ADR-0154** (SPEC-949 memakai ULANG `TimelineCanvas` di keputusan 11 untuk mode Lintas project; kanvasnya bertambah dua prop **opsional** — `testId` & `labelHead` — dan tanda tangan lama tak berubah)
 Terkait: ADR-0150 (fondasi `Task`/`Member`) · ADR-0152 (eskalasi) · ADR-0115 (state tampilan persisten) · ADR-0131 (nilai basi, bukan layar galat) · SPEC-879 (gulir lokal) · SPEC-906 (nama ikon lucide)
 
 ## Konteks

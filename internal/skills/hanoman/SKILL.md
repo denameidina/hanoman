@@ -189,10 +189,10 @@ Pakai skill lebih sempit saat task cocok:
   repoDir/cwd datang apa adanya, jadi tanpa `realpath` baris tak pernah cocok dengan sesinya —
   **senyap**; dan entri `.trash` tak bisa di-assert keberadaannya di test karena `releaseWorktree`
   menendang penyapunya seketika — yang membuktikan ia dipindah adalah bentuk namanya `<sesi>.<stempel>`.
-- **Papan Tim — kerja MANUSIA, papan LAIN** (SPEC-945/946/947/948 · **ADR-0150**+**ADR-0151**+**ADR-0152**+**ADR-0153**; menegakkan
-  ADR-0008/0024, 0145/0039, 0107, 0115, 0094, 0127; **nol kolom** ditambahkan ke `Spec`, jadi
+- **Papan Tim — kerja MANUSIA, papan LAIN** (SPEC-945/946/947/948/949 · **ADR-0150**+**ADR-0151**+**ADR-0152**+**ADR-0153**+**ADR-0154**; menegakkan
+  ADR-0008/0024, 0145/0039, 0107, 0115, 0094, 0127, SPEC-146 & SPEC-255; **nol kolom** ditambahkan ke `Spec`, jadi
   larangan tenggat/estimasi SPEC-162 utuh): dua entity tersync `Task` & `Member`, plus layar `Tim`
-  ber-mode **Papan dan Linimasa**. Kolomnya `Task.status` (`backlog·doing·review·done`) — **milik manusia**, jadi
+  ber-**tiga** mode — **Papan · Linimasa · Lintas project**, satu array `TEAM_VIEWS`. Kolomnya `Task.status` (`backlog·doing·review·done`) — **milik manusia**, jadi
   `canDropTask` **membalik** `canDrop` board Backlog alih-alih menyempitkannya: keempat kolom saling
   menerima dan yang tersisa satu larangan (`from !== to`). `Member.id` **deterministik dari email
   ternormalisasi** (pola ADR-0094) → `email` **immutable**, ditegakkan dua lapis karena `.omit()`
@@ -244,6 +244,27 @@ Pakai skill lebih sempit saat task cocok:
   `app.css` menaikkan tiap `button` ke 44 px di layar sentuh dan jsdom tak memuat stylesheet, jadi
   nol test akan merah. `TimelineCanvas` sengaja tak menyebut `Task` dan menerima `bars` **jamak**
   supaya item E memakainya ulang.
+
+  Mode **Lintas project** (SPEC-949 · **ADR-0154**) memakai kanvas itu APA ADANYA — hanya bertambah
+  dua prop **opsional** (`testId`, `labelHead`), tanda tangan lama tak berubah, test mode Linimasa
+  hijau tanpa disentuh. Satu baris per project + baris "Tanpa project", bisa **dibuka** jadi
+  task-nya. **Lima hal yang gagal senyap kalau dilupakan:** (1) amplop `projectSpan` SENDIRIAN
+  berbohong tentang okupansi — project ber-task di Januari & Desember menggambar batang selebar
+  setahun dan tampak bertabrakan dengan segalanya, tepat pada satu-satunya pertanyaan yang mode ini
+  jawab — jadi tiap baris membawa **amplop + satu segmen per task**, dan urutan lukisnya diuji
+  karena amplop yang belakangan **menutupi** segmennya tanpa satu pun galat; (2) `projectSpan`
+  mengembalikan **`null`**, bukan rentang selebar nol, saat tak satu pun task bertanggal — akhir
+  tetap inklusif **tanpa ditambahkan dua kali** (`taskSpan` sudah menambahkannya), task tanpa
+  tanggal **diabaikan** alih-alih membatalkan rentang, dan `invalid` **menular** supaya baris
+  berisi tanggal terbalik mengaku; (3) penyaring project **dinonaktifkan & terlihat mati**, bukan
+  diabaikan diam-diam (penyaring menyala yang tak berlaku sekelas dengan plafon yang memotong
+  senyap) dan nilainya **TAK ditulis** sebab App pemilik tunggalnya (SPEC-146) — akibatnya mode ini
+  SATU-SATUNYA yang memuat ulang saat berpindah, dan kedua arahnya diuji; (4) `TimelineCanvas`
+  butuh `testId` sendiri sebab dua mode yang berbagi komponen **LOLOS** cermin `SURFACES` sambil
+  melanggar persis apa yang dijaganya; (5) kunci "tanpa project" **`Symbol`**, bukan string
+  sentinel — `Project.id` renameable (SPEC-255), jadi `"__none__"` adalah id yang SAH. Jendela
+  dihitung dari SELURUH task, bukan baris yang terlihat: membuka satu baris tak boleh menggeser
+  sumbu saat operator membandingkan dua project.
 - **Backlog bisa ditandai selesai MANUAL** (SPEC-804/**ADR-0120**; ADR-0008 & ADR-0047 & ADR-0099 &
   ADR-0105 ditegakkan, **ADR-0103 diamandemen**): `POST /specs/:id/done` `{reason?, confirm?}`
   memajukan satu item ke `done` tanpa sesi — untuk pekerjaan yang beres DI LUAR sesi (dikerjakan

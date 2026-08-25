@@ -3,7 +3,7 @@
 - React + TypeScript (Vite). Komponen dari Hanoman Design System.
 - Layout responsif (SPEC-763): drawer mobile `<768px`, rail 72px pada tablet `768–1199px`, sidebar
   248px pada desktop `≥1200px`; topbar minimum 56px dan dapat wrap; konten maks 1200px (Docs full-width).
-- Bagian: Overview, Projects (list + pagination + cari + hapus project per baris) → **detail project** (identitas, coverage, edit `name`/`desc` lewat `PATCH /projects/:id`, dan pintu: Source of Truth, Terminal, Backlog, Changelog, Reverse docs). `id` tak pernah dapat diubah — ia kunci asing spec (SPEC-146). Hapus project ada di detail dan di header Docs — konfirmasi dulu, ditolak bila ada sesi tmux aktif; rename tidak ditolak, karena `id` tak bergerak. **PRD** (SPEC-210 · ADR-0041 — layar nav sebelum Backlog, **two-pane**: sidebar kiri daftar dokumen PRD yang bisa diklik + pane kanan preview `MarkdownView` inline. Filter project punya opsi **"Semua project"** → `GET /prds` lintas-project (item dikelompokkan per project); satu project terpilih → `GET /projects/:id/prds`; keduanya freshest-wins. **PRD baru** membuka sesi `flow:"prd"` project-level; project target dipilih **di dalam modal** (field `Select` project, default ikut filter aktif atau project pertama saat "Semua project") — tombol selalu aktif, tak perlu memfilter daftar dulu (SPEC-212); **Take ke backlog** membuka `NewSpecModal` ter-prefill dengan tautan PRD di teks Konteks, ke project asal PRD), Backlog (cari teks + filter project/stage/prioritas + tab sumber + tiga mode tampilan grid/list/board + aksi per spec + detail spec via modal: judul, stage bar, objective, field brief/QA), Terminal (sesi Claude Code interaktif di tmux), Docs (tree realtime semua `.md` di repo via `GET /docs`, dikelompokkan per direktori; kategori di luar `docsDir` masuk grup **Lainnya (tidak dinilai)** tanpa status linked — hanya kategori berskor yang masuk coverage, lihat ADR-0013; tombol **Muat ulang** membaca ulang tree, **Hapus** menghapus file asli, path ditampilkan repo-relative tanpa prefix `internal/docs`), VPS (daftar + audit/harden + Test connection + Open Console shell ssh + buka sesi Claude, SPEC-211; **klik baris membuka satu modal** berisi detail VPS — last audit + health disk/mem/load — menyatu dengan checklist kepatuhan 232 item, SPEC-220/221; tak ada lagi side panel terpisah), Tim (papan kerja **manusia** — dua mode tampilan: Papan kanban empat kolom dan Linimasa Gantt rencana; SPEC-946/948), Settings (model & effort sesi — **default global**; model/effort dipilih **per sesi saat Start** lewat picker `StartSessionModal`, matrix per-fase dicabut, SPEC-252/ADR-0061; notifikasi, akun, users).
+- Bagian: Overview, Projects (list + pagination + cari + hapus project per baris) → **detail project** (identitas, coverage, edit `name`/`desc` lewat `PATCH /projects/:id`, dan pintu: Source of Truth, Terminal, Backlog, Changelog, Reverse docs). `id` tak pernah dapat diubah — ia kunci asing spec (SPEC-146). Hapus project ada di detail dan di header Docs — konfirmasi dulu, ditolak bila ada sesi tmux aktif; rename tidak ditolak, karena `id` tak bergerak. **PRD** (SPEC-210 · ADR-0041 — layar nav sebelum Backlog, **two-pane**: sidebar kiri daftar dokumen PRD yang bisa diklik + pane kanan preview `MarkdownView` inline. Filter project punya opsi **"Semua project"** → `GET /prds` lintas-project (item dikelompokkan per project); satu project terpilih → `GET /projects/:id/prds`; keduanya freshest-wins. **PRD baru** membuka sesi `flow:"prd"` project-level; project target dipilih **di dalam modal** (field `Select` project, default ikut filter aktif atau project pertama saat "Semua project") — tombol selalu aktif, tak perlu memfilter daftar dulu (SPEC-212); **Take ke backlog** membuka `NewSpecModal` ter-prefill dengan tautan PRD di teks Konteks, ke project asal PRD), Backlog (cari teks + filter project/stage/prioritas + tab sumber + tiga mode tampilan grid/list/board + aksi per spec + detail spec via modal: judul, stage bar, objective, field brief/QA), Terminal (sesi Claude Code interaktif di tmux), Docs (tree realtime semua `.md` di repo via `GET /docs`, dikelompokkan per direktori; kategori di luar `docsDir` masuk grup **Lainnya (tidak dinilai)** tanpa status linked — hanya kategori berskor yang masuk coverage, lihat ADR-0013; tombol **Muat ulang** membaca ulang tree, **Hapus** menghapus file asli, path ditampilkan repo-relative tanpa prefix `internal/docs`), VPS (daftar + audit/harden + Test connection + Open Console shell ssh + buka sesi Claude, SPEC-211; **klik baris membuka satu modal** berisi detail VPS — last audit + health disk/mem/load — menyatu dengan checklist kepatuhan 232 item, SPEC-220/221; tak ada lagi side panel terpisah), Tim (papan kerja **manusia** — tiga mode tampilan: Papan kanban empat kolom, Linimasa Gantt rencana, dan Lintas project satu baris ringkas per project; SPEC-946/948/949), Settings (model & effort sesi — **default global**; model/effort dipilih **per sesi saat Start** lewat picker `StartSessionModal`, matrix per-fase dicabut, SPEC-252/ADR-0061; notifikasi, akun, users).
 - **Klien** (SPEC-919 · [ADR-0147](../adr/0147-kanal-presence-di-socket-sync.md)) — `ClientsScreen`:
   satu kartu per device (nama, `hub ini` untuk mesin lokal, online/offline, terakhir terlihat) berisi
   sesi hidupnya (SPEC-nnn + judul dari backlog, project, fase, status, sudah berjalan berapa lama);
@@ -209,7 +209,7 @@ menyapu sisanya. Nilai yang gagal di-parse atau salah bentuk jatuh ke default, t
 | prd | — | `status`, `sel` |
 | backlog | — | `tab`, `view`, `q`, `stage`, `prio`, `dateField`, `from`, `to`, `page`, `detailId`, scroll |
 | triage | — | `tab`, `project`, `status`, `q`, `page`, `openId`, scroll |
-| team | — | `view`, `q`, `col`, `member` — **tanpa `page`**: papan tim tak dipaginasi (ADR-0151) |
+| team | — | `view`, `q`, `col`, `member`, `zoom` (ADR-0153), `expanded` (ADR-0154) — **tanpa `page`**: papan tim tak dipaginasi (ADR-0151) |
 | scheduler | — | `queue-<status>-page`, `cronRunsPage`, `cronProject`, `cronOpenRuns` |
 | lead | — | `filter`, `decPage`, `flowPage` |
 | terminal | — | `project`; mapping grid kanonik di server per user (ADR-0118) |
@@ -992,8 +992,8 @@ kosongnya membawa pintu masuk "Tugas baru".
 
 Toolbar dua baris cermin `BacklogScreen`: baris atas toggle mode tampilan (`Tabs variant="pill"`),
 **Tugas baru**, **Anggota**, `SyncButton`, `ResetViewButton`, hitungan ber-`role="status"`, dan
-`LiveConnectionBadge`; baris bawah **Cari tugas** + penyaring project, kolom, anggota, dan — hanya
-di mode Linimasa — **Zoom linimasa**. Kelas
+`LiveConnectionBadge`; baris bawah **Cari tugas** + penyaring project, kolom, anggota, dan — di mode
+Linimasa **dan** Lintas project — **Zoom linimasa**. Kelas
 responsifnya dinamai sendiri (`.hn-team-topline` dkk.) dan didaftarkan ke grup selector yang sama
 di `app.css` — layar yang meminjam nama layar lain adalah cara aturan mulai berubah untuk satu
 layar dan diam-diam ikut mengubah yang lain.
@@ -1001,19 +1001,33 @@ layar dan diam-diam ikut mengubah yang lain.
 Penyaring project memakai **`App.projectFilter`** (SPEC-146: App pemilik tunggal "daftar disaring
 ke project mana"), jadi berpindah dari Backlog ke Tim tak mengganti project yang sedang dilihat —
 dan karena state itu di luar jangkauan `resetUiState("team")`, `ResetViewButton` diberi `onReset`.
+Di mode **Lintas project** penyaring itu `disabled` dan `title`-nya menyebut sebabnya, sementara
+nilainya **tidak** ditulis — mode yang gunanya membandingkan antar-project tak boleh mendarat
+menampilkan satu baris, dan menyetelnya ke `"all"` sendiri akan mengubah apa yang dilihat Backlog.
+Ia juga tak ikut `activeFilters` di mode itu: lencana "N filter aktif" yang menghitung penyaring
+yang tak berlaku sama menyesatkannya dengan mengabaikannya diam-diam. Konsekuensinya jujur dan
+diuji dua arah — mode ini **satu-satunya** yang memuat ulang saat berpindah, dan hanya saat
+penyaringnya memang sedang aktif.
+
 Penyaring **kolom** mempersempit kolom yang tampil, dan hanya kolom yang tampil yang dimuat &
 dilanggan, jadi biaya servernya ikut mengecil. Tak ada sentinel "Tanpa project": `where.projectId`
 di server hanya dipasang saat nilainya truthy, jadi `projectId: null` tak bisa dinyatakan sebagai
 query tanpa menambah sentinel ke kontrak — kartu tanpa project tetap terlihat di "Semua project"
-dan diberi label `tanpa project`. Sisa state tampilan (`view`, `q`, `col`, `member`, `zoom`) persisten
-berkunci `team` (SPEC-740/ADR-0115); tak ada `page`, papan tak dipaginasi.
+dan diberi label `tanpa project`. Sisa state tampilan (`view`, `q`, `col`, `member`, `zoom`,
+`expanded`) persisten berkunci `team` (SPEC-740/ADR-0115); tak ada `page`, papan tak dipaginasi.
+`expanded` menyimpan baris project yang terbuka di mode Lintas project — nilai rusak jatuh ke `[]`
+tanpa melempar, dan project yang sudah lenyap tinggal di sana tanpa efek karena tak ada baris yang
+bisa dibukanya.
 
-`TEAM_VIEWS` berisi **dua** entri (`board` · "Papan", `timeline` · "Linimasa") yang dirender
-sebagai tablist ber-`usePersistedState`; mode Lintas project menambahkan entri ke array yang
-**sama** — bukan memasang mekanisme baru pada layar yang sudah dipakai orang. Sejak entri kedua,
-cermin `TEAM_VIEWS` ↔ cabang render dijaga test kontrak: entri tanpa cabangnya sendiri merender
-permukaan mode **lain** di bawah pilnya, 200 dan nol error — kelas bug yang sama yang dijaga
-`changelog-nav.test.tsx` untuk `HN_NAV`.
+`TEAM_VIEWS` berisi **tiga** entri (`board` · "Papan", `timeline` · "Linimasa", `projects` ·
+"Lintas project") yang dirender sebagai tablist ber-`usePersistedState`; ketiganya satu array — mode
+baru menambah entri, bukan memasang mekanisme baru pada layar yang sudah dipakai orang. Cermin
+`TEAM_VIEWS` ↔ cabang render dijaga test kontrak: entri tanpa cabangnya sendiri merender permukaan
+mode **lain** di bawah pilnya, 200 dan nol error — kelas bug yang sama yang dijaga
+`changelog-nav.test.tsx` untuk `HN_NAV`. Karena mode Lintas project memakai komponen kanvas yang
+**sama** dengan mode Linimasa, ia wajib membawa `data-testid` sendiri (`TimelineCanvas` menerimanya
+lewat prop `testId`) — tanpa itu ia **lolos** cermin itu sambil melanggar persis apa yang
+dijaganya.
 
 **Kartu membawa aksi eksplisit karena drag mati di keyboard dan di layar sentuh.** Tiap kartu punya
 dua `Select` di kakinya — *Pindah kolom* dan *Tugaskan* — plus satu baris aksi backlog, semuanya
@@ -1065,16 +1079,44 @@ bisa dikosongkan tanpa satu pun test merah. Kelasnya menyimpan sisanya (`overscr
 `-webkit-overflow-scrolling`), yang memang tak berarti di jsdom. Kolom label
 `position: sticky; left: 0`; gridline baris digambar `repeating-linear-gradient`, bukan satu div
 per sel (40 baris × 120 tick = 4 800 node kosong). `TimelineCanvas` sengaja **tak menyebut `Task`**
-dan menerima `bars` **jamak**, karena mode Lintas project memakainya dengan baris per project.
+dan menerima `bars` **jamak** — dan mode Lintas project di bawah memakai keduanya apa adanya.
+
+**Mode Lintas project** (SPEC-949 · ADR-0154) adalah mode ketiga dan terakhir: satu baris ringkas
+per project, plus baris **"Tanpa project"**, yang bisa **dibuka** menjadi task-nya. Ia memakai
+ULANG `TimelineCanvas` — kanvasnya hanya bertambah dua prop **opsional** (`testId`, `labelHead`),
+tanda tangan lamanya tak berubah satu huruf pun, dan test mode Linimasa tetap hijau tanpa disentuh.
+
+Tiap baris project membawa **amplop + segmen**: satu batang amplop `min(startDate)`→`max(dueDate)`
+dari `projectSpan(tasks)`, lalu satu segmen per task bertanggal di atasnya. Amplop sendirian
+berbohong tentang okupansi — project ber-task di Januari dan Desember menggambar batang selebar
+setahun dan tampak bertabrakan dengan segalanya — dan karena satu-satunya guna mode ini adalah
+menemukan tabrakan, kebohongan itu tepat mengenai satu-satunya pembacanya. Urutan lukisnya diuji:
+amplop yang dilukis **sesudah** segmen menutupi segmennya, dan itu lolos sempurna dari uji
+aritmetika mana pun.
+
+Yang perlu diketahui saat menyentuh aritmetikanya: `projectSpan` mengembalikan **`null`**, bukan
+rentang selebar nol, saat tak satu pun task bertanggal — satu-satunya pintu yang menutup batang tak
+terlihat dan `NaN%`; akhir tetap inklusif **tanpa ditambahkan dua kali** karena `taskSpan` sudah
+menambahkannya; task tanpa tanggal **diabaikan** alih-alih membatalkan rentang; dan `invalid`
+**menular** dari task mana pun yang tanggalnya terbalik supaya barisnya mengaku. `barGeometry`
+dipisah jadi `spanGeometry(span, window)` karena rentang project tak punya `startDate`.
+`projectGroups` adalah satu-satunya tempat task dibagi per project, dengan invarian "tiap id muncul
+tepat sekali" diuji langsung; kunci "tanpa project" di dalamnya `Symbol`, bukan string sentinel,
+sebab `Project.id` renameable (SPEC-255).
+
+Jendela dihitung dari **seluruh** task yang termuat, bukan dari baris yang terlihat: membuka satu
+baris tak boleh menggeser sumbu saat operator sedang membandingkan dua project. Project yang jatuh
+di luar jendela berplafon **tetap punya baris**, tanpa batang, dan `meta`-nya dibedakan dari "belum
+dijadwalkan" — dua keadaan bar-less dengan sebab dan penawar berbeda tak boleh terlihat sama.
 
 Berkasnya dipecah **sejak awal** — `BacklogScreen` 63 KB dan `TerminalScreen` 57 KB adalah
 pelajaran yang tak perlu diulang:
 
 | Berkas | Tanggung jawab |
 |---|---|
-| `screens/team-rules.ts` | fungsi **murni**: `TEAM_COLUMNS`, `emptyBoard`, `canDropTask`, `nextOrder`, `moveCard`, `replaceCard`, konversi tanggal, dan seluruh aritmetika linimasa (`taskSpan`, `timelineWindow`, `barGeometry`, `todayOffset`, `timelineRows`). Nol React, nol I/O |
+| `screens/team-rules.ts` | fungsi **murni**: `TEAM_COLUMNS`, `emptyBoard`, `canDropTask`, `nextOrder`, `moveCard`, `replaceCard`, konversi tanggal, dan seluruh aritmetika linimasa (`taskSpan`, `timelineWindow`, `spanGeometry`, `barGeometry`, `todayOffset`, `timelineRows`, `projectSpan`, `projectGroups`). Nol React, nol I/O |
 | `screens/team-board.tsx` | `TeamBoard` + `TaskCard` — render & event drag |
-| `screens/team-timeline.tsx` | `TimelineCanvas` (generik, tak menyebut `Task`) + `TeamTimeline` (mode task) |
+| `screens/team-timeline.tsx` | `TimelineCanvas` (generik, tak menyebut `Task`) + `TeamTimeline` (mode task) + `TeamProjectTimeline` (mode lintas project) |
 | `screens/TaskModal.tsx` | satu form untuk buat DAN ubah, plus hapus |
 | `screens/MembersPanel.tsx` | modal kelola anggota |
 | `screens/EscalateDialog.tsx` | dialog eskalasi kartu → backlog (project bila perlu · source · prioritas) |
@@ -1092,7 +1134,9 @@ kartu sungguhan di jsdom (`fireEvent.dragStart` + `fireEvent.drop`, dengan `Data
 persis pola `src/test/backlog-board.test.tsx`. Linimasa mengikuti pembagian yang sama:
 `team-rules.test.ts` menguji aritmetikanya langsung, sementara `team-timeline.test.tsx` merender
 kanvasnya dan membandingkan `left`/`width` batang dengan `barGeometry` untuk masukan yang sama —
-`left`/`width` yang tertukar lolos sempurna dari uji aritmetikanya sendiri.
+`left`/`width` yang tertukar lolos sempurna dari uji aritmetikanya sendiri. Mode Lintas project
+mengikuti pembagian yang persis sama lewat `team-projects.test.tsx`, dengan satu tambahan yang
+hanya bisa diuji di DOM: **urutan lukis** amplop terhadap segmennya.
 
 ## Terminal (sesi Claude Code interaktif)
 `TerminalScreen` menampilkan sesi dalam **grid `rows × cols`** (CSS Grid): `+ Kolom` menambah
