@@ -1759,7 +1759,7 @@ Konsekuensinya `data.cascade` pada `project.deleted` **kurang melaporkan** task 
 dinyatakan, bukan terlupa (lihat ADR-0150).
 ```
 
-- [ ] **Step 4: Seksi route di `api-contract.md`**
+- [x] **Step 4: Seksi route di `api-contract.md`**
 
 Sisipkan seksi baru mengikuti gaya berkas itu (blok kode berisi path + komentar `#`), diletakkan sesudah seksi tiket/triase:
 
@@ -1819,7 +1819,7 @@ DELETE /tasks/:id  -> 204   # menulis tombstone sync (ADR-0119). 404 id tak ada.
 # params: { projectId?, status?, memberId?, page, limit } — sama dengan query GET /tasks.
 ```
 
-- [ ] **Step 5: Tautkan di index**
+- [x] **Step 5: Tautkan di index**
 
 Di `internal/docs/README.md`, tambahkan di **puncak** daftar `## adr` (nomor menurun):
 
@@ -1829,7 +1829,7 @@ Di `internal/docs/README.md`, tambahkan di **puncak** daftar `## adr` (nomor men
 
 Dan di bagian `## architecture`, satu butir yang menautkan `data-model` + `api-contract` untuk fitur ini, mengikuti gaya butir-butir tebal di sana.
 
-- [ ] **Step 6: Periksa integritas index**
+- [x] **Step 6: Periksa integritas index**
 
 ```bash
 node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli build && node cli/dist/index.js docs index --check
@@ -1837,7 +1837,7 @@ node cli/dist/index.js docs index --check 2>/dev/null || pnpm --filter ./cli bui
 
 Expected: tak ada dokumen baru yang tak ter-link. Bila CLI belum ter-build dan build-nya mahal, cukup verifikasi manual bahwa berkas ADR baru muncul di `internal/docs/README.md`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/docs
@@ -1862,7 +1862,7 @@ Expected: hijau. **Jangan menerima "no test files" sebagai bukti** — `--change
 
 Gagal palsu yang sudah dikenal dan **bukan** regresi dari task ini: `404`/`P2022` ramai (DB tetangga terhapus — pastikan `TEST_DATABASE_URL` terpasang), `listChatSessions is not a function` di test portal (merah di base), dan tiga `<Input type="number">` di `placeholder-contract` (merah di base).
 
-- [ ] **Step 2: Typecheck paket yang tersentuh**
+- [x] **Step 2: Typecheck paket yang tersentuh**
 
 ```bash
 pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./cli typecheck
@@ -1870,7 +1870,7 @@ pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --f
 
 Expected: nol error di ketiganya. **Bukan** `pnpm -r typecheck` — itu satu proses tsc per paket sekaligus.
 
-- [ ] **Step 3: Buktikan `GROUPS` & webhook tak tersentuh**
+- [x] **Step 3: Buktikan `GROUPS` & webhook tak tersentuh**
 
 ```bash
 git diff --name-only "$HANOMAN_BASE_SHA" | grep -E 'services/events\.ts|webhook' || echo "bersih"
@@ -1878,7 +1878,7 @@ git diff --name-only "$HANOMAN_BASE_SHA" | grep -E 'services/events\.ts|webhook'
 
 Expected: `bersih`.
 
-- [ ] **Step 4: Smoke endpoint nyata di local**
+- [x] **Step 4: Smoke endpoint nyata di local**
 
 Task ini menyentuh endpoint, jadi sekali di akhir — bukan tiap task. Pakai HANOMAN_HOME khusus supaya tak menyentuh DB dev nyata:
 
