@@ -39,6 +39,7 @@ import lead from "./routes/lead";
 import changelog from "./routes/changelog";
 import customAgents from "./routes/custom-agents";
 import members from "./routes/members";
+import tasks from "./routes/tasks";
 import githubIssues from "./routes/github-issues";
 import telegram from "./routes/telegram";
 import webhooks from "./routes/webhooks";
@@ -262,6 +263,7 @@ export function buildApp(
     await api.register(portalChatAdmin); // SPEC-854 · ADR-0129 · transkrip & PRD draft (operator)
     await api.register(clientAccounts); // SPEC-617 · ADR-0110 · kelola akun klien (cookie-only)
     await api.register(members);      // SPEC-945 · ADR-0150 · direktori orang papan tim (cookie-only)
+    await api.register(tasks);        // SPEC-945 · ADR-0150 · kartu kerja manusia (cookie-only)
   }, { prefix: "/api" });
 
   // Prod: serve the built dashboard from one process; SPA-fallback to

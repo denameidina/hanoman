@@ -1151,7 +1151,7 @@ git commit -m "feat(945): route CRUD /api/members, email immutable"
 - Consumes: `zCreateTask`, `zPatchTask`, `TaskView` (Task 2); `buildTasksPage`, `taskView` (Task 4); `notifySynced`/`deleteSynced`.
 - Produces: route `GET|POST /api/tasks`, `PATCH|DELETE /api/tasks/:id`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Buat `server/test/tasks.route.test.ts`:
 
@@ -1311,7 +1311,7 @@ describe("DELETE /tasks/:id", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tasks.route.test.ts
@@ -1319,7 +1319,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: FAIL — seluruh request `404`.
 
-- [ ] **Step 3: Tulis `server/src/routes/tasks.ts`**
+- [x] **Step 3: Tulis `server/src/routes/tasks.ts`**
 
 ```ts
 import type { FastifyInstance } from "fastify";
@@ -1414,7 +1414,7 @@ export default async function (app: FastifyInstance) {
 }
 ```
 
-- [ ] **Step 4: Daftarkan di `app.ts`**
+- [x] **Step 4: Daftarkan di `app.ts`**
 
 Import, sesudah `import members from "./routes/members";`:
 
@@ -1428,7 +1428,7 @@ Register, tepat sesudah baris `members`:
     await api.register(tasks);        // SPEC-945 · ADR-0150 · kartu kerja manusia (cookie-only)
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan LULUS**
+- [x] **Step 5: Jalankan test, pastikan LULUS**
 
 ```bash
 TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/tasks.route.test.ts
@@ -1436,7 +1436,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-para
 
 Expected: PASS (17 test).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/tasks.ts server/src/app.ts server/test/tasks.route.test.ts
