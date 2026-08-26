@@ -13,7 +13,7 @@ import { buildFileTree, TreeRow, ChangedSection } from "./file-tree";
 import { readDroppedEntries } from "./drop-entries";
 import { DiffView } from "./diff-view";
 import { MarkdownView } from "../ds/markdown";
-import { usePersistedState, scoped, isStr, oneOf } from "../ui-state";
+import { usePersistedState, scoped, isStr, isBool, oneOf } from "../ui-state";
 
 const langOf = (p: string): string => {
   const ext = p.slice(p.lastIndexOf(".") + 1);
@@ -84,6 +84,11 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   const [viewRef, setViewRef] = usePersistedState(ui, "viewRef", "", isStr);   // kosong = working tree
   const [branches, setBranches] = React.useState<{ branches: string[]; remotes: string[] }>({ branches: [], remotes: [] });
   const [files, setFiles] = React.useState<string[]>([]);
+  // Direktori terabaikan yang diruntuhkan server (isinya belum dimuat) + entri yang .gitignore
+  // sembunyikan, untuk ditandai redup. Keduanya kosong selama toggle "tersembunyi" mati.
+  const [dirs, setDirs] = React.useState<string[]>([]);
+  const [ignored, setIgnored] = React.useState<Set<string>>(new Set());
+  const [hidden, setHidden] = usePersistedState(ui, "hidden", false, isBool);
   const [treeState, setTreeState] = React.useState<"loading" | "ready" | "error">("loading");
   const [selected, setSelected] = usePersistedState(ui, "selected", "", isStr);
   const [selKind, setSelKind] = usePersistedState<"file" | "staged" | "unstaged">(
@@ -119,9 +124,27 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
 
   const reloadTree = React.useCallback(() => {
     setTreeState("loading");
-    api.ideTree(projectId, viewRef).then((t) => { setFiles(t.files); setTreeState("ready"); })
+    api.ideTree(projectId, viewRef, { hidden })
+      .then((t) => {
+        setFiles(t.files); setDirs(t.dirs ?? []); setIgnored(new Set(t.ignored ?? []));
+        setTreeState("ready");
+      })
       .catch(() => setTreeState("error"));
-  }, [projectId, viewRef]);
+  }, [projectId, viewRef, hidden]);
+  /**
+   * Membuka direktori terabaikan yang diruntuhkan server. Isinya digabung ke state pohon yang
+   * sama — bukan disimpan terpisah — supaya seleksi, tujuan operasi berkas, dan buildFileTree
+   * bekerja atas satu daftar. Seluruh isi direktori terabaikan ikut terabaikan, jadi semuanya
+   * masuk `ignored` dan tampil redup seperti induknya.
+   */
+  const expandDir = React.useCallback(async (path: string) => {
+    try {
+      const t = await api.ideTree(projectId, "", { under: path });
+      setFiles((f) => [...new Set([...f, ...t.files])].sort());
+      setDirs((d) => [...new Set([...d, ...(t.dirs ?? [])])].sort());
+      setIgnored((g) => new Set([...g, ...t.files, ...(t.dirs ?? [])]));
+    } catch { onToast?.("Gagal membuka folder", "err", "x-circle"); }
+  }, [projectId, onToast]);
   // Status working tree independen dari ref yang dilihat (staged/unstaged inheren milik working tree).
   const reloadStatus = React.useCallback(() => {
     api.ideWorkingStatus(projectId).then(setStatus).catch(() => setStatus(null));
@@ -339,6 +362,12 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
           <Card padding={0} fill>
             <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--border-hair)" }}>
               <span className="hn-eyebrow" style={{ flex: 1 }}>changes{status?.branch ? ` · ${status.branch}` : ""}</span>
+              {/* Entri terabaikan hanya ada di working tree — sebuah commit tak pernah memuatnya,
+                  jadi togglenya mati saat sedang melihat ref, bukan berbohong dengan diam. */}
+              <Button size="sm" variant={hidden ? "secondary" : "ghost"} leftIcon={hidden ? "eye" : "eye-off"}
+                disabled={!!viewRef} aria-pressed={hidden}
+                title={viewRef ? "Hanya di working tree" : "Tampilkan berkas & folder yang .gitignore sembunyikan"}
+                onClick={() => setHidden(!hidden)}>Tersembunyi</Button>
               <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={afterWrite}>Muat ulang</Button>
             </div>
             {/* ADR-0121 · aksi berkas. Label tujuan wajib terlihat: tanpa itu folder tujuan jadi
@@ -392,9 +421,10 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
               {treeState === "loading" ? <StateBlock kind="loading" compact title="Memuat file…" />
                 : treeState === "error" ? <StateBlock kind="error" compact title="Gagal memuat file" action={reloadTree} />
                 : files.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Tak ada file" />
-                : buildFileTree(files).map((n) => (
+                : buildFileTree(files, dirs).map((n) => (
                     <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""}
-                      onSelect={selectFile} dirSelected={dirSel} onSelectDir={setDirSel} />
+                      onSelect={selectFile} dirSelected={dirSel} onSelectDir={setDirSel}
+                      ignored={ignored} onExpand={hidden ? expandDir : undefined} />
                   ))}
             </div>
           </Card>

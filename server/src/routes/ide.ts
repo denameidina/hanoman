@@ -17,7 +17,7 @@ import { closeSession } from "../services/session-close";
 import { releaseWorktree } from "../services/worktree-reaper";
 import { sessionIdForSpec } from "../services/session-id";
 import {
-  listRepoTree, readRepoFile, writeRepoFile, listGraph, commitDetail, commitFileDiff, compareCommits, compareFile,
+  listRepoTree, listIgnoredEntries, listDirEntries, readRepoFile, writeRepoFile, listGraph, commitDetail, commitFileDiff, compareCommits, compareFile,
   searchCommits, runGitOp, validateGitOp, touchesTree, repoStatus, listStashes,
   workingStatus, workingFileDiff, type GitOp, type GraphOpts,
 } from "../services/git-ide";
@@ -79,11 +79,28 @@ const UPLOAD_LIMITS = {
 const UPLOAD_TOTAL_MAX = 2 * 1024 * 1024 * 1024;
 
 export default async function (app: FastifyInstance) {
+  // `hidden=1` ikut menampilkan yang .gitignore sembunyikan; `under=<dir>` membuka SATU tingkat
+  // isi sebuah direktori (dipakai untuk direktori terabaikan yang diruntuhkan). Keduanya tak
+  // berlaku di atas ref: sebuah commit tak pernah memuat berkas terabaikan.
   app.get("/projects/:id/tree", async (req, reply) => {
     const repoDir = await repoOf((req.params as { id: string }).id);
     if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
-    const ref = (req.query as { ref?: string }).ref ?? "";
-    return { ref, files: await listRepoTree(repoDir, ref) };
+    const q = req.query as { ref?: string; hidden?: string; under?: string };
+    const ref = q.ref ?? "";
+    const hidden = q.hidden === "1" || q.hidden === "true";
+    if (q.under) {
+      try { return { ref: "", ...await listDirEntries(repoDir, q.under), ignored: [] as string[] }; }
+      catch (e) { return entryError(reply, e); }
+    }
+    const files = await listRepoTree(repoDir, ref);
+    if (!hidden || ref) return { ref, files, dirs: [] as string[], ignored: [] as string[] };
+    const ign = await listIgnoredEntries(repoDir);
+    return {
+      ref,
+      files: [...files, ...ign.files].sort(),
+      dirs: ign.dirs,
+      ignored: [...ign.files, ...ign.dirs],
+    };
   });
 
   app.get("/projects/:id/file", async (req, reply) => {

@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync } from "node:fs";
+import { readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { changedFiles, withTempIndex, type ChangedFile, type ReviewFile } from "./spec-review";
 import { assertSafeRepoPathSync, readRepoFile as readSafeRepoFile, writeRepoFileAtomic } from "./safe-repo-path";
@@ -32,6 +33,55 @@ export async function listRepoTree(repoDir: string | null, ref = ""): Promise<st
       : await exec("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: repoDir, ...GIT });
     return [...new Set(splitZ(stdout))].sort();
   } catch { return []; }
+}
+
+export type IgnoredEntries = { files: string[]; dirs: string[] };
+
+/**
+ * Entri yang .gitignore sembunyikan dari `listRepoTree`. `--directory --no-empty-directory`
+ * MERUNTUHKAN direktori yang seluruhnya diabaikan menjadi SATU entri: di repo ini 22 686 berkas
+ * (2,0 MB path) menjadi 34 entri. Tanpa peruntuhan itu, menyalakan toggle berarti mengirim
+ * seluruh isi node_modules ke browser setiap kali — jadi isinya dibuka belakangan, satu tingkat
+ * per klik, lewat `listDirEntries`.
+ *
+ * Ref tak punya berkas terabaikan (yang diabaikan tak pernah masuk commit), jadi ini khusus
+ * working tree — pemanggilnya yang menjaga itu.
+ */
+export async function listIgnoredEntries(repoDir: string | null): Promise<IgnoredEntries> {
+  const empty: IgnoredEntries = { files: [], dirs: [] };
+  if (!repoDir || !existsSync(repoDir)) return empty;
+  try {
+    const { stdout } = await exec("git",
+      ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "--no-empty-directory", "-z"],
+      { cwd: repoDir, ...GIT });
+    const files: string[] = [], dirs: string[] = [];
+    for (const e of new Set(splitZ(stdout))) {
+      // git menandai direktori dengan garis miring di ekor; buildFileTree memakai path tanpa itu.
+      if (e.endsWith("/")) dirs.push(e.slice(0, -1)); else files.push(e);
+    }
+    return { files: files.sort(), dirs: dirs.sort() };
+  } catch { return empty; }
+}
+
+const DIR_ENTRY_MAX = 5000;
+
+/**
+ * Isi SATU tingkat sebuah direktori, langsung dari disk. Dipakai untuk membuka direktori
+ * terabaikan yang diruntuhkan di atas: apa pun di dalamnya juga terabaikan, jadi git tak punya
+ * jawaban yang lebih baik daripada readdir — dan readdir tak pernah melebar melampaui satu tingkat.
+ */
+export async function listDirEntries(repoDir: string | null, rel: string): Promise<IgnoredEntries & { truncated: boolean }> {
+  const empty = { files: [], dirs: [], truncated: false };
+  if (!repoDir) return empty;
+  const abs = repoAbsPath(repoDir, rel); // throw → route 400
+  let raw;
+  try { raw = await readdir(abs, { withFileTypes: true }); } catch { return empty; }
+  const files: string[] = [], dirs: string[] = [];
+  for (const d of raw.slice(0, DIR_ENTRY_MAX)) {
+    if (d.name === ".git") continue; // repoAbsPath menolaknya juga; ini menjaga daftarnya bersih
+    (d.isDirectory() ? dirs : files).push(`${rel}/${d.name}`);
+  }
+  return { files: files.sort(), dirs: dirs.sort(), truncated: raw.length > DIR_ENTRY_MAX };
 }
 
 export type RepoFile = { path: string; content: string | null; binary: boolean; truncated: boolean };

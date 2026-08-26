@@ -4,19 +4,26 @@ import { Icon } from "../ds";
 import type { ChangedFile } from "../api/client";
 
 export type FileNode = { name: string; path: string; kids: FileNode[]; leaf: boolean };
-export function buildFileTree(paths: string[]): FileNode[] {
+/**
+ * `dirs` menamai direktori yang harus ada SEBAGAI direktori meski tak satu pun path di `paths`
+ * lewat di bawahnya — direktori terabaikan yang diruntuhkan server, yang isinya baru dimuat saat
+ * dibuka. Tanpa daftar terpisah ini, "dist" berbentuk persis seperti berkas bernama dist.
+ */
+export function buildFileTree(paths: string[], dirs: string[] = []): FileNode[] {
   const root: FileNode = { name: "", path: "", kids: [], leaf: false };
-  for (const p of paths) {
+  const add = (p: string, leafLast: boolean) => {
     let cur = root;
-    const segs = p.split("/");
+    const segs = p.split("/").filter(Boolean);
     segs.forEach((seg, i) => {
-      const leaf = i === segs.length - 1;
+      const leaf = leafLast && i === segs.length - 1;
       const path = cur.path ? cur.path + "/" + seg : seg;
       let next = cur.kids.find((k) => k.name === seg && k.leaf === leaf);
       if (!next) { next = { name: seg, path, kids: [], leaf }; cur.kids.push(next); }
       cur = next;
     });
-  }
+  };
+  for (const p of paths) add(p, true);
+  for (const d of dirs) add(d, false);
   const sort = (n: FileNode) => {
     n.kids.sort((a, b) => (a.leaf === b.leaf ? a.name.localeCompare(b.name) : a.leaf ? 1 : -1));
     n.kids.forEach(sort);
@@ -27,13 +34,21 @@ export function buildFileTree(paths: string[]): FileNode[] {
 
 export const ST_COLOR: Record<string, string> = { A: "var(--leaf-600)", M: "var(--brass-600)", D: "var(--clay-500)" };
 
-export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen = false, dirSelected, onSelectDir }:
+export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen = false, dirSelected, onSelectDir,
+  ignored, onExpand }:
   { node: FileNode; selected: string; onSelect: (p: string) => void; depth?: number;
     meta?: Record<string, ChangedFile>; defaultOpen?: boolean;
     // ADR-0121 · folder sebagai TUJUAN operasi berkas. Opsional supaya pemakaian di Review
     // (ChangedSection) tak berubah sedikit pun.
-    dirSelected?: string; onSelectDir?: (p: string) => void }) {
+    dirSelected?: string; onSelectDir?: (p: string) => void;
+    // Entri yang .gitignore sembunyikan — diredupkan supaya toggle "tersembunyi" terbaca sebagai
+    // keadaan, bukan sebagai daftar yang tiba-tiba memanjang tanpa sebab.
+    ignored?: Set<string>;
+    // Direktori terabaikan datang KOSONG dari server; isinya dimuat saat ia dibuka.
+    onExpand?: (p: string) => void | Promise<void> }) {
   const [open, setOpen] = React.useState(defaultOpen);
+  const [loading, setLoading] = React.useState(false);
+  const dim = ignored?.has(node.path) ? 0.62 : 1;
   if (node.leaf) {
     const on = node.path === selected;
     const cf = meta?.[node.path];
@@ -41,7 +56,7 @@ export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen
       <button onClick={() => onSelect(node.path)} style={{
         display: "flex", alignItems: "center", gap: 8, width: "100%",
         padding: "5px 8px", paddingLeft: 22 + depth * 12, border: "none", cursor: "pointer",
-        textAlign: "left", background: on ? "var(--brass-100)" : "transparent",
+        textAlign: "left", background: on ? "var(--brass-100)" : "transparent", opacity: dim,
       }}>
         {cf
           ? <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: ST_COLOR[cf.status] }}>{cf.status}</span>
@@ -59,22 +74,40 @@ export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen
   // Satu klik sekaligus buka/tutup dan memilih: memisahkan chevron jadi tombol tersendiri
   // berarti tombol bersarang di dalam tombol — tak sah di HTML & merusak navigasi keyboard.
   const dirOn = !!onSelectDir && node.path === dirSelected;
+  // Hanya direktori yang benar-benar kosong yang boleh meminta isinya; setelah termuat sekali,
+  // kids-nya terisi dan klik berikutnya kembali jadi buka/tutup murni.
+  const lazy = !!onExpand && node.kids.length === 0;
+  async function toggle() {
+    onSelectDir?.(node.path);
+    const next = !open;
+    setOpen(next);
+    if (next && lazy && !loading) {
+      setLoading(true);
+      try { await onExpand?.(node.path); } finally { setLoading(false); }
+    }
+  }
   return (
     <div>
-      <button onClick={() => { setOpen((o) => !o); onSelectDir?.(node.path); }} style={{
+      <button onClick={() => void toggle()} style={{
         display: "flex", alignItems: "center", gap: 8, width: "100%",
         padding: "5px 6px", paddingLeft: 6 + depth * 12, border: "none",
         background: dirOn ? "var(--brass-100)" : "transparent", cursor: "pointer", textAlign: "left",
+        opacity: dim,
       }}>
         <Icon name={open ? "chevron-down" : "chevron-right"} size={14} color="var(--text-subtle)" />
         <Icon name="folder" size={15} color={dirOn ? "var(--brass-700)" : "var(--brass-500)"} />
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5,
           color: dirOn ? "var(--brass-700)" : "var(--text-strong)", fontWeight: dirOn ? 700 : 500 }}>{node.name}/</span>
+        {loading && <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>memuat…</span>}
       </button>
       {open && node.kids.map((k) => (
         <TreeRow key={k.path} node={k} selected={selected} onSelect={onSelect} depth={depth + 1}
-          meta={meta} defaultOpen={defaultOpen} dirSelected={dirSelected} onSelectDir={onSelectDir} />
+          meta={meta} defaultOpen={defaultOpen} dirSelected={dirSelected} onSelectDir={onSelectDir}
+          ignored={ignored} onExpand={onExpand} />
       ))}
+      {open && !loading && node.kids.length === 0 && (
+        <div style={{ padding: "4px 8px", paddingLeft: 28 + depth * 12, fontSize: 11.5, color: "var(--text-subtle)" }}>kosong</div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { resetDb, makeProject, makeSpec, makeRepoWithBranches, makeRepoWithSpecB
 import { createSession, killAll } from "../src/services/pty";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 
 const FAKE_CLAUDE = fileURLToPath(new URL("./fixtures/fake-claude.sh", import.meta.url));
 const app = buildApp({ requireAuth: false });
@@ -35,6 +35,21 @@ function twoCommitRepo(): string {
   return dir;
 }
 
+// Repo dengan .gitignore yang menyembunyikan satu berkas dan satu direktori berisi — bahan uji
+// toggle "tersembunyi" Explorer. Ter-commit supaya `?ref=main` punya snapshot untuk dibandingkan.
+function ignoredRepo(): string {
+  const dir = makeRepoWithBranches();                     // README.md ter-commit di main
+  const g = (...a: string[]) => spawnSync("git", a, { cwd: dir, encoding: "utf8" });
+  writeFileSync(`${dir}/.gitignore`, "secret.env\ndist/\n");
+  writeFileSync(`${dir}/a.ts`, "1");
+  writeFileSync(`${dir}/secret.env`, "K=1");
+  mkdirSync(`${dir}/dist/deep`, { recursive: true });
+  writeFileSync(`${dir}/dist/bundle.js`, "x");
+  writeFileSync(`${dir}/dist/deep/more.js`, "y");
+  g("add", "-A"); g("commit", "-qm", "hidrepo");
+  return dir;
+}
+
 beforeAll(async () => {
   await resetDb();
   await makeProject({ id: "ide", repoDir: makeRepoWithBranches("dev") });
@@ -48,6 +63,7 @@ beforeAll(async () => {
   // ADR-0121 · operasi berkas Explorer (entry + upload)
   await makeProject({ id: "entryrepo", repoDir: makeRepoWithBranches() });
   // SPEC-360 · branch cleanup
+  await makeProject({ id: "hidrepo", repoDir: ignoredRepo() });   // toggle "tersembunyi" Explorer
   await makeProject({ id: "cleanrepo", repoDir: mergedRepo("clean") });
   await makeProject({ id: "lockrepo", repoDir: mergedRepo("locked") });
   await makeSpec({ id: "locked", projectId: "lockrepo", stage: "executing" }); // → hanoman/locked terkunci
@@ -59,6 +75,30 @@ describe("ide routes", () => {
     expect(r.statusCode).toBe(200);
     expect(r.json().files).toContain("README.md");
     expect((await app.inject({ url: "/api/projects/ghost/tree" })).statusCode).toBe(404);
+  });
+  // Toggle "tersembunyi" Explorer. Route-nya yang menjaga dua hal yang tak bisa dijaga di klien:
+  // entri terabaikan TIDAK ikut selama flag-nya mati (default lama tak berubah sebaris pun), dan
+  // `under` memakai penjaga path yang sama dengan endpoint berkas — 400, bukan pembacaan liar.
+  it("GET /tree?hidden=1 menyertakan entri .gitignore; tanpa flag tak berubah", async () => {
+    const plain = await app.inject({ url: "/api/projects/hidrepo/tree" });
+    expect(plain.json().files).toEqual([".gitignore", "README.md", "a.ts"]);
+    expect(plain.json().dirs).toEqual([]);
+    const hid = await app.inject({ url: "/api/projects/hidrepo/tree?hidden=1" });
+    expect(hid.json().files).toContain("secret.env");
+    expect(hid.json().dirs).toEqual(["dist"]);       // diruntuhkan: isinya belum dikirim
+    expect(hid.json().files).not.toContain("dist/bundle.js");
+    expect(hid.json().ignored).toEqual(expect.arrayContaining(["secret.env", "dist"]));
+  });
+  it("GET /tree?hidden=1 di atas ref tetap snapshot commit — commit tak punya berkas terabaikan", async () => {
+    const r = await app.inject({ url: "/api/projects/hidrepo/tree?ref=main&hidden=1" });
+    expect(r.json().files).not.toContain("secret.env");
+    expect(r.json().dirs).toEqual([]);
+  });
+  it("GET /tree?under= membuka satu tingkat; path keluar-repo → 400", async () => {
+    const r = await app.inject({ url: "/api/projects/hidrepo/tree?under=dist" });
+    expect(r.json().files).toEqual(["dist/bundle.js"]);
+    expect(r.json().dirs).toEqual(["dist/deep"]);
+    expect((await app.inject({ url: "/api/projects/hidrepo/tree?under=../" })).statusCode).toBe(400);
   });
   it("GET /file membaca isi; path keluar-repo → 400; hilang → 404", async () => {
     const ok = await app.inject({ url: "/api/projects/ide/file?path=README.md" });

@@ -533,7 +533,14 @@ jawaban yang sah. Unduh memakai helper yang sama dengan dokumen lain
 
 ## IDE Visual (SPEC-182 · ADR-0034)
 ```
-GET    /projects/:id/tree?ref=          # { ref, files:string[] }  ref kosong=working tree (ls-files), isi=ls-tree <ref>; 404 project tak ada
+GET    /projects/:id/tree?ref=&hidden=&under=  # { ref, files:string[], dirs:string[], ignored:string[] }  ref kosong=working tree (ls-files), isi=ls-tree <ref>; 404 project tak ada
+#   ADR-0156 · hidden=1 ikut mendaftar entri .gitignore (working tree saja — sebuah commit tak
+#   memuatnya, jadi bersama ref flag-nya diabaikan). Direktori yang SELURUHNYA diabaikan
+#   diruntuhkan jadi satu nama di `dirs` (`--directory --no-empty-directory`): di repo ini 22 686
+#   berkas / 2,0 MB path menjadi 8 entri / 111 KB. `ignored` menamai entri terabaikan supaya UI
+#   bisa meredupkannya. `under=<dir>` menjawab SATU tingkat isi sebuah direktori (readdir, bukan
+#   git — isi direktori terabaikan juga terabaikan) dengan penjaga path yang sama: 400 keluar
+#   repo/.git. Itulah cara membuka direktori yang diruntuhkan, satu tingkat per klik.
 GET    /projects/:id/file?path=&ref=    # { path, content, binary, truncated }  disk / git show <ref>:<path>; 400 path keluar repo/.git; 404 file tak ada
 GET    /projects/:id/working-status      # (SPEC-234) { branch, staged:ChangedFile[], unstaged:ChangedFile[] }  staged=index vs HEAD, unstaged=working tree vs index+untracked (temp-index); read-only, TAK digerbang sesi; repoDir kosong → {branch:"",staged:[],unstaged:[]}; 404 project tak ada. Path /working-status dibedakan dari /status milik SPEC-233 (repoStatus, baris di bawah) yang beda bentuk respons.
 GET    /projects/:id/file-diff?path=&staged=  # (SPEC-234) ReviewFile diff satu file working tree; staged=1 → index vs HEAD, else working tree vs index; 400 path buruk/kosong; 404 file tak dalam changeset

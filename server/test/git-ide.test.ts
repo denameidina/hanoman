@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { makeTempRepo, makeRepoWithBranches, makeRepoWithSpecCommits, makeRepoWithSpecBranch, makeRepoWithChanges } from "./factory";
-import { listRepoTree, readRepoFile, repoAbsPath, listGraph, commitDetail, writeRepoFile, runGitOp, validateGitOp, workingStatus, workingFileDiff, touchesTree, repoStatus, listStashes, commitFileDiff, compareCommits, compareFile, searchCommits } from "../src/services/git-ide";
+import { listRepoTree, listIgnoredEntries, listDirEntries, readRepoFile, repoAbsPath, listGraph, commitDetail, writeRepoFile, runGitOp, validateGitOp, workingStatus, workingFileDiff, touchesTree, repoStatus, listStashes, commitFileDiff, compareCommits, compareFile, searchCommits } from "../src/services/git-ide";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
@@ -18,6 +18,36 @@ describe("git-ide read", () => {
   it("listRepoTree: repoDir null / bukan repo → []", async () => {
     expect(await listRepoTree(null)).toEqual([]);
     expect(await listRepoTree(makeTempRepo({}) + "/nope")).toEqual([]);
+  });
+  // Toggle "tersembunyi" di Explorer berdiri di atas dua fungsi ini. Yang dijaga: entri terabaikan
+  // memang MUNCUL (tanpa itu togglenya tak punya apa-apa untuk ditampilkan), dan direktori yang
+  // seluruhnya diabaikan tetap DIRUNTUHKAN — kalau peruntuhannya lepas, satu klik mengirim seluruh
+  // isi node_modules ke browser dan tak ada satu pun error yang mengatakannya.
+  it("listIgnoredEntries: berkas terabaikan muncul, direktori terabaikan diruntuhkan", async () => {
+    const dir = makeTempRepo({
+      ".gitignore": "secret.env\ndist/\n", "a.ts": "1", "secret.env": "K=1",
+      "dist/bundle.js": "x", "dist/deep/more.js": "y",
+    });
+    const ign = await listIgnoredEntries(dir);
+    expect(ign.files).toContain("secret.env");
+    expect(ign.dirs).toEqual(["dist"]);          // SATU entri, bukan dua berkas di dalamnya
+    expect(ign.files).not.toContain("dist/bundle.js");
+    // …dan listRepoTree biasa tetap tak memuat satu pun di antaranya.
+    expect(await listRepoTree(dir)).toEqual([".gitignore", "a.ts"]);
+  });
+  it("listIgnoredEntries: repoDir null / bukan repo → kosong", async () => {
+    expect(await listIgnoredEntries(null)).toEqual({ files: [], dirs: [] });
+    expect(await listIgnoredEntries(makeTempRepo({}) + "/nope")).toEqual({ files: [], dirs: [] });
+  });
+  it("listDirEntries membuka SATU tingkat, memisahkan berkas dari direktori", async () => {
+    const dir = makeTempRepo({ "dist/bundle.js": "x", "dist/deep/more.js": "y" });
+    expect(await listDirEntries(dir, "dist")).toEqual(
+      { files: ["dist/bundle.js"], dirs: ["dist/deep"], truncated: false });
+  });
+  it("listDirEntries memakai penjaga path yang sama: keluar repo & .git ditolak", async () => {
+    const dir = makeTempRepo({ "a.ts": "1" });
+    await expect(listDirEntries(dir, "../")).rejects.toThrow();
+    await expect(listDirEntries(dir, ".git")).rejects.toThrow();
   });
   it("readRepoFile working tree membaca isi disk", async () => {
     const dir = makeTempRepo({ "a.txt": "halo\n" });

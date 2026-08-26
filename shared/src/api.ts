@@ -59,7 +59,15 @@ export const paths = {
   breakdown: (id: string, prd: string) => `${API}/projects/${id}/breakdown?prd=${encodeURIComponent(prd)}`,
   specsBatch: `${API}/specs/batch`,
   // SPEC-182 · IDE Visual
-  ideTree: (id: string, ref = "") => `${API}/projects/${id}/tree${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`,
+  // `hidden` menyertakan entri .gitignore; `under` membuka satu tingkat isi sebuah direktori.
+  ideTree: (id: string, ref = "", opts?: { hidden?: boolean; under?: string }) => {
+    const q = new URLSearchParams();
+    if (ref) q.set("ref", ref);
+    if (opts?.hidden) q.set("hidden", "1");
+    if (opts?.under) q.set("under", opts.under);
+    const s = q.toString();
+    return `${API}/projects/${id}/tree${s ? `?${s}` : ""}`;
+  },
   ideFile: (id: string, path?: string, ref = "") =>
     `${API}/projects/${id}/file${path ? `?path=${encodeURIComponent(path)}${ref ? `&ref=${encodeURIComponent(ref)}` : ""}` : ""}`,
   ideGraph: (id: string, limit = 200, opts?: { branches?: string[]; showRemote?: boolean; showTags?: boolean }) => {

@@ -56,6 +56,9 @@ export type ReviewFile = {
 };
 // SPEC-182 · IDE Visual
 export type RepoFile = { path: string; content: string | null; binary: boolean; truncated: boolean };
+// Pohon berkas Explorer. `dirs` = direktori yang isinya BELUM dimuat (direktori terabaikan yang
+// diruntuhkan server); `ignored` = entri yang .gitignore sembunyikan, untuk ditandai di UI.
+export type IdeTree = { ref: string; files: string[]; dirs?: string[]; ignored?: string[]; truncated?: boolean };
 // SPEC-234 · status working tree utama (staged/unstaged), diturunkan dari git.
 export type WorkingStatus = { branch: string; staged: ChangedFile[]; unstaged: ChangedFile[] };
 // ADR-0121 · unggahan selalu 200 selama badannya sah; kegagalan per-berkas hidup di `skipped`
@@ -320,7 +323,8 @@ export const api = {
   putDoc: (id: string, path: string, content: string) =>
     j<{ path: string; content: string }>(paths.docFile(id, path), { method: "PUT", ...body({ content }) }),
   deleteDoc: (id: string, path: string) => j<void>(paths.docFile(id, path), { method: "DELETE" }),
-  ideTree: (id: string, ref = "") => j<{ ref: string; files: string[] }>(paths.ideTree(id, ref)),
+  ideTree: (id: string, ref = "", opts?: { hidden?: boolean; under?: string }) =>
+    j<IdeTree>(paths.ideTree(id, ref, opts)),
   ideFile: (id: string, path: string, ref = "") => j<RepoFile>(paths.ideFile(id, path, ref)),
   putIdeFile: (id: string, path: string, content: string) =>
     j<{ path: string; content: string }>(paths.ideFile(id), { method: "PUT", ...body({ path, content }) }),

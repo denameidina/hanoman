@@ -58,14 +58,20 @@ export const IDE_TOOLS: readonly McpToolDef[] = [
     name: "hanoman_ide_tree",
     title: "Pohon berkas repo project",
     description:
-      "Daftar berkas repo project pada sebuah ref. Tanpa `ref` ia membaca working tree apa adanya, termasuk perubahan yang belum di-commit.",
+      "Daftar berkas repo project pada sebuah ref. Tanpa `ref` ia membaca working tree apa adanya, termasuk perubahan yang belum di-commit. `hidden` ikut menyertakan yang .gitignore sembunyikan — direktori yang seluruhnya diabaikan (mis. `node_modules`) diruntuhkan jadi satu entri di `dirs`; buka isinya dengan `under`, satu tingkat per panggilan.",
     inputSchema: obj({
-      properties: { project: PROJECT, ref: str("Ref git (branch/tag/sha). Kosongkan untuk working tree.") },
+      properties: {
+        project: PROJECT,
+        ref: str("Ref git (branch/tag/sha). Kosongkan untuk working tree."),
+        hidden: bool("Sertakan berkas & direktori yang diabaikan .gitignore. Tak berlaku bersama `ref`."),
+        under: str("Jalur direktori; balasannya berisi SATU tingkat isinya. Dipakai untuk membuka direktori terabaikan yang diruntuhkan."),
+      },
       required: ["project"],
     }),
     mode: "read", capability: "ide:read",
     samplePath: "/projects/hanoman/tree", sampleMethod: "GET",
-    build: (a) => ({ method: "GET", path: `${p(a.project)}/tree`, query: query({ ref: s(a.ref) }) }),
+    build: (a) => ({ method: "GET", path: `${p(a.project)}/tree`,
+      query: query({ ref: s(a.ref), hidden: a.hidden ? "1" : "", under: s(a.under) }) }),
     shape: (raw) => raw,
   },
   {
