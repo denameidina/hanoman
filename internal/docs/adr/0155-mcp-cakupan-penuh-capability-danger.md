@@ -191,3 +191,13 @@ keamanan. Deskripsi tool-lah yang memberitahu agen capability apa yang sebenarny
 - Membuka `scheduler/crons`, `webhooks`, `portal`, `sync`, atau permukaan `COOKIE_ONLY` lain.
   Semuanya menuntut ADR-nya sendiri; `crons` khususnya adalah `POST /terminal/sessions` yang
   ditunda (ADR-0112).
+
+## Amandemen 2026-08-26 — "pilih semua" per kolom
+
+Grid empat kolomnya mendapat checkbox **pilih semua**: satu global di sel kiri header, satu per
+kolom (`baca`, `tulis`, `berbahaya`). Bekerja atas himpunan id yang benar-benar ada di katalog,
+bukan hasil kali domain×akses — kolom `berbahaya` hanya terisi untuk empat domain, jadi memilihnya
+berarti empat capability, bukan satu per domain. Tri-state: *indeterminate* saat kolomnya setengah
+terisi, supaya kolom yang sebagian tercentang tak terbaca kosong. Tak mengubah satu pun keputusan
+di atas — hanya menghapus alasan orang memberi token capability seadanya karena malas mencentang
+tiga puluhan kotak.

@@ -407,6 +407,27 @@ function lostRights(caps: string[]): string[] {
   return LOST_RIGHTS.filter((l) => caps.includes(l.had) && !caps.includes(l.needs)).map((l) => l.sentence);
 }
 
+/**
+ * Checkbox "pilih semua" untuk satu kolom capability. Ia tri-state: tercentang bila SELURUH id-nya
+ * terpilih, indeterminate bila sebagian — supaya kolom yang setengah terisi tak terbaca kosong.
+ * `indeterminate` cuma ada sebagai properti DOM, bukan atribut, jadi harus dipasang lewat ref.
+ */
+function CheckAll({ ids, picked, onToggle, ariaLabel, label }: {
+  ids: string[]; picked: string[]; onToggle: (ids: string[], next: boolean) => void; ariaLabel: string; label?: string;
+}) {
+  const ref = React.useRef<HTMLInputElement>(null);
+  const chosen = ids.filter((id) => picked.includes(id)).length;
+  const all = ids.length > 0 && chosen === ids.length;
+  React.useEffect(() => { if (ref.current) ref.current.indeterminate = chosen > 0 && !all; }, [chosen, all]);
+  if (ids.length === 0) return null;
+  return (
+    <label style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: 11.5, color: "var(--text-subtle)", marginLeft: label ? 0 : 5 }}>
+      {label && <span>{label}</span>}
+      <input ref={ref} type="checkbox" aria-label={ariaLabel} checked={all} onChange={() => onToggle(ids, !all)} />
+    </label>
+  );
+}
+
 // SPEC-257 · ADR-0065 · Akses AI Agent: master switch + agent token + capability per-domain.
 export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   const { confirm, dialog } = useConfirm();
@@ -432,6 +453,12 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
     catch { onToast?.("Gagal menyimpan", "err", "x-circle"); setSetting(setting); }
   }
   const toggleCap = (id: string) => setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  // ADR-0155 · "pilih semua" bekerja atas himpunan id yang BENAR-BENAR ada di katalog, bukan atas
+  // hasil kali domain×akses: kolom `berbahaya` hanya terisi untuk sebagian domain, jadi memilih
+  // semua kolom itu berarti empat capability, bukan satu per domain.
+  const toggleAll = (ids: string[], next: boolean) => setPicked((p) => next
+    ? Array.from(new Set([...p, ...ids]))
+    : p.filter((x) => !ids.includes(x)));
   async function create() {
     if (name.trim().length < 1 || busy) return;
     setBusy(true);
@@ -462,6 +489,8 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
 
   // Kelompokkan capability per domain → baris {domain, read?, write?} untuk grid checkbox.
   const domains = Array.from(new Set(caps.map((c) => c.domain)));
+  const idsOf = (access: string) => caps.filter((c) => c.access === access).map((c) => c.id);
+  const allIds = caps.map((c) => c.id);
   const active = (items ?? []).filter((t) => !t.revokedAt);
 
   return (
@@ -517,9 +546,18 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
               domain yang punya pecahannya; sisanya sengaja kosong — sel kosong lebih jujur daripada
               checkbox yang tak memetakan ke capability mana pun. */}
           <div className="hn-grid-mobile" style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "6px 14px", alignItems: "center" }}>
-            <div /><div style={{ fontSize: 11.5, color: "var(--text-subtle)", textAlign: "center" }}>baca</div>
-            <div style={{ fontSize: 11.5, color: "var(--text-subtle)", textAlign: "center" }}>tulis</div>
-            <div style={{ fontSize: 11.5, color: "var(--status-err)", textAlign: "center" }}>berbahaya</div>
+            <div style={{ textAlign: "right" }}>
+              <CheckAll label="Pilih semua capability" ariaLabel="pilih semua capability" ids={allIds} picked={picked} onToggle={toggleAll} />
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--text-subtle)", textAlign: "center" }}>
+              baca<CheckAll ariaLabel="pilih semua baca" ids={idsOf("read")} picked={picked} onToggle={toggleAll} />
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--text-subtle)", textAlign: "center" }}>
+              tulis<CheckAll ariaLabel="pilih semua tulis" ids={idsOf("write")} picked={picked} onToggle={toggleAll} />
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--status-err)", textAlign: "center" }}>
+              berbahaya<CheckAll ariaLabel="pilih semua berbahaya" ids={idsOf("danger")} picked={picked} onToggle={toggleAll} />
+            </div>
             {domains.map((d) => {
               const r = caps.find((c) => c.domain === d && c.access === "read");
               const w = caps.find((c) => c.domain === d && c.access === "write");
