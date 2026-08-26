@@ -9,9 +9,10 @@ import { paginate } from "../services/paginate";
 // SPEC-945 · ADR-0150 · direktori orang untuk papan tim. GLOBAL, bukan per project: Task boleh
 // tanpa project, jadi direktori orang tak bisa digantung pada project.
 //
-// Tak ada entri di `capabilityForRoute`: top-segment yang tak terdaftar jatuh ke `null`, dan
-// `checkAgentCapability` memperlakukannya sama dengan COOKIE_ONLY. Papan tim adalah permukaan
-// manusia, jadi tertutupnya bagi agent token adalah default yang benar — bukan kelalaian.
+// ADR-0157 · satu domain capability dengan `/tasks` (`team:read`/`team:write`): kartu tanpa nama
+// penanggung jawab hanyalah judul, jadi memberi salah satunya tanpa yang lain menghasilkan agen
+// yang membaca `memberId` tapi tak bisa menyebut siapa orangnya. Tetap di luar `clientRouteAllowed`
+// — direktori orang bukan permukaan klien.
 
 const view = (m: Member): MemberView => ({
   id: m.id, name: m.name, email: m.email, role: m.role, active: m.active,

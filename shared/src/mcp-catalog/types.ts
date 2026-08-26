@@ -30,7 +30,12 @@ export type McpToolDef = {
   description: string;
   inputSchema: JsonSchemaObject;
   mode: McpMode;
-  /** Capability REST yang dituntut. `null` = tool ini tak memanggil `/api` sama sekali. */
+  /**
+   * Capability REST yang dituntut. `null` = tool ini tak menuntut apa pun — entah karena ia tak
+   * memanggil `/api` sama sekali (`hanoman_about`), entah karena route-nya `GLOBAL_READ`
+   * (ADR-0157). Assert di `server/test/mcp-coverage.test.ts` menjaga agar `null` tak pernah bisa
+   * menyelundupkan route yang sebenarnya bergerbang capability.
+   */
   capability: string | null;
   /** Path CONTOH (tanpa `/api`) untuk uji kontrak terhadap `capabilityForRoute`. */
   samplePath: string;

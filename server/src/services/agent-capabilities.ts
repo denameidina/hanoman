@@ -98,6 +98,15 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     return rw("vps");
   }
   if (top === "prds") return rw("docs");
+  // ADR-0157 · papan Tim. `tasks` DAN `members` satu domain: kartu tanpa nama penanggung jawab
+  // hanyalah judul, dan memberi salah satunya tanpa yang lain menghasilkan agen yang bisa membaca
+  // penugasan tapi tak bisa menyebut siapa orangnya. `rw()` menurunkan read/write DARI METHOD.
+  //
+  // `POST /tasks/:id/escalate` MELAHIRKAN backlog item namun tetap `team:write`, cermin persis
+  // `POST /tickets/:id/accept` yang tetap `support:write` (ADR-0062/0095): permukaan MASUK
+  // memegang capability permukaannya sendiri. Yang menahan peluncuran sesi tetap `launchPrincipal`
+  // — tanpa `sessions:write` pada token yang sama, Spec-nya lahir TANPA `launchApprovedAt`.
+  if (top === "tasks" || top === "members") return rw("team");
   if (top === "terminal") {
     // SPEC-786 · workspace memuat preferensi per akun dan diturunkan dari req.user.id;
     // capability sesi tak membawa identitas admin yang diperlukan untuk isolasi row ini.

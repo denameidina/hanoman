@@ -29,6 +29,9 @@ const UNWRAPPED = new Map<string, string>([
   ["POST /projects/:id/upload", "multipart"],
   ["GET /projects/:id/archive", "biner (zip)"],
   ["GET /terminal/sessions/:id/ws", "WebSocket, bukan request-response"],
+  // ADR-0157 · GLOBAL_READ tapi tetap di luar: kanal siar, bukan request-response. Tool MCP tak
+  // punya bentuk untuk aliran yang tak pernah selesai.
+  ["GET /events/ws", "WebSocket siar, bukan request-response"],
   // Byte mentah dengan content-disposition: lampiran bisa berupa gambar, dan tool teks akan
   // mengembalikan sampah. Sekelas dengan `archive` di atas.
   ["GET /specs/:id/attachments/:attId", "biner (unduhan lampiran)"],
@@ -86,6 +89,32 @@ describe("cakupan katalog MCP", () => {
     for (const t of MCP_TOOLS) {
       if (!t.capability) continue;
       expect(capabilityForRoute(t.sampleMethod, `/api${t.samplePath}`), t.name).toBe(t.capability);
+    }
+  });
+
+  // ADR-0157 · lubang yang sempat ada: `GLOBAL_READ` di-`continue` oleh assert di atas, sehingga
+  // `/limits`, `/limits/codex`, `/update`, dan `/fs/browse` terlihat "tercakup" sementara nol tool
+  // menyentuhnya — padahal SETIAP agent token sah bisa memanggilnya lewat REST tanpa satu pun
+  // capability dicentang. Route paling longgar justru yang paling mudah lolos dari gerbang.
+  it("setiap route GLOBAL_READ punya tool, atau terdaftar dikecualikan", () => {
+    const missing: string[] = [];
+    for (const r of routeInventory()) {
+      if (capabilityForRoute(r.method, r.path) !== "GLOBAL_READ") continue;
+      const key = `${r.method} ${r.path}`;
+      if (UNWRAPPED.has(key) || COVERED_BY_BRANCH.has(key)) continue;
+      const re = toPattern(r.path);
+      if (!MCP_TOOLS.some((t) => t.sampleMethod === r.method && re.test(t.samplePath))) missing.push(key);
+    }
+    expect(missing, `route GLOBAL_READ tanpa tool MCP:\n${missing.join("\n")}`).toEqual([]);
+  });
+
+  // Sisi lain dari assert yang sama: `capability: null` berarti "tak menuntut apa pun", dan itu
+  // hanya boleh benar untuk route GLOBAL_READ. Tanpa assert ini, sebuah tool bisa menyentuh route
+  // bergerbang sambil mengaku bebas capability, dan yang menemukannya adalah 403 di lapangan.
+  it("tool tanpa capability hanya menyentuh route GLOBAL_READ", () => {
+    for (const t of MCP_TOOLS) {
+      if (t.capability) continue;
+      expect(capabilityForRoute(t.sampleMethod, `/api${t.samplePath}`), t.name).toBe("GLOBAL_READ");
     }
   });
 

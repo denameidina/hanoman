@@ -16,6 +16,8 @@ import { SESSIONS_TOOLS } from "./sessions";
 import { NOTIFICATIONS_TOOLS } from "./notifications";
 import { SUPPORT_TOOLS } from "./support";
 import { LEAD_TOOLS } from "./lead";
+import { TEAM_TOOLS } from "./team";
+import { SYSTEM_TOOLS } from "./system";
 import type { McpToolDef } from "./types";
 
 export const MCP_TOOLS: readonly McpToolDef[] = [
@@ -32,4 +34,9 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   ...NOTIFICATIONS_TOOLS,
   ...SUPPORT_TOOLS,
   ...LEAD_TOOLS,
+  // ADR-0157 · papan Tim (kerja manusia) lalu status instance. Keduanya di ekor daftar dengan
+  // sengaja: urutan di sini = urutan yang dibaca model, dan pekerjaan sehari-hari agen tetap
+  // backlog/sesi/IDE — bukan kartu orang lain.
+  ...TEAM_TOOLS,
+  ...SYSTEM_TOOLS,
 ];

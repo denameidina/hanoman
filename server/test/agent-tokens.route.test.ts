@@ -20,7 +20,7 @@ describe("/agent-tokens routes (cookie-only)", () => {
     expect((await app.inject({ method: "GET", url: "/api/agent-tokens" })).statusCode).toBe(401);
   });
 
-  it("capabilities catalog lists 28 entries", async () => {
+  it("capabilities catalog lists 30 entries", async () => {
     const cookie = await login();
     const r = await app.inject({ method: "GET", url: "/api/agent-tokens/capabilities", headers: { cookie } });
     expect(r.statusCode).toBe(200);
@@ -37,7 +37,11 @@ describe("/agent-tokens routes (cookie-only)", () => {
     // `backlog:lifecycle`, `vps:exec` → 28. Keempatnya MEMPERSEMPIT, bukan memperlebar: route yang
     // dulu dijangkau `:write` kini menuntut capability tersendiri yang tak diimplikasikan apa pun.
     // Tripwire ini tetap menyala karena jumlah kotak yang harus dicentang manusia memang bertambah.
-    expect(r.json().capabilities).toHaveLength(28);
+    // ADR-0157 menambahkan `team:read`/`team:write` → 30: papan Tim (`/api/tasks` & `/api/members`)
+    // yang sebelumnya tak dikenal `capabilityForRoute` sama sekali, jadi tertutup bagi agen. Ini
+    // pelebaran permukaan yang sebenarnya, bukan pemecahan — kartu kerja MANUSIA kini bisa dibaca
+    // dan ditulis agen yang manusianya mencentang kotak itu.
+    expect(r.json().capabilities).toHaveLength(30);
     expect(r.json().capabilities[0]).toMatchObject({ id: expect.any(String), domain: expect.any(String), access: expect.any(String) });
   });
 

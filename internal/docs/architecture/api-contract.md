@@ -850,7 +850,7 @@ GET /agent-integration.md   -> 200 text/markdown; charset=utf-8   # isi docs/age
 
 ```
 # Kelola kredensial AI agent — COOKIE-ONLY (agent token sendiri → 403; anti privilege-escalation).
-GET    /agent-tokens/capabilities   -> { capabilities: CapabilityInfo[] }   # katalog 24 (12 domain × read/write) untuk UI
+GET    /agent-tokens/capabilities   -> { capabilities: CapabilityInfo[] }   # katalog 30 (13 domain; 4 punya akses ke-3 `danger`) untuk UI
 GET    /agent-tokens                 -> { items: AgentTokenView[] }          # tanpa hash/plaintext
 POST   /agent-tokens { name, capabilities[] }  -> 201 { ...AgentTokenView, token }   # plaintext hnm_agt_… SEKALI
 #   400 nama kosong / capability asing (divalidasi vs CAPABILITY_IDS). createdBy = user pemanggil.
@@ -859,14 +859,16 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 #   AgentTokenView = { id, name, tokenPrefix, capabilities[], enabled, createdBy|null, createdAt, lastUsedAt|null, revokedAt|null }
 ```
 
-> **Capability** = `"<domain>:<access>"`, `access ∈ {read,write}`, **write⊇read**. 12 domain: `projects`,
+> **Capability** = `"<domain>:<access>"`, `access ∈ {read,write,danger}`, **write⊇read** dan `danger`
+> tak diimplikasikan apa pun (ADR-0155). 13 domain: `projects`,
 > `backlog`, `sessions` (spawn agen = RCE), `docs`, `ide`, `vps` (remote exec), `settings` (+`/scheduler`),
 > `support` (tickets + issue GitHub), `notifications`, `lead` (ADR-0091), `agents` (ADR-0094),
-> `telegram` (ADR-0096). Peta route→capability di `server/src/services/agent-capabilities.ts`:
+> `telegram` (ADR-0096), `team` (papan Tim: `/tasks*` + `/members*`, ADR-0157). Peta route→capability di `server/src/services/agent-capabilities.ts`:
 > GET/HEAD → `:read`, selainnya → `:write`; sub-path `/projects/:id/{docs,prds}` → `docs`,
 > `/projects/:id/{tree,file,git,status,graph,commit,compare,remotes,…}` → `ide`; WS terminal → `sessions:write`.
-> **Read-only global** (`/limits`,`/update`,`/events/ws`,`/fs/browse`,`/health`) → token ber-capability apa
-> pun, **hanya untuk method baca** (SPEC-405 · ADR-0088). **Tak-boleh-didelegasikan** (agent → 403):
+> **Read-only global** (`/limits`,`/limits/codex`,`/update`,`/events/ws`,`/fs/browse`,`/health`) → token
+> ber-capability apa pun — bahkan token TANPA satu pun capability — **hanya untuk method baca**
+> (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157). **Tak-boleh-didelegasikan** (agent → 403):
 > `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, `/webhooks` (ADR-0100), `/portal` &
 > `/client-accounts` (ADR-0110), `/session-events` (ADR-0146), `/presence` (ADR-0147), dan
 > `/telegram/{settings,test,credentials}` (ADR-0097); route tak dikenal peta → cookie-only. Master switch
@@ -1514,15 +1516,19 @@ POST /api/github-issues/:id/unlink  -> 200 { id, status:"new", specId:null } · 
 > (`kind: secret`, melayani jalur `gh` **dan** REST) + `HANOMAN_GH_BIN` (default `gh`); `hanoman doctor`
 > melaporkan `gh` sebagai probe **non-fatal**. **UI:** tab kedua di layar Triase, bukan layar baru.
 
-## Papan tim (SPEC-945 · [ADR-0150](../adr/0150-fondasi-papan-tim-task-member.md)) — **COOKIE_ONLY**
+## Papan tim (SPEC-945 · [ADR-0150](../adr/0150-fondasi-papan-tim-task-member.md), dibuka untuk agen oleh [ADR-0157](../adr/0157-mcp-papan-tim-dan-global-read.md)) — **`team:read` / `team:write`**
 ```
 # Kerja MANUSIA di sekitar pekerjaan agen. `Task.status` milik manusia dan bebas dipindah, beda
 # dari `Spec.stage` yang diturunkan dari fase sesi (ADR-0008/0024). Tak satu kolom pun ditambahkan
 # ke `Spec` — larangan estimasi/tenggat SPEC-162 utuh.
 #
-# Tak ada entri di `capabilityForRoute` maupun `clientRouteAllowed` — KEDUANYA deny-by-default
-# (ADR-0065 · ADR-0110), jadi papan tim tertutup bagi agent token DAN role `client` tanpa satu
-# baris pun. Itu keputusan, bukan kelalaian; ditegakkan test, bukan diasumsikan.
+# ADR-0157 · seluruh route di bawah dipetakan ke domain `team` (`GET`/`HEAD` → `team:read`, method
+# lain → `team:write`) dan punya sepuluh tool MCP. Domain TERSENDIRI dari `backlog`: satu centang
+# "Backlog — tulis" tak boleh diam-diam membuka papan orang, dan sebaliknya. `tasks` & `members`
+# BERBAGI domain — kartu tanpa nama penanggung jawab hanyalah judul.
+#
+# Yang TETAP tertutup: role `client` (portal). Tak ada entri di `clientRouteAllowed`, dan daftar itu
+# deny-by-default (ADR-0110), jadi tak ada baris yang perlu ditulis untuk mempertahankannya.
 
 GET    /api/members?active&page&limit   -> Paginated<MemberView>
 #   Urutan: aktif dulu, lalu nama asc. Nonaktif TETAP terlihat — kartu lama yang ditugaskan
@@ -1542,6 +1548,8 @@ PATCH  /api/members/:id   { name?, role?, active? }  -> MemberView
 #   operator — itu sebabnya penolakannya lapis kedua di ATAS `.omit()` skemanya. 404 id tak ada.
 DELETE /api/members/:id   -> 204
 #   Task-nya JATUH ke memberId: null (onDelete: SetNull), tidak ikut terhapus. 404 id tak ada.
+#   Tool MCP-nya bermode `danger` (hilang dari tingkat default) sambil tetap menuntut `team:write`:
+#   domain ini tak punya pecahan `danger`, jadi modenya ergonomi — bukan gerbang (ADR-0155/0157).
 
 GET    /api/tasks?projectId&status&memberId&q&page&limit  -> Paginated<TaskView>
 #   Urut `order` menaik, seri dipecah `id`. Berhalaman (ADR-0107).
@@ -1597,10 +1605,14 @@ POST   /api/tasks/:id/escalate   { source, priority, projectId? }   # SPEC-947 �
 #   acceptGithubIssue yang memang tak punya nilai itu di tangan. brief/audit →
 #   { context, outcome, constraints, priority } — `priority` WAJIB di zBriefPayload.
 #   Teks kartu TIDAK dibungkus UNTRUSTED_*: pembungkus itu ada karena tiket datang dari PUBLIK,
-#   sementara kartu ditulis anggota tim di dashboard ber-auth (route COOKIE_ONLY dua arah).
+#   sementara kartu ditulis anggota tim di dashboard ber-auth atau oleh agen ber-`team:write`
+#   (ADR-0157) — keduanya di dalam gerbang, tak satu pun anonim.
 #   Yang ikut: detail, kolom papan, prioritas kartu, assignee (NAMANYA), rentang tanggal.
 #   `launchApprovedBy` = launchPrincipal(req) (SPEC-761); tanpa principal ia null & author jatuh
 #   ke "Tim · system" — stempel yang tak ada tak dikarang. Retry P2002 ≤3× (SPEC-197).
+#   ADR-0157 · agen punya NAMA: author "Tim · agent:<id token>" bila pemanggilnya agent token, dan
+#   `launchApprovedBy` "agent:<id>" HANYA bila token itu juga memegang `sessions:write` — capability
+#   `team:write` sendirian melahirkan Spec yang TAK disetujui untuk diluncurkan.
 #   `specId` menunjuk Spec TERHAPUS → membuat Spec BARU (cermin acceptGithubIssue; `spec!` milik
 #   acceptTicket akan mengembalikan undefined): API tak boleh punya keadaan buntu. 404 id tak ada.
 #   Stage TIDAK pernah ditulis balik ke Task (ADR-0090 · ADR-0150 keputusan 4).

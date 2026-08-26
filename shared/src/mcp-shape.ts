@@ -70,7 +70,20 @@ export const shapeGithubIssue = (row: Record<string, unknown>): Record<string, u
   body: clip(row.body, 500),
 });
 
-export const shapeLeadDecision = (row: Record<string, unknown>): Record<string, unknown> => ({
+// ADR-0157 · kartu papan Tim. `detail` dipotong seperti `objective` backlog: ia menampung sampai
+// 20 000 karakter (zCreateTask) dan satu kartu bisa menghabiskan seluruh plafon balasan sendirian.
+// `spec` (cermin backlog) dilewatkan APA ADANYA — tiga field, dan justru itu yang menjawab
+// "kartu ini sudah jadi backlog atau belum" tanpa panggilan kedua.
+export const shapeTask = (row: Record<string, unknown>): Record<string, unknown> => ({
+  ...pick(row, ["id", "projectId", "title", "status", "priority", "memberId",
+    "startDate", "dueDate", "order", "specId", "spec", "createdAt", "updatedAt"]),
+  detail: clip(row.detail, 500),
+});
+
+export const shapeMember = (row: Record<string, unknown>): Record<string, unknown> =>
+  pick(row, ["id", "name", "email", "role", "active"]);
+
+export const shapeLeadDecision =(row: Record<string, unknown>): Record<string, unknown> => ({
   ...pick(row, ["id", "projectId", "specId", "sessionId", "gate", "kind", "status", "confidence", "action", "choice", "createdAt"]),
   question: clip(row.question, 300),
   answer: clip(row.answer, 500),

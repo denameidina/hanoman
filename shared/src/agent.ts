@@ -24,6 +24,11 @@ export const CAPABILITY_IDS = [
   // SPEC-476 · ADR-0096 · context/memory/reply/audit kanal Telegram. Aksi produk tetap memakai
   // capability domain produk masing-masing; domain ini tidak memberi akses shell atau sesi.
   "telegram:read", "telegram:write",
+  // ADR-0157 · papan Tim (`/api/tasks`, `/api/members`). Domain TERSENDIRI, bukan menumpang
+  // `backlog`: kartu tim adalah pekerjaan MANUSIA yang `status`-nya bebas dipindah, sementara
+  // `Spec.stage` diturunkan dari fase sesi (ADR-0008/0024). Menumpangkannya berarti satu centang
+  // "Backlog — tulis" diam-diam membuka papan orang, dan sebaliknya.
+  "team:read", "team:write",
   // ADR-0155 · akses KETIGA: `danger`. Dipecah dari `:write` karena keempat operasi ini bukan
   // "menulis lebih banyak", melainkan menjalankan sesuatu di luar proses hanoman — sesi agen di
   // worktree, perintah di VPS, git yang mengubah sejarah, penghapusan artefak dokumen.
@@ -66,6 +71,8 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "agents:write", domain: "agents", access: "write", label: "Custom agent — tulis", desc: "Buat/ubah/hapus custom agent; definisinya dipakai setiap sesi baru.", risk: "exec" },
   { id: "telegram:read", domain: "telegram", access: "read", label: "Telegram — baca", desc: "Baca status gateway, binding, memory, dan audit Telegram." },
   { id: "telegram:write", domain: "telegram", access: "write", label: "Telegram — tulis", desc: "Perbarui context/memory dan terbitkan reply sesi operator Telegram." },
+  { id: "team:read", domain: "team", access: "read", label: "Tim — baca", desc: "Lihat kartu papan Tim & direktori anggota." },
+  { id: "team:write", domain: "team", access: "write", label: "Tim — tulis", desc: "Buat/ubah/hapus kartu papan Tim & anggota; eskalasi kartu jadi backlog item." },
   // ADR-0155 · akses `danger`. Tak satu pun diimplikasikan `:write` di domainnya; manusia harus
   // mencentangnya sendiri di Settings → Akses AI Agent.
   { id: "sessions:spawn", domain: "sessions", access: "danger", label: "Sesi — buka sesi baru", desc: "Membuka sesi agen BARU di worktree (menjalankan claude/codex dengan izin penuh). Dipisah dari Sesi — tulis: mengendalikan sesi yang sudah ada tak lagi cukup untuk membuka yang baru.", risk: "rce" },
@@ -91,6 +98,7 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "lead", label: "Lead", desc: "Minta putusan ke hanoman-lead & baca jejak keputusannya." },
   { domain: "agents", label: "Custom agent", desc: "Katalog persona agen global & per project." },
   { domain: "telegram", label: "Telegram", desc: "Status, binding, memory, reply, dan audit kanal operator Telegram." },
+  { domain: "team", label: "Tim", desc: "Kartu papan Tim (kerja manusia), direktori anggota, eskalasi kartu ke backlog." },
 ];
 
 // write meng-implikasikan read pada domain yang sama.

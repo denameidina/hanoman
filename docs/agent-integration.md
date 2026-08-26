@@ -91,7 +91,8 @@ host-mu benar dan masalahnya ada pada token atau master switch.
 ## 3. Capability
 
 Capability berformat `"<domain>:<access>"`, `access ∈ {read, write}`, dan **write meng-implikasikan
-read** pada domain yang sama. Ada **12 domain × 2 = 24 capability**. Katalog resmi (dengan label &
+read** pada domain yang sama. Ada **13 domain**; empat di antaranya punya akses KETIGA `danger`
+(ADR-0155) yang **tak diimplikasikan `:write`**, sehingga totalnya **30 capability**. Katalog resmi (dengan label &
 deskripsi) tampil di panel **Settings → Akses AI Agent** saat manusia membuat token; endpoint
 katalognya (`GET /api/agent-tokens/capabilities`) bersifat **cookie-only** (lihat §5) — kamu tak
 perlu mengambilnya, cukup rujuk tabel di bawah:
@@ -110,6 +111,7 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 | `lead` | `/api/lead*` | minta putusan ke hanoman-lead & baca jejaknya — **`lead:write` bisa menggerakkan sesi** (ADR-0091) |
 | `agents` | `/api/custom-agents*` | katalog custom agent global & per project — **`agents:write` mengubah apa yang dilihat SETIAP sesi baru** (ADR-0094) |
 | `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096) |
+| `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
 
 Aturan pemetaan **deterministik** (`server/src/services/agent-capabilities.ts`): `GET`/`HEAD` →
 `:read`, metode lain → `:write`. Itu berlaku untuk domain `lead` juga — **`POST /api/lead/decisions`
@@ -117,6 +119,12 @@ menuntut `lead:write`**, dan `lead:read` tak pernah cukup: meminta putusan melah
 permanen dan keputusannya bisa menggerakkan sesi. Sub-path `/api/projects/:id/{docs,prds}` dihitung
 domain **`docs`**; sub-path IDE/git di atas dihitung domain **`ide`**; WebSocket terminal butuh
 **`sessions:write`**.
+
+Empat endpoint STATUS tak menuntut capability sama sekali — token sah mana pun boleh membacanya
+(`GLOBAL_READ`, ADR-0157): `GET /api/limits`, `GET /api/limits/codex`, `GET /api/update`, dan
+`GET /api/fs/browse` (menelusuri folder mesin untuk mengisi `repoDir`). Hanya method BACA:
+`POST /api/update/apply` me-restart instance dan tetap **403** untuk agent token, apa pun
+capability-nya (SPEC-405/ADR-0088) — prefix yang sama tak menurunkan gerbangnya.
 
 ## 4. Aturan gate & kode status
 

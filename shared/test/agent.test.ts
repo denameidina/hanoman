@@ -9,10 +9,11 @@ describe("agent capabilities", () => {
   // ADR-0155 · domain tak lagi selalu berpasangan read/write: empat domain mendapat akses KETIGA
   // `danger` (sessions, ide, backlog, vps) → 24 + 4 = 28. Karena itu jumlahnya tak bisa lagi
   // diturunkan dari "domain × 2"; ia dihitung dari akses yang benar-benar ada.
-  it("has 12 domains, 28 capability ids across three access levels, all in metadata", () => {
-    expect(CAPABILITY_IDS.length).toBe(28);
-    expect(new Set(CAPABILITY_IDS).size).toBe(28);
-    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(12);
+  // ADR-0157 · +domain `team` (papan Tim: `/api/tasks` & `/api/members`) → 13 domain, 30 id.
+  it("has 13 domains, 30 capability ids across three access levels, all in metadata", () => {
+    expect(CAPABILITY_IDS.length).toBe(30);
+    expect(new Set(CAPABILITY_IDS).size).toBe(30);
+    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(13);
     expect(CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id).sort())
       .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "vps:exec"]);
     expect(CAPABILITIES.map((c) => c.id).sort()).toEqual([...CAPABILITY_IDS].sort());

@@ -10,6 +10,7 @@
 // basi tanpa suara — `~/.claude/skills/hanoman/api-reference.md` masih memuat domain `errors` dan
 // source `cross-audit` yang dicabut SPEC-384. Skema tool tak bisa basi diam-diam: ia dites.
 import { zPriority, zSpecSource, zStage } from "./enums";
+import { ESCALATE_SOURCES, TASK_STATUSES } from "./team";
 
 export type JsonSchemaNode = {
   type?: string;
@@ -67,6 +68,10 @@ export const PRIORITY_ENUM = zPriority.options;
 export const SOURCE_ENUM = zSpecSource.options;
 export const STAGE_ENUM = zStage.options;
 export const SEVERITY_ENUM = ["critical", "major", "minor"] as const;
+// ADR-0157 · papan Tim. Diturunkan, bukan disalin — kolom kelima yang kelak ditambahkan tak boleh
+// membuat skema tool berbohong tentang nilai yang diterima server.
+export const TASK_STATUS_ENUM = TASK_STATUSES;
+export const ESCALATE_SOURCE_ENUM = ESCALATE_SOURCES;
 
 export const PRIORITY = enumStr(
   PRIORITY_ENUM,

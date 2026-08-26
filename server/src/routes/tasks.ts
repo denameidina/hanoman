@@ -10,8 +10,10 @@ import { escalateTask } from "../services/task-escalate";
 // SPEC-945 · ADR-0150 · CRUD kartu kerja MANUSIA. Bukan backlog: `status` di sini milik manusia dan
 // bebas dipindah, sementara `Spec.stage` diturunkan dari fase sesi (ADR-0008/0024).
 //
-// Tak ada entri di `capabilityForRoute` maupun `clientRouteAllowed` — keduanya deny-by-default,
-// jadi route ini tertutup bagi agent token DAN role `client` tanpa satu baris pun (ADR-0110).
+// ADR-0157 · terjangkau agent token lewat `team:read`/`team:write` (`capabilityForRoute`). Tetap
+// tertutup bagi role `client`: tak ada entri di `clientRouteAllowed`, dan daftar itu deny-by-default
+// (ADR-0110). Papan tim BUKAN permukaan klien, sementara agen yang memelihara papan hanya perlu
+// capability yang dicentang manusia sekali.
 
 /** Rujukan tanpa pesan yang bisa dibaca: P2003 Prisma menyebut nama constraint, bukan nilainya. */
 async function refProblem(
@@ -124,7 +126,10 @@ export default async function (app: FastifyInstance) {
 
     const r = await escalateTask(task, {
       projectId, source, priority,
-      author: req.user?.email ?? "system", launchApprovedBy: launchPrincipal(req),
+      // ADR-0157 · agen punya NAMA di sini. Tanpa cabang kedua setiap eskalasi lewat MCP menulis
+      // `Tim · system`, dan asal-usul backlog jadi tak bisa ditelusuri persis pada jalur yang baru
+      // saja dibuka — `launchPrincipal` di bawah sudah membedakan keduanya, penulisnya harus juga.
+      author: req.user?.email ?? (req.agent ? `agent:${req.agent.id}` : "system"), launchApprovedBy: launchPrincipal(req),
     });
     const view = taskView(r.task, { id: r.spec.id, stage: r.spec.stage, priority: r.spec.priority });
     return reply.code(r.created ? 201 : 200).send({ created: r.created, spec: r.spec, task: view });

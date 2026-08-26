@@ -231,6 +231,9 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // Mengirim pesan ke MANUSIA di luar hanoman: tak ada undo, tapi domainnya tak punya
   // pecahan `danger`.
   "hanoman_telegram_reply_send",
+  // ADR-0157 · papan Tim. Menghapus kartu/anggota permanen di seluruh mesin tersync, tapi domain
+  // `team` tak punya pecahan `danger` — mode `danger`-nya ergonomi, bukan gerbang.
+  "hanoman_task_delete", "hanoman_member_delete",
 ]);
 
 describe("mode ⇔ capability", () => {

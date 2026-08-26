@@ -134,21 +134,41 @@ describe("status global read-only tak boleh tembus lewat method tulis (SPEC-405 
   });
 });
 
-// SPEC-945 · ADR-0150 · papan tim adalah permukaan MANUSIA. Tak ada entri di `capabilityForRoute`,
-// jadi ia jatuh ke `null` → cookie-only. Ini keputusan, bukan kelalaian — dan test ini yang
-// membuatnya tetap begitu bila suatu hari seseorang menambahkan cabang tanpa memikirkannya.
-describe("papan tim tertutup bagi agent token", () => {
-  // SPEC-947 · bentuk 3-SEGMEN ikut dicacah: cabang ber-sub-segmen (pola `IDE_SUBS`,
-  // `seg[1] === "crons"`) adalah cara paling lazim sebuah permukaan diam-diam terbuka.
-  for (const p of ["/api/members", "/api/members/a@x.id", "/api/tasks", "/api/tasks/t1",
-    "/api/tasks/t1/escalate"])
-    for (const m of ["GET", "POST", "PATCH", "DELETE"])
-      it(`${m} ${p} → cookie-only`, () => {
-        expect(capabilityForRoute(m, p)).toBeNull();
-        const r = checkAgentCapability(["backlog:write", "support:write"], m, p);
-        expect(r.ok).toBe(false);
-        expect(!r.ok && r.reason).toBe("cookie-only");
-      });
+// ADR-0157 · papan Tim TERBUKA bagi agent token lewat domain `team` — membalik keputusan
+// ADR-0150 yang membiarkannya jatuh ke `null`. Yang dijaga di sini tiga hal, dan yang KETIGA yang
+// paling mudah rusak: bentuk 3-segmen (`/tasks/:id/escalate`) harus ikut domainnya, bukan diam-diam
+// jatuh ke cabang lain — pola `IDE_SUBS` & `seg[1] === "crons"` adalah cara paling lazim sebuah
+// sub-path menyimpang dari induknya.
+describe("papan tim = domain capability `team`", () => {
+  const paths = ["/api/members", "/api/members/a@x.id", "/api/tasks", "/api/tasks/t1",
+    "/api/tasks/t1/escalate"];
+
+  for (const p of paths) {
+    it(`GET ${p} → team:read`, () => expect(capabilityForRoute("GET", p)).toBe("team:read"));
+    for (const m of ["POST", "PATCH", "PUT", "DELETE"])
+      it(`${m} ${p} → team:write`, () => expect(capabilityForRoute(m, p)).toBe("team:write"));
+  }
+
+  it("token backlog/support penuh TIDAK menjangkau papan tim — domainnya memang terpisah", () => {
+    const r = checkAgentCapability(["backlog:write", "support:write"], "POST", "/api/tasks");
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.need).toBe("team:write");
+    expect(!r.ok && r.reason).toBe("capability");
+  });
+
+  it("`team:read` tak cukup untuk menulis, `team:write` mencakup baca", () => {
+    expect(checkAgentCapability(["team:read"], "POST", "/api/tasks").ok).toBe(false);
+    expect(checkAgentCapability(["team:read"], "GET", "/api/tasks").ok).toBe(true);
+    expect(checkAgentCapability(["team:write"], "GET", "/api/members").ok).toBe(true);
+    expect(checkAgentCapability(["team:write"], "DELETE", "/api/tasks/t1").ok).toBe(true);
+  });
+
+  // Sisi yang selalu perlu dijaga saat sebuah top-segment baru lahir: tetangganya tak ikut.
+  it("segmen lain tak ikut terseret oleh cabang baru", () => {
+    expect(capabilityForRoute("GET", "/api/specs")).toBe("backlog:read");
+    expect(capabilityForRoute("GET", "/api/tickets")).toBe("support:read");
+    expect(capabilityForRoute("POST", "/api/terminal/sessions")).toBe("sessions:spawn");
+  });
 });
 
 // ADR-0155 · empat operasi dipecah dari `:write` ke capability berakses `danger`. Test ini menjaga

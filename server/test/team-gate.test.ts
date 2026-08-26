@@ -5,13 +5,16 @@ import { prisma } from "../src/db";
 import { issueAgentToken } from "../src/services/agent-token";
 import { resetDb } from "./factory";
 
-// SPEC-945 · ADR-0150 · papan tim tertutup bagi agent token KARENA `capabilityForRoute` tak
-// mengenalnya (`null` → cookie-only), bukan karena route-nya tak ada.
+// SPEC-945 · ADR-0150, DIAMANDEMEN ADR-0157 · papan tim kini punya domain capability sendiri
+// (`team`). Yang diuji di sini bukan lagi "tertutup", melainkan bahwa penolakannya lahir dari
+// DOMAIN YANG SALAH, bukan dari route yang tak ada: token bermodal seluruh capability LAIN tetap
+// 403 — dan 403-nya menyebut `need: team:*`, bukan `cookie-only`.
 //
-// Perbedaan itu yang diuji di sini, dan ia tak bisa diuji dengan satu request saja: `403` sendirian
-// juga muncul di pohon yang BELUM punya route ini sama sekali, karena gerbangnya berjalan sebagai
-// hook SEBELUM routing. Jadi tiap path diperiksa BERPASANGAN — sesi cookie menjangkaunya (bukan
-// 404), agent token bermodal capability terluas tetap ditolak.
+// Bedanya tak bisa diuji dengan satu request saja: `403` sendirian juga muncul di pohon yang BELUM
+// punya route ini sama sekali, karena gerbangnya berjalan sebagai hook SEBELUM routing. Jadi tiap
+// path diperiksa BERPASANGAN — sesi cookie menjangkaunya (bukan 404), agent token bercapability
+// lain tetap ditolak. Jalur POSITIF (`team:read`/`team:write` benar-benar membuka) hidup di
+// `team-agent-access.test.ts`.
 
 const gated = buildApp();                          // gerbang auth hidup
 const open = buildApp({ requireAuth: false });     // setara sesi cookie
@@ -43,7 +46,7 @@ const call = (
   app: FastifyInstance, method: Method, url: string, headers?: Record<string, string>,
 ): Promise<LightMyRequestResponse> => app.inject({ method, url, headers, payload: {} });
 
-describe("SPEC-945 · papan tim: ada untuk manusia, tertutup bagi agen", () => {
+describe("SPEC-945 · ADR-0157 · papan tim: ada untuk manusia, digerbangi domain `team`", () => {
   it("sesi cookie MENJANGKAU kedua daftar — bukan 404", async () => {
     for (const url of READS) {
       const r = await open.inject({ method: "GET", url });
@@ -53,7 +56,7 @@ describe("SPEC-945 · papan tim: ada untuk manusia, tertutup bagi agen", () => {
     }
   });
 
-  it("agent token bermodal capability TERLUAS tetap 403 cookie-only", async () => {
+  it("agent token bermodal SELURUH capability lain tetap 403 — dan 403-nya menyebut `team`", async () => {
     const { token } = await issueAgentToken({ name: "bot", capabilities: [
       "projects:write", "backlog:write", "support:write", "settings:write", "agents:write",
     ] });
@@ -67,13 +70,13 @@ describe("SPEC-945 · papan tim: ada untuk manusia, tertutup bagi agen", () => {
       ["PATCH", "/api/tasks/t1"], ["DELETE", "/api/tasks/t1"],
     ];
     for (const [method, url] of calls) {
-      {
-        const r = await call(gated, method, url, h);
-        expect(r.statusCode, `${method} ${url}`).toBe(403);
-        // `reason: cookie-only`, BUKAN `need: <capability>`: tak ada capability yang cukup, jadi
-        // menawarkan nama capability di sini akan mengundang orang menerbitkan token yang percuma.
-        expect(r.json().need, `${method} ${url}`).toBeUndefined();
-      }
+      const r = await call(gated, method, url, h);
+      expect(r.statusCode, `${method} ${url}`).toBe(403);
+      // ADR-0157 · `need` KINI ada, dan itu perbaikan yang disengaja: 403 tanpa nama capability
+      // meninggalkan agen tanpa kalimat yang bisa disampaikan ke manusia (ADR-0065 §"baca 403
+      // sebagai instruksi"). Domainnya `team`, bukan `backlog` — token di atas memegang
+      // `backlog:write` dan tetap ditolak, dan itulah bukti pemisahan domainnya nyata.
+      expect(r.json().need, `${method} ${url}`).toBe(method === "GET" ? "team:read" : "team:write");
     }
   });
 

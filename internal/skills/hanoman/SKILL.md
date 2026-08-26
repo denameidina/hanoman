@@ -197,7 +197,9 @@ Pakai skill lebih sempit saat task cocok:
   menerima dan yang tersisa satu larangan (`from !== to`). `Member.id` **deterministik dari email
   ternormalisasi** (pola ADR-0094) → `email` **immutable**, ditegakkan dua lapis karena `.omit()`
   sendirian membuangnya senyap, dan UI-nya karena itu **tak punya field email sama sekali** di form
-  ubah. **Gotcha yang mengunci bentuk UI:** papan tak dipaginasi tapi topik `tasks` mewajibkan
+  ubah. **ADR-0157 mengamandemen "papan ini tertutup bagi agent token"**: `/api/tasks*` &
+  `/api/members*` kini domain capability `team` dan punya sepuluh tool MCP; yang TETAP tertutup
+  adalah role `client` (tak ada entri `clientRouteAllowed`, deny-by-default). **Gotcha yang mengunci bentuk UI:** papan tak dipaginasi tapi topik `tasks` mewajibkan
   `page`/`limit` dengan `zSubLimit` dijepit **200**, dan `order` bermakna DI DALAM kolom — jadi satu
   langganan untuk seluruh papan memotong himpunan gabungan empat kolom di titik **sewenang-wenang**.
   Papan memasang **empat langganan, satu per kolom**, tiap kolom ber-`total` sendiri, dan plafonnya
@@ -505,19 +507,32 @@ Pakai skill lebih sempit saat task cocok:
   per domain sejak ADR-0155) sebagai data murni yang dipakai runtime CLI **dan** panel Settings —
   diikat ke gate oleh `server/test/mcp-capability.test.ts`
   (`capabilityForRoute(sampleMethod, samplePath) === capability`).
-  **ADR-0155 membalik batas ADR-0099 §4.** Katalog kini **151 tool** dengan cakupan PENUH atas
+  **ADR-0155 membalik batas ADR-0099 §4.** Katalog kini **165 tool** (151 + 14 dari ADR-0157) dengan cakupan PENUH atas
   seluruh route yang terjangkau agent token, termasuk spawn sesi, VPS, integrate, delete, dan stage.
   Alasannya: kelima permukaan itu SUDAH terjangkau agent token lewat REST, jadi larangan di katalog
   memasang gerbang di tempat yang tak dilewati siapa pun. Batasnya pindah ke **capability berakses
   ketiga `danger`** (`sessions:spawn`, `ide:git`, `backlog:lifecycle`, `vps:exec`) yang **tak
-  diimplikasikan `:write` mana pun**. **TIGA tingkat mode:** `--read-only` (62 tool) →
-  *(default)* (117) → `--danger` (151); yang lebih sempit **menghilangkan** tool, bukan menolaknya
+  diimplikasikan `:write` mana pun**. **TIGA tingkat mode:** `--read-only` (68 tool) →
+  *(default)* (129) → `--danger` (165); yang lebih sempit **menghilangkan** tool, bukan menolaknya
   saat dipanggil, dan yang lebih sempit selalu menang. Tingkat itu **BUKAN kontrol keamanan** —
   ia mencegah salah pilih; yang menahan sungguhan adalah capability pada token.
   **Yang tetap di luar katalog, dan alasannya:** empat route kredensial Telegram (ADR-0097), tiga
   route dialog sesi (SPEC-899 — agen yang bisa menjawab `AskUserQuestion` bisa menjawab
   pertanyaannya sendiri), enam route `scheduler/crons` (ADR-0112 — cron adalah
   `POST /terminal/sessions` yang ditunda), multipart/biner, dan `password` VPS.
+  **ADR-0157 menutup dua lubang terakhir.** (a) Papan Tim (`/api/tasks*`, `/api/members*`) yang
+  jatuh ke `null` di `capabilityForRoute` — kini domain **`team:read`/`team:write`** (capability
+  **28 → 30**, **13 domain**), satu domain untuk dua permukaan karena kartu tanpa nama penanggung
+  jawab hanyalah judul, dan TERSENDIRI dari `backlog` karena `status` kartu milik manusia sementara
+  `Spec.stage` diturunkan dari fase sesi. `POST /tasks/:id/escalate` melahirkan `Spec` tapi tetap
+  `team:write` (preseden `/tickets/:id/accept`); yang menahan peluncuran tetap `launchPrincipal` —
+  tanpa `sessions:write`, Spec-nya lahir TANPA `launchApprovedAt`. (b) Empat route **`GLOBAL_READ`**
+  (`/limits`, `/limits/codex`, `/update`, `/fs/browse`) yang sudah terjangkau SETIAP token sah tanpa
+  satu pun capability — gerbang cakupan me-`continue` padanya sehingga mereka terlihat "tercakup"
+  sementara nol tool menyentuhnya. **Jebakan yang lahir bersamanya:** `capability: null` kini punya
+  DUA arti (tak memanggil `/api`, ATAU route `GLOBAL_READ`), jadi assert baru menuntut setiap tool
+  null menyentuh route `GLOBAL_READ` — tanpanya sebuah tool bisa mengaku bebas capability sambil
+  menyentuh route bergerbang. `POST /update/apply` tetap tanpa tool di tingkat MANA PUN (ADR-0088).
   `server/test/mcp-coverage.test.ts` membaca inventaris route dari **sumber** dan menolak endpoint
   baru yang terjangkau tapi lupa dibungkus. `MCP_TOOL_SCHEMA_VERSION` aditif-dalam-versi: yang
   dijaga adalah tanda tangan v1 tetap utuh, bukan daftar penuh yang harus disunting tiap kali. **Tiga gotcha wajib:** (1) **stdout milik JSON-RPC** —
