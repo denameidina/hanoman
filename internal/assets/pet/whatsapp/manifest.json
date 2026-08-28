@@ -1,0 +1,231 @@
+{
+  "name": "Hanoman Pet — Sehari-hari",
+  "publisher": "Nafanesia",
+  "version": 1,
+  "date": "2026-08-28",
+  "format": {
+    "type": "static-webp",
+    "width": 512,
+    "height": 512,
+    "maxBytes": 100000
+  },
+  "trayIcon": {
+    "file": "tray-icon.png",
+    "width": 96,
+    "height": 96,
+    "bytes": 7279,
+    "sha256": "233f7f64153973b6161a643c5b266d042936ea1b11d0850e26c9495fff2e7d9e"
+  },
+  "stickers": [
+    {
+      "slug": "pagi",
+      "label": "Pagi!",
+      "file": "id-text/hanoman-pet-pagi.webp",
+      "bytes": 29196,
+      "sha256": "634c6849a6c70590a975b913b3aafe915986176d5854a521edbee1d1f9d7c8c0"
+    },
+    {
+      "slug": "halo",
+      "label": "Halo!",
+      "file": "id-text/hanoman-pet-halo.webp",
+      "bytes": 30096,
+      "sha256": "6aeb19f321f7aeec36cd0b37b49cfc8e2aed3664034504848c60b814889abfbf"
+    },
+    {
+      "slug": "siap",
+      "label": "Siap!",
+      "file": "id-text/hanoman-pet-siap.webp",
+      "bytes": 27992,
+      "sha256": "83b2bcfc166298b067533479dc0d317fd84fad119708ed06859fb3d5db49c3d3"
+    },
+    {
+      "slug": "oke",
+      "label": "Oke!",
+      "file": "id-text/hanoman-pet-oke.webp",
+      "bytes": 30428,
+      "sha256": "44eb80f35e30f45856e1d701784155c80e7d22577e09f520efad0f93662ac318"
+    },
+    {
+      "slug": "gas",
+      "label": "Gas!",
+      "file": "id-text/hanoman-pet-gas.webp",
+      "bytes": 31476,
+      "sha256": "200fb0aebac5d27460dc029e38ecd2630479abae8f65408e96b708f35490d6ed"
+    },
+    {
+      "slug": "otw",
+      "label": "OTW",
+      "file": "id-text/hanoman-pet-otw.webp",
+      "bytes": 31844,
+      "sha256": "5f7cde7ff849a970e77f98a2fd306470d30f10128947956948f1cde5d58d23e7"
+    },
+    {
+      "slug": "bentar-ya",
+      "label": "Bentar ya",
+      "file": "id-text/hanoman-pet-bentar-ya.webp",
+      "bytes": 28688,
+      "sha256": "9e366cc32852c80540c2f0f5c2228d0fdf21030103a394bbfa86c958f5f168f2"
+    },
+    {
+      "slug": "makasih",
+      "label": "Makasih!",
+      "file": "id-text/hanoman-pet-makasih.webp",
+      "bytes": 27200,
+      "sha256": "9ae01c105577ed38973251dd31e6321454b57d21df4fd1b554833bda36bb9e34"
+    },
+    {
+      "slug": "sama-sama",
+      "label": "Sama-sama",
+      "file": "id-text/hanoman-pet-sama-sama.webp",
+      "bytes": 32270,
+      "sha256": "67fc321cf7d0bb7af68aac9363bfa1a8ecb91313c12a50d830a93880af9c12d3"
+    },
+    {
+      "slug": "maaf-ya",
+      "label": "Maaf ya",
+      "file": "id-text/hanoman-pet-maaf-ya.webp",
+      "bytes": 27388,
+      "sha256": "951fa465280d81f5fd8d59cb6ec05a0b1218a52d8be5b764c00de6cb36aca2b3"
+    },
+    {
+      "slug": "baik-dipahami",
+      "label": "Baik, dipahami",
+      "file": "id-text/hanoman-pet-baik-dipahami.webp",
+      "bytes": 30542,
+      "sha256": "094d8b509e2bd399fcd4af7055d78e1fc07c1d47c734c9349836b3823c62a716"
+    },
+    {
+      "slug": "siap-dikerjakan",
+      "label": "Siap dikerjakan",
+      "file": "id-text/hanoman-pet-siap-dikerjakan.webp",
+      "bytes": 33866,
+      "sha256": "d2829a655483a8b941e8d740e66f4064e91848b18ee2724fdfa68a406e3b61f6"
+    },
+    {
+      "slug": "sedang-diproses",
+      "label": "Sedang diproses",
+      "file": "id-text/hanoman-pet-sedang-diproses.webp",
+      "bytes": 33120,
+      "sha256": "5d5b3c60b2e19f84da073a797893e40ad6faaa5eb13fe13abf9f9225b99c0ebf"
+    },
+    {
+      "slug": "mohon-ditinjau",
+      "label": "Mohon ditinjau",
+      "file": "id-text/hanoman-pet-mohon-ditinjau.webp",
+      "bytes": 32070,
+      "sha256": "9e87d013c8cbcd4e1a4a5c3901926c2404511c27202b7875c108edfb936fe86d"
+    },
+    {
+      "slug": "perlu-revisi",
+      "label": "Perlu revisi",
+      "file": "id-text/hanoman-pet-perlu-revisi.webp",
+      "bytes": 33156,
+      "sha256": "eff74e1c500668e6b93e1223acdb132e2528a274f2ce1e75d67784dda848df95"
+    },
+    {
+      "slug": "sudah-selesai",
+      "label": "Sudah selesai",
+      "file": "id-text/hanoman-pet-sudah-selesai.webp",
+      "bytes": 30140,
+      "sha256": "b9c72d193f37cad631734947398fcb7e2c38c26758a1f8c8583e604bb7ebf0a1"
+    },
+    {
+      "slug": "sudah-dikirim",
+      "label": "Sudah dikirim",
+      "file": "id-text/hanoman-pet-sudah-dikirim.webp",
+      "bytes": 32534,
+      "sha256": "88fbbd87c44fcb7d1fb8466e55d26a220d945260039ed9f58912f466bf910836"
+    },
+    {
+      "slug": "terima-kasih",
+      "label": "Terima kasih",
+      "file": "id-text/hanoman-pet-terima-kasih.webp",
+      "bytes": 29510,
+      "sha256": "ede88b2445615a03a82f9b7c0db4cd2ba6eb9a253ec0fd070a0af0966d8a236b"
+    },
+    {
+      "slug": "serius",
+      "label": "Serius.",
+      "file": "id-text/hanoman-pet-serius.webp",
+      "bytes": 29246,
+      "sha256": "c9b0fe13c410207dc3311f1f4a05b2c9b2c718276690fffdff4092541d4dab04"
+    },
+    {
+      "slug": "ini-penting",
+      "label": "Ini penting",
+      "file": "id-text/hanoman-pet-ini-penting.webp",
+      "bytes": 30432,
+      "sha256": "1c46366a00f458efc2aa720fce54337fd37adfaa19da4480c67c2fc441b1ac46"
+    },
+    {
+      "slug": "tolong-fokus",
+      "label": "Tolong fokus",
+      "file": "id-text/hanoman-pet-tolong-fokus.webp",
+      "bytes": 31186,
+      "sha256": "d3064400d917b190c4013559b79bc09749b6c2a37534922f4c8d4112f1fd6b60"
+    },
+    {
+      "slug": "cek-lagi",
+      "label": "Cek lagi",
+      "file": "id-text/hanoman-pet-cek-lagi.webp",
+      "bytes": 30546,
+      "sha256": "2a7af893b0ed572794dd3677a1ff54f7ca648e05639f88906de57fed94283856"
+    },
+    {
+      "slug": "jangan-lupa",
+      "label": "Jangan lupa",
+      "file": "id-text/hanoman-pet-jangan-lupa.webp",
+      "bytes": 32558,
+      "sha256": "2b69bf70fa3da4f9db1062bc73b34cb682abb618fe900a986413f2f80f060f77"
+    },
+    {
+      "slug": "hah",
+      "label": "Hah?!",
+      "file": "id-text/hanoman-pet-hah.webp",
+      "bytes": 30150,
+      "sha256": "b6e0ff87e2f29c4b616f620bd1b2f7c063215b7c3fdd6ce3aa1fc990ee7babb6"
+    },
+    {
+      "slug": "serius-kaget",
+      "label": "Serius?!",
+      "file": "id-text/hanoman-pet-serius-kaget.webp",
+      "bytes": 33458,
+      "sha256": "8f21c22958da932fb6589a301d1c607bc379073533b40ed7ea25f4e9503987d0"
+    },
+    {
+      "slug": "waduh",
+      "label": "Waduh...",
+      "file": "id-text/hanoman-pet-waduh.webp",
+      "bytes": 30740,
+      "sha256": "a017f7fb805657d18f9b0e0465653fee8a4171aca5afa2e0fd76509cec8c6731"
+    },
+    {
+      "slug": "tenang",
+      "label": "Tenang...",
+      "file": "id-text/hanoman-pet-tenang.webp",
+      "bytes": 31426,
+      "sha256": "d80bb31f1d95c133f614c57976f67e865374060aa5cbc0ab296bd6ee0ccb64e0"
+    },
+    {
+      "slug": "mantap",
+      "label": "Mantap!",
+      "file": "id-text/hanoman-pet-mantap.webp",
+      "bytes": 32508,
+      "sha256": "fc560fff5f82b3f07f9f870ba35b735bb8024d01d48dd3ec3ac599c669d0eb9b"
+    },
+    {
+      "slug": "yes",
+      "label": "Yes!",
+      "file": "id-text/hanoman-pet-yes.webp",
+      "bytes": 28020,
+      "sha256": "cf1a58f822598b6a0193fd682dc8791e844760b653472024745ba9fc759cce40"
+    },
+    {
+      "slug": "semangat",
+      "label": "Semangat!",
+      "file": "id-text/hanoman-pet-semangat.webp",
+      "bytes": 34852,
+      "sha256": "43d21ab4746616f560b4a9f05150d79a144a572516d2a4626e159eb5e04c0700"
+    }
+  ]
+}

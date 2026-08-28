@@ -15,7 +15,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 
 ## brand
 - [Hanoman brand book](brand/README.md) — filosofi story-led/product-grounded, empat lakon, voice bilingual, messaging, identitas visual, dan contoh penerapan untuk produk open-source
-  - [Illustration system](brand/illustration/README.md) — art direction Surakarta, model karakter/mascot (termasuk band **pet** 80–128 px, ADR-0140; atlas pet v02 16 baris sejak SPEC-904), katalog 41 aset, hybrid briefs, prompt library, dan delivery QA
+  - [Illustration system](brand/illustration/README.md) — art direction Surakarta, model karakter/mascot (termasuk band **pet** 80–128 px, ADR-0140; atlas pet v02 16 baris sejak SPEC-904; derivatif WhatsApp pet 30 reaksi), katalog 41 aset, hybrid briefs, prompt library, dan delivery QA
 
 ## requirements
 - [prd](requirements/prd.md) · [frd](requirements/frd.md) · [rd](requirements/rd.md) · [acceptance-criteria (EARS)](requirements/acceptance-criteria-ears-standard.md)

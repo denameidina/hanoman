@@ -16,6 +16,27 @@ yang hanya dipilih saat pet dielus, jadi ia tak masuk `POSE_ROW`. `held`, `falli
 juga bukan pose — ketiganya baris interaksi untuk pet yang **diseret**, dan sejak SPEC-905/ADR-0144
 dipakai oleh mode `held`/`falling`/`dizzy` di `pet-walk.ts`, bukan oleh `POSE_ROW`.
 
+## Derivatif WhatsApp — Hanoman Pet — Sehari-hari
+
+`whatsapp/` adalah paket eksternal terpisah berisi 30 reaksi statis dari identitas PET-001. Paket ini
+bukan baris atlas, bukan status produk, dan tidak menambah ID katalog `STK-001…008`. Copy-nya mencakup
+percakapan sehari-hari, profesional, tegas, kaget, dan penyemangat; urutan serta checksum kanonik ada
+di `whatsapp/manifest.json`.
+
+| path | apa |
+|---|---|
+| `whatsapp/masters/hanoman-pet-<slug>.png` | 30 master transparan tanpa teks, dibuat dengan referensi `ref/anoman-pet-model.png` |
+| `whatsapp/id-text/*.webp` | 30 stiker 512×512 px siap impor, copy IBM Plex Sans Bold, masing-masing <100 KB |
+| `whatsapp/proof/` | contact sheet dan preview pada 96 px |
+| `whatsapp/tray-icon.png` + `manifest.json` | ikon paket 96×96 px dan inventory ber-checksum |
+| `whatsapp/hanoman-pet-sehari-hari.zip` | bundel distribusi satu paket |
+
+Turunan diregenerasi tanpa menyentuh master dengan:
+
+```bash
+python3 internal/scripts/export-whatsapp-stickers.py --pack pet --font <IBMPlexSans-Bold.ttf>
+```
+
 ## Isi
 
 | path | apa | dikomit |

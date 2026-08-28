@@ -56,3 +56,11 @@ Static delivery derivatives live in `internal/assets/illustration/whatsapp/`: on
 one Indonesian-copy pack, each with eight transparent 512 px WebP stickers. Reproduce them from the
 approved masters with `python3 internal/scripts/export-whatsapp-stickers.py --font <IBMPlexSans-Bold.ttf>`;
 the script preserves the masters, enforces the 100 KB sticker limit, and emits 96 px QA previews.
+
+The separate **Hanoman Pet — Sehari-hari** derivative lives in `internal/assets/pet/whatsapp/` and
+uses one 30-item Indonesian-copy pack: daily conversation, professional, firm, surprised, calming,
+and encouraging reactions. Its text-free PNG masters derive from the approved PET-001 model sheet;
+the deterministic exporter adds IBM Plex Sans Bold copy, produces transparent 512 px WebP files,
+and records bytes plus SHA-256 in `manifest.json`. This external reaction pack is not dashboard
+status, does not create atlas rows, and does not extend the `STK-001`–`STK-008` catalog. Reproduce it
+with `python3 internal/scripts/export-whatsapp-stickers.py --pack pet --font <IBMPlexSans-Bold.ttf>`.
