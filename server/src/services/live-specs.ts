@@ -11,10 +11,18 @@ import { recordHeadSha } from "./spec-head";
 // SPEC-199 · dulu inline di GET /specs; kini dipakai route HTTP DAN hub siar (services/events.ts)
 // supaya push WS dan pull HTTP tak pernah drift. Stage live diturunkan dari berkas fase sesi
 // (SPEC-168), hanya maju (ADR-0008), write-through CAS (SPEC-197).
+// Nomor SPEC hidup di kolom STRING, jadi `orderBy: { id: "desc" }` mengurutkannya leksikografis:
+// "SPEC-999" > "SPEC-140" > "SPEC-1015". Begitu backlog tembus empat digit, item TERBARU jatuh ke
+// EKOR daftar — dan karena list view dipaginasi 20/halaman, ia terbaca sebagai "spec 1000 ke atas
+// tidak tampil". SQLite tak bisa mengurut numerik di kolom itu, tapi biayanya nol: `findMany` di
+// bawah memang memuat set penuh (paginasi terjadi di layer response, routes/specs.ts).
+// Id tanpa angka jatuh ke 0 — ia tetap ikut terbawa, hanya duduk di belakang.
+const specNum = (id: string) => Number.parseInt(id.match(/\d+/)?.[0] ?? "0", 10);
+
 export async function liveSpecs(filter: { project?: string; source?: string } = {}) {
-  const specs = await prisma.spec.findMany({
+  const specs = (await prisma.spec.findMany({
     where: { projectId: filter.project, source: filter.source }, orderBy: { id: "desc" },
-  });
+  })).sort((a, b) => specNum(b.id) - specNum(a.id));
   const live = sessionPhasesBySpec();
   // SPEC-447 · ADR-0093 · dependency dihias DI SINI supaya GET /specs dan grup siar WS `specs`
   // membaca nilai yang sama (SPEC-199). Nol biaya untuk backlog yang tak memakai dependency:
