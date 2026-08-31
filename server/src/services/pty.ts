@@ -2,12 +2,13 @@ import { spawn, type IPty } from "node-pty";
 import { execFile, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
-  renderAgentsJson, agentRosterBlock, agentDelegationClause, type AgentDef, type Flow, type Agent,
+  renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook,
+  type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import { coerceCodexEffort, isTerminalResponse, resolveChoices, type SessionKind } from "@hanoman/shared";
 import { readPhases, sessionComplete, type Phase } from "./session-phases";
@@ -197,7 +198,8 @@ const goalStatePath = (id: string): string => `${tmpdir()}/hanoman-goal-gates/${
 // sama persis (SPEC-223): instruksi agen adalah PROSA, dan tmux membatasi SATU command ±16 KB —
 // JSON inline akan menembusnya dan sesi mati dengan `command too long`. Di tmpdir, bukan turunan
 // cwd: cwd bisa homedir (sesi VPS) yang tak boleh dikotori, dan worktree bisa lenyap.
-export const agentsFilePath = (id: string): string => `${tmpdir()}/hanoman-agents/${id}.json`;
+export const agentTempDir = (id: string): string => `${tmpdir()}/hanoman-agents/${id}`;
+export const agentsFilePath = (id: string): string => `${agentTempDir(id)}/claude.json`;
 
 // SPEC-862 · skrip askpass milik hanoman. Sekamar dengan berkas prompt (SPEC-223) dan sengaja
 // TIDAK ber-id sesi: isinya sama untuk semua sesi dan tak memuat apa pun yang khas satu sesi.
@@ -461,13 +463,44 @@ const emitDeath = (d: SessionDeath): void => { try { hooks.onDeath?.(d); } catch
 // PENYARING, dan yang dipakai wajib agen sesi yang sebenarnya (`agentForDefs` di `createSession`),
 // bukan `Setting.agent` — sesi bisa lahir dengan override per-request, dan membaca yang salah
 // mengulang bug SPEC-377 dalam bentuk baru.
-type CustomAgentSource = (projectId: string, agent: Agent) => AgentDef[];
+export type AgentSelectionContext = {
+  projectId: string; runtime: Agent; flow?: Flow; cwd: string; baseSha?: string;
+  prompt?: string; changedFiles: string[];
+};
+type CustomAgentSource = (context: AgentSelectionContext) => AgentDef[];
 let customAgentSource: CustomAgentSource = () => [];
 export function registerCustomAgentSource(fn: CustomAgentSource): void { customAgentSource = fn; }
 // Gagal baca → daftar KOSONG. Katalog agen tak pernah boleh menggagalkan kelahiran sesi.
-const customAgentsFor = (projectId: string, agent: Agent): AgentDef[] => {
-  try { return customAgentSource(projectId, agent); } catch { return []; }
+const customAgentsFor = (context: AgentSelectionContext): AgentDef[] => {
+  try { return customAgentSource(context); } catch { return []; }
 };
+
+type GitDiffRunner = (cwd: string, args: string[]) => string;
+const runGitDiff: GitDiffRunner = (cwd, args) =>
+  execFileSync("git", ["-C", cwd, ...args], {
+    encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+  });
+
+/** Snapshot kecil untuk smart activation; kegagalan git sengaja menjadi roster minimal. */
+export function collectChangedFiles(
+  cwd: string,
+  baseSha?: string,
+  run: GitDiffRunner = runGitDiff,
+): string[] {
+  try {
+    const files = new Set<string>();
+    const add = (args: string[]): void => {
+      for (const path of run(cwd, args).split("\0")) if (path) files.add(path);
+    };
+    if (baseSha) add(["diff", "--name-only", "-z", `${baseSha}...HEAD`]);
+    add(["diff", "--name-only", "-z"]);
+    add(["diff", "--cached", "--name-only", "-z"]);
+    add(["ls-files", "--others", "--exclude-standard", "-z"]);
+    return [...files].sort();
+  } catch {
+    return [];
+  }
+}
 
 // Jenis sesi diturunkan saat LAHIR, saat opsinya masih di tangan — sesudah itu tmux hanya menyimpan
 // sebagian (tak ada jejak `command` maupun `prompt`). Fungsi murni supaya bisa diuji tanpa tmux.
@@ -542,16 +575,41 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // menempelkan roster ke prompt, jadi ia harus sudah ada saat berkasnya dibuat. Sesi ber-
   // `opts.command` (shell mentah ADR-0056, konsol VPS) tak menerima apa pun — tak ada agen di sana.
   const agentForDefs: Agent = opts.agent ?? "claude";
-  const customDefs = opts.command ? [] : customAgentsFor(projectId, agentForDefs);
-  // codex tak punya padanan `--agents` yang bisa diverifikasi (ADR-0094 M5: kunci `-c` tak dikenal
-  // diterima diam-diam), jadi rosternya lewat kanal yang memang milik hanoman sendiri: prompt.
-  // Mengembalikan "" saat katalog kosong → prompt sesi lain byte-identik seperti sebelumnya.
-  // SPEC-881 · ADR-0136 · dua kanal, satu titik. Codex mengadopsi peran INLINE lewat roster; claude
-  // menerima definisi lewat `--agents` dan hanya perlu DORONGAN untuk menoleh ke sana. Keduanya
-  // mengembalikan "" saat katalog kosong → prompt sesi byte-identik seperti sebelumnya.
-  const rosterBlock = agentForDefs === "codex"
-    ? agentRosterBlock(customDefs)
-    : agentDelegationClause(customDefs);
+  const selectionContext: AgentSelectionContext = {
+    projectId, runtime: agentForDefs, flow: opts.flow, cwd,
+    baseSha: opts.env?.HANOMAN_BASE_SHA, prompt: opts.prompt,
+    changedFiles: opts.command ? [] : collectChangedFiles(cwd, opts.env?.HANOMAN_BASE_SHA),
+  };
+  const customDefs = opts.command ? [] : customAgentsFor(selectionContext);
+  let rosterBlock = "";
+  let codexAgentArgs: string[] = [];
+  let agentsFile: string | undefined;
+  if (customDefs.length > 0) {
+    const tempDir = agentTempDir(id);
+    mkdirSync(tempDir, { recursive: true, mode: 0o700 });
+    const readOnlyHook = customDefs.some((def) => def.workspacePolicy === "read-only")
+      ? writeReadOnlyHook(tempDir)
+      : undefined;
+    if (agentForDefs === "claude") {
+      const json = renderAgentsJson(customDefs, { readOnlyHookCommand: readOnlyHook?.command });
+      if (json) {
+        agentsFile = agentsFilePath(id);
+        writeFileSync(agentsFile, json, { mode: 0o600 });
+        rosterBlock = agentDelegationClause(customDefs, "claude");
+      }
+    } else {
+      const materialized = materializeCodexAgents(customDefs, tempDir, {
+        readOnlyHookCommand: readOnlyHook?.command,
+      });
+      codexAgentArgs = materialized.args;
+      rosterBlock = materialized.delegationClause;
+      for (const warning of materialized.warnings) {
+        process.stderr.write(
+          `hanoman: custom agent ${warning.agentName} tidak dimaterialisasi: ${warning.reason}\n`,
+        );
+      }
+    }
+  }
 
   let promptArg = "";
   let promptFile: string | undefined;
@@ -590,15 +648,6 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     // adalah prosa dan tmux membatasi SATU command ±16 KB — kelas kegagalan SPEC-223, dibayar
     // sekali dan dipakai ulang. Hasil command-substitution dikutip ganda, jadi isinya tak dipindai
     // ulang shell (aman dari injeksi) dan batasnya ARG_MAX, bukan 16 KB.
-    let agentsFile: string | undefined;
-    if (agent === "claude") {
-      const json = renderAgentsJson(customDefs);
-      if (json) {
-        agentsFile = agentsFilePath(id);
-        mkdirSync(dirname(agentsFile), { recursive: true, mode: 0o700 });
-        writeFileSync(agentsFile, json, { mode: 0o600 });
-      }
-    }
     // Prompt (bila ada) = argumen positional pertama agen, TANPA sq (sudah dikutip ganda).
     const flags = agentFlags({
       agent, model: opts.model, effort,
@@ -612,7 +661,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     // saja, claude menerima literal `$(cat /tmp/…)` sebagai definisi agen — dan itu tepat
     // kegagalan-senyapnya: JSON tak sah DIABAIKAN tanpa pesan, exit 0, NOL agen.
     const agentsArg = agentsFile ? `--agents "$(cat ${sq(agentsFile)})"` : "";
-    argv = [sq(agentBin(agent)), promptArg, flags, agentsArg].filter(Boolean).join(" ");
+    const nativeAgentArgs = agent === "codex" ? codexAgentArgs.map(sq).join(" ") : "";
+    argv = [sq(agentBin(agent)), promptArg, flags, agentsArg, nativeAgentArgs]
+      .filter(Boolean).join(" ");
   }
 
   // Env di depan perintah, bukan `new-session -e`: tmux menyerahkan sisa argv-nya ke shell,
@@ -1200,6 +1251,9 @@ export function killSession(id: string): boolean {
   const transcript = captureTranscript(id);
   drop(id);
   tmux("kill-session", "-t", name(id));
+  // Direktori ini eksklusif milik id sesi yang sudah di-resolve, berisi beberapa config/hook kecil.
+  // Hapus sinkron agar return `killSession` juga menjadi batas lifecycle kredensial/instruksinya.
+  try { rmSync(agentTempDir(id), { recursive: true, force: true }); } catch { /* temp opsional */ }
   emitDeath({ sessionId: id, exitCode: p.exited ? p.code : null, transcript });
   // SPEC-816 · lampiran gambar sesi ini ikut mati. Fire-and-forget: `rm` async (rmSync memblokir
   // event loop, SPEC-742/ADR-0116) dan kegagalannya tak boleh menahan penutupan sesi.

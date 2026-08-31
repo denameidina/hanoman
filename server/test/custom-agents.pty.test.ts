@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
-import { readFileSync, existsSync, mkdtempSync } from "node:fs";
+import { readFileSync, existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createSession, killSession, registerCustomAgentSource, agentsFilePath, promptFilePath,
+  agentTempDir,
 } from "../src/services/pty";
 import type { AgentDef } from "@hanoman/runner";
 
@@ -65,6 +66,17 @@ describe("createSession · claude", () => {
     expect(j.tes.tools).not.toContain("Task");
   });
 
+  it("memasang hook hard read-only dan membuang tool mutasi dari agen read-only", () => {
+    registerCustomAgentSource(() => [{
+      ...defs[0]!, workspacePolicy: "read-only", tools: ["Read", "Write", "Bash"],
+    }]);
+    const s = createSession("p1", cwd, { id: born("ca-claude-ro"), agent: "claude", prompt: "halo" });
+    const j = JSON.parse(readFileSync(agentsFilePath(s.id), "utf8"));
+    expect(j.rev.tools).toEqual(["Read", "Bash"]);
+    expect(j.rev.permissionMode).toBe("plan");
+    expect(j.rev.hooks.PreToolUse[0].hooks[0].command).toContain("custom-agent-readonly.cjs");
+  });
+
   it("tanpa custom agent, argv TIDAK memuat --agents dan berkasnya tak dibuat", () => {
     registerCustomAgentSource(() => []);
     const s = createSession("p1", cwd, { id: born("ca-claude-3"), agent: "claude", prompt: "halo" });
@@ -87,14 +99,29 @@ describe("createSession · claude", () => {
 });
 
 describe("createSession · codex", () => {
-  it("TIDAK memasang --agents, tapi menempelkan roster ke prompt", () => {
+  it("memasang registry subagent native dan hanya klausa delegasi ringkas di prompt", () => {
     registerCustomAgentSource(() => defs);
     const s = createSession("p1", cwd, { id: born("ca-codex-1"), agent: "codex", prompt: "halo" });
-    expect(paneCmd(s.id)).not.toContain("--agents");
+    const cmd = paneCmd(s.id);
+    expect(cmd).not.toContain("--agents");
+    expect(cmd).toContain('agents.\\"rev\\".description');
+    expect(cmd).toContain('agents.\\"rev\\".config_file');
     const prompt = readFileSync(promptFilePath(s.id), "utf8");
     expect(prompt.startsWith("halo")).toBe(true);
-    expect(prompt).toContain("@rev");
-    expect(prompt).toContain("kamu peninjau");
+    expect(prompt).toContain("spawn_agent");
+    expect(prompt).toContain("**rev**");
+    expect(prompt).not.toContain("kamu peninjau");
+    expect(existsSync(join(agentTempDir(s.id), "00-rev.toml"))).toBe(true);
+  });
+
+  it("memasang sandbox, hook, dan trust satu-sesi untuk agen read-only", () => {
+    registerCustomAgentSource(() => [{ ...defs[0]!, workspacePolicy: "read-only" }]);
+    const s = createSession("p1", cwd, { id: born("ca-codex-ro"), agent: "codex", prompt: "halo" });
+    const cmd = paneCmd(s.id);
+    const toml = readFileSync(join(agentTempDir(s.id), "00-rev.toml"), "utf8");
+    expect(cmd).toContain("--dangerously-bypass-hook-trust");
+    expect(toml).toContain('sandbox_mode = "read-only"');
+    expect(toml).toContain("[[hooks.PreToolUse]]");
   });
 
   it("tanpa custom agent, prompt codex byte-identik dengan sebelumnya", () => {
@@ -126,16 +153,24 @@ describe("sumber yang melempar", () => {
 // roster sesi, bukan proses mana yang dijalankan. Diperiksa lewat argv & isi berkas, bukan
 // bentuk respons (pelajaran `sessionModel()`).
 describe("penyaring runtime (SPEC-484 · ADR-0101)", () => {
-  it("sumber menerima agen sesi sebagai argumen KEDUA", () => {
+  it("sumber menerima seluruh konteks sesi dan changed files satu kali", () => {
+    execFileSync("git", ["init", "-q"], { cwd });
+    writeFileSync(join(cwd, "package.json"), "{}\n");
     const seen: string[] = [];
-    registerCustomAgentSource((_p, agent) => { seen.push(agent); return []; });
-    createSession("p1", cwd, { id: born("ca-rt-1"), agent: "codex", prompt: "halo" });
-    expect(seen).toContain("codex");
+    registerCustomAgentSource((context) => {
+      seen.push(context.projectId, context.runtime, context.flow ?? "", context.cwd,
+        context.prompt ?? "", ...context.changedFiles);
+      return [];
+    });
+    createSession("p1", cwd, {
+      id: born("ca-rt-1"), agent: "codex", flow: "feature", prompt: "halo",
+    });
+    expect(seen).toEqual(["p1", "codex", "feature", cwd, "halo", "package.json"]);
   });
 
   it("agen yang lolos saring untuk claude masuk --agents", () => {
-    registerCustomAgentSource((_p, agent) =>
-      agent === "claude"
+    registerCustomAgentSource((context) =>
+      context.runtime === "claude"
         ? [{ name: "cl", description: "d", instructions: "i", tools: null, model: null, mentions: [] }]
         : []);
     const s = createSession("p1", cwd, { id: born("ca-rt-2"), agent: "claude", prompt: "halo" });
@@ -144,8 +179,8 @@ describe("penyaring runtime (SPEC-484 · ADR-0101)", () => {
   });
 
   it("katalog kosong untuk agen itu → --agents TIDAK dipasang sama sekali", () => {
-    registerCustomAgentSource((_p, agent) =>
-      agent === "codex"
+    registerCustomAgentSource((context) =>
+      context.runtime === "codex"
         ? [{ name: "cx", description: "d", instructions: "i", tools: null, model: null, mentions: [] }]
         : []);
     const s = createSession("p1", cwd, { id: born("ca-rt-3"), agent: "claude", prompt: "halo" });
@@ -153,17 +188,18 @@ describe("penyaring runtime (SPEC-484 · ADR-0101)", () => {
     expect(existsSync(agentsFilePath(s.id))).toBe(false);
   });
 
-  // Penyaring wajib mengenai KEDUA permukaan materialisasi — roster codex punya jalur sendiri
-  // (prompt, bukan argv), jadi menyaring hanya di jalur claude meninggalkan separuh bug.
-  it("roster codex hanya memuat agen yang lolos saring untuk codex", () => {
-    registerCustomAgentSource((_p, agent) =>
-      agent === "codex"
+  it("registry codex hanya memuat agen yang lolos saring untuk codex", () => {
+    registerCustomAgentSource((context) =>
+      context.runtime === "codex"
         ? [{ name: "cx", description: "d", instructions: "khusus codex", tools: null, model: null, mentions: [] }]
         : [{ name: "cl", description: "d", instructions: "khusus claude", tools: null, model: null, mentions: [] }]);
     const s = createSession("p1", cwd, { id: born("ca-rt-4"), agent: "codex", prompt: "halo" });
     const prompt = readFileSync(promptFilePath(s.id), "utf8");
-    expect(prompt).toContain("@cx");
-    expect(prompt).not.toContain("@cl");
+    const cmd = paneCmd(s.id);
+    expect(cmd).toContain('agents.\\"cx\\".config_file');
+    expect(cmd).not.toContain('agents.\\"cl\\".config_file');
+    expect(prompt).toContain("**cx**");
+    expect(prompt).not.toContain("**cl**");
   });
 });
 
@@ -186,13 +222,23 @@ describe("klausa delegasi di prompt", () => {
     expect(readFileSync(promptFilePath(s.id), "utf8")).toBe("halo");
   });
 
-  // Codex mengadopsi peran INLINE lewat roster (ADR-0094 keputusan 4) — ia tak punya subagent untuk
-  // didelegasi, jadi klausa claude di sana akan menyuruhnya memanggil yang tak ada.
-  it("sesi codex tetap menerima roster, bukan klausa", () => {
+  it("sesi codex menerima klausa subagent native, bukan roster inline lama", () => {
     registerCustomAgentSource(() => defs);
     const s = createSession("p1", cwd, { id: born("ca-klausa-3"), agent: "codex", prompt: "halo" });
     const prompt = readFileSync(promptFilePath(s.id), "utf8");
-    expect(prompt).toContain("## Custom agent hanoman");
-    expect(prompt).not.toContain("## Subagent yang tersedia");
+    expect(prompt).toContain("## Subagent yang tersedia");
+    expect(prompt).toContain("spawn_agent");
+    expect(prompt).not.toContain("## Custom agent hanoman");
+  });
+});
+
+describe("lifecycle materialisasi", () => {
+  it("menghapus direktori agen milik sesi yang ditutup", () => {
+    registerCustomAgentSource(() => defs);
+    const s = createSession("p1", cwd, { id: born("ca-cleanup"), agent: "codex", prompt: "halo" });
+    expect(existsSync(agentTempDir(s.id))).toBe(true);
+    expect(killSession(s.id)).toBe(true);
+    ids.splice(ids.indexOf(s.id), 1);
+    expect(existsSync(agentTempDir(s.id))).toBe(false);
   });
 });

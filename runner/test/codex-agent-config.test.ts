@@ -48,6 +48,7 @@ describe("materializeCodexAgents", () => {
       "-c", "agents.enabled=true",
       "-c", "agents.max_concurrent_threads_per_session=3",
     ]);
+    expect(result.args).toContain("--dangerously-bypass-hook-trust");
     expect(result.args).toContain('agents."scout".description="Cari \\"kode\\""');
     expect(result.args.some((arg) => arg.startsWith('agents."scout".config_file='))).toBe(true);
     expect(result.configPaths).toHaveLength(1);

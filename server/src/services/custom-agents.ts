@@ -2,10 +2,13 @@ import { prisma } from "../db";
 import {
   activationOf, effortOf, effectiveAgents, detectCycle, maxTurnsOf, mentionsOf, toolsOf,
   runtimeOf, timeoutSecondsOf, workspacePolicyOf, expandTools, ALL_TOOLS, GLOBAL_SCOPE,
+  BUILTIN_AGENTS, BUILTIN_AGENT_NAMES, modelsForRuntime,
   type CustomAgent, type AgentNode, type Agent,
 } from "@hanoman/shared";
-import type { AgentDef } from "@hanoman/runner";
-import { registerCustomAgentSource } from "./pty";
+import { PIPELINES, type AgentDef, type Flow } from "@hanoman/runner";
+import {
+  collectChangedFiles, registerCustomAgentSource, type AgentSelectionContext,
+} from "./pty";
 import { agentToolIds } from "./agent-tool-catalog";
 import { seedBuiltinAgents } from "./builtin-agents";
 
@@ -37,6 +40,68 @@ export type CustomAgentRow = {
   enabled: boolean;
 };
 
+export { collectChangedFiles };
+export type { AgentSelectionContext };
+
+const phasesOf = (flow?: Flow): readonly string[] => flow ? PIPELINES[flow] : [];
+const hasPhase = (context: AgentSelectionContext, name: string): boolean =>
+  phasesOf(context.flow).includes(name);
+const touchesDependency = (files: readonly string[]): boolean => files.some((path) =>
+  /(^|\/)(?:package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?|Cargo\.(?:toml|lock)|go\.(?:mod|sum)|requirements[^/]*\.txt|pyproject\.toml)$/i.test(path));
+const touchesExternalInput = (context: AgentSelectionContext): boolean => {
+  const surface = [context.prompt ?? "", ...context.changedFiles].join("\n");
+  return /(?:^|[\W_/.-])(route|routes|handler|auth|oauth|api|cli|config|filesystem|upload|webhook|input)(?:$|[\W_/.-])/i
+    .test(surface);
+};
+const touchesExecutableWork = (files: readonly string[]): boolean => files.some((path) =>
+  !/(^|\/)(?:docs?|internal\/docs)\//i.test(path)
+  && /(?:\.(?:[cm]?[jt]sx?|py|go|rs|java|rb|php)|(?:^|\/)test(?:s)?\/)/i.test(path));
+
+function smartBuiltinSelected(row: CustomAgentRow, context: AgentSelectionContext): boolean {
+  switch (row.name) {
+    case "scout":
+      return hasPhase(context, "Plan") || hasPhase(context, "Execute")
+        || hasPhase(context, "Audit") || context.changedFiles.length === 0;
+    case "blast-radius":
+      return hasPhase(context, "Execute") || hasPhase(context, "Audit")
+        || context.changedFiles.length > 0;
+    case "security-reviewer":
+      return (hasPhase(context, "Execute") || hasPhase(context, "Audit"))
+        && touchesExternalInput(context);
+    case "spec-auditor":
+      return hasPhase(context, "Plan") || hasPhase(context, "Execute");
+    case "dep-auditor":
+      return touchesDependency(context.changedFiles);
+    case "root-causer":
+      return hasPhase(context, "Audit");
+    case "qa-verifier":
+      return context.runtime === "claude" && hasPhase(context, "Execute")
+        && workspacePolicyOf(row.workspacePolicy) === "isolated-worktree"
+        && touchesExecutableWork(context.changedFiles);
+    case "edge-case-hunter":
+      return context.runtime === "claude" && hasPhase(context, "Execute")
+        && workspacePolicyOf(row.workspacePolicy) === "isolated-worktree";
+    default:
+      return true;
+  }
+}
+
+export function selectAgentRows(
+  rows: CustomAgentRow[],
+  context: AgentSelectionContext,
+): CustomAgentRow[] {
+  return rows.filter((row) => {
+    if (!row.enabled) return false;
+    const runtime = runtimeOf(row.runtime);
+    if (runtime !== null && runtime !== context.runtime) return false;
+    if (workspacePolicyOf(row.workspacePolicy) === "isolated-worktree"
+      && context.runtime !== "claude") return false;
+    if (activationOf(row.activation) === "always") return true;
+    const builtin = row.projectId === null && BUILTIN_AGENT_NAMES.includes(row.name);
+    return builtin ? smartBuiltinSelected(row, context) : true;
+  });
+}
+
 let cache: CustomAgentRow[] = [];
 // SPEC-484 · ADR-0101 · repoDir per project untuk sumber MCP ber-scope project
 // (`<repoDir>/.mcp.json`, `~/.claude.json` projects[<repoDir>]). Di-cache karena `agentDefsFor`
@@ -67,6 +132,20 @@ export function toDef(r: CustomAgentRow): AgentDef {
   };
 }
 
+function recommendedModel(row: CustomAgentRow, runtime: Agent): string | null {
+  if (row.model) return row.model;
+  if (row.projectId !== null) return null;
+  const builtin = BUILTIN_AGENTS.find((agent) => agent.name === row.name);
+  if (!builtin) return null;
+  const model = builtin.models[runtime];
+  if (runtime === "claude" && (model === "haiku" || model === "sonnet")) return model;
+  return modelsForRuntime(runtime).some((entry) => entry.id === model) ? model : null;
+}
+
+function toRuntimeDef(row: CustomAgentRow, runtime: Agent): AgentDef {
+  return { ...toDef(row), model: recommendedModel(row, runtime) };
+}
+
 /** Isi ulang cache dari DB. Dipanggil saat boot dan sesudah SETIAP mutasi (route & sync). */
 export async function loadCustomAgents(): Promise<void> {
   try {
@@ -86,25 +165,46 @@ export async function loadCustomAgents(): Promise<void> {
 }
 
 /** SINKRON — dibaca dari titik cekik `createSession`. */
-export function agentDefsFor(projectId: string, agent: Agent): AgentDef[] {
+export function agentDefsFor(context: AgentSelectionContext): AgentDef[];
+export function agentDefsFor(projectId: string, agent: Agent): AgentDef[];
+export function agentDefsFor(
+  contextOrProjectId: AgentSelectionContext | string,
+  legacyAgent?: Agent,
+): AgentDef[] {
+  const legacy = typeof contextOrProjectId === "string";
+  const context: AgentSelectionContext = legacy
+    ? {
+      projectId: contextOrProjectId, runtime: legacyAgent ?? "claude", cwd: "",
+      changedFiles: [],
+    }
+    : contextOrProjectId;
+  const { projectId } = context;
   const globals = cache.filter((r) => r.projectId === null).map(asCustomAgent);
   const project = cache.filter((r) => r.projectId === projectId).map(asCustomAgent);
-  // SPEC-484 · ADR-0101 keputusan 2 · penyaring: null = ikut sesi induk (dipakai KEDUA mesin).
-  const eff = effectiveAgents(globals, project)
-    .filter((a) => a.runtime === null || a.runtime === agent);
+  const effectiveIds = new Set(effectiveAgents(globals, project).map((agent) => agent.id));
+  const effectiveRows = cache.filter((row) => effectiveIds.has(row.id));
+  // Overload lama dipakai oleh diagnosis/cache tests dan berarti "semua definisi efektif untuk
+  // runtime". Hanya pintu createSession yang memiliki flow+diff cukup untuk smart activation.
+  const eff = legacy
+    ? effectiveRows.filter((row) => row.enabled
+      && (runtimeOf(row.runtime) === null || runtimeOf(row.runtime) === context.runtime)
+      && !(workspacePolicyOf(row.workspacePolicy) === "isolated-worktree"
+        && context.runtime !== "claude"))
+    : selectAgentRows(effectiveRows, context);
   // Katalog hanya dihitung bila ada yang benar-benar memakai `*` — pembacaan berkas konfigurasi
   // tak perlu terjadi di setiap kelahiran sesi.
-  const needsCatalog = eff.some((a) => (a.tools ?? []).includes(ALL_TOOLS));
+  const needsCatalog = eff.some((row) => (toolsOf(row.tools) ?? []).includes(ALL_TOOLS));
   const catalogIds = needsCatalog ? agentToolIds(repoDirCache.get(projectId) ?? null) : [];
-  return eff.map((a) => ({
-    name: a.name, description: a.description, instructions: a.instructions,
+  return eff.map((row) => {
+    const a = asCustomAgent(row);
+    return {
+      ...toRuntimeDef(row, context.runtime),
     // Ekspansi terjadi DI SINI, sebelum `resolveTools` di runner: meneruskan `"*"` apa adanya
     // membuat claude membuangnya senyap (agen tanpa alat), sementara menerjemahkannya jadi `null`
     // membuat agen mewarisi SELURUH tool termasuk `Task` — lapis 2 anti-loop lenyap tanpa jejak.
-    tools: expandTools(a.tools, catalogIds), model: a.model, mentions: a.mentions ?? [],
-    activation: a.activation, effort: a.effort, workspacePolicy: a.workspacePolicy,
-    maxTurns: a.maxTurns, timeoutSeconds: a.timeoutSeconds,
-  }));
+      tools: expandTools(a.tools, catalogIds), mentions: a.mentions ?? [],
+    };
+  });
 }
 
 /**
@@ -146,5 +246,5 @@ export async function installCustomAgents(): Promise<void> {
   // hilang sendiri di boot berikutnya.
   await seedBuiltinAgents();
   await loadCustomAgents();
-  registerCustomAgentSource((projectId, agent) => agentDefsFor(projectId, agent));
+  registerCustomAgentSource((context) => agentDefsFor(context));
 }
