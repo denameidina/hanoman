@@ -20,6 +20,7 @@ export type AgentDef = {
 
 /** Mention yang benar-benar bisa dituju: nama di luar roster dibuang, agar prosa tak berbohong. */
 const liveMentions = (def: AgentDef, roster: AgentDef[]): string[] => {
+  if (def.workspacePolicy === "read-only") return [];
   const names = new Set(roster.map((r) => r.name));
   return def.mentions.filter((m) => names.has(m) && m !== def.name);
 };
@@ -31,13 +32,16 @@ const liveMentions = (def: AgentDef, roster: AgentDef[]): string[] => {
  */
 export function agentPromptOf(def: AgentDef, roster: AgentDef[]): string {
   const can = liveMentions(def, roster);
+  const instructions = def.timeoutSeconds
+    ? `${def.instructions}\n\nBatas waktu Hanoman untuk pekerjaan ini ${def.timeoutSeconds} detik. Prioritaskan putusan dan bukti sebelum batas itu.`
+    : def.instructions;
   // SPEC-543 · ADR-0108 · subagent claude lahir dengan konteks TERPISAH — prompt sesi tak
   // menjangkaunya, jadi klausa gaya kode harus ikut di sini atau ia tak pernah sampai. Jalur codex
   // (`agentRosterBlock`) sengaja tak mengulanginya: roster itu ditempel ke prompt sesi yang sudah
   // membawa klausa.
   if (can.length === 0) {
     return [
-      def.instructions,
+      instructions,
       "",
       "---",
       "Kamu TIDAK boleh mendelegasikan ke agen lain. Selesaikan sendiri lalu laporkan hasilnya.",
@@ -47,7 +51,7 @@ export function agentPromptOf(def: AgentDef, roster: AgentDef[]): string {
   }
   const list = can.map((m) => `@${m}`).join(", ");
   return [
-    def.instructions,
+    instructions,
     "",
     "---",
     `Kamu boleh mendelegasikan HANYA ke: ${list}. Panggil lewat ${MENTION_TOOL} dengan nama agennya.`,
@@ -63,15 +67,34 @@ export function agentPromptOf(def: AgentDef, roster: AgentDef[]): string {
  * gerbang "jangan pasang flag sama sekali", supaya argv sesi tanpa custom agent byte-identik
  * dengan sebelum SPEC-450.
  */
-export function renderAgentsJson(defs: AgentDef[]): string {
+type RenderAgentsOptions = { readOnlyHookCommand?: string };
+
+const READ_ONLY_TOOLS = new Set(["Read", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"]);
+
+export function renderAgentsJson(defs: AgentDef[], options: RenderAgentsOptions = {}): string {
   if (defs.length === 0) return "";
-  const out: Record<string, { description: string; prompt: string; tools: string[]; model?: string }> = {};
+  const out: Record<string, Record<string, unknown>> = {};
   for (const d of defs) {
+    const resolvedTools = resolveTools({ tools: d.tools, mentions: d.mentions });
+    const readOnly = d.workspacePolicy === "read-only";
     out[d.name] = {
       description: d.description,
       prompt: agentPromptOf(d, defs),
-      tools: resolveTools({ tools: d.tools, mentions: d.mentions }),
+      tools: readOnly ? resolvedTools.filter((tool) => READ_ONLY_TOOLS.has(tool)) : resolvedTools,
       ...(d.model ? { model: d.model } : {}),
+      ...(d.effort ? { effort: d.effort } : {}),
+      ...(typeof d.maxTurns === "number" ? { maxTurns: d.maxTurns } : {}),
+      ...(d.workspacePolicy === "isolated-worktree" ? { isolation: "worktree" } : {}),
+      ...(readOnly ? { permissionMode: "plan" } : {}),
+      ...(readOnly && options.readOnlyHookCommand ? {
+        hooks: {
+          PreToolUse: [{
+            hooks: [{
+              type: "command", command: options.readOnlyHookCommand, timeout: 5,
+            }],
+          }],
+        },
+      } : {}),
     };
   }
   return JSON.stringify(out);
@@ -121,7 +144,10 @@ export function agentRosterBlock(defs: AgentDef[]): string {
  *
  * Kosong saat roster kosong — invarian "prompt byte-identik saat katalog kosong" (ADR-0094).
  */
-export function agentDelegationClause(defs: AgentDef[]): string {
+export function agentDelegationClause(
+  defs: AgentDef[],
+  runtime: "claude" | "codex" = "claude",
+): string {
   if (defs.length === 0) return "";
   return [
     "",
@@ -133,7 +159,10 @@ export function agentDelegationClause(defs: AgentDef[]): string {
     "",
     ...defs.map((d) => `- **${d.name}** — ${d.description}`),
     "",
-    `Panggil lewat tool ${MENTION_TOOL} dengan nama agennya. Mereka tak bisa mendelegasikan lagi,`,
+    runtime === "codex"
+      ? "Panggil target bernama persis lewat `spawn_agent`."
+      : `Panggil lewat tool ${MENTION_TOOL} dengan nama agennya.`,
+    "Mereka tak bisa mendelegasikan lagi,",
     "jadi tak ada rantai panggilan yang perlu kamu jaga. Laporan mereka adalah MASUKAN — kamu yang",
     "memutuskan, dan kamu yang bertanggung jawab atas hasilnya.",
     "",

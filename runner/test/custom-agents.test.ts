@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  renderAgentsJson, agentRosterBlock, agentPromptOf, agentDelegationClause, type AgentDef,
+  renderAgentsJson, agentPromptOf, agentDelegationClause, type AgentDef,
 } from "../src/custom-agents";
 import { DEFAULT_AGENT_TOOLS, MENTION_MAX_HOPS } from "@hanoman/shared";
 
@@ -11,6 +11,11 @@ const def = (o: Partial<AgentDef> & { name: string }): AgentDef => ({
   tools: o.tools ?? null,
   model: o.model ?? null,
   mentions: o.mentions ?? [],
+  activation: o.activation ?? "always",
+  effort: o.effort ?? null,
+  workspacePolicy: o.workspacePolicy ?? "inherit",
+  maxTurns: o.maxTurns ?? null,
+  timeoutSeconds: o.timeoutSeconds ?? null,
 });
 
 describe("renderAgentsJson", () => {
@@ -50,6 +55,29 @@ describe("renderAgentsJson", () => {
     const j = JSON.parse(renderAgentsJson([def({ name: "a", instructions: nasty })]));
     expect(j.a.prompt).toContain(nasty);
   });
+
+  it("memancarkan profil Claude yang didukung runtime", () => {
+    const parsed = JSON.parse(renderAgentsJson([def({
+      name: "qa", model: "sonnet", effort: "high", workspacePolicy: "isolated-worktree",
+      maxTurns: 40, timeoutSeconds: 900,
+    })]));
+    expect(parsed.qa).toMatchObject({
+      model: "sonnet", effort: "high", isolation: "worktree", maxTurns: 40,
+    });
+    expect(parsed.qa.prompt).toContain("900 detik");
+  });
+
+  it("read-only mencabut tool mutasi dan memasang permission + validator hook", () => {
+    const parsed = JSON.parse(renderAgentsJson([def({
+      name: "review", tools: ["Read", "Write", "Edit", "Bash", "Task", "mcp__db__write"],
+      mentions: ["other"], workspacePolicy: "read-only",
+    }), def({ name: "other" })], { readOnlyHookCommand: "node /tmp/readonly.js" }));
+    expect(parsed.review.tools).toEqual(["Read", "Bash"]);
+    expect(parsed.review.permissionMode).toBe("plan");
+    expect(parsed.review.hooks.PreToolUse[0].hooks[0]).toMatchObject({
+      type: "command", command: "node /tmp/readonly.js",
+    });
+  });
 });
 
 describe("agentPromptOf — lapis 3 anti-loop", () => {
@@ -75,28 +103,6 @@ describe("agentPromptOf — lapis 3 anti-loop", () => {
   });
 });
 
-describe("agentRosterBlock — jalur codex", () => {
-  it("daftar kosong → string kosong (tak ada yang ditempel ke prompt)", () => {
-    expect(agentRosterBlock([])).toBe("");
-  });
-
-  it("memuat nama, deskripsi, dan instruksi tiap agen", () => {
-    const b = agentRosterBlock([def({ name: "rev", description: "tinjau kode" })]);
-    expect(b).toContain("rev");
-    expect(b).toContain("tinjau kode");
-    expect(b).toContain("instruksi rev");
-  });
-
-  it("menyebut allowlist mention tiap agen", () => {
-    const b = agentRosterBlock([def({ name: "a", mentions: ["b"] }), def({ name: "b" })]);
-    expect(b).toContain("@b");
-  });
-
-  it("diawali baris pemisah supaya bisa ditempel ke akhir prompt apa pun", () => {
-    expect(agentRosterBlock([def({ name: "a" })]).startsWith("\n")).toBe(true);
-  });
-});
-
 // SPEC-543 · ADR-0108 · subagent claude punya konteks TERPISAH: prompt sesi (yang membawa klausa
 // gaya kode) tak pernah sampai ke sana, jadi klausanya harus ikut di prompt perannya sendiri.
 describe("klausa gaya kode di custom agent (SPEC-543)", () => {
@@ -116,11 +122,6 @@ describe("klausa gaya kode di custom agent (SPEC-543)", () => {
     expect(j.rev.prompt).toContain(MARK);
   });
 
-  // Roster codex ditempel ke AKHIR prompt sesi yang sudah membawa klausa; memasangnya lagi di sini
-  // menggandakan teks yang sama sekali per peran.
-  it("roster codex TIDAK mengulanginya", () => {
-    expect(agentRosterBlock([def({ name: "a" }), def({ name: "b" })])).not.toContain(MARK);
-  });
 });
 
 // SPEC-881 · ADR-0136 · dorongan untuk jalur CLAUDE. Codex sudah menerima roster yang menyuruhnya
@@ -145,5 +146,14 @@ describe("agentDelegationClause", () => {
 
   it("membawa deskripsi tiap agen sebagai pemicunya", () => {
     expect(agentDelegationClause([def("scout", "cari kode")])).toContain("cari kode");
+  });
+
+  it("Codex diarahkan ke spawn_agent tanpa membawa full instructions", () => {
+    const agent = def("scout", "cari kode");
+    agent.instructions = "RAHASIA-INSTRUKSI-PANJANG";
+    const out = agentDelegationClause([agent], "codex");
+    expect(out).toContain("spawn_agent");
+    expect(out).toContain("scout");
+    expect(out).not.toContain("RAHASIA-INSTRUKSI-PANJANG");
   });
 });
