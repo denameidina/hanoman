@@ -140,6 +140,45 @@ describe("GET /api/custom-agents", () => {
     expect(r.json()).toHaveLength(1);
     expect(r.json()[0].enabled).toBe(false);
   });
+
+  it("menurunkan availability dan alasan terhadap runtime yang diminta", async () => {
+    await post({
+      name: "claude-only", description: "d", instructions: "i", runtime: "claude",
+      workspacePolicy: "isolated-worktree",
+    });
+    const codex = await app.inject({
+      method: "GET", url: "/api/custom-agents?runtime=codex",
+    });
+    expect(codex.statusCode).toBe(200);
+    expect(codex.json()[0]).toMatchObject({
+      available: false,
+      availabilityReason: "hanya tersedia untuk runtime claude",
+    });
+
+    const claude = await app.inject({
+      method: "GET", url: "/api/custom-agents?runtime=claude",
+    });
+    expect(claude.json()[0]).toMatchObject({ available: true });
+    expect(claude.json()[0].availabilityReason).toBeUndefined();
+  });
+
+  it("menjelaskan isolated-worktree yang unavailable di Codex walau runtime diwarisi", async () => {
+    await prisma.customAgent.create({ data: {
+      id: "global:isolated", projectId: null, name: "isolated", description: "d", instructions: "i",
+      runtime: null, workspacePolicy: "isolated-worktree",
+    } });
+    const r = await app.inject({ method: "GET", url: "/api/custom-agents?runtime=codex" });
+    expect(r.json()[0]).toMatchObject({
+      available: false,
+      availabilityReason: "isolated-worktree belum tersedia untuk subagent Codex",
+    });
+  });
+
+  it("menolak runtime query asing", async () => {
+    expect((await app.inject({
+      method: "GET", url: "/api/custom-agents?runtime=gemini",
+    })).statusCode).toBe(400);
+  });
 });
 
 describe("PATCH /api/custom-agents/:id", () => {

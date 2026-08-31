@@ -122,7 +122,7 @@ describe("createSession · codex", () => {
     const s = createSession("p1", cwd, { id: born("ca-codex-ro"), agent: "codex", prompt: "halo" });
     const cmd = paneCmd(s.id);
     const toml = readFileSync(join(agentTempDir(s.id), "00-rev.toml"), "utf8");
-    expect(cmd).toContain("--dangerously-bypass-hook-trust");
+    expect(cmd.match(/--dangerously-bypass-hook-trust/g)).toHaveLength(1);
     expect(toml).toContain('sandbox_mode = "read-only"');
     expect(toml).toContain("[[hooks.PreToolUse]]");
   });

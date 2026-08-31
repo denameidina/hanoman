@@ -11,6 +11,11 @@ const POLICY = {
   gitCommands: ["diff", "show", "status", "log"],
 } as const;
 
+/** Kept standalone because its source is embedded alongside the evaluator in the hook file. */
+function denyReadOnly(detail: string): ReadOnlyDecision {
+  return { allowed: false, reason: `Hanoman read-only policy: ${detail}` };
+}
+
 /** Standalone on purpose: its source is embedded in the temporary hook script below. */
 function evaluateReadOnlyPayload(payload: unknown, policy: {
   directTools: readonly string[];
@@ -19,21 +24,17 @@ function evaluateReadOnlyPayload(payload: unknown, policy: {
   shellCommands: readonly string[];
   gitCommands: readonly string[];
 }): ReadOnlyDecision {
-  const deny = (detail: string): ReadOnlyDecision => ({
-    allowed: false,
-    reason: `Hanoman read-only policy: ${detail}`,
-  });
-  if (!payload || typeof payload !== "object") return deny("payload hook tidak sah");
+  if (!payload || typeof payload !== "object") return denyReadOnly("payload hook tidak sah");
   const event = payload as Record<string, unknown>;
   const tool = typeof event.tool_name === "string"
     ? event.tool_name
     : typeof event.toolName === "string" ? event.toolName : "";
-  if (!tool) return deny("nama tool tidak tersedia");
+  if (!tool) return denyReadOnly("nama tool tidak tersedia");
   if (policy.directTools.includes(tool)) return { allowed: true };
   if (policy.deniedTools.includes(tool) || tool.startsWith("mcp__")) {
-    return deny(`tool ${tool} dapat mengubah state`);
+    return denyReadOnly(`tool ${tool} dapat mengubah state`);
   }
-  if (!policy.shellTools.includes(tool)) return deny(`tool ${tool} tidak terbukti read-only`);
+  if (!policy.shellTools.includes(tool)) return denyReadOnly(`tool ${tool} tidak terbukti read-only`);
 
   const rawInput = event.tool_input;
   const input = rawInput && typeof rawInput === "object" ? rawInput as Record<string, unknown> : {};
@@ -41,9 +42,9 @@ function evaluateReadOnlyPayload(payload: unknown, policy: {
     ? input.command
     : typeof input.cmd === "string" ? input.cmd : "";
   const trimmed = command.trim();
-  if (!trimmed) return deny("perintah shell kosong atau tidak dikenal");
+  if (!trimmed) return denyReadOnly("perintah shell kosong atau tidak dikenal");
   if (/\r|\n|;|&&|\|\||\||[<>]|\$\(|`/.test(trimmed)) {
-    return deny("operator shell yang dapat merangkai atau menulis dilarang");
+    return denyReadOnly("operator shell yang dapat merangkai atau menulis dilarang");
   }
 
   const first = trimmed.split(/\s+/, 1)[0] ?? "";
@@ -52,14 +53,14 @@ function evaluateReadOnlyPayload(payload: unknown, policy: {
     const subcommand = trimmed.slice(first.length).trim().split(/\s+/, 1)[0] ?? "";
     return policy.gitCommands.includes(subcommand)
       ? { allowed: true }
-      : deny(`git ${subcommand || "<kosong>"} bukan operasi baca yang diizinkan`);
+      : denyReadOnly(`git ${subcommand || "<kosong>"} bukan operasi baca yang diizinkan`);
   }
   if (!policy.shellCommands.includes(commandName)) {
-    return deny(`perintah ${commandName || "<kosong>"} tidak terbukti read-only`);
+    return denyReadOnly(`perintah ${commandName || "<kosong>"} tidak terbukti read-only`);
   }
   if (commandName === "sed"
     && /(^|\s)(?:-i\S*|--in-place(?:=\S*)?)(?:\s|$)/.test(trimmed)) {
-    return deny("sed in-place dapat mengubah berkas");
+    return denyReadOnly("sed in-place dapat mengubah berkas");
   }
   return { allowed: true };
 }
@@ -71,6 +72,7 @@ export function readOnlyDecision(payload: unknown): ReadOnlyDecision {
 export function readOnlyHookSource(): string {
   return [
     '"use strict";',
+    `const denyReadOnly = ${denyReadOnly.toString()};`,
     `const evaluate = ${evaluateReadOnlyPayload.toString()};`,
     `const policy = ${JSON.stringify(POLICY)};`,
     "let input = '';",

@@ -49,5 +49,8 @@ for (const entry of result.cases) {
     + `forbidden=${entry.score.forbiddenHitRate.toFixed(2)} runtime_exit=${entry.status}\n`,
   );
 }
+for (const entry of result.skipped) {
+  process.stdout.write(`SKIP ${entry.id}: ${entry.reason}\n`);
+}
 process.stdout.write(`Report: ${result.reportPath}\n`);
 process.exitCode = result.exitCode;

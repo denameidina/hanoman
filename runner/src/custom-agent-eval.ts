@@ -55,6 +55,13 @@ export type AgentEvalCaseReport = {
   score: AgentEvalScore;
 };
 
+export type AgentEvalSkippedCase = {
+  id: string;
+  agentName: string;
+  runtime: AgentEvalRuntime;
+  reason: string;
+};
+
 export type AgentEvalReport = {
   version: 1;
   runtime: AgentEvalRuntime;
@@ -64,6 +71,7 @@ export type AgentEvalReport = {
   sourceHashAfter: string;
   passed: boolean;
   cases: AgentEvalCaseReport[];
+  skipped: AgentEvalSkippedCase[];
 };
 
 type RunOptions = {
@@ -194,6 +202,15 @@ const builtinAgentDef = (agentName: string, runtime: AgentEvalRuntime): AgentDef
   };
 };
 
+const unsupportedReason = (entry: AgentEvalCase, runtime: AgentEvalRuntime): string | null => {
+  const builtin = BUILTIN_AGENTS.find((candidate) => candidate.name === entry.agentName);
+  if (!builtin) return `builtin ${entry.agentName} tidak dikenal`;
+  if (runtime === "codex" && builtin.workspacePolicy === "isolated-worktree") {
+    return "isolated-worktree belum tersedia untuk subagent Codex";
+  }
+  return null;
+};
+
 const defaultExecutor: AgentEvalExecutor = (execution) => {
   const result = spawnSync(execution.command, execution.args, {
     cwd: execution.cwd,
@@ -229,7 +246,12 @@ const executionFor = (
   const task = `${entry.task}${rendered.delegationClause}`;
   return {
     runtime, caseId: entry.id, agentName: entry.agentName, command: "codex", cwd: repoDir, task,
-    args: ["exec", ...rendered.args, "--dangerously-bypass-approvals-and-sandbox", task],
+    // Eval memanggil Codex langsung (bukan lewat agentFlags sesi), jadi trust untuk hook temp
+    // milik Hanoman dipasang tepat sekali di sini.
+    args: [
+      "exec", ...rendered.args,
+      "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", task,
+    ],
   };
 };
 
@@ -237,11 +259,21 @@ export async function runCustomAgentEvaluations(options: RunOptions): Promise<{
   reportPath: string;
   exitCode: 0 | 1;
   cases: AgentEvalCaseReport[];
+  skipped: AgentEvalSkippedCase[];
 }> {
   const evalRoot = resolve(options.evalRoot);
   validateAgentEvalManifest(options.cases, evalRoot);
-  const selected = options.cases.filter((entry) => !options.agentName || entry.agentName === options.agentName);
-  if (selected.length === 0) throw new Error(`Tidak ada kasus untuk agent: ${options.agentName ?? "(semua)"}`);
+  const requested = options.cases.filter((entry) => !options.agentName || entry.agentName === options.agentName);
+  if (requested.length === 0) throw new Error(`Tidak ada kasus untuk agent: ${options.agentName ?? "(semua)"}`);
+  const skipped = requested.flatMap((entry): AgentEvalSkippedCase[] => {
+    const reason = unsupportedReason(entry, options.runtime);
+    return reason ? [{ id: entry.id, agentName: entry.agentName, runtime: options.runtime, reason }] : [];
+  });
+  if (options.agentName && skipped.length === requested.length) {
+    throw new Error(`Agent ${options.agentName} tidak tersedia untuk ${options.runtime}: ${skipped[0]!.reason}`);
+  }
+  const skippedIds = new Set(skipped.map((entry) => entry.id));
+  const selected = requested.filter((entry) => !skippedIds.has(entry.id));
 
   const reportPath = options.outputPath
     ? resolve(options.outputPath)
@@ -294,8 +326,9 @@ export async function runCustomAgentEvaluations(options: RunOptions): Promise<{
     sourceHashAfter,
     passed,
     cases: reports,
+    skipped,
   };
   mkdirSync(dirname(reportPath), { recursive: true });
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
-  return { reportPath, exitCode: passed ? 0 : 1, cases: reports };
+  return { reportPath, exitCode: passed ? 0 : 1, cases: reports, skipped };
 }

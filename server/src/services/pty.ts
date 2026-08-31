@@ -595,8 +595,8 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // TIDAK dipindai ulang oleh shell (hasil command-substitution dikutip ganda) → aman dari injeksi.
   // Ditulis ke tmpdir (bukan turunan cwd): cwd bisa homedir (sesi VPS) yang tak boleh dikotori dan
   // parent-nya tak selalu writable. Dibaca sekali saat lahir; OS yang membersihkan tmpdir.
-  // SPEC-450 · ADR-0094 · custom agent. Dihitung SEBELUM berkas prompt ditulis: jalur codex
-  // menempelkan roster ke prompt, jadi ia harus sudah ada saat berkasnya dibuat. Sesi ber-
+  // SPEC-450/950 · ADR-0094/0159 · custom agent. Dihitung SEBELUM berkas prompt ditulis karena
+  // kedua runtime menempelkan klausa delegasi ringkas ke prompt parent. Sesi ber-
   // `opts.command` (shell mentah ADR-0056, konsol VPS) tak menerima apa pun — tak ada agen di sana.
   const agentForDefs: Agent = opts.agent ?? "claude";
   const selectionContext: AgentSelectionContext = {

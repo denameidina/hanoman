@@ -41,7 +41,7 @@ describe("lifecycle AgentInvocation", () => {
     const endedAt = new Date("2026-08-31T02:00:00.000Z");
     await stopAgentInvocation({ ...base, runtimeInvocationId: "orphan", endedAt, status: "interrupted" });
     const row = await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "orphan" } });
-    expect(row).toMatchObject({ status: "interrupted", durationMs: 0 });
+    expect(row).toMatchObject({ status: "completed", durationMs: null });
     expect(row.startedAt).toEqual(endedAt);
     expect(row.endedAt).toEqual(endedAt);
   });

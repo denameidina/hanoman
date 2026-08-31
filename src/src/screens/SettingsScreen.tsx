@@ -1516,11 +1516,11 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
       <Card eyebrow="agen" title="Custom agent — global">
         <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
           Persona yang tersedia untuk <b>setiap sesi baru</b> di semua project. Sesi <b>claude</b>
-          menerimanya sebagai subagent sungguhan; sesi <b>codex</b> menerimanya sebagai peran yang
-          diadopsi di dalam sesi. Agen boleh saling memanggil lewat <i>Mention</i>, dan grafnya wajib
+          dan <b>codex</b> menerima child native dengan konteks terpisah. Agen boleh saling memanggil
+          lewat <i>Mention</i>, dan grafnya wajib
           asiklik — agen tanpa mention tak diberi alat delegasi sama sekali.
         </div>
-        <CustomAgentsPanel projectId={null} onToast={onToast} />
+        <CustomAgentsPanel projectId={null} runtime={s?.agent} onToast={onToast} />
       </Card>
     )
     : tab === "aktivitas" ? <ActivityPanel onToast={onToast} />

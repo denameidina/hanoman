@@ -1,8 +1,8 @@
 import { resolveTools, MENTION_MAX_HOPS, MENTION_TOOL } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "./code-style";
 
-// SPEC-450 · ADR-0094 · render custom agent ke dua permukaan: JSON `--agents` (claude, native)
-// dan blok roster prosa (codex). Murni & tanpa I/O — pemanggil (pty.ts) yang menulis berkas.
+// SPEC-450/950 · ADR-0094/0159 · bagian murni renderer native dua runtime. Claude menerima JSON
+// `--agents`; Codex TOML dirakit di `codex-agent-config.ts`. Pemanggil yang menulis berkas temp.
 
 export type AgentDef = {
   /** Soft-link local untuk telemetry; tidak dirender ke konfigurasi runtime. */
@@ -37,10 +37,8 @@ export function agentPromptOf(def: AgentDef, roster: AgentDef[]): string {
   const instructions = def.timeoutSeconds
     ? `${def.instructions}\n\nBatas waktu Hanoman untuk pekerjaan ini ${def.timeoutSeconds} detik. Prioritaskan putusan dan bukti sebelum batas itu.`
     : def.instructions;
-  // SPEC-543 · ADR-0108 · subagent claude lahir dengan konteks TERPISAH — prompt sesi tak
-  // menjangkaunya, jadi klausa gaya kode harus ikut di sini atau ia tak pernah sampai. Jalur codex
-  // (`agentRosterBlock`) sengaja tak mengulanginya: roster itu ditempel ke prompt sesi yang sudah
-  // membawa klausa.
+  // SPEC-543/950 · ADR-0108/0159 · subagent kedua runtime lahir dengan konteks TERPISAH, jadi
+  // klausa gaya kode harus ikut di developer instructions masing-masing.
   if (can.length === 0) {
     return [
       instructions,
@@ -103,43 +101,8 @@ export function renderAgentsJson(defs: AgentDef[], options: RenderAgentsOptions 
 }
 
 /**
- * Blok roster untuk codex — ditempel ke AKHIR prompt sesi. Codex 0.146 tak punya padanan
- * `--agents` yang bisa diverifikasi (ADR-0094 M5: kunci `-c` tak dikenal diterima diam-diam),
- * jadi hanoman memakai kanal yang memang miliknya sendiri. Codex mengadopsi peran INLINE — tak
- * ada proses kedua, jadi risiko loop di codex struktural nol.
- */
-export function agentRosterBlock(defs: AgentDef[]): string {
-  if (defs.length === 0) return "";
-  const lines: string[] = [
-    "",
-    "## Custom agent hanoman",
-    "",
-    "Peran berikut tersedia untuk sesi ini. Saat sebuah tugas cocok dengan salah satunya, ADOPSI",
-    "perannya (baca instruksinya, kerjakan dengan sudut pandang itu) lalu kembali ke peranmu sendiri.",
-    "Jangan melahirkan proses agen baru.",
-    "",
-  ];
-  for (const d of defs) {
-    const can = liveMentions(d, defs);
-    lines.push(`### @${d.name} — ${d.description}`);
-    lines.push("");
-    lines.push(d.instructions);
-    lines.push("");
-    lines.push(
-      can.length
-        ? `Boleh berkonsultasi ke: ${can.map((m) => `@${m}`).join(", ")} (maks ${MENTION_MAX_HOPS} hop berantai).`
-        : "Tidak boleh berkonsultasi ke peran lain.",
-    );
-    lines.push("");
-  }
-  return lines.join("\n");
-}
-
-/**
- * SPEC-881 · ADR-0136 · klausa untuk jalur CLAUDE. Codex sudah menerima `agentRosterBlock` yang
- * menyuruhnya MENGADOPSI peran; claude menerima definisinya lewat `--agents` tapi tak menerima
- * satu pun dorongan untuk menoleh ke sana — dan katalog yang tak pernah dipanggil sama saja dengan
- * katalog kosong.
+ * SPEC-881/950 · ADR-0136/0159 · klausa parent hanya memuat nama, deskripsi, dan cara delegasi.
+ * Full instructions hidup di konfigurasi native child, tidak membakar konteks parent.
  *
  * Menyebut agen yang BENAR-BENAR ada di roster sesi ini, bukan daftar statis: operator yang
  * mematikan sebuah agen tak boleh menerima prompt yang menyuruh memanggilnya.

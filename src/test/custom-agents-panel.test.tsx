@@ -19,7 +19,7 @@ const { FakeApiError } = vi.hoisted(() => ({
 }));
 vi.mock("../src/api/client", () => ({
   api: {
-    listCustomAgents: (p?: string) => listCustomAgents(p),
+    listCustomAgents: (p?: string, runtime?: string) => listCustomAgents(p, runtime),
     createCustomAgent: (b: unknown) => createCustomAgent(b),
     updateCustomAgent: (id: string, b: unknown) => updateCustomAgent(id, b),
     deleteCustomAgent: (id: string) => deleteCustomAgent(id),
@@ -72,7 +72,7 @@ describe("CustomAgentsPanel", () => {
     render(<CustomAgentsPanel projectId="p1" />);
     expect(await screen.findByText("rev")).toBeTruthy();
     expect(screen.getByText("tes")).toBeTruthy();
-    expect(listCustomAgents).toHaveBeenCalledWith("p1");
+    expect(listCustomAgents).toHaveBeenCalledWith("p1", undefined);
   });
 
   it("menandai agen warisan global sebagai read-only di permukaan project", async () => {
@@ -92,7 +92,7 @@ describe("CustomAgentsPanel", () => {
   it("permukaan global hanya meminta agen global (tanpa projectId)", async () => {
     render(<CustomAgentsPanel projectId={null} />);
     await screen.findByText("rev");
-    expect(listCustomAgents).toHaveBeenCalledWith(undefined);
+    expect(listCustomAgents).toHaveBeenCalledWith(undefined, undefined);
     expect(screen.queryByText(/warisan global/i)).toBeNull();
   });
 
@@ -311,6 +311,12 @@ describe("badge agen bawaan", () => {
 });
 
 describe("SPEC-950 · profil eksekusi dan bukti efektivitas", () => {
+  it("meminta availability terhadap runtime sesi", async () => {
+    render(<CustomAgentsPanel projectId={null} runtime="codex" />);
+    await screen.findByText("rev");
+    expect(listCustomAgents).toHaveBeenCalledWith(undefined, "codex");
+  });
+
   it("mengedit dan mengirim seluruh profil eksekusi", async () => {
     updateCustomAgent.mockResolvedValue(rows[1]);
     render(<CustomAgentsPanel projectId={null} />);

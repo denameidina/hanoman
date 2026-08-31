@@ -153,8 +153,10 @@ export async function stopAgentInvocation(input: InvocationStop, io: Io = {}) {
   const after = snapshot(input.cwd, io.gitStatus);
   snapshotHashes.delete(keyOf(input));
   const evidence = {
-    status: input.status ?? "completed", endedAt,
-    durationMs: Math.max(0, endedAt.getTime() - startedAt.getTime()),
+    // Stop tanpa start lazim setelah restart server di tengah invocation. Waktu start dan status
+    // runtime sudah hilang; simpan baris sintetis yang dapat diaudit tanpa mengarang durasi 0 ms.
+    status: existing ? (input.status ?? "completed") : "completed", endedAt,
+    durationMs: existing ? Math.max(0, endedAt.getTime() - startedAt.getTime()) : null,
     ...usage,
     resultExcerpt: cleanResult === null ? null : utf8Prefix(cleanResult, MAX_EXCERPT_BYTES),
     resultHash: cleanResult === null ? null : hash(cleanResult),

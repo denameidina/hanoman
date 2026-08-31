@@ -141,7 +141,7 @@ describe("toDef", () => {
       maxTurns: 40, timeoutSeconds: 900, enabled: true,
     });
     expect(d).toEqual({
-      name: "a", description: "desc", instructions: "ins",
+      id: "global:a", name: "a", description: "desc", instructions: "ins",
       tools: ["Read"], model: "haiku", mentions: ["b"],
       activation: "smart", effort: "high", workspacePolicy: "read-only",
       maxTurns: 40, timeoutSeconds: 900,

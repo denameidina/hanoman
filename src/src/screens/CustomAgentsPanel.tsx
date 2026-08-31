@@ -77,10 +77,11 @@ function errorText(e: unknown): string {
 
 export type CustomAgentsPanelProps = {
   projectId: string | null;
+  runtime?: AgentRuntime;
   onToast?: (msg: string, kind?: string, icon?: string) => void;
 };
 
-export function CustomAgentsPanel({ projectId, onToast }: CustomAgentsPanelProps) {
+export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast }: CustomAgentsPanelProps) {
   const [rows, setRows] = React.useState<CustomAgentView[] | null>(null);
   const [catalog, setCatalog] = React.useState<AgentCatalogView | null>(null);
   const [metrics, setMetrics] = React.useState<AgentMetricsView | null>(null);
@@ -93,7 +94,7 @@ export function CustomAgentsPanel({ projectId, onToast }: CustomAgentsPanelProps
     let nextRows: CustomAgentView[] = [];
     let nextCatalog: AgentCatalogView = { tools: [], models: [], runtimes: [] };
     let nextMetrics: AgentMetricsView = { agents: [], recent: [] };
-    try { nextRows = await api.listCustomAgents(projectId ?? undefined); }
+    try { nextRows = await api.listCustomAgents(projectId ?? undefined, sessionRuntime); }
     catch (e) { setErr(errorText(e)); }
     // Katalog gagal dimuat TIDAK boleh menyembunyikan daftar agen: ia jatuh ke katalog kosong, dan
     // setiap nilai tersimpan lalu tampil sebagai chip bertanda — terlihat, bukan hilang senyap.
@@ -106,7 +107,7 @@ export function CustomAgentsPanel({ projectId, onToast }: CustomAgentsPanelProps
       });
     } catch { /* telemetry opsional tidak boleh menyembunyikan katalog */ }
     setCatalog(nextCatalog); setMetrics(nextMetrics); setRows(nextRows);
-  }, [projectId]);
+  }, [projectId, sessionRuntime]);
 
   const reloadMetrics = React.useCallback(async () => {
     try {

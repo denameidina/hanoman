@@ -133,6 +133,7 @@ describe("custom-agent live harness isolation", () => {
       cases: AGENT_EVAL_CASES,
       execute: async (execution) => {
         expect(execution.args).toContain("agents.enabled=true");
+        expect(execution.args.filter((arg) => arg === "--dangerously-bypass-hook-trust")).toHaveLength(1);
         const configArg = execution.args.find((arg) => arg.includes(".config_file="));
         const configPath = JSON.parse(configArg?.split("=").slice(1).join("=") ?? "\"\"");
         expect(readFileSync(configPath, "utf8")).toContain("developer_instructions");
@@ -141,6 +142,45 @@ describe("custom-agent live harness isolation", () => {
     });
     expect(result.exitCode).toBe(1);
     expect(result.cases.every((entry) => !entry.score.passed)).toBe(true);
+  });
+
+  it("skips Codex-incompatible builtins when running all cases", async () => {
+    const reportDir = mkdtempSync(join(tmpdir(), "hanoman-agent-eval-test-codex-all-"));
+    const executions: AgentEvalExecution[] = [];
+    const result = await runCustomAgentEvaluations({
+      runtime: "codex",
+      outputPath: join(reportDir, "report.json"),
+      evalRoot,
+      cases: AGENT_EVAL_CASES,
+      execute: async (execution) => {
+        executions.push(execution);
+        return {
+          status: 0,
+          stdout: readFileSync(join(evalRoot, "frozen-output", `${execution.caseId}.txt`), "utf8"),
+          stderr: "",
+        };
+      },
+    });
+
+    expect(executions).toHaveLength(12);
+    expect(result.exitCode).toBe(0);
+    expect(result.skipped).toEqual([
+      expect.objectContaining({ id: "qa-verifier-positive", agentName: "qa-verifier" }),
+      expect.objectContaining({ id: "qa-verifier-control", agentName: "qa-verifier" }),
+      expect.objectContaining({ id: "edge-case-hunter-positive", agentName: "edge-case-hunter" }),
+      expect.objectContaining({ id: "edge-case-hunter-control", agentName: "edge-case-hunter" }),
+    ]);
+    expect(result.skipped.every((entry) => entry.reason.includes("isolated-worktree"))).toBe(true);
+  });
+
+  it("rejects an explicitly selected agent that its runtime cannot materialize", async () => {
+    await expect(runCustomAgentEvaluations({
+      runtime: "codex",
+      agentName: "qa-verifier",
+      evalRoot,
+      cases: AGENT_EVAL_CASES,
+      execute: async () => ({ status: 0, stdout: "", stderr: "" }),
+    })).rejects.toThrow(/qa-verifier.*isolated-worktree/i);
   });
 
   it("refuses to write reports inside the eval source tree", async () => {

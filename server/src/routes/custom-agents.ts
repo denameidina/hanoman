@@ -30,7 +30,27 @@ const rowsOf = async (): Promise<CustomAgentRow[]> =>
 const stampsOf = async (): Promise<Record<string, string>> => (await getSetting()).builtinAgents;
 
 /** Satu tempat yang tahu bentuk respons; `inherited` hanya bermakna saat diminta per-project. */
-const view = (r: CustomAgentRow, projectId?: string, stamps: Record<string, string> = {}) => {
+const availabilityOf = (r: CustomAgentRow, requestedRuntime?: AgentRuntime) => {
+  const configuredRuntime = runtimeOf(r.runtime);
+  if (requestedRuntime && configuredRuntime && configuredRuntime !== requestedRuntime) {
+    return { available: false, availabilityReason: `hanya tersedia untuk runtime ${configuredRuntime}` };
+  }
+  const effectiveRuntime = requestedRuntime ?? configuredRuntime;
+  if (workspacePolicyOf(r.workspacePolicy) === "isolated-worktree" && effectiveRuntime === "codex") {
+    return {
+      available: false,
+      availabilityReason: "isolated-worktree belum tersedia untuk subagent Codex",
+    };
+  }
+  return { available: true };
+};
+
+const view = (
+  r: CustomAgentRow,
+  projectId?: string,
+  stamps: Record<string, string> = {},
+  requestedRuntime?: AgentRuntime,
+) => {
   // Bawaan SELALU global: nama yang sama dipakai sebagai agen project adalah baris milik operator
   // yang menimpa bawaan (ADR-0094), bukan bawaan itu sendiri.
   const builtin = r.projectId === null && BUILTIN_AGENT_NAMES.includes(r.name);
@@ -48,6 +68,7 @@ const view = (r: CustomAgentRow, projectId?: string, stamps: Record<string, stri
     // pernah menyentuhnya) dibaca sebagai "disunting" — lebih baik menandai berlebih daripada
     // menjanjikan "asli bawaan" untuk isi yang tak bisa kita buktikan.
     builtinEdited: builtin ? stamps[r.name] !== rowFingerprint(r) : false,
+    ...availabilityOf(r, requestedRuntime),
     ...(projectId ? { inherited: r.projectId === null } : {}),
   };
 };
@@ -92,8 +113,13 @@ export default async function (app: FastifyInstance) {
     };
   });
 
-  app.get("/custom-agents", async (req) => {
-    const projectId = (req.query as { projectId?: string }).projectId;
+  app.get("/custom-agents", async (req, reply) => {
+    const query = req.query as { projectId?: string; runtime?: string };
+    const projectId = query.projectId;
+    const requestedRuntime = query.runtime;
+    if (requestedRuntime && !AGENT_RUNTIMES.includes(requestedRuntime as AgentRuntime)) {
+      return reply.code(400).send({ error: "runtime harus claude atau codex" });
+    }
     const rows = await prisma.customAgent.findMany({
       where: projectId ? { OR: [{ projectId: null }, { projectId }] } : { projectId: null },
       orderBy: { name: "asc" },
@@ -106,7 +132,7 @@ export default async function (app: FastifyInstance) {
     const stamps = await stampsOf();
     return [...byName.values()]
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((r) => view(r, projectId, stamps));
+      .map((r) => view(r, projectId, stamps, requestedRuntime as AgentRuntime | undefined));
   });
 
   app.post("/custom-agents", async (req, reply) => {
