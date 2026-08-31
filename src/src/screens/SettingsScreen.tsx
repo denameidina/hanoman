@@ -53,6 +53,7 @@ const S_DEFAULTS: Setting = {
   // SPEC-881 · stempel suntingan agen bawaan. Wajib di tipe `Setting` (entities.ts:374) tapi
   // terlewat di default ini, jadi `pnpm --filter ./src typecheck` merah di base sebelum SPEC-884.
   builtinAgents: {},
+  builtinAgentPolicies: {},
 };
 
 // SPEC-383 · label agen dipakai di judul grup model DAN di baris warisan kartu konflik — satu

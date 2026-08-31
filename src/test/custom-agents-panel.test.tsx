@@ -6,6 +6,8 @@ const createCustomAgent = vi.fn();
 const updateCustomAgent = vi.fn();
 const deleteCustomAgent = vi.fn();
 const getCustomAgentCatalog = vi.fn();
+const getCustomAgentMetrics = vi.fn();
+const updateAgentInvocationDisposition = vi.fn();
 
 // `vi.mock` di-hoist ke atas berkas, jadi kelas yang dideklarasikan di scope modul masih TDZ
 // saat factory-nya jalan → "Cannot access before initialization". `vi.hoisted` ikut terangkat.
@@ -22,6 +24,9 @@ vi.mock("../src/api/client", () => ({
     updateCustomAgent: (id: string, b: unknown) => updateCustomAgent(id, b),
     deleteCustomAgent: (id: string) => deleteCustomAgent(id),
     getCustomAgentCatalog: (p?: string) => getCustomAgentCatalog(p),
+    getCustomAgentMetrics: (p: unknown) => getCustomAgentMetrics(p),
+    updateAgentInvocationDisposition: (id: string, b: unknown) =>
+      updateAgentInvocationDisposition(id, b),
   },
   ApiError: FakeApiError,
 }));
@@ -54,6 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   listCustomAgents.mockResolvedValue(rows);
   getCustomAgentCatalog.mockResolvedValue(catalog);
+  getCustomAgentMetrics.mockResolvedValue({ agents: [], recent: [] });
 });
 
 // SPEC-484 · helper `pick` (klik <span> di dalam <label> DS) DICABUT bersama Checkbox mention:
@@ -301,5 +307,93 @@ describe("badge agen bawaan", () => {
     render(<CustomAgentsPanel projectId={null} />);
     await waitFor(() => expect(listCustomAgents).toHaveBeenCalled());
     expect(screen.queryByTestId("builtin-punyaku")).toBeNull();
+  });
+});
+
+describe("SPEC-950 · profil eksekusi dan bukti efektivitas", () => {
+  it("mengedit dan mengirim seluruh profil eksekusi", async () => {
+    updateCustomAgent.mockResolvedValue(rows[1]);
+    render(<CustomAgentsPanel projectId={null} />);
+    await screen.findByText("rev");
+    fireEvent.click(screen.getAllByRole("button", { name: /ubah/i })[0]!);
+    fireEvent.change(screen.getByLabelText("Aktivasi"), { target: { value: "smart" } });
+    fireEvent.change(screen.getByLabelText("Effort"), { target: { value: "high" } });
+    fireEvent.change(screen.getByLabelText("Kebijakan workspace"), { target: { value: "read-only" } });
+    fireEvent.change(screen.getByLabelText("Maksimum giliran"), { target: { value: "42" } });
+    fireEvent.change(screen.getByLabelText("Timeout detik"), { target: { value: "900" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan/i }));
+    await waitFor(() => expect(updateCustomAgent).toHaveBeenCalled());
+    expect(updateCustomAgent.mock.calls[0]).toEqual(["global:rev", expect.objectContaining({
+      activation: "smart", effort: "high", workspacePolicy: "read-only",
+      maxTurns: 42, timeoutSeconds: 900,
+    })]);
+  });
+
+  it("mengunci simpan untuk batas numerik dan kombinasi isolated+Codex", async () => {
+    render(<CustomAgentsPanel projectId={null} />);
+    fireEvent.click(await screen.findByRole("button", { name: /agen baru/i }));
+    fireEvent.change(screen.getByLabelText("Nama"), { target: { value: "agen-baru" } });
+    fireEvent.change(screen.getByLabelText("Maksimum giliran"), { target: { value: "201" } });
+    expect((screen.getByRole("button", { name: /simpan/i }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Maksimum giliran"), { target: { value: "40" } });
+    fireEvent.change(screen.getByLabelText("Runtime agent"), { target: { value: "codex" } });
+    const policy = screen.getByLabelText("Kebijakan workspace") as HTMLSelectElement;
+    expect([...policy.options].find((o) => o.value === "isolated-worktree")?.disabled).toBe(true);
+  });
+
+  it("menjelaskan agen enabled yang tidak tersedia", async () => {
+    listCustomAgents.mockResolvedValue([{ ...rows[0], inherited: false, available: false,
+      availabilityReason: "isolated-worktree belum tersedia untuk Codex" }]);
+    render(<CustomAgentsPanel projectId={null} />);
+    expect(await screen.findByText(/isolated-worktree belum tersedia untuk Codex/i)).toBeTruthy();
+  });
+
+  it("menampilkan metrik 30 hari, nilai tak tersedia sebagai em dash, dan alarm workspace", async () => {
+    getCustomAgentMetrics.mockResolvedValue({
+      agents: [{
+        agentName: "rev", invocationCount: 7, medianDurationMs: null,
+        inputTokens: null, outputTokens: null, cachedTokens: null,
+        dispositions: { pending: 2, accepted: 3, partial: 1, rejected: 1, falsePositive: 0 },
+        operationalPrecision: 0.8, workspaceChanged: true,
+      }],
+      recent: [{
+        id: "inv-1", sessionId: "s1", projectId: "p1", specId: null, runtime: "claude",
+        customAgentId: "global:rev", agentName: "rev", model: null, status: "completed",
+        startedAt: "2026-08-30T00:00:00.000Z", endedAt: "2026-08-30T00:00:01.000Z",
+        durationMs: null, inputTokens: null, outputTokens: null, cachedTokens: null,
+        resultExcerpt: "temuan", resultHash: "h", workspaceChanged: true,
+        disposition: "pending", dispositionNote: null, evaluatedAt: null,
+      }],
+    });
+    render(<CustomAgentsPanel projectId={null} />);
+    await screen.findByText("rev");
+    expect(screen.getByTestId("metrics-rev").textContent).toContain("7 invocation");
+    expect(screen.getByTestId("metrics-rev").textContent).toContain("Durasi median: —");
+    expect(screen.getByTestId("metrics-rev").textContent).toContain("Token: —");
+    expect(screen.getByTestId("precision-rev").textContent).toContain("80%");
+    expect(screen.getByText(/workspace berubah/i)).toBeTruthy();
+    expect(getCustomAgentMetrics).toHaveBeenCalledWith(expect.objectContaining({ projectId: undefined }));
+  });
+
+  it("menilai invocation lalu memuat ulang metrics", async () => {
+    getCustomAgentMetrics.mockResolvedValue({ agents: [], recent: [{
+      id: "inv-1", sessionId: "s1", projectId: "p1", specId: null, runtime: "claude",
+      customAgentId: "global:rev", agentName: "rev", model: null, status: "completed",
+      startedAt: "2026-08-30T00:00:00.000Z", endedAt: "2026-08-30T00:00:01.000Z",
+      durationMs: 1000, inputTokens: 10, outputTokens: 5, cachedTokens: null,
+      resultExcerpt: "temuan", resultHash: "h", workspaceChanged: false,
+      disposition: "pending", dispositionNote: null, evaluatedAt: null,
+    }] });
+    updateAgentInvocationDisposition.mockResolvedValue({});
+    render(<CustomAgentsPanel projectId={null} />);
+    await screen.findByText("rev");
+    fireEvent.click(screen.getByText(/1 bukti terbaru/i));
+    fireEvent.change(screen.getByLabelText("Disposition inv-1"), { target: { value: "accepted" } });
+    fireEvent.change(screen.getByLabelText("Catatan inv-1"), { target: { value: "berguna" } });
+    fireEvent.click(screen.getByRole("button", { name: "Nilai inv-1" }));
+    await waitFor(() => expect(updateAgentInvocationDisposition).toHaveBeenCalledWith("inv-1", {
+      disposition: "accepted", note: "berguna",
+    }));
+    expect(getCustomAgentMetrics.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });

@@ -120,7 +120,7 @@ export function Input({ size = "md", leftIcon, rightIcon, invalid = false, disab
 const SELECT_SIZES: Record<string, { h: number; px: number; fs: string }> = {
   sm: { h: 30, px: 10, fs: "var(--text-sm)" }, md: { h: 38, px: 12, fs: "var(--text-md)" }, lg: { h: 46, px: 14, fs: "var(--text-base)" },
 };
-type Option = string | { value: string; label: string };
+type Option = string | { value: string; label: string; disabled?: boolean };
 type SelectProps = { options?: Option[]; value?: string; defaultValue?: string;
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; size?: Size; disabled?: boolean; invalid?: boolean;
   placeholder?: string; style?: React.CSSProperties } & Record<string, any>;
@@ -146,7 +146,9 @@ export function Select({ options = [], value, defaultValue, onChange, size = "md
         padding: `0 ${s.px + 22}px 0 ${s.px}px`, cursor: disabled ? "not-allowed" : "pointer" },
     }),
       placeholder && React.createElement("option", { value: "", disabled: true }, placeholder),
-      norm.map((o) => React.createElement("option", { key: o.value, value: o.value }, o.label))),
+      norm.map((o) => React.createElement("option", {
+        key: o.value, value: o.value, disabled: o.disabled,
+      }, o.label))),
     React.createElement(Icon, { name: "chevron-down", size: 16, color: "var(--text-subtle)",
       style: { position: "absolute", right: s.px, pointerEvents: "none" } }));
 }
