@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DEFAULT_METHOD, METHODS, methodSkills, methodStatus } from "@hanoman/shared";
-import { doctorReport } from "../src/commands/doctor";
+import { doctorReport, resolveDoctorCodexBin } from "../src/commands/doctor";
 
 const ok = {
   node: "v22.0.0", git: "git version 2.44.0", tmux: "tmux 3.4",
@@ -50,6 +50,15 @@ describe("doctorReport", () => {
   it("satu agen cukup", () => {
     expect(doctorReport({ ...ok, claude: null, codex: "0.146.0" }).ok).toBe(true);
   });
+  it("Codex lama diperingatkan sebagai tidak mendukung custom agent native", () => {
+    const r = doctorReport({ ...ok, codex: "codex-cli 0.150.0" });
+    expect(r.ok).toBe(true);
+    expect(r.lines.join("\n")).toMatch(/! codex .*custom agent native.*0\.151\.0/i);
+  });
+  it("Codex minimum terukur ditandai siap untuk custom agent native", () => {
+    expect(doctorReport({ ...ok, codex: "codex-cli 0.151.0" }).lines.join("\n"))
+      .toMatch(/✓ codex .*custom agent native/i);
+  });
   // SPEC-846 · operator tak bisa mendefinisikan batas backup/restore bila perintah kesehatan tak
   // pernah menyebut direktori mana yang sebenarnya dipakai.
   it("setiap path data efektif tercetak", () => {
@@ -96,14 +105,35 @@ describe("doctorReport", () => {
     expect(dengan.lines.join("\n")).toContain("gh version 2.96.0");
   });
 
-  // SPEC-909 · ADR-0146 · tanpa `curl` hook tetap `exit 0` (tak pernah memblokir agen), tapi lead
-  // berhenti menerima pertanyaan sesi TANPA satu pun error di mana pun. Kegagalan senyap justru
-  // yang layak dilaporkan — dan justru karena senyap, ia tak boleh fatal.
-  it("SPEC-909 · curl absen = peringatan yang menyebut akibatnya, BUKAN fatal", () => {
+  // SPEC-950 · event sesi normal memakai spool; curl kini hanya fallback bila env spool tak ada.
+  it("curl absen hanya memperingatkan fallback event, BUKAN telemetry utama", () => {
     const tanpa = doctorReport({ ...ok, curl: null });
     expect(tanpa.ok).toBe(true);
-    expect(tanpa.lines.join("\n")).toContain("hanoman-lead tak akan menerima pertanyaan sesi");
+    expect(tanpa.lines.join("\n")).toContain("fallback event");
+    expect(tanpa.lines.join("\n")).not.toContain("tak akan menerima pertanyaan sesi");
     expect(doctorReport({ ...ok, curl: "curl 8.7.1" }).lines.join("\n")).toContain("curl 8.7.1");
+  });
+});
+
+describe("doctor Codex binary resolution", () => {
+  it("uses RuntimeConfig from the effective DB before env/default", async () => {
+    const reads: Array<{ dbUrl: string; key: string }> = [];
+    const value = await resolveDoctorCodexBin(
+      { HANOMAN_CODEX_BIN: "/env/codex" },
+      "file:/state/hanoman.db",
+      async (dbUrl, key) => { reads.push({ dbUrl, key }); return "/db/codex"; },
+    );
+    expect(value).toBe("/db/codex");
+    expect(reads).toEqual([{ dbUrl: "file:/state/hanoman.db", key: "HANOMAN_CODEX_BIN" }]);
+  });
+
+  it("falls back to env/default when DB inspection is unavailable", async () => {
+    await expect(resolveDoctorCodexBin(
+      { HANOMAN_CODEX_BIN: "/env/codex" }, "file:/missing.db",
+      async () => { throw new Error("table missing"); },
+    )).resolves.toBe("/env/codex");
+    await expect(resolveDoctorCodexBin({}, "file:/missing.db", async () => null))
+      .resolves.toBe("codex");
   });
 });
 

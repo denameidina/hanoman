@@ -1,13 +1,18 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
+  cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync,
+  readdirSync, renameSync, rmSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { BUILTIN_AGENTS } from "@hanoman/shared";
-import { materializeCodexAgents } from "./codex-agent-config";
+import {
+  CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported, materializeCodexAgents,
+} from "./codex-agent-config";
+import { codexHookArgs } from "./codex-settings";
 import { agentDelegationClause, renderAgentsJson, type AgentDef } from "./custom-agents";
+import { guardSettings } from "./settings";
 
 export type AgentEvalRuntime = "claude" | "codex";
 export type AgentEvalFinding = { id: string; patterns: string[] };
@@ -38,6 +43,9 @@ export type AgentEvalExecution = {
   args: string[];
   cwd: string;
   task: string;
+  eventDir: string;
+  env: NodeJS.ProcessEnv;
+  timeoutMs: number;
 };
 
 export type AgentEvalExecutionResult = { status: number; stdout: string; stderr: string };
@@ -74,10 +82,13 @@ export type AgentEvalReport = {
   skipped: AgentEvalSkippedCase[];
 };
 
-type RunOptions = {
+export type RunCustomAgentEvaluationsOptions = {
   runtime: AgentEvalRuntime;
   agentName?: string;
   outputPath?: string;
+  runtimeBin?: string;
+  clientVersion?: string | null;
+  caseTimeoutMs?: number;
   evalRoot: string;
   cases: readonly AgentEvalCase[];
   execute?: AgentEvalExecutor;
@@ -86,6 +97,19 @@ type RunOptions = {
 const isInside = (parent: string, child: string): boolean => {
   const rel = relative(resolve(parent), resolve(child));
   return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+};
+
+/** Resolve symlinks even when the final report file does not exist yet. */
+const canonicalWritePath = (target: string): string => {
+  let cursor = resolve(target);
+  const missing: string[] = [];
+  while (!existsSync(cursor)) {
+    const parent = dirname(cursor);
+    if (parent === cursor) throw new Error(`Ancestor output tidak ditemukan: ${target}`);
+    missing.unshift(basename(cursor));
+    cursor = parent;
+  }
+  return resolve(realpathSync(cursor), ...missing);
 };
 
 function assertString(value: unknown, label: string): asserts value is string {
@@ -109,7 +133,10 @@ export function validateAgentEvalManifest(
     assertString(entry.fixtureDir, `${entry.id}.fixtureDir`);
     assertString(entry.source, `${entry.id}.source`);
     const fixturePath = resolve(evalRoot, entry.fixtureDir);
-    if (!isInside(evalRoot, fixturePath)) throw new Error(`Fixture keluar eval root: ${entry.fixtureDir}`);
+    if (!existsSync(fixturePath)
+      || !isInside(realpathSync(evalRoot), realpathSync(fixturePath))) {
+      throw new Error(`Fixture keluar eval root: ${entry.fixtureDir}`);
+    }
     if (!existsSync(join(fixturePath, "base")) || !existsSync(join(fixturePath, "change"))) {
       throw new Error(`Fixture wajib memiliki base/ dan change/: ${entry.fixtureDir}`);
     }
@@ -156,19 +183,25 @@ export function scoreAgentEvalCase(entry: AgentEvalCase, output: string): AgentE
   };
 }
 
-const hashTree = (root: string): string => {
+/** Hash every tracked and unignored source path in the checkout, not only eval fixtures. */
+const hashGitCheckout = (root: string): string => {
   const hash = createHash("sha256");
-  const visit = (dir: string): void => {
-    for (const name of readdirSync(dir).sort()) {
-      const path = join(dir, name);
-      const rel = relative(root, path);
-      const stat = statSync(path);
-      hash.update(`${stat.isDirectory() ? "d" : "f"}:${rel}\0`);
-      if (stat.isDirectory()) visit(path);
-      else hash.update(readFileSync(path));
+  const result = spawnSync(
+    "git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+    { cwd: root, encoding: "utf8" },
+  );
+  if (result.status !== 0) throw new Error(`git ls-files gagal: ${result.stderr}`);
+  const paths = result.stdout.split("\0").filter(Boolean).sort();
+  for (const rel of paths) {
+    const path = join(root, rel);
+    if (!existsSync(path)) {
+      hash.update(`missing:${rel}\0`);
+      continue;
     }
-  };
-  visit(root);
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink()) hash.update(`l:${rel}\0${readlinkSync(path)}\0`);
+    else hash.update(`f:${stat.mode}:${rel}\0`).update(readFileSync(path));
+  }
   return hash.digest("hex");
 };
 
@@ -182,6 +215,14 @@ const copyContents = (source: string, destination: string): void => {
 const git = (cwd: string, args: string[]): void => {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} gagal: ${result.stderr}`);
+};
+
+const gitTopLevel = (cwd: string): string => {
+  const result = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8" });
+  if (result.status !== 0 || !result.stdout.trim()) {
+    throw new Error(`Source eval wajib berada di checkout git: ${result.stderr}`);
+  }
+  return realpathSync(resolve(result.stdout.trim()));
 };
 
 const builtinAgentDef = (agentName: string, runtime: AgentEvalRuntime): AgentDef => {
@@ -211,11 +252,14 @@ const unsupportedReason = (entry: AgentEvalCase, runtime: AgentEvalRuntime): str
   return null;
 };
 
-const defaultExecutor: AgentEvalExecutor = (execution) => {
+export const executeAgentEvaluation: AgentEvalExecutor = (execution) => {
   const result = spawnSync(execution.command, execution.args, {
     cwd: execution.cwd,
+    env: execution.env,
     encoding: "utf8",
     maxBuffer: 10 * 1024 * 1024,
+    timeout: execution.timeoutMs,
+    killSignal: "SIGTERM",
   });
   return {
     status: result.status ?? 1,
@@ -224,38 +268,130 @@ const defaultExecutor: AgentEvalExecutor = (execution) => {
   };
 };
 
+const EVAL_ENV_KEYS = new Set([
+  "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL",
+  "TERM", "COLORTERM", "NO_COLOR", "CI", "SSH_AUTH_SOCK", "SSL_CERT_FILE", "SSL_CERT_DIR",
+  "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+]);
+const EVAL_ENV_PREFIXES = [
+  "ANTHROPIC_", "CLAUDE_", "OPENAI_", "CODEX_", "AZURE_OPENAI_", "AWS_", "GOOGLE_", "GCP_",
+];
+
+/** Keep runtime auth/connectivity, but discard inherited project cwd and tool-config pointers. */
+const evaluationEnvironment = (repoDir: string, eventDir: string): NodeJS.ProcessEnv => {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && (EVAL_ENV_KEYS.has(key)
+      || key.startsWith("LC_") || EVAL_ENV_PREFIXES.some((prefix) => key.startsWith(prefix)))) {
+      env[key] = value;
+    }
+  }
+  env.PWD = repoDir;
+  env.OLDPWD = repoDir;
+  env.INIT_CWD = repoDir;
+  env.HANOMAN_EVENT_DIR = eventDir;
+  delete env.RIPGREP_CONFIG_PATH;
+  return env;
+};
+
+const requiredDelegation = (entry: AgentEvalCase, runtime: AgentEvalRuntime): string => [
+  entry.task,
+  agentDelegationClause([builtinAgentDef(entry.agentName, runtime)], runtime),
+  "## Kontrak evaluasi",
+  runtime === "codex"
+    ? `WAJIB panggil subagent \`${entry.agentName}\` tepat satu kali lewat \`spawn_agent\`.`
+    : `WAJIB panggil subagent \`${entry.agentName}\` tepat satu kali lewat tool Task.`,
+  ...(runtime === "codex" ? [
+    "Bila spawn_agent membalas error transient `no thread with id`, JANGAN spawn lagi: child mungkin sudah dijadwalkan. Gunakan `wait_agent` satu kali dengan timeout 30 detik; bila tidak ada child, laporkan kegagalan.",
+  ] : []),
+  "Jangan menyelesaikan tugas sendiri. Tunggu child selesai, lalu kembalikan hasil child tanpa mengubah substansinya.",
+].join("\n\n");
+
+type EvalLifecycle = {
+  hook_event_name?: unknown;
+  agent_id?: unknown;
+  agent_type?: unknown;
+  last_assistant_message?: unknown;
+  result?: unknown;
+};
+
+const attributedChildOutput = (
+  eventDir: string,
+  agentName: string,
+): { output: string; error: string | null } => {
+  const events: EvalLifecycle[] = [];
+  for (const name of readdirSync(eventDir).filter((entry) => entry.endsWith(".json")).sort()) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(eventDir, name), "utf8")) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        events.push(parsed as EvalLifecycle);
+      }
+    } catch { /* malformed hook output cannot establish attribution */ }
+  }
+  const starts = events.filter((event) => event.hook_event_name === "SubagentStart"
+    && event.agent_type === agentName && typeof event.agent_id === "string");
+  if (starts.length !== 1) {
+    return { output: "", error: `lifecycle ${agentName}: butuh tepat satu SubagentStart, dapat ${starts.length}` };
+  }
+  const agentId = starts[0]!.agent_id;
+  const stops = events.filter((event) => event.hook_event_name === "SubagentStop"
+    && event.agent_id === agentId
+    && (event.agent_type === undefined || event.agent_type === agentName));
+  if (stops.length !== 1) {
+    return { output: "", error: `lifecycle ${agentName}: butuh tepat satu SubagentStop berpasangan, dapat ${stops.length}` };
+  }
+  const raw = stops[0]!.last_assistant_message ?? stops[0]!.result;
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return { output: "", error: `lifecycle ${agentName}: SubagentStop tidak membawa hasil child` };
+  }
+  return { output: raw, error: null };
+};
+
 const executionFor = (
   runtime: AgentEvalRuntime,
   entry: AgentEvalCase,
   repoDir: string,
   configDir: string,
+  eventDir: string,
+  runtimeBin: string,
+  timeoutMs: number,
+  clientVersion?: string | null,
 ): AgentEvalExecution => {
   const def = builtinAgentDef(entry.agentName, runtime);
+  const task = requiredDelegation(entry, runtime);
+  const env = evaluationEnvironment(repoDir, eventDir);
   if (runtime === "claude") {
     const rendered = renderAgentsJson([def]);
-    const task = `${entry.task}${agentDelegationClause([def], "claude")}`;
     return {
-      runtime, caseId: entry.id, agentName: entry.agentName, command: "claude", cwd: repoDir, task,
-      args: ["--print", "--agents", rendered, "--dangerously-skip-permissions", task],
+      runtime, caseId: entry.id, agentName: entry.agentName, command: runtimeBin, cwd: repoDir, task,
+      eventDir, env, timeoutMs,
+      args: [
+        "--print", "--agents", rendered,
+        "--restricted", "--permission-mode", "plan",
+        "--tools", "Task", "--allowedTools", "Task",
+        "--settings", JSON.stringify(guardSettings(undefined, undefined, true)),
+        task,
+      ],
     };
   }
-  const rendered = materializeCodexAgents([def], configDir);
+  const rendered = materializeCodexAgents([def], configDir, { clientVersion });
   if (rendered.liveDefs.length !== 1) {
     throw new Error(`Agent ${entry.agentName} tidak dapat dimaterialisasi untuk Codex`);
   }
-  const task = `${entry.task}${rendered.delegationClause}`;
   return {
-    runtime, caseId: entry.id, agentName: entry.agentName, command: "codex", cwd: repoDir, task,
+    runtime, caseId: entry.id, agentName: entry.agentName, command: runtimeBin, cwd: repoDir, task,
+    eventDir, env, timeoutMs,
     // Eval memanggil Codex langsung (bukan lewat agentFlags sesi), jadi trust untuk hook temp
     // milik Hanoman dipasang tepat sekali di sini.
     args: [
-      "exec", ...rendered.args,
-      "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", task,
+      "exec", ...rendered.args, ...codexHookArgs({ eventHook: true }),
+      "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules",
+      "-c", 'approval_policy="never"', "--dangerously-bypass-hook-trust", task,
     ],
   };
 };
 
-export async function runCustomAgentEvaluations(options: RunOptions): Promise<{
+export async function runCustomAgentEvaluations(options: RunCustomAgentEvaluationsOptions): Promise<{
   reportPath: string;
   exitCode: 0 | 1;
   cases: AgentEvalCaseReport[];
@@ -274,21 +410,37 @@ export async function runCustomAgentEvaluations(options: RunOptions): Promise<{
   }
   const skippedIds = new Set(skipped.map((entry) => entry.id));
   const selected = requested.filter((entry) => !skippedIds.has(entry.id));
+  if (options.runtime === "codex" && !codexNativeAgentsSupported(options.clientVersion ?? null)) {
+    throw new Error(
+      `Codex ${options.clientVersion ?? "tak terdeteksi"} tidak mendukung custom agent native; `
+      + `butuh >= ${CODEX_NATIVE_AGENTS_MIN_CLIENT}`,
+    );
+  }
+  const caseTimeoutMs = options.caseTimeoutMs ?? 180_000;
+  if (!Number.isInteger(caseTimeoutMs) || caseTimeoutMs < 1) {
+    throw new Error("caseTimeoutMs wajib integer positif");
+  }
 
   const reportPath = options.outputPath
     ? resolve(options.outputPath)
     : join(mkdtempSync(join(tmpdir(), "hanoman-agent-eval-report-")), "report.json");
-  if (isInside(evalRoot, reportPath)) throw new Error("Output report tidak boleh berada di source eval");
+  const safeReportPath = canonicalWritePath(reportPath);
+  const checkoutRoot = gitTopLevel(evalRoot);
+  if (isInside(checkoutRoot, safeReportPath)) {
+    throw new Error("Output report tidak boleh berada di source checkout");
+  }
 
-  const sourceHashBefore = hashTree(evalRoot);
+  const sourceHashBefore = hashGitCheckout(checkoutRoot);
   const reports: AgentEvalCaseReport[] = [];
   for (const entry of selected) {
     const tempRoot = mkdtempSync(join(tmpdir(), `hanoman-agent-eval-${entry.id}-`));
     const repoDir = join(tempRoot, "repo");
     const configDir = join(tempRoot, "agent-config");
+    const eventDir = join(tempRoot, "events");
     try {
       mkdirSync(repoDir, { recursive: true });
       mkdirSync(configDir, { recursive: true });
+      mkdirSync(eventDir, { recursive: true, mode: 0o700 });
       const fixtureRoot = resolve(evalRoot, entry.fixtureDir);
       copyContents(join(fixtureRoot, "base"), repoDir);
       git(repoDir, ["init", "--quiet"]);
@@ -297,24 +449,32 @@ export async function runCustomAgentEvaluations(options: RunOptions): Promise<{
       git(repoDir, ["add", "--all"]);
       git(repoDir, ["commit", "--quiet", "-m", "eval base"]);
       copyContents(join(fixtureRoot, "change"), repoDir);
-      const execution = executionFor(options.runtime, entry, repoDir, configDir);
-      const result = await (options.execute ?? defaultExecutor)(execution);
-      const score = scoreAgentEvalCase(entry, result.stdout);
+      const execution = executionFor(
+        options.runtime, entry, repoDir, configDir,
+        eventDir,
+        options.runtimeBin ?? options.runtime,
+        caseTimeoutMs,
+        options.clientVersion,
+      );
+      const result = await (options.execute ?? executeAgentEvaluation)(execution);
+      const attributed = attributedChildOutput(eventDir, entry.agentName);
+      const status = attributed.error ? 1 : result.status;
+      const score = scoreAgentEvalCase(entry, attributed.output);
       reports.push({
         id: entry.id,
         agentName: entry.agentName,
         runtime: options.runtime,
-        status: result.status,
-        stderr: result.stderr,
-        output: result.stdout,
-        score: { ...score, passed: score.passed && result.status === 0 },
+        status,
+        stderr: [result.stderr, attributed.error].filter(Boolean).join("\n"),
+        output: attributed.output,
+        score: { ...score, passed: score.passed && status === 0 },
       });
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
   }
 
-  const sourceHashAfter = hashTree(evalRoot);
+  const sourceHashAfter = hashGitCheckout(checkoutRoot);
   if (sourceHashBefore !== sourceHashAfter) throw new Error("Source eval berubah selama harness berjalan");
   const passed = reports.every((entry) => entry.status === 0 && entry.score.passed);
   const report: AgentEvalReport = {
@@ -328,7 +488,15 @@ export async function runCustomAgentEvaluations(options: RunOptions): Promise<{
     cases: reports,
     skipped,
   };
-  mkdirSync(dirname(reportPath), { recursive: true });
-  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  mkdirSync(dirname(safeReportPath), { recursive: true });
+  const tempReportPath = join(
+    dirname(safeReportPath), `.${basename(safeReportPath)}.${process.pid}.${Date.now()}.tmp`,
+  );
+  try {
+    writeFileSync(tempReportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+    renameSync(tempReportPath, safeReportPath);
+  } finally {
+    rmSync(tempReportPath, { force: true });
+  }
   return { reportPath, exitCode: passed ? 0 : 1, cases: reports, skipped };
 }

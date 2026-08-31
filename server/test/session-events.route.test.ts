@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { LightMyRequestResponse } from "fastify";
 import { LEAD_DEFAULTS } from "@hanoman/shared";
 import { buildApp } from "../src/app";
@@ -9,6 +12,7 @@ import { __resetDetect } from "../src/services/lead/detect";
 import { setLead } from "../src/services/lead/config";
 import { checkAgentCapability } from "../src/services/agent-capabilities";
 import { __resetInvocationSnapshots } from "../src/services/agent-invocations";
+import { drainSessionEventSpool } from "../src/services/session-event-relay";
 
 // SPEC-909 · ADR-0146 · pintu masuk event. tmux di-mock: route ini tak boleh butuh pane sungguhan.
 // `getSession` (sinkron) ikut di-mock karena pagar AC-10 di `admitAsk` memakainya — route memakai
@@ -118,6 +122,22 @@ describe("POST /api/session-events", () => {
       sessionId: "s1", projectId: "p1", agentName: "scout", customAgentId: "global:scout",
       status: "completed", resultExcerpt: "hasil scout",
     });
+    await app.close();
+  });
+
+  it("menerima lifecycle sandbox melalui spool relay dan route bertoken yang sama", async () => {
+    const app = buildApp();
+    const root = mkdtempSync(join(tmpdir(), "hanoman-route-relay-"));
+    const dir = join(root, "s1");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "start.json"), JSON.stringify({
+      hook_event_name: "SubagentStart", agent_id: "spooled-1", agent_type: "scout",
+    }));
+
+    expect(await drainSessionEventSpool({ inject: (request) => app.inject(request) }, root)).toBe(1);
+    expect(await prisma.agentInvocation.findFirst({
+      where: { sessionId: "s1", runtimeInvocationId: "spooled-1" },
+    })).toMatchObject({ agentName: "scout", status: "running" });
     await app.close();
   });
 

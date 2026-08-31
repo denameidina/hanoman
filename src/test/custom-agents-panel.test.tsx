@@ -236,6 +236,24 @@ describe("CustomAgentsPanel · kontrol pilihan (SPEC-484)", () => {
     expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("");
   });
 
+  it("Effort adalah katalog dan menyusut saat model Codex berubah", async () => {
+    getCustomAgentCatalog.mockResolvedValue({
+      ...catalog,
+      models: [...catalog.models,
+        { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", runtime: "codex" }],
+    });
+    render(<CustomAgentsPanel projectId={null} />);
+    fireEvent.click(await screen.findByRole("button", { name: /agen baru/i }));
+    fireEvent.change(screen.getByLabelText("Runtime agent"), { target: { value: "codex" } });
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "gpt-5.6-sol" } });
+    const effort = () => screen.getByLabelText("Effort") as HTMLSelectElement;
+    expect([...effort().options].map((option) => option.value)).toContain("ultra");
+    fireEvent.change(effort(), { target: { value: "ultra" } });
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "gpt-5.6-luna" } });
+    expect([...effort().options].map((option) => option.value)).not.toContain("ultra");
+    expect(effort().value).toBe("");
+  });
+
   it("mengirim runtime & tools sebagai array saat simpan", async () => {
     createCustomAgent.mockResolvedValue(rows[0]);
     render(<CustomAgentsPanel projectId={null} />);

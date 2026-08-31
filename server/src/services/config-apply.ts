@@ -30,6 +30,11 @@ export async function applyConfigSideEffect(key: string): Promise<void> {
     return;
   }
   if (configEntry(key)?.inheritEnv) mirrorInheritEnv(key);
+  // Session baru harus digate terhadap biner efektif yang baru, bukan snapshot saat boot.
+  if (key === "HANOMAN_CODEX_BIN") {
+    const { refreshCustomAgentRuntimeSupport } = await import("./custom-agents");
+    await refreshCustomAgentRuntimeSupport();
+  }
 }
 
 export async function rotateSyncOrigin(input: string): Promise<{ needsDeviceToken: true }> {

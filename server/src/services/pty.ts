@@ -2,7 +2,7 @@ import { spawn, type IPty } from "node-pty";
 import { execFile, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -22,6 +22,8 @@ import { effectiveStr } from "../config";
 import { controlHost, loadIngressPolicy } from "./ingress-policy";
 import { sessionEventToken } from "./session-event-token";
 import { sandboxCommand } from "./session-sandbox";
+import { sessionEventDir } from "./session-event-spool";
+export { sessionEventDir } from "./session-event-spool";
 
 // Sesi hidup di dalam tmux server, bukan di proses API (ADR-0016). Restart `pnpm dev`
 // tidak lagi membunuh claude yang sedang bekerja, dan refresh browser hanya menyambung
@@ -452,6 +454,7 @@ export function sessionEventEnv(
     HANOMAN_SESSION_ID: sessionId,
     HANOMAN_EVENT_URL: `http://127.0.0.1:${port}/api/session-events`,
     HANOMAN_EVENT_TOKEN: sessionEventToken(sessionId),
+    HANOMAN_EVENT_DIR: sessionEventDir(sessionId),
     ...(host ? { HANOMAN_EVENT_HOST: host } : {}),
   };
 }
@@ -494,6 +497,11 @@ export type AgentSelectionContext = {
 type CustomAgentSource = (context: AgentSelectionContext) => AgentDef[];
 let customAgentSource: CustomAgentSource = () => [];
 export function registerCustomAgentSource(fn: CustomAgentSource): void { customAgentSource = fn; }
+type CodexNativeAgentSupport = () => { version: string | null; ok: boolean };
+let codexNativeAgentSupport: CodexNativeAgentSupport = () => ({ version: "0.151.0", ok: true });
+export function registerCodexNativeAgentSupport(fn: CodexNativeAgentSupport): void {
+  codexNativeAgentSupport = fn;
+}
 // Gagal baca → daftar KOSONG. Katalog agen tak pernah boleh menggagalkan kelahiran sesi.
 const customAgentsFor = (context: AgentSelectionContext): AgentDef[] => {
   try { return customAgentSource(context); } catch { return []; }
@@ -580,6 +588,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   const existing = getSession(id);
   if (existing && !existing.exited) return existing;
   if (existing) killSession(id);
+  const eventDir = opts.command ? undefined : sessionEventDir(id);
+  if (eventDir) {
+    mkdirSync(eventDir, { recursive: true, mode: 0o700 });
+    chmodSync(eventDir, 0o700);
+  }
 
   // `--dangerously-skip-permissions` melewati prompt izin, bukan sistem hook. Sejak ADR-0037
   // tak ada lagi hook deny — `--settings` di sini hanya memasang marker keputusan (SPEC-184),
@@ -608,9 +621,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   let rosterBlock = "";
   let codexAgentArgs: string[] = [];
   let agentsFile: string | undefined;
+  let agentConfigDir: string | undefined;
   let liveAgentDefs: AgentDef[] = [];
   if (customDefs.length > 0) {
     const tempDir = agentTempDir(id);
+    agentConfigDir = tempDir;
     mkdirSync(tempDir, { recursive: true, mode: 0o700 });
     const readOnlyHook = customDefs.some((def) => def.workspacePolicy === "read-only")
       ? writeReadOnlyHook(tempDir)
@@ -626,6 +641,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     } else {
       const materialized = materializeCodexAgents(customDefs, tempDir, {
         readOnlyHookCommand: readOnlyHook?.command,
+        clientVersion: codexNativeAgentSupport().version,
       });
       codexAgentArgs = materialized.args;
       rosterBlock = materialized.delegationClause;
@@ -722,19 +738,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // Env tambahan dari pemanggil lewat jalur yang sama.
   for (const [k, v] of Object.entries(opts.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
   let cmd = envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
-  // SPEC-909 · ADR-0146 · sesi ber-sandbox TAK BISA mengirim event: `sandboxArgv` menjalankan
-  // perintahnya di dalam `podman run --network <bridge>`, jadi `127.0.0.1` di sana adalah loopback
-  // CONTAINER sementara server wajib bind loopback HOST (ADR-0117) — dan `NO_PROXY` memastikan curl
-  // tak mencoba egress proxy. Menutupnya butuh server yang terjangkau dari jaringan sesi, dan itu
-  // keputusan tersendiri. Yang bisa dilakukan di sini: JANGAN mengaku punya hook event, supaya
-  // engine menotifikasinya sekali alih-alih membiarkannya menggantung tanpa siapa pun tahu.
-  let sandboxed = false;
   if (!opts.command) {
     const wrapped = sandboxCommand({
       command: cmd, worktree: cwd, phaseFile: opts.phaseFile, promptFile,
-      attachmentsDir: opts.attachmentsDir,
+      agentConfigDir, eventDir, attachmentsDir: opts.attachmentsDir,
     });
-    sandboxed = wrapped !== cmd;
     cmd = wrapped;
   }
   // SPEC-184 · direktori marker keputusan; hook Notification menulis absolute path di dalamnya.
@@ -785,8 +793,8 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // SPEC-909 · ADR-0146 · penanda "sesi ini bisa mengirim event". Sesi hidup TANPA penanda ini tak
   // akan dijawab lead — engine menotifikasinya sekali. Opsi window, bukan berkas: sumber kebenaran
   // sesi tetap tmux (pola @hanoman_agent, SPEC-338), jadi ia selamat dari restart server tanpa
-  // registry apa pun. Sesi ber-sandbox sengaja TIDAK menyandangnya (lihat catatan di atas).
-  if (!opts.command && !sandboxed) tmux("set-option", "-t", name(id), "@hanoman_event_hook", "1");
+  // registry apa pun. Sandbox menulis ke spool rw sempit yang direlay server ke route yang sama.
+  if (!opts.command) tmux("set-option", "-t", name(id), "@hanoman_event_hook", "1");
   // SPEC-332 · fire-and-forget: respons HTTP tak boleh menunggu TUI siap. Gagal = diam, karena
   // jaminan mode goal sudah dipegang hook Stop di argv di atas.
   // SPEC-397 · ADR-0085 · kedua agen: codex-cli ≥ 0.146 punya mode goal native yang di-arm lewat
@@ -1289,6 +1297,7 @@ export function killSession(id: string): boolean {
   // Direktori ini eksklusif milik id sesi yang sudah di-resolve, berisi beberapa config/hook kecil.
   // Hapus sinkron agar return `killSession` juga menjadi batas lifecycle kredensial/instruksinya.
   try { rmSync(agentTempDir(id), { recursive: true, force: true }); } catch { /* temp opsional */ }
+  try { rmSync(sessionEventDir(id), { recursive: true, force: true }); } catch { /* spool opsional */ }
   emitDeath({ sessionId: id, exitCode: p.exited ? p.code : null, transcript });
   // SPEC-816 · lampiran gambar sesi ini ikut mati. Fire-and-forget: `rm` async (rmSync memblokir
   // event loop, SPEC-742/ADR-0116) dan kegagalannya tak boleh menahan penutupan sesi.

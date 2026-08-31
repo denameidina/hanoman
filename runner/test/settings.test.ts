@@ -1,4 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { guardSettings, EVENT_HOOK_COMMAND } from "../src/settings";
 
 describe("guardSettings", () => {
@@ -69,6 +73,17 @@ describe("SPEC-909 · hook pengirim event", () => {
 
   it("membatasi tunggu supaya server mati tak menggantungkan agen", () => {
     expect(EVENT_HOOK_COMMAND).toContain("-m 2");
+  });
+
+  it("menulis satu payload atomik ke spool saat berjalan di sandbox", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hanoman-event-hook-"));
+    const payload = JSON.stringify({ hook_event_name: "SubagentStart", agent_id: "sub-1" });
+    execFileSync("/bin/sh", ["-c", EVENT_HOOK_COMMAND], {
+      input: payload, env: { ...process.env, HANOMAN_EVENT_DIR: dir },
+    });
+    const files = readdirSync(dir);
+    expect(files).toHaveLength(1);
+    expect(readFileSync(join(dir, files[0]!), "utf8")).toBe(payload);
   });
 
   it("tanpa eventHook, settings byte-identik seperti sebelum SPEC-909", () => {

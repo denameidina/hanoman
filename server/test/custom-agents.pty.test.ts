@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createSession, getSession, killSession, registerCustomAgentSource, agentsFilePath, promptFilePath,
-  agentTempDir,
+  agentTempDir, registerCodexNativeAgentSupport, sessionEventDir,
 } from "../src/services/pty";
 import type { AgentDef } from "@hanoman/runner";
 
@@ -25,8 +25,12 @@ beforeEach(() => { cwd = mkdtempSync(join(tmpdir(), "hnm-ca-")); });
 afterEach(() => {
   for (const id of ids.splice(0)) { try { killSession(id); } catch { /* sudah mati */ } }
   registerCustomAgentSource(() => []);
+  registerCodexNativeAgentSupport(() => ({ version: "0.151.0", ok: true }));
 });
-afterAll(() => { registerCustomAgentSource(() => []); });
+afterAll(() => {
+  registerCustomAgentSource(() => []);
+  registerCodexNativeAgentSupport(() => ({ version: "0.151.0", ok: true }));
+});
 
 /** argv pane tmux — satu-satunya bukti yang tak bisa lulus palsu. */
 const paneCmd = (id: string): string =>
@@ -99,6 +103,28 @@ describe("createSession · claude", () => {
 });
 
 describe("createSession · codex", () => {
+  it("warns and omits native registry on an unsupported client, without inline fallback", () => {
+    registerCustomAgentSource(() => defs);
+    registerCodexNativeAgentSupport(() => ({ version: "0.150.0", ok: false }));
+    const writes: string[] = [];
+    const originalWrite = process.stderr.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk)); return true;
+    }) as typeof process.stderr.write;
+    try {
+      const s = createSession("p1", cwd, {
+        id: born("ca-codex-old"), agent: "codex", prompt: "halo",
+      });
+      const cmd = paneCmd(s.id);
+      expect(cmd).not.toContain("agents.enabled=true");
+      expect(readFileSync(promptFilePath(s.id), "utf8")).toBe("halo");
+      expect(getSession(s.id)?.agentRoster).toEqual([]);
+      expect(writes.join("")).toMatch(/0\.151\.0/);
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+  });
+
   it("memasang registry subagent native dan hanya klausa delegasi ringkas di prompt", () => {
     registerCustomAgentSource(() => defs);
     const s = createSession("p1", cwd, { id: born("ca-codex-1"), agent: "codex", prompt: "halo" });
@@ -131,6 +157,40 @@ describe("createSession · codex", () => {
     registerCustomAgentSource(() => []);
     const s = createSession("p1", cwd, { id: born("ca-codex-2"), agent: "codex", prompt: "halo" });
     expect(readFileSync(promptFilePath(s.id), "utf8")).toBe("halo");
+  });
+
+  it("mounts native configs and hook read-only into the production sandbox", () => {
+    const keys = [
+      "HANOMAN_SESSION_SANDBOX", "HANOMAN_AGENT_CREDENTIAL_DIR", "HANOMAN_EGRESS_PROXY",
+      "HANOMAN_SESSION_IMAGE", "HANOMAN_SESSION_NETWORK",
+    ] as const;
+    const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+    Object.assign(process.env, {
+      HANOMAN_SESSION_SANDBOX: "podman",
+      HANOMAN_AGENT_CREDENTIAL_DIR: "/srv/hanoman/credentials",
+      HANOMAN_EGRESS_PROXY: "http://egress.internal:3128",
+      HANOMAN_SESSION_IMAGE: "hanoman-agent:test",
+      HANOMAN_SESSION_NETWORK: "hanoman-egress",
+    });
+    try {
+      registerCustomAgentSource(() => [{ ...defs[0]!, workspacePolicy: "read-only" }]);
+      const s = createSession("p1", cwd, {
+        id: born("ca-codex-sandbox"), agent: "codex", prompt: "halo",
+      });
+      expect(paneCmd(s.id)).toContain(
+        `${agentTempDir(s.id)}:${agentTempDir(s.id)}:ro`,
+      );
+      expect(paneCmd(s.id)).toContain(
+        `${sessionEventDir(s.id)}:${sessionEventDir(s.id)}:rw`,
+      );
+      expect(getSession(s.id)?.eventHook).toBe(true);
+    } finally {
+      for (const key of keys) {
+        const value = before[key];
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 });
 

@@ -21,11 +21,16 @@ export function assertRuntimeBoundary(env: Env, runtime: { uid: number | undefin
 }
 
 export type SandboxInput = {
+  podmanBin?: string;
   command: string;
   worktree: string;
   worktreeMode?: "ro" | "rw";
   phaseFile?: string;
   promptFile?: string;
+  /** SPEC-950 · ADR-0159 · JSON/TOML + hook custom-agent; dibaca child, tidak ditulis. */
+  agentConfigDir?: string;
+  /** SPEC-950 · spool event atomik; satu-satunya mount custom-agent yang writable. */
+  eventDir?: string;
   /** SPEC-843 · ADR-0124 · direktori lampiran backlog. RO: sesi membacanya, tak pernah menulisnya. */
   attachmentsDir?: string;
   credentialDir: string;
@@ -38,16 +43,21 @@ export function sandboxArgv(input: SandboxInput): string[] {
   const mounts = ["--volume", `${input.worktree}:/workspace:${input.worktreeMode ?? "rw"}`];
   if (input.phaseFile) mounts.push("--volume", `${input.phaseFile}:${input.phaseFile}:rw`);
   if (input.promptFile) mounts.push("--volume", `${input.promptFile}:${input.promptFile}:ro`);
+  if (input.agentConfigDir)
+    mounts.push("--volume", `${input.agentConfigDir}:${input.agentConfigDir}:ro`);
+  if (input.eventDir)
+    mounts.push("--volume", `${input.eventDir}:${input.eventDir}:rw`);
   if (input.attachmentsDir)
     mounts.push("--volume", `${input.attachmentsDir}:${input.attachmentsDir}:ro`);
   mounts.push("--volume", `${input.credentialDir}:/agent-home:ro`);
   return [
-    "podman", "run", "--rm", "--read-only", "--cap-drop=ALL", "--userns=keep-id",
+    input.podmanBin ?? "podman", "run", "--rm", "--read-only", "--cap-drop=ALL", "--userns=keep-id",
     "--security-opt", "no-new-privileges", "--pids-limit", "512", "--memory", "4g",
     "--cpus", "4", "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=256m", "--workdir", "/workspace",
     "--network", input.network,
     "--env", `HTTPS_PROXY=${input.proxy}`, "--env", `HTTP_PROXY=${input.proxy}`,
     "--env", "NO_PROXY=localhost,127.0.0.1,::1", "--env", "HOME=/agent-home",
+    ...(input.eventDir ? ["--env", `HANOMAN_EVENT_DIR=${input.eventDir}`] : []),
     ...mounts, input.image, "/bin/sh", "-lc", input.command,
   ];
 }
@@ -56,7 +66,8 @@ const quote = (value: string): string => `'${value.replace(/'/g, `'"'"'`)}'`;
 
 export function sandboxArgvFromEnv(input: {
   command: string; worktree: string; worktreeMode?: "ro" | "rw";
-  phaseFile?: string; promptFile?: string; attachmentsDir?: string; env?: Env;
+  phaseFile?: string; promptFile?: string; agentConfigDir?: string; eventDir?: string;
+  attachmentsDir?: string; env?: Env;
 }): string[] | null {
   const env = input.env ?? process.env;
   // SPEC-884 · pemicunya hardening, bukan NODE_ENV. Operator yang menyetel HANOMAN_SESSION_SANDBOX
@@ -69,6 +80,7 @@ export function sandboxArgvFromEnv(input: {
   if (!credentialDir || !proxy) throw new Error("credential dir dan egress proxy wajib untuk sandbox");
   return sandboxArgv({
     ...input, credentialDir, proxy,
+    podmanBin: env.HANOMAN_PODMAN_BIN ?? "podman",
     image: env.HANOMAN_SESSION_IMAGE ?? "hanoman-agent:latest",
     network: env.HANOMAN_SESSION_NETWORK ?? "hanoman-egress",
   });
@@ -76,7 +88,7 @@ export function sandboxArgvFromEnv(input: {
 
 export function sandboxCommand(input: {
   command: string; worktree: string; phaseFile?: string; promptFile?: string;
-  attachmentsDir?: string; env?: Env;
+  agentConfigDir?: string; eventDir?: string; attachmentsDir?: string; env?: Env;
 }): string {
   const argv = sandboxArgvFromEnv(input);
   if (!argv) return input.command;

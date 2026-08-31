@@ -1,4 +1,7 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -6,6 +9,7 @@ import { AGENT_EVAL_CASES } from "../../evals/custom-agents/manifest";
 import {
   runCustomAgentEvaluations,
   scoreAgentEvalCase,
+  executeAgentEvaluation,
   validateAgentEvalManifest,
   type AgentEvalCase,
   type AgentEvalExecution,
@@ -23,6 +27,17 @@ const basicCase = (overrides: Partial<AgentEvalCase> = {}): AgentEvalCase => ({
   source: "SPEC-950",
   ...overrides,
 });
+
+const publishChildResult = (execution: AgentEvalExecution, output: string): void => {
+  writeFileSync(join(execution.eventDir, "01-start.json"), JSON.stringify({
+    hook_event_name: "SubagentStart", agent_id: `child-${execution.caseId}`,
+    agent_type: execution.agentName,
+  }));
+  writeFileSync(join(execution.eventDir, "02-stop.json"), JSON.stringify({
+    hook_event_name: "SubagentStop", agent_id: `child-${execution.caseId}`,
+    agent_type: execution.agentName, last_assistant_message: output,
+  }));
+};
 
 describe("custom-agent eval manifest and scorer", () => {
   it("has one positive and one control for every builtin", () => {
@@ -44,6 +59,26 @@ describe("custom-agent eval manifest and scorer", () => {
 
     const forbidden = scoreAgentEvalCase(basicCase(), "AccountWire is stale; tidak ada cermin");
     expect(forbidden).toMatchObject({ recall: 1, forbiddenHitRate: 1, passed: false });
+  });
+
+  it("accepts equivalent synchronization language in the scout control", () => {
+    const control = AGENT_EVAL_CASES.find((entry) => entry.id === "scout-control")!;
+    expect(scoreAgentEvalCase(
+      control,
+      "AccountWire dan locale konsisten; perubahan kedua deklarasi simetris.",
+    )).toMatchObject({ recall: 1, forbiddenHitRate: 0, passed: true });
+  });
+
+  it("does not confuse 'no additional mirror' with a false claim that no mirror exists", () => {
+    const positive = AGENT_EVAL_CASES.find((entry) => entry.id === "scout-positive")!;
+    expect(scoreAgentEvalCase(
+      positive,
+      "packages/web/source.txt AccountWire kehilangan locale dan tertinggal. Tidak ditemukan cermin lain.",
+    )).toMatchObject({ recall: 1, forbiddenHitRate: 0, passed: true });
+    expect(scoreAgentEvalCase(
+      positive,
+      "packages/web/source.txt AccountWire locale stale. Tidak ada cermin payload pengguna.",
+    )).toMatchObject({ recall: 1, forbiddenHitRate: 1, passed: false });
   });
 
   it("rejects malformed findings, duplicate ids, and fixture escapes", () => {
@@ -82,6 +117,17 @@ describe("custom-agent eval manifest and scorer", () => {
 });
 
 describe("custom-agent live harness isolation", () => {
+  it("terminates a runtime case at its wall-clock limit", async () => {
+    const result = await executeAgentEvaluation({
+      runtime: "codex", caseId: "timeout", agentName: "scout",
+      command: process.execPath, args: ["-e", "setTimeout(() => {}, 1000)"],
+      cwd: tmpdir(), task: "timeout", eventDir: tmpdir(), env: process.env,
+      timeoutMs: 50,
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/timed out|ETIMEDOUT/i);
+  });
+
   it("copies fixtures, initializes git, uses product renderers, filters, and preserves sources", async () => {
     const reportDir = mkdtempSync(join(tmpdir(), "hanoman-agent-eval-test-report-"));
     const reportPath = join(reportDir, "report.json");
@@ -102,12 +148,28 @@ describe("custom-agent live harness isolation", () => {
         expect(execution.cwd.startsWith(evalRoot)).toBe(false);
         expect(existsSync(join(execution.cwd, ".git"))).toBe(true);
         expect(execution.args).toContain("--agents");
+        expect(execution.args).toEqual(expect.arrayContaining([
+          "--restricted", "--permission-mode", "plan", "--tools", "Task",
+          "--allowedTools", "Task", "--settings",
+        ]));
+        expect(execution.args).not.toContain("--dangerously-skip-permissions");
+        expect(execution.env.HANOMAN_EVENT_DIR).toBe(execution.eventDir);
+        expect(execution.env.PWD).toBe(execution.cwd);
+        expect(execution.env.OLDPWD).toBe(execution.cwd);
+        expect(execution.env.INIT_CWD).toBe(execution.cwd);
+        expect(execution.env.RIPGREP_CONFIG_PATH).toBeUndefined();
+        expect(execution.timeoutMs).toBe(180_000);
+        expect(execution.task).toMatch(/tepat satu kali/);
         const agentsJson = execution.args[execution.args.indexOf("--agents") + 1] ?? "";
         expect(JSON.parse(agentsJson).scout).toBeDefined();
         writeFileSync(join(execution.cwd, "executor-marker.txt"), "temp only");
+        publishChildResult(
+          execution,
+          readFileSync(join(evalRoot, "frozen-output", `${execution.caseId}.txt`), "utf8"),
+        );
         return {
           status: 0,
-          stdout: readFileSync(join(evalRoot, "frozen-output", `${execution.caseId}.txt`), "utf8"),
+          stdout: "PARENT OUTPUT MUST NOT BE SCORED",
           stderr: "",
         };
       },
@@ -127,6 +189,7 @@ describe("custom-agent live harness isolation", () => {
     const reportDir = mkdtempSync(join(tmpdir(), "hanoman-agent-eval-test-codex-"));
     const result = await runCustomAgentEvaluations({
       runtime: "codex",
+      clientVersion: "0.151.0",
       agentName: "scout",
       outputPath: join(reportDir, "report.json"),
       evalRoot,
@@ -134,10 +197,17 @@ describe("custom-agent live harness isolation", () => {
       execute: async (execution) => {
         expect(execution.args).toContain("agents.enabled=true");
         expect(execution.args.filter((arg) => arg === "--dangerously-bypass-hook-trust")).toHaveLength(1);
+        expect(execution.args).toEqual(expect.arrayContaining([
+          "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules",
+        ]));
+        expect(execution.args).not.toContain("--ephemeral");
+        expect(execution.args).not.toContain("--dangerously-bypass-approvals-and-sandbox");
+        expect(execution.task).toMatch(/no thread with id.*wait_agent.*30 detik/is);
         const configArg = execution.args.find((arg) => arg.includes(".config_file="));
         const configPath = JSON.parse(configArg?.split("=").slice(1).join("=") ?? "\"\"");
         expect(readFileSync(configPath, "utf8")).toContain("developer_instructions");
-        return { status: 0, stdout: "temuan tidak lengkap", stderr: "" };
+        publishChildResult(execution, "temuan tidak lengkap");
+        return { status: 0, stdout: "AccountWire is stale", stderr: "" };
       },
     });
     expect(result.exitCode).toBe(1);
@@ -149,14 +219,19 @@ describe("custom-agent live harness isolation", () => {
     const executions: AgentEvalExecution[] = [];
     const result = await runCustomAgentEvaluations({
       runtime: "codex",
+      clientVersion: "0.151.0",
       outputPath: join(reportDir, "report.json"),
       evalRoot,
       cases: AGENT_EVAL_CASES,
       execute: async (execution) => {
         executions.push(execution);
+        publishChildResult(
+          execution,
+          readFileSync(join(evalRoot, "frozen-output", `${execution.caseId}.txt`), "utf8"),
+        );
         return {
           status: 0,
-          stdout: readFileSync(join(evalRoot, "frozen-output", `${execution.caseId}.txt`), "utf8"),
+          stdout: "parent tidak dinilai",
           stderr: "",
         };
       },
@@ -176,6 +251,7 @@ describe("custom-agent live harness isolation", () => {
   it("rejects an explicitly selected agent that its runtime cannot materialize", async () => {
     await expect(runCustomAgentEvaluations({
       runtime: "codex",
+      clientVersion: "0.151.0",
       agentName: "qa-verifier",
       evalRoot,
       cases: AGENT_EVAL_CASES,
@@ -191,5 +267,92 @@ describe("custom-agent live harness isolation", () => {
       cases: [AGENT_EVAL_CASES[0]!],
       execute: async () => ({ status: 0, stdout: "", stderr: "" }),
     })).rejects.toThrow(/output/i);
+  });
+
+  it("refuses to write reports anywhere inside the source checkout", async () => {
+    await expect(runCustomAgentEvaluations({
+      runtime: "claude",
+      outputPath: resolve(evalRoot, "../report.json"),
+      evalRoot,
+      cases: [AGENT_EVAL_CASES[0]!],
+      execute: async () => ({ status: 0, stdout: "", stderr: "" }),
+    })).rejects.toThrow(/checkout/i);
+  });
+
+  it("refuses a report path that enters the checkout through a symlink", async () => {
+    const outside = mkdtempSync(join(tmpdir(), "hanoman-agent-eval-symlink-"));
+    const checkout = resolve(evalRoot, "../..");
+    const link = join(outside, "checkout");
+    symlinkSync(checkout, link, "dir");
+    try {
+      await expect(runCustomAgentEvaluations({
+        runtime: "claude",
+        outputPath: join(link, "report.json"),
+        evalRoot,
+        cases: [AGENT_EVAL_CASES[0]!],
+        execute: async () => ({ status: 0, stdout: "", stderr: "" }),
+      })).rejects.toThrow(/checkout/i);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects Codex evals when the native-agent client gate is unknown or too old", async () => {
+    for (const clientVersion of [null, "0.150.9"]) {
+      await expect(runCustomAgentEvaluations({
+        runtime: "codex",
+        clientVersion,
+        agentName: "scout",
+        evalRoot,
+        cases: AGENT_EVAL_CASES,
+        execute: async () => ({ status: 0, stdout: "", stderr: "" }),
+      })).rejects.toThrow(/0\.151\.0/i);
+    }
+  });
+
+  it("fails attribution when the target child has no complete lifecycle", async () => {
+    const reportDir = mkdtempSync(join(tmpdir(), "hanoman-agent-eval-attribution-"));
+    try {
+      const result = await runCustomAgentEvaluations({
+        runtime: "claude",
+        agentName: "scout",
+        outputPath: join(reportDir, "report.json"),
+        evalRoot,
+        cases: [AGENT_EVAL_CASES.find((entry) => entry.id === "scout-positive")!],
+        execute: async () => ({ status: 0, stdout: "AccountWire is stale", stderr: "" }),
+      });
+      expect(result.exitCode).toBe(1);
+      expect(result.cases[0]).toMatchObject({ status: 1, output: "" });
+      expect(result.cases[0]!.stderr).toMatch(/lifecycle.*scout/i);
+    } finally {
+      rmSync(reportDir, { recursive: true, force: true });
+    }
+  });
+
+  it("detects writes elsewhere in the source checkout, outside evalRoot", async () => {
+    const checkout = mkdtempSync(join(tmpdir(), "hanoman-agent-eval-checkout-"));
+    const isolatedEvalRoot = join(checkout, "eval");
+    const fixture = join(isolatedEvalRoot, "fixture");
+    const reportDir = mkdtempSync(join(tmpdir(), "hanoman-agent-eval-integrity-report-"));
+    mkdirSync(join(fixture, "base"), { recursive: true });
+    mkdirSync(join(fixture, "change"), { recursive: true });
+    writeFileSync(join(fixture, "base", "source.txt"), "before\n");
+    writeFileSync(join(fixture, "change", "source.txt"), "after\n");
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: checkout }).status).toBe(0);
+    try {
+      await expect(runCustomAgentEvaluations({
+        runtime: "claude",
+        outputPath: join(reportDir, "report.json"),
+        evalRoot: isolatedEvalRoot,
+        cases: [basicCase({ fixtureDir: "fixture" })],
+        execute: async () => {
+          writeFileSync(join(checkout, "outside-eval.txt"), "mutation\n");
+          return { status: 0, stdout: "AccountWire is stale", stderr: "" };
+        },
+      })).rejects.toThrow(/source eval berubah/i);
+    } finally {
+      rmSync(checkout, { recursive: true, force: true });
+      rmSync(reportDir, { recursive: true, force: true });
+    }
   });
 });

@@ -48,13 +48,28 @@ pnpm agent:eval --runtime claude|codex [--agent name] [--output path]
 
 Manifest `evals/custom-agents/manifest.ts` membawa satu kasus positif + satu kontrol untuk setiap
 delapan builtin. Harness menyalin `base/` ke repo `mktemp`, membuat commit, menimpa `change/` untuk
-membentuk diff, lalu memakai renderer produk Claude/Codex. Repo temp selalu dibuang di `finally`;
-report default hidup di temp report terpisah dan output eksplisit **ditolak** bila menunjuk ke source
-eval. Harness membandingkan hash source sebelum/sesudah.
+membentuk diff, lalu memakai renderer produk Claude/Codex. Parent wajib memanggil target tepat satu
+kali; hanya hasil dari pasangan hook `SubagentStart`/`SubagentStop` target yang dinilai. Stdout
+parent diabaikan dan lifecycle hilang/duplikat menggagalkan kasus. Parent Claude restricted dan
+hanya mendapat `Task` dalam mode plan; parent Codex memakai sandbox read-only, approval never,
+tanpa user config/rules. `--ephemeral` tidak dipakai karena pada Codex 0.151 ia membuat thread parent
+tak terdaftar ke daemon kolaborasi dan `spawn_agent` gagal. `PWD`, `OLDPWD`, dan `INIT_CWD` diarahkan ke repo temp, sementara environment
+lain dibatasi ke auth/konektivitas runtime. Repo temp selalu dibuang di `finally`; report default
+hidup di temp report terpisah dan output eksplisit **ditolak** bila menunjuk ke bagian
+mana pun dari checkout git sumber (bukan hanya direktori eval), termasuk bila masuk lewat symlink.
+Report ditulis `.tmp` lalu di-rename atomik. Harness membandingkan hash seluruh tracked + unignored
+checkout sumber sebelum/sesudah, jadi perubahan di luar direktori eval juga menggagalkan run.
+Setiap kasus punya wall-clock timeout 180 detik; timeout menghasilkan exit gagal dan tidak menahan
+harness tanpa batas.
+Jika Codex tetap membalas transient `no thread with id` setelah child dijadwalkan, parent tidak
+melakukan spawn kedua: ia menunggu sekali melalui `wait_agent` dengan batas 30 detik.
 
 Saat seluruh katalog dijalankan untuk Codex, kasus builtin berprofil `isolated-worktree` dilaporkan
 sebagai `SKIP` karena profil itu belum didukung child Codex; memilih agen itu secara eksplisit
 berakhir gagal dengan alasan yang sama. Skip kompatibilitas tidak dihitung sebagai lulus atau gagal.
+Eval Codex memakai `HANOMAN_CODEX_BIN` (default `codex`), mem-probe `--version`, dan berhenti sebelum
+memanggil model bila native custom agent tak terdeteksi atau versinya <`0.151.0`. Eval Claude memakai
+`HANOMAN_CLAUDE_BIN` (default `claude`).
 
 Test rutin tidak menjalankan model. Ia hanya menjalankan scorer terhadap `frozen-output`: semua
 expected finding harus cocok (`recall=1`) dan forbidden hit harus nol. Exit live nonzero bila CLI

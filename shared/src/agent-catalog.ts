@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_TOOLS, type AgentRuntime } from "./custom-agent";
-import { MODELS, CODEX_MODELS } from "./entities";
+import { DEFAULT_AGENT_TOOLS, type AgentEffort, type AgentRuntime } from "./custom-agent";
+import { MODELS, EFFORTS, CODEX_MODELS } from "./entities";
 
 // SPEC-484 · ADR-0101 · katalog pilihan form Custom Agent. Nol I/O: dipakai server (validasi +
 // ekspansi `*`) dan UI (opsi dropdown) dari SATU sumber. Bagian yang butuh I/O — penemuan server
@@ -50,6 +50,27 @@ export function modelsForRuntime(rt: AgentRuntime | null): AgentModelInfo[] {
   if (rt === "claude") return claude;
   if (rt === "codex") return codex;
   return [...claude, ...codex];
+}
+
+const codexCommonEfforts = (): AgentEffort[] => {
+  const first = CODEX_MODELS[0]?.efforts ?? [];
+  return first.filter((effort) => CODEX_MODELS.every((model) => model.efforts.includes(effort))) as AgentEffort[];
+};
+
+/** Effort yang sah untuk pasangan runtime/model; warisan ambigu memakai irisan kedua runtime. */
+export function effortsForRuntimeModel(
+  runtime: AgentRuntime | null,
+  model: string | null,
+): AgentEffort[] {
+  if (runtime === "claude" || (!runtime && model && MODELS.some((entry) => entry.id === model))) {
+    return [...EFFORTS] as AgentEffort[];
+  }
+  const codexModel = model ? CODEX_MODELS.find((entry) => entry.id === model) : undefined;
+  if (runtime === "codex" || codexModel) {
+    return [...(codexModel?.efforts ?? codexCommonEfforts())] as AgentEffort[];
+  }
+  const codex = new Set(codexCommonEfforts());
+  return EFFORTS.filter((effort) => codex.has(effort as AgentEffort)) as AgentEffort[];
 }
 
 /**

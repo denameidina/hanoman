@@ -11,8 +11,9 @@ import { Card, Button, Badge, Input, Switch, MultiSelect, Select, Field, HnTexta
 import { api, ApiError } from "../api/client";
 import {
   AGENT_NAME_RE, DEFAULT_AGENT_TOOLS, ALL_TOOLS, resolveTools, modelsForRuntime,
+  effortsForRuntimeModel,
   type CustomAgentView, type AgentCatalogView, type AgentRuntime, type AgentMetricsView,
-  type AgentDisposition,
+  type AgentDisposition, type AgentEffort,
 } from "@hanoman/shared";
 
 // SPEC-484 · ADR-0101 · tools/model/mention/runtime memakai KONTROL PILIHAN bersumber API. Ketikan
@@ -139,6 +140,9 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
     .filter((m) => !mentionOptions.some((o) => o.value === m));
   const modelInvalid = Boolean(editing?.draft.model)
     && !modelOptions.some((o) => o.value === editing!.draft.model);
+  const effortOptions = effortsForRuntimeModel(runtime, editing?.draft.model || null);
+  const effortInvalid = Boolean(editing?.draft.effort)
+    && !effortOptions.includes(editing!.draft.effort as never);
   // Validasi server KERAS (ADR-0101 keputusan 5): nilai lama yang tak lagi ada di katalog TETAP
   // terbaca, tapi tak bisa disimpan ulang apa adanya. Menguncinya di sini = operator melihat
   // sebabnya sebelum menekan Simpan, bukan sesudah menerima 400.
@@ -149,7 +153,7 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
       && editing.draft.runtime !== "claude")
   ) : false;
   const blocked = invalidTools.length > 0 || invalidMentions.length > 0
-    || modelInvalid || profileInvalid;
+    || modelInvalid || effortInvalid || profileInvalid;
 
   /** `*` dan nama eksplisit saling meniadakan — cermin aturan server, ditegakkan di kontrol. */
   const setTools = (next: string[]) => {
@@ -166,7 +170,18 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
     const model = allowed.includes(editing.draft.model) ? editing.draft.model : "";
     const workspacePolicy = next === "codex" && editing.draft.workspacePolicy === "isolated-worktree"
       ? "inherit" : editing.draft.workspacePolicy;
-    setEditing({ ...editing, draft: { ...editing.draft, runtime: next, model, workspacePolicy } });
+    const effort = effortsForRuntimeModel((next || null) as AgentRuntime | null, model || null)
+      .includes(editing.draft.effort as never) ? editing.draft.effort : "";
+    setEditing({ ...editing, draft: {
+      ...editing.draft, runtime: next, model, effort, workspacePolicy,
+    } });
+  };
+
+  const setModel = (model: string) => {
+    if (!editing) return;
+    const effort = effortsForRuntimeModel(runtime, model || null).includes(editing.draft.effort as never)
+      ? editing.draft.effort : "";
+    setEditing({ ...editing, draft: { ...editing.draft, model, effort } });
   };
 
   async function save() {
@@ -180,7 +195,7 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
         tools: d.tools.length ? d.tools : null, model: d.model || null,
         mentions: d.mentions, runtime: (d.runtime || null) as AgentRuntime | null,
         enabled: d.enabled, activation: d.activation as "always" | "smart",
-        effort: d.effort || null,
+        effort: (d.effort || null) as AgentEffort | null,
         workspacePolicy: d.workspacePolicy as "inherit" | "read-only" | "isolated-worktree",
         maxTurns: d.maxTurns === "" ? null : Number(d.maxTurns),
         timeoutSeconds: d.timeoutSeconds === "" ? null : Number(d.timeoutSeconds),
@@ -411,8 +426,7 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
               <Select aria-label="Model" value={editing.draft.model} invalid={modelInvalid}
                 options={[{ value: "", label: "Ikut sesi induk" }, ...modelOptions,
                   ...(modelInvalid ? [{ value: editing.draft.model, label: `⚠ ${editing.draft.model} — tak ada di katalog` }] : [])]}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  setEditing({ ...editing, draft: { ...editing.draft, model: e.target.value } })} />
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setModel(e.target.value)} />
             </Field>
           </div>
           <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -424,8 +438,13 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
                 })} />
             </Field>
             <Field label="Effort" hint="Kosongkan untuk mewarisi sesi.">
-              <Input aria-label="Effort" value={editing.draft.effort} placeholder="mis. low, medium, high"
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditing({
+              <Select aria-label="Effort" value={editing.draft.effort} invalid={effortInvalid}
+                options={[{ value: "", label: "Ikut sesi induk" },
+                  ...effortOptions.map((effort) => ({ value: effort, label: effort })),
+                  ...(effortInvalid
+                    ? [{ value: editing.draft.effort, label: `⚠ ${editing.draft.effort} — tak didukung` }]
+                    : [])]}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditing({
                   ...editing, draft: { ...editing.draft, effort: e.target.value },
                 })} />
             </Field>

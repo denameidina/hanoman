@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { cmpVersion } from "@hanoman/shared";
+import { codexNativeVersionProbe } from "@hanoman/runner";
 import { effectiveStr } from "../config";
 
 // Perbandingan versi tinggal di shared supaya server & web tak pernah berbeda pendapat; di-ekspor
@@ -21,6 +22,22 @@ let cache: { at: number; version: string | null } | null = null;
 
 const codexBin = (): string => effectiveStr("HANOMAN_CODEX_BIN") ?? "codex";
 
+type VersionRunner = (bin: string, args: string[]) => Promise<{ stdout: string }>;
+const runVersion: VersionRunner = async (bin, args) => {
+  const { stdout } = await run(bin, args, { timeout: 10_000 });
+  return { stdout };
+};
+
+/** Probe the host or Podman image according to the actual session execution boundary. */
+export async function probeCodexVersion(
+  env: NodeJS.ProcessEnv = process.env,
+  execute: VersionRunner = runVersion,
+): Promise<string | null> {
+  const probe = codexNativeVersionProbe(env, codexBin());
+  try { return parseCodexVersion((await execute(probe.bin, probe.args)).stdout); }
+  catch { return null; }
+}
+
 /** Ambil `X.Y.Z` pertama dari keluaran `codex --version` (mis. "codex-cli 0.145.0"). */
 export function parseCodexVersion(out: string): string | null {
   const m = /(\d+)\.(\d+)\.(\d+)/.exec(out);
@@ -34,11 +51,7 @@ export function parseCodexVersion(out: string): string | null {
  */
 export async function getCodexVersion(now = Date.now()): Promise<string | null> {
   if (cache && now - cache.at < TTL_MS) return cache.version;
-  let version: string | null = null;
-  try {
-    const { stdout } = await run(codexBin(), ["--version"], { timeout: 5_000 });
-    version = parseCodexVersion(stdout);
-  } catch { /* biner tak ada / gagal jalan — biarkan null */ }
+  const version = await probeCodexVersion();
   cache = { at: now, version };
   return version;
 }

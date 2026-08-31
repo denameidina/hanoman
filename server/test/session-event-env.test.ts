@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sessionEventEnv } from "../src/services/pty";
+import { sessionEventDir, sessionEventEnv } from "../src/services/pty";
 import { sessionEventToken } from "../src/services/session-event-token";
 import { loadIngressPolicy, controlHost } from "../src/services/ingress-policy";
 
@@ -9,6 +9,7 @@ describe("env event sesi", () => {
     expect(e.HANOMAN_EVENT_URL).toBe("http://127.0.0.1:9911/api/session-events");
     expect(e.HANOMAN_SESSION_ID).toBe("spec-909");
     expect(e.HANOMAN_EVENT_TOKEN).toBe(sessionEventToken("spec-909"));
+    expect(e.HANOMAN_EVENT_DIR).toBe(sessionEventDir("spec-909"));
   });
 
   it("tanpa PORT jatuh ke 8787, cermin server.ts", () => {

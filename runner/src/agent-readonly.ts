@@ -16,6 +16,50 @@ function denyReadOnly(detail: string): ReadOnlyDecision {
   return { allowed: false, reason: `Hanoman read-only policy: ${detail}` };
 }
 
+/** Tokenizer kecil untuk memeriksa argv tanpa mengeksekusi shell. Operator shell ditolak lebih dulu. */
+function tokenizeReadOnlyCommand(command: string): string[] | null {
+  const tokens: string[] = [];
+  let token = "";
+  let quote = "";
+  let escaped = false;
+  let active = false;
+  for (let index = 0; index < command.length; index++) {
+    const char = command[index]!;
+    if (escaped) {
+      token += char;
+      escaped = false;
+      active = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = "";
+      else if (char === "\\" && quote === '"') escaped = true;
+      else token += char;
+      active = true;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      active = true;
+    } else if (char === "\\") {
+      escaped = true;
+      active = true;
+    } else if (/\s/.test(char)) {
+      if (active) {
+        tokens.push(token);
+        token = "";
+        active = false;
+      }
+    } else {
+      token += char;
+      active = true;
+    }
+  }
+  if (quote || escaped) return null;
+  if (active) tokens.push(token);
+  return tokens;
+}
+
 /** Standalone on purpose: its source is embedded in the temporary hook script below. */
 function evaluateReadOnlyPayload(payload: unknown, policy: {
   directTools: readonly string[];
@@ -23,7 +67,7 @@ function evaluateReadOnlyPayload(payload: unknown, policy: {
   deniedTools: readonly string[];
   shellCommands: readonly string[];
   gitCommands: readonly string[];
-}): ReadOnlyDecision {
+}, environment: Record<string, string | undefined>): ReadOnlyDecision {
   if (!payload || typeof payload !== "object") return denyReadOnly("payload hook tidak sah");
   const event = payload as Record<string, unknown>;
   const tool = typeof event.tool_name === "string"
@@ -43,36 +87,72 @@ function evaluateReadOnlyPayload(payload: unknown, policy: {
     : typeof input.cmd === "string" ? input.cmd : "";
   const trimmed = command.trim();
   if (!trimmed) return denyReadOnly("perintah shell kosong atau tidak dikenal");
-  if (/\r|\n|;|&&|\|\||\||[<>]|\$\(|`/.test(trimmed)) {
+  if (/\r|\n|;|&&|\|\||\||[<>]|\$|`/.test(trimmed)) {
     return denyReadOnly("operator shell yang dapat merangkai atau menulis dilarang");
   }
 
-  const first = trimmed.split(/\s+/, 1)[0] ?? "";
+  const tokens = tokenizeReadOnlyCommand(trimmed);
+  if (!tokens?.length) return denyReadOnly("perintah shell tidak dapat diparse dengan aman");
+  const first = tokens[0] ?? "";
   const commandName = first.split("/").pop() ?? "";
+  // Hanya executable dari PATH yang boleh lolos. Membolehkan `./rg` atau `/tmp/git` berdasarkan
+  // basename memberi repo/pemanggil kesempatan mengganti program baca dengan executable mutatif.
+  if (first !== commandName) {
+    return denyReadOnly("executable ber-path tidak diizinkan; gunakan command allowlist dari PATH");
+  }
   if (commandName === "git") {
-    const subcommand = trimmed.slice(first.length).trim().split(/\s+/, 1)[0] ?? "";
-    return policy.gitCommands.includes(subcommand)
-      ? { allowed: true }
-      : denyReadOnly(`git ${subcommand || "<kosong>"} bukan operasi baca yang diizinkan`);
+    const subcommand = tokens[1] ?? "";
+    if (!policy.gitCommands.includes(subcommand)) {
+      return denyReadOnly(`git ${subcommand || "<kosong>"} bukan operasi baca yang diizinkan`);
+    }
+    const args = tokens.slice(2);
+    if (args.some((arg) => arg === "--output" || arg.startsWith("--output=")
+      || arg === "--ext-diff" || arg === "--textconv")) {
+      return denyReadOnly("opsi git dapat menulis atau menjalankan helper eksternal");
+    }
+    if (subcommand !== "status"
+      && (!args.includes("--no-ext-diff") || !args.includes("--no-textconv"))) {
+      return denyReadOnly("git diff/show/log wajib menonaktifkan helper eksternal dan textconv");
+    }
+    return { allowed: true };
   }
   if (!policy.shellCommands.includes(commandName)) {
     return denyReadOnly(`perintah ${commandName || "<kosong>"} tidak terbukti read-only`);
   }
-  if (commandName === "sed"
-    && /(^|\s)(?:-i\S*|--in-place(?:=\S*)?)(?:\s|$)/.test(trimmed)) {
-    return denyReadOnly("sed in-place dapat mengubah berkas");
+  // ripgrep membaca file ini sebelum menilai argv. Isinya dapat menyuntikkan `--pre <program>`,
+  // sehingga command `rg pattern .` yang tampak murni baca sebenarnya mengeksekusi program lain.
+  if (commandName === "rg" && environment.RIPGREP_CONFIG_PATH?.trim()) {
+    return denyReadOnly("RIPGREP_CONFIG_PATH dapat menyuntikkan preprocessor eksternal");
+  }
+  if (commandName === "rg" && tokens.slice(1).some((arg) =>
+    arg === "--pre" || arg.startsWith("--pre=") || arg === "--pre-glob"
+    || arg.startsWith("--pre-glob=") || arg === "--hostname-bin"
+    || arg.startsWith("--hostname-bin="))) {
+    return denyReadOnly("opsi rg dapat menjalankan helper eksternal");
+  }
+  if (commandName === "sed") {
+    const quiet = tokens[1] === "-n" || tokens[1] === "--quiet" || tokens[1] === "--silent";
+    const printOnly = /^\d+(?:,\d+)?p$/.test(tokens[2] ?? "");
+    const files = tokens.slice(3);
+    if (!quiet || !printOnly || files.length === 0 || files.some((arg) => arg.startsWith("-"))) {
+      return denyReadOnly("hanya sed -n '<baris>[,<baris>]p' <berkas> yang diizinkan");
+    }
   }
   return { allowed: true };
 }
 
-export function readOnlyDecision(payload: unknown): ReadOnlyDecision {
-  return evaluateReadOnlyPayload(payload, POLICY);
+export function readOnlyDecision(
+  payload: unknown,
+  environment: Record<string, string | undefined> = process.env,
+): ReadOnlyDecision {
+  return evaluateReadOnlyPayload(payload, POLICY, environment);
 }
 
 export function readOnlyHookSource(): string {
   return [
     '"use strict";',
     `const denyReadOnly = ${denyReadOnly.toString()};`,
+    `const tokenizeReadOnlyCommand = ${tokenizeReadOnlyCommand.toString()};`,
     `const evaluate = ${evaluateReadOnlyPayload.toString()};`,
     `const policy = ${JSON.stringify(POLICY)};`,
     "let input = '';",
@@ -81,7 +161,7 @@ export function readOnlyHookSource(): string {
     "process.stdin.on('end', () => {",
     "  let payload;",
     "  try { payload = JSON.parse(input); } catch { payload = null; }",
-    "  const decision = evaluate(payload, policy);",
+    "  const decision = evaluate(payload, policy, process.env);",
     "  if (!decision.allowed) { process.stderr.write(decision.reason + '\\n'); process.exitCode = 2; }",
     "});",
     "process.stdin.resume();",
@@ -95,5 +175,7 @@ export function writeReadOnlyHook(dir: string): { path: string; command: string 
   const path = join(dir, "custom-agent-readonly.cjs");
   writeFileSync(path, readOnlyHookSource(), { mode: 0o600 });
   chmodSync(path, 0o600);
-  return { path, command: `${shellQuote(process.execPath)} ${shellQuote(path)}` };
+  // Resolve lewat PATH child. process.execPath adalah path host (mis. Homebrew macOS) yang tidak
+  // ada di image Podman Linux walau direktori hook sudah di-mount.
+  return { path, command: `node ${shellQuote(path)}` };
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { AGENT_EVAL_CASES } from "../evals/custom-agents/manifest";
 import {
@@ -32,10 +33,21 @@ for (let index = 2; index < process.argv.length; index += 1) {
 
 const runtime = values.get("--runtime");
 if (runtime !== "claude" && runtime !== "codex") throw new Error(`--runtime wajib claude|codex\n${usage}`);
+const runtimeBin = runtime === "codex"
+  ? process.env.HANOMAN_CODEX_BIN ?? "codex"
+  : process.env.HANOMAN_CLAUDE_BIN ?? "claude";
+let clientVersion: string | null | undefined;
+if (runtime === "codex") {
+  const probe = spawnSync(runtimeBin, ["--version"], { encoding: "utf8", timeout: 10_000 });
+  const match = /(\d+)\.(\d+)\.(\d+)/.exec(`${probe.stdout ?? ""}\n${probe.stderr ?? ""}`);
+  clientVersion = match?.[0] ?? null;
+}
 
 const evalRoot = resolve(import.meta.dirname, "../evals/custom-agents");
 const result = await runCustomAgentEvaluations({
   runtime: runtime as AgentEvalRuntime,
+  runtimeBin,
+  clientVersion,
   agentName: values.get("--agent"),
   outputPath: values.get("--output") ? resolve(process.cwd(), values.get("--output")!) : undefined,
   evalRoot,

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   AGENT_RUNTIMES, ALL_TOOLS, ALL_TOOLS_ENTRY, BUILTIN_AGENT_TOOLS, mcpToolEntry,
   modelsForRuntime, expandTools, DEFAULT_AGENT_TOOLS, resolveTools, MENTION_TOOL,
+  effortsForRuntimeModel,
 } from "./index";
 
 describe("AGENT_RUNTIMES", () => {
@@ -43,6 +44,22 @@ describe("modelsForRuntime", () => {
     const ids = modelsForRuntime(null).map((x) => x.id);
     expect(ids).toContain("claude-opus-5");
     expect(ids).toContain("gpt-5.6-sol");
+  });
+});
+
+describe("effortsForRuntimeModel", () => {
+  it("Claude memakai katalog effort Claude", () => {
+    expect(effortsForRuntimeModel("claude", null)).toContain("ultracode");
+    expect(effortsForRuntimeModel("claude", null)).not.toContain("ultra");
+  });
+
+  it("Codex mengikuti model terpilih", () => {
+    expect(effortsForRuntimeModel("codex", "gpt-5.6-sol")).toContain("ultra");
+    expect(effortsForRuntimeModel("codex", "gpt-5.6-luna")).not.toContain("ultra");
+  });
+
+  it("runtime dan model warisan hanya menawarkan irisan yang aman", () => {
+    expect(effortsForRuntimeModel(null, null)).toEqual(["xhigh", "high", "medium", "low"]);
   });
 });
 

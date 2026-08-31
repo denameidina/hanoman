@@ -1361,6 +1361,30 @@ Pakai skill lebih sempit saat task cocok:
   Codex menolak flag duplikat dan pane mati sebelum TUI. Test read-only juga wajib mengeksekusi
   **berkas hook yang dihasilkan**, bukan hanya validator murni: serialisasi `Function#toString`
   dari transpiler pernah membawa helper `__name` yang tidak ikut tertulis sehingga hook crash.
+  Codex native-agent memerlukan client terdeteksi **>=0.151.0**; yang lebih tua/tak terdeteksi
+  diberi warning dan tidak menerima registry maupun roster inline. Probe wajib melihat konteks
+  eksekusi sesi yang benar (host atau image Podman), sesudah cache config DB dimuat; `doctor` wajib
+  membaca override binary dari DB efektif, perubahan `HANOMAN_CODEX_BIN` refresh langsung, dan
+  upgrade in-place refresh maksimal lima menit secara serial. `HANOMAN_PODMAN_BIN` wajib sama untuk
+  probe dan argv sesi aktual. Di sandbox, direktori config
+  temp wajib di-mount pada path absolut yang sama secara **ro** dan hook memanggil `node` portabel,
+  bukan path Node host. Telemetry sandbox tidak memakai loopback container: hook menulis satu
+  berkas atomik ke spool temp per sesi yang di-mount **rw**, lalu server me-replay-nya melalui
+  `/api/session-events` bertoken; publish wajib `.tmp`→rename, dan `429`/5xx/exception wajib diretry.
+  Validator read-only wajib menolak executable ber-path (`./rg`, `/tmp/git`) serta opsi
+  tulis/eksekusi tersembunyi (`git --output`/external diff/textconv, `rg --pre*`, sed non-print,
+  ekspansi env, shell operator), serta `rg` saat `RIPGREP_CONFIG_PATH` terisi.
+  Effort form/boundary berasal dari katalog runtime+model; jangan kembalikan input teks bebas.
+  Report `agent:eval` wajib di luar seluruh checkout git sumber berdasarkan real path (symlink tidak
+  boleh lolos), ditulis atomik; parent live harus plan/read-only dengan cwd env ke repo temp, dan
+  integrity hash meliputi seluruh tracked + unignored checkout. Skor wajib berasal dari tepat satu
+  pasangan lifecycle child target—stdout parent diabaikan. Eval Codex wajib mem-probe versi live
+  >=0.151 dan meneruskannya ke materializer. Bila Codex `spawn_agent` membalas transient
+  `no thread with id` sesudah menjadwalkan child, tunggu sekali 30 detik lewat `wait_agent`; jangan
+  spawn kedua. Jangan pasang `--ephemeral` pada eval multi-agent Codex 0.151: thread parent tidak
+  terdaftar ke daemon kolaborasi dan spawn selalu gagal.
+  Parent harness wajib memutus kasus live yang melewati 180 detik; timeout prompt child saja bukan
+  jaminan kill dari runtime.
 - **Form Custom Agent berbasis katalog + `runtime`** (SPEC-484/ADR-**0101**, memperluas 0094 & 0074):
   `tools`/`model`/`mention` memakai **kontrol pilihan** bersumber API — `GET /api/custom-agents/catalog`
   untuk tools/model/runtime, `GET /custom-agents?projectId=` (yang sudah dipanggil panel) untuk mention;

@@ -22,6 +22,7 @@ import { secureHanomanHome } from "./services/secure-home";
 import { startRetentionSweep } from "./services/retention";
 import { uploadDir } from "./services/uploads";
 import { transcriptDir } from "./services/transcript-store";
+import { startSessionEventRelay } from "./services/session-event-relay";
 
 // SPEC-215 · deteksi update default ON (registry HANOMAN_UPDATE_FETCH="1"), dibaca via resolver
 // di services/update.ts. Test memuat buildApp dari app.ts (tak pernah server.ts) dan vitest.config
@@ -34,6 +35,9 @@ const port = Number(process.env.PORT ?? 8787);
 // yang menerminasi TLS. Production fail-closed bila bind bukan loopback (SPEC-761/ADR-0117).
 const host = process.env.HOST ?? "127.0.0.1";
 assertRuntimeBoundary(process.env, { uid: process.getuid?.(), host });
+// Hook onClose wajib didaftarkan sebelum Fastify listen/ready. Relay memakai app.inject agar
+// autentikasi dan parsing event tetap satu jalur, termasuk ketika event datang dari sandbox.
+startSessionEventRelay(app);
 
 // Jangan biarkan satu promise yatim (mis. sweep monitor saat DB kedip) menjatuhkan orchestrator
 // tanpa jejak (SPEC-197). Log, jangan crash.
@@ -68,13 +72,28 @@ const bootstrapReady = secureHanomanHome({
   console.log(`setup admin memerlukan token di ${proof.path}; kedaluwarsa ${new Date(proof.expiresAt).toISOString()}`);
 });
 
-bootstrapReady.then(() => app.listen({ port, host })).then(async () => {
-  console.log(`hanoman api ${host}:${port}`);
+bootstrapReady.then(async () => {
+  // Config DB harus menang SEBELUM katalog custom agent mem-probe runtime. Jika dibalik, gate
+  // native agent dapat membaca `codex` dari env sementara PTY kemudian meluncurkan override DB.
+  // Degradasinya tetap env/default bila DB/config side-effect sedang gagal.
+  try {
+    const { loadConfig } = await import("./config");
+    const { applyConfigOnBoot } = await import("./services/config-apply");
+    await loadConfig();
+    await applyConfigOnBoot();
+  } catch (e) {
+    console.error("config runtime gagal dimuat — memakai env/default:", e);
+  }
   // SPEC-450 · ADR-0094 · muat katalog custom agent & daftarkan sumbernya SEBELUM sesi pertama
   // bisa lahir — governor scheduler & denyut lead sama-sama bisa meluncurkan sesi pada tick
   // pertama. Ditunggu (bukan fire-and-forget): sesi yang lahir sebelum cache terisi akan lahir
   // TANPA custom agent, dan itu gejala senyap — argv-nya sah, agennya cuma tak ada.
   await installCustomAgents();
+  // Route HTTP juga dapat melahirkan sesi. Karena itu listen baru dibuka sesudah config dan
+  // katalog siap; "sebelum scheduler tick" saja masih menyisakan race untuk request Start.
+  return app.listen({ port, host });
+}).then(async () => {
+  console.log(`hanoman api ${host}:${port}`);
   // SPEC-481 · ADR-0100 · daftarkan tap webhook SEBELUM apa pun bisa menulis baris. Sebelum ini
   // tap diam, jadi peristiwa yang lahir di antara boot dan pemasangan hilang — dan itu senyap.
   await installWebhooks();
@@ -98,22 +117,7 @@ bootstrapReady.then(() => app.listen({ port, host })).then(async () => {
   // SPEC-476 · ADR-0096 · gateway baru boleh polling sesudah server menerima request, katalog
   // custom agent terpasang, dan hook history siap. API base selalu loopback: session operator
   // berjalan di proses lokal walau HTTP publik bind ke alamat lain.
-  // SPEC-215 · config runtime: muat override DB lalu terapkan (mirror kredensial + init sync client).
-  // SPEC-477 · ADR-0097 · WAJIB sebelum installTelegramGateway: gateway kini membaca kredensialnya
-  // lewat resolver config, dan cache config yang masih kosong membuatnya diam-diam jatuh ke env
-  // saja — kegagalan yang SENYAP dan tampak benar (gateway berperilaku persis seperti sebelumnya).
-  // Di-`await` tapi TIDAK boleh fatal: sebelum SPEC-477 ia fire-and-forget, jadi DB yang kedip di
-  // sini dulu hanya mencetak unhandledRejection. Membiarkannya melempar berarti `listen gagal` →
-  // `process.exit(1)` untuk seluruh orchestrator (cermin kebijakan "log, jangan crash" di atas).
-  // Degradasinya benar: tanpa cache config, gateway jatuh ke env — perilaku pra-SPEC-477.
-  try {
-    const { loadConfig } = await import("./config");
-    const { applyConfigOnBoot } = await import("./services/config-apply");
-    await loadConfig();
-    await applyConfigOnBoot();
-  } catch (e) {
-    console.error("config runtime gagal dimuat — memakai env/default:", e);
-  }
+  // SPEC-477 · config sudah dimuat sebelum installCustomAgents; gateway membaca resolver yang sama.
   const boundPort = (app.server.address() as AddressInfo).port;
   await installTelegramGateway(app, { apiBase: `http://127.0.0.1:${boundPort}` });
   startVpsMonitor(); // healthcheck 5 menit + audit harian (SPEC-164)

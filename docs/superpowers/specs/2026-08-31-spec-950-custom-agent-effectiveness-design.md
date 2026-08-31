@@ -1,7 +1,7 @@
 # SPEC-950 — Custom agent efektif, terisolasi, terukur, dan native di kedua runtime
 
 Tanggal: 2026-08-31
-Status: disetujui (brainstorming)
+Status: diimplementasi; verifikasi final 2026-08-31 (lihat ADR-0159)
 Pendahulu: SPEC-450 (ADR-0094) · SPEC-484 (ADR-0101) · SPEC-881 (ADR-0136) · SPEC-909 (ADR-0146)
 ADR yang lahir dari spec ini: **ADR-0159**
 

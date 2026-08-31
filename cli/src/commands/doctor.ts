@@ -7,6 +7,8 @@ import { dirname, resolve } from "node:path";
 import {
   resolveDataDirs, resolveDbUrl, dbFilePath, dbUrlNotice, scanAgentSkills,
   resolveHardening, collectProbeFacts, prerequisites, allReady,
+  CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported,
+  codexNativeVersionProbe,
 } from "@hanoman/runner";
 import { DEFAULT_METHOD, METHODS, methodStatus, zAgent, type MethodSkillStatus } from "@hanoman/shared";
 import type { Ctx } from "../router";
@@ -37,18 +39,22 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
     { mark: p.git ? "✓" : "✗", text: p.git ?? "git — TAK ADA (wajib: worktree per sesi)", fatal: !p.git },
     { mark: p.tmux ? "✓" : "✗", text: p.tmux ?? "tmux — TAK ADA (wajib: sesi agen hidup di tmux)", fatal: !p.tmux },
     { mark: p.claude ? "✓" : "·", text: p.claude ? `claude ${p.claude}` : "claude — tak ada", fatal: false },
-    { mark: p.codex ? "✓" : "·", text: p.codex ? `codex ${p.codex}` : "codex — tak ada", fatal: false },
+    { mark: p.codex ? (codexNativeAgentsSupported(p.codex) ? "✓" : "!") : "·",
+      text: p.codex
+        ? `codex ${p.codex} — custom agent native ${codexNativeAgentsSupported(p.codex)
+          ? "siap" : `butuh >= ${CODEX_NATIVE_AGENTS_MIN_CLIENT}; sesi parent tetap bisa berjalan`}`
+        : "codex — tak ada",
+      fatal: false },
     // SPEC-471 · ADR-0095 · `gh` opsional: tanpa dia tarik issue jatuh ke HTTPS + GITHUB_TOKEN.
     { mark: p.gh ? "✓" : "·",
       text: p.gh ? `gh ${p.gh}` : "gh — tak ada (tarik issue akan lewat HTTP + GITHUB_TOKEN)",
       fatal: false },
-    // SPEC-909 · ADR-0146 · NON-FATAL dan itu disengaja: tanpa `curl` hook tetap `exit 0` — ia tak
-    // pernah memblokir agen — tapi hanoman-lead tak akan menerima SATU PUN pertanyaan sesi, dan tak
-    // ada error di mana pun yang akan mengatakannya. Kegagalan senyap justru yang layak dilaporkan.
+    // SPEC-950 · jalur normal memakai spool file bahkan di sandbox. curl hanya fallback untuk hook
+    // lama/tanpa HANOMAN_EVENT_DIR, jadi absennya tidak lagi berarti telemetry utama mati.
     { mark: p.curl ? "✓" : "!",
       text: p.curl
         ? `curl ${p.curl}`
-        : "curl — TAK ADA: hanoman-lead tak akan menerima pertanyaan sesi (SPEC-909)",
+        : "curl — tak ada (fallback event tanpa spool tidak tersedia)",
       fatal: false },
     // Direktori turunan lahir saat dipakai, jadi izin tulis yang belum ada di situ adalah
     // peringatan — bukan alasan menyatakan hanoman tak bisa menjalankan sesi. Home tetap fatal.
@@ -103,12 +109,39 @@ function version(bin: string, args: string[]): string | null {
   catch { return null; }
 }
 
+type RuntimeConfigReader = (dbUrl: string, key: string) => Promise<string | null>;
+
+const readRuntimeConfig: RuntimeConfigReader = async (dbUrl, key) => {
+  const { PrismaClient } = await import("@prisma/client");
+  const client = new PrismaClient({ datasourceUrl: dbUrl });
+  try {
+    return (await client.runtimeConfig.findUnique({ where: { key }, select: { value: true } }))?.value ?? null;
+  } finally {
+    await client.$disconnect();
+  }
+};
+
+/** Doctor must inspect the same DB override that server sessions resolve before env/default. */
+export async function resolveDoctorCodexBin(
+  env: Record<string, string | undefined>,
+  dbUrl: string,
+  read: RuntimeConfigReader = readRuntimeConfig,
+): Promise<string> {
+  try {
+    const configured = (await read(dbUrl, "HANOMAN_CODEX_BIN"))?.trim();
+    if (configured) return configured;
+  } catch { /* missing/unmigrated/unreadable DB: doctor still reports env/default prerequisites */ }
+  return env.HANOMAN_CODEX_BIN?.trim() || "codex";
+}
+
 export default async function doctor(_argv: string[], ctx: Ctx): Promise<number> {
   let layout: ReturnType<typeof resolveLayout>;
   let db: string;
+  let dbUrl: string;
   try {
     layout = resolveLayout(distDir(), existsSync);
-    db = dbFilePath(resolveDbUrl(ctx.env, dirname(layout.schema)));
+    dbUrl = resolveDbUrl(ctx.env, dirname(layout.schema));
+    db = dbFilePath(dbUrl);
   } catch (e) { ctx.stderr(`${(e as Error).message}\n`); return 1; }
 
   const d = resolveDataDirs(ctx.env);
@@ -120,7 +153,8 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
   ];
 
   const claude = version(ctx.env.HANOMAN_CLAUDE_BIN ?? "claude", ["--version"]);
-  const codex = version(ctx.env.HANOMAN_CODEX_BIN ?? "codex", ["--version"]);
+  const codexProbe = codexNativeVersionProbe(ctx.env, await resolveDoctorCodexBin(ctx.env, dbUrl));
+  const codex = version(codexProbe.bin, codexProbe.args);
   // SPEC-739 · ADR-0114 · hanya agen yang CLI-nya ADA yang dilaporkan: kesiapan metode codex di
   // mesin tanpa codex cuma derau. Metode DEFAULT saja — itu yang dipakai sesi tanpa pilihan.
   const method = METHODS[DEFAULT_METHOD]!;

@@ -22,6 +22,11 @@ export const AGENT_ACTIVATIONS = ["always", "smart"] as const;
 export type AgentActivation = (typeof AGENT_ACTIVATIONS)[number];
 export const zAgentActivation = z.enum(AGENT_ACTIVATIONS);
 
+/** Gabungan nilai effort yang benar-benar dikenal kedua runtime. Kombinasi model divalidasi lagi. */
+export const AGENT_EFFORTS = ["ultra", "max", "xhigh", "high", "medium", "low", "ultracode"] as const;
+export type AgentEffort = (typeof AGENT_EFFORTS)[number];
+export const zAgentEffort = z.enum(AGENT_EFFORTS);
+
 export const AGENT_WORKSPACE_POLICIES = ["inherit", "read-only", "isolated-worktree"] as const;
 export type AgentWorkspacePolicy = (typeof AGENT_WORKSPACE_POLICIES)[number];
 export const zAgentWorkspacePolicy = z.enum(AGENT_WORKSPACE_POLICIES);
@@ -59,7 +64,7 @@ export const zCustomAgent = z.object({
   mentions: z.array(z.string()).nullable(),
   runtime: z.enum(AGENT_RUNTIMES).nullable(),
   activation: zAgentActivation.default("always"),
-  effort: z.string().nullable().default(null),
+  effort: zAgentEffort.nullable().default(null),
   workspacePolicy: zAgentWorkspacePolicy.default("inherit"),
   maxTurns: z.number().int().min(1).max(200).nullable().default(null),
   timeoutSeconds: z.number().int().min(30).max(3600).nullable().default(null),
@@ -80,7 +85,7 @@ const zCreateCustomAgentFields = z.object({
   // SPEC-484 · ADR-0101 · PENYARING mesin sesi, bukan pemilih proses. null/absen = ikut sesi induk.
   runtime: z.enum(AGENT_RUNTIMES).nullable().optional(),
   activation: zAgentActivation.optional(),
-  effort: z.string().trim().min(1).max(50).nullable().optional(),
+  effort: zAgentEffort.nullable().optional(),
   workspacePolicy: zAgentWorkspacePolicy.optional(),
   maxTurns: z.number().int().min(1).max(200).nullable().optional(),
   timeoutSeconds: z.number().int().min(30).max(3600).nullable().optional(),
@@ -154,8 +159,10 @@ export function workspacePolicyOf(v: unknown): AgentWorkspacePolicy {
     : "inherit";
 }
 
-export function effortOf(v: unknown): string | null {
-  return typeof v === "string" && v.trim().length > 0 && v.length <= 50 ? v : null;
+export function effortOf(v: unknown): AgentEffort | null {
+  return typeof v === "string" && (AGENT_EFFORTS as readonly string[]).includes(v)
+    ? (v as AgentEffort)
+    : null;
 }
 
 export function maxTurnsOf(v: unknown): number | null {
@@ -209,7 +216,7 @@ export type CustomAgentView = {
   /** SPEC-484 · ADR-0101 · null = ikut sesi induk (dipakai sesi claude MAUPUN codex). */
   runtime: AgentRuntime | null;
   activation: AgentActivation;
-  effort: string | null;
+  effort: AgentEffort | null;
   workspacePolicy: AgentWorkspacePolicy;
   maxTurns: number | null;
   timeoutSeconds: number | null;

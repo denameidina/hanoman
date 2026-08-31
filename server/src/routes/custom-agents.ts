@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import {
   activationOf, effortOf, maxTurnsOf, timeoutSecondsOf, workspacePolicyOf,
   zCreateCustomAgent, zUpdateCustomAgent, customAgentId, mentionsOf, toolsOf, runtimeOf,
-  modelsForRuntime, ALL_TOOLS, AGENT_RUNTIMES, AGENT_RUNTIME_LABELS, BUILTIN_AGENT_NAMES,
+  modelsForRuntime, effortsForRuntimeModel, ALL_TOOLS, AGENT_RUNTIMES, AGENT_RUNTIME_LABELS, BUILTIN_AGENT_NAMES,
   type AgentRuntime, type AgentCatalogView,
 } from "@hanoman/shared";
 import { prisma } from "../db";
@@ -99,6 +99,16 @@ function modelProblem(model: string | null | undefined, runtime: AgentRuntime | 
   return ok ? null : { error: "model tak dikenal untuk runtime ini", model, runtime };
 }
 
+function effortProblem(
+  effort: string | null | undefined,
+  runtime: AgentRuntime | null,
+  model: string | null,
+) {
+  if (!effort) return null;
+  const ok = effortsForRuntimeModel(runtime, model).includes(effort as never);
+  return ok ? null : { error: "effort tak didukung runtime/model ini", effort, runtime, model };
+}
+
 export default async function (app: FastifyInstance) {
   // SPEC-484 · ADR-0101 · sumber daftar tools/model/runtime untuk form. Daftar MENTION sengaja tak
   // di sini: ia sudah hidup di `GET /custom-agents?projectId=` lengkap dengan aturan
@@ -148,6 +158,8 @@ export default async function (app: FastifyInstance) {
     if (tp) return reply.code(400).send(tp);
     const mp = modelProblem(p.model ?? null, p.runtime ?? null);
     if (mp) return reply.code(400).send(mp);
+    const ep = effortProblem(p.effort ?? null, p.runtime ?? null, p.model ?? null);
+    if (ep) return reply.code(400).send(ep);
 
     const id = customAgentId(projectId, p.name);
     if (await prisma.customAgent.findUnique({ where: { id } }))
@@ -228,6 +240,14 @@ export default async function (app: FastifyInstance) {
         effRuntime,
       );
       if (mp) return reply.code(400).send(mp);
+    }
+    if (parsed.data.effort !== undefined || parsed.data.model !== undefined || "runtime" in parsed.data) {
+      const ep = effortProblem(
+        parsed.data.effort !== undefined ? parsed.data.effort : effortOf(before.effort),
+        effRuntime,
+        parsed.data.model !== undefined ? parsed.data.model : before.model,
+      );
+      if (ep) return reply.code(400).send(ep);
     }
 
     const candidate: CustomAgentRow = {

@@ -56,6 +56,20 @@ describe("POST /api/custom-agents", () => {
     });
   });
 
+  it("menolak effort yang tidak didukung runtime/model", async () => {
+    const invalidValue = await post({
+      name: "bad-effort", description: "d", instructions: "i", effort: "turbo",
+    });
+    expect(invalidValue.statusCode).toBe(400);
+
+    const invalidPair = await post({
+      name: "luna-ultra", description: "d", instructions: "i",
+      runtime: "codex", model: "gpt-5.6-luna", effort: "ultra",
+    });
+    expect(invalidPair.statusCode).toBe(400);
+    expect(invalidPair.json()).toMatchObject({ effort: "ultra", runtime: "codex" });
+  });
+
   it("menolak 400 untuk nama yang bukan slug", async () => {
     expect((await post({ name: "Rev", description: "d", instructions: "i" })).statusCode).toBe(400);
   });
@@ -215,6 +229,19 @@ describe("PATCH /api/custom-agents/:id", () => {
       activation: "smart", effort: "medium", workspacePolicy: "read-only",
       maxTurns: 25, timeoutSeconds: 300,
     });
+  });
+
+  it("menolak perubahan model yang membuat effort tersimpan tidak sah", async () => {
+    await post({
+      name: "sol-ultra", description: "d", instructions: "i",
+      runtime: "codex", model: "gpt-5.6-sol", effort: "ultra",
+    });
+    const r = await app.inject({
+      method: "PATCH", url: "/api/custom-agents/global:sol-ultra",
+      payload: { model: "gpt-5.6-luna" },
+    });
+    expect(r.statusCode).toBe(400);
+    expect(r.json()).toMatchObject({ effort: "ultra", model: "gpt-5.6-luna" });
   });
 
   it("menolak isolated-worktree bila runtime efektifnya Codex", async () => {

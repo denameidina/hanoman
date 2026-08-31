@@ -733,8 +733,9 @@ GET/PUT  /settings                      # Setting blob (zSetting): model, effort
 #                                           menjatuhkan readiness ke `error` gara-gara satu dropdown.
 #                                         PUT ganti seluruh blob (full replace).
 GET      /codex/version                 # { version: string|null, minRequired: "0.144.0", ok: boolean }  (SPEC-339)
-#   Versi codex CLI terpasang (`<HANOMAN_CODEX_BIN> --version`, cache 5 menit). `version: null` =
-#   tak terdeteksi (biner tak ada / keluaran tak dikenal) dan itu TIDAK dianggap gagal → `ok: true`.
+#   Versi codex CLI pada konteks sesi efektif (host: `<HANOMAN_CODEX_BIN> --version`; sandbox:
+#   probe biner yang sama di `HANOMAN_SESSION_IMAGE`, cache 5 menit). `version: null` = tak
+#   terdeteksi (biner/image tak ada / keluaran tak dikenal) dan itu TIDAK dianggap gagal → `ok: true`.
 #   Murni observabilitas untuk catatan lunak di Settings & picker Start; TIDAK pernah memblokir Start
 #   (ADR-0037 — agen dipercaya, isolasi lewat worktree).
 GET      /methods/status               # { agents[], methods[] }  (SPEC-739/ADR-0114)
@@ -1894,6 +1895,7 @@ POST   /api/custom-agents { projectId?, name, description, instructions, tools?,
 #         400 slug nama tak sah · projectId tak ada · mention tak dikenal { unknown: string[] }
 #         400 tool tak dikenal { unknownTools: string[] } · `*` bercampur nama lain
 #         400 model tak dikenal untuk runtime-nya { model, runtime } · runtime di luar {claude,codex}
+#         400 effort tak didukung pasangan efektif { effort, model, runtime }
 #         409 nama sudah dipakai di scope itu · mention membentuk siklus { scope, cycle: string[] }
 PATCH  /api/custom-agents/:id { description?, instructions?, tools?, model?, mentions?, runtime?,
 #                               activation?, effort?, workspacePolicy?, maxTurns?, timeoutSeconds?, enabled? }
@@ -1916,13 +1918,21 @@ PATCH  /api/custom-agents/invocations/:id { disposition, note? }
 > SPEC-223, karena tmux membatasi SATU command ±16 KB). Sesi **codex** menerima
 > `agents.enabled=true` + satu `agents."name".config_file` TOML temp per child. Prompt parent kedua
 > runtime hanya membawa nama/deskripsi/klausa delegasi, bukan full instructions.
+> Codex native agent memerlukan client terdeteksi `>=0.151.0`; selain itu Hanoman memperingatkan,
+> tidak memasang registry, dan tidak menghidupkan kembali roster inline. Probe mengikuti konteks
+> eksekusi sesi (host atau image Podman), berjalan sesudah config DB dimuat, refresh langsung saat
+> `HANOMAN_CODEX_BIN` berubah, dan refresh berkala lima menit untuk upgrade in-place.
 > Keduanya dirakit di titik cekik `createSession` lewat `registerCustomAgentSource`, jadi tak ada
 > route yang perlu diubah dan tak ada yang bisa lupa memasangnya.
 >
 > **Execution profile (SPEC-950):** `activation` = `always|smart`; `workspacePolicy` =
 > `inherit|read-only|isolated-worktree`; `maxTurns` 1–200; `timeoutSeconds` 30–3600. Kombinasi
 > isolated dengan runtime selain Claude ditolak. `available`/`availabilityReason` pada view adalah
-> turunan. Read-only dipagari validator + hook `PreToolUse`; parent sandbox hanya defense in depth.
+> turunan. Effort berasal dari katalog runtime/model (bukan teks bebas); kombinasi warisan memakai
+> irisan aman. Read-only dipagari validator + hook `PreToolUse`; parent sandbox hanya defense in
+> depth. Di Podman, config/hook temp di-mount `ro`, sedangkan spool event per sesi saja yang `rw`;
+> hook memublikasikan `.json` lewat rename atomik. Worker me-replay ke endpoint event bertoken yang
+> sama; `429`/5xx/exception dipertahankan untuk retry, payload invalid dan 4xx permanen dibuang.
 >
 > Metrics nullable tidak diubah menjadi nol. Operational precision = `(accepted+partial) / semua
 > disposition non-pending`; bila belum ada disposition hasilnya null. Eval recall dari fixture

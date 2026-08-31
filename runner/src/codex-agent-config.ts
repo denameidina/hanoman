@@ -1,6 +1,36 @@
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { cmpVersion } from "@hanoman/shared";
 import { agentDelegationClause, agentPromptOf, type AgentDef } from "./custom-agents";
+import { resolveHardening } from "./runtime-profile";
+
+/** Versi pertama yang benar-benar diverifikasi membawa custom agents + hooks stabil. */
+export const CODEX_NATIVE_AGENTS_MIN_CLIENT = "0.151.0";
+
+export function codexNativeAgentsSupported(version: string | null): boolean {
+  const parsed = version ? /(\d+)\.(\d+)\.(\d+)/.exec(version)?.[0] : null;
+  return parsed ? cmpVersion(parsed, CODEX_NATIVE_AGENTS_MIN_CLIENT) >= 0 : false;
+}
+
+type VersionProbeEnv = Record<string, string | undefined>;
+const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;
+
+/** Command that observes the same Codex executable context a session will actually use. */
+export function codexNativeVersionProbe(
+  env: VersionProbeEnv,
+  codexBin = env.HANOMAN_CODEX_BIN ?? "codex",
+): { bin: string; args: string[] } {
+  const sandbox = env.HANOMAN_SESSION_SANDBOX ?? (resolveHardening(env) ? "required" : "off");
+  if (sandbox !== "podman") return { bin: codexBin, args: ["--version"] };
+  return {
+    bin: env.HANOMAN_PODMAN_BIN ?? "podman",
+    args: [
+      "run", "--rm", "--read-only", "--cap-drop=ALL", "--userns=keep-id",
+      "--network", "none", env.HANOMAN_SESSION_IMAGE ?? "hanoman-agent:latest",
+      "/bin/sh", "-lc", `${shellQuote(codexBin)} --version`,
+    ],
+  };
+}
 
 const tomlString = (value: string): string => JSON.stringify(value);
 const tomlKey = (value: string): string => JSON.stringify(value);
@@ -44,6 +74,8 @@ export function renderCodexAgentToml(
 }
 
 type MaterializeOptions = RenderOptions & {
+  /** Absen = pemanggil sudah menjamin kompatibilitas; null = probe gagal, jadi jangan mengarang. */
+  clientVersion?: string | null;
   writeFile?: (path: string, content: string) => void;
   chmod?: (path: string, mode: number) => void;
 };
@@ -57,6 +89,16 @@ export function materializeCodexAgents(
 ): CodexMaterialization {
   if (defs.length === 0) {
     return { args: [], delegationClause: "", configPaths: [], warnings: [], liveDefs: [] };
+  }
+  if ("clientVersion" in options && !codexNativeAgentsSupported(options.clientVersion ?? null)) {
+    const seen = options.clientVersion ?? "tak terdeteksi";
+    return {
+      args: [], delegationClause: "", configPaths: [], liveDefs: [],
+      warnings: defs.map((def) => ({
+        agentName: def.name,
+        reason: `Codex ${seen} tidak mendukung custom agent native; butuh >= ${CODEX_NATIVE_AGENTS_MIN_CLIENT}`,
+      })),
+    };
   }
   const write = options.writeFile
     ?? ((path: string, content: string) => writeFileSync(path, content, { mode: 0o600 }));

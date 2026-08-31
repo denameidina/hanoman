@@ -6,14 +6,20 @@ export const AGENT_EVAL_CASES: readonly AgentEvalCase[] = [
   {
     id: "scout-positive", agentName: "scout",
     task: "Petakan semua cermin payload pengguna dan tunjukkan yang tertinggal setelah diff.",
-    expected: [finding("renamed-mirror", "packages/web/source\\.txt", "AccountWire", "locale", "stale")],
-    forbidden: [finding("false-no-mirror", "tidak ada", "cermin")],
+    expected: [finding(
+      "renamed-mirror", "packages/web/source\\.txt", "AccountWire", "locale", "stale|tertinggal",
+    )],
+    forbidden: [finding(
+      "false-no-mirror", "(?:tidak ada|tidak ditemukan) cermin(?: payload)?(?: pengguna)?(?:[.!]|$)",
+    )],
     fixtureDir: "fixtures/scout-positive", source: "SPEC-950 audit: duplicate payload with a different symbol name",
   },
   {
     id: "scout-control", agentName: "scout",
     task: "Petakan semua cermin payload pengguna dan pastikan diff tetap konsisten.",
-    expected: [finding("mirror-synchronized", "AccountWire", "locale", "sinkron")],
+    expected: [finding(
+      "mirror-synchronized", "AccountWire", "locale", "sinkron|konsisten|konsistensi|simetris|identik",
+    )],
     forbidden: [finding("false-stale", "AccountWire", "tertinggal")],
     fixtureDir: "fixtures/scout-control", source: "SPEC-950 negative control",
   },

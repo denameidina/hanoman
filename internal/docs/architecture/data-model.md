@@ -798,7 +798,7 @@ semua project); terisi = milik satu project, dan agen project **menimpa** agen g
 | `mentions` | `Json?` | Array nama agen yang boleh dipanggil. `null`/`[]` = daun. |
 | `runtime` | `String?` | **SPEC-484 · [ADR-0101](../adr/0101-form-custom-agent-katalog-runtime.md)** · penyaring mesin sesi. `null` = **ikut sesi induk** (dipakai sesi claude **dan** codex — perilaku ADR-0094 apa adanya, jadi baris lama tak perlu backfill); `"claude"`/`"codex"` = hanya dimaterialisasi di sesi mesin itu. Nilai asing dari sync dibaca sebagai `null`. Ikut `FIELDS.customAgent`. |
 | `activation` | `String` | **SPEC-950 · [ADR-0159](../adr/0159-custom-agent-native-terukur-terisolasi.md)** · `always` atau `smart`; default legacy `always`. Builtin smart dipilih dari flow/prompt/diff saat sesi lahir. |
-| `effort` | `String?` | Override reasoning effort child; null = warisi/rekomendasi runtime. |
+| `effort` | `String?` | Override reasoning effort child dari katalog `ultra|max|xhigh|high|medium|low|ultracode`; null = warisi/rekomendasi runtime. Kombinasi sah divalidasi terhadap runtime+model efektif; warisan ambigu memakai irisan aman. |
 | `workspacePolicy` | `String` | `inherit` · `read-only` · `isolated-worktree`; default legacy `inherit`. Isolasi child hanya tersedia untuk Claude. |
 | `maxTurns` | `Int?` | Null atau 1–200; dipancarkan hanya saat runtime mendukung. |
 | `timeoutSeconds` | `Int?` | Null atau 30–3600; batas yang disampaikan ke child, bukan klaim kill server bila runtime tak mendukung native timeout. |

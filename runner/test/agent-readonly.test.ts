@@ -14,7 +14,7 @@ const payload = (tool_name: string, command?: string) => ({
 describe("readOnlyDecision", () => {
   it.each([
     ["Bash", "rg -n customAgent server/src"],
-    ["Bash", "git diff --stat HEAD~1"],
+    ["Bash", "git diff --no-ext-diff --no-textconv --stat HEAD~1"],
     ["Bash", "sed -n '1,80p' README.md"],
     ["Read", undefined],
     ["Glob", undefined],
@@ -35,6 +35,16 @@ describe("readOnlyDecision", () => {
     ["Bash", "sed -i.bak s/x/y/ file"],
     ["Bash", "sed --in-place s/x/y/ file"],
     ["Bash", "rg $(touch probe) ."],
+    ["Bash", "git diff --no-ext-diff --no-textconv --output=/tmp/owned HEAD"],
+    ["Bash", "git show --no-ext-diff --no-textconv --output /tmp/owned HEAD"],
+    ["Bash", "git diff --stat HEAD"],
+    ["Bash", "rg --pre touch pattern ."],
+    ["Bash", "rg --pre=touch pattern ."],
+    ["Bash", "sed -n '1w /tmp/owned' README.md"],
+    ["Bash", "sed -e '1e touch /tmp/owned' README.md"],
+    ["Bash", "git diff $HANOMAN_UNTRUSTED_OPTION"],
+    ["Bash", "./rg pattern ."],
+    ["Bash", "/tmp/git status"],
   ])("denies mutation before execution: %s %s", (tool, command) => {
     const decision = readOnlyDecision(payload(tool!, command));
     expect(decision.allowed).toBe(false);
@@ -46,6 +56,16 @@ describe("readOnlyDecision", () => {
     expect(readOnlyDecision({ tool_name: "Bash", tool_input: {} }).allowed).toBe(false);
     expect(readOnlyDecision({ tool_name: "unknown", tool_input: {} }).allowed).toBe(false);
     expect(readOnlyDecision(null).allowed).toBe(false);
+  });
+
+  it("denies rg when an inherited config can inject a preprocessor", () => {
+    const decision = readOnlyDecision(
+      payload("Bash", "rg pattern ."),
+      { RIPGREP_CONFIG_PATH: "/tmp/hostile-ripgreprc" },
+    );
+    expect(decision.allowed).toBe(false);
+    if (decision.allowed) throw new Error("expected read-only denial");
+    expect(decision.reason).toMatch(/RIPGREP_CONFIG_PATH/);
   });
 });
 
@@ -59,6 +79,7 @@ describe("generated read-only hook", () => {
     const dir = mkdtempSync(join(tmpdir(), "hanoman-readonly-"));
     dirs.push(dir);
     const hook = writeReadOnlyHook(dir);
+    expect(hook.command).toBe(`node '${hook.path}'`);
     const allowed = spawnSync(process.execPath, [hook.path], {
       input: JSON.stringify(payload("Bash", "git status --short")), encoding: "utf8",
     });
@@ -70,5 +91,12 @@ describe("generated read-only hook", () => {
     });
     expect(denied.status).toBe(2);
     expect(denied.stderr).toContain("read-only");
+
+    const hiddenPreprocessor = spawnSync(process.execPath, [hook.path], {
+      input: JSON.stringify(payload("Bash", "rg pattern .")), encoding: "utf8",
+      env: { ...process.env, RIPGREP_CONFIG_PATH: "/tmp/hostile-ripgreprc" },
+    });
+    expect(hiddenPreprocessor.status).toBe(2);
+    expect(hiddenPreprocessor.stderr).toContain("RIPGREP_CONFIG_PATH");
   });
 });

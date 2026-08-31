@@ -5,12 +5,16 @@ import {
   BUILTIN_AGENTS, BUILTIN_AGENT_NAMES, modelsForRuntime,
   type CustomAgent, type AgentNode, type Agent,
 } from "@hanoman/shared";
-import { PIPELINES, type AgentDef, type Flow } from "@hanoman/runner";
 import {
-  collectChangedFiles, registerCustomAgentSource, type AgentSelectionContext,
+  PIPELINES, codexNativeAgentsSupported, type AgentDef, type Flow,
+} from "@hanoman/runner";
+import {
+  collectChangedFiles, registerCodexNativeAgentSupport, registerCustomAgentSource,
+  type AgentSelectionContext,
 } from "./pty";
 import { agentToolIds } from "./agent-tool-catalog";
 import { seedBuiltinAgents } from "./builtin-agents";
+import { _resetCodexVersionCache, getCodexVersion } from "./codex-version";
 
 // SPEC-450 · ADR-0094 keputusan 7 · katalog custom agent untuk lapis proses.
 //
@@ -103,12 +107,19 @@ export function selectAgentRows(
 }
 
 let cache: CustomAgentRow[] = [];
+let codexNativeSupport: { version: string | null; ok: boolean } = { version: null, ok: false };
+let codexSupportRefreshTimer: NodeJS.Timeout | null = null;
+let codexSupportRefreshTail: Promise<void> = Promise.resolve();
 // SPEC-484 · ADR-0101 · repoDir per project untuk sumber MCP ber-scope project
 // (`<repoDir>/.mcp.json`, `~/.claude.json` projects[<repoDir>]). Di-cache karena `agentDefsFor`
 // SINKRON — ia dibaca dari `createSession`, sementara resolusi binding butuh DB. Di-refresh
 // bersama katalog agen; binding yang berubah tanpa mutasi agen paling buruk membuat ekspansi `*`
 // melewatkan server MCP ber-scope project sampai mutasi berikutnya.
 let repoDirCache = new Map<string, string | null>();
+
+export function currentCustomAgentRuntimeSupport(): { version: string | null; ok: boolean } {
+  return { ...codexNativeSupport };
+}
 
 const asCustomAgent = (r: CustomAgentRow): CustomAgent => ({
   id: r.id, projectId: r.projectId, name: r.name,
@@ -240,12 +251,43 @@ export function unknownMentions(row: CustomAgentRow, all: CustomAgentRow[]): str
   return mentionsOf(row.mentions).filter((m) => !visible.has(m));
 }
 
-/** Dipanggil sekali dari server.ts, SEBELUM sesi pertama bisa lahir. */
+type CodexSupportProbe = () => Promise<string | null>;
+const defaultCodexSupportProbe: CodexSupportProbe = async () => {
+  _resetCodexVersionCache();
+  return getCodexVersion();
+};
+
+/** Re-probe the exact host/image binary used by future sessions and publish atomically. */
+export async function refreshCustomAgentRuntimeSupport(
+  probe: CodexSupportProbe = defaultCodexSupportProbe,
+): Promise<void> {
+  // Timer dan config mutation dapat tiba bersamaan. Urutan queue adalah urutan permintaan, jadi
+  // probe lama wajib selesai sebelum probe config terbaru memublikasikan nilai akhirnya.
+  const refresh = codexSupportRefreshTail.then(async () => {
+    const version = await probe();
+    codexNativeSupport = { version, ok: codexNativeAgentsSupported(version) };
+  });
+  codexSupportRefreshTail = refresh.catch(() => {});
+  return refresh;
+}
+
+/** Dipanggil sekali dari server.ts, sesudah config DB dimuat dan SEBELUM sesi pertama lahir. */
 export async function installCustomAgents(): Promise<void> {
   // SPEC-881 · ADR-0136 · urutannya MENGIKAT: seed dulu, baru cache. Terbalik berarti sesi pertama
   // sesudah boot lahir tanpa agen bawaan — argv-nya sah, agennya cuma tak ada — dan gejalanya
   // hilang sendiri di boot berikutnya.
   await seedBuiltinAgents();
   await loadCustomAgents();
+  await refreshCustomAgentRuntimeSupport();
+  registerCodexNativeAgentSupport(() => codexNativeSupport);
   registerCustomAgentSource((context) => agentDefsFor(context));
+  // Upgrade biner/image di tempat ikut terdeteksi tanpa restart. `unref` menjaga timer ini tidak
+  // menahan shutdown/test; perubahan path via runtime config di-refresh langsung oleh config-apply.
+  if (!codexSupportRefreshTimer) {
+    codexSupportRefreshTimer = setInterval(() => {
+      void refreshCustomAgentRuntimeSupport()
+        .catch((error) => console.error("custom agent: probe Codex gagal:", error));
+    }, 5 * 60_000);
+    codexSupportRefreshTimer.unref();
+  }
 }

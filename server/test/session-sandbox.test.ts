@@ -57,6 +57,8 @@ describe("production session sandbox", () => {
     const argv = sandboxArgv({
       command: "claude --dangerously-skip-permissions", worktree: "/srv/repo/.worktrees/spec-1",
       phaseFile: "/srv/state/phases/spec-1", promptFile: "/srv/state/prompts/spec-1",
+      agentConfigDir: "/srv/state/agents/spec-1",
+      eventDir: "/srv/state/events/spec-1",
       credentialDir: "/srv/state/credentials/spec-1", image: "hanoman-agent:1",
       network: "hanoman-egress", proxy: "http://egress.internal:3128",
     });
@@ -65,8 +67,23 @@ describe("production session sandbox", () => {
       "--network", "hanoman-egress", "--pids-limit", "512",
     ]));
     expect(argv.join(" ")).toContain("/workspace:rw");
+    expect(argv.join(" ")).toContain(
+      "/srv/state/agents/spec-1:/srv/state/agents/spec-1:ro",
+    );
+    expect(argv.join(" ")).toContain("/srv/state/events/spec-1:/srv/state/events/spec-1:rw");
+    expect(argv).toContain("HANOMAN_EVENT_DIR=/srv/state/events/spec-1");
     expect(argv.join(" ")).not.toContain("/Users/");
     expect(argv.at(-3)).toBe("/bin/sh");
     expect(argv.at(-1)).toContain("claude --dangerously-skip-permissions");
+  });
+
+  it("uses the configured Podman binary for the actual session argv", () => {
+    const argv = sandboxArgv({
+      command: "codex", worktree: "/srv/repo/.worktrees/spec-1",
+      credentialDir: "/srv/state/credentials/spec-1", image: "hanoman-agent:1",
+      network: "hanoman-egress", proxy: "http://egress.internal:3128",
+      podmanBin: "/opt/podman-custom",
+    });
+    expect(argv[0]).toBe("/opt/podman-custom");
   });
 });

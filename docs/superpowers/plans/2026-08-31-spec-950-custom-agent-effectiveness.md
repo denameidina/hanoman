@@ -1,5 +1,7 @@
 # Custom Agent Effectiveness Implementation Plan
 
+Status: selesai 2026-08-31; seluruh task diimplementasi dan diverifikasi sesuai bukti ADR-0159.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task, superpowers:test-driven-development for every behavior change, and superpowers:verification-before-completion before claiming success.
 
 **Goal:** Make Hanoman custom agents native in Claude and Codex, safe by default, selectively activated, operationally measurable, and backed by deterministic evaluations.

@@ -21,13 +21,27 @@
  * Env-nya dipasang saat sesi lahir (`sessionEventEnv`, server/src/services/pty.ts). Tanpa env itu
  * `curl` memanggil URL kosong, gagal, dan `exit 0` — sesi kembali ke perilaku menunggu manusia.
  */
+// Sandbox tidak dapat menjangkau loopback host. Di sana satu hook menulis satu berkas unik dengan
+// satu write atomik; server me-relay-nya kembali melalui route bertoken yang sama. Script sengaja
+// hanya memakai kutip ganda agar aman menjadi satu argumen shell berkutip tunggal.
+const EVENT_SPOOL_SCRIPT = [
+  'const fs=require("node:fs"),p=require("node:path"),c=require("node:crypto")',
+  'let d=""',
+  'process.stdin.setEncoding("utf8")',
+  'process.stdin.on("data",x=>d+=x)',
+  'process.stdin.on("end",()=>{let t="";try{const n=Date.now()+"-"+process.pid+"-"+c.randomUUID();t=p.join(process.env.HANOMAN_EVENT_DIR,n+".tmp");const f=p.join(process.env.HANOMAN_EVENT_DIR,n+".json");fs.writeFileSync(t,d,{flag:"wx",mode:0o600});fs.renameSync(t,f)}catch{if(t)try{fs.rmSync(t,{force:true})}catch{}}})',
+].join(";");
+
 export const EVENT_HOOK_COMMAND = [
+  'if [ -n "${HANOMAN_EVENT_DIR:-}" ]; then',
+  `node -e '${EVENT_SPOOL_SCRIPT}' >/dev/null 2>&1;`,
+  "else",
   'curl -sS -m 2 -X POST "$HANOMAN_EVENT_URL"',
   "-H 'content-type: application/json'",
   '-H "authorization: Bearer $HANOMAN_EVENT_TOKEN"',
   '-H "x-hanoman-session: $HANOMAN_SESSION_ID"',
   '${HANOMAN_EVENT_HOST:+-H "host: $HANOMAN_EVENT_HOST"}',
-  "--data-binary @- >/dev/null 2>&1; exit 0",
+  "--data-binary @- >/dev/null 2>&1; fi; exit 0",
 ].join(" ");
 
 export const guardSettings = (decisionFile?: string, goal?: string, eventHook?: boolean) => {

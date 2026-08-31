@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
-  parseCodexVersion, cmpVersion, codexVersionInfo, _resetCodexVersionCache, CODEX_MIN_CLIENT,
+  parseCodexVersion, probeCodexVersion, cmpVersion, codexVersionInfo,
+  _resetCodexVersionCache, CODEX_MIN_CLIENT,
 } from "../src/services/codex-version";
 import { buildApp } from "../src/app";
 
 beforeEach(() => { _resetCodexVersionCache(); });
-afterEach(() => { delete process.env.HANOMAN_CODEX_BIN; });
+afterEach(() => {
+  delete process.env.HANOMAN_CODEX_BIN;
+  delete process.env.HANOMAN_SESSION_SANDBOX;
+  delete process.env.HANOMAN_SESSION_IMAGE;
+  delete process.env.HANOMAN_PODMAN_BIN;
+});
 
 describe("SPEC-339 · deteksi versi codex", () => {
   it("memparse keluaran `codex --version`", () => {
@@ -35,6 +41,21 @@ describe("SPEC-339 · deteksi versi codex", () => {
     const info = await codexVersionInfo();
     expect(info.version).toBeNull();
     expect(info.ok).toBe(true);
+  });
+
+  it("versi native dibaca dari image sandbox, bukan executable host", async () => {
+    process.env.HANOMAN_CODEX_BIN = "codex";
+    process.env.HANOMAN_SESSION_SANDBOX = "podman";
+    process.env.HANOMAN_SESSION_IMAGE = "hanoman-agent:test";
+    process.env.HANOMAN_PODMAN_BIN = "/opt/podman-custom";
+    const calls: Array<{ bin: string; args: string[] }> = [];
+    const version = await probeCodexVersion(process.env, async (bin, args) => {
+      calls.push({ bin, args });
+      return { stdout: "codex-cli 0.151.0\n" };
+    });
+    expect(version).toBe("0.151.0");
+    expect(calls[0]).toMatchObject({ bin: "/opt/podman-custom" });
+    expect(calls[0]!.args).toContain("hanoman-agent:test");
   });
 
   it("GET /api/codex/version mengembalikan bentuk kontraknya", async () => {

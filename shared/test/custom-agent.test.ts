@@ -171,4 +171,10 @@ describe("zCreateCustomAgent", () => {
     const r = zCreateCustomAgent.safeParse({ name: "rev", description: "  ", instructions: "i" });
     expect(r.success).toBe(false);
   });
+  it("menolak effort di luar katalog runtime", () => {
+    const r = zCreateCustomAgent.safeParse({
+      name: "rev", description: "d", instructions: "i", effort: "turbo",
+    });
+    expect(r.success).toBe(false);
+  });
 });

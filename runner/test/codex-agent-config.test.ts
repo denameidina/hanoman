@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { materializeCodexAgents, renderCodexAgentToml } from "../src/codex-agent-config";
+import {
+  CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported,
+  codexNativeVersionProbe, materializeCodexAgents, renderCodexAgentToml,
+} from "../src/codex-agent-config";
 import type { AgentDef } from "../src/custom-agents";
 
 const def = (overrides: Partial<AgentDef> = {}): AgentDef => ({
@@ -39,6 +42,17 @@ describe("materializeCodexAgents", () => {
     });
   });
 
+  it("does not fake native agents on an unsupported Codex client", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hanoman-codex-agent-"));
+    dirs.push(dir);
+    const result = materializeCodexAgents([def()], dir, { clientVersion: "0.150.0" });
+    expect(result.args).toEqual([]);
+    expect(result.configPaths).toEqual([]);
+    expect(result.liveDefs).toEqual([]);
+    expect(result.delegationClause).toBe("");
+    expect(result.warnings[0]?.reason).toContain(CODEX_NATIVE_AGENTS_MIN_CLIENT);
+  });
+
   it("writes 0600 configs and quoted dotted-key overrides", () => {
     const dir = mkdtempSync(join(tmpdir(), "hanoman-codex-agent-"));
     dirs.push(dir);
@@ -72,5 +86,26 @@ describe("materializeCodexAgents", () => {
     expect(result.args.some((arg) => arg.includes('agents."good"'))).toBe(true);
     expect(result.args.some((arg) => arg.includes('agents."bad"'))).toBe(false);
     expect(result.warnings).toEqual([{ agentName: "bad", reason: "disk full" }]);
+  });
+});
+
+describe("codexNativeAgentsSupported", () => {
+  it("requires a detected client at or above the measured minimum", () => {
+    expect(codexNativeAgentsSupported("codex-cli 0.151.0")).toBe(true);
+    expect(codexNativeAgentsSupported("0.150.9")).toBe(false);
+    expect(codexNativeAgentsSupported(null)).toBe(false);
+  });
+
+  it("probes the sandbox image instead of the host binary when sessions use Podman", () => {
+    expect(codexNativeVersionProbe({
+      HANOMAN_SESSION_SANDBOX: "podman",
+      HANOMAN_SESSION_IMAGE: "hanoman-agent:42",
+    }, "/host/codex")).toEqual({
+      bin: "podman",
+      args: expect.arrayContaining([
+        "run", "--rm", "--network", "none", "hanoman-agent:42",
+        "/bin/sh", "-lc", "'/host/codex' --version",
+      ]),
+    });
   });
 });
