@@ -230,6 +230,66 @@ Server menolak boot production bila uid 0, bind bukan loopback, origin split/tru
 atau sandbox bukan Podman. `WorkingDirectory` tidak dipakai untuk menemukan aset paket, tetapi
 memastikan cwd private dan stabil. Migrasi Prisma tetap diterapkan otomatis setiap start.
 
+### 3.1 Egress proxy rootless
+
+Sandbox Podman menuntut egress lewat proxy sendiri. Unit-nya berjalan sebagai user service yang
+sama dan **wajib** dirujuk `hanoman.service`:
+
+```ini
+# /etc/systemd/system/hanoman-egress-proxy.service
+[Unit]
+Description=Hanoman rootless egress proxy
+After=network-online.target user@<uid>.service
+Wants=network-online.target
+Requires=user@<uid>.service
+
+[Service]
+Type=simple
+User=hanoman
+Group=hanoman
+Environment=HOME=/var/lib/hanoman
+Environment=XDG_RUNTIME_DIR=/run/user/<uid>
+WorkingDirectory=/
+Delegate=yes
+NoNewPrivileges=no
+ExecStart=/usr/bin/podman start --attach hanoman-egress-proxy
+ExecStop=/usr/bin/podman stop --time 10 hanoman-egress-proxy
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`NoNewPrivileges=no` di unit ini **bukan kelalaian** — ia syarat kerja, dan hanya di unit ini
+(`hanoman.service` tetap `true`). Podman rootless memanggil setuid `/usr/bin/newuidmap` untuk
+**membuat** user-namespace milik user service; `NoNewPrivileges=true` menetralkan setuid itu:
+
+```
+newuidmap: write to uid_map failed: Operation not permitted
+Error: cannot set up namespace using "/usr/bin/newuidmap"   → exit 125
+```
+
+Aktifkan lingering (`loginctl enable-linger hanoman`) dan pastikan `/etc/subuid` & `/etc/subgid`
+punya baris untuk user itu — tetapi bila keduanya sudah benar dan galat di atas tetap muncul,
+tersangkanya `NoNewPrivileges`, bukan subuid.
+
+Dua jebakan diagnosis, keduanya terukur di hub produksi 31 Agu 2026 (8.974 restart dalam 8 jam):
+
+- **Gerbang ini hanya kena di jalur *create*.** Selama namespace-nya sudah ada, podman cuma
+  *join* dan `newuidmap` tak pernah dipanggil — unit yang cacat bisa jalan mulus berminggu-minggu
+  dan baru roboh di **reboot berikutnya**. Uptime panjang bukan bukti unit ini benar. Uji dari
+  kondisi bersih: `systemctl stop`, `pkill -u hanoman -f catatonit`, lalu `systemctl start`.
+- **`NRestarts` pada `hanoman.service` menipu.** Karena `Requires=`, kegagalan proxy menyeret
+  hanoman ikut start-stop tiap `RestartSec`, tetapi hitungannya menempel di unit **proxy**;
+  `hanoman.service` tetap melapor `NRestarts=0`. Baca `NRestarts` unit proxy, atau hitung baris
+  `Started hanoman.service` di jurnal boot.
+
+Pulih darurat tanpa mengubah unit: bikin ulang namespace-nya dari jalur berprivilese —
+`sudo -u hanoman -H sh -c "cd /; XDG_RUNTIME_DIR=/run/user/<uid> HOME=/var/lib/hanoman podman ps"`
+— container naik dan loop berhenti seketika. Itu tambal, bukan perbaikan: kambuh di reboot
+berikutnya.
+
 ## 4. Reverse proxy TLS dan access proxy
 
 Contoh Caddy di bawah menunjukkan pemisahan host. Blok `forward_auth` adalah placeholder kontrak;
