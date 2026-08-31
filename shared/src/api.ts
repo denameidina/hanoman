@@ -209,6 +209,9 @@ export const paths = {
   leadFlowCancel: (id: string) => `${API}/lead/flows/${encodeURIComponent(id)}/cancel`,
   // SPEC-450 · ADR-0094 · katalog custom agent. `?projectId=` → himpunan EFEKTIF (global+project).
   customAgents: `${API}/custom-agents`,
+  customAgentMetrics: `${API}/custom-agents/metrics`,
+  customAgentInvocation: (id: string) =>
+    `${API}/custom-agents/invocations/${encodeURIComponent(id)}`,
   // SPEC-484 · ADR-0101 · sumber daftar tools/model/runtime untuk form (mention dari `customAgents`).
   customAgentCatalog: `${API}/custom-agents/catalog`,
   // SPEC-481 · ADR-0100 · webhook keluar (cookie-only)

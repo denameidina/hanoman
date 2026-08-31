@@ -56,6 +56,8 @@ export const guardSettings = (decisionFile?: string, goal?: string, eventHook?: 
   if (eventHook) {
     hooks.PreToolUse = [{ matcher: "AskUserQuestion",
       hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] }];
+    hooks.SubagentStart = [{ hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] }];
+    hooks.SubagentStop = [{ hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] }];
   }
   // SPEC-332 · ADR-0073 · mode goal: mesin yang SAMA dipasang `/goal` di dalam sesi
   // (sessionHooksRegistry.add(cwd,"Stop","",{type:"prompt",prompt})), tapi dari luar dan saat sesi

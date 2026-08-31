@@ -494,6 +494,37 @@ model SessionHistory {
   @@index([sessionId])
 }
 
+// SPEC-950 · ADR-0159 · bukti lifecycle custom subagent. LOCAL-only: runtime invocation dan
+// worktree hanya bermakna di mesin ini. Tanpa FK agar bukti tetap ada setelah sesi/agent dihapus.
+model AgentInvocation {
+  id                  String    @id
+  sessionId           String
+  projectId           String
+  specId              String?
+  runtime             String
+  runtimeInvocationId String
+  customAgentId       String?
+  agentName           String
+  model               String?
+  status              String
+  startedAt           DateTime
+  endedAt             DateTime?
+  durationMs           Int?
+  inputTokens         Int?
+  outputTokens        Int?
+  cachedTokens        Int?
+  resultExcerpt       String?
+  resultHash          String?
+  workspaceChanged    Boolean   @default(false)
+  disposition         String    @default("pending")
+  dispositionNote     String?
+  evaluatedAt         DateTime?
+
+  @@unique([sessionId, runtimeInvocationId])
+  @@index([agentName, startedAt])
+  @@index([sessionId, startedAt])
+}
+
 // SPEC-213 · ADR-0045 · change-feed server-authoritative. seq = kursor global sync.
 model SyncLog {
   // SPEC-398 · ADR-0086 · `Int`, BUKAN `BigInt`. Di SQLite sebuah kolom hanya jadi alias rowid

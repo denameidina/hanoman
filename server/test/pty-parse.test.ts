@@ -16,6 +16,7 @@ const line = (over: Record<string, string> = {}) => {
     "#{@hanoman_branch}": "", "#{@hanoman_agent}": "codex", "#{alternate_on}": "0",
     "#{window_activity}": "1756000000", "#{@hanoman_event_hook}": "1",
     "#{session_created}": "1755999000",
+    "#{@hanoman_agent_roster}": '[{"id":"global:scout","name":"scout","model":"haiku"}]',
     ...over,
   };
   return FIELDS.map((f) => v[f] ?? "").join("\t");
@@ -23,8 +24,8 @@ const line = (over: Record<string, string> = {}) => {
 
 describe("parsePanes", () => {
   it("FMT dan destructuring sama panjang", () => {
-    expect(FIELDS).toHaveLength(15);
-    expect(FIELDS[FIELDS.length - 1]).toBe("#{session_created}");
+    expect(FIELDS).toHaveLength(16);
+    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_agent_roster}");
   });
 
   it("memetakan setiap kolom ke field yang benar", () => {
@@ -33,6 +34,7 @@ describe("parsePanes", () => {
       id: "spec-919", projectId: "hanoman", specId: "SPEC-919", flow: "feature",
       cwd: "/tmp/wt", exited: false, agent: "codex", altScreen: false,
       activityAt: 1756000000, eventHook: true, startedAt: 1755999000,
+      agentRoster: [{ id: "global:scout", name: "scout", model: "haiku" }],
     });
   });
 
@@ -47,7 +49,7 @@ describe("parsePanes", () => {
      `.catch(() => [])` di view dan `catch { return; }` di sender, jadi presence mati SENYAP. */
   it("baris terpotong (kolom tak ada sama sekali) tetap memberi startedAt 0, bukan NaN", () => {
     const potong = (n: number) => line().split("\t").slice(0, n).join("\t");
-    const [p] = parsePanes(potong(FIELDS.length - 1));
+    const [p] = parsePanes(potong(FIELDS.length - 2));
     expect(p!.startedAt).toBe(0);
     expect(Number.isNaN(p!.startedAt)).toBe(false);
     expect(() => new Date(p!.startedAt * 1000).toISOString()).not.toThrow();

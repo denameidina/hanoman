@@ -124,6 +124,7 @@ const asCustomAgent = (r: CustomAgentRow): CustomAgent => ({
 
 export function toDef(r: CustomAgentRow): AgentDef {
   return {
+    id: r.id,
     name: r.name, description: r.description, instructions: r.instructions,
     tools: toolsOf(r.tools), model: r.model, mentions: mentionsOf(r.mentions),
     activation: activationOf(r.activation), effort: effortOf(r.effort),

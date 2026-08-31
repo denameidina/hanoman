@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  createSession, killSession, registerCustomAgentSource, agentsFilePath, promptFilePath,
+  createSession, getSession, killSession, registerCustomAgentSource, agentsFilePath, promptFilePath,
   agentTempDir,
 } from "../src/services/pty";
 import type { AgentDef } from "@hanoman/runner";
@@ -112,6 +112,9 @@ describe("createSession · codex", () => {
     expect(prompt).toContain("**rev**");
     expect(prompt).not.toContain("kamu peninjau");
     expect(existsSync(join(agentTempDir(s.id), "00-rev.toml"))).toBe(true);
+    expect(getSession(s.id)?.agentRoster).toEqual([
+      { name: "rev" }, { name: "tes" },
+    ]);
   });
 
   it("memasang sandbox, hook, dan trust satu-sesi untuk agen read-only", () => {

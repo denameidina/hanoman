@@ -35,6 +35,7 @@ describe("materializeCodexAgents", () => {
     dirs.push(dir);
     expect(materializeCodexAgents([], dir)).toEqual({
       args: [], delegationClause: "", configPaths: [], warnings: [],
+      liveDefs: [],
     });
   });
 

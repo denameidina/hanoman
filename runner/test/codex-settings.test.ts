@@ -148,6 +148,8 @@ describe("SPEC-909 · hook pengirim event codex", () => {
     expect(stop.startsWith("hooks.Stop=")).toBe(true);
     expect(stop).toContain("date +%s >");        // penulis marker tetap ada …
     expect(stop).toContain("curl");              // … dan pengirim event menyusul
+    expect(args.some((arg) => arg.startsWith("hooks.SubagentStart=") && arg.includes("curl"))).toBe(true);
+    expect(args.some((arg) => arg.startsWith("hooks.SubagentStop=") && arg.includes("curl"))).toBe(true);
   });
 
   it("tanpa eventHook, argv byte-identik seperti sebelum SPEC-909", () => {

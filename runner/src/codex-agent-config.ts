@@ -11,6 +11,7 @@ export type CodexMaterialization = {
   delegationClause: string;
   configPaths: string[];
   warnings: CodexMaterializationWarning[];
+  liveDefs: AgentDef[];
 };
 
 type RenderOptions = { readOnlyHookCommand?: string };
@@ -55,7 +56,7 @@ export function materializeCodexAgents(
   options: MaterializeOptions = {},
 ): CodexMaterialization {
   if (defs.length === 0) {
-    return { args: [], delegationClause: "", configPaths: [], warnings: [] };
+    return { args: [], delegationClause: "", configPaths: [], warnings: [], liveDefs: [] };
   }
   const write = options.writeFile
     ?? ((path: string, content: string) => writeFileSync(path, content, { mode: 0o600 }));
@@ -84,7 +85,7 @@ export function materializeCodexAgents(
     }
   }
   if (successful.length === 0) {
-    return { args: [], delegationClause: "", configPaths: [], warnings };
+    return { args: [], delegationClause: "", configPaths: [], warnings, liveDefs: [] };
   }
 
   const args = [
@@ -108,5 +109,6 @@ export function materializeCodexAgents(
     delegationClause: agentDelegationClause(liveDefs, "codex"),
     configPaths: successful.map((entry) => entry.path),
     warnings,
+    liveDefs,
   };
 }

@@ -7,6 +7,7 @@ import { registerBacklogSource } from "./services/scheduler/sources/backlog";
 import { registerTriaseSource } from "./services/scheduler/sources/triase";
 import { installSessionHistory, reconcileHistory } from "./services/session-history";
 import { installCustomAgents } from "./services/custom-agents";
+import { reconcileAgentInvocations } from "./services/agent-invocations";
 import { listSessions } from "./services/pty";
 import { installTelegramGateway } from "./services/telegram/bootstrap";
 import { installWebhooks } from "./services/webhooks/install";
@@ -88,6 +89,9 @@ bootstrapReady.then(() => app.listen({ port, host })).then(async () => {
     void reconcileHistory(liveIds)
       .then((n) => { if (n) console.log(`riwayat sesi: ${n} baris berjalan direkonsiliasi`); })
       .catch((e) => console.error("rekonsiliasi riwayat sesi:", e));
+    void reconcileAgentInvocations(liveIds)
+      .then((n) => { if (n) console.log(`custom agent: ${n} invocation ditandai abandoned`); })
+      .catch((e) => console.error("rekonsiliasi invocation custom agent:", e));
   } catch (e) {
     console.error("rekonsiliasi riwayat sesi dilewati — tmux tak terbaca:", e);
   }

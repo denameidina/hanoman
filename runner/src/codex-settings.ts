@@ -52,6 +52,10 @@ export function codexHookArgs(o: { decisionFile?: string; goalGate?: string; eve
   const args: string[] = [];
   if (stop.length) args.push("-c", `hooks.Stop=${group(stop)}`);
   if (submit.length) args.push("-c", `hooks.UserPromptSubmit=${group(submit)}`);
+  if (o.eventHook) {
+    args.push("-c", `hooks.SubagentStart=${group([EVENT_HOOK_COMMAND])}`);
+    args.push("-c", `hooks.SubagentStop=${group([EVENT_HOOK_COMMAND])}`);
+  }
   return args;
 }
 

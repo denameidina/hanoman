@@ -3,6 +3,7 @@ import { parseHookEvent } from "@hanoman/shared";
 import { verifySessionEventToken } from "../services/session-event-token";
 import { getSessionAsync } from "../services/pty";
 import { intakeAsk } from "../services/lead/ask";
+import { startAgentInvocation, stopAgentInvocation } from "../services/agent-invocations";
 
 // SPEC-909 · ADR-0146 · pintu masuk event pertanyaan sesi.
 //
@@ -18,6 +19,10 @@ import { intakeAsk } from "../services/lead/ask";
 // benar bila urutan cabang di app.ts kelak berubah, bukan sebagai lapis kedua yang aktif hari ini.
 
 const bearer = (h: string | undefined): string => /^Bearer (.+)$/.exec(h ?? "")?.[1] ?? "";
+const recordOf = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" ? value as Record<string, unknown> : null;
+const boundedString = (value: unknown, max: number): string | undefined =>
+  typeof value === "string" && value.length > 0 && value.length <= max ? value : undefined;
 
 export default async function (app: FastifyInstance) {
   app.post("/session-events", async (req, reply) => {
@@ -33,6 +38,34 @@ export default async function (app: FastifyInstance) {
     // sampai 916 ms saat mesin sibuk (SPEC-878). Jalur event tak boleh membayar itu.
     const s = await getSessionAsync(sessionId);
     if (!s || s.exited) return reply.code(404).send({ error: "live session not found" });
+
+    const body = recordOf(req.body);
+    const lifecycle = body?.hook_event_name;
+    if (body && (lifecycle === "SubagentStart" || lifecycle === "SubagentStop")) {
+      const runtimeInvocationId = boundedString(
+        body.agent_id ?? body.subagent_id ?? body.thread_id, 500,
+      );
+      const agentName = boundedString(body.agent_type ?? body.agent_name, 200);
+      const meta = agentName
+        ? (s.agentRoster ?? []).find((agent) => agent.name === agentName) : undefined;
+      if (!runtimeInvocationId || !meta) return reply.code(202).send({ ignored: true });
+      const identity = {
+        sessionId, projectId: s.projectId, specId: s.specId, runtime: s.agent,
+        runtimeInvocationId, customAgentId: meta.id, agentName: meta.name, model: meta.model,
+        cwd: s.cwd,
+      };
+      const outcome = lifecycle === "SubagentStart"
+        ? await startAgentInvocation(identity)
+        : await stopAgentInvocation({
+          ...identity,
+          status: body.status === "interrupted" ? "interrupted" : "completed",
+          result: boundedString(body.last_assistant_message ?? body.result, 1_000_000),
+          transcriptPath: boundedString(
+            body.agent_transcript_path ?? body.transcript_path, 4_096,
+          ),
+        });
+      return reply.code(202).send(outcome.duplicate ? { duplicate: true } : { accepted: true });
+    }
 
     const event = parseHookEvent(req.body);
     // Bukan 400: hook menembak untuk SETIAP `PreToolUse`/`Stop` yang cocok matchernya, dan sebagian

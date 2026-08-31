@@ -149,6 +149,10 @@ export type Pane = SessionInfo & {
   // penanda ini lahir sebelum pembaruan dan tak akan dijawab lead (engine menotifikasinya sekali).
   // SENGAJA di luar `SessionInfo`: ia detail internal, bukan bagian DTO yang disiarkan/disync.
   eventHook: boolean;
+  agentRoster?: SessionAgentMeta[];
+};
+export type SessionAgentMeta = {
+  id?: string; name: string; model?: string; timeoutSeconds?: number;
 };
 
 // Satu attachment per sesi: satu klien tmux melayani semua WebSocket yang menonton.
@@ -311,6 +315,7 @@ export const FMT = [
   // SPEC-919 · field baru ditambahkan di UJUNG: posisi kolom lama tak bergeser, dan
   // `pty-parse.test.ts` mengunci panjang FMT terhadap destructuring `parsePanes`.
   "#{window_activity}", "#{@hanoman_event_hook}", "#{session_created}",
+  "#{@hanoman_agent_roster}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -342,7 +347,7 @@ export async function listPanesAsync(): Promise<Pane[]> {
 export function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
-      alternate, activity, eventHook, created] = line.split("\t");
+      alternate, activity, eventHook, created, agentRoster] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -367,8 +372,27 @@ export function parsePanes(out: string): Pane[] {
       startedAt: Number(created) || 0,
       // SPEC-909 · ADR-0146 · sesi yang lahir sebelum pembaruan tak punya opsi ini → false.
       eventHook: eventHook === "1",
+      agentRoster: parseAgentRoster(agentRoster),
     }];
   });
+}
+
+function parseAgentRoster(value: string | undefined): SessionAgentMeta[] {
+  try {
+    const parsed: unknown = JSON.parse(value || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((entry): SessionAgentMeta[] => {
+      if (!entry || typeof entry !== "object") return [];
+      const row = entry as Record<string, unknown>;
+      if (typeof row.name !== "string") return [];
+      return [{
+        name: row.name,
+        ...(typeof row.id === "string" ? { id: row.id } : {}),
+        ...(typeof row.model === "string" ? { model: row.model } : {}),
+        ...(typeof row.timeoutSeconds === "number" ? { timeoutSeconds: row.timeoutSeconds } : {}),
+      }];
+    });
+  } catch { return []; }
 }
 
 const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent,
@@ -584,6 +608,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   let rosterBlock = "";
   let codexAgentArgs: string[] = [];
   let agentsFile: string | undefined;
+  let liveAgentDefs: AgentDef[] = [];
   if (customDefs.length > 0) {
     const tempDir = agentTempDir(id);
     mkdirSync(tempDir, { recursive: true, mode: 0o700 });
@@ -596,6 +621,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
         agentsFile = agentsFilePath(id);
         writeFileSync(agentsFile, json, { mode: 0o600 });
         rosterBlock = agentDelegationClause(customDefs, "claude");
+        liveAgentDefs = customDefs;
       }
     } else {
       const materialized = materializeCodexAgents(customDefs, tempDir, {
@@ -603,6 +629,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
       });
       codexAgentArgs = materialized.args;
       rosterBlock = materialized.delegationClause;
+      liveAgentDefs = materialized.liveDefs;
       for (const warning of materialized.warnings) {
         process.stderr.write(
           `hanoman: custom agent ${warning.agentName} tidak dimaterialisasi: ${warning.reason}\n`,
@@ -745,6 +772,14 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   if (opts.branch) tmux("set-option", "-t", name(id), "@hanoman_branch", opts.branch);
   // SPEC-338 · mesin sesi ikut tersimpan di tmux — sumber kebenaran sesi tetap tmux, bukan DB.
   tmux("set-option", "-t", name(id), "@hanoman_agent", agent);
+  if (liveAgentDefs.length > 0) {
+    const roster: SessionAgentMeta[] = liveAgentDefs.map((def) => ({
+      ...(def.id ? { id: def.id } : {}), name: def.name,
+      ...(def.model ? { model: def.model } : {}),
+      ...(def.timeoutSeconds ? { timeoutSeconds: def.timeoutSeconds } : {}),
+    }));
+    tmux("set-option", "-t", name(id), "@hanoman_agent_roster", JSON.stringify(roster));
+  }
   if (opts.phaseFile) tmux("set-option", "-t", name(id), "@hanoman_phase_file", opts.phaseFile);
   if (opts.decisionFile) tmux("set-option", "-t", name(id), "@hanoman_decision_file", opts.decisionFile);
   // SPEC-909 · ADR-0146 · penanda "sesi ini bisa mengirim event". Sesi hidup TANPA penanda ini tak

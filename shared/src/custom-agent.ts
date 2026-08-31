@@ -230,6 +230,33 @@ export type CustomAgentView = {
 
 export type AgentNode = { name: string; mentions: string[] };
 
+export const AGENT_DISPOSITIONS = [
+  "pending", "accepted", "partial", "rejected", "false-positive",
+] as const;
+export type AgentDisposition = (typeof AGENT_DISPOSITIONS)[number];
+
+export type AgentInvocationView = {
+  id: string; sessionId: string; projectId: string; specId: string | null;
+  runtime: AgentRuntime; customAgentId: string | null; agentName: string; model: string | null;
+  status: string; startedAt: string; endedAt: string | null; durationMs: number | null;
+  inputTokens: number | null; outputTokens: number | null; cachedTokens: number | null;
+  resultExcerpt: string | null; resultHash: string | null; workspaceChanged: boolean;
+  disposition: AgentDisposition; dispositionNote: string | null; evaluatedAt: string | null;
+};
+
+export type AgentDispositionCounts = {
+  pending: number; accepted: number; partial: number; rejected: number; falsePositive: number;
+};
+
+export type AgentMetricView = {
+  agentName: string; invocationCount: number; medianDurationMs: number | null;
+  inputTokens: number | null; outputTokens: number | null; cachedTokens: number | null;
+  dispositions: AgentDispositionCounts; operationalPrecision: number | null;
+  workspaceChanged: boolean;
+};
+
+export type AgentMetricsView = { agents: AgentMetricView[]; recent: AgentInvocationView[] };
+
 /**
  * DFS berwarna. Mengembalikan jalur siklus (`["a","b","a"]`) atau null. Mention ke nama yang tak
  * ada diabaikan — validasi rujukan tugas lapis route, bukan lapis graf.

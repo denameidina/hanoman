@@ -5,6 +5,8 @@ import { CODE_STYLE_CLAUSE } from "./code-style";
 // dan blok roster prosa (codex). Murni & tanpa I/O — pemanggil (pty.ts) yang menulis berkas.
 
 export type AgentDef = {
+  /** Soft-link local untuk telemetry; tidak dirender ke konfigurasi runtime. */
+  id?: string;
   name: string;
   description: string;
   instructions: string;

@@ -55,6 +55,8 @@ describe("SPEC-909 · hook pengirim event", () => {
     expect(h.PreToolUse).toHaveLength(1);
     expect(h.PreToolUse![0].matcher).toBe("AskUserQuestion");
     expect(h.PreToolUse![0].hooks[0]).toEqual({ type: "command", command: EVENT_HOOK_COMMAND });
+    expect(h.SubagentStart![0].hooks[0]).toEqual({ type: "command", command: EVENT_HOOK_COMMAND });
+    expect(h.SubagentStop![0].hooks[0]).toEqual({ type: "command", command: EVENT_HOOK_COMMAND });
   });
 
   it("SELALU exit 0 — PreToolUse berkode 2 memblokir tool-nya", () => {

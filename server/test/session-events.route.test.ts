@@ -8,13 +8,15 @@ import { __resetAsks } from "../src/services/lead/ask";
 import { __resetDetect } from "../src/services/lead/detect";
 import { setLead } from "../src/services/lead/config";
 import { checkAgentCapability } from "../src/services/agent-capabilities";
+import { __resetInvocationSnapshots } from "../src/services/agent-invocations";
 
 // SPEC-909 · ADR-0146 · pintu masuk event. tmux di-mock: route ini tak boleh butuh pane sungguhan.
 // `getSession` (sinkron) ikut di-mock karena pagar AC-10 di `admitAsk` memakainya — route memakai
 // kembaran asinkronnya supaya tak memblokir event loop, tapi keduanya harus melihat sesi yang sama.
 const PANE: Record<string, unknown> = {
   s1: { id: "s1", projectId: "p1", specId: "SPEC-1", exited: false, agent: "claude",
-        decisionFile: "/m", cwd: "/w" },
+        decisionFile: "/m", cwd: "/w",
+        agentRoster: [{ name: "scout", id: "global:scout", model: "haiku" }] },
   dead: { id: "dead", projectId: "p1", exited: true, agent: "claude", cwd: "/w" },
 };
 vi.mock("../src/services/pty", async (orig) => ({
@@ -44,12 +46,14 @@ const clean = async () => {
   await prisma.leadDecision.deleteMany();
   await prisma.leadFlow.deleteMany();
   await prisma.notification.deleteMany();
+  await prisma.agentInvocation.deleteMany();
   await prisma.setting.deleteMany();
   await prisma.project.deleteMany();
 };
 beforeEach(async () => {
   await clean();
   __resetAsks(); __resetDetect();
+  __resetInvocationSnapshots();
   await prisma.project.create({ data: { id: "p1", name: "P1", desc: "", kind: "web", leadOptIn: true } });
   await setLead({ ...LEAD_DEFAULTS, enabled: true });
 });
@@ -91,6 +95,41 @@ describe("POST /api/session-events", () => {
     const r = await post(app, { ...CLAUDE, tool_name: "Bash" }, auth("s1"));
     expect(r.statusCode).toBe(202);
     expect(r.json()).toEqual({ ignored: true });
+    await app.close();
+  });
+
+  it("merekam start/stop subagent idempoten dari roster sesi", async () => {
+    const app = buildApp();
+    const start = {
+      hook_event_name: "SubagentStart", agent_id: "sub-1", agent_type: "scout",
+      session_id: "dead",
+    };
+    expect((await post(app, start, auth("s1"))).json()).toEqual({ accepted: true });
+    expect((await post(app, start, auth("s1"))).json()).toEqual({ duplicate: true });
+    const stop = {
+      hook_event_name: "SubagentStop", agent_id: "sub-1", agent_type: "scout",
+      last_assistant_message: "hasil scout",
+    };
+    expect((await post(app, stop, auth("s1"))).json()).toEqual({ accepted: true });
+    expect((await post(app, stop, auth("s1"))).json()).toEqual({ duplicate: true });
+    const rows = await prisma.agentInvocation.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      sessionId: "s1", projectId: "p1", agentName: "scout", customAgentId: "global:scout",
+      status: "completed", resultExcerpt: "hasil scout",
+    });
+    await app.close();
+  });
+
+  it("mengabaikan agent_type di luar roster Hanoman dan lifecycle tanpa id", async () => {
+    const app = buildApp();
+    for (const body of [
+      { hook_event_name: "SubagentStart", agent_id: "x", agent_type: "Explore" },
+      { hook_event_name: "SubagentStart", agent_type: "scout" },
+    ]) {
+      expect((await post(app, body, auth("s1"))).json()).toEqual({ ignored: true });
+    }
+    expect(await prisma.agentInvocation.count()).toBe(0);
     await app.close();
   });
 

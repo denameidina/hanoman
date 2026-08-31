@@ -63,7 +63,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   if (top === "lead") return rw("lead");
   // SPEC-450 · ADR-0094 keputusan 8 · dipetakan MENURUT METHOD, bukan prefix (kelas bug SPEC-405):
   // menulis definisi agen mengubah apa yang dilihat SETIAP sesi baru di seluruh workspace.
-  if (top === "custom-agents") return rw("agents");
+  if (top === "custom-agents") {
+    if (seg[1] === "metrics" || seg[1] === "invocations") return "COOKIE_ONLY";
+    return rw("agents");
+  }
   // SPEC-477 · ADR-0097 · permukaan KREDENSIAL bukan permukaan kerja sesi operator: ia menyimpan
   // bot token & AgentToken, jadi agent token mana pun (termasuk milik gateway itu sendiri, yang
   // wajib memegang `settings:write`) tak boleh menyentuhnya. Sub-path `/telegram/*` yang lain
