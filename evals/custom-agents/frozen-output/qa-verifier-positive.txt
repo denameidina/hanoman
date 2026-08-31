@@ -1,0 +1,1 @@
+Test normalizeEmail tetap hijau pada base karena implementasi lama sudah memenuhi assertion. Test ini tidak relevan dan tak membuktikan perubahan.

@@ -1,0 +1,1 @@
+GET /documents/:id memerlukan autentikasi dan query mengikat ownerId ke user.id; ownership enforced dan jalur aman.

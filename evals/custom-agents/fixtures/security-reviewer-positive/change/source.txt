@@ -1,0 +1,3 @@
+GET /documents/:id
+const user = requireAuthenticated(request);
+return db.document.findUnique({ where: { id: request.params.id } });

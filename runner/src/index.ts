@@ -10,6 +10,7 @@ export * from "./agent-cli";
 export * from "./custom-agents";
 export * from "./agent-readonly";
 export * from "./codex-agent-config";
+export * from "./custom-agent-eval";
 export * from "./verify-scope";
 export * from "./code-style";
 export * from "./paths";

@@ -11,6 +11,9 @@ importers:
 
   .:
     devDependencies:
+      tsx:
+        specifier: ^4.16.0
+        version: 4.23.0
       typescript:
         specifier: ^5.5.0
         version: 5.9.3

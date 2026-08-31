@@ -1,0 +1,2 @@
+export function receive(event) { if (!ledger.includes(event.id)) ledger.push(event.id); }
+test("duplicate delivery is idempotent", () => { receive({ id: "evt-1" }); receive({ id: "evt-1" }); expect(ledger).toHaveLength(1); });

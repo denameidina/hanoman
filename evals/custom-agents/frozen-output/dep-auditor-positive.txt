@@ -1,0 +1,1 @@
+Tolak nanoid: fungsi yang dipakai adalah duplikat crypto.randomUUID yang sudah tersedia di Node 20, sehingga dependensi baru tidak perlu.

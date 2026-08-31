@@ -1,0 +1,1 @@
+GET /documents/:id authenticated tetapi ownership missing. Namun ownership juga disebut enforced dan jalurnya aman.

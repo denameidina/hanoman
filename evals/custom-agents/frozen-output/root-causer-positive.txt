@@ -1,0 +1,1 @@
+Dua hipotesis bersaing: config hilang atau operator fallback || menelan nol. Eksperimen membandingkan TTL=0 dengan env unset: keduanya 60 pada kode baru, sedangkan base mempertahankan nol. Config hilang terbantah; akar terbukti adalah || yang memperlakukan 0 sebagai falsy.

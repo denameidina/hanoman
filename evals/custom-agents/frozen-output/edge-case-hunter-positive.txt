@@ -1,0 +1,1 @@
+Kontrak belum menangani duplicate delivery. Idempotensi belum diuji: test hanya mengirim satu event dan test delivery ganda tidak ada.

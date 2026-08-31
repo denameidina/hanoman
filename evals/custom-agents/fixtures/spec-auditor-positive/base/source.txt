@@ -1,0 +1,2 @@
+Acceptance criteria:
+- [ ] emit audit log after document deletion

@@ -1,0 +1,2 @@
+package.json dependencies: {}
+export const makeId = () => crypto.randomUUID();

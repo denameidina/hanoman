@@ -1,0 +1,2 @@
+export const makeId = () => crypto.randomUUID();
+No package.json dependency was added.

@@ -1,0 +1,3 @@
+GET /documents/:id
+const user = requireAuthenticated(request);
+return db.document.findFirst({ where: { id: request.params.id, ownerId: user.id } });

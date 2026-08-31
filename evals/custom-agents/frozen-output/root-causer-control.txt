@@ -1,0 +1,1 @@
+Dengan TTL=0 nilai dipertahankan sebagai nol, sedangkan env unset menjadi 60. Laporan tidak tereproduksi dan tidak ada bug pada fallback nullish.

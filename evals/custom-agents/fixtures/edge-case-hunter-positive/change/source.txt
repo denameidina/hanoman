@@ -1,0 +1,2 @@
+export function receive(event) { ledger.push(event.id); }
+test("records one delivery", () => receive({ id: "evt-1" }));

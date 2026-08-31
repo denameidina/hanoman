@@ -1,0 +1,1 @@
+PROFILE_FIELDS adalah daftar manual yang tertinggal: field locale pada Profile hilang dari daftar tersebut dan akan gagal senyap.

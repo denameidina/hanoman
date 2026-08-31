@@ -1,0 +1,1 @@
+Test normalizeEmail merah pada base yang masih mengembalikan input mentah, lalu hijau setelah patch. Test relevan terhadap implementasi.

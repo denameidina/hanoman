@@ -1,0 +1,1 @@
+Test duplicate delivery memanggil event yang sama dua kali dan membuktikan idempotensi; batas delivery ganda sudah tertutup.

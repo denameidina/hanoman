@@ -1,0 +1,2 @@
+type Profile = { id: string; displayName: string; locale: string };
+const PROFILE_FIELDS = ["id", "displayName"];

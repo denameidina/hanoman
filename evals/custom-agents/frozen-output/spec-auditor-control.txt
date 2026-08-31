@@ -1,0 +1,1 @@
+Kriteria audit log terpenuhi: source.txt menambahkan panggilan emitAudit pada deleteDocument dan memberi jejak konkret.

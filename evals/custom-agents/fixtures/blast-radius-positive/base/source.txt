@@ -1,0 +1,2 @@
+type Profile = { id: string; displayName: string };
+const PROFILE_FIELDS = ["id", "displayName"];

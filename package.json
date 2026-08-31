@@ -17,12 +17,14 @@
     "prod": "pnpm prod:setup && pnpm prod:api",
     "build": "pnpm --filter ./src build && pnpm --filter ./server build && node scripts/stamp-build.mjs",
     "build:cli": "pnpm --filter ./cli build",
+    "agent:eval": "tsx scripts/agent-eval.ts",
     "release": "pnpm build && pnpm build:cli && node cli/dist/hanoman.js __pack && (cd dist-npm && npm pack --dry-run)",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run --no-file-parallelism",
     "validate": "pnpm db:generate && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
+    "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
   },

@@ -1,0 +1,1 @@
+crypto.randomUUID digunakan langsung dan aman tanpa dependensi baru.

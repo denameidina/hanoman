@@ -1,0 +1,1 @@
+Jalur GET /documents/:id memang authenticated, tetapi query hanya memakai id. Ownership check missing sehingga pengguna dapat membaca dokumen milik orang lain.

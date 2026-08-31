@@ -1,0 +1,2 @@
+export const ttl = Number(process.env.CACHE_TTL) || 60;
+observed: CACHE_TTL=0 produces ttl=60; unset also produces ttl=60.
