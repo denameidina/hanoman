@@ -31,12 +31,15 @@ describe("wiring sync entitas customAgent", () => {
     await prisma.customAgent.create({ data: {
       id, projectId: "demo", name: "rev", description: "d", instructions: "i",
       tools: ["Read"], model: "haiku", mentions: ["lain"], enabled: false,
+      activation: "smart", effort: "high", workspacePolicy: "read-only",
+      maxTurns: 40, timeoutSeconds: 900,
     } });
     const snap = await snapshot("customAgent", id);
     expect(snap).not.toBeNull();
     expect(Object.keys(snap!.data).sort()).toEqual([
-      "createdAt", "description", "enabled", "instructions",
-      "mentions", "model", "name", "projectId", "runtime", "tools", "updatedAt",
+      "activation", "createdAt", "description", "effort", "enabled", "instructions",
+      "maxTurns", "mentions", "model", "name", "projectId", "runtime", "timeoutSeconds",
+      "tools", "updatedAt", "workspacePolicy",
     ]);
     expect(snap!.data.mentions).toEqual(["lain"]);
     expect(snap!.data.enabled).toBe(false);
@@ -46,13 +49,18 @@ describe("wiring sync entitas customAgent", () => {
     const id = customAgentId(null, "glob");
     const r = await applyPush("customAgent", id, 0, {
       projectId: null, name: "glob", description: "d", instructions: "i",
-      tools: null, model: null, mentions: ["x"], enabled: false,
+      tools: null, model: null, mentions: ["x"], enabled: false, activation: "smart",
+      effort: "medium", workspacePolicy: "read-only", maxTurns: 25, timeoutSeconds: 300,
       createdAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:00.000Z",
     });
     expect(r.ok).toBe(true);
     const row = await prisma.customAgent.findUnique({ where: { id } });
     expect(row?.enabled).toBe(false);
     expect(row?.mentions).toEqual(["x"]);
+    expect(row).toMatchObject({
+      activation: "smart", effort: "medium", workspacePolicy: "read-only",
+      maxTurns: 25, timeoutSeconds: 300,
+    });
     expect(row?.createdAt.toISOString()).toBe("2026-08-01T00:00:00.000Z");
   });
 

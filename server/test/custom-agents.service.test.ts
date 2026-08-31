@@ -136,11 +136,15 @@ describe("toDef", () => {
   it("memetakan baris DB ke bentuk render runner", () => {
     const d = toDef({
       id: "global:a", projectId: null, name: "a", description: "desc",
-      instructions: "ins", tools: ["Read"], model: "haiku", mentions: ["b"], runtime: null, enabled: true,
+      instructions: "ins", tools: ["Read"], model: "haiku", mentions: ["b"], runtime: null,
+      activation: "smart", effort: "high", workspacePolicy: "read-only",
+      maxTurns: 40, timeoutSeconds: 900, enabled: true,
     });
     expect(d).toEqual({
       name: "a", description: "desc", instructions: "ins",
       tools: ["Read"], model: "haiku", mentions: ["b"],
+      activation: "smart", effort: "high", workspacePolicy: "read-only",
+      maxTurns: 40, timeoutSeconds: 900,
     });
   });
 });

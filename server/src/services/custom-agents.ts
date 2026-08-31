@@ -1,6 +1,7 @@
 import { prisma } from "../db";
 import {
-  effectiveAgents, detectCycle, mentionsOf, toolsOf, runtimeOf, expandTools, ALL_TOOLS, GLOBAL_SCOPE,
+  activationOf, effortOf, effectiveAgents, detectCycle, maxTurnsOf, mentionsOf, toolsOf,
+  runtimeOf, timeoutSecondsOf, workspacePolicyOf, expandTools, ALL_TOOLS, GLOBAL_SCOPE,
   type CustomAgent, type AgentNode, type Agent,
 } from "@hanoman/shared";
 import type { AgentDef } from "@hanoman/runner";
@@ -28,6 +29,11 @@ export type CustomAgentRow = {
   mentions: unknown;
   /** SPEC-484 · ADR-0101 · dibaca `runtimeOf` — nilai asing dari sync = null (warisi). */
   runtime: unknown;
+  activation?: unknown;
+  effort?: unknown;
+  workspacePolicy?: unknown;
+  maxTurns?: unknown;
+  timeoutSeconds?: unknown;
   enabled: boolean;
 };
 
@@ -44,6 +50,9 @@ const asCustomAgent = (r: CustomAgentRow): CustomAgent => ({
   description: r.description, instructions: r.instructions,
   tools: toolsOf(r.tools), model: r.model, mentions: mentionsOf(r.mentions),
   runtime: runtimeOf(r.runtime),
+  activation: activationOf(r.activation), effort: effortOf(r.effort),
+  workspacePolicy: workspacePolicyOf(r.workspacePolicy),
+  maxTurns: maxTurnsOf(r.maxTurns), timeoutSeconds: timeoutSecondsOf(r.timeoutSeconds),
   enabled: r.enabled,
   createdAt: "", updatedAt: "",   // tak dipakai lapis ini
 });
@@ -52,6 +61,9 @@ export function toDef(r: CustomAgentRow): AgentDef {
   return {
     name: r.name, description: r.description, instructions: r.instructions,
     tools: toolsOf(r.tools), model: r.model, mentions: mentionsOf(r.mentions),
+    activation: activationOf(r.activation), effort: effortOf(r.effort),
+    workspacePolicy: workspacePolicyOf(r.workspacePolicy),
+    maxTurns: maxTurnsOf(r.maxTurns), timeoutSeconds: timeoutSecondsOf(r.timeoutSeconds),
   };
 }
 
@@ -90,6 +102,8 @@ export function agentDefsFor(projectId: string, agent: Agent): AgentDef[] {
     // membuat claude membuangnya senyap (agen tanpa alat), sementara menerjemahkannya jadi `null`
     // membuat agen mewarisi SELURUH tool termasuk `Task` — lapis 2 anti-loop lenyap tanpa jejak.
     tools: expandTools(a.tools, catalogIds), model: a.model, mentions: a.mentions ?? [],
+    activation: a.activation, effort: a.effort, workspacePolicy: a.workspacePolicy,
+    maxTurns: a.maxTurns, timeoutSeconds: a.timeoutSeconds,
   }));
 }
 

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { zCreateCustomAgent, zUpdateCustomAgent, runtimeOf } from "./index";
+import {
+  activationOf, maxTurnsOf, runtimeOf, timeoutSecondsOf, workspacePolicyOf,
+  zCreateCustomAgent, zUpdateCustomAgent,
+} from "./index";
 
 const base = { name: "rev", description: "d", instructions: "i" };
 
@@ -21,6 +24,47 @@ describe("zUpdateCustomAgent · runtime", () => {
   it("ikut terbawa sebagai field opsional", () => {
     expect(zUpdateCustomAgent.safeParse({ runtime: "codex" }).success).toBe(true);
     expect(zUpdateCustomAgent.safeParse({ runtime: "gemini" }).success).toBe(false);
+  });
+});
+
+describe("execution profile", () => {
+  it("accepts the complete profile and keeps it on updates", () => {
+    const profile = {
+      activation: "smart",
+      effort: "high",
+      workspacePolicy: "read-only",
+      maxTurns: 40,
+      timeoutSeconds: 900,
+    } as const;
+    expect(zCreateCustomAgent.parse({ ...base, ...profile })).toMatchObject(profile);
+    expect(zUpdateCustomAgent.parse(profile)).toEqual(profile);
+  });
+
+  it.each([
+    { maxTurns: 0 },
+    { maxTurns: 201 },
+    { maxTurns: 1.5 },
+    { timeoutSeconds: 29 },
+    { timeoutSeconds: 3601 },
+    { timeoutSeconds: 30.5 },
+  ])("rejects an out-of-range execution limit: %j", (profile) => {
+    expect(zCreateCustomAgent.safeParse({ ...base, ...profile }).success).toBe(false);
+  });
+
+  it("rejects isolated worktrees for Codex definitions", () => {
+    expect(zCreateCustomAgent.safeParse({
+      ...base, runtime: "codex", workspacePolicy: "isolated-worktree",
+    }).success).toBe(false);
+    expect(zUpdateCustomAgent.safeParse({
+      runtime: "codex", workspacePolicy: "isolated-worktree",
+    }).success).toBe(false);
+  });
+
+  it("normalizes foreign synced values to safe legacy defaults", () => {
+    expect(activationOf("sometimes")).toBe("always");
+    expect(workspacePolicyOf("write-anywhere")).toBe("inherit");
+    expect(maxTurnsOf(-1)).toBeNull();
+    expect(timeoutSecondsOf("900")).toBeNull();
   });
 });
 

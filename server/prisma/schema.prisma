@@ -167,6 +167,11 @@ model CustomAgent {
   model        String?
   mentions     Json?
   runtime      String?  // SPEC-484 · ADR-0101 · penyaring mesin sesi; null = ikut sesi induk
+  activation   String   @default("always") // SPEC-950 · always | smart
+  effort       String?  // override reasoning effort; null = warisi sesi
+  workspacePolicy String @default("inherit") // inherit | read-only | isolated-worktree
+  maxTurns     Int?
+  timeoutSeconds Int?
   enabled      Boolean  @default(true)
   version      Int      @default(0) // SPEC-213 · version-stamp sync (ADR-0045)
   createdAt    DateTime @default(now())

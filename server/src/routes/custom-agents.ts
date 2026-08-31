@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import {
+  activationOf, effortOf, maxTurnsOf, timeoutSecondsOf, workspacePolicyOf,
   zCreateCustomAgent, zUpdateCustomAgent, customAgentId, mentionsOf, toolsOf, runtimeOf,
   modelsForRuntime, ALL_TOOLS, AGENT_RUNTIMES, AGENT_RUNTIME_LABELS, BUILTIN_AGENT_NAMES,
   type AgentRuntime, type AgentCatalogView,
@@ -38,6 +39,9 @@ const view = (r: CustomAgentRow, projectId?: string, stamps: Record<string, stri
     description: r.description, instructions: r.instructions,
     tools: toolsOf(r.tools), model: r.model, mentions: mentionsOf(r.mentions),
     runtime: runtimeOf(r.runtime),
+    activation: activationOf(r.activation), effort: effortOf(r.effort),
+    workspacePolicy: workspacePolicyOf(r.workspacePolicy),
+    maxTurns: maxTurnsOf(r.maxTurns), timeoutSeconds: timeoutSecondsOf(r.timeoutSeconds),
     enabled: r.enabled,
     builtin,
     // Sidik jari yang tak tercatat (baris menyeberang sync dari mesin lain, seed di sini belum
@@ -127,6 +131,9 @@ export default async function (app: FastifyInstance) {
       id, projectId, name: p.name, description: p.description, instructions: p.instructions,
       tools: p.tools ?? null, model: p.model ?? null, mentions: p.mentions ?? [],
       runtime: p.runtime ?? null,
+      activation: p.activation ?? "always", effort: p.effort ?? null,
+      workspacePolicy: p.workspacePolicy ?? "inherit",
+      maxTurns: p.maxTurns ?? null, timeoutSeconds: p.timeoutSeconds ?? null,
       enabled: p.enabled ?? true,
     };
     const all = [...(await rowsOf()), candidate];
@@ -139,6 +146,11 @@ export default async function (app: FastifyInstance) {
       id, projectId, name: p.name, description: p.description, instructions: p.instructions,
       tools: candidate.tools as never, model: candidate.model,
       mentions: candidate.mentions as never, runtime: candidate.runtime as string | null,
+      activation: candidate.activation as string,
+      effort: candidate.effort as string | null,
+      workspacePolicy: candidate.workspacePolicy as string,
+      maxTurns: candidate.maxTurns as number | null,
+      timeoutSeconds: candidate.timeoutSeconds as number | null,
       enabled: candidate.enabled,
     } });
     // Cache WAJIB di-refresh tiap mutasi: tanpa itu sesi yang lahir sesudahnya memakai katalog
@@ -169,6 +181,15 @@ export default async function (app: FastifyInstance) {
     // untuk model claude. `"runtime" in parsed.data` membedakan "tak dikirim" dari "dikirim null".
     const effRuntime: AgentRuntime | null =
       "runtime" in parsed.data ? (parsed.data.runtime ?? null) : runtimeOf(before.runtime);
+    const effWorkspacePolicy = "workspacePolicy" in parsed.data
+      ? parsed.data.workspacePolicy ?? "inherit"
+      : workspacePolicyOf(before.workspacePolicy);
+    if (("runtime" in parsed.data || "workspacePolicy" in parsed.data)
+      && effWorkspacePolicy === "isolated-worktree" && effRuntime !== "claude") {
+      return reply.code(400).send({
+        error: "isolated-worktree hanya tersedia untuk agen ber-runtime Claude Code",
+      });
+    }
     if (parsed.data.tools !== undefined) {
       const tp = toolsProblem(parsed.data.tools, agentToolIds(await repoDirOf(before.projectId)));
       if (tp) return reply.code(400).send(tp);
@@ -189,6 +210,12 @@ export default async function (app: FastifyInstance) {
       mentions: parsed.data.mentions ?? mentionsOf(before.mentions),
       tools: parsed.data.tools !== undefined ? parsed.data.tools : toolsOf(before.tools),
       runtime: effRuntime,
+      activation: parsed.data.activation ?? activationOf(before.activation),
+      effort: parsed.data.effort !== undefined ? parsed.data.effort : effortOf(before.effort),
+      workspacePolicy: effWorkspacePolicy,
+      maxTurns: parsed.data.maxTurns !== undefined ? parsed.data.maxTurns : maxTurnsOf(before.maxTurns),
+      timeoutSeconds: parsed.data.timeoutSeconds !== undefined
+        ? parsed.data.timeoutSeconds : timeoutSecondsOf(before.timeoutSeconds),
     };
     const all = (await rowsOf()).map((r) => (r.id === id ? candidate : r));
     const unknown = unknownMentions(candidate, all);
@@ -200,6 +227,11 @@ export default async function (app: FastifyInstance) {
       description: candidate.description, instructions: candidate.instructions,
       tools: candidate.tools as never, model: candidate.model,
       mentions: candidate.mentions as never, runtime: candidate.runtime as string | null,
+      activation: candidate.activation as string,
+      effort: candidate.effort as string | null,
+      workspacePolicy: candidate.workspacePolicy as string,
+      maxTurns: candidate.maxTurns as number | null,
+      timeoutSeconds: candidate.timeoutSeconds as number | null,
       enabled: candidate.enabled,
     } });
     await loadCustomAgents();

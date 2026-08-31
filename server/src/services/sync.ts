@@ -79,7 +79,8 @@ const FIELDS: Record<Entity, string[]> = {
   // SPEC-484 · ADR-0101 · `runtime` ikut: ia menentukan sesi mesin mana yang memakai persona ini,
   // dan kolom yang terlewat di sini mendarat sebagai default palsu (= "warisi") di setiap mesin
   // lain tanpa satu pun error.
-  customAgent: ["projectId", "name", "description", "instructions", "tools", "model", "mentions", "runtime", "enabled", "createdAt", "updatedAt"],
+  customAgent: ["projectId", "name", "description", "instructions", "tools", "model", "mentions", "runtime",
+    "activation", "effort", "workspacePolicy", "maxTurns", "timeoutSeconds", "enabled", "createdAt", "updatedAt"],
   // SPEC-471 · ADR-0095 · SELURUH kolom bermakna ikut. `status`/`specId` termasuk: keputusan
   // triase adalah bagian keadaan yang harus dilihat sama oleh semua mesin — tanpa itu satu
   // mesin bisa menerima ulang issue yang di mesin lain sudah jadi backlog.
@@ -146,6 +147,7 @@ export const __DATE_FIELDS = DATE_FIELDS;
 const NUMBER_FIELDS = new Set([
   "vps:port", "ticket:number", "ticketAttachment:size", "githubIssue:number",
 ]);
+const NULLABLE_NUMBER_FIELDS = new Set(["customAgent:maxTurns", "customAgent:timeoutSeconds"]);
 // SPEC-945 · ADR-0150 · TERPISAH dari NUMBER_FIELDS, yang menuntut `Number.isSafeInteger`.
 // `Task.order` adalah Float, dan pecahan itu justru ALASAN keberadaannya: drop di antara dua kartu
 // menulis titik tengah tetangganya. Menaruhnya di NUMBER_FIELDS lolos selama nilainya masih 0
@@ -187,6 +189,11 @@ export function validateSyncData(
     }
     if (NUMBER_FIELDS.has(key)) {
       if (!Number.isSafeInteger(value)) throw new Error(`sync tipe invalid: ${entity}.${field}`);
+      continue;
+    }
+    if (NULLABLE_NUMBER_FIELDS.has(key)) {
+      if (value !== null && !Number.isSafeInteger(value))
+        throw new Error(`sync tipe invalid: ${entity}.${field}`);
       continue;
     }
     if (BOOLEAN_FIELDS.has(key)) {

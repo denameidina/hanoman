@@ -24,6 +24,12 @@ export type BuiltinAgentDef = {
   /** Himpunan bagian DEFAULT_AGENT_TOOLS. Nama MCP dilarang: berbeda per mesin. */
   readonly tools: readonly string[];
   readonly enabledByDefault: boolean;
+  readonly activation: "smart";
+  readonly effort: "low" | "medium" | "high";
+  readonly workspacePolicy: "read-only" | "isolated-worktree";
+  readonly maxTurns: number | null;
+  readonly timeoutSeconds: number | null;
+  readonly models: Readonly<Record<"claude" | "codex", string>>;
 };
 
 export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
@@ -36,6 +42,9 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       + "belasan berkas sendiri.",
     tools: ["Read", "Glob", "Grep"],
     enabledByDefault: true,
+    activation: "smart", effort: "low", workspacePolicy: "read-only",
+    maxTurns: null, timeoutSeconds: null,
+    models: { claude: "haiku", codex: "gpt-5.6-terra" },
     instructions: [
       "Kamu navigator basis kode. Tugasmu MENJAWAB, bukan menyalin.",
       "",
@@ -65,6 +74,9 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       + "dia untuk memperbaiki — dia mendiagnosis.",
     tools: ["Read", "Glob", "Grep", "Bash"],
     enabledByDefault: false,
+    activation: "smart", effort: "high", workspacePolicy: "read-only",
+    maxTurns: null, timeoutSeconds: null,
+    models: { claude: "sonnet", codex: "gpt-5.6" },
     instructions: [
       "Kamu diagnostikus. Kamu TIDAK memperbaiki kode — kamu membuktikan sebabnya.",
       "",
@@ -97,7 +109,10 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       + "tersentuh perubahan, memisahkan gagal palsu dari regresi, dan membuktikan bahwa test yang "
       + "lulus itu benar-benar menguji perubahannya.",
     tools: ["Read", "Glob", "Grep", "Bash"],
-    enabledByDefault: true,
+    enabledByDefault: false,
+    activation: "smart", effort: "medium", workspacePolicy: "isolated-worktree",
+    maxTurns: 40, timeoutSeconds: 900,
+    models: { claude: "sonnet", codex: "gpt-5.6-terra" },
     instructions: [
       "Kamu gerbang terakhir sebelum sesuatu diumumkan hijau. Tugasmu MERAGUKAN kehijauan itu.",
       "",
@@ -109,18 +124,18 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       "   paralelisme antar-berkas test, sisa proses/soket/port dari run sebelumnya, variabel",
       "   lingkungan yang bocor dari shell, dan test yang memang sudah merah SEBELUM perubahan.",
       "   Cara memutuskannya: jalankan ulang test itu SENDIRIAN, dengan state yang bersih.",
-      "4. UJI RELEVANSI — langkah yang hampir tak pernah dilakukan siapa pun, dan tanpa ini 'hijau'",
-      "   tak berarti apa-apa: siapkan pohon kerja terpisah di commit SEBELUM perubahan",
-      "   (`git worktree add --detach <dir> <base-sha>`), pasang test barunya di sana, jalankan,",
-      "   dan tuntut test itu MERAH. Test yang tetap hijau tanpa perubahan tidak membuktikan apa",
-      "   pun tentang perubahan itu.",
-      "5. Bersihkan pohon kerja sementara (`git worktree remove`).",
+      "4. UJI RELEVANSI hanya di worktree sementara dari `baseSha`, tidak pernah di worktree",
+      "   parent: buat worktree terpisah, pasang patch test di sana, jalankan, dan tuntut test",
+      "   itu MERAH. Bila `baseSha` atau patch test tidak tersedia, laporkan `belum terbukti`;",
+      "   jangan mencoba eksperimen kontrol di source parent.",
+      "5. Bersihkan worktree sementara milikmu. Laporkan secara eksplisit bila cleanup gagal.",
       "",
       "Larangan keras:",
       "- JANGAN `git stash` untuk apa pun. Tumpukan stash milik REPO, bukan pohon kerja — sesi lain",
       "  bisa mem-pop stash milikmu, dan kamu bisa mem-pop milik mereka. Isolasi memakai",
       "  `git worktree add`, titik.",
       "- JANGAN mengubah test agar lulus. Bila test-nya yang salah, itu temuan, bukan pekerjaan.",
+      "- JANGAN mengubah satu byte pun di worktree parent, termasuk berkas probe sementara.",
       "",
       "Gerbang bukti: setiap klaim membawa perintah DAN potongan keluarannya. Tanpa keluaran, tanpa",
       "klaim. 'Semua test lulus' tanpa keluaran adalah kegagalanmu, bukan laporan.",
@@ -138,6 +153,9 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       + "dulu sebelum menyimpannya.",
     tools: ["Read", "Glob", "Grep", "Bash", "Write", "Edit"],
     enabledByDefault: false,
+    activation: "smart", effort: "high", workspacePolicy: "isolated-worktree",
+    maxTurns: null, timeoutSeconds: null,
+    models: { claude: "sonnet", codex: "gpt-5.6" },
     instructions: [
       "Kamu penambal jalur bahagia. Cakupan yang terlihat baik bukan urusanmu — kontrak yang tak",
       "pernah diuji itu urusanmu.",
@@ -173,6 +191,9 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       + "konstanta. Ia mencari kegagalan senyap — yang tak memunculkan satu pun error.",
     tools: ["Read", "Glob", "Grep", "Bash"],
     enabledByDefault: true,
+    activation: "smart", effort: "medium", workspacePolicy: "read-only",
+    maxTurns: null, timeoutSeconds: null,
+    models: { claude: "sonnet", codex: "gpt-5.6-terra" },
     instructions: [
       "Kamu pencari cermin yang hanyut. Kelas bug yang kamu buru punya satu ciri: TIDAK ADA yang",
       "error. Satu kontrak hidup di beberapa tempat, satu tempat diperbarui, sisanya diam.",
@@ -208,6 +229,9 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       + "tak terpenuhi, walau kotaknya sudah tercentang.",
     tools: ["Read", "Glob", "Grep", "Bash"],
     enabledByDefault: false,
+    activation: "smart", effort: "high", workspacePolicy: "read-only",
+    maxTurns: null, timeoutSeconds: null,
+    models: { claude: "sonnet", codex: "gpt-5.6-terra" },
     instructions: [
       "Kamu pengadu janji. Kamu tak menilai bagus atau tidaknya kode — kamu menilai apakah yang",
       "diminta benar-benar ada.",
@@ -240,6 +264,9 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       + "jalurnya.",
     tools: ["Read", "Glob", "Grep", "Bash"],
     enabledByDefault: true,
+    activation: "smart", effort: "high", workspacePolicy: "read-only",
+    maxTurns: null, timeoutSeconds: null,
+    models: { claude: "sonnet", codex: "gpt-5.6" },
     instructions: [
       "Kamu penelusur sumber-ke-sink. Daftar kekhawatiran umum tak mengubah apa pun; yang mengubah",
       "adalah satu jalur konkret dari input yang tak dipercaya sampai ke tempat ia melukai.",
@@ -277,6 +304,9 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       + "tanpa dependensi baru itu.",
     tools: ["Read", "Glob", "Grep", "Bash", "WebSearch", "WebFetch"],
     enabledByDefault: false,
+    activation: "smart", effort: "medium", workspacePolicy: "read-only",
+    maxTurns: null, timeoutSeconds: null,
+    models: { claude: "haiku", codex: "gpt-5.6-terra" },
     instructions: [
       "Kamu gerbang rantai pasok. Satu dependensi masuk lewat satu baris diff dan tak pernah",
       "diperiksa lagi seumur hidup proyek — pemeriksaan itu terjadi sekarang atau tidak sama sekali.",

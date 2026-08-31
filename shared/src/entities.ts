@@ -372,6 +372,9 @@ export const zSetting = z.object({
   // LOKAL per mesin: `setting` TIDAK ada di FIELDS sync (server/src/services/sync.ts), jadi dua
   // mesin dengan versi hanoman berbeda tak bisa saling menimpa definisi bolak-balik.
   builtinAgents: z.record(z.string(), z.string()).default({}),
+  // SPEC-950 · marker safety policy lokal. Terpisah dari fingerprint konten agar policy sekali
+  // jalan tidak membuat seed memperlakukan konfigurasi operator sebagai bawaan.
+  builtinAgentPolicies: z.record(z.string(), z.string()).default({}),
 });
 export type Setting = z.infer<typeof zSetting>;
 

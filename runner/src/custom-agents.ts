@@ -11,6 +11,11 @@ export type AgentDef = {
   tools: string[] | null;
   model: string | null;
   mentions: string[];
+  activation?: "always" | "smart";
+  effort?: string | null;
+  workspacePolicy?: "inherit" | "read-only" | "isolated-worktree";
+  maxTurns?: number | null;
+  timeoutSeconds?: number | null;
 };
 
 /** Mention yang benar-benar bisa dituju: nama di luar roster dibuang, agar prosa tak berbohong. */

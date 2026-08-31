@@ -43,6 +43,19 @@ describe("POST /api/custom-agents", () => {
     expect(r.json().id).toBe("p1:rev");
   });
 
+  it("menyimpan profil eksekusi lengkap", async () => {
+    const r = await post({
+      name: "profiled", description: "d", instructions: "i",
+      activation: "smart", effort: "high", workspacePolicy: "read-only",
+      maxTurns: 40, timeoutSeconds: 900,
+    });
+    expect(r.statusCode).toBe(201);
+    expect(r.json()).toMatchObject({
+      activation: "smart", effort: "high", workspacePolicy: "read-only",
+      maxTurns: 40, timeoutSeconds: 900,
+    });
+  });
+
   it("menolak 400 untuk nama yang bukan slug", async () => {
     expect((await post({ name: "Rev", description: "d", instructions: "i" })).statusCode).toBe(400);
   });
@@ -147,6 +160,33 @@ describe("PATCH /api/custom-agents/:id", () => {
     expect(r.statusCode).toBe(200);
     expect(r.json().instructions).toBe("baru");
     expect(r.json().enabled).toBe(false);
+  });
+
+  it("mengubah profil eksekusi dan mengembalikan nilai efektif", async () => {
+    await post({ name: "agn-a", description: "d", instructions: "i" });
+    const r = await app.inject({
+      method: "PATCH", url: "/api/custom-agents/global:agn-a",
+      payload: {
+        activation: "smart", effort: "medium", workspacePolicy: "read-only",
+        maxTurns: 25, timeoutSeconds: 300,
+      },
+    });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toMatchObject({
+      activation: "smart", effort: "medium", workspacePolicy: "read-only",
+      maxTurns: 25, timeoutSeconds: 300,
+    });
+  });
+
+  it("menolak isolated-worktree bila runtime efektifnya Codex", async () => {
+    await post({
+      name: "cdx-isolated", description: "d", instructions: "i", runtime: "codex",
+    });
+    const r = await app.inject({
+      method: "PATCH", url: "/api/custom-agents/global:cdx-isolated",
+      payload: { workspacePolicy: "isolated-worktree" },
+    });
+    expect(r.statusCode).toBe(400);
   });
 
   it("404 untuk id yang tak ada", async () => {

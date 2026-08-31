@@ -39,9 +39,35 @@ describe("katalog agen bawaan", () => {
     }
   });
 
-  it("tepat empat menyala secara default", () => {
+  it("hanya tiga agen read-only menyala secara default", () => {
     const on = BUILTIN_AGENTS.filter((a) => a.enabledByDefault).map((a) => a.name).sort();
-    expect(on).toEqual(["blast-radius", "qa-verifier", "scout", "security-reviewer"]);
+    expect(on).toEqual(["blast-radius", "scout", "security-reviewer"]);
+    for (const agent of BUILTIN_AGENTS.filter((a) => a.enabledByDefault)) {
+      expect(agent.activation).toBe("smart");
+      expect(agent.workspacePolicy).toBe("read-only");
+      expect(agent.tools).not.toContain("Write");
+      expect(agent.tools).not.toContain("Edit");
+    }
+  });
+
+  it("qa-verifier opt-in selalu meminta worktree terisolasi dan batas kerja", () => {
+    const qa = BUILTIN_AGENTS.find((a) => a.name === "qa-verifier")!;
+    expect(qa.enabledByDefault).toBe(false);
+    expect(qa.activation).toBe("smart");
+    expect(qa.workspacePolicy).toBe("isolated-worktree");
+    expect(qa.maxTurns).toBe(40);
+    expect(qa.timeoutSeconds).toBe(900);
+    expect(qa.instructions).toContain("worktree sementara");
+    expect(qa.instructions).toContain("belum terbukti");
+  });
+
+  it("membawa rekomendasi model dan effort per runtime", () => {
+    const scout = BUILTIN_AGENTS.find((a) => a.name === "scout")!;
+    const security = BUILTIN_AGENTS.find((a) => a.name === "security-reviewer")!;
+    expect(scout.models).toEqual({ claude: "haiku", codex: "gpt-5.6-terra" });
+    expect(scout.effort).toBe("low");
+    expect(security.models).toEqual({ claude: "sonnet", codex: "gpt-5.6" });
+    expect(security.effort).toBe("high");
   });
 
   // Berkas ini ikut dibundel untuk browser. `node:crypto` di sini mematikan build web, dan
@@ -67,9 +93,11 @@ describe("bookkeeping sidik jari di zSetting", () => {
 
   it("default objek kosong saat absen", () => {
     expect(zSetting.parse(base).builtinAgents).toEqual({});
+    expect(zSetting.parse(base).builtinAgentPolicies).toEqual({});
   });
 
   it("bentuk asing ditolak, tidak diterima diam-diam", () => {
     expect(zSetting.safeParse({ ...base, builtinAgents: "bukan objek" }).success).toBe(false);
+    expect(zSetting.safeParse({ ...base, builtinAgentPolicies: "bukan objek" }).success).toBe(false);
   });
 });
