@@ -797,6 +797,11 @@ semua project); terisi = milik satu project, dan agen project **menimpa** agen g
 | `model` | `String?` | `null` = warisi model sesi. |
 | `mentions` | `Json?` | Array nama agen yang boleh dipanggil. `null`/`[]` = daun. |
 | `runtime` | `String?` | **SPEC-484 · [ADR-0101](../adr/0101-form-custom-agent-katalog-runtime.md)** · penyaring mesin sesi. `null` = **ikut sesi induk** (dipakai sesi claude **dan** codex — perilaku ADR-0094 apa adanya, jadi baris lama tak perlu backfill); `"claude"`/`"codex"` = hanya dimaterialisasi di sesi mesin itu. Nilai asing dari sync dibaca sebagai `null`. Ikut `FIELDS.customAgent`. |
+| `activation` | `String` | **SPEC-950 · [ADR-0159](../adr/0159-custom-agent-native-terukur-terisolasi.md)** · `always` atau `smart`; default legacy `always`. Builtin smart dipilih dari flow/prompt/diff saat sesi lahir. |
+| `effort` | `String?` | Override reasoning effort child; null = warisi/rekomendasi runtime. |
+| `workspacePolicy` | `String` | `inherit` · `read-only` · `isolated-worktree`; default legacy `inherit`. Isolasi child hanya tersedia untuk Claude. |
+| `maxTurns` | `Int?` | Null atau 1–200; dipancarkan hanya saat runtime mendukung. |
+| `timeoutSeconds` | `Int?` | Null atau 30–3600; batas yang disampaikan ke child, bukan klaim kill server bila runtime tak mendukung native timeout. |
 | `enabled` | `Boolean` | Agen project yang **dimatikan menyembunyikan** global bernama sama. |
 | `version` | `Int` | Version-stamp sync (ADR-0045). Ikut `SYNCED`/`FIELDS`/`PG_ORDER`. |
 
@@ -824,6 +829,30 @@ semua project); terisi = milik satu project, dan agen project **menimpa** agen g
   pernah diteruskan apa adanya (claude **membuangnya senyap** → agen tanpa alat) dan tak pernah
   diterjemahkan jadi `null` (agen tanpa `tools` mewarisi **seluruh** tool termasuk `Task`, dan lapis
   2 anti-loop lenyap tanpa jejak). `runner/src/custom-agents.ts` karena itu tak pernah melihat `"*"`.
+- Kelima execution field **ikut `FIELDS.customAgent`**. `available` dan `availabilityReason` bukan
+  kolom: keduanya diturunkan dari kombinasi runtime/policy di response supaya client lama tidak
+  mengirim kebenaran kedua lewat sync.
+
+## AgentInvocation (SPEC-950 · [ADR-0159](../adr/0159-custom-agent-native-terukur-terisolasi.md))
+
+Bukti lifecycle custom subagent, **LOCAL-only dan tak disync**. Tanpa FK: `SessionHistory` dapat
+dipangkas dan `CustomAgent` dapat dihapus, tetapi evidence historis tetap perlu terbaca.
+
+| Kolom | Catatan |
+|---|---|
+| `id` | UUID baris lokal. |
+| `sessionId` · `projectId` · `specId?` | Snapshot konteks parent; tidak ber-FK. |
+| `runtime` · `runtimeInvocationId` | Identitas event runtime; unique `(sessionId,runtimeInvocationId)` membuat lifecycle idempoten. |
+| `customAgentId?` · `agentName` · `model?` | Soft-link dan snapshot identitas child. |
+| `status` | `running|completed|interrupted|abandoned`. Boot menutup orphan running sebagai abandoned. |
+| `startedAt` · `endedAt?` · `durationMs?` | Stop sintetis sesudah restart memakai `startedAt=endedAt` dan `durationMs=null`, bukan nol palsu. |
+| `inputTokens?` · `outputTokens?` · `cachedTokens?` | Hanya nilai yang dapat dibaca dari transcript allowlisted; bentuk asing tetap null. |
+| `resultExcerpt?` · `resultHash?` | Excerpt tanpa ANSI, maksimum 4 KiB UTF-8; SHA-256 hasil bersih penuh. |
+| `workspaceChanged` | Perbandingan hash `git status --porcelain=v1 -z` start/stop; bukan attribution eksklusif. |
+| `disposition` · `dispositionNote?` · `evaluatedAt?` | `pending|accepted|partial|rejected|false-positive`, keputusan admin manusia. |
+
+Tabel ini **tidak masuk** `SYNCED`, `FIELDS`, `PG_ORDER`, atau migration Postgres legacy. Transcript
+path tidak disimpan; parser hanya membaca berkas biasa di root runtime yang diizinkan dan <10 MiB.
 
 ## GithubIssue (SPEC-471 · [ADR-0095](../adr/0095-tarik-issue-github-ke-backlog.md))
 

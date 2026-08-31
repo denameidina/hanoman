@@ -1260,9 +1260,9 @@ Pakai skill lebih sempit saat task cocok:
   **Empat hal yang mudah dirusak:** (1) gerbangnya hidup **di dalam teks** klausa (baris pertama
   "berlaku setiap kali kamu menulis atau mengubah kode") — itulah yang membuat SATU konstanta bisa
   dipakai prompt yang keluarannya bukan kode; varian kedua = kelas bug SPEC-431/448/475/481 dalam
-  bentuk teks; (2) **`agentRosterBlock` codex sengaja tak menerimanya** (roster ditempel ke prompt
-  sesi yang sudah membawanya), sementara subagent `claude --agents` punya konteks **terpisah** dan
-  harus membawanya sendiri; (3) klausa **tak boleh memuat nama perintah** — prompt hidup di ARGV,
+  bentuk teks; (2) sejak SPEC-950/ADR-0159, `agentPromptOf` memasangnya di child native Claude
+  **dan Codex** karena keduanya berkonteks terpisah; prompt parent hanya menerima klausa delegasi
+  ringkas; (3) klausa **tak boleh memuat nama perintah** — prompt hidup di ARGV,
   jadi ia jadi muatan `pkill -f` sesi tetangga (SPEC-402), dijaga test; (4) bukti "terkirim" dibaca
   dari **pane tmux sesi sungguhan** (`session-launch.test.ts`, claude & codex), bukan dari
   `startPrompt()` — yang dijaga spec ini justru call site yang lupa memanggil builder-nya.
@@ -1331,11 +1331,10 @@ Pakai skill lebih sempit saat task cocok:
   **deterministik** `"<projectId|global>:<name>"` dan `name` **immutable**: baris ini menyeberang
   changefeed yang **tak punya operasi hapus**, jadi id acak membuat dua mesin melahirkan dua baris
   yang lalu bertemu di satu objek JSON **berkunci nama** dan salah satunya hilang tanpa jejak.
-  **Nol berkas ditulis ke worktree.** Sesi **claude** lahir dengan `--agents "$(cat <file>)"`
-  (mekanisme native — custom agent jadi **subagent sungguhan**; JSON di berkas tmpdir karena tmux
-  membatasi SATU command ±16 KB, kelas kegagalan SPEC-223); sesi **codex** menerima blok **roster**
-  yang ditempel ke akhir prompt sesi dan mengadopsi peran **inline** (tak ada proses kedua → risiko
-  loop di codex **struktural nol**). Keduanya dirakit di titik cekik **`createSession`** lewat
+  **Amandemen SPEC-950/ADR-0159:** nol berkas ditulis ke worktree/home. Sesi **claude** lahir
+  dengan `--agents "$(cat <file>)"`; sesi **codex** menerima `agents.enabled=true` + TOML temp per
+  child. Keduanya native; full instructions hanya di config child, prompt parent hanya roster
+  ringkas. Keduanya dirakit di titik cekik **`createSession`** lewat
   `registerCustomAgentSource` (cermin `registerSessionHooks`) dengan cache **sinkron** — Prisma
   async, `createSession` tidak — yang di-invalidasi tiap mutasi route & sync; gagal baca → daftar
   kosong. Sesi ber-`opts.command` (shell mentah) tak menerima apa pun. **Anti-loop tiga lapis, dua
@@ -1357,6 +1356,11 @@ Pakai skill lebih sempit saat task cocok:
   kemampuan; (7) `"customAgent"` wajib ikut `PG_ORDER` + seluruh kolomnya di `FIELDS.customAgent`.
   Domain capability **baru `agents`**, dipetakan **menurut method** (kelas bug SPEC-405). **Bukan**
   titik spawn agen baru — `services/lead/brain.ts` tetap satu-satunya di luar `pty.ts` (SPEC-448).
+  **Gotcha native SPEC-950:** `--dangerously-bypass-hook-trust` Codex sudah datang dari
+  `agentFlags()` dan wajib muncul **tepat sekali** — jangan menambahkannya lagi di materializer;
+  Codex menolak flag duplikat dan pane mati sebelum TUI. Test read-only juga wajib mengeksekusi
+  **berkas hook yang dihasilkan**, bukan hanya validator murni: serialisasi `Function#toString`
+  dari transpiler pernah membawa helper `__name` yang tidak ikut tertulis sehingga hook crash.
 - **Form Custom Agent berbasis katalog + `runtime`** (SPEC-484/ADR-**0101**, memperluas 0094 & 0074):
   `tools`/`model`/`mention` memakai **kontrol pilihan** bersumber API — `GET /api/custom-agents/catalog`
   untuk tools/model/runtime, `GET /custom-agents?projectId=` (yang sudah dipanggil panel) untuk mention;

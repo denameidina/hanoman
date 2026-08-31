@@ -37,3 +37,26 @@ Sesi memakai auth Claude Code yang sama dengan sesi harian: `claude` membaca tok
 atau `~/.claude/.credentials.json`, dengan alternatif env `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_API_KEY`
 (lihat `.env.example`). Tak ada lagi verifikasi kredensial saat boot worker — tak ada worker. Indikator
 limit membaca token OAuth yang sama untuk memanggil usage API (`services/limits.ts`, ADR-0024).
+
+## Evaluasi custom agent (SPEC-950 · ADR-0159)
+
+Eval live selalu **opt-in** dan memakai kuota runtime:
+
+```bash
+pnpm agent:eval --runtime claude|codex [--agent name] [--output path]
+```
+
+Manifest `evals/custom-agents/manifest.ts` membawa satu kasus positif + satu kontrol untuk setiap
+delapan builtin. Harness menyalin `base/` ke repo `mktemp`, membuat commit, menimpa `change/` untuk
+membentuk diff, lalu memakai renderer produk Claude/Codex. Repo temp selalu dibuang di `finally`;
+report default hidup di temp report terpisah dan output eksplisit **ditolak** bila menunjuk ke source
+eval. Harness membandingkan hash source sebelum/sesudah.
+
+Saat seluruh katalog dijalankan untuk Codex, kasus builtin berprofil `isolated-worktree` dilaporkan
+sebagai `SKIP` karena profil itu belum didukung child Codex; memilih agen itu secara eksplisit
+berakhir gagal dengan alasan yang sama. Skip kompatibilitas tidak dihitung sebagai lulus atau gagal.
+
+Test rutin tidak menjalankan model. Ia hanya menjalankan scorer terhadap `frozen-output`: semua
+expected finding harus cocok (`recall=1`) dan forbidden hit harus nol. Exit live nonzero bila CLI
+runtime gagal, expected hilang, atau forbidden muncul. Jangan memasukkan `agent:eval` ke install,
+boot, build, test rutin, atau CI.

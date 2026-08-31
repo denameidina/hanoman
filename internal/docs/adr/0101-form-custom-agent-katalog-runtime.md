@@ -1,6 +1,6 @@
 # ADR-0101 — Form Custom Agent berbasis katalog: `runtime` sebagai penyaring, katalog tool turunan konfigurasi MCP
 
-- Status: Accepted
+- Status: Accepted — konteks materialisasi Codex **diamandemen ADR-0159**
 - Tanggal: 2026-08-01
 - SPEC: SPEC-484 (form Custom Agent: dropdown tools/model/mention + runtime)
 - Terkait: **memperluas** [0094](0094-custom-agent-katalog-materialisasi-native.md) — katalog, anti-loop
@@ -10,7 +10,12 @@
   (kolom baru wajib ikut `FIELDS`) dan [0065](0065-ai-agent-capability-agent-token.md) (endpoint baru
   dipetakan menurut method); **tidak menyentuh** [0037](0037-cabut-guardrail-safety.md) — validasi di
   sini adalah gerbang **bentuk data** di route CRUD, bukan hook deny di sesi agen;
-  **tidak mencabut** apa pun.
+  **diamandemen** [0159](0159-custom-agent-native-terukur-terisolasi.md): `runtime` tetap penyaring,
+  tetapi kedua sisi sekarang memakai child native.
+
+> **Amandemen 2026-08-31:** penyebutan roster Codex inline di bawah adalah konteks historis.
+> Runtime tetap field penyaring persis seperti keputusan ini; yang berubah hanya targetnya menjadi
+> konfigurasi custom agent native Codex di tmpdir sesi.
 
 ## Konteks
 

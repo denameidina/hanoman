@@ -1,6 +1,6 @@
 # ADR-0136 — Agen bawaan sistem: katalog konstanta yang di-SEED sebagai baris, diperbarui hanya bila belum disunting
 
-- Status: Accepted
+- Status: Accepted — default/policy builtin **diamandemen ADR-0159**
 - Tanggal: 2026-08-22
 - SPEC: SPEC-881 (custom agent bawaan sistem)
 - Terkait: **memperluas** [0094](0094-custom-agent-katalog-materialisasi-native.md) — katalog,
@@ -11,7 +11,15 @@
   tempat pengetahuan hidup) dan [0119](0119-tombstone-sync-penghapusan-menyeberang.md)
   (penghapusan adalah keadaan, bukan ketiadaan); **tidak menyentuh**
   [0045](0045-skema-sync-synclog-version-stamp.md) — nol kolom baru, jadi `FIELDS` tak berubah;
-  **tidak mencabut** apa pun.
+  **diamandemen** [0159](0159-custom-agent-native-terukur-terisolasi.md) pada default QA,
+  execution profile, model rekomendasi, dan aktivasi smart.
+
+> **Amandemen 2026-08-31 (SPEC-950/ADR-0159):** hanya tiga builtin aktif default (`scout`,
+> `blast-radius`, `security-reviewer`), semuanya smart + read-only. `qa-verifier` menjadi opt-in,
+> isolated-worktree, 40 turn/900 detik. Upgrade mematikan seed QA lama yang belum disunting tepat
+> sekali; baris operator-edited tetap utuh. Tabel konstanta sekarang juga membawa profile dan
+> rekomendasi model per runtime, sementara kolom `model` seed tetap null agar override operator
+> dan pemilihan runtime tetap bekerja.
 
 ## Konteks
 
@@ -35,7 +43,7 @@ mengembalikan **putusan kecil** — itu satu-satunya keuntungan struktural subag
 | domain | agen | menyala |
 |---|---|---|
 | software development | `scout` · `root-causer` | `scout` |
-| QA | `qa-verifier` · `edge-case-hunter` | `qa-verifier` |
+| QA | `qa-verifier` · `edge-case-hunter` | — *(diamandemen ADR-0159)* |
 | audit | `blast-radius` · `spec-auditor` | `blast-radius` |
 | security | `security-reviewer` · `dep-auditor` | `security-reviewer` |
 
@@ -47,7 +55,7 @@ di dalam `security-reviewer`).
 (ADR-0113): menambah agen kesembilan = satu entri. Nol I/O dan **nol `node:*`** — paket itu ikut
 dibundel untuk browser, dan sidik jarinya karena itu dihitung di server.
 
-**3. Nilai yang konstan untuk kedelapan BUKAN field entri.** `projectId` null · `model` null ·
+**3. Nilai scope/delegasi untuk kedelapan BUKAN field entri.** `projectId` null · `model` null ·
 `mentions` `[]` · `runtime` null. Menjadikannya field berarti mengundang entri masa depan yang
 memasang `mentions`, dan itu membuka kembali lapis-1 anti-loop ADR-0094 yang hari ini nol risiko:
 tanpa `mentions`, `Task` **dicabut** dari argv dan agen daun tak punya alat memanggil siapa pun.
@@ -65,7 +73,8 @@ Isi baris sekarang masih persis sidik jari yang terakhir ditulis seed (= belum d
 **dan** sidik jari versi terpasang berbeda dari itu (= memang ada yang baru). Tanpa syarat pertama,
 upgrade menimpa kerja operator; tanpa syarat kedua, setiap boot menulis ulang baris yang sudah
 mutakhir — `updatedAt` bergerak tanpa sebab dan menyeberang sync sebagai **mutasi palsu** ke setiap
-mesin lain. `enabled` **tak pernah** ikut diperbarui: saklar itu milik operator sejak seed pertama.
+mesin lain. `enabled` tak ikut pembaruan isi biasa; pengecualian satu kali untuk QA lama yang belum
+disunting ditetapkan ADR-0159.
 
 **7. Bookkeeping sidik jari menumpang `Setting.data`, dan karena itu LOKAL per mesin.** Nol
 migration (kolomnya sudah `Json`), dan yang menentukan: `setting` **tidak ada** di `FIELDS` sync,
@@ -76,17 +85,17 @@ jadi dua mesin dengan versi hanoman berbeda tak bisa saling menimpa definisi bol
 baru akan menyeberang changefeed, dan hub versi lama menolak **seluruh** push yang membawanya —
 kelas SPEC-880, dibayar sekali dan tak perlu dibayar ulang di sini.
 
-**9. Satu KLAUSA prompt untuk jalur claude, menyebut agen yang benar-benar ada di roster sesi itu.**
-Codex sudah menerima roster yang menyuruhnya mengadopsi peran; claude menerima definisinya lewat
-`--agents` tapi tak menerima satu pun dorongan untuk menoleh ke sana. Daftarnya **bukan statis**:
+**9. Satu KLAUSA prompt parent, menyebut agen yang benar-benar ada di roster sesi itu.** Sejak
+ADR-0159 kedua runtime menerima definisi native, sedangkan prompt parent hanya perlu dorongan untuk
+mendelegasikan. Daftarnya **bukan statis**:
 operator yang mematikan sebuah agen tak boleh menerima prompt yang menyuruh memanggilnya. Roster
 kosong → nol byte, jadi invarian "prompt byte-identik saat katalog kosong" tetap utuh.
 
 ## Konsekuensi
 
-- Instalasi baru langsung punya delapan persona, empat aktif — SPEC-450 berhenti menjadi permukaan
+- Instalasi baru langsung punya delapan persona, tiga aktif — SPEC-450 berhenti menjadi permukaan
   kosong.
-- Empat yang menyala membayar byte di setiap kelahiran sesi (argv claude; prompt codex). Empat yang
+- Tiga yang menyala dipertimbangkan smart saat kelahiran sesi. Lima yang
   mati tak membayar apa pun sampai diklik.
 - Baris bawaan **menyeberang sync** seperti baris custom agent lain. Dua mesin dengan versi hanoman
   berbeda berebut lewat LWW dan yang menulis terakhir menang. Diterima — bukan dihilangkan — karena
@@ -94,8 +103,8 @@ kosong → nol byte, jadi invarian "prompt byte-identik saat katalog kosong" tet
   (ADR-0094 keputusan 2).
 - Tiga dari delapan sengaja **tak bisa menulis apa pun** (`scout` bahkan tanpa `Bash`), jadi memanggil
   mereka tak pernah bisa mengotori worktree.
-- Test lama `prompt claude toBe("halo")` dipersempit ke maksud aslinya (roster codex & prosa
-  instruksi tak bocor ke jalur claude) — perubahan perilaku yang disengaja, bukan test yang melunak.
+- Full instructions tidak bocor ke prompt parent kedua runtime; hanya klausa delegasi ringkas yang
+  membawa nama/deskripsi agent efektif.
 
 ## Gotcha yang wajib diingat
 

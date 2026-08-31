@@ -56,11 +56,9 @@ di sini bukan "sedikit komentar" melainkan "komentar yang membawa informasi yang
    | `agentPromptOf` (custom agent, `claude --agents`) | tanpa gerbang |
    | `leadPrompt` · `changelogPrompt` | tanpa gerbang; gerbangnya baris pertama klausa |
 
-   **`agentRosterBlock` (codex) sengaja TIDAK menerimanya.** Roster itu ditempel ke akhir prompt
-   sesi yang sudah membawa klausa, jadi memasangnya di sana menggandakan teks yang sama sekali per
-   peran. Jalur claude berbeda secara struktural: subagent yang lahir dari `--agents` punya konteks
-   **terpisah** dan tak pernah melihat prompt sesi — di sanalah klausa harus ikut, atau ia tak akan
-   pernah sampai.
+   **Amandemen ADR-0159:** persona Codex inline sudah dicabut. `agentPromptOf` sekarang mengirim
+   klausa ke developer instructions child native **kedua runtime**, karena keduanya berkonteks
+   terpisah. Prompt parent hanya mendapat klausa delegasi ringkas dan tidak mengulang full prompt.
 
 4. **Tanpa `Setting`, tanpa kolom, tanpa endpoint, tanpa override per sesi.** Perbedaan sadar dari
    ADR-0080: scope verifikasi punya knob karena biayanya nyata dan berbeda per mesin dan per

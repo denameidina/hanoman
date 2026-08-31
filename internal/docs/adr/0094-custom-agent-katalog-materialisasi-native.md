@@ -1,6 +1,6 @@
 # ADR-0094 — Custom agent: katalog di DB, materialisasi native per agen, anti-loop berlapis
 
-- Status: Accepted
+- Status: Accepted — materialisasi Codex inline **dicabut ADR-0159**
 - Tanggal: 2026-08-01
 - SPEC: SPEC-450 (custom agent hanoman)
 - Terkait: **memperluas** [0074](0074-codex-sebagai-mesin-sesi.md) — satu perbedaan CLI lagi dirakit
@@ -13,7 +13,13 @@
   dan permukaan tool di argv, bukan hook deny di sesi agen; **tidak menghidupkan kembali**
   [0024](0024-sesi-interaktif-menggantikan-run.md) — tak ada proses agen baru yang dilahirkan hanoman,
   `services/lead/brain.ts` tetap satu-satunya titik spawn di luar `pty.ts` (SPEC-448);
-  **tidak mencabut** apa pun.
+  **diamandemen** [0159](0159-custom-agent-native-terukur-terisolasi.md) pada materialisasi Codex,
+  execution profile, seleksi, dan telemetry.
+
+> **Amandemen 2026-08-31 (SPEC-950/ADR-0159):** bagian keputusan 4 yang menempelkan roster penuh
+> ke prompt Codex dan konsekuensi "tak ada proses kedua" adalah historis. Codex sekarang memakai
+> custom agent native berbasis TOML temp; prompt parent hanya membawa klausa delegasi ringkas.
+> Tidak ada berkas worktree/home, tetapi berkas konfigurasi sesi memang lahir di tmpdir.
 
 ## Konteks
 
@@ -62,17 +68,18 @@ yang sama dan rekonsiliasi LWW/`SyncConflict` (ADR-0067) yang sudah ada menangan
 karena changefeed **tak punya operasi hapus**: rename yang mengubah id meninggalkan baris yatim di
 setiap mesin lain. Ganti nama = hapus + buat baru, keputusan sadar operator.
 
-**3. Nol berkas ditulis ke mana pun.** Definisi mengalir lewat **argv** (claude) dan **prompt sesi**
-(codex). Tak ada `.claude/agents/` di worktree, tak ada sentuhan `~/.claude`, tak ada sentuhan
-`.git/info/exclude` (M6). Satu-satunya berkas yang lahir adalah berkas sementara pembawa JSON
-`--agents`, di tmpdir, di luar worktree — persis seperti berkas prompt SPEC-223.
+**3. Nol berkas ditulis ke worktree atau home runtime.** Definisi mengalir lewat konfigurasi native
+di tmpdir sesi. Tak ada `.claude/agents/` di worktree, tak ada sentuhan `~/.claude`, tak ada sentuhan
+`.git/info/exclude` (M6). Berkas yang lahir hanya konfigurasi JSON/TOML dan hook sementara di
+tmpdir sesi, di luar worktree — persis kelas berkas prompt SPEC-223.
 
-**4. Materialisasi berbeda per agen, dan asimetrinya dinyatakan terbuka.**
+**4. Materialisasi berbeda per agen, dan asimetrinya dinyatakan terbuka.** *(Subbagian Codex di
+bawah dicabut ADR-0159; dipertahankan sebagai riwayat pengukuran.)*
 - **claude** → `--agents "$(cat <file>)"`. Mekanisme native (M1): custom agent menjadi **subagent
   sungguhan** dengan konteks terisolasi. JSON ditulis ke berkas lalu diserahkan lewat
   command-substitution karena tmux membatasi **satu** command ±16 KB dan instruksi agen adalah prosa
   — kelas kegagalan SPEC-223, dibayar sekali dan dipakai ulang.
-- **codex** → blok **roster** yang ditempel ke akhir prompt sesi: nama · deskripsi · instruksi ·
+- **codex (historis)** → blok **roster** yang ditempel ke akhir prompt sesi: nama · deskripsi · instruksi ·
   daftar mention tiap agen. Codex **mengadopsi peran secara inline**; tak ada proses kedua.
 
   Ini bukan penyeragaman yang gagal melainkan pembacaan jujur atas M5. Efek sampingnya justru baik:
@@ -113,13 +120,13 @@ dipetakan ke `GLOBAL_READ` — itu persis lubang yang ditutup SPEC-405/ADR-0088.
 
 ## Konsekuensi
 
-- **Berbiaya nol saat tak dipakai.** Katalog kosong → `--agents` tak dipasang, roster tak ditempel,
+- **Berbiaya nol saat tak dipakai.** Katalog kosong → flag/config agent tak dipasang, klausa tak ditempel,
   argv sesi byte-identik dengan sebelum ADR ini.
 - Sesi ber-`opts.command` (shell mentah ADR-0056, konsol VPS) tak menerima apa pun — tak ada agen di
   sana.
-- Sesi **codex tanpa prompt** tak menerima roster. Diterima sadar: satu-satunya jalur berprompt-kosong
+- *(Historis.)* Sesi **codex tanpa prompt** tak menerima roster. Diterima sadar: satu-satunya jalur berprompt-kosong
   adalah terminal, dan terminal biasa sudah shell mentah.
-- Custom agent **tak menambah permukaan eksekusi**. Subagent claude berjalan di dalam proses agen yang
+- *(Historis untuk implementasi awal.)* Custom agent **tak menambah permukaan eksekusi**. Subagent claude berjalan di dalam proses agen yang
   sama, di worktree yang sama, di bawah `--dangerously-skip-permissions` yang sama (ADR-0037). Yang
   bertambah hanya persona dan pembagian konteks.
 - Kuotanya menumpang langganan yang sama dan terlihat di badge limit yang sudah ada — konsekuensi yang

@@ -1874,10 +1874,12 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 #                   MESIN INI (stempel hidup di Setting.data, lokal, tak disync). Sidik jari yang
 #                   tak tercatat dibaca sebagai "disunting" — menandai berlebih lebih baik daripada
 #                   menjanjikan "asli bawaan" untuk isi yang tak bisa dibuktikan.
-GET    /api/custom-agents                 -> CustomAgentView[]        # agen GLOBAL saja
-GET    /api/custom-agents?projectId=<id>  -> CustomAgentView[]        # himpunan EFEKTIF (global+project),
+GET    /api/custom-agents[?runtime=claude|codex] -> CustomAgentView[] # agen GLOBAL saja
+GET    /api/custom-agents?projectId=<id>[&runtime=claude|codex] -> CustomAgentView[] # himpunan EFEKTIF,
 #                                            baris global bertanda `inherited: true`; nama yang ditimpa
 #                                            project muncul SEKALI (versi project yang menang)
+#      runtime opsional menurunkan `available`/`availabilityReason`; tidak menyaring baris supaya
+#      operator tetap dapat memperbaiki atau menghidupkan/mematikan definisi yang unavailable.
 GET    /api/custom-agents/catalog[?projectId=<id>] -> AgentCatalogView
 #      { tools: {id,label,group:"shortcut"|"builtin"|"mcp"}[], models: {id,label,runtime}[],
 #        runtimes: {id,label}[] }   # SPEC-484 · ADR-0101 · sumber daftar untuk form.
@@ -1886,27 +1888,45 @@ GET    /api/custom-agents/catalog[?projectId=<id>] -> AgentCatalogView
 #      ~/.codex/config.toml — semuanya GAGAL-TERBUKA (berkas hilang/rusak → sumber dilewati).
 #      Daftar MENTION sengaja TIDAK di sini: ia sudah hidup di `GET /custom-agents?projectId=`
 #      lengkap dengan aturan project-menimpa-global.
-POST   /api/custom-agents { projectId?, name, description, instructions, tools?, model?, mentions?, runtime?, enabled? }
+POST   /api/custom-agents { projectId?, name, description, instructions, tools?, model?, mentions?, runtime?,
+#                            activation?, effort?, workspacePolicy?, maxTurns?, timeoutSeconds?, enabled? }
 #      -> 201 CustomAgentView
 #         400 slug nama tak sah · projectId tak ada · mention tak dikenal { unknown: string[] }
 #         400 tool tak dikenal { unknownTools: string[] } · `*` bercampur nama lain
 #         400 model tak dikenal untuk runtime-nya { model, runtime } · runtime di luar {claude,codex}
 #         409 nama sudah dipakai di scope itu · mention membentuk siklus { scope, cycle: string[] }
-PATCH  /api/custom-agents/:id { description?, instructions?, tools?, model?, mentions?, runtime?, enabled? }
+PATCH  /api/custom-agents/:id { description?, instructions?, tools?, model?, mentions?, runtime?,
+#                               activation?, effort?, workspacePolicy?, maxTurns?, timeoutSeconds?, enabled? }
 #      -> 200 CustomAgentView · 400 (termasuk upaya mengubah `name`/`projectId`) · 404 · 409 siklus
 DELETE /api/custom-agents/:id -> 204     # mencabut nama itu dari `mentions` agen lain (tanpa rujukan yatim)
+
+# SPEC-950 · ADR-0159 · COOKIE_ONLY admin: excerpt bisa memuat detail internal dan disposition
+# adalah putusan manusia, bukan capability agent.
+GET    /api/custom-agents/metrics?projectId=&from=&to=
+#      -> { agents: AgentMetricView[], recent: AgentInvocationView[] } · recent maksimal 100
+PATCH  /api/custom-agents/invocations/:id { disposition, note? }
+#      disposition = accepted|partial|rejected|false-positive · note null/≤500 · 404 bila tak ada
 ```
 > **`id` deterministik `"<projectId|global>:<name>"`** (titik dua sah di segmen path RFC 3986) dan
 > **`name` immutable** — baris ini menyeberang changefeed yang tak punya operasi hapus; rename yang
 > mengubah id akan meninggalkan baris yatim di setiap mesin lain (ADR-0094).
 >
-> **Materialisasinya berbeda per agen, dan tak menulis satu berkas pun ke worktree.** Sesi **claude**
+> **Materialisasinya native di kedua runtime, dan tak menulis satu berkas pun ke worktree.** Sesi **claude**
 > lahir dengan `--agents "$(cat <file>)"` (mekanisme native; JSON di berkas tmpdir seperti prompt
-> SPEC-223, karena tmux membatasi SATU command ±16 KB). Sesi **codex** menerima blok **roster** yang
-> ditempel ke akhir prompt sesi — codex 0.146 tak punya padanan yang bisa diverifikasi (ia menerima
-> kunci `-c` tak dikenal secara diam-diam), jadi ia mengadopsi peran **inline** tanpa proses kedua.
+> SPEC-223, karena tmux membatasi SATU command ±16 KB). Sesi **codex** menerima
+> `agents.enabled=true` + satu `agents."name".config_file` TOML temp per child. Prompt parent kedua
+> runtime hanya membawa nama/deskripsi/klausa delegasi, bukan full instructions.
 > Keduanya dirakit di titik cekik `createSession` lewat `registerCustomAgentSource`, jadi tak ada
 > route yang perlu diubah dan tak ada yang bisa lupa memasangnya.
+>
+> **Execution profile (SPEC-950):** `activation` = `always|smart`; `workspacePolicy` =
+> `inherit|read-only|isolated-worktree`; `maxTurns` 1–200; `timeoutSeconds` 30–3600. Kombinasi
+> isolated dengan runtime selain Claude ditolak. `available`/`availabilityReason` pada view adalah
+> turunan. Read-only dipagari validator + hook `PreToolUse`; parent sandbox hanya defense in depth.
+>
+> Metrics nullable tidak diubah menjadi nol. Operational precision = `(accepted+partial) / semua
+> disposition non-pending`; bila belum ada disposition hasilnya null. Eval recall dari fixture
+> adalah ukuran terpisah dan tidak digabung menjadi quality score.
 >
 > **Anti-loop tiga lapis**, dan yang menjamin adalah dua lapis pertama: (1) graf mention wajib
 > **asiklik** — divalidasi atas scope global **dan setiap project** (agen project bisa menimpa nama
