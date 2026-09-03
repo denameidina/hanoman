@@ -156,8 +156,13 @@ textarea:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--brass-600);
-  color: var(--text-on-brass);
+  /* `--text-on-brass` justru TIDAK bisa dipakai di sini: nilainya `var(--ink-900)` — tinta gelap,
+     dirancang untuk `--accent` (brass-500) yang terang, bukan untuk brass tua. Di atas brass-600 ia
+     memberi rasio kontras 3,77:1 (gelap di atas gelap) dan angkanya praktis tak terbaca. Pasangan
+     ini kebalikannya: kertas di atas brass tua, 6,65:1 — lolos WCAG AA dengan lapang. Diukur, dan
+     dijaga terus-menerus di `src/test/nav-pending-badge.test.tsx`. */
+  background: var(--brass-700);
+  color: var(--bone-000);
   border-radius: var(--radius-pill);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);

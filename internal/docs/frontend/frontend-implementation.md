@@ -2042,7 +2042,14 @@ kedua ujung (pola yang sama dipakai `ticket-status.ts` & `prd-status.ts`).
    `Shell` dirender di belasan cabang `App`, dan cabang yang terlewat tak akan error — ia hanya
    kehilangan badge-nya, senyap.
 
-Warnanya brass (`--brass-600`), bukan clay: ini pekerjaan yang menunggu, bukan kesalahan. Test:
+Warnanya **kertas di atas brass tua** (`--bone-000` pada `--brass-700`), bukan clay: ini pekerjaan
+yang menunggu, bukan kesalahan. Pasangan itu diukur, bukan dipilih dari nama token — rilis 0.2.5
+sempat mengirim `color: var(--text-on-brass)`, yang **nilainya `var(--ink-900)`**: tinta gelap yang
+dirancang untuk `--accent` (brass-500) yang terang. Di atas brass-600 rasionya **3,77:1** dan
+angkanya tak terbaca sama sekali di layar; pasangan sekarang **6,65:1**. Typecheck, build, dan
+seluruh test render lolos tanpa satu pun dari mereka melihat warna — karena itu gerbangnya kini
+menghitung rasio WCAG dari nilai token yang berlaku (`nav-pending-badge.test.tsx`), lengkap dengan
+kontrol negatif yang membuktikan pasangan lama gagal di gerbang yang sama. Test:
 `src/test/nav-pending-badge.test.tsx` (render), `shared/src/pending.test.ts` (aturan angka),
 `server/test/pending-counts.service.test.ts` (definisi + cache PRD), dan `server/test/events.test.ts`
 (frame ikut di `attach`, karena badge ini tak punya muat awal HTTP).
