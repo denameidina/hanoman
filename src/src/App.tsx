@@ -4,11 +4,11 @@
 import React from "react";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, NAV_KEYS, NavGate, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
+import { Shell, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
-import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView } from "@hanoman/shared";
+import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts } from "@hanoman/shared";
 import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
@@ -769,6 +769,14 @@ export default function App() {
      mematahkan 20 test ber-mock parsial sekaligus (kelas jebakan SPEC-884). */
   const [presence, setPresence] = React.useState<PresenceView>({ enabled: false, devices: [] });
 
+  /* SPEC-961 · angka "butuh pengajuan" per permukaan nav, didorong grup siar `pending`. `null`
+     sampai frame pertama tiba — sengaja BUKAN nol: server yang lebih tua tak pernah mengirim frame
+     ini (ADR-0087), dan badge "0" di seluruh sidebar adalah cara paling meyakinkan untuk berbohong
+     tentang keadaan itu. Tanpa muat awal HTTP: `attach()` mengirim seluruh grup begitu socket
+     terbuka, dan menambah satu panggilan `api` di `load()` mematahkan test ber-mock parsial
+     (jebakan yang sama yang membuat muat awal presence duduk di ClientsScreen). */
+  const [pending, setPending] = React.useState<PendingCounts | null>(null);
+
   const load = React.useCallback(() => {
     setStatus("loading");
     Promise.all([api.listProjects(), api.listSpecs(), api.listTerminals()])
@@ -819,6 +827,7 @@ export default function App() {
     else if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
     else if (m.t === "leadAsks") setLeadAsks(m.asks);
     else if (m.t === "presence") setPresence({ enabled: m.enabled, devices: m.devices });
+    else if (m.t === "pending") setPending(m.counts);
   }), []);
 
   const proj = projectsView.find((p) => p.id === projectId) || projectsView[0];
@@ -1536,7 +1545,9 @@ export default function App() {
             tidak boleh terlihat sama dengan yang dikeraskan. Di luar ClientPortal: klien tak
             punya kuasa mengubahnya, jadi baginya ini cuma kecemasan tanpa tombol. */}
         <UnhardenedBanner status={setupStatus} />
-        <NavGate.Provider value={{ clients: presence.enabled }}>{screen}</NavGate.Provider>
+        <NavGate.Provider value={{ clients: presence.enabled }}>
+          <NavPending.Provider value={pending}>{screen}</NavPending.Provider>
+        </NavGate.Provider>
         <HanomanPet sessions={sessions} backlog={backlog} asks={leadAsks}
           onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
         <NewSpecModal open={modal === "brief"} onClose={() => { setModal(null); setSpecPrefill(null); }}

@@ -9,6 +9,7 @@ import { LimitBadge, CodexLimitBadge } from "../screens/LimitIndicator";
 import { UpdateBadge, ReloadBadge } from "../screens/UpdateIndicator";
 import { AccountMenu } from "../auth/AccountMenu";
 import { useResponsiveTier } from "./responsive";
+import { pendingFor, pendingLabel, type PendingCounts } from "@hanoman/shared";
 // Dari `../ui-state/hooks`, BUKAN barrel `../ui-state`: barrel itu memuat ResetViewButton
 // yang mengimpor komponen DS, dan lewat sana `ds → shell → ui-state → ds` jadi lingkaran impor.
 import { useScrollRestore } from "../ui-state/hooks";
@@ -69,10 +70,33 @@ function HnWordmark() {
   );
 }
 
+/* SPEC-961 · angka "butuh pengajuan" per entri nav, berkunci `NavItem.key`. Context dengan alasan
+   yang sama persis seperti `NavGate` di bawah: `Shell` dirender di belasan cabang `App`, dan prop
+   baru di semuanya adalah undangan bagi cabang yang terlewat — cabang begitu tak akan error, ia
+   hanya kehilangan badge-nya, senyap. `null` = belum ada frame (server lama, ADR-0087) dan sengaja
+   berbeda dari nol: yang pertama tak merender apa pun, yang kedua juga tak merender apa pun tetapi
+   karena memang tak ada yang menunggu. */
+export const NavPending = React.createContext<PendingCounts | null>(null);
+
+function HnNavBadge({ count }: { count: number }) {
+  return (
+    // `aria-hidden`: angkanya SUDAH masuk ke nama tombolnya (`aria-label` di bawah). Tanpa ini
+    // pembaca layar menyebutkan "3" dua kali — sekali sebagai nama, sekali sebagai isi.
+    <span className="hn-nav-badge" data-testid="nav-badge" aria-hidden="true">
+      {pendingLabel(count)}
+    </span>
+  );
+}
+
 function HnSidebarItem({ item, active, onNavigate }: { item: NavItem; active?: string; onNavigate?: (key: string) => void }) {
   const on = active === item.key;
   const [hover, setHover] = React.useState(false);
   const interactive = !!onNavigate;
+  const pending = pendingFor(React.useContext(NavPending), item.key);
+  // Angka ikut ke dalam nama yang dibacakan & tooltip: di lebar tablet label-nya disembunyikan CSS,
+  // sehingga tanpa ini pembaca layar hanya mendengar "Triase" untuk tombol yang justru sedang
+  // memberi tahu ada tiga yang menunggu.
+  const name = pending ? `${item.label}, ${pending} butuh pengajuan` : item.label;
   return (
     <button
       type="button"
@@ -80,8 +104,8 @@ function HnSidebarItem({ item, active, onNavigate }: { item: NavItem; active?: s
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       aria-current={on ? "page" : undefined}
-      aria-label={item.label}
-      title={item.label}
+      aria-label={name}
+      title={name}
       style={{
         display: "flex", alignItems: "center", gap: 10, width: "100%",
         minHeight: 44, padding: "8px 10px", cursor: interactive ? "pointer" : "default",
@@ -96,6 +120,7 @@ function HnSidebarItem({ item, active, onNavigate }: { item: NavItem; active?: s
     >
       <Icon name={item.icon} size={17} color={on ? "var(--accent-hover)" : "var(--text-muted)"} />
       <span className="hn-nav-label">{item.label}</span>
+      {pending !== undefined && <HnNavBadge count={pending} />}
     </button>
   );
 }

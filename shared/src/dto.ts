@@ -1,4 +1,5 @@
 import type { PresenceDeviceView } from "./presence";
+import type { PendingCounts } from "./pending";
 import { z } from "zod";
 import type { SessionAsk } from "./session-ask";
 import type { TaskView } from "./team";
@@ -800,7 +801,7 @@ export type EventsClientMsg = z.infer<typeof zEventsClientMsg>;
 
 // SPEC-199 · frame siar dashboard (server → klien), lewat GET /events/ws (ADR-0039). Per-grup,
 // bukan snapshot monolitik — perubahan satu grup tak mengirim ulang yang lain.
-// SPEC-908 · grup GLOBAL tanpa parameter di depan (sepuluh sejak SPEC-919); enam varian terakhir milik
+// SPEC-908 · grup GLOBAL tanpa parameter di depan (sebelas sejak SPEC-961); enam varian terakhir milik
 // langganan berparameter (`zEventsClientMsg` di atas), yang membuat kanal ini tak lagi read-only.
 export type EventMsg =
   | { t: "specs"; specs: Spec[] }
@@ -821,6 +822,11 @@ export type EventMsg =
   // Grup, bukan topik berlangganan (ADR-0145): muatannya tak berparameter — satu snapshot yang
   // sama untuk semua penonton.
   | { t: "presence"; enabled: boolean; devices: PresenceDeviceView[] }
+  // SPEC-961 · grup GLOBAL ke-11: berapa banyak yang masih menunggu PENGAJUAN operator, per
+  // permukaan nav. Angka, bukan daftar: yang dibutuhkan sidebar cuma "apakah ada, berapa" — dan
+  // daftar yang sudah disiarkan (`specs`) tak cukup menjawabnya sendiri (tiket, issue GitHub, dan
+  // PRD sama sekali tak ada di frame global mana pun).
+  | { t: "pending"; counts: PendingCounts }
   // SPEC-908 · frame langganan berparameter. `key` = subKey(topic, params) yang dihitung KEDUA
   // sisi; klien membuang frame yang kuncinya bukan miliknya, jadi halaman/filter yang sedang
   // aktif tak mungkin ditimpa muatan halaman lain.

@@ -41,6 +41,11 @@ describe("events hub", () => {
     expect(groups(c).has("update")).toBe(true);
     const nf = c.frames.find((f) => f.t === "notifications");
     expect(nf).toMatchObject({ unread: 0 });
+    // SPEC-961 · grup ke-11. Badge sidebar tak punya muat awal HTTP: kalau frame ini tak ikut di
+    // attach, angkanya baru muncul pada tick pertama yang isinya BERUBAH — di instalasi tenang,
+    // tak pernah.
+    expect(c.frames.find((f) => f.t === "pending"))
+      .toMatchObject({ counts: { triage: 0, backlog: 0, prd: 0, lead: 0 } });
     detach(c);
   });
 

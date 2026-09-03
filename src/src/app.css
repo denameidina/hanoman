@@ -143,8 +143,34 @@ textarea:focus-visible,
   .hn-vps-actions { flex-wrap: wrap; justify-content: flex-end; }
 }
 
+/* SPEC-961 · badge "butuh pengajuan" di entri sidebar. `margin-left: auto` mengunci angkanya ke
+   tepi kanan supaya kolomnya sejajar antar-baris; `flex-shrink: 0` menjaga ia tak pernah menyusut
+   saat label panjang ("Dalang Hanoman") mengambil sisa ruang. Brass, bukan clay: ini pekerjaan yang
+   menunggu, bukan kesalahan — merah dicadangkan untuk keadaan yang benar-benar salah. */
+.hn-nav-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brass-600);
+  color: var(--text-on-brass);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+}
+
 @media (min-width: 768px) and (max-width: 1199px) {
   .hn-shell-sidebar { width: var(--sidebar-w); padding: 14px 8px; }
+  /* Label disembunyikan di tier ini, jadi `margin-left: auto` tak lagi punya sisa ruang untuk
+     mendorong; badge duduk rapat di samping ikon dan tombolnya tetap terpusat. */
+  .hn-shell-sidebar .hn-nav-badge { margin-left: 0; }
+
   .hn-shell-sidebar .hn-nav-label,
   .hn-shell-sidebar .hn-shell-workspace,
   .hn-shell-sidebar .hn-shell-wordmark > div > div > span:last-child { display: none; }

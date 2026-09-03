@@ -9,6 +9,7 @@ import { isDeciding } from "./lead/deciding";
 import { liveAsks } from "./lead/ask";
 import { listCleanups } from "./worktree-reaper";
 import { presenceView } from "./presence/view";
+import { pendingCounts } from "./pending-counts";
 import { prisma } from "../db";
 import { effectiveInt } from "../config";
 import { subKey, type EventMsg, type EventTopic } from "@hanoman/shared";
@@ -85,6 +86,13 @@ const GROUPS: Group[] = [
   // menambah informasi. `presenceView` menyegarkan sesi mesin ini sendiri di dalamnya — satu
   // `tmux list-panes` asinkron, tak menahan event loop.
   { everyTicks: 3, cookieOnly: true, last: "", build: async () => ({ t: "presence", ...(await presenceView()) }) },
+  // SPEC-961 · grup GLOBAL ke-11 · angka "butuh pengajuan" untuk badge sidebar. 5 dtk: badge bukan
+  // board — yang dijanjikannya adalah "ada yang menunggu", bukan detik keberapa ia muncul — dan
+  // dedup signature membuat frame lahir hanya saat salah satu angka berubah (jarang). Empat angka,
+  // bukan empat grup: keempatnya berubah dari peristiwa yang sama (item diajukan/diputuskan) dan
+  // dibaca satu komponen yang sama. `cookieOnly` TIDAK dipasang — muatannya jumlah agregat tanpa
+  // id/judul, dan agent token sudah boleh membaca daftar sumbernya lewat capability masing-masing.
+  { everyTicks: 5, last: "", build: async () => ({ t: "pending", counts: await pendingCounts() }) },
 ];
 
 // SPEC-908 · klien yang `send`-nya melempar harus dilepas dari `clients` DAN dari peta langganan.

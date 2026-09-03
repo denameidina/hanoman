@@ -2006,6 +2006,47 @@ terjebak sampai reload (`runs`/`triggers` pernah begitu, SPEC-162). Sejak SPEC-5
 test (`src/test/changelog-nav.test.tsx`) yang mengenumerasi `HN_NAV` melawan sumber `App.tsx`, bukan
 hanya komentar di `shell.tsx`.
 
+## Badge "butuh pengajuan" di sidebar (SPEC-961)
+
+Sidebar tak pernah menjawab pertanyaan pertama operator tiap kali membuka dashboard: **apa lagi yang
+menunggu saya?** Empat permukaan `HN_NAV` karena itu membawa **badge angka** di tepi kanan entrinya:
+
+| Nav | Yang dihitung |
+| --- | --- |
+| `triage` | `Ticket` + `GithubIssue` berstatus `new` — dua kanal masuk, satu angka, persis seperti layarnya |
+| `backlog` | `Spec` yang **belum pernah punya sesi** (`startedAt === null`, ADR-0090) dan belum `done` |
+| `prd` | PRD berstatus `draft` — belum melahirkan satu pun backlog (`shared/src/prd-status.ts`) |
+| `lead` | `LeadFlow` yang masih terbuka (`menunggu` / `sebagian`) |
+
+**Angkanya datang dari server, bukan dihitung di klien.** Grup siar GLOBAL ke-11 `pending` di
+`/api/events/ws` (tiap 5 dtk, dedup signature — frame lahir hanya saat salah satu angka berubah).
+Menghitungnya di klien mustahil tanpa berbohong: tiket, issue GitHub, dan PRD tak ada di frame
+global mana pun, dan `specs` sendiri berpaginasi di layarnya.
+
+**Bentuknya satu definisi, dibaca dua sisi.** `shared/src/pending.ts` memegang tipe `PendingCounts`,
+kosakata status lead yang terbuka, dan helper render (`pendingFor`, `pendingLabel`, `pendingTotal`).
+Server mengisi angkanya, `shell.tsx` merender — dan "belum diputuskan" tak bisa berarti dua hal di
+kedua ujung (pola yang sama dipakai `ticket-status.ts` & `prd-status.ts`).
+
+**Empat keputusan tampilan yang mengikat:**
+
+1. **Nol tak pernah dirender.** Nol adalah keadaan paling sering, dan kolom "0" di seluruh sidebar
+   berisik justru saat tak ada yang perlu dikerjakan.
+2. **`null` ≠ nol.** Server yang lebih tua tak pernah mengirim frame `pending` (ADR-0087); sampai
+   frame pertama tiba sidebar terlihat **persis seperti sebelum SPEC ini**, bukan seperti instalasi
+   yang antreannya kosong.
+3. **Angka masuk ke nama tombolnya** (`aria-label` "Triase, 3 butuh pengajuan"). Pada rail tablet
+   (768–1199px) label nav disembunyikan CSS, jadi angka yang hanya hidup sebagai teks badge tak
+   punya cara diumumkan; badge-nya sendiri `aria-hidden` supaya tak dibacakan dua kali.
+4. **Context, bukan prop.** `NavPending` mengikuti `NavGate` (SPEC-919) dengan alasan yang sama:
+   `Shell` dirender di belasan cabang `App`, dan cabang yang terlewat tak akan error — ia hanya
+   kehilangan badge-nya, senyap.
+
+Warnanya brass (`--brass-600`), bukan clay: ini pekerjaan yang menunggu, bukan kesalahan. Test:
+`src/test/nav-pending-badge.test.tsx` (render), `shared/src/pending.test.ts` (aturan angka),
+`server/test/pending-counts.service.test.ts` (definisi + cache PRD), dan `server/test/events.test.ts`
+(frame ikut di `attach`, karena badge ini tak punya muat awal HTTP).
+
 ## Settings → Akses AI Agent → MCP server (SPEC-482 · ADR-0099)
 
 `src/src/screens/McpPanel.tsx` dirender **di dalam** `AgentAccessPanel` (tab "Akses AI Agent"), di

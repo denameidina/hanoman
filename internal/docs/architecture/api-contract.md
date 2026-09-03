@@ -1288,7 +1288,17 @@ GET    /events/ws                    # WebSocket siar dashboard (global). Auth =
 #         lastSeenAt, sessions[] }`, `sessions[] = { sessionId, projectId, specId?, flow?, phase?,
 #         agent, status:"working"|"waiting"|"exited", startedAt, statusAt }`. `enabled` = hub ini
 #         punya >=1 DeviceToken belum dicabut; false → dashboard tak menampilkan apa pun soal ini.
-#         Nol isi terminal, nol `cwd`: lihat ADR-0147 §3.)
+#         Nol isi terminal, nol `cwd`: lihat ADR-0147 §3.) ·
+#       { t:"pending", counts } (SPEC-961, tiap 5s — berapa yang masih menunggu PENGAJUAN operator,
+#         untuk badge angka di sidebar. `counts = { triage, backlog, prd, lead }`, keempatnya
+#         NILAI TURUNAN penuh (nol kolom, nol tabel): triage = Ticket + GithubIssue berstatus
+#         `new`; backlog = Spec `startedAt: null` yang belum `done` (ADR-0090/ADR-0120);
+#         prd = PRD berstatus `draft` (prd-status.ts — belum melahirkan backlog); lead = LeadFlow
+#         `menunggu`/`sebagian`. Definisi & helper render ada di `shared/src/pending.ts` supaya
+#         "belum diputuskan" tak berarti dua hal di server dan di tampilan. Angka PRD di-cache
+#         60 dtk di server: PRD bukan entitas DB (ADR-0041), menghitungnya = walk repoDir +
+#         baca berkas per project, SINKRON, di event loop yang sama dengan PTY terminal.
+#         Tanpa muat awal HTTP — `attach()` mengirim grup ini seperti grup global lain.)
 #
 #   SPEC-908 · ADR-0145 · LANGGANAN BERPARAMETER (mengamandemen ADR-0039: kanal tak lagi read-only)
 #   klien->server, SATU jenis frame, semantik GANTI-PENUH (mengganti seluruh himpunan langganan):
