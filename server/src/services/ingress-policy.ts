@@ -65,10 +65,21 @@ export function classifyIngress(req: IngressRequest, policy: IngressPolicy): "pu
   return "denied";
 }
 
-export function trustProxyFromEnv(env: Env): string[] | number | false {
+// Hop-count (`HANOMAN_TRUST_PROXY=1`) dulu bentuk yang DIDOKUMENTASIKAN deploy-vps.md. Sejak fastify
+// 5.12.1 (GHSA-3m5p-2c4r-xxw2) angka diterima tapi **fail-closed**: tak satu pun peer dipercaya,
+// jadi instance yang di-update diam-diam berhenti membaca `X-Forwarded-Proto` — cookie `secure`
+// tak pernah terpasang, login di balik TLS mati tanpa satu pun galat. Dipetakan ke loopback: topologi
+// yang memang disyaratkan dokumen itu (hanoman bind 127.0.0.1, Caddy di host yang sama) — dan
+// diteriakkan saat boot supaya operator memindahkannya ke CIDR eksplisit.
+export const HOP_COUNT_TRUST = ["127.0.0.1/32", "::1/128"] as const;
+export function trustProxyFromEnv(env: Env, warn: (msg: string) => void = (m) => console.warn(m)): string[] | false {
   const raw = env.HANOMAN_TRUST_PROXY?.trim();
   if (!raw) return false;
-  if (/^[1-9]\d*$/.test(raw)) return Number(raw);
+  if (/^[1-9]\d*$/.test(raw)) {
+    warn(`HANOMAN_TRUST_PROXY=${raw} (hop-count) tak lagi didukung fastify ≥5.12.1 — dipetakan ke `
+      + `${HOP_COUNT_TRUST.join(",")}; tulis CIDR proxy-mu secara eksplisit`);
+    return [...HOP_COUNT_TRUST];
+  }
   const values = raw.split(",").map((v) => v.trim()).filter(Boolean);
   if (!values.length || values.some((v) => v === "true" || (!v.includes("/") && v !== "loopback")))
     throw new Error("HANOMAN_TRUST_PROXY harus berupa hop atau CIDR eksplisit");

@@ -1,6 +1,8 @@
 # ADR-0117 — Boundary deployment publik, otoritas efektif, dan sandbox sesi
 
-- Status: Accepted
+- Status: Accepted — **catatan 2026-09-05 (audit):** `HANOMAN_TRUST_PROXY` hop-count (`=1`) tak lagi
+  didukung fastify ≥5.12.1 (GHSA-3m5p-2c4r-xxw2, angka = fail-closed). `trustProxyFromEnv` memetakannya
+  ke loopback + peringatan boot; dokumen deploy kini menulis CIDR eksplisit.
 - Tanggal: 2026-08-14
 - SPEC: SPEC-761
 - Terkait: **mengamandemen** [0028](0028-auth-sesi-opaque-di-db.md) (bootstrap bukan lagi

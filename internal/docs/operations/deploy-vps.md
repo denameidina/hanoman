@@ -42,8 +42,10 @@ operator ─ SSO/MFA/VPN ─ admin.example ┘                         │
   permukaan anonim dan menyerahkan perlindungannya pada cookie login + limiter.
 - Hanoman bind loopback. Firewall hanya membuka SSH dan listener reverse proxy; port 8787 tidak
   pernah dibuka langsung.
-- Caddy harus menjadi satu-satunya proxy ke origin. `HANOMAN_TRUST_PROXY=1` berarti tepat satu hop;
-  gunakan CIDR bila ada lebih dari satu proxy yang diketahui. Jangan mempercayai semua forwarded IP.
+- Caddy harus menjadi satu-satunya proxy ke origin. `HANOMAN_TRUST_PROXY` adalah **CIDR proxy-nya**
+  (`127.0.0.1/32,::1/128` untuk Caddy di host yang sama; tambahkan CIDR lain bila proxy-nya di mesin
+  lain). Bentuk hop-count lama (`=1`) **tak lagi didukung** fastify ≥5.12.1 (fail-closed): hanoman
+  memetakannya ke loopback + peringatan saat boot (audit 2026-09-05). Jangan mempercayai semua forwarded IP.
 
 ## 0. Provisioning satu perintah (SPEC-883 · [ADR-0137](../adr/0137-provisioning-vps-berbasis-katalog.md))
 
@@ -158,7 +160,7 @@ HANOMAN_TMUX_SOCKET=hanoman-prod
 
 HANOMAN_PUBLIC_ORIGINS=https://help.example
 HANOMAN_CONTROL_ORIGINS=https://admin.example
-HANOMAN_TRUST_PROXY=1
+HANOMAN_TRUST_PROXY=127.0.0.1/32,::1/128
 
 HANOMAN_SESSION_SANDBOX=podman
 HANOMAN_SESSION_IMAGE=hanoman-agent:latest

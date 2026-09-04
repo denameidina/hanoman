@@ -42,4 +42,15 @@ describe("ingress policy", () => {
     expect(trustProxyFromEnv({})).toBe(false);
     expect(() => trustProxyFromEnv({ HANOMAN_TRUST_PROXY: "true" })).toThrow(/hop atau CIDR/);
   });
+
+  // fastify ≥5.12.1 menjadikan angka fail-closed (nol peer dipercaya). Nilai yang dulu
+  // didokumentasikan tak boleh diam-diam mematikan X-Forwarded-Proto: dipetakan ke loopback + peringatan.
+  it("hop-count lama dipetakan ke loopback dan diteriakkan, bukan diteruskan sebagai angka", () => {
+    const warned: string[] = [];
+    expect(trustProxyFromEnv({ HANOMAN_TRUST_PROXY: "1" }, (m) => warned.push(m)))
+      .toEqual(["127.0.0.1/32", "::1/128"]);
+    expect(warned).toHaveLength(1);
+    expect(warned[0]).toMatch(/hop-count/);
+    expect(warned[0]).toMatch(/CIDR/);
+  });
 });
