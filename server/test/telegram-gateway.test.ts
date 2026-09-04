@@ -174,6 +174,12 @@ describe("TelegramGateway lifecycle recovery (SPEC-476)", () => {
     await g.start();
     expect((await prisma.telegramUpdate.findUnique({ where: { updateId: 17 } }))?.state).toBe("uncertain");
     expect((await prisma.telegramOutbox.findFirst())?.state).toBe("uncertain");
+    // `start()` sengaja tak menunggu loop-nya (ADR-0024: long-poll hidup di latar). Sebelum
+    // `getUpdates` pertama, loop masih menunggu `chatsAwaitingReply` + `typing.refresh` +
+    // `store.offset()` — tiga roundtrip DB yang berlomba dengan dua `await` di atas. Yang diuji
+    // adalah NILAI offset-nya, bukan siapa yang menang lomba: tunggu sampai poll pertama lahir.
+    const deadline = Date.now() + 5_000;
+    while (polledOffset === null && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
     expect(polledOffset).toBe(18);
     expect(telegramRuntimeStatus().running).toBe(true);
     await g.stop();

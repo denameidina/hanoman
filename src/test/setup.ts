@@ -1,5 +1,12 @@
 import "@testing-library/jest-dom";
+import { configure } from "@testing-library/react";
 import { beforeEach } from "vitest";
+
+// ADR-0160 · dua belas layar dimuat malas (`React.lazy`). Di vitest, `import()` pertama sebuah layar
+// berat (Terminal + xterm, IDE + highlight) juga berarti TRANSFORM modulnya — terukur 1,6 dtk dingin,
+// di atas 1 dtk bawaan `findBy*`/`waitFor`. Batasnya dinaikkan global: test yang lulus tak jadi
+// lebih lambat (ia berhenti begitu elemennya muncul), hanya test yang memang gagal menunggu lebih lama.
+configure({ asyncUtilTimeout: 5000 });
 
 // SPEC-740 · state tampilan kini persisten di localStorage, dan vitest memakai SATU jsdom
 // per berkas test — tanpa ini test pertama yang menyetel filter mewariskannya ke test

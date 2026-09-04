@@ -7,8 +7,11 @@ const app = buildApp({ requireAuth: false });
 
 beforeEach(async () => {
   await resetDb();
-  await prisma.notification.create({ data: { specId: "SPEC-1", title: "satu", projectId: "p1" } });
-  await prisma.notification.create({ data: { specId: "SPEC-2", title: "dua", projectId: "p1" } });
+  // `createdAt` eksplisit: dua `create` berturut-turut lazim jatuh di milidetik yang sama, dan
+  // `orderBy createdAt desc` atas dua stempel yang seri mengembalikan urutan sesuka SQLite —
+  // terlihat sebagai "SPEC-1 lebih dulu" hanya saat mesin sibuk (audit 2026-09-05).
+  await prisma.notification.create({ data: { specId: "SPEC-1", title: "satu", projectId: "p1", createdAt: new Date("2026-09-05T00:00:00Z") } });
+  await prisma.notification.create({ data: { specId: "SPEC-2", title: "dua", projectId: "p1", createdAt: new Date("2026-09-05T00:00:01Z") } });
 });
 
 describe("notifications routes", () => {
