@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { hashPassword } from "../src/services/auth";
-import { PORTAL_CHAT_DEFAULTS } from "@hanoman/shared";
+import { PORTAL_CHAT_DEFAULTS, periodKeyOf } from "@hanoman/shared";
 
 const app = buildApp();
 const clean = async () => {
@@ -38,7 +38,9 @@ async function seed(repoDir: string | null) {
     email: "klien@x.co", passwordHash: await hashPassword("password2"), role: "client" } });
   await prisma.clientProjectAccess.create({ data: { userId: klien.id, projectId: "p1" } });
   const s = await prisma.portalChatSession.create({ data: {
-    projectId: "p1", userId: klien.id, type: "brainstorm", periodKey: "2026-08",
+    // periodKey mengikuti BULAN BERJALAN: kuota `terpakai` dihitung dari periodKeyOf(now), jadi
+    // nilai literal "2026-08" membuat test ini mati sendiri begitu kalender berganti bulan.
+    projectId: "p1", userId: klien.id, type: "brainstorm", periodKey: periodKeyOf(new Date()),
     summary: "ide program loyalitas", prdMarkdown: "# Program loyalitas\n\nisi",
     prdReadyAt: new Date("2026-08-19T10:00:00Z") } });
   await prisma.portalChatMessage.create({ data: {

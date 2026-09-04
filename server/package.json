@@ -19,7 +19,7 @@
     "@hanoman/shared": "workspace:*",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@prisma/client": "^6.19.0",
-    "fastify": "^5.12.0",
+    "fastify": "^5.12.1",
     "file-type": "^21.3.4",
     "marked": "^12.0.2",
     "node-pty": "^1.1.0",

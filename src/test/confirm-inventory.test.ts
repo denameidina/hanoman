@@ -23,8 +23,10 @@ describe("inventaris window.confirm (SPEC-847)", () => {
 
   // Daftar pengecualian ditulis lengkap supaya penambahan diam-diam jadi kegagalan test,
   // bukan sesuatu yang harus ditemukan lewat review.
+  // Per BERKAS, bukan per baris: nomor baris bergeser tiap ada suntingan di atasnya dan itu bukan
+  // pengecualian baru — yang dijaga di sini adalah jumlah dan lokasi pengecualiannya.
   it("pengecualian yang diketahui persis satu", () => {
-    expect(hits.map(where)).toEqual(["src/src/screens/GitGraph.tsx:137"]);
+    expect(hits.map((h) => h.file)).toEqual(["src/src/screens/GitGraph.tsx"]);
   });
 
   // Komponen yang memanggil useConfirm() tapi lupa merender {dialog} membuat promise-nya

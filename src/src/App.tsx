@@ -656,6 +656,7 @@ export function EditProjectModal({ open, project, onClose, onSave }:
           : "disync ke semua mesin · hanya bisa diubah dari instance yang memegang katalog device"}>
         {canEditHandled ? (
           <MultiSelect aria-label="Pilih hanoman client" placeholder="Pilih client…"
+            searchPlaceholder="mis. mac-mini atau vps-jakarta"
             emptyText="Tak ada device terdaftar yang cocok."
             value={handled.map((h) => h.deviceId)}
             invalidValues={handled

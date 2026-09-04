@@ -8,6 +8,7 @@ import { resetDb } from "./factory";
 import { killAll } from "../src/services/pty";
 import { _resetLimitsCache } from "../src/services/limits";
 import { _resetUpdateCache } from "../src/services/update";
+import { __resetPendingCache } from "../src/services/pending-counts";
 
 // Klien perekam frame (lihat pty.test.ts) — cukup untuk menguji kontrak siar tanpa WS nyata.
 function fakeClient() {
@@ -24,6 +25,13 @@ beforeEach(async () => {
   _resetUpdateCache();
   killAll();
   await resetDb();
+  // `pending` (SPEC-961) menghitung Ticket/GithubIssue/LeadFlow, dan resetDb() tak menyentuh
+  // ketiganya — sisa berkas test lain di DB bersama membuat angkanya bukan nol saat suite
+  // penuh, padahal hijau sendirian. Cache PRD ikut dilupakan supaya hitungan disk segar.
+  await prisma.ticket.deleteMany();
+  await prisma.githubIssue.deleteMany();
+  await prisma.leadFlow.deleteMany();
+  __resetPendingCache();
   __reset();
 });
 afterEach(() => { __reset(); _resetUpdateCache(); });

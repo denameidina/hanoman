@@ -462,14 +462,14 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
           </Field>
           <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Maksimum giliran" hint="Kosong = warisi; 1–200.">
-              <Input aria-label="Maksimum giliran" type="number" min={1} max={200}
+              <Input aria-label="Maksimum giliran" type="number" min={1} max={200} placeholder="mis. 40"
                 invalid={!optionalIntValid(editing.draft.maxTurns, 1, 200)} value={editing.draft.maxTurns}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditing({
                   ...editing, draft: { ...editing.draft, maxTurns: e.target.value },
                 })} />
             </Field>
             <Field label="Timeout detik" hint="Kosong = tanpa batas Hanoman; 30–3600.">
-              <Input aria-label="Timeout detik" type="number" min={30} max={3600}
+              <Input aria-label="Timeout detik" type="number" min={30} max={3600} placeholder="mis. 600"
                 invalid={!optionalIntValid(editing.draft.timeoutSeconds, 30, 3_600)}
                 value={editing.draft.timeoutSeconds}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditing({

@@ -16,6 +16,9 @@ import { distDir, applyMigrations, ensurePrismaClient } from "./start";
 export const PG_ORDER = [
   // SPEC-450 · ADR-0094 · CustomAgent sesudah Project (FK projectId nullable → cascade).
   "Project", "Spec", "CustomAgent", "Setting", "Notification",
+  // ADR-0159 · AgentInvocation sesudah CustomAgent: `customAgentId` menunjuk ke sana (tanpa FK).
+  // LOCAL-only dan lazimnya TIDAK ada di sumber Postgres lama — jalur 42P01 = nol baris.
+  "AgentInvocation",
   // SPEC-516 · ADR-0105 · Changelog sesudah Project (FK projectId). Tabel ini LOCAL-only dan
   // lazimnya TIDAK ada di sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris.
   "Changelog",

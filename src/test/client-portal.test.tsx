@@ -7,6 +7,7 @@ vi.mock("../src/api/portal", () => ({
   portalApi: {
     listProjects: vi.fn(), listBacklog: vi.fn(), listTickets: vi.fn(),
     getSpec: vi.fn(), getTicket: vi.fn(), logout: vi.fn(), createTicket: vi.fn(),
+    listChatSessions: vi.fn(),
   },
 }));
 import { portalApi } from "../src/api/portal";
@@ -15,6 +16,9 @@ import { mockViewport, resetViewport } from "./viewport";
 const USER: UserView = { id: "u1", email: "klien@x.co", role: "client", createdAt: "2026-08-01T00:00:00Z" };
 
 beforeEach(() => {
+  // SPEC-854 · ClientPortal mengintip chat (`listChatSessions`) untuk menyalakan tab Obrolan;
+  // vi.fn() polos mengembalikan undefined → `.then` melempar di dalam effect → seluruh render jatuh.
+  (portalApi.listChatSessions as any).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 });
   (portalApi.listProjects as any).mockResolvedValue({
     items: [{ id: "p1", name: "Toko Mekar" }], total: 1, page: 1, pageSize: 1 });
   (portalApi.listBacklog as any).mockResolvedValue({ items: [{

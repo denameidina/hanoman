@@ -1325,14 +1325,14 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
         {portalChat.enabled && (
           <>
             <SettingRow title="Jatah brainstorming" desc="Berapa sesi brainstorming per project tiap bulan. 0 = tertutup.">
-              <Input aria-label="Jatah brainstorming" type="number" min={0} max={1000}
+              <Input aria-label="Jatah brainstorming" type="number" min={0} max={1000} placeholder="mis. 3"
                 style={{ width: 110 }} defaultValue={portalChat.brainstormPerMonth}
                 onBlur={(e: React.FocusEvent<HTMLInputElement>) => savePortalChat(
                   { brainstormPerMonth: jatah(e.target.value, portalChat.brainstormPerMonth) },
                   "Jatah brainstorming → " + e.target.value)} />
             </SettingRow>
             <SettingRow title="Jatah pertanyaan" desc="Berapa sesi tanya-jawab per project tiap bulan. 0 = tertutup.">
-              <Input aria-label="Jatah pertanyaan" type="number" min={0} max={10000}
+              <Input aria-label="Jatah pertanyaan" type="number" min={0} max={10000} placeholder="mis. 30"
                 style={{ width: 110 }} defaultValue={portalChat.askPerMonth}
                 onBlur={(e: React.FocusEvent<HTMLInputElement>) => savePortalChat(
                   { askPerMonth: jatah(e.target.value, portalChat.askPerMonth) },
@@ -1352,7 +1352,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             </SettingRow>
             <SettingRow title="Batas waktu satu jawaban" last
               desc="Detik. Lewat dari ini klien menerima kalimat 'coba lagi sebentar', bukan layar menggantung.">
-              <Input aria-label="Batas waktu obrolan portal" type="number" min={10} max={900}
+              <Input aria-label="Batas waktu obrolan portal" type="number" min={10} max={900} placeholder="mis. 120"
                 style={{ width: 110 }} defaultValue={portalChat.timeoutSec}
                 onBlur={(e: React.FocusEvent<HTMLInputElement>) => savePortalChat(
                   { timeoutSec: jatah(e.target.value, portalChat.timeoutSec) },

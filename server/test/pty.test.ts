@@ -20,6 +20,10 @@ import { phaseFilePath, type Phase } from "../src/services/session-phases";
 // createSession SELALU menambahkan --dangerously-skip-permissions, jadi binary pengganti
 // harus menoleransi flag itu. /bin/cat tidak: ia mati seketika dengan "illegal option".
 const FAKE_CLAUDE = fileURLToPath(new URL("./fixtures/fake-claude.sh", import.meta.url));
+// Test yang menunggu tmux + fake-claude BENAR-BENAR lahir: di mesin yang sedang memuat beberapa
+// sesi agen, spawn itu terukur melewati 5 dtk bawaan vitest (audit 2026-09-05: 4 timeout palsu,
+// hijau di mesin idle). Batasnya dilonggarkan hanya untuk kasus yang menunggu proses nyata.
+const TMUX_SPAWN_TIMEOUT = 20_000;
 
 // SPEC-397 · berdiri sebagai `codex`: memantulkan stdin DAN memancarkan penanda runtime goal codex
 // begitu menerima `/goal …`. fake-claude.sh dipakai sebagai kontrol negatif (ia memantulkan `/goal`
@@ -60,7 +64,9 @@ function fakeClient() {
     close: () => { closed = true; },
   };
 }
-const waitFor = async (ok: () => boolean, ms = 5000) => {
+// Bawaan mengikuti TMUX_SPAWN_TIMEOUT: yang menentukan gagal-cepat adalah timeout `it`, bukan
+// helper ini — helper yang lebih pendek dari timeout test hanya mengubah pesan gagalnya.
+const waitFor = async (ok: () => boolean, ms = TMUX_SPAWN_TIMEOUT) => {
   const deadline = Date.now() + ms;
   while (!ok()) {
     if (Date.now() > deadline) throw new Error("timeout menunggu kondisi");
@@ -409,7 +415,7 @@ describe("pty service", () => {
     await waitFor(() => allData(c).includes("halo"));
     expect(listSessions()[0]).toMatchObject({ id: s.id, projectId: "p2", cwd: process.cwd(), exited: false });
     expect(getSession(s.id)).toMatchObject({ id: s.id, projectId: "p2" });
-  });
+  }, TMUX_SPAWN_TIMEOUT);
 
   // SPEC-812 · node-pty membaca dengan buffer tetap 1024 byte, jadi satu frame per chunk berarti
   // ±128 frame/detik untuk sesi yang ramai keluaran. Karena tak ada chunk node-pty yang melewati
@@ -456,7 +462,7 @@ describe("pty service", () => {
     attach(s.id, second); // klien tmux baru; tmux menggambar ulang layar yang sama
     await waitFor(() => allData(second).includes("args:"));
     expect(lastFrame(second)?.t).not.toBe("exit");
-  });
+  }, TMUX_SPAWN_TIMEOUT);
 
   // Sesi sebuah backlog item itu tunggal: menekan Start lagi harus menyambung, bukan
   // menyalakan `claude` kedua di atas worktree yang sama (ADR-0015).
@@ -889,7 +895,7 @@ describe("kejujuran akhir sesi (SPEC-402)", () => {
     expect(c.wasClosed()).toBe(false);
     // Dan sesinya memang tak pernah mati: tmux yang sebenarnya masih memegangnya.
     expect(listSessions().find((x) => x.id === s.id)).toMatchObject({ id: s.id, exited: false });
-  });
+  }, TMUX_SPAWN_TIMEOUT);
 });
 
 // SPEC-362 · ADR-0079 · hook riwayat sesi. pty.ts tetap nol dependensi DB: ia hanya menembakkan
@@ -993,6 +999,6 @@ describe("hook riwayat sesi (SPEC-362)", () => {
       await waitFor(() => (tmuxCapture(s.id) ?? "").includes("jawaban biasa"));
       expect(tmuxCapture(s.id) ?? "").not.toContain("4jawaban biasa");
       killSession(s.id);
-    });
+    }, TMUX_SPAWN_TIMEOUT);
   });
 });

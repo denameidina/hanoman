@@ -25,7 +25,11 @@ import { updateBadgeLabel, updateBadgeLabelShort } from "../src/api/update";
 import type { UpdateStatus } from "@hanoman/shared";
 
 const css = readFileSync(resolve(import.meta.dirname, "../src/app.css"), "utf8");
-const mobile = css.slice(css.indexOf("@media (max-width: 767px) {"), css.indexOf(".hn-local-overflow"));
+// Batas akhir dicari SESUDAH awal blok mobile: `.hn-local-overflow` juga disebut di komentar
+// kepala berkas (jauh sebelum media query), dan indexOf tanpa titik mulai memilih yang itu →
+// irisan kosong → ketiga assertion di bawah gagal pada CSS yang benar.
+const mobileStart = css.indexOf("@media (max-width: 767px) {");
+const mobile = css.slice(mobileStart, css.indexOf(".hn-local-overflow {", mobileStart));
 
 describe("SPEC-763 · tab tak menyusut sampai labelnya tumpah", () => {
   it("mematikan flex-shrink pada setiap tab sehingga strip yang sempit menggulir", () => {
