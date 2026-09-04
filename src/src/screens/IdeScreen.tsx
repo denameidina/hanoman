@@ -1,8 +1,26 @@
 /* IdeScreen — IDE Visual (SPEC-182): Explorer (pohon file + editor highlight) & Git Graph,
    satu toolbar (project + branch switcher). SPEC-234: section Staged/Changed + diff pane. */
 import React from "react";
-import hljs from "highlight.js";
+// ADR-0160 · `highlight.js/lib/core` + bahasa yang memang dipetakan `langOf` di bawah, bukan paket
+// utuh: bundel penuh ±190 bahasa terukur 940 KB (312 KB gzip) — lebih besar dari seluruh sisa
+// dashboard — hanya untuk mewarnai belasan ekstensi yang pernah dibuka di Explorer.
+import hljs from "highlight.js/lib/core";
+import langTypescript from "highlight.js/lib/languages/typescript";
+import langJavascript from "highlight.js/lib/languages/javascript";
+import langJson from "highlight.js/lib/languages/json";
+import langMarkdown from "highlight.js/lib/languages/markdown";
+import langCss from "highlight.js/lib/languages/css";
+import langXml from "highlight.js/lib/languages/xml";
+import langBash from "highlight.js/lib/languages/bash";
+import langPython from "highlight.js/lib/languages/python";
+import langYaml from "highlight.js/lib/languages/yaml";
+import langSql from "highlight.js/lib/languages/sql";
+import langDiff from "highlight.js/lib/languages/diff";
 import "highlight.js/styles/github.css";
+for (const [name, def] of Object.entries({
+  typescript: langTypescript, javascript: langJavascript, json: langJson, markdown: langMarkdown,
+  css: langCss, xml: langXml, bash: langBash, python: langPython, yaml: langYaml, sql: langSql, diff: langDiff,
+})) hljs.registerLanguage(name, def);
 import { Card, Button, Select, Icon, StateBlock, Tabs, Badge, DocDownload, DocPreviewModal, isMarkdownPath, ResponsivePanels, Modal, Input, ConfirmDialog } from "../ds";
 import { api, ApiError, type RepoFile, type ReviewFile, type WorkingStatus, type GitOp, type Remote, type IdeUploadResult } from "../api/client";
 import type { ProjectVM } from "./types";

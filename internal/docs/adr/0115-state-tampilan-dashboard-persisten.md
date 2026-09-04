@@ -1,6 +1,6 @@
 # ADR-0115 — State tampilan dashboard persisten di storage, berkunci per layar
 
-- Status: Accepted
+- Status: Accepted — **diamandemen [0160](0160-navigasi-dashboard-router-url.md)** (2026-09-05): alternatif "router + query string" yang ditolak di bawah kini diterima; `section` diturunkan dari URL dan `app.section` di storage hanya dibaca saat URL tak menunjuk halaman. Sisanya (kunci per layar, hook, prune) tetap berlaku.
 - Tanggal: 2026-08-13
 - SPEC: SPEC-740
 - Terkait: **diamandemen sebagian oleh [0118](0118-workspace-terminal-kanonik-per-user.md)** untuk

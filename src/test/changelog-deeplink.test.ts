@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { parseChangelogHash, changelogDeepLink, parseSpecHash } from "../src/screens/deeplink";
+import { parseRoute } from "../src/routes";
+import { NAV_KEYS } from "../src/ds/shell";
 
-const loc = { origin: "https://hanoman.test", pathname: "/" };
+const loc = { origin: "https://hanoman.test" };
 
 describe("SPEC-519 · deep-link changelog", () => {
   it("membaca projectId tanpa cl", () => {
@@ -29,11 +31,12 @@ describe("SPEC-519 · deep-link changelog", () => {
     expect(parseChangelogHash("#spec=SPEC-9")).toBeNull();
   });
 
-  it("builder simetris dengan parser", () => {
-    expect(changelogDeepLink("arta", null, loc)).toBe("https://hanoman.test/#changelog=arta");
-    expect(changelogDeepLink("arta", "c1", loc)).toBe("https://hanoman.test/#changelog=arta&cl=c1");
+  // ADR-0160 · builder memakai path router; parser hash di atas tinggal untuk link lama.
+  it("builder simetris dengan parser rute", () => {
+    expect(changelogDeepLink("arta", null, loc)).toBe("https://hanoman.test/changelog/arta");
+    expect(changelogDeepLink("arta", "c1", loc)).toBe("https://hanoman.test/changelog/arta/c1");
     const url = changelogDeepLink("a/b", "c 1", loc);
-    expect(parseChangelogHash(url.slice(url.indexOf("#"))))
-      .toEqual({ projectId: "a/b", changelogId: "c 1" });
+    expect(parseRoute(new URL(url).pathname, NAV_KEYS))
+      .toEqual({ section: "changelog", projectId: "a/b", changelogId: "c 1" });
   });
 });

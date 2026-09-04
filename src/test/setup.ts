@@ -8,4 +8,8 @@ import { beforeEach } from "vitest";
 // localStorage di dalam beforeEach/test-nya sendiri tak terpengaruh.
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* mode privat */ }
+  // ADR-0160 · URL kini state navigasi (router). jsdom yang sama dipakai seluruh berkas, jadi test
+  // yang mendarat di /backlog/SPEC-1 mewariskan path itu ke test berikutnya — yang lalu mengira
+  // halaman tersimpannya diabaikan.
+  try { window.history.replaceState(null, "", "/"); } catch { /* lingkungan tanpa history */ }
 });

@@ -1,6 +1,6 @@
 # ADR-0071 — Link ticket triase: deep-link backlog (hash SPA) + token bagikan status publik
 
-- Status: Accepted
+- Status: Accepted — **bagian 1 diamandemen [0160](0160-navigasi-dashboard-router-url.md)** (2026-09-05): URL kanonik backlog kini `/backlog/<id>` (router); hash `#spec=` tetap dibaca saat mount lalu dialihkan. Bagian 2–3 tak berubah.
 - Tanggal: 2026-07-22
 - SPEC: 293
 - Terkait: **memperluas 0062** (Help Center tiket publik + triase→backlog), 0018/0019 (nilai

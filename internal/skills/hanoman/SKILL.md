@@ -115,9 +115,11 @@ Pakai skill lebih sempit saat task cocok:
 - **State tampilan tiap halaman persisten di storage, berkunci per layar** (SPEC-740/**ADR-0115**;
   ADR-0107 & ADR-0071 **ditegakkan**, tak ada yang dicabut): filter & pencarian, paginasi, posisi
   scroll, item terpilih & panel terbuka bertahan lintas navigasi **dan** refresh/buka-ulang browser.
-  Sebabnya struktural — dashboard menavigasi lewat state `section` di App, bukan router URL, jadi tiap
-  layar di-unmount dan seluruh `useState`-nya hilang; refresh lebih buruk lagi karena `section` sendiri
-  lahir `"overview"`. Mekanismenya **satu** modul `src/src/ui-state` (`store.ts` bebas React →
+  Sebabnya struktural — tiap layar di-unmount saat pengguna pindah, jadi seluruh `useState`-nya hilang.
+  (Sejak **ADR-0160**, audit 2026-09-05, halaman = URL lewat react-router: `section` diturunkan dari
+  `pathname` oleh `src/src/routes.ts`, `app.section` di storage hanya dibaca saat URL tak menunjuk
+  halaman; dua belas layar `React.lazy`. Hash `#spec=`/`#changelog=` ADR-0071 dialihkan ke
+  `/backlog/<id>` / `/changelog/<p>[/<cl>]`.) Mekanismenya **satu** modul `src/src/ui-state` (`store.ts` bebas React →
   bisa diuji langsung, `hooks.ts`, `ResetViewButton.tsx`), bukan tambalan per layar: layar baru
   memakai **`usePersistedState(screen, field, initial, accept?)`** alih-alih `useState` dan otomatis
   ikut. Kunci **`hn.ui.v1.<screen>[@<scope>].<field>`** — **versi hidup DI DALAM kunci** (menaikkannya
@@ -407,8 +409,8 @@ Pakai skill lebih sempit saat task cocok:
   berbohong kepada agennya (SPEC-432).
   **Letak & jangkauan (SPEC-519, tanpa ADR):** changelog punya **entri sidebar sendiri**
   (`changelog`, ikon `megaphone`) dan halaman yang bisa dibuka langsung lewat
-  **`#changelog=<projectId>[&cl=<changelogId>]`** (pola hash ADR-0071 yang sama dengan `#spec=`,
-  di-parse sekali saat mount lalu dibersihkan; kedua parser saling eksklusif). Daftar rilisnya
+  **`/changelog/<projectId>[/<changelogId>]`** (router ADR-0160; hash lama
+  `#changelog=<projectId>[&cl=<id>]` ADR-0071 masih dibaca saat mount lalu dialihkan; kedua parser saling eksklusif). Daftar rilisnya
   bergulir dengan **tinggi berbatas** (rantai flex yang menembus `Card` putus tanpa prop `fill` —
   audit SPEC-393) dan dicari lewat **satu parameter aditif `?q=`** pada `GET /projects/:id/changelog`
   yang sudah ada — predikat murni `changelogMatches()` di `@hanoman/shared`, disaring **sebelum**

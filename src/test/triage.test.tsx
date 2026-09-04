@@ -74,9 +74,9 @@ describe("SPEC-253 · TriageScreen", () => {
     fireEvent.click(await screen.findByText("Tak bisa login"));
     // status turunan backlog (executing → "Sedang dikerjakan")
     expect(await screen.findByText("Sedang dikerjakan")).toBeTruthy();
-    // buka backlog di tab baru → URL hash #spec=SPEC-9
+    // buka backlog di tab baru → URL router /backlog/SPEC-9 (ADR-0160)
     fireEvent.click(screen.getByRole("button", { name: /buka backlog/i }));
-    expect(openSpy).toHaveBeenCalledWith(expect.stringContaining("#spec=SPEC-9"), "_blank", "noreferrer");
+    expect(openSpy).toHaveBeenCalledWith(expect.stringContaining("/backlog/SPEC-9"), "_blank", "noreferrer");
     // salin link publik → clipboard menerima publicStatusUrl
     fireEvent.click(screen.getByRole("button", { name: /salin link publik/i }));
     expect(writeText).toHaveBeenCalledWith("https://h.id/help/demo/status/hnm_shr_ab");

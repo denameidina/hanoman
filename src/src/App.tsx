@@ -2,6 +2,8 @@
    prototype App.jsx: window.HN → api.* on mount; every mutating handler
    calls the client and updates state from the response. */
 import React from "react";
+import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
+import { parseRoute, routePath } from "./routes";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
 import { Shell, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
@@ -27,27 +29,32 @@ import { presenceIndex } from "./screens/presence-map";
 import { repoBasename, cloneErrorText } from "./screens/git-remote";
 import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
-import { DalangHanomanScreen } from "./screens/DalangHanomanScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
 import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
 import { BacklogScreen } from "./screens/BacklogScreen";
-import { TeamScreen } from "./screens/TeamScreen";
-import { TriageScreen } from "./screens/TriageScreen";
 import { PrdScreen, NewPrdModal, type PrdPrefill, type PrdBriefForm } from "./screens/PrdScreen";
 import type { AuditEscalation } from "@hanoman/shared";
-import { TerminalScreen } from "./screens/TerminalScreen";
-import { IdeScreen } from "./screens/IdeScreen";
-import { VpsScreen } from "./screens/VpsScreen";
-import { SchedulerScreen } from "./screens/SchedulerScreen";
-import { LeadScreen } from "./screens/LeadScreen";
-import { DocsWorkspace } from "./screens/DocsWorkspace";
-import { ChangelogScreen } from "./screens/ChangelogScreen";
 // SPEC-585 · pet maskot. Dipasang di App, BUKAN di dalam Shell: <Shell> ditulis ulang di tiap
 // cabang `section`, jadi pet yang tinggal di sana lahir kembali tiap navigasi — animasi idle mulai
 // dari nol dan keadaan transient hilang persis saat operator pindah layar untuk melihatnya.
 import { HanomanPet } from "./screens/HanomanPet";
-import { ReviewScreen } from "./screens/ReviewScreen";
-import { SettingsScreen } from "./screens/SettingsScreen";
+// ADR-0160 · layar yang bukan beranda dimuat MALAS: sebelum ini seluruh dashboard adalah satu chunk
+// 3,8 MB (935 KB gzip) — xterm, highlight.js, marked, git graph, VPS, Settings 98 KB — semuanya
+// diunduh untuk membuka Overview. Tiap `import()` di bawah jadi chunk sendiri yang baru diambil saat
+// section-nya pertama dibuka; `gate()` memasang Suspense. Overview/Projects/Backlog/PRD tetap eager:
+// itu jalur pertama tiap sesi dan PrdScreen berbagi modul dengan NewPrdModal yang dipakai App.
+const DalangHanomanScreen = React.lazy(() => import("./screens/DalangHanomanScreen").then((m) => ({ default: m.DalangHanomanScreen })));
+const TeamScreen = React.lazy(() => import("./screens/TeamScreen").then((m) => ({ default: m.TeamScreen })));
+const TriageScreen = React.lazy(() => import("./screens/TriageScreen").then((m) => ({ default: m.TriageScreen })));
+const TerminalScreen = React.lazy(() => import("./screens/TerminalScreen").then((m) => ({ default: m.TerminalScreen })));
+const IdeScreen = React.lazy(() => import("./screens/IdeScreen").then((m) => ({ default: m.IdeScreen })));
+const VpsScreen = React.lazy(() => import("./screens/VpsScreen").then((m) => ({ default: m.VpsScreen })));
+const SchedulerScreen = React.lazy(() => import("./screens/SchedulerScreen").then((m) => ({ default: m.SchedulerScreen })));
+const LeadScreen = React.lazy(() => import("./screens/LeadScreen").then((m) => ({ default: m.LeadScreen })));
+const DocsWorkspace = React.lazy(() => import("./screens/DocsWorkspace").then((m) => ({ default: m.DocsWorkspace })));
+const ChangelogScreen = React.lazy(() => import("./screens/ChangelogScreen").then((m) => ({ default: m.ChangelogScreen })));
+const ReviewScreen = React.lazy(() => import("./screens/ReviewScreen").then((m) => ({ default: m.ReviewScreen })));
+const SettingsScreen = React.lazy(() => import("./screens/SettingsScreen").then((m) => ({ default: m.SettingsScreen })));
 
 const SEVERITY =[{ value: "critical", label: "Critical" }, { value: "major", label: "Major" }, { value: "minor", label: "Minor" }];
 const PRIORITY = [{ value: "tinggi", label: "Tinggi" }, { value: "sedang", label: "Sedang" }, { value: "rendah", label: "Rendah" }];
@@ -676,14 +683,31 @@ export function EditProjectModal({ open, project, onClose, onSave }:
   );
 }
 
+// ADR-0160 · router membungkus App di SINI, bukan di main.tsx: sebelas berkas test me-mount `<App />`
+// telanjang, dan `/help/*` (PublicHelpApp) memang hidup di luar router dashboard.
 export default function App() {
-  // SPEC-740 · ADR-0115 · halaman terakhir yang dibuka ikut dipulihkan; refresh tak lagi
-  // melempar balik ke Overview. Guard NAV_KEYS menutup section transien (project/review)
+  return <BrowserRouter><AppInner /></BrowserRouter>;
+}
+
+function AppInner() {
+  // ADR-0160 · halaman = URL. `section` diturunkan dari pathname (`routes.ts`), bukan disimpan
+  // sebagai state; tombol Kembali/Maju browser dan link yang dibagikan bekerja dengan sendirinya.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const route = React.useMemo(() => parseRoute(location.pathname, NAV_KEYS), [location.pathname]);
+  // SPEC-740 · ADR-0115 · halaman terakhir yang dibuka tetap diingat: `/` (tab baru, bookmark lama)
+  // mendarat di sana, bukan di Overview. Guard NAV_KEYS menutup section transien (project/review)
   // dan key yang sudah tak ada (`runs`/`triggers`, SPEC-162).
-  const [section, setSection] = usePersistedState("app", "section", "overview", oneOf(...NAV_KEYS));
-  // SPEC-293 · deep-link #spec=<id> (buka backlog + SpecDetail saat mount). Diteruskan ke BacklogScreen.
+  const [savedSection, setSavedSection] = usePersistedState("app", "section", "overview", oneOf(...NAV_KEYS));
+  const section = route?.section ?? savedSection;
+  React.useEffect(() => {
+    if (route && NAV_KEYS.includes(route.section)) setSavedSection(route.section);
+  }, [route?.section]);
+  const setSection = React.useCallback((key: string) => navigate(routePath({ section: key })), [navigate]);
+  const goProject = React.useCallback((id: string) => navigate(routePath({ section: "project", projectId: id })), [navigate]);
+  // SPEC-293 · deep-link backlog (`/backlog/<id>`, dulu `#spec=<id>`): SpecDetail item itu dibuka. Diteruskan ke BacklogScreen.
   const [openSpecId, setOpenSpecId] = React.useState<string | null>(null);
-  // SPEC-519 · deep-link #changelog=<projectId>[&cl=<id>] — rilis yang harus terbuka saat mount.
+  // SPEC-519 · deep-link changelog (`/changelog/<projectId>[/<id>]`, dulu `#changelog=…`) — rilis yang harus terbuka.
   const [openChangelogId, setOpenChangelogId] = React.useState<string | null>(null);
   const [projects, setProjects] = React.useState<ProjectView[]>([]);
   const [backlog, setBacklog] = React.useState<Spec[]>([]);
@@ -739,29 +763,27 @@ export default function App() {
   // di dalam kunci) — disapu sekali di sini supaya storage tak tumbuh selamanya.
   React.useEffect(() => { pruneUiState(); }, []);
 
-  // SPEC-293 · deep-link backlog: buka `${origin}${pathname}#spec=<id>` (mis. dari tab baru tombol
-  // "Buka backlog" di Triase) → langsung ke section backlog + SpecDetail. Hash dibersihkan
-  // agar tak memicu ulang. Sekali-mount (ADR-0071); bukan router SPA umum.
+  // ADR-0160 · saat mount: hash lama ADR-0071 (`#spec=<id>` / `#changelog=<projectId>[&cl=<id>]`)
+  // ditulis ulang ke path-nya (link yang sudah beredar tetap hidup), dan `/` atau path yang tak
+  // dikenal dialihkan ke halaman terakhir yang tersimpan. `replace`: riwayat browser tak boleh
+  // menyimpan URL perantara yang kalau ditekan Kembali cuma mengalihkan lagi.
   React.useEffect(() => {
-    const clean = () => window.history.replaceState(null, "", window.location.pathname + window.location.search);
     const id = parseSpecHash(window.location.hash);
-    if (id) {
-      setSection("backlog");
-      setOpenSpecId(id);
-      clean();
-      return;
-    }
-    // SPEC-519 · `#changelog=<projectId>[&cl=<id>]`, saling eksklusif dengan `#spec=`: satu hash,
-    // satu section. `setProjectId` di sini menang atas default `load()` — load memakai
-    // `(cur) => cur || items[0]`, jadi nilai dari hash tak ditimpa.
+    if (id) { navigate(routePath({ section: "backlog", specId: id }), { replace: true }); return; }
     const cl = parseChangelogHash(window.location.hash);
-    if (cl) {
-      setSection("changelog");
-      setProjectId(cl.projectId);
-      setOpenChangelogId(cl.changelogId);
-      clean();
+    if (cl) { navigate(routePath({ section: "changelog", projectId: cl.projectId, changelogId: cl.changelogId }), { replace: true }); return; }
+    if (!route) navigate(routePath({ section: savedSection }), { replace: true });
+  }, [route]);
+  // ADR-0160 · state yang diturunkan dari URL. `setProjectId` di sini menang atas default `load()` —
+  // load memakai `(cur) => cur || items[0]`, jadi nilai dari URL tak ditimpa. Ketiganya membaca
+  // parameter, bukan menyalin `route` utuh, supaya pindah ke section lain tak menyentuhnya.
+  React.useEffect(() => {
+    if (route?.section === "project" || route?.section === "changelog") {
+      if (route.projectId) setProjectId(route.projectId);
     }
-  }, []);
+    if (route?.section === "backlog") setOpenSpecId(route.specId ?? null);
+    if (route?.section === "changelog") setOpenChangelogId(route.changelogId ?? null);
+  }, [route?.section, route?.projectId, route?.specId, route?.changelogId]);
 
   /* SPEC-919 · ADR-0147 · sesi hidup lintas device, didorong grup siar `presence` — `attach()`
      mengirim seluruh grup begitu socket terbuka, jadi state ini terisi tanpa satu request pun.
@@ -834,17 +856,26 @@ export default function App() {
   const proj = projectsView.find((p) => p.id === projectId) || projectsView[0];
   // SPEC-198 · search project via API di ProjectsScreen (bukan filter klien di App).
 
-  function openProject(p: ProjectVM) { setProjectId(p.id); setSection("project"); }
+  function openProject(p: ProjectVM) { setProjectId(p.id); goProject(p.id); }
   // SPEC-171 · buka layar review file worktree sebuah backlog item.
-  function openReview(s: Spec) { setReview({ id: s.id, kind: "spec", title: s.title }); setSection("review"); }
+  // ADR-0160 · review hidup di `/review/<kind>/<id>`; `review` state hanya memegang JUDUL (URL
+  // tak membawanya). Refresh di URL itu jatuh ke judul dari backlog, atau id-nya sendiri.
+  const goReview = (kind: "spec" | "session", id: string) => navigate(routePath({ section: "review", kind, id }));
+  function openReview(s: Spec) { setReview({ id: s.id, kind: "spec", title: s.title }); goReview("spec", s.id); }
   // SPEC-171 · dari Terminal (Cell spec): id spec saja → cari judulnya di backlog.
   function openReviewSpecId(id: string) {
-    setReview({ id, kind: "spec", title: backlog.find((s) => s.id === id)?.title ?? id }); setSection("review");
+    setReview({ id, kind: "spec", title: backlog.find((s) => s.id === id)?.title ?? id }); goReview("spec", id);
   }
   // SPEC-230 · review worktree sesi project-level (PRD, tanpa Spec).
   function openSessionReview(id: string, title: string) {
-    setReview({ id, kind: "session", title }); setSection("review");
+    setReview({ id, kind: "session", title }); goReview("session", id);
   }
+  // Target review yang DIRENDER: dari URL, judul dari state bila masih untuk id yang sama.
+  const reviewTarget = route?.section === "review"
+    ? (review && review.id === route.id && review.kind === route.kind
+        ? review
+        : { id: route.id!, kind: route.kind!, title: backlog.find((s) => s.id === route.id)?.title ?? route.id! })
+    : null;
 
   // SPEC-184 · klik aksi notifikasi. `sessions` = daftar ter-poll (cek liveness untuk notif done).
   const openNotification = React.useCallback((nt: Notification) => {
@@ -924,7 +955,7 @@ export default function App() {
         // pesan endpoint-nya.
         const { error } = cloneErrorText(e);
         setProjects((list) => [created!, ...list]);
-        setProjectId(created.id); setModal(null); setSection("project");
+        setProjectId(created.id); setModal(null); goProject(created.id);
         showToast(`Project ${created.id} dibuat, tapi clone gagal · ${error} · clone ulang dari detail project`,
           "warn", "git-branch");
         return;
@@ -945,7 +976,7 @@ export default function App() {
           return;
         } catch { /* jatuh ke layar project di bawah */ }
       }
-      setProjectId(created.id); setSection("project");
+      setProjectId(created.id); goProject(created.id);
       showToast(`Project ${created.id} dibuat · tekan "Scaffold docs" untuk menyusun SoT`, "ok", "box");
       return;
     }
@@ -961,7 +992,7 @@ export default function App() {
       // Project dipertahankan (cermin kegagalan clone di atas): mendarat di detail project, tempat
       // pintu "Reverse docs" jadi retry-nya — bukan Docs kosong yang tak menawarkan langkah apa pun.
       const detail = (e as { detail?: { error?: string } }).detail?.error;
-      setSection("project");
+      goProject(created.id);
       showToast(`Project ${created.id} dibuat, tapi reverse docs gagal dimulai`
         + (detail ? ` · ${detail}` : "") + ` · ulangi lewat "Reverse docs"`, "warn", "radar");
     }
@@ -1291,12 +1322,16 @@ export default function App() {
 
   // Fetch awal dipakai semua screen kecuali Settings, jadi loading/error-nya
   // digerbangkan satu kali di sini.
+  // ADR-0160 · Suspense di sini pula: layar malas yang chunk-nya belum tiba menampilkan blok
+  // memuat yang sama, bukan layar kosong.
+  const suspend = (body: React.ReactNode) =>
+    <React.Suspense fallback={<StateBlock kind="loading" title="Memuat halaman…" />}>{body}</React.Suspense>;
   const gate = (body: React.ReactNode) =>
     status === "loading" ? <StateBlock kind="loading" title="Memuat workspace…" />
       : status === "error" ? <StateBlock kind="error" illustration="PST-006"
           title="Gagal memuat data dari server"
           hint="Pastikan server hanoman berjalan, lalu coba lagi." action={load} />
-      : body;
+      : suspend(body);
 
   // SPEC-169 · gerbang auth: splash → Setup/Login → app.
   if (!auth) return <StateBlock kind="loading" title="Memuat hanoman…" />;
@@ -1520,13 +1555,13 @@ export default function App() {
     );
   } else if (section === "review") {
     // SPEC-171/230 · layar review file worktree — backlog item (spec) ATAU sesi PRD (session).
-    const back = review?.kind === "session" ? "terminal" : "backlog";
+    const back = reviewTarget?.kind === "session" ? "terminal" : "backlog";
     screen = (
       <Shell active="backlog" title="Review" wide onNavigate={setSection}
-        breadcrumb={review ? (review.kind === "session" ? "terminal · " : "backlog · ") + review.id : "review"}
+        breadcrumb={reviewTarget ? (reviewTarget.kind === "session" ? "terminal · " : "backlog · ") + reviewTarget.id : "review"}
         actions={<Button size="sm" variant="ghost" leftIcon="arrow-left" onClick={() => setSection(back)}>Kembali</Button>}>
-        {gate(review
-          ? <ReviewScreen specId={review.id} kind={review.kind} title={review.title} onBack={() => setSection(back)} />
+        {gate(reviewTarget
+          ? <ReviewScreen specId={reviewTarget.id} kind={reviewTarget.kind} title={reviewTarget.title} onBack={() => setSection(back)} />
           : <StateBlock kind="empty" icon="git-compare" title="Pilih item untuk di-review"
               hint="Buka Review dari Backlog atau dari sel sesi di Terminal." action={() => setSection("backlog")} actionLabel="Ke Backlog" />)}
       </Shell>
@@ -1534,7 +1569,7 @@ export default function App() {
   } else if (section === "settings") {
     screen = (
       <Shell active="settings" title="Settings" breadcrumb="nafanesia.id · workspace" onNavigate={setSection}>
-        <SettingsScreen onToast={showToast} me={me} onLoggedOut={onLoggedOut} />
+        {suspend(<SettingsScreen onToast={showToast} me={me} onLoggedOut={onLoggedOut} />)}
       </Shell>
     );
   }

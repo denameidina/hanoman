@@ -93,14 +93,14 @@ describe("SchedulerScreen observabilitas (SPEC-299)", () => {
     expect(screen.queryByText(/· selesai —/)).not.toBeInTheDocument();
   });
 
-  it("done item punya tombol Buka review deep-link #spec=", async () => {
+  it("done item punya tombol Buka review deep-link /backlog/<id>", async () => {
     getSchedulerState.mockResolvedValue(STATE);
     getSchedulerQueue.mockImplementation(queueFrom(QUEUE_ROWS));
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
     renderScreen();
     const btn = await screen.findByRole("button", { name: /buka review/i });
     fireEvent.click(btn);
-    expect(openSpy).toHaveBeenCalledWith(expect.stringContaining("#spec=SPEC-2"), "_blank", "noreferrer");
+    expect(openSpy).toHaveBeenCalledWith(expect.stringContaining("/backlog/SPEC-2"), "_blank", "noreferrer");
     openSpy.mockRestore();
   });
 

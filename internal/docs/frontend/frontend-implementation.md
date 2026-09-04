@@ -220,10 +220,16 @@ menyapu sisanya. Nilai yang gagal di-parse atau salah bentuk jatuh ke default, t
 | changelog | project | `q`, `page`, `selectedId` |
 | settings | — | `tab` |
 
-`section` yang dipulihkan digerbangi **`NAV_KEYS`** (diekspor `ds/shell.tsx`): section transien
-(`project`/`review`) dan key mati (`runs`/`triggers`) tak boleh jadi titik mendarat. Deep-link hash
-(`#spec=`, `#changelog=`, ADR-0071) berjalan sesudah mount dan karena itu **menang** atas state yang
-dipulihkan.
+**Navigasi = URL (ADR-0160).** `section` **diturunkan** dari `pathname` lewat `src/src/routes.ts`
+(`/backlog`, `/projects/<id>`, `/backlog/<specId>`, `/changelog/<p>[/<cl>]`, `/review/<kind>/<id>`);
+`setSection(key)` = `navigate(routePath(...))`, jadi tombol Kembali/Maju browser dan link yang dibagikan
+bekerja. `app.section` di storage tetap DITULIS tiap rute `HN_NAV` dibuka dan hanya DIBACA saat URL tak
+menunjuk halaman (`/`, key mati `runs`/`triggers`), digerbangi **`NAV_KEYS`** (diekspor `ds/shell.tsx`):
+section transien (`project`/`review`) tak boleh jadi titik mendarat dari storage — dari URL boleh, karena
+id-nya ikut di path. Hash lama (`#spec=`, `#changelog=`, ADR-0071) dibaca sesudah mount lalu **dialihkan**
+(`replace`) ke path barunya; builder `specDeepLink`/`changelogDeepLink` memancarkan path.
+Dua belas layar di luar Overview/Projects/Backlog/PRD adalah `React.lazy` di balik Suspense `gate()`:
+test yang membuka layar itu memakai `findBy*`/`waitFor`, bukan `getBy*` langsung sesudah klik.
 
 **Impor:** `ResetViewButton` mengambil `Badge`/`Button` dari `../ds/components/*` dan `ds/shell.tsx`
 mengambil `useScrollRestore` dari `../ui-state/hooks` — lewat barrel, `ds → shell → ui-state → ds`

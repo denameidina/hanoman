@@ -1,6 +1,9 @@
-// SPEC-293 · deep-link backlog lewat hash fragment (SPA hanoman tak punya router; ADR-0071).
-// URL kanonik satu backlog = `${origin}${pathname}#spec=<SPEC-ID>`. App mem-parse-nya sekali saat
-// mount lalu membuka SpecDetail. Modul murni ini dipakai App (parse) + Triase (build).
+// SPEC-293 · deep-link backlog. Sejak ADR-0160 dashboard punya router URL: URL kanonik satu backlog
+// = `${origin}/backlog/<SPEC-ID>` (dibangun `routes.ts`). Bentuk hash lama ADR-0071
+// (`#spec=<id>`, `#changelog=<projectId>[&cl=<id>]`) TETAP di-parse App saat mount dan ditulis ulang
+// ke path — link yang sudah beredar di email/tiket tak boleh mati. Modul murni: App (parse) +
+// Triase/Changelog/Scheduler (build).
+import { absoluteRouteUrl } from "../routes";
 
 // Ekstrak SPEC-ID dari hash `#spec=<id>` (juga `#a=1&spec=<id>`). null bila tak ada.
 export function parseSpecHash(hash: string): string | null {
@@ -9,13 +12,13 @@ export function parseSpecHash(hash: string): string | null {
 }
 
 // Bangun URL absolut ke satu backlog dari lokasi saat ini.
-export function specDeepLink(id: string, loc: { origin: string; pathname: string } = window.location): string {
-  return `${loc.origin}${loc.pathname}#spec=${encodeURIComponent(id)}`;
+export function specDeepLink(id: string, loc: { origin: string } = window.location): string {
+  return absoluteRouteUrl({ section: "backlog", specId: id }, loc);
 }
 
-// SPEC-519 · deep-link changelog, pola & siklus hidup yang sama dengan `#spec=` (ADR-0071):
+// SPEC-519 · deep-link changelog, siklus hidup yang sama dengan `#spec=` (ADR-0071):
 // `#changelog=<projectId>` membuka halaman changelog project itu, `&cl=<id>` langsung memilih satu
-// rilis. Di-parse SEKALI saat mount lalu hash dibersihkan agar tak memicu ulang.
+// rilis. Di-parse SEKALI saat mount lalu dialihkan ke `/changelog/<projectId>[/<id>]`.
 export function parseChangelogHash(hash: string): { projectId: string; changelogId: string | null } | null {
   const m = /(?:^|[#&])changelog=([^&]+)/.exec(hash || "");
   if (!m || !m[1]) return null;
@@ -25,7 +28,6 @@ export function parseChangelogHash(hash: string): { projectId: string; changelog
 
 // Bangun URL absolut ke halaman changelog (opsional: satu rilis) dari lokasi saat ini.
 export function changelogDeepLink(projectId: string, changelogId?: string | null,
-  loc: { origin: string; pathname: string } = window.location): string {
-  const cl = changelogId ? `&cl=${encodeURIComponent(changelogId)}` : "";
-  return `${loc.origin}${loc.pathname}#changelog=${encodeURIComponent(projectId)}${cl}`;
+  loc: { origin: string } = window.location): string {
+  return absoluteRouteUrl({ section: "changelog", projectId, changelogId: changelogId ?? null }, loc);
 }

@@ -146,3 +146,15 @@ while read -r k; do [ -n "$k" ] && rm -f "$HANOMAN_UPLOAD_DIR/$k"; done < /tmp/m
 Melewatkannya hanya menyisakan byte inert — tak ada yang rusak, cuma disk terpakai. Migration-nya
 sendiri (`20260731180000_drop_errors_sdk_crossaudit`) tetap aman dijalankan tanpa langkah ini.
 Lihat [ADR-0092](../adr/0092-cabut-error-monitoring-sdk-cross-audit.md).
+
+## Variabel lingkungan tambahan (audit 2026-09-05)
+
+Empat knob yang dibaca kode tetapi sebelumnya tak tercatat di mana pun. Semuanya opsional; nilai
+bawaannya adalah yang berlaku bila variabelnya kosong.
+
+| variabel | dibaca oleh | bawaan | arti |
+|---|---|---|---|
+| `HANOMAN_TICKET_RETENTION_DAYS` | `server/src/services/ticket.ts` | `90` | umur tiket Help Center yang sudah ditutup sebelum disapu retensi (ADR-0131) |
+| `HANOMAN_IDE_UPLOAD_MAX_BYTES` | `server/src/routes/ide.ts` | `UPLOAD_TOTAL_MAX` di route | plafon total byte satu unggahan multipart IDE (ADR-0121) |
+| `HANOMAN_MCP_MAX_BYTES` | `cli/src/mcp/config.ts` | lihat `--max-bytes` | batas ukuran balasan tool MCP; flag `--max-bytes` menang (ADR-0099) |
+| `HANOMAN_EVENT_DIR` | disuntik `pty.ts` ke tiap sesi agen | per-sesi di tmpdir | spool telemetry hook agen; **bukan** untuk diisi operator — sesi mewarisinya dari server (ADR-0159) |

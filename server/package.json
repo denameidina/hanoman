@@ -17,7 +17,6 @@
     "@fastify/websocket": "^11.3.0",
     "@hanoman/runner": "workspace:*",
     "@hanoman/shared": "workspace:*",
-    "@jridgewell/trace-mapping": "^0.3.25",
     "@prisma/client": "^6.19.0",
     "fastify": "^5.12.1",
     "file-type": "^21.3.4",

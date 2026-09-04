@@ -1451,7 +1451,8 @@ GET   /tickets/:id            -> TicketDetail { ...ticket, detail, attachments:[
 #   SPEC-805 · ${base} = origin publik pertama (HANOMAN_PUBLIC_ORIGINS) bila split dikonfigurasi, BUKAN Host
 #   request — route ini hanya hidup di host control, yang justru menolak /api/help. Host control me-redirect
 #   302 path SPA /help/* ke origin publik agar link lama tetap hidup. Tanpa split, fallback ke Host request.
-#   lazily bila tiket lama belum punya (idempoten, tanpa sync). Deep-link backlog UI = ${origin}#spec=<id> (ADR-0071).
+#   lazily bila tiket lama belum punya (idempoten, tanpa sync). Deep-link backlog UI = ${origin}/backlog/<id>
+#   (router ADR-0160; bentuk hash lama `#spec=<id>` ADR-0071 tetap dialihkan ke sana saat mount).
 GET   /tickets/:id/attachments/:attId    # attachment ber-auth · 404; Content-Disposition: attachment,
 #   X-Content-Type-Options:nosniff, Content-Security-Policy:sandbox (active content tak inline di admin origin)
       # SPEC-272 · di CLIENT byte ditarik lazy dari hub (readUploadOrFetch → /sync/attachments) bila absen lokal, lalu di-cache
@@ -1736,7 +1737,7 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 > `/api/events/ws`, bukan lagi self-poll `GET /api/scheduler/state` 5 dtk; endpoint HTTP-nya tetap
 > ada sebagai muat awal + fallback. Yang dirender: status per source (enable/last-run/next-run),
 > antrean (`status:"queued"`), sesi berjalan (`state.sessions`, indikator `decision`=menunggu keputusan),
-> selesai (`status:"done"`, tombol **Buka review** deep-link `#spec=<id>` → diff/ringkasan di Review yang ada),
+> selesai (`status:"done"`, tombol **Buka review** deep-link `/backlog/<id>` (ADR-0160) → diff/ringkasan di Review yang ada),
 > gagal (`status:"failed"` + `note` alasan). Panel setelan menulis semua knob via `PUT /api/scheduler/config`
 > (enable+cadence per source, cap, autonomy, ambang errors); **rem darurat** Pause (`{paused:true}`) / Stop
 > (`{enabled:false}`) via endpoint yang sama; **opt-in per project** (pola helpEnabled) via `PATCH
