@@ -92,7 +92,10 @@ dipangkas ke `lib/core` + bahasa yang memang dipetakan `langOf`.
 - `review` di URL tanpa `title`: refresh di `/review/session/<id>` menampilkan id sebagai judul.
   Diterima — judul sesi tak punya sumber selain state yang memang hilang saat refresh.
 - Layar malas yang chunk-nya gagal diunduh (deploy baru di tengah sesi, SPEC-868) melempar di
-  Suspense; `ReloadBadge` yang sudah ada adalah penawarnya. Tak ada error boundary khusus di sini —
-  `StateBlock` "Memuat halaman…" adalah satu-satunya fallback.
+  Suspense. Dua pagar: **`LazyBoundary`** (`ds/LazyBoundary.tsx`, dipasang `gate()`) merender blok
+  galat "Halaman gagal dimuat · Muat ulang" alih-alih memutihkan seluruh App; dan server menjawab
+  **404** untuk `/assets/*` yang hilang, bukan `index.html` — terukur di smoke: sebelum ini
+  `/assets/nope.js` → 200 HTML, yang membuat `import()` gagal dengan galat parse yang menyesatkan.
+  `ReloadBadge` tetap jalur proaktifnya.
 - Test App yang membuka layar malas harus memakai `findBy*`/`waitFor`, bukan `getBy*` langsung
   sesudah klik — sebelum ini layar dirender sinkron.

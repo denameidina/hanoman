@@ -4,6 +4,7 @@
 import React from "react";
 import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 import { parseRoute, routePath } from "./routes";
+import { LazyBoundary } from "./ds/LazyBoundary";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
 import { Shell, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
@@ -1325,7 +1326,9 @@ function AppInner() {
   // ADR-0160 · Suspense di sini pula: layar malas yang chunk-nya belum tiba menampilkan blok
   // memuat yang sama, bukan layar kosong.
   const suspend = (body: React.ReactNode) =>
-    <React.Suspense fallback={<StateBlock kind="loading" title="Memuat halaman…" />}>{body}</React.Suspense>;
+    <LazyBoundary>
+      <React.Suspense fallback={<StateBlock kind="loading" title="Memuat halaman…" />}>{body}</React.Suspense>
+    </LazyBoundary>;
   const gate = (body: React.ReactNode) =>
     status === "loading" ? <StateBlock kind="loading" title="Memuat workspace…" />
       : status === "error" ? <StateBlock kind="error" illustration="PST-006"

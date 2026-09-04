@@ -276,8 +276,14 @@ export function buildApp(
     const dist = pickWebDir(dirname(fileURLToPath(import.meta.url)), env, existsSync);
     if (dist) {
       app.register(fastifyStatic, { root: dist });
+      // ADR-0160 · `/assets/*` adalah chunk ber-hash hasil build: yang hilang (tab lama meminta chunk
+      // rilis sebelumnya, SPEC-868) harus 404, BUKAN index.html — HTML yang dikira JavaScript
+      // membuat `import()` layar malas gagal dengan pesan parse yang menyesatkan, sementara 404
+      // jatuh rapi ke LazyBoundary "Halaman gagal dimuat · Muat ulang".
       app.setNotFoundHandler((req, reply) =>
-        req.url.startsWith("/api") ? reply.code(404).send({ error: "not found" }) : reply.sendFile("index.html"));
+        req.url.startsWith("/api") ? reply.code(404).send({ error: "not found" })
+          : req.url.startsWith("/assets/") ? reply.code(404).type("text/plain").send("not found")
+          : reply.sendFile("index.html"));
     }
   }
   return app;
