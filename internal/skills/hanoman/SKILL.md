@@ -1408,7 +1408,12 @@ Pakai skill lebih sempit saat task cocok:
   memungkinkan server smoke dengan DB temp mengonsumsi event sesi tetangga. Jangan memindahkan
   antrean lama otomatis karena kepemilikan home tidak tercatat. Tuntaskan sesi sandbox lama atau
   mulai ulang dengan env spool baru saat mengganti server; HTTP host tidak memakai spool.
-  Eval kini 20 fixture berbukti terstruktur. Hook read-only produksi wajib diteruskan ke kedua
+  Katalog berisi 16 peran. Delapan tambahan design/build/performance/analisis/arsitektur/operasi/
+  support/knowledge bersifat opt-in; lima penulis isolated (Claude saja), tiga analis read-only.
+  Lihat `internal/docs/operations/app-support-agents.md` untuk pemilihan dan handoff. Registrasi
+  API isolated wajib runtime claude. Tugas selesai perlu bukti; browser/monitoring/tiket tidak
+  otomatis tersedia. Eval tetap 20 fixture untuk delapan audit awal, belum mencakup delapan baru.
+  Hook read-only produksi wajib diteruskan ke kedua
   renderer. Kandidat dikomit hanya di repo temp agar child isolated mendapat snapshot yang benar.
   Replay QA/edge menjalankan byte fixture yang ditangkap sebelum runtime + test vector JSON
   tervalidasi, tidak pernah menjalankan JavaScript buatan child. Hash artefak dan exit dari replay

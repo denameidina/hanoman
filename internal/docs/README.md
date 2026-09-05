@@ -265,6 +265,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [0001 — Docs sebagai Source of Truth](adr/0001-docs-as-source-of-truth.md) — *superseded by 0023*
 
 ## operations
+- [Agent pembuatan dan dukungan aplikasi](operations/app-support-agents.md) — delapan peran baru, pemilihan tugas, profil runtime, bukti dan batas verifikasi; [spec](../../docs/superpowers/specs/2026-09-05-app-support-agents-design.md) dan [plan](../../docs/superpowers/plans/2026-09-05-app-support-agents.md).
 - [roadmap](operations/roadmap.md) · [gtm](operations/gtm.md) · [agent-documentation-workflow](operations/agent-documentation-workflow.md)
 - [production](operations/production.md) — menjalankan instance prod di samping dev (`HANOMAN_HOME` + port terpisah)
 - [deploy-vps](operations/deploy-vps.md) — deploy single-host ke VPS publik di belakang reverse proxy TLS

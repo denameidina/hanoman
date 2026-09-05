@@ -35,7 +35,7 @@ daripada nilai yang terlihat.
 
 ## Keputusan
 
-**1. Delapan persona, dua per domain, dipilih lewat tiga syarat yang menggugurkan.** Entri harus
+**1. Delapan persona audit awal, dua per domain, dipilih lewat tiga syarat yang menggugurkan.** Entri harus
 (a) punya **prosedur**, bukan persona — "kamu reviewer, review-lah" tak menambah apa pun di atas
 model utama; (b) menutup kelas kegagalan yang **terukur**; (c) membakar konteks di tempat lain lalu
 mengembalikan **putusan kecil** — itu satu-satunya keuntungan struktural subagent claude.
@@ -51,11 +51,21 @@ Yang gugur karena syarat itu: `doc-syncer`, `adr-writer`, `changelog-writer` (fa
 skill sudah mengerjakannya) dan `secret-scanner` (satu regex, bukan agen — ia menjadi satu langkah
 di dalam `security-reviewer`).
 
+**Amandemen 2026-09-05 — pembuatan dan dukungan aplikasi.** Katalog diperluas
+menjadi 16 dengan product-designer, feature-builder, performance-engineer,
+product-analyst, solution-architect, operations-engineer, support-triager dan
+knowledge-maintainer. Kelompok ini menjalankan pekerjaan bounded dengan artefak
+dan bukti, bukan audit saja; efektivitasnya belum dibenchmark. Knowledge-maintainer
+menangani pengetahuan pengguna lintas panduan/FAQ/runbook berdasarkan versi terverifikasi,
+bukan sekadar menggandakan langkah doc-sync fase. Semua tambahan opt-in/smart;
+lima yang menulis memakai isolated-worktree, tiga analisis read-only. Profil,
+input dan handoff dijelaskan di [panduan](../operations/app-support-agents.md).
+
 **2. Katalog hidup sebagai TABEL KONSTANTA di `shared`, DATA MURNI.** Pola registry `METHODS`
-(ADR-0113): menambah agen kesembilan = satu entri. Nol I/O dan **nol `node:*`** — paket itu ikut
+(ADR-0113): menambah agen = satu entri data. Nol I/O dan **nol `node:*`** — paket itu ikut
 dibundel untuk browser, dan sidik jarinya karena itu dihitung di server.
 
-**3. Nilai scope/delegasi untuk kedelapan BUKAN field entri.** `projectId` null · `model` null ·
+**3. Nilai scope/delegasi untuk seluruh katalog BUKAN field entri.** `projectId` null · `model` null ·
 `mentions` `[]` · `runtime` null. Menjadikannya field berarti mengundang entri masa depan yang
 memasang `mentions`, dan itu membuka kembali lapis-1 anti-loop ADR-0094 yang hari ini nol risiko:
 tanpa `mentions`, `Task` **dicabut** dari argv dan agen daun tak punya alat memanggil siapa pun.
@@ -93,17 +103,17 @@ kosong → nol byte, jadi invarian "prompt byte-identik saat katalog kosong" tet
 
 ## Konsekuensi
 
-- Instalasi baru langsung punya delapan persona, tiga aktif — SPEC-450 berhenti menjadi permukaan
+- Instalasi baru langsung punya 16 peran, tiga aktif — SPEC-450 berhenti menjadi permukaan
   kosong.
 - Tiga yang menyala tersedia di registry sepanjang sesi yang kompatibel. Smart mengarahkan
   delegasi dari pekerjaan terkini, bukan menyaring registry dari diff saat kelahiran sesi
-  (amandemen ADR-0159, 2026-09-05). Lima yang mati tak ikut registry sampai diaktifkan.
+  (amandemen ADR-0159, 2026-09-05). Tiga belas yang mati tak ikut registry sampai diaktifkan.
 - Baris bawaan **menyeberang sync** seperti baris custom agent lain. Dua mesin dengan versi hanoman
   berbeda berebut lewat LWW dan yang menulis terakhir menang. Diterima — bukan dihilangkan — karena
   id deterministik `global:<name>` membuat keduanya **satu baris**, bukan dua yang saling menelan
   (ADR-0094 keputusan 2).
-- Tiga dari delapan sengaja **tak bisa menulis apa pun** (`scout` bahkan tanpa `Bash`), jadi memanggil
-  mereka tak pernah bisa mengotori worktree.
+- Tiga yang aktif default memakai read-only; tiga analis aplikasi tambahan juga read-only.
+  Peran penulis meminta worktree terisolasi dan tidak boleh dianggap mengisolasi layanan eksternal.
 - Full instructions tidak bocor ke prompt parent kedua runtime; hanya klausa delegasi ringkas yang
   membawa nama/deskripsi agent efektif.
 
@@ -119,7 +129,8 @@ kosong → nol byte, jadi invarian "prompt byte-identik saat katalog kosong" tet
 3. **`enabled` bukan bagian sidik jari.** Memasukkannya membuat operator yang mematikan satu agen
    terbaca sebagai "menyunting", sehingga perbaikan instruksi tak pernah lagi sampai ke baris itu.
 4. **`name` immutable** (ADR-0094 keputusan 2). Mengganti nama bawaan di versi berikutnya
-   meninggalkan baris yatim di setiap mesin. Kedelapan nama dikunci di SPEC-881.
+   meninggalkan baris yatim di setiap mesin. Delapan nama awal dikunci di SPEC-881,
+   delapan tambahan di spec aplikasi 2026-09-05 yang ditautkan dari panduan.
 5. **Tak satu pun bawaan boleh memakai nama tool MCP.** Nama server MCP berbeda per mesin; validasi
    keras ADR-0101 menolaknya, dan claude membuang nama tool tak dikenal **senyap** (ADR-0094 M4) —
    agen tanpa alat, exit 0, tanpa keluhan.

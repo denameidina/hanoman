@@ -157,12 +157,15 @@ terpisah, tanpa menjumlahkan token cache ke input. Di samping `recent` global ma
 sudah dinilai, dan perlu kerja ulang, dideduplikasi berdasarkan invocation; agent yang lebih sepi
 tidak kehilangan semua contoh hanya karena agent lain lebih ramai.
 
-Eval di `evals/custom-agents` membawa 20 kasus: satu positif dan satu kontrol per delapan builtin,
+Eval di `evals/custom-agents` membawa 20 kasus: satu positif dan satu kontrol per delapan builtin audit awal,
 ditambah preservasi QA, requirement sudah terpenuhi di base, dan sumber lokal advisory/lisensi
 terkunci yang diketahui/belum diketahui. Scorer menuntut JSON evidence berstatus lengkap,
 verdict terstruktur yang dikonfirmasi, serta revision/path/baris/kutipan yang cocok dengan snapshot
 fixture; keyword-only, negasi, klaim unknown sebagai confirmed, jangkar salah, dan field tak dikenal
 ditolak. Ini benchmark dengan kosakata terbatas, bukan penilaian bebas atas semua prosa diagnosis.
+Delapan [agent aplikasi](../operations/app-support-agents.md) yang ditambahkan 2026-09-05
+belum mempunyai fixture perilaku. Validasi seed/profile/renderer tidak boleh dilaporkan sebagai
+benchmark keberhasilan tugas delapan agent tersebut; permintaan eval tanpa kasus gagal eksplisit.
 
 Fixture QA/edge adalah project Node test runner tanpa instalasi dependency. Child menghasilkan
 test vector JSON berbatas; harness memeriksa artefak, lalu menjalankan ulang kode fixture tepercaya

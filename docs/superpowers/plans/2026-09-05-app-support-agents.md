@@ -53,7 +53,7 @@ runner/test/builtin-app-agents.test.ts (baru). Jangan mengubah docs milik parent
 
 ### Task 2: Dokumentasi, verifikasi dan registrasi
 
-Ownership parent: spec/plan ini, internal/docs/guides/app-support-agents.md,
+Ownership parent: spec/plan ini, internal/docs/operations/app-support-agents.md,
 internal/docs/README.md, ADR-0136/0159 dan internal/skills/hanoman/SKILL.md.
 
 - [ ] Dokumentasikan delapan peran, routing/handoff, tools yang masih diperlukan,
