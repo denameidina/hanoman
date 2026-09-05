@@ -1,5 +1,24 @@
 # Frontend implementation
 
+## Penolakan peluncuran (SPEC-1108 / ADR-0161)
+
+`StartSessionModal` menahan dialog saat menerima 409 admission: jumlah seluruh pane hidup,
+agen terstruktur, cap, load/core dan ambangnya ditampilkan sebelum opsi **Mulai tetap**.
+**Coba lagi** tidak memaksa. Tombol force dependency yang sudah ada menjelaskan bahwa
+force juga melewati cap dan pemeriksaan host. Force hanya diterima dari operator cookie;
+Bearer AgentToken ditolak 403 sebelum stempel approval atau persiapan peluncuran.
+
+`useLaunchAdmission` menangani aksi manual reverse/scaffold/PRD/breakdown, restart dari
+riwayat, dan Ambil backlog di Terminal. Callback retry mempertahankan argumen pekerjaan
+aslinya; dialog menawarkan coba lagi, force eksplisit, atau batal. Peluncuran otomatis
+saat create project tidak memakai hook ini dan tidak mengirim force.
+
+SettingsPanel Scheduler menyediakan `launchGuard.enabled` dan `maxLoadPerCore` (default
+2,5); gerbang bekerja meski scheduler/source mati. Snapshot admission datang melalui
+state/topik scheduler yang sudah ada. Load `null` ditulis **tidak tersedia**, Windows
+menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
+
+
 - React + TypeScript (Vite). Komponen dari Hanoman Design System.
 - Layout responsif (SPEC-763): drawer mobile `<768px`, rail 72px pada tablet `768–1199px`, sidebar
   248px pada desktop `≥1200px`; topbar minimum 56px dan dapat wrap; konten maks 1200px (Docs full-width).

@@ -1,3 +1,4 @@
+import { LaunchAdmissionError } from "./services/session-admission";
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
@@ -102,6 +103,11 @@ export function buildApp(
     : pickGuideFile(dirname(fileURLToPath(import.meta.url)), env, existsSync);
   const ingress = loadIngressPolicy(env);
   const app = Fastify({ logger: false, trustProxy: trustProxyFromEnv(env) });
+  app.setErrorHandler((error, _req, reply) => {
+    if (error instanceof LaunchAdmissionError)
+      return reply.code(409).send({ error: error.message, kind: error.kind, admission: error.admission });
+    return reply.send(error);
+  });
   app.addHook("onRequest", async (req, reply) => {
     const role = classifyIngress({ host: req.headers.host ?? "", method: req.method, url: req.url }, ingress);
     if (role === "denied") return reply.code(404).send({ error: "not found" });

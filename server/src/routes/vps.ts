@@ -12,7 +12,7 @@ import { sshExec, consoleArgv } from "../services/vps-ssh";
 import { runAudit, scriptPath } from "../services/vps-audit";
 import { buildChecklist } from "../vps/checklist";
 import { bootstrapKey } from "../services/vps-bootstrap";
-import { createSession } from "../services/pty";
+import { createAgentSession, createOperatorSession } from "../services/session-launch-gate";
 import { sessionModel } from "../services/settings";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
@@ -322,7 +322,7 @@ export default async function (app: FastifyInstance) {
     const v = await prisma.vps.findUnique({ where: { id: (req.params as { id: string }).id } });
     if (!v) return reply.code(404).send({ error: "not found" });
     if (keyMissing(v)) return reply.code(409).send({ error: "key VPS tidak ada di mesin ini", keyMissing: true });
-    const s = createSession(`vps-console:${v.id}`, homedir(), { id: `vpsc-${v.id}`, command: consoleArgv(v) });
+    const s = await createOperatorSession(`vps-console:${v.id}`, homedir(), { id: `vpsc-${v.id}`, command: consoleArgv(v) });
     return reply.code(201).send({ id: s.id });
   });
 
@@ -334,7 +334,7 @@ export default async function (app: FastifyInstance) {
     if (keyMissing(v)) return reply.code(409).send({ error: "key VPS tidak ada di mesin ini", keyMissing: true });
     const checks = (v.audit as VpsCheck[] | null) ?? [];
     const { model, effort } = await sessionModel();
-    const s = createSession(`vps:${v.id}`, homedir(), {
+    const s = await createAgentSession(`vps:${v.id}`, homedir(), {
       model, effort,
       prompt: [
         `Kamu membantu hardening lanjutan VPS "${v.name}" (${v.user}@${v.host} port ${v.port}).`,

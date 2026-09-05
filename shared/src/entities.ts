@@ -233,13 +233,18 @@ export const zCodex = z.object({
 export type Codex = z.infer<typeof zCodex>;
 export const CODEX_DEFAULTS: Codex = zCodex.parse({});
 
-// SPEC-294 · ADR-0072 · knob scheduler otonom. Semua default MATI. Ditambahkan ke zSetting sebagai
+// SPEC-294 · ADR-0072 · otomasi default MATI; gerbang peluncuran default aktif (ADR-0161).
+// Ditambahkan ke zSetting sebagai
 // .default(SCHEDULER_DEFAULTS) → baris Setting lama tanpa blok ini tetap parse (key hilang diisi default).
 const zSourceCommon = { enabled: z.boolean().default(false) };
 export const zScheduler = z.object({
   enabled: z.boolean().default(false),      // master subsystem switch
   paused: z.boolean().default(false),       // rem darurat (Pause): blokir drain ≤1 tick
   maxConcurrent: z.number().int().min(1).default(2),   // cap sesi hidup
+  launchGuard: z.object({
+    enabled: z.boolean().default(true),
+    maxLoadPerCore: z.number().finite().positive().default(2.5),
+  }).default({}),
   autonomy: z.enum(["full-control", "butuh-keputusan"]).default("butuh-keputusan"), // dikonsumsi daun #5
   sources: z.object({
     backlog: z.object({ ...zSourceCommon, everyMin: z.number().int().min(1).default(15) }).default({}),

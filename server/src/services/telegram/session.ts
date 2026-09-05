@@ -8,7 +8,7 @@ import {
 import type { AcceptedTelegramInput } from "./protocol";
 import type { TelegramStore } from "./store";
 
-type SessionRef = { id: string; exited: boolean };
+type SessionRef = { id: string; exited: boolean; reused?: true };
 type SessionCreateOptions = {
   id: string;
   prompt: string;
@@ -19,8 +19,8 @@ type SessionCreateOptions = {
 };
 
 export type TelegramSessionPort = {
-  getSession(id: string): SessionRef | undefined;
-  createSession(projectId: string, cwd: string, opts: SessionCreateOptions): SessionRef;
+  getSession(id: string): SessionRef | undefined | Promise<SessionRef | undefined>;
+  createSession(projectId: string, cwd: string, opts: SessionCreateOptions): SessionRef | Promise<SessionRef>;
   sendToPane(id: string, text: string): Promise<boolean>;
   /** SPEC-492 · dipakai `/engine restart`: satu-satunya cara setelan runtime berlaku SEKARANG. */
   killSession(id: string): boolean;
@@ -75,7 +75,7 @@ export class TelegramSessionCoordinator {
     if (!context) throw new Error("gagal membuat binding chat Telegram");
 
     const sessionId = telegramOperatorSessionId(input.chatId);
-    const live = this.deps.port.getSession(sessionId);
+    const live = await this.deps.port.getSession(sessionId);
     if (live && !live.exited) {
       if (!await this.deps.port.sendToPane(sessionId, formatTelegramTurn(input))) {
         throw new Error("pane operator tidak menerima steer");
@@ -104,7 +104,7 @@ export class TelegramSessionCoordinator {
       summary: context.summary,
       memories: context.memories,
     });
-    const born = this.deps.port.createSession(projectId, cwd, {
+    const born = await this.deps.port.createSession(projectId, cwd, {
       id: sessionId,
       prompt,
       agent: engine.agent,
@@ -117,8 +117,13 @@ export class TelegramSessionCoordinator {
       },
     });
     if (born.id !== sessionId || born.exited) throw new Error("pane operator gagal lahir");
+    // Another dispatch may have created this deterministic pane while admission was pending.
+    // Its initial prompt contains that turn; this turn must still reach the live operator.
+    if (born.reused && !await this.deps.port.sendToPane(sessionId, formatTelegramTurn(input))) {
+      throw new Error("pane operator tidak menerima steer");
+    }
     await this.deps.store.bindSession(input.chatId, sessionId);
-    return { sessionId, created: true };
+    return { sessionId, created: !born.reused };
   }
 
   /**
@@ -139,7 +144,7 @@ export class TelegramSessionCoordinator {
     if (!cmd) return null;
 
     const sessionId = telegramOperatorSessionId(input.chatId);
-    const live = this.deps.port.getSession(sessionId);
+    const live = await this.deps.port.getSession(sessionId);
     const alive = Boolean(live && !live.exited);
 
     let text: string;

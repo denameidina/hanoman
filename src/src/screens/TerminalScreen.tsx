@@ -15,6 +15,7 @@ import type { Spec } from "./types";
 import * as L from "./terminal-layout";
 import * as W from "./terminal-workspace";
 import { useTerminalWorkspace } from "./use-terminal-workspace";
+import { useLaunchAdmission } from "./use-launch-admission";
 import { usePersistedState, isStr, isBool, isNum } from "../ui-state";
 import { clampFontSize, inlineActionCount, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX } from "./terminal-chrome";
@@ -71,6 +72,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
   // SPEC-362 · riwayat sesi. State-nya sekadar boolean: modal baru dirender saat diminta, jadi
   // tak ada request riwayat maupun elemen tambahan selama operator tak membukanya.
   const [historyOpen, setHistoryOpen] = React.useState(false);
+  const launchAdmission = useLaunchAdmission();
   const tier = useResponsiveTier();
   const mobile = tier === "mobile";
   const [activeCell, setActiveCell] = React.useState(0);
@@ -173,10 +175,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
 
   // SPEC-179 · ambil backlog item tanpa pindah page. Reuse start API idempoten +
   // placeFirstEmptyInActive — sesi baru langsung masuk grid aktif.
-  async function pickBacklog(spec: Spec) {
+  async function pickBacklog(spec: Spec, force?: true) {
     const flow: Flow = flowForSource(spec.source);
     try {
-      const { id } = await api.startSession({ spec: spec.id, flow });
+      const { id } = await api.startSession({ spec: spec.id, flow, ...(force ? { force } : {}) });
       setSessions((s) => s.some((x) => x.id === id)
         ? s
         : [...s, { id, projectId: spec.projectId, specId: spec.id, flow, cwd: "", exited: false }]);
@@ -185,6 +187,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
       setPicking(false);
       setPickError(null);
     } catch (e) {
+      if (launchAdmission.offerRetry(e, spec.id, (next) => pickBacklog(spec, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 400 || e.status === 422);
       setPickError(`${spec.id} · gagal mulai${noRepo ? " · project belum punya repoDir" : ""}`);
     }
@@ -192,10 +195,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
 
   // SPEC-362 · "Mulai lagi" = sesi BARU dengan konteks yang sama; sesi lamanya sudah mati bersama
   // panenya. Endpoint yang dipakai persis endpoint yang melahirkan sesi jenis itu pertama kali.
-  async function restartFromHistory(r: SessionHistoryView) {
+  async function restartFromHistory(r: SessionHistoryView, force?: true) {
     try {
       const born = r.specId
-        ? await api.startSession({ spec: r.specId, flow: (r.flow ?? "feature") as Flow })
+        ? await api.startSession({ spec: r.specId, flow: (r.flow ?? "feature") as Flow, ...(force ? { force } : {}) })
         : r.kind === "shell"
           ? await api.createShell(r.projectId)
           : r.kind === "terminal"
@@ -208,14 +211,19 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
                 ...(r.model ? { model: r.model } : {}),
                 ...(r.effort ? { effort: r.effort } : {}),
               })
-            : await api.createTerminalFlow(r.projectId, r.kind as Flow);
+            : await (force ? api.createTerminalFlow(r.projectId, r.kind as Flow, { force })
+              : api.createTerminalFlow(r.projectId, r.kind as Flow));
       setSessions((s) => (s.some((x) => x.id === born.id)
         ? s
         : [...s, { id: born.id, projectId: r.projectId, specId: r.specId ?? undefined, cwd: "", exited: false }]));
       void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, born.id));
       setRequestedSession(born.id);
       setHistoryOpen(false);
-    } catch {
+    } catch (e) {
+      if (r.specId || (r.kind !== "shell" && r.kind !== "terminal")) {
+        if (launchAdmission.offerRetry(e, `${r.projectId} · ${r.title ?? r.specId ?? r.kind}`,
+          (next) => restartFromHistory(r, next))) return;
+      }
       // Gagal (project tak ter-bind, worktree tak bisa dibuat) — biarkan modal terbuka; pesan
       // detailnya sudah muncul di jalur Start biasa, riwayat tak perlu menduplikasinya.
     }
@@ -513,6 +521,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
         <SessionHistoryModal projects={projects} onClose={() => setHistoryOpen(false)}
           onRestart={(r) => void restartFromHistory(r)} />
       )}
+      {launchAdmission.dialog}
 
       {fullId && byId(fullId) && (
         <FullscreenTerminal session={byId(fullId)!}

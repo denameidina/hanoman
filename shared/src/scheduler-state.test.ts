@@ -2,6 +2,15 @@ import { describe, it, expect } from "vitest";
 import { zSchedulerState, SCHEDULER_DEFAULTS } from "./index";
 
 describe("zSchedulerState (SPEC-299)", () => {
+  it.each(["unsupported", "unavailable"])("retains unavailable load and pane counts: %s", (loadStatus) => {
+    const admission = { enabled: true, liveCount: 6, liveAgentCount: 4, maxConcurrent: 6,
+      loadPerCore: null, maxLoadPerCore: 2.5, loadStatus };
+    const parsed = zSchedulerState.parse({ config: SCHEDULER_DEFAULTS, cap: 6, liveCount: 6,
+      sources: [], sessions: [], queueCounts: { queued: 0, launched: 0, done: 0, failed: 0, canceled: 0 },
+      admission });
+    expect(parsed.admission).toEqual(admission);
+  });
+
   it("memparse respons state fondasi apa adanya (field ekstra diabaikan)", () => {
     const sample = {
       config: SCHEDULER_DEFAULTS,

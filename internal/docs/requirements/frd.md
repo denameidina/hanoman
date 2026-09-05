@@ -224,15 +224,23 @@ tanpa penopang tidak ditulis.
   durable `SchedulerQueueItem` (idempoten lewat `specId @unique`)
   ([ADR-0072](../adr/0072-scheduler-fondasi-engine-antrean-durable-cap.md)).
 - THE SYSTEM SHALL menolak men-drain antrean melewati cap `maxConcurrent` yang dihitung dari
-  `pty.listSessions`.
+  pane tmux hidup yang dibaca asinkron.
 - THE SYSTEM SHALL memasukkan ke antrean **hanya** backlog yang `baseSha` **dan** `stage`-nya
   menyatakan belum dikerjakan (`baseSha = null` ∧ `stage ≠ "done"`) — berlaku untuk checker `backlog`
   maupun denyut hanoman-lead (SPEC-431).
 - IF sebuah item antrean menunjuk `Spec` ber-`stage = "done"` saat governor hendak meluncurkannya,
   THEN THE SYSTEM SHALL menutup item itu (`status:"done"` + alasan) **tanpa** meluncurkan sesi dan
   tanpa memakai slot concurrency.
-- THE SYSTEM SHALL mempertahankan default **mati** untuk `Setting.scheduler` dan
-  `Project.schedulerOptIn`.
+- THE SYSTEM SHALL mempertahankan default **mati** untuk otomasi `Setting.scheduler.enabled`
+  dan `Project.schedulerOptIn`, serta default **aktif** untuk `scheduler.launchGuard`
+  ([ADR-0161](../adr/0161-gerbang-peluncuran-sesi-cap-dan-sumber-daya.md)).
+- WHEN peluncuran agen terstruktur melebihi cap atau load/core > ambang (default 2,5),
+  THEN THE SYSTEM SHALL menjawab 409 beserta angka dan mempertahankan pekerjaan yang ada.
+  Gerbang berlaku lintas manual, scheduler, lead, cron, workflow project, konflik, VPS, Telegram.
+  Re-attach, terminal biasa, shell, dan konsol SSH SHALL tetap dapat diakses; semua pane hidup
+  tetap dihitung, pane exited tidak. Force manusia SHALL melewati kedua gerbang.
+- WHEN metrik load tidak tersedia (termasuk Windows), THEN THE SYSTEM SHALL meluluskan
+  check load dan menampilkan status unavailable/unsupported dengan nilai null.
 
 ## VPS
 

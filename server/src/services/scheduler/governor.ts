@@ -1,3 +1,4 @@
+import { LaunchAdmissionError } from "../session-admission";
 import type { Scheduler } from "@hanoman/shared";
 import type { SchedulerQueueItem } from "@prisma/client";
 import { prisma } from "../../db";
@@ -12,8 +13,8 @@ import { blockedNote, type SpecBlocker } from "../spec-deps";
 // SPEC-294 · ADR-0072 · governor concurrency. Deps di-inject agar teruji tanpa tmux/claude nyata;
 // produksi mengikatnya ke pty + startSpecSession (engine.ts).
 export type GovernorDeps = {
-  liveCount: () => number;                                  // sesi hidup gabungan manual+scheduler (pty.listSessions)
-  isLive: (specId: string) => string | null;               // sessionId hidup untuk spec, atau null
+  liveCount: () => number | Promise<number>;                                  // sesi hidup gabungan manual+scheduler (pty.listSessions)
+  isLive: (specId: string) => string | null | Promise<string | null>;               // sessionId hidup untuk spec, atau null
   isDone: (specId: string) => Promise<boolean>;            // SPEC-431 · spec sudah selesai → jangan pernah diluncurkan
   // SPEC-447 · ADR-0093 · dependency yang belum selesai/ter-merge. WAJIB (bukan opsional): satu-
   // satunya pembangun produksi adalah `prodDeps`, jadi tipe wajib = jaminan kompilasi bahwa
@@ -30,7 +31,7 @@ export type GovernorDeps = {
 // SPEC-646 · ADR-0112 · seam peluncuran cron, di-inject agar teruji tanpa tmux/git nyata — cermin
 // `launch`/`isLive` milik antrean spec.
 export type CronDeps = {
-  liveCron: (cronId: string) => string | null;                // sessionId pane cron hidup, atau null
+  liveCron: (cronId: string) => string | null | Promise<string | null>;                // sessionId pane cron hidup, atau null
   launchCron: (cron: CronLaunchInput) => Promise<string>;     // → sessionId; throw = gagal
 };
 
@@ -74,7 +75,7 @@ export async function drainCronRuns(slots: number, deps: CronDeps): Promise<numb
     // itu alasannya masuk riwayat run, bukan sekadar tak terjadi apa-apa.
     if (!project?.schedulerOptIn) { await close("skipped", CRON_OPTOUT_NOTE); continue; }
     // Satu sesi per cron (ADR-0015): jatuh tempo berikutnya DILEWATI, tak menumpuk sesi.
-    const live = deps.liveCron(cron.id);
+    const live = await deps.liveCron(cron.id);
     if (live) { await close("skipped", cronLiveNote(live)); continue; }
     if (slots <= 0) { await noteCronRun(run.id, CAP_FULL_NOTE); continue; }
     try {
@@ -89,7 +90,8 @@ export async function drainCronRuns(slots: number, deps: CronDeps): Promise<numb
       await prisma.schedulerCron.update({ where: { id: cron.id }, data: { lastRunAt: new Date() } });
       slots--;
     } catch (e) {
-      await close("failed", (e as Error).message);
+      if (e instanceof LaunchAdmissionError) await noteCronRun(run.id, e.message);
+      else await close("failed", (e as Error).message);
     }
   }
   return slots;
@@ -102,7 +104,7 @@ export async function drain(cfg: Scheduler, deps: GovernorDeps): Promise<void> {
   if (draining) return;
   draining = true;
   try {
-    let slots = cfg.maxConcurrent - deps.liveCount();
+    let slots = cfg.maxConcurrent - await deps.liveCount();
     // SPEC-646 · cron lebih dulu, ANGGARAN YANG SAMA. Dipanggil juga saat `slots <= 0` supaya baris
     // cron yang jatuh tempo tetap mendapat catatan "cap penuh" alih-alih menggantung tanpa
     // penjelasan sampai kedaluwarsa.
@@ -133,7 +135,7 @@ export async function drain(cfg: Scheduler, deps: GovernorDeps): Promise<void> {
       if (blocked.length) { await noteRow(item.id, blockedNote(blocked)); continue; }
       // Idempoten satu-sesi-per-spec: sesi spec sudah hidup (mis. di-Start manual) → tandai launched
       // tanpa makan slot (sudah terhitung di liveCount) & tanpa spawn kedua.
-      const liveId = deps.isLive(item.specId);
+      const liveId = await deps.isLive(item.specId);
       if (liveId) { await markLaunched(item.id, liveId); continue; }
       try {
         const sessionId = await deps.launch(item, cfg.autonomy);
@@ -145,6 +147,11 @@ export async function drain(cfg: Scheduler, deps: GovernorDeps): Promise<void> {
         slots--;
       } catch (e) {
         // Gagal (mis. project belum di-bind) → tandai, TANPA retry (PRD non-goal). Slot tak terpakai.
+        if (e instanceof LaunchAdmissionError) {
+          await noteRow(item.id, e.message);
+          // Tekanan berlaku global; jangan membaca tmux ulang untuk setiap item saat host sesak.
+          break;
+        }
         await markFailed(item.id, (e as Error).message);
       }
     }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { StartSessionModal } from "../src/App";
 import { api } from "../src/api/client";
 
@@ -43,8 +43,9 @@ describe("StartSessionModal (SPEC-252)", () => {
     expect(onStarted).toHaveBeenCalledWith("spec-9", undefined);
   });
 
-  it("tak merender apa pun bila spec null", () => {
+  it("tak merender apa pun bila spec null", async () => {
     const { container } = render(<StartSessionModal open spec={null} onClose={() => {}} onStarted={() => {}} />);
+    await act(async () => {});
     expect(container.textContent).toBe("");
   });
 });

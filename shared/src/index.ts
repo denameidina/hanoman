@@ -19,6 +19,7 @@ export * from "./portal";
 export * from "./portal-chat";
 export * from "./prd-status";
 export * from "./session-kind";
+export * from "./session-admission";
 export * from "./session-end";
 export * from "./config";
 export * from "./config-registry";
