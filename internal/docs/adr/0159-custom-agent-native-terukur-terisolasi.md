@@ -31,7 +31,8 @@ profil aman, aktivasi relevan, bukti lifecycle, keputusan manusia, dan eval dete
 - Claude menerima JSON `--agents` dengan prompt/tool/model/effort/policy per agent.
 - Codex menerima `agents.enabled=true`, plafon tiga thread, dan satu
   `agents."<name>".config_file` TOML per agent melalui `-c`. Full developer instructions hanya
-  hidup di TOML child; prompt parent membawa nama, deskripsi, dan cara memanggil `spawn_agent`.
+  hidup di TOML child; nama/deskripsi didaftarkan pada registry native. Prompt parent
+  hanya membawa arahan delegasi dan handoff berukuran tetap.
 - Seluruh JSON/TOML/hook hidup di direktori temp sesi (direktori `0700`, berkas `0600`) dan dibuang
   saat sesi ditutup. Di sandbox Podman direktori yang sama di-bind ke path absolutnya secara
   read-only; perintah hook memakai `node`, bukan path Node host. Tidak ada `.claude/agents`,
@@ -52,6 +53,15 @@ Bagian ADR-0094 yang menyatakan Codex mengadopsi roster inline dan risiko loop C
 struktural **dicabut**. Pengukuran 2026-08-01 atas Codex 0.146 tetap catatan historis yang sah;
 keputusan produk berubah karena runtime sekarang menyediakan custom agent native yang dapat
 diverifikasi.
+
+**Amandemen pengurangan prompt 2026-09-05:** hapus daftar nama/deskripsi dan uraian
+roster dari prompt parent Claude maupun Codex. `agentDelegationClause` hanya
+menambahkan satu paragraf untuk delegasi yang relevan, tujuan/scope/base/kandidat
+termasuk dirty changes/bukti terdahulu/verifikasi, dan pemeriksaan hasil. Kosong
+bila tidak ada agent yang dimaterialisasi. Metadata tetap ada di JSON `--agents`
+Claude serta registry/TOML Codex. Pengurangan duplikasi tidak berarti metadata
+native atau laporan child gratis token. Perbaikan kecil ini langsung execute;
+Spec/Plan terpisah skipped, kontraknya amandemen ini dan test prompt/native.
 
 ### 2. Execution profile adalah data tersync
 

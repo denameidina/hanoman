@@ -75,6 +75,8 @@ describe("materializeCodexAgents", () => {
     expect(statSync(result.configPaths[0]!).mode & 0o777).toBe(0o600);
     expect(readFileSync(result.configPaths[0]!, "utf8")).toContain("developer_instructions");
     expect(result.delegationClause).toContain("spawn_agent");
+    expect(result.delegationClause).not.toContain("scout");
+    expect(result.delegationClause).not.toContain('Cari "kode"');
     expect(result.delegationClause).not.toContain("baris 1");
   });
 

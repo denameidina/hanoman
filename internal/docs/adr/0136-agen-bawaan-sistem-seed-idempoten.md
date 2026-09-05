@@ -95,11 +95,12 @@ jadi dua mesin dengan versi hanoman berbeda tak bisa saling menimpa definisi bol
 baru akan menyeberang changefeed, dan hub versi lama menolak **seluruh** push yang membawanya —
 kelas SPEC-880, dibayar sekali dan tak perlu dibayar ulang di sini.
 
-**9. Satu KLAUSA prompt parent, menyebut agen yang benar-benar ada di roster sesi itu.** Sejak
-ADR-0159 kedua runtime menerima definisi native, sedangkan prompt parent hanya perlu dorongan untuk
-mendelegasikan. Daftarnya **bukan statis**:
-operator yang mematikan sebuah agen tak boleh menerima prompt yang menyuruh memanggilnya. Roster
-kosong → nol byte, jadi invarian "prompt byte-identik saat katalog kosong" tetap utuh.
+**9. Satu KLAUSA prompt parent berukuran tetap.** Amandemen 2026-09-05: daftar nama,
+deskripsi dan penjelasan panjang agent dihapus dari prompt parent karena metadata sudah
+terdaftar pada runtime native (ADR-0159). Parent hanya menerima arahan delegasi relevan,
+handoff berbukti dan pemeriksaan hasil. Ukurannya tidak bertambah ketika jumlah/deskripsi
+agent bertambah. Registry kosong → nol byte, jadi invarian "prompt byte-identik saat
+katalog kosong" tetap utuh. Agent yang dimatikan tetap tidak didaftarkan.
 
 ## Konsekuensi
 
@@ -114,8 +115,9 @@ kosong → nol byte, jadi invarian "prompt byte-identik saat katalog kosong" tet
   (ADR-0094 keputusan 2).
 - Tiga yang aktif default memakai read-only; tiga analis aplikasi tambahan juga read-only.
   Peran penulis meminta worktree terisolasi dan tidak boleh dianggap mengisolasi layanan eksternal.
-- Full instructions tidak bocor ke prompt parent kedua runtime; hanya klausa delegasi ringkas yang
-  membawa nama/deskripsi agent efektif.
+- Prompt parent kedua runtime tidak menyalin nama/deskripsi/instruksi agent; nama/deskripsi
+  tersedia pada registry native, instruksi lengkap pada config child. Metadata native dan
+  laporan child tetap dapat memakai konteks; ini penghapusan duplikasi, bukan klaim nol token.
 
 ## Gotcha yang wajib diingat
 

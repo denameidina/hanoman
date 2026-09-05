@@ -153,9 +153,8 @@ describe("klausa gaya kode di custom agent (SPEC-543)", () => {
 
 });
 
-// SPEC-881 · ADR-0136 · dorongan untuk jalur CLAUDE. Codex sudah menerima roster yang menyuruhnya
-// MENGADOPSI peran; claude menerima definisinya lewat `--agents` tapi tak menerima satu pun alasan
-// untuk menoleh ke sana — dan katalog yang tak pernah dipanggil sama saja dengan katalog kosong.
+// ADR-0136/0159 · metadata tersedia melalui registry native. Prompt parent hanya arahan
+// delegasi/handoff yang ukurannya tetap, berapa pun jumlah atau panjang definisi agent.
 describe("agentDelegationClause", () => {
   const def = (name: string, description: string): AgentDef => ({
     name, description, instructions: "i", tools: null, model: null, mentions: [],
@@ -166,27 +165,31 @@ describe("agentDelegationClause", () => {
     expect(agentDelegationClause([])).toBe("");
   });
 
-  it("hanya menyebut agen yang ada di roster", () => {
-    const out = agentDelegationClause([def("scout", "cari kode"), def("qa-verifier", "uji")]);
-    expect(out).toContain("scout");
-    expect(out).toContain("qa-verifier");
-    expect(out).not.toContain("blast-radius");
+  it.each(["claude", "codex"] as const)("arahan %s tetap sama tanpa menyalin metadata agent", (runtime) => {
+    const agents = Array.from({ length: 16 }, (_, i) => ({
+      ...def(`role-${i}`, `DESKRIPSI-${i}-${"panjang ".repeat(50)}`),
+      instructions: `INSTRUKSI-PRIVAT-${i}`, activation: "smart" as const,
+    }));
+    const out = agentDelegationClause(agents, runtime);
+    expect(out).toBe(agentDelegationClause([agents[0]!], runtime));
+    expect(out).not.toBe("");
+    for (const agent of agents) {
+      expect(out).not.toContain(agent.name);
+      expect(out).not.toContain(agent.description);
+      expect(out).not.toContain(agent.instructions);
+    }
+    expect(out).not.toContain("## Subagent yang tersedia");
   });
 
-  it("membawa deskripsi tiap agen sebagai pemicunya", () => {
-    expect(agentDelegationClause([def("scout", "cari kode")])).toContain("cari kode");
-  });
-
-  it("menilai ulang smart delegation dari pekerjaan terbaru dan meminta handoff lengkap", () => {
-    const agent = def("scout", "cari kode");
-    agent.activation = "smart";
-    const out = agentDelegationClause([agent]);
-    expect(out).toContain("pekerjaan, fase, dan diff TERKINI");
+  it("mempertahankan handoff berbukti dan pemilihan sesuai pekerjaan", () => {
+    const out = agentDelegationClause([def("scout", "cari kode")]);
+    expect(out).toContain("relevan");
     expect(out).toContain("base SHA");
     expect(out).toContain("dirty changes");
     expect(out).toContain("bukti sebelumnya");
-    expect(out).toContain("kandidat yang diperiksa");
+    expect(out).toContain("kandidat");
     expect(out).toContain("aturan verifikasi");
+    expect(out).toContain("Task");
   });
 
   it("Codex diarahkan ke spawn_agent tanpa membawa full instructions", () => {
@@ -194,7 +197,8 @@ describe("agentDelegationClause", () => {
     agent.instructions = "RAHASIA-INSTRUKSI-PANJANG";
     const out = agentDelegationClause([agent], "codex");
     expect(out).toContain("spawn_agent");
-    expect(out).toContain("scout");
+    expect(out).not.toContain("scout");
+    expect(out).not.toContain("cari kode");
     expect(out).not.toContain("RAHASIA-INSTRUKSI-PANJANG");
   });
 });

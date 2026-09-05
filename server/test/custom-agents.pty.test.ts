@@ -148,7 +148,7 @@ describe("createSession · codex", () => {
     const prompt = readFileSync(promptFilePath(s.id), "utf8");
     expect(prompt.startsWith("halo")).toBe(true);
     expect(prompt).toContain("spawn_agent");
-    expect(prompt).toContain("**rev**");
+    expect(prompt).not.toContain("**rev**");
     expect(prompt).not.toContain("kamu peninjau");
     expect(existsSync(join(agentTempDir(s.id), "00-rev.toml"))).toBe(true);
     expect(getSession(s.id)?.agentRoster).toEqual([
@@ -275,7 +275,7 @@ describe("penyaring runtime (SPEC-484 · ADR-0101)", () => {
     const cmd = paneCmd(s.id);
     expect(cmd).toContain('agents.\\"cx\\".config_file');
     expect(cmd).not.toContain('agents.\\"cl\\".config_file');
-    expect(prompt).toContain("**cx**");
+    expect(prompt).not.toContain("**cx**");
     expect(prompt).not.toContain("**cl**");
   });
 });
@@ -283,13 +283,21 @@ describe("penyaring runtime (SPEC-484 · ADR-0101)", () => {
 // SPEC-881 · ADR-0136 · klausa delegasi. Diperiksa lewat ISI BERKAS PROMPT, bukan bentuk respons —
 // alasan yang sama dengan kontrak argv di atas.
 describe("klausa delegasi di prompt", () => {
-  it("sesi claude menerima klausa yang menyebut agen di roster", () => {
+  it("sesi claude menyimpan metadata pada config native dan hanya arahan di prompt", () => {
     registerCustomAgentSource(() => defs);
     const s = createSession("p1", cwd, { id: born("ca-klausa-1"), agent: "claude", prompt: "halo" });
     const prompt = readFileSync(promptFilePath(s.id), "utf8");
-    expect(prompt).toContain("## Subagent yang tersedia");
-    expect(prompt).toContain("- **rev** (always) — tinjau");
-    expect(prompt).toContain("- **tes** (always) — uji");
+    expect(prompt).toMatch(/^halo\s+Delegasikan/);
+    expect(prompt).toContain("Task");
+    expect(prompt).not.toContain("## Subagent yang tersedia");
+    const native = JSON.parse(readFileSync(agentsFilePath(s.id), "utf8"));
+    for (const agent of defs) {
+      expect(prompt).not.toContain(`**${agent.name}**`);
+      expect(prompt).not.toContain(agent.description);
+      expect(prompt).not.toContain(agent.instructions);
+      expect(native[agent.name].description).toBe(agent.description);
+      expect(native[agent.name].prompt).toContain(agent.instructions);
+    }
   });
 
   // Invarian ADR-0094: katalog kosong → prompt byte-identik dengan sebelum fitur ini.
@@ -303,9 +311,20 @@ describe("klausa delegasi di prompt", () => {
     registerCustomAgentSource(() => defs);
     const s = createSession("p1", cwd, { id: born("ca-klausa-3"), agent: "codex", prompt: "halo" });
     const prompt = readFileSync(promptFilePath(s.id), "utf8");
-    expect(prompt).toContain("## Subagent yang tersedia");
+    expect(prompt).toMatch(/^halo\s+Delegasikan/);
+    expect(prompt).not.toContain("## Subagent yang tersedia");
     expect(prompt).toContain("spawn_agent");
     expect(prompt).not.toContain("## Custom agent hanoman");
+    const cmd = paneCmd(s.id);
+    for (const [i, agent] of defs.entries()) {
+      expect(prompt).not.toContain(`**${agent.name}**`);
+      expect(prompt).not.toContain(agent.description);
+      expect(prompt).not.toContain(agent.instructions);
+      expect(cmd).toContain(`agents.\\"${agent.name}\\".description`);
+      const native = readFileSync(join(agentTempDir(s.id), `${String(i).padStart(2, "0")}-${agent.name}.toml`), "utf8");
+      expect(native).toContain(`description = "${agent.description}"`);
+      expect(native).toContain(agent.instructions);
+    }
   });
 });
 

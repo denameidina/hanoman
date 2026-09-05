@@ -1338,8 +1338,9 @@ Pakai skill lebih sempit saat task cocok:
   yang lalu bertemu di satu objek JSON **berkunci nama** dan salah satunya hilang tanpa jejak.
   **Amandemen SPEC-950/ADR-0159:** nol berkas ditulis ke worktree/home. Sesi **claude** lahir
   dengan `--agents "$(cat <file>)"`; sesi **codex** menerima `agents.enabled=true` + TOML temp per
-  child. Keduanya native; full instructions hanya di config child, prompt parent hanya roster
-  ringkas. Keduanya dirakit di titik cekik **`createSession`** lewat
+  child. Keduanya native; full instructions hanya di config child. Nama/deskripsi tersedia
+  lewat registry native dan tidak disalin ke prompt parent; parent hanya menerima satu
+  arahan delegasi/handoff berukuran tetap (kosong bila registry kosong). Keduanya dirakit di titik cekik **`createSession`** lewat
   `registerCustomAgentSource` (cermin `registerSessionHooks`) dengan cache **sinkron** — Prisma
   async, `createSession` tidak — yang di-invalidasi tiap mutasi route & sync; gagal baca → daftar
   kosong. Sesi ber-`opts.command` (shell mentah) tak menerima apa pun. **Anti-loop tiga lapis, dua

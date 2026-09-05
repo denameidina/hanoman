@@ -37,6 +37,11 @@ tersedia untuk dipilih parent, bukan otomatis dipanggil pada setiap giliran.
 Perubahan konfigurasi berlaku pada **sesi baru**; roster sesi yang sedang berjalan
 tidak diubah.
 
+Nama/deskripsi agent tersedia melalui registry native. Prompt utama hanya mendapat
+satu arahan delegasi/handoff yang ukurannya tetap; daftar dan instruksi agent tidak
+disalin ke dalamnya. Jika tidak ada agent yang dimaterialisasi, arahan itu juga tidak
+ditambahkan. Laporan child dan metadata native tetap dapat menggunakan konteks.
+
 | Kelompok | Policy | Runtime | Batas awal |
 | --- | --- | --- | --- |
 | designer, builder, performance, operations, knowledge | isolated-worktree | Claude Code | 40 turn |

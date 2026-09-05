@@ -167,11 +167,8 @@ export function renderAgentsJson(defs: AgentDef[], options: RenderAgentsOptions 
 }
 
 /**
- * SPEC-881/950 · ADR-0136/0159 · klausa parent hanya memuat nama, deskripsi, dan cara delegasi.
- * Full instructions hidup di konfigurasi native child, tidak membakar konteks parent.
- *
- * Menyebut agen yang BENAR-BENAR ada di roster sesi ini, bukan daftar statis: operator yang
- * mematikan sebuah agen tak boleh menerima prompt yang menyuruh memanggilnya.
+ * ADR-0136/0159 · parent mendapat arahan delegasi/handoff berukuran tetap.
+ * Nama/deskripsi tersedia lewat registry native; instruksi lengkap ada di config child.
  *
  * Kosong saat roster kosong — invarian "prompt byte-identik saat katalog kosong" (ADR-0094).
  */
@@ -182,26 +179,10 @@ export function agentDelegationClause(
   if (defs.length === 0) return "";
   return [
     "",
-    "## Subagent yang tersedia",
     "",
-    "Sesi ini punya subagent berikut sepanjang lifetime sesi. Sebelum tiap delegasi, nilai ulang",
-    "kebutuhannya dari pekerjaan, fase, dan diff TERKINI. `smart` berarti pilih saat relevan, bukan",
-    "capability yang dibekukan atau disembunyikan ketika sesi lahir. Konteks mereka TERPISAH",
-    "dari milikmu, jadi menyerahkan penyapuan & verifikasi ke mereka MENGHEMAT konteksmu sendiri,",
-    "bukan memboroskannya.",
-    "",
-    ...defs.map((d) => `- **${d.name}** (${d.activation ?? "always"}) — ${d.description}`),
-    "",
-    "Saat mendelegasikan, sertakan tujuan dan scope sempit, base SHA, kandidat yang diperiksa",
-    "termasuk dirty changes, bukti sebelumnya yang dapat dipakai ulang, serta aturan verifikasi.",
-    "Jangan meminta child menyapu ulang bukti yang sudah cukup tanpa alasan.",
-    "",
-    runtime === "codex"
-      ? "Panggil target bernama persis lewat `spawn_agent`."
-      : `Panggil lewat tool ${MENTION_TOOL} dengan nama agennya.`,
-    "Mereka tak bisa mendelegasikan lagi,",
-    "jadi tak ada rantai panggilan yang perlu kamu jaga. Laporan mereka adalah MASUKAN — kamu yang",
-    "memutuskan, dan kamu yang bertanggung jawab atas hasilnya.",
+    `Delegasikan tugas yang relevan melalui ${runtime === "codex" ? "spawn_agent" : MENTION_TOOL}. `
+      + "Sertakan tujuan, scope, base SHA, kandidat termasuk dirty changes, bukti sebelumnya, "
+      + "dan aturan verifikasi. Tinjau hasil subagent sebelum digunakan.",
     "",
   ].join("\n");
 }
