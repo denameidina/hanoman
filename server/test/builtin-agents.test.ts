@@ -5,7 +5,7 @@ import {
 } from "../src/services/builtin-agents";
 import { getSetting } from "../src/services/settings";
 import { writeTombstone } from "../src/services/tombstone";
-import { installCustomAgents, agentDefsFor } from "../src/services/custom-agents";
+import { installCustomAgents, agentDefsFor, loadCustomAgents } from "../src/services/custom-agents";
 import { BUILTIN_AGENTS, customAgentId } from "@hanoman/shared";
 
 // SPEC-881 · ADR-0136 · seed katalog agen bawaan. Yang diuji di sini bukan "barisnya lahir" —
@@ -96,6 +96,44 @@ describe("seedBuiltinAgents — upgrade", () => {
     const data = { ...s, builtinAgents: { ...s.builtinAgents, [name]: fp } };
     await prisma.setting.upsert({ where: { id: 1 }, update: { data }, create: { id: 1, data } });
   };
+
+  it("upgrade delapan lama melahirkan delapan baru sekali tanpa menimpa edit, saklar, atau tombstone", async () => {
+    const oldNames = ["scout", "root-causer", "qa-verifier", "edge-case-hunter",
+      "blast-radius", "spec-auditor", "security-reviewer", "dep-auditor"];
+    const old = BUILTIN_AGENTS.filter((a) => oldNames.includes(a.name));
+    for (const a of old) {
+      await prisma.customAgent.create({ data: {
+        id: idOf(a.name), projectId: null, name: a.name, description: a.description,
+        instructions: a.instructions, tools: [...a.tools], model: null, mentions: [], runtime: null,
+        activation: a.activation, effort: a.effort, workspacePolicy: a.workspacePolicy,
+        maxTurns: a.maxTurns, timeoutSeconds: a.timeoutSeconds, enabled: a.enabledByDefault,
+      } });
+      await stempel(a.name, builtinFingerprint(a));
+    }
+    // The existing eight-agent release already applied this one-time QA policy.
+    const setting = await getSetting();
+    await prisma.setting.update({ where: { id: 1 }, data: { data: { ...setting,
+      builtinAgentPolicies: { "qa-verifier": QA_SAFETY_POLICY } } } });
+    await prisma.customAgent.update({ where: { id: idOf("scout") }, data: { instructions: "milik operator" } });
+    await prisma.customAgent.update({ where: { id: idOf("blast-radius") }, data: { enabled: false } });
+    await prisma.customAgent.delete({ where: { id: idOf("dep-auditor") } });
+    await writeTombstone("customAgent", idOf("dep-auditor"), 99, {});
+    const before = await prisma.customAgent.findMany({ orderBy: { name: "asc" } });
+
+    await seedBuiltinAgents();
+    const once = await prisma.customAgent.findMany({ orderBy: { name: "asc" } });
+    const added = once.filter((a) => !oldNames.includes(a.name));
+    expect(added).toHaveLength(8);
+    expect(added.every((a) => !a.enabled && a.model === null && a.runtime === null)).toBe(true);
+    expect(once.filter((a) => oldNames.includes(a.name))).toEqual(before);
+    expect(await prisma.customAgent.findUnique({ where: { id: idOf("dep-auditor") } })).toBeNull();
+    await seedBuiltinAgents();
+    expect(await prisma.customAgent.findMany({ orderBy: { name: "asc" } })).toEqual(once);
+    for (const a of added) {
+      expect((await getSetting()).builtinAgents[a.name])
+        .toBe(builtinFingerprint(BUILTIN_AGENTS.find((b) => b.name === a.name)!));
+    }
+  });
 
   it("memperbarui baris yang belum disunting", async () => {
     await seedBuiltinAgents();
@@ -218,5 +256,26 @@ describe("installCustomAgents — urutan mengikat", () => {
     await installCustomAgents();
     const names = agentDefsFor("p1", "claude").map((a) => a.name).sort();
     expect(names).toEqual(["blast-radius", "scout", "security-reviewer"]);
+  });
+});
+
+
+describe("app/support — profil efektif dari seed", () => {
+  it("memilih model per runtime dan mempertahankan override operator", async () => {
+    const names = ["product-designer", "feature-builder", "performance-engineer", "product-analyst",
+      "solution-architect", "operations-engineer", "support-triager", "knowledge-maintainer"];
+    await seedBuiltinAgents();
+    await prisma.customAgent.updateMany({ where: { name: { in: names } }, data: { enabled: true } });
+    await loadCustomAgents();
+    const claude = agentDefsFor("p1", "claude").filter((a) => names.includes(a.name));
+    expect(claude).toHaveLength(8);
+    expect(claude.every((a) => a.model === "sonnet" && a.mentions.length === 0)).toBe(true);
+    const codex = agentDefsFor("p1", "codex").filter((a) => names.includes(a.name));
+    expect(codex.map((a) => a.name).sort()).toEqual(["product-analyst", "solution-architect", "support-triager"]);
+    expect(codex.every((a) => a.model === "gpt-5.6-terra" && a.workspacePolicy === "read-only")).toBe(true);
+    await prisma.customAgent.update({ where: { id: idOf("product-analyst") }, data: { model: "gpt-5.6", effort: "high" } });
+    await loadCustomAgents();
+    expect(agentDefsFor("p1", "codex").find((a) => a.name === "product-analyst"))
+      .toMatchObject({ model: "gpt-5.6", effort: "high", workspacePolicy: "read-only" });
   });
 });

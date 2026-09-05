@@ -1,36 +1,25 @@
 // SPEC-881 · ADR-0136 · katalog agen bawaan sistem. Cermin registry METHODS (ADR-0113): tabel
-// konstanta, satu-satunya tempat pengetahuan ini hidup, menambah agen kesembilan = satu entri.
+// konstanta, satu-satunya tempat pengetahuan ini hidup, menambah agen = satu entri katalog.
 //
 // DATA MURNI: nol I/O, nol `node:crypto`. Paket ini ikut dibundel untuk browser, dan sidik jari
 // baris dihitung di server (`services/builtin-agents.ts`), bukan di sini.
 //
-// Nilai yang KONSTAN untuk kedelapan sengaja BUKAN field: projectId null (global) · model null
+// Nilai yang KONSTAN untuk seluruh katalog sengaja BUKAN field: projectId null (global) · model null
 // (warisi sesi) · mentions [] · runtime null. Menjadikannya field berarti mengundang entri masa
 // depan yang memasang `mentions`, dan itu membuka kembali lapis-1 anti-loop ADR-0094 yang hari ini
 // nol risiko — tanpa `mentions`, `Task` DICABUT dari argv dan agen daun tak punya alat memanggil
 // siapa pun.
 //
-// Prinsip seleksi (tiga syarat, entri yang gagal salah satunya tidak masuk):
+// Prinsip seleksi (termasuk perluasan aplikasi/dukungan yang belum dibenchmark):
 //   1. punya PROSEDUR, bukan persona — "kamu reviewer, review-lah" tak menambah apa pun;
-//   2. menutup kelas kegagalan yang TERUKUR, bukan yang kebetulan;
+//   2. memiliki scope, acceptance dan bukti keluaran yang dapat diperiksa;
 //   3. membakar konteks di tempat lain lalu mengembalikan putusan kecil — itu satu-satunya
 //      keuntungan struktural subagent claude.
 
-export type BuiltinAgentDef = {
-  readonly name: string;
-  /** Dibaca claude untuk MEMILIH subagent. Mulai dengan "Gunakan saat …" — ini pintunya. */
-  readonly description: string;
-  readonly instructions: string;
-  /** Himpunan bagian DEFAULT_AGENT_TOOLS. Nama MCP dilarang: berbeda per mesin. */
-  readonly tools: readonly string[];
-  readonly enabledByDefault: boolean;
-  readonly activation: "smart";
-  readonly effort: "low" | "medium" | "high";
-  readonly workspacePolicy: "read-only" | "isolated-worktree";
-  readonly maxTurns: number | null;
-  readonly timeoutSeconds: number | null;
-  readonly models: Readonly<Record<"claude" | "codex", string>>;
-};
+import type { BuiltinAgentDef } from "./builtin-agent-types";
+import { BUILTIN_APP_AGENTS } from "./builtin-app-agents";
+
+export type { BuiltinAgentDef } from "./builtin-agent-types";
 
 export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
   {
@@ -352,6 +341,7 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       "dengan catatan · tolak (+ pengganti ekuivalen) · belum terverifikasi.",
     ].join("\n"),
   },
+  ...BUILTIN_APP_AGENTS,
 ];
 
 // Jaring saat modul dievaluasi sengaja TIDAK dipasang di sini: `builtin-agents.test.ts` yang

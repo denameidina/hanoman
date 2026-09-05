@@ -5,7 +5,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BUILTIN_AGENTS } from "@hanoman/shared";
 import { renderAgentsJson, type AgentDef } from "../src/custom-agents";
 import { agentDefinitionHash } from "../src/agent-definition";
@@ -52,7 +52,7 @@ const publishChildResult = (execution: AgentEvalExecution, output: string): void
 };
 
 describe("custom-agent eval manifest and scorer", () => {
-  it("has one positive and one control for every builtin plus preservation/source controls", () => {
+  it("has one positive and one control for the eight audit builtins with fixtures plus preservation/source controls", () => {
     validateAgentEvalManifest(AGENT_EVAL_CASES, evalRoot);
     const agents = new Set(AGENT_EVAL_CASES.map((entry) => entry.agentName));
     expect(agents.size).toBe(8);
@@ -417,6 +417,16 @@ describe("custom-agent live harness isolation", () => {
     ]);
     expect(result.skipped.every((entry) => entry.reason.includes("isolated-worktree"))).toBe(true);
   });
+
+  it.each(["product-designer", "feature-builder", "performance-engineer", "product-analyst",
+    "solution-architect", "operations-engineer", "support-triager", "knowledge-maintainer"])(
+    "rejects evaluation of %s without fixtures before calling the executor", async (agentName) => {
+      const execute = vi.fn(async () => ({ status: 0, stdout: "", stderr: "" }));
+      await expect(runCustomAgentEvaluations({ runtime: "claude", agentName, evalRoot,
+        cases: AGENT_EVAL_CASES, execute })).rejects.toThrow(`Tidak ada kasus untuk agent: ${agentName}`);
+      expect(execute).not.toHaveBeenCalled();
+    },
+  );
 
   it("rejects an explicitly selected agent that its runtime cannot materialize", async () => {
     await expect(runCustomAgentEvaluations({
