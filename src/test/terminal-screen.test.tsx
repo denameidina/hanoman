@@ -2,6 +2,7 @@ import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Spec } from "@hanoman/shared";
 import { TerminalScreen, PhaseStrip } from "../src/screens/TerminalScreen";
+import { ApiError } from "../src/api/client";
 import { mockViewport, resetViewport } from "./viewport";
 
 // TerminalPane membuka WebSocket + xterm (butuh canvas). jsdom tak punya keduanya; yang
@@ -593,6 +594,23 @@ describe("TerminalScreen (grid)", () => {
 });
 
 describe("TerminalScreen (Ambil backlog)", () => {
+  it("retains a rejected backlog selection for explicit human force", async () => {
+    listTerminals.mockResolvedValue([]);
+    listSpecs.mockResolvedValue({ items: backlog, total: 3, page: 1, pageSize: 20 });
+    startSession.mockRejectedValueOnce(new ApiError(409, "409", { error: "Cap penuh", kind: "capacity",
+      admission: { enabled: true, liveCount: 6, liveAgentCount: 4, maxConcurrent: 6,
+        loadPerCore: 1.5, maxLoadPerCore: 2.5, loadStatus: "available" },
+    })).mockResolvedValueOnce({ id: "spec101sess" });
+    render(<TerminalScreen projects={projects} backlog={backlog} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Ambil backlog" }));
+    fireEvent.click(await screen.findByText("Bug B"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("6 sesi hidup");
+    expect(startSession).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Mulai tetap" }));
+    await waitFor(() => expect(startSession).toHaveBeenLastCalledWith({ spec: "SPEC-101", flow: "qa", force: true }));
+    expect(await screen.findByText("spec101sess")).toBeInTheDocument();
+  });
+
   it("membuka modal berisi spec yang bisa diambil — bukan yang done", async () => {
     listTerminals.mockResolvedValue([]);
     render(<TerminalScreen projects={projects} backlog={backlog} />);

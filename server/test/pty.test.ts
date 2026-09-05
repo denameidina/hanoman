@@ -910,6 +910,7 @@ describe("hook riwayat sesi (SPEC-362)", () => {
     expect(sessionKind({ id: "vpsc-1", command: ["ssh"] }, "vps-console:1", "/home/x")).toBe("vps");
     expect(sessionKind({ id: "abc", command: ["/bin/bash"] }, "p1", "/r")).toBe("shell");
     expect(sessionKind({ id: "merge-x" }, "p1", "/r/.worktrees/merge-x")).toBe("worktree");
+    expect(sessionKind({ id: "merge-x" }, "p1", String.raw`C:\r\.worktrees\merge-x`)).toBe("worktree");
     expect(sessionKind({ id: "abc" }, "p1", "/r")).toBe("terminal");
   });
 

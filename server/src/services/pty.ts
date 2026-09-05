@@ -137,6 +137,8 @@ export type SessionInfo = {
   agent: Agent;
 };
 export type Pane = SessionInfo & {
+  // ADR-0161: metadata tmux internal; klasifikasi tidak mengubah hitungan semua pane hidup.
+  launchClass?: "agent" | "terminal";
   code: number; phaseFile?: string; decisionFile?: string;
   // SPEC-863 · `#{alternate_on}` pane — TUI layar penuh (vim) 1, shell dan TUI agen 0.
   altScreen: boolean;
@@ -317,7 +319,7 @@ export const FMT = [
   // SPEC-919 · field baru ditambahkan di UJUNG: posisi kolom lama tak bergeser, dan
   // `pty-parse.test.ts` mengunci panjang FMT terhadap destructuring `parsePanes`.
   "#{window_activity}", "#{@hanoman_event_hook}", "#{session_created}",
-  "#{@hanoman_agent_roster}",
+  "#{@hanoman_agent_roster}", "#{@hanoman_launch_class}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -349,7 +351,7 @@ export async function listPanesAsync(): Promise<Pane[]> {
 export function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
-      alternate, activity, eventHook, created, agentRoster] = line.split("\t");
+      alternate, activity, eventHook, created, agentRoster, launchClass] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -375,6 +377,7 @@ export function parsePanes(out: string): Pane[] {
       // SPEC-909 · ADR-0146 · sesi yang lahir sebelum pembaruan tak punya opsi ini → false.
       eventHook: eventHook === "1",
       agentRoster: parseAgentRoster(agentRoster),
+      launchClass: launchClass === "agent" || launchClass === "terminal" ? launchClass : undefined,
     }];
   });
 }
@@ -544,7 +547,7 @@ export function sessionKind(
   if (projectId.startsWith("telegram:")) return "telegram";
   if (projectId.startsWith("vps")) return "vps";           // routes/vps.ts: "vps:<id>" & "vps-console:<id>"
   if (o.command) return "shell";
-  if (cwd.includes("/.worktrees/")) return "worktree";     // sesi konflik merge/integrate
+  if (/[\\/]\.worktrees[\\/]/.test(cwd)) return "worktree";     // sesi konflik merge/integrate
   return "terminal";
 }
 
@@ -780,6 +783,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   if (opts.branch) tmux("set-option", "-t", name(id), "@hanoman_branch", opts.branch);
   // SPEC-338 · mesin sesi ikut tersimpan di tmux — sumber kebenaran sesi tetap tmux, bukan DB.
   tmux("set-option", "-t", name(id), "@hanoman_agent", agent);
+  const kind = sessionKind({ ...opts, id }, projectId, cwd);
+  tmux("set-option", "-t", name(id), "@hanoman_launch_class",
+    opts.command || kind === "terminal" ? "terminal" : "agent");
   if (liveAgentDefs.length > 0) {
     const roster: SessionAgentMeta[] = liveAgentDefs.map((def) => ({
       ...(def.id ? { id: def.id } : {}), name: def.name,
@@ -805,7 +811,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // ADR-0015 bukan sesi baru dan tak boleh melahirkan baris riwayat kedua).
   emitBirth({
     sessionId: id, projectId, specId: opts.specId, flow: opts.flow,
-    kind: sessionKind({ id, specId: opts.specId, flow: opts.flow, command: opts.command }, projectId, cwd),
+    kind,
     agent, model: opts.model, effort: opts.effort, branch: opts.branch, cwd,
   });
   return { id, projectId, specId: opts.specId, flow: opts.flow, cwd, branch: opts.branch, exited: false, decision: false, agent };

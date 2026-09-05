@@ -9,9 +9,10 @@ import type { AddressInfo } from "node:net";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { killAll, killSession, listSessions, promptFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
+import { DEFAULT_SETTING } from "../src/services/settings";
 import { phaseFilePath } from "../src/services/session-phases";
 import { sweepRepo, __resetReaper } from "../src/services/worktree-reaper";
-import { resetDb, makeProject, makeSpec } from "./factory";
+import { resetDb, makeProject, makeSpec, makeSetting } from "./factory";
 
 // Lihat pty.test.ts: /bin/cat mati karena --dangerously-skip-permissions ilegal baginya.
 const FAKE_CLAUDE = fileURLToPath(new URL("./fixtures/fake-claude.sh", import.meta.url));
@@ -124,6 +125,8 @@ beforeAll(async () => {
   execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t",
     "commit", "-qm", "init", "--allow-empty"], { cwd: repoDir });
   await resetDb();
+  // Berkas ini sengaja menumpuk pane lintas test; admission aktif diuji terpisah (SPEC-1108).
+  await makeSetting({ scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } } });
   await makeProject({ id: "p1", repoDir });
   await makeProject({ id: "p2", name: "p2", repoDir: null });
   await app.listen({ port: 0, host: "127.0.0.1" });

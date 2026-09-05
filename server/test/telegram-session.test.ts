@@ -84,6 +84,47 @@ describe("TelegramSessionCoordinator (SPEC-476)", () => {
     expect((await store.chatContext("42"))?.sessionId).toBe(result.sessionId);
   });
 
+  it("waits for asynchronous guarded birth before binding the chat", async () => {
+    const port = fakePort();
+    const create = port.createSession;
+    port.createSession = async (...args) => create(...args);
+    const result = await coordinator(port).dispatch(input);
+    expect(result).toEqual({ sessionId: telegramOperatorSessionId("42"), created: true });
+    expect((await store.chatContext("42"))?.sessionId).toBe(result.sessionId);
+    expect(port.born[0]!.opts).not.toHaveProperty("force");
+  });
+
+  it("propagates admission rejection without binding a nonexistent pane", async () => {
+    const port = fakePort();
+    const denial = Object.assign(new Error("cap penuh"), { kind: "capacity" });
+    port.createSession = async () => { throw denial; };
+    await expect(coordinator(port).dispatch(input)).rejects.toBe(denial);
+    expect((await store.chatContext("42"))?.sessionId).toBeNull();
+    expect(port.born).toEqual([]);
+  });
+
+  it("steers the incoming message when another request created the pane during admission", async () => {
+    const port = fakePort();
+    const sessionId = telegramOperatorSessionId("42");
+    port.createSession = async () => {
+      const session = { id: sessionId, exited: false, reused: true as const };
+      port.live.set(sessionId, session);
+      return session;
+    };
+    expect(await coordinator(port).dispatch(input)).toEqual({ sessionId, created: false });
+    expect(port.sent).toEqual([{ id: sessionId, text: "[Telegram update 17 · chat 42 · kind text]\nstatus proyek" }]);
+    expect((await store.chatContext("42"))?.sessionId).toBe(sessionId);
+  });
+
+  it("awaits asynchronous pane lookup so an absent pane is created", async () => {
+    const port = fakePort();
+    const sessionId = telegramOperatorSessionId("42");
+    port.getSession = async () => undefined;
+    expect(await coordinator(port).dispatch(input)).toEqual({ sessionId, created: true });
+    expect(port.born).toHaveLength(1);
+    expect(port.sent).toEqual([]);
+  });
+
   it("routes later natural messages and commands to the same live pane", async () => {
     const port = fakePort();
     const c = coordinator(port);

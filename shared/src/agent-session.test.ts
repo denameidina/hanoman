@@ -3,6 +3,18 @@ import { zAgent, zCodex, CODEX_DEFAULTS, CODEX_MODELS, CODEX_EFFORTS, zSetting }
 import { zTerminalSession } from "./dto";
 
 describe("SPEC-338 · agent sesi", () => {
+  it.each([
+    { project: "p1", flow: "reverse" },
+    { project: "p1", flow: "scaffold" },
+    { project: "p1", flow: "prd", brief: { title: "T", context: "c", outcome: "o" } },
+    { project: "p1", flow: "breakdown", prdPath: "docs/prd/a.md" },
+  ])("SPEC-1108 · preserves explicit human force in $flow and rejects invalid force", (input) => {
+    expect(zTerminalSession.parse({ ...input, force: true })).toMatchObject({ force: true });
+    expect(zTerminalSession.parse({ ...input, force: false })).toMatchObject({ force: false });
+    expect(zTerminalSession.parse(input)).not.toHaveProperty("force");
+    expect(zTerminalSession.safeParse({ ...input, force: "true" }).success).toBe(false);
+  });
+
   it("zAgent hanya menerima claude|codex", () => {
     expect(zAgent.parse("claude")).toBe("claude");
     expect(zAgent.parse("codex")).toBe("codex");

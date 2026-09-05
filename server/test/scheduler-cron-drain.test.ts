@@ -1,3 +1,4 @@
+import { LaunchAdmissionError } from "../src/services/session-admission";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "../src/db";
 import { drainCronRuns, type CronDeps } from "../src/services/scheduler/governor";
@@ -32,6 +33,19 @@ const deps = (over: Partial<CronDeps> = {}): CronDeps => ({
 const statusOf = async (id: string) => (await prisma.schedulerCronRun.findUnique({ where: { id } }))!;
 
 describe("drainCronRuns", () => {
+  it("resource pressure keeps the existing cron run queued with metrics", async () => {
+    const { run } = await mk();
+    const remaining = await drainCronRuns(2, deps({ launchCron: async () => {
+      throw new LaunchAdmissionError("host-load", {
+        enabled: true, liveCount: 0, liveAgentCount: 0, maxConcurrent: 2,
+        loadPerCore: 3.75, maxLoadPerCore: 2.5, loadStatus: "available",
+      });
+    } }));
+    expect(remaining).toBe(2);
+    expect(await statusOf(run.id)).toMatchObject({ status: "queued", sessionId: null });
+    expect((await statusOf(run.id)).note).toContain("3.75");
+  });
+
   it("meluncurkan dan mengembalikan sisa slot", async () => {
     const { run } = await mk();
     expect(await drainCronRuns(2, deps())).toBe(1);

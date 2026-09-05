@@ -7,7 +7,8 @@ import { listRemotes, addRemote, setRemoteUrl, removeRemote, prUrl } from "../se
 import { downloadFormat, sendDocDownload, sendReviewDownload } from "../services/doc-export";
 import { prisma } from "../db";
 import { repoOf } from "../services/repo-dir";
-import { listSessions, createSession } from "../services/pty";
+import { listSessions } from "../services/pty";
+import { createAgentSession } from "../services/session-launch-gate";
 import { conflictSessionDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { mergeIntoCurrent, rebaseOntoCurrent, pullIntoCurrent, dropCommit, sourceBranch, type GraphMergeResult } from "../services/integrate";
@@ -590,6 +591,6 @@ async function finishGraphOp(
     CODE_STYLE_CLAUSE,
     `${verb} via git graph project ${id}.`,
   ].join("\n\n");
-  const s = createSession(id, r.worktree, { id: basename(r.worktree), model, effort, agent, prompt });
+  const s = await createAgentSession(id, r.worktree, { id: basename(r.worktree), model, effort, agent, prompt });
   return { status: "conflict", sessionId: s.id };
 }

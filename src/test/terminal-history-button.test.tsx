@@ -9,6 +9,7 @@ const sessionTranscript = vi.fn();
 const startSession = vi.fn();
 const createShell = vi.fn();
 const createTerminal = vi.fn();
+const createTerminalFlow = vi.fn();
 vi.mock("../src/api/client", () => ({
   api: {
     listTerminals: vi.fn(async () => []),
@@ -18,13 +19,16 @@ vi.mock("../src/api/client", () => ({
     startSession: (...a: unknown[]) => startSession(...a),
     createShell: (...a: unknown[]) => createShell(...a),
     createTerminal: (...a: unknown[]) => createTerminal(...a),
+    createTerminalFlow: (...a: unknown[]) => createTerminalFlow(...a),
     deleteTerminal: vi.fn(async () => {}),
     getTerminalWorkspace: vi.fn(async () => ({ workspace: null, revision: 0, updatedAt: null })),
     putTerminalWorkspace: vi.fn(async (input: { baseRevision: number; workspace: unknown }) => ({
       workspace: input.workspace, revision: input.baseRevision + 1, updatedAt: "2026-08-15T00:00:00.000Z",
     })),
   },
-  ApiError: class extends Error { status = 0; detail: unknown = null; },
+  ApiError: class extends Error {
+    constructor(public status: number, message: string, public detail: unknown = null) { super(message); }
+  },
 }));
 
 vi.mock("../src/api/events", () => ({
@@ -38,6 +42,7 @@ vi.mock("../src/api/events", () => ({
 }));
 vi.mock("../src/screens/TerminalPane", () => ({ TerminalPane: () => <div data-testid="pane" /> }));
 import { TerminalScreen } from "../src/screens/TerminalScreen";
+import { ApiError } from "../src/api/client";
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: "h1", sessionId: "spec-362", projectId: "p1", specId: "SPEC-362", title: "History session terminal",
@@ -47,7 +52,7 @@ const row = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
-  [listSessionHistory, sessionTranscript, startSession, createShell, createTerminal].forEach((m) => m.mockReset());
+  [listSessionHistory, sessionTranscript, startSession, createShell, createTerminal, createTerminalFlow].forEach((m) => m.mockReset());
   startSession.mockResolvedValue({ id: "spec-362" });
   createShell.mockResolvedValue({ id: "sh1" });
   createTerminal.mockResolvedValue({ id: "t1" });
@@ -56,6 +61,29 @@ beforeEach(() => {
 const projects = [{ id: "p1", name: "hanoman" }];
 
 describe("Riwayat di Terminal (SPEC-362)", () => {
+  it.each(["spec", "reverse"])("shows rejection and manually retries %s history with the same context", async (kind) => {
+    const start = kind === "spec" ? startSession : createTerminalFlow;
+    start.mockRejectedValueOnce(new ApiError(409, "409", { error: "Host sibuk", kind: "host-load",
+      admission: { enabled: true, liveCount: 3, liveAgentCount: 2, maxConcurrent: 6,
+        loadPerCore: 3.75, maxLoadPerCore: 2.5, loadStatus: "available" },
+    })).mockResolvedValueOnce({ id: "retry-session" });
+    listSessionHistory.mockResolvedValue({ items: [row({ kind, ...(kind === "reverse" ? { specId: null, flow: "reverse" } : {}) })],
+      total: 1, page: 1, pageSize: 20 });
+    render(<TerminalScreen projects={projects} backlog={[]} />);
+    fireEvent.click(await screen.findByText("Riwayat"));
+    fireEvent.click(await screen.findByText("History session terminal"));
+    fireEvent.click(await screen.findByText("Mulai lagi"));
+    const alert = await screen.findByRole("alert", {}, { timeout: 1000 });
+    expect(alert).toHaveTextContent("3 sesi hidup");
+    expect(alert).toHaveTextContent("3.75");
+    expect(start).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Mulai tetap" }));
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+    if (kind === "spec") expect(start).toHaveBeenLastCalledWith({ spec: "SPEC-362", flow: "feature", force: true });
+    else expect(start).toHaveBeenLastCalledWith("p1", "reverse", { force: true });
+    await waitFor(() => expect(screen.queryByText("Riwayat sesi")).not.toBeInTheDocument());
+  });
+
   it("riwayat TIDAK dirender sebelum diminta — grid terminal tak terhalangi", async () => {
     render(<TerminalScreen projects={projects} backlog={[]} />);
     await waitFor(() => expect(screen.getByTestId("terminal-root")).toBeTruthy());

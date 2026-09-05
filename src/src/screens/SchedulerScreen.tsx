@@ -12,8 +12,9 @@ import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
 import type {
   SchedulerStateView, SchedulerQueueItemView, SchedulerSessionView, SchedulerSourceView, Scheduler,
-  TopicParams,
+  TopicParams, LaunchStatus,
 } from "@hanoman/shared";
+import { SCHEDULER_DEFAULTS } from "@hanoman/shared";
 import type { ProjectVM, Spec } from "./types";
 import { specDeepLink } from "./deeplink";
 import { SchedulerCrons } from "./SchedulerCrons";
@@ -247,6 +248,22 @@ function ControlBar({ cfg, cap, liveCount, onWrite, busy }:
   );
 }
 
+function AdmissionStatus({ status }: { status: LaunchStatus }) {
+  return (
+    <Card eyebrow="host · peluncuran agen" title="Gerbang peluncuran">
+      <div aria-label="Status gerbang peluncuran" style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", lineHeight: 1.6 }}>
+        <div>Gerbang {status.enabled ? "aktif" : "nonaktif"} · {status.liveCount} sesi hidup · {status.liveAgentCount} agen terstruktur · cap {status.maxConcurrent}</div>
+        <div>Load per core: {status.loadStatus === "available" && status.loadPerCore !== null
+          ? status.loadPerCore.toFixed(2) : "tidak tersedia"}
+          {status.loadStatus === "unsupported" ? " (tidak didukung platform)" : ""} · ambang {status.maxLoadPerCore}</div>
+        <div style={{ fontSize: "var(--text-xs)", marginTop: 6 }}>
+          Berlaku juga saat scheduler berhenti. Terminal dan shell tetap bisa dibuka; keduanya ikut mengisi cap.
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 // Panel setelan: form lokal disemai dari config, tombol Simpan menulis blok penuh (zScheduler).
 function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next: Scheduler) => void; busy: boolean }) {
   const [draft, setDraft] = React.useState<Scheduler>(cfg);
@@ -254,9 +271,12 @@ function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next:
   const setSrc = (k: "backlog" | "triase", patch: Record<string, unknown>) =>
     setDraft((d) => ({ ...d, sources: { ...d.sources, [k]: { ...d.sources[k], ...patch } } }));
   const num = (v: string, min = 1) => Math.max(min, Number(v) || min);
+  const guard = draft.launchGuard ?? SCHEDULER_DEFAULTS.launchGuard;
+  const validLoad = Number.isFinite(guard.maxLoadPerCore) && guard.maxLoadPerCore > 0;
   return (
     <Card eyebrow="scheduler · setelan" title="Konfigurasi"
-      actions={<Button size="sm" leftIcon="save" disabled={busy} onClick={() => onWrite(draft)}>Simpan setelan</Button>}>
+      actions={<Button size="sm" leftIcon="save" disabled={busy || !validLoad}
+        onClick={() => onWrite({ ...draft, launchGuard: guard })}>Simpan setelan</Button>}>
       <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 14 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span className="hn-eyebrow">Cap concurrent</span>
@@ -268,6 +288,23 @@ function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next:
           <Select value={draft.autonomy} aria-label="Autonomy"
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDraft((d) => ({ ...d, autonomy: e.target.value as Scheduler["autonomy"] }))}
             options={[{ value: "butuh-keputusan", label: "butuh-keputusan" }, { value: "full-control", label: "full-control" }]} />
+        </label>
+      </div>
+      <div style={{ marginTop: 14, padding: "10px 12px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)" }}>
+        <Switch label="Gerbang peluncuran" checked={guard.enabled}
+          onChange={(enabled: boolean) => setDraft((d) => ({ ...d, launchGuard: { ...guard, enabled } }))} />
+        <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.5 }}>
+          Membatasi peluncuran agen menurut cap sesi dan beban host, termasuk peluncuran manual.
+          Mematikannya melewati kedua pemeriksaan. Terpisah dari sakelar scheduler dan source.
+        </p>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span className="hn-eyebrow">Ambang load per core</span>
+          <Input type="number" min={0} step="any" value={String(guard.maxLoadPerCore)}
+            aria-label="Ambang load per core" aria-invalid={!validLoad} placeholder="2.5"
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({
+              ...d, launchGuard: { ...guard, maxLoadPerCore: Number(e.target.value) },
+            }))} />
+          {!validLoad && <span style={{ fontSize: "var(--text-xs)", color: "var(--clay-500)" }}>Isi angka lebih besar dari nol.</span>}
         </label>
       </div>
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -369,6 +406,7 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
       <ControlBar cfg={state.config} cap={state.cap} liveCount={state.liveCount} onWrite={writeConfig} busy={busy} />
+      {state.admission && <AdmissionStatus status={state.admission} />}
 
       <Card eyebrow="scheduler · observabilitas" title="Status per source">
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

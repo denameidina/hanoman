@@ -4,6 +4,17 @@ import { api } from "../src/api/client";
 
 // SPEC-162 · SSE run dan control run sudah tak ada; yang tersisa satu POST yang membuka sesi.
 describe("api client · sesi backlog", () => {
+  it.each(["reverse", "scaffold", "prd", "breakdown", "history"])("forwards explicit human force for %s", async (flow) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "session-1108" }), { status: 201 }));
+    if (flow === "reverse") await api.reverseDocs("p1", { force: true });
+    else if (flow === "scaffold") await api.scaffoldDocs("p1", { force: true });
+    else if (flow === "prd") await api.startPrd("p1", { title: "T", context: "c", outcome: "o" }, { force: true });
+    else if (flow === "breakdown") await api.startBreakdown("p1", "docs/prd/a.md", { force: true });
+    else await api.createTerminalFlow("p1", "reverse", { force: true });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))).toMatchObject({ project: "p1", force: true });
+  });
+
   it("startSession mem-POST spec + flow ke path sesi terminal", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ id: "spec-1" }), { status: 201, headers: { "content-type": "application/json" } }));

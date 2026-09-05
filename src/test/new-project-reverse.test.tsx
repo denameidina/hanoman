@@ -82,6 +82,20 @@ describe("existing project → reverse docs auto-start (SPEC-848)", () => {
   });
 
   // AC-1
+  it("automatic reverse rejected by admission stays unforced and returns to the project retry action", async () => {
+    reverseDocs.mockRejectedValue(new FakeApiError(409, "409", { error: "Cap penuh", kind: "capacity",
+      admission: { enabled: true, liveCount: 6, liveAgentCount: 4, maxConcurrent: 6,
+        loadPerCore: 1.5, maxLoadPerCore: 2.5, loadStatus: "available" },
+    }));
+    await openNewProjectExisting();
+    fireEvent.change(screen.getByPlaceholderText("/path/ke/repo"), { target: { value: "/repo/ada" } });
+    fireEvent.click(screen.getByText("Tambah → reverse-engineer docs"));
+    expect(await screen.findByText("Reverse docs")).toBeInTheDocument();
+    expect(reverseDocs).toHaveBeenCalledTimes(1);
+    expect(reverseDocs).toHaveBeenCalledWith("repo");
+    expect(screen.queryByRole("button", { name: "Mulai tetap" })).not.toBeInTheDocument();
+  });
+
   it("mode folder lokal memulai tepat satu sesi reverse lalu membuka Terminal", async () => {
     await openNewProjectExisting();
     fireEvent.change(screen.getByPlaceholderText("/path/ke/repo"), { target: { value: "/repo/ada" } });

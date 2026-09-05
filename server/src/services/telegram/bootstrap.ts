@@ -7,7 +7,8 @@ import { effectiveStr } from "../../config";
 import { verifyAgentToken as verifyAgentTokenReal } from "../agent-token";
 import { ensureCodexTrust } from "../codex-trust";
 import { getSetting as getSettingReal } from "../settings";
-import { createSession, getSession, killSession, sendToPane } from "../pty";
+import { getSessionAsync, killSession, sendToPane } from "../pty";
+import { createAgentSession } from "../session-launch-gate";
 import { TelegramApiClient } from "./client";
 import { setTelegramEngine, telegramAgentDefaults, telegramEngineContext } from "./config";
 import { TelegramGateway } from "./gateway";
@@ -86,7 +87,7 @@ export function telegramSessionDeps(input: {
 }): TelegramSessionCoordinatorDeps {
   return {
     store: input.store,
-    port: { getSession, createSession, sendToPane, killSession },
+    port: { getSession: getSessionAsync, createSession: createAgentSession, sendToPane, killSession },
     // SPEC-492 · BUKAN `sessionAgentDefaults`: sesi operator Telegram sebagian besar membaca API
     // lalu merangkum, bukan menulis kode, jadi ia boleh punya runtime/model/effort sendiri.
     defaults: telegramAgentDefaults,

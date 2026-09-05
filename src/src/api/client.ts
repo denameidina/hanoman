@@ -420,20 +420,20 @@ export const api = {
     agent?: Agent;                    // SPEC-338 · ADR-0074 · mesin sesi; kosong → Setting.agent
     verifyScope?: VerifyScope;        // SPEC-376 · ADR-0080 · scope verifikasi; kosong → Setting.verifyScope
     method?: string;                  // SPEC-734 · ADR-0113 · metode workflow; kosong → payload → Setting.method
-    force?: boolean }) =>             // SPEC-447 · ADR-0093 · lewati gerbang dependency (jalur manusia)
+    force?: boolean }) =>             // ADR-0093/0161 · lewati dependency + admission (jalur manusia)
     // SPEC-394 · ADR-0084 · `resumed` ada HANYA saat peluncuran melanjutkan artefak sesi sebelumnya
     // (worktree utuh atau tip branch sesi). Absen = sesi baru atau re-attach ke sesi hidup.
     j<{ id: string; resumed?: boolean }>(paths.terminalSessions, { method: "POST", ...body(b) }),
   // SPEC-166 · reverse: sesi project-level menyusun Source of Truth dari kode, di worktree-nya.
-  reverseDocs: (project: string) =>
-    j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, flow: "reverse" }) }),
+  reverseDocs: (project: string, opts?: { force?: boolean }) =>
+    j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, flow: "reverse", ...(opts ?? {}) }) }),
   // SPEC-222 · scaffold: sesi project-level menyusun Source of Truth dari ide (from-scratch).
-  scaffoldDocs: (project: string) =>
-    j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, flow: "scaffold" }) }),
+  scaffoldDocs: (project: string, opts?: { force?: boolean }) =>
+    j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, flow: "scaffold", ...(opts ?? {}) }) }),
   // SPEC-362 · "Mulai lagi" sesi project-level dari riwayat (reverse/scaffold): bentuk
   // body-nya identik dengan reverseDocs/scaffoldDocs, hanya flow-nya yang datang dari baris riwayat.
-  createTerminalFlow: (project: string, flow: Flow) =>
-    j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, flow }) }),
+  createTerminalFlow: (project: string, flow: Flow, opts?: { force?: boolean }) =>
+    j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, flow, ...(opts ?? {}) }) }),
   // SPEC-210 · dokumen PRD. listPrds/getPrd baca freshest-wins; startPrd buka sesi prd.
   listPrds: (project: string) => j<{ items: PrdDoc[] }>(paths.prds(project)),
   // perbaikan SPEC-210 · daftar PRD lintas-project (filter "Semua project").
@@ -443,15 +443,16 @@ export const api = {
   // SPEC-340 · ADR-0076 · opts = eskalasi audit → PRD: branchFrom (worktree dari branch audit) +
   // fromAudit (isi dokumen audit disematkan server ke prompt). Tanpa opts, body persis spt dulu.
   startPrd: (project: string, brief: { title: string; context: string; outcome: string; constraints?: string },
-             opts?: { branchFrom?: string; fromAudit?: string }) =>
+             opts?: { branchFrom?: string; fromAudit?: string; force?: boolean }) =>
     j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({
       project, flow: "prd", brief,
       ...(opts?.branchFrom ? { branchFrom: opts.branchFrom } : {}),
-      ...(opts?.fromAudit ? { fromAudit: opts.fromAudit } : {}) }) }),
+      ...(opts?.fromAudit ? { fromAudit: opts.fromAudit } : {}),
+      ...(opts?.force !== undefined ? { force: opts.force } : {}) }) }),
   // SPEC-273 · breakdown PRD → N backlog. startBreakdown buka sesi; getBreakdown baca manifest;
   // createSpecsBatch materialize usulan (review manusia) jadi N spec independen.
-  startBreakdown: (project: string, prdPath: string) =>
-    j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, flow: "breakdown", prdPath }) }),
+  startBreakdown: (project: string, prdPath: string, opts?: { force?: boolean }) =>
+    j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, flow: "breakdown", prdPath, ...(opts ?? {}) }) }),
   getBreakdown: (project: string, prdPath: string) =>
     j<BreakdownDoc>(paths.breakdown(project, prdPath)),
   createSpecsBatch: (b: { project: string; items: BreakdownItem[]; branchFrom?: string; prdPath?: string }) =>

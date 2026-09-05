@@ -106,6 +106,7 @@ import { StartSessionModal } from "../src/App";
 describe("StartSessionModal · dependency (SPEC-447)", () => {
   it("item terblokir: tombol jadi 'Mulai tetap' dan mengirim force", async () => {
     render(<StartSessionModal open spec={blocked} onClose={() => {}} onStarted={() => {}} />);
+    expect(screen.getByTestId("dep-blocked-note")).toHaveTextContent(/melewati cap sesi dan pemeriksaan beban host/i);
     fireEvent.click(await screen.findByText("Mulai tetap"));
     await waitFor(() => expect(startSession).toHaveBeenCalledWith(
       expect.objectContaining({ spec: "SPEC-9", force: true })));

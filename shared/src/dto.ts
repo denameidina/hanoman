@@ -15,6 +15,7 @@ import type { Spec, Notification } from "./entities";
 import { zProjectKind, zSpecSource, zPriority, zStage, zTicketCategory, zTicketStatus, zVerifyScope } from "./enums";
 import { payloadMatchesSource } from "./spec-source";
 import { parseCron } from "./cron-expr";
+import { zLaunchStatus } from "./session-admission";
 
 // SPEC-198 · amplop daftar via API: search/filter/paginasi dilakukan server-side.
 export type Paginated<T> = { items: T[]; total: number; page: number; pageSize: number };
@@ -204,6 +205,7 @@ export type SchedulerQueueCounts = z.infer<typeof zSchedulerQueueCounts>;
 export const zSchedulerState = z.object({
   config: zScheduler,
   cap: z.number(), liveCount: z.number(),
+  admission: zLaunchStatus.optional(),
   sources: z.array(zSchedulerSourceView),
   queueCounts: zSchedulerQueueCounts,
   sessions: z.array(zSchedulerSessionView),
@@ -426,18 +428,18 @@ export const zTerminalSession = z.union([
   // SPEC-166 · "reverse" = sesi project-level di worktree-nya sendiri, menyusun Source of Truth
   // dari kode. TANPA override runtime: sesi project-level mengikuti Setting.agent (ADR-0074).
   // Terminal biasa (tanpa flow) kini punya variannya SENDIRI di bawah — lihat SPEC-517.
-  z.object({ project: z.string(), flow: z.literal("reverse") }),
+  z.object({ project: z.string(), flow: z.literal("reverse"), force: z.boolean().optional() }),
   // SPEC-210 · sesi prd project-level di worktree sendiri; menghasilkan dokumen PRD dari brief.
   // SPEC-340 · ADR-0076 · eskalasi audit → PRD: branchFrom = branch audit (worktree lahir dari sana,
   // resolveCommit + fallback origin/<rev>), fromAudit = id spec audit (isi dokumennya disematkan ke
   // prompt). Keduanya opsional & independen; tanpa keduanya perilaku lama utuh (HEAD, prompt polos).
   z.object({ project: z.string(), flow: z.literal("prd"), brief: zPrdBrief,
-    branchFrom: z.string().min(1).optional(), fromAudit: z.string().min(1).optional() }),
+    branchFrom: z.string().min(1).optional(), fromAudit: z.string().min(1).optional(), force: z.boolean().optional() }),
   // SPEC-273 · sesi breakdown project-level: pecah SATU PRD (prdPath) → manifest N backlog.
-  z.object({ project: z.string(), flow: z.literal("breakdown"), prdPath: z.string().min(1) }),
+  z.object({ project: z.string(), flow: z.literal("breakdown"), prdPath: z.string().min(1), force: z.boolean().optional() }),
   // SPEC-222 · scaffold: sesi project-level from-scratch, menyusun SoT dari ide. Tanpa brief
   // (diseed dari Project.desc), tanpa Spec — cermin reverse.
-  z.object({ project: z.string(), flow: z.literal("scaffold") }),
+  z.object({ project: z.string(), flow: z.literal("scaffold"), force: z.boolean().optional() }),
   // SPEC-517 · terminal agen biasa: agen (claude|codex) + model + effort boleh dipilih PER SESI,
   // seperti picker Start backlog (ADR-0061/0074). Kosong → default global (Setting).
   // `flow: z.undefined()` BUKAN hiasan: varian ini permisif dan diletakkan SESUDAH semua varian

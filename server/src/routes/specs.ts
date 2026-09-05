@@ -3,7 +3,8 @@ import { existsSync } from "node:fs";
 import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, grantsCapability, type Stage } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { integrate, sourceBranch } from "../services/integrate";
-import { createSession, listSessions } from "../services/pty";
+import { listSessions } from "../services/pty";
+import { createAgentSession } from "../services/session-launch-gate";
 import { conflictSessionDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { prisma } from "../db";
@@ -507,7 +508,7 @@ export default async function (app: FastifyInstance) {
       CODE_STYLE_CLAUSE,
       `Backlog item ${spec.id} — ${spec.title}.`,
     ].join("\n\n");
-    const s = createSession(spec.projectId, r.worktree, {
+    const s = await createAgentSession(spec.projectId, r.worktree, {
       id: `merge-${spec.id.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`,
       specId: spec.id, model, effort, agent, prompt,
     });

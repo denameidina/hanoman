@@ -1,3 +1,4 @@
+import { LaunchAdmissionError } from "../src/services/session-admission";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { prisma } from "../src/db";
 import { enqueue, queueItemForSpec, listQueue, markCanceled } from "../src/services/scheduler/queue";
@@ -9,6 +10,25 @@ beforeEach(clean); afterAll(clean);
 const cfg = (over = {}) => ({ ...SCHEDULER_DEFAULTS, enabled: true, ...over });
 
 describe("governor.drain", () => {
+  it("host admission postpones an item in the existing queue instead of failing it", async () => {
+    await enqueue({ specId: "SPEC-wait", projectId: "p1", source: "backlog", priority: "sedang" });
+    await enqueue({ specId: "SPEC-wait2", projectId: "p1", source: "backlog", priority: "sedang" });
+    let attempts = 0;
+    const deps: GovernorDeps = {
+      drainCrons: async (s) => s, liveCount: async () => 0, isLive: () => null,
+      isDone: async () => false, blockers: async () => [],
+      launch: async () => { attempts++; throw new LaunchAdmissionError("host-load", {
+        enabled: true, liveCount: 0, liveAgentCount: 0, maxConcurrent: 2,
+        loadPerCore: 3.75, maxLoadPerCore: 2.5, loadStatus: "available",
+      }); },
+    };
+    await drain(cfg(), deps);
+    expect(await queueItemForSpec("SPEC-wait")).toMatchObject({ status: "queued", sessionId: null });
+    expect((await queueItemForSpec("SPEC-wait"))!.note).toContain("3.75");
+    expect(attempts).toBe(1);
+    expect((await queueItemForSpec("SPEC-wait2"))!.status).toBe("queued");
+  });
+
   it("never launches beyond cap (live count invariant)", async () => {
     for (const p of ["a", "b", "c", "d"]) await enqueue({ specId: `SPEC-${p}`, projectId: "p1", source: "backlog", priority: "sedang" });
     let launched = 0;

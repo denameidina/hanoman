@@ -3,7 +3,7 @@
    calls the client and updates state from the response. */
 import React from "react";
 import { useModelCatalog } from "./api/model-catalog";
-import { coerceClaudeEffort } from "@hanoman/shared";
+import { coerceClaudeEffort, zLaunchRejection, type LaunchRejection } from "@hanoman/shared";
 import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 import { parseRoute, routePath } from "./routes";
 import { LazyBoundary } from "./ds/LazyBoundary";
@@ -18,6 +18,7 @@ import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, co
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
+import { useLaunchAdmission } from "./screens/use-launch-admission";
 import { AttachmentPicker } from "./screens/SpecAttachments";
 import { AuthScreen } from "./screens/AuthScreen";
 import { SetupWizard, UnhardenedBanner } from "./screens/SetupWizard";
@@ -108,6 +109,8 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // menjaga id yang tak dikenal (mis. ikut sync dari hub) tak membuat picker-nya kosong.
   const [method, setMethod] = React.useState<string>(resolveMethod().id);
   const [busy, setBusy] = React.useState(false);
+  const [launchRejection, setLaunchRejection] = React.useState<LaunchRejection | null>(null);
+  React.useEffect(() => { setLaunchRejection(null); }, [open, spec?.id]);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
   // SPEC-739 · ADR-0114 · kesiapan skill metode di mesin ini. Gagal-diam dengan alasan yang sama
@@ -165,24 +168,29 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // bermode goal (server pun memaksanya — ini cerminan UI-nya, bukan gerbangnya).
   const goalLocked = isGoalShapedFlow(flow);
   // SPEC-447 · ADR-0093 · gerbang dependency ada di SERVER (409); ini cerminannya supaya operator
-  // tahu apa yang ia paksa sebelum menekannya. `force` tak pernah terkirim bila daftar ini kosong.
+  // tahu apa yang ia paksa sebelum menekannya. Force admission baru ditawarkan setelah 409.
   const blockers = s.blockedBy ?? [];
   const isBlocked = blockers.length > 0;
   // SPEC-739 · ADR-0114 · status untuk pasangan (metode, agen) yang SEDANG dipilih — dua-duanya,
   // karena superpowers bisa siap untuk claude dan kosong untuk codex di mesin yang sama.
   const methodStat = methodStatuses?.find((m) => m.method === method && m.agent === agent) ?? null;
-  async function start() {
+  async function start(force = false) {
     setBusy(true);
+    setLaunchRejection(null);
     try {
       const { id, resumed } = await api.startSession({
         spec: s.id, flow, model, effort, agent,
         goal: goalOn, goalCondition: goalOn && goalCond.trim() ? goalCond.trim() : undefined,
         verifyScope, method,
-        ...(isBlocked ? { force: true } : {}),   // SPEC-447 · ADR-0093
+        ...(isBlocked || force ? { force: true } : {}),   // ADR-0093/0161 · keputusan manusia
       });
       onStarted(id, resumed); onClose();
     }
-    catch (e) { onError?.(e); }
+    catch (e) {
+      const rejected = e instanceof ApiError && e.status === 409 ? zLaunchRejection.safeParse(e.detail) : null;
+      if (rejected?.success) setLaunchRejection(rejected.data);
+      else onError?.(e);
+    }
     finally { setBusy(false); }
   }
   return (
@@ -190,12 +198,25 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       footer={<>
         <Button variant="ghost" onClick={onClose}>Batal</Button>
         <Button leftIcon={isBlocked ? "lock" : "play"} variant={isBlocked ? "danger" : "primary"}
-          disabled={busy} onClick={start}>{isBlocked ? "Mulai tetap" : "Mulai"}</Button>
+          disabled={busy} onClick={() => void start()}>{isBlocked ? "Mulai tetap" : launchRejection ? "Coba lagi" : "Mulai"}</Button>
+        {launchRejection && !isBlocked && <Button leftIcon="lock" variant="danger" disabled={busy}
+          onClick={() => void start(true)}>Mulai tetap</Button>}
       </>}>
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
         Agen, model & effort untuk sesi ini. Default dari setelan global; ubah bila perlu. Sesi lahir dengan pilihan
         ini untuk seluruh hidupnya (satu proses) — <code>/model</code> di terminal tetap bisa mengubahnya.
       </div>
+      {launchRejection && <div role="alert" style={{
+        fontSize: 12.5, lineHeight: 1.55, marginBottom: 12, padding: "9px 11px",
+        borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-strong)",
+      }}>
+        <b>{launchRejection.error}</b>
+        <div>{launchRejection.admission.liveCount} sesi hidup · {launchRejection.admission.liveAgentCount} agen terstruktur · cap {launchRejection.admission.maxConcurrent}</div>
+        <div>Load per core: {launchRejection.admission.loadStatus === "available" && launchRejection.admission.loadPerCore !== null
+          ? launchRejection.admission.loadPerCore.toFixed(2) : "tidak tersedia"}
+          {launchRejection.admission.loadStatus === "unsupported" ? " (tidak didukung platform)" : ""} · ambang {launchRejection.admission.maxLoadPerCore}</div>
+        <div>Coba lagi setelah beban turun, atau pilih Mulai tetap untuk melewati cap dan pemeriksaan beban host.</div>
+      </div>}
       {/* SPEC-447 · ADR-0093 · daftar pemblokir DI DEPAN tombol: memaksa peluncuran itu sah, tapi
           operator harus melihat dulu apa yang ia lewati. Worktree sesi lahir `--detach` dari
           basisnya, jadi pekerjaan dependency yang belum ter-merge memang TAK ADA di dalamnya. */}
@@ -208,6 +229,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           <b>{blockers.map((b) => `${b.id} (${b.reason === "missing" ? "tak ditemukan"
             : b.reason === "unmerged" ? "belum ter-merge" : "belum selesai"})`).join(", ")}</b>.
           Sesi tetap bisa dimulai, tapi worktree-nya lahir dari basis yang belum memuat pekerjaan itu.
+          {" "}Mulai tetap juga melewati cap sesi dan pemeriksaan beban host.
         </div>
       )}
       {/* SPEC-338 · ADR-0074 · mesin sesi. Perilaku sesi identik (worktree, fase, stage, review);
@@ -743,6 +765,7 @@ function AppInner() {
   const [modal, setModal] = React.useState<string | null>(null);
   // SPEC-847 · ADR-0127 · konfirmasi destruktif memakai dialog aplikasi, bukan window.confirm.
   const { confirm, dialog } = useConfirm();
+  const launchAdmission = useLaunchAdmission();
   // SPEC-210 · prefill NewSpecModal saat "Take ke backlog" dari sebuah PRD.
   const [specPrefill, setSpecPrefill] = React.useState<SpecPrefill | null>(null);
   // SPEC-340 · ADR-0076 · eskalasi audit → PRD: modal brief PRD ter-prefill + asal auditnya.
@@ -1068,24 +1091,26 @@ function AppInner() {
 
   // SPEC-166 · Reverse docs: sesi interaktif menyusun Source of Truth dari kode. Fase
   // Wawancara hidup di layar Terminal — di sanalah manusia menjawab agen.
-  async function reverseDocs(p: ProjectVM) {
+  async function reverseDocs(p: ProjectVM, force?: true) {
     try {
-      const { id } = await api.reverseDocs(p.id);
+      const { id } = await (force ? api.reverseDocs(p.id, { force }) : api.reverseDocs(p.id));
       openTerminal(id);
       showToast(p.id + " · reverse docs · sesi " + id + " dimulai", "info", "radar");
     } catch (e) {
+      if (launchAdmission.offerRetry(e, `${p.id} · reverse docs`, (next) => reverseDocs(p, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast(p.id + " · gagal mulai reverse" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
     }
   }
 
   // SPEC-222 · Scaffold docs: sesi interaktif menyusun Source of Truth dari ide (from-scratch).
-  async function scaffoldDocs(p: ProjectVM) {
+  async function scaffoldDocs(p: ProjectVM, force?: true) {
     try {
-      const { id } = await api.scaffoldDocs(p.id);
+      const { id } = await (force ? api.scaffoldDocs(p.id, { force }) : api.scaffoldDocs(p.id));
       openTerminal(id);
       showToast(p.id + " · scaffold docs · sesi " + id + " dimulai", "info", "sparkles");
     } catch (e) {
+      if (launchAdmission.offerRetry(e, `${p.id} · scaffold docs`, (next) => scaffoldDocs(p, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast(p.id + " · gagal mulai scaffold" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
     }
@@ -1094,12 +1119,13 @@ function AppInner() {
   // SPEC-210 · buka sesi prd project-level (brainstorm interaktif → dokumen PRD), lalu ke Terminal.
   // SPEC-340 · ADR-0076 · opts terisi bila PRD ini eskalasi dari audit (branch audit + dokumennya).
   async function startPrd(project: string, brief: PrdBriefForm,
-                          opts?: { branchFrom?: string; fromAudit?: string }) {
+                          opts?: { branchFrom?: string; fromAudit?: string }, force?: true) {
     try {
-      const { id } = await api.startPrd(project, brief, opts);
+      const { id } = await api.startPrd(project, brief, force ? { ...opts, force } : opts);
       openTerminal(id);
       showToast(`PRD · sesi ${id} dimulai`, "info", "scroll-text");
     } catch (e) {
+      if (launchAdmission.offerRetry(e, `${project} · PRD`, (next) => startPrd(project, brief, opts, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast("gagal mulai PRD" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
     }
@@ -1107,12 +1133,13 @@ function AppInner() {
   // SPEC-210 · take PRD → backlog: prefill NewSpecModal (brief) dari PRD, buka modal-nya.
   function takeToBacklog(pf: PrdPrefill) { setSpecPrefill(pf); setModal("brief"); }
   // SPEC-273 · mulai sesi breakdown PRD (menulis manifest usulan backlog paralel-independen).
-  async function startBreakdown(project: string, prdPath: string) {
+  async function startBreakdown(project: string, prdPath: string, force?: true) {
     try {
-      const { id } = await api.startBreakdown(project, prdPath);
+      const { id } = await (force ? api.startBreakdown(project, prdPath, { force }) : api.startBreakdown(project, prdPath));
       openTerminal(id);
       showToast(`Breakdown · sesi ${id} dimulai`, "info", "split");
     } catch (e) {
+      if (launchAdmission.offerRetry(e, `${project} · breakdown`, (next) => startBreakdown(project, prdPath, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast("gagal mulai breakdown" + (noRepo ? " · project belum punya repoDir/PRD" : ""), "warn", "x-circle");
     }
@@ -1621,6 +1648,7 @@ function AppInner() {
             showToast((startSpec?.id ?? "") + " · gagal mulai sesi" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
           }} />
         {dialog}
+        {launchAdmission.dialog}
         <Toast toast={toast} />
       </NotificationsProvider>
     </AuthProvider>

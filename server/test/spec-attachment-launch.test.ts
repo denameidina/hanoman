@@ -31,6 +31,8 @@ vi.mock("../src/services/pty", async () => {
   return {
     sessionIdForSpec,
     getSession: () => undefined,
+    getSessionAsync: async () => undefined,
+    listPanesAsync: async () => [],
     killSession: () => {},
     createSession: (_projectId: string, _cwd: string, opts: { prompt?: string; attachmentsDir?: string }) => {
       created.push({ prompt: opts.prompt, attachmentsDir: opts.attachmentsDir });

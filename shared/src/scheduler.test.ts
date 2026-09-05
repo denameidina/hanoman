@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { zScheduler, SCHEDULER_DEFAULTS, zSetting } from "./entities";
 
 describe("zScheduler", () => {
-  it("all defaults are OFF", () => {
+  it("automation defaults are OFF", () => {
     expect(SCHEDULER_DEFAULTS.enabled).toBe(false);
     expect(SCHEDULER_DEFAULTS.paused).toBe(false);
     expect(SCHEDULER_DEFAULTS.maxConcurrent).toBe(2);
@@ -18,6 +18,24 @@ describe("zScheduler", () => {
   });
   it("rejects maxConcurrent < 1", () => {
     expect(zScheduler.safeParse({ maxConcurrent: 0 }).success).toBe(false);
+  });
+});
+
+describe("launch guard configuration (SPEC-1108)", () => {
+  it("protects old settings even when the scheduler and its sources are disabled", () => {
+    const required = { autoDefault: true, autoScaffold: true, notifyFail: true };
+    const old = zSetting.parse({ ...required, scheduler: { enabled: false, maxConcurrent: 6 } });
+    expect(old.scheduler.launchGuard).toEqual({ enabled: true, maxLoadPerCore: 2.5 });
+    expect(zSetting.parse(required).scheduler.launchGuard).toEqual({ enabled: true, maxLoadPerCore: 2.5 });
+  });
+
+  it.each([0, -1, Infinity, -Infinity, NaN])("rejects invalid load threshold %s", (maxLoadPerCore) => {
+    expect(zScheduler.safeParse({ launchGuard: { maxLoadPerCore } }).success).toBe(false);
+  });
+
+  it("preserves an explicit disable and a positive fractional threshold", () => {
+    expect(zScheduler.parse({ launchGuard: { enabled: false, maxLoadPerCore: 0.75 } }).launchGuard)
+      .toEqual({ enabled: false, maxLoadPerCore: 0.75 });
   });
 });
 

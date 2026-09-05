@@ -8,7 +8,7 @@ import { sweepCronDue } from "./cron";
 import { startCronSession, liveCronSession } from "./cron-session";
 import { reconcile as reconcileImpl, reconcileProdDeps } from "./reconcile";
 import { scanDecisions } from "../notifications";
-import { listSessions, getSession, sessionIdForSpec } from "../pty";
+import { listSessionsAsync, getSessionAsync, sessionIdForSpec } from "../pty";
 import { startSpecSession } from "../session-launch";
 import { blockersForSpec } from "../spec-deps";
 import { resolveRepoDir } from "../local-binding";
@@ -54,8 +54,8 @@ export async function tick(now: number, deps: GovernorDeps, end: EndOfSession = 
 
 // Deps produksi: cap dihitung dari sesi tmux hidup; launch lewat jalur bersama startSpecSession.
 export const prodDeps: GovernorDeps = {
-  liveCount: () => listSessions().filter((s) => !s.exited).length,
-  isLive: (specId) => { const s = getSession(sessionIdForSpec(specId)); return s && !s.exited ? s.id : null; },
+  liveCount: async () => (await listSessionsAsync()).filter((s) => !s.exited).length,
+  isLive: async (specId) => { const s = await getSessionAsync(sessionIdForSpec(specId)); return s && !s.exited ? s.id : null; },
   // SPEC-431 · dibaca ULANG dari DB tepat sebelum launch, bukan dari baris antrean: antrean tak
   // menyimpan stage, dan item bisa selesai selagi mengantre. Spec yang hilang bukan urusan gerbang
   // ini — `launch` di bawah yang melempar "spec tak ada" → item ditandai failed dengan alasannya.

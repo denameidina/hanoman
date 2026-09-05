@@ -12,6 +12,7 @@ import { integrateBranch } from "../services/integrate";
 import { sessionAgentDefaults, conflictSessionDefaults, terminalAgentDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { startSpecSession, LaunchError } from "../services/session-launch";
+import { withSessionAdmission, createAgentSession, createOperatorSession } from "../services/session-launch-gate";
 import { approveLaunch, launchPrincipal } from "../services/launch-authority";
 import { admitBrowserWs, openWsConnection, revalidateWsPrincipal, createPrincipalWatch, WsMessageGuard } from "../services/ws-admission";
 import { installCommand } from "../services/method-status";
@@ -27,7 +28,7 @@ import { recordSessionResult } from "../services/session-result";
 import { recordCompletion } from "../services/notifications";
 import { STAGES } from "../services/stage-machine";
 import {
-  createSession, getSession, listSessions, killSession, sessionPhases,
+  createSession, getSession, listSessions, listSessionsAsync, killSession, sessionPhases,
   attach, detach, writeTo, resize, shellBin, sendToPane, interruptPane, clearMarker, type Client,
 } from "../services/pty";
 import { saveSessionUpload } from "../services/uploads";
@@ -80,6 +81,11 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
   app.post("/terminal/sessions", async (req, reply) => {
     const parsed = zTerminalSession.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid body" });
+    // ADR-0161: kemampuan meluncurkan sesi tidak memberi otomasi hak mengabaikan gerbang host.
+    // Tolak sebelum approveLaunch agar request force agen tak meninggalkan persetujuan backlog.
+    if (req.agent && "force" in parsed.data && parsed.data.force) {
+      return reply.code(403).send({ error: "force hanya boleh digunakan manusia melalui dashboard" });
+    }
 
     // Sesi backlog item: `claude` interaktif di worktree-nya sendiri, dengan prompt awal yang
     // memuat objective dan pipeline fase-nya (SPEC-162). SPEC-294 · jalur peluncuran diseragamkan
@@ -144,10 +150,10 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         // tak dikenal berarti menjalankan perintah yang tak diminta siapa pun.
         const m = METHODS[inst.method];
         if (!m) return reply.code(400).send({ error: `metode "${inst.method}" tak dikenal` });
-        const s = createSession(project.id, repoDir, { command: installCommand(m, inst.agent) });
+        const s = await createOperatorSession(project.id, repoDir, { command: installCommand(m, inst.agent) });
         return reply.code(201).send({ id: s.id });
       }
-      const s = createSession(project.id, repoDir, { command: [shellBin()] });
+      const s = await createOperatorSession(project.id, repoDir, { command: [shellBin()] });
       return reply.code(201).send({ id: s.id });
     }
 
@@ -163,69 +169,66 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     // dari project-nya supaya Start kedua menyambung ke sesi yang sama (ADR-0015).
     if (parsed.data.flow === "reverse") {
       const id = `reverse-${project.id.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`;
-      // SPEC-394 · ADR-0084 · hanya pane HIDUP yang berarti "sesinya sudah jalan"; pane mati
-      // dilahirkan ulang (dibunuh di titik cekik `createSession`).
-      const live = getSession(id);
-      if (live && !live.exited) return reply.code(201).send({ id: live.id });
-
-      // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
-      // tak punya picker: ia mengikuti agen default global.
-      const { agent, model, effort } = await sessionAgentDefaults();
-      if (agent === "codex") ensureCodexTrust(repoDir);
-      const wt = `${repoDir}/.worktrees/${id}`;
-      let reused: boolean;
-      try {
-        // HEAD, bukan "main": repo target bukan milik hanoman — default branch-nya bebas.
-        reused = ensureWorktree(repoDir, wt, "HEAD");
-      } catch (e) {
-        return reply.code(422).send({ error: `gagal membuat worktree: ${(e as Error).message}` });
-      }
-      const s = createSession(project.id, wt, {
-        id, flow: "reverse", model, effort, agent,
-        phaseFile: phaseFilePath(repoDir, id),
-        decisionFile: decisionFilePath(repoDir, id),
-        prompt: startProjectPrompt("reverse", {
-          id: project.id, name: project.name, desc: project.desc, stack: project.stack,
-        }, "reverse-docs") + resumeNote(reused),
-      });
-      return reply.code(201).send({ id: s.id });
+      const result = await withSessionAdmission({ id, force: parsed.data.force }, async () => {
+        // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
+        // tak punya picker: ia mengikuti agen default global.
+        const { agent, model, effort } = await sessionAgentDefaults();
+        if (agent === "codex") ensureCodexTrust(repoDir);
+        const wt = `${repoDir}/.worktrees/${id}`;
+        let reused: boolean;
+        try {
+          // HEAD, bukan "main": repo target bukan milik hanoman — default branch-nya bebas.
+          reused = ensureWorktree(repoDir, wt, "HEAD");
+        } catch (e) {
+          return { code: 422, body: { error: `gagal membuat worktree: ${(e as Error).message}` } };
+        }
+        const s = createSession(project.id, wt, {
+          id, flow: "reverse", model, effort, agent,
+          phaseFile: phaseFilePath(repoDir, id),
+          decisionFile: decisionFilePath(repoDir, id),
+          prompt: startProjectPrompt("reverse", {
+            id: project.id, name: project.name, desc: project.desc, stack: project.stack,
+          }, "reverse-docs") + resumeNote(reused),
+        });
+        return { code: 201, body: { id: s.id } };
+      }, (pane) => ({ code: 201, body: { id: pane.id } }));
+      return reply.code(result.code).send(result.body);
     }
 
     // SPEC-222 · sesi scaffold project-level: dari ide → Source of Truth penuh. Id deterministik
     // dari project (Start kedua menyambung, ADR-0015). Cermin reverse; diseed dari project.desc.
     if (parsed.data.flow === "scaffold") {
       const id = `scaffold-${project.id.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`;
-      // SPEC-394 · ADR-0084 · pane mati bukan sesi — lihat cabang reverse di atas.
-      const live = getSession(id);
-      if (live && !live.exited) return reply.code(201).send({ id: live.id });
-
-      // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
-      // tak punya picker: ia mengikuti agen default global.
-      const { agent, model, effort } = await sessionAgentDefaults();
-      if (agent === "codex") ensureCodexTrust(repoDir);
-      const wt = `${repoDir}/.worktrees/${id}`;
-      let reused: boolean;
-      try {
-        // SPEC-223 · "project baru pasti kosongan": repoDir bisa BELUM ada di disk saat scaffold
-        // (project di-sync dari device lain, folder dipindah/hapus, atau init-saat-create tak jalan).
-        // initRepo idempoten (mkdir + git init + commit seed bila belum ada HEAD) — jaring pengaman
-        // agar scaffold dari ide tak pernah mati `spawnSync git ENOENT`. Scaffold ⟺ from-scratch,
-        // jadi memiliki lifecycle repo kosong memang tugasnya (bukan mengasumsikannya, ADR-0052).
-        // Tetap dipanggil lebih dulu walau worktree-nya dipakai ulang: ia idempoten.
-        realGit.initRepo(repoDir);
-        reused = ensureWorktree(repoDir, wt, "HEAD");
-      } catch (e) {
-        return reply.code(422).send({ error: `gagal membuat worktree: ${(e as Error).message}` });
-      }
-      const s = createSession(project.id, wt, {
-        id, flow: "scaffold", model, effort, agent,
-        phaseFile: phaseFilePath(repoDir, id),
-        decisionFile: decisionFilePath(repoDir, id),
-        prompt: startScaffoldPrompt(
-          { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
-          "scaffold-docs") + resumeNote(reused),
-      });
-      return reply.code(201).send({ id: s.id });
+      const result = await withSessionAdmission({ id, force: parsed.data.force }, async () => {
+        // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
+        // tak punya picker: ia mengikuti agen default global.
+        const { agent, model, effort } = await sessionAgentDefaults();
+        if (agent === "codex") ensureCodexTrust(repoDir);
+        const wt = `${repoDir}/.worktrees/${id}`;
+        let reused: boolean;
+        try {
+          // SPEC-223 · "project baru pasti kosongan": repoDir bisa BELUM ada di disk saat scaffold
+          // (project di-sync dari device lain, folder dipindah/hapus, atau init-saat-create tak jalan).
+          // initRepo idempoten (mkdir + git init + commit seed bila belum ada HEAD) — jaring pengaman
+          // agar scaffold dari ide tak pernah mati `spawnSync git ENOENT`. Scaffold ⟺ from-scratch,
+          // jadi memiliki lifecycle repo kosong memang tugasnya (bukan mengasumsikannya, ADR-0052).
+          // Tetap dipanggil lebih dulu walau worktree-nya dipakai ulang: ia idempoten.
+          realGit.initRepo(repoDir);
+          reused = ensureWorktree(repoDir, wt, "HEAD");
+        } catch (e) {
+          return { code: 422, body: { error: `gagal membuat worktree: ${(e as Error).message}` } };
+        }
+        const s = createSession(project.id, wt, {
+          id, flow: "scaffold", model, effort, agent,
+          phaseFile: phaseFilePath(repoDir, id),
+          decisionFile: decisionFilePath(repoDir, id),
+          prompt: startScaffoldPrompt(
+            { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
+            "scaffold-docs") + resumeNote(reused),
+        });
+        return { code: 201, body: { id: s.id } };
+      }, (pane) => ({ code: 201, body: { id: pane.id } }));
+      return reply.code(result.code).send(result.body);
     }
 
     // SPEC-210 · sesi prd project-level: PM menyusun dokumen PRD dari brief + brainstorm. Meniru
@@ -237,38 +240,37 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
       if (!slug) return reply.code(400).send({ error: "judul PRD kosong" });
       const id = `prd-${slug}`;
-      // SPEC-394 · ADR-0084 · pane mati bukan sesi — lihat cabang reverse di atas.
-      const live = getSession(id);
-      if (live && !live.exited) return reply.code(201).send({ id: live.id });
-
-      // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
-      // tak punya picker: ia mengikuti agen default global.
-      const { agent, model, effort } = await sessionAgentDefaults();
-      if (agent === "codex") ensureCodexTrust(repoDir);
-      const wt = `${repoDir}/.worktrees/${id}`;
-      let reused: boolean;
-      try {
-        // HEAD, bukan "main": repo target bukan milik hanoman — default branch-nya bebas.
-        // SPEC-340 · ADR-0076 · PRD hasil eskalasi audit lahir dari branch auditnya, supaya
-        // dokumen audit ada di worktree & jejak git PRD bersambung dengan auditnya.
-        reused = ensureWorktree(repoDir, wt, branchFrom ?? "HEAD");
-      } catch (e) {
-        return reply.code(422).send({ error: `gagal membuat worktree: ${(e as Error).message}` });
-      }
-      // SPEC-340 · isi dokumen audit (freshest-wins) disematkan ke prompt — prompt self-contained,
-      // lepas dari status merge branch audit. Dokumen tak terbaca → PRD tetap jalan tanpa blok itu.
-      const auditDoc = fromAudit ? await readAuditDoc(fromAudit) : null;
-      const s = createSession(project.id, wt, {
-        id, flow: "prd", branch: `prd/${slug}`, model, effort, agent,
-        phaseFile: phaseFilePath(repoDir, id),
-        decisionFile: decisionFilePath(repoDir, id),
-        prompt: startPrdPrompt(
-          { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
-          brief, `prd/${slug}`,
-          auditDoc ? { id: fromAudit!, path: auditDoc.path, content: auditDoc.content } : undefined)
-          + resumeNote(reused),
-      });
-      return reply.code(201).send({ id: s.id });
+      const result = await withSessionAdmission({ id, force: parsed.data.force }, async () => {
+        // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
+        // tak punya picker: ia mengikuti agen default global.
+        const { agent, model, effort } = await sessionAgentDefaults();
+        if (agent === "codex") ensureCodexTrust(repoDir);
+        const wt = `${repoDir}/.worktrees/${id}`;
+        let reused: boolean;
+        try {
+          // HEAD, bukan "main": repo target bukan milik hanoman — default branch-nya bebas.
+          // SPEC-340 · ADR-0076 · PRD hasil eskalasi audit lahir dari branch auditnya, supaya
+          // dokumen audit ada di worktree & jejak git PRD bersambung dengan auditnya.
+          reused = ensureWorktree(repoDir, wt, branchFrom ?? "HEAD");
+        } catch (e) {
+          return { code: 422, body: { error: `gagal membuat worktree: ${(e as Error).message}` } };
+        }
+        // SPEC-340 · isi dokumen audit (freshest-wins) disematkan ke prompt — prompt self-contained,
+        // lepas dari status merge branch audit. Dokumen tak terbaca → PRD tetap jalan tanpa blok itu.
+        const auditDoc = fromAudit ? await readAuditDoc(fromAudit) : null;
+        const s = createSession(project.id, wt, {
+          id, flow: "prd", branch: `prd/${slug}`, model, effort, agent,
+          phaseFile: phaseFilePath(repoDir, id),
+          decisionFile: decisionFilePath(repoDir, id),
+          prompt: startPrdPrompt(
+            { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
+            brief, `prd/${slug}`,
+            auditDoc ? { id: fromAudit!, path: auditDoc.path, content: auditDoc.content } : undefined)
+            + resumeNote(reused),
+        });
+        return { code: 201, body: { id: s.id } };
+      }, (pane) => ({ code: 201, body: { id: pane.id } }));
+      return reply.code(result.code).send(result.body);
     }
 
     // SPEC-273 · sesi breakdown project-level: pecah SATU PRD → manifest N backlog paralel-independen.
@@ -276,38 +278,38 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     // Isi PRD disematkan ke prompt (freshest-wins), jadi breakdown lepas dari status merge PRD.
     if (parsed.data.flow === "breakdown") {
       const { prdPath } = parsed.data;
-      const content = await readPrd(project.id, prdPath); // gate: hanya docs/prd/*.md, freshest-wins
-      if (content === null) return reply.code(400).send({ error: "PRD tak terbaca" });
       const base = prdPath.slice(prdPath.lastIndexOf("/") + 1).replace(/\.md$/, "");
       const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
       if (!slug) return reply.code(400).send({ error: "path PRD tak valid" });
       const id = `breakdown-${slug}`;
-      // SPEC-394 · ADR-0084 · pane mati bukan sesi — lihat cabang reverse di atas.
-      const live = getSession(id);
-      if (live && !live.exited) return reply.code(201).send({ id: live.id });
+      const result = await withSessionAdmission({ id, force: parsed.data.force }, async () => {
+        const content = await readPrd(project.id, prdPath, await listSessionsAsync());
+        if (content === null) return { code: 400, body: { error: "PRD tak terbaca" } };
 
-      // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
-      // tak punya picker: ia mengikuti agen default global.
-      const { agent, model, effort } = await sessionAgentDefaults();
-      if (agent === "codex") ensureCodexTrust(repoDir);
-      const wt = `${repoDir}/.worktrees/${id}`;
-      let reused: boolean;
-      try {
-        reused = ensureWorktree(repoDir, wt, "HEAD");
-      } catch (e) {
-        return reply.code(422).send({ error: `gagal membuat worktree: ${(e as Error).message}` });
-      }
-      const titleM = content.match(/^#\s+(.+)$/m);
-      const title = titleM ? titleM[1]!.trim() : slug;
-      const s = createSession(project.id, wt, {
-        id, flow: "breakdown", branch: `breakdown/${slug}`, model, effort, agent,
-        phaseFile: phaseFilePath(repoDir, id),
-        decisionFile: decisionFilePath(repoDir, id),
-        prompt: startBreakdownPrompt(
-          { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
-          { title, path: prdPath, content }, `breakdown/${slug}`) + resumeNote(reused),
-      });
-      return reply.code(201).send({ id: s.id });
+        // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
+        // tak punya picker: ia mengikuti agen default global.
+        const { agent, model, effort } = await sessionAgentDefaults();
+        if (agent === "codex") ensureCodexTrust(repoDir);
+        const wt = `${repoDir}/.worktrees/${id}`;
+        let reused: boolean;
+        try {
+          reused = ensureWorktree(repoDir, wt, "HEAD");
+        } catch (e) {
+          return { code: 422, body: { error: `gagal membuat worktree: ${(e as Error).message}` } };
+        }
+        const titleM = content.match(/^#\s+(.+)$/m);
+        const title = titleM ? titleM[1]!.trim() : slug;
+        const s = createSession(project.id, wt, {
+          id, flow: "breakdown", branch: `breakdown/${slug}`, model, effort, agent,
+          phaseFile: phaseFilePath(repoDir, id),
+          decisionFile: decisionFilePath(repoDir, id),
+          prompt: startBreakdownPrompt(
+            { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
+            { title, path: prdPath, content }, `breakdown/${slug}`) + resumeNote(reused),
+        });
+        return { code: 201, body: { id: s.id } };
+      }, (pane) => ({ code: 201, body: { id: pane.id } }));
+      return reply.code(result.code).send(result.body);
     }
 
     // SPEC-338 · ADR-0074 · terminal agen biasa (bukan shell mentah) ikut agen default global,
@@ -319,7 +321,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     // `Setting.agent`, dan membaca yang salah membuat sesi mentok di layar trust codex (SPEC-377).
     const { agent, model, effort } = await terminalAgentDefaults(parsed.data);
     if (agent === "codex") ensureCodexTrust(repoDir);
-    const s = createSession(project.id, repoDir, { agent, model, effort });
+    const s = await createOperatorSession(project.id, repoDir, { agent, model, effort });
     return reply.code(201).send({ id: s.id });
   });
 
@@ -466,7 +468,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       CODE_STYLE_CLAUSE,
       `Sesi PRD ${s.id}.`,
     ].join("\n\n");
-    const cs = createSession(s.projectId, r.worktree, {
+    const cs = await createAgentSession(s.projectId, r.worktree, {
       id: `merge-${id.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`,
       model, effort, agent, prompt,
     });

@@ -1050,9 +1050,22 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #       tersentuh). `force: true` MELEWATI gerbang ini: hanya jalur manusia yang memilikinya;
 #       governor scheduler & denyut lead tak punya jalan paksa (governor melewati item terblokir,
 #       barisnya tetap `queued` + `note`, slot tak terpakai).
+#     SPEC-1108 / ADR-0161: 409 { error, kind:"capacity"|"host-load", admission:{enabled,
+#       liveCount,liveAgentCount,maxConcurrent,loadPerCore,maxLoadPerCore,loadStatus} } bila
+#       cap penuh atau load/core > ambang. liveCount SEMUA pane hidup; liveAgentCount agen
+#       terstruktur. Pane exited tidak dihitung. loadStatus available|unsupported|unavailable,
+#       loadPerCore null bila metrik tidak tersedia (Windows unsupported, bukan nol).
+#       Gerbang tetap aktif saat scheduler/source mati; re-attach tetap lulus. Force manual
+#       menembus dependency, cap, dan load; approval tetap wajib. UI menampilkan angka lalu
+#       menawarkan Mulai tetap. Bearer AgentToken dengan force:true ditolak 403 sebelum
+#       stempel approval atau persiapan; force hanya untuk operator cookie. Tidak ada antrean manual kedua.
+#       Kebijakan yang sama menggerbangi reverse/scaffold/prd/breakdown (menerima force?),
+#       cron, agen konflik, hardening VPS, dan Telegram. Terminal biasa (termasuk agen TUI
+#       tanpa flow), shell, dan konsol SSH bebas penolakan, tetap mengurangi slot.
+#       Penolakan spawn agen konflik mempertahankan worktree Git yang sudah berkonflik.
 #     403 { error:"launch approval required" } bila Spec belum punya approval LOCAL-only. Gerbang
 #       final berada di `startSpecSession` sebelum kill/worktree/tmux, jadi semua jalur scheduler,
-#       governor, lead, cron, dan route manual tunduk pada pemeriksaan yang sama. Start manual oleh
+#       governor, lead, dan route backlog manual tunduk pada pemeriksaan yang sama. Start manual oleh
 #       cookie admin atau AgentToken `sessions:write` memberi approval atomik terlebih dahulu.
 #     verifyScope?: "changed"|"full" — scope verifikasi PER SESI; kosong → Setting.verifyScope
 #       (default "changed"). "changed" menyisipkan klausa scope ke prompt (uji berkas yang berubah
@@ -1671,11 +1684,15 @@ DELETE /api/tasks/:id/escalate   -> 200 TaskView (specId: null)
 
 ## Scheduler (SPEC-294 · ADR-0072) — LOCAL per-instance
 ```
-# Fondasi scheduler otonom (di belakang gate cookie; agent-token → domain `settings`). Semua default MATI.
-GET  /api/scheduler/config   -> Scheduler (zScheduler: enabled, paused, maxConcurrent, autonomy, sources.{backlog,triase})
+# Fondasi scheduler otonom (cookie; agent-token → domain settings). Otomasi default mati, launchGuard default aktif.
+GET  /api/scheduler/config   -> Scheduler (zScheduler: enabled, paused, maxConcurrent, launchGuard, autonomy, sources.{backlog,triase})
 PUT  /api/scheduler/config   { Scheduler }  -> Scheduler   # ganti blok penuh (pola PUT /settings). Pause = { paused:true }. 400 invalid.
 GET  /api/scheduler/state    -> { config, cap, liveCount, sources:[{id,enabled,everyMin,minCount?,lastRunAt,nextRunAt}],
-#                                  queueCounts:{queued,launched,done,failed,canceled}, sessions:[sesi live ber-item 'launched'] }
+#                                  queueCounts:{queued,launched,done,failed,canceled}, sessions:[sesi live ber-item 'launched'],
+#                                  admission:{enabled,liveCount,liveAgentCount,maxConcurrent,loadPerCore,maxLoadPerCore,loadStatus} }
+# SPEC-1108: launchGuard={enabled:true,maxLoadPerCore:2.5}, angka finite positif. Baris lama diisi default.
+# Switch baru mematikan kedua check peluncuran; batching governor tetap memakai maxConcurrent.
+# State admission juga dikirim melalui topik schedulerState; metrik Windows null/unsupported.
 # SPEC-523 · ADR-0107 · `queue` DICABUT dari state (daftar tanpa batas); state membawa hitungannya saja.
 GET  /api/scheduler/queue    ?status=queued|launched|done|failed|canceled&page&limit
 #                            -> Paginated<SchedulerQueueItemView>   # { items, total, page, pageSize }
@@ -1687,10 +1704,16 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 > Engine in-process (di-start dari `server.ts`, timer `.unref`; `app.ts` bebas-timer — **membalik sebagian
 > ADR-0024**): per source enable+cadence → checker terdaftar (`registerSchedulerSource`) enqueue kandidat;
 > governor drain antrean durable (`SchedulerQueueItem`, `specId @unique` idempoten) di bawah
-> `cap=maxConcurrent` (dihitung dari `pty.listSessions`), urut prioritas, tahan saat cap penuh; **Pause**
+> `cap=maxConcurrent` (pane hidup dibaca asinkron dari tmux), urut prioritas, tahan saat cap penuh; **Pause**
 > blokir drain ≤1 tick. Peluncuran lewat `startSpecSession` (jalur bersama Start manual); `flow` diturunkan
 > `flowForSource(spec.source)` server-side. **Opt-in per project:** `PATCH /api/projects/:id { schedulerOptIn }`
 > (lokal — tak masuk `FIELDS` sync). Semua knob & state **LOCAL per-instance** (tak disync).
+>
+> **Gerbang bersama (SPEC-1108 / ADR-0161):** check→spawn diserialkan satu proses di
+> session-admission; startSpecSession tetap pintu backlog manual/scheduler/lead. Cap dan
+> load berlaku meski otomasi mati. Penolakan sementara menyimpan note pada item antrean
+> spec/cron yang sudah ada dan membiarkannya queued untuk tick berikutnya. Otomasi tidak
+> mengirim force. Snapshot status mengekspos load yang tidak tersedia secara eksplisit.
 >
 > **Source-checker konkret pertama (SPEC-295):** `backlog` — saat cadence backlog jatuh-tempo, meng-enqueue
 > semua `Spec` belum-mulai (`baseSha===null`) dari project `schedulerOptIn` urut prioritas `tinggi→sedang→rendah`

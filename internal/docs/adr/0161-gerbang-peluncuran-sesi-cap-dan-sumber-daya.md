@@ -148,10 +148,47 @@ tanpa memodelkan sebabnya.
 - Gerbang ini **tidak** menyembuhkan sesi yang sudah terlanjur jalan. Ia mencegah yang ke-N lahir,
   bukan menghentikan yang ke-1..N-1.
 
+## Amandemen implementasi SPEC-1108 (2026-09-05, disetujui operator)
+
+Audit kode menemukan bahwa cron, workflow project, agen konflik, hardening VPS, dan gateway
+Telegram tidak melewati `startSpecSession()`. Cakupan diperluas atas persetujuan operator:
+semua agen terstruktur memakai satu kebijakan `session-admission`, melalui wrapper launcher
+asinkron; `startSpecSession()` tetap pintu bersama backlog manual, scheduler, dan lead.
+Tidak ada aritmetika gerbang di route. Terminal biasa (termasuk TUI agen tanpa pekerjaan
+terstruktur), shell, dan konsol SSH VPS tetap bebas penolakan dan tetap dihitung dalam cap.
+
+Check→spawn diserialkan dalam satu proses server; kelahiran terminal yang dikecualikan
+juga memakai mutex yang sama tanpa check cap/load. Ini mutex peluncuran sementara, bukan
+antrean kerja manual kedua; tidak ada item durable, retry otomatis manual, atau registry
+sesi DB. Re-attach diperiksa sebelum gerbang, dan pembacaan tmux gagal tidak dianggap nol.
+Metadata `launchClass` agent/terminal disimpan di pane tmux saat lahir untuk angka penolakan;
+pane lama diklasifikasi dari spec/flow/cwd/project yang sudah tersedia. Cap selalu memakai
+semua pane hidup, sehingga klasifikasi lama tidak dapat melonggarkan cap.
+
+`Setting.scheduler.launchGuard = { enabled: true, maxLoadPerCore: 2.5 }`. Default 2,5
+disetujui sebagai nilai awal: sekitar 51% di atas titik sehat 1,66 dan 33% di bawah
+titik 3,75 menuju panic; belum terkalibrasi lintas host. `enabled` mematikan kedua
+gerbang baru secara eksplisit; batching governor tetap memakai `maxConcurrent`. Scheduler
+atau source mati tidak mematikan gerbang. Load ditolak hanya bila **lebih besar** dari ambang.
+
+Penolakan 409 membawa `kind: capacity|host-load` dan `admission` berisi `enabled`,
+`liveCount` (semua pane hidup), `liveAgentCount` (agen terstruktur), `maxConcurrent`,
+`loadPerCore`, `maxLoadPerCore`, `loadStatus: available|unsupported|unavailable`. Windows
+memakai null + unsupported; data invalid memakai null + unavailable, sehingga tidak
+terlihat aktif dengan angka nol. Status yang sama tersedia di state scheduler.
+`force` milik tindakan manusia; Bearer AgentToken yang mengirim force:true ditolak 403
+sebelum lookup/approval/spawn. Otomasi tidak memasoknya. Penolakan sementara pada
+governor menahan item di antrean yang sudah ada beserta alasannya, bukan menutup failed.
+
+Untuk konflik, operasi Git yang diminta manusia sudah terjadi sebelum diketahui bahwa
+agen pemulih dibutuhkan. Gerbang menolak **spawn agen**, mempertahankan worktree konflik
+untuk pemulihan manual, dan tidak mencoba membatalkan Git atau menghapus kerja operator.
+Gerbang backlog/project/cron tetap berdiri sebelum kill/worktree.
+
 ## Yang TIDAK diputuskan di sini
 
-- **Angka ambang default.** Butuh kalibrasi di lebih dari satu host. Dua titik data yang ada baru
-  3,75/core (menuju panic) dan 1,66/core (sehat); keduanya dari mesin yang sama.
+- **Kalibrasi lintas host.** Default awal 2,5 ditetapkan amandemen di atas; pengukuran
+  lebih luas tetap diperlukan untuk mengevaluasinya.
 - **Apakah sesi yang sedang berjalan boleh dihentikan otomatis saat host sesak.** Itu mencabut kerja
   yang sedang berlangsung dan menabrak "manusia terakhir yang memutuskan" jauh lebih keras daripada
   menolak peluncuran. Perlu ADR sendiri bila kelak dibutuhkan.

@@ -281,13 +281,15 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
 - `agentAccessEnabled` (SPEC-257/[ADR-0065](../adr/0065-ai-agent-capability-agent-token.md), Boolean, default **false**) —
   **master switch** akses AI agent. `false` → semua `AgentToken` ditolak (401), apa pun `enabled`/capability-nya.
 - `scheduler` (SPEC-294/[ADR-0072](../adr/0072-scheduler-fondasi-engine-antrean-durable-cap.md), `zScheduler`,
-  **semua default MATI**) — knob scheduler otonom: `enabled` (master), `paused` (rem darurat Pause),
+  **otomasi default MATI, launchGuard default aktif**) — knob scheduler otonom: `enabled` (master), `paused` (rem darurat Pause),
   `maxConcurrent` (cap sesi hidup — **penerus `maxConcurrent` yang dicabut ADR-0024**), `autonomy`
   (`full-control|butuh-keputusan`, **dikonsumsi SPEC-298**: governor menyuntik klausa prompt per mode saat
   meluncurkan sesi scheduler — `full-control` = putuskan sendiri & tembus sampai `done` tanpa berhenti
   bertanya; `butuh-keputusan` = berhenti di titik keputusan → marker SPEC-184 → notif decision, slot tetap
-  terpakai), dan `sources.{backlog,errors,triase}`
-  (`enabled`+`everyMin` per source; `errors.minCount`). Ditambahkan sebagai `.default(SCHEDULER_DEFAULTS)`
+  terpakai), `launchGuard` (SPEC-1108/[ADR-0161](../adr/0161-gerbang-peluncuran-sesi-cap-dan-sumber-daya.md):
+  `{enabled:true,maxLoadPerCore:2.5}`, positif finite; switch mematikan check cap/load baru,
+  tidak menghapus batching governor), dan `sources.{backlog,triase}`
+  (`enabled`+`everyMin` per source). Ditambahkan sebagai `.default(SCHEDULER_DEFAULTS)`
   → baris Setting lama tetap parse (blok hilang diisi default).
 
 - `goal` (SPEC-332/[ADR-0073](../adr/0073-mode-goal-stop-hook-per-sesi.md), `zGoal`, **default MATI**) —

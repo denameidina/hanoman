@@ -24,8 +24,8 @@ const line = (over: Record<string, string> = {}) => {
 
 describe("parsePanes", () => {
   it("FMT dan destructuring sama panjang", () => {
-    expect(FIELDS).toHaveLength(16);
-    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_agent_roster}");
+    expect(FIELDS).toHaveLength(17);
+    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_launch_class}");
   });
 
   it("memetakan setiap kolom ke field yang benar", () => {
@@ -36,6 +36,12 @@ describe("parsePanes", () => {
       activityAt: 1756000000, eventHook: true, startedAt: 1755999000,
       agentRoster: [{ id: "global:scout", name: "scout", model: "haiku" }],
     });
+  });
+
+  it("membaca kelas launch dari tmux, dan membiarkan pane lama tanpa kelas", () => {
+    expect(parsePanes(line({ "#{@hanoman_launch_class}": "terminal" }))[0]!.launchClass).toBe("terminal");
+    expect(parsePanes(line({ "#{@hanoman_launch_class}": "agent" }))[0]!.launchClass).toBe("agent");
+    expect(parsePanes(line())[0]!.launchClass).toBeUndefined();
   });
 
   it("startedAt 0 saat tmux tak menjawab field itu", () => {
@@ -49,7 +55,7 @@ describe("parsePanes", () => {
      `.catch(() => [])` di view dan `catch { return; }` di sender, jadi presence mati SENYAP. */
   it("baris terpotong (kolom tak ada sama sekali) tetap memberi startedAt 0, bukan NaN", () => {
     const potong = (n: number) => line().split("\t").slice(0, n).join("\t");
-    const [p] = parsePanes(potong(FIELDS.length - 2));
+    const [p] = parsePanes(potong(14));
     expect(p!.startedAt).toBe(0);
     expect(Number.isNaN(p!.startedAt)).toBe(false);
     expect(() => new Date(p!.startedAt * 1000).toISOString()).not.toThrow();
