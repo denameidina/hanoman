@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  BUILTIN_AGENTS, BUILTIN_AGENT_NAMES, AGENT_NAME_RE, DEFAULT_AGENT_TOOLS, zSetting,
+  BUILTIN_AGENTS, BUILTIN_AGENT_NAMES, AGENT_NAME_RE, DEFAULT_AGENT_TOOLS, zSetting, zCreateCustomAgent, effortsForRuntimeModel, modelsForRuntime,
 } from "../src";
 
 // SPEC-881 · ADR-0136 · kontrak katalog agen bawaan. Seed menulis LANGSUNG lewat Prisma dan
@@ -9,11 +9,43 @@ import {
 // tak ada, ia tak ditegakkan sama sekali.
 
 describe("katalog agen bawaan", () => {
-  it("berisi delapan entri bernama unik", () => {
-    expect(BUILTIN_AGENTS).toHaveLength(8);
+  it("berisi enam belas entri bernama unik", () => {
+    expect(BUILTIN_AGENTS).toHaveLength(16);
     const names = BUILTIN_AGENTS.map((a) => a.name);
-    expect(new Set(names).size).toBe(8);
+    expect(new Set(names).size).toBe(16);
     expect(BUILTIN_AGENT_NAMES).toEqual(names);
+  });
+
+  it("delapan profile aplikasi opt-in valid untuk runtime dan model rekomendasinya", () => {
+    const expected = {
+      "product-designer": ["isolated-worktree", "medium"],
+      "feature-builder": ["isolated-worktree", "medium"],
+      "performance-engineer": ["isolated-worktree", "high"],
+      "product-analyst": ["read-only", "medium"],
+      "solution-architect": ["read-only", "high"],
+      "operations-engineer": ["isolated-worktree", "medium"],
+      "support-triager": ["read-only", "medium"],
+      "knowledge-maintainer": ["isolated-worktree", "medium"],
+    };
+    for (const [name, [policy, effort]] of Object.entries(expected)) {
+      const a = BUILTIN_AGENTS.find((entry) => entry.name === name);
+      expect(a, name).toBeDefined();
+      if (!a) continue;
+      expect(a).toMatchObject({ workspacePolicy: policy, effort, enabledByDefault: false,
+        activation: "smart", timeoutSeconds: null, maxTurns: policy === "read-only" ? 30 : 40,
+        models: { claude: "sonnet", codex: "gpt-5.6-terra" } });
+      expect(zCreateCustomAgent.safeParse({ ...a, model: null, mentions: [],
+        runtime: policy === "isolated-worktree" ? "claude" : null }).success).toBe(true);
+      for (const runtime of ["claude", "codex"] as const) {
+        // Claude accepts the native sonnet alias; the shared dropdown lists full IDs.
+        if (runtime === "codex") expect(modelsForRuntime(runtime).map((m) => m.id)).toContain(a.models[runtime]);
+        expect(effortsForRuntimeModel(runtime, a.models[runtime])).toContain(a.effort);
+      }
+      expect(a.tools).not.toContain("Task");
+      if (policy === "read-only") {
+        expect(a.tools).toEqual(["Read", "Glob", "Grep", "WebFetch", "WebSearch"]);
+      }
+    }
   });
 
   it("setiap nama lolos AGENT_NAME_RE", () => {
@@ -70,11 +102,53 @@ describe("katalog agen bawaan", () => {
     expect(security.effort).toBe("high");
   });
 
+  it("memberi batas turn operasional per kelompok builtin", () => {
+    const limits = Object.fromEntries(BUILTIN_AGENTS.map((a) => [a.name, a.maxTurns]));
+    expect(limits).toEqual({
+      scout: 20,
+      "root-causer": 40,
+      "qa-verifier": 40,
+      "edge-case-hunter": 40,
+      "blast-radius": 30,
+      "spec-auditor": 30,
+      "security-reviewer": 30,
+      "dep-auditor": 30,
+      "product-designer": 40,
+      "feature-builder": 40,
+      "performance-engineer": 40,
+      "product-analyst": 30,
+      "solution-architect": 30,
+      "operations-engineer": 40,
+      "support-triager": 30,
+      "knowledge-maintainer": 40,
+    });
+  });
+
+  it("memperbaiki aturan bukti yang terlalu absolut dan audit supply-chain", () => {
+    const instructions = (name: string) => BUILTIN_AGENTS.find((a) => a.name === name)!.instructions;
+    expect(instructions("qa-verifier")).toContain("test preservasi");
+    expect(instructions("edge-case-hunter")).toContain("langsung hijau");
+    expect(instructions("edge-case-hunter")).toContain("negative control");
+    expect(instructions("blast-radius")).toContain("dampak");
+    expect(instructions("blast-radius")).toContain("keyakinan");
+    expect(instructions("spec-auditor")).toContain("sudah terpenuhi di base");
+    expect(instructions("spec-auditor")).toContain("keadaan akhir");
+    expect(instructions("security-reviewer")).toContain("belum dapat disimpulkan");
+    expect(instructions("security-reviewer")).toContain("scope yang diperiksa");
+    expect(instructions("dep-auditor")).toContain("versi terkunci");
+    expect(instructions("dep-auditor")).toContain("tanggal pemeriksaan");
+    expect(instructions("dep-auditor")).toContain("sumber primer");
+    expect(instructions("dep-auditor")).toContain("ekuivalen secara fungsi");
+    expect(instructions("dep-auditor")).toContain("belum terverifikasi");
+  });
+
   // Berkas ini ikut dibundel untuk browser. `node:crypto` di sini mematikan build web, dan
   // gejalanya muncul jauh dari sini.
   it("tabelnya data murni — tanpa impor node:*", () => {
-    const src = readFileSync(new URL("../src/builtin-agents.ts", import.meta.url), "utf8");
-    expect(src).not.toMatch(/from "node:/);
+    for (const file of ["builtin-agents.ts", "builtin-app-agents.ts"]) {
+      const src = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8");
+      expect(src).not.toMatch(/from "node:/);
+    }
   });
 });
 

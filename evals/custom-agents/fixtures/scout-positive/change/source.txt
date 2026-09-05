@@ -1,5 +1,1 @@
-packages/shared/source.txt
-export type UserPayload = { id: string; name: string; locale: string };
-
-packages/web/source.txt
-type AccountWire = { id: string; name: string };
+Payload declarations live in packages/shared/source.txt and packages/web/source.txt.

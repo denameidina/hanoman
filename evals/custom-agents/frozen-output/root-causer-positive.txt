@@ -1,1 +1,25 @@
-Dua hipotesis bersaing: config hilang atau operator fallback || menelan nol. Eksperimen membandingkan TTL=0 dengan env unset: keduanya 60 pada kode baru, sedangkan base mempertahankan nol. Config hilang terbantah; akar terbukti adalah || yang memperlakukan 0 sebagai falsy.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "zero-lost-by-or-static",
+      "status": "confirmed",
+      "claim": "zero-lost-by-or-static",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 1,
+          "quote": "export const ttl = Number(process.env.CACHE_TTL) || 60;"
+        },
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 2,
+          "quote": "observed: CACHE_TTL=0 produces ttl=60; unset also produces ttl=60."
+        }
+      ]
+    }
+  ]
+}

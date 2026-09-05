@@ -10,6 +10,7 @@ const zQuery = z.object({
 const zPatch = z.object({
   disposition: z.enum(["accepted", "partial", "rejected", "false-positive"]),
   note: z.string().max(500).nullable().optional(),
+  reworkRequired: z.boolean().nullable().optional(),
 }).strict();
 
 export default async function (app: FastifyInstance) {
@@ -26,7 +27,9 @@ export default async function (app: FastifyInstance) {
     const body = zPatch.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message });
     const id = String((req.params as { id?: string }).id ?? "");
-    const view = await updateAgentInvocationDisposition(id, body.data.disposition, body.data.note);
+    const view = await updateAgentInvocationDisposition(
+      id, body.data.disposition, body.data.note, body.data.reworkRequired,
+    );
     return view ?? reply.code(404).send({ error: "invocation tidak ditemukan" });
   });
 }

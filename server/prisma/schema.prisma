@@ -506,6 +506,7 @@ model AgentInvocation {
   customAgentId       String?
   agentName           String
   model               String?
+  definitionHash      String?
   status              String
   startedAt           DateTime
   endedAt             DateTime?
@@ -519,6 +520,7 @@ model AgentInvocation {
   disposition         String    @default("pending")
   dispositionNote     String?
   evaluatedAt         DateTime?
+  reworkRequired      Boolean?
 
   @@unique([sessionId, runtimeInvocationId])
   @@index([agentName, startedAt])

@@ -799,7 +799,7 @@ semua project); terisi = milik satu project, dan agen project **menimpa** agen g
 | `model` | `String?` | `null` = warisi model sesi. |
 | `mentions` | `Json?` | Array nama agen yang boleh dipanggil. `null`/`[]` = daun. |
 | `runtime` | `String?` | **SPEC-484 · [ADR-0101](../adr/0101-form-custom-agent-katalog-runtime.md)** · penyaring mesin sesi. `null` = **ikut sesi induk** (dipakai sesi claude **dan** codex — perilaku ADR-0094 apa adanya, jadi baris lama tak perlu backfill); `"claude"`/`"codex"` = hanya dimaterialisasi di sesi mesin itu. Nilai asing dari sync dibaca sebagai `null`. Ikut `FIELDS.customAgent`. |
-| `activation` | `String` | **SPEC-950 · [ADR-0159](../adr/0159-custom-agent-native-terukur-terisolasi.md)** · `always` atau `smart`; default legacy `always`. Builtin smart dipilih dari flow/prompt/diff saat sesi lahir. |
+| `activation` | `String` | **SPEC-950 · [ADR-0159](../adr/0159-custom-agent-native-terukur-terisolasi.md)** · `always` atau `smart`; default legacy `always`. Seluruh enabled yang kompatibel masuk registry; smart mengarahkan delegasi berdasarkan pekerjaan/fase/diff terkini (amandemen 2026-09-05). |
 | `effort` | `String?` | Override reasoning effort child dari katalog `ultra|max|xhigh|high|medium|low|ultracode`; null = warisi/rekomendasi runtime. Kombinasi sah divalidasi terhadap runtime+model efektif; warisan ambigu memakai irisan aman. |
 | `workspacePolicy` | `String` | `inherit` · `read-only` · `isolated-worktree`; default legacy `inherit`. Isolasi child hanya tersedia untuk Claude. |
 | `maxTurns` | `Int?` | Null atau 1–200; dipancarkan hanya saat runtime mendukung. |
@@ -846,12 +846,16 @@ dipangkas dan `CustomAgent` dapat dihapus, tetapi evidence historis tetap perlu 
 | `sessionId` · `projectId` · `specId?` | Snapshot konteks parent; tidak ber-FK. |
 | `runtime` · `runtimeInvocationId` | Identitas event runtime; unique `(sessionId,runtimeInvocationId)` membuat lifecycle idempoten. |
 | `customAgentId?` · `agentName` · `model?` | Soft-link dan snapshot identitas child. |
+| `definitionHash?` | SHA-256 prompt/profile efektif saat registry lahir, diteruskan dari roster trusted; null berarti versi historis tidak diketahui. Start pertama tetap menang. |
 | `status` | `running|completed|interrupted|abandoned`. Boot menutup orphan running sebagai abandoned. |
 | `startedAt` · `endedAt?` · `durationMs?` | Stop sintetis sesudah restart memakai `startedAt=endedAt` dan `durationMs=null`, bukan nol palsu. |
 | `inputTokens?` · `outputTokens?` · `cachedTokens?` | Hanya nilai yang dapat dibaca dari transcript allowlisted; bentuk asing tetap null. |
 | `resultExcerpt?` · `resultHash?` | Excerpt tanpa ANSI, maksimum 4 KiB UTF-8; SHA-256 hasil bersih penuh. |
 | `workspaceChanged` | Perbandingan hash `git status --porcelain=v1 -z` start/stop; bukan attribution eksklusif. |
 | `disposition` · `dispositionNote?` · `evaluatedAt?` | `pending|accepted|partial|rejected|false-positive`, keputusan admin manusia. |
+
+`reworkRequired` (Boolean nullable) adalah penilaian admin apakah hasil perlu kerja ulang parent;
+null berarti belum dinilai, independen dari disposition. Kedua kolom baru ini LOCAL-only.
 
 Tabel ini **tidak masuk** `SYNCED`, `FIELDS`, `PG_ORDER`, atau migration Postgres legacy. Transcript
 path tidak disimpan; parser hanya membaca berkas biasa di root runtime yang diizinkan dan <10 MiB.

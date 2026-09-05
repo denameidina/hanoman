@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "preservation-test-valid",
+      "status": "confirmed",
+      "claim": "preservation-test-valid",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "app.cjs",
+          "line": 1,
+          "quote": "exports.normalizeEmail = (value) => value.trim().toLowerCase();"
+        },
+        {
+          "revision": "candidate",
+          "path": "cases.json",
+          "line": 3,
+          "quote": "    \"input\": \"a@b.com\","
+        },
+        {
+          "revision": "base",
+          "path": "app.cjs",
+          "line": 1,
+          "quote": "exports.normalizeEmail = (value) => value.toLowerCase();"
+        }
+      ],
+      "command": {
+        "cwd": ".",
+        "artifact": "cases.json",
+        "baseExit": 0,
+        "candidateExit": 0,
+        "mutantExit": 1
+      }
+    }
+  ]
+}

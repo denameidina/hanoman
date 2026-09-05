@@ -32,16 +32,82 @@ const liveMentions = (def: AgentDef, roster: AgentDef[]): string[] => {
  * (lapis 1) dan ketiadaan `Task` (lapis 2). Ia ada karena SPEC-432 sudah mengukur harganya: agen
  * berbatas yang TAK diberi tahu batasnya membakar seluruh anggaran tanpa hasil.
  */
-export function agentPromptOf(def: AgentDef, roster: AgentDef[]): string {
+const policyClause = (def: AgentDef): string[] => {
+  const policy = def.workspacePolicy ?? "inherit";
+  if (policy === "read-only") {
+    const root = def.name === "root-causer" ? [
+      "Untuk root-causer, lakukan diagnosis statis dari bukti yang sudah tersedia. Labeli hipotesis",
+      "yang belum terbukti dan berikan rencana eksperimen untuk parent; jangan menjalankan reproduksi",
+      "yang memerlukan eksekusi atau mutasi di workspace ini.",
+    ] : [];
+    return [
+      "Policy efektif: read-only. Inspeksi statis saja; jangan mengubah workspace atau menjalankan",
+      "operasi yang ditolak validator read-only.",
+      ...root,
+      "Jangan mengklaim eksperimen telah dijalankan tanpa output yang benar-benar kamu terima.",
+    ];
+  }
+  if (policy === "isolated-worktree") {
+    const root = def.name === "root-causer"
+      ? ["Untuk root-causer, kamu boleh mereproduksi dan menjalankan eksperimen hanya di worktree terisolasi ini."]
+      : [];
+    return [
+      "Policy efektif: isolated-worktree. Semua tulisan, test patch, reproduksi, dan eksperimen",
+      "harus tetap di worktree terisolasi yang diberikan; jangan menyentuh worktree parent.",
+      ...root,
+      "Jangan mengklaim eksperimen telah dijalankan tanpa output yang benar-benar kamu terima.",
+    ];
+  }
+  return [
+    "Policy efektif: inherit. Ikuti izin workspace sesi parent dan jangan memperluas scope sendiri.",
+    "Jangan mengklaim eksperimen telah dijalankan tanpa output yang benar-benar kamu terima.",
+  ];
+};
+
+const workLimitClause = (def: AgentDef, runtime: "claude" | "codex"): string[] => {
+  const lines: string[] = [];
+  if (typeof def.maxTurns === "number") {
+    lines.push(runtime === "claude"
+      ? `Batas awal pekerjaan ${def.maxTurns} turn. Renderer juga mengirim maxTurns native ke Claude; ini batas turn, bukan hard kill wall-clock.`
+      : `Batas awal pekerjaan ${def.maxTurns} turn adalah batas instruksional di Codex; bukan hard kill.`);
+  }
+  if (typeof def.timeoutSeconds === "number") {
+    lines.push(
+      `Batas waktu ${def.timeoutSeconds} detik adalah batas instruksional. Prioritaskan putusan dan bukti; ini bukan jaminan hard kill server.`,
+    );
+  }
+  return lines;
+};
+
+const handoffClause = (): string[] => [
+  "Kontrak serah-terima:",
+  "- Masukan yang harus kamu gunakan: tujuan, scope, base SHA, kandidat yang diperiksa termasuk",
+  "  dirty changes, bukti sebelumnya, dan aturan verifikasi. Bila ada yang hilang, nyatakan batasnya.",
+  "- Awali laporan dengan `Status: selesai | sebagian | terhalang`.",
+  "- Laporkan simpulan, jangkar bukti, tingkat keyakinan, scope yang belum diperiksa, dan langkah",
+  "  berikutnya. Batas laporan: maksimal 12 temuan utama dan maksimal 1200 kata.",
+];
+
+export function agentPromptOf(
+  def: AgentDef,
+  roster: AgentDef[],
+  runtime: "claude" | "codex" = "claude",
+): string {
   const can = liveMentions(def, roster);
-  const instructions = def.timeoutSeconds
-    ? `${def.instructions}\n\nBatas waktu Hanoman untuk pekerjaan ini ${def.timeoutSeconds} detik. Prioritaskan putusan dan bukti sebelum batas itu.`
-    : def.instructions;
+  const contract = [
+    def.instructions,
+    "",
+    "---",
+    ...policyClause(def),
+    ...workLimitClause(def, runtime),
+    "",
+    ...handoffClause(),
+  ];
   // SPEC-543/950 · ADR-0108/0159 · subagent kedua runtime lahir dengan konteks TERPISAH, jadi
   // klausa gaya kode harus ikut di developer instructions masing-masing.
   if (can.length === 0) {
     return [
-      instructions,
+      ...contract,
       "",
       "---",
       "Kamu TIDAK boleh mendelegasikan ke agen lain. Selesaikan sendiri lalu laporkan hasilnya.",
@@ -51,7 +117,7 @@ export function agentPromptOf(def: AgentDef, roster: AgentDef[]): string {
   }
   const list = can.map((m) => `@${m}`).join(", ");
   return [
-    instructions,
+    ...contract,
     "",
     "---",
     `Kamu boleh mendelegasikan HANYA ke: ${list}. Panggil lewat ${MENTION_TOOL} dengan nama agennya.`,
@@ -67,7 +133,7 @@ export function agentPromptOf(def: AgentDef, roster: AgentDef[]): string {
  * gerbang "jangan pasang flag sama sekali", supaya argv sesi tanpa custom agent byte-identik
  * dengan sebelum SPEC-450.
  */
-type RenderAgentsOptions = { readOnlyHookCommand?: string };
+type RenderAgentsOptions = { readOnlyHookCommand?: string; promptSuffix?: string };
 
 const READ_ONLY_TOOLS = new Set(["Read", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"]);
 
@@ -79,7 +145,7 @@ export function renderAgentsJson(defs: AgentDef[], options: RenderAgentsOptions 
     const readOnly = d.workspacePolicy === "read-only";
     out[d.name] = {
       description: d.description,
-      prompt: agentPromptOf(d, defs),
+      prompt: agentPromptOf(d, defs, "claude") + (options.promptSuffix ?? ""),
       tools: readOnly ? resolvedTools.filter((tool) => READ_ONLY_TOOLS.has(tool)) : resolvedTools,
       ...(d.model ? { model: d.model } : {}),
       ...(d.effort ? { effort: d.effort } : {}),
@@ -101,11 +167,8 @@ export function renderAgentsJson(defs: AgentDef[], options: RenderAgentsOptions 
 }
 
 /**
- * SPEC-881/950 · ADR-0136/0159 · klausa parent hanya memuat nama, deskripsi, dan cara delegasi.
- * Full instructions hidup di konfigurasi native child, tidak membakar konteks parent.
- *
- * Menyebut agen yang BENAR-BENAR ada di roster sesi ini, bukan daftar statis: operator yang
- * mematikan sebuah agen tak boleh menerima prompt yang menyuruh memanggilnya.
+ * ADR-0136/0159 · parent mendapat arahan delegasi/handoff berukuran tetap.
+ * Nama/deskripsi tersedia lewat registry native; instruksi lengkap ada di config child.
  *
  * Kosong saat roster kosong — invarian "prompt byte-identik saat katalog kosong" (ADR-0094).
  */
@@ -116,20 +179,10 @@ export function agentDelegationClause(
   if (defs.length === 0) return "";
   return [
     "",
-    "## Subagent yang tersedia",
     "",
-    "Sesi ini punya subagent berikut. Delegasikan saat tugasnya cocok — konteks mereka TERPISAH",
-    "dari milikmu, jadi menyerahkan penyapuan & verifikasi ke mereka MENGHEMAT konteksmu sendiri,",
-    "bukan memboroskannya.",
-    "",
-    ...defs.map((d) => `- **${d.name}** — ${d.description}`),
-    "",
-    runtime === "codex"
-      ? "Panggil target bernama persis lewat `spawn_agent`."
-      : `Panggil lewat tool ${MENTION_TOOL} dengan nama agennya.`,
-    "Mereka tak bisa mendelegasikan lagi,",
-    "jadi tak ada rantai panggilan yang perlu kamu jaga. Laporan mereka adalah MASUKAN — kamu yang",
-    "memutuskan, dan kamu yang bertanggung jawab atas hasilnya.",
+    `Delegasikan tugas yang relevan melalui ${runtime === "codex" ? "spawn_agent" : MENTION_TOOL}. `
+      + "Sertakan tujuan, scope, base SHA, kandidat termasuk dirty changes, bukti sebelumnya, "
+      + "dan aturan verifikasi. Tinjau hasil subagent sebelum digunakan.",
     "",
   ].join("\n");
 }

@@ -1,1 +1,25 @@
-AccountWire ditemukan sebagai cermin payload. Field locale hadir di kedua kontrak; keduanya sinkron.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "mirror-synchronized",
+      "status": "confirmed",
+      "claim": "mirror-synchronized",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "packages/shared/source.txt",
+          "line": 1,
+          "quote": "export type UserPayload = { id: string; name: string; locale: string };"
+        },
+        {
+          "revision": "candidate",
+          "path": "packages/web/source.txt",
+          "line": 1,
+          "quote": "type AccountWire = { id: string; name: string; locale: string };"
+        }
+      ]
+    }
+  ]
+}

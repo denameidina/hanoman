@@ -1,0 +1,12 @@
+{
+  "fixtureOnly": true,
+  "publisher": "Fixture Maintainer",
+  "date": "2026-09-01",
+  "package": "fixture-parser",
+  "affected": [
+    "1.0.0"
+  ],
+  "fixed": "1.0.1",
+  "advisoryId": "LOCAL-ADVISORY-001",
+  "license": "GPL-3.0-only"
+}

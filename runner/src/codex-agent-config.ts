@@ -44,7 +44,7 @@ export type CodexMaterialization = {
   liveDefs: AgentDef[];
 };
 
-type RenderOptions = { readOnlyHookCommand?: string };
+type RenderOptions = { readOnlyHookCommand?: string; promptSuffix?: string };
 
 export function renderCodexAgentToml(
   def: AgentDef,
@@ -54,7 +54,7 @@ export function renderCodexAgentToml(
   const lines = [
     `name = ${tomlString(def.name)}`,
     `description = ${tomlString(def.description)}`,
-    `developer_instructions = ${tomlString(agentPromptOf(def, roster))}`,
+    `developer_instructions = ${tomlString(agentPromptOf(def, roster, "codex") + (options.promptSuffix ?? ""))}`,
     ...(def.model ? [`model = ${tomlString(def.model)}`] : []),
     ...(def.effort ? [`model_reasoning_effort = ${tomlString(def.effort)}`] : []),
     ...(def.workspacePolicy === "read-only" ? ['sandbox_mode = "read-only"'] : []),

@@ -20,7 +20,7 @@ import { drainSessionEventSpool } from "../src/services/session-event-relay";
 const PANE: Record<string, unknown> = {
   s1: { id: "s1", projectId: "p1", specId: "SPEC-1", exited: false, agent: "claude",
         decisionFile: "/m", cwd: "/w",
-        agentRoster: [{ name: "scout", id: "global:scout", model: "haiku" }] },
+        agentRoster: [{ name: "scout", id: "global:scout", model: "haiku", definitionHash: "a".repeat(64) }] },
   dead: { id: "dead", projectId: "p1", exited: true, agent: "claude", cwd: "/w" },
 };
 vi.mock("../src/services/pty", async (orig) => ({
@@ -107,6 +107,7 @@ describe("POST /api/session-events", () => {
     const start = {
       hook_event_name: "SubagentStart", agent_id: "sub-1", agent_type: "scout",
       session_id: "dead",
+      definitionHash: "forged-from-agent", model: "forged-model",
     };
     expect((await post(app, start, auth("s1"))).json()).toEqual({ accepted: true });
     expect((await post(app, start, auth("s1"))).json()).toEqual({ duplicate: true });
@@ -121,6 +122,7 @@ describe("POST /api/session-events", () => {
     expect(rows[0]).toMatchObject({
       sessionId: "s1", projectId: "p1", agentName: "scout", customAgentId: "global:scout",
       status: "completed", resultExcerpt: "hasil scout",
+      definitionHash: "a".repeat(64), model: "haiku",
     });
     await app.close();
   });

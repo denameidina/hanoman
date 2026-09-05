@@ -1,1 +1,25 @@
-PROFILE_FIELDS adalah daftar manual yang tertinggal: field locale pada Profile hilang dari daftar tersebut dan akan gagal senyap.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "manual-list-stale",
+      "status": "confirmed",
+      "claim": "manual-list-stale",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 1,
+          "quote": "type Profile = { id: string; displayName: string; locale: string };"
+        },
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 2,
+          "quote": "const PROFILE_FIELDS = [\"id\", \"displayName\"];"
+        }
+      ]
+    }
+  ]
+}

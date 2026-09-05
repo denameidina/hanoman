@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Tanggal: 2026-08-31
+- Amandemen: 2026-09-05 — audit seluruh builtin; availability sepanjang sesi, mandat sesuai policy, dan evidence per definisi.
 - SPEC: SPEC-950 (audit efektivitas custom agent)
 - Terkait: **mengamandemen** [0094](0094-custom-agent-katalog-materialisasi-native.md) dengan
   mencabut materialisasi Codex inline; **mengamandemen**
@@ -30,7 +31,8 @@ profil aman, aktivasi relevan, bukti lifecycle, keputusan manusia, dan eval dete
 - Claude menerima JSON `--agents` dengan prompt/tool/model/effort/policy per agent.
 - Codex menerima `agents.enabled=true`, plafon tiga thread, dan satu
   `agents."<name>".config_file` TOML per agent melalui `-c`. Full developer instructions hanya
-  hidup di TOML child; prompt parent membawa nama, deskripsi, dan cara memanggil `spawn_agent`.
+  hidup di TOML child; nama/deskripsi didaftarkan pada registry native. Prompt parent
+  hanya membawa arahan delegasi dan handoff berukuran tetap.
 - Seluruh JSON/TOML/hook hidup di direktori temp sesi (direktori `0700`, berkas `0600`) dan dibuang
   saat sesi ditutup. Di sandbox Podman direktori yang sama di-bind ke path absolutnya secara
   read-only; perintah hook memakai `node`, bukan path Node host. Tidak ada `.claude/agents`,
@@ -51,6 +53,24 @@ Bagian ADR-0094 yang menyatakan Codex mengadopsi roster inline dan risiko loop C
 struktural **dicabut**. Pengukuran 2026-08-01 atas Codex 0.146 tetap catatan historis yang sah;
 keputusan produk berubah karena runtime sekarang menyediakan custom agent native yang dapat
 diverifikasi.
+
+**Amandemen pengurangan prompt 2026-09-05:** hapus daftar nama/deskripsi dan uraian
+roster dari prompt parent Claude maupun Codex. `agentDelegationClause` hanya
+menambahkan satu paragraf untuk delegasi yang relevan, tujuan/scope/base/kandidat
+termasuk dirty changes/bukti terdahulu/verifikasi, dan pemeriksaan hasil. Kosong
+bila tidak ada agent yang dimaterialisasi. Metadata tetap ada di JSON `--agents`
+Claude serta registry/TOML Codex. Pengurangan duplikasi tidak berarti metadata
+native atau laporan child gratis token. Perbaikan kecil ini langsung execute;
+Spec/Plan terpisah skipped, kontraknya amandemen ini dan test prompt/native.
+
+Verifikasi amandemen: 86 test terkait + typecheck runner/server lulus. Smoke
+Claude Code 2.1.261 mendaftarkan product-analyst dan support-triager secara native;
+prompt tugas tidak memuat nama atau deskripsi keduanya. Runtime memilih
+product-analyst tepat sekali, menghasilkan tool result berpasangan dan selesai
+sukses. Ini bukti penemuan/pemanggilan pada skenario tersebut, bukan benchmark
+seluruh katalog. Konfigurasi Codex teruji; smoke live Codex belum berjalan karena
+executable lokal gagal ENOENT. Source ini belum menyatakan server aktif sudah
+diupdate; prompt sesi yang sudah lahir juga tidak diubah.
 
 ### 2. Execution profile adalah data tersync
 
@@ -83,14 +103,35 @@ Hanya `scout`, `blast-radius`, dan `security-reviewer` aktif default; ketiganya 
 sempit atas aturan ADR-0136 bahwa `enabled` selalu milik operator, karena perilaku lama terbukti
 dapat mengotori worktree parent.
 
-Seleksi dihitung sekali saat sesi lahir dari runtime, flow, prompt, `baseSha`, dan daftar changed
-files. `always` custom agent tetap ikut; builtin `smart` memakai predicate konstanta per nama.
-Kegagalan membaca git menjadi changed-files kosong dan tidak menggagalkan sesi.
+**Amandemen 2026-09-05:** registry native memuat seluruh agent enabled yang kompatibel dengan runtime
+dan policy, sepanjang sesi. `smart` menentukan kapan parent mendelegasikan dari pekerjaan, fase,
+dan diff **terkini**; tidak lagi menjadi predicate yang menyembunyikan agent saat lahir. QA/dep
+karena itu tersedia meskipun diff awal kosong, dan security/spec dapat dipakai di goal/no_effort/audit.
+Saklar operator, override project, policy isolated-worktree khusus Claude, gerbang versi Codex,
+serta sesi raw shell tetap mengikat. Menyunting katalog memengaruhi sesi baru, bukan hot reload
+registry sesi berjalan. `selectionReason` menjelaskan kebijakan ketersediaan pada response katalog.
+
+Instruksi root-causer mengikuti policy efektif: read-only berarti diagnosis statis atas bukti yang
+tersedia, hipotesis berlabel, dan rencana eksperimen untuk parent. Operator dapat memilih
+isolated-worktree Claude untuk menjalankan eksperimen; validator baca-saja tidak dilonggarkan.
+Test preservasi perilaku boleh langsung hijau; spec-auditor menguji keadaan akhir termasuk
+requirement yang sudah dipenuhi di base. Security membedakan jalur terbukti, belum disimpulkan,
+dan scope yang diperiksa. Handoff parent menyertakan tujuan/scope/base SHA/kandidat termasuk dirty
+changes/bukti sebelumnya/aturan verifikasi. Child menyatakan selesai/sebagian/terhalang, bukti,
+keyakinan, cakupan belum diperiksa, dan langkah berikutnya; batas instruksional 12 temuan/1200 kata.
+MaxTurns awal yang dapat disunting: scout 20, auditor 30, root/QA/edge 40. Ini batas operasional
+sementara, bukan hasil benchmark; Claude memakai native maxTurns, Codex mendapat instruksi batas.
+Timeout QA 900 detik tetap instruksional, tidak dipasarkan sebagai hard kill.
 
 ### 4. Invocation menjadi bukti lokal, bukan klaim UI
 
 Hook `SubagentStart`/`SubagentStop` Claude dan Codex masuk endpoint event sesi yang sudah ditandatangani.
-Hook menulis satu berkas unik/atomik ke spool temp per sesi. Direktori itu menjadi satu-satunya
+Hook menulis satu berkas unik/atomik ke spool per sesi. Sejak amandemen 2026-09-05, root-nya
+`<HANOMAN_HOME>/session-events`, sehingga server uji/instalasi lain tidak mengambil lalu menandatangani
+event milik home lain. Direktori global lama di tmpdir tidak dipindai atau dimigrasikan otomatis
+karena tidak membawa bukti kepemilikan instalasi. Sebelum mengganti server, tuntaskan sesi sandbox
+lama atau jalankan kembali dengan env spool baru; sesi host yang mengirim HTTP tidak memakai spool.
+Direktori sesi itu menjadi satu-satunya
 mount custom-agent writable (`rw`) di sandbox; worker server memproses maksimal 1 MB per berkas dan
 me-replay payload melalui `/api/session-events` dengan token turunan sesi. Dengan demikian loopback
 container tidak dianggap loopback host, sementara autentikasi, roster check, idempotensi, dan rate
@@ -115,13 +156,61 @@ nullable, disposition, dan precision operasional `(accepted+partial)/seluruh non
 `PATCH /api/custom-agents/invocations/:id` menyimpan `accepted|partial|rejected|false-positive`
 serta note. Excerpt membuat kedua route tetap cookie-only; agent token tidak mendapat akses.
 
-Eval di `evals/custom-agents` membawa satu kasus positif dan satu kontrol per delapan builtin.
-Scorer murni menuntut semua finding expected dan nol forbidden hit. `pnpm agent:eval --runtime
-claude|codex [--agent name] [--output path]` adalah live opt-in: fixture disalin ke repo temp,
-renderer produk dipakai, dan parent **wajib** mendelegasikan tepat sekali ke target. Hook lifecycle
+**Amandemen 2026-09-05:** metadata tmux membekukan SHA-256 `definitionHash` dari prompt/profile
+efektif dan policy baca-saja saat sesi lahir. Helper runner memakai artefak renderer native yang sama,
+mengganti lokasi hook temp dengan slot stabil, lalu memasukkan source hook, activation, dan
+model/effort warisan yang diketahui. Field tools yang tidak diterapkan renderer tidak memecah
+varian. Saat materialisasi Codex berhasil parsial, hash tetap memakai roster yang dipakai saat
+berkas itu dirender. Route event mengambilnya dari roster yang dipercaya,
+bukan payload child; kolom nullable pada AgentInvocation mempertahankan unknown historis. Start
+ulang/stop tidak mengganti identitas definisi start pertama. `reworkRequired` nullable menyimpan
+penilaian admin apakah hasil membutuhkan kerja ulang parent, independen dari disposition.
+Response metrics mempertahankan agregat `agents` dan menambah `variants` per nama/runtime/model/hash,
+`evaluatedCount`, hitungan rework, serta `telemetry` (event terakhir, bukti belum lengkap, status
+relay). Relay menyimpan observasi in-memory per spool root: waktu pemeriksaan/pengiriman/kendala,
+retry pada pemeriksaan terakhir, total retry dan event dibuang sejak boot. Nol invocation bukan
+bukti tidak dipakai; relay yang dapat memproses antrean tidak menjamin seluruh runtime mengirim
+hook. UI memisahkan gagal memuat dari bukti kosong dan menampilkan input/output/cache secara
+terpisah, tanpa menjumlahkan token cache ke input. Di samping `recent` global maksimum 100,
+`samples` mempertahankan maksimum dua contoh per-agent dari masing-masing kelompok pending,
+sudah dinilai, dan perlu kerja ulang, dideduplikasi berdasarkan invocation; agent yang lebih sepi
+tidak kehilangan semua contoh hanya karena agent lain lebih ramai.
+
+Eval di `evals/custom-agents` membawa 20 kasus: satu positif dan satu kontrol per delapan builtin audit awal,
+ditambah preservasi QA, requirement sudah terpenuhi di base, dan sumber lokal advisory/lisensi
+terkunci yang diketahui/belum diketahui. Scorer menuntut JSON evidence berstatus lengkap,
+verdict terstruktur yang dikonfirmasi, serta revision/path/baris/kutipan yang cocok dengan snapshot
+fixture; keyword-only, negasi, klaim unknown sebagai confirmed, jangkar salah, dan field tak dikenal
+ditolak. Ini benchmark dengan kosakata terbatas, bukan penilaian bebas atas semua prosa diagnosis.
+Delapan [agent aplikasi](../operations/app-support-agents.md) yang ditambahkan 2026-09-05
+belum mempunyai fixture perilaku. Validasi seed/profile/renderer tidak boleh dilaporkan sebagai
+benchmark keberhasilan tugas delapan agent tersebut; permintaan eval tanpa kasus gagal eksplisit.
+
+Fixture QA/edge adalah project Node test runner tanpa instalasi dependency. Child menghasilkan
+test vector JSON berbatas; harness memeriksa artefak, lalu menjalankan ulang kode fixture tepercaya
+terhadap base, kandidat, dan mutant. Byte runner/aplikasi disimpan sebelum runtime berjalan;
+JavaScript buatan child tidak dieksekusi oleh replay. Hasil mencatat hash artefak/output dan exit
+yang diamati, dengan otoritas eksplisit `harness-replay-of-declarative-artifact`. Ini mengukur
+test berbasis data, bukan kualitas penulisan sembarang kode test atau membuktikan child sebelumnya
+sudah mengeksekusi perintah.
+
+`pnpm agent:eval --runtime claude|codex [--agent name] [--case id] [--output path]` adalah live
+opt-in: fixture disalin ke repo temp, base SHA dicatat, lalu overlay kandidat dikomit **hanya di repo
+temp** agar child worktree native melihat kandidat yang sama. Renderer dan hook read-only produk
+dipakai; parent **wajib** mendelegasikan tepat sekali ke target. Hook lifecycle
 ditulis ke direktori event temp; hanya `last_assistant_message`/`result` dari tepat satu pasangan
 `SubagentStart`–`SubagentStop` target yang dinilai. Stdout parent tidak pernah menjadi hasil agent.
-Parent Claude berjalan restricted + `plan` dengan tool hanya `Task`; parent Codex berjalan
+Parent Claude berjalan restricted + `plan` dengan Task/Read/Glob/Grep pada daftar alat dan
+permission allowlist. Membatasi daftar global ke Task ternyata menghilangkan alat baca dari
+resolusi child native Claude 2.1.261. Parent kini boleh membaca fixture; hanya hasil child
+teratribusi yang dinilai. Bash/Write/Edit tetap tidak tersedia dan hook read-only tidak dilonggarkan.
+Live Claude adalah subset inspeksi berkas, bukan bukti parity seluruh tool produksi termasuk Git/Bash.
+Lima kasus QA/edge **tidak tersedia live** dalam harness restricted ini: Bash child dihilangkan
+oleh runtime dan penulisan artefak child di bawah plan belum didukung dengan batas yang terverifikasi.
+Kelima kasus tetap diuji lewat replay offline independen; ini tidak membuktikan QA/edge live.
+Codex juga tetap tidak mendukung policy isolated-worktree. Pemilihan kasus yang seluruhnya
+unavailable tidak boleh menghasilkan sukses kosong.
+Parent Codex berjalan
 sandbox `read-only`, approval `never`, serta tanpa user config/rules. Mode `ephemeral` sengaja tidak
 dipakai karena Codex 0.151 tidak mendaftarkan thread parent ke daemon kolaborasi dalam mode itu,
 sehingga `spawn_agent` gagal `no thread with id`. Environment child dibentuk dari
@@ -131,7 +220,11 @@ tetap menjadi deteksi tambahan. Setiap kasus live dibatasi wall-clock 180 detik;
 failure report, bukan proses yang menggantung. Report ditulis atomik di luar **seluruh checkout git sumber**, lalu
 repo temp dibuang. Larangan output memakai real path sehingga symlink ke checkout tidak lolos.
 Eval Codex mem-probe biner live, menolak versi tak terdeteksi/<`0.151.0`, dan meneruskan versi itu
-ke materializer produk. Test/CI hanya menilai output beku dan tidak memanggil model. Precision
+ke materializer produk. Kontrak format JSON/verdict ditambahkan sesudah prompt native child
+selama evaluasi; instruksi peran dan policy produksi tetap utuh. Report versi 2 membedakan
+fingerprint definisi produksi dari fingerprint konfigurasi evaluasi yang menyertakan protokol
+format, serta mencatat model, base/candidate SHA, dan bukti validasi.
+Test/CI hanya menilai output beku dan tidak memanggil model. Precision
 operasional dan eval recall tetap dua angka berbeda.
 
 Bukti live terbatas 2026-08-31: Codex 0.151.0 menjalankan `scout-positive` dan `scout-control`
@@ -139,6 +232,13 @@ melalui child native teratribusi; keduanya lulus (`recall=1`, forbidden hit `0`,
 checkout sumber sebelum/sesudah identik. Ini membuktikan jalur dan dua kasus `scout`, **bukan**
 benchmark live seluruh delapan builtin atau bukti Claude—keduanya tetap perlu run terpisah saat
 credential/kuota tersedia.
+
+Bukti tindak lanjut 2026-09-05: uji Claude 2.1.261 mengungkap pewarisan pembatas alat global
+dan kontrak format yang tidak cukup disampaikan hanya ke parent; keduanya diperbaiki pada harness.
+Run scout-positive terakhir memiliki lifecycle lengkap, dua jangkar benar dan source hash tetap,
+tetapi **FAIL** karena prosa + blok JSON melanggar amplop JSON murni. Ini tidak dihitung sebagai
+live pass. Codex lokal gagal probe karena executable vendor hilang; lima QA/edge tetap hanya
+terverifikasi offline pada harness ini.
 
 ## Konsekuensi
 

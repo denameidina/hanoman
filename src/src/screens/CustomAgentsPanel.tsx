@@ -10,6 +10,7 @@ import React from "react";
 import { useModelCatalog } from "../api/model-catalog";
 import { Card, Button, Badge, Input, Switch, MultiSelect, Select, Field, HnTextarea, StateBlock, Callout, Modal } from "../ds";
 import { api, ApiError } from "../api/client";
+import { CustomAgentMetrics } from "./CustomAgentMetrics";
 import {
   AGENT_NAME_RE, DEFAULT_AGENT_TOOLS, ALL_TOOLS, resolveTools, modelsForRuntime,
   effortsForRuntimeModel,
@@ -45,10 +46,6 @@ const draftOf = (a: CustomAgentView): Draft => ({
 
 const optionalIntValid = (value: string, min: number, max: number): boolean =>
   value === "" || (/^\d+$/.test(value) && Number(value) >= min && Number(value) <= max);
-const durationText = (ms: number | null): string => {
-  if (ms === null) return "—";
-  return ms < 1_000 ? `${ms} ms` : `${(ms / 1_000).toFixed(ms % 1_000 ? 1 : 0)} dtk`;
-};
 
 /**
  * Terjemahkan penolakan server jadi kalimat yang bisa ditindaklanjuti. 409 bersiklus membawa
@@ -87,7 +84,10 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
   const [rows, setRows] = React.useState<CustomAgentView[] | null>(null);
   const [catalog, setCatalog] = React.useState<AgentCatalogView | null>(null);
   const [metrics, setMetrics] = React.useState<AgentMetricsView | null>(null);
-  const [reviews, setReviews] = React.useState<Record<string, { disposition: string; note: string }>>({});
+  const [reviews, setReviews] = React.useState<Record<string, {
+    disposition: string; note: string; reworkRequired?: boolean | null;
+  }>>({});
+  const [metricsError, setMetricsError] = React.useState(false);
   const [err, setErr] = React.useState<string>("");
   const [editing, setEditing] = React.useState<{ id: string | null; draft: Draft } | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -95,7 +95,8 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
   const load = React.useCallback(async () => {
     let nextRows: CustomAgentView[] = [];
     let nextCatalog: AgentCatalogView = { tools: [], models: [], runtimes: [] };
-    let nextMetrics: AgentMetricsView = { agents: [], recent: [] };
+    let nextMetrics: AgentMetricsView | null = null;
+    setMetricsError(false);
     try { nextRows = await api.listCustomAgents(projectId ?? undefined, sessionRuntime); }
     catch (e) { setErr(errorText(e)); }
     // Katalog gagal dimuat TIDAK boleh menyembunyikan daftar agen: ia jatuh ke katalog kosong, dan
@@ -107,7 +108,7 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
         projectId: projectId ?? undefined,
         from: new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString(),
       });
-    } catch { /* telemetry opsional tidak boleh menyembunyikan katalog */ }
+    } catch { setMetricsError(true); }
     setCatalog(nextCatalog); setMetrics(nextMetrics); setRows(nextRows);
   }, [projectId, sessionRuntime]);
 
@@ -117,7 +118,8 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
         projectId: projectId ?? undefined,
         from: new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString(),
       }));
-    } catch { /* bukti lama tetap terlihat bila refresh sesaat gagal */ }
+      setMetricsError(false);
+    } catch { setMetricsError(true); }
   }, [projectId]);
 
   React.useEffect(() => { void load(); }, [load]);
@@ -230,6 +232,7 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
       await api.updateAgentInvocationDisposition(id, {
         disposition: review.disposition as Exclude<AgentDisposition, "pending">,
         note: review.note,
+        ...(review.reworkRequired !== undefined ? { reworkRequired: review.reworkRequired } : {}),
       });
       await reloadMetrics();
       onToast?.("Penilaian invocation disimpan", "ok");
@@ -253,6 +256,29 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
       </div>
 
       {err && !editing && <Callout tone="err">{err}</Callout>}
+      {metricsError && <Callout tone="warn">
+        Bukti penggunaan gagal dimuat. Angka yang masih terlihat berasal dari pemuatan sebelumnya.
+        <Button size="sm" variant="ghost" onClick={() => void reloadMetrics()}>Muat ulang bukti</Button>
+      </Callout>}
+      {!metricsError && metrics && metrics.agents.length === 0 && <Callout tone="info">
+        Belum ada bukti invocation dalam periode ini. Ini tidak membuktikan agent belum pernah dipakai;
+        pengiriman event dapat tidak tercatat.
+      </Callout>}
+      {!metricsError && metrics?.telemetry?.state === "observed" && <div style={{
+        fontSize: "var(--text-xs)", color: "var(--text-subtle)",
+      }}>
+        Event terakhir tercatat: {metrics.telemetry.lastEventAt
+          ? new Date(metrics.telemetry.lastEventAt).toLocaleString("id-ID") : "—"}
+        {` · ${metrics.telemetry.incompleteCount} invocation belum memiliki bukti lengkap.`}
+        {" Catatan ini tidak menjamin seluruh event berhasil dikirim."}
+      </div>}
+      {metrics?.telemetry?.relay && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
+        Pengiriman event: {metrics.telemetry.relay.state === "unobserved" ? "belum diperiksa"
+          : metrics.telemetry.relay.state === "degraded" ? "terganggu" : "antrean dapat diproses"}
+        {` · ${metrics.telemetry.relay.retryPending} pengiriman ditunda pada pemeriksaan terakhir`}
+        {` · ${metrics.telemetry.relay.droppedEvents} event ditolak sejak server menyala`}
+        {metrics.telemetry.relay.lastIssueAt && ` · kendala terakhir ${new Date(metrics.telemetry.relay.lastIssueAt).toLocaleString("id-ID")}`}
+      </div>}
 
       {rows.length === 0 && (
         <StateBlock kind="empty" compact title="Belum ada custom agent"
@@ -267,14 +293,9 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
           : a.tools;
         const tools = resolveTools({ tools: shownTools, mentions: a.mentions });
         const readOnly = Boolean(projectId && a.inherited);
-        const metric = metrics?.agents.find((entry) => entry.agentName === a.name);
-        const recent = (metrics?.recent ?? []).filter((entry) => entry.agentName === a.name).slice(0, 5);
-        const tokenValues = metric
-          ? [metric.inputTokens, metric.outputTokens, metric.cachedTokens].filter(
-            (value): value is number => value !== null,
-          ) : [];
-        const tokenText = tokenValues.length
-          ? tokenValues.reduce((sum, value) => sum + value, 0).toLocaleString("id-ID") : "—";
+        const recent = metrics?.samples
+          ? metrics.samples.filter((entry) => entry.agentName === a.name)
+          : (metrics?.recent ?? []).filter((entry) => entry.agentName === a.name).slice(0, 5);
         return (
           <Card key={a.id} padding={14}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
@@ -308,32 +329,26 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
               {a.model && <span>Model: {a.model}</span>}
               <span>Aktivasi: {a.activation ?? "always"}</span>
               <span>Workspace: {a.workspacePolicy ?? "inherit"}</span>
+              {a.maxTurns != null && <span>Batas kerja: {a.maxTurns} giliran
+                {" (native Claude; instruksi pada Codex)"}</span>}
+              {a.timeoutSeconds != null && <span>Target waktu: {a.timeoutSeconds} detik
+                {" (instruksi; tidak menghentikan proses otomatis)"}</span>}
             </div>
+            {a.selectionReason && <div style={{ fontSize: "var(--text-xs)", marginTop: 6 }}>{a.selectionReason}</div>}
+            {a.activation === "smart" && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 6 }}>
+              Tersedia sepanjang sesi yang kompatibel. Dipanggil saat tugas, fase, dan perubahan terbaru membutuhkan perannya.
+            </div>}
+            {a.workspacePolicy === "read-only" && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 6 }}>
+              Pemeriksaan statis; perintah test dan eksperimen memerlukan lingkungan terisolasi.
+            </div>}
             {a.available === false && a.availabilityReason && (
               <Callout tone="warn">{a.availabilityReason}</Callout>
             )}
-            <div data-testid={`metrics-${a.name}`} style={{
-              display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10,
-              paddingTop: 9, borderTop: "1px solid var(--border-hair)",
-              fontSize: "var(--text-xs)", color: "var(--text-subtle)",
-            }}>
-              <span>{metric?.invocationCount ?? 0} invocation · 30 hari</span>
-              <span>Durasi median: {durationText(metric?.medianDurationMs ?? null)}</span>
-              <span>Token: {tokenText}</span>
-              <span data-testid={`precision-${a.name}`}>
-                Precision: {metric?.operationalPrecision == null
-                  ? "—" : `${Math.round(metric.operationalPrecision * 100)}%`}
-              </span>
-              {metric && <span>
-                Diterima {metric.dispositions.accepted} · Parsial {metric.dispositions.partial}
-                {" · "}Ditolak {metric.dispositions.rejected} · False-positive {metric.dispositions.falsePositive}
-              </span>}
-              {metric?.workspaceChanged && <Badge tone="err" size="sm">workspace berubah</Badge>}
-            </div>
+            <CustomAgentMetrics name={a.name} metrics={metrics} />
             {recent.length > 0 && (
               <details style={{ marginTop: 8 }}>
                 <summary style={{ cursor: "pointer", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-                  {recent.length} bukti terbaru
+                  {recent.length} sampel bukti
                 </summary>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
                   {recent.map((invocation) => {
@@ -341,14 +356,17 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
                     const disposition = review?.disposition
                       ?? (invocation.disposition === "pending" ? "" : invocation.disposition);
                     const note = review?.note ?? invocation.dispositionNote ?? "";
+                    const rework = review?.reworkRequired !== undefined
+                      ? review.reworkRequired : invocation.reworkRequired ?? null;
                     return <div key={invocation.id} style={{
                       padding: 8, border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)",
                     }}>
                       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)", marginBottom: 6 }}>
                         {new Date(invocation.startedAt).toLocaleString("id-ID")} · {invocation.runtime}
+                        {` · ${invocation.model ?? "model tidak tercatat"} · versi ${invocation.definitionHash?.slice(0, 12) ?? "tidak tercatat"}`}
                         {invocation.resultExcerpt ? ` · ${invocation.resultExcerpt}` : ""}
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "150px 1fr auto", gap: 8 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                         <Select aria-label={`Disposition ${invocation.id}`} value={disposition}
                           options={[
                             { value: "", label: "Pilih disposition" },
@@ -358,12 +376,22 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
                             { value: "false-positive", label: "False-positive" },
                           ]}
                           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setReviews({
-                            ...reviews, [invocation.id]: { disposition: e.target.value, note },
+                            ...reviews, [invocation.id]: { ...review, disposition: e.target.value, note },
+                          })} />
+                        <Select aria-label={`Kerja ulang ${invocation.id}`} value={rework === null ? "" : rework ? "yes" : "no"}
+                          options={[
+                            { value: "", label: "Kerja ulang belum dinilai" },
+                            { value: "yes", label: "Perlu kerja ulang" },
+                            { value: "no", label: "Tidak perlu kerja ulang" },
+                          ]}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setReviews({
+                            ...reviews, [invocation.id]: { disposition, note,
+                              reworkRequired: e.target.value === "" ? null : e.target.value === "yes" },
                           })} />
                         <Input aria-label={`Catatan ${invocation.id}`} value={note} maxLength={500}
                           placeholder="Catatan opsional"
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReviews({
-                            ...reviews, [invocation.id]: { disposition, note: e.target.value },
+                            ...reviews, [invocation.id]: { ...review, disposition, note: e.target.value },
                           })} />
                         <Button size="sm" aria-label={`Nilai ${invocation.id}`} loading={busy}
                           disabled={!disposition} onClick={() => void judge(invocation.id)}>Nilai</Button>

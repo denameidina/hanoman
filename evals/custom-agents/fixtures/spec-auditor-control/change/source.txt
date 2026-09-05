@@ -1,3 +1,2 @@
 Acceptance criteria:
 - [x] emit audit log after document deletion
-source.txt implementation: deleteDocument calls emitAudit("document.deleted").

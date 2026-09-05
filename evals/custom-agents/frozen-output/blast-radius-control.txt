@@ -1,1 +1,25 @@
-PROFILE_FIELDS memuat locale dan lengkap terhadap kontrak Profile; daftar manual sinkron.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "manual-list-synchronized",
+      "status": "confirmed",
+      "claim": "manual-list-synchronized",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 1,
+          "quote": "type Profile = { id: string; displayName: string; locale: string };"
+        },
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 2,
+          "quote": "const PROFILE_FIELDS = [\"id\", \"displayName\", \"locale\"];"
+        }
+      ]
+    }
+  ]
+}

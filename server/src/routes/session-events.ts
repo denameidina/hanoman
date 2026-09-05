@@ -52,6 +52,7 @@ export default async function (app: FastifyInstance) {
       const identity = {
         sessionId, projectId: s.projectId, specId: s.specId, runtime: s.agent,
         runtimeInvocationId, customAgentId: meta.id, agentName: meta.name, model: meta.model,
+        definitionHash: meta.definitionHash,
         cwd: s.cwd,
       };
       const outcome = lifecycle === "SubagentStart"

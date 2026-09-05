@@ -1937,6 +1937,7 @@ GET    /api/custom-agents?projectId=<id>[&runtime=claude|codex] -> CustomAgentVi
 #                                            project muncul SEKALI (versi project yang menang)
 #      runtime opsional menurunkan `available`/`availabilityReason`; tidak menyaring baris supaya
 #      operator tetap dapat memperbaiki atau menghidupkan/mematikan definisi yang unavailable.
+#      `selectionReason` menjelaskan availability; smart berarti delegasi sesuai pekerjaan terkini.
 GET    /api/custom-agents/catalog[?projectId=<id>] -> AgentCatalogView
 #      { tools: {id,label,group:"shortcut"|"builtin"|"mcp"}[], models: {id,label,runtime}[],
 #        runtimes: {id,label}[] }   # SPEC-484 · ADR-0101 · sumber daftar untuk form.
@@ -1961,9 +1962,18 @@ DELETE /api/custom-agents/:id -> 204     # mencabut nama itu dari `mentions` age
 # SPEC-950 · ADR-0159 · COOKIE_ONLY admin: excerpt bisa memuat detail internal dan disposition
 # adalah putusan manusia, bukan capability agent.
 GET    /api/custom-agents/metrics?projectId=&from=&to=
-#      -> { agents: AgentMetricView[], recent: AgentInvocationView[] } · recent maksimal 100
-PATCH  /api/custom-agents/invocations/:id { disposition, note? }
+#      -> { agents: AgentMetricView[], variants: AgentMetricVariantView[], recent: AgentInvocationView[], samples: AgentInvocationView[], telemetry }
+#      recent maksimal 100. variants dipisah agentName/runtime/model/definitionHash (nullable historis).
+#      samples max 2 per-agent per kelompok pending/dinilai/rework, deduplikasi id.
+#      MetricView membawa evaluatedCount dan rework {required,notRequired,unknown}; agregat lama tetap.
+#      telemetry: state unobserved|observed, lastEventAt nullable, incompleteCount,
+#        relay {state:unobserved|ready|degraded, checkedAt,lastDeliveryAt,lastIssueAt,
+#               retryPending,retryAttempts,droppedEvents}; waktu berupa string ISO atau null.
+#      relay adalah keadaan transport server sejak boot, bukan jaminan seluruh hook runtime sehat.
+PATCH  /api/custom-agents/invocations/:id { disposition, note?, reworkRequired? }
 #      disposition = accepted|partial|rejected|false-positive · note null/≤500 · 404 bila tak ada
+#      reworkRequired true|false|null; absen mempertahankan nilai lama, null menghapus penilaian.
+#      InvocationView membawa definitionHash nullable dan reworkRequired nullable.
 ```
 > **`id` deterministik `"<projectId|global>:<name>"`** (titik dua sah di segmen path RFC 3986) dan
 > **`name` immutable** — baris ini menyeberang changefeed yang tak punya operasi hapus; rename yang
@@ -1987,6 +1997,7 @@ PATCH  /api/custom-agents/invocations/:id { disposition, note? }
 > turunan. Effort berasal dari katalog runtime/model (bukan teks bebas); kombinasi warisan memakai
 > irisan aman. Read-only dipagari validator + hook `PreToolUse`; parent sandbox hanya defense in
 > depth. Di Podman, config/hook temp di-mount `ro`, sedangkan spool event per sesi saja yang `rw`;
+> root spool berada di `<HANOMAN_HOME>/session-events`, bukan tmpdir bersama antar-instalasi;
 > hook memublikasikan `.json` lewat rename atomik. Worker me-replay ke endpoint event bertoken yang
 > sama; `429`/5xx/exception dipertahankan untuk retry, payload invalid dan 4xx permanen dibuang.
 >

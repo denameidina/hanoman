@@ -1,1 +1,1 @@
-export const normalizeEmail = (value) => value;
+See app.cjs, test.cjs and cases.json.

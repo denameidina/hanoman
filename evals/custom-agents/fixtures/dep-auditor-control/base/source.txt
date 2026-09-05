@@ -1,1 +1,1 @@
-export const makeId = () => "temporary";
+export const makeId = () => crypto.randomUUID();

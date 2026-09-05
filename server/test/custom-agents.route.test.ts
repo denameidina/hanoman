@@ -3,7 +3,7 @@ import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { capabilityForRoute } from "../src/services/agent-capabilities";
 import { customAgentId } from "@hanoman/shared";
-import { agentDefsFor } from "../src/services/custom-agents";
+import { agentDefsFor, refreshCustomAgentRuntimeSupport } from "../src/services/custom-agents";
 import { seedBuiltinAgents } from "../src/services/builtin-agents";
 
 const app = buildApp({ requireAuth: false });
@@ -13,6 +13,7 @@ const clean = async () => {
 };
 beforeEach(async () => {
   await clean();
+  await refreshCustomAgentRuntimeSupport(async () => null);
   await prisma.project.create({ data: { id: "p1", name: "P1", desc: "", kind: "web" } });
 });
 afterAll(clean);
@@ -155,10 +156,24 @@ describe("GET /api/custom-agents", () => {
     expect(r.json()[0].enabled).toBe(false);
   });
 
+  it("does not promise native availability for unknown or outdated Codex", async () => {
+    await post({ name: "reader", description: "d", instructions: "i", activation: "smart" });
+    for (const version of [null, "0.150.0"]) {
+      await refreshCustomAgentRuntimeSupport(async () => version);
+      const r = await app.inject({ method: "GET", url: "/api/custom-agents?runtime=codex" });
+      expect(r.json()[0]).toMatchObject({ available: false,
+        availabilityReason: expect.stringContaining("0.151.0"),
+        selectionReason: "tidak masuk registry runtime ini" });
+    }
+    await refreshCustomAgentRuntimeSupport(async () => "0.151.0");
+    const ready = await app.inject({ method: "GET", url: "/api/custom-agents?runtime=codex" });
+    expect(ready.json()[0].available).toBe(true);
+  });
+
   it("menurunkan availability dan alasan terhadap runtime yang diminta", async () => {
     await post({
       name: "claude-only", description: "d", instructions: "i", runtime: "claude",
-      workspacePolicy: "isolated-worktree",
+      workspacePolicy: "isolated-worktree", activation: "smart",
     });
     const codex = await app.inject({
       method: "GET", url: "/api/custom-agents?runtime=codex",
@@ -167,12 +182,16 @@ describe("GET /api/custom-agents", () => {
     expect(codex.json()[0]).toMatchObject({
       available: false,
       availabilityReason: "hanya tersedia untuk runtime claude",
+      selectionReason: "tidak masuk registry runtime ini",
     });
 
     const claude = await app.inject({
       method: "GET", url: "/api/custom-agents?runtime=claude",
     });
-    expect(claude.json()[0]).toMatchObject({ available: true });
+    expect(claude.json()[0]).toMatchObject({
+      available: true,
+      selectionReason: "tersedia sepanjang sesi; parent menilai kebutuhan dari pekerjaan terbaru",
+    });
     expect(claude.json()[0].availabilityReason).toBeUndefined();
   });
 

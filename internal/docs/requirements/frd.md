@@ -254,6 +254,17 @@ tanpa penopang tidak ditulis.
 
 ## Settings
 
+- WHILE custom agent enabled dan kompatibel dengan runtime/policy sesi, THE SYSTEM SHALL
+  mempertahankannya dalam registry native sepanjang sesi; aktivasi smart SHALL dinilai parent
+  sebelum delegasi menggunakan pekerjaan terbaru, bukan memfilter permanen dari diff awal
+  ([ADR-0159](../adr/0159-custom-agent-native-terukur-terisolasi.md), amandemen 2026-09-05).
+- THE SYSTEM SHALL menyelaraskan instruksi dan alasan availability dengan policy efektif serta
+  gerbang versi runtime. Diagnosis read-only SHALL membedakan bukti statis dari eksperimen yang
+  belum dijalankan; test preservasi dan requirement yang sudah terpenuhi di base SHALL diakui.
+- THE SYSTEM SHALL menyajikan bukti invocation menurut runtime, model, dan hash definisi efektif,
+  dengan sampel dinilai/pending, penilaian kerja ulang nullable, serta token masuk/keluar/cache
+  terpisah. Bukti kosong, kegagalan memuat, dan observasi relay SHALL dibedakan; nilai historis
+  yang tidak tercatat SHALL tetap tidak diketahui.
 - THE SYSTEM SHALL menyusun tab "Model sesi" **bersumbu agen** — satu blok berjudul per agen, dengan
   badge agen yang dipakai sesi baru ([ADR-0081](../adr/0081-default-sesi-konflik-opt-in.md)).
 - THE SYSTEM SHALL membaca katalog claude dari `MODELS`/`EFFORTS` di `@hanoman/shared`, sumber yang sama

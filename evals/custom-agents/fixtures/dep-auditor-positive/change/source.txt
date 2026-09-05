@@ -1,4 +1,2 @@
-package.json dependencies: { "nanoid": "5.1.0" }
-import { nanoid } from "nanoid";
+import { nanoid } from 'nanoid';
 export const makeId = () => nanoid();
-Node 20 runtime also provides crypto.randomUUID().

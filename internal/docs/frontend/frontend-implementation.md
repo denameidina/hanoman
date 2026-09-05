@@ -2211,6 +2211,15 @@ untuk keadaan default hanya menambah derau. Kolom Tools di kartu tetap merender 
 (`resolveTools`), dan `["*"]` ikut di-expand secara tampilan supaya yang terbaca adalah apa yang
 benar-benar diterima agen.
 
+**Bukti agent (amandemen ADR-0159, 2026-09-05):** kartu menjelaskan arti smart (tersedia sepanjang
+sesi, delegasi menurut pekerjaan terbaru), policy baca-saja, maxTurns native Claude/instruksi
+Codex, dan timeout instruksional. `CustomAgentMetrics` menampilkan token input/output/cache
+terpisah, jumlah dinilai/pending/kerja ulang, dan rincian runtime/model/hash definisi. Nilai
+historis null tampil belum tercatat. Penilaian kerja ulang memakai Select tiga keadaan
+(belum dinilai/perlu/tidak perlu), terpisah dari disposition. Kegagalan fetch bukti tampil dengan
+tombol muat ulang; nol baris diberi penjelasan bahwa bukan bukti agent tidak dipakai. Status relay
+menyebut observasi transport server sejak boot, bukan mengklaim semua hook runtime sehat.
+
 ## Obrolan portal klien — `ChatPanel` + `PortalChatPanel` (SPEC-854 · ADR-0129/0130)
 
 Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa pun kecuali DTO.

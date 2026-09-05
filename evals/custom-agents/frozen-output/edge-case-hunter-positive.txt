@@ -1,1 +1,26 @@
-Kontrak belum menangani duplicate delivery. Idempotensi belum diuji: test hanya mengirim satu event dan test delivery ganda tidak ada.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "idempotency-fails",
+      "status": "confirmed",
+      "claim": "idempotency-fails",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "app.cjs",
+          "line": 1,
+          "quote": "exports.createReceiver = () => { const ledger = []; return { receive: (event) => ledger.push(event.id), count: () => ledger.length }; };"
+        }
+      ],
+      "command": {
+        "cwd": ".",
+        "artifact": "cases.json",
+        "baseExit": 1,
+        "candidateExit": 1,
+        "mutantExit": 1
+      }
+    }
+  ]
+}

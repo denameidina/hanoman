@@ -22,6 +22,17 @@ beforeEach(async () => {
 afterAll(async () => { await prisma.agentInvocation.deleteMany(); });
 
 describe("lifecycle AgentInvocation", () => {
+  it("freezes the executed definition at start and preserves unknown legacy evidence", async () => {
+    await startAgentInvocation({ ...base, definitionHash: "a".repeat(64) });
+    await startAgentInvocation({ ...base, definitionHash: "b".repeat(64) });
+    await stopAgentInvocation({ ...base, definitionHash: "c".repeat(64) });
+    const row = await prisma.agentInvocation.findFirstOrThrow();
+    expect(row).toMatchObject({ definitionHash: "a".repeat(64), reworkRequired: null });
+    await stopAgentInvocation({ ...base, runtimeInvocationId: "legacy" });
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "legacy" } }))
+      .toMatchObject({ definitionHash: null, reworkRequired: null });
+  });
+
   it("start/stop idempoten dan menghitung durasi tanpa menimpa stop pertama", async () => {
     const startedAt = new Date("2026-08-31T01:00:00.000Z");
     const endedAt = new Date("2026-08-31T01:00:01.500Z");

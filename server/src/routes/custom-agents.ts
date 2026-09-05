@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { CODEX_NATIVE_AGENTS_MIN_CLIENT } from "@hanoman/runner";
 import {
   activationOf, effortOf, maxTurnsOf, timeoutSecondsOf, workspacePolicyOf,
   zCreateCustomAgent, zUpdateCustomAgent, customAgentId, mentionsOf, toolsOf, runtimeOf,
@@ -13,7 +14,7 @@ import { agentToolCatalog, agentToolIds } from "../services/agent-tool-catalog";
 import { getSetting } from "../services/settings";
 import { rowFingerprint } from "../services/builtin-agents";
 import {
-  loadCustomAgents, validateGraph, unknownMentions, type CustomAgentRow,
+  currentCustomAgentRuntimeSupport, loadCustomAgents, validateGraph, unknownMentions, type CustomAgentRow,
 } from "../services/custom-agents";
 
 // SPEC-450 · ADR-0094 · CRUD katalog custom agent. Integritas ditegakkan DI BOUNDARY (rujukan,
@@ -42,7 +43,28 @@ const availabilityOf = (r: CustomAgentRow, requestedRuntime?: AgentRuntime) => {
       availabilityReason: "isolated-worktree belum tersedia untuk subagent Codex",
     };
   }
+  if (effectiveRuntime === "codex") {
+    const support = currentCustomAgentRuntimeSupport();
+    if (!support.ok) {
+      return {
+        available: false,
+        availabilityReason: `native subagent perlu Codex >= ${CODEX_NATIVE_AGENTS_MIN_CLIENT}; versi ${support.version ?? "belum terdeteksi"}`,
+      };
+    }
+  }
   return { available: true };
+};
+
+const selectionReasonOf = (
+  r: CustomAgentRow,
+  availability: { available: boolean },
+): string => {
+  if (!r.enabled) return "dinonaktifkan operator";
+  if (!availability.available) return "tidak masuk registry runtime ini";
+  if (activationOf(r.activation) === "smart") {
+    return "tersedia sepanjang sesi; parent menilai kebutuhan dari pekerjaan terbaru";
+  }
+  return "selalu tersedia sepanjang sesi";
 };
 
 const view = (
@@ -54,6 +76,7 @@ const view = (
   // Bawaan SELALU global: nama yang sama dipakai sebagai agen project adalah baris milik operator
   // yang menimpa bawaan (ADR-0094), bukan bawaan itu sendiri.
   const builtin = r.projectId === null && BUILTIN_AGENT_NAMES.includes(r.name);
+  const availability = availabilityOf(r, requestedRuntime);
   return {
     id: r.id, projectId: r.projectId, name: r.name,
     description: r.description, instructions: r.instructions,
@@ -68,7 +91,8 @@ const view = (
     // pernah menyentuhnya) dibaca sebagai "disunting" — lebih baik menandai berlebih daripada
     // menjanjikan "asli bawaan" untuk isi yang tak bisa kita buktikan.
     builtinEdited: builtin ? stamps[r.name] !== rowFingerprint(r) : false,
-    ...availabilityOf(r, requestedRuntime),
+    ...availability,
+    selectionReason: selectionReasonOf(r, availability),
     ...(projectId ? { inherited: r.projectId === null } : {}),
   };
 };
