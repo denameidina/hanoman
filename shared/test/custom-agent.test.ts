@@ -171,10 +171,10 @@ describe("zCreateCustomAgent", () => {
     const r = zCreateCustomAgent.safeParse({ name: "rev", description: "  ", instructions: "i" });
     expect(r.success).toBe(false);
   });
-  it("menolak effort di luar katalog runtime", () => {
+  it("menerima effort runtime masa depan yang bentuknya sah", () => {
     const r = zCreateCustomAgent.safeParse({
       name: "rev", description: "d", instructions: "i", effort: "turbo",
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 });
