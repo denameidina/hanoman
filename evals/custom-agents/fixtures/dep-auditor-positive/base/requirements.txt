@@ -1,0 +1,1 @@
+Product ID must be exactly 21 URL-safe characters. UUID format is not equivalent.

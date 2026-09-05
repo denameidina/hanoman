@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Fastify from "fastify";
-import { drainSessionEventSpool, startSessionEventRelay } from "../src/services/session-event-relay";
+import { drainSessionEventSpool, startSessionEventRelay, sessionEventRelayStatus } from "../src/services/session-event-relay";
 import { sessionEventToken } from "../src/services/session-event-token";
 
 describe("sandbox session event relay", () => {
@@ -69,11 +69,15 @@ describe("sandbox session event relay", () => {
 
     expect(await drainSessionEventSpool(app, root)).toBe(0);
     expect(existsSync(path)).toBe(true);
+    expect(sessionEventRelayStatus(root)).toMatchObject({ state: "degraded", retryPending: 1, retryAttempts: 1 });
     statusCode = 503;
     expect(await drainSessionEventSpool(app, root)).toBe(0);
     expect(existsSync(path)).toBe(true);
     statusCode = 202;
     expect(await drainSessionEventSpool(app, root)).toBe(1);
     expect(existsSync(path)).toBe(false);
+    expect(sessionEventRelayStatus(root)).toMatchObject({ state: "ready", retryPending: 0,
+      retryAttempts: 2, lastDeliveryAt: expect.any(String), lastIssueAt: expect.any(String) });
+    expect(sessionEventRelayStatus(root + "-unknown")).toMatchObject({ state: "unobserved", checkedAt: null });
   });
 });

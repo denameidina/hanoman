@@ -1,1 +1,31 @@
-crypto.randomUUID digunakan langsung dan aman tanpa dependensi baru.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "runtime-only",
+      "status": "confirmed",
+      "claim": "runtime-only",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "requirements.txt",
+          "line": 1,
+          "quote": "Product ID uses UUID format."
+        },
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 1,
+          "quote": "export const makeId = () => crypto.randomUUID();"
+        },
+        {
+          "revision": "candidate",
+          "path": "package.json",
+          "line": 3,
+          "quote": "  \"dependencies\": {}"
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { AgentRelayStatus } from "@hanoman/shared";
 import { constants } from "node:fs";
 import { mkdir, open, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -16,11 +17,43 @@ type RelayRequest = {
   payload: Record<string, unknown>;
 };
 type Injectable = { inject(request: RelayRequest): Promise<{ statusCode: number }> };
+const observations = new Map<string, AgentRelayStatus>();
+export function sessionEventRelayStatus(root = sessionEventSpoolRoot()): AgentRelayStatus {
+  return { ...(observations.get(root) ?? {
+    state: "unobserved", checkedAt: null, lastDeliveryAt: null, lastIssueAt: null,
+    retryPending: 0, retryAttempts: 0, droppedEvents: 0,
+  }) };
+}
+
+/** Counters describe this relay process, not whether every runtime emits hooks. */
+export async function drainSessionEventSpool(app: Injectable, root = sessionEventSpoolRoot()): Promise<number> {
+  const previous = sessionEventRelayStatus(root);
+  const current = { retries: 0, dropped: 0 };
+  let delivered = 0;
+  let failed = false;
+  try {
+    delivered = await drainSpool(app, root, current);
+    return delivered;
+  } catch (error) {
+    failed = true;
+    throw error;
+  } finally {
+    const now = new Date().toISOString();
+    observations.set(root, {
+      state: failed || current.retries > 0 ? "degraded" : "ready", checkedAt: now,
+      lastDeliveryAt: delivered ? now : previous.lastDeliveryAt,
+      lastIssueAt: failed || current.retries || current.dropped ? now : previous.lastIssueAt,
+      retryPending: current.retries, retryAttempts: previous.retryAttempts + current.retries,
+      droppedEvents: previous.droppedEvents + current.dropped,
+    });
+  }
+}
 
 /** Drain best-effort: setiap berkas invalid/terproses dibuang agar satu payload tak membuat loop. */
-export async function drainSessionEventSpool(
+async function drainSpool(
   app: Injectable,
-  root = sessionEventSpoolRoot(),
+  root: string,
+  observation: { retries: number; dropped: number },
 ): Promise<number> {
   await mkdir(root, { recursive: true, mode: 0o700 });
   let delivered = 0;
@@ -53,6 +86,7 @@ export async function drainSessionEventSpool(
         }
         payload = parsed as Record<string, unknown>;
       } catch {
+        observation.dropped++;
         await rm(path, { force: true }).catch(() => {});
         continue;
       } finally {
@@ -68,10 +102,14 @@ export async function drainSessionEventSpool(
           },
           payload,
         });
-        if (response.statusCode === 429 || response.statusCode >= 500) continue;
+        if (response.statusCode === 429 || response.statusCode >= 500) {
+          observation.retries++;
+          continue;
+        }
         await rm(path, { force: true }).catch(() => {});
         if (response.statusCode >= 200 && response.statusCode < 300) delivered++;
-      } catch { /* server sesaat gagal: simpan berkas untuk tick berikutnya */ }
+        else observation.dropped++;
+      } catch { observation.retries++; } // simpan berkas untuk tick berikutnya
     }
   }
   return delivered;

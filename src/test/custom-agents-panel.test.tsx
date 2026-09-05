@@ -329,6 +329,37 @@ describe("badge agen bawaan", () => {
 });
 
 describe("SPEC-950 · profil eksekusi dan bukti efektivitas", () => {
+  it("distinguishes missing evidence from a failed metrics request", async () => {
+    getCustomAgentMetrics.mockRejectedValue(new Error("offline"));
+    render(<CustomAgentsPanel projectId={null} />);
+    await screen.findByText("rev");
+    expect(screen.getByText(/Bukti penggunaan gagal dimuat/)).toBeTruthy();
+    expect(screen.queryByText(/Belum ada bukti invocation dalam periode ini/)).toBeNull();
+  });
+  it("shows reviewed samples even when another agent occupies recent history", async () => {
+    getCustomAgentMetrics.mockResolvedValue({ agents: [], variants: [], recent: [], samples: [{
+      id: "older-reviewed", agentName: "rev", runtime: "claude", model: null,
+      startedAt: "2026-09-01T00:00:00Z", disposition: "partial", reworkRequired: true,
+      resultExcerpt: "bukti dinilai yang lebih lama",
+    }] });
+    render(<CustomAgentsPanel projectId={null} />);
+    await screen.findByText("rev");
+    expect(screen.getByText(/bukti dinilai yang lebih lama/)).toBeTruthy();
+    expect((screen.getByLabelText("Disposition older-reviewed") as HTMLSelectElement).value).toBe("partial");
+    expect((screen.getByLabelText("Kerja ulang older-reviewed") as HTMLSelectElement).value).toBe("yes");
+  });
+
+  it("shows unknown usage honestly and keeps token categories separate", async () => {
+    getCustomAgentMetrics.mockResolvedValue({ agents: [], recent: [], variants: [],
+      telemetry: { state: "unobserved", lastEventAt: null, incompleteCount: 0 } });
+    render(<CustomAgentsPanel projectId={null} />);
+    await screen.findByText("rev");
+    expect(screen.getByText(/Belum ada bukti invocation dalam periode ini/)).toBeTruthy();
+    const summary = screen.getByTestId("metrics-rev").textContent;
+    expect(summary).toContain("Token masuk: —");
+    expect(summary).toContain("keluar: —");
+    expect(summary).toContain("cache: —");
+  });
   it("meminta availability terhadap runtime sesi", async () => {
     render(<CustomAgentsPanel projectId={null} runtime="codex" />);
     await screen.findByText("rev");
@@ -393,7 +424,7 @@ describe("SPEC-950 · profil eksekusi dan bukti efektivitas", () => {
     await screen.findByText("rev");
     expect(screen.getByTestId("metrics-rev").textContent).toContain("7 invocation");
     expect(screen.getByTestId("metrics-rev").textContent).toContain("Durasi median: —");
-    expect(screen.getByTestId("metrics-rev").textContent).toContain("Token: —");
+    expect(screen.getByTestId("metrics-rev").textContent).toContain("Token masuk: —");
     expect(screen.getByTestId("precision-rev").textContent).toContain("80%");
     expect(screen.getByText(/workspace berubah/i)).toBeTruthy();
     expect(getCustomAgentMetrics).toHaveBeenCalledWith(expect.objectContaining({ projectId: undefined }));
@@ -411,7 +442,7 @@ describe("SPEC-950 · profil eksekusi dan bukti efektivitas", () => {
     updateAgentInvocationDisposition.mockResolvedValue({});
     render(<CustomAgentsPanel projectId={null} />);
     await screen.findByText("rev");
-    fireEvent.click(screen.getByText(/1 bukti terbaru/i));
+    fireEvent.click(screen.getByText(/1 sampel bukti/i));
     fireEvent.change(screen.getByLabelText("Disposition inv-1"), { target: { value: "accepted" } });
     fireEvent.change(screen.getByLabelText("Catatan inv-1"), { target: { value: "berguna" } });
     fireEvent.click(screen.getByRole("button", { name: "Nilai inv-1" }));
@@ -419,5 +450,36 @@ describe("SPEC-950 · profil eksekusi dan bukti efektivitas", () => {
       disposition: "accepted", note: "berguna",
     }));
     expect(getCustomAgentMetrics.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps runtime/model/definition evidence separate and saves explicit rework", async () => {
+    const metric = {
+      agentName: "rev", invocationCount: 1, evaluatedCount: 1, medianDurationMs: 1000,
+      inputTokens: 10, outputTokens: 5, cachedTokens: 3,
+      dispositions: { pending: 0, accepted: 1, partial: 0, rejected: 0, falsePositive: 0 },
+      operationalPrecision: 1, workspaceChanged: false,
+      rework: { required: 0, notRequired: 1, unknown: 0 },
+    };
+    getCustomAgentMetrics.mockResolvedValue({ agents: [metric], variants: [
+      { ...metric, runtime: "claude", model: "sonnet", definitionHash: "a".repeat(64) },
+      { ...metric, runtime: "codex", model: null, definitionHash: null },
+    ], recent: [{
+      id: "inv-1", agentName: "rev", runtime: "claude", model: "sonnet",
+      startedAt: "2026-09-05T00:00:00.000Z",
+      disposition: "accepted", dispositionNote: "berguna", reworkRequired: false,
+      resultExcerpt: "bukti", workspaceChanged: false,
+    }] });
+    updateAgentInvocationDisposition.mockResolvedValue({});
+    render(<CustomAgentsPanel projectId={null} />);
+    await screen.findByText("rev");
+    expect(screen.getByText(/claude · sonnet/, { selector: "li" }).textContent).toContain("aaaaaaaaaaaa");
+    expect(screen.getByText(/codex · model tidak tercatat/).textContent).toContain("versi tidak tercatat");
+    fireEvent.click(screen.getByText(/1 sampel bukti/i));
+    fireEvent.change(screen.getByLabelText("Kerja ulang inv-1"), { target: { value: "yes" } });
+    fireEvent.change(screen.getByLabelText("Catatan inv-1"), { target: { value: "perlu penyempurnaan" } });
+    fireEvent.click(screen.getByRole("button", { name: "Nilai inv-1" }));
+    await waitFor(() => expect(updateAgentInvocationDisposition).toHaveBeenCalledWith("inv-1", {
+      disposition: "accepted", note: "perlu penyempurnaan", reworkRequired: true,
+    }));
   });
 });

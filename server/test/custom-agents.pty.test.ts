@@ -40,6 +40,19 @@ const paneCmd = (id: string): string =>
   ], { encoding: "utf8" });
 
 describe("createSession · claude", () => {
+  it("snapshots the inherited session model in the invocation roster", () => {
+    registerCustomAgentSource(() => defs);
+    const a = createSession("p1", cwd, {
+      id: born("ca-inherit-a"), agent: "claude", prompt: "halo", model: "sonnet",
+    });
+    const b = createSession("p1", cwd, {
+      id: born("ca-inherit-b"), agent: "claude", prompt: "halo", model: "opus",
+    });
+    expect(getSession(a.id)!.agentRoster![0]!.model).toBe("sonnet");
+    expect(getSession(b.id)!.agentRoster![0]!.model).toBe("opus");
+    expect(getSession(a.id)!.agentRoster![0]!.definitionHash)
+      .not.toBe(getSession(b.id)!.agentRoster![0]!.definitionHash);
+  });
   it("memasang --agents dari BERKAS, bukan JSON inline (tmux membatasi satu command ~16 KB)", () => {
     registerCustomAgentSource(() => defs);
     const s = createSession("p1", cwd, { id: born("ca-claude-1"), agent: "claude", prompt: "halo" });
@@ -139,7 +152,8 @@ describe("createSession · codex", () => {
     expect(prompt).not.toContain("kamu peninjau");
     expect(existsSync(join(agentTempDir(s.id), "00-rev.toml"))).toBe(true);
     expect(getSession(s.id)?.agentRoster).toEqual([
-      { name: "rev" }, { name: "tes" },
+      { name: "rev", definitionHash: expect.stringMatching(/^[a-f0-9]{64}$/) },
+      { name: "tes", definitionHash: expect.stringMatching(/^[a-f0-9]{64}$/) },
     ]);
   });
 
@@ -274,8 +288,8 @@ describe("klausa delegasi di prompt", () => {
     const s = createSession("p1", cwd, { id: born("ca-klausa-1"), agent: "claude", prompt: "halo" });
     const prompt = readFileSync(promptFilePath(s.id), "utf8");
     expect(prompt).toContain("## Subagent yang tersedia");
-    expect(prompt).toContain("- **rev** — tinjau");
-    expect(prompt).toContain("- **tes** — uji");
+    expect(prompt).toContain("- **rev** (always) — tinjau");
+    expect(prompt).toContain("- **tes** (always) — uji");
   });
 
   // Invarian ADR-0094: katalog kosong → prompt byte-identik dengan sebelum fitur ini.

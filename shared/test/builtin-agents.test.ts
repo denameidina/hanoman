@@ -70,6 +70,38 @@ describe("katalog agen bawaan", () => {
     expect(security.effort).toBe("high");
   });
 
+  it("memberi batas turn operasional per kelompok builtin", () => {
+    const limits = Object.fromEntries(BUILTIN_AGENTS.map((a) => [a.name, a.maxTurns]));
+    expect(limits).toEqual({
+      scout: 20,
+      "root-causer": 40,
+      "qa-verifier": 40,
+      "edge-case-hunter": 40,
+      "blast-radius": 30,
+      "spec-auditor": 30,
+      "security-reviewer": 30,
+      "dep-auditor": 30,
+    });
+  });
+
+  it("memperbaiki aturan bukti yang terlalu absolut dan audit supply-chain", () => {
+    const instructions = (name: string) => BUILTIN_AGENTS.find((a) => a.name === name)!.instructions;
+    expect(instructions("qa-verifier")).toContain("test preservasi");
+    expect(instructions("edge-case-hunter")).toContain("langsung hijau");
+    expect(instructions("edge-case-hunter")).toContain("negative control");
+    expect(instructions("blast-radius")).toContain("dampak");
+    expect(instructions("blast-radius")).toContain("keyakinan");
+    expect(instructions("spec-auditor")).toContain("sudah terpenuhi di base");
+    expect(instructions("spec-auditor")).toContain("keadaan akhir");
+    expect(instructions("security-reviewer")).toContain("belum dapat disimpulkan");
+    expect(instructions("security-reviewer")).toContain("scope yang diperiksa");
+    expect(instructions("dep-auditor")).toContain("versi terkunci");
+    expect(instructions("dep-auditor")).toContain("tanggal pemeriksaan");
+    expect(instructions("dep-auditor")).toContain("sumber primer");
+    expect(instructions("dep-auditor")).toContain("ekuivalen secara fungsi");
+    expect(instructions("dep-auditor")).toContain("belum terverifikasi");
+  });
+
   // Berkas ini ikut dibundel untuk browser. `node:crypto` di sini mematikan build web, dan
   // gejalanya muncul jauh dari sini.
   it("tabelnya data murni — tanpa impor node:*", () => {

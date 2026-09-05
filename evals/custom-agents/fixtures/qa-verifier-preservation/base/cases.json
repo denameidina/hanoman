@@ -1,0 +1,6 @@
+[
+  {
+    "input": "a@b.com",
+    "expected": "a@b.com"
+  }
+]

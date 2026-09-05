@@ -1390,6 +1390,39 @@ Pakai skill lebih sempit saat task cocok:
   terdaftar ke daemon kolaborasi dan spawn selalu gagal.
   Parent harness wajib memutus kasus live yang melewati 180 detik; timeout prompt child saja bukan
   jaminan kill dari runtime.
+  **Amandemen audit 2026-09-05:** registry memuat seluruh agent enabled yang kompatibel sepanjang
+  sesi; smart berarti parent menilai ulang kebutuhan dari fase/diff/bukti terbaru sebelum delegasi.
+  Agent yang dinonaktifkan atau diubah setelah sesi lahir tetap memerlukan sesi baru. Availability
+  di API wajib konsisten dengan gerbang versi Codex dan policy isolated-worktree.
+  Root-causer default read-only hanya mendiagnosis statis dan menyerahkan rencana eksperimen;
+  eksperimen langsung hanya bila policy efektif isolated-worktree. Jangan longgarkan hook untuk
+  memenuhi prompt. Handoff mencakup tujuan/scope/base SHA/kandidat termasuk dirty changes/bukti
+  terdahulu/aturan verifikasi; keluaran mencakup status, jangkar, keyakinan dan bagian belum diperiksa.
+  Batas giliran builtin bersifat awal dan bisa disunting: scout 20, auditor 30, root/QA/edge 40;
+  Claude menerapkan maxTurns native, Codex secara instruksional; target waktu QA tetap instruksional.
+  Hash definisi efektif dicatat dari roster tepercaya saat invocation pertama, mencakup prompt,
+  runtime, profil/tools, dan hook read-only; payload agent tidak boleh menggantinya. Hash lama dan
+  penilaian kerja ulang yang tak diketahui tetap null. Agregat dipertahankan, varian dipisah menurut
+  runtime/model/hash. Status relay hanya observasi proses server, bukan jaminan seluruh hook sehat.
+  Spool wajib berada di `<HANOMAN_HOME>/session-events/<sessionId>`; root tmpdir lama pernah
+  memungkinkan server smoke dengan DB temp mengonsumsi event sesi tetangga. Jangan memindahkan
+  antrean lama otomatis karena kepemilikan home tidak tercatat. Tuntaskan sesi sandbox lama atau
+  mulai ulang dengan env spool baru saat mengganti server; HTTP host tidak memakai spool.
+  Eval kini 20 fixture berbukti terstruktur. Hook read-only produksi wajib diteruskan ke kedua
+  renderer. Kandidat dikomit hanya di repo temp agar child isolated mendapat snapshot yang benar.
+  Replay QA/edge menjalankan byte fixture yang ditangkap sebelum runtime + test vector JSON
+  tervalidasi, tidak pernah menjalankan JavaScript buatan child. Hash artefak dan exit dari replay
+  adalah bukti harness, bukan bukti child pernah menjalankan shell. Contoh dinilai/pending/rework
+  di metrics tidak boleh hilang karena batas recent global; gunakan `samples` per-agent.
+  Claude 2.1.261 mewariskan pembatas daftar alat global: `--tools Task` dapat membuat child
+  tidak punya alat baca, dan `--allowedTools` saja tidak mengembalikannya. Harness static memakai
+  Task/Read/Glob/Grep pada kedua daftar, restricted+plan tetap, hasil parent tetap tidak dinilai.
+  Live QA/edge dinyatakan unavailable pada harness ini; jangan menyebut replay offline sebagai
+  benchmark model live atau menambahkan Bash global tanpa batas eksekusi yang sesuai.
+  Kontrak format eval harus terpasang langsung sesudah prompt child native; kontrak yang hanya
+  berada di task parent bisa hilang saat didelegasikan atau bertentangan dengan format prosa
+  builtin. Report membedakan hash produksi dari hash evaluasi yang menyertakan suffix format;
+  jangan menyamakan keduanya atau melonggarkan parser demi meluluskan hasil yang tidak sesuai.
 - **Form Custom Agent berbasis katalog + `runtime`** (SPEC-484/ADR-**0101**, memperluas 0094 & 0074):
   `tools`/`model`/`mention` memakai **kontrol pilihan** bersumber API — `GET /api/custom-agents/catalog`
   untuk tools/model/runtime, `GET /custom-agents?projectId=` (yang sudah dipanggil panel) untuk mention;

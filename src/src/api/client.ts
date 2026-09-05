@@ -690,6 +690,7 @@ export const api = {
     j<AgentMetricsView>(paths.customAgentMetrics + qs(p)),
   updateAgentInvocationDisposition: (id: string, b: {
     disposition: Exclude<AgentDisposition, "pending">; note?: string | null;
+    reworkRequired?: boolean | null;
   }) => j<AgentInvocationView>(paths.customAgentInvocation(id), { method: "PATCH", ...body(b) }),
   // SPEC-481 · ADR-0100 · webhook keluar. Semua cookie-only; tak ada jalur agent token.
   listWebhooks: () => j<{ endpoints: WebhookEndpointView[]; eventTypes: string[] }>(paths.webhooks),

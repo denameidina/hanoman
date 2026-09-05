@@ -231,6 +231,7 @@ export type CustomAgentView = {
   /** Turunan runtime/policy; enabled tetap berarti preferensi operator. */
   available?: boolean;
   availabilityReason?: string;
+  selectionReason?: string;
   inherited?: boolean;
 };
 
@@ -244,10 +245,12 @@ export type AgentDisposition = (typeof AGENT_DISPOSITIONS)[number];
 export type AgentInvocationView = {
   id: string; sessionId: string; projectId: string; specId: string | null;
   runtime: AgentRuntime; customAgentId: string | null; agentName: string; model: string | null;
+  definitionHash: string | null;
   status: string; startedAt: string; endedAt: string | null; durationMs: number | null;
   inputTokens: number | null; outputTokens: number | null; cachedTokens: number | null;
   resultExcerpt: string | null; resultHash: string | null; workspaceChanged: boolean;
   disposition: AgentDisposition; dispositionNote: string | null; evaluatedAt: string | null;
+  reworkRequired: boolean | null;
 };
 
 export type AgentDispositionCounts = {
@@ -259,9 +262,31 @@ export type AgentMetricView = {
   inputTokens: number | null; outputTokens: number | null; cachedTokens: number | null;
   dispositions: AgentDispositionCounts; operationalPrecision: number | null;
   workspaceChanged: boolean;
+  evaluatedCount: number;
+  rework: { required: number; notRequired: number; unknown: number };
 };
 
-export type AgentMetricsView = { agents: AgentMetricView[]; recent: AgentInvocationView[] };
+export type AgentMetricVariantView = AgentMetricView & {
+  runtime: AgentRuntime; model: string | null; definitionHash: string | null;
+};
+export type AgentRelayStatus = {
+  state: "unobserved" | "ready" | "degraded";
+  checkedAt: string | null; lastDeliveryAt: string | null; lastIssueAt: string | null;
+  retryPending: number; retryAttempts: number; droppedEvents: number;
+};
+export type AgentMetricsView = {
+  agents: AgentMetricView[]; recent: AgentInvocationView[];
+  variants: AgentMetricVariantView[];
+  /** At most two pending, reviewed and rework examples per agent, deduplicated by invocation. */
+  samples: AgentInvocationView[];
+  /** Evidence within the requested filter, not a claim that all hooks are healthy. */
+  telemetry: {
+    state: "unobserved" | "observed";
+    lastEventAt: string | null;
+    incompleteCount: number;
+    relay: AgentRelayStatus;
+  };
+};
 
 /**
  * DFS berwarna. Mengembalikan jalur siklus (`["a","b","a"]`) atau null. Mention ke nama yang tak

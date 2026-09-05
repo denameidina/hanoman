@@ -1,0 +1,1 @@
+Product ID uses UUID format.

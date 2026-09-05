@@ -5,9 +5,10 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import {
   AGENT_DISPOSITIONS, type Agent, type AgentDisposition, type AgentInvocationView,
-  type AgentMetricView, type AgentMetricsView,
+  type AgentMetricView, type AgentMetricVariantView, type AgentMetricsView,
 } from "@hanoman/shared";
 import { prisma } from "../db";
+import { sessionEventRelayStatus } from "./session-event-relay";
 
 const MAX_EXCERPT_BYTES = 4_096;
 const MAX_TRANSCRIPT_BYTES = 10 * 1024 * 1024;
@@ -16,6 +17,7 @@ const ANSI = /[\u001b\u009b](?:\][^\u0007]*(?:\u0007|\u001b\\)|\[[0-?]*[ -/]*[@-
 type InvocationIdentity = {
   sessionId: string; projectId: string; specId?: string; runtime: Agent;
   runtimeInvocationId: string; customAgentId?: string; agentName: string; model?: string;
+  definitionHash?: string;
   cwd: string;
 };
 export type InvocationStart = InvocationIdentity & { startedAt?: Date };
@@ -131,7 +133,8 @@ export async function startAgentInvocation(input: InvocationStart, io: Io = {}) 
       specId: input.specId ?? null, runtime: input.runtime,
       runtimeInvocationId: input.runtimeInvocationId,
       customAgentId: input.customAgentId ?? null, agentName: input.agentName,
-      model: input.model ?? null, status: "running", startedAt,
+      model: input.model ?? null, definitionHash: input.definitionHash ?? null,
+      status: "running", startedAt,
     },
   });
   const before = snapshot(input.cwd, io.gitStatus);
@@ -172,7 +175,7 @@ export async function stopAgentInvocation(input: InvocationStop, io: Io = {}) {
       specId: input.specId ?? null, runtime: input.runtime,
       runtimeInvocationId: input.runtimeInvocationId,
       customAgentId: input.customAgentId ?? null, agentName: input.agentName,
-      model: input.model ?? null, startedAt, ...evidence,
+      model: input.model ?? null, definitionHash: input.definitionHash ?? null, startedAt, ...evidence,
     },
   });
   return { row, duplicate: false };
@@ -201,6 +204,7 @@ export const agentInvocationView = (row: Row): AgentInvocationView => ({
   id: row.id, sessionId: row.sessionId, projectId: row.projectId, specId: row.specId,
   runtime: row.runtime === "codex" ? "codex" : "claude",
   customAgentId: row.customAgentId, agentName: row.agentName, model: row.model,
+  definitionHash: row.definitionHash,
   status: row.status, startedAt: row.startedAt.toISOString(),
   endedAt: row.endedAt?.toISOString() ?? null, durationMs: row.durationMs,
   inputTokens: row.inputTokens, outputTokens: row.outputTokens, cachedTokens: row.cachedTokens,
@@ -209,6 +213,7 @@ export const agentInvocationView = (row: Row): AgentInvocationView => ({
   disposition: AGENT_DISPOSITIONS.includes(row.disposition as AgentDisposition)
     ? row.disposition as AgentDisposition : "pending",
   dispositionNote: row.dispositionNote, evaluatedAt: row.evaluatedAt?.toISOString() ?? null,
+  reworkRequired: row.reworkRequired,
 });
 
 const median = (values: number[]): number | null => {
@@ -235,8 +240,17 @@ export async function agentMetrics(query: {
   };
   const rows = await prisma.agentInvocation.findMany({ where, orderBy: { startedAt: "desc" } });
   const groups = new Map<string, typeof rows>();
-  for (const row of rows) groups.set(row.agentName, [...(groups.get(row.agentName) ?? []), row]);
-  const agents: AgentMetricView[] = [...groups.entries()].map(([agentName, invocations]) => {
+  const variantGroups = new Map<string, typeof rows>();
+  const add = (map: Map<string, typeof rows>, key: string, row: Row) => {
+    const group = map.get(key);
+    if (group) group.push(row);
+    else map.set(key, [row]);
+  };
+  for (const row of rows) {
+    add(groups, row.agentName, row);
+    add(variantGroups, JSON.stringify([row.agentName, row.runtime, row.model, row.definitionHash]), row);
+  }
+  const summarize = (agentName: string, invocations: typeof rows): AgentMetricView => {
     const dispositions = { pending: 0, accepted: 0, partial: 0, rejected: 0, falsePositive: 0 };
     for (const row of invocations) {
       if (row.disposition === "accepted") dispositions.accepted++;
@@ -258,21 +272,58 @@ export async function agentMetrics(query: {
       operationalPrecision: evaluated
         ? (dispositions.accepted + dispositions.partial) / evaluated : null,
       workspaceChanged: invocations.some((row) => row.workspaceChanged),
+      evaluatedCount: evaluated,
+      rework: {
+        required: invocations.filter((row) => row.reworkRequired === true).length,
+        notRequired: invocations.filter((row) => row.reworkRequired === false).length,
+        unknown: invocations.filter((row) => row.reworkRequired === null).length,
+      },
     };
-  }).sort((a, b) => a.agentName.localeCompare(b.agentName));
-  return { agents, recent: rows.slice(0, 100).map(agentInvocationView) };
+  };
+  const agents = [...groups.entries()].map(([name, group]) => summarize(name, group))
+    .sort((a, b) => a.agentName.localeCompare(b.agentName));
+  const variants = [...variantGroups.values()].map((group): AgentMetricVariantView => ({
+    ...summarize(group[0]!.agentName, group),
+    runtime: group[0]!.runtime === "codex" ? "codex" : "claude",
+    model: group[0]!.model, definitionHash: group[0]!.definitionHash,
+  })).sort((a, b) => JSON.stringify([a.agentName, a.runtime, a.model, a.definitionHash])
+    .localeCompare(JSON.stringify([b.agentName, b.runtime, b.model, b.definitionHash])));
+  const lastEventAt = rows.reduce((latest, row) =>
+    Math.max(latest, row.startedAt.getTime(), row.endedAt?.getTime() ?? 0), 0);
+  const sampleRows = new Map<string, Row>();
+  for (const group of groups.values()) {
+    for (const category of [
+      (row: Row) => row.disposition === "pending",
+      (row: Row) => row.disposition !== "pending",
+      (row: Row) => row.reworkRequired === true,
+    ]) {
+      for (const row of group.filter(category).slice(0, 2)) sampleRows.set(row.id, row);
+    }
+  }
+  return {
+    agents, variants, recent: rows.slice(0, 100).map(agentInvocationView),
+    samples: [...sampleRows.values()].map(agentInvocationView),
+    telemetry: {
+      state: rows.length ? "observed" : "unobserved",
+      lastEventAt: rows.length ? new Date(lastEventAt).toISOString() : null,
+      incompleteCount: rows.filter((row) => !row.endedAt || row.resultHash === null).length,
+      relay: sessionEventRelayStatus(),
+    },
+  };
 }
 
 export async function updateAgentInvocationDisposition(
   id: string,
   disposition: Exclude<AgentDisposition, "pending">,
   note?: string | null,
+  reworkRequired?: boolean | null,
 ): Promise<AgentInvocationView | null> {
   const exists = await prisma.agentInvocation.findUnique({ where: { id } });
   if (!exists) return null;
   const row = await prisma.agentInvocation.update({
     where: { id }, data: {
       disposition, dispositionNote: note?.trim() || null, evaluatedAt: new Date(),
+      ...(reworkRequired !== undefined ? { reworkRequired } : {}),
     },
   });
   return agentInvocationView(row);

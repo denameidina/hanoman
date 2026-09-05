@@ -2,12 +2,10 @@ import { prisma } from "../db";
 import {
   activationOf, effortOf, effectiveAgents, detectCycle, maxTurnsOf, mentionsOf, toolsOf,
   runtimeOf, timeoutSecondsOf, workspacePolicyOf, expandTools, ALL_TOOLS, GLOBAL_SCOPE,
-  BUILTIN_AGENTS, BUILTIN_AGENT_NAMES, modelsForRuntime,
+  BUILTIN_AGENTS, modelsForRuntime,
   type CustomAgent, type AgentNode, type Agent,
 } from "@hanoman/shared";
-import {
-  PIPELINES, codexNativeAgentsSupported, type AgentDef, type Flow,
-} from "@hanoman/runner";
+import { codexNativeAgentsSupported, type AgentDef } from "@hanoman/runner";
 import {
   collectChangedFiles, registerCodexNativeAgentSupport, registerCustomAgentSource,
   type AgentSelectionContext,
@@ -47,49 +45,6 @@ export type CustomAgentRow = {
 export { collectChangedFiles };
 export type { AgentSelectionContext };
 
-const phasesOf = (flow?: Flow): readonly string[] => flow ? PIPELINES[flow] : [];
-const hasPhase = (context: AgentSelectionContext, name: string): boolean =>
-  phasesOf(context.flow).includes(name);
-const touchesDependency = (files: readonly string[]): boolean => files.some((path) =>
-  /(^|\/)(?:package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?|Cargo\.(?:toml|lock)|go\.(?:mod|sum)|requirements[^/]*\.txt|pyproject\.toml)$/i.test(path));
-const touchesExternalInput = (context: AgentSelectionContext): boolean => {
-  const surface = [context.prompt ?? "", ...context.changedFiles].join("\n");
-  return /(?:^|[\W_/.-])(route|routes|handler|auth|oauth|api|cli|config|filesystem|upload|webhook|input)(?:$|[\W_/.-])/i
-    .test(surface);
-};
-const touchesExecutableWork = (files: readonly string[]): boolean => files.some((path) =>
-  !/(^|\/)(?:docs?|internal\/docs)\//i.test(path)
-  && /(?:\.(?:[cm]?[jt]sx?|py|go|rs|java|rb|php)|(?:^|\/)test(?:s)?\/)/i.test(path));
-
-function smartBuiltinSelected(row: CustomAgentRow, context: AgentSelectionContext): boolean {
-  switch (row.name) {
-    case "scout":
-      return hasPhase(context, "Plan") || hasPhase(context, "Execute")
-        || hasPhase(context, "Audit") || context.changedFiles.length === 0;
-    case "blast-radius":
-      return hasPhase(context, "Execute") || hasPhase(context, "Audit")
-        || context.changedFiles.length > 0;
-    case "security-reviewer":
-      return (hasPhase(context, "Execute") || hasPhase(context, "Audit"))
-        && touchesExternalInput(context);
-    case "spec-auditor":
-      return hasPhase(context, "Plan") || hasPhase(context, "Execute");
-    case "dep-auditor":
-      return touchesDependency(context.changedFiles);
-    case "root-causer":
-      return hasPhase(context, "Audit");
-    case "qa-verifier":
-      return context.runtime === "claude" && hasPhase(context, "Execute")
-        && workspacePolicyOf(row.workspacePolicy) === "isolated-worktree"
-        && touchesExecutableWork(context.changedFiles);
-    case "edge-case-hunter":
-      return context.runtime === "claude" && hasPhase(context, "Execute")
-        && workspacePolicyOf(row.workspacePolicy) === "isolated-worktree";
-    default:
-      return true;
-  }
-}
-
 export function selectAgentRows(
   rows: CustomAgentRow[],
   context: AgentSelectionContext,
@@ -100,9 +55,7 @@ export function selectAgentRows(
     if (runtime !== null && runtime !== context.runtime) return false;
     if (workspacePolicyOf(row.workspacePolicy) === "isolated-worktree"
       && context.runtime !== "claude") return false;
-    if (activationOf(row.activation) === "always") return true;
-    const builtin = row.projectId === null && BUILTIN_AGENT_NAMES.includes(row.name);
-    return builtin ? smartBuiltinSelected(row, context) : true;
+    return true;
   });
 }
 
@@ -195,8 +148,9 @@ export function agentDefsFor(
   const project = cache.filter((r) => r.projectId === projectId).map(asCustomAgent);
   const effectiveIds = new Set(effectiveAgents(globals, project).map((agent) => agent.id));
   const effectiveRows = cache.filter((row) => effectiveIds.has(row.id));
-  // Overload lama dipakai oleh diagnosis/cache tests dan berarti "semua definisi efektif untuk
-  // runtime". Hanya pintu createSession yang memiliki flow+diff cukup untuk smart activation.
+  // Semua definisi enabled + runtime/policy-compatible hidup sepanjang sesi. `activation=smart`
+  // mengarahkan parent kapan mendelegasikan berdasarkan pekerjaan TERKINI; ia tidak boleh
+  // membekukan capability dari flow/diff saat sesi lahir.
   const eff = legacy
     ? effectiveRows.filter((row) => row.enabled
       && (runtimeOf(row.runtime) === null || runtimeOf(row.runtime) === context.runtime)

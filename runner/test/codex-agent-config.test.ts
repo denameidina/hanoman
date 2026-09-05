@@ -17,13 +17,18 @@ const def = (overrides: Partial<AgentDef> = {}): AgentDef => ({
 
 describe("renderCodexAgentToml", () => {
   it("encodes native role, model, effort, sandbox, and hook as valid TOML literals", () => {
-    const out = renderCodexAgentToml(def(), [def()], { readOnlyHookCommand: "node '/tmp/a b.js'" });
+    const out = renderCodexAgentToml(def({ maxTurns: 20 }), [def()], {
+      readOnlyHookCommand: "node '/tmp/a b.js'",
+    });
     expect(out).toContain('name = "scout"');
     expect(out).toContain('model = "gpt-5.6-terra"');
     expect(out).toContain('model_reasoning_effort = "low"');
     expect(out).toContain('sandbox_mode = "read-only"');
     expect(out).toContain('[[hooks.PreToolUse]]');
     expect(out).toContain("baris 1\\nbaris 2");
+    expect(out).toContain("20 turn");
+    expect(out).toContain("batas instruksional");
+    expect(out).not.toContain("max_turns");
   });
 });
 

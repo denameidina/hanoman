@@ -1,1 +1,26 @@
-Test duplicate delivery memanggil event yang sama dua kali dan membuktikan idempotensi; batas delivery ganda sudah tertutup.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "idempotency-preserved",
+      "status": "confirmed",
+      "claim": "idempotency-preserved",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "app.cjs",
+          "line": 1,
+          "quote": "exports.createReceiver = () => { const ledger = new Set(); return { receive: (event) => ledger.add(event.id), count: () => ledger.size }; };"
+        }
+      ],
+      "command": {
+        "cwd": ".",
+        "artifact": "cases.json",
+        "baseExit": 0,
+        "candidateExit": 0,
+        "mutantExit": 1
+      }
+    }
+  ]
+}

@@ -35,53 +35,33 @@ describe("selectAgentRows", () => {
   });
 
   it.each([
-    ["scout", { flow: "feature" }],
-    ["blast-radius", { flow: "feature" }],
-    ["spec-auditor", { flow: "feature" }],
-    ["root-causer", { flow: "audit" }],
-  ] as const)("selects %s for its matching flow", (name, overrides) => {
+    ["qa-verifier", { flow: "feature" }],
+    ["dep-auditor", { flow: "feature" }],
+    ["security-reviewer", { flow: "goal" }],
+    ["security-reviewer", { flow: "no_effort" }],
+    ["spec-auditor", { flow: "audit" }],
+  ] as const)("keeps enabled %s in the lifetime registry", (name, overrides) => {
     expect(selectAgentRows([builtin(name)], context(overrides)).map((agent) => agent.name))
       .toEqual([name]);
   });
 
-  it("selects scout for a project session with no diff", () => {
-    expect(selectAgentRows([builtin("scout")], context()).map((agent) => agent.name))
-      .toEqual(["scout"]);
-  });
-
-  it("selects dep-auditor only for an opted-in manifest or lockfile diff", () => {
-    const row = builtin("dep-auditor");
-    expect(selectAgentRows([row], context({ changedFiles: ["src/a.ts"] }))).toEqual([]);
-    expect(selectAgentRows([row], context({ changedFiles: ["pnpm-lock.yaml"] })))
-      .toHaveLength(1);
-  });
-
-  it("selects security-reviewer only when an Execute/Audit flow touches external input", () => {
-    const row = builtin("security-reviewer");
-    expect(selectAgentRows([row], context({ flow: "feature", prompt: "ubah warna tombol" })))
-      .toEqual([]);
-    expect(selectAgentRows([row], context({ flow: "feature", prompt: "tambah route auth callback" })))
-      .toHaveLength(1);
-    expect(selectAgentRows([row], context({ flow: "audit", changedFiles: ["server/src/routes/x.ts"] })))
-      .toHaveLength(1);
-  });
-
-  it("makes QA available only for eligible Claude Execute work", () => {
-    const row = builtin("qa-verifier");
-    const eligible = { flow: "feature" as const, changedFiles: ["server/src/a.ts"] };
-    expect(selectAgentRows([row], context(eligible))).toHaveLength(1);
-    expect(selectAgentRows([row], context({ ...eligible, runtime: "codex" }))).toEqual([]);
-    expect(selectAgentRows([row], context({ flow: "audit", changedFiles: ["server/src/a.ts"] })))
-      .toEqual([]);
-  });
-
-  it("selects edge-case-hunter only inside a Claude isolated worktree", () => {
-    const isolated = builtin("edge-case-hunter");
-    expect(selectAgentRows([isolated], context({ flow: "feature" }))).toHaveLength(1);
-    expect(selectAgentRows([isolated], context({ flow: "feature", runtime: "codex" }))).toEqual([]);
+  it("keeps smart agents available when the birth diff does not match their trigger", () => {
     expect(selectAgentRows([
-      { ...isolated, workspacePolicy: "read-only" },
-    ], context({ flow: "feature" }))).toEqual([]);
+      builtin("scout"), builtin("root-causer"), builtin("blast-radius"),
+    ], context({ flow: "goal", changedFiles: [] })).map((agent) => agent.name))
+      .toEqual(["scout", "root-causer", "blast-radius"]);
+  });
+
+  it("still excludes a runtime-incompatible agent", () => {
+    expect(selectAgentRows([
+      builtin("scout", { runtime: "claude" }),
+    ], context({ runtime: "codex" }))).toEqual([]);
+  });
+
+  it("still excludes isolated-worktree agents from Codex", () => {
+    expect(selectAgentRows([
+      builtin("edge-case-hunter"),
+    ], context({ runtime: "codex" }))).toEqual([]);
   });
 });
 

@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "local-advisory-license-unknown",
+      "status": "confirmed",
+      "claim": "local-advisory-license-unknown",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "package-lock.json",
+          "line": 1,
+          "quote": "{\"lockfileVersion\":3,\"packages\":{\"node_modules/fixture-parser\":{\"version\":\"1.0.0\"}}}"
+        },
+        {
+          "revision": "candidate",
+          "path": "sources/license.txt",
+          "line": 1,
+          "quote": "Fixture package license: UNKNOWN"
+        },
+        {
+          "revision": "candidate",
+          "path": "policy.txt",
+          "line": 1,
+          "quote": "Allowed licenses: MIT, Apache-2.0. Check ONLY supplied local primary source fixtures; no live CVE claim."
+        },
+        {
+          "revision": "candidate",
+          "path": "sources/advisory.json",
+          "line": 1,
+          "quote": "{\"fixtureOnly\":true,\"date\":\"2026-09-01\",\"status\":\"unavailable\"}"
+        }
+      ]
+    }
+  ]
+}

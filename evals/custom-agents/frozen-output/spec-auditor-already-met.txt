@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "criterion-already-met",
+      "status": "confirmed",
+      "claim": "criterion-already-met",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 2,
+          "quote": "- [x] emit audit log after document deletion"
+        },
+        {
+          "revision": "candidate",
+          "path": "delete.js",
+          "line": 1,
+          "quote": "export function deleteDocument(id) { removeDocument(id); emitAudit(\"document.deleted\"); }"
+        },
+        {
+          "revision": "base",
+          "path": "delete.js",
+          "line": 1,
+          "quote": "export function deleteDocument(id) { removeDocument(id); emitAudit(\"document.deleted\"); }"
+        }
+      ]
+    }
+  ]
+}

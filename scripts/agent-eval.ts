@@ -8,7 +8,7 @@ import {
 } from "../runner/src/custom-agent-eval";
 
 const usage = [
-  "Usage: pnpm agent:eval --runtime claude|codex [--agent name] [--output path]",
+  "Usage: pnpm agent:eval --runtime claude|codex [--agent name] [--case id] [--output path]",
   "",
   "Live dan opt-in: perintah ini menjalankan CLI model terhadap repo fixture sementara.",
 ].join("\n");
@@ -25,7 +25,7 @@ for (let index = 2; index < process.argv.length; index += 1) {
   const key = equal === -1 ? arg : arg.slice(0, equal);
   const value = equal === -1 ? process.argv[++index] : arg.slice(equal + 1);
   if (!value || value.startsWith("--")) throw new Error(`Nilai wajib untuk ${key}\n${usage}`);
-  if (!new Set(["--runtime", "--agent", "--output"]).has(key)) {
+  if (!new Set(["--runtime", "--agent", "--case", "--output"]).has(key)) {
     throw new Error(`Opsi tidak dikenal: ${key}\n${usage}`);
   }
   values.set(key, value);
@@ -49,6 +49,7 @@ const result = await runCustomAgentEvaluations({
   runtimeBin,
   clientVersion,
   agentName: values.get("--agent"),
+  caseId: values.get("--case"),
   outputPath: values.get("--output") ? resolve(process.cwd(), values.get("--output")!) : undefined,
   evalRoot,
   cases: AGENT_EVAL_CASES,
@@ -60,6 +61,7 @@ for (const entry of result.cases) {
     `${status} ${entry.id}: recall=${entry.score.recall.toFixed(2)} `
     + `forbidden=${entry.score.forbiddenHitRate.toFixed(2)} runtime_exit=${entry.status}\n`,
   );
+  for (const error of entry.score.evidenceErrors) process.stdout.write(`  evidence: ${error}\n`);
 }
 for (const entry of result.skipped) {
   process.stdout.write(`SKIP ${entry.id}: ${entry.reason}\n`);

@@ -95,8 +95,9 @@ kosong → nol byte, jadi invarian "prompt byte-identik saat katalog kosong" tet
 
 - Instalasi baru langsung punya delapan persona, tiga aktif — SPEC-450 berhenti menjadi permukaan
   kosong.
-- Tiga yang menyala dipertimbangkan smart saat kelahiran sesi. Lima yang
-  mati tak membayar apa pun sampai diklik.
+- Tiga yang menyala tersedia di registry sepanjang sesi yang kompatibel. Smart mengarahkan
+  delegasi dari pekerjaan terkini, bukan menyaring registry dari diff saat kelahiran sesi
+  (amandemen ADR-0159, 2026-09-05). Lima yang mati tak ikut registry sampai diaktifkan.
 - Baris bawaan **menyeberang sync** seperti baris custom agent lain. Dua mesin dengan versi hanoman
   berbeda berebut lewat LWW dan yang menulis terakhir menang. Diterima — bukan dihilangkan — karena
   id deterministik `global:<name>` membuat keduanya **satu baris**, bukan dua yang saling menelan

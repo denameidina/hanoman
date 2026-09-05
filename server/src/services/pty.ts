@@ -23,6 +23,7 @@ import { controlHost, loadIngressPolicy } from "./ingress-policy";
 import { sessionEventToken } from "./session-event-token";
 import { sandboxCommand } from "./session-sandbox";
 import { sessionEventDir } from "./session-event-spool";
+import { agentDefinitionHash } from "@hanoman/runner";
 export { sessionEventDir } from "./session-event-spool";
 
 // Sesi hidup di dalam tmux server, bukan di proses API (ADR-0016). Restart `pnpm dev`
@@ -156,7 +157,7 @@ export type Pane = SessionInfo & {
   agentRoster?: SessionAgentMeta[];
 };
 export type SessionAgentMeta = {
-  id?: string; name: string; model?: string; timeoutSeconds?: number;
+  id?: string; name: string; model?: string; timeoutSeconds?: number; definitionHash?: string;
 };
 
 // Satu attachment per sesi: satu klien tmux melayani semua WebSocket yang menonton.
@@ -394,6 +395,8 @@ function parseAgentRoster(value: string | undefined): SessionAgentMeta[] {
         name: row.name,
         ...(typeof row.id === "string" ? { id: row.id } : {}),
         ...(typeof row.model === "string" ? { model: row.model } : {}),
+        ...(typeof row.definitionHash === "string" && /^[a-f0-9]{64}$/.test(row.definitionHash)
+          ? { definitionHash: row.definitionHash } : {}),
         ...(typeof row.timeoutSeconds === "number" ? { timeoutSeconds: row.timeoutSeconds } : {}),
       }];
     });
@@ -457,7 +460,7 @@ export function sessionEventEnv(
     HANOMAN_SESSION_ID: sessionId,
     HANOMAN_EVENT_URL: `http://127.0.0.1:${port}/api/session-events`,
     HANOMAN_EVENT_TOKEN: sessionEventToken(sessionId),
-    HANOMAN_EVENT_DIR: sessionEventDir(sessionId),
+    HANOMAN_EVENT_DIR: sessionEventDir(sessionId, env),
     ...(host ? { HANOMAN_EVENT_HOST: host } : {}),
   };
 }
@@ -787,9 +790,16 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   tmux("set-option", "-t", name(id), "@hanoman_launch_class",
     opts.command || kind === "terminal" ? "terminal" : "agent");
   if (liveAgentDefs.length > 0) {
+    const inherited = {
+      model: opts.model,
+      effort: agent === "codex" && opts.model && opts.effort
+        ? coerceCodexEffort(opts.model, opts.effort) : opts.effort,
+    };
     const roster: SessionAgentMeta[] = liveAgentDefs.map((def) => ({
       ...(def.id ? { id: def.id } : {}), name: def.name,
-      ...(def.model ? { model: def.model } : {}),
+      ...(def.model ?? inherited.model ? { model: def.model ?? inherited.model } : {}),
+      // Native files were rendered with customDefs, even if another Codex file failed to write.
+      definitionHash: agentDefinitionHash(def, customDefs, agent, inherited),
       ...(def.timeoutSeconds ? { timeoutSeconds: def.timeoutSeconds } : {}),
     }));
     tmux("set-option", "-t", name(id), "@hanoman_agent_roster", JSON.stringify(roster));

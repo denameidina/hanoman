@@ -1,1 +1,25 @@
-Kriteria audit log tercentang tetapi tidak ada jejak implementasi di diff. Kotak tanpa jejak bukan bukti; kriterianya tak terpenuhi.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "criterion-missing",
+      "status": "confirmed",
+      "claim": "criterion-missing",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 2,
+          "quote": "- [x] emit audit log after document deletion"
+        },
+        {
+          "revision": "candidate",
+          "path": "delete.js",
+          "line": 1,
+          "quote": "export function deleteDocument(id) { removeDocument(id); }"
+        }
+      ]
+    }
+  ]
+}

@@ -34,6 +34,47 @@ beforeEach(clean);
 afterAll(async () => { await clean(); await app.close(); });
 
 describe("GET /api/custom-agents/metrics", () => {
+  it("keeps per-agent reviewed, pending and rework samples beyond the global recent limit", async () => {
+    const cookie = await login();
+    await prisma.agentInvocation.createMany({ data: [
+      ...Array.from({ length: 101 }, () => invocation({ agentName: "busy-agent",
+        startedAt: new Date("2026-09-05T00:00:00Z") })),
+      invocation({ id: "reviewed", disposition: "accepted", reworkRequired: false }),
+      invocation({ id: "rework", disposition: "partial", reworkRequired: true }),
+      invocation({ id: "pending" }),
+    ] as never[] });
+    const r = await app.inject({ method: "GET", url: "/api/custom-agents/metrics", headers: { cookie } });
+    expect(r.json().recent).toHaveLength(100);
+    expect(r.json().recent.every((row: { agentName: string }) => row.agentName === "busy-agent")).toBe(true);
+    const samples = r.json().samples.filter((row: { agentName: string }) => row.agentName === "scout");
+    expect(samples.map((row: { id: string }) => row.id).sort()).toEqual(["pending", "reviewed", "rework"]);
+  });
+  it("reports no observed evidence without claiming no usage or healthy hooks", async () => {
+    const cookie = await login();
+    const r = await app.inject({ method: "GET", url: "/api/custom-agents/metrics", headers: { cookie } });
+    expect(r.json()).toMatchObject({
+      agents: [], variants: [], recent: [],
+      telemetry: { state: "unobserved", lastEventAt: null, incompleteCount: 0 },
+    });
+  });
+
+  it("separates runtime, model and executed definition without losing the aggregate", async () => {
+    const cookie = await login();
+    await prisma.agentInvocation.createMany({ data: [
+      invocation({ definitionHash: "a".repeat(64), disposition: "accepted", reworkRequired: false }),
+      invocation({ definitionHash: "b".repeat(64), disposition: "partial", reworkRequired: true }),
+      invocation({ definitionHash: "a".repeat(64), model: "sonnet" }),
+      invocation({ definitionHash: null, runtime: "codex", model: "gpt-5.6-terra" }),
+    ] as never[] });
+    const r = await app.inject({ method: "GET", url: "/api/custom-agents/metrics", headers: { cookie } });
+    const body = r.json();
+    expect(body.agents).toHaveLength(1);
+    expect(body.agents[0]).toMatchObject({ invocationCount: 4, evaluatedCount: 2,
+      rework: { required: 1, notRequired: 1, unknown: 2 } });
+    expect(body.variants).toHaveLength(4);
+    expect(body.variants).toContainEqual(expect.objectContaining({ runtime: "codex", definitionHash: null }));
+    expect(body.telemetry).toMatchObject({ state: "observed", lastEventAt: "2026-08-20T00:00:01.000Z" });
+  });
   it("mengagregasi median, token tersedia, disposition, precision, dan perubahan workspace", async () => {
     const cookie = await login();
     await prisma.agentInvocation.createMany({ data: [
@@ -89,6 +130,20 @@ describe("GET /api/custom-agents/metrics", () => {
 });
 
 describe("PATCH /api/custom-agents/invocations/:id", () => {
+  it("stores optional tri-state parent rework and preserves it when omitted", async () => {
+    const cookie = await login();
+    await prisma.agentInvocation.create({ data: invocation({ id: "rework" }) as never });
+    const patch = (payload: Record<string, unknown>) => app.inject({ method: "PATCH",
+      url: "/api/custom-agents/invocations/rework", headers: { cookie }, payload });
+    for (const reworkRequired of [true, false, null]) {
+      const r = await patch({ disposition: "accepted", reworkRequired });
+      expect(r.statusCode).toBe(200);
+      expect(r.json().reworkRequired).toBe(reworkRequired);
+    }
+    await patch({ disposition: "partial", reworkRequired: true });
+    expect((await patch({ disposition: "accepted" })).json().reworkRequired).toBe(true);
+    expect((await patch({ disposition: "accepted", reworkRequired: "yes" })).statusCode).toBe(400);
+  });
   it("menilai invocation dan mengembalikan view tanpa path internal", async () => {
     const cookie = await login();
     await prisma.agentInvocation.create({ data: invocation({ id: "judge", runtimeInvocationId: "judge" }) as never });

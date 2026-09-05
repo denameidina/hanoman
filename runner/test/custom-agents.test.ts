@@ -101,6 +101,35 @@ describe("agentPromptOf — lapis 3 anti-loop", () => {
     expect(p).toContain("@b");
     expect(p).not.toContain("@hantu");
   });
+
+  it("membawa policy efektif read-only dan melarang klaim eksperimen tanpa output", () => {
+    const p = agentPromptOf(def({
+      name: "root-causer", workspacePolicy: "read-only", maxTurns: 40,
+    }), [], "claude");
+    expect(p).toContain("Policy efektif: read-only");
+    expect(p).toContain("diagnosis statis");
+    expect(p).toContain("rencana eksperimen untuk parent");
+    expect(p).toContain("Jangan mengklaim eksperimen telah dijalankan tanpa output");
+  });
+
+  it("mengizinkan root-causer mereproduksi hanya pada isolated-worktree", () => {
+    const p = agentPromptOf(def({
+      name: "root-causer", workspacePolicy: "isolated-worktree", maxTurns: 40,
+    }), [], "claude");
+    expect(p).toContain("Policy efektif: isolated-worktree");
+    expect(p).toContain("boleh mereproduksi");
+    expect(p).toContain("worktree terisolasi");
+  });
+
+  it("membawa kontrak handoff, batas laporan, dan batas turn instruksional", () => {
+    const p = agentPromptOf(def({ name: "scout", maxTurns: 20 }), [], "codex");
+    expect(p).toContain("Status: selesai | sebagian | terhalang");
+    expect(p).toContain("maksimal 12 temuan utama");
+    expect(p).toContain("maksimal 1200 kata");
+    expect(p).toContain("20 turn");
+    expect(p).toContain("batas instruksional");
+    expect(p).toContain("bukan hard kill");
+  });
 });
 
 // SPEC-543 · ADR-0108 · subagent claude punya konteks TERPISAH: prompt sesi (yang membawa klausa
@@ -146,6 +175,18 @@ describe("agentDelegationClause", () => {
 
   it("membawa deskripsi tiap agen sebagai pemicunya", () => {
     expect(agentDelegationClause([def("scout", "cari kode")])).toContain("cari kode");
+  });
+
+  it("menilai ulang smart delegation dari pekerjaan terbaru dan meminta handoff lengkap", () => {
+    const agent = def("scout", "cari kode");
+    agent.activation = "smart";
+    const out = agentDelegationClause([agent]);
+    expect(out).toContain("pekerjaan, fase, dan diff TERKINI");
+    expect(out).toContain("base SHA");
+    expect(out).toContain("dirty changes");
+    expect(out).toContain("bukti sebelumnya");
+    expect(out).toContain("kandidat yang diperiksa");
+    expect(out).toContain("aturan verifikasi");
   });
 
   it("Codex diarahkan ke spawn_agent tanpa membawa full instructions", () => {

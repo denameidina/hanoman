@@ -1,0 +1,1 @@
+type AccountWire = { id: string; name: string; locale: string };

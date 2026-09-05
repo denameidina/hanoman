@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "dependencies": {
+    "nanoid": "5.1.0"
+  }
+}

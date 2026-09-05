@@ -101,15 +101,16 @@ describe("seedBuiltinAgents — upgrade", () => {
     await seedBuiltinAgents();
     // Baris ini SEOLAH ditulis seed versi sebelumnya: isinya beda dari katalog terpasang, tapi
     // stempelnya cocok dengan isinya — jadi "belum disentuh operator", hanya versi lama.
-    const lama = { ...scout, instructions: "isi versi lama" };
+    const lama = { ...scout, instructions: "isi versi lama", maxTurns: null };
     await prisma.customAgent.update({ where: { id: idOf("scout") },
-      data: { instructions: lama.instructions } });
+      data: { instructions: lama.instructions, maxTurns: lama.maxTurns } });
     await stempel("scout", builtinFingerprint(lama));
 
     await seedBuiltinAgents();
 
     const row = await prisma.customAgent.findUnique({ where: { id: idOf("scout") } });
     expect(row!.instructions).toBe(scout.instructions);
+    expect(row!.maxTurns).toBe(20);
     expect((await getSetting()).builtinAgents.scout).toBe(builtinFingerprint(scout));
   });
 
@@ -122,6 +123,14 @@ describe("seedBuiltinAgents — upgrade", () => {
     await seedBuiltinAgents();
     const row = await prisma.customAgent.findUnique({ where: { id: idOf("scout") } });
     expect(row!.instructions).toBe("punya operator");
+  });
+
+  it("TIDAK menimpa batas turn yang sudah disunting operator", async () => {
+    await seedBuiltinAgents();
+    await prisma.customAgent.update({ where: { id: idOf("scout") }, data: { maxTurns: 77 } });
+    await seedBuiltinAgents();
+    expect((await prisma.customAgent.findUnique({ where: { id: idOf("scout") } }))!.maxTurns)
+      .toBe(77);
   });
 
   it("upgrade memperbarui isi tapi TIDAK pernah mengembalikan saklar enabled operator", async () => {

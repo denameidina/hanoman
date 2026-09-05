@@ -1,1 +1,25 @@
-Temuan cermin: packages/web/source.txt mendefinisikan AccountWire dengan bentuk payload yang sama tetapi nama simbol berbeda. Field locale sudah masuk UserPayload dan belum masuk AccountWire, jadi cermin itu stale.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "mirror-stale",
+      "status": "confirmed",
+      "claim": "mirror-stale",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "packages/shared/source.txt",
+          "line": 1,
+          "quote": "export type UserPayload = { id: string; name: string; locale: string };"
+        },
+        {
+          "revision": "candidate",
+          "path": "packages/web/source.txt",
+          "line": 1,
+          "quote": "type AccountWire = { id: string; name: string };"
+        }
+      ]
+    }
+  ]
+}

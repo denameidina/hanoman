@@ -1,0 +1,24 @@
+# Perbaikan audit custom agent bawaan — 5 September 2026
+
+Keputusan pengguna: “perbaiki semua yang harus diperbaiki”, menindaklanjuti [audit](../../../internal/docs/research/audit-2026-09-05-custom-agent-bawaan.md). Implementasi meneruskan worktree audit yang sama. Mengamandemen ADR-0159; tidak mengubah default tiga agent atau pilihan model tanpa benchmark.
+
+## Hasil yang wajib
+1. Seluruh builtin yang enabled dan kompatibel terdaftar native sepanjang sesi, termasuk saat diff masih kosong dan flow goal/no_effort/audit. Smart mengatur kapan parent mendelegasikan berdasarkan tugas/fase/diff TERKINI, bukan menghapus kemampuan saat lahir. Disabled, project override, runtime incompatibility, raw shell, dan Codex version gate tetap dihormati. UI menjelaskan availability dan arti smart.
+2. Root-causer membaca policy efektif: read-only = diagnosis statis dengan bukti yang sudah tersedia, hipotesis berlabel, serta rencana eksperimen untuk parent; isolated-worktree = reproduksi/eksperimen di lingkungan terpisah. Read-only validator tidak dilonggarkan. Prompt dilarang mengklaim eksperimen telah berjalan tanpa output.
+3. Perbaiki seluruh delapan prompt sesuai audit: gunakan ulang scout; prioritas blast radius berdasarkan dampak/keyakinan; test preservasi boleh hijau; spec dinilai pada keadaan akhir dan dapat sudah terpenuhi di base; security membedakan terbukti/belum disimpulkan/cakupan diperiksa; dep mencakup manifest/lockfile lintas ekosistem, versi terkunci, tanggal/sumber primer, ekuivalensi fungsi, dan unknown verdict.
+4. Kontrak handoff bersama mencakup tujuan/scope/base SHA/kandidat termasuk dirty changes/bukti sebelumnya/aturan verifikasi. Child menyatakan selesai/sebagian/terhalang, simpulan, jangkar, keyakinan, scope belum diperiksa, langkah berikutnya. Laporan maks. 12 temuan utama dan 1200 kata sebagai batas instruksional. Pasang batas turn eksplisit per builtin (scout 20; auditor 30; root/QA/edge 40) sebagai batas awal operasional yang dapat disunting, bukan hasil benchmark. Timeout QA tetap 900 detik instruksional; agent lain tidak diberi klaim hard timeout baru. Codex maxTurns dilaporkan sebagai instruksional bila tidak native.
+5. Eval menggunakan hook read-only PRODUKSI pada kedua renderer. Root read-only dinilai diagnosis statis; pengujian eksekusi memakai profil terisolasi yang kompatibel. Fixture QA/edge executable memakai Node built-in test runner, nol dependensi baru. Evaluasi menggunakan evidence terstruktur yang divalidasi terhadap fixture/artefak dan output child, tidak menerima keyword-only/negated/unknown sebagai temuan confirmed. Tambahkan kontrol test preservasi dan criterion already met, serta kasus advisory/lisensi berbasis fixture sumber lokal (bukan data CVE live rekaan). Tetap atribusi lifecycle child, isolated parent, realpath source protection, report di luar checkout, timeout harness, skip runtime unsupported.
+6. Persist fingerprint definisi EFEKTIF pada metadata sesi dan AgentInvocation LOCAL-only (nullable untuk historis). Tambahkan disposition opsional reworkRequired (null belum dinilai). Metrik agregat lama tetap tersedia; variants dibedakan agent/runtime/model/fingerprint. Tampilkan sampel dinilai/pending/rework dan status evidence “belum diamati”/“teramati”, bukan menyimpulkan tidak dipakai atau hook sehat dari nol event. Token input/output/cache ditampilkan terpisah untuk menghindari penghitungan ganda. Capability/cookie-only tetap berlaku.
+7. Seed tetap mempertahankan suntingan/saklar/tombstone operator; perubahan prompt/batas masuk melalui fingerprint upgrade unedited. Null historis tetap unknown. Tidak menulis DB operasional saat pengembangan.
+
+## Validasi
+
+Amandemen berbasis verifikasi runtime: harness live Claude memakai Task/Read/Glob/Grep secara
+global dan pada permission allowlist karena CLI 2.1.261 juga menyaring tool child dari daftar
+global. Parent tetap restricted+plan tanpa Bash/Write/Edit; hanya lifecycle child target yang
+dinilai. Lima fixture QA/edge tetap executable lewat replay offline berbasis data, namun live
+ditandai unavailable sampai eksekusi/penulisan child dapat dibatasi dan diverifikasi dengan aman.
+Keduanya tidak dihitung sebagai live pass. Spool produksi dipisah menurut HANOMAN_HOME setelah
+smoke menemukan antrean tmpdir global dapat dikonsumsi server uji.
+
+Regression test merah lebih dulu untuk bug mekanis; test terarah serial dengan TEST_DATABASE_URL unik dan env bersih. Typecheck shared/runner/server/frontend yang tersentuh. Smoke endpoint sekali pada server dan DB temp, bukan instance operasional. Review keseluruhan sebelum dinyatakan selesai. Benchmark live jika runtime/kredensial tersedia dijalankan opt-in terbatas setelah harness terbukti; kegagalan akses dilaporkan, tidak diganti klaim keberhasilan. Tidak suite penuh, publish, atau merge otomatis.

@@ -1,2 +1,1 @@
-export const normalizeEmail = (value) => value.trim().toLowerCase();
-test("normalizes email", () => expect(normalizeEmail(" A@B.COM ")).toBe("a@b.com"));
+See app.cjs, test.cjs and cases.json.

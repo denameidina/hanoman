@@ -1,1 +1,31 @@
-Jalur GET /documents/:id memang authenticated, tetapi query hanya memakai id. Ownership check missing sehingga pengguna dapat membaca dokumen milik orang lain.
+{
+  "version": 1,
+  "status": "complete",
+  "findings": [
+    {
+      "id": "ownership-missing",
+      "status": "confirmed",
+      "claim": "ownership-missing",
+      "anchors": [
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 1,
+          "quote": "GET /documents/:id"
+        },
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 2,
+          "quote": "const user = requireAuthenticated(request);"
+        },
+        {
+          "revision": "candidate",
+          "path": "source.txt",
+          "line": 3,
+          "quote": "return db.document.findUnique({ where: { id: request.params.id } });"
+        }
+      ]
+    }
+  ]
+}
