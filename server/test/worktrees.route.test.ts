@@ -5,8 +5,9 @@ import { join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "../src/app";
 import { resetDb, makeProject, makeSpec, makeRepoWithWorktree } from "./factory";
-import { createSession, getSession, killAll } from "../src/services/pty";
+import { createSession, getSession, killSession, killAll } from "../src/services/pty";
 import { __resetReaper, trashDirOf } from "../src/services/worktree-reaper";
+import { beginSession, reconcileHistory } from "../src/services/session-history";
 
 // SPEC-861 · ADR-0132 · tiga route worktree. Daftar & stats read-only turunan git; hapus adalah
 // operasi destruktif yang diperlakukan seperti /branches/delete (selalu 200 bila body sah).
@@ -82,6 +83,49 @@ describe("GET /projects/:id/worktrees/stats", () => {
 });
 
 describe("POST /projects/:id/worktrees/delete", () => {
+  it("mode yatim menemukan history crash lalu melepas checkout setelah diminta", async () => {
+    const repoDir = await project("orphan");
+    const cwd = join(repoDir, ".worktrees", "spec-w1");
+    await beginSession({ sessionId: "spec-w1", projectId: "orphan", cwd, kind: "terminal", agent: "claude" });
+    await reconcileHistory([]);
+    const list = await app.inject({ method: "GET", url: "/api/projects/orphan/worktrees" });
+    expect(list.json().worktrees.find((w: any) => w.name === "spec-w1").orphan.sessionId).toBe("spec-w1");
+    expect(existsSync(cwd)).toBe(true);
+    const r = await app.inject({ method: "POST", url: "/api/projects/orphan/worktrees/delete",
+      payload: { names: ["spec-w1"], orphanOnly: true } });
+    expect(r.json().results[0]).toMatchObject({ ok: true, cleanup: expect.stringMatching(/^spec-w1\./) });
+    expect(existsSync(cwd)).toBe(false);
+  });
+
+  it("mode yatim tidak menutup pane yang kembali hidup", async () => {
+    const repoDir = await project("orphan-live");
+    const cwd = join(repoDir, ".worktrees", "spec-w1");
+    createSession("orphan-live", cwd, { id: "spec-w1" });
+    const r = await app.inject({ method: "POST", url: "/api/projects/orphan-live/worktrees/delete",
+      payload: { names: ["spec-w1"], orphanOnly: true } });
+    expect(r.json().results[0].ok).toBe(false);
+    expect(getSession("spec-w1")).toBeDefined();
+    expect(existsSync(cwd)).toBe(true);
+    killSession("spec-w1");
+  });
+
+  it("mode yatim tidak boleh menghapus checkout tanpa history", async () => {
+    const repoDir = await project("orphan-no-history");
+    const r = await app.inject({ method: "POST", url: "/api/projects/orphan-no-history/worktrees/delete",
+      payload: { names: ["spec-w1"], orphanOnly: true } });
+    expect(r.json().results[0].ok).toBe(false);
+    expect(existsSync(join(repoDir, ".worktrees", "spec-w1"))).toBe(true);
+  });
+
+  it.each([{ orphanOnly: "true" }, { orphanOnly: true, deleteBranch: true }])(
+    "mode pemungutan tidak sah ditolak: %j", async (options) => {
+      await project("orphan-invalid");
+      const r = await app.inject({ method: "POST", url: "/api/projects/orphan-invalid/worktrees/delete",
+        payload: { names: ["spec-w1"], ...options } });
+      expect(r.statusCode).toBe(400);
+    },
+  );
+
   it("melepas worktree ke .trash lalu mem-prune registrasinya", async () => {
     const repoDir = await project("wp4");
     const wt = join(repoDir, ".worktrees", "spec-w1");

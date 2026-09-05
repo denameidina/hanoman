@@ -1,5 +1,7 @@
 # ADR — index & riwayat keputusan
 
+- [0162 — Worktree yatim dipungut setelah konfirmasi operator](0162-pemungutan-worktree-yatim-dengan-konfirmasi.md) — SPEC-1109: deteksi boot dan tab Worktrees memakai history + tmux; pemungutan manual menjaga resume ADR-0084. Mode yatim tidak menutup sesi yang kembali hidup, rename gagal tidak jatuh ke penghapusan sinkron, dan reaper tetap `.trash/**`.
+
 Sub-index dari [internal/docs/README.md](../README.md). Index utama menyimpan daftar **satu baris per
 ADR**; berkas ini menyimpan **narasinya** — apa yang diperluas, dicabut, atau diamandemen tiap
 keputusan, berikut gotcha yang harus diingat. Pemisahan ini dilakukan di SPEC-386: index utama dibaca

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { WorktreesPanel } from "../src/screens/WorktreesPanel";
 import { api, type WorktreeReport } from "../src/api/client";
 
@@ -19,7 +19,10 @@ const report = (): WorktreeReport => ({
 // membungkus <span> kotak — dan onClick hidup di span itu, bukan di label. Mengklik label = no-op,
 // jadi test yang mengklik label bisa "lulus" karena tak terjadi apa-apa (pelajaran SPEC-299).
 const pick = (id: string) => fireEvent.click(screen.getByTestId(id).firstElementChild!);
-const confirm = async () => fireEvent.click(await screen.findByRole("button", { name: /ya, hapus/i }));
+const confirm = async () => {
+  const button = await screen.findByRole("button", { name: /ya, hapus/i });
+  await act(async () => { fireEvent.click(button); });
+};
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -29,6 +32,36 @@ beforeEach(() => {
 });
 
 describe("WorktreesPanel", () => {
+  it("pemungutan yatim meminta konfirmasi dan tidak menghapus branch", async () => {
+    const r = report();
+    r.worktrees[2]!.orphan = { historyId: "h1", sessionId: "old" };
+    vi.mocked(api.worktrees).mockResolvedValue(r);
+    const del = vi.spyOn(api, "deleteWorktrees").mockResolvedValue({
+      results: [{ name: "wt-b", ok: true, cleanup: "wt-b.abc" }],
+    });
+    render(<WorktreesPanel projectId="p1" />);
+    expect(await screen.findByText("sesi yatim")).toBeInTheDocument();
+    pick("with-branch");
+    fireEvent.click(screen.getByRole("button", { name: /Pungut yatim/ }));
+    expect(await screen.findByText(/termasuk berkas ignored/)).toBeInTheDocument();
+    expect(del).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /batal/i }));
+    expect(del).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Pungut yatim/ }));
+    await confirm();
+    await waitFor(() => expect(del).toHaveBeenCalledWith("p1", { names: ["wt-b"], orphanOnly: true }));
+  });
+
+  it.each(["request", "git"])("stats gagal %s tidak diklaim aman dalam dialog", async (failure) => {
+    if (failure === "request") vi.mocked(api.worktreeStats).mockRejectedValue(new Error("offline"));
+    else vi.mocked(api.worktreeStats).mockResolvedValue({ name: "wt-b", sizeBytes: null, dirtyFiles: null, orphanCommits: null });
+    render(<WorktreesPanel projectId="p1" />);
+    await screen.findByText("wt-b");
+    fireEvent.click(screen.getByTestId("row-delete-wt-b"));
+    expect(await screen.findByText(/dampak.*belum diketahui/i)).toBeInTheDocument();
+    expect(screen.queryByText(/tak ada kerja yang belum tersimpan/)).not.toBeInTheDocument();
+  });
+
   it("menampilkan tiap worktree hidup + backlog & stage-nya", async () => {
     render(<WorktreesPanel projectId="p1" />);
     expect(await screen.findByText("spec-1")).toBeInTheDocument();

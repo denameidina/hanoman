@@ -1,14 +1,15 @@
 # ADR-0132 — Permukaan penghapusan worktree: tab Worktrees, daftar turunan git, hapus lewat `.trash`
 
 - Status: Accepted
+- Amandemen SPEC-1109: [ADR-0162](0162-pemungutan-worktree-yatim-dengan-konfirmasi.md) menambah penanda yatim dari history/tmux, mode pemungutan dengan konfirmasi tanpa menutup pane, serta statistik gagal baca bernilai null.
 - Tanggal: 2026-08-20
 - SPEC: SPEC-861
 - Terkait: **menegakkan** [0116](0116-penutupan-sesi-asinkron-worktree-trash.md) (domain penyapu
   tetap `.trash/**` dan HANYA itu; yang berubah adalah APA yang masuk ke `.trash`),
   [0077](0077-hapus-branch-tak-terpakai-pagar-per-branch.md) (pagar kunci per-branch dipakai ulang
   apa adanya — tak ada jalur hapus branch kedua), [0002](0002-git-worktree-isolation.md) &
-  [0015](0015-satu-run-satu-backlog-item.md) (worktree detached ber-id deterministik dari id spec),
-  [0018](0018-coverage-nilai-turunan.md)/[0011](0011-docs-live-bukan-snapshot.md) (daftar adalah
+  [0015](0015-one-session-per-backlog.md) (worktree detached ber-id deterministik dari id spec),
+  [0018](0018-coverage-nilai-turunan.md)/[0011](0011-docs-realtime-filesystem.md) (daftar adalah
   nilai turunan, tanpa kolom & tanpa cache), [0127](0127-satu-kontrak-konfirmasi-destruktif.md)
   (`useConfirm` + `impact[]`), dan [0121](0121-operasi-berkas-ide-explorer.md) (capability domain
   `ide` diturunkan DARI METHOD). **Tidak mencabut apa pun.** Tanpa migration, tanpa kolom, tanpa

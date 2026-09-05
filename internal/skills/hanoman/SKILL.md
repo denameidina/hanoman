@@ -174,7 +174,7 @@ Pakai skill lebih sempit saat task cocok:
   tak terdaftar di mana pun, sehingga worktree yatim memakan disk **dan** registrasinya mengunci
   branch di tab Branches (`BranchLock: "worktree"`) — dua kebuntuan yang saling mengait. Daftarnya
   **nilai turunan penuh** `git worktree list --porcelain` tiap request (tanpa kolom DB, tanpa cache),
-  servicenya **murni** seperti `branch-cleanup.ts`: `out()` tak pernah melempar, `execFile` async
+  servicenya **murni** seperti `branch-cleanup.ts`: `out()` tak pernah melempar (gagal = null untuk statistik sejak SPEC-1109), `execFile` async
   (route ini berbagi event loop dengan terminal PTY), dan Spec/sesi tmux/efek samping masuk sebagai
   parameter & deps yang dirakit di `routes/ide.ts`. **Entri `.trash/**` dikecualikan** — domain reaper
   TIDAK diperlebar, yang berubah hanya APA yang masuk ke `.trash`. **`ownsWorktree()` satu-satunya
@@ -585,6 +585,8 @@ Pakai skill lebih sempit saat task cocok:
 
 ## Aturan Sesi & Eksekusi
 
+- **Worktree yatim sesudah crash** (SPEC-1109/[ADR-0162](../../docs/adr/0162-pemungutan-worktree-yatim-dengan-konfirmasi.md)): boot mendeteksi, operator mengonfirmasi pemungutan di tab Worktrees. Ikuti ADR ini ketika mengubah rekonsiliasi atau pemungutan: resume ADR-0084 tetap utuh, snapshot mempertahankan semua pane termasuk cwd kembar, dan jalur yatim memakai rename ketat tanpa fallback penghapusan sinkron.
+
 - Mesin eksekusi nyata = **`server/src/services/pty.ts`**: `createSession()` men-spawn agen (`<prompt>` + flag agen) di window tmux; node-pty `tmux attach` menjembatani ke WebSocket, poll 500 ms mengawasi exit + perubahan phase-file lalu broadcast frame. **tmux adalah satu-satunya sumber kebenaran pekerjaan berjalan — tidak ada baris `Run` di DB.**
 - **Penutupan sesi ASINKRON: worktree dipindah ke `.trash`, penyapu latar yang menghapus**
   (SPEC-742/**ADR-0116**; ADR-0079 gerbang `ownsWorktree`, ADR-0030/0093 bukti `headSha`, ADR-0018/0019
@@ -745,8 +747,9 @@ Pakai skill lebih sempit saat task cocok:
   predikat sendiri di atas `session.decision` — itu satu-satunya sebab kosakata keduanya identik.
   `decisionAt` ikut turunan: `max(onset marker, window_activity)` = awal episode yang SEDANG
   berlangsung (isi marker sendiri tetap ADR-0141 apa adanya).
-- **Kegagalan `tmux` BUKAN "tak ada sesi"** (SPEC-402): `listPanes()` mengembalikan `[]` hanya untuk
-  `no server running`/`error connecting to` (`TmuxError.noServer`); kegagalan lain **dilempar**.
+- **Kegagalan `tmux` BUKAN "tak ada sesi"** (SPEC-402/1109): `listPanes()` mengembalikan `[]` hanya untuk
+  `no server running` atau koneksi socket dengan `No such file or directory`/`Connection refused`;
+  `Permission denied`, `Too many open files`, dan kegagalan lain **dilempar**.
   Dulu `catch { return []; }` menelan semuanya, dan loop poll 500 ms membacanya sebagai "semua sesi
   dibunuh dari luar" → `end(id, 0)` = **"— sesi berakhir (exit 0) —"** untuk SETIAP terminal yang
   terbuka, pada agen yang masih bekerja. Dua pemberat: dedup siaran `services/events.ts` tak pernah

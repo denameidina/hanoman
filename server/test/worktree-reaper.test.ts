@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prisma } from "../src/db";
 import {
-  trashDirOf, releaseWorktree, listCleanups, sweepRepo, __resetReaper,
+  trashDirOf, releaseWorktree, releaseWorktreeToTrash, listCleanups, sweepRepo, __resetReaper,
   type ReaperDeps,
 } from "../src/services/worktree-reaper";
 import { resetDb } from "./factory";
@@ -37,6 +37,17 @@ const deps = (over: Partial<ReaperDeps> = {}): ReaperDeps => ({
 });
 
 beforeEach(async () => { await resetDb(); __resetReaper(); });
+
+it("pelepasan ketat mempertahankan worktree bila rename gagal", () => {
+  const repo = repoWithTrash();
+  const cwd = join(repo, ".worktrees", "spec-1");
+  mkdirSync(cwd, { recursive: true });
+  writeFileSync(join(cwd, "kerja.txt"), "belum disimpan");
+  expect(() => releaseWorktreeToTrash(repo, cwd, "p1", deps({
+    trash: () => { throw new Error("EXDEV"); },
+  }))).toThrow("EXDEV");
+  expect(existsSync(join(cwd, "kerja.txt"))).toBe(true);
+});
 
 describe("sweepRepo", () => {
   it("mengosongkan .trash dan melaporkan jumlah yang terhapus", async () => {

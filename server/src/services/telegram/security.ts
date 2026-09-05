@@ -11,7 +11,7 @@ export function isDestructiveTelegramRequest(method: string, path: string, body:
   if (verb === "POST") {
     if (/\/update\/apply$/.test(path)) return true;
     if (/\/(?:specs|terminal\/sessions)\/[^/]+\/integrate$/.test(path)) return true;
-    if (/\/projects\/[^/]+\/(?:git\/(?:merge|rebase|drop|reset|clean)|branches\/delete)$/.test(path)) return true;
+    if (/\/projects\/[^/]+\/(?:git\/(?:merge|rebase|drop|reset|clean)|(?:branches|worktrees)\/delete)$/.test(path)) return true;
     if (/\/projects\/[^/]+\/git$/.test(path)) {
       const data = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
       return new Set([

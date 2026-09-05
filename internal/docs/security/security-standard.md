@@ -184,6 +184,8 @@
   - DELETE/integrate/reset/clean/drop/update/harden/remediate/revert destruktif membutuhkan confirmation
     inline approved yang terikat chat/update/method/path, expiring, dan single-use. Capability dan pagar
     endpoint existing tetap ditegakkan sesudahnya.
+  - `POST /projects/:id/worktrees/delete`, termasuk `orphanOnly:true`, memakai konfirmasi yang sama
+    (SPEC-1109/ADR-0162). Correlation tanpa confirmation tidak cukup untuk memungut checkout.
   - Reply hanya amplop eksplisit tersanitasi; raw PTY/capture-pane dilarang menjadi chat meski ANSI
     sudah dibuang, karena tetap dapat memuat reasoning, command echo, atau credential.
 - **Secret config at-rest & pagar kredensial (SPEC-477, [ADR-0097](../adr/0097-kredensial-telegram-di-settings-terenkripsi.md))**:

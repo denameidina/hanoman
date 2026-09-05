@@ -859,6 +859,8 @@ export type WorktreeCleanupView = {
 // `git worktree list --porcelain` tiap request (ADR-0018/0011): tak ada kolom DB, tak ada cache.
 // Entri `.worktrees/.trash/**` TIDAK muncul di sini — itu wilayah reaper (WorktreeCleanupView).
 export type WorktreeView = {
+  /** ADR-0162: riwayat sesi terputus tanpa pane; pemungutan tetap perlu konfirmasi. */
+  orphan?: { historyId: string; sessionId: string };
   /** Path absolut apa adanya dari git. */
   path: string;
   /** `basename(path)` — juga id baris di API tulis; klien tak pernah mengirim path. */
@@ -887,9 +889,10 @@ export type WorktreeStats = {
   name: string;
   /** null = `du` gagal/timeout atau direktorinya sudah lenyap. */
   sizeBytes: number | null;
-  dirtyFiles: number;
+  /** null = status git gagal dibaca. */
+  dirtyFiles: number | null;
   /** Commit yang HANYA hidup di worktree ini — kerja yang benar-benar hilang bila dihapus. */
-  orphanCommits: number;
+  orphanCommits: number | null;
 };
 
 // SPEC-861 · ADR-0132 · satu baris hasil per worktree yang diminta. Selalu 200 bila body sah —

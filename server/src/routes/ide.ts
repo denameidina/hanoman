@@ -12,10 +12,10 @@ import { conflictSessionDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { mergeIntoCurrent, rebaseOntoCurrent, pullIntoCurrent, dropCommit, sourceBranch, type GraphMergeResult } from "../services/integrate";
 import { listUnusedBranches, deleteBranches, type BranchScope } from "../services/branch-cleanup";
-import { listWorktrees, worktreeStats, deleteWorktrees, type WorktreeInputs } from "../services/worktree-list";
+import { listWorktrees, worktreeStats, deleteWorktrees, collectOrphanWorktrees } from "../services/worktree-list";
 import { closeSession } from "../services/session-close";
-import { releaseWorktree } from "../services/worktree-reaper";
-import { sessionIdForSpec } from "../services/session-id";
+import { releaseWorktree, releaseWorktreeToTrash, prodReaperDeps } from "../services/worktree-reaper";
+import { projectWorktreeInputs as worktreeInputs, worktreeSessions } from "../services/worktree-project";
 import {
   listRepoTree, listIgnoredEntries, listDirEntries, readRepoFile, writeRepoFile, listGraph, commitDetail, commitFileDiff, compareCommits, compareFile,
   searchCommits, runGitOp, validateGitOp, touchesTree, repoStatus, listStashes,
@@ -44,19 +44,6 @@ async function lockInputs(id: string) {
   return {
     openSpecBranches: new Set(open.map((s) => sourceBranch(s.id))),
     sessionBranches: new Set(sessions),
-  };
-}
-
-// SPEC-861 · ADR-0132 · sinyal NON-git sebuah worktree, dikumpulkan di route dengan alasan yang
-// sama dengan `lockInputs` di atas: service-nya murni. Kunci `specs` adalah id sesi yang
-// deterministik dari id spec (ADR-0015) — sama dengan `basename` worktree-nya.
-async function worktreeInputs(id: string): Promise<WorktreeInputs> {
-  const specs = await prisma.spec.findMany({ where: { projectId: id }, select: { id: true, stage: true } });
-  return {
-    specs: new Map(specs.map((s) => [sessionIdForSpec(s.id), { id: s.id, stage: s.stage }])),
-    sessions: new Map(listSessions()
-      .filter((s) => s.projectId === id && !s.exited)
-      .map((s) => [resolve(s.cwd), { id: s.id, specId: s.specId ?? null }])),
   };
 }
 
@@ -545,9 +532,20 @@ export default async function (app: FastifyInstance) {
     const repoDir = await repoOf(id);
     if (repoDir === undefined) return reply.code(404).send({ error: "not found" });
     if (!repoDir) return reply.code(400).send({ error: "project tidak punya repoDir" });
-    const b = req.body as { names?: unknown; deleteBranch?: unknown };
+    const b = req.body as { names?: unknown; deleteBranch?: unknown; orphanOnly?: unknown };
     if (!Array.isArray(b?.names) || b.names.some((n) => typeof n !== "string" || !n))
       return reply.code(400).send({ error: "names wajib berisi nama worktree" });
+    if (b.orphanOnly !== undefined && typeof b.orphanOnly !== "boolean")
+      return reply.code(400).send({ error: "orphanOnly wajib boolean" });
+    if (b.orphanOnly === true) {
+      if (b.deleteBranch === true)
+        return reply.code(400).send({ error: "pemungutan yatim tidak menghapus branch" });
+      return collectOrphanWorktrees(repoDir, b.names as string[], {
+        inputs: () => worktreeInputs(id), sessionsNow: worktreeSessions,
+        release: (repo, path) => releaseWorktreeToTrash(repo, path, id),
+        prune: prodReaperDeps.prune,
+      });
+    }
     const locks = await lockInputs(id);
     return deleteWorktrees(repoDir, b.names as string[], {
       withBranch: b.deleteBranch === true,

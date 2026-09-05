@@ -253,9 +253,9 @@ export function noTtyPromptEnv(): Record<string, string> {
 // belum/tak ada tmux server di socket ini; sisanya (fork gagal saat mesin penuh proses, socket knob
 // salah, server kedip) adalah keadaan TAK DIKETAHUI. Membacanya sebagai daftar kosong sama dengan
 // memberi tahu setiap terminal yang terbuka bahwa sesinya berakhir `exit 0` — padahal agennya masih
-// bekerja. Pola sengaja sempit: `error connecting to …` sudah mencakup socket yang tak ada, jadi
-// "no such file or directory" telanjang tak perlu ikut (dan bisa datang dari kegagalan lain).
-const NO_SERVER = /no server running|error connecting to/i;
+// bekerja. SPEC-1109: `error connecting to` juga memuat EACCES/EMFILE; hanya socket yang
+// hilang atau menolak koneksi yang membuktikan tak ada server, bukan semua kegagalan koneksi.
+const NO_SERVER = /^(?:no server running on .+|error connecting to .+ \((?:No such file or directory|Connection refused)\))$/i;
 export class TmuxError extends Error {
   constructor(message: string, readonly noServer: boolean) { super(message); }
 }

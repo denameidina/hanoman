@@ -7,7 +7,7 @@ import { parseWorktreePorcelain, listWorktrees, worktreeStats, type WorktreeInpu
 
 // SPEC-861 · ADR-0132 · penemuan worktree HIDUP. Modul yang diuji di sini murni: tak menyentuh DB
 // maupun tmux, jadi seluruh berkas ini berjalan atas repo git sungguhan saja.
-const NONE: WorktreeInputs = { specs: new Map(), sessions: new Map() };
+const NONE: WorktreeInputs = { specs: new Map(), sessions: [] };
 const g = (cwd: string, ...a: string[]) => {
   const r = spawnSync("git", a, { cwd, encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${a.join(" ")}: ${r.stderr}`);
@@ -54,6 +54,42 @@ describe("parseWorktreePorcelain", () => {
 });
 
 describe("listWorktrees", () => {
+  it("menemukan riwayat reconciled lama dan riwayat terbuka sebagai yatim", async () => {
+    const dir = repo();
+    for (const endedReason of ["reconciled", null]) {
+      const r = await listWorktrees(dir, { ...NONE, history: [{
+        id: "h1", sessionId: "spec-1", cwd: join(dir, ".worktrees", "spec-1"),
+        startedAt: new Date(0), endedAt: endedReason ? new Date(1) : null, endedReason,
+      }] });
+      expect(r.worktrees.find((w) => w.name === "spec-1")?.orphan)
+        .toEqual({ historyId: "h1", sessionId: "spec-1" });
+      expect(r.worktrees.find((w) => w.name === "wt-feat")?.orphan).toBeUndefined();
+    }
+  });
+
+  it("history terbaru closed membatalkan klaim yatim riwayat lama", async () => {
+    const dir = repo();
+    const h = { id: "old", sessionId: "spec-1", cwd: join(dir, ".worktrees", "spec-1"),
+      startedAt: new Date(0), endedAt: new Date(1), endedReason: "reconciled" };
+    const r = await listWorktrees(dir, { ...NONE, history: [
+      { ...h, id: "new", startedAt: new Date(2), endedReason: "closed" }, h,
+    ] });
+    expect(r.worktrees.find((w) => w.name === "spec-1")?.orphan).toBeUndefined();
+  });
+
+  it("pane dengan id lama atau cwd yang dipakai ulang melindungi checkout", async () => {
+    const dir = repo();
+    const cwd = join(dir, ".worktrees", "spec-1");
+    for (const [path, id] of [[dir, "spec-1"], [cwd, "new-session"], [join(cwd, "src"), "nested"]]) {
+      const r = await listWorktrees(dir, { ...NONE,
+        sessions: [{ cwd: path!, id: id!, specId: null }],
+        history: [{ id: "h1", sessionId: "spec-1", cwd, startedAt: new Date(0),
+          endedAt: new Date(1), endedReason: "reconciled" }],
+      });
+      expect(r.worktrees.find((w) => w.name === "spec-1")?.orphan).toBeUndefined();
+    }
+  });
+
   it("mendaftar worktree hidup dengan branch atau detached", async () => {
     const dir = repo();
     const r = await listWorktrees(dir, NONE);
@@ -94,7 +130,7 @@ describe("listWorktrees", () => {
   it("memetakan worktree ke SPEC lewat id sesi & stage-nya", async () => {
     const r = await listWorktrees(repo(), {
       specs: new Map([["spec-1", { id: "SPEC-1", stage: "executing" }]]),
-      sessions: new Map(),
+      sessions: [],
     });
     const w = r.worktrees.find((x) => x.name === "spec-1")!;
     expect(w.spec).toEqual({ id: "SPEC-1", stage: "executing" });
@@ -105,7 +141,7 @@ describe("listWorktrees", () => {
     const dir = repo();
     const r = await listWorktrees(dir, {
       specs: new Map(),
-      sessions: new Map([[resolve(dir, ".worktrees", "spec-1"), { id: "spec-1", specId: "SPEC-1" }]]),
+      sessions: [{ cwd: resolve(dir, ".worktrees", "spec-1"), id: "spec-1", specId: "SPEC-1" }],
     });
     expect(r.worktrees.find((w) => w.name === "spec-1")!.session).toEqual({ id: "spec-1", specId: "SPEC-1" });
     expect(r.worktrees.find((w) => w.name === "wt-feat")!.session).toBeNull();
@@ -128,6 +164,14 @@ describe("listWorktrees", () => {
 describe("worktreeStats", () => {
   const find = async (dir: string, name: string) =>
     (await listWorktrees(dir, NONE)).worktrees.find((w) => w.name === name)!;
+
+  it("git gagal dibaca menghasilkan dampak tidak diketahui, bukan nol", async () => {
+    const dir = repo();
+    const w = await find(dir, "spec-1");
+    const invalid = await worktreeStats("/repo-does-not-exist", { ...w, path: "/worktree-does-not-exist" });
+    expect(invalid.dirtyFiles).toBeNull();
+    expect(invalid.orphanCommits).toBeNull();
+  });
 
   it("menghitung berkas yang belum tersimpan", async () => {
     const dir = repo();

@@ -29,6 +29,7 @@ const TICK_MS = 60_000;
 export const trashDirOf = (repoDir: string): string => resolve(repoDir, ".worktrees", ".trash");
 
 export type ReaperDeps = {
+  trash?: (repoDir: string, cwd: string) => string | null;
   rm: (path: string) => Promise<void>;
   /** Membatalkan registrasi worktree yang direktorinya sudah lenyap. Sekali per repo per sapuan. */
   prune: (repoDir: string) => Promise<void>;
@@ -89,13 +90,19 @@ const sessionIdOf = (entry: string): string => entry.split(".")[0] ?? entry;
 export function releaseWorktree(
   repoDir: string, cwd: string, projectId: string, deps: ReaperDeps = prodReaperDeps,
 ): string | null {
-  let path: string | null;
   try {
-    path = realGit.trashWorktree(repoDir, cwd);
+    return releaseWorktreeToTrash(repoDir, cwd, projectId, deps);
   } catch {
     realGit.removeWorktree(repoDir, cwd);
     return null;
   }
+}
+
+// ADR-0162: pemungutan yatim tidak boleh menghapus pohon sinkron ketika rename gagal.
+export function releaseWorktreeToTrash(
+  repoDir: string, cwd: string, projectId: string, deps: ReaperDeps = prodReaperDeps,
+): string | null {
+  const path = (deps.trash ?? realGit.trashWorktree)(repoDir, cwd);
   if (!path) return null;
   const entry = path.slice(trashDirOf(repoDir).length + 1);
   pending.set(path, { path, repoDir, projectId, entry, sessionId: sessionIdOf(entry), since: Date.now() });

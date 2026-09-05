@@ -5,6 +5,15 @@ import type { Paginated, SessionEndReason, SessionHistoryView } from "@hanoman/s
 import { prisma } from "../db";
 import { registerSessionHooks, type SessionBirth, type SessionDeath } from "./pty";
 import { saveTranscript, readTranscript, deleteTranscript, listTranscripts } from "./transcript-store";
+import type { WorktreeHistory } from "./worktree-list";
+
+export async function worktreeHistory(projectId: string): Promise<WorktreeHistory[]> {
+  // Baris closed ikut dibaca: ia bisa membatalkan klaim yatim dari sesi lama di cwd yang sama.
+  return prisma.sessionHistory.findMany({
+    where: { projectId }, orderBy: { startedAt: "desc" },
+    select: { id: true, sessionId: true, cwd: true, startedAt: true, endedAt: true, endedReason: true },
+  });
+}
 
 type Row = {
   id: string; sessionId: string; projectId: string; specId: string | null; title: string | null;

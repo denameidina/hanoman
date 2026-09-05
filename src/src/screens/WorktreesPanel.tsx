@@ -74,16 +74,17 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
   // Urutan mengikuti daftar server supaya `names` deterministik (dan enak di-assert).
   const pickedNames = rows.filter((w) => picked.has(w.name)).map((w) => w.name);
   const anyBranch = rows.some((w) => w.deletable && w.branch);
+  const orphans = rows.filter((w) => w.orphan);
+  const collectible = orphans.filter((w) => w.deletable).map((w) => w.name);
 
-  const ask = async (names: string[]) => {
+  const ask = async (names: string[], orphanOnly = false) => {
     const target = rows.filter((w) => names.includes(w.name));
-    // Dialog yang tak bisa menyebut angkanya bukan konfirmasi (ADR-0127): baris yang stats-nya
-    // belum sempat termuat dijemput dulu, sekali, sebelum dialognya dibuka.
+    // Muat ulang sebelum konfirmasi: pekerjaan bisa berubah sejak daftar pertama dibuka.
     const fetched: Record<string, WorktreeStats> = { ...stats };
     for (const w of target) {
-      if (fetched[w.name]) continue;
       const s = await api.worktreeStats(projectId, w.name).catch(() => null);
       if (s) fetched[w.name] = s;
+      else delete fetched[w.name];
     }
     setStats(fetched);
 
@@ -95,16 +96,21 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
     if (sessions) impact.push(`${sessions} sesi aktif akan ditutup lebih dulu`);
     if (orphan) impact.push(`${orphan} commit tak ada di tempat lain — hilang`);
     if (dirty) impact.push(`${dirty} berkas belum tersimpan`);
-    if (withBranch && branches.length) impact.push(`branch ikut dihapus: ${branches.join(", ")}`);
-    if (!impact.length) impact.push("tak ada kerja yang belum tersimpan di sini");
+    const unknown = target.filter((w) => fetched[w.name]?.dirtyFiles == null
+      || fetched[w.name]?.orphanCommits == null).length;
+    if (unknown) impact.push(`Dampak ${unknown} worktree belum diketahui — statistik git gagal dibaca`);
+    if (!orphanOnly && withBranch && branches.length) impact.push(`branch ikut dihapus: ${branches.join(", ")}`);
+    impact.push("Seluruh isi direktori akan hilang, termasuk berkas ignored seperti .env dan node_modules");
 
     await confirm({
       eyebrow: "worktree", title: `Hapus ${names.length} worktree?`, confirmLabel: "Ya, hapus",
-      message: "Direktorinya dipindah ke .worktrees/.trash/ dan byte-nya dihapus di latar.",
+      message: orphanOnly
+        ? "Worktree sesi terputus ini akan dihapus. Sesi yang kembali hidup akan dilewati."
+        : "Direktori worktree akan dihapus di latar.",
       impact,
       run: async () => {
         const r = await api.deleteWorktrees(projectId,
-          { names, ...(withBranch ? { deleteBranch: true } : {}) });
+          { names, ...(orphanOnly ? { orphanOnly: true } : withBranch ? { deleteBranch: true } : {}) });
         setResults(r.results);
         load();
       },
@@ -132,6 +138,15 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
           Hapus terpilih ({pickedNames.length})
         </Button>
       </div>
+
+      {orphans.length > 0 && state === "ready" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+          padding: "10px 14px", borderBottom: "1px solid var(--border-hair)", fontSize: 12.5 }}>
+          <span style={{ flex: 1 }}>{orphans.length} worktree sesi yatim — dipertahankan sampai kamu memungutnya.</span>
+          <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={!collectible.length}
+            onClick={() => void ask(collectible, true)}>Pungut yatim ({collectible.length})</Button>
+        </div>
+      )}
 
       {results && (
         <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-hair)", fontSize: 12.5 }}>
@@ -188,6 +203,7 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
                 {!w.branch && <Badge size="sm" tone="brass">detached</Badge>}
                 {w.spec && <Badge size="sm" tone="brass">{w.spec.id} · {w.spec.stage}</Badge>}
                 {w.session && <Badge size="sm" tone="warn">sesi aktif</Badge>}
+                {w.orphan && <Badge size="sm" tone="warn">sesi yatim</Badge>}
                 {w.prunable && <Badge size="sm" tone="warn">prunable</Badge>}
                 {w.locked && <Badge size="sm" tone="warn">terkunci git</Badge>}
                 {w.blocked && <Badge size="sm" tone="warn">{w.blocked}</Badge>}

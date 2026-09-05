@@ -7,6 +7,7 @@ import { startLead } from "./services/lead/engine";
 import { registerBacklogSource } from "./services/scheduler/sources/backlog";
 import { registerTriaseSource } from "./services/scheduler/sources/triase";
 import { installSessionHistory, reconcileHistory } from "./services/session-history";
+import { detectOrphanWorktrees } from "./services/worktree-project";
 import { installCustomAgents } from "./services/custom-agents";
 import { reconcileAgentInvocations } from "./services/agent-invocations";
 import { listSessions } from "./services/pty";
@@ -109,7 +110,12 @@ bootstrapReady.then(async () => {
   try {
     const liveIds = listSessions().map((s) => s.id);
     void reconcileHistory(liveIds)
-      .then((n) => { if (n) console.log(`riwayat sesi: ${n} baris berjalan direkonsiliasi`); })
+      .then(async (n) => {
+        if (n) console.log(`riwayat sesi: ${n} baris berjalan direkonsiliasi`);
+        for (const row of await detectOrphanWorktrees()) {
+          console.log(`worktree yatim: ${row.projectId} — ${row.count} menunggu konfirmasi di tab Worktrees`);
+        }
+      })
       .catch((e) => console.error("rekonsiliasi riwayat sesi:", e));
     void reconcileAgentInvocations(liveIds)
       .then((n) => { if (n) console.log(`custom agent: ${n} invocation ditandai abandoned`); })

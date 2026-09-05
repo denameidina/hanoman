@@ -23,7 +23,7 @@ async function clean() {
 beforeEach(async () => {
   await clean();
   await prisma.setting.create({ data: { id: 1, data: { ...DEFAULT_SETTING, agentAccessEnabled: true } } });
-  const gateway = await issueAgentToken({ name: "telegram-gateway", capabilities: ["telegram:write"] });
+  const gateway = await issueAgentToken({ name: "telegram-gateway", capabilities: ["telegram:write", "ide:git"] });
   const ordinary = await issueAgentToken({ name: "ordinary-agent", capabilities: ["telegram:write"] });
   gatewayHeaders = { authorization: `Bearer ${gateway.token}` };
   ordinaryHeaders = { authorization: `Bearer ${ordinary.token}` };
@@ -39,6 +39,14 @@ beforeEach(async () => {
 afterAll(async () => { await clean(); await app.close(); });
 
 describe("Telegram destructive confirmation guard (SPEC-476)", () => {
+  it("pemungutan worktree memerlukan konfirmasi Telegram sebelum route berjalan", async () => {
+    const response = await app.inject({ method: "POST", url: "/api/projects/p1/worktrees/delete",
+      headers: { ...gatewayHeaders, "x-hanoman-telegram-update": "17" },
+      payload: { names: ["spec-1"], orphanOnly: true } });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ error: "telegram confirmation required" });
+  });
+
   it("classifies irreversible route shapes without treating reads or preview as destructive", () => {
     expect(isDestructiveTelegramRequest("DELETE", "/api/telegram/chats/42/memories", undefined)).toBe(true);
     expect(isDestructiveTelegramRequest("POST", "/api/specs/SPEC-1/integrate", {})).toBe(true);

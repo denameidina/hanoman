@@ -127,6 +127,7 @@ export const LOCK_LABEL: Record<BranchLock, string> = {
 };
 // SPEC-861 · ADR-0132 · cermin server/src/services/worktree-list.ts + shared/src/dto.ts.
 export type WorktreeView = {
+  orphan?: { historyId: string; sessionId: string };
   path: string; name: string; head: string; branch: string | null;
   prunable: boolean; locked: boolean; deletable: boolean; blocked: string | null;
   spec: { id: string; stage: string } | null;
@@ -134,7 +135,7 @@ export type WorktreeView = {
   createdAt: string | null;
 };
 export type WorktreeReport = { repoDir: string; worktrees: WorktreeView[] };
-export type WorktreeStats = { name: string; sizeBytes: number | null; dirtyFiles: number; orphanCommits: number };
+export type WorktreeStats = { name: string; sizeBytes: number | null; dirtyFiles: number | null; orphanCommits: number | null };
 export type WorktreeDeleteResult = {
   name: string; ok: boolean; cleanup: string | null; closedSession?: string;
   branch?: { name: string; ok: boolean; error?: string }; error?: string;
@@ -384,7 +385,7 @@ export const api = {
   // lahir dulu, sinyal mahal menyusul per baris.
   worktrees: (id: string) => j<WorktreeReport>(paths.worktrees(id)),
   worktreeStats: (id: string, name: string) => j<WorktreeStats>(paths.worktreeStats(id, name)),
-  deleteWorktrees: (id: string, b: { names: string[]; deleteBranch?: boolean }) =>
+  deleteWorktrees: (id: string, b: { names: string[]; deleteBranch?: boolean; orphanOnly?: boolean }) =>
     j<{ results: WorktreeDeleteResult[] }>(paths.worktreesDelete(id), { method: "POST", ...body(b) }),
   browseFs: (path?: string) =>
     j<{ path: string; parent: string | null; entries: { name: string; path: string }[] }>(paths.fsBrowse(path)),

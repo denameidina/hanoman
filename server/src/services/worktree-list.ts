@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import type { WorktreeDeleteResult, WorktreeReport, WorktreeStats, WorktreeView } from "@hanoman/shared";
 import { ownsWorktree } from "./session-worktree";
@@ -14,10 +14,9 @@ import { ownsWorktree } from "./session-worktree";
 const exec = promisify(execFile);
 const GIT = { timeout: 60_000, maxBuffer: 1 << 24, encoding: "utf8" as const };
 
-// Cermin out() di branch-cleanup.ts: gagal → string kosong, TAK PERNAH melempar. Route ini
-// read-only; repo rusak / tanpa commit tak boleh jadi 500.
-async function out(cwd: string, args: string[]): Promise<string> {
-  try { return (await exec("git", args, { cwd, ...GIT })).stdout; } catch { return ""; }
+// null membedakan gagal baca dari hasil kosong; dampak penghapusan tak boleh mengarang nol.
+async function out(cwd: string, args: string[]): Promise<string | null> {
+  try { return (await exec("git", args, { cwd, ...GIT })).stdout; } catch { return null; }
 }
 
 export type RawWorktree = {
@@ -49,11 +48,17 @@ export function parseWorktreePorcelain(text: string): RawWorktree[] {
   return rows;
 }
 
+export type WorktreeHistory = {
+  id: string; sessionId: string; cwd: string; startedAt: Date;
+  endedAt: Date | null; endedReason: string | null;
+};
+
 export type WorktreeInputs = {
   /** Kunci = id sesi deterministik dari id spec (ADR-0015) = `basename` worktree-nya. */
   specs: Map<string, { id: string; stage: string }>;
-  /** Kunci = `resolve(cwd)` sesi tmux yang masih hidup. */
-  sessions: Map<string, { id: string; specId: string | null }>;
+  /** Semua pane, termasuk yang exited atau berbagi cwd; id tidak boleh hilang karena dedup. */
+  sessions: { cwd: string; id: string; specId: string | null }[];
+  history?: WorktreeHistory[];
 };
 
 const EMPTY: WorktreeReport = { repoDir: "", worktrees: [] };
@@ -64,8 +69,22 @@ const EMPTY: WorktreeReport = { repoDir: "", worktrees: [] };
 // mana pun kena hal yang sama, dan gagalnya SENYAP (baris tak pernah cocok dengan sesinya, gerbang
 // `ownsWorktree` menolak worktree yang sah). Cermin `samePath` di runner/src/git.ts.
 const real = (p: string): string => {
-  try { return realpathSync(p); } catch { return resolve(p); }
+  try { return realpathSync(p); } catch {
+    const path = resolve(p);
+    const parent = dirname(path);
+    return parent === path ? path : join(real(parent), basename(path));
+  }
 };
+
+export function hasWorktreeSession(
+  path: string, sessionId: string, sessions: WorktreeInputs["sessions"],
+): boolean {
+  const target = real(path);
+  return sessions.some((s) => {
+    const current = real(s.cwd);
+    return s.id === sessionId || current === target || current.startsWith(target + sep);
+  });
+}
 
 // `.git` sebuah worktree tertaut adalah BERKAS yang ditulis sekali saat `worktree add` dan tak
 // pernah disentuh lagi — stempel lahir yang jujur, tanpa tabel. birthtime 0 (sebagian filesystem
@@ -88,9 +107,15 @@ export async function listWorktrees(
   // `.trash` adalah wilayah reaper (SPEC-742/ADR-0116) dan sudah punya permukaannya sendiri.
   // Prefix path yang sudah dinormalkan, bukan substring: nama worktree boleh memuat ".trash".
   const trash = resolve(baseReal, ".worktrees", ".trash");
-  const sessions = new Map([...inputs.sessions].map(([cwd, s]) => [real(cwd), s]));
+  const sessions = new Map(inputs.sessions.map((s) => [real(s.cwd), { id: s.id, specId: s.specId }]));
+  const history = new Map<string, WorktreeHistory>();
+  for (const h of inputs.history ?? []) {
+    const path = real(h.cwd);
+    const previous = history.get(path);
+    if (!previous || h.startedAt > previous.startedAt) history.set(path, h);
+  }
   const rows: WorktreeView[] = [];
-  for (const w of parseWorktreePorcelain(text)) {
+  for (const w of parseWorktreePorcelain(text ?? "")) {
     const path = resolve(w.path);
     if (path === trash || path.startsWith(trash + sep)) continue;
     const name = basename(path);
@@ -99,6 +124,10 @@ export async function listWorktrees(
     // bisa ter-bind ke checkout yang kebetulan berada di bawah `.worktrees/`.
     const deletable = ownsWorktree(baseReal, path);
     const spec = inputs.specs.get(name);
+    const latest = history.get(path);
+    const orphan = latest && (!latest.endedAt || latest.endedReason === "reconciled")
+      && !hasWorktreeSession(path, latest.sessionId, inputs.sessions)
+      ? { historyId: latest.id, sessionId: latest.sessionId } : undefined;
     rows.push({
       path, name, head: w.head, branch: w.branch,
       prunable: w.prunable, locked: w.locked,
@@ -107,6 +136,7 @@ export async function listWorktrees(
       spec: spec ? { id: spec.id, stage: spec.stage } : null,
       session: sessions.get(path) ?? null,
       createdAt: await bornAt(path),
+      ...(orphan ? { orphan } : {}),
     });
   }
   // Deterministik untuk test & UI: yang tak bisa dihapus di atas (konteks), sisanya per nama.
@@ -134,10 +164,10 @@ async function diskBytes(w: WorktreeView): Promise<number | null> {
   } catch { return null; }
 }
 
-async function dirtyCount(w: WorktreeView): Promise<number> {
+async function dirtyCount(w: WorktreeView): Promise<number | null> {
   if (w.prunable) return 0;
   const s = await out(w.path, ["status", "--porcelain"]);
-  return s.split("\n").filter((l) => l.trim()).length;
+  return s === null ? null : s.split("\n").filter((l) => l.trim()).length;
 }
 
 // "Kerja yang akan hilang": commit reachable dari HEAD worktree ini tetapi TIDAK dari ref lain mana
@@ -149,13 +179,13 @@ async function dirtyCount(w: WorktreeView): Promise<number> {
 // jawabannya 0 dan seluruh kerja yang akan hilang tak pernah disebut dialog konfirmasi) dan untuk
 // `--remotes` relatif terhadap `refs/remotes/` (`*/feat`). `--exclude` juga di-RESET sesudah tiap
 // `--branches`/`--remotes`/`--tags`, jadi ia wajib ditulis ulang sebelum masing-masing.
-async function orphanCount(repoDir: string, w: WorktreeView): Promise<number> {
-  if (!w.head) return 0;
+async function orphanCount(repoDir: string, w: WorktreeView): Promise<number | null> {
+  if (!w.head) return null;
   const args = ["rev-list", "--count", w.head, "--not"];
   if (w.branch) args.push(`--exclude=${w.branch}`, "--branches", `--exclude=*/${w.branch}`, "--remotes", "--tags");
   else args.push("--branches", "--remotes", "--tags");
-  const n = Number.parseInt((await out(repoDir, args)).trim(), 10);
-  return Number.isFinite(n) ? n : 0;
+  const n = Number.parseInt((await out(repoDir, args))?.trim() ?? "", 10);
+  return Number.isFinite(n) ? n : null;
 }
 
 // SPEC-861 · ADR-0132 · orkestrasi penghapusan. Deps disuntik supaya modul ini tetap murni: tutup
@@ -170,6 +200,41 @@ export type WorktreeDeleteDeps = {
   /** `branch-cleanup.deleteBranches` BESERTA pagar kuncinya — jangan tulis jalur kedua. */
   deleteBranch: (repoDir: string, name: string) => Promise<{ ok: boolean; error?: string }>;
 };
+
+export type OrphanCollectDeps = {
+  inputs: () => Promise<WorktreeInputs>;
+  sessionsNow: () => WorktreeInputs["sessions"];
+  release: (repoDir: string, path: string) => string | null;
+  prune: (repoDir: string) => Promise<void>;
+};
+
+export async function collectOrphanWorktrees(
+  repoDir: string, names: string[], deps: OrphanCollectDeps,
+): Promise<{ results: WorktreeDeleteResult[] }> {
+  const results: WorktreeDeleteResult[] = [];
+  for (const name of names) {
+    const row: WorktreeDeleteResult = { name, ok: false, cleanup: null };
+    try {
+      const report = await listWorktrees(repoDir, await deps.inputs());
+      const matches = report.worktrees.filter((w) => w.name === name);
+      if (matches.length !== 1) throw new Error("nama worktree tidak ditemukan atau ambigu");
+      const w = matches[0]!;
+      if (!w.deletable) throw new Error(`tak bisa dipungut: ${w.blocked}`);
+      if (!w.orphan) throw new Error("worktree bukan sesi yatim; muat ulang daftar");
+      // Tidak ada await sampai rename: peluncuran sesi oleh server ini tidak bisa menyela.
+      if (hasWorktreeSession(w.path, w.orphan.sessionId, deps.sessionsNow())) {
+        throw new Error("worktree kembali dipakai sesi; muat ulang daftar");
+      }
+      row.cleanup = deps.release(report.repoDir, w.path);
+      await deps.prune(report.repoDir);
+      row.ok = true;
+    } catch (e) {
+      row.error = (e as Error).message;
+    }
+    results.push(row);
+  }
+  return { results };
+}
 
 export async function deleteWorktrees(
   repoDir: string,

@@ -1,5 +1,9 @@
 # ADR-0116 — Penutupan sesi asinkron: worktree dipindah ke `.trash`, penyapu latar yang menghapus
 
+Ekstensi SPEC-1109: [ADR-0162](0162-pemungutan-worktree-yatim-dengan-konfirmasi.md)
+menetapkan pelepasan ketat untuk pemungutan yatim setelah konfirmasi. Rename gagal
+di mode itu mempertahankan checkout; fallback sinkron di bawah hanya untuk penutupan normal.
+
 - Status: Accepted
 - Tanggal: 2026-08-13
 - SPEC: SPEC-742

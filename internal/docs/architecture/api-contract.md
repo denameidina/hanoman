@@ -634,7 +634,7 @@ POST /projects/:id/branches/delete  { names:string[], scope?, base?, allowUnmerg
 #   400 names/scope cacat, allowUnmerged bukan boolean, tanpa repoDir.
 #   Capability agent: keduanya di domain `projects` (projects:read/write), BUKAN `ide` — cermin GET /branches lama.
 # Worktree yang masih HIDUP (SPEC-861 · ADR-0132) — nilai turunan git, tanpa kolom DB, tanpa cache
-GET  /projects/:id/worktrees          # { repoDir, worktrees:[{path,name,head,branch|null,prunable,locked,deletable,blocked|null,spec:{id,stage}|null,session:{id,specId}|null,createdAt}] }
+GET  /projects/:id/worktrees          # { repoDir, worktrees:[{path,name,head,branch|null,prunable,locked,deletable,blocked|null,spec:{id,stage}|null,session:{id,specId}|null,createdAt,orphan?:{historyId,sessionId}}] }
 #   Turunan `git worktree list --porcelain` TIAP request. Entri `.worktrees/.trash/**` DIKECUALIKAN —
 #   itu wilayah reaper & sudah punya permukaannya sendiri (GET /terminal/cleanups, ADR-0116).
 #   branch null = detached HEAD → pakai `head` (sesi hanoman SELALU detached, ADR-0002).
@@ -642,13 +642,26 @@ GET  /projects/:id/worktrees          # { repoDir, worktrees:[{path,name,head,br
 #   deletable = ownsWorktree(repoDir, path) — HUBUNGAN path↔repoDir, bukan bentuk path (SPEC-362).
 #   Checkout project ikut tampil dengan deletable:false + blocked:"checkout project".
 #   Path git selalu FISIK (macOS: /var/folders → /private/**) → dinormalkan lewat realpath.
-#   404 project tak ada; tanpa repoDir/bukan repo → { repoDir:"", worktrees:[] } — TAK PERNAH 500.
-GET  /projects/:id/worktrees/stats?name=   # { name, sizeBytes:number|null, dirtyFiles, orphanCommits }
+#   orphan (SPEC-1109/ADR-0162) = history TERBARU per cwd fisik terbuka/reconciled dan tmux tidak
+#   memiliki pane dengan id sama atau cwd di checkout itu. Pane exited tetap melindungi checkout.
+#   History closed terbaru membatalkan klaim lama; history nihil bukan yatim. Tanpa kolom/cache.
+#   404 project tak ada; tanpa repoDir/bukan repo → daftar kosong. Tmux gagal → galat, BUKAN nol sesi.
+GET  /projects/:id/worktrees/stats?name=   # { name, sizeBytes:number|null, dirtyFiles:number|null, orphanCommits:number|null }
 #   Sinyal MAHAL (du -sk + git status) sengaja terpisah supaya daftar tak menunggunya; UI memuat per baris.
 #   orphanCommits = commit yang HANYA hidup di worktree ini (branch yang ter-checkout di sini ikut
 #   dikecualikan, karena 'hapus branch juga' akan ikut menghapusnya) = kerja yang benar-benar hilang.
+#   Gagal membaca status/rev-list → null, bukan nol. Dialog mengakui dampak tidak diketahui dan
+#   selalu menyebut hilangnya seluruh isi termasuk ignored; nol bukan jaminan aman dihapus.
 #   `name` divalidasi terhadap daftar TURUNAN → klien tak pernah mengirim path. 404 nama di luar daftar.
-POST /projects/:id/worktrees/delete  { names:string[], deleteBranch? }  # { results:[{name,ok,cleanup|null,closedSession?,branch?:{name,ok,error?},error?}] }
+POST /projects/:id/worktrees/delete  { names:string[], deleteBranch?, orphanOnly? }  # { results:[{name,ok,cleanup|null,closedSession?,branch?:{name,ok,error?},error?}] }
+#   orphanOnly:true = pemungutan setelah konfirmasi operator (ADR-0162), BUKAN penutupan sesi.
+#   Daftar + history dibaca ulang per baris; nama ambigu/non-kanonik/checkout project/bukan yatim
+#   ditolak. Tmux dibaca ulang tepat sebelum rename: pane yang kembali hidup tidak ditutup.
+#   releaseWorktreeToTrash melempar bila rename gagal, mempertahankan path asal TANPA fallback
+#   remove sinkron. Byte sesudah rename milik reaper .trash/**. Branch tidak ikut dihapus.
+#   400 orphanOnly bukan boolean atau orphanOnly:true + deleteBranch:true.
+#   Gateway Telegram wajib confirmation inline untuk route ini, termasuk mode orphanOnly.
+#   Tanpa orphanOnly:true, kontrak penghapusan normal berikut tetap berlaku.
 #   Urutan mengikat: turunkan ulang daftar → gerbang deletable → [sesi hidup? closeSession()] →
 #   releaseWorktree() (rename ke .trash, SPEC-742 — event loop tak terblokir) → git worktree prune →
 #   [deleteBranch? deleteBranches() BESERTA pagar kunci ADR-0077, bukan jalur kedua].
@@ -658,7 +671,7 @@ POST /projects/:id/worktrees/delete  { names:string[], deleteBranch? }  # { resu
 #   dinamai dialog konfirmasi (useConfirm + impact[], ADR-0127), bukan penolakan. Yang menolak hanya
 #   ownsWorktree. Penghapusan BRANCH tetap bisa gagal & alasannya dilaporkan di baris `branch`.
 #   Selalu 200 bila body sah — kegagalan hidup di baris results. 400 names cacat, tanpa repoDir.
-#   Capability agent: domain `ide` (ide:read/write), diturunkan DARI METHOD (hindari kelas bug SPEC-405).
+#   Capability agent: read = ide:read, delete = ide:git (akses danger, ADR-0155); diturunkan DARI METHOD.
 # Isolasi (merge/rebase/pull/drop): { status:"clean",detail } | { status:"conflict",sessionId } | 400 body/target · 409 detached/source hilang/working-tree kotor
 # Read (status/stashes/remotes/compare/search): 404 project tak ada; commit-file/compare-file: 400 path keluar repo · 404 tak ada
 # GET /projects/:id/graph menerima filter opsional: ?branches=a,b&showRemote=&showTags= (default = --all lama)
@@ -1004,7 +1017,8 @@ GET    /terminal/sessions            # [{ id, projectId, specId?, flow?, cwd, br
 #     ≠ 0 = pekerjaan TERPUTUS (mis. 143 = agen di-SIGTERM), bukan tuntas → UI memberi pil
 #     "Gagal · exit <n>", bukan "Selesai". Endpoint ini & frame siar `sessions` membawa nilai yang sama.
 #   CATATAN: kegagalan invokasi tmux TIDAK lagi dilaporkan sebagai daftar kosong (SPEC-402) —
-#     hanya "no server running"/"error connecting to" berarti nol sesi; kegagalan lain → 500,
+#     hanya "no server running" atau koneksi socket ENOENT/ECONNREFUSED berarti nol sesi;
+#     Permission denied/Too many open files dan kegagalan lain → 500 (SPEC-1109),
 #     karena daftar kosong palsu membuat setiap terminal terbuka mengumumkan `exit 0`.
 POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 tanpa repoDir
 #   {project, shell:true} (SPEC-236, ADR-0056): terminal biasa NON-agen — shell mentah
