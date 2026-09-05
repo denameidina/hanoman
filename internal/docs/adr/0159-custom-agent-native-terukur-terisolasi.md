@@ -63,6 +63,15 @@ Claude serta registry/TOML Codex. Pengurangan duplikasi tidak berarti metadata
 native atau laporan child gratis token. Perbaikan kecil ini langsung execute;
 Spec/Plan terpisah skipped, kontraknya amandemen ini dan test prompt/native.
 
+Verifikasi amandemen: 86 test terkait + typecheck runner/server lulus. Smoke
+Claude Code 2.1.261 mendaftarkan product-analyst dan support-triager secara native;
+prompt tugas tidak memuat nama atau deskripsi keduanya. Runtime memilih
+product-analyst tepat sekali, menghasilkan tool result berpasangan dan selesai
+sukses. Ini bukti penemuan/pemanggilan pada skenario tersebut, bukan benchmark
+seluruh katalog. Konfigurasi Codex teruji; smoke live Codex belum berjalan karena
+executable lokal gagal ENOENT. Source ini belum menyatakan server aktif sudah
+diupdate; prompt sesi yang sudah lahir juga tidak diubah.
+
 ### 2. Execution profile adalah data tersync
 
 `CustomAgent` mendapat `activation` (`always|smart`), `effort?`, `workspacePolicy`
