@@ -1,6 +1,12 @@
 # ADR-0072 — Fondasi scheduler otonom: engine in-process, antrean durable, cap concurrency
 
-- Status: Accepted
+- Status: Accepted — **diamandemen [0161](0161-gerbang-peluncuran-sesi-cap-dan-sumber-daya.md)**
+  (2026-09-05, SPEC-1108): invarian poin 3 berbunyi "sesi hidup tak pernah melebihi cap" tetapi
+  penegaknya hanya ada di `governor.drain()`, sedangkan jalur bersama poin 6 (`startSpecSession()`,
+  dipakai POST manual & lead) tak pernah memeriksanya — dengan source scheduler mati, cap-nya tak
+  menegakkan apa pun. Gerbang pindah ke jalur bersama itu, invarian dinyatakan ulang sebagai **sesi
+  agen** (terminal/shell tetap dihitung, tak pernah ditolak), dan ditambah gerbang sumber daya
+  berbasis load-per-core. Poin 5 (semua knob di Setting) & poin 6 tetap berlaku apa adanya.
 - Tanggal: 2026-07-22
 - SPEC: SPEC-294 (backlog fondasi dari breakdown PRD scheduler)
 - Terkait: **membalik sebagian [0024](0024-sesi-interaktif-menggantikan-run.md)** (yang mencabut
