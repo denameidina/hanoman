@@ -804,6 +804,7 @@ export type EventsClientMsg = z.infer<typeof zEventsClientMsg>;
 // SPEC-908 · grup GLOBAL tanpa parameter di depan (sebelas sejak SPEC-961); enam varian terakhir milik
 // langganan berparameter (`zEventsClientMsg` di atas), yang membuat kanal ini tak lagi read-only.
 export type EventMsg =
+  | { t: "models"; catalog: import("./model-catalog").ModelCatalog }
   | { t: "specs"; specs: Spec[] }
   | { t: "sessions"; sessions: SessionDTO[] }
   // SPEC-523 · `total` ikut disiarkan: bell menampilkan 50 teratas, dan tanpa angka ini 50 itu

@@ -15,12 +15,18 @@ import { McpPanel } from "./McpPanel";   // SPEC-482 · ADR-0099 · pemasangan M
 import { SetupWizard } from "./SetupWizard";   // SPEC-884 · ADR-0139 · setup awal, bisa diulang
 import { AgentDocCard } from "./AgentDocCard";   // SPEC-489 · halaman dokumentasi AI Agent
 import { usePersistedState, isStr } from "../ui-state";
+import { useModelCatalog } from "../api/model-catalog";
+import { claudeEfforts, coerceClaudeEffort } from "@hanoman/shared";
 
 // SPEC-383 · katalog claude dibaca dari @hanoman/shared — sumber yang SAMA dengan picker Start
 // (App.tsx). Sebelumnya tab ini menyalinnya (`S_MODELS`/`S_EFFORT` + komentar "keep in sync"),
 // jadi Settings dan Start bisa menampilkan daftar model claude yang berbeda.
-const S_MODELS = MODELS.map((m) => ({ value: m.id, label: m.label }));
-const S_EFFORT = EFFORTS.map((v) => ({ value: v, label: v === "xhigh" ? "x-high" : v }));
+const claudeEffortOptions = (model: string) =>
+  claudeEfforts(model).map((v) => ({ value: v, label: v === "xhigh" ? "x-high" : v }));
+const claudeEffortPatch = (model: string, effort: string) => {
+  const next = coerceClaudeEffort(model, effort);
+  return next === effort ? {} : { effort: next };
+};
 // SPEC-252 · ADR-0061 · matrix model/effort per fase (SPEC-238) dicabut — model/effort kini per SESI,
 // dipilih saat Start (StartSessionModal). Yang tersisa di sini hanya default global.
 // SPEC-180 · nada notifikasi backlog selesai (durasi bervariasi). "off" = senyap (toast+daftar tetap jalan).
@@ -641,6 +647,8 @@ const S_SECTIONS = [
 
 export function SettingsScreen({ onToast, me, onLoggedOut }:
   { onToast?: ShowToast; me: UserView; onLoggedOut: () => void }) {
+  const modelCatalog = useModelCatalog();
+  const S_MODELS = MODELS.map((m) => ({ value: m.id, label: m.label }));
   const [s, setS] = React.useState<Setting | null>(null);
   const [failed, setFailed] = React.useState(false);
   // SPEC-740 · ADR-0115 · sub-tab aktif bertahan; refresh tak melempar balik ke Akun.
@@ -1038,13 +1046,23 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
           adalah blok milik agen terpilih di atas — yang satunya tersimpan, menunggu giliran.
         </div>
         <div data-testid="agent-group-claude">
+          <div style={{ padding: "8px 0", color: "var(--text-muted)", fontSize: 12 }}>
+            Katalog model diperiksa otomatis setiap 5 menit.
+            {Object.entries(modelCatalog.providers).map(([agent, status]) => (
+              <div key={agent}>
+                {agent}: {status.source === "bundled" ? "daftar bawaan" : status.source === "cache" ? "cache terakhir" : "dari CLI"}
+                {status.checkedAt ? " · diperiksa " + new Date(status.checkedAt).toLocaleTimeString() : ""}
+                {status.error ? " · " + status.error : ""}
+              </div>
+            ))}
+          </div>
           <AgentGroupHeader id="claude" label={AGENT_LABEL.claude} active={agent === "claude"} />
           <SettingRow title="Model" desc="Diteruskan apa adanya ke `claude --model`.">
             <Select size="sm" aria-label="Model claude" value={s.model} options={S_MODELS} style={{ width: 190 }}
-              onChange={(e) => save({ model: e.target.value }, "Model claude → " + e.target.value)} />
+              onChange={(e) => save({ model: e.target.value, ...claudeEffortPatch(e.target.value, s.effort) }, "Model claude → " + e.target.value)} />
           </SettingRow>
           <SettingRow title="Effort" last desc="Anggaran berpikir per giliran (`claude --effort`).">
-            <Select size="sm" aria-label="Effort claude" value={s.effort} options={S_EFFORT} style={{ width: 130 }}
+            <Select size="sm" aria-label="Effort claude" value={s.effort} options={claudeEffortOptions(s.model)} style={{ width: 130 }}
               onChange={(e) => save({ effort: e.target.value }, "Effort claude → " + e.target.value)} />
           </SettingRow>
         </div>
@@ -1108,7 +1126,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
                 onChange={(e) => {
                   const model = e.target.value;
                   saveConflict({ model, ...(conflict.agent === "codex"
-                    ? { effort: coerceCodexEffort(model, conflict.effort) } : {}) },
+                    ? { effort: coerceCodexEffort(model, conflict.effort) } : claudeEffortPatch(model, conflict.effort)) },
                     "Model konflik → " + model);
                 }} />
             </SettingRow>
@@ -1118,7 +1136,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
               <Select size="sm" aria-label="Effort konflik" value={conflict.effort} style={{ width: 130 }}
                 options={conflict.agent === "codex"
                   ? codexEfforts(conflict.model).map((v) => ({ value: v, label: v }))
-                  : S_EFFORT}
+                  : claudeEffortOptions(conflict.model)}
                 onChange={(e) => saveConflict({ effort: e.target.value }, "Effort konflik → " + e.target.value)} />
             </SettingRow>
           </>
@@ -1168,7 +1186,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
                 onChange={(e) => {
                   const model = e.target.value;
                   saveEngine({ model, ...(engine.agent === "codex"
-                    ? { effort: coerceCodexEffort(model, engine.effort) } : {}) },
+                    ? { effort: coerceCodexEffort(model, engine.effort) } : claudeEffortPatch(model, engine.effort)) },
                     "Model lead → " + model);
                 }} />
             </SettingRow>
@@ -1177,7 +1195,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
               <Select size="sm" aria-label="Effort lead" value={engine.effort} style={{ width: 130 }}
                 options={engine.agent === "codex"
                   ? codexEfforts(engine.model).map((v) => ({ value: v, label: v }))
-                  : S_EFFORT}
+                  : claudeEffortOptions(engine.model)}
                 onChange={(e) => saveEngine({ effort: e.target.value }, "Effort lead → " + e.target.value)} />
             </SettingRow>
           </>
@@ -1230,7 +1248,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
                 onChange={(e) => {
                   const model = e.target.value;
                   saveTgEngine({ model, ...(tgEngine.agent === "codex"
-                    ? { effort: coerceCodexEffort(model, tgEngine.effort) } : {}) },
+                    ? { effort: coerceCodexEffort(model, tgEngine.effort) } : claudeEffortPatch(model, tgEngine.effort)) },
                     "Model operator Telegram → " + model);
                 }} />
             </SettingRow>
@@ -1239,7 +1257,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
               <Select size="sm" aria-label="Effort Telegram" value={tgEngine.effort} style={{ width: 130 }}
                 options={tgEngine.agent === "codex"
                   ? codexEfforts(tgEngine.model).map((v) => ({ value: v, label: v }))
-                  : S_EFFORT}
+                  : claudeEffortOptions(tgEngine.model)}
                 onChange={(e) => saveTgEngine({ effort: e.target.value }, "Effort operator Telegram → " + e.target.value)} />
             </SettingRow>
           </>
@@ -1289,7 +1307,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
                 onChange={(e) => {
                   const model = e.target.value;
                   saveChangelog({ model, ...(changelog.agent === "codex"
-                    ? { effort: coerceCodexEffort(model, changelog.effort) } : {}) },
+                    ? { effort: coerceCodexEffort(model, changelog.effort) } : claudeEffortPatch(model, changelog.effort)) },
                     "Model changelog → " + model);
                 }} />
             </SettingRow>
@@ -1298,7 +1316,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
               <Select size="sm" aria-label="Effort changelog" value={changelog.effort} style={{ width: 130 }}
                 options={changelog.agent === "codex"
                   ? codexEfforts(changelog.model).map((v) => ({ value: v, label: v }))
-                  : S_EFFORT}
+                  : claudeEffortOptions(changelog.model)}
                 onChange={(e) => saveChangelog({ effort: e.target.value }, "Effort changelog → " + e.target.value)} />
             </SettingRow>
           </>
@@ -1341,12 +1359,12 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             <SettingRow title="Model" desc="Mesin obrolan selalu Claude — gerbang tool yang menjaganya tak ada di runtime lain.">
               <Select size="sm" aria-label="Model obrolan portal" value={portalChat.model}
                 style={{ width: 190 }} options={S_MODELS}
-                onChange={(e) => savePortalChat({ model: e.target.value },
+                onChange={(e) => savePortalChat({ model: e.target.value, ...claudeEffortPatch(e.target.value, portalChat.effort) },
                   "Model obrolan portal → " + e.target.value)} />
             </SettingRow>
             <SettingRow title="Effort">
               <Select size="sm" aria-label="Effort obrolan portal" value={portalChat.effort}
-                style={{ width: 130 }} options={S_EFFORT}
+                style={{ width: 130 }} options={claudeEffortOptions(portalChat.model)}
                 onChange={(e) => savePortalChat({ effort: e.target.value },
                   "Effort obrolan portal → " + e.target.value)} />
             </SettingRow>

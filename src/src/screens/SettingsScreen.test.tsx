@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SettingsScreen } from "./SettingsScreen";
+import { bundledModelCatalog } from "@hanoman/shared";
 import { CODEX_DEFAULTS, CONFLICT_DEFAULTS, GOAL_DEFAULTS, LEAD_DEFAULTS, PORTAL_CHAT_DEFAULTS, SCHEDULER_DEFAULTS, TELEGRAM_DEFAULTS } from "@hanoman/shared";
 
 const setting = {
@@ -45,6 +46,7 @@ function telegramFetch(extra: (path: string, init?: RequestInit) => Promise<Resp
     if (path === "/api/codex/version") return json({ version: null, minRequired: "0.0.0", ok: true });
     if (path === "/api/telegram/status") return json(status);
     if (path === "/api/telegram/settings") return json(credentials);
+    if (path === "/api/models") return json(bundledModelCatalog());
     throw new Error(`unexpected fetch ${path}`);
   });
 }

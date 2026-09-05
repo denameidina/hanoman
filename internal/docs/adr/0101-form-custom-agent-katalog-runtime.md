@@ -1,5 +1,9 @@
 # ADR-0101 — Form Custom Agent berbasis katalog: `runtime` sebagai penyaring, katalog tool turunan konfigurasi MCP
 
+**Amandemen 2026-09-05:** daftar model dan effort berasal dari snapshot CLI runtime yang
+disebarkan ke shared dan browser; validasi pasangan tetap keras di route. Model baru dan
+effort baru tidak memerlukan enum baru di kode. Lihat [katalog model otomatis](../architecture/model-catalog.md).
+
 - Status: Accepted — konteks materialisasi Codex **diamandemen ADR-0159**
 - Tanggal: 2026-08-01
 - SPEC: SPEC-484 (form Custom Agent: dropdown tools/model/mention + runtime)

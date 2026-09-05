@@ -1,5 +1,6 @@
 import { paths, subKey, MAX_SUBS, type EventMsg, type EventTopic, type TopicParams } from "@hanoman/shared";
 import { api } from "./client";
+import { installModelCatalog } from "./model-catalog-state";
 
 // SPEC-199 · satu koneksi WS dibagi semua consumer (ref-count, pola api/limits.ts). Server
 // mendorong frame per-grup; tiap consumer filter berdasarkan msg.t. Reconnect backoff +
@@ -130,6 +131,7 @@ async function open(): Promise<void> {
   ws.onmessage = (ev) => {
     let m: EventMsg;
     try { m = JSON.parse(ev.data as string); } catch { return; }
+    if (m.t === "models") installModelCatalog(m.catalog);
     lastFrameAt = Date.now();
     if (!status.connected) setStatus({ connected: true, since: Date.now() });
     if (m.t === "hello") {

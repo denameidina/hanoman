@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import {
   zSetting, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS,
-  RETIRED_CODEX_MODELS, LEAD_DEFAULTS, coerceCodexEffort, type Setting, type Agent, type Codex,
+  RETIRED_CODEX_MODELS, LEAD_DEFAULTS, coerceCodexEffort, codexModel, type Setting, type Agent, type Codex,
   TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, DEFAULT_METHOD, PORTAL_CHAT_DEFAULTS,
 } from "@hanoman/shared";
 
@@ -53,7 +53,7 @@ export async function getSetting(): Promise<Setting> {
  * `gpt-5.4` (tanpa ultra) ke gpt-5.5 tak ada gunanya bila effort `ultra`-nya dibiarkan.
  */
 function normalizeCodex(c: Codex): Codex {
-  const model = RETIRED_CODEX_MODELS[c.model] ?? c.model;
+  const model = codexModel(c.model) ? c.model : RETIRED_CODEX_MODELS[c.model] ?? c.model;
   return { model, effort: coerceCodexEffort(model, c.effort) };
 }
 

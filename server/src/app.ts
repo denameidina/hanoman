@@ -21,6 +21,7 @@ import terminalWorkspace from "./routes/terminal-workspace";
 import vps from "./routes/vps";
 import limits from "./routes/limits";
 import codex from "./routes/codex";
+import models from "./routes/models";
 import methods from "./routes/methods";
 import update from "./routes/update";
 import events from "./routes/events";
@@ -252,6 +253,7 @@ export function buildApp(
     await api.register(tickets, { publicBase: ingress.publicBase });  // SPEC-253 · triase (di belakang gate cookie)
     await api.register(scheduler);  // SPEC-294 · config/state scheduler (di belakang gate cookie)
     await api.register(codex);      // SPEC-339 · versi codex CLI untuk peringatan model 5.6
+    await api.register(models);
     await api.register(methods);    // SPEC-739 · ADR-0114 · kesiapan skill metode per agen
     await api.register(lead);       // SPEC-409 · ADR-0091 · hanoman-lead (cookie + capability `lead`)
     await api.register(customAgents); // SPEC-450 · ADR-0094 · katalog custom agent (capability `agents`)

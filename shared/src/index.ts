@@ -37,3 +37,4 @@ export * from "./session-ask";
 export * from "./presence";
 export * from "./pending";
 export * from "./team";
+export * from "./model-catalog";

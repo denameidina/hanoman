@@ -158,6 +158,12 @@ evaluatornya pada akhirnya bisa menilai "cukup"; asimetri ini disengaja.
 
 ## Pembaruan SPEC-339 (2026-07-27) — katalog per model
 
+**Amandemen 2026-09-05:** discovery `codex debug models` menggantikan pemeliharaan manual
+katalog sebagai sumber utama, dengan fallback bawaan dan cache terakhir. Astra sudah tersedia
+di fallback. Peta pensiun tidak mengganti model yang ditemukan kembali oleh CLI.
+Lihat [katalog model otomatis](../architecture/model-catalog.md).
+
+
 GPT-5.6 (`gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`) menambahkan effort `max` dan `ultra`, dan
 dukungannya **tidak seragam**: Luna tak mendukung `ultra`, dan seluruh model 5.5 ke bawah tak
 mendukung keduanya. Asumsi awal ADR ini — bahwa katalog codex cukup berupa dua daftar sejajar

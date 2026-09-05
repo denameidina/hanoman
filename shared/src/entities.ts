@@ -103,12 +103,14 @@ const NOTIFY_SOUNDS = ["off", "short", "medium", "long",
 // dan `askTimeoutMin` hilang bersama runner headless.
 // SPEC-238 · daftar pilihan valid untuk UI (server tetap lenient z.string()). +Fable, +max, +ultracode.
 // SPEC-252 · ADR-0061 — dipakai picker "Mulai sesi" (model/effort per sesi) + kartu default global Settings.
-export const MODELS = [
+export type ClaudeModel = { id: string; label: string; efforts?: readonly string[] };
+export let MODELS: readonly ClaudeModel[] = [
   { id: "claude-opus-5", label: "Opus 5" },
   { id: "claude-sonnet-5", label: "Sonnet 5" },
   { id: "claude-haiku-4-5", label: "Haiku 4.5" },
   { id: "claude-fable-5", label: "Fable 5" },
-] as const;
+  { id: "claude-fable-5-1", label: "Fable 5.1", efforts: ["max", "xhigh", "high", "medium", "low"] },
+];
 export const EFFORTS = ["xhigh", "high", "medium", "low", "max", "ultracode"] as const;
 
 // SPEC-338 · ADR-0074 · katalog codex. Slug diteruskan apa adanya ke `codex -m`; effort ke
@@ -134,12 +136,30 @@ const E_LUNA = ["max", "xhigh", "high", "medium", "low"] as const;
 // Irisan yang didukung SETIAP model codex — juga jawaban untuk model yang belum kita daftar.
 const E_BASE = ["xhigh", "high", "medium", "low"] as const;
 
-export const CODEX_MODELS: readonly CodexModel[] = [
+export let CODEX_MODELS: readonly CodexModel[] = [
+  { id: "gpt-6-astra", label: "GPT-6 Astra", efforts: E_5_6, fallback: "medium", minClient: "" },
   { id: "gpt-5.6-sol",   label: "GPT-5.6 Sol",   efforts: E_5_6,  fallback: "xhigh", minClient: "0.144.0" },
   { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", efforts: E_5_6,  fallback: "xhigh", minClient: "0.144.0" },
   { id: "gpt-5.6-luna",  label: "GPT-5.6 Luna",  efforts: E_LUNA, fallback: "xhigh", minClient: "0.144.0" },
   { id: "gpt-5.5",       label: "GPT-5.5",       efforts: E_BASE, fallback: "xhigh", minClient: "0.124.0" },
 ];
+
+/** Installed only by the runtime catalog boundary; defaults and persisted selections stay intact. */
+export function replaceModelCatalog(claude: readonly ClaudeModel[], codex: readonly CodexModel[]): void {
+  MODELS = claude;
+  CODEX_MODELS = codex;
+}
+
+export function claudeEfforts(modelId: string): readonly string[] {
+  return MODELS.find((m) => m.id === modelId)?.efforts ?? EFFORTS;
+}
+
+/** Normalize only when a user picks a model; discovery itself never writes settings. */
+export function coerceClaudeEffort(modelId: string, effort: string): string {
+  const levels = MODELS.find((m) => m.id === modelId)?.efforts;
+  if (!levels?.length || levels.includes(effort)) return effort;
+  return levels.includes("xhigh") ? "xhigh" : levels[0]!;
+}
 
 // Gabungan semua effort codex. Dipertahankan demi pemanggil lama, TAPI bukan lagi sumber pilihan
 // UI — picker wajib memakai `codexEfforts(model)` supaya kombinasi tolak tak pernah tampil.

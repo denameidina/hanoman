@@ -1,4 +1,5 @@
 import { buildApp } from "./app";
+import { startModelDiscovery } from "./services/model-catalog";
 import { prisma } from "./db";
 import { startVpsMonitor } from "./services/vps-monitor";
 import { startScheduler } from "./services/scheduler/engine";
@@ -38,6 +39,8 @@ assertRuntimeBoundary(process.env, { uid: process.getuid?.(), host });
 // Hook onClose wajib didaftarkan sebelum Fastify listen/ready. Relay memakai app.inject agar
 // autentikasi dan parsing event tetap satu jalur, termasuk ketika event datang dari sandbox.
 startSessionEventRelay(app);
+let stopModelDiscovery: (() => void) | undefined;
+app.addHook("onClose", async () => { stopModelDiscovery?.(); });
 
 // Jangan biarkan satu promise yatim (mis. sweep monitor saat DB kedip) menjatuhkan orchestrator
 // tanpa jejak (SPEC-197). Log, jangan crash.
@@ -121,6 +124,7 @@ bootstrapReady.then(async () => {
   const boundPort = (app.server.address() as AddressInfo).port;
   await installTelegramGateway(app, { apiBase: `http://127.0.0.1:${boundPort}` });
   startVpsMonitor(); // healthcheck 5 menit + audit harian (SPEC-164)
+  stopModelDiscovery = startModelDiscovery();
   registerBacklogSource(); // SPEC-295 · daftarkan checker backlog sebelum engine tick pertama
   registerTriaseSource(); // SPEC-297 · daftarkan checker triase sebelum engine tick pertama
   startScheduler(); // SPEC-294 · ADR-0072 · engine scheduler in-process (timer .unref, app.ts bebas-timer)

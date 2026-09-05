@@ -1,5 +1,5 @@
 import { DEFAULT_AGENT_TOOLS, type AgentEffort, type AgentRuntime } from "./custom-agent";
-import { MODELS, EFFORTS, CODEX_MODELS } from "./entities";
+import { MODELS, EFFORTS, CODEX_MODELS, claudeEfforts } from "./entities";
 
 // SPEC-484 · ADR-0101 · katalog pilihan form Custom Agent. Nol I/O: dipakai server (validasi +
 // ekspansi `*`) dan UI (opsi dropdown) dari SATU sumber. Bagian yang butuh I/O — penemuan server
@@ -63,7 +63,7 @@ export function effortsForRuntimeModel(
   model: string | null,
 ): AgentEffort[] {
   if (runtime === "claude" || (!runtime && model && MODELS.some((entry) => entry.id === model))) {
-    return [...EFFORTS] as AgentEffort[];
+    return [...claudeEfforts(model ?? "")] as AgentEffort[];
   }
   const codexModel = model ? CODEX_MODELS.find((entry) => entry.id === model) : undefined;
   if (runtime === "codex" || codexModel) {

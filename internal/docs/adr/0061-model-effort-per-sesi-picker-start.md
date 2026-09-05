@@ -51,6 +51,12 @@ Operator memutuskan: jadikan model & effort **per sesi**, bukan per fase — dit
   (satu sesi = satu proses, live tmux attach). Ditolak — sama seperti alternatif yang sudah ditolak ADR-0058.
 
 ## Consequences
+
+**Amandemen 2026-09-05:** `MODELS` dan `CODEX_MODELS` menjadi snapshot runtime dengan fallback
+bawaan. CLI memasok model/effort baru tanpa rilis Hanoman; Settings menghitung pilihan saat
+render. Pilihan default dan sesi berjalan tidak diganti oleh discovery.
+Lihat [katalog model otomatis](../architecture/model-catalog.md).
+
 - Operator memilih model/effort tiap memulai sesi backlog; andal karena argv saat lahir (tak bergantung agen).
 - Tanpa perubahan skema Prisma — `phaseModels` dihapus dari skema **zod**, bukan tabel; baris lama tetap parse.
 - Kontrak API `POST /terminal/sessions` bertambah field **opsional** `model`/`effort` pada varian spec-flow;

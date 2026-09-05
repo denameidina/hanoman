@@ -7,6 +7,7 @@
    bukan ketikan operator — jadi pencabutan `Task` untuk agen daun TERLIHAT, bukan tersembunyi.
    Itu lapis 2 anti-loop, dan lapis yang tak terlihat adalah lapis yang dikira tak ada. */
 import React from "react";
+import { useModelCatalog } from "../api/model-catalog";
 import { Card, Button, Badge, Input, Switch, MultiSelect, Select, Field, HnTextarea, StateBlock, Callout, Modal } from "../ds";
 import { api, ApiError } from "../api/client";
 import {
@@ -131,8 +132,8 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
   const toolOptions = (catalog?.tools ?? []).map((t) => ({
     value: t.id, label: t.label, ...(t.group === "mcp" ? { group: "MCP" } : {}),
   }));
+  useModelCatalog();
   const modelOptions = modelsForRuntime(runtime)
-    .filter((m) => !catalog || catalog.models.length === 0 || catalog.models.some((c) => c.id === m.id))
     .map((m) => ({ value: m.id, label: runtime ? m.label : `${m.label} · ${m.runtime}` }));
   const mentionOptions = mentionable.map((m) => ({ value: m.name, label: m.name }));
   const invalidTools = (editing?.draft.tools ?? []).filter((t) => !catalogToolIds.includes(t));

@@ -107,7 +107,7 @@ describe("SPEC-383 · kartu default sesi konflik", () => {
     openModel();
     const sel = await screen.findByLabelText("Model konflik");
     const opts = [...sel.querySelectorAll("option")].map((o) => (o as HTMLOptionElement).value);
-    expect(opts).toEqual(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"]);
+    expect(opts).toEqual(["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"]);
   });
 
   // Respons GET /settings yang ter-cache dari sebelum SPEC-383 belum punya kunci ini — layar

@@ -4,6 +4,7 @@ import { liveSpecs } from "./live-specs";
 import { notificationsFeed } from "./notifications";
 import { getLimits } from "./limits";
 import { getCodexLimits } from "./codex-limits";
+import { modelCatalogService } from "./model-catalog";
 import { getUpdateStatus } from "./update";
 import { isDeciding } from "./lead/deciding";
 import { liveAsks } from "./lead/ask";
@@ -49,6 +50,9 @@ type Group = { everyTicks: number; last: string; build: () => Promise<WireMsg>; 
   cookieOnly?: boolean };
 // everyTicks = recompute tiap N detik: board 1s, notif 3s, vps 15s, limits 30s (cache 30s service).
 const GROUPS: Group[] = [
+  { everyTicks: 3, cookieOnly: true, last: "", build: async () => ({
+    t: "models", catalog: modelCatalogService.snapshot(),
+  }) },
   // SPEC-409 · ADR-0091 · AC-3 · `deciding` menandai sesi yang sedang DISUSUN keputusannya oleh
   // hanoman-lead. Tanpa penanda ini sesi yang justru sedang dilayani terbaca persis seperti sesi
   // yang mandek — bentuknya sama: diam, marker keputusan terisi. Dihias DI SINI, bukan di pty.ts:

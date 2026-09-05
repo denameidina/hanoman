@@ -1,5 +1,5 @@
 import {
-  MODELS, EFFORTS, CODEX_MODELS, codexEfforts, coerceCodexEffort, type Agent,
+  MODELS, claudeEfforts, coerceClaudeEffort, CODEX_MODELS, codexEfforts, coerceCodexEffort, type Agent,
 } from "@hanoman/shared";
 
 /** Default per agen sebagaimana dibaca dari `GET /settings` (blok claude & blok codex). */
@@ -16,7 +16,7 @@ export function runtimeModels(agent: Agent): readonly { id: string; label: strin
 
 /** SPEC-339 · effort adalah properti MODEL untuk codex; untuk claude ia properti CLI. */
 export function runtimeEfforts(agent: Agent, model: string): readonly string[] {
-  return agent === "codex" ? codexEfforts(model) : EFFORTS;
+  return agent === "codex" ? codexEfforts(model) : claudeEfforts(model);
 }
 
 /**
@@ -28,6 +28,6 @@ export function runtimeFor(defs: RuntimeDefs, agent: Agent): { model: string; ef
   const d = defs[agent];
   return {
     model: d.model,
-    effort: agent === "codex" ? coerceCodexEffort(d.model, d.effort) : d.effort,
+    effort: agent === "codex" ? coerceCodexEffort(d.model, d.effort) : coerceClaudeEffort(d.model, d.effort),
   };
 }

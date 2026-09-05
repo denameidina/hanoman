@@ -24,8 +24,8 @@ export const zAgentActivation = z.enum(AGENT_ACTIVATIONS);
 
 /** Gabungan nilai effort yang benar-benar dikenal kedua runtime. Kombinasi model divalidasi lagi. */
 export const AGENT_EFFORTS = ["ultra", "max", "xhigh", "high", "medium", "low", "ultracode"] as const;
-export type AgentEffort = (typeof AGENT_EFFORTS)[number];
-export const zAgentEffort = z.enum(AGENT_EFFORTS);
+export const zAgentEffort = z.string().min(1).max(64).regex(/^[a-z][a-z0-9_-]*$/);
+export type AgentEffort = z.infer<typeof zAgentEffort>;
 
 export const AGENT_WORKSPACE_POLICIES = ["inherit", "read-only", "isolated-worktree"] as const;
 export type AgentWorkspacePolicy = (typeof AGENT_WORKSPACE_POLICIES)[number];
@@ -160,9 +160,8 @@ export function workspacePolicyOf(v: unknown): AgentWorkspacePolicy {
 }
 
 export function effortOf(v: unknown): AgentEffort | null {
-  return typeof v === "string" && (AGENT_EFFORTS as readonly string[]).includes(v)
-    ? (v as AgentEffort)
-    : null;
+  const parsed = zAgentEffort.safeParse(v);
+  return parsed.success ? parsed.data : null;
 }
 
 export function maxTurnsOf(v: unknown): number | null {

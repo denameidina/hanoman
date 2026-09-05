@@ -2,6 +2,8 @@
    prototype App.jsx: window.HN → api.* on mount; every mutating handler
    calls the client and updates state from the response. */
 import React from "react";
+import { useModelCatalog } from "./api/model-catalog";
+import { coerceClaudeEffort } from "@hanoman/shared";
 import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 import { parseRoute, routePath } from "./routes";
 import { LazyBoundary } from "./ds/LazyBoundary";
@@ -151,7 +153,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // Turunkan SEKARANG supaya perubahannya terlihat di picker, bukan diam-diam saat sesi lahir.
   const pickModel = (id: string) => {
     setModel(id);
-    if (agent === "codex") setEffort((e) => coerceCodexEffort(id, e));
+    setEffort((e) => agent === "codex" ? coerceCodexEffort(id, e) : coerceClaudeEffort(id, e));
   };
   const models = runtimeModels(agent);
   // SPEC-339 · effort adalah properti MODEL untuk codex — daftarnya menyempit mengikuti pilihan.
@@ -691,6 +693,7 @@ export default function App() {
 }
 
 function AppInner() {
+  useModelCatalog();
   // ADR-0160 · halaman = URL. `section` diturunkan dari pathname (`routes.ts`), bukan disimpan
   // sebagai state; tombol Kembali/Maju browser dan link yang dibagikan bekerja dengan sendirinya.
   const location = useLocation();

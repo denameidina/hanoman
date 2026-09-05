@@ -1,5 +1,5 @@
 import {
-  CODEX_MODELS, EFFORTS, MODELS, codexEfforts, coerceCodexEffort,
+  CODEX_MODELS, claudeEfforts, MODELS, codexEfforts, coerceCodexEffort,
   type Agent, type AgentEngine,
 } from "@hanoman/shared";
 
@@ -45,7 +45,7 @@ export type EngineCommand =
 const claudeModels = (): string[] => MODELS.map((m) => m.id);
 const codexModels = (): string[] => CODEX_MODELS.map((m) => m.id);
 const effortsFor = (t: EngineTriple): readonly string[] =>
-  t.agent === "codex" ? codexEfforts(t.model) : EFFORTS;
+  t.agent === "codex" ? codexEfforts(t.model) : claudeEfforts(t.model);
 
 const usage = [
   "Setelan runtime sesi operator Telegram:",

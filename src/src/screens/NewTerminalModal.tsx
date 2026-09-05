@@ -1,4 +1,5 @@
 import React from "react";
+import { coerceClaudeEffort } from "@hanoman/shared";
 import { Modal, Button, Select, Field } from "../ds";
 import { api } from "../api/client";
 import { codexClientTooOld, codexModel, coerceCodexEffort, CODEX_DEFAULTS, type Agent } from "@hanoman/shared";
@@ -51,7 +52,7 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
   // SPEC-339 · menukar model bisa membuat effort terpilih jadi tak sah (Luna tak punya `ultra`).
   const pickModel = (id: string) => {
     setModel(id);
-    if (agent === "codex") setEffort((e) => coerceCodexEffort(id, e));
+    setEffort((e) => agent === "codex" ? coerceCodexEffort(id, e) : coerceClaudeEffort(id, e));
   };
 
   async function create() {

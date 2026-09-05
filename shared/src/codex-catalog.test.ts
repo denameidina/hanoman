@@ -7,7 +7,7 @@ import {
 describe("SPEC-339 · katalog codex per-model", () => {
   it("memuat trio GPT-5.6 + gpt-5.5, tanpa model yang dipensiunkan", () => {
     expect(CODEX_MODELS.map((m) => m.id)).toEqual([
-      "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5",
+      "gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5",
     ]);
   });
 

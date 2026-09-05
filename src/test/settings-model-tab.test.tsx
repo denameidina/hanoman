@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { MODELS, EFFORTS } from "@hanoman/shared";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { MODELS, EFFORTS, bundledModelCatalog } from "@hanoman/shared";
+import { installModelCatalog } from "../src/api/model-catalog-state";
+
+afterEach(() => { act(() => installModelCatalog(bundledModelCatalog())); });
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -39,6 +42,21 @@ const openModel = () => {
 // SPEC-383 · Temuan A · blok claude tak pernah menyebut "claude" di teks yang TERLIHAT (hanya
 // aria-label), dan judul "default global" tetap terpampang di atas blok yang sedang tak dipakai.
 describe("SPEC-383 · tab Model sesi bersumbu agen", () => {
+  it("menerima model baru saat Settings terbuka tanpa menulis default sampai operator memilihnya", async () => {
+    vi.mocked(api.getSettings).mockResolvedValue(settings({ effort: "ultracode" }) as any);
+    vi.mocked(api.putSettings).mockClear();
+    openModel();
+    const select = await screen.findByLabelText("Model claude");
+    const next = bundledModelCatalog();
+    next.claude = [...next.claude, { id: "claude-future", label: "Future", efforts: ["high", "low"] }];
+    act(() => installModelCatalog(next));
+    expect(select.querySelector('option[value="claude-future"]')).toBeTruthy();
+    expect(select).toHaveValue("claude-opus-5");
+    expect(api.putSettings).not.toHaveBeenCalled();
+    fireEvent.change(select, { target: { value: "claude-future" } });
+    await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "claude-future", effort: "high" })));
+  });
   // Nama agen di dalam `<option>` picker "Agen default" TIDAK dihitung — itu sudah ada sebelum
   // SPEC-383 dan bukan yang menamai bloknya. Yang dituntut: grup ber-judul, memuat picker-nya.
   it("setiap blok model punya judul agen yang terlihat mata", async () => {

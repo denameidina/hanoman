@@ -1266,6 +1266,14 @@ DELETE /terminal/history?projectId&before
 > di-replay saat klien reconnect. RCE by design — server bind `127.0.0.1` secara default, lihat ADR-0014.
 
 ## Events (SPEC-199 · ADR-0039 · SPEC-908/ADR-0145)
+
+Katalog model runtime: `GET /api/models` (admin cookie, tanpa query/body) mengembalikan
+`{claude: [{id,label,efforts?}], codex: [{id,label,efforts,fallback,minClient}],
+providers: {claude,codex}}`. Status provider = `{source:"bundled"|"cache"|"cli",
+checkedAt:string|null, updatedAt:string|null, error:string|null}`.
+Frame cookie-only `{t:"models",catalog}` membawa snapshot yang sama; discovery server 5 menit,
+distribusi perubahan setiap 3 detik, tanpa polling browser. Lihat [kontrak katalog](model-catalog.md).
+
 ```
 GET    /events/ws                    # WebSocket siar dashboard (global). Auth = gate /api (cookie).
 #   server->klien, GRUP GLOBAL (per-grup, saat berubah; snapshot penuh saat connect):
