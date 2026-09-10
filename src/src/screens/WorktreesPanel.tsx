@@ -2,7 +2,7 @@
    dengan hapus per baris + bulk yang ikut menutup sesinya dan (opsional) menghapus branch-nya.
    Pasangan BranchesPanel.tsx untuk sisi worktree; seluruh data turunan git dari server.
    Sesi tmux hidup, backlog belum selesai, dan isi kotor adalah PERINGATAN, bukan penolakan —
-   satu-satunya baris yang tak bisa dihapus adalah yang ditolak `ownsWorktree` di server. */
+   satu-satunya baris yang tak bisa dihapus adalah checkout utama repo (SPEC-1150/ADR-0163). */
 import React from "react";
 import { Card, Button, Badge, Checkbox, StateBlock, useConfirm } from "../ds";
 import { usePersistedState, scoped } from "../ui-state";

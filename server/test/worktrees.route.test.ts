@@ -177,6 +177,19 @@ describe("POST /projects/:id/worktrees/delete", () => {
     expect(g(repoDir, "branch", "--format=%(refname:short)").stdout).toContain("hanoman/spec-lock");
   });
 
+  it("worktree DI LUAR .worktrees kini bisa dihapus — SPEC-1150", async () => {
+    const repoDir = await project("wp11");
+    const external = join(repoDir, "external-wt");
+    g(repoDir, "worktree", "add", "-q", "--detach", external, "main");
+    const list = await app.inject({ method: "GET", url: "/api/projects/wp11/worktrees" });
+    const row = list.json().worktrees.find((w: any) => w.name === "external-wt");
+    expect(row.deletable).toBe(true);
+    const r = await app.inject({ method: "POST", url: "/api/projects/wp11/worktrees/delete",
+      payload: { names: ["external-wt"] } });
+    expect(r.json().results[0]).toMatchObject({ ok: true });
+    expect(existsSync(external)).toBe(false);
+  });
+
   it("checkout project sendiri TAK PERNAH bisa dihapus", async () => {
     const repoDir = await project("wp8");
     const r = await app.inject({ method: "POST", url: "/api/projects/wp8/worktrees/delete",

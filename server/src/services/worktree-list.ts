@@ -4,7 +4,6 @@ import { stat } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import type { WorktreeDeleteResult, WorktreeReport, WorktreeStats, WorktreeView } from "@hanoman/shared";
-import { ownsWorktree } from "./session-worktree";
 
 // SPEC-861 · ADR-0132 · penemuan worktree yang masih HIDUP di sebuah project — pasangan
 // `branch-cleanup.ts` untuk sisi worktree. Nilai turunan penuh dari git tiap request
@@ -66,8 +65,8 @@ const EMPTY: WorktreeReport = { repoDir: "", worktrees: [] };
 // `git worktree list` SELALU menjawab path fisik, sementara repoDir & cwd sesi datang apa adanya
 // dari DB/tmux. macOS men-symlink `/tmp` dan `/var/folders` ke `/private/**`, jadi membandingkan
 // string mentah gagal palsu — dan bukan cuma di direktori test: repo yang hidup di bawah symlink
-// mana pun kena hal yang sama, dan gagalnya SENYAP (baris tak pernah cocok dengan sesinya, gerbang
-// `ownsWorktree` menolak worktree yang sah). Cermin `samePath` di runner/src/git.ts.
+// mana pun kena hal yang sama, dan gagalnya SENYAP (baris tak pernah cocok dengan sesi/riwayatnya).
+// Cermin `samePath` di runner/src/git.ts.
 const real = (p: string): string => {
   try { return realpathSync(p); } catch {
     const path = resolve(p);
@@ -114,15 +113,22 @@ export async function listWorktrees(
     const previous = history.get(path);
     if (!previous || h.startedAt > previous.startedAt) history.set(path, h);
   }
+  const raw = parseWorktreePorcelain(text ?? "");
+  // SPEC-1150 · `git worktree list` SELALU memancarkan working tree utama sebagai baris PERTAMA,
+  // apa pun cwd pemanggilnya (diverifikasi git 2.x) — sinyal dari struktur repo git itu sendiri,
+  // independen dari binding repoDir project. Dogfooding hanoman di dalam worktree-nya sendiri bisa
+  // membuat repoDir ter-bind ke checkout TERTAUT, bukan working tree utama; mengecualikan mainPath
+  // di sini menjaga working tree utama yang SESUNGGUHNYA tetap tak bisa dihapus meski begitu
+  // (ADR-0163) — tanpanya insiden SPEC-362 terulang, hanya berpindah baris.
+  const mainPath = raw[0] ? resolve(raw[0].path) : null;
   const rows: WorktreeView[] = [];
-  for (const w of parseWorktreePorcelain(text ?? "")) {
+  for (const w of raw) {
     const path = resolve(w.path);
     if (path === trash || path.startsWith(trash + sep)) continue;
     const name = basename(path);
-    // SPEC-362 · `ownsWorktree` adalah SATU-SATUNYA gerbang, dan ia menguji HUBUNGAN cwd↔repoDir,
-    // bukan bentuk path. hanoman didogfood di dalam worktree-nya sendiri, sehingga sebuah project
-    // bisa ter-bind ke checkout yang kebetulan berada di bawah `.worktrees/`.
-    const deletable = ownsWorktree(baseReal, path);
+    // SPEC-1150 · satu-satunya worktree yang dikecualikan dari hapus adalah checkout utama —
+    // worktree lain di luar container `.worktrees` project kini boleh dipilih & dihapus.
+    const deletable = path !== baseReal && path !== mainPath;
     const spec = inputs.specs.get(name);
     const latest = history.get(path);
     const orphan = latest && (!latest.endedAt || latest.endedReason === "reconciled")
@@ -132,7 +138,7 @@ export async function listWorktrees(
       path, name, head: w.head, branch: w.branch,
       prunable: w.prunable, locked: w.locked,
       deletable,
-      blocked: deletable ? null : path === baseReal ? "checkout project" : "di luar .worktrees project ini",
+      blocked: deletable ? null : "checkout project",
       spec: spec ? { id: spec.id, stage: spec.stage } : null,
       session: sessions.get(path) ?? null,
       createdAt: await bornAt(path),
