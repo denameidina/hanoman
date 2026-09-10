@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Amandemen SPEC-1109: [ADR-0162](0162-pemungutan-worktree-yatim-dengan-konfirmasi.md) menambah penanda yatim dari history/tmux, mode pemungutan dengan konfirmasi tanpa menutup pane, serta statistik gagal baca bernilai null.
+- Amandemen SPEC-1150: [ADR-0163](0163-worktree-di-luar-container-kini-deletable.md) mengganti gerbang `deletable` §3 di bawah — bukan lagi `ownsWorktree` (container-based), melainkan pengecualian checkout utama saja (repoDir ATAU working tree utama git yang sesungguhnya). Worktree di luar `.worktrees` kini deletable; butir terakhir §Konsekuensi di bawah digantikan uraian di ADR-0163.
 - Tanggal: 2026-08-20
 - SPEC: SPEC-861
 - Terkait: **menegakkan** [0116](0116-penutupan-sesi-asinkron-worktree-trash.md) (domain penyapu
@@ -86,12 +87,10 @@ turunkan ulang daftar → gerbang deletable → [sesi hidup? closeSession()] →
   git worktree prune → [deleteBranch? deleteBranches() BESERTA pagar ADR-0077]
 ```
 
-**`ownsWorktree()` adalah satu-satunya gerbang `deletable`, dan ditegakkan di jalur TULIS.** Ia
-menguji HUBUNGAN path↔repoDir, bukan bentuk path. hanoman didogfood di dalam worktree-nya sendiri,
-sehingga sebuah project bisa ter-bind ke checkout yang kebetulan berada di bawah `.worktrees/` —
-menguji bentuk path saja pernah membuat `removeWorktree(repoDir, repoDir)` menghapus checkout
-project itu sendiri (SPEC-362). Checkout project tetap **tampil** sebagai baris (ia konteks yang
-berguna) dengan `deletable: false` dan alasan prosa di `blocked`.
+**Gerbang `deletable` ditegakkan di jalur TULIS** (lihat amandemen ADR-0163: sejak SPEC-1150
+bukan lagi `ownsWorktree`, melainkan pengecualian checkout utama saja). Checkout project tetap
+**tampil** sebagai baris (ia konteks yang berguna) dengan `deletable: false` dan alasan prosa
+`"checkout project"` di `blocked`.
 
 **Penghapusan tidak memblokir event loop.** Request hanya me-`rename` worktree ke
 `.worktrees/.trash/` (SPEC-742: 1 ms vs 1 370 ms `rmSync`, dengan 1 364 ms di antaranya tanpa satu
@@ -139,9 +138,9 @@ membawa balik ke tab Branches.
 - Domain reaper **tidak** diperlebar. Ia tetap hanya menyentuh `.trash/**`, jadi invarian bebas-kunci
   ADR-0116 utuh. Yang berubah adalah apa yang masuk ke `.trash`.
 - Tak ada kolom DB, tak ada migration, tak ada model baru.
-- Pada instance dogfood yang project-nya ter-bind ke checkout DI BAWAH `.worktrees/`, **tak ada**
-  baris yang deletable. Itu benar dan disengaja: `ownsWorktree` menolak, dan menolak adalah jawaban
-  yang aman.
+- Pada instance dogfood yang project-nya ter-bind ke checkout DI BAWAH `.worktrees/`: **sejak
+  ADR-0163 (SPEC-1150)** hanya checkout yang di-bind DAN working tree utama git yang sesungguhnya
+  yang tetap `deletable:false` — bukan lagi seluruh baris.
 
 ## Gotcha terukur
 

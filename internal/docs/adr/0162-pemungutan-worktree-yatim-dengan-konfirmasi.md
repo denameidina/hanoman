@@ -4,7 +4,9 @@ Status: accepted · 2026-09-05 · SPEC-1109. Kebijakan direkomendasikan sesudah 
 disetujui melalui instruksi pengguna untuk melanjutkan. Menegakkan
 [0084](0084-melanjutkan-sesi-backlog.md), [0016](0016-sesi-terminal-hidup-di-tmux.md),
 [0116](0116-penutupan-sesi-asinkron-worktree-trash.md), dan memperluas
-[0132](0132-permukaan-penghapusan-worktree.md).
+[0132](0132-permukaan-penghapusan-worktree.md). **Diamandemen SPEC-1150/[ADR-0163](0163-worktree-di-luar-container-kini-deletable.md)**
+pada paragraf checkout non-kanonik di bawah: kepemilikan yang tak terbukti tak lagi jadi alasan
+menolak pemindahannya.
 
 Boot mendeteksi worktree sesi yatim tetapi **tidak memindahkan atau menghapusnya**.
 Operator memungut lewat tab Worktrees yang sudah ada, dengan dialog dampak. Keputusan
@@ -51,9 +53,10 @@ akan hilang. Statistik git yang gagal dibaca bernilai `null`, bukan nol, dan
 ditampilkan sebagai dampak tidak diketahui. Nol bukan jaminan bahwa pekerjaan aman.
 
 Path `wt-spec-1099` di luar `.worktrees` tidak ditemukan pembuatnya di jalur produk
-saat ini; seluruh peluncur membentuk path kanonik. Ia tetap ditampilkan bila
-terdaftar git, dengan alasan blokir. Pemindahan checkout non-kanonik dikecualikan
-karena kepemilikannya tidak terbukti; tidak ada migrasi diam-diam.
+saat ini; seluruh peluncur membentuk path kanonik. **Diamandemen ADR-0163 (SPEC-1150):**
+checkout non-kanonik yang terdaftar git kini deletable seperti worktree biasa — hanya
+checkout utama repo (repoDir ATAU working tree utama git yang sesungguhnya) yang tetap
+dikecualikan pemindahannya.
 
 Rincian implementasi: [spec](../../../docs/superpowers/specs/2026-09-05-spec-1109-worktree-yatim-design.md)
 dan [plan](../../../docs/superpowers/plans/2026-09-05-spec-1109-worktree-yatim.md).

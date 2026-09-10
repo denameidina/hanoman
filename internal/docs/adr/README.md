@@ -1,5 +1,6 @@
 # ADR — index & riwayat keputusan
 
+- [0163 — Tab Worktrees: hanya checkout utama yang dikecualikan dari hapus, bukan lagi seluruh isi di luar `.worktrees`](0163-worktree-di-luar-container-kini-deletable.md) — SPEC-1150: **mengamandemen** 0132 §3/Konsekuensi & 0162 (paragraf checkout non-kanonik). `deletable` bukan lagi `ownsWorktree` (container-based) — hanya `path === repoDir` ATAU `path === mainPath` (baris pertama `git worktree list --porcelain`, working tree utama git yang sesungguhnya, sinyal independen dari binding repoDir) yang dikecualikan. `ownsWorktree()` sendiri tak berubah, tetap dipakai `session-close.ts`/`spec-reset.ts` untuk pelepasan OTOMATIS (SPEC-362), kelas masalah berbeda yang sengaja tetap sempit.
 - [0162 — Worktree yatim dipungut setelah konfirmasi operator](0162-pemungutan-worktree-yatim-dengan-konfirmasi.md) — SPEC-1109: deteksi boot dan tab Worktrees memakai history + tmux; pemungutan manual menjaga resume ADR-0084. Mode yatim tidak menutup sesi yang kembali hidup, rename gagal tidak jatuh ke penghapusan sinkron, dan reaper tetap `.trash/**`.
 
 Sub-index dari [internal/docs/README.md](../README.md). Index utama menyimpan daftar **satu baris per

@@ -639,8 +639,11 @@ GET  /projects/:id/worktrees          # { repoDir, worktrees:[{path,name,head,br
 #   itu wilayah reaper & sudah punya permukaannya sendiri (GET /terminal/cleanups, ADR-0116).
 #   branch null = detached HEAD → pakai `head` (sesi hanoman SELALU detached, ADR-0002).
 #   spec dipetakan dari `basename(path)` == sessionIdForSpec(specId) (ADR-0015); merge-*/cron-* → null.
-#   deletable = ownsWorktree(repoDir, path) — HUBUNGAN path↔repoDir, bukan bentuk path (SPEC-362).
-#   Checkout project ikut tampil dengan deletable:false + blocked:"checkout project".
+#   deletable = path !== repoDir && path !== mainPath (baris pertama porcelain = working tree
+#   utama git yang sesungguhnya, ADR-0163/SPEC-1150) — bukan lagi ownsWorktree container-based;
+#   worktree di luar .worktrees kini deletable. ownsWorktree tetap gerbang SPEC-362 terpisah,
+#   dipakai session-close/spec-reset untuk pelepasan OTOMATIS (lihat DELETE /terminal/sessions/:id).
+#   Checkout utama ikut tampil dengan deletable:false + blocked:"checkout project".
 #   Path git selalu FISIK (macOS: /var/folders → /private/**) → dinormalkan lewat realpath.
 #   orphan (SPEC-1109/ADR-0162) = history TERBARU per cwd fisik terbuka/reconciled dan tmux tidak
 #   memiliki pane dengan id sama atau cwd di checkout itu. Pane exited tetap melindungi checkout.
@@ -669,7 +672,8 @@ POST /projects/:id/worktrees/delete  { names:string[], deleteBranch?, orphanOnly
 #   itu pula yang membereskan baris `prunable` (registrasi tanpa direktori).
 #   Tak ada baris terkunci permanen: sesi hidup / backlog belum done / isi kotor = PERINGATAN yang
 #   dinamai dialog konfirmasi (useConfirm + impact[], ADR-0127), bukan penolakan. Yang menolak hanya
-#   ownsWorktree. Penghapusan BRANCH tetap bisa gagal & alasannya dilaporkan di baris `branch`.
+#   checkout utama repo (ADR-0163). Penghapusan BRANCH tetap bisa gagal & alasannya dilaporkan di
+#   baris `branch`.
 #   Selalu 200 bila body sah — kegagalan hidup di baris results. 400 names cacat, tanpa repoDir.
 #   Capability agent: read = ide:read, delete = ide:git (akses danger, ADR-0155); diturunkan DARI METHOD.
 # Isolasi (merge/rebase/pull/drop): { status:"clean",detail } | { status:"conflict",sessionId } | 400 body/target · 409 detached/source hilang/working-tree kotor

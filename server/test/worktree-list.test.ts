@@ -118,13 +118,29 @@ describe("listWorktrees", () => {
 
   // GOTCHA · hanoman didogfood DI DALAM worktree-nya sendiri: sebuah project bisa ter-bind ke
   // checkout yang kebetulan berada di bawah `.worktrees/`. Menguji bentuk path saja pernah membuat
-  // removeWorktree(repoDir, repoDir) menghapus checkout project itu sendiri (SPEC-362).
-  it("project ter-bind ke checkout DI BAWAH .worktrees → tak ada baris yang deletable", async () => {
+  // removeWorktree(repoDir, repoDir) menghapus checkout project itu sendiri (SPEC-362). SPEC-1150
+  // melonggarkan gerbang untuk worktree LAIN di luar container, tapi working tree utama yang
+  // sesungguhnya (baris pertama `git worktree list`, di sini `dir`) tetap terlindung — kalau tidak,
+  // insiden yang sama terjadi lagi hanya berpindah baris.
+  it("project ter-bind ke checkout DI BAWAH .worktrees → checkout ITU dan working tree utama tetap tak deletable, sisanya boleh", async () => {
     const dir = repo();
     const bound = join(dir, ".worktrees", "spec-1");
     const r = await listWorktrees(bound, NONE);
     expect(r.worktrees.length).toBeGreaterThan(1);
-    expect(r.worktrees.every((w) => !w.deletable)).toBe(true);
+    expect(r.worktrees.find((w) => w.path === realpathSync(dir))!.deletable).toBe(false);
+    expect(r.worktrees.find((w) => w.path === realpathSync(bound))!.deletable).toBe(false);
+    expect(r.worktrees.find((w) => w.name === "wt-feat")!.deletable).toBe(true);
+    expect(r.worktrees.find((w) => w.name === "gone")!.deletable).toBe(true);
+  });
+
+  it("worktree DI LUAR .worktrees (dibuat manual) kini deletable — SPEC-1150", async () => {
+    const dir = repo();
+    const external = join(dir, "external-wt");
+    g(dir, "worktree", "add", "-q", "--detach", external, "main");
+    const r = await listWorktrees(dir, NONE);
+    const w = r.worktrees.find((x) => x.path === realpathSync(external))!;
+    expect(w.deletable).toBe(true);
+    expect(w.blocked).toBeNull();
   });
 
   it("memetakan worktree ke SPEC lewat id sesi & stage-nya", async () => {
