@@ -6,6 +6,7 @@ import { prisma } from "../db";
 import { requireDeviceToken } from "../services/device-auth";
 import { verifyDeviceToken } from "../services/device-token";
 import { attachSync, detachSync } from "../services/sync-hub";
+import { registerDeviceSocket } from "../services/device-sockets";
 import { recordPresence, dropPresence } from "../services/presence/registry";
 import type { Client } from "../services/pty";
 import { applyPush, pull, bootstrapSnapshot, isEntity, type Entity } from "../services/sync";
@@ -156,6 +157,8 @@ export default async function (app: FastifyInstance) {
     catch { socket.close(1008, "connection limit"); return; }
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     attachSync(client);
+    // SPEC-1215 · ADR-0165 §7 · supaya DELETE /device-tokens/:id bisa menutupnya seketika.
+    const unregisterSocket = registerDeviceSocket(principal.id, "sync", socket);
 
     /* SPEC-919 · ADR-0147 · arah naik kanal ini. Sebelumnya `/sync/ws` tak pernah memasang
        `socket.on("message")` sama sekali — dan justru itulah yang membuat hub versi LAMA
@@ -180,6 +183,8 @@ export default async function (app: FastifyInstance) {
       void revalidateWsPrincipal(req, principal).then((ok) => { if (!ok) socket.close(1008, "token revoked"); });
     }, 60_000);
     revalidate.unref?.();
-    socket.on("close", () => { clearInterval(revalidate); release(); detachSync(client); dropPresence(principal.id); });
+    socket.on("close", () => {
+      clearInterval(revalidate); release(); detachSync(client); dropPresence(principal.id); unregisterSocket();
+    });
   });
 }

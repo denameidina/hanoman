@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { zIssueDeviceToken, type DeviceTokenView } from "@hanoman/shared";
 import { prisma } from "../db";
 import { issueDeviceToken, revokeDeviceToken } from "../services/device-token";
+import { closeDeviceSockets } from "../services/device-sockets";
 
 // SPEC-213 · ADR-0044 · kelola device token dari dashboard (cookie-authed, warisan gate /api).
 // Plaintext token hanya balik di POST (sekali). List & revoke tak pernah membuka rahasia.
@@ -24,6 +25,10 @@ export default async function (app: FastifyInstance) {
 
   app.delete("/device-tokens/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
-    return (await revokeDeviceToken(id)) ? reply.code(204).send() : reply.code(404).send({ error: "not found" });
+    if (!(await revokeDeviceToken(id))) return reply.code(404).send({ error: "not found" });
+    // SPEC-1215 · ADR-0165 §7 · SESUDAH revokedAt tertulis (reconnect langsung 401) dan SEBELUM 204:
+    // socket sync + relay device ini ditutup sekarang, tak menunggu revalidasi 60 dtk.
+    closeDeviceSockets(id, 1008, "token revoked");
+    return reply.code(204).send();
   });
 }

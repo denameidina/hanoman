@@ -1450,7 +1450,7 @@ git commit -m "feat(logs): appendEvent seq HLC + tap lahir/tutup sesi (SPEC-1215
   - `closeDeviceSockets(deviceId: string, code?: number, reason?: string): number`
   - `deviceSocketCount(deviceId: string, kind?: DeviceSocketKind): number`, `__resetDeviceSockets(): void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/device-token-revoke.test.ts`:
 
@@ -1521,12 +1521,12 @@ describe("pencabutan device token seketika (SPEC-1215 · ADR-0165 §7 · AC-A4)"
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/device-token-revoke.test.ts`
 Expected: FAIL — modul `device-sockets` tak ada.
 
-- [ ] **Step 3: Implementasi registry**
+- [x] **Step 3: Implementasi registry**
 
 Create `server/src/services/device-sockets.ts`:
 
@@ -1574,7 +1574,7 @@ export function deviceSocketCount(deviceId: string, kind?: DeviceSocketKind): nu
 export function __resetDeviceSockets(): void { byDevice.clear(); }
 ```
 
-- [ ] **Step 4: Pakai di route**
+- [x] **Step 4: Pakai di route**
 
 Ganti handler `app.delete("/device-tokens/:id", …)` di `server/src/routes/device-tokens.ts` menjadi (dan tambahkan `import { closeDeviceSockets } from "../services/device-sockets";`):
 
@@ -1604,12 +1604,12 @@ dan ubah baris `socket.on("close", …)` menjadi:
     });
 ```
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/device-token-revoke.test.ts server/test/device-tokens.route.test.ts server/test/sync-ws-presence.test.ts server/test/sync-ws.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/device-sockets.ts server/src/routes/device-tokens.ts server/src/routes/sync.ts server/test/device-token-revoke.test.ts
