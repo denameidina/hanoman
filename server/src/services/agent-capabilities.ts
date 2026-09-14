@@ -38,8 +38,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // atas nama sesi mana pun — itu bukan capability, itu peniruan identitas.
   // SPEC-919 · ADR-0147 · `presence` memaparkan peta pekerjaan yang sedang berjalan di SELURUH
   // mesin operator. Tak ada capability yang berarti apa pun untuk itu (preseden /device-tokens).
+  // SPEC-1215 · ADR-0165 §4 · `remote-control` menyalakan eksekusi agen di mesin ini atas perintah hub.
+  // Capability apa pun yang bisa menulisnya adalah eskalasi RCE — cookie-only (preseden /agent-tokens).
   if (top === "auth" || top === "agent-tokens" || top === "device-tokens" || top === "sync"
-    || top === "presence" || top === "models"
+    || top === "presence" || top === "models" || top === "remote-control"
     || top === "portal" || top === "client-accounts" || top === "session-events") return "COOKIE_ONLY";
   // read-only global (status). SPEC-405 · ADR-0088 · `GLOBAL_READ` HANYA untuk method baca:
   // `POST /update/apply` me-restart instance, dan itu tak pernah boleh lolos hanya karena

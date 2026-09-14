@@ -167,6 +167,10 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
   agregat lintas-mesin, jadi ia cookie-only apa pun method-nya. Frame siar `presence` di
   `/api/events/ws` mengikuti gerbang yang sama — grup itu **tidak** dikirim ke principal non-cookie,
   walau kanalnya sendiri `GLOBAL_READ` bagi agent token
+- `/api/remote-control` — grant kendali jarak jauh mesin ini dari hub (SPEC-1215/ADR-0165): siapa
+  pun yang bisa menulisnya bisa membuka eksekusi agen di mesin ini atas perintah hub. Cookie-only apa
+  pun method-nya, dan `PUT /api/settings` pun tak bisa mengubah kunci `remoteControl`/`logShipping`/
+  `logRetention`
 - `POST /api/update/apply` dan tulis lain di bawah prefix status (`/api/limits`, `/api/update`,
   `/api/events`, `/api/fs`, `/api/health`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya
   cookie-only

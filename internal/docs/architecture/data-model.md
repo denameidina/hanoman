@@ -280,6 +280,16 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   codex: {…} }`. Sesi ber-flow aktif lahir sebagai orchestrator; tiap fase dikerjakan subagent native
   `hanoman-fase-<slug>` dengan model/effort sel, atau warisan orchestrator bila `null`. Lenient; baris lama
   tanpa blok ini parse dengan default aktif. Tanpa migration.
+- `remoteControl`, `logShipping`, `logRetention` (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md)/[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md),
+  sudah di `zSetting` sejak turunan A; `logShipping`/`logRetention` baru dibaca SPEC-1217) — LOCAL-only, tanpa migration.
+  - `remoteControl = { enabled:false, capabilities:[] }`: grant kendali jarak jauh dari hub, dengan
+    `capabilities ⊆ sessions:read|write|spawn, backlog:read|write, ide:read`.
+  - `logShipping = { event:true, server:false, transcript:false }`: lajur log yang dikirim ke hub.
+  - `logRetention = { eventDays:90, serverDays:7, transcriptDays:30, maxBytes:256 MiB }`: di hub.
+
+  Ketiganya **tak** ditulis `PUT /settings`, yang mempertahankan nilai tersimpan. Pengelolanya
+  `PUT /remote-control` dan `PUT /logs/retention` (COOKIE_ONLY), karena `settings:write` ber-agent
+  token tak boleh menyalakan RCE atau memendekkan audit.
 - `autoDefault`, `autoScaffold`, `notifyFail`
 - `notifyDone` (SPEC-180, default true) — toast+sound saat backlog selesai
 - `notifySound` (SPEC-180, default `short`) — `off` atau salah satu nada; durasi/varian bunyi notifikasi
@@ -712,6 +722,37 @@ scaffold, breakdown, dan konsol VPS.
 - **Purge manual ber-scope** (`projectId` dan/atau `before`) tetap tersedia. Sweep retention harian
   juga memilih sesi berakhir >30 hari dalam batch bounded; hold `session:<id>` mengecualikan record.
   Bila delete transkrip gagal, record DB dipertahankan agar percobaan berikutnya dapat retry.
+
+## LogEntry / LogCursor (SPEC-1215 · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — skema mendarat di turunan A (SPEC-1215); ingest, pencarian, retensi di SPEC-1217
+
+Log terpusat hub + audit kendali jarak jauh. **LOCAL-only per instance**, bukan entitas sync: tak masuk
+`SYNCED`/`FIELDS`/`WEBHOOK_ENTITIES`. Keduanya **tetap terdaftar** di `PG_ORDER` `migrate-from-postgres`
+(test menuntut `PG_ORDER` = seluruh model DMMF; tabel absen di Postgres lama = jalur 42P01, preseden
+`AgentInvocation`/`Changelog` — koreksi fase Plan SPEC-1215 §S13 P1).
+Migration: `20260915120000_log_terpusat` (dua `CREATE TABLE` + indeks, nol backfill).
+
+- **`LogEntry`**:
+  - kolom: `id` Int autoincrement, `deviceId` (`DeviceToken.id` pengirim, atau `"local"` untuk instance
+    ini), `lane` (`event|server|transcript`), `seq` **BigInt**, `ts`, `receivedAt`, `level`, `kind`,
+    `projectId?`/`specId?`/`sessionId?` (tanpa FK, konvensi `SessionResult`), `msg`, `data Json?`,
+    `transcriptKey?`, `bytes` Int;
+  - unique `(deviceId, lane, seq)`; index `(ts)`, `(deviceId,ts)`, `(projectId,ts)`, `(specId,ts)`,
+    `(lane,ts)`.
+- **`LogCursor`** `(deviceId, lane)` → `seq` BigInt:
+  - di hub: high-water mark yang sudah diterima dari device itu;
+  - di klien (`deviceId:"local"`): yang sudah di-ack hub.
+- **`seq` = jam logis hibrida** `max(seqTerakhir+1, Date.now()×1000)`. Ia monoton lintas restart dan
+  instal ulang ber-token sama, tanpa menulis penghitung per baris. `Int` Prisma 32 bit tak cukup.
+- **Dedup** tanpa `skipDuplicates` (tak didukung SQLite): satu transaksi `seq > cursor` → `createMany`
+  → majukan kursor.
+- **Isi per lajur:**
+  - lajur `server` klien **tak** menulis SQLite per baris; ia di spool NDJSON
+    `$HANOMAN_HOME/log-spool/server/`;
+  - di hub, lajur `server` masuk per batch.
+- **Transkrip di hub:** berkas `$HANOMAN_HOME/remote-transcripts/<deviceId>/<seq>.txt`, ditulis
+  **sebelum** barisnya. Berkas tanpa baris dipungut sapuan.
+- **Retensi:** `runRetention()` yang sudah ada — umur per lajur (`Setting.data.logRetention`), lalu
+  plafon `SUM(bytes)`, baris dulu lalu berkas.
 
 ## Retention lifecycle (SPEC-761)
 

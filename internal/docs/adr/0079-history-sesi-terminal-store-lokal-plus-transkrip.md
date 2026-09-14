@@ -4,6 +4,11 @@
 **0047** (activity log stage) — dan membuka **pengecualian terbatas** atas larangan transkrip di
 0047. Terkait 0002/0015/0028/0038/0065.
 
+> **Amendment SPEC-1215 / [ADR-0166](0166-log-terpusat-ingest-satu-arah.md) (dirancang):** transkrip
+> boleh menyeberang ke hub lewat lajur `transcript` `POST /api/sync/logs`, **hanya** bila
+> `Setting.data.logShipping.transcript` dinyalakan cookie di klien itu (default mati). Isinya diredaksi
+> sebelum dikirim dan sekali lagi di hub. `SessionHistory` sendiri tetap LOCAL-only.
+
 ## Konteks
 
 `server/src/services/pty.ts` menyatakan tmux sebagai satu-satunya sumber kebenaran sesi (ADR-0016):

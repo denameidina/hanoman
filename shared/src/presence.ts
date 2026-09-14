@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { zLaunchStatus, type LaunchStatus } from "./session-admission";
+import type { RemoteCapability } from "./relay";
 
 /* SPEC-919 · ADR-0147/0148 · kontrak "sesi apa yang hidup di device mana".
    Muatannya sengaja RINGKAS: hub sudah memegang baris Spec & Project yang menyeberang sync,
@@ -68,6 +70,17 @@ export type PresenceDeviceView = {
   /** `DeviceToken.lastSeenAt` — ditulis jalur sync yang sudah ada, bukan oleh kanal ini. */
   lastSeenAt: string | null;
   sessions: PresenceSessionView[];
+  /** SPEC-1215 · ADR-0165 · ketersediaan kendali dari `hello` socket relay; `null` = tak ada socket
+      relay (grant mati, klien lama, offline). Opsional di tipe supaya literal lama tetap sah;
+      `presenceView()` selalu mengisinya. */
+  control?: PresenceControlView | null;
+  /** SPEC-1215 · angka `launchStatus()` dari frame naik `capacity`; `null` = belum ada frame. */
+  capacity?: LaunchStatus | null;
+};
+
+export type PresenceControlView = {
+  state: "available" | "protocol-mismatch";
+  protocol: number; version: string; capabilities: RemoteCapability[]; since: string;
 };
 
 export type PresenceView = {
@@ -106,4 +119,24 @@ export function presenceSignature(sessions: PresenceSession[]): string {
       .map((s) => [s.sessionId, s.projectId, s.specId ?? "", s.flow ?? "", s.phase ?? "",
         s.agent, s.status, s.startedAt]),
   );
+}
+
+/* SPEC-1215 · ADR-0165 §9 · arah naik KEDUA di socket sync: kapasitas klien. Di socket sync, bukan
+   relay, karena angka ini berguna untuk SEMUA klien terpasang, termasuk yang tak opt-in. Hub lama
+   membuangnya senyap: `zPresenceFrame` gagal parse karena `t` bukan "presence". */
+export const zCapacityFrame = z.object({
+  t: z.literal("capacity"),
+  v: z.literal(PRESENCE_PROTOCOL),
+  admission: zLaunchStatus,
+}).strict();
+export type CapacityFrame = z.infer<typeof zCapacityFrame>;
+
+export const capacityFrameJson = (admission: LaunchStatus): string =>
+  JSON.stringify({ t: "capacity", v: PRESENCE_PROTOCOL, admission });
+
+/** Dedup pengirim. `loadPerCore` dibulatkan 1 desimal: load average bergerak tiap tick, dan
+    signature presisi penuh berarti satu frame per 3 dtk walau tak ada yang berubah berarti. */
+export function capacitySignature(a: LaunchStatus): string {
+  return JSON.stringify([a.enabled, a.liveCount, a.liveAgentCount, a.maxConcurrent,
+    a.loadPerCore === null ? null : Math.round(a.loadPerCore * 10) / 10, a.maxLoadPerCore, a.loadStatus]);
 }

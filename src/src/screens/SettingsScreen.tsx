@@ -3,12 +3,13 @@
 import React from "react";
 import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier } from "../ds";
 import { api, ApiError } from "../api/client";
-import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
+import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus, SetupStatus } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
 import { CustomAgentsPanel } from "./CustomAgentsPanel";
 import { ClientAccessPanel } from "./ClientAccessPanel";   // SPEC-617 · ADR-0110 · kelola akses klien
+import { RemoteControlPanel } from "./RemoteControlPanel";   // SPEC-1215 · ADR-0165 · grant kendali jarak jauh
 import { WebhooksPanel } from "./WebhooksPanel";
 import { WebhookDocs } from "./WebhookDocs";
 import { McpPanel } from "./McpPanel";   // SPEC-482 · ADR-0099 · pemasangan MCP siap salin
@@ -58,6 +59,9 @@ const S_DEFAULTS: Setting = {
   changelog: CHANGELOG_ENGINE_DEFAULTS, // SPEC-518 · agen pembuat changelog (opt-in, mati)
   portalChat: PORTAL_CHAT_DEFAULTS, // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
   orchestration: ORCHESTRATION_DEFAULTS, // ADR-0164 · orkestrasi subagent per fase (default aktif)
+  remoteControl: REMOTE_CONTROL_DEFAULTS, // SPEC-1215 · wajib di tipe Setting; dikelola RemoteControlPanel
+  logShipping: LOG_SHIPPING_DEFAULTS,
+  logRetention: LOG_RETENTION_DEFAULTS,
   // SPEC-881 · stempel suntingan agen bawaan. Wajib di tipe `Setting` (entities.ts:374) tapi
   // terlewat di default ini, jadi `pnpm --filter ./src typecheck` merah di base sebelum SPEC-884.
   builtinAgents: {},
@@ -635,6 +639,7 @@ const S_SECTIONS = [
   { key: "users", label: "Users", icon: "users" },
   { key: "akses-klien", label: "Akses klien", icon: "user-check" }, // SPEC-617 · ADR-0110 · portal klien
   { key: "perangkat", label: "Perangkat", icon: "key-round" },   // SPEC-213 · device tokens
+  { key: "kendali-jarak-jauh", label: "Kendali jarak jauh", icon: "shield" }, // SPEC-1215 · ADR-0165 · grant hub → mesin ini
   { key: "agent", label: "Akses AI Agent", icon: "bot" },        // SPEC-257 · agent token + capability
   { key: "custom-agent", label: "Custom agent", icon: "bot" },   // SPEC-450 · ADR-0094 · katalog agen global
   { key: "aktivitas", label: "Aktivitas", icon: "activity" },    // SPEC-213 · activity log
@@ -1537,6 +1542,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
     : tab === "users" ? <UsersPanel me={me} onToast={onToast} />
     : tab === "akses-klien" ? <ClientAccessPanel />
     : tab === "perangkat" ? <DeviceTokensPanel onToast={onToast} />
+    : tab === "kendali-jarak-jauh" ? <RemoteControlPanel onToast={onToast} />
     : tab === "agent" ? <AgentAccessPanel onToast={onToast} />
     // SPEC-450 · ADR-0094 · permukaan GLOBAL katalog custom agent. Komponen yang sama dipakai
     // Project detail dengan projectId terisi — satu panel, dua scope.

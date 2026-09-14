@@ -1008,3 +1008,42 @@ model PortalChatMessage {
 
   @@unique([sessionId, seq])
 }
+
+/// SPEC-1215 · ADR-0166 · log terpusat + audit kendali jarak jauh. LOCAL-only per instance: BUKAN
+/// entitas sync (tak masuk SYNCED/FIELDS/WEBHOOK_ENTITIES). Di klien `deviceId` = "local"; di hub
+/// = DeviceToken.id pengirim (SPEC-1217). Tanpa kolom `version`.
+model LogEntry {
+  id            Int      @id @default(autoincrement())
+  deviceId      String
+  lane          String   // event | server | transcript (zod shared/src/logs.ts)
+  seq           BigInt   // jam logis hibrida per (deviceId, lane); Int Prisma 32 bit tak cukup
+  ts            DateTime
+  receivedAt    DateTime @default(now())
+  level         String
+  kind          String
+  projectId     String?  // tanpa FK (konvensi SessionResult)
+  specId        String?
+  sessionId     String?
+  msg           String
+  data          Json?
+  transcriptKey String?
+  bytes         Int      // msg + data + transkrip, untuk plafon maxBytes retensi
+
+  @@unique([deviceId, lane, seq])
+  @@index([ts])
+  @@index([deviceId, ts])
+  @@index([projectId, ts])
+  @@index([specId, ts])
+  @@index([lane, ts])
+}
+
+/// SPEC-1215 · ADR-0166 §3 · high-water mark. Hub: seq terakhir yang diterima dari device itu.
+/// Klien (`deviceId` "local"): seq terakhir yang sudah di-ack hub.
+model LogCursor {
+  deviceId  String
+  lane      String
+  seq       BigInt
+  updatedAt DateTime @updatedAt
+
+  @@id([deviceId, lane])
+}

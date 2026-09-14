@@ -112,6 +112,19 @@ Pakai skill lebih sempit saat task cocok:
   `DeviceToken` belum dicabut → instalasi satu mesin nol perubahan tampilan. Reconnect sync ikut naik
   jadi backoff 1→30 dtk ber-jitter, sekaligus menambal timer reconnect yang **tak pernah dibatalkan**
   `stopSyncClient()` (socket yatim ber-token lama sesudah `applySyncConfig()`).
+- **Kendali jarak jauh hub → klien, turunan A** (SPEC-1215/**ADR-0165**+**ADR-0166**): klien yang grant
+  LOCAL-only `Setting.data.remoteControl`-nya dinyalakan cookie lewat `PUT /api/remote-control` membuka
+  socket KEDUA `ws://<hub>/api/sync/relay/ws` (device token); grant mati = nol upgrade. Hub mengirim `req`
+  ke route yang SUDAH ada dan dispatcher klien menjalankannya lewat `app.inject`. **Lima gotcha:**
+  (1) principal `remote` sah hanya bila header `x-hanoman-relay` = rahasia proses **dan**
+  `req.raw.socket` bukan `net.Socket` — header dari jaringan 401 walau rahasianya benar; (2)
+  `relayRouteAllowed` adalah lapis kedua di atas capability (`backlog:write` lewat relay hanya
+  `POST /specs/:id/done`), dan body `POST /terminal/sessions` dinilai di `preHandler` karena `onRequest`
+  belum punya body; (3) `PUT /api/settings` mempertahankan `remoteControl`/`logShipping`/`logRetention`;
+  (4) `registerSessionHooks` kini aditif dan mengembalikan pencabut — jangan "mereset" dengan `{}`;
+  (5) `DELETE /device-tokens/:id` menutup socket sync + relay sebelum 204 lewat `device-sockets.ts`.
+  Audit `remote.*`/`grant.changed` hidup di `LogEntry` `deviceId:"local"`. Route HTTP relay di hub,
+  stream tampilan, dan log terpusat: SPEC-1216 / SPEC-1218 / SPEC-1217.
 - **State tampilan tiap halaman persisten di storage, berkunci per layar** (SPEC-740/**ADR-0115**;
   ADR-0107 & ADR-0071 **ditegakkan**, tak ada yang dicabut): filter & pencarian, paginasi, posisi
   scroll, item terpilih & panel terbuka bertahan lintas navigasi **dan** refresh/buka-ulang browser.

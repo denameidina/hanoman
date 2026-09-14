@@ -1,4 +1,4 @@
-import { PRESENCE_OFFLINE_MS, type PresenceSession, type PresenceSessionView } from "@hanoman/shared";
+import { PRESENCE_OFFLINE_MS, type LaunchStatus, type PresenceSession, type PresenceSessionView } from "@hanoman/shared";
 
 /* SPEC-919 · ADR-0148 · keadaan hidup per-device, DI MEMORI.
 
@@ -34,9 +34,6 @@ export function recordPresence(deviceId: string, sessions: PresenceSession[], no
   devices.set(deviceId, { sessions: next, lastFrameAt: now });
 }
 
-/** Socket putus = device offline seketika; tak perlu menunggu ambang denyut. */
-export function dropPresence(deviceId: string): void { devices.delete(deviceId); }
-
 /** Device yang denyutnya berhenti melewati ambang disapu di sini — tak ada timer yang perlu hidup. */
 export function presenceEntries(now = Date.now()): PresenceEntry[] {
   const out: PresenceEntry[] = [];
@@ -52,5 +49,24 @@ export function presenceEntries(now = Date.now()): PresenceEntry[] {
   return out;
 }
 
+/* SPEC-1215 · ADR-0165 §9 · kapasitas per device, DI MEMORI seperti sesi (prinsip ADR-0148). Peta
+   terpisah dari `devices`: frame capacity bisa tiba sebelum frame presence pertama. */
+const capacities = new Map<string, { admission: LaunchStatus; at: number }>();
+
+export function recordCapacity(deviceId: string, admission: LaunchStatus, now = Date.now()): void {
+  capacities.set(deviceId, { admission, at: now });
+}
+
+/** Angka yang denyutnya berhenti melewati ambang offline tak lagi dipercaya untuk routing. */
+export function capacityFor(deviceId: string, now = Date.now()): LaunchStatus | null {
+  const c = capacities.get(deviceId);
+  if (!c) return null;
+  if (now - c.at >= PRESENCE_OFFLINE_MS) { capacities.delete(deviceId); return null; }
+  return c.admission;
+}
+
+/** Socket putus = device offline seketika; tak perlu menunggu ambang denyut. */
+export function dropPresence(deviceId: string): void { devices.delete(deviceId); capacities.delete(deviceId); }
+
 /** Test-only: kosongkan peta. */
-export function __resetPresence(): void { devices.clear(); }
+export function __resetPresence(): void { devices.clear(); capacities.clear(); }

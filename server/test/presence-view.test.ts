@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { hostname } from "node:os";
-import { LOCAL_DEVICE_ID, type PresenceSession } from "@hanoman/shared";
+import { LOCAL_DEVICE_ID, type LaunchStatus, type PresenceSession } from "@hanoman/shared";
 import { prisma } from "../src/db";
-import { recordPresence, __resetPresence } from "../src/services/presence/registry";
+import { recordPresence, recordCapacity, __resetPresence } from "../src/services/presence/registry";
 import { presenceView } from "../src/services/presence/view";
+import { __resetRelayHub, attachRelaySocket } from "../src/services/relay/hub";
+import { __resetDeviceSockets } from "../src/services/device-sockets";
 
 const T0 = Date.parse("2026-08-24T01:00:00.000Z");
 const s = (over: Partial<PresenceSession> = {}): PresenceSession => ({
@@ -23,10 +25,35 @@ const device = async (name: string, over: { revokedAt?: Date; lastSeenAt?: Date 
   });
 };
 
-beforeEach(async () => { __resetPresence(); await clean(); });
+beforeEach(async () => { __resetPresence(); __resetRelayHub(); __resetDeviceSockets(); await clean(); });
 afterAll(clean);
 
 describe("presenceView", () => {
+  // SPEC-1215 · ADR-0165 §9 · kapasitas & ketersediaan kendali untuk routing target Start (SPEC-1216).
+  const adm = (over: Partial<LaunchStatus> = {}): LaunchStatus => ({
+    enabled: true, liveCount: 1, liveAgentCount: 1, maxConcurrent: 4,
+    loadPerCore: 0.3, maxLoadPerCore: 1.5, loadStatus: "available", ...over,
+  });
+
+  it("device online membawa capacity dan control; mesin lokal membawa capacity sendiri", async () => {
+    const d = await device("laptop");
+    recordPresence(d.id, [s()], T0);
+    recordCapacity(d.id, adm(), T0);
+    const link = attachRelaySocket(d.id, { readyState: 1, send: () => {}, close: () => {} });
+    link.onMessage(JSON.stringify({ t: "hello", v: 1, protocol: 1, version: "0.5.0", capabilities: ["sessions:read", "sessions:spawn"] }));
+    const v = await presenceView({ local: none, localCapacity: async () => adm({ liveCount: 9 }), now: T0 });
+    expect(v.devices[0]).toMatchObject({ local: true, control: null, capacity: { liveCount: 9 } });
+    const found = v.devices.find((x) => x.deviceId === d.id)!;
+    expect(found.capacity).toEqual(adm());
+    expect(found.control).toMatchObject({ state: "available", capabilities: ["sessions:read", "sessions:spawn"] });
+  });
+
+  it("device offline: capacity dan control null", async () => {
+    const d = await device("laptop");
+    recordCapacity(d.id, adm(), T0);
+    const v = await presenceView({ local: none, localCapacity: async () => adm(), now: T0 });
+    expect(v.devices.find((x) => x.deviceId === d.id)).toMatchObject({ online: false, capacity: null, control: null });
+  });
   it("enabled false tanpa satu pun device token", async () => {
     expect((await presenceView({ local: none, now: T0 })).enabled).toBe(false);
   });

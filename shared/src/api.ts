@@ -175,6 +175,8 @@ export const paths = {
   // SPEC-213 · device token + activity log
   deviceTokens: `${API}/device-tokens`,
   deviceToken: (id: string) => `${API}/device-tokens/${id}`,
+  // SPEC-1215 · ADR-0165 · grant kendali jarak jauh mesin ini (cookie-only)
+  remoteControl: `${API}/remote-control`,
   sessionResults: (projectId?: string) =>
     `${API}/session-results${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`,
   // SPEC-215 · config runtime

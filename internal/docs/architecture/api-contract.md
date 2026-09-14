@@ -888,7 +888,8 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > ber-capability apa pun — bahkan token TANPA satu pun capability — **hanya untuk method baca**
 > (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157). **Tak-boleh-didelegasikan** (agent → 403):
 > `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, `/webhooks` (ADR-0100), `/portal` &
-> `/client-accounts` (ADR-0110), `/session-events` (ADR-0146), `/presence` (ADR-0147), dan
+> `/client-accounts` (ADR-0110), `/session-events` (ADR-0146), `/presence` (ADR-0147),
+> `/remote-control` (SPEC-1215 · ADR-0165), dan
 > `/telegram/{settings,test,credentials}` (ADR-0097); route tak dikenal peta → cookie-only. Master switch
 > `Setting.agentAccessEnabled` (PUT /settings) mematikan semua. **Kecuali** endpoint `PUBLIC`
 > (`/health`, `/auth/status`, `/auth/login`, `/auth/setup`, `/agent-integration.md`) yang tak pernah
@@ -1401,6 +1402,60 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 #   Ingress: `classifyIngress` TAK disentuh. Hook memanggil loopback (`http://127.0.0.1:<port>`) dan
 #   mengirim header `Host` = host control pertama saat origin dipisah (`HANOMAN_EVENT_HOST`).
 ```
+
+## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **sebagian mendarat (turunan A)**
+
+> **Status:** kontrak dikunci fase Spec 2026-09-15.
+> **Dilayani sejak turunan A (SPEC-1215):** `GET /sync/relay/ws` (hub; `welcome`/`req`/`cancel` ↔
+> `hello`/`res`; klien A menjawab `open` dengan `close 4502`), frame naik `capacity` +
+> `devices[].control|capacity` di `GET /presence`, `DELETE /device-tokens/:id` yang menutup socket sebelum
+> 204, `GET|PUT /remote-control` (tanpa `shipping` — menyusul SPEC-1217), gate principal `remote`, dan
+> `PUT /settings` yang mempertahankan tiga kunci baru.
+> **Belum dilayani:** `/devices/:deviceId/relay/*` dan tiket `relay:*` (SPEC-1216/SPEC-1218), `POST /sync/logs`
+> dan `/logs*` (SPEC-1217), perubahan `POST /terminal/sessions` & `POST /specs/:id/done` (SPEC-1216).
+
+```
+# ── HUB ──────────────────────────────────────────────────────────────────────────────────────────
+GET    /sync/relay/ws                    # Bearer device token (query → 401). Dibuka KLIEN hanya bila grant lokal
+                                         # menyala; satu per device (baru menggantikan lama: 4000). Frame .strict():
+                                         # hub→klien welcome|req|cancel|open|data|credit|close,
+                                         # klien→hub hello|res|opened|geometry|data|close. Muatan per frame ≤32 KiB.
+                                         # Gagal di sini TAK PERNAH menutup /sync/ws.
+GET|POST|PUT|PATCH|DELETE /devices/:deviceId/relay/*    # COOKIE_ONLY. Diteruskan ke /api/<*> di klien (app.inject);
+                                         # status/body klien apa adanya + `x-hanoman-device`. Galat hub { error, relay }:
+                                         # 404 unknown-device · 503 offline · 409 protocol-mismatch · 413 too-large
+                                         # (body >32 KiB / respons >1 MiB) · 415 unsupported-media · 429 busy (>4 inflight)
+                                         # · 502 protocol · 504 timeout (30 dtk; 120 dtk POST …/terminal/sessions)
+GET    /devices/:deviceId/relay/{terminal/sessions/:id/ws | events/ws}   # WS, tiket relay:<deviceId>:<target>
+POST   /ws-tickets { target:"relay:<deviceId>:events" | "relay:<deviceId>:terminal:<id>" }  # hanya cookie
+GET    /presence                         # + devices[].control {state,protocol,version,capabilities,since}|null
+                                         #   + devices[].capacity LaunchStatus|null (frame naik `capacity` di /sync/ws)
+POST   /sync/logs                        # Bearer device. { v:1, lane:"event"|"server"|"transcript", attempt,
+                                         #   entries:[{seq,ts,level,kind,msg,projectId?,specId?,sessionId?,data?,transcript?}] }
+                                         # ≤500 entri, seq naik ketat; body ≤1 MiB, gzip terdekompresi ≤2 MiB
+                                         # → 200 { lane, accepted, duplicate, lastSeq } · 400 · 401 · 413 · 415 · 429 {retryAfterSec}
+GET    /logs?from&to&device&project&spec&session&lane&level&kind&q&cursor&limit   # COOKIE_ONLY; from/to wajib ≤31 hari
+                                         # → { items: LogEntryView[], nextCursor, limit } — kursor, TANPA total
+GET    /logs/:id/transcript              # COOKIE_ONLY · text/plain
+GET|PUT /logs/retention                  # COOKIE_ONLY · { eventDays, serverDays, transcriptDays, maxBytes }
+DELETE /device-tokens/:id                # BERUBAH: socket sync + relay device itu ditutup 1008 SEBELUM 204
+
+# ── KLIEN ────────────────────────────────────────────────────────────────────────────────────────
+GET|PUT /remote-control                  # COOKIE_ONLY. { control:{enabled,capabilities⊆REMOTE_CAPABILITIES},
+                                         #   logs:{event,server,transcript} } + status relay/pengiriman + audit 50 terbaru.
+                                         # PUT /settings TAK menulis remoteControl/logShipping/logRetention.
+POST   /terminal/sessions                # BERUBAH: `force` dari principal remote → 403; body +confirmRemote?;
+                                         # 409 { error:"remote-session"|"confirm-required", remoteSession } (gerbang presence di hub)
+POST   /specs/:id/done                   # BERUBAH: 409 confirm-required juga saat presence menunjukkan sesi di device lain
+```
+
+> **Principal `remote`** (klien). Lahir hanya dari dispatcher relay in-process: header
+> `x-hanoman-relay` = rahasia proses **dan** `req.raw.socket` bukan `net.Socket`. Request jaringan
+> yang membawa header itu → 401, bahkan dengan rahasia yang benar (terukur di spike S0a).
+> Capability = grant `Setting.data.remoteControl`, dinilai `checkAgentCapability`, **plus** allowlist
+> `relayRouteAllowed`: sesi baca/steer/interrupt/dialog/start-spec, dokumen & review sesi, IDE baca,
+> `POST /specs/:id/done`, WS terminal & events. WS terminal `mode:"read"` menuntut `sessions:read`;
+> `resize` dari hub selalu dibuang. Top `devices`, `remote-control`, `logs` → COOKIE_ONLY.
 
 ## VPS (SPEC-164 · ADR-0025 · SPEC-211/ADR-0042)
 ```

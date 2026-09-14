@@ -11,6 +11,10 @@ import { RENAME_SEP } from "./rename-project";
 import { effectiveStr, effectiveInt } from "../config";
 import { safeRequest } from "./safe-outbound-request";
 import { startPresenceSender } from "./presence/sender";
+import { RECONNECT_MAX_MS, RECONNECT_MIN_MS, nextBackoff, withJitter } from "./backoff";
+import { startRelayClient, stopRelayClient } from "./relay/client";
+// Diekspor ulang: test & pemanggil lama mengimpornya dari modul ini.
+export { RECONNECT_MAX_MS, RECONNECT_MIN_MS, nextBackoff, withJitter };
 
 // SPEC-213 · ADR-0043 · sisi CLIENT: instance lokal menyinkron (server-to-server) ke hub.
 // Disiplin pull-before-push (AC-18): tarik dulu (server-authoritative), lalu push antre lokal.
@@ -420,17 +424,6 @@ let timer: NodeJS.Timeout | undefined;
 let ws: import("ws").WebSocket | undefined;
 let started = false;
 
-/* SPEC-919 · ADR-0147 · reconnect dulu `setTimeout(…, 3000)` datar: terhadap hub yang mati ia
-   mengetuk 20×/menit selamanya, dan timernya TAK PERNAH dibatalkan — `stopSyncClient()` menyetel
-   `started=false` tapi ketukan yang tertunda tetap jalan, sehingga `applySyncConfig()` (stop lalu
-   start) meninggalkan satu socket yatim yang menyambung memakai token LAMA. */
-export const RECONNECT_MIN_MS = 1_000;
-export const RECONNECT_MAX_MS = 30_000;
-export const nextBackoff = (prev: number): number =>
-  prev <= 0 ? RECONNECT_MIN_MS : Math.min(RECONNECT_MAX_MS, prev * 2);
-export const withJitter = (ms: number, rnd: () => number = Math.random): number =>
-  Math.round(ms * (0.8 + rnd() * 0.4));
-
 let reconnectTimer: NodeJS.Timeout | undefined;
 let reconnectDelay = 0;
 let presence: { stop(): void } | undefined;
@@ -465,6 +458,9 @@ export async function syncTick(transport: Transport): Promise<void> {
 // SYNC_SERVER_URL + SYNC_DEVICE_TOKEN di-set.
 export async function startSyncClient(base: string, token: string, tickMs?: number): Promise<void> {
   started = true;
+  // SPEC-1215 · ADR-0165 · socket relay hidup berdampingan dengan sync dan TAK ditunggu: ia membaca
+  // grant sendiri dan diam bila mati. Instance tanpa app terpasang (test sync lama) tetap nol relay.
+  startRelayClient(base, token);
   const transport = fetchTransport(base, token);
   const tick = () => syncTick(transport);
 
@@ -518,6 +514,7 @@ export function stopSyncClient(): void {
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = undefined; }
   reconnectDelay = 0;
   presence?.stop(); presence = undefined;
+  stopRelayClient();
   try { ws?.close(); } catch { /* noop */ }
   ws = undefined;
 }

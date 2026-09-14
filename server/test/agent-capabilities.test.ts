@@ -65,6 +65,9 @@ describe("capabilityForRoute", () => {
     ["POST", "/api/session-events", "COOKIE_ONLY"],
     // SPEC-919 · ADR-0147 · peta pekerjaan lintas mesin — tak ada capability yang berarti untuknya.
     ["GET", "/api/presence", "COOKIE_ONLY"],
+    // SPEC-1215 · ADR-0165 §4 · grant kendali jarak jauh.
+    ["GET", "/api/remote-control", "COOKIE_ONLY"],
+    ["PUT", "/api/remote-control", "COOKIE_ONLY"],
     ["GET", "/api/nonsense", null],
   ];
   it.each(cases)("%s %s → %s", (m, p, want) => {

@@ -9,6 +9,12 @@
   [0016](0016-sesi-terminal-hidup-di-tmux.md) (tmux satu-satunya sumber kebenaran soal sesi),
   [0093](0093-dependency-antar-backlog.md) (pola `force` milik jalur manusia),
   [0084](0084-melanjutkan-sesi-backlog.md) (pane hidup = re-attach, bukan peluncuran baru).
+- **Amendment SPEC-1215 / [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (dirancang):**
+  `force` dari principal `remote` (aksi hub di klien) → **403**, cabang yang sama dengan agent token.
+  Operator hub tak merasakan beban mesin yang ia paksa, jadi hak menolak host berlaku penuh terhadapnya.
+  Angka `LaunchStatus` klien naik ke hub lewat frame `capacity` supaya penolakan terlihat SEBELUM Start.
+  `startSpecSession` di hub juga mendapat `LaunchError("remote-session")` (presence menolak, tak
+  pernah meluluskan).
 
 ## Konteks
 

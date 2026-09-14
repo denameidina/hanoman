@@ -7,6 +7,7 @@ import { startLead } from "./services/lead/engine";
 import { registerBacklogSource } from "./services/scheduler/sources/backlog";
 import { registerTriaseSource } from "./services/scheduler/sources/triase";
 import { installSessionHistory, reconcileHistory } from "./services/session-history";
+import { installEventTap } from "./services/logs/event-log";
 import { detectOrphanWorktrees } from "./services/worktree-project";
 import { installCustomAgents } from "./services/custom-agents";
 import { reconcileAgentInvocations } from "./services/agent-invocations";
@@ -25,6 +26,8 @@ import { startRetentionSweep } from "./services/retention";
 import { uploadDir } from "./services/uploads";
 import { transcriptDir } from "./services/transcript-store";
 import { startSessionEventRelay } from "./services/session-event-relay";
+import { installRelayClient } from "./services/relay/client";
+import { injectableFrom } from "./services/relay/dispatcher";
 
 // SPEC-215 · deteksi update default ON (registry HANOMAN_UPDATE_FETCH="1"), dibaca via resolver
 // di services/update.ts. Test memuat buildApp dari app.ts (tak pernah server.ts) dan vitest.config
@@ -40,6 +43,9 @@ assertRuntimeBoundary(process.env, { uid: process.getuid?.(), host });
 // Hook onClose wajib didaftarkan sebelum Fastify listen/ready. Relay memakai app.inject agar
 // autentikasi dan parsing event tetap satu jalur, termasuk ketika event datang dari sandbox.
 startSessionEventRelay(app);
+// SPEC-1215 · ADR-0165 · dispatcher relay menjalankan request hub lewat `app.inject` pada app INI,
+// jadi gate & handler-nya identik dengan request lokal. Dipasang sebelum config boot memulai sync.
+installRelayClient(injectableFrom(app));
 let stopModelDiscovery: (() => void) | undefined;
 app.addHook("onClose", async () => { stopModelDiscovery?.(); });
 
@@ -104,6 +110,9 @@ bootstrapReady.then(async () => {
   // SPEC-362 · ADR-0079 · pasang hook riwayat SEBELUM apa pun bisa melahirkan sesi, lalu tutup
   // baris "berjalan" yang panenya sudah lenyap (tmux mati di luar hanoman: kill-server, reboot).
   installSessionHistory();
+  // SPEC-1215 · ADR-0166 · tap event lokal (lahir/tutup sesi). Hook sesi kini aditif, jadi ia berdiri
+  // di samping riwayat sesi, bukan menggantikannya.
+  installEventTap();
   // SPEC-402 · `listSessions()` boleh MELEMPAR (kegagalan tmux ≠ tak ada sesi). Rekonsiliasi yang
   // berjalan atas daftar kosong palsu akan menutup baris riwayat sesi yang justru masih berjalan —
   // "selesai padahal belum" versi tabel. Lewati saja: barisnya tetap terbuka sampai boot berikutnya.

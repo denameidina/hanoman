@@ -8,6 +8,13 @@
 > credential query WebSocket dicabut; browser memakai tiket one-time di subprotocol dan agent HTTP
 > memakai Bearer header. Capability route tidak lagi cukup untuk efek launch: hanya cookie admin atau
 > `sessions:write` menulis approval LOCAL-only, lalu launcher memeriksa approval pada choke point akhir.
+
+> **Amendment SPEC-1215 / [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (berlaku sejak turunan A untuk principal `remote` dan top `remote-control`; top `devices` & `logs` lahir bersama SPEC-1216/SPEC-1217):**
+> peta `capabilityForRoute`/`checkAgentCapability` menilai principal KETIGA, `remote`. Principal ini
+> lahir hanya in-process dari dispatcher relay (rahasia proses + `raw.socket` bukan `net.Socket`), dan
+> capability-nya grant LOCAL-only `Setting.data.remoteControl` ⊆ `REMOTE_CAPABILITIES`, ditambah
+> allowlist route relay. Satu pengecualian: WS terminal ber-mode `read` menuntut `sessions:read`. Top
+> baru `devices`, `remote-control`, dan `logs` → COOKIE_ONLY.
 > `SYNC_SERVER_URL`/credential destination juga cookie-admin-only.
 
 ## Konteks

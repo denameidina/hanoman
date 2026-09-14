@@ -11,6 +11,11 @@
   [0065](0065-ai-agent-capability-agent-token.md) (capability dinilai sampai efek launch), dan
   [0100](0100-webhook-keluar-peristiwa.md) (DNS address dipin ke koneksi, redirect ditolak).
   Menegakkan 0046/0066/0068 untuk sync/Help tanpa credential URL atau public-input auto-launch.
+- **Amendment SPEC-1215 / [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (dirancang):**
+  principal yang boleh menulis launch approval LOCAL-only bertambah `remote` ber-`sessions:spawn`
+  (`launchApprovedBy = remote:<email>@<hubOrigin>`). Invarian #1 tetap: asalnya cookie manusia di hub
+  yang device token-nya dipasang operator klien, dan grant-nya dinyalakan cookie manusia di klien.
+  Tak ada input publik yang bisa mencapainya.
 
 ## Konteks
 

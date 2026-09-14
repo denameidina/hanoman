@@ -38,6 +38,8 @@ export * from "./terminal-io";
 export * from "./session-dialog";
 export * from "./session-ask";
 export * from "./presence";
+export * from "./relay";
+export * from "./logs";
 export * from "./pending";
 export * from "./team";
 export * from "./model-catalog";

@@ -1,12 +1,14 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { gzipSync } from "node:zlib";
 import { z } from "zod";
-import { PRESENCE_MAX_FRAMES_PER_MIN, zPresenceFrame } from "@hanoman/shared";
+import { PRESENCE_MAX_FRAMES_PER_MIN, RELAY_MAX_FRAMES_PER_MIN, zCapacityFrame, zPresenceFrame } from "@hanoman/shared";
 import { prisma } from "../db";
 import { requireDeviceToken } from "../services/device-auth";
 import { verifyDeviceToken } from "../services/device-token";
 import { attachSync, detachSync } from "../services/sync-hub";
-import { recordPresence, dropPresence } from "../services/presence/registry";
+import { registerDeviceSocket } from "../services/device-sockets";
+import { attachRelaySocket } from "../services/relay/hub";
+import { recordPresence, recordCapacity, dropPresence } from "../services/presence/registry";
 import type { Client } from "../services/pty";
 import { applyPush, pull, bootstrapSnapshot, isEntity, type Entity } from "../services/sync";
 import { syncNow, fetchTransport } from "../services/sync-client";
@@ -47,6 +49,17 @@ function maybeGzip(req: FastifyRequest, reply: FastifyReply, payload: unknown): 
   reply.header("content-type", "application/json; charset=utf-8");
   reply.header("content-encoding", "gzip");
   return gzipSync(Buffer.from(JSON.stringify(payload)));
+}
+
+// Kanal server-to-server memakai Authorization header. Credential query sengaja ditolak agar
+// token tidak masuk access log, history, atau telemetry proxy. Dipakai /sync/ws DAN /sync/relay/ws.
+// Hook async yang mengirim balasan WAJIB `return reply` (konvensi Fastify), persis bentuk lama.
+async function requireDeviceWs(req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply | void> {
+  if ((req.query as { token?: string }).token) return reply.code(401).send({ error: "query token rejected" });
+  const token = bearerToken(req);
+  const dev = token ? await verifyDeviceToken(token) : null;
+  if (!dev) return reply.code(401).send({ error: "unauthorized" });
+  req.wsPrincipal = { kind: "device", id: dev.id };
 }
 
 export default async function (app: FastifyInstance) {
@@ -138,17 +151,9 @@ export default async function (app: FastifyInstance) {
     return resolveConflict(entity, recordId, p.data.choice, push);
   });
 
-  // Kanal server-to-server memakai Authorization header. Credential query sengaja ditolak agar
-  // token tidak masuk access log, history, atau telemetry proxy.
   app.get("/sync/ws", {
     websocket: true,
-    preValidation: async (req, reply) => {
-      if ((req.query as { token?: string }).token) return reply.code(401).send({ error: "query token rejected" });
-      const token = bearerToken(req);
-      const dev = token ? await verifyDeviceToken(token) : null;
-      if (!dev) return reply.code(401).send({ error: "unauthorized" });
-      req.wsPrincipal = { kind: "device", id: dev.id };
-    },
+    preValidation: requireDeviceWs,
   }, async (socket, req) => {
     const principal = req.wsPrincipal!;
     let release: () => void;
@@ -156,6 +161,8 @@ export default async function (app: FastifyInstance) {
     catch { socket.close(1008, "connection limit"); return; }
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     attachSync(client);
+    // SPEC-1215 · ADR-0165 §7 · supaya DELETE /device-tokens/:id bisa menutupnya seketika.
+    const unregisterSocket = registerDeviceSocket(principal.id, "sync", socket);
 
     /* SPEC-919 · ADR-0147 · arah naik kanal ini. Sebelumnya `/sync/ws` tak pernah memasang
        `socket.on("message")` sama sekali — dan justru itulah yang membuat hub versi LAMA
@@ -169,10 +176,13 @@ export default async function (app: FastifyInstance) {
     socket.on("message", (raw: Buffer) => {
       try {
         if (!guard.accept(raw).ok) return;
-        const parsed = zPresenceFrame.safeParse(JSON.parse(raw.toString("utf8")));
-        if (!parsed.success) return;
+        const msg: unknown = JSON.parse(raw.toString("utf8"));
         // deviceId SELALU dari token terverifikasi — payload tak pernah boleh menamai dirinya.
-        recordPresence(principal.id, parsed.data.sessions);
+        const presence = zPresenceFrame.safeParse(msg);
+        if (presence.success) { recordPresence(principal.id, presence.data.sessions); return; }
+        // SPEC-1215 · ADR-0165 §9 · arah naik kedua. Gagal parse = dibuang, tak pernah menutup socket.
+        const capacity = zCapacityFrame.safeParse(msg);
+        if (capacity.success) recordCapacity(principal.id, capacity.data.admission);
       } catch { /* frame rusak — dibuang */ }
     });
 
@@ -180,6 +190,30 @@ export default async function (app: FastifyInstance) {
       void revalidateWsPrincipal(req, principal).then((ok) => { if (!ok) socket.close(1008, "token revoked"); });
     }, 60_000);
     revalidate.unref?.();
-    socket.on("close", () => { clearInterval(revalidate); release(); detachSync(client); dropPresence(principal.id); });
+    socket.on("close", () => {
+      clearInterval(revalidate); release(); detachSync(client); dropPresence(principal.id); unregisterSocket();
+    });
+  });
+
+  // SPEC-1215 · ADR-0165 §1 · socket KEDUA per device, dibuka klien HANYA bila grant lokalnya menyala.
+  // Beda sadar dari /sync/ws: socket ini TIDAK mengangkut changefeed, jadi pelanggar guard DITUTUP
+  // (1008/1009) — kegagalannya tak pernah menyentuh socket sync karena socket-nya memang terpisah.
+  app.get("/sync/relay/ws", { websocket: true, preValidation: requireDeviceWs }, async (socket, req) => {
+    const principal = req.wsPrincipal!;
+    let release: () => void;
+    try { release = openWsConnection(principal); }
+    catch { socket.close(1008, "connection limit"); return; }
+    const link = attachRelaySocket(principal.id, socket);
+    const guard = new WsMessageGuard({ perWindow: RELAY_MAX_FRAMES_PER_MIN });
+    socket.on("message", (raw: Buffer) => {
+      const verdict = guard.accept(raw);
+      if (!verdict.ok) { socket.close(verdict.code, verdict.reason); return; }
+      link.onMessage(raw.toString("utf8"));
+    });
+    const revalidate = setInterval(() => {
+      void revalidateWsPrincipal(req, principal).then((ok) => { if (!ok) socket.close(1008, "token revoked"); });
+    }, 60_000);
+    revalidate.unref?.();
+    socket.on("close", () => { clearInterval(revalidate); release(); link.onClose(); });
   });
 }

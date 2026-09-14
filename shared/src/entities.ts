@@ -4,6 +4,8 @@ import { TELEGRAM_DEFAULTS, zTelegramSettings } from "./telegram";
 import { zAgentEngine, type AgentEngine } from "./agent-engine";
 import { zAutoMerge } from "./auto-merge";
 import { DEFAULT_METHOD } from "./method-catalog";
+import { REMOTE_CONTROL_DEFAULTS, zRemoteControl } from "./relay";
+import { LOG_RETENTION_DEFAULTS, LOG_SHIPPING_DEFAULTS, zLogRetention, zLogShipping } from "./logs";
 
 export type Stage = z.infer<typeof zStage>;
 // SPEC-338 · ADR-0074 · mesin sesi. Di-re-ekspor dari sini supaya konsumen setelan cukup
@@ -417,6 +419,12 @@ export const zSetting = z.object({
   changelog: zAgentEngine.default(CHANGELOG_ENGINE_DEFAULTS),             // SPEC-518 · agen pembuat changelog (opt-in, mati)
   portalChat: zPortalChat.default(PORTAL_CHAT_DEFAULTS),                  // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
   orchestration: zOrchestration.default(ORCHESTRATION_DEFAULTS),         // ADR-0164 · orkestrasi subagent per fase (default aktif)
+  // SPEC-1215 · ADR-0165/0166 · LOCAL-only (setting tak ada di SYNCED) dan TAK ditulis `PUT /settings`
+  // (routes/settings.ts mempertahankan nilai tersimpan). Pengelolanya `PUT /api/remote-control` dan,
+  // kelak, `PUT /api/logs/retention` — keduanya COOKIE_ONLY.
+  remoteControl: zRemoteControl.default(REMOTE_CONTROL_DEFAULTS),      // grant kendali jarak jauh (default mati)
+  logShipping: zLogShipping.default(LOG_SHIPPING_DEFAULTS),            // lajur log ke hub (SPEC-1217)
+  logRetention: zLogRetention.default(LOG_RETENTION_DEFAULTS),         // retensi log di hub (SPEC-1217)
   // SPEC-881 · ADR-0136 · sidik jari isi bawaan yang TERAKHIR ditulis seed di mesin ini, per nama
   // agen. Dipakai seed untuk membedakan "belum pernah disunting operator" dari "sudah". WAJIB
   // dideklarasikan di sini: zod membuang kunci tak dikenal dan `PUT /settings` menulis balik hasil

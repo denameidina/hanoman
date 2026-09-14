@@ -901,7 +901,10 @@ describe("kejujuran akhir sesi (SPEC-402)", () => {
 // SPEC-362 · ADR-0079 · hook riwayat sesi. pty.ts tetap nol dependensi DB: ia hanya menembakkan
 // dua peristiwa dari dua titik cekik (createSession/killSession).
 describe("hook riwayat sesi (SPEC-362)", () => {
-  afterEach(() => { registerSessionHooks({}); });  // singleton modul — jangan bocor ke test lain
+  // SPEC-1215 · hook kini aditif: `registerSessionHooks({})` hanya MENAMBAH pendaftar kosong dan
+  // membiarkan hook test sebelumnya hidup. Cabut lewat fungsi yang dikembalikan.
+  let unhook: (() => void) | undefined;
+  afterEach(() => { unhook?.(); unhook = undefined; });
 
   it("sessionKind menurunkan jenis dari opsi kelahiran, bukan dari tebakan belakangan", () => {
     expect(sessionKind({ id: "spec-1", specId: "SPEC-1" }, "p1", "/r/.worktrees/spec-1")).toBe("spec");
@@ -916,7 +919,7 @@ describe("hook riwayat sesi (SPEC-362)", () => {
 
   it("onBirth menembak sekali saat sesi lahir dan TIDAK menembak saat Start kedua (re-attach)", () => {
     const births: SessionBirth[] = [];
-    registerSessionHooks({ onBirth: (b) => { births.push(b); } });
+    unhook = registerSessionHooks({ onBirth: (b) => { births.push(b); } });
     const id = "hook-birth";
     createSession("p-hook", process.cwd(), { id, command: ["/bin/sh", "-c", "sleep 30"] });
     createSession("p-hook", process.cwd(), { id, command: ["/bin/sh", "-c", "sleep 30"] }); // re-attach
@@ -929,7 +932,7 @@ describe("hook riwayat sesi (SPEC-362)", () => {
 
   it("onDeath membawa transkrip yang di-capture SEBELUM pane dibunuh", async () => {
     const deaths: SessionDeath[] = [];
-    registerSessionHooks({ onDeath: (d) => { deaths.push(d); } });
+    unhook = registerSessionHooks({ onDeath: (d) => { deaths.push(d); } });
     const id = "hook-death";
     createSession("p-hook", process.cwd(), { id, command: ["/bin/sh", "-c", "echo PENANDA-RIWAYAT; sleep 30"] });
     await waitFor(() => (tmuxCapture(id) ?? "").includes("PENANDA-RIWAYAT"));

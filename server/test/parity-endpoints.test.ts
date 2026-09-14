@@ -29,6 +29,9 @@ const NEW_PRESENCE = ["/api/presence"];
 // tak terbedakan dari "belum login" — bukan sebagai kesalahan pemasangan.
 const NEW_TEAM = ["/api/members", "/api/tasks",
   "/escalate"];   // SPEC-947 · ADR-0152 · di bawah /api/tasks/:id, cermin bentuk ide di BASELINE
+// SPEC-1215 · ADR-0165 · alasan yang sama: klien menandai hub "tak mendukung relay" saat upgrade 404,
+// jadi route relay yang lupa di-register terbaca sebagai hub versi lama — gagal senyap.
+const NEW_RELAY = ["/api/sync/relay/ws", "/api/remote-control"];
 
 describe("parity: endpoint baseline preserved (SPEC-213 AC-23)", () => {
   it("every baseline endpoint still registered", () => {
@@ -45,5 +48,8 @@ describe("parity: endpoint baseline preserved (SPEC-213 AC-23)", () => {
   });
   it("team surface registered (SPEC-945)", () => {
     for (const p of NEW_TEAM) expect(routes, `belum ada: ${p}`).toContain(p);
+  });
+  it("relay surface registered (SPEC-1215)", () => {
+    for (const p of NEW_RELAY) expect(routes, `belum ada: ${p}`).toContain(p);
   });
 });

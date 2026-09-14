@@ -32,6 +32,10 @@ export const PG_ORDER = [
   "SessionResult", "SessionHistory",
   // SPEC-799 · ADR-0119 · SyncTombstone LOCAL-only, tanpa FK; letaknya bersama tabel sync lain.
   "SyncLog", "LocalBinding", "SyncOutbox", "SyncState", "SyncConflict", "SyncTombstone",
+  // SPEC-1215 · ADR-0166 · LOCAL-only, tanpa FK. Tabel ini tak ada di sumber Postgres lama — jalur
+  // 42P01 memperlakukannya sebagai nol baris (cermin AgentInvocation/Changelog). Tetap WAJIB
+  // terdaftar: test migrate-pg menuntut PG_ORDER = seluruh model DMMF.
+  "LogEntry", "LogCursor",
   // SPEC-485 · ADR-0102 · LeadFlow SEBELUM LeadDecision: `flowId` menunjuk ke sana. Tanpa FK, tapi
   // urutan tabel harus tetap mencerminkan arah tautannya bagi pembaca berikutnya.
   // SPEC-646 · ADR-0112 · SchedulerCron SEBELUM SchedulerCronRun: `cronId` menunjuk ke sana. Tanpa
