@@ -40,9 +40,9 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
   `screens/presence-map.ts`. Ia **beda** dari `HandledByChips` (ADR-0135): yang itu penetapan MANUAL
   yang menyeberang sync, yang ini keadaan LIVE yang tak pernah masuk DB. Daftar nama kosong →
   **nol elemen**, ujung terakhir gerbang "instance tanpa sync tak berubah tampilannya".
-- **Kendali & tampilan klien dari hub — DIRANCANG** (SPEC-1215 ·
+- **Kendali & tampilan klien dari hub — sebagian mendarat** (SPEC-1215 ·
   [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [spec §S4.11](../../../docs/superpowers/specs/2026-09-14-spec-1215-hub-orkestrasi-klien-design.md)),
-  belum ada di kode.
+  `RemoteControlPanel` (Settings → Kendali jarak jauh) mendarat di turunan A tanpa toggle lajur log (SPEC-1217); sisanya DIRANCANG untuk SPEC-1216/SPEC-1218.
   - **Pabrik API.** `createApi({ base })` menggantikan prefix `/api` dengan
     `/api/devices/<deviceId>/relay`; `api = createApi()` tetap untuk 61 importir.
   - **`InstanceContext`** (`local | remote`) memberi `useApi()` dan `useWsTarget()` (URL + tiket

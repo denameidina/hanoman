@@ -147,7 +147,7 @@ Invariant pengujian yang mengikat: keempat lapis adalah **fungsi murni**, jadi s
 tanpa memanggil agen — termasuk korpus injeksi yang sungguh-sungguh mencoba menembus dan korpus
 balasan bocor yang tiga di antaranya benar-benar diproduksi agen saat pengukuran SPEC-854.
 
-## Kendali jarak jauh hub → klien & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — DIRANCANG
+## Kendali jarak jauh hub → klien & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — sebagian mendarat (turunan A: grant, gate `remote`, allowlist, pencabutan seketika; sisanya SPEC-1216/1217/1218)
 
 **Aktor baru: hub terhadap klien.**
 - **Yang ia punya:** device token klien (dipasang operator klien) dan cookie manusia di hub.

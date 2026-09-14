@@ -888,7 +888,8 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > ber-capability apa pun — bahkan token TANPA satu pun capability — **hanya untuk method baca**
 > (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157). **Tak-boleh-didelegasikan** (agent → 403):
 > `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, `/webhooks` (ADR-0100), `/portal` &
-> `/client-accounts` (ADR-0110), `/session-events` (ADR-0146), `/presence` (ADR-0147), dan
+> `/client-accounts` (ADR-0110), `/session-events` (ADR-0146), `/presence` (ADR-0147),
+> `/remote-control` (SPEC-1215 · ADR-0165), dan
 > `/telegram/{settings,test,credentials}` (ADR-0097); route tak dikenal peta → cookie-only. Master switch
 > `Setting.agentAccessEnabled` (PUT /settings) mematikan semua. **Kecuali** endpoint `PUBLIC`
 > (`/health`, `/auth/status`, `/auth/login`, `/auth/setup`, `/agent-integration.md`) yang tak pernah
@@ -1402,12 +1403,16 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 #   mengirim header `Host` = host control pertama saat origin dipisah (`HANOMAN_EVENT_HOST`).
 ```
 
-## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **DIRANCANG, belum ada di kode**
+## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **sebagian mendarat (turunan A)**
 
-> **Status:** kontrak dikunci fase Spec 2026-09-15. Implementasi lewat turunan A–D
-> ([spec §S4](../../../docs/superpowers/specs/2026-09-14-spec-1215-hub-orkestrasi-klien-design.md)).
-> Penanda ini dicabut per bagian saat turunannya mendarat. Selama penanda ada, **tak satu pun** route
-> di bawah dilayani server.
+> **Status:** kontrak dikunci fase Spec 2026-09-15.
+> **Dilayani sejak turunan A (SPEC-1215):** `GET /sync/relay/ws` (hub; `welcome`/`req`/`cancel` ↔
+> `hello`/`res`; klien A menjawab `open` dengan `close 4502`), frame naik `capacity` +
+> `devices[].control|capacity` di `GET /presence`, `DELETE /device-tokens/:id` yang menutup socket sebelum
+> 204, `GET|PUT /remote-control` (tanpa `shipping` — menyusul SPEC-1217), gate principal `remote`, dan
+> `PUT /settings` yang mempertahankan tiga kunci baru.
+> **Belum dilayani:** `/devices/:deviceId/relay/*` dan tiket `relay:*` (SPEC-1216/SPEC-1218), `POST /sync/logs`
+> dan `/logs*` (SPEC-1217), perubahan `POST /terminal/sessions` & `POST /specs/:id/done` (SPEC-1216).
 
 ```
 # ── HUB ──────────────────────────────────────────────────────────────────────────────────────────

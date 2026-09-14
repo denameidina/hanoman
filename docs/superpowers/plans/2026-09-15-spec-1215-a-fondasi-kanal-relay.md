@@ -4095,7 +4095,7 @@ git commit -m "feat(ui): panel Kendali jarak jauh — grant opt-in, status relay
 
 **Interfaces:** — (dokumen; tak ada kode)
 
-- [ ] **Step 1: Status ADR**
+- [x] **Step 1: Status ADR**
 
 `0165` baris 3-5, ganti tiga baris `**Status:** diterima (SPEC-1215, fase Spec) · 2026-09-15 · **implementasi menyusul** lewat turunan` … `memuat satu pun perilaku di bawah.` dengan:
 
@@ -4117,14 +4117,14 @@ aditif, dan tap lokal `session.start`/`session.end`/`remote.request`/`remote.lin
 `server`/`transcript`, serta tap `session.phase`/`session.result`/`launch.rejected`/`log.gap`.
 ```
 
-- [ ] **Step 2: Penanda amandemen**
+- [x] **Step 2: Penanda amandemen**
 
 - `0046`: `(dirancang,` + baris berikut `> berlaku saat turunan A mendarat):**` → `(berlaku sejak turunan A mendarat, SPEC-1215):**` (satu baris).
 - `0147`: `(0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (dirancang):**` → `(0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (butir 1, 2, 4 berlaku sejak turunan A; butir 3 menyusul SPEC-1216):**`
 - `0065`: `(0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (dirancang):**` → `(0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (berlaku sejak turunan A untuk principal `remote` dan top `remote-control`; top `devices` & `logs` lahir bersama SPEC-1216/SPEC-1217):**`
 - `0148`, `0135`, `0117`, `0161`, `0120`, `0079`: **biarkan** `(dirancang)` — milik SPEC-1216/SPEC-1217.
 
-- [ ] **Step 3: Architecture, security, frontend, operations**
+- [x] **Step 3: Architecture, security, frontend, operations**
 
 `api-contract.md` baris 1405: ganti `— **DIRANCANG, belum ada di kode**` dengan `— **sebagian mendarat (turunan A)**`. Ganti blok status 4 baris (`> **Status:** kontrak dikunci fase Spec 2026-09-15. Implementasi lewat turunan A–D` … `> di bawah dilayani server.`) dengan:
 
@@ -4151,7 +4151,7 @@ Lalu jalankan `grep -n "presence" internal/docs/architecture/api-contract.md` un
 
 `operations/production.md` baris 90: `menyiarkan \`GET /api/sync/ws\`. |` → `menyiarkan \`GET /api/sync/ws\`, menerima \`GET /api/sync/relay/ws\` (SPEC-1215 — reverse proxy wajib meneruskan upgrade keduanya). |`
 
-- [ ] **Step 4: Index & skill**
+- [x] **Step 4: Index & skill**
 
 `internal/docs/README.md` baris 105-106: ganti kedua kemunculan `**dirancang (SPEC-1215)**` dengan `**turunan A mendarat (SPEC-1215)**`.
 `internal/docs/adr/README.md`: `SPEC-1215 (dirancang; tabel & tap event di turunan A, sisanya turunan D)` → `SPEC-1215 (tabel & tap event lokal mendarat di turunan A; sisanya SPEC-1217)`; `SPEC-1215 (dirancang; turunan A/B/C)` → `SPEC-1215 (turunan A mendarat; B = SPEC-1216, C = SPEC-1218)`.
@@ -4174,12 +4174,12 @@ Lalu jalankan `grep -n "presence" internal/docs/architecture/api-contract.md` un
   stream tampilan, dan log terpusat: SPEC-1216 / SPEC-1218 / SPEC-1217.
 ```
 
-- [ ] **Step 5: Integritas index**
+- [x] **Step 5: Integritas index**
 
 Run: `hanoman docs index --check`
 Expected: `index ok`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs internal/skills/hanoman/SKILL.md

@@ -38,9 +38,9 @@ jatuh tempo. Terukur: `AskUserQuestion` → lead mulai menyusun turun dari lanta
 tick) ke **32–164 ms**, dan `capture-pane` saat tak ada yang bertanya jadi **nol**. Tak ada kanal
 WebSocket baru: keadaan tanya untuk pet menumpang frame `leadAsks` di `/api/events/ws` (ADR-0039).
 
-**Kendali jarak jauh & log terpusat — DIRANCANG (SPEC-1215 ·
+**Kendali jarak jauh & log terpusat — turunan A mendarat (SPEC-1215 ·
 [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) ·
-[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)), belum ada di kode.**
+[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)); B/C/D = SPEC-1216/SPEC-1218/SPEC-1217.**
 - **Relay.** Klien yang grant lokalnya menyala membuka socket **kedua** ke hub,
   `/api/sync/relay/ws` (device token). Hub mengirim request ke route REST/WS **yang sudah ada**, dan
   klien menjalankannya ulang in-process lewat `app.inject`/`app.injectWS`. Tanpa katalog RPC, tanpa

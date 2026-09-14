@@ -281,7 +281,7 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   `hanoman-fase-<slug>` dengan model/effort sel, atau warisan orchestrator bila `null`. Lenient; baris lama
   tanpa blok ini parse dengan default aktif. Tanpa migration.
 - `remoteControl`, `logShipping`, `logRetention` (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md)/[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md),
-  **DIRANCANG, belum di `zSetting`**) — LOCAL-only, tanpa migration.
+  sudah di `zSetting` sejak turunan A; `logShipping`/`logRetention` baru dibaca SPEC-1217) — LOCAL-only, tanpa migration.
   - `remoteControl = { enabled:false, capabilities:[] }`: grant kendali jarak jauh dari hub, dengan
     `capabilities ⊆ sessions:read|write|spawn, backlog:read|write, ide:read`.
   - `logShipping = { event:true, server:false, transcript:false }`: lajur log yang dikirim ke hub.
@@ -723,7 +723,7 @@ scaffold, breakdown, dan konsol VPS.
   juga memilih sesi berakhir >30 hari dalam batch bounded; hold `session:<id>` mengecualikan record.
   Bila delete transkrip gagal, record DB dipertahankan agar percobaan berikutnya dapat retry.
 
-## LogEntry / LogCursor (SPEC-1215 · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **DIRANCANG, belum ada di skema**
+## LogEntry / LogCursor (SPEC-1215 · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — skema mendarat di turunan A (SPEC-1215); ingest, pencarian, retensi di SPEC-1217
 
 Log terpusat hub + audit kendali jarak jauh. **LOCAL-only per instance**, bukan entitas sync: tak masuk
 `SYNCED`/`FIELDS`/`WEBHOOK_ENTITIES`. Keduanya **tetap terdaftar** di `PG_ORDER` `migrate-from-postgres`

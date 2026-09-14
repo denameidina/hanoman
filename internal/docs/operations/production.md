@@ -87,7 +87,7 @@ Peran ditentukan env, bukan binari berbeda:
 
 | var | efek |
 |---|---|
-| *(tak diset)* | **Hub**: menerima push, melayani `GET /api/sync/pull`, menyiarkan `GET /api/sync/ws`. |
+| *(tak diset)* | **Hub**: menerima push, melayani `GET /api/sync/pull`, menyiarkan `GET /api/sync/ws`, menerima `GET /api/sync/relay/ws` (SPEC-1215 — reverse proxy wajib meneruskan upgrade keduanya). |
 | `SYNC_SERVER_URL=https://hub.example` | **Client**: instance ini menyinkron (server-to-server) ke hub itu. |
 | `SYNC_DEVICE_TOKEN=<token>` | Device token (Bearer) untuk auth sync/WS. Wajib bila `SYNC_SERVER_URL` diset. |
 | `SYNC_TICK_MS` | Opsional; interval drain fallback outbox (default 15000). |

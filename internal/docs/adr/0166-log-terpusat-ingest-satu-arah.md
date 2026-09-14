@@ -1,8 +1,10 @@
 # ADR-0166 — Log terpusat: ingest satu arah di `/api/sync/logs`, tiga lajur, high-water mark per device
 
-**Status:** diterima (SPEC-1215, fase Spec) · 2026-09-15 · **implementasi menyusul**. Tabel dan jalur
-event lokal dikerjakan turunan A. Pengiriman, ingest, pencarian, retensi, lajur `server`, dan lajur
-`transcript` dikerjakan turunan D.
+**Status:** diterima (SPEC-1215, fase Spec) · 2026-09-15 · **sebagian mendarat (turunan A)**: model
+`LogEntry`/`LogCursor` (migration `20260915120000_log_terpusat`), `appendEvent` ber-seq HLC, hook sesi
+aditif, dan tap lokal `session.start`/`session.end`/`remote.request`/`remote.link`/`grant.changed`.
+**Menyusul di SPEC-1217 (turunan D):** pengiriman, ingest, redaksi, pencarian, retensi, lajur
+`server`/`transcript`, serta tap `session.phase`/`session.result`/`launch.rejected`/`log.gap`.
 **Mengamandemen** [0079](0079-history-sesi-terminal-store-lokal-plus-transkrip.md): transkrip boleh
 menyeberang ke hub, **hanya** bila lajur `transcript` dinyalakan cookie lokal.
 **Menegakkan** [0131](0131-retensi-change-feed-sync.md) (tanpa tulisan berkadens tinggi di jalur sync;
