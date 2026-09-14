@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
 import { StartSessionModal } from "../src/App";
 import { api } from "../src/api/client";
@@ -40,6 +40,8 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
     (api.getSettings as any).mockResolvedValue(settingWith(structuredClone(ORCHESTRATION_DEFAULTS)));
     renderModal();
     await waitFor(() => expect(screen.getByLabelText("Effort")).toHaveValue("xhigh"));
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview"))
+      .toHaveTextContent("Execute · Opus 5 · xhigh (warisi)"));
     fireEvent.change(screen.getByLabelText("Effort"), { target: { value: "high" } });
     expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Execute · Opus 5 · high (warisi)");
   });
@@ -58,5 +60,45 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
     (api.getCodexVersion as any).mockResolvedValueOnce({ version: "0.150.0", minRequired: "0.144.0", ok: true });
     renderModal();
     await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("belum mendukung subagent native"));
+  });
+
+  // ADR-0164 · gerbang muat: absennya data BELUM dimuat ≠ "sesi tunggal" — pratinjau harus diam
+  // dulu sampai respons Settings/versi codex tiba, sama seperti codexVer null ≠ "gagal deteksi".
+  it("settings belum termuat → pratinjau menunggu, bukan menuduh sesi tunggal", async () => {
+    (api.getSettings as any).mockReturnValueOnce(new Promise(() => {})); // tak pernah resolve
+    renderModal();
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Memuat rencana fase"));
+    expect(screen.getByTestId("phase-plan-preview")).not.toHaveTextContent("dikerjakan subagent");
+  });
+
+  it("codex: versi belum termuat → pratinjau menunggu, lalu tampil setelah versi tiba", async () => {
+    (api.getSettings as any).mockResolvedValue(settingWith(structuredClone(ORCHESTRATION_DEFAULTS),
+      { agent: "codex", codex: { model: "gpt-5.6-sol", effort: "high" } }));
+    let resolveVersion!: (v: unknown) => void;
+    (api.getCodexVersion as any).mockReturnValueOnce(new Promise((resolve) => { resolveVersion = resolve; }));
+    renderModal();
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Memuat rencana fase"));
+    expect(screen.getByTestId("phase-plan-preview")).not.toHaveTextContent("belum mendukung");
+    await act(async () => { resolveVersion({ version: "0.151.0", minRequired: "0.144.0", ok: true }); });
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Execute ·"));
+  });
+
+  it("codex: versi gagal dimuat → tetap dianggap tak terdeteksi (sama seperti server)", async () => {
+    (api.getSettings as any).mockResolvedValue(settingWith(structuredClone(ORCHESTRATION_DEFAULTS),
+      { agent: "codex", codex: { model: "gpt-5.6-sol", effort: "high" } }));
+    (api.getCodexVersion as any).mockRejectedValueOnce(new Error("boom"));
+    renderModal();
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("belum mendukung subagent native"));
+  });
+
+  it("sel sebagian (hanya model atau hanya effort) → tanda warisi per bagian", async () => {
+    const orchestration = structuredClone(ORCHESTRATION_DEFAULTS);
+    orchestration.qa.claude.Plan = { model: "claude-sonnet-5", effort: null };
+    orchestration.qa.claude.Execute = { model: null, effort: "low" };
+    (api.getSettings as any).mockResolvedValue(settingWith(orchestration));
+    renderModal();
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview"))
+      .toHaveTextContent("Plan · Sonnet 5 · xhigh (effort warisi)"));
+    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Execute · Opus 5 · low (model warisi)");
   });
 });

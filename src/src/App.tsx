@@ -116,11 +116,20 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
   // ADR-0164 · matriks orkestrasi untuk pratinjau fase. Absen di respons Setting lama → default aktif.
   const [orchestration, setOrchestration] = React.useState<Orchestration | undefined>(undefined);
+  // ADR-0164 · gerbang muat pratinjau fase: sebelum kedua respons ini tiba, `orchestration`
+  // undefined dan `codexVer` null TIDAK BOLEH dibaca sebagai "default aktif"/"codex tak
+  // terdeteksi" — pratinjau harus diam dulu, bukan menuduh sesi tunggal secara keliru.
+  const [settingsLoaded, setSettingsLoaded] = React.useState(false);
+  const [codexVerLoaded, setCodexVerLoaded] = React.useState(false);
   // SPEC-739 · ADR-0114 · kesiapan skill metode di mesin ini. Gagal-diam dengan alasan yang sama
   // dengan codexVer: modal harus tetap bisa dipakai, dan ketiadaan bukti bukan bukti ketiadaan.
   const [methodStatuses, setMethodStatuses] = React.useState<MethodSkillStatus[] | null>(null);
   React.useEffect(() => {
     if (!open) return;
+    // ADR-0164 · reset gerbang muat setiap kali modal dibuka/spec berganti — respons lama tak
+    // boleh menandai "termuat" untuk pembukaan yang baru.
+    setSettingsLoaded(false);
+    setCodexVerLoaded(false);
     api.getSettings().then((s) => {
       // `?? `: server selalu mengirim keduanya (zod .default()), tapi respons yang di-cache
       // sebelum SPEC-338 belum punya — jangan sampai picker-nya kosong.
@@ -140,9 +149,11 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       setVerifyScope(s.verifyScope ?? "changed");
       setMethod(resolveMethod(s.method).id);
       setOrchestration(s.orchestration);
-    }).catch(() => {});
+      setSettingsLoaded(true);
+    }).catch(() => { setSettingsLoaded(true); });
     // SPEC-339 · versi codex CLI untuk catatan lunak. Gagal-diam: modal harus tetap bisa dipakai.
-    api.getCodexVersion().then((v) => setCodexVer(v.version)).catch(() => {});
+    api.getCodexVersion().then((v) => { setCodexVer(v.version); setCodexVerLoaded(true); })
+      .catch(() => { setCodexVerLoaded(true); });
     // SPEC-739 · ADR-0114 · kesiapan metode × agen, diturunkan live dari disk oleh server.
     api.getMethodStatus().then((r) => setMethodStatuses(r.methods)).catch(() => setMethodStatuses(null));
     // SPEC-407 · `spec` ikut jadi dependency: prefill mode goal bergantung source-nya.
@@ -268,7 +279,8 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       {/* ADR-0164 · pratinjau rencana fase: resolver yang SAMA dengan server, jadi apa yang
           operator lihat di sini persis apa yang lahir saat sesi dimulai. */}
       <PhasePlanPreview flow={flow as OrchestrationFlow} agent={agent} model={model} effort={effort}
-        orchestration={orchestration} codexVersion={codexVer} />
+        orchestration={orchestration} codexVersion={codexVer}
+        loading={!settingsLoaded || (agent === "codex" && !codexVerLoaded)} />
       {/* SPEC-332 · ADR-0073 · mode goal: sesi menolak berhenti sampai kondisinya terbukti di
           transkrip. Interupsi manusia (Esc) tetap bekerja; melepas gate = hentikan sesinya. */}
       <Field label="Mode goal"
