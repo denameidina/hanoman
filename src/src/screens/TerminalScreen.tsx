@@ -771,50 +771,69 @@ export function PhaseStrip({ phases, compact = false, now }: {
     if (a.status === "running" && a.startedAt) return formatDuration(at - Date.parse(a.startedAt));
     return "";
   };
+  // ADR-0164 · review panel-terpotong: panel detail dulu hidup DI DALAM baris chip yang
+  // men-scroll (overflowX: auto). Spec CSS overflow menegaskan bila satu sumbu diset bukan
+  // `visible`, sumbu lain yang `visible` dihitung ulang jadi `auto` — jadi overflow-y strip pun
+  // ikut jadi `auto` begitu overflow-x-nya diset, dan panel `position:absolute; top:100%` yang
+  // masih jadi ANAK baris scroll itu jatuh ke area scroll vertikal setinggi baris chip (~20px)
+  // yang tersembunyi. Di browser sungguhan "klik chip → detail" jadi tak terlihat/tak terjangkau;
+  // jsdom tak melakukan layout jadi test lama tetap hijau walau bug-nya nyata. Perbaikannya:
+  // wrapper LUAR ini sengaja TIDAK menyetel overflow apa pun (default `visible` kedua sumbu), dan
+  // hanya baris chip di dalamnya (`phase-strip-scroller`) yang men-scroll horizontal. Panelnya
+  // jadi SAUDARA baris scroll itu, tetap anak wrapper luar, sehingga `top: 100%` mengacu ke
+  // wrapper yang tak dipotong.
   return (
     <div data-testid="phase-strip" style={{
-      position: "relative", display: "flex", alignItems: "center", gap: 8, padding: "3px 8px", flex: "0 0 auto",
-      borderBottom: "1px solid var(--border-hair)", fontSize: 10, fontFamily: "var(--font-mono)",
-      overflowX: "auto", whiteSpace: "nowrap",
+      position: "relative", flex: "0 0 auto", borderBottom: "1px solid var(--border-hair)",
     }}>
-      {phases.map((p) => {
-        if (!p.agent) {
-          return <span key={p.name} data-state={p.state} title={p.state} style={nameStyle(p)}>{p.name}</span>;
-        }
-        const a = p.agent;
-        const tone = chipTone(p);
-        const full = !compact || p.state === "active";
-        const duration = durationOf(p);
-        return (
-          <button key={p.name} type="button" data-tone={tone} aria-expanded={open === p.name}
-            aria-label={`Detail fase ${p.name}`} onClick={() => setOpen(open === p.name ? null : p.name)}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 4, flex: "0 0 auto", padding: "1px 6px",
-              border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "transparent",
-              font: "inherit", color: "var(--text-body)", cursor: "pointer",
-            }}>
-            <span aria-hidden>{CHIP_ICON[tone]}</span>
-            <span data-state={p.state} title={p.state} style={nameStyle(p)}>{p.name}</span>
-            {p.state === "skipped" && <span>dilewati</span>}
-            {full && a.model && <span>· {modelLabel(a.model)}</span>}
-            {full && a.effort && <span>· {a.effort}</span>}
-            {full && duration && <span>· {duration}</span>}
-            {a.attempts > 1 && <span>↻{a.attempts}</span>}
-            {a.evidence === "missing" && (
-              <span role="img" aria-label="bukti subagent tak diterima" title="bukti subagent tak diterima"
-                style={{ color: "var(--status-warn)" }}>⚠</span>
-            )}
-          </button>
-        );
-      })}
+      <div data-testid="phase-strip-scroller" style={{
+        display: "flex", alignItems: "center", gap: 8, padding: "3px 8px",
+        fontSize: 10, fontFamily: "var(--font-mono)",
+        overflowX: "auto", whiteSpace: "nowrap",
+      }}>
+        {phases.map((p) => {
+          if (!p.agent) {
+            return <span key={p.name} data-state={p.state} title={p.state} style={nameStyle(p)}>{p.name}</span>;
+          }
+          const a = p.agent;
+          const tone = chipTone(p);
+          const full = !compact || p.state === "active";
+          const duration = durationOf(p);
+          return (
+            <button key={p.name} type="button" data-tone={tone} aria-expanded={open === p.name}
+              aria-label={`Detail fase ${p.name}`} onClick={() => setOpen(open === p.name ? null : p.name)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 4, flex: "0 0 auto", padding: "1px 6px",
+                border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "transparent",
+                font: "inherit", color: "var(--text-body)", cursor: "pointer",
+              }}>
+              <span aria-hidden>{CHIP_ICON[tone]}</span>
+              <span data-state={p.state} title={p.state} style={nameStyle(p)}>{p.name}</span>
+              {p.state === "skipped" && <span>dilewati</span>}
+              {full && a.model && <span>· {modelLabel(a.model)}</span>}
+              {full && a.effort && <span>· {a.effort}</span>}
+              {full && duration && <span>· {duration}</span>}
+              {a.attempts > 1 && <span>↻{a.attempts}</span>}
+              {a.evidence === "missing" && (
+                <span role="img" aria-label="bukti subagent tak diterima" title="bukti subagent tak diterima"
+                  style={{ color: "var(--status-warn)" }}>⚠</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
       {openPhase?.agent && (
         <div role="dialog" aria-label={`Detail fase ${openPhase.name}`} style={{
           position: "absolute", top: "100%", left: 8, zIndex: 5, minWidth: 220, maxWidth: "min(420px, 90vw)",
           padding: "8px 10px", background: "var(--surface-card)", border: "1px solid var(--border-hair)",
           borderRadius: "var(--radius-sm)", whiteSpace: "normal", lineHeight: 1.5,
+          fontSize: 10, fontFamily: "var(--font-mono)",
         }}>
           <div><b>{openPhase.agent.name}</b></div>
-          <div>{modelLabel(openPhase.agent.model)} · {openPhase.agent.effort ?? "—"} · {openPhase.agent.status ?? "belum mulai"}</div>
+          {/* Guard: `model` opsional — dibangun dari bagian yang ADA saja supaya tak menyisakan
+              "· " di depan saat model kosong. */}
+          <div>{[modelLabel(openPhase.agent.model), openPhase.agent.effort, openPhase.agent.status ?? "belum mulai"]
+            .filter(Boolean).join(" · ")}</div>
           <div>durasi {durationOf(openPhase) || "—"} · percobaan {openPhase.agent.attempts}</div>
           <div>token in {openPhase.agent.inputTokens ?? "—"} · out {openPhase.agent.outputTokens ?? "—"} · cache {openPhase.agent.cachedTokens ?? "—"}</div>
           {openPhase.agent.resultExcerpt && (

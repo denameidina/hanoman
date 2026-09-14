@@ -64,3 +64,33 @@ describe("PhaseStrip · chip agen fase (ADR-0164)", () => {
     expect(screen.getByRole("button", { name: "Detail fase Plan" })).toHaveTextContent("dilewati");
   });
 });
+
+// ADR-0164 · review: panel detail dulu hidup DI DALAM baris chip yang men-scroll (overflowX:
+// auto), dan spec CSS overflow memaksa overflow-y strip jadi `auto` begitu overflow-x diset —
+// panel `position:absolute; top:100%` pun jatuh ke area scroll vertikal setinggi baris chip itu
+// sendiri, tak pernah terlihat di browser sungguhan (jsdom tak layout jadi test lama tetap hijau).
+describe("PhaseStrip · panel detail tak terpotong (ADR-0164)", () => {
+  it("panel detail BUKAN keturunan penggulung chip, tapi ADA di dalam wrapper strip", () => {
+    render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent() }]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Detail fase Spec" }));
+    const dialog = screen.getByRole("dialog", { name: "Detail fase Spec" });
+    expect(screen.getByTestId("phase-strip-scroller").contains(dialog)).toBe(false);
+    expect(screen.getByTestId("phase-strip").contains(dialog)).toBe(true);
+  });
+
+  it("penggulung chip overflow-x:auto; wrapper luar tak menyetel overflow apa pun", () => {
+    render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent() }]} />);
+    const scroller = screen.getByTestId("phase-strip-scroller");
+    expect(scroller).toHaveStyle({ overflowX: "auto" });
+    const strip = screen.getByTestId("phase-strip");
+    expect(strip.style.overflowX).toBe("");
+    expect(strip.style.overflowY).toBe("");
+  });
+
+  it("agen tanpa model: baris detail tak diawali '·'", () => {
+    render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent({ model: undefined }) }]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Detail fase Spec" }));
+    const dialog = screen.getByRole("dialog", { name: "Detail fase Spec" });
+    expect(within(dialog).getByText(/^high · completed$/)).toBeInTheDocument();
+  });
+});
