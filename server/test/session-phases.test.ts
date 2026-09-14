@@ -319,26 +319,95 @@ describe("enrichPhases (ADR-0164)", () => {
     { name: "Brainstorm", state: "done" }, { name: "Spec", state: "done" }, { name: "Plan", state: "active" },
   ];
 
+  // Sejak I-1, `enrichPhases` mewajibkan `bornAt` (ms epoch; 0 = tak diketahui → perilaku lama).
+  // Seluruh test di bawah memakai `bornAt=0` KECUALI yang eksplisit menguji pembatasan umur sesi.
   it("fase tanpa agen fase di roster tak disentuh", () => {
-    expect(enrichPhases(phases, roster, [], new Map(), 0)[0]).toEqual({ name: "Brainstorm", state: "done" });
+    expect(enrichPhases(phases, roster, [], new Map(), 0, 0)[0]).toEqual({ name: "Brainstorm", state: "done" });
   });
   it("invocation terakhir menentukan status; percobaan = agent id berbeda", () => {
     const [, spec] = enrichPhases(phases, roster, [
       inv({ runtimeInvocationId: "a1", status: "interrupted", startedAt: "2026-09-14T00:00:00.000Z" }),
       inv({ runtimeInvocationId: "a2", status: "completed", startedAt: "2026-09-14T00:05:00.000Z" }),
-    ], new Map(), 0);
+    ], new Map(), 0, 0);
     expect(spec!.agent).toMatchObject({
       name: "hanoman-fase-spec", model: "claude-opus-5", effort: "high", status: "completed", attempts: 2, evidence: "ok",
     });
   });
   it("fase done tanpa invocation: pending selama tenggang, missing sesudahnya", () => {
     const seen = new Map([["Spec", 1_000]]);
-    expect(enrichPhases(phases, roster, [], seen, 1_000 + 59_999)[1]!.agent!.evidence).toBe("pending");
-    expect(enrichPhases(phases, roster, [], seen, 1_000 + 60_000)[1]!.agent!.evidence).toBe("missing");
+    expect(enrichPhases(phases, roster, [], seen, 1_000 + 59_999, 0)[1]!.agent!.evidence).toBe("pending");
+    expect(enrichPhases(phases, roster, [], seen, 1_000 + 60_000, 0)[1]!.agent!.evidence).toBe("missing");
   });
   it("fase aktif belum berinvocation tetap pending walau lama", () => {
-    expect(enrichPhases(phases, roster, [], new Map(), 10_000_000)[2]!.agent)
+    expect(enrichPhases(phases, roster, [], new Map(), 10_000_000, 0)[2]!.agent)
       .toMatchObject({ attempts: 0, evidence: "pending" });
+  });
+});
+
+// I-1 · ADR-0164 · sesi ditutup di tengah fase lalu dilanjutkan (id sesi sama, `sessionIdForSpec`)
+// meninggalkan baris invocation dari SEBELUM kelahiran sesi baru — tanpa gerbang ini chip Plan
+// tampil "running 2h…"/`↻` palsu dari run yang sudah mati.
+describe("enrichPhases · I-1 chip dibatasi umur sesi (ADR-0164)", () => {
+  const roster = [{ name: "hanoman-fase-plan", phase: "Plan", model: "claude-sonnet-5", effort: "low" }];
+  const phases: Phase[] = [{ name: "Plan", state: "active" }];
+  const inv = (o: Partial<PhaseInvocation> = {}): PhaseInvocation => ({
+    phase: "Plan", runtimeInvocationId: "old-1", status: "running", startedAt: "2026-09-14T00:00:00.000Z",
+    durationMs: null, inputTokens: null, outputTokens: null, cachedTokens: null, resultExcerpt: null, ...o,
+  });
+  const BORN = Date.parse("2026-09-14T01:00:00.000Z");
+
+  it("invocation lama running SEBELUM bornAt tak tampil running; attempts nol", () => {
+    const [plan] = enrichPhases(phases, roster, [inv()], new Map(), BORN + 1_000, BORN);
+    expect(plan!.agent).toMatchObject({ attempts: 0, evidence: "pending" });
+    expect(plan!.agent!.status).toBeUndefined();
+  });
+
+  it("invocation lama + baru: attempts hanya baris SESUDAH lahir, status dari baris baru", () => {
+    const invs = [
+      inv({ runtimeInvocationId: "old-1", status: "running", startedAt: "2026-09-14T00:00:00.000Z" }),
+      inv({ runtimeInvocationId: "new-1", status: "completed", startedAt: "2026-09-14T01:05:00.000Z" }),
+    ];
+    const [plan] = enrichPhases(phases, roster, invs, new Map(), BORN + 10 * 60_000, BORN);
+    expect(plan!.agent).toMatchObject({ attempts: 1, status: "completed", evidence: "ok" });
+  });
+
+  it("bornAt 0 → perilaku lama (semua invocation, tanpa peduli waktu, ikut dihitung)", () => {
+    const [plan] = enrichPhases(phases, roster, [inv()], new Map(), BORN + 1_000, 0);
+    expect(plan!.agent).toMatchObject({ attempts: 1, status: "running", evidence: "ok" });
+  });
+});
+
+// M-2 · ADR-0164 · fase yang SUDAH done|skipped SAAT SESI LAHIR (mis. sesi lama mode tunggal tanpa
+// invocation, dilanjutkan sebagai orchestrator baru) tak boleh dilabeli ⚠ "missing" hanya karena
+// tak ada invocation SESUDAH lahir — createSession menandainya lewat `@hanoman_done_at_birth`.
+describe("enrichPhases · M-2 fase sudah done saat lahir (ADR-0164)", () => {
+  const roster = [{ name: "hanoman-fase-spec", phase: "Spec", model: "claude-opus-5", effort: "high" }];
+  const specDone: Phase[] = [{ name: "Spec", state: "done" }];
+  const oldInv = (): PhaseInvocation => ({
+    phase: "Spec", runtimeInvocationId: "legacy-1", status: "completed", startedAt: "2026-09-01T00:00:00.000Z",
+    durationMs: 1_000, inputTokens: 1, outputTokens: 1, cachedTokens: null, resultExcerpt: "Status: selesai",
+  });
+  const BORN = Date.parse("2026-09-14T00:00:00.000Z");
+
+  it("done saat lahir TANPA invocation sama sekali: tak pernah missing walau lewat tenggang", () => {
+    const seen = new Map([["Spec", BORN]]);
+    const doneAtBirth = new Set(["Spec"]);
+    const [spec] = enrichPhases(specDone, roster, [], seen, BORN + 10 * 60_000, BORN, doneAtBirth);
+    expect(spec!.agent!.evidence).toBe("pending");
+  });
+
+  it("done saat lahir DENGAN invocation lama (sebelum bornAt): evidence ok, status/attempts tak ikut invocation lama", () => {
+    const seen = new Map([["Spec", BORN]]);
+    const doneAtBirth = new Set(["Spec"]);
+    const [spec] = enrichPhases(specDone, roster, [oldInv()], seen, BORN + 10 * 60_000, BORN, doneAtBirth);
+    expect(spec!.agent).toMatchObject({ attempts: 0, evidence: "ok" });
+    expect(spec!.agent!.status).toBeUndefined();
+  });
+
+  it("done SESUDAH lahir (bukan di daftar doneAtBirth) tanpa invocation: missing sesudah tenggang (perilaku lama tetap)", () => {
+    const seen = new Map([["Spec", BORN + 1_000]]);
+    const [spec] = enrichPhases(specDone, roster, [], seen, BORN + 1_000 + 60_000, BORN);
+    expect(spec!.agent!.evidence).toBe("missing");
   });
 });
 

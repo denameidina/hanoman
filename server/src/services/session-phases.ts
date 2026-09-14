@@ -68,19 +68,36 @@ export function readPhases(file: string, flow: Flow): Phase[] {
  * `doneSeenAt` (kapan server pertama melihat fase `done`) disuntik pemanggil. `missing` = fase tercatat
  * selesai tanpa satu pun invocation lewat tenggang relay — dilabeli "bukti tak diterima", bukan
  * "tidak didelegasikan": hook fail-open dan nol invocation bukan bukti tak dipakai (ADR-0159).
+ *
+ * I-1 · `bornAt` (ms epoch kelahiran sesi INI; 0 = tak diketahui → perilaku lama, semua invocation
+ * dihitung) membatasi status/startedAt/durasi/token/cuplikan/attempts ke invocation SESUDAH lahir:
+ * sesi lama yang ditutup di tengah fase lalu dilanjutkan (id sesi tetap, `sessionIdForSpec`)
+ * meninggalkan baris `running` yang bukan milik sesi baru — tanpa gerbang ini chip menampilkan
+ * "running 2h…"/`↻` dari run yang sudah mati.
+ *
+ * M-2 · `doneAtBirth` = fase yang SUDAH `done`/`skipped` SAAT SESI LAHIR (dicatat `createSession`
+ * dari berkas fase, lihat pty.ts). Fase ini TAK PERNAH `missing`: invocation lama (dari sebelum
+ * lahir, mis. run mode tunggal tanpa subagent) boleh jadi bukti `ok`, tapi tak ikut status/
+ * attempts — kalau tak ada invocation sama sekali, dibiarkan `pending` (paling jujur: bukan `ok`
+ * yang mengarang bukti, bukan pula `missing` yang menuduh "tak diterima" padahal memang belum
+ * pernah didelegasikan lewat subagent).
  */
 export function enrichPhases(
   phases: Phase[], roster: PhaseRosterEntry[], invocations: PhaseInvocation[],
-  doneSeenAt: Map<string, number>, now: number,
+  doneSeenAt: Map<string, number>, now: number, bornAt: number,
+  doneAtBirth: ReadonlySet<string> = new Set(),
 ): Phase[] {
   return phases.map((p) => {
     const r = roster.find((entry) => entry.phase === p.name);
     if (!r) return p;
-    const mine = invocations.filter((i) => i.phase === p.name)
+    const all = invocations.filter((i) => i.phase === p.name);
+    const mine = all.filter((i) => bornAt === 0 || Date.parse(i.startedAt) >= bornAt)
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
     const last = mine[mine.length - 1];
+    const bornDone = doneAtBirth.has(p.name);
     const seen = doneSeenAt.get(p.name);
     const evidence: PhaseAgent["evidence"] = mine.length > 0 ? "ok"
+      : bornDone ? (all.length > 0 ? "ok" : "pending")
       : p.state === "done" && seen !== undefined && now - seen >= PHASE_EVIDENCE_GRACE_MS ? "missing"
         : "pending";
     return {

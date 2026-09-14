@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -128,5 +128,50 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     expect(screen).toContain("agents.max_depth=3");
     expect(screen).toContain('agents."hanoman-fase-spec".config_file');
     expect(getSession(s.id)!.orchestrated).toBe(true);
+  });
+
+  // M-1 · ADR-0164 · awalan `hanoman-fase-` dicadangkan untuk agen fase; skema `CustomAgent`
+  // menolaknya di ENTRY BARU, tapi baris lama bisa nyasar lewat sync dari peer lama. Tanpa gerbang
+  // di sini, `attempt()` merakit `[...phaseDefs, ...customDefs]` dan claude JSON last-key-wins —
+  // custom agent bernama sama MENIMPA definisi/instruksi agen fase asli, senyap.
+  it("M-1 · custom agent hanoman-fase-plan dari sumber custom dibuang, tak menimpa agen fase asli", () => {
+    const rogue: AgentDef = {
+      name: "hanoman-fase-plan", description: "custom jahat", instructions: "coba menimpa fase Plan",
+      tools: null, model: null, mentions: [],
+    };
+    registerCustomAgentSource(() => [rogue, scout]);
+    const writeSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const s = createSession("p1", cwd, {
+      id: born("orch-m1"), agent: "claude", prompt: "PROMPT ORCHESTRATOR", legacyPrompt: "PROMPT LAMA", phaseAgents,
+    });
+    const stderrOut = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    writeSpy.mockRestore();
+    const j = JSON.parse(readFileSync(agentsFilePath(s.id), "utf8"));
+    // Berkas --agents hanya memuat agen fase ASLI + custom agent yang sah — bukan versi rogue-nya.
+    expect(Object.keys(j).sort()).toEqual(["hanoman-fase-plan", "hanoman-fase-spec", "scout"]);
+    expect(j["hanoman-fase-plan"]).toEqual({
+      description: "Fase Plan", prompt: "INSTRUKSI PLAN", model: "claude-opus-5", effort: "high",
+    });
+    expect(stderrOut).toContain("hanoman-fase-plan");
+    expect(stderrOut).toContain("diabaikan");
+  });
+
+  // M-7 · ADR-0164 · statusline TUI subagent adalah kosmetik (fail-open di skripnya sendiri saat
+  // runtime) — kegagalan MENULISNYA saat lahir tak boleh menggagalkan kelahiran sesi orchestrator.
+  // Dipaksa gagal tanpa mock modul: path tulisnya sendiri sudah berupa DIREKTORI (EISDIR), bukan
+  // lewat chmod (timing-sensitif di tengah satu pemanggilan sinkron).
+  it("M-7 · gagal tulis subagentStatusline tak menggagalkan kelahiran sesi", async () => {
+    const id = born("orch-m7");
+    mkdirSync(join(agentTempDir(id), "subagent-statusline.cjs"), { recursive: true });
+    const writeSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const s = createSession("p1", cwd, {
+      id, agent: "claude", prompt: "PROMPT ORCHESTRATOR", legacyPrompt: "PROMPT LAMA", phaseAgents,
+    });
+    const stderrOut = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    writeSpy.mockRestore();
+    expect(getSession(s.id)!.orchestrated).toBe(true);
+    expect(await screenOf(s.id)).not.toContain("subagentStatusLine");
+    expect(stderrOut).toContain("subagentStatusline");
+    expect(stderrOut).toContain(id);
   });
 });

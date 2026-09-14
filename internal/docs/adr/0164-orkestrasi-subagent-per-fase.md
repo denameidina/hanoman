@@ -40,6 +40,9 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
 2. **Agen fase di-generate saat sesi lahir** (`buildPhaseAgents`), bernama `hanoman-fase-<slug>`, bukan
    baris `CustomAgent`: tak disync, tak masuk katalog, tak masuk graf mention. Instruksinya potongan prompt
    mode tunggal yang dipindah ke fase pemiliknya. Awalan `hanoman-fase-` dicadangkan di skema custom agent.
+   Review whole-branch (M-1): skema hanya menggerbangi ENTRY BARU — baris `CustomAgent` lama ber-awalan itu
+   bisa nyasar lewat sync dari peer lama, jadi `createSession` MENYARING ulang `customDefs` di kelahiran
+   sesi (bukan cuma memercayai skema) supaya tak pernah menimpa definisi agen fase asli.
 3. **Agen fase dirender tanpa kunci `tools`** — pengecualian sadar atas gotcha 5 ADR-0094 (P1): tanpa itu
    agen fase kehilangan `Skill` tanpa galat. Batas loop: kedalaman native claude (3 lapis), `agents.max_depth=3`
    codex, larangan tertulis memanggil `hanoman-fase-*`.
@@ -69,7 +72,10 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
 6. **Bukti**: `AgentInvocation.phase`/`effort` (satu migration, LOCAL-only); effort stop dari payload
    runtime. Frame `phase` WS terminal diperkaya status/durasi/percobaan/token; `evidence: missing` sesudah
    60 dtk tanpa invocation dilabeli "bukti subagent tak diterima". Metrik custom agent mengecualikan baris
-   ber-`phase`.
+   ber-`phase`. Review whole-branch (I-1/M-2): chip HANYA memakai invocation SEJAK SESI LAHIR (id sesi
+   tetap per spec, jadi run yang dilanjutkan bisa mewarisi baris `running` dari run yang sudah mati) —
+   fase yang sudah `done`/`skipped` SAAT LAHIR (dicatat `createSession` dari berkas fase ke opsi tmux
+   `@hanoman_done_at_birth`) tak pernah dilabeli ⚠ hanya karena tak ada invocation sesudah lahir.
 7. **Tampilan**: tab Settings "Orkestrasi" (`Switch` `aria-label` `Orkestrasi <flow>` per kartu), pratinjau
    fase di modal Start (`Memuat rencana fase…` sampai Setting — dan bila codex, versi codex — termuat;
    tanda per bagian ` (warisi)`/` (model warisi)`/` (effort warisi)`), chip `PhaseStrip` (strip menggulir

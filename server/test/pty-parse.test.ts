@@ -24,8 +24,9 @@ const line = (over: Record<string, string> = {}) => {
 
 describe("parsePanes", () => {
   it("FMT dan destructuring sama panjang", () => {
-    expect(FIELDS).toHaveLength(20);
-    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_orchestrated}");
+    expect(FIELDS).toHaveLength(21);
+    // M-2 · ADR-0164 · field baru di UJUNG (pola SPEC-919): kolom lama tak bergeser.
+    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_done_at_birth}");
   });
 
   it("memetakan setiap kolom ke field yang benar", () => {
@@ -73,5 +74,12 @@ describe("parsePanes", () => {
     expect(p).toMatchObject({ model: "claude-opus-5", effort: "high", orchestrated: true });
     expect(p!.agentRoster).toEqual([{ name: "hanoman-fase-plan", phase: "Plan", model: "claude-sonnet-5", effort: "low" }]);
     expect(parsePanes(line())[0]!.orchestrated).toBe(false);
+  });
+
+  it("M-2 · ADR-0164 · daftar fase sudah done|skipped saat lahir, dari opsi tmux @hanoman_done_at_birth", () => {
+    const [p] = parsePanes(line({ "#{@hanoman_done_at_birth}": "Brainstorm,Objective" }));
+    expect(p!.doneAtBirth).toEqual(["Brainstorm", "Objective"]);
+    // Sesi lama tanpa opsi ini (atau tak ada fase done saat lahir) → undefined, bukan [].
+    expect(parsePanes(line())[0]!.doneAtBirth).toBeUndefined();
   });
 });

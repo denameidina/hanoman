@@ -10,7 +10,9 @@ import {
   renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook,
   writeSubagentStatusline, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
-import { coerceCodexEffort, isTerminalResponse, resolveChoices, type SessionKind } from "@hanoman/shared";
+import {
+  coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
+} from "@hanoman/shared";
 import {
   enrichPhases, readPhases, sessionComplete, trackDoneSeen, type Phase, type PhaseInvocation,
 } from "./session-phases";
@@ -160,6 +162,11 @@ export type Pane = SessionInfo & {
   // SENGAJA di luar `SessionInfo`: ia detail internal, bukan bagian DTO yang disiarkan/disync.
   eventHook: boolean;
   agentRoster?: SessionAgentMeta[];
+  // M-2 · ADR-0164 · nama fase yang SUDAH `done`/`skipped` saat sesi LAHIR (dicatat createSession
+  // dari berkas fase) — dipakai `enrichPhases` supaya fase itu tak pernah dilabeli ⚠ "missing"
+  // hanya karena tak ada invocation SESUDAH lahir. Opsi tmux, bukan memori proses: bertahan lintas
+  // restart server sama seperti opsi lain (pola @hanoman_agent, SPEC-338), pty tetap nol dependensi DB.
+  doneAtBirth?: string[];
 };
 export type SessionAgentMeta = {
   id?: string; name: string; model?: string; timeoutSeconds?: number; definitionHash?: string;
@@ -191,7 +198,13 @@ function phaseView(p: Pane, a: Attachment): Phase[] {
   trackDoneSeen(phases, a.doneSeenAt, now);
   const roster = (p.agentRoster ?? []).flatMap((r) =>
     r.phase ? [{ name: r.name, phase: r.phase, model: r.model, effort: r.effort }] : []);
-  return roster.length ? enrichPhases(phases, roster, phaseInvocations.get(p.id) ?? [], a.doneSeenAt, now) : phases;
+  // I-1/M-2 · ADR-0164 · `startedAt` tmux dalam detik epoch; `enrichPhases` menerima ms.
+  return roster.length
+    ? enrichPhases(
+      phases, roster, phaseInvocations.get(p.id) ?? [], a.doneSeenAt, now,
+      p.startedAt * 1000, new Set(p.doneAtBirth ?? []),
+    )
+    : phases;
 }
 
 // Variabel yang sama yang dipakai runner/src/claude-cli.ts.
@@ -346,6 +359,8 @@ export const FMT = [
   "#{@hanoman_agent_roster}", "#{@hanoman_launch_class}",
   // ADR-0164 · di UJUNG juga, alasan yang sama dengan SPEC-919.
   "#{@hanoman_model}", "#{@hanoman_effort}", "#{@hanoman_orchestrated}",
+  // M-2 · ADR-0164 · nama fase done|skipped SAAT LAHIR, dipisah koma — di UJUNG juga.
+  "#{@hanoman_done_at_birth}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -378,7 +393,7 @@ export function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
       alternate, activity, eventHook, created, agentRoster, launchClass, model, effort,
-      orchestrated] = line.split("\t");
+      orchestrated, doneAtBirth] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -408,6 +423,9 @@ export function parsePanes(out: string): Pane[] {
       model: model || undefined,
       effort: effort || undefined,
       orchestrated: orchestrated === "1",
+      // M-2 · ADR-0164 · daftar kosong/tak ada opsi → undefined, bukan [] (sesi lama atau sesi
+      // tanpa satu pun fase done saat lahir tak perlu membawa array kosong di DTO internal).
+      doneAtBirth: doneAtBirth ? doneAtBirth.split(",").filter(Boolean) : undefined,
     }];
   });
 }
@@ -661,9 +679,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   const agentForDefs: Agent = opts.agent ?? "claude";
   // SPEC-339 · titik cekik tunggal: effort codex yang tak didukung model diturunkan ke fallback DI
   // SINI, bukan di route — SEMUA kelahiran sesi bermuara ke createSession, termasuk jalur ber-
-  // AgentToken yang tak lewat picker UI. Argv, roster, opsi tmux, dan (ADR-0164) `attempt()` agen
-  // fase di bawah semua memakai `sessionEffort` ini. Hanya dikoersi bila keduanya ada: tanpa effort,
-  // `agentFlags` memang tak memasang flag apa pun.
+  // AgentToken yang tak lewat picker UI. Argv, roster (warisan def tanpa effort sendiri), dan opsi
+  // tmux semua memakai `sessionEffort` ini — TAPI (ADR-0164) agen fase di `attempt()` di bawah
+  // TIDAK: tiap AgentDef fase membawa effort-nya SENDIRI, sudah dikoersi resolver `resolvePhasePlan`
+  // saat rencana fase disusun. Hanya dikoersi bila keduanya ada: tanpa effort, `agentFlags` memang
+  // tak memasang flag apa pun.
   const sessionEffort = agentForDefs === "codex" && opts.model && opts.effort
     ? coerceCodexEffort(opts.model, opts.effort) : opts.effort;
   const selectionContext: AgentSelectionContext = {
@@ -671,7 +691,20 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     baseSha: opts.env?.HANOMAN_BASE_SHA, prompt: opts.prompt,
     changedFiles: opts.command ? [] : collectChangedFiles(cwd, opts.env?.HANOMAN_BASE_SHA),
   };
-  const customDefs = opts.command ? [] : customAgentsFor(selectionContext);
+  const rawCustomDefs = opts.command ? [] : customAgentsFor(selectionContext);
+  // M-1 · ADR-0164 · awalan `hanoman-fase-` dicadangkan untuk agen fase; skema `CustomAgent`
+  // menolaknya di ENTRY BARU, tapi baris LAMA bisa nyasar lewat sync dari peer yang belum
+  // ber-gerbang itu. Dibuang di TITIK TUNGGAL kelahiran sesi: `attempt()` di bawah merakit
+  // `[...phaseDefs, ...customDefs]` dan claude JSON last-key-wins — tanpa saringan ini custom
+  // agent bernama sama MENIMPA definisi/instruksi agen fase asli, senyap.
+  const customDefs = rawCustomDefs.filter((def) => !isPhaseAgentName(def.name));
+  for (const def of rawCustomDefs) {
+    if (isPhaseAgentName(def.name)) {
+      process.stderr.write(
+        `hanoman: custom agent ${def.name} diabaikan — awalan hanoman-fase- dicadangkan (ADR-0164)\n`,
+      );
+    }
+  }
   const requestedPhaseDefs = opts.command ? [] : (opts.phaseAgents ?? []);
   let rosterBlock = "";
   let codexAgentArgs: string[] = [];
@@ -740,7 +773,18 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
         );
       attempt([]);
     }
-    if (orchestrated && agentForDefs === "claude") statusLineCommand = writeSubagentStatusline(tempDir);
+    if (orchestrated && agentForDefs === "claude") {
+      // M-7 · ADR-0164 · skrip statusline TUI subagent adalah kosmetik dan fail-open di dalam
+      // dirinya sendiri saat runtime (lihat subagent-statusline.ts) — gagal MENULISNYA saat lahir
+      // (disk penuh, permission) tak boleh menggagalkan kelahiran sesi orchestrator; efeknya cuma
+      // baris statusline hilang, claude memakai baris bawaannya.
+      try { statusLineCommand = writeSubagentStatusline(tempDir); }
+      catch (error) {
+        process.stderr.write(
+          `hanoman: gagal menulis subagentStatusline sesi ${id}: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+      }
+    }
   }
 
   let promptArg = "";
@@ -885,6 +929,18 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     tmux("set-option", "-t", name(id), "@hanoman_agent_roster", JSON.stringify(roster));
   }
   if (opts.phaseFile) tmux("set-option", "-t", name(id), "@hanoman_phase_file", opts.phaseFile);
+  // M-2 · ADR-0164 · fase yang SUDAH `done`/`skipped` SAAT SESI LAHIR (mis. sesi lama mode tunggal
+  // tanpa invocation, diteruskan sebagai orchestrator baru) dicatat di sini, sebagai OPSI TMUX —
+  // bukan variabel proses — supaya bertahan lintas restart server (pola @hanoman_agent, SPEC-338;
+  // pty.ts tetap nol dependensi DB). `enrichPhases` memakainya supaya fase ini tak pernah dilabeli
+  // ⚠ "missing" hanya karena tak ada invocation SESUDAH lahir.
+  if (opts.phaseFile && opts.flow) {
+    const doneAtBirth = readPhases(opts.phaseFile, opts.flow)
+      .filter((p) => p.state === "done" || p.state === "skipped")
+      .map((p) => p.name);
+    if (doneAtBirth.length > 0)
+      tmux("set-option", "-t", name(id), "@hanoman_done_at_birth", doneAtBirth.join(","));
+  }
   if (opts.decisionFile) tmux("set-option", "-t", name(id), "@hanoman_decision_file", opts.decisionFile);
   // SPEC-909 · ADR-0146 · penanda "sesi ini bisa mengirim event". Sesi hidup TANPA penanda ini tak
   // akan dijawab lead — engine menotifikasinya sekali. Opsi window, bukan berkas: sumber kebenaran

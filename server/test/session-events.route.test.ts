@@ -144,6 +144,19 @@ describe("POST /api/session-events", () => {
     await app.close();
   });
 
+  it("M-4 · effort.level raksasa dari hook diabaikan — effort roster dipertahankan (ADR-0164)", async () => {
+    const app = buildApp();
+    await post(app, { hook_event_name: "SubagentStart", agent_id: "ag-m4", agent_type: "hanoman-fase-plan" }, auth("s1"));
+    const stop = await post(app, {
+      hook_event_name: "SubagentStop", agent_id: "ag-m4", agent_type: "hanoman-fase-plan",
+      effort: { level: "x".repeat(10_000) }, last_assistant_message: "Status: selesai",
+    }, auth("s1"));
+    expect(stop.statusCode).toBe(202);
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "ag-m4" } }))
+      .toMatchObject({ status: "completed", effort: "low" });
+    await app.close();
+  });
+
   it("review Task 9 · effort runtime SubagentStop hanya menang untuk agen fase, bukan custom agent", async () => {
     const app = buildApp();
     await post(app, { hook_event_name: "SubagentStart", agent_id: "scout-9", agent_type: "scout" }, auth("s1"));
