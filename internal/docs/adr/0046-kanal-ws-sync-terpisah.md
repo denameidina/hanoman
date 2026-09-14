@@ -5,6 +5,12 @@ Status: diterima · SPEC-213 · 2026-07-14
 > **Amendment SPEC-761 / [ADR-0117](0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md):**
 > device token pada query dicabut; upgrade machine-to-machine wajib Bearer header dan query ditolak.
 
+> **Amendment SPEC-1215 / [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (dirancang,
+> berlaku saat turunan A mendarat):** keluarga `/api/sync/*` mendapat socket KEDUA
+> `GET /api/sync/relay/ws`. Otorisasinya sama (device token Bearer), tapi hanya dibuka klien yang grant
+> lokalnya menyala, dan ia mengangkut aksi jarak jauh + stream tampilan. Kegagalannya tak pernah
+> menutup `/api/sync/ws`. Pencabutan device token menutup kedua socket seketika.
+
 ## Konteks
 Realtime dashboard sudah lewat satu WS siar `/api/events/ws` (ADR-0039), auth diwarisi cookie
 same-origin. Sync antar-mesin (ADR-0043) butuh siar changefeed ke instance lain, diautentikasi

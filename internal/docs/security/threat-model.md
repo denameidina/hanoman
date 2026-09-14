@@ -146,3 +146,45 @@ ditutup di **gerbang keluaran** (pola `email` → tolak total), bukan dicegah di
 Invariant pengujian yang mengikat: keempat lapis adalah **fungsi murni**, jadi seluruhnya diuji
 tanpa memanggil agen — termasuk korpus injeksi yang sungguh-sungguh mencoba menembus dan korpus
 balasan bocor yang tiga di antaranya benar-benar diproduksi agen saat pengukuran SPEC-854.
+
+## Kendali jarak jauh hub → klien & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — DIRANCANG
+
+**Aktor baru: hub terhadap klien.**
+- **Yang ia punya:** device token klien (dipasang operator klien) dan cookie manusia di hub.
+- **Yang ia bisa, dalam batas grant LOCAL-only** yang dinyalakan cookie manusia di klien:
+  - melihat sesi/dokumen/IDE;
+  - mengetik ke terminal;
+  - membuka sesi agen (RCE efektif di mesin klien);
+  - menandai backlog selesai.
+- **Blast radius:** hub yang jebol = aksi di **setiap** klien opt-in dalam batas grant masing-masing.
+  Klien yang tak memercayai hub-nya tak boleh menyalakan grant.
+
+**Trust boundary baru:**
+
+```text
+browser ─ cookie hub ─ /devices/:d/relay/* (COOKIE_ONLY) ─ relay socket (device token, dibuka klien)
+        ─ dispatcher klien: allowlist ∧ grant ∧ rahasia proses ∧ bukan net.Socket ─ route yang SAMA
+klien ─ redaksi ─ POST /sync/logs (device token) ─ redaksi ulang ─ LogEntry hub (COOKIE_ONLY baca)
+```
+
+| Ancaman | Kontrol wajib | Residual |
+|---|---|---|
+| Agent token hub mengendalikan klien | route relay, tiket `relay:*`, `/logs`, `/remote-control` COOKIE_ONLY; tiket relay hanya `req.user` | cookie hub yang dicuri = kendali; tetap di balik access proxy (ADR-0117) |
+| Hub menyalakan grant sendiri | `setting` tak di-sync; `PUT /settings` mempertahankan kunci grant; `PUT /remote-control` cookie lokal | admin klien bisa salah menyalakan |
+| Pemalsuan principal `remote` dari jaringan | header relay dari socket nyata → 401 walau rahasianya benar (terukur); rahasia 32 byte hanya di memori | bug gate baru; dikunci test `listen()` nyata |
+| Eskalasi lewat capability lebar (`backlog:write` → `PATCH /specs`) | allowlist `relayRouteAllowed` murni (hanya `/specs/:id/done`), tanpa `archive`/unggah/tulis IDE/git | route baru tak otomatis terjangkau (deny-by-default) |
+| Hub memaksa beban di mesin 8 GB | `force` remote → 403; `LaunchStatus` terlihat di hub; plafon stream/inflight/kredit | penonton banyak tetap memakan CPU dalam plafon |
+| Penonton hub menggeser layar operator lokal | `resize` dari hub selalu dibuang; `geometry` searah | — |
+| Token dicabut tapi socket bertahan | pencabutan menutup sync + relay sebelum 204; grant mati menutup relay sebelum `PUT` membalas | — |
+| Sesi ganda lintas instance | presence menolak (`remote-session`) / meminta konfirmasi; tak pernah meluluskan | jendela ≤ 3 dtk; start langsung di klien lain tak tercegah |
+| Rahasia bocor ke hub lewat log/transkrip | redaksi pola + nilai diketahui di klien **dan** hub, gagal-tertutup (`log.gap`); lajur server & transkrip default mati | pola baru di luar korpus; korpus diperbarui saat ditemukan |
+| Banjir log melumpuhkan hub (kelas ADR-0131) | kuota 20 000/jam per device (429), batch per tick, gabung baris berulang, retensi umur + plafon byte | ukur p95 `GET /specs` (spec S10) |
+| Penghapusan bukti audit | retensi COOKIE_ONLY, tak lewat `PUT /settings`; audit dua sisi (`relay.*` di hub, `remote.*` di klien) | admin hub dapat memendekkan retensi |
+
+**Invariant pengujian tambahan:**
+- klien tanpa grant = nol upgrade relay;
+- header relay dari jaringan = 401;
+- route di luar allowlist = 403 tanpa handler berjalan;
+- pencabutan menutup kedua socket sebelum 204;
+- kirim ulang batch log = nol baris baru;
+- redaktor melempar = entri dibuang.

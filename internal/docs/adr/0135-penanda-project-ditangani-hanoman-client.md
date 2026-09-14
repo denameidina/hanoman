@@ -5,6 +5,11 @@
 - SPEC: SPEC-880
 - Menegakkan: ADR-0043, ADR-0044, ADR-0045 · Kontras dengan: ADR-0072, ADR-0091, ADR-0103
 
+> **Amendment SPEC-1215 / [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (dirancang):**
+> §6 dilonggarkan untuk SATU pembaca. Dialog Start di hub memakai `handledBy` untuk MENGUSULKAN target
+> default (∩ online ∩ grant `sessions:spawn` ∩ kapasitas tersedia). Manusia tetap yang menekan Start,
+> dan `handledBy` tetap tak menggerbangi scheduler, lead, maupun auto-dispatch (tak ada auto-dispatch).
+
 ## Konteks
 
 Satu instalasi hanoman dipakai dari beberapa mesin (hub VPS + instance lokal) yang saling sync

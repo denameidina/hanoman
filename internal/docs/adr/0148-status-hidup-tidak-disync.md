@@ -8,6 +8,12 @@ berkadens tinggi), [0045](0045-skema-sync-synclog-version-stamp.md) (yang menyeb
 Berpasangan dengan [ADR-0147](0147-kanal-presence-di-socket-sync.md), yang memutuskan bagaimana
 keadaan itu sampai ke hub.
 
+> **Amendment SPEC-1215 / [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (dirancang):**
+> §Batas ("presence tak boleh dibaca jalur eksekusi") dilonggarkan satu arah. Registry presence —
+> ditambah `recentlyOffline` memori ≤ 24 jam — boleh MENOLAK peluncuran (`409 remote-session`) atau
+> MEMINTA KONFIRMASI (`409 confirm-required`), tak pernah meluluskan. Kapasitas (`capacity`) dan status
+> kendali (`control`) per device ikut disimpan di memori yang sama, tetap nol tabel.
+
 ## Konteks
 
 SPEC-919 membawa "sesi apa yang hidup di device mana" ke hub. Pertanyaan yang tersisa: di mana

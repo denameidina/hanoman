@@ -40,6 +40,21 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
   `screens/presence-map.ts`. Ia **beda** dari `HandledByChips` (ADR-0135): yang itu penetapan MANUAL
   yang menyeberang sync, yang ini keadaan LIVE yang tak pernah masuk DB. Daftar nama kosong →
   **nol elemen**, ujung terakhir gerbang "instance tanpa sync tak berubah tampilannya".
+- **Kendali & tampilan klien dari hub — DIRANCANG** (SPEC-1215 ·
+  [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [spec §S4.11](../../../docs/superpowers/specs/2026-09-14-spec-1215-hub-orkestrasi-klien-design.md)),
+  belum ada di kode.
+  - **Pabrik API.** `createApi({ base })` menggantikan prefix `/api` dengan
+    `/api/devices/<deviceId>/relay`; `api = createApi()` tetap untuk 61 importir.
+  - **`InstanceContext`** (`local | remote`) memberi `useApi()` dan `useWsTarget()` (URL + tiket
+    `relay:<deviceId>:…`). `TerminalPane`, chip fase, `SpecDocsModal`, dan panel IDE baca dirender
+    **modul yang sama** di dalamnya.
+  - **`TerminalPane` remote:** tak pernah mengirim `resize`, menerapkan frame `geometry`, baca-saja
+    tanpa `sessions:write`, dan resync `4009` lewat reconnect yang ada.
+  - **Layar Klien:** menampilkan `control` & `capacity`, tombol **Buka** (`RemoteInstanceView` +
+    banner "Sedang melihat klien X · vN"), dan tab **Log** (`LogsPanel`, kursor).
+  - **`StartSessionModal` di hub:** mendapat pemilih target (default `handledBy` ∩ online ∩
+    `sessions:spawn` ∩ kapasitas); "Mulai tetap" tak dirender untuk target remote.
+  - **Settings klien:** `RemoteControlPanel` (grant, lajur log, status, audit).
 - **Start dari Backlog tetap di Backlog** setelah sesi berhasil dibuat; modal tertutup dan toast sukses
   tampil. Operator berpindah ke Terminal hanya lewat aksi eksplisit **Buka sesi** (SPEC-341).
 - Filter project di Backlog **dan PRD** dibaca dari satu state `projectFilter` milik `App`, bukan state

@@ -6,6 +6,11 @@
 - Menegakkan: ADR-0008 (stage hanya maju, kemajuan dari fase sesi) · ADR-0045 · ADR-0047 (activity log) · ADR-0090 · ADR-0099 (batas permukaan MCP) · ADR-0100 · ADR-0105 (`doneAt` tulis-sekali)
 - Mengamandemen: **ADR-0103** — kandidat sweep auto-merge kini disaring `manualDone`.
 - Tidak mencabut apa pun.
+- **Amendment SPEC-1215 / [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (dirancang):**
+  gerbang sesi hidup `POST /specs/:id/done` di hub membaca juga presence device lain (`working|waiting`,
+  atau `recentlyOffline`) dengan dua langkah yang sama: `409 confirm-required { session: {id, deviceId,
+  name} }` → `confirm: true`. Dari hub ke klien, route ini dijalankan lewat relay (capability
+  `backlog:write` + allowlist) sehingga `manualDone.by` = aktor `remote`.
 
 ## Konteks
 
