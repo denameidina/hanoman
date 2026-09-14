@@ -67,6 +67,8 @@ import { classifyIngress, loadIngressPolicy, trustProxyFromEnv } from "./service
 import { MAX_WS_MESSAGE_BYTES, wsControlOrigins } from "./services/ws-admission";
 import { resolveHardening, resolveHome } from "@hanoman/runner";
 import { prisma } from "./db";
+import { RELAY_HEADER, relayBodyAllowed } from "@hanoman/shared";
+import { admitRemoteRequest } from "./services/relay/gate";
 
 // Endpoint yang boleh diakses tanpa sesi (path lengkap termasuk prefix /api).
 const PUBLIC = new Set([
@@ -153,8 +155,18 @@ export function buildApp(
       throwFileSizeLimit: false,
       limits: { fileSize: 5 * 1024 * 1024, files: 12, fields: 20, fieldSize: 20_000 },
     });
+    // SPEC-1215 · ADR-0165 §3 · principal `remote`: request yang dijalankan ulang dispatcher relay
+    // in-process. Dipasang TANPA syarat requireAuth (keputusan Plan P4) supaya header relay dari
+    // jaringan selalu 401 — juga di app test. Gate cookie di bawah melewati `req.remote`.
+    api.addHook("onRequest", async (req, reply) => {
+      if (req.headers[RELAY_HEADER] === undefined) return;
+      const verdict = await admitRemoteRequest(req);
+      if (!verdict.ok) return reply.code(verdict.status).send(verdict.body);
+      req.remote = verdict.remote;
+    });
     if (requireAuth) {
       api.addHook("onRequest", async (req, reply) => {
+        if (req.remote) return; // SPEC-1215 · sudah dinilai gate remote di atas
         // Isi req.user best-effort dulu (juga untuk endpoint publik spt /auth/status
         // yang ingin tahu siapa pemanggilnya), baru gerbang route non-publik.
         const token = req.cookies?.[COOKIE_NAME];
@@ -216,6 +228,12 @@ export function buildApp(
     // SPEC-476 · berjalan sesudah onRequest auth/capability agar identitas AgentToken sudah ada.
     // Cookie dan AgentToken biasa lewat apa adanya; hanya token gateway runtime yang wajib correlation
     // dan confirmation untuk aksi sulit dibatalkan.
+    // SPEC-1215 · keputusan Plan P3 · body baru ter-parse di sini: `POST /terminal/sessions` lewat relay
+    // hanya varian `spec`. Dispatcher sudah memeriksanya sebelum inject; ini lapis kedua.
+    api.addHook("preHandler", async (req, reply) => {
+      if (req.remote && !relayBodyAllowed(req.method, req.url, req.body))
+        return reply.code(403).send({ error: "relay route not allowed" });
+    });
     api.addHook("preHandler", guardTelegramGatewayRequest);
     // SPEC-481 · ADR-0100 · stempel aktor untuk amplop webhook. Dipasang di `preHandler` (bukan
     // `onRequest`) supaya `req.user`/`req.agent` sudah terisi gate auth di atas; tanpa itu setiap

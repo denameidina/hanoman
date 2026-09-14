@@ -1632,7 +1632,7 @@ git commit -m "feat(sync): cabut device token menutup socket seketika (SPEC-1215
   - `encodeRelayActor(a: RelayActor): string`, `decodeRelayActor(v: unknown): RelayActor | null`
   - `admitRemoteRequest(req, readGrant?): Promise<{ ok: true; remote: RemoteContext } | { ok: false; status: 401 | 403; body: { error: string; need?: string } }>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/relay-gate.test.ts`:
 
@@ -1750,12 +1750,12 @@ describe("gate remote di app — jaringan nyata vs in-process", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/relay-gate.test.ts`
 Expected: FAIL — modul `relay/gate` tak ada.
 
-- [ ] **Step 3: Implementasi rahasia & gate**
+- [x] **Step 3: Implementasi rahasia & gate**
 
 Create `server/src/services/relay/secret.ts`:
 
@@ -1846,7 +1846,7 @@ export async function admitRemoteRequest(
 }
 ```
 
-- [ ] **Step 4: Pasang di `app.ts`**
+- [x] **Step 4: Pasang di `app.ts`**
 
 Tambahkan impor:
 
@@ -1886,12 +1886,12 @@ Sisipkan tepat sebelum `api.addHook("preHandler", guardTelegramGatewayRequest);`
     });
 ```
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/relay-gate.test.ts server/test/agent-gate.test.ts server/test/client-gate.test.ts server/test/app.test.ts && pnpm --filter ./server typecheck`
 Expected: PASS; typecheck bersih.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/relay/secret.ts server/src/services/relay/gate.ts server/src/app.ts server/test/relay-gate.test.ts
