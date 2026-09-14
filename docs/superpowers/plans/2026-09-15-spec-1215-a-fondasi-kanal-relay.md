@@ -3429,7 +3429,7 @@ git commit -m "feat(relay): GET|PUT /api/remote-control cookie-only, grant berub
   - `recordCapacity(deviceId: string, admission: LaunchStatus, now?: number): void`, `capacityFor(deviceId: string, now?: number): LaunchStatus | null`
   - `presenceView(o?: { local?; localCapacity?: () => Promise<LaunchStatus>; now? })` — setiap `PresenceDeviceView` kini membawa `control` dan `capacity` (bisa `null`)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `server/test/presence-sender.test.ts` (dan tambahkan `type LaunchStatus` ke impor `@hanoman/shared` di baris 2):
 
@@ -3566,12 +3566,12 @@ describe("frame capacity di /api/sync/ws (SPEC-1215 · AC-A10)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/presence-sender.test.ts server/test/presence-view.test.ts server/test/sync-capacity.test.ts`
 Expected: FAIL — `recordCapacity`/`capacityFor` bukan export; opsi `capacity` diabaikan.
 
-- [ ] **Step 3: Snapshot bersama**
+- [x] **Step 3: Snapshot bersama**
 
 Ganti isi `server/src/services/presence/snapshot.ts` menjadi:
 
@@ -3637,7 +3637,7 @@ export async function buildLocalCapacity(): Promise<LaunchStatus> {
 }
 ```
 
-- [ ] **Step 4: Pengirim**
+- [x] **Step 4: Pengirim**
 
 Ganti `createPresenceSender` dan `startPresenceSender` di `server/src/services/presence/sender.ts` (baris 13-60) menjadi, dan tambahkan `capacityFrameJson, capacitySignature, type LaunchStatus` ke impor `@hanoman/shared` serta `buildLocalCapacity` ke impor `./snapshot`:
 
@@ -3713,7 +3713,7 @@ export function startPresenceSender(o: {
 }
 ```
 
-- [ ] **Step 5: Registry & view**
+- [x] **Step 5: Registry & view**
 
 Di `server/src/services/presence/registry.ts`: ubah impor baris 1 menjadi `import { PRESENCE_OFFLINE_MS, type LaunchStatus, type PresenceSession, type PresenceSessionView } from "@hanoman/shared";`, ubah `dropPresence` dan `__resetPresence`, lalu tambahkan fungsi baru:
 
@@ -3783,7 +3783,7 @@ export async function presenceView(
 }
 ```
 
-- [ ] **Step 6: Hub menerima frame capacity**
+- [x] **Step 6: Hub menerima frame capacity**
 
 Di `server/src/routes/sync.ts`: tambahkan `zCapacityFrame` ke impor `@hanoman/shared` dan `recordCapacity` ke impor `../services/presence/registry`. Ganti handler `socket.on("message", …)` di `/sync/ws` menjadi:
 
@@ -3802,12 +3802,12 @@ Di `server/src/routes/sync.ts`: tambahkan `zCapacityFrame` ke impor `@hanoman/sh
     });
 ```
 
-- [ ] **Step 7: Jalankan test**
+- [x] **Step 7: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/presence-sender.test.ts server/test/presence-view.test.ts server/test/sync-capacity.test.ts server/test/presence-snapshot.test.ts server/test/presence-registry.test.ts server/test/presence.route.test.ts server/test/sync-ws-presence.test.ts server/test/sync-client-presence-wiring.test.ts server/test/events-presence-gate.test.ts && pnpm --filter ./server typecheck`
 Expected: PASS; typecheck bersih.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/services/presence server/src/routes/sync.ts server/test/presence-sender.test.ts server/test/presence-view.test.ts server/test/sync-capacity.test.ts

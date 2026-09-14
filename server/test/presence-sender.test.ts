@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PRESENCE_HEARTBEAT_MS, PRESENCE_PROTOCOL, type PresenceSession } from "@hanoman/shared";
+import { PRESENCE_HEARTBEAT_MS, PRESENCE_PROTOCOL, type LaunchStatus, type PresenceSession } from "@hanoman/shared";
 import { createPresenceSender } from "../src/services/presence/sender";
 
 const T0 = 1_000_000;
@@ -68,5 +68,35 @@ describe("pengirim presence", () => {
       build: async () => [s()],
     });
     await expect(sender.tick(T0)).resolves.toBeUndefined();
+  });
+});
+
+describe("frame capacity di pengirim (SPEC-1215 · AC-A10)", () => {
+  const adm = (over: Partial<LaunchStatus> = {}): LaunchStatus => ({
+    enabled: true, liveCount: 1, liveAgentCount: 1, maxConcurrent: 4,
+    loadPerCore: 0.3, maxLoadPerCore: 1.5, loadStatus: "available", ...over,
+  });
+  const capFrames = (sent: string[]) => sent.map((j) => JSON.parse(j)).filter((f) => f.t === "capacity");
+
+  it("dikirim pada tick pertama, diam saat sama, dikirim saat berubah dan saat denyut", async () => {
+    let current = adm();
+    const sent: string[] = [];
+    const sender = createPresenceSender({ send: (j) => sent.push(j), build: async () => [s()], capacity: async () => current });
+    await sender.tick(T0);
+    await sender.tick(T0 + 3_000);
+    expect(capFrames(sent)).toHaveLength(1);
+    current = adm({ liveCount: 2 });
+    await sender.tick(T0 + 6_000);
+    expect(capFrames(sent)).toHaveLength(2);
+    await sender.tick(T0 + 6_000 + PRESENCE_HEARTBEAT_MS);
+    expect(capFrames(sent)).toHaveLength(3);
+    expect(capFrames(sent)[0]).toMatchObject({ t: "capacity", v: PRESENCE_PROTOCOL, admission: adm() });
+  });
+
+  it("capacity yang melempar tak menghentikan presence", async () => {
+    const sent: string[] = [];
+    const sender = createPresenceSender({ send: (j) => sent.push(j), build: async () => [s()], capacity: async () => { throw new Error("tmux"); } });
+    await expect(sender.tick(T0)).resolves.toBeUndefined();
+    expect(sent.map((j) => JSON.parse(j).t)).toEqual(["presence"]);
   });
 });

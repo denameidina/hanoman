@@ -1,14 +1,14 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { gzipSync } from "node:zlib";
 import { z } from "zod";
-import { PRESENCE_MAX_FRAMES_PER_MIN, RELAY_MAX_FRAMES_PER_MIN, zPresenceFrame } from "@hanoman/shared";
+import { PRESENCE_MAX_FRAMES_PER_MIN, RELAY_MAX_FRAMES_PER_MIN, zCapacityFrame, zPresenceFrame } from "@hanoman/shared";
 import { prisma } from "../db";
 import { requireDeviceToken } from "../services/device-auth";
 import { verifyDeviceToken } from "../services/device-token";
 import { attachSync, detachSync } from "../services/sync-hub";
 import { registerDeviceSocket } from "../services/device-sockets";
 import { attachRelaySocket } from "../services/relay/hub";
-import { recordPresence, dropPresence } from "../services/presence/registry";
+import { recordPresence, recordCapacity, dropPresence } from "../services/presence/registry";
 import type { Client } from "../services/pty";
 import { applyPush, pull, bootstrapSnapshot, isEntity, type Entity } from "../services/sync";
 import { syncNow, fetchTransport } from "../services/sync-client";
@@ -176,10 +176,13 @@ export default async function (app: FastifyInstance) {
     socket.on("message", (raw: Buffer) => {
       try {
         if (!guard.accept(raw).ok) return;
-        const parsed = zPresenceFrame.safeParse(JSON.parse(raw.toString("utf8")));
-        if (!parsed.success) return;
+        const msg: unknown = JSON.parse(raw.toString("utf8"));
         // deviceId SELALU dari token terverifikasi — payload tak pernah boleh menamai dirinya.
-        recordPresence(principal.id, parsed.data.sessions);
+        const presence = zPresenceFrame.safeParse(msg);
+        if (presence.success) { recordPresence(principal.id, presence.data.sessions); return; }
+        // SPEC-1215 · ADR-0165 §9 · arah naik kedua. Gagal parse = dibuang, tak pernah menutup socket.
+        const capacity = zCapacityFrame.safeParse(msg);
+        if (capacity.success) recordCapacity(principal.id, capacity.data.admission);
       } catch { /* frame rusak — dibuang */ }
     });
 
