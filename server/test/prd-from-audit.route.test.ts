@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { killAll, getSession, promptFilePath } from "../src/services/pty";
+import { DEFAULT_SETTING } from "../src/services/settings";
+import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
 import { makeRepoWithBranches } from "./factory";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -49,6 +51,11 @@ const promptOf = (id: string) => readFileSync(promptFilePath(id), "utf8");
 
 describe("POST /terminal/sessions flow:prd dari audit (SPEC-340 · ADR-0076)", () => {
   it("memakai branchFrom untuk worktree & menyematkan dokumen audit ke prompt", async () => {
+    // ADR-0164 · test ini menegaskan prompt mode tunggal — dokumen audit disematkan penuh di prompt
+    // orchestrator lewat konteks agen fase PRD (buildPhaseAgents), bukan di prompt parent.
+    const data = { ...DEFAULT_SETTING,
+      orchestration: { ...ORCHESTRATION_DEFAULTS, prd: { enabled: false, claude: {}, codex: {} } } };
+    await prisma.setting.create({ data: { id: 1, data } });
     const res = await app.inject({ method: "POST", url: "/api/terminal/sessions", payload: {
       project: "p1", flow: "prd", brief: { title: "Kuota tenant", context: "c", outcome: "o" },
       branchFrom: "hanoman/spec-900", fromAudit: "SPEC-900" } });

@@ -2145,7 +2145,7 @@ Expected: exit 0.
     orchestrator: { model: string; effort: string }): PhasePlan | null;
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `shared/src/custom-agent-reserved.test.ts`:
 
@@ -2234,12 +2234,12 @@ Tambahkan di `server/test/session-launch.test.ts` (tambah impor `readFileSync, e
   });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" rtk proxy pnpm vitest --run --no-file-parallelism shared/src/custom-agent-reserved.test.ts server/test/orchestration.service.test.ts server/test/session-launch.test.ts`
 Expected: FAIL — nama tercadang lolos, modul `orchestration` tak ada, sesi lahir tanpa agen fase.
 
-- [ ] **Step 3: Nama tercadang** — `shared/src/custom-agent.ts`
+- [x] **Step 3: Nama tercadang** — `shared/src/custom-agent.ts`
 
 Tambah impor `import { PHASE_AGENT_PREFIX, isPhaseAgentName } from "./orchestration";` lalu baris `name` di `zCreateCustomAgentFields` menjadi:
 
@@ -2250,7 +2250,7 @@ Tambah impor `import { PHASE_AGENT_PREFIX, isPhaseAgentName } from "./orchestrat
     .refine((n) => !isPhaseAgentName(n), { message: `awalan ${PHASE_AGENT_PREFIX} dicadangkan untuk agen fase hanoman` }),
 ```
 
-- [ ] **Step 4: Satu titik resolusi** — `server/src/services/orchestration.ts`
+- [x] **Step 4: Satu titik resolusi** — `server/src/services/orchestration.ts`
 
 ```ts
 import { resolvePhasePlan, type Agent, type PhasePlan, type Setting } from "@hanoman/shared";
@@ -2271,7 +2271,7 @@ export function sessionPhasePlan(
 }
 ```
 
-- [ ] **Step 5: Backlog** — `server/src/services/session-launch.ts`
+- [x] **Step 5: Backlog** — `server/src/services/session-launch.ts`
 
 Impor runner baris 3 menjadi:
 
@@ -2312,7 +2312,7 @@ tambah `import { sessionPhasePlan } from "./orchestration";`, lalu ganti blok da
 
 dan panggilan `createSession(spec.projectId, worktree, { … })` menambah `legacyPrompt, phaseAgents,` sesudah `prompt,`.
 
-- [ ] **Step 6: Empat flow project** — `server/src/routes/terminal.ts`
+- [x] **Step 6: Empat flow project** — `server/src/routes/terminal.ts`
 
 Impor runner baris 7 menambah `buildPhaseAgents, projectContext, scaffoldContext, prdContext, breakdownContext, PROJECT_METHOD`; baris 12 menambah `getSetting`; tambah `import { sessionPhasePlan } from "../services/orchestration";`.
 
@@ -2389,7 +2389,7 @@ Breakdown — ganti `const s = createSession(…)` dengan:
         });
 ```
 
-- [ ] **Step 7: Jalankan, pastikan lulus**
+- [x] **Step 7: Jalankan, pastikan lulus**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" rtk proxy pnpm vitest --run --no-file-parallelism shared/src/custom-agent-reserved.test.ts server/test/orchestration.service.test.ts server/test/session-launch.test.ts server/test/spec-attachment-launch.test.ts server/test/custom-agents.route.test.ts`
 Expected: PASS semua.
@@ -2399,7 +2399,7 @@ Bila test launch/route LAMA merah karena menegaskan teks prompt mode tunggal (mi
 Run: `rtk proxy pnpm --filter ./shared typecheck && rtk proxy pnpm --filter ./server typecheck`
 Expected: exit 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 /usr/bin/git add shared/src/custom-agent.ts shared/src/custom-agent-reserved.test.ts server/src/services/orchestration.ts server/test/orchestration.service.test.ts server/src/services/session-launch.ts server/src/routes/terminal.ts server/test/session-launch.test.ts

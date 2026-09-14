@@ -34,6 +34,9 @@ vi.mock("../src/services/pty", async () => {
     getSessionAsync: async () => undefined,
     listPanesAsync: async () => [],
     killSession: () => {},
+    // ADR-0164 · session-launch kini menghitung rencana fase lewat services/orchestration.ts, yang
+    // membaca gerbang ini dari pty.ts — mock harus tetap punya export ini walau nol tmux di sini.
+    nativeAgentsAvailable: () => true,
     createSession: (_projectId: string, _cwd: string, opts: { prompt?: string; attachmentsDir?: string }) => {
       created.push({ prompt: opts.prompt, attachmentsDir: opts.attachmentsDir });
       return { id: "spec-9400" };
