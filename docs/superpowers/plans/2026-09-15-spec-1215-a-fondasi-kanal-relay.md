@@ -3123,7 +3123,7 @@ git commit -m "feat(relay): tautan relay klien — grant, hello, backoff, unsupp
 - Consumes: `getSetting` (Task 3), `appendEvent`/`recentAudit` (Task 6), `refreshRelayClient`/`relayClientStatus` (Task 11), shared `zRemoteControlPut`, `validateRemoteGrant`, `type RemoteControlView`.
 - Produces: `remoteControlView(): Promise<RemoteControlView>`, `updateRemoteControl(input: RemoteControlPut, by: string): Promise<RemoteControlView>`; route `GET /api/remote-control` → `RemoteControlView`; `PUT /api/remote-control` → `RemoteControlView` | 400.
 
-- [ ] **Step 1: Tulis test route yang gagal**
+- [x] **Step 1: Tulis test route yang gagal**
 
 Create `server/test/remote-control.route.test.ts`:
 
@@ -3264,12 +3264,12 @@ describe("grant ↔ socket relay (SPEC-1215 AC-A2, AC-A5)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/remote-control.route.test.ts server/test/remote-control.relay.test.ts`
 Expected: FAIL — `/api/remote-control` 404.
 
-- [ ] **Step 3: Service & route**
+- [x] **Step 3: Service & route**
 
 Create `server/src/services/remote-control.ts`:
 
@@ -3346,7 +3346,7 @@ Di `server/src/app.ts`: `import remoteControl from "./routes/remote-control";` d
     await api.register(remoteControl); // SPEC-1215 · ADR-0165 · grant kendali jarak jauh (cookie-only)
 ```
 
-- [ ] **Step 4: Peta capability, naskah agen, parity**
+- [x] **Step 4: Peta capability, naskah agen, parity**
 
 Di `server/src/services/agent-capabilities.ts`, ubah kondisi COOKIE_ONLY baris 41-43 menjadi:
 
@@ -3398,12 +3398,12 @@ dan di dalam `describe`:
   });
 ```
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/remote-control.route.test.ts server/test/remote-control.relay.test.ts server/test/agent-capabilities.test.ts server/test/agent-doc-contract.test.ts server/test/parity-endpoints.test.ts server/test/mcp-coverage.test.ts && pnpm --filter ./server typecheck`
 Expected: PASS; typecheck bersih.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/remote-control.ts server/src/routes/remote-control.ts server/src/app.ts server/src/services/agent-capabilities.ts server/test/remote-control.route.test.ts server/test/remote-control.relay.test.ts server/test/agent-capabilities.test.ts server/test/agent-doc-contract.test.ts server/test/parity-endpoints.test.ts docs/agent-integration.md

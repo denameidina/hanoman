@@ -55,6 +55,7 @@ import fastifyMultipart from "@fastify/multipart";
 import authRoutes from "./routes/auth";
 import setupRoutes from "./routes/setup";
 import agentTokens from "./routes/agent-tokens";
+import remoteControl from "./routes/remote-control";
 import { COOKIE_NAME, lookupSession } from "./services/auth";
 import { agentTokenFromReq, authenticateAgent } from "./services/agent-auth";
 import { checkAgentCapability } from "./services/agent-capabilities";
@@ -266,6 +267,7 @@ export function buildApp(
     await api.register(wsTickets, { allowTestPrincipal: !requireAuth && env.NODE_ENV === "test" });
     await api.register(deviceTokens);
     await api.register(agentTokens);   // SPEC-257 · kelola agent token (cookie-only)
+    await api.register(remoteControl); // SPEC-1215 · ADR-0165 · grant kendali jarak jauh (cookie-only)
     await api.register(bindings);
     await api.register(sync);
     await api.register(presence);   // SPEC-919 · ADR-0147 · muat awal halaman Klien
