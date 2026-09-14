@@ -372,8 +372,9 @@ describe("session-launch", () => {
 
     it("prompt-nya prompt goal, bukan pipeline perencanaan", async () => {
       process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
-      await setGoal({ enabled: false, condition: "" });
-      // ADR-0164 · test ini menegaskan prompt mode tunggal
+      // ADR-0164 · test ini menegaskan prompt mode tunggal. `setOrchestration` menulis ulang SELURUH
+      // baris Setting dari DEFAULT_SETTING — `setGoal` sebelumnya di sini cuma tertimpa senyap; mode
+      // goal tetap SELALU menyala untuk flow "goal" (SPEC-407) apa pun isi Setting.goal.
       await setOrchestration("goal", false);
       const spec = await seedRepoGoal("SPEC-GG4");
       const r = await startSpecSession(spec, { flow: "goal" });

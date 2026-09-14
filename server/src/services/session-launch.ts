@@ -204,9 +204,13 @@ export async function startSpecSession(
     // lahir dari input yang SAMA, jadi fallback all-or-nothing di createSession tak merakit ulang apa pun.
     const fullPlan = sessionPhasePlan(setting, opts.flow, agent, { model, effort });
     // SPEC-172 · continue hanya melanjutkan Execute; flow goal tak punya Execute dan tetap utuh.
-    const plan = fullPlan && isContinue && !isGoalFlow
-      ? { ...fullPlan, phases: fullPlan.phases.filter((p) => p.phase === "Execute") }
-      : fullPlan;
+    let plan = fullPlan;
+    if (fullPlan && isContinue && !isGoalFlow) {
+      const phases = fullPlan.phases.filter((p) => p.phase === "Execute");
+      // ADR-0164 · flow tanpa fase Execute (mis. audit) menyaring jadi KOSONG — pakai `null`, bukan
+      // plan dengan `phases: []`, supaya prompt orchestrator tak dirakit atas daftar fase kosong.
+      plan = phases.length ? { ...fullPlan, phases } : null;
+    }
     const buildPrompt = (p: typeof plan): string => {
       if (isGoalFlow) {
         // SPEC-407 · satu builder untuk ketiga keadaan sesi goal: `continuePrompt`/`resumePrompt`
