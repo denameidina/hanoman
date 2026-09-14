@@ -4,7 +4,8 @@ import { paths, type Paginated, type ProjectView, type Spec, type Setting, type 
   type SessionDialogAnswer, type SessionDialogPayload,
   type SetupStatus, type SetupApplyResult,
   type TaskView, type MemberView, type CreateTaskInput, type EscalateTaskInput, type PatchTaskInput,
-  type CreateMemberInput, type PatchMemberInput } from "@hanoman/shared";
+  type CreateMemberInput, type PatchMemberInput,
+  type RemoteControlView, type RemoteControlPut } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -542,6 +543,9 @@ export const api = {
   createDeviceToken: (b: { name: string }) =>
     j<{ id: string; name: string; token: string }>(paths.deviceTokens, { method: "POST", ...body(b) }),
   revokeDeviceToken: (id: string) => j<void>(paths.deviceToken(id), { method: "DELETE" }),
+  // SPEC-1215 · ADR-0165 · grant kendali jarak jauh (LOCAL-only, cookie-only).
+  getRemoteControl: () => j<RemoteControlView>(paths.remoteControl),
+  putRemoteControl: (b: RemoteControlPut) => j<RemoteControlView>(paths.remoteControl, { method: "PUT", ...body(b) }),
   // SPEC-257 · agent token (kelola cookie-only) — token plaintext hanya balik di create (sekali).
   getAgentCapabilities: () => j<{ capabilities: CapabilityInfo[] }>(paths.agentCapabilities),
   listAgentTokens: () => j<{ items: AgentTokenView[] }>(paths.agentTokens),

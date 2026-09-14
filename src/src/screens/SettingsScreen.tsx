@@ -9,6 +9,7 @@ import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
 import { CustomAgentsPanel } from "./CustomAgentsPanel";
 import { ClientAccessPanel } from "./ClientAccessPanel";   // SPEC-617 · ADR-0110 · kelola akses klien
+import { RemoteControlPanel } from "./RemoteControlPanel";   // SPEC-1215 · ADR-0165 · grant kendali jarak jauh
 import { WebhooksPanel } from "./WebhooksPanel";
 import { WebhookDocs } from "./WebhookDocs";
 import { McpPanel } from "./McpPanel";   // SPEC-482 · ADR-0099 · pemasangan MCP siap salin
@@ -638,6 +639,7 @@ const S_SECTIONS = [
   { key: "users", label: "Users", icon: "users" },
   { key: "akses-klien", label: "Akses klien", icon: "user-check" }, // SPEC-617 · ADR-0110 · portal klien
   { key: "perangkat", label: "Perangkat", icon: "key-round" },   // SPEC-213 · device tokens
+  { key: "kendali-jarak-jauh", label: "Kendali jarak jauh", icon: "shield" }, // SPEC-1215 · ADR-0165 · grant hub → mesin ini
   { key: "agent", label: "Akses AI Agent", icon: "bot" },        // SPEC-257 · agent token + capability
   { key: "custom-agent", label: "Custom agent", icon: "bot" },   // SPEC-450 · ADR-0094 · katalog agen global
   { key: "aktivitas", label: "Aktivitas", icon: "activity" },    // SPEC-213 · activity log
@@ -1540,6 +1542,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
     : tab === "users" ? <UsersPanel me={me} onToast={onToast} />
     : tab === "akses-klien" ? <ClientAccessPanel />
     : tab === "perangkat" ? <DeviceTokensPanel onToast={onToast} />
+    : tab === "kendali-jarak-jauh" ? <RemoteControlPanel onToast={onToast} />
     : tab === "agent" ? <AgentAccessPanel onToast={onToast} />
     // SPEC-450 · ADR-0094 · permukaan GLOBAL katalog custom agent. Komponen yang sama dipakai
     // Project detail dengan projectId terisi — satu panel, dua scope.

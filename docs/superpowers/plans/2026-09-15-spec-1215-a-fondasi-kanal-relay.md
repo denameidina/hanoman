@@ -3827,7 +3827,7 @@ git commit -m "feat(presence): frame capacity + control/capacity per device (SPE
 - Consumes: `GET|PUT /api/remote-control` (Task 12); `type RemoteControlView`, `type RemoteControlPut`, `type RemoteCapability`, `type RelayLinkState` (Task 1); `Switch`, `Card`, `Badge`, `StateBlock`, `type ShowToast` (`src/src/ds`).
 - Produces: `paths.remoteControl`, `api.getRemoteControl(): Promise<RemoteControlView>`, `api.putRemoteControl(b: RemoteControlPut): Promise<RemoteControlView>`, `export function RemoteControlPanel({ onToast }: { onToast?: ShowToast })`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/src/screens/RemoteControlPanel.test.tsx`:
 
@@ -3911,12 +3911,12 @@ describe("RemoteControlPanel (SPEC-1215 · ADR-0165 §4)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run src/src/screens/RemoteControlPanel.test.tsx`
 Expected: FAIL — modul `./RemoteControlPanel` tak ada.
 
-- [ ] **Step 3: Path & client API**
+- [x] **Step 3: Path & client API**
 
 Di `shared/src/api.ts`, sesudah baris `deviceToken: (id: string) => \`${API}/device-tokens/${id}\`,`:
 
@@ -3933,7 +3933,7 @@ Di `src/src/api/client.ts`, tambahkan `type RemoteControlView, type RemoteContro
   putRemoteControl: (b: RemoteControlPut) => j<RemoteControlView>(paths.remoteControl, { method: "PUT", ...body(b) }),
 ```
 
-- [ ] **Step 4: Komponen**
+- [x] **Step 4: Komponen**
 
 Create `src/src/screens/RemoteControlPanel.tsx`:
 
@@ -4052,7 +4052,7 @@ export function RemoteControlPanel({ onToast }: { onToast?: ShowToast }) {
 }
 ```
 
-- [ ] **Step 5: Pasang di Settings**
+- [x] **Step 5: Pasang di Settings**
 
 Di `src/src/screens/SettingsScreen.tsx`: `import { RemoteControlPanel } from "./RemoteControlPanel";   // SPEC-1215 · ADR-0165 · grant kendali jarak jauh` di dekat impor `ClientAccessPanel`. Di `S_SECTIONS`, sesudah baris `{ key: "perangkat", … }`:
 
@@ -4066,12 +4066,12 @@ Di rantai `content`, sesudah baris `: tab === "perangkat" ? <DeviceTokensPanel o
     : tab === "kendali-jarak-jauh" ? <RemoteControlPanel onToast={onToast} />
 ```
 
-- [ ] **Step 6: Jalankan test + typecheck**
+- [x] **Step 6: Jalankan test + typecheck**
 
 Run: `pnpm vitest --run src/src/screens/RemoteControlPanel.test.tsx src/src/screens/SettingsScreen.test.tsx && pnpm --filter ./src typecheck && pnpm --filter ./shared typecheck`
 Expected: PASS; typecheck bersih.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/api.ts src/src/api/client.ts src/src/screens/RemoteControlPanel.tsx src/src/screens/RemoteControlPanel.test.tsx src/src/screens/SettingsScreen.tsx
