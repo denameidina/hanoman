@@ -90,7 +90,7 @@ Satu fungsi murni bebas zod di `shared/src/orchestration.ts` (pola `method-catal
 runner/server/UI):
 
 ```ts
-resolvePhasePlan({ flow, runtime, method, orchestration, orchestrator: { model, effort },
+resolvePhasePlan({ flow, runtime, orchestration, orchestrator: { model, effort },
                    nativeAgents: boolean }): PhasePlan | null
 type PhasePlan = { phases: { phase: string; agentName: string; model: string; effort: string }[] }
 ```
@@ -225,9 +225,18 @@ Loop per fase:
   skema; LOCAL-only seperti sebelumnya (tak masuk `FIELDS` sync).
 - Route `session-events` mengambil `phase`/`effort` dari roster tepercaya (bukan payload child),
   menyimpannya, lalu memicu siaran ulang frame `phase` sesi itu.
-- `pty.ts` tetap nol dependensi DB: status live datang dari **sumber invocation yang mendaftarkan
-  diri** (`registerPhaseInvocationSource`, pola `registerCustomAgentSource` ADR-0094 §7). Frame
-  `phase` saat attach dan sesudah restart server diisi dari sumber yang sama.
+- `pty.ts` tetap nol dependensi DB: status live datang dari cache `setPhaseInvocations`, disuntik
+  `refreshPhaseInvocations` (`server/src/services/phase-invocations.ts`) yang dipanggil route
+  `session-events` dan route WS terminal (attach) — bukan pola `registerCustomAgentSource`
+  (ADR-0094 §7) yang mendaftarkan sumber lewat callback. Frame `phase` saat attach dan sesudah
+  restart server diisi lewat jalur yang sama.
+- Field agen (status, `startedAt`, durasi, token, cuplikan, `attempts`) dihitung dari invocation
+  **sejak sesi ini lahir** saja (`bornAt`): sesi yang ditutup di tengah fase lalu dilanjutkan (id
+  sesi tetap) tak mewarisi baris `running`/lama dari run yang sudah mati. Fase yang sudah
+  `done`/`skipped` **saat sesi lahir** (`doneAtBirth`, dicatat `createSession` dari berkas fase ke
+  opsi tmux `@hanoman_done_at_birth`, dibaca balik `phaseView`) tak pernah berevidence `missing`/⚠
+  hanya karena tak ada invocation sesudah lahir — evidence-nya `ok` bila ada invocation lama,
+  selebihnya `pending`.
 - `Phase` (frontend `client.ts`, server `session-phases.ts`) + `agent?: { name, model, effort,
   status, startedAt, durationMs, attempts, tokens, evidence }`. `attempts` = jumlah
   `runtimeInvocationId` berbeda untuk fase itu (resume memakai id yang sama → idempoten).
@@ -245,10 +254,13 @@ katalog runtime) dan effort (`— warisi` + `effortsForRuntimeModel`). Ganti mod
 sel (cermin picker Start). Flow mati → kartu diredupkan, matriks tetap tersimpan. Salinan "matrix
 per-fase dicabut" di tab Model sesi (`SettingsScreen.tsx`) diganti tautan ke tab ini.
 
-**Modal Start** (`StartSessionModal`): picker yang ada berlabel **Orchestrator**; di bawahnya
-pratinjau read-only "Fase" dari `resolvePhasePlan`, dihitung ulang tiap runtime/model/effort
-berubah. Flow mati → "Orkestrasi mati untuk flow ini — sesi tunggal"; codex terlalu tua → "Codex
-<0.151 — sesi tunggal".
+**Modal Start** (`StartSessionModal`): label picker yang ada (Agen/Model/Effort) tak berubah; teks
+pengantar modal menyebut **orchestrator** ("Agen, model & effort orchestrator sesi ini…"). Di
+bawahnya `PhasePlanPreview` — pratinjau read-only "Fase" dari `resolvePhasePlan` yang sama dengan
+server, dihitung ulang tiap runtime/model/effort berubah, dengan gerbang muat ("Memuat rencana
+fase…" sampai Setting — dan bila codex, versi codex — termuat) dan tanda per bagian ` (warisi)`/
+` (model warisi)`/` (effort warisi)`. Flow mati → "Orkestrasi mati untuk flow ini — sesi tunggal";
+codex terlalu tua → "Codex <0.151 — sesi tunggal".
 
 **Sel terminal.** Header: chip `orch <model> · <effort>` bila `orchestrated`. `PhaseStrip` jadi chip:
 
@@ -298,8 +310,8 @@ terpisah (tak dijumlahkan), cuplikan hasil. Label model dari katalog `MODELS`/`C
   menyimpan `phase` dan `effort` dari roster, dan THE frame `phase` sesi itu SHALL disiarkan ulang.
 - **AC-10** — WHILE sebuah fase berjalan, THE chip fase SHALL menampilkan model, effort, dan durasi
   berjalan; WHEN selesai, THE chip SHALL menampilkan durasi akhir dan jumlah percobaan bila >1.
-- **AC-11** — IF fase tercatat `done` tanpa invocation selama ≥60 detik, THEN THE chip SHALL
-  menampilkan ⚠ "bukti subagent tak diterima".
+- **AC-11** — IF fase tercatat `done` tanpa invocation selama ≥60 detik DAN bukan fase yang sudah
+  `done`/`skipped` saat sesi lahir, THEN THE chip SHALL menampilkan ⚠ "bukti subagent tak diterima".
 - **AC-12** — WHERE runtime claude dan sesi diorkestrasi, THE `--settings` SHALL memuat
   `subagentStatusLine`; WHERE runtime codex, SHALL tidak.
 - **AC-13** — THE route custom agent SHALL menolak nama berawalan `hanoman-fase-` dengan 400.
