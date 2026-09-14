@@ -2716,7 +2716,7 @@ git commit -m "feat(relay): hub /api/sync/relay/ws + requestRelay, gagal relay t
   - test-only: `__relayClientLastDelayMs(): number | null`, `__resetRelayClient(): void`
   - `server/src/services/backoff.ts`: `RECONNECT_MIN_MS`, `RECONNECT_MAX_MS`, `nextBackoff(prev)`, `withJitter(ms, rnd?)` (tetap di-re-export `sync-client.ts`)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/relay-client.test.ts`:
 
@@ -2862,12 +2862,12 @@ describe("tautan relay klien (SPEC-1215 · ADR-0165 §1)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/relay-client.test.ts`
 Expected: FAIL — modul `relay/client` tak ada.
 
-- [ ] **Step 3: Pindahkan helper backoff**
+- [x] **Step 3: Pindahkan helper backoff**
 
 Create `server/src/services/backoff.ts`:
 
@@ -2894,7 +2894,7 @@ export { RECONNECT_MAX_MS, RECONNECT_MIN_MS, nextBackoff, withJitter };
 
 (pindahkan dua baris `import` itu ke blok impor di atas berkas bila linter/TS mengeluh impor di tengah modul).
 
-- [ ] **Step 4: Implementasi tautan relay**
+- [x] **Step 4: Implementasi tautan relay**
 
 Create `server/src/services/relay/client.ts`:
 
@@ -3063,7 +3063,7 @@ export function __resetRelayClient(): void {
 }
 ```
 
-- [ ] **Step 5: Kaitkan ke sync client & boot**
+- [x] **Step 5: Kaitkan ke sync client & boot**
 
 Di `server/src/services/sync-client.ts`, di `startSyncClient` tepat sesudah `started = true;`:
 
@@ -3094,12 +3094,12 @@ dan tepat sesudah `startSessionEventRelay(app);` (baris 42):
 installRelayClient(injectableFrom(app));
 ```
 
-- [ ] **Step 6: Jalankan test**
+- [x] **Step 6: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/relay-client.test.ts server/test/sync-backoff.test.ts server/test/sync-client-presence-wiring.test.ts server/test/sync-client.test.ts && pnpm --filter ./server typecheck`
 Expected: PASS; typecheck bersih.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/backoff.ts server/src/services/relay/client.ts server/src/services/sync-client.ts server/src/server.ts server/test/relay-client.test.ts
