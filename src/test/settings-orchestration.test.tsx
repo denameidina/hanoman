@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
+import { ORCHESTRATION_DEFAULTS, ORCHESTRATION_FLOWS } from "@hanoman/shared";
 import { SettingsScreen } from "../src/screens/SettingsScreen";
 import { api } from "../src/api/client";
 
@@ -59,9 +59,15 @@ describe("Settings · Orkestrasi (ADR-0164)", () => {
 
   it("mematikan saklar flow menyimpan enabled:false", async () => {
     await open();
-    fireEvent.click(within(screen.getByLabelText("Orkestrasi qa")).getByRole("switch"));
+    fireEvent.click(screen.getByRole("switch", { name: "Orkestrasi qa" }));
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
     expect(lastPut().orchestration.qa.enabled).toBe(false);
+  });
+
+  it("setiap saklar flow punya nama aksesibel", async () => {
+    await open();
+    for (const flow of ORCHESTRATION_FLOWS)
+      expect(screen.getByRole("switch", { name: `Orkestrasi ${flow}` })).toBeInTheDocument();
   });
 
   it("ganti model codex mengoreksi effort yang tak didukung model baru", async () => {

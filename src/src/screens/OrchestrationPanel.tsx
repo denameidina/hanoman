@@ -83,14 +83,9 @@ export function OrchestrationPanel({ orchestration, onChange }: {
                 <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
                   {f.enabled ? "Fase dikerjakan subagent" : "Sesi tunggal (orkestrasi mati)"}
                 </span>
-                {/* aria-label di pembungkus, BUKAN di Switch: track Switch (role="switch") sendiri yang
-                    jadi target aria-label bila dipasang langsung di situ, jadi ia tak bisa jadi
-                    descendant dirinya sendiri untuk within(...).getByRole("switch") di test. */}
-                <div aria-label={`Orkestrasi ${flow}`}>
-                  <Switch checked={f.enabled}
-                    onChange={(v: boolean) => putFlow(flow, { ...f, enabled: v },
-                      `Orkestrasi ${FLOW_LABEL[flow]} · ${v ? "aktif" : "nonaktif"}`)} />
-                </div>
+                <Switch checked={f.enabled} aria-label={`Orkestrasi ${flow}`}
+                  onChange={(v: boolean) => putFlow(flow, { ...f, enabled: v },
+                    `Orkestrasi ${FLOW_LABEL[flow]} · ${v ? "aktif" : "nonaktif"}`)} />
               </div>
               <div style={{ overflowX: "auto", opacity: f.enabled ? 1 : 0.55 }}>
                 <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontSize: 12.5 }}>
