@@ -896,7 +896,7 @@ git commit -m "feat(settings): kunci remoteControl/logShipping/logRetention LOCA
 **Interfaces:**
 - Produces: delegate `prisma.logEntry` (kolom `id Int`, `deviceId`, `lane`, `seq BigInt`, `ts`, `receivedAt`, `level`, `kind`, `projectId?`, `specId?`, `sessionId?`, `msg`, `data Json?`, `transcriptKey?`, `bytes Int`) dan `prisma.logCursor` (`deviceId`, `lane`, `seq BigInt`, `updatedAt`; PK `[deviceId, lane]`).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/log-schema.test.ts`:
 
@@ -953,12 +953,12 @@ describe("skema log terpusat (SPEC-1215 · ADR-0166)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-schema.test.ts`
 Expected: FAIL — `prisma.logEntry` undefined / model tak ada di DMMF.
 
-- [ ] **Step 3: Tambah model di akhir `server/prisma/schema.prisma`**
+- [x] **Step 3: Tambah model di akhir `server/prisma/schema.prisma`**
 
 ```prisma
 /// SPEC-1215 · ADR-0166 · log terpusat + audit kendali jarak jauh. LOCAL-only per instance: BUKAN
@@ -1001,7 +1001,7 @@ model LogCursor {
 }
 ```
 
-- [ ] **Step 4: Tulis migration**
+- [x] **Step 4: Tulis migration**
 
 Create `server/prisma/migrations/20260915120000_log_terpusat/migration.sql`:
 
@@ -1042,12 +1042,12 @@ CREATE INDEX "LogEntry_specId_ts_idx" ON "LogEntry"("specId", "ts");
 CREATE INDEX "LogEntry_lane_ts_idx" ON "LogEntry"("lane", "ts");
 ```
 
-- [ ] **Step 5: Buktikan skema ≡ migration (tanpa drift)**
+- [x] **Step 5: Buktikan skema ≡ migration (tanpa drift)**
 
 Run: `pnpm db:generate && pnpm --filter ./server exec prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "file:$(mktemp -d)/shadow.db" --exit-code`
 Expected: `No difference detected.` dan exit 0. Bila ada selisih, jangan ubah skema: ganti isi `migration.sql` dengan keluaran `prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "file:$(mktemp -d)/shadow.db" --script` (dengan migration baru dipindah sementara ke luar direktori), pertahankan baris komentar pertama, lalu ulangi step ini sampai exit 0.
 
-- [ ] **Step 6: Daftarkan di `PG_ORDER`**
+- [x] **Step 6: Daftarkan di `PG_ORDER`**
 
 Di `cli/src/commands/migrate-pg.ts`, sesudah baris `"SyncLog", "LocalBinding", "SyncOutbox", "SyncState", "SyncConflict", "SyncTombstone",` sisipkan:
 
@@ -1058,12 +1058,12 @@ Di `cli/src/commands/migrate-pg.ts`, sesudah baris `"SyncLog", "LocalBinding", "
   "LogEntry", "LogCursor",
 ```
 
-- [ ] **Step 7: Jalankan test**
+- [x] **Step 7: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-schema.test.ts cli/test/migrate-pg.test.ts server/test/sync-exclusions.test.ts server/test/webhook-catalog-dmmf.test.ts`
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations/20260915120000_log_terpusat cli/src/commands/migrate-pg.ts server/test/log-schema.test.ts
