@@ -2238,7 +2238,7 @@ git commit -m "feat(relay): dispatcher klien req→inject→res terpotong + audi
   - `requestRelay(deviceId: string, r: { method: RelayMethod; path: string; query?: string; body?: unknown; actor: RelayActor }, opts?: { timeoutMs?: number }): Promise<RelayResponse>`
   - `relayControlFor(deviceId: string): PresenceControlView | null`, `__resetRelayHub(): void`
 
-- [ ] **Step 1: Tulis test unit yang gagal**
+- [x] **Step 1: Tulis test unit yang gagal**
 
 Create `server/test/relay-hub.test.ts`:
 
@@ -2355,12 +2355,12 @@ describe("requestRelay", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run server/test/relay-hub.test.ts`
 Expected: FAIL — modul `relay/hub` tak ada.
 
-- [ ] **Step 3: Implementasi hub**
+- [x] **Step 3: Implementasi hub**
 
 Create `server/src/services/relay/hub.ts`:
 
@@ -2500,12 +2500,12 @@ export function __resetRelayHub(): void {
 }
 ```
 
-- [ ] **Step 4: Jalankan test unit**
+- [x] **Step 4: Jalankan test unit**
 
 Run: `pnpm vitest --run server/test/relay-hub.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Tulis test route yang gagal**
+- [x] **Step 5: Tulis test route yang gagal**
 
 Create `server/test/relay-hub.route.test.ts`:
 
@@ -2609,12 +2609,12 @@ describe("GET /api/sync/relay/ws (SPEC-1215 · ADR-0165 §1)", () => {
 });
 ```
 
-- [ ] **Step 6: Jalankan, pastikan gagal**
+- [x] **Step 6: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/relay-hub.route.test.ts`
 Expected: FAIL — upgrade `/api/sync/relay/ws` 404.
 
-- [ ] **Step 7: Route di `sync.ts`**
+- [x] **Step 7: Route di `sync.ts`**
 
 Di `server/src/routes/sync.ts`: tambahkan impor
 
@@ -2664,7 +2664,7 @@ Ganti opsi `/sync/ws` (`preValidation: async (req, reply) => { … }`) dengan `p
   });
 ```
 
-- [ ] **Step 8: Tambah kasus relay di test pencabutan**
+- [x] **Step 8: Tambah kasus relay di test pencabutan**
 
 Di `server/test/device-token-revoke.test.ts`, tambahkan di dalam `describe`:
 
@@ -2684,12 +2684,12 @@ Di `server/test/device-token-revoke.test.ts`, tambahkan di dalam `describe`:
   });
 ```
 
-- [ ] **Step 9: Jalankan test**
+- [x] **Step 9: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/relay-hub.test.ts server/test/relay-hub.route.test.ts server/test/device-token-revoke.test.ts server/test/sync-ws-presence.test.ts server/test/sync-ws.test.ts && pnpm --filter ./server typecheck`
 Expected: PASS; typecheck bersih.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add server/src/services/relay/hub.ts server/src/routes/sync.ts server/test/relay-hub.test.ts server/test/relay-hub.route.test.ts server/test/device-token-revoke.test.ts

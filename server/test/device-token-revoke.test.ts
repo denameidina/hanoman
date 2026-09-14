@@ -61,4 +61,18 @@ describe("pencabutan device token seketika (SPEC-1215 · ADR-0165 §7 · AC-A4)"
     await app.inject({ method: "DELETE", url: `/api/device-tokens/${device.id}`, headers: { cookie } });
     expect(await upgradeStatus("/api/sync/ws", device.token)).toBe(401);
   });
+
+  it("socket relay ikut ditutup 1008 sebelum 204 (AC-A4)", async () => {
+    const { cookie, device } = await loginAndDevice();
+    const sync = await open("/api/sync/ws", device.token);
+    const relay = await open("/api/sync/relay/ws", device.token);
+    relay.send(JSON.stringify({ t: "hello", v: 1, protocol: 1, version: "0.5.0", capabilities: ["sessions:read"] }));
+    await waitFor(() => deviceSocketCount(device.id, "relay") === 1 && deviceSocketCount(device.id, "sync") === 1);
+    const codes = Promise.all([closeCode(sync), closeCode(relay)]);
+    const del = await app.inject({ method: "DELETE", url: `/api/device-tokens/${device.id}`, headers: { cookie } });
+    expect(del.statusCode).toBe(204);
+    expect(deviceSocketCount(device.id)).toBe(0);
+    expect(await codes).toEqual([1008, 1008]);
+    expect(await upgradeStatus("/api/sync/relay/ws", device.token)).toBe(401);
+  });
 });
