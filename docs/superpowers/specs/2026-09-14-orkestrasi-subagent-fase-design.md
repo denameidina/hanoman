@@ -1,7 +1,7 @@
 # Orkestrasi subagent per fase — design
 
-Status: draft, 2026-09-14 — menunggu review operator. ADR-0164 ditulis bersama implementasi dan
-mengikat keputusan di bawah. Terkait: [ADR-0024](../../../internal/docs/adr/0024-sesi-interaktif-menggantikan-run.md),
+Status: approved 2026-09-14 · diimplementasikan lewat [plan](../plans/2026-09-14-orkestrasi-subagent-fase.md).
+[ADR-0164](../../../internal/docs/adr/0164-orkestrasi-subagent-per-fase.md) mengikat. Terkait: [ADR-0024](../../../internal/docs/adr/0024-sesi-interaktif-menggantikan-run.md),
 [ADR-0035](../../../internal/docs/adr/0035-sesi-lanjut-fase-tanpa-berhenti-kecuali-keputusan.md),
 [ADR-0058](../../../internal/docs/adr/0058-model-effort-per-fase.md),
 [ADR-0061](../../../internal/docs/adr/0061-model-effort-per-sesi-picker-start.md),
@@ -28,6 +28,19 @@ menerima `model`/`effort` per agen di `--agents`, subagent boleh bersarang 3 lap
 dan subagent bisa dilanjutkan dengan konteks utuh lewat `SendMessage` (v2.1.191+); Codex menerima
 `model`/`model_reasoning_effort` per role di `config_file`, plus `send_input`/`resume_agent`.
 Terpasang di mesin ini: claude 2.1.270, codex 0.154.0.
+
+## Pengukuran fondasi (2026-09-14)
+
+Diukur dengan parent SENGAJA berbeda dari anak (claude 2.1.270, codex 0.154.0), dicatat juga di ADR-0164:
+
+| # | Yang diukur | Hasil |
+|---|---|---|
+| P1 | claude `--agents` tanpa kunci `tools` | Subagent mendapat seluruh tool sesi dan memanggil skill `superpowers:verification-before-completion`. |
+| P2 | claude parent Haiku/low, agen Sonnet/medium | stdin `subagentStatusLine`: `model: claude-sonnet-5`, `effort: medium`; `SubagentStop.effort.level = medium`. |
+| P3 | claude `SendMessage` ke agent ID | Subagent yang sama dilanjutkan dengan konteks utuh; `SubagentStart` menembak ulang dengan `agent_id` SAMA. |
+| P4 | stdin `subagentStatusLine` | `tasks[]` = `id, type:"local_agent", label/description, startTime (ms), model, effort?, tokenCount` — **tanpa nama agen**. |
+| P5 | codex parent Sol/medium, role Luna/low via `config_file` | Rollout anak `gpt-5.6-luna` + `reasoning_effort: low`; rollout parent nol `luna`. |
+| P6 | codex `spawn_agent` + `send_input` | Skill tersedia di anak; pesan susulan dijawab dari konteks yang sama. |
 
 ## Keputusan operator
 
@@ -195,7 +208,8 @@ Loop per fase:
 - `SessionAgentMeta` + `phase?`, `effort?` (effort hasil koersi). Opsi tmux baru
   `@hanoman_model`, `@hanoman_effort`, `@hanoman_orchestrated`.
 - Sesi claude ber-rencana: `--settings` menambah `subagentStatusLine` →
-  `node <tempDir>/subagent-statusline.mjs`, membaca `<tempDir>/roster.json`. Codex: tanpa padanan.
+  `node <tempDir>/subagent-statusline.cjs <tempDir>/subagent-models.json`; label dari deskripsi pemanggilan
+  `Fase <Nama Fase>` (stdin tak membawa nama agen), model & effort dari task itu sendiri. Codex: tanpa padanan.
 - Argv & prompt flow yang saklarnya mati **byte-identik** dengan sebelum spec ini.
 
 ### 7. Bukti & data realtime

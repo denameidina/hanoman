@@ -3547,12 +3547,12 @@ Expected: exit 0.
 
 **Interfaces:** dokumentasi saja; tak ada kode.
 
-- [ ] **Step 1: Pastikan nomor ADR belum terpakai**
+- [x] **Step 1: Pastikan nomor ADR belum terpakai**
 
 Run: `ls internal/docs/adr | rtk proxy grep -E "^016[4-9]"`
 Expected: kosong. Bila 0164 sudah ada (sesi lain), pakai nomor bebas berikutnya dan ganti SEMUA rujukan `ADR-0164` di kode & docs dalam task ini (`rtk proxy grep -rn "ADR-0164" shared runner server src internal docs`).
 
-- [ ] **Step 2: Tulis ADR** — `internal/docs/adr/0164-orkestrasi-subagent-per-fase.md`
+- [x] **Step 2: Tulis ADR** — `internal/docs/adr/0164-orkestrasi-subagent-per-fase.md`
 
 ```markdown
 # ADR-0164 — Orkestrasi subagent per fase: model & effort lewat definisi subagent
@@ -3633,7 +3633,7 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
 
 Ganti tautan `[0040](0040-*.md)` dengan nama berkas ADR-0040 yang sebenarnya: `ls internal/docs/adr | rtk proxy grep "^0040-"`.
 
-- [ ] **Step 3: Index** — `internal/docs/README.md`
+- [x] **Step 3: Index** — `internal/docs/README.md`
 
 Di bagian ADR, tepat di atas baris `- [0163 — …`:
 
@@ -3643,7 +3643,7 @@ Di bagian ADR, tepat di atas baris `- [0163 — …`:
 
 Pada entri "rancangan orkestrasi subagent per fase" di bagian research, ganti ekor `ADR-0164 (bersama implementasi)` dengan `[ADR-0164](adr/0164-orkestrasi-subagent-per-fase.md) · [plan](../../docs/superpowers/plans/2026-09-14-orkestrasi-subagent-fase.md)`.
 
-- [ ] **Step 4: Data model** — `internal/docs/architecture/data-model.md`
+- [x] **Step 4: Data model** — `internal/docs/architecture/data-model.md`
 
 Di §Setting, sesudah butir `phaseModels` **dicabut** …:
 
@@ -3661,7 +3661,7 @@ Di tabel §AgentInvocation, sesudah baris `definitionHash?`:
 | `phase?` · `effort?` | [ADR-0164](../adr/0164-orkestrasi-subagent-per-fase.md) · fase milik agen fase (null untuk custom agent); effort dari roster saat start, diganti effort runtime (`SubagentStop.effort.level`) saat stop. Metrik custom agent mengecualikan baris ber-`phase`. |
 ```
 
-- [ ] **Step 5: Kontrak API** — `internal/docs/architecture/api-contract.md`
+- [x] **Step 5: Kontrak API** — `internal/docs/architecture/api-contract.md`
 
 Baris `GET    /terminal/sessions            # [{ id, projectId, specId?, flow?, cwd, branch?, exited, exitCode?, decision, agent }]` menjadi:
 
@@ -3678,7 +3678,7 @@ Cari dokumentasi WS terminal (`rtk proxy grep -n "terminal/sessions/:id/ws" inte
 #   Frame disiarkan ulang tiap SubagentStart/Stop agen fase dan sesudah hidrasi saat attach.
 ```
 
-- [ ] **Step 6: Frontend & skill project**
+- [x] **Step 6: Frontend & skill project**
 
 Tambahkan di akhir `internal/docs/frontend/frontend-implementation.md`:
 
@@ -3704,13 +3704,13 @@ Di `internal/skills/hanoman/SKILL.md`, di akhir butir `- **Model & effort per SE
   (tab Settings → Orkestrasi) — lewat definisi subagent saat sesi lahir, bukan `/model` (ADR-0058 tetap dicabut).
 ```
 
-- [ ] **Step 7: Spec** — `docs/superpowers/specs/2026-09-14-orkestrasi-subagent-fase-design.md`
+- [x] **Step 7: Spec** — `docs/superpowers/specs/2026-09-14-orkestrasi-subagent-fase-design.md`
 
 - Baris status menjadi `Status: approved 2026-09-14 · diimplementasikan lewat [plan](../plans/2026-09-14-orkestrasi-subagent-fase.md). [ADR-0164](../../../internal/docs/adr/0164-orkestrasi-subagent-per-fase.md) mengikat.`
 - §6 butir statusline: ganti `node <tempDir>/subagent-statusline.mjs`, membaca `<tempDir>/roster.json` dengan `node <tempDir>/subagent-statusline.cjs <tempDir>/subagent-models.json`; label dari deskripsi pemanggilan `Fase <Nama Fase>` (stdin tak membawa nama agen), model & effort dari task itu sendiri.
 - Tambahkan bagian `## Pengukuran fondasi (2026-09-14)` berisi tabel P1–P6 yang sama dengan ADR-0164.
 
-- [ ] **Step 8: Integritas index & commit**
+- [x] **Step 8: Integritas index & commit**
 
 Run: `rtk proxy pnpm exec tsx cli/src/index.ts docs index --check` — bila perintah itu tak tersedia di worktree, jalankan `rtk proxy grep -c "0164-orkestrasi-subagent-per-fase" internal/docs/README.md` dan pastikan ≥ 1.
 Expected: index sah / hitungan ≥ 1.
