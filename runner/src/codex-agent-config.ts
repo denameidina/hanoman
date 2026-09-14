@@ -1,16 +1,12 @@
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cmpVersion } from "@hanoman/shared";
+import { CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported } from "@hanoman/shared";
 import { agentDelegationClause, agentPromptOf, type AgentDef } from "./custom-agents";
 import { resolveHardening } from "./runtime-profile";
 
-/** Versi pertama yang benar-benar diverifikasi membawa custom agents + hooks stabil. */
-export const CODEX_NATIVE_AGENTS_MIN_CLIENT = "0.151.0";
-
-export function codexNativeAgentsSupported(version: string | null): boolean {
-  const parsed = version ? /(\d+)\.(\d+)\.(\d+)/.exec(version)?.[0] : null;
-  return parsed ? cmpVersion(parsed, CODEX_NATIVE_AGENTS_MIN_CLIENT) >= 0 : false;
-}
+// ADR-0164 · gerbang versi pindah ke @hanoman/shared (UI butuh aturan yang sama); diekspor ulang
+// supaya pemakai lama tak berubah.
+export { CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported };
 
 type VersionProbeEnv = Record<string, string | undefined>;
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;

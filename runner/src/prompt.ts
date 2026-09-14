@@ -1,30 +1,13 @@
 import type { Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx, AttachmentCtx } from "./types";
-import { resolveMethod, type MethodDef } from "@hanoman/shared";
+import { resolveMethod, FLOW_PHASES, type MethodDef } from "@hanoman/shared";
 import { REVERSE_STANDARD } from "./reverse-standard";
 import { verifyScopeClause } from "./verify-scope";
 import { CODE_STYLE_CLAUSE } from "./code-style";
 import { readGoalPayload } from "./goal-spec";
 
-export const PIPELINES: Record<Flow, readonly string[]> = {
-  feature: ["Brainstorm", "Objective", "Spec", "Plan", "Execute"],
-  qa: ["Audit", "Spec", "Plan", "Execute"],
-  scaffold: ["Brainstorm", "Objective", "Doc index"],
-  reverse: ["Scan", "Docs teknis", "Wawancara", "Konvensi & index", "Serah terima"],
-  prd: ["Brainstorm", "PRD"],
-  audit: ["Audit", "Laporan"],
-  breakdown: ["Analisis", "Breakdown"],
-  // SPEC-337 · ADR-0075 · audit lintas project: fase & stage-map identik audit-only, scope-nya
-  // yang berbeda (project utama + tetangga ProjectLink).
-  // SPEC-407 · ADR-0089 · backlog goal: tak ada fase perencanaan sama sekali. `Goal` = kerjakan,
-  // `Verifikasi` = buktikan. Kedua nama unik lintas PIPELINES — syarat peta REACHED di server,
-  // yang berkunci nama fase saja.
-  goal: ["Goal", "Verifikasi"],
-  // SPEC-825 · ADR-0123 · task remeh: SATU fase. Fase `Verifikasi` milik flow goal menghabiskan
-  // satu giliran agen untuk membuktikan sesuatu yang diff-nya sendiri sudah membuktikan; untuk
-  // ganti copy / bump konstanta / typo docs itu murni biaya. Nama `Kerjakan` unik lintas
-  // PIPELINES — syarat peta REACHED server, yang berkunci nama fase saja.
-  no_effort: ["Kerjakan"],
-};
+// ADR-0164 · daftar fase pindah ke @hanoman/shared (`FLOW_PHASES`) supaya Settings & modal Start
+// membaca sumber yang sama; nama lama tetap diekspor untuk semua pemakai runner/server.
+export const PIPELINES: Record<Flow, readonly string[]> = FLOW_PHASES;
 
 // SPEC-825 · daftar fase KERJA — "sesi ini menulis kode". Dipakai DUA gerbang di DUA paket:
 // `writesCode` di bawah (verifyScope + klausa gaya kode + exitSkills) dan aturan "fase kerja yang

@@ -5,6 +5,8 @@ export * from "./method-catalog";
 export * from "./method-status";
 export * from "./agent-engine";
 export * from "./entities";
+export * from "./orchestration";
+export * from "./orchestration-plan";
 export * from "./agent";
 export * from "./custom-agent";
 export * from "./builtin-agents";
