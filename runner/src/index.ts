@@ -22,3 +22,4 @@ export * from "./spawn-helper";
 export * from "./config-env";
 export * from "./runtime-profile";
 export * from "./sandbox-probe";
+export * from "./subagent-statusline";

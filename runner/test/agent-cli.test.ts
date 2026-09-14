@@ -47,3 +47,12 @@ describe("agentFlags · codex", () => {
     expect(joined).toContain("/tmp/g.sh");
   });
 });
+
+describe("agentFlags · subagentStatusLine (ADR-0164)", () => {
+  it("claude: masuk ke JSON --settings; codex: diabaikan", () => {
+    const claude = agentFlags({ agent: "claude", subagentStatusLine: "node x" });
+    const settings = JSON.parse(claude[claude.indexOf("--settings") + 1]!);
+    expect(settings.subagentStatusLine).toEqual({ type: "command", command: "node x" });
+    expect(agentFlags({ agent: "codex", subagentStatusLine: "node x" }).join(" ")).not.toContain("node x");
+  });
+});

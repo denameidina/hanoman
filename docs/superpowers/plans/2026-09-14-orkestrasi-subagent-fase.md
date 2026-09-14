@@ -1587,7 +1587,7 @@ Expected: exit 0 (parameter baru opsional — pemanggil server belum berubah).
   ```
 - Kontrak stdin (terukur claude 2.1.270, 2026-09-14): `{ tasks: [{ id, type: "local_agent", status, description, label, startTime /* epoch ms */, model, effort?, tokenCount }] }`. Baris dikembalikan sebagai `{"id","content"}` per baris; id yang tak ditulis memakai baris bawaan.
 
-- [ ] **Step 1: Tulis test yang gagal** — `runner/test/subagent-statusline.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `runner/test/subagent-statusline.test.ts`
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -1659,12 +1659,12 @@ describe("agentFlags · subagentStatusLine (ADR-0164)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `rtk proxy pnpm vitest --run runner/test/subagent-statusline.test.ts runner/test/settings.test.ts runner/test/agent-cli.test.ts`
 Expected: FAIL — modul `../src/subagent-statusline` tak ada; `subagentStatusLine` undefined.
 
-- [ ] **Step 3: Implementasi** — `runner/src/subagent-statusline.ts`
+- [x] **Step 3: Implementasi** — `runner/src/subagent-statusline.ts`
 
 ```ts
 import { writeFileSync } from "node:fs";
@@ -1746,7 +1746,7 @@ dan baris `--settings` claude menjadi:
 
 `runner/src/index.ts` — tambahkan `export * from "./subagent-statusline";`.
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `rtk proxy pnpm vitest --run runner/test/subagent-statusline.test.ts runner/test/settings.test.ts runner/test/agent-cli.test.ts runner/test/codex-settings.test.ts`
 Expected: PASS semua.
@@ -1754,7 +1754,7 @@ Expected: PASS semua.
 Run: `rtk proxy pnpm --filter ./runner typecheck`
 Expected: exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 /usr/bin/git add runner/src/subagent-statusline.ts runner/test/subagent-statusline.test.ts runner/src/settings.ts runner/src/agent-cli.ts runner/src/index.ts runner/test/settings.test.ts runner/test/agent-cli.test.ts

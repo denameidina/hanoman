@@ -97,3 +97,13 @@ describe("SPEC-909 · hook pengirim event", () => {
     expect(h.UserPromptSubmit![0].hooks[0].command).toContain(": >");
   });
 });
+
+describe("guardSettings · subagentStatusLine (ADR-0164)", () => {
+  it("tanpa command: bentuk lama persis — hanya kunci hooks", () => {
+    expect(Object.keys(guardSettings("/m", undefined, true))).toEqual(["hooks"]);
+  });
+  it("dengan command: kunci subagentStatusLine bertipe command", () => {
+    expect(guardSettings(undefined, undefined, true, 'node "/t/s.cjs" "/t/m.json"').subagentStatusLine)
+      .toEqual({ type: "command", command: 'node "/t/s.cjs" "/t/m.json"' });
+  });
+});
