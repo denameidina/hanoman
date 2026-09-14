@@ -531,7 +531,7 @@ git commit -m "feat(shared): kontrak relay SPEC-1215 — frame, allowlist, grant
   - `type PresenceControlView = { state: "available" | "protocol-mismatch"; protocol: number; version: string; capabilities: RemoteCapability[]; since: string }`
   - `PresenceDeviceView.control?: PresenceControlView | null`, `PresenceDeviceView.capacity?: LaunchStatus | null`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `shared/src/logs.test.ts`:
 
@@ -601,12 +601,12 @@ describe("frame capacity (SPEC-1215 · ADR-0165 §9)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/logs.test.ts shared/src/presence-capacity.test.ts`
 Expected: FAIL — `./logs` tak ditemukan; `capacityFrameJson` bukan export.
 
-- [ ] **Step 3: Implementasi `logs.ts`**
+- [x] **Step 3: Implementasi `logs.ts`**
 
 Create `shared/src/logs.ts`:
 
@@ -659,7 +659,7 @@ export const zLogRetention = z.object({
 export type LogRetention = z.infer<typeof zLogRetention>;
 ```
 
-- [ ] **Step 4: Implementasi tambahan `presence.ts`**
+- [x] **Step 4: Implementasi tambahan `presence.ts`**
 
 Di `shared/src/presence.ts`, tambahkan impor di bawah `import { z } from "zod";`:
 
@@ -718,7 +718,7 @@ export function capacitySignature(a: LaunchStatus): string {
 }
 ```
 
-- [ ] **Step 5: Export**
+- [x] **Step 5: Export**
 
 Di `shared/src/index.ts`, tambahkan sesudah `export * from "./relay";`:
 
@@ -726,12 +726,12 @@ Di `shared/src/index.ts`, tambahkan sesudah `export * from "./relay";`:
 export * from "./logs";
 ```
 
-- [ ] **Step 6: Jalankan test + typecheck shared**
+- [x] **Step 6: Jalankan test + typecheck shared**
 
 Run: `pnpm vitest --run shared/src/logs.test.ts shared/src/presence-capacity.test.ts shared/src/relay.test.ts && pnpm --filter ./shared typecheck`
 Expected: PASS; typecheck tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/logs.ts shared/src/logs.test.ts shared/src/presence.ts shared/src/presence-capacity.test.ts shared/src/index.ts
