@@ -78,19 +78,37 @@ describe("PhaseStrip · panel detail tak terpotong (ADR-0164)", () => {
     expect(screen.getByTestId("phase-strip").contains(dialog)).toBe(true);
   });
 
-  it("penggulung chip overflow-x:auto; wrapper luar tak menyetel overflow apa pun", () => {
-    render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent() }]} />);
-    const scroller = screen.getByTestId("phase-strip-scroller");
-    expect(scroller).toHaveStyle({ overflowX: "auto" });
-    const strip = screen.getByTestId("phase-strip");
-    expect(strip.style.overflowX).toBe("");
-    expect(strip.style.overflowY).toBe("");
-  });
-
   it("agen tanpa model: baris detail tak diawali '·'", () => {
     render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent({ model: undefined }) }]} />);
     fireEvent.click(screen.getByRole("button", { name: "Detail fase Spec" }));
     const dialog = screen.getByRole("dialog", { name: "Detail fase Spec" });
     expect(within(dialog).getByText(/^high · completed$/)).toBeInTheDocument();
+  });
+});
+
+// ADR-0164 · review 2: panel bisa setinggi ~242px (4 baris + `<pre>` maks 160px), tapi sel di
+// grid padat cuma ~220px dan sel itu `overflow: hidden` — jadi containing block panel dipindah
+// dari wrapper strip ini ke wrapper BADAN sel (lihat terminal-screen.test.tsx), dan wrapper strip
+// ini sendiri sengaja LEPAS `position: relative` supaya bukan lagi containing block-nya. Panel
+// jadi bergantung ke posisi statisnya (bukan `top`), dibatasi tinggi lewat `maxHeight` relatif +
+// men-scroll sendiri kalau sel pendek.
+describe("PhaseStrip · panel dibatasi tinggi badan sel, bukan wrapper strip (ADR-0164 review 2)", () => {
+  it("wrapper phase-strip tak lagi jadi containing block: tanpa position, tanpa overflow", () => {
+    render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent() }]} />);
+    const strip = screen.getByTestId("phase-strip");
+    expect(strip.style.position).toBe("");
+    expect(strip.style.overflowX).toBe("");
+    expect(strip.style.overflowY).toBe("");
+    expect(screen.getByTestId("phase-strip-scroller")).toHaveStyle({ overflowX: "auto" });
+  });
+
+  it("panel: absolute tanpa top (posisi statis), overflow-y & maxHeight sendiri", () => {
+    render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent() }]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Detail fase Spec" }));
+    const dialog = screen.getByRole("dialog", { name: "Detail fase Spec" });
+    expect(dialog.style.position).toBe("absolute");
+    expect(dialog.style.top).toBe("");
+    expect(dialog.style.overflowY).toBe("auto");
+    expect(dialog.style.maxHeight).toContain("100%");
   });
 });

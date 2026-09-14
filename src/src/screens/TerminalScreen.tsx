@@ -782,9 +782,24 @@ export function PhaseStrip({ phases, compact = false, now }: {
   // hanya baris chip di dalamnya (`phase-strip-scroller`) yang men-scroll horizontal. Panelnya
   // jadi SAUDARA baris scroll itu, tetap anak wrapper luar, sehingga `top: 100%` mengacu ke
   // wrapper yang tak dipotong.
+  //
+  // ADR-0164 · review 2: perbaikan di atas memindahkan panel keluar dari baris scroll, tapi
+  // containing block-nya (wrapper strip ini, dulu `position: relative`) masih anak sel grid yang
+  // `overflow: hidden` (jaga grid rapi) — dan panel bisa setinggi ~242px (4 baris + `<pre>` maks
+  // 160px) sementara sel padat di grid cuma ~220px, jadi ujung bawah panel terpotong lagi, kali
+  // ini oleh sel bukan oleh strip. Containing block panel dipindah SATU LEVEL LEBIH LUAR: ke
+  // wrapper BADAN sel di `Cell` (header + strip + pane, tinggi definit, selalu di dalam sel) —
+  // lihat `position: "relative"` di sana. Wrapper strip ini sengaja MELEPAS `position: relative`
+  // supaya bukan lagi containing block-nya. Panel tetap `position: absolute` tapi TANPA
+  // `top`/`left`, jadi ia jatuh ke posisi statisnya (persis di bawah baris chip, masih anak
+  // wrapper strip ini secara struktur DOM) sementara ukurannya (`maxHeight`, `maxWidth`) dihitung
+  // relatif terhadap badan sel. Anggaran 48px pada `maxHeight: calc(100% - 48px)` = tinggi strip
+  // (~24px) + kemungkinan scrollbar horizontal non-overlay baris chip bila chip meluber (~15px) +
+  // margin bawah kecil; sisanya jadi batas atas tinggi panel, dan kontennya sendiri yang
+  // men-scroll (`overflowY: auto`) kalau sel terlalu pendek untuk menampung semuanya.
   return (
     <div data-testid="phase-strip" style={{
-      position: "relative", flex: "0 0 auto", borderBottom: "1px solid var(--border-hair)",
+      flex: "0 0 auto", borderBottom: "1px solid var(--border-hair)",
     }}>
       <div data-testid="phase-strip-scroller" style={{
         display: "flex", alignItems: "center", gap: 8, padding: "3px 8px",
@@ -824,7 +839,9 @@ export function PhaseStrip({ phases, compact = false, now }: {
       </div>
       {openPhase?.agent && (
         <div role="dialog" aria-label={`Detail fase ${openPhase.name}`} style={{
-          position: "absolute", top: "100%", left: 8, zIndex: 5, minWidth: 220, maxWidth: "min(420px, 90vw)",
+          position: "absolute", marginLeft: 8, zIndex: 5, minWidth: 220,
+          maxWidth: "min(420px, calc(100% - 16px))", maxHeight: "calc(100% - 48px)", overflowY: "auto",
+          boxSizing: "border-box",
           padding: "8px 10px", background: "var(--surface-card)", border: "1px solid var(--border-hair)",
           borderRadius: "var(--radius-sm)", whiteSpace: "normal", lineHeight: 1.5,
           fontSize: 10, fontFamily: "var(--font-mono)",
@@ -1034,9 +1051,12 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
         </span>
       </div>
       {/* Sesi berakhir (SPEC-188): badan diredupkan agar terbaca beku; header + badge
-          "Selesai" tetap penuh supaya statusnya justru paling kontras. */}
+          "Selesai" tetap penuh supaya statusnya justru paling kontras.
+          ADR-0164 review 2 · `position: relative` di sini (bukan di wrapper `phase-strip`) jadi
+          containing block panel detail fase: tinggi = strip + pane, selalu definit dan selalu
+          di dalam sel (yang `overflow: hidden`), jadi panel tak bisa lagi meluber ke luar sel. */}
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0,
-        opacity: session.exited ? 0.6 : 1 }}>
+        position: "relative", opacity: session.exited ? 0.6 : 1 }}>
         <PhaseStrip phases={phases} compact={headerWidth < 480} />
         {/* key = identitas sesi: pindah antar sel memindah subtree, bukan me-remount WebSocket.
             SPEC-232 · saat sel ini sedang layar-penuh, pane-nya dilepas (placeholder) supaya

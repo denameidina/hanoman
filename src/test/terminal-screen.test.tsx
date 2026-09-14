@@ -525,6 +525,9 @@ describe("TerminalScreen (grid)", () => {
 
     emitPhases("fin11111", QA_DONE, true);
     expect(await screen.findByText("Selesai")).toBeInTheDocument();
+    // ADR-0164 review 2 · containing block panel detail fase = wrapper badan sel (bukan wrapper
+    // strip), supaya panel dibatasi tinggi sel yang `overflow: hidden`, bukan meluber ke pane.
+    expect(screen.getByTestId("phase-strip").parentElement).toHaveStyle({ position: "relative" });
   });
 
   // Badan pane TIDAK diredupkan: prosesnya masih hidup dan operator masih bisa mengetik di sana.
