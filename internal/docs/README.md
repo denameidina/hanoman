@@ -21,6 +21,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [prd](requirements/prd.md) · [frd](requirements/frd.md) · [rd](requirements/rd.md) · [acceptance-criteria (EARS)](requirements/acceptance-criteria-ears-standard.md)
 
 ## research
+- [rancangan orkestrasi subagent per fase](../../docs/superpowers/specs/2026-09-14-orkestrasi-subagent-fase-design.md) — sesi interaktif menjadi orchestrator dan setiap fase flow dikerjakan agen native `hanoman-fase-<slug>` yang model/effort-nya disetel per fase di `Setting.orchestration` (saklar per flow, default aktif, dua matriks claude/codex, sel kosong mewarisi picker Start). Tidak mengulang ADR-0058: model/effort terkunci di definisi subagent saat sesi lahir dan setiap delegasi meninggalkan bukti `SubagentStart`/`Stop`; pelanggaran terlihat sebagai ⚠ di chip `PhaseStrip`. Ulang sekali lalu eskalasi, relay fase interaktif ke subagent yang sama, `subagentStatusLine` di TUI claude. ADR-0164 (bersama implementasi)
 - [audit 2026-09-05 — delapan custom agent bawaan](research/audit-2026-09-05-custom-agent-bawaan.md) — penilaian per agent, reproduksi celah policy/seleksi/eval, dan rekomendasi prioritas.
 - [Spec tindak lanjut audit custom agent](../../docs/superpowers/specs/2026-09-05-custom-agent-audit-followup.md) dan [rencana implementasi](../../docs/superpowers/plans/2026-09-05-custom-agent-audit-followup.md) — kontrak perbaikan prompt, ketersediaan, evaluator, dan bukti hasil.
 - [audit SPEC-1109 — worktree sesi yatim setelah crash](research/audit-spec-1109-worktree-sesi-yatim.md)
