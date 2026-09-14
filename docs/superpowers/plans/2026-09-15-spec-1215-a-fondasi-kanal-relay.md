@@ -751,7 +751,7 @@ git commit -m "feat(shared): kontrak log & frame capacity SPEC-1215"
 - Consumes: `zRemoteControl`, `REMOTE_CONTROL_DEFAULTS` (Task 1); `zLogShipping`, `LOG_SHIPPING_DEFAULTS`, `zLogRetention`, `LOG_RETENTION_DEFAULTS` (Task 2).
 - Produces: `Setting.remoteControl: RemoteControl`, `Setting.logShipping: LogShipping`, `Setting.logRetention: LogRetention` — dibaca `getSetting()` di Task 8, 11, 12.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/settings-remote-keys.test.ts`:
 
@@ -800,12 +800,12 @@ describe("PUT /settings tak menulis kunci LOCAL-only SPEC-1215 (AC-A3)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/settings-remote-keys.test.ts`
 Expected: FAIL — `DEFAULT_SETTING.remoteControl` undefined.
 
-- [ ] **Step 3: Tambah kunci ke `zSetting`**
+- [x] **Step 3: Tambah kunci ke `zSetting`**
 
 Di `shared/src/entities.ts`, tambahkan impor sesudah baris 6:
 
@@ -825,7 +825,7 @@ Di `zSetting`, sisipkan tepat sebelum baris komentar `// SPEC-881 · ADR-0136 ·
   logRetention: zLogRetention.default(LOG_RETENTION_DEFAULTS),         // retensi log di hub (SPEC-1217)
 ```
 
-- [ ] **Step 4: Default server & frontend**
+- [x] **Step 4: Default server & frontend**
 
 Di `server/src/services/settings.ts`, tambahkan `REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS,` ke impor `@hanoman/shared` (baris 2-6), lalu di `DEFAULT_SETTING` sesudah `orchestration: ORCHESTRATION_DEFAULTS,`:
 
@@ -843,7 +843,7 @@ Di `src/src/screens/SettingsScreen.tsx`, tambahkan `REMOTE_CONTROL_DEFAULTS, LOG
   logRetention: LOG_RETENTION_DEFAULTS,
 ```
 
-- [ ] **Step 5: `PUT /settings` mempertahankan**
+- [x] **Step 5: `PUT /settings` mempertahankan**
 
 Ganti isi handler `app.put("/settings", …)` di `server/src/routes/settings.ts` menjadi:
 
@@ -873,12 +873,12 @@ Ganti isi handler `app.put("/settings", …)` di `server/src/routes/settings.ts`
   });
 ```
 
-- [ ] **Step 6: Jalankan test tersentuh + typecheck**
+- [x] **Step 6: Jalankan test tersentuh + typecheck**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/settings-remote-keys.test.ts server/test/settings.test.ts server/test/sync-exclusions.test.ts && pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck`
 Expected: PASS; tiga typecheck bersih. Bila `src` typecheck merah pada literal `Setting` lain, tambahkan tiga kunci yang sama di literal itu (bukan `as Setting`).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/entities.ts server/src/services/settings.ts server/src/routes/settings.ts src/src/screens/SettingsScreen.tsx server/test/settings-remote-keys.test.ts

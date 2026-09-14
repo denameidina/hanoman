@@ -3,6 +3,7 @@ import {
   zSetting, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS,
   RETIRED_CODEX_MODELS, LEAD_DEFAULTS, coerceCodexEffort, codexModel, type Setting, type Agent, type Codex,
   TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, DEFAULT_METHOD, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS,
+  REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS,
 } from "@hanoman/shared";
 
 // Model id + effort yang diteruskan apa adanya ke `claude --model` / `--effort`.
@@ -27,6 +28,9 @@ export const DEFAULT_SETTING: Setting = {
   changelog: CHANGELOG_ENGINE_DEFAULTS, // SPEC-518 · agen pembuat changelog (opt-in, mati)
   portalChat: PORTAL_CHAT_DEFAULTS, // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
   orchestration: ORCHESTRATION_DEFAULTS, // ADR-0164 · orkestrasi subagent per fase (default aktif)
+  remoteControl: REMOTE_CONTROL_DEFAULTS, // SPEC-1215 · ADR-0165 · grant LOCAL-only, default mati
+  logShipping: LOG_SHIPPING_DEFAULTS,     // SPEC-1215 · ADR-0166
+  logRetention: LOG_RETENTION_DEFAULTS,   // SPEC-1215 · ADR-0166
   builtinAgents: {},               // SPEC-881 · ADR-0136 · sidik jari seed (lokal, tak disync)
   builtinAgentPolicies: {},        // SPEC-950 · marker safety policy sekali-jalan (lokal)
 };
