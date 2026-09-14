@@ -67,8 +67,11 @@ export default async function (app: FastifyInstance) {
           transcriptPath: boundedString(
             body.agent_transcript_path ?? body.transcript_path, 4_096,
           ),
-          // ADR-0164 · effort yang BENAR-BENAR dipakai runtime (claude: `effort.level` di SubagentStop).
-          ...(typeof recordOf(body.effort)?.level === "string"
+          // ADR-0164 · effort yang BENAR-BENAR dipakai runtime (claude: `effort.level` di
+          // SubagentStop) — HANYA untuk agen fase. Review Task 9: custom agent bisa membawa
+          // `effort` roster sendiri (mis. katalog method), dan payload runtime bukan miliknya
+          // untuk ditimpa — pertahankan perilaku effort roster custom agent apa adanya.
+          ...(meta.phase && typeof recordOf(body.effort)?.level === "string"
             ? { effort: String(recordOf(body.effort)!.level) } : {}),
         });
       if (meta.phase) void refreshPhaseInvocations(sessionId);

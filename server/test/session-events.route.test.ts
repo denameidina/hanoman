@@ -144,6 +144,19 @@ describe("POST /api/session-events", () => {
     await app.close();
   });
 
+  it("review Task 9 · effort runtime SubagentStop hanya menang untuk agen fase, bukan custom agent", async () => {
+    const app = buildApp();
+    await post(app, { hook_event_name: "SubagentStart", agent_id: "scout-9", agent_type: "scout" }, auth("s1"));
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "scout-9" } }))
+      .toMatchObject({ agentName: "scout", phase: null, effort: null });
+    const stop = await post(app, { hook_event_name: "SubagentStop", agent_id: "scout-9", agent_type: "scout",
+      effort: { level: "max" }, last_assistant_message: "hasil scout" }, auth("s1"));
+    expect(stop.statusCode).toBe(202);
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "scout-9" } }))
+      .toMatchObject({ status: "completed", effort: null });
+    await app.close();
+  });
+
   it("menerima lifecycle sandbox melalui spool relay dan route bertoken yang sama", async () => {
     const app = buildApp();
     const root = mkdtempSync(join(tmpdir(), "hanoman-route-relay-"));

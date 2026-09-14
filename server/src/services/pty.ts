@@ -11,7 +11,9 @@ import {
   writeSubagentStatusline, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import { coerceCodexEffort, isTerminalResponse, resolveChoices, type SessionKind } from "@hanoman/shared";
-import { enrichPhases, readPhases, sessionComplete, type Phase, type PhaseInvocation } from "./session-phases";
+import {
+  enrichPhases, readPhases, sessionComplete, trackDoneSeen, type Phase, type PhaseInvocation,
+} from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
 import { dropSessionUploads } from "./uploads";
 import {
@@ -186,8 +188,7 @@ const phaseInvocations = new Map<string, PhaseInvocation[]>();
 function phaseView(p: Pane, a: Attachment): Phase[] {
   const phases = readPhases(p.phaseFile!, p.flow!);
   const now = Date.now();
-  for (const phase of phases)
-    if (phase.state === "done" && !a.doneSeenAt.has(phase.name)) a.doneSeenAt.set(phase.name, now);
+  trackDoneSeen(phases, a.doneSeenAt, now);
   const roster = (p.agentRoster ?? []).flatMap((r) =>
     r.phase ? [{ name: r.name, phase: r.phase, model: r.model, effort: r.effort }] : []);
   return roster.length ? enrichPhases(phases, roster, phaseInvocations.get(p.id) ?? [], a.doneSeenAt, now) : phases;
@@ -1195,6 +1196,12 @@ function drop(id: string): void {
   // `pending` masih terisi berarti membuangnya.
   flushOutput(a);
   attached.delete(id);
+  // ADR-0164 · review Task 9: `drop` adalah SATU-SATUNYA titik yang menghapus entri `attached`
+  // (dipanggil `pty.onExit` untuk pane yang mati sendiri, `end()` untuk pane yang ditemukan mati
+  // lewat poll, dan `killAll`/`detachAll`) — cache invocation fase sesi ini ikut dibuang di sini,
+  // bukan hanya di `killSession`. Tanpa ini sesi yang berakhir tanpa lewat `killSession` (pane
+  // yang mati sendiri, atau klien yang sekadar detach) meninggalkan entrinya menumpuk selamanya.
+  phaseInvocations.delete(id);
   a.pty.kill();
   for (const c of a.clients) c.close();
   a.clients.clear();
@@ -1255,13 +1262,24 @@ function pollPhases(p: Pane, a: Attachment): void {
   broadcast(a, { t: "phase", phases, complete });
 }
 
-/** ADR-0164 · suntik invocation fase terbaru lalu siarkan ulang frame fase bila ada penonton. */
+/**
+ * ADR-0164 · review Task 9: HANYA menyimpan cache — tak lagi memanggil `getSession`/`pollPhases`.
+ * Ini jalur HOOK (dipanggil dari route session-events dan route WS terminal): `getSession` sinkron
+ * memaksa `execFileSync` tmux dan memblokir event loop sampai 916 ms saat mesin sibuk (SPEC-878,
+ * lihat komentar `getSessionAsync`). Memanggilnya di sini tak perlu — tick poll async (≤ 500 ms,
+ * `startPoll`) sudah membaca cache ini lewat `phaseView` pada pane segar, dan `phaseKey` memuat
+ * `agent` sehingga siaran otomatis terjadi begitu isinya berubah, tanpa satu pun tmux tambahan.
+ *
+ * Sesi yang tak ditonton (`attached` kosong untuknya) tak disimpan sama sekali: `attach()` selalu
+ * menghidrasi ulang lewat `refreshPhaseInvocations` sesudah WS tersambung, jadi cache untuk sesi
+ * tanpa penonton hanya akan menumpuk tanpa pernah dibaca — dibuang di `drop()`/`killSession()`.
+ */
 export function setPhaseInvocations(sessionId: string, rows: PhaseInvocation[]): void {
-  phaseInvocations.set(sessionId, rows);
-  const a = attached.get(sessionId);
-  const p = a ? getSession(sessionId) : null;
-  if (a && p) pollPhases(p, a);
+  if (attached.has(sessionId)) phaseInvocations.set(sessionId, rows);
 }
+
+/** Test-only: intip cache tanpa tmux. */
+export const __phaseInvocationsFor = (id: string): PhaseInvocation[] | undefined => phaseInvocations.get(id);
 
 // SPEC-863 · cermin pollPhases: frame lahir hanya saat berubah, dan sumbernya `Pane` yang sudah
 // dipegang loop poll — tak ada invokasi tmux tambahan, `#{alternate_on}` ikut di `FMT`.

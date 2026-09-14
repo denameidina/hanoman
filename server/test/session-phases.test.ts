@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   phaseFilePath, decisionFilePath, readPhases, stageFor, planComplete, stageForRun,
-  phasesComplete, sessionComplete, enrichPhases, type Phase, type PhaseState, type PhaseInvocation,
+  phasesComplete, sessionComplete, enrichPhases, trackDoneSeen,
+  type Phase, type PhaseState, type PhaseInvocation,
 } from "../src/services/session-phases";
 
 describe("decisionFilePath (SPEC-184)", () => {
@@ -338,5 +339,36 @@ describe("enrichPhases (ADR-0164)", () => {
   it("fase aktif belum berinvocation tetap pending walau lama", () => {
     expect(enrichPhases(phases, roster, [], new Map(), 10_000_000)[2]!.agent)
       .toMatchObject({ attempts: 0, evidence: "pending" });
+  });
+});
+
+describe("trackDoneSeen (ADR-0164)", () => {
+  const P = (pairs: [string, PhaseState][]): Phase[] =>
+    pairs.map(([name, state]) => ({ name, state }));
+
+  it("mencatat waktu PERTAMA kali terlihat done, sekali saja", () => {
+    const seen = new Map<string, number>();
+    trackDoneSeen(P([["Spec", "done"]]), seen, 1_000);
+    trackDoneSeen(P([["Spec", "done"]]), seen, 5_000);
+    expect(seen.get("Spec")).toBe(1_000);
+  });
+
+  it("melupakan fase yang tak lagi done (mis. direset ke active)", () => {
+    const seen = new Map([["Spec", 1_000]]);
+    trackDoneSeen(P([["Spec", "active"]]), seen, 5_000);
+    expect(seen.has("Spec")).toBe(false);
+  });
+
+  it("melupakan fase yang tak lagi hadir di daftar", () => {
+    const seen = new Map([["Spec", 1_000]]);
+    trackDoneSeen(P([["Plan", "active"]]), seen, 5_000);
+    expect(seen.has("Spec")).toBe(false);
+  });
+
+  it("fase done lain tak tersentuh oleh entri yang dilupakan", () => {
+    const seen = new Map([["Spec", 1_000], ["Brainstorm", 500]]);
+    trackDoneSeen(P([["Brainstorm", "done"], ["Spec", "pending"]]), seen, 5_000);
+    expect(seen.get("Brainstorm")).toBe(500);
+    expect(seen.has("Spec")).toBe(false);
   });
 });

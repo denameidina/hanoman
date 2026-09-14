@@ -101,6 +101,16 @@ export function enrichPhases(
   });
 }
 
+/** ADR-0164 · catat kapan fase PERTAMA kali terlihat `done`; lupakan fase yang tak lagi `done`
+ *  supaya fase yang di-reset lalu selesai lagi mendapat tenggang bukti yang utuh. */
+export function trackDoneSeen(phases: Phase[], doneSeenAt: Map<string, number>, now: number): void {
+  const byName = new Map(phases.map((p) => [p.name, p.state]));
+  for (const name of [...doneSeenAt.keys()])
+    if (byName.get(name) !== "done") doneSeenAt.delete(name);
+  for (const p of phases)
+    if (p.state === "done" && !doneSeenAt.has(p.name)) doneSeenAt.set(p.name, now);
+}
+
 // ADR-0008 · Spec.stage cermin fase, hanya maju. `skipped` dihitung sebagai tercapai:
 // jalur cepat qa melewati Spec+Plan justru karena pekerjaannya tak diperlukan.
 // SPEC-237 · `Laporan` = fase terminal flow audit-only → stage `done` (dokumen ditulis, tak ada
