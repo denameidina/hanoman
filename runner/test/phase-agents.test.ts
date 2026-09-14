@@ -67,6 +67,15 @@ describe("buildPhaseAgents (ADR-0164)", () => {
     expect(b).toContain("internal/docs/research/audit-spec-1100-*.md");
   });
 
+  // I-2 · ADR-0164 · qa lanjutan audit: orchestrator menandai `Audit skipped` SENDIRI (tanpa
+  // mendelegasikan ke agen fase Audit) — jadi agen fase Audit tak pernah dipanggil dalam skenario
+  // ini. Fase pertama yang BENAR-BENAR dipanggil adalah Spec; ia yang harus menerima catatan
+  // dokumen audit asal, bukan Audit.
+  it("qa lanjutan audit: note juga di Spec — fase pertama yang benar-benar dipanggil sesudah Audit dilewati", () => {
+    const s = at(agentsFor("qa", { fromAudit: "SPEC-1100" }), "Spec").instructions;
+    expect(s).toContain("internal/docs/research/audit-spec-1100-*.md");
+  });
+
   it("flow audit: kontrak eskalasi hanya di Laporan", () => {
     const defs = agentsFor("audit");
     expect(at(defs, "Laporan").instructions).toContain(ESCALATION_CONTRACT);

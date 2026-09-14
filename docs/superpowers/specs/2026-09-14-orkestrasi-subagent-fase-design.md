@@ -183,8 +183,9 @@ Loop per fase:
    marker; flow backlog: push sesudah fase terakhir (aturan hari ini). Gerbang penutup: pekerjaan belum
    tuntas — tak boleh commit/push final — sampai tiap fase di rencana punya baris `done`/`skipped`.
 3. `sebagian`/`terhalang`/galat → delegasi ulang **sekali** ke agen yang sama, laporan gagal
-   disertakan. Gagal lagi → berhenti dan `AskUserQuestion` (hanoman-lead/inbox). Berlaku juga di
-   sesi scheduler full-control: kegagalan delegasi dikecualikan dari "jangan bertanya".
+   disertakan. Gagal lagi → berhenti dan `AskUserQuestion` (hanoman-lead/inbox); plan codex (tanpa
+   tool itu) tanyakan di terminal sesi. Berlaku juga di sesi scheduler full-control: kegagalan
+   delegasi dikecualikan dari "jangan bertanya".
 4. `Pertanyaan untuk manusia` → tanyakan (lihat §5), lalu **lanjutkan subagent yang sama**
    (`SendMessage` ke agent ID / `send_input`) dengan jawabannya. Giliran relay bukan percobaan.
 5. Orchestrator **dilarang** mengerjakan fase sendiri.
@@ -194,11 +195,12 @@ Loop per fase:
 | Kasus | Perilaku |
 |---|---|
 | Jalur cepat qa (ADR-0040) | Laporan Audit memuat `Rekomendasi fase: jalur-cepat \| penuh` + alasan; jalur cepat → orchestrator menulis `Spec skipped`, `Plan skipped`, lanjut Execute |
-| Lanjutan audit (`fromAudit`) | Orchestrator menulis `Audit skipped` sendiri — melewati bukan pekerjaan, tanpa subagent |
+| Lanjutan audit qa (`fromAudit`) | Orchestrator menulis `Audit skipped` sendiri — tanpa subagent Audit — lalu meneruskan path dokumen audit ke agen fase Spec; SATU keputusan routing (jalur-cepat/penuh) tetap boleh orchestrator, bukan investigasi/rancangan |
+| Lanjutan audit feature (`fromAudit`) | Semua fase tetap didelegasikan; orchestrator hanya meneruskan path dokumen audit ke agen fase Brainstorm (dan Objective) lewat `Artefak fase sebelumnya:`, tanpa membacanya sendiri |
 | Continue (SPEC-172) | Rencana satu fase: Execute |
 | Resume (SPEC-394) | Orchestrator menerima `resumeClause`, loop mulai dari `r.next`; agen fase tak berubah |
 | Goal / no_effort | Goal → Verifikasi / Kerjakan. Hook `Stop` goal (claude) & goal gate (codex) tetap di orchestrator — keduanya menilai seluruh sesi; selesainya subagent memicu `SubagentStop`, bukan `Stop` |
-| Pertanyaan keputusan (sesi manual backlog) | Orchestrator `AskUserQuestion` → relay jawaban. Full-control: orchestrator memutuskan sendiri (klausa hari ini) |
+| Pertanyaan keputusan (sesi manual backlog) | Orchestrator `AskUserQuestion` → relay jawaban; plan codex tanyakan di terminal sesi (tak ada tool itu). Full-control: orchestrator memutuskan sendiri (klausa hari ini) |
 | Fase interaktif (Wawancara reverse, Brainstorm prd & scaffold) | Subagent mengajukan SATU pertanyaan per laporan; orchestrator menampilkannya di terminal seperti hari ini, menunggu jawaban, relay ke subagent yang sama |
 
 ### 6. Materialisasi, roster & gerbang

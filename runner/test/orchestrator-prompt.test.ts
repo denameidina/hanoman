@@ -64,6 +64,56 @@ describe("orchestratorClause (ADR-0164)", () => {
     expect(c).not.toContain("Fase <n>/<total>:");
     expect(c).toContain("BUKAN baris pertama blok serah-terima");
   });
+
+  // M-6 · codex tak punya tool AskUserQuestion — orchestrator codex bertanya di terminal ini,
+  // bukan lewat tool yang tak ada. claude tetap memakainya.
+  it("codex bertanya di terminal, bukan AskUserQuestion; claude tetap AskUserQuestion", () => {
+    const codexClause = orchestratorClause(plan("feature", "codex"));
+    const claudeClause = orchestratorClause(plan("feature", "claude"));
+    expect(codexClause).not.toContain("AskUserQuestion");
+    expect(codexClause).toContain("tanyakan di terminal ini");
+    expect(claudeClause).toContain("AskUserQuestion");
+  });
+  it("codex: aturan tanya-di-terminal tetap berlaku walau klausa otonomi menyuruh tak bertanya", () => {
+    const c = orchestratorClause(plan("feature", "codex"));
+    expect(c).toContain("Aturan ini berlaku walau klausa otonomi di prompt ini menyuruhmu tak bertanya");
+  });
+});
+
+// I-2 · varian orchestrator dari klausa lanjutan audit (payload.fromAudit). Sesi tunggal boleh
+// disuruh "pakai sebagai bahan" karena agen ITU SENDIRI mengerjakan fasenya; orchestrator TIDAK —
+// instruksi yang sama di mode orchestrator berarti menyuruhnya mengerjakan isi fase sendiri.
+describe("lanjutan audit (fromAudit) · varian orchestrator vs sesi tunggal (I-2, ADR-0164)", () => {
+  const featureFromAudit = { id: "SPEC-320", title: "Ekspor CSV", source: "brief", priority: "sedang",
+    objective: "bisa unduh", payload: { fromAudit: "SPEC-300" } };
+  const qaFromAudit = { id: "SPEC-321", title: "Bug antrean", source: "qa", priority: "tinggi",
+    objective: "perbaiki antrean", payload: { fromAudit: "SPEC-237", steps: "s" } };
+
+  it("feature orchestrator: dokumen audit ke handoff Brainstorm, BUKAN dibaca/dirancang orchestrator", () => {
+    const p = startPrompt("feature", featureFromAudit, "hanoman/spec-320", undefined, undefined,
+      undefined, undefined, plan("feature"));
+    expect(p).not.toContain("pekerjaanmu");
+    expect(p).not.toContain("pakai sebagai bahan fase Brainstorm");
+    expect(p).toContain("audit-spec-300-*.md");
+    expect(p).toContain("Artefak fase sebelumnya");
+  });
+
+  it("qa orchestrator: Audit ditandai skipped sendiri, dokumen diteruskan, satu keputusan routing", () => {
+    const p = startPrompt("qa", qaFromAudit, "hanoman/spec-321", undefined, undefined,
+      undefined, undefined, plan("qa"));
+    expect(p).toContain("Audit skipped");
+    expect(p).toContain('tail -1 "$HANOMAN_PHASE_FILE"');
+    expect(p).toContain("SATU keputusan ROUTING");
+    expect(p).not.toContain("baca dokumen audit itu sebagai temuan");
+  });
+
+  it("tanpa rencana (sesi tunggal): teks lama utuh — split orchestrator/sesi-tunggal eksplisit", () => {
+    const pFeature = startPrompt("feature", featureFromAudit, "hanoman/spec-320");
+    expect(pFeature).toContain("pekerjaanmu");
+    expect(pFeature).toContain("pakai sebagai bahan fase Brainstorm");
+    const pQa = startPrompt("qa", qaFromAudit, "hanoman/spec-321");
+    expect(pQa).toContain("baca dokumen audit itu sebagai temuan");
+  });
 });
 
 describe("pembangun prompt · mode orchestrator (ADR-0164)", () => {

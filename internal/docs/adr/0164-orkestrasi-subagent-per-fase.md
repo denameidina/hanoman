@@ -53,6 +53,16 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
    terpisah, eksplisit BUKAN baris pertama blok), dan penulisan berkas fase jadi tindakan wajib pertama
    (diverifikasi `tail -1`) sebelum fase berikutnya/commit/push, dengan gerbang penutup yang menolak
    commit final sebelum SEMUA fase tercatat `done`/`skipped`.
+   Review whole-branch (temuan I-2) menemukan klausa lanjutan audit (`payload.fromAudit`) sesi tunggal
+   dipakai APA ADANYA di mode orchestrator, padahal isinya menyuruh AGEN itu sendiri "pakai sebagai
+   bahan"/"ambil keputusan" — di orchestrator itu berarti mengerjakan fase sendiri. Varian orchestrator
+   (`auditContinuationForOrchestrator`) dipisah: feature meneruskan path dokumen audit ke agen fase
+   Brainstorm (dan Objective) lewat `Artefak fase sebelumnya:`, TANPA orchestrator membacanya untuk
+   merancang; qa menandai `Audit skipped` sendiri (gerbang `tail -1` yang sama) lalu meneruskan dokumen
+   itu ke agen fase Spec, dengan orchestrator diizinkan SATU keputusan ROUTING saja (jalur-cepat/penuh)
+   dari isi dokumen — bukan investigasi maupun rancangan. Temuan M-6: codex tak punya tool
+   `AskUserQuestion`; klausa langkah 3–4 untuk plan codex diganti "tanyakan di terminal ini lalu tunggu
+   jawaban", aturan tetap berlaku walau klausa otonomi menyuruh tak bertanya — claude tak berubah.
 5. **All-or-nothing**: satu agen fase gagal dimaterialisasi (atau codex < 0.151) → sesi lahir mode tunggal
    dengan prompt lama yang dirakit pemanggil dari input yang sama. Flow mati → argv & prompt byte-identik
    (golden test).

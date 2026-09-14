@@ -81,9 +81,18 @@ function backlogGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string
       return "- Objective: baca dokumen spec dari fase Brainstorm (path-nya di serah-terima), lalu tambahkan "
         + "bagian `## Objective` berisi SATU objective terukur beserta kriteria suksesnya.";
     case "Spec":
+      // I-2 · ADR-0164 · qa lanjutan audit (`fromAudit`): orchestrator menandai Audit `skipped`
+      // SENDIRI (lihat `auditContinuationForOrchestrator`) — agen fase Audit tak pernah dipanggil
+      // pada kontinuitas ini. Spec-lah fase PERTAMA yang benar-benar dipanggil, jadi catatan dokumen
+      // audit asal harus ikut di sini, bukan di Audit (yang di flow ini tak dieksekusi).
       return flow === "qa"
         ? `- Spec: tulis dokumen spec perbaikan di \`${m.specDir}/\` dari dokumen audit fase Audit (path-nya `
           + "di serah-terima): akar masalah, bentuk perbaikan, dan acceptance criteria gaya EARS."
+          + (ctx.fromAudit
+            ? ` Backlog ini LANJUTAN audit ${ctx.fromAudit} — fase Audit sengaja DILEWATI orchestrator, `
+              + `jadi baca dokumennya di \`internal/docs/research/audit-${ctx.fromAudit.toLowerCase()}-*.md\` `
+              + "(path juga ada di serah-terima) sebagai temuan; jangan menginvestigasi ulang dari nol."
+            : "")
         : "- Spec: lengkapi dokumen spec yang sama — arsitektur, komponen, kontrak data/API, penanganan "
           + "galat, dan acceptance criteria gaya EARS. Perbarui docs Source of Truth yang tersentuh.";
     case "Plan":

@@ -135,6 +135,16 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "pertama blok serah-terima di atas."
     : "Deskripsi pemanggilan (parameter `description`) diisi persis `Fase <Nama Fase>` — tanpa nomor "
       + "urut, dan BUKAN baris pertama blok serah-terima di atas.";
+  // M-6 · codex tak punya tool AskUserQuestion — pemanggilan tool yang tak ada bukan instruksi yang
+  // bisa dipatuhi. Orchestrator codex bertanya di terminal sesi ini sendiri (sama seperti klausa
+  // otonomi menyuruh manusia dijawab di terminal); orchestrator claude tetap AskUserQuestion.
+  const askEscalation = codex
+    ? "tanyakan di terminal ini lalu tunggu jawaban"
+    : "tanyakan lewat AskUserQuestion";
+  const askReport = codex
+    ? "tanyakan ke manusia di terminal ini lalu tunggu jawaban"
+    : "tanyakan ke manusia (AskUserQuestion; di fase yang memang bergiliran dengan manusia — "
+      + "Wawancara, Brainstorm prd/scaffold — tanyakan di terminal ini)";
   const list = plan.phases
     .map((p, i) => `${i + 1}. ${p.phase} → \`${p.agentName}\` · ${p.model} · ${p.effort}`)
     .join("\n");
@@ -154,10 +164,9 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "satu-satunya penulis berkas itu.",
     "3. `Status: sebagian`/`terhalang`, galat, atau laporan tanpa bukti → delegasikan ULANG SEKALI ke "
       + "subagent fase yang sama dengan laporan gagalnya disertakan (`Percobaan: 2/2`). Gagal lagi → "
-      + "BERHENTI dan tanyakan lewat AskUserQuestion apa yang harus dilakukan. Aturan ini berlaku walau "
+      + `BERHENTI dan ${askEscalation} apa yang harus dilakukan. Aturan ini berlaku walau `
       + "klausa otonomi di prompt ini menyuruhmu tak bertanya.",
-    "4. `Pertanyaan untuk manusia:` di laporan → tanyakan ke manusia (AskUserQuestion; di fase yang memang "
-      + "bergiliran dengan manusia — Wawancara, Brainstorm prd/scaffold — tanyakan di terminal ini), lalu "
+    `4. \`Pertanyaan untuk manusia:\` di laporan → ${askReport}, lalu `
       + `LANJUTKAN subagent yang SAMA lewat ${resume} dengan jawabannya. Giliran relay ini bukan percobaan `
       + "ulang. Di sesi tanpa pengawas, putuskan sendiri lalu teruskan keputusanmu dengan cara yang sama.",
     o.fastPath
@@ -252,6 +261,39 @@ const auditContinuationInstruction = (flow: Flow, spec: SpecBrief): string => {
     + "tandai fase Audit dilewati (`echo \"Audit skipped\" >> \"$HANOMAN_PHASE_FILE\"`), lalu ambil "
     + "keputusan pasca-Audit: perbaikan jelas & kecil → langsung Execute (tandai `Spec skipped` dan "
     + "`Plan skipped` bila sesuai); selain itu Spec → Plan → Execute penuh.";
+};
+
+// I-2 · ADR-0164 · varian ORCHESTRATOR dari auditContinuationInstruction. Teks sesi tunggal di atas
+// bicara ke agen yang MENGERJAKAN fasenya sendiri ("BACA dokumen itu ... pakai sebagai bahan",
+// "ambil keputusan pasca-Audit"); dipakai apa adanya di mode orchestrator, itu berarti menyuruh
+// ORCHESTRATOR mengerjakan isi fase sendiri — persis larangan `orchestratorClause`. Feature: dokumen
+// audit jadi bahan AGEN FASE Brainstorm lewat handoff (`Artefak fase sebelumnya:`), bukan dibaca
+// orchestrator untuk merancang. qa: orchestrator sendiri yang menandai Audit `skipped` (agen fase
+// Audit tak pernah dipanggil pada kontinuitas ini), lalu meneruskan dokumennya ke agen fase Spec;
+// satu-satunya keputusan yang boleh diambil orchestrator dari isi dokumen itu adalah ROUTING
+// (jalur-cepat atau penuh) — bukan investigasi ulang maupun rancangan perbaikan.
+export const auditContinuationForOrchestrator = (flow: Flow, spec: SpecBrief): string => {
+  if (flow !== "qa" && flow !== "feature") return "";
+  const fromAudit = spec.payload && typeof spec.payload === "object"
+    ? (spec.payload as { fromAudit?: unknown }).fromAudit : undefined;
+  if (typeof fromAudit !== "string" || !fromAudit) return "";
+  const doc = `internal/docs/research/audit-${fromAudit.toLowerCase()}-*.md`;
+  if (flow === "feature")
+    return `Backlog brief ini LANJUTAN dari audit ${fromAudit}. Worktree ini lahir dari branch audit `
+      + `itu, jadi dokumen audit sudah ada di ${doc}. Saat memanggil agen fase Brainstorm (dan `
+      + "Objective), cantumkan path itu di baris `Artefak fase sebelumnya:` blok serah-terima — "
+      + "JANGAN membacanya sendiri untuk merancang fitur ini. Temuannya sudah terbukti, tapi bentuk "
+      + "solusinya belum; itu tetap dikerjakan agen fasenya masing-masing, bukan olehmu.";
+  return `Backlog qa ini LANJUTAN dari audit ${fromAudit}. Temuannya sudah terbukti di ${doc} — `
+    + "JANGAN mendelegasikan ulang fase Audit. Sebelum fase lain: jalankan persis "
+    + '`echo "Audit skipped" >> "$HANOMAN_PHASE_FILE"`, verifikasi dengan `tail -1 "$HANOMAN_PHASE_FILE"` '
+    + "bahwa barisnya benar tertulis (gerbang yang sama seperti langkah 2), lalu cantumkan path dokumen "
+    + "audit itu di baris `Artefak fase sebelumnya:` saat memanggil agen fase Spec. Kamu diizinkan "
+    + "mengambil SATU keputusan ROUTING dari isi dokumen audit itu SAJA: bila ia merekomendasikan jalur "
+    + "cepat (temuan berconfidence tinggi, perbaikan langsung), tandai `Spec skipped` lalu `Plan skipped` "
+    + "(gerbang yang sama) lalu panggil agen fase Execute; selain itu panggil Spec → Plan → Execute penuh "
+    + "lewat agen fasenya masing-masing. Kamu TIDAK menginvestigasi ulang maupun merancang perbaikannya "
+    + "sendiri — itu tetap pekerjaan agen fase.";
 };
 
 // SPEC-376 · ADR-0080 — klausa scope verifikasi hanya untuk flow yang MENULIS KODE. Flow
@@ -382,7 +424,7 @@ export function startPrompt(
   // pasca-Audit) hidup di definisi agen fase — prompt parent hanya membawa kontrak delegasi.
   if (plan) {
     return [
-      head, orchestratorClause(plan, { fastPath: flow === "qa" }), auditContinuationInstruction(flow, spec),
+      head, orchestratorClause(plan, { fastPath: flow === "qa" }), auditContinuationForOrchestrator(flow, spec),
       autonomyClause(autonomy), attachmentClause(attachments), push, specContext(spec),
     ].filter(Boolean).join("\n\n");
   }
