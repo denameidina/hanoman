@@ -9,6 +9,7 @@ export * from "./codex-settings";
 export * from "./agent-cli";
 export * from "./custom-agents";
 export * from "./agent-definition";
+export * from "./phase-agents";
 export * from "./agent-readonly";
 export * from "./codex-agent-config";
 export * from "./custom-agent-eval";
