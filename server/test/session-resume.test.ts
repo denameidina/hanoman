@@ -8,6 +8,8 @@ import { prisma } from "../src/db";
 import { startSpecSession } from "../src/services/session-launch";
 import { killAll, killSession, getSession, createSession, promptFilePath } from "../src/services/pty";
 import { realGit } from "@hanoman/runner";
+import { DEFAULT_SETTING } from "../src/services/settings";
+import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
 
 // SPEC-394 · ADR-0084 — "Lanjutkan" harus MELANJUTKAN. Alat ukur test ini adalah perbedaan dua
 // binary palsu: fake-claude.sh TETAP HIDUP (`exec cat`), /bin/echo langsung keluar sehingga
@@ -47,6 +49,13 @@ async function seed(specId: string, stage = "planned") {
   } });
   return { dir, spec };
 }
+
+// ADR-0164 · mirror `setOrchestration` di session-launch.test.ts — MENGGANTI SELURUH baris Setting.
+const setOrchestration = (flow: "feature" | "qa" | "goal", enabled: boolean) => {
+  const data = { ...DEFAULT_SETTING,
+    orchestration: { ...ORCHESTRATION_DEFAULTS, [flow]: { enabled, claude: {}, codex: {} } } } as unknown as object;
+  return prisma.setting.upsert({ where: { id: 1 }, update: { data }, create: { id: 1, data } });
+};
 
 const waitExited = async (id: string) => {
   for (let i = 0; i < 200 && !getSession(id)?.exited; i++) await new Promise((r) => setTimeout(r, 20));
@@ -175,6 +184,7 @@ describe("SPEC-394 · resume tanpa worktree, fresh, dan stage done", () => {
 
   it("tanpa worktree & tanpa branch sesi → perilaku lama persis (startPrompt, baseSha ditulis)", async () => {
     process.env.HANOMAN_CLAUDE_BIN = ALIVE;
+    await setOrchestration("qa", false);   // ADR-0164 · test ini menegaskan prompt mode tunggal
     const { spec } = await seed("SPEC-L6");
     const r = await startSpecSession(spec, { flow: "qa" });
     expect(r.resumed).toBeUndefined();
