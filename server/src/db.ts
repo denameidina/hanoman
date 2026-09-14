@@ -11,6 +11,14 @@ import { webhookTap, type TapBase } from "./services/webhooks/tap";
 // `DATABASE_URL` non-`file:` diabaikan dengan peringatan (var itu biasanya milik project lain —
 // amandemen ADR-0086). `../prisma` benar di dev (server/src → server/prisma), di bundle repo
 // (server/dist → server/prisma), dan di paket npm (dist → <pkg>/prisma).
+// SPEC-1215 · ADR-0166 · `LogEntry.seq`/`LogCursor.seq` adalah `BigInt` (seq HLC, `Int` 32 bit tak
+// cukup). `JSON.stringify` bawaan Node tak tahu cara menyerialkan `BigInt` dan melempar — patch
+// global sekali di sini (satu-satunya tempat `PrismaClient` lahir) supaya baris mentahnya aman
+// dipakai `JSON.stringify` di mana pun (log, test), bukan cuma lewat `toLogEntryView`.
+(BigInt.prototype as unknown as { toJSON(): string }).toJSON = function (this: bigint) {
+  return this.toString();
+};
+
 const schemaDir = resolve(dirname(fileURLToPath(import.meta.url)), "../prisma");
 process.umask(0o077);
 // Dijaga di sini juga untuk jalur `node dist/server.js` langsung, tanpa lewat CLI.

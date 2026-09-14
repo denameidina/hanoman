@@ -7,6 +7,7 @@ import { startLead } from "./services/lead/engine";
 import { registerBacklogSource } from "./services/scheduler/sources/backlog";
 import { registerTriaseSource } from "./services/scheduler/sources/triase";
 import { installSessionHistory, reconcileHistory } from "./services/session-history";
+import { installEventTap } from "./services/logs/event-log";
 import { detectOrphanWorktrees } from "./services/worktree-project";
 import { installCustomAgents } from "./services/custom-agents";
 import { reconcileAgentInvocations } from "./services/agent-invocations";
@@ -104,6 +105,9 @@ bootstrapReady.then(async () => {
   // SPEC-362 · ADR-0079 · pasang hook riwayat SEBELUM apa pun bisa melahirkan sesi, lalu tutup
   // baris "berjalan" yang panenya sudah lenyap (tmux mati di luar hanoman: kill-server, reboot).
   installSessionHistory();
+  // SPEC-1215 · ADR-0166 · tap event lokal (lahir/tutup sesi). Hook sesi kini aditif, jadi ia berdiri
+  // di samping riwayat sesi, bukan menggantikannya.
+  installEventTap();
   // SPEC-402 · `listSessions()` boleh MELEMPAR (kegagalan tmux ≠ tak ada sesi). Rekonsiliasi yang
   // berjalan atas daftar kosong palsu akan menutup baris riwayat sesi yang justru masih berjalan —
   // "selesai padahal belum" versi tabel. Lewati saja: barisnya tetap terbuka sampai boot berikutnya.

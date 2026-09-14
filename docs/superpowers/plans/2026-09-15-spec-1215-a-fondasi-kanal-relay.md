@@ -1202,7 +1202,7 @@ git commit -m "refactor(pty): hook sesi aditif agar tap log tak mematikan riwaya
   - `recentAudit(limit?: number): Promise<LogEntryView[]>` — kind `remote.*` atau `grant.changed`, `ts desc, id desc`
   - `toLogEntryView(row): LogEntryView`, `installEventTap(): () => void`, `__resetEventLog(): void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/log-event.test.ts`:
 
@@ -1283,12 +1283,12 @@ describe("installEventTap", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-event.test.ts`
 Expected: FAIL — modul `event-log` tak ada.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Create `server/src/services/logs/event-log.ts`:
 
@@ -1407,7 +1407,7 @@ export function installEventTap(): () => void {
 export function __resetEventLog(): void { lastSeq = null; }
 ```
 
-- [ ] **Step 4: Pasang di boot**
+- [x] **Step 4: Pasang di boot**
 
 Di `server/src/server.ts`, tambahkan impor sesudah baris 9:
 
@@ -1423,12 +1423,12 @@ dan tepat sesudah `installSessionHistory();` (baris 106):
   installEventTap();
 ```
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-event.test.ts server/test/session-hooks-additive.test.ts && pnpm --filter ./server typecheck`
 Expected: PASS; typecheck bersih.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/logs/event-log.ts server/src/server.ts server/test/log-event.test.ts
