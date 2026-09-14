@@ -73,24 +73,14 @@ const phaseInstruction = (phases: readonly string[], method: MethodDef) => {
 // SPEC-734 · ADR-0113 · peta fase → skill datang dari registry metode (`METHODS` di
 // @hanoman/shared), bukan konstanta di sini. Objective dan Spec adalah keluaran skill brainstorming
 // yang di-invoke di fase Brainstorm — sengaja tak punya entri sendiri. Fase reverse dipandu standar
-// docs di prompt-nya, bukan skill.
-//
-// `exitSkills` digabungkan ke fase TERAKHIR pipeline dan hanya untuk flow penulis-kode (gerbang
-// `writesCode` yang SAMA dengan scopeClause/codeStyleClause — menyalin daftar flow-nya berarti dua
-// definisi "sesi ini menulis kode" yang bisa berselisih saat flow baru lahir). Itulah yang membuat
-// INVARIAN 2 struktural: metode boleh mengganti CARA sebuah fase dikerjakan, tapi tak boleh
-// menegosiasikan pintu keluarnya. Untuk `superpowers` gabungan itu di-dedup habis (Execute &
-// Verifikasi memang sudah memuat gerbangnya) → prompt byte-identik dengan sebelum spec ini.
+// docs di prompt-nya, bukan skill. Aturan `exitSkills` huni di `phaseSkillsFor` (ADR-0164):
+// digabung ke fase TERAKHIR hanya untuk flow penulis-kode (INVARIAN 2 ADR-0113).
 const skillInstruction = (
-  phases: readonly string[], method: MethodDef, withExit: boolean,
+  flow: Flow, phases: readonly string[], method: MethodDef,
 ) => {
-  const last = phases[phases.length - 1];
   const lines = phases
     .map((p) => {
-      const own = method.phaseSkills[p] ?? [];
-      const skills = withExit && p === last
-        ? [...new Set([...own, ...method.exitSkills])]
-        : own;
+      const skills = phaseSkillsFor(flow, p, method);
       return skills.length ? `- ${p}: ${skills.join(", ")}` : "";
     })
     .filter(Boolean);
@@ -332,7 +322,7 @@ export function startPrompt(
     codeStyleClause(flow),
     methodClause(m),
     attachmentClause(attachments),
-    skillInstruction(PIPELINES[flow], m, writesCode(flow)),
+    skillInstruction(flow, PIPELINES[flow], m),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
     specContext(spec),
@@ -361,7 +351,7 @@ export function continuePrompt(
     codeStyleClause(flow),
     methodClause(m),
     attachmentClause(attachments),
-    skillInstruction(["Execute"], m, writesCode(flow)),
+    skillInstruction(flow, ["Execute"], m),
     `Setelah selesai: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Worktree `
       + `ini detached HEAD — itu memang disengaja.`,
     specContext(spec),
@@ -429,7 +419,7 @@ export function resumePrompt(
     codeStyleClause(flow),
     methodClause(m),
     attachmentClause(attachments),
-    skillInstruction(PIPELINES[flow], m, writesCode(flow)),
+    skillInstruction(flow, PIPELINES[flow], m),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
     specContext(spec),
@@ -477,7 +467,7 @@ export function startGoalPrompt(
     codeStyleClause(flow),
     methodClause(m),
     attachmentClause(opts.attachments),
-    skillInstruction(PIPELINES[flow], m, writesCode(flow)),
+    skillInstruction(flow, PIPELINES[flow], m),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
     goalBlock(spec),
@@ -540,7 +530,7 @@ export function startPrdPrompt(project: ProjectBrief, brief: PrdBrief, branchTo:
     phaseInstruction(PIPELINES.prd, PROJECT_METHOD),
     lines.Brainstorm,
     lines.PRD,
-    skillInstruction(PIPELINES.prd, PROJECT_METHOD, false),
+    skillInstruction("prd", PIPELINES.prd, PROJECT_METHOD),
     `Setelah PRD ditulis: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Bila remote `
       + `origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree `
       + `ini detached HEAD — memang disengaja. Manusia yang me-review lalu merge branch ${branchTo}.`,
@@ -600,7 +590,7 @@ export function startScaffoldPrompt(project: ProjectBrief, branchTo: string): st
       + `push per fase, supaya pekerjaan tak hilang bila worktree lenyap. Bila remote origin tidak ada, `
       + `lewati push dan catat itu di laporan akhir — jangan gagal diam-diam. Worktree ini `
       + `detached HEAD — memang disengaja. Manusia yang me-review dan merge branch ${branchTo}.`,
-    skillInstruction(PIPELINES.scaffold, PROJECT_METHOD, false),
+    skillInstruction("scaffold", PIPELINES.scaffold, PROJECT_METHOD),
     scaffoldContext(project),
     `=== STANDAR DOCS ===\n${REVERSE_STANDARD}`,
   ].filter(Boolean).join("\n\n");
