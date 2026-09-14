@@ -26,7 +26,7 @@ export const WORK_PHASES = ["Execute", "Goal", "Kerjakan"] as const;
 // yang mematuhinya akan mandek diam menunggu review yang tak akan datang. Berhenti hanya untuk
 // keputusan manusia sejati, yang agen surface sebagai pertanyaan di terminalnya (ADR-0024).
 // Sengaja tak dipakai startProjectPrompt: fase Wawancara reverse memang interaktif.
-const AUTONOMY_CLAUSE =
+export const AUTONOMY_CLAUSE =
   "Jalankan seluruh pipeline sampai tuntas tanpa berhenti di batas antar-fase. Checkpoint "
   + "\"review\"/\"approval\"/\"need review\" milik skill superpowers BUKAN titik berhenti di sini — "
   + "lanjut saja ke fase berikutnya. Berhenti HANYA saat butuh keputusan manusia sejati (percabangan "
@@ -48,7 +48,7 @@ const AUTONOMY_CLAUSE_FULL =
 
 // SPEC-298 · pilih klausa per mode. undefined (peluncuran manual) → klausa tanya (lama): sesi
 // manual berpengawas, manusia menonton & boleh menjawab.
-const autonomyClause = (mode?: Autonomy): string =>
+export const autonomyClause = (mode?: Autonomy): string =>
   mode === "full-control" ? AUTONOMY_CLAUSE_FULL : AUTONOMY_CLAUSE;
 
 // Agen yang melapor, server yang menonton: di PTY tak ada batas giliran yang terbaca mesin.
@@ -102,6 +102,22 @@ const skillInstruction = (
       + `mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.\n${lines.join("\n")}`
     : "";
 };
+
+// ADR-0164 · satu baris panduan fase dari guide bergaris `- <Fase>: …` (REVERSE/SCAFFOLD). Agen
+// fase memakai baris yang SAMA dengan prompt sesi tunggal, bukan salinan yang bisa berselisih.
+export function guideLine(guide: string, phase: string): string {
+  return guide.split("\n").find((line) => line.startsWith(`- ${phase}:`)) ?? "";
+}
+
+// ADR-0164 · skill satu fase — aturan `skillInstruction` untuk satu baris: `exitSkills` digabung ke
+// fase TERAKHIR hanya untuk flow penulis-kode (INVARIAN 2 ADR-0113).
+export function phaseSkillsFor(flow: Flow, phase: string, method: MethodDef): string[] {
+  const own = method.phaseSkills[phase] ?? [];
+  const phases = PIPELINES[flow];
+  return writesCode(flow) && phase === phases[phases.length - 1]
+    ? [...new Set([...own, ...method.exitSkills])]
+    : [...own];
+}
 
 // SPEC-204 · ADR-0040 — jalur cepat qa: sesudah Audit, temuan berconfidence tinggi yang
 // perbaikannya langsung (diff kecil, akar masalah jelas) melewati Spec+Plan. Keputusan
@@ -191,21 +207,21 @@ const auditContinuationInstruction = (flow: Flow, spec: SpecBrief): string => {
 // SPEC-407 · flow goal MENULIS KODE juga, meski pipeline-nya tak punya fase `Execute`. Tanpa
 // klausa ini ia jatuh ke DoD repo target dan menjalankan suite penuh — persis lubang ADR-0080.
 // SPEC-825 · daftarnya `WORK_PHASES`, bukan rantai `||` yang tumbuh satu suku tiap flow baru.
-const writesCode = (flow: Flow): boolean =>
+export const writesCode = (flow: Flow): boolean =>
   PIPELINES[flow].some((p) => (WORK_PHASES as readonly string[]).includes(p));
-const scopeClause = (flow: Flow, scope?: VerifyScope): string =>
+export const scopeClause = (flow: Flow, scope?: VerifyScope): string =>
   scope && writesCode(flow) ? verifyScopeClause(scope) : "";
 
 // SPEC-543 · ADR-0108 — klausa gaya kode. Gerbangnya `writesCode` yang SAMA dengan scopeClause;
 // menyalin daftar flow-nya berarti dua definisi "sesi ini menulis kode" yang bisa berselisih saat
 // flow baru lahir. Tak ber-knob, sengaja berbeda dari verifyScope: tak ada keadaan di mana
 // "sesi ini boleh menulis komentar yang mengulang kode" masuk akal untuk ditawarkan.
-const codeStyleClause = (flow: Flow): string => writesCode(flow) ? CODE_STYLE_CLAUSE : "";
+export const codeStyleClause = (flow: Flow): string => writesCode(flow) ? CODE_STYLE_CLAUSE : "";
 
 // SPEC-734 · ADR-0113 · klausa khas metode (mis. "sesi ini tak berpenunggu"). Metode tanpa
 // `extraClause` menghasilkan string kosong → `filter(Boolean)` membuangnya → prompt tak berubah
 // sedikit pun, yang membuat default `superpowers` byte-identik dengan sebelum spec ini.
-const methodClause = (method: MethodDef): string => method.extraClause ?? "";
+export const methodClause = (method: MethodDef): string => method.extraClause ?? "";
 
 // SPEC-843 · ADR-0124 · lampiran backlog. Directive AKTIF dengan path absolut — kebalikan SADAR dari
 // lampiran tiket, yang dibingkai UNTRUSTED dan sengaja TANPA path host (SPEC-761). Bedanya asal,
@@ -232,14 +248,78 @@ const attachmentClause = (ctx?: AttachmentCtx): string => {
 // Sesi project-level (reverse/scaffold/prd/breakdown) TAK punya baris `Spec`, jadi tak punya metode
 // tersimpan; ketiganya juga flow dokumen, yang katalog mattpocock tak layani. Mereka tetap di metode
 // default — dinyatakan, bukan kebetulan (ADR-0113).
-const PROJECT_METHOD = resolveMethod();
+export const PROJECT_METHOD = resolveMethod();
+
+// ADR-0164 · blok konteks di ekor prompt. Diekspor karena agen fase lahir dengan konteks TERPISAH
+// (subagent tak melihat prompt parent), jadi server menyematkan blok yang SAMA ke instruksinya.
+export const specContext = (spec: SpecBrief): string => {
+  const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
+  return `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
+    + `Judul: ${spec.title}\nObjective: ${spec.objective}${detail}`;
+};
+export const goalDetail = (spec: SpecBrief): string => {
+  const g = readGoalPayload(spec.payload);
+  return [
+    `Goal: ${g?.goal ?? spec.objective}`,
+    g?.done ? `Selesai bila: ${g.done}` : "",
+    g?.constraints ? `Batasan: ${g.constraints}` : "",
+  ].filter(Boolean).join("\n");
+};
+export const goalBlock = (spec: SpecBrief): string =>
+  `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
+    + `Judul: ${spec.title}`;
+export const goalContext = (spec: SpecBrief): string => `${goalDetail(spec)}\n\n${goalBlock(spec)}`;
+export const projectContext = (project: ProjectBrief): string =>
+  `Project ${project.id} · ${project.name}\nDeskripsi: ${project.desc || "—"}\nStack: ${project.stack || "—"}`;
+export const scaffoldContext = (project: ProjectBrief): string =>
+  `Project ${project.id} · ${project.name}\nIde awal: ${project.desc || "—"}\nStack: ${project.stack || "—"}`;
+export const prdBriefBlock = (project: ProjectBrief, brief: PrdBrief): string =>
+  `Project ${project.id} · ${project.name}\nBrief — Judul: ${brief.title}\nKonteks: ${brief.context}\n`
+    + `Outcome: ${brief.outcome}${brief.constraints ? `\nBatasan: ${brief.constraints}` : ""}`;
+export const prdAuditBlock = (audit?: AuditDoc): string => audit
+  ? `=== DOKUMEN AUDIT ${audit.id} (${audit.path}) ===\nPRD ini adalah TINDAK LANJUT audit di bawah. `
+    + "Pakai temuannya sebagai bahan brainstorm — jangan menginvestigasi ulang, dan jangan pula "
+    + `menyalinnya mentah-mentah ke PRD.\n\n${audit.content}`
+  : "";
+export const prdContext = (project: ProjectBrief, brief: PrdBrief, audit?: AuditDoc): string =>
+  [prdBriefBlock(project, brief), prdAuditBlock(audit)].filter(Boolean).join("\n\n");
+export const breakdownContext = (project: ProjectBrief, prd: BreakdownPrd): string =>
+  `Project ${project.id} · ${project.name}\n=== PRD: ${prd.title} (${prd.path}) ===\n${prd.content}`;
+
+// ADR-0164 · baris panduan fase PRD & breakdown dipakai DUA jalur: prompt sesi tunggal di bawah dan
+// instruksi agen fase (phase-agents.ts). String dipindah APA ADANYA dari pembangunnya.
+export const prdPhaseLines = (slug: string): Record<"Brainstorm" | "PRD", string> => ({
+  Brainstorm: `- Brainstorm: pandu PM secara interaktif. Ajukan SATU pertanyaan per giliran ke manusia di `
+    + `terminal ini, tunggu jawabannya, perdalam brief sampai jelas (masalah, pengguna, scope, `
+    + `metrik sukses). Jangan mengarang; topik yang PM belum jawab tandai sebagai open question.`,
+  PRD: `- PRD: tulis dokumen ke \`docs/prd/${slug}.md\`. Awali dengan heading \`# <judul PRD>\`, lalu `
+    + `bagian: Ringkasan · Masalah & konteks · Persona/pengguna · Goals & non-goals · Scope `
+    + `(in/out) · User stories · Acceptance criteria (gaya EARS) · Metrik sukses · Open questions. `
+    + `Isi lengkap dan spesifik dari hasil brainstorm, bukan kerangka kosong.`,
+});
+export const breakdownPhaseLines = (slug: string, title: string): Record<"Analisis" | "Breakdown", string> => ({
+  Analisis: `- Analisis: baca PRD (di bawah) sampai paham SELURUH scope in-PRD. Petakan pekerjaan menjadi `
+    + `unit-unit yang: (a) kecil & terukur — tiap unit tuntas dalam satu sesi; (b) non-overlapping `
+    + `— cakupan tak tumpang tindih; (c) TANPA cross-dependency — urutan bebas, bisa jalan bersamaan; `
+    + `(d) gabungannya MENUTUP seluruh scope PRD. Bila dua unit terpaksa berurutan, gabung jadi satu.`,
+  Breakdown: `- Breakdown: tulis manifest ke \`docs/prd/${slug}.breakdown.md\`. Awali heading `
+    + `\`# Breakdown: ${title}\`, lalu prosa: ringkasan + untuk TIAP backlog satu paragraf `
+    + `(judul, cakupan, dan SATU kalimat kenapa aman-paralel / tak bergantung yang lain). `
+    + `Di AKHIR dokumen sertakan TEPAT SATU blok kode berpagar json berisi kontrak mesin PERSIS `
+    + `bentuk ini (tanpa komentar, priority ∈ tinggi|sedang|rendah):\n`
+    + "```json\n"
+    + `{ "items": [ { "title": "…", "context": "…", "outcome": "…", "priority": "sedang" } ] }\n`
+    + "```\n"
+    + `\`context\` = bagian PRD yang dicakup; \`outcome\` = kondisi selesai terukur; \`title\` ringkas. `
+    + `Minimal 2 item bila PRD memang kompleks; bila PRD ternyata sekecil 1 unit, katakan itu di `
+    + `prosa dan tetap tulis 1 item.`,
+});
 
 export function startPrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, autonomy?: Autonomy, verifyScope?: VerifyScope,
   method?: string, attachments?: AttachmentCtx,
 ): string {
   const m = resolveMethod(method);
-  const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
   return [
     `hanoman ${flow}. Ikuti internal/docs sebagai Source of Truth; perbarui docs yang tersentuh `
       + `dan link-nya di index, dalam commit yang sama.`,
@@ -255,8 +335,7 @@ export function startPrompt(
     skillInstruction(PIPELINES[flow], m, writesCode(flow)),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
-    `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
-      + `Judul: ${spec.title}\nObjective: ${spec.objective}${detail}`,
+    specContext(spec),
   ].filter(Boolean).join("\n\n");
 }
 
@@ -270,7 +349,6 @@ export function continuePrompt(
   method?: string, attachments?: AttachmentCtx,
 ): string {
   const m = resolveMethod(method);
-  const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
   return [
     `hanoman ${flow} — MELANJUTKAN backlog item yang sebelumnya ditandai selesai padahal `
       + `pekerjaannya belum tuntas. Ikuti internal/docs sebagai Source of Truth; perbarui `
@@ -286,8 +364,7 @@ export function continuePrompt(
     skillInstruction(["Execute"], m, writesCode(flow)),
     `Setelah selesai: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Worktree `
       + `ini detached HEAD — itu memang disengaja.`,
-    `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
-      + `Judul: ${spec.title}\nObjective: ${spec.objective}${detail}`,
+    specContext(spec),
   ].filter(Boolean).join("\n\n");
 }
 
@@ -336,7 +413,6 @@ export function resumePrompt(
   autonomy?: Autonomy, verifyScope?: VerifyScope, method?: string, attachments?: AttachmentCtx,
 ): string {
   const m = resolveMethod(method);
-  const detail = spec.payload ? `\nDetail: ${JSON.stringify(spec.payload)}` : "";
   // Keputusan pasca-Audit (ADR-0040) hanya relevan selama Audit belum tercatat. Sesudah itu
   // keputusannya SUDAH diambil dan sudah mewujud sebagai baris `Spec skipped`/`Spec done` di
   // berkas fase — menyuruh agen memutuskannya lagi berarti mengundangnya membatalkan keputusan
@@ -356,8 +432,7 @@ export function resumePrompt(
     skillInstruction(PIPELINES[flow], m, writesCode(flow)),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
-    `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
-      + `Judul: ${spec.title}\nObjective: ${spec.objective}${detail}`,
+    specContext(spec),
   ].filter(Boolean).join("\n\n");
 }
 
@@ -376,13 +451,7 @@ export function startGoalPrompt(
           attachments?: AttachmentCtx } = {},
 ): string {
   const m = resolveMethod(opts.method);
-  const g = readGoalPayload(spec.payload);
   const noEffort = flow === "no_effort";
-  const detail = [
-    `Goal: ${g?.goal ?? spec.objective}`,
-    g?.done ? `Selesai bila: ${g.done}` : "",
-    g?.constraints ? `Batasan: ${g.constraints}` : "",
-  ].filter(Boolean).join("\n");
   return [
     noEffort
       ? "hanoman no-effort — sesi ini mengerjakan SATU pekerjaan remeh lalu berhenti. TIDAK ada "
@@ -397,7 +466,7 @@ export function startGoalPrompt(
         + "internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di "
         + "index, dalam commit yang sama.",
     opts.resume ? resumeClause(opts.resume, branchTo, m.planDir, false) : "",
-    detail,
+    goalDetail(spec),
     phaseInstruction(PIPELINES[flow], m),
     noEffort ? ""
       : "Fase Verifikasi bukan formalitas: jalankan perintah yang membuktikan goal-nya tercapai "
@@ -411,8 +480,7 @@ export function startGoalPrompt(
     skillInstruction(PIPELINES[flow], m, writesCode(flow)),
     `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
       + `Worktree ini detached HEAD — itu memang disengaja.`,
-    `Backlog item ${spec.id} · sumber ${spec.source} · prioritas ${spec.priority}\n`
-      + `Judul: ${spec.title}`,
+    goalBlock(spec),
   ].filter(Boolean).join("\n\n");
 }
 
@@ -429,7 +497,7 @@ export const RESUMED_WORKTREE_NOTE =
 // Panduan per fase reverse (SPEC-166). Wawancara adalah fase interaktif: manusia menonton
 // sesi ini lewat terminal dashboard dan menjawab di sana — karena itu SATU pertanyaan per
 // giliran, bukan borongan.
-const REVERSE_PHASE_GUIDE = [
+export const REVERSE_PHASE_GUIDE = [
   "- Scan: baca source code — stack, arsitektur, data model, API surface, perilaku domain. Belum menulis docs.",
   "- Docs teknis: tulis kategori yang bisa diturunkan dari kode (architecture, requirements + "
     + "EARS dari perilaku nyata, adr ber-Status accepted (reverse-engineered), operations, "
@@ -453,7 +521,7 @@ export function startProjectPrompt(flow: Flow, project: ProjectBrief, branchTo: 
       + `push per fase, supaya pekerjaan tak hilang bila worktree lenyap. Bila remote origin tidak ada, `
       + `lewati push dan catat itu di laporan akhir — jangan gagal diam-diam. Worktree ini `
       + `detached HEAD — memang disengaja. Manusia yang me-review dan merge branch ${branchTo}.`,
-    `Project ${project.id} · ${project.name}\nDeskripsi: ${project.desc || "—"}\nStack: ${project.stack || "—"}`,
+    projectContext(project),
     `=== STANDAR DOCS ===\n${REVERSE_STANDARD}`,
   ].join("\n\n");
 }
@@ -465,32 +533,19 @@ export function startProjectPrompt(flow: Flow, project: ProjectBrief, branchTo: 
 // AUTONOMY_CLAUSE: seperti Wawancara reverse, brainstorm PRD memang berjalan bergiliran dgn PM.
 export function startPrdPrompt(project: ProjectBrief, brief: PrdBrief, branchTo: string, audit?: AuditDoc): string {
   const slug = branchTo.slice(branchTo.lastIndexOf("/") + 1);
-  // SPEC-340 · ADR-0076 · PRD hasil eskalasi audit: temuan audit adalah BAHAN brainstorm yang sudah
-  // terbukti. Disematkan utuh (bukan path) agar prompt lepas dari status merge branch audit —
-  // pola startBreakdownPrompt yang menyematkan isi PRD.
-  const auditBlock = audit
-    ? `=== DOKUMEN AUDIT ${audit.id} (${audit.path}) ===\nPRD ini adalah TINDAK LANJUT audit di bawah. `
-      + "Pakai temuannya sebagai bahan brainstorm — jangan menginvestigasi ulang, dan jangan pula "
-      + `menyalinnya mentah-mentah ke PRD.\n\n${audit.content}`
-    : "";
+  const lines = prdPhaseLines(slug);
   return [
     `hanoman prd. Kamu memandu PM/PO menyusun SATU dokumen PRD untuk project ini dari brief + `
       + `brainstorm. Keluaranmu HANYA dokumen PRD — JANGAN menulis kode fitur.`,
     phaseInstruction(PIPELINES.prd, PROJECT_METHOD),
-    `- Brainstorm: pandu PM secara interaktif. Ajukan SATU pertanyaan per giliran ke manusia di `
-      + `terminal ini, tunggu jawabannya, perdalam brief sampai jelas (masalah, pengguna, scope, `
-      + `metrik sukses). Jangan mengarang; topik yang PM belum jawab tandai sebagai open question.`,
-    `- PRD: tulis dokumen ke \`docs/prd/${slug}.md\`. Awali dengan heading \`# <judul PRD>\`, lalu `
-      + `bagian: Ringkasan · Masalah & konteks · Persona/pengguna · Goals & non-goals · Scope `
-      + `(in/out) · User stories · Acceptance criteria (gaya EARS) · Metrik sukses · Open questions. `
-      + `Isi lengkap dan spesifik dari hasil brainstorm, bukan kerangka kosong.`,
+    lines.Brainstorm,
+    lines.PRD,
     skillInstruction(PIPELINES.prd, PROJECT_METHOD, false),
     `Setelah PRD ditulis: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Bila remote `
       + `origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree `
       + `ini detached HEAD — memang disengaja. Manusia yang me-review lalu merge branch ${branchTo}.`,
-    `Project ${project.id} · ${project.name}\nBrief — Judul: ${brief.title}\nKonteks: ${brief.context}\n`
-      + `Outcome: ${brief.outcome}${brief.constraints ? `\nBatasan: ${brief.constraints}` : ""}`,
-    auditBlock,
+    prdBriefBlock(project, brief),
+    prdAuditBlock(audit),
   ].filter(Boolean).join("\n\n");
 }
 
@@ -500,31 +555,19 @@ export function startPrdPrompt(project: ProjectBrief, brief: PrdBrief, branchTo:
 // (analisis, bukan brainstorm bergiliran) → memakai AUTONOMY_CLAUSE.
 export function startBreakdownPrompt(project: ProjectBrief, prd: BreakdownPrd, branchTo: string): string {
   const slug = branchTo.slice(branchTo.lastIndexOf("/") + 1);
+  const lines = breakdownPhaseLines(slug, prd.title);
   return [
     `hanoman breakdown. Kamu memecah SATU PRD kompleks menjadi BEBERAPA backlog kecil yang bisa `
       + `dikerjakan PARALEL tanpa saling bergantung. Keluaranmu HANYA dokumen manifest — `
       + `JANGAN menulis kode fitur.`,
     phaseInstruction(PIPELINES.breakdown, PROJECT_METHOD),
-    `- Analisis: baca PRD (di bawah) sampai paham SELURUH scope in-PRD. Petakan pekerjaan menjadi `
-      + `unit-unit yang: (a) kecil & terukur — tiap unit tuntas dalam satu sesi; (b) non-overlapping `
-      + `— cakupan tak tumpang tindih; (c) TANPA cross-dependency — urutan bebas, bisa jalan bersamaan; `
-      + `(d) gabungannya MENUTUP seluruh scope PRD. Bila dua unit terpaksa berurutan, gabung jadi satu.`,
-    `- Breakdown: tulis manifest ke \`docs/prd/${slug}.breakdown.md\`. Awali heading `
-      + `\`# Breakdown: ${prd.title}\`, lalu prosa: ringkasan + untuk TIAP backlog satu paragraf `
-      + `(judul, cakupan, dan SATU kalimat kenapa aman-paralel / tak bergantung yang lain). `
-      + `Di AKHIR dokumen sertakan TEPAT SATU blok kode berpagar json berisi kontrak mesin PERSIS `
-      + `bentuk ini (tanpa komentar, priority ∈ tinggi|sedang|rendah):\n`
-      + "```json\n"
-      + `{ "items": [ { "title": "…", "context": "…", "outcome": "…", "priority": "sedang" } ] }\n`
-      + "```\n"
-      + `\`context\` = bagian PRD yang dicakup; \`outcome\` = kondisi selesai terukur; \`title\` ringkas. `
-      + `Minimal 2 item bila PRD memang kompleks; bila PRD ternyata sekecil 1 unit, katakan itu di `
-      + `prosa dan tetap tulis 1 item.`,
+    lines.Analisis,
+    lines.Breakdown,
     AUTONOMY_CLAUSE,
     `Setelah manifest ditulis: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Bila remote `
       + `origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree `
       + `ini detached HEAD — memang disengaja. Manusia me-review manifest lalu materialize backlog darinya.`,
-    `Project ${project.id} · ${project.name}\n=== PRD: ${prd.title} (${prd.path}) ===\n${prd.content}`,
+    breakdownContext(project, prd),
   ].filter(Boolean).join("\n\n");
 }
 
@@ -532,7 +575,7 @@ export function startBreakdownPrompt(project: ProjectBrief, prd: BreakdownPrd, b
 // tak ada kode untuk dipindai, jadi Brainstorm interaktif menggali ide jadi objective, lalu
 // Doc index menulis seluruh internal/docs/** dari ide+objective+jawaban. Brainstorm memang
 // bergiliran dengan manusia — karena itu SATU pertanyaan per giliran, tanpa AUTONOMY_CLAUSE.
-const SCAFFOLD_PHASE_GUIDE = [
+export const SCAFFOLD_PHASE_GUIDE = [
   "- Brainstorm: perdalam IDE project (di bawah) jadi masalah, pengguna, scope, dan metrik sukses. "
     + "Ajukan SATU pertanyaan per giliran ke manusia di terminal ini, tunggu jawabannya. Jangan "
     + "mengarang; topik yang belum dijawab tandai sebagai open question.",
@@ -558,7 +601,7 @@ export function startScaffoldPrompt(project: ProjectBrief, branchTo: string): st
       + `lewati push dan catat itu di laporan akhir — jangan gagal diam-diam. Worktree ini `
       + `detached HEAD — memang disengaja. Manusia yang me-review dan merge branch ${branchTo}.`,
     skillInstruction(PIPELINES.scaffold, PROJECT_METHOD, false),
-    `Project ${project.id} · ${project.name}\nIde awal: ${project.desc || "—"}\nStack: ${project.stack || "—"}`,
+    scaffoldContext(project),
     `=== STANDAR DOCS ===\n${REVERSE_STANDARD}`,
   ].filter(Boolean).join("\n\n");
 }
