@@ -3728,17 +3728,17 @@ Dikerjakan **controller** (sesi utama), bukan subagent implementer: smoke memaka
 - Create (sementara, JANGAN di-commit): `server/.smoke/render.ts`, `server/.smoke/seed.ts`, `server/.smoke/token.ts`
 - Modify: `docs/superpowers/plans/2026-09-14-orkestrasi-subagent-fase.md` (centang)
 
-- [ ] **Step 1: Test tersentuh, serial**
+- [x] **Step 1: Test tersentuh, serial**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" rtk proxy pnpm vitest --run --changed 05978c6d --no-file-parallelism`
 Expected: PASS. Setiap merah dicek di base dulu (`/usr/bin/git stash` DILARANG — pakai `/usr/bin/git worktree add "$(mktemp -d)/base" 05978c6d` lalu jalankan test yang sama di sana). Merah yang juga merah di base dicatat apa adanya di laporan akhir, bukan diperbaiki diam-diam.
 
-- [ ] **Step 2: Typecheck keempat paket**
+- [x] **Step 2: Typecheck keempat paket**
 
 Run: `rtk proxy pnpm --filter ./shared typecheck && rtk proxy pnpm --filter ./runner typecheck && rtk proxy pnpm --filter ./server typecheck && rtk proxy pnpm --filter ./src typecheck`
 Expected: exit 0.
 
-- [ ] **Step 3: Smoke live orchestrator claude (renderer produk sungguhan)**
+- [x] **Step 3: Smoke live orchestrator claude (renderer produk sungguhan)**
 
 `server/.smoke/render.ts`:
 
@@ -3808,7 +3808,7 @@ Expected (semua wajib):
 
 Gagal di salah satu = temuan, bukan catatan kaki: laporkan dengan output apa adanya dan hentikan penutupan pekerjaan.
 
-- [ ] **Step 4: API nyata dengan HOME sekali pakai**
+- [x] **Step 4: API nyata dengan HOME sekali pakai**
 
 `server/.smoke/seed.ts`:
 
@@ -3868,7 +3868,7 @@ Expected:
 
 Bila auth/Origin menolak (401/403/404), baca `server/src/app.ts` bagian gerbang cookie & ingress lalu sesuaikan header — catat penyesuaiannya di laporan.
 
-- [ ] **Step 5: Bersihkan (per-PID, bukan pola)**
+- [x] **Step 5: Bersihkan (per-PID, bukan pola)**
 
 ```sh
 kill <PID server dari Step 4>
@@ -3879,7 +3879,7 @@ rm -rf server/.smoke
 
 Expected: `git status` hanya menunjukkan centang plan (belum di-commit) — tak ada `server/.smoke`.
 
-- [ ] **Step 6: Commit centang plan**
+- [x] **Step 6: Commit centang plan**
 
 ```bash
 /usr/bin/git add docs/superpowers/plans/2026-09-14-orkestrasi-subagent-fase.md
