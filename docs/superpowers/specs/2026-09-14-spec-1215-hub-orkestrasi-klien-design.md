@@ -1,7 +1,7 @@
 # SPEC-1215 — Hub mengorkestrasi klien hanoman: kendali sesi jarak jauh, tampilan identik, dan log terpusat
 
 **Tanggal:** 2026-09-14 · **Flow:** feature · **Prioritas:** sedang · **Sumber:** brief
-**Base:** `67478d09` · **Fase penulis bagian ini:** Brainstorm (1/5), Objective (2/5), Spec (3/5)
+**Base:** `67478d09` · **Fase penulis bagian ini:** Brainstorm (1/5), Objective (2/5), Spec (3/5), Plan (4/5, §S13)
 **ADR:** [0165 — kendali jarak jauh lewat socket relay](../../../internal/docs/adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) ·
 [0166 — log terpusat](../../../internal/docs/adr/0166-log-terpusat-ingest-satu-arah.md)
 
@@ -834,9 +834,11 @@ model LogCursor {
 - **Migration** `server/prisma/migrations/20260915120000_log_terpusat/migration.sql`: `CREATE TABLE`
   ×2 + indeks, nol backfill, dan tak menyentuh tabel lain. Timestamp sesudah migration terakhir
   `20260914120000_agent_invocation_phase`.
-- **Wajib dikecualikan eksplisit:** `SYNCED`/`FIELDS`, `PG_ORDER` dan daftar model
-  `migrate-from-postgres` (tabel tak ada di Postgres lama), serta `WEBHOOK_ENTITIES`. Test DMMF yang
-  mencocokkan daftar model harus diperbarui, bukan dilemahkan.
+- **Wajib dikecualikan eksplisit** dari `SYNCED`/`FIELDS` dan `WEBHOOK_ENTITIES`. **Dikoreksi fase Plan
+  (§S13 P1):** keduanya justru WAJIB terdaftar di `PG_ORDER` — `cli/test/migrate-pg.test.ts:23` menuntut
+  `PG_ORDER` = seluruh model DMMF, dan tabel yang tak ada di Postgres lama sudah ditangani jalur 42P01
+  (preseden `AgentInvocation`/`Changelog`). Test DMMF yang mencocokkan daftar model harus diperbarui,
+  bukan dilemahkan.
 
 #### S4.11 Kontrak frontend
 
@@ -952,6 +954,9 @@ model LogCursor {
   masih dipegang sesi ini (satu backlog satu sesi, ADR-0015). Memfilekan A–D sekarang membuka jalan dua
   sesi mengerjakan kontrak yang sama. Turunan dipakai sebagai **irisan plan** berurutan. Bila Plan
   menilai satu sesi terlalu besar, B–D difilekan saat itu dengan spec ini sebagai design-of-record.
+- **Diputuskan fase Plan (§S13):** sesi SPEC-1215 mengeksekusi **A** saja; B, C, D difilekan sebagai
+  **SPEC-1216** (B), **SPEC-1218** (C), **SPEC-1217** (D), masing-masing ber-`dependsOn` SPEC-1215 (C juga
+  SPEC-1216), sehingga gerbang dependency ADR-0093 menahan peluncurannya sampai A selesai dan ter-merge.
 
 ### S9. Acceptance criteria (EARS)
 
@@ -1169,3 +1174,41 @@ ber-`SYNC_SERVER_URL` ke hub), lalu curl:
 - Timeout relay tak membatalkan efek yang sudah terjadi di klien. Presence dan log menjadi sumber
   kebenaran sesudahnya.
 - Angka S4.1 adalah angka awal. Kalibrasi C/D bisa mengubahnya lewat amandemen ADR.
+
+### S13. Keputusan & koreksi fase Plan (4/5)
+
+**Plan:** [2026-09-15-spec-1215-a-fondasi-kanal-relay.md](../plans/2026-09-15-spec-1215-a-fondasi-kanal-relay.md)
+— 16 task TDD (+ Task 0 persiapan), dieksekusi sesi SPEC-1215.
+
+**Skop eksekusi sesi ini = turunan A penuh** (AC-A1…A12, AC-M1…M2). Turunan lain difilekan di DB oleh fase
+Plan, masing-masing menunjuk spec ini sebagai design-of-record:
+
+| Backlog | Turunan | AC | `dependsOn` |
+|---|---|---|---|
+| SPEC-1216 | B · Orkestrasi | AC-B1…B11 | SPEC-1215 |
+| SPEC-1218 | C · Tampilan identik | AC-C1…C10 | SPEC-1215, SPEC-1216 |
+| SPEC-1217 | D · Log terpusat | AC-D1…D10 | SPEC-1215 |
+
+Alasan memfilekan sekarang: sesudah A, SPEC-1215 akan ditandai selesai, dan B–D tak boleh hanya hidup di
+dokumen. Risiko dua sesi mengerjakan kontrak yang sama ditutup gerbang dependency ADR-0093 (dibaca
+peluncuran manual, governor scheduler, dan denyut lead) — terverifikasi `SPEC-1216.blockedBy =
+[{SPEC-1215, unfinished}]`.
+
+**Koreksi & keputusan (mengikat Execute; bila berselisih dengan §S0–S12, bagian ini yang berlaku):**
+
+- **P1 · `PG_ORDER` memuat `LogEntry`/`LogCursor`.** §S4.10 menyebut "dikecualikan"; kode menuntut sebaliknya
+  (`cli/test/migrate-pg.test.ts:23`: `PG_ORDER` = seluruh model DMMF; jalur 42P01 untuk tabel absen).
+- **P2 · Tap event A** = `session.start`, `session.end`, `remote.request`, `remote.link`, `grant.changed`.
+  `session.phase`, `session.result`, `launch.rejected`, `log.gap` pindah ke SPEC-1217.
+- **P3 · Body `POST /terminal/sessions` dinilai di `preHandler`** (`relayBodyAllowed`), bukan `onRequest` —
+  body belum di-parse di sana. Dispatcher memeriksa path & body sebelum `inject`.
+- **P4 · Hook gate `remote` dipasang terlepas dari `requireAuth`**; gate cookie melewati `req.remote`.
+- **P5 · `PresenceDeviceView.control`/`capacity` opsional di tipe**, selalu diisi `presenceView()`.
+- **P6 · `GET /api/remote-control` tanpa `shipping` dan `RemoteControlPanel` tanpa toggle lajur log di A**
+  — keduanya lahir bersama shipper SPEC-1217 (kejujuran tampilan K7). `PUT` tetap menerima `logs`.
+- **P7 · Retensi baris `LogEntry` lokal** menyusul `pruneLogs` SPEC-1217.
+- **P8 · `requestRelay()` hub diekspor tanpa route HTTP**; `relay.request` di hub dicatat SPEC-1216.
+- **P9 · Helper backoff pindah ke `server/src/services/backoff.ts`** (di-re-export `sync-client.ts`).
+- **P10 · Klien A menjawab frame `open` dengan `close 4502`** supaya hub versi C tak menunggu 10 dtk.
+- **P11 · `registerSessionHooks` mengembalikan pencabut**; `server/test/pty.test.ts:904` yang mereset dengan
+  `registerSessionHooks({})` wajib diganti.

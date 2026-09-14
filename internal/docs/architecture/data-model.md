@@ -726,7 +726,9 @@ scaffold, breakdown, dan konsol VPS.
 ## LogEntry / LogCursor (SPEC-1215 · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **DIRANCANG, belum ada di skema**
 
 Log terpusat hub + audit kendali jarak jauh. **LOCAL-only per instance**, bukan entitas sync: tak masuk
-`SYNCED`/`FIELDS`/`PG_ORDER`/`WEBHOOK_ENTITIES` maupun daftar model `migrate-from-postgres`.
+`SYNCED`/`FIELDS`/`WEBHOOK_ENTITIES`. Keduanya **tetap terdaftar** di `PG_ORDER` `migrate-from-postgres`
+(test menuntut `PG_ORDER` = seluruh model DMMF; tabel absen di Postgres lama = jalur 42P01, preseden
+`AgentInvocation`/`Changelog` — koreksi fase Plan SPEC-1215 §S13 P1).
 Migration: `20260915120000_log_terpusat` (dua `CREATE TABLE` + indeks, nol backfill).
 
 - **`LogEntry`**:

@@ -146,8 +146,10 @@ siapa di hub yang melakukan apa. Tanpa hub, klien tetap menyimpan audit `remote.
 sama.
 
 **Buruk.**
-- Dua model baru yang wajib dikecualikan dari setiap daftar tulis-tangan entitas sync
-  (`SYNCED`/`FIELDS`/`PG_ORDER`/`WEBHOOK_ENTITIES`/daftar model `migrate-from-postgres`).
+- Dua model baru yang wajib dikecualikan dari daftar tulis-tangan entitas sync
+  (`SYNCED`/`FIELDS`/`WEBHOOK_ENTITIES`), tetapi **wajib didaftarkan** di `PG_ORDER` `migrate-from-postgres`:
+  test menuntut `PG_ORDER` = seluruh model DMMF, dan tabel yang absen di Postgres lama ditangani jalur
+  42P01 (koreksi fase Plan SPEC-1215 §S13 P1).
 - Hook sesi pty harus diubah dari satu slot menjadi aditif. `registerSessionHooks` hari ini
   **mengganti** hook sebelumnya, jadi pendaftar kedua akan mematikan riwayat sesi tanpa satu pun
   error.
