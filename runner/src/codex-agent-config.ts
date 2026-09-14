@@ -143,7 +143,7 @@ export function materializeCodexAgents(
   const liveDefs = successful.map((entry) => entry.def);
   return {
     args,
-    delegationClause: agentDelegationClause(liveDefs.filter((d) => d.kind !== "phase"), "codex"),
+    delegationClause: agentDelegationClause(liveDefs, "codex"),
     configPaths: successful.map((entry) => entry.path),
     warnings,
     liveDefs,

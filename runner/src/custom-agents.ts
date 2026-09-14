@@ -193,7 +193,9 @@ export function agentDelegationClause(
   defs: AgentDef[],
   runtime: "claude" | "codex" = "claude",
 ): string {
-  if (defs.length === 0) return "";
+  // ADR-0164 · agen fase bukan custom agent: kontrak delegasinya ada di prompt orchestrator,
+  // jadi mereka tak pernah ikut klausa ini — di kedua runtime, dari satu tempat.
+  if (defs.every((def) => def.kind === "phase")) return "";
   return [
     "",
     "",

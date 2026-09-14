@@ -218,6 +218,9 @@ describe("renderAgentsJson · agen fase (ADR-0164)", () => {
     expect(j.scout.tools).toBeDefined();
   });
   it("agen fase tak masuk klausa delegasi custom agent", () => {
-    expect(agentDelegationClause([{ ...phase, kind: "phase" as const, phase: "Plan" }].filter((d) => d.kind !== "phase"))).toBe("");
+    const phaseDef = { ...phase, kind: "phase" as const, phase: "Plan" };
+    expect(agentDelegationClause([phaseDef])).toBe("");
+    expect(agentDelegationClause([phaseDef], "codex")).toBe("");
+    expect(agentDelegationClause([phaseDef, def({ name: "scout" })])).toBe(agentDelegationClause([def({ name: "scout" })]));
   });
 });
