@@ -46,7 +46,13 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
 4. **Prompt orchestrator** hanya membawa kontrak delegasi: deskripsi pemanggilan `Fase <Nama Fase>` (P4),
    blok serah-terima tetap, orchestrator satu-satunya penulis `$HANOMAN_PHASE_FILE`, ulang **sekali** lalu
    `AskUserQuestion` (juga di sesi full-control), relay pertanyaan ke subagent yang SAMA (P3/P6), dilarang
-   mengerjakan fase sendiri.
+   mengerjakan fase sendiri. **Live smoke 2026-09-14** (orchestrator Haiku 4.5/low) menemukan header blok
+   `Fase <n>/<total>: <Nama Fase>` bersebelahan dengan instruksi deskripsi membuat model menyalin header
+   sebagai deskripsi, dan langkah tulis `$HANOMAN_PHASE_FILE` bukan gerbang wajib sehingga terlewat sebelum
+   commit/push — klausa diperkuat: header jadi `Urutan: <n>/<total> · <Nama Fase>` (deskripsi kalimat
+   terpisah, eksplisit BUKAN baris pertama blok), dan penulisan berkas fase jadi tindakan wajib pertama
+   (diverifikasi `tail -1`) sebelum fase berikutnya/commit/push, dengan gerbang penutup yang menolak
+   commit final sebelum SEMUA fase tercatat `done`/`skipped`.
 5. **All-or-nothing**: satu agen fase gagal dimaterialisasi (atau codex < 0.151) → sesi lahir mode tunggal
    dengan prompt lama yang dirakit pemanggil dari input yang sama. Flow mati → argv & prompt byte-identik
    (golden test).
@@ -71,7 +77,10 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
 ## Konsekuensi
 
 - Delegasi tetap kepatuhan orchestrator; yang dijamin model/effort **saat** didelegasikan dan **terlihatnya**
-  pelanggaran, bukan kemustahilannya.
+  pelanggaran, bukan kemustahilannya. Terukur 2026-09-14: orchestrator lemah (Haiku 4.5/low) melewatkan
+  penulisan `$HANOMAN_PHASE_FILE` sama sekali sebelum gerbang di atas ditambahkan — Opus 5/medium pada sesi
+  pembanding yang sama menulisnya benar. Klausa yang lebih ketat mengurangi risiko ini, tak menghapusnya;
+  operator sebaiknya tetap memilih model orchestrator yang cukup mampu, bukan mengandalkan prompt saja.
 - Tiap fase mulai dengan konteks segar → biaya token bisa naik; serah-terima lewat berkas.
 - Default aktif mengubah perilaku semua flow sesudah upgrade, termasuk `no_effort`.
 - `pty.ts` tetap nol dependensi DB: invocation disuntik lewat `setPhaseInvocations`.

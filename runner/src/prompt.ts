@@ -114,10 +114,27 @@ export function phaseSkillsFor(flow: Flow, phase: string, method: MethodDef): st
 // bukti SubagentStart/Stop, jadi pelanggarannya terlihat, tidak diam seperti ADR-0058.
 // Deskripsi pemanggilan `Fase <Nama Fase>` wajib: stdin `subagentStatusLine` claude hanya membawa
 // deskripsi itu sebagai label, tanpa nama agen (terukur 2026-09-14).
+//
+// Live smoke 2026-09-14 (claude 2.1.270, orchestrator Haiku 4.5/low, dibandingkan Opus 5/medium yang
+// benar) menemukan DUA cacat di versi klausa ini — lihat progress.md T14 Step 3:
+// (A) Langkah 2 bukan gerbang wajib: orchestrator lemah menyimpulkan fase selesai dari laporan lalu
+//     langsung commit/push TANPA pernah menulis $HANOMAN_PHASE_FILE — backlog tak pernah maju
+//     (sessionComplete/reconcile/session-close semua membaca berkas itu). Sekarang menulis+`tail -1`
+//     verifikasi jadi tindakan PERTAMA, wajib sebelum fase berikutnya/commit/push.
+// (B) Baris pertama blok serah-terima dulu `Fase <n>/<total>: <Nama Fase>` — persis bersebelahan
+//     dengan instruksi "isi deskripsi pemanggilan persis `Fase <Nama Fase>`" — sehingga model
+//     menyalin header blok sebagai deskripsi (`Fase 1/1: Kerjakan`, bukan `Fase Kerjakan`). Header
+//     diganti `Urutan: <n>/<total> · <Nama Fase>`; aturan deskripsi kini kalimat sendiri yang
+//     eksplisit menyebut BUKAN baris pertama blok.
 export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = {}): string {
   const codex = plan.runtime === "codex";
   const call = codex ? "spawn_agent" : "tool Agent";
   const resume = codex ? "send_input ke agent id yang sama" : "SendMessage ke agent ID yang kamu terima";
+  const describeRule = codex
+    ? "Deskripsi/label pemanggilan diisi persis `Fase <Nama Fase>` — tanpa nomor urut, dan BUKAN baris "
+      + "pertama blok serah-terima di atas."
+    : "Deskripsi pemanggilan (parameter `description`) diisi persis `Fase <Nama Fase>` — tanpa nomor "
+      + "urut, dan BUKAN baris pertama blok serah-terima di atas.";
   const list = plan.phases
     .map((p, i) => `${i + 1}. ${p.phase} → \`${p.agentName}\` · ${p.model} · ${p.effort}`)
     .join("\n");
@@ -126,14 +143,15 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "sudah terkunci di definisinya — kamu TIDAK mengerjakan isi fase sendiri.",
     `Fase berurutan:\n${list}`,
     "Untuk SETIAP fase, berurutan:",
-    `1. Panggil subagent fasenya lewat ${call}. Isi deskripsi pemanggilan persis \`Fase <Nama Fase>\`, dan `
-      + "tugasnya berupa blok serah-terima berbentuk tetap:\n"
-      + "Fase <n>/<total>: <Nama Fase>\nTujuan: <objective backlog/project>\n"
+    `1. Panggil subagent fasenya lewat ${call}, tugasnya berupa blok serah-terima berbentuk tetap:\n`
+      + "Urutan: <n>/<total> · <Nama Fase>\nTujuan: <objective backlog/project>\n"
       + "Base SHA: $HANOMAN_BASE_SHA (atau -)\nArtefak fase sebelumnya: <path yang dilaporkan, atau ->\n"
       + "Keputusan manusia sejauh ini: <ringkas, atau ->\nLampiran: <path INDEX.md lampiran, atau ->\n"
-      + "Percobaan: <k>/2",
-    "2. Baca laporannya. `Status: selesai` DENGAN bukti → append satu baris ke berkas di $HANOMAN_PHASE_FILE "
-      + "— persis: `echo \"<Nama Fase> done\" >> \"$HANOMAN_PHASE_FILE\"`. Kamu satu-satunya penulis berkas itu.",
+      + `Percobaan: <k>/2\n\n${describeRule}`,
+    "2. Baca laporannya. `Status: selesai` DENGAN bukti → SEBELUM hal lain (memanggil fase berikutnya, "
+      + "commit, atau push): jalankan persis `echo \"<Nama Fase> done\" >> \"$HANOMAN_PHASE_FILE\"`, lalu "
+      + "verifikasi dengan `tail -1 \"$HANOMAN_PHASE_FILE\"` bahwa barisnya benar tertulis. Kamu "
+      + "satu-satunya penulis berkas itu.",
     "3. `Status: sebagian`/`terhalang`, galat, atau laporan tanpa bukti → delegasikan ULANG SEKALI ke "
       + "subagent fase yang sama dengan laporan gagalnya disertakan (`Percobaan: 2/2`). Gagal lagi → "
       + "BERHENTI dan tanyakan lewat AskUserQuestion apa yang harus dilakukan. Aturan ini berlaku walau "
@@ -143,11 +161,15 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + `LANJUTKAN subagent yang SAMA lewat ${resume} dengan jawabannya. Giliran relay ini bukan percobaan `
       + "ulang. Di sesi tanpa pengawas, putuskan sendiri lalu teruskan keputusanmu dengan cara yang sama.",
     o.fastPath
-      ? "5. `Rekomendasi fase: jalur-cepat` sesudah Audit → append `Spec skipped` lalu `Plan skipped` ke "
-        + "$HANOMAN_PHASE_FILE (format yang sama), lanjut ke Execute. `penuh` → Spec → Plan → Execute."
+      ? "5. `Rekomendasi fase: jalur-cepat` sesudah Audit → SEBELUM lanjut ke Execute: jalankan `echo "
+        + "\"Spec skipped\" >> \"$HANOMAN_PHASE_FILE\"` lalu `echo \"Plan skipped\" >> \"$HANOMAN_PHASE_FILE\"` "
+        + "(gerbang yang sama seperti langkah 2), lalu lanjut ke Execute. `penuh` → Spec → Plan → Execute."
       : "",
     "DILARANG mengerjakan isi fase sendiri — termasuk saat subagent gagal. Menulis `skipped` untuk fase "
       + "yang dilewati bukan mengerjakannya.",
+    "Pekerjaan ini BELUM selesai sampai SEMUA fase di daftar di atas punya baris `done` atau `skipped` di "
+      + "$HANOMAN_PHASE_FILE — JANGAN commit/push final atau menyatakan tuntas sebelum itu. Periksa dengan "
+      + "`cat \"$HANOMAN_PHASE_FILE\"` sebelum commit terakhir.",
   ].filter(Boolean).join("\n\n");
 }
 

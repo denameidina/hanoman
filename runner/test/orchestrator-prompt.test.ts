@@ -28,11 +28,41 @@ describe("orchestratorClause (ADR-0164)", () => {
     expect(c).toContain("DILARANG mengerjakan isi fase sendiri");
     expect(c).not.toContain("jalur-cepat");
   });
-  it("codex memakai spawn_agent & send_input; fastPath menambah aturan jalur cepat", () => {
+  // Live smoke (claude 2.1.270, orchestrator Haiku 4.5/low): (B) label statusline keluar
+  // `Fase 1/1: Kerjakan` karena baris pertama blok serah-terima itu sendiri `Fase <n>/<total>: …`,
+  // bersebelahan dengan instruksi deskripsi — model menyalin header alih-alih deskripsi. (A) orchestrator
+  // menulis "Fase Kerjakan selesai" lalu langsung `git push` TANPA pernah menulis
+  // `$HANOMAN_PHASE_FILE` — langkah 2 bukan gerbang wajib. Lihat progress.md T14 Step 3.
+  it("blok serah-terima BUKAN 'Fase <n>/<total>:' dan deskripsi pemanggilan dijelaskan terpisah (temuan B)", () => {
+    const c = orchestratorClause(plan("feature"));
+    expect(c).toContain("Urutan: <n>/<total> · <Nama Fase>");
+    expect(c).not.toContain("Fase <n>/<total>:");
+    expect(c).toContain("`Fase <Nama Fase>`");
+    expect(c).toContain("BUKAN baris pertama blok serah-terima");
+  });
+  it("langkah 2 menggerbang penulisan $HANOMAN_PHASE_FILE sebelum fase berikutnya/commit/push (temuan A)", () => {
+    const c = orchestratorClause(plan("feature"));
+    expect(c).toContain('tail -1 "$HANOMAN_PHASE_FILE"');
+    expect(c).toContain("SEBELUM hal lain (memanggil fase berikutnya, commit, atau push)");
+    expect(c).toContain("Kamu satu-satunya penulis berkas itu");
+  });
+  it("gerbang penutup: belum tuntas sampai tiap fase punya baris done/skipped — untuk plan claude & codex", () => {
+    const claudeClause = orchestratorClause(plan("feature", "claude"));
+    const codexClause = orchestratorClause(plan("feature", "codex"));
+    for (const c of [claudeClause, codexClause]) {
+      expect(c).toContain("BELUM selesai sampai SEMUA fase di daftar di atas punya baris");
+      expect(c).toContain('cat "$HANOMAN_PHASE_FILE"');
+    }
+  });
+  it("codex memakai spawn_agent & send_input; fastPath menambah aturan jalur cepat & tetap menggerbang skip", () => {
     const c = orchestratorClause(plan("qa", "codex"), { fastPath: true });
     expect(c).toContain("spawn_agent");
     expect(c).toContain("send_input");
     expect(c).toContain("`Rekomendasi fase: jalur-cepat`");
+    expect(c).toContain("Spec skipped");
+    expect(c).toContain("Plan skipped");
+    expect(c).not.toContain("Fase <n>/<total>:");
+    expect(c).toContain("BUKAN baris pertama blok serah-terima");
   });
 });
 

@@ -172,11 +172,16 @@ aturan commit/push, dan klausa delegasi agen kustom yang sudah ada. Berlaku di s
 Loop per fase:
 
 1. Panggil `hanoman-fase-<slug>` (claude `Agent`, codex `spawn_agent`) dengan **blok serah-terima
-   tetap**: `Fase <n>/<total> · flow · backlog/project`, objective, base SHA, path artefak fase
-   sebelumnya, keputusan manusia sejauh ini, `INDEX.md` lampiran bila ada, `Percobaan <k>/2`.
-2. `Status: selesai` + bukti → orchestrator menulis `echo "<Fase> done" >> "$HANOMAN_PHASE_FILE"`.
-   **Satu-satunya penulis marker.** Flow project: push sesudah tiap marker; flow backlog: push
-   sesudah fase terakhir (aturan hari ini).
+   tetap**: `Urutan: <n>/<total> · <Nama Fase>`, objective, base SHA, path artefak fase sebelumnya,
+   keputusan manusia sejauh ini, `INDEX.md` lampiran bila ada, `Percobaan <k>/2`. Deskripsi pemanggilan
+   (`Fase <Nama Fase>`) adalah instruksi TERPISAH, bukan baris pertama blok ini — live smoke 2026-09-14
+   menemukan orchestrator lemah menyalin header blok sebagai deskripsi saat keduanya bersebelahan.
+2. `Status: selesai` + bukti → SEBELUM hal lain (fase berikutnya, commit, push), orchestrator menulis
+   `echo "<Fase> done" >> "$HANOMAN_PHASE_FILE"` lalu memverifikasi dengan `tail -1`. **Satu-satunya
+   penulis marker**, dan penulisannya wajib, bukan opsional — live smoke 2026-09-14 (orchestrator lemah)
+   menemukan langkah ini terlewat sebelum gerbang wajib ini ditambahkan. Flow project: push sesudah tiap
+   marker; flow backlog: push sesudah fase terakhir (aturan hari ini). Gerbang penutup: pekerjaan belum
+   tuntas — tak boleh commit/push final — sampai tiap fase di rencana punya baris `done`/`skipped`.
 3. `sebagian`/`terhalang`/galat → delegasi ulang **sekali** ke agen yang sama, laporan gagal
    disertakan. Gagal lagi → berhenti dan `AskUserQuestion` (hanoman-lead/inbox). Berlaku juga di
    sesi scheduler full-control: kegagalan delegasi dikecualikan dari "jangan bertanya".
