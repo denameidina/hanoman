@@ -1,0 +1,124 @@
+hanoman reverse. Susun Source of Truth repo ini dari kodenya di internal/docs/**, mengikuti STANDAR DOCS di bagian bawah prompt ini.
+
+Kerjakan fase berurutan: Scan → Docs teknis → Wawancara → Konvensi & index → Serah terima.
+Setiap kali sebuah fase selesai (atau kamu putuskan dilewati), append satu baris ke berkas di $HANOMAN_PHASE_FILE — persis: `echo "<Nama Fase> done" >> "$HANOMAN_PHASE_FILE"`, atau `skipped` sebagai ganti `done`. Nama fase ditulis apa adanya seperti di atas.
+
+- Scan: baca source code — stack, arsitektur, data model, API surface, perilaku domain. Belum menulis docs.
+- Docs teknis: tulis kategori yang bisa diturunkan dari kode (architecture, requirements + EARS dari perilaku nyata, adr ber-Status accepted (reverse-engineered), operations, security, design-system/frontend bila relevan). Isi lengkap dan spesifik, bukan kerangka.
+- Wawancara: untuk product, business, brand, research, entrypoints — ajukan SATU pertanyaan per giliran ke manusia di terminal ini, tunggu jawabannya, isi docs dari jawaban. Jangan mengarang. Topik tanpa jawaban tandai: Status: draft — menunggu input.
+- Konvensi & index: tulis internal/docs/README.md (index bernomor lengkap), CLAUDE.md, AGENTS.md, .claude/settings.json + .claude/hooks/ensure-docs-updated.py persis seperti STANDAR DOCS.
+- Serah terima: pastikan setiap berkas docs terdaftar di index, lalu tulis ringkasan hasil + daftar pertanyaan yang belum terjawab ke terminal.
+
+Setiap fase selesai: commit hasilnya, lalu `git push origin HEAD:refs/heads/reverse-docs` — push per fase, supaya pekerjaan tak hilang bila worktree lenyap. Bila remote origin tidak ada, lewati push dan catat itu di laporan akhir — jangan gagal diam-diam. Worktree ini detached HEAD — memang disengaja. Manusia yang me-review dan merge branch reverse-docs.
+
+Project p1 · P1
+Deskripsi: ide
+Stack: ts
+
+=== STANDAR DOCS ===
+# Standar docs-driven (acuan: termilo)
+
+## Prinsip
+- Root repo hanya untuk konfigurasi agent + folder implementasi. SEMUA dokumen hidup di internal/docs/.
+- internal/docs/README.md adalah index + registry Source of Truth: SETIAP doc terdaftar di sana dengan deskripsi satu baris, dalam urutan baca bernomor.
+- Docs detail adalah kanonik; entrypoints/ hanya pintu masuk ringkas. Bila konflik, perbaiki doc detail dulu, lalu sinkronkan entrypoint-nya.
+- Setiap perubahan perilaku ditulis dulu sebagai acceptance criteria EARS sebelum kode.
+- Update docs yang tersentuh DALAM COMMIT YANG SAMA dengan kodenya.
+- Isi doc harus lengkap dan spesifik terhadap repo ini — bukan kerangka, bukan lorem, bukan tebakan.
+
+## Struktur kategori (subfolder internal/docs/)
+- entrypoints/ — blueprint.md, brd.md, prd.md, frd.md, rd.md; ringkas, menunjuk doc detail.
+- product/ — blueprint produk, prinsip scope, onboarding.
+- business/ — brd.md: model bisnis, target pasar, pricing.
+- requirements/ — prd.md, frd.md, rd-NN-<domain>.md per domain, standar EARS.
+- research/ — riset pasar, kompetitor, sizing.
+- brand/ — strategi brand, warna, logo, tone copywriting.
+- architecture/ — stack.md, data-model.md, api-contract.md, nfr.md.
+- adr/ — keputusan arsitektur, NNNN-judul.md (4 digit, mulai 0001).
+- design-system/ — spec design system (bila ada UI).
+- frontend/ — catatan implementasi frontend (bila ada).
+- operations/ — runbook, roadmap, implementation-standard, agent-documentation-workflow.
+- security/ — standar keamanan, audit bertanggal YYYY-MM-DD.
+- qa/ — spec QA bertanggal YYYY-MM-DD-<slug>-spec.md; yang selesai pindah ke qa/done/.
+
+## Format doc
+Setiap doc dibuka header polos (BUKAN YAML frontmatter):
+
+  # Judul
+  Status: <draft | accepted | operating standard | ...>
+  Date: YYYY-MM-DD
+
+Format ADR (internal/docs/adr/NNNN-judul.md):
+
+  # ADR-NNNN Judul
+  Status: accepted
+  Date: YYYY-MM-DD
+  ## Context
+  ## Decision
+  ## Rationale
+  ## Consequences
+  ## Sources
+
+ADR yang diturunkan dari kode saat reverse ditandai: Status: accepted (reverse-engineered).
+
+## EARS — 5 pola acceptance criteria (semua terukur; tanpa "cepat/aman" tanpa angka)
+- Ubiquitous: "The system shall <respons>"
+- Event-driven: "When <trigger>, the system shall <respons>"
+- State-driven: "While <keadaan>, the system shall <respons>"
+- Optional: "Where <fitur ada>, the system shall <respons>"
+- Unwanted: "If <kondisi tak diinginkan>, then the system shall <respons>"
+
+## internal/docs/README.md (index, wajib)
+- Bagian Reading Order: daftar bernomor, satu baris per doc: "N. [judul](path) - deskripsi satu baris".
+- Bagian Canonical Files: doc mana yang kanonik untuk area apa.
+- Bagian Naming Standard: glosarium istilah domain repo ini (agar sebutan konsisten).
+- Bagian Source Discipline: aturan "perbaiki doc detail dulu, sinkronkan entrypoint".
+
+## CLAUDE.md + AGENTS.md repo target (tulis KEDUANYA)
+Isi minimal (sesuaikan dengan repo):
+- Start here: baca AGENTS.md -> internal/docs/README.md -> hanya doc yang relevan dengan task. Jangan implement dari ingatan bila doc-nya ada.
+- Documentation-First Rule: sebelum task, kenali doc pemilik area; perubahan perilaku -> tulis/ubah EARS dulu; keputusan arsitektural -> ADR baru; doc baru wajib ter-link dari README index.
+- Update docs tersentuh dalam commit yang sama; bila perubahan murni mekanis, sebut eksplisit "no docs update needed".
+- Definition of Done: implementasi sesuai docs; docs tersentuh terbarui; test jalan (atau diblokir dengan alasan eksplisit); tak ada path/istilah basi; laporan akhir menyebut docs yang berubah.
+
+## Stop hook enforcement (pasang di repo target)
+Tulis .claude/settings.json (gabungkan bila sudah ada):
+
+  {
+    "hooks": {
+      "Stop": [
+        { "matcher": "", "hooks": [
+          { "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ensure-docs-updated.py" }
+        ] }
+      ]
+    }
+  }
+
+Tulis .claude/hooks/ensure-docs-updated.py lalu chmod +x. Sesuaikan IMPLEMENTATION_PREFIXES
+dengan folder implementasi nyata repo ini (hasil fase Scan):
+
+  #!/usr/bin/env python3
+  """Stop hook: blok bila implementasi ter-stage tanpa update docs."""
+  import json, subprocess, sys
+
+  IMPLEMENTATION_PREFIXES = ("src/",)  # SESUAIKAN dengan repo ini
+  DOC_PREFIXES = ("internal/docs/", "AGENTS.md", "CLAUDE.md")
+
+  def staged():
+      out = subprocess.run(["git", "diff", "--cached", "--name-only"],
+                           text=True, capture_output=True).stdout
+      return [l.strip() for l in out.splitlines() if l.strip()]
+
+  def main():
+      paths = staged()
+      impl = [p for p in paths if p.startswith(IMPLEMENTATION_PREFIXES)]
+      docs = [p for p in paths if p.startswith(DOC_PREFIXES)]
+      if impl and not docs:
+          print(json.dumps({"decision": "block", "reason":
+              "Implementasi ter-stage tanpa update internal/docs/**. Perbarui doc yang "
+              "tersentuh + link di index, atau nyatakan 'no docs update needed'."}))
+      return 0
+
+  if __name__ == "__main__":
+      sys.exit(main())

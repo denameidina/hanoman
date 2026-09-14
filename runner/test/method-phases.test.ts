@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { METHODS } from "@hanoman/shared";
+import { METHODS, FLOW_PHASES } from "@hanoman/shared";
 import { PIPELINES } from "../src/prompt";
 
 // SPEC-734 · assertion ini TAK BISA tinggal di `shared`: `PIPELINES` hidup di `runner`, dan
@@ -15,5 +15,9 @@ describe("METHODS × PIPELINES", () => {
           .toBe(true);
       }
     }
+  });
+
+  it("PIPELINES adalah FLOW_PHASES milik shared, bukan cermin kedua (ADR-0164)", () => {
+    expect(PIPELINES).toBe(FLOW_PHASES);
   });
 });

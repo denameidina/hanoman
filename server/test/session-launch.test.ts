@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { prisma } from "../src/db";
 import { startSpecSession, LaunchError, sessionIdForSpec } from "../src/services/session-launch";
-import { killAll, killSession } from "../src/services/pty";
+import { killAll, killSession, agentsFilePath, promptFilePath } from "../src/services/pty";
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { resolveGoalCondition } from "@hanoman/runner";
+import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
 
 const clean = async () => {
   killAll();
@@ -138,6 +139,44 @@ describe("session-launch", () => {
     const data = { ...DEFAULT_SETTING, ...patch } as unknown as object;
     return prisma.setting.upsert({ where: { id: 1 }, update: { data }, create: { id: 1, data } });
   };
+
+  // ADR-0164 · default orkestrasi AKTIF: sesi backlog lahir sebagai orchestrator dengan agen fase.
+  // Tipe flow lebih lebar dari brief (bukan hanya "feature"|"qa"): test lama yang menegaskan prompt
+  // mode tunggal untuk flow "goal" juga butuh gerbang yang sama.
+  const setOrchestration = (flow: "feature" | "qa" | "goal", enabled: boolean) => {
+    const data = { ...DEFAULT_SETTING,
+      orchestration: { ...ORCHESTRATION_DEFAULTS, [flow]: { enabled, claude: {}, codex: {} } } } as unknown as object;
+    return prisma.setting.upsert({ where: { id: 1 }, update: { data }, create: { id: 1, data } });
+  };
+
+  it("orkestrasi aktif (default) → agen fase ikut lahir dan prompt orchestrator", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const spec = await seedRepo("SPEC-ORCH1");
+    const r = await startSpecSession(spec, { flow: "feature" });
+    const agents = JSON.parse(readFileSync(agentsFilePath(r.id), "utf8"));
+    expect(Object.keys(agents)).toEqual(expect.arrayContaining(["hanoman-fase-brainstorm", "hanoman-fase-execute"]));
+    expect(readFileSync(promptFilePath(r.id), "utf8")).toContain("Sesi ini ORCHESTRATOR");
+    killSession(r.id);
+  });
+
+  it("orkestrasi flow mati → prompt mode tunggal, tanpa berkas agen", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    await setOrchestration("feature", false);
+    const spec = await seedRepo("SPEC-ORCH2");
+    const r = await startSpecSession(spec, { flow: "feature" });
+    expect(readFileSync(promptFilePath(r.id), "utf8")).toContain("Kerjakan fase berurutan");
+    expect(existsSync(agentsFilePath(r.id))).toBe(false);
+    killSession(r.id);
+  });
+
+  it("continue (stage done) hanya membawa agen fase Execute", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const seeded = await seedRepo("SPEC-ORCH3");
+    const spec = await prisma.spec.update({ where: { id: seeded.id }, data: { stage: "done" } });
+    const r = await startSpecSession(spec, { flow: "feature" });
+    expect(Object.keys(JSON.parse(readFileSync(agentsFilePath(r.id), "utf8")))).toEqual(["hanoman-fase-execute"]);
+    killSession(r.id);
+  });
 
   it("opts.agent codex melahirkan sesi codex dengan flag codex", async () => {
     process.env.HANOMAN_CODEX_BIN = "/bin/echo";
@@ -333,7 +372,10 @@ describe("session-launch", () => {
 
     it("prompt-nya prompt goal, bukan pipeline perencanaan", async () => {
       process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
-      await setGoal({ enabled: false, condition: "" });
+      // ADR-0164 · test ini menegaskan prompt mode tunggal. `setOrchestration` menulis ulang SELURUH
+      // baris Setting dari DEFAULT_SETTING — `setGoal` sebelumnya di sini cuma tertimpa senyap; mode
+      // goal tetap SELALU menyala untuk flow "goal" (SPEC-407) apa pun isi Setting.goal.
+      await setOrchestration("goal", false);
       const spec = await seedRepoGoal("SPEC-GG4");
       const r = await startSpecSession(spec, { flow: "goal" });
       const argv = await argvOf(r.id);
@@ -410,7 +452,10 @@ describe("session-launch", () => {
 
     it("sesi backlog codex membawanya juga (klausa netral-agen)", async () => {
       process.env.HANOMAN_CODEX_BIN = "/bin/echo";
-      await setSetting({ agent: "codex" });
+      // ADR-0164 · test ini menegaskan prompt mode tunggal — orchestrator codex menyimpan instruksi
+      // fase (termasuk klausa ini) di berkas config native, bukan di argv yang dibaca `argvOf`.
+      await setSetting({ agent: "codex",
+        orchestration: { ...ORCHESTRATION_DEFAULTS, feature: { enabled: false, claude: {}, codex: {} } } });
       const spec = await seedRepo("SPEC-543B");
       const r = await startSpecSession(spec, { flow: "feature" });
       expect(await argvOf(r.id)).toContain(MARK);

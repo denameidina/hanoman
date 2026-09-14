@@ -1,0 +1,67 @@
+hanoman qa — MELANJUTKAN sesi backlog yang sudah berjalan. Ikuti internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di index, dalam commit yang sama.
+
+Sesi ini MELANJUTKAN pekerjaan sesi sebelumnya untuk backlog item yang sama — bukan memulai dari nol. Fase yang SUDAH tercatat di $HANOMAN_PHASE_FILE: Audit done. JANGAN mengulang fase itu dan JANGAN menulis ulang barisnya. Lanjutkan dari fase: Spec. Worktree ini DIBANGUN ULANG dari tip branch sesi `b`: commit sesi sebelumnya ada, tetapi perubahan yang belum sempat di-commit TIDAK ada. Sebelum menulis apa pun: baca `git log --oneline` dan `git status`, lalu plan di `docs/superpowers/plans/**` untuk backlog item ini (`- [x]` sudah selesai, `- [ ]` belum). Jangan menulis ulang yang sudah ada.
+
+Kerjakan fase berurutan: Audit → Spec → Plan → Execute.
+Setiap kali sebuah fase selesai (atau kamu putuskan dilewati), append satu baris ke berkas di $HANOMAN_PHASE_FILE — persis: `echo "<Nama Fase> done" >> "$HANOMAN_PHASE_FILE"`, atau `skipped` sebagai ganti `done`. Nama fase ditulis apa adanya seperti di atas.
+Execute BELUM selesai selama plan (`docs/superpowers/plans/**`) masih punya task `- [ ]`: kerjakan SEMUA PR/task sampai tiap kotak jadi `- [x]` sebelum menulis `Execute done`. hanoman menahan backlog di `executing`, bukan `done`, selama masih ada `- [ ]`.
+
+Jalankan seluruh pipeline sampai tuntas tanpa berhenti di batas antar-fase. Checkpoint "review"/"approval"/"need review" milik skill superpowers BUKAN titik berhenti di sini — lanjut saja ke fase berikutnya. Berhenti HANYA saat butuh keputusan manusia sejati (percabangan yang mengubah bentuk kerja: data model, kontrak API, scope); saat itu tanyakan di terminal ini dan tunggu jawabannya. Selain itu, terus lanjut.
+
+Scope verifikasi: HANYA yang berubah. Mesin ini menjalankan beberapa sesi sekaligus —
+memverifikasi seluruh project menghabiskan RAM & CPU yang sedang dipakai sesi lain.
+
+Berkas yang berubah di worktree ini:
+`git diff --name-only "$HANOMAN_BASE_SHA"...HEAD` (yang sudah di-commit) dan
+`git status --porcelain` (yang belum).
+
+- Test: jalankan HANYA test yang berkaitan dengan berkas itu. Repo vitest:
+  `pnpm vitest --run --changed "$HANOMAN_BASE_SHA"` (vitest sendiri menurunkan berkas yang
+  berubah dari git, termasuk yang belum di-commit), atau `pnpm vitest related --run <berkas…>`,
+  atau sebut path berkas test-nya langsung. Stack lain: `pytest <path>`, `go test ./paket/...`.
+  JANGAN `pnpm test` atau `vitest run` polos — itu seluruh suite.
+  Jebakan: `--changed` menyalakan `passWithNoTests`, jadi nol test TERLIHAT hijau. Pastikan
+  test-nya memang berjalan, jangan menerima "no test files" sebagai bukti.
+- Typecheck: hanya paket yang tersentuh (mis. `pnpm --filter ./server typecheck`).
+  JANGAN `pnpm -r typecheck` — itu menyalakan satu proses tsc per paket sekaligus.
+- Lint: hanya berkas yang berubah, bukan seluruh repo.
+- Build penuh: hanya bila yang kamu ubah memang soal build/bundling.
+- Boot server + curl / smoke end-to-end: hanya bila task ini menyentuh endpoint atau perilaku
+  runtime-nya, sekali di akhir — bukan rutin tiap task.
+- Membereskan proses nyangkut: JANGAN `pkill -f <pola>` maupun `killall`. Prompt setiap sesi
+  hidup di ARGV proses agennya, jadi pola seperti `vitest`/`tsc`/`node` ikut mencocoki agen sesi
+  LAIN di mesin ini dan mematikannya di tengah kerja — dan `pkill` mengecualikan leluhurnya
+  sendiri, jadi yang mati selalu sesi tetangga, bukan sesimu. Bunuh per-PID: `ps`/`lsof -ti:<port>`
+  → `kill <pid>`; atau sempitkan polanya sampai memuat path worktree-mu sendiri.
+
+Suite penuh, lint penuh, dan build penuh adalah tugas MANUSIA sebelum merge, bukan tugas sesi.
+Pengecualian yang kamu putuskan sendiri: bila perubahanmu memang berdampak luas (mengubah
+tipe/kontrak bersama, skema, atau berkas yang diimpor banyak modul), perluas scope seperlunya
+dan katakan alasannya. Ini panduan biaya, bukan larangan.
+
+Gaya kode — berlaku setiap kali kamu menulis atau mengubah kode:
+- Tulis kode yang rapi dan mengikuti idiom, penamaan, serta struktur kode di sekitarnya.
+  Kodemu harus terbaca seperti kode yang sudah ada di berkas itu, bukan seperti tempelan.
+- Jangan menulis komentar yang cuma mengulang apa yang sudah dinyatakan kode.
+- Komentar hanya untuk hal yang TIDAK terbaca dari kode: alasan/why sebuah keputusan,
+  trade-off yang diambil, workaround beserta rujukan SPEC/ADR-nya, atau invariant yang tak
+  kelihatan. Komentar semacam itu justru berharga — jangan ikut dibuang.
+- Jangan menambahkan komentar pembatas seksi, header berhiasan, atau narasi langkah demi langkah.
+- Jangan meninggalkan kode mati atau kode yang dikomentari. Hapus saja; riwayat git yang menyimpannya.
+
+LAMPIRAN backlog item ini (1 berkas) sudah tersedia sebagai berkas di mesin ini:
+- `/att/a.md` — a.md (text/markdown, 3 byte)
+BACA semuanya SEBELUM mengerjakan fase pertama — dokumen teks (.md/.txt/.log/.json/.csv) baca langsung, PDF dan gambar baca lewat path berkasnya. Ini konteks yang dipegang manusia saat memfilekan item ini; mengabaikannya berarti bekerja dengan konteks yang lebih miskin darinya.
+Lampiran bisa BERTAMBAH atau BERKURANG selagi sesi berjalan. Di AWAL SETIAP FASE, baca ulang manifest `/att/INDEX.md` lalu baca lampiran yang belum pernah kamu baca — daftar di atas adalah keadaan saat sesi ini lahir, bukan keadaan tetap.
+
+Skills superpowers WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.
+- Audit: superpowers:systematic-debugging
+- Plan: superpowers:writing-plans
+- Execute: superpowers:executing-plans, superpowers:test-driven-development, superpowers:verification-before-completion
+
+Setelah fase terakhir: commit, lalu `git push origin HEAD:refs/heads/b`. Worktree ini detached HEAD — itu memang disengaja.
+
+Backlog item SPEC-1151 · sumber qa · prioritas tinggi
+Judul: Orkestrasi
+Objective: Fase dikerjakan subagent
+Detail: {"fromAudit":"SPEC-1100","steps":"s"}

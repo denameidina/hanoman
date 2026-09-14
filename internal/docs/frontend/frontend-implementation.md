@@ -2250,3 +2250,24 @@ Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa p
   di sebelahnya menyatakan apa adanya: menyimpan ke `docs/prd/`, **tidak** membuat backlog.
 - Angka jatah di `portal-chat-kuota` datang dari amplop daftar (`quotaView` yang sama dengan klien),
   bukan hitungan kedua.
+
+## Settings → Orkestrasi, pratinjau Start, chip fase (ADR-0164)
+
+- **Tab Orkestrasi** (`OrchestrationPanel`): satu kartu per flow — `Switch` ber-`aria-label` `Orkestrasi
+  <flow>` langsung + tabel fase × (Claude Code | Codex CLI) berisi dua `Select` (model: `— warisi
+  orchestrator` + katalog runtime; effort: `— warisi` + `runtimeEfforts`). Menukar model mengoreksi effort
+  sel. Tabel di dalam `overflowX: auto`.
+- **Modal Start** (`PhasePlanPreview`): picker yang ada = orchestrator; di bawahnya daftar `Fase · model ·
+  effort (warisi)` dari `resolvePhasePlan`, atau catatan "sesi tunggal" (flow mati / codex < 0.151).
+  Sebelum Setting — dan untuk codex, versi codex — termuat, pratinjau menampilkan `Memuat rencana fase…`
+  alih-alih menyimpulkan sesi tunggal lebih dulu; gagal memuat versi codex dihitung sebagai tak terdeteksi
+  → sesi tunggal (cermin server, yang memperlakukan versi codex null sebagai tak didukung). Tanda warisi
+  per BAGIAN, bukan per sel: ` (warisi)` bila sel model dan effort kosong keduanya, ` (model warisi)` /
+  ` (effort warisi)` bila cuma satu yang kosong.
+- **Sel terminal**: chip `orch <model> · <effort>` di header bila `orchestrated`; `PhaseStrip` menggambar
+  fase ber-agen sebagai chip `ikon · nama · model · effort · durasi` (+`↻n`, ⚠ "bukti subagent tak
+  diterima"), ringkas bila header < 480px, klik → detail token in/out/cache terpisah + cuplikan hasil.
+  Baris chip menggulir horizontal di scroller-nya sendiri; panel detail adalah SIBLING dari scroller itu,
+  diposisikan relatif terhadap badan sel (`position: relative` di badan sel, bukan di strip), tingginya
+  dibatasi tinggi badan sel (`maxHeight: calc(100% - 48px)`) dengan scroll vertikal internal, lebarnya ≤
+  lebar sel. Fase tanpa agen digambar seperti sebelumnya.

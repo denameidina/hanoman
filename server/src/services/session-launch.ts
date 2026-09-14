@@ -1,11 +1,12 @@
 import { prisma } from "../db";
 import type { Spec } from "@prisma/client";
-import { realGit, startPrompt, continuePrompt, resumePrompt, startGoalPrompt, resolveGoalCondition, type Flow, type Autonomy, type VerifyScope, type ResumeCtx } from "@hanoman/runner";
+import { realGit, startPrompt, continuePrompt, resumePrompt, startGoalPrompt, resolveGoalCondition, buildPhaseAgents, fromAuditOf, specContext, goalContext, type Flow, type Autonomy, type VerifyScope, type ResumeCtx } from "@hanoman/runner";
 import { resolveMethod, readSpecMethod, stampSpecMethod, isGoalShapedFlow, type Agent } from "@hanoman/shared";
 import { resolveRepoDir } from "./local-binding";
 import { getSetting } from "./settings";
 import { ensureCodexTrust } from "./codex-trust";
 import { createSession, getSessionAsync, killSession, sessionIdForSpec } from "./pty";
+import { sessionPhasePlan } from "./orchestration";
 import { blockersForSpec, blockedNote, type SpecBlocker } from "./spec-deps";
 import { phaseFilePath, decisionFilePath, readPhases } from "./session-phases";
 import { specAttachmentsDir, syncSpecAttachmentsDir } from "./spec-attachment-dir";
@@ -199,20 +200,36 @@ export async function startSpecSession(
       priority: spec.priority, objective: spec.objective, payload: spec.payload ?? undefined,
     };
     const resumeCtx = resume ? buildResumeCtx(repoDir, id, opts.flow, resume.worktreeKept) : undefined;
-    let prompt: string;
-    if (isGoalFlow) {
-      // SPEC-407 · satu builder untuk ketiga keadaan sesi goal: `continuePrompt`/`resumePrompt`
-      // bicara plan berkotak & fase perencanaan, dan sesi goal tak punya keduanya.
-      prompt = startGoalPrompt(opts.flow as "goal" | "no_effort", brief, branchTo, {
-        autonomy: opts.autonomy, verifyScope, resume: resumeCtx, method: method.id, attachments,
-      });
-    } else if (isContinue) {
-      prompt = continuePrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id, attachments);
-    } else if (resumeCtx) {
-      prompt = resumePrompt(opts.flow, brief, branchTo, resumeCtx, opts.autonomy, verifyScope, method.id, attachments);
-    } else {
-      prompt = startPrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id, attachments);
+    // ADR-0164 · rencana fase dihitung SEKALI; prompt orchestrator, agen fase, dan prompt mode tunggal
+    // lahir dari input yang SAMA, jadi fallback all-or-nothing di createSession tak merakit ulang apa pun.
+    const fullPlan = sessionPhasePlan(setting, opts.flow, agent, { model, effort });
+    // SPEC-172 · continue hanya melanjutkan Execute; flow goal tak punya Execute dan tetap utuh.
+    let plan = fullPlan;
+    if (fullPlan && isContinue && !isGoalFlow) {
+      const phases = fullPlan.phases.filter((p) => p.phase === "Execute");
+      // ADR-0164 · flow tanpa fase Execute (mis. audit) menyaring jadi KOSONG — pakai `null`, bukan
+      // plan dengan `phases: []`, supaya prompt orchestrator tak dirakit atas daftar fase kosong.
+      plan = phases.length ? { ...fullPlan, phases } : null;
     }
+    const buildPrompt = (p: typeof plan): string => {
+      if (isGoalFlow) {
+        // SPEC-407 · satu builder untuk ketiga keadaan sesi goal: `continuePrompt`/`resumePrompt`
+        // bicara plan berkotak & fase perencanaan, dan sesi goal tak punya keduanya.
+        return startGoalPrompt(opts.flow as "goal" | "no_effort", brief, branchTo, {
+          autonomy: opts.autonomy, verifyScope, resume: resumeCtx, method: method.id, attachments, plan: p,
+        });
+      }
+      if (isContinue) return continuePrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id, attachments, p);
+      if (resumeCtx) return resumePrompt(opts.flow, brief, branchTo, resumeCtx, opts.autonomy, verifyScope, method.id, attachments, p);
+      return startPrompt(opts.flow, brief, branchTo, opts.autonomy, verifyScope, method.id, attachments, p);
+    };
+    const legacyPrompt = buildPrompt(null);
+    const prompt = plan ? buildPrompt(plan) : legacyPrompt;
+    const phaseAgents = plan ? buildPhaseAgents(plan, {
+      flow: opts.flow, method, verifyScope,
+      context: isGoalFlow ? goalContext(brief) : specContext(brief),
+      fromAudit: fromAuditOf(spec.payload),
+    }) : [];
     // SPEC-376 · ADR-0080 · env sesi. baseSha SUDAH dihitung di addWorktree di atas — tanpa
     // meneruskannya, klausa "berkas yang berubah" tak bisa dieksekusi tanpa menebak: worktree
     // lahir `--detach`, jadi `main` belum tentu ada dan `HEAD~1` salah.
@@ -222,7 +239,7 @@ export async function startSpecSession(
       phaseFile: phaseFilePath(repoDir, id),
       decisionFile: decisionFilePath(repoDir, id),
       attachmentsDir: attachments.items.length ? attachments.dir : undefined,
-      prompt,
+      prompt, legacyPrompt, phaseAgents,
       env: scopeEnv,
     });
     return resume ? { id: s.id, resumed: true } : { id: s.id };

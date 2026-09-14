@@ -275,6 +275,11 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   dari skema `zSetting`; baris `Setting` lama yang masih memuatnya tetap parse (key asing diabaikan).
   Model/effort tetap `z.string()` (lenient); daftar pilihan valid (`MODELS`/`EFFORTS`, memuat
   `claude-fable-5` · `max` · `ultracode`) hidup di `@hanoman/shared` untuk picker Start.
+- `orchestration` ([ADR-0164](../adr/0164-orkestrasi-subagent-per-fase.md)) — satu kunci per flow
+  (`feature`…`no_effort`) berbentuk `{ enabled (default true), claude: {<Fase>: {model|null, effort|null}},
+  codex: {…} }`. Sesi ber-flow aktif lahir sebagai orchestrator; tiap fase dikerjakan subagent native
+  `hanoman-fase-<slug>` dengan model/effort sel, atau warisan orchestrator bila `null`. Lenient; baris lama
+  tanpa blok ini parse dengan default aktif. Tanpa migration.
 - `autoDefault`, `autoScaffold`, `notifyFail`
 - `notifyDone` (SPEC-180, default true) — toast+sound saat backlog selesai
 - `notifySound` (SPEC-180, default `short`) — `off` atau salah satu nada; durasi/varian bunyi notifikasi
@@ -847,6 +852,7 @@ dipangkas dan `CustomAgent` dapat dihapus, tetapi evidence historis tetap perlu 
 | `runtime` · `runtimeInvocationId` | Identitas event runtime; unique `(sessionId,runtimeInvocationId)` membuat lifecycle idempoten. |
 | `customAgentId?` · `agentName` · `model?` | Soft-link dan snapshot identitas child. |
 | `definitionHash?` | SHA-256 prompt/profile efektif saat registry lahir, diteruskan dari roster trusted; null berarti versi historis tidak diketahui. Start pertama tetap menang. |
+| `phase?` · `effort?` | [ADR-0164](../adr/0164-orkestrasi-subagent-per-fase.md) · fase milik agen fase (null untuk custom agent); effort dari roster saat start, diganti effort runtime (`SubagentStop.effort.level`) saat stop. Metrik custom agent mengecualikan baris ber-`phase`. |
 | `status` | `running|completed|interrupted|abandoned`. Boot menutup orphan running sebagai abandoned. |
 | `startedAt` · `endedAt?` · `durationMs?` | Stop sintetis sesudah restart memakai `startedAt=endedAt` dan `durationMs=null`, bukan nol palsu. |
 | `inputTokens?` · `outputTokens?` · `cachedTokens?` | Hanya nilai yang dapat dibaca dari transcript allowlisted; bentuk asing tetap null. |

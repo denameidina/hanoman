@@ -44,7 +44,9 @@ export const EVENT_HOOK_COMMAND = [
   "--data-binary @- >/dev/null 2>&1; fi; exit 0",
 ].join(" ");
 
-export const guardSettings = (decisionFile?: string, goal?: string, eventHook?: boolean) => {
+export const guardSettings = (
+  decisionFile?: string, goal?: string, eventHook?: boolean, subagentStatusLine?: string,
+) => {
   const hooks: Record<string, unknown[]> = {};
   // SPEC-184 · sinyal "agen minta masukan manusia" dari Claude sendiri. Notification idle/izin/
   // agent_needs_input menandai marker; UserPromptSubmit (manusia menjawab) mengosongkannya.
@@ -79,5 +81,10 @@ export const guardSettings = (decisionFile?: string, goal?: string, eventHook?: 
   // tetap dicabut, hook ini tak pernah menolak tool call, ia hanya menahan sesi BERHENTI sebelum
   // kondisinya terbukti di transkrip. Interrupt manusia (Esc) bukan event Stop → kendali tetap ada.
   if (goal) hooks.Stop = [{ hooks: [{ type: "prompt", prompt: goal }] }];
-  return { hooks };
+  // ADR-0164 · kunci ini hanya lahir untuk sesi orchestrator — tanpanya JSON `--settings` persis
+  // seperti sebelumnya (byte-identik untuk flow yang orkestrasinya mati).
+  return {
+    hooks,
+    ...(subagentStatusLine ? { subagentStatusLine: { type: "command", command: subagentStatusLine } } : {}),
+  };
 };

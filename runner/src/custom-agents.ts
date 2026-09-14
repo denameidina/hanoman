@@ -18,6 +18,14 @@ export type AgentDef = {
   workspacePolicy?: "inherit" | "read-only" | "isolated-worktree";
   maxTurns?: number | null;
   timeoutSeconds?: number | null;
+  /**
+   * ADR-0164 · `phase` = agen fase dari `buildPhaseAgents`: instruksi dirender APA ADANYA, tanpa
+   * kunci `tools` (mewarisi seluruh tool sesi — Skill/Agent/MCP) dan tanpa klausa policy/delegasi
+   * custom agent. Absen = custom agent.
+   */
+  kind?: "custom" | "phase";
+  /** ADR-0164 · nama fase PIPELINES milik agen fase; ikut roster tmux sebagai bukti. */
+  phase?: string;
 };
 
 /** Mention yang benar-benar bisa dituju: nama di luar roster dibuang, agar prosa tak berbohong. */
@@ -141,6 +149,15 @@ export function renderAgentsJson(defs: AgentDef[], options: RenderAgentsOptions 
   if (defs.length === 0) return "";
   const out: Record<string, Record<string, unknown>> = {};
   for (const d of defs) {
+    if (d.kind === "phase") {
+      out[d.name] = {
+        description: d.description,
+        prompt: d.instructions,
+        ...(d.model ? { model: d.model } : {}),
+        ...(d.effort ? { effort: d.effort } : {}),
+      };
+      continue;
+    }
     const resolvedTools = resolveTools({ tools: d.tools, mentions: d.mentions });
     const readOnly = d.workspacePolicy === "read-only";
     out[d.name] = {
@@ -176,7 +193,9 @@ export function agentDelegationClause(
   defs: AgentDef[],
   runtime: "claude" | "codex" = "claude",
 ): string {
-  if (defs.length === 0) return "";
+  // ADR-0164 · agen fase bukan custom agent: kontrak delegasinya ada di prompt orchestrator,
+  // jadi mereka tak pernah ikut klausa ini — di kedua runtime, dari satu tempat.
+  if (defs.every((def) => def.kind === "phase")) return "";
   return [
     "",
     "",

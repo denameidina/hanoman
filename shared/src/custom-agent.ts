@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PHASE_AGENT_PREFIX, isPhaseAgentName } from "./orchestration";
 
 // SPEC-450 · ADR-0094 · kontrak murni custom agent. Nol I/O: dipakai server (validasi + resolusi
 // scope), runner (render argv/prompt), dan UI (bentuk form) dari satu sumber.
@@ -76,7 +77,10 @@ export type CustomAgent = z.infer<typeof zCustomAgent>;
 
 const zCreateCustomAgentFields = z.object({
   projectId: z.string().nullable().optional(),
-  name: z.string().regex(AGENT_NAME_RE),
+  // ADR-0164 · awalan agen fase dicadangkan — registry native berkunci nama, jadi custom agent
+  // bernama sama akan menimpa agen fase sesi orchestrator tanpa satu pun galat.
+  name: z.string().regex(AGENT_NAME_RE)
+    .refine((n) => !isPhaseAgentName(n), { message: `awalan ${PHASE_AGENT_PREFIX} dicadangkan untuk agen fase hanoman` }),
   description: z.string().trim().min(1).max(500),
   instructions: z.string().trim().min(1).max(20_000),
   tools: z.array(z.string()).nullable().optional(),

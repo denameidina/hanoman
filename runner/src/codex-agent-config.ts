@@ -1,16 +1,12 @@
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cmpVersion } from "@hanoman/shared";
+import { CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported } from "@hanoman/shared";
 import { agentDelegationClause, agentPromptOf, type AgentDef } from "./custom-agents";
 import { resolveHardening } from "./runtime-profile";
 
-/** Versi pertama yang benar-benar diverifikasi membawa custom agents + hooks stabil. */
-export const CODEX_NATIVE_AGENTS_MIN_CLIENT = "0.151.0";
-
-export function codexNativeAgentsSupported(version: string | null): boolean {
-  const parsed = version ? /(\d+)\.(\d+)\.(\d+)/.exec(version)?.[0] : null;
-  return parsed ? cmpVersion(parsed, CODEX_NATIVE_AGENTS_MIN_CLIENT) >= 0 : false;
-}
+// ADR-0164 · gerbang versi pindah ke @hanoman/shared (UI butuh aturan yang sama); diekspor ulang
+// supaya pemakai lama tak berubah.
+export { CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported };
 
 type VersionProbeEnv = Record<string, string | undefined>;
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;
@@ -54,7 +50,9 @@ export function renderCodexAgentToml(
   const lines = [
     `name = ${tomlString(def.name)}`,
     `description = ${tomlString(def.description)}`,
-    `developer_instructions = ${tomlString(agentPromptOf(def, roster, "codex") + (options.promptSuffix ?? ""))}`,
+    `developer_instructions = ${tomlString(def.kind === "phase"
+      ? def.instructions
+      : agentPromptOf(def, roster, "codex") + (options.promptSuffix ?? ""))}`,
     ...(def.model ? [`model = ${tomlString(def.model)}`] : []),
     ...(def.effort ? [`model_reasoning_effort = ${tomlString(def.effort)}`] : []),
     ...(def.workspacePolicy === "read-only" ? ['sandbox_mode = "read-only"'] : []),
@@ -78,6 +76,8 @@ type MaterializeOptions = RenderOptions & {
   clientVersion?: string | null;
   writeFile?: (path: string, content: string) => void;
   chmod?: (path: string, mode: number) => void;
+  /** ADR-0164 · batas kedalaman subagent codex, dipasang eksplisit hanya untuk sesi orchestrator. */
+  maxDepth?: number;
 };
 
 const safeFilename = (name: string): string => name.replace(/[^a-z0-9-]/gi, "-");
@@ -134,6 +134,7 @@ export function materializeCodexAgents(
     "-c", "agents.enabled=true",
     "-c", "agents.max_concurrent_threads_per_session=3",
   ];
+  if (options.maxDepth) args.push("-c", `agents.max_depth=${options.maxDepth}`);
   for (const { def, path } of successful) {
     const key = `agents.${tomlKey(def.name)}`;
     args.push("-c", `${key}.description=${tomlString(def.description)}`);

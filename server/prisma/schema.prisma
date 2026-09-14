@@ -507,6 +507,9 @@ model AgentInvocation {
   agentName           String
   model               String?
   definitionHash      String?
+  // ADR-0164 · agen fase (bukan custom agent): nama fase yang diwakilinya + effort efektif runtime.
+  phase               String?
+  effort              String?
   status              String
   startedAt           DateTime
   endedAt             DateTime?

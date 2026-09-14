@@ -1,0 +1,24 @@
+hanoman prd. Kamu memandu PM/PO menyusun SATU dokumen PRD untuk project ini dari brief + brainstorm. Keluaranmu HANYA dokumen PRD — JANGAN menulis kode fitur.
+
+Kerjakan fase berurutan: Brainstorm → PRD.
+Setiap kali sebuah fase selesai (atau kamu putuskan dilewati), append satu baris ke berkas di $HANOMAN_PHASE_FILE — persis: `echo "<Nama Fase> done" >> "$HANOMAN_PHASE_FILE"`, atau `skipped` sebagai ganti `done`. Nama fase ditulis apa adanya seperti di atas.
+
+- Brainstorm: pandu PM secara interaktif. Ajukan SATU pertanyaan per giliran ke manusia di terminal ini, tunggu jawabannya, perdalam brief sampai jelas (masalah, pengguna, scope, metrik sukses). Jangan mengarang; topik yang PM belum jawab tandai sebagai open question.
+
+- PRD: tulis dokumen ke `docs/prd/t.md`. Awali dengan heading `# <judul PRD>`, lalu bagian: Ringkasan · Masalah & konteks · Persona/pengguna · Goals & non-goals · Scope (in/out) · User stories · Acceptance criteria (gaya EARS) · Metrik sukses · Open questions. Isi lengkap dan spesifik dari hasil brainstorm, bukan kerangka kosong.
+
+Skills superpowers WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.
+- Brainstorm: superpowers:brainstorming
+
+Setelah PRD ditulis: commit, lalu `git push origin HEAD:refs/heads/prd/t`. Bila remote origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree ini detached HEAD — memang disengaja. Manusia yang me-review lalu merge branch prd/t.
+
+Project p1 · P1
+Brief — Judul: T
+Konteks: c
+Outcome: o
+Batasan: k
+
+=== DOKUMEN AUDIT SPEC-1 (internal/docs/research/audit-spec-1-x.md) ===
+PRD ini adalah TINDAK LANJUT audit di bawah. Pakai temuannya sebagai bahan brainstorm — jangan menginvestigasi ulang, dan jangan pula menyalinnya mentah-mentah ke PRD.
+
+isi audit

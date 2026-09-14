@@ -8,10 +8,14 @@ import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
   renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook,
-  type AgentDef, type Flow, type Agent,
+  writeSubagentStatusline, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
-import { coerceCodexEffort, isTerminalResponse, resolveChoices, type SessionKind } from "@hanoman/shared";
-import { readPhases, sessionComplete, type Phase } from "./session-phases";
+import {
+  coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
+} from "@hanoman/shared";
+import {
+  enrichPhases, readPhases, sessionComplete, trackDoneSeen, type Phase, type PhaseInvocation,
+} from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
 import { dropSessionUploads } from "./uploads";
 import {
@@ -136,6 +140,9 @@ export type SessionInfo = {
   decisionAt?: string;
   // SPEC-338 · ADR-0074 · mesin sesi. Sesi lama (tanpa opsi tmux ini) dibaca sebagai "claude".
   agent: Agent;
+  // ADR-0164 · model/effort orchestrator (argv saat lahir) + penanda sesi diorkestrasi. Absen untuk
+  // sesi lama; `orchestrated` hanya ikut DTO bila true.
+  model?: string; effort?: string; orchestrated?: boolean;
 };
 export type Pane = SessionInfo & {
   // ADR-0161: metadata tmux internal; klasifikasi tidak mengubah hitungan semua pane hidup.
@@ -155,9 +162,16 @@ export type Pane = SessionInfo & {
   // SENGAJA di luar `SessionInfo`: ia detail internal, bukan bagian DTO yang disiarkan/disync.
   eventHook: boolean;
   agentRoster?: SessionAgentMeta[];
+  // M-2 · ADR-0164 · nama fase yang SUDAH `done`/`skipped` saat sesi LAHIR (dicatat createSession
+  // dari berkas fase) — dipakai `enrichPhases` supaya fase itu tak pernah dilabeli ⚠ "missing"
+  // hanya karena tak ada invocation SESUDAH lahir. Opsi tmux, bukan memori proses: bertahan lintas
+  // restart server sama seperti opsi lain (pola @hanoman_agent, SPEC-338), pty tetap nol dependensi DB.
+  doneAtBirth?: string[];
 };
 export type SessionAgentMeta = {
   id?: string; name: string; model?: string; timeoutSeconds?: number; definitionHash?: string;
+  // ADR-0164 · agen fase membawa nama fasenya; effort = nilai efektif saat lahir (sudah dikoersi).
+  phase?: string; effort?: string;
 };
 
 // Satu attachment per sesi: satu klien tmux melayani semua WebSocket yang menonton.
@@ -168,8 +182,30 @@ type Attachment = {
   pty: IPty; scrollback: string; clients: Set<Client>; lastPhases: string;
   lastAlt?: boolean;
   pending: string; flushTimer?: NodeJS.Timeout;
+  // ADR-0164 · kapan server pertama melihat tiap fase `done` — bahan tenggang bukti `enrichPhases`.
+  doneSeenAt: Map<string, number>;
 };
 const attached = new Map<string, Attachment>();
+
+// ADR-0164 · status live agen fase per sesi. Diisi route session-events & route WS terminal (yang
+// membaca DB); pty sendiri tak pernah menyentuh DB (ADR-0094 §7).
+const phaseInvocations = new Map<string, PhaseInvocation[]>();
+
+/** Frame fase satu pane: berkas fase diperkaya roster agen fase + invocation. Tanpa agen fase → apa adanya. */
+function phaseView(p: Pane, a: Attachment): Phase[] {
+  const phases = readPhases(p.phaseFile!, p.flow!);
+  const now = Date.now();
+  trackDoneSeen(phases, a.doneSeenAt, now);
+  const roster = (p.agentRoster ?? []).flatMap((r) =>
+    r.phase ? [{ name: r.name, phase: r.phase, model: r.model, effort: r.effort }] : []);
+  // I-1/M-2 · ADR-0164 · `startedAt` tmux dalam detik epoch; `enrichPhases` menerima ms.
+  return roster.length
+    ? enrichPhases(
+      phases, roster, phaseInvocations.get(p.id) ?? [], a.doneSeenAt, now,
+      p.startedAt * 1000, new Set(p.doneAtBirth ?? []),
+    )
+    : phases;
+}
 
 // Variabel yang sama yang dipakai runner/src/claude-cli.ts.
 const claudeBin = () => effectiveStr("HANOMAN_CLAUDE_BIN") ?? "claude";
@@ -321,6 +357,10 @@ export const FMT = [
   // `pty-parse.test.ts` mengunci panjang FMT terhadap destructuring `parsePanes`.
   "#{window_activity}", "#{@hanoman_event_hook}", "#{session_created}",
   "#{@hanoman_agent_roster}", "#{@hanoman_launch_class}",
+  // ADR-0164 · di UJUNG juga, alasan yang sama dengan SPEC-919.
+  "#{@hanoman_model}", "#{@hanoman_effort}", "#{@hanoman_orchestrated}",
+  // M-2 · ADR-0164 · nama fase done|skipped SAAT LAHIR, dipisah koma — di UJUNG juga.
+  "#{@hanoman_done_at_birth}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -352,7 +392,8 @@ export async function listPanesAsync(): Promise<Pane[]> {
 export function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
-      alternate, activity, eventHook, created, agentRoster, launchClass] = line.split("\t");
+      alternate, activity, eventHook, created, agentRoster, launchClass, model, effort,
+      orchestrated, doneAtBirth] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -379,6 +420,12 @@ export function parsePanes(out: string): Pane[] {
       eventHook: eventHook === "1",
       agentRoster: parseAgentRoster(agentRoster),
       launchClass: launchClass === "agent" || launchClass === "terminal" ? launchClass : undefined,
+      model: model || undefined,
+      effort: effort || undefined,
+      orchestrated: orchestrated === "1",
+      // M-2 · ADR-0164 · daftar kosong/tak ada opsi → undefined, bukan [] (sesi lama atau sesi
+      // tanpa satu pun fase done saat lahir tak perlu membawa array kosong di DTO internal).
+      doneAtBirth: doneAtBirth ? doneAtBirth.split(",").filter(Boolean) : undefined,
     }];
   });
 }
@@ -398,18 +445,23 @@ function parseAgentRoster(value: string | undefined): SessionAgentMeta[] {
         ...(typeof row.definitionHash === "string" && /^[a-f0-9]{64}$/.test(row.definitionHash)
           ? { definitionHash: row.definitionHash } : {}),
         ...(typeof row.timeoutSeconds === "number" ? { timeoutSeconds: row.timeoutSeconds } : {}),
+        ...(typeof row.phase === "string" ? { phase: row.phase } : {}),
+        ...(typeof row.effort === "string" ? { effort: row.effort } : {}),
       }];
     });
   } catch { return []; }
 }
 
 const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent,
-  decisionFile, activityAt }: Pane): SessionInfo => ({
+  decisionFile, activityAt, model, effort, orchestrated }: Pane): SessionInfo => ({
   id, projectId, specId, flow, cwd, exited, branch, decision, agent,
   // Hanya untuk pane mati: `pane_dead_status` kosong pada pane hidup, dan `exitCode: 0` di sana
   // akan terbaca sebagai "sudah berakhir sukses".
   ...(exited ? { exitCode: code } : {}),
   ...(decision && decisionFile ? { decisionAt: decisionOnset(decisionFile, activityAt) } : {}),
+  ...(model ? { model } : {}),
+  ...(effort ? { effort } : {}),
+  ...(orchestrated ? { orchestrated: true } : {}),
 });
 
 export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
@@ -508,6 +560,9 @@ let codexNativeAgentSupport: CodexNativeAgentSupport = () => ({ version: "0.151.
 export function registerCodexNativeAgentSupport(fn: CodexNativeAgentSupport): void {
   codexNativeAgentSupport = fn;
 }
+/** ADR-0164 · runtime sanggup subagent native: claude selalu, codex bila client terdeteksi >= 0.151. */
+export const nativeAgentsAvailable = (agent: Agent): boolean =>
+  agent === "claude" || codexNativeAgentSupport().ok;
 // Gagal baca → daftar KOSONG. Katalog agen tak pernah boleh menggagalkan kelahiran sesi.
 const customAgentsFor = (context: AgentSelectionContext): AgentDef[] => {
   try { return customAgentSource(context); } catch { return []; }
@@ -576,6 +631,10 @@ export type CreateOpts = {
   attachmentsDir?: string;
   // Env tambahan di depan argv sesi (mis. HANOMAN_BASE_SHA / HANOMAN_VERIFY_SCOPE).
   env?: Record<string, string>;
+  // ADR-0164 · orkestrasi. `phaseAgents` terisi = minta sesi orchestrator; `legacyPrompt` = prompt
+  // mode tunggal dari input yang SAMA, dipakai bila satu agen fase gagal dimaterialisasi.
+  phaseAgents?: AgentDef[];
+  legacyPrompt?: string;
 };
 
 export function createSession(projectId: string, cwd: string, opts: CreateOpts = {}): SessionInfo {
@@ -618,43 +677,111 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // kedua runtime menempelkan klausa delegasi ringkas ke prompt parent. Sesi ber-
   // `opts.command` (shell mentah ADR-0056, konsol VPS) tak menerima apa pun — tak ada agen di sana.
   const agentForDefs: Agent = opts.agent ?? "claude";
+  // SPEC-339 · titik cekik tunggal: effort codex yang tak didukung model diturunkan ke fallback DI
+  // SINI, bukan di route — SEMUA kelahiran sesi bermuara ke createSession, termasuk jalur ber-
+  // AgentToken yang tak lewat picker UI. Argv, roster (warisan def tanpa effort sendiri), dan opsi
+  // tmux semua memakai `sessionEffort` ini — TAPI (ADR-0164) agen fase di `attempt()` di bawah
+  // TIDAK: tiap AgentDef fase membawa effort-nya SENDIRI, sudah dikoersi resolver `resolvePhasePlan`
+  // saat rencana fase disusun. Hanya dikoersi bila keduanya ada: tanpa effort, `agentFlags` memang
+  // tak memasang flag apa pun.
+  const sessionEffort = agentForDefs === "codex" && opts.model && opts.effort
+    ? coerceCodexEffort(opts.model, opts.effort) : opts.effort;
   const selectionContext: AgentSelectionContext = {
     projectId, runtime: agentForDefs, flow: opts.flow, cwd,
     baseSha: opts.env?.HANOMAN_BASE_SHA, prompt: opts.prompt,
     changedFiles: opts.command ? [] : collectChangedFiles(cwd, opts.env?.HANOMAN_BASE_SHA),
   };
-  const customDefs = opts.command ? [] : customAgentsFor(selectionContext);
+  const rawCustomDefs = opts.command ? [] : customAgentsFor(selectionContext);
+  // M-1 · ADR-0164 · awalan `hanoman-fase-` dicadangkan untuk agen fase; skema `CustomAgent`
+  // menolaknya di ENTRY BARU, tapi baris LAMA bisa nyasar lewat sync dari peer yang belum
+  // ber-gerbang itu. Dibuang di TITIK TUNGGAL kelahiran sesi: `attempt()` di bawah merakit
+  // `[...phaseDefs, ...customDefs]` dan claude JSON last-key-wins — tanpa saringan ini custom
+  // agent bernama sama MENIMPA definisi/instruksi agen fase asli, senyap.
+  const customDefs = rawCustomDefs.filter((def) => !isPhaseAgentName(def.name));
+  for (const def of rawCustomDefs) {
+    if (isPhaseAgentName(def.name)) {
+      process.stderr.write(
+        `hanoman: custom agent ${def.name} diabaikan — awalan hanoman-fase- dicadangkan (ADR-0164)\n`,
+      );
+    }
+  }
+  const requestedPhaseDefs = opts.command ? [] : (opts.phaseAgents ?? []);
   let rosterBlock = "";
   let codexAgentArgs: string[] = [];
   let agentsFile: string | undefined;
   let agentConfigDir: string | undefined;
   let liveAgentDefs: AgentDef[] = [];
-  if (customDefs.length > 0) {
+  let renderedDefs: AgentDef[] = [];
+  let orchestrated = false;
+  let statusLineCommand: string | undefined;
+  if (customDefs.length > 0 || requestedPhaseDefs.length > 0) {
     const tempDir = agentTempDir(id);
     agentConfigDir = tempDir;
     mkdirSync(tempDir, { recursive: true, mode: 0o700 });
     const readOnlyHook = customDefs.some((def) => def.workspacePolicy === "read-only")
       ? writeReadOnlyHook(tempDir)
       : undefined;
-    if (agentForDefs === "claude") {
-      const json = renderAgentsJson(customDefs, { readOnlyHookCommand: readOnlyHook?.command });
-      if (json) {
-        agentsFile = agentsFilePath(id);
-        writeFileSync(agentsFile, json, { mode: 0o600 });
+    // ADR-0164 · satu lintasan renderer untuk agen fase + custom agent. Array kosong = sukses;
+    // sebaliknya berisi ALASAN tiap agen fase yang gagal (bukan boolean polos — review Task 7:
+    // fallback yang membisu tentang penyebabnya tak bisa didiagnosis dari luar). Pemanggil lalu
+    // mencoba lagi TANPA agen fase (all-or-nothing): orchestrator yang lahir tanpa salah satu agen
+    // fasenya akan terpaksa mengerjakan fase itu sendiri.
+    const attempt = (phaseDefs: AgentDef[]): string[] => {
+      const defs = [...phaseDefs, ...customDefs];
+      if (defs.length === 0) return [];
+      if (agentForDefs === "claude") {
+        const file = agentsFilePath(id);
+        try {
+          writeFileSync(file, renderAgentsJson(defs, { readOnlyHookCommand: readOnlyHook?.command }), { mode: 0o600 });
+        } catch (error) {
+          if (phaseDefs.length === 0) throw error;
+          return [error instanceof Error ? error.message : String(error)];
+        }
+        agentsFile = file;
         rosterBlock = agentDelegationClause(customDefs, "claude");
-        liveAgentDefs = customDefs;
+        liveAgentDefs = defs;
+        renderedDefs = defs;
+        return [];
       }
-    } else {
-      const materialized = materializeCodexAgents(customDefs, tempDir, {
+      const materialized = materializeCodexAgents(defs, tempDir, {
         readOnlyHookCommand: readOnlyHook?.command,
         clientVersion: codexNativeAgentSupport().version,
+        ...(phaseDefs.length > 0 ? { maxDepth: 3 } : {}),
       });
+      const phaseFailures = materialized.warnings.filter((w) => phaseDefs.some((d) => d.name === w.agentName));
+      if (phaseFailures.length > 0) return phaseFailures.map((w) => `${w.agentName}: ${w.reason}`);
       codexAgentArgs = materialized.args;
       rosterBlock = materialized.delegationClause;
       liveAgentDefs = materialized.liveDefs;
+      renderedDefs = defs;
       for (const warning of materialized.warnings) {
         process.stderr.write(
           `hanoman: custom agent ${warning.agentName} tidak dimaterialisasi: ${warning.reason}\n`,
+        );
+      }
+      return [];
+    };
+    let phaseFailReasons: string[] = [];
+    if (requestedPhaseDefs.length > 0) {
+      phaseFailReasons = attempt(requestedPhaseDefs);
+      orchestrated = phaseFailReasons.length === 0;
+    }
+    if (!orchestrated) {
+      if (requestedPhaseDefs.length > 0)
+        process.stderr.write(
+          `hanoman: agen fase sesi ${id} gagal dimaterialisasi — sesi lahir mode tunggal: ${phaseFailReasons.join("; ")}\n`,
+        );
+      attempt([]);
+    }
+    if (orchestrated && agentForDefs === "claude") {
+      // M-7 · ADR-0164 · skrip statusline TUI subagent adalah kosmetik dan fail-open di dalam
+      // dirinya sendiri saat runtime (lihat subagent-statusline.ts) — gagal MENULISNYA saat lahir
+      // (disk penuh, permission) tak boleh menggagalkan kelahiran sesi orchestrator; efeknya cuma
+      // baris statusline hilang, claude memakai baris bawaannya.
+      try { statusLineCommand = writeSubagentStatusline(tempDir); }
+      catch (error) {
+        process.stderr.write(
+          `hanoman: gagal menulis subagentStatusline sesi ${id}: ${error instanceof Error ? error.message : String(error)}\n`,
         );
       }
     }
@@ -662,10 +789,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
 
   let promptArg = "";
   let promptFile: string | undefined;
-  if (!opts.command && opts.prompt) {
+  const sessionPrompt = orchestrated ? opts.prompt : (opts.legacyPrompt ?? opts.prompt);
+  if (!opts.command && sessionPrompt) {
     promptFile = promptFilePath(id);
     mkdirSync(dirname(promptFile), { recursive: true, mode: 0o700 });
-    writeFileSync(promptFile, opts.prompt + rosterBlock, { mode: 0o600 });
+    writeFileSync(promptFile, sessionPrompt + rosterBlock, { mode: 0o600 });
     promptArg = `"$(cat ${sq(promptFile)})"`;
   }
   // SPEC-338 · ADR-0074 · perbedaan CLI antar agen dirakit `agentFlags`; di sini tinggal
@@ -686,24 +814,18 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
         phaseFile: opts.phaseFile ?? "", worktree: cwd, stateFile: goalStatePath(id),
       }), { mode: 0o700 });
     }
-    // SPEC-339 · titik cekik tunggal: effort yang tak didukung model codex diturunkan ke fallback
-    // model SEBELUM argv dirakit. Ditaruh di sini, bukan di route, karena SEMUA kelahiran sesi
-    // bermuara ke createSession — termasuk jalur ber-AgentToken yang tak lewat picker UI.
-    // Hanya dikoersi bila keduanya ada: tanpa effort, `agentFlags` memang tak memasang flag apa pun.
-    const effort = agent === "codex" && opts.model && opts.effort
-      ? coerceCodexEffort(opts.model, opts.effort)
-      : opts.effort;
     // SPEC-450 · ADR-0094 gotcha 4 · JSON `--agents` lewat BERKAS, bukan inline: instruksi agen
     // adalah prosa dan tmux membatasi SATU command ±16 KB — kelas kegagalan SPEC-223, dibayar
     // sekali dan dipakai ulang. Hasil command-substitution dikutip ganda, jadi isinya tak dipindai
     // ulang shell (aman dari injeksi) dan batasnya ARG_MAX, bukan 16 KB.
     // Prompt (bila ada) = argumen positional pertama agen, TANPA sq (sudah dikutip ganda).
     const flags = agentFlags({
-      agent, model: opts.model, effort,
+      agent, model: opts.model, effort: sessionEffort,
       decisionFile: opts.decisionFile, goal: opts.goal, goalGate,
       // SPEC-909 · ADR-0146 · sesi ber-`opts.command` tak pernah sampai ke sini (cabang shell
       // mentah di atas), jadi hook event hanya pernah terpasang di sesi agen.
       eventHook: true,
+      subagentStatusLine: statusLineCommand,
     }).map(sq).join(" ");
     // GOTCHA ADR-0094 #4: `--agents` TIDAK boleh ikut `.map(sq)` seperti flag lain — ia harus tetap
     // berbentuk `"$(cat …)"` supaya `sh -c` yang melahirkan sesi meng-expand-nya. Di-`sq` sekali
@@ -789,22 +911,36 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   const kind = sessionKind({ ...opts, id }, projectId, cwd);
   tmux("set-option", "-t", name(id), "@hanoman_launch_class",
     opts.command || kind === "terminal" ? "terminal" : "agent");
+  // ADR-0164 · model/effort orchestrator + penanda orkestrasi → chip header sel terminal.
+  if (!opts.command && opts.model) tmux("set-option", "-t", name(id), "@hanoman_model", opts.model);
+  if (!opts.command && sessionEffort) tmux("set-option", "-t", name(id), "@hanoman_effort", sessionEffort);
+  if (orchestrated) tmux("set-option", "-t", name(id), "@hanoman_orchestrated", "1");
   if (liveAgentDefs.length > 0) {
-    const inherited = {
-      model: opts.model,
-      effort: agent === "codex" && opts.model && opts.effort
-        ? coerceCodexEffort(opts.model, opts.effort) : opts.effort,
-    };
+    const inherited = { model: opts.model, effort: sessionEffort };
     const roster: SessionAgentMeta[] = liveAgentDefs.map((def) => ({
       ...(def.id ? { id: def.id } : {}), name: def.name,
       ...(def.model ?? inherited.model ? { model: def.model ?? inherited.model } : {}),
-      // Native files were rendered with customDefs, even if another Codex file failed to write.
-      definitionHash: agentDefinitionHash(def, customDefs, agent, inherited),
+      ...(def.phase ? { phase: def.phase } : {}),
+      ...(def.effort ?? inherited.effort ? { effort: def.effort ?? inherited.effort } : {}),
+      // Berkas native dirender dengan `renderedDefs`, walau satu berkas Codex lain gagal ditulis.
+      definitionHash: agentDefinitionHash(def, renderedDefs, agent, inherited),
       ...(def.timeoutSeconds ? { timeoutSeconds: def.timeoutSeconds } : {}),
     }));
     tmux("set-option", "-t", name(id), "@hanoman_agent_roster", JSON.stringify(roster));
   }
   if (opts.phaseFile) tmux("set-option", "-t", name(id), "@hanoman_phase_file", opts.phaseFile);
+  // M-2 · ADR-0164 · fase yang SUDAH `done`/`skipped` SAAT SESI LAHIR (mis. sesi lama mode tunggal
+  // tanpa invocation, diteruskan sebagai orchestrator baru) dicatat di sini, sebagai OPSI TMUX —
+  // bukan variabel proses — supaya bertahan lintas restart server (pola @hanoman_agent, SPEC-338;
+  // pty.ts tetap nol dependensi DB). `enrichPhases` memakainya supaya fase ini tak pernah dilabeli
+  // ⚠ "missing" hanya karena tak ada invocation SESUDAH lahir.
+  if (opts.phaseFile && opts.flow) {
+    const doneAtBirth = readPhases(opts.phaseFile, opts.flow)
+      .filter((p) => p.state === "done" || p.state === "skipped")
+      .map((p) => p.name);
+    if (doneAtBirth.length > 0)
+      tmux("set-option", "-t", name(id), "@hanoman_done_at_birth", doneAtBirth.join(","));
+  }
   if (opts.decisionFile) tmux("set-option", "-t", name(id), "@hanoman_decision_file", opts.decisionFile);
   // SPEC-909 · ADR-0146 · penanda "sesi ini bisa mengirim event". Sesi hidup TANPA penanda ini tak
   // akan dijawab lead — engine menotifikasinya sekali. Opsi window, bukan berkas: sumber kebenaran
@@ -1094,7 +1230,9 @@ function flushOutput(a: Attachment): void {
 // ditutup. Yang menentukan akhir adalah pane-nya — itulah yang di-poll di bawah.
 function open(id: string): Attachment {
   const pty = spawnPty("attach-session", "-d", "-t", name(id));
-  const a: Attachment = { pty, scrollback: "", clients: new Set(), lastPhases: "", pending: "" };
+  const a: Attachment = {
+    pty, scrollback: "", clients: new Set(), lastPhases: "", pending: "", doneSeenAt: new Map(),
+  };
   pty.onData((d) => {
     a.pending += d;
     if (a.pending.length >= COALESCE_MAX_BYTES) flushOutput(a);
@@ -1114,6 +1252,12 @@ function drop(id: string): void {
   // `pending` masih terisi berarti membuangnya.
   flushOutput(a);
   attached.delete(id);
+  // ADR-0164 · review Task 9: `drop` adalah SATU-SATUNYA titik yang menghapus entri `attached`
+  // (dipanggil `pty.onExit` untuk pane yang mati sendiri, `end()` untuk pane yang ditemukan mati
+  // lewat poll, dan `killAll`/`detachAll`) — cache invocation fase sesi ini ikut dibuang di sini,
+  // bukan hanya di `killSession`. Tanpa ini sesi yang berakhir tanpa lewat `killSession` (pane
+  // yang mati sendiri, atau klien yang sekadar detach) meninggalkan entrinya menumpuk selamanya.
+  phaseInvocations.delete(id);
   a.pty.kill();
   for (const c of a.clients) c.close();
   a.clients.clear();
@@ -1166,13 +1310,32 @@ export const sessionFinished = (id: string): boolean => {
 
 function pollPhases(p: Pane, a: Attachment): void {
   if (!p.flow || !p.phaseFile) return;
-  const phases = readPhases(p.phaseFile, p.flow);
+  const phases = phaseView(p, a);
   const complete = paneComplete(p);
   const json = phaseKey(phases, complete);
   if (json === a.lastPhases) return;
   a.lastPhases = json;
   broadcast(a, { t: "phase", phases, complete });
 }
+
+/**
+ * ADR-0164 · review Task 9: HANYA menyimpan cache — tak lagi memanggil `getSession`/`pollPhases`.
+ * Ini jalur HOOK (dipanggil dari route session-events dan route WS terminal): `getSession` sinkron
+ * memaksa `execFileSync` tmux dan memblokir event loop sampai 916 ms saat mesin sibuk (SPEC-878,
+ * lihat komentar `getSessionAsync`). Memanggilnya di sini tak perlu — tick poll async (≤ 500 ms,
+ * `startPoll`) sudah membaca cache ini lewat `phaseView` pada pane segar, dan `phaseKey` memuat
+ * `agent` sehingga siaran otomatis terjadi begitu isinya berubah, tanpa satu pun tmux tambahan.
+ *
+ * Sesi yang tak ditonton (`attached` kosong untuknya) tak disimpan sama sekali: `attach()` selalu
+ * menghidrasi ulang lewat `refreshPhaseInvocations` sesudah WS tersambung, jadi cache untuk sesi
+ * tanpa penonton hanya akan menumpuk tanpa pernah dibaca — dibuang di `drop()`/`killSession()`.
+ */
+export function setPhaseInvocations(sessionId: string, rows: PhaseInvocation[]): void {
+  if (attached.has(sessionId)) phaseInvocations.set(sessionId, rows);
+}
+
+/** Test-only: intip cache tanpa tmux. */
+export const __phaseInvocationsFor = (id: string): PhaseInvocation[] | undefined => phaseInvocations.get(id);
 
 // SPEC-863 · cermin pollPhases: frame lahir hanya saat berubah, dan sumbernya `Pane` yang sudah
 // dipegang loop poll — tak ada invokasi tmux tambahan, `#{alternate_on}` ikut di `FMT`.
@@ -1279,7 +1442,7 @@ export function attach(id: string, c: Client): void {
   // Lewat sinilah pil "Selesai" selamat dari refresh & pindah sel: klien baru langsung diberi
   // verdict-nya, tak perlu menunggu berkas fase berubah lagi (yang takkan pernah terjadi).
   if (p.flow && p.phaseFile) {
-    const phases = readPhases(p.phaseFile, p.flow);
+    const phases = phaseView(p, a);
     const complete = paneComplete(p);
     a.lastPhases = phaseKey(phases, complete);
     c.send(frame({ t: "phase", phases, complete }));
@@ -1304,6 +1467,7 @@ export function resize(id: string, cols: number, rows: number): void {
 }
 
 export function killSession(id: string): boolean {
+  phaseInvocations.delete(id);
   const p = getSession(id);
   if (!p) return false;
   // SPEC-362 · capture SEBELUM kill: sesudah `kill-session` scrollback-nya tak ada lagi.

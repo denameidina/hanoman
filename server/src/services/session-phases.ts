@@ -1,10 +1,25 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
-import { PLAN_DIRS, type Stage } from "@hanoman/shared";
+import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, type Stage } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
 
 export type PhaseState = "done" | "skipped" | "active" | "pending";
-export type Phase = { name: string; state: PhaseState };
+// ADR-0164 · bukti agen fase yang ikut frame `phase`. `resultExcerpt` aman di sini: WS terminal
+// ber-cookie, sama dengan route metrik yang memuat excerpt (ADR-0159).
+export type PhaseInvocation = {
+  phase: string; runtimeInvocationId: string; status: string; startedAt: string;
+  durationMs: number | null; inputTokens: number | null; outputTokens: number | null;
+  cachedTokens: number | null; resultExcerpt: string | null;
+};
+export type PhaseRosterEntry = { name: string; phase: string; model?: string; effort?: string };
+export type PhaseAgent = {
+  name: string; model?: string; effort?: string; status?: string; startedAt?: string;
+  durationMs?: number | null; attempts: number;
+  inputTokens?: number | null; outputTokens?: number | null; cachedTokens?: number | null;
+  resultExcerpt?: string | null;
+  evidence: "ok" | "pending" | "missing";
+};
+export type Phase = { name: string; state: PhaseState; agent?: PhaseAgent };
 
 // Di luar worktree: `git add -A` milik agen tak boleh bisa melihatnya. `.worktrees` sudah
 // ada di .gitignore, jadi berkas ini tak pernah mendarat di branch mana pun.
@@ -46,6 +61,71 @@ export function readPhases(file: string, flow: Flow): Phase[] {
     activeTaken = true;
     return { name, state: "active" as const };
   });
+}
+
+/**
+ * ADR-0164 · fase diperkaya agen fasenya. MURNI: roster (tmux), invocation (DB lewat cache pty), dan
+ * `doneSeenAt` (kapan server pertama melihat fase `done`) disuntik pemanggil. `missing` = fase tercatat
+ * selesai tanpa satu pun invocation lewat tenggang relay — dilabeli "bukti tak diterima", bukan
+ * "tidak didelegasikan": hook fail-open dan nol invocation bukan bukti tak dipakai (ADR-0159).
+ *
+ * I-1 · `bornAt` (ms epoch kelahiran sesi INI; 0 = tak diketahui → perilaku lama, semua invocation
+ * dihitung) membatasi status/startedAt/durasi/token/cuplikan/attempts ke invocation SESUDAH lahir:
+ * sesi lama yang ditutup di tengah fase lalu dilanjutkan (id sesi tetap, `sessionIdForSpec`)
+ * meninggalkan baris `running` yang bukan milik sesi baru — tanpa gerbang ini chip menampilkan
+ * "running 2h…"/`↻` dari run yang sudah mati.
+ *
+ * M-2 · `doneAtBirth` = fase yang SUDAH `done`/`skipped` SAAT SESI LAHIR (dicatat `createSession`
+ * dari berkas fase, lihat pty.ts). Fase ini TAK PERNAH `missing`: invocation lama (dari sebelum
+ * lahir, mis. run mode tunggal tanpa subagent) boleh jadi bukti `ok`, tapi tak ikut status/
+ * attempts — kalau tak ada invocation sama sekali, dibiarkan `pending` (paling jujur: bukan `ok`
+ * yang mengarang bukti, bukan pula `missing` yang menuduh "tak diterima" padahal memang belum
+ * pernah didelegasikan lewat subagent).
+ */
+export function enrichPhases(
+  phases: Phase[], roster: PhaseRosterEntry[], invocations: PhaseInvocation[],
+  doneSeenAt: Map<string, number>, now: number, bornAt: number,
+  doneAtBirth: ReadonlySet<string> = new Set(),
+): Phase[] {
+  return phases.map((p) => {
+    const r = roster.find((entry) => entry.phase === p.name);
+    if (!r) return p;
+    const all = invocations.filter((i) => i.phase === p.name);
+    const mine = all.filter((i) => bornAt === 0 || Date.parse(i.startedAt) >= bornAt)
+      .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+    const last = mine[mine.length - 1];
+    const bornDone = doneAtBirth.has(p.name);
+    const seen = doneSeenAt.get(p.name);
+    const evidence: PhaseAgent["evidence"] = mine.length > 0 ? "ok"
+      : bornDone ? (all.length > 0 ? "ok" : "pending")
+      : p.state === "done" && seen !== undefined && now - seen >= PHASE_EVIDENCE_GRACE_MS ? "missing"
+        : "pending";
+    return {
+      ...p,
+      agent: {
+        name: r.name,
+        ...(r.model ? { model: r.model } : {}),
+        ...(r.effort ? { effort: r.effort } : {}),
+        attempts: new Set(mine.map((i) => i.runtimeInvocationId)).size,
+        ...(last ? {
+          status: last.status, startedAt: last.startedAt, durationMs: last.durationMs,
+          inputTokens: last.inputTokens, outputTokens: last.outputTokens, cachedTokens: last.cachedTokens,
+          resultExcerpt: last.resultExcerpt,
+        } : {}),
+        evidence,
+      },
+    };
+  });
+}
+
+/** ADR-0164 · catat kapan fase PERTAMA kali terlihat `done`; lupakan fase yang tak lagi `done`
+ *  supaya fase yang di-reset lalu selesai lagi mendapat tenggang bukti yang utuh. */
+export function trackDoneSeen(phases: Phase[], doneSeenAt: Map<string, number>, now: number): void {
+  const byName = new Map(phases.map((p) => [p.name, p.state]));
+  for (const name of [...doneSeenAt.keys()])
+    if (byName.get(name) !== "done") doneSeenAt.delete(name);
+  for (const p of phases)
+    if (p.state === "done" && !doneSeenAt.has(p.name)) doneSeenAt.set(p.name, now);
 }
 
 // ADR-0008 · Spec.stage cermin fase, hanya maju. `skipped` dihitung sebagai tercapai:

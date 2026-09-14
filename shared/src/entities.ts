@@ -363,6 +363,33 @@ export const zPortalChat = z.object({
 export type PortalChat = z.infer<typeof zPortalChat>;
 export const PORTAL_CHAT_DEFAULTS: PortalChat = zPortalChat.parse({});
 
+// ADR-0164 · orkestrasi subagent per fase. `Setting.data` bertipe Json → blok ini TANPA migration,
+// cermin conflict/goal. Default AKTIF per flow (keputusan operator). Sel `null` = warisi
+// model/effort orchestrator (picker Start). Lenient `z.string()` seperti model/effort akar:
+// katalog ditegakkan UI, dan kunci fase tak dikenal diabaikan `resolvePhasePlan`.
+export const zPhaseCell = z.object({
+  model: z.string().nullable().default(null),
+  effort: z.string().nullable().default(null),
+});
+export type PhaseCell = z.infer<typeof zPhaseCell>;
+export const zFlowOrchestration = z.object({
+  enabled: z.boolean().default(true),
+  claude: z.record(z.string(), zPhaseCell).default({}),
+  codex: z.record(z.string(), zPhaseCell).default({}),
+});
+export type FlowOrchestration = z.infer<typeof zFlowOrchestration>;
+// Kunci eksplisit, bukan `Object.fromEntries`: tipe hasilnya harus tetap `Record<flow, …>` penuh.
+// Kecocokannya dengan `ORCHESTRATION_FLOWS` dijaga orchestration.test.ts.
+export const zOrchestration = z.object({
+  feature: zFlowOrchestration.default({}), qa: zFlowOrchestration.default({}),
+  scaffold: zFlowOrchestration.default({}), reverse: zFlowOrchestration.default({}),
+  prd: zFlowOrchestration.default({}), audit: zFlowOrchestration.default({}),
+  breakdown: zFlowOrchestration.default({}), goal: zFlowOrchestration.default({}),
+  no_effort: zFlowOrchestration.default({}),
+});
+export type Orchestration = z.infer<typeof zOrchestration>;
+export const ORCHESTRATION_DEFAULTS: Orchestration = zOrchestration.parse({});
+
 export const zSetting = z.object({
   model: z.string().default("claude-opus-5"),
   effort: z.string().default("xhigh"),
@@ -389,6 +416,7 @@ export const zSetting = z.object({
   telegram: zTelegramSettings.default(TELEGRAM_DEFAULTS),                 // SPEC-476 · ADR-0096 · gateway Telegram (default mati)
   changelog: zAgentEngine.default(CHANGELOG_ENGINE_DEFAULTS),             // SPEC-518 · agen pembuat changelog (opt-in, mati)
   portalChat: zPortalChat.default(PORTAL_CHAT_DEFAULTS),                  // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
+  orchestration: zOrchestration.default(ORCHESTRATION_DEFAULTS),         // ADR-0164 · orkestrasi subagent per fase (default aktif)
   // SPEC-881 · ADR-0136 · sidik jari isi bawaan yang TERAKHIR ditulis seed di mesin ini, per nama
   // agen. Dipakai seed untuk membedakan "belum pernah disunting operator" dari "sudah". WAJIB
   // dideklarasikan di sini: zod membuang kunci tak dikenal dan `PUT /settings` menulis balik hasil

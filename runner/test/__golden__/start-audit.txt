@@ -1,0 +1,39 @@
+hanoman audit. Ikuti internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di index, dalam commit yang sama.
+
+Kerjakan fase berurutan: Audit → Laporan.
+Setiap kali sebuah fase selesai (atau kamu putuskan dilewati), append satu baris ke berkas di $HANOMAN_PHASE_FILE — persis: `echo "<Nama Fase> done" >> "$HANOMAN_PHASE_FILE"`, atau `skipped` sebagai ganti `done`. Nama fase ditulis apa adanya seperti di atas.
+
+Ini audit-only: investigasi SAJA, JANGAN menulis perbaikan kode apa pun. Fase Audit (systematic-debugging): telusuri akar masalah / log / jawaban dan nilai apakah issue terdefinisi dengan baik. Fase Laporan: tulis DOKUMEN AUDIT ke Source of Truth `internal/docs/research/audit-<spec-id>-<slug>.md` (ikuti konvensi audit yang ada), tautkan di `internal/docs/README.md`, memuat: keluhan/pertanyaan, temuan (dengan bukti/log), apakah issue terdefinisi baik, dan rekomendasi tindak lanjut. Commit dokumen itu lalu push. Tak ada kode fitur.
+
+REKOMENDASI ESKALASI (wajib, terbaca mesin). Di bagian akhir dokumen audit, tulis bagian
+`## Rekomendasi eskalasi` berisi penjelasan singkat untuk manusia, LALU tepat SATU blok ```json
+berbentuk persis seperti ini (satu-satunya blok json di dokumen itu):
+
+```json
+{ "escalation": { "target": "none|qa|brief|prd", "reason": "<alasan singkat>",
+  "alternatives": ["<target lain yang masuk akal>"],
+  "prefill": { "title": "", "context": "", "outcome": "", "constraints": "", "severity": "", "steps": "" } } }
+```
+
+Pilih `target` dari hasil auditmu, bukan default:
+- "qa" — bug / regresi / perilaku salah yang perlu diperbaiki. Isi `prefill.severity`
+  (critical|major|minor) dan `prefill.steps` (langkah reproduksi).
+- "brief" — kebutuhan/fitur yang bentuknya sudah jelas dan cakupannya satu backlog.
+  Isi `prefill.title`, `prefill.context`, `prefill.outcome`.
+- "prd" — kebutuhan produk yang besar, ambigu, atau lintas modul sehingga perlu dokumen PRD
+  lebih dulu. Isi `prefill.title`, `prefill.context`, `prefill.outcome`.
+- "none" — pertanyaannya sudah terjawab; tak perlu perbaikan maupun fitur baru.
+
+`alternatives` boleh array kosong. Jangan menulis blok json lain di dokumen itu.
+
+Jalankan seluruh pipeline sampai tuntas tanpa berhenti di batas antar-fase. Checkpoint "review"/"approval"/"need review" milik skill superpowers BUKAN titik berhenti di sini — lanjut saja ke fase berikutnya. Berhenti HANYA saat butuh keputusan manusia sejati (percabangan yang mengubah bentuk kerja: data model, kontrak API, scope); saat itu tanyakan di terminal ini dan tunggu jawabannya. Selain itu, terus lanjut.
+
+Skills superpowers WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.
+- Audit: superpowers:systematic-debugging
+
+Setelah fase terakhir: commit, lalu `git push origin HEAD:refs/heads/b`. Worktree ini detached HEAD — itu memang disengaja.
+
+Backlog item SPEC-1151 · sumber brief · prioritas tinggi
+Judul: Orkestrasi
+Objective: Fase dikerjakan subagent
+Detail: {"context":"c","outcome":"o"}

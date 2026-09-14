@@ -4,14 +4,15 @@ import { prisma } from "../db";
 import {
   zTerminalSession, zIntegrate, zTerminalSteerInput, zSessionDialogAnswer, METHODS, type Stage,
 } from "@hanoman/shared";
-import { resolveHome, realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, type Flow } from "@hanoman/runner";
+import { resolveHome, realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, buildPhaseAgents, projectContext, scaffoldContext, prdContext, breakdownContext, PROJECT_METHOD, type Flow } from "@hanoman/runner";
 import { phaseFilePath, decisionFilePath, readPhases, stageForRun } from "../services/session-phases";
 import { specReview, reviewFile } from "../services/spec-review";
 import { downloadFormat, sendReviewDownload } from "../services/doc-export";
 import { integrateBranch } from "../services/integrate";
-import { sessionAgentDefaults, conflictSessionDefaults, terminalAgentDefaults } from "../services/settings";
+import { sessionAgentDefaults, conflictSessionDefaults, terminalAgentDefaults, getSetting } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { startSpecSession, LaunchError } from "../services/session-launch";
+import { sessionPhasePlan } from "../services/orchestration";
 import { withSessionAdmission, createAgentSession, createOperatorSession } from "../services/session-launch-gate";
 import { approveLaunch, launchPrincipal } from "../services/launch-authority";
 import { admitBrowserWs, openWsConnection, revalidateWsPrincipal, createPrincipalWatch, WsMessageGuard } from "../services/ws-admission";
@@ -32,6 +33,7 @@ import {
   attach, detach, writeTo, resize, shellBin, sendToPane, interruptPane, clearMarker, type Client,
 } from "../services/pty";
 import { saveSessionUpload } from "../services/uploads";
+import { refreshPhaseInvocations } from "../services/phase-invocations";
 import {
   readSessionDialog, answerSessionDialog, sessionPaneIO, beginAnswer, endAnswer,
 } from "../services/session-dialog";
@@ -182,13 +184,18 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         } catch (e) {
           return { code: 422, body: { error: `gagal membuat worktree: ${(e as Error).message}` } };
         }
+        const brief = { id: project.id, name: project.name, desc: project.desc, stack: project.stack };
+        // ADR-0164 · rencana fase dari Setting yang sama; prompt lama ikut sebagai fallback.
+        const plan = sessionPhasePlan(await getSetting(), "reverse", agent, { model, effort });
+        const legacyPrompt = startProjectPrompt("reverse", brief, "reverse-docs") + resumeNote(reused);
         const s = createSession(project.id, wt, {
           id, flow: "reverse", model, effort, agent,
           phaseFile: phaseFilePath(repoDir, id),
           decisionFile: decisionFilePath(repoDir, id),
-          prompt: startProjectPrompt("reverse", {
-            id: project.id, name: project.name, desc: project.desc, stack: project.stack,
-          }, "reverse-docs") + resumeNote(reused),
+          prompt: plan ? startProjectPrompt("reverse", brief, "reverse-docs", plan) + resumeNote(reused) : legacyPrompt,
+          legacyPrompt,
+          phaseAgents: plan
+            ? buildPhaseAgents(plan, { flow: "reverse", method: PROJECT_METHOD, context: projectContext(brief) }) : [],
         });
         return { code: 201, body: { id: s.id } };
       }, (pane) => ({ code: 201, body: { id: pane.id } }));
@@ -218,13 +225,17 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         } catch (e) {
           return { code: 422, body: { error: `gagal membuat worktree: ${(e as Error).message}` } };
         }
+        const brief = { id: project.id, name: project.name, desc: project.desc, stack: project.stack };
+        const plan = sessionPhasePlan(await getSetting(), "scaffold", agent, { model, effort });
+        const legacyPrompt = startScaffoldPrompt(brief, "scaffold-docs") + resumeNote(reused);
         const s = createSession(project.id, wt, {
           id, flow: "scaffold", model, effort, agent,
           phaseFile: phaseFilePath(repoDir, id),
           decisionFile: decisionFilePath(repoDir, id),
-          prompt: startScaffoldPrompt(
-            { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
-            "scaffold-docs") + resumeNote(reused),
+          prompt: plan ? startScaffoldPrompt(brief, "scaffold-docs", plan) + resumeNote(reused) : legacyPrompt,
+          legacyPrompt,
+          phaseAgents: plan
+            ? buildPhaseAgents(plan, { flow: "scaffold", method: PROJECT_METHOD, context: scaffoldContext(brief) }) : [],
         });
         return { code: 201, body: { id: s.id } };
       }, (pane) => ({ code: 201, body: { id: pane.id } }));
@@ -258,15 +269,19 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         // SPEC-340 · isi dokumen audit (freshest-wins) disematkan ke prompt — prompt self-contained,
         // lepas dari status merge branch audit. Dokumen tak terbaca → PRD tetap jalan tanpa blok itu.
         const auditDoc = fromAudit ? await readAuditDoc(fromAudit) : null;
+        const project_ = { id: project.id, name: project.name, desc: project.desc, stack: project.stack };
+        const audit = auditDoc ? { id: fromAudit!, path: auditDoc.path, content: auditDoc.content } : undefined;
+        const plan = sessionPhasePlan(await getSetting(), "prd", agent, { model, effort });
+        const legacyPrompt = startPrdPrompt(project_, brief, `prd/${slug}`, audit) + resumeNote(reused);
         const s = createSession(project.id, wt, {
           id, flow: "prd", branch: `prd/${slug}`, model, effort, agent,
           phaseFile: phaseFilePath(repoDir, id),
           decisionFile: decisionFilePath(repoDir, id),
-          prompt: startPrdPrompt(
-            { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
-            brief, `prd/${slug}`,
-            auditDoc ? { id: fromAudit!, path: auditDoc.path, content: auditDoc.content } : undefined)
-            + resumeNote(reused),
+          prompt: plan ? startPrdPrompt(project_, brief, `prd/${slug}`, audit, plan) + resumeNote(reused) : legacyPrompt,
+          legacyPrompt,
+          phaseAgents: plan ? buildPhaseAgents(plan, {
+            flow: "prd", method: PROJECT_METHOD, context: prdContext(project_, brief, audit), prd: { slug },
+          }) : [],
         });
         return { code: 201, body: { id: s.id } };
       }, (pane) => ({ code: 201, body: { id: pane.id } }));
@@ -299,13 +314,19 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         }
         const titleM = content.match(/^#\s+(.+)$/m);
         const title = titleM ? titleM[1]!.trim() : slug;
+        const project_ = { id: project.id, name: project.name, desc: project.desc, stack: project.stack };
+        const prd = { title, path: prdPath, content };
+        const plan = sessionPhasePlan(await getSetting(), "breakdown", agent, { model, effort });
+        const legacyPrompt = startBreakdownPrompt(project_, prd, `breakdown/${slug}`) + resumeNote(reused);
         const s = createSession(project.id, wt, {
           id, flow: "breakdown", branch: `breakdown/${slug}`, model, effort, agent,
           phaseFile: phaseFilePath(repoDir, id),
           decisionFile: decisionFilePath(repoDir, id),
-          prompt: startBreakdownPrompt(
-            { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
-            { title, path: prdPath, content }, `breakdown/${slug}`) + resumeNote(reused),
+          prompt: plan ? startBreakdownPrompt(project_, prd, `breakdown/${slug}`, plan) + resumeNote(reused) : legacyPrompt,
+          legacyPrompt,
+          phaseAgents: plan ? buildPhaseAgents(plan, {
+            flow: "breakdown", method: PROJECT_METHOD, context: breakdownContext(project_, prd), prd: { slug, title },
+          }) : [],
         });
         return { code: 201, body: { id: s.id } };
       }, (pane) => ({ code: 201, body: { id: pane.id } }));
@@ -524,6 +545,9 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     const guard = new WsMessageGuard({ perWindow: TERMINAL_WS_MESSAGES_PER_MINUTE });
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     attach(id, client);
+    // ADR-0164 · invocation agen fase dari DB — frame pertama sudah membawa rencana dari roster, frame
+    // kedua (sesudah hidrasi) membawa status. Tanpa await: handler ini sengaja sinkron (lihat bawah).
+    void refreshPhaseInvocations(id);
     // Revalidasi principal (SPEC-761) berjalan di LATAR, dipicu frame yang datang (≤ 1×/dtk) dan
     // interval 60 dtk di bawah. Sebelumnya setiap frame `in` di-`await` di belakang satu query
     // Prisma sebelum `writeTo`: dua frame beruntun berlomba dan mendarat terbalik di pty (terukur

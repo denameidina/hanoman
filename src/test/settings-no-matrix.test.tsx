@@ -3,8 +3,9 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SettingsScreen } from "../src/screens/SettingsScreen";
 import { api } from "../src/api/client";
 
-// SPEC-252 · ADR-0061 — matrix model/effort per fase (SPEC-238) DICABUT. Tab "Model sesi" hanya
-// menyisakan default global; model/effort dipilih per sesi saat Start (StartSessionModal).
+// SPEC-252 · ADR-0061 — matrix per-fase lama (SPEC-238) DICABUT dari tab "Model sesi". ADR-0164 ·
+// model/effort per fase kini hidup di tab "Orkestrasi" (definisi subagent, bukan `/model`), dan tab
+// Model sesi hanya menunjuk ke sana.
 vi.mock("../src/api/client", () => ({
   api: {
     // SPEC-739 · kedua permukaan ini kini ikut menanyakan kesiapan skill metode; dijawab
@@ -38,6 +39,7 @@ describe("Settings tanpa matrix per-fase (SPEC-252)", () => {
     // matrix per-fase tidak ada lagi
     expect(screen.queryByText(/Model & effort per fase/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Laporan")).not.toBeInTheDocument();
+    expect(screen.getByText(/tab Orkestrasi/)).toBeInTheDocument();
   });
 
   it("mengubah model global mem-PUT { model } (bukan phaseModels)", async () => {

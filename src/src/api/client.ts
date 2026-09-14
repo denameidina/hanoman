@@ -16,7 +16,16 @@ export class ApiError extends Error {
 export type Flow = "feature" | "qa" | "scaffold" | "reverse" | "prd" | "audit" | "breakdown" | "goal" | "no_effort";
 // SPEC-210 · dokumen PRD project (freshest-wins: worktree sesi prd hidup > repoDir). Tipe di @hanoman/shared.
 export type { PrdDoc };
-export type Phase = { name: string; state: "done" | "skipped" | "active" | "pending" };
+// ADR-0164 · agen fase yang mengerjakan fase ini (frame `phase` WS terminal). Absen = fase tanpa
+// orkestrasi. `evidence: "missing"` = fase tercatat selesai tanpa bukti subagent lewat tenggang relay.
+export type PhaseAgent = {
+  name: string; model?: string; effort?: string; status?: string; startedAt?: string;
+  durationMs?: number | null; attempts: number;
+  inputTokens?: number | null; outputTokens?: number | null; cachedTokens?: number | null;
+  resultExcerpt?: string | null;
+  evidence: "ok" | "pending" | "missing";
+};
+export type Phase = { name: string; state: "done" | "skipped" | "active" | "pending"; agent?: PhaseAgent };
 export type TerminalSession = {
   id: string; projectId: string; specId?: string; flow?: Flow; cwd: string; exited: boolean;
   branch?: string;   // SPEC-230 · branch integrasi sesi (PRD: prd/<slug>)
@@ -35,6 +44,8 @@ export type TerminalSession = {
   // marker bisa memuat beberapa episode menunggu. Absen = tak diketahui; pet tak pernah
   // mengeskalasi tanpa stempel.
   decisionAt?: string;
+  // ADR-0164 · model/effort orchestrator (argv saat lahir) dan penanda sesi diorkestrasi.
+  model?: string; effort?: string; orchestrated?: boolean;
 };
 // SPEC-167 · respons dry-run PATCH /specs/:id saat revert akan menghapus artefak.
 export type RevertPending = { pending: true; stage: string; wouldDelete: string[] };

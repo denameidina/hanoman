@@ -202,3 +202,25 @@ describe("agentDelegationClause", () => {
     expect(out).not.toContain("RAHASIA-INSTRUKSI-PANJANG");
   });
 });
+
+// ADR-0164 · agen fase: instruksi apa adanya dan TANPA kunci tools — terukur 2026-09-14 (claude
+// 2.1.270): subagent tanpa `tools` mewarisi seluruh tool sesi termasuk Skill.
+describe("renderAgentsJson · agen fase (ADR-0164)", () => {
+  const phase = def({
+    name: "hanoman-fase-plan", description: "Fase Plan", instructions: "INSTRUKSI FASE",
+    model: "claude-sonnet-5",
+  });
+  it("tanpa tools, prompt apa adanya, model & effort ikut", () => {
+    const j = JSON.parse(renderAgentsJson([{ ...phase, kind: "phase" as const, phase: "Plan", effort: "low" }, def({ name: "scout" })]));
+    expect(j["hanoman-fase-plan"]).toEqual({
+      description: "Fase Plan", prompt: "INSTRUKSI FASE", model: "claude-sonnet-5", effort: "low",
+    });
+    expect(j.scout.tools).toBeDefined();
+  });
+  it("agen fase tak masuk klausa delegasi custom agent", () => {
+    const phaseDef = { ...phase, kind: "phase" as const, phase: "Plan" };
+    expect(agentDelegationClause([phaseDef])).toBe("");
+    expect(agentDelegationClause([phaseDef], "codex")).toBe("");
+    expect(agentDelegationClause([phaseDef, def({ name: "scout" })])).toBe(agentDelegationClause([def({ name: "scout" })]));
+  });
+});

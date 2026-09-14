@@ -525,6 +525,9 @@ describe("TerminalScreen (grid)", () => {
 
     emitPhases("fin11111", QA_DONE, true);
     expect(await screen.findByText("Selesai")).toBeInTheDocument();
+    // ADR-0164 review 2 · containing block panel detail fase = wrapper badan sel (bukan wrapper
+    // strip), supaya panel dibatasi tinggi sel yang `overflow: hidden`, bukan meluber ke pane.
+    expect(screen.getByTestId("phase-strip").parentElement).toHaveStyle({ position: "relative" });
   });
 
   // Badan pane TIDAK diredupkan: prosesnya masih hidup dan operator masih bisa mengetik di sana.
@@ -1068,5 +1071,18 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     await screen.findByRole("button", { name: /Sesi baru/ });
     fireEvent.click(screen.getByRole("button", { name: "Aksi terminal lain" }));
     expect(screen.getByText("16px")).toBeInTheDocument();
+  });
+
+  it("ADR-0164 · sesi diorkestrasi menampilkan model & effort orchestrator di header sel", async () => {
+    stubResizeObserver(900);
+    localStorage.setItem(WKEY, JSON.stringify({ active: "g1", groups: [
+      { id: "g1", name: "Utama", layout: { rows: 1, cols: 1, cells: ["aaaa1111"] } },
+    ] }));
+    listTerminals.mockResolvedValue([
+      { id: "aaaa1111", projectId: "p1", specId: "SPEC-1", cwd: "/repo", exited: false,
+        orchestrated: true, model: "claude-opus-5", effort: "high" },
+    ]);
+    render(<TerminalScreen projects={projects} onOpenReview={() => {}} />);
+    expect(await screen.findByTestId("orchestrator-chip")).toHaveTextContent("orch Opus 5 · high");
   });
 });

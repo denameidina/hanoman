@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { prisma } from "../src/db";
 import {
   __resetInvocationSnapshots, reconcileAgentInvocations, startAgentInvocation,
-  stopAgentInvocation,
+  stopAgentInvocation, agentMetrics, listPhaseInvocations,
 } from "../src/services/agent-invocations";
 
 const base = {
@@ -101,5 +101,25 @@ describe("lifecycle AgentInvocation", () => {
       .toMatchObject({ status: "abandoned", endedAt: expect.any(Date) });
     expect(await prisma.agentInvocation.findFirstOrThrow({ where: { sessionId: "live" } }))
       .toMatchObject({ status: "running", endedAt: null });
+  });
+});
+
+describe("invocation agen fase (ADR-0164)", () => {
+  it("menyimpan phase & effort; stop memakai effort runtime", async () => {
+    await startAgentInvocation({ ...base, runtimeInvocationId: "fase-1", agentName: "hanoman-fase-plan",
+      customAgentId: undefined, phase: "Plan", effort: "low" });
+    await stopAgentInvocation({ ...base, runtimeInvocationId: "fase-1", agentName: "hanoman-fase-plan",
+      customAgentId: undefined, phase: "Plan", effort: "medium", result: "Status: selesai" });
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "fase-1" } }))
+      .toMatchObject({ phase: "Plan", effort: "medium", status: "completed" });
+    expect(await listPhaseInvocations("s1")).toEqual([expect.objectContaining({
+      phase: "Plan", runtimeInvocationId: "fase-1", status: "completed", resultExcerpt: "Status: selesai",
+    })]);
+  });
+  it("metrik custom agent mengecualikan invocation agen fase", async () => {
+    await startAgentInvocation({ ...base, runtimeInvocationId: "fase-2", agentName: "hanoman-fase-spec",
+      customAgentId: undefined, phase: "Spec" });
+    await startAgentInvocation({ ...base, runtimeInvocationId: "scout-1" });
+    expect(JSON.stringify(await agentMetrics({}))).not.toContain("hanoman-fase-spec");
   });
 });

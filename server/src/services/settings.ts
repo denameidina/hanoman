@@ -2,7 +2,7 @@ import { prisma } from "../db";
 import {
   zSetting, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS,
   RETIRED_CODEX_MODELS, LEAD_DEFAULTS, coerceCodexEffort, codexModel, type Setting, type Agent, type Codex,
-  TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, DEFAULT_METHOD, PORTAL_CHAT_DEFAULTS,
+  TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, DEFAULT_METHOD, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS,
 } from "@hanoman/shared";
 
 // Model id + effort yang diteruskan apa adanya ke `claude --model` / `--effort`.
@@ -26,6 +26,7 @@ export const DEFAULT_SETTING: Setting = {
   telegram: TELEGRAM_DEFAULTS,     // SPEC-476 · ADR-0096 · gateway Telegram opt-in
   changelog: CHANGELOG_ENGINE_DEFAULTS, // SPEC-518 · agen pembuat changelog (opt-in, mati)
   portalChat: PORTAL_CHAT_DEFAULTS, // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
+  orchestration: ORCHESTRATION_DEFAULTS, // ADR-0164 · orkestrasi subagent per fase (default aktif)
   builtinAgents: {},               // SPEC-881 · ADR-0136 · sidik jari seed (lokal, tak disync)
   builtinAgentPolicies: {},        // SPEC-950 · marker safety policy sekali-jalan (lokal)
 };

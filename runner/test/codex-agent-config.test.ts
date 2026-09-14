@@ -116,3 +116,28 @@ describe("codexNativeAgentsSupported", () => {
     });
   });
 });
+
+describe("agen fase codex (ADR-0164)", () => {
+  const phase: AgentDef = {
+    kind: "phase" as const, phase: "Execute", name: "hanoman-fase-execute", description: "Fase Execute",
+    instructions: "KERJAKAN PLAN", tools: null, model: "gpt-5.6-luna", effort: "low", mentions: [],
+  };
+  it("developer_instructions apa adanya dengan model & effort role", () => {
+    const toml = renderCodexAgentToml(phase, [phase]);
+    expect(toml).toContain('developer_instructions = "KERJAKAN PLAN"');
+    expect(toml).toContain('model = "gpt-5.6-luna"');
+    expect(toml).toContain('model_reasoning_effort = "low"');
+  });
+  it("maxDepth dipasang eksplisit dan agen fase tak masuk klausa delegasi", () => {
+    const m = materializeCodexAgents([phase], "/tmp/hnm-fase", {
+      clientVersion: "0.154.0", maxDepth: 3, writeFile: () => {}, chmod: () => {},
+    });
+    expect(m.args).toContain("agents.max_depth=3");
+    expect(m.delegationClause).toBe("");
+    expect(m.liveDefs.map((d) => d.name)).toEqual(["hanoman-fase-execute"]);
+  });
+  it("tanpa maxDepth argv custom agent tak berubah", () => {
+    const m = materializeCodexAgents([def()], "/tmp/hnm-fase", { clientVersion: "0.154.0", writeFile: () => {}, chmod: () => {} });
+    expect(m.args.some((a) => a.startsWith("agents.max_depth"))).toBe(false);
+  });
+});

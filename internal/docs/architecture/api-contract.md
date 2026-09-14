@@ -1003,7 +1003,7 @@ PUT    /terminal/workspace  { baseRevision, workspace: TerminalWorkspaceV1 }
 POST   /ws-tickets { target:"events"|"terminal:<sessionId>" } -> { ticket }
 #   Cookie user atau AgentToken yang sudah lolos gate; tiket 192-bit base64url, target-specific,
 #   one-use, 30 detik, bounded 2048. Browser mengirimnya sebagai subprotocol, bukan URL.
-GET    /terminal/sessions            # [{ id, projectId, specId?, flow?, cwd, branch?, exited, exitCode?, decision, agent }]
+GET    /terminal/sessions            # [{ id, projectId, specId?, flow?, cwd, branch?, exited, exitCode?, decision, agent, model?, effort?, orchestrated? }]
 #   branch? (SPEC-230): branch integrasi sesi project-level (PRD = prd/<slug>) — menyalakan review+merge di sel
 #   agent (SPEC-338/ADR-0074): "claude" | "codex" — mesin sesi, dibaca dari opsi tmux @hanoman_agent.
 #     Sesi yang lahir sebelum ADR-0074 (tanpa opsi itu) dilaporkan sebagai "claude".
@@ -1243,6 +1243,13 @@ GET    /terminal/cleanups            # { items: [{ sessionId, projectId, entry, 
 #   sekali per entri). Ikut capability `sessions` yang sudah ada, tanpa perubahan gerbang.
 #   Disiarkan juga sebagai frame `{ t:"cleanups", cleanups }` di /events/ws.
 GET    /terminal/sessions/:id/ws     # WebSocket; close 4004 bila sesi tak ada
+#   ADR-0164 · frame {t:"phase", phases, complete}: tiap fase MAY membawa `agent` =
+#   { name, model?, effort?, status?, startedAt?, durationMs?, attempts, inputTokens?, outputTokens?,
+#     cachedTokens?, resultExcerpt?, evidence: "ok"|"pending"|"missing" } untuk sesi orchestrator.
+#   Frame disiarkan ulang tiap SubagentStart/Stop agen fase dan sesudah hidrasi saat attach.
+#   Review whole-branch (I-1/M-2) · seluruh field agen (kecuali `evidence` untuk fase yang sudah
+#   done/skipped SAAT SESI LAHIR) dihitung dari invocation SEJAK SESI LAHIR — baris `running`/lama
+#   dari run yang dilanjutkan (id sesi sama) tak lagi mewarnai chip sesi baru.
 #   server->klien: { t:"data", d } · { t:"phase", phases, complete } · { t:"exit", code }
 #   klien->server: { t:"in", d } · { t:"resize", cols, rows }
 #   Browser lebih dulu POST /ws-tickets {target:"terminal:<id>"} lalu mengirim subprotocol
