@@ -528,11 +528,24 @@ export type SessionBirth = {
 };
 export type SessionDeath = { sessionId: string; exitCode: number | null; transcript: string | null };
 type SessionHooks = { onBirth?: (b: SessionBirth) => void; onDeath?: (d: SessionDeath) => void };
-let hooks: SessionHooks = {};
-export function registerSessionHooks(h: SessionHooks): void { hooks = h; }
-// Fire-and-forget: riwayat tak boleh memblokir atau menggagalkan kelahiran/penutupan sesi.
-const emitBirth = (b: SessionBirth): void => { try { hooks.onBirth?.(b); } catch { /* riwayat opsional */ } };
-const emitDeath = (d: SessionDeath): void => { try { hooks.onDeath?.(d); } catch { /* riwayat opsional */ } };
+// SPEC-1215 · ADR-0166 · dulu SATU slot (`hooks = h`): pendaftar kedua — tap log event — MENGGANTI
+// riwayat sesi tanpa satu pun error. Kini himpunan; pendaftar mencabut dirinya lewat fungsi yang
+// dikembalikan, bukan dengan mendaftarkan `{}` (yang kini hanya menambah pendaftar kosong).
+const hooks = new Set<SessionHooks>();
+export function registerSessionHooks(h: SessionHooks): () => void {
+  hooks.add(h);
+  return () => { hooks.delete(h); };
+}
+// Fire-and-forget: riwayat/log tak boleh memblokir atau menggagalkan kelahiran/penutupan sesi, dan
+// pendaftar yang melempar tak boleh membungkam pendaftar sesudahnya.
+const emitBirth = (b: SessionBirth): void => {
+  for (const h of hooks) { try { h.onBirth?.(b); } catch { /* opsional */ } }
+};
+const emitDeath = (d: SessionDeath): void => {
+  for (const h of hooks) { try { h.onDeath?.(d); } catch { /* opsional */ } }
+};
+/** Test-only: tembakkan hook tanpa tmux. */
+export const __emitSessionHooks = { birth: emitBirth, death: emitDeath };
 
 // SPEC-450 · ADR-0094 keputusan 7 · katalog custom agent. `pty.ts` tetap NOL DEPENDENSI DB — ia
 // hanya memanggil sumber yang mendaftarkan diri (services/custom-agents.ts, dipasang dari

@@ -1080,7 +1080,7 @@ git commit -m "feat(db): LogEntry & LogCursor LOCAL-only (SPEC-1215 · ADR-0166)
 **Interfaces:**
 - Produces: `registerSessionHooks(h: { onBirth?: (b: SessionBirth) => void; onDeath?: (d: SessionDeath) => void }): () => void` (mengembalikan pencabut); `__emitSessionHooks: { birth(b: SessionBirth): void; death(d: SessionDeath): void }` (test-only). Dipakai Task 6.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/session-hooks-additive.test.ts`:
 
@@ -1125,12 +1125,12 @@ describe("registerSessionHooks aditif", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run server/test/session-hooks-additive.test.ts`
 Expected: FAIL — `__emitSessionHooks` bukan export.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Ganti `server/src/services/pty.ts:530-535` (dari `type SessionHooks = …` sampai `const emitDeath = …`) dengan:
 
@@ -1156,7 +1156,7 @@ const emitDeath = (d: SessionDeath): void => {
 export const __emitSessionHooks = { birth: emitBirth, death: emitDeath };
 ```
 
-- [ ] **Step 4: Perbaiki `pty.test.ts` yang bergantung pada semantik ganti-slot**
+- [x] **Step 4: Perbaiki `pty.test.ts` yang bergantung pada semantik ganti-slot**
 
 Di `server/test/pty.test.ts`, ganti baris 904:
 
@@ -1175,12 +1175,12 @@ menjadi:
 
 Lalu baris 919 `registerSessionHooks({ onBirth: (b) => { births.push(b); } });` → `unhook = registerSessionHooks({ onBirth: (b) => { births.push(b); } });`, dan baris 932 `registerSessionHooks({ onDeath: (d) => { deaths.push(d); } });` → `unhook = registerSessionHooks({ onDeath: (d) => { deaths.push(d); } });`.
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-hooks-additive.test.ts server/test/pty.test.ts -t "hook"`
 Expected: PASS. (`pty.test.ts` memakai tmux socket test; bila merah karena tmux sisa/tetangga, lihat memori "pty.test.ts gagal palsu karena tmux sisa" — bukan regresi.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/test/pty.test.ts server/test/session-hooks-additive.test.ts
