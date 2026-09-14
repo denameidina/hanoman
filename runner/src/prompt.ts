@@ -280,20 +280,30 @@ export const auditContinuationForOrchestrator = (flow: Flow, spec: SpecBrief): s
   const doc = `internal/docs/research/audit-${fromAudit.toLowerCase()}-*.md`;
   if (flow === "feature")
     return `Backlog brief ini LANJUTAN dari audit ${fromAudit}. Worktree ini lahir dari branch audit `
-      + `itu, jadi dokumen audit sudah ada di ${doc}. Saat memanggil agen fase Brainstorm (dan `
-      + "Objective), cantumkan path itu di baris `Artefak fase sebelumnya:` blok serah-terima — "
-      + "JANGAN membacanya sendiri untuk merancang fitur ini. Temuannya sudah terbukti, tapi bentuk "
+      + `itu, jadi dokumen audit sudah ada di ${doc}. Saat memanggil agen fase Brainstorm, cantumkan `
+      + "path itu di baris `Artefak fase sebelumnya:` blok serah-terima — JANGAN membacanya sendiri "
+      + "untuk merancang fitur ini. Saat memanggil agen fase Objective, baris itu biasanya sudah "
+      + "membawa path artefak Brainstorm (dokumen spec yang ditulis fase itu); tambahkan path dokumen "
+      + "audit di samping path itu, bukan menggantikannya. Temuannya sudah terbukti, tapi bentuk "
       + "solusinya belum; itu tetap dikerjakan agen fasenya masing-masing, bukan olehmu.";
+  // Final fix A2 · dua pemicu jalur cepat qa (langkah 5 orchestratorClause, berbasis frasa `Rekomendasi
+  // fase: jalur-cepat` dari agen Audit vs keputusan ROUTING orchestrator dari dokumen audit di sini)
+  // bersambung tanpa kalimat penyelaras: Audit tak pernah dipanggil pada kontinuitas ini, jadi frasa itu
+  // tak akan pernah muncul — literal, orchestrator bisa jatuh SELALU ke jalur penuh, atau mendelegasikan
+  // ulang Audit demi frasa itu (melanggar larangan di atas). Kalimat di bawah eksplisit: keputusan
+  // routing di sini MENGGANTIKAN langkah 5, bukan menunggunya.
   return `Backlog qa ini LANJUTAN dari audit ${fromAudit}. Temuannya sudah terbukti di ${doc} — `
     + "JANGAN mendelegasikan ulang fase Audit. Sebelum fase lain: jalankan persis "
     + '`echo "Audit skipped" >> "$HANOMAN_PHASE_FILE"`, verifikasi dengan `tail -1 "$HANOMAN_PHASE_FILE"` '
     + "bahwa barisnya benar tertulis (gerbang yang sama seperti langkah 2), lalu cantumkan path dokumen "
-    + "audit itu di baris `Artefak fase sebelumnya:` saat memanggil agen fase Spec. Kamu diizinkan "
-    + "mengambil SATU keputusan ROUTING dari isi dokumen audit itu SAJA: bila ia merekomendasikan jalur "
-    + "cepat (temuan berconfidence tinggi, perbaikan langsung), tandai `Spec skipped` lalu `Plan skipped` "
-    + "(gerbang yang sama) lalu panggil agen fase Execute; selain itu panggil Spec → Plan → Execute penuh "
-    + "lewat agen fasenya masing-masing. Kamu TIDAK menginvestigasi ulang maupun merancang perbaikannya "
-    + "sendiri — itu tetap pekerjaan agen fase.";
+    + "audit itu di baris `Artefak fase sebelumnya:` saat memanggil agen fase Spec. Keputusan routing di "
+    + "sini menggantikan langkah 5 di atas — JANGAN menunggu frasa `Rekomendasi fase: jalur-cepat` dari "
+    + "agen Audit karena Audit tidak dijalankan pada kelanjutan ini. Kamu diizinkan mengambil SATU "
+    + "keputusan ROUTING dari isi dokumen audit itu SAJA, dibaca langsung dari kriterianya: temuan "
+    + "berconfidence tinggi dan perbaikan langsung berdiff kecil → tandai `Spec skipped` lalu `Plan "
+    + "skipped` (gerbang yang sama) lalu panggil agen fase Execute; selebihnya panggil Spec → Plan → "
+    + "Execute penuh lewat agen fasenya masing-masing. Kamu TIDAK menginvestigasi ulang maupun merancang "
+    + "perbaikannya sendiri — itu tetap pekerjaan agen fase.";
 };
 
 // SPEC-376 · ADR-0080 — klausa scope verifikasi hanya untuk flow yang MENULIS KODE. Flow

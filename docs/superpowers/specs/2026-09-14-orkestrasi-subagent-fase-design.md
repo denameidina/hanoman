@@ -195,7 +195,7 @@ Loop per fase:
 | Kasus | Perilaku |
 |---|---|
 | Jalur cepat qa (ADR-0040) | Laporan Audit memuat `Rekomendasi fase: jalur-cepat \| penuh` + alasan; jalur cepat → orchestrator menulis `Spec skipped`, `Plan skipped`, lanjut Execute |
-| Lanjutan audit qa (`fromAudit`) | Orchestrator menulis `Audit skipped` sendiri — tanpa subagent Audit — lalu meneruskan path dokumen audit ke agen fase Spec; SATU keputusan routing (jalur-cepat/penuh) tetap boleh orchestrator, bukan investigasi/rancangan |
+| Lanjutan audit qa (`fromAudit`) | Orchestrator menulis `Audit skipped` sendiri — tanpa subagent Audit — lalu meneruskan path dokumen audit ke agen fase Spec; SATU keputusan routing (jalur-cepat/penuh) tetap boleh orchestrator, MENGGANTIKAN pemicu jalur cepat baris di atas (frasa dari agen Audit yang tak dijalankan), bukan investigasi/rancangan |
 | Lanjutan audit feature (`fromAudit`) | Semua fase tetap didelegasikan; orchestrator hanya meneruskan path dokumen audit ke agen fase Brainstorm (dan Objective) lewat `Artefak fase sebelumnya:`, tanpa membacanya sendiri |
 | Continue (SPEC-172) | Rencana satu fase: Execute |
 | Resume (SPEC-394) | Orchestrator menerima `resumeClause`, loop mulai dari `r.next`; agen fase tak berubah |

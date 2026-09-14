@@ -98,6 +98,15 @@ describe("lanjutan audit (fromAudit) · varian orchestrator vs sesi tunggal (I-2
     expect(p).toContain("Artefak fase sebelumnya");
   });
 
+  // Final fix A2 (minor) · Objective biasanya membawa path artefak Brainstorm di baris `Artefak
+  // fase sebelumnya:` — path dokumen audit harus DITAMBAHKAN di samping path itu, bukan menggantikannya.
+  it("feature orchestrator: untuk Objective, path audit di samping path artefak Brainstorm", () => {
+    const p = startPrompt("feature", featureFromAudit, "hanoman/spec-320", undefined, undefined,
+      undefined, undefined, plan("feature"));
+    expect(p).toContain("Objective");
+    expect(p).toContain("di samping");
+  });
+
   it("qa orchestrator: Audit ditandai skipped sendiri, dokumen diteruskan, satu keputusan routing", () => {
     const p = startPrompt("qa", qaFromAudit, "hanoman/spec-321", undefined, undefined,
       undefined, undefined, plan("qa"));
@@ -105,6 +114,25 @@ describe("lanjutan audit (fromAudit) · varian orchestrator vs sesi tunggal (I-2
     expect(p).toContain('tail -1 "$HANOMAN_PHASE_FILE"');
     expect(p).toContain("SATU keputusan ROUTING");
     expect(p).not.toContain("baca dokumen audit itu sebagai temuan");
+  });
+
+  // Final fix A2 (important) · dua pemicu jalur cepat qa (langkah 5 orchestratorClause vs keputusan
+  // routing dari dokumen audit pada kelanjutan) harus disambung eksplisit: kelanjutan audit
+  // MENGGANTIKAN langkah 5, dan orchestrator DILARANG menunggu frasa `Rekomendasi fase: jalur-cepat`
+  // dari agen Audit karena Audit tak pernah dijalankan pada kelanjutan ini.
+  it("qa orchestrator: keputusan routing kelanjutan audit menggantikan langkah 5, tak menunggu frasa Audit", () => {
+    const p = startPrompt("qa", qaFromAudit, "hanoman/spec-321", undefined, undefined,
+      undefined, undefined, plan("qa"));
+    expect(p).toContain("menggantikan langkah 5");
+    expect(p).toContain("JANGAN menunggu frasa `Rekomendasi fase: jalur-cepat` dari agen Audit");
+  });
+
+  // Final fix A2 · sesi qa BIASA (tanpa fromAudit) tak boleh tersentuh: langkah 5 apa adanya, tanpa
+  // klausa penggantian yang hanya berlaku pada kelanjutan audit.
+  it("qa orchestrator TANPA fromAudit: langkah 5 apa adanya, tanpa klausa penggantian", () => {
+    const p = startPrompt("qa", spec, "b", undefined, undefined, undefined, undefined, plan("qa"));
+    expect(p).toContain("`Rekomendasi fase: jalur-cepat` sesudah Audit");
+    expect(p).not.toContain("menggantikan langkah 5");
   });
 
   it("tanpa rencana (sesi tunggal): teks lama utuh — split orchestrator/sesi-tunggal eksplisit", () => {

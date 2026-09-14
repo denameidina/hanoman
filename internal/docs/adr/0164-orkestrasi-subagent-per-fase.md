@@ -66,6 +66,12 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
    dari isi dokumen — bukan investigasi maupun rancangan. Temuan M-6: codex tak punya tool
    `AskUserQuestion`; klausa langkah 3–4 untuk plan codex diganti "tanyakan di terminal ini lalu tunggu
    jawaban", aturan tetap berlaku walau klausa otonomi menyuruh tak bertanya — claude tak berubah.
+   Final fix A2: keputusan ROUTING kelanjutan audit qa itu MENGGANTIKAN pemicu langkah 5 (frasa
+   `Rekomendasi fase: jalur-cepat` dari agen Audit) — dua mekanisme dulu bersambung tanpa penyelaras
+   sehingga orchestrator literal bisa selalu jatuh ke jalur penuh (frasa tak akan pernah ada karena
+   Audit tak dijalankan) atau mendelegasikan ulang Audit demi frasa itu. Untuk feature, path dokumen
+   audit di baris `Artefak fase sebelumnya:` saat memanggil Objective ditambahkan DI SAMPING path
+   artefak Brainstorm, bukan menggantikannya.
 5. **All-or-nothing**: satu agen fase gagal dimaterialisasi (atau codex < 0.151) → sesi lahir mode tunggal
    dengan prompt lama yang dirakit pemanggil dari input yang sama. Flow mati → argv & prompt byte-identik
    (golden test).
