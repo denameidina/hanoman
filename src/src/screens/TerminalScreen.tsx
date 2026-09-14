@@ -19,6 +19,7 @@ import { useLaunchAdmission } from "./use-launch-admission";
 import { usePersistedState, isStr, isBool, isNum } from "../ui-state";
 import { clampFontSize, inlineActionCount, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX } from "./terminal-chrome";
+import { chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
 
 export function TerminalScreen({ userId = "test-user", projects, backlog = [], focusSession, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf }: {
   userId?: string;
@@ -736,24 +737,91 @@ const PHASE_COLOR: Record<Phase["state"], string> = {
   skipped: "var(--text-subtle)",
   pending: "var(--text-subtle)",
 };
-export function PhaseStrip({ phases }: { phases: Phase[] | null }) {
+const CHIP_ICON: Record<ChipTone, string> = {
+  done: "✓", running: "●", pending: "○", skipped: "–", failed: "✕", abandoned: "⨯",
+};
+
+// ADR-0164 · fase tanpa agen digambar persis seperti sebelumnya. Fase ber-agen jadi chip: nama ·
+// model · effort · durasi, ditambah ↻n bila diulang dan ⚠ bila bukti subagent tak diterima.
+// `compact` (sel sempit): hanya chip aktif yang menampilkan model/effort/durasi.
+export function PhaseStrip({ phases, compact = false, now }: {
+  phases: Phase[] | null; compact?: boolean; now?: number;
+}) {
+  const [open, setOpen] = React.useState<string | null>(null);
+  const [, setTick] = React.useState(0);
+  const running = !!phases?.some((p) => p.agent?.status === "running");
+  React.useEffect(() => {
+    if (!running || now !== undefined) return;
+    const t = setInterval(() => setTick((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [running, now]);
   if (!phases?.length) return null;
+  const at = now ?? Date.now();
+  const openPhase = phases.find((p) => p.name === open && p.agent);
+  const nameStyle = (p: Phase): React.CSSProperties => ({
+    color: PHASE_COLOR[p.state],
+    fontWeight: p.state === "active" ? 600 : 400,
+    textDecoration: p.state === "skipped" ? "line-through" : "none",
+    opacity: p.state === "pending" ? 0.5 : 1,
+  });
+  const durationOf = (p: Phase): string => {
+    const a = p.agent;
+    if (!a) return "";
+    if (typeof a.durationMs === "number") return formatDuration(a.durationMs);
+    if (a.status === "running" && a.startedAt) return formatDuration(at - Date.parse(a.startedAt));
+    return "";
+  };
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 8, padding: "3px 8px", flex: "0 0 auto",
+    <div data-testid="phase-strip" style={{
+      position: "relative", display: "flex", alignItems: "center", gap: 8, padding: "3px 8px", flex: "0 0 auto",
       borderBottom: "1px solid var(--border-hair)", fontSize: 10, fontFamily: "var(--font-mono)",
+      overflowX: "auto", whiteSpace: "nowrap",
     }}>
-      {phases.map((p) => (
-        <span key={p.name} data-state={p.state} title={p.state}
-          style={{
-            color: PHASE_COLOR[p.state],
-            fontWeight: p.state === "active" ? 600 : 400,
-            textDecoration: p.state === "skipped" ? "line-through" : "none",
-            opacity: p.state === "pending" ? 0.5 : 1,
-          }}>
-          {p.name}
-        </span>
-      ))}
+      {phases.map((p) => {
+        if (!p.agent) {
+          return <span key={p.name} data-state={p.state} title={p.state} style={nameStyle(p)}>{p.name}</span>;
+        }
+        const a = p.agent;
+        const tone = chipTone(p);
+        const full = !compact || p.state === "active";
+        const duration = durationOf(p);
+        return (
+          <button key={p.name} type="button" data-tone={tone} aria-expanded={open === p.name}
+            aria-label={`Detail fase ${p.name}`} onClick={() => setOpen(open === p.name ? null : p.name)}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4, flex: "0 0 auto", padding: "1px 6px",
+              border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "transparent",
+              font: "inherit", color: "var(--text-body)", cursor: "pointer",
+            }}>
+            <span aria-hidden>{CHIP_ICON[tone]}</span>
+            <span data-state={p.state} title={p.state} style={nameStyle(p)}>{p.name}</span>
+            {p.state === "skipped" && <span>dilewati</span>}
+            {full && a.model && <span>· {modelLabel(a.model)}</span>}
+            {full && a.effort && <span>· {a.effort}</span>}
+            {full && duration && <span>· {duration}</span>}
+            {a.attempts > 1 && <span>↻{a.attempts}</span>}
+            {a.evidence === "missing" && (
+              <span role="img" aria-label="bukti subagent tak diterima" title="bukti subagent tak diterima"
+                style={{ color: "var(--status-warn)" }}>⚠</span>
+            )}
+          </button>
+        );
+      })}
+      {openPhase?.agent && (
+        <div role="dialog" aria-label={`Detail fase ${openPhase.name}`} style={{
+          position: "absolute", top: "100%", left: 8, zIndex: 5, minWidth: 220, maxWidth: "min(420px, 90vw)",
+          padding: "8px 10px", background: "var(--surface-card)", border: "1px solid var(--border-hair)",
+          borderRadius: "var(--radius-sm)", whiteSpace: "normal", lineHeight: 1.5,
+        }}>
+          <div><b>{openPhase.agent.name}</b></div>
+          <div>{modelLabel(openPhase.agent.model)} · {openPhase.agent.effort ?? "—"} · {openPhase.agent.status ?? "belum mulai"}</div>
+          <div>durasi {durationOf(openPhase) || "—"} · percobaan {openPhase.agent.attempts}</div>
+          <div>token in {openPhase.agent.inputTokens ?? "—"} · out {openPhase.agent.outputTokens ?? "—"} · cache {openPhase.agent.cachedTokens ?? "—"}</div>
+          {openPhase.agent.resultExcerpt && (
+            <pre style={{ margin: "6px 0 0", whiteSpace: "pre-wrap", maxHeight: 160, overflow: "auto" }}>{openPhase.agent.resultExcerpt}</pre>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -909,6 +977,13 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {label} · {session.id.slice(0, 6)}
         </span>
+        {/* ADR-0164 · model & effort orchestrator; model tiap fase ada di chip PhaseStrip. */}
+        {session.orchestrated && session.model && (
+          <span data-testid="orchestrator-chip" title="Model & effort orchestrator"
+            style={{ flex: "0 0 auto", fontSize: 10, color: "var(--text-muted)" }}>
+            orch {modelLabel(session.model)}{session.effort ? ` · ${session.effort}` : ""}
+          </span>
+        )}
         {/* SPEC-402 · kode keluar ikut tercetak: "Gagal" tanpa angka menyisakan pertanyaan
             "gagal kenapa", dan angkanya (143 = SIGTERM) itulah petunjuknya. */}
         {session.exited && (failed
@@ -943,7 +1018,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
           "Selesai" tetap penuh supaya statusnya justru paling kontras. */}
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0,
         opacity: session.exited ? 0.6 : 1 }}>
-        <PhaseStrip phases={phases} />
+        <PhaseStrip phases={phases} compact={headerWidth < 480} />
         {/* key = identitas sesi: pindah antar sel memindah subtree, bukan me-remount WebSocket.
             SPEC-232 · saat sel ini sedang layar-penuh, pane-nya dilepas (placeholder) supaya
             hanya modal yang meng-attach tmux — jaga invariant satu sesi = satu attach. */}

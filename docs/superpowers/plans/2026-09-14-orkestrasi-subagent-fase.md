@@ -2792,7 +2792,7 @@ Expected: exit 0.
   export function PhaseStrip(props: { phases: Phase[] | null; compact?: boolean; now?: number }): JSX.Element | null;
   ```
 
-- [ ] **Step 1: Tulis test yang gagal** — `src/test/phase-strip.test.tsx`
+- [x] **Step 1: Tulis test yang gagal** — `src/test/phase-strip.test.tsx`
 
 ```tsx
 import { describe, it, expect } from "vitest";
@@ -2880,12 +2880,12 @@ Di `src/test/terminal-screen.test.tsx`, di dalam `describe("TerminalScreen · ak
   });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `rtk proxy pnpm vitest --run src/test/phase-strip.test.tsx src/test/terminal-screen.test.tsx`
 Expected: FAIL — modul `phase-chip` tak ada; `orchestrator-chip` tak ditemukan.
 
-- [ ] **Step 3: Tipe** — `src/src/api/client.ts`
+- [x] **Step 3: Tipe** — `src/src/api/client.ts`
 
 Ganti `export type Phase = …` dengan:
 
@@ -2909,7 +2909,7 @@ Di `TerminalSession`, sesudah `decisionAt?: string;`:
   model?: string; effort?: string; orchestrated?: boolean;
 ```
 
-- [ ] **Step 4: Helper murni** — `src/src/screens/phase-chip.ts`
+- [x] **Step 4: Helper murni** — `src/src/screens/phase-chip.ts`
 
 ```ts
 import { MODELS, CODEX_MODELS } from "@hanoman/shared";
@@ -2937,7 +2937,7 @@ export function chipTone(p: Phase): ChipTone {
 }
 ```
 
-- [ ] **Step 5: `PhaseStrip`** — `src/src/screens/TerminalScreen.tsx`
+- [x] **Step 5: `PhaseStrip`** — `src/src/screens/TerminalScreen.tsx`
 
 Tambah impor `import { chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";`. Ganti fungsi `PhaseStrip` (tetap di bawah `PHASE_COLOR`) dengan:
 
@@ -3032,7 +3032,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
 }
 ```
 
-- [ ] **Step 6: Header sel & strip ringkas** — di `Cell`, tepat sebelum `{session.exited && (failed …`:
+- [x] **Step 6: Header sel & strip ringkas** — di `Cell`, tepat sebelum `{session.exited && (failed …`:
 
 ```tsx
         {/* ADR-0164 · model & effort orchestrator; model tiap fase ada di chip PhaseStrip. */}
@@ -3046,7 +3046,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
 
 dan ganti `<PhaseStrip phases={phases} />` dengan `<PhaseStrip phases={phases} compact={headerWidth < 480} />`.
 
-- [ ] **Step 7: Jalankan, pastikan lulus**
+- [x] **Step 7: Jalankan, pastikan lulus**
 
 Run: `rtk proxy pnpm vitest --run src/test/phase-strip.test.tsx src/test/terminal-screen.test.tsx`
 Expected: PASS semua (test `PhaseStrip` lama tetap hijau — fase tanpa agen tak berubah).
@@ -3054,7 +3054,7 @@ Expected: PASS semua (test `PhaseStrip` lama tetap hijau — fase tanpa agen tak
 Run: `rtk proxy pnpm --filter ./src typecheck`
 Expected: exit 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 /usr/bin/git add src/src/api/client.ts src/src/screens/phase-chip.ts src/src/screens/TerminalScreen.tsx src/test/phase-strip.test.tsx src/test/terminal-screen.test.tsx
