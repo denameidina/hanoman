@@ -83,17 +83,17 @@ Alasan memfilekan sekarang, bukan menunggu: bila SPEC-1215 ditandai selesai sesu
 
 ### Task 0: Siapkan worktree (tanpa commit)
 
-- [ ] **Step 1: Install & generate**
+- [x] **Step 1: Install & generate**
 
 Run: `cd /Users/denameidina/Documents/Nafanesia/hanoman/.worktrees/spec-1215 && pnpm install`
 Expected: selesai tanpa error; `postinstall` server men-generate Prisma Client. Bila kelak muncul `Property 'dmmf' does not exist`, jalankan `pnpm db:generate`.
 
-- [ ] **Step 2: Kunci base SHA untuk `--changed`**
+- [x] **Step 2: Kunci base SHA untuk `--changed`**
 
 Run: `export HANOMAN_BASE_SHA=${HANOMAN_BASE_SHA:-67478d09c611ed926620eaa8c69c4213d5486ef0} && git log --oneline -1`
 Expected: HEAD memuat commit docs SPEC-1215 fase Plan.
 
-- [ ] **Step 3: Baseline suite yang akan disentuh**
+- [x] **Step 3: Baseline suite yang akan disentuh**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-ws-presence.test.ts server/test/sync-client-presence-wiring.test.ts server/test/device-tokens.route.test.ts server/test/agent-gate.test.ts server/test/settings.test.ts server/test/presence-view.test.ts server/test/presence-sender.test.ts cli/test/migrate-pg.test.ts`
 Expected: PASS. Catat test yang sudah merah di base (jangan diperbaiki diam-diam; sebut di laporan).
@@ -119,7 +119,7 @@ Expected: PASS. Catat test yang sudah merah di base (jangan diperbaiki diam-diam
   - `remoteCapabilityFor(method: string, path: string, mode: "read" | "write"): Capability | null`
   - `zRemoteControlPut`, `type RemoteControlPut`, `type RelayLinkState`, `type RelayLinkStatus`, `type RemoteControlView` (butuh `LogEntryView` dari Task 2 — tipe ini ditambahkan di Task 2 Step 5)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `shared/src/relay.test.ts`:
 
@@ -268,12 +268,12 @@ describe("frame relay .strict()", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/relay.test.ts`
 Expected: FAIL — `Failed to resolve import "./relay"`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Create `shared/src/relay.ts`:
 
@@ -499,12 +499,12 @@ export * from "./relay";
 
 (Impor tipe `./logs` di atas baru terpenuhi di Task 2. Karena itu jalankan Step 4 **sesudah** Task 2 Step 3 bila typecheck mengeluh, atau buat `shared/src/logs.ts` Task 2 lebih dulu — vitest sendiri tak menegakkan impor tipe.)
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `pnpm vitest --run shared/src/relay.test.ts`
 Expected: PASS (seluruh tabel).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/relay.ts shared/src/relay.test.ts shared/src/index.ts
