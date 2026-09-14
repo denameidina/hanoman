@@ -2445,7 +2445,7 @@ Expected: exit 0.
   ```
 - Payload hook terukur (claude 2.1.270): `SubagentStart {agent_id, agent_type}`; `SubagentStop {agent_id, agent_type, effort: {level}, last_assistant_message, agent_transcript_path}`. Melanjutkan subagent (`SendMessage`) menembak `SubagentStart` lagi dengan `agent_id` SAMA → idempoten lewat unique yang ada.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `server/test/session-phases.test.ts` (tambah `enrichPhases, type PhaseInvocation` ke impor `../src/services/session-phases`):
 
@@ -2535,12 +2535,12 @@ lalu di dalam `describe("POST /api/session-events")`:
   });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" rtk proxy pnpm vitest --run --no-file-parallelism server/test/session-phases.test.ts server/test/agent-invocations.service.test.ts server/test/session-events.route.test.ts`
 Expected: FAIL — `enrichPhases` tak ada; kolom `phase` tak dikenal Prisma.
 
-- [ ] **Step 3: Skema + migration**
+- [x] **Step 3: Skema + migration**
 
 `server/prisma/schema.prisma`, model `AgentInvocation`, sesudah `definitionHash String?`:
 
@@ -2560,7 +2560,7 @@ ALTER TABLE "AgentInvocation" ADD COLUMN "effort" TEXT;
 Run: `rtk proxy pnpm db:generate`
 Expected: `Generated Prisma Client`.
 
-- [ ] **Step 4: `enrichPhases`** — `server/src/services/session-phases.ts`
+- [x] **Step 4: `enrichPhases`** — `server/src/services/session-phases.ts`
 
 Tambah impor `import { PHASE_EVIDENCE_GRACE_MS } from "@hanoman/shared";` (gabungkan dengan impor shared yang ada) dan ganti `export type Phase = …` dengan:
 
@@ -2625,7 +2625,7 @@ export function enrichPhases(
 }
 ```
 
-- [ ] **Step 5: Invocation** — `server/src/services/agent-invocations.ts`
+- [x] **Step 5: Invocation** — `server/src/services/agent-invocations.ts`
 
 Tambah `import type { PhaseInvocation } from "./session-phases";`. Di `InvocationIdentity` sesudah `definitionHash?: string;`:
 
@@ -2674,7 +2674,7 @@ export async function refreshPhaseInvocations(sessionId: string): Promise<void> 
 }
 ```
 
-- [ ] **Step 6: Route event** — `server/src/routes/session-events.ts`
+- [x] **Step 6: Route event** — `server/src/routes/session-events.ts`
 
 Tambah `import { refreshPhaseInvocations } from "../services/phase-invocations";`. Objek `identity` menambah sesudah `definitionHash: meta.definitionHash,`:
 
@@ -2697,7 +2697,7 @@ Sesudah `const outcome = …;` dan sebelum `return reply.code(202)…`:
       if (meta.phase) void refreshPhaseInvocations(sessionId);
 ```
 
-- [ ] **Step 7: Cache & frame di pty** — `server/src/services/pty.ts`
+- [x] **Step 7: Cache & frame di pty** — `server/src/services/pty.ts`
 
 Impor `session-phases` menjadi `import { enrichPhases, readPhases, sessionComplete, type Phase, type PhaseInvocation } from "./session-phases";`.
 
@@ -2750,7 +2750,7 @@ Baris pertama di dalam `export function killSession(id: string): boolean {`:
     void refreshPhaseInvocations(id);
 ```
 
-- [ ] **Step 8: Jalankan, pastikan lulus**
+- [x] **Step 8: Jalankan, pastikan lulus**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" rtk proxy pnpm vitest --run --no-file-parallelism server/test/session-phases.test.ts server/test/agent-invocations.service.test.ts server/test/session-events.route.test.ts server/test/custom-agent-metrics.route.test.ts server/test/phase-agents.pty.test.ts`
 Expected: PASS semua.
@@ -2758,7 +2758,7 @@ Expected: PASS semua.
 Run: `rtk proxy pnpm --filter ./server typecheck`
 Expected: exit 0.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 /usr/bin/git add server/prisma/schema.prisma server/prisma/migrations/20260914120000_agent_invocation_phase server/src/services/session-phases.ts server/src/services/agent-invocations.ts server/src/services/phase-invocations.ts server/src/routes/session-events.ts server/src/services/pty.ts server/src/routes/terminal.ts server/test/session-phases.test.ts server/test/agent-invocations.service.test.ts server/test/session-events.route.test.ts

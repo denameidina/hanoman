@@ -1,10 +1,25 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
-import { PLAN_DIRS, type Stage } from "@hanoman/shared";
+import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, type Stage } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
 
 export type PhaseState = "done" | "skipped" | "active" | "pending";
-export type Phase = { name: string; state: PhaseState };
+// ADR-0164 · bukti agen fase yang ikut frame `phase`. `resultExcerpt` aman di sini: WS terminal
+// ber-cookie, sama dengan route metrik yang memuat excerpt (ADR-0159).
+export type PhaseInvocation = {
+  phase: string; runtimeInvocationId: string; status: string; startedAt: string;
+  durationMs: number | null; inputTokens: number | null; outputTokens: number | null;
+  cachedTokens: number | null; resultExcerpt: string | null;
+};
+export type PhaseRosterEntry = { name: string; phase: string; model?: string; effort?: string };
+export type PhaseAgent = {
+  name: string; model?: string; effort?: string; status?: string; startedAt?: string;
+  durationMs?: number | null; attempts: number;
+  inputTokens?: number | null; outputTokens?: number | null; cachedTokens?: number | null;
+  resultExcerpt?: string | null;
+  evidence: "ok" | "pending" | "missing";
+};
+export type Phase = { name: string; state: PhaseState; agent?: PhaseAgent };
 
 // Di luar worktree: `git add -A` milik agen tak boleh bisa melihatnya. `.worktrees` sudah
 // ada di .gitignore, jadi berkas ini tak pernah mendarat di branch mana pun.
@@ -45,6 +60,44 @@ export function readPhases(file: string, flow: Flow): Phase[] {
     if (activeTaken) return { name, state: "pending" as const };
     activeTaken = true;
     return { name, state: "active" as const };
+  });
+}
+
+/**
+ * ADR-0164 · fase diperkaya agen fasenya. MURNI: roster (tmux), invocation (DB lewat cache pty), dan
+ * `doneSeenAt` (kapan server pertama melihat fase `done`) disuntik pemanggil. `missing` = fase tercatat
+ * selesai tanpa satu pun invocation lewat tenggang relay — dilabeli "bukti tak diterima", bukan
+ * "tidak didelegasikan": hook fail-open dan nol invocation bukan bukti tak dipakai (ADR-0159).
+ */
+export function enrichPhases(
+  phases: Phase[], roster: PhaseRosterEntry[], invocations: PhaseInvocation[],
+  doneSeenAt: Map<string, number>, now: number,
+): Phase[] {
+  return phases.map((p) => {
+    const r = roster.find((entry) => entry.phase === p.name);
+    if (!r) return p;
+    const mine = invocations.filter((i) => i.phase === p.name)
+      .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+    const last = mine[mine.length - 1];
+    const seen = doneSeenAt.get(p.name);
+    const evidence: PhaseAgent["evidence"] = mine.length > 0 ? "ok"
+      : p.state === "done" && seen !== undefined && now - seen >= PHASE_EVIDENCE_GRACE_MS ? "missing"
+        : "pending";
+    return {
+      ...p,
+      agent: {
+        name: r.name,
+        ...(r.model ? { model: r.model } : {}),
+        ...(r.effort ? { effort: r.effort } : {}),
+        attempts: new Set(mine.map((i) => i.runtimeInvocationId)).size,
+        ...(last ? {
+          status: last.status, startedAt: last.startedAt, durationMs: last.durationMs,
+          inputTokens: last.inputTokens, outputTokens: last.outputTokens, cachedTokens: last.cachedTokens,
+          resultExcerpt: last.resultExcerpt,
+        } : {}),
+        evidence,
+      },
+    };
   });
 }
 

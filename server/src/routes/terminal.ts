@@ -33,6 +33,7 @@ import {
   attach, detach, writeTo, resize, shellBin, sendToPane, interruptPane, clearMarker, type Client,
 } from "../services/pty";
 import { saveSessionUpload } from "../services/uploads";
+import { refreshPhaseInvocations } from "../services/phase-invocations";
 import {
   readSessionDialog, answerSessionDialog, sessionPaneIO, beginAnswer, endAnswer,
 } from "../services/session-dialog";
@@ -544,6 +545,9 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     const guard = new WsMessageGuard({ perWindow: TERMINAL_WS_MESSAGES_PER_MINUTE });
     const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     attach(id, client);
+    // ADR-0164 · invocation agen fase dari DB — frame pertama sudah membawa rencana dari roster, frame
+    // kedua (sesudah hidrasi) membawa status. Tanpa await: handler ini sengaja sinkron (lihat bawah).
+    void refreshPhaseInvocations(id);
     // Revalidasi principal (SPEC-761) berjalan di LATAR, dipicu frame yang datang (≤ 1×/dtk) dan
     // interval 60 dtk di bawah. Sebelumnya setiap frame `in` di-`await` di belakang satu query
     // Prisma sebelum `writeTo`: dua frame beruntun berlomba dan mendarat terbalik di pty (terukur

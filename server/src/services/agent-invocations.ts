@@ -9,6 +9,7 @@ import {
 } from "@hanoman/shared";
 import { prisma } from "../db";
 import { sessionEventRelayStatus } from "./session-event-relay";
+import type { PhaseInvocation } from "./session-phases";
 
 const MAX_EXCERPT_BYTES = 4_096;
 const MAX_TRANSCRIPT_BYTES = 10 * 1024 * 1024;
@@ -18,6 +19,8 @@ type InvocationIdentity = {
   sessionId: string; projectId: string; specId?: string; runtime: Agent;
   runtimeInvocationId: string; customAgentId?: string; agentName: string; model?: string;
   definitionHash?: string;
+  // ADR-0164 · agen fase. `effort` saat start dari roster tepercaya; saat stop dari payload runtime.
+  phase?: string; effort?: string;
   cwd: string;
 };
 export type InvocationStart = InvocationIdentity & { startedAt?: Date };
@@ -134,6 +137,7 @@ export async function startAgentInvocation(input: InvocationStart, io: Io = {}) 
       runtimeInvocationId: input.runtimeInvocationId,
       customAgentId: input.customAgentId ?? null, agentName: input.agentName,
       model: input.model ?? null, definitionHash: input.definitionHash ?? null,
+      phase: input.phase ?? null, effort: input.effort ?? null,
       status: "running", startedAt,
     },
   });
@@ -164,6 +168,8 @@ export async function stopAgentInvocation(input: InvocationStop, io: Io = {}) {
     resultExcerpt: cleanResult === null ? null : utf8Prefix(cleanResult, MAX_EXCERPT_BYTES),
     resultHash: cleanResult === null ? null : hash(cleanResult),
     workspaceChanged: before !== undefined && after !== null && before !== after,
+    // ADR-0164 · effort yang BENAR-BENAR dipakai runtime menang atas nilai start-time.
+    ...(input.effort ? { effort: input.effort } : {}),
   };
   if (existing) {
     const row = await prisma.agentInvocation.update({ where: { id: existing.id }, data: evidence });
@@ -175,7 +181,8 @@ export async function stopAgentInvocation(input: InvocationStop, io: Io = {}) {
       specId: input.specId ?? null, runtime: input.runtime,
       runtimeInvocationId: input.runtimeInvocationId,
       customAgentId: input.customAgentId ?? null, agentName: input.agentName,
-      model: input.model ?? null, definitionHash: input.definitionHash ?? null, startedAt, ...evidence,
+      model: input.model ?? null, definitionHash: input.definitionHash ?? null,
+      phase: input.phase ?? null, startedAt, ...evidence,
     },
   });
   return { row, duplicate: false };
@@ -233,6 +240,8 @@ export async function agentMetrics(query: {
   projectId?: string; from?: Date; to?: Date;
 }): Promise<AgentMetricsView> {
   const where = {
+    // ADR-0164 · telemetri agen fase milik terminal, bukan presisi katalog custom agent.
+    phase: null,
     ...(query.projectId ? { projectId: query.projectId } : {}),
     ...(query.from || query.to ? { startedAt: {
       ...(query.from ? { gte: query.from } : {}), ...(query.to ? { lte: query.to } : {}),
@@ -330,3 +339,16 @@ export async function updateAgentInvocationDisposition(
 }
 
 export function __resetInvocationSnapshots(): void { snapshotHashes.clear(); }
+
+/** ADR-0164 · invocation agen fase satu sesi, urut waktu mulai — bahan frame `phase` terminal. */
+export async function listPhaseInvocations(sessionId: string): Promise<PhaseInvocation[]> {
+  const rows = await prisma.agentInvocation.findMany({
+    where: { sessionId, phase: { not: null } }, orderBy: { startedAt: "asc" },
+  });
+  return rows.map((row) => ({
+    phase: row.phase!, runtimeInvocationId: row.runtimeInvocationId, status: row.status,
+    startedAt: row.startedAt.toISOString(), durationMs: row.durationMs,
+    inputTokens: row.inputTokens, outputTokens: row.outputTokens, cachedTokens: row.cachedTokens,
+    resultExcerpt: row.resultExcerpt,
+  }));
+}

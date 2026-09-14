@@ -20,7 +20,10 @@ import { drainSessionEventSpool } from "../src/services/session-event-relay";
 const PANE: Record<string, unknown> = {
   s1: { id: "s1", projectId: "p1", specId: "SPEC-1", exited: false, agent: "claude",
         decisionFile: "/m", cwd: "/w",
-        agentRoster: [{ name: "scout", id: "global:scout", model: "haiku", definitionHash: "a".repeat(64) }] },
+        agentRoster: [
+          { name: "scout", id: "global:scout", model: "haiku", definitionHash: "a".repeat(64) },
+          { name: "hanoman-fase-plan", phase: "Plan", model: "claude-sonnet-5", effort: "low", definitionHash: "b".repeat(64) },
+        ] },
   dead: { id: "dead", projectId: "p1", exited: true, agent: "claude", cwd: "/w" },
 };
 vi.mock("../src/services/pty", async (orig) => ({
@@ -124,6 +127,20 @@ describe("POST /api/session-events", () => {
       status: "completed", resultExcerpt: "hasil scout",
       definitionHash: "a".repeat(64), model: "haiku",
     });
+    await app.close();
+  });
+
+  it("ADR-0164 · event agen fase menyimpan phase & effort; stop mengambil effort runtime", async () => {
+    const app = buildApp();
+    const start = await post(app, { hook_event_name: "SubagentStart", agent_id: "ag-1", agent_type: "hanoman-fase-plan" }, auth("s1"));
+    expect(start.statusCode).toBe(202);
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "ag-1" } }))
+      .toMatchObject({ agentName: "hanoman-fase-plan", phase: "Plan", model: "claude-sonnet-5", effort: "low" });
+    const stop = await post(app, { hook_event_name: "SubagentStop", agent_id: "ag-1", agent_type: "hanoman-fase-plan",
+      effort: { level: "medium" }, last_assistant_message: "Status: selesai" }, auth("s1"));
+    expect(stop.statusCode).toBe(202);
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "ag-1" } }))
+      .toMatchObject({ status: "completed", effort: "medium" });
     await app.close();
   });
 

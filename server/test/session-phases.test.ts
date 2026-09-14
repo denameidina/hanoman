@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   phaseFilePath, decisionFilePath, readPhases, stageFor, planComplete, stageForRun,
-  phasesComplete, sessionComplete, type Phase, type PhaseState,
+  phasesComplete, sessionComplete, enrichPhases, type Phase, type PhaseState, type PhaseInvocation,
 } from "../src/services/session-phases";
 
 describe("decisionFilePath (SPEC-184)", () => {
@@ -302,5 +302,41 @@ describe("SPEC-825 · flow no_effort (satu fase)", () => {
   it("phasesComplete benar untuk pipeline satu fase", () => {
     expect(phasesComplete(kerjakan("done"))).toBe(true);
     expect(phasesComplete(kerjakan("active"))).toBe(false);
+  });
+});
+
+describe("enrichPhases (ADR-0164)", () => {
+  const roster = [
+    { name: "hanoman-fase-spec", phase: "Spec", model: "claude-opus-5", effort: "high" },
+    { name: "hanoman-fase-plan", phase: "Plan", model: "claude-sonnet-5", effort: "low" },
+  ];
+  const inv = (o: Partial<PhaseInvocation>): PhaseInvocation => ({
+    phase: "Spec", runtimeInvocationId: "a1", status: "completed", startedAt: "2026-09-14T00:00:00.000Z",
+    durationMs: 72_000, inputTokens: 10, outputTokens: 5, cachedTokens: null, resultExcerpt: "Status: selesai", ...o,
+  });
+  const phases: Phase[] = [
+    { name: "Brainstorm", state: "done" }, { name: "Spec", state: "done" }, { name: "Plan", state: "active" },
+  ];
+
+  it("fase tanpa agen fase di roster tak disentuh", () => {
+    expect(enrichPhases(phases, roster, [], new Map(), 0)[0]).toEqual({ name: "Brainstorm", state: "done" });
+  });
+  it("invocation terakhir menentukan status; percobaan = agent id berbeda", () => {
+    const [, spec] = enrichPhases(phases, roster, [
+      inv({ runtimeInvocationId: "a1", status: "interrupted", startedAt: "2026-09-14T00:00:00.000Z" }),
+      inv({ runtimeInvocationId: "a2", status: "completed", startedAt: "2026-09-14T00:05:00.000Z" }),
+    ], new Map(), 0);
+    expect(spec!.agent).toMatchObject({
+      name: "hanoman-fase-spec", model: "claude-opus-5", effort: "high", status: "completed", attempts: 2, evidence: "ok",
+    });
+  });
+  it("fase done tanpa invocation: pending selama tenggang, missing sesudahnya", () => {
+    const seen = new Map([["Spec", 1_000]]);
+    expect(enrichPhases(phases, roster, [], seen, 1_000 + 59_999)[1]!.agent!.evidence).toBe("pending");
+    expect(enrichPhases(phases, roster, [], seen, 1_000 + 60_000)[1]!.agent!.evidence).toBe("missing");
+  });
+  it("fase aktif belum berinvocation tetap pending walau lama", () => {
+    expect(enrichPhases(phases, roster, [], new Map(), 10_000_000)[2]!.agent)
+      .toMatchObject({ attempts: 0, evidence: "pending" });
   });
 });

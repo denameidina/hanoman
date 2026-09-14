@@ -4,6 +4,7 @@ import { verifySessionEventToken } from "../services/session-event-token";
 import { getSessionAsync } from "../services/pty";
 import { intakeAsk } from "../services/lead/ask";
 import { startAgentInvocation, stopAgentInvocation } from "../services/agent-invocations";
+import { refreshPhaseInvocations } from "../services/phase-invocations";
 
 // SPEC-909 · ADR-0146 · pintu masuk event pertanyaan sesi.
 //
@@ -53,6 +54,8 @@ export default async function (app: FastifyInstance) {
         sessionId, projectId: s.projectId, specId: s.specId, runtime: s.agent,
         runtimeInvocationId, customAgentId: meta.id, agentName: meta.name, model: meta.model,
         definitionHash: meta.definitionHash,
+        ...(meta.phase ? { phase: meta.phase } : {}),
+        ...(meta.effort ? { effort: meta.effort } : {}),
         cwd: s.cwd,
       };
       const outcome = lifecycle === "SubagentStart"
@@ -64,7 +67,11 @@ export default async function (app: FastifyInstance) {
           transcriptPath: boundedString(
             body.agent_transcript_path ?? body.transcript_path, 4_096,
           ),
+          // ADR-0164 · effort yang BENAR-BENAR dipakai runtime (claude: `effort.level` di SubagentStop).
+          ...(typeof recordOf(body.effort)?.level === "string"
+            ? { effort: String(recordOf(body.effort)!.level) } : {}),
         });
+      if (meta.phase) void refreshPhaseInvocations(sessionId);
       return reply.code(202).send(outcome.duplicate ? { duplicate: true } : { accepted: true });
     }
 

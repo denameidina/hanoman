@@ -11,7 +11,7 @@ import {
   writeSubagentStatusline, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import { coerceCodexEffort, isTerminalResponse, resolveChoices, type SessionKind } from "@hanoman/shared";
-import { readPhases, sessionComplete, type Phase } from "./session-phases";
+import { enrichPhases, readPhases, sessionComplete, type Phase, type PhaseInvocation } from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
 import { dropSessionUploads } from "./uploads";
 import {
@@ -173,8 +173,25 @@ type Attachment = {
   pty: IPty; scrollback: string; clients: Set<Client>; lastPhases: string;
   lastAlt?: boolean;
   pending: string; flushTimer?: NodeJS.Timeout;
+  // ADR-0164 · kapan server pertama melihat tiap fase `done` — bahan tenggang bukti `enrichPhases`.
+  doneSeenAt: Map<string, number>;
 };
 const attached = new Map<string, Attachment>();
+
+// ADR-0164 · status live agen fase per sesi. Diisi route session-events & route WS terminal (yang
+// membaca DB); pty sendiri tak pernah menyentuh DB (ADR-0094 §7).
+const phaseInvocations = new Map<string, PhaseInvocation[]>();
+
+/** Frame fase satu pane: berkas fase diperkaya roster agen fase + invocation. Tanpa agen fase → apa adanya. */
+function phaseView(p: Pane, a: Attachment): Phase[] {
+  const phases = readPhases(p.phaseFile!, p.flow!);
+  const now = Date.now();
+  for (const phase of phases)
+    if (phase.state === "done" && !a.doneSeenAt.has(phase.name)) a.doneSeenAt.set(phase.name, now);
+  const roster = (p.agentRoster ?? []).flatMap((r) =>
+    r.phase ? [{ name: r.name, phase: r.phase, model: r.model, effort: r.effort }] : []);
+  return roster.length ? enrichPhases(phases, roster, phaseInvocations.get(p.id) ?? [], a.doneSeenAt, now) : phases;
+}
 
 // Variabel yang sama yang dipakai runner/src/claude-cli.ts.
 const claudeBin = () => effectiveStr("HANOMAN_CLAUDE_BIN") ?? "claude";
@@ -1156,7 +1173,9 @@ function flushOutput(a: Attachment): void {
 // ditutup. Yang menentukan akhir adalah pane-nya — itulah yang di-poll di bawah.
 function open(id: string): Attachment {
   const pty = spawnPty("attach-session", "-d", "-t", name(id));
-  const a: Attachment = { pty, scrollback: "", clients: new Set(), lastPhases: "", pending: "" };
+  const a: Attachment = {
+    pty, scrollback: "", clients: new Set(), lastPhases: "", pending: "", doneSeenAt: new Map(),
+  };
   pty.onData((d) => {
     a.pending += d;
     if (a.pending.length >= COALESCE_MAX_BYTES) flushOutput(a);
@@ -1228,12 +1247,20 @@ export const sessionFinished = (id: string): boolean => {
 
 function pollPhases(p: Pane, a: Attachment): void {
   if (!p.flow || !p.phaseFile) return;
-  const phases = readPhases(p.phaseFile, p.flow);
+  const phases = phaseView(p, a);
   const complete = paneComplete(p);
   const json = phaseKey(phases, complete);
   if (json === a.lastPhases) return;
   a.lastPhases = json;
   broadcast(a, { t: "phase", phases, complete });
+}
+
+/** ADR-0164 · suntik invocation fase terbaru lalu siarkan ulang frame fase bila ada penonton. */
+export function setPhaseInvocations(sessionId: string, rows: PhaseInvocation[]): void {
+  phaseInvocations.set(sessionId, rows);
+  const a = attached.get(sessionId);
+  const p = a ? getSession(sessionId) : null;
+  if (a && p) pollPhases(p, a);
 }
 
 // SPEC-863 · cermin pollPhases: frame lahir hanya saat berubah, dan sumbernya `Pane` yang sudah
@@ -1341,7 +1368,7 @@ export function attach(id: string, c: Client): void {
   // Lewat sinilah pil "Selesai" selamat dari refresh & pindah sel: klien baru langsung diberi
   // verdict-nya, tak perlu menunggu berkas fase berubah lagi (yang takkan pernah terjadi).
   if (p.flow && p.phaseFile) {
-    const phases = readPhases(p.phaseFile, p.flow);
+    const phases = phaseView(p, a);
     const complete = paneComplete(p);
     a.lastPhases = phaseKey(phases, complete);
     c.send(frame({ t: "phase", phases, complete }));
@@ -1366,6 +1393,7 @@ export function resize(id: string, cols: number, rows: number): void {
 }
 
 export function killSession(id: string): boolean {
+  phaseInvocations.delete(id);
   const p = getSession(id);
   if (!p) return false;
   // SPEC-362 · capture SEBELUM kill: sesudah `kill-session` scrollback-nya tak ada lagi.
