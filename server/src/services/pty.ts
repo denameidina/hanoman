@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
   renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook,
-  type AgentDef, type Flow, type Agent,
+  writeSubagentStatusline, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import { coerceCodexEffort, isTerminalResponse, resolveChoices, type SessionKind } from "@hanoman/shared";
 import { readPhases, sessionComplete, type Phase } from "./session-phases";
@@ -136,6 +136,9 @@ export type SessionInfo = {
   decisionAt?: string;
   // SPEC-338 · ADR-0074 · mesin sesi. Sesi lama (tanpa opsi tmux ini) dibaca sebagai "claude".
   agent: Agent;
+  // ADR-0164 · model/effort orchestrator (argv saat lahir) + penanda sesi diorkestrasi. Absen untuk
+  // sesi lama; `orchestrated` hanya ikut DTO bila true.
+  model?: string; effort?: string; orchestrated?: boolean;
 };
 export type Pane = SessionInfo & {
   // ADR-0161: metadata tmux internal; klasifikasi tidak mengubah hitungan semua pane hidup.
@@ -158,6 +161,8 @@ export type Pane = SessionInfo & {
 };
 export type SessionAgentMeta = {
   id?: string; name: string; model?: string; timeoutSeconds?: number; definitionHash?: string;
+  // ADR-0164 · agen fase membawa nama fasenya; effort = nilai efektif saat lahir (sudah dikoersi).
+  phase?: string; effort?: string;
 };
 
 // Satu attachment per sesi: satu klien tmux melayani semua WebSocket yang menonton.
@@ -321,6 +326,8 @@ export const FMT = [
   // `pty-parse.test.ts` mengunci panjang FMT terhadap destructuring `parsePanes`.
   "#{window_activity}", "#{@hanoman_event_hook}", "#{session_created}",
   "#{@hanoman_agent_roster}", "#{@hanoman_launch_class}",
+  // ADR-0164 · di UJUNG juga, alasan yang sama dengan SPEC-919.
+  "#{@hanoman_model}", "#{@hanoman_effort}", "#{@hanoman_orchestrated}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -352,7 +359,8 @@ export async function listPanesAsync(): Promise<Pane[]> {
 export function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
-      alternate, activity, eventHook, created, agentRoster, launchClass] = line.split("\t");
+      alternate, activity, eventHook, created, agentRoster, launchClass, model, effort,
+      orchestrated] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -379,6 +387,9 @@ export function parsePanes(out: string): Pane[] {
       eventHook: eventHook === "1",
       agentRoster: parseAgentRoster(agentRoster),
       launchClass: launchClass === "agent" || launchClass === "terminal" ? launchClass : undefined,
+      model: model || undefined,
+      effort: effort || undefined,
+      orchestrated: orchestrated === "1",
     }];
   });
 }
@@ -398,18 +409,23 @@ function parseAgentRoster(value: string | undefined): SessionAgentMeta[] {
         ...(typeof row.definitionHash === "string" && /^[a-f0-9]{64}$/.test(row.definitionHash)
           ? { definitionHash: row.definitionHash } : {}),
         ...(typeof row.timeoutSeconds === "number" ? { timeoutSeconds: row.timeoutSeconds } : {}),
+        ...(typeof row.phase === "string" ? { phase: row.phase } : {}),
+        ...(typeof row.effort === "string" ? { effort: row.effort } : {}),
       }];
     });
   } catch { return []; }
 }
 
 const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent,
-  decisionFile, activityAt }: Pane): SessionInfo => ({
+  decisionFile, activityAt, model, effort, orchestrated }: Pane): SessionInfo => ({
   id, projectId, specId, flow, cwd, exited, branch, decision, agent,
   // Hanya untuk pane mati: `pane_dead_status` kosong pada pane hidup, dan `exitCode: 0` di sana
   // akan terbaca sebagai "sudah berakhir sukses".
   ...(exited ? { exitCode: code } : {}),
   ...(decision && decisionFile ? { decisionAt: decisionOnset(decisionFile, activityAt) } : {}),
+  ...(model ? { model } : {}),
+  ...(effort ? { effort } : {}),
+  ...(orchestrated ? { orchestrated: true } : {}),
 });
 
 export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
@@ -508,6 +524,9 @@ let codexNativeAgentSupport: CodexNativeAgentSupport = () => ({ version: "0.151.
 export function registerCodexNativeAgentSupport(fn: CodexNativeAgentSupport): void {
   codexNativeAgentSupport = fn;
 }
+/** ADR-0164 · runtime sanggup subagent native: claude selalu, codex bila client terdeteksi >= 0.151. */
+export const nativeAgentsAvailable = (agent: Agent): boolean =>
+  agent === "claude" || codexNativeAgentSupport().ok;
 // Gagal baca → daftar KOSONG. Katalog agen tak pernah boleh menggagalkan kelahiran sesi.
 const customAgentsFor = (context: AgentSelectionContext): AgentDef[] => {
   try { return customAgentSource(context); } catch { return []; }
@@ -576,6 +595,10 @@ export type CreateOpts = {
   attachmentsDir?: string;
   // Env tambahan di depan argv sesi (mis. HANOMAN_BASE_SHA / HANOMAN_VERIFY_SCOPE).
   env?: Record<string, string>;
+  // ADR-0164 · orkestrasi. `phaseAgents` terisi = minta sesi orchestrator; `legacyPrompt` = prompt
+  // mode tunggal dari input yang SAMA, dipakai bila satu agen fase gagal dimaterialisasi.
+  phaseAgents?: AgentDef[];
+  legacyPrompt?: string;
 };
 
 export function createSession(projectId: string, cwd: string, opts: CreateOpts = {}): SessionInfo {
@@ -618,54 +641,84 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // kedua runtime menempelkan klausa delegasi ringkas ke prompt parent. Sesi ber-
   // `opts.command` (shell mentah ADR-0056, konsol VPS) tak menerima apa pun — tak ada agen di sana.
   const agentForDefs: Agent = opts.agent ?? "claude";
+  // SPEC-339 · effort codex dikoersi SEKALI di sini; argv, roster, dan opsi tmux memakai nilai ini.
+  const sessionEffort = agentForDefs === "codex" && opts.model && opts.effort
+    ? coerceCodexEffort(opts.model, opts.effort) : opts.effort;
   const selectionContext: AgentSelectionContext = {
     projectId, runtime: agentForDefs, flow: opts.flow, cwd,
     baseSha: opts.env?.HANOMAN_BASE_SHA, prompt: opts.prompt,
     changedFiles: opts.command ? [] : collectChangedFiles(cwd, opts.env?.HANOMAN_BASE_SHA),
   };
   const customDefs = opts.command ? [] : customAgentsFor(selectionContext);
+  const requestedPhaseDefs = opts.command ? [] : (opts.phaseAgents ?? []);
   let rosterBlock = "";
   let codexAgentArgs: string[] = [];
   let agentsFile: string | undefined;
   let agentConfigDir: string | undefined;
   let liveAgentDefs: AgentDef[] = [];
-  if (customDefs.length > 0) {
+  let renderedDefs: AgentDef[] = [];
+  let orchestrated = false;
+  let statusLineCommand: string | undefined;
+  if (customDefs.length > 0 || requestedPhaseDefs.length > 0) {
     const tempDir = agentTempDir(id);
     agentConfigDir = tempDir;
     mkdirSync(tempDir, { recursive: true, mode: 0o700 });
     const readOnlyHook = customDefs.some((def) => def.workspacePolicy === "read-only")
       ? writeReadOnlyHook(tempDir)
       : undefined;
-    if (agentForDefs === "claude") {
-      const json = renderAgentsJson(customDefs, { readOnlyHookCommand: readOnlyHook?.command });
-      if (json) {
-        agentsFile = agentsFilePath(id);
-        writeFileSync(agentsFile, json, { mode: 0o600 });
+    // ADR-0164 · satu lintasan renderer untuk agen fase + custom agent. `false` = ada agen fase yang
+    // gagal; pemanggil lalu mencoba lagi TANPA agen fase (all-or-nothing): orchestrator yang lahir
+    // tanpa salah satu agen fasenya akan terpaksa mengerjakan fase itu sendiri.
+    const attempt = (phaseDefs: AgentDef[]): boolean => {
+      const defs = [...phaseDefs, ...customDefs];
+      if (defs.length === 0) return true;
+      if (agentForDefs === "claude") {
+        const file = agentsFilePath(id);
+        try {
+          writeFileSync(file, renderAgentsJson(defs, { readOnlyHookCommand: readOnlyHook?.command }), { mode: 0o600 });
+        } catch (error) {
+          if (phaseDefs.length === 0) throw error;
+          return false;
+        }
+        agentsFile = file;
         rosterBlock = agentDelegationClause(customDefs, "claude");
-        liveAgentDefs = customDefs;
+        liveAgentDefs = defs;
+        renderedDefs = defs;
+        return true;
       }
-    } else {
-      const materialized = materializeCodexAgents(customDefs, tempDir, {
+      const materialized = materializeCodexAgents(defs, tempDir, {
         readOnlyHookCommand: readOnlyHook?.command,
         clientVersion: codexNativeAgentSupport().version,
+        ...(phaseDefs.length > 0 ? { maxDepth: 3 } : {}),
       });
+      if (materialized.warnings.some((w) => phaseDefs.some((d) => d.name === w.agentName))) return false;
       codexAgentArgs = materialized.args;
       rosterBlock = materialized.delegationClause;
       liveAgentDefs = materialized.liveDefs;
+      renderedDefs = defs;
       for (const warning of materialized.warnings) {
         process.stderr.write(
           `hanoman: custom agent ${warning.agentName} tidak dimaterialisasi: ${warning.reason}\n`,
         );
       }
+      return true;
+    };
+    orchestrated = requestedPhaseDefs.length > 0 && attempt(requestedPhaseDefs);
+    if (!orchestrated) {
+      if (requestedPhaseDefs.length > 0)
+        process.stderr.write(`hanoman: agen fase sesi ${id} gagal dimaterialisasi — sesi lahir mode tunggal\n`);
+      attempt([]);
     }
+    if (orchestrated && agentForDefs === "claude") statusLineCommand = writeSubagentStatusline(tempDir);
   }
 
   let promptArg = "";
   let promptFile: string | undefined;
-  if (!opts.command && opts.prompt) {
+  const sessionPrompt = orchestrated ? opts.prompt : (opts.legacyPrompt ?? opts.prompt);
+  if (!opts.command && sessionPrompt) {
     promptFile = promptFilePath(id);
     mkdirSync(dirname(promptFile), { recursive: true, mode: 0o700 });
-    writeFileSync(promptFile, opts.prompt + rosterBlock, { mode: 0o600 });
+    writeFileSync(promptFile, sessionPrompt + rosterBlock, { mode: 0o600 });
     promptArg = `"$(cat ${sq(promptFile)})"`;
   }
   // SPEC-338 · ADR-0074 · perbedaan CLI antar agen dirakit `agentFlags`; di sini tinggal
@@ -690,9 +743,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     // model SEBELUM argv dirakit. Ditaruh di sini, bukan di route, karena SEMUA kelahiran sesi
     // bermuara ke createSession — termasuk jalur ber-AgentToken yang tak lewat picker UI.
     // Hanya dikoersi bila keduanya ada: tanpa effort, `agentFlags` memang tak memasang flag apa pun.
-    const effort = agent === "codex" && opts.model && opts.effort
-      ? coerceCodexEffort(opts.model, opts.effort)
-      : opts.effort;
+    const effort = sessionEffort;
     // SPEC-450 · ADR-0094 gotcha 4 · JSON `--agents` lewat BERKAS, bukan inline: instruksi agen
     // adalah prosa dan tmux membatasi SATU command ±16 KB — kelas kegagalan SPEC-223, dibayar
     // sekali dan dipakai ulang. Hasil command-substitution dikutip ganda, jadi isinya tak dipindai
@@ -704,6 +755,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
       // SPEC-909 · ADR-0146 · sesi ber-`opts.command` tak pernah sampai ke sini (cabang shell
       // mentah di atas), jadi hook event hanya pernah terpasang di sesi agen.
       eventHook: true,
+      subagentStatusLine: statusLineCommand,
     }).map(sq).join(" ");
     // GOTCHA ADR-0094 #4: `--agents` TIDAK boleh ikut `.map(sq)` seperti flag lain — ia harus tetap
     // berbentuk `"$(cat …)"` supaya `sh -c` yang melahirkan sesi meng-expand-nya. Di-`sq` sekali
@@ -789,17 +841,19 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   const kind = sessionKind({ ...opts, id }, projectId, cwd);
   tmux("set-option", "-t", name(id), "@hanoman_launch_class",
     opts.command || kind === "terminal" ? "terminal" : "agent");
+  // ADR-0164 · model/effort orchestrator + penanda orkestrasi → chip header sel terminal.
+  if (!opts.command && opts.model) tmux("set-option", "-t", name(id), "@hanoman_model", opts.model);
+  if (!opts.command && sessionEffort) tmux("set-option", "-t", name(id), "@hanoman_effort", sessionEffort);
+  if (orchestrated) tmux("set-option", "-t", name(id), "@hanoman_orchestrated", "1");
   if (liveAgentDefs.length > 0) {
-    const inherited = {
-      model: opts.model,
-      effort: agent === "codex" && opts.model && opts.effort
-        ? coerceCodexEffort(opts.model, opts.effort) : opts.effort,
-    };
+    const inherited = { model: opts.model, effort: sessionEffort };
     const roster: SessionAgentMeta[] = liveAgentDefs.map((def) => ({
       ...(def.id ? { id: def.id } : {}), name: def.name,
       ...(def.model ?? inherited.model ? { model: def.model ?? inherited.model } : {}),
-      // Native files were rendered with customDefs, even if another Codex file failed to write.
-      definitionHash: agentDefinitionHash(def, customDefs, agent, inherited),
+      ...(def.phase ? { phase: def.phase } : {}),
+      ...(def.effort ?? inherited.effort ? { effort: def.effort ?? inherited.effort } : {}),
+      // Berkas native dirender dengan `renderedDefs`, walau satu berkas Codex lain gagal ditulis.
+      definitionHash: agentDefinitionHash(def, renderedDefs, agent, inherited),
       ...(def.timeoutSeconds ? { timeoutSeconds: def.timeoutSeconds } : {}),
     }));
     tmux("set-option", "-t", name(id), "@hanoman_agent_roster", JSON.stringify(roster));

@@ -24,8 +24,8 @@ const line = (over: Record<string, string> = {}) => {
 
 describe("parsePanes", () => {
   it("FMT dan destructuring sama panjang", () => {
-    expect(FIELDS).toHaveLength(17);
-    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_launch_class}");
+    expect(FIELDS).toHaveLength(20);
+    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_orchestrated}");
   });
 
   it("memetakan setiap kolom ke field yang benar", () => {
@@ -63,5 +63,15 @@ describe("parsePanes", () => {
 
   it("baris di luar prefix hanoman dibuang", () => {
     expect(parsePanes(line({ "#{session_name}": "lain" }))).toHaveLength(0);
+  });
+
+  it("ADR-0164 · model/effort orchestrator, penanda orkestrasi, dan roster ber-fase", () => {
+    const [p] = parsePanes(line({
+      "#{@hanoman_model}": "claude-opus-5", "#{@hanoman_effort}": "high", "#{@hanoman_orchestrated}": "1",
+      "#{@hanoman_agent_roster}": '[{"name":"hanoman-fase-plan","phase":"Plan","model":"claude-sonnet-5","effort":"low"}]',
+    }));
+    expect(p).toMatchObject({ model: "claude-opus-5", effort: "high", orchestrated: true });
+    expect(p!.agentRoster).toEqual([{ name: "hanoman-fase-plan", phase: "Plan", model: "claude-sonnet-5", effort: "low" }]);
+    expect(parsePanes(line())[0]!.orchestrated).toBe(false);
   });
 });

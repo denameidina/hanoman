@@ -1781,7 +1781,7 @@ Expected: exit 0.
   ```
 - Aturan: orchestrated = `phaseAgents.length > 0` **dan** seluruh agen fase termaterialisasi. Gagal satu → pakai `legacyPrompt`, buang agen fase, tanpa `@hanoman_orchestrated`/`subagentStatusLine`, peringatan stderr. Sesi tanpa `phaseAgents`: argv & berkas agen byte-identik dengan sebelumnya.
 
-- [ ] **Step 1: Tulis test yang gagal** — `server/test/phase-agents.pty.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `server/test/phase-agents.pty.test.ts`
 
 ```ts
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -1899,12 +1899,12 @@ Di `server/test/pty-parse.test.ts`: ubah `expect(FIELDS).toHaveLength(17);` menj
   });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" rtk proxy pnpm vitest --run --no-file-parallelism server/test/phase-agents.pty.test.ts server/test/pty-parse.test.ts`
 Expected: FAIL — berkas agen tak memuat agen fase, `orchestrated` undefined, `FIELDS` masih 17.
 
-- [ ] **Step 3: Tipe & parsing** — `server/src/services/pty.ts`
+- [x] **Step 3: Tipe & parsing** — `server/src/services/pty.ts`
 
 Impor runner (baris 8–12) menjadi:
 
@@ -1989,7 +1989,7 @@ export const nativeAgentsAvailable = (agent: Agent): boolean =>
   legacyPrompt?: string;
 ```
 
-- [ ] **Step 4: Materialisasi all-or-nothing** — di `createSession`, ganti blok dari `const agentForDefs: Agent = opts.agent ?? "claude";` sampai akhir blok penulisan berkas prompt (`promptArg = \`"$(cat ${sq(promptFile)})"\`; }`) dengan:
+- [x] **Step 4: Materialisasi all-or-nothing** — di `createSession`, ganti blok dari `const agentForDefs: Agent = opts.agent ?? "claude";` sampai akhir blok penulisan berkas prompt (`promptArg = \`"$(cat ${sq(promptFile)})"\`; }`) dengan:
 
 ```ts
   const agentForDefs: Agent = opts.agent ?? "claude";
@@ -2075,7 +2075,7 @@ export const nativeAgentsAvailable = (agent: Agent): boolean =>
   }
 ```
 
-- [ ] **Step 5: Argv, opsi tmux, roster**
+- [x] **Step 5: Argv, opsi tmux, roster**
 
 Di cabang argv agen, ganti blok `const effort = agent === "codex" && … : opts.effort;` dengan `const effort = sessionEffort;`, dan panggilan `agentFlags({ … })` menambah properti:
 
@@ -2110,7 +2110,7 @@ Blok roster (`if (liveAgentDefs.length > 0) { … }`) menjadi:
   }
 ```
 
-- [ ] **Step 6: Jalankan, pastikan lulus**
+- [x] **Step 6: Jalankan, pastikan lulus**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" rtk proxy pnpm vitest --run --no-file-parallelism server/test/phase-agents.pty.test.ts server/test/pty-parse.test.ts server/test/custom-agents.pty.test.ts server/test/pty.test.ts`
 Expected: PASS semua. (`pty.test.ts` merah karena `SSH_ASKPASS`/tmux sisa tetangga → lihat catatan resep; bukan regresi bila juga merah di base `05978c6d`.)
@@ -2118,7 +2118,7 @@ Expected: PASS semua. (`pty.test.ts` merah karena `SSH_ASKPASS`/tmux sisa tetang
 Run: `rtk proxy pnpm --filter ./server typecheck`
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 /usr/bin/git add server/src/services/pty.ts server/test/phase-agents.pty.test.ts server/test/pty-parse.test.ts
