@@ -641,7 +641,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // kedua runtime menempelkan klausa delegasi ringkas ke prompt parent. Sesi ber-
   // `opts.command` (shell mentah ADR-0056, konsol VPS) tak menerima apa pun — tak ada agen di sana.
   const agentForDefs: Agent = opts.agent ?? "claude";
-  // SPEC-339 · effort codex dikoersi SEKALI di sini; argv, roster, dan opsi tmux memakai nilai ini.
+  // SPEC-339 · titik cekik tunggal: effort codex yang tak didukung model diturunkan ke fallback DI
+  // SINI, bukan di route — SEMUA kelahiran sesi bermuara ke createSession, termasuk jalur ber-
+  // AgentToken yang tak lewat picker UI. Argv, roster, opsi tmux, dan (ADR-0164) `attempt()` agen
+  // fase di bawah semua memakai `sessionEffort` ini. Hanya dikoersi bila keduanya ada: tanpa effort,
+  // `agentFlags` memang tak memasang flag apa pun.
   const sessionEffort = agentForDefs === "codex" && opts.model && opts.effort
     ? coerceCodexEffort(opts.model, opts.effort) : opts.effort;
   const selectionContext: AgentSelectionContext = {
@@ -666,32 +670,35 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     const readOnlyHook = customDefs.some((def) => def.workspacePolicy === "read-only")
       ? writeReadOnlyHook(tempDir)
       : undefined;
-    // ADR-0164 · satu lintasan renderer untuk agen fase + custom agent. `false` = ada agen fase yang
-    // gagal; pemanggil lalu mencoba lagi TANPA agen fase (all-or-nothing): orchestrator yang lahir
-    // tanpa salah satu agen fasenya akan terpaksa mengerjakan fase itu sendiri.
-    const attempt = (phaseDefs: AgentDef[]): boolean => {
+    // ADR-0164 · satu lintasan renderer untuk agen fase + custom agent. Array kosong = sukses;
+    // sebaliknya berisi ALASAN tiap agen fase yang gagal (bukan boolean polos — review Task 7:
+    // fallback yang membisu tentang penyebabnya tak bisa didiagnosis dari luar). Pemanggil lalu
+    // mencoba lagi TANPA agen fase (all-or-nothing): orchestrator yang lahir tanpa salah satu agen
+    // fasenya akan terpaksa mengerjakan fase itu sendiri.
+    const attempt = (phaseDefs: AgentDef[]): string[] => {
       const defs = [...phaseDefs, ...customDefs];
-      if (defs.length === 0) return true;
+      if (defs.length === 0) return [];
       if (agentForDefs === "claude") {
         const file = agentsFilePath(id);
         try {
           writeFileSync(file, renderAgentsJson(defs, { readOnlyHookCommand: readOnlyHook?.command }), { mode: 0o600 });
         } catch (error) {
           if (phaseDefs.length === 0) throw error;
-          return false;
+          return [error instanceof Error ? error.message : String(error)];
         }
         agentsFile = file;
         rosterBlock = agentDelegationClause(customDefs, "claude");
         liveAgentDefs = defs;
         renderedDefs = defs;
-        return true;
+        return [];
       }
       const materialized = materializeCodexAgents(defs, tempDir, {
         readOnlyHookCommand: readOnlyHook?.command,
         clientVersion: codexNativeAgentSupport().version,
         ...(phaseDefs.length > 0 ? { maxDepth: 3 } : {}),
       });
-      if (materialized.warnings.some((w) => phaseDefs.some((d) => d.name === w.agentName))) return false;
+      const phaseFailures = materialized.warnings.filter((w) => phaseDefs.some((d) => d.name === w.agentName));
+      if (phaseFailures.length > 0) return phaseFailures.map((w) => `${w.agentName}: ${w.reason}`);
       codexAgentArgs = materialized.args;
       rosterBlock = materialized.delegationClause;
       liveAgentDefs = materialized.liveDefs;
@@ -701,12 +708,18 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
           `hanoman: custom agent ${warning.agentName} tidak dimaterialisasi: ${warning.reason}\n`,
         );
       }
-      return true;
+      return [];
     };
-    orchestrated = requestedPhaseDefs.length > 0 && attempt(requestedPhaseDefs);
+    let phaseFailReasons: string[] = [];
+    if (requestedPhaseDefs.length > 0) {
+      phaseFailReasons = attempt(requestedPhaseDefs);
+      orchestrated = phaseFailReasons.length === 0;
+    }
     if (!orchestrated) {
       if (requestedPhaseDefs.length > 0)
-        process.stderr.write(`hanoman: agen fase sesi ${id} gagal dimaterialisasi — sesi lahir mode tunggal\n`);
+        process.stderr.write(
+          `hanoman: agen fase sesi ${id} gagal dimaterialisasi — sesi lahir mode tunggal: ${phaseFailReasons.join("; ")}\n`,
+        );
       attempt([]);
     }
     if (orchestrated && agentForDefs === "claude") statusLineCommand = writeSubagentStatusline(tempDir);
@@ -739,18 +752,13 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
         phaseFile: opts.phaseFile ?? "", worktree: cwd, stateFile: goalStatePath(id),
       }), { mode: 0o700 });
     }
-    // SPEC-339 · titik cekik tunggal: effort yang tak didukung model codex diturunkan ke fallback
-    // model SEBELUM argv dirakit. Ditaruh di sini, bukan di route, karena SEMUA kelahiran sesi
-    // bermuara ke createSession — termasuk jalur ber-AgentToken yang tak lewat picker UI.
-    // Hanya dikoersi bila keduanya ada: tanpa effort, `agentFlags` memang tak memasang flag apa pun.
-    const effort = sessionEffort;
     // SPEC-450 · ADR-0094 gotcha 4 · JSON `--agents` lewat BERKAS, bukan inline: instruksi agen
     // adalah prosa dan tmux membatasi SATU command ±16 KB — kelas kegagalan SPEC-223, dibayar
     // sekali dan dipakai ulang. Hasil command-substitution dikutip ganda, jadi isinya tak dipindai
     // ulang shell (aman dari injeksi) dan batasnya ARG_MAX, bukan 16 KB.
     // Prompt (bila ada) = argumen positional pertama agen, TANPA sq (sudah dikutip ganda).
     const flags = agentFlags({
-      agent, model: opts.model, effort,
+      agent, model: opts.model, effort: sessionEffort,
       decisionFile: opts.decisionFile, goal: opts.goal, goalGate,
       // SPEC-909 · ADR-0146 · sesi ber-`opts.command` tak pernah sampai ke sini (cabang shell
       // mentah di atas), jadi hook event hanya pernah terpasang di sesi agen.

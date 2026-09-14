@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -23,7 +23,12 @@ const scout: AgentDef = { name: "scout", description: "cari", instructions: "kam
 let cwd: string;
 const ids: string[] = [];
 const born = (id: string): string => { ids.push(id); return id; };
-beforeEach(() => { cwd = mkdtempSync(join(tmpdir(), "hnm-orch-")); });
+beforeEach(() => {
+  cwd = mkdtempSync(join(tmpdir(), "hnm-orch-"));
+  // Mesin ini bersama sesi lain — jangan pernah melahirkan claude/codex sungguhan dari test.
+  process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+  process.env.HANOMAN_CODEX_BIN = "/bin/echo";
+});
 afterEach(() => {
   for (const id of ids.splice(0)) { try { killSession(id); } catch { /* sudah mati */ } }
   registerCustomAgentSource(() => []);
@@ -62,7 +67,6 @@ describe("createSession · orchestrator (ADR-0164)", () => {
   });
 
   it("claude: --settings memuat subagentStatusLine hanya untuk sesi diorkestrasi", async () => {
-    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
     const a = createSession("p1", cwd, { id: born("orch-sl-a"), agent: "claude", prompt: "P", legacyPrompt: "L", phaseAgents });
     const b = createSession("p1", cwd, { id: born("orch-sl-b"), agent: "claude", prompt: "P" });
     expect(await screenOf(a.id)).toContain("subagentStatusLine");
@@ -78,17 +82,46 @@ describe("createSession · orchestrator (ADR-0164)", () => {
 
   it("codex < 0.151: seluruh rencana dibatalkan, prompt lama, tanpa penanda orkestrasi", () => {
     registerCodexNativeAgentSupport(() => ({ version: "0.150.0", ok: false }));
+    const writeSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const s = createSession("p1", cwd, {
       id: born("orch-codex-old"), agent: "codex", model: "gpt-5.6-sol", effort: "high",
       prompt: "PROMPT ORCHESTRATOR", legacyPrompt: "PROMPT LAMA", phaseAgents,
     });
+    const stderrOut = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    writeSpy.mockRestore();
     expect(readFileSync(promptFilePath(s.id), "utf8")).toBe("PROMPT LAMA");
     expect(getSession(s.id)!.orchestrated).toBe(false);
     expect(getSession(s.id)!.agentRoster ?? []).toEqual([]);
+    // Review Task 7: fallback harus mencetak ALASANNYA, bukan cuma "gagal dimaterialisasi".
+    expect(stderrOut).toContain("0.151.0");
+  });
+
+  it("codex ≥ 0.151: satu agen fase gagal (workspacePolicy tak didukung) mencetak alasannya, sisanya jatuh ke mode tunggal", async () => {
+    registerCustomAgentSource(() => [scout]);
+    registerCodexNativeAgentSupport(() => ({ version: "0.154.0", ok: true }));
+    // Fase pertama dipaksa gagal dengan policy yang ditolak materializer Codex — kegagalan NYATA
+    // satu agen fase, sementara fase kedua & custom agent tetap bisa dimaterialisasi.
+    const brokenPhaseAgents: AgentDef[] = [
+      { ...phaseAgents[0]!, workspacePolicy: "isolated-worktree" },
+      phaseAgents[1]!,
+    ];
+    const writeSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const s = createSession("p1", cwd, {
+      id: born("orch-codex-partial"), agent: "codex",
+      prompt: "PROMPT ORCHESTRATOR", legacyPrompt: "PROMPT LAMA", phaseAgents: brokenPhaseAgents,
+    });
+    const stderrOut = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    writeSpy.mockRestore();
+    expect(readFileSync(promptFilePath(s.id), "utf8").startsWith("PROMPT LAMA")).toBe(true);
+    expect(getSession(s.id)!.orchestrated).toBe(false);
+    expect(getSession(s.id)!.agentRoster!.map((r) => r.name)).toEqual(["scout"]);
+    expect(await screenOf(s.id)).not.toContain("agents.max_depth");
+    expect(stderrOut).toContain("gagal dimaterialisasi");
+    expect(stderrOut).toContain("hanoman-fase-spec");
+    expect(stderrOut).toContain("isolated-worktree");
   });
 
   it("codex ≥ 0.151: agen fase jadi role native dengan max_depth eksplisit", async () => {
-    process.env.HANOMAN_CODEX_BIN = "/bin/echo";
     registerCodexNativeAgentSupport(() => ({ version: "0.154.0", ok: true }));
     const s = createSession("p1", cwd, { id: born("orch-codex"), agent: "codex", prompt: "P", legacyPrompt: "L", phaseAgents });
     const screen = await screenOf(s.id);
