@@ -3080,7 +3080,7 @@ Expected: exit 0.
   ```
 - aria-label kontrol (dipakai test): `Orkestrasi <flow>` (Switch), `Model <flow> <Fase> <claude|codex>`, `Effort <flow> <Fase> <claude|codex>`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `src/test/settings-orchestration.test.tsx`
+- [x] **Step 1: Tulis test yang gagal** — `src/test/settings-orchestration.test.tsx`
 
 ```tsx
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -3175,12 +3175,12 @@ dan di test pertama sesudah `expect(screen.queryByText("Laporan")).not.toBeInThe
     expect(screen.getByText(/tab Orkestrasi/)).toBeInTheDocument();
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `rtk proxy pnpm vitest --run src/test/settings-orchestration.test.tsx src/test/settings-no-matrix.test.tsx`
 Expected: FAIL — teks `Orkestrasi` tak ada di navigasi; `tab Orkestrasi` tak ada di kartu Model sesi.
 
-- [ ] **Step 3: Panel** — `src/src/screens/OrchestrationPanel.tsx`
+- [x] **Step 3: Panel** — `src/src/screens/OrchestrationPanel.tsx`
 
 ```tsx
 import React from "react";
@@ -3306,7 +3306,7 @@ export function OrchestrationPanel({ orchestration, onChange }: {
 }
 ```
 
-- [ ] **Step 4: Sambungkan ke Settings** — `src/src/screens/SettingsScreen.tsx`
+- [x] **Step 4: Sambungkan ke Settings** — `src/src/screens/SettingsScreen.tsx`
 
 Tambah impor `import { OrchestrationPanel } from "./OrchestrationPanel";   // ADR-0164 · orkestrasi subagent per fase`.
 
@@ -3335,7 +3335,7 @@ Kartu "Model sesi — default global": ganti kalimat `Sesi = satu proses, satu m
 
 dan ganti komentar JSX di atas kartu itu (`SPEC-252 · ADR-0061 · default global saja … matrix per-fase (SPEC-238) dicabut …`) dengan versi yang menyebut `ADR-0164 · model per fase kini lewat definisi subagent di tab Orkestrasi; matrix /model ADR-0058 tetap dicabut.`
 
-- [ ] **Step 5: Jalankan, pastikan lulus**
+- [x] **Step 5: Jalankan, pastikan lulus**
 
 Run: `rtk proxy pnpm vitest --run src/test/settings-orchestration.test.tsx src/test/settings-no-matrix.test.tsx src/test/settings-model-tab.test.tsx src/test/settings-nav.test.tsx src/test/icon-registry.test.ts`
 Expected: PASS semua (ikon `layers` sudah terdaftar di registry).
@@ -3343,7 +3343,7 @@ Expected: PASS semua (ikon `layers` sudah terdaftar di registry).
 Run: `rtk proxy pnpm --filter ./src typecheck`
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 /usr/bin/git add src/src/screens/OrchestrationPanel.tsx src/src/screens/SettingsScreen.tsx src/test/settings-orchestration.test.tsx src/test/settings-no-matrix.test.tsx

@@ -14,6 +14,7 @@ import { WebhookDocs } from "./WebhookDocs";
 import { McpPanel } from "./McpPanel";   // SPEC-482 · ADR-0099 · pemasangan MCP siap salin
 import { SetupWizard } from "./SetupWizard";   // SPEC-884 · ADR-0139 · setup awal, bisa diulang
 import { AgentDocCard } from "./AgentDocCard";   // SPEC-489 · halaman dokumentasi AI Agent
+import { OrchestrationPanel } from "./OrchestrationPanel";   // ADR-0164 · orkestrasi subagent per fase
 import { usePersistedState, isStr } from "../ui-state";
 import { useModelCatalog } from "../api/model-catalog";
 import { claudeEfforts, coerceClaudeEffort } from "@hanoman/shared";
@@ -643,6 +644,7 @@ const S_SECTIONS = [
   { key: "webhook", label: "Webhook", icon: "webhook" },         // SPEC-481 · ADR-0100 · webhook keluar
   { key: "umum", label: "Umum", icon: "sliders-horizontal" },
   { key: "model", label: "Model sesi", icon: "cpu" },
+  { key: "orkestrasi", label: "Orkestrasi", icon: "layers" },   // ADR-0164 · model/effort per fase
   { key: "sesi", label: "Sesi", icon: "bell" },
 ] as const;
 
@@ -909,6 +911,11 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
         </div>
       </>
     );
+    // ADR-0164 · satu-satunya penulis `Setting.orchestration` → `save()` dari snapshot mount aman.
+    if (tab === "orkestrasi") return (
+      <OrchestrationPanel orchestration={s.orchestration}
+        onChange={(orchestration, msg) => save({ orchestration }, msg)} />
+    );
     if (tab === "model") {
       // SPEC-339 · catatan LUNAK versi codex CLI. Seluruh aturannya di codexClientTooOld (shared) —
       // Settings dan picker Start memakai fungsi yang sama, jadi keduanya tak bisa berbeda pendapat.
@@ -1034,16 +1041,18 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             onChange={(e) => save({ agent: e.target.value as Setting["agent"] }, "Agen → " + e.target.value)} />
         </SettingRow>
       </Card>
-      {/* SPEC-252 · ADR-0061 · default global saja. Model & effort dipilih PER SESI saat Start
-          (picker StartSessionModal); matrix per-fase (SPEC-238) dicabut. Manusia tetap bebas mengetik
-          `/model`/`/effort` di dalam terminal — itu justru gunanya interaktif.
+      {/* ADR-0164 · model per fase kini lewat definisi subagent di tab Orkestrasi; matrix /model
+          ADR-0058 tetap dicabut. Kartu ini hanya default global — model & effort per SESI dipilih
+          saat Start (picker StartSessionModal); manusia tetap bebas mengetik `/model`/`/effort` di
+          dalam terminal — itu justru gunanya interaktif.
           SPEC-383 · dua agen berdampingan, MASING-MASING berjudul namanya dan bertanda mana yang
           sedang dipakai — dulu blok claude hanya berbunyi "Model"/"Effort" tanpa menyebut agennya,
           sementara judul "default global" tetap terpampang meski agen aktifnya codex. */}
       <Card eyebrow="model" title="Model sesi — default global">
         <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
           Default untuk sesi baru; bisa di-override per sesi saat <b>Start</b>. Di terminal, <code>/model</code>
-          mengubahnya kapan saja. Sesi = satu proses, satu model seumur hidup. Yang benar-benar dipakai
+          mengubahnya kapan saja. Dengan orkestrasi aktif, model ini menjadi model <b>orchestrator</b>; model
+          &amp; effort tiap fase diatur di <b>tab Orkestrasi</b>. Yang benar-benar dipakai
           adalah blok milik agen terpilih di atas — yang satunya tersimpan, menunggu giliran.
         </div>
         <div data-testid="agent-group-claude">
