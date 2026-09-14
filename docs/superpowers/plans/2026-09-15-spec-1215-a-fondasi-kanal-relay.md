@@ -1914,7 +1914,7 @@ git commit -m "feat(relay): gate principal remote — rahasia proses, grant, all
   - `createRelayDispatcher(o: { app: InjectableApp; send: (json: string) => void; host?: () => string; audit?: (e: RemoteRequestAudit) => void; now?: () => number }): { onMessage(raw: string): void; cancelAll(): void; inflight(): number }`
   - `type RelayDispatcher = ReturnType<typeof createRelayDispatcher>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/relay-dispatcher.test.ts`:
 
@@ -2076,12 +2076,12 @@ describe("dispatcher relay + gate app nyata", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/relay-dispatcher.test.ts`
 Expected: FAIL — modul `relay/dispatcher` tak ada.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Create `server/src/services/relay/dispatcher.ts`:
 
@@ -2208,12 +2208,12 @@ export function createRelayDispatcher(o: {
 export type RelayDispatcher = ReturnType<typeof createRelayDispatcher>;
 ```
 
-- [ ] **Step 4: Jalankan test**
+- [x] **Step 4: Jalankan test**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/relay-dispatcher.test.ts && pnpm --filter ./server typecheck`
 Expected: PASS; typecheck bersih.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/relay/dispatcher.ts server/test/relay-dispatcher.test.ts
