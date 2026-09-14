@@ -14,12 +14,13 @@ import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts } from "@hanoman/shared";
-import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus } from "@hanoman/shared";
+import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus, type Orchestration, type OrchestrationFlow } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
 import { useLaunchAdmission } from "./screens/use-launch-admission";
 import { AttachmentPicker } from "./screens/SpecAttachments";
+import { PhasePlanPreview } from "./screens/PhasePlanPreview";
 import { AuthScreen } from "./screens/AuthScreen";
 import { SetupWizard, UnhardenedBanner } from "./screens/SetupWizard";
 import { ClientPortal } from "./portal/ClientPortal";
@@ -113,6 +114,8 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   React.useEffect(() => { setLaunchRejection(null); }, [open, spec?.id]);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
+  // ADR-0164 · matriks orkestrasi untuk pratinjau fase. Absen di respons Setting lama → default aktif.
+  const [orchestration, setOrchestration] = React.useState<Orchestration | undefined>(undefined);
   // SPEC-739 · ADR-0114 · kesiapan skill metode di mesin ini. Gagal-diam dengan alasan yang sama
   // dengan codexVer: modal harus tetap bisa dipakai, dan ketiadaan bukti bukan bukti ketiadaan.
   const [methodStatuses, setMethodStatuses] = React.useState<MethodSkillStatus[] | null>(null);
@@ -136,6 +139,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       setGoalCond(goalLockedNow ? "" : s.goal.condition);
       setVerifyScope(s.verifyScope ?? "changed");
       setMethod(resolveMethod(s.method).id);
+      setOrchestration(s.orchestration);
     }).catch(() => {});
     // SPEC-339 · versi codex CLI untuk catatan lunak. Gagal-diam: modal harus tetap bisa dipakai.
     api.getCodexVersion().then((v) => setCodexVer(v.version)).catch(() => {});
@@ -203,8 +207,9 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           onClick={() => void start(true)}>Mulai tetap</Button>}
       </>}>
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
-        Agen, model & effort untuk sesi ini. Default dari setelan global; ubah bila perlu. Sesi lahir dengan pilihan
-        ini untuk seluruh hidupnya (satu proses) — <code>/model</code> di terminal tetap bisa mengubahnya.
+        Agen, model &amp; effort <b>orchestrator</b> sesi ini. Default dari setelan global; ubah bila perlu. Bila
+        orkestrasi flow ini aktif, tiap fase dikerjakan subagent dengan model &amp; effort di bawah (Settings ›
+        Orkestrasi).
       </div>
       {launchRejection && <div role="alert" style={{
         fontSize: 12.5, lineHeight: 1.55, marginBottom: 12, padding: "9px 11px",
@@ -260,6 +265,10 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           Sesi tetap boleh dijalankan, tapi modelnya belum tentu dikenali CLI ini.
         </div>
       )}
+      {/* ADR-0164 · pratinjau rencana fase: resolver yang SAMA dengan server, jadi apa yang
+          operator lihat di sini persis apa yang lahir saat sesi dimulai. */}
+      <PhasePlanPreview flow={flow as OrchestrationFlow} agent={agent} model={model} effort={effort}
+        orchestration={orchestration} codexVersion={codexVer} />
       {/* SPEC-332 · ADR-0073 · mode goal: sesi menolak berhenti sampai kondisinya terbukti di
           transkrip. Interupsi manusia (Esc) tetap bekerja; melepas gate = hentikan sesinya. */}
       <Field label="Mode goal"

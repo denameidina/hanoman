@@ -3368,7 +3368,7 @@ Expected: exit 0.
   ```
 - Payload `api.startSession` **tidak berubah** — pratinjau murni tampilan; server menghitung ulang rencana dari Setting yang sama (`start-session-model.test.tsx` yang memeriksa payload persis tetap hijau).
 
-- [ ] **Step 1: Tulis test yang gagal** — `src/test/start-session-orchestration.test.tsx`
+- [x] **Step 1: Tulis test yang gagal** — `src/test/start-session-orchestration.test.tsx`
 
 ```tsx
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -3435,12 +3435,12 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `rtk proxy pnpm vitest --run src/test/start-session-orchestration.test.tsx`
 Expected: FAIL — `Unable to find an element by: [data-testid="phase-plan-preview"]`.
 
-- [ ] **Step 3: Komponen** — `src/src/screens/PhasePlanPreview.tsx`
+- [x] **Step 3: Komponen** — `src/src/screens/PhasePlanPreview.tsx`
 
 ```tsx
 import React from "react";
@@ -3487,7 +3487,7 @@ export function PhasePlanPreview({ flow, agent, model, effort, orchestration, co
 }
 ```
 
-- [ ] **Step 4: Sambungkan ke modal** — `src/src/App.tsx`
+- [x] **Step 4: Sambungkan ke modal** — `src/src/App.tsx`
 
 Impor shared baris 17 menambah `type Orchestration, type OrchestrationFlow`; tambah `import { PhasePlanPreview } from "./screens/PhasePlanPreview";`.
 
@@ -3519,7 +3519,7 @@ Tepat sesudah blok `{agent === "codex" && codexClientTooOld(model, codexVer) && 
         orchestration={orchestration} codexVersion={codexVer} />
 ```
 
-- [ ] **Step 5: Jalankan, pastikan lulus**
+- [x] **Step 5: Jalankan, pastikan lulus**
 
 Run: `rtk proxy pnpm vitest --run src/test/start-session-orchestration.test.tsx src/test/start-session-model.test.tsx src/test/start-session-agent.test.tsx src/test/start-session-goal.test.tsx`
 Expected: PASS semua.
@@ -3527,7 +3527,7 @@ Expected: PASS semua.
 Run: `rtk proxy pnpm --filter ./src typecheck`
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 /usr/bin/git add src/src/screens/PhasePlanPreview.tsx src/src/App.tsx src/test/start-session-orchestration.test.tsx
