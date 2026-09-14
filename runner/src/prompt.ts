@@ -1,5 +1,5 @@
 import type { Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx, AttachmentCtx } from "./types";
-import { resolveMethod, FLOW_PHASES, type MethodDef } from "@hanoman/shared";
+import { resolveMethod, FLOW_PHASES, type MethodDef, type PhasePlan } from "@hanoman/shared";
 import { REVERSE_STANDARD } from "./reverse-standard";
 import { verifyScopeClause } from "./verify-scope";
 import { CODE_STYLE_CLAUSE } from "./code-style";
@@ -107,6 +107,48 @@ export function phaseSkillsFor(flow: Flow, phase: string, method: MethodDef): st
   return writesCode(flow) && phase === phases[phases.length - 1]
     ? [...new Set([...own, ...method.exitSkills])]
     : [...own];
+}
+
+// ADR-0164 · kontrak orchestrator. Yang mengikat model/effort tiap fase adalah DEFINISI subagent
+// (argv saat lahir); klausa ini hanya menyuruh mendelegasikan — dan setiap delegasi meninggalkan
+// bukti SubagentStart/Stop, jadi pelanggarannya terlihat, tidak diam seperti ADR-0058.
+// Deskripsi pemanggilan `Fase <Nama Fase>` wajib: stdin `subagentStatusLine` claude hanya membawa
+// deskripsi itu sebagai label, tanpa nama agen (terukur 2026-09-14).
+export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = {}): string {
+  const codex = plan.runtime === "codex";
+  const call = codex ? "spawn_agent" : "tool Agent";
+  const resume = codex ? "send_input ke agent id yang sama" : "SendMessage ke agent ID yang kamu terima";
+  const list = plan.phases
+    .map((p, i) => `${i + 1}. ${p.phase} → \`${p.agentName}\` · ${p.model} · ${p.effort}`)
+    .join("\n");
+  return [
+    "Sesi ini ORCHESTRATOR. Setiap fase dikerjakan subagent fase miliknya dengan model & effort yang "
+      + "sudah terkunci di definisinya — kamu TIDAK mengerjakan isi fase sendiri.",
+    `Fase berurutan:\n${list}`,
+    "Untuk SETIAP fase, berurutan:",
+    `1. Panggil subagent fasenya lewat ${call}. Isi deskripsi pemanggilan persis \`Fase <Nama Fase>\`, dan `
+      + "tugasnya berupa blok serah-terima berbentuk tetap:\n"
+      + "Fase <n>/<total>: <Nama Fase>\nTujuan: <objective backlog/project>\n"
+      + "Base SHA: $HANOMAN_BASE_SHA (atau -)\nArtefak fase sebelumnya: <path yang dilaporkan, atau ->\n"
+      + "Keputusan manusia sejauh ini: <ringkas, atau ->\nLampiran: <path INDEX.md lampiran, atau ->\n"
+      + "Percobaan: <k>/2",
+    "2. Baca laporannya. `Status: selesai` DENGAN bukti → append satu baris ke berkas di $HANOMAN_PHASE_FILE "
+      + "— persis: `echo \"<Nama Fase> done\" >> \"$HANOMAN_PHASE_FILE\"`. Kamu satu-satunya penulis berkas itu.",
+    "3. `Status: sebagian`/`terhalang`, galat, atau laporan tanpa bukti → delegasikan ULANG SEKALI ke "
+      + "subagent fase yang sama dengan laporan gagalnya disertakan (`Percobaan: 2/2`). Gagal lagi → "
+      + "BERHENTI dan tanyakan lewat AskUserQuestion apa yang harus dilakukan. Aturan ini berlaku walau "
+      + "klausa otonomi di prompt ini menyuruhmu tak bertanya.",
+    "4. `Pertanyaan untuk manusia:` di laporan → tanyakan ke manusia (AskUserQuestion; di fase yang memang "
+      + "bergiliran dengan manusia — Wawancara, Brainstorm prd/scaffold — tanyakan di terminal ini), lalu "
+      + `LANJUTKAN subagent yang SAMA lewat ${resume} dengan jawabannya. Giliran relay ini bukan percobaan `
+      + "ulang. Di sesi tanpa pengawas, putuskan sendiri lalu teruskan keputusanmu dengan cara yang sama.",
+    o.fastPath
+      ? "5. `Rekomendasi fase: jalur-cepat` sesudah Audit → append `Spec skipped` lalu `Plan skipped` ke "
+        + "$HANOMAN_PHASE_FILE (format yang sama), lanjut ke Execute. `penuh` → Spec → Plan → Execute."
+      : "",
+    "DILARANG mengerjakan isi fase sendiri — termasuk saat subagent gagal. Menulis `skipped` untuk fase "
+      + "yang dilewati bukan mengerjakannya.",
+  ].filter(Boolean).join("\n\n");
 }
 
 // SPEC-204 · ADR-0040 — jalur cepat qa: sesudah Audit, temuan berconfidence tinggi yang
@@ -307,12 +349,23 @@ export const breakdownPhaseLines = (slug: string, title: string): Record<"Analis
 
 export function startPrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, autonomy?: Autonomy, verifyScope?: VerifyScope,
-  method?: string, attachments?: AttachmentCtx,
+  method?: string, attachments?: AttachmentCtx, plan?: PhasePlan | null,
 ): string {
   const m = resolveMethod(method);
+  const head = `hanoman ${flow}. Ikuti internal/docs sebagai Source of Truth; perbarui docs yang tersentuh `
+    + `dan link-nya di index, dalam commit yang sama.`;
+  const push = `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
+    + `Worktree ini detached HEAD — itu memang disengaja.`;
+  // ADR-0164 · orchestrator: CARA mengerjakan fase (skill, panduan, scope, gaya kode, keputusan
+  // pasca-Audit) hidup di definisi agen fase — prompt parent hanya membawa kontrak delegasi.
+  if (plan) {
+    return [
+      head, orchestratorClause(plan, { fastPath: flow === "qa" }), auditContinuationInstruction(flow, spec),
+      autonomyClause(autonomy), attachmentClause(attachments), push, specContext(spec),
+    ].filter(Boolean).join("\n\n");
+  }
   return [
-    `hanoman ${flow}. Ikuti internal/docs sebagai Source of Truth; perbarui docs yang tersentuh `
-      + `dan link-nya di index, dalam commit yang sama.`,
+    head,
     phaseInstruction(PIPELINES[flow], m),
     auditDecisionInstruction(flow),
     auditContinuationInstruction(flow, spec),
@@ -323,8 +376,7 @@ export function startPrompt(
     methodClause(m),
     attachmentClause(attachments),
     skillInstruction(flow, PIPELINES[flow], m),
-    `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
-      + `Worktree ini detached HEAD — itu memang disengaja.`,
+    push,
     specContext(spec),
   ].filter(Boolean).join("\n\n");
 }
@@ -336,13 +388,24 @@ export function startPrompt(
 // kerja yang selesai umumnya sudah ter-merge ke branchFrom (worktree lahir dari sana).
 export function continuePrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, autonomy?: Autonomy, verifyScope?: VerifyScope,
-  method?: string, attachments?: AttachmentCtx,
+  method?: string, attachments?: AttachmentCtx, plan?: PhasePlan | null,
 ): string {
   const m = resolveMethod(method);
+  const head = `hanoman ${flow} — MELANJUTKAN backlog item yang sebelumnya ditandai selesai padahal `
+    + `pekerjaannya belum tuntas. Ikuti internal/docs sebagai Source of Truth; perbarui `
+    + `docs yang tersentuh dan link-nya di index, dalam commit yang sama.`;
+  const push = `Setelah selesai: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Worktree `
+    + `ini detached HEAD — itu memang disengaja.`;
+  if (plan) {
+    return [
+      head,
+      `JANGAN mengulang fase awal — spec & plan sudah ada di ${m.planDir}/**. Lanjutkan HANYA fase `
+        + "Execute lewat subagent fasenya.",
+      orchestratorClause(plan), autonomyClause(autonomy), attachmentClause(attachments), push, specContext(spec),
+    ].filter(Boolean).join("\n\n");
+  }
   return [
-    `hanoman ${flow} — MELANJUTKAN backlog item yang sebelumnya ditandai selesai padahal `
-      + `pekerjaannya belum tuntas. Ikuti internal/docs sebagai Source of Truth; perbarui `
-      + `docs yang tersentuh dan link-nya di index, dalam commit yang sama.`,
+    head,
     `JANGAN mengulang fase awal — spec & plan sudah ada. Lanjut di fase Execute: baca plan `
       + `di ${m.planDir}/** untuk backlog item ini, periksa task yang sudah \`[x]\` `
       + `dan selesaikan yang masih \`[ ]\`. Verifikasi nyata sebelum klaim selesai.`,
@@ -352,8 +415,7 @@ export function continuePrompt(
     methodClause(m),
     attachmentClause(attachments),
     skillInstruction(flow, ["Execute"], m),
-    `Setelah selesai: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Worktree `
-      + `ini detached HEAD — itu memang disengaja.`,
+    push,
     specContext(spec),
   ].filter(Boolean).join("\n\n");
 }
@@ -401,6 +463,7 @@ const resumeClause = (
 export function resumePrompt(
   flow: Flow, spec: SpecBrief, branchTo: string, resume: ResumeCtx,
   autonomy?: Autonomy, verifyScope?: VerifyScope, method?: string, attachments?: AttachmentCtx,
+  plan?: PhasePlan | null,
 ): string {
   const m = resolveMethod(method);
   // Keputusan pasca-Audit (ADR-0040) hanya relevan selama Audit belum tercatat. Sesudah itu
@@ -408,10 +471,20 @@ export function resumePrompt(
   // berkas fase — menyuruh agen memutuskannya lagi berarti mengundangnya membatalkan keputusan
   // sesi sebelumnya.
   const auditDecided = resume.recorded.some((line) => line.startsWith("Audit "));
+  const head = `hanoman ${flow} — MELANJUTKAN sesi backlog yang sudah berjalan. Ikuti internal/docs sebagai `
+    + `Source of Truth; perbarui docs yang tersentuh dan link-nya di index, dalam commit yang sama.`;
+  const resumed = resumeClause(resume, branchTo, m.planDir, PIPELINES[flow].includes("Plan"));
+  const push = `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
+    + `Worktree ini detached HEAD — itu memang disengaja.`;
+  if (plan) {
+    return [
+      head, resumed, orchestratorClause(plan, { fastPath: flow === "qa" && !auditDecided }),
+      autonomyClause(autonomy), attachmentClause(attachments), push, specContext(spec),
+    ].filter(Boolean).join("\n\n");
+  }
   return [
-    `hanoman ${flow} — MELANJUTKAN sesi backlog yang sudah berjalan. Ikuti internal/docs sebagai `
-      + `Source of Truth; perbarui docs yang tersentuh dan link-nya di index, dalam commit yang sama.`,
-    resumeClause(resume, branchTo, m.planDir, PIPELINES[flow].includes("Plan")),
+    head,
+    resumed,
     phaseInstruction(PIPELINES[flow], m),
     auditDecided ? "" : auditDecisionInstruction(flow),
     autonomyClause(autonomy),
@@ -420,8 +493,7 @@ export function resumePrompt(
     methodClause(m),
     attachmentClause(attachments),
     skillInstruction(flow, PIPELINES[flow], m),
-    `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
-      + `Worktree ini detached HEAD — itu memang disengaja.`,
+    push,
     specContext(spec),
   ].filter(Boolean).join("\n\n");
 }
@@ -438,24 +510,34 @@ export function resumePrompt(
 export function startGoalPrompt(
   flow: "goal" | "no_effort", spec: SpecBrief, branchTo: string,
   opts: { autonomy?: Autonomy; verifyScope?: VerifyScope; resume?: ResumeCtx; method?: string;
-          attachments?: AttachmentCtx } = {},
+          attachments?: AttachmentCtx; plan?: PhasePlan | null } = {},
 ): string {
   const m = resolveMethod(opts.method);
   const noEffort = flow === "no_effort";
+  const head = noEffort
+    ? "hanoman no-effort — sesi ini mengerjakan SATU pekerjaan remeh lalu berhenti. TIDAK ada "
+      + "fase Brainstorm, Objective, Spec, Plan, maupun fase pembuktian terpisah: jangan menulis "
+      + "design doc, jangan menulis plan berkotak, jangan memecah pekerjaan ini jadi backlog "
+      + "baru, dan jangan menambah fase sendiri. Langsung kerjakan, buktikan seperlunya di fase "
+      + "yang sama, lalu berhenti. Tetap ikuti internal/docs sebagai Source of Truth; perbarui "
+      + "docs yang tersentuh dan link-nya di index, dalam commit yang sama."
+    : "hanoman goal — sesi ini mengejar SATU goal sampai tercapai. TIDAK ada fase Brainstorm, "
+      + "Objective, Spec, maupun Plan: jangan menulis design doc, jangan menulis plan berkotak, "
+      + "jangan memecah pekerjaan ini jadi backlog baru. Langsung kerjakan goal-nya. Tetap ikuti "
+      + "internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di "
+      + "index, dalam commit yang sama.";
+  const resumed = opts.resume ? resumeClause(opts.resume, branchTo, m.planDir, false) : "";
+  const push = `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
+    + `Worktree ini detached HEAD — itu memang disengaja.`;
+  if (opts.plan) {
+    return [
+      head, resumed, goalDetail(spec), orchestratorClause(opts.plan), autonomyClause(opts.autonomy),
+      attachmentClause(opts.attachments), push, goalBlock(spec),
+    ].filter(Boolean).join("\n\n");
+  }
   return [
-    noEffort
-      ? "hanoman no-effort — sesi ini mengerjakan SATU pekerjaan remeh lalu berhenti. TIDAK ada "
-        + "fase Brainstorm, Objective, Spec, Plan, maupun fase pembuktian terpisah: jangan menulis "
-        + "design doc, jangan menulis plan berkotak, jangan memecah pekerjaan ini jadi backlog "
-        + "baru, dan jangan menambah fase sendiri. Langsung kerjakan, buktikan seperlunya di fase "
-        + "yang sama, lalu berhenti. Tetap ikuti internal/docs sebagai Source of Truth; perbarui "
-        + "docs yang tersentuh dan link-nya di index, dalam commit yang sama."
-      : "hanoman goal — sesi ini mengejar SATU goal sampai tercapai. TIDAK ada fase Brainstorm, "
-        + "Objective, Spec, maupun Plan: jangan menulis design doc, jangan menulis plan berkotak, "
-        + "jangan memecah pekerjaan ini jadi backlog baru. Langsung kerjakan goal-nya. Tetap ikuti "
-        + "internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di "
-        + "index, dalam commit yang sama.",
-    opts.resume ? resumeClause(opts.resume, branchTo, m.planDir, false) : "",
+    head,
+    resumed,
     goalDetail(spec),
     phaseInstruction(PIPELINES[flow], m),
     noEffort ? ""
@@ -468,8 +550,7 @@ export function startGoalPrompt(
     methodClause(m),
     attachmentClause(opts.attachments),
     skillInstruction(flow, PIPELINES[flow], m),
-    `Setelah fase terakhir: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. `
-      + `Worktree ini detached HEAD — itu memang disengaja.`,
+    push,
     goalBlock(spec),
   ].filter(Boolean).join("\n\n");
 }
@@ -501,16 +582,24 @@ export const REVERSE_PHASE_GUIDE = [
     + "+ daftar pertanyaan yang belum terjawab ke terminal.",
 ].join("\n");
 
-export function startProjectPrompt(flow: Flow, project: ProjectBrief, branchTo: string): string {
+export function startProjectPrompt(flow: Flow, project: ProjectBrief, branchTo: string, plan?: PhasePlan | null): string {
+  const push = `Setiap fase selesai: commit hasilnya, lalu \`git push origin HEAD:refs/heads/${branchTo}\` — `
+    + `push per fase, supaya pekerjaan tak hilang bila worktree lenyap. Bila remote origin tidak ada, `
+    + `lewati push dan catat itu di laporan akhir — jangan gagal diam-diam. Worktree ini `
+    + `detached HEAD — memang disengaja. Manusia yang me-review dan merge branch ${branchTo}.`;
+  if (plan) {
+    return [
+      `hanoman ${flow}. Susun Source of Truth repo ini dari kodenya di internal/docs/** lewat subagent `
+        + "fase; STANDAR DOCS ada di definisi agen fase penulis docs.",
+      orchestratorClause(plan), push, projectContext(project),
+    ].join("\n\n");
+  }
   return [
     `hanoman ${flow}. Susun Source of Truth repo ini dari kodenya di internal/docs/**, `
       + `mengikuti STANDAR DOCS di bagian bawah prompt ini.`,
     phaseInstruction(PIPELINES[flow], PROJECT_METHOD),
     REVERSE_PHASE_GUIDE,
-    `Setiap fase selesai: commit hasilnya, lalu \`git push origin HEAD:refs/heads/${branchTo}\` — `
-      + `push per fase, supaya pekerjaan tak hilang bila worktree lenyap. Bila remote origin tidak ada, `
-      + `lewati push dan catat itu di laporan akhir — jangan gagal diam-diam. Worktree ini `
-      + `detached HEAD — memang disengaja. Manusia yang me-review dan merge branch ${branchTo}.`,
+    push,
     projectContext(project),
     `=== STANDAR DOCS ===\n${REVERSE_STANDARD}`,
   ].join("\n\n");
@@ -521,8 +610,20 @@ export function startProjectPrompt(flow: Flow, project: ProjectBrief, branchTo: 
 // kode fitur. Brainstorm interaktif (satu pertanyaan per giliran; PM menonton terminal), lalu
 // tulis PRD terstruktur, commit, push ke branch prd/<slug>; manusia yang merge. Tak membawa
 // AUTONOMY_CLAUSE: seperti Wawancara reverse, brainstorm PRD memang berjalan bergiliran dgn PM.
-export function startPrdPrompt(project: ProjectBrief, brief: PrdBrief, branchTo: string, audit?: AuditDoc): string {
+export function startPrdPrompt(
+  project: ProjectBrief, brief: PrdBrief, branchTo: string, audit?: AuditDoc, plan?: PhasePlan | null,
+): string {
   const slug = branchTo.slice(branchTo.lastIndexOf("/") + 1);
+  const push = `Setelah PRD ditulis: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Bila remote `
+    + `origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree `
+    + `ini detached HEAD — memang disengaja. Manusia yang me-review lalu merge branch ${branchTo}.`;
+  if (plan) {
+    return [
+      "hanoman prd. Kamu memimpin penyusunan SATU dokumen PRD untuk project ini lewat subagent fase. "
+        + "Keluaranmu HANYA dokumen PRD — JANGAN menulis kode fitur.",
+      orchestratorClause(plan), push, prdBriefBlock(project, brief),
+    ].join("\n\n");
+  }
   const lines = prdPhaseLines(slug);
   return [
     `hanoman prd. Kamu memandu PM/PO menyusun SATU dokumen PRD untuk project ini dari brief + `
@@ -531,9 +632,7 @@ export function startPrdPrompt(project: ProjectBrief, brief: PrdBrief, branchTo:
     lines.Brainstorm,
     lines.PRD,
     skillInstruction("prd", PIPELINES.prd, PROJECT_METHOD),
-    `Setelah PRD ditulis: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Bila remote `
-      + `origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree `
-      + `ini detached HEAD — memang disengaja. Manusia yang me-review lalu merge branch ${branchTo}.`,
+    push,
     prdBriefBlock(project, brief),
     prdAuditBlock(audit),
   ].filter(Boolean).join("\n\n");
@@ -543,8 +642,22 @@ export function startPrdPrompt(project: ProjectBrief, brief: PrdBrief, branchTo:
 // (tanpa saling bergantung). Project-level (tanpa Spec), meniru startPrdPrompt. Isi PRD disematkan
 // (lepas dari status merge). Keluaran HANYA manifest doc — tak menulis kode fitur. Autonomous
 // (analisis, bukan brainstorm bergiliran) → memakai AUTONOMY_CLAUSE.
-export function startBreakdownPrompt(project: ProjectBrief, prd: BreakdownPrd, branchTo: string): string {
+export function startBreakdownPrompt(
+  project: ProjectBrief, prd: BreakdownPrd, branchTo: string, plan?: PhasePlan | null,
+): string {
   const slug = branchTo.slice(branchTo.lastIndexOf("/") + 1);
+  const push = `Setelah manifest ditulis: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Bila remote `
+    + `origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree `
+    + `ini detached HEAD — memang disengaja. Manusia me-review manifest lalu materialize backlog darinya.`;
+  if (plan) {
+    return [
+      "hanoman breakdown. Kamu memimpin pemecahan SATU PRD kompleks menjadi BEBERAPA backlog kecil yang "
+        + "bisa dikerjakan PARALEL lewat subagent fase. Keluaranmu HANYA dokumen manifest — JANGAN "
+        + "menulis kode fitur.",
+      orchestratorClause(plan), AUTONOMY_CLAUSE, push,
+      `Project ${project.id} · ${project.name}\nPRD: ${prd.title} (${prd.path})`,
+    ].join("\n\n");
+  }
   const lines = breakdownPhaseLines(slug, prd.title);
   return [
     `hanoman breakdown. Kamu memecah SATU PRD kompleks menjadi BEBERAPA backlog kecil yang bisa `
@@ -554,9 +667,7 @@ export function startBreakdownPrompt(project: ProjectBrief, prd: BreakdownPrd, b
     lines.Analisis,
     lines.Breakdown,
     AUTONOMY_CLAUSE,
-    `Setelah manifest ditulis: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Bila remote `
-      + `origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree `
-      + `ini detached HEAD — memang disengaja. Manusia me-review manifest lalu materialize backlog darinya.`,
+    push,
     breakdownContext(project, prd),
   ].filter(Boolean).join("\n\n");
 }
@@ -580,16 +691,25 @@ export const SCAFFOLD_PHASE_GUIDE = [
 // SPEC-222 · sesi scaffold: dari ide → Source of Truth penuh untuk project from-scratch. Meniru
 // startProjectPrompt (reverse) tetapi diseed oleh ide (project.desc), tanpa fase Scan. Tanpa
 // AUTONOMY_CLAUSE: Brainstorm interaktif, manusia menjawab di terminal (seperti Wawancara reverse).
-export function startScaffoldPrompt(project: ProjectBrief, branchTo: string): string {
+export function startScaffoldPrompt(project: ProjectBrief, branchTo: string, plan?: PhasePlan | null): string {
+  const push = `Setiap fase selesai: commit hasilnya, lalu \`git push origin HEAD:refs/heads/${branchTo}\` — `
+    + `push per fase, supaya pekerjaan tak hilang bila worktree lenyap. Bila remote origin tidak ada, `
+    + `lewati push dan catat itu di laporan akhir — jangan gagal diam-diam. Worktree ini `
+    + `detached HEAD — memang disengaja. Manusia yang me-review dan merge branch ${branchTo}.`;
+  if (plan) {
+    return [
+      "hanoman scaffold. Susun Source of Truth LENGKAP untuk project from-scratch ini di internal/docs/** "
+        + "DARI IDE-nya lewat subagent fase; STANDAR DOCS ada di definisi agen fase Doc index. Belum ada "
+        + "kode — docs dulu.",
+      orchestratorClause(plan), push, scaffoldContext(project),
+    ].join("\n\n");
+  }
   return [
     `hanoman scaffold. Susun Source of Truth LENGKAP untuk project from-scratch ini di internal/docs/** `
       + `DARI IDE-nya, mengikuti STANDAR DOCS di bagian bawah prompt ini. Belum ada kode — docs dulu.`,
     phaseInstruction(PIPELINES.scaffold, PROJECT_METHOD),
     SCAFFOLD_PHASE_GUIDE,
-    `Setiap fase selesai: commit hasilnya, lalu \`git push origin HEAD:refs/heads/${branchTo}\` — `
-      + `push per fase, supaya pekerjaan tak hilang bila worktree lenyap. Bila remote origin tidak ada, `
-      + `lewati push dan catat itu di laporan akhir — jangan gagal diam-diam. Worktree ini `
-      + `detached HEAD — memang disengaja. Manusia yang me-review dan merge branch ${branchTo}.`,
+    push,
     skillInstruction("scaffold", PIPELINES.scaffold, PROJECT_METHOD),
     scaffoldContext(project),
     `=== STANDAR DOCS ===\n${REVERSE_STANDARD}`,

@@ -91,12 +91,12 @@
   export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null;
   ```
 
-- [ ] **Step 0: Pasang dependensi worktree**
+- [x] **Step 0: Pasang dependensi worktree**
 
 Run: `rtk proxy pnpm install`
 Expected: selesai tanpa error (postinstall `server` men-generate Prisma Client).
 
-- [ ] **Step 1: Tulis test yang gagal** — `shared/src/orchestration.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `shared/src/orchestration.test.ts`
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -209,12 +209,12 @@ describe("codexNativeAgentsSupported", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `rtk proxy pnpm vitest --run shared/src/orchestration.test.ts`
 Expected: FAIL — `Failed to resolve import "./orchestration"`.
 
-- [ ] **Step 3: Buat `shared/src/orchestration.ts`**
+- [x] **Step 3: Buat `shared/src/orchestration.ts`**
 
 ```ts
 // ADR-0164 · orkestrasi subagent per fase — konstanta & tipe TANPA impor. `entities.ts` membangun
@@ -267,7 +267,7 @@ export type PhasePlan = {
 };
 ```
 
-- [ ] **Step 4: Tambah skema di `shared/src/entities.ts`** — sisipkan tepat sebelum `export const zSetting = z.object({`
+- [x] **Step 4: Tambah skema di `shared/src/entities.ts`** — sisipkan tepat sebelum `export const zSetting = z.object({`
 
 ```ts
 // ADR-0164 · orkestrasi subagent per fase. `Setting.data` bertipe Json → blok ini TANPA migration,
@@ -304,7 +304,7 @@ Lalu di dalam `zSetting`, tepat sesudah baris `portalChat: zPortalChat.default(P
   orchestration: zOrchestration.default(ORCHESTRATION_DEFAULTS),         // ADR-0164 · orkestrasi subagent per fase (default aktif)
 ```
 
-- [ ] **Step 5: Buat `shared/src/orchestration-plan.ts`**
+- [x] **Step 5: Buat `shared/src/orchestration-plan.ts`**
 
 ```ts
 import { cmpVersion, coerceClaudeEffort, coerceCodexEffort, type Orchestration } from "./entities";
@@ -353,19 +353,19 @@ export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
 }
 ```
 
-- [ ] **Step 6: Ekspor dari `shared/src/index.ts`** — tambahkan dua baris sesudah `export * from "./entities";`
+- [x] **Step 6: Ekspor dari `shared/src/index.ts`** — tambahkan dua baris sesudah `export * from "./entities";`
 
 ```ts
 export * from "./orchestration";
 export * from "./orchestration-plan";
 ```
 
-- [ ] **Step 7: Jalankan test, pastikan lulus**
+- [x] **Step 7: Jalankan test, pastikan lulus**
 
 Run: `rtk proxy pnpm vitest --run shared/src/orchestration.test.ts`
 Expected: PASS (semua test di berkas).
 
-- [ ] **Step 8: Runner memakai sumber tunggal**
+- [x] **Step 8: Runner memakai sumber tunggal**
 
 `runner/src/prompt.ts` baris 2 menjadi:
 
@@ -411,7 +411,7 @@ export { CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported };
   orchestration: ORCHESTRATION_DEFAULTS, // ADR-0164 · orkestrasi subagent per fase (default aktif)
 ```
 
-- [ ] **Step 9: Verifikasi tersentuh**
+- [x] **Step 9: Verifikasi tersentuh**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" rtk proxy pnpm vitest --run --no-file-parallelism shared/src/orchestration.test.ts runner/test/method-phases.test.ts runner/test/codex-agent-config.test.ts runner/test/prompt.test.ts server/test/settings.test.ts`
 Expected: PASS semua.
@@ -419,7 +419,7 @@ Expected: PASS semua.
 Run: `rtk proxy pnpm --filter ./shared typecheck && rtk proxy pnpm --filter ./runner typecheck && rtk proxy pnpm --filter ./server typecheck && rtk proxy pnpm --filter ./src typecheck`
 Expected: exit 0 keempatnya.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 /usr/bin/git add shared/src/orchestration.ts shared/src/orchestration-plan.ts shared/src/orchestration.test.ts shared/src/entities.ts shared/src/index.ts runner/src/prompt.ts runner/src/codex-agent-config.ts runner/test/method-phases.test.ts server/src/services/settings.ts src/src/screens/SettingsScreen.tsx
@@ -462,7 +462,7 @@ Expected: exit 0 keempatnya.
   export const breakdownPhaseLines: (slug: string, title: string) => Record<"Analisis" | "Breakdown", string>;
   ```
 
-- [ ] **Step 1: Tulis golden test** — `runner/test/prompt-golden.test.ts` (SEBELUM menyentuh prompt.ts)
+- [x] **Step 1: Tulis golden test** — `runner/test/prompt-golden.test.ts` (SEBELUM menyentuh prompt.ts)
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -525,23 +525,23 @@ describe("golden prompt mode sesi tunggal (ADR-0164)", () => {
 });
 ```
 
-- [ ] **Step 2: Bangkitkan golden dari kode yang ada**
+- [x] **Step 2: Bangkitkan golden dari kode yang ada**
 
 Run: `rtk proxy pnpm vitest --run runner/test/prompt-golden.test.ts -u`
 Expected: PASS, 11 berkas tertulis di `runner/test/__golden__/`. Periksa `runner/test/__golden__/reverse.txt` memuat `=== STANDAR DOCS ===` (bukti isinya prompt nyata, bukan kosong).
 
-- [ ] **Step 3: Commit golden SEBELUM refactor**
+- [x] **Step 3: Commit golden SEBELUM refactor**
 
 ```bash
 /usr/bin/git add runner/test/prompt-golden.test.ts runner/test/__golden__
 /usr/bin/git commit -m "test(prompt): golden byte-identitas prompt mode sesi tunggal"
 ```
 
-- [ ] **Step 4: Ekspor klausa yang sudah ada** — di `runner/src/prompt.ts` ubah `const` menjadi `export const` (isi tak berubah) untuk: `AUTONOMY_CLAUSE`, `autonomyClause`, `writesCode`, `scopeClause`, `codeStyleClause`, `methodClause`, `REVERSE_PHASE_GUIDE`, `SCAFFOLD_PHASE_GUIDE`, `PROJECT_METHOD`.
+- [x] **Step 4: Ekspor klausa yang sudah ada** — di `runner/src/prompt.ts` ubah `const` menjadi `export const` (isi tak berubah) untuk: `AUTONOMY_CLAUSE`, `autonomyClause`, `writesCode`, `scopeClause`, `codeStyleClause`, `methodClause`, `REVERSE_PHASE_GUIDE`, `SCAFFOLD_PHASE_GUIDE`, `PROJECT_METHOD`.
 
 Tambahkan impor tipe yang dibutuhkan helper di bawah bila belum ada di baris 1: `ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd` (sudah ada), `SpecBrief` (sudah ada).
 
-- [ ] **Step 5: Tambah helper per fase** — sisipkan tepat sesudah fungsi `skillInstruction`
+- [x] **Step 5: Tambah helper per fase** — sisipkan tepat sesudah fungsi `skillInstruction`
 
 ```ts
 // ADR-0164 · satu baris panduan fase dari guide bergaris `- <Fase>: …` (REVERSE/SCAFFOLD). Agen
@@ -561,7 +561,7 @@ export function phaseSkillsFor(flow: Flow, phase: string, method: MethodDef): st
 }
 ```
 
-- [ ] **Step 6: Tambah blok konteks + baris fase PRD/breakdown** — sisipkan tepat sebelum `export function startPrompt(`
+- [x] **Step 6: Tambah blok konteks + baris fase PRD/breakdown** — sisipkan tepat sebelum `export function startPrompt(`
 
 ````ts
 // ADR-0164 · blok konteks di ekor prompt. Diekspor karena agen fase lahir dengan konteks TERPISAH
@@ -630,7 +630,7 @@ export const breakdownPhaseLines = (slug: string, title: string): Record<"Analis
 });
 ````
 
-- [ ] **Step 7: Pembangun mode tunggal memakai helper** (byte tetap sama)
+- [x] **Step 7: Pembangun mode tunggal memakai helper** (byte tetap sama)
 
 - `startPrompt`, `continuePrompt`, `resumePrompt`: hapus `const detail = …`; ganti elemen terakhir array (`Backlog item … ${detail}`) dengan `specContext(spec)`.
 - `startGoalPrompt`: hapus `const g = …` dan `const detail = …`; ganti elemen `detail` dengan `goalDetail(spec)`, dan elemen terakhir (`Backlog item … Judul: ${spec.title}`) dengan `goalBlock(spec)`.
@@ -639,7 +639,7 @@ export const breakdownPhaseLines = (slug: string, title: string): Record<"Analis
 - `startPrdPrompt`: hapus `const auditBlock = …`; ganti dua elemen `- Brainstorm: …` dan `- PRD: …` dengan `prdPhaseLines(slug).Brainstorm, prdPhaseLines(slug).PRD,`; ganti elemen brief (`Project … Outcome …`) dengan `prdBriefBlock(project, brief)` dan elemen `auditBlock` dengan `prdAuditBlock(audit)`.
 - `startBreakdownPrompt`: ganti dua elemen `- Analisis: …` dan `- Breakdown: …` dengan `breakdownPhaseLines(slug, prd.title).Analisis, breakdownPhaseLines(slug, prd.title).Breakdown,`; ganti elemen terakhir dengan `breakdownContext(project, prd)`.
 
-- [ ] **Step 8: Buktikan byte tak berubah**
+- [x] **Step 8: Buktikan byte tak berubah**
 
 Run: `rtk proxy pnpm vitest --run runner/test/prompt-golden.test.ts runner/test/prompt.test.ts runner/test/escalation-prompt.test.ts runner/test/code-style.test.ts runner/test/verify-scope.test.ts`
 Expected: PASS semua, **tanpa** `-u`. Mismatch golden = refactor mengubah byte → perbaiki kodenya, bukan snapshot-nya.
@@ -647,7 +647,7 @@ Expected: PASS semua, **tanpa** `-u`. Mismatch golden = refactor mengubah byte �
 Run: `rtk proxy pnpm --filter ./runner typecheck`
 Expected: exit 0.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 /usr/bin/git add runner/src/prompt.ts
@@ -673,7 +673,7 @@ Expected: exit 0.
   ```
 - Aturan: `kind: "phase"` → claude JSON `{ description, prompt: instructions, model?, effort? }` **tanpa** `tools`; codex TOML `developer_instructions = instructions` apa adanya. Agen fase tak pernah masuk `agentDelegationClause`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Tambahkan di akhir `runner/test/custom-agents.test.ts`:
 
@@ -741,12 +741,12 @@ describe("agentDefinitionHash · agen fase (ADR-0164)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `rtk proxy pnpm vitest --run runner/test/custom-agents.test.ts runner/test/codex-agent-config.test.ts runner/test/agent-definition.test.ts`
 Expected: FAIL — objek agen fase masih memuat `tools`, `agents.max_depth=3` tak ada, hash melempar `Cannot read properties of undefined (reading 'sort')`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `runner/src/custom-agents.ts` — di dalam `export type AgentDef = { … }` tambahkan sesudah `timeoutSeconds?`:
 
@@ -809,7 +809,7 @@ dan ganti `delegationClause: agentDelegationClause(liveDefs, "codex"),` dengan:
   if (typeof native !== "string" && native.tools) native.tools.sort();
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `rtk proxy pnpm vitest --run runner/test/custom-agents.test.ts runner/test/codex-agent-config.test.ts runner/test/agent-definition.test.ts runner/test/prompt-golden.test.ts`
 Expected: PASS semua.
@@ -817,7 +817,7 @@ Expected: PASS semua.
 Run: `rtk proxy pnpm --filter ./runner typecheck`
 Expected: exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 /usr/bin/git add runner/src/custom-agents.ts runner/src/codex-agent-config.ts runner/src/agent-definition.ts runner/test/custom-agents.test.ts runner/test/codex-agent-config.test.ts runner/test/agent-definition.test.ts
@@ -844,7 +844,7 @@ Expected: exit 0.
   export function buildPhaseAgents(plan: PhasePlan, ctx: PhaseAgentContext): AgentDef[];
   ```
 
-- [ ] **Step 1: Tulis test yang gagal** — `runner/test/phase-agents.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `runner/test/phase-agents.test.ts`
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -955,12 +955,12 @@ describe("fromAuditOf", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `rtk proxy pnpm vitest --run runner/test/phase-agents.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/phase-agents"`.
 
-- [ ] **Step 3: Implementasi** — `runner/src/phase-agents.ts`
+- [x] **Step 3: Implementasi** — `runner/src/phase-agents.ts`
 
 ```ts
 import { PHASE_AGENT_PREFIX, type MethodDef, type PhasePlan, type PhasePlanEntry } from "@hanoman/shared";
@@ -1148,7 +1148,7 @@ Di `runner/src/index.ts`, tambahkan sesudah `export * from "./agent-definition";
 export * from "./phase-agents";
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `rtk proxy pnpm vitest --run runner/test/phase-agents.test.ts runner/test/prompt-golden.test.ts`
 Expected: PASS semua.
@@ -1156,7 +1156,7 @@ Expected: PASS semua.
 Run: `rtk proxy pnpm --filter ./runner typecheck`
 Expected: exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 /usr/bin/git add runner/src/phase-agents.ts runner/test/phase-agents.test.ts runner/src/index.ts
@@ -1185,7 +1185,7 @@ Expected: exit 0.
   startScaffoldPrompt(project, branchTo, plan?: PhasePlan | null)
   ```
 
-- [ ] **Step 1: Tulis test yang gagal** — `runner/test/orchestrator-prompt.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `runner/test/orchestrator-prompt.test.ts`
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -1273,12 +1273,12 @@ describe("pembangun prompt · mode orchestrator (ADR-0164)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `rtk proxy pnpm vitest --run runner/test/orchestrator-prompt.test.ts`
 Expected: FAIL — `orchestratorClause is not a function` / `does not provide an export named 'orchestratorClause'`.
 
-- [ ] **Step 3: Tambah `orchestratorClause`** — `runner/src/prompt.ts`
+- [x] **Step 3: Tambah `orchestratorClause`** — `runner/src/prompt.ts`
 
 Baris impor shared menjadi:
 
@@ -1332,7 +1332,7 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
 }
 ```
 
-- [ ] **Step 4: `startPrompt`, `continuePrompt`, `resumePrompt`** — ganti ketiga fungsi dengan bentuk berikut (komentar di atas fungsi & di dalam `resumePrompt` dipertahankan)
+- [x] **Step 4: `startPrompt`, `continuePrompt`, `resumePrompt`** — ganti ketiga fungsi dengan bentuk berikut (komentar di atas fungsi & di dalam `resumePrompt` dipertahankan)
 
 ```ts
 export function startPrompt(
@@ -1438,7 +1438,7 @@ export function resumePrompt(
 }
 ```
 
-- [ ] **Step 5: `startGoalPrompt`** — tambah `plan?: PhasePlan | null` ke tipe `opts`; pindahkan ekspresi ternary elemen pertama array APA ADANYA ke `const head = …;`, lalu badan fungsi menjadi:
+- [x] **Step 5: `startGoalPrompt`** — tambah `plan?: PhasePlan | null` ke tipe `opts`; pindahkan ekspresi ternary elemen pertama array APA ADANYA ke `const head = …;`, lalu badan fungsi menjadi:
 
 ```ts
   const m = resolveMethod(opts.method);
@@ -1486,7 +1486,7 @@ export function resumePrompt(
 
 (`head` adalah ekspresi ternary elemen pertama array lama, dipindah apa adanya; golden test menolak satu karakter pun yang berubah.)
 
-- [ ] **Step 6: Empat pembangun project** — tambah parameter `plan?: PhasePlan | null` dan cabang orchestrator di awal badan; array mode tunggal tak berubah.
+- [x] **Step 6: Empat pembangun project** — tambah parameter `plan?: PhasePlan | null` dan cabang orchestrator di awal badan; array mode tunggal tak berubah.
 
 ```ts
 export function startProjectPrompt(flow: Flow, project: ProjectBrief, branchTo: string, plan?: PhasePlan | null): string {
@@ -1552,7 +1552,7 @@ export function startProjectPrompt(flow: Flow, project: ProjectBrief, branchTo: 
   }
 ```
 
-- [ ] **Step 7: Jalankan, pastikan lulus**
+- [x] **Step 7: Jalankan, pastikan lulus**
 
 Run: `rtk proxy pnpm vitest --run runner/test/orchestrator-prompt.test.ts runner/test/prompt-golden.test.ts runner/test/prompt.test.ts runner/test/phase-agents.test.ts runner/test/escalation-prompt.test.ts`
 Expected: PASS semua; golden tanpa `-u`.
@@ -1560,7 +1560,7 @@ Expected: PASS semua; golden tanpa `-u`.
 Run: `rtk proxy pnpm --filter ./runner typecheck && rtk proxy pnpm --filter ./server typecheck`
 Expected: exit 0 (parameter baru opsional — pemanggil server belum berubah).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 /usr/bin/git add runner/src/prompt.ts runner/test/orchestrator-prompt.test.ts
@@ -3771,7 +3771,7 @@ settings.subagentStatusLine.command = `tee -a ${dir}/statusline.log | ${settings
 writeFileSync(join(dir, "settings.json"), JSON.stringify(settings));
 ```
 
-Tulis ke scratchpad `smoke-orkestrasi.sh` lalu jalankan `sh <path>` di background (timeout 10 menit):
+Tulis ke `.superpowers/sdd/smoke-orkestrasi.sh` lalu jalankan `sh <path>` di background (timeout 10 menit):
 
 ```sh
 #!/bin/sh
