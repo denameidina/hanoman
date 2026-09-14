@@ -50,7 +50,9 @@ export function renderCodexAgentToml(
   const lines = [
     `name = ${tomlString(def.name)}`,
     `description = ${tomlString(def.description)}`,
-    `developer_instructions = ${tomlString(agentPromptOf(def, roster, "codex") + (options.promptSuffix ?? ""))}`,
+    `developer_instructions = ${tomlString(def.kind === "phase"
+      ? def.instructions
+      : agentPromptOf(def, roster, "codex") + (options.promptSuffix ?? ""))}`,
     ...(def.model ? [`model = ${tomlString(def.model)}`] : []),
     ...(def.effort ? [`model_reasoning_effort = ${tomlString(def.effort)}`] : []),
     ...(def.workspacePolicy === "read-only" ? ['sandbox_mode = "read-only"'] : []),
@@ -74,6 +76,8 @@ type MaterializeOptions = RenderOptions & {
   clientVersion?: string | null;
   writeFile?: (path: string, content: string) => void;
   chmod?: (path: string, mode: number) => void;
+  /** ADR-0164 · batas kedalaman subagent codex, dipasang eksplisit hanya untuk sesi orchestrator. */
+  maxDepth?: number;
 };
 
 const safeFilename = (name: string): string => name.replace(/[^a-z0-9-]/gi, "-");
@@ -130,6 +134,7 @@ export function materializeCodexAgents(
     "-c", "agents.enabled=true",
     "-c", "agents.max_concurrent_threads_per_session=3",
   ];
+  if (options.maxDepth) args.push("-c", `agents.max_depth=${options.maxDepth}`);
   for (const { def, path } of successful) {
     const key = `agents.${tomlKey(def.name)}`;
     args.push("-c", `${key}.description=${tomlString(def.description)}`);
@@ -138,7 +143,7 @@ export function materializeCodexAgents(
   const liveDefs = successful.map((entry) => entry.def);
   return {
     args,
-    delegationClause: agentDelegationClause(liveDefs, "codex"),
+    delegationClause: agentDelegationClause(liveDefs.filter((d) => d.kind !== "phase"), "codex"),
     configPaths: successful.map((entry) => entry.path),
     warnings,
     liveDefs,

@@ -44,3 +44,13 @@ describe("executed agent definition identity", () => {
     expect(agentDefinitionHash(def, [def], "claude", { promptSuffix: "" })).toBe(production);
   });
 });
+
+describe("agentDefinitionHash · agen fase (ADR-0164)", () => {
+  it("menghitung hash walau definisi native tak punya tools", () => {
+    const phase: AgentDef = {
+      kind: "phase" as const, phase: "Spec", name: "hanoman-fase-spec", description: "Fase Spec",
+      instructions: "SPEC", tools: null, model: "claude-opus-5", effort: "high", mentions: [],
+    };
+    expect(agentDefinitionHash(phase, [phase], "claude")).toMatch(/^[a-f0-9]{64}$/);
+  });
+});

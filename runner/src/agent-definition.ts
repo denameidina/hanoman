@@ -14,8 +14,8 @@ export function agentDefinitionHash(
   const liveRoster = [def, ...roster.filter((entry) => entry.name !== def.name)];
   const native = runtime === "codex"
     ? renderCodexAgentToml(def, liveRoster, options)
-    : JSON.parse(renderAgentsJson(liveRoster, options))[def.name] as { tools: string[] };
-  if (typeof native !== "string") native.tools.sort();
+    : JSON.parse(renderAgentsJson(liveRoster, options))[def.name] as { tools?: string[] };
+  if (typeof native !== "string" && native.tools) native.tools.sort();
   return createHash("sha256").update(JSON.stringify({
     version: 1, runtime, native, activation: def.activation ?? "always",
     model: def.model ?? inherited.model ?? null,
