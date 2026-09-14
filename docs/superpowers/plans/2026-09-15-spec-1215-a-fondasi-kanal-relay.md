@@ -4190,22 +4190,22 @@ git commit -m "docs(spec-1215): cabut penanda DIRANCANG bagian turunan A"
 
 **Files:** — (tak ada perubahan kecuali perbaikan yang ditemukan; setiap perbaikan kembali ke task asalnya dengan test merah dulu)
 
-- [ ] **Step 1: Typecheck paket tersentuh**
+- [x] **Step 1: Typecheck paket tersentuh**
 
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck && pnpm --filter ./cli typecheck`
 Expected: keempatnya tanpa error.
 
-- [ ] **Step 2: Test yang tersentuh sejak base**
+- [x] **Step 2: Test yang tersentuh sejak base**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --changed "${HANOMAN_BASE_SHA:-67478d09c611ed926620eaa8c69c4213d5486ef0}" --no-file-parallelism`
 Expected: seluruh berkas PASS; jumlah berkas > 0 (`--changed` menyalakan `passWithNoTests`, jadi nol berkas = hijau palsu — bila nol, jalankan ulang dengan path eksplisit dari Task 1–14). Gagal ramai 404/P2022 = isolasi DB/env, bukan regresi.
 
-- [ ] **Step 3: Index docs**
+- [x] **Step 3: Index docs**
 
 Run: `hanoman docs index --check`
 Expected: `index ok`.
 
-- [ ] **Step 4: Boot hub + klien (dua `HANOMAN_HOME`, dua port)**
+- [x] **Step 4: Boot hub + klien (dua `HANOMAN_HOME`, dua port)**
 
 ```bash
 S=$(mktemp -d); mkdir -p "$S/hub" "$S/klien"
@@ -4234,7 +4234,7 @@ curl -s -c "$S/klien.jar" -H 'content-type: application/json' -d '{"email":"op@k
 
 Expected: kedua `/api/health` menjawab `{"ok":true}`; `device.json` berisi `id` dan `token`.
 
-- [ ] **Step 5: Curl endpoint yang tersentuh**
+- [x] **Step 5: Curl endpoint yang tersentuh**
 
 ```bash
 # (a) default mati: tanpa socket relay
@@ -4275,7 +4275,7 @@ Expected:
 - (f) PUT → `relay.state:"off"`; presence hub → `control:null` untuk device itu.
 - (g) DELETE → `204`; GET klien → `relay.state` `"backoff"` atau `"rejected"` dengan `lastClose.code` `1008` atau `401`; `hub.log` tak memuat stack trace.
 
-- [ ] **Step 6: Matikan kedua instance per-PID (JANGAN `pkill -f`)**
+- [x] **Step 6: Matikan kedua instance per-PID (JANGAN `pkill -f`)**
 
 ```bash
 kill "$(cat "$S/klien.pid")" "$(cat "$S/hub.pid")"
@@ -4284,7 +4284,7 @@ tmux -L hanoman-smoke-hub kill-server 2>/dev/null; tmux -L hanoman-smoke-klien k
 
 Catatan: `pnpm exec` bisa meninggalkan proses anak `tsx`; bila `lsof -ti:18787` / `lsof -ti:18788` masih memberi PID, `kill <pid>` satu per satu.
 
-- [ ] **Step 7: Centang plan & commit akhir**
+- [x] **Step 7: Centang plan & commit akhir**
 
 Centang setiap step yang selesai di berkas plan ini (`- [ ]` → `- [x]`), lalu:
 
