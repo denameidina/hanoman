@@ -1,0 +1,35 @@
+hanoman qa. Ikuti internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di index, dalam commit yang sama.
+
+Kerjakan fase berurutan: Audit → Spec → Plan → Execute.
+Setiap kali sebuah fase selesai (atau kamu putuskan dilewati), append satu baris ke berkas di $HANOMAN_PHASE_FILE — persis: `echo "<Nama Fase> done" >> "$HANOMAN_PHASE_FILE"`, atau `skipped` sebagai ganti `done`. Nama fase ditulis apa adanya seperti di atas.
+Execute BELUM selesai selama plan (`docs/matt/plans/**`) masih punya task `- [ ]`: kerjakan SEMUA PR/task sampai tiap kotak jadi `- [x]` sebelum menulis `Execute done`. hanoman menahan backlog di `executing`, bukan `done`, selama masih ada `- [ ]`.
+
+Keputusan pasca-Audit (qa): bila temuan berconfidence tinggi dan perbaikannya bisa dikerjakan langsung (diff kecil, akar masalah jelas), LEWATI Spec dan Plan — tandai keduanya `skipped` (`echo "Spec skipped" >> "$HANOMAN_PHASE_FILE"` lalu `echo "Plan skipped" >> "$HANOMAN_PHASE_FILE"`) dan langsung ke Execute; dokumen audit menjadi doc-of-record perbaikan itu. Bila temuan luas, berisiko, atau ambigu, jalankan Spec → Plan → Execute penuh. Keputusan ini milikmu berdasarkan hasil Audit, bukan default — jangan bayar perencanaan yang tak perlu untuk perbaikan sepele.
+
+Backlog qa ini LANJUTAN dari audit SPEC-1100. Worktree ini lahir dari branch audit itu, jadi dokumen audit sudah ada di internal/docs/research/audit-spec-1100-*.md. JANGAN mengulang investigasi fase Audit dari nol — baca dokumen audit itu sebagai temuan, tandai fase Audit dilewati (`echo "Audit skipped" >> "$HANOMAN_PHASE_FILE"`), lalu ambil keputusan pasca-Audit: perbaikan jelas & kecil → langsung Execute (tandai `Spec skipped` dan `Plan skipped` bila sesuai); selain itu Spec → Plan → Execute penuh.
+
+Kamu berjalan TANPA pengawas — tak ada manusia yang menonton terminal ini untuk menjawab. Putuskan sendiri di SETIAP percabangan (termasuk yang mengubah bentuk kerja: data model, kontrak API, scope) berdasarkan Source of Truth dan penilaian terbaikmu; JANGAN berhenti bertanya. Tembus seluruh pipeline sampai stage `done`, lalu commit & push. Jangan menunggu review/persetujuan siapa pun — catat asumsi & keputusan penting di pesan commit agar bisa di-review pasca-fakta. Merge ke branch utama tetap dilakukan manusia, bukan kamu.
+
+Gaya kode — berlaku setiap kali kamu menulis atau mengubah kode:
+- Tulis kode yang rapi dan mengikuti idiom, penamaan, serta struktur kode di sekitarnya.
+  Kodemu harus terbaca seperti kode yang sudah ada di berkas itu, bukan seperti tempelan.
+- Jangan menulis komentar yang cuma mengulang apa yang sudah dinyatakan kode.
+- Komentar hanya untuk hal yang TIDAK terbaca dari kode: alasan/why sebuah keputusan,
+  trade-off yang diambil, workaround beserta rujukan SPEC/ADR-nya, atau invariant yang tak
+  kelihatan. Komentar semacam itu justru berharga — jangan ikut dibuang.
+- Jangan menambahkan komentar pembatas seksi, header berhiasan, atau narasi langkah demi langkah.
+- Jangan meninggalkan kode mati atau kode yang dikomentari. Hapus saja; riwayat git yang menyimpannya.
+
+Sesi ini TAK BERPENUNGGU — tak ada manusia yang menonton terminal untuk menjawab. Skill mattpocock yang kontraknya mewawancarai manusia (`/grill-me`, `/to-spec`, `/triage`) JANGAN dipakai: pakai primitif model-invoked-nya dan putuskan sendiri. `to-tickets` di fase Plan dipakai HANYA sebagai penghasil berkas plan berkotak `- [ ]` di `docs/matt/plans/`, BUKAN penerbit tiket — hanoman sendiri adalah issue tracker-nya, jadi jangan menulis ke tracker eksternal mana pun.
+
+Skills mattpocock WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.
+- Audit: mattpocock-skills:diagnosing-bugs
+- Plan: mattpocock-skills:to-tickets
+- Execute: mattpocock-skills:implement, mattpocock-skills:tdd, mattpocock-skills:code-review, superpowers:verification-before-completion
+
+Setelah fase terakhir: commit, lalu `git push origin HEAD:refs/heads/b`. Worktree ini detached HEAD — itu memang disengaja.
+
+Backlog item SPEC-1151 · sumber qa · prioritas tinggi
+Judul: Orkestrasi
+Objective: Fase dikerjakan subagent
+Detail: {"fromAudit":"SPEC-1100","steps":"s"}

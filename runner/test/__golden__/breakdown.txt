@@ -1,0 +1,21 @@
+hanoman breakdown. Kamu memecah SATU PRD kompleks menjadi BEBERAPA backlog kecil yang bisa dikerjakan PARALEL tanpa saling bergantung. Keluaranmu HANYA dokumen manifest — JANGAN menulis kode fitur.
+
+Kerjakan fase berurutan: Analisis → Breakdown.
+Setiap kali sebuah fase selesai (atau kamu putuskan dilewati), append satu baris ke berkas di $HANOMAN_PHASE_FILE — persis: `echo "<Nama Fase> done" >> "$HANOMAN_PHASE_FILE"`, atau `skipped` sebagai ganti `done`. Nama fase ditulis apa adanya seperti di atas.
+
+- Analisis: baca PRD (di bawah) sampai paham SELURUH scope in-PRD. Petakan pekerjaan menjadi unit-unit yang: (a) kecil & terukur — tiap unit tuntas dalam satu sesi; (b) non-overlapping — cakupan tak tumpang tindih; (c) TANPA cross-dependency — urutan bebas, bisa jalan bersamaan; (d) gabungannya MENUTUP seluruh scope PRD. Bila dua unit terpaksa berurutan, gabung jadi satu.
+
+- Breakdown: tulis manifest ke `docs/prd/p.breakdown.md`. Awali heading `# Breakdown: PRD`, lalu prosa: ringkasan + untuk TIAP backlog satu paragraf (judul, cakupan, dan SATU kalimat kenapa aman-paralel / tak bergantung yang lain). Di AKHIR dokumen sertakan TEPAT SATU blok kode berpagar json berisi kontrak mesin PERSIS bentuk ini (tanpa komentar, priority ∈ tinggi|sedang|rendah):
+```json
+{ "items": [ { "title": "…", "context": "…", "outcome": "…", "priority": "sedang" } ] }
+```
+`context` = bagian PRD yang dicakup; `outcome` = kondisi selesai terukur; `title` ringkas. Minimal 2 item bila PRD memang kompleks; bila PRD ternyata sekecil 1 unit, katakan itu di prosa dan tetap tulis 1 item.
+
+Jalankan seluruh pipeline sampai tuntas tanpa berhenti di batas antar-fase. Checkpoint "review"/"approval"/"need review" milik skill superpowers BUKAN titik berhenti di sini — lanjut saja ke fase berikutnya. Berhenti HANYA saat butuh keputusan manusia sejati (percabangan yang mengubah bentuk kerja: data model, kontrak API, scope); saat itu tanyakan di terminal ini dan tunggu jawabannya. Selain itu, terus lanjut.
+
+Setelah manifest ditulis: commit, lalu `git push origin HEAD:refs/heads/breakdown/p`. Bila remote origin tidak ada, lewati push dan catat itu di terminal — jangan gagal diam-diam. Worktree ini detached HEAD — memang disengaja. Manusia me-review manifest lalu materialize backlog darinya.
+
+Project p1 · P1
+=== PRD: PRD (docs/prd/p.md) ===
+# PRD
+isi

@@ -1,0 +1,30 @@
+hanoman no-effort — sesi ini mengerjakan SATU pekerjaan remeh lalu berhenti. TIDAK ada fase Brainstorm, Objective, Spec, Plan, maupun fase pembuktian terpisah: jangan menulis design doc, jangan menulis plan berkotak, jangan memecah pekerjaan ini jadi backlog baru, dan jangan menambah fase sendiri. Langsung kerjakan, buktikan seperlunya di fase yang sama, lalu berhenti. Tetap ikuti internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di index, dalam commit yang sama.
+
+Sesi ini MELANJUTKAN pekerjaan sesi sebelumnya untuk backlog item yang sama — bukan memulai dari nol. Fase yang SUDAH tercatat di $HANOMAN_PHASE_FILE: Audit done. JANGAN mengulang fase itu dan JANGAN menulis ulang barisnya. Lanjutkan dari fase: Spec. Worktree ini DIBANGUN ULANG dari tip branch sesi `b`: commit sesi sebelumnya ada, tetapi perubahan yang belum sempat di-commit TIDAK ada. Sebelum menulis apa pun: baca `git log --oneline` dan `git status` untuk melihat apa yang sudah dikerjakan. Jangan menulis ulang yang sudah ada.
+
+Goal: Hijau
+Selesai bila: test lulus
+Batasan: tanpa migrasi
+
+Kerjakan fase berurutan: Kerjakan.
+Setiap kali sebuah fase selesai (atau kamu putuskan dilewati), append satu baris ke berkas di $HANOMAN_PHASE_FILE — persis: `echo "<Nama Fase> done" >> "$HANOMAN_PHASE_FILE"`, atau `skipped` sebagai ganti `done`. Nama fase ditulis apa adanya seperti di atas.
+
+Jalankan seluruh pipeline sampai tuntas tanpa berhenti di batas antar-fase. Checkpoint "review"/"approval"/"need review" milik skill superpowers BUKAN titik berhenti di sini — lanjut saja ke fase berikutnya. Berhenti HANYA saat butuh keputusan manusia sejati (percabangan yang mengubah bentuk kerja: data model, kontrak API, scope); saat itu tanyakan di terminal ini dan tunggu jawabannya. Selain itu, terus lanjut.
+
+Gaya kode — berlaku setiap kali kamu menulis atau mengubah kode:
+- Tulis kode yang rapi dan mengikuti idiom, penamaan, serta struktur kode di sekitarnya.
+  Kodemu harus terbaca seperti kode yang sudah ada di berkas itu, bukan seperti tempelan.
+- Jangan menulis komentar yang cuma mengulang apa yang sudah dinyatakan kode.
+- Komentar hanya untuk hal yang TIDAK terbaca dari kode: alasan/why sebuah keputusan,
+  trade-off yang diambil, workaround beserta rujukan SPEC/ADR-nya, atau invariant yang tak
+  kelihatan. Komentar semacam itu justru berharga — jangan ikut dibuang.
+- Jangan menambahkan komentar pembatas seksi, header berhiasan, atau narasi langkah demi langkah.
+- Jangan meninggalkan kode mati atau kode yang dikomentari. Hapus saja; riwayat git yang menyimpannya.
+
+Skills superpowers WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.
+- Kerjakan: superpowers:verification-before-completion
+
+Setelah fase terakhir: commit, lalu `git push origin HEAD:refs/heads/b`. Worktree ini detached HEAD — itu memang disengaja.
+
+Backlog item SPEC-1151 · sumber goal · prioritas tinggi
+Judul: Orkestrasi
