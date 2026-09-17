@@ -23,8 +23,17 @@ describe("buildPhaseAgents (ADR-0164)", () => {
       "hanoman-fase-brainstorm", "hanoman-fase-objective", "hanoman-fase-spec",
       "hanoman-fase-plan", "hanoman-fase-execute",
     ]);
+    const expectedRuntime = {
+      Brainstorm: { model: "claude-sonnet-5", effort: "medium" },
+      Objective: { model: "claude-sonnet-5", effort: "medium" },
+      Spec: { model: "claude-opus-5", effort: "medium" },
+      Plan: { model: "claude-sonnet-5", effort: "medium" },
+      Execute: { model: "claude-sonnet-5", effort: "medium" },
+    } as const;
     for (const d of defs) {
-      expect(d).toMatchObject({ kind: "phase", tools: null, model: "claude-opus-5", effort: "high", mentions: [] });
+      expect(d).toMatchObject({
+        kind: "phase", tools: null, ...expectedRuntime[d.phase as keyof typeof expectedRuntime], mentions: [],
+      });
       expect(d.instructions).toContain("KONTEKS-UJI");
       expect(d.instructions).toContain("JANGAN menulis `$HANOMAN_PHASE_FILE`");
       expect(d.instructions).toContain("Status: selesai | sebagian | terhalang");
