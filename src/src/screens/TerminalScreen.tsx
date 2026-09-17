@@ -116,16 +116,16 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
   }, [mutateWorkspace, sessions, sessionsLoaded, workspaceWritable, ws]);
 
   // The shared StartSessionModal is rendered by App, so its successful response reaches this
-  // screen through a small optimistic hand-off. The next authoritative WS/list snapshot
-  // deduplicates the same id.
+  // screen through a small optimistic hand-off. Wait for the initial list so a slower response
+  // cannot overwrite this new session; the next authoritative WS snapshot deduplicates the id.
   React.useEffect(() => {
-    if (!startedSession || startedSession.specId == null) return;
+    if (!startedSession || startedSession.specId == null || !sessionsLoaded) return;
     setSessions((current) => current.some((session) => session.id === startedSession.id)
       ? current
       : [...current, { ...startedSession, cwd: "", exited: false }]);
     setRequestedSession(startedSession.id);
     onStartedSessionHandled?.();
-  }, [onStartedSessionHandled, startedSession]);
+  }, [onStartedSessionHandled, sessionsLoaded, startedSession]);
 
   // SPEC-184 · notifikasi mengarahkan ke sesi tertentu → tempatkan ke grid aktif begitu sesi itu
   // muncul di daftar hidup. SPEC-197 · efek ini jalan tiap `sessions` berubah; tanpa guard, sesi
