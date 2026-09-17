@@ -8,8 +8,10 @@ agen terstruktur, cap, load/core dan ambangnya ditampilkan sebelum opsi **Mulai 
 force juga melewati cap dan pemeriksaan host. Force hanya diterima dari operator cookie;
 Bearer AgentToken ditolak 403 sebelum stempel approval atau persiapan peluncuran.
 
-`useLaunchAdmission` menangani aksi manual reverse/scaffold/PRD/breakdown, restart dari
-riwayat, dan Ambil backlog di Terminal. Callback retry mempertahankan argumen pekerjaan
+`StartSessionModal` dipakai bersama oleh Start di Backlog dan Ambil backlog di Terminal,
+sehingga operator mendapat picker model/effort serta override fase yang sama sebelum sesi
+lahir. `useLaunchAdmission` menangani aksi manual reverse/scaffold/PRD/breakdown dan restart dari
+riwayat. Callback retry mempertahankan argumen pekerjaan
 aslinya; dialog menawarkan coba lagi, force eksplisit, atau batal. Peluncuran otomatis
 saat create project tidak memakai hook ini dan tidak mengirim force.
 

@@ -21,9 +21,14 @@ import { clampFontSize, inlineActionCount, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX } from "./terminal-chrome";
 import { chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
 
-export function TerminalScreen({ userId = "test-user", projects, backlog = [], focusSession, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf }: {
+export function TerminalScreen({ userId = "test-user", projects, backlog = [], focusSession, startedSession, onStartedSessionHandled, onStartBacklog, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf }: {
   userId?: string;
   projects: { id: string; name: string }[]; backlog?: Spec[]; focusSession?: string | null;
+  // SPEC-252/0164 · App owns the shared StartSessionModal so Terminal and Backlog use one picker.
+  onStartBacklog?: (spec: Spec) => void;
+  // Keep the just-created session visible immediately; the WS snapshot remains authoritative.
+  startedSession?: Pick<TerminalSession, "id" | "projectId" | "specId" | "flow"> | null;
+  onStartedSessionHandled?: () => void;
   onOpenReview?: (specId: string) => void;
   onOpenSessionReview?: (sessionId: string, title: string) => void;
   titleOf?: (specId: string) => string | undefined;
@@ -110,6 +115,18 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
     void mutateWorkspace((current) => W.reconcileAll(current, liveIds));
   }, [mutateWorkspace, sessions, sessionsLoaded, workspaceWritable, ws]);
 
+  // The shared StartSessionModal is rendered by App, so its successful response reaches this
+  // screen through a small optimistic hand-off. The next authoritative WS/list snapshot
+  // deduplicates the same id.
+  React.useEffect(() => {
+    if (!startedSession || startedSession.specId == null) return;
+    setSessions((current) => current.some((session) => session.id === startedSession.id)
+      ? current
+      : [...current, { ...startedSession, cwd: "", exited: false }]);
+    setRequestedSession(startedSession.id);
+    onStartedSessionHandled?.();
+  }, [onStartedSessionHandled, startedSession]);
+
   // SPEC-184 · notifikasi mengarahkan ke sesi tertentu → tempatkan ke grid aktif begitu sesi itu
   // muncul di daftar hidup. SPEC-197 · efek ini jalan tiap `sessions` berubah; tanpa guard, sesi
   // fokus yang sudah tampil bisa "loncat" ke sel-kosong-pertama saat sesi lain exit. Hanya place
@@ -174,9 +191,16 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
     setRequestedSession(id);
   }
 
-  // SPEC-179 · ambil backlog item tanpa pindah page. Reuse start API idempoten +
-  // placeFirstEmptyInActive — sesi baru langsung masuk grid aktif.
+  // SPEC-179 · ambil backlog item tanpa pindah page. Di App, aksi ini membuka StartSessionModal
+  // yang sama dengan Backlog agar model/effort orchestrator dan override fase bisa ditinjau dulu.
+  // Fallback langsung dipertahankan untuk pemakaian screen mandiri/test lama.
   async function pickBacklog(spec: Spec, force?: true) {
+    if (onStartBacklog && !force) {
+      setPicking(false);
+      setPickError(null);
+      onStartBacklog(spec);
+      return;
+    }
     const flow: Flow = flowForSource(spec.source);
     try {
       const { id } = await api.startSession({ spec: spec.id, flow, ...(force ? { force } : {}) });

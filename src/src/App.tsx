@@ -782,6 +782,10 @@ function AppInner() {
   const [projectFilter, setProjectFilter] = usePersistedState("app", "projectFilter", "all", isStr);
   // SPEC-184 · sesi yang harus difokuskan di Terminal setelah klik aksi notifikasi.
   const [focusSession, setFocusSession] = React.useState<string | null>(null);
+  // SPEC-179/252 · Terminal's backlog picker uses the same StartSessionModal as Backlog. Keep
+  // the successful hand-off here so the session appears in the grid before the next WS snapshot.
+  const [terminalStartedSession, setTerminalStartedSession] = React.useState<TerminalSession | null>(null);
+  const [startOrigin, setStartOrigin] = React.useState<"backlog" | "terminal" | null>(null);
   const openTerminal = React.useCallback((sessionId?: string | null) => {
     setFocusSession(sessionId ?? null);
     setSection("terminal");
@@ -1081,7 +1085,9 @@ function AppInner() {
   // SPEC-252 · ADR-0061 · Start membuka picker model/effort per sesi dulu (StartSessionModal);
   // konfirmasi picker-lah yang memanggil api.startSession dengan pilihan itu.
   const [startSpec, setStartSpec] = React.useState<Spec | null>(null);
-  function startSession(spec: Spec) { setStartSpec(spec); }
+  function startSession(spec: Spec) { setStartOrigin("backlog"); setStartSpec(spec); }
+  function startTerminalBacklog(spec: Spec) { setStartOrigin("terminal"); setStartSpec(spec); }
+  const clearTerminalStartedSession = React.useCallback(() => setTerminalStartedSession(null), []);
 
   // SPEC-175 · rebase/merge branch hasil sebuah done spec. Bersih → toast; conflict → pindah ke
   // Terminal tempat sesi claude membereskan konflik (pola startSession).
@@ -1522,6 +1528,8 @@ function AppInner() {
               hint="Terminal butuh project dengan repoDir untuk dijalankan."
               action={() => setModal("project")} actionLabel="Project baru" />
           : <TerminalScreen userId={me.id} projects={projectsView} backlog={backlog} focusSession={focusSession}
+              startedSession={terminalStartedSession} onStartedSessionHandled={clearTerminalStartedSession}
+              onStartBacklog={startTerminalBacklog}
               onOpenReview={openReviewSpecId} onOpenSessionReview={openSessionReview}
               titleOf={(id) => backlog.find((s) => s.id === id)?.title}
               onIntegrate={integrateSpec} onIntegrateSession={integrateSession}
@@ -1666,10 +1674,24 @@ function AppInner() {
             SPEC-394 · ADR-0084 · toast membedakan "dilanjutkan" dari "dimulai": tombolnya memang
             berbunyi "Lanjutkan", jadi toast yang selalu berkata "dimulai" ikut menegaskan kesan
             keliru bahwa pekerjaan sebelumnya dibuang. */}
-        <StartSessionModal open={!!startSpec} spec={startSpec} onClose={() => setStartSpec(null)}
-          onStarted={(id, resumed) => showToast(
-            (startSpec?.id ?? "") + " · sesi " + id + (resumed ? " dilanjutkan" : " dimulai"),
-            "info", "play")}
+        <StartSessionModal open={!!startSpec} spec={startSpec}
+          onClose={() => { setStartSpec(null); setStartOrigin(null); }}
+          onStarted={(id, resumed) => {
+            const selected = startSpec;
+            if (startOrigin === "terminal" && selected) {
+              const started: TerminalSession = {
+                id, projectId: selected.projectId, specId: selected.id,
+                flow: flowForSource(selected.source), cwd: "", exited: false,
+              };
+              setTerminalStartedSession(started);
+              setFocusSession(id);
+              setSessions((current) => current.some((session) => session.id === id)
+                ? current : [...current, started]);
+            }
+            showToast(
+              (selected?.id ?? "") + " · sesi " + id + (resumed ? " dilanjutkan" : " dimulai"),
+              "info", "play");
+          }}
           onError={(e) => {
             const noRepo = e instanceof ApiError && (e.status === 400 || e.status === 422);
             showToast((startSpec?.id ?? "") + " · gagal mulai sesi" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");

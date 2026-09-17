@@ -123,4 +123,26 @@ describe("app flows", () => {
 
     expect(await screen.findByTestId("pane-spec-341")).toBeInTheDocument();
   });
+
+  it("Ambil backlog dari Terminal membuka picker Start dan mengirim override fase", async () => {
+    window.history.replaceState({}, "", "/terminal");
+    listSpecs.mockResolvedValue({ items: [spec], total: 1, page: 1, pageSize: 20 });
+    vi.mocked(api.startSession).mockReset().mockResolvedValue({ id: "terminal-spec-341" });
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ambil backlog" })).toBeInTheDocument());
+    fireEvent.click(await screen.findByRole("button", { name: "Ambil backlog" }));
+    fireEvent.click(await screen.findByText("Tetap di backlog"));
+
+    expect(await screen.findByLabelText("Agen")).toBeInTheDocument();
+    const phaseModel = await screen.findByLabelText("Model subagent Audit");
+    fireEvent.change(phaseModel, { target: { value: "claude-haiku-4-5" } });
+    fireEvent.change(screen.getByLabelText("Effort subagent Audit"), { target: { value: "low" } });
+    fireEvent.click(screen.getByRole("button", { name: "Mulai" }));
+
+    await waitFor(() => expect(api.startSession).toHaveBeenCalledWith(expect.objectContaining({
+      spec: "SPEC-341", flow: "qa", phaseOverrides: { Audit: { model: "claude-haiku-4-5", effort: "low" } },
+    })));
+    expect(await screen.findByTestId("pane-terminal-spec-341")).toBeInTheDocument();
+  });
 });
