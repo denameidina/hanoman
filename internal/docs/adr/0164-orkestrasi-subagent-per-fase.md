@@ -33,10 +33,10 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
 
 ## Keputusan
 
-1. **`Setting.orchestration`** (Json, tanpa migration): saklar per flow default **aktif** + matriks
+1. **`Setting.orchestration`** (Json, tanpa migration): saklar per flow + matriks
    `claude`/`codex` × fase; sel `null` mewarisi model/effort orchestrator (picker Start). Resolver murni
    `resolvePhasePlan` (`@hanoman/shared`) dipakai server dan pratinjau Start; effort dikoersi ke model
-   hasil resolusi.
+   hasil resolusi. Profil bawaan yang ter-seed dijelaskan pada amandemen 2026-09-17.
 2. **Agen fase di-generate saat sesi lahir** (`buildPhaseAgents`), bernama `hanoman-fase-<slug>`, bukan
    baris `CustomAgent`: tak disync, tak masuk katalog, tak masuk graf mention. Instruksinya potongan prompt
    mode tunggal yang dipindah ke fase pemiliknya. Awalan `hanoman-fase-` dicadangkan di skema custom agent.
@@ -104,5 +104,37 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
   pembanding yang sama menulisnya benar. Klausa yang lebih ketat mengurangi risiko ini, tak menghapusnya;
   operator sebaiknya tetap memilih model orchestrator yang cukup mampu, bukan mengandalkan prompt saja.
 - Tiap fase mulai dengan konteks segar → biaya token bisa naik; serah-terima lewat berkas.
-- Default aktif mengubah perilaku semua flow sesudah upgrade, termasuk `no_effort`.
+- Profil bawaan yang ter-seed dapat mengubah perilaku flow sesudah upgrade; marker provenance mencegah
+  perubahan itu menimpa nilai yang pernah diedit operator.
 - `pty.ts` tetap nol dependensi DB: invocation disuntik lewat `setPhaseInvocations`.
+
+## Amandemen 2026-09-17 — default runtime bawaan dan override per sesi
+
+Rekomendasi model/effort kini menjadi default produk, bukan hanya contoh di dokumentasi:
+
+| Ruang | Claude | Codex |
+|---|---|---|
+| Orchestrator global | `claude-sonnet-5` · `medium` | `gpt-5.6-terra` · `medium` |
+| Fase rutin | Sonnet · medium | Terra · medium |
+| Fase sintesis/keputusan | Opus · medium | Sol · medium |
+| `no_effort` bila diaktifkan | Haiku 4.5 · low | Terra · low |
+
+Matriks lengkap per flow/fase berada di `BUILTIN_ORCHESTRATION_DEFAULTS` (`@hanoman/shared`):
+Spec pada feature/qa/prd memakai Opus/Sol, breakdown memakai Opus/Sol, dan fase dokumentasi
+reverse memakai Sonnet/Terra. `no_effort` default-nya **mati**.
+
+Saat install pertama atau boot sesudah update, server men-seed default sebelum sesi pertama dapat lahir.
+Seed menyimpan marker lokal `builtinRuntimeDefaults`: setiap model, effort, saklar flow, dan field
+sel fase ditandai `seeded` atau `user`. Nilai `seeded` mengikuti rekomendasi versi terbaru; nilai
+`user` tidak disentuh. Baris lama tanpa marker dikenali dari default historis (`Opus/xhigh`,
+`Sol/xhigh`, dan matriks kosong) lalu dimigrasikan tanpa migration SQL. Setting bersifat lokal dan
+marker tidak ikut sync antar-mesin.
+
+Pada modal **Mulai sesi**, setelah picker orchestrator, operator dapat memilih `model` dan `effort`
+untuk setiap subagent fase. Payload opsional `phaseOverrides` tidak disimpan ke Setting: ia hanya
+berlaku pada sesi yang sedang dilahirkan. Prioritas resolusi adalah:
+
+`override sesi` → `sel Settings` → `orchestrator` → koersi effort terhadap model hasil resolusi.
+
+Ganti runtime pada modal menghapus override fase karena katalog Claude dan Codex berbeda. Flow mati
+atau Codex yang belum mendukung native subagent tetap mengikuti fallback sesi tunggal.

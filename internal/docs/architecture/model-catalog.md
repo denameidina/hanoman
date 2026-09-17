@@ -4,7 +4,8 @@ Hanoman menemukan model dari CLI terpasang saat startup dan setiap **5 menit**. 
 memuat Claude Fable 5.1 (`claude-fable-5-1`) dan GPT-6 Astra (`gpt-6-astra`).
 Model baru tidak memerlukan perubahan kode Hanoman selama protokol katalog CLI kompatibel.
 Ketersediaan tetap bergantung pada akun, konfigurasi provider, dan versi CLI. Hanoman tidak
-mengupgrade CLI, mengganti default tersimpan, atau mengubah sesi yang sudah berjalan.
+mengupgrade CLI atau mengubah sesi yang sudah berjalan. Default runtime bawaan dapat di-seed saat
+install/update; pilihan yang sudah diedit operator tidak diganti.
 
 ## Sumber dan batas
 

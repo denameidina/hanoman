@@ -4,10 +4,11 @@ import {
   RETIRED_CODEX_MODELS, LEAD_DEFAULTS, coerceCodexEffort, codexModel, type Setting, type Agent, type Codex,
   TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, DEFAULT_METHOD, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS,
   REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS,
+  BUILTIN_RUNTIME_DEFAULTS,
 } from "@hanoman/shared";
 
 // Model id + effort yang diteruskan apa adanya ke `claude --model` / `--effort`.
-const STEP = { model: "claude-opus-5", effort: "xhigh" };
+const STEP = { model: "claude-sonnet-5", effort: "medium" };
 // DB yang masih segar belum punya baris Setting (ia lahir di PUT /settings pertama). Default
 // ini menjaga API tetap boot alih-alih melempar P2025.
 export const DEFAULT_SETTING: Setting = {
@@ -33,6 +34,7 @@ export const DEFAULT_SETTING: Setting = {
   logRetention: LOG_RETENTION_DEFAULTS,   // SPEC-1215 · ADR-0166
   builtinAgents: {},               // SPEC-881 · ADR-0136 · sidik jari seed (lokal, tak disync)
   builtinAgentPolicies: {},        // SPEC-950 · marker safety policy sekali-jalan (lokal)
+  builtinRuntimeDefaults: BUILTIN_RUNTIME_DEFAULTS, // seed rekomendasi model/fase; user edit dipertahankan
 };
 
 // Baris Setting adalah `Json` bebas bentuk, dan baris yang ditulis SEBELUM SPEC-162 masih

@@ -4,6 +4,7 @@ import {
 } from "./orchestration";
 import { codexNativeAgentsSupported, resolvePhasePlan } from "./orchestration-plan";
 import { ORCHESTRATION_DEFAULTS, zOrchestration, zSetting } from "./entities";
+import { BUILTIN_ORCHESTRATION_DEFAULTS } from "./runtime-defaults";
 import { AGENT_NAME_RE } from "./custom-agent";
 
 const orchestrator = { model: "claude-opus-5", effort: "xhigh" };
@@ -36,11 +37,14 @@ describe("phaseAgentName", () => {
 });
 
 describe("Setting.orchestration", () => {
-  it("default: setiap flow aktif dengan matriks kosong", () => {
-    expect(Object.keys(ORCHESTRATION_DEFAULTS).sort()).toEqual([...ORCHESTRATION_FLOWS].sort());
-    for (const flow of ORCHESTRATION_FLOWS)
-      expect(ORCHESTRATION_DEFAULTS[flow]).toEqual({ enabled: true, claude: {}, codex: {} });
-  });
+	it("default bawaan memuat rekomendasi model/effort per flow dan fase", () => {
+		expect(Object.keys(ORCHESTRATION_DEFAULTS).sort()).toEqual([...ORCHESTRATION_FLOWS].sort());
+		expect(ORCHESTRATION_DEFAULTS.feature.claude.Spec).toEqual({ model: "claude-opus-5", effort: "medium" });
+		expect(ORCHESTRATION_DEFAULTS.feature.codex.Spec).toEqual({ model: "gpt-5.6-sol", effort: "medium" });
+		expect(ORCHESTRATION_DEFAULTS.feature.claude.Execute).toEqual({ model: "claude-sonnet-5", effort: "medium" });
+		expect(ORCHESTRATION_DEFAULTS.no_effort.enabled).toBe(false);
+		expect(ORCHESTRATION_DEFAULTS).toEqual(BUILTIN_ORCHESTRATION_DEFAULTS);
+	});
   it("baris Setting lama tanpa blok ini tetap parse dengan default aktif", () => {
     const s = zSetting.parse({ autoDefault: true, autoScaffold: true, notifyFail: true });
     expect(s.orchestration.feature.enabled).toBe(true);
@@ -67,14 +71,30 @@ describe("resolvePhasePlan", () => {
   it("blok absen (respons Setting lama) → default aktif", () => {
     expect(resolvePhasePlan({ ...base, orchestration: undefined })?.phases).toHaveLength(5);
   });
-  it("sel kosong mewarisi orchestrator di setiap fase", () => {
-    const plan = resolvePhasePlan(base)!;
+	it("sel kosong mewarisi orchestrator di setiap fase", () => {
+		const emptyOrchestration = zOrchestration.parse({});
+		const plan = resolvePhasePlan({ ...base, orchestration: emptyOrchestration })!;
     expect(plan).toMatchObject({ flow: "feature", runtime: "claude" });
     expect(plan.phases.map((p) => p.phase)).toEqual(FLOW_PHASES.feature);
     expect(plan.phases[3]).toEqual({
       phase: "Plan", agentName: "hanoman-fase-plan", model: "claude-opus-5", effort: "xhigh",
-    });
-  });
+		});
+	});
+	it("override per sesi menang atas sel Settings dan orchestrator", () => {
+		const orchestration = { ...ORCHESTRATION_DEFAULTS,
+			feature: { ...ORCHESTRATION_DEFAULTS.feature,
+				claude: { ...ORCHESTRATION_DEFAULTS.feature.claude,
+					Plan: { model: "claude-opus-5", effort: "high" },
+				},
+			},
+		};
+		const plan = resolvePhasePlan({ ...base, orchestration,
+			phaseOverrides: { Plan: { model: "claude-haiku-4-5", effort: "low" } },
+		})!;
+		expect(plan.phases.find((p) => p.phase === "Plan")).toMatchObject({
+			model: "claude-haiku-4-5", effort: "low",
+		});
+	});
   it("model sel dipakai; effort warisan dikoersi ke model hasil resolusi (claude)", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS,
       feature: { enabled: true, claude: { Plan: { model: "claude-fable-5-1", effort: null } }, codex: {} } };

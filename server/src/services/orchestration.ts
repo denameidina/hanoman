@@ -1,4 +1,4 @@
-import { resolvePhasePlan, type Agent, type PhasePlan, type Setting } from "@hanoman/shared";
+import { resolvePhasePlan, type Agent, type PhasePlan, type PhaseOverrides, type Setting } from "@hanoman/shared";
 import type { Flow } from "@hanoman/runner";
 import { nativeAgentsAvailable } from "./pty";
 
@@ -8,9 +8,11 @@ import { nativeAgentsAvailable } from "./pty";
 // tanpa satu pun agen fase.
 export function sessionPhasePlan(
   setting: Setting, flow: Flow, agent: Agent, orchestrator: { model: string; effort: string },
+  phaseOverrides?: PhaseOverrides,
 ): PhasePlan | null {
   return resolvePhasePlan({
     flow, runtime: agent, orchestration: setting.orchestration, orchestrator,
+    phaseOverrides,
     nativeAgents: nativeAgentsAvailable(agent),
   });
 }

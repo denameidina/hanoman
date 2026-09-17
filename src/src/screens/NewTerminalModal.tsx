@@ -21,7 +21,7 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
   const [model, setModel] = React.useState("claude-opus-5");
   const [effort, setEffort] = React.useState("xhigh");
   const [defs, setDefs] = React.useState<RuntimeDefs>({
-    claude: { model: "claude-opus-5", effort: "xhigh" },
+    claude: { model: "claude-sonnet-5", effort: "medium" },
     codex: { ...CODEX_DEFAULTS },
   });
   const [busy, setBusy] = React.useState(false);

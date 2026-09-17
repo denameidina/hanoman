@@ -2,7 +2,7 @@ import { paths, type Paginated, type ProjectView, type Spec, type Setting, type 
   type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
   type ProvisionStep, type ProvisionResult,
   type SessionDialogAnswer, type SessionDialogPayload,
-  type SetupStatus, type SetupApplyResult,
+  type SetupStatus, type SetupApplyResult, type PhaseOverrides,
   type TaskView, type MemberView, type CreateTaskInput, type EscalateTaskInput, type PatchTaskInput,
   type CreateMemberInput, type PatchMemberInput,
   type RemoteControlView, type RemoteControlPut } from "@hanoman/shared";
@@ -429,7 +429,7 @@ export const api = {
   // SPEC-162 · sesi claude interaktif untuk sebuah backlog item, di worktree-nya sendiri.
   // SPEC-252 · ADR-0061 · model/effort per sesi (opsional; kosong → default global di server).
   // SPEC-332 · ADR-0073 · mode goal per sesi (opsional; kosong → default global di server).
-  startSession: (b: { spec: string; flow: Flow; model?: string; effort?: string; goal?: boolean; goalCondition?: string;
+  startSession: (b: { spec: string; flow: Flow; model?: string; effort?: string; phaseOverrides?: PhaseOverrides; goal?: boolean; goalCondition?: string;
     agent?: Agent;                    // SPEC-338 · ADR-0074 · mesin sesi; kosong → Setting.agent
     verifyScope?: VerifyScope;        // SPEC-376 · ADR-0080 · scope verifikasi; kosong → Setting.verifyScope
     method?: string;                  // SPEC-734 · ADR-0113 · metode workflow; kosong → payload → Setting.method

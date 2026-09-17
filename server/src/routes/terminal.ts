@@ -107,6 +107,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
           agent: parsed.data.agent,                                           // SPEC-338 · ADR-0074
           verifyScope: parsed.data.verifyScope,                               // SPEC-376 · ADR-0080
           method: parsed.data.method,                                         // SPEC-734 · ADR-0113
+          phaseOverrides: parsed.data.phaseOverrides,                         // ADR-0164 · override subagent per sesi
           force: parsed.data.force,                                           // SPEC-447 · ADR-0093
         });
         // SPEC-394 · ADR-0084 · `resumed` hanya muncul saat peluncuran benar-benar MELANJUTKAN

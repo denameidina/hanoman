@@ -107,6 +107,8 @@ hanoman update            # npm i -g hanoman@latest --prefer-online
 ```
 
 Sesudah `hanoman update`, instance yang berjalan perlu di-restart (mis. `systemctl restart hanoman`).
+Saat boot pertama sesudah install/update, Hanoman menyegarkan default model/effort bawaan dan
+matriks subagent. Nilai yang pernah diedit user ditandai dan dipertahankan; tidak perlu migration SQL.
 
 ## Konfigurasi
 

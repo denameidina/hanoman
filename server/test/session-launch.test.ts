@@ -159,6 +159,18 @@ describe("session-launch", () => {
     killSession(r.id);
   });
 
+  it("override subagent per fase diteruskan ke definisi agen saat sesi lahir", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const spec = await seedRepo("SPEC-ORCH-OVERRIDE");
+    const r = await startSpecSession(spec, {
+      flow: "feature",
+      phaseOverrides: { Spec: { model: "claude-haiku-4-5", effort: "low" } },
+    });
+    const agents = JSON.parse(readFileSync(agentsFilePath(r.id), "utf8"));
+    expect(agents["hanoman-fase-spec"]).toMatchObject({ model: "claude-haiku-4-5", effort: "low" });
+    killSession(r.id);
+  });
+
   it("orkestrasi flow mati → prompt mode tunggal, tanpa berkas agen", async () => {
     process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
     await setOrchestration("feature", false);
@@ -322,7 +334,7 @@ describe("session-launch", () => {
     const r = await startSpecSession(spec, { flow: "feature", agent: "claude" });
     const argv = await argvOf(r.id);
     expect(argv).toContain("--dangerously-skip-permissions");
-    expect(argv).toContain("--model claude-opus-5");   // kembali ke blok model claude
+    expect(argv).toContain("--model claude-sonnet-5");   // kembali ke blok model claude
     killSession(r.id);
   });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
-import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
+import { ORCHESTRATION_DEFAULTS, zOrchestration } from "@hanoman/shared";
 import { StartSessionModal } from "../src/App";
 import { api } from "../src/api/client";
 
@@ -28,7 +28,7 @@ beforeEach(() => {
 
 describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
   it("memakai sel Settings dan menandai fase yang mewarisi orchestrator", async () => {
-    const orchestration = structuredClone(ORCHESTRATION_DEFAULTS);
+    const orchestration = zOrchestration.parse({});
     orchestration.qa.claude.Plan = { model: "claude-sonnet-5", effort: "low" };
     (api.getSettings as any).mockResolvedValue(settingWith(orchestration));
     renderModal();
@@ -37,7 +37,7 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
   });
 
   it("mengubah effort orchestrator ikut mengubah fase yang mewarisi", async () => {
-    (api.getSettings as any).mockResolvedValue(settingWith(structuredClone(ORCHESTRATION_DEFAULTS)));
+    (api.getSettings as any).mockResolvedValue(settingWith(zOrchestration.parse({})));
     renderModal();
     await waitFor(() => expect(screen.getByLabelText("Effort")).toHaveValue("xhigh"));
     await waitFor(() => expect(screen.getByTestId("phase-plan-preview"))
@@ -47,7 +47,7 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
   });
 
   it("flow yang orkestrasinya mati → sesi tunggal", async () => {
-    const orchestration = structuredClone(ORCHESTRATION_DEFAULTS);
+    const orchestration = zOrchestration.parse({});
     orchestration.qa.enabled = false;
     (api.getSettings as any).mockResolvedValue(settingWith(orchestration));
     renderModal();
@@ -100,5 +100,17 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
     await waitFor(() => expect(screen.getByTestId("phase-plan-preview"))
       .toHaveTextContent("Plan · Sonnet 5 · xhigh (effort warisi)"));
     expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Execute · Opus 5 · low (model warisi)");
+  });
+
+  it("mengirim override model dan effort subagent per fase saat mulai", async () => {
+    (api.getSettings as any).mockResolvedValue(settingWith(structuredClone(ORCHESTRATION_DEFAULTS)));
+    renderModal();
+    await waitFor(() => expect(screen.getByLabelText("Model subagent Plan")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Model subagent Plan"), { target: { value: "claude-haiku-4-5" } });
+    fireEvent.change(screen.getByLabelText("Effort subagent Plan"), { target: { value: "low" } });
+    fireEvent.click(screen.getByRole("button", { name: "Mulai" }));
+    await waitFor(() => expect(api.startSession).toHaveBeenCalledWith(expect.objectContaining({
+      phaseOverrides: { Plan: { model: "claude-haiku-4-5", effort: "low" } },
+    })));
   });
 });

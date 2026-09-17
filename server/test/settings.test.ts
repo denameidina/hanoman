@@ -23,8 +23,8 @@ describe("settings", () => {
   it("baris pra-SPEC-162 diberi model + effort, dan kunci matinya dibuang", async () => {
     await prisma.setting.create({ data: { id: 1, data: BARIS_LAMA } });
     const s = await getSetting();
-    expect(s.model).toBe("claude-opus-5");
-    expect(s.effort).toBe("xhigh");
+    expect(s.model).toBe("claude-sonnet-5");
+    expect(s.effort).toBe("medium");
     expect(s).not.toHaveProperty("steps");
     expect(s).not.toHaveProperty("maxConcurrent");
   });
@@ -83,14 +83,14 @@ describe("settings", () => {
   });
 
   it("sessionAgentDefaults default = claude memakai model/effort claude", async () => {
-    expect(await sessionAgentDefaults()).toEqual({ agent: "claude", model: "claude-opus-5", effort: "xhigh" });
+    expect(await sessionAgentDefaults()).toEqual({ agent: "claude", model: "claude-sonnet-5", effort: "medium" });
   });
 
   it("baris Setting lama (tanpa agent/codex) tetap claude — tanpa migration", async () => {
     await prisma.setting.create({ data: { id: 1, data: BARIS_LAMA } });
     const s = await getSetting();
     expect(s.agent).toBe("claude");
-    expect(s.codex).toEqual({ model: "gpt-5.6-sol", effort: "xhigh" });
+    expect(s.codex).toEqual({ model: "gpt-5.6-terra", effort: "medium" });
   });
 
   // SPEC-339 · baris Setting lama menyimpan model codex yang sudah dipensiunkan. Dibaca mentah,

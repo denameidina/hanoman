@@ -51,8 +51,8 @@ describe("SPEC-339 · katalog codex per-model", () => {
     expect(RETIRED_CODEX_MODELS["gpt-5.4-mini"]).toBe("gpt-5.5");
   });
 
-  it("default codex = gpt-5.6-sol / xhigh, dan CODEX_EFFORTS adalah gabungan", () => {
-    expect(CODEX_DEFAULTS).toEqual({ model: "gpt-5.6-sol", effort: "xhigh" });
+  it("default codex = gpt-5.6-terra / medium, dan CODEX_EFFORTS adalah gabungan", () => {
+    expect(CODEX_DEFAULTS).toEqual({ model: "gpt-5.6-terra", effort: "medium" });
     expect(CODEX_EFFORTS).toEqual(["ultra", "max", "xhigh", "high", "medium", "low"]);
   });
 

@@ -38,8 +38,8 @@ describe("SPEC-237 · source audit", () => {
 describe("SPEC-162 · kontrak sesi interaktif", () => {
   it("zSetting memberi model + effort default", () => {
     const s = zSetting.parse({ autoDefault: true, autoScaffold: true, notifyFail: true });
-    expect(s.model).toBe("claude-opus-5");
-    expect(s.effort).toBe("xhigh");
+    expect(s.model).toBe("claude-sonnet-5");
+    expect(s.effort).toBe("medium");
   });
 
   it("zTerminalSession menerima sesi project maupun sesi backlog", () => {

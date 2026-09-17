@@ -184,8 +184,8 @@ keduanya. `CODEX_MODELS` (shared) karena itu membawa `efforts`/`fallback`/`minCl
 
 | Slug | Effort | Klien minimum |
 |---|---|---|
-| `gpt-5.6-sol` (default) | ultra, max, xhigh, high, medium, low | 0.144.0 |
-| `gpt-5.6-terra` | ultra, max, xhigh, high, medium, low | 0.144.0 |
+| `gpt-5.6-sol` | ultra, max, xhigh, high, medium, low | 0.144.0 |
+| `gpt-5.6-terra` (default) | ultra, max, xhigh, high, medium, low | 0.144.0 |
 | `gpt-5.6-luna` | max, xhigh, high, medium, low | 0.144.0 |
 | `gpt-5.5` | xhigh, high, medium, low | 0.124.0 |
 

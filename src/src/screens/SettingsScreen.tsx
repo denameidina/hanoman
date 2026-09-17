@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier } from "../ds";
 import { api, ApiError } from "../api/client";
-import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
+import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus, SetupStatus } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
@@ -42,7 +42,7 @@ const S_SOUNDS = [
   { value: "fanfare", label: "Fanfare · 0.9s" }, { value: "off", label: "Senyap" },
 ];
 const S_DEFAULTS: Setting = {
-  model: "claude-opus-5", effort: "xhigh",
+  model: "claude-sonnet-5", effort: "medium",
   autoDefault: true, autoScaffold: true, notifyFail: true,
   notifyDone: true, notifySound: "short",
   notifyDecision: true, notifyDecisionSound: "alert",
@@ -66,6 +66,7 @@ const S_DEFAULTS: Setting = {
   // terlewat di default ini, jadi `pnpm --filter ./src typecheck` merah di base sebelum SPEC-884.
   builtinAgents: {},
   builtinAgentPolicies: {},
+  builtinRuntimeDefaults: BUILTIN_RUNTIME_DEFAULTS,
 };
 
 // SPEC-383 · label agen dipakai di judul grup model DAN di baris warisan kartu konflik — satu
@@ -1127,7 +1128,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
                 options={[{ value: "claude", label: AGENT_LABEL.claude }, { value: "codex", label: AGENT_LABEL.codex }]}
                 onChange={(e) => {
                   // Cermin `pickAgent` di StartSessionModal: menukar agen HARUS menukar model+effort
-                  // sekalian ke default agen itu — kalau tidak sesi lahir `codex -m claude-opus-5`.
+                  // sekalian ke default agen itu — kalau tidak sesi lahir `codex -m claude-sonnet-5`.
                   const a = e.target.value as "claude" | "codex";
                   const d = a === "codex" ? codex : { model: s.model, effort: s.effort };
                   saveConflict({ agent: a, model: d.model, effort: a === "codex" ? coerceCodexEffort(d.model, d.effort) : d.effort },

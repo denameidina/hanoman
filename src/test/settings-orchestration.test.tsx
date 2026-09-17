@@ -47,14 +47,14 @@ describe("Settings · Orkestrasi (ADR-0164)", () => {
     await open();
     fireEvent.change(screen.getByLabelText("Model feature Plan claude"), { target: { value: "claude-sonnet-5" } });
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
-    expect(lastPut().orchestration.feature.claude.Plan).toEqual({ model: "claude-sonnet-5", effort: null });
+    expect(lastPut().orchestration.feature.claude.Plan).toEqual({ model: "claude-sonnet-5", effort: "medium" });
   });
 
   it("memilih effort sel menyimpan effort itu", async () => {
     await open();
     fireEvent.change(screen.getByLabelText("Effort feature Execute claude"), { target: { value: "low" } });
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
-    expect(lastPut().orchestration.feature.claude.Execute).toEqual({ model: null, effort: "low" });
+    expect(lastPut().orchestration.feature.claude.Execute).toEqual({ model: "claude-sonnet-5", effort: "low" });
   });
 
   it("mematikan saklar flow menyimpan enabled:false", async () => {

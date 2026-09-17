@@ -6,6 +6,9 @@ import { zAutoMerge } from "./auto-merge";
 import { DEFAULT_METHOD } from "./method-catalog";
 import { REMOTE_CONTROL_DEFAULTS, zRemoteControl } from "./relay";
 import { LOG_RETENTION_DEFAULTS, LOG_SHIPPING_DEFAULTS, zLogRetention, zLogShipping } from "./logs";
+import {
+  BUILTIN_ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, zBuiltinRuntimeDefaults,
+} from "./runtime-defaults";
 
 export type Stage = z.infer<typeof zStage>;
 // SPEC-338 · ADR-0074 · mesin sesi. Di-re-ekspor dari sini supaya konsumen setelan cukup
@@ -229,8 +232,8 @@ export const RETIRED_CODEX_MODELS: Record<string, string> = {
 // Default model/effort codex. Model/effort claude sengaja TETAP di `Setting.model`/`Setting.effort`
 // (kontrak GET /settings + baris Setting lama), jadi blok ini hanya untuk codex.
 export const zCodex = z.object({
-  model: z.string().default("gpt-5.6-sol"),
-  effort: z.string().default("xhigh"),
+  model: z.string().default("gpt-5.6-terra"),
+  effort: z.string().default("medium"),
 });
 export type Codex = z.infer<typeof zCodex>;
 export const CODEX_DEFAULTS: Codex = zCodex.parse({});
@@ -374,6 +377,15 @@ export const zPhaseCell = z.object({
   effort: z.string().nullable().default(null),
 });
 export type PhaseCell = z.infer<typeof zPhaseCell>;
+// Override ini hidup hanya selama satu peluncuran. Tidak disimpan di Setting karena ia adalah
+// keputusan operator untuk sesi tertentu, sedangkan matriks di bawah adalah default instance.
+export const zPhaseOverride = z.object({
+  model: z.string().optional(),
+  effort: z.string().optional(),
+});
+export type PhaseOverride = z.infer<typeof zPhaseOverride>;
+export const zPhaseOverrides = z.record(z.string(), zPhaseOverride);
+export type PhaseOverrides = z.infer<typeof zPhaseOverrides>;
 export const zFlowOrchestration = z.object({
   enabled: z.boolean().default(true),
   claude: z.record(z.string(), zPhaseCell).default({}),
@@ -390,11 +402,11 @@ export const zOrchestration = z.object({
   no_effort: zFlowOrchestration.default({}),
 });
 export type Orchestration = z.infer<typeof zOrchestration>;
-export const ORCHESTRATION_DEFAULTS: Orchestration = zOrchestration.parse({});
+export const ORCHESTRATION_DEFAULTS: Orchestration = zOrchestration.parse(BUILTIN_ORCHESTRATION_DEFAULTS);
 
 export const zSetting = z.object({
-  model: z.string().default("claude-opus-5"),
-  effort: z.string().default("xhigh"),
+  model: z.string().default("claude-sonnet-5"),
+  effort: z.string().default("medium"),
   autoDefault: z.boolean(),
   autoScaffold: z.boolean(),
   notifyFail: z.boolean(),
@@ -436,6 +448,9 @@ export const zSetting = z.object({
   // SPEC-950 · marker safety policy lokal. Terpisah dari fingerprint konten agar policy sekali
   // jalan tidak membuat seed memperlakukan konfigurasi operator sebagai bawaan.
   builtinAgentPolicies: z.record(z.string(), z.string()).default({}),
+  // Marker lokal per bagian: `seeded` boleh menerima rekomendasi baru saat update, `user` harus
+  // dipertahankan. Setting tidak ikut sync, sehingga keputusan operator tetap milik mesin ini.
+  builtinRuntimeDefaults: zBuiltinRuntimeDefaults.default(BUILTIN_RUNTIME_DEFAULTS),
 });
 export type Setting = z.infer<typeof zSetting>;
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { buildApp } from "../src/app";
 import { DEFAULT_SETTING, getSetting } from "../src/services/settings";
+import { applyRuntimeDefaults } from "../src/services/runtime-defaults";
 import { makeSetting, resetDb } from "./factory";
 
 const app = buildApp({ requireAuth: false });
@@ -38,5 +39,25 @@ describe("PUT /settings tak menulis kunci LOCAL-only SPEC-1215 (AC-A3)", () => {
     const s = await getSetting();
     expect(s.notifyDone).toBe(false);
     expect(s.remoteControl).toEqual({ enabled: true, capabilities: ["sessions:read"] });
+  });
+
+  it("edit model dan satu sel fase ditandai user lalu tetap dipertahankan saat seed berikutnya", async () => {
+    const orchestration = structuredClone(DEFAULT_SETTING.orchestration);
+    orchestration.feature.claude.Plan = { model: "custom-claude", effort: "high" };
+    const put = await app.inject({ method: "PUT", url: "/api/settings", payload: {
+      ...DEFAULT_SETTING, model: "custom-claude", effort: "low", orchestration,
+    } });
+    expect(put.statusCode).toBe(200);
+    const current = await getSetting();
+    expect(current.builtinRuntimeDefaults.claude.model).toBe("user");
+    expect(current.builtinRuntimeDefaults.orchestration["feature.claude.Plan.model"]).toBe("user");
+
+    const upgraded = applyRuntimeDefaults(current)!;
+    expect(upgraded.data.model).toBe("custom-claude");
+    expect(upgraded.data.effort).toBe("low");
+    expect(upgraded.data.orchestration.feature.claude.Plan).toEqual({ model: "custom-claude", effort: "high" });
+    expect(upgraded.data.orchestration.feature.claude.Execute).toEqual(
+      DEFAULT_SETTING.orchestration.feature.claude.Execute,
+    );
   });
 });

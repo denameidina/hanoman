@@ -688,13 +688,14 @@ POST /projects/:id/worktrees/delete  { names:string[], deleteBranch?, orphanOnly
 ```
 GET/PUT  /settings                      # Setting blob (zSetting): model, effort, autoDefault, autoScaffold,
 #                                         notifyFail, notifyDone (bool), notifySound — SPEC-180. Tanpa dailyBudget/maxConcurrent.
-#                                         model/effort = DEFAULT GLOBAL sesi baru (SPEC-252/ADR-0061); per sesi di-override saat Start.
+#                                         model/effort = DEFAULT GLOBAL sesi baru (Claude Sonnet 5/medium;
+#                                           Codex GPT-5.6 Terra/medium) (SPEC-252/ADR-0061); per sesi di-override saat Start.
 #                                         phaseModels DICABUT (SPEC-252/ADR-0061) — baris lama yang masih memuatnya tetap parse (diabaikan).
 #                                         goal { enabled:false, condition:"" } (SPEC-332/ADR-0073) — default global mode goal
 #                                           sesi backlog; condition kosong = pakai default DoD bawaan. Blok selalu ADA di response
 #                                           (zod .default()), jadi baris Setting lama tetap parse tanpa migration.
-#                                         agent: "claude"|"codex" (default "claude") + codex { model:"gpt-5.6-sol",
-#                                           effort:"xhigh" } (SPEC-338/ADR-0074) — mesin sesi default + katalog
+#                                         agent: "claude"|"codex" (default "claude") + codex { model:"gpt-5.6-terra",
+#                                           effort:"medium" } (SPEC-338/ADR-0074) — mesin sesi default + katalog
 #                                           model/effort codex. model/effort di akar TETAP milik claude.
 #                                         conflict { enabled:false, agent:"claude", model:"claude-opus-5",
 #                                           effort:"xhigh" } — SPEC-383/ADR-0081 · default KHUSUS sesi
@@ -1102,6 +1103,8 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #       Setting.agent (konflik: blok Setting.conflict bila dinyalakan, ADR-0081). Terminal agen biasa
 #       DIKECUALIKAN sejak SPEC-517: ia punya form pemilih runtime sendiri (lihat varian di atas).
 #     model/effort opsional = override PER SESI (kosong → default global);
+#     phaseOverrides?: { [fase]: { model?: string; effort?: string } } = override PER SESI untuk
+#       subagent fase (kosong → rekomendasi/matriks Settings → orchestrator); tidak disimpan ke Setting.
 #     jadi argv --model/--effort saat sesi lahir (andal, tak bergantung agen).
 #     goal?: boolean — mode goal PER SESI. undefined → ikut Setting.goal.enabled; false → MATI walau
 #       global menyala; true → nyala. goalCondition?: string ≤4000 — kondisi khusus sesi ini.

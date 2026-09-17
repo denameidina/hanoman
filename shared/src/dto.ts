@@ -3,7 +3,7 @@ import type { PendingCounts } from "./pending";
 import { z } from "zod";
 import type { SessionAsk } from "./session-ask";
 import type { TaskView } from "./team";
-import { zProject, zBriefPayload, zQaPayload, zGoalPayload, zSpec, zScheduler, zAgent, zLead } from "./entities";
+import { zProject, zBriefPayload, zQaPayload, zGoalPayload, zSpec, zScheduler, zAgent, zLead, zPhaseOverrides } from "./entities";
 import {
   zLeadGate, zLeadKind, zLeadConfidence, zLeadAction, zLeadStatus, zLeadChoice,
   zLeadFlowStatus, zLeadSelect,
@@ -456,6 +456,9 @@ export const zTerminalSession = z.union([
   // SPEC-376 · ADR-0080 — scope verifikasi per SESI: undefined → ikut Setting.verifyScope.
   z.object({
     spec: z.string(), flow: zFlow, model: z.string().optional(), effort: z.string().optional(),
+    // Override model/effort subagent hanya berlaku untuk sesi ini; kosong berarti memakai
+    // rekomendasi bawaan atau matriks Settings pada fase tersebut.
+    phaseOverrides: zPhaseOverrides.optional(),
     goal: z.boolean().optional(), goalCondition: z.string().max(4000).optional(),
     agent: zAgent.optional(),
     verifyScope: zVerifyScope.optional(),

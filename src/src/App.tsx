@@ -14,7 +14,7 @@ import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts } from "@hanoman/shared";
-import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus, type Orchestration, type OrchestrationFlow } from "@hanoman/shared";
+import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus, type Orchestration, type OrchestrationFlow, type PhaseOverrides } from "@hanoman/shared";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
@@ -89,16 +89,18 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // menyampaikannya (toast di App), modal ini tak menebak-nebak.
   { open: boolean; spec: Spec | null; onClose: () => void;
     onStarted: (id: string, resumed?: boolean) => void; onError?: (e: unknown) => void }) {
-  const [model, setModel] = React.useState("claude-opus-5");
-  const [effort, setEffort] = React.useState("xhigh");
+  const [model, setModel] = React.useState("claude-sonnet-5");
+  const [effort, setEffort] = React.useState("medium");
   // SPEC-338 · ADR-0074 · agen sesi. Model/effort dipilih dari katalog agen terpilih — mengganti
-  // agen HARUS menukar keduanya, kalau tidak sesi lahir dengan `codex -m claude-opus-5`.
+  // agen HARUS menukar keduanya, kalau tidak sesi lahir dengan `codex -m claude-sonnet-5`.
   const [agent, setAgent] = React.useState<Agent>("claude");
   // Default per agen dari setelan global, dipakai saat picker agen berpindah.
   const [defs, setDefs] = React.useState<RuntimeDefs>({
-    claude: { model: "claude-opus-5", effort: "xhigh" },
+    claude: { model: "claude-sonnet-5", effort: "medium" },
     codex: { ...CODEX_DEFAULTS },
   });
+  // Override per fase adalah keputusan sesi saat ini, bukan perubahan Settings global.
+  const [phaseOverrides, setPhaseOverrides] = React.useState<PhaseOverrides>({});
   // SPEC-332 · ADR-0073 · mode goal per sesi. Prefill dari default global; kondisi kosong dikirim
   // sebagai undefined supaya server yang memilih template global lalu default DoD bawaan.
   const [goalOn, setGoalOn] = React.useState(false);
@@ -130,6 +132,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     // boleh menandai "termuat" untuk pembukaan yang baru.
     setSettingsLoaded(false);
     setCodexVerLoaded(false);
+    setPhaseOverrides({});
     api.getSettings().then((s) => {
       // `?? `: server selalu mengirim keduanya (zod .default()), tapi respons yang di-cache
       // sebelum SPEC-338 belum punya — jangan sampai picker-nya kosong.
@@ -160,6 +163,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   }, [open, spec]);
   const pickAgent = (a: Agent) => {
     setAgent(a);
+    setPhaseOverrides({});
     // SPEC-339 · default global bisa saja pasangan lama yang kini tak sah — koreksi saat dipasang.
     // SPEC-517 · aturannya (blok agen terpilih + koersi effort codex) hidup di session-runtime.ts,
     // sumber yang sama dengan picker "Sesi baru" di Terminal.
@@ -195,6 +199,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     try {
       const { id, resumed } = await api.startSession({
         spec: s.id, flow, model, effort, agent,
+        ...(Object.keys(phaseOverrides).length ? { phaseOverrides } : {}),
         goal: goalOn, goalCondition: goalOn && goalCond.trim() ? goalCond.trim() : undefined,
         verifyScope, method,
         ...(isBlocked || force ? { force: true } : {}),   // ADR-0093/0161 · keputusan manusia
@@ -220,7 +225,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
         Agen, model &amp; effort <b>orchestrator</b> sesi ini. Default dari setelan global; ubah bila perlu. Bila
         orkestrasi flow ini aktif, tiap fase dikerjakan subagent dengan model &amp; effort di bawah (Settings ›
-        Orkestrasi).
+        Orkestrasi). Override di bawah hanya berlaku untuk sesi ini dan tidak mengubah Settings.
       </div>
       {launchRejection && <div role="alert" style={{
         fontSize: 12.5, lineHeight: 1.55, marginBottom: 12, padding: "9px 11px",
@@ -279,7 +284,8 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       {/* ADR-0164 · pratinjau rencana fase: resolver yang SAMA dengan server, jadi apa yang
           operator lihat di sini persis apa yang lahir saat sesi dimulai. */}
       <PhasePlanPreview flow={flow as OrchestrationFlow} agent={agent} model={model} effort={effort}
-        orchestration={orchestration} codexVersion={codexVer}
+        orchestration={orchestration} codexVersion={codexVer} phaseOverrides={phaseOverrides}
+        onPhaseOverridesChange={setPhaseOverrides}
         loading={!settingsLoaded || (agent === "codex" && !codexVerLoaded)} />
       {/* SPEC-332 · ADR-0073 · mode goal: sesi menolak berhenti sampai kondisinya terbukti di
           transkrip. Interupsi manusia (Esc) tetap bekerja; melepas gate = hentikan sesinya. */}

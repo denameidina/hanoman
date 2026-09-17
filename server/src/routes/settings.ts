@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { zSetting } from "@hanoman/shared";
 import { prisma } from "../db";
 import { getSetting } from "../services/settings";
+import { markRuntimeDefaultsUserEdited } from "../services/runtime-defaults";
 import { reloadTelegramGateway } from "../services/telegram/bootstrap";
 import { telegramReloadNeeded } from "../services/telegram/config";
 export default async function (app: FastifyInstance) {
@@ -10,11 +11,24 @@ export default async function (app: FastifyInstance) {
     const parsed = zSetting.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const before = await getSetting();
+    const input = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+      ? req.body as Record<string, unknown> : {};
+    const has = (key: string): boolean => Object.prototype.hasOwnProperty.call(input, key);
+    // Klien lama tidak mengirim blok runtime baru. Jangan biarkan default zod mengganti matriks
+    // atau pilihan model milik operator hanya karena request datang dari versi dashboard lama.
+    const runtimePreserved = {
+      ...parsed.data,
+      model: has("model") ? parsed.data.model : before.model,
+      effort: has("effort") ? parsed.data.effort : before.effort,
+      codex: has("codex") ? parsed.data.codex : before.codex,
+      orchestration: has("orchestration") ? parsed.data.orchestration : before.orchestration,
+    };
     // SPEC-1215 · ADR-0165 §4 / ADR-0166 §7–8 · tiga kunci ini dibaca dari baris TERSIMPAN, bukan body:
     // `settings:write` agent token tak boleh menyalakan RCE ke mesinnya sendiri, mengekspor transkrip,
     // atau memendekkan retensi (= menghapus bukti audit). Pengelolanya route COOKIE_ONLY sendiri.
     const data = {
-      ...parsed.data,
+      ...runtimePreserved,
+      builtinRuntimeDefaults: markRuntimeDefaultsUserEdited(before, runtimePreserved),
       remoteControl: before.remoteControl, logShipping: before.logShipping, logRetention: before.logRetention,
     };
     const row = await prisma.setting.upsert({ where: { id: 1 },

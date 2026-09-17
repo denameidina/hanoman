@@ -262,7 +262,7 @@ tiap berkas.
 
 ## Setting (per workspace)
 Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
-- `model` (default `claude-opus-5`) + `effort` (default `xhigh`) — **default global** untuk sesi baru,
+- `model` (default `claude-sonnet-5`) + `effort` (default `medium`) — **default global** untuk sesi baru,
   dipakai sebagai argv saat sesi lahir. Sejak [ADR-0061](../adr/0061-model-effort-per-sesi-picker-start.md)
   (SPEC-252) model/effort dipilih **per SESI** saat Start (picker `StartSessionModal` → body opsional
   `model`/`effort` di `POST /terminal/sessions`); kosong → default global ini. Manusia tetap bisa
@@ -276,10 +276,15 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   Model/effort tetap `z.string()` (lenient); daftar pilihan valid (`MODELS`/`EFFORTS`, memuat
   `claude-fable-5` · `max` · `ultracode`) hidup di `@hanoman/shared` untuk picker Start.
 - `orchestration` ([ADR-0164](../adr/0164-orkestrasi-subagent-per-fase.md)) — satu kunci per flow
-  (`feature`…`no_effort`) berbentuk `{ enabled (default true), claude: {<Fase>: {model|null, effort|null}},
-  codex: {…} }`. Sesi ber-flow aktif lahir sebagai orchestrator; tiap fase dikerjakan subagent native
-  `hanoman-fase-<slug>` dengan model/effort sel, atau warisan orchestrator bila `null`. Lenient; baris lama
-  tanpa blok ini parse dengan default aktif. Tanpa migration.
+  (`feature`…`no_effort`) berbentuk `{ enabled, claude: {<Fase>: {model|null, effort|null}},
+  codex: {…} }`. Default bawaan mengisi model/effort rekomendasi tiap fase (`no_effort.enabled=false`);
+  nilai `null` pada konfigurasi user tetap berarti warisan orchestrator. Sesi ber-flow aktif lahir sebagai
+  orchestrator; tiap fase dikerjakan subagent native `hanoman-fase-<slug>`. Baris lama tanpa blok ini
+  parse dan di-seed tanpa migration.
+- `builtinRuntimeDefaults` (LOCAL-only, tanpa migration) — marker provenance versi seed. `seeded`
+  boleh diperbarui saat Hanoman membawa rekomendasi baru; `user` dipertahankan. Marker granular per
+  model/effort global, saklar flow, dan field model/effort sel fase. Pada `POST /terminal/sessions`
+  varian backlog, `phaseOverrides` opsional adalah override transient per sesi dan tidak ditulis ke Setting.
 - `remoteControl`, `logShipping`, `logRetention` (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md)/[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md),
   sudah di `zSetting` sejak turunan A; `logShipping`/`logRetention` baru dibaca SPEC-1217) — LOCAL-only, tanpa migration.
   - `remoteControl = { enabled:false, capabilities:[] }`: grant kendali jarak jauh dari hub, dengan
@@ -316,7 +321,7 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   `goal`/`goalCondition` di `POST /terminal/sessions`; sesi scheduler mengikuti default global ini.
   Ditambahkan sebagai `.default(GOAL_DEFAULTS)` → baris Setting lama tetap parse, **tanpa migration**.
 - `agent` (`claude|codex`, default `claude`) + `codex` (`{ model, effort }`, default
-  `gpt-5.6-sol`/`xhigh`) — SPEC-338/[ADR-0074](../adr/0074-codex-sebagai-mesin-sesi.md): mesin sesi
+  `gpt-5.6-terra`/`medium`) — SPEC-338/[ADR-0074](../adr/0074-codex-sebagai-mesin-sesi.md): mesin sesi
   default untuk SEMUA sesi yang men-spawn agen. `model`/`effort` di akar **tetap milik claude**;
   `sessionAgentDefaults()` memilih blok mengikuti `agent`. Blok codex dinormalkan saat **dibaca**
   (model pensiun → `gpt-5.5`, lalu effort dikoersi ke yang didukung model itu — SPEC-339).

@@ -125,7 +125,7 @@ describe("schemas", () => {
     it("baris lama yang masih memuat phaseModels tetap parse (field diabaikan)", () => {
       const s = zSetting.parse({ ...base, phaseModels: { feature: { Brainstorm: { model: "claude-sonnet-5" } } } });
       expect("phaseModels" in s).toBe(false);
-      expect(s.model).toBe("claude-opus-5");
+      expect(s.model).toBe("claude-sonnet-5");
     });
     it("MODELS memuat Fable; EFFORTS memuat max & ultracode (dipakai picker Start)", () => {
       expect(MODELS.map((m) => m.id)).toContain("claude-fable-5");

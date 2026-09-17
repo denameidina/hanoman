@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import type { Spec } from "@prisma/client";
 import { realGit, startPrompt, continuePrompt, resumePrompt, startGoalPrompt, resolveGoalCondition, buildPhaseAgents, fromAuditOf, specContext, goalContext, type Flow, type Autonomy, type VerifyScope, type ResumeCtx } from "@hanoman/runner";
-import { resolveMethod, readSpecMethod, stampSpecMethod, isGoalShapedFlow, type Agent } from "@hanoman/shared";
+import { resolveMethod, readSpecMethod, stampSpecMethod, isGoalShapedFlow, type Agent, type PhaseOverrides } from "@hanoman/shared";
 import { resolveRepoDir } from "./local-binding";
 import { getSetting } from "./settings";
 import { ensureCodexTrust } from "./codex-trust";
@@ -74,6 +74,8 @@ export async function startSpecSession(
     // `Spec.payload.method` → `Setting.method` → "superpowers". Governor scheduler tak
     // memasoknya → ikut rantai itu, seperti model/effort.
     method?: string;
+    // Override model/effort subagent per fase untuk sesi ini; tidak mengubah Setting global.
+    phaseOverrides?: PhaseOverrides;
     // SPEC-447 · ADR-0093 · lewati gerbang dependency. HANYA jalur manusia yang memasoknya
     // (POST /terminal/sessions); governor & denyut lead TAK PERNAH memaksa.
     force?: boolean;
@@ -202,7 +204,7 @@ export async function startSpecSession(
     const resumeCtx = resume ? buildResumeCtx(repoDir, id, opts.flow, resume.worktreeKept) : undefined;
     // ADR-0164 · rencana fase dihitung SEKALI; prompt orchestrator, agen fase, dan prompt mode tunggal
     // lahir dari input yang SAMA, jadi fallback all-or-nothing di createSession tak merakit ulang apa pun.
-    const fullPlan = sessionPhasePlan(setting, opts.flow, agent, { model, effort });
+    const fullPlan = sessionPhasePlan(setting, opts.flow, agent, { model, effort }, opts.phaseOverrides);
     // SPEC-172 · continue hanya melanjutkan Execute; flow goal tak punya Execute dan tetap utuh.
     let plan = fullPlan;
     if (fullPlan && isContinue && !isGoalFlow) {

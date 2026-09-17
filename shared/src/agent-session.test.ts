@@ -21,8 +21,8 @@ describe("SPEC-338 · agent sesi", () => {
     expect(zAgent.safeParse("gemini").success).toBe(false);
   });
 
-  it("default codex = gpt-5.6-sol / xhigh", () => {
-    expect(CODEX_DEFAULTS).toEqual({ model: "gpt-5.6-sol", effort: "xhigh" });
+  it("default codex = gpt-5.6-terra / medium", () => {
+    expect(CODEX_DEFAULTS).toEqual({ model: "gpt-5.6-terra", effort: "medium" });
     expect(zCodex.parse({})).toEqual(CODEX_DEFAULTS);
   });
 
@@ -55,5 +55,13 @@ describe("SPEC-338 · agent sesi", () => {
     expect(agentOf({ spec: "SPEC-338", flow: "feature", agent: "codex" })).toBe("codex");
     expect(agentOf({ spec: "SPEC-338", flow: "feature" })).toBe(undefined);
     expect(zTerminalSession.safeParse({ spec: "S", flow: "feature", agent: "gemini" }).success).toBe(false);
+  });
+
+  it("POST /terminal/sessions menerima override model/effort tiap fase", () => {
+    const parsed = zTerminalSession.parse({
+      spec: "SPEC-338", flow: "feature",
+      phaseOverrides: { Plan: { model: "claude-haiku-4-5", effort: "low" } },
+    });
+    expect(parsed).toMatchObject({ phaseOverrides: { Plan: { model: "claude-haiku-4-5", effort: "low" } } });
   });
 });

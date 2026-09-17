@@ -2274,6 +2274,8 @@ Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa p
   sel. Tabel di dalam `overflowX: auto`.
 - **Modal Start** (`PhasePlanPreview`): picker yang ada = orchestrator; di bawahnya daftar `Fase · model ·
   effort (warisi)` dari `resolvePhasePlan`, atau catatan "sesi tunggal" (flow mati / codex < 0.151).
+  Setiap fase juga memiliki picker override model + effort; nilai kosong berarti rekomendasi Settings/
+  orchestrator. Override dikirim sebagai `phaseOverrides` dan hanya berlaku untuk sesi itu.
   Sebelum Setting — dan untuk codex, versi codex — termuat, pratinjau menampilkan `Memuat rencana fase…`
   alih-alih menyimpulkan sesi tunggal lebih dulu; gagal memuat versi codex dihitung sebagai tak terdeteksi
   → sesi tunggal (cermin server, yang memperlakukan versi codex null sebagai tak didukung). Tanda warisi

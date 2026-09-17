@@ -12,6 +12,7 @@ import {
 } from "./pty";
 import { agentToolIds } from "./agent-tool-catalog";
 import { seedBuiltinAgents } from "./builtin-agents";
+import { seedRuntimeDefaults } from "./runtime-defaults";
 import { _resetCodexVersionCache, getCodexVersion } from "./codex-version";
 
 // SPEC-450 · ADR-0094 keputusan 7 · katalog custom agent untuk lapis proses.
@@ -230,6 +231,7 @@ export async function installCustomAgents(): Promise<void> {
   // SPEC-881 · ADR-0136 · urutannya MENGIKAT: seed dulu, baru cache. Terbalik berarti sesi pertama
   // sesudah boot lahir tanpa agen bawaan — argv-nya sah, agennya cuma tak ada — dan gejalanya
   // hilang sendiri di boot berikutnya.
+  await seedRuntimeDefaults();
   await seedBuiltinAgents();
   await loadCustomAgents();
   await refreshCustomAgentRuntimeSupport();

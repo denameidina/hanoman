@@ -25,6 +25,18 @@ describe("api client · sesi backlog", () => {
     }));
   });
 
+  it("startSession meneruskan override subagent per fase", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "spec-2" }), { status: 201, headers: { "content-type": "application/json" } }));
+    await api.startSession({ spec: "SPEC-2", flow: "qa",
+      phaseOverrides: { Audit: { model: "claude-haiku-4-5", effort: "low" } } });
+    expect(fetchMock).toHaveBeenCalledWith(paths.terminalSessions, expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ spec: "SPEC-2", flow: "qa",
+        phaseOverrides: { Audit: { model: "claude-haiku-4-5", effort: "low" } } }),
+    }));
+  });
+
   it("DELETE sesi mengembalikan undefined pada 204, bukan melempar", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
     await expect(api.deleteTerminal("spec-1")).resolves.toBeUndefined();
