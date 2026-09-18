@@ -1407,10 +1407,11 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 #   mengirim header `Host` = host control pertama saat origin dipisah (`HANOMAN_EVENT_HOST`).
 ```
 
-## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **sebagian mendarat (turunan A + B + D)**
+## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **mendarat penuh (turunan A + B + C + D)**
 
 > **Status:** kontrak dikunci fase Spec 2026-09-15; turunan B (orkestrasi hub lewat relay) mendarat
-> SPEC-1216, turunan D (log terpusat: ingest, pencarian, retensi, shipper klien) mendarat SPEC-1217.
+> SPEC-1216, turunan C (tampilan identik — stream/resize/backpressure) mendarat SPEC-1217, turunan D
+> (log terpusat: ingest, pencarian, retensi, shipper klien) mendarat SPEC-1217.
 > **Dilayani sejak turunan A (SPEC-1215):** `GET /sync/relay/ws` (hub; `welcome`/`req`/`cancel` ↔
 > `hello`/`res`; klien A menjawab `open` dengan `close 4502`), frame naik `capacity` +
 > `devices[].control|capacity` di `GET /presence`, `DELETE /device-tokens/:id` yang menutup socket sebelum
@@ -1422,11 +1423,20 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 > tiket `relay:<deviceId>:…`, `POST /terminal/sessions` & `POST /specs/:id/done` dengan `force` dari
 > `remote` → 403, `409 { error:"remote-session"|"confirm-required", remoteSession }` (gerbang presence
 > lintas instance), dan retry klien `syncOnce` pada `409 spec-404`.
+> **Dilayani sejak turunan C (SPEC-1218):** rute GET yang sama (`/devices/:deviceId/relay/*`) kini
+> JUGA mendeklarasikan `wsHandler` — request non-`/ws` tetap HTTP pass-through (di atas), tapi
+> request yang mengakhiri path dengan `/ws` di-upgrade ke WebSocket sesudah tiket dikonsumsi di
+> `preValidation` (`admitBrowserWs(req, "relay:<deviceId>:events"|"relay:<deviceId>:terminal:<id>", …)`,
+> hanya `req.user` — device/agent/remote ditolak). Sesudah upgrade: `openStream`/`closeStream`
+> memetakan browser socket ke satu `sid` di `relay/hub.ts` (plafon `RELAY_MAX_STREAMS=6`
+> stream/device, 4409 di koneksi ke-7), lalu meneruskan frame `data`/`geometry`/`close` dari device
+> apa adanya dan menegakkan kredit (`RELAY_CREDIT_INITIAL=256 KiB`, isi ulang di bawah
+> `RELAY_CREDIT_REFILL_BELOW=64 KiB`, `bufferedAmount` ≤ `RELAY_SOCKET_MAX_BUFFERED=1 MiB`) —
+> lihat §10 ADR-0165 untuk plafon lengkap dan status pengukurannya.
 > **Dilayani sejak turunan D (SPEC-1217):** `POST /sync/logs` (ingest batch Bearer device),
 > `GET /logs`, `GET /logs/:id/transcript`, `GET|PUT /logs/retention` (semua COOKIE_ONLY), dan
 > `GET|PUT /remote-control` kini membawa `logs:{event,server,transcript}` (toggle lajur pengiriman
 > shipper klien, dipasang/dicabut tanpa restart — D4/AC-S3).
-> **Belum dilayani:** stream/resize/backpressure §10 (SPEC-1218, turunan C).
 
 ```
 # ── HUB ──────────────────────────────────────────────────────────────────────────────────────────

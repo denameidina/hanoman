@@ -1627,13 +1627,13 @@ git commit -m "feat(spec-1218): ClientsScreen tombol Buka → RemoteInstanceView
   run penuh 10 menit sebagai langkah manusia terpisah — pola SPEC-1217 AC-S9 yang sudah membedakan
   run cepat vs run penuh).
 
-- [ ] **Step 1: Cari pola skrip preseden**
+- [x] **Step 1: Cari pola skrip preseden**
 
 ```bash
 ls server/scripts/ 2>/dev/null; cat docs/superpowers/plans/2026-09-18-spec-1217-ac-s9-hasil-pengukuran.md | head -40
 ```
 
-- [ ] **Step 2: Tulis skrip**
+- [x] **Step 2: Tulis skrip**
 
 Struktur mengikuti preseden AC-S9: boot server sungguhan (`node server/dist/server.js` atau
 `tsx server/src/server.ts`) di HANOMAN_HOME terpisah, buka 4 koneksi `injectWS`/WebSocket nyata ke
@@ -1641,7 +1641,7 @@ Struktur mengikuti preseden AC-S9: boot server sungguhan (`node server/dist/serv
 test harness atau proxy TCP sederhana, cetak CSV per detik: `t,stream,cpuUserMs,cpuSysMs,rssMB,
 bufferedAmount`.
 
-- [ ] **Step 3: Jalankan run singkat verifikasi (60 dtk) DI MESIN NYATA (bukan CI)**
+- [x] **Step 3: Jalankan run singkat verifikasi (60 dtk) DI MESIN NYATA (bukan CI)**
 
 ```bash
 node --loader tsx server/scripts/relay-8gb-measurement.ts --duration 60 --streams 4 --rtt 200
@@ -1657,7 +1657,7 @@ Bila dilanggar, amandemen `internal/docs/adr/0165-*.md` §10 dengan angka baru +
 bila tidak, catat "plafon awal S0b lulus pengukuran 8 GB, tak diamandemen" — TETAP tercatat, bukan
 diklaim tanpa berkas hasil.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/scripts/relay-8gb-measurement.ts docs/superpowers/plans/2026-09-18-spec-1218-ac-c10-hasil-pengukuran.md
@@ -1675,7 +1675,7 @@ git commit -m "feat(spec-1218): skrip pengukuran 4 stream/RTT 200ms + hasil Mac 
 - Modify: `internal/docs/architecture/stack.md`
 - Modify: `internal/docs/README.md`
 
-- [ ] **Step 1: Cabut penanda DIRANCANG**
+- [x] **Step 1: Cabut penanda DIRANCANG**
 
 ```bash
 grep -n "DIRANCANG untuk SPEC-1218" internal/docs/frontend/frontend-implementation.md
@@ -1684,12 +1684,12 @@ grep -n "DIRANCANG untuk SPEC-1218" internal/docs/frontend/frontend-implementati
 Ganti kalimat itu (SC11) menjadi pernyataan bahwa turunan C (stream, resize, backpressure §S10)
 sudah mendarat.
 
-- [ ] **Step 2: `api-contract.md` — `wsHandler` + tiket relay**
+- [x] **Step 2: `api-contract.md` — `wsHandler` + tiket relay**
 
 Tambahkan entri: route `/api/devices/:deviceId/relay/*` kini juga `wsHandler` (upgrade), target
 tiket `relay:<deviceId>:events|terminal:<id>` khusus `req.user`.
 
-- [ ] **Step 3: ADR-0165 — mendarat, hasil pengukuran, catatan desain `revalidateWsPrincipal`**
+- [x] **Step 3: ADR-0165 — mendarat, hasil pengukuran, catatan desain `revalidateWsPrincipal`**
 
 Ganti header "**Menyusul:** stream, resize, dan §10 backpressure di SPEC-1218 (turunan C)" menjadi
 "**Turunan C mendarat** (SPEC-1218): §2 stream `open`/`data`/`credit`/`geometry`/`close` via
@@ -1699,11 +1699,11 @@ penggunaan HUB-side (`admitBrowserWs`/`relayControlFor`, Task 2/4) dari klien-si
 in-process, Task 7/10) — dua mekanisme berbeda di bawah kata "remote" yang sama, supaya pembaca
 ADR di masa depan tak menyangka satu fungsi generik menutup keduanya.
 
-- [ ] **Step 4: `stack.md` — penanda turunan**
+- [x] **Step 4: `stack.md` — penanda turunan**
 
 Perbarui diagram/prosa "A only, B/C/D menyusul" jadi "A/B/C/D mendarat".
 
-- [ ] **Step 5: Tautkan di `internal/docs/README.md`**
+- [x] **Step 5: Tautkan di `internal/docs/README.md`**
 
 Tambah baris plan (pola baris 27/30 yang sudah ada untuk SPEC-1216/1217) sesudah baris rancangan
 SPEC-1218 (baris 28 sudah ada):
@@ -1712,7 +1712,7 @@ SPEC-1218 (baris 28 sudah ada):
 - [plan SPEC-1218 turunan C — tampilan identik lewat stream relay](../../docs/superpowers/plans/2026-09-18-spec-1218-tampilan-identik-turunan-c-plan.md) — 18 task TDD menurunkan §T1–§T12 spec di atas: tiket `relay:<deviceId>:…` (T1), `WsPrincipal` remote HUB-side + admitBrowserWs/revalidateWsPrincipal (T2), peta stream/kredit/plafon `relay/hub.ts` (T3), `wsHandler` `devices-relay.ts` (T4), `InjectableApp.injectWS` (T5), dispatcher jalur `open` via `injectWS({onOpen})` (T6), admisi WS klien `req.remote` in-process — dibedakan dari kind "remote" HUB-side untuk menghindari `revalidateWsPrincipal` menutup stream palsu (T7), `pty.ts` geometry (T8), `events.ts` grup terbatas (T9-T10), `TerminalPane`/`SpecDocsModal`/`IdeReadPanel` mode remote (T11-T13), `PresenceView.hubVersion` aditif menggantikan `api.getUpdateStatus()` yang tak ada (T14), `RemoteBanner`/`RemoteInstanceView` (T15), tombol Buka `ClientsScreen` (T16), pengukuran Mac mini 8 GB (T17), dan docs (T18).
 ```
 
-- [ ] **Step 6: `git grep` untuk memastikan tak ada sisa penanda**
+- [x] **Step 6: `git grep` untuk memastikan tak ada sisa penanda**
 
 ```bash
 git grep -n "DIRANCANG.*SPEC-1218\|SPEC-1218.*DIRANCANG" -- internal/docs/
@@ -1728,7 +1728,7 @@ frames), dan `RemoteBanner` menolak render saat protokol klien sengaja dibedakan
 `RELAY_PROTOCOL` sementara di satu sisi, rebuild, buktikan gate `AC-C7` menolak). Catat hasil
 smoke (lulus/gagal + apa yang diperbaiki) di pesan commit Step 8 — bukan diklaim tanpa dijalankan.
 
-- [ ] **Step 8: Commit BERSAMA (atau segera sesudah) commit kode terkait**
+- [x] **Step 8: Commit BERSAMA (atau segera sesudah) commit kode terkait**
 
 ```bash
 git add internal/docs/ server/scripts/ docs/superpowers/plans/2026-09-18-spec-1218-ac-c10-hasil-pengukuran.md

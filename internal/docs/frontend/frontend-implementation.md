@@ -42,14 +42,16 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
   `screens/presence-map.ts`. Ia **beda** dari `HandledByChips` (ADR-0135): yang itu penetapan MANUAL
   yang menyeberang sync, yang ini keadaan LIVE yang tak pernah masuk DB. Daftar nama kosong →
   **nol elemen**, ujung terakhir gerbang "instance tanpa sync tak berubah tampilannya".
-- **Kendali & tampilan klien dari hub — turunan A + B + D mendarat** (SPEC-1215/SPEC-1216/SPEC-1217 ·
+- **Kendali & tampilan klien dari hub — turunan A + B + C + D mendarat** (SPEC-1215/SPEC-1216/SPEC-1217/SPEC-1218 ·
   [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [spec §S4.11](../../../docs/superpowers/specs/2026-09-14-spec-1215-hub-orkestrasi-klien-design.md)),
   `RemoteControlPanel` (Settings → Kendali jarak jauh) mendarat dengan **tiga toggle lajur log**
   (`event`/`server`/`transcript`, `event` default nyala — SPEC-1217 AC-D1). Target Start + aksi sesi
   lintas instance (`createApi({base})`, `InstanceContext`, pemilih target di `StartSessionModal`, retry
   `syncOnce` pada `409 spec-404`), termasuk route `/devices/:deviceId/relay/*`, mendarat di turunan B
   (SPEC-1216 · [spec §S9](../../../docs/superpowers/specs/2026-09-14-spec-1215-hub-orkestrasi-klien-design.md));
-  tampilan identik — stream, resize, backpressure §S10 — tetap DIRANCANG untuk SPEC-1218 (turunan C).
+  tampilan identik — stream, resize, backpressure §S10 — mendarat di turunan C (SPEC-1218):
+  `RemoteInstanceView`/`RemoteBanner`, `TerminalPane`/`SpecDocsModal`/`IdeReadPanel` mode=remote,
+  dan tombol Buka `ClientsScreen` — lihat [plan turunan C](../../../docs/superpowers/plans/2026-09-18-spec-1218-tampilan-identik-turunan-c-plan.md).
   - **Pabrik API.** `createApi({ base })` menggantikan prefix `/api` dengan
     `/api/devices/<deviceId>/relay`; `api = createApi()` tetap untuk 61 importir.
   - **`InstanceContext`** (`local | remote`) memberi `useApi()` dan `useWsTarget()` (URL + tiket

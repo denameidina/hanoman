@@ -4,8 +4,26 @@
 relay, §3 principal `remote`, §4 grant + `/api/remote-control`, §5 allowlist, §7 pencabutan seketika, dan
 §9 frame `capacity` + `control`. **Turunan B mendarat** (SPEC-1216): §6 approval/`force`/langganan dan §8
 satu sesi lintas instance (`/devices/:deviceId/relay/*`, `StartSessionModal` target picker, retry
-`syncOnce` pada `409 spec-404`). **Menyusul:** stream, resize, dan §10 backpressure di SPEC-1218
-(turunan C). Koreksi fase Plan atas spec dicatat di spec §S13.
+`syncOnce` pada `409 spec-404`). **Turunan C mendarat** (SPEC-1218): §2 stream
+`open`/`data`/`credit`/`geometry`/`close` via `injectWS` (`RemoteInstanceView`, `TerminalPane`
+mode=remote baca-saja tanpa `resize`, `SpecDocsModal`/`IdeReadPanel` lewat `useApi()`), §6 grup
+`/events/ws` terbatas per-klien (`attach({groups})`), §10 backpressure — plafon awal (6 stream/4
+inflight/256 KiB kredit/64 KiB refill/1 MiB `bufferedAmount`/32 KiB per frame/12.000 frame-menit)
+**provisional, pending pengukuran 8 GB penuh** (Task 17 SPEC-1218: run singkat 60 dtk di mesin dev
+lulus tanpa pelanggaran plafon, tapi run PENUH 10 menit di Mac mini 8 GB — LANGKAH MANUSIA — belum
+dijalankan; lihat `docs/superpowers/plans/2026-09-18-spec-1218-ac-c10-hasil-pengukuran.md`). Koreksi
+fase Plan atas spec dicatat di spec §S13.
+
+> **Catatan desain — dua principal `remote` berbeda di bawah nama yang sama (SPEC-1218 Task 2/4 vs
+> Task 7/10):** HUB-side, `remote` di `admitBrowserWs`/`relayControlFor` (§3/§4 di bawah) menilai
+> apakah SOCKET KLIEN yang menyambung ke socket relay `/sync/relay/ws` boleh diterima hub —
+> keadaannya di `relay/hub.ts` (peta `links`/`streams` per device). Klien-side, `req.remote`
+> in-process (dipasang gate `admitRemoteRequest` di `app.ts`, dipakai dispatcher relay §S9 desain)
+> menilai apakah REQUEST HTTP yang tiba di klien lewat header `x-hanoman-relay` boleh dijalankan
+> lokal — sama sekali tak berbagi kode/keadaan dengan yang HUB-side. Pembaca ADR ini di masa depan
+> jangan menyangka satu fungsi generik "principal remote" menutup keduanya: keduanya kebetulan
+> memakai kata "remote" untuk konsep yang mirip (identitas pihak ketiga yang bukan `user`/`agent`
+> biasa) tapi berjalan di sisi proses dan lapisan gerbang yang berbeda.
 **Mengamandemen** [0046](0046-kanal-ws-sync-terpisah.md) & [0147](0147-kanal-presence-di-socket-sync.md)
 (keluarga `/api/sync/*` mendapat socket kedua dan frame naik `capacity`),
 [0148](0148-status-hidup-tidak-disync.md) & [0135](0135-penanda-project-ditangani-hanoman-client.md)
