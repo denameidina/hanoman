@@ -2053,7 +2053,7 @@ git commit -m "feat(server): GET /api/logs, /logs/:id/transcript, GET|PUT /logs/
 - Consumes: `LogRetention` type (Task 1), `deleteTranscript`/`listTranscripts` (`transcript-store.ts`, sudah ada — dipakai untuk transkrip `deviceId:"local"`; transkrip remote punya direktori sendiri `remote-transcripts/<deviceId>/`).
 - Produces: `pruneLogs(now: Date, retention: LogRetention, opts?: {dryRun?: boolean}): Promise<{logsPruned: number; logBytesFreed: number}>`, `reconcileRemoteTranscripts(): Promise<{orphans: number}>`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/retention-logs.test.ts
@@ -2110,12 +2110,12 @@ describe("pruneLogs", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/retention-logs.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/logs/prune.ts
@@ -2210,12 +2210,12 @@ export async function reconcileRemoteTranscripts(): Promise<{ orphans: number }>
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/retention-logs.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Kabel ke `runRetention()`**
+- [x] **Step 5: Kabel ke `runRetention()`**
 
 Modify `server/src/services/retention.ts`:
 
@@ -2249,12 +2249,12 @@ export async function runRetention(opts: RetentionOptions = {}, deps: RetentionD
 }
 ```
 
-- [ ] **Step 6: Run existing retention suite (regresi nol)**
+- [x] **Step 6: Run existing retention suite (regresi nol)**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/retention.test.ts server/test/retention-logs.test.ts`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/logs/prune.ts server/src/services/retention.ts server/test/retention-logs.test.ts
