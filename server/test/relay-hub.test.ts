@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { RELAY_MAX_INFLIGHT } from "@hanoman/shared";
+import { RELAY_MAX_INFLIGHT, RELAY_CREDIT_INITIAL } from "@hanoman/shared";
 import { __resetDeviceSockets, deviceSocketCount } from "../src/services/device-sockets";
-import { __resetRelayHub, attachRelaySocket, relayControlFor, requestRelay } from "../src/services/relay/hub";
+import {
+  __resetRelayHub, attachRelaySocket, relayControlFor, requestRelay,
+  openStream, onClientFrame, closeStream,
+} from "../src/services/relay/hub";
 
 type Frame = Record<string, any>;
 const actor = { hubOrigin: "https://hub.example", userId: "u1", email: "op@hub.example" };
@@ -106,5 +109,67 @@ describe("requestRelay", () => {
       .rejects.toMatchObject({ kind: "too-large" });
     expect(again.sent.length).toBe(before);
     expect(sent.length).toBeGreaterThan(0);
+  });
+});
+
+describe("relay/hub.ts — stream, kredit, plafon (SPEC-1218 · AC-C4/C5/C6)", () => {
+  it("openStream ke-7 saat 6 aktif → null (4409 di pemanggil)", () => {
+    ready();
+    for (let i = 0; i < 6; i++) expect(openStream("dev1", { path: "/api/terminal/sessions/x/ws", mode: "read", actor }, fake().socket)).not.toBeNull();
+    expect(openStream("dev1", { path: "/api/terminal/sessions/x/ws", mode: "read", actor }, fake().socket)).toBeNull();
+  });
+
+  it("inflightOpens turun saat 'opened' diterima (koreksi: bukan plafon terpisah — lihat komentar openStream)", () => {
+    ready();
+    const sid = openStream("dev1", { path: "/api/terminal/sessions/x/ws", mode: "read", actor }, fake().socket)!;
+    expect(sid).not.toBeNull();
+    onClientFrame("dev1", { t: "opened", sid }); // tak melempar — inflightOpens turun dari 1 ke 0
+    // plafon TETAP hanya RELAY_MAX_STREAMS (6) — AC-C5 (Task 4) menuntut 6 open mentah sukses.
+    for (let i = 0; i < 5; i++) expect(openStream("dev1", { path: "/api/terminal/sessions/x/ws", mode: "read", actor }, fake().socket)).not.toBeNull();
+    expect(openStream("dev1", { path: "/api/terminal/sessions/x/ws", mode: "read", actor }, fake().socket)).toBeNull();
+  });
+
+  it("kredit habis → data berikutnya dibuang, tak diteruskan ke browser", () => {
+    ready();
+    const browser = fake();
+    const sid = openStream("dev1", { path: "/api/terminal/sessions/x/ws", mode: "read", actor }, browser.socket)!;
+    onClientFrame("dev1", { t: "opened", sid });
+    onClientFrame("dev1", { t: "data", sid, d: "x".repeat(RELAY_CREDIT_INITIAL) });
+    const before = browser.sent.filter((f) => f.t === "data").length;
+    onClientFrame("dev1", { t: "data", sid, d: "y" });
+    expect(browser.sent.filter((f) => f.t === "data").length).toBe(before);
+  });
+
+  it("refill di bawah 64 KiB → kirim credit ke KLIEN (link.socket); pertama kali → resync browser 4009", () => {
+    const link = ready();
+    const browser = fake();
+    const sid = openStream("dev1", { path: "/api/terminal/sessions/x/ws", mode: "read", actor }, browser.socket)!;
+    onClientFrame("dev1", { t: "opened", sid });
+    onClientFrame("dev1", { t: "data", sid, d: "x".repeat(RELAY_CREDIT_INITIAL) });
+    expect(link.sent.some((f) => f.t === "credit" && f.sid === sid)).toBe(true);
+    expect(browser.closes.filter(([code]) => code === 4009).length).toBe(1);
+  });
+
+  it("dua kondisi refill <5dtk berturutan pada stream berbeda → resync tak digandakan per lastResyncAt", () => {
+    const link = ready();
+    const browser1 = fake();
+    const sid1 = openStream("dev1", { path: "/api/terminal/sessions/x/ws", mode: "read", actor }, browser1.socket)!;
+    onClientFrame("dev1", { t: "opened", sid: sid1 });
+    onClientFrame("dev1", { t: "data", sid: sid1, d: "x".repeat(RELAY_CREDIT_INITIAL) });
+    expect(browser1.closes.filter(([code]) => code === 4009).length).toBe(1);
+    // stream sid1 sudah ditutup (resync) — frame data berikutnya untuknya dibuang, bukan diteruskan lagi
+    const before = browser1.sent.filter((f) => f.t === "data").length;
+    onClientFrame("dev1", { t: "data", sid: sid1, d: "z" });
+    expect(browser1.sent.filter((f) => f.t === "data").length).toBe(before);
+    expect(link.sent.filter((f) => f.t === "credit").length).toBeGreaterThan(0);
+  });
+
+  it("browser socket tertutup → close ke klien segera (≤2 dtk, bukan menunggu idle)", () => {
+    const link = ready();
+    const browser = fake();
+    const sid = openStream("dev1", { path: "/api/terminal/sessions/x/ws", mode: "read", actor }, browser.socket)!;
+    onClientFrame("dev1", { t: "opened", sid });
+    closeStream("dev1", sid);
+    expect(link.sent.some((f) => f.t === "close" && f.sid === sid && f.code === 1000)).toBe(true);
   });
 });

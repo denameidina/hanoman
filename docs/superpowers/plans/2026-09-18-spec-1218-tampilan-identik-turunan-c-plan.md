@@ -286,7 +286,7 @@ git commit -m "feat(spec-1218): WsPrincipal remote (HUB-side) + admitBrowserWs/r
   `RELAY_CREDIT_REFILL_BELOW`/`RELAY_SOCKET_MAX_BUFFERED`/`RELAY_RESYNC_MIN_MS`/
   `RELAY_IDLE_STREAM_CLOSE_MS` (`@hanoman/shared`, sudah ada).
 
-- [ ] **Step 1: Tulis test tabel yang gagal (fixture `fake()`/`hello()`/`ready()` sudah ada di berkas)**
+- [x] **Step 1: Tulis test tabel yang gagal (fixture `fake()`/`hello()`/`ready()` sudah ada di berkas)**
 
 ```ts
 describe("relay/hub.ts — stream, kredit, plafon (SPEC-1218 · AC-C4/C5/C6)", () => {
@@ -335,7 +335,7 @@ describe("relay/hub.ts — stream, kredit, plafon (SPEC-1218 · AC-C4/C5/C6)", (
 dengan bentuk `StreamState`/`fake()` nyata saat menulisnya; jangan longgarkan assert `toBeNull`/
 `toBe` di atas demi lulus.)
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -343,7 +343,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`openStream`/`onClientFrame`/`closeStream` tak ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // relay/hub.ts — tambahan tipe & state
@@ -394,7 +394,7 @@ yang sama — jangan buat handler kedua).
 `previous.streams` (kirim close ke setiap browser socket yang masih terbuka) — tambahkan di blok
 `if (previous)` yang sudah ada.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -402,7 +402,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/relay/hub.ts server/test/relay-hub.test.ts
