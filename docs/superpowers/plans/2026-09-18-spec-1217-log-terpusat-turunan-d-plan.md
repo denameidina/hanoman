@@ -197,7 +197,7 @@ git commit -m "feat(shared): konstanta S3.1 + zLogBatch/zLogSearchQuery (SPEC-12
 - Produces: `redactText(text: string, known?: readonly string[]): string`, `redactValue<T>(value: T, known?: readonly string[]): T`.
 - Consumes: tak ada (fungsi murni, nol dependensi).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // shared/test/redact.test.ts
@@ -262,12 +262,12 @@ describe("redactValue", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism shared/test/redact.test.ts`
 Expected: FAIL — module `../src/redact` not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // shared/src/redact.ts
@@ -332,12 +332,12 @@ export function redactValue<T>(value: T, known?: readonly string[]): T {
 
 Tambahkan ke `shared/src/index.ts`: `export * from "./redact";`
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism shared/test/redact.test.ts`
 Expected: PASS — jika pola JWT/PEM/env perlu penyesuaian regex untuk lolos, sesuaikan regex (bukan test) sampai korpus di atas hijau tanpa melonggarkan pola negatif ("teks biasa" tetap tak tersentuh).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/redact.ts shared/src/index.ts shared/test/redact.test.ts
