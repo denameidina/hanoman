@@ -1627,13 +1627,13 @@ git commit -m "feat(spec-1218): ClientsScreen tombol Buka → RemoteInstanceView
   run penuh 10 menit sebagai langkah manusia terpisah — pola SPEC-1217 AC-S9 yang sudah membedakan
   run cepat vs run penuh).
 
-- [ ] **Step 1: Cari pola skrip preseden**
+- [x] **Step 1: Cari pola skrip preseden**
 
 ```bash
 ls server/scripts/ 2>/dev/null; cat docs/superpowers/plans/2026-09-18-spec-1217-ac-s9-hasil-pengukuran.md | head -40
 ```
 
-- [ ] **Step 2: Tulis skrip**
+- [x] **Step 2: Tulis skrip**
 
 Struktur mengikuti preseden AC-S9: boot server sungguhan (`node server/dist/server.js` atau
 `tsx server/src/server.ts`) di HANOMAN_HOME terpisah, buka 4 koneksi `injectWS`/WebSocket nyata ke
@@ -1641,7 +1641,7 @@ Struktur mengikuti preseden AC-S9: boot server sungguhan (`node server/dist/serv
 test harness atau proxy TCP sederhana, cetak CSV per detik: `t,stream,cpuUserMs,cpuSysMs,rssMB,
 bufferedAmount`.
 
-- [ ] **Step 3: Jalankan run singkat verifikasi (60 dtk) DI MESIN NYATA (bukan CI)**
+- [x] **Step 3: Jalankan run singkat verifikasi (60 dtk) DI MESIN NYATA (bukan CI)**
 
 ```bash
 node --loader tsx server/scripts/relay-8gb-measurement.ts --duration 60 --streams 4 --rtt 200
@@ -1657,7 +1657,7 @@ Bila dilanggar, amandemen `internal/docs/adr/0165-*.md` §10 dengan angka baru +
 bila tidak, catat "plafon awal S0b lulus pengukuran 8 GB, tak diamandemen" — TETAP tercatat, bukan
 diklaim tanpa berkas hasil.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/scripts/relay-8gb-measurement.ts docs/superpowers/plans/2026-09-18-spec-1218-ac-c10-hasil-pengukuran.md
