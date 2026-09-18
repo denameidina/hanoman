@@ -6,6 +6,7 @@ import { prisma } from "../../db";
 import { buildLocalPresence, buildLocalCapacity } from "./snapshot";
 import { presenceEntries, recordPresence, capacityFor } from "./registry";
 import { relayControlFor } from "../relay/hub";
+import { runningVersion } from "../update";
 
 /* SPEC-919 · ADR-0148 · gabungan katalog device (DB, persisten) + keadaan hidup (memori).
 
@@ -53,5 +54,5 @@ export async function presenceView(
   }
 
   // Gerbang requirement 7: instalasi satu mesin (nol device token) tak berubah tampilannya.
-  return { enabled: rows.length > 0, devices };
+  return { enabled: rows.length > 0, devices, hubVersion: runningVersion() };
 }

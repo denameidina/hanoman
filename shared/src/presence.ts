@@ -87,6 +87,8 @@ export type PresenceView = {
   /** Instalasi ini memang punya lebih dari satu mesin. `false` → layar tak berubah sama sekali. */
   enabled: boolean;
   devices: PresenceDeviceView[];
+  // SPEC-1218 · versi instance INI, dibaca RemoteBanner untuk banding versi klien yang dibuka.
+  hubVersion: string;
 };
 
 /** Potong daftar sesi sampai frame utuhnya muat di `PRESENCE_MAX_FRAME_BYTES`.

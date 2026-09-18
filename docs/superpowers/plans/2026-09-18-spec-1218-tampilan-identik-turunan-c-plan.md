@@ -1329,13 +1329,13 @@ git commit -m "feat(spec-1218): IdeReadPanel — subset baca IdeScreen via useAp
 - **Koreksi dicatat di Global Constraints:** menggantikan asumsi spec teknis §T7 `api.getUpdateStatus()`
   yang tak ada di `src/src/api/client.ts`.
 
-- [ ] **Step 1: Cari fungsi pembangun `PresenceView` nyata**
+- [x] **Step 1: Cari fungsi pembangun `PresenceView` nyata**
 
 ```bash
 grep -rln "PresenceView\b" server/src/services | grep -v test
 ```
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 it("presenceView() menyertakan hubVersion = runningVersion() (SPEC-1218 · prasyarat RemoteBanner)", async () => {
@@ -1344,7 +1344,7 @@ it("presenceView() menyertakan hubVersion = runningVersion() (SPEC-1218 · prasy
 });
 ```
 
-- [ ] **Step 3: Jalankan, pastikan gagal**
+- [x] **Step 3: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1352,7 +1352,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`hubVersion` undefined).
 
-- [ ] **Step 4: Implementasi**
+- [x] **Step 4: Implementasi**
 
 ```ts
 // shared/src/presence.ts
@@ -1366,7 +1366,7 @@ export type PresenceView = {
 Di pembangun server (`presence/view.ts` atau setara): `import { runningVersion } from
 "../update";` lalu `return { enabled, devices, hubVersion: runningVersion() };`.
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1375,7 +1375,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 Expected: PASS (`events.route.test.ts` yang menguji frame `presence` — pastikan tak regresi bentuk
 frame lama, `hubVersion` aditif).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/presence.ts server/src/services/presence/*.ts
