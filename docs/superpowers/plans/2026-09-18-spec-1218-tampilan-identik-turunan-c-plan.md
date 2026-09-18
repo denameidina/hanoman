@@ -186,7 +186,7 @@ git commit -m "feat(spec-1218): ws-tickets target relay:<deviceId>:events|termin
   dipakai HUB mengadmisi socket **browser** yang menembak `wsHandler` `devices-relay.ts` (Task 4).
   Task 7 (admisi injectWS klien) SENGAJA tidak memakai kind ini — lihat alasannya di Task 7.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // tambahan di server/test/ws-admission.test.ts
@@ -211,7 +211,7 @@ describe("admitBrowserWs — target relay:<deviceId>:… (SPEC-1218 · prasyarat
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -220,7 +220,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 Expected: FAIL (TS: `"remote"` bukan anggota `WsPrincipal.kind`; `consumeWsTicket` menolak target
 relay karena `WsTarget` belum memuatnya).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // ws-admission.ts
@@ -254,7 +254,7 @@ if (principal.kind === "remote") {
 tak melempar; bila `relay/hub.ts` sudah aman diimpor statis di modul ini pakai import statis biasa
 dan catat koreksi di commit.)
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -262,7 +262,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS (kedua berkas — Task 1 kini type-check bersih juga).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/ws-admission.ts server/test/ws-admission.test.ts

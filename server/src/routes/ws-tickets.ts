@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { issueWsTicket } from "../services/ws-admission";
+import { issueWsTicket, type WsTarget } from "../services/ws-admission";
 
 const relayTarget = /^relay:[^:]+:(events|terminal:[^:]+)$/;
 const targetSchema = z.string().refine((value) =>
@@ -18,6 +18,6 @@ export default async function (app: FastifyInstance, opts: { allowTestPrincipal?
           ? { kind: "test" as const, id: "test" }
           : null;
     if (!principal) return reply.code(401).send({ error: "unauthorized" });
-    return { ticket: issueWsTicket(principal, parsed.data.target as "events" | `terminal:${string}`) };
+    return { ticket: issueWsTicket(principal, parsed.data.target as WsTarget) };
   });
 }
