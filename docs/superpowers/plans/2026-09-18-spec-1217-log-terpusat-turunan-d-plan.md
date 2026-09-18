@@ -1650,7 +1650,7 @@ git commit -m "feat(server): route POST /api/sync/logs penuh — zod, transkrip,
 - Consumes: `zLogBatch`/`LOG_SHIP_MAX_BATCHES_PER_TICK`/`LOG_UNSUPPORTED_RETRY_MS` (Task 1); `readSpoolSegments`/`removeSpoolSegment` (Task 4); `Transport` type (`sync-client.ts`, sudah ada — `(method, path, body?) => Promise<{status:number; body:unknown}>`).
 - Produces: `shipLogs(transport: Transport): Promise<void>`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-shipper.test.ts
@@ -1692,12 +1692,12 @@ describe("shipLogs", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-shipper.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/logs/shipper.ts
@@ -1780,12 +1780,12 @@ export async function shipLogs(transport: Transport): Promise<void> {
 export function __resetShipperPause(): void { pausedUntil.clear(); }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-shipper.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Kabel ke `syncTick()`**
+- [x] **Step 5: Kabel ke `syncTick()`**
 
 Modify `server/src/services/sync-client.ts`:
 
@@ -1806,12 +1806,12 @@ export async function syncTick(transport: Transport): Promise<void> {
 }
 ```
 
-- [ ] **Step 6: Run existing sync-client suite (regresi nol)**
+- [x] **Step 6: Run existing sync-client suite (regresi nol)**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync-client.test.ts`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/logs/shipper.ts server/src/services/sync-client.ts server/test/log-shipper.test.ts

@@ -13,6 +13,7 @@ import { safeRequest } from "./safe-outbound-request";
 import { startPresenceSender } from "./presence/sender";
 import { RECONNECT_MAX_MS, RECONNECT_MIN_MS, nextBackoff, withJitter } from "./backoff";
 import { startRelayClient, stopRelayClient } from "./relay/client";
+import { shipLogs } from "./logs/shipper";
 // Diekspor ulang: test & pemanggil lama mengimpornya dari modul ini.
 export { RECONNECT_MAX_MS, RECONNECT_MIN_MS, nextBackoff, withJitter };
 
@@ -451,6 +452,10 @@ export async function syncTick(transport: Transport): Promise<void> {
       pullSehat = false;
     }
   }
+  // SPEC-1217 · TANPA timer baru — dikuras di titik yang sama, fire-and-forget: shipper gagal
+  // TAK PERNAH mengganggu sync (K11/AC-M2). `transport` Fastify GET/POST sudah kompatibel sebagai
+  // Transport shipper (method, path, body?).
+  void shipLogs(transport).catch((e: unknown) => console.warn(`shipper gagal: ${(e as Error).message}`));
 }
 
 // Jalankan client sync: syncOnce awal + WS siar (apply + drain saat frame) + reconnect backoff +
