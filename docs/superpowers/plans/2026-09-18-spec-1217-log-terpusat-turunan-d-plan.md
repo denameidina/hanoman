@@ -1833,7 +1833,7 @@ git commit -m "feat(server): shipLogs() dikuras syncTick, tanpa timer baru (SPEC
 - Consumes: `zLogSearchQuery` (Task 1), `toLogEntryView` (`event-log.ts`, sudah ada), `getSetting`/`putSetting`-setara untuk `logRetention` (pola `remote-control.ts`: baca `getSetting()`, tulis lewat `prisma.setting.upsert`).
 - Produces: `searchLogs(q: LogSearchQuery): Promise<{ items: LogEntryView[]; nextCursor: string | null }>`, `readRemoteTranscript(id: number): Promise<string | null>`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/logs.route.test.ts
@@ -1912,12 +1912,12 @@ describe("GET|PUT /api/logs/retention", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/logs.route.test.ts`
 Expected: FAIL — route `/api/logs` 404.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/logs/search.ts
@@ -2028,12 +2028,12 @@ await api.register(remoteControl);
 await api.register(logs);   // SPEC-1217 · GET /logs, /logs/:id/transcript, GET|PUT /logs/retention (COOKIE_ONLY)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/logs.route.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/logs/search.ts server/src/routes/logs.ts server/src/services/agent-capabilities.ts server/src/app.ts server/test/logs.route.test.ts
