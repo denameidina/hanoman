@@ -38,9 +38,9 @@ jatuh tempo. Terukur: `AskUserQuestion` → lead mulai menyusun turun dari lanta
 tick) ke **32–164 ms**, dan `capture-pane` saat tak ada yang bertanya jadi **nol**. Tak ada kanal
 WebSocket baru: keadaan tanya untuk pet menumpang frame `leadAsks` di `/api/events/ws` (ADR-0039).
 
-**Kendali jarak jauh & log terpusat — turunan A + B + D mendarat (SPEC-1215/SPEC-1216/SPEC-1217 ·
+**Kendali jarak jauh & log terpusat — turunan A + B + C + D mendarat (SPEC-1215/SPEC-1216/SPEC-1218/SPEC-1217 ·
 [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) ·
-[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)); C = SPEC-1218 menyusul.**
+[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)).**
 - **Relay.** Klien yang grant lokalnya menyala membuka socket **kedua** ke hub,
   `/api/sync/relay/ws` (device token). Hub mengirim request ke route REST/WS **yang sudah ada**, dan
   klien menjalankannya ulang in-process lewat `app.inject`/`app.injectWS`. Tanpa katalog RPC, tanpa
@@ -51,6 +51,12 @@ WebSocket baru: keadaan tanya untuk pet menumpang frame `leadAsks` di `/api/even
   `InstanceContext` merebase klien ke relay, dan dispatcher klien meretry `syncOnce` pada `409
   spec-404`. Gerbang presence lintas instance menolak/mengusulkan lewat `409
   remote-session|confirm-required`, tak pernah meluluskan otomatis.
+- **Tampilan identik (turunan C).** `/api/devices/:deviceId/relay/*` GET kini juga `wsHandler`
+  (upgrade lewat tiket `relay:<deviceId>:events|terminal:<id>`, hanya `req.user`): `openStream`
+  memetakan browser socket ke `sid` di `relay/hub.ts` (plafon 6 stream/device, kredit alir
+  256 KiB/isi ulang 64 KiB), meneruskan frame `data`/`geometry`/`close` device apa adanya.
+  `RemoteInstanceView` (tab Terminal/Dokumen/IDE) menggerbangi protokol via `RemoteBanner`;
+  `TerminalPane` mode=remote baca-saja tanpa `resize`.
 - **Log — shipper klien.** Sadapan (`event`: tap sesi lahir/tutup; `server`: sadapan console,
   dipasang/dicabut tanpa restart mengikuti toggle `Setting.logShipping.server`) menulis ke spool
   NDJSON `$HANOMAN_HOME/log-spool/<lane>/` (rotasi per ukuran segmen, plafon total). Shipper
