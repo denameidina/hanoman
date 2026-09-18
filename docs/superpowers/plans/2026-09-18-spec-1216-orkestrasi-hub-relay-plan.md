@@ -1844,7 +1844,7 @@ git commit -m "feat(spec-1216): StartSessionModal — pemilih target default + a
 
 **Interfaces:** (dokumentasi, tak ada kode)
 
-- [ ] **Step 1: Baca tiap titik yang disebut spec teknis §T10 sebelum mengedit**
+- [x] **Step 1: Baca tiap titik yang disebut spec teknis §T10 sebelum mengedit**
 
 ```bash
 grep -n "SPEC-1216" internal/docs/frontend/frontend-implementation.md \
@@ -1854,20 +1854,20 @@ sed -n '1410,1425p' internal/docs/architecture/api-contract.md
 sed -n '140,155p' internal/docs/security/threat-model.md
 ```
 
-- [ ] **Step 2: Cabut frasa "SPEC-1216" di `frontend-implementation.md:47`**
+- [x] **Step 2: Cabut frasa "SPEC-1216" di `frontend-implementation.md:47`**
 
 Ganti `"sisanya DIRANCANG untuk SPEC-1216/SPEC-1218"` menjadi `"sisanya DIRANCANG untuk SPEC-1218"`
 — bagian SPEC-1216 dianggap SUDAH mendarat di kalimat sebelumnya (sesuaikan kalimat penuhnya
 dengan isi nyata baris itu, mengikuti kutipan di spec teknis: `RemoteControlPanel` mendarat A tanpa
 toggle lajur log, target Start + aksi sesi mendarat B, log terpusat tetap milik C/D).
 
-- [ ] **Step 3: Perbarui `api-contract.md` — cabut "Belum dilayani" untuk devices-relay**
+- [x] **Step 3: Perbarui `api-contract.md` — cabut "Belum dilayani" untuk devices-relay**
 
 Baris 1417-1418: ganti status route `/devices/:deviceId/relay/*` dari "Belum dilayani (SPEC-1216)"
 menjadi entri route terlayani (method, capability `COOKIE_ONLY`, mapping status). Tambahkan
 `devices` ke daftar top non-delegatable bila daftar itu berbentuk tabel/list eksplisit.
 
-- [ ] **Step 4: Perbarui ADR-0165 §6/§8/§9 + `adr/README.md`**
+- [x] **Step 4: Perbarui ADR-0165 §6/§8/§9 + `adr/README.md`**
 
 Ganti setiap "menyusul SPEC-1216" menjadi "mendarat SPEC-1216" (atau frasa serupa yang menyatakan
 statusnya sudah terimplementasi), konsisten dengan amandemen ADR-0117/0120/0135/0147/0148/0161
@@ -1877,12 +1877,12 @@ yang disebut spec teknis — cek masing-masing berkas ADR itu untuk frasa yang s
 grep -rln "menyusul SPEC-1216" internal/docs/adr/
 ```
 
-- [ ] **Step 5: Perbarui `threat-model.md:150` + `stack.md`**
+- [x] **Step 5: Perbarui `threat-model.md:150` + `stack.md`**
 
 Masukkan turunan B ke daftar yang sudah mendarat (bukan lagi "direncanakan"); perbarui
 diagram/penanda turunan di `stack.md` bila ada penanda eksplisit "A only, B/C/D menyusul".
 
-- [ ] **Step 6: Tautkan di `internal/docs/README.md`**
+- [x] **Step 6: Tautkan di `internal/docs/README.md`**
 
 Pastikan entri untuk `frontend-implementation.md`, `api-contract.md`, `adr/0165-*.md`,
 `security/threat-model.md`, `architecture/stack.md` tetap tertaut (biasanya sudah, karena berkas
@@ -1890,7 +1890,7 @@ lama — bukan baru). Bila plan/spec SPEC-1216 belum tertaut, tambahkan baris un
 `docs/superpowers/specs/2026-09-18-spec-1216-orkestrasi-hub-relay-design.md` dan plan ini
 (`docs/superpowers/plans/2026-09-18-spec-1216-orkestrasi-hub-relay-plan.md`) di bagian yang sesuai.
 
-- [ ] **Step 7: `git grep` untuk memastikan tak ada sisa "SPEC-1216" di penanda DIRANCANG**
+- [x] **Step 7: `git grep` untuk memastikan tak ada sisa "SPEC-1216" di penanda DIRANCANG**
 
 ```bash
 git grep -n "DIRANCANG.*SPEC-1216\|SPEC-1216.*DIRANCANG" -- internal/docs/
@@ -1898,7 +1898,7 @@ git grep -n "DIRANCANG.*SPEC-1216\|SPEC-1216.*DIRANCANG" -- internal/docs/
 Expected: nol hasil (atau hanya kemunculan yang memang bukan penanda "belum dikerjakan", mis. di
 riwayat/rujukan spec ini sendiri).
 
-- [ ] **Step 8: Commit BERSAMA kode Execute (bukan commit terpisah)**
+- [x] **Step 8: Commit BERSAMA kode Execute (bukan commit terpisah)**
 
 Task ini dieksekusi sebagai bagian dari commit penutup setiap task kode di atas yang menyentuh
 kontrak yang didokumentasikan — atau, bila dikerjakan terakhir, satu commit gabungan:

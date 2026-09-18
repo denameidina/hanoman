@@ -13,7 +13,7 @@ baru), [0039](0039-realtime-lewat-websocket-siar.md)/[0145](0145-langganan-berpa
 Berpasangan dengan [ADR-0148](0148-status-hidup-tidak-disync.md), yang memutuskan di mana keadaan
 itu disimpan.
 
-> **Amendment SPEC-1215 / [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (butir 1, 2, 4 berlaku sejak turunan A; butir 3 menyusul SPEC-1216):**
+> **Amendment SPEC-1215 / [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) (butir 1, 2, 4 berlaku sejak turunan A; butir 3 mendarat SPEC-1216, turunan B):**
 > (1) arah naik `/api/sync/ws` bertambah SATU jenis frame, `{ t:"capacity", v:1, admission }`
 > (angka `launchStatus()`), yang juga dibuang senyap oleh hub lama. (2) §Plafon "menonton terminal
 > klien dari hub ada DI LUAR" dibuka lewat socket relay KEDUA, bukan socket ini. (3) Frasa "presence

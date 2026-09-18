@@ -890,7 +890,8 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157). **Tak-boleh-didelegasikan** (agent → 403):
 > `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, `/webhooks` (ADR-0100), `/portal` &
 > `/client-accounts` (ADR-0110), `/session-events` (ADR-0146), `/presence` (ADR-0147),
-> `/remote-control` (SPEC-1215 · ADR-0165), dan
+> `/remote-control` (SPEC-1215 · ADR-0165), `/devices/:deviceId/relay/*` (SPEC-1216 · ADR-0165 §6 —
+> menjalankan aksi sesi di mesin lain atas nama pemanggil), dan
 > `/telegram/{settings,test,credentials}` (ADR-0097); route tak dikenal peta → cookie-only. Master switch
 > `Setting.agentAccessEnabled` (PUT /settings) mematikan semua. **Kecuali** endpoint `PUBLIC`
 > (`/health`, `/auth/status`, `/auth/login`, `/auth/setup`, `/agent-integration.md`) yang tak pernah
@@ -1406,7 +1407,7 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 #   mengirim header `Host` = host control pertama saat origin dipisah (`HANOMAN_EVENT_HOST`).
 ```
 
-## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **sebagian mendarat (turunan A)**
+## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **sebagian mendarat (turunan A+B)**
 
 > **Status:** kontrak dikunci fase Spec 2026-09-15.
 > **Dilayani sejak turunan A (SPEC-1215):** `GET /sync/relay/ws` (hub; `welcome`/`req`/`cancel` ↔
@@ -1414,8 +1415,14 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 > `devices[].control|capacity` di `GET /presence`, `DELETE /device-tokens/:id` yang menutup socket sebelum
 > 204, `GET|PUT /remote-control` (tanpa `shipping` — menyusul SPEC-1217), gate principal `remote`, dan
 > `PUT /settings` yang mempertahankan tiga kunci baru.
-> **Belum dilayani:** `/devices/:deviceId/relay/*` dan tiket `relay:*` (SPEC-1216/SPEC-1218), `POST /sync/logs`
-> dan `/logs*` (SPEC-1217), perubahan `POST /terminal/sessions` & `POST /specs/:id/done` (SPEC-1216).
+> **Dilayani sejak turunan B (SPEC-1216):** `GET|POST|PUT|PATCH|DELETE /devices/:deviceId/relay/*`
+> (COOKIE_ONLY, diteruskan ke `/api/<*>` di klien via `app.inject`, galat hub `{ error, relay }`),
+> `GET /devices/:deviceId/relay/{terminal/sessions/:id/ws | events/ws}` + `POST /ws-tickets` untuk
+> tiket `relay:<deviceId>:…`, `POST /terminal/sessions` & `POST /specs/:id/done` dengan `force` dari
+> `remote` → 403, `409 { error:"remote-session"|"confirm-required", remoteSession }` (gerbang presence
+> lintas instance), dan retry klien `syncOnce` pada `409 spec-404`.
+> **Belum dilayani:** `POST /sync/logs` dan `/logs*` (SPEC-1217), stream/resize/backpressure §10
+> (SPEC-1218).
 
 ```
 # ── HUB ──────────────────────────────────────────────────────────────────────────────────────────

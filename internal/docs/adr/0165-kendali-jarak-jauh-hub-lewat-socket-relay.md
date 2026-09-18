@@ -2,9 +2,10 @@
 
 **Status:** diterima (SPEC-1215, fase Spec) · 2026-09-15 · **turunan A mendarat** (SPEC-1215): §1 socket
 relay, §3 principal `remote`, §4 grant + `/api/remote-control`, §5 allowlist, §7 pencabutan seketika, dan
-§9 frame `capacity` + `control`. **Menyusul:** §6 approval/`force`/langganan dan §8 satu sesi lintas
-instance di SPEC-1216 (turunan B); stream, resize, dan §10 backpressure di SPEC-1218 (turunan C). Koreksi
-fase Plan atas spec dicatat di spec §S13.
+§9 frame `capacity` + `control`. **Turunan B mendarat** (SPEC-1216): §6 approval/`force`/langganan dan §8
+satu sesi lintas instance (`/devices/:deviceId/relay/*`, `StartSessionModal` target picker, retry
+`syncOnce` pada `409 spec-404`). **Menyusul:** stream, resize, dan §10 backpressure di SPEC-1218
+(turunan C). Koreksi fase Plan atas spec dicatat di spec §S13.
 **Mengamandemen** [0046](0046-kanal-ws-sync-terpisah.md) & [0147](0147-kanal-presence-di-socket-sync.md)
 (keluarga `/api/sync/*` mendapat socket kedua dan frame naik `capacity`),
 [0148](0148-status-hidup-tidak-disync.md) & [0135](0135-penanda-project-ditangani-hanoman-client.md)

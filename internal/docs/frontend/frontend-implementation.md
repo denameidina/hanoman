@@ -44,7 +44,11 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
   **nol elemen**, ujung terakhir gerbang "instance tanpa sync tak berubah tampilannya".
 - **Kendali & tampilan klien dari hub — sebagian mendarat** (SPEC-1215 ·
   [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [spec §S4.11](../../../docs/superpowers/specs/2026-09-14-spec-1215-hub-orkestrasi-klien-design.md)),
-  `RemoteControlPanel` (Settings → Kendali jarak jauh) mendarat di turunan A tanpa toggle lajur log (SPEC-1217); sisanya DIRANCANG untuk SPEC-1216/SPEC-1218.
+  `RemoteControlPanel` (Settings → Kendali jarak jauh) mendarat di turunan A tanpa toggle lajur log (SPEC-1217).
+  Target Start + aksi sesi lintas instance (`createApi({base})`, `InstanceContext`, pemilih target di
+  `StartSessionModal`, retry `syncOnce` pada `409 spec-404`) mendarat di turunan B (SPEC-1216 ·
+  [spec §S9](../../../docs/superpowers/specs/2026-09-14-spec-1215-hub-orkestrasi-klien-design.md)); log
+  terpusat tetap DIRANCANG untuk SPEC-1217/SPEC-1218.
   - **Pabrik API.** `createApi({ base })` menggantikan prefix `/api` dengan
     `/api/devices/<deviceId>/relay`; `api = createApi()` tetap untuk 61 importir.
   - **`InstanceContext`** (`local | remote`) memberi `useApi()` dan `useWsTarget()` (URL + tiket
