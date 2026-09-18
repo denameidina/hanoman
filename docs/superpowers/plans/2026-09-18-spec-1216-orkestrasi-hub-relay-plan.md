@@ -152,7 +152,7 @@ git commit -m "feat(spec-1216): top devices COOKIE_ONLY + ekspor zRelayPath (AC-
   perubahan lanjutan (route ini tak tahu soal gerbang presence; itu murni di klien lewat jalur yang
   sudah ada).
 
-- [ ] **Step 1: Tulis test tabel-driven yang gagal (mock `requestRelay`)**
+- [x] **Step 1: Tulis test tabel-driven yang gagal (mock `requestRelay`)**
 
 ```ts
 // server/test/devices-relay.route.test.ts
@@ -255,7 +255,7 @@ describe("/api/devices/:deviceId/relay/* (SPEC-1216 · AC-B1/B9/B10)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal (404 keseluruhan — route belum ada)**
+- [x] **Step 2: Jalankan, pastikan gagal (404 keseluruhan — route belum ada)**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -263,7 +263,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (banyak assert status).
 
-- [ ] **Step 3: Implementasi route**
+- [x] **Step 3: Implementasi route**
 
 ```ts
 // server/src/routes/devices-relay.ts
@@ -359,7 +359,7 @@ dan sesudah `await api.register(remoteControl); // SPEC-1215 · ADR-0165 · gran
 await api.register(devicesRelay);  // SPEC-1216 · ADR-0165 §4/§6 · aksi sesi klien lewat relay (cookie-only)
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -369,7 +369,7 @@ Expected: PASS. Bila `app.route({method:[...]})` menolak tipe array literal RELA
 TS — Fastify menerima `string[]`, jadi `[...RELAY_METHODS] as any` sudah cukup longgar; ganti ke
 `Array.from(RELAY_METHODS)` bila linter TS lebih ketat.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/devices-relay.ts server/src/app.ts server/test/devices-relay.route.test.ts
