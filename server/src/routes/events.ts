@@ -15,19 +15,35 @@ import { zEventsClientMsg } from "@hanoman/shared";
 // Satu frame per perubahan filter/halaman; 120 semenit sudah jauh di atas kecepatan manusia.
 const SUB_FRAMES_PER_MINUTE = 120;
 
+// SPEC-1218 · AC-C9 · grup yang boleh mengalir ke principal `remote` klien — subset kecil dan
+// murni informasi operasional (bukan `models`/`presence`, keduanya `cookieOnly`). `ide:read`
+// menambah `git` (panel IDE baca lintas mesin).
+export function remoteEventGroups(ideRead: boolean): Set<import("@hanoman/shared").EventMsg["t"]> {
+  return new Set(["sessions", "leadAsks", "cleanups", ...(ideRead ? ["git" as const] : [])]);
+}
+
 export default async function (app: FastifyInstance, opts: { allowedOrigins?: Set<string> }) {
   app.get("/events/ws", {
     websocket: true,
     preValidation: async (req, reply) => {
+      // SPEC-1218 · pola sama Task 7: `req.remote` (gate `/api` onRequest) sudah memverifikasi
+      // allowlist+capability request in-process ini — tak butuh tiket sama sekali.
+      if (req.remote) return;
       try { req.wsPrincipal = admitBrowserWs(req, "events", opts.allowedOrigins ?? new Set()); }
       catch { return reply.code(401).send({ error: "WebSocket admission rejected" }); }
     },
   }, (socket, req) => {
+    const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
+    if (req.remote) {
+      const ideRead = req.remote.capabilities.includes("ide:read");
+      void attach(client, { maySubscribe: false, groups: remoteEventGroups(ideRead) });
+      socket.on("close", () => detach(client));
+      return;
+    }
     const principal = req.wsPrincipal!;
     let release: () => void;
     try { release = openWsConnection(principal); }
     catch { socket.close(1008, "connection limit"); return; }
-    const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
     const maySubscribe = canSubscribeTopics(principal);
     void attach(client, { maySubscribe });
     const guard = new WsMessageGuard({ perWindow: SUB_FRAMES_PER_MINUTE });

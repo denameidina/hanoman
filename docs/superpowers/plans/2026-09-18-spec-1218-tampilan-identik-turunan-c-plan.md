@@ -1015,7 +1015,7 @@ git commit -m "feat(spec-1218): attach({groups}) membatasi grup broadcast per-kl
   "leadAsks", "cleanups", ...(ideRead ? ["git"] : [])]`); preValidation route ini bertambah cabang
   `req.remote` (pola SAMA Task 7).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 describe("/api/events/ws (klien) — principal remote grup terbatas (SPEC-1218 · AC-C9)", () => {
@@ -1027,7 +1027,7 @@ describe("/api/events/ws (klien) — principal remote grup terbatas (SPEC-1218 �
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1035,7 +1035,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (401 tanpa tiket, sama seperti Task 7 sebelum diperbaiki).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // routes/events.ts
@@ -1066,7 +1066,7 @@ Handler:
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1074,7 +1074,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/events.ts server/test/events.route.test.ts
