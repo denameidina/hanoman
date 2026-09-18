@@ -187,7 +187,35 @@ export type SpecListParams = {
 };
 // SPEC-880 · `handledBy` = deviceId; menjawab "apa saja yang dipegang mesin X" dalam satu klik.
 export type ProjectListParams = { q?: string; handledBy?: string; page?: number; limit?: number };
-export const api = {
+// SPEC-1216 · ADR-0165 §11 · factory: `base` default "/api" (hub lokal); target remote memakai
+// `/api/devices/:id/relay` (rebase transparan lewat relay). `j`/`jUpload` MODUL (di atas) tetap
+// dipakai `portalChatApi` (tak disebut Task 8 — audiens beda, tak pernah lewat rebase remote):
+// j/jUpload LOKAL di bawah ini MENAUNGI (shadow) nama yang sama untuk seluruh literal `api`, jadi
+// 164 method di bawah tak berubah satu karakter pun — hanya keduanya kini rebase-aware.
+export function createApi(o: { base?: string } = {}) {
+  const base = o.base ?? "/api";
+  // "/api/x" → base+"/x"; "/api" (tanpa slash, jarang) → base. Semua `paths.*` lahir dengan prefix
+  // "/api/", jadi pengecualian kedua praktis tak pernah kena, tapi dijaga untuk kelengkapan.
+  const rebase = (u: string) => (u.startsWith("/api/") || u === "/api" ? base + u.slice(4) : u);
+  async function j<T>(url: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(rebase(url), { headers: { "content-type": "application/json" }, ...init });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => null);
+      throw new ApiError(res.status, `${init?.method ?? "GET"} ${url} → ${res.status}`, detail);
+    }
+    return res.status === 204 ? (undefined as T) : res.json();
+  }
+  // SPEC-816 · multipart punya fetch sendiri: `j()` memaksa `content-type: application/json`, dan
+  // header itu MENGHAPUS boundary yang dihasilkan FormData → server tak bisa mem-parse body-nya.
+  async function jUpload<T>(url: string, form: FormData): Promise<T> {
+    const res = await fetch(rebase(url), { method: "POST", body: form });
+    if (!res.ok) {
+      const detail = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new ApiError(res.status, detail?.error ?? `POST ${url} → ${res.status}`, detail);
+    }
+    return res.json() as Promise<T>;
+  }
+  return {
   issueWsTicket: (target: "events" | `terminal:${string}`) =>
     j<{ ticket: string }>(paths.wsTickets, { method: "POST", ...body({ target }) }),
   // SPEC-816 · lampiran gambar sesi terminal. Yang kembali adalah PATH berkas di server; pane
@@ -327,7 +355,7 @@ export const api = {
   // dan gagal). Sengaja tanpa header auth: endpointnya publik, dan itulah yang membuat "cukup
   // diberi tautan" benar-benar berlaku.
   agentDoc: async (): Promise<string> => {
-    const res = await fetch(paths.agentDoc, { headers: { accept: "text/markdown" } });
+    const res = await fetch(rebase(paths.agentDoc), { headers: { accept: "text/markdown" } });
     if (!res.ok) throw new ApiError(res.status, `GET ${paths.agentDoc} → ${res.status}`);
     return res.text();
   },
@@ -719,7 +747,9 @@ export const api = {
     j<{ items: WebhookDeliveryView[] }>(paths.webhookDeliveries(id) + qs({ limit })),
   retryWebhookDelivery: (id: string) =>
     j<WebhookDeliveryView>(paths.webhookDeliveryRetry(id), { method: "POST", ...body({}) }),
-};
+  };
+}
+export const api = createApi();
 
 // SPEC-854 · ADR-0129 · permukaan OPERATOR untuk obrolan portal klien. Namespace sendiri, cermin
 // `portalApi` di sisi klien: dua audiens yang sangat berbeda tak boleh berbagi satu objek yang

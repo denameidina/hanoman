@@ -1254,7 +1254,7 @@ git commit -m "feat(spec-1216): retry spec-404 di dispatcher klien via syncOnce 
 - Produces: `createApi(o?: {base?: string}): typeof api` — Task 9 (`InstanceContext`) memakainya
   untuk `useApi()`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 // src/test/instance.test.tsx (bagian 1)
@@ -1285,7 +1285,7 @@ describe("createApi({base}) (SPEC-1216 · AC-B7/B9)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1293,7 +1293,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`createApi` tak diekspor).
 
-- [ ] **Step 3: Implementasi — bungkus `j`/`jUpload`/`agentDoc`/objek `api` ke dalam factory**
+- [x] **Step 3: Implementasi — bungkus `j`/`jUpload`/`agentDoc`/objek `api` ke dalam factory**
 
 Di `src/src/api/client.ts`, langsung SEBELUM `async function j<T>(...)` (baris ~156), bungkus
 SELURUH sisa berkas — dari `async function j` sampai penutup `export const api = { ... };` di akhir
@@ -1353,7 +1353,7 @@ Catatan pelaksanaan (mekanis, bukan desain): pindahkan definisi tipe (`ApiError`
 method tak berubah satu pun kecuali dua rebase di atas). Jalankan `pnpm -F @hanoman/web typecheck`
 sesudah paste untuk menangkap method yang lupa ter-include di `return {}`.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus + typecheck bersih**
+- [x] **Step 4: Jalankan test, pastikan lulus + typecheck bersih**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1363,7 +1363,7 @@ pnpm -F @hanoman/web typecheck
 Expected: PASS; nol error tipe (61 importir `api` lama harus tetap kompilasi tanpa perubahan
 karena `export const api = createApi()` tak berubah bentuk).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/client.ts src/test/instance.test.tsx
