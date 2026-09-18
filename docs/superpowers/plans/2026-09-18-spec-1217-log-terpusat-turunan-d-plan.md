@@ -1321,7 +1321,7 @@ git commit -m "feat(server): parser bodyLimit terenkapsulasi untuk POST /sync/lo
 - Consumes: `zLogBatch`, `LOG_INGEST_MAX_PER_HOUR` (Task 1); `redactText`, `redactValue` (Task 2); `knownSecrets` (Task 3); `appendGap` (Task 9).
 - Produces: `ingestBatch(deviceId: string, batch: LogBatch): Promise<{ status: 200 | 400 | 413 | 429; body: { lane?: string; accepted?: number; duplicate?: number; lastSeq?: string; error?: string; retryAfterSec?: number } }>`, `__resetIngestQuota(): void`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-ingest.service.test.ts
@@ -1393,12 +1393,12 @@ describe("ingestBatch", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-ingest.service.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/logs/ingest.ts
@@ -1485,7 +1485,7 @@ export async function ingestBatch(deviceId: string, batch: LogBatch): Promise<In
 export function __resetIngestQuota(): void { quota = new Map(); }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-ingest.service.test.ts`
 Expected: PASS — bila field unik Prisma `deviceId_lane` bukan nama yang di-generate untuk `@@id`
@@ -1493,7 +1493,7 @@ gabungan `LogCursor`, sesuaikan ke nama field gabungan aktual (`prisma generate`
 `deviceId_lane` untuk `@@id([deviceId, lane])`; verifikasi lewat `grep deviceId_lane
 server/node_modules/.prisma/client/index.d.ts` bila error tipe muncul).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/logs/ingest.ts server/test/log-ingest.service.test.ts
