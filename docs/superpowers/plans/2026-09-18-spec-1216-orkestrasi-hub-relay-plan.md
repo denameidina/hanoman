@@ -74,7 +74,7 @@ di frontend, dikonsumsi `StartSessionModal`. Tidak ada skema Prisma baru.
 - Produces: `zRelayPath: z.ZodType<string>` (dipakai Task 2 untuk validasi `params["*"]`);
   `capabilityForRoute("GET", "/api/devices/x/relay/terminal/sessions") === "COOKIE_ONLY"`.
 
-- [ ] **Step 1: Cari nama test file yang ada dan tulis test yang gagal**
+- [x] **Step 1: Cari nama test file yang ada dan tulis test yang gagal**
 
 ```bash
 grep -n "remote-control\"" server/test/agent-capabilities.test.ts
@@ -89,7 +89,7 @@ it("top devices → COOKIE_ONLY (SPEC-1216 · ADR-0165 §4)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal (capabilityForRoute memulangkan `rw(...)` atau null)**
+- [x] **Step 2: Jalankan test, pastikan gagal (capabilityForRoute memulangkan `rw(...)` atau null)**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -97,7 +97,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (nilai ≠ `"COOKIE_ONLY"`).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/agent-capabilities.ts`, blok tak-boleh-didelegasikan (yang memuat
 `top === "presence"`), tambahkan `"devices"` ke daftar `||`:
@@ -118,7 +118,7 @@ Di `shared/src/relay.ts:97`, tambahkan `export`:
 export const zRelayPath = z.string().max(2048).regex(/^\/api\//).refine((p) => !UNSAFE_PATH.test(p), "path relay tak sah");
 ```
 
-- [ ] **Step 4: Jalankan test lagi, pastikan lulus**
+- [x] **Step 4: Jalankan test lagi, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -126,7 +126,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/relay.ts server/src/services/agent-capabilities.ts server/test/agent-capabilities.test.ts

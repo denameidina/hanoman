@@ -102,7 +102,7 @@ export type RelayActor = z.infer<typeof zRelayActor>;
 
 const zId = z.string().min(1).max(64);
 const UNSAFE_PATH = /(^|\/)\.\.?(\/|$)|%2e|%2f|%5c|\\|[?#]/i;
-const zRelayPath = z.string().max(2048).regex(/^\/api\//).refine((p) => !UNSAFE_PATH.test(p), "path relay tak sah");
+export const zRelayPath = z.string().max(2048).regex(/^\/api\//).refine((p) => !UNSAFE_PATH.test(p), "path relay tak sah");
 const zPart = z.string().refine((s) => utf8Bytes(s) <= RELAY_PART_MAX_BYTES, "part relay > 32 KiB");
 export const RELAY_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 export type RelayMethod = (typeof RELAY_METHODS)[number];

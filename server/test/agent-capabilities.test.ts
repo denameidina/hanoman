@@ -74,6 +74,13 @@ describe("capabilityForRoute", () => {
     expect(capabilityForRoute(m, p)).toBe(want);
   });
 
+  // SPEC-1216 · ADR-0165 §4 · `/devices/:id/relay/*` menjalankan aksi sesi di mesin lain atas nama
+  // operator — capability apa pun yang bisa mendelegasikannya adalah eskalasi RCE lintas mesin.
+  it("top devices → COOKIE_ONLY (SPEC-1216 · ADR-0165 §4)", () => {
+    expect(capabilityForRoute("GET", "/api/devices/dev1/relay/terminal/sessions")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("POST", "/api/devices/dev1/relay/specs/x/done")).toBe("COOKIE_ONLY");
+  });
+
   // SPEC-471 · ADR-0095 · triase issue satu domain dengan tiket; dipetakan MENURUT METHOD
   // (kelas bug SPEC-405: prefix status yang lolos GLOBAL_READ tanpa melihat method).
   it("SPEC-471 · github-issues & projects/:id/github → domain support per-method", () => {
