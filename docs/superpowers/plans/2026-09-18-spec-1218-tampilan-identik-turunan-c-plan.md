@@ -422,7 +422,7 @@ git commit -m "feat(spec-1218): relay/hub.ts peta stream + kredit + plafon 6/4 +
   sudah ada), `zRelayPath` (sudah ada).
 - Produces: `GET /api/devices/:deviceId/relay/*` (upgrade) — Task 15 tak menyentuhnya lagi.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Pola fixture: `app.injectWS` terhadap route ini (server test env), dengan tiket
 `relay:<deviceId>:terminal:<id>` dari `POST /api/ws-tickets` (Task 1), lalu assert:
@@ -471,7 +471,7 @@ describe("devices-relay wsHandler (SPEC-1218 · AC-C5/AC-C6)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -479,7 +479,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (route belum punya `wsHandler`, upgrade gagal/404).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // devices-relay.ts — tambahan ke app.route({...}) yang SUDAH ADA (bukan route kedua)
@@ -528,7 +528,7 @@ app.route({
 (Sesuaikan deteksi `inner` dengan bentuk nyata `wildcard` yang diamati saat Step 2 gagal — jangan
 menebak regex tanpa menjalankannya.)
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -536,7 +536,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS (kedua — route HTTP lama tak boleh regresi).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/devices-relay.ts server/test/devices-relay.wshandler.test.ts
