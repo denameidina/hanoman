@@ -2,7 +2,9 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { issueWsTicket } from "../services/ws-admission";
 
-const targetSchema = z.string().refine((value) => value === "events" || value.startsWith("terminal:"));
+const relayTarget = /^relay:[^:]+:(events|terminal:[^:]+)$/;
+const targetSchema = z.string().refine((value) =>
+  value === "events" || value.startsWith("terminal:") || relayTarget.test(value));
 
 export default async function (app: FastifyInstance, opts: { allowTestPrincipal?: boolean }) {
   app.post("/ws-tickets", async (req, reply) => {
