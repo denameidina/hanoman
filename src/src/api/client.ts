@@ -193,6 +193,20 @@ export type LogSearchQueryInput = {
   from: string; to: string; deviceId?: string; projectId?: string; specId?: string;
   lane?: string; level?: string; kind?: string; q?: string; cursor?: string; limit?: number;
 };
+// SPEC-1217 · ADR-0166 · log terpusat — diekspor berdiri sendiri (dan dirujuk di `api` di bawah)
+// supaya `vi.spyOn(client, "logs")` (pola tetangga `LogsPanel.test.tsx`) bisa menyadap panggilannya.
+export function logs(q: LogSearchQueryInput): Promise<{ items: LogEntryView[]; nextCursor: string | null }> {
+  return j(`${paths.logs}${qs(q as unknown as Record<string, string | number | boolean | undefined>)}`);
+}
+export async function logTranscript(id: number): Promise<string> {
+  const res = await fetch(paths.logTranscript(id));
+  if (!res.ok) throw new ApiError(res.status, `GET ${paths.logTranscript(id)} → ${res.status}`);
+  return res.text();
+}
+export function logRetention(): Promise<LogRetention> { return j(paths.logRetention); }
+export function putLogRetention(r: LogRetention): Promise<LogRetention> {
+  return j(paths.logRetention, { method: "PUT", ...body(r) });
+}
 export const api = {
   issueWsTicket: (target: "events" | `terminal:${string}`) =>
     j<{ ticket: string }>(paths.wsTickets, { method: "POST", ...body({ target }) }),
@@ -553,16 +567,7 @@ export const api = {
   getRemoteControl: () => j<RemoteControlView>(paths.remoteControl),
   putRemoteControl: (b: RemoteControlPut) => j<RemoteControlView>(paths.remoteControl, { method: "PUT", ...body(b) }),
   // SPEC-1217 · ADR-0166 · log terpusat — pencarian (kursor, tanpa `total`), transkrip remote, retensi.
-  logs: (q: LogSearchQueryInput) => j<{ items: LogEntryView[]; nextCursor: string | null }>(
-    `${paths.logs}${qs(q as unknown as Record<string, string | number | boolean | undefined>)}`,
-  ),
-  logTranscript: async (id: number) => {
-    const res = await fetch(paths.logTranscript(id));
-    if (!res.ok) throw new ApiError(res.status, `GET ${paths.logTranscript(id)} → ${res.status}`);
-    return res.text();
-  },
-  logRetention: () => j<LogRetention>(paths.logRetention),
-  putLogRetention: (r: LogRetention) => j<LogRetention>(paths.logRetention, { method: "PUT", ...body(r) }),
+  logs, logTranscript, logRetention, putLogRetention,
   // SPEC-257 · agent token (kelola cookie-only) — token plaintext hanya balik di create (sekali).
   getAgentCapabilities: () => j<{ capabilities: CapabilityInfo[] }>(paths.agentCapabilities),
   listAgentTokens: () => j<{ items: AgentTokenView[] }>(paths.agentTokens),
