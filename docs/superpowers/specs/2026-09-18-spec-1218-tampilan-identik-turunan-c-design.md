@@ -173,3 +173,51 @@ keputusan desain terbuka, melainkan langkah verifikasi wajib yang sudah punya kr
 tertulis. Fase Objective berikutnya menurunkan kriteria sukses terukur dari AC-C1…AC-C10 di atas; fase
 Spec berikutnya (bila perlu koreksi kecil sekelas S1 SPEC-1215) mencatatnya sebagai koreksi, bukan
 desain baru.
+
+## Objective
+
+**Fase penulis bagian ini:** Objective (2/5)
+
+### Objective (tunggal, terukur)
+
+Menutup seluruh titik kosong kode yang dipetakan di fase Brainstorm — `wsHandler` di route relay hub,
+tiket `relay:<deviceId>:events|terminal:<id>`, principal `remote` di gate WS hub, dispatcher stream
+`open`/`opened`/`data`/`credit`/`geometry`/`close` lewat `injectWS({onOpen})`, grup `/events/ws`
+terbatas untuk `remote`, komponen frontend `RemoteInstanceView`/`RemoteBanner` memakai `InstanceContext`
+remote di komponen yang **sudah ada** (`TerminalPane`, `SpecDocsModal`, panel IDE baca), dan pengukuran
+CPU/RSS/`bufferedAmount` di Mac mini 8 GB — sehingga **AC-C1…AC-C10 (SPEC-1215 §S9) lulus sebagai test
+kontrak/otomatis yang dapat dijalankan ulang**, bukan diverifikasi manual/anekdot, dan `internal/docs`
+yang tersentuh (termasuk pencabutan penanda DIRANCANG di
+`internal/docs/frontend/frontend-implementation.md:52`) diperbarui dalam commit yang sama dengan kode.
+
+Objective ini tidak menambah cakupan di luar AC-C1…C10 yang sudah dikunci SPEC-1215 §S9 — ia hanya
+menurunkannya menjadi kriteria yang bisa dicentang test, sesuai batas turunan C yang dikonfirmasi di
+bagian Konteks & keputusan di atas (satu-satunya angka "belum final" — plafon backpressure S4.1 —
+punya jalan keluar tertulis: ukur di Mac mini 8 GB per S0b/AC-C10, amandemen ADR-0165 bila anggaran
+dilanggar; itu bukan cakupan tambahan, melainkan bagian dari AC-C10 itu sendiri).
+
+### Kriteria sukses (satu baris = satu AC, dapat dicentang oleh test)
+
+| # | AC | Kriteria sukses terukur |
+|---|---|---|
+| SC1 | AC-C1 | Test frontend: membuka klien X (`ClientsScreen` → tombol "Buka") merender `RemoteInstanceView` yang me-mount `TerminalPane`, chip fase, `SpecDocsModal`, dan panel IDE baca-saja **dari berkas sumber yang sama** dipakai layar lokal (diuji lewat import path/identity komponen, bukan salinan), semuanya di dalam `InstanceContext` remote (`useInstance().kind === "remote"`), disertai `RemoteBanner` bertuliskan "Sedang melihat klien X · vN". |
+| SC2 | AC-C2 | Test: `TerminalPane` dalam mode remote **tak pernah** mengirim frame `resize` (spy pada pengiriman socket, disimulasikan resize kontainer); dispatcher klien (`relay/dispatcher.ts`) membuang **setiap** frame `resize` masuk dari hub pada jalur `open`, untuk mode `read` maupun `write`. |
+| SC3 | AC-C3 | Test: stream dibuka tanpa grant `sessions:write` → dispatcher klien membuang setiap frame `in` (dibuktikan: keystroke terkirim dari hub tak pernah sampai ke pty klien), dan `TerminalPane` merender penanda baca-saja (dicek lewat snapshot/`getByText` atau atribut ARIA). |
+| SC4 | AC-C4 | Test: kredit stream terminal disetel habis (0) → keluaran pty berikutnya **dibuang** (tak pernah dibuffer, dicek: setelah kredit pulih tak ada replay backlog), dan `credit` refill memicu resync **paling banyak** 1× per jendela 5 dtk (dua refill berurutan < 5 dtk → resync kedua ditekan, dibuktikan hitungan frame `data`/`geometry` terkirim). |
+| SC5 | AC-C5 | Test: membuka stream ke-7 pada device yang sudah punya 6 stream aktif ditutup **`4409`**; permintaan ke-5 saat sudah ada 4 request inflight ditolak/ditunda (plafon 4 inflight per device); setiap frame relay yang dikirim `> 32 KiB` (`RELAY_PART_MAX_BYTES`) dipotong sebelum kirim (dicek ukuran tiap frame `data`/`res` di socket relay). |
+| SC6 | AC-C6 | Test: penonton terakhir sebuah stream terputus (komponen unmount / tab ditutup) → `injectWS` milik stream itu ditutup dalam **≤ 2 dtk** (fake timers, dicek pemanggilan `close`/`destroy` pada objek `injectWS` yang dipasang `onOpen`). |
+| SC7 | AC-C7 | Test: `control.protocol` device tak cocok dengan hub → hub menolak membuka tampilan (respons/gate eksplisit, bukan render kosong); `control.protocol` cocok tapi `control.version` beda → `RemoteBanner` merender peringatan versi, tampilan tetap terbuka. |
+| SC8 | AC-C8 | Test regresi jalur stream baru: frame yang dikirim route secara **sinkron** saat attach (scrollback, `alt`, `phase`) sampai ke hub — direplikasi sebagai kasus terpisah dari S0a (0/2 → 2/2), membuktikan listener `injectWS` jalur `open` dipasang lewat `onOpen`, bukan sesudahnya. |
+| SC9 | AC-C9 | Test: principal `remote` yang subscribe `/events/ws` hanya menerima payload grup `sessions`, `leadAsks`, `cleanups`, dan topik `git` (hanya bila grant memuat `ide:read`, dibuktikan dengan dan tanpa grant itu); grup `cookieOnly` **tak pernah** terkirim ke principal `remote` (dicek: nol frame grup itu di seluruh transkrip test). |
+| SC10 | AC-C10 | Skrip pengukuran (pola `server/test/…` AC-S9 SPEC-1217) menjalankan 4 stream terminal dari agen sibuk dengan RTT 200 ms selama durasi tetap di Mac mini 8 GB, mencatat `process.cpuUsage()`/`memoryUsage().rss`/`bufferedAmount` per detik per stream; hasil dan kelulusan/pelanggaran anggaran S0b dicatat sebagai amandemen ADR-0165 §9/§10 (bukan asersi tanpa angka). |
+| SC11 | Constraint brief | `internal/docs` yang tersentuh diperbarui dan ditautkan di `internal/docs/README.md`; penanda DIRANCANG di `internal/docs/frontend/frontend-implementation.md:52` ("tampilan identik … tetap DIRANCANG untuk SPEC-1218 (turunan C)") dicabut — **dalam commit yang sama** dengan kode fase Execute. |
+
+### Cara verifikasi (ringkas, bukan rencana — didetailkan di fase Plan)
+
+Seluruh SC di atas diverifikasi lewat **test otomatis** (`pnpm vitest --run` pada berkas yang tersentuh,
+`--no-file-parallelism` untuk set yang menyentuh test server per `CLAUDE.md`) plus satu **smoke manual**
+di akhir Execute: boot dua instance lokal (hub + klien), buka klien dari hub via `RemoteInstanceView`,
+dan buktikan nyata TerminalPane menerima output live, buang `resize`, dan banner protocol-mismatch —
+bukan hanya lulus mock. SC10 (pengukuran 8 GB) diverifikasi lewat skrip yang benar-benar dijalankan di
+mesin nyata dan hasilnya dicatat, bukan diklaim. Tak ada SC yang dianggap terpenuhi oleh klaim tanpa
+bukti test/pengukuran yang benar-benar dijalankan.
