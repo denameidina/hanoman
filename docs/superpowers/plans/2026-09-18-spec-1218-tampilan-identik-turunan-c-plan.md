@@ -1097,7 +1097,7 @@ git commit -m "feat(spec-1218): principal remote /events/ws klien → attach gro
   `t==="geometry"` (di `onmessage`, baris 266) memanggil `term.resize(f.cols, f.rows)`; tanpa
   `sessions:write` di `capabilities` → `onData`/`sendKey` tak terpasang + `showKeys` disembunyikan.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 // src/test/terminal-pane-remote.test.tsx
@@ -1125,7 +1125,7 @@ describe("TerminalPane mode=remote (SPEC-1218 · AC-C2/AC-C3)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1133,7 +1133,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (prop `mode` tak dikenal, resize tetap terkirim).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Tambah import `useApi, useWsTarget, useInstance` dari `../api/instance`; prop `mode = "local"`.
 
@@ -1180,7 +1180,7 @@ Close `4009` — `socket.onclose` (baris 319) sudah memanggil `retry()` untuk ko
 `4009` **sudah** jatuh ke `retry()` existing (baris 335) tanpa perubahan — verifikasi ini sebagai
 bagian test Step 4, JANGAN tambahkan cabang kode baru untuk `4009` bila `retry()` sudah menutupnya.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1188,7 +1188,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS (keduanya — mode lokal tak boleh regresi).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalPane.tsx src/test/terminal-pane-remote.test.tsx
