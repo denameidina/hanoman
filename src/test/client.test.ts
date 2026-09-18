@@ -77,4 +77,21 @@ describe("api client", () => {
     expect((globalThis.fetch as any).mock.calls[0][0]).toBe("/api/projects/p1/changelog/c1");
     expect(r.id).toBe("c1");
   });
+  // SPEC-1217 · logs() memanggil GET /api/logs dengan query string
+  it("logs() memanggil GET /api/logs dengan query string", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ items: [], nextCursor: null }),
+      { status: 200, headers: { "content-type": "application/json" } }));
+    globalThis.fetch = fetchMock as any;
+    await api.logs({ from: "2026-01-01T00:00:00.000Z", to: "2026-01-02T00:00:00.000Z" });
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/logs?");
+  });
+  it("putLogRetention() memanggil PUT /api/logs/retention", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ eventDays: 90, serverDays: 7, transcriptDays: 30, maxBytes: 1 }),
+      { status: 200, headers: { "content-type": "application/json" } }));
+    globalThis.fetch = fetchMock as any;
+    await api.putLogRetention({ eventDays: 90, serverDays: 7, transcriptDays: 30, maxBytes: 1 });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/api/logs/retention");
+    expect((init as RequestInit).method).toBe("PUT");
+  });
 });

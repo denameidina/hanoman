@@ -2356,7 +2356,7 @@ git commit -m "feat(server): pasang/cabut sadapan console tanpa restart saat tog
 **Interfaces:**
 - Produces: `logs(query: LogSearchQueryInput): Promise<{items: LogEntryView[]; nextCursor: string|null}>`, `logTranscript(id: number): Promise<string>`, `logRetention(): Promise<LogRetention>`, `putLogRetention(r: LogRetention): Promise<LogRetention>`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Cari pola panggilan yang sudah ada (mis. `remoteControl()`) di `src/src/api/client.ts` dan test-nya
 lebih dulu:
@@ -2389,12 +2389,12 @@ it("putLogRetention() memanggil PUT /api/logs/retention", async () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism <path test client yang ditemukan>`
 Expected: FAIL — `logs`/`putLogRetention` bukan export.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Tambahkan ke `src/src/api/client.ts`, mengikuti bentuk fungsi `apiFetch`/`json` yang sudah dipakai
 fungsi lain di berkas yang sama (mis. `remoteControl()`, `putRemoteControl()`):
@@ -2429,12 +2429,12 @@ export async function putLogRetention(r: LogRetention): Promise<LogRetention> {
 Sesuaikan nama helper (`apiFetch`, header `content-type`, base URL) persis dengan yang dipakai
 fungsi tetangga di berkas yang sama — jangan menduplikasi pola fetch yang berbeda dari konvensi file.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism <path test client>`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/client.ts <path test client>
