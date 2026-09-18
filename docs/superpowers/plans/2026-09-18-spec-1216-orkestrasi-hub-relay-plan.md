@@ -391,7 +391,7 @@ git commit -m "feat(spec-1216): route relay hub /api/devices/:id/relay/* + audit
 - Produces: `launchPrincipal(source): string | null` — dipakai Task 5 apa adanya (tanda tangan
   sudah kompatibel, `terminal.ts:99` memanggil `launchPrincipal(req)` tanpa perubahan pemanggilan).
 
-- [ ] **Step 1: Cari test file & pola yang ada**
+- [x] **Step 1: Cari test file & pola yang ada**
 
 ```bash
 grep -rn "launchPrincipal" server/test/*.ts
@@ -424,7 +424,7 @@ describe("launchPrincipal (SPEC-1216 · AC-B1/B2)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal (TS: `remote` bukan properti `PrincipalSource`)**
+- [x] **Step 2: Jalankan, pastikan gagal (TS: `remote` bukan properti `PrincipalSource`)**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -432,7 +432,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (type error atau assertion mismatch).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // server/src/services/launch-authority.ts
@@ -478,7 +478,7 @@ if ((req.agent || req.remote) && "force" in parsed.data && parsed.data.force) {
 }
 ```
 
-- [ ] **Step 4: Tulis/lengkapi test route `force` dari remote → 403 sebelum approveLaunch**
+- [x] **Step 4: Tulis/lengkapi test route `force` dari remote → 403 sebelum approveLaunch**
 
 Cari test force yang ada:
 
@@ -507,7 +507,7 @@ it("force dari remote → 403 sebelum approveLaunch; launchApprovedBy tetap null
 (Sesuaikan helper `injectRemoteRequest` dengan fixture nyata `relay-gate.test.ts` — gate real, bukan
 mock, supaya AC-B3 dibuktikan lewat jalur asli.)
 
-- [ ] **Step 5: Jalankan seluruh test tersentuh, pastikan lulus**
+- [x] **Step 5: Jalankan seluruh test tersentuh, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -515,7 +515,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/launch-authority.ts server/src/routes/terminal.ts server/test/launch-authority.test.ts server/test/terminal.route.test.ts

@@ -6,12 +6,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AddressInfo } from "node:net";
+import { RELAY_ACTOR_HEADER, RELAY_HEADER } from "@hanoman/shared";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { killAll, killSession, listSessions, promptFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { phaseFilePath } from "../src/services/session-phases";
 import { sweepRepo, __resetReaper } from "../src/services/worktree-reaper";
+import { encodeRelayActor } from "../src/services/relay/gate";
+import { relaySecret } from "../src/services/relay/secret";
 import { resetDb, makeProject, makeSpec, makeSetting } from "./factory";
 
 // Lihat pty.test.ts: /bin/cat mati karena --dangerously-skip-permissions ilegal baginya.
@@ -1077,6 +1080,38 @@ describe("POST /terminal/sessions · dependency (SPEC-447)", () => {
     expect(res.statusCode).toBe(201);
     expect(res.json().id).toBe("spec-t2");
     killSession("spec-t2");
+  });
+});
+
+// SPEC-1216 · ADR-0165 §6 · cermin ADR-0161: force dari principal non-manusia (agent ATAU remote)
+// ditolak SEBELUM approveLaunch, supaya request yang gagal tak meninggalkan launchApprovedBy.
+describe("POST /terminal/sessions · force dari remote (SPEC-1216 · AC-B3)", () => {
+  const remoteActor = { hubOrigin: "https://hub.example", userId: "h1", email: "op@hub.example" };
+  const relayHeaders = (over: Record<string, string> = {}) => ({
+    [RELAY_HEADER]: relaySecret(), [RELAY_ACTOR_HEADER]: encodeRelayActor(remoteActor), ...over,
+  });
+
+  it("force dari remote → 403 sebelum approveLaunch; launchApprovedBy tetap null (AC-B3)", async () => {
+    // Catatan penyimpangan (Task 3): `makeSetting` (factory.ts) melakukan `{...DEFAULT_SETTING,
+    // ...over}` — memanggilnya dengan HANYA `remoteControl` menimpa balik `scheduler.launchGuard`
+    // yang disetel `beforeAll` berkas ini (baris ~132) ke default (`enabled:true`), yang kemudian
+    // menjatuhkan test DELETE sesudahnya (admission gate menolak sesi baru). Disertakan lagi di sini.
+    await makeSetting({
+      scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } },
+      remoteControl: { enabled: true, capabilities: ["sessions:read", "sessions:spawn"] },
+    });
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const spec = await makeSpec({
+      id: "SPEC-T3", projectId: "p1", stage: "planned", launchApprovedAt: null, launchApprovedBy: null,
+    });
+    const res = await app.inject({
+      method: "POST", url: "/api/terminal/sessions",
+      payload: { spec: spec.id, flow: "feature", force: true },
+      headers: { host: "127.0.0.1", ...relayHeaders() },
+    });
+    expect(res.statusCode).toBe(403);
+    const after = await prisma.spec.findUnique({ where: { id: spec.id } });
+    expect(after!.launchApprovedBy).toBeNull();
   });
 });
 

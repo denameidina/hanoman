@@ -85,7 +85,9 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     if (!parsed.success) return reply.code(400).send({ error: "invalid body" });
     // ADR-0161: kemampuan meluncurkan sesi tidak memberi otomasi hak mengabaikan gerbang host.
     // Tolak sebelum approveLaunch agar request force agen tak meninggalkan persetujuan backlog.
-    if (req.agent && "force" in parsed.data && parsed.data.force) {
+    // SPEC-1216 · ADR-0165 §6 · cermin ADR-0161: force principal non-manusia ditolak SEBELUM
+    // approveLaunch, supaya request yang gagal tak meninggalkan launchApprovedBy.
+    if ((req.agent || req.remote) && "force" in parsed.data && parsed.data.force) {
       return reply.code(403).send({ error: "force hanya boleh digunakan manusia melalui dashboard" });
     }
 

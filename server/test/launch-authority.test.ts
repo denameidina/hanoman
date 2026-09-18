@@ -35,3 +35,22 @@ describe("effective launch authority", () => {
     expect(__FIELDS.spec).not.toContain("launchApprovedBy");
   });
 });
+
+describe("launchPrincipal (SPEC-1216 · AC-B1/B2)", () => {
+  it("user menang atas remote", () => {
+    expect(launchPrincipal({
+      user: { id: "u1", email: "a@b.co" },
+      remote: { actor: { hubOrigin: "http://hub", userId: "h1", email: "op@hub.co" }, capabilities: ["sessions:spawn"] },
+    })).toBe("user:a@b.co");
+  });
+  it("remote ber-sessions:spawn → remote:<email>@<hubOrigin>", () => {
+    expect(launchPrincipal({
+      remote: { actor: { hubOrigin: "http://hub.local", userId: "h1", email: "op@hub.co" }, capabilities: ["sessions:spawn", "sessions:read"] },
+    })).toBe("remote:op@hub.co@http://hub.local");
+  });
+  it("remote tanpa sessions:spawn → null (tak ada approval)", () => {
+    expect(launchPrincipal({
+      remote: { actor: { hubOrigin: "http://hub", userId: "h1", email: "op@hub.co" }, capabilities: ["sessions:read"] },
+    })).toBeNull();
+  });
+});
