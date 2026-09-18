@@ -68,7 +68,7 @@ Urutan task mengikuti §S6 spec: redact → spool/console-tap → taps → inges
 **Interfaces:**
 - Produces: `LOG_BATCH_MAX_ENTRIES`, `LOG_BODY_MAX_BYTES`, `LOG_DECODED_MAX_BYTES`, `LOG_TRANSCRIPT_MAX_BYTES`, `LOG_SPOOL_MAX_BYTES`, `LOG_SPOOL_SEGMENT_BYTES`, `LOG_LOCAL_PENDING_MAX_ROWS`, `LOG_REPEAT_WINDOW_MS`, `LOG_INGEST_MAX_PER_HOUR`, `LOG_SEARCH_MAX_RANGE_DAYS`, `LOG_SEARCH_MAX_LIMIT`, `LOG_SHIP_MAX_BATCHES_PER_TICK`, `LOG_UNSUPPORTED_RETRY_MS`; `type LogWireEntry`, `zLogWireEntry`, `zLogBatch`, `type LogBatch`; `zLogSearchQuery`, `type LogSearchQuery`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan ke `shared/test/logs.test.ts`:
 
@@ -108,12 +108,12 @@ describe("zLogSearchQuery", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism shared/test/logs.test.ts`
 Expected: FAIL — `zLogBatch`/`zLogSearchQuery`/`LOG_BATCH_MAX_ENTRIES` bukan export dari `../src/logs`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Tambahkan di `shared/src/logs.ts` (sesudah `zLogRetention`):
 
@@ -172,12 +172,12 @@ export const zLogSearchQuery = z.object({
 export type LogSearchQuery = z.infer<typeof zLogSearchQuery>;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism shared/test/logs.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/logs.ts shared/test/logs.test.ts
