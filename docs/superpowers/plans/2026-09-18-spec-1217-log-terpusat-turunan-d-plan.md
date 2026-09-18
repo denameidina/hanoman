@@ -2745,7 +2745,7 @@ git commit -m "feat(web): tiga toggle lajur log di RemoteControlPanel, event def
 - Produces: skrip yang dijalankan manual sekali di akhir eksekusi plan, sebelum default
   `LOG_INGEST_MAX_PER_HOUR`/`LOG_BATCH_MAX_ENTRIES` dianggap final.
 
-- [ ] **Step 1: Tulis skrip pengukuran**
+- [x] **Step 1: Tulis skrip pengukuran**
 
 ```ts
 // server/scripts/log-ingest-benchmark.ts
@@ -2811,7 +2811,7 @@ async function main() {
 main().catch((e) => { console.error(e); process.exit(1); });
 ```
 
-- [ ] **Step 2: Jalankan skrip terhadap server nyata (bukan test suite)**
+- [x] **Step 2: Jalankan skrip terhadap server nyata (bukan test suite)**
 
 Boot server: `pnpm dev` (atau `node server/dist/server.js` sesudah build) dengan
 `TEST_DATABASE_URL`/DB khusus benchmark (jangan DB produksi). Login sekali, ambil cookie sesi,
@@ -2823,7 +2823,7 @@ HANOMAN_BASE=http://127.0.0.1:4600 HANOMAN_COOKIE="<cookie sesi>" node --import 
 
 Expected: skrip mencetak `baseline p95`, `p95 di bawah beban`, dan verdict `LULUS`/`GAGAL AC-S9`.
 
-- [ ] **Step 3: Catat hasil**
+- [x] **Step 3: Catat hasil**
 
 Tulis hasil aktual (angka p95 baseline/di-bawah-beban, persentase kenaikan, jumlah `P1008` yang
 diamati di log server selama pengukuran — `grep -c P1008` pada output server) ke
@@ -2847,7 +2847,7 @@ batch (§S3.1 plan ini), bukan keputusan baru — jangan ubah konstanta di `shar
 amandemen itu.
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/scripts/log-ingest-benchmark.ts docs/superpowers/plans/2026-09-18-spec-1217-ac-s9-hasil-pengukuran.md
