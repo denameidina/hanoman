@@ -10,8 +10,8 @@ const MAX_TICKETS = 2_048;
 const MAX_CONNECTIONS_PER_PRINCIPAL = 8;
 const PROTOCOL_PREFIX = "hanoman-ticket.";
 
-export type WsTarget = "events" | "sync" | `terminal:${string}`;
-export type WsPrincipal = { kind: "user" | "agent" | "device" | "test"; id: string };
+export type WsTarget = "events" | "sync" | `terminal:${string}` | `relay:${string}:${"events" | `terminal:${string}`}`;
+export type WsPrincipal = { kind: "user" | "agent" | "device" | "test" | "remote"; id: string };
 type Ticket = { principal: WsPrincipal; target: WsTarget; expiresAt: number };
 
 declare module "fastify" { interface FastifyRequest { wsPrincipal?: WsPrincipal } }
@@ -114,6 +114,10 @@ export function admitBrowserWs(
   const token = ticketFromProtocol(req.headers["sec-websocket-protocol"]);
   if (!token) throw new Error("WebSocket ticket required");
   const principal = consumeWsTicket(token, target);
+  if (target.startsWith("relay:")) {
+    const deviceId = target.slice("relay:".length, target.indexOf(":", "relay:".length + 1));
+    return { kind: "remote", id: deviceId };
+  }
   if (principal.kind === "user" && req.user?.id !== principal.id) throw new Error("WebSocket principal mismatch");
   if (principal.kind === "agent" && req.agent?.id !== principal.id) throw new Error("WebSocket principal mismatch");
   return principal;
@@ -151,6 +155,10 @@ export async function revalidateWsPrincipal(req: FastifyRequest, principal: WsPr
   if (principal.kind === "device") {
     const token = bearerToken(req);
     return !!token && (await verifyDeviceToken(token))?.id === principal.id;
+  }
+  if (principal.kind === "remote") {
+    const { relayControlFor } = await import("./relay/hub");
+    return relayControlFor(principal.id) !== null;
   }
   return req.agent?.id === principal.id;
 }

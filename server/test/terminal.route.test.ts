@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AddressInfo } from "node:net";
-import { RELAY_ACTOR_HEADER, RELAY_HEADER } from "@hanoman/shared";
+import { RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MODE_HEADER, type RemoteCapability } from "@hanoman/shared";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { killAll, killSession, listSessions, promptFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
@@ -138,6 +138,75 @@ beforeAll(async () => {
   origin = `127.0.0.1:${(app.server.address() as AddressInfo).port}`;
 });
 afterAll(async () => { restoreShell(); await app.close(); });
+
+describe("preValidation /:id/ws — req.remote in-process (SPEC-1218 · prasyarat AC-C1-C9)", () => {
+  // `makeSetting` MENGGANTI seluruh baris (bukan merge parsial) — tanpa membawa scheduler yang
+  // sama dipakai `beforeAll`, panggilan di sini akan menghidupkan lagi `launchGuard` default dan
+  // membocorkan 409 ke SETIAP test lain di berkas ini yang berjalan sesudahnya.
+  const remoteSetting = (remoteControl: { enabled: boolean; capabilities: RemoteCapability[] }) =>
+    makeSetting({ remoteControl, scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } } });
+  const remoteHeaders = (over: Record<string, string> = {}) => ({
+    [RELAY_HEADER]: relaySecret(),
+    [RELAY_ACTOR_HEADER]: encodeRelayActor({ hubOrigin: "https://hub.example", userId: "u1", email: "op@hub.example" }),
+    [RELAY_MODE_HEADER]: "read",
+    ...over,
+  });
+  // `isInProcessRequest` (secret.ts) menolak koneksi jaringan NYATA meski header relay dipalsu
+  // (`req.raw.socket instanceof Socket` sengaja true untuk TCP asli) — jadi test ini WAJIB
+  // in-process (`app.injectWS`), bukan `connect()` (WebSocket network) seperti tes lain berkas
+  // ini. Sesi WAJIB tetap hidup (`FAKE_CLAUDE`, bukan `/bin/echo`): pty yang sudah `exited` saat
+  // `attach()` dipanggil mengirim frame `exit` lalu `client.close()` TANPA kode (pola replay
+  // sesi mati, `pty.ts:1438`) — pada duplex sintetis `injectWS` frame terakhir itu bisa hilang
+  // sebelum socket benar tertutup, meniru "premature close" yang ternyata bukan bug Task 7.
+  async function connectRemote(id: string, headers: Record<string, string> = remoteHeaders()) {
+    const ws = await app.injectWS(`/api/terminal/sessions/${id}/ws`, { headers } as any);
+    const frames: Frame[] = [];
+    ws.on("message", (raw: Buffer) => frames.push(JSON.parse(raw.toString())));
+    return { ws, frames };
+  }
+
+  it("preValidation mengenali req.remote tanpa tiket (header relay) — bukan 401 admission rejected", async () => {
+    await remoteSetting({ enabled: true, capabilities: ["sessions:read"] });
+    const id = "spec-1218-remote-t1";
+    createSessionSvc("p1", repoDir, { id, command: [FAKE_CLAUDE] });
+    try {
+      const c = await connectRemote(id);
+      c.ws.send(JSON.stringify({ t: "in", d: "halo\n" }));
+      await waitFor(() => c.frames.some((f) => f.t === "data" && (f.d ?? "").includes("halo")));
+      expect(c.ws.readyState).toBe(1);
+      c.ws.terminate();
+    } finally { killSession(id); }
+  });
+
+  it("grant remoteControl mati → req.remote tak terisi, admitBrowserWs tanpa tiket → 401", async () => {
+    await remoteSetting({ enabled: false, capabilities: [] });
+    const id = "spec-1218-remote-t2";
+    createSessionSvc("p1", repoDir, { id, command: [FAKE_CLAUDE] });
+    try {
+      await expect(app.injectWS(`/api/terminal/sessions/${id}/ws`, { headers: remoteHeaders() } as any))
+        .rejects.toThrow("Unexpected server response: 401");
+    } finally { killSession(id); }
+  });
+
+  it("revalidate interval TIDAK dipasang untuk principal remote — no setInterval leak lewat watch.refresh", async () => {
+    // Perilaku diverifikasi tak langsung: principal remote tak pernah memanggil
+    // `revalidateWsPrincipal` (yang untuk kind lain query Prisma per refresh 60 dtk) — kalau watch
+    // generik terpasang untuknya, refresh manapun akan menutup 1008 begitu
+    // `revalidateWsPrincipal({kind:"remote",...})` dievaluasi (Task 2 cabang `relayControlFor`,
+    // kosong di mesin klien). Koneksi tetap sehat sesudah roundtrip pesan tanpa 1008.
+    await remoteSetting({ enabled: true, capabilities: ["sessions:read"] });
+    const id = "spec-1218-remote-t3";
+    createSessionSvc("p1", repoDir, { id, command: [FAKE_CLAUDE] });
+    try {
+      const c = await connectRemote(id);
+      c.ws.send(JSON.stringify({ t: "in", d: "cek\n" }));
+      await waitFor(() => c.frames.some((f) => f.t === "data" && (f.d ?? "").includes("cek")));
+      expect(c.ws.readyState).toBe(1);
+      expect(c.frames.some((f) => f.t === "close" || (f as any).code === 1008)).toBe(false);
+      c.ws.terminate();
+    } finally { killSession(id); }
+  });
+});
 
 describe("terminal routes", () => {
   it("streams pty output and the exit code over the websocket", async () => {

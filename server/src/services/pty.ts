@@ -167,6 +167,10 @@ export type Pane = SessionInfo & {
   // hanya karena tak ada invocation SESUDAH lahir. Opsi tmux, bukan memori proses: bertahan lintas
   // restart server sama seperti opsi lain (pola @hanoman_agent, SPEC-338), pty tetap nol dependensi DB.
   doneAtBirth?: string[];
+  // SPEC-1218 · AC-C2 · `#{pane_width}`/`#{pane_height}` — geometri untuk frame `geometry` stream
+  // relay (`paneGeometry`). Undefined bila tmux tak menjawabnya (versi lama).
+  width?: number;
+  height?: number;
 };
 export type SessionAgentMeta = {
   id?: string; name: string; model?: string; timeoutSeconds?: number; definitionHash?: string;
@@ -361,6 +365,8 @@ export const FMT = [
   "#{@hanoman_model}", "#{@hanoman_effort}", "#{@hanoman_orchestrated}",
   // M-2 · ADR-0164 · nama fase done|skipped SAAT LAHIR, dipisah koma — di UJUNG juga.
   "#{@hanoman_done_at_birth}",
+  // SPEC-1218 · AC-C2 · geometri pane untuk frame `geometry` stream relay — di UJUNG juga.
+  "#{pane_width}", "#{pane_height}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -379,6 +385,13 @@ function listPanes(): Pane[] {
 
 // Kembaran asinkron `listPanes()` — semantik kegagalan SAMA PERSIS (server belum jalan → [],
 // kegagalan lain dilempar), hanya tak menahan event loop selama tmux menjawab.
+/** SPEC-1218 · AC-C2 · geometri pane untuk frame `geometry` stream relay — murni dari `listPanes()`. */
+export function paneGeometry(id: string): { cols: number; rows: number } | null {
+  const p = listPanes().find((x) => x.id === id);
+  if (p?.width === undefined || p?.height === undefined) return null;
+  return { cols: p.width, rows: p.height };
+}
+
 export async function listPanesAsync(): Promise<Pane[]> {
   let out: string;
   try { out = await tmuxAsync("list-panes", "-a", "-F", FMT); }
@@ -393,7 +406,7 @@ export function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
       alternate, activity, eventHook, created, agentRoster, launchClass, model, effort,
-      orchestrated, doneAtBirth] = line.split("\t");
+      orchestrated, doneAtBirth, paneWidth, paneHeight] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -426,6 +439,9 @@ export function parsePanes(out: string): Pane[] {
       // M-2 · ADR-0164 · daftar kosong/tak ada opsi → undefined, bukan [] (sesi lama atau sesi
       // tanpa satu pun fase done saat lahir tak perlu membawa array kosong di DTO internal).
       doneAtBirth: doneAtBirth ? doneAtBirth.split(",").filter(Boolean) : undefined,
+      // SPEC-1218 · AC-C2 · kosong (tmux lama tanpa kolom ini) → undefined, bukan NaN.
+      width: paneWidth ? Number(paneWidth) : undefined,
+      height: paneHeight ? Number(paneHeight) : undefined,
     }];
   });
 }

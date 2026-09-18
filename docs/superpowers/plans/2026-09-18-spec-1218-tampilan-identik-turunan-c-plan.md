@@ -96,7 +96,7 @@ Prisma 6 (SQLite, tanpa migration), Vitest, React 18 + TS + xterm.
   cookie-only tak berubah, `opts.allowTestPrincipal` tetap untuk test).
 - Consumes: `issueWsTicket` (`ws-admission.ts`, sudah ada, tak berubah tanda tangannya sampai Task 2).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/ws-tickets.relay-target.test.ts
@@ -131,7 +131,7 @@ describe("POST /api/ws-tickets — target relay:<deviceId>:… (SPEC-1218 · pra
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -139,7 +139,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (400 untuk kedua target relay valid — `targetSchema` menolaknya).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // ws-tickets.ts
@@ -152,7 +152,7 @@ Cast di `issueWsTicket(principal, parsed.data.target as WsTarget)` (Task 2 mempe
 sampai saat itu gunakan `as any` bersyarat SEMENTARA — catat TODO Task 2 di komentar, ditutup di
 Task 2 Step 3, bukan dibiarkan).
 
-- [ ] **Step 4: Jalankan, pastikan lulus (mungkin type error `WsTarget` — sah, ditutup Task 2)**
+- [x] **Step 4: Jalankan, pastikan lulus (mungkin type error `WsTarget` — sah, ditutup Task 2)**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -161,7 +161,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 Expected: PASS (runtime); TS type-check untuk `WsTarget` ditutup Task 2, jangan blokir commit ini
 bila `tsc` project-wide belum dijalankan (SPEC-376 — hanya test tersentuh).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/ws-tickets.ts server/test/ws-tickets.relay-target.test.ts
@@ -186,7 +186,7 @@ git commit -m "feat(spec-1218): ws-tickets target relay:<deviceId>:events|termin
   dipakai HUB mengadmisi socket **browser** yang menembak `wsHandler` `devices-relay.ts` (Task 4).
   Task 7 (admisi injectWS klien) SENGAJA tidak memakai kind ini — lihat alasannya di Task 7.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // tambahan di server/test/ws-admission.test.ts
@@ -211,7 +211,7 @@ describe("admitBrowserWs — target relay:<deviceId>:… (SPEC-1218 · prasyarat
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -220,7 +220,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 Expected: FAIL (TS: `"remote"` bukan anggota `WsPrincipal.kind`; `consumeWsTicket` menolak target
 relay karena `WsTarget` belum memuatnya).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // ws-admission.ts
@@ -254,7 +254,7 @@ if (principal.kind === "remote") {
 tak melempar; bila `relay/hub.ts` sudah aman diimpor statis di modul ini pakai import statis biasa
 dan catat koreksi di commit.)
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -262,7 +262,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS (kedua berkas — Task 1 kini type-check bersih juga).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/ws-admission.ts server/test/ws-admission.test.ts
@@ -286,7 +286,7 @@ git commit -m "feat(spec-1218): WsPrincipal remote (HUB-side) + admitBrowserWs/r
   `RELAY_CREDIT_REFILL_BELOW`/`RELAY_SOCKET_MAX_BUFFERED`/`RELAY_RESYNC_MIN_MS`/
   `RELAY_IDLE_STREAM_CLOSE_MS` (`@hanoman/shared`, sudah ada).
 
-- [ ] **Step 1: Tulis test tabel yang gagal (fixture `fake()`/`hello()`/`ready()` sudah ada di berkas)**
+- [x] **Step 1: Tulis test tabel yang gagal (fixture `fake()`/`hello()`/`ready()` sudah ada di berkas)**
 
 ```ts
 describe("relay/hub.ts — stream, kredit, plafon (SPEC-1218 · AC-C4/C5/C6)", () => {
@@ -335,7 +335,7 @@ describe("relay/hub.ts — stream, kredit, plafon (SPEC-1218 · AC-C4/C5/C6)", (
 dengan bentuk `StreamState`/`fake()` nyata saat menulisnya; jangan longgarkan assert `toBeNull`/
 `toBe` di atas demi lulus.)
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -343,7 +343,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`openStream`/`onClientFrame`/`closeStream` tak ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // relay/hub.ts — tambahan tipe & state
@@ -394,7 +394,7 @@ yang sama — jangan buat handler kedua).
 `previous.streams` (kirim close ke setiap browser socket yang masih terbuka) — tambahkan di blok
 `if (previous)` yang sudah ada.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -402,7 +402,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/relay/hub.ts server/test/relay-hub.test.ts
@@ -422,7 +422,7 @@ git commit -m "feat(spec-1218): relay/hub.ts peta stream + kredit + plafon 6/4 +
   sudah ada), `zRelayPath` (sudah ada).
 - Produces: `GET /api/devices/:deviceId/relay/*` (upgrade) — Task 15 tak menyentuhnya lagi.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Pola fixture: `app.injectWS` terhadap route ini (server test env), dengan tiket
 `relay:<deviceId>:terminal:<id>` dari `POST /api/ws-tickets` (Task 1), lalu assert:
@@ -471,7 +471,7 @@ describe("devices-relay wsHandler (SPEC-1218 · AC-C5/AC-C6)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -479,7 +479,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (route belum punya `wsHandler`, upgrade gagal/404).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // devices-relay.ts — tambahan ke app.route({...}) yang SUDAH ADA (bukan route kedua)
@@ -528,7 +528,7 @@ app.route({
 (Sesuaikan deteksi `inner` dengan bentuk nyata `wildcard` yang diamati saat Step 2 gagal — jangan
 menebak regex tanpa menjalankannya.)
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -536,7 +536,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS (kedua — route HTTP lama tak boleh regresi).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/devices-relay.ts server/test/devices-relay.wshandler.test.ts
@@ -560,7 +560,7 @@ git commit -m "feat(spec-1218): wsHandler /api/devices/:id/relay/* bersanding ha
   dipanggil di klien — spec teknis §T5 tak menyebut perluasan `InjectableApp` secara eksplisit
   karena kontraknya berhenti di level frame; perluasan tipe ini murni mekanis, bukan keputusan baru.
 
-- [ ] **Step 1: Tulis test yang gagal (kerangka tipe, bukan perilaku jalur open — itu Task 6)**
+- [x] **Step 1: Tulis test yang gagal (kerangka tipe, bukan perilaku jalur open — itu Task 6)**
 
 ```ts
 // tambahan di relay-dispatcher.test.ts
@@ -580,7 +580,7 @@ it("injectableFrom mengekspos injectWS di atas app.injectWS asli (SPEC-1218 · p
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -588,7 +588,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (TS: `injectWS` bukan properti `InjectableApp`).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 export type InjectableApp = {
@@ -605,7 +605,7 @@ export function injectableFrom(app: FastifyInstance): InjectableApp {
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -613,7 +613,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/relay/dispatcher.ts server/test/relay-dispatcher.test.ts
@@ -635,7 +635,7 @@ git commit -m "feat(spec-1218): InjectableApp.injectWS + injectableFrom (prasyar
 - Produces: `onMessage` menangani `f.t === "open"` lewat `injectWS`, menggantikan placeholder
   `close 4502` (baris 134); buang `resize` selalu; buang `in`/`diag` bila mode bukan `"write"`.
 
-- [ ] **Step 1: Tulis test regresi `onOpen` (mereplikasi 0/2→2/2 S0a, kasus TERPISAH — AC-C8) yang gagal**
+- [x] **Step 1: Tulis test regresi `onOpen` (mereplikasi 0/2→2/2 S0a, kasus TERPISAH — AC-C8) yang gagal**
 
 ```ts
 it("jalur open: frame sinkron attach sampai HANYA lewat onOpen, 2/2 (AC-C8, replikasi S0a terpisah)", async () => {
@@ -660,7 +660,7 @@ it("buang in/diag saat mode read", async () => { /* ... */ });
 it("gate: path relay tak diizinkan atau capability kurang → close 4403 sebelum injectWS dipanggil", async () => { /* injectWS mock TAK terpanggil sama sekali */ });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -668,7 +668,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`f.t === "open"` masih menjawab `close 4502`).
 
-- [ ] **Step 3: Implementasi** (ganti baris 132-134 `createRelayDispatcher`'s `onMessage`)
+- [x] **Step 3: Implementasi** (ganti baris 132-134 `createRelayDispatcher`'s `onMessage`)
 
 ```ts
 const streams = new Map<string, { mode: "read" | "write"; ws: InjectedWs }>();
@@ -716,7 +716,7 @@ Import tambahan di header berkas: `getSetting` (`../settings`), `remoteCapabilit
 `relayRouteAllowed`, `grantsCapability` (`@hanoman/shared`), `paneGeometryFor` (Task 8, sementara
 stub `() => undefined` sampai Task 8 mendarat — catat TODO ditutup Task 8, bukan dibiarkan).
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -724,7 +724,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/relay/dispatcher.ts server/test/relay-dispatcher.test.ts
@@ -749,7 +749,7 @@ untuk `GET /api/terminal/sessions/:id/ws` sebelum preValidation ini berjalan) ad
 BENAR di sini. Revalidasi berkelanjutan grant yang dicabut selagi stream terbuka **bukan** tanggung
 jawab route ini — itu milik watch terpisah di dispatcher sendiri (T8, Task 6 lanjutan/Task 9).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 it("preValidation /:id/ws mengenali req.remote in-process (mock RELAY_HEADER via inject) tanpa tiket (SPEC-1218 · prasyarat AC-C1-C9)", async () => {
@@ -762,7 +762,7 @@ it("revalidate interval TIDAK dipasang untuk principal remote (klien) — no set
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -770,7 +770,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (401 tanpa tiket).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // terminal.ts — preValidation route /:id/ws
@@ -799,7 +799,7 @@ socket.on("close", () => { if (revalidate) clearInterval(revalidate); watch?.dis
 `id` berprefiks `client:` ini otomatis memplafon stream per hub-origin+user, plafon TAMBAHAN yang
 tak melanggar plafon 6/4 milik `relay/hub.ts`, murni pertahanan berlapis).
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -807,7 +807,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/terminal.ts server/test/terminal.route.test.ts
@@ -827,7 +827,7 @@ git commit -m "feat(spec-1218): admisi WS klien req.remote in-process di /:id/ws
 - Produces: `FMT` bertambah `#{pane_width}`/`#{pane_height}` di UJUNG (pola SPEC-919/ADR-0164, tak
   menggeser kolom lama); `paneGeometry(id): {cols, rows} | null` murni dari `listPanes()`.
 
-- [ ] **Step 1: Cari test parser FMT yang ada**
+- [x] **Step 1: Cari test parser FMT yang ada**
 
 ```bash
 grep -rln "parsePanes\|FMT" server/test
@@ -844,7 +844,7 @@ it("FMT bertambah pane_width/pane_height di ujung, paneGeometry(id) murni dari l
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -853,7 +853,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 Expected: FAIL (`paneGeometry` tak ada, atau kolom FMT tak cocok — sesuaikan test dengan urutan
 FMT NYATA yang dibaca dari `pty.ts:352-364` sebelum mengunci assert).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // pty.ts — FMT (baris 352-364), tambah di UJUNG array (sebelum .join("\t"))
@@ -888,7 +888,7 @@ function paneGeometryFor(path: string): { cols: number; rows: number } | undefin
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -896,7 +896,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/src/services/relay/dispatcher.ts server/test/pty-parse.test.ts
@@ -916,7 +916,7 @@ git commit -m "feat(spec-1218): FMT pane_width/pane_height + paneGeometry(id) un
   membatasi grup yang dikirim SEGERA (snapshot attach) maupun `broadcast` berikutnya ke anggota
   himpunan itu, **selain** gerbang `cookieOnly` yang sudah ada (dua gerbang, bukan pengganti).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 describe("attach({groups}) — grup terbatas (SPEC-1218 · AC-C9)", () => {
@@ -935,7 +935,7 @@ describe("attach({groups}) — grup terbatas (SPEC-1218 · AC-C9)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -944,7 +944,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 Expected: FAIL (TS: `groups` bukan properti opsi `attach`; grup di luar `{sessions}` tetap
 terkirim).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 export async function attach(c: Client, o: { maySubscribe?: boolean; groups?: Set<EventMsg["t"]> } = {}): Promise<void> {
@@ -987,7 +987,7 @@ Tambahkan `const clientGroups = new WeakMap<Client, Set<EventMsg["t"]>>();` deka
 dan bersihkan di `__reset()` test-only (`clientGroups` `WeakMap` tak perlu `.clear()` eksplisit,
 tapi catat di komentar kenapa aman).
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -995,7 +995,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/events.ts server/test/events.test.ts
@@ -1015,7 +1015,7 @@ git commit -m "feat(spec-1218): attach({groups}) membatasi grup broadcast per-kl
   "leadAsks", "cleanups", ...(ideRead ? ["git"] : [])]`); preValidation route ini bertambah cabang
   `req.remote` (pola SAMA Task 7).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 describe("/api/events/ws (klien) — principal remote grup terbatas (SPEC-1218 · AC-C9)", () => {
@@ -1027,7 +1027,7 @@ describe("/api/events/ws (klien) — principal remote grup terbatas (SPEC-1218 �
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1035,7 +1035,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (401 tanpa tiket, sama seperti Task 7 sebelum diperbaiki).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // routes/events.ts
@@ -1066,7 +1066,7 @@ Handler:
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1074,7 +1074,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/events.ts server/test/events.route.test.ts

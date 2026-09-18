@@ -81,3 +81,41 @@ describe("events hub", () => {
     expect(c.frames.length).toBe(n);
   });
 });
+
+describe("attach({groups}) — grup terbatas (SPEC-1218 · AC-C9)", () => {
+  it("groups diisi → hanya grup dalam himpunan yang dikirim saat attach, cookieOnly tetap nol", async () => {
+    const c = fakeClient();
+    await attach(c, { maySubscribe: false, groups: new Set(["sessions"]) });
+    const types = groups(c);
+    expect(types).toContain("hello");
+    expect(types.has("sessions")).toBe(true);
+    // cookieOnly (models/presence) tak boleh terkirim untuk principal non-cookie.
+    expect(types.has("models")).toBe(false);
+    expect(types.has("presence")).toBe(false);
+    // grup non-cookieOnly TAPI di luar {sessions} juga tak boleh terkirim.
+    expect(types.has("specs")).toBe(false);
+    expect(types.has("notifications")).toBe(false);
+    detach(c);
+  });
+
+  it("groups tak diisi (undefined) → perilaku lama tak berubah (regresi)", async () => {
+    const c = fakeClient();
+    await attach(c);
+    const types = groups(c);
+    expect(types.has("sessions")).toBe(true);
+    expect(types.has("specs")).toBe(true);
+    expect(types.has("notifications")).toBe(true);
+    detach(c);
+  });
+
+  it("broadcast berikutnya juga terbatas grupnya untuk klien ber-groups", async () => {
+    const c = fakeClient();
+    await attach(c, { maySubscribe: false, groups: new Set(["notifications"]) });
+    const before = c.frames.filter((f) => f.t === "notifications").length;
+    await prisma.notification.create({ data: { specId: "SPEC-3", title: "z", projectId: "p1" } });
+    await __tick(); await __tick(); await __tick();
+    expect(c.frames.filter((f) => f.t === "notifications").length).toBeGreaterThan(before);
+    expect(c.frames.some((f) => f.t === "specs")).toBe(false);
+    detach(c);
+  });
+});

@@ -1,15 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import {
   MAX_WS_MESSAGE_BYTES,
   WS_REVALIDATE_EVERY_MS,
   WsMessageGuard,
+  admitBrowserWs,
   createPrincipalWatch,
   assertWsOrigin,
   consumeWsTicket,
   issueWsTicket,
+  revalidateWsPrincipal,
   wsAllowlistFor,
   wsTicketProtocol,
 } from "../src/services/ws-admission";
+import { attachRelaySocket, __resetRelayHub } from "../src/services/relay/hub";
 
 describe("WebSocket admission", () => {
   it("matches the complete Origin and rejects foreign or missing browser origins", () => {
@@ -165,5 +168,24 @@ describe("WebSocket admission", () => {
       await h.tick();
       expect(h.revoked()).toBe(0);
     });
+  });
+});
+
+describe("admitBrowserWs — target relay:<deviceId>:… (SPEC-1218 · prasyarat C1-C9)", () => {
+  beforeEach(() => __resetRelayHub());
+
+  it("tiket relay valid → {kind:'remote', id: deviceId}", () => {
+    const token = issueWsTicket({ kind: "user", id: "u1" }, "relay:dev1:events" as any);
+    const req = { headers: { origin: "http://localhost", host: "localhost",
+      "sec-websocket-protocol": `hanoman-ticket.${token}` } } as any;
+    const p = admitBrowserWs(req, "relay:dev1:events" as any, new Set(["http://localhost"]));
+    expect(p).toEqual({ kind: "remote", id: "dev1" });
+  });
+
+  it("revalidateWsPrincipal remote — link relay masih hidup → true, mati → false", async () => {
+    const fakeSocket = { readyState: 1, send: () => {}, close: () => {} };
+    attachRelaySocket("dev1", fakeSocket).onMessage(JSON.stringify({ t: "hello", v: 1, protocol: 1, version: "0.5.0", capabilities: [] }));
+    await expect(revalidateWsPrincipal({} as any, { kind: "remote", id: "dev1" })).resolves.toBe(true);
+    await expect(revalidateWsPrincipal({} as any, { kind: "remote", id: "dev2" })).resolves.toBe(false);
   });
 });
