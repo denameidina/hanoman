@@ -1399,7 +1399,7 @@ git commit -m "feat(spec-1218): PresenceView.hubVersion aditif, prasyarat Remote
   "protocol-mismatch"` SEBELUM render apa pun (AC-C7); else `InstanceProvider` `kind:"remote"` +
   `Tabs` Terminal/Dokumen/IDE → `TerminalPane mode="remote"`/`SpecDocsModal`/`IdeReadPanel`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 describe("RemoteInstanceView (SPEC-1218 · AC-C1/AC-C7)", () => {
@@ -1423,7 +1423,7 @@ describe("RemoteInstanceView (SPEC-1218 · AC-C1/AC-C7)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1431,7 +1431,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (modul belum ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```tsx
 // RemoteBanner.tsx
@@ -1491,7 +1491,7 @@ export function RemoteInstanceView({ device, hubVersion, sessionId, projectId, o
 tersedia di `PresenceDeviceView.sessions[]` saat Task 16 memanggilnya dari `ClientsScreen` — kalau
 device tak punya sesi aktif, tab Terminal/Dokumen menampilkan `StateBlock` kosong, bukan crash.)
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1499,7 +1499,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/RemoteBanner.tsx src/src/screens/RemoteInstanceView.tsx src/test/remote-instance-view.test.tsx
