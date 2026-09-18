@@ -2600,7 +2600,7 @@ git commit -m "feat(web): LogsPanel — pencarian, kursor, transkrip, retensi (S
 **Interfaces:**
 - Consumes: `LogsPanel` (Task 18); `Tabs` (`src/src/ds/components/ui.tsx`, dipakai `TerminalScreen.tsx:481`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan ke `src/test/ClientsScreen.test.tsx`:
 
@@ -2617,12 +2617,12 @@ it("tab Log merender LogsPanel", async () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism src/test/ClientsScreen.test.tsx`
 Expected: FAIL — tak ada tab "Device"/"Log" di render sekarang (daftar datar `DeviceCard`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Modify `src/src/screens/ClientsScreen.tsx` — bungkus daftar `DeviceCard` yang ada (baris ~127-133)
 dengan `Tabs variant="pill"`:
@@ -2650,12 +2650,12 @@ Sesuaikan nama prop `Tabs` (`items`/`active`/`onChange` vs nama aktual) dengan d
 `src/src/ds/components/ui.tsx` — verifikasi lewat `grep -n "export function Tabs" -A 15
 src/src/ds/components/ui.tsx` sebelum menulis.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism src/test/ClientsScreen.test.tsx`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/ClientsScreen.tsx src/test/ClientsScreen.test.tsx

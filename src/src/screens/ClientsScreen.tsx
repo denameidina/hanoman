@@ -1,7 +1,9 @@
 import React from "react";
 import { Card, Badge, StateBlock } from "../ds";
+import { Tabs } from "../ds/components/ui";
 import { api } from "../api/client";
 import { Icon } from "../ds/icon";
+import { LogsPanel } from "./LogsPanel";
 import type { PresenceDeviceView, PresenceSessionView, PresenceView } from "@hanoman/shared";
 
 /* SPEC-919 · ADR-0147 · halaman "Klien": device yang sinkron ke hub ini, dan pekerjaan yang
@@ -118,17 +120,28 @@ export function ClientsScreen({ view, specTitles, onOpenSpec }:
   // Satu stempel per render: dua baris yang lahir dari render yang sama tak boleh menghitung
   // "sudah berapa lama" dari dua titik waktu berbeda.
   const now = Date.now();
-  if (shown.devices.length === 0) {
-    return (
-      <StateBlock kind="empty" icon="monitor" title="Belum ada device"
-        hint="Device muncul di sini sesudah sebuah instance hanoman menerbitkan device token dan menyinkron ke hub ini." />
-    );
-  }
+  // SPEC-1217 · D6/AC-S8 · tab "Device"|"Log", default "Device" — layar Klien lama tetap terlihat
+  // sama persis di tab default, log terpusat (LogsPanel) hidup di tab kedua.
+  const [tab, setTab] = React.useState<"device" | "log">("device");
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {shown.devices.map((d) => (
-        <DeviceCard key={d.deviceId} d={d} specTitles={specTitles} onOpenSpec={onOpenSpec} now={now} />
-      ))}
+      <Tabs variant="pill"
+        tabs={[{ value: "device", label: "Device" }, { value: "log", label: "Log" }]}
+        value={tab} onChange={(v) => setTab(v as "device" | "log")} />
+      {tab === "device" ? (
+        shown.devices.length === 0 ? (
+          <StateBlock kind="empty" icon="monitor" title="Belum ada device"
+            hint="Device muncul di sini sesudah sebuah instance hanoman menerbitkan device token dan menyinkron ke hub ini." />
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {shown.devices.map((d) => (
+              <DeviceCard key={d.deviceId} d={d} specTitles={specTitles} onOpenSpec={onOpenSpec} now={now} />
+            ))}
+          </div>
+        )
+      ) : (
+        <LogsPanel />
+      )}
     </div>
   );
 }
