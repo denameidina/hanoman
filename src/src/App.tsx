@@ -11,10 +11,15 @@ import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
 import { Shell, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
-import { api, ApiError, type TerminalSession, type SourceResetPending } from "./api/client";
+import { api, ApiError, createApi, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts } from "@hanoman/shared";
-import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus, type Orchestration, type OrchestrationFlow, type PhaseOverrides } from "@hanoman/shared";
+import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, LOCAL_DEVICE_ID, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus, type Orchestration, type OrchestrationFlow, type PhaseOverrides } from "@hanoman/shared";
+// SPEC-1216 · ADR-0165 §11 · target picker dialog Start — murni (Task 10), dipakai di sini apa
+// adanya. `createApi` diimpor dari "./api/client" (bukan "./api/instance"): instance.tsx hanya
+// mengekspor InstanceProvider/useInstance/useApi/useWsTarget, StartSessionModal ini dipanggil dari
+// luar provider manapun (pola lama yang memanggil `api.*` langsung), jadi `targetApi` lokal cukup.
+import { startTargets, type StartTarget, type TargetReason } from "./api/start-targets";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
 import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
@@ -63,6 +68,18 @@ const SettingsScreen = React.lazy(() => import("./screens/SettingsScreen").then(
 
 const SEVERITY =[{ value: "critical", label: "Critical" }, { value: "major", label: "Major" }, { value: "minor", label: "Minor" }];
 const PRIORITY = [{ value: "tinggi", label: "Tinggi" }, { value: "sedang", label: "Sedang" }, { value: "rendah", label: "Rendah" }];
+
+// SPEC-1216 · ADR-0165 §11 · label alasan target Start tak terpilih (StartSessionModal).
+function reasonLabel(r?: TargetReason): string {
+  switch (r) {
+    case "offline": return "offline";
+    case "control-off": return "kendali jarak jauh mati";
+    case "protocol-mismatch": return "versi tak cocok";
+    case "no-spawn": return "tanpa izin mulai sesi";
+    case "capacity-full": return "kapasitas penuh";
+    default: return "tak tersedia";
+  }
+}
 
 type SpecForm = { kind: string; project: string; title: string; context: string; outcome: string; constraints: string;
   priority: string; severity: string; steps: string; expected: string; actual: string; env: string; branchFrom: string; fromAudit: string;
@@ -114,6 +131,10 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   const [busy, setBusy] = React.useState(false);
   const [launchRejection, setLaunchRejection] = React.useState<LaunchRejection | null>(null);
   React.useEffect(() => { setLaunchRejection(null); }, [open, spec?.id]);
+  // SPEC-1216 · ADR-0165 §11 · target Start: "hub ini" atau device handledBy/online lainnya.
+  const [targets, setTargets] = React.useState<StartTarget[]>([{ deviceId: LOCAL_DEVICE_ID, name: "hub ini", eligible: true }]);
+  const [targetId, setTargetId] = React.useState<string>(LOCAL_DEVICE_ID);
+  const [remoteError, setRemoteError] = React.useState<{ error: string; remoteSession?: { deviceId: string; name: string; sessionId: string | null } } | null>(null);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
   // ADR-0164 · matriks orkestrasi untuk pratinjau fase. Absen di respons Setting lama → default aktif.
@@ -161,6 +182,40 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     api.getMethodStatus().then((r) => setMethodStatuses(r.methods)).catch(() => setMethodStatuses(null));
     // SPEC-407 · `spec` ikut jadi dependency: prefill mode goal bergantung source-nya.
   }, [open, spec]);
+  // SPEC-1216 · ADR-0165 §11 · efek TERPISAH dari efek settings di atas: gagal-diam di sini (mis.
+  // instalasi lama tanpa `api.presence`/`api.getProject` ter-mock di test) tak boleh mengganggu
+  // prefill model/effort/goal. `api.presence`/`api.getProject` diperiksa dulu sebelum dipanggil —
+  // pemanggil lama (test StartSessionModal yang mem-mock `api` parsial) tak pernah melempar
+  // TypeError sinkron dari sini.
+  React.useEffect(() => {
+    if (!open || !spec) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [view, handledByRaw] = await Promise.all([
+          typeof api.presence === "function" ? api.presence() : Promise.resolve({ enabled: false, devices: [] } as PresenceView),
+          typeof api.getProject === "function"
+            ? api.getProject(spec.projectId).then((p) => p.handledBy ?? []).catch(() => [] as HandledByEntry[])
+            : Promise.resolve([] as HandledByEntry[]),
+        ]);
+        if (cancelled) return;
+        const t = startTargets(view, handledByRaw);
+        setTargets(t);
+        const first = t.find((x) => x.deviceId !== LOCAL_DEVICE_ID && x.eligible);
+        setTargetId(first?.deviceId ?? LOCAL_DEVICE_ID);
+      } catch {
+        if (cancelled) return;
+        setTargets([{ deviceId: LOCAL_DEVICE_ID, name: "hub ini", eligible: true }]);
+        setTargetId(LOCAL_DEVICE_ID);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, spec?.id]);
+  const isRemoteTarget = targetId !== LOCAL_DEVICE_ID;
+  const targetApi = React.useMemo(
+    () => (isRemoteTarget ? createApi({ base: `/api/devices/${targetId}/relay` }) : api),
+    [isRemoteTarget, targetId],
+  );
   const pickAgent = (a: Agent) => {
     setAgent(a);
     setPhaseOverrides({});
@@ -193,20 +248,25 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // SPEC-739 · ADR-0114 · status untuk pasangan (metode, agen) yang SEDANG dipilih — dua-duanya,
   // karena superpowers bisa siap untuk claude dan kosong untuk codex di mesin yang sama.
   const methodStat = methodStatuses?.find((m) => m.method === method && m.agent === agent) ?? null;
-  async function start(force = false) {
+  async function start(force = false, confirmRemote = false) {
     setBusy(true);
-    setLaunchRejection(null);
+    setLaunchRejection(null); setRemoteError(null);
     try {
-      const { id, resumed } = await api.startSession({
+      const { id, resumed } = await targetApi.startSession({
         spec: s.id, flow, model, effort, agent,
         ...(Object.keys(phaseOverrides).length ? { phaseOverrides } : {}),
         goal: goalOn, goalCondition: goalOn && goalCond.trim() ? goalCond.trim() : undefined,
         verifyScope, method,
         ...(isBlocked || force ? { force: true } : {}),   // ADR-0093/0161 · keputusan manusia
+        ...(confirmRemote ? { confirmRemote: true } : {}),
       });
       onStarted(id, resumed); onClose();
     }
     catch (e) {
+      if (e instanceof ApiError && e.status === 409 && e.detail && typeof e.detail === "object"
+        && ((e.detail as any).error === "remote-session" || (e.detail as any).error === "confirm-required")) {
+        setRemoteError(e.detail as any); return;
+      }
       const rejected = e instanceof ApiError && e.status === 409 ? zLaunchRejection.safeParse(e.detail) : null;
       if (rejected?.success) setLaunchRejection(rejected.data);
       else onError?.(e);
@@ -219,7 +279,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
         <Button variant="ghost" onClick={onClose}>Batal</Button>
         <Button leftIcon={isBlocked ? "lock" : "play"} variant={isBlocked ? "danger" : "primary"}
           disabled={busy} onClick={() => void start()}>{isBlocked ? "Mulai tetap" : launchRejection ? "Coba lagi" : "Mulai"}</Button>
-        {launchRejection && !isBlocked && <Button leftIcon="lock" variant="danger" disabled={busy}
+        {launchRejection && !isBlocked && !isRemoteTarget && <Button leftIcon="lock" variant="danger" disabled={busy}
           onClick={() => void start(true)}>Mulai tetap</Button>}
       </>}>
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
@@ -251,6 +311,24 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
             : b.reason === "unmerged" ? "belum ter-merge" : "belum selesai"})`).join(", ")}</b>.
           Sesi tetap bisa dimulai, tapi worktree-nya lahir dari basis yang belum memuat pekerjaan itu.
           {" "}Mulai tetap juga melewati cap sesi dan pemeriksaan beban host.
+        </div>
+      )}
+      {/* SPEC-1216 · ADR-0165 §11 · target Start: "hub ini" atau device handledBy/online lainnya. */}
+      <Field label="Target" hint="Mesin yang menjalankan sesi ini. Tak terpilih tetap tampil beserta alasannya.">
+        <Select aria-label="target" value={targetId} style={{ width: "100%" }}
+          options={targets.map((t) => ({ value: t.deviceId, label: t.eligible ? t.name : `${t.name} — ${reasonLabel(t.reason)}`, disabled: !t.eligible }))}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setTargetId(e.target.value); setRemoteError(null); }} />
+      </Field>
+      {remoteError?.error === "remote-session" && remoteError.remoteSession && (
+        <div role="alert" style={{ fontSize: 12.5, marginBottom: 12, padding: "9px 11px", borderRadius: 8, background: "var(--warn-bg, #fdf6e3)" }}>
+          Sesi ini sudah berjalan di <b>{remoteError.remoteSession.name}</b>.
+          {/* aksi "Sambung ke sesi" milik navigasi TerminalScreen — turunan C; di sini cukup pesan + tutup */}
+        </div>
+      )}
+      {remoteError?.error === "confirm-required" && (
+        <div role="alert" style={{ fontSize: 12.5, marginBottom: 12, padding: "9px 11px", borderRadius: 8, background: "var(--warn-bg, #fdf6e3)" }}>
+          <div>Device terakhir yang mengerjakan ini sudah offline.</div>
+          <Button variant="danger" disabled={busy} onClick={() => void start(false, true)}>Tetap mulai</Button>
         </div>
       )}
       {/* SPEC-338 · ADR-0074 · mesin sesi. Perilaku sesi identik (worktree, fase, stage, review);

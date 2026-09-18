@@ -1646,7 +1646,7 @@ git commit -m "feat(spec-1216): startTargets murni — default + alasan tak terp
   `createApi({base})` (Task 8), `api.getPresence()`/`api.listHandledBy()` (endpoint yang sudah ada
   — verifikasi nama pastinya di Step 1).
 
-- [ ] **Step 1: Cari endpoint presence/handledBy yang sudah dipakai di frontend**
+- [x] **Step 1: Cari endpoint presence/handledBy yang sudah dipakai di frontend**
 
 ```bash
 grep -n "getPresence\|presenceView\|PresenceView\|handledBy" src/src/api/client.ts src/src/App.tsx | head -20
@@ -1654,7 +1654,7 @@ grep -n "getPresence\|presenceView\|PresenceView\|handledBy" src/src/api/client.
 
 Catat nama method `api.*` persis (dipakai Step 3).
 
-- [ ] **Step 2: Tulis test render yang gagal**
+- [x] **Step 2: Tulis test render yang gagal**
 
 ```tsx
 // src/test/start-session-target.test.tsx (bagian 2, tambahan)
@@ -1681,7 +1681,7 @@ describe("StartSessionModal — target picker (SPEC-1216 · AC-B7/B8)", () => {
 `grep -n "fixtureSpec\|makeSpec" src/test/*.test.tsx` untuk pola yang konsisten dengan suite
 lain di file itu.)
 
-- [ ] **Step 3: Jalankan, pastikan gagal**
+- [x] **Step 3: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1689,7 +1689,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (tak ada `aria-label="target"` di modal).
 
-- [ ] **Step 4: Implementasi — tambahan state + fetch + render di `StartSessionModal`**
+- [x] **Step 4: Implementasi — tambahan state + fetch + render di `StartSessionModal`**
 
 Tambah state (dekat `const [launchRejection, ...]`, baris ~115):
 
@@ -1813,7 +1813,7 @@ mengekspor `InstanceProvider`/`useInstance`/`useApi`/`useWsTarget`. `StartSessio
 tidak memakai `useApi()` karena ia dipanggil dari luar `InstanceProvider` manapun — konsisten
 dengan pola lama yang memanggil `api.*` langsung; `targetApi` lokal cukup.)
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1822,7 +1822,7 @@ pnpm -F @hanoman/web typecheck
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/App.tsx src/test/start-session-target.test.tsx
