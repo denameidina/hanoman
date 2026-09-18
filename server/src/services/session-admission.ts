@@ -1,4 +1,5 @@
 import type { LaunchStatus, Scheduler } from "@hanoman/shared";
+import { appendEvent } from "./logs/event-log";
 
 export type LaunchPane = {
   id: string; exited: boolean; launchClass?: "agent" | "terminal";
@@ -36,6 +37,7 @@ export class LaunchAdmissionError extends Error {
     super(`${kind === "capacity" ? "Cap sesi penuh" : "Beban host melampaui ambang"}: `
       + `${a.liveAgentCount} agen, ${a.liveCount} sesi hidup / cap ${a.maxConcurrent}; `
       + `load/core ${load} / ambang ${a.maxLoadPerCore}. Tunggu atau gunakan force.`);
+    void appendEvent({ kind: "launch.rejected", level: "warn", msg: this.message, data: { kind, admission } });
   }
 }
 

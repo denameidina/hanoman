@@ -882,7 +882,7 @@ git commit -m "feat(server): tap session.phase dari buildLocalPresence (SPEC-121
 - Consumes: `appendEvent` (event-log.ts, sudah ada).
 - Produces: tak ada API baru — efek samping `appendEvent({kind:"launch.rejected", ...})` di titik lempar `LaunchAdmissionError`/`LaunchError`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-launch-rejected.test.ts
@@ -907,12 +907,12 @@ describe("launch.rejected di titik lempar", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-launch-rejected.test.ts`
 Expected: FAIL — constructor `LaunchAdmissionError` belum menembak `appendEvent`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Modify `server/src/services/session-admission.ts` — tambahkan import dan panggilan di constructor:
 
@@ -947,17 +947,17 @@ export class LaunchError extends Error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-launch-rejected.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Run existing session-admission/session-launch suites (regresi nol)**
+- [x] **Step 5: Run existing session-admission/session-launch suites (regresi nol)**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/session-admission.test.ts server/test/session-launch.test.ts`
 Expected: PASS tanpa perubahan — `appendEvent` tak pernah reject (event-log.ts sudah menjamin ini sejak turunan A).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/session-admission.ts server/src/services/session-launch.ts server/test/log-launch-rejected.test.ts

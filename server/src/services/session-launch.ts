@@ -12,6 +12,7 @@ import { phaseFilePath, decisionFilePath, readPhases } from "./session-phases";
 import { specAttachmentsDir, syncSpecAttachmentsDir } from "./spec-attachment-dir";
 import { assertLaunchApproved } from "./launch-authority";
 import { withSessionAdmission } from "./session-launch-gate";
+import { appendEvent } from "./logs/event-log";
 
 // Re-ekspor supaya pemanggil (governor, test) punya satu titik impor jalur peluncuran.
 export { sessionIdForSpec } from "./pty";
@@ -22,7 +23,10 @@ export { sessionIdForSpec } from "./pty";
 export class LaunchError extends Error {
   // SPEC-447 · `blockers` hanya terisi untuk kind "blocked"; route memetakannya ke body 409.
   constructor(message: string, readonly kind: "needs-bind" | "worktree" | "blocked" | "not-approved",
-              readonly blockers: SpecBlocker[] = []) { super(message); }
+              readonly blockers: SpecBlocker[] = []) {
+    super(message);
+    void appendEvent({ kind: "launch.rejected", level: "warn", msg: message, data: { kind, blockers } });
+  }
 }
 export type StartSpecResult = { id: string; reused?: boolean; resumed?: boolean };
 
