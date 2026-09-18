@@ -1,17 +1,67 @@
 # SPEC-1217 · SPEC-1215 turunan D — log terpusat: pengiriman, ingest, redaksi, pencarian & retensi
 
+**Tanggal:** 2026-09-18 · **Flow:** feature · **Prioritas:** sedang · **Sumber:** brief
+**Base:** `61bc006c` · **Fase penulis bagian ini:** Brainstorm (1/5), Objective (2/5)
+**ADR:** [0166 — log terpusat, ingest satu arah](../../../internal/docs/adr/0166-log-terpusat-ingest-satu-arah.md)
+(mengunci kontrak; fase ini tidak membukanya kembali — lihat "Konteks & keputusan" di bawah)
+
 ## Objective
 
-Log klien sampai ke hub dan tercari: shipper pada tick sync yang ada mengirim lajur `event` (default
-menyala), `server` (sadapan console → spool NDJSON, opt-in) dan `transcript` (opt-in) ke
-`POST /api/sync/logs`; hub ingest dengan gzip cap ganda, zod, redaksi lapis 2, high-water mark
-`LogCursor` dalam satu transaksi (nol duplikat pada kirim ulang), kuota 20 000 entri/jam;
-`redactText()` murni diuji korpus di klien dan hub (gagal-tertutup → `log.gap`); spool offline
-berbatas dengan urutan buang server → transcript → event; tap tambahan `session.phase`/
-`session.result`/`launch.rejected`; `GET /api/logs` (kursor, rentang ≤31 hari, penyaring
-device/project/spec/lane/level/kind/q) + `GET /api/logs/:id/transcript` + `GET|PUT /api/logs/retention`
-(`COOKIE_ONLY`) + `LogsPanel` di layar Klien; retensi `Setting.logRetention` di `runRetention()` yang
-sudah ada; ukur p95 `GET /specs` di bawah ingest sintetis. Cakupan: AC-D1…AC-D10 spec SPEC-1215 §S9.
+**Log dari klien opt-in — lajur `event` (default menyala), `server` (sadapan console, opt-in), dan
+`transcript` (opt-in) — sampai utuh dan tanpa duplikat di hub lewat `POST /api/sync/logs`, tersaring
+dan tercari kembali oleh operator lewat `GET /api/logs` (device/project/spec/lane/level/kind/kata
+kunci, rentang ≤ 31 hari) tanpa satu pun rahasia bocor ke penyimpanan hub, dan tanpa regresi latensi
+terukur pada `GET /specs` saat hub menerima beban ingest sintetis setara proyeksi ADR-0166 §7.**
+
+Objective ini adalah irisan turunan D dari kriteria sukses #5 payung SPEC-1215 ("Log terpusat tercari
+dan tanpa duplikat", `docs/superpowers/specs/2026-09-14-spec-1215-hub-orkestrasi-klien-design.md`
+baris 39–43); turunan D mengeksekusinya, tidak mendefinisikan ulang.
+
+### Kriteria sukses (terukur)
+
+1. **Pengiriman aktif secara default, opt-in eksplisit untuk sisanya (AC-D1).** Klien yang terhubung
+   hub mengirim lajur `event` tiap tick sync tanpa konfigurasi tambahan; lajur `server`/`transcript`
+   tetap nol pengiriman sampai `Setting.data.logShipping` dinyalakan cookie lokal — dibuktikan test
+   yang mengamati request `POST /api/sync/logs` sebelum/sesudah toggle.
+2. **Nol duplikat pada kirim ulang, termasuk crash window (AC-D2).** Mengirim ulang batch identik
+   (simulasi klien offline lalu retry, dan simulasi crash antara commit hub & tulis kursor klien)
+   selalu menghasilkan 0 baris baru dan `duplicate` = jumlah entri di respons; unique index
+   `(deviceId, lane, seq)` tidak pernah dilanggar di test.
+3. **Spool offline berbatas dan tak pernah tumbuh tanpa batas (AC-D3).** Simulasi offline berkepanjangan
+   menunjukkan spool `server` berhenti tumbuh pada ≤ 64 MiB (segmen 1 MiB) dan `event`/`transcript`
+   pada ≤ 50 000 baris tertunda; saat penuh, buang mengikuti urutan server → transcript → event,
+   masing-masing meninggalkan satu entri `log.gap`.
+4. **Rahasia tak pernah mendarat di penyimpanan (AC-D4).** Korpus uji `redactText()` (klien dan hub,
+   fungsi murni yang sama secara kontrak) membuktikan pola rahasia tersamar sebelum spool/kirim dan
+   diulang saat ingest; kegagalan redaktor membuang entri dan menggantinya `log.gap
+   reason:"redaction-failed"` (gagal-tertutup) — tidak pernah entri tak-terredaksi tersimpan.
+5. **Pencarian operator terjawab dalam kontrak yang jelas (AC-D5, AC-D8).** `GET /api/logs` dengan
+   `from`/`to` ≤ 31 hari dan kombinasi penyaring device/project/spec/lane/level/kind/`q` mengembalikan
+   hasil terurut `ts desc, id desc`, kursor ≤ 200/halaman, mencakup baris `relay.*` (aktor hub) dan
+   `remote.*` (aktor klien) dalam satu tabel; rentang absen atau > 31 hari → `400`.
+6. **Retensi otomatis, bukan tugas manual (AC-D6).** Sapuan retensi harian (langkah tambahan di
+   `runRetention()` yang sudah ada, tanpa timer baru) menghapus entri melewati
+   `Setting.logRetention.<lane>Days` dan, selama total `bytes` > `maxBytes`, entri terlama; berkas
+   transkrip yatim terpungut sesudah baris DB-nya hilang — dibuktikan test yang menjalankan sapuan
+   dan mengukur sisa baris/berkas.
+7. **Kuota melindungi hub tanpa menghentikan sync (AC-D7, AC-D9).** Ingest > 20 000 entri/jam per
+   device → `429 { retryAfterSec }` yang hanya menunda lajur bersangkutan; `POST /api/sync/logs` 404
+   → klien menunda pengiriman 30 menit tanpa menghentikan tick sync yang lain; spool tetap berbatas
+   selama penundaan.
+8. **Operator melihatnya di dashboard (AC-D5, AC-D10, bagian UI §S4.9).** `LogsPanel` di layar Klien
+   menampilkan hasil `GET /api/logs`/`GET /api/logs/:id/transcript` dan pengaturan
+   `GET|PUT /api/logs/retention` (`COOKIE_ONLY`); sadapan `console` di boot hub meneruskan keluaran
+   asli ke stdout/stderr tanpa perubahan, baris identik beruntun dalam 60 detik tergabung
+   (`data.repeat`).
+9. **Nol regresi latensi pada beban terukur, bukan proyeksi (ADR-0166 §7, §S10 SPEC-1215).**
+   Pengukuran 10 device × batch 500 entri/15 dtk selama 10 menit menunjukkan p95 `GET /specs` naik
+   ≤ 20% dibanding baseline tanpa ingest, dan nol error `P1008` (database lock) — dijalankan sebagai
+   task eksplisit sebelum default `LOG_INGEST_MAX_PER_HOUR`/ukuran batch dikunci; gagal → jalur
+   koreksinya amandemen ADR-0166, bukan keputusan baru di fase ini.
+
+Kesepuluh AC-D1…AC-D10 (spec SPEC-1215 §S9) dan §K9–K10/§S4.7–S4.9/§S6/§S10 tetap kontrak final yang
+mengikat fase Spec/Plan/Execute turunan D; kriteria di atas adalah proyeksi terukurnya untuk fase
+Objective, bukan pembukaan ulang keputusan.
 
 ## Konteks & keputusan
 
