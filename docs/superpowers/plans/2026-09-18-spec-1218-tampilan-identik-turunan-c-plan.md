@@ -560,7 +560,7 @@ git commit -m "feat(spec-1218): wsHandler /api/devices/:id/relay/* bersanding ha
   dipanggil di klien — spec teknis §T5 tak menyebut perluasan `InjectableApp` secara eksplisit
   karena kontraknya berhenti di level frame; perluasan tipe ini murni mekanis, bukan keputusan baru.
 
-- [ ] **Step 1: Tulis test yang gagal (kerangka tipe, bukan perilaku jalur open — itu Task 6)**
+- [x] **Step 1: Tulis test yang gagal (kerangka tipe, bukan perilaku jalur open — itu Task 6)**
 
 ```ts
 // tambahan di relay-dispatcher.test.ts
@@ -580,7 +580,7 @@ it("injectableFrom mengekspos injectWS di atas app.injectWS asli (SPEC-1218 · p
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -588,7 +588,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (TS: `injectWS` bukan properti `InjectableApp`).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 export type InjectableApp = {
@@ -605,7 +605,7 @@ export function injectableFrom(app: FastifyInstance): InjectableApp {
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -613,7 +613,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/relay/dispatcher.ts server/test/relay-dispatcher.test.ts

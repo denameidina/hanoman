@@ -152,4 +152,17 @@ describe("dispatcher relay + gate app nyata", () => {
     await makeSetting({ remoteControl: { enabled: false, capabilities: ["sessions:read"] } });
     expect((await run("off")).status).toBe(401);
   });
+
+  it("injectableFrom mengekspos injectWS di atas app.injectWS asli (SPEC-1218 · prasyarat)", async () => {
+    const calls: any[] = [];
+    const fakeApp = {
+      inject: async () => ({ statusCode: 200, headers: {}, body: "{}" }),
+      injectWS: async (path: string, o: unknown, hooks: { onOpen: (ws: unknown) => void }) => {
+        calls.push([path, o]); hooks.onOpen({ send: () => {}, on: () => {}, close: () => {} });
+      },
+    };
+    const wrapped = injectableFrom(fakeApp as any);
+    await wrapped.injectWS!("/api/events/ws", { headers: { host: "x" } }, { onOpen: () => {} });
+    expect(calls[0][0]).toBe("/api/events/ws");
+  });
 });

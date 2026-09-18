@@ -14,8 +14,17 @@ import { relaySecret } from "./secret";
    yang persis sama dengan request dari dashboard lokal. */
 
 export type InjectResponse = { statusCode: number; headers: Record<string, unknown>; body: string };
+export type InjectedWs = {
+  send(data: string): void;
+  on(ev: "message" | "close", cb: (...a: any[]) => void): void;
+  close(code?: number, reason?: string): void;
+};
 export type InjectableApp = {
   inject(o: { method: string; url: string; headers: Record<string, string>; payload?: string }): Promise<InjectResponse>;
+  // Koreksi (Global Constraints #1): spec teknis §T5 berhenti di level frame, tak menyebut
+  // perluasan `InjectableApp` — ini SATU-SATUNYA tempat `injectWS` sesungguhnya dipanggil di
+  // klien. Opsional supaya mock lama yang cuma punya `inject` (test dispatcher yang ada) tak pecah.
+  injectWS?(path: string, o: { headers: Record<string, string> }, hooks: { onOpen: (ws: InjectedWs) => void }): Promise<void>;
 };
 export type RemoteRequestAudit = { kind: "remote.request"; level: "info" | "warn" | "error"; msg: string; data: Record<string, unknown> };
 
@@ -28,6 +37,7 @@ export function injectableFrom(app: FastifyInstance): InjectableApp {
       });
       return { statusCode: r.statusCode, headers: r.headers as Record<string, unknown>, body: r.body };
     },
+    async injectWS(path, o, hooks) { await app.injectWS(path, o as any, hooks as any); },
   };
 }
 
