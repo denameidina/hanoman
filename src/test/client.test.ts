@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { api } from "../src/api/client";
+import { api, logs, putLogRetention } from "../src/api/client";
 const envelope = (items: unknown[]) => new Response(
   JSON.stringify({ items, total: items.length, page: 1, pageSize: 20 }),
   { status: 200, headers: { "content-type": "application/json" } });
@@ -76,5 +76,22 @@ describe("api client", () => {
     const r = await api.getChangelog("p1", "c1");
     expect((globalThis.fetch as any).mock.calls[0][0]).toBe("/api/projects/p1/changelog/c1");
     expect(r.id).toBe("c1");
+  });
+  // SPEC-1217 · logs() memanggil GET /api/logs dengan query string
+  it("logs() memanggil GET /api/logs dengan query string", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ items: [], nextCursor: null }),
+      { status: 200, headers: { "content-type": "application/json" } }));
+    globalThis.fetch = fetchMock as any;
+    await logs({ from: "2026-01-01T00:00:00.000Z", to: "2026-01-02T00:00:00.000Z" });
+    expect((fetchMock as any).mock.calls[0][0]).toContain("/api/logs?");
+  });
+  it("putLogRetention() memanggil PUT /api/logs/retention", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ eventDays: 90, serverDays: 7, transcriptDays: 30, maxBytes: 1 }),
+      { status: 200, headers: { "content-type": "application/json" } }));
+    globalThis.fetch = fetchMock as any;
+    await putLogRetention({ eventDays: 90, serverDays: 7, transcriptDays: 30, maxBytes: 1 });
+    const [url, init] = (fetchMock as any).mock.calls[0];
+    expect(url).toContain("/api/logs/retention");
+    expect((init as RequestInit).method).toBe("PUT");
   });
 });

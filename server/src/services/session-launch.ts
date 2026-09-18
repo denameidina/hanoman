@@ -15,6 +15,7 @@ import { withSessionAdmission } from "./session-launch-gate";
 import { presenceView } from "./presence/view";
 import { remoteSessionVerdict } from "./presence/remote-session";
 import { recentlyOffline } from "./presence/registry";
+import { appendEvent } from "./logs/event-log";
 
 // Re-ekspor supaya pemanggil (governor, test) punya satu titik impor jalur peluncuran.
 export { sessionIdForSpec } from "./pty";
@@ -30,7 +31,10 @@ export class LaunchError extends Error {
     readonly blockers: SpecBlocker[] = [],
     // SPEC-1216 · ADR-0165 §6 · terisi untuk kind "remote-session"/"confirm-required".
     readonly remoteSession?: { deviceId: string; name: string; sessionId: string | null },
-  ) { super(message); }
+  ) {
+    super(message);
+    void appendEvent({ kind: "launch.rejected", level: "warn", msg: message, data: { kind, blockers } });
+  }
 }
 export type StartSpecResult = { id: string; reused?: boolean; resumed?: boolean };
 

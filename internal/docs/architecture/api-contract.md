@@ -1407,22 +1407,26 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 #   mengirim header `Host` = host control pertama saat origin dipisah (`HANOMAN_EVENT_HOST`).
 ```
 
-## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **sebagian mendarat (turunan A+B)**
+## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **sebagian mendarat (turunan A + B + D)**
 
-> **Status:** kontrak dikunci fase Spec 2026-09-15.
+> **Status:** kontrak dikunci fase Spec 2026-09-15; turunan B (orkestrasi hub lewat relay) mendarat
+> SPEC-1216, turunan D (log terpusat: ingest, pencarian, retensi, shipper klien) mendarat SPEC-1217.
 > **Dilayani sejak turunan A (SPEC-1215):** `GET /sync/relay/ws` (hub; `welcome`/`req`/`cancel` ↔
 > `hello`/`res`; klien A menjawab `open` dengan `close 4502`), frame naik `capacity` +
 > `devices[].control|capacity` di `GET /presence`, `DELETE /device-tokens/:id` yang menutup socket sebelum
-> 204, `GET|PUT /remote-control` (tanpa `shipping` — menyusul SPEC-1217), gate principal `remote`, dan
-> `PUT /settings` yang mempertahankan tiga kunci baru.
+> 204, `GET|PUT /remote-control`, gate principal `remote`, dan `PUT /settings` yang mempertahankan tiga
+> kunci baru.
 > **Dilayani sejak turunan B (SPEC-1216):** `GET|POST|PUT|PATCH|DELETE /devices/:deviceId/relay/*`
 > (COOKIE_ONLY, diteruskan ke `/api/<*>` di klien via `app.inject`, galat hub `{ error, relay }`),
 > `GET /devices/:deviceId/relay/{terminal/sessions/:id/ws | events/ws}` + `POST /ws-tickets` untuk
 > tiket `relay:<deviceId>:…`, `POST /terminal/sessions` & `POST /specs/:id/done` dengan `force` dari
 > `remote` → 403, `409 { error:"remote-session"|"confirm-required", remoteSession }` (gerbang presence
 > lintas instance), dan retry klien `syncOnce` pada `409 spec-404`.
-> **Belum dilayani:** `POST /sync/logs` dan `/logs*` (SPEC-1217), stream/resize/backpressure §10
-> (SPEC-1218).
+> **Dilayani sejak turunan D (SPEC-1217):** `POST /sync/logs` (ingest batch Bearer device),
+> `GET /logs`, `GET /logs/:id/transcript`, `GET|PUT /logs/retention` (semua COOKIE_ONLY), dan
+> `GET|PUT /remote-control` kini membawa `logs:{event,server,transcript}` (toggle lajur pengiriman
+> shipper klien, dipasang/dicabut tanpa restart — D4/AC-S3).
+> **Belum dilayani:** stream/resize/backpressure §10 (SPEC-1218, turunan C).
 
 ```
 # ── HUB ──────────────────────────────────────────────────────────────────────────────────────────
@@ -1440,10 +1444,13 @@ GET    /devices/:deviceId/relay/{terminal/sessions/:id/ws | events/ws}   # WS, t
 POST   /ws-tickets { target:"relay:<deviceId>:events" | "relay:<deviceId>:terminal:<id>" }  # hanya cookie
 GET    /presence                         # + devices[].control {state,protocol,version,capabilities,since}|null
                                          #   + devices[].capacity LaunchStatus|null (frame naik `capacity` di /sync/ws)
-POST   /sync/logs                        # Bearer device. { v:1, lane:"event"|"server"|"transcript", attempt,
+POST   /sync/logs                        # Bearer device. { lane:"event"|"server"|"transcript",
                                          #   entries:[{seq,ts,level,kind,msg,projectId?,specId?,sessionId?,data?,transcript?}] }
-                                         # ≤500 entri, seq naik ketat; body ≤1 MiB, gzip terdekompresi ≤2 MiB
-                                         # → 200 { lane, accepted, duplicate, lastSeq } · 400 · 401 · 413 · 415 · 429 {retryAfterSec}
+                                         # ≤500 entri/batch (LOG_BATCH_MAX_ENTRIES); body ≤1 MiB (LOG_BODY_MAX_BYTES),
+                                         # content-encoding:gzip opsional, terdekompresi ≤2 MiB (LOG_DECODED_MAX_BYTES).
+                                         # Transkrip per-entri ditulis tmp+rename SEBELUM ingest (berkas yatim disapu retensi).
+                                         # → 200 { lane, accepted, duplicate, lastSeq } · 400 body/entri cacat · 401 · 413 · 415
+                                         #   content-encoding tak didukung · 429 kuota LOG_INGEST_MAX_PER_HOUR terlampaui
 GET    /logs?from&to&device&project&spec&session&lane&level&kind&q&cursor&limit   # COOKIE_ONLY; from/to wajib ≤31 hari
                                          # → { items: LogEntryView[], nextCursor, limit } — kursor, TANPA total
 GET    /logs/:id/transcript              # COOKIE_ONLY · text/plain

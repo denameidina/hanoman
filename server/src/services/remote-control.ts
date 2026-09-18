@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import type { RemoteControl, RemoteControlPut, RemoteControlView } from "@hanoman/shared";
 import { prisma } from "../db";
 import { appendEvent, recentAudit } from "./logs/event-log";
+import { installConsoleTap, isConsoleTapInstalled, uninstallConsoleTap } from "./logs/console-tap";
 import { refreshRelayClient, relayClientStatus } from "./relay/client";
 import { getSetting } from "./settings";
 
@@ -22,6 +23,11 @@ export async function updateRemoteControl(input: RemoteControlPut, by: string): 
   const logs = input.logs ?? before.logShipping;
   const data = { ...before, remoteControl: control, logShipping: logs } as unknown as Prisma.InputJsonValue;
   await prisma.setting.upsert({ where: { id: 1 }, update: { data }, create: { id: 1, data } });
+
+  // SPEC-1217 · D4/AC-S3 · sadapan console.* dipasang/dicabut LANGSUNG, tanpa restart — proses
+  // lokal murni, tak menyentuh DB, jadi urutan relatif terhadap upsert di atas tak kritikal.
+  if (logs.server && !isConsoleTapInstalled()) installConsoleTap();
+  if (!logs.server && isConsoleTapInstalled()) uninstallConsoleTap();
 
   const grantChanged = JSON.stringify(before.remoteControl) !== JSON.stringify(control);
   // AC-A5 · ditunggu: socket relay tertutup SEBELUM route membalas.

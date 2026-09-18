@@ -4,7 +4,14 @@ import { ClientsScreen, sinceLabel } from "../src/screens/ClientsScreen";
 import { api } from "../src/api/client";
 import type { PresenceView } from "@hanoman/shared";
 
-vi.mock("../src/api/client", () => ({ api: { presence: vi.fn() } }));
+vi.mock("../src/api/client", () => ({
+  api: { presence: vi.fn() },
+  // SPEC-1217 · D6/AC-S8 · tab "Log" merender LogsPanel, yang memanggil fungsi ini di mount.
+  logs: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+  logTranscript: vi.fn().mockResolvedValue(""),
+  logRetention: vi.fn().mockResolvedValue({ eventDays: 90, serverDays: 7, transcriptDays: 30, maxBytes: 1 }),
+  putLogRetention: vi.fn().mockResolvedValue({ eventDays: 90, serverDays: 7, transcriptDays: 30, maxBytes: 1 }),
+}));
 
 const view: PresenceView = {
   enabled: true,
@@ -66,6 +73,19 @@ describe("ClientsScreen", () => {
     render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={onOpenSpec} />);
     fireEvent.click(screen.getByTestId("presence-session-prd-abc"));
     expect(onOpenSpec).not.toHaveBeenCalled();
+  });
+});
+
+describe("ClientsScreen tab Device|Log (SPEC-1217 D6/AC-S8)", () => {
+  it("tab default Device — test layar Klien yang ada tetap hijau tanpa perubahan ekspektasi (AC-S8)", () => {
+    render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
+    expect(screen.getByRole("tab", { name: /device/i })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("tab Log merender LogsPanel", async () => {
+    render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
+    fireEvent.click(screen.getByRole("tab", { name: /log/i }));
+    await waitFor(() => expect(screen.getByRole("tab", { name: /log/i })).toHaveAttribute("aria-selected", "true"));
   });
 });
 

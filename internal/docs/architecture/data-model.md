@@ -728,7 +728,7 @@ scaffold, breakdown, dan konsol VPS.
   juga memilih sesi berakhir >30 hari dalam batch bounded; hold `session:<id>` mengecualikan record.
   Bila delete transkrip gagal, record DB dipertahankan agar percobaan berikutnya dapat retry.
 
-## LogEntry / LogCursor (SPEC-1215 · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — skema mendarat di turunan A (SPEC-1215); ingest, pencarian, retensi di SPEC-1217
+## LogEntry / LogCursor (SPEC-1215 · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **mendarat penuh** (skema turunan A/SPEC-1215; ingest, pencarian, retensi turunan D/SPEC-1217)
 
 Log terpusat hub + audit kendali jarak jauh. **LOCAL-only per instance**, bukan entitas sync: tak masuk
 `SYNCED`/`FIELDS`/`WEBHOOK_ENTITIES`. Keduanya **tetap terdaftar** di `PG_ORDER` `migrate-from-postgres`

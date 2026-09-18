@@ -5,7 +5,8 @@ import { paths, type Paginated, type ProjectView, type Spec, type Setting, type 
   type SetupStatus, type SetupApplyResult, type PhaseOverrides,
   type TaskView, type MemberView, type CreateTaskInput, type EscalateTaskInput, type PatchTaskInput,
   type CreateMemberInput, type PatchMemberInput,
-  type RemoteControlView, type RemoteControlPut } from "@hanoman/shared";
+  type RemoteControlView, type RemoteControlPut,
+  type LogEntryView, type LogRetention } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -187,6 +188,27 @@ export type SpecListParams = {
 };
 // SPEC-880 · `handledBy` = deviceId; menjawab "apa saja yang dipegang mesin X" dalam satu klik.
 export type ProjectListParams = { q?: string; handledBy?: string; page?: number; limit?: number };
+// SPEC-1217 · §S4.8 · GET /api/logs — rentang wajib, kursor opaque, TANPA `total` (ADR-0107 exc. #4).
+export type LogSearchQueryInput = {
+  from: string; to: string; deviceId?: string; projectId?: string; specId?: string;
+  lane?: string; level?: string; kind?: string; q?: string; cursor?: string; limit?: number;
+};
+// SPEC-1217 · ADR-0166 · log terpusat — diekspor berdiri sendiri (dan dirujuk di `api` di bawah)
+// supaya `vi.spyOn(client, "logs")` (pola tetangga `LogsPanel.test.tsx`) bisa menyadap panggilannya.
+// Sengaja tetap memakai `j` MODUL (bukan `j` lokal ber-rebase createApi): sama seperti
+// `portalChatApi`, permukaan ini bukan bagian rebase remote SPEC-1216 Task 8.
+export function logs(q: LogSearchQueryInput): Promise<{ items: LogEntryView[]; nextCursor: string | null }> {
+  return j(`${paths.logs}${qs(q as unknown as Record<string, string | number | boolean | undefined>)}`);
+}
+export async function logTranscript(id: number): Promise<string> {
+  const res = await fetch(paths.logTranscript(id));
+  if (!res.ok) throw new ApiError(res.status, `GET ${paths.logTranscript(id)} → ${res.status}`);
+  return res.text();
+}
+export function logRetention(): Promise<LogRetention> { return j(paths.logRetention); }
+export function putLogRetention(r: LogRetention): Promise<LogRetention> {
+  return j(paths.logRetention, { method: "PUT", ...body(r) });
+}
 // SPEC-1216 · ADR-0165 §11 · factory: `base` default "/api" (hub lokal); target remote memakai
 // `/api/devices/:id/relay` (rebase transparan lewat relay). `j`/`jUpload` MODUL (di atas) tetap
 // dipakai `portalChatApi` (tak disebut Task 8 — audiens beda, tak pernah lewat rebase remote):
@@ -574,6 +596,8 @@ export function createApi(o: { base?: string } = {}) {
   // SPEC-1215 · ADR-0165 · grant kendali jarak jauh (LOCAL-only, cookie-only).
   getRemoteControl: () => j<RemoteControlView>(paths.remoteControl),
   putRemoteControl: (b: RemoteControlPut) => j<RemoteControlView>(paths.remoteControl, { method: "PUT", ...body(b) }),
+  // SPEC-1217 · ADR-0166 · log terpusat — pencarian (kursor, tanpa `total`), transkrip remote, retensi.
+  logs, logTranscript, logRetention, putLogRetention,
   // SPEC-257 · agent token (kelola cookie-only) — token plaintext hanya balik di create (sekali).
   getAgentCapabilities: () => j<{ capabilities: CapabilityInfo[] }>(paths.agentCapabilities),
   listAgentTokens: () => j<{ items: AgentTokenView[] }>(paths.agentTokens),

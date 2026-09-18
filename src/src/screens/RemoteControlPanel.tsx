@@ -1,5 +1,5 @@
 import React from "react";
-import type { RelayLinkState, RemoteCapability, RemoteControlView } from "@hanoman/shared";
+import type { LogLane, RelayLinkState, RemoteCapability, RemoteControlView } from "@hanoman/shared";
 import { Badge, Card, StateBlock, Switch, type ShowToast } from "../ds";
 import { api } from "../api/client";
 
@@ -12,6 +12,13 @@ const EXTRA: { cap: RemoteCapability; label: string; desc: string }[] = [
   { cap: "sessions:write", label: "Tulis terminal", desc: "Ketik ke terminal, steer, interrupt, jawab & ambil alih dialog." },
   { cap: "sessions:spawn", label: "Mulai sesi", desc: "Membuka sesi agen BARU di mesin ini atas perintah hub — eksekusi agen di mesin ini. Hub tak bisa memaksa melewati gerbang beban." },
   { cap: "backlog:write", label: "Tandai selesai", desc: "Hanya menandai backlog selesai; suntingan backlog lain tetap tertutup untuk hub." },
+];
+// SPEC-1217 · AC-D1 UI · tiga lajur log ke hub — terpisah dari grant kendali jarak jauh (D4):
+// lajur log kirim baris ke `POST /sync/logs`, bukan buka route eksekusi.
+const LOG_LANES: { lane: LogLane; label: string; desc: string }[] = [
+  { lane: "event", label: "event", desc: "Lahir/tutup sesi, perubahan grant — lajur audit lokal (default nyala)." },
+  { lane: "server", label: "server", desc: "console.* proses server ini, disadap & diredaksi sebelum dikirim." },
+  { lane: "transcript", label: "transcript", desc: "Transkrip sesi terminal yang sudah ditutup." },
 ];
 const RELAY_LABEL: Record<RelayLinkState, string> = {
   off: "mati", connecting: "menyambung", open: "tersambung", backoff: "mencoba lagi",
@@ -67,6 +74,16 @@ export function RemoteControlPanel({ onToast }: { onToast?: ShowToast }) {
   const toggleExtra = (cap: RemoteCapability, on: boolean) =>
     save(enabled, on ? union(capabilities, VIEW, [cap]) : capabilities.filter((c) => c !== cap));
 
+  const toggleLog = async (lane: LogLane, on: boolean) => {
+    setBusy(true);
+    try {
+      setView(await api.putRemoteControl({ logs: { ...view.logs, [lane]: on } }));
+      onToast?.(on ? `Lajur ${lane} mulai dikirim ke hub` : `Lajur ${lane} berhenti dikirim`, "ok", "check");
+    } catch {
+      onToast?.("Gagal menyimpan lajur log", "err", "x-circle");
+    } finally { setBusy(false); }
+  };
+
   return (
     <>
       <Card eyebrow="kendali" title="Kendali jarak jauh dari hub">
@@ -84,6 +101,19 @@ export function RemoteControlPanel({ onToast }: { onToast?: ShowToast }) {
         {EXTRA.map((e, i) => (
           <Row key={e.cap} title={e.label} desc={e.desc} last={i === EXTRA.length - 1}>
             <Switch checked={has(e.cap)} disabled={busy || !enabled} onChange={(on: boolean) => void toggleExtra(e.cap, on)} aria-label={e.label} />
+          </Row>
+        ))}
+      </Card>
+      <Card eyebrow="kendali" title="Lajur log ke hub">
+        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+          Mengirim baris dari mesin ini ke <code>POST /sync/logs</code> di hub — lepas dari grant kendali
+          jarak jauh di atas. Tiap lajur bisa dinyalakan/dimatikan sendiri-sendiri, langsung berlaku
+          tanpa restart.
+        </div>
+        {LOG_LANES.map((l, i) => (
+          <Row key={l.lane} title={l.label} desc={l.desc} last={i === LOG_LANES.length - 1}>
+            <Switch checked={view.logs[l.lane]} disabled={busy}
+              onChange={(on: boolean) => void toggleLog(l.lane, on)} aria-label={l.label} />
           </Row>
         ))}
       </Card>

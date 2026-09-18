@@ -2,6 +2,8 @@ import { prisma } from "../db";
 import { deleteTranscript as deleteTranscriptFile } from "./transcript-store";
 import { reconcileTranscripts } from "./session-history";
 import { deleteUpload } from "./uploads";
+import { pruneLogs, reconcileRemoteTranscripts } from "./logs/prune";
+import { getSetting } from "./settings";
 
 export const RETENTION_DAYS = {
   tickets: 90, newTickets: 180, sessions: 30, deliveries: 30, sessionResults: 90,
@@ -22,6 +24,9 @@ export type RetentionReport = {
   // mengejar tunggakan ratusan ribu baris (di hub produksi: 121.222) — dengan jatah 100/hari
   // tunggakan sebesar itu butuh 1.210 hari untuk habis.
   feedPruned: number;
+  // SPEC-1217 · AC-D6 · retensi lajur log (LogEntry) — bukan bagian jatah `batchSize` deleteExpired.
+  logsPruned: number;
+  logBytesFreed: number;
 };
 
 const before = (now: Date, days: number) => new Date(now.getTime() - days * 86_400_000);
@@ -32,9 +37,14 @@ export async function runRetention(
 ): Promise<RetentionReport> {
   const report: RetentionReport = {
     candidates: 0, deleted: 0, bytes: 0, failed: 0, orphans: 0, dangling: 0, feedPruned: 0,
+    logsPruned: 0, logBytesFreed: 0,
   };
   await deleteExpired(report, opts, deps);
   report.feedPruned = await pruneSyncFeed(opts.now ?? new Date(), opts.dryRun ?? false);
+  const setting = await getSetting();
+  const logReport = await pruneLogs(opts.now ?? new Date(), setting.logRetention, { dryRun: opts.dryRun });
+  report.logsPruned = logReport.logsPruned;
+  report.logBytesFreed = logReport.logBytesFreed;
   // SPEC-845 · ADR-0126 · rekonsiliasi jalan di SETIAP sapuan, termasuk saat jatah batch habis di
   // tengah jalan — berkas yatim justru lahir dari penghapusan yang terpotong. Ini juga satu-satunya
   // job maintenance-nya: tak ada timer maupun proses kedua (ADR-0024).
@@ -42,6 +52,7 @@ export async function runRetention(
   report.orphans = gc.orphans;
   report.dangling = gc.dangling;
   report.failed += gc.failed;
+  if (!opts.dryRun) await reconcileRemoteTranscripts();
   return report;
 }
 

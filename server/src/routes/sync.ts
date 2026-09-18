@@ -1,7 +1,13 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
+import { mkdir, rename, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { z } from "zod";
-import { PRESENCE_MAX_FRAMES_PER_MIN, RELAY_MAX_FRAMES_PER_MIN, zCapacityFrame, zPresenceFrame } from "@hanoman/shared";
+import { resolveDataDirs } from "@hanoman/runner";
+import {
+  LOG_BODY_MAX_BYTES, LOG_DECODED_MAX_BYTES, PRESENCE_MAX_FRAMES_PER_MIN, RELAY_MAX_FRAMES_PER_MIN,
+  zCapacityFrame, zLogBatch, zPresenceFrame,
+} from "@hanoman/shared";
 import { prisma } from "../db";
 import { requireDeviceToken } from "../services/device-auth";
 import { verifyDeviceToken } from "../services/device-token";
@@ -15,6 +21,7 @@ import { syncNow, fetchTransport } from "../services/sync-client";
 import { listPendingDeletes } from "../services/sync-delete";
 import { listConflicts, resolveConflict } from "../services/conflicts";
 import { readUpload } from "../services/uploads";
+import { ingestBatch } from "../services/logs/ingest";
 import { effectiveStr } from "../config";
 import { bearerToken, openWsConnection, revalidateWsPrincipal, WsMessageGuard } from "../services/ws-admission";
 
@@ -111,6 +118,63 @@ export default async function (app: FastifyInstance) {
       }
     }
     return { results };
+  });
+
+  // D5 · scope terenkapsulasi: bodyLimit sendiri, TAK menyentuh parser JSON global dipakai /sync/push,pull.
+  //
+  // content-encoding/ukuran diperiksa DI PARSER (bukan di handler): parsing berjalan sebelum
+  // preHandler, jadi memeriksa di handler membuat `requireDeviceToken` menjawab 401 duluan untuk
+  // request tanpa token — 415/413 harus tetap benar terlepas dari otentikasi perangkat.
+  app.register(async (logs) => {
+    // app.ts sudah memasang parser application/json global (`parseAs: "string"`, tanpa bodyLimit
+    // khusus) — child scope mewarisinya, jadi override di sini WAJIB melepasnya dulu di scope ini.
+    logs.removeContentTypeParser("application/json");
+    logs.addContentTypeParser("application/json", { parseAs: "buffer", bodyLimit: LOG_BODY_MAX_BYTES },
+      (req, body, done) => {
+        const enc = String(req.headers["content-encoding"] ?? "");
+        if (enc && enc !== "gzip") {
+          const err = Object.assign(new Error("unsupported content-encoding"), { statusCode: 415 });
+          done(err, undefined);
+          return;
+        }
+        if (!enc) { done(null, body as Buffer); return; }
+        try {
+          const decoded = gunzipSync(body as Buffer, { maxOutputLength: LOG_DECODED_MAX_BYTES });
+          done(null, decoded);
+        } catch (e) {
+          if ((e as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE") {
+            done(Object.assign(new Error("decoded body too large"), { statusCode: 413 }), undefined);
+            return;
+          }
+          done(Object.assign(new Error("invalid gzip"), { statusCode: 400 }), undefined);
+        }
+      });
+
+    logs.post("/sync/logs", { preHandler: requireDeviceToken }, async (req, reply) => {
+      let parsedJson: unknown;
+      try { parsedJson = JSON.parse((req.body as Buffer).toString("utf8")); }
+      catch { return reply.code(400).send({ error: "invalid json" }); }
+      const parsed = zLogBatch.safeParse(parsedJson);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+      const deviceId = req.device!.id;
+
+      // S3.4 · transkrip ditulis SEBELUM ingest (berkas yatim dipungut sapuan; tak pernah baris
+      // tanpa berkas). tmp+rename per entri ber-transkrip.
+      const withTranscriptKey = await Promise.all(parsed.data.entries.map(async (e) => {
+        if (!e.transcript) return e;
+        const dir = join(resolveDataDirs().home, "remote-transcripts", deviceId);
+        await mkdir(dir, { recursive: true, mode: 0o700 });
+        const final = join(dir, `${e.seq}.txt`);
+        const tmp = `${final}.tmp`;
+        await writeFile(tmp, e.transcript, { encoding: "utf8", mode: 0o600 });
+        await rename(tmp, final);
+        const { transcript: _drop, ...rest } = e;
+        return { ...rest, data: { ...(e.data ?? {}), __transcriptKey: `${deviceId}/${e.seq}.txt` } };
+      }));
+
+      const result = await ingestBatch(deviceId, { lane: parsed.data.lane, entries: withTranscriptKey });
+      return reply.code(result.status).send(result.body);
+    });
   });
 
   // SPEC-268 · ADR-0066 · pemicu sync manual (tombol UI). Cookie-authed lewat gate global (path ini

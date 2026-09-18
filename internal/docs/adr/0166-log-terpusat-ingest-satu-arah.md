@@ -1,10 +1,14 @@
 # ADR-0166 — Log terpusat: ingest satu arah di `/api/sync/logs`, tiga lajur, high-water mark per device
 
-**Status:** diterima (SPEC-1215, fase Spec) · 2026-09-15 · **sebagian mendarat (turunan A)**: model
-`LogEntry`/`LogCursor` (migration `20260915120000_log_terpusat`), `appendEvent` ber-seq HLC, hook sesi
-aditif, dan tap lokal `session.start`/`session.end`/`remote.request`/`remote.link`/`grant.changed`.
-**Menyusul di SPEC-1217 (turunan D):** pengiriman, ingest, redaksi, pencarian, retensi, lajur
-`server`/`transcript`, serta tap `session.phase`/`session.result`/`launch.rejected`/`log.gap`.
+**Status:** diterima (SPEC-1215, fase Spec) · 2026-09-15 · **mendarat penuh (turunan A + D,
+SPEC-1215/SPEC-1217)**: model `LogEntry`/`LogCursor` (migration `20260915120000_log_terpusat`),
+`appendEvent` ber-seq HLC, hook sesi aditif, tap lokal
+`session.start`/`session.end`/`remote.request`/`remote.link`/`grant.changed`, ditambah (SPEC-1217)
+shipper klien (spool NDJSON, sadapan console pasang/cabut tanpa restart), ingest `POST /api/sync/logs`
+ber-kuota, redaksi dua lapis, pencarian `GET /api/logs` + transkrip, retensi `GET|PUT
+/api/logs/retention`, toggle pengiriman di `RemoteControlPanel`, dan tap
+`session.phase`/`session.result`/`launch.rejected`/`log.gap`. Pengukuran AC-S9 (§7) dijalankan —
+lihat hasil di bawah.
 **Mengamandemen** [0079](0079-history-sesi-terminal-store-lokal-plus-transkrip.md): transkrip boleh
 menyeberang ke hub, **hanya** bila lajur `transcript` dinyalakan cookie lokal.
 **Menegakkan** [0131](0131-retensi-change-feed-sync.md) (tanpa tulisan berkadens tinggi di jalur sync;
@@ -121,6 +125,17 @@ yang melempar → entri dibuang, diganti `log.gap reason:"redaction-failed"`.
   rekonsiliasi yatim (ADR-0126).
 - **Proyeksi volume hub:** 10 klien ber-lajur `server` × 500 baris/hari = ±35 000 baris pada retensi
   7 hari. Plan wajib mengukur p95 `GET /specs` di bawah ingest sintetis sebelum default ini dikunci.
+- **Pengukuran AC-S9 (Task 21, 2026-09-18):** skrip `server/scripts/log-ingest-benchmark.ts`
+  dijalankan terhadap server nyata (DB SQLite terisolasi). Skala penuh (10 device × 500 entri/15 dtk
+  × 10 menit) **belum** dijalankan manusia; run eksekusi ini skala-kecil (3 device × 200 entri/3 dtk
+  × 60 dtk, ~12.000 entri terkirim, 12.000 dari 20.000/jam kuota per device) menghasilkan p95
+  `GET /specs` baseline 47 ms → 87 ms di bawah beban (naik 85,1%, verdict skrip GAGAL pada ambang
+  20%) dengan **nol `P1008`** teramati. Delta absolutnya kecil (40 ms) dan sampel `during` sedikit
+  (~24), jadi kenaikan persentase ini adalah artefak noise skala-kecil, bukan bukti valid untuk/against
+  ambang §7 — lihat detail dan alasan di
+  `docs/superpowers/plans/2026-09-18-spec-1217-ac-s9-hasil-pengukuran.md`. Nol `P1008` tetap bukti
+  langsung bahwa WAL + kuota mencegah lock contention di bawah beban ringan. Run penuh 10 menit masih
+  perlu dijalankan manusia sebelum default `LOG_INGEST_MAX_PER_HOUR`/ukuran batch dianggap final.
 
 ### 8. Pengaturan pengiriman di klien — COOKIE_ONLY
 

@@ -3,6 +3,7 @@ import { listPanesAsync, type Pane } from "../pty";
 import { readPhases } from "../session-phases";
 import { getScheduler } from "../scheduler/config";
 import { currentLaunchStatus } from "../session-launch-gate";
+import { observePhases } from "../logs/phase-tap";
 
 /* SPEC-919 · ADR-0148 · proyeksi pane tmux → snapshot presence.
    `cwd` SENGAJA dibuang: itulah bagian yang membuat `SessionHistory` local-only
@@ -50,7 +51,9 @@ export function __resetPanesMemo(): void { panesMemo = null; }
     Dipotong di plafon supaya frame tak pernah menabrak `maxPayload` socket sync. */
 export async function buildLocalPresence(): Promise<PresenceSession[]> {
   const panes = await listPanesShared();
-  return panes.slice(0, MAX_PRESENCE_SESSIONS).map((p) => paneToPresence(p, activePhase(p)));
+  const rows = panes.slice(0, MAX_PRESENCE_SESSIONS).map((p) => paneToPresence(p, activePhase(p)));
+  observePhases(rows.map((r) => ({ sessionId: r.sessionId, projectId: r.projectId, specId: r.specId, phase: r.phase })));
+  return rows;
 }
 
 /** SPEC-1215 · ADR-0165 §9 · angka yang SAMA dengan gerbang peluncuran, bukan metrik baru. */

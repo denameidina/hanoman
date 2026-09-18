@@ -18,9 +18,14 @@ function mockApi(initial: RemoteControlView) {
   let current = initial;
   vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
     if (String(url) === "/api/remote-control" && init?.method === "PUT") {
-      const body = JSON.parse(String(init.body)) as { control: RemoteControlView["control"] };
+      const body = JSON.parse(String(init.body)) as
+        Partial<{ control: RemoteControlView["control"]; logs: RemoteControlView["logs"] }>;
       puts.push(body);
-      current = { ...current, control: body.control };
+      current = {
+        ...current,
+        ...(body.control ? { control: body.control } : {}),
+        ...(body.logs ? { logs: body.logs } : {}),
+      };
       return json(current);
     }
     if (String(url) === "/api/remote-control") return json(current);
@@ -73,5 +78,23 @@ describe("RemoteControlPanel (SPEC-1215 · ADR-0165 §4)", () => {
     expect(await screen.findByText("tersambung")).toBeInTheDocument();
     expect(screen.getByText("https://hub.example")).toBeInTheDocument();
     expect(screen.getAllByTestId("remote-audit-row")).toHaveLength(1);
+  });
+});
+
+// SPEC-1217 · AC-D1 UI · tiga lajur log ke hub, terpisah dari grant kendali jarak jauh.
+describe("RemoteControlPanel lajur log (SPEC-1217 AC-D1)", () => {
+  it("lajur event ditampilkan menyala secara default", async () => {
+    mockApi(base);
+    render(<RemoteControlPanel />);
+    expect(await screen.findByRole("switch", { name: /event/i })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("mengetuk toggle server memanggil putRemoteControl dengan logs.server berubah", async () => {
+    const puts = mockApi(base);
+    render(<RemoteControlPanel />);
+    fireEvent.click(await screen.findByRole("switch", { name: /^server$/i }));
+    await waitFor(() => expect(puts).toEqual([
+      expect.objectContaining({ logs: expect.objectContaining({ server: expect.any(Boolean) }) }),
+    ]));
   });
 });
