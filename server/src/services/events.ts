@@ -32,6 +32,10 @@ const clients = new Set<Client>();
 // SPEC-919 · klien yang principal-nya cookie. `WeakSet` karena keanggotaannya properti KONEKSI,
 // bukan daftar kedua yang harus disapu saat detach.
 const cookieClients = new WeakSet<Client>();
+// SPEC-1218 · AC-C9 · grup terbatas per-klien (principal `remote` klien) — GERBANG KEDUA, di
+// samping `cookieOnly`, bukan penggantinya. `WeakMap` karena keanggotaannya properti KONEKSI,
+// sama seperti `cookieClients` — tak perlu disapu eksplisit saat detach.
+const clientGroups = new WeakMap<Client, Set<EventMsg["t"]>>();
 // SPEC-215 · dibaca per-pakai (cfg live). Test menurunkan tick agar cepat; prod 1s. Loop cuma jalan saat ada klien.
 const tickMs = () => effectiveInt("HANOMAN_EVENTS_TICK_MS") ?? 1000;
 
@@ -106,6 +110,8 @@ function broadcast(msg: WireMsg, cookieOnly = false): void {
   const s = JSON.stringify(msg);
   for (const c of clients) {
     if (cookieOnly && !cookieClients.has(c)) continue;
+    const groups = clientGroups.get(c);
+    if (groups && !groups.has(msg.t)) continue;
     sendTo(c, s);
   }
 }
@@ -258,11 +264,12 @@ function stopLoop(): void {
 
 // Klien baru dapat snapshot penuh SEGERA (tak menunggu tick) — late joiner langsung tersinkron,
 // persis scrollback di pty.attach. Dibangun fresh, lepas dari dedup broadcast.
-export async function attach(c: Client, o: { maySubscribe?: boolean } = {}): Promise<void> {
+export async function attach(c: Client, o: { maySubscribe?: boolean; groups?: Set<EventMsg["t"]> } = {}): Promise<void> {
   clients.add(c);
   // Gerbang yang sama dengan `sub`: principal yang tak boleh berlangganan juga tak boleh menerima
   // grup `cookieOnly`. Satu bit, dua tempat yang dibacanya — bukan dua predikat yang bisa berselisih.
   if (o.maySubscribe !== false) cookieClients.add(c);
+  if (o.groups) clientGroups.set(c, o.groups);
   startLoop();
   // SPEC-908 · advertensi kemampuan, dikirim PALING DULU. Server lama tak mengirim frame ini sama
   // sekali — ketiadaannya itulah sinyal yang dipakai klien untuk tetap men-poll HTTP (ADR-0087).
@@ -275,6 +282,7 @@ export async function attach(c: Client, o: { maySubscribe?: boolean } = {}): Pro
     if (g.cookieOnly && !cookieClients.has(c)) continue;
     let msg: WireMsg;
     try { msg = await g.build(); } catch { continue; }
+    if (o.groups && !o.groups.has(msg.t)) continue;
     try { c.send(JSON.stringify(msg)); } catch { return; }
   }
 }

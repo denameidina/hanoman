@@ -916,7 +916,7 @@ git commit -m "feat(spec-1218): FMT pane_width/pane_height + paneGeometry(id) un
   membatasi grup yang dikirim SEGERA (snapshot attach) maupun `broadcast` berikutnya ke anggota
   himpunan itu, **selain** gerbang `cookieOnly` yang sudah ada (dua gerbang, bukan pengganti).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 describe("attach({groups}) — grup terbatas (SPEC-1218 · AC-C9)", () => {
@@ -935,7 +935,7 @@ describe("attach({groups}) — grup terbatas (SPEC-1218 · AC-C9)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -944,7 +944,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 Expected: FAIL (TS: `groups` bukan properti opsi `attach`; grup di luar `{sessions}` tetap
 terkirim).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 export async function attach(c: Client, o: { maySubscribe?: boolean; groups?: Set<EventMsg["t"]> } = {}): Promise<void> {
@@ -987,7 +987,7 @@ Tambahkan `const clientGroups = new WeakMap<Client, Set<EventMsg["t"]>>();` deka
 dan bersihkan di `__reset()` test-only (`clientGroups` `WeakMap` tak perlu `.clear()` eksplisit,
 tapi catat di komentar kenapa aman).
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -995,7 +995,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/events.ts server/test/events.test.ts
