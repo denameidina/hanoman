@@ -38,7 +38,13 @@ export function recordPresence(deviceId: string, sessions: PresenceSession[], no
 export function presenceEntries(now = Date.now()): PresenceEntry[] {
   const out: PresenceEntry[] = [];
   for (const [deviceId, d] of devices) {
-    if (now - d.lastFrameAt >= PRESENCE_OFFLINE_MS) { devices.delete(deviceId); continue; }
+    if (now - d.lastFrameAt >= PRESENCE_OFFLINE_MS) {
+      for (const t of d.sessions.values()) {
+        if ((t.session.status === "working" || t.session.status === "waiting") && t.session.specId)
+          recordRecentlyOffline({ deviceId, name: deviceId, specId: t.session.specId, sessionId: t.session.sessionId }, now);
+      }
+      devices.delete(deviceId); continue;
+    }
     out.push({
       deviceId,
       sessions: [...d.sessions.values()].map((t) => ({
@@ -65,8 +71,41 @@ export function capacityFor(deviceId: string, now = Date.now()): LaunchStatus | 
   return c.admission;
 }
 
+/* SPEC-1216 · ADR-0165 §5 · jaring "device punah" untuk gerbang confirm-required, DI MEMORI
+   (prinsip ADR-0148). Satu entri per (deviceId, specId) — sesi terakhir yang tercatat working|waiting
+   sebelum device itu punah. Restart hub mengosongkannya; poin 3 remoteSessionVerdict (lastResultDeviceId)
+   jadi jaring keduanya. */
+type OfflineEntry = { deviceId: string; name: string; sessionId: string | null; at: number };
+const recentlyOfflineMap = new Map<string, OfflineEntry>(); // key = `${deviceId}:${specId}`
+
+export function recordRecentlyOffline(
+  e: { deviceId: string; name: string; specId: string; sessionId: string | null }, now = Date.now(),
+): void {
+  recentlyOfflineMap.set(`${e.deviceId}:${e.specId}`, { deviceId: e.deviceId, name: e.name, sessionId: e.sessionId, at: now });
+}
+
+const RECENTLY_OFFLINE_TTL_MS = 24 * 60 * 60_000;
+export function recentlyOffline(specId: string, now = Date.now()): Array<{ deviceId: string; name: string; specId: string; sessionId: string | null; at: number }> {
+  const out: Array<{ deviceId: string; name: string; specId: string; sessionId: string | null; at: number }> = [];
+  for (const [key, v] of recentlyOfflineMap) {
+    if (now - v.at >= RECENTLY_OFFLINE_TTL_MS) { recentlyOfflineMap.delete(key); continue; }
+    const [deviceId, specId2] = key.split(":");
+    if (specId2 === specId) out.push({ deviceId: deviceId!, name: v.name, specId, sessionId: v.sessionId, at: v.at });
+  }
+  return out;
+}
+
 /** Socket putus = device offline seketika; tak perlu menunggu ambang denyut. */
-export function dropPresence(deviceId: string): void { devices.delete(deviceId); capacities.delete(deviceId); }
+export function dropPresence(deviceId: string): void {
+  const d = devices.get(deviceId);
+  if (d) {
+    for (const t of d.sessions.values()) {
+      if ((t.session.status === "working" || t.session.status === "waiting") && t.session.specId)
+        recordRecentlyOffline({ deviceId, name: deviceId, specId: t.session.specId, sessionId: t.session.sessionId });
+    }
+  }
+  devices.delete(deviceId); capacities.delete(deviceId);
+}
 
 /** Test-only: kosongkan peta. */
-export function __resetPresence(): void { devices.clear(); capacities.clear(); }
+export function __resetPresence(): void { devices.clear(); capacities.clear(); recentlyOfflineMap.clear(); }

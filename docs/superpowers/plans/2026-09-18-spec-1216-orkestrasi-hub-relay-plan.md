@@ -537,7 +537,7 @@ git commit -m "feat(spec-1216): launchPrincipal remote + force remote 403 sebelu
   `session-launch.ts` dan Task 6 di `specs.ts`); `recordRecentlyOffline(entry)`/
   `recentlyOffline(specId, now?)` (Task 5 membaca ini sebagai input `remoteSessionVerdict`).
 
-- [ ] **Step 1: Tulis test tabel murni yang gagal**
+- [x] **Step 1: Tulis test tabel murni yang gagal**
 
 ```ts
 // server/test/remote-session-gate.test.ts (bagian 1 — murni)
@@ -600,7 +600,7 @@ describe("remoteSessionVerdict (SPEC-1216 · AC-B5/B6)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal (modul belum ada)**
+- [x] **Step 2: Jalankan, pastikan gagal (modul belum ada)**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -608,7 +608,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (cannot find module).
 
-- [ ] **Step 3: Implementasi `remote-session.ts`**
+- [x] **Step 3: Implementasi `remote-session.ts`**
 
 ```ts
 // server/src/services/presence/remote-session.ts
@@ -651,7 +651,7 @@ export function remoteSessionVerdict(input: {
 }
 ```
 
-- [ ] **Step 4: Jalankan test bagian murni, pastikan lulus**
+- [x] **Step 4: Jalankan test bagian murni, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -659,7 +659,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Tulis test `recentlyOffline` di registry (gagal dulu)**
+- [x] **Step 5: Tulis test `recentlyOffline` di registry (gagal dulu)**
 
 Tambahkan di `server/test/remote-session-gate.test.ts` (bagian 2 — registry):
 
@@ -680,7 +680,7 @@ describe("recentlyOffline registry (SPEC-1216 · AC-B6)", () => {
 
 (`beforeEach`/`describe` sudah diimpor di Step 1; tambahkan `beforeEach` ke import vitest bila belum.)
 
-- [ ] **Step 6: Jalankan, pastikan gagal**
+- [x] **Step 6: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -688,7 +688,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`recordRecentlyOffline` tak ada).
 
-- [ ] **Step 7: Implementasi di `registry.ts`**
+- [x] **Step 7: Implementasi di `registry.ts`**
 
 Tambahkan di `server/src/services/presence/registry.ts` (dekat `capacities`, sebelum
 `dropPresence`):
@@ -764,7 +764,7 @@ Reset test-only helper `__resetPresence` juga mengosongkan `recentlyOfflineMap`:
 export function __resetPresence(): void { devices.clear(); capacities.clear(); recentlyOfflineMap.clear(); }
 ```
 
-- [ ] **Step 8: Jalankan seluruh test, pastikan lulus**
+- [x] **Step 8: Jalankan seluruh test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -772,7 +772,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/src/services/presence/remote-session.ts server/src/services/presence/registry.ts server/test/remote-session-gate.test.ts
