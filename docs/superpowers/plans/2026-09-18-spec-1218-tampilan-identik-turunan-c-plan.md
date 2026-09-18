@@ -749,7 +749,7 @@ untuk `GET /api/terminal/sessions/:id/ws` sebelum preValidation ini berjalan) ad
 BENAR di sini. Revalidasi berkelanjutan grant yang dicabut selagi stream terbuka **bukan** tanggung
 jawab route ini — itu milik watch terpisah di dispatcher sendiri (T8, Task 6 lanjutan/Task 9).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 it("preValidation /:id/ws mengenali req.remote in-process (mock RELAY_HEADER via inject) tanpa tiket (SPEC-1218 · prasyarat AC-C1-C9)", async () => {
@@ -762,7 +762,7 @@ it("revalidate interval TIDAK dipasang untuk principal remote (klien) — no set
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -770,7 +770,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (401 tanpa tiket).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // terminal.ts — preValidation route /:id/ws
@@ -799,7 +799,7 @@ socket.on("close", () => { if (revalidate) clearInterval(revalidate); watch?.dis
 `id` berprefiks `client:` ini otomatis memplafon stream per hub-origin+user, plafon TAMBAHAN yang
 tak melanggar plafon 6/4 milik `relay/hub.ts`, murni pertahanan berlapis).
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -807,7 +807,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/terminal.ts server/test/terminal.route.test.ts

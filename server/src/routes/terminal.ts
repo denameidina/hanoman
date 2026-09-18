@@ -543,13 +543,23 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     websocket: true,
     preValidation: async (req, reply) => {
       const { id } = req.params as { id: string };
+      // SPEC-1218 · ADR-0165 §3 · `req.remote` (gate `/api` onRequest, ADR-0165 §3) sudah
+      // memverifikasi allowlist+capability untuk request in-process ini — TIDAK memakai
+      // `admitBrowserWs`'s tiket (dispatcher `injectWS` tak membawa satu pun) atau
+      // `revalidateWsPrincipal`'s cabang `remote` HUB-side (`relayControlFor` kosong di
+      // mesin klien, lihat Task 2 — memakainya di sini menutup socket 60 dtk sesudah setiap
+      // stream dibuka, kelas kegagalan senyap SPEC-761).
+      if (req.remote) return;
       try { req.wsPrincipal = admitBrowserWs(req, `terminal:${id}`, opts.allowedOrigins ?? new Set()); }
       catch { return reply.code(401).send({ error: "WebSocket admission rejected" }); }
     },
   }, (socket, req) => {
     const { id } = req.params as { id: string };
     if (!getSession(id)) return socket.close(4004, "not found");
-    const principal = req.wsPrincipal!;
+    const isClientRemote = req.remote !== undefined;
+    const principal = isClientRemote
+      ? { kind: "remote" as const, id: `client:${req.remote!.actor.hubOrigin}:${req.remote!.actor.userId}` }
+      : req.wsPrincipal!;
     let release: () => void;
     try { release = openWsConnection(principal); }
     catch { socket.close(1008, "connection limit"); return; }
@@ -565,14 +575,19 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     // `bcdef` → `bdcef`, 3/3 run), satu query yang tertahan pool menahan ketikan 5 dtk, dan P1008
     // milik sync menutup socket yang sah dengan "session revoked". Handler di bawah karena itu
     // SINKRON dari ujung ke ujung — urutan ke pty = urutan kedatangan frame, tanpa satu `await` pun.
-    const watch = createPrincipalWatch({
+    // Principal `remote` (klien, in-process) tak butuh revalidasi berkelanjutan: `req.remote`
+    // sudah mewakili verdict admisi keseluruhan request ini, dan grant yang dicabut SELAGI
+    // stream terbuka bukan tanggung jawab route ini — itu milik watch terpisah di dispatcher
+    // sendiri (Task 6/Task 9), bukan `revalidateWsPrincipal` generik (lihat Task 2 & komentar
+    // preValidation di atas untuk kenapa cabang `remote` HUB-sana tak cocok di sini).
+    const watch = isClientRemote ? null : createPrincipalWatch({
       check: () => revalidateWsPrincipal(req, principal),
       onRevoked: () => socket.close(1008, "session revoked"),
     });
     socket.on("message", (raw: Buffer) => {
       const verdict = guard.accept(raw);
       if (!verdict.ok) { socket.close(verdict.code, verdict.reason); return; }
-      if (!watch.admit()) return;
+      if (watch && !watch.admit()) return;
       let m: { t?: string; d?: string; cols?: number; rows?: number; seq?: number; ev?: unknown[] };
       // ponytail: frame rusak dibuang diam-diam — pengirimnya UI kita sendiri.
       try { m = JSON.parse(raw.toString()); } catch { return; }
@@ -595,8 +610,8 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         try { appendDiag(resolveHome(), id, m.ev); } catch { /* diagnostik bukan alasan sesi mati */ }
       }
     });
-    const revalidate = setInterval(() => watch.refresh(), 60_000);
-    revalidate.unref?.();
-    socket.on("close", () => { clearInterval(revalidate); watch.dispose(); release(); detach(id, client); });
+    const revalidate = watch ? setInterval(() => watch.refresh(), 60_000) : undefined;
+    revalidate?.unref?.();
+    socket.on("close", () => { if (revalidate) clearInterval(revalidate); watch?.dispose(); release(); detach(id, client); });
   });
 }
