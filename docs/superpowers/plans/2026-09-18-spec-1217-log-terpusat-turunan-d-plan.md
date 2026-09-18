@@ -760,7 +760,7 @@ git commit -m "feat(server): sadapan console + data.repeat (SPEC-1217 AC-D10)"
 - Consumes: `appendEvent` (Task 9's `event-log.ts` sudah punya sejak turunan A — dipakai langsung, tak perlu menunggu Task 9).
 - Produces: `observePhases(rows: {sessionId:string; projectId:string; specId?:string; phase?:string}[]): void`, `__resetPhaseTap(): void`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-phase-tap.test.ts
@@ -801,12 +801,12 @@ describe("observePhases", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-phase-tap.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/logs/phase-tap.ts
@@ -842,12 +842,12 @@ Catatan: test kedua kasus ketiga mengharap baris **pertama** setelah dibuang dia
 menulis event) — sesuaikan bila skenario test butuh dua panggilan `observePhases` beruntun untuk
 memunculkan transisi tertulis (baseline dulu, lalu perubahan).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-phase-tap.test.ts`
 Expected: PASS — sesuaikan test ketiga bila baseline-setelah-hilang butuh dua tick untuk terlihat sebagai transisi (perbaiki test, bukan lemahkan invarian "baris pertama = baseline").
 
-- [ ] **Step 5: Kabel ke `buildLocalPresence()`**
+- [x] **Step 5: Kabel ke `buildLocalPresence()`**
 
 Modify `server/src/services/presence/snapshot.ts`:
 
@@ -862,7 +862,7 @@ export async function buildLocalPresence(): Promise<PresenceSession[]> {
 }
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/logs/phase-tap.ts server/src/services/presence/snapshot.ts server/test/log-phase-tap.test.ts
