@@ -1270,7 +1270,7 @@ git commit -m "feat(spec-1218): SpecDocsModal pakai useApi() untuk mode remote (
   `ideTree`/`ideFile`/`ideWorkingStatus`/`ideFileDiff`/`ideGit(op:"graph"|"compare"|...)`; TANPA
   tombol tulis/commit/rename/delete/upload/remote-add.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 it("IdeReadPanel merender tree+file+workingStatus dari useApi(), nol tombol tulis (AC-C1)", () => {
@@ -1279,7 +1279,7 @@ it("IdeReadPanel merender tree+file+workingStatus dari useApi(), nol tombol tuli
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1287,7 +1287,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (modul belum ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Salin kerangka baca `IdeScreen.tsx` (tree/file/workingStatus/fileDiff/graph/compare — baris
 144-186/204 area query saja, BUKAN `runGit`/`api.putIdeFile`/`api.ideCreateEntry`/
@@ -1298,7 +1298,7 @@ berkas kanan (MarkdownView/diff read-only), tab "Graph"/"Compare" baca. Tak ada 
 tulis — unduhan review tetap di luar (ADR-0165 §5), TAPI unduhan FILE IDE baca (`ideFileDownloadUrl`)
 boleh tetap ada karena termasuk permukaan `GET` yang di-allowlist (`shared/src/relay.ts:154-155`).
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1306,7 +1306,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/IdeReadPanel.tsx src/test/ide-read-panel.test.tsx
