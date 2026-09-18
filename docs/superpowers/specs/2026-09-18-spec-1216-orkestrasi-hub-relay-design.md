@@ -126,3 +126,44 @@ Seluruh keputusan bentuk (kontrak API, gerbang, capability, alasan penolakan tar
 fase Spec SPEC-1215 dan dikonfirmasi berlaku tanpa kontradiksi terhadap keadaan kode saat ini. Fase
 Objective berikutnya menurunkan kriteria sukses terukur dari AC-B1…AC-B11 di atas; fase Spec berikutnya
 (bila perlu koreksi kecil sekelas S1 SPEC-1215) mencatatnya sebagai koreksi, bukan desain baru.
+
+## Objective
+
+**Fase penulis bagian ini:** Objective (2/5)
+
+### Objective (tunggal, terukur)
+
+Menutup seluruh titik kosong kode yang dipetakan di fase Brainstorm (route HTTP relay, gerbang satu
+sesi lintas instance, `launchPrincipal` remote, retry `syncOnce`, `createApi`/`InstanceContext`, dialog
+Start bertarget) sehingga **AC-B1…AC-B11 (SPEC-1215 §S9) lulus sebagai test kontrak/otomatis yang dapat
+dijalankan ulang** — bukan diverifikasi manual/anekdot — dan `internal/docs` yang tersentuh (termasuk
+pencabutan penanda DIRANCANG di `internal/docs/frontend/frontend-implementation.md:47`) diperbarui
+dalam commit yang sama dengan kode.
+
+Objective ini tidak menambah cakupan di luar AC-B1…B11 yang sudah dikunci SPEC-1215 §S9 — ia hanya
+menurunkannya menjadi kriteria yang bisa dicentang test, sesuai batas turunan B yang dikonfirmasi di
+bagian Konteks & keputusan di atas.
+
+### Kriteria sukses (satu baris = satu AC, dapat dicentang oleh test)
+
+| # | AC | Kriteria sukses terukur |
+|---|---|---|
+| SC1 | AC-B1, AC-B9 | Test kontrak baru memanggil `POST /api/devices/:deviceId/relay/terminal/sessions {spec}` pada device ber-grant `sessions:spawn` → klien menjalankan `POST /api/terminal/sessions` lewat `app.inject` dengan body sama, worktree lahir di mesin **klien** (bukan hub); pola yang sama (route relay → route klien, status/body klien diteruskan apa adanya) dibuktikan lulus untuk steer, interrupt, jawab dialog, dan tandai selesai. |
+| SC2 | AC-B2 | Test kontrak menjalankan start/steer/interrupt/jawab-dialog/tandai-selesai atas fixture **identik** dua jalur — cookie lokal vs relay — lalu meng-assert kolom `Spec`, berkas fase, id sesi, dan path worktree **sama persis**; satu-satunya beda yang lulus assert adalah prefix aktor (`launchApprovedBy`, `manualDone.by`). |
+| SC3 | AC-B3 | Test unit/integrasi: request relay dengan `force: true` dijawab **403** sebelum `approveLaunch` dipanggil (dibuktikan lewat spy/mock tak terpanggil), untuk cabang principal `remote` baru di `launch-authority.ts`. |
+| SC4 | AC-B4 | Test: start relay ke device yang sudah punya sesi hidup untuk SPEC yang sama memulangkan id sesi **yang ada** (bukan sesi baru); tak ada pane kedua tercipta (dicek lewat count sesi/tmux pane sebelum-sesudah). |
+| SC5 | AC-B5 | Test: presence hub menunjukkan sesi `working`/`waiting` SPEC X di device D → `startSpecSession` SPEC X di hub (aktor manusia maupun scheduler) dan start relay ke device selain D dijawab **409** dengan body persis `{deviceId, name, sessionId}`. |
+| SC6 | AC-B6 | Test: device yang terakhir tercatat mengerjakan SPEC X sudah tak ada di presence (punah) → `startSpecSession` dan `POST /specs/:id/done` di hub dijawab **409 confirm-required**; hanya berhasil saat request menyertakan `confirmRemote: true` / `confirm: true`. |
+| SC7 | AC-B7 | Test frontend (dialog Start): untuk backlog ber-`handledBy`, target default terpilih = device `handledBy` pertama yang online ∩ ber-`sessions:spawn` ∩ kapasitas tak penuh; tanpa kandidat memenuhi → default jatuh ke "hub ini"; **tak ada** peluncuran terjadi tanpa klik manusia (dicek: tak ada pemanggilan API start otomatis saat dialog dibuka). |
+| SC8 | AC-B8 | Test frontend: device offline / tanpa grant `sessions:spawn` / kapasitas penuh / berprotokol lain tampil di dialog Start sebagai **tak terpilih** disertai alasan spesifik per kondisi; status online/offline dialog mengikuti siklus presence ≤ 90 dtk (test memakai fixture presence dengan `lastSeenAt` melewati ambang). |
+| SC9 | AC-B10 | Test: relay offline / timeout / respons > 1 MiB dijawab hub berturut-turut **503**/**504**/**413** dengan `kind: "relay"`; dibuktikan **tak ada** tulisan state lokal (Session/Spec/dsb.) selain baris log `relay.request` (diff DB before/after kosong di luar tabel log). |
+| SC10 | AC-B11 | Test dispatcher klien: relay start dijawab klien 404 `spec not found` → klien menjalankan **tepat satu** `syncOnce` lalu mengulang **tepat satu kali** sebelum meneruskan jawaban akhir (dibuktikan lewat spy/count pemanggilan `syncOnce` dan `app.inject`). |
+| SC11 | Constraint brief | `internal/docs` yang tersentuh diperbarui dan ditautkan di `internal/docs/README.md`, serta frasa "SPEC-1216" di penanda DIRANCANG `internal/docs/frontend/frontend-implementation.md:47` dicabut — **dalam commit yang sama** dengan kode fase Execute. |
+
+### Cara verifikasi (ringkas, bukan rencana — didetailkan di fase Plan)
+
+Seluruh SC di atas diverifikasi lewat **test otomatis** (`pnpm vitest --run` pada berkas yang tersentuh,
+`--no-file-parallelism` untuk set yang menyentuh test server per `CLAUDE.md`) plus satu **smoke manual**
+di akhir Execute: boot server, curl `/api/devices/:deviceId/relay/terminal/sessions` end-to-end antara
+dua instance lokal (hub + klien) untuk membuktikan SC1/SC2 nyata, bukan hanya lulus mock. Tak ada SC
+yang dianggap terpenuhi oleh klaim tanpa bukti test/curl yang benar-benar dijalankan.
