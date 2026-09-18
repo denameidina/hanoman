@@ -7,6 +7,7 @@ import {
 import { controlHost, loadIngressPolicy } from "../ingress-policy";
 import { appendEvent } from "../logs/event-log";
 import { getSetting } from "../settings";
+import { paneGeometry } from "../pty";
 import { encodeRelayActor } from "./gate";
 import { relaySecret } from "./secret";
 
@@ -46,8 +47,10 @@ export function injectableFrom(app: FastifyInstance): InjectableApp {
 // `classifyIngress` menjawab 404 untuk host asing (spike S0a), dan `inject` tanpa host = `localhost:80`.
 const defaultHost = (): string => controlHost(loadIngressPolicy(process.env)) ?? "127.0.0.1";
 const JSON_TYPE = "application/json; charset=utf-8";
-// TODO(Task 8): stub sampai `pty.ts` punya `paneGeometry(id)` — diisi geometri nyata di sana.
-function paneGeometryFor(_path: string): { cols: number; rows: number } | undefined { return undefined; }
+function paneGeometryFor(path: string): { cols: number; rows: number } | undefined {
+  const m = path.match(/^\/api\/terminal\/sessions\/([^/]+)\/ws$/);
+  return m ? paneGeometry(m[1]!) ?? undefined : undefined;
+}
 
 export function createRelayDispatcher(o: {
   app: InjectableApp;

@@ -127,6 +127,9 @@ describe("dispatcher relay — unit (SPEC-1215 · ADR-0165 §2, spec §S4.5)", (
     h.d.onMessage(JSON.stringify({ t: "open", sid: "s1", path: "/api/events/ws", mode: "read", actor }));
     h.d.onMessage(req({ id: "x" }));
     await waitFor(() => assemble(h.sent, "x").ended);
+    // `open` melewati `getSetting()` (await, Prisma) sebelum menjawab close 4502 — jalur async
+    // TERPISAH dari `req`/`x` di atas, jadi ditunggu sendiri alih-alih diasumsikan sudah tuntas.
+    await waitFor(() => h.sent.some((f) => f.t === "close"));
     expect(assemble(h.sent, "x").status).toBe(502);
     expect(h.sent.filter((f) => f.t === "close")).toEqual([{ t: "close", sid: "s1", code: 4502, reason: expect.any(String) }]);
   });

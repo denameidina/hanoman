@@ -827,7 +827,7 @@ git commit -m "feat(spec-1218): admisi WS klien req.remote in-process di /:id/ws
 - Produces: `FMT` bertambah `#{pane_width}`/`#{pane_height}` di UJUNG (pola SPEC-919/ADR-0164, tak
   menggeser kolom lama); `paneGeometry(id): {cols, rows} | null` murni dari `listPanes()`.
 
-- [ ] **Step 1: Cari test parser FMT yang ada**
+- [x] **Step 1: Cari test parser FMT yang ada**
 
 ```bash
 grep -rln "parsePanes\|FMT" server/test
@@ -844,7 +844,7 @@ it("FMT bertambah pane_width/pane_height di ujung, paneGeometry(id) murni dari l
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -853,7 +853,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 Expected: FAIL (`paneGeometry` tak ada, atau kolom FMT tak cocok — sesuaikan test dengan urutan
 FMT NYATA yang dibaca dari `pty.ts:352-364` sebelum mengunci assert).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // pty.ts — FMT (baris 352-364), tambah di UJUNG array (sebelum .join("\t"))
@@ -888,7 +888,7 @@ function paneGeometryFor(path: string): { cols: number; rows: number } | undefin
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -896,7 +896,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/pty.ts server/src/services/relay/dispatcher.ts server/test/pty-parse.test.ts

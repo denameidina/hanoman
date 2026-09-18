@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FMT, parsePanes } from "../src/services/pty";
+import { FMT, parsePanes, paneGeometry } from "../src/services/pty";
 
 /* SPEC-919 · `parsePanes` men-destructure baris tab per POSISI. Menambah satu field ke FMT
    tanpa menggeser destructuring-nya menghasilkan nilai yang salah di SETIAP kolom sesudahnya —
@@ -24,9 +24,25 @@ const line = (over: Record<string, string> = {}) => {
 
 describe("parsePanes", () => {
   it("FMT dan destructuring sama panjang", () => {
-    expect(FIELDS).toHaveLength(21);
-    // M-2 · ADR-0164 · field baru di UJUNG (pola SPEC-919): kolom lama tak bergeser.
-    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_done_at_birth}");
+    expect(FIELDS).toHaveLength(23);
+    // SPEC-1218 · AC-C2 · pane_width/pane_height di UJUNG (pola SPEC-919): kolom lama tak bergeser.
+    expect(FIELDS[FIELDS.length - 2]).toBe("#{pane_width}");
+    expect(FIELDS[FIELDS.length - 1]).toBe("#{pane_height}");
+  });
+
+  it("SPEC-1218 · AC-C2 · paneGeometry(id) murni dari listPanes — cols/rows dari pane_width/pane_height", () => {
+    const [p] = parsePanes(line({ "#{pane_width}": "80", "#{pane_height}": "24" }));
+    expect(p).toMatchObject({ width: 80, height: 24 });
+  });
+
+  it("SPEC-1218 · AC-C2 · pane_width/pane_height kosong (tmux lama) → width/height undefined", () => {
+    const [p] = parsePanes(line());
+    expect(p!.width).toBeUndefined();
+    expect(p!.height).toBeUndefined();
+  });
+
+  it("SPEC-1218 · AC-C2 · paneGeometry(id) → null bila pane tak ditemukan (murni listPanes, tak menebak)", () => {
+    expect(paneGeometry("tak-ada-pane-spec-1218")).toBeNull();
   });
 
   it("memetakan setiap kolom ke field yang benar", () => {
