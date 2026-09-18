@@ -1508,7 +1508,7 @@ git commit -m "feat(spec-1216): InstanceContext — useInstance/useApi/useWsTarg
 - Produces: `startTargets(view, handledBy)` — Task 11 (`StartSessionModal`) memakainya untuk
   default + render tak-terpilih.
 
-- [ ] **Step 1: Tulis test tabel murni yang gagal**
+- [x] **Step 1: Tulis test tabel murni yang gagal**
 
 ```tsx
 // src/test/start-session-target.test.tsx (bagian 1)
@@ -1552,7 +1552,7 @@ describe("startTargets (SPEC-1216 · AC-B7/B8)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1560,7 +1560,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (modul tak ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // src/src/api/start-targets.ts
@@ -1618,7 +1618,7 @@ function capacityFull(c: LaunchStatus): boolean { /* isi sama */ }
 selalu `true` di `presenceView()`) dan kapasitasnya tak penuh — cermin "tanpa kandidat → hub ini"
 (AC-B7) karena hub selalu ada di indeks 0 dan (nyaris) selalu eligible.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1626,7 +1626,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/start-targets.ts src/test/start-session-target.test.tsx
