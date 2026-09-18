@@ -1383,7 +1383,7 @@ git commit -m "feat(spec-1216): createApi({base}) — j/jUpload/agentDoc rebase 
 - Produces: `InstanceProvider`, `useInstance()`, `useApi()`, `useWsTarget()` — Task 11
   (`StartSessionModal`) memakai `useApi()`/`useInstance()` untuk aksi target remote.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 // src/test/instance.test.tsx (bagian 2, tambahan)
@@ -1428,7 +1428,7 @@ konsisten dengan `RELAY_ROUTES` yang sudah mengizinkan `GET …/ws`, mis.
 `` `/api/devices/${deviceId}/relay/terminal/sessions/${sid}/ws` `` untuk varian `` `terminal:${sid}` ``
 dan `` `/api/devices/${deviceId}/relay/events/ws` `` untuk `"events"`.)
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1436,7 +1436,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (modul tak ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```tsx
 // src/src/api/instance.tsx
@@ -1480,7 +1480,7 @@ export function useWsTarget(local: "events" | `terminal:${string}`): { url: stri
 
 Sesuaikan assertion test Step 1 (`t.url`) dengan bentuk nyata di atas sebelum menjalankan ulang.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1488,7 +1488,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/api/instance.tsx src/test/instance.test.tsx
