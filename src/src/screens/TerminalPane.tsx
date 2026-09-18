@@ -5,6 +5,7 @@ import "@xterm/xterm/css/xterm.css";
 import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
+import { useApi, useInstance, useWsTarget } from "../api/instance";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
 import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
 import * as P from "./terminal-predict";
@@ -36,7 +37,7 @@ type LinkState =
   | { state: "retrying"; attempt: number };
 
 export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true, diag = false }: {
+  predict = true, diag = false, mode = "local" }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -50,7 +51,15 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   // Perekam diagnostik jalur input. Opt-in, mati secara default: ia merekam SETIAP tombol yang
   // ditekan di pane ini, jadi ia hanya boleh menyala saat operator memang sedang menyelidiki.
   diag?: boolean;
+  // SPEC-1218 · ADR-0165 §11 · "remote" = mirroring pane di klien lain lewat relay: server memegang
+  // geometri (frame `geometry` menggantikan `resize` yang kita kirim), dan tanpa `sessions:write`
+  // pane jadi baca-saja — tak ada `onData`/composer/keys yang bisa mengetik ke pty orang lain.
+  mode?: "local" | "remote";
 }) {
+  const apiHook = useApi();
+  const wsTarget = useWsTarget(`terminal:${sessionId}`);
+  const instance = useInstance();
+  const canWrite = mode !== "remote" || (instance.kind === "remote" && instance.capabilities.includes("sessions:write"));
   const host = React.useRef<HTMLDivElement>(null);
   // Dipegang di ref supaya effect koneksi tetap hanya bergantung pada `sessionId`: mengubah
   // ukuran font tak boleh melahirkan socket baru.
@@ -228,11 +237,17 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     }, 100);
 
     const connect = () => {
-      void api.issueWsTicket(`terminal:${sessionId}`).then(({ ticket }) => {
+      const ticketPromise = mode === "remote"
+        ? apiHook.issueWsTicket(wsTarget.ticketTarget as any).then((r) => ({ ticket: r.ticket, url: wsTarget.url }))
+        : api.issueWsTicket(`terminal:${sessionId}`).then((r) => ({
+          ticket: r.ticket,
+          url: `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${paths.terminalWs(sessionId)}`,
+        }));
+      void ticketPromise.then(({ ticket, url }) => {
         if (disposed) return;
-        const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+        const scheme = url.startsWith("/") ? (location.protocol === "https:" ? "wss:" : "ws:") : "";
         const socket = new WebSocket(
-          `${scheme}//${location.host}${paths.terminalWs(sessionId)}`, [`hanoman-ticket.${ticket}`]);
+          url.startsWith("/") ? `${scheme}//${location.host}${url}` : url, [`hanoman-ticket.${ticket}`]);
         ws = socket;
 
         socket.onopen = () => {
@@ -257,7 +272,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
             // Geometri yang berubah selagi putus hilang senyap (`send` no-op saat socket mati),
             // jadi ia wajib mendahului byte antrean — kalau tidak TUI menggambar blob itu untuk
             // geometri lama lalu me-rewrap seluruh layar.
-            send({ t: "resize", cols: term.cols, rows: term.rows });
+            // SPEC-1218 · mode remote: geometri milik pemilik pane (frame `geometry` masuk), bukan
+            // kontainer kita — mengirim `resize` di sini akan merebut kolom/baris pane orang lain.
+            if (mode !== "remote") send({ t: "resize", cols: term.cols, rows: term.rows });
           }
           // Dikuras di SETIAP open, bukan hanya yang pertama: itu yang mengubah buffer SPEC-771
           // dari penyembunyi kegagalan menjadi penyelamat ketikan.
@@ -266,7 +283,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
         socket.onmessage = (ev) => {
           const f = JSON.parse(ev.data as string) as {
             t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
-            on?: boolean; seq?: number;
+            on?: boolean; seq?: number; cols?: number; rows?: number;
           };
           if (f.t === "data") {
             const r = P.onServerData(pred, f.d ?? "", Date.now());
@@ -291,6 +308,11 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
               clockIfDelivered();
             });
             clockIfDelivered();
+          }
+          // SPEC-1218 · mode remote: server memegang geometri pane orang lain — kita gambar ulang
+          // langsung ke ukurannya, BUKAN lewat `fit.fit()` yang akan menghitung dari kontainer kita.
+          else if (f.t === "geometry" && typeof f.cols === "number" && typeof f.rows === "number") {
+            term.resize(f.cols, f.rows);
           }
           // SPEC-878 · ADR-0134 · pengakuan pengiriman: satu-satunya titik nol jam TTL prediksi.
           else if (f.t === "ack") {
@@ -388,7 +410,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       if (lines) term.scrollLines(lines);
       return false;
     });
-    const typed = term.onData(onTyped);
+    // SPEC-1218 · tanpa `sessions:write` pane remote adalah cermin baca-saja: tak memasang
+    // `onData` sama sekali menutup jalur ketik di sumbernya, bukan hanya di tampilan (composer/keys
+    // JSX di bawah sudah tersembunyi juga, tapi keyboard fisik lewat host masih bisa memicu ini).
+    const typed = canWrite ? term.onData(onTyped) : { dispose: () => {} };
 
     // Hulu `term.onData`: peristiwa asli papan tombol/IME. Di papan tombol lunak tablet, satu
     // "tombol" tak selalu satu keydown — IME memakai composition, dan teks yang benar-benar
@@ -491,7 +516,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       const rect = entries[0]?.contentRect ?? el.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
       fit.fit();
-      send({ t: "resize", cols: term.cols, rows: term.rows });
+      if (mode !== "remote") send({ t: "resize", cols: term.cols, rows: term.rows });
     });
     ro.observe(el);
 
@@ -538,8 +563,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     current.fit.fit();
-    current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
-  }, [fontSize]);
+    if (mode !== "remote") current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
+  }, [fontSize, mode]);
 
   // SPEC-882 · kolom ketik & bar tombol memakan tinggi host, jadi `cols`/`rows` PTY ikut berubah
   // saat sakelarnya digeser. ResizeObserver menangkapnya di browser, tapi frame `resize` wajib
@@ -551,8 +576,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     current.fit.fit();
-    current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
-  }, [showKeys]);
+    if (mode !== "remote") current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
+  }, [showKeys, mode]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -590,9 +615,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
         background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)",
         touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
-      {showKeys && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
+      {showKeys && canWrite && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
         external={composerDrain} linkState={link.state} queue={queue} />}
-      {showKeys && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
+      {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
     </div>
   );
 }

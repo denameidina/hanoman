@@ -11,10 +11,40 @@ vi.mock("../src/api/client", () => ({
   logTranscript: vi.fn().mockResolvedValue(""),
   logRetention: vi.fn().mockResolvedValue({ eventDays: 90, serverDays: 7, transcriptDays: 30, maxBytes: 1 }),
   putLogRetention: vi.fn().mockResolvedValue({ eventDays: 90, serverDays: 7, transcriptDays: 30, maxBytes: 1 }),
+  // SPEC-1218 · tombol "Buka" merender RemoteInstanceView, yang memakai useApi()/createApi() untuk
+  // TerminalPane mode=remote + SpecDocsModal + IdeReadPanel.
+  createApi: () => ({
+    issueWsTicket: vi.fn().mockResolvedValue({ ticket: "t" }),
+    getSpecDocs: vi.fn().mockResolvedValue({ files: [] }),
+    ideTree: vi.fn().mockResolvedValue({ files: [], dirs: [] }),
+    ideWorkingStatus: vi.fn().mockResolvedValue({ branch: "main", staged: [], unstaged: [] }),
+    ideGraph: vi.fn().mockResolvedValue({ commits: [], current: "main", total: 0 }),
+  }),
 }));
+vi.mock("@xterm/xterm", () => ({ Terminal: class {
+  public cols = 80; public rows = 24; public options: Record<string, unknown> = {};
+  public loadAddon(): void {} public open(): void {} public focus(): void {}
+  public write(): void {} public resize(): void {} public scrollLines(): void {}
+  public dispose(): void {} public hasSelection(): boolean { return false; }
+  public getSelection(): string { return ""; }
+  public attachCustomKeyEventHandler(): void {} public attachCustomWheelEventHandler(): void {}
+  public onData(): { dispose: () => void } { return { dispose: () => {} }; }
+  public get buffer() { return { active: { viewportY: 0, cursorX: 0, cursorY: 0, getLine: () => undefined } }; }
+} }));
+vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { public fit(): void {} } }));
+vi.stubGlobal("WebSocket", class {
+  public static readonly OPEN = 1;
+  public readyState = 1;
+  public onopen: (() => void) | null = null;
+  public onmessage: ((ev: { data: string }) => void) | null = null;
+  public onclose: ((ev: { code: number }) => void) | null = null;
+  public onerror: (() => void) | null = null;
+  public send(): void {} public close(): void {}
+});
+vi.stubGlobal("ResizeObserver", class { constructor() {} observe(): void {} disconnect(): void {} });
 
 const view: PresenceView = {
-  enabled: true,
+  enabled: true, hubVersion: "0.5.0",
   devices: [{
     deviceId: "local", name: "mac-dena", local: true, online: true,
     lastSeenAt: "2026-08-24T01:00:00.000Z",
@@ -61,7 +91,7 @@ describe("ClientsScreen", () => {
   it("sesi tanpa specId tak bisa diklik", () => {
     const onOpenSpec = vi.fn();
     const v: PresenceView = {
-      enabled: true,
+      enabled: true, hubVersion: "0.5.0",
       devices: [{
         deviceId: "local", name: "mac-dena", local: true, online: true, lastSeenAt: null,
         sessions: [{
@@ -73,6 +103,47 @@ describe("ClientsScreen", () => {
     render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={onOpenSpec} />);
     fireEvent.click(screen.getByTestId("presence-session-prd-abc"));
     expect(onOpenSpec).not.toHaveBeenCalled();
+  });
+});
+
+describe("ClientsScreen tombol Buka (SPEC-1218 · AC-C1/C7)", () => {
+  it("tombol Buka merender RemoteInstanceView untuk device dengan control tersedia", async () => {
+    const v: PresenceView = {
+      enabled: true, hubVersion: "0.5.0",
+      devices: [{
+        deviceId: "d1", name: "laptop", local: false, online: true, lastSeenAt: null, sessions: [],
+        control: { state: "available", protocol: 1, version: "0.5.0", capabilities: ["sessions:read"], since: "" },
+      }],
+    };
+    render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /buka/i }));
+    expect(await screen.findByTestId("remote-banner")).toBeInTheDocument();
+  });
+
+  it("device control.state protocol-mismatch → tombol Buka disabled dengan alasan", () => {
+    const v: PresenceView = {
+      enabled: true, hubVersion: "0.5.0",
+      devices: [{
+        deviceId: "d1", name: "laptop", local: false, online: true, lastSeenAt: null, sessions: [],
+        control: { state: "protocol-mismatch", protocol: 2, version: "0.6.0", capabilities: [], since: "" },
+      }],
+    };
+    render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
+    expect(screen.getByRole("button", { name: /buka/i })).toBeDisabled();
+  });
+
+  it("device tanpa control → tombol Buka disabled", () => {
+    const v: PresenceView = {
+      enabled: true, hubVersion: "0.5.0",
+      devices: [{ deviceId: "d1", name: "laptop", local: false, online: false, lastSeenAt: null, sessions: [] }],
+    };
+    render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
+    expect(screen.getByRole("button", { name: /buka/i })).toBeDisabled();
+  });
+
+  it("device lokal tak menawarkan tombol Buka — hanya device remote (d2) yang dapat", () => {
+    render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
+    expect(screen.getAllByRole("button", { name: /^buka$/i })).toHaveLength(1);
   });
 });
 
@@ -94,13 +165,13 @@ describe("ClientsScreen muat awal HTTP", () => {
 
   it("menarik /api/presence hanya saat frame siar belum membawa apa pun", async () => {
     vi.mocked(api.presence).mockResolvedValue({
-      enabled: true,
+      enabled: true, hubVersion: "0.5.0",
       devices: [{
         deviceId: "d9", name: "dari-http", local: false, online: true,
         lastSeenAt: null, sessions: [],
       }],
     });
-    render(<ClientsScreen view={{ enabled: false, devices: [] }} specTitles={{}} onOpenSpec={() => {}} />);
+    render(<ClientsScreen view={{ enabled: false, hubVersion: "0.5.0", devices: [] }} specTitles={{}} onOpenSpec={() => {}} />);
     await waitFor(() => expect(screen.getByText("dari-http")).toBeTruthy());
   });
 
@@ -111,7 +182,7 @@ describe("ClientsScreen muat awal HTTP", () => {
 
   it("server lama (fetch gagal) tetap merender keadaan kosong, bukan melempar", async () => {
     vi.mocked(api.presence).mockRejectedValue(new Error("404"));
-    render(<ClientsScreen view={{ enabled: false, devices: [] }} specTitles={{}} onOpenSpec={() => {}} />);
+    render(<ClientsScreen view={{ enabled: false, hubVersion: "0.5.0", devices: [] }} specTitles={{}} onOpenSpec={() => {}} />);
     await waitFor(() => expect(screen.getByText("Belum ada device")).toBeTruthy());
   });
 });

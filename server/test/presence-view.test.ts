@@ -58,6 +58,14 @@ describe("presenceView", () => {
     expect((await presenceView({ local: none, now: T0 })).enabled).toBe(false);
   });
 
+  // SPEC-1218 · prasyarat RemoteBanner: klien membandingkan versi instance ini dengan versi
+  // sendiri untuk peringatan "versi hub berbeda dari klien" — koreksi atas §T7 (`api.getUpdateStatus()`
+  // tak ada di src/src/api/client.ts).
+  it("menyertakan hubVersion = runningVersion()", async () => {
+    const v = await presenceView({ local: none, now: T0 });
+    expect(v.hubVersion).toEqual(expect.any(String));
+  });
+
   it("enabled true begitu ada device token yang belum dicabut", async () => {
     await device("laptop");
     expect((await presenceView({ local: none, now: T0 })).enabled).toBe(true);

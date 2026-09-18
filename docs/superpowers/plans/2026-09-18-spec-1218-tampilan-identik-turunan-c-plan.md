@@ -1097,7 +1097,7 @@ git commit -m "feat(spec-1218): principal remote /events/ws klien → attach gro
   `t==="geometry"` (di `onmessage`, baris 266) memanggil `term.resize(f.cols, f.rows)`; tanpa
   `sessions:write` di `capabilities` → `onData`/`sendKey` tak terpasang + `showKeys` disembunyikan.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 // src/test/terminal-pane-remote.test.tsx
@@ -1125,7 +1125,7 @@ describe("TerminalPane mode=remote (SPEC-1218 · AC-C2/AC-C3)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1133,7 +1133,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (prop `mode` tak dikenal, resize tetap terkirim).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Tambah import `useApi, useWsTarget, useInstance` dari `../api/instance`; prop `mode = "local"`.
 
@@ -1180,7 +1180,7 @@ Close `4009` — `socket.onclose` (baris 319) sudah memanggil `retry()` untuk ko
 `4009` **sudah** jatuh ke `retry()` existing (baris 335) tanpa perubahan — verifikasi ini sebagai
 bagian test Step 4, JANGAN tambahkan cabang kode baru untuk `4009` bila `retry()` sudah menutupnya.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1188,7 +1188,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS (keduanya — mode lokal tak boleh regresi).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalPane.tsx src/test/terminal-pane-remote.test.tsx
@@ -1209,7 +1209,7 @@ git commit -m "feat(spec-1218): TerminalPane mode=remote — buang resize, geome
   "../api/client"`; `const api = useApi();` di dalam komponen (nama lokal sama, nol perubahan
   pemanggilan `api.getSpecDocs`/`api.getSpecDocFile`/`api.specDocDownloadUrl` di bawahnya).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 it("dalam InstanceContext remote, SpecDocsModal memanggil api instance remote (base /api/devices/:id/relay), bukan api singleton lokal (AC-C1)", () => {
@@ -1219,7 +1219,7 @@ it("dalam InstanceContext remote, SpecDocsModal memanggil api instance remote (b
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1227,7 +1227,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (komponen selalu memakai singleton `api` lokal).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```tsx
 import { useApi } from "../api/instance";
@@ -1242,7 +1242,7 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
 Tak ada aksi tulis di komponen ini sama sekali (murni baca) — tak ada yang perlu disembunyikan
 untuk mode remote (AC-C1 memang tak menuntut itu untuk dokumen).
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1250,7 +1250,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SpecDocsModal.tsx src/test/spec-docs-modal-remote.test.tsx
@@ -1270,7 +1270,7 @@ git commit -m "feat(spec-1218): SpecDocsModal pakai useApi() untuk mode remote (
   `ideTree`/`ideFile`/`ideWorkingStatus`/`ideFileDiff`/`ideGit(op:"graph"|"compare"|...)`; TANPA
   tombol tulis/commit/rename/delete/upload/remote-add.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 it("IdeReadPanel merender tree+file+workingStatus dari useApi(), nol tombol tulis (AC-C1)", () => {
@@ -1279,7 +1279,7 @@ it("IdeReadPanel merender tree+file+workingStatus dari useApi(), nol tombol tuli
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1287,7 +1287,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (modul belum ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Salin kerangka baca `IdeScreen.tsx` (tree/file/workingStatus/fileDiff/graph/compare — baris
 144-186/204 area query saja, BUKAN `runGit`/`api.putIdeFile`/`api.ideCreateEntry`/
@@ -1298,7 +1298,7 @@ berkas kanan (MarkdownView/diff read-only), tab "Graph"/"Compare" baca. Tak ada 
 tulis — unduhan review tetap di luar (ADR-0165 §5), TAPI unduhan FILE IDE baca (`ideFileDownloadUrl`)
 boleh tetap ada karena termasuk permukaan `GET` yang di-allowlist (`shared/src/relay.ts:154-155`).
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1306,7 +1306,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/IdeReadPanel.tsx src/test/ide-read-panel.test.tsx
@@ -1329,13 +1329,13 @@ git commit -m "feat(spec-1218): IdeReadPanel — subset baca IdeScreen via useAp
 - **Koreksi dicatat di Global Constraints:** menggantikan asumsi spec teknis §T7 `api.getUpdateStatus()`
   yang tak ada di `src/src/api/client.ts`.
 
-- [ ] **Step 1: Cari fungsi pembangun `PresenceView` nyata**
+- [x] **Step 1: Cari fungsi pembangun `PresenceView` nyata**
 
 ```bash
 grep -rln "PresenceView\b" server/src/services | grep -v test
 ```
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 it("presenceView() menyertakan hubVersion = runningVersion() (SPEC-1218 · prasyarat RemoteBanner)", async () => {
@@ -1344,7 +1344,7 @@ it("presenceView() menyertakan hubVersion = runningVersion() (SPEC-1218 · prasy
 });
 ```
 
-- [ ] **Step 3: Jalankan, pastikan gagal**
+- [x] **Step 3: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1352,7 +1352,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`hubVersion` undefined).
 
-- [ ] **Step 4: Implementasi**
+- [x] **Step 4: Implementasi**
 
 ```ts
 // shared/src/presence.ts
@@ -1366,7 +1366,7 @@ export type PresenceView = {
 Di pembangun server (`presence/view.ts` atau setara): `import { runningVersion } from
 "../update";` lalu `return { enabled, devices, hubVersion: runningVersion() };`.
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1375,7 +1375,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 Expected: PASS (`events.route.test.ts` yang menguji frame `presence` — pastikan tak regresi bentuk
 frame lama, `hubVersion` aditif).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/presence.ts server/src/services/presence/*.ts
@@ -1399,7 +1399,7 @@ git commit -m "feat(spec-1218): PresenceView.hubVersion aditif, prasyarat Remote
   "protocol-mismatch"` SEBELUM render apa pun (AC-C7); else `InstanceProvider` `kind:"remote"` +
   `Tabs` Terminal/Dokumen/IDE → `TerminalPane mode="remote"`/`SpecDocsModal`/`IdeReadPanel`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 describe("RemoteInstanceView (SPEC-1218 · AC-C1/AC-C7)", () => {
@@ -1423,7 +1423,7 @@ describe("RemoteInstanceView (SPEC-1218 · AC-C1/AC-C7)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1431,7 +1431,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (modul belum ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```tsx
 // RemoteBanner.tsx
@@ -1491,7 +1491,7 @@ export function RemoteInstanceView({ device, hubVersion, sessionId, projectId, o
 tersedia di `PresenceDeviceView.sessions[]` saat Task 16 memanggilnya dari `ClientsScreen` — kalau
 device tak punya sesi aktif, tab Terminal/Dokumen menampilkan `StateBlock` kosong, bukan crash.)
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1499,7 +1499,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/RemoteBanner.tsx src/src/screens/RemoteInstanceView.tsx src/test/remote-instance-view.test.tsx
@@ -1520,7 +1520,7 @@ git commit -m "feat(spec-1218): RemoteInstanceView + RemoteBanner — gate proto
   `openDevice` di `ClientsScreen`); disabled + alasan bila `d.control?.state ===
   "protocol-mismatch"` atau `!d.control` (grant mati/offline).
 
-- [ ] **Step 1: Cari test file yang ada**
+- [x] **Step 1: Cari test file yang ada**
 
 ```bash
 grep -rl "ClientsScreen" src/test
@@ -1542,7 +1542,7 @@ it("device control.state protocol-mismatch → tombol Buka disabled dengan alasa
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1550,7 +1550,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (tombol "Buka" tak ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```tsx
 // ClientsScreen.tsx
@@ -1593,7 +1593,7 @@ Perbarui komentar berkas baris 9-11 ("Tak ada isi terminal di sini … sengaja d
 itu sudah basi sesudah C mendarat, ganti dengan catatan bahwa mirror terminal kini ADA lewat
 `RemoteInstanceView` (dicatat juga di Task 17 docs, tapi kode diperbarui di SINI, commit yang sama).
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1601,7 +1601,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/ClientsScreen.tsx src/test/clients-screen.test.tsx
