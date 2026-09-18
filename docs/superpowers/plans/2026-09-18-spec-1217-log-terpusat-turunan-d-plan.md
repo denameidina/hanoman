@@ -356,7 +356,7 @@ git commit -m "feat(shared): redactText/redactValue murni + korpus AC-D4/AC-S5 (
 - Consumes: `redactText`/`redactValue` (Task 2, `@hanoman/shared`).
 - Produces: `knownSecrets(): string[]` — daftar nilai proses (device token aktif, env bernama rahasia ≥8 char, `Setting.data.secret?.key` bila ada) untuk dipakai sebagai argumen `known` ke `redactText`/`redactValue`. **Tak** ikut ke `shared` karena membaca `process.env`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-redact-known.test.ts
@@ -384,12 +384,12 @@ describe("knownSecrets", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-redact-known.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/logs/redact-known.ts
@@ -408,12 +408,12 @@ export function knownSecrets(): string[] {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-redact-known.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/logs/redact-known.ts server/test/log-redact-known.test.ts
