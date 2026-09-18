@@ -1209,7 +1209,7 @@ git commit -m "feat(spec-1218): TerminalPane mode=remote — buang resize, geome
   "../api/client"`; `const api = useApi();` di dalam komponen (nama lokal sama, nol perubahan
   pemanggilan `api.getSpecDocs`/`api.getSpecDocFile`/`api.specDocDownloadUrl` di bawahnya).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```tsx
 it("dalam InstanceContext remote, SpecDocsModal memanggil api instance remote (base /api/devices/:id/relay), bukan api singleton lokal (AC-C1)", () => {
@@ -1219,7 +1219,7 @@ it("dalam InstanceContext remote, SpecDocsModal memanggil api instance remote (b
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1227,7 +1227,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (komponen selalu memakai singleton `api` lokal).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```tsx
 import { useApi } from "../api/instance";
@@ -1242,7 +1242,7 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
 Tak ada aksi tulis di komponen ini sama sekali (murni baca) — tak ada yang perlu disembunyikan
 untuk mode remote (AC-C1 memang tak menuntut itu untuk dokumen).
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1250,7 +1250,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/SpecDocsModal.tsx src/test/spec-docs-modal-remote.test.tsx

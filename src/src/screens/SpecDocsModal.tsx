@@ -3,7 +3,8 @@
    sumber freshest-wins (worktree sesi hidup > repoDir) di-resolve server. */
 import React from "react";
 import { Modal, StateBlock, Icon, MarkdownView, DocDownload, ResponsivePanels } from "../ds";
-import { api, type SpecDoc } from "../api/client";
+import { type SpecDoc } from "../api/client";
+import { useApi } from "../api/instance";
 
 const KIND_LABEL: Record<string, string> = {
   audit: "Audit", spec: "Spec", plan: "Plan",
@@ -11,6 +12,7 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: () => void }) {
+  const api = useApi();
   const [files, setFiles] = React.useState<SpecDoc[] | null>(null);
   const [ixError, setIxError] = React.useState(false);
   const [sel, setSel] = React.useState("");
@@ -27,7 +29,7 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
       if (r.files[0]) setSel(r.files[0].path);
     }).catch(() => { if (alive) setIxError(true); });
     return () => { alive = false; };
-  }, [specId]);
+  }, [specId, api]);
 
   React.useEffect(() => {
     if (!sel || sel in cache) return;
@@ -36,7 +38,7 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
       .then((d) => { if (alive) setCache((c) => ({ ...c, [sel]: d.content })); })
       .catch(() => { if (alive) setCache((c) => ({ ...c, [sel]: null })); });
     return () => { alive = false; };
-  }, [sel, specId, cache]);
+  }, [sel, specId, cache, api]);
 
   const loading = files === null && !ixError;
   const docLoading = !!sel && !(sel in cache);
