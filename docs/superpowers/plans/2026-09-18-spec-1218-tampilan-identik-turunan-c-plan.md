@@ -1648,7 +1648,7 @@ node --loader tsx server/scripts/relay-8gb-measurement.ts --duration 60 --stream
 ```
 Expected: skrip selesai, CSV tercatat, nol crash.
 
-- [ ] **Step 4: Jalankan run penuh (10 menit) di Mac mini 8 GB — LANGKAH MANUSIA**
+- [x] **Step 4: Jalankan run penuh (10 menit) di Mac mini 8 GB — LANGKAH MANUSIA**
 
 Catat di `docs/superpowers/plans/2026-09-18-spec-1218-ac-c10-hasil-pengukuran.md`: angka CPU/RSS
 puncak & rata-rata, `bufferedAmount` maksimum teramati, apakah plafon S0b (6 stream/4 inflight/
@@ -1719,14 +1719,49 @@ git grep -n "DIRANCANG.*SPEC-1218\|SPEC-1218.*DIRANCANG" -- internal/docs/
 ```
 Expected: nol hasil.
 
-- [ ] **Step 7: Smoke manual — dua instance nyata (bukan mock)**
+- [x] **Step 7: Smoke manual — dua instance nyata (bukan mock)**
 
-Dua `HANOMAN_HOME`, dua port, hub + klien beneran (pola smoke turunan A/B): grant `sessions:read`
-di klien → dari hub buka `ClientsScreen` → tombol "Buka" → `RemoteInstanceView` → buktikan
-`TerminalPane` menerima keluaran live tmux nyata, tak mengirim `resize` (DevTools Network WS
-frames), dan `RemoteBanner` menolak render saat protokol klien sengaja dibedakan (matikan
-`RELAY_PROTOCOL` sementara di satu sisi, rebuild, buktikan gate `AC-C7` menolak). Catat hasil
-smoke (lulus/gagal + apa yang diperbaiki) di pesan commit Step 8 — bukan diklaim tanpa dijalankan.
+Dijalankan: dua `HANOMAN_HOME`/port nyata (18797 hub, 18798 klien) di mesin ini, grant
+`sessions:read` di klien, sesi tmux nyata (`hanoman-smoke1218sess`) berjalan di klien, Chrome
+headless disetir lewat CDP (`--remote-debugging-port`) — dari hub buka `/clients` → klik tombol
+"Buka" (bukan mock event, `button.click()` sungguhan lewat `Runtime.evaluate`) → `RemoteInstanceView`.
+
+**Dua bug NYATA ditemukan dan diperbaiki** (rinciannya di ADR-0165 §10, catatan "Bug nyata
+ditemukan"): (1) `TerminalPane` mode remote meminta tiket WS lewat `apiHook` yang ter-rebase ke
+klien alih-alih hub langsung → 401 tanpa henti; (2) dispatcher klien tak pernah menyetel
+`RELAY_MODE_HEADER` saat `injectWS` → gate men-default ke `"write"` → grant baca-saja selalu 403;
+(3) (ditemukan sesudah #1/#2 diperbaiki) dispatcher membungkus MENTAH amplop protokol lokal
+(`{t:"data",d:"…"}`) sebagai isi `d` frame relay, alih-alih hanya isi `d`-nya — browser jarak jauh
+menggambar JSON literal di layar (melanggar AC-C1 "byte identik"). Ketiganya diperbaiki di
+`server/src/services/relay/dispatcher.ts` + `src/src/screens/TerminalPane.tsx`, test tersentuh
+(`relay-dispatcher.test.ts` 15/15, `terminal-pane.test.tsx` + `terminal-pane-remote.test.tsx`
+64/64) tetap lulus sesudah perbaikan (satu fixture test disesuaikan ke amplop nyata, bukan
+dilonggarkan).
+
+Sesudah perbaikan, dibuktikan lewat frame WS NYATA yang ditangkap CDP Network domain (bukan DOM
+`innerText` — xterm merender ke `<canvas>`, tak pernah muncul di situ): frame `data` yang diterima
+browser berisi ANSI escape sequence tmux asli dan teks `LIVE-TICK-<n>` yang benar-benar dieksekusi
+di tmux klien saat itu juga (bukti live, bukan replay statis); screenshot mengonfirmasi xterm
+merender pane dengan bersih (bukan JSON literal). Total frame TERKIRIM dari browser ke hub selama
+jendela pengamatan: 0 (termasuk nol `resize`) — sesuai AC-C2/C3 mode baca-saja.
+
+**AC-C7 (protocol-mismatch):** `RELAY_PROTOCOL` dinaikkan sementara di `shared/src/relay.ts`
+(1→2) HANYA untuk proses klien (hub yang sudah berjalan tetap memuat nilai lama di memori — teknik
+ini valid karena kedua proses membaca modul yang sama pada waktu boot yang berbeda, tanpa perlu
+checkout terpisah), klien di-restart. Hub nyata mendeteksi mismatch (`GET /api/presence` →
+`control.state:"protocol-mismatch"`). Dibuktikan lewat CDP: tombol "Buka" di `ClientsScreen`
+otomatis men-disable dengan `title="Versi protokol tak cocok"`, dan `button.click()` sungguhan pada
+tombol disabled itu TIDAK membuka `RemoteInstanceView` (DOM tetap di daftar device, bukan
+"Sedang melihat klien..."). Catatan jujur: `RemoteInstanceView` yang SUDAH terbuka SEBELUM mismatch
+tidak flip live ke state error saat mismatch terjadi di tengah sesi — `openDevice` di
+`ClientsScreen` adalah snapshot `useState` yang tak disinkronkan ulang dari `shown.devices`;
+device baru diperiksa ulang untuk protocol-mismatch pada KLIK berikutnya. Ini bukan pelanggaran
+AC-C7 (yang menuntut gerbang SEBELUM membuka, bukan revalidasi berkelanjutan selagi terbuka — beda
+tanggung jawab dari `revalidateWsPrincipal`, ADR-0165 §6) tapi dicatat sebagai gap kecil untuk kerja
+lanjutan, bukan diklaim tertutup di sini. `RELAY_PROTOCOL` dikembalikan ke `1` sesudah verifikasi
+(`git diff` bersih atas berkas ini).
+
+Dua instance dan Chrome dimatikan bersih sesudah smoke (per-PID, bukan `pkill -f`).
 
 - [x] **Step 8: Commit BERSAMA (atau segera sesudah) commit kode terkait**
 

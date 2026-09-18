@@ -152,7 +152,11 @@ describe("dispatcher relay — jalur open (SPEC-1218 · AC-C2/C3/C8)", () => {
     const { d, sent } = harnessWS(async (_p, _o, hooks) => {
       const ws = {
         send: (data: string) => synced.push(data),
-        on: (ev: string, cb: any) => { if (ev === "message") setImmediate(() => cb(Buffer.from("scrollback"))); },
+        // Koreksi (smoke manual Task 18 Step 7, AC-C1): pesan `injectWS` adalah AMPLOP protokol
+        // lokal (`{t:"data",d:"…"}`), bukan byte pty mentah — mengirim string polos di sini dulu
+        // lolos test tapi meledak nyata (JSON amplop tercetak literal di layar TerminalPane
+        // jarak jauh). Fixture kini mencerminkan amplop nyata.
+        on: (ev: string, cb: any) => { if (ev === "message") setImmediate(() => cb(Buffer.from(JSON.stringify({ t: "data", d: "scrollback" })))); },
         close: () => {},
       };
       hooks.onOpen(ws as any);

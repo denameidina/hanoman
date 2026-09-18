@@ -5,7 +5,7 @@ import "@xterm/xterm/css/xterm.css";
 import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
-import { useApi, useInstance, useWsTarget } from "../api/instance";
+import { useInstance, useWsTarget } from "../api/instance";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
 import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
 import * as P from "./terminal-predict";
@@ -56,7 +56,6 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   // pane jadi baca-saja — tak ada `onData`/composer/keys yang bisa mengetik ke pty orang lain.
   mode?: "local" | "remote";
 }) {
-  const apiHook = useApi();
   const wsTarget = useWsTarget(`terminal:${sessionId}`);
   const instance = useInstance();
   const canWrite = mode !== "remote" || (instance.kind === "remote" && instance.capabilities.includes("sessions:write"));
@@ -237,8 +236,16 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     }, 100);
 
     const connect = () => {
+      // SPEC-1218 · smoke manual Task 18 Step 7 menemukan bug nyata di sini: `apiHook.issueWsTicket`
+      // (useApi() untuk instance remote) me-rebase ke `/api/devices/<id>/relay/ws-tickets`, yang
+      // DIPROKSI ke mesin KLIEN (devices-relay.ts handler HTTP) dan mengeluarkan tiket dari ticket
+      // store LOKAL klien — bukan dari hub. Tapi `wsTarget.ticketTarget` (`relay:<deviceId>:…`,
+      // useWsTarget) hanya valid dikonsumsi `admitBrowserWs` di HUB (Task 1/2). Tiket klien itu
+      // tak pernah dikenal hub → setiap upgrade WS browser→hub gagal 401 "WebSocket admission
+      // rejected" tanpa henti (menyambung ulang tak pernah berhasil). Tiket relay wajib diminta ke
+      // `/api/ws-tickets` HUB langsung — `api` (singleton lokal), bukan `apiHook` yang di-rebase.
       const ticketPromise = mode === "remote"
-        ? apiHook.issueWsTicket(wsTarget.ticketTarget as any).then((r) => ({ ticket: r.ticket, url: wsTarget.url }))
+        ? api.issueWsTicket(wsTarget.ticketTarget as any).then((r) => ({ ticket: r.ticket, url: wsTarget.url }))
         : api.issueWsTicket(`terminal:${sessionId}`).then((r) => ({
           ticket: r.ticket,
           url: `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${paths.terminalWs(sessionId)}`,

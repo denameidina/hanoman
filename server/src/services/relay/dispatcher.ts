@@ -1,6 +1,6 @@
 import type { FastifyInstance, InjectOptions } from "fastify";
 import {
-  RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MAX_INFLIGHT, RELAY_REQUEST_BODY_MAX_BYTES, RELAY_RESPONSE_MAX_BYTES,
+  RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MAX_INFLIGHT, RELAY_MODE_HEADER, RELAY_REQUEST_BODY_MAX_BYTES, RELAY_RESPONSE_MAX_BYTES,
   grantsCapability, relayBodyAllowed, relayRouteAllowed, remoteCapabilityFor, splitUtf8, utf8Bytes,
   zHubToClientFrame, type HubToClientFrame, type RelayReqFrame,
 } from "@hanoman/shared";
@@ -147,21 +147,51 @@ export function createRelayDispatcher(o: {
     const ok = override ? grantsCapability(grant.capabilities, override) : relayRouteAllowed("GET", f.path);
     if (!ok) { send({ t: "close", sid: f.sid, code: 4403, reason: "capability required" }); return; }
     if (!o.app.injectWS) { send({ t: "close", sid: f.sid, code: 4502, reason: "injectWS tak didukung" }); return; }
-    await o.app.injectWS(f.path, {
-      headers: { host: host(), [RELAY_HEADER]: relaySecret(), [RELAY_ACTOR_HEADER]: encodeRelayActor(f.actor) },
-    }, {
-      onOpen: (ws) => {
-        streams.set(f.sid, { mode: f.mode, ws });
-        send({ t: "opened", sid: f.sid, geometry: paneGeometryFor(f.path) });
-        ws.on("message", (raw: Buffer) => {
-          for (const part of splitUtf8(raw.toString("utf8"))) send({ t: "data", sid: f.sid, d: part });
-        });
-        ws.on("close", (code: number, reason: Buffer) => {
-          streams.delete(f.sid);
-          send({ t: "close", sid: f.sid, code, reason: reason?.toString() });
-        });
-      },
-    });
+    // Koreksi (smoke manual Task 18 Step 7): `RELAY_MODE_HEADER` tak pernah disetel di sini
+    // sebelumnya — `admitRemoteRequest` (gate.ts) lalu men-default `mode` ke "write" untuk SETIAP
+    // open, jadi grant baca-saja (`sessions:read` tanpa `sessions:write`) selalu gagal 403
+    // "capability required" walau AC-C1 menuntut mirror baca-saja cukup dengan `sessions:read`.
+    // Tanpa header ini `handleOpen` gagal senyap: `injectWS` menolak (403) di dalam promise yang
+    // tak ditangkap try/catch di sini, jadi hub tak pernah menerima `close` — browser menunggu
+    // sampai idle timer 2 dtk (`RELAY_IDLE_STREAM_CLOSE_MS`) baru tertutup tanpa pesan jelas.
+    try {
+      await o.app.injectWS(f.path, {
+        headers: {
+          host: host(), [RELAY_HEADER]: relaySecret(), [RELAY_ACTOR_HEADER]: encodeRelayActor(f.actor),
+          [RELAY_MODE_HEADER]: f.mode,
+        },
+      }, {
+        onOpen: (ws) => {
+          streams.set(f.sid, { mode: f.mode, ws });
+          send({ t: "opened", sid: f.sid, geometry: paneGeometryFor(f.path) });
+          ws.on("message", (raw: Buffer) => {
+            // Koreksi (smoke manual Task 18 Step 7): pesan `injectWS` di sini BUKAN byte pty
+            // mentah — ia adalah AMPLOP protokol terminal LOKAL yang sama dipakai TerminalPane
+            // lokal (`{t:"data",d:"…"}`/`{t:"resize",…}`/`{t:"ack",…}`/dll, `terminal.ts`).
+            // Sebelum koreksi ini, seluruh pesan (termasuk `{`/`}`/`"t":"data"` literalnya)
+            // dibungkus MENTAH sebagai `d` frame relay `data` → browser jarak jauh menggambar
+            // JSON amplopnya sendiri sebagai teks pane (byte TIDAK identik, melanggar AC-C1).
+            // Hanya envelope `t:"data"` yang diteruskan (isi `d`-nya, dibelah ulang per
+            // `splitUtf8`); `resize`/`ack`/`alt`/`exit`/dll SENGAJA dibuang di sini — geometri
+            // pane sudah dikirim sekali saat `opened` (Task 8, `paneGeometryFor`), dan kontrol
+            // lain milik penampil lokal, bukan cermin baca-saja.
+            let m: { t?: string; d?: string };
+            try { m = JSON.parse(raw.toString("utf8")); } catch { return; }
+            if (m.t !== "data" || typeof m.d !== "string") return;
+            for (const part of splitUtf8(m.d)) send({ t: "data", sid: f.sid, d: part });
+          });
+          ws.on("close", (code: number, reason: Buffer) => {
+            streams.delete(f.sid);
+            send({ t: "close", sid: f.sid, code, reason: reason?.toString() });
+          });
+        },
+      });
+    } catch (e) {
+      // `app.injectWS` menolak (mis. gate `admitRemoteRequest` 403) — hub HARUS diberi tahu,
+      // bukan dibiarkan menunggu idle timer. Kode 4403 dipakai konsisten dengan cabang gate di atas.
+      send({ t: "close", sid: f.sid, code: 4403, reason: (e as Error).message ?? "injectWS gagal" });
+      return;
+    }
     void appendEvent({ kind: "remote.stream", level: "info", msg: `open ${f.path}`, data: { actor: f.actor, path: f.path, mode: f.mode, sid: f.sid } });
   }
 

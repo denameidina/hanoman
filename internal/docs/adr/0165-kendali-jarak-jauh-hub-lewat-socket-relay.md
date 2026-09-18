@@ -9,10 +9,14 @@ satu sesi lintas instance (`/devices/:deviceId/relay/*`, `StartSessionModal` tar
 mode=remote baca-saja tanpa `resize`, `SpecDocsModal`/`IdeReadPanel` lewat `useApi()`), §6 grup
 `/events/ws` terbatas per-klien (`attach({groups})`), §10 backpressure — plafon awal (6 stream/4
 inflight/256 KiB kredit/64 KiB refill/1 MiB `bufferedAmount`/32 KiB per frame/12.000 frame-menit)
-**provisional, pending pengukuran 8 GB penuh** (Task 17 SPEC-1218: run singkat 60 dtk di mesin dev
-lulus tanpa pelanggaran plafon, tapi run PENUH 10 menit di Mac mini 8 GB — LANGKAH MANUSIA — belum
-dijalankan; lihat `docs/superpowers/plans/2026-09-18-spec-1218-ac-c10-hasil-pengukuran.md`). Koreksi
-fase Plan atas spec dicatat di spec §S13.
+**lulus pengukuran Mac mini 8 GB (M2, 8 core) nyata 600 dtk/4 stream/RTT 200 ms** (Task 17 SPEC-1218:
+run singkat 60 dtk verifikasi + run PENUH 10 menit keduanya dijalankan; puncak RSS 224.6 MB dari
+8 GB, puncak CPU ≈11% dari satu core, ≈2 844 frame/menit/stream — jauh di bawah plafon 12 000
+frame/menit/device; nol crash/kebocoran dalam 10 menit; siklus kredit/resync §10 berjalan sesuai
+desain) — **tak diamandemen**; lihat rincian dan keterbatasan (6/6 stream & `bufferedAmount`
+non-loopback belum diuji) di
+`docs/superpowers/plans/2026-09-18-spec-1218-ac-c10-hasil-pengukuran.md`. Koreksi fase Plan atas
+spec dicatat di spec §S13.
 
 > **Catatan desain — dua principal `remote` berbeda di bawah nama yang sama (SPEC-1218 Task 2/4 vs
 > Task 7/10):** HUB-side, `remote` di `admitBrowserWs`/`relayControlFor` (§3/§4 di bawah) menilai
@@ -215,8 +219,35 @@ Routing = **target default** dialog Start di hub: device pertama `handledBy` yan
 
 Plafon awal per device: 6 stream, 4 request inflight, respons ≤ 1 MiB, muatan per frame ≤ 32 KiB,
 `bufferedAmount` socket relay ≤ 1 MiB (di atasnya semua stream dianggap tanpa kredit), 12 000
-frame/menit. **Angka awal, bukan kalibrasi.** Plan wajib mengukurnya di Mac mini 8 GB (4 stream,
-RTT 200 ms) dan boleh mengubahnya lewat amandemen ADR ini.
+frame/menit. **Angka awal, dikonfirmasi bukan diamandemen** — pengukuran Mac mini 8 GB (M2, 8 core,
+600 dtk, 4 stream, RTT 200 ms, Task 17 SPEC-1218) tak melanggar satu pun plafon di atas (rincian
+angka: `docs/superpowers/plans/2026-09-18-spec-1218-ac-c10-hasil-pengukuran.md`). 6/6 stream penuh
+dan `bufferedAmount` pada koneksi non-loopback (RTT/kongesti TCP nyata, bukan simulasi `setTimeout`
+di sisi device saja) belum diukur — pengukuran susulan boleh mengamandemen ADR ini bila keduanya
+kelak menunjukkan pelanggaran.
+
+**Bug nyata ditemukan & diperbaiki lewat smoke manual dua-instance (Task 18 Step 7), bukan test
+mock** — keduanya luput dari 5706 test otomatis karena mock berhenti di batas yang salah:
+1. `TerminalPane` (mode `remote`) meminta tiket WS lewat `apiHook.issueWsTicket` (`useApi()`, DASAR
+   di-rebase ke `/api/devices/<id>/relay/ws-tickets`) alih-alih `api.issueWsTicket` (hub lokal).
+   Target tiket `relay:<deviceId>:terminal:<id>` HANYA valid diverifikasi `admitBrowserWs` di HUB
+   (Task 1/2) — versi ter-rebase memproksi permintaan ke KLIEN, yang menerbitkan tiket dari ticket
+   store lokalnya sendiri (tak pernah dikenal hub), sehingga SETIAP upgrade WS browser→hub gagal
+   401 tanpa henti. Diperbaiki: `TerminalPane` kini selalu memakai `api.issueWsTicket` untuk target
+   relay (`src/src/screens/TerminalPane.tsx`).
+2. `RELAY_MODE_HEADER` (dipakai `relay/gate.ts` untuk menilai `sessions:read` vs `sessions:write`)
+   TAK PERNAH disetel dispatcher klien (`handleOpen`, `relay/dispatcher.ts`) saat memanggil
+   `injectWS` — gate lalu men-default `mode` ke `"write"` untuk SETIAP open, sehingga grant
+   baca-saja (`sessions:read` tanpa `sessions:write`) selalu ditolak 403 walau §4 menjamin WS
+   ber-`mode:"read"` cukup `sessions:read`. Diperbaiki: header disetel dari `f.mode` asli; kegagalan
+   `injectWS` (mis. 403 ini) kini juga ditangkap dan dibalas `close 4403` ke hub — sebelumnya
+   `unhandledRejection` senyap, hub menunggu idle timer 2 dtk tanpa pesan jelas.
+3. Pesan `injectWS` dari sesi terminal LOKAL adalah amplop protokol (`{t:"data",d:"…"}`), bukan byte
+   pty mentah — dispatcher lama membungkus SELURUH amplop itu (termasuk `{`/`"t":"data"`-nya
+   sendiri) sebagai isi `d` frame relay, jadi browser jarak jauh menggambar teks JSON literal di
+   pane-nya sendiri (melanggar "byte identik" AC-C1). Diperbaiki: dispatcher kini mem-parse amplop
+   lokal dan HANYA meneruskan isi `d` bila `t === "data"`; `resize`/`ack`/`alt`/dll sengaja dibuang
+   (geometri sudah dikirim sekali saat `opened`, Task 8).
 
 ## Alternatif yang ditolak
 
