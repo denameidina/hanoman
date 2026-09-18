@@ -1066,7 +1066,7 @@ git commit -m "feat(server): tap session.result di recordSessionResult (SPEC-121
 - Consumes: `saveTranscript` (`transcript-store.ts`, sudah ada), `redactText`, `knownSecrets`.
 - Produces: `appendGap(reason: string, opts?: {lost?: number; fromSeq?: string; toSeq?: string}): Promise<void>` (dipakai Task 5/11/13/15); `installEventTap()` diubah agar `onDeath` juga menulis baris lajur `transcript` bila `Setting.data.logShipping.transcript` menyala (dibaca lewat parameter, bukan query Setting langsung dari `pty.ts`-independent module — lihat implementasi: `installEventTap(opts: {transcriptEnabled: () => Promise<boolean>})`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-event-transcript-tap.test.ts
@@ -1105,12 +1105,12 @@ describe("installEventTap onDeath transkrip", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-event-transcript-tap.test.ts`
 Expected: FAIL — `appendGap` bukan export, `installEventTap` belum menerima `opts`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Modify `server/src/services/logs/event-log.ts` — tambahkan sesudah `appendEvent`:
 
@@ -1184,13 +1184,13 @@ belum ada — verifikasi bentuk `d` di `registerSessionHooks`/`SessionHooks` seb
 isi dari sumber yang sama dipakai `saveTranscript` di `session-history.ts` (pane scrollback pada
 saat pane ditutup).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-event-transcript-tap.test.ts server/test/log-event.test.ts`
 Expected: PASS (jalankan juga suite event-log lama bila namanya berbeda — cari dengan
 `ls server/test | grep -i event-log`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/logs/event-log.ts server/test/log-event-transcript-tap.test.ts

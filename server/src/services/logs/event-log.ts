@@ -1,11 +1,13 @@
 import { hostname } from "node:os";
 import { Prisma } from "@prisma/client";
 import {
-  LOCAL_DEVICE_ID, LOG_DATA_MAX_BYTES, LOG_MSG_MAX_BYTES, nextSeq, splitUtf8, utf8Bytes,
+  LOCAL_DEVICE_ID, LOG_DATA_MAX_BYTES, LOG_MSG_MAX_BYTES, nextSeq, redactText, splitUtf8, utf8Bytes,
   type LogEntryView, type LogLane, type LogLevel,
 } from "@hanoman/shared";
 import { prisma } from "../../db";
 import { registerSessionHooks } from "../pty";
+import { knownSecrets } from "./redact-known";
+import { saveTranscript } from "../transcript-store";
 
 /* SPEC-1215 · ADR-0166 · lajur `event` instance ini (`deviceId` "local"). Semua event — lahir/tutup
    sesi, audit aksi jarak jauh, perubahan grant — masuk lewat SATU pintu ini, supaya seq HLC hanya
@@ -64,6 +66,17 @@ export function appendEvent(e: EventInput): Promise<void> {
   return settled;
 }
 
+/** AC-D3/AC-D4 · satu pintu untuk mencatat kehilangan (spool penuh, redaksi gagal, batch ditolak
+    hub). `lost` default 1: kebanyakan pemanggil kehilangan tepat satu entri per kejadian. */
+export async function appendGap(
+  reason: string, opts: { lost?: number; fromSeq?: string; toSeq?: string } = {},
+): Promise<void> {
+  await appendEvent({
+    kind: "log.gap", level: "warn", msg: `celah log: ${reason}`,
+    data: { lost: opts.lost ?? 1, reason, fromSeq: opts.fromSeq ?? null, toSeq: opts.toSeq ?? null },
+  });
+}
+
 type LogRow = Awaited<ReturnType<typeof prisma.logEntry.findMany>>[number];
 
 export function toLogEntryView(r: LogRow): LogEntryView {
@@ -89,7 +102,9 @@ export async function recentAudit(limit = 50): Promise<LogEntryView[]> {
 
 /** `cwd` dan transkrip SENGAJA tak dicatat: keduanya milik mesin ini (alasan yang sama dengan
     presence, ADR-0148). Transkrip menyeberang hanya lewat lajur `transcript` opt-in (SPEC-1217). */
-export function installEventTap(): () => void {
+export function installEventTap(
+  opts: { transcriptEnabled: () => Promise<boolean> } = { transcriptEnabled: async () => false },
+): () => void {
   return registerSessionHooks({
     onBirth: (b) => {
       void appendEvent({
@@ -104,6 +119,27 @@ export function installEventTap(): () => void {
         msg: `sesi ${d.sessionId} ditutup (exit ${d.exitCode ?? "?"})`, sessionId: d.sessionId,
         data: { exitCode: d.exitCode },
       });
+      void (async () => {
+        if (!(await opts.transcriptEnabled())) return;
+        const text = d.transcript ?? "";
+        if (!text.trim()) return;
+        let redacted: string;
+        try { redacted = redactText(text, knownSecrets()); }
+        catch { await appendGap("redaction-failed"); return; }
+        const saved = await saveTranscript(redacted).catch(() => null);
+        if (!saved || !saved.key) return;
+        await appendEvent({
+          kind: "session.transcript", sessionId: d.sessionId,
+          msg: `transkrip sesi ${d.sessionId}`, data: { bytes: saved.bytes, truncated: saved.truncated },
+        }).then(async () => {
+          // `appendEvent` tak mengembalikan id baris; tulis transcriptKey lewat update terakhir
+          // yang cocok (deviceId "local", lane "event", kind "session.transcript", sessionId).
+          await prisma.logEntry.updateMany({
+            where: { deviceId: LOCAL_DEVICE_ID, lane: "event", kind: "session.transcript", sessionId: d.sessionId },
+            data: { transcriptKey: saved.key },
+          });
+        });
+      })();
     },
   });
 }
