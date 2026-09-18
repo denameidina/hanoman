@@ -1,7 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { z } from "zod";
-import { PRESENCE_MAX_FRAMES_PER_MIN, RELAY_MAX_FRAMES_PER_MIN, zCapacityFrame, zPresenceFrame } from "@hanoman/shared";
+import {
+  LOG_BODY_MAX_BYTES, LOG_DECODED_MAX_BYTES, PRESENCE_MAX_FRAMES_PER_MIN, RELAY_MAX_FRAMES_PER_MIN,
+  zCapacityFrame, zPresenceFrame,
+} from "@hanoman/shared";
 import { prisma } from "../db";
 import { requireDeviceToken } from "../services/device-auth";
 import { verifyDeviceToken } from "../services/device-token";
@@ -111,6 +114,43 @@ export default async function (app: FastifyInstance) {
       }
     }
     return { results };
+  });
+
+  // D5 · scope terenkapsulasi: bodyLimit sendiri, TAK menyentuh parser JSON global dipakai /sync/push,pull.
+  //
+  // content-encoding/ukuran diperiksa DI PARSER (bukan di handler): parsing berjalan sebelum
+  // preHandler, jadi memeriksa di handler membuat `requireDeviceToken` menjawab 401 duluan untuk
+  // request tanpa token — 415/413 harus tetap benar terlepas dari otentikasi perangkat.
+  app.register(async (logs) => {
+    // app.ts sudah memasang parser application/json global (`parseAs: "string"`, tanpa bodyLimit
+    // khusus) — child scope mewarisinya, jadi override di sini WAJIB melepasnya dulu di scope ini.
+    logs.removeContentTypeParser("application/json");
+    logs.addContentTypeParser("application/json", { parseAs: "buffer", bodyLimit: LOG_BODY_MAX_BYTES },
+      (req, body, done) => {
+        const enc = String(req.headers["content-encoding"] ?? "");
+        if (enc && enc !== "gzip") {
+          const err = Object.assign(new Error("unsupported content-encoding"), { statusCode: 415 });
+          done(err, undefined);
+          return;
+        }
+        if (!enc) { done(null, body as Buffer); return; }
+        try {
+          const decoded = gunzipSync(body as Buffer, { maxOutputLength: LOG_DECODED_MAX_BYTES });
+          done(null, decoded);
+        } catch (e) {
+          if ((e as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE") {
+            done(Object.assign(new Error("decoded body too large"), { statusCode: 413 }), undefined);
+            return;
+          }
+          done(Object.assign(new Error("invalid gzip"), { statusCode: 400 }), undefined);
+        }
+      });
+
+    logs.post("/sync/logs", { preHandler: requireDeviceToken }, async (_req, reply) => {
+      // Task 12 mengisi parsing zLogBatch + ingest penuh di sini (req.body sudah berupa Buffer
+      // JSON terdekompresi, hasil parser di atas).
+      return reply.code(501).send({ error: "not implemented" });
+    });
   });
 
   // SPEC-268 · ADR-0066 · pemicu sync manual (tombol UI). Cookie-authed lewat gate global (path ini

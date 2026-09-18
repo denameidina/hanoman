@@ -1208,7 +1208,7 @@ git commit -m "feat(server): appendGap() + tap lajur transcript di onDeath (SPEC
 **Interfaces:**
 - Produces: scope terenkapsulasi `app.register(async (logs) => {...})` di dalam `routes/sync.ts` yang memasang `addContentTypeParser` dan menolak `content-encoding` asing (415) / body > 1 MiB (413) SEBELUM route `POST /sync/logs` didefinisikan penuh (Task 12 mengisi handler; task ini hanya memasang parser dan route stub yang membalas `501` sementara, supaya AC-S4 bisa diuji terisolasi dari ingest).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-sync-parser.test.ts
@@ -1250,12 +1250,12 @@ describe("parser POST /api/sync/logs", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-sync-parser.test.ts`
 Expected: FAIL — route `/api/sync/logs` 404.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Tambahkan di `server/src/routes/sync.ts`, di dalam `export default async function (app: FastifyInstance)`,
 sesudah route `/sync/push` yang sudah ada:
@@ -1290,19 +1290,19 @@ app.register(async (logs) => {
 413 sebelum handler dipanggil — cukupi lewat opsi `bodyLimit` di `addContentTypeParser`, bukan cek
 manual `raw.length`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-sync-parser.test.ts`
 Expected: PASS — bila 413 body mentah tak otomatis dari `bodyLimit` (tergantung versi Fastify menolak
 di level connection vs content-type-parser), tambahkan pengecekan eksplisit `raw.length > LOG_BODY_MAX_BYTES`
 di awal handler sebelum blok content-encoding.
 
-- [ ] **Step 5: Run test sync lama (regresi nol pada /sync/push,pull)**
+- [x] **Step 5: Run test sync lama (regresi nol pada /sync/push,pull)**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/sync.route.test.ts`
 Expected: PASS tanpa perubahan.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/sync.ts server/test/log-sync-parser.test.ts
