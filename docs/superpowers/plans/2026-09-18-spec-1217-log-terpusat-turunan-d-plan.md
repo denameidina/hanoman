@@ -975,7 +975,7 @@ git commit -m "feat(server): tap launch.rejected di titik lempar (SPEC-1217 D2/A
 **Interfaces:**
 - Consumes: `appendEvent`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-session-result-tap.test.ts
@@ -1004,12 +1004,12 @@ describe("session.result tap", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-session-result-tap.test.ts`
 Expected: FAIL — `session.result` belum ditulis.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Modify `server/src/services/session-result.ts`:
 
@@ -1042,12 +1042,12 @@ export async function recordSessionResult(input: Record<string, unknown>): Promi
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-session-result-tap.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/session-result.ts server/test/log-session-result-tap.test.ts
