@@ -2870,57 +2870,57 @@ git commit -m "test(server): skrip pengukuran ingest sintetis AC-S9 + hasil (SPE
 
 **Interfaces:** Tak ada — perubahan naratif/status murni, bukan kode.
 
-- [ ] **Step 1: `api-contract.md`**
+- [x] **Step 1: `api-contract.md`**
 
 Buka `internal/docs/architecture/api-contract.md:1414-1418`. Ganti baris yang menandai
 `POST /sync/logs`, `/logs*`, dan `remote-control` (tanpa `shipping`) sebagai "belum dilayani/DIRANCANG"
 menjadi deskripsi kontrak nyata: method, path, request/response, capability (`COOKIE_ONLY` untuk
 `/logs*`, device-token untuk `/sync/logs`) — persis bentuk yang sudah diimplementasikan Task 10-14.
 
-- [ ] **Step 2: `data-model.md`**
+- [x] **Step 2: `data-model.md`**
 
 Buka `internal/docs/architecture/data-model.md:288-296,740-760`. Cabut penanda "DIRANCANG" pada
 `LogEntry`/`LogCursor` (sudah mendarat sejak turunan A, tapi bagian ingest/pencarian/retensi turunan
 D-nya baru mendarat sekarang) dan tambahkan ringkasan alur ingest (redaksi lapis 2, transaksi HWM,
 kuota) yang sekarang nyata di kode.
 
-- [ ] **Step 3: `stack.md`**
+- [x] **Step 3: `stack.md`**
 
 Buka `internal/docs/architecture/stack.md:41-48`. Perbarui ringkasan "log terpusat" dari
 proyeksi/rencana menjadi status mendarat: shipper dikuras tick sync, spool NDJSON, sadapan console,
 redaksi dua lapis, retensi lewat `runRetention()`.
 
-- [ ] **Step 4: `frontend-implementation.md`**
+- [x] **Step 4: `frontend-implementation.md`**
 
 Buka `internal/docs/frontend/frontend-implementation.md:45-59`. Konfirmasi tab "Log" di layar Klien
 (sudah disebut di sana sebagai rencana) sekarang mendarat sebagai `LogsPanel.tsx`; tambahkan catatan
 kursor tanpa `total` dan blok retensi.
 
-- [ ] **Step 5: ADR-0166**
+- [x] **Step 5: ADR-0166**
 
 Buka `internal/docs/adr/0166-log-terpusat-ingest-satu-arah.md`. Ubah status dari "sebagian mendarat"
 (turunan A saja) menjadi "mendarat penuh" (turunan A+D). Tambahkan baris hasil pengukuran AC-S9
 (Task 21) sebagai bukti §7 terverifikasi, bukan lagi proyeksi.
 
-- [ ] **Step 6: `agent-integration.md`**
+- [x] **Step 6: `agent-integration.md`**
 
 Buka `internal/docs/agent-integration.md`. Tambahkan `logs` ke daftar top-level `COOKIE_ONLY` (cermin
 `remote-control` yang sudah terdaftar), dengan catatan singkat kenapa (audit yang bisa memalsukan
 seluruh jejak sesi tak boleh didelegasikan ke capability agent token).
 
-- [ ] **Step 7: `SKILL.md`**
+- [x] **Step 7: `SKILL.md`**
 
 Buka `internal/skills/hanoman/SKILL.md`. Cari bagian yang menyebut log terpusat/relay/sync sebagai
 rencana turunan D dan perbarui jadi status mendarat, dengan pointer ke plan ini dan ADR-0166.
 
-- [ ] **Step 8: Tautkan di index**
+- [x] **Step 8: Tautkan di index**
 
 Buka `internal/docs/README.md`. Tambahkan/perbarui tautan ke plan ini
 (`docs/superpowers/plans/2026-09-18-spec-1217-log-terpusat-turunan-d-plan.md`) dan hasil pengukuran
 AC-S9 di seksi yang relevan (SPEC-1217 / log terpusat), mengikuti format entri index yang sudah ada
 di berkas itu.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add internal/docs/architecture/api-contract.md internal/docs/architecture/data-model.md \

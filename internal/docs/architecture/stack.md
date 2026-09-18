@@ -38,15 +38,21 @@ jatuh tempo. Terukur: `AskUserQuestion` → lead mulai menyusun turun dari lanta
 tick) ke **32–164 ms**, dan `capture-pane` saat tak ada yang bertanya jadi **nol**. Tak ada kanal
 WebSocket baru: keadaan tanya untuk pet menumpang frame `leadAsks` di `/api/events/ws` (ADR-0039).
 
-**Kendali jarak jauh & log terpusat — turunan A mendarat (SPEC-1215 ·
+**Kendali jarak jauh & log terpusat — turunan A + D mendarat (SPEC-1215/SPEC-1217 ·
 [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) ·
-[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)); B/C/D = SPEC-1216/SPEC-1218/SPEC-1217.**
+[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)); B/C = SPEC-1216/SPEC-1218 belum digarap.**
 - **Relay.** Klien yang grant lokalnya menyala membuka socket **kedua** ke hub,
   `/api/sync/relay/ws` (device token). Hub mengirim request ke route REST/WS **yang sudah ada**, dan
   klien menjalankannya ulang in-process lewat `app.inject`/`app.injectWS`. Tanpa katalog RPC, tanpa
   queue/worker, dan tanpa hub menyambung ke klien (tembus NAT).
-- **Log.** Mengalir satu arah lewat `POST /api/sync/logs` pada tick sync yang sudah ada, dengan dedup
-  high-water mark per device di SQLite hub.
+- **Log — shipper klien.** Sadapan (`event`: tap sesi lahir/tutup; `server`: sadapan console,
+  dipasang/dicabut tanpa restart mengikuti toggle `Setting.logShipping.server`) menulis ke spool
+  NDJSON `$HANOMAN_HOME/log-spool/<lane>/` (rotasi per ukuran segmen, plafon total). Shipper
+  mengurasnya di tick sync yang sudah ada lewat `POST /api/sync/logs` (redaksi lapis 1 di klien,
+  lapis 2 lagi di hub), dengan dedup high-water mark `(deviceId,lane,seq)` per device di SQLite hub.
+- **Log — pencarian & retensi.** `GET /api/logs` (kursor opaque, tanpa `total`) dan
+  `GET /api/logs/:id/transcript` melayani dashboard; `GET|PUT /api/logs/retention` mengatur umur per
+  lajur dan plafon byte, dieksekusi `runRetention()` (baris dulu, lalu berkas transkrip/spool yatim).
 - **Infrastruktur.** Tak ada timer baru selain tick snapshot sesi 3 dtk yang sudah dibayar presence;
   kini ia juga berjalan selama socket sync putus.
 

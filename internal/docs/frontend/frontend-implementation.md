@@ -42,9 +42,11 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
   `screens/presence-map.ts`. Ia **beda** dari `HandledByChips` (ADR-0135): yang itu penetapan MANUAL
   yang menyeberang sync, yang ini keadaan LIVE yang tak pernah masuk DB. Daftar nama kosong →
   **nol elemen**, ujung terakhir gerbang "instance tanpa sync tak berubah tampilannya".
-- **Kendali & tampilan klien dari hub — sebagian mendarat** (SPEC-1215 ·
+- **Kendali & tampilan klien dari hub — turunan A + D mendarat** (SPEC-1215/SPEC-1217 ·
   [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [spec §S4.11](../../../docs/superpowers/specs/2026-09-14-spec-1215-hub-orkestrasi-klien-design.md)),
-  `RemoteControlPanel` (Settings → Kendali jarak jauh) mendarat di turunan A tanpa toggle lajur log (SPEC-1217); sisanya DIRANCANG untuk SPEC-1216/SPEC-1218.
+  `RemoteControlPanel` (Settings → Kendali jarak jauh) mendarat dengan **tiga toggle lajur log**
+  (`event`/`server`/`transcript`, `event` default nyala — SPEC-1217 AC-D1); relay B/C
+  (`/devices/:deviceId/relay/*`, tiket `relay:*`) tetap DIRANCANG untuk SPEC-1216/SPEC-1218.
   - **Pabrik API.** `createApi({ base })` menggantikan prefix `/api` dengan
     `/api/devices/<deviceId>/relay`; `api = createApi()` tetap untuk 61 importir.
   - **`InstanceContext`** (`local | remote`) memberi `useApi()` dan `useWsTarget()` (URL + tiket
@@ -53,10 +55,14 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
   - **`TerminalPane` remote:** tak pernah mengirim `resize`, menerapkan frame `geometry`, baca-saja
     tanpa `sessions:write`, dan resync `4009` lewat reconnect yang ada.
   - **Layar Klien:** menampilkan `control` & `capacity`, tombol **Buka** (`RemoteInstanceView` +
-    banner "Sedang melihat klien X · vN"), dan tab **Log** (`LogsPanel`, kursor).
+    banner "Sedang melihat klien X · vN"), dan tab **Device | Log** (default Device — SPEC-1217
+    D6/AC-S8). Tab **Log** merender `LogsPanel.tsx` (SPEC-1217 AC-D5/D8/D10): pencarian
+    (device/project/spec/lane/level/kind/teks), kursor opaque (tanpa `total`), buka transkrip per
+    entri, dan blok retensi (`GET|PUT /api/logs/retention`).
   - **`StartSessionModal` di hub:** mendapat pemilih target (default `handledBy` ∩ online ∩
     `sessions:spawn` ∩ kapasitas); "Mulai tetap" tak dirender untuk target remote.
-  - **Settings klien:** `RemoteControlPanel` (grant, lajur log, status, audit).
+  - **Settings klien:** `RemoteControlPanel` (grant, tiga toggle lajur log, status relay/pengiriman,
+    audit 50 terbaru).
 - **Start dari Backlog tetap di Backlog** setelah sesi berhasil dibuat; modal tertutup dan toast sukses
   tampil. Operator berpindah ke Terminal hanya lewat aksi eksplisit **Buka sesi** (SPEC-341).
 - Filter project di Backlog **dan PRD** dibaca dari satu state `projectFilter` milik `App`, bukan state

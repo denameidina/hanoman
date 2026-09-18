@@ -171,6 +171,11 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
   pun yang bisa menulisnya bisa membuka eksekusi agen di mesin ini atas perintah hub. Cookie-only apa
   pun method-nya, dan `PUT /api/settings` pun tak bisa mengubah kunci `remoteControl`/`logShipping`/
   `logRetention`
+- `/api/logs*` (`GET /api/logs`, `GET /api/logs/:id/transcript`, `GET|PUT /api/logs/retention`) —
+  log terpusat & audit lintas klien (SPEC-1217/ADR-0166): ini jejak audit "siapa melakukan apa di
+  mesin mana", dan agen yang bisa membacanya atau memendekkan retensinya bisa menyembunyikan atau
+  memalsukan seluruh jejak sesi. Cookie-only apa pun method-nya — beda dari `POST /api/sync/logs`
+  (pengiriman batch **dari** klien), yang tetap device-token seperti jalur sync lain
 - `POST /api/update/apply` dan tulis lain di bawah prefix status (`/api/limits`, `/api/update`,
   `/api/events`, `/api/fs`, `/api/health`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya
   cookie-only

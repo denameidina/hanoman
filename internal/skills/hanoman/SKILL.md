@@ -112,7 +112,8 @@ Pakai skill lebih sempit saat task cocok:
   `DeviceToken` belum dicabut → instalasi satu mesin nol perubahan tampilan. Reconnect sync ikut naik
   jadi backoff 1→30 dtk ber-jitter, sekaligus menambal timer reconnect yang **tak pernah dibatalkan**
   `stopSyncClient()` (socket yatim ber-token lama sesudah `applySyncConfig()`).
-- **Kendali jarak jauh hub → klien, turunan A** (SPEC-1215/**ADR-0165**+**ADR-0166**): klien yang grant
+- **Kendali jarak jauh hub → klien, turunan A + D mendarat** (SPEC-1215/SPEC-1217 ·
+  **ADR-0165**+**ADR-0166**): klien yang grant
   LOCAL-only `Setting.data.remoteControl`-nya dinyalakan cookie lewat `PUT /api/remote-control` membuka
   socket KEDUA `ws://<hub>/api/sync/relay/ws` (device token); grant mati = nol upgrade. Hub mengirim `req`
   ke route yang SUDAH ada dan dispatcher klien menjalankannya lewat `app.inject`. **Lima gotcha:**
@@ -123,8 +124,18 @@ Pakai skill lebih sempit saat task cocok:
   belum punya body; (3) `PUT /api/settings` mempertahankan `remoteControl`/`logShipping`/`logRetention`;
   (4) `registerSessionHooks` kini aditif dan mengembalikan pencabut — jangan "mereset" dengan `{}`;
   (5) `DELETE /device-tokens/:id` menutup socket sync + relay sebelum 204 lewat `device-sockets.ts`.
-  Audit `remote.*`/`grant.changed` hidup di `LogEntry` `deviceId:"local"`. Route HTTP relay di hub,
-  stream tampilan, dan log terpusat: SPEC-1216 / SPEC-1218 / SPEC-1217.
+  Audit `remote.*`/`grant.changed` hidup di `LogEntry` `deviceId:"local"`. Route HTTP relay di hub
+  dan stream tampilan tetap SPEC-1216 / SPEC-1218 (belum digarap).
+- **Log terpusat mendarat (turunan D, SPEC-1217/ADR-0166):** shipper klien mengalir satu arah lewat
+  `POST /api/sync/logs` pada tick sync yang sudah ada — lajur `event` (tap sesi lahir/fase/selesai,
+  audit remote, default nyala), `server` (sadapan `console`, spool NDJSON di
+  `$HANOMAN_HOME/log-spool/`, **nol tulisan SQLite per baris di klien**, dipasang/dicabut tanpa
+  restart mengikuti toggle `RemoteControlPanel`), dan `transcript` (transkrip sesi ditutup). Hub:
+  redaksi lapis 2, dedup high-water mark `(deviceId,lane,seq)` transaksional, kuota
+  `LOG_INGEST_MAX_PER_HOUR`/device → `429`. Dashboard: tab **Log** di Layar Klien
+  (`src/src/screens/LogsPanel.tsx`) — pencarian, kursor tanpa `total`, buka transkrip, blok retensi
+  (`GET|PUT /api/logs/retention`, `runRetention()` yang sudah ada). Pengukuran AC-S9 (dampak ingest
+  pada p95 `GET /specs`) dan hasilnya: `docs/superpowers/plans/2026-09-18-spec-1217-ac-s9-hasil-pengukuran.md`.
 - **State tampilan tiap halaman persisten di storage, berkunci per layar** (SPEC-740/**ADR-0115**;
   ADR-0107 & ADR-0071 **ditegakkan**, tak ada yang dicabut): filter & pencarian, paginasi, posisi
   scroll, item terpilih & panel terbuka bertahan lintas navigasi **dan** refresh/buka-ulang browser.
