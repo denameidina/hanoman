@@ -4,6 +4,7 @@ import { RELAY_PROTOCOL, RELAY_UNSUPPORTED_RETRY_MS, type RelayLinkState, type R
 import { nextBackoff, withJitter } from "../backoff";
 import { appendEvent } from "../logs/event-log";
 import { getSetting } from "../settings";
+import { syncNow } from "../sync-client";
 import { runningVersion } from "../update";
 import { createRelayDispatcher, type InjectableApp, type RelayDispatcher } from "./dispatcher";
 
@@ -74,7 +75,7 @@ async function connect(gen: number): Promise<void> {
   const url = `${target.base.replace(/^http/, "ws").replace(/\/$/, "")}/api/sync/relay/ws`;
   setState("connecting");
   const s = new WebSocket(url, { headers: { authorization: `Bearer ${target.token}` } });
-  const d = createRelayDispatcher({ app, send: (json) => { if (s.readyState === 1) s.send(json); } });
+  const d = createRelayDispatcher({ app, send: (json) => { if (s.readyState === 1) s.send(json); }, syncOnce: () => syncNow() });
   sock = s;
   dispatcher = d;
   let settled = false;

@@ -1074,13 +1074,13 @@ git commit -m "feat(spec-1216): POST /specs/:id/done gerbang presence lapis kedu
 - Produces: `createRelayDispatcher(o)` bertambah field opsional `syncOnce` — aditif, pemanggil
   lama (test A yang sudah ada) tak berubah karena defaultnya `() => syncNow()`.
 
-- [ ] **Step 1: Baca pola test dispatcher yang sudah ada**
+- [x] **Step 1: Baca pola test dispatcher yang sudah ada**
 
 ```bash
 sed -n '1,40p' server/test/relay-dispatcher.test.ts
 ```
 
-- [ ] **Step 2: Tulis test yang gagal**
+- [x] **Step 2: Tulis test yang gagal**
 
 ```ts
 // server/test/relay-dispatcher.spec404.test.ts
@@ -1142,7 +1142,7 @@ describe("relay dispatcher retry spec-404 (SPEC-1216 · AC-B11)", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan, pastikan gagal**
+- [x] **Step 3: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1150,7 +1150,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`syncOnce` option tak dikenal type-wise / retry tak terjadi).
 
-- [ ] **Step 4: Implementasi di `dispatcher.ts`**
+- [x] **Step 4: Implementasi di `dispatcher.ts`**
 
 Tambah opsi & pemakaiannya:
 
@@ -1217,7 +1217,7 @@ closure `record` untuk percobaan PERTAMA saat retry terjadi: ubah tanda tangan `
 sebelum retry, alih-alih hanya via cabang di atas — sesuaikan agar 404 pertama tetap tercatat
 sendiri seperti T5 minta.)
 
-- [ ] **Step 5: Suntik `syncOnce` di `relay/client.ts`**
+- [x] **Step 5: Suntik `syncOnce` di `relay/client.ts`**
 
 `client.ts:78`, di `connect()`:
 
@@ -1227,7 +1227,7 @@ import { syncNow } from "../sync-client";
 const d = createRelayDispatcher({ app, send: (json) => { if (s.readyState === 1) s.send(json); }, syncOnce: () => syncNow() });
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan lulus (dan test dispatcher A lama tetap hijau)**
+- [x] **Step 6: Jalankan test, pastikan lulus (dan test dispatcher A lama tetap hijau)**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1235,7 +1235,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/relay/dispatcher.ts server/src/services/relay/client.ts server/test/relay-dispatcher.spec404.test.ts

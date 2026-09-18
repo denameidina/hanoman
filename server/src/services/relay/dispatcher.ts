@@ -41,10 +41,14 @@ export function createRelayDispatcher(o: {
   host?: () => string;
   audit?: (e: RemoteRequestAudit) => void;
   now?: () => number;
+  // SPEC-1216 · ADR-0165 §11 · disuntik relay/client.ts (default syncNow di sana, bukan di sini —
+  // dispatcher tak boleh mengimpor sync-client langsung, cermin kenapa audit disuntikkan).
+  syncOnce?: () => Promise<unknown>;
 }) {
   const host = o.host ?? defaultHost;
   const audit = o.audit ?? ((e: RemoteRequestAudit) => { void appendEvent(e); });
   const now = o.now ?? Date.now;
+  const syncOnce = o.syncOnce ?? (async () => {});
   const inflight = new Map<string, { cancelled: boolean }>();
 
   const send = (frame: Record<string, unknown>): void => {
@@ -61,10 +65,10 @@ export function createRelayDispatcher(o: {
 
   async function handleReq(f: RelayReqFrame): Promise<void> {
     const started = now();
-    const record = (status: number): void => audit({
+    const record = (status: number, extra: Record<string, unknown> = {}): void => audit({
       kind: "remote.request", level: status >= 500 ? "error" : status >= 400 ? "warn" : "info",
       msg: `${f.method} ${f.path} → ${status}`,
-      data: { actor: f.actor, method: f.method, path: f.path, status, ms: now() - started },
+      data: { actor: f.actor, method: f.method, path: f.path, status, ms: now() - started, ...extra },
     });
     if (inflight.has(f.id)) return; // id kembar dari hub — frame pertama yang menang
     if (inflight.size >= RELAY_MAX_INFLIGHT) { fail(f.id, 429, "relay-busy"); record(429); return; }
@@ -81,7 +85,8 @@ export function createRelayDispatcher(o: {
     const entry = { cancelled: false };
     inflight.set(f.id, entry);
     try {
-      const res = await o.app.inject({
+      const isSpawn = f.method === "POST" && f.path === "/api/terminal/sessions" && f.body && typeof f.body === "object" && "spec" in (f.body as any);
+      const doInject = () => o.app.inject({
         method: f.method, url,
         headers: {
           host: host(), [RELAY_HEADER]: relaySecret(), [RELAY_ACTOR_HEADER]: encodeRelayActor(f.actor),
@@ -89,7 +94,22 @@ export function createRelayDispatcher(o: {
         },
         ...(payload !== undefined ? { payload } : {}),
       });
-      record(res.statusCode);
+      let res = await doInject();
+      let retried = false;
+      if (isSpawn && res.statusCode === 404 && entry.cancelled === false) {
+        const parsed = (() => { try { return JSON.parse(res.body); } catch { return null; } })();
+        if (parsed?.error === "spec not found") {
+          record(404, { attempt: 1 }); // percobaan pertama, tercatat sendiri
+          await syncOnce().catch(() => {});
+          if (!entry.cancelled) { res = await doInject(); retried = true; }
+        }
+      }
+      if (!retried) record(res.statusCode);
+      else audit({
+        kind: "remote.request", level: res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info",
+        msg: `${f.method} ${f.path} → ${res.statusCode}`,
+        data: { actor: f.actor, method: f.method, path: f.path, status: res.statusCode, ms: now() - started, retried: true },
+      });
       if (entry.cancelled) return;
       if (utf8Bytes(res.body) > RELAY_RESPONSE_MAX_BYTES) { fail(f.id, 502, "relay-response-too-large"); return; }
       reply(f.id, res.statusCode, String(res.headers["content-type"] ?? "application/octet-stream"), res.body);
