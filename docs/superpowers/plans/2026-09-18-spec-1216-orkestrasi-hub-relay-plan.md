@@ -797,7 +797,7 @@ git commit -m "feat(spec-1216): remoteSessionVerdict murni + recentlyOffline reg
   opsional keempat `remoteSession` — Task 6 memakai `remoteSessionVerdict` yang sama (bukan
   `LaunchError`, karena `specs.ts:/done` bukan jalur `startSpecSession`).
 
-- [ ] **Step 1: Verifikasi field yang dipakai `lastResultDeviceId` benar-benar ada**
+- [x] **Step 1: Verifikasi field yang dipakai `lastResultDeviceId` benar-benar ada**
 
 ```bash
 grep -n "model SessionResult" -A 15 server/prisma/schema.prisma
@@ -808,7 +808,7 @@ Catat nama field device (`deviceId`?) dan cara query "hasil terakhir untuk spec 
 sesuaikan Step 3 dengan skema NYATA, bukan tebakan. Bila field berbeda dari yang diasumsikan di
 spec teknis, catat penyimpangannya di pesan commit Step 6 sebagai koreksi kecil (bukan re-desain).
 
-- [ ] **Step 2: Tulis test integrasi yang gagal**
+- [x] **Step 2: Tulis test integrasi yang gagal**
 
 Tambahkan ke `server/test/remote-session-gate.test.ts` (bagian 3):
 
@@ -831,7 +831,7 @@ describe("startSpecSession gerbang presence (SPEC-1216 · AC-B5/B6)", () => {
 (Sesuaikan `makeSpec`/`makeProject` dengan helper nyata di `server/test/factory.ts` — jalankan
 `grep -n "export.*makeSpec\|export.*makeProject" server/test/factory.ts` untuk tanda tangan pastinya.)
 
-- [ ] **Step 3: Jalankan, pastikan gagal**
+- [x] **Step 3: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -839,7 +839,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`LaunchError` tanpa kind `remote-session`, atau sesi tetap lahir).
 
-- [ ] **Step 4: Implementasi di `session-launch.ts`**
+- [x] **Step 4: Implementasi di `session-launch.ts`**
 
 ```ts
 // tambahan import di header
@@ -897,7 +897,7 @@ Gerbang ditanam SESUDAH `const pane = await getSessionAsync(id);` dan cabang re-
     try { assertLaunchApproved(spec); }
 ```
 
-- [ ] **Step 5: Isi `lastResultDeviceId` dari `SessionResult` (sesuai skema Step 1)**
+- [x] **Step 5: Isi `lastResultDeviceId` dari `SessionResult` (sesuai skema Step 1)**
 
 Ganti `lastResultDeviceId: null` dengan query nyata — contoh bila `SessionResult` punya kolom
 `deviceId` dan `specId`, urut `createdAt desc`, `take: 1`:
@@ -914,7 +914,7 @@ const lastResultDeviceId = lastResult?.deviceId && lastResult.deviceId !== LOCAL
 sama sekali, catat itu sebagai temuan dan gunakan `lastResultDeviceId: null` — poin 3
 `remoteSessionVerdict` jadi no-op, bukan bug, karena poin 1/2 tetap menggerbang.)
 
-- [ ] **Step 6: Jalankan test, pastikan lulus**
+- [x] **Step 6: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -922,7 +922,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 7: Mapping status di `terminal.ts`**
+- [x] **Step 7: Mapping status di `terminal.ts`**
 
 Di blok `catch (e) { if (e instanceof LaunchError) { ... } }` (`terminal.ts`, dekat
 `if (e.kind === "blocked") ...`), tambah dua cabang SEBELUM `not-approved`:
@@ -950,7 +950,7 @@ const r = await startSpecSession(launchable, {
 });
 ```
 
-- [ ] **Step 8: Tulis test route untuk 409 remote-session/confirm-required, jalankan, lulus**
+- [x] **Step 8: Tulis test route untuk 409 remote-session/confirm-required, jalankan, lulus**
 
 Tambahkan test di `server/test/terminal.route.test.ts` yang mereproduksi fixture presence lewat
 `recordPresence` lalu memanggil `POST /terminal/sessions`, meng-assert status 409 dan body persis.
@@ -961,7 +961,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/src/services/session-launch.ts server/src/routes/terminal.ts shared/src/dto.ts server/test/remote-session-gate.test.ts server/test/terminal.route.test.ts

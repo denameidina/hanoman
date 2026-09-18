@@ -469,6 +469,9 @@ export const zTerminalSession = z.union([
     // SPEC-447 · ADR-0093 — lewati gerbang dependency. Hanya jalur manusia; UI hanya
     // mengirimkannya sesudah operator melihat daftar pemblokirnya.
     force: z.boolean().optional(),
+    // SPEC-1216 · ADR-0165 §6 — lewati gerbang presence satu-sesi (confirm-required). Hanya
+    // jalur manusia; UI hanya mengirimkannya sesudah operator melihat dialog konfirmasi.
+    confirmRemote: z.boolean().optional(),
   }),
 ]);
 

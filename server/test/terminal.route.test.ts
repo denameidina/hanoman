@@ -15,6 +15,8 @@ import { phaseFilePath } from "../src/services/session-phases";
 import { sweepRepo, __resetReaper } from "../src/services/worktree-reaper";
 import { encodeRelayActor } from "../src/services/relay/gate";
 import { relaySecret } from "../src/services/relay/secret";
+import { issueDeviceToken } from "../src/services/device-token";
+import { recordPresence, recordRecentlyOffline, __resetPresence } from "../src/services/presence/registry";
 import { resetDb, makeProject, makeSpec, makeSetting } from "./factory";
 
 // Lihat pty.test.ts: /bin/cat mati karena --dangerously-skip-permissions ilegal baginya.
@@ -1112,6 +1114,49 @@ describe("POST /terminal/sessions · force dari remote (SPEC-1216 · AC-B3)", ()
     expect(res.statusCode).toBe(403);
     const after = await prisma.spec.findUnique({ where: { id: spec.id } });
     expect(after!.launchApprovedBy).toBeNull();
+  });
+});
+
+// SPEC-1216 · ADR-0165 §5/§6 · gerbang presence lapis pertama (startSpecSession) via route HTTP.
+describe("POST /terminal/sessions · gerbang presence remote (SPEC-1216 · AC-B5/B6)", () => {
+  beforeEach(async () => {
+    __resetPresence();
+    await makeSetting({ scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } } });
+  });
+
+  it("sesi working di device lain → 409 {error:'remote-session', remoteSession}", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const u = await prisma.user.create({ data: { email: "dgate1@d.co", passwordHash: "x:y" } });
+    const t = await issueDeviceToken(u.id, "laptop");
+    const spec = await makeSpec({ id: "SPEC-T4", projectId: "p1", stage: "planned" });
+    recordPresence(t.id, [{ sessionId: "s1", projectId: "p1", specId: spec.id, agent: "claude", status: "working", startedAt: new Date().toISOString() }]);
+    const res = await app.inject({ method: "POST", url: "/api/terminal/sessions", payload: { spec: spec.id, flow: "feature" } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "remote-session", remoteSession: { deviceId: t.id, name: "laptop", sessionId: "s1" } });
+  });
+
+  it("device terakhir dipakai kini offline (recentlyOffline) → 409 {error:'confirm-required'}", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const spec = await makeSpec({ id: "SPEC-T5", projectId: "p1", stage: "planned" });
+    recordRecentlyOffline({ deviceId: "dOff", name: "mesin-mati", specId: spec.id, sessionId: "s2" });
+    const res = await app.inject({ method: "POST", url: "/api/terminal/sessions", payload: { spec: spec.id, flow: "feature" } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      error: "confirm-required",
+      remoteSession: { deviceId: "dOff", name: "mesin-mati", sessionId: "s2", offline: true },
+    });
+  });
+
+  it("confirmRemote:true melewati gerbang confirm-required", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const spec = await makeSpec({ id: "SPEC-T6", projectId: "p1", stage: "planned" });
+    recordRecentlyOffline({ deviceId: "dOff2", name: "mesin-mati-2", specId: spec.id, sessionId: "s3" });
+    const res = await app.inject({
+      method: "POST", url: "/api/terminal/sessions",
+      payload: { spec: spec.id, flow: "feature", confirmRemote: true },
+    });
+    expect(res.statusCode).toBe(201);
+    killSession("spec-t6");
   });
 });
 

@@ -111,6 +111,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
           method: parsed.data.method,                                         // SPEC-734 · ADR-0113
           phaseOverrides: parsed.data.phaseOverrides,                         // ADR-0164 · override subagent per sesi
           force: parsed.data.force,                                           // SPEC-447 · ADR-0093
+          confirmRemote: "confirmRemote" in parsed.data ? parsed.data.confirmRemote : undefined,  // SPEC-1216 · ADR-0165 §6
         });
         // SPEC-394 · ADR-0084 · `resumed` hanya muncul saat peluncuran benar-benar MELANJUTKAN
         // artefak sesi sebelumnya. Aditif — klien yang hanya membaca `id` tak terpengaruh.
@@ -122,6 +123,13 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
           // bisa menyebut SIAPA yang ditunggu dan menawarkan "Mulai tetap" (force).
           if (e.kind === "blocked")
             return reply.code(409).send({ error: e.message, blocked: true, blockers: e.blockers });
+          // SPEC-1216 · ADR-0165 §6 · gerbang presence satu-sesi: sesi lain sungguh hidup di
+          // device lain (409 keras, tak bisa dilewati) vs device itu terakhir terlihat kini
+          // offline (409 lunak, UI menawarkan konfirmasi via `confirmRemote`).
+          if (e.kind === "remote-session")
+            return reply.code(409).send({ error: "remote-session", remoteSession: e.remoteSession });
+          if (e.kind === "confirm-required")
+            return reply.code(409).send({ error: "confirm-required", remoteSession: { ...e.remoteSession, offline: true } });
           if (e.kind === "not-approved") return reply.code(403).send({ error: e.message });
           return e.kind === "needs-bind"
             ? reply.code(400).send({ error: e.message, needsBind: true })

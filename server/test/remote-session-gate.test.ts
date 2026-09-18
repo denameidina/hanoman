@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { LOCAL_DEVICE_ID, type PresenceDeviceView } from "@hanoman/shared";
 import { remoteSessionVerdict } from "../src/services/presence/remote-session";
-import { recordRecentlyOffline, recentlyOffline, __resetPresence } from "../src/services/presence/registry";
+import { recordRecentlyOffline, recentlyOffline, recordPresence, __resetPresence } from "../src/services/presence/registry";
+import { startSpecSession, LaunchError } from "../src/services/session-launch";
+import { DEFAULT_SETTING } from "../src/services/settings";
+import { issueDeviceToken } from "../src/services/device-token";
+import { prisma } from "../src/db";
+import { makeSpec, makeProject, makeSetting, resetDb } from "./factory";
 
 const dev = (id: string, over: Partial<PresenceDeviceView> = {}): PresenceDeviceView => ({
   deviceId: id, name: id, local: id === LOCAL_DEVICE_ID, online: true, lastSeenAt: null,
@@ -65,5 +70,30 @@ describe("recentlyOffline registry (SPEC-1216 · AC-B6)", () => {
       { deviceId: "dA", name: "laptop", specId: "SPEC-1", sessionId: "s1", at: 1000 },
     ]);
     expect(recentlyOffline("SPEC-1", 1000 + 25 * 3600_000)).toEqual([]);
+  });
+});
+
+describe("startSpecSession gerbang presence (SPEC-1216 · AC-B5/B6)", () => {
+  // Catatan penyimpangan (Task 5): mesin uji ini bisa punya sesi tmux tersisa dari sesi hanoman
+  // lain (ADR-0161 launchGuard nyata), jadi tanpa mematikan launchGuard `withSessionAdmission`
+  // (yang membungkus startSpecSession LEBIH LUAR dari gerbang presence) menolak duluan dengan
+  // LaunchAdmissionError "capacity" — bukan LaunchError yang diuji. Pola sama terminal.route.test.ts.
+  beforeEach(async () => {
+    await resetDb(); __resetPresence();
+    await prisma.deviceToken.deleteMany(); await prisma.user.deleteMany();
+    await makeSetting({ scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } } });
+  });
+
+  it("sesi working di device lain untuk spec yang sama → LaunchError remote-session, TAK memanggil createSession", async () => {
+    const project = await makeProject();
+    const spec = await makeSpec({ projectId: project.id, launchApprovedAt: new Date(), launchApprovedBy: "user:a@b.co" });
+    // Catatan penyimpangan (Task 5): `presenceView()` (server/src/services/presence/view.ts)
+    // HANYA memuat device yang punya baris `DeviceToken` DB — `recordPresence` ke registry
+    // in-memory saja (pola plan) tak cukup untuk device muncul di `view.devices`. Perlu token
+    // sungguhan supaya deviceId-nya bisa "dilihat" jalur presenceView() yang sama dipakai gerbang.
+    const u = await prisma.user.create({ data: { email: "d@d.co", passwordHash: "x:y" } });
+    const t = await issueDeviceToken(u.id, "laptop");
+    recordPresence(t.id, [{ sessionId: "s1", projectId: project.id, specId: spec.id, agent: "claude", status: "working", startedAt: new Date().toISOString() }]);
+    await expect(startSpecSession(spec, { flow: "feature" })).rejects.toMatchObject({ kind: "remote-session" });
   });
 });

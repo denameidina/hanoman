@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import type { Spec } from "@prisma/client";
 import { realGit, startPrompt, continuePrompt, resumePrompt, startGoalPrompt, resolveGoalCondition, buildPhaseAgents, fromAuditOf, specContext, goalContext, type Flow, type Autonomy, type VerifyScope, type ResumeCtx } from "@hanoman/runner";
-import { resolveMethod, readSpecMethod, stampSpecMethod, isGoalShapedFlow, type Agent, type PhaseOverrides } from "@hanoman/shared";
+import { resolveMethod, readSpecMethod, stampSpecMethod, isGoalShapedFlow, LOCAL_DEVICE_ID, type Agent, type PhaseOverrides } from "@hanoman/shared";
 import { resolveRepoDir } from "./local-binding";
 import { getSetting } from "./settings";
 import { ensureCodexTrust } from "./codex-trust";
@@ -12,6 +12,9 @@ import { phaseFilePath, decisionFilePath, readPhases } from "./session-phases";
 import { specAttachmentsDir, syncSpecAttachmentsDir } from "./spec-attachment-dir";
 import { assertLaunchApproved } from "./launch-authority";
 import { withSessionAdmission } from "./session-launch-gate";
+import { presenceView } from "./presence/view";
+import { remoteSessionVerdict } from "./presence/remote-session";
+import { recentlyOffline } from "./presence/registry";
 
 // Re-ekspor supaya pemanggil (governor, test) punya satu titik impor jalur peluncuran.
 export { sessionIdForSpec } from "./pty";
@@ -21,8 +24,13 @@ export { sessionIdForSpec } from "./pty";
 // (route) atau menandai antrean gagal (governor).
 export class LaunchError extends Error {
   // SPEC-447 · `blockers` hanya terisi untuk kind "blocked"; route memetakannya ke body 409.
-  constructor(message: string, readonly kind: "needs-bind" | "worktree" | "blocked" | "not-approved",
-              readonly blockers: SpecBlocker[] = []) { super(message); }
+  constructor(
+    message: string,
+    readonly kind: "needs-bind" | "worktree" | "blocked" | "not-approved" | "remote-session" | "confirm-required",
+    readonly blockers: SpecBlocker[] = [],
+    // SPEC-1216 · ADR-0165 §6 · terisi untuk kind "remote-session"/"confirm-required".
+    readonly remoteSession?: { deviceId: string; name: string; sessionId: string | null },
+  ) { super(message); }
 }
 export type StartSpecResult = { id: string; reused?: boolean; resumed?: boolean };
 
@@ -79,11 +87,35 @@ export async function startSpecSession(
     // SPEC-447 · ADR-0093 · lewati gerbang dependency. HANYA jalur manusia yang memasoknya
     // (POST /terminal/sessions); governor & denyut lead TAK PERNAH memaksa.
     force?: boolean;
+    // SPEC-1216 · ADR-0165 §6 · lewati gerbang presence satu-sesi. HANYA jalur manusia yang
+    // memasoknya (POST /terminal/sessions), cermin `force`. Governor & denyut lead tak pernah.
+    confirmRemote?: boolean;
   },
 ): Promise<StartSpecResult> {
   const id = sessionIdForSpec(spec.id);
   return withSessionAdmission({ id, force: opts.force }, async () => {
     const pane = await getSessionAsync(id);
+    // SPEC-1216 · ADR-0165 §5/§8 · gerbang satu sesi lintas instance. HANYA saat tak ada pane
+    // LOKAL (re-attach ke sesi yang sedang berjalan di mesin INI tak boleh ikut ditolak). Berdiri
+    // SEBELUM approveLaunch/blockersForSpec — penolakan tak boleh meninggalkan efek. Di klien
+    // (bukan hub) presence/registry.ts hanya pernah terisi LOCAL_DEVICE_ID lewat presenceView(),
+    // jadi verdict di sini selalu "ok" tanpa flag "saya hub" terpisah — test menegakkan ini.
+    if (!pane) {
+      const view = await presenceView();
+      const lastResult = await prisma.sessionResult.findFirst({
+        where: { specId: spec.id }, orderBy: { createdAt: "desc" }, select: { deviceId: true },
+      });
+      const lastResultDeviceId = lastResult?.deviceId && lastResult.deviceId !== LOCAL_DEVICE_ID
+        ? { deviceId: lastResult.deviceId, name: lastResult.deviceId } : null;
+      const verdict = remoteSessionVerdict({
+        specId: spec.id, now: Date.now(), devices: view.devices,
+        recentlyOffline: recentlyOffline(spec.id),
+        lastResultDeviceId,
+      });
+      if (verdict.kind === "remote-session") throw new LaunchError(`${spec.id} sedang berjalan di ${verdict.remote.name}`, "remote-session", [], verdict.remote);
+      if (verdict.kind === "confirm-required" && !opts.confirmRemote)
+        throw new LaunchError(`${spec.id} terakhir berjalan di ${verdict.remote.name} yang kini offline`, "confirm-required", [], verdict.remote);
+    }
     try { assertLaunchApproved(spec); }
     catch (error) { throw new LaunchError((error as Error).message, "not-approved"); }
     // SPEC-213 · binding lokal per-device menang atas Project.repoDir (AC-8). Tanpa checkout lokal →
