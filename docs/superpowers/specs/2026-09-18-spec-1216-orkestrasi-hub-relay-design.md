@@ -167,3 +167,378 @@ Seluruh SC di atas diverifikasi lewat **test otomatis** (`pnpm vitest --run` pad
 di akhir Execute: boot server, curl `/api/devices/:deviceId/relay/terminal/sessions` end-to-end antara
 dua instance lokal (hub + klien) untuk membuktikan SC1/SC2 nyata, bukan hanya lulus mock. Tak ada SC
 yang dianggap terpenuhi oleh klaim tanpa bukti test/curl yang benar-benar dijalankan.
+
+## Spec teknis (fase Spec 3/5)
+
+**Fase penulis bagian ini:** Spec (3/5)
+
+> Bagian ini **tidak mengunci kontrak baru**. Kontraknya sudah dikunci spec SPEC-1215 §S4.4/§S4.5/
+> §S4.6/§S4.11/§S5/§S6/§S9 dan ADR-0165 §6/§8/§9. Yang dikunci di sini adalah **cara mendaratkannya di
+> kode yang benar-benar ada di base `61bc006c`**: berkas, tanda tangan fungsi, urutan gerbang, dan
+> bentuk test. Setiap angka/kosakata yang berselisih dengan SPEC-1215/ADR-0165 adalah salah tulis di
+> sini, bukan keputusan baru — koreksinya lewat amandemen ADR-0165.
+
+### T1. Arsitektur turunan B di atas fondasi A
+
+```
+Browser hub ──cookie──▶ HUB Fastify
+  StartSessionModal (target picker)        routes/devices-relay.ts   (BARU, COOKIE_ONLY, top "devices")
+  aksi sesi via InstanceContext remote  │    └─ requestRelay()  ← sudah ada (A, hub.ts:99)
+  createApi({base})                     │  services/presence/registry.ts  + recentlyOffline (BARU)
+                                        │  services/session-launch.ts     + gerbang presence (BARU)
+                                        │  routes/specs.ts  POST /specs/:id/done + gerbang presence
+                                        ▼  services/logs/event-log.ts     ← audit relay.request (A)
+                         WS /api/sync/relay/ws  (A)
+KLIEN Fastify
+  services/relay/dispatcher.ts  + retry spec-404 → syncNow() sekali (BARU)
+  app.ts gate `remote` (A) → routes/terminal.ts  + force 403 (BARU)
+  services/launch-authority.ts  + cabang principal `remote` (BARU)
+  startSpecSession apa adanya → worktree LAHIR DI KLIEN
+```
+
+Tiga invarian yang menyandera bentuk di atas:
+
+1. **Gerbang presence hanya berarti di hub.** `presence/registry.ts` di klien hanya pernah diisi
+   `recordPresence(LOCAL_DEVICE_ID, …)` oleh `presenceView()`; peta device remote hanya terisi di
+   handler `/api/sync/ws` yang cuma hidup di hub. Karena itu gerbang ditanam **di dalam**
+   `startSpecSession` (satu jalur untuk route manual, governor scheduler, dan denyut lead) **tanpa**
+   flag "saya hub" — di klien ia terbukti no-op karena tak ada entri device ≠ `local`. Test menegakkan
+   ini, bukan komentar.
+2. **Presence tak pernah meluluskan** (ADR-0165 §8). Gerbang hanya menambah cabang **penolakan**;
+   tak ada jalur baru yang melewati `assertLaunchApproved`, gerbang dependency, atau
+   `withSessionAdmission`.
+3. **Worktree lahir di klien** karena hub tak pernah memanggil `startSpecSession` untuk target remote —
+   ia hanya meneruskan HTTP. Itu sifat `requestRelay` + `app.inject`, bukan sesuatu yang route baru
+   boleh "optimalkan".
+
+### T2. Komponen (berkas yang lahir/berubah di turunan B)
+
+| Berkas | Perubahan | AC |
+|---|---|---|
+| `server/src/routes/devices-relay.ts` (baru) | route `GET|POST|PUT|PATCH|DELETE /devices/:deviceId/relay/*`; pemetaan `RelayError` → status; audit `relay.request` | B1, B9, B10 |
+| `server/src/services/agent-capabilities.ts` | top `devices` **eksplisit** `COOKIE_ONLY` (hari ini jatuh ke `null` → cookie-only secara kebetulan; dijadikan baris + test) | B1 |
+| `server/src/services/launch-authority.ts` | `launchPrincipal` mengenal `source.remote` | B1, B2 |
+| `server/src/routes/terminal.ts` | `force` dari `req.remote` → 403 sebelum `approveLaunch`; `confirmRemote` diteruskan; `LaunchError` baru → 409 | B3, B5, B6 |
+| `server/src/services/session-launch.ts` | `LaunchError` kind `remote-session`/`confirm-required` + payload `remoteSession`; gerbang presence | B4, B5, B6 |
+| `server/src/services/presence/registry.ts` | `recordRecentlyOffline`/`recentlyOffline(specId)` (memori, ≤ 24 jam) diisi dari `dropPresence`/sapuan `presenceEntries` | B6 |
+| `server/src/services/presence/remote-session.ts` (baru) | fungsi murni `remoteSessionVerdict()` — satu-satunya tempat presence dibaca sebagai gerbang | B5, B6 |
+| `server/src/routes/specs.ts` | `POST /specs/:id/done`: gerbang presence lapis kedua + `by` aktor remote | B6, B9 |
+| `server/src/services/relay/dispatcher.ts` | retry spec-404 → satu `syncOnce` lalu satu ulang | B11 |
+| `server/src/services/relay/client.ts` | menyuntik `syncOnce: () => syncNow()` ke dispatcher | B11 |
+| `src/src/api/client.ts` | `createApi({ base })` + `export const api = createApi()` | B7, B9 |
+| `src/src/api/instance.tsx` (baru) | `InstanceContext`, `useInstance`, `useApi`, `useWsTarget` | B7, B9 |
+| `src/src/api/start-targets.ts` (baru) | fungsi murni `startTargets(view, handledBy)` → kandidat + alasan | B7, B8 |
+| `src/src/App.tsx` (`StartSessionModal`) | pemilih target, default, alasan tak terpilih, tanpa force di target remote, 409 `remote-session`/`confirm-required` | B7, B8 |
+
+Tak ada perubahan skema Prisma, tak ada migration, tak ada konstanta `shared` baru selain tipe.
+
+### T3. Kontrak — route relay hub (`routes/devices-relay.ts`)
+
+```ts
+// didaftarkan di scope /api yang sudah ada; lima method, satu handler
+app.route({ method: ["GET","POST","PUT","PATCH","DELETE"], url: "/devices/:deviceId/relay/*", handler })
+
+// 1. principal: COOKIE_ONLY. req.user wajib; req.agent/req.remote → 403 (jatuh dari gate app.ts)
+// 2. device: prisma.deviceToken.findFirst({ where: { id, revokedAt: null } })
+//    tak ada / dicabut                         → 404 { error, relay: "unknown-device" }
+// 3. content-type non-JSON pada method bertubuh → 415 { error, relay: "unsupported-media" }
+// 4. path  = "/api/" + params["*"]              (tanpa "..", ≤ 2048 — zRelayPath shared, A)
+//    query = req.raw.url setelah "?" (≤ 2048)
+//    body  = req.body apa adanya (JSON), undefined untuk GET/DELETE tanpa tubuh
+// 5. actor = { hubOrigin, userId: req.user.id, email: req.user.email }
+//    hubOrigin = req.headers.origin ?? `${req.protocol}://${req.headers.host}` (≤ 200)
+// 6. timeout = RELAY_SPAWN_TIMEOUT_MS bila (POST && path === "/api/terminal/sessions")
+//              selain itu RELAY_REQ_TIMEOUT_MS
+// 7. requestRelay(deviceId, { method, path, query, body, actor }, { timeoutMs })
+// 8. sukses → reply.code(res.status)
+//               .header("content-type", res.contentType ?? "application/json")
+//               .header("x-hanoman-device", deviceId).send(res.body)   // body TEKS apa adanya
+```
+
+Pemetaan `RelayError.kind` → status (satu tabel, dipakai test tabel-driven):
+
+| `kind` | status | body |
+|---|---|---|
+| `offline` | 503 | `{ error, relay:"offline", presence: "online"|"offline" }` (dari `presenceView`/registry) |
+| `protocol-mismatch` | 409 | `{ error, relay:"protocol-mismatch" }` |
+| `too-large` | 413 | `{ error, relay:"too-large" }` |
+| `busy` | 429 | `{ error, relay:"busy" }` |
+| `protocol` | 502 | `{ error, relay:"protocol" }` |
+| `timeout` | 504 | `{ error, relay:"timeout" }` — `sendCancel` sudah dilakukan `hub.ts:112` |
+
+Audit (hub, `deviceId: "local"`, lajur `event`): `appendEvent({ kind: "relay.request", level: status ≥ 500 ? "error" : status ≥ 400 ? "warn" : "info", msg: "<METHOD> <path> → <status>", specId?, data: { deviceId, actor: { userId, email }, method, path, status, ms } })`. `specId` diisi bila path memuat `/specs/:id` atau body memuat `spec`. Audit ditulis **untuk setiap hasil**, termasuk 404/503/504 — dan itu satu-satunya tulisan state yang boleh terjadi di jalur galat (AC-B10).
+
+Catatan yang mengikat: route ini **tak** menyentuh Prisma selain `deviceToken.findFirst` (baca) dan
+`logEntry.create` (audit). Test AC-B10 membuktikannya dengan snapshot `count()` seluruh model non-log
+sebelum/sesudah.
+
+### T4. Kontrak — principal, `force`, dan gerbang satu sesi
+
+**`launchPrincipal` (klien).**
+
+```ts
+type PrincipalSource = {
+  user?: { id: string; email: string } | null;
+  agent?: { id: string; capabilities: string[] } | null;
+  remote?: { actor: RelayActor; capabilities: string[] } | null;   // = req.remote (gate A)
+};
+// urutan: user → remote → agent
+// remote ber-`sessions:spawn` → `remote:<email>@<hubOrigin>`; tanpa itu → null (tak ada approval)
+```
+
+`req.remote` sudah dideklarasikan `services/relay/gate.ts:11`, jadi `launchPrincipal(req)` tetap
+dipanggil dengan `req` yang sama di `routes/terminal.ts:99`.
+
+**`force` (klien).** `routes/terminal.ts:88` diperluas: `if ((req.agent || req.remote) && parsed.data.force)`
+→ 403, tetap **sebelum** `approveLaunch`. Alasannya bukan gaya: 403 sesudah approval meninggalkan
+`launchApprovedBy` atas peluncuran yang ditolak (pelajaran ADR-0161 yang sudah tertulis di komentar
+baris itu).
+
+**Gerbang presence (hub) — `remoteSessionVerdict()` murni.**
+
+```ts
+type RemoteSessionVerdict =
+  | { kind: "ok" }
+  | { kind: "remote-session";   remote: { deviceId: string; name: string; sessionId: string } }
+  | { kind: "confirm-required"; remote: { deviceId: string; name: string; sessionId: string | null; offline: true } };
+
+remoteSessionVerdict(input: {
+  specId: string;
+  devices: PresenceDeviceView[];      // presenceView() — sudah memuat name, online, sessions
+  recentlyOffline: { deviceId: string; name: string; specId: string; sessionId: string | null; at: number }[];
+  lastResultDeviceId: { deviceId: string; name: string } | null;  // SessionResult.deviceId terakhir, Spec.stage ≠ done
+  now: number;
+}): RemoteSessionVerdict
+```
+
+Urutan penilaian (mengikat):
+1. sesi `working|waiting` untuk `specId` di device `deviceId !== LOCAL_DEVICE_ID` → `remote-session`
+   (device pertama menurut urutan `presenceView`, yang sudah `createdAt asc`);
+2. entri `recentlyOffline` untuk `specId` ber-umur ≤ 24 jam → `confirm-required`;
+3. `lastResultDeviceId` ≠ null dan device itu tak online → `confirm-required` (`sessionId: null`);
+4. selain itu `ok`. **`ok` bukan izin** — pemanggil tetap menjalankan seluruh gerbang lain.
+
+`recentlyOffline` hidup di `presence/registry.ts` sebagai peta memori (prinsip ADR-0148, tanpa baris
+DB): diisi saat sebuah device punah — baik lewat `dropPresence()` (socket sync tutup) maupun lewat
+sapuan ambang di `presenceEntries()` — dengan sesi `working|waiting` terakhirnya; entri kedaluwarsa
+24 jam dibuang saat dibaca. Restart hub mengosongkannya; poin 3 adalah jaring untuk kasus itu.
+
+**Penempatan di `startSpecSession`** (`session-launch.ts`, di dalam `withSessionAdmission`):
+SESUDAH `const pane = await getSessionAsync(id)` dan cabang re-attach, SEBELUM gerbang dependency
+`blockersForSpec` dan `killSession`. Alasan: pane hidup lokal = re-attach (AC-B4 di klien), dan
+penolakan tak boleh meninggalkan efek.
+
+```ts
+// opts aditif: confirmRemote?: boolean — HANYA jalur manusia yang memasoknya, cermin `force`
+if (!pane) {
+  const v = remoteSessionVerdict({ … });
+  if (v.kind === "remote-session") throw new LaunchError(msg, "remote-session", [], v.remote);
+  if (v.kind === "confirm-required" && !opts.confirmRemote)
+    throw new LaunchError(msg, "confirm-required", [], v.remote);
+}
+```
+
+- `opts.force` **tidak** melewatkan gerbang ini: `force` milik gerbang dependency ADR-0093, dan `force`
+  dari remote sudah 403 lebih dulu.
+- Governor scheduler & denyut lead tak pernah mengirim `confirmRemote` → item itu dilewati apa adanya
+  (`LaunchError` sudah jalur kegagalan yang mereka pahami).
+
+`LaunchError` bertambah dua `kind` dan satu field opsional; `blockers` tetap di posisi ketiga agar
+pemanggil lama tak berubah.
+
+**Route mapping (hub, `routes/terminal.ts`):**
+
+```
+kind "remote-session"    → 409 { error: "remote-session",   remoteSession: { deviceId, name, sessionId } }
+kind "confirm-required"  → 409 { error: "confirm-required", remoteSession: { deviceId, name, sessionId, offline: true } }
+```
+
+**`POST /specs/:id/done` (`routes/specs.ts:338`).** Sesudah cek pane lokal yang sudah ada
+(`live && confirm !== true` → 409), ditambah lapis kedua dengan `remoteSessionVerdict` yang sama:
+verdict ≠ `ok` dan `confirm !== true` → `409 { error: "confirm-required", session: { id: sessionId, deviceId, name } }`.
+`by` = `req.user?.email ?? (req.remote ? \`remote:${req.remote.actor.email}@${req.remote.actor.hubOrigin}\` : "system")`.
+
+### T5. Kontrak — retry spec-404 di dispatcher klien
+
+`createRelayDispatcher` menerima opsi baru `syncOnce?: () => Promise<unknown>` (default `() => syncNow()`,
+disuntik `relay/client.ts:77`). Di `handleReq`, sesudah `inject` pertama:
+
+```
+retry HANYA bila SEMUA benar:
+  f.method === "POST" ∧ f.path === "/api/terminal/sessions" ∧ body memuat `spec`
+  ∧ res.statusCode === 404 ∧ body JSON ber-`error === "spec not found"`
+maka: await syncOnce() (galat ditelan) → inject KEDUA dengan argumen identik → respons kedua yang diteruskan
+```
+
+Tepat satu `syncOnce` dan tepat satu pengulangan per frame `req`; `entry.cancelled` dihormati sebelum
+dan sesudah `syncOnce`. Audit `remote.request` dicatat untuk hasil **akhir** dengan `data.retried: true`;
+percobaan pertama dicatat `level: "info"`, `data.attempt: 1` agar jejak 404-nya tak hilang.
+
+### T6. Kontrak frontend
+
+**`createApi({ base })` (`src/src/api/client.ts`).** Objek `api` (164 metode, `client.ts:190`) dipindah
+utuh ke dalam `export function createApi(o: { base?: string } = {})`; `export const api = createApi()`
+dipertahankan untuk 61 importir (koreksi S1 butir 13). Satu-satunya perubahan perilaku ada di **tiga**
+tempat pemanggil `fetch` (`client.ts:156`, `:167`, `:330`), yang semuanya melewati:
+
+```ts
+const base = o.base ?? "/api";
+const rebase = (u: string) => (u.startsWith("/api/") || u === "/api" ? base + u.slice(4) : u);
+```
+
+Diffnya besar tetapi mekanis (indentasi + tiga baris); test `instance.test.tsx` membuktikan rebase atas
+sampel metode `j`, `jUpload`, dan `getAgentDoc` dengan `fetch` di-mock.
+
+**`InstanceContext` (`src/src/api/instance.tsx`, baru).**
+
+```ts
+type Instance =
+  | { kind: "local" }
+  | { kind: "remote"; deviceId: string; name: string; version: string; protocol: number;
+      capabilities: RemoteCapability[] };
+useInstance(): Instance
+useApi(): ReturnType<typeof createApi>        // memo per deviceId; local → `api`
+useWsTarget(local: "events" | `terminal:${string}`): { url: string; ticketTarget: string }
+// remote → { url: `/api/devices/${deviceId}/relay/…`, ticketTarget: `relay:${deviceId}:${local}` }
+```
+
+`useWsTarget` mendarat di B sebagai kontrak murni (diuji), konsumennya (`TerminalPane`) milik turunan C.
+Tanpa provider, `useInstance()` = `{ kind: "local" }` — 61 importir lama tak berubah.
+
+**`startTargets()` (`src/src/api/start-targets.ts`, baru; murni, diuji tabel).**
+
+```ts
+startTargets(view: PresenceView, handledBy: HandledByEntry[]):
+  { deviceId: string; name: string; eligible: boolean; reason?: TargetReason }[]
+type TargetReason = "offline" | "control-off" | "protocol-mismatch" | "no-spawn" | "capacity-full";
+```
+
+- urutan: "hub ini" (`LOCAL_DEVICE_ID`) lebih dulu, lalu device `handledBy` sesuai urutannya, lalu
+  device lain;
+- `eligible` = `online` ∧ `control?.state === "available"` ∧ `capabilities` memuat `sessions:spawn`
+  ∧ kapasitas tak penuh; `reason` mengambil **kondisi pertama yang gagal** menurut urutan di atas;
+- kapasitas penuh = `capacity` ada dan (`!enabled` ∨ `liveAgentCount >= maxConcurrent` ∨
+  `loadStatus === "unavailable"` ∨ (`loadPerCore !== null` ∧ `loadPerCore > maxLoadPerCore`));
+  `capacity === null` **bukan** alasan menolak (angka belum tiba ≠ penuh) — presence tak pernah
+  meluluskan, tapi ia juga tak boleh mengarang kepenuhan;
+- `online` datang apa adanya dari `presenceView` (ambang `PRESENCE_OFFLINE_MS` 90 dtk, AC-B8).
+
+**`StartSessionModal` (`src/src/App.tsx:87`).**
+- baris pemilih target di atas pemilih model; **default** = kandidat `handledBy` pertama yang
+  `eligible`, selain itu "hub ini". Pemilihan default hanya mengubah state — tak ada `api.startSession`
+  yang dipanggil saat dialog dibuka (AC-B7, diuji dengan hitungan pemanggilan `fetch`);
+- target tak terpilih tetap dirender (disabled) beserta `reason` dalam bahasa manusia;
+- target remote → `useApi()` remote; tombol **"Mulai tetap" (force) tak dirender** (permintaannya akan
+  dijawab 403 oleh klien, jadi merendernya = menawarkan kegagalan);
+- `409 error:"remote-session"` → aksi "Sambung ke sesi di `<name>`" (membuka sesi yang disebut
+  `remoteSession.sessionId` di device itu), bukan tombol coba lagi;
+- `409 error:"confirm-required"` → konfirmasi dua langkah; klik kedua mengirim ulang body yang sama
+  ber-`confirmRemote: true`;
+- `409` kapasitas/`blocked` yang sudah ada (`zLaunchRejection`, `App.tsx:210`) tak berubah bentuknya —
+  cabang baru dibedakan dari `detail.error`, bukan dari status.
+
+### T7. Penanganan galat (delta atas SPEC-1215 §S6)
+
+| Kondisi | Perilaku | Jejak |
+|---|---|---|
+| Device tak ada / dicabut | `404 relay:"unknown-device"` | `relay.request` warn |
+| Grant mati / klien lama / offline | `503 relay:"offline"` + `presence` | `relay.request` warn |
+| Timeout 30/120 dtk | `504`; `cancel` terkirim; **efek yang sudah jalan tak dibatalkan** dan muncul di presence berikutnya | `relay.request` error |
+| Respons > 1 MiB | klien menjawab `502 relay-response-too-large` (A); hub memetakan rakitan > 1 MiB → `413 relay:"too-large"` | `relay.request` warn |
+| `force` dari remote | `403` sebelum `approveLaunch`; `launchApprovedBy` tak tersentuh | `remote.request` warn |
+| Presence: sesi hidup di device lain | `409 remote-session` di hub, **tak ada** frame relay terkirim | `launch.rejected` (SPEC-1217) |
+| Presence: device punah ≤ 24 jam | `409 confirm-required`; scheduler melewati item | idem |
+| Spec belum ter-pull di klien | satu `syncOnce` → satu ulang; masih 404 → diteruskan apa adanya | `remote.request` |
+| `syncOnce` melempar | galat ditelan, pengulangan tetap dijalankan sekali | `remote.request` |
+| Dialog Start tanpa kandidat | default "hub ini"; peluncuran tetap butuh klik | — |
+
+### T8. Acceptance criteria (EARS) — turunan B
+
+Sama nomornya dengan SPEC-1215 §S9 (sumber kebenaran); yang ditambahkan di sini adalah **titik ukur**
+yang membuat tiap AC bisa dicentang test.
+
+- **AC-B1** — WHEN operator hub ber-cookie mengirim `POST /api/devices/:d/relay/terminal/sessions {spec}`
+  ke device ber-grant `sessions:spawn`, THE klien SHALL menjalankan `POST /api/terminal/sessions` lewat
+  `app.inject` dengan body yang sama, dan worktree SHALL lahir di mesin klien. *Ukur:* `inject` klien
+  dispy → argumen identik; `startSpecSession` klien terpanggil; hub nol pemanggilan `startSpecSession`.
+- **AC-B2** — THE test kontrak SHALL menjalankan start, steer, interrupt, jawab dialog, dan tandai
+  selesai atas fixture identik lewat cookie lokal dan lewat relay, lalu membuktikan kolom `Spec`,
+  berkas fase, id sesi, dan path worktree identik; satu-satunya beda `launchApprovedBy` dan
+  `manualDone.by` (prefix `remote:`).
+- **AC-B3** — IF request relay membawa `force: true`, THEN THE klien SHALL menjawab `403` dan
+  `approveLaunch` SHALL tak terpanggil (spy) serta `Spec.launchApprovedBy` SHALL tetap `null`.
+- **AC-B4** — WHEN klien sudah punya pane hidup untuk SPEC itu, THE start relay SHALL memulangkan id
+  sesi yang sama dan jumlah pane SHALL tak bertambah.
+- **AC-B5** — IF presence hub menunjukkan sesi `working|waiting` untuk SPEC X di device D, THEN setiap
+  `startSpecSession` SPEC X di hub (manusia maupun scheduler) dan start relay ke device ≠ D SHALL
+  ditolak `409 { error:"remote-session", remoteSession:{deviceId,name,sessionId} }`, dan **nol frame
+  `req`** SHALL terkirim ke socket relay.
+- **AC-B6** — IF device yang terakhir tercatat mengerjakan SPEC X sudah punah dari presence, THEN start
+  dan `POST /specs/:id/done` di hub SHALL menjawab `409 confirm-required` dan SHALL berhasil hanya
+  dengan `confirmRemote: true` / `confirm: true`; jalur scheduler SHALL tak pernah memasoknya.
+- **AC-B7** — WHEN dialog Start dibuka untuk backlog yang project-nya ber-`handledBy`, THE dialog SHALL
+  memilih default = device `handledBy` pertama yang online ∧ `sessions:spawn` ∧ kapasitas tak penuh
+  (tanpa kandidat → "hub ini"), AND THE dialog SHALL tak memanggil satu pun endpoint start sebelum
+  klik manusia.
+- **AC-B8** — WHILE device offline, tanpa grant/`sessions:spawn`, berkapasitas penuh, atau berprotokol
+  lain, THE dialog Start SHALL menampilkannya tak terpilih beserta alasan spesifiknya; status
+  online/offline SHALL mengikuti `PRESENCE_OFFLINE_MS` (90 dtk).
+- **AC-B9** — WHEN operator hub menekan steer/interrupt/jawab dialog/tandai selesai pada sesi klien,
+  THE hub SHALL merutekannya ke route klien yang sama dan meneruskan status, `content-type`, dan body
+  klien apa adanya (+ header `x-hanoman-device`).
+- **AC-B10** — IF relay offline, timeout, atau respons melebihi 1 MiB, THEN THE hub SHALL menjawab
+  `503`/`504`/`413` ber-`relay` kind, AND jumlah baris seluruh model non-log SHALL identik
+  sebelum/sesudah, dengan tepat satu baris `relay.request` bertambah.
+- **AC-B11** — IF klien menjawab `404 spec not found` untuk start relay, THEN THE klien SHALL memanggil
+  `syncOnce` **tepat sekali** dan `app.inject` **tepat dua kali** sebelum meneruskan jawaban akhir.
+
+### T9. Rencana verifikasi
+
+Test (TDD, mengikuti §S10 SPEC-1215, path konkret):
+
+- `server/test/devices-relay.route.test.ts` — tabel 404/415/503/409/413/429/502/504, header
+  `x-hanoman-device`, timeout 120 dtk khusus `POST …/terminal/sessions`, audit `relay.request`,
+  diff `count()` model non-log (AC-B1/B9/B10).
+- `server/test/relay-contract.test.ts` — dua jalur (cookie lokal vs relay) atas fixture identik
+  (AC-B2), termasuk `force` 403 (AC-B3) dan re-attach (AC-B4).
+- `server/test/remote-session-gate.test.ts` — `remoteSessionVerdict` tabel murni + integrasi
+  `startSpecSession`/`POST /specs/:id/done`, jalur scheduler, `confirmRemote`/`confirm`,
+  `recentlyOffline` kedaluwarsa (AC-B5/B6).
+- `server/test/relay-dispatcher.spec404.test.ts` — hitungan `syncOnce`/`inject` (AC-B11).
+- `src/test/instance.test.tsx` — `createApi` rebase (tiga call-site `fetch`), `useApi`, `useWsTarget`.
+- `src/test/start-session-target.test.tsx` — `startTargets` tabel + default + alasan + nol fetch saat
+  dialog dibuka + force tak dirender + 409 `remote-session`/`confirm-required` (AC-B7/B8).
+
+Resep run (mesin bersesi banyak, `CLAUDE.md` + SPEC-479):
+
+```
+env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS \
+  TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
+  pnpm vitest --run --no-file-parallelism <paths>
+```
+
+Smoke API nyata sekali di akhir Execute (dua `HANOMAN_HOME`, dua port, klien ber-`SYNC_SERVER_URL`):
+`PUT /api/remote-control` → `POST /api/devices/:d/relay/terminal/sessions` → `…/steer` →
+`POST /api/devices/:d/relay/specs/:id/done`, ditambah satu start ganda untuk membuktikan
+`409 remote-session` nyata.
+
+### T10. Docs yang tersentuh
+
+- **Fase ini:** spec ini + entri indeks `internal/docs/README.md`.
+- **Saat Execute (commit yang sama dengan kode):**
+  - `internal/docs/architecture/api-contract.md` — cabut "Belum dilayani" untuk
+    `/devices/:deviceId/relay/*` dan perubahan `POST /terminal/sessions` & `POST /specs/:id/done`
+    (baris 1417–1418); tambahkan `devices` ke daftar top non-delegatable;
+  - `internal/docs/frontend/frontend-implementation.md:47` — cabut frasa "SPEC-1216" dari penanda
+    DIRANCANG (bagian SPEC-1218 tetap);
+  - `internal/docs/adr/0165-*.md` §6/§8/§9 + `adr/README.md` + amandemen ADR-0117/0120/0135/0147/0148/0161
+    — ubah "menyusul SPEC-1216" menjadi "mendarat";
+  - `internal/docs/security/threat-model.md:150` — turunan B masuk daftar yang sudah mendarat;
+  - `internal/docs/architecture/stack.md` — diagram/penanda turunan.
+
+### T11. Batas & residu (mewarisi §S12, tanpa tambahan baru)
+
+Jendela balapan ≤ 3 dtk antar-start lintas device; start langsung di klien Y untuk SPEC yang hidup di
+klien X tak tercegah; aktor di klien adalah klaim hub; timeout relay tak membatalkan efek yang sudah
+terjadi. `recentlyOffline` hilang saat hub restart — jaringnya `SessionResult.deviceId` terakhir, dan
+itu memang hanya mengusulkan konfirmasi, tak pernah meluluskan.
