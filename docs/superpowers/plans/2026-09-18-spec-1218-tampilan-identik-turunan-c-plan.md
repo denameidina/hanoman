@@ -1520,7 +1520,7 @@ git commit -m "feat(spec-1218): RemoteInstanceView + RemoteBanner — gate proto
   `openDevice` di `ClientsScreen`); disabled + alasan bila `d.control?.state ===
   "protocol-mismatch"` atau `!d.control` (grant mati/offline).
 
-- [ ] **Step 1: Cari test file yang ada**
+- [x] **Step 1: Cari test file yang ada**
 
 ```bash
 grep -rl "ClientsScreen" src/test
@@ -1542,7 +1542,7 @@ it("device control.state protocol-mismatch → tombol Buka disabled dengan alasa
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1550,7 +1550,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (tombol "Buka" tak ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```tsx
 // ClientsScreen.tsx
@@ -1593,7 +1593,7 @@ Perbarui komentar berkas baris 9-11 ("Tak ada isi terminal di sini … sengaja d
 itu sudah basi sesudah C mendarat, ganti dengan catatan bahwa mirror terminal kini ADA lewat
 `RemoteInstanceView` (dicatat juga di Task 17 docs, tapi kode diperbarui di SINI, commit yang sama).
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1601,7 +1601,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/ClientsScreen.tsx src/test/clients-screen.test.tsx

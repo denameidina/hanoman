@@ -1,14 +1,16 @@
 import React from "react";
-import { Card, Badge, StateBlock } from "../ds";
+import { Card, Badge, Button, StateBlock } from "../ds";
 import { Tabs } from "../ds/components/ui";
 import { api } from "../api/client";
 import { Icon } from "../ds/icon";
 import { LogsPanel } from "./LogsPanel";
+import { RemoteInstanceView } from "./RemoteInstanceView";
 import type { PresenceDeviceView, PresenceSessionView, PresenceView } from "@hanoman/shared";
 
 /* SPEC-919 · ADR-0147 · halaman "Klien": device yang sinkron ke hub ini, dan pekerjaan yang
-   sedang berjalan di masing-masing. Tak ada isi terminal di sini — menempel ke sesi klien dari
-   hub sengaja di luar lingkup (butuh relay WS lintas instance + gerbang auth sendiri). */
+   sedang berjalan di masing-masing.
+   SPEC-1218 · ADR-0165 §11 · mirror terminal/dokumen/IDE klien kini ADA lewat tombol "Buka" →
+   `RemoteInstanceView`, baca-saja; menempel untuk MENGETIK di sesi klien tetap di luar lingkup. */
 
 const STATUS: Record<PresenceSessionView["status"], { label: string; tone: "ok" | "warn" | "neutral" }> = {
   working: { label: "bekerja", tone: "ok" },
@@ -64,9 +66,10 @@ function SessionRow({ s, title, onOpenSpec, now }:
   );
 }
 
-function DeviceCard({ d, specTitles, onOpenSpec, now }:
+function DeviceCard({ d, specTitles, onOpenSpec, now, onOpenRemote }:
   { d: PresenceDeviceView; specTitles: Record<string, string>;
-    onOpenSpec: (specId: string) => void; now: number }) {
+    onOpenSpec: (specId: string) => void; now: number; onOpenRemote: (d: PresenceDeviceView) => void }) {
+  const mismatch = d.control?.state === "protocol-mismatch";
   return (
     <Card>
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
@@ -82,6 +85,12 @@ function DeviceCard({ d, specTitles, onOpenSpec, now }:
         <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>
           terakhir terlihat {d.lastSeenAt ? sinceLabel(d.lastSeenAt, now) + " lalu" : "—"}
         </span>
+        {!d.local && (
+          <Button size="sm" disabled={mismatch || !d.control} onClick={() => onOpenRemote(d)}
+            title={mismatch ? "Versi protokol tak cocok" : !d.control ? "Kendali jarak jauh tak menyala di klien ini" : undefined}>
+            Buka
+          </Button>
+        )}
       </div>
       {d.sessions.length === 0
         ? (
@@ -123,24 +132,33 @@ export function ClientsScreen({ view, specTitles, onOpenSpec }:
   // SPEC-1217 · D6/AC-S8 · tab "Device"|"Log", default "Device" — layar Klien lama tetap terlihat
   // sama persis di tab default, log terpusat (LogsPanel) hidup di tab kedua.
   const [tab, setTab] = React.useState<"device" | "log">("device");
+  const [openDevice, setOpenDevice] = React.useState<PresenceDeviceView | null>(null);
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <Tabs variant="pill"
-        tabs={[{ value: "device", label: "Device" }, { value: "log", label: "Log" }]}
-        value={tab} onChange={(v) => setTab(v as "device" | "log")} />
-      {tab === "device" ? (
-        shown.devices.length === 0 ? (
-          <StateBlock kind="empty" icon="monitor" title="Belum ada device"
-            hint="Device muncul di sini sesudah sebuah instance hanoman menerbitkan device token dan menyinkron ke hub ini." />
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {shown.devices.map((d) => (
-              <DeviceCard key={d.deviceId} d={d} specTitles={specTitles} onOpenSpec={onOpenSpec} now={now} />
-            ))}
-          </div>
-        )
+      {openDevice ? (
+        <RemoteInstanceView device={openDevice} hubVersion={shown.hubVersion}
+          sessionId={openDevice.sessions[0]?.sessionId} onClose={() => setOpenDevice(null)} />
       ) : (
-        <LogsPanel />
+        <>
+          <Tabs variant="pill"
+            tabs={[{ value: "device", label: "Device" }, { value: "log", label: "Log" }]}
+            value={tab} onChange={(v) => setTab(v as "device" | "log")} />
+          {tab === "device" ? (
+            shown.devices.length === 0 ? (
+              <StateBlock kind="empty" icon="monitor" title="Belum ada device"
+                hint="Device muncul di sini sesudah sebuah instance hanoman menerbitkan device token dan menyinkron ke hub ini." />
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                {shown.devices.map((d) => (
+                  <DeviceCard key={d.deviceId} d={d} specTitles={specTitles} onOpenSpec={onOpenSpec}
+                    now={now} onOpenRemote={setOpenDevice} />
+                ))}
+              </div>
+            )
+          ) : (
+            <LogsPanel />
+          )}
+        </>
       )}
     </div>
   );
