@@ -432,7 +432,7 @@ git commit -m "feat(server): knownSecrets() nilai rahasia diketahui proses (SPEC
 - Consumes: `LOG_SPOOL_MAX_BYTES`, `LOG_SPOOL_SEGMENT_BYTES` (Task 1, `@hanoman/shared`), `LogWireEntry` (Task 1).
 - Produces: `spoolDir(lane: "server"): string`; `appendSpool(lane: "server", entry: LogWireEntry): Promise<{ dropped: LogWireEntry | null }>`; `readSpoolSegments(lane: "server"): Promise<{ file: string; entries: LogWireEntry[] }[]>`; `removeSpoolSegment(file: string): Promise<void>`; `spoolTotalBytes(lane: "server"): Promise<number>`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-spool.test.ts
@@ -489,12 +489,12 @@ describe("spool NDJSON", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-spool.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/logs/spool.ts
@@ -568,12 +568,12 @@ export async function spoolTotalBytes(lane: "server"): Promise<number> {
 export function __resetSpoolWriter(): void { currentFile = null; currentBytes = 0; }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-spool.test.ts`
 Expected: PASS (bila step 2 uji "menutup segmen" tak stabil karena memo antar test, panggil `__resetSpoolWriter()` di `beforeEach`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/logs/spool.ts server/test/log-spool.test.ts
