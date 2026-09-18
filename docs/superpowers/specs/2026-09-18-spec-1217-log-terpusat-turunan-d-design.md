@@ -1,7 +1,7 @@
 # SPEC-1217 · SPEC-1215 turunan D — log terpusat: pengiriman, ingest, redaksi, pencarian & retensi
 
 **Tanggal:** 2026-09-18 · **Flow:** feature · **Prioritas:** sedang · **Sumber:** brief
-**Base:** `61bc006c` · **Fase penulis bagian ini:** Brainstorm (1/5), Objective (2/5)
+**Base:** `61bc006c` · **Fase penulis bagian ini:** Brainstorm (1/5), Objective (2/5), Spec (3/5)
 **ADR:** [0166 — log terpusat, ingest satu arah](../../../internal/docs/adr/0166-log-terpusat-ingest-satu-arah.md)
 (mengunci kontrak; fase ini tidak membukanya kembali — lihat "Konteks & keputusan" di bawah)
 
@@ -212,3 +212,324 @@ Bentuk kontrak persis (skema Zod `zLogBatch`, respons `LogEntryView`, rute `S4.7
 literal di spec SPEC-1215; fase Spec turunan D mengutipnya sebagai kontrak final, hanya mengoreksi bila
 ditemukan kontradiksi terhadap kode nyata turunan A (pola koreksi S1/S13 yang sudah dipraktikkan sesi
 SPEC-1215). Tidak ditemukan kontradiksi semacam itu pada peninjauan kode di atas.
+
+## Spec teknis (fase Spec 3/5)
+
+**Design-of-record tetap spec SPEC-1215 §S4.7–S4.9/§S6/§S9/§S10 + ADR-0166.** Bagian ini **tidak**
+membuka ulang keputusan itu; ia (a) mengutip kontrak yang mengikat, (b) **menutup enam titik
+mekanisme** yang tertulis di ADR sebagai maksud tetapi belum punya bentuk di kode, dan (c) menurunkan
+acceptance criteria EARS yang bisa diuji. Bila bagian ini berselisih dengan §S4–§S10 SPEC-1215, yang
+berlaku adalah SPEC-1215 — kecuali pada enam butir §D di bawah, yang justru mengisinya.
+
+### D. Mekanisme yang ditutup fase ini (bentuk, bukan keputusan baru)
+
+**D1 · `session.phase` ditembakkan dari `buildLocalPresence()`, bukan hook pty ketiga.**
+ADR-0166 §2 menyebut sumbernya "tick snapshot sesi 3 dtk". Kode nyata: `SessionHooks` hanya
+`onBirth`/`onDeath` (`server/src/services/pty.ts:530`), dan `pty.ts` **sengaja nol dependensi DB**
+(komentar `pty.ts:520-524`) — menambah `onPhase` di sana berarti memindahkan pembacaan berkas fase ke
+modul yang justru dijaga bebas I/O DB. Sebaliknya, `buildLocalPresence()`
+(`server/src/services/presence/snapshot.ts:51-54`) **sudah** menghitung `activePhase(p)` tiap tick 3
+dtk lewat `readPhases()`, dan ia satu-satunya pembangun snapshot untuk klien (`presence/sender.ts:75`,
+tick 3 dtk) maupun hub (`presence/view.ts:24`). Karena itu:
+
+```ts
+// server/src/services/logs/phase-tap.ts (baru)
+export function observePhases(rows: { sessionId: string; projectId: string; specId?: string; phase?: string }[]): void
+// diff murni terhadap Map<sessionId, phase|null> di memori →
+//   appendEvent({ kind:"session.phase", msg:`sesi <id> fase <from> → <to>`, data:{from,to} })
+// sesi yang hilang dari snapshot dibuang dari Map (tak ada event; `session.end` sudah melaporkannya)
+export function __resetPhaseTap(): void
+```
+
+`buildLocalPresence()` memanggilnya satu baris sesudah `.map(paneToPresence…)`, fire-and-forget.
+**Residu yang diterima:** instance tanpa sync **dan** tanpa layar Presence terbuka tak pernah
+membangun snapshot, jadi tak menghasilkan `session.phase`. Itu konsisten dengan ADR-0166 (sumbernya
+memang tick snapshot) dan tak melanggar K11: fitur lokal tak berubah.
+
+**D2 · `launch.rejected` ditembakkan di titik LEMPAR, bukan di lima titik tangkap.**
+`LaunchAdmissionError` dilempar dua kali di satu berkas (`session-admission.ts:59,61`) dan
+`LaunchError` tiga kali (`session-launch.ts:92,105,173`), sementara penangkapnya lima
+(`app.ts:110`, `routes/terminal.ts:117`, `governor.ts:93,150`). Tap dipasang di titik lempar →
+peluncuran manual, scheduler, **dan** relay tercakup tanpa satu pun call site tambahan:
+`appendEvent({ kind:"launch.rejected", level:"warn", data:{ kind, admission? , blockers? } })`.
+
+**D3 · `session.result` ditap di `recordSessionResult()`** (`session-result.ts:11-20`), **sesudah**
+`prisma.sessionResult.create` dan **sebelum** `notifySynced`, memakai field yang sudah lolos WHITELIST
+(`status`, `oldStage`, `newStage`, `projectId`, `specId`). Nol perubahan alur; `appendEvent` tak pernah
+reject (`event-log.ts:62-66`).
+
+**D4 · Sadapan `console` dipasang/dicabut oleh keadaan, bukan hanya oleh boot.**
+`installConsoleTap()`/`uninstallConsoleTap()` dipanggil (a) di `server.ts` saat boot bila
+`Setting.data.logShipping.server` menyala, dan (b) dari `updateRemoteControl()`
+(`services/remote-control.ts:16-42`) sesudah tulisan, sehingga menyalakan toggle berlaku **tanpa
+restart**. Keluaran asli diteruskan ke `console` asli lebih dulu (AC-D10), redaksi dan spool
+sesudahnya.
+
+**D5 · Dekompresi request ber-cap dipasang di scope terenkapsulasi**, bukan di parser JSON global:
+`routes/sync.ts` membuka `app.register(async (logs) => { … })` yang memasang
+`addContentTypeParser("application/json", { parseAs:"buffer", bodyLimit: LOG_BODY_MAX_BYTES })` dan
+`gunzipSync(buf, { maxOutputLength: LOG_DECODED_MAX_BYTES })`. `/sync/push` dan `/sync/pull` tak
+tersentuh. `content-encoding` selain `gzip`/kosong → **415**; `RangeError`
+(`ERR_BUFFER_TOO_LARGE`) atau body mentah > 1 MiB → **413**.
+
+**D6 · `LogsPanel` adalah tab di layar Klien, bukan tab di `RemoteInstanceView`.**
+Turunan D bergantung **A saja**; `RemoteInstanceView` lahir di C. `frontend-implementation.md:56`
+memang sudah menempatkan tab **Log** di layar Klien. `ClientsScreen.tsx:127-133` hari ini daftar datar
+`DeviceCard` → ditambah `<Tabs variant="pill">` ("Device" | "Log") memakai komponen `Tabs` yang sudah
+ada (`src/src/ds/components/ui.tsx`, dipakai `TerminalScreen.tsx:481`).
+
+### S1. Arsitektur
+
+```
+ KLIEN (instance mana pun) ────────────────────────────────────────────────────────────────────
+  console.*  ──► logs/console-tap.ts ──(redactText)──► logs/spool.ts  NDJSON bersegmen 1 MiB
+                  (keluaran asli tetap ke stdout/stderr;   $HANOMAN_HOME/log-spool/server/*.ndjson
+                   identik beruntun ≤60 dtk → data.repeat)  ≤64 MiB, buang tertua → log.gap
+  hook sesi onBirth/onDeath ┐
+  buildLocalPresence() ─────┤ logs/{event-tap,phase-tap}.ts ──(redactText)──► appendEvent()
+  recordSessionResult()     ├─► kind: session.start|phase|end|result, launch.rejected,
+  Launch*Error (titik lempar)│         remote.*, grant.changed, log.gap
+  saveTranscript() (onDeath) ┘  lajur transcript: baris penunjuk LogEntry + transcriptKey lokal
+                                     │
+  syncTick() ──sesudah syncOnce()──► logs/shipper.ts   per lajur ≤4 batch/tick, ≤500 entri
+      (TANPA timer baru)               sumber: LogEntry local seq > LogCursor("local",lane)
+                                       lajur server: segmen spool
+                                       ack 200 → LogCursor("local") maju; 400→gap; 404→tunda 30 mnt;
+                                       413→belah; 429→tunda retryAfterSec (lajur itu saja)
+                                     │ POST /api/sync/logs  Bearer device token, gzip opsional
+ HUB ─────────────────────────────────▼────────────────────────────────────────────────────────
+  routes/sync.ts (scope terenkapsulasi) → gunzip maxOutputLength 2 MiB → zod zLogBatch
+   → logs/redact lapis 2 → tulis berkas transkrip (tmp+rename) → $transaction{
+       LogCursor(deviceId,lane) → saring seq>cursor → createMany → upsert kursor }
+   → kuota 20 000 entri/jam per device (memori) → 200 {lane,accepted,duplicate,lastSeq}
+  routes/logs.ts  GET /logs · GET /logs/:id/transcript · GET|PUT /logs/retention   (COOKIE_ONLY)
+  services/retention.ts runRetention() + pruneLogs()  (sapuan 24 jam yang SUDAH ada)
+  src/src/screens/ClientsScreen.tsx  tab "Log" → LogsPanel.tsx
+```
+
+### S2. Komponen
+
+| Modul | Baru/ubah | Tanggung jawab |
+|---|---|---|
+| `shared/src/logs.ts` | ubah | konstanta S4.1 yang belum ada (batch/body/spool/kuota/pencarian), `zLogBatch`/`zLogWireEntry` `.strict()`, `zLogSearchQuery` |
+| `shared/src/redact.ts` | baru | `redactText(text, known)` murni + `redactValue(data, known)` untuk `data` JSON |
+| `server/src/services/logs/redact-known.ts` | baru | kumpulan "nilai yang diketahui proses" (device token, `secret.key`, env bernama rahasia) — **tak** ikut ke `shared` karena membaca proses |
+| `server/src/services/logs/spool.ts` | baru | NDJSON bersegmen, `append()`, `readSegments()`, `dropOldest()`, batas 64 MiB/1 MiB |
+| `server/src/services/logs/console-tap.ts` | baru | `installConsoleTap()`/`uninstallConsoleTap()`, penggabung `data.repeat` |
+| `server/src/services/logs/phase-tap.ts` | baru | `observePhases()` (D1) |
+| `server/src/services/logs/event-log.ts` | ubah | `installEventTap()` + tap transkrip `onDeath`; `appendGap()` |
+| `server/src/services/logs/shipper.ts` | baru | `shipLogs(base, token)` per lajur, kursor, penundaan per lajur |
+| `server/src/services/logs/ingest.ts` | baru | redaksi lapis 2, berkas transkrip, transaksi high-water mark, kuota |
+| `server/src/services/logs/search.ts` | baru | `searchLogs(q)` kursor opaque, `readRemoteTranscript(id)` |
+| `server/src/services/logs/prune.ts` | baru | `pruneLogs(now, retention)` + `reconcileRemoteTranscripts()` |
+| `server/src/routes/sync.ts` | ubah | scope `POST /sync/logs` (D5) |
+| `server/src/routes/logs.ts` | baru | `GET /logs`, `GET /logs/:id/transcript`, `GET|PUT /logs/retention` |
+| `server/src/services/agent-capabilities.ts` | ubah | top `/logs*` → COOKIE_ONLY (pola `/remote-control*`, baris 44) |
+| `server/src/services/retention.ts` | ubah | `runRetention()` memanggil `pruneLogs()`; `RetentionReport.logsPruned`/`logBytes` |
+| `server/src/services/remote-control.ts` | ubah | `logs` di `GET` (P6 SPEC-1215) + pasang/cabut sadapan console (D4) |
+| `server/src/services/sync-client.ts` | ubah | `syncTick()` memanggil `shipLogs()` fire-and-forget |
+| `server/src/services/presence/snapshot.ts` | ubah | satu baris `observePhases()` (D1) |
+| `server/src/services/session-admission.ts` · `session-launch.ts` · `session-result.ts` | ubah | tap D2/D3 |
+| `server/src/server.ts` | ubah | `installConsoleTap()` di boot bila lajur `server` menyala |
+| `src/src/screens/LogsPanel.tsx` | baru | pencarian + kursor + transkrip + pengaturan retensi |
+| `src/src/screens/ClientsScreen.tsx` · `RemoteControlPanel.tsx` | ubah | tab "Log" (D6); tiga toggle lajur log |
+| `src/src/api/client.ts` | ubah | `logs()`, `logTranscript()`, `logRetention()`, `putLogRetention()` |
+
+### S3. Kontrak
+
+#### S3.1 Konstanta yang ditambahkan ke `shared/src/logs.ts`
+
+Sudah ada di kode (turunan A): `LOG_LANES`, `LOG_LEVELS`, `LOG_MSG_MAX_BYTES` (4 KiB),
+`LOG_DATA_MAX_BYTES` (8 KiB), `nextSeq`, `LogEntryView`, `zLogShipping`, `zLogRetention`.
+**Ditambahkan D**, nilai persis §S4.1 SPEC-1215 — tak boleh diubah tanpa amandemen ADR-0166:
+
+```ts
+LOG_BATCH_MAX_ENTRIES = 500          LOG_BODY_MAX_BYTES = 1 MiB     LOG_DECODED_MAX_BYTES = 2 MiB
+LOG_TRANSCRIPT_MAX_BYTES = 1 MiB     LOG_SPOOL_MAX_BYTES = 64 MiB   LOG_SPOOL_SEGMENT_BYTES = 1 MiB
+LOG_LOCAL_PENDING_MAX_ROWS = 50_000  LOG_REPEAT_WINDOW_MS = 60_000  LOG_INGEST_MAX_PER_HOUR = 20_000
+LOG_SEARCH_MAX_RANGE_DAYS = 31       LOG_SEARCH_MAX_LIMIT = 200     LOG_SHIP_MAX_BATCHES_PER_TICK = 4
+LOG_UNSUPPORTED_RETRY_MS = 30 * 60_000
+```
+
+#### S3.2 `redactText()` (fungsi murni, `shared/src/redact.ts`)
+
+```ts
+export function redactText(text: string, known?: readonly string[]): string
+export function redactValue<T>(value: T, known?: readonly string[]): T   // rekursif atas string di JSON
+```
+
+- **Pola** (ADR-0166 §5, urutan tetap): header `Bearer <t>`; `hnm_agt_…`; `sk-ant-…`;
+  `ghp_`/`github_pat_`; `AKIA[0-9A-Z]{16}`; `xox[abprs]-…`; blok PEM (`-----BEGIN … KEY-----` …
+  `-----END`); JWT (`eyJ…\.…\.…`); baris `NAMA=nilai` dengan NAMA cocok
+  `TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE|CREDENTIAL|COOKIE|DSN|AUTH`.
+- **Nilai yang diketahui proses:** `known` ≥ 8 karakter, dicocokkan **terpanjang dulu** (substring
+  literal, bukan regex).
+- Pengganti: `«redacted:<label>»`. Fungsi **murni** dan **idempoten** (`f(f(x)) === f(x)`), sehingga
+  lapis kedua di hub tak merusak keluaran lapis pertama.
+- **Gagal-tertutup:** pemanggil (klien maupun hub) membungkusnya `try/catch`; lempar → entri dibuang
+  dan diganti `log.gap { lost:1, reason:"redaction-failed", fromSeq, toSeq }`.
+
+#### S3.3 Spool NDJSON (klien, lajur `server`)
+
+`$HANOMAN_HOME/log-spool/server/<epochMs>-<n>.ndjson`, satu baris = satu `LogWireEntry` **yang sudah
+diredaksi**. Segmen ditutup pada 1 MiB; total > 64 MiB → segmen **tertua** dihapus dan satu
+`log.gap { lost, reason:"spool-full", fromSeq, toSeq }` lahir di lajur `event`. Urutan buang saat
+tekanan: `server` → `transcript` → `event` (`event` hanya dipangkas bila baris `LogEntry` local
+belum-terkirim > `LOG_LOCAL_PENDING_MAX_ROWS`). Nol tulisan SQLite per baris console.
+
+#### S3.4 `POST /api/sync/logs` — dikutip utuh dari §S4.7 (kontrak final)
+
+Skema `zLogBatch`/`LogWireEntry`, urutan enam langkah hub, dan matriks respons klien
+(200/400/404/413/429/5xx) berlaku **apa adanya**. Tambahan bentuk yang ditutup fase ini:
+
+- preHandler `requireDeviceToken` (pola `routes/sync.ts:66`), `deviceId = req.device!.id`;
+- kuota: `Map<deviceId, { windowStart, count }>` di memori hub, jendela geser 1 jam →
+  `429 { error:"quota", retryAfterSec }`; `retryAfterSec` = sisa detik jendela;
+- `seq` naik **ketat** dalam batch (`400` bila tidak);
+- transkrip ditulis `…/remote-transcripts/<deviceId>/<seq>.txt.tmp` lalu `rename` **sebelum**
+  `$transaction` (berkas yatim dipungut sapuan; tak pernah baris tanpa berkas);
+- `bytes` = `utf8Bytes(msg) + bytes(data JSON) + bytes(transkrip)`.
+
+#### S3.5 `GET /api/logs` · `/logs/:id/transcript` · `GET|PUT /logs/retention`
+
+Kontrak §S4.8 berlaku apa adanya. Bentuk yang ditutup fase ini:
+
+- **Kursor opaque** = `base64url(JSON.stringify({ ts: <ISO>, id: <number> }))`; halaman berikutnya =
+  `OR: [{ ts: { lt } }, { ts, id: { lt } }]` di atas `orderBy [{ts:"desc"},{id:"desc"}]` — stabil
+  walau baris baru masuk di antara halaman. Kursor cacat → **400**.
+- `lane` menerima daftar dipisah koma; `level` = **minimum** (`info` → `info|warn|error`) lewat
+  `in`; `kind` = `startsWith`; `q` = `contains` pada `msg` (≤ 200 karakter, tanpa FTS/raw SQL).
+- `from`/`to` wajib, `to - from ≤ 31 hari`, `to ≥ from` → selain itu **400**.
+- **Tanpa `total`** (pengecualian keempat ADR-0107, dikunci ADR-0166 §7).
+- `GET /logs/:id/transcript`: baris bukan lajur `transcript`, `transcriptKey` kosong, atau berkas
+  hilang → **404**; sukses → `text/plain; charset=utf-8`.
+- `PUT /logs/retention` memvalidasi `zLogRetention` (sudah ada, `shared/src/logs.ts:42-45`) dan
+  menulis `Setting.data.logRetention`. `PUT /settings` tetap **mempertahankan** kunci itu (sudah
+  terpasang turunan A) — memendekkan retensi lewat agent token berarti menghapus bukti audit.
+- Ketiganya `COOKIE_ONLY` lewat top `/logs*` di `agent-capabilities.ts`.
+
+#### S3.6 Retensi
+
+`runRetention()` (`retention.ts:29-46`) memanggil `pruneLogs(now, retention, opts)` **sesudah**
+`pruneSyncFeed` dan **sebelum** `reconcileTranscripts`. `RetentionReport` bertambah dua field
+(`logsPruned`, `logBytesFreed`) — pola `feedPruned`, bukan laporan terpisah. Urutan di dalam
+`pruneLogs`: (1) per lajur `ts < now - <lane>Days` dalam potongan 5 000 id; (2) selama
+`aggregate _sum.bytes > maxBytes`, hapus terlama per potongan; (3) hapus berkas transkrip milik
+baris yang terhapus; (4) `reconcileRemoteTranscripts()` memungut berkas tanpa baris (pola
+`reconcileTranscripts`, `session-history.ts:170-200`, termasuk grace period). Di klien, baris
+`deviceId:"local"` yang **sudah di-ack** (`seq ≤ LogCursor("local",lane)`) dan melewati umur ikut
+tersapu fungsi yang sama (P7 SPEC-1215); baris belum-terkirim tak pernah dihapus sapuan umur.
+
+#### S3.7 Frontend
+
+- `LogsPanel` (`src/src/screens/LogsPanel.tsx`): formulir penyaring (rentang default 24 jam, device,
+  project, spec, lane, level, kind, `q`), daftar baris dense (`hn-dense-row`, pola
+  `ClientsScreen.tsx:34-47`), tombol "Muat lagi" memakai `nextCursor` (tak ada nomor halaman — tak ada
+  `total`), baris ber-`hasTranscript` membuka transkrip, dan blok "Retensi" (`GET|PUT`).
+  `StateBlock kind="empty"` saat nol hasil; galat 400 rentang ditampilkan apa adanya.
+- `ClientsScreen`: `Tabs variant="pill"` ("Device" | "Log"); tab default "Device" sehingga layar yang
+  ada tak berubah bentuknya.
+- `RemoteControlPanel`: tiga toggle lajur log (`logs.event|server|transcript`) di atas
+  `api.putRemoteControl()` yang sudah ada; `event` ditampilkan menyala secara default.
+
+### S4. Penanganan galat
+
+Matriks §S6 SPEC-1215 berlaku apa adanya untuk baris ingest/spool/redaktor/transkrip. Yang
+ditambahkan fase ini (bentuk, bukan keputusan):
+
+| Kondisi | Perilaku | Jejak |
+|---|---|---|
+| `content-encoding` asing di `/sync/logs` | `415` sebelum parsing | — |
+| gzip mekar > 2 MiB (`ERR_BUFFER_TOO_LARGE`) atau body mentah > 1 MiB | `413`; klien membelah batch | — |
+| `seq` tak naik ketat / skema cacat | `400 { error }`; klien menaruh `log.gap reason:"rejected"` dan **memajukan** kursor (anti-livelock ADR-0082) | `log.gap` |
+| Kuota terlampaui | `429 { error, retryAfterSec }`; klien menunda **lajur itu**; `syncOnce` tetap jalan | — |
+| `attempt === 1 && duplicate > 0` | hub menulis `log.gap reason:"seq-regression"` | `log.gap` |
+| `$transaction` gagal | `500`; berkas transkrip yang sudah ditulis jadi yatim → dipungut sapuan; kursor klien tak maju → kirim ulang | — |
+| Shipper melempar apa pun | ditangkap di `syncTick`; sync **tak** terganggu (K11/AC-M2) | `console.warn` transisi |
+| `redactText` melempar (klien atau hub) | entri dibuang, diganti `log.gap reason:"redaction-failed"` | `log.gap` |
+| Spool tak bisa ditulis (disk penuh/ENOSPC) | sadapan console **tetap** meneruskan ke stdout/stderr; baris dibuang | `log.gap reason:"spool-write"` |
+| Berkas transkrip hilang sebelum dikirim | entri dikirim `data.missing:true`, tanpa `transcript` | — |
+| Kursor `GET /logs` cacat / rentang > 31 hari / `from`/`to` absen | `400` | — |
+| `GET /logs/:id/transcript` bukan lajur transcript / berkas hilang | `404` | — |
+
+### S5. Acceptance criteria (EARS)
+
+**Kontrak final (dikutip dari §S9 SPEC-1215 — tak diubah):** AC-D1 … AC-D10, sebagaimana tertulis
+lengkap di bagian "Keputusan yang dikunci untuk turunan D" di atas. Turunan D dinyatakan selesai
+hanya bila kesepuluhnya terbukti lewat test.
+
+**Turunan spec (mengikat Plan/Execute; menutup mekanisme §D, bukan menggantikan AC-D di atas):**
+
+- **AC-S1** (D1) — WHEN `buildLocalPresence()` menghasilkan snapshot yang fase `active` sebuah sesi
+  berbeda dari snapshot sebelumnya, THE instance SHALL menulis satu `LogEntry` `kind:"session.phase"`
+  ber-`data {from, to}`. WHILE fase tak berubah, THE instance SHALL tak menulis satu baris pun.
+- **AC-S2** (D2/D3) — WHEN `LaunchAdmissionError` atau `LaunchError` dilempar, THE instance SHALL
+  menulis `launch.rejected` ber-`level:"warn"` **satu kali** per lemparan, apa pun penangkapnya
+  (route, scheduler, relay). WHEN `recordSessionResult()` menulis barisnya, THE instance SHALL
+  menulis `session.result {status, oldStage, newStage}`. IF penulisan log gagal, THEN peluncuran dan
+  `SessionResult` SHALL tetap berjalan seperti sebelumnya.
+- **AC-S3** (D4) — WHEN operator menyalakan lajur `server` lewat `PUT /api/remote-control`, THE klien
+  SHALL memasang sadapan `console` tanpa restart, dan WHEN ia mematikannya, THE klien SHALL
+  mencabutnya sehingga `console.*` kembali ke bentuk aslinya (diuji dengan membandingkan referensi
+  fungsi sebelum dan sesudah).
+- **AC-S4** (D5) — THE route `POST /api/sync/logs` SHALL memakai parser ber-`bodyLimit` sendiri,
+  dan `POST /api/sync/push` SHALL tetap memakai parser JSON bawaan (diuji: push besar yang lolos hari
+  ini tetap lolos).
+- **AC-S5** (S3.2) — THE `redactText()` SHALL idempoten (`f(f(x)) === f(x)`) dan murni (nol I/O),
+  dibuktikan korpus yang memuat setiap pola ADR-0166 §5 plus kasus negatif (teks biasa yang
+  menyerupai token tak boleh ikut tersamar lebih dari polanya).
+- **AC-S6** (S3.5) — WHEN sebuah halaman `GET /api/logs` diambil dan baris baru masuk sebelum halaman
+  berikutnya diminta, THE kursor SHALL tetap mengembalikan baris yang belum terlihat, tanpa
+  duplikat dan tanpa lompatan (diuji dengan menyisipkan baris di antara dua panggilan).
+- **AC-S7** (S3.6) — WHEN sapuan retensi berjalan di klien, THE sapuan SHALL tak pernah menghapus
+  baris `local` yang `seq`-nya melewati `LogCursor("local", lane)` (belum di-ack hub), berapa pun
+  umurnya.
+- **AC-S8** (D6) — THE layar Klien SHALL merender tab "Device" secara default, sehingga test layar
+  Klien yang ada hijau tanpa perubahan ekspektasi; tab "Log" SHALL merender `LogsPanel`.
+- **AC-S9** (§S10 SPEC-1215 / ADR-0166 §7) — THE pengukuran ingest sintetis (10 device × 500
+  entri/15 dtk × 10 mnt) SHALL dijalankan sebagai task eksplisit sebelum default
+  `LOG_INGEST_MAX_PER_HOUR` dikunci. IF p95 `GET /specs` naik > 20 % atau ada `P1008`, THEN
+  koreksinya SHALL berupa amandemen ADR-0166, bukan keputusan baru di sesi ini.
+
+### S6. Rencana verifikasi
+
+Diambil dari §S10 SPEC-1215 ("Server D" + frontend), ditambah berkas untuk mekanisme §D:
+
+| Berkas test | Menutup |
+|---|---|
+| `shared/test/redact.test.ts` | AC-D4, AC-S5 (korpus pola + nilai diketahui + idempoten + lempar) |
+| `shared/test/logs.test.ts` (ubah) | konstanta baru, `zLogBatch` `.strict()`, seq naik ketat |
+| `server/test/log-ingest.route.test.ts` | AC-D2, AC-D4, AC-D7, AC-S4 (kirim ulang, gzip 413/415, kuota 429, berkas-sebelum-baris, `seq-regression`) |
+| `server/test/log-shipper.test.ts` | AC-D1, AC-D2 (crash-kirim-ulang), AC-D7, AC-D9 |
+| `server/test/log-spool.test.ts` | AC-D3, AC-D10 (`data.repeat`, urutan buang, `log.gap`) |
+| `server/test/logs.route.test.ts` | AC-D5, AC-D8, AC-S6 (rentang wajib, penyaring, kursor stabil, `relay.*` + `remote.*` satu tabel) |
+| `server/test/retention-logs.test.ts` | AC-D6, AC-S7 |
+| `server/test/log-taps.test.ts` | AC-S1, AC-S2, AC-S3 (phase diff, launch.rejected, session.result, pasang/cabut sadapan) |
+| `src/test/LogsPanel.test.tsx` · `ClientsScreen.test.tsx` (ubah) | AC-D5 (UI), AC-S8 |
+| `src/test/RemoteControlPanel.test.tsx` (ubah) | AC-D1 (toggle lajur) |
+
+Resep run (mesin bersesi banyak, wajib): `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u
+SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism
+<paths>`.
+
+**Pengukuran (AC-S9)** dan **API nyata sekali di akhir** (`POST /api/sync/logs` dua kali identik →
+`duplicate`; `GET /api/logs`; `GET|PUT /api/logs/retention`) sesuai §S10 SPEC-1215.
+
+### S7. Docs yang tersentuh
+
+- **Fase ini (commit yang sama):** dokumen ini; tautannya di `internal/docs/README.md`.
+- **Saat Execute (commit implementasi):** cabut penanda "belum dilayani/DIRANCANG" bagian D di
+  `architecture/api-contract.md:1417-1418` (`POST /sync/logs`, `/logs*`) dan `remote-control` tanpa
+  `shipping` (baris 1414), `architecture/data-model.md:288-296,740-760`,
+  `architecture/stack.md:41-48`, `frontend/frontend-implementation.md:45-59`,
+  `adr/0166-log-terpusat-ingest-satu-arah.md` (status "sebagian mendarat" → mendarat penuh),
+  `docs/agent-integration.md` (daftar cookie-only: top `logs`), dan `internal/skills/hanoman/SKILL.md`.
+
+### S8. Batas & residu yang diterima
+
+- Instance tanpa sync **dan** tanpa layar Presence terbuka tak menghasilkan `session.phase` (D1).
+- Jam klien mundur melewati selisih seq → entri terbaca duplikat, terlihat sebagai
+  `log.gap seq-regression` (residu ADR-0166 §3, tak ditutup di sini).
+- Kuota disimpan di memori hub: restart hub mengosongkan jendela. Itu sengaja — ia pagar beban, bukan
+  akuntansi.
+- Angka §S3.1 adalah angka awal ADR-0166; hanya AC-S9 yang boleh mengubahnya, lewat amandemen ADR.
