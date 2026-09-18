@@ -592,7 +592,7 @@ git commit -m "feat(server): spool NDJSON bersegmen lajur server (SPEC-1217 AC-D
 - Consumes: `appendSpool` (Task 4), `redactText` (Task 2), `knownSecrets` (Task 3), `appendEvent`/`appendGap` (Task 9, tapi `appendGap` dipanggil di sini via import — deklarasikan stub minimal di Task 9 lebih dulu bila dibutuhkan; di task ini cukup `appendEvent` yang SUDAH ada sejak turunan A).
 - Produces: `installConsoleTap(): void`, `uninstallConsoleTap(): void`, `isConsoleTapInstalled(): boolean`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-console-tap.test.ts
@@ -646,12 +646,12 @@ describe("console-tap", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-console-tap.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/logs/console-tap.ts
@@ -735,12 +735,12 @@ export function uninstallConsoleTap(): void {
 export function isConsoleTapInstalled(): boolean { return installed; }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-console-tap.test.ts`
 Expected: PASS — kasus `data.repeat` bergantung `flush` yang dipanggil setelah timer; sesuaikan `advanceTimersByTimeAsync` bila timing meleset (jangan longgarkan assert jumlah panggilan).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/logs/console-tap.ts server/test/log-console-tap.test.ts
