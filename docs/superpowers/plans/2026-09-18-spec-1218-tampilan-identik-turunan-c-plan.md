@@ -635,7 +635,7 @@ git commit -m "feat(spec-1218): InjectableApp.injectWS + injectableFrom (prasyar
 - Produces: `onMessage` menangani `f.t === "open"` lewat `injectWS`, menggantikan placeholder
   `close 4502` (baris 134); buang `resize` selalu; buang `in`/`diag` bila mode bukan `"write"`.
 
-- [ ] **Step 1: Tulis test regresi `onOpen` (mereplikasi 0/2→2/2 S0a, kasus TERPISAH — AC-C8) yang gagal**
+- [x] **Step 1: Tulis test regresi `onOpen` (mereplikasi 0/2→2/2 S0a, kasus TERPISAH — AC-C8) yang gagal**
 
 ```ts
 it("jalur open: frame sinkron attach sampai HANYA lewat onOpen, 2/2 (AC-C8, replikasi S0a terpisah)", async () => {
@@ -660,7 +660,7 @@ it("buang in/diag saat mode read", async () => { /* ... */ });
 it("gate: path relay tak diizinkan atau capability kurang → close 4403 sebelum injectWS dipanggil", async () => { /* injectWS mock TAK terpanggil sama sekali */ });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -668,7 +668,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (`f.t === "open"` masih menjawab `close 4502`).
 
-- [ ] **Step 3: Implementasi** (ganti baris 132-134 `createRelayDispatcher`'s `onMessage`)
+- [x] **Step 3: Implementasi** (ganti baris 132-134 `createRelayDispatcher`'s `onMessage`)
 
 ```ts
 const streams = new Map<string, { mode: "read" | "write"; ws: InjectedWs }>();
@@ -716,7 +716,7 @@ Import tambahan di header berkas: `getSetting` (`../settings`), `remoteCapabilit
 `relayRouteAllowed`, `grantsCapability` (`@hanoman/shared`), `paneGeometryFor` (Task 8, sementara
 stub `() => undefined` sampai Task 8 mendarat — catat TODO ditutup Task 8, bukan dibiarkan).
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -724,7 +724,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/relay/dispatcher.ts server/test/relay-dispatcher.test.ts

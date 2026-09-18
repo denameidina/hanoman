@@ -132,6 +132,93 @@ describe("dispatcher relay — unit (SPEC-1215 · ADR-0165 §2, spec §S4.5)", (
   });
 });
 
+describe("dispatcher relay — jalur open (SPEC-1218 · AC-C2/C3/C8)", () => {
+  function harnessWS(injectWS: InjectableApp["injectWS"]) {
+    const sent: Frame[] = [];
+    const d = createRelayDispatcher({
+      app: { inject: async () => ({ statusCode: 200, headers: {}, body: "{}" }), injectWS },
+      send: (json) => sent.push(JSON.parse(json)), host: () => "127.0.0.1", audit: () => {},
+    });
+    return { d, sent };
+  }
+
+  it("jalur open: frame sinkron attach sampai HANYA lewat onOpen, 2/2 (AC-C8, replikasi S0a terpisah)", async () => {
+    await resetDb();
+    await makeSetting({ remoteControl: { enabled: true, capabilities: ["sessions:read"] } });
+    const synced: string[] = [];
+    const { d, sent } = harnessWS(async (_p, _o, hooks) => {
+      const ws = {
+        send: (data: string) => synced.push(data),
+        on: (ev: string, cb: any) => { if (ev === "message") setImmediate(() => cb(Buffer.from("scrollback"))); },
+        close: () => {},
+      };
+      hooks.onOpen(ws as any);
+    });
+    await d.onMessage(JSON.stringify({ t: "open", sid: "s1", path: "/api/events/ws", mode: "read", actor }));
+    await waitFor(() => sent.some((f) => f.t === "opened"));
+    await waitFor(() => sent.some((f) => f.t === "data"));
+    expect(sent.filter((f) => f.t === "opened")).toHaveLength(1);
+    expect(sent.some((f) => f.t === "data")).toBe(true);
+  });
+
+  it("buang frame resize dari hub SELALU, mode read maupun write", async () => {
+    await resetDb();
+    await makeSetting({ remoteControl: { enabled: true, capabilities: ["sessions:write"] } });
+    for (const mode of ["read", "write"] as const) {
+      const forwarded: string[] = [];
+      const { d, sent } = harnessWS(async (_p, _o, hooks) => {
+        hooks.onOpen({ send: (data: string) => forwarded.push(data), on: () => {}, close: () => {} } as any);
+      });
+      d.onMessage(JSON.stringify({ t: "open", sid: `s-${mode}`, path: "/api/terminal/sessions/x/ws", mode, actor }));
+      await waitFor(() => sent.some((f) => f.t === "opened"));
+      d.onMessage(JSON.stringify({ t: "data", sid: `s-${mode}`, d: JSON.stringify({ t: "resize", cols: 80, rows: 24 }) }));
+      expect(forwarded).toHaveLength(0);
+    }
+  });
+
+  it("buang in/diag saat mode read", async () => {
+    await resetDb();
+    await makeSetting({ remoteControl: { enabled: true, capabilities: ["sessions:read"] } });
+    const forwarded: string[] = [];
+    const { d, sent } = harnessWS(async (_p, _o, hooks) => {
+      hooks.onOpen({ send: (data: string) => forwarded.push(data), on: () => {}, close: () => {} } as any);
+    });
+    d.onMessage(JSON.stringify({ t: "open", sid: "s1", path: "/api/terminal/sessions/x/ws", mode: "read", actor }));
+    await waitFor(() => sent.some((f) => f.t === "opened"));
+    d.onMessage(JSON.stringify({ t: "data", sid: "s1", d: JSON.stringify({ t: "in", d: "ls\n" }) }));
+    d.onMessage(JSON.stringify({ t: "data", sid: "s1", d: JSON.stringify({ t: "diag", ev: [] }) }));
+    expect(forwarded).toHaveLength(0);
+  });
+
+  it("gate: path relay tak diizinkan → close 4403 sebelum injectWS dipanggil", async () => {
+    await resetDb();
+    await makeSetting({ remoteControl: { enabled: true, capabilities: ["sessions:read"] } });
+    let injectWSCalled = false;
+    const { d, sent } = harnessWS(async (_p, _o, hooks) => {
+      injectWSCalled = true;
+      hooks.onOpen({ send: () => {}, on: () => {}, close: () => {} } as any);
+    });
+    d.onMessage(JSON.stringify({ t: "open", sid: "s1", path: "/api/backlog/secret", mode: "read", actor }));
+    await waitFor(() => sent.length > 0);
+    expect(injectWSCalled).toBe(false);
+    expect(sent).toEqual([{ t: "close", sid: "s1", code: 4403, reason: expect.any(String) }]);
+  });
+
+  it("gate: capability kurang untuk terminal WS baca → close 4403 sebelum injectWS dipanggil", async () => {
+    await resetDb();
+    await makeSetting({ remoteControl: { enabled: true, capabilities: [] } });
+    let injectWSCalled = false;
+    const { d, sent } = harnessWS(async (_p, _o, hooks) => {
+      injectWSCalled = true;
+      hooks.onOpen({ send: () => {}, on: () => {}, close: () => {} } as any);
+    });
+    d.onMessage(JSON.stringify({ t: "open", sid: "s1", path: "/api/terminal/sessions/x/ws", mode: "read", actor }));
+    await waitFor(() => sent.length > 0);
+    expect(injectWSCalled).toBe(false);
+    expect(sent).toEqual([{ t: "close", sid: "s1", code: 4403, reason: expect.any(String) }]);
+  });
+});
+
 describe("dispatcher relay + gate app nyata", () => {
   const app = buildApp();
   afterAll(async () => { await app.close(); await resetDb(); });

@@ -1,10 +1,12 @@
 import type { FastifyInstance, InjectOptions } from "fastify";
 import {
   RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MAX_INFLIGHT, RELAY_REQUEST_BODY_MAX_BYTES, RELAY_RESPONSE_MAX_BYTES,
-  relayBodyAllowed, relayRouteAllowed, splitUtf8, utf8Bytes, zHubToClientFrame, type RelayReqFrame,
+  grantsCapability, relayBodyAllowed, relayRouteAllowed, remoteCapabilityFor, splitUtf8, utf8Bytes,
+  zHubToClientFrame, type HubToClientFrame, type RelayReqFrame,
 } from "@hanoman/shared";
 import { controlHost, loadIngressPolicy } from "../ingress-policy";
 import { appendEvent } from "../logs/event-log";
+import { getSetting } from "../settings";
 import { encodeRelayActor } from "./gate";
 import { relaySecret } from "./secret";
 
@@ -44,6 +46,8 @@ export function injectableFrom(app: FastifyInstance): InjectableApp {
 // `classifyIngress` menjawab 404 untuk host asing (spike S0a), dan `inject` tanpa host = `localhost:80`.
 const defaultHost = (): string => controlHost(loadIngressPolicy(process.env)) ?? "127.0.0.1";
 const JSON_TYPE = "application/json; charset=utf-8";
+// TODO(Task 8): stub sampai `pty.ts` punya `paneGeometry(id)` — diisi geometri nyata di sana.
+function paneGeometryFor(_path: string): { cols: number; rows: number } | undefined { return undefined; }
 
 export function createRelayDispatcher(o: {
   app: InjectableApp;
@@ -60,6 +64,7 @@ export function createRelayDispatcher(o: {
   const now = o.now ?? Date.now;
   const syncOnce = o.syncOnce ?? (async () => {});
   const inflight = new Map<string, { cancelled: boolean }>();
+  const streams = new Map<string, { mode: "read" | "write"; ws: InjectedWs }>();
 
   const send = (frame: Record<string, unknown>): void => {
     try { o.send(JSON.stringify(frame)); } catch { /* socket tertutup — hub menganggap offline */ }
@@ -131,6 +136,42 @@ export function createRelayDispatcher(o: {
     }
   }
 
+  // AC-C2/C3/C8 · jalur `open` milik SPEC-1218: hub minta klien membuka ulang stream WS (terminal
+  // baca/tulis, /events/ws) via `injectWS`, mencermin `handleReq` untuk request satu-tembak.
+  async function handleOpen(f: Extract<HubToClientFrame, { t: "open" }>): Promise<void> {
+    const grant = (await getSetting()).remoteControl;
+    const override = remoteCapabilityFor("GET", f.path, f.mode);
+    const ok = override ? grantsCapability(grant.capabilities, override) : relayRouteAllowed("GET", f.path);
+    if (!ok) { send({ t: "close", sid: f.sid, code: 4403, reason: "capability required" }); return; }
+    if (!o.app.injectWS) { send({ t: "close", sid: f.sid, code: 4502, reason: "injectWS tak didukung" }); return; }
+    await o.app.injectWS(f.path, {
+      headers: { host: host(), [RELAY_HEADER]: relaySecret(), [RELAY_ACTOR_HEADER]: encodeRelayActor(f.actor) },
+    }, {
+      onOpen: (ws) => {
+        streams.set(f.sid, { mode: f.mode, ws });
+        send({ t: "opened", sid: f.sid, geometry: paneGeometryFor(f.path) });
+        ws.on("message", (raw: Buffer) => {
+          for (const part of splitUtf8(raw.toString("utf8"))) send({ t: "data", sid: f.sid, d: part });
+        });
+        ws.on("close", (code: number, reason: Buffer) => {
+          streams.delete(f.sid);
+          send({ t: "close", sid: f.sid, code, reason: reason?.toString() });
+        });
+      },
+    });
+    void appendEvent({ kind: "remote.stream", level: "info", msg: `open ${f.path}`, data: { actor: f.actor, path: f.path, mode: f.mode, sid: f.sid } });
+  }
+
+  function handleStreamData(f: { sid: string; d: string }): void {
+    const s = streams.get(f.sid);
+    if (!s) return;
+    let m: { t?: string };
+    try { m = JSON.parse(f.d); } catch { return; }
+    if (m.t === "resize") return;
+    if ((m.t === "in" || m.t === "diag") && s.mode !== "write") return;
+    s.ws.send(f.d);
+  }
+
   return {
     onMessage(raw: string): void {
       let parsed: ReturnType<typeof zHubToClientFrame.safeParse>;
@@ -139,9 +180,12 @@ export function createRelayDispatcher(o: {
       const f = parsed.data;
       if (f.t === "req") { void handleReq(f); return; }
       if (f.t === "cancel") { const e = inflight.get(f.id); if (e) e.cancelled = true; return; }
-      // Keputusan Plan P10 · stream milik SPEC-1218. Jawab tutup, jangan diam: hub versi C yang
-      // bicara ke klien versi A tak perlu menunggu RELAY_OPEN_TIMEOUT_MS.
-      if (f.t === "open") send({ t: "close", sid: f.sid, code: 4502, reason: "stream relay belum didukung klien ini" });
+      if (f.t === "open") { void handleOpen(f); return; }
+      if (f.t === "data") { handleStreamData(f); return; }
+      if (f.t === "credit" || f.t === "close") {
+        if (f.t === "close") { streams.get(f.sid)?.ws.close(f.code, f.reason); streams.delete(f.sid); }
+        return;
+      }
     },
     cancelAll(): void { for (const e of inflight.values()) e.cancelled = true; },
     inflight: (): number => inflight.size,
