@@ -3,6 +3,8 @@ import { buildApp } from "../src/app";
 import { listSessions } from "../src/services/pty";
 import { prisma } from "../src/db";
 import { capabilityForRoute } from "../src/services/agent-capabilities";
+import { issueDeviceToken } from "../src/services/device-token";
+import { recordPresence, __resetPresence } from "../src/services/presence/registry";
 import { resetDb, makeProject, makeSpec } from "./factory";
 
 // Overlay stage-live & daftar sesi membaca tmux nyata; di test tak ada pane. Mock keduanya —
@@ -18,6 +20,8 @@ const post = (id: string, body: unknown = {}) =>
 
 beforeEach(async () => {
   await resetDb();
+  __resetPresence();
+  await prisma.deviceToken.deleteMany(); await prisma.user.deleteMany();
   await makeProject({ id: "p1" });
   vi.mocked(listSessions).mockReturnValue([]);
 });
@@ -86,5 +90,29 @@ describe("SPEC-804 · ADR-0120 · POST /specs/:id/done", () => {
 
   it("capability-nya backlog:write, bukan cookie-only", () => {
     expect(capabilityForRoute("POST", "/api/specs/SPEC-810/done")).toBe("backlog:write");
+  });
+
+  // SPEC-1216 · ADR-0165 §5/§6/§8 · lapis kedua gerbang presence: `live` di atas hanya melihat
+  // tmux MESIN INI (mock `listSessions`); ini menguji device LAIN yang sedang mengerjakan spec
+  // yang sama, dilihat lewat presenceView() (join registry in-memory + DeviceToken sungguhan —
+  // lihat catatan Task 5 di server/src/services/session-launch.ts).
+  it("gerbang presence lapis kedua: device lain kerjakan spec ini → 409 confirm-required (AC-B6)", async () => {
+    await makeSpec({ id: "SPEC-820", projectId: "p1", stage: "executing" });
+    const u = await prisma.user.create({ data: { email: "dgate@d.co", passwordHash: "x:y" } });
+    const t = await issueDeviceToken(u.id, "laptop");
+    recordPresence(t.id, [{ sessionId: "s1", projectId: "p1", specId: "SPEC-820", agent: "claude", status: "working", startedAt: new Date().toISOString() }]);
+    const res = await post("SPEC-820");
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("confirm-required");
+    expect(res.json().session).toEqual({ id: "s1", deviceId: t.id, name: "laptop" });
+  });
+
+  it("confirm:true melewati gerbang presence lapis kedua", async () => {
+    await makeSpec({ id: "SPEC-821", projectId: "p1", stage: "executing" });
+    const u = await prisma.user.create({ data: { email: "dgate2@d.co", passwordHash: "x:y" } });
+    const t = await issueDeviceToken(u.id, "laptop");
+    recordPresence(t.id, [{ sessionId: "s1", projectId: "p1", specId: "SPEC-821", agent: "claude", status: "working", startedAt: new Date().toISOString() }]);
+    const res = await post("SPEC-821", { confirm: true });
+    expect(res.statusCode).not.toBe(409);
   });
 });

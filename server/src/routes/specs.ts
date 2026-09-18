@@ -22,6 +22,9 @@ import { recordSourceChange } from "../services/notifications";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { completeSpecManually } from "../services/spec-complete";
+import { presenceView } from "../services/presence/view";
+import { remoteSessionVerdict } from "../services/presence/remote-session";
+import { recentlyOffline } from "../services/presence/registry";
 import {
   addSpecAttachments, deleteSpecAttachment, dropSpecAttachments, listSpecAttachments,
   SPEC_ATTACHMENT_LIMITS, type SpecUpload,
@@ -349,8 +352,25 @@ export default async function (app: FastifyInstance) {
     const live = listSessions().find((s) => s.specId === id && !s.exited);
     if (live && parsed.data.confirm !== true)
       return reply.code(409).send({ error: "confirm-required", session: { id: live.id, agent: live.agent } });
+    // SPEC-1216 · ADR-0165 §5/§6/§8 · lapis kedua gerbang presence: `live` di atas hanya melihat
+    // tmux MESIN INI. Tanpanya, item yang sedang dikerjakan device LAIN bisa ditandai selesai
+    // dari sini tanpa operator itu pernah tahu — sejalan gerbang startSpecSession (Task 5).
+    if (!live) {
+      const view = await presenceView();
+      const verdict = remoteSessionVerdict({
+        specId: id, now: Date.now(), devices: view.devices,
+        recentlyOffline: recentlyOffline(id), lastResultDeviceId: null,
+      });
+      if (verdict.kind !== "ok" && parsed.data.confirm !== true) {
+        return reply.code(409).send({
+          error: "confirm-required",
+          session: verdict.remote.sessionId ? { id: verdict.remote.sessionId, deviceId: verdict.remote.deviceId, name: verdict.remote.name } : undefined,
+        });
+      }
+    }
     const res = await completeSpecManually(spec, {
-      by: req.user?.email ?? "system", reason: parsed.data.reason || undefined,
+      by: req.user?.email ?? (req.remote ? `remote:${req.remote.actor.email}@${req.remote.actor.hubOrigin}` : "system"),
+      reason: parsed.data.reason || undefined,
     });
     // count 0 = sesi/overlay menyelesaikannya di bawah kita antara findUnique dan CAS.
     if (!res.ok) return reply.code(409).send({ error: "backlog item sudah selesai" });

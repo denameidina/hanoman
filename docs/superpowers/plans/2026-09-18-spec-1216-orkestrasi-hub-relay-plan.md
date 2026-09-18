@@ -979,7 +979,7 @@ git commit -m "feat(spec-1216): gerbang presence startSpecSession + 409 remote-s
 **Interfaces:**
 - Consumes: `remoteSessionVerdict()`, `recentlyOffline()`, `presenceView()` (Task 4/5, pola sama).
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```bash
 grep -n "specs/:id/done\|confirm-required" server/test/specs.route.test.ts | head -10
@@ -1002,7 +1002,7 @@ it("confirm:true melewati gerbang presence", async () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1010,7 +1010,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: FAIL (status 200, bukan 409).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/routes/specs.ts`, sesudah cek `if (live && parsed.data.confirm !== true) return reply.code(409)...`,
 tambahkan lapis kedua SEBELUM `completeSpecManually`:
@@ -1043,7 +1043,7 @@ import { remoteSessionVerdict } from "../services/presence/remote-session";
 import { recentlyOffline } from "../services/presence/registry";
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 ```bash
 env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
@@ -1051,7 +1051,7 @@ env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL=
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/specs.ts server/test/specs.route.test.ts
