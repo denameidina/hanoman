@@ -8,6 +8,7 @@ import { registerBacklogSource } from "./services/scheduler/sources/backlog";
 import { registerTriaseSource } from "./services/scheduler/sources/triase";
 import { installSessionHistory, reconcileHistory } from "./services/session-history";
 import { installEventTap } from "./services/logs/event-log";
+import { installConsoleTap } from "./services/logs/console-tap";
 import { getSetting } from "./services/settings";
 import { detectOrphanWorktrees } from "./services/worktree-project";
 import { installCustomAgents } from "./services/custom-agents";
@@ -114,6 +115,10 @@ bootstrapReady.then(async () => {
   // SPEC-1215 · ADR-0166 · tap event lokal (lahir/tutup sesi). Hook sesi kini aditif, jadi ia berdiri
   // di samping riwayat sesi, bukan menggantikannya.
   installEventTap({ transcriptEnabled: async () => (await getSetting()).logShipping.transcript });
+  // SPEC-1217 · D4/AC-S3 · sadapan console dipasang di boot bila lajur `server` sudah menyala dari
+  // Setting tersimpan — toggle setelahnya dilayani `updateRemoteControl()` tanpa restart.
+  const bootSetting = await getSetting();
+  if (bootSetting.logShipping.server) installConsoleTap();
   // SPEC-402 · `listSessions()` boleh MELEMPAR (kegagalan tmux ≠ tak ada sesi). Rekonsiliasi yang
   // berjalan atas daftar kosong palsu akan menutup baris riwayat sesi yang justru masih berjalan —
   // "selesai padahal belum" versi tabel. Lewati saja: barisnya tetap terbuka sampai boot berikutnya.

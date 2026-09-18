@@ -2273,7 +2273,7 @@ git commit -m "feat(server): pruneLogs() + reconcileRemoteTranscripts() di runRe
 **Interfaces:**
 - Consumes: `installConsoleTap`/`uninstallConsoleTap`/`isConsoleTapInstalled` (Task 5).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-console-toggle.test.ts
@@ -2301,12 +2301,12 @@ describe("toggle lajur server memasang/mencabut sadapan console tanpa restart", 
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-console-toggle.test.ts`
 Expected: FAIL — sadapan belum dipasang/dicabut dari `updateRemoteControl`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Modify `server/src/services/remote-control.ts`:
 
@@ -2328,17 +2328,17 @@ const bootSetting = await getSetting();
 if (bootSetting.logShipping.server) installConsoleTap();
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-console-toggle.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Run existing remote-control suite (regresi nol)**
+- [x] **Step 5: Run existing remote-control suite (regresi nol)**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/remote-control.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/remote-control.ts server/src/server.ts server/test/log-console-toggle.test.ts
