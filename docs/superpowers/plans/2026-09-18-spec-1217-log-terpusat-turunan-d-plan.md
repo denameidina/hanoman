@@ -1511,7 +1511,7 @@ git commit -m "feat(server): ingestBatch() redaksi lapis 2 + HWM transaksi + kuo
 **Interfaces:**
 - Consumes: `zLogBatch` (Task 1), `ingestBatch` (Task 11), `saveTranscript`/transcript path per-device (`$HANOMAN_HOME/remote-transcripts/<deviceId>/<seq>.txt`, tulis langsung `writeFile`+`rename` — bukan `saveTranscript` yang menulis ke `transcriptDir()` sesi; ini path terpisah per S3.4).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/log-ingest.route.test.ts
@@ -1566,12 +1566,12 @@ describe("POST /api/sync/logs", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-ingest.route.test.ts`
 Expected: FAIL — handler masih `501`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Ganti blok `return reply.code(501).send(...)` di Task 10 dengan:
 
@@ -1625,12 +1625,12 @@ data: fresh.map((e) => {
 }),
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `env -u HANOMAN_CONTROL_ORIGINS -u DATABASE_URL -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/log-ingest.route.test.ts server/test/log-sync-parser.test.ts server/test/log-ingest.service.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/sync.ts server/src/services/logs/ingest.ts server/test/log-ingest.route.test.ts

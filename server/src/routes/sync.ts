@@ -1,9 +1,12 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { gunzipSync, gzipSync } from "node:zlib";
+import { mkdir, rename, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { z } from "zod";
+import { resolveDataDirs } from "@hanoman/runner";
 import {
   LOG_BODY_MAX_BYTES, LOG_DECODED_MAX_BYTES, PRESENCE_MAX_FRAMES_PER_MIN, RELAY_MAX_FRAMES_PER_MIN,
-  zCapacityFrame, zPresenceFrame,
+  zCapacityFrame, zLogBatch, zPresenceFrame,
 } from "@hanoman/shared";
 import { prisma } from "../db";
 import { requireDeviceToken } from "../services/device-auth";
@@ -18,6 +21,7 @@ import { syncNow, fetchTransport } from "../services/sync-client";
 import { listPendingDeletes } from "../services/sync-delete";
 import { listConflicts, resolveConflict } from "../services/conflicts";
 import { readUpload } from "../services/uploads";
+import { ingestBatch } from "../services/logs/ingest";
 import { effectiveStr } from "../config";
 import { bearerToken, openWsConnection, revalidateWsPrincipal, WsMessageGuard } from "../services/ws-admission";
 
@@ -146,10 +150,30 @@ export default async function (app: FastifyInstance) {
         }
       });
 
-    logs.post("/sync/logs", { preHandler: requireDeviceToken }, async (_req, reply) => {
-      // Task 12 mengisi parsing zLogBatch + ingest penuh di sini (req.body sudah berupa Buffer
-      // JSON terdekompresi, hasil parser di atas).
-      return reply.code(501).send({ error: "not implemented" });
+    logs.post("/sync/logs", { preHandler: requireDeviceToken }, async (req, reply) => {
+      let parsedJson: unknown;
+      try { parsedJson = JSON.parse((req.body as Buffer).toString("utf8")); }
+      catch { return reply.code(400).send({ error: "invalid json" }); }
+      const parsed = zLogBatch.safeParse(parsedJson);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+      const deviceId = req.device!.id;
+
+      // S3.4 · transkrip ditulis SEBELUM ingest (berkas yatim dipungut sapuan; tak pernah baris
+      // tanpa berkas). tmp+rename per entri ber-transkrip.
+      const withTranscriptKey = await Promise.all(parsed.data.entries.map(async (e) => {
+        if (!e.transcript) return e;
+        const dir = join(resolveDataDirs().home, "remote-transcripts", deviceId);
+        await mkdir(dir, { recursive: true, mode: 0o700 });
+        const final = join(dir, `${e.seq}.txt`);
+        const tmp = `${final}.tmp`;
+        await writeFile(tmp, e.transcript, { encoding: "utf8", mode: 0o600 });
+        await rename(tmp, final);
+        const { transcript: _drop, ...rest } = e;
+        return { ...rest, data: { ...(e.data ?? {}), __transcriptKey: `${deviceId}/${e.seq}.txt` } };
+      }));
+
+      const result = await ingestBatch(deviceId, { lane: parsed.data.lane, entries: withTranscriptKey });
+      return reply.code(result.status).send(result.body);
     });
   });
 

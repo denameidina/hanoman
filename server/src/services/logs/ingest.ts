@@ -61,11 +61,17 @@ export async function ingestBatch(deviceId: string, batch: LogBatch): Promise<In
     const duplicate = redacted.length - fresh.length;
     if (fresh.length > 0) {
       await tx.logEntry.createMany({
-        data: fresh.map((e) => ({
-          deviceId, lane, seq: BigInt(e.seq), ts: new Date(e.ts), level: e.level, kind: e.kind,
-          projectId: e.projectId ?? null, specId: e.specId ?? null, sessionId: e.sessionId ?? null,
-          msg: e.msg, data: e.data ?? undefined, bytes: Buffer.byteLength(e.msg, "utf8"),
-        })),
+        data: fresh.map((e) => {
+          const raw = (e.data ?? {}) as Record<string, unknown>;
+          const { __transcriptKey, ...rest } = raw;
+          return {
+            deviceId, lane, seq: BigInt(e.seq), ts: new Date(e.ts), level: e.level, kind: e.kind,
+            projectId: e.projectId ?? null, specId: e.specId ?? null, sessionId: e.sessionId ?? null,
+            msg: e.msg, data: Object.keys(rest).length ? rest : undefined,
+            transcriptKey: (__transcriptKey as string) ?? null,
+            bytes: Buffer.byteLength(e.msg, "utf8"),
+          };
+        }),
       });
       const lastSeq = BigInt(fresh[fresh.length - 1]!.seq);
       await tx.logCursor.upsert({
