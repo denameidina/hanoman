@@ -20,6 +20,7 @@ const view = (over: Partial<PresenceView> = {}): PresenceView => ({
       status: "exited", startedAt: "2026-08-24T00:00:00.000Z", statusAt: "2026-08-24T00:00:00.000Z",
     }],
   }],
+  hubVersion: "1.0.0",
   ...over,
 });
 

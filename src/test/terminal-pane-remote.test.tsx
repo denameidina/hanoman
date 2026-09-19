@@ -1,3 +1,4 @@
+import type { RemoteCapability } from "@hanoman/shared";
 import { render, cleanup, act, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TerminalPane } from "../src/screens/TerminalPane";
@@ -56,7 +57,7 @@ class FakeWebSocket {
 
 const remoteInstance = {
   kind: "remote" as const, deviceId: "dev1", name: "laptop", version: "0.5.0", protocol: 1,
-  capabilities: ["sessions:read"] as const,
+  capabilities: ["sessions:read"] as RemoteCapability[],
 };
 
 const paneHost = (container: HTMLElement): HTMLElement =>

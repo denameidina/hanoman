@@ -1,3 +1,4 @@
+import type { RemoteCapability } from "@hanoman/shared";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IdeReadPanel } from "../src/screens/IdeReadPanel";
@@ -22,7 +23,7 @@ vi.mock("../src/api/client", () => ({
 
 const remoteInstance = {
   kind: "remote" as const, deviceId: "dev1", name: "laptop", version: "0.5.0", protocol: 1,
-  capabilities: ["sessions:read"] as const,
+  capabilities: ["sessions:read"] as RemoteCapability[],
 };
 
 beforeEach(() => {

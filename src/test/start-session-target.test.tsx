@@ -30,12 +30,12 @@ const handledBy = (deviceId: string, name = deviceId): HandledByEntry[] => [{ de
 
 describe("startTargets (SPEC-1216 · AC-B7/B8)", () => {
   it("urutan: hub ini dulu, lalu handledBy, lalu device lain", () => {
-    const view: PresenceView = { enabled: true, devices: [dev({ deviceId: LOCAL_DEVICE_ID }), dev({ deviceId: "dB" }), dev({ deviceId: "dA" })] };
+    const view: PresenceView = { enabled: true, devices: [dev({ deviceId: LOCAL_DEVICE_ID }), dev({ deviceId: "dB" }), dev({ deviceId: "dA" })], hubVersion: "1.0.0" };
     const out = startTargets(view, handledBy("dA"));
     expect(out.map((t) => t.deviceId)).toEqual([LOCAL_DEVICE_ID, "dA", "dB"]);
   });
   it("eligible = online ∧ control available ∧ sessions:spawn ∧ kapasitas tak penuh", () => {
-    const view: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA" })] };
+    const view: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA" })], hubVersion: "1.0.0" };
     expect(startTargets(view, handledBy("dA"))[1]).toMatchObject({ deviceId: "dA", eligible: true });
   });
   it.each([
@@ -46,11 +46,11 @@ describe("startTargets (SPEC-1216 · AC-B7/B8)", () => {
     ["kapasitas penuh (liveAgentCount≥max)", { capacity: { enabled: true, liveCount: 5, liveAgentCount: 5, maxConcurrent: 5, loadPerCore: 0.1, maxLoadPerCore: 1, loadStatus: "available" } }, "capacity-full"],
     ["kapasitas penuh (load>ambang)", { capacity: { enabled: true, liveCount: 1, liveAgentCount: 1, maxConcurrent: 5, loadPerCore: 2, maxLoadPerCore: 1, loadStatus: "available" } }, "capacity-full"],
   ] as const)("%s → reason %s", (_label, over, reason) => {
-    const view: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA", ...(over as Partial<PresenceDeviceView>) })] };
+    const view: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA", ...(over as Partial<PresenceDeviceView>) })], hubVersion: "1.0.0" };
     expect(startTargets(view, handledBy("dA"))[1]).toMatchObject({ deviceId: "dA", eligible: false, reason });
   });
   it("capacity === null bukan alasan menolak", () => {
-    const view: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA", capacity: null })] };
+    const view: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA", capacity: null })], hubVersion: "1.0.0" };
     expect(startTargets(view, handledBy("dA"))[1]).toMatchObject({ deviceId: "dA", eligible: true });
   });
 });
@@ -62,8 +62,8 @@ const settings = (over: object = {}) => ({
   agentAccessEnabled: false, scheduler: {}, goal: { enabled: false, condition: "" },
   agent: "claude", codex: { model: "gpt-5.6-sol", effort: "xhigh" }, ...over,
 });
-const viewWithDA: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA", name: "laptop-dA" })] };
-const viewAllOffline: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA", online: false })] };
+const viewWithDA: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA", name: "laptop-dA" })], hubVersion: "1.0.0" };
+const viewAllOffline: PresenceView = { enabled: true, devices: [dev({ deviceId: "dA", online: false })], hubVersion: "1.0.0" };
 
 describe("StartSessionModal — target picker (SPEC-1216 · AC-B7/B8)", () => {
   beforeEach(() => {

@@ -193,7 +193,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     (async () => {
       try {
         const [view, handledByRaw] = await Promise.all([
-          typeof api.presence === "function" ? api.presence() : Promise.resolve({ enabled: false, devices: [] } as PresenceView),
+          typeof api.presence === "function" ? api.presence() : Promise.resolve({ enabled: false, devices: [], hubVersion: "" } as PresenceView),
           typeof api.getProject === "function"
             ? api.getProject(spec.projectId).then((p) => p.handledBy ?? []).catch(() => [] as HandledByEntry[])
             : Promise.resolve([] as HandledByEntry[]),
@@ -926,7 +926,7 @@ function AppInner() {
      Muat awal HTTP-nya SENGAJA tidak di sini melainkan di `ClientsScreen`: `load()` adalah efek
      yang dijalankan SETIAP test yang me-mount App, dan menambah satu panggilan `api` di sana
      mematahkan 20 test ber-mock parsial sekaligus (kelas jebakan SPEC-884). */
-  const [presence, setPresence] = React.useState<PresenceView>({ enabled: false, devices: [] });
+  const [presence, setPresence] = React.useState<PresenceView>({ enabled: false, devices: [], hubVersion: "" });
 
   /* SPEC-961 · angka "butuh pengajuan" per permukaan nav, didorong grup siar `pending`. `null`
      sampai frame pertama tiba — sengaja BUKAN nol: server yang lebih tua tak pernah mengirim frame
@@ -985,7 +985,7 @@ function AppInner() {
     if (m.t === "specs") { setBacklog(m.specs); setDataVersion((v) => v + 1); }
     else if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
     else if (m.t === "leadAsks") setLeadAsks(m.asks);
-    else if (m.t === "presence") setPresence({ enabled: m.enabled, devices: m.devices });
+    else if (m.t === "presence") setPresence({ enabled: m.enabled, devices: m.devices, hubVersion: m.hubVersion });
     else if (m.t === "pending") setPending(m.counts);
   }), []);
 

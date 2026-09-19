@@ -830,7 +830,7 @@ export type EventMsg =
   // SPEC-919 · ADR-0147 · grup GLOBAL ke-10: sesi hidup di semua device yang tersambung ke hub ini.
   // Grup, bukan topik berlangganan (ADR-0145): muatannya tak berparameter — satu snapshot yang
   // sama untuk semua penonton.
-  | { t: "presence"; enabled: boolean; devices: PresenceDeviceView[] }
+  | { t: "presence"; enabled: boolean; devices: PresenceDeviceView[]; hubVersion: string }
   // SPEC-961 · grup GLOBAL ke-11: berapa banyak yang masih menunggu PENGAJUAN operator, per
   // permukaan nav. Angka, bukan daftar: yang dibutuhkan sidebar cuma "apakah ada, berapa" — dan
   // daftar yang sudah disiarkan (`specs`) tak cukup menjawabnya sendiri (tiket, issue GitHub, dan

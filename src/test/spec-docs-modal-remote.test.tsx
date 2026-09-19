@@ -1,3 +1,4 @@
+import type { RemoteCapability } from "@hanoman/shared";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SpecDocsModal } from "../src/screens/SpecDocsModal";
@@ -15,7 +16,7 @@ afterEach(() => vi.clearAllMocks());
 
 const remoteInstance = {
   kind: "remote" as const, deviceId: "dev1", name: "laptop", version: "0.5.0", protocol: 1,
-  capabilities: ["sessions:read"] as const,
+  capabilities: ["sessions:read"] as RemoteCapability[],
 };
 
 describe("SpecDocsModal (SPEC-1218 · AC-C1)", () => {
