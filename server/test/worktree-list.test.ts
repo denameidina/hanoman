@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { parseWorktreePorcelain, listWorktrees, worktreeStats, type WorktreeInputs } from "../src/services/worktree-list";
+import { parseWorktreePorcelain, listWorktrees, worktreeStats, deleteWorktrees, type WorktreeInputs } from "../src/services/worktree-list";
 
 // SPEC-861 · ADR-0132 · penemuan worktree HIDUP. Modul yang diuji di sini murni: tak menyentuh DB
 // maupun tmux, jadi seluruh berkas ini berjalan atas repo git sungguhan saja.
@@ -227,5 +227,24 @@ describe("worktreeStats", () => {
     const s = await worktreeStats(dir, await find(dir, "gone"));
     expect(s.dirtyFiles).toBe(0);
     expect(s.sizeBytes).toBeNull();
+  });
+});
+
+describe("deleteWorktrees — worktree terkunci", () => {
+  it("membuka kunci lebih dulu lalu melepas & prune, sehingga registrasi lenyap", async () => {
+    const dir = repo();
+    g(dir, "worktree", "lock", join(dir, ".worktrees", "wt-feat"));
+    const calls: string[] = [];
+    const r = await deleteWorktrees(dir, ["wt-feat"], {
+      ...NONE,
+      closeSession: async () => null,
+      release: (repo, path) => { rmSync(path, { recursive: true, force: true }); calls.push("release"); return "e"; },
+      unlock: async (repo, path) => { g(repo, "worktree", "unlock", path); calls.push("unlock"); },
+      prune: async (repo) => { g(repo, "worktree", "prune"); calls.push("prune"); },
+      deleteBranch: async () => ({ ok: true }),
+    });
+    expect(r.results[0]!.ok).toBe(true);
+    expect(calls).toEqual(["unlock", "release", "prune"]);
+    expect((await listWorktrees(dir, NONE)).worktrees.some((w) => w.name === "wt-feat")).toBe(false);
   });
 });

@@ -203,6 +203,8 @@ export type WorktreeDeleteDeps = {
   /** `worktree-reaper.releaseWorktree` — `rename` ke `.trash`, byte-nya milik penyapu (SPEC-742). */
   release: (repoDir: string, path: string) => string | null;
   prune: (repoDir: string) => Promise<void>;
+  /** `git worktree unlock` — registrasi terkunci tak disapu `prune`, jadi harus dibuka dulu. */
+  unlock: (repoDir: string, path: string) => Promise<void>;
   /** `branch-cleanup.deleteBranches` BESERTA pagar kuncinya — jangan tulis jalur kedua. */
   deleteBranch: (repoDir: string, name: string) => Promise<{ ok: boolean; error?: string }>;
 };
@@ -267,6 +269,7 @@ export async function deleteWorktrees(
       // Sesi hidup ditutup lewat jalur penutupan sesi yang SUDAH ADA — bukan mencabut direktori
       // dari bawah proses yang masih jalan. Jalur itu juga yang memajukan stage & mencatat headSha
       // selagi worktree-nya masih di tempatnya, lalu melepasnya sendiri.
+      if (w.locked) await opts.unlock(report.repoDir, w.path);
       if (w.session) {
         const closed = await opts.closeSession(w.session.id);
         row.closedSession = w.session.id;

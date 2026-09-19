@@ -553,6 +553,10 @@ export default async function (app: FastifyInstance) {
       ...(await worktreeInputs(id)),
       closeSession,
       release: (repo, path) => releaseWorktree(repo, path, id),
+      // Worktree terkunci (`git worktree lock`) tetap boleh dihapus dari IDE: buka kuncinya dulu.
+      unlock: async (repo, path) => {
+        await execAsync("git", ["worktree", "unlock", path], { cwd: repo, timeout: 30_000 });
+      },
       prune: async (repo) => {
         // Gagal-diam: registrasi basi bukan alasan menahan penghapusan (cermin prodReaperDeps).
         try { await execAsync("git", ["worktree", "prune"], { cwd: repo, timeout: 30_000 }); } catch { /* */ }
