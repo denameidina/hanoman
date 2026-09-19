@@ -1,5 +1,6 @@
 import { resolveTools, MENTION_MAX_HOPS, MENTION_TOOL } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "./code-style";
+import { DECIDER } from "./prompt";
 
 // SPEC-450/950 · ADR-0094/0159 · bagian murni renderer native dua runtime. Claude menerima JSON
 // `--agents`; Codex TOML dirakit di `codex-agent-config.ts`. Pemanggil yang menulis berkas temp.
@@ -91,9 +92,15 @@ const handoffClause = (): string[] => [
   "Kontrak serah-terima:",
   "- Masukan yang harus kamu gunakan: tujuan, scope, base SHA, kandidat yang diperiksa termasuk",
   "  dirty changes, bukti sebelumnya, dan aturan verifikasi. Bila ada yang hilang, nyatakan batasnya.",
-  "- Awali laporan dengan `Status: selesai | sebagian | terhalang`.",
+  "- Awali laporan dengan `Status: selesai | sebagian | terhalang | menunggu-keputusan`.",
   "- Laporkan simpulan, jangkar bukti, tingkat keyakinan, scope yang belum diperiksa, dan langkah",
   "  berikutnya. Batas laporan: maksimal 12 temuan utama dan maksimal 1200 kata.",
+  // ADR-0167 · batas temuan di atas bukan batas pertanyaan: keputusan terbuka tak berbatas.
+  "- `Keputusan terbuka:` (wajib) setiap hal yang masih ambigu dan akan mempengaruhi hasil — data",
+  "  model, kontrak API, scope, asumsi yang terpaksa diambil — sebagai pertanyaan bernomor diakhiri `?`",
+  "  beserta opsi dan rekomendasimu, tanpa batas jumlah; `-` bila tak ada.",
+  "  Jangan memutuskannya sendiri: bila ada, laporkan `Status: menunggu-keputusan` dan berhenti.",
+  `  Yang menjawab ${DECIDER}.`,
 ];
 
 export function agentPromptOf(
@@ -196,12 +203,21 @@ export function agentDelegationClause(
   // ADR-0164 · agen fase bukan custom agent: kontrak delegasinya ada di prompt orchestrator,
   // jadi mereka tak pernah ikut klausa ini — di kedua runtime, dari satu tempat.
   if (defs.every((def) => def.kind === "phase")) return "";
+  const codex = runtime === "codex";
+  // ADR-0167 · relay yang sama dengan orchestrator langkah 4; codex tak punya AskUserQuestion (M-6).
+  const relay = codex
+    ? "ajukan semuanya di terminal ini (bernomor, tiap pertanyaan diakhiri `?`), lalu teruskan jawabannya "
+      + "lewat send_input ke agent id yang sama"
+    : "ajukan semuanya lewat AskUserQuestion (pecah per 4 pertanyaan), lalu teruskan jawabannya lewat "
+      + "SendMessage ke agent ID yang sama";
   return [
     "",
     "",
-    `Delegasikan tugas yang relevan melalui ${runtime === "codex" ? "spawn_agent" : MENTION_TOOL}. `
+    `Delegasikan tugas yang relevan melalui ${codex ? "spawn_agent" : MENTION_TOOL}. `
       + "Sertakan tujuan, scope, base SHA, kandidat termasuk dirty changes, bukti sebelumnya, "
-      + "dan aturan verifikasi. Tinjau hasil subagent sebelum digunakan.",
+      + "dan aturan verifikasi. Tinjau hasil subagent sebelum digunakan. "
+      + `Bila laporannya memuat \`Keputusan terbuka:\` yang bukan \`-\`, JANGAN menjawabnya sendiri: ${relay}. `
+      + `Yang menjawab ${DECIDER}.`,
     "",
   ].join("\n");
 }

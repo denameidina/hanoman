@@ -176,12 +176,13 @@ describe("startPrompt", () => {
     }
   });
 
-  // SPEC-187 · ADR-0035: lanjut antar-fase tanpa berhenti; berhenti hanya untuk keputusan manusia.
-  it("feature/qa: menyuruh terus lanjut antar-fase, berhenti hanya untuk keputusan manusia", () => {
+  // SPEC-187 · ADR-0035: lanjut antar-fase tanpa berhenti; berhenti hanya untuk yang ambigu — dan sejak
+  // ADR-0167 pemutusnya lead (bila aktif) atau manusia, bukan selalu manusia.
+  it("feature/qa: menyuruh terus lanjut antar-fase, berhenti hanya untuk keputusan ambigu", () => {
     for (const flow of ["feature", "qa"] as const) {
       const p = startPrompt(flow, spec, "b");
       expect(p).toContain("tanpa berhenti di batas antar-fase");
-      expect(p).toContain("keputusan manusia");
+      expect(p).toContain("Berhenti HANYA untuk hal yang masih ambigu");
     }
   });
 
@@ -218,25 +219,33 @@ describe("startPrompt", () => {
 
 // SPEC-298 · klausa autonomy per mode untuk sesi yang diluncurkan scheduler.
 describe("autonomy per mode (SPEC-298)", () => {
-  it("full-control: putuskan sendiri, tanpa pengawas, tembus sampai done — bukan klausa tanya", () => {
+  // ADR-0167 · full-control mencabut checkpoint & menunggu persetujuan, BUKAN keputusan ambigu: itu tetap
+  // ditanyakan, dan hanoman yang merutekannya ke lead (bila aktif) atau manusia.
+  it("full-control: tembus sampai done tanpa checkpoint, tetapi keputusan ambigu tetap ditanyakan", () => {
     const p = startPrompt("feature", spec, "b", "full-control");
-    expect(p).toContain("TANPA pengawas");
-    expect(p).toContain("JANGAN berhenti");
-    expect(p).not.toContain("tanyakan di terminal");
+    expect(p).toContain("diluncurkan scheduler");
+    expect(p).toContain("sampai stage `done`");
+    expect(p).toContain("jangan menunggu persetujuan siapa pun");
+    expect(p).not.toContain("Putuskan sendiri di SETIAP percabangan");
+    expect(p).not.toContain("JANGAN berhenti bertanya");
+    expect(p).toContain("JANGAN memutuskan sendiri");
   });
-  it("butuh-keputusan: klausa lama (berhenti untuk keputusan manusia, tanya di terminal)", () => {
+  it.each(["full-control", "butuh-keputusan", undefined] as const)("%s: cara bertanya netral-agen, tanpa batas, pemutus lead/manusia", (mode) => {
+    const p = startPrompt("feature", spec, "b", mode);
+    expect(p).toContain("AskUserQuestion bila agenmu punya tool itu");
+    expect(p).toContain("tanyakan di terminal ini");
+    expect(p).toContain("Tak ada batas jumlah pertanyaan");
+    expect(p).toMatch(/hanoman-lead bila aktif.*selain itu manusia/);
+  });
+  it("butuh-keputusan: tetap tanpa berhenti di batas antar-fase; bukan klausa scheduler", () => {
     const p = startPrompt("feature", spec, "b", "butuh-keputusan");
     expect(p).toContain("tanpa berhenti di batas antar-fase");
-    expect(p).toContain("tanyakan di terminal");
-    expect(p).not.toContain("TANPA pengawas");
-  });
-  it("default (manual, tanpa arg): identik klausa lama", () => {
-    expect(startPrompt("feature", spec, "b")).toContain("tanyakan di terminal");
-    expect(startPrompt("feature", spec, "b")).not.toContain("TANPA pengawas");
+    expect(p).not.toContain("diluncurkan scheduler");
+    expect(startPrompt("feature", spec, "b")).not.toContain("diluncurkan scheduler");
   });
   it("continuePrompt menghormati mode full-control", () => {
     const p = continuePrompt("feature", spec, "b", "full-control");
-    expect(p).toContain("TANPA pengawas");
+    expect(p).toContain("diluncurkan scheduler");
   });
 });
 

@@ -36,8 +36,22 @@ describe("buildPhaseAgents (ADR-0164)", () => {
       });
       expect(d.instructions).toContain("KONTEKS-UJI");
       expect(d.instructions).toContain("JANGAN menulis `$HANOMAN_PHASE_FILE`");
-      expect(d.instructions).toContain("Status: selesai | sebagian | terhalang");
-      expect(d.instructions).toContain("Pertanyaan untuk manusia:");
+      expect(d.instructions).toContain("Status: selesai | sebagian | terhalang | menunggu-keputusan");
+      expect(d.instructions).toContain("`Keputusan terbuka:`");
+    }
+  });
+
+  // ADR-0167 · 166 run agen fase, 0 pertanyaan: asumsi jatuh ke prosa/`Rekomendasi fase:` yang tak dibaca
+  // orchestrator. Agen fase tak boleh memutuskan yang ambigu, dan daftarnya tak berbatas.
+  it("keputusan ambigu dilaporkan sebagai `Keputusan terbuka:` tanpa batas, bukan diputuskan sendiri", () => {
+    for (const d of agentsFor("feature")) {
+      expect(d.instructions).not.toContain("Pertanyaan untuk manusia:");
+      expect(d.instructions).toContain("TIDAK BOLEH memutuskan sendiri");
+      expect(d.instructions).toContain("asumsi yang terpaksa");
+      expect(d.instructions).toContain("tanpa batas jumlah");
+      expect(d.instructions).toContain("`selesai` hanya sah bila isinya `-`");
+      expect(d.instructions).toMatch(/hanoman-lead bila aktif.*selain itu manusia/);
+      expect(d.instructions).not.toMatch(/SATU pertanyaan|maksimal \d+ pertanyaan/i);
     }
   });
 

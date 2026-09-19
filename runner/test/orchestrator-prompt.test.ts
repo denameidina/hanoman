@@ -78,6 +78,27 @@ describe("orchestratorClause (ADR-0164)", () => {
     const c = orchestratorClause(plan("feature", "codex"));
     expect(c).toContain("Aturan ini berlaku walau klausa otonomi di prompt ini menyuruhmu tak bertanya");
   });
+
+  // ADR-0167 · keputusan terbuka ditanyakan SEMUA sebelum marker fase, tanpa batas, dan orchestrator
+  // tak pernah menjawab sendiri — lead (bila aktif) atau manusia yang memutuskan.
+  it.each(["claude", "codex"] as const)("%s: relay keputusan terbuka sebelum marker, tanpa batas, tak menjawab sendiri", (rt) => {
+    const c = orchestratorClause(plan("feature", rt));
+    expect(c).toContain("`Keputusan terbuka:`");
+    expect(c).toContain("`Status: menunggu-keputusan`");
+    expect(c).toContain("SEBELUM menulis marker fase");
+    expect(c).toContain("tak ada batas jumlah pertanyaan maupun putaran");
+    expect(c).toContain("JANGAN pernah menjawab sendiri");
+    expect(c).toMatch(/hanoman-lead bila aktif.*selain itu manusia/);
+    expect(c).not.toContain("putuskan sendiri");
+    expect(c).not.toContain("Pertanyaan untuk manusia:");
+  });
+  it("claude memecah >4 pertanyaan ke beberapa AskUserQuestion; codex satu pesan bernomor diakhiri ?", () => {
+    expect(orchestratorClause(plan("feature", "claude")))
+      .toContain("paling banyak 4 pertanyaan per panggilan, jadi pecah sisanya ke panggilan berikutnya");
+    const codex = orchestratorClause(plan("feature", "codex"));
+    expect(codex).toContain("tiap pertanyaan bernomor dan diakhiri `?`");
+    expect(codex).not.toContain("AskUserQuestion");
+  });
 });
 
 // I-2 · varian orchestrator dari klausa lanjutan audit (payload.fromAudit). Sesi tunggal boleh

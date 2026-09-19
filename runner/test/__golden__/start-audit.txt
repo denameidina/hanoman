@@ -26,7 +26,7 @@ Pilih `target` dari hasil auditmu, bukan default:
 
 `alternatives` boleh array kosong. Jangan menulis blok json lain di dokumen itu.
 
-Jalankan seluruh pipeline sampai tuntas tanpa berhenti di batas antar-fase. Checkpoint "review"/"approval"/"need review" milik skill superpowers BUKAN titik berhenti di sini — lanjut saja ke fase berikutnya. Berhenti HANYA saat butuh keputusan manusia sejati (percabangan yang mengubah bentuk kerja: data model, kontrak API, scope); saat itu tanyakan di terminal ini dan tunggu jawabannya. Selain itu, terus lanjut.
+Jalankan seluruh pipeline sampai tuntas tanpa berhenti di batas antar-fase. Checkpoint "review"/"approval"/"need review" milik skill superpowers BUKAN titik berhenti di sini — lanjut saja ke fase berikutnya. Berhenti HANYA untuk hal yang masih ambigu dan akan mempengaruhi hasil (data model, kontrak API, scope, perilaku yang terlihat pengguna, atau asumsi yang terpaksa kamu ambil agar bisa lanjut): JANGAN memutuskannya sendiri, ajukan lewat AskUserQuestion bila agenmu punya tool itu (paling banyak 4 pertanyaan per panggilan — pecah sisanya ke panggilan berikutnya); bila tidak, tanyakan di terminal ini sekaligus, tiap pertanyaan bernomor dan diakhiri `?` beserta opsinya, lalu tunggu jawabannya. Tak ada batas jumlah pertanyaan: selama masih ambigu dan akan mempengaruhi hasil, tanyakan. Yang menjawab ditentukan hanoman — hanoman-lead bila aktif untuk project ini, selain itu manusia; jangan menjawabnya sendiri. Selain itu, terus lanjut.
 
 Skills superpowers WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.
 - Audit: superpowers:systematic-debugging

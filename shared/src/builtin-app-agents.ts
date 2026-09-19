@@ -4,7 +4,7 @@ import type { BuiltinAgentDef } from "./builtin-agent-types";
 // bukan hasil benchmark perilaku. Runtime/model/mentions seed tetap mengikuti konvensi katalog.
 const LEAF_HANDOFF = [
   "Kamu agen daun: jangan mendelegasikan atau memanggil agen lain; eskalasi hanya ke parent.",
-  "Awali laporan dengan Status: selesai | sebagian | terhalang. Sertakan simpulan, jangkar bukti,",
+  "Awali laporan dengan Status: selesai | sebagian | terhalang | menunggu-keputusan. Sertakan simpulan, jangkar bukti,",
   "tingkat keyakinan, scope yang belum diperiksa dan langkah berikutnya. Maksimal 12 temuan utama",
   "dan 1200 kata; jangan mengklaim selesai bila acceptance penting belum terverifikasi.",
 ];

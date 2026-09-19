@@ -304,8 +304,8 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   **otomasi default MATI, launchGuard default aktif**) — knob scheduler otonom: `enabled` (master), `paused` (rem darurat Pause),
   `maxConcurrent` (cap sesi hidup — **penerus `maxConcurrent` yang dicabut ADR-0024**), `autonomy`
   (`full-control|butuh-keputusan`, **dikonsumsi SPEC-298**: governor menyuntik klausa prompt per mode saat
-  meluncurkan sesi scheduler — `full-control` = putuskan sendiri & tembus sampai `done` tanpa berhenti
-  bertanya; `butuh-keputusan` = berhenti di titik keputusan → marker SPEC-184 → notif decision, slot tetap
+  meluncurkan sesi scheduler — `full-control` = tembus sampai `done` tanpa checkpoint review/approval, tetapi
+  keputusan ambigu tetap ditanyakan — [ADR-0167](../adr/0167-keputusan-ambigu-lead-atau-manusia.md); `butuh-keputusan` = berhenti di titik keputusan → marker SPEC-184 → notif decision, slot tetap
   terpakai), `launchGuard` (SPEC-1108/[ADR-0161](../adr/0161-gerbang-peluncuran-sesi-cap-dan-sumber-daya.md):
   `{enabled:true,maxLoadPerCore:2.5}`, positif finite; switch mematikan check cap/load baru,
   tidak menghapus batching governor), dan `sources.{backlog,triase}`

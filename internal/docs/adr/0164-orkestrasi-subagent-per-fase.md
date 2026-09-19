@@ -1,6 +1,8 @@
 # ADR-0164 — Orkestrasi subagent per fase: model & effort lewat definisi subagent
 
-- Status: Accepted
+- Status: Accepted · **diamandemen [0167](0167-keputusan-ambigu-lead-atau-manusia.md)** (2026-09-19):
+  `Pertanyaan untuk manusia:` (satu pertanyaan) diganti `Keputusan terbuka:` (wajib, tanpa batas) +
+  status `menunggu-keputusan`; relay langkah 4 tak lagi "putuskan sendiri" di sesi tanpa pengawas.
 - Tanggal: 2026-09-14
 - Spec: [rancangan orkestrasi subagent per fase](../../../docs/superpowers/specs/2026-09-14-orkestrasi-subagent-fase-design.md)
 - Terkait: **mengamandemen** [0061](0061-model-effort-per-sesi-picker-start.md) — model/effort sesi kini

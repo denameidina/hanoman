@@ -130,6 +130,15 @@ describe("agentPromptOf — lapis 3 anti-loop", () => {
     expect(p).toContain("batas instruksional");
     expect(p).toContain("bukan hard kill");
   });
+
+  // ADR-0167 · custom agent dulu tak punya jalur tanya sama sekali.
+  it.each(["claude", "codex"] as const)("%s: keputusan ambigu dilaporkan sebagai `Keputusan terbuka:`", (rt) => {
+    const p = agentPromptOf(def({ name: "scout" }), [], rt);
+    expect(p).toContain("Status: selesai | sebagian | terhalang | menunggu-keputusan");
+    expect(p).toContain("`Keputusan terbuka:`");
+    expect(p).toContain("tanpa batas jumlah");
+    expect(p).toContain("Jangan memutuskannya sendiri");
+  });
 });
 
 // SPEC-543 · ADR-0108 · subagent claude punya konteks TERPISAH: prompt sesi (yang membawa klausa
@@ -190,6 +199,18 @@ describe("agentDelegationClause", () => {
     expect(out).toContain("kandidat");
     expect(out).toContain("aturan verifikasi");
     expect(out).toContain("Task");
+  });
+
+  it("parent meneruskan `Keputusan terbuka:` ke pemutus, bukan menjawabnya sendiri (ADR-0167)", () => {
+    const claude = agentDelegationClause([def("scout", "cari kode")], "claude");
+    expect(claude).toContain("`Keputusan terbuka:`");
+    expect(claude).toContain("JANGAN menjawabnya sendiri");
+    expect(claude).toContain("AskUserQuestion");
+    expect(claude).toContain("SendMessage");
+    const codex = agentDelegationClause([def("scout", "cari kode")], "codex");
+    expect(codex).toContain("`Keputusan terbuka:`");
+    expect(codex).toContain("send_input");
+    expect(codex).not.toContain("AskUserQuestion");
   });
 
   it("Codex diarahkan ke spawn_agent tanpa membawa full instructions", () => {

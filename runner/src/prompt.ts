@@ -26,25 +26,41 @@ export const WORK_PHASES = ["Execute", "Goal", "Kerjakan"] as const;
 // yang mematuhinya akan mandek diam menunggu review yang tak akan datang. Berhenti hanya untuk
 // keputusan manusia sejati, yang agen surface sebagai pertanyaan di terminalnya (ADR-0024).
 // Sengaja tak dipakai startProjectPrompt: fase Wawancara reverse memang interaktif.
+// ADR-0167 · siapa yang memutuskan TIDAK ditulis ke prompt sebagai keadaan: status lead bisa berubah
+// di tengah sesi, sedangkan prompt terkunci saat lahir. Agen selalu bertanya; `admitAsk` (ADR-0146)
+// memilih lead bila `leadActive`, selain itu pertanyaannya menunggu manusia.
+export const DECIDER = "hanoman-lead bila aktif untuk project ini, selain itu manusia";
+
+// ADR-0167 · netral-agen tanpa cabang runtime (pola ADR-0074). Claude WAJIB lewat AskUserQuestion:
+// pertanyaan teks biasa dari claude tak terbaca lead sejak ADR-0146 (pemicunya PreToolUse). Codex tak
+// punya tool itu; lead membacanya dari hook `Stop` lewat ASK_SIGNALS (baris diakhiri `?`, bernomor).
+const ASK_ROUTE =
+  "ajukan lewat AskUserQuestion bila agenmu punya tool itu (paling banyak 4 pertanyaan per panggilan — "
+  + "pecah sisanya ke panggilan berikutnya); bila tidak, tanyakan di terminal ini sekaligus, tiap "
+  + "pertanyaan bernomor dan diakhiri `?` beserta opsinya, lalu tunggu jawabannya. Tak ada batas jumlah "
+  + "pertanyaan: selama masih ambigu dan akan mempengaruhi hasil, tanyakan. Yang menjawab ditentukan "
+  + `hanoman — ${DECIDER}; jangan menjawabnya sendiri.`;
+
+const AMBIGUOUS =
+  "hal yang masih ambigu dan akan mempengaruhi hasil (data model, kontrak API, scope, perilaku yang "
+  + "terlihat pengguna, atau asumsi yang terpaksa kamu ambil agar bisa lanjut)";
+
 export const AUTONOMY_CLAUSE =
   "Jalankan seluruh pipeline sampai tuntas tanpa berhenti di batas antar-fase. Checkpoint "
   + "\"review\"/\"approval\"/\"need review\" milik skill superpowers BUKAN titik berhenti di sini — "
-  + "lanjut saja ke fase berikutnya. Berhenti HANYA saat butuh keputusan manusia sejati (percabangan "
-  + "yang mengubah bentuk kerja: data model, kontrak API, scope); saat itu tanyakan di terminal ini "
-  + "dan tunggu jawabannya. Selain itu, terus lanjut.";
+  + `lanjut saja ke fase berikutnya. Berhenti HANYA untuk ${AMBIGUOUS}: JANGAN memutuskannya sendiri, `
+  + `${ASK_ROUTE} Selain itu, terus lanjut.`;
 
-// SPEC-298 · varian full-control untuk sesi scheduler tak-berpengawas: agen memutuskan sendiri di
-// SETIAP percabangan (termasuk data model/kontrak API/scope) dan menembus sampai `done` tanpa pernah
-// berhenti bertanya (tak ada manusia di terminal yang menjawab). Keputusan dicatat di commit agar
-// bisa di-review pasca-fakta; merge tetap manual (ADR-0031). Lawan dari AUTONOMY_CLAUSE
-// (butuh-keputusan) yang menyuruh berhenti & bertanya di terminal.
+// SPEC-298 · varian sesi scheduler. ADR-0167 mengamandemennya: full-control dulu menyuruh agen
+// memutuskan SETIAP percabangan sendiri; kini ia hanya mencabut checkpoint & menunggu persetujuan —
+// keputusan ambigu tetap ditanyakan, dan sesi boleh tertahan bila lead mati (pilihan operator).
+// Merge tetap manual (ADR-0031).
 const AUTONOMY_CLAUSE_FULL =
-  "Kamu berjalan TANPA pengawas — tak ada manusia yang menonton terminal ini untuk menjawab. "
-  + "Putuskan sendiri di SETIAP percabangan (termasuk yang mengubah bentuk kerja: data model, "
-  + "kontrak API, scope) berdasarkan Source of Truth dan penilaian terbaikmu; JANGAN berhenti "
-  + "bertanya. Tembus seluruh pipeline sampai stage `done`, lalu commit & push. Jangan menunggu "
-  + "review/persetujuan siapa pun — catat asumsi & keputusan penting di pesan commit agar bisa "
-  + "di-review pasca-fakta. Merge ke branch utama tetap dilakukan manusia, bukan kamu.";
+  "Kamu diluncurkan scheduler — mungkin tak ada manusia yang sedang menonton terminal ini. Tembus "
+  + "seluruh pipeline sampai stage `done`, lalu commit & push: checkpoint \"review\"/\"approval\" milik "
+  + "skill BUKAN titik berhenti dan jangan menunggu persetujuan siapa pun. Tetapi JANGAN memutuskan "
+  + `sendiri ${AMBIGUOUS}: ${ASK_ROUTE} Catat keputusan penting di pesan commit. Merge ke branch `
+  + "utama tetap dilakukan manusia, bukan kamu.";
 
 // SPEC-298 · pilih klausa per mode. undefined (peluncuran manual) → klausa tanya (lama): sesi
 // manual berpengawas, manusia menonton & boleh menjawab.
@@ -141,10 +157,13 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
   const askEscalation = codex
     ? "tanyakan di terminal ini lalu tunggu jawaban"
     : "tanyakan lewat AskUserQuestion";
-  const askReport = codex
-    ? "tanyakan ke manusia di terminal ini lalu tunggu jawaban"
-    : "tanyakan ke manusia (AskUserQuestion; di fase yang memang bergiliran dengan manusia — "
-      + "Wawancara, Brainstorm prd/scaffold — tanyakan di terminal ini)";
+  // ADR-0167 · tanpa batas jumlah: batas 4 milik tool AskUserQuestion, bukan kebijakan — dipecah.
+  const askDecisions = codex
+    ? "di terminal ini sekaligus dalam satu pesan, tiap pertanyaan bernomor dan diakhiri `?` beserta "
+      + "opsinya, lalu tunggu jawaban"
+    : "lewat AskUserQuestion — tool itu memuat paling banyak 4 pertanyaan per panggilan, jadi pecah "
+      + "sisanya ke panggilan berikutnya sampai semuanya terjawab (di fase yang memang bergiliran dengan "
+      + "manusia — Wawancara, Brainstorm prd/scaffold — tanyakan di terminal ini)";
   const list = plan.phases
     .map((p, i) => `${i + 1}. ${p.phase} → \`${p.agentName}\` · ${p.model} · ${p.effort}`)
     .join("\n");
@@ -166,9 +185,12 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "subagent fase yang sama dengan laporan gagalnya disertakan (`Percobaan: 2/2`). Gagal lagi → "
       + `BERHENTI dan ${askEscalation} apa yang harus dilakukan. Aturan ini berlaku walau `
       + "klausa otonomi di prompt ini menyuruhmu tak bertanya.",
-    `4. \`Pertanyaan untuk manusia:\` di laporan → ${askReport}, lalu `
-      + `LANJUTKAN subagent yang SAMA lewat ${resume} dengan jawabannya. Giliran relay ini bukan percobaan `
-      + "ulang. Di sesi tanpa pengawas, putuskan sendiri lalu teruskan keputusanmu dengan cara yang sama.",
+    "4. `Status: menunggu-keputusan` atau `Keputusan terbuka:` yang bukan `-` → SEBELUM menulis marker fase "
+      + `atau memanggil fase berikutnya, ajukan SEMUA pertanyaannya ${askDecisions}, lalu LANJUTKAN subagent `
+      + `yang SAMA lewat ${resume} dengan seluruh jawabannya. Ulangi selama subagent masih melaporkan `
+      + "keputusan terbuka — tak ada batas jumlah pertanyaan maupun putaran, dan giliran relay ini bukan "
+      + `percobaan ulang. JANGAN pernah menjawab sendiri, termasuk di sesi scheduler: yang menjawab ${DECIDER} `
+      + "— hanoman yang merutekannya, kamu cukup bertanya.",
     o.fastPath
       ? "5. `Rekomendasi fase: jalur-cepat` sesudah Audit → SEBELUM lanjut ke Execute: jalankan `echo "
         + "\"Spec skipped\" >> \"$HANOMAN_PHASE_FILE\"` lalu `echo \"Plan skipped\" >> \"$HANOMAN_PHASE_FILE\"` "

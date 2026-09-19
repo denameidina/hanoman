@@ -1835,8 +1835,8 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 > window, satu tiket = satu backlog. Terdaftar di `server.ts` (`registerTriaseSource()`) sebelum `startScheduler()`.
 >
 > **Autonomy + akhir sesi (SPEC-298, daun #5):** governor menyuntik **klausa prompt per mode** dari
-> `scheduler.autonomy` saat meluncurkan sesi — `full-control` = agen putuskan sendiri & tembus sampai `done`
-> tanpa berhenti bertanya; `butuh-keputusan` = berhenti di titik keputusan (marker SPEC-184 → `Notification`
+> `scheduler.autonomy` saat meluncurkan sesi — `full-control` = tembus sampai `done` tanpa checkpoint
+> review/approval, tetapi keputusan ambigu **tetap ditanyakan** (ADR-0167: lead bila aktif, selain itu manusia); `butuh-keputusan` = berhenti di titik keputusan (marker SPEC-184 → `Notification`
 > `decision`, sesi tetap **memegang slot**). `engine.tick` (sebelum drain) menjalankan **rekonsiliasi akhir sesi**
 > (`services/scheduler/reconcile.ts`) + `scanDecisions`: item `launched` yang mencapai `done` → `Notification`
 > `done` + `SessionResult` ringkasan (diff review diturunkan `GET /api/specs/:id/review`, `baseSha..headSha`),

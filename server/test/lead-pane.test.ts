@@ -52,3 +52,18 @@ describe("readCodexTurn · sinyal BERTANYA", () => {
     expect(readCodexTurn("   \n\n  ").reason).toContain("tanpa pesan");
   });
 });
+
+// ADR-0167 · kontrak lintas modul: orchestrator/sesi codex diperintahkan (runner `orchestratorClause`,
+// `ASK_ROUTE`) mengajukan SEMUA keputusan terbuka dalam satu pesan, tiap pertanyaan bernomor dan
+// diakhiri `?`. Bila format itu tak lolos gerbang ini, lead tak pernah melihat pertanyaan codex dan
+// "lead aktif → lead memutuskan" bocor diam-diam. Sengaja > 4 butir: tak ada batas jumlah.
+describe("readCodexTurn · format keputusan terbuka ADR-0167", () => {
+  it("pesan relay berformat kontrak dibaca sebagai pertanyaan", () => {
+    const message = [
+      "Fase Brainstorm melaporkan keputusan terbuka:",
+      ...Array.from({ length: 6 }, (_, i) =>
+        `${i + 1}. Kolom status ke-${i + 1} disimpan sebagai enum atau string bebas?\n   a) enum  b) string — rekomendasi: enum`),
+    ].join("\n");
+    expect(readCodexTurn(message)).toEqual({ asking: true, reason: "" });
+  });
+});

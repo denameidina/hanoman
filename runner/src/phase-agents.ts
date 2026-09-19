@@ -2,7 +2,7 @@ import { PHASE_AGENT_PREFIX, type MethodDef, type PhasePlan, type PhasePlanEntry
 import type { AgentDef } from "./custom-agents";
 import type { Flow, VerifyScope } from "./types";
 import {
-  ESCALATION_CONTRACT, REVERSE_PHASE_GUIDE, SCAFFOLD_PHASE_GUIDE, WORK_PHASES, breakdownPhaseLines,
+  DECIDER, ESCALATION_CONTRACT, REVERSE_PHASE_GUIDE, SCAFFOLD_PHASE_GUIDE, WORK_PHASES, breakdownPhaseLines,
   codeStyleClause, guideLine, methodClause, phaseSkillsFor, prdPhaseLines, scopeClause,
 } from "./prompt";
 import { REVERSE_STANDARD } from "./reverse-standard";
@@ -28,13 +28,20 @@ export type PhaseAgentContext = {
 const PROJECT_FLOWS: ReadonlySet<Flow> = new Set(["reverse", "scaffold", "prd", "breakdown"]);
 const DOC_WRITING_PHASES: ReadonlySet<string> = new Set(["Docs teknis", "Konvensi & index", "Doc index"]);
 
+// ADR-0167 · 166 run agen fase terukur, 0 pertanyaan: versi lama membuka dengan "lanjut sampai tuntas /
+// JANGAN bertanya" dan hanya muat SATU pertanyaan, jadi asumsi jatuh ke prosa yang tak dibaca
+// orchestrator. Larangan memutuskan kini didahulukan, dan daftarnya tak berbatas.
 const PHASE_AGENT_AUTONOMY =
   "Kamu dipanggil orchestrator sesi hanoman, bukan manusia. Checkpoint \"review\"/\"approval\" milik "
-  + "skill BUKAN titik berhenti — lanjut sampai fase ini tuntas. JANGAN bertanya ke manusia secara "
-  + "langsung: bila butuh keputusan yang mengubah bentuk kerja (data model, kontrak API, scope), atau "
-  + "panduan fase menyuruhmu bertanya ke manusia di terminal, tulis SATU pertanyaan di bagian "
-  + "`Pertanyaan untuk manusia:` laporanmu lalu berhenti. Jawabannya datang sebagai pesan susulan ke "
-  + "agen yang sama — lanjutkan dari sana dengan konteks yang sudah kamu punya.";
+  + "skill BUKAN titik berhenti. Tetapi kamu TIDAK BOLEH memutuskan sendiri hal yang masih ambigu dan "
+  + "akan mempengaruhi hasil — percabangan data model, kontrak API, scope, perilaku yang terlihat "
+  + "pengguna, atau asumsi yang terpaksa kamu ambil agar bisa lanjut — dan kamu tak bisa bertanya "
+  + "langsung. Daftarkan SEMUANYA di bagian `Keputusan terbuka:` laporanmu (tanpa batas jumlah; tiap "
+  + "butir berupa pertanyaan bernomor diakhiri `?` beserta opsi dan rekomendasimu), begitu juga bila "
+  + "panduan fase menyuruhmu bertanya ke manusia, lalu tulis `Status: menunggu-keputusan` dan berhenti. "
+  + "Jawabannya datang sebagai pesan susulan ke agen yang sama — lanjutkan dari sana; bila jawaban itu "
+  + "memunculkan ambiguitas baru, laporkan lagi dengan cara yang sama. Yang menjawab ditentukan hanoman "
+  + `— ${DECIDER}.`;
 
 const PHASE_AGENT_RULES = [
   "Batas peran fase:",
@@ -46,10 +53,10 @@ const PHASE_AGENT_RULES = [
 
 const PHASE_AGENT_REPORT = [
   "Kontrak laporan (wajib, di akhir):",
-  "- Baris pertama: `Status: selesai | sebagian | terhalang`.",
+  "- Baris pertama: `Status: selesai | sebagian | terhalang | menunggu-keputusan`.",
   "- `Artefak:` path berkas yang kamu tulis/ubah.",
   "- `Bukti:` perintah yang dijalankan beserta hasil yang benar-benar kamu baca.",
-  "- `Pertanyaan untuk manusia:` (opsional) SATU pertanyaan; bila ada, berhenti di situ.",
+  "- `Keputusan terbuka:` (wajib) daftar pertanyaan, atau `-` bila tak ada. `selesai` hanya sah bila isinya `-`.",
   "- `Rekomendasi fase:` (opsional) mis. `jalur-cepat` sesudah Audit qa.",
   "Klaim tanpa bukti bukan bukti. Maksimal 1200 kata.",
 ].join("\n");
