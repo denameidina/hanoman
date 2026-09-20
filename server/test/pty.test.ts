@@ -183,6 +183,35 @@ describe("pty service", () => {
     expect(allData(c).replace(/\s+/g, " ")).toContain("REQUIRE=never");
   });
 
+  // `claude` mewarisi env dari tmux server (lahir dengan env server hanoman), BUKAN dari process.env
+  // yang kita ubah belakangan. Karena itu "Hapus" token OAuth harus melepasnya per sesi dengan
+  // `env -u`; menghapus dari process.env saja tak menyentuh token yang sudah ada di tmux server.
+  it("kredensial warisan yang dikosongkan operator dilepas dari sesi baru meski tmux server membawanya", async () => {
+    const cfg = await import("../src/config");
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    const tmuxArgs = ["-L", process.env.HANOMAN_TMUX_SOCKET ?? "hanoman-test", "-f", "/dev/null"];
+    try {
+      const warm = createSession("tok0", process.cwd());   // melahirkan tmux server
+      await waitFor(() => getSession(warm.id) !== undefined);
+      execFileSync("tmux", [...tmuxArgs, "set-environment", "-g", "CLAUDE_CODE_OAUTH_TOKEN", "sk-dari-tmux-server"]);
+
+      const a = createSession("tok1", process.cwd());
+      const ca = fakeClient();
+      attach(a.id, ca);
+      await waitFor(() => allData(ca).includes("oauth:"));
+      expect(allData(ca).replace(/\s+/g, " ")).toContain("TOKEN=[sk-dari-tmux-server]");   // pra-syarat
+
+      await cfg.setConfig("CLAUDE_CODE_OAUTH_TOKEN", "");
+      const b = createSession("tok2", process.cwd());
+      const cb = fakeClient();
+      attach(b.id, cb);
+      await waitFor(() => allData(cb).includes("oauth:"));
+      expect(allData(cb).replace(/\s+/g, " ")).toContain("TOKEN=[]");
+    } finally {
+      await cfg.clearConfig("CLAUDE_CODE_OAUTH_TOKEN");
+    }
+  });
+
   // SPEC-332 · ADR-0073 · mode goal: Stop hook bertipe prompt ikut lahir bersama sesi.
   it("goal opt menaruh Stop hook bertipe prompt di argv --settings", async () => {
     process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";

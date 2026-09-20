@@ -17,7 +17,8 @@ function ensureSnapshot(key: string): void {
 function mirrorInheritEnv(key: string): void {
   ensureSnapshot(key);
   const v = rawDbValue(key) ?? ORIGINAL_ENV.get(key);
-  if (v === undefined) delete process.env[key]; else process.env[key] = v;
+  // "" = dikosongkan operator (penanda `suppressedInheritKeys`), bukan token berisi string kosong.
+  if (v === undefined || v === "") delete process.env[key]; else process.env[key] = v;
 }
 
 // Dispatch side-effect untuk satu key yang berubah (set/clear).

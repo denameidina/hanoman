@@ -276,3 +276,5 @@ legacy; ia bukan konfigurasi deploy. Lihat [security-standard](../security/secur
 Biaya bersifat **estimasi dan tidak menggerakkan apa pun** (ADR-0012): tidak ada `dailyBudget`, tidak ada
 budget flag. Indikator limit dibaca langsung dari OAuth usage API Anthropic (`services/limits.ts`,
 ADR-0024), bukan dari parsing output terminal.
+
+**Hapus kredensial warisan** (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`; `inheritEnv`). `DELETE /config/:key` menyimpan baris DB berisi string kosong sebagai penanda ("dikosongkan operator", `suppressedInheritKeys()` di `server/src/config.ts`), bukan sekadar menghapus baris. Sebelumnya nilai dari env proses (plist launchd/shell) muncul lagi sesudah "Hapus" — dan `claude` mewarisi env dari tmux server, bukan dari `process.env` server ini, jadi `createSession` memasang prefix `env -u <KEY>` untuk kunci yang dikosongkan supaya sesi baru memakai default `claude`. Berlaku untuk sesi BARU; sesi yang sudah hidup tak berubah.

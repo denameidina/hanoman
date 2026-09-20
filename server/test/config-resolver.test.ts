@@ -74,3 +74,15 @@ describe("SPEC-477 · secret at-rest", () => {
     quiet.mockRestore();
   });
 });
+
+describe("suppressedInheritKeys", () => {
+  it("hanya kunci inheritEnv yang dikosongkan eksplisit di DB", async () => {
+    const { suppressedInheritKeys, setConfig, clearConfig, loadConfig } = await import("../src/config");
+    await loadConfig();
+    expect(suppressedInheritKeys()).toEqual([]);
+    await setConfig("CLAUDE_CODE_OAUTH_TOKEN", "");
+    await setConfig("ANTHROPIC_API_KEY", "sk-aktif");
+    expect(suppressedInheritKeys()).toEqual(["CLAUDE_CODE_OAUTH_TOKEN"]);
+    await clearConfig("CLAUDE_CODE_OAUTH_TOKEN"); await clearConfig("ANTHROPIC_API_KEY");
+  });
+});

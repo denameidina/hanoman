@@ -23,7 +23,7 @@ import {
   answerChoiceDialog, answerMultiSelectDialog, answerNotesDialog, readDialogScreen, submitReview,
   type PaneIO,
 } from "./tui-dialog";
-import { effectiveStr } from "../config";
+import { effectiveStr, suppressedInheritKeys } from "../config";
 import { controlHost, loadIngressPolicy } from "./ingress-policy";
 import { sessionEventToken } from "./session-event-token";
 import { sandboxCommand } from "./session-sandbox";
@@ -902,7 +902,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   if (opts.attachmentsDir) envPairs.push(`HANOMAN_ATTACHMENTS_DIR=${sq(opts.attachmentsDir)}`);
   // Env tambahan dari pemanggil lewat jalur yang sama.
   for (const [k, v] of Object.entries(opts.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
-  let cmd = envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
+  // Kredensial warisan yang dikosongkan operator: `claude` mewarisi env dari tmux server (lahir
+  // dengan env server ini), jadi hanya `env -u` yang benar-benar melepasnya dari sesi baru.
+  const unsets = opts.command ? [] : suppressedInheritKeys().flatMap((k) => ["-u", k]);
+  let cmd = unsets.length ? ["env", ...unsets, ...envPairs, argv].join(" ")
+    : envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
   if (!opts.command) {
     const wrapped = sandboxCommand({
       command: cmd, worktree: cwd, phaseFile: opts.phaseFile, promptFile,

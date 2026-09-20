@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { configEntry } from "@hanoman/shared";
+import { CONFIG_REGISTRY, configEntry } from "@hanoman/shared";
 import { decryptSecret, encryptSecret } from "./services/secret-box";
 
 // SPEC-215 · ADR-0049 · resolver terpusat: override DB → env → default registry.
@@ -27,6 +27,14 @@ export async function loadConfig(): Promise<void> {
 }
 
 export function rawDbValue(key: string): string | undefined { return cache.get(key); }
+
+// Kunci warisan (token claude, API key) yang DIKOSONGKAN operator lewat "Hapus": baris DB berisi
+// string kosong sebagai penanda. Tanpa penanda, nilai dari env proses (plist launchd, shell) tak
+// bisa dimatikan dari dashboard — override DB yang dihapus hanya mengembalikan env, dan `claude`
+// mewarisi env itu dari tmux server sehingga token lama tetap menempel di setiap sesi baru.
+export function suppressedInheritKeys(): string[] {
+  return CONFIG_REGISTRY.filter((e) => e.inheritEnv && cache.get(e.key) === "").map((e) => e.key);
+}
 
 export function effectiveStr(key: string): string | undefined {
   return cache.get(key) ?? process.env[key] ?? configEntry(key)?.default;
