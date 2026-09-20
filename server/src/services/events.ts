@@ -1,6 +1,6 @@
 import type { Client } from "./pty";
 import { listSessionsAsync } from "./pty";
-import { liveSpecs } from "./live-specs";
+import { liveOverlayTick, listSpecsSlim, specsDigest } from "./live-specs";
 import { notificationsFeed } from "./notifications";
 import { getLimits } from "./limits";
 import { getCodexLimits } from "./codex-limits";
@@ -51,9 +51,17 @@ const tickMs = () => effectiveInt("HANOMAN_EVENTS_TICK_MS") ?? 1000;
    bisa menjangkaunya karena `POST /ws-tickets` jatuh ke default cookie-only — tapi itu ketiadaan
    entri di sebuah peta, bukan keputusan; satu cabang `ws-tickets` yang lahir nanti akan membukanya
    tanpa satu pun test merah. */
-type Group = { everyTicks: number; last: string; build: () => Promise<WireMsg>; failing?: boolean;
-  cookieOnly?: boolean };
+/* SPEC-1267 · `last` = frame JSON terakhir yang DISIARKAN (dipakai `attach` klien baru, tanpa build
+   ulang); `lastSig` = kunci dedup-nya. Tanpa `sig`, kuncinya JSON frame itu sendiri. `pre` jalan
+   tiap tick (efek samping yang tak boleh ikut ter-dedup), `gate` menahan `build` sama sekali selama
+   nilainya tak berubah — untuk grup yang membangun frame mahal seperti `specs`. */
+type Group = { everyTicks: number; last: string; lastSig?: string; lastT?: EventMsg["t"]; lastGate?: string;
+  build: () => Promise<WireMsg>; pre?: () => Promise<void>; gate?: () => Promise<string>;
+  sig?: (msg: WireMsg) => string; failing?: boolean; cookieOnly?: boolean };
 // everyTicks = recompute tiap N detik: board 1s, notif 3s, vps 15s, limits 30s (cache 30s service).
+export const presenceKey = (m: WireMsg): string => JSON.stringify({ ...m, devices: (m.devices as { local?: boolean }[]).map(
+  (d) => (d.local ? { ...d, lastSeenAt: null } : d)) });
+
 const GROUPS: Group[] = [
   { everyTicks: 3, cookieOnly: true, last: "", build: async () => ({
     t: "models", catalog: modelCatalogService.snapshot(),
@@ -68,7 +76,11 @@ const GROUPS: Group[] = [
     // loop — termasuk frame ketikan terminal — selama spawn (terukur sampai 916 ms saat mesin sibuk).
     sessions: (await listSessionsAsync()).map((s) => (isDeciding(s.id) ? { ...s, deciding: true } : s)),
   }) },
-  { everyTicks: 1,  last: "", build: async () => ({ t: "specs", specs: await liveSpecs() }) },
+  // SPEC-1267 · frame ringkas (`SpecSlim`: tanpa payload/objective/sourceHistory) yang hanya dibangun
+  // saat `specsDigest` berubah. Kemajuan stage dari fase sesi (`liveOverlayTick`) tetap dijalankan
+  // tiap tick: ia hidup di berkas/tmux, bukan di DB, jadi digest DB tak melihatnya sebelum ditulis.
+  { everyTicks: 1,  last: "", pre: liveOverlayTick, gate: specsDigest,
+    build: async () => ({ t: "specs", specs: await listSpecsSlim() }) },
   { everyTicks: 3,  last: "", build: async () => ({ t: "notifications", ...(await notificationsFeed()) }) },
   // SPEC-742 · ADR-0116 · pembersihan worktree yang masih jalan. `listCleanups()` membaca peta di
   // memori, bukan disk — nol I/O per tick, dan dedup signature membuat frame lahir hanya saat
@@ -94,7 +106,10 @@ const GROUPS: Group[] = [
   // dihitung). 3 dtk: presence berdenyut 30 dtk, jadi kadens lebih rapat hanya menambah build tanpa
   // menambah informasi. `presenceView` menyegarkan sesi mesin ini sendiri di dalamnya — satu
   // `tmux list-panes` asinkron, tak menahan event loop.
-  { everyTicks: 3, cookieOnly: true, last: "", build: async () => ({ t: "presence", ...(await presenceView()) }) },
+  // SPEC-1267 · `lastSeenAt` device lokal = jam build ini, jadi berubah tiap build; kunci dedup
+  // mengosongkannya supaya frame hanya lahir saat isi presence benar-benar berubah.
+  { everyTicks: 3, cookieOnly: true, last: "", build: async () => ({ t: "presence", ...(await presenceView()) }),
+    sig: presenceKey },
   // SPEC-961 · grup GLOBAL ke-11 · angka "butuh pengajuan" untuk badge sidebar. 5 dtk: badge bukan
   // board — yang dijanjikannya adalah "ada yang menunggu", bukan detik keberapa ia muncul — dan
   // dedup signature membuat frame lahir hanya saat salah satu angka berubah (jarang). Empat angka,
@@ -107,8 +122,7 @@ const GROUPS: Group[] = [
 // SPEC-908 · klien yang `send`-nya melempar harus dilepas dari `clients` DAN dari peta langganan.
 // Menyapu `clients` saja meninggalkan entri hidup untuk penonton yang sudah tak ada — dan entri
 // `git` berarti `git log` + `git status` + `git stash list` tiap 4 dtk untuk nol pembaca.
-function broadcast(msg: WireMsg, cookieOnly = false): void {
-  const s = JSON.stringify(msg);
+function broadcast(msg: WireMsg, s: string, cookieOnly = false): void {
   for (const c of clients) {
     if (cookieOnly && !cookieClients.has(c)) continue;
     const groups = clientGroups.get(c);
@@ -223,27 +237,47 @@ let tick = 0;
 let busy = false;
 let timer: NodeJS.Timeout | undefined;
 
-// Satu iterasi: tiap grup yang jatuh temponya di-recompute; broadcast hanya saat signature berubah.
+// Bangun satu grup: `pre` → `gate` → `build` → dedup. Mengembalikan frame yang harus disiarkan atau
+// null. Kegagalan dilog sekali per grup (`failing`) dan tak pernah menjatuhkan grup lain.
+async function runGroup(g: Group): Promise<{ g: Group; msg: WireMsg; json: string; key: string; gate?: string } | null> {
+  const t0 = profStart();
+  let msg: WireMsg | undefined;
+  try {
+    await g.pre?.();
+    let gate: string | undefined;
+    if (g.gate) {
+      // Digest yang gagal dibaca tak boleh membekukan grup: fail-open ke build penuh.
+      try { gate = await g.gate(); } catch { gate = undefined; }
+      if (gate !== undefined && gate === g.lastGate) { profEnd("gate", t0, 0, false); return null; }
+    }
+    msg = await g.build();
+    if (g.failing) { g.failing = false; console.log(`siar dashboard pulih: ${msg.t}`); }
+    const json = JSON.stringify(msg);
+    const key = g.sig ? g.sig(msg) : json;
+    const emit = key !== g.lastSig;
+    profEnd(msg.t, t0, json.length, emit);
+    if (g.gate) g.lastGate = gate;
+    return emit ? { g, msg, json, key, gate } : null;
+  } catch (e) {
+    if (!g.failing) { g.failing = true; console.error("siar dashboard gagal membangun frame:", e); }
+    return null;
+  }
+}
+
+// Satu iterasi: grup yang jatuh tempo dibangun PARALEL dan terisolasi (satu grup lambat atau gagal
+// tak menunda yang lain), lalu disiarkan berurutan sesuai `GROUPS`; frame lahir hanya saat kunci berubah.
 export async function __tick(): Promise<void> {
   if (busy) return;             // build bisa > TICK_MS (DB/tmux); jangan menumpuk
   busy = true;
   tick++;
   try {
-    for (const g of GROUPS) {
-      if (tick % g.everyTicks !== 0) continue;
-      let msg: WireMsg;
-      const t0 = profStart();
-      try { msg = await g.build(); }
-      catch (e) {
-        if (!g.failing) { g.failing = true; console.error("siar dashboard gagal membangun frame:", e); }
-        continue;
-      }
-      if (g.failing) { g.failing = false; console.log(`siar dashboard pulih: ${msg.t}`); }
-      const sig = JSON.stringify(msg);
-      if (sig === g.last) { profEnd(msg.t, t0, sig.length, false); continue; }
-      profEnd(msg.t, t0, sig.length, true);
-      g.last = sig;
-      broadcast(msg, g.cookieOnly);
+    const results = await Promise.all(GROUPS.filter((g) => tick % g.everyTicks === 0).map(runGroup));
+    for (const r of results) {
+      if (!r) continue;
+      r.g.last = r.json;
+      r.g.lastSig = r.key;
+      r.g.lastT = r.msg.t;
+      broadcast(r.msg, r.json, r.g.cookieOnly);
     }
     // SPEC-908 · entri langganan ditick di loop yang sama tetapi TIDAK di-await (lihat runEntry).
     for (const e of entries.values()) {
@@ -263,11 +297,11 @@ function startLoop(): void {
 function stopLoop(): void {
   if (timer) { clearInterval(timer); timer = undefined; }
   tick = 0;
-  for (const g of GROUPS) g.last = "";   // klien berikut mulai dari state segar
+  for (const g of GROUPS) { g.last = ""; g.lastSig = undefined; g.lastGate = undefined; }   // klien berikut mulai dari state segar
 }
 
 // Klien baru dapat snapshot penuh SEGERA (tak menunggu tick) — late joiner langsung tersinkron,
-// persis scrollback di pty.attach. Dibangun fresh, lepas dari dedup broadcast.
+// persis scrollback di pty.attach. Dari frame siaran terakhir bila ada, kalau tidak dibangun segar.
 export async function attach(c: Client, o: { maySubscribe?: boolean; groups?: Set<EventMsg["t"]> } = {}): Promise<void> {
   clients.add(c);
   // Gerbang yang sama dengan `sub`: principal yang tak boleh berlangganan juga tak boleh menerima
@@ -282,12 +316,19 @@ export async function attach(c: Client, o: { maySubscribe?: boolean; groups?: Se
   // tak pernah menyalakan fallback-nya — layar diam selamanya tanpa satu pun error.
   const topics = o.maySubscribe === false ? [] : TOPIC_NAMES;
   try { c.send(JSON.stringify({ t: "hello", topics } satisfies EventMsg)); } catch { return; }
-  for (const g of GROUPS) {
-    if (g.cookieOnly && !cookieClients.has(c)) continue;
-    let msg: WireMsg;
-    try { msg = await g.build(); } catch { continue; }
-    if (o.groups && !o.groups.has(msg.t)) continue;
-    try { c.send(JSON.stringify(msg)); } catch { return; }
+  // SPEC-1267 · grup yang sudah punya frame siaran (`g.last`) dikirim apa adanya — tanpa build ulang
+  // (terutama `specs`). Hanya grup yang belum pernah lahir (loop baru menyala) dibangun segar, paralel.
+  const wanted = GROUPS.filter((g) => !(g.cookieOnly && !cookieClients.has(c)));
+  const frames = await Promise.all(wanted.map(async (g): Promise<{ t: EventMsg["t"]; json: string } | null> => {
+    if (g.last && g.lastT) return { t: g.lastT, json: g.last };
+    try {
+      const msg = await g.build();
+      return { t: msg.t, json: JSON.stringify(msg) };
+    } catch { return null; }
+  }));
+  for (const f of frames) {
+    if (!f || (o.groups && !o.groups.has(f.t))) continue;
+    try { c.send(f.json); } catch { return; }
   }
 }
 

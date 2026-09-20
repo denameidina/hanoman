@@ -273,18 +273,18 @@ it("GET /specs/:id overlay baca-saja: stage maju di respons, DB & notifikasi tak
 **Interfaces:**
 - Produces: `Group.sig?: (msg: WireMsg) => string`; `Group.gate?: () => Promise<string>` (bila diberikan dan hasilnya sama dengan `g.lastGate`, `build()` DILEWATI dan tak ada frame, namun `pre()` tetap dijalankan); `Group.pre?: () => Promise<void>` (dipanggil tiap tick; untuk `specs` = `liveOverlayTick`). `broadcast(sig: string, s: WireMsg, cookieOnly)`.
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
   - Frame `specs` hasil `build()` tak memuat 3 field (AC-S1).
   - DB diam 5 tick → `broadcast` 1x (frame pertama) lalu 0 (AC-S3).
   - Ubah satu baris → tepat 1 frame (AC-S4).
   - Sesi hidup mock berfase maju, DB digest awal sama → `liveOverlayTick` dipanggil tiap tick (spy) dan baris DB naik stage (AC-S6).
   - `specsDigest` melempar → frame tetap dibangun (fail-open).
   - `JSON.stringify` dipanggil sekali per frame lahir (spy pada `JSON.stringify` dengan filter arg `t==="specs"`) (AC-S17).
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3: Implementasi.** Di `__tick` untuk tiap grup jatuh tempo: `await g.pre?.()` (try/catch → log via `g.failing`); bila `g.gate`: `let k; try { k = await g.gate() } catch { k = undefined }`; `if (k !== undefined && k === g.lastGate) continue;` lalu `g.lastGate = k`. Build → `const sig = g.sig ? g.sig(msg) : JSON.stringify(msg)`; bila `g.sig` ada, string kirim tetap `JSON.stringify(msg)` sekali dan disimpan ke `g.last`; dedup pada `g.lastSig`. Untuk grup `specs`: `pre: liveOverlayTick`, `gate: specsDigest`, `build: async () => ({t:"specs", specs: await listSpecsSlim()})`. Setelah gate berubah tetapi `liveOverlayTick` baru saja memajukan DB, digest berikutnya berubah lagi → satu frame tambahan yang wajar. `stopLoop` juga mereset `lastGate`.
-- [ ] **Step 4:** `pnpm vitest --run --no-file-parallelism server/test/events.test.ts` PASS + test SPEC-199 lain hijau.
-- [ ] **Step 5: Docs** — `internal/docs/architecture/stack.md`, SKILL.md baris 85 (kontrak frame `specs` ringkas, dedup digest). Draft ADR ditunda ke Task 11 (satu ADR).
-- [ ] **Step 6: Commit** `perf(events): frame specs ringkas + dedup digest, stringify sekali`.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3: Implementasi.** Di `__tick` untuk tiap grup jatuh tempo: `await g.pre?.()` (try/catch → log via `g.failing`); bila `g.gate`: `let k; try { k = await g.gate() } catch { k = undefined }`; `if (k !== undefined && k === g.lastGate) continue;` lalu `g.lastGate = k`. Build → `const sig = g.sig ? g.sig(msg) : JSON.stringify(msg)`; bila `g.sig` ada, string kirim tetap `JSON.stringify(msg)` sekali dan disimpan ke `g.last`; dedup pada `g.lastSig`. Untuk grup `specs`: `pre: liveOverlayTick`, `gate: specsDigest`, `build: async () => ({t:"specs", specs: await listSpecsSlim()})`. Setelah gate berubah tetapi `liveOverlayTick` baru saja memajukan DB, digest berikutnya berubah lagi → satu frame tambahan yang wajar. `stopLoop` juga mereset `lastGate`.
+- [x] **Step 4:** `pnpm vitest --run --no-file-parallelism server/test/events.test.ts` PASS + test SPEC-199 lain hijau.
+- [x] **Step 5: Docs** — `internal/docs/architecture/stack.md`, SKILL.md baris 85 (kontrak frame `specs` ringkas, dedup digest). Draft ADR ditunda ke Task 11 (satu ADR).
+- [x] **Step 6: Commit** `perf(events): frame specs ringkas + dedup digest, stringify sekali`.
 
 ---
 
@@ -373,14 +373,14 @@ it("mergeSlim menjaga objective/payload/sourceHistory dari HTTP", () => {
 - Modify: `server/src/services/events.ts` (`__tick`, `attach`), grup presence (baris ~96) dengan `sig` yang membuang `lastSeenAt` device lokal
 - Test: `server/test/events.test.ts`
 
-- [ ] **Step 1: Tes gagal**
+- [x] **Step 1: Tes gagal**
   - Dua grup fake, satu melempar → grup lain tetap `broadcast`, urutan broadcast = urutan `GROUPS` (AC-S15).
   - `attach` klien kedua saat loop hidup dengan `g.last` terisi → `build` tidak dipanggil ulang, klien menerima string `g.last` (AC-S16). Klien pertama (g.last kosong) → build.
   - Presence: dua build yang hanya beda `lastSeenAt` device lokal → 1 frame; payload frame tetap memuat `lastSeenAt` mutakhir (AC-S24, dua assert).
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** `const due = GROUPS.filter(g => tick % g.everyTicks === 0); const results = await Promise.allSettled(due.map(runGroup))`; `runGroup` menjalankan `pre/gate/build` + profil dan mengembalikan `{g,msg,sig}|null`; sesudah semuanya settle, iterasi `due` berurutan untuk `broadcast`. Kegagalan → `g.failing` seperti kini. `attach`: `if (g.last && !(g.cookieOnly && !cookieClients.has(c)))` filter grup lalu kirim `g.last`; sisanya `await g.build()`. Presence `sig: (m) => JSON.stringify({ ...m, devices: m.devices.map(d => d.isLocal ? { ...d, lastSeenAt: 0 } : d) })` (sesuaikan nama field yang sebenarnya di `presence/view.ts:40`).
-- [ ] **Step 4:** PASS. **Step 5: Commit** `perf(events): grup dibangun paralel terisolasi, attach pakai g.last, presence terdedup`.
-- [ ] **Keputusan bersyarat (kadens):** JANGAN ubah `everyTicks` di task ini. Diputuskan di Task 11 hanya bila angka gagal (keputusan #4).
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** `const due = GROUPS.filter(g => tick % g.everyTicks === 0); const results = await Promise.allSettled(due.map(runGroup))`; `runGroup` menjalankan `pre/gate/build` + profil dan mengembalikan `{g,msg,sig}|null`; sesudah semuanya settle, iterasi `due` berurutan untuk `broadcast`. Kegagalan → `g.failing` seperti kini. `attach`: `if (g.last && !(g.cookieOnly && !cookieClients.has(c)))` filter grup lalu kirim `g.last`; sisanya `await g.build()`. Presence `sig: (m) => JSON.stringify({ ...m, devices: m.devices.map(d => d.isLocal ? { ...d, lastSeenAt: 0 } : d) })` (sesuaikan nama field yang sebenarnya di `presence/view.ts:40`).
+- [x] **Step 4:** PASS. **Step 5: Commit** `perf(events): grup dibangun paralel terisolasi, attach pakai g.last, presence terdedup`.
+- [x] **Keputusan bersyarat (kadens):** JANGAN ubah `everyTicks` di task ini. Diputuskan di Task 11 hanya bila angka gagal (keputusan #4).
 
 ---
 
