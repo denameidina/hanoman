@@ -15,6 +15,7 @@ import { prisma } from "../db";
 import { effectiveInt } from "../config";
 import { subKey, type EventMsg, type EventTopic } from "@hanoman/shared";
 import { TOPICS, TOPIC_NAMES, isTopic, parseParams } from "./events-topics";
+import { profStart, profEnd, startLagMonitor } from "./events-profile";
 
 // SPEC-199 · satu WebSocket siar untuk seluruh data real-time dashboard (ADR-0039). Meniru
 // pola siar services/pty.ts: satu Set klien, satu loop ref-counted, frame lahir hanya saat
@@ -231,6 +232,7 @@ export async function __tick(): Promise<void> {
     for (const g of GROUPS) {
       if (tick % g.everyTicks !== 0) continue;
       let msg: WireMsg;
+      const t0 = profStart();
       try { msg = await g.build(); }
       catch (e) {
         if (!g.failing) { g.failing = true; console.error("siar dashboard gagal membangun frame:", e); }
@@ -238,7 +240,8 @@ export async function __tick(): Promise<void> {
       }
       if (g.failing) { g.failing = false; console.log(`siar dashboard pulih: ${msg.t}`); }
       const sig = JSON.stringify(msg);
-      if (sig === g.last) continue;
+      if (sig === g.last) { profEnd(msg.t, t0, sig.length, false); continue; }
+      profEnd(msg.t, t0, sig.length, true);
       g.last = sig;
       broadcast(msg, g.cookieOnly);
     }
@@ -253,6 +256,7 @@ export async function __tick(): Promise<void> {
 
 function startLoop(): void {
   if (timer) return;
+  startLagMonitor();
   timer = setInterval(() => { void __tick(); }, tickMs());
   timer.unref();
 }
