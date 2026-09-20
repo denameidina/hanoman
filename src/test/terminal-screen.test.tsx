@@ -1008,15 +1008,16 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     render(<TerminalScreen projects={projects} onOpenReview={() => {}} />);
     await screen.findByTestId("pane");
 
-    // jalan keluar tak pernah runtuh
-    expect(screen.getByRole("button", { name: "Layar penuh sesi aaaa1111" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Tutup sesi aaaa1111" })).toBeInTheDocument();
-    // aksi lain pindah ke overflow, dan tetap dapat dipilih
+    // semua aksi (termasuk layar penuh & tutup) runtuh ke overflow, dan tetap dapat dipilih
+    expect(screen.queryByRole("button", { name: "Layar penuh sesi aaaa1111" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Tutup sesi aaaa1111" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Lihat dokumen sesi aaaa1111" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain sesi aaaa1111" }));
     expect(screen.getByRole("button", { name: "Lihat dokumen" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review perubahan" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Lepas dari grid" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Layar penuh" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Tutup" }).length).toBeGreaterThan(0);
   });
 
   it("membiarkan aksi inline pada sel lebar", async () => {

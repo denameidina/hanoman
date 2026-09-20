@@ -8,15 +8,16 @@ export const HEADER_LABEL_MIN = 96;
 export const HEADER_MEDIA_PX = 50;
 /** Jarak antar tombol aksi di dalam klaster `.hn-terminal-actions` — bukan gap header (8px). */
 export const ACTION_GAP = 2;
-/** `Layar penuh` + `Tutup` tak pernah runtuh: keduanya jalan keluar, bukan aksi tambahan. */
-export const ALWAYS_INLINE = 2;
+/** Semua aksi (termasuk `Layar penuh` + `Tutup`) boleh runtuh ke overflow; tombol overflow-nya yang tak pernah hilang. */
+export const ALWAYS_INLINE = 0;
 
 /** Berapa aksi yang boleh tetap inline pada header selebar `width`. Sisanya milik overflow.
- *  `actionPx` mengikuti pointer: 28 (halus) / 44 (kasar), mencermin app.css. */
-export function inlineActionCount(width: number, total: number, actionPx: number): number {
+ *  `actionPx` mengikuti pointer: 28 (halus) / 44 (kasar), mencermin app.css. `reservePx` =
+ *  lebar chip/pil status + kelebihan tombol teks, yang ikut berebut ruang dengan klaster aksi. */
+export function inlineActionCount(width: number, total: number, actionPx: number, reservePx = 0): number {
   if (!Number.isFinite(width) || width <= 0) return total;
   const slot = actionPx + ACTION_GAP;
-  const room = Math.floor((width - HEADER_LABEL_MIN - HEADER_MEDIA_PX - ALWAYS_INLINE * slot) / slot);
+  const room = Math.floor((width - HEADER_LABEL_MIN - HEADER_MEDIA_PX - reservePx - ALWAYS_INLINE * slot) / slot);
   if (room >= total) return total;
   // Satu slot dibayarkan untuk tombol overflow itu sendiri.
   return Math.max(0, room - 1);

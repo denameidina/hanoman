@@ -1017,8 +1017,30 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
           title="Lepas dari grid (sesi tetap hidup)">lepas</button>
       ),
     },
+    // SPEC-232 · lihat SATU terminal ini secara penuh dalam modal.
+    {
+      key: "fullscreen", label: "Layar penuh", icon: "fullscreen",
+      title: "Layar penuh — fokus 1 terminal", onSelect: onFullscreen,
+      render: (
+        <button type="button" key="fullscreen" className="hn-terminal-action" onClick={onFullscreen}
+          title="Layar penuh — fokus 1 terminal" aria-label={`Layar penuh sesi ${session.id}`}>
+          <Icon name="fullscreen" size={12} />
+        </button>
+      ),
+    },
+    {
+      key: "close", label: "Tutup", icon: "x", title: "Tutup sesi", onSelect: onClose,
+      render: (
+        <button type="button" key="close" className="hn-terminal-action" aria-label={`Tutup sesi ${session.id}`}
+          onClick={onClose}>×</button>
+      ),
+    },
   ];
-  const inline = inlineActionCount(headerWidth, collapsible.length, coarse ? 44 : 28);
+  // Chip orchestrator, pil status, dan tombol teks `lepas` melebihi slot ikon; tanpa reserve ini
+  // aksinya terpotong `overflow: hidden` sel alih-alih runtuh ke menu overflow.
+  const reservePx = 40 + (session.orchestrated && session.model ? 110 : 0)
+    + (session.exited || finished ? 110 : 0) + (deciding || (awaiting && !finished) ? 130 : 0);
+  const inline = inlineActionCount(headerWidth, collapsible.length, coarse ? 44 : 28, reservePx);
   const hidden = collapsible.slice(inline);
   return (
     <>
@@ -1064,14 +1086,6 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
             <OverflowActions label={`Aksi lain sesi ${session.id}`}
               items={hidden.map(({ render: _render, ...item }) => item)} />
           )}
-          {/* SPEC-232 · lihat SATU terminal ini secara penuh dalam modal. */}
-          <button type="button" className="hn-terminal-action" onClick={onFullscreen} title="Layar penuh — fokus 1 terminal"
-            aria-label={`Layar penuh sesi ${session.id}`}
-          >
-            <Icon name="fullscreen" size={12} />
-          </button>
-          <button type="button" className="hn-terminal-action" aria-label={`Tutup sesi ${session.id}`}
-            onClick={onClose}>×</button>
         </span>
       </div>
       {/* Sesi berakhir (SPEC-188): badan diredupkan agar terbaca beku; header + badge

@@ -14,14 +14,15 @@ describe("inlineActionCount", () => {
   });
 
   it("menyisakan satu slot untuk tombol overflow saat tak semuanya muat", () => {
-    // slot 30px (28 + gap klaster 2), tetap 96 + 50 + 2×30 = 206 → sisa 94 → 3 slot;
+    // slot 30px (28 + gap klaster 2), tetap 96 + 50 = 146 → sisa 104 → 3 slot;
     // satu dipakai tombol overflow
-    expect(inlineActionCount(300, 4, 28)).toBe(2);
+    expect(inlineActionCount(250, 4, 28)).toBe(2);
+    expect(inlineActionCount(250, 4, 28, 60)).toBe(0);
   });
 
   it("meruntuhkan seluruh aksi saat pointer kasar memperbesar tiap kontrol", () => {
-    // slot 46px, tetap 96 + 50 + 2×46 = 238 → sisa 62 → 1 slot, habis untuk tombol overflow
-    expect(inlineActionCount(300, 4, 44)).toBe(0);
+    // slot 46px, tetap 146 → sisa 54 → 1 slot, habis untuk tombol overflow
+    expect(inlineActionCount(200, 4, 44)).toBe(0);
   });
 
   it("tak pernah mengembalikan angka negatif", () => {
