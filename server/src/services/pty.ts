@@ -1449,6 +1449,15 @@ function replayExited(c: Client, p: Pane, screen: string): void {
   c.close();
 }
 
+// SPEC-1267 · layar penuh sebagai frame reset: dikirim ke klien yang frame `data`-nya dibuang
+// backpressure. Hanya layar yang terlihat (tanpa riwayat) — cukup untuk menyamakan kembali tampilan.
+export async function screenResyncFrame(id: string): Promise<string | null> {
+  try {
+    const screen = await tmuxAsync("capture-pane", "-p", "-e", "-J", "-t", name(id));
+    return frame({ t: "data", d: `\x1b[2J\x1b[H${stripTerminalQueries(screen.replace(/\n/g, "\r\n"))}` });
+  } catch { return null; }
+}
+
 const CAPTURE_ARGS = (id: string) => ["capture-pane", "-p", "-e", "-J", "-S", "-2000", "-t", name(id)];
 
 export function attach(id: string, c: Client): void {

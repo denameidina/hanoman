@@ -393,10 +393,10 @@ it("mergeSlim menjaga objective/payload/sourceHistory dari HTTP", () => {
 **Interfaces:**
 - Produces: `createBoundedSender(ws: {send(s:string|Buffer):void; bufferedAmount:number}, opts?: {high?: number /*1 MiB*/; cap?: number /*256 KiB*/; onResync?: () => void}): { send(chunk: string): void; flush(): void; dispose(): void }`.
 
-- [ ] **Step 1: Tes gagal** — ws palsu dengan `bufferedAmount` diatur tes: (a) di bawah plafon → kirim langsung; (b) di atas 1 MiB → chunk digabung, tak dikirim; (c) `bufferedAmount` turun (interval `setTimeout(20)` mengecek) → satu kirim gabungan; (d) penulis jauh lebih cepat: pending melewati `cap` → byte terlama dibuang, `onResync` dipanggil sekali, `bufferedAmount` diamati tak tumbuh monoton (AC-S25a); (e) coalescing 16 ms tak disentuh (test coalescer lama tetap hijau).
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Implementasi di berkas baru `server/src/services/bounded-sender.ts`; pasang di titik kirim terminal. `onResync` mengirim ulang layar memakai jalur attach/scrollback yang sudah ada (`capture-pane` async dari Task 7) sebagai frame reset. Timer drain `unref()` dan dihentikan di `dispose` (dipanggil saat close).
-- [ ] **Step 4:** PASS + test pty/terminal route tersentuh. **Step 5: Commit** `feat(terminal): backpressure bufferedAmount, drop terlama + resync`. Docs: stack.md.
+- [x] **Step 1: Tes gagal** — ws palsu dengan `bufferedAmount` diatur tes: (a) di bawah plafon → kirim langsung; (b) di atas 1 MiB → chunk digabung, tak dikirim; (c) `bufferedAmount` turun (interval `setTimeout(20)` mengecek) → satu kirim gabungan; (d) penulis jauh lebih cepat: pending melewati `cap` → byte terlama dibuang, `onResync` dipanggil sekali, `bufferedAmount` diamati tak tumbuh monoton (AC-S25a); (e) coalescing 16 ms tak disentuh (test coalescer lama tetap hijau).
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Implementasi di berkas baru `server/src/services/bounded-sender.ts`; pasang di titik kirim terminal. `onResync` mengirim ulang layar memakai jalur attach/scrollback yang sudah ada (`capture-pane` async dari Task 7) sebagai frame reset. Timer drain `unref()` dan dihentikan di `dispose` (dipanggil saat close).
+- [x] **Step 4:** PASS + test pty/terminal route tersentuh. **Step 5: Commit** `feat(terminal): backpressure bufferedAmount, drop terlama + resync`. Docs: stack.md.
 
 ---
 

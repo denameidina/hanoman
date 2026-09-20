@@ -13,7 +13,7 @@ vi.mock("node:fs", async (orig) => {
   const m = await orig<typeof import("node:fs")>();
   const spy = <T extends (...a: never[]) => unknown>(name: string, f: T) => ((...a: unknown[]) => {
     if (String(a[0]).includes(TAG)) seen.sync.push(`${name}:${String(a[0])}`);
-    return (f as (...x: unknown[]) => unknown)(...a);
+    return (f as unknown as (...x: unknown[]) => unknown)(...a);
   }) as unknown as T;
   return { ...m, readFileSync: spy("readFileSync", m.readFileSync), statSync: spy("statSync", m.statSync), readdirSync: spy("readdirSync", m.readdirSync) };
 });

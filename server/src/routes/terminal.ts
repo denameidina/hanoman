@@ -29,9 +29,10 @@ import { recordSessionResult } from "../services/session-result";
 import { recordCompletion } from "../services/notifications";
 import { STAGES } from "../services/stage-machine";
 import {
-  createSession, getSession, getSessionAsync, attachAsync, listSessions, listSessionsAsync, killSession, sessionPhases,
+  createSession, getSession, getSessionAsync, attachAsync, screenResyncFrame, listSessions, listSessionsAsync, killSession, sessionPhases,
   detach, writeTo, resize, shellBin, sendToPane, interruptPane, clearMarker, type Client,
 } from "../services/pty";
+import { createBoundedSender } from "../services/bounded-sender";
 import { saveSessionUpload } from "../services/uploads";
 import { refreshPhaseInvocations } from "../services/phase-invocations";
 import {
@@ -563,7 +564,10 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     try { release = openWsConnection(principal); }
     catch { socket.close(1008, "connection limit"); return; }
     const guard = new WsMessageGuard({ perWindow: TERMINAL_WS_MESSAGES_PER_MINUTE });
-    const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
+    const bounded = createBoundedSender(socket, {
+      onResync: () => { void screenResyncFrame(id).then((f) => { if (f) bounded.send(f); }); },
+    });
+    const client: Client = { send: (m) => bounded.send(m), close: () => socket.close() };
     // SPEC-1267 · pencarian pane lewat `getSessionAsync` (tmux tak memblokir event loop). Frame yang
     // tiba selagi menunggu ditahan dan diputar ulang BERURUTAN sesudah attach siap — `writeTo`
     // sebelum attach akan membuang ketikan pertama.
@@ -625,6 +629,6 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     void attachReady.then(() => { ready = true; for (const raw of early.splice(0)) onMessage(raw); });
     const revalidate = watch ? setInterval(() => watch.refresh(), 60_000) : undefined;
     revalidate?.unref?.();
-    socket.on("close", () => { closed = true; if (revalidate) clearInterval(revalidate); watch?.dispose(); release(); detach(id, client); });
+    socket.on("close", () => { closed = true; bounded.dispose(); if (revalidate) clearInterval(revalidate); watch?.dispose(); release(); detach(id, client); });
   });
 }
