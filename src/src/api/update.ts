@@ -149,6 +149,30 @@ export function reloadNoticeText(version: string): string {
 /** Ekspor tersendiri karena `location` milik jsdom tak bisa diganti dengan bersih dari test. */
 export function reloadPage(): void { location.reload(); }
 
+/**
+ * Menunggu server hidup lagi sesudah restart. Restart manual tak mengganti versi, jadi tak ada
+ * drift yang memicu badge "muat ulang" — tanpa ini popover diam selamanya di "Menjalankan ulang…"
+ * dan tab memegang bundle serta koneksi lama. Server dianggap kembali bila probe sukses SESUDAH
+ * terlihat mati, atau setelah `minWaitMs` (restart bisa lebih cepat dari interval polling).
+ * Probe yang melempar = mati. `sleep` diinjeksi supaya bisa dites tanpa timer sungguhan.
+ */
+export async function waitForServerBack(
+  probe: () => Promise<boolean> = defaultProbe,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+  o: { intervalMs?: number; timeoutMs?: number; minWaitMs?: number } = {},
+): Promise<boolean> {
+  const interval = o.intervalMs ?? 1_000, timeout = o.timeoutMs ?? 90_000, minWait = o.minWaitMs ?? 3_000;
+  let seenDown = false;
+  for (let elapsed = 0; elapsed < timeout;) {
+    await sleep(interval); elapsed += interval;
+    const ok = await probe().catch(() => false);
+    if (!ok) seenDown = true;
+    else if (seenDown || elapsed >= minWait) return true;
+  }
+  return false;
+}
+const defaultProbe = async (): Promise<boolean> => (await fetch("/api/health", { cache: "no-store" })).ok;
+
 /** Restart manual (tanpa memasang). Dua langkah seperti `applyUpdate`. */
 export async function applyRestart(confirm: boolean): Promise<ApplyOutcome> {
   let res: Response;

@@ -5,10 +5,16 @@ import type { UpdateStatus } from "@hanoman/shared";
 // Badge self-fetch via useUpdate(); pakai nilai tetap agar render deterministik (pola limit-indicator).
 let hook: UpdateStatus;
 const applySpy = vi.fn();
+const restartSpy = vi.fn();
+const waitSpy = vi.fn();
+const reloadSpy = vi.fn();
 vi.mock("../src/api/update", async (orig) => ({
   ...(await orig<typeof import("../src/api/update")>()),
   useUpdate: () => hook,
   applyUpdate: (confirm: boolean) => applySpy(confirm),
+  applyRestart: (confirm: boolean) => restartSpy(confirm),
+  waitForServerBack: () => waitSpy(),
+  reloadPage: () => reloadSpy(),
 }));
 import { UpdateBadge } from "../src/screens/UpdateIndicator";
 
@@ -19,7 +25,7 @@ const mk = (o: Partial<UpdateStatus>): UpdateStatus => ({
 const avail = (o: Partial<UpdateStatus> = {}) =>
   mk({ updateAvailable: true, latestVersion: "0.2.0", command: "npm i -g hanoman@latest", ...o });
 
-beforeEach(() => applySpy.mockReset());
+beforeEach(() => { applySpy.mockReset(); restartSpy.mockReset(); waitSpy.mockReset(); reloadSpy.mockReset(); });
 
 describe("UpdateBadge", () => {
   // SPEC-906 · up-to-date bukan lagi keadaan diam: pil netral memikul versi terpasang, karena
@@ -108,5 +114,28 @@ describe("UpdateBadge", () => {
     fireEvent.click(screen.getByTitle("Update tersedia"));
     fireEvent.click(screen.getByText("Pasang & mulai ulang"));
     await waitFor(() => expect(screen.getByText(/sudah terkini/)).toBeTruthy());
+  });
+});
+
+describe("Mulai ulang hanoman (manual)", () => {
+  const open = async () => {
+    hook = mk({ canApply: true });
+    restartSpy.mockResolvedValueOnce({ kind: "accepted", liveSessions: 0, from: "", to: null });
+    render(<UpdateBadge />);
+    fireEvent.click(screen.getByTitle("Versi terpasang"));
+    fireEvent.click(screen.getByText("Mulai ulang hanoman"));
+  };
+
+  it("sesudah 202 dan server kembali → halaman dimuat ulang", async () => {
+    waitSpy.mockResolvedValueOnce(true);
+    await open();
+    await waitFor(() => expect(reloadSpy).toHaveBeenCalledTimes(1));
+  });
+
+  it("server tak kembali → pesan gagal, TIDAK memuat ulang halaman", async () => {
+    waitSpy.mockResolvedValueOnce(false);
+    await open();
+    expect(await screen.findByText(/belum kembali/i)).toBeTruthy();
+    expect(reloadSpy).not.toHaveBeenCalled();
   });
 });

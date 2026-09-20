@@ -3,7 +3,7 @@ import { Icon } from "../ds/icon";
 import {
   useUpdate, updateHeadline, updateBadgeLabel, updateBadgeLabelShort, updateVersionLine,
   updateRegistryLine, applyUpdate, applyRestart, applyConfirmMessage, type ApplyOutcome,
-  useServerRestartedTo, reloadNoticeLabel, reloadNoticeText, reloadPage,
+  useServerRestartedTo, reloadNoticeLabel, reloadNoticeText, reloadPage, waitForServerBack,
 } from "../api/update";
 import { usePopoverFocus } from "../ds/popover";
 
@@ -71,8 +71,14 @@ export function UpdateBadge() {
     setRPhase({ t: confirm ? "applying" : "asking" });
     const r: ApplyOutcome = await applyRestart(confirm);
     if (r.kind === "confirm") setRPhase({ t: "confirming", message: `Ada ${r.liveSessions} sesi berjalan. Sesi tmux tetap hidup, dashboard terputus sebentar. Mulai ulang?` });
-    else if (r.kind === "accepted") setRPhase({ t: "applying" });
-    else setRPhase({ t: "failed", message: r.message });
+    else if (r.kind === "accepted") {
+      setRPhase({ t: "applying" });
+      // Versi tak berubah → tak ada drift yang memuat ulang tab; tunggu server lalu muat ulang sendiri.
+      void waitForServerBack().then((back) => {
+        if (back) reloadPage();
+        else setRPhase({ t: "failed", message: "Server belum kembali dalam 90 detik — periksa prosesnya lalu muat ulang halaman ini." });
+      });
+    } else setRPhase({ t: "failed", message: r.message });
   };
   const name = u.updateAvailable ? "Update tersedia" : "Versi terpasang";
   const label = u.updateAvailable ? updateBadgeLabel(u) : `v${u.currentVersion}`;
