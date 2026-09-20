@@ -29,9 +29,10 @@ import { recordSessionResult } from "../services/session-result";
 import { recordCompletion } from "../services/notifications";
 import { STAGES } from "../services/stage-machine";
 import {
-  createSession, getSession, listSessions, listSessionsAsync, killSession, sessionPhases,
-  attach, detach, writeTo, resize, shellBin, sendToPane, interruptPane, clearMarker, type Client,
+  createSession, getSession, getSessionAsync, attachAsync, screenResyncFrame, listSessions, listSessionsAsync, killSession, sessionPhases,
+  detach, writeTo, resize, shellBin, sendToPane, interruptPane, clearMarker, type Client,
 } from "../services/pty";
+import { createBoundedSender } from "../services/bounded-sender";
 import { saveSessionUpload } from "../services/uploads";
 import { refreshPhaseInvocations } from "../services/phase-invocations";
 import {
@@ -555,7 +556,6 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     },
   }, (socket, req) => {
     const { id } = req.params as { id: string };
-    if (!getSession(id)) return socket.close(4004, "not found");
     const isClientRemote = req.remote !== undefined;
     const principal = isClientRemote
       ? { kind: "remote" as const, id: `client:${req.remote!.actor.hubOrigin}:${req.remote!.actor.userId}` }
@@ -564,11 +564,26 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     try { release = openWsConnection(principal); }
     catch { socket.close(1008, "connection limit"); return; }
     const guard = new WsMessageGuard({ perWindow: TERMINAL_WS_MESSAGES_PER_MINUTE });
-    const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
-    attach(id, client);
-    // ADR-0164 · invocation agen fase dari DB — frame pertama sudah membawa rencana dari roster, frame
-    // kedua (sesudah hidrasi) membawa status. Tanpa await: handler ini sengaja sinkron (lihat bawah).
-    void refreshPhaseInvocations(id);
+    const bounded = createBoundedSender(socket, {
+      onResync: () => { void screenResyncFrame(id).then((f) => { if (f) bounded.send(f); }); },
+    });
+    const client: Client = { send: (m) => bounded.send(m), close: () => socket.close() };
+    // SPEC-1267 · pencarian pane lewat `getSessionAsync` (tmux tak memblokir event loop). Frame yang
+    // tiba selagi menunggu ditahan dan diputar ulang BERURUTAN sesudah attach siap — `writeTo`
+    // sebelum attach akan membuang ketikan pertama.
+    let ready = false;
+    let closed = false;
+    const early: Buffer[] = [];
+    const attachReady = (async () => {
+      const found = await getSessionAsync(id);
+      if (!found) { socket.close(4004, "not found"); return; }
+      if (closed) return;
+      await attachAsync(id, client);
+      if (closed) { detach(id, client); return; }
+      // ADR-0164 · invocation agen fase dari DB — frame pertama sudah membawa rencana dari roster, frame
+      // kedua (sesudah hidrasi) membawa status.
+      void refreshPhaseInvocations(id);
+    })().catch(() => { socket.close(1011, "attach failed"); });
     // Revalidasi principal (SPEC-761) berjalan di LATAR, dipicu frame yang datang (≤ 1×/dtk) dan
     // interval 60 dtk di bawah. Sebelumnya setiap frame `in` di-`await` di belakang satu query
     // Prisma sebelum `writeTo`: dua frame beruntun berlomba dan mendarat terbalik di pty (terukur
@@ -584,7 +599,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       check: () => revalidateWsPrincipal(req, principal),
       onRevoked: () => socket.close(1008, "session revoked"),
     });
-    socket.on("message", (raw: Buffer) => {
+    const onMessage = (raw: Buffer) => {
       const verdict = guard.accept(raw);
       if (!verdict.ok) { socket.close(verdict.code, verdict.reason); return; }
       if (watch && !watch.admit()) return;
@@ -609,9 +624,11 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       else if (m.t === "diag" && Array.isArray(m.ev)) {
         try { appendDiag(resolveHome(), id, m.ev); } catch { /* diagnostik bukan alasan sesi mati */ }
       }
-    });
+    };
+    socket.on("message", (raw: Buffer) => { if (ready) onMessage(raw); else early.push(raw); });
+    void attachReady.then(() => { ready = true; for (const raw of early.splice(0)) onMessage(raw); });
     const revalidate = watch ? setInterval(() => watch.refresh(), 60_000) : undefined;
     revalidate?.unref?.();
-    socket.on("close", () => { if (revalidate) clearInterval(revalidate); watch?.dispose(); release(); detach(id, client); });
+    socket.on("close", () => { closed = true; bounded.dispose(); if (revalidate) clearInterval(revalidate); watch?.dispose(); release(); detach(id, client); });
   });
 }

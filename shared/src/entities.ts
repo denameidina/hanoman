@@ -99,6 +99,17 @@ export const zSpec = z.object({
 });
 export type Spec = z.infer<typeof zSpec>;
 
+// SPEC-1267 · bentuk daftar: tanpa `payload`/`sourceHistory` (bagian terbesar baris), `objective`
+// tetap ada karena grid/list dan pencarian `?q=` membacanya. Detail penuh lewat `GET /specs/:id`.
+export const zSpecListItem = zSpec.omit({ payload: true, sourceHistory: true }).extend({
+  version: z.number().optional(), updatedAt: z.string().optional(),
+});
+export type SpecListItem = z.infer<typeof zSpecListItem>;
+// SPEC-1267 · bentuk frame siar `specs`: tanpa `objective` juga. `version`/`updatedAt` dipakai klien
+// untuk dedup digest; keduanya kolom DB yang tak ada di `zSpec`.
+export const zSpecSlim = zSpecListItem.omit({ objective: true });
+export type SpecSlim = z.infer<typeof zSpecSlim>;
+
 // SPEC-180/184 · nada notifikasi (aset .wav di src/public/sounds). "off" = senyap.
 const NOTIFY_SOUNDS = ["off", "short", "medium", "long",
   "blip", "pop", "ping", "coin", "alert", "chime", "success", "bell", "marimba", "fanfare"] as const;

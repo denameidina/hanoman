@@ -4,7 +4,7 @@
 |---|---|---|
 | Dashboard | React + TypeScript + Vite | UI cepat, tim familiar |
 | Navigasi web | react-router-dom v7 (`BrowserRouter`) | halaman = URL, Kembali/Maju browser & link yang bisa dibagikan; layar berat `React.lazy` ([ADR-0160](../adr/0160-navigasi-dashboard-router-url.md)) |
-| Realtime | WebSocket: PTY terminal + satu kanal siar dashboard | siar membawa grup global (ADR-0039) **dan** langganan berparameter (SPEC-908/ADR-0145); HTTP tinggal muat awal & fallback |
+| Realtime | WebSocket: PTY terminal + satu kanal siar dashboard | siar membawa grup global (ADR-0039) **dan** langganan berparameter (SPEC-908/ADR-0145); HTTP tinggal muat awal & fallback; SPEC-1267: frame `specs` ringkas (`SpecSlim`) hanya lahir saat digest berubah, grup dibangun paralel terisolasi, klien baru dilayani dari frame siaran terakhir; jalur periodik (overlay stage, scan keputusan, reconcile scheduler, reaper, denyut lead, attach WS terminal) async di atas `listPanesShared`/`getSessionAsync` + berkas fase dimemo per mtime — nol `execFileSync`/`readFileSync` di sana; WS terminal berbackpressure (`bufferedAmount` > 1 MiB menahan frame, antrean > 256 KiB membuang `data` terlama lalu mengirim layar penuh) |
 | Server | Node.js + TypeScript (Fastify) | satu bahasa lintas stack; `@fastify/websocket`, `cookie`, `static` |
 | DB | **SQLite (Prisma 6)** | embedded, nol proses eksternal; berkas di `~/.hanoman/hanoman.db` ([ADR-0086](../adr/0086-sqlite-satu-satunya-provider.md)), dibuka `journal_mode=WAL` ([ADR-0131](../adr/0131-retensi-change-feed-sync.md) §4) |
 | Distribusi | **paket npm global `hanoman`** | `npm i -g hanoman` → `hanoman`; update `hanoman update` ([ADR-0087](../adr/0087-distribusi-npm-global-satu-perintah.md)) |

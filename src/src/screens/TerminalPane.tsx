@@ -1,6 +1,7 @@
 import React from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
@@ -11,6 +12,7 @@ import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./te
 import * as P from "./terminal-predict";
 import * as D from "./terminal-diag";
 import { TerminalComposer } from "./TerminalComposer";
+import { createHiddenRing } from "../lib/hidden-ring";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
 // (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
@@ -22,6 +24,7 @@ import { TerminalComposer } from "./TerminalComposer";
 // dari "generator koneksi" yang dilarang SPEC-761.
 const RECONNECT_BACKOFF_MS = [500, 1_000, 2_000, 4_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000];
 const RECONNECT_MAX = RECONNECT_BACKOFF_MS.length;
+const RESIZE_DEBOUNCE_MS = 100;
 
 // SPEC-878 · ADR-0134 · antrean adalah penyelamat ketikan (SPEC-800), bukan tempat penyimpanan.
 // 4 KiB memuat satu paragraf yang di-paste dan tetap menghentikan antrean yang lari.
@@ -36,8 +39,10 @@ type LinkState =
   | { state: "connecting" | "open" | "gone" | "lost" }
   | { state: "retrying"; attempt: number };
 
-export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true, diag = false, mode = "local" }: {
+export const TerminalPane = React.memo(TerminalPaneImpl);
+
+function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
+  predict = true, diag = false, mode = "local", hidden = false }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -55,6 +60,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   // geometri (frame `geometry` menggantikan `resize` yang kita kirim), dan tanpa `sessions:write`
   // pane jadi baca-saja — tak ada `onData`/composer/keys yang bisa mengetik ke pty orang lain.
   mode?: "local" | "remote";
+  // SPEC-1267 · pane display:none tak mem-parse keluaran: ditahan di ring 256 KB dan diputar ulang
+  // (atau digambar ulang tmux bila ring meluap) saat tampil kembali.
+  hidden?: boolean;
 }) {
   const wsTarget = useWsTarget(`terminal:${sessionId}`);
   const instance = useInstance();
@@ -68,7 +76,11 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   predictRef.current = predict;
   const diagRef = React.useRef(diag);
   diagRef.current = diag;
-  const view = React.useRef<{ term: Terminal; fit: FitAddon; send: (m: unknown) => void } | null>(null);
+  const hiddenRef = React.useRef(hidden);
+  hiddenRef.current = hidden;
+  const ring = React.useRef(createHiddenRing());
+  const resync = React.useRef<() => void>(() => {});
+  const view = React.useRef<{ term: Terminal; fit: FitAddon; sendSize: (force?: boolean) => void } | null>(null);
   // onExit boleh berubah tiap render; menaruhnya di ref menjaga effect ini
   // hanya bergantung pada sessionId — remount = sesi yang benar-benar berbeda.
   const exitRef = React.useRef(onExit);
@@ -96,7 +108,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const token = (n: string, fallback: string) => css.getPropertyValue(n).trim() || fallback;
     const term = new Terminal({
       fontFamily: token("--font-mono", "monospace"),
-      fontSize: clampFontSize(fontSizeRef.current), cursorBlink: true,
+      fontSize: clampFontSize(fontSizeRef.current), cursorBlink: false,
       // SPEC-511 · tmux lahir dengan `mouse on` (SPEC-209) supaya wheel browser menggulir riwayat
       // pane; harganya, tmux menyalakan mouse-reporting di terminal klien (terukur: `?1000h`
       // `?1002h` `?1006h`) — dan xterm memanggil `SelectionService.disable()` begitu ada protokol
@@ -110,6 +122,15 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
+    // SPEC-1267 · renderer WebGL menggantikan DOM renderer; gagal (tak ada GPU/konteks hilang) →
+    // kembali ke DOM renderer bawaan tanpa mengganggu pengguna.
+    let webgl: WebglAddon | undefined;
+    const dropWebgl = () => { webgl?.dispose(); webgl = undefined; };
+    try {
+      webgl = new WebglAddon();
+      webgl.onContextLoss(dropWebgl);
+      term.loadAddon(webgl);
+    } catch { dropWebgl(); }
     const visibleRect = () => {
       const rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0 ? rect : null;
@@ -122,7 +143,16 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     let timer: ReturnType<typeof setTimeout> | undefined;
     let finished = false;
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
-    view.current = { term, fit, send };
+    // SPEC-1267 · `resize` yang ukurannya sama dengan yang terakhir sampai ke server tak dikirim ulang.
+    let lastSentSize = "";
+    const sendSize = (force = false) => {
+      if (mode === "remote" || ws?.readyState !== WebSocket.OPEN) return;
+      const size = `${term.cols}x${term.rows}`;
+      if (!force && size === lastSentSize) return;
+      lastSentSize = size;
+      send({ t: "resize", cols: term.cols, rows: term.rows });
+    };
+    view.current = { term, fit, sendSize };
     // Perekam diagnostik. Selalu DIBUAT, tapi `rec` diam total selama sakelarnya mati — dengan
     // begitu menyalakannya tak perlu melahirkan socket baru, sama seperti sakelar prediksi.
     const diagRec = D.createDiagRecorder({
@@ -225,15 +255,23 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       else if (r.deferred) rec("pred", "tangguh: frame server in flight");
       else rec("pred", `tolak cx=${view.cursorX}/${view.cols} alt=${pred.altScreen ? 1 : 0}`
         + ` deliverable=${view.deliverable ? 1 : 0} suspend=${Math.max(0, pred.suspendedUntil - Date.now())}`);
+      armTtl();
       batcher.push(d, wasPredicting || r.write.length > 0 || r.deferred === true);
     };
     // TTL adalah satu-satunya sinyal yang memisahkan "pty diam" — password dan tombol yang ditelan
     // dialog sama-sama terukur membalas NOL byte — dari "jaringan lambat".
-    const ttl = setInterval(() => {
-      const r = P.onTick(pred, Date.now());
-      pred = r.state;
-      if (r.write) term.write(r.write);
-    }, 100);
+    // SPEC-1267 · timer hanya hidup selagi ada prediksi yang belum di-echo — dulu berdetak 100 ms per
+    // pane sepanjang hidupnya. `armTtl` dipanggil di setiap titik yang bisa menambah `pending`.
+    let ttl: ReturnType<typeof setInterval> | undefined;
+    const armTtl = () => {
+      if (ttl || !pred.pending) return;
+      ttl = setInterval(() => {
+        const r = P.onTick(pred, Date.now());
+        pred = r.state;
+        if (r.write) term.write(r.write);
+        if (!pred.pending && ttl) { clearInterval(ttl); ttl = undefined; }
+      }, 100);
+    };
 
     const connect = () => {
       // SPEC-1218 · smoke manual Task 18 Step 7 menemukan bug nyata di sini: `apiHook.issueWsTicket`
@@ -281,7 +319,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
             // geometri lama lalu me-rewrap seluruh layar.
             // SPEC-1218 · mode remote: geometri milik pemilik pane (frame `geometry` masuk), bukan
             // kontainer kita — mengirim `resize` di sini akan merebut kolom/baris pane orang lain.
-            if (mode !== "remote") send({ t: "resize", cols: term.cols, rows: term.rows });
+            // Sambungan baru = server belum tahu ukuran kita, jadi dedup direset.
+            lastSentSize = "";
+            sendSize();
           }
           // Dikuras di SETIAP open, bukan hanya yang pertama: itu yang mengubah buffer SPEC-771
           // dari penyembunyi kegagalan menjadi penyelamat ketikan.
@@ -292,7 +332,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
             t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
             on?: boolean; seq?: number; cols?: number; rows?: number;
           };
-          if (f.t === "data") {
+          if (f.t === "data" && hiddenRef.current) {
+            ring.current.push(f.d ?? "");
+          } else if (f.t === "data") {
             const r = P.onServerData(pred, f.d ?? "", Date.now());
             pred = r.state;
             const gen = pred.gen;
@@ -312,6 +354,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
               const back = P.onFrameParsed(pred, gen, viewOf(), Date.now(), predictRef.current);
               pred = back.state;
               if (back.write) term.write(back.write);
+              armTtl();
               clockIfDelivered();
             });
             clockIfDelivered();
@@ -379,6 +422,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       timer = setTimeout(connect, wait);
     };
 
+    // Ring meluap = replay tak lengkap: layar dikosongkan lalu sambungan diulang supaya tmux
+    // menggambar ulang layar penuh (jalur attach yang sama dengan reconnect).
+    resync.current = () => { term.reset(); ws?.close(); };
+
     retryNow.current = () => {
       if (disposed) return;
       clearTimeout(timer);
@@ -430,6 +477,11 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const ta = term.textarea;
     const onDiagKey = (e: KeyboardEvent) => rec("key", e.key, e.keyCode);
     const onDiagComp = (e: Event) => rec("comp", `${e.type}:${D.showBytes((e as CompositionEvent).data ?? "")}`);
+    // SPEC-1267 · kursor berkedip memaksa repaint terus-menerus: hanya pane yang fokus.
+    const onFocusIn = () => { term.options.cursorBlink = true; };
+    const onFocusOut = () => { term.options.cursorBlink = false; };
+    ta?.addEventListener("focus", onFocusIn);
+    ta?.addEventListener("blur", onFocusOut);
     ta?.addEventListener("keydown", onDiagKey);
     ta?.addEventListener("compositionstart", onDiagComp);
     ta?.addEventListener("compositionupdate", onDiagComp);
@@ -519,11 +571,14 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     el.addEventListener("touchend", onTouchEnd, { passive: true });
     el.addEventListener("touchcancel", resetTouch, { passive: true });
 
+    // SPEC-1267 · drag pemisah/jendela memicu ResizeObserver puluhan kali per detik; fit + kirim
+    // digabung ke satu langkah 100 ms sesudah gerakan berhenti.
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
     const ro = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect ?? el.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
-      fit.fit();
-      if (mode !== "remote") send({ t: "resize", cols: term.cols, rows: term.rows });
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { fit.fit(); sendSize(); }, RESIZE_DEBOUNCE_MS);
     });
     ro.observe(el);
 
@@ -544,9 +599,12 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", resetTouch);
       ro.disconnect();
-      clearInterval(ttl);
+      clearTimeout(resizeTimer);
+      if (ttl) clearInterval(ttl);
       batcher.dispose();
       diagRec.dispose();
+      ta?.removeEventListener("focus", onFocusIn);
+      ta?.removeEventListener("blur", onFocusOut);
       ta?.removeEventListener("keydown", onDiagKey);
       ta?.removeEventListener("compositionstart", onDiagComp);
       ta?.removeEventListener("compositionupdate", onDiagComp);
@@ -556,6 +614,14 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       term.dispose();
     };
   }, [sessionId]);
+
+  React.useEffect(() => {
+    const current = view.current;
+    if (hidden || !current) return;
+    const { chunks, overflowed } = ring.current.drain();
+    if (overflowed) resync.current();
+    else for (const c of chunks) current.term.write(c);
+  }, [hidden]);
 
   // Ukuran font diterapkan tanpa me-remount: remount berarti socket baru, tiket baru, dan layar
   // kosong sampai tmux menggambar ulang. `cols`/`rows` PTY turunan ukuran font, jadi frame resize
@@ -570,7 +636,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     current.fit.fit();
-    if (mode !== "remote") current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
+    current.sendSize(true);
   }, [fontSize, mode]);
 
   // SPEC-882 · kolom ketik & bar tombol memakan tinggi host, jadi `cols`/`rows` PTY ikut berubah
@@ -583,7 +649,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     current.fit.fit();
-    if (mode !== "remote") current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
+    current.sendSize(true);
   }, [showKeys, mode]);
 
   return (

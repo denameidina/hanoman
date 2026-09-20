@@ -11,7 +11,7 @@ import {
 import { zAutoMerge } from "./auto-merge";
 import { zHandledBy, zHandledByView } from "./handled-by";
 import { zPrdStatus } from "./prd-status";
-import type { Spec, Notification } from "./entities";
+import type { Spec, SpecSlim, Notification } from "./entities";
 import { zProjectKind, zSpecSource, zPriority, zStage, zTicketCategory, zTicketStatus, zVerifyScope } from "./enums";
 import { payloadMatchesSource } from "./spec-source";
 import { parseCron } from "./cron-expr";
@@ -813,7 +813,7 @@ export type EventsClientMsg = z.infer<typeof zEventsClientMsg>;
 // langganan berparameter (`zEventsClientMsg` di atas), yang membuat kanal ini tak lagi read-only.
 export type EventMsg =
   | { t: "models"; catalog: import("./model-catalog").ModelCatalog }
-  | { t: "specs"; specs: Spec[] }
+  | { t: "specs"; specs: SpecSlim[] }
   | { t: "sessions"; sessions: SessionDTO[] }
   // SPEC-523 · `total` ikut disiarkan: bell menampilkan 50 teratas, dan tanpa angka ini 50 itu
   // terbaca sebagai "semuanya". Bentuk daftar frame tak berubah (tetap 50 teratas).

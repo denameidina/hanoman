@@ -1,4 +1,5 @@
 import React from "react";
+import { subscribeTick } from "../lib/shared-ticker";
 import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, StatusPill,
   ProductStateIllustration, Tabs, OverflowActions, useResponsiveTier, useCoarsePointer,
   type OverflowItem } from "../ds";
@@ -11,7 +12,7 @@ import { NewTerminalModal } from "./NewTerminalModal";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { IntegrateDialog } from "./IntegrateDialog";
 import { B_STAGES } from "./BacklogScreen";
-import type { Spec } from "./types";
+import type { SpecSlim } from "./types";
 import * as L from "./terminal-layout";
 import * as W from "./terminal-workspace";
 import { useTerminalWorkspace } from "./use-terminal-workspace";
@@ -21,22 +22,31 @@ import { clampFontSize, inlineActionCount, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX } from "./terminal-chrome";
 import { chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
 
-export function TerminalScreen({ userId = "test-user", projects, backlog = [], focusSession, startedSession, onStartedSessionHandled, onStartBacklog, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf }: {
+// Default prop bernilai literal `[]` baru tiap render akan mematahkan memo `Cell`.
+const NO_BACKLOG: SpecSlim[] = [];
+
+export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BACKLOG, focusSession, startedSession, onStartedSessionHandled, onStartBacklog, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, sessions: sessionsProp, setSessions: setSessionsProp }: {
   userId?: string;
-  projects: { id: string; name: string }[]; backlog?: Spec[]; focusSession?: string | null;
+  projects: { id: string; name: string }[]; backlog?: SpecSlim[]; focusSession?: string | null;
   // SPEC-252/0164 · App owns the shared StartSessionModal so Terminal and Backlog use one picker.
-  onStartBacklog?: (spec: Spec) => void;
+  onStartBacklog?: (spec: SpecSlim) => void;
   // Keep the just-created session visible immediately; the WS snapshot remains authoritative.
   startedSession?: Pick<TerminalSession, "id" | "projectId" | "specId" | "flow"> | null;
   onStartedSessionHandled?: () => void;
   onOpenReview?: (specId: string) => void;
   onOpenSessionReview?: (sessionId: string, title: string) => void;
   titleOf?: (specId: string) => string | undefined;
-  onIntegrate?: (spec: Spec, op: "merge" | "rebase", target: string) => void;
+  onIntegrate?: (spec: SpecSlim, op: "merge" | "rebase", target: string) => void;
   onIntegrateSession?: (session: TerminalSession, op: "merge" | "rebase", target: string) => void;
-  specOf?: (specId: string) => Spec | undefined;
+  specOf?: (specId: string) => SpecSlim | undefined;
+  // SPEC-1267 · daftar sesi milik App (satu langganan `sessions` untuk seluruh aplikasi). Tanpa prop
+  // ini layar memegang salinannya sendiri dan berlangganan sendiri.
+  sessions?: TerminalSession[];
+  setSessions?: React.Dispatch<React.SetStateAction<TerminalSession[]>>;
 }) {
-  const [sessions, setSessions] = React.useState<TerminalSession[]>([]);
+  const [ownSessions, setOwnSessions] = React.useState<TerminalSession[]>([]);
+  const sessions = sessionsProp ?? ownSessions;
+  const setSessions = setSessionsProp ?? setOwnSessions;
   // SPEC-742 · ADR-0116 · worktree yang masih disapu di latar. Bukan sesi: sesinya sudah lenyap.
   const [cleanups, setCleanups] = React.useState<WorktreeCleanupView[]>([]);
   const workspaceController = useTerminalWorkspace(userId);
@@ -96,7 +106,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
   // SPEC-199 · daftar sesi (`exited` + marker "menunggu keputusan") didorong lewat WS siar
   // (ADR-0039), bukan poll 8s. tmux = source of truth di server; snapshot penuh saat connect.
   React.useEffect(() => subscribe((m) => {
-    if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
+    if (m.t === "sessions" && !sessionsProp) setSessions(m.sessions as TerminalSession[]);
     // SPEC-742 · ADR-0116 · tab yang ditutup lepas SEKETIKA (sesinya memang sudah lenyap); yang
     // masih berjalan cuma penghapusan byte worktree-nya. Tanpa baris ini kerja itu tak kasatmata,
     // dan "kok disknya belum kembali" jadi pertanyaan tanpa jawaban.
@@ -169,7 +179,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
 
   const failedCleanups = cleanups.filter((c) => c.error);
   const byId = (id: string) => sessions.find((s) => s.id === id) ?? null;
-  const nameOf = (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid;
+  const nameOf = React.useCallback(
+    (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid, [projects]);
 
   // SPEC-517 · sesi agen biasa lahir DI DALAM NewTerminalModal (ia yang memegang pilihan
   // runtime); di sini tinggal menaruhnya di grid — persis jalur lama sesudah createTerminal.
@@ -194,7 +205,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
   // SPEC-179 · ambil backlog item tanpa pindah page. Di App, aksi ini membuka StartSessionModal
   // yang sama dengan Backlog agar model/effort orchestrator dan override fase bisa ditinjau dulu.
   // Fallback langsung dipertahankan untuk pemakaian screen mandiri/test lama.
-  async function pickBacklog(spec: Spec, force?: true) {
+  async function pickBacklog(spec: SpecSlim, force?: true) {
     if (onStartBacklog && !force) {
       setPicking(false);
       setPickError(null);
@@ -275,6 +286,37 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
   const markExited = React.useCallback((id: string, code?: number) => {
     setSessions((s) => s.map((x) => (x.id === id ? { ...x, exited: true, exitCode: code } : x)));
   }, []);
+
+  // SPEC-1267 · handler per-sel yang identitasnya stabil supaya `Cell` (React.memo) tak render ulang
+  // tiap render layar. Isinya membaca `latest` saat dipanggil, jadi tak pernah basi.
+  const current = {
+    close, detach: (id: string) => { void mutateWorkspace((c) => W.detach(c, id)); }, markExited, setFullId,
+    props: { onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf },
+  };
+  const latest = React.useRef(current);
+  latest.current = current;
+  const cellHandlers = React.useRef(new Map<string, {
+    onClose: () => void; onDetach: () => void; onExit: (code: number) => void; onFullscreen: () => void;
+  }>());
+  const handlersFor = (id: string) => {
+    let h = cellHandlers.current.get(id);
+    if (!h) {
+      h = {
+        onClose: () => void latest.current.close(id), onDetach: () => latest.current.detach(id),
+        onExit: (code) => latest.current.markExited(id, code), onFullscreen: () => latest.current.setFullId(id),
+      };
+      cellHandlers.current.set(id, h);
+    }
+    return h;
+  };
+  const stableProps = React.useRef({
+    onOpenReview: (specId: string) => latest.current.props.onOpenReview?.(specId),
+    onOpenSessionReview: (sid: string, title: string) => latest.current.props.onOpenSessionReview?.(sid, title),
+    titleOf: (specId: string) => latest.current.props.titleOf?.(specId),
+    onIntegrate: (spec: SpecSlim, op: "merge" | "rebase", target: string) => latest.current.props.onIntegrate?.(spec, op, target),
+    onIntegrateSession: (session: TerminalSession, op: "merge" | "rebase", target: string) => latest.current.props.onIntegrateSession?.(session, op, target),
+    specOf: (specId: string) => latest.current.props.specOf?.(specId),
+  }).current;
 
   const place = (idx: number, id: string) => {
     setActiveCell(idx);
@@ -517,12 +559,16 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
                     border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", overflow: "hidden",
                   }}>
                     {s
-                      ? <Cell session={s} nameOf={nameOf} onClose={() => void close(s.id)}
-                          canArrange={workspaceWritable} onDetach={() => detach(s.id)} onExit={(code) => markExited(s.id, code)} onReview={onOpenReview}
-                          onSessionReview={onOpenSessionReview}
-                          titleOf={titleOf} onIntegrate={onIntegrate} onIntegrateSession={onIntegrateSession} specOf={specOf}
+                      ? <Cell session={s} nameOf={nameOf} {...handlersFor(s.id)}
+                          canArrange={workspaceWritable}
+                          onReview={onOpenReview && stableProps.onOpenReview}
+                          onSessionReview={onOpenSessionReview && stableProps.onOpenSessionReview}
+                          titleOf={titleOf && stableProps.titleOf} onIntegrate={onIntegrate && stableProps.onIntegrate}
+                          onIntegrateSession={onIntegrateSession && stableProps.onIntegrateSession}
+                          specOf={specOf && stableProps.specOf} backlog={backlog}
                           fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
-                          fullscreen={fullId === s.id} onFullscreen={() => setFullId(s.id)} />
+                          fullscreen={fullId === s.id}
+                          paneHidden={mobile && activeCell !== idx} />
                       : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
                   </div>
                 );
@@ -572,14 +618,14 @@ function cellLabel(s: TerminalSession, nameOf: (pid: string) => string,
 // SPEC-179 · picker backlog dari Terminal. Daftar padat + cari; klik baris = ambil.
 // Filter search/stage/prioritas mencermin halaman Backlog (SPEC-178) supaya konsisten.
 function BacklogPicker({ seed, activeIds, error, onPick, onClose }: {
-  seed: Spec[]; activeIds: Set<string>; error: string | null; onPick: (s: Spec) => void; onClose: () => void;
+  seed: SpecSlim[]; activeIds: Set<string>; error: string | null; onPick: (s: SpecSlim) => void; onClose: () => void;
 }) {
   const [q, setQ] = React.useState("");
   const [stageFilter, setStageFilter] = React.useState("all");
   const [prioFilter, setPrioFilter] = React.useState("all");
   // SPEC-198 · search/filter startable via API. Seed dari prop (render instan + tahan mock parsial),
   // lalu refetch dari server. Exclusi sesi aktif tetap di klien (state sesi, bukan filter/paginasi).
-  const [items, setItems] = React.useState<Spec[]>(seed);
+  const [items, setItems] = React.useState<SpecSlim[]>(seed);
   const [dq, setDq] = React.useState("");
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
   React.useEffect(() => {
@@ -776,8 +822,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
   const running = !!phases?.some((p) => p.agent?.status === "running");
   React.useEffect(() => {
     if (!running || now !== undefined) return;
-    const t = setInterval(() => setTick((x) => x + 1), 1000);
-    return () => clearInterval(t);
+    return subscribeTick(() => setTick((x) => x + 1));
   }, [running, now]);
   if (!phases?.length) return null;
   const at = now ?? Date.now();
@@ -886,17 +931,21 @@ export function PhaseStrip({ phases, compact = false, now }: {
   );
 }
 
-function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen }: {
+const Cell = React.memo(CellImpl);
+
+function CellImpl({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen, paneHidden }: {
   session: TerminalSession; nameOf: (pid: string) => string;
   onClose: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
   onReview?: (specId: string) => void;
   onSessionReview?: (sessionId: string, title: string) => void;
   titleOf?: (specId: string) => string | undefined;
-  onIntegrate?: (spec: Spec, op: "merge" | "rebase", target: string) => void;
+  onIntegrate?: (spec: SpecSlim, op: "merge" | "rebase", target: string) => void;
   onIntegrateSession?: (session: TerminalSession, op: "merge" | "rebase", target: string) => void;
-  specOf?: (specId: string) => Spec | undefined;
+  specOf?: (specId: string) => SpecSlim | undefined;
+  // Hanya kunci render ulang: `titleOf`/`specOf` stabil, jadi perubahan backlog harus lewat prop ini.
+  backlog?: SpecSlim[];
   fontSize: number; showKeys: boolean; predict: boolean; diag: boolean;
-  fullscreen: boolean; onFullscreen: () => void;
+  fullscreen: boolean; onFullscreen: () => void; paneHidden?: boolean;
 }) {
   const [phases, setPhases] = React.useState<Phase[] | null>(null);
   // SPEC-800 · yang menentukan bukan lebar viewport melainkan lebar SEL: grid 4 kolom di desktop
@@ -1106,7 +1155,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
                 Terbuka di layar penuh
               </div>
             : <TerminalPane key={session.id} sessionId={session.id} onExit={onExit} onPhases={onPhases}
-                fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} />}
+                fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} hidden={paneHidden} />}
         </div>
       </div>
       {docs && session.specId && <SpecDocsModal specId={session.specId} onClose={() => setDocs(false)} />}

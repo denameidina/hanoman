@@ -5,7 +5,8 @@ import {
   Card, Badge, Tabs, Select, Button, IconButton, Icon, Checkbox, serverPage, Pager, Modal, StateBlock, Input,
   Field, HnTextarea, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE
 } from "../ds";
-import { api, type SourceResetPending } from "../api/client";
+import { api, ApiError, type SourceResetPending } from "../api/client";
+import { mergeSlim } from "../lib/specs-digest";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { SpecAttachmentsPanel, type AttachmentToast } from "./SpecAttachments";
 import { IntegrateDialog } from "./IntegrateDialog";
@@ -20,7 +21,7 @@ import {
   usePersistedState, useScrollRestore, useResetOnChange, ResetViewButton,
   oneOf, isStr, isNum, nullableStr,
 } from "../ui-state";
-import type { Spec } from "./types";
+import type { Spec, SpecListItem, SpecSlim } from "./types";
 import type { ProjectVM } from "./types";
 import type { AuditEscalation } from "@hanoman/shared";
 import { AUTO_MERGE_OFF, autoMergeSummary, resolveAutoMerge, payloadShapeFor, type AutoMerge } from "@hanoman/shared";
@@ -48,7 +49,7 @@ export { SOURCE_META, sourceMeta };
 export const blockLabel = (reason: string): string =>
   reason === "missing" ? "tak ditemukan" : reason === "unmerged" ? "belum ter-merge" : "belum selesai";
 
-function BlockedBadge({ spec }: { spec: Spec }) {
+function BlockedBadge({ spec }: { spec: SpecListItem }) {
   const bl = spec.blockedBy ?? [];
   if (!bl.length) return null;
   return (
@@ -110,36 +111,40 @@ const escVariant = (e: AuditEscalation | null, target: string): "primary" | "sec
 // Source yang berujung dokumen audit — berhak atas ketiga pintu eskalasi.
 const isAuditSource = (source: string) => source === "audit";
 
+// SPEC-1267 · `payload`/`sourceHistory` tak ikut daftar maupun frame siar; `undefined` = detail penuh
+// belum dimuat (`null` = memang tak punya payload).
+type DetailSpec = SpecListItem & { payload?: Spec["payload"]; sourceHistory?: Spec["sourceHistory"] };
+
 function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, projectPolicy, allSpecs, onAttachmentToast }:
   {
-    spec: Spec | null; onClose: () => void; onEditBranch?: (s: Spec, b: string | null) => void;
-    onRevertStage?: (s: Spec, target: string, confirmDelete?: boolean) => Promise<any>;
+    spec: DetailSpec | null; onClose: () => void; onEditBranch?: (s: SpecSlim, b: string | null) => void;
+    onRevertStage?: (s: SpecSlim, target: string, confirmDelete?: boolean) => Promise<any>;
     // SPEC-804 · ADR-0120 · maju ke `done` tanpa sesi. Bersebelahan dengan revert: satu blok,
     // dua arah.
-    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
-    onOpenReview?: (s: Spec) => void;
-    onStart?: (s: Spec) => void;
-    onIntegrate?: (s: Spec, op: "merge" | "rebase", target: string) => void;
-    onEditSpec?: (s: Spec, patch: { title?: string; priority?: string; payload?: unknown }) => void;
+    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    onOpenReview?: (s: SpecSlim) => void;
+    onStart?: (s: SpecSlim) => void;
+    onIntegrate?: (s: SpecSlim, op: "merge" | "rebase", target: string) => void;
+    onEditSpec?: (s: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown }) => void;
     // SPEC-237 · naikkan audit → Finding QA. SPEC-340 · ADR-0076 · dua pintu lagi (brief & PRD);
     // argumen kedua = rekomendasi terbaca (null bila dokumen audit belum punya blok escalation).
-    onPromoteToQa?: (s: Spec, e: AuditEscalation | null) => void;
-    onPromoteToBrief?: (s: Spec, e: AuditEscalation | null) => void;
-    onPromoteToPrd?: (s: Spec, e: AuditEscalation | null) => void;
+    onPromoteToQa?: (s: SpecListItem, e: AuditEscalation | null) => void;
+    onPromoteToBrief?: (s: SpecListItem, e: AuditEscalation | null) => void;
+    onPromoteToPrd?: (s: SpecListItem, e: AuditEscalation | null) => void;
     // SPEC-447 · ADR-0093 · dependency bisa diperbaiki kapan saja (termasuk sesudah item dimulai):
     // gerbangnya soal peluncuran BERIKUTNYA, bukan konten yang sedang dikerjakan sesi hidup.
-    onEditDeps?: (s: Spec, ids: string[]) => void;
+    onEditDeps?: (s: SpecSlim, ids: string[]) => void;
     // SPEC-486 · ADR-0103 · override kebijakan auto-merge item ini (null = kembali ikut project).
     // Alasan yang sama dengan onEditDeps: ia menggerbangi apa yang terjadi SESUDAH kerja.
-    onEditAutoMerge?: (s: Spec, v: AutoMerge | null) => void;
+    onEditAutoMerge?: (s: SpecSlim, v: AutoMerge | null) => void;
     // SPEC-546 · ADR-0109 · ubah type/source item in-place. Boleh ditawarkan kapan saja:
     // gerbangnya ditegakkan server, dan dialog mencerminkannya.
     // ADR-0149 · mengembalikan rencana reset (atau null) supaya dialog bisa menampilkan daftar
     // apa yang hilang dan meminta konfirmasi sebelum satu byte pun terhapus.
-    onChangeSource?: (s: Spec, source: string, payload?: unknown, confirmReset?: boolean)
+    onChangeSource?: (s: SpecListItem, source: string, payload?: unknown, confirmReset?: boolean)
       => Promise<SourceResetPending | null> | void;
     projectPolicy?: unknown;   // Project.autoMerge — untuk label "Ikut project (…)"
-    allSpecs?: Spec[];
+    allSpecs?: SpecSlim[];
     // SPEC-843 · ADR-0124 · hasil unggah/hapus lampiran. Bentuknya `AttachmentToast`, bukan
     // `onToast` layar (yang bersignature toast App); panel lampiran tak perlu tahu ikon.
     onAttachmentToast?: AttachmentToast;
@@ -158,7 +163,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
   // SPEC-186 · konten hanya boleh diubah selagi item masih di backlog & belum pernah dimulai.
   const [editing, setEditing] = React.useState(false);
   const [form, setForm] = React.useState<Record<string, string>>({});
-  const editable = spec?.stage === "brainstorming" && spec?.baseSha == null && !!onEditSpec;
+  const editable = spec?.stage === "brainstorming" && spec?.baseSha == null && !!onEditSpec && spec.payload !== undefined;
   const startEdit = () => {
     if (!spec) return;
     const pp = (spec.payload || {}) as Record<string, string>;
@@ -543,10 +548,10 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
         <MarkDoneDialog spec={spec} onClose={() => setMarkDone(false)} onSubmit={onMarkDone} />
       )}
       {/* SPEC-546 · ADR-0109 · dialog pilih source tujuan + form field bentuk barunya. */}
-      {showSource && onChangeSource && (
+      {showSource && onChangeSource && spec.payload !== undefined && (
         // ADR-0149 · dialog yang menutup dirinya sendiri lewat `onClose`: submit PERTAMA pada
         // jalur reset justru harus membuatnya tetap terbuka untuk menampilkan daftar konfirmasi.
-        <ChangeSourceDialog spec={spec} onClose={() => setShowSource(false)}
+        <ChangeSourceDialog spec={spec as Spec} onClose={() => setShowSource(false)}
           onSubmit={(source, payload, confirmReset) =>
             Promise.resolve(onChangeSource(spec, source, payload, confirmReset) ?? null)} />
       )}
@@ -558,10 +563,10 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
    "mulai sesi", jadi board tetap bisa dipakai tanpa drag. */
 function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkDone, running }:
   {
-    spec: Spec; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
-    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void;
+    spec: SpecListItem; onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void;
+    onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void;
     // SPEC-804 · ADR-0120 · tandai selesai manual. Dua langkahnya ditangani MarkDoneDialog.
-    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
     running?: boolean
   }) {
   const [docs, setDocs] = React.useState(false);
@@ -606,7 +611,7 @@ export const fmtCreated = (iso?: string | null): string => {
     ? t.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "";
 };
 
-function CreatedAt({ spec, style }: { spec: Spec; style?: React.CSSProperties }) {
+function CreatedAt({ spec, style }: { spec: SpecListItem; style?: React.CSSProperties }) {
   const label = fmtCreated(spec.createdAt);
   if (!label) return null;
   return (
@@ -618,7 +623,7 @@ function CreatedAt({ spec, style }: { spec: Spec; style?: React.CSSProperties })
 };
 
 function TitleButton({ spec, onOpenDetail, size = 15 }:
-  { spec: Spec; onOpenDetail?: (s: Spec) => void; size?: number }) {
+  { spec: SpecListItem; onOpenDetail?: (s: SpecSlim) => void; size?: number }) {
   return (
     <button onClick={() => onOpenDetail && onOpenDetail(spec)} style={{
       border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer",
@@ -631,9 +636,9 @@ function TitleButton({ spec, onOpenDetail, size = 15 }:
 
 function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running, presenceOn }:
   {
-    spec: Spec; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
-    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
-    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    spec: SpecListItem; onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void;
+    onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onOpenDetail?: (s: SpecSlim) => void;
+    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
     running?: boolean; presenceOn?: string[]
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
@@ -674,9 +679,9 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
    Baris padat: satu spec per baris, stage bar inline, aksi di kanan. */
 function SpecRow({ spec, projectName, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running, presenceOn }:
   {
-    spec: Spec; projectName?: string; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
-    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
-    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    spec: SpecListItem; projectName?: string; onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void;
+    onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onOpenDetail?: (s: SpecSlim) => void;
+    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
     running?: boolean; presenceOn?: string[]
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
@@ -727,7 +732,7 @@ const COLUMNS: { key: string; label: string; icon?: string }[] = [
    Kolom "Failed" hilang bersama tabel Run: sebuah sesi tak punya status terminal yang bisa
    dibaca dari luar. Yang gagal terlihat di terminalnya sendiri, dan itu satu-satunya tempat
    yang jujur. */
-export function specColumn(spec: Spec, hasSession?: boolean): string {
+export function specColumn(spec: SpecListItem, hasSession?: boolean): string {
   if (spec.stage === "done") return SUCCESS_COL;
   if (!hasSession && spec.stage === "brainstorming") return BACKLOG_COL;
   return spec.stage;
@@ -745,9 +750,9 @@ export const canDrop = (from: string, to: string): boolean =>
 
 function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, onMarkDone, running, presenceOn, onDragStart, onDragEnd, dragging }:
   {
-    spec: Spec; col: string; onOpenDetail?: (s: Spec) => void; onStart?: (s: Spec) => void;
-    onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void;
-    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    spec: SpecListItem; col: string; onOpenDetail?: (s: SpecSlim) => void; onStart?: (s: SpecSlim) => void;
+    onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void;
+    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
     running?: boolean; presenceOn?: string[];
     onDragStart: () => void; onDragEnd: () => void; dragging: boolean
   }) {
@@ -794,15 +799,15 @@ function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, 
 
 function Board({ specs, activeSpecs, presenceBySpec, onStart, onOpenRun, onOpenReview, onOpenDetail, onMarkDone }:
   {
-    specs: Spec[]; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
-    onStart?: (s: Spec) => void; onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
-    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    specs: SpecListItem[]; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
+    onStart?: (s: SpecSlim) => void; onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onOpenDetail?: (s: SpecSlim) => void;
+    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
   }) {
-  const [drag, setDrag] = React.useState<{ spec: Spec; from: string } | null>(null);
+  const [drag, setDrag] = React.useState<{ spec: SpecListItem; from: string } | null>(null);
   const [over, setOver] = React.useState<string | null>(null);
   // SPEC-197 · di-memo: Board re-render tiap drag (setOver), tak perlu bangun ulang Map tiap kali.
   const byCol = React.useMemo(() => {
-    const m = new Map<string, Spec[]>(COLUMNS.map((c) => [c.key, []]));
+    const m = new Map<string, SpecListItem[]>(COLUMNS.map((c) => [c.key, []]));
     for (const s of specs) m.get(specColumn(s, activeSpecs?.has(s.id)))?.push(s);
     return m;
   }, [specs, activeSpecs]);
@@ -867,31 +872,31 @@ const VIEWS = [
 
 export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, presenceBySpec, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onMarkDone, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
   {
-    backlog: Spec[]; projects: ProjectVM[]; pageSize?: number;
-    onStart?: (s: Spec) => void; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
-    onDelete?: (s: Spec) => void; onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onNew?: () => void;
-    onEditBranch?: (s: Spec, b: string | null) => void;
-    onRevertStage?: (s: Spec, target: string, confirmDelete?: boolean) => Promise<any>;
+    backlog: SpecSlim[]; projects: ProjectVM[]; pageSize?: number;
+    onStart?: (s: SpecSlim) => void; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
+    onDelete?: (s: SpecSlim) => void; onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onNew?: () => void;
+    onEditBranch?: (s: SpecSlim, b: string | null) => void;
+    onRevertStage?: (s: SpecSlim, target: string, confirmDelete?: boolean) => Promise<any>;
     // SPEC-804 · ADR-0120 · tandai selesai manual; `needConfirm` = server minta konfirmasi karena
     // ada sesi hidup untuk item ini.
-    onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
-    onIntegrate?: (s: Spec, op: "merge" | "rebase", target: string) => void;
-    onEditSpec?: (s: Spec, patch: { title?: string; priority?: string; payload?: unknown }) => void;
+    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    onIntegrate?: (s: SpecSlim, op: "merge" | "rebase", target: string) => void;
+    onEditSpec?: (s: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown }) => void;
     // SPEC-447 · ADR-0093 · ubah dependency item (di luar gerbang edit SPEC-186).
-    onEditDeps?: (s: Spec, ids: string[]) => void;
+    onEditDeps?: (s: SpecSlim, ids: string[]) => void;
     // SPEC-486 · ADR-0103 · ubah kebijakan auto-merge item (null = kembali ikut project).
-    onEditAutoMerge?: (s: Spec, v: AutoMerge | null) => void;
+    onEditAutoMerge?: (s: SpecSlim, v: AutoMerge | null) => void;
     // SPEC-546 · ADR-0109 · ubah type/source item in-place (id/riwayat/dependency tetap).
     // ADR-0149 · signature harus SAMA dengan yang dipakai `SpecDetail`: tipe 3-argumen tetap
     // lolos tsc (arity lebih sedikit assignable), jadi ia berbohong tanpa satu pun error —
     // dan `confirmReset` yang tak terbaca berarti konfirmasi operator tak pernah sampai.
-    onChangeSource?: (s: Spec, source: string, payload?: unknown, confirmReset?: boolean)
+    onChangeSource?: (s: SpecListItem, source: string, payload?: unknown, confirmReset?: boolean)
       => Promise<SourceResetPending | null> | void;
     // SPEC-237 · naikkan audit → Finding QA. SPEC-340 · ADR-0076 · + feature brief & PRD;
     // argumen kedua = rekomendasi hanoman yang terbaca dari dokumen audit (bisa null).
-    onPromoteToQa?: (s: Spec, e: AuditEscalation | null) => void;
-    onPromoteToBrief?: (s: Spec, e: AuditEscalation | null) => void;
-    onPromoteToPrd?: (s: Spec, e: AuditEscalation | null) => void;
+    onPromoteToQa?: (s: SpecListItem, e: AuditEscalation | null) => void;
+    onPromoteToBrief?: (s: SpecListItem, e: AuditEscalation | null) => void;
+    onPromoteToPrd?: (s: SpecListItem, e: AuditEscalation | null) => void;
     projectFilter: string; onProjectFilter: (id: string) => void; dataVersion?: number;
     onToast?: (msg: string, kind?: string, icon?: string) => void; // SPEC-268 · hasil tombol Sync
     initialDetailId?: string | null;     // SPEC-293 · deep-link #spec= → buka SpecDetail saat mount
@@ -925,8 +930,8 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // SPEC-198 · search/filter/paginasi via API. Seed dari prop `backlog` (App tetap memuat set
   // penuh utk Overview/board/poll) → render instan + tahan mock parsial di test; lalu refetch
   // potongan terfilter/terpaginasi dari server. Board minta set terfilter penuh (tanpa page).
-  const [data, setData] = React.useState<{ items: Spec[]; total: number }>(
-    () => ({ items: backlog, total: backlog.length }));
+  const [data, setData] = React.useState<{ items: SpecListItem[]; total: number }>(
+    () => ({ items: backlog.map((s) => ({ objective: "", ...s })), total: backlog.length }));
   // Yang dipulihkan `page`, BUKAN `limit` — `limit` tanpa `page` berperilaku sebagai
   // PLAFON (SPEC-523 · ADR-0107). `pageSize` tetap prop konstanta.
   const [page, setPage] = usePersistedState("backlog", "page", 1, isNum);
@@ -991,10 +996,32 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     return () => { alive = false; };
   }, [tab, proj, stageFilter, prioFilter, dq, view, page, pageSize, dataVersion, syncNonce, dateField, from, to]);
   const backlogById = React.useMemo(() => new Map(backlog.map((s) => [s.id, s])), [backlog]);
+  // Frame siar lebih segar daripada daftar HTTP, tapi tak membawa `objective`: yang ringan ditimpa
+  // dari siar, sisanya tetap dari HTTP.
   const items = React.useMemo(
-    () => data.items.map((s) => backlogById.get(s.id) ?? s),
+    () => data.items.map((s) => mergeSlim(s, backlogById.get(s.id))),
     [data.items, backlogById],
   );
+  const [detail, setDetail] = React.useState<Spec | null>(null);
+  // Detail penuh dimuat saat item dibuka dan disegarkan tiap `dataVersion` (edit/stage mengubah
+  // digest siar); item yang lenyap (404) menutup dialog.
+  React.useEffect(() => {
+    if (!detailId || !api.getSpec) { setDetail(null); return; }
+    let alive = true;
+    api.getSpec(detailId).then((d) => { if (alive) setDetail(d); }).catch((e) => {
+      if (!alive || !(e instanceof ApiError) || e.status !== 404) return;
+      setDetailId(null);
+      onToast?.(`${detailId} sudah tidak ada`, "warn");
+    });
+    return () => { alive = false; };
+  }, [detailId, dataVersion]);
+  const detailSpec: DetailSpec | null = React.useMemo(() => {
+    if (!detailId) return null;
+    const slim = backlogById.get(detailId);
+    if (detail?.id === detailId) return mergeSlim(detail, slim);
+    const listed = data.items.find((s) => s.id === detailId);
+    return listed ? mergeSlim(listed, slim) : slim ? { objective: "", ...slim } : null;
+  }, [detailId, detail, data.items, backlogById]);
   const sp = serverPage(data.total, page, pageSize);
   return (
     <div style={LIST_SCREEN_STYLE}>
@@ -1096,7 +1123,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
           </div>
         </>
       )}
-      <SpecDetail spec={backlog.find((s) => s.id === detailId) || null} onClose={() => setDetailId(null)}
+      <SpecDetail spec={detailSpec} onClose={() => setDetailId(null)}
         onEditBranch={onEditBranch} onRevertStage={onRevertStage} onMarkDone={onMarkDone} onOpenReview={onOpenReview} onStart={onStart} onIntegrate={onIntegrate} onEditSpec={onEditSpec} onPromoteToQa={onPromoteToQa}
         onPromoteToBrief={onPromoteToBrief} onPromoteToPrd={onPromoteToPrd}
         onEditDeps={onEditDeps} onEditAutoMerge={onEditAutoMerge} onChangeSource={onChangeSource}

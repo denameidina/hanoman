@@ -13,7 +13,7 @@ import { Shell, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button,
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, createApi, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
-import type { ProjectView, Spec, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts } from "@hanoman/shared";
+import type { ProjectView, Spec, SpecSlim, SpecListItem, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts } from "@hanoman/shared";
 import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, LOCAL_DEVICE_ID, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus, type Orchestration, type OrchestrationFlow, type PhaseOverrides } from "@hanoman/shared";
 // SPEC-1216 · ADR-0165 §11 · target picker dialog Start — murni (Task 10), dipakai di sini apa
 // adanya. `createApi` diimpor dari "./api/client" (bukan "./api/instance"): instance.tsx hanya
@@ -36,6 +36,8 @@ import { FolderPicker } from "./screens/FolderPicker";
 import { HandledByChips } from "./screens/HandledByChips";
 import { ClientsScreen } from "./screens/ClientsScreen";
 import { presenceIndex } from "./screens/presence-map";
+import { specsDigestOf, toSlim } from "./lib/specs-digest";
+import { presenceKeyOf } from "./lib/presence-key";
 import { repoBasename, cloneErrorText } from "./screens/git-remote";
 import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
@@ -104,7 +106,7 @@ type SpecPrefill = { project?: string; title?: string; context?: string; outcome
 export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // SPEC-394 · `resumed` diteruskan apa adanya dari server: pemanggil yang memutuskan cara
   // menyampaikannya (toast di App), modal ini tak menebak-nebak.
-  { open: boolean; spec: Spec | null; onClose: () => void;
+  { open: boolean; spec: SpecSlim | null; onClose: () => void;
     onStarted: (id: string, resumed?: boolean) => void; onError?: (e: unknown) => void }) {
   const [model, setModel] = React.useState("claude-sonnet-5");
   const [effort, setEffort] = React.useState("medium");
@@ -436,7 +438,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
     prefill?: SpecPrefill;
     // SPEC-447 · ADR-0093 · kandidat dependency. Diambil dari state backlog App (set penuh dari
     // siar WS) — sengaja TANPA fetch baru: daftar yang sama sudah ada di memori.
-    specs?: Spec[] }) {
+    specs?: SpecSlim[] }) {
   const blank: SpecForm = { kind: prefill?.kind ?? "brief", project: prefill?.project || defaultProject,
     title: prefill?.title ?? "", context: prefill?.context ?? "", outcome: prefill?.outcome ?? "",
     constraints: prefill?.constraints ?? "",
@@ -841,7 +843,9 @@ function AppInner() {
   // SPEC-519 · deep-link changelog (`/changelog/<projectId>[/<id>]`, dulu `#changelog=…`) — rilis yang harus terbuka.
   const [openChangelogId, setOpenChangelogId] = React.useState<string | null>(null);
   const [projects, setProjects] = React.useState<ProjectView[]>([]);
-  const [backlog, setBacklog] = React.useState<Spec[]>([]);
+  const [backlog, setBacklog] = React.useState<SpecSlim[]>([]);
+  // SPEC-1267 · sidik jari frame `specs` terakhir; `dataVersion` naik hanya bila isinya berubah.
+  const lastSpecsDigest = React.useRef("");
   // SPEC-198 · dinaikkan tiap backlog/sessions berubah (load + poll). Layar daftar yang
   // self-fetch (Backlog, Projects) me-refetch saat ini berubah — tanpa poll ganda.
   const [dataVersion, setDataVersion] = React.useState(0);
@@ -940,7 +944,8 @@ function AppInner() {
     setStatus("loading");
     Promise.all([api.listProjects(), api.listSpecs(), api.listTerminals()])
       .then(([p, s, t]) => {
-        setProjects(p.items); setBacklog(s.items); setSessions(t);
+        setProjects(p.items); setBacklog(s.items.map(toSlim)); setSessions(t);
+        lastSpecsDigest.current = specsDigestOf(s.items);
         setProjectId((cur) => cur || p.items[0]?.id || "");
         setDataVersion((v) => v + 1);
         setStatus("ready");
@@ -982,10 +987,20 @@ function AppInner() {
   // SPEC-198 · bump dataVersion tiap snapshot specs tiba supaya layar self-fetch (Backlog,
   // Projects) yang berpaginasi-server ikut me-refetch dan tetap segar selama sesi hidup.
   React.useEffect(() => subscribe((m) => {
-    if (m.t === "specs") { setBacklog(m.specs); setDataVersion((v) => v + 1); }
+    if (m.t === "specs") {
+      const digest = specsDigestOf(m.specs);
+      if (digest !== lastSpecsDigest.current) {
+        lastSpecsDigest.current = digest;
+        setBacklog(m.specs);
+        setDataVersion((v) => v + 1);
+      }
+    }
     else if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
     else if (m.t === "leadAsks") setLeadAsks(m.asks);
-    else if (m.t === "presence") setPresence({ enabled: m.enabled, devices: m.devices, hubVersion: m.hubVersion });
+    else if (m.t === "presence") {
+      const next = { enabled: m.enabled, devices: m.devices, hubVersion: m.hubVersion };
+      setPresence((cur) => (presenceKeyOf(cur) === presenceKeyOf(next) ? cur : next));
+    }
     else if (m.t === "pending") setPending(m.counts);
   }), []);
 
@@ -997,7 +1012,7 @@ function AppInner() {
   // ADR-0160 · review hidup di `/review/<kind>/<id>`; `review` state hanya memegang JUDUL (URL
   // tak membawanya). Refresh di URL itu jatuh ke judul dari backlog, atau id-nya sendiri.
   const goReview = (kind: "spec" | "session", id: string) => navigate(routePath({ section: "review", kind, id }));
-  function openReview(s: Spec) { setReview({ id: s.id, kind: "spec", title: s.title }); goReview("spec", s.id); }
+  function openReview(s: SpecSlim) { setReview({ id: s.id, kind: "spec", title: s.title }); goReview("spec", s.id); }
   // SPEC-171 · dari Terminal (Cell spec): id spec saja → cari judulnya di backlog.
   function openReviewSpecId(id: string) {
     setReview({ id, kind: "spec", title: backlog.find((s) => s.id === id)?.title ?? id }); goReview("spec", id);
@@ -1162,14 +1177,14 @@ function AppInner() {
   // `branchFrom` tak dikirim — server membacanya dari baris Spec (SPEC-143).
   // SPEC-252 · ADR-0061 · Start membuka picker model/effort per sesi dulu (StartSessionModal);
   // konfirmasi picker-lah yang memanggil api.startSession dengan pilihan itu.
-  const [startSpec, setStartSpec] = React.useState<Spec | null>(null);
-  function startSession(spec: Spec) { setStartOrigin("backlog"); setStartSpec(spec); }
-  function startTerminalBacklog(spec: Spec) { setStartOrigin("terminal"); setStartSpec(spec); }
+  const [startSpec, setStartSpec] = React.useState<SpecSlim | null>(null);
+  function startSession(spec: SpecSlim) { setStartOrigin("backlog"); setStartSpec(spec); }
+  function startTerminalBacklog(spec: SpecSlim) { setStartOrigin("terminal"); setStartSpec(spec); }
   const clearTerminalStartedSession = React.useCallback(() => setTerminalStartedSession(null), []);
 
   // SPEC-175 · rebase/merge branch hasil sebuah done spec. Bersih → toast; conflict → pindah ke
   // Terminal tempat sesi claude membereskan konflik (pola startSession).
-  async function integrateSpec(spec: Spec, op: "merge" | "rebase", target: string) {
+  async function integrateSpec(spec: SpecSlim, op: "merge" | "rebase", target: string) {
     try {
       const r = await api.integrateSpec(spec.id, op, target);
       if (r.status === "conflict") {
@@ -1272,7 +1287,7 @@ function AppInner() {
   // ter-prefill (title + backlink audit di langkah); qa menjalankan audit→spec→plan→execute (perbaikan).
   // SPEC-340 · ADR-0076 · prefill kini boleh datang dari rekomendasi audit yang terbaca mesin;
   // bila tak ada, jatuh ke turunan lama (judul + objective) supaya audit pra-SPEC-340 tetap bisa naik.
-  function promoteToQa(spec: Spec, e: AuditEscalation | null) {
+  function promoteToQa(spec: SpecListItem, e: AuditEscalation | null) {
     const pf = e?.prefill;
     const backlink = `Dari audit ${spec.id}: ${spec.objective}`;
     setSpecPrefill({ project: spec.projectId, kind: "qa", title: pf?.title || spec.title,
@@ -1287,7 +1302,7 @@ function AppInner() {
   }
   // SPEC-340 · ADR-0076 · audit → feature brief. Branch audit diteruskan supaya dokumen audit ada
   // di worktree; `fromAudit` membuat prompt memakainya sebagai bahan Brainstorm (TANPA skip fase).
-  function promoteToBrief(spec: Spec, e: AuditEscalation | null) {
+  function promoteToBrief(spec: SpecListItem, e: AuditEscalation | null) {
     const pf = e?.prefill;
     setSpecPrefill({ project: spec.projectId, kind: "brief", title: pf?.title || spec.title,
       context: pf?.context || `Dari audit ${spec.id}: ${spec.objective}`,
@@ -1296,7 +1311,7 @@ function AppInner() {
   }
   // SPEC-340 · ADR-0076 · audit → PRD. PRD bukan Spec (ADR-0041): yang dibuka modal brief PRD,
   // lalu sesi prd lahir dari branch audit dengan dokumen auditnya disematkan server ke prompt.
-  function promoteToPrd(spec: Spec, e: AuditEscalation | null) {
+  function promoteToPrd(spec: SpecListItem, e: AuditEscalation | null) {
     const pf = e?.prefill;
     setPrdFromAudit({ project: spec.projectId, branchFrom: `hanoman/${spec.id.toLowerCase()}`,
       fromAudit: spec.id, title: pf?.title || spec.title,
@@ -1304,7 +1319,7 @@ function AppInner() {
   }
 
   // SPEC-143. Hanya menentukan basis run BERIKUTNYA; run yang sudah jalan diubah dari layar Runs.
-  async function editBranch(spec: Spec, branchFrom: string | null) {
+  async function editBranch(spec: SpecSlim, branchFrom: string | null) {
     try {
       const updated = await api.patchSpec(spec.id, { branchFrom });
       if ("pending" in updated) return; // dry-run hanya untuk revert stage — tak mungkin di sini
@@ -1314,7 +1329,7 @@ function AppInner() {
   }
 
   // SPEC-186 · edit konten backlog selagi belum dimulai. 409 = keburu dimulai sesi lain.
-  async function editSpec(spec: Spec, patch: { title?: string; priority?: string; payload?: unknown }) {
+  async function editSpec(spec: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown }) {
     try {
       const updated = await api.patchSpec(spec.id, patch);
       if ("pending" in updated) return;
@@ -1332,7 +1347,7 @@ function AppInner() {
   // DIKEMBALIKAN ke dialog alih-alih ditelan toast: yang perlu dilihat operator adalah daftar
   // konkret apa yang hilang, dan itu tak muat di toast. 409 = sesi masih berjalan.
   async function changeSourceOfSpec(
-    spec: Spec, source: string, payload?: unknown, confirmReset?: boolean,
+    spec: SpecSlim, source: string, payload?: unknown, confirmReset?: boolean,
   ): Promise<SourceResetPending | null> {
     try {
       const res = await api.changeSpecSource(spec.id, { source, payload, confirmReset });
@@ -1352,7 +1367,7 @@ function AppInner() {
   // SPEC-447 · ADR-0093 · dependency bisa diubah kapan saja — ia menggerbangi peluncuran
   // BERIKUTNYA, bukan konten sesi berjalan (karena itu di luar gerbang SPEC-186). 400 = validasi
   // server (id asing, lintas project, siklus).
-  async function editDeps(spec: Spec, dependsOn: string[]) {
+  async function editDeps(spec: SpecSlim, dependsOn: string[]) {
     try {
       const updated = await api.patchSpec(spec.id, { dependsOn });
       if ("pending" in updated) return;
@@ -1367,7 +1382,7 @@ function AppInner() {
   // SPEC-486 · ADR-0103 · override kebijakan auto-merge item; `null` = kembali ikut project.
   // Alasan yang sama dengan editDeps: ia menggerbangi apa yang terjadi SESUDAH kerja, jadi
   // boleh diubah kapan saja. 400/409 = gerbang server (branch karangan / project tanpa repoDir).
-  async function editAutoMerge(spec: Spec, autoMerge: AutoMerge | null) {
+  async function editAutoMerge(spec: SpecSlim, autoMerge: AutoMerge | null) {
     try {
       const updated = await api.patchSpec(spec.id, { autoMerge });
       if ("pending" in updated) return;
@@ -1381,7 +1396,7 @@ function AppInner() {
 
   // SPEC-167 · revert backward-only. Respons `pending` = dry-run: kembalikan ke pemanggil
   // supaya dialog konfirmasi muncul; hanya panggilan confirmDelete yang mengubah state.
-  async function revertStage(spec: Spec, target: string, confirmDelete?: boolean) {
+  async function revertStage(spec: SpecSlim, target: string, confirmDelete?: boolean) {
     try {
       const res = await api.patchSpec(spec.id, { stage: target, confirmDelete });
       if ("pending" in res) return res;
@@ -1393,7 +1408,7 @@ function AppInner() {
 
   // SPEC-804 · ADR-0120 · tandai item selesai manual. 409 `confirm-required` bukan kegagalan:
   // server memberi tahu ada sesi hidup, dan dialog mengirim ulang dengan `confirm: true`.
-  async function markSpecDone(spec: Spec, reason: string, confirm: boolean) {
+  async function markSpecDone(spec: SpecSlim, reason: string, confirm: boolean) {
     try {
       const updated = await api.markSpecDone(spec.id, { reason: reason || undefined, confirm });
       setBacklog((b) => b.map((s) => (s.id === updated.id ? updated : s)));
@@ -1410,7 +1425,7 @@ function AppInner() {
     }
   }
 
-  async function deleteSpec(spec: Spec) {
+  async function deleteSpec(spec: SpecSlim) {
     await api.deleteSpec(spec.id);
     setBacklog((b) => b.filter((s) => s.id !== spec.id));
     showToast(spec.id + " dihapus dari backlog", "warn", "trash-2");
@@ -1606,6 +1621,7 @@ function AppInner() {
               hint="Terminal butuh project dengan repoDir untuk dijalankan."
               action={() => setModal("project")} actionLabel="Project baru" />
           : <TerminalScreen userId={me.id} projects={projectsView} backlog={backlog} focusSession={focusSession}
+              sessions={sessions} setSessions={setSessions}
               startedSession={terminalStartedSession} onStartedSessionHandled={clearTerminalStartedSession}
               onStartBacklog={startTerminalBacklog}
               onOpenReview={openReviewSpecId} onOpenSessionReview={openSessionReview}

@@ -1,17 +1,26 @@
 import { prisma } from "../db";
-import { listSessions } from "./pty";
+import { listSessions, listSessionsAsync } from "./pty";
 import { worktreeHistory } from "./session-history";
 import { sessionIdForSpec } from "./session-id";
 import { listWorktrees, type WorktreeInputs } from "./worktree-list";
 import { prodReaperDeps } from "./worktree-reaper";
 
+const toWorktreeSession = (s: { cwd: string; id: string; specId?: string }) =>
+  ({ cwd: s.cwd, id: s.id, specId: s.specId ?? null });
+
+// Termasuk pane exited dan project lain: cwd dapat dipakai ulang atau binding repo dibagi.
+// Sinkron SENGAJA: `collectOrphanWorktrees` tak boleh menyela sesudah cek ini sampai rename.
 export function worktreeSessions(): WorktreeInputs["sessions"] {
-  // Termasuk pane exited dan project lain: cwd dapat dipakai ulang atau binding repo dibagi.
-  return listSessions().map((s) => ({ cwd: s.cwd, id: s.id, specId: s.specId ?? null }));
+  return listSessions().map(toWorktreeSession);
+}
+
+// SPEC-1267 · jalur periodik (reaper 60 dtk) membaca daftar sesi tanpa memblokir event loop.
+export async function worktreeSessionsAsync(): Promise<WorktreeInputs["sessions"]> {
+  return (await listSessionsAsync()).map(toWorktreeSession);
 }
 
 export async function projectWorktreeInputs(
-  projectId: string, sessions = worktreeSessions,
+  projectId: string, sessions: () => WorktreeInputs["sessions"] | Promise<WorktreeInputs["sessions"]> = worktreeSessionsAsync,
 ): Promise<WorktreeInputs> {
   const [specs, history] = await Promise.all([
     prisma.spec.findMany({ where: { projectId }, select: { id: true, stage: true } }),
@@ -19,7 +28,7 @@ export async function projectWorktreeInputs(
   ]);
   return {
     specs: new Map(specs.map((s) => [sessionIdForSpec(s.id), s])),
-    history, sessions: sessions(),
+    history, sessions: await sessions(),
   };
 }
 

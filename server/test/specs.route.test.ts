@@ -2,18 +2,19 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "../src/app";
-import { killAll, getSession, sessionPhasesBySpec } from "../src/services/pty";
+import { killAll, getSession } from "../src/services/pty";
+import { sessionPhasesBySpecAsync } from "../src/services/live-phases";
 import { prisma } from "../src/db";
 import { resetDb, makeProject, makeSpec, makeRepoWithBranches, makeTempRepo, makeRepoWithWorktree, makeRepoWithSpecCommits, makeRepoWithSpecBranch } from "./factory";
 import { setConfig, clearConfig } from "../src/config";
 
 // SPEC-198 · overlay stage-live baca tmux nyata; di test tak ada pane. Mock hanya
-// sessionPhasesBySpec (sisanya asli) — default Map kosong = perilaku identik dgn env test
+// sessionPhasesBySpecAsync (sisanya asli) — default Map kosong = perilaku identik dgn env test
 // tanpa sesi. Satu test memakainya untuk membuktikan write-through jalan atas SET PENUH.
-vi.mock("../src/services/pty", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/services/pty")>();
-  return { ...actual, sessionPhasesBySpec: vi.fn(() => new Map()) };
-});
+vi.mock("../src/services/live-phases", async (orig) => ({
+  ...(await orig<typeof import("../src/services/live-phases")>()),
+  sessionPhasesBySpecAsync: vi.fn(async () => new Map()),
+}));
 
 const FAKE_CLAUDE = fileURLToPath(new URL("./fixtures/fake-claude.sh", import.meta.url));
 const app = buildApp({ requireAuth: false });
@@ -119,7 +120,7 @@ describe("specs routes", () => {
     await makeSpec({ id: "SPEC-500", projectId: "ppage", stage: "brainstorming" });
     // Sesi live (mock) memajukan SPEC-500 brainstorming → planned. stageForRun tak menggerbang
     // stage non-`done` dgn plan, jadi cwd palsu cukup.
-    vi.mocked(sessionPhasesBySpec).mockReturnValueOnce(
+    vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(
       new Map([["SPEC-500", { phases: [{ name: "Plan", state: "done" }], cwd: "/tmp/none" }]]) as any);
     // id desc → SPEC-501 di halaman 1; limit=1 menaruh SPEC-500 DI LUAR halaman.
     const res = await app.inject({ url: "/api/specs?project=ppage&page=1&limit=1" });
@@ -137,7 +138,7 @@ describe("specs routes", () => {
     try {
       await makeProject({ id: "psync", repoDir: makeTempRepo({}) });
       await makeSpec({ id: "SPEC-267A", projectId: "psync", stage: "brainstorming" });
-      vi.mocked(sessionPhasesBySpec).mockReturnValueOnce(
+      vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(
         new Map([["SPEC-267A", { phases: [{ name: "Plan", state: "done" }], cwd: "/tmp/none" }]]) as any);
       await app.inject({ url: "/api/specs?project=psync" });
       const out = await prisma.syncOutbox.findMany();
@@ -588,5 +589,47 @@ describe("filter source (SPEC-521)", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().items).toEqual([]);
     expect(res.json().total).toBe(0);
+  });
+});
+
+// SPEC-1267 · daftar ringkas + detail per item.
+describe("GET /specs ringkas & GET /specs/:id (SPEC-1267)", () => {
+  beforeAll(async () => {
+    await makeProject({ id: "pslim", repoDir: makeRepoWithBranches() });
+    await makeSpec({ id: "SPEC-1267A", projectId: "pslim", stage: "brainstorming", title: "slim",
+      objective: "kata-unik-zzz", payload: { context: "c", outcome: "o", constraints: "", priority: "sedang" } });
+  });
+
+  it("GET /specs: items tanpa payload/sourceHistory, dengan objective", async () => {
+    const res = await app.inject({ url: "/api/specs?project=pslim" });
+    const item = res.json().items[0];
+    expect("payload" in item).toBe(false);
+    expect("sourceHistory" in item).toBe(false);
+    expect(item.objective).toBe("kata-unik-zzz");
+  });
+
+  it("GET /specs?q= tetap menemukan kata yang hanya ada di objective", async () => {
+    const res = await app.inject({ url: "/api/specs?project=pslim&q=kata-unik-zzz" });
+    expect(res.json().items.map((s: any) => s.id)).toContain("SPEC-1267A");
+  });
+
+  it("GET /specs/:id memuat payload penuh; id ngawur 404", async () => {
+    const ok = await app.inject({ url: "/api/specs/SPEC-1267A" });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().payload.context).toBe("c");
+    expect(ok.json().objective).toBe("kata-unik-zzz");
+    const nf = await app.inject({ url: "/api/specs/SPEC-NOPE" });
+    expect(nf.statusCode).toBe(404);
+    expect(nf.json()).toEqual({ error: "spec tak ditemukan" });
+  });
+
+  it("overlay baca-saja: stage maju di respons, DB dan notifikasi tak berubah", async () => {
+    const notifs = await prisma.notification.count();
+    vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(
+      new Map([["SPEC-1267A", { phases: [{ name: "Plan", state: "done" }], cwd: "/tmp/none" }]]) as any);
+    const res = await app.inject({ url: "/api/specs/SPEC-1267A" });
+    expect(res.json().stage).toBe("planned");
+    expect((await prisma.spec.findUnique({ where: { id: "SPEC-1267A" } }))!.stage).toBe("brainstorming");
+    expect(await prisma.notification.count()).toBe(notifs);
   });
 });

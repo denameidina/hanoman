@@ -109,7 +109,10 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
     render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     const initialFits = xt.fitCount;
+    vi.useFakeTimers();
     xt.resize?.([{ contentRect: { width: 640, height: 360 } } as ResizeObserverEntry]);
+    vi.advanceTimersByTime(100);
+    vi.useRealTimers();
     expect(xt.fitCount).toBe(initialFits + 1);
     expect(sockets[0]?.sent).toContain(JSON.stringify({ t: "resize", cols: 80, rows: 24 }));
   });

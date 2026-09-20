@@ -384,7 +384,7 @@ tak ada channel realtime baru (ADR-0024 & ADR-0039 utuh).
 | sumber | frame WS | dipakai untuk |
 |---|---|---|
 | `sessions: TerminalSession[]` | `sessions` | `exited`, `exitCode`, `decision`, `deciding`, `decisionAt`, `specId` |
-| `backlog: Spec[]` | `specs` | `stage`, `blockedBy`, `source`, `title` |
+| `backlog: SpecSlim[]` | `specs` (SPEC-1267: tanpa `payload`/`objective`/`sourceHistory`; `dataVersion` naik hanya bila `specsDigestOf` berubah) | `stage`, `blockedBy`, `source`, `title` |
 | `useNotifications().items` | `notifications` | `type` + `createdAt` keadaan transient |
 | `subscribeStatus()` dari `api/events` | — (socket itu sendiri) | apakah ketiga sumber di atas masih segar (SPEC-897) |
 | `document.hidden` | — | snapshot rekap "selama kamu pergi" (SPEC-898) |

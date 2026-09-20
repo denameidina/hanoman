@@ -3,6 +3,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -14,7 +15,7 @@ import {
   coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
 } from "@hanoman/shared";
 import {
-  enrichPhases, readPhases, sessionComplete, trackDoneSeen, type Phase, type PhaseInvocation,
+  enrichPhases, readPhases, readPhasesAsync, sessionComplete, sessionCompleteAsync, trackDoneSeen, type Phase, type PhaseInvocation,
 } from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
 import { dropSessionUploads } from "./uploads";
@@ -57,6 +58,10 @@ const POLL_MS = 500;
 // statSync gagal (berkas belum ada) → false.
 export const markerFilled = (f: string): boolean => {
   try { return statSync(f).size > 0; } catch { return false; }
+};
+// SPEC-1267 · kembaran asinkron untuk jalur periodik (scan keputusan tiap 3 dtk).
+export const markerFilledAsync = async (f: string): Promise<boolean> => {
+  try { return (await stat(f)).size > 0; } catch { return false; }
 };
 
 // SPEC-903 · ADR-0143 · dua penulis marker dari sisi server, dan hanya dua: rantai lead yang tuntas
@@ -196,8 +201,7 @@ const attached = new Map<string, Attachment>();
 const phaseInvocations = new Map<string, PhaseInvocation[]>();
 
 /** Frame fase satu pane: berkas fase diperkaya roster agen fase + invocation. Tanpa agen fase → apa adanya. */
-function phaseView(p: Pane, a: Attachment): Phase[] {
-  const phases = readPhases(p.phaseFile!, p.flow!);
+function phaseView(p: Pane, a: Attachment, phases: Phase[]): Phase[] {
   const now = Date.now();
   trackDoneSeen(phases, a.doneSeenAt, now);
   const roster = (p.agentRoster ?? []).flatMap((r) =>
@@ -488,11 +492,13 @@ export const listSessionsAsync = async (): Promise<SessionInfo[]> => (await list
 // SPEC-184 · sesi hidup yang punya marker keputusan — masukan scanDecisions().
 // SPEC-903 · ADR-0143 · `waiting` adalah bit turunan yang SAMA dengan `SessionInfo.decision`, supaya
 // notifikasi dan panel lead tak punya rumus sendiri yang bisa berselisih dengan pil di layar.
-export const liveDecisions = (): {
+export type LiveDecision = {
   id: string; specId?: string; projectId: string; decisionFile: string; waiting: boolean;
   eventHook: boolean;
-}[] =>
-  listPanes()
+};
+
+export const decisionsOf = (panes: Pane[]): LiveDecision[] =>
+  panes
     .filter((p) => !p.exited && p.decisionFile)
     .map((p) => ({
       id: p.id, specId: p.specId, projectId: p.projectId, decisionFile: p.decisionFile!,
@@ -501,6 +507,8 @@ export const liveDecisions = (): {
       // dijawab lead. Tick rumah tangga lead menotifikasinya sekali; pembaca lain mengabaikannya.
       eventHook: p.eventHook,
     }));
+
+export const liveDecisions = (): LiveDecision[] => decisionsOf(listPanes());
 
 export const getSession = (id: string): Pane | undefined => listPanes().find((p) => p.id === id);
 
@@ -1205,25 +1213,6 @@ export function sessionPhases(id: string): Phase[] | null {
   return readPhases(p.phaseFile, p.flow);
 }
 
-// Fase per spec untuk semua sesi tmux, dalam satu `list-panes` — dipakai GET /specs untuk
-// menurunkan stage live tanpa satu tmux call per spec (SPEC-168). Tak difilter `exited`:
-// berkas fase pane mati (belum di-DELETE) tetap kebenaran terakhirnya; forward-only di
-// pemanggil (stageFor + guard STAGES.indexOf) menjaga tak ada stage yang mundur.
-export function sessionPhasesBySpec(): Map<string, { phases: Phase[]; cwd: string }> {
-  const out = new Map<string, { phases: Phase[]; cwd: string }>();
-  // SPEC-402 · sengaja LUNAK di sini (peta kosong saat tmux tak bisa dibaca): overlay stage
-  // forward-only (stageFor + guard STAGES.indexOf), jadi satu bacaan tanpa overlay hanya berarti
-  // "stage DB apa adanya" — tak ada stage yang mundur dan tak ada sesi yang dinyatakan berakhir.
-  let panes: Pane[];
-  try { panes = listPanes(); } catch { return out; }
-  for (const p of panes) {
-    if (!p.specId || !p.flow || !p.phaseFile) continue;
-    // cwd = worktree run-nya: GET /specs menggerbang `done` dengan plan di dalamnya (SPEC-173).
-    out.set(p.specId, { phases: readPhases(p.phaseFile, p.flow), cwd: p.cwd });
-  }
-  return out;
-}
-
 function broadcast(a: Attachment, f: Frame): void {
   const msg = frame(f);
   for (const c of a.clients) c.send(msg);
@@ -1337,10 +1326,21 @@ export const sessionFinished = (id: string): boolean => {
   return !!p && paneComplete(p);
 };
 
-function pollPhases(p: Pane, a: Attachment): void {
+// SPEC-1267 · varian asinkron untuk denyut lead (60 dtk): tak ada spawn tmux/baca berkas sinkron.
+export const sessionFinishedAsync = async (id: string): Promise<boolean> => {
+  const p = await getSessionAsync(id);
+  return !!p && !!p.flow && !!p.phaseFile
+    && sessionCompleteAsync(await readPhasesAsync(p.phaseFile, p.flow), p.cwd, p.specId);
+};
+
+// Berkas fase dibaca SEKALI per tick (memo mtime) dan dipakai untuk tampilan maupun verdict `complete`
+// — dulu dibaca dua kali per pane tiap 500 ms (`phaseView` dan `paneComplete`).
+async function pollPhases(p: Pane, a: Attachment): Promise<void> {
   if (!p.flow || !p.phaseFile) return;
-  const phases = phaseView(p, a);
-  const complete = paneComplete(p);
+  const raw = await readPhasesAsync(p.phaseFile, p.flow);
+  const complete = await sessionCompleteAsync(raw, p.cwd, p.specId);
+  if (attached.get(p.id) !== a) return;   // dilepas selagi berkas dibaca
+  const phases = phaseView(p, a, raw);
   const json = phaseKey(phases, complete);
   if (json === a.lastPhases) return;
   a.lastPhases = json;
@@ -1395,7 +1395,7 @@ function startPoll(): void {
     // "— sesi berakhir (exit 0) —" pada agen yang masih bekerja. Diperparah dedup siaran di
     // services/events.ts: kebenaran (`exited:false`) tak pernah dikirim ulang, jadi pil "Selesai"
     // palsu itu LENGKET. Keadaan tak diketahui bukan bukti kematian.
-    listPanesAsync().then((panes) => {
+    listPanesAsync().then(async (panes) => {
       const live = new Map(panes.map((p) => [p.id, p]));
       for (const [id, a] of snapshot) {
         if (attached.get(id) !== a) continue;   // dilepas atau diganti selagi tmux ditanya
@@ -1403,7 +1403,7 @@ function startPoll(): void {
         if (!p) end(id, 0);            // sesinya dibunuh dari luar
         else if (p.exited) end(id, p.code);
         else {
-          pollPhases(p, a);
+          await pollPhases(p, a).catch(() => { /* berkas fase tak terbaca: tick berikutnya */ });
           pollAlt(p, a);
         }
       }
@@ -1441,20 +1441,42 @@ export const stripTerminalQueries = (s: string): string => s.replace(TERMINAL_QU
 // ulang di sini supaya call site server dan test SPEC-860 tak bergeser.
 export { isTerminalResponse };
 
+// Pane mati tidak butuh klien tmux — attach ke sana tidak menggambar ulang apa pun.
+// Putar ulang layarnya lalu tutup, persis seperti membuka kembali tab sesi yang berakhir.
+function replayExited(c: Client, p: Pane, screen: string): void {
+  if (screen.trim()) c.send(frame({ t: "data", d: stripTerminalQueries(screen.replace(/\n/g, "\r\n")) }));
+  c.send(frame({ t: "exit", code: p.code }));
+  c.close();
+}
+
+// SPEC-1267 · layar penuh sebagai frame reset: dikirim ke klien yang frame `data`-nya dibuang
+// backpressure. Hanya layar yang terlihat (tanpa riwayat) — cukup untuk menyamakan kembali tampilan.
+export async function screenResyncFrame(id: string): Promise<string | null> {
+  try {
+    const screen = await tmuxAsync("capture-pane", "-p", "-e", "-J", "-t", name(id));
+    return frame({ t: "data", d: `\x1b[2J\x1b[H${stripTerminalQueries(screen.replace(/\n/g, "\r\n"))}` });
+  } catch { return null; }
+}
+
+const CAPTURE_ARGS = (id: string) => ["capture-pane", "-p", "-e", "-J", "-S", "-2000", "-t", name(id)];
+
 export function attach(id: string, c: Client): void {
   const p = getSession(id);
   if (!p) { c.close(); return; }
-  // Pane mati tidak butuh klien tmux — attach ke sana tidak menggambar ulang apa pun.
-  // Putar ulang layarnya lalu tutup, persis seperti membuka kembali tab sesi yang berakhir.
-  if (p.exited) {
-    const screen = tmux("capture-pane", "-p", "-e", "-J", "-S", "-2000", "-t", name(id));
-    if (screen.trim()) {
-      c.send(frame({ t: "data", d: stripTerminalQueries(screen.replace(/\n/g, "\r\n")) }));
-    }
-    c.send(frame({ t: "exit", code: p.code }));
-    c.close();
-    return;
-  }
+  if (p.exited) { replayExited(c, p, tmux(...CAPTURE_ARGS(id))); return; }
+  attachLive(id, c, p);
+}
+
+// SPEC-1267 · jalur route WS terminal: pencarian pane dan capture-pane (pane mati) tak memblokir
+// event loop yang sama dengan frame PTY sesi lain.
+export async function attachAsync(id: string, c: Client): Promise<void> {
+  const p = await getSessionAsync(id);
+  if (!p) { c.close(); return; }
+  if (p.exited) { replayExited(c, p, await tmuxAsync(...CAPTURE_ARGS(id))); return; }
+  attachLive(id, c, p);
+}
+
+function attachLive(id: string, c: Client, p: Pane): void {
   const a = attached.get(id) ?? open(id);
   a.clients.add(c);
   // Scrollback lebih dulu untuk klien kedua; klien pertama digambar ulang oleh tmux sendiri.
@@ -1471,8 +1493,9 @@ export function attach(id: string, c: Client): void {
   // Lewat sinilah pil "Selesai" selamat dari refresh & pindah sel: klien baru langsung diberi
   // verdict-nya, tak perlu menunggu berkas fase berubah lagi (yang takkan pernah terjadi).
   if (p.flow && p.phaseFile) {
-    const phases = phaseView(p, a);
-    const complete = paneComplete(p);
+    const raw = readPhases(p.phaseFile, p.flow);
+    const phases = phaseView(p, a, raw);
+    const complete = sessionComplete(raw, p.cwd, p.specId);
     a.lastPhases = phaseKey(phases, complete);
     c.send(frame({ t: "phase", phases, complete }));
   }

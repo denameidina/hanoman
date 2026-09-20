@@ -17,6 +17,7 @@ import { encodeRelayActor } from "../src/services/relay/gate";
 import { relaySecret } from "../src/services/relay/secret";
 import { issueDeviceToken } from "../src/services/device-token";
 import { recordPresence, recordRecentlyOffline, __resetPresence } from "../src/services/presence/registry";
+import { __resetPanesMemo } from "../src/services/presence/snapshot";
 import { resetDb, makeProject, makeSpec, makeSetting } from "./factory";
 
 // Lihat pty.test.ts: /bin/cat mati karena --dangerously-skip-permissions ilegal baginya.
@@ -987,6 +988,7 @@ describe("GET /specs · stage live dari sesi", () => {
   const start = (spec: string, flow = "feature") =>
     app.inject({ method: "POST", url: "/api/terminal/sessions", payload: { spec, flow } });
   const stageOf = async (id: string) => {
+    __resetPanesMemo();   // daftar pane overlay dimemo 1 dtk (listPanesShared); tes membaca tepat sesudah Start
     const res = await app.inject({ url: "/api/specs" });
     return (res.json().items as { id: string; stage: string }[]).find((s) => s.id === id)?.stage;
   };

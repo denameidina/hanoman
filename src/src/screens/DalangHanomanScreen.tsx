@@ -7,7 +7,7 @@
 import React from "react";
 import { Icon } from "../ds";
 import type { TerminalSession } from "../api/client";
-import type { ProjectVM, Spec } from "./types";
+import type { ProjectVM, SpecSlim } from "./types";
 import { isToday } from "./DalangStage";
 // Hero dirakit dari 5 bagian ber-sendi (rig sheet Codex): badan + 4 lengan berputar
 // di cakram pivot bahunya masing-masing — animasi jauh lebih hidup dari satu gambar statis.
@@ -111,7 +111,7 @@ function Kpi({ icon, tone, label, value, sub }: {
 }
 
 export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession, onOpenProject, onGoto, onExit }: {
-  projects: ProjectVM[]; backlog: Spec[]; sessions: TerminalSession[];
+  projects: ProjectVM[]; backlog: SpecSlim[]; sessions: TerminalSession[];
   onOpenSession: (id: string) => void; onOpenProject: (p: ProjectVM) => void;
   onGoto: (s: string) => void; onExit: () => void;
 }) {

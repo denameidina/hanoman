@@ -1,5 +1,5 @@
 import React from "react";
-import type { SessionAsk, Spec } from "@hanoman/shared";
+import type { SessionAsk, SpecSlim } from "@hanoman/shared";
 import type { TerminalSession } from "../api/client";
 // SPEC-908 · `useEventsStatus` pindah ke api/live.ts — kini dipakai juga oleh indikator
 // koneksi keempat layar realtime, jadi definisinya tak boleh tinggal lokal di sini.
@@ -95,7 +95,7 @@ function useLaneWidth(): number {
 }
 
 export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
-  { sessions: TerminalSession[]; backlog: Spec[]; asks?: SessionAsk[]; onOpen: (target: PetTarget) => void }) {
+  { sessions: TerminalSession[]; backlog: SpecSlim[]; asks?: SessionAsk[]; onOpen: (target: PetTarget) => void }) {
   const { items } = useNotifications();
   const [hidden, setHidden] = React.useState(loadPetHidden);
   const [roam, setRoam] = React.useState(loadPetRoam);

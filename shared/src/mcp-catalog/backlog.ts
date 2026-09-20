@@ -45,18 +45,11 @@ const CORE: readonly McpToolDef[] = [
     description:
       "Isi lengkap satu backlog item termasuk `payload`, `baseSha`/`headSha`, dan penanda `editable` (masih boleh diubah bila stage `brainstorming` dan belum pernah punya sesi).",
     inputSchema: obj({ properties: { spec: str(ID_HINT) }, required: ["spec"] }),
-    mode: "read", capability: "backlog:read", samplePath: "/specs", sampleMethod: "GET",
-    build: (a) => ({ method: "GET", path: "/specs", query: { q: String(a.spec), limit: "100" } }),
-    // REST tak punya `GET /specs/:id`; `q` adalah SUBSTRING, jadi `SPEC-48` mengembalikan
-    // SPEC-480…489. Pencocokan persis dilakukan di sini, bukan dipercayakan ke server.
-    shape: (raw, a) => {
-      const want = String(a.spec).trim().toLowerCase();
-      const items = ((raw as { items?: unknown[] })?.items ?? []) as Record<string, unknown>[];
-      const hit = items.find((i) => String(i.id).toLowerCase() === want);
-      return hit
-        ? shapeSpecDetail(hit)
-        : { error: `backlog "${String(a.spec)}" tidak ada. Cek ejaannya (bentuknya SPEC-nnn) atau cari dengan hanoman_backlog_search.` };
-    },
+    mode: "read", capability: "backlog:read", samplePath: "/specs/SPEC-1", sampleMethod: "GET",
+    // SPEC-1267 · `GET /specs` tak lagi membawa `payload`/`sourceHistory`, jadi isi penuh HANYA ada di
+    // `GET /specs/:id`. Pencocokan id persis kini urusan server (404 bila tak ada).
+    build: (a) => ({ method: "GET", path: `/specs/${enc(String(a.spec).trim())}` }),
+    shape: (raw) => shapeSpecDetail(raw as Record<string, unknown>),
   },
   {
     name: "hanoman_backlog_docs_list",

@@ -11,8 +11,12 @@ import { resetDb, makeProject, makeSpec } from "./factory";
 // `listSessions` adalah gerbang "ada sesi hidup untuk item ini", dan itu yang diuji di sini.
 vi.mock("../src/services/pty", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/services/pty")>();
-  return { ...actual, sessionPhasesBySpec: vi.fn(() => new Map()), listSessions: vi.fn(() => []) };
+  return { ...actual, listSessions: vi.fn(() => []) };
 });
+vi.mock("../src/services/live-phases", async (orig) => ({
+  ...(await orig<typeof import("../src/services/live-phases")>()),
+  sessionPhasesBySpecAsync: vi.fn(async () => new Map()),
+}));
 
 const app = buildApp({ requireAuth: false });
 const post = (id: string, body: unknown = {}) =>

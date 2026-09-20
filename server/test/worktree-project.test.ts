@@ -16,10 +16,10 @@ describe("deteksi worktree saat boot", () => {
     await beginSession({ sessionId: "spec-1", projectId: "p1", cwd: join(repoDir, ".worktrees", "spec-1"),
       kind: "terminal", agent: "claude" });
     await reconcileHistory([]);
-    vi.spyOn(pty, "listSessions").mockReturnValue([
+    vi.spyOn(pty, "listSessionsAsync").mockResolvedValue([
       { id: "spec-1", cwd: repoDir, specId: "SPEC-1", exited: false },
       { id: "other", cwd: repoDir, exited: true },
-    ] as ReturnType<typeof pty.listSessions>);
+    ] as Awaited<ReturnType<typeof pty.listSessionsAsync>>);
     expect(await detectOrphanWorktrees({
       repos: async () => [{ projectId: "p1", repoDir }], inputs: projectWorktreeInputs,
     })).toEqual([]);

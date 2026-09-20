@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { prisma } from "../src/db";
-import { sessionPhasesBySpec } from "../src/services/pty";
+import { sessionPhasesBySpecAsync } from "../src/services/live-phases";
 import { liveSpecs } from "../src/services/live-specs";
 import { completeSpecManually } from "../src/services/spec-complete";
 import { resetDb, makeProject, makeSpec } from "./factory";
 
-vi.mock("../src/services/pty", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/services/pty")>();
-  return { ...actual, sessionPhasesBySpec: vi.fn(() => new Map()) };
-});
+vi.mock("../src/services/live-phases", async (orig) => ({
+  ...(await orig<typeof import("../src/services/live-phases")>()),
+  sessionPhasesBySpecAsync: vi.fn(async () => new Map()),
+}));
 
 beforeEach(async () => {
   await resetDb();
@@ -22,7 +22,7 @@ describe("SPEC-804 · penandaan manual tak ditimpa overlay stage-live", () => {
   it("sesi yang masih melaporkan Execute tak menyeret item kembali dari done", async () => {
     await makeSpec({ id: "SPEC-820", projectId: "p1", stage: "executing", title: "judul" });
     await completeSpecManually((await prisma.spec.findUnique({ where: { id: "SPEC-820" } }))!, { by: "dena@x" });
-    vi.mocked(sessionPhasesBySpec).mockReturnValue(new Map([["SPEC-820", {
+    vi.mocked(sessionPhasesBySpecAsync).mockResolvedValue(new Map([["SPEC-820", {
       phases: [
         { name: "Brainstorm", state: "done" as const }, { name: "Objective", state: "done" as const },
         { name: "Spec", state: "done" as const }, { name: "Plan", state: "done" as const },

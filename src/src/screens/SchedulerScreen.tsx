@@ -15,7 +15,7 @@ import type {
   TopicParams, LaunchStatus,
 } from "@hanoman/shared";
 import { SCHEDULER_DEFAULTS } from "@hanoman/shared";
-import type { ProjectVM, Spec } from "./types";
+import type { ProjectVM, SpecSlim } from "./types";
 import { specDeepLink } from "./deeplink";
 import { SchedulerCrons } from "./SchedulerCrons";
 import { usePersistedState, isNum } from "../ui-state";
@@ -50,13 +50,13 @@ function until(iso: string | null, now = Date.now()): string {
 const PRIO_TONE: Record<string, string> = { tinggi: "err", sedang: "warn", rendah: "neutral" };
 
 export type SchedulerScreenProps = {
-  projects: ProjectVM[]; backlog: Spec[];
+  projects: ProjectVM[]; backlog: SpecSlim[];
   onProjectChanged: (id: string) => void | Promise<void>;
   onToast: (msg: string, kind?: string, icon?: string) => void;
   onGotoTerminal: (sessionId: string) => void;
 };
 
-function titleFor(specId: string, backlog: Spec[]): string {
+function titleFor(specId: string, backlog: SpecSlim[]): string {
   return backlog.find((s) => s.id === specId)?.title ?? specId;
 }
 
@@ -88,7 +88,7 @@ function RowShell({ children }: { children: React.ReactNode }) {
 }
 
 function QueueRow({ q, backlog, onCancel, busy }:
-  { q: SchedulerQueueItemView; backlog: Spec[]; onCancel: (id: string) => void; busy: boolean }) {
+  { q: SchedulerQueueItemView; backlog: SpecSlim[]; onCancel: (id: string) => void; busy: boolean }) {
   return (
     <RowShell>
       <span style={{ flex: 1, minWidth: 0 }}>
@@ -109,7 +109,7 @@ function QueueRow({ q, backlog, onCancel, busy }:
 // ber-`update:{}`) karena itu tak bisa menghidupkannya lagi saat checker `backlog` menjumpai spec
 // yang sama pada cadence berikutnya.
 function CanceledRow({ q, backlog, onRequeue, busy }:
-  { q: SchedulerQueueItemView; backlog: Spec[]; onRequeue: (id: string) => void; busy: boolean }) {
+  { q: SchedulerQueueItemView; backlog: SpecSlim[]; onRequeue: (id: string) => void; busy: boolean }) {
   return (
     <RowShell>
       <Icon name="ban" size={16} color="var(--text-subtle)" />
@@ -124,7 +124,7 @@ function CanceledRow({ q, backlog, onRequeue, busy }:
   );
 }
 
-function SessionRow({ s, backlog, onGotoTerminal }: { s: SchedulerSessionView; backlog: Spec[]; onGotoTerminal: (sessionId: string) => void }) {
+function SessionRow({ s, backlog, onGotoTerminal }: { s: SchedulerSessionView; backlog: SpecSlim[]; onGotoTerminal: (sessionId: string) => void }) {
   return (
     <RowShell>
       <span style={{ flex: 1, minWidth: 0 }}>
@@ -137,7 +137,7 @@ function SessionRow({ s, backlog, onGotoTerminal }: { s: SchedulerSessionView; b
   );
 }
 
-function DoneRow({ q, backlog, onToast }: { q: SchedulerQueueItemView; backlog: Spec[]; onToast: SchedulerScreenProps["onToast"] }) {
+function DoneRow({ q, backlog, onToast }: { q: SchedulerQueueItemView; backlog: SpecSlim[]; onToast: SchedulerScreenProps["onToast"] }) {
   const link = specDeepLink(q.specId);
   return (
     <RowShell>
@@ -156,7 +156,7 @@ function DoneRow({ q, backlog, onToast }: { q: SchedulerQueueItemView; backlog: 
   );
 }
 
-function FailedRow({ q, backlog }: { q: SchedulerQueueItemView; backlog: Spec[] }) {
+function FailedRow({ q, backlog }: { q: SchedulerQueueItemView; backlog: SpecSlim[] }) {
   return (
     <RowShell>
       <Icon name="x-circle" size={16} color="var(--clay-500)" />

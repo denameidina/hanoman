@@ -233,7 +233,10 @@ DELETE /projects/:id/help-center  # 200-ish 204 · nonaktifkan (tak hapus tiket 
 ## Backlog / specs
 ```
 GET  /specs?project=&source=&q=&stage=&priority=&startable=&dateField=&from=&to=&page=&limit=
-#   -> { items: Spec[], total, page, pageSize }. SELALU envelope (SPEC-198).
+#   -> { items: SpecListItem[], total, page, pageSize }. SELALU envelope (SPEC-198).
+#   SPEC-1267 · `SpecListItem` = `Spec` TANPA `payload` dan `sourceHistory` (dua kolom terbesar; tak dibaca
+#   dari DB sama sekali). `objective` tetap ada — filter `q` mencocokkannya dan grid/list menampilkannya.
+#   Filter/paginasi tetap berjalan sebelum keluar sebagai `SpecListItem`. Detail penuh: `GET /specs/:id`.
 #   Overlay stage-live dari phase-file + write-through CAS + notifikasi `done` jalan atas SET PENUH
 #   (scope project/source). Search/filter (q atas id+title+objective, stage, priority, startable=live≠done)
 #   & paginasi diterapkan DI MEMORI SETELAH overlay — filter stage cocok ke stage LIVE, bukan DB.
@@ -260,6 +263,9 @@ GET  /specs?project=&source=&q=&stage=&priority=&startable=&dateField=&from=&to=
 #   SPEC-475 · "ujung kerja" dependency = `headSha` ?? tip branch sesinya (`hanoman/<sessionId>`,
 #   memo 15 dtk) — kolom `headSha` sendirian kosong pada ~76 % item `done` ber-worktree, sehingga
 #   membacanya begitu saja membuat `unmerged` tak pernah muncul. Tak ada jejak sama sekali = siap.
+GET  /specs/:id            -> 200 Spec PENUH (payload, objective, sourceHistory) | 404 { error: "spec tak ditemukan" }
+#   SPEC-1267 · overlay stage-live BACA-SAJA (stage maju di respons; tak menulis DB dan tak membuat
+#   notifikasi — persist tetap milik tick siar & GET /specs). Capability `backlog:read` (prefix /specs per method).
 POST /specs               { project, source, ...payload, branchFrom? }  -> SPEC-n
 POST /specs/batch         { project, items:[BreakdownItem], branchFrom?, prdPath? } -> {created:[Spec]}
 #   SPEC-273 · ADR-0069 · materialize breakdown: N spec `source:"brief"` independen (id berurutan via
@@ -1320,7 +1326,8 @@ distribusi perubahan setiap 3 detik, tanpa polling browser. Lihat [kontrak katal
 ```
 GET    /events/ws                    # WebSocket siar dashboard (global). Auth = gate /api (cookie).
 #   server->klien, GRUP GLOBAL (per-grup, saat berubah; snapshot penuh saat connect):
-#     { t:"specs", specs } · { t:"sessions", sessions } · { t:"notifications", items, unread }
+#     { t:"specs", specs: SpecSlim[] } (SPEC-1267 · tanpa payload/objective/sourceHistory; lahir hanya bila
+#       `specsDigest` berubah — detail lewat GET /specs/:id) · { t:"sessions", sessions } · { t:"notifications", items, unread }
 #     { t:"limits", limits } · { t:"codexLimits", limits } (SPEC-338, tiap 30s, grup TERPISAH dari
 #       `limits` karena sumber & semantik kesegarannya beda) · { t:"vps", vps } ·
 #       { t:"cleanups", cleanups } (SPEC-742, tiap 3s — dibangun dari peta memori, nol I/O) ·
