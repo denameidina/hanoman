@@ -28,6 +28,15 @@
 
 **Docs tersentuh (saat Execute).** `internal/docs/architecture/stack.md`, `internal/skills/hanoman/SKILL.md` (kontrak frame `specs`), `api-contract.md` bila ada; ADR baru bila kontrak frame berubah (amandemen ADR-0039/0145).
 
+## Keputusan (dijawab manusia)
+
+1. **Frame `specs` = A.** Semua spec dikirim dalam bentuk ringkas (tanpa `payload`, `sourceHistory`, `objective`); detail dimuat via HTTP. Dedup siaran memakai hash `max(updatedAt)+count+sum(version)` dari query agregat, bukan `JSON.stringify` penuh. B dan C tidak dipakai.
+2. **Kompatibilitas = tanpa.** Kontrak diubah serentak; server dan klien satu paket npm. Tak ada penanda kapabilitas atau versi frame. Catatan risiko untuk fase Spec: klien lama yang tersambung ke server baru (mis. instance remote lewat hub dengan versi berbeda) akan menerima frame ringkas; fase Spec harus menuliskan dampak ini di ADR amandemen ADR-0039/0145 dan ambang versi minimum bila diperlukan.
+3. **Detail di klien.** `GET /specs/:id` saat item dibuka (dialog, Change Source, backlink audit `App.tsx:1277-1303`, `BacklogScreen.tsx:164,249,391`) plus `listSpecs` paginasi untuk daftar. `backlogById` tidak boleh menimpa hasil HTTP dengan item frame ringkas (`BacklogScreen.tsx` ~996); merge hanya untuk field ringkas (stage, status, version, updatedAt).
+4. **Kadens `specs` 1 dtk menjadi 3 dtk** hanya bila angka ukur sesudah langkah 1-3 masih buruk.
+5. **Instrumen** `HANOMAN_EVENTS_PROFILE=1` dipasang dan dipertahankan sebagai diagnostik (nol biaya saat mati).
+6. **Cakupan Execute** = langkah 0-7 seluruhnya (termasuk backpressure, klien terminal, dan verifikasi akhir baseline vs sesudah).
+
 ## Keputusan terbuka
 
-Lihat laporan fase (nomor 1-4); dijawab hanoman sebelum fase Objective.
+-
