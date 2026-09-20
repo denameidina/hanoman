@@ -38,7 +38,7 @@ import { deleteDoc } from "../services/docs";
 import { listSpecDocs, resolveDir } from "../services/spec-docs";
 import { readEscalation } from "../services/audit-escalation";
 import { resolveRepoDir } from "../services/local-binding";
-import { validateDependsOn, dependsOnOf } from "../services/spec-deps";
+import { validateDependsOn, dependsOnOf, decorateBlocked } from "../services/spec-deps";
 import { checkAutoMerge } from "../services/auto-merge-gate";
 import { Prisma } from "@prisma/client";
 import { readDocFile } from "../services/scan";
@@ -47,7 +47,7 @@ import { paginate } from "../services/paginate";
 import { dayStart, dayEnd, inDayRange } from "../services/date-range";
 // SPEC-199 · overlay stage-live + write-through + notifikasi kini di liveSpecs (dipakai juga hub
 // siar WS) supaya push & pull tak drift. Rute tinggal filter+paginasi (SPEC-198) di atasnya.
-import { liveSpecs } from "../services/live-specs";
+import { liveSpecs, liveOverlayTick, listSpecsItems, overlayOne } from "../services/live-specs";
 import { launchPrincipal } from "../services/launch-authority";
 
 // SPEC-143: daftar yang mengisi dropdown adalah daftar yang menjaga gerbang — tak ada validator
@@ -90,8 +90,17 @@ export default async function (app: FastifyInstance) {
     // sekarang di liveSpecs, dibagi dengan hub siar WS (SPEC-199) supaya push & pull tak drift.
     // Filter/paginasi DITERAPKAN SETELAH overlay (SPEC-198): filter `stage`/`startable` mencocokkan
     // stage live, bukan DB basi; spec off-page tetap maju stage & bernotif karena overlay lebih dulu.
-    const overlaid = await liveSpecs({ project, source });
-    return paginate(filterSpecs(overlaid, { q, stage, priority, startable, dateField, from, to }), page, limit);
+    await liveOverlayTick();
+    const items = await listSpecsItems({ project, source });
+    return paginate(filterSpecs(items, { q, stage, priority, startable, dateField, from, to }), page, limit);
+  });
+  // SPEC-1267 · detail penuh satu item (`payload`/`sourceHistory` yang tak lagi ikut daftar & siar).
+  // Stage live tersaji lewat overlay baca-saja; persist + notifikasi tetap milik tick siar dan GET /specs.
+  app.get("/specs/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const row = await prisma.spec.findUnique({ where: { id } });
+    if (!row) return reply.code(404).send({ error: "spec tak ditemukan" });
+    return (await decorateBlocked([await overlayOne(row)]))[0];
   });
   app.post("/specs", async (req, reply) => {
     const parsed = zCreateSpec.safeParse(req.body);

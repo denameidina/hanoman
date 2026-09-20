@@ -82,7 +82,7 @@ Pakai skill lebih sempit saat task cocok:
   ADR-0087); dan `capabilityForRoute` dulu memetakan prefix status (`update`/`limits`/`events`/`fs`/
   `health`) ke `GLOBAL_READ` **tanpa melihat method**, jadi menambah endpoint tulis di bawahnya
   berarti setiap agent token bisa me-restart instance — kini `GLOBAL_READ` hanya untuk method baca.
-- Realtime: **satu WebSocket siar `/api/events/ws`** per tab di samping WS terminal PTY (ADR-0039, diamandemen **ADR-0145**). **Sebelas** grup snapshot GLOBAL disiarkan tanpa diminta (sessions, specs, notifications, cleanups, leadAsks (SPEC-909), vps, limits, codexLimits, update, presence (SPEC-919), pending (SPEC-961)); **lima** layar berparameter — Scheduler, Triase, Lead, GitGraph, Tim — **berlangganan** lewat frame `{t:"sub"}` di socket yang sama. Klien **tak** men-poll HTTP: endpoint HTTP-nya tinggal muat awal + fallback saat server belum punya topiknya. Jaga UI responsif — log sesi streaming, jangan blok main thread.
+- Realtime: **satu WebSocket siar `/api/events/ws`** per tab di samping WS terminal PTY (ADR-0039, diamandemen **ADR-0145**). **Sebelas** grup snapshot GLOBAL disiarkan tanpa diminta (sessions, specs (ringkas: `SpecSlim` tanpa `payload`/`objective`/`sourceHistory`, hanya lahir saat digest berubah — SPEC-1267), notifications, cleanups, leadAsks (SPEC-909), vps, limits, codexLimits, update, presence (SPEC-919), pending (SPEC-961)); **lima** layar berparameter — Scheduler, Triase, Lead, GitGraph, Tim — **berlangganan** lewat frame `{t:"sub"}` di socket yang sama. Klien **tak** men-poll HTTP: endpoint HTTP-nya tinggal muat awal + fallback saat server belum punya topiknya. Jaga UI responsif — log sesi streaming, jangan blok main thread.
 - **Presence sesi lintas device — arah NAIK di socket sync yang sudah ada, keadaan di MEMORI**
   (SPEC-919/**ADR-0147**+**ADR-0148**, mengamandemen ADR-0046; menegakkan 0043/0044/0117, 0024,
   0039/0145, 0131, dan kontras dengan 0135): klien mengirim `{t:"presence",v:1,sessions[]}` ke atas
@@ -569,7 +569,7 @@ Pakai skill lebih sempit saat task cocok:
   panggilan yang sah" benar-benar bekerja; (3) **401 telanjang tak bisa dibedakan** antara host
   salah / master switch mati / token dicabut → probe `GET /api/health` (PUBLIC, tanpa auth) sekali
   lalu di-cache adalah satu-satunya pemisah "host salah" dari "token salah". Selain itu: `GET
-  /specs/:id` **tidak ada** (backlog_get mencocokkan id persis atas `q` yang substring), `startable`
+  /specs/:id` **ada sejak SPEC-1267** (detail penuh; `GET /specs` kini tanpa `payload`/`sourceHistory`), `startable`
   diekspos **boolean** (`false` menghilangkan parameternya — string selain `"true"` diabaikan senyap
   oleh server), token **tak pernah dari flag** (ARGV terbaca `ps`, SPEC-402), redaksi di **satu**
   titik keluar (SPEC-472), dan pemotongan balasan **wajib tetap JSON sah**.

@@ -236,7 +236,7 @@ Isi placeholder komentar di atas dengan mock nyata sesuai pola test SPEC-199 yan
 - Consumes: `listSpecsLive`, `liveOverlayTick` (Task 2), `zSpecListItem`.
 - Produces: `GET /specs/:id -> 200 Spec | 404 { error: "spec tak ditemukan" }`; `GET /specs` `items: SpecListItem[]`.
 
-- [ ] **Step 1: Tes gagal**
+- [x] **Step 1: Tes gagal**
 
 ```ts
 it("GET /specs: items tanpa payload/sourceHistory, dengan objective", async () => { /* inject, cek kunci */ });
@@ -256,11 +256,11 @@ it("GET /specs/:id overlay baca-saja: stage maju di respons, DB & notifikasi tak
   // mock sessionPhasesBySpec seperti test SPEC-199; assert row DB stage lama, prisma.notification.count() sama
 });
 ```
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3: Implementasi.** Di handler daftar: `const rows = await liveSpecs(filter); const items = filterSpecs(rows, q…)` (urutan tak berubah), lalu `paginate(items.map(({payload, sourceHistory, ...rest}) => rest))`. Route baru: cari via `prisma.spec.findUnique`; 404 bila null; terapkan overlay baca-saja untuk satu item (ekspor `overlayOne(spec)` dari `live-specs.ts` yang memakai `applyOverlay`); `decorateBlocked([spec])[0]`.
-- [ ] **Step 4:** `pnpm vitest --run --no-file-parallelism server/test/specs.route.test.ts` PASS.
-- [ ] **Step 5: Docs** — `internal/docs/architecture/api-contract.md`: tambah `GET /specs/:id`, ubah kontrak `GET /specs`; `internal/skills/hanoman/SKILL.md:572` koreksi klaim "tidak ada".
-- [ ] **Step 6: Commit** `feat(specs): GET /specs/:id + GET /specs ringkas (objective ditahan)`.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3: Implementasi.** Di handler daftar: `const rows = await liveSpecs(filter); const items = filterSpecs(rows, q…)` (urutan tak berubah), lalu `paginate(items.map(({payload, sourceHistory, ...rest}) => rest))`. Route baru: cari via `prisma.spec.findUnique`; 404 bila null; terapkan overlay baca-saja untuk satu item (ekspor `overlayOne(spec)` dari `live-specs.ts` yang memakai `applyOverlay`); `decorateBlocked([spec])[0]`.
+- [x] **Step 4:** `pnpm vitest --run --no-file-parallelism server/test/specs.route.test.ts` PASS.
+- [x] **Step 5: Docs** — `internal/docs/architecture/api-contract.md`: tambah `GET /specs/:id`, ubah kontrak `GET /specs`; `internal/skills/hanoman/SKILL.md:572` koreksi klaim "tidak ada".
+- [x] **Step 6: Commit** `feat(specs): GET /specs/:id + GET /specs ringkas (objective ditahan)`.
 
 ---
 

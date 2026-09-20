@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
-import { zSpecSlim, type SpecSlim, type Stage } from "@hanoman/shared";
+import { zSpecListItem, zSpecSlim, type SpecSlim, type Stage } from "@hanoman/shared";
+import type { Spec as PrismaSpec } from "@prisma/client";
 import { prisma } from "../db";
 import { sessionPhasesBySpecAsync, type LivePhases } from "./live-phases";
 import { planCompleteAsync, phasesComplete, stageForRunAsync } from "./session-phases";
 import { STAGES } from "./stage-machine";
 import { recordCompletion } from "./notifications";
 import { notifySynced } from "./sync-notify";
-import { decorateBlocked } from "./spec-deps";
+import { decorateBlocked, type SpecBlocker } from "./spec-deps";
 import { recordHeadSha } from "./spec-head";
 
 // SPEC-199 · dulu inline di GET /specs; kini dipakai route HTTP DAN hub siar (services/events.ts)
@@ -22,17 +23,21 @@ const specNum = (id: string) => Number.parseInt(id.match(/\d+/)?.[0] ?? "0", 10)
 
 type Filter = { project?: string; source?: string };
 
-// Kolom siar `specs`: turunan `zSpecSlim` supaya select dan tipe frame tak bisa berselisih.
+// Kolom baris ringkas: turunan skema zod supaya select dan tipe respons tak bisa berselisih.
 // `blockedBy` bukan kolom (dihias `decorateBlocked`); `dependsOn` kolom Json dan tetap dipilih.
-const SLIM_SELECT = Object.fromEntries(
-  Object.keys(zSpecSlim.shape).filter((k) => k !== "blockedBy").map((k) => [k, true]),
+const selectOf = (shape: Record<string, unknown>) => Object.fromEntries(
+  Object.keys(shape).filter((k) => k !== "blockedBy").map((k) => [k, true]),
 ) as { id: true };
+const SLIM_SELECT = selectOf(zSpecSlim.shape);
+const LIST_SELECT = selectOf(zSpecListItem.shape);
 
 const phases = (): Promise<LivePhases> => sessionPhasesBySpecAsync().catch(() => new Map());
 
 const sortByNumber = <T extends { id: string }>(rows: T[]) => rows.sort((a, b) => specNum(b.id) - specNum(a.id));
 
 type Slim = Parameters<typeof decorateBlocked>[0][number] & { id: string; stage: string; title: string };
+
+type ListRow = Omit<PrismaSpec, "payload" | "sourceHistory"> & { dependsOn: string[]; blockedBy: SpecBlocker[] };
 
 type Advance = { id: string; from: Stage; stage: Stage; cwd: string };
 
@@ -95,11 +100,18 @@ export async function listSpecsLive(filter: Filter = {}) {
   return decorateBlocked((await applyOverlay(specs, await phases())).out);
 }
 
-export async function listSpecsSlim(): Promise<SpecSlim[]> {
-  const rows = sortByNumber(await prisma.spec.findMany({ select: SLIM_SELECT, orderBy: { id: "desc" } }));
+async function listSelected(select: { id: true }, where: object = {}) {
+  const rows = sortByNumber(await prisma.spec.findMany({ where, select, orderBy: { id: "desc" } }));
   const { out } = await applyOverlay(rows as unknown as Slim[], await phases());
-  return (await decorateBlocked(out)) as unknown as SpecSlim[];
+  return decorateBlocked(out);
 }
+
+export const listSpecsSlim = () => listSelected(SLIM_SELECT) as unknown as Promise<SpecSlim[]>;
+
+// Bentuk GET /specs: tanpa `payload`/`sourceHistory` dibaca dari DB sama sekali, `objective` tetap
+// ada karena filter `?q=` mencocokkannya dan grid/list menampilkannya.
+export const listSpecsItems = (filter: Filter = {}) =>
+  listSelected(LIST_SELECT, { projectId: filter.project, source: filter.source }) as unknown as Promise<ListRow[]>;
 
 // Overlay baca-saja satu baris, untuk GET /specs/:id: stage maju di respons tanpa menulis DB.
 export async function overlayOne<T extends { id: string; stage: string; title: string; projectId: string }>(spec: T): Promise<T> {

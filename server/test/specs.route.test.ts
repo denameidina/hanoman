@@ -588,3 +588,45 @@ describe("filter source (SPEC-521)", () => {
     expect(res.json().total).toBe(0);
   });
 });
+
+// SPEC-1267 · daftar ringkas + detail per item.
+describe("GET /specs ringkas & GET /specs/:id (SPEC-1267)", () => {
+  beforeAll(async () => {
+    await makeProject({ id: "pslim", repoDir: makeRepoWithBranches() });
+    await makeSpec({ id: "SPEC-1267A", projectId: "pslim", stage: "brainstorming", title: "slim",
+      objective: "kata-unik-zzz", payload: { context: "c", outcome: "o", constraints: "", priority: "sedang" } });
+  });
+
+  it("GET /specs: items tanpa payload/sourceHistory, dengan objective", async () => {
+    const res = await app.inject({ url: "/api/specs?project=pslim" });
+    const item = res.json().items[0];
+    expect("payload" in item).toBe(false);
+    expect("sourceHistory" in item).toBe(false);
+    expect(item.objective).toBe("kata-unik-zzz");
+  });
+
+  it("GET /specs?q= tetap menemukan kata yang hanya ada di objective", async () => {
+    const res = await app.inject({ url: "/api/specs?project=pslim&q=kata-unik-zzz" });
+    expect(res.json().items.map((s: any) => s.id)).toContain("SPEC-1267A");
+  });
+
+  it("GET /specs/:id memuat payload penuh; id ngawur 404", async () => {
+    const ok = await app.inject({ url: "/api/specs/SPEC-1267A" });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().payload.context).toBe("c");
+    expect(ok.json().objective).toBe("kata-unik-zzz");
+    const nf = await app.inject({ url: "/api/specs/SPEC-NOPE" });
+    expect(nf.statusCode).toBe(404);
+    expect(nf.json()).toEqual({ error: "spec tak ditemukan" });
+  });
+
+  it("overlay baca-saja: stage maju di respons, DB dan notifikasi tak berubah", async () => {
+    const notifs = await prisma.notification.count();
+    vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(
+      new Map([["SPEC-1267A", { phases: [{ name: "Plan", state: "done" }], cwd: "/tmp/none" }]]) as any);
+    const res = await app.inject({ url: "/api/specs/SPEC-1267A" });
+    expect(res.json().stage).toBe("planned");
+    expect((await prisma.spec.findUnique({ where: { id: "SPEC-1267A" } }))!.stage).toBe("brainstorming");
+    expect(await prisma.notification.count()).toBe(notifs);
+  });
+});
