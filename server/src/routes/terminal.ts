@@ -583,7 +583,12 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       // ADR-0164 · invocation agen fase dari DB — frame pertama sudah membawa rencana dari roster, frame
       // kedua (sesudah hidrasi) membawa status.
       void refreshPhaseInvocations(id);
-    })().catch(() => { socket.close(1011, "attach failed"); });
+    })().catch((err) => {
+      // Dulu ditelan: PTY sistem habis (posix_spawnp failed) tampil di dashboard hanya sebagai
+      // "menyambung ulang" tanpa jejak di log server.
+      req.log.error({ err, sessionId: id }, "attach terminal gagal");
+      socket.close(1011, "attach failed");
+    });
     // Revalidasi principal (SPEC-761) berjalan di LATAR, dipicu frame yang datang (≤ 1×/dtk) dan
     // interval 60 dtk di bawah. Sebelumnya setiap frame `in` di-`await` di belakang satu query
     // Prisma sebelum `writeTo`: dua frame beruntun berlomba dan mendarat terbalik di pty (terukur
