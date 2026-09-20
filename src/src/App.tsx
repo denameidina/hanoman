@@ -988,9 +988,12 @@ function AppInner() {
   // Projects) yang berpaginasi-server ikut me-refetch dan tetap segar selama sesi hidup.
   React.useEffect(() => subscribe((m) => {
     if (m.t === "specs") {
-      setBacklog(m.specs);
       const digest = specsDigestOf(m.specs);
-      if (digest !== lastSpecsDigest.current) { lastSpecsDigest.current = digest; setDataVersion((v) => v + 1); }
+      if (digest !== lastSpecsDigest.current) {
+        lastSpecsDigest.current = digest;
+        setBacklog(m.specs);
+        setDataVersion((v) => v + 1);
+      }
     }
     else if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
     else if (m.t === "leadAsks") setLeadAsks(m.asks);

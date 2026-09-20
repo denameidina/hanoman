@@ -21,7 +21,10 @@ import { clampFontSize, inlineActionCount, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX } from "./terminal-chrome";
 import { chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
 
-export function TerminalScreen({ userId = "test-user", projects, backlog = [], focusSession, startedSession, onStartedSessionHandled, onStartBacklog, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, sessions: sessionsProp, setSessions: setSessionsProp }: {
+// Default prop bernilai literal `[]` baru tiap render akan mematahkan memo `Cell`.
+const NO_BACKLOG: SpecSlim[] = [];
+
+export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BACKLOG, focusSession, startedSession, onStartedSessionHandled, onStartBacklog, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, sessions: sessionsProp, setSessions: setSessionsProp }: {
   userId?: string;
   projects: { id: string; name: string }[]; backlog?: SpecSlim[]; focusSession?: string | null;
   // SPEC-252/0164 · App owns the shared StartSessionModal so Terminal and Backlog use one picker.
@@ -175,7 +178,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
 
   const failedCleanups = cleanups.filter((c) => c.error);
   const byId = (id: string) => sessions.find((s) => s.id === id) ?? null;
-  const nameOf = (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid;
+  const nameOf = React.useCallback(
+    (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid, [projects]);
 
   // SPEC-517 · sesi agen biasa lahir DI DALAM NewTerminalModal (ia yang memegang pilihan
   // runtime); di sini tinggal menaruhnya di grid — persis jalur lama sesudah createTerminal.
@@ -281,6 +285,37 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
   const markExited = React.useCallback((id: string, code?: number) => {
     setSessions((s) => s.map((x) => (x.id === id ? { ...x, exited: true, exitCode: code } : x)));
   }, []);
+
+  // SPEC-1267 · handler per-sel yang identitasnya stabil supaya `Cell` (React.memo) tak render ulang
+  // tiap render layar. Isinya membaca `latest` saat dipanggil, jadi tak pernah basi.
+  const current = {
+    close, detach: (id: string) => { void mutateWorkspace((c) => W.detach(c, id)); }, markExited, setFullId,
+    props: { onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf },
+  };
+  const latest = React.useRef(current);
+  latest.current = current;
+  const cellHandlers = React.useRef(new Map<string, {
+    onClose: () => void; onDetach: () => void; onExit: (code: number) => void; onFullscreen: () => void;
+  }>());
+  const handlersFor = (id: string) => {
+    let h = cellHandlers.current.get(id);
+    if (!h) {
+      h = {
+        onClose: () => void latest.current.close(id), onDetach: () => latest.current.detach(id),
+        onExit: (code) => latest.current.markExited(id, code), onFullscreen: () => latest.current.setFullId(id),
+      };
+      cellHandlers.current.set(id, h);
+    }
+    return h;
+  };
+  const stableProps = React.useRef({
+    onOpenReview: (specId: string) => latest.current.props.onOpenReview?.(specId),
+    onOpenSessionReview: (sid: string, title: string) => latest.current.props.onOpenSessionReview?.(sid, title),
+    titleOf: (specId: string) => latest.current.props.titleOf?.(specId),
+    onIntegrate: (spec: SpecSlim, op: "merge" | "rebase", target: string) => latest.current.props.onIntegrate?.(spec, op, target),
+    onIntegrateSession: (session: TerminalSession, op: "merge" | "rebase", target: string) => latest.current.props.onIntegrateSession?.(session, op, target),
+    specOf: (specId: string) => latest.current.props.specOf?.(specId),
+  }).current;
 
   const place = (idx: number, id: string) => {
     setActiveCell(idx);
@@ -523,12 +558,15 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
                     border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", overflow: "hidden",
                   }}>
                     {s
-                      ? <Cell session={s} nameOf={nameOf} onClose={() => void close(s.id)}
-                          canArrange={workspaceWritable} onDetach={() => detach(s.id)} onExit={(code) => markExited(s.id, code)} onReview={onOpenReview}
-                          onSessionReview={onOpenSessionReview}
-                          titleOf={titleOf} onIntegrate={onIntegrate} onIntegrateSession={onIntegrateSession} specOf={specOf}
+                      ? <Cell session={s} nameOf={nameOf} {...handlersFor(s.id)}
+                          canArrange={workspaceWritable}
+                          onReview={onOpenReview && stableProps.onOpenReview}
+                          onSessionReview={onOpenSessionReview && stableProps.onOpenSessionReview}
+                          titleOf={titleOf && stableProps.titleOf} onIntegrate={onIntegrate && stableProps.onIntegrate}
+                          onIntegrateSession={onIntegrateSession && stableProps.onIntegrateSession}
+                          specOf={specOf && stableProps.specOf} backlog={backlog}
                           fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
-                          fullscreen={fullId === s.id} onFullscreen={() => setFullId(s.id)}
+                          fullscreen={fullId === s.id}
                           paneHidden={mobile && activeCell !== idx} />
                       : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
                   </div>
@@ -893,7 +931,9 @@ export function PhaseStrip({ phases, compact = false, now }: {
   );
 }
 
-function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen, paneHidden }: {
+const Cell = React.memo(CellImpl);
+
+function CellImpl({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen, paneHidden }: {
   session: TerminalSession; nameOf: (pid: string) => string;
   onClose: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
   onReview?: (specId: string) => void;
@@ -902,6 +942,8 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
   onIntegrate?: (spec: SpecSlim, op: "merge" | "rebase", target: string) => void;
   onIntegrateSession?: (session: TerminalSession, op: "merge" | "rebase", target: string) => void;
   specOf?: (specId: string) => SpecSlim | undefined;
+  // Hanya kunci render ulang: `titleOf`/`specOf` stabil, jadi perubahan backlog harus lewat prop ini.
+  backlog?: SpecSlim[];
   fontSize: number; showKeys: boolean; predict: boolean; diag: boolean;
   fullscreen: boolean; onFullscreen: () => void; paneHidden?: boolean;
 }) {

@@ -38,7 +38,9 @@ type LinkState =
   | { state: "connecting" | "open" | "gone" | "lost" }
   | { state: "retrying"; attempt: number };
 
-export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
+export const TerminalPane = React.memo(TerminalPaneImpl);
+
+function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
   predict = true, diag = false, mode = "local", hidden = false }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
