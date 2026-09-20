@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, StatusPill, Badge, ProgressBar, Icon, Button, StateBlock } from "../ds";
 import type { TerminalSession } from "../api/client";
-import type { ProjectVM, Spec } from "./types";
+import type { ProjectVM, SpecSlim } from "./types";
 import { LimitWindows } from "./LimitIndicator";
 import { DalangStage } from "./DalangStage";
 import { useLimits } from "../api/limits";
@@ -67,7 +67,7 @@ function AttnRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }
 /* Baris = sesi tmux HIDUP dari siaran WS, bukan `ProjectView.session` yang hanya dimuat saat
    login. Sub-label memakai `Spec.stage` (overlay live) — fase sesi tak ada di wire ini. */
 function LiveSessionRow({ s, projects, backlog, onOpenSession }: {
-  s: TerminalSession; projects: ProjectVM[]; backlog: Spec[]; onOpenSession: (id: string) => void;
+  s: TerminalSession; projects: ProjectVM[]; backlog: SpecSlim[]; onOpenSession: (id: string) => void;
 }) {
   const name = projects.find((p) => p.id === s.projectId)?.name ?? s.projectId;
   const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
@@ -112,7 +112,7 @@ function MiniStat({ icon, label, value, tone }: { icon: string; label: string; v
 }
 
 export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onGoto, onOpenSession }:
-  { projects: ProjectVM[]; backlog: Spec[]; sessions: TerminalSession[];
+  { projects: ProjectVM[]; backlog: SpecSlim[]; sessions: TerminalSession[];
     onOpenProject: (p: ProjectVM) => void; onGoto: (s: string) => void;
     onOpenSession: (id: string) => void }) {
   const limits = useLimits();
@@ -137,7 +137,7 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
     { label: "Sesi aktif", value: live.length, dot: "var(--brass-500)" },
     { label: "Perlu perhatian", value: highAtt, dot: "var(--clay-600)" },
     { label: "Docs on-convention", value: onConv + "/" + projects.length, sub: "rata-rata " + coverageAvg + "%", dot: "var(--leaf-600)" },
-    { label: "Spec di backlog", value: backlog.length, sub: briefN + " brief · " + qaN + " QA · " + auditN + " audit", dot: "var(--wind-600)" },
+    { label: "SpecSlim di backlog", value: backlog.length, sub: briefN + " brief · " + qaN + " QA · " + auditN + " audit", dot: "var(--wind-600)" },
   ];
 
   return (

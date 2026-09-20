@@ -302,7 +302,7 @@ Dibagi tiga commit (5a, 5b, 5c). Tugas 5b sesuai saran fase Spec (penyatuan tipe
   - `mergeSlim<T extends SpecSlim>(http: T, slim: SpecSlim | undefined): T` menimpa HANYA `stage,status,version,updatedAt,blockedBy,dependsOn,title,priority` (field ringkas), mempertahankan `payload/objective/sourceHistory`.
   - `api.getSpec(id: string): Promise<Spec>` (404 → lempar galat bertipe yang dikenali, mis. `ApiError.status===404`).
 
-- [ ] **5a Step 1: Test gagal (`specs-digest.test.ts`)**
+- [x] **5a Step 1: Test gagal (`specs-digest.test.ts`)**
 
 ```ts
 it("digest sama untuk isi sama, referensi beda", () => {
@@ -316,15 +316,15 @@ it("mergeSlim menjaga objective/payload/sourceHistory dari HTTP", () => {
   expect(m.objective).toBe("obj"); expect(m.stage).toBe("exec"); expect(m.version).toBe(2);
 });
 ```
-- [ ] **5a Step 2-4:** gagal → implementasi (`specsDigestOf` = `specs.map(s=>`${s.id}:${s.stage}:${s.version}:${s.updatedAt}`).join("|")`) → lulus (`pnpm vitest --run src/src/lib/specs-digest.test.ts`).
-- [ ] **5a Step 5:** `App.tsx:984`: `const lastDigest = useRef(""); … if (m.t==="specs") { setBacklog(m.specs); const d = specsDigestOf(m.specs); if (d !== lastDigest.current) { lastDigest.current = d; setDataVersion(v=>v+1); } }`. Balik urutan merge `BacklogScreen.tsx:997-1000` menjadi `data.items.map((s) => mergeSlim(s, backlogById.get(s.id)))`. Ketik state `backlog` sebagai `SpecSlim[]` (5b). Tes render/komponen: buktikan `setDataVersion` tak naik pada frame identik bila ada harness App; bila tidak ada, cukup unit `specsDigestOf`.
-- [ ] **Commit 5a:** `perf(client): dedup dataVersion by digest + mergeSlim`.
-- [ ] **5b:** Ganti tipe state `backlog` (App + prop turunan) menjadi `SpecSlim[]`; hasil `load()` awal (`App.tsx:941`) dipetakan ke `SpecSlim` (sekarang dari `SpecListItem` dengan `objective` dibuang via helper `toSlim`) supaya `objective` tak muncul kadang-kadang. `pnpm --filter src exec tsc --noEmit` (satu kali, lokal untuk file tersentuh; bukan `-r`) harus menunjukkan semua pembaca `payload/objective/sourceHistory` yang tersisa sebagai galat tipe → itulah daftar call-site untuk 5c. **Commit 5b** `refactor(client): state backlog bertipe SpecSlim`.
-- [ ] **5c: detail via HTTP.** `BacklogScreen` dialog detail: `useEffect` `api.getSpec(id)` saat dibuka, simpan `detail` state; baris 164/249/391/395/443 membaca dari `detail`. 404 → tutup dialog + toast (AC-S22). `ChangeSourceDialog` menerima `spec: Spec` dari pemanggil (hasil `getSpec`). Backlink audit `App.tsx:1277-1303`: `await api.getSpec(id)` untuk `objective`. Baris grid/list `:656,:695` tetap membaca `objective` dari item HTTP (`SpecListItem`). Test komponen: dialog memanggil `getSpec` (mock api), 404 menutup dialog.
-- [ ] **5c Step:** hapus langganan `sessions` kedua `TerminalScreen.tsx:98`, pakai prop dari `App` (AC-S23); test: render TerminalScreen dengan prop, assert `subscribe("sessions")` tidak dipanggil dari dalamnya.
-- [ ] **5c Step:** dedup `presence` di klien: bandingkan signature tanpa `lastSeenAt` lokal sebelum `setState`.
-- [ ] **Jalankan:** `pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism`. **Commit 5c** `feat(client): detail spec via GET /specs/:id, satu langganan sessions`.
-- [ ] **Docs:** `internal/docs/frontend/*` yang menyebut state backlog/dataVersion bila ada (grep `dataVersion` di `internal/docs`).
+- [x] **5a Step 2-4:** gagal → implementasi (`specsDigestOf` = `specs.map(s=>`${s.id}:${s.stage}:${s.version}:${s.updatedAt}`).join("|")`) → lulus (`pnpm vitest --run src/src/lib/specs-digest.test.ts`).
+- [x] **5a Step 5:** `App.tsx:984`: `const lastDigest = useRef(""); … if (m.t==="specs") { setBacklog(m.specs); const d = specsDigestOf(m.specs); if (d !== lastDigest.current) { lastDigest.current = d; setDataVersion(v=>v+1); } }`. Balik urutan merge `BacklogScreen.tsx:997-1000` menjadi `data.items.map((s) => mergeSlim(s, backlogById.get(s.id)))`. Ketik state `backlog` sebagai `SpecSlim[]` (5b). Tes render/komponen: buktikan `setDataVersion` tak naik pada frame identik bila ada harness App; bila tidak ada, cukup unit `specsDigestOf`.
+- [x] **Commit 5a:** `perf(client): dedup dataVersion by digest + mergeSlim`.
+- [x] **5b:** Ganti tipe state `backlog` (App + prop turunan) menjadi `SpecSlim[]`; hasil `load()` awal (`App.tsx:941`) dipetakan ke `SpecSlim` (sekarang dari `SpecListItem` dengan `objective` dibuang via helper `toSlim`) supaya `objective` tak muncul kadang-kadang. `pnpm --filter src exec tsc --noEmit` (satu kali, lokal untuk file tersentuh; bukan `-r`) harus menunjukkan semua pembaca `payload/objective/sourceHistory` yang tersisa sebagai galat tipe → itulah daftar call-site untuk 5c. **Commit 5b** `refactor(client): state backlog bertipe SpecSlim`.
+- [x] **5c: detail via HTTP.** `BacklogScreen` dialog detail: `useEffect` `api.getSpec(id)` saat dibuka, simpan `detail` state; baris 164/249/391/395/443 membaca dari `detail`. 404 → tutup dialog + toast (AC-S22). `ChangeSourceDialog` menerima `spec: Spec` dari pemanggil (hasil `getSpec`). Backlink audit `App.tsx:1277-1303`: `await api.getSpec(id)` untuk `objective`. Baris grid/list `:656,:695` tetap membaca `objective` dari item HTTP (`SpecListItem`). Test komponen: dialog memanggil `getSpec` (mock api), 404 menutup dialog.
+- [x] **5c Step:** hapus langganan `sessions` kedua `TerminalScreen.tsx:98`, pakai prop dari `App` (AC-S23); test: render TerminalScreen dengan prop, assert `subscribe("sessions")` tidak dipanggil dari dalamnya.
+- [x] **5c Step:** dedup `presence` di klien: bandingkan signature tanpa `lastSeenAt` lokal sebelum `setState`.
+- [x] **Jalankan:** `pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism`. **Commit 5c** `feat(client): detail spec via GET /specs/:id, satu langganan sessions`.
+- [x] **Docs:** `internal/docs/frontend/*` yang menyebut state backlog/dataVersion bila ada (grep `dataVersion` di `internal/docs`).
 
 ---
 

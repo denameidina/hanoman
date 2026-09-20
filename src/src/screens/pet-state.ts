@@ -4,7 +4,7 @@
 // Kosakata sesinya SENGAJA identik dengan sel Terminal (`TerminalScreen`): `awaiting` = hidup &&
 // decision, `deciding` menang atasnya, `failed` = exited && exitCode bukan nol. Pet yang memakai
 // rumus lain akan mengatakan hal yang berlawanan dengan sel di layar yang sama.
-import type { Notification, Spec } from "@hanoman/shared";
+import type { Notification, SpecSlim } from "@hanoman/shared";
 import type { TerminalSession } from "../api/client";
 
 export type PetPose = "ready" | "sleeping" | "working" | "deciding" | "waiting" | "blocked"
@@ -93,7 +93,7 @@ export type PetView = PetCondition & { conditions: PetCondition[] };
 
 export type PetInput = {
   sessions: TerminalSession[];
-  backlog: Spec[];
+  backlog: SpecSlim[];
   notifications: Notification[];
   now: number;
   connection?: PetConnection;   // kosong = dianggap terhubung
@@ -112,7 +112,7 @@ const byId = <T extends { id: string }>(rows: T[]): T[] => [...rows].sort((a, b)
 
 const sessionName = (s: TerminalSession): string => s.specId ?? s.id;
 
-const specOf = (backlog: Spec[], s: TerminalSession): Spec | undefined =>
+const specOf = (backlog: SpecSlim[], s: TerminalSession): SpecSlim | undefined =>
   (s.specId ? backlog.find((x) => x.id === s.specId) : undefined);
 
 const hhmm = (t: number): string =>
@@ -126,7 +126,7 @@ export const newestNotifiedAt = (rows: Notification[]): string =>
 export const petPulse = (sessions: TerminalSession[], notifications: Notification[]): string =>
   `${sessions.filter((s) => !s.exited).map((s) => s.id).sort().join(",")}|${newestNotifiedAt(notifications)}`;
 
-export const doneSpecIds = (backlog: Spec[]): Set<string> =>
+export const doneSpecIds = (backlog: SpecSlim[]): Set<string> =>
   new Set(backlog.filter((s) => s.stage === "done").map((s) => s.id));
 
 // Tiap sesi tepat SATU kondisi: panel yang mendaftar semuanya akan menyebut sesi yang sama dua
@@ -145,7 +145,7 @@ export function sessionKind(s: TerminalSession, doneSpecs: ReadonlySet<string>):
 // SPEC-899 · sesi yang benar-benar meminta jawaban manusia. Sengaja lewat `sessionKind` yang sama
 // dengan panel & rekap, bukan lewat predikat kedua (`decision && !deciding`) yang bisa berselisih
 // dengannya — tabel yang disalin ke pemakai kedua adalah kelas bug SPEC-431/448.
-export const waitingSessions = (sessions: TerminalSession[], backlog: Spec[]): TerminalSession[] => {
+export const waitingSessions = (sessions: TerminalSession[], backlog: SpecSlim[]): TerminalSession[] => {
   const done = doneSpecIds(backlog);
   return byId(sessions).filter((s) => sessionKind(s, done) === "waiting");
 };
@@ -159,7 +159,7 @@ export const waitingSessions = (sessions: TerminalSession[], backlog: Spec[]): T
  * kondisi dan `deciding` menang atas `waiting`, jadi kotak yang hanya digantung di `waiting` tak
  * pernah muncul di jendela yang justru dituju AC-6 — "ambil alih SEBELUM lead mengetik ke pane".
  */
-export const decidingSessions = (sessions: TerminalSession[], backlog: Spec[]): TerminalSession[] => {
+export const decidingSessions = (sessions: TerminalSession[], backlog: SpecSlim[]): TerminalSession[] => {
   const done = doneSpecIds(backlog);
   return byId(sessions).filter((s) => sessionKind(s, done) === "deciding");
 };

@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, Field, HnTextarea, Modal } from "../ds";
-import type { Spec } from "./types";
+import type { Spec, SpecSlim } from "./types";
 
 export type MarkDoneResult = { needConfirm: true; sessionId?: string } | Spec | undefined;
 
@@ -11,9 +11,9 @@ const REASON_MAX = 280;
 // konfirmasi yang bisa berselisih. Peringatan sesi hidup datang dari respons server
 // (`needConfirm`), bukan dari daftar sesi klien yang bisa basi.
 export function MarkDoneDialog({ spec, onClose, onSubmit }: {
-  spec: Spec;
+  spec: SpecSlim;
   onClose: () => void;
-  onSubmit: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+  onSubmit: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
 }) {
   const [reason, setReason] = React.useState("");
   const [live, setLive] = React.useState<string | null>(null);

@@ -8,7 +8,7 @@
    menunggu manusia = `decision && !deciding`. Murni presentasi, tanpa fetch sendiri. */
 import React from "react";
 import type { TerminalSession } from "../api/client";
-import type { ProjectVM, Spec } from "./types";
+import type { ProjectVM, SpecSlim } from "./types";
 // Aset dalang digenerate Codex/GPT Image (chroma key hijau → transparan), master + rekaman
 // produksi di internal/assets/dalang/. Ukuran display (512/384/256) supaya bundle tak bengkak —
 // pelajaran registry illustration (master 1,5 MB per berkas dilarang masuk glob bundel).
@@ -68,7 +68,7 @@ function WayangSilhouette({ height, color, rod }: { height: number; color: strin
 }
 
 function LivePuppet({ s, projects, backlog, index, onOpenSession }: {
-  s: TerminalSession; projects: ProjectVM[]; backlog: Spec[]; index: number;
+  s: TerminalSession; projects: ProjectVM[]; backlog: SpecSlim[]; index: number;
   onOpenSession: (id: string) => void;
 }) {
   const projectName = projects.find((p) => p.id === s.projectId)?.name ?? s.projectId;
@@ -114,7 +114,7 @@ function Stat({ value, label, dot }: { value: React.ReactNode; label: string; do
 }
 
 export function DalangStage({ projects, backlog, sessions, onOpenSession, onOpenProject }: {
-  projects: ProjectVM[]; backlog: Spec[]; sessions: TerminalSession[];
+  projects: ProjectVM[]; backlog: SpecSlim[]; sessions: TerminalSession[];
   onOpenSession: (id: string) => void; onOpenProject: (p: ProjectVM) => void;
 }) {
   // Urutan tmux bisa bergeser tiap siaran — stabilkan per id (cermin pet-state.ts `byId`).
