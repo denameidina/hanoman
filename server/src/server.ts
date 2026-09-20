@@ -1,4 +1,5 @@
 import { buildApp } from "./app";
+import { createShutdown } from "./services/graceful-shutdown";
 import { startModelDiscovery } from "./services/model-catalog";
 import { prisma } from "./db";
 import { startVpsMonitor } from "./services/vps-monitor";
@@ -58,10 +59,12 @@ process.on("uncaughtException", (err) => console.error("uncaughtException:", err
 
 // Tutup rapi: onClose (app.ts) melepas klien tmux; sesi claude selamat — hidup di tmux server,
 // bukan proses ini (ADR-0016). Lalu putus Prisma agar koneksi tak menggantung saat restart.
-async function shutdown(sig: string): Promise<void> {
-  console.log(`${sig} — menutup`);
-  try { await app.close(); await prisma.$disconnect(); } finally { process.exit(0); }
-}
+// Batas waktu wajib: tanpanya `app.close()` yang menggantung meninggalkan server yatim (lihat
+// services/graceful-shutdown.ts).
+const shutdown = createShutdown({
+  close: async () => { await app.close(); await prisma.$disconnect(); },
+  exit: (code) => process.exit(code),
+});
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
 

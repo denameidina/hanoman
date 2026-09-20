@@ -276,3 +276,5 @@ legacy; ia bukan konfigurasi deploy. Lihat [security-standard](../security/secur
 Biaya bersifat **estimasi dan tidak menggerakkan apa pun** (ADR-0012): tidak ada `dailyBudget`, tidak ada
 budget flag. Indikator limit dibaca langsung dari OAuth usage API Anthropic (`services/limits.ts`,
 ADR-0024), bukan dari parsing output terminal.
+
+**Penutupan server berbatas waktu** (`server/src/services/graceful-shutdown.ts`). `SIGTERM`/`SIGINT` menjalankan `app.close()` + putus Prisma dengan batas 5 dtk, lalu `process.exit` dipaksa. Sebelumnya `close()` yang menggantung meninggalkan server yatim (PPID 1) yang masih memegang klien tmux; bersama server baru mereka saling menendang lewat `attach-session -d` (±8 attach/dtk) sampai PTY sistem (`kern.tty.ptmx_max` = 511) habis dan setiap terminal baru gagal `attach failed` (WS 1011) → dashboard "menyambung ulang" selamanya. Kegagalan attach kini dicatat di log server (`attach terminal gagal`). Sesi tmux tetap selamat dari restart (ADR-0016).
