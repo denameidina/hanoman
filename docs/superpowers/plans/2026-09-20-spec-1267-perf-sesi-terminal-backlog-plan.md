@@ -411,7 +411,7 @@ Enam sub-commit kecil; tiap sub-langkah: tes dulu, implementasi, `pnpm vitest --
 - [x] **10c memo + handler stabil.** `React.memo(Cell)`, `React.memo(TerminalPane)`; handler di `TerminalScreen.tsx:520-527` via `useCallback`/ref. Test: render ulang parent dengan prop identik tidak me-render ulang Cell (hitung render lewat spy pada komponen anak). Commit `perf(terminal): memo Cell/TerminalPane + handler stabil`.
 - [x] **10d ticker bersama PhaseStrip (AC-S29).** `shared-ticker.ts`: `subscribeTick(fn): () => void`, satu `setInterval(1000)` hidup selama ada pelanggan; test dengan fake timers: 5 pelanggan → 1 interval; 0 pelanggan → interval dibersihkan. Ganti interval per sel `TerminalScreen.tsx:779`. Commit.
 - [x] **10e timer 100 ms bersyarat (AC-S29).** `TerminalPane.tsx:232`: mulai interval saat prediksi pending > 0, `clearInterval` saat 0; test fake timers. Commit.
-- [ ] **10f resize debounce + dedup (AC-S30).** Debounce `ResizeObserver` 100 ms; simpan `lastSent {cols,rows}`; test: 5 resize cepat dengan ukuran akhir sama dengan yang terkirim → 0 pesan; ukuran baru → 1 pesan. Commit.
+- [x] **10f resize debounce + dedup (AC-S30).** Debounce `ResizeObserver` 100 ms; simpan `lastSent {cols,rows}`; test: 5 resize cepat dengan ukuran akhir sama dengan yang terkirim → 0 pesan; ukuran baru → 1 pesan. Commit.
 - [ ] **Jalankan:** `pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism`. Docs: `internal/docs/frontend/*` terminal (grep `TerminalPane`).
 
 ---

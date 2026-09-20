@@ -24,6 +24,7 @@ import { createHiddenRing } from "../lib/hidden-ring";
 // dari "generator koneksi" yang dilarang SPEC-761.
 const RECONNECT_BACKOFF_MS = [500, 1_000, 2_000, 4_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000];
 const RECONNECT_MAX = RECONNECT_BACKOFF_MS.length;
+const RESIZE_DEBOUNCE_MS = 100;
 
 // SPEC-878 · ADR-0134 · antrean adalah penyelamat ketikan (SPEC-800), bukan tempat penyimpanan.
 // 4 KiB memuat satu paragraf yang di-paste dan tetap menghentikan antrean yang lari.
@@ -79,7 +80,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   hiddenRef.current = hidden;
   const ring = React.useRef(createHiddenRing());
   const resync = React.useRef<() => void>(() => {});
-  const view = React.useRef<{ term: Terminal; fit: FitAddon; send: (m: unknown) => void } | null>(null);
+  const view = React.useRef<{ term: Terminal; fit: FitAddon; sendSize: (force?: boolean) => void } | null>(null);
   // onExit boleh berubah tiap render; menaruhnya di ref menjaga effect ini
   // hanya bergantung pada sessionId — remount = sesi yang benar-benar berbeda.
   const exitRef = React.useRef(onExit);
@@ -142,7 +143,16 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     let timer: ReturnType<typeof setTimeout> | undefined;
     let finished = false;
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
-    view.current = { term, fit, send };
+    // SPEC-1267 · `resize` yang ukurannya sama dengan yang terakhir sampai ke server tak dikirim ulang.
+    let lastSentSize = "";
+    const sendSize = (force = false) => {
+      if (mode === "remote" || ws?.readyState !== WebSocket.OPEN) return;
+      const size = `${term.cols}x${term.rows}`;
+      if (!force && size === lastSentSize) return;
+      lastSentSize = size;
+      send({ t: "resize", cols: term.cols, rows: term.rows });
+    };
+    view.current = { term, fit, sendSize };
     // Perekam diagnostik. Selalu DIBUAT, tapi `rec` diam total selama sakelarnya mati — dengan
     // begitu menyalakannya tak perlu melahirkan socket baru, sama seperti sakelar prediksi.
     const diagRec = D.createDiagRecorder({
@@ -309,7 +319,9 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
             // geometri lama lalu me-rewrap seluruh layar.
             // SPEC-1218 · mode remote: geometri milik pemilik pane (frame `geometry` masuk), bukan
             // kontainer kita — mengirim `resize` di sini akan merebut kolom/baris pane orang lain.
-            if (mode !== "remote") send({ t: "resize", cols: term.cols, rows: term.rows });
+            // Sambungan baru = server belum tahu ukuran kita, jadi dedup direset.
+            lastSentSize = "";
+            sendSize();
           }
           // Dikuras di SETIAP open, bukan hanya yang pertama: itu yang mengubah buffer SPEC-771
           // dari penyembunyi kegagalan menjadi penyelamat ketikan.
@@ -559,11 +571,14 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     el.addEventListener("touchend", onTouchEnd, { passive: true });
     el.addEventListener("touchcancel", resetTouch, { passive: true });
 
+    // SPEC-1267 · drag pemisah/jendela memicu ResizeObserver puluhan kali per detik; fit + kirim
+    // digabung ke satu langkah 100 ms sesudah gerakan berhenti.
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
     const ro = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect ?? el.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
-      fit.fit();
-      if (mode !== "remote") send({ t: "resize", cols: term.cols, rows: term.rows });
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { fit.fit(); sendSize(); }, RESIZE_DEBOUNCE_MS);
     });
     ro.observe(el);
 
@@ -584,6 +599,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", resetTouch);
       ro.disconnect();
+      clearTimeout(resizeTimer);
       if (ttl) clearInterval(ttl);
       batcher.dispose();
       diagRec.dispose();
@@ -620,7 +636,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     current.fit.fit();
-    if (mode !== "remote") current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
+    current.sendSize(true);
   }, [fontSize, mode]);
 
   // SPEC-882 · kolom ketik & bar tombol memakan tinggi host, jadi `cols`/`rows` PTY ikut berubah
@@ -633,7 +649,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     current.fit.fit();
-    if (mode !== "remote") current.send({ t: "resize", cols: current.term.cols, rows: current.term.rows });
+    current.sendSize(true);
   }, [showKeys, mode]);
 
   return (

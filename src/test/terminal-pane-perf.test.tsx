@@ -120,3 +120,21 @@ describe("timer prediksi (SPEC-1267 · AC-S29)", () => {
     expect(spy.mock.calls.filter(([, ms]) => ms === 100)).toEqual([]);
   });
 });
+
+describe("resize debounce + dedup (SPEC-1267 · AC-S30)", () => {
+  const rect = { contentRect: { width: 640, height: 360 } } as ResizeObserverEntry;
+  const resizesOf = () => sockets[0]!.sent.filter((m) => m.includes('"resize"'));
+
+  it("lima resize beruntun digabung; ukuran sama dengan yang terkirim tak dikirim ulang", async () => {
+    render(<TerminalPane sessionId="s" onExit={() => {}} />);
+    await connected();
+    vi.useFakeTimers();
+    for (let i = 0; i < 5; i++) xt.resize?.([rect]);
+    vi.advanceTimersByTime(100);
+    expect(resizesOf()).toHaveLength(1);
+    for (let i = 0; i < 5; i++) xt.resize?.([rect]);
+    vi.advanceTimersByTime(100);
+    expect(resizesOf()).toHaveLength(1);
+    vi.useRealTimers();
+  });
+});
