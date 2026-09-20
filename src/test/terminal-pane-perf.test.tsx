@@ -111,3 +111,12 @@ describe("renderer & kursor (SPEC-1267 · AC-S27/S28)", () => {
     expect(xt.options.cursorBlink).toBe(false);
   });
 });
+
+describe("timer prediksi (SPEC-1267 · AC-S29)", () => {
+  it("pane idle tak membuat interval 100 ms", async () => {
+    const spy = vi.spyOn(globalThis, "setInterval");
+    render(<TerminalPane sessionId="s" onExit={() => {}} />);
+    await connected();
+    expect(spy.mock.calls.filter(([, ms]) => ms === 100)).toEqual([]);
+  });
+});

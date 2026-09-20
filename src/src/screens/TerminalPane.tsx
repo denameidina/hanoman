@@ -245,15 +245,23 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       else if (r.deferred) rec("pred", "tangguh: frame server in flight");
       else rec("pred", `tolak cx=${view.cursorX}/${view.cols} alt=${pred.altScreen ? 1 : 0}`
         + ` deliverable=${view.deliverable ? 1 : 0} suspend=${Math.max(0, pred.suspendedUntil - Date.now())}`);
+      armTtl();
       batcher.push(d, wasPredicting || r.write.length > 0 || r.deferred === true);
     };
     // TTL adalah satu-satunya sinyal yang memisahkan "pty diam" — password dan tombol yang ditelan
     // dialog sama-sama terukur membalas NOL byte — dari "jaringan lambat".
-    const ttl = setInterval(() => {
-      const r = P.onTick(pred, Date.now());
-      pred = r.state;
-      if (r.write) term.write(r.write);
-    }, 100);
+    // SPEC-1267 · timer hanya hidup selagi ada prediksi yang belum di-echo — dulu berdetak 100 ms per
+    // pane sepanjang hidupnya. `armTtl` dipanggil di setiap titik yang bisa menambah `pending`.
+    let ttl: ReturnType<typeof setInterval> | undefined;
+    const armTtl = () => {
+      if (ttl || !pred.pending) return;
+      ttl = setInterval(() => {
+        const r = P.onTick(pred, Date.now());
+        pred = r.state;
+        if (r.write) term.write(r.write);
+        if (!pred.pending && ttl) { clearInterval(ttl); ttl = undefined; }
+      }, 100);
+    };
 
     const connect = () => {
       // SPEC-1218 · smoke manual Task 18 Step 7 menemukan bug nyata di sini: `apiHook.issueWsTicket`
@@ -334,6 +342,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
               const back = P.onFrameParsed(pred, gen, viewOf(), Date.now(), predictRef.current);
               pred = back.state;
               if (back.write) term.write(back.write);
+              armTtl();
               clockIfDelivered();
             });
             clockIfDelivered();
@@ -575,7 +584,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", resetTouch);
       ro.disconnect();
-      clearInterval(ttl);
+      if (ttl) clearInterval(ttl);
       batcher.dispose();
       diagRec.dispose();
       ta?.removeEventListener("focus", onFocusIn);
