@@ -11,7 +11,7 @@ import {
   resolveHome, resolveDbUrl, dbFilePath, prismaCliPath, dbUrlNotice, repairSpawnHelper,
   readConfigEnv,
 } from "@hanoman/runner";
-import { CONFIG_RESTART_EXIT, UPDATE_RESTART_EXIT } from "@hanoman/shared";
+import { CONFIG_RESTART_EXIT, MANUAL_RESTART_EXIT, UPDATE_RESTART_EXIT } from "@hanoman/shared";
 import type { Ctx } from "../router";
 import { resolveLayout } from "../layout";
 import { INSTALL_ARGS } from "./update";
@@ -168,6 +168,7 @@ export function planSupervisorStep(
   code: number, restartsUsed: number, configRestartsUsed = 0,
 ): SupervisorStep {
   // SPEC-884 · ADR-0139 · "config berubah, jalankan ulang" — TANPA npm, TANPA prisma generate.
+  if (code === MANUAL_RESTART_EXIT) return { action: "restart" };
   if (code === CONFIG_RESTART_EXIT)
     return configRestartsUsed >= MAX_CONFIG_RESTARTS ? { action: "exit", code } : { action: "restart" };
   if (code !== UPDATE_RESTART_EXIT) return { action: "exit", code };
@@ -297,6 +298,10 @@ export default async function start(argv: string[], ctx: Ctx): Promise<number> {
         ctx.stderr(`hanoman: jatah restart-konfigurasi (${MAX_CONFIG_RESTARTS}) habis — keluar\n`);
       }
       return step.code;
+    }
+    if (step.action === "restart" && code === MANUAL_RESTART_EXIT) {
+      ctx.stdout("hanoman · restart manual dari dashboard; menjalankan ulang\n");
+      continue;
     }
     if (step.action === "restart") {
       configRestartsUsed++;

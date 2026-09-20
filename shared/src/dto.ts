@@ -709,6 +709,10 @@ export const UPDATE_RESTART_EXIT = 75;
 // menyelesaikan wizard — akibat yang sama sekali tak diminta.
 export const CONFIG_RESTART_EXIT = 76;
 
+// Restart manual dari tombol "Mulai ulang" (troubleshooting/stuck): jalankan ulang server apa adanya,
+// tanpa npm dan tanpa jatah — dipicu manusia, jadi loop tak berujung bukan mode kegagalan.
+export const MANUAL_RESTART_EXIT = 77;
+
 // Dua langkah sengaja: tanpa `confirm` endpoint hanya melapor (dry-run), dengan `confirm` ia
 // benar-benar keluar. Nilai non-boolean DITOLAK — "ya"/1 tak boleh terbaca sebagai persetujuan.
 export const zUpdateApplyBody = z.object({ confirm: z.boolean().optional() });

@@ -2,7 +2,7 @@ import React from "react";
 import { Icon } from "../ds/icon";
 import {
   useUpdate, updateHeadline, updateBadgeLabel, updateBadgeLabelShort, updateVersionLine,
-  updateRegistryLine, applyUpdate, applyConfirmMessage, type ApplyOutcome,
+  updateRegistryLine, applyUpdate, applyRestart, applyConfirmMessage, type ApplyOutcome,
   useServerRestartedTo, reloadNoticeLabel, reloadNoticeText, reloadPage,
 } from "../api/update";
 import { usePopoverFocus } from "../ds/popover";
@@ -51,6 +51,7 @@ export function UpdateBadge() {
   const [open, setOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [phase, setPhase] = React.useState<Phase>({ t: "idle" });
+  const [rPhase, setRPhase] = React.useState<Phase>({ t: "idle" });
   const popover = usePopoverFocus(open, () => setOpen(false), "dialog");
   // Versi kosong (dev, atau bundle yang belum ter-stamp) tak punya apa pun untuk disebut: pil `v`
   // telanjang lebih buruk daripada topbar kosong.
@@ -65,6 +66,13 @@ export function UpdateBadge() {
     if (r.kind === "confirm") setPhase({ t: "confirming", message: applyConfirmMessage(r.liveSessions) });
     else if (r.kind === "accepted") setPhase({ t: "applying" });
     else setPhase({ t: "failed", message: r.message });
+  };
+  const restart = async (confirm: boolean) => {
+    setRPhase({ t: confirm ? "applying" : "asking" });
+    const r: ApplyOutcome = await applyRestart(confirm);
+    if (r.kind === "confirm") setRPhase({ t: "confirming", message: `Ada ${r.liveSessions} sesi berjalan. Sesi tmux tetap hidup, dashboard terputus sebentar. Mulai ulang?` });
+    else if (r.kind === "accepted") setRPhase({ t: "applying" });
+    else setRPhase({ t: "failed", message: r.message });
   };
   const name = u.updateAvailable ? "Update tersedia" : "Versi terpasang";
   const label = u.updateAvailable ? updateBadgeLabel(u) : `v${u.currentVersion}`;
@@ -131,6 +139,34 @@ export function UpdateBadge() {
             </>
           )}
           <div style={{ fontSize: 11, color: "var(--text-subtle)" }}>{updateVersionLine(u)}</div>
+          {u.canApply && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border-hair)" }}>
+              {rPhase.t === "idle" && (
+                <button onClick={() => void restart(false)} style={btn} title="Untuk server yang macet atau troubleshooting">
+                  <Icon name="refresh-cw" size={12} /> Mulai ulang hanoman
+                </button>
+              )}
+              {rPhase.t === "asking" && <div style={{ fontSize: 11, color: "var(--text-subtle)" }}>Memeriksa sesi yang berjalan…</div>}
+              {rPhase.t === "confirming" && (
+                <>
+                  <div style={{ fontSize: 11, color: "var(--text-body)", marginBottom: 8 }}>{rPhase.message}</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => void restart(true)} style={btnPrimary}>Ya, mulai ulang</button>
+                    <button onClick={() => setRPhase({ t: "idle" })} style={btn}>Batal</button>
+                  </div>
+                </>
+              )}
+              {rPhase.t === "applying" && (
+                <div style={{ fontSize: 11, color: "var(--text-body)" }}>Menjalankan ulang — dashboard tersambung lagi sendiri.</div>
+              )}
+              {rPhase.t === "failed" && (
+                <>
+                  <div style={{ fontSize: 11, color: "var(--status-err-text, var(--text-body))", marginBottom: 8 }}>{rPhase.message}</div>
+                  <button onClick={() => setRPhase({ t: "idle" })} style={btn}>Coba lagi</button>
+                </>
+              )}
+            </div>
+          )}
           {!u.updateAvailable && (
             <div style={{ fontSize: 11, color: "var(--text-subtle)", marginTop: 4 }}>{updateRegistryLine(u)}</div>
           )}

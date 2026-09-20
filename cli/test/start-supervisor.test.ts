@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_CONFIG_RESTARTS, MAX_UPDATE_RESTARTS, planSupervisorStep, spawnEnv,
 } from "../src/commands/start";
-import { CONFIG_RESTART_EXIT, UPDATE_RESTART_EXIT } from "@hanoman/shared";
+import { CONFIG_RESTART_EXIT, MANUAL_RESTART_EXIT, UPDATE_RESTART_EXIT } from "@hanoman/shared";
 
 describe("supervisor (SPEC-884)", () => {
   it("exit 76 = jalankan ulang TANPA memasang apa pun", () => {
@@ -13,6 +13,10 @@ describe("supervisor (SPEC-884)", () => {
     expect(planSupervisorStep(CONFIG_RESTART_EXIT, MAX_UPDATE_RESTARTS, 0)).toEqual({ action: "restart" });
     expect(planSupervisorStep(CONFIG_RESTART_EXIT, 0, MAX_CONFIG_RESTARTS))
       .toEqual({ action: "exit", code: CONFIG_RESTART_EXIT });
+  });
+
+  it("exit 77 (tombol Mulai ulang) = jalankan ulang tanpa jatah", () => {
+    expect(planSupervisorStep(MANUAL_RESTART_EXIT, MAX_UPDATE_RESTARTS, MAX_CONFIG_RESTARTS)).toEqual({ action: "restart" });
   });
 
   it("perilaku lama tak berubah", () => {

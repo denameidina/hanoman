@@ -148,3 +148,19 @@ export function reloadNoticeText(version: string): string {
 
 /** Ekspor tersendiri karena `location` milik jsdom tak bisa diganti dengan bersih dari test. */
 export function reloadPage(): void { location.reload(); }
+
+/** Restart manual (tanpa memasang). Dua langkah seperti `applyUpdate`. */
+export async function applyRestart(confirm: boolean): Promise<ApplyOutcome> {
+  let res: Response;
+  try {
+    res = await fetch("/api/restart", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm }),
+    });
+  } catch { return { kind: "error", message: "Server tak terjangkau." }; }
+  let b: Record<string, unknown> = {};
+  try { b = (await res.json()) as Record<string, unknown>; } catch { /* body kosong */ }
+  const live = Number(b.liveSessions ?? 0);
+  if (res.status === 202) return { kind: "accepted", liveSessions: live, from: "", to: null };
+  if (res.status === 409 && b.error === "confirm-required") return { kind: "confirm", liveSessions: live, from: "", to: null };
+  return { kind: "error", message: applyErrorMessage(String(b.error ?? res.status)) };
+}

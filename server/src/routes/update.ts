@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { zUpdateApplyBody } from "@hanoman/shared";
-import { getUpdateStatus, requestRestartForUpdate } from "../services/update";
+import { getUpdateStatus, requestRestartForUpdate, supervised } from "../services/update";
 import { listSessions } from "../services/pty";
+import { requestManualRestart } from "../services/restart";
 
 // GET /api/update — status auto-update (SPEC-214/398). Auth-gated otomatis (bukan anggota PUBLIC
 // di app.ts). Realtime lewat WS siar grup "update".
@@ -32,5 +33,17 @@ export default async function update(app: FastifyInstance) {
 
     requestRestartForUpdate();
     return reply.code(202).send({ accepted: true, from, to, liveSessions });
+  });
+
+  // POST /api/restart — mulai ulang tanpa memasang apa pun, untuk server yang macet / troubleshooting.
+  // Dua langkah seperti /update/apply; hanya sah bila ada supervisor yang akan menghidupkannya lagi.
+  app.post("/restart", async (req, reply) => {
+    const parsed = zUpdateApplyBody.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: "bad-body" });
+    if (!supervised()) return reply.code(409).send({ error: "unsupervised" });
+    const liveSessions = listSessions().filter((s) => !s.exited).length;
+    if (!parsed.data.confirm) return reply.code(409).send({ error: "confirm-required", liveSessions });
+    requestManualRestart();
+    return reply.code(202).send({ accepted: true, liveSessions });
   });
 }

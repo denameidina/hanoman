@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import * as restartSvc from "../src/services/restart";
 import { buildApp } from "../src/app";
 import { _resetUpdateCache, __setRegistrySnapshot, __setExiter } from "../src/services/update";
 
@@ -108,5 +109,29 @@ describe("POST /api/update/apply (SPEC-405 · ADR-0088)", () => {
     expect(res.statusCode).toBe(401);
     await settle();
     expect(exits).toEqual([]);
+  });
+});
+
+describe("POST /api/restart", () => {
+  const spy = vi.spyOn(restartSvc, "requestManualRestart").mockImplementation(() => {});
+  afterEach(() => { spy.mockClear(); restoreEnv(); });
+
+  it("409 unsupervised tanpa supervisor; tak keluar", async () => {
+    delete process.env.HANOMAN_SUPERVISOR;
+    const res = await buildApp({ requireAuth: false }).inject({ method: "POST", url: "/api/restart", payload: { confirm: true } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("unsupervised");
+    expect(spy).not.toHaveBeenCalled();
+  });
+  it("tanpa confirm hanya melapor; dengan confirm 202 + restart", async () => {
+    process.env.HANOMAN_SUPERVISOR = "1";
+    const app = buildApp({ requireAuth: false });
+    const r1 = await app.inject({ method: "POST", url: "/api/restart", payload: {} });
+    expect(r1.statusCode).toBe(409);
+    expect(r1.json().error).toBe("confirm-required");
+    expect(spy).not.toHaveBeenCalled();
+    const r2 = await app.inject({ method: "POST", url: "/api/restart", payload: { confirm: true } });
+    expect(r2.statusCode).toBe(202);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

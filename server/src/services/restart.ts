@@ -5,7 +5,7 @@
 // (terukur: "process.exit unexpectedly called with 76", dua kali, pada test yang tetap terlihat
 // hijau). Modul kecil ini bisa di-mock; menambahkan cabang `NODE_ENV === "test"` di route tidak
 // akan pernah bisa diuji dan menyembunyikan efek nyatanya.
-import { CONFIG_RESTART_EXIT } from "@hanoman/shared";
+import { CONFIG_RESTART_EXIT, MANUAL_RESTART_EXIT } from "@hanoman/shared";
 
 /**
  * Ditunda sesaat supaya response sempat mengalir keluar sebelum proses berakhir — pemanggil
@@ -14,4 +14,9 @@ import { CONFIG_RESTART_EXIT } from "@hanoman/shared";
  */
 export function requestConfigRestart(delayMs = 50): void {
   setTimeout(() => process.exit(CONFIG_RESTART_EXIT), delayMs);
+}
+
+/** Tombol "Mulai ulang" di dashboard. Sama seperti di atas, tapi tanpa jatah di supervisor. */
+export function requestManualRestart(delayMs = 250): void {
+  setTimeout(() => process.exit(MANUAL_RESTART_EXIT), delayMs);
 }

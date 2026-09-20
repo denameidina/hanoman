@@ -635,6 +635,10 @@ function TitleButton({ spec, onOpenDetail, size = 15 }:
   );
 }
 
+const CLAMP = (n: number): React.CSSProperties => ({
+  display: "-webkit-box", WebkitLineClamp: n, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere",
+});
+
 function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running, presenceOn }:
   {
     spec: SpecListItem; onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void;
@@ -644,7 +648,7 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
   }) {
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
   return (
-    <Card padding={16}>
+    <Card padding={16} fill style={{ height: "100%" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -658,12 +662,13 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
             <PresenceChip names={presenceOn} />
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>· {spec.projectId}</span>
           </div>
-          <div style={{ marginTop: 8 }}><TitleButton spec={spec} onOpenDetail={onOpenDetail} /></div>
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4, lineHeight: 1.45 }}>{spec.objective}</div>
+          <div style={{ marginTop: 8, ...CLAMP(2) }}><TitleButton spec={spec} onOpenDetail={onOpenDetail} /></div>
+          {/* Ukuran kartu tetap: deskripsi panjang dipotong elipsis (3 baris), bukan memanjangkan kartu. */}
+          <div title={spec.objective} style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4, lineHeight: 1.45, ...CLAMP(3) }}>{spec.objective}</div>
         </div>
         <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"}>{prio.label}</Badge>
       </div>
-      <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border-hair)" }}>
+      <div style={{ marginTop: "auto", paddingTop: 12, borderTop: "1px solid var(--border-hair)" }}>
         <StageBar stage={spec.stage} />
         <div className="hn-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12 }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>
@@ -1112,7 +1117,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
           ) : (
             <div ref={listRef} data-testid="backlog-scroll" className="hn-backlog-grid" style={{
               ...LIST_SCROLL_STYLE, display: "grid", gap: 12,
-              gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))"
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))", gridAutoRows: "1fr"
             }}>
               {items.map((s) => <SpecCard key={s.id} spec={s} onStart={onStart}
                 running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
