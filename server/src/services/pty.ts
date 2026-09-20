@@ -1205,25 +1205,6 @@ export function sessionPhases(id: string): Phase[] | null {
   return readPhases(p.phaseFile, p.flow);
 }
 
-// Fase per spec untuk semua sesi tmux, dalam satu `list-panes` — dipakai GET /specs untuk
-// menurunkan stage live tanpa satu tmux call per spec (SPEC-168). Tak difilter `exited`:
-// berkas fase pane mati (belum di-DELETE) tetap kebenaran terakhirnya; forward-only di
-// pemanggil (stageFor + guard STAGES.indexOf) menjaga tak ada stage yang mundur.
-export function sessionPhasesBySpec(): Map<string, { phases: Phase[]; cwd: string }> {
-  const out = new Map<string, { phases: Phase[]; cwd: string }>();
-  // SPEC-402 · sengaja LUNAK di sini (peta kosong saat tmux tak bisa dibaca): overlay stage
-  // forward-only (stageFor + guard STAGES.indexOf), jadi satu bacaan tanpa overlay hanya berarti
-  // "stage DB apa adanya" — tak ada stage yang mundur dan tak ada sesi yang dinyatakan berakhir.
-  let panes: Pane[];
-  try { panes = listPanes(); } catch { return out; }
-  for (const p of panes) {
-    if (!p.specId || !p.flow || !p.phaseFile) continue;
-    // cwd = worktree run-nya: GET /specs menggerbang `done` dengan plan di dalamnya (SPEC-173).
-    out.set(p.specId, { phases: readPhases(p.phaseFile, p.flow), cwd: p.cwd });
-  }
-  return out;
-}
-
 function broadcast(a: Attachment, f: Frame): void {
   const msg = frame(f);
   for (const c of a.clients) c.send(msg);

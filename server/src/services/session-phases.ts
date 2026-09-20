@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
 import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, type Stage } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
@@ -35,10 +36,8 @@ export const decisionFilePath = (repoDir: string, sessionId: string): string =>
 // Satu baris = satu transisi: "<Nama Fase> done" | "<Nama Fase> skipped". Nama fase boleh
 // berspasi ("Doc index"), jadi state-nya token TERAKHIR. Baris yang tak dikenali diabaikan —
 // berkas ini ditulis agen lewat `echo`, dan tak boleh ada yang bisa menyandera tampilan fase.
-function recorded(file: string): Map<string, PhaseState> {
+function parseRecorded(raw: string): Map<string, PhaseState> {
   const out = new Map<string, PhaseState>();
-  let raw: string;
-  try { raw = readFileSync(file, "utf8"); } catch { return out; }
   for (const line of raw.split("\n")) {
     const trimmed = line.trimEnd();
     const i = trimmed.lastIndexOf(" ");
@@ -50,9 +49,31 @@ function recorded(file: string): Map<string, PhaseState> {
   return out;
 }
 
+function recorded(file: string): Map<string, PhaseState> {
+  let raw: string;
+  try { raw = readFileSync(file, "utf8"); } catch { return new Map(); }
+  return parseRecorded(raw);
+}
+
+// SPEC-1267 · pembacaan asinkron berkas fase, dimemo per (path, mtimeMs, size): jalur periodik
+// (overlay stage, poll fase, cek pane selesai) membaca berkas yang sama beberapa kali per tick, dan
+// berkas ini hampir tak pernah berubah. `stat` tetap dijalankan tiap panggilan sehingga perubahan
+// langsung terlihat.
+const phaseFileMemo = new Map<string, { mtimeMs: number; size: number; seen: Map<string, PhaseState> }>();
+async function recordedAsync(file: string): Promise<Map<string, PhaseState>> {
+  let st: Awaited<ReturnType<typeof stat>>;
+  try { st = await stat(file); } catch { phaseFileMemo.delete(file); return new Map(); }
+  const hit = phaseFileMemo.get(file);
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.seen;
+  let raw: string;
+  try { raw = await readFile(file, "utf8"); } catch { return new Map(); }
+  const seen = parseRecorded(raw);
+  phaseFileMemo.set(file, { mtimeMs: st.mtimeMs, size: st.size, seen });
+  return seen;
+}
+
 // Fase aktif diturunkan, tidak disimpan: yang pertama belum tercatat.
-export function readPhases(file: string, flow: Flow): Phase[] {
-  const seen = recorded(file);
+const derivePhases = (seen: Map<string, PhaseState>, flow: Flow): Phase[] => {
   let activeTaken = false;
   return PIPELINES[flow].map((name) => {
     const state = seen.get(name);
@@ -61,6 +82,12 @@ export function readPhases(file: string, flow: Flow): Phase[] {
     activeTaken = true;
     return { name, state: "active" as const };
   });
+};
+
+export const readPhases = (file: string, flow: Flow): Phase[] => derivePhases(recorded(file), flow);
+
+export async function readPhasesAsync(file: string, flow: Flow): Promise<Phase[]> {
+  return derivePhases(await recordedAsync(file), flow);
 }
 
 /**
@@ -183,6 +210,23 @@ export function planComplete(worktree: string, specId: string): boolean {
   return true;
 }
 
+// SPEC-1267 · padanan asinkron `planComplete` untuk jalur periodik: readdirSync/readFileSync
+// memblokir event loop yang sama dengan frame terminal. Semantik identik (UNION seluruh PLAN_DIRS).
+export async function planCompleteAsync(worktree: string, specId: string): Promise<boolean> {
+  const re = new RegExp(`(^|[^a-z0-9])${specId.toLowerCase()}([^0-9]|$)`);
+  for (const rel of PLAN_DIRS) {
+    const dir = `${worktree}/${rel}`;
+    let names: string[];
+    try { names = await readdir(dir); } catch { continue; }
+    for (const n of names) {
+      if (!re.test(n.toLowerCase())) continue;
+      try { if (/^[ \t]*- \[ \]/m.test(await readFile(`${dir}/${n}`, "utf8"))) return false; }
+      catch { /* file lenyap saat dibaca — abaikan */ }
+    }
+  }
+  return true;
+}
+
 // SPEC-433 · "pekerjaan selesai" adalah fakta yang BERDIRI SENDIRI di sebelah "pane mati".
 // `exited` (⇐ `#{pane_dead}`) menjawab "prosesnya sudah mati?", dan agen hanoman adalah TUI
 // interaktif yang kembali ke prompt-nya sesudah fase terakhir — jadi di jalur sukses pane tak
@@ -219,5 +263,11 @@ export function sessionComplete(phases: Phase[], worktree: string, specId?: stri
 export function stageForRun(phases: Phase[], worktree: string, specId: string): Stage | null {
   const s = stageFor(phases);
   if (s === "done" && !planComplete(worktree, specId)) return "executing";
+  return s;
+}
+
+export async function stageForRunAsync(phases: Phase[], worktree: string, specId: string): Promise<Stage | null> {
+  const s = stageFor(phases);
+  if (s === "done" && !(await planCompleteAsync(worktree, specId))) return "executing";
   return s;
 }

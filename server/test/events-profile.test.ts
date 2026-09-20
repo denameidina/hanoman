@@ -17,8 +17,8 @@ describe("events-profile", () => {
     const m = await import("../src/services/events-profile");
     const t0 = m.profStart();
     m.profEnd("specs", t0, 1234, true);
-    expect(m.__snapshot().specs.frames).toBe(1);
-    expect(m.__snapshot().specs.bytes).toBe(1234);
+    expect(m.__snapshot().specs!.frames).toBe(1);
+    expect(m.__snapshot().specs!.bytes).toBe(1234);
     delete process.env.HANOMAN_EVENTS_PROFILE;
   });
 });

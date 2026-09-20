@@ -1,16 +1,13 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { prisma } from "../src/db";
 import { liveSpecs } from "../src/services/live-specs";
-import { sessionPhasesBySpec } from "../src/services/pty";
+import { sessionPhasesBySpecAsync } from "../src/services/live-phases";
 import { makeRepoWithBranches } from "./factory";
 import { spawnSync } from "node:child_process";
 
-// Overlay stage-live membaca tmux nyata; di test tak ada pane. Mock hanya sessionPhasesBySpec
+// Overlay stage-live membaca tmux nyata; di test tak ada pane. Mock hanya sessionPhasesBySpecAsync
 // (sisanya asli) — pola yang sama dengan specs.route.test.ts.
-vi.mock("../src/services/pty", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/services/pty")>();
-  return { ...actual, sessionPhasesBySpec: vi.fn(() => new Map()) };
-});
+vi.mock("../src/services/live-phases", () => ({ sessionPhasesBySpecAsync: vi.fn(async () => new Map()) }));
 
 const clean = async () => { await prisma.spec.deleteMany(); await prisma.project.deleteMany(); };
 beforeEach(clean); afterAll(clean);
@@ -28,7 +25,7 @@ describe("liveSpecs · merekam headSha saat stage maju ke done (SPEC-475)", () =
     await seed("SPEC-LH1");
     const wt = makeRepoWithBranches();
     const expected = spawnSync("git", ["rev-parse", "HEAD"], { cwd: wt, encoding: "utf8" }).stdout.trim();
-    vi.mocked(sessionPhasesBySpec).mockReturnValueOnce(
+    vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(
       new Map([["SPEC-LH1", { phases: [{ name: "Execute", state: "done" }], cwd: wt }]]) as never);
     await liveSpecs({ project: "plh" });
     const row = await prisma.spec.findUnique({ where: { id: "SPEC-LH1" } });
@@ -41,7 +38,7 @@ describe("liveSpecs · merekam headSha saat stage maju ke done (SPEC-475)", () =
   it("kemajuan ke stage non-done tak menyentuh headSha", async () => {
     await seed("SPEC-LH2", "brainstorming");
     const wt = makeRepoWithBranches();
-    vi.mocked(sessionPhasesBySpec).mockReturnValueOnce(
+    vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(
       new Map([["SPEC-LH2", { phases: [{ name: "Plan", state: "done" }], cwd: wt }]]) as never);
     await liveSpecs({ project: "plh" });
     const row = await prisma.spec.findUnique({ where: { id: "SPEC-LH2" } });

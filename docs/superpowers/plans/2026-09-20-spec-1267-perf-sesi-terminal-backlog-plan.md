@@ -140,7 +140,7 @@ git commit -m "perf(events): instrumen HANOMAN_EVENTS_PROFILE + baseline SPEC-12
 **Interfaces:**
 - Produces: `zSpecListItem`, `type SpecListItem = z.infer<typeof zSpecListItem>`, `zSpecSlim`, `type SpecSlim`; frame `{ t: "specs"; specs: SpecSlim[] }`.
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
 
 ```ts
 import { zSpec, zSpecListItem, zSpecSlim } from "../src/entities";
@@ -155,8 +155,8 @@ it("SpecSlim tanpa objective; dependsOn/blockedBy dipertahankan bila ada di zSpe
 });
 ```
 
-- [ ] **Step 2:** `pnpm vitest --run shared/test/spec-slim.test.ts` → FAIL.
-- [ ] **Step 3: Implementasi**
+- [x] **Step 2:** `pnpm vitest --run shared/test/spec-slim.test.ts` → FAIL.
+- [x] **Step 3: Implementasi**
 
 ```ts
 export const zSpecListItem = zSpec.omit({ payload: true, sourceHistory: true });
@@ -165,8 +165,8 @@ export const zSpecSlim = zSpecListItem.omit({ objective: true });
 export type SpecSlim = z.infer<typeof zSpecSlim>;
 ```
 Ubah `dto.ts:816` menjadi `specs: SpecSlim[]`. Bila `zSpec` bukan `ZodObject` langsung (mis. `.extend`/refine), sesuaikan `.omit` pada objek dasarnya. Jalankan `pnpm --filter shared build` bila paket mengekspor dari `dist`.
-- [ ] **Step 4:** test lulus.
-- [ ] **Step 5: Commit** `feat(shared): SpecListItem/SpecSlim, frame specs ringkas`. (Tipe klien/server yang pecah dibetulkan di Task 2-5; commit ini boleh dibarengi sekadar cast sementara TIDAK boleh — jika compile pecah, satukan dengan Task 2 di commit yang sama.)
+- [x] **Step 4:** test lulus.
+- [x] **Step 5: Commit** `feat(shared): SpecListItem/SpecSlim, frame specs ringkas`. (Tipe klien/server yang pecah dibetulkan di Task 2-5; commit ini boleh dibarengi sekadar cast sementara TIDAK boleh — jika compile pecah, satukan dengan Task 2 di commit yang sama.)
 
 ---
 
@@ -186,7 +186,7 @@ Ubah `dto.ts:816` menjadi `specs: SpecSlim[]`. Bila `zSpec` bukan `ZodObject` la
   - `liveSpecs(filter)` = `await liveOverlayTick(); return listSpecsLive(filter)` (perilaku tak berubah)
 - Consumes: `sessionPhasesBySpec()` sinkron dulu (diasyncan di Task 6; tulis lewat satu fungsi lokal `phases()` agar Task 6 mengganti satu titik).
 
-- [ ] **Step 1: Test gagal** (pakai helper DB test yang dipakai `specs.route.test.ts`)
+- [x] **Step 1: Test gagal** (pakai helper DB test yang dipakai `specs.route.test.ts`)
 
 ```ts
 it("digest berubah saat update/tambah/hapus, tetap saat diam", async () => {
@@ -207,13 +207,13 @@ it("listSpecsSlim tak memuat payload/objective/sourceHistory", async () => {
 it("liveOverlayTick memajukan stage + persist walau tak ada yang memanggil listSpecs", async () => {
   // gunakan mock sessionPhasesBySpec persis seperti test 'advances + persists off-page' di specs.route.test.ts
 });
-it("liveSignature berubah saat plan berhenti memuat '- [ ]' (AC-S7)", async () => { /* tulis berkas plan di tmp cwd, ubah, bandingkan */ });
+it("liveSignature berubah saat plan berhenti memuat '- [x]' (AC-S7)", async () => { /* tulis berkas plan di tmp cwd, ubah, bandingkan */ });
 it("digest melempar → cabang pemanggil fail-open (diuji di Task 4)", () => {});
 ```
 Isi placeholder komentar di atas dengan mock nyata sesuai pola test SPEC-199 yang ada (salin mock-nya; jangan biarkan kosong).
 
-- [ ] **Step 2:** jalankan → FAIL.
-- [ ] **Step 3: Implementasi**
+- [x] **Step 2:** jalankan → FAIL.
+- [x] **Step 3: Implementasi**
   - Ekstrak inti overlay menjadi `applyOverlay(specs, live)` murni (mengembalikan `{out, advanced, doneNow}`).
   - `liveOverlayTick`: `live = await phases()`; bila `live.size===0` return; `findMany({where:{id:{in:[...live.keys()]}}})`; hitung advanced; jalankan blok write-through CAS + `recordHeadSha` + `notifySynced` + `recordCompletion` yang SAMA persis dengan kode lama (pindahkan, jangan tulis ulang logikanya).
   - `listSpecsLive`: `findMany` + sort `specNum` + `applyOverlay` baca-saja + `decorateBlocked`.
@@ -221,8 +221,8 @@ Isi placeholder komentar di atas dengan mock nyata sesuai pola test SPEC-199 yan
   - `specsDigest`: `aggregate({_count:{_all:true}, _max:{updatedAt:true}, _sum:{version:true}})` → `sha1(`${count}:${max?.getTime()??0}:${sum??0}|${await liveSignature()}`)`.
   - `liveSignature`: dari `phases()` urut `specId`; `${specId}:${faseAktif}` + bila fase akhir `done` → `:${mtimeMs}:${size}` berkas plan (pakai `fs/promises.stat`, di-try/catch → `:0:0`). Gunakan helper gerbang plan di `session-phases.ts:176` untuk lokasi plan.
   - `liveSpecs` = komposisi.
-- [ ] **Step 4:** `pnpm vitest --run --no-file-parallelism server/test/live-specs-split.test.ts server/test/specs.route.test.ts` → semua PASS (test lama tanpa edit).
-- [ ] **Step 5: Commit** `refactor(specs): pecah liveSpecs jadi overlay tick + penyajian + digest` (sertakan perubahan Task 1 bila terpisah membuat compile pecah).
+- [x] **Step 4:** `pnpm vitest --run --no-file-parallelism server/test/live-specs-split.test.ts server/test/specs.route.test.ts` → semua PASS (test lama tanpa edit).
+- [x] **Step 5: Commit** `refactor(specs): pecah liveSpecs jadi overlay tick + penyajian + digest` (sertakan perubahan Task 1 bila terpisah membuat compile pecah).
 
 ---
 

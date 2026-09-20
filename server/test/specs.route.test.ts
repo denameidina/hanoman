@@ -2,18 +2,16 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "../src/app";
-import { killAll, getSession, sessionPhasesBySpec } from "../src/services/pty";
+import { killAll, getSession } from "../src/services/pty";
+import { sessionPhasesBySpecAsync } from "../src/services/live-phases";
 import { prisma } from "../src/db";
 import { resetDb, makeProject, makeSpec, makeRepoWithBranches, makeTempRepo, makeRepoWithWorktree, makeRepoWithSpecCommits, makeRepoWithSpecBranch } from "./factory";
 import { setConfig, clearConfig } from "../src/config";
 
 // SPEC-198 · overlay stage-live baca tmux nyata; di test tak ada pane. Mock hanya
-// sessionPhasesBySpec (sisanya asli) — default Map kosong = perilaku identik dgn env test
+// sessionPhasesBySpecAsync (sisanya asli) — default Map kosong = perilaku identik dgn env test
 // tanpa sesi. Satu test memakainya untuk membuktikan write-through jalan atas SET PENUH.
-vi.mock("../src/services/pty", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/services/pty")>();
-  return { ...actual, sessionPhasesBySpec: vi.fn(() => new Map()) };
-});
+vi.mock("../src/services/live-phases", () => ({ sessionPhasesBySpecAsync: vi.fn(async () => new Map()) }));
 
 const FAKE_CLAUDE = fileURLToPath(new URL("./fixtures/fake-claude.sh", import.meta.url));
 const app = buildApp({ requireAuth: false });
@@ -119,7 +117,7 @@ describe("specs routes", () => {
     await makeSpec({ id: "SPEC-500", projectId: "ppage", stage: "brainstorming" });
     // Sesi live (mock) memajukan SPEC-500 brainstorming → planned. stageForRun tak menggerbang
     // stage non-`done` dgn plan, jadi cwd palsu cukup.
-    vi.mocked(sessionPhasesBySpec).mockReturnValueOnce(
+    vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(
       new Map([["SPEC-500", { phases: [{ name: "Plan", state: "done" }], cwd: "/tmp/none" }]]) as any);
     // id desc → SPEC-501 di halaman 1; limit=1 menaruh SPEC-500 DI LUAR halaman.
     const res = await app.inject({ url: "/api/specs?project=ppage&page=1&limit=1" });
@@ -137,7 +135,7 @@ describe("specs routes", () => {
     try {
       await makeProject({ id: "psync", repoDir: makeTempRepo({}) });
       await makeSpec({ id: "SPEC-267A", projectId: "psync", stage: "brainstorming" });
-      vi.mocked(sessionPhasesBySpec).mockReturnValueOnce(
+      vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(
         new Map([["SPEC-267A", { phases: [{ name: "Plan", state: "done" }], cwd: "/tmp/none" }]]) as any);
       await app.inject({ url: "/api/specs?project=psync" });
       const out = await prisma.syncOutbox.findMany();
