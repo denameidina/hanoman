@@ -5,15 +5,15 @@ import { TerminalPane } from "../src/screens/TerminalPane";
 
 // SPEC-1267 · kontrak perf pane: ring pane tersembunyi, WebGL + fallback, timer prediksi, resize.
 const xt = vi.hoisted(() => ({
-  written: [] as string[], resets: 0, options: {} as Record<string, unknown>,
+  written: [] as string[], resets: 0, textarea: undefined as HTMLTextAreaElement | undefined, options: {} as Record<string, unknown>,
   resize: undefined as ((e: ResizeObserverEntry[]) => void) | undefined,
   webgl: { throwOnLoad: false, disposed: 0, contextLoss: undefined as (() => void) | undefined },
 }));
 
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
-    cols = 80; rows = 24; options: Record<string, unknown>;
-    constructor(o: Record<string, unknown>) { this.options = { ...o }; xt.options = this.options; }
+    cols = 80; rows = 24; options: Record<string, unknown>; textarea = document.createElement("textarea");
+    constructor(o: Record<string, unknown>) { this.options = { ...o }; xt.options = this.options; xt.textarea = this.textarea; }
     loadAddon(a: { activate?: () => void }): void { a.activate?.(); }
     open(): void {} focus(): void {}
     write(d: string, cb?: () => void): void { xt.written.push(d); cb?.(); }
@@ -82,5 +82,32 @@ describe("pane tersembunyi (SPEC-1267 · AC-S26)", () => {
     expect(xt.resets).toBe(1);
     expect(sockets[0]!.closed).toBe(1);
     expect(xt.written).toEqual([]);
+  });
+});
+
+describe("renderer & kursor (SPEC-1267 · AC-S27/S28)", () => {
+  it("WebGL gagal dimuat: pane tetap hidup (DOM renderer) dan addon di-dispose sekali", async () => {
+    xt.webgl.throwOnLoad = true;
+    render(<TerminalPane sessionId="s" onExit={() => {}} />);
+    await connected();
+    expect(xt.webgl.disposed).toBe(1);
+  });
+
+  it("konteks WebGL hilang: addon di-dispose dan pane tetap hidup", async () => {
+    render(<TerminalPane sessionId="s" onExit={() => {}} />);
+    await connected();
+    expect(xt.webgl.disposed).toBe(0);
+    xt.webgl.contextLoss?.();
+    expect(xt.webgl.disposed).toBe(1);
+  });
+
+  it("cursorBlink mati kecuali pane fokus", async () => {
+    render(<TerminalPane sessionId="s" onExit={() => {}} />);
+    await connected();
+    expect(xt.options.cursorBlink).toBe(false);
+    xt.textarea!.dispatchEvent(new Event("focus"));
+    expect(xt.options.cursorBlink).toBe(true);
+    xt.textarea!.dispatchEvent(new Event("blur"));
+    expect(xt.options.cursorBlink).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import React from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
@@ -104,7 +105,7 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const token = (n: string, fallback: string) => css.getPropertyValue(n).trim() || fallback;
     const term = new Terminal({
       fontFamily: token("--font-mono", "monospace"),
-      fontSize: clampFontSize(fontSizeRef.current), cursorBlink: true,
+      fontSize: clampFontSize(fontSizeRef.current), cursorBlink: false,
       // SPEC-511 · tmux lahir dengan `mouse on` (SPEC-209) supaya wheel browser menggulir riwayat
       // pane; harganya, tmux menyalakan mouse-reporting di terminal klien (terukur: `?1000h`
       // `?1002h` `?1006h`) — dan xterm memanggil `SelectionService.disable()` begitu ada protokol
@@ -118,6 +119,15 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
+    // SPEC-1267 · renderer WebGL menggantikan DOM renderer; gagal (tak ada GPU/konteks hilang) →
+    // kembali ke DOM renderer bawaan tanpa mengganggu pengguna.
+    let webgl: WebglAddon | undefined;
+    const dropWebgl = () => { webgl?.dispose(); webgl = undefined; };
+    try {
+      webgl = new WebglAddon();
+      webgl.onContextLoss(dropWebgl);
+      term.loadAddon(webgl);
+    } catch { dropWebgl(); }
     const visibleRect = () => {
       const rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0 ? rect : null;
@@ -444,6 +454,11 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
     const ta = term.textarea;
     const onDiagKey = (e: KeyboardEvent) => rec("key", e.key, e.keyCode);
     const onDiagComp = (e: Event) => rec("comp", `${e.type}:${D.showBytes((e as CompositionEvent).data ?? "")}`);
+    // SPEC-1267 · kursor berkedip memaksa repaint terus-menerus: hanya pane yang fokus.
+    const onFocusIn = () => { term.options.cursorBlink = true; };
+    const onFocusOut = () => { term.options.cursorBlink = false; };
+    ta?.addEventListener("focus", onFocusIn);
+    ta?.addEventListener("blur", onFocusOut);
     ta?.addEventListener("keydown", onDiagKey);
     ta?.addEventListener("compositionstart", onDiagComp);
     ta?.addEventListener("compositionupdate", onDiagComp);
@@ -561,6 +576,8 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       clearInterval(ttl);
       batcher.dispose();
       diagRec.dispose();
+      ta?.removeEventListener("focus", onFocusIn);
+      ta?.removeEventListener("blur", onFocusOut);
       ta?.removeEventListener("keydown", onDiagKey);
       ta?.removeEventListener("compositionstart", onDiagComp);
       ta?.removeEventListener("compositionupdate", onDiagComp);
