@@ -276,3 +276,5 @@ legacy; ia bukan konfigurasi deploy. Lihat [security-standard](../security/secur
 Biaya bersifat **estimasi dan tidak menggerakkan apa pun** (ADR-0012): tidak ada `dailyBudget`, tidak ada
 budget flag. Indikator limit dibaca langsung dari OAuth usage API Anthropic (`services/limits.ts`,
 ADR-0024), bukan dari parsing output terminal.
+
+**Mulai ulang manual di dashboard** (`UpdateIndicator`, `waitForServerBack` di `src/src/api/update.ts`). Sesudah `POST /api/restart` → `202`, klien memoll `/api/health` sampai server terlihat mati lalu hidup lagi (atau ≥3 dtk), lalu memuat ulang tab; lewat 90 dtk ia menampilkan pesan gagal. Restart manual tak mengganti versi sehingga tak ada drift yang memicu badge "muat ulang" — sebelumnya popover diam selamanya di "Menjalankan ulang…" dan tab memegang bundle serta koneksi lama.
