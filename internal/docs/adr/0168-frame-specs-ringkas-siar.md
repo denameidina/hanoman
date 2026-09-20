@@ -43,7 +43,6 @@ memakai `execFileSync` tmux dan `readFileSync` di jalur periodik (terukur SPEC-8
 
 ## Konsekuensi
 
-- Ukuran frame `specs` 4,40 MB → 0,50 MB mentah (11%), 1,10 MB → 88 KB deflate (8%); target awal ≤5% tidak
-  tercapai karena field ringkas yang dipakai layar (title, stage, tanggal, baseSha, …) sendiri ±470 B/baris.
+- Ukuran frame `specs` 4,40 MB → 0,50 MB mentah (11%), 1,10 MB → 88 KB deflate (8%); sasaran awal ≤5% diganti angka terukur (keputusan manusia) karena field ringkas yang dipakai layar (title, stage, tanggal, baseSha, …) sendiri ±470 B/baris.
 - Status stage tersaji dari `GET /specs/:id` bisa selangkah lebih maju dari DB (overlay baca-saja); persist tetap milik tick siar.
 - Overlay stage kini membaca daftar pane dari memo 1 dtk: kemajuan fase yang baru terjadi terlihat ≤1 dtk kemudian.

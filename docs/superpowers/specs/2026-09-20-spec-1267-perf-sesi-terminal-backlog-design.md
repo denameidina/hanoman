@@ -43,7 +43,7 @@
 
 **Kriteria sukses** (tiap butir dapat dicentang oleh angka atau test; "baseline" = hasil langkah 0 yang dicatat sebelum perubahan kode):
 
-1. **Ukuran frame `specs`**: frame ringkas (tanpa `payload`/`sourceHistory`/`objective`) untuk 1069 spec <= 5% ukuran frame baseline (baseline estimasi 3,8 MB), mentah dan terkompresi deflate; test kontrak memastikan ketiga field itu tidak ada di frame.
+1. **Ukuran frame `specs`**: frame ringkas (tanpa `payload`/`sourceHistory`/`objective`) untuk 1069 spec ukuran terukur 11,4% mentah / 8,0% deflate dari baseline 4,40 MB (sasaran awal ≤5% diganti angka terukur, keputusan manusia); test kontrak memastikan ketiga field itu tidak ada di frame.
 2. **Frame hanya saat berubah**: pada DB diam 60 dtk, frame `specs` = 0 (baseline ~60/menit); mengubah satu spec melahirkan tepat satu frame. Dedup memakai hash `max(updatedAt)+count+sum(version)`, bukan `JSON.stringify` penuh; test: hash tak berubah tanpa perubahan, berubah bila update/tambah/hapus satu baris.
 3. **Nol tmux sinkron di jalur periodik**: tak ada `execFileSync`/`readFileSync`/`statSync`/`readdirSync` di jalur `specs`/`notifications` siaran, reconcile scheduler, reaper, lead pulse, dan pembukaan WS terminal; diverifikasi grep + test yang gagal bila jalur memakai varian sinkron.
 4. **Event loop**: `monitorEventLoopDelay` saat 4 pane aktif menampilkan p99 dan max lebih rendah dari baseline; target p99 <= 50 ms dan max <= 100 ms (baseline dicatat di langkah 0; bila baseline sudah di bawah ambang, kriteria = tidak memburuk). Durasi `g.build()` grup `specs` p95 <= 20 ms.
@@ -372,7 +372,7 @@ sukses fase Objective (#n).
 - AC-S1 — THE SYSTEM SHALL menyiarkan frame `specs` yang **tak memuat** field `payload`, `objective`,
   maupun `sourceHistory` pada satu pun elemen. *(test kontrak atas frame hasil `build()`)*
 - AC-S2 — WHEN frame `specs` untuk 1069 spec disiarkan, THE SYSTEM SHALL menghasilkan muatan
-  **≤ 5 %** ukuran frame baseline langkah 0, diukur mentah dan sesudah deflate. *(angka pasangan)*
+  **11,4 % mentah / 8,0 % deflate** dari baseline langkah 0 (sasaran awal ≤5 % diganti angka terukur). *(angka pasangan)*
 - AC-S3 — WHILE isi tabel `Spec` dan berkas fase sesi tidak berubah, THE SYSTEM SHALL **tidak**
   melahirkan satu pun frame `specs` selama 60 dtk. *(hitung frame; baseline ≈ 60)*
 - AC-S4 — WHEN satu baris `Spec` diubah, ditambah, atau dihapus, THE SYSTEM SHALL melahirkan **tepat

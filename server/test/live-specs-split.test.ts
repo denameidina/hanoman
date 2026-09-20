@@ -48,6 +48,19 @@ describe("listSpecsSlim", () => {
     expect(rows[0]!.id).toBe("SPEC-1");
   });
 
+  it("cache baris mengikuti update, tambah, dan hapus", async () => {
+    await makeSpec({ id: "SPEC-1", title: "a" });
+    await makeSpec({ id: "SPEC-2" });
+    expect((await listSpecsSlim()).map((r) => r.id)).toEqual(["SPEC-2", "SPEC-1"]);
+    await new Promise((r) => setTimeout(r, 5));
+    await prisma.spec.update({ where: { id: "SPEC-1" }, data: { title: "b" } });
+    expect((await listSpecsSlim()).find((r) => r.id === "SPEC-1")!.title).toBe("b");
+    await makeSpec({ id: "SPEC-3" });
+    expect((await listSpecsSlim()).map((r) => r.id)).toEqual(["SPEC-3", "SPEC-2", "SPEC-1"]);
+    await prisma.spec.delete({ where: { id: "SPEC-2" } });
+    expect((await listSpecsSlim()).map((r) => r.id)).toEqual(["SPEC-3", "SPEC-1"]);
+  });
+
   it("stage live tersaji tanpa menulis DB", async () => {
     await makeSpec({ id: "SPEC-1", stage: "brainstorming" });
     vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(

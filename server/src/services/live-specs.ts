@@ -33,7 +33,12 @@ const LIST_SELECT = selectOf(zSpecListItem.shape);
 
 const phases = (): Promise<LivePhases> => sessionPhasesBySpecAsync().catch(() => new Map());
 
-const sortByNumber = <T extends { id: string }>(rows: T[]) => rows.sort((a, b) => specNum(b.id) - specNum(a.id));
+// Nomor dihitung sekali per baris (bukan dua kali per perbandingan): dengan ~1000 baris, regex di
+// dalam komparator menjadi bagian terbesar biaya penyajian.
+const sortByNumber = <T extends { id: string }>(rows: T[]) => {
+  const n = new Map(rows.map((r) => [r.id, specNum(r.id)]));
+  return rows.sort((a, b) => n.get(b.id)! - n.get(a.id)!);
+};
 
 type Slim = Parameters<typeof decorateBlocked>[0][number] & { id: string; stage: string; title: string };
 
@@ -46,6 +51,7 @@ type Advance = { id: string; from: Stage; stage: Stage; cwd: string };
 async function applyOverlay<T extends { id: string; stage: string; title: string; projectId: string }>(
   specs: T[], live: LivePhases,
 ): Promise<{ out: T[]; advanced: Advance[]; doneNow: { specId: string; title: string; projectId: string | null }[] }> {
+  if (live.size === 0) return { out: specs, advanced: [], doneNow: [] };
   const advanced: Advance[] = [];
   const doneNow: { specId: string; title: string; projectId: string | null }[] = [];
   const out = await Promise.all(specs.map(async (s) => {
@@ -106,7 +112,34 @@ async function listSelected(select: { id: true }, where: object = {}) {
   return decorateBlocked(out);
 }
 
-export const listSpecsSlim = () => listSelected(SLIM_SELECT) as unknown as Promise<SpecSlim[]>;
+// SPEC-1267 · decode Prisma atas ~1000 baris (±12 ms) adalah biaya terbesar build `specs`. Baris
+// ringkas disimpan per id dan tiap build hanya membaca yang `updatedAt`-nya menyusul; selisih jumlah
+// baris (hapus / id berganti) memaksa muat ulang penuh. Overlay stage & dependency tetap dihitung
+// ulang di atasnya karena keduanya bukan kolom.
+type SlimRow = { id: string; updatedAt: Date };
+let slimCache: { rows: Map<string, SlimRow>; max: Date } | null = null;
+
+async function slimRows(): Promise<SlimRow[]> {
+  const count = await prisma.spec.count();
+  if (slimCache) {
+    const changed = (await prisma.spec.findMany({
+      where: { updatedAt: { gte: slimCache.max } }, select: SLIM_SELECT,
+    })) as unknown as SlimRow[];
+    for (const r of changed) {
+      slimCache.rows.set(r.id, r);
+      if (r.updatedAt > slimCache.max) slimCache.max = r.updatedAt;
+    }
+    if (slimCache.rows.size === count) return [...slimCache.rows.values()];
+  }
+  const rows = (await prisma.spec.findMany({ select: SLIM_SELECT })) as unknown as SlimRow[];
+  slimCache = { rows: new Map(rows.map((r) => [r.id, r])), max: rows.reduce((m, r) => (r.updatedAt > m ? r.updatedAt : m), new Date(0)) };
+  return rows;
+}
+
+export async function listSpecsSlim(): Promise<SpecSlim[]> {
+  const { out } = await applyOverlay(sortByNumber(await slimRows()) as unknown as Slim[], await phases());
+  return (await decorateBlocked(out)) as unknown as SpecSlim[];
+}
 
 // Bentuk GET /specs: tanpa `payload`/`sourceHistory` dibaca dari DB sama sekali, `objective` tetap
 // ada karena filter `?q=` mencocokkannya dan grid/list menampilkannya.
