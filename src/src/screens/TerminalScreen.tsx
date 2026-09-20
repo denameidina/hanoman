@@ -528,7 +528,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = [], f
                           onSessionReview={onOpenSessionReview}
                           titleOf={titleOf} onIntegrate={onIntegrate} onIntegrateSession={onIntegrateSession} specOf={specOf}
                           fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
-                          fullscreen={fullId === s.id} onFullscreen={() => setFullId(s.id)} />
+                          fullscreen={fullId === s.id} onFullscreen={() => setFullId(s.id)}
+                          paneHidden={mobile && activeCell !== idx} />
                       : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
                   </div>
                 );
@@ -892,7 +893,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
   );
 }
 
-function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen }: {
+function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen, paneHidden }: {
   session: TerminalSession; nameOf: (pid: string) => string;
   onClose: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
   onReview?: (specId: string) => void;
@@ -902,7 +903,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
   onIntegrateSession?: (session: TerminalSession, op: "merge" | "rebase", target: string) => void;
   specOf?: (specId: string) => SpecSlim | undefined;
   fontSize: number; showKeys: boolean; predict: boolean; diag: boolean;
-  fullscreen: boolean; onFullscreen: () => void;
+  fullscreen: boolean; onFullscreen: () => void; paneHidden?: boolean;
 }) {
   const [phases, setPhases] = React.useState<Phase[] | null>(null);
   // SPEC-800 · yang menentukan bukan lebar viewport melainkan lebar SEL: grid 4 kolom di desktop
@@ -1112,7 +1113,7 @@ function Cell({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview
                 Terbuka di layar penuh
               </div>
             : <TerminalPane key={session.id} sessionId={session.id} onExit={onExit} onPhases={onPhases}
-                fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} />}
+                fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} hidden={paneHidden} />}
         </div>
       </div>
       {docs && session.specId && <SpecDocsModal specId={session.specId} onClose={() => setDocs(false)} />}

@@ -11,6 +11,7 @@ import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./te
 import * as P from "./terminal-predict";
 import * as D from "./terminal-diag";
 import { TerminalComposer } from "./TerminalComposer";
+import { createHiddenRing } from "../lib/hidden-ring";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
 // (per frame dan tiap 60 dtk), kuota pesan, restart server saat update (SPEC-405), jaringan mobile.
@@ -37,7 +38,7 @@ type LinkState =
   | { state: "retrying"; attempt: number };
 
 export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true, diag = false, mode = "local" }: {
+  predict = true, diag = false, mode = "local", hidden = false }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -55,6 +56,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   // geometri (frame `geometry` menggantikan `resize` yang kita kirim), dan tanpa `sessions:write`
   // pane jadi baca-saja — tak ada `onData`/composer/keys yang bisa mengetik ke pty orang lain.
   mode?: "local" | "remote";
+  // SPEC-1267 · pane display:none tak mem-parse keluaran: ditahan di ring 256 KB dan diputar ulang
+  // (atau digambar ulang tmux bila ring meluap) saat tampil kembali.
+  hidden?: boolean;
 }) {
   const wsTarget = useWsTarget(`terminal:${sessionId}`);
   const instance = useInstance();
@@ -68,6 +72,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
   predictRef.current = predict;
   const diagRef = React.useRef(diag);
   diagRef.current = diag;
+  const hiddenRef = React.useRef(hidden);
+  hiddenRef.current = hidden;
+  const ring = React.useRef(createHiddenRing());
+  const resync = React.useRef<() => void>(() => {});
   const view = React.useRef<{ term: Terminal; fit: FitAddon; send: (m: unknown) => void } | null>(null);
   // onExit boleh berubah tiap render; menaruhnya di ref menjaga effect ini
   // hanya bergantung pada sessionId — remount = sesi yang benar-benar berbeda.
@@ -292,7 +300,9 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
             t: string; d?: string; code?: number; phases?: Phase[]; complete?: boolean;
             on?: boolean; seq?: number; cols?: number; rows?: number;
           };
-          if (f.t === "data") {
+          if (f.t === "data" && hiddenRef.current) {
+            ring.current.push(f.d ?? "");
+          } else if (f.t === "data") {
             const r = P.onServerData(pred, f.d ?? "", Date.now());
             pred = r.state;
             const gen = pred.gen;
@@ -378,6 +388,10 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       setLink({ state: "retrying", attempt });
       timer = setTimeout(connect, wait);
     };
+
+    // Ring meluap = replay tak lengkap: layar dikosongkan lalu sambungan diulang supaya tmux
+    // menggambar ulang layar penuh (jalur attach yang sama dengan reconnect).
+    resync.current = () => { term.reset(); ws?.close(); };
 
     retryNow.current = () => {
       if (disposed) return;
@@ -556,6 +570,14 @@ export function TerminalPane({ sessionId, onExit, onPhases, fontSize = FONT_DEFA
       term.dispose();
     };
   }, [sessionId]);
+
+  React.useEffect(() => {
+    const current = view.current;
+    if (hidden || !current) return;
+    const { chunks, overflowed } = ring.current.drain();
+    if (overflowed) resync.current();
+    else for (const c of chunks) current.term.write(c);
+  }, [hidden]);
 
   // Ukuran font diterapkan tanpa me-remount: remount berarti socket baru, tiket baru, dan layar
   // kosong sampai tmux menggambar ulang. `cols`/`rows` PTY turunan ukuran font, jadi frame resize
