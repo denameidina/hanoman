@@ -74,6 +74,20 @@ export const guardSettings = (
       hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] }];
     hooks.SubagentStart = [{ hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] }];
     hooks.SubagentStop = [{ hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] }];
+    if (decisionFile) {
+      // Mode orkestrasi: pane utama diam selama subagent bekerja, lalu hook Notification "idle"
+      // ("waiting for your input") mengisi marker dan gerbang paneQuiet lolos → pil "Menunggu
+      // keputusan" palsu. Penghitung subagent hidup (satu baris per subagent, `<marker>.sub`)
+      // membuat Notification idle diabaikan selama ada subagent; izin/needs-input tetap menandai.
+      const sub = `'${decisionFile.split("'").join("'\\''")}.sub'`;
+      const f = `'${decisionFile.split("'").join("'\\''")}'`;
+      hooks.SubagentStart!.push({ hooks: [{ type: "command", command: `echo 1 >> ${sub}; exit 0` }] });
+      hooks.SubagentStop!.push({ hooks: [{ type: "command",
+        command: `[ -s ${sub} ] && { sed '$d' ${sub} > ${sub}.t; mv ${sub}.t ${sub}; }; exit 0` }] });
+      hooks.Notification = [{ hooks: [{ type: "command",
+        command: `m=$(cat); if [ -s ${sub} ]; then echo "$m" | grep -qiE 'permission|needs.?input'; else echo "$m" | grep -qiE 'idle|permission|waiting for|needs.?input'; fi && { [ -s ${f} ] || date +%s > ${f}; } || true` }] }];
+      hooks.UserPromptSubmit = [{ hooks: [{ type: "command", command: `: > ${f}; : > ${sub}` }] }];
+    }
   }
   // SPEC-332 · ADR-0073 · mode goal: mesin yang SAMA dipasang `/goal` di dalam sesi
   // (sessionHooksRegistry.add(cwd,"Stop","",{type:"prompt",prompt})), tapi dari luar dan saat sesi

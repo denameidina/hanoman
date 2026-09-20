@@ -628,6 +628,7 @@ function TitleButton({ spec, onOpenDetail, size = 15 }:
     <button onClick={() => onOpenDetail && onOpenDetail(spec)} style={{
       border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer",
       fontFamily: "var(--font-sans)", fontSize: size, fontWeight: 600, color: "var(--text-strong)",
+      overflowWrap: "anywhere",
     }}>
       {spec.title}
     </button>
@@ -687,12 +688,13 @@ function SpecRow({ spec, projectName, onStart, onDelete, onOpenRun, onOpenReview
   const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
   return (
     <div className="hn-backlog-row" style={{
-      display: "flex", alignItems: "center", gap: 14, padding: "12px 16px",
+      display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px 14px", padding: "12px 16px",
       borderBottom: "1px solid var(--border-hair)", background: "var(--surface-card)"
     }}>
       <Icon name={sourceMeta(spec.source).icon} size={15} color={sourceMeta(spec.source).color} />
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)", flex: "0 0 84px" }}>{spec.id}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      {/* Judul tak boleh diperas jadi kolom sempit: basis 320px, sisa meta turun ke baris berikutnya. */}
+      <div style={{ flex: "1 1 320px", minWidth: 240 }}>
         <TitleButton spec={spec} onOpenDetail={onOpenDetail} size={14} />
         <div style={{
           fontSize: 12, color: "var(--text-muted)", marginTop: 2, overflow: "hidden",

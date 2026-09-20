@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { guardSettings, EVENT_HOOK_COMMAND } from "../src/settings";
@@ -105,5 +105,23 @@ describe("guardSettings · subagentStatusLine (ADR-0164)", () => {
   it("dengan command: kunci subagentStatusLine bertipe command", () => {
     expect(guardSettings(undefined, undefined, true, 'node "/t/s.cjs" "/t/m.json"').subagentStatusLine)
       .toEqual({ type: "command", command: 'node "/t/s.cjs" "/t/m.json"' });
+  });
+
+  it("orkestrasi: Notification idle diabaikan selama ada subagent hidup; izin tetap menandai", () => {
+    const dir = mkdtempSync(join(tmpdir(), "dec-"));
+    const f = join(dir, "s1");
+    const h = guardSettings(f, undefined, true).hooks as Record<string, any[]>;
+    const run = (cmd: string, input = "") => { try { execFileSync("sh", ["-c", cmd], { input }); } catch { /* exit != 0 */ } };
+    const notif = h.Notification![0].hooks[0].command, start = h.SubagentStart![1].hooks[0].command,
+      stop = h.SubagentStop![1].hooks[0].command;
+    run(start);
+    run(notif, "Claude is waiting for your input");
+    expect(existsSync(f)).toBe(false);
+    run(notif, "Claude needs your permission to use Bash");
+    expect(readFileSync(f, "utf8").length).toBeGreaterThan(0);
+    run(h.UserPromptSubmit![0].hooks[0].command);
+    run(stop);
+    run(notif, "Claude is waiting for your input");
+    expect(readFileSync(f, "utf8").length).toBeGreaterThan(0);
   });
 });
