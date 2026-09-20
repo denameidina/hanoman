@@ -37,6 +37,26 @@
 5. **Instrumen** `HANOMAN_EVENTS_PROFILE=1` dipasang dan dipertahankan sebagai diagnostik (nol biaya saat mati).
 6. **Cakupan Execute** = langkah 0-7 seluruhnya (termasuk backpressure, klien terminal, dan verifikasi akhir baseline vs sesudah).
 
+## Objective
+
+**Objective (satu, terukur).** Di Backlog dengan 4 pane terminal aktif dan DB lokal 1069 spec, terminal tetap responsif: jalur siaran periodik tidak lagi memblokir event loop dan frame `specs` kecil serta hanya lahir saat isinya berubah, dibuktikan oleh angka baseline (langkah 0) versus sesudah (langkah 7), diukur di skenario, DB, dan mesin yang sama dengan instrumen `HANOMAN_EVENTS_PROFILE=1`.
+
+**Kriteria sukses** (tiap butir dapat dicentang oleh angka atau test; "baseline" = hasil langkah 0 yang dicatat sebelum perubahan kode):
+
+1. **Ukuran frame `specs`**: frame ringkas (tanpa `payload`/`sourceHistory`/`objective`) untuk 1069 spec <= 5% ukuran frame baseline (baseline estimasi 3,8 MB), mentah dan terkompresi deflate; test kontrak memastikan ketiga field itu tidak ada di frame.
+2. **Frame hanya saat berubah**: pada DB diam 60 dtk, frame `specs` = 0 (baseline ~60/menit); mengubah satu spec melahirkan tepat satu frame. Dedup memakai hash `max(updatedAt)+count+sum(version)`, bukan `JSON.stringify` penuh; test: hash tak berubah tanpa perubahan, berubah bila update/tambah/hapus satu baris.
+3. **Nol tmux sinkron di jalur periodik**: tak ada `execFileSync`/`readFileSync`/`statSync`/`readdirSync` di jalur `specs`/`notifications` siaran, reconcile scheduler, reaper, lead pulse, dan pembukaan WS terminal; diverifikasi grep + test yang gagal bila jalur memakai varian sinkron.
+4. **Event loop**: `monitorEventLoopDelay` saat 4 pane aktif menampilkan p99 dan max lebih rendah dari baseline; target p99 <= 50 ms dan max <= 100 ms (baseline dicatat di langkah 0; bila baseline sudah di bawah ambang, kriteria = tidak memburuk). Durasi `g.build()` grup `specs` p95 <= 20 ms.
+5. **Klien tanpa refetch/re-render per frame tak berubah**: dalam 60 dtk tanpa perubahan data, `GET /specs` = 0 (baseline ~60/menit) dan `dataVersion` tidak naik; test unit atas fungsi dedup klien (id, version, updatedAt sama = tanpa naik).
+6. **Detail via HTTP, tanpa regresi**: dialog, Change Source, audit backlink (`App.tsx:1277-1303`), dan `BacklogScreen.tsx:164,249,391` memuat detail lewat `GET /specs/:id`; `backlogById` tidak menimpa hasil HTTP dengan item frame ringkas (test merge hanya field ringkas).
+7. **Langganan `sessions` tunggal dan `presence` terdedup**: satu pemrosesan frame `sessions` di klien; frame `presence` tidak lahir bila hanya `lastSeenAt` device lokal yang berubah.
+8. **Terminal**: kadens `specs` 1 dtk -> 3 dtk hanya bila kriteria 4 belum tercapai setelah langkah 1-3 (keputusan #4); backpressure `bufferedAmount` pada kirim terminal tanpa memutus coalescing PTY 16 ms/cap 64 KB; klien terminal (WebGL fallback DOM, cursorBlink pane fokus, pane tersembunyi dijeda, `React.memo`, ticker PhaseStrip bersama, timer 100 ms bersyarat, debounce+dedup resize) menurunkan CPU renderer 4 pane dibanding baseline di profil Chrome.
+9. **Bukti akhir**: tabel baseline vs sesudah (durasi build per grup, lag event loop, frame `specs`/menit, GET /specs/menit, ukuran frame, CPU renderer 1 vs 4 pane) tercatat; tak ada klaim perbaikan tanpa angka pasangan.
+10. **Invarian terjaga**: coalescing PTY 16 ms/cap 64 KB, satu WS events ref-count, IMMEDIATE_PER_MIN/MAX_INFLIGHT, dan dedup siaran tetap; tak ada perubahan skema DB; test tersentuh hijau (`pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism`, DB terisolasi) dan API nyata dicoba di local (boot server, curl `GET /specs`, `GET /specs/:id`).
+11. **Docs**: `internal/docs/architecture/stack.md`, `internal/skills/hanoman/SKILL.md`, dan ADR baru (amandemen ADR-0039/0145, memuat dampak klien lama tanpa kompatibilitas, keputusan #2) diperbarui di commit yang sama dan ditautkan di `internal/docs/README.md`.
+
+**Di luar objective**: diff per baris (C), penanda kapabilitas/versi frame, perubahan skema DB, PTY coalescing.
+
 ## Keputusan terbuka
 
 -
