@@ -5,7 +5,10 @@ import { liveSpecs } from "../src/services/live-specs";
 import { completeSpecManually } from "../src/services/spec-complete";
 import { resetDb, makeProject, makeSpec } from "./factory";
 
-vi.mock("../src/services/live-phases", () => ({ sessionPhasesBySpecAsync: vi.fn(async () => new Map()) }));
+vi.mock("../src/services/live-phases", async (orig) => ({
+  ...(await orig<typeof import("../src/services/live-phases")>()),
+  sessionPhasesBySpecAsync: vi.fn(async () => new Map()),
+}));
 
 beforeEach(async () => {
   await resetDb();

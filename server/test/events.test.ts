@@ -17,7 +17,10 @@ function fakeClient() {
   const frames: { t: string; [k: string]: unknown }[] = [];
   return { frames, send: (m: string) => frames.push(JSON.parse(m)), close: () => {} };
 }
-vi.mock("../src/services/live-phases", () => ({ sessionPhasesBySpecAsync: vi.fn(async () => new Map()) }));
+vi.mock("../src/services/live-phases", async (orig) => ({
+  ...(await orig<typeof import("../src/services/live-phases")>()),
+  sessionPhasesBySpecAsync: vi.fn(async () => new Map()),
+}));
 
 const groups = (c: ReturnType<typeof fakeClient>) => new Set(c.frames.map((f) => f.t));
 

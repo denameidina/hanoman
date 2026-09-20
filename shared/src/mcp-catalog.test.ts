@@ -75,12 +75,11 @@ describe("katalog tool MCP", () => {
       .toEqual(["dependsOn", "payload", "priority", "spec", "title"]);
   });
 
-  it("backlog_get mencocokkan id PERSIS, bukan substring q", () => {
+  it("backlog_get membaca GET /specs/:id (detail penuh), bukan daftar", () => {
     const t = byName("hanoman_backlog_get");
-    const raw = { items: [{ id: "SPEC-4820", stage: "done" }, { id: "SPEC-482", stage: "planned" }], total: 2, page: 1, pageSize: 50 };
-    expect((t.shape(raw, { spec: "SPEC-482" }) as { id: string }).id).toBe("SPEC-482");
-    expect(t.shape({ items: [], total: 0, page: 1, pageSize: 50 }, { spec: "SPEC-999" }))
-      .toMatchObject({ error: expect.stringContaining("SPEC-999") });
+    expect(t.build({ spec: " SPEC-482 " })).toMatchObject({ method: "GET", path: "/specs/SPEC-482" });
+    expect(t.shape({ id: "SPEC-482", stage: "planned", payload: { context: "c" } }, { spec: "SPEC-482" }))
+      .toMatchObject({ id: "SPEC-482", stage: "planned" });
   });
 
   it("versi skema tool ada dan disebut di instructions", () => {

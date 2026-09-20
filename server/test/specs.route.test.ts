@@ -11,7 +11,10 @@ import { setConfig, clearConfig } from "../src/config";
 // SPEC-198 · overlay stage-live baca tmux nyata; di test tak ada pane. Mock hanya
 // sessionPhasesBySpecAsync (sisanya asli) — default Map kosong = perilaku identik dgn env test
 // tanpa sesi. Satu test memakainya untuk membuktikan write-through jalan atas SET PENUH.
-vi.mock("../src/services/live-phases", () => ({ sessionPhasesBySpecAsync: vi.fn(async () => new Map()) }));
+vi.mock("../src/services/live-phases", async (orig) => ({
+  ...(await orig<typeof import("../src/services/live-phases")>()),
+  sessionPhasesBySpecAsync: vi.fn(async () => new Map()),
+}));
 
 const FAKE_CLAUDE = fileURLToPath(new URL("./fixtures/fake-claude.sh", import.meta.url));
 const app = buildApp({ requireAuth: false });

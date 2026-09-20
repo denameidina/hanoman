@@ -7,7 +7,10 @@ import { spawnSync } from "node:child_process";
 
 // Overlay stage-live membaca tmux nyata; di test tak ada pane. Mock hanya sessionPhasesBySpecAsync
 // (sisanya asli) — pola yang sama dengan specs.route.test.ts.
-vi.mock("../src/services/live-phases", () => ({ sessionPhasesBySpecAsync: vi.fn(async () => new Map()) }));
+vi.mock("../src/services/live-phases", async (orig) => ({
+  ...(await orig<typeof import("../src/services/live-phases")>()),
+  sessionPhasesBySpecAsync: vi.fn(async () => new Map()),
+}));
 
 const clean = async () => { await prisma.spec.deleteMany(); await prisma.project.deleteMany(); };
 beforeEach(clean); afterAll(clean);

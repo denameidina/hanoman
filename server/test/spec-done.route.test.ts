@@ -13,7 +13,10 @@ vi.mock("../src/services/pty", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/services/pty")>();
   return { ...actual, listSessions: vi.fn(() => []) };
 });
-vi.mock("../src/services/live-phases", () => ({ sessionPhasesBySpecAsync: vi.fn(async () => new Map()) }));
+vi.mock("../src/services/live-phases", async (orig) => ({
+  ...(await orig<typeof import("../src/services/live-phases")>()),
+  sessionPhasesBySpecAsync: vi.fn(async () => new Map()),
+}));
 
 const app = buildApp({ requireAuth: false });
 const post = (id: string, body: unknown = {}) =>
