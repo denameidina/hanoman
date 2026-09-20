@@ -1,4 +1,5 @@
 import React from "react";
+import { subscribeTick } from "../lib/shared-ticker";
 import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, StatusPill,
   ProductStateIllustration, Tabs, OverflowActions, useResponsiveTier, useCoarsePointer,
   type OverflowItem } from "../ds";
@@ -821,8 +822,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
   const running = !!phases?.some((p) => p.agent?.status === "running");
   React.useEffect(() => {
     if (!running || now !== undefined) return;
-    const t = setInterval(() => setTick((x) => x + 1), 1000);
-    return () => clearInterval(t);
+    return subscribeTick(() => setTick((x) => x + 1));
   }, [running, now]);
   if (!phases?.length) return null;
   const at = now ?? Date.now();
