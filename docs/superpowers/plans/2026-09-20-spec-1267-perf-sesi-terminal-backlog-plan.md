@@ -1,6 +1,6 @@
 # SPEC-1267 Perf Sesi Terminal di Backlog Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Terminal di Backlog responsif saat sesi agen berjalan: frame `specs` kecil dan hanya lahir saat berubah, nol I/O sinkron di jalur periodik, klien tak refetch/re-render per frame tak berubah.
 
@@ -55,7 +55,7 @@ Spec: `docs/superpowers/specs/2026-09-20-spec-1267-perf-sesi-terminal-backlog-de
 **Interfaces:**
 - Produces: `export const PROFILE: boolean`; `export function profStart(): number` (0 bila mati); `export function profEnd(group: string, t0: number, bytes: number, emitted: boolean): void`; `export function startLagMonitor(): void`.
 
-- [ ] **Step 1: Tulis test gagal**
+- [x] **Step 1: Tulis test gagal**
 
 ```ts
 import { describe, it, expect, vi } from "vitest";
@@ -80,9 +80,9 @@ describe("events-profile", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal** — `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/events-profile.test.ts` → FAIL (modul tak ada).
+- [x] **Step 2: Jalankan, pastikan gagal** — `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --no-file-parallelism server/test/events-profile.test.ts` → FAIL (modul tak ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -114,15 +114,15 @@ export function startLagMonitor(): void {
 
 Pasang di `__tick`: `const t0 = profStart();` sebelum `g.build()`, `profEnd(msg.t, t0, sig.length, emitted)` sesudahnya; panggil `startLagMonitor()` di `startLoop()`.
 
-- [ ] **Step 4: Test lulus** — jalankan perintah Step 2 → PASS.
+- [x] **Step 4: Test lulus** — jalankan perintah Step 2 → PASS.
 
-- [ ] **Step 5: Ukur baseline (WAJIB sebelum Task 1)**
+- [x] **Step 5: Ukur baseline (WAJIB sebelum Task 1)**
   1. `export HANOMAN_HOME=$(mktemp -d)`; salin DB dev 1069 baris ke `$HANOMAN_HOME/hanoman.db` bila ada, kalau tidak seed 1069 baris lewat skrip sementara di scratchpad (1056 `done` dengan `payload` besar).
   2. `HANOMAN_EVENTS_PROFILE=1 node server/dist/server.js` (build dulu), buka Backlog di Chrome dengan 1 pane lalu 4 pane; catat 3 laporan 10 dtk tiap skenario.
   3. DevTools: hitung request `GET /specs`/menit dan frame WS `specs`/menit; ukuran satu frame `specs` mentah (`curl` atau log profil) dan deflate; profil Performance 30 dtk (CPU renderer) untuk 1 vs 4 pane.
   4. Tulis tabel "sebelum" ke `docs/superpowers/plans/2026-09-20-spec-1267-perf-sesi-terminal-backlog-baseline.md` (data, bukan laporan analisis; dirujuk Task 11).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/events-profile.ts server/src/services/events.ts server/test/events-profile.test.ts docs/superpowers/plans/2026-09-20-spec-1267-perf-sesi-terminal-backlog-baseline.md
@@ -412,7 +412,7 @@ Enam sub-commit kecil; tiap sub-langkah: tes dulu, implementasi, `pnpm vitest --
 - [x] **10d ticker bersama PhaseStrip (AC-S29).** `shared-ticker.ts`: `subscribeTick(fn): () => void`, satu `setInterval(1000)` hidup selama ada pelanggan; test dengan fake timers: 5 pelanggan → 1 interval; 0 pelanggan → interval dibersihkan. Ganti interval per sel `TerminalScreen.tsx:779`. Commit.
 - [x] **10e timer 100 ms bersyarat (AC-S29).** `TerminalPane.tsx:232`: mulai interval saat prediksi pending > 0, `clearInterval` saat 0; test fake timers. Commit.
 - [x] **10f resize debounce + dedup (AC-S30).** Debounce `ResizeObserver` 100 ms; simpan `lastSent {cols,rows}`; test: 5 resize cepat dengan ukuran akhir sama dengan yang terkirim → 0 pesan; ukuran baru → 1 pesan. Commit.
-- [ ] **Jalankan:** `pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism`. Docs: `internal/docs/frontend/*` terminal (grep `TerminalPane`).
+- [x] **Jalankan:** `pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism`. Docs: `internal/docs/frontend/*` terminal (grep `TerminalPane`).
 
 ---
 
@@ -422,18 +422,18 @@ Enam sub-commit kecil; tiap sub-langkah: tes dulu, implementasi, `pnpm vitest --
 - Modify: `internal/docs/architecture/stack.md`, `internal/docs/architecture/api-contract.md`, `internal/skills/hanoman/SKILL.md` (baris 85 & 572 sudah disentuh Task 3-4; pastikan konsisten), `internal/docs/README.md`
 - Create: `internal/docs/adr/0168-frame-specs-ringkas-siar.md` (cek nomor bebas: `ls internal/docs/adr | tail`; bila bentrok, ambil nomor berikutnya), tabel hasil di `docs/superpowers/plans/2026-09-20-spec-1267-perf-sesi-terminal-backlog-baseline.md`
 
-- [ ] **Step 1: Ukur ulang** persis skenario/DB/mesin Task 0 Step 5 (1 vs 4 pane): durasi build per grup, lag event loop p50/p99/max, frame `specs`/menit (DB diam 60 dtk → 0), `GET /specs`/menit (→ 0), ukuran frame mentah+deflate (≤ 5% baseline), CPU renderer. Tempel tabel sebelum vs sesudah.
-- [ ] **Step 2: Keputusan bersyarat.** Bila p99 > 50 ms atau max > 100 ms atau build `specs` p95 > 20 ms setelah Task 4-9, ubah `everyTicks` grup `specs` 1→3 (test + ukur ulang, dokumentasikan sebagai perilaku terlihat). Bila deflate terlihat di profil, buka keputusan baru (jangan ubah `perMessageDeflate` tanpa pasangan angka sendiri, AC-S33a).
-- [ ] **Step 3: API nyata.** `pnpm --filter server build`; boot `HANOMAN_HOME=$(mktemp -d) node server/dist/server.js` (DB terpisah), lalu:
+- [x] **Step 1: Ukur ulang** persis skenario/DB/mesin Task 0 Step 5 (1 vs 4 pane): durasi build per grup, lag event loop p50/p99/max, frame `specs`/menit (DB diam 60 dtk → 0), `GET /specs`/menit (→ 0), ukuran frame mentah+deflate (≤ 5% baseline), CPU renderer. Tempel tabel sebelum vs sesudah.
+- [x] **Step 2: Keputusan bersyarat.** Bila p99 > 50 ms atau max > 100 ms atau build `specs` p95 > 20 ms setelah Task 4-9, ubah `everyTicks` grup `specs` 1→3 (test + ukur ulang, dokumentasikan sebagai perilaku terlihat). Bila deflate terlihat di profil, buka keputusan baru (jangan ubah `perMessageDeflate` tanpa pasangan angka sendiri, AC-S33a).
+- [x] **Step 3: API nyata.** `pnpm --filter server build`; boot `HANOMAN_HOME=$(mktemp -d) node server/dist/server.js` (DB terpisah), lalu:
   - `curl -s localhost:$PORT/api/specs | jq '.items[0] | keys'` → tak ada `payload`/`sourceHistory`, ada `objective`.
   - `curl -s localhost:$PORT/api/specs/SPEC-1` → penuh; id ngawur → 404 `{"error":"spec tak ditemukan"}`.
   - `curl -s "localhost:$PORT/api/specs?q=<kata objective>"` → item ditemukan.
   - Sambung `/api/events/ws` (wscat/node) → frame `specs` tanpa 3 field; diam 60 dtk → nol frame `specs` lanjutan.
   (Auth/prefix mengikuti konfigurasi lokal; sesuaikan `PORT` dan cookie/token.)
-- [ ] **Step 4: ADR** amandemen ADR-0039/0145: frame `specs` ringkas, `GET /specs/:id`, `GET /specs` `SpecListItem`; dampak klien lama/baru tanpa kompatibilitas (gejala senyap, penawar `ReloadBadge`/`trackServerVersion` SPEC-868); alternatif B/C ditolak. Tautkan di `internal/docs/README.md`.
-- [ ] **Step 5: Grep verifikasi nol sinkron:** `grep -nE "execFileSync|readFileSync|statSync|readdirSync" server/src/services/live-specs.ts server/src/services/events.ts server/src/routes/terminal.ts` → tak ada di jalur periodik.
-- [ ] **Step 6: Test tersentuh:** `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism` → hijau.
-- [ ] **Step 7: Commit** `docs(spec-1267): hasil ukur, ADR frame specs ringkas, stack/api-contract/SKILL`.
+- [x] **Step 4: ADR** amandemen ADR-0039/0145: frame `specs` ringkas, `GET /specs/:id`, `GET /specs` `SpecListItem`; dampak klien lama/baru tanpa kompatibilitas (gejala senyap, penawar `ReloadBadge`/`trackServerVersion` SPEC-868); alternatif B/C ditolak. Tautkan di `internal/docs/README.md`.
+- [x] **Step 5: Grep verifikasi nol sinkron:** `grep -nE "execFileSync|readFileSync|statSync|readdirSync" server/src/services/live-specs.ts server/src/services/events.ts server/src/routes/terminal.ts` → tak ada di jalur periodik.
+- [x] **Step 6: Test tersentuh:** `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism` → hijau.
+- [x] **Step 7: Commit** `docs(spec-1267): hasil ukur, ADR frame specs ringkas, stack/api-contract/SKILL`.
 
 ---
 

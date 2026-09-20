@@ -1326,7 +1326,8 @@ distribusi perubahan setiap 3 detik, tanpa polling browser. Lihat [kontrak katal
 ```
 GET    /events/ws                    # WebSocket siar dashboard (global). Auth = gate /api (cookie).
 #   server->klien, GRUP GLOBAL (per-grup, saat berubah; snapshot penuh saat connect):
-#     { t:"specs", specs } · { t:"sessions", sessions } · { t:"notifications", items, unread }
+#     { t:"specs", specs: SpecSlim[] } (SPEC-1267 · tanpa payload/objective/sourceHistory; lahir hanya bila
+#       `specsDigest` berubah — detail lewat GET /specs/:id) · { t:"sessions", sessions } · { t:"notifications", items, unread }
 #     { t:"limits", limits } · { t:"codexLimits", limits } (SPEC-338, tiap 30s, grup TERPISAH dari
 #       `limits` karena sumber & semantik kesegarannya beda) · { t:"vps", vps } ·
 #       { t:"cleanups", cleanups } (SPEC-742, tiap 3s — dibangun dari peta memori, nol I/O) ·

@@ -60,6 +60,7 @@ describe("RemoteInstanceView (SPEC-1218 · AC-C1/AC-C7)", () => {
     expect(mod).toBeTruthy();
     // Modul RemoteInstanceView mengimpor TerminalPane dari "./TerminalPane" — path sumber yang
     // SAMA dengan yang diimpor layar lokal di sini, jadi module resolution menjaminnya satu fungsi.
-    expect(typeof LocalTerminalPane.TerminalPane).toBe("function");
+    // SPEC-1267 · TerminalPane dibungkus React.memo, jadi ia objek komponen, bukan fungsi polos.
+    expect(LocalTerminalPane.TerminalPane).toBeTruthy();
   });
 });
