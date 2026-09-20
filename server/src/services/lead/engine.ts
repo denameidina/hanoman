@@ -4,7 +4,7 @@ import { pulse, prodPulseDeps, type PulseDeps } from "./pulse";
 import { pruneAsks } from "./ask";
 import { expireFlows } from "./flow";
 import { recordLeadDecision, recordLegacySession } from "../notifications";
-import { liveDecisions } from "../pty";
+import { liveDecisionsAsync } from "../live-phases";
 
 // SPEC-409 · ADR-0091 · SPEC-909 · ADR-0146 · irama hanoman-lead.
 //
@@ -98,9 +98,9 @@ export async function tick(now: number, deps: LeadTickDeps = {}): Promise<void> 
   //     lalu dilahirkan ulang tanpa satu pun event di antaranya akan mewarisi `answers`/`failures`
   //     nyawa sebelumnya — dan AC-11 menutupnya sebelum ia sempat bertanya sekali pun.
   jobs.push((async () => {
-    const live = deps.live ?? liveDecisions;
+    const live = deps.live ?? liveDecisionsAsync;
     const legacy = deps.legacy ?? recordLegacySession;
-    for (const s of live()) {
+    for (const s of await live()) {
       if (s.eventHook || !s.waiting) continue;
       await legacy(s.id, s.projectId || null, s.specId ?? null);
     }

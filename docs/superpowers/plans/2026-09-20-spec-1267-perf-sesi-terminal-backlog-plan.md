@@ -338,15 +338,15 @@ it("mergeSlim menjaga objective/payload/sourceHistory dari HTTP", () => {
 - Produces: `sessionPhasesBySpecAsync(): Promise<Map<string,{phases:…;cwd:string}>>`; `liveDecisionsAsync()`; `readPhasesAsync(path): Promise<PhaseFile|null>` dengan memo `(path,mtimeMs,size)` per tick; `planOpenAsync(cwd, specId): Promise<boolean>`; `stageForRunAsync(...)`.
 - Consumes: `listPanesShared()` dari `server/src/services/presence/snapshot.ts:39`.
 
-- [ ] **Step 1: Tes gagal**
+- [x] **Step 1: Tes gagal**
   - Menyadap `child_process.execFileSync`, `fs.readFileSync/statSync/readdirSync` (vi.spyOn pada modul `node:fs` dan `node:child_process`), jalankan `liveOverlayTick()`, `specsDigest()`, build grup `notifications`, hitung panggilan pada path fase/plan/tmux → 0 (AC-S9).
   - `listPanesShared` menolak → `sessionPhasesBySpecAsync()` = map kosong, stage tak mundur (AC-S12).
   - `pollPhases` + `paneComplete` untuk berkas sama dalam satu tick → satu `readFile` (AC-S11).
   - Dua pemanggil `sessionPhasesBySpecAsync` dalam 1 dtk → satu `tmux list-panes` (AC-S10).
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3: Implementasi.** Salin logika sinkron ke pasangan async (jangan ubah semantik "hanya maju"); `phases()` di live-specs menjadi `sessionPhasesBySpecAsync().catch(() => new Map())`. Memo berkas fase: `Map<path,{mtimeMs,size,value}>` divalidasi dengan `fs.promises.stat` (async). Gerbang plan `readdir`/`readFile` → `fs/promises`. `notificationsFeed` memakai `liveDecisionsAsync`. Hapus varian sinkron bila tak ada pemanggil tersisa (`grep -rn sessionPhasesBySpec\( server/src`); jika masih ada pemanggil non-periodik, biarkan dan beri komentar.
-- [ ] **Step 4:** `pnpm vitest --run --no-file-parallelism server/test/periodic-async.test.ts server/test/live-specs-split.test.ts server/test/specs.route.test.ts server/test/pty*.test.ts` PASS (ingat memori: pty test gagal palsu oleh tmux sisa; bersihkan socket test bila perlu).
-- [ ] **Step 5: Commit** `perf(server): jalur periodik specs/notifications tanpa I/O sinkron`. Docs: stack.md (satu baris: jalur periodik async di atas `listPanesShared`).
+- [x] **Step 2:** FAIL.
+- [x] **Step 3: Implementasi.** Salin logika sinkron ke pasangan async (jangan ubah semantik "hanya maju"); `phases()` di live-specs menjadi `sessionPhasesBySpecAsync().catch(() => new Map())`. Memo berkas fase: `Map<path,{mtimeMs,size,value}>` divalidasi dengan `fs.promises.stat` (async). Gerbang plan `readdir`/`readFile` → `fs/promises`. `notificationsFeed` memakai `liveDecisionsAsync`. Hapus varian sinkron bila tak ada pemanggil tersisa (`grep -rn sessionPhasesBySpec\( server/src`); jika masih ada pemanggil non-periodik, biarkan dan beri komentar.
+- [x] **Step 4:** `pnpm vitest --run --no-file-parallelism server/test/periodic-async.test.ts server/test/live-specs-split.test.ts server/test/specs.route.test.ts server/test/pty*.test.ts` PASS (ingat memori: pty test gagal palsu oleh tmux sisa; bersihkan socket test bila perlu).
+- [x] **Step 5: Commit** `perf(server): jalur periodik specs/notifications tanpa I/O sinkron`. Docs: stack.md (satu baris: jalur periodik async di atas `listPanesShared`).
 
 ---
 
@@ -359,11 +359,11 @@ it("mergeSlim menjaga objective/payload/sourceHistory dari HTTP", () => {
 **Interfaces:**
 - Consumes: `getSessionAsync(id)` (`pty.ts:510`), `listSessionsAsync()`. Bila `capture-pane` untuk pane mati hanya ada versi sinkron, tambah `capturePaneAsync(name, opts)` (promisify `execFile`).
 
-- [ ] **Step 1: Tes gagal** — spy `execFileSync` lalu jalankan: reconcile scheduler untuk item launched, satu tick reaper, satu pulse lead, `attach` WS terminal (`injectWS`) → 0 panggilan `execFileSync` bertarget tmux (AC-S9).
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Ganti `getSession`→`await getSessionAsync` di lima titik; jadikan fungsi pembungkusnya `async` bila belum, dan perbarui pemanggilnya. Pada `attach` WS, pasang listener `onOpen`/buffer pesan yang masuk selama `await` supaya frame awal tak hilang (lihat catatan spike SPEC-1215 "frame attach hilang tanpa listener onOpen").
-- [ ] **Step 4:** `pnpm vitest --run --no-file-parallelism` pada test tersentuh (`terminal.route`, scheduler, lead, worktree-project) PASS. Catatan memori: `terminal.route` gagal palsu bila `HANOMAN_SHELL`/`NODE_ENV` salah; ikuti memori itu, bukan regresi.
-- [ ] **Step 5: Commit** `perf(server): route WS terminal, scheduler, reaper, lead tanpa tmux sinkron`.
+- [x] **Step 1: Tes gagal** — spy `execFileSync` lalu jalankan: reconcile scheduler untuk item launched, satu tick reaper, satu pulse lead, `attach` WS terminal (`injectWS`) → 0 panggilan `execFileSync` bertarget tmux (AC-S9).
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Ganti `getSession`→`await getSessionAsync` di lima titik; jadikan fungsi pembungkusnya `async` bila belum, dan perbarui pemanggilnya. Pada `attach` WS, pasang listener `onOpen`/buffer pesan yang masuk selama `await` supaya frame awal tak hilang (lihat catatan spike SPEC-1215 "frame attach hilang tanpa listener onOpen").
+- [x] **Step 4:** `pnpm vitest --run --no-file-parallelism` pada test tersentuh (`terminal.route`, scheduler, lead, worktree-project) PASS. Catatan memori: `terminal.route` gagal palsu bila `HANOMAN_SHELL`/`NODE_ENV` salah; ikuti memori itu, bukan regresi.
+- [x] **Step 5: Commit** `perf(server): route WS terminal, scheduler, reaper, lead tanpa tmux sinkron`.
 
 ---
 

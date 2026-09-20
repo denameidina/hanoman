@@ -1,6 +1,7 @@
 import type { Paginated, LeadStatusView, LeadDecisionView, LeadFlowView } from "@hanoman/shared";
 import { prisma } from "../../db";
-import { listSessionsAsync, liveDecisions } from "../pty";
+import { listSessionsAsync } from "../pty";
+import { liveDecisionsAsync } from "../live-phases";
 import { listQueue } from "../scheduler/queue";
 import { getLead, leadActive } from "./config";
 import { listDecisions, toDecisionView } from "./trail";
@@ -24,7 +25,7 @@ export async function buildLeadStatus(): Promise<LeadStatusView> {
   let live: Awaited<ReturnType<typeof listSessionsAsync>> = [];
   try { live = (await listSessionsAsync()).filter((s) => !s.exited); } catch { /* tmux tak terbaca */ }
   let waiting: string[] = [];
-  try { waiting = liveDecisions().filter((d) => d.waiting).map((d) => d.id); }
+  try { waiting = (await liveDecisionsAsync()).filter((d) => d.waiting).map((d) => d.id); }
   catch { /* idem */ }
   const rows = await Promise.all(projects.map(async (p) => ({
     projectId: p.id, name: p.name,

@@ -1,5 +1,6 @@
 import { prisma } from "../db";
-import { liveDecisions, markerFilled } from "./pty";
+import { markerFilledAsync } from "./pty";
+import { liveDecisionsAsync } from "./live-phases";
 import type { DriftItem } from "../vps/drift";
 
 // SPEC-221 · notifikasi drift kepatuhan VPS (AC-19). Satu notif AGREGAT per audit (bukan per item —
@@ -178,11 +179,11 @@ type DecisionSession = {
 let awaiting = new Set<string>();
 export function __resetAwaiting(): void { awaiting = new Set(); } // test-only
 
-export async function scanDecisions(read: () => DecisionSession[] = liveDecisions): Promise<void> {
+export async function scanDecisions(read: () => DecisionSession[] | Promise<DecisionSession[]> = liveDecisionsAsync): Promise<void> {
   const next = new Set<string>();
   const fresh: DecisionSession[] = [];
-  for (const s of read()) {
-    if (!markerFilled(s.decisionFile)) continue;
+  for (const s of await read()) {
+    if (!(await markerFilledAsync(s.decisionFile))) continue;
     // SPEC-903 · ADR-0143 · dua peran dipisah. KAPAN menotifikasi memakai bit turunan: marker codex
     // dipasang di tiap akhir turn, jadi sesi yang melanjutkan sendiri tak boleh menotifikasi.
     // BERAPA KALI tetap dikunci pada marker terisi — manusia yang mengetik jawabannya membuat pane

@@ -1,8 +1,8 @@
 import { prisma } from "../../db";
 import type { LeadDecision } from "@prisma/client";
 import type { Lead, Scheduler } from "@hanoman/shared";
-import { listSessions, sessionFinished } from "../pty";
-import { planComplete } from "../session-phases";
+import { listSessionsAsync, sessionFinishedAsync } from "../pty";
+import { planCompleteAsync } from "../session-phases";
 import { resolveRepoDir } from "../local-binding";
 import { specReview } from "../spec-review";
 import { enqueue, UNSTARTED_SPEC_WHERE } from "../scheduler/queue";
@@ -55,17 +55,21 @@ export function findCollisions(areas: WorkArea[]): Collision[] {
   return out;
 }
 
+// SPEC-1267 · pembacaan sesi/plan di denyut ini asinkron (event loop yang sama melayani PTY);
+// fake sinkron di test tetap sah.
+type Maybe<T> = T | Promise<T>;
+
 // ── Deps ─────────────────────────────────────────────────────────────────────────────────────
 export type PulseDeps = {
-  sessions: () => { id: string; projectId: string; specId?: string; cwd: string; exited: boolean; exitCode?: number }[];
+  sessions: () => Maybe<{ id: string; projectId: string; specId?: string; cwd: string; exited: boolean; exitCode?: number }[]>;
   areas: (s: { id: string; projectId: string; specId: string }) => Promise<string[]>;
-  planDone: (cwd: string, specId: string) => boolean;
+  planDone: (cwd: string, specId: string) => Maybe<boolean>;
   /**
    * SPEC-451 · verdict "pekerjaan sesi ini sudah selesai" (SPEC-433) — fakta yang BERDIRI SENDIRI
    * di sebelah `exited`. Ia yang menggerbangi pintu keberhasilan; `exited` menggerbangi pintu
    * kegagalan. Memakai `exited` untuk keduanya adalah konflasi yang sama yang ditutup SPEC-402/433.
    */
-  finished: (sessionId: string) => boolean;
+  finished: (sessionId: string) => Maybe<boolean>;
   decide: typeof decide;
   decideDeps: DecideDeps;
   apply: typeof applyAction;
@@ -78,7 +82,7 @@ export type PulseDeps = {
 };
 
 export const prodPulseDeps: PulseDeps = {
-  sessions: () => { try { return listSessions(); } catch { return []; } },
+  sessions: () => listSessionsAsync().catch(() => []),
   areas: async (s) => {
     const repoDir = await resolveRepoDir(s.projectId);
     if (!repoDir) return [];
@@ -89,8 +93,8 @@ export const prodPulseDeps: PulseDeps = {
       return r.changed.map((c) => c.path);
     } catch { return []; }   // worktree sudah lenyap / basis tak resolve → bukan area kerja
   },
-  planDone: planComplete,
-  finished: (id) => { try { return sessionFinished(id); } catch { return false; } },
+  planDone: planCompleteAsync,
+  finished: (id) => sessionFinishedAsync(id).catch(() => false),
   decide,
   decideDeps: prodDecideDeps,
   apply: applyAction,
@@ -167,10 +171,10 @@ export async function pulse(deps: PulseDeps = prodPulseDeps): Promise<PulseResul
 async function followUpFinished(cfg: Lead, optIn: string[], deps: PulseDeps): Promise<number> {
   let n = 0;
   const opt = new Set(optIn);
-  for (const s of deps.sessions()) {
+  for (const s of await deps.sessions()) {
     if (!s.exited || !s.specId || !opt.has(s.projectId)) continue;
     const bad = (s.exitCode ?? 0) !== 0;
-    const unfinished = !deps.planDone(s.cwd, s.specId);
+    const unfinished = !(await deps.planDone(s.cwd, s.specId));
     if (!bad && !unfinished) continue;
     // Idempoten lewat JEJAK, bukan Set memori: sesi mati bertahan di tmux (`remain-on-exit on`)
     // berhari-hari, dan denyut tiap 5 menit akan memutuskan hal yang sama berulang kali —
@@ -244,10 +248,10 @@ async function followUpFinished(cfg: Lead, optIn: string[], deps: PulseDeps): Pr
 async function followUpComplete(optIn: string[], deps: PulseDeps): Promise<number> {
   let n = 0;
   const opt = new Set(optIn);
-  for (const s of deps.sessions()) {
+  for (const s of await deps.sessions()) {
     if (!s.specId || !opt.has(s.projectId)) continue;
     if ((s.exitCode ?? 0) !== 0) continue;        // yang gagal tetap milik pintu kegagalan
-    if (!deps.finished(s.id)) continue;           // BUKAN `s.exited` — itulah seluruh temuannya
+    if (!(await deps.finished(s.id))) continue;           // BUKAN `s.exited` — itulah seluruh temuannya
     // Idempoten lewat JEJAK, bukan Set memori (pane hidup bertahan berhari-hari, dan Set justru
     // kosong sesudah restart). Awalannya deterministik per sesi dan TAK dimiliki pintu lain:
     // pintu kegagalan memulai dengan "Sesi …", pintu tabrakan dengan "Dua pekerjaan menyentuh …".
@@ -288,7 +292,7 @@ async function followUpComplete(optIn: string[], deps: PulseDeps): Promise<numbe
 // ── D · tabrakan area kerja ──────────────────────────────────────────────────────────────────
 async function detectCollisions(optIn: string[], deps: PulseDeps): Promise<number> {
   const opt = new Set(optIn);
-  const live = deps.sessions().filter((s) => !s.exited && s.specId && opt.has(s.projectId));
+  const live = (await deps.sessions()).filter((s) => !s.exited && s.specId && opt.has(s.projectId));
   if (live.length < 2) return 0;
   const areas: WorkArea[] = [];
   for (const s of live) {

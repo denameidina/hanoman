@@ -6,8 +6,8 @@ import { recordCompletion, recordFailure } from "../notifications";
 import { recordSessionResult } from "../session-result";
 import { STAGES } from "../stage-machine";
 import { notifySynced } from "../sync-notify";
-import { getSession } from "../pty";
-import { readPhases, stageForRun } from "../session-phases";
+import { getSessionAsync } from "../pty";
+import { readPhasesAsync, stageForRunAsync } from "../session-phases";
 import { recordHeadSha } from "../spec-head";
 
 // SPEC-298 · ADR-0072 (daun #5) · rekonsiliasi akhir sesi scheduler. Dipanggil engine.tick
@@ -17,8 +17,8 @@ import { recordHeadSha } from "../spec-head";
 // (PRD non-goal — cegah pembakaran usage).
 export type ReconcilePane = { exited: boolean; flow?: Flow; phaseFile?: string; cwd: string } | undefined;
 export type ReconcileDeps = {
-  pane: (sessionId: string) => ReconcilePane;                                   // getSession projeksi
-  deriveStage: (phaseFile: string, flow: Flow, cwd: string, specId: string) => Stage | null; // stageForRun(readPhases…)
+  pane: (sessionId: string) => ReconcilePane | Promise<ReconcilePane>;          // getSessionAsync projeksi
+  deriveStage: (phaseFile: string, flow: Flow, cwd: string, specId: string) => Stage | null | Promise<Stage | null>; // stageForRun(readPhases…)
   headSha: (worktree: string) => string | null;                                // realGit.headSha best-effort
 };
 
@@ -29,12 +29,12 @@ export async function reconcile(deps: ReconcileDeps): Promise<void> {
     try {
       const spec = await prisma.spec.findUnique({ where: { id: item.specId } });
       if (!spec) { await markFailed(item.id, "spec hilang"); continue; }
-      const p = deps.pane(item.sessionId ?? "");
+      const p = await deps.pane(item.sessionId ?? "");
 
       // Stage LIVE diturunkan langsung dari berkas fase (independen pengawas). Persist maju via CAS.
       let stage = spec.stage as Stage;
       if (p?.flow && p.phaseFile) {
-        const d = deps.deriveStage(p.phaseFile, p.flow, p.cwd, item.specId);
+        const d = await deps.deriveStage(p.phaseFile, p.flow, p.cwd, item.specId);
         if (d && STAGES.indexOf(d) > STAGES.indexOf(stage)) {
           const { count } = await prisma.spec.updateMany({ where: { id: item.specId, stage }, data: { stage: d } });
           if (count > 0) await notifySynced("spec", item.specId).catch(() => {});
@@ -68,12 +68,12 @@ export async function reconcile(deps: ReconcileDeps): Promise<void> {
   }
 }
 
-// Deps produksi: pane dari tmux (getSession), stage dari berkas fase, headSha dari git (best-effort).
+// Deps produksi: pane dari tmux (getSessionAsync), stage dari berkas fase, headSha dari git (best-effort).
 export const reconcileProdDeps: ReconcileDeps = {
-  pane: (sessionId) => {
-    const s = getSession(sessionId);
+  pane: async (sessionId) => {
+    const s = await getSessionAsync(sessionId);
     return s ? { exited: s.exited, flow: s.flow, phaseFile: s.phaseFile, cwd: s.cwd } : undefined;
   },
-  deriveStage: (phaseFile, flow, cwd, specId) => stageForRun(readPhases(phaseFile, flow), cwd, specId),
+  deriveStage: async (phaseFile, flow, cwd, specId) => stageForRunAsync(await readPhasesAsync(phaseFile, flow), cwd, specId),
   headSha: (wt) => { try { return realGit.headSha(wt); } catch { return null; } },
 };

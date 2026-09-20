@@ -1,6 +1,7 @@
 import type { Phase } from "./session-phases";
 import { readPhasesAsync } from "./session-phases";
 import { listPanesShared } from "./presence/snapshot";
+import { decisionsOf, type LiveDecision } from "./pty";
 
 export type LivePhases = Map<string, { phases: Phase[]; cwd: string }>;
 
@@ -17,4 +18,10 @@ export async function sessionPhasesBySpecAsync(): Promise<LivePhases> {
     out.set(p.specId, { phases: await readPhasesAsync(p.phaseFile, p.flow), cwd: p.cwd });
   }));
   return out;
+}
+
+// SPEC-1267 · sesi hidup ber-marker keputusan untuk scan periodik (notifikasi, lead), dari
+// `list-panes` yang sama yang dibagi dengan presence dan overlay stage.
+export async function liveDecisionsAsync(): Promise<LiveDecision[]> {
+  return decisionsOf(await listPanesShared());
 }

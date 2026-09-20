@@ -271,3 +271,8 @@ export async function stageForRunAsync(phases: Phase[], worktree: string, specId
   if (s === "done" && !(await planCompleteAsync(worktree, specId))) return "executing";
   return s;
 }
+
+export async function sessionCompleteAsync(phases: Phase[], worktree: string, specId?: string): Promise<boolean> {
+  if (!phasesComplete(phases)) return false;
+  return specId ? planCompleteAsync(worktree, specId) : true;
+}
