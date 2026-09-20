@@ -599,6 +599,24 @@ function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkD
   );
 }
 
+/** Tanggal dibuat spec, ringkas ("20 Sep 2026"); string kosong bila tak terbaca. */
+export const fmtCreated = (iso?: string | null): string => {
+  const t = iso ? new Date(iso) : null;
+  return t && !Number.isNaN(t.getTime())
+    ? t.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "";
+};
+
+function CreatedAt({ spec, style }: { spec: Spec; style?: React.CSSProperties }) {
+  const label = fmtCreated(spec.createdAt);
+  if (!label) return null;
+  return (
+    <time dateTime={spec.createdAt} title="Tanggal dibuat" data-testid="spec-created"
+      style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", whiteSpace: "nowrap", ...style }}>
+      {label}
+    </time>
+  );
+};
+
 function TitleButton({ spec, onOpenDetail, size = 15 }:
   { spec: Spec; onOpenDetail?: (s: Spec) => void; size?: number }) {
   return (
@@ -642,7 +660,9 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border-hair)" }}>
         <StageBar stage={spec.stage} />
         <div className="hn-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12 }}>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{spec.author}</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>
+            {spec.author}{fmtCreated(spec.createdAt) && " · "}<CreatedAt spec={spec} />
+          </span>
           <SpecActions spec={spec} onStart={onStart} onDelete={onDelete} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onMarkDone={onMarkDone} running={running} />
         </div>
       </div>
@@ -652,9 +672,9 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
 
 /* ── List view ─────────────────────────────────────────────────────────────
    Baris padat: satu spec per baris, stage bar inline, aksi di kanan. */
-function SpecRow({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running, presenceOn }:
+function SpecRow({ spec, projectName, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running, presenceOn }:
   {
-    spec: Spec; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
+    spec: Spec; projectName?: string; onStart?: (s: Spec) => void; onDelete?: (s: Spec) => void;
     onOpenRun?: (s: Spec) => void; onOpenReview?: (s: Spec) => void; onOpenDetail?: (s: Spec) => void;
     onMarkDone?: (s: Spec, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
     running?: boolean; presenceOn?: string[]
@@ -674,9 +694,11 @@ function SpecRow({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetai
           textOverflow: "ellipsis", whiteSpace: "nowrap"
         }}>{spec.objective}</div>
       </div>
+      <Badge tone="neutral" size="sm" icon="folder" data-testid="spec-project">{projectName ?? spec.projectId}</Badge>
       {spec.branchFrom && <Badge tone="neutral" size="sm" icon="git-branch">{spec.branchFrom}</Badge>}
       <BlockedBadge spec={spec} />
       <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"}>{prio.label}</Badge>
+      <CreatedAt spec={spec} />
       {/* SPEC-919 · ADR-0147 · penanda LIVE lintas device — beda dari StageBar yang stage tersimpan. */}
       <PresenceChip names={presenceOn} />
       <div style={{ flex: "0 0 auto" }}><StageBar stage={spec.stage} /></div>
@@ -748,6 +770,7 @@ function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, 
         <Icon name={sourceMeta(spec.source).icon} size={13} color={sourceMeta(spec.source).color} />
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{spec.id}</span>
         <span style={{ flex: 1 }} />
+        <CreatedAt spec={spec} />
         <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"}>{spec.priority}</Badge>
       </div>
       <TitleButton spec={spec} onOpenDetail={onOpenDetail} size={13} />
@@ -1052,7 +1075,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
               ...LIST_SCROLL_STYLE, border: "1px solid var(--border-hair)",
               borderRadius: "var(--radius-lg)", overflowX: "hidden"
             }}>
-              {items.map((s) => <SpecRow key={s.id} spec={s} onStart={onStart}
+              {items.map((s) => <SpecRow key={s.id} spec={s} projectName={projects.find((x) => x.id === s.projectId)?.name} onStart={onStart}
                 running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
                 onOpenReview={onOpenReview} onMarkDone={onMarkDone}
                 onOpenDetail={(x) => setDetailId(x.id)} />)}
