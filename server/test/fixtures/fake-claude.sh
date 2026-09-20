@@ -17,4 +17,6 @@ echo "env: IS_SANDBOX=${IS_SANDBOX:-}"
 # SPEC-862 · bukti gerbang prompt kredensial: pane sesi agen tak punya manusia, jadi ssh/git
 # tak boleh pernah meminta ketikan di tty-nya.
 echo "sshenv: ASKPASS=${SSH_ASKPASS:-} REQUIRE=${SSH_ASKPASS_REQUIRE:-} GITPROMPT=${GIT_TERMINAL_PROMPT:-}"
+# Bukti kredensial warisan: kosong bila operator menekan "Hapus" (env -u).
+echo "oauth: TOKEN=[${CLAUDE_CODE_OAUTH_TOKEN:-}]"
 exec cat

@@ -77,6 +77,33 @@ describe("config routes", () => {
   });
 });
 
+// Token OAuth yang datang dari ENV proses (mis. plist launchd) tak punya baris DB, jadi "Hapus"
+// dulu hanya menghapus override yang tak ada dan token env tetap menempel di setiap sesi baru.
+describe("DELETE kredensial inheritEnv yang berasal dari env", () => {
+  const KEY = "CLAUDE_CODE_OAUTH_TOKEN";
+  const before = process.env[KEY];
+  afterAll(() => { if (before === undefined) delete process.env[KEY]; else process.env[KEY] = before; });
+
+  it("token env dimatikan: hasValue false, process.env bersih, dan tetap begitu setelah reload", async () => {
+    process.env[KEY] = "sk-ant-oat01-dari-env-ZLMp";
+    const cookie = await login();
+    let g = await app.inject({ method: "GET", url: "/api/config", headers: { cookie } });
+    expect(g.json().entries.find((e: any) => e.key === KEY)).toMatchObject({ source: "env", hasValue: true });
+
+    const del = await app.inject({ method: "DELETE", url: `/api/config/${KEY}`, headers: { cookie } });
+    expect(del.statusCode).toBe(204);
+
+    g = await app.inject({ method: "GET", url: "/api/config", headers: { cookie } });
+    expect(g.json().entries.find((e: any) => e.key === KEY).hasValue).toBe(false);
+    expect(process.env[KEY]).toBeUndefined();
+
+    await loadConfig();   // boot berikutnya: penanda harus bertahan
+    const { applyConfigOnBoot } = await import("../src/services/config-apply");
+    await applyConfigOnBoot();
+    expect(process.env[KEY]).toBeUndefined();
+  });
+});
+
 // SPEC-477 · ADR-0097 · AgentToken gateway Telegram WAJIB memegang `settings:write` (ADR-0096 §2),
 // dan capabilityForRoute memetakan /config ke settings:write. Tanpa pagar ini sesi operator
 // Telegram bisa menulis ulang bot token & AgentToken-nya SENDIRI lewat percakapan.

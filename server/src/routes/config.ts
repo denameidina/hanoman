@@ -61,7 +61,9 @@ export default async function (app: FastifyInstance) {
     if (!entry) return reply.code(400).send({ error: "key tak dikenal" });
     if (entry.category === "bootstrap") return reply.code(400).send({ error: "bootstrap read-only" });
     if (agentBlocked(req, entry)) return reply.code(403).send({ error: "cookie session required" });
-    await clearConfig(key);
+    // Kunci warisan: "Hapus" = sesi memakai default claude (tanpa token ini), meski env proses
+    // memilikinya. Penanda kosong, bukan sekadar hapus baris — lihat `suppressedInheritKeys`.
+    if (entry.inheritEnv) await setConfig(key, ""); else await clearConfig(key);
     await applyConfigSideEffect(key);
     return reply.code(204).send();
   });
