@@ -92,6 +92,14 @@ penuh. "listSpecs paginasi" pada keputusan #3 berarti **paginasi di layer respon
 (`paginate()`, `routes/specs.ts:94`) — bukan paginasi DB baru. Biaya memori per request tak
 berkurang; yang berkurang adalah **byte di kawat** dan **frekuensi**.
 
+**S0.3a — pemanggil `listSpecs` di klien, lengkap (mengoreksi brief).** Hanya tiga, dan
+`ProjectsScreen`/`PrdScreen` **tidak** termasuk (keduanya memang me-refetch pada `dataVersion`,
+tetapi daftar miliknya sendiri, bukan `GET /specs`): `App.tsx:941` — `api.listSpecs()` **tanpa
+`page`/`limit`**, yaitu full-fetch ±3,8 MB yang mengisi state `backlog`; `BacklogScreen.tsx:975-981`
+— berpaginasi kecuali di view board; `TerminalScreen.tsx:587` — picker, `startable: true`.
+Deklarasinya `src/src/api/client.ts:271` (`Paginated<Spec>`). Jadi keputusan #3 opsi B menyentuh
+tiga call-site dan satu tipe, bukan lima layar.
+
 **S0.4 — merge klien menimpa hasil HTTP tanpa syarat.** `BacklogScreen.tsx:997-1000`:
 `data.items.map((s) => backlogById.get(s.id) ?? s)` — item frame WS **menggantikan seluruh objek**
 hasil `listSpecs`. Dengan frame ringkas, baris daftar kehilangan `objective` yang dirender di
@@ -216,15 +224,38 @@ specs even when paginated"*) menjadi jaring pengaman tanpa ditulis ulang.
   grup, ukuran frame mentah, apakah frame lahir, dan `monitorEventLoopDelay` (p50/p99/max, direset
   per interval laporan 10 dtk). Mati = nol alokasi, nol `hrtime` (gerbang boolean modul-level).
 
-### S2.4 `shared/src/entities.ts` — `SpecSlim`
+### S2.4 `shared/src/entities.ts` — `SpecListItem` & `SpecSlim`
 
-`zSpecSlim` = `zSpec.omit({ payload: true, objective: true, sourceHistory: true })`. Diturunkan
-dengan `.omit()`, **bukan** ditulis ulang, sehingga kolom baru di `zSpec` ikut terbawa otomatis dan
-tak ada peluang dua definisi berselisih.
+Dua bentuk baru, **dirantai** dari `zSpec` dengan `.omit()` — bukan ditulis ulang — sehingga kolom
+baru di `zSpec` terbawa otomatis dan tak ada peluang tiga definisi berselisih:
 
-### S2.5 `server/src/routes/specs.ts` — `GET /specs/:id` baru
+```ts
+export const zSpecListItem = zSpec.omit({ payload: true, sourceHistory: true });   // GET /specs
+export const zSpecSlim     = zSpecListItem.omit({ objective: true });              // frame WS
+```
 
-Satu route baru; `GET /specs` tak berubah bentuk responsnya.
+`objective` **ditahan** di `SpecListItem` karena tiap baris grid/list merendernya
+(`BacklogScreen.tsx:656,695`); ia dibuang di `SpecSlim` karena kriteria sukses #1 menguncinya dan
+karena baris daftar tak pernah merender dari frame WS (frame hanya di-*merge* ke item HTTP, §S2.6).
+
+### S2.5 `server/src/routes/specs.ts` — `GET /specs/:id` baru + `GET /specs` dilangsingkan
+
+Satu route baru (§S3.2). `GET /specs` mempertahankan envelope, filter, dan urutan ADR-0038, tetapi
+`items`-nya dipetakan ke `SpecListItem` **setelah** `filterSpecs()` — bukan sebelum, karena
+`filterSpecs` mencari `q` di `s.objective` (`routes/specs.ts:80`) dan pemetaan yang terlalu dini
+akan mematikan pencarian secara senyap. `payload` dan `sourceHistory` dibuang di titik serialisasi
+itu saja; `liveSpecs()`/`listSpecsLive()` tetap memuat baris penuh dari DB sehingga overlay,
+write-through, dan notifikasi `done` tak tersentuh.
+
+### S2.6a Klien — dampak `GET /specs` yang dilangsingkan
+
+`SpecListParams`/`listSpecs` (`src/src/api/client.ts:271`) menjadi `Paginated<SpecListItem>`. Tiga
+pemanggilnya (§S0.3a) tak ada yang membaca `payload`/`sourceHistory` dari hasil daftar; yang
+membacanya adalah dialog detail, Change Source, dan riwayat konversi — ketiganya pindah ke
+`GET /specs/:id` (§S2.6). State `backlog` di `App.tsx` karenanya bertipe `SpecSlim[]` saat datang
+dari frame WS dan `SpecListItem[]` saat datang dari `load()` awal; keduanya disatukan sebagai
+`SpecSlim` (irisan terkecil) supaya tak ada pembaca yang bisa bergantung pada `objective` yang
+kadang ada kadang tidak.
 
 ### S2.6 Klien
 
@@ -278,12 +309,25 @@ GET /specs/:id                            -> 200 Spec | 404 { error }
 #   tanpa peta baru — pola yang sama dengan /specs/:id/escalation).
 ```
 
-### S3.3 `GET /specs` (TIDAK berubah)
+### S3.3 `GET /specs` (kontrak BERUBAH — keputusan #3 opsi B)
 
-Bentuk respons, envelope `{items,total,page,pageSize}`, filter, dan ADR-0038 tetap. `items` tetap
-`Spec` **penuh** — baris daftar Backlog merender `objective` (`BacklogScreen.tsx:656,695`), jadi
-membuangnya dari HTTP akan mengosongkan subjudul tiap baris. Lihat keputusan terbuka #3 untuk
-kemungkinan membuang `payload`/`sourceHistory` dari list HTTP.
+Envelope `{items,total,page,pageSize}`, seluruh parameter query, semantik filter atas stage **live**,
+dan larangan paginasi DB (ADR-0038) **tidak** berubah. Yang berubah hanya bentuk elemen `items`:
+
+```
+GET /specs?project=&source=&q=&stage=&priority=&startable=&dateField=&from=&to=&page=&limit=
+   -> { items: SpecListItem[], total, page, pageSize }
+#   SpecListItem = Spec TANPA `payload` dan `sourceHistory`. `objective` TETAP ADA — tiap baris
+#   grid/list merendernya sebagai subjudul (BacklogScreen.tsx:656,695) dan `q` mencarinya.
+#   Pemetaan terjadi SESUDAH filterSpecs() supaya pencarian `q` atas objective tak mati senyap.
+#   Overlay + write-through + notifikasi `done` tetap berjalan atas baris PENUH di dalam liveSpecs.
+#   Detail (payload, sourceHistory) dimuat per item lewat GET /specs/:id.
+```
+
+Dampak: full-fetch `App.tsx:941` (tanpa `page`/`limit`) turun dari ±3,8 MB menjadi ±0,3 MB pada DB
+1069 baris (estimasi baseline: `payload` 2,64 MB + `sourceHistory` 0,17 MB dibuang, `objective`
+0,85 MB ditahan — angka final wajib diukur di langkah 0/7, bukan dikutip dari sini). Tanpa
+pelangsingan ini, kriteria sukses #5 hanya memindahkan muatan dari kanal WS ke kanal HTTP.
 
 ### S3.4 Frame WS `presence` (TIDAK berubah bentuknya)
 
@@ -314,8 +358,9 @@ milidetik yang sama, dan tick berikutnya yang menyentuh baris mana pun memperbai
 | `GET /specs/:id` id tak ada | `404 { error: "spec tak ditemukan" }` — bentuk galat yang sama dengan `PATCH /specs/:id` |
 | Klien memanggil `getSpec` untuk item yang baru dihapus | `404` → dialog ditutup + toast, **bukan** layar kosong; daftar disegarkan dari `dataVersion` berikutnya |
 | `WebglAddon` gagal dimuat / konteks WebGL hilang saat runtime | `dispose()` addon, jatuh ke renderer DOM, sekali per pane, tanpa toast — kegagalan grafis tak boleh jadi kegagalan terminal |
-| `bufferedAmount` melewati plafon di kirim terminal | Byte baru **digabung** ke buffer tertunda; bila buffer tertunda melewati capnya, byte terlama dibuang dan pane ditandai `resync` (§S4.4). Coalescing PTY 16 ms/cap 64 KB **tak disentuh** |
-| Pane tersembunyi, ring buffer meluap | Pane ditandai `resync`; saat ditampilkan, layar diisi ulang dari `capture-pane`/scrollback attach yang sudah ada alih-alih memutar buffer yang bolong |
+| `bufferedAmount` melewati plafon **1 MB** di kirim terminal | Byte baru **digabung** ke buffer tertunda; bila buffer tertunda melewati capnya, byte **terlama dibuang** dan pane ditandai `resync`. Delay berbatas ditukar dengan layar yang bisa melompat — keluhan asli SPEC-1267 adalah delay, dan `capture-pane` membuat layar selalu bisa dibenarkan. Coalescing PTY 16 ms/cap 64 KB **tak disentuh** |
+| Pane tersembunyi, ring buffer **256 KB** meluap | Pane ditandai `resync`; saat ditampilkan, layar diisi ulang dari `capture-pane`/scrollback attach yang sudah ada alih-alih memutar buffer yang bolong. Ring dibuat **256 KB per pane** — cermin cap coalescing PTY yang sudah ada — supaya memori tetap konstan di mesin yang ADR-0161 akui bisa Mac mini 8 GB |
+| `perMessageDeflate` (`app.ts:143-148`) | **Tidak disentuh** di langkah 1-6. Level 6 dan threshold tetap, untuk kanal events maupun frame terminal. Baik menurunkan level global maupun mematikannya untuk terminal mengorbankan hasil terukur SPEC-812 (aliran PTY 26× kompresibel, 966 → 36 kbit/dtk) demi tebakan. Ia baru boleh disentuh bila profil langkah 7 menunjukkan deflate benar-benar muncul sebagai biaya — dan perubahannya butuh pasangan angka sendiri |
 | Klien lama menerima frame ringkas | Tak ada galat; lihat §S3.1 — gejala senyap, penawarnya `ReloadBadge` |
 
 ## S5 — Acceptance criteria (EARS)
@@ -381,8 +426,20 @@ sukses fase Objective (#n).
 - AC-S20 — WHEN daftar backlog dirender, THE SYSTEM SHALL menggabungkan item frame ringkas ke item
   hasil HTTP **hanya pada field ringkas**, dan SHALL NOT mengosongkan `payload`, `objective`, maupun
   `sourceHistory` yang berasal dari HTTP. *(test `mergeSlim`)*
+- AC-S20a — THE SYSTEM SHALL menjawab `GET /specs` dengan `items` yang **tak memuat** `payload`
+  maupun `sourceHistory`, dan yang **tetap memuat** `objective`. *(test kontrak route)*
+- AC-S20b — WHEN `GET /specs?q=<kata>` dipanggil dan `<kata>` hanya muncul di `objective` sebuah
+  spec, THE SYSTEM SHALL tetap memulangkan spec itu. *(pagar terhadap pemetaan yang terlalu dini —
+  kegagalannya senyap)*
+- AC-S20c — WHEN `GET /specs` dipanggil, THE SYSTEM SHALL menjalankan overlay, write-through, dan
+  notifikasi `done` atas baris **penuh**, tak terpengaruh pelangsingan respons. *(AC-S8 berlaku
+  tanpa perubahan)*
 - AC-S21 — WHEN dialog detail backlog, Change Source, atau backlink audit dibuka, THE SYSTEM SHALL
   memuat spec penuh lewat `GET /specs/:id`.
+- AC-S21a — THE SYSTEM SHALL menerapkan overlay stage-live **baca-saja** pada `GET /specs/:id`
+  sehingga stage yang tampil di dialog sama dengan stage di baris daftarnya, dan SHALL NOT
+  menjalankan write-through maupun notifikasi `done` dari route itu. *(test: sesi hidup berfase
+  lebih maju → stage di respons maju, tetapi baris DB tak berubah dan nol notifikasi lahir)*
 - AC-S22 — IF `GET /specs/:id` menjawab 404, THEN THE SYSTEM SHALL menutup dialog dan memberi toast,
   bukan menampilkan formulir kosong.
 - AC-S23 — THE SYSTEM SHALL memproses frame `sessions` di **satu** tempat saja di klien.
@@ -391,12 +448,20 @@ sukses fase Objective (#n).
   mutakhir. *(dua assert: dedup ya, payload tak dipangkas)*
 
 **Terminal (#8)**
-- AC-S25 — WHEN `bufferedAmount` socket terminal melewati plafon, THE SYSTEM SHALL menggabungkan
-  atau menunda frame keluaran alih-alih terus mengantre, dan SHALL NOT mengubah coalescing PTY
+- AC-S25 — WHEN `bufferedAmount` socket terminal melewati **1 MB**, THE SYSTEM SHALL menggabungkan
+  byte keluaran ke buffer tertunda alih-alih terus mengantre, dan SHALL NOT mengubah coalescing PTY
   16 ms/cap 64 KB.
+- AC-S25a — IF buffer tertunda itu sendiri melewati capnya, THEN THE SYSTEM SHALL membuang byte
+  **terlama** dan menandai pane `resync`, sehingga delay kirim tetap berbatas sekalipun klien atau
+  tunnel melambat tanpa batas. *(test: penulis lebih cepat dari pembaca → `bufferedAmount` tak
+  tumbuh monoton)*
 - AC-S26 — WHILE sebuah pane tersembunyi, THE SYSTEM SHALL tidak menulis maupun mem-parse keluaran
-  ke instance xterm-nya; WHEN pane itu ditampilkan kembali, THE SYSTEM SHALL memulihkan layarnya
-  utuh.
+  ke instance xterm-nya, dan SHALL menahannya di ring buffer **256 KB** per pane; WHEN pane itu
+  ditampilkan kembali, THE SYSTEM SHALL memulihkan layarnya utuh.
+- AC-S26a — IF ring buffer pane tersembunyi meluap, THEN THE SYSTEM SHALL memulihkan layar dari
+  `capture-pane`/scrollback attach yang sudah ada dan SHALL NOT memutar buffer yang bolong.
+- AC-S26b — THE SYSTEM SHALL menjaga memori penahan pane tersembunyi **konstan** terhadap lama
+  penyembunyian. *(pagar ADR-0161: mesin bisa Mac mini 8 GB)*
 - AC-S27 — THE SYSTEM SHALL memakai renderer WebGL; IF WebGL tak tersedia atau konteksnya hilang,
   THEN THE SYSTEM SHALL jatuh ke renderer DOM tanpa memutus sesi.
 - AC-S28 — THE SYSTEM SHALL menyalakan `cursorBlink` hanya pada pane yang sedang fokus.
@@ -414,6 +479,9 @@ sukses fase Objective (#n).
   pasangan angkanya.
 - AC-S33 — THE SYSTEM SHALL mempertahankan kuota `IMMEDIATE_PER_MIN`/`MAX_INFLIGHT`, satu WS events
   ber-ref-count, dan dedup siaran; dan SHALL NOT mengubah skema DB.
+- AC-S33a — THE SYSTEM SHALL membiarkan konfigurasi `perMessageDeflate` (`app.ts:143-148`) apa
+  adanya sampai profil langkah 7 menunjukkan deflate sebagai biaya nyata; dan IF ia kelak diubah,
+  THEN perubahan itu SHALL dibawa pasangan angkanya sendiri terhadap hasil terukur SPEC-812.
 - AC-S34 — THE SYSTEM SHALL menghidupkan kembali nol guardrail/poller/queue yang dicabut ADR-0024
   dan ADR-0039.
 - AC-S35 — THE SYSTEM SHALL memperbarui `internal/docs/architecture/stack.md`,
@@ -433,55 +501,32 @@ sukses fase Objective (#n).
 6. Klien terminal (AC-S26…S31).
 7. Ukur ulang + docs + ADR (AC-S32…S35).
 
+
+## S7 — Keputusan fase Spec (dijawab manusia)
+
+Ketujuh keputusan terbuka fase ini ditutup; seluruhnya sesuai rekomendasi. Sudah dirambatkan ke
+§S2-§S5 di atas — daftar ini rekaman, bukan sumber kedua.
+
+| # | Keputusan | Mendarat di |
+|---|---|---|
+| 1 | **Pecah `liveSpecs()`** menjadi `liveOverlayTick()` (efek, O(sesi hidup), tiap tick) + `listSpecsSlim()`/`listSpecsLive()` (penyajian, hanya saat digest berubah). `liveSpecs()` lama dipertahankan sebagai **komposisi** keduanya agar test SPEC-199/ADR-0038 yang ada tetap jadi pagar. | §S2.1, AC-S6…S8 |
+| 2 | **`GET /specs/:id` memakai overlay stage-live baca-saja** — tanpa write-through, tanpa notifikasi `done`. Stage di dialog tak pernah berbeda dari stage di barisnya; satu GET detail tak bisa menggerakkan state backlog. | §S3.2, AC-S21a |
+| 3 | **`GET /specs` dilangsingkan** (opsi B): `items` membuang `payload` + `sourceHistory`, **menahan** `objective`. Pemetaan sesudah `filterSpecs()`. Tiga call-site klien menyesuaikan (§S0.3a) — bukan `ProjectsScreen`/`PrdScreen`, yang tak memanggil `listSpecs`. | §S2.5, §S2.6a, §S3.3, AC-S20a…c |
+| 4 | **Pane tersembunyi: ring 256 KB + resync `capture-pane` saat meluap.** Memori konstan dipilih di atas scrollback utuh (ADR-0161: mesin bisa Mac mini 8 GB). | §S4, AC-S26…S26b |
+| 5 | **Backpressure: drop byte terlama + penanda resync, plafon `bufferedAmount` 1 MB.** Delay berbatas dipilih di atas byte utuh — keluhan aslinya delay, dan `capture-pane` selalu bisa membenarkan layar. | §S4, AC-S25, AC-S25a |
+| 6 | **`perMessageDeflate` tidak diubah** sampai profil langkah 7 membuktikan deflate muncul sebagai biaya. Menurunkan level atau mematikannya untuk terminal mengorbankan hasil terukur SPEC-812 demi tebakan. | §S4, AC-S33a |
+| 7 | **Kompatibilitas: ADR cukup mencatat** dampak klien lama; penawarnya `ReloadBadge`/`trackServerVersion` (SPEC-868). Ambang versi ditolak karena melanggar keputusan #2 fase Brainstorm yang sudah dikunci. | §S3.1, AC-S35 |
+
+Dua konsekuensi keputusan #3 yang wajib dibawa fase Plan sebagai task tersendiri, karena keduanya
+gagal **senyap** bila terlewat:
+
+- **`q` mencari di `objective`** (`routes/specs.ts:80`). Memetakan `items` ke `SpecListItem`
+  sebelum `filterSpecs()` akan mematikan pencarian tanpa satu pun error — AC-S20b adalah pagarnya.
+- **State `backlog` klien menjadi `SpecSlim`** (irisan terkecil dari frame WS dan `load()` awal).
+  Tanpa penyatuan tipe itu, `objective` kadang ada (sesudah `load()`) kadang tidak (sesudah frame
+  WS pertama), dan pembaca yang bergantung padanya baru rusak beberapa detik setelah halaman dibuka
+  — kelas bug yang paling mahal didiagnosis.
+
 ## Keputusan terbuka
 
-1. `liveSpecs()` dipecah menjadi `liveOverlayTick()` (efek, O(sesi hidup), jalan tiap tick) +
-   `listSpecsSlim()`/`listSpecsLive()` (penyajian, jalan hanya saat digest berubah) sebagaimana
-   §S2.1 — atau tetap satu fungsi utuh yang dipanggil tiap tick dan hanya **framenya** yang didedup?
-   Opsi A (pecah): satu-satunya cara memenuhi AC-S3 tanpa mematikan kemajuan stage (§S0.1), tetapi ia
-   merestrukturisasi fungsi yang SPEC-199 sengaja jadikan satu agar push & pull tak drift.
-   Opsi B (utuh): nol risiko drift, tetapi `findMany` set penuh tetap dibayar tiap detik sehingga
-   AC-S14 (p95 ≤ 20 ms) hampir pasti gagal pada 1069 baris. **Rekomendasi: A**, dengan `liveSpecs()`
-   lama dipertahankan sebagai komposisi keduanya supaya test perilaku yang ada tetap jadi pagar.
-2. `GET /specs/:id` menerapkan overlay stage-live **baca-saja** (stage yang tampil sama dengan
-   `GET /specs`) tanpa write-through dan tanpa notifikasi `done`, sebagaimana §S3.2 — atau tanpa
-   overlay sama sekali (stage DB apa adanya)? Opsi A (overlay baca-saja): dialog tak pernah
-   menampilkan stage yang berbeda dari baris daftarnya; biayanya satu pembacaan pane ber-memo.
-   Opsi B (tanpa overlay): termurah, tetapi dialog bisa menunjukkan stage lebih lama daripada
-   barisnya sendiri saat sesi berjalan — persis keluhan yang ADR-0038 hindari. **Rekomendasi: A.**
-3. Respons `GET /specs` tetap membawa `Spec` penuh (§S3.3), atau ikut dilangsingkan dengan membuang
-   `payload` + `sourceHistory` (tetapi **menahan** `objective`, yang dirender di tiap baris daftar
-   `BacklogScreen.tsx:656,695`)? Opsi A (penuh): nol perubahan kontrak HTTP, tetapi full-fetch tanpa
-   `page`/`limit` — yang masih dipakai App dan board — tetap ±3,8 MB per request, dan ia kini terjadi
-   **sesudah** setiap perubahan data alih-alih tiap detik. Opsi B (list dilangsingkan, detail via
-   `:id`): memangkas ±3,5 MB dari jalur HTTP juga, tetapi menambah satu bentuk respons baru dan
-   menyentuh `ProjectsScreen`/`PrdScreen` yang membaca daftar yang sama. **Rekomendasi: B**, karena
-   tanpa itu kriteria #5 hanya memindahkan 3,8 MB dari kanal WS ke kanal HTTP.
-4. Saat pane tersembunyi dijeda (AC-S26) dan ring buffer penahan meluap, pemulihan layar memakai
-   `capture-pane`/scrollback attach yang sudah ada (layar benar, scrollback lama hilang), atau ring
-   buffer dibuat cukup besar sehingga praktis tak pernah meluap (mis. 2 MB per pane, biaya memori
-   4 pane = 8 MB)? Opsi A (resync): memori tetap, tetapi operator bisa kehilangan scrollback yang
-   belum sempat ditulis. Opsi B (ring besar): tak ada yang hilang, tetapi memori tumbuh linier
-   terhadap jumlah pane di mesin yang di ADR-0161 sudah diakui bisa Mac mini 8 GB.
-   **Rekomendasi: A**, dengan ring 256 KB per pane — cermin cap coalescing PTY yang sudah ada.
-5. Saat `bufferedAmount` melewati plafon di kirim terminal (AC-S25), byte lama **digabung/dibuang**
-   dengan penanda resync, atau pengiriman **ditunda** sampai antrean surut (tanpa kehilangan byte,
-   tetapi delay tumbuh — persis gejala yang SPEC-1267 ingin hilangkan)? Opsi A (drop+resync):
-   delay berbatas, layar bisa melompat. Opsi B (tunda): tak ada byte hilang, delay tak berbatas.
-   **Rekomendasi: A** dengan plafon 1 MB, karena keluhan aslinya adalah delay, bukan kehilangan
-   scrollback — dan `capture-pane` membuat layar selalu bisa dibenarkan.
-6. Deflate kanal `events` (`app.ts:143-148`, `perMessageDeflate` level 6 dipakai bersama frame
-   terminal): sesudah frame `specs` turun ≥95 %, level diturunkan (mis. 3) / threshold dinaikkan,
-   atau **dimatikan untuk frame terminal saja** sementara kanal events tetap terkompresi? Opsi A
-   (turunkan level global): satu knob, tetapi SPEC-812 mengukur 26× kompresibilitas aliran PTY —
-   menurunkan level menggerus kemenangan itu. Opsi B (mati untuk terminal): menaikkan byte terminal
-   kembali ke 966 kbit/dtk per pane, membatalkan SPEC-812. **Rekomendasi: tidak mengubah apa pun di
-   sini sampai langkah 7 menunjukkan deflate benar-benar muncul di profil** — YAGNI, dan kedua opsi
-   di atas mengorbankan hasil terukur SPEC-812 demi tebakan.
-7. Kompatibilitas frame ringkas (keputusan #2 = tanpa): apakah ADR baru cukup **mencatat** dampak
-   klien lama dan mengandalkan `ReloadBadge`/`trackServerVersion` (SPEC-868) sebagai penawar, atau
-   perlu **ambang versi minimum** yang ditegakkan — mis. hub menolak/memperingatkan device relay
-   ber-`hubVersion` di bawah versi rilis ini? Opsi A (catat saja): nol kode, tetapi instance remote
-   lintas versi menampilkan backlog tanpa objective tanpa satu pun sinyal. Opsi B (ambang):
-   memerlukan bidang versi baru pada jalur relay dan keputusan #2 secara eksplisit menolak penanda
-   versi frame. **Rekomendasi: A**, karena Opsi B melanggar keputusan #2 yang sudah dikunci manusia.
+-
