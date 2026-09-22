@@ -8,6 +8,7 @@ import { startLead } from "./services/lead/engine";
 import { registerBacklogSource } from "./services/scheduler/sources/backlog";
 import { registerTriaseSource } from "./services/scheduler/sources/triase";
 import { installSessionHistory, reconcileHistory } from "./services/session-history";
+import { resumeReconciledSessions } from "./services/session-boot-resume";
 import { installEventTap } from "./services/logs/event-log";
 import { installConsoleTap } from "./services/logs/console-tap";
 import { getSetting } from "./services/settings";
@@ -127,11 +128,24 @@ bootstrapReady.then(async () => {
   // "selesai padahal belum" versi tabel. Lewati saja: barisnya tetap terbuka sampai boot berikutnya.
   try {
     const liveIds = listSessions().map((s) => s.id);
+    // ADR-0169 · cutoff diambil SEBELUM reconcileHistory() menulis — reconcileHistory menstempel
+    // SATU `reconciledAt` untuk seluruh sapuannya, jadi reconciledSpecIdsSince(cutoff) di dalam
+    // resumeReconciledSessions() menangkap TEPAT sapuan boot ini, bukan reconcile lama.
+    const reconcileCutoff = new Date();
     void reconcileHistory(liveIds)
       .then(async (n) => {
         if (n) console.log(`riwayat sesi: ${n} baris berjalan direkonsiliasi`);
         for (const row of await detectOrphanWorktrees()) {
           console.log(`worktree yatim: ${row.projectId} — ${row.count} menunggu konfirmasi di tab Worktrees`);
+        }
+        // ADR-0169 · begitu baris ditutup, backlog yang tadinya berjalan langsung dicoba
+        // dilanjutkan otomatis — TANPA menunggu klik "Lanjutkan" manusia.
+        if (n) {
+          const { resumed, failed } = await resumeReconciledSessions(reconcileCutoff);
+          if (resumed.length)
+            console.log(`auto-resume: ${resumed.length} sesi dilanjutkan otomatis (${resumed.join(", ")})`);
+          if (failed.length)
+            console.log(`auto-resume: ${failed.length} sesi gagal dilanjutkan otomatis, lihat notifikasi (${failed.join(", ")})`);
         }
       })
       .catch((e) => console.error("rekonsiliasi riwayat sesi:", e));
