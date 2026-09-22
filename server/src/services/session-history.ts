@@ -230,6 +230,19 @@ export async function reconcileHistory(liveSessionIds: string[]): Promise<number
   return closed;
 }
 
+// ADR-0169 · specId dari baris yang baru saja direkonsiliasi PADA SAPUAN BOOT INI — himpunan
+// kandidat auto-resume. `cutoff` = waktu tepat SEBELUM reconcileHistory() dipanggil;
+// reconcileHistory menstempel SATU `reconciledAt` untuk seluruh sapuannya (lihat komentar di
+// atas), jadi `reconciledAt >= cutoff` mengambil persis sapuan itu, bukan reconcile lama.
+export async function reconciledSpecIdsSince(cutoff: Date): Promise<string[]> {
+  const rows = await prisma.sessionHistory.findMany({
+    where: { endedReason: RECONCILED, reconciledAt: { gte: cutoff }, specId: { not: null } },
+    select: { specId: true },
+    distinct: ["specId"],
+  });
+  return rows.map((r) => r.specId!);
+}
+
 // Dipanggil server.ts sebelum request pertama. Hook fire-and-forget di pty menelan error, jadi
 // promise yang gagal di sini tak boleh menggantung sebagai unhandled rejection.
 export function installSessionHistory(): void {

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { prisma } from "../src/db";
 import {
   beginSession, finishSession, listHistory, getHistory, transcriptOf, purgeHistory, reconcileHistory,
-  reconcileTranscripts,
+  reconcileTranscripts, reconciledSpecIdsSince,
 } from "../src/services/session-history";
 import { transcriptDir } from "../src/services/transcript-store";
 
@@ -146,6 +146,28 @@ describe("session-history service (SPEC-362)", () => {
     expect(await reconcileHistory([])).toBe(2);
     const rows = await prisma.sessionHistory.findMany({ where: { sessionId: { in: ["z1", "z2"] } } });
     expect(new Set(rows.map((r) => r.reconciledAt!.getTime())).size).toBe(1);
+  });
+
+  it("reconciledSpecIdsSince mengembalikan specId UNIK dari sapuan boot ini, tanpa yang null (ADR-0169)", async () => {
+    await beginSession(birth({ sessionId: "a", specId: "SPEC-1" }));
+    await beginSession(birth({ sessionId: "b", specId: "SPEC-1" })); // reopen — dua baris, satu specId
+    await beginSession(birth({ sessionId: "c", specId: "SPEC-2" }));
+    await beginSession(birth({ sessionId: "d", specId: undefined, kind: "shell" }));
+    const cutoff = new Date();
+    expect(await reconcileHistory([])).toBe(4);
+    expect((await reconciledSpecIdsSince(cutoff)).sort()).toEqual(["SPEC-1", "SPEC-2"]);
+  });
+
+  it("reconciledSpecIdsSince mengabaikan reconcile SEBELUM cutoff (ADR-0169)", async () => {
+    await beginSession(birth({ sessionId: "lama", specId: "SPEC-OLD" }));
+    expect(await reconcileHistory([])).toBe(1);
+    // Jeda nyata: resolusi Date 1ms bisa membuat cutoff SAMA dengan reconciledAt yang baru
+    // ditulis di atas bila keduanya jatuh di milidetik yang sama — `gte` sengaja inklusif
+    // untuk sapuan yang SEDANG berjalan (server.ts menangkap cutoff SEBELUM reconcileHistory),
+    // jadi test "sebelum cutoff" ini butuh jarak waktu yang nyata, bukan cuma urutan kode.
+    await new Promise((r) => setTimeout(r, 5));
+    const cutoff = new Date();
+    expect(await reconciledSpecIdsSince(cutoff)).toEqual([]);
   });
 
   it("purge menghapus baris ber-scope dan berkas transkripnya", async () => {
