@@ -9,7 +9,9 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("../src/db", () => ({ prisma: {
   spec: { update: async () => { state.effects.push("update"); return {}; } },
+  sessionResult: { findFirst: async () => null },
 } }));
+vi.mock("../src/services/presence/view", () => ({ presenceView: async () => ({ devices: [] }) }));
 vi.mock("../src/services/pty", async () => ({
   ...await import("../src/services/session-id"),
   getSession: (id: string) => state.panes.find((p) => p.id === id),
@@ -17,6 +19,7 @@ vi.mock("../src/services/pty", async () => ({
   listSessionsAsync: async () => state.panes.slice(),
   listPanesAsync: async () => state.panes.slice(),
   killSession: () => { state.effects.push("kill"); },
+  nativeAgentsAvailable: () => false,
   createSession: (_project: string, _cwd: string, opts: { specId: string }) => {
     const pane = { id: opts.specId.toLowerCase(), specId: opts.specId, projectId: "p", exited: false };
     state.effects.push("spawn");
@@ -62,5 +65,11 @@ describe("SPEC-1108 · gerbang bersama peluncuran backlog", () => {
     state.panes.push({ id: "spec-1108", specId: spec.id, projectId: "p", exited: false });
     await expect(startSpecSession(spec, { flow: "qa" })).resolves.toEqual({ id: "spec-1108", reused: true });
     expect(state.effects).toEqual([]);
+  });
+
+  it("opts.bypassCapacity melewati cap TANPA memerlukan force (ADR-0169)", async () => {
+    await expect(startSpecSession(spec, { flow: "qa", bypassCapacity: true }))
+      .resolves.toMatchObject({ id: "spec-1108" });
+    expect(state.effects).toContain("spawn");
   });
 });

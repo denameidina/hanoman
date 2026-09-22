@@ -46,7 +46,7 @@ dependency ADR-0093 (yang selama ini terikat jadi satu lewat `force`).
 - Produces: `startSpecSession(spec, opts)` menerima opsi baru `opts.bypassCapacity?: boolean`.
   Task 3 memakainya lewat `startSpecSession(spec, { flow, bypassCapacity: true })`.
 
-- [ ] **Step 1: Baca opts type saat ini untuk memastikan titik sisip yang benar**
+- [x] **Step 1: Baca opts type saat ini untuk memastikan titik sisip yang benar**
 
 Buka `server/src/services/session-launch.ts`, cari blok ini (sekitar baris 90-97):
 
@@ -60,7 +60,7 @@ Buka `server/src/services/session-launch.ts`, cari blok ini (sekitar baris 90-97
   return withSessionAdmission({ id, force: opts.force }, async () => {
 ```
 
-- [ ] **Step 2: Tambah opsi `bypassCapacity` dan gunakan di pemanggilan gate**
+- [x] **Step 2: Tambah opsi `bypassCapacity` dan gunakan di pemanggilan gate**
 
 Ganti blok di atas persis dengan:
 
@@ -79,7 +79,7 @@ Ganti blok di atas persis dengan:
   return withSessionAdmission({ id, force: opts.force || opts.bypassCapacity }, async () => {
 ```
 
-- [ ] **Step 3: Tulis test yang gagal dulu**
+- [x] **Step 3: Tulis test yang gagal dulu**
 
 Di `server/test/session-launch-admission.test.ts`, tambahkan `it` baru di dalam
 `describe("SPEC-1108 · gerbang bersama peluncuran backlog", ...)`, sesudah test
@@ -93,7 +93,7 @@ Di `server/test/session-launch-admission.test.ts`, tambahkan `it` baru di dalam
   });
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan GAGAL dulu (opsi belum ada efeknya)**
+- [x] **Step 4: Jalankan test, pastikan GAGAL dulu (opsi belum ada efeknya)**
 
 Run: `pnpm --filter ./server vitest run session-launch-admission.test.ts`
 Expected sebelum Step 2 diterapkan: FAIL — `state.effects` tidak memuat `"spawn"` (request
@@ -103,12 +103,12 @@ ditolak `LaunchAdmissionError` kind `"capacity"` karena cap 1 sudah terisi pane 
 > pembaca melihat kode akhir lebih dulu, tapi saat eksekusi TETAP tulis test (Step 3), jalankan
 > dan pastikan gagal, BARU terapkan Step 2, sesuai TDD.
 
-- [ ] **Step 5: Jalankan test lagi, pastikan LULUS**
+- [x] **Step 5: Jalankan test lagi, pastikan LULUS**
 
 Run: `pnpm --filter ./server vitest run session-launch-admission.test.ts`
 Expected: PASS, seluruh `describe("SPEC-1108 …")` hijau (3 test).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/session-launch.ts server/test/session-launch-admission.test.ts
@@ -138,7 +138,7 @@ EOF
   file ini, baris 29).
 - Produces: `reconciledSpecIdsSince(cutoff: Date): Promise<string[]>` — dipakai Task 3.
 
-- [ ] **Step 1: Tulis test yang gagal dulu**
+- [x] **Step 1: Tulis test yang gagal dulu**
 
 Di `server/test/session-history.service.test.ts`, ubah baris import (baris 6-9) agar ikut
 mengimpor fungsi baru:
@@ -172,12 +172,12 @@ test `"satu sapuan boot memberi SATU stempel reconciledAt untuk semua barisnya"`
   });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm --filter ./server vitest run session-history.service.test.ts --no-file-parallelism`
 Expected: FAIL — `reconciledSpecIdsSince is not a function` (belum diekspor).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Di `server/src/services/session-history.ts`, sisipkan fungsi baru tepat SESUDAH penutup
 `reconcileHistory` (baris 231, `}`) dan SEBELUM komentar `// Dipanggil server.ts sebelum request
@@ -199,12 +199,12 @@ export async function reconciledSpecIdsSince(cutoff: Date): Promise<string[]> {
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm --filter ./server vitest run session-history.service.test.ts --no-file-parallelism`
 Expected: PASS, seluruh file hijau.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/session-history.ts server/test/session-history.service.test.ts
@@ -239,7 +239,7 @@ EOF
   `ResumeDeps = { startSpec: (spec: Spec) => Promise<StartSpecResult>; recordFail: (specId: string, title: string, projectId: string | null, reason: string) => Promise<void> }`.
   Dipakai Task 4 (`server.ts`) tanpa argumen `deps` (memakai default produksi).
 
-- [ ] **Step 1: Tulis test yang gagal dulu**
+- [x] **Step 1: Tulis test yang gagal dulu**
 
 Buat `server/test/session-boot-resume.test.ts`:
 
@@ -333,12 +333,12 @@ describe("resumeReconciledSessions (ADR-0169)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan GAGAL**
+- [x] **Step 2: Jalankan test, pastikan GAGAL**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm --filter ./server vitest run session-boot-resume.test.ts --no-file-parallelism`
 Expected: FAIL — modul `../src/services/session-boot-resume` belum ada.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Buat `server/src/services/session-boot-resume.ts`:
 
@@ -394,17 +394,17 @@ export async function resumeReconciledSessions(cutoff: Date, deps: ResumeDeps = 
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan LULUS**
+- [x] **Step 4: Jalankan test, pastikan LULUS**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm --filter ./server vitest run session-boot-resume.test.ts --no-file-parallelism`
 Expected: PASS, 3 test hijau.
 
-- [ ] **Step 5: Typecheck paket server**
+- [x] **Step 5: Typecheck paket server**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: nol error.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/session-boot-resume.ts server/test/session-boot-resume.test.ts
@@ -432,7 +432,7 @@ EOF
 - Consumes: `resumeReconciledSessions` (Task 3), `reconcileHistory` (existing, tak berubah).
 - Produces: tidak ada — titik integrasi akhir, hanya dipanggil dari boot sequence proses.
 
-- [ ] **Step 1: Tambah import**
+- [x] **Step 1: Tambah import**
 
 Di `server/src/server.ts`, sesudah baris 10 (`import { installSessionHistory, reconcileHistory }
 from "./services/session-history";`), tambahkan:
@@ -441,7 +441,7 @@ from "./services/session-history";`), tambahkan:
 import { resumeReconciledSessions } from "./services/session-boot-resume";
 ```
 
-- [ ] **Step 2: Ganti blok reconcile boot**
+- [x] **Step 2: Ganti blok reconcile boot**
 
 Cari blok ini (sekitar baris 128-137):
 
@@ -486,12 +486,12 @@ Ganti persis dengan:
       .catch((e) => console.error("rekonsiliasi riwayat sesi:", e));
 ```
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `pnpm --filter ./server typecheck`
 Expected: nol error.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/src/server.ts
@@ -519,7 +519,7 @@ EOF
 - Consumes: tidak ada (dokumentasi murni).
 - Produces: tidak ada.
 
-- [ ] **Step 1: Tulis ADR-0169**
+- [x] **Step 1: Tulis ADR-0169**
 
 Buat `internal/docs/adr/0169-auto-resume-sesi-setelah-boot.md`:
 
@@ -608,7 +608,7 @@ keduanya (kapasitas + dependency) seperti sebelum ADR ini — `bypassCapacity` a
 tambahan, bukan pengganti.
 ```
 
-- [ ] **Step 2: Tautkan di index docs**
+- [x] **Step 2: Tautkan di index docs**
 
 Di `internal/docs/README.md`, sisipkan baris baru TEPAT SESUDAH baris `## adr` (baris 114) dan
 SEBELUM baris `- [0168 — …]` (baris 115) — jadi ADR-0169 muncul paling atas (terbaru):
@@ -617,7 +617,7 @@ SEBELUM baris `- [0168 — …]` (baris 115) — jadi ADR-0169 muncul paling ata
 - [0169 — Sesi backlog yang direkonsiliasi saat boot dilanjutkan otomatis](adr/0169-auto-resume-sesi-setelah-boot.md) — **mengamandemen 0161** (kapasitas dilewati lewat opsi baru `bypassCapacity`, TERPISAH dari `force` — gerbang dependency 0093 tetap berlaku), melengkapi 0084 (jalur `resume` dipakai apa adanya). `reconciledSpecIdsSince()` menurunkan kandidat dari sapuan `reconcileHistory()` yang sudah ada, `resumeReconciledSessions()` memanggil `startSpecSession()` berurutan per kandidat, kegagalan per item dicatat notifikasi tanpa menghentikan yang lain. Design: [rancangan auto-resume sesi](../../docs/superpowers/specs/2026-09-22-auto-resume-sesi-setelah-restart-design.md)
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add internal/docs/adr/0169-auto-resume-sesi-setelah-boot.md internal/docs/README.md
@@ -641,19 +641,19 @@ EOF
 - Produces: bukti tertulis (log) bahwa boot sungguhan memicu auto-resume, dilampirkan di ringkasan
   penyelesaian task ini (bukan file baru).
 
-- [ ] **Step 1: Siapkan DB test terisolasi**
+- [x] **Step 1: Siapkan DB test terisolasi**
 
 ```bash
 export TEST_DATABASE_URL="file:$(mktemp -d)/hanoman-verify.db"
 export HANOMAN_HOME="$(mktemp -d)"
 ```
 
-- [ ] **Step 2: Migrate DB verifikasi**
+- [x] **Step 2: Migrate DB verifikasi**
 
 Run: `pnpm --filter ./server exec prisma migrate deploy --schema server/prisma/schema.prisma`
 Expected: migration sukses, nol error.
 
-- [ ] **Step 3: Suntik satu baris `SessionHistory` "berjalan" + `Spec` yang belum `done`**
+- [x] **Step 3: Suntik satu baris `SessionHistory` "berjalan" + `Spec` yang belum `done`**
 
 Buat skrip sekali-pakai `/tmp/seed-boot-verify.mjs` (di luar repo, scratch):
 
@@ -676,7 +676,7 @@ await prisma.$disconnect();
 Run: `node /tmp/seed-boot-verify.mjs`
 Expected: cetak `seeded`.
 
-- [ ] **Step 4: Boot server, amati log**
+- [x] **Step 4: Boot server, amati log**
 
 Run: `pnpm --filter ./server dev` (atau `node server/dist/server.js` bila sudah dibuild), biarkan
 ±10 detik, lalu hentikan (Ctrl-C).
@@ -692,18 +692,30 @@ Expected di log:
 
 Kalau TIDAK ADA baris `auto-resume:` sama sekali → bug di wiring Task 4, perbaiki sebelum lanjut.
 
-- [ ] **Step 5: Bersihkan**
+- [x] **Step 5: Bersihkan**
 
 ```bash
 rm -f /tmp/seed-boot-verify.mjs
 unset TEST_DATABASE_URL HANOMAN_HOME
 ```
 
-- [ ] **Step 6: Laporkan hasil**
+- [x] **Step 6: Laporkan hasil**
 
 Tulis satu paragraf di ringkasan penyelesaian task ini: log baris mana yang benar-benar muncul,
 dan konfirmasi bahwa itu membuktikan wiring boot → auto-resume berjalan pada instance sungguhan.
 Tidak ada commit di task ini (tak ada file diubah).
+
+**Hasil (dijalankan 2026-09-22):** boot server sungguhan (`tsx src/server.ts`, terisolasi penuh —
+`HANOMAN_HOME`/`DATABASE_URL` scratch, `HANOMAN_TMUX_SOCKET` terpisah, `PORT=8799`, tanpa menyentuh
+instance produksi yang sedang berjalan di mesin yang sama) mencetak persis:
+`riwayat sesi: 1 baris berjalan direkonsiliasi` diikuti
+`auto-resume: 1 sesi gagal dilanjutkan otomatis, lihat notifikasi (SPEC-VERIFY-1)`. Notifikasi
+`fail:SPEC-VERIFY-1` terverifikasi tersimpan di DB dengan title
+`"Gagal: Verifikasi boot — gagal dilanjutkan otomatis — launch SPEC-VERIFY-1 belum disetujui
+principal sessions:write"` — alasan gagalnya persis `assertLaunchApproved` (fixture verifikasi
+sengaja tak pernah `launchApprovedAt`), bukan bug wiring. Ini membuktikan rantai penuh
+`reconcileHistory()` → `resumeReconciledSessions()` → `startSpecSession()` → kegagalan tertangkap
+→ `recordFailure()` benar-benar terpanggil pada boot sungguhan, bukan cuma lulus test terisolasi.
 
 ---
 
