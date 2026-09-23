@@ -27,9 +27,9 @@ describe("buildPhaseAgents (ADR-0164)", () => {
     const expectedRuntime = {
       Brainstorm: { model: "sonnet", effort: "medium" },
       Objective: { model: "sonnet", effort: "medium" },
-      Spec: { model: "opus", effort: "medium" },
-      Plan: { model: "sonnet", effort: "medium" },
-      Execute: { model: "sonnet", effort: "medium" },
+      Spec: { model: "opus", effort: "high" },
+      Plan: { model: "opus", effort: "high" },
+      Execute: { model: "sonnet", effort: "high" },
     } as const;
     for (const d of defs) {
       expect(d).toMatchObject({

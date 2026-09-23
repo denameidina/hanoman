@@ -165,6 +165,26 @@ berlaku pada sesi yang sedang dilahirkan. Prioritas resolusi adalah:
 Ganti runtime pada modal menghapus override fase karena katalog Claude dan Codex berbeda. Flow mati
 atau Codex yang belum mendukung native subagent tetap mengikuti fallback sesi tunggal.
 
+## Amandemen 2026-09-23 — effort per peran fase (`RUNTIME_DEFAULTS_VERSION` 2026-09-23-v2)
+
+Matriks 2026-09-17 memberi `medium` pada semua fase. Effort seragam itu salah alokasi: fase penentu
+arah mendapat nalar terlalu dangkal, sementara fase percakapan dengan manusia tak butuh lebih dari
+medium. v2 mengalokasikan effort menurut peran fase:
+
+| Peran fase | Fase | Claude | Codex |
+|---|---|---|---|
+| Penentu arah | Spec, Plan (feature), Audit (qa/audit), Analisis, Doc index, PRD | `opus` · high | Sol · high |
+| Eksekusi kode | Execute, Plan (qa), Goal, Docs teknis | `sonnet` · high | Terra · high |
+| Interaktif dengan manusia | Brainstorm, Objective, Wawancara, Scan | `sonnet` · medium | Terra · medium |
+| Verifikasi / sintesis ringan | Verifikasi, Breakdown, Konvensi & index | `opus` · medium | Sol · medium |
+| Menulis ulang temuan | Laporan · Serah terima | `sonnet` · medium · low | Terra · medium · low |
+
+Alasan: kesalahan fase penentu arah menjalar ke semua fase sesudahnya, sedangkan keluarannya pendek
+sehingga effort tinggi murah; eksekusi kode paling peka effort, dan medium cenderung menambah
+putaran revisi yang lebih mahal per task selesai; Verifikasi memakai keluarga model yang berbeda
+dari eksekutor supaya hijau palsu lebih mungkin tertangkap. Orchestrator global dan `no_effort`
+tidak berubah. Seed boot memindahkan sel berstatus `seeded` ke matriks v2; sel `user` tak disentuh.
+
 ## Amandemen 2026-09-23 — temuan audit orkestrasi (prioritas sedang)
 
 - **S1 · relay ke subagent yang sama.** `SubagentStart` kedua dengan `agent_id` sama sesudah Stop

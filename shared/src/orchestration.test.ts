@@ -39,9 +39,12 @@ describe("phaseAgentName", () => {
 describe("Setting.orchestration", () => {
 	it("default bawaan memuat rekomendasi model/effort per flow dan fase", () => {
 		expect(Object.keys(ORCHESTRATION_DEFAULTS).sort()).toEqual([...ORCHESTRATION_FLOWS].sort());
-		expect(ORCHESTRATION_DEFAULTS.feature.claude.Spec).toEqual({ model: "opus", effort: "medium" });
-		expect(ORCHESTRATION_DEFAULTS.feature.codex.Spec).toEqual({ model: "gpt-5.6-sol", effort: "medium" });
-		expect(ORCHESTRATION_DEFAULTS.feature.claude.Execute).toEqual({ model: "sonnet", effort: "medium" });
+		expect(ORCHESTRATION_DEFAULTS.feature.claude.Spec).toEqual({ model: "opus", effort: "high" });
+		expect(ORCHESTRATION_DEFAULTS.feature.codex.Spec).toEqual({ model: "gpt-5.6-sol", effort: "high" });
+		expect(ORCHESTRATION_DEFAULTS.feature.claude.Plan).toEqual({ model: "opus", effort: "high" });
+		expect(ORCHESTRATION_DEFAULTS.feature.claude.Execute).toEqual({ model: "sonnet", effort: "high" });
+		expect(ORCHESTRATION_DEFAULTS.feature.claude.Brainstorm).toEqual({ model: "sonnet", effort: "medium" });
+		expect(ORCHESTRATION_DEFAULTS.goal.claude.Verifikasi).toEqual({ model: "opus", effort: "medium" });
 		expect(ORCHESTRATION_DEFAULTS.no_effort.enabled).toBe(false);
 		expect(ORCHESTRATION_DEFAULTS).toEqual(BUILTIN_ORCHESTRATION_DEFAULTS);
 	});

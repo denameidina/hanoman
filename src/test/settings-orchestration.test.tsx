@@ -47,7 +47,7 @@ describe("Settings · Orkestrasi (ADR-0164)", () => {
     await open();
     fireEvent.change(screen.getByLabelText("Model feature Plan claude"), { target: { value: "sonnet" } });
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
-    expect(lastPut().orchestration.feature.claude.Plan).toEqual({ model: "sonnet", effort: "medium" });
+    expect(lastPut().orchestration.feature.claude.Plan).toEqual({ model: "sonnet", effort: "high" });
   });
 
   it("memilih effort sel menyimpan effort itu", async () => {

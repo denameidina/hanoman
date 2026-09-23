@@ -41,7 +41,7 @@ describe("runtime defaults", () => {
       claude: { model: state, effort: "seeded" } });
     const seeded = applyRuntimeDefaults({ ...base, model: "claude-sonnet-5", builtinRuntimeDefaults: marker("seeded") })!;
     expect(seeded.data.model).toBe("sonnet");
-    expect(seeded.data.orchestration.feature.claude.Spec).toEqual({ model: "opus", effort: "medium" });
+    expect(seeded.data.orchestration.feature.claude.Spec).toEqual({ model: "opus", effort: "high" });
     const pinned = applyRuntimeDefaults({ ...base, model: "claude-sonnet-5", builtinRuntimeDefaults: marker("user") })!;
     expect(pinned.data.model).toBe("claude-sonnet-5");
   });
