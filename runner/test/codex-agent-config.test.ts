@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported,
-  codexNativeVersionProbe, materializeCodexAgents, renderCodexAgentToml,
+  codexNativeVersionProbe, materializeCodexAgents, renderCodexAgentToml, tomlBasicString,
 } from "../src/codex-agent-config";
 import type { AgentDef } from "../src/custom-agents";
 
@@ -29,6 +29,47 @@ describe("renderCodexAgentToml", () => {
     expect(out).toContain("20 turn");
     expect(out).toContain("batas instruksional");
     expect(out).not.toContain("max_turns");
+  });
+});
+
+describe("tomlBasicString (TOML 1.0 basic string)", () => {
+  // Payload/objective/isu GitHub mengalir ke developer_instructions agen fase — teks pengguna.
+  const nasty = 'a\u0000b\u0001c\u001fd\u007fe\tf\ng\rh\bi\fj"k\\l ✓ 日本 😀 \ud800 x \udc00 y \ud83d';
+  const out = tomlBasicString(nasty);
+
+  it("meng-escape SEMUA kontrol U+0000–U+001F dan U+007F (DEL)", () => {
+    expect(out).not.toMatch(/[\u0000-\u001f\u007f]/);
+    expect(out).toContain("\\u007F");
+    expect(out).toContain("\\u0000");
+    expect(out).toContain("\\u001F");
+    expect(out).toContain("\\t");
+    expect(out).toContain("\\n");
+    expect(out).toContain('\\"');
+    expect(out).toContain("\\\\");
+  });
+
+  it("surrogate tunggal (tak terwakili di TOML) menjadi U+FFFD, pasangan sah dipertahankan", () => {
+    expect(out).not.toMatch(/\\u[dD][89a-fA-F]/);
+    expect(out).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/);
+    expect(out).toContain("😀");
+    expect(out).toContain("✓ 日本");
+  });
+
+  it("round-trip: escape yang dipakai adalah subset JSON, jadi JSON.parse membaca isi yang sama", () => {
+    const expected = nasty.replace(
+      /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "\ufffd",
+    );
+    expect(JSON.parse(out)).toBe(expected);
+    expect(out.startsWith('"') && out.endsWith('"')).toBe(true);
+  });
+
+  it("renderCodexAgentToml memakai escaper ini untuk instruksi agen fase", () => {
+    const phaseDef: AgentDef = {
+      kind: "phase", phase: "Spec", name: "hanoman-fase-spec", description: "Fase Spec",
+      instructions: "isu \u007f\ud800", tools: null, model: "gpt-5.6-sol", effort: "medium", mentions: [],
+    };
+    const toml = renderCodexAgentToml(phaseDef, [phaseDef]);
+    expect(toml).toContain('developer_instructions = "isu \\u007F\ufffd"');
   });
 });
 

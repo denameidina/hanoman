@@ -2083,7 +2083,10 @@ PATCH  /api/custom-agents/invocations/:id { disposition, note?, reworkRequired? 
 > lahir dengan `--agents "$(cat <file>)"` (mekanisme native; JSON di berkas tmpdir seperti prompt
 > SPEC-223, karena tmux membatasi SATU command ±16 KB). Sesi **codex** menerima
 > `agents.enabled=true` + satu `agents."name".config_file` TOML temp per child. Prompt parent kedua
-> runtime hanya membawa nama/deskripsi/klausa delegasi, bukan full instructions.
+> runtime hanya membawa nama/deskripsi/klausa delegasi, bukan full instructions. Semua string TOML
+> (berkas dan nilai `-c`) ditulis `tomlBasicString` (TOML 1.0), bukan `JSON.stringify`: kontrol
+> U+0000–U+001F dan U+007F di-escape, surrogate tunggal diganti U+FFFD — instruksi agen fase membawa
+> teks pengguna, dan DEL mentah membuat codex gagal mem-parse berkas.
 > Codex native agent memerlukan client terdeteksi `>=0.151.0`; selain itu Hanoman memperingatkan,
 > tidak memasang registry, dan tidak menghidupkan kembali roster inline. Probe mengikuti konteks
 > eksekusi sesi (host atau image Podman), berjalan sesudah config DB dimuat, refresh langsung saat
