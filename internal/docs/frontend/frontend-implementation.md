@@ -2303,4 +2303,8 @@ Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa p
   Baris chip menggulir horizontal di scroller-nya sendiri; panel detail adalah SIBLING dari scroller itu,
   diposisikan relatif terhadap badan sel (`position: relative` di badan sel, bukan di strip), tingginya
   dibatasi tinggi badan sel (`maxHeight: calc(100% - 48px)`) dengan scroll vertikal internal, lebarnya ≤
-  lebar sel. Fase tanpa agen digambar seperti sebelumnya.
+  lebar sel. Fase tanpa agen digambar seperti sebelumnya. Aksesibilitas (audit R2): nama aksesibel chip
+  selalu lengkap — `Fase <nama>: <status> · <model> · <effort> · <durasi> · percobaan n · bukti subagent
+  tak diterima` (`chipAccessibleName`, juga saat mode ringkas menyembunyikannya secara visual); panel
+  `Detail fase <nama>` memakai `usePopoverFocus` DS (`aria-haspopup`/`aria-controls`, fokus masuk panel,
+  Esc & klik-luar menutup, fokus kembali ke chip).
