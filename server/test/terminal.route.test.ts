@@ -9,7 +9,7 @@ import type { AddressInfo } from "node:net";
 import { RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MODE_HEADER, type RemoteCapability } from "@hanoman/shared";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
-import { killAll, killSession, listSessions, promptFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
+import { killAll, killSession, listSessions, promptFilePath, agentsFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { phaseFilePath } from "../src/services/session-phases";
 import { sweepRepo, __resetReaper } from "../src/services/worktree-reaper";
@@ -806,6 +806,7 @@ describe("terminal routes · sesi reverse", () => {
     const id = born.json().id as string;
     const wt = join(repoDir, ".worktrees", id);
     writeFileSync(join(wt, "draft-docs.md"), "dokumen setengah jadi");
+    appendFileSync(phaseFilePath(repoDir, id), "Scan done\n");
 
     killSession(id);                       // pane hilang, worktree tetap
     const again = await start("p1");
@@ -814,6 +815,10 @@ describe("terminal routes · sesi reverse", () => {
     expect(existsSync(join(wt, "draft-docs.md"))).toBe(true);        // TIDAK terhapus
     expect(listSessions().filter((s) => s.id === id && !s.exited)).toHaveLength(1);
     expect(readFileSync(promptFilePath(id), "utf8")).toContain("BUKAN kosong");
+    // S2 · agen fase (konteks terpisah) ikut tahu ia melanjutkan — bukan hanya orchestrator.
+    const agents = JSON.parse(readFileSync(agentsFilePath(id), "utf8")) as Record<string, { prompt: string }>;
+    expect(agents["hanoman-fase-docs-teknis"]!.prompt).toContain("MELANJUTKAN pekerjaan sesi sebelumnya");
+    expect(agents["hanoman-fase-docs-teknis"]!.prompt).toContain("Scan done");
     killSession(id);
   });
 
@@ -824,6 +829,7 @@ describe("terminal routes · sesi reverse", () => {
     expect(r.statusCode).toBe(201);
     const id = r.json().id as string;
     expect(readFileSync(promptFilePath(id), "utf8")).not.toContain("BUKAN kosong");
+    expect(readFileSync(agentsFilePath(id), "utf8")).not.toContain("MELANJUTKAN");
     killSession(id);
   });
 

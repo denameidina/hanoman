@@ -144,3 +144,13 @@ berlaku pada sesi yang sedang dilahirkan. Prioritas resolusi adalah:
 
 Ganti runtime pada modal menghapus override fase karena katalog Claude dan Codex berbeda. Flow mati
 atau Codex yang belum mendukung native subagent tetap mengikuti fallback sesi tunggal.
+
+## Amandemen 2026-09-23 — temuan audit orkestrasi (prioritas sedang)
+
+- **S1 · relay ke subagent yang sama.** `SubagentStart` kedua dengan `agent_id` sama sesudah Stop
+  (relay `SendMessage`, P3/ADR-0167) membuka ulang `AgentInvocation` (running, `startedAt` pertama
+  tetap) alih-alih dianggap duplikat; Stop akhir menulis bukti terbaru. Replay spool dibedakan lewat
+  waktu kejadian event (`x-hanoman-event-at`). `attempts` tak bertambah (id sama).
+- **S2 · resume sampai ke agen fase.** `PhaseAgentContext.resume` menambahkan blok
+  `=== MELANJUTKAN ===` ke instruksi setiap agen fase — backlog dari `ResumeCtx`, project bila
+  worktree dipakai ulang. Tanpa resume instruksi byte-identik.

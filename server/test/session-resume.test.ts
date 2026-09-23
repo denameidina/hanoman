@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { prisma } from "../src/db";
 import { startSpecSession } from "../src/services/session-launch";
-import { killAll, killSession, getSession, createSession, promptFilePath } from "../src/services/pty";
+import { killAll, killSession, getSession, createSession, promptFilePath, agentsFilePath } from "../src/services/pty";
 import { realGit } from "@hanoman/runner";
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
@@ -136,6 +136,13 @@ describe("SPEC-394 · resume dengan worktree utuh", () => {
     expect(prompt).toContain("Spec skipped");
     expect(prompt).toContain("Lanjutkan dari fase: Plan.");
     expect(prompt).toContain("belum di-commit");
+    // S2 · agen fase lahir dengan konteks TERPISAH — catatan resume harus ada di definisinya juga.
+    const agents = JSON.parse(readFileSync(agentsFilePath(r2.id), "utf8")) as Record<string, { prompt: string }>;
+    for (const name of ["hanoman-fase-plan", "hanoman-fase-execute"]) {
+      expect(agents[name]!.prompt).toContain("MELANJUTKAN pekerjaan sesi sebelumnya");
+      expect(agents[name]!.prompt).toContain("Audit done · Spec skipped");
+      expect(agents[name]!.prompt).toContain("belum di-commit");
+    }
     killSession(r2.id);
   });
 
@@ -179,6 +186,8 @@ describe("SPEC-394 · resume tanpa worktree, fresh, dan stage done", () => {
     const prompt = readFileSync(promptFilePath(r2.id), "utf8");
     expect(prompt).toContain("DIBANGUN ULANG");
     expect(prompt).toContain("TIDAK ada");
+    const agents = JSON.parse(readFileSync(agentsFilePath(r2.id), "utf8")) as Record<string, { prompt: string }>;
+    expect(agents["hanoman-fase-audit"]!.prompt).toContain("DIBANGUN ULANG");
     killSession(r2.id);
   });
 

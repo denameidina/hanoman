@@ -77,6 +77,13 @@ const ensureWorktree = (repoDir: string, wt: string, branchFrom: string): boolea
   return false;
 };
 const resumeNote = (reused: boolean): string => (reused ? `\n\n${RESUMED_WORKTREE_NOTE}` : "");
+// S2 · SPEC-394 · kembaran `resumeNote` untuk AGEN FASE: subagent lahir dengan konteks terpisah dan
+// tak pernah melihat prompt orchestrator. Fase yang sudah tercatat ikut disebut supaya agen fase tak
+// mengulang artefak fase sebelumnya. Worktree baru → undefined (instruksi byte-identik).
+const phaseResume = (reused: boolean, repoDir: string, id: string, flow: Flow) => reused
+  ? { resume: { worktreeKept: true, recorded: readPhases(phaseFilePath(repoDir, id), flow)
+    .filter((p) => p.state === "done" || p.state === "skipped").map((p) => `${p.name} ${p.state}`) } }
+  : {};
 
 export default async function (app: FastifyInstance, opts: { allowedOrigins?: Set<string> }) {
   app.get("/terminal/sessions", async () => listSessions());
@@ -207,7 +214,10 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
           prompt: plan ? startProjectPrompt("reverse", brief, "reverse-docs", plan) + resumeNote(reused) : legacyPrompt,
           legacyPrompt,
           phaseAgents: plan
-            ? buildPhaseAgents(plan, { flow: "reverse", method: PROJECT_METHOD, context: projectContext(brief) }) : [],
+            ? buildPhaseAgents(plan, {
+              flow: "reverse", method: PROJECT_METHOD, context: projectContext(brief),
+              ...phaseResume(reused, repoDir, id, "reverse"),
+            }) : [],
         });
         return { code: 201, body: { id: s.id } };
       }, (pane) => ({ code: 201, body: { id: pane.id } }));
@@ -247,7 +257,10 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
           prompt: plan ? startScaffoldPrompt(brief, "scaffold-docs", plan) + resumeNote(reused) : legacyPrompt,
           legacyPrompt,
           phaseAgents: plan
-            ? buildPhaseAgents(plan, { flow: "scaffold", method: PROJECT_METHOD, context: scaffoldContext(brief) }) : [],
+            ? buildPhaseAgents(plan, {
+              flow: "scaffold", method: PROJECT_METHOD, context: scaffoldContext(brief),
+              ...phaseResume(reused, repoDir, id, "scaffold"),
+            }) : [],
         });
         return { code: 201, body: { id: s.id } };
       }, (pane) => ({ code: 201, body: { id: pane.id } }));
@@ -293,6 +306,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
           legacyPrompt,
           phaseAgents: plan ? buildPhaseAgents(plan, {
             flow: "prd", method: PROJECT_METHOD, context: prdContext(project_, brief, audit), prd: { slug },
+            ...phaseResume(reused, repoDir, id, "prd"),
           }) : [],
         });
         return { code: 201, body: { id: s.id } };
@@ -338,6 +352,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
           legacyPrompt,
           phaseAgents: plan ? buildPhaseAgents(plan, {
             flow: "breakdown", method: PROJECT_METHOD, context: breakdownContext(project_, prd), prd: { slug, title },
+            ...phaseResume(reused, repoDir, id, "breakdown"),
           }) : [],
         });
         return { code: 201, body: { id: s.id } };

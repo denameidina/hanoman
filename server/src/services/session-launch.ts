@@ -272,6 +272,8 @@ export async function startSpecSession(
       flow: opts.flow, method, verifyScope,
       context: isGoalFlow ? goalContext(brief) : specContext(brief),
       fromAudit: fromAuditOf(spec.payload),
+      // S2 · SPEC-394 · subagent tak melihat `resumeClause` orchestrator — ia dapat catatannya sendiri.
+      ...(resumeCtx ? { resume: resumeCtx } : {}),
     }) : [];
     // SPEC-376 · ADR-0080 · env sesi. baseSha SUDAH dihitung di addWorktree di atas — tanpa
     // meneruskannya, klausa "berkas yang berubah" tak bisa dieksekusi tanpa menebak: worktree
