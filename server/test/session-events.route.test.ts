@@ -130,6 +130,41 @@ describe("POST /api/session-events", () => {
     await app.close();
   });
 
+  // S1 · test di atas tetap sah: Start/Stop KEMBAR adalah replay (spool mengirim ulang event yang
+  // sama). Yang dulu ikut terkunci sebagai "duplikat" adalah Start SESUDAH Stop — itu lanjutan relay
+  // ADR-0167 (P3: `agent_id` sama), bukan replay, dan kini membuka ulang baris.
+  it("S1 · relay jawaban ke subagent yang sama: Start kedua membuka ulang, Stop akhir menang", async () => {
+    const app = buildApp();
+    const ev = (name: string, extra: object = {}) =>
+      ({ hook_event_name: name, agent_id: "ag-relay", agent_type: "hanoman-fase-plan", ...extra });
+    const at = (ms: number) => ({ ...auth("s1"), "x-hanoman-event-at": String(ms) });
+    const t0 = Date.now() - 60_000;
+    expect((await post(app, ev("SubagentStart"), at(t0))).json()).toEqual({ accepted: true });
+    expect((await post(app, ev("SubagentStop", { last_assistant_message: "Status: menunggu-keputusan" }),
+      at(t0 + 10_000))).json()).toEqual({ accepted: true });
+    // replay Start pertama dari spool (lebih tua dari Stop) tetap duplikat
+    expect((await post(app, ev("SubagentStart"), at(t0))).json()).toEqual({ duplicate: true });
+    expect((await post(app, ev("SubagentStart"), at(t0 + 30_000))).json()).toEqual({ accepted: true });
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "ag-relay" } }))
+      .toMatchObject({ status: "running", endedAt: null, startedAt: new Date(t0) });
+    expect((await post(app, ev("SubagentStop", { last_assistant_message: "Status: selesai" }),
+      at(t0 + 50_000))).json()).toEqual({ accepted: true });
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "ag-relay" } }))
+      .toMatchObject({ status: "completed", durationMs: 50_000, resultExcerpt: "Status: selesai" });
+    await app.close();
+  });
+
+  it("S1 · x-hanoman-event-at di luar rentang wajar diabaikan (jatuh ke waktu terima)", async () => {
+    const app = buildApp();
+    const before = Date.now();
+    await post(app, { hook_event_name: "SubagentStart", agent_id: "ag-far", agent_type: "scout" },
+      { ...auth("s1"), "x-hanoman-event-at": String(Date.now() + 86_400_000) });
+    const row = await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "ag-far" } });
+    expect(row.startedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(row.startedAt.getTime()).toBeLessThanOrEqual(Date.now());
+    await app.close();
+  });
+
   it("ADR-0164 · event agen fase menyimpan phase & effort; stop mengambil effort runtime", async () => {
     const app = buildApp();
     const start = await post(app, { hook_event_name: "SubagentStart", agent_id: "ag-1", agent_type: "hanoman-fase-plan" }, auth("s1"));

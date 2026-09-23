@@ -26,10 +26,11 @@ beforeEach(async () => {
 });
 afterAll(clean);
 
-const reconciledFor = async (specId: string) => {
+const reconciledFor = async (specId: string, runtime: { agent?: "claude" | "codex"; model?: string; effort?: string } = {}) => {
   await beginSession({
     sessionId: specId.toLowerCase(), projectId: PROJECT_ID, specId, flow: "feature",
-    kind: "spec", agent: "claude", cwd: `/repo/.worktrees/${specId.toLowerCase()}`,
+    kind: "spec", agent: runtime.agent ?? "claude", model: runtime.model, effort: runtime.effort,
+    cwd: `/repo/.worktrees/${specId.toLowerCase()}`,
   });
 };
 
@@ -73,6 +74,25 @@ describe("resumeReconciledSessions (ADR-0169)", () => {
     expect(report.failed).toEqual(["SPEC-9101"]);
     expect(failedReasons).toHaveLength(1);
     expect(failedReasons[0]).toContain("worktree rusak");
+  });
+
+  // S4c · resume = MELANJUTKAN sesi yang sama (ADR-0084): runtime saat lahir (SessionHistory) ikut,
+  // bukan Setting global — sesi codex tak boleh lanjut sebagai claude.
+  it("S4c · meneruskan agen/model/effort sesi asal dari SessionHistory", async () => {
+    await seedSpec({ id: "SPEC-9104", stage: "executing" });
+    await seedSpec({ id: "SPEC-9105", stage: "executing" });
+    await reconciledFor("SPEC-9104", { agent: "codex", model: "gpt-5.6-terra", effort: "low" });
+    await reconciledFor("SPEC-9105");
+    const cutoff = new Date();
+    await reconcileHistory([]);
+    const seen: Record<string, unknown> = {};
+    const deps: ResumeDeps = {
+      startSpec: async (spec, runtime) => { seen[spec.id] = runtime; return { id: spec.id }; },
+      recordFail: async () => { throw new Error("tak boleh dipanggil"); },
+    };
+    await resumeReconciledSessions(cutoff, deps);
+    expect(seen["SPEC-9104"]).toEqual({ agent: "codex", model: "gpt-5.6-terra", effort: "low" });
+    expect(seen["SPEC-9105"]).toEqual({ agent: "claude" });
   });
 
   it("tak ada kandidat → deps sama sekali tak dipanggil", async () => {

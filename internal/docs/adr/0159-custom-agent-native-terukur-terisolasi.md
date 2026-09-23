@@ -141,6 +141,10 @@ exception, `429`, dan 5xx dipertahankan untuk tick berikutnya. Hook selalu fail-
 Roster efektif disimpan sebagai metadata tmux sehingga server hanya menerima `agent_type` Hanoman
 yang benar-benar tersedia di sesi itu. Unique `(sessionId,runtimeInvocationId)` membuat start/stop
 idempoten; boot menutup invocation `running` tanpa parent hidup sebagai `abandoned`.
+Amandemen 2026-09-23 (audit S1, ADR-0167): Start sesudah Stop dengan `agent_id` sama adalah relay
+`SendMessage` ke subagent yang SAMA, bukan replay — baris dibuka ulang dan Stop akhir menulis bukti
+terbaru. Pembedanya waktu kejadian event (`x-hanoman-event-at` dari nama berkas spool; relay kini
+mengirim urut kronologis), lihat kontrak `POST /session-events` di api-contract.
 
 `AgentInvocation` LOCAL-only dan tanpa FK. Ia menyimpan waktu/status, model, token yang benar-benar
 tersedia, excerpt bersih ANSI maksimal 4 KiB, hash hasil penuh, hash perubahan status worktree,

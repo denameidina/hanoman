@@ -1,5 +1,6 @@
 import {
-  CLAUDE_DEFAULT_ALIAS, cmpVersion, coerceClaudeEffort, coerceCodexEffort, type Orchestration, type PhaseOverrides,
+  CLAUDE_DEFAULT_ALIAS, ORCHESTRATION_DEFAULTS, cmpVersion, coerceClaudeEffort, coerceCodexEffort,
+  type Orchestration, type PhaseOverrides,
 } from "./entities";
 
 /** Nilai `model` subagent claude yang berarti "model percakapan utama" (dokumen sub-agents Claude Code). */
@@ -20,7 +21,8 @@ export function codexNativeAgentsSupported(version: string | null): boolean {
 export type PhasePlanInput = {
   flow: OrchestrationFlow;
   runtime: "claude" | "codex";
-  /** `undefined` = respons Setting lama tanpa blok ini → default aktif. */
+  /** `undefined` = respons Setting lama tanpa blok ini → `ORCHESTRATION_DEFAULTS` (matriks bawaan,
+   *  `no_effort` mati — amandemen 2026-09-17), sama dengan `.default()` zSetting di server. */
   orchestration: Orchestration | undefined;
   orchestrator: { model: string; effort: string };
   /** Override model/effort yang dipilih operator hanya untuk sesi ini. */
@@ -30,7 +32,7 @@ export type PhasePlanInput = {
 };
 
 export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
-  const cfg = input.orchestration?.[input.flow];
+  const cfg = (input.orchestration ?? ORCHESTRATION_DEFAULTS)[input.flow];
   if (!input.nativeAgents || cfg?.enabled === false) return null;
   const cells = cfg?.[input.runtime] ?? {};
   // Effort dikoersi ke model HASIL resolusi: sel Luna yang mewarisi `ultra` harus turun ke

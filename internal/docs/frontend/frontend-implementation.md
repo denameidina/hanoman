@@ -1305,7 +1305,9 @@ berselisih pendapat. Pilihannya dikirim sebagai `POST {project, agent?, model?, 
 argv pane tmux; tanpa mengubah apa pun, body-nya `{project}` polos dan perilakunya persis seperti
 sebelumnya. Catatan versi codex (`codexClientTooOld`) muncul di sini juga dan **tak** memblokir
 tombolnya. "Mulai lagi" pada baris riwayat ber-`kind: "terminal"` mengirim runtime baris itu —
-agen/model/effort sudah tercatat di `SessionHistory` sejak ADR-0079.
+agen/model/effort sudah tercatat di `SessionHistory` sejak ADR-0079. Sejak audit S4c (2026-09-23)
+baris ber-`specId` juga mengirim `agent` (+ `model`/`effort` bila tercatat), supaya sesi codex tak
+dilanjutkan sebagai claude; `phaseOverrides` sesi asal tak tersimpan di mana pun, jadi tak diulang.
 
 Toolbar juga punya **Riwayat** (SPEC-362 · [ADR-0079](../adr/0079-history-sesi-terminal-store-lokal-plus-transkrip.md)):
 membuka `SessionHistoryModal` — **modal**, bukan panel tetap, persis seperti picker "Ambil backlog".
@@ -2302,7 +2304,11 @@ Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa p
   alih-alih menyimpulkan sesi tunggal lebih dulu; gagal memuat versi codex dihitung sebagai tak terdeteksi
   → sesi tunggal (cermin server, yang memperlakukan versi codex null sebagai tak didukung). Tanda warisi
   per BAGIAN, bukan per sel: ` (warisi)` bila sel model dan effort kosong keduanya, ` (model warisi)` /
-  ` (effort warisi)` bila cuma satu yang kosong.
+  ` (effort warisi)` bila cuma satu yang kosong. Audit S4 (2026-09-23): blok `orchestration` absen di
+  respons = `ORCHESTRATION_DEFAULTS` (matriks bawaan, `no_effort` mati — sama dengan server), bukan sel
+  kosong; `GET /settings` GAGAL menampilkan galat (`role="alert"`, "Gagal memuat Setting") alih-alih
+  rencana palsu; target device remote (SPEC-1216) menambah catatan `phase-plan-remote-note` bahwa
+  rencana final ditentukan Setting device itu dan override fase bisa diabaikan device versi lama.
 - **Sel terminal**: chip `orch <model> · <effort>` di header bila `orchestrated`; `PhaseStrip` menggambar
   fase ber-agen sebagai chip `ikon · nama · model · effort · durasi` (+`↻n`, ⚠ "bukti subagent tak
   diterima"), ringkas bila header < 480px, klik → detail token in/out/cache terpisah + cuplikan hasil.

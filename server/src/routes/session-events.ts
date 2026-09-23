@@ -24,6 +24,16 @@ const recordOf = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" ? value as Record<string, unknown> : null;
 const boundedString = (value: unknown, max: number): string | undefined =>
   typeof value === "string" && value.length > 0 && value.length <= max ? value : undefined;
+// S1 · waktu event dari relay spool (`x-hanoman-event-at`, ms epoch dari nama berkas hook). Hanya
+// membedakan replay dari lanjutan relay di AgentInvocation; di luar rentang wajar (lebih dari 7 hari
+// lalu atau lebih dari 1 menit ke depan) diabaikan → waktu terima, perilaku sebelum header ini ada.
+const EVENT_AT_PAST_MS = 7 * 24 * 60 * 60_000;
+const EVENT_AT_FUTURE_MS = 60_000;
+const eventAtOf = (header: unknown, now = Date.now()): Date | undefined => {
+  if (typeof header !== "string" || !/^\d{1,15}$/.test(header)) return undefined;
+  const ms = Number(header);
+  return ms >= now - EVENT_AT_PAST_MS && ms <= now + EVENT_AT_FUTURE_MS ? new Date(ms) : undefined;
+};
 
 export default async function (app: FastifyInstance) {
   app.post("/session-events", async (req, reply) => {
@@ -58,10 +68,12 @@ export default async function (app: FastifyInstance) {
         ...(meta.effort ? { effort: meta.effort } : {}),
         cwd: s.cwd,
       };
+      const eventAt = eventAtOf(req.headers["x-hanoman-event-at"]);
       const outcome = lifecycle === "SubagentStart"
-        ? await startAgentInvocation(identity)
+        ? await startAgentInvocation({ ...identity, ...(eventAt ? { startedAt: eventAt } : {}) })
         : await stopAgentInvocation({
           ...identity,
+          ...(eventAt ? { endedAt: eventAt } : {}),
           status: body.status === "interrupted" ? "interrupted" : "completed",
           result: boundedString(body.last_assistant_message ?? body.result, 1_000_000),
           transcriptPath: boundedString(

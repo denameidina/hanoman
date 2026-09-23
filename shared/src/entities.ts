@@ -423,12 +423,17 @@ export const zPhaseCell = z.object({
 export type PhaseCell = z.infer<typeof zPhaseCell>;
 // Override ini hidup hanya selama satu peluncuran. Tidak disimpan di Setting karena ia adalah
 // keputusan operator untuk sesi tertentu, sedangkan matriks di bawah adalah default instance.
+// S6 · input transient dari body request (modal Start / relay) yang berakhir di definisi agen & argv:
+// berbatas, tidak seperti sel Setting yang lenient (sel tersimpan tak boleh tiba-tiba gagal parse).
+export const PHASE_OVERRIDE_LIMITS = { model: 200, effort: 64, phase: 64, phases: 32 } as const;
 export const zPhaseOverride = z.object({
-  model: z.string().optional(),
-  effort: z.string().optional(),
+  model: z.string().min(1).max(PHASE_OVERRIDE_LIMITS.model).optional(),
+  effort: z.string().min(1).max(PHASE_OVERRIDE_LIMITS.effort).optional(),
 });
 export type PhaseOverride = z.infer<typeof zPhaseOverride>;
-export const zPhaseOverrides = z.record(z.string(), zPhaseOverride);
+export const zPhaseOverrides = z.record(z.string().min(1).max(PHASE_OVERRIDE_LIMITS.phase), zPhaseOverride)
+  .refine((o) => Object.keys(o).length <= PHASE_OVERRIDE_LIMITS.phases,
+    { message: `phaseOverrides maksimal ${PHASE_OVERRIDE_LIMITS.phases} fase` });
 export type PhaseOverrides = z.infer<typeof zPhaseOverrides>;
 export const zFlowOrchestration = z.object({
   enabled: z.boolean().default(true),

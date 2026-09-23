@@ -243,6 +243,28 @@ export async function reconciledSpecIdsSince(cutoff: Date): Promise<string[]> {
   return rows.map((r) => r.specId!);
 }
 
+// S4c · runtime SAAT LAHIR sesi yang direkonsiliasi, per spec (baris terbaru pada sapuan ini).
+// Auto-resume (ADR-0169) melanjutkan sesi yang SAMA (ADR-0084): agen/model/effort-nya ikut, bukan
+// Setting global — sesi codex tak boleh lanjut sebagai claude. Nilai null tak diteruskan.
+export type SessionRuntime = { agent: "claude" | "codex"; model?: string; effort?: string };
+export async function reconciledRuntimesSince(cutoff: Date): Promise<Map<string, SessionRuntime>> {
+  const rows = await prisma.sessionHistory.findMany({
+    where: { endedReason: RECONCILED, reconciledAt: { gte: cutoff }, specId: { not: null } },
+    select: { specId: true, agent: true, model: true, effort: true },
+    orderBy: { startedAt: "desc" },
+  });
+  const out = new Map<string, SessionRuntime>();
+  for (const r of rows) {
+    if (out.has(r.specId!)) continue;
+    out.set(r.specId!, {
+      // `agent` kolom String — nilai asing jatuh ke claude, cermin pembacaan @hanoman_agent (pty.ts).
+      agent: r.agent === "codex" ? "codex" : "claude",
+      ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}),
+    });
+  }
+  return out;
+}
+
 // Dipanggil server.ts sebelum request pertama. Hook fire-and-forget di pty menelan error, jadi
 // promise yang gagal di sini tak boleh menggantung sebagai unhandled rejection.
 export function installSessionHistory(): void {

@@ -139,12 +139,15 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   const [remoteError, setRemoteError] = React.useState<{ error: string; remoteSession?: { deviceId: string; name: string; sessionId: string | null } } | null>(null);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
-  // ADR-0164 · matriks orkestrasi untuk pratinjau fase. Absen di respons Setting lama → default aktif.
+  // ADR-0164 · matriks orkestrasi untuk pratinjau fase. Absen di respons Setting lama →
+  // ORCHESTRATION_DEFAULTS (matriks bawaan, sama dengan server — S4a).
   const [orchestration, setOrchestration] = React.useState<Orchestration | undefined>(undefined);
   // ADR-0164 · gerbang muat pratinjau fase: sebelum kedua respons ini tiba, `orchestration`
   // undefined dan `codexVer` null TIDAK BOLEH dibaca sebagai "default aktif"/"codex tak
   // terdeteksi" — pratinjau harus diam dulu, bukan menuduh sesi tunggal secara keliru.
   const [settingsLoaded, setSettingsLoaded] = React.useState(false);
+  // S4a · GET Setting gagal ≠ "termuat dengan orchestration undefined": pratinjau menampilkan galat.
+  const [settingsError, setSettingsError] = React.useState(false);
   const [codexVerLoaded, setCodexVerLoaded] = React.useState(false);
   // SPEC-739 · ADR-0114 · kesiapan skill metode di mesin ini. Gagal-diam dengan alasan yang sama
   // dengan codexVer: modal harus tetap bisa dipakai, dan ketiadaan bukti bukan bukti ketiadaan.
@@ -154,6 +157,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     // ADR-0164 · reset gerbang muat setiap kali modal dibuka/spec berganti — respons lama tak
     // boleh menandai "termuat" untuk pembukaan yang baru.
     setSettingsLoaded(false);
+    setSettingsError(false);
     setCodexVerLoaded(false);
     setPhaseOverrides({});
     api.getSettings().then((s) => {
@@ -176,7 +180,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       setMethod(resolveMethod(s.method).id);
       setOrchestration(s.orchestration);
       setSettingsLoaded(true);
-    }).catch(() => { setSettingsLoaded(true); });
+    }).catch(() => { setSettingsError(true); setSettingsLoaded(true); });
     // SPEC-339 · versi codex CLI untuk catatan lunak. Gagal-diam: modal harus tetap bisa dipakai.
     api.getCodexVersion().then((v) => { setCodexVer(v.version); setCodexVerLoaded(true); })
       .catch(() => { setCodexVerLoaded(true); });
@@ -365,6 +369,8 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       <PhasePlanPreview flow={flow as OrchestrationFlow} agent={agent} model={model} effort={effort}
         orchestration={orchestration} codexVersion={codexVer} phaseOverrides={phaseOverrides}
         onPhaseOverridesChange={setPhaseOverrides}
+        loadError={settingsError}
+        remoteTarget={isRemoteTarget ? (targets.find((t) => t.deviceId === targetId)?.name ?? targetId) : null}
         loading={!settingsLoaded || (agent === "codex" && !codexVerLoaded)} />
       {/* SPEC-332 · ADR-0073 · mode goal: sesi menolak berhenti sampai kondisinya terbukti di
           transkrip. Interupsi manusia (Esc) tetap bekerja; melepas gate = hentikan sesinya. */}

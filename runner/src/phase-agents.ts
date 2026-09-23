@@ -23,6 +23,10 @@ export type PhaseAgentContext = {
   prd?: { slug: string; title?: string };
   /** id backlog audit asal (`payload.fromAudit`) untuk feature/qa lanjutan audit. */
   fromAudit?: string;
+  /** S2 · SPEC-394 · sesi ini MELANJUTKAN sesi sebelumnya (backlog: `ResumeCtx`; project: worktree
+   *  dipakai ulang). Subagent tak melihat `resumeClause` orchestrator, jadi ia dapat catatannya sendiri.
+   *  undefined → instruksi byte-identik dengan sebelum field ini ada. */
+  resume?: { worktreeKept: boolean; recorded: readonly string[] };
 };
 
 const PROJECT_FLOWS: ReadonlySet<Flow> = new Set(["reverse", "scaffold", "prd", "breakdown"]);
@@ -64,6 +68,24 @@ const PHASE_AGENT_REPORT = [
 const ATTACHMENT_NOTE =
   "Bila serah-terima menyebut manifest lampiran (`INDEX.md`), baca manifest itu dan lampiran yang "
   + "relevan di awal fase.";
+
+// S2 · cermin `resumeClause` (prompt.ts) untuk subagent: tanpa ini agen fase yang lahir di worktree
+// sesi sebelumnya menulis ulang pekerjaan belum-commit, atau Brainstorm membuat dokumen spec KEDUA.
+function resumeNoteFor(r: NonNullable<PhaseAgentContext["resume"]>): string {
+  return "=== MELANJUTKAN ===\n" + [
+    "Sesi ini MELANJUTKAN pekerjaan sesi sebelumnya untuk tugas yang sama — bukan memulai dari nol.",
+    r.worktreeKept
+      ? "Worktree ini adalah worktree sesi sebelumnya apa adanya — termasuk perubahan yang belum di-commit."
+      : "Worktree ini DIBANGUN ULANG dari tip branch sesi: commit sesi sebelumnya ada, tetapi perubahan "
+        + "yang belum sempat di-commit TIDAK ada.",
+    r.recorded.length
+      ? `Fase yang SUDAH tercatat di $HANOMAN_PHASE_FILE: ${r.recorded.join(" · ")}.`
+      : "",
+    "Sebelum menulis apa pun: baca `git log --oneline` dan `git status`, lalu artefak fasemu yang "
+      + "mungkin sudah ada (dokumen spec/plan/docs untuk tugas ini). Lanjutkan & perbarui berkas itu — "
+      + "JANGAN membuat dokumen baru kedua dan JANGAN menulis ulang yang sudah ada.",
+  ].filter(Boolean).join(" ");
+}
 
 /** Defensif seperti `readSpecMethod`: payload datang dari kolom Json. */
 export function fromAuditOf(payload: unknown): string | undefined {
@@ -192,6 +214,7 @@ export function phaseAgentInstructions(
     PHASE_AGENT_AUTONOMY,
     PHASE_AGENT_RULES,
     PHASE_AGENT_REPORT,
+    ctx.resume ? resumeNoteFor(ctx.resume) : "",
     `=== KONTEKS ===\n${ctx.context}`,
   ].filter(Boolean).join("\n\n");
 }

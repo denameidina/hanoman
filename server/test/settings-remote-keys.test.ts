@@ -60,4 +60,18 @@ describe("PUT /settings tak menulis kunci LOCAL-only SPEC-1215 (AC-A3)", () => {
       DEFAULT_SETTING.orchestration.feature.claude.Execute,
     );
   });
+
+  // S5 · kontrak yang diandalkan rebase dashboard (settings-rebase.ts): body = DB TERBARU + satu
+  // perubahan non-runtime → tak satu pun model/effort/sel orkestrasi ditandai `user`, sehingga seed
+  // berikutnya tetap bebas memperbaruinya. (Yang dulu merusak: body = snapshot mount yang basi.)
+  it("S5 · PUT berbasis DB terbaru yang hanya mengubah notifySound tak menandai runtime `user`", async () => {
+    const fresh = await getSetting();
+    const put = await app.inject({ method: "PUT", url: "/api/settings",
+      payload: { ...fresh, notifySound: fresh.notifySound === "short" ? "chime" : "short" } });
+    expect(put.statusCode).toBe(200);
+    const marker = (await getSetting()).builtinRuntimeDefaults;
+    expect(marker.claude).toEqual({ model: "seeded", effort: "seeded" });
+    expect(marker.codex).toEqual({ model: "seeded", effort: "seeded" });
+    expect(Object.values(marker.orchestration).every((v) => v === "seeded")).toBe(true);
+  });
 });

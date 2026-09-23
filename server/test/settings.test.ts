@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../src/db";
 import { resetDb } from "./factory";
-import { getSetting, sessionModel, sessionAgentDefaults, DEFAULT_SETTING } from "../src/services/settings";
+import { getSetting, sessionModel, sessionAgentDefaults, DEFAULT_SETTING, normalizePhaseOverrides } from "../src/services/settings";
 import { DEFAULT_METHOD, resolveMethod } from "@hanoman/shared";
 
 // Baris Setting adalah `Json` bebas bentuk. Baris yang ditulis SEBELUM SPEC-162 menyimpan
@@ -118,6 +118,31 @@ describe("settings", () => {
     } as unknown as object } });
     const s = await getSetting();
     expect(s.codex).toEqual({ model: "gpt-5.5", effort: "xhigh" });
+  });
+
+  // S6 · pola normalisasi model global/codex diperluas ke sel orkestrasi: sel yang menyimpan id
+  // pensiun dulu masuk resolver mentah → agen fase lahir dengan model yang tak lagi ada.
+  it("S6 · sel orkestrasi: model pensiun dipetakan, effort codex dikoersi ke model hasil pemetaan", async () => {
+    const orchestration = structuredClone(DEFAULT_SETTING.orchestration);
+    orchestration.feature.claude.Spec = { model: "claude-opus-4-8", effort: "high" };
+    orchestration.feature.codex.Plan = { model: "gpt-5.4", effort: "ultra" };
+    orchestration.feature.codex.Execute = { model: "gpt-5.6-luna", effort: "ultra" };
+    orchestration.feature.codex.Spec = { model: null, effort: "ultra" };   // warisi model → effort dibiarkan
+    await prisma.setting.create({ data: { id: 1, data: { ...DEFAULT_SETTING, orchestration } as unknown as object } });
+    const s = await getSetting();
+    expect(s.orchestration.feature.claude.Spec).toEqual({ model: "opus", effort: "high" });
+    expect(s.orchestration.feature.codex.Plan).toEqual({ model: "gpt-5.5", effort: "xhigh" });
+    expect(s.orchestration.feature.codex.Execute).toEqual({ model: "gpt-5.6-luna", effort: "xhigh" });
+    expect(s.orchestration.feature.codex.Spec).toEqual({ model: null, effort: "ultra" });
+    expect(s.orchestration.qa).toEqual(DEFAULT_SETTING.orchestration.qa);
+  });
+
+  it("S6 · override fase sesi juga dinormalisasi (pensiun + koersi codex)", () => {
+    expect(normalizePhaseOverrides("claude", { Spec: { model: "claude-opus-4-8", effort: "high" } }))
+      .toEqual({ Spec: { model: "opus", effort: "high" } });
+    expect(normalizePhaseOverrides("codex", { Plan: { model: "gpt-5.4", effort: "ultra" }, Spec: { effort: "low" } }))
+      .toEqual({ Plan: { model: "gpt-5.5", effort: "xhigh" }, Spec: { effort: "low" } });
+    expect(normalizePhaseOverrides("claude", undefined)).toBeUndefined();
   });
 
   // SPEC-734 · AC-8 · baris Setting yang ditulis SEBELUM spec ini tak punya kunci `method`;

@@ -272,6 +272,8 @@ export async function startSpecSession(
       flow: opts.flow, method, verifyScope,
       context: isGoalFlow ? goalContext(brief) : specContext(brief),
       fromAudit: fromAuditOf(spec.payload),
+      // S2 · SPEC-394 · subagent tak melihat `resumeClause` orchestrator — ia dapat catatannya sendiri.
+      ...(resumeCtx ? { resume: resumeCtx } : {}),
     }) : [];
     // SPEC-376 · ADR-0080 · env sesi. baseSha SUDAH dihitung di addWorktree di atas — tanpa
     // meneruskannya, klausa "berkas yang berubah" tak bisa dieksekusi tanpa menebak: worktree
@@ -283,6 +285,9 @@ export async function startSpecSession(
       decisionFile: decisionFilePath(repoDir, id),
       attachmentsDir: attachments.items.length ? attachments.dir : undefined,
       prompt, legacyPrompt, phaseAgents,
+      // S3 · SPEC-172 · berkas fase continue masih memuat `Execute done` run lama; fase yang DIKERJAKAN
+      // ULANG sesi ini tak boleh dihitung `doneAtBirth`, supaya ⚠ bukti tetap bisa menyala.
+      ...(isContinue && plan ? { rerunPhases: plan.phases.map((p) => p.phase) } : {}),
       env: scopeEnv,
     });
     return resume ? { id: s.id, resumed: true } : { id: s.id };

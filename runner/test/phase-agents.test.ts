@@ -159,6 +159,31 @@ describe("buildPhaseAgents (ADR-0164)", () => {
     expect(at(defs, "Verifikasi").instructions).toContain("bukan formalitas");
     expect(at(defs, "Goal").instructions).not.toContain("Skills superpowers WAJIB");
   });
+
+  // S2 · SPEC-394 · subagent lahir dengan konteks TERPISAH — catatan resume yang hanya ditempel ke
+  // prompt orchestrator tak pernah sampai. Tanpa ini agen fase menulis ulang pekerjaan belum-commit
+  // atau Brainstorm membuat dokumen spec kedua.
+  it("S2 · resume: catatan melanjutkan ikut ke setiap agen fase, sebelum blok KONTEKS", () => {
+    const kept = agentsFor("feature", { resume: { worktreeKept: true, recorded: ["Brainstorm done"] } });
+    for (const d of kept) {
+      expect(d.instructions).toContain("MELANJUTKAN pekerjaan sesi sebelumnya");
+      expect(d.instructions).toContain("termasuk perubahan yang belum di-commit");
+      expect(d.instructions).toContain("Brainstorm done");
+      expect(d.instructions).toContain("`git log --oneline` dan `git status`");
+      expect(d.instructions.indexOf("MELANJUTKAN")).toBeLessThan(d.instructions.indexOf("=== KONTEKS ==="));
+    }
+    expect(at(kept, "Brainstorm").instructions).toContain("JANGAN membuat dokumen baru kedua");
+    const rebuilt = agentsFor("feature", { resume: { worktreeKept: false, recorded: [] } });
+    expect(at(rebuilt, "Plan").instructions).toContain("DIBANGUN ULANG");
+    expect(at(rebuilt, "Plan").instructions).not.toContain("tercatat di $HANOMAN_PHASE_FILE");
+  });
+
+  it("S2 · tanpa resume: instruksi byte-identik (tak ada catatan melanjutkan)", () => {
+    const fresh = agentsFor("feature");
+    const explicit = agentsFor("feature", { resume: undefined });
+    expect(explicit.map((d) => d.instructions)).toEqual(fresh.map((d) => d.instructions));
+    for (const d of fresh) expect(d.instructions).not.toContain("MELANJUTKAN");
+  });
 });
 
 describe("fromAuditOf", () => {

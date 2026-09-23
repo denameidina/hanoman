@@ -119,6 +119,18 @@ function transcriptUsage(path: string | undefined, roots = transcriptRoots()): U
   } catch { return EMPTY_USAGE; }
 }
 
+/**
+ * REPLAY vs LANJUTAN (S1 · ADR-0167). Relay jawaban ke subagent yang SAMA (`SendMessage` ke agent ID,
+ * P3) menembakkan `SubagentStart` KEDUA dengan `agent_id` yang sama sesudah Stop laporan
+ * `menunggu-keputusan`. Start itu bukan replay: ia membuka ulang baris (running, endedAt/durasi
+ * dikosongkan, `startedAt` PERTAMA dipertahankan) sehingga Stop akhir menulis bukti terbaru.
+ * Pembedanya waktu EVENT (`startedAt`, dari nama berkas spool lewat relay, atau waktu terima): Start
+ * yang tak lebih baru dari `endedAt` adalah replay/terlambat (mis. tertahan retry 500 lalu terkirim
+ * sesudah Stop-nya) → tetap duplikat. Start saat baris masih running → duplikat. Relay BUKAN
+ * percobaan ulang: `runtimeInvocationId` sama, jadi `attempts` (session-phases.ts) tak bertambah.
+ * Batas sadar: Stop LAMA yang di-replay SESUDAH pembukaan ulang tak bisa dibedakan (waktu buka ulang
+ * tak disimpan — butuh kolom baru) dan akan menutup putaran itu lebih awal; Stop berikutnya duplikat.
+ */
 export async function startAgentInvocation(input: InvocationStart, io: Io = {}) {
   const startedAt = input.startedAt ?? new Date();
   const existing = await prisma.agentInvocation.findUnique({
@@ -126,6 +138,15 @@ export async function startAgentInvocation(input: InvocationStart, io: Io = {}) 
       sessionId: input.sessionId, runtimeInvocationId: input.runtimeInvocationId,
     } },
   });
+  if (existing?.endedAt && startedAt.getTime() > existing.endedAt.getTime()) {
+    const row = await prisma.agentInvocation.update({
+      where: { id: existing.id },
+      data: { status: "running", endedAt: null, durationMs: null },
+    });
+    const before = snapshot(input.cwd, io.gitStatus);
+    if (before !== null) snapshotHashes.set(keyOf(input), before);
+    return { row, duplicate: false };
+  }
   const row = await prisma.agentInvocation.upsert({
     where: { sessionId_runtimeInvocationId: {
       sessionId: input.sessionId, runtimeInvocationId: input.runtimeInvocationId,
@@ -167,7 +188,9 @@ export async function stopAgentInvocation(input: InvocationStop, io: Io = {}) {
     ...usage,
     resultExcerpt: cleanResult === null ? null : utf8Prefix(cleanResult, MAX_EXCERPT_BYTES),
     resultHash: cleanResult === null ? null : hash(cleanResult),
-    workspaceChanged: before !== undefined && after !== null && before !== after,
+    // S1 · putaran relay (baris dibuka ulang) tak menghapus perubahan workspace putaran sebelumnya.
+    workspaceChanged: (existing?.workspaceChanged ?? false)
+      || (before !== undefined && after !== null && before !== after),
     // ADR-0164 · effort yang BENAR-BENAR dipakai runtime menang atas nilai start-time.
     ...(input.effort ? { effort: input.effort } : {}),
   };

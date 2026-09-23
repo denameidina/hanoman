@@ -16,6 +16,7 @@ import { McpPanel } from "./McpPanel";   // SPEC-482 · ADR-0099 · pemasangan M
 import { SetupWizard } from "./SetupWizard";   // SPEC-884 · ADR-0139 · setup awal, bisa diulang
 import { AgentDocCard } from "./AgentDocCard";   // SPEC-489 · halaman dokumentasi AI Agent
 import { OrchestrationPanel } from "./OrchestrationPanel";   // ADR-0164 · orkestrasi subagent per fase
+import { rebaseEdits } from "./settings-rebase";   // S5 · PUT hanya membawa perubahan operator
 import { usePersistedState, isStr } from "../ui-state";
 import { useModelCatalog } from "../api/model-catalog";
 import { claudeEfforts, coerceClaudeEffort } from "@hanoman/shared";
@@ -466,8 +467,12 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
     if (!setting) return;
     const updated = { ...setting, agentAccessEnabled: next };
     setSetting(updated);
-    try { await api.putSettings(updated); onToast?.("Akses AI agent " + (next ? "aktif" : "nonaktif"), next ? "ok" : "warn", "bot"); }
-    catch { onToast?.("Gagal menyimpan", "err", "x-circle"); setSetting(setting); }
+    // S5 · rebase ke DB terbaru: snapshot mount panel ini tak boleh membalik runtime seed/lainnya.
+    try {
+      const fresh = await api.getSettings().catch(() => undefined);
+      await api.putSettings(rebaseEdits(setting, updated, fresh));
+      onToast?.("Akses AI agent " + (next ? "aktif" : "nonaktif"), next ? "ok" : "warn", "bot");
+    } catch { onToast?.("Gagal menyimpan", "err", "x-circle"); setSetting(setting); }
   }
   const toggleCap = (id: string) => setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
   // ADR-0155 · "pilih semua" bekerja atas himpunan id yang BENAR-BENAR ada di katalog, bukan atas
@@ -662,6 +667,9 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
   const modelCatalog = useModelCatalog();
   const [s, setS] = React.useState<Setting | null>(null);
   const [failed, setFailed] = React.useState(false);
+  // S5 · antrean simpan: tiap simpan = GET segar → rebase → PUT, berurutan, supaya simpan kedua tak
+  // me-rebase di atas DB yang belum memuat simpan pertama (klik beruntun, ketikan kondisi goal).
+  const saveQueue = React.useRef<Promise<unknown>>(Promise.resolve());
   // SPEC-740 · ADR-0115 · sub-tab aktif bertahan; refresh tak melempar balik ke Akun.
   const [tab, setTab] = usePersistedState<string>("settings", "tab", "akun", isStr);
   const tier = useResponsiveTier();
@@ -715,9 +723,17 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
     if (failed) return <StateBlock kind="error" title="Gagal memuat pengaturan"
       hint="Pengaturan tidak ditampilkan agar tidak menimpa nilai di server." action={load} />;
     if (!s) return <StateBlock kind="loading" title="Memuat pengaturan…" />;
+    // S5 · `next` = snapshot tab + perubahan operator. Yang dikirim BUKAN `next` mentah melainkan DB
+    // terbaru dengan hanya bagian yang benar-benar diubah (rebaseEdits): tab yang terbuka melewati
+    // update/seed tak lagi membalik model/sel orkestrasi seed baru ke id lama dan menguncinya `user`
+    // lewat provenance server. GET gagal → `next` apa adanya (perilaku lama).
     const persist = (next: Setting, msg?: string, tone?: string, icon?: string) => {
+      const base = s;
       setS(next);
-      api.putSettings(next).catch(() => {});
+      saveQueue.current = saveQueue.current.then(async () => {
+        const fresh = await api.getSettings().catch(() => undefined);
+        await api.putSettings(rebaseEdits(base, next, fresh));
+      }).catch(() => {});
       if (msg && onToast) onToast(msg, tone || "ok", icon || "check-circle-2");
     };
     const save = (patch: Partial<Setting>, msg: string) => persist({ ...s, ...patch }, msg);
@@ -919,7 +935,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
         </div>
       </>
     );
-    // ADR-0164 · satu-satunya penulis `Setting.orchestration` → `save()` dari snapshot mount aman.
+    // ADR-0164 · `save()` → `persist()` me-rebase perubahan sel ke DB terbaru (S5): seed runtime
+    // default sesudah update ikut menulis blok ini, jadi snapshot mount TIDAK lagi aman dikirim utuh.
     if (tab === "orkestrasi") return (
       <OrchestrationPanel orchestration={s.orchestration}
         onChange={(orchestration, msg) => save({ orchestration }, msg)} />
@@ -960,8 +977,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
       const lead = s.lead ?? LEAD_DEFAULTS;
       const engine = lead.engine ?? LEAD_DEFAULTS.engine;
       // Kartu ini menulis lewat PUT /lead/config, BUKAN `save()` (PUT /settings) seperti kartu
-      // konflik — dan itu perbedaan sadar. `persist()` mengirim SELURUH objek Setting dari snapshot
-      // yang dimuat sekali saat mount, sementara blok `lead` punya penulis KEDUA: LeadScreen
+      // konflik — dan itu perbedaan sadar. `persist()` (sebelum S5) mengirim SELURUH objek Setting
+      // dari snapshot yang dimuat sekali saat mount, sementara blok `lead` punya penulis KEDUA: LeadScreen
       // (rem darurat Pause, denyut, batas waktu, opt-in per project). Urutan "buka Settings →
       // tekan Pause di layar Lead → ganti model lead di Settings" akan mengembalikan `paused` ke
       // nilai snapshot, yakni rem darurat yang lepas sendiri tanpa satu pun klik yang mengatakannya.

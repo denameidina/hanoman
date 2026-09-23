@@ -40,6 +40,26 @@ describe("sandbox session event relay", () => {
     expect(existsSync(path)).toBe(false);
   });
 
+  // S1 · hook spool menamai berkas `<Date.now()>-<pid>-<uuid>.json`. Waktu itu = kapan event
+  // TERJADI; route memakainya untuk membedakan Start lanjutan relay (sesudah Stop) dari Start
+  // terlambat yang tertahan retry. Urutan kirim juga dipatok kronologis (readdir tak menjamin urut).
+  it("S1 · meneruskan waktu event dari nama berkas dan mengirim urut kronologis", async () => {
+    const root = mkdtempSync(join(tmpdir(), "hanoman-event-relay-at-"));
+    const dir = join(root, "sess-at");
+    mkdirSync(dir);
+    const late = "1790000002000-12-bbb.json";
+    const early = "1790000001000-12-aaa.json";
+    writeFileSync(join(dir, late), JSON.stringify({ hook_event_name: "SubagentStop", agent_id: "x" }));
+    writeFileSync(join(dir, early), JSON.stringify({ hook_event_name: "SubagentStart", agent_id: "x" }));
+    const calls: Array<{ headers: Record<string, string>; payload: Record<string, unknown> }> = [];
+    await drainSessionEventSpool({
+      inject: async (request) => { calls.push(request as never); return { statusCode: 202 }; },
+    }, root);
+    expect(calls.map((c) => [c.payload.hook_event_name, c.headers["x-hanoman-event-at"]])).toEqual([
+      ["SubagentStart", "1790000001000"], ["SubagentStop", "1790000002000"],
+    ]);
+  });
+
   it("drops malformed and oversized files without injecting them", async () => {
     const root = mkdtempSync(join(tmpdir(), "hanoman-event-relay-bad-"));
     const dir = join(root, "sess-2");

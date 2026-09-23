@@ -79,7 +79,7 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
     expect(start).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Mulai tetap" }));
     await waitFor(() => expect(start).toHaveBeenCalledTimes(2));
-    if (kind === "spec") expect(start).toHaveBeenLastCalledWith({ spec: "SPEC-362", flow: "feature", force: true });
+    if (kind === "spec") expect(start).toHaveBeenLastCalledWith({ spec: "SPEC-362", flow: "feature", agent: "claude", force: true });
     else expect(start).toHaveBeenLastCalledWith("p1", "reverse", { force: true });
     await waitFor(() => expect(screen.queryByText("Riwayat sesi")).not.toBeInTheDocument());
   });
@@ -99,13 +99,26 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
     await waitFor(() => expect(listSessionHistory).toHaveBeenCalled());
   });
 
-  it("Mulai lagi sesi backlog memanggil startSession dengan spec + flow tersimpan", async () => {
+  // S4c · runtime sesi asal ikut (cermin SPEC-517 terminal agen): tanpa itu sesi codex bisa
+  // dilanjutkan sebagai claude mengikuti Setting global. Baris lama tanpa model/effort → agen saja.
+  it("Mulai lagi sesi backlog memanggil startSession dengan spec + flow + agen tersimpan", async () => {
     listSessionHistory.mockResolvedValue({ items: [row()], total: 1, page: 1, pageSize: 20 });
     render(<TerminalScreen projects={projects} backlog={[]} />);
     fireEvent.click(await screen.findByText("Riwayat"));
     fireEvent.click(await screen.findByText("History session terminal"));
     fireEvent.click(await screen.findByText("Mulai lagi"));
-    await waitFor(() => expect(startSession).toHaveBeenCalledWith({ spec: "SPEC-362", flow: "feature" }));
+    await waitFor(() => expect(startSession).toHaveBeenCalledWith({ spec: "SPEC-362", flow: "feature", agent: "claude" }));
+  });
+
+  it("S4c · Mulai lagi sesi backlog membawa runtime baris riwayatnya (codex tetap codex)", async () => {
+    listSessionHistory.mockResolvedValue({ items: [row({ agent: "codex", model: "gpt-5.6-terra", effort: "low" })],
+      total: 1, page: 1, pageSize: 20 });
+    render(<TerminalScreen projects={projects} backlog={[]} />);
+    fireEvent.click(await screen.findByText("Riwayat"));
+    fireEvent.click(await screen.findByText("History session terminal"));
+    fireEvent.click(await screen.findByText("Mulai lagi"));
+    await waitFor(() => expect(startSession).toHaveBeenCalledWith({
+      spec: "SPEC-362", flow: "feature", agent: "codex", model: "gpt-5.6-terra", effort: "low" }));
   });
 
   // SPEC-517 · "Mulai lagi" = sesi BARU dengan konteks yang sama. Sejak runtime bisa dipilih,

@@ -164,3 +164,31 @@ berlaku pada sesi yang sedang dilahirkan. Prioritas resolusi adalah:
 
 Ganti runtime pada modal menghapus override fase karena katalog Claude dan Codex berbeda. Flow mati
 atau Codex yang belum mendukung native subagent tetap mengikuti fallback sesi tunggal.
+
+## Amandemen 2026-09-23 — temuan audit orkestrasi (prioritas sedang)
+
+- **S1 · relay ke subagent yang sama.** `SubagentStart` kedua dengan `agent_id` sama sesudah Stop
+  (relay `SendMessage`, P3/ADR-0167) membuka ulang `AgentInvocation` (running, `startedAt` pertama
+  tetap) alih-alih dianggap duplikat; Stop akhir menulis bukti terbaru. Replay spool dibedakan lewat
+  waktu kejadian event (`x-hanoman-event-at`). `attempts` tak bertambah (id sama).
+- **S2 · resume sampai ke agen fase.** `PhaseAgentContext.resume` menambahkan blok
+  `=== MELANJUTKAN ===` ke instruksi setiap agen fase — backlog dari `ResumeCtx`, project bila
+  worktree dipakai ulang. Tanpa resume instruksi byte-identik.
+- **S3 · continue (SPEC-172).** Berkas fase tak pernah dikosongkan, jadi `Execute done` run lama
+  membuat Execute `doneAtBirth` (⚠ mustahil) dan memenuhi gerbang penutup. Fase di rencana continue
+  kini dikecualikan dari `@hanoman_done_at_birth` (`CreateOpts.rerunPhases`) dan prompt continue
+  orchestrator menyatakan baris lama tak berlaku: baris `Execute done` BARU wajib ditulis sesudah
+  agen Execute sesi ini selesai. Chip/`complete` tetap membaca berkas fase apa adanya (baris lama
+  terlihat `done` sejak lahir) — mengosongkan/menandai berkas fase adalah keputusan terbuka.
+- **S4 · pratinjau Start = sesi yang lahir.** (a) `resolvePhasePlan` memperlakukan `orchestration`
+  undefined sebagai `ORCHESTRATION_DEFAULTS` (bukan "semua aktif, sel kosong" yang usang sejak
+  amandemen 2026-09-17); `GET /settings` gagal tampil sebagai galat di pratinjau. (b) Target device
+  remote: pratinjau menyatakan rencana final ditentukan Setting device target (tak ada jalur relay
+  baca Setting remote). (c) Auto-resume boot & "Mulai lagi" meneruskan runtime sesi asal dari
+  `SessionHistory` (ADR-0169 amandemen 2026-09-23); `phaseOverrides` tak tersimpan → tak diulang.
+- **S5 · simpan Settings basi.** `SettingsScreen.persist()` me-rebase perubahan operator ke DB
+  terbaru (`rebaseEdits`) sebelum `PUT /settings`, sehingga marker provenance hanya menandai `user`
+  field yang benar-benar diubah; `hanoman_settings_set` menyuruh `_get` tepat sebelumnya.
+- **S6 · normalisasi sel & override.** Sel `orchestration` dan `phaseOverrides` melewati pemetaan
+  model pensiun + koersi effort codex yang sama dengan model global; `zPhaseOverride` berbatas
+  panjang (model ≤200, effort ≤64, ≤32 fase).
