@@ -107,21 +107,85 @@ describe("guardSettings · subagentStatusLine (ADR-0164)", () => {
       .toEqual({ type: "command", command: 'node "/t/s.cjs" "/t/m.json"' });
   });
 
-  it("orkestrasi: Notification idle diabaikan selama ada subagent hidup; izin tetap menandai", () => {
-    const dir = mkdtempSync(join(tmpdir(), "dec-"));
-    const f = join(dir, "s1");
-    const h = guardSettings(f, undefined, true).hooks as Record<string, any[]>;
-    const run = (cmd: string, input = "") => { try { execFileSync("sh", ["-c", cmd], { input }); } catch { /* exit != 0 */ } };
-    const notif = h.Notification![0].hooks[0].command, start = h.SubagentStart![1].hooks[0].command,
-      stop = h.SubagentStop![1].hooks[0].command;
-    run(start);
-    run(notif, "Claude is waiting for your input");
-    expect(existsSync(f)).toBe(false);
-    run(notif, "Claude needs your permission to use Bash");
+  // T3 · audit 2026-09-23 (claude 2.1.280), diukur di tmux terpisah dengan hook perekam: penghitung
+  // baris lama (`echo 1 >>` di SubagentStart, `sed '$d'` di SubagentStop) turun ke 0 saat subagent
+  // fase MASIH bekerja, karena (c) SubagentStop "hantu" ber-`agent_type` kosong tanpa SubagentStart
+  // menembak ±5 dtk sesudah tiap Stop orchestrator; dan (a) notifikasi selesainya task latar tiba
+  // sebagai UserPromptSubmit `<task-notification>` yang ikut mengosongkannya. Notification idle
+  // 60 dtk kemudian lalu mengisi marker → pil "Menunggu keputusan" palsu. Urutan payload di bawah
+  // adalah urutan yang terekam (dipangkas ke field yang dibaca hook).
+  const replay = (f: string, goal?: string) => {
+    const h = guardSettings(f, goal, true).hooks as Record<string, any[]>;
+    return (event: string, payload: Record<string, unknown>) => {
+      for (const group of h[event] ?? []) {
+        for (const hook of group.hooks) {
+          if (hook.type !== "command" || hook.command === EVENT_HOOK_COMMAND) continue;
+          try {
+            execFileSync("sh", ["-c", hook.command], { input: JSON.stringify({ hook_event_name: event, ...payload }) });
+          } catch { /* exit != 0 */ }
+        }
+      }
+    };
+  };
+  const idle = { message: "Claude is waiting for your input", notification_type: "idle_prompt" };
+  const running = (...ids: string[]) => ({
+    background_tasks: ids.map((id) => ({ id, type: "subagent", status: "running", description: "Fase", agent_type: "hanoman-fase-plan" })),
+  });
+
+  it("T3 · subagent latar masih jalan: SubagentStop hantu & task-notification tak membuat idle menandai", () => {
+    const f = join(mkdtempSync(join(tmpdir(), "dec-")), "s1");
+    const fire = replay(f);
+    fire("UserPromptSubmit", { prompt: "mulai" });
+    fire("SubagentStart", { agent_id: "a6399a31", agent_type: "hanoman-fase-plan" });
+    fire("Stop", { stop_hook_active: false, ...running("a6399a31") });
+    fire("SubagentStop", { agent_id: "a6b18ac5", agent_type: "", ...running("a6399a31") }); // hantu
+    fire("Notification", idle);
+    expect(existsSync(f) ? readFileSync(f, "utf8") : "").toBe("");
+    // izin/needs-input tetap menandai walau subagent jalan
+    fire("Notification", { message: "Claude needs your permission to use Bash", notification_type: "permission_prompt" });
     expect(readFileSync(f, "utf8").length).toBeGreaterThan(0);
-    run(h.UserPromptSubmit![0].hooks[0].command);
-    run(stop);
-    run(notif, "Claude is waiting for your input");
+  });
+
+  it("T3 · dua subagent paralel: task-notification yang pertama tak mengosongkan yang kedua", () => {
+    const f = join(mkdtempSync(join(tmpdir(), "dec-")), "s1");
+    const fire = replay(f);
+    fire("UserPromptSubmit", { prompt: "mulai" });
+    fire("Stop", running("A", "B"));
+    fire("SubagentStop", { agent_id: "A", agent_type: "hanoman-fase-plan", ...running("A", "B") });
+    fire("UserPromptSubmit", { prompt: "<task-notification>\n<task-id>A</task-id>" });
+    fire("Stop", running("B"));
+    fire("Notification", idle);
+    expect(existsSync(f) ? readFileSync(f, "utf8") : "").toBe("");
+  });
+
+  it("T3 · semua subagent selesai: idle kembali menandai", () => {
+    const f = join(mkdtempSync(join(tmpdir(), "dec-")), "s1");
+    const fire = replay(f);
+    fire("Stop", running("A"));
+    fire("SubagentStop", { agent_id: "A", agent_type: "hanoman-fase-plan", ...running("A") });
+    fire("UserPromptSubmit", { prompt: "<task-notification>\n<task-id>A</task-id>" });
+    fire("Stop", { background_tasks: [] });
+    fire("Notification", idle);
+    expect(readFileSync(f, "utf8")).toMatch(/^\d+\n$/);
+  });
+
+  it("T3 · task latar non-subagent (shell) tak menahan idle; payload rusak gagal-terbuka", () => {
+    const f = join(mkdtempSync(join(tmpdir(), "dec-")), "s1");
+    const fire = replay(f);
+    fire("Stop", { background_tasks: [{ id: "b1", type: "shell", status: "running" }] });
+    fire("Notification", idle);
     expect(readFileSync(f, "utf8").length).toBeGreaterThan(0);
+    const g = join(mkdtempSync(join(tmpdir(), "dec-")), "s2");
+    const h = guardSettings(g, undefined, true).hooks as Record<string, any[]>;
+    execFileSync("sh", ["-c", h.Stop![0].hooks[0].command], { input: "bukan json" });
+    replay(g)("Notification", idle);
+    expect(readFileSync(g, "utf8").length).toBeGreaterThan(0);
+  });
+
+  it("T3 · Stop snapshot hidup berdampingan dengan Stop hook mode goal", () => {
+    const h = guardSettings("/w/.decisions/s1", "kondisi goal", true).hooks as Record<string, any[]>;
+    expect(h.Stop).toHaveLength(2);
+    expect(h.Stop![1]).toEqual({ hooks: [{ type: "prompt", prompt: "kondisi goal" }] });
+    expect(h.Stop![0].hooks[0].command).toContain("background_tasks");
   });
 });

@@ -192,3 +192,102 @@ atau Codex yang belum mendukung native subagent tetap mengikuti fallback sesi tu
 - **S6 · normalisasi sel & override.** Sel `orchestration` dan `phaseOverrides` melewati pemetaan
   model pensiun + koersi effort codex yang sama dengan model global; `zPhaseOverride` berbatas
   panjang (model ≤200, effort ≤64, ≤32 fase).
+
+## Amandemen 2026-09-23 — audit prioritas tinggi (claude 2.1.280)
+
+### T2 · konteks bersama lewat berkas + ambang argumen `--agents`
+
+Masalah: `ctx.context` (brief/payload/isi PRD/dokumen audit) disalin utuh ke **setiap** agen fase, lalu
+seluruh JSON diserahkan sebagai SATU argumen `--agents "$(cat …)"`. Linux menolak satu argumen exec
+> 128 KiB (`MAX_ARG_STRLEN`) dengan E2BIG "Argument list too long": pane mati seketika, dan
+all-or-nothing (keputusan 5) hanya menangkap kegagalan `writeFileSync`. Terukur di audit: payload 25 KB
+→ argumen 168 KB; breakdown PRD 60 KB → 141 KB.
+
+Keputusan:
+1. `AgentDef.context` membawa konteks bersama **terpisah** dari `instructions`; `phasePromptOf`
+   (`runner/src/custom-agents.ts`) merakit `instructions + "=== KONTEKS ===" + …`. Codex (TOML lewat
+   `config_file`, tak kena batas argv) tetap inline — byte-identik dengan sebelumnya.
+2. Claude: `createSession` menulis konteks **sekali** ke `<tmpdir>/hanoman-agents/<id>/phase-context.md`
+   (0600, di luar worktree; direktori ini sudah di-mount sandbox ADR-0117 sebagai `agentConfigDir`
+   read-only di path yang sama) dan tiap agen fase hanya menerima path-nya plus perintah membacanya utuh
+   lebih dulu. Terukur sesudahnya: argumen `--agents` **15 461 B** untuk payload feature 10/25/40/200 KB
+   dan **6 359 B** untuk PRD breakdown 60/300 KB — tak lagi bergantung ukuran konteks.
+3. Jaring pengaman: JSON agen fase yang tetap > `AGENTS_ARG_SAFE_BYTES` (100 KiB) diperlakukan sebagai
+   kegagalan materialisasi → mode tunggal (`legacyPrompt`) + alasan di stderr.
+4. `--agents` dari berkas **tidak** tersedia: `claude --help` 2.1.280 hanya mendokumentasikan
+   `--agents <json>` (berbeda dari `--settings <file-or-json>`), dan diukur langsung
+   `claude -p … --agents /path/agents.json` menjawab `Error: Invalid --agents configuration: invalid
+   JSON: JSON Parse error: Unrecognized token '/'`. Jalur `"$(cat …)"` tetap satu-satunya.
+
+Batas yang diterima: prompt orchestrator/mode tunggal sendiri juga satu argumen (`"$(cat prompt)"`);
+payload ≥ ±125 KB tetap menembus 128 KiB di Linux, di kedua mode (terukur: payload 200 KB → prompt
+lama 228 KB). Itu kelas yang sama tetapi di luar orkestrasi — tercatat sebagai keputusan terbuka.
+
+### T1 · subagent fase berjalan di LATAR — `background: false` tidak efektif
+
+Bukti audit: 413/413 run `hanoman-fase-*` tercatat `requestShape: background` di
+`~/.claude/projects/**/subagents/*.meta.json` walau `run_in_background` tak diisi; giliran orchestrator
+berakhir saat menunggu sehingga hook Stop menembak di tengah fase (≈458 kali). Asumsi desain §5
+("selesainya subagent memicu SubagentStop, bukan Stop") tidak berlaku di claude 2.1.280.
+
+Diukur 2026-09-23, claude 2.1.280, parent & agen `haiku`, direktori scratch, hook perekam
+(interaktif lewat tmux socket terpisah; `claude -p` langsung):
+
+| Mode | Konfigurasi | `requestShape` | Stop parent selama subagent jalan |
+|---|---|---|---|
+| `-p` | definisi tanpa `background` | foreground | tidak (Stop sekali, sesudah SubagentStop) |
+| interaktif | definisi tanpa `background` | background | ya — Stop 7 dtk sesudah launch, subagent selesai 27,9 dtk |
+| interaktif | `"background": false` | background | ya |
+| interaktif | prompt meminta `run_in_background: false` | background — model tak mengirim param itu | ya |
+| interaktif | env `CLAUDE_CODE_FORK_SUBAGENT=0` + `"background": false`, param dihilangkan | background | ya |
+| interaktif | env `CLAUDE_CODE_FORK_SUBAGENT=0` + `run_in_background: false` eksplisit (2 run) | foreground | tidak |
+| interaktif | env `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` | foreground | tidak |
+
+Pembacaan bundel 2.1.280 cocok dengan tabel: `shouldRunAsync = remote || (A && !backgroundTasksDisabled)`,
+`A = run_in_background === true || agent.background === true || (coordinator || forceAsync ||
+run_in_background !== false)`, dengan `forceAsync` = gerbang *fork subagent* yang aktif di setiap sesi
+interaktif (nonaktif di `-p`, atau bila `CLAUDE_CODE_FORK_SUBAGENT=0`). Kunci `background` definisi hanya
+pernah dibaca sebagai `=== true`.
+
+Keputusan: `background: false` **tidak** dirender (tak berefek). Yang dipasang sekarang: aturan agen
+fase "JANGAN mengakhiri giliran atau melapor selama masih menunggu proses/tugas latar milikmu sendiri"
+(`PHASE_AGENT_RULES`) — 22 laporan agen fase di audit tak punya baris `Status:` karena agen fase sendiri
+mengakhiri giliran sambil menunggu proses latarnya. Pilihan memaksa sinkron (env di atas) adalah keputusan
+produk dan menunggu keputusan operator; sampai itu, Stop di tengah fase adalah perilaku yang **diterima**
+dan penanda "menunggu keputusan" ditangani T3.
+
+### T3 · "menunggu keputusan" palsu saat subagent bekerja — akar terbukti, sumber sinyal diganti
+
+Penghitung lama (`<marker>.sub`, commit 69a512b7): SubagentStart `echo 1 >>`, SubagentStop `sed '$d'`,
+Notification idle diabaikan bila berkas berisi, UserPromptSubmit mengosongkannya. Diukur dengan hook
+perekam + poller berkas 1 dtk (claude 2.1.280, interaktif, tmux socket terpisah):
+
+- **(c) terbukti — akar utama.** Setiap kali giliran orchestrator berakhir (Stop), ±5 dtk kemudian
+  menembak SubagentStop "hantu": `agent_id` baru, `agent_type` kosong, tanpa SubagentStart
+  (6/6 run bersubagent latar; kerap satu lagi sesudah Stop akhir). `sed '$d'` membuang baris milik subagent fase yang masih
+  jalan → penghitung 0 pada 8,7–12,3 dtk padahal subagent selesai pada 10,8–30,1 dtk. Dengan subagent
+  100 dtk: Notification `idle_prompt` pada 64,2 dtk mengisi marker selagi subagent jalan — persis
+  pola spec-1321 (marker terisi 60 dtk sesudah giliran berakhir, `.sub` 0 baris).
+- **(a) terbukti terjadi.** Selesainya task latar tiba sebagai UserPromptSubmit berisi
+  `<task-notification>…`, sehingga `: > sub` ikut menembak. Berbahaya bila ada >1 subagent paralel.
+- **(b)** balapan `sub.t` tak teramati (tak ada dua SubagentStop bersamaan di run mana pun); gugur
+  bersama desain lama.
+- Payload Notification **tidak** membawa `background_tasks`; payload **Stop** membawanya
+  (`[{id,type:"subagent",status:"running",…}]`) tepat saat orchestrator mulai menganggur.
+
+Keputusan: penghitung baris diganti **snapshot Stop** — hook Stop (bila `eventHook` + `decisionFile`)
+menulis satu baris per `background_tasks` bertipe `subagent` yang `running` ke `<marker>.sub`
+(`node -e`, gagal parse = kosong = perilaku lama). Tiap giliran berakhir dengan Stop, jadi snapshot
+selalu segar; SubagentStart/Stop tak lagi menyentuh berkas. Shell latar tak dihitung supaya server dev
+milik orchestrator tak membungkam marker selamanya. Stop snapshot hidup berdampingan dengan Stop hook
+`prompt` mode goal (ADR-0073). Diverifikasi ulang dengan pengaturan hasil `guardSettings` asli: idle
+pada 64,7 dtk (subagent jalan s.d. 108,6 dtk) **tidak** mengisi marker; idle sesudah semua subagent
+selesai mengisinya pada 169 dtk (Stop terakhir + 59 dtk).
+
+**AC-2 diamandemen** (keputusan 5 "flow mati → argv & prompt byte-identik"): byte-identitas kini
+berlaku untuk **prompt** (golden `runner/test/__golden__`) dan ketiadaan `--agents`, **bukan** untuk
+blok hook `--settings`. Snapshot Stop dipasang di SEMUA sesi claude ber-`decisionFile`, tidak digerbangi
+ke sesi orchestrator/ber-custom-agent: di claude 2.1.280 setiap pemanggilan `Agent` di sesi interaktif
+berjalan di latar (T1), termasuk subagent bawaan (`Explore`, `general-purpose`, `Plan`) yang tersedia di
+setiap sesi — sesi mode tunggal yang memakainya kena pil palsu yang sama. Menggerbanginya berarti
+mempertahankan bug itu demi byte-identitas yang tak dibaca siapa pun selain test.

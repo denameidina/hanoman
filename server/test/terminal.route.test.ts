@@ -9,7 +9,7 @@ import type { AddressInfo } from "node:net";
 import { RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MODE_HEADER, type RemoteCapability } from "@hanoman/shared";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
-import { killAll, killSession, listSessions, promptFilePath, agentsFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
+import { killAll, killSession, listSessions, promptFilePath, agentsFilePath, phaseContextFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { phaseFilePath } from "../src/services/session-phases";
 import { sweepRepo, __resetReaper } from "../src/services/worktree-reaper";
@@ -1125,7 +1125,10 @@ describe("terminal routes · sesi breakdown", () => {
     await c.opened;
     await waitFor(() => c.frames.some((f) => f.t === "exit"));
     expect(c.data()).toContain("docs/prd/jadwal-invoice.breakdown.md");
-    expect(c.data()).toContain("SCOPE-MARKER");
+    // ADR-0164 amandemen T2 · isi PRD tak lagi disalin ke argv `--agents` (batas 128 KiB Linux): agen
+    // fase membacanya dari berkas konteks bersama, yang path-nya ada di argv.
+    expect(c.data()).toContain(phaseContextFilePath("breakdown-jadwal-invoice"));
+    expect(readFileSync(phaseContextFilePath("breakdown-jadwal-invoice"), "utf8")).toContain("SCOPE-MARKER");
     c.ws.close();
     await app.inject({ method: "DELETE", url: "/api/terminal/sessions/breakdown-jadwal-invoice" });
   });

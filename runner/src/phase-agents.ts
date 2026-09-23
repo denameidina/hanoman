@@ -53,6 +53,13 @@ const PHASE_AGENT_RULES = [
   "- JANGAN `git push` — push milik orchestrator. Commit artefak fasemu sendiri sebelum melapor.",
   `- JANGAN memanggil agen berawalan \`${PHASE_AGENT_PREFIX}\`. Custom agent lain boleh dipanggil bila relevan.`,
   "- Kerjakan HANYA fase ini; fase lain dikerjakan agen fasenya sendiri.",
+  // T1 · ADR-0164 amandemen 2026-09-23 · 22 laporan tanpa `Status:` di audit: agen fase mengakhiri
+  // gilirannya sambil menunggu proses latarnya sendiri, dan teks "menunggu" itu dibaca orchestrator
+  // sebagai laporan final. Giliranmu yang berakhir = laporanmu, jadi menunggu harus terjadi DI DALAM giliran.
+  "- JANGAN mengakhiri giliran atau melapor selama masih menunggu proses/tugas latar milikmu sendiri "
+    + "(test/build/server yang kamu jalankan di latar, subagent yang kamu panggil): tunggu sampai selesai "
+    + "dan baca hasilnya, lalu tulis laporan lengkap berawalan `Status:`. Akhir giliranmu dibaca "
+    + "orchestrator sebagai laporan final — teks \"menunggu proses latar\" bukan laporan.",
 ].join("\n");
 
 const PHASE_AGENT_REPORT = [
@@ -189,6 +196,7 @@ function projectGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string
   return forPhaseAgent(lines[phase] ?? "");
 }
 
+/** Instruksi agen fase TANPA blok KONTEKS — konteks bersama dirakit `phasePromptOf` (T2). */
 export function phaseAgentInstructions(
   entry: PhasePlanEntry, index: number, plan: PhasePlan, ctx: PhaseAgentContext,
 ): string {
@@ -214,8 +222,9 @@ export function phaseAgentInstructions(
     PHASE_AGENT_AUTONOMY,
     PHASE_AGENT_RULES,
     PHASE_AGENT_REPORT,
+    // S2 · catatan resume kecil & khas sesi → tetap di instruksi; konteks bersama yang besar dirakit
+    // terpisah oleh `phasePromptOf` (T2) supaya tak disalin ke tiap agen.
     ctx.resume ? resumeNoteFor(ctx.resume) : "",
-    `=== KONTEKS ===\n${ctx.context}`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -226,6 +235,9 @@ export function buildPhaseAgents(plan: PhasePlan, ctx: PhaseAgentContext): Agent
     name: entry.agentName,
     description: `Fase ${entry.phase} flow ${plan.flow} hanoman — hanya dipanggil orchestrator sesi ini.`,
     instructions: phaseAgentInstructions(entry, index, plan, ctx),
+    // T2 · konteks bersama dibawa TERPISAH (lihat `phasePromptOf`): claude merujuknya lewat satu
+    // berkas di temp dir sesi, codex tetap inline.
+    context: ctx.context,
     tools: null,
     model: entry.model,
     effort: entry.effort,

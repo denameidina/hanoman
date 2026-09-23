@@ -169,6 +169,12 @@ describe("agen fase codex (ADR-0164)", () => {
     expect(toml).toContain('model = "gpt-5.6-luna"');
     expect(toml).toContain('model_reasoning_effort = "low"');
   });
+  // T2 · codex tak terdampak batas argv (TOML lewat config_file): konteks tetap INLINE, byte-identik
+  // dengan sebelum konteks dipisah dari instruksi.
+  it("konteks bersama tetap inline di developer_instructions", () => {
+    const toml = renderCodexAgentToml({ ...phase, context: "ISI-KONTEKS" }, [phase]);
+    expect(toml).toContain('developer_instructions = "KERJAKAN PLAN\\n\\n=== KONTEKS ===\\nISI-KONTEKS"');
+  });
   it("maxDepth dipasang eksplisit dan agen fase tak masuk klausa delegasi", () => {
     const m = materializeCodexAgents([phase], "/tmp/hnm-fase", {
       clientVersion: "0.154.0", maxDepth: 3, writeFile: () => {}, chmod: () => {},

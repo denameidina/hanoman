@@ -3,7 +3,7 @@ import { ORCHESTRATION_DEFAULTS, resolveMethod, resolvePhasePlan } from "@hanoma
 import { buildPhaseAgents, fromAuditOf } from "../src/phase-agents";
 import { CODE_STYLE_CLAUSE } from "../src/code-style";
 import { ESCALATION_CONTRACT, startPrdPrompt, startProjectPrompt, startScaffoldPrompt } from "../src/prompt";
-import type { AgentDef } from "../src/custom-agents";
+import { phasePromptOf, renderAgentsJson, type AgentDef } from "../src/custom-agents";
 import type { Flow } from "../src/types";
 
 const planFor = (flow: Flow) => resolvePhasePlan({
@@ -35,11 +35,41 @@ describe("buildPhaseAgents (ADR-0164)", () => {
       expect(d).toMatchObject({
         kind: "phase", tools: null, ...expectedRuntime[d.phase as keyof typeof expectedRuntime], mentions: [],
       });
-      expect(d.instructions).toContain("KONTEKS-UJI");
+      // T2 · konteks bersama TIDAK disalin ke tiap instruksi — dibawa terpisah supaya renderer claude
+      // bisa merujuknya lewat SATU berkas (argumen `--agents` tetap di bawah MAX_ARG_STRLEN Linux).
+      expect(d.instructions).not.toContain("KONTEKS-UJI");
+      expect(d.context).toBe("KONTEKS-UJI");
+      expect(phasePromptOf(d)).toContain("=== KONTEKS ===\nKONTEKS-UJI");
       expect(d.instructions).toContain("JANGAN menulis `$HANOMAN_PHASE_FILE`");
       expect(d.instructions).toContain("Status: selesai | sebagian | terhalang | menunggu-keputusan");
       expect(d.instructions).toContain("`Keputusan terbuka:`");
     }
+  });
+
+  // T1 · audit: 22 laporan agen fase tanpa baris `Status:` — agen fase mengakhiri gilirannya sambil
+  // menunggu proses latarnya sendiri ("I'll pause here and wait for the background test run"), dan
+  // orchestrator membaca teks itu sebagai laporan final.
+  it("dilarang mengakhiri giliran selama masih menunggu proses/tugas latar miliknya sendiri", () => {
+    for (const d of agentsFor("feature")) {
+      expect(d.instructions).toMatch(/JANGAN mengakhiri giliran.*proses\/tugas latar milikmu sendiri/);
+      expect(d.instructions).toContain("tunggu sampai selesai");
+      expect(d.instructions).toMatch(/laporan lengkap berawalan `Status:`/);
+    }
+  });
+
+  // T2 · terukur di audit: payload 25 KB → argumen `--agents` 168 KB karena konteks disalin ke tiap
+  // fase; Linux menolak satu argumen > 128 KiB (MAX_ARG_STRLEN). Dengan konteks dirujuk lewat berkas,
+  // ukuran argumen tak lagi bergantung ukuran konteks.
+  it("konteks besar dirujuk lewat berkas: argumen --agents jauh di bawah 128 KiB", () => {
+    const big = "Langkah \"reproduksi\": buka halaman — klik tombol.\n".repeat(2_000); // ≈ 100 KB
+    const defs = agentsFor("feature", { context: big });
+    const inline = Buffer.byteLength(renderAgentsJson(defs));
+    const ref = Buffer.byteLength(renderAgentsJson(defs, {
+      phaseContextFile: { context: big, path: "/tmp/hanoman-agents/s/phase-context.md" },
+    }));
+    expect(inline).toBeGreaterThan(128 * 1024);
+    expect(ref).toBeLessThan(64 * 1024);
+    expect(inline - ref).toBeGreaterThan(defs.length * (Buffer.byteLength(big) - 1024));
   });
 
   // ADR-0167 · 166 run agen fase, 0 pertanyaan: asumsi jatuh ke prosa/`Rekomendasi fase:` yang tak dibaca
@@ -170,7 +200,9 @@ describe("buildPhaseAgents (ADR-0164)", () => {
       expect(d.instructions).toContain("termasuk perubahan yang belum di-commit");
       expect(d.instructions).toContain("Brainstorm done");
       expect(d.instructions).toContain("`git log --oneline` dan `git status`");
-      expect(d.instructions.indexOf("MELANJUTKAN")).toBeLessThan(d.instructions.indexOf("=== KONTEKS ==="));
+      // T2 · blok KONTEKS dirakit `phasePromptOf`, bukan bagian `instructions` — urutannya dicek di prompt jadi.
+      const prompt = phasePromptOf(d);
+      expect(prompt.indexOf("MELANJUTKAN")).toBeLessThan(prompt.indexOf("=== KONTEKS ==="));
     }
     expect(at(kept, "Brainstorm").instructions).toContain("JANGAN membuat dokumen baru kedua");
     const rebuilt = agentsFor("feature", { resume: { worktreeKept: false, recorded: [] } });

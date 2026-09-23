@@ -288,6 +288,15 @@ const goalStatePath = (id: string): string => `${tmpdir()}/hanoman-goal-gates/${
 // cwd: cwd bisa homedir (sesi VPS) yang tak boleh dikotori, dan worktree bisa lenyap.
 export const agentTempDir = (id: string): string => `${tmpdir()}/hanoman-agents/${id}`;
 export const agentsFilePath = (id: string): string => `${agentTempDir(id)}/claude.json`;
+// ADR-0164 amandemen 2026-09-23 (T2) · konteks bersama agen fase claude, ditulis SEKALI dan dirujuk
+// path-nya dari tiap agen fase. Sekamar dengan `claude.json`: temp dir ini sudah di-mount sandbox
+// (ADR-0117) sebagai `agentConfigDir` read-only di path yang sama, jadi terbaca dari dalam container.
+export const phaseContextFilePath = (id: string): string => `${agentTempDir(id)}/phase-context.md`;
+// T2 · `--agents "$(cat …)"` menjadi SATU argumen exec. Linux menolak satu argumen > 128 KiB
+// (MAX_ARG_STRLEN = 32 halaman) dengan E2BIG "Argument list too long": pane mati seketika dan
+// all-or-nothing tak pernah melihatnya. Ambang ini menyisakan ruang di bawah batas itu; JSON agen
+// fase yang tetap melewatinya diperlakukan sebagai kegagalan materialisasi (fallback mode tunggal).
+export const AGENTS_ARG_SAFE_BYTES = 100 * 1024;
 
 // SPEC-862 · skrip askpass milik hanoman. Sekamar dengan berkas prompt (SPEC-223) dan sengaja
 // TIDAK ber-id sesi: isinya sama untuk semua sesi dan tak memuat apa pun yang khas satu sesi.
@@ -817,7 +826,25 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
       if (agentForDefs === "claude") {
         const file = agentsFilePath(id);
         try {
-          writeFileSync(file, renderAgentsJson(defs, { readOnlyHookCommand: readOnlyHook?.command }), { mode: 0o600 });
+          // T2 · konteks bersama (brief/payload/PRD) SEKALI ke berkas, bukan disalin ke tiap agen fase
+          // di dalam satu argumen `--agents` (payload 25 KB dulu memberi argumen 168 KB).
+          const shared = phaseDefs.find((d) => d.context !== undefined)?.context;
+          let phaseContextFile: { context: string; path: string } | undefined;
+          if (shared !== undefined) {
+            const path = phaseContextFilePath(id);
+            writeFileSync(path, shared, { mode: 0o600 });
+            chmodSync(path, 0o600);
+            phaseContextFile = { context: shared, path };
+          }
+          const json = renderAgentsJson(defs, {
+            readOnlyHookCommand: readOnlyHook?.command, ...(phaseContextFile ? { phaseContextFile } : {}),
+          });
+          const bytes = Buffer.byteLength(json);
+          if (phaseDefs.length > 0 && bytes > AGENTS_ARG_SAFE_BYTES) {
+            return [`argumen --agents ${bytes} B melewati ambang aman ${AGENTS_ARG_SAFE_BYTES} B `
+              + "(batas satu argumen exec Linux 128 KiB)"];
+          }
+          writeFileSync(file, json, { mode: 0o600 });
         } catch (error) {
           if (phaseDefs.length === 0) throw error;
           return [error instanceof Error ? error.message : String(error)];
