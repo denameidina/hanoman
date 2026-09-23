@@ -191,6 +191,11 @@ describe("pembangun prompt · mode orchestrator (ADR-0164)", () => {
       { ...full, phases: full.phases.filter((x) => x.phase === "Execute") });
     expect(p).toContain("1. Execute → `hanoman-fase-execute`");
     expect(p).not.toContain("hanoman-fase-plan");
+    // S3 · berkas fase continue masih memuat `Execute done` run lama — gerbang penutup tak boleh
+    // terpenuhi olehnya. Orchestrator wajib menulis baris BARU sesudah agen Execute sesi ini selesai.
+    expect(p).toContain("baris `Execute done` LAMA");
+    expect(p).toContain("TIDAK berlaku");
+    expect(p).toMatch(/baris `Execute done` BARU/);
   });
   it("startGoalPrompt dengan rencana: klausa Verifikasi pindah ke agen fase", () => {
     const g = { ...spec, source: "goal", payload: { goal: "Hijau" } };

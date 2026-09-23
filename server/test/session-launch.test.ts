@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { mkdtempSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { prisma } from "../src/db";
 import { startSpecSession, LaunchError, sessionIdForSpec } from "../src/services/session-launch";
-import { killAll, killSession, agentsFilePath, promptFilePath } from "../src/services/pty";
+import { killAll, killSession, agentsFilePath, promptFilePath, getSession } from "../src/services/pty";
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { resolveGoalCondition } from "@hanoman/runner";
 import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
@@ -187,6 +187,26 @@ describe("session-launch", () => {
     const spec = await prisma.spec.update({ where: { id: seeded.id }, data: { stage: "done" } });
     const r = await startSpecSession(spec, { flow: "feature" });
     expect(Object.keys(JSON.parse(readFileSync(agentsFilePath(r.id), "utf8")))).toEqual(["hanoman-fase-execute"]);
+    killSession(r.id);
+  });
+
+  // S3 · berkas fase sesi continue masih memuat `Execute done` run lama. Tanpa pengecualian ini Execute
+  // dihitung `doneAtBirth` → ⚠ tak pernah bisa menyala dan gerbang penutup orchestrator langsung lolos.
+  it("S3 · continue: fase di rencana continue TIDAK dihitung done-at-birth; prompt menolak baris lama", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const seeded = await seedRepo("SPEC-ORCH3B");
+    const spec = await prisma.spec.update({ where: { id: seeded.id }, data: { stage: "done" } });
+    const repoDir = (await prisma.project.findUniqueOrThrow({ where: { id: "pg" } })).repoDir!;
+    const id = sessionIdForSpec(spec.id);
+    mkdirSync(join(repoDir, ".worktrees", ".phases"), { recursive: true });
+    writeFileSync(join(repoDir, ".worktrees", ".phases", id),
+      "Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\n");
+    const r = await startSpecSession(spec, { flow: "feature" });
+    const born = getSession(r.id)!.doneAtBirth ?? [];
+    expect(born).toEqual(expect.arrayContaining(["Brainstorm", "Plan"]));
+    expect(born).not.toContain("Execute");
+    const prompt = readFileSync(promptFilePath(r.id), "utf8");
+    expect(prompt).toContain("baris `Execute done` LAMA");
     killSession(r.id);
   });
 

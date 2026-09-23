@@ -285,6 +285,9 @@ export async function startSpecSession(
       decisionFile: decisionFilePath(repoDir, id),
       attachmentsDir: attachments.items.length ? attachments.dir : undefined,
       prompt, legacyPrompt, phaseAgents,
+      // S3 · SPEC-172 · berkas fase continue masih memuat `Execute done` run lama; fase yang DIKERJAKAN
+      // ULANG sesi ini tak boleh dihitung `doneAtBirth`, supaya ⚠ bukti tetap bisa menyala.
+      ...(isContinue && plan ? { rerunPhases: plan.phases.map((p) => p.phase) } : {}),
       env: scopeEnv,
     });
     return resume ? { id: s.id, resumed: true } : { id: s.id };

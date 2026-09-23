@@ -154,3 +154,9 @@ atau Codex yang belum mendukung native subagent tetap mengikuti fallback sesi tu
 - **S2 · resume sampai ke agen fase.** `PhaseAgentContext.resume` menambahkan blok
   `=== MELANJUTKAN ===` ke instruksi setiap agen fase — backlog dari `ResumeCtx`, project bila
   worktree dipakai ulang. Tanpa resume instruksi byte-identik.
+- **S3 · continue (SPEC-172).** Berkas fase tak pernah dikosongkan, jadi `Execute done` run lama
+  membuat Execute `doneAtBirth` (⚠ mustahil) dan memenuhi gerbang penutup. Fase di rencana continue
+  kini dikecualikan dari `@hanoman_done_at_birth` (`CreateOpts.rerunPhases`) dan prompt continue
+  orchestrator menyatakan baris lama tak berlaku: baris `Execute done` BARU wajib ditulis sesudah
+  agen Execute sesi ini selesai. Chip/`complete` tetap membaca berkas fase apa adanya (baris lama
+  terlihat `done` sejak lahir) — mengosongkan/menandai berkas fase adalah keputusan terbuka.

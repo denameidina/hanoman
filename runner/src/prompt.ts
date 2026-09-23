@@ -497,6 +497,12 @@ export function continuePrompt(
       head,
       `JANGAN mengulang fase awal — spec & plan sudah ada di ${m.planDir}/**. Lanjutkan HANYA fase `
         + "Execute lewat subagent fasenya.",
+      // S3 · berkas fase tak pernah dikosongkan: baris `Execute done` run lama masih ada dan akan
+      // memenuhi gerbang penutup sebelum agen Execute sesi ini bekerja sama sekali.
+      "$HANOMAN_PHASE_FILE masih memuat baris `Execute done` LAMA dari sesi sebelumnya — baris itu "
+        + "TIDAK berlaku untuk sesi ini dan tidak memenuhi gerbang penutup. Sesudah agen fase Execute "
+        + "SESI INI melapor `Status: selesai`, tulis baris `Execute done` BARU (verifikasi `tail -1`); "
+        + "commit/push final baru sah sesudah baris baru itu.",
       orchestratorClause(plan), autonomyClause(autonomy), attachmentClause(attachments), push, specContext(spec),
     ].filter(Boolean).join("\n\n");
   }

@@ -672,6 +672,9 @@ export type CreateOpts = {
   // mode tunggal dari input yang SAMA, dipakai bila satu agen fase gagal dimaterialisasi.
   phaseAgents?: AgentDef[];
   legacyPrompt?: string;
+  // S3 · SPEC-172 · fase yang DIKERJAKAN ULANG sesi ini (continue: Execute) — dikecualikan dari
+  // `@hanoman_done_at_birth` walau berkas fase masih memuat barisnya dari run lama.
+  rerunPhases?: string[];
 };
 
 export function createSession(projectId: string, cwd: string, opts: CreateOpts = {}): SessionInfo {
@@ -976,8 +979,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // pty.ts tetap nol dependensi DB). `enrichPhases` memakainya supaya fase ini tak pernah dilabeli
   // ⚠ "missing" hanya karena tak ada invocation SESUDAH lahir.
   if (opts.phaseFile && opts.flow) {
+    const rerun = new Set(opts.rerunPhases ?? []);
     const doneAtBirth = readPhases(opts.phaseFile, opts.flow)
-      .filter((p) => p.state === "done" || p.state === "skipped")
+      .filter((p) => (p.state === "done" || p.state === "skipped") && !rerun.has(p.name))
       .map((p) => p.name);
     if (doneAtBirth.length > 0)
       tmux("set-option", "-t", name(id), "@hanoman_done_at_birth", doneAtBirth.join(","));
