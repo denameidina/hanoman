@@ -1,7 +1,7 @@
 import React from "react";
 import { subscribeTick } from "../lib/shared-ticker";
 import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, StatusPill,
-  ProductStateIllustration, Tabs, OverflowActions, useResponsiveTier, useCoarsePointer,
+  ProductStateIllustration, Tabs, OverflowActions, useResponsiveTier, useCoarsePointer, usePopoverFocus,
   type OverflowItem } from "../ds";
 import { api, ApiError, type TerminalSession, type Phase, type Flow } from "../api/client";
 import { subscribe } from "../api/events";
@@ -20,7 +20,7 @@ import { useLaunchAdmission } from "./use-launch-admission";
 import { usePersistedState, isStr, isBool, isNum } from "../ui-state";
 import { clampFontSize, inlineActionCount, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX } from "./terminal-chrome";
-import { chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
+import { chipAccessibleName, chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
 
 // Default prop bernilai literal `[]` baru tiap render akan mematahkan memo `Cell`.
 const NO_BACKLOG: SpecSlim[] = [];
@@ -818,6 +818,9 @@ export function PhaseStrip({ phases, compact = false, now }: {
   phases: Phase[] | null; compact?: boolean; now?: number;
 }) {
   const [open, setOpen] = React.useState<string | null>(null);
+  // Audit R2 · pola popover DS (LimitIndicator): Esc, klik-luar, fokus masuk panel & kembali ke chip.
+  // Satu panel untuk banyak chip — `triggerRef` dipasang di chip yang sedang terbuka saja.
+  const popover = usePopoverFocus(open !== null, () => setOpen(null), "dialog");
   const [, setTick] = React.useState(0);
   const running = !!phases?.some((p) => p.agent?.status === "running");
   React.useEffect(() => {
@@ -885,7 +888,9 @@ export function PhaseStrip({ phases, compact = false, now }: {
           const duration = durationOf(p);
           return (
             <button key={p.name} type="button" data-tone={tone} aria-expanded={open === p.name}
-              aria-label={`Detail fase ${p.name}`} onClick={() => setOpen(open === p.name ? null : p.name)}
+              ref={open === p.name ? popover.triggerRef : undefined} aria-haspopup="dialog"
+              aria-controls={open === p.name ? popover.panelId : undefined}
+              aria-label={chipAccessibleName(p, duration)} onClick={() => setOpen(open === p.name ? null : p.name)}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 4, flex: "0 0 auto", padding: "1px 6px",
                 border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "transparent",
@@ -907,7 +912,8 @@ export function PhaseStrip({ phases, compact = false, now }: {
         })}
       </div>
       {openPhase?.agent && (
-        <div role="dialog" aria-label={`Detail fase ${openPhase.name}`} style={{
+        <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label={`Detail fase ${openPhase.name}`}
+          tabIndex={-1} onKeyDown={popover.onKeyDown} style={{
           position: "absolute", marginLeft: 8, zIndex: 5, minWidth: 220,
           maxWidth: "min(420px, calc(100% - 16px))", maxHeight: "calc(100% - 48px)", overflowY: "auto",
           boxSizing: "border-box",

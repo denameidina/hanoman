@@ -144,13 +144,27 @@ export function phaseSkillsFor(flow: Flow, phase: string, method: MethodDef): st
 //     eksplisit menyebut BUKAN baris pertama blok.
 export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = {}): string {
   const codex = plan.runtime === "codex";
-  const call = codex ? "spawn_agent" : "tool Agent";
-  const resume = codex ? "send_input ke agent id yang sama" : "SendMessage ke agent ID yang kamu terima";
+  const call = codex
+    ? "spawn_agent"
+    : "tool Agent dengan parameter `subagent_type` berisi persis nama agen fase di daftar (mis. "
+      + `\`${plan.phases[0]?.agentName ?? "hanoman-fase-<fase>"}\`)`;
+  const resume = codex ? "send_input ke agent id yang sama" : "SendMessage ke agent ID yang kamu catat";
+  // Audit R5 · transkrip nyata: spec-1218 memanggil Agent TANPA `subagent_type` (lima fase jatuh ke
+  // general-purpose dengan model orchestrator); spec-1299 memakai `Agent(to=…)` untuk melanjutkan agen
+  // yang sama sehingga lahir agen duplikat. Codex (spawn_agent/send_input) tak punya kedua jebakan itu.
   const describeRule = codex
     ? "Deskripsi/label pemanggilan diisi persis `Fase <Nama Fase>` — tanpa nomor urut, dan BUKAN baris "
       + "pertama blok serah-terima di atas."
     : "Deskripsi pemanggilan (parameter `description`) diisi persis `Fase <Nama Fase>` — tanpa nomor "
-      + "urut, dan BUKAN baris pertama blok serah-terima di atas.";
+      + "urut, dan BUKAN baris pertama blok serah-terima di atas.\n"
+      + "JANGAN pernah memanggil tool Agent tanpa `subagent_type` atau dengan `general-purpose`: fase itu "
+      + "jatuh ke agen umum ber-model orchestrator dan model/effort fasenya hilang. Sebelum memanggil, periksa "
+      + "ulang bahwa `subagent_type` = nama agen fase itu; bila tool menolaknya, itu galat langkah 3 — bukan "
+      + "alasan beralih ke agen umum. Catat agent ID yang dikembalikan hasil pemanggilan: itulah satu-satunya "
+      + "pegangan untuk melanjutkan agen yang SAMA. Melanjutkan agen itu (relay jawaban langkah 4) HANYA "
+      + "lewat SendMessage — tool Agent tak punya parameter `to`, dan memanggilnya lagi melahirkan agen BARU "
+      + "tanpa konteks (duplikat).";
+  const retry = codex ? "" : " (pemanggilan tool Agent BARU dengan `subagent_type` yang sama)";
   // M-6 · codex tak punya tool AskUserQuestion — pemanggilan tool yang tak ada bukan instruksi yang
   // bisa dipatuhi. Orchestrator codex bertanya di terminal sesi ini sendiri (sama seperti klausa
   // otonomi menyuruh manusia dijawab di terminal); orchestrator claude tetap AskUserQuestion.
@@ -162,8 +176,20 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
     ? "di terminal ini sekaligus dalam satu pesan, tiap pertanyaan bernomor dan diakhiri `?` beserta "
       + "opsinya, lalu tunggu jawaban"
     : "lewat AskUserQuestion — tool itu memuat paling banyak 4 pertanyaan per panggilan, jadi pecah "
-      + "sisanya ke panggilan berikutnya sampai semuanya terjawab (di fase yang memang bergiliran dengan "
-      + "manusia — Wawancara, Brainstorm prd/scaffold — tanyakan di terminal ini)";
+      + "sisanya ke panggilan berikutnya sampai semuanya terjawab";
+  // Audit R4 · fase bergiliran dengan manusia (Wawancara reverse, Brainstorm prd/scaffold) kini melapor
+  // satu topik per putaran lewat `Keputusan terbuka:` — relaynya langkah 4 yang SAMA. Dulu claude
+  // disuruh bertanya "di terminal ini" untuk fase itu; teks biasa claude tak terbaca lead (ADR-0167 #6).
+  const turnTaking = plan.flow === "reverse" || plan.flow === "scaffold" || plan.flow === "prd"
+    ? " Fase yang bergiliran dengan manusia (Wawancara, Brainstorm prd/scaffold) melapor satu topik per "
+      + "putaran — relay tiap putaran dengan cara yang sama, bawa konteks & opsi dari laporannya, dan "
+      + "biarkan jawaban bebas."
+    : "";
+  const handoff = plan.phases.some((p) => p.phase === "Serah terima")
+    ? "Sesudah fase Serah terima tercatat, tampilkan bagian `Ringkasan serah terima:` dari laporannya APA "
+      + "ADANYA ke manusia di terminal ini (teks biasa — informasi, bukan pertanyaan) sebelum menutup "
+      + "pekerjaan."
+    : "";
   const list = plan.phases
     .map((p, i) => `${i + 1}. ${p.phase} → \`${p.agentName}\` · ${p.model} · ${p.effort}`)
     .join("\n");
@@ -182,7 +208,7 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "verifikasi dengan `tail -1 \"$HANOMAN_PHASE_FILE\"` bahwa barisnya benar tertulis. Kamu "
       + "satu-satunya penulis berkas itu.",
     "3. `Status: sebagian`/`terhalang`, galat, atau laporan tanpa bukti → delegasikan ULANG SEKALI ke "
-      + "subagent fase yang sama dengan laporan gagalnya disertakan (`Percobaan: 2/2`). Gagal lagi → "
+      + `subagent fase yang sama${retry} dengan laporan gagalnya disertakan (\`Percobaan: 2/2\`). Gagal lagi → `
       + `BERHENTI dan ${askEscalation} apa yang harus dilakukan. Aturan ini berlaku walau `
       + "klausa otonomi di prompt ini menyuruhmu tak bertanya.",
     "4. `Status: menunggu-keputusan` atau `Keputusan terbuka:` yang bukan `-` → SEBELUM menulis marker fase "
@@ -190,12 +216,13 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + `yang SAMA lewat ${resume} dengan seluruh jawabannya. Ulangi selama subagent masih melaporkan `
       + "keputusan terbuka — tak ada batas jumlah pertanyaan maupun putaran, dan giliran relay ini bukan "
       + `percobaan ulang. JANGAN pernah menjawab sendiri, termasuk di sesi scheduler: yang menjawab ${DECIDER} `
-      + "— hanoman yang merutekannya, kamu cukup bertanya.",
+      + `— hanoman yang merutekannya, kamu cukup bertanya.${turnTaking}`,
     o.fastPath
       ? "5. `Rekomendasi fase: jalur-cepat` sesudah Audit → SEBELUM lanjut ke Execute: jalankan `echo "
         + "\"Spec skipped\" >> \"$HANOMAN_PHASE_FILE\"` lalu `echo \"Plan skipped\" >> \"$HANOMAN_PHASE_FILE\"` "
         + "(gerbang yang sama seperti langkah 2), lalu lanjut ke Execute. `penuh` → Spec → Plan → Execute."
       : "",
+    handoff,
     "DILARANG mengerjakan isi fase sendiri — termasuk saat subagent gagal. Menulis `skipped` untuk fase "
       + "yang dilewati bukan mengerjakannya.",
     "Pekerjaan ini BELUM selesai sampai SEMUA fase di daftar di atas punya baris `done` atau `skipped` di "

@@ -2290,8 +2290,14 @@ Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa p
   sel. Tabel di dalam `overflowX: auto`.
 - **Modal Start** (`PhasePlanPreview`): picker yang ada = orchestrator; di bawahnya daftar `Fase · model ·
   effort (warisi)` dari `resolvePhasePlan`, atau catatan "sesi tunggal" (flow mati / codex < 0.151).
-  Setiap fase juga memiliki picker override model + effort; nilai kosong berarti rekomendasi Settings/
-  orchestrator. Override dikirim sebagai `phaseOverrides` dan hanya berlaku untuk sesi itu.
+  Setiap fase juga memiliki picker override model + effort (`Select` DS ukuran `sm`); opsi kosong
+  menyebut sumber & nilainya — `Warisi Settings · <nilai>` bila sel Settings terisi, selain itu
+  `Warisi orchestrator · <nilai>` (dihitung `resolvePhasePlan` tanpa bagian override itu). Nilai override
+  tersimpan selalu tetap jadi opsi terpilih: model di luar katalog lewat `modelSelectOptions`, effort yang
+  tak didukung model hasil resolusi (mis. sesudah model orchestrator diganti) sebagai `<effort> (dikoersi →
+  <efektif>)`. Override dikirim sebagai `phaseOverrides` dan hanya berlaku untuk sesi itu; tanda baris per
+  bagian juga untuk override — ` (override sesi)` hanya bila model DAN effort di-override, selain itu mis.
+  ` (model override · effort warisi)` (audit R6).
   Sebelum Setting — dan untuk codex, versi codex — termuat, pratinjau menampilkan `Memuat rencana fase…`
   alih-alih menyimpulkan sesi tunggal lebih dulu; gagal memuat versi codex dihitung sebagai tak terdeteksi
   → sesi tunggal (cermin server, yang memperlakukan versi codex null sebagai tak didukung). Tanda warisi
@@ -2303,4 +2309,8 @@ Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa p
   Baris chip menggulir horizontal di scroller-nya sendiri; panel detail adalah SIBLING dari scroller itu,
   diposisikan relatif terhadap badan sel (`position: relative` di badan sel, bukan di strip), tingginya
   dibatasi tinggi badan sel (`maxHeight: calc(100% - 48px)`) dengan scroll vertikal internal, lebarnya ≤
-  lebar sel. Fase tanpa agen digambar seperti sebelumnya.
+  lebar sel. Fase tanpa agen digambar seperti sebelumnya. Aksesibilitas (audit R2): nama aksesibel chip
+  selalu lengkap — `Fase <nama>: <status> · <model> · <effort> · <durasi> · percobaan n · bukti subagent
+  tak diterima` (`chipAccessibleName`, juga saat mode ringkas menyembunyikannya secara visual); panel
+  `Detail fase <nama>` memakai `usePopoverFocus` DS (`aria-haspopup`/`aria-controls`, fokus masuk panel,
+  Esc & klik-luar menutup, fokus kembali ke chip).

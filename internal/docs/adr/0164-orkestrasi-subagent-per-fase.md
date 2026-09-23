@@ -68,6 +68,22 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
    dari isi dokumen — bukan investigasi maupun rancangan. Temuan M-6: codex tak punya tool
    `AskUserQuestion`; klausa langkah 3–4 untuk plan codex diganti "tanyakan di terminal ini lalu tunggu
    jawaban", aturan tetap berlaku walau klausa otonomi menyuruh tak bertanya — claude tak berubah.
+   **Audit R5 (2026-09-23):** transkrip nyata menunjukkan orchestrator claude memanggil `Agent` TANPA
+   `subagent_type` (spec-1218: lima fase jatuh ke general-purpose ber-model orchestrator) dan memakai
+   `Agent(to=…)` untuk melanjutkan agen yang sama (spec-1299: agen duplikat). Cabang claude kini mewajibkan
+   `subagent_type` = nama agen fase persis (dilarang kosong/`general-purpose`, periksa ulang sebelum
+   memanggil, penolakan tool = galat langkah 3), mencatat agent ID hasil pemanggilan, dan melanjutkan agen
+   yang sama HANYA lewat `SendMessage` (tool Agent tak punya `to`); tool Agent BARU hanya untuk percobaan
+   ulang langkah 3. Codex (`spawn_agent`/`send_input`) tak berubah.
+   **Audit R4 (2026-09-23):** agen fase tak berhadapan dengan manusia, tetapi baris panduan Wawancara
+   reverse / Brainstorm scaffold-prd yang disalin apa adanya menyuruhnya bertanya "di terminal ini", dan
+   Serah terima reverse menyuruh menulis ringkasan "ke terminal". `phase-agents.ts` (`forPhaseAgent`)
+   mengadaptasi kalimat itu HANYA di instruksi agen fase: pertanyaan jadi butir `Keputusan terbuka:` satu
+   topik per putaran + `Status: menunggu-keputusan`; ringkasan jadi bagian `Ringkasan serah terima:`
+   laporan. Langkah 4 orchestrator kini seragam (claude lewat `AskUserQuestion` juga untuk fase
+   bergiliran — pengecualian "tanyakan di terminal ini" dicabut, teks biasa claude tak terbaca lead,
+   ADR-0167 #6), dan orchestrator reverse menampilkan `Ringkasan serah terima:` apa adanya ke manusia.
+   Prompt sesi tunggal tak berubah (golden).
    Final fix A2: keputusan ROUTING kelanjutan audit qa itu MENGGANTIKAN pemicu langkah 5 (frasa
    `Rekomendasi fase: jalur-cepat` dari agen Audit) — dua mekanisme dulu bersambung tanpa penyelaras
    sehingga orchestrator literal bisa selalu jatuh ke jalur penuh (frasa tak akan pernah ada karena
@@ -76,10 +92,14 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
    artefak Brainstorm, bukan menggantikannya.
 5. **All-or-nothing**: satu agen fase gagal dimaterialisasi (atau codex < 0.151) → sesi lahir mode tunggal
    dengan prompt lama yang dirakit pemanggil dari input yang sama. Flow mati → argv & prompt byte-identik
-   (golden test).
+   (golden test). Konteks smart activation custom agent (`AgentSelectionContext.prompt`) selalu prompt
+   yang benar-benar lahir: roster dipilih ulang dengan `legacyPrompt` saat fallback (audit R7).
 6. **Bukti**: `AgentInvocation.phase`/`effort` (satu migration, LOCAL-only); effort stop dari payload
    runtime. Frame `phase` WS terminal diperkaya status/durasi/percobaan/token; `evidence: missing` sesudah
-   60 dtk tanpa invocation dilabeli "bukti subagent tak diterima". Metrik custom agent mengecualikan baris
+   60 dtk tanpa invocation dilabeli "bukti subagent tak diterima" — 60 dtk dihitung sejak server PERTAMA
+   melihat marker `done`: satu peta per sesi di level modul `pty.ts` (bukan per attachment, jadi
+   reconnect dashboard tak me-reset), dicerminkan ke opsi tmux `@hanoman_phase_done_seen` supaya tahan
+   restart server (audit R3). Metrik custom agent mengecualikan baris
    ber-`phase`. Review whole-branch (I-1/M-2): chip HANYA memakai invocation SEJAK SESI LAHIR (id sesi
    tetap per spec, jadi run yang dilanjutkan bisa mewarisi baris `running` dari run yang sudah mati) —
    fase yang sudah `done`/`skipped` SAAT LAHIR (dicatat `createSession` dari berkas fase ke opsi tmux

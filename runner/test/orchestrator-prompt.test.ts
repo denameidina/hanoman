@@ -92,6 +92,49 @@ describe("orchestratorClause (ADR-0164)", () => {
     expect(c).not.toContain("putuskan sendiri");
     expect(c).not.toContain("Pertanyaan untuk manusia:");
   });
+  // R4 · agen fase bergiliran (Wawancara, Brainstorm prd/scaffold) kini melapor satu topik per putaran
+  // lewat `Keputusan terbuka:` — relay langkah 4 sama untuk SEMUA fase; claude tak lagi disuruh
+  // bertanya "di terminal ini" (teks biasa claude tak terbaca lead, ADR-0167 #6).
+  it("R4 · claude: langkah 4 seragam lewat AskUserQuestion, termasuk fase bergiliran", () => {
+    for (const flow of ["reverse", "scaffold", "prd"] as const) {
+      const c = orchestratorClause(plan(flow, "claude"));
+      expect(c).not.toContain("tanyakan di terminal ini");
+      expect(c).toContain("satu topik per putaran");
+    }
+  });
+  it("R4 · reverse: orchestrator menampilkan `Ringkasan serah terima:` ke manusia; flow lain tidak", () => {
+    for (const rt of ["claude", "codex"] as const) {
+      const c = orchestratorClause(plan("reverse", rt));
+      expect(c).toContain("`Ringkasan serah terima:`");
+      expect(c).toContain("APA ADANYA");
+    }
+    expect(orchestratorClause(plan("feature"))).not.toContain("Ringkasan serah terima");
+  });
+
+  // R5 · transkrip nyata: spec-1218 memanggil Agent TANPA `subagent_type` (lima fase jatuh ke
+  // general-purpose dengan model orchestrator); spec-1299 memakai `Agent(to=…)` untuk melanjutkan
+  // agen yang sama, sehingga lahir agen duplikat.
+  it("R5 · claude: subagent_type wajib = nama agen fase persis, dan verifikasinya", () => {
+    const c = orchestratorClause(plan("feature", "claude"));
+    expect(c).toContain("`subagent_type`");
+    expect(c).toContain("persis nama agen fase di daftar");
+    expect(c).toContain("general-purpose");
+    expect(c).toContain("JANGAN pernah memanggil tool Agent tanpa `subagent_type`");
+  });
+  it("R5 · claude: lanjutan agen yang sama HANYA lewat SendMessage, tool Agent tak punya `to`", () => {
+    const c = orchestratorClause(plan("feature", "claude"));
+    expect(c).toContain("Catat agent ID");
+    expect(c).toContain("HANYA lewat SendMessage");
+    expect(c).toContain("tool Agent tak punya parameter `to`");
+    expect(c).toContain("pemanggilan tool Agent BARU");
+  });
+  it("R5 · codex tak tersentuh aturan khas tool Agent claude", () => {
+    const c = orchestratorClause(plan("feature", "codex"));
+    expect(c).not.toContain("subagent_type");
+    expect(c).not.toContain("SendMessage");
+    expect(c).toContain("send_input");
+  });
+
   it("claude memecah >4 pertanyaan ke beberapa AskUserQuestion; codex satu pesan bernomor diakhiri ?", () => {
     expect(orchestratorClause(plan("feature", "claude")))
       .toContain("paling banyak 4 pertanyaan per panggilan, jadi pecah sisanya ke panggilan berikutnya");

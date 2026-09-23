@@ -28,8 +28,45 @@ export function codexNativeVersionProbe(
   };
 }
 
-const tomlString = (value: string): string => JSON.stringify(value);
-const tomlKey = (value: string): string => JSON.stringify(value);
+const TOML_SHORT_ESCAPES: Record<number, string> = {
+  0x08: "\\b", 0x09: "\\t", 0x0a: "\\n", 0x0c: "\\f", 0x0d: "\\r", 0x22: '\\"', 0x5c: "\\\\",
+};
+
+/**
+ * Basic string TOML 1.0. `JSON.stringify` tidak cukup: ia membiarkan U+007F (DEL) mentah dan
+ * menulis surrogate tunggal sebagai `\udXXX` — keduanya ilegal di TOML. Instruksi agen fase
+ * membawa teks pengguna (payload, objective, isu GitHub), jadi keduanya bisa muncul. Kontrol
+ * U+0000–U+001F dan U+007F di-escape; surrogate tunggal tak bisa direpresentasikan (TOML hanya
+ * menerima Unicode scalar value) sehingga diganti U+FFFD. Escape yang dipakai subset JSON.
+ */
+export function tomlBasicString(value: string): string {
+  let out = '"';
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        out += value[i]! + value[i + 1]!;
+        i += 1;
+      } else {
+        out += "�";
+      }
+      continue;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) {
+      out += "�";
+      continue;
+    }
+    const short = TOML_SHORT_ESCAPES[code];
+    if (short) out += short;
+    else if (code < 0x20 || code === 0x7f) out += `\\u${code.toString(16).toUpperCase().padStart(4, "0")}`;
+    else out += value[i]!;
+  }
+  return `${out}"`;
+}
+
+const tomlString = tomlBasicString;
+const tomlKey = tomlBasicString;
 
 export type CodexMaterializationWarning = { agentName: string; reason: string };
 export type CodexMaterialization = {
