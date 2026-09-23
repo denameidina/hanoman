@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import type { LimitsDTO, LimitWindow, LimitSeverity } from "@hanoman/shared";
 import { effectiveStr } from "../config";
@@ -27,17 +27,36 @@ function credsFile(): string {
   return join(effectiveStr("CLAUDE_CONFIG_DIR") ?? join(homedir(), ".claude"), ".credentials.json");
 }
 
+type SecurityRun = (args: string[]) => string;
+const securityRun: SecurityRun = (args) =>
+  execFileSync("security", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+const osAccount = (): string | null => {
+  try { return userInfo().username || null; } catch { return null; }
+};
+
+/**
+ * Token dari Keychain macOS. Entri milik akun user DULU, baru entri tanpa `-a`: terukur 2026-09-23
+ * (claude 2.1.280) Keychain memuat dua entri `Claude Code-credentials` — akun `unknown` dengan
+ * accessToken kosong dan akun user macOS dengan token hidup — dan `-s` saja memilih yang pertama.
+ * Token kosong tak pernah dikembalikan: ia berarti "coba sumber berikutnya", bukan "tak login".
+ */
+export function keychainAccessToken(run: SecurityRun = securityRun, account = osAccount()): string | null {
+  const base = ["find-generic-password", "-s", "Claude Code-credentials"];
+  for (const scope of account ? [["-a", account], []] : [[]]) {
+    try {
+      const tok: unknown = JSON.parse(run([...base, ...scope, "-w"]))?.claudeAiOauth?.accessToken;
+      if (typeof tok === "string" && tok) return tok;
+    } catch { /* entri tak ada / bukan JSON → sumber berikutnya */ }
+  }
+  return null;
+}
+
 // Keychain dulu (macOS tanpa CLAUDE_CONFIG_DIR eksplisit — di mesin dev berkasnya kedaluwarsa,
 // token hidup ada di Keychain), lalu berkas (Linux/prod, atau CLAUDE_CONFIG_DIR di-set = seam test).
 function readAccessToken(): string | null {
   if (process.platform === "darwin" && !effectiveStr("CLAUDE_CONFIG_DIR")) {
-    try {
-      const blob = execFileSync(
-        "security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"],
-        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-      const tok = JSON.parse(blob)?.claudeAiOauth?.accessToken;
-      if (tok) return tok;
-    } catch { /* jatuh ke berkas */ }
+    const tok = keychainAccessToken();
+    if (tok) return tok;
   }
   try {
     return JSON.parse(readFileSync(credsFile(), "utf8"))?.claudeAiOauth?.accessToken ?? null;

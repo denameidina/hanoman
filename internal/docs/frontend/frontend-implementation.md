@@ -319,7 +319,10 @@ kegagalannya terbaca seperti regresi komponen.
   API Anthropic (SPEC-181/ADR-0024). Settings tak punya `dailyBudget`/`maxConcurrent`. Label reset tiap
   window = countdown (`reset 5j 30m`); window **weekly** menambah momen absolut reset (tanggal+jam, waktu
   lokal browser, `id-ID`) — mis. `reset 52j 8m · Rab, 15 Jul, 07.00` — karena reset mingguan berhari-hari
-  ke depan (SPEC-205).
+  ke depan (SPEC-205). Di macOS token dibaca dari Keychain `Claude Code-credentials` milik **akun user
+  macOS** (`-a <user>`) lebih dulu, baru entri tanpa akun: claude 2.1.280 bisa menyisakan entri akun
+  `unknown` ber-accessToken kosong yang terpilih lebih dulu, dan badge lalu menampilkan "Claude idle /
+  belum login" padahal claude login (terukur 2026-09-23). Token kosong dilewati, tak pernah dipakai.
 - Markdown render: `marked` → sanitasi allowlist DOMPurify → `MarkdownView`; file non-.md dirender
   sebagai blok kode. Konten repository tidak pernah langsung dipasang sebagai HTML (SPEC-759).
 - State ringan lewat React; persist preferensi (edit docs, settings) ke server (dan localStorage sebagai draft).
