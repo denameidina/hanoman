@@ -49,6 +49,13 @@ const PHASE_AGENT_RULES = [
   "- JANGAN `git push` — push milik orchestrator. Commit artefak fasemu sendiri sebelum melapor.",
   `- JANGAN memanggil agen berawalan \`${PHASE_AGENT_PREFIX}\`. Custom agent lain boleh dipanggil bila relevan.`,
   "- Kerjakan HANYA fase ini; fase lain dikerjakan agen fasenya sendiri.",
+  // T1 · ADR-0164 amandemen 2026-09-23 · 22 laporan tanpa `Status:` di audit: agen fase mengakhiri
+  // gilirannya sambil menunggu proses latarnya sendiri, dan teks "menunggu" itu dibaca orchestrator
+  // sebagai laporan final. Giliranmu yang berakhir = laporanmu, jadi menunggu harus terjadi DI DALAM giliran.
+  "- JANGAN mengakhiri giliran atau melapor selama masih menunggu proses/tugas latar milikmu sendiri "
+    + "(test/build/server yang kamu jalankan di latar, subagent yang kamu panggil): tunggu sampai selesai "
+    + "dan baca hasilnya, lalu tulis laporan lengkap berawalan `Status:`. Akhir giliranmu dibaca "
+    + "orchestrator sebagai laporan final — teks \"menunggu proses latar\" bukan laporan.",
 ].join("\n");
 
 const PHASE_AGENT_REPORT = [

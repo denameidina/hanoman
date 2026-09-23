@@ -174,3 +174,36 @@ Keputusan:
 Batas yang diterima: prompt orchestrator/mode tunggal sendiri juga satu argumen (`"$(cat prompt)"`);
 payload ≥ ±125 KB tetap menembus 128 KiB di Linux, di kedua mode (terukur: payload 200 KB → prompt
 lama 228 KB). Itu kelas yang sama tetapi di luar orkestrasi — tercatat sebagai keputusan terbuka.
+
+### T1 · subagent fase berjalan di LATAR — `background: false` tidak efektif
+
+Bukti audit: 413/413 run `hanoman-fase-*` tercatat `requestShape: background` di
+`~/.claude/projects/**/subagents/*.meta.json` walau `run_in_background` tak diisi; giliran orchestrator
+berakhir saat menunggu sehingga hook Stop menembak di tengah fase (≈458 kali). Asumsi desain §5
+("selesainya subagent memicu SubagentStop, bukan Stop") tidak berlaku di claude 2.1.280.
+
+Diukur 2026-09-23, claude 2.1.280, parent & agen `haiku`, direktori scratch, hook perekam
+(interaktif lewat tmux socket terpisah; `claude -p` langsung):
+
+| Mode | Konfigurasi | `requestShape` | Stop parent selama subagent jalan |
+|---|---|---|---|
+| `-p` | definisi tanpa `background` | foreground | tidak (Stop sekali, sesudah SubagentStop) |
+| interaktif | definisi tanpa `background` | background | ya — Stop 7 dtk sesudah launch, subagent selesai 27,9 dtk |
+| interaktif | `"background": false` | background | ya |
+| interaktif | prompt meminta `run_in_background: false` | background — model tak mengirim param itu | ya |
+| interaktif | env `CLAUDE_CODE_FORK_SUBAGENT=0` + `"background": false`, param dihilangkan | background | ya |
+| interaktif | env `CLAUDE_CODE_FORK_SUBAGENT=0` + `run_in_background: false` eksplisit (2 run) | foreground | tidak |
+| interaktif | env `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` | foreground | tidak |
+
+Pembacaan bundel 2.1.280 cocok dengan tabel: `shouldRunAsync = remote || (A && !backgroundTasksDisabled)`,
+`A = run_in_background === true || agent.background === true || (coordinator || forceAsync ||
+run_in_background !== false)`, dengan `forceAsync` = gerbang *fork subagent* yang aktif di setiap sesi
+interaktif (nonaktif di `-p`, atau bila `CLAUDE_CODE_FORK_SUBAGENT=0`). Kunci `background` definisi hanya
+pernah dibaca sebagai `=== true`.
+
+Keputusan: `background: false` **tidak** dirender (tak berefek). Yang dipasang sekarang: aturan agen
+fase "JANGAN mengakhiri giliran atau melapor selama masih menunggu proses/tugas latar milikmu sendiri"
+(`PHASE_AGENT_RULES`) — 22 laporan agen fase di audit tak punya baris `Status:` karena agen fase sendiri
+mengakhiri giliran sambil menunggu proses latarnya. Pilihan memaksa sinkron (env di atas) adalah keputusan
+produk dan menunggu keputusan operator; sampai itu, Stop di tengah fase adalah perilaku yang **diterima**
+dan penanda "menunggu keputusan" ditangani T3.

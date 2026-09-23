@@ -46,6 +46,17 @@ describe("buildPhaseAgents (ADR-0164)", () => {
     }
   });
 
+  // T1 · audit: 22 laporan agen fase tanpa baris `Status:` — agen fase mengakhiri gilirannya sambil
+  // menunggu proses latarnya sendiri ("I'll pause here and wait for the background test run"), dan
+  // orchestrator membaca teks itu sebagai laporan final.
+  it("dilarang mengakhiri giliran selama masih menunggu proses/tugas latar miliknya sendiri", () => {
+    for (const d of agentsFor("feature")) {
+      expect(d.instructions).toMatch(/JANGAN mengakhiri giliran.*proses\/tugas latar milikmu sendiri/);
+      expect(d.instructions).toContain("tunggu sampai selesai");
+      expect(d.instructions).toMatch(/laporan lengkap berawalan `Status:`/);
+    }
+  });
+
   // T2 · terukur di audit: payload 25 KB → argumen `--agents` 168 KB karena konteks disalin ke tiap
   // fase; Linux menolak satu argumen > 128 KiB (MAX_ARG_STRLEN). Dengan konteks dirujuk lewat berkas,
   // ukuran argumen tak lagi bergantung ukuran konteks.
