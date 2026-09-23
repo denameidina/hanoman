@@ -121,6 +121,35 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     expect(stderrOut).toContain("isolated-worktree");
   });
 
+  // R7 · smart activation custom agent harus melihat prompt yang BENAR-BENAR lahir: saat fallback
+  // all-or-nothing, itu `legacyPrompt`, bukan prompt orchestrator yang tak pernah dipakai.
+  it("R7 · fallback mode tunggal memilih custom agent dengan legacyPrompt yang lahir", () => {
+    const seen: Array<string | undefined> = [];
+    registerCustomAgentSource((ctx) => {
+      seen.push(ctx.prompt);
+      return ctx.prompt === "PROMPT LAMA" ? [scout] : [];
+    });
+    registerCodexNativeAgentSupport(() => ({ version: "0.154.0", ok: true }));
+    const writeSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const s = createSession("p1", cwd, {
+      id: born("orch-r7-fallback"), agent: "codex", prompt: "PROMPT ORCHESTRATOR", legacyPrompt: "PROMPT LAMA",
+      phaseAgents: [{ ...phaseAgents[0]!, workspacePolicy: "isolated-worktree" }, phaseAgents[1]!],
+    });
+    writeSpy.mockRestore();
+    expect(getSession(s.id)!.orchestrated).toBe(false);
+    expect(seen.at(-1)).toBe("PROMPT LAMA");
+    expect(getSession(s.id)!.agentRoster!.map((r) => r.name)).toEqual(["scout"]);
+  });
+
+  it("R7 · sesi orchestrator memilih custom agent dengan prompt orchestrator", () => {
+    const seen: Array<string | undefined> = [];
+    registerCustomAgentSource((ctx) => { seen.push(ctx.prompt); return [scout]; });
+    createSession("p1", cwd, {
+      id: born("orch-r7-ok"), agent: "claude", prompt: "PROMPT ORCHESTRATOR", legacyPrompt: "PROMPT LAMA", phaseAgents,
+    });
+    expect(seen).toEqual(["PROMPT ORCHESTRATOR"]);
+  });
+
   it("codex ≥ 0.151: agen fase jadi role native dengan max_depth eksplisit", async () => {
     registerCodexNativeAgentSupport(() => ({ version: "0.154.0", ok: true }));
     const s = createSession("p1", cwd, { id: born("orch-codex"), agent: "codex", prompt: "P", legacyPrompt: "L", phaseAgents });

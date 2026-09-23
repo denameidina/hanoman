@@ -723,26 +723,32 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // tak memasang flag apa pun.
   const sessionEffort = agentForDefs === "codex" && opts.model && opts.effort
     ? coerceCodexEffort(opts.model, opts.effort) : opts.effort;
+  const requestedPhaseDefs = opts.command ? [] : (opts.phaseAgents ?? []);
+  // R7 · smart activation melihat prompt yang BENAR-BENAR lahir: prompt orchestrator bila agen fase
+  // diminta, `legacyPrompt` bila tidak — dan dipilih ulang dengan `legacyPrompt` saat fallback.
+  const bornPrompt = (orch: boolean): string | undefined => orch ? opts.prompt : (opts.legacyPrompt ?? opts.prompt);
   const selectionContext: AgentSelectionContext = {
     projectId, runtime: agentForDefs, flow: opts.flow, cwd,
-    baseSha: opts.env?.HANOMAN_BASE_SHA, prompt: opts.prompt,
+    baseSha: opts.env?.HANOMAN_BASE_SHA, prompt: bornPrompt(requestedPhaseDefs.length > 0),
     changedFiles: opts.command ? [] : collectChangedFiles(cwd, opts.env?.HANOMAN_BASE_SHA),
   };
-  const rawCustomDefs = opts.command ? [] : customAgentsFor(selectionContext);
   // M-1 · ADR-0164 · awalan `hanoman-fase-` dicadangkan untuk agen fase; skema `CustomAgent`
   // menolaknya di ENTRY BARU, tapi baris LAMA bisa nyasar lewat sync dari peer yang belum
   // ber-gerbang itu. Dibuang di TITIK TUNGGAL kelahiran sesi: `attempt()` di bawah merakit
   // `[...phaseDefs, ...customDefs]` dan claude JSON last-key-wins — tanpa saringan ini custom
   // agent bernama sama MENIMPA definisi/instruksi agen fase asli, senyap.
-  const customDefs = rawCustomDefs.filter((def) => !isPhaseAgentName(def.name));
-  for (const def of rawCustomDefs) {
-    if (isPhaseAgentName(def.name)) {
-      process.stderr.write(
-        `hanoman: custom agent ${def.name} diabaikan — awalan hanoman-fase- dicadangkan (ADR-0164)\n`,
-      );
+  const selectCustomDefs = (context: AgentSelectionContext, warn: boolean): AgentDef[] => {
+    const raw = opts.command ? [] : customAgentsFor(context);
+    for (const def of raw) {
+      if (warn && isPhaseAgentName(def.name)) {
+        process.stderr.write(
+          `hanoman: custom agent ${def.name} diabaikan — awalan hanoman-fase- dicadangkan (ADR-0164)\n`,
+        );
+      }
     }
-  }
-  const requestedPhaseDefs = opts.command ? [] : (opts.phaseAgents ?? []);
+    return raw.filter((def) => !isPhaseAgentName(def.name));
+  };
+  let customDefs = selectCustomDefs(selectionContext, true);
   let rosterBlock = "";
   let codexAgentArgs: string[] = [];
   let agentsFile: string | undefined;
@@ -755,8 +761,10 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     const tempDir = agentTempDir(id);
     agentConfigDir = tempDir;
     mkdirSync(tempDir, { recursive: true, mode: 0o700 });
-    const readOnlyHook = customDefs.some((def) => def.workspacePolicy === "read-only")
-      ? writeReadOnlyHook(tempDir)
+    // Lazy: set custom agent bisa dipilih ulang saat fallback (R7).
+    let hook: ReturnType<typeof writeReadOnlyHook> | undefined;
+    const readOnlyHookFor = () => customDefs.some((def) => def.workspacePolicy === "read-only")
+      ? (hook ??= writeReadOnlyHook(tempDir))
       : undefined;
     // ADR-0164 · satu lintasan renderer untuk agen fase + custom agent. Array kosong = sukses;
     // sebaliknya berisi ALASAN tiap agen fase yang gagal (bukan boolean polos — review Task 7:
@@ -766,6 +774,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     const attempt = (phaseDefs: AgentDef[]): string[] => {
       const defs = [...phaseDefs, ...customDefs];
       if (defs.length === 0) return [];
+      const readOnlyHook = readOnlyHookFor();
       if (agentForDefs === "claude") {
         const file = agentsFilePath(id);
         try {
@@ -804,10 +813,12 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
       orchestrated = phaseFailReasons.length === 0;
     }
     if (!orchestrated) {
-      if (requestedPhaseDefs.length > 0)
+      if (requestedPhaseDefs.length > 0) {
         process.stderr.write(
           `hanoman: agen fase sesi ${id} gagal dimaterialisasi — sesi lahir mode tunggal: ${phaseFailReasons.join("; ")}\n`,
         );
+        customDefs = selectCustomDefs({ ...selectionContext, prompt: bornPrompt(false) }, false);
+      }
       attempt([]);
     }
     if (orchestrated && agentForDefs === "claude") {
@@ -826,7 +837,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
 
   let promptArg = "";
   let promptFile: string | undefined;
-  const sessionPrompt = orchestrated ? opts.prompt : (opts.legacyPrompt ?? opts.prompt);
+  const sessionPrompt = bornPrompt(orchestrated);
   if (!opts.command && sessionPrompt) {
     promptFile = promptFilePath(id);
     mkdirSync(dirname(promptFile), { recursive: true, mode: 0o700 });

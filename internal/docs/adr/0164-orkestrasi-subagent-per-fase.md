@@ -76,7 +76,8 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
    artefak Brainstorm, bukan menggantikannya.
 5. **All-or-nothing**: satu agen fase gagal dimaterialisasi (atau codex < 0.151) → sesi lahir mode tunggal
    dengan prompt lama yang dirakit pemanggil dari input yang sama. Flow mati → argv & prompt byte-identik
-   (golden test).
+   (golden test). Konteks smart activation custom agent (`AgentSelectionContext.prompt`) selalu prompt
+   yang benar-benar lahir: roster dipilih ulang dengan `legacyPrompt` saat fallback (audit R7).
 6. **Bukti**: `AgentInvocation.phase`/`effort` (satu migration, LOCAL-only); effort stop dari payload
    runtime. Frame `phase` WS terminal diperkaya status/durasi/percobaan/token; `evidence: missing` sesudah
    60 dtk tanpa invocation dilabeli "bukti subagent tak diterima". Metrik custom agent mengecualikan baris
