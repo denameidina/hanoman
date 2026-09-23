@@ -157,4 +157,4 @@ bawaannya adalah yang berlaku bila variabelnya kosong.
 | `HANOMAN_TICKET_RETENTION_DAYS` | `server/src/services/ticket.ts` | `90` | umur tiket Help Center yang sudah ditutup sebelum disapu retensi (ADR-0131) |
 | `HANOMAN_IDE_UPLOAD_MAX_BYTES` | `server/src/routes/ide.ts` | `UPLOAD_TOTAL_MAX` di route | plafon total byte satu unggahan multipart IDE (ADR-0121) |
 | `HANOMAN_MCP_MAX_BYTES` | `cli/src/mcp/config.ts` | lihat `--max-bytes` | batas ukuran balasan tool MCP; flag `--max-bytes` menang (ADR-0099) |
-| `HANOMAN_EVENT_DIR` | disuntik `pty.ts` ke tiap sesi agen | per-sesi di tmpdir | spool telemetry hook agen; **bukan** untuk diisi operator — sesi mewarisinya dari server (ADR-0159) |
+| `HANOMAN_EVENT_DIR` | disuntik `pty.ts` ke tiap sesi agen | per-sesi di `<HANOMAN_HOME>/session-events` | spool telemetry hook agen; **bukan** untuk diisi operator — sesi mewarisinya dari server (ADR-0159). Relay me-replay-nya dengan `Host` control dari `HANOMAN_CONTROL_ORIGINS`; `session event relay: route menolak event` di log berarti event terbuang |

@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Fastify from "fastify";
 import { drainSessionEventSpool, startSessionEventRelay, sessionEventRelayStatus } from "../src/services/session-event-relay";
 import { sessionEventToken } from "../src/services/session-event-token";
+import { classifyIngress, loadIngressPolicy } from "../src/services/ingress-policy";
 
 describe("sandbox session event relay", () => {
   it("can register its lifecycle before Fastify becomes ready", async () => {
@@ -79,5 +80,48 @@ describe("sandbox session event relay", () => {
     expect(sessionEventRelayStatus(root)).toMatchObject({ state: "ready", retryPending: 0,
       retryAttempts: 2, lastDeliveryAt: expect.any(String), lastIssueAt: expect.any(String) });
     expect(sessionEventRelayStatus(root + "-unknown")).toMatchObject({ state: "unobserved", checkedAt: null });
+  });
+
+  // `HANOMAN_CONTROL_ORIGINS` menyalakan gerbang ingress: Host di luar daftar dijawab 404. Relay
+  // dulu inject tanpa Host (default `localhost:80`), jadi SETIAP event spool dibuang diam-diam —
+  // AgentInvocation kosong dan pertanyaan sesi tak pernah sampai ke lead.
+  const ingressGatedApp = (env: Record<string, string>) => {
+    const app = Fastify();
+    const policy = loadIngressPolicy(env);
+    app.addHook("onRequest", async (req, reply) => {
+      const role = classifyIngress({ host: req.headers.host ?? "", method: req.method, url: req.url }, policy);
+      if (role === "denied") return reply.code(404).send({ error: "not found" });
+    });
+    app.post("/api/session-events", async (_req, reply) => reply.code(202).send({ accepted: true }));
+    return app;
+  };
+  const CONTROL_ENV = { HANOMAN_CONTROL_ORIGINS: "http://127.0.0.1:8787,https://hm.example.com" };
+
+  it("delivers through the ingress gate when control origins are configured", async () => {
+    const root = mkdtempSync(join(tmpdir(), "hanoman-event-relay-ingress-"));
+    const dir = join(root, "sess-4");
+    mkdirSync(dir);
+    const path = join(dir, "event.json");
+    writeFileSync(path, JSON.stringify({ hook_event_name: "SubagentStart", agent_id: "a", agent_type: "scout" }));
+    const app = ingressGatedApp(CONTROL_ENV);
+    startSessionEventRelay(app, { root, intervalMs: 20, env: CONTROL_ENV });
+
+    await vi.waitFor(() => expect(existsSync(path)).toBe(false));
+    await app.close();
+
+    expect(sessionEventRelayStatus(root)).toMatchObject({ droppedEvents: 0, lastDeliveryAt: expect.any(String) });
+  });
+
+  it("logs events the route rejects instead of dropping them silently", async () => {
+    const root = mkdtempSync(join(tmpdir(), "hanoman-event-relay-rejected-"));
+    const dir = join(root, "sess-5");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "event.json"), JSON.stringify({ hook_event_name: "SubagentStart" }));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await drainSessionEventSpool({ inject: async () => ({ statusCode: 404 }) }, root);
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("404"));
+    warn.mockRestore();
   });
 });

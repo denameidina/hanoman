@@ -2100,6 +2100,12 @@ PATCH  /api/custom-agents/invocations/:id { disposition, note?, reworkRequired? 
 > root spool berada di `<HANOMAN_HOME>/session-events`, bukan tmpdir bersama antar-instalasi;
 > hook memublikasikan `.json` lewat rename atomik. Worker me-replay ke endpoint event bertoken yang
 > sama; `429`/5xx/exception dipertahankan untuk retry, payload invalid dan 4xx permanen dibuang.
+> Replay membawa header `Host` = host control pertama (`HANOMAN_CONTROL_ORIGINS`) bila gerbang
+> ingress menyala — kembaran `HANOMAN_EVENT_HOST` jalur curl dan `defaultHost` dispatcher relay hub.
+> Tanpanya `inject` membawa `localhost:80`, `classifyIngress` menjawab 404, dan setiap event spool
+> terbuang: sejak spool jadi jalur tunggal (2026-08-31) sampai perbaikan ini, instance ber-origin
+> terpisah tak punya satu pun `AgentInvocation` dan pertanyaan sesi tak pernah sampai ke lead.
+> 4xx yang dibuang kini dicatat satu baris `console.warn` per drain (bukan per event).
 >
 > Metrics nullable tidak diubah menjadi nol. Operational precision = `(accepted+partial) / semua
 > disposition non-pending`; bila belum ada disposition hasilnya null. Eval recall dari fixture
