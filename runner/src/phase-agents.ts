@@ -149,6 +149,7 @@ function projectGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string
   return lines[phase] ?? "";
 }
 
+/** Instruksi agen fase TANPA blok KONTEKS — konteks bersama dirakit `phasePromptOf` (T2). */
 export function phaseAgentInstructions(
   entry: PhasePlanEntry, index: number, plan: PhasePlan, ctx: PhaseAgentContext,
 ): string {
@@ -174,7 +175,6 @@ export function phaseAgentInstructions(
     PHASE_AGENT_AUTONOMY,
     PHASE_AGENT_RULES,
     PHASE_AGENT_REPORT,
-    `=== KONTEKS ===\n${ctx.context}`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -185,6 +185,9 @@ export function buildPhaseAgents(plan: PhasePlan, ctx: PhaseAgentContext): Agent
     name: entry.agentName,
     description: `Fase ${entry.phase} flow ${plan.flow} hanoman — hanya dipanggil orchestrator sesi ini.`,
     instructions: phaseAgentInstructions(entry, index, plan, ctx),
+    // T2 · konteks bersama dibawa TERPISAH (lihat `phasePromptOf`): claude merujuknya lewat satu
+    // berkas di temp dir sesi, codex tetap inline.
+    context: ctx.context,
     tools: null,
     model: entry.model,
     effort: entry.effort,

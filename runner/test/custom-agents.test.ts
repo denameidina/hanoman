@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  renderAgentsJson, agentPromptOf, agentDelegationClause, type AgentDef,
+  renderAgentsJson, agentPromptOf, agentDelegationClause, phasePromptOf, type AgentDef,
 } from "../src/custom-agents";
 import { DEFAULT_AGENT_TOOLS, MENTION_MAX_HOPS } from "@hanoman/shared";
 
@@ -237,6 +237,31 @@ describe("renderAgentsJson · agen fase (ADR-0164)", () => {
       description: "Fase Plan", prompt: "INSTRUKSI FASE", model: "claude-sonnet-5", effort: "low",
     });
     expect(j.scout.tools).toBeDefined();
+  });
+  // T2 · konteks bersama (brief/payload/PRD) dulu disalin utuh ke SETIAP agen fase lalu seluruh JSON
+  // lewat SATU argumen `--agents`: payload 25 KB → 168 KB, lewat MAX_ARG_STRLEN Linux (128 KiB) →
+  // exec gagal "Argument list too long". Kini konteks ditulis sekali ke berkas dan dirujuk path-nya.
+  it("konteks bersama: inline tanpa berkas (byte-identik), dirujuk path bila berkas diberikan", () => {
+    const withCtx = { ...phase, kind: "phase" as const, phase: "Plan", context: "ISI-KONTEKS" };
+    const inline = JSON.parse(renderAgentsJson([withCtx]))["hanoman-fase-plan"].prompt;
+    expect(inline).toBe("INSTRUKSI FASE\n\n=== KONTEKS ===\nISI-KONTEKS");
+    expect(phasePromptOf(withCtx)).toBe(inline);
+    const ref = JSON.parse(renderAgentsJson([withCtx], {
+      phaseContextFile: { context: "ISI-KONTEKS", path: "/tmp/hanoman-agents/s1/phase-context.md" },
+    }))["hanoman-fase-plan"].prompt;
+    expect(ref).not.toContain("ISI-KONTEKS");
+    expect(ref.startsWith("INSTRUKSI FASE\n\n=== KONTEKS ===\n")).toBe(true);
+    expect(ref).toContain("`/tmp/hanoman-agents/s1/phase-context.md`");
+    expect(ref).toMatch(/Baca berkas itu UTUH/);
+    // Konteks yang BUKAN isi berkas tetap inline — berkas tak pernah dirujuk untuk isi yang lain.
+    const other = { ...withCtx, name: "hanoman-fase-spec", context: "LAIN" };
+    const j = JSON.parse(renderAgentsJson([withCtx, other], {
+      phaseContextFile: { context: "ISI-KONTEKS", path: "/tmp/x.md" },
+    }));
+    expect(j["hanoman-fase-spec"].prompt).toContain("=== KONTEKS ===\nLAIN");
+  });
+  it("agen fase tanpa konteks: prompt apa adanya", () => {
+    expect(phasePromptOf({ ...phase, kind: "phase" as const })).toBe("INSTRUKSI FASE");
   });
   it("agen fase tak masuk klausa delegasi custom agent", () => {
     const phaseDef = { ...phase, kind: "phase" as const, phase: "Plan" };

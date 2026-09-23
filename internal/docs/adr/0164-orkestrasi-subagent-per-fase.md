@@ -144,3 +144,33 @@ berlaku pada sesi yang sedang dilahirkan. Prioritas resolusi adalah:
 
 Ganti runtime pada modal menghapus override fase karena katalog Claude dan Codex berbeda. Flow mati
 atau Codex yang belum mendukung native subagent tetap mengikuti fallback sesi tunggal.
+
+## Amandemen 2026-09-23 — audit prioritas tinggi (claude 2.1.280)
+
+### T2 · konteks bersama lewat berkas + ambang argumen `--agents`
+
+Masalah: `ctx.context` (brief/payload/isi PRD/dokumen audit) disalin utuh ke **setiap** agen fase, lalu
+seluruh JSON diserahkan sebagai SATU argumen `--agents "$(cat …)"`. Linux menolak satu argumen exec
+> 128 KiB (`MAX_ARG_STRLEN`) dengan E2BIG "Argument list too long": pane mati seketika, dan
+all-or-nothing (keputusan 5) hanya menangkap kegagalan `writeFileSync`. Terukur di audit: payload 25 KB
+→ argumen 168 KB; breakdown PRD 60 KB → 141 KB.
+
+Keputusan:
+1. `AgentDef.context` membawa konteks bersama **terpisah** dari `instructions`; `phasePromptOf`
+   (`runner/src/custom-agents.ts`) merakit `instructions + "=== KONTEKS ===" + …`. Codex (TOML lewat
+   `config_file`, tak kena batas argv) tetap inline — byte-identik dengan sebelumnya.
+2. Claude: `createSession` menulis konteks **sekali** ke `<tmpdir>/hanoman-agents/<id>/phase-context.md`
+   (0600, di luar worktree; direktori ini sudah di-mount sandbox ADR-0117 sebagai `agentConfigDir`
+   read-only di path yang sama) dan tiap agen fase hanya menerima path-nya plus perintah membacanya utuh
+   lebih dulu. Terukur sesudahnya: argumen `--agents` **15 461 B** untuk payload feature 10/25/40/200 KB
+   dan **6 359 B** untuk PRD breakdown 60/300 KB — tak lagi bergantung ukuran konteks.
+3. Jaring pengaman: JSON agen fase yang tetap > `AGENTS_ARG_SAFE_BYTES` (100 KiB) diperlakukan sebagai
+   kegagalan materialisasi → mode tunggal (`legacyPrompt`) + alasan di stderr.
+4. `--agents` dari berkas **tidak** tersedia: `claude --help` 2.1.280 hanya mendokumentasikan
+   `--agents <json>` (berbeda dari `--settings <file-or-json>`), dan diukur langsung
+   `claude -p … --agents /path/agents.json` menjawab `Error: Invalid --agents configuration: invalid
+   JSON: JSON Parse error: Unrecognized token '/'`. Jalur `"$(cat …)"` tetap satu-satunya.
+
+Batas yang diterima: prompt orchestrator/mode tunggal sendiri juga satu argumen (`"$(cat prompt)"`);
+payload ≥ ±125 KB tetap menembus 128 KiB di Linux, di kedua mode (terukur: payload 200 KB → prompt
+lama 228 KB). Itu kelas yang sama tetapi di luar orkestrasi — tercatat sebagai keputusan terbuka.

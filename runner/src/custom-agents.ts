@@ -27,7 +27,35 @@ export type AgentDef = {
   kind?: "custom" | "phase";
   /** ADR-0164 · nama fase PIPELINES milik agen fase; ikut roster tmux sebagai bukti. */
   phase?: string;
+  /**
+   * ADR-0164 amandemen 2026-09-23 (T2) · konteks bersama agen fase (backlog/project/brief/PRD),
+   * TERPISAH dari `instructions` supaya renderer claude bisa merujuknya lewat satu berkas alih-alih
+   * menyalinnya ke tiap agen. Dirakit oleh `phasePromptOf`.
+   */
+  context?: string;
 };
+
+export const PHASE_CONTEXT_HEADER = "=== KONTEKS ===";
+
+/** Berkas konteks bersama agen fase yang sudah ditulis pemanggil (claude saja). */
+export type PhaseContextFile = { context: string; path: string };
+
+/**
+ * ADR-0164 amandemen 2026-09-23 (T2) · prompt agen fase = instruksi + blok KONTEKS. Tanpa berkas:
+ * konteks inline — byte-identik dengan sebelum konteks dipisah (codex selalu begini: TOML lewat
+ * `config_file`, tak kena batas argv). Dengan berkas yang ISINYA sama persis: hanya path-nya, sebab
+ * `--agents` claude adalah SATU argumen exec dan Linux menolak argumen > 128 KiB (MAX_ARG_STRLEN) —
+ * menyalin payload 25 KB ke tiap fase sudah memberi 168 KB.
+ */
+export function phasePromptOf(def: AgentDef, file?: PhaseContextFile): string {
+  if (def.context === undefined) return def.instructions;
+  const body = file && file.context === def.context
+    ? `Konteks sesi ini (backlog/project/brief/PRD) ada di berkas \`${file.path}\`. Baca berkas itu UTUH `
+      + "dengan tool Read SEBELUM mengerjakan apa pun — isinya bagian dari instruksimu, bukan lampiran "
+      + "opsional. Berkas itu hanya-baca dan berada di luar worktree; jangan menyalin atau meng-commit-nya."
+    : def.context;
+  return `${def.instructions}\n\n${PHASE_CONTEXT_HEADER}\n${body}`;
+}
 
 /** Mention yang benar-benar bisa dituju: nama di luar roster dibuang, agar prosa tak berbohong. */
 const liveMentions = (def: AgentDef, roster: AgentDef[]): string[] => {
@@ -148,7 +176,11 @@ export function agentPromptOf(
  * gerbang "jangan pasang flag sama sekali", supaya argv sesi tanpa custom agent byte-identik
  * dengan sebelum SPEC-450.
  */
-type RenderAgentsOptions = { readOnlyHookCommand?: string; promptSuffix?: string };
+type RenderAgentsOptions = {
+  readOnlyHookCommand?: string; promptSuffix?: string;
+  /** T2 · konteks bersama agen fase sudah ditulis ke berkas ini; agen fase yang konteksnya sama merujuknya. */
+  phaseContextFile?: PhaseContextFile;
+};
 
 const READ_ONLY_TOOLS = new Set(["Read", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"]);
 
@@ -159,7 +191,7 @@ export function renderAgentsJson(defs: AgentDef[], options: RenderAgentsOptions 
     if (d.kind === "phase") {
       out[d.name] = {
         description: d.description,
-        prompt: d.instructions,
+        prompt: phasePromptOf(d, options.phaseContextFile),
         ...(d.model ? { model: d.model } : {}),
         ...(d.effort ? { effort: d.effort } : {}),
       };

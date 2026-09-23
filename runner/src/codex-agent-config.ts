@@ -1,7 +1,7 @@
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported } from "@hanoman/shared";
-import { agentDelegationClause, agentPromptOf, type AgentDef } from "./custom-agents";
+import { agentDelegationClause, agentPromptOf, phasePromptOf, type AgentDef } from "./custom-agents";
 import { resolveHardening } from "./runtime-profile";
 
 // ADR-0164 · gerbang versi pindah ke @hanoman/shared (UI butuh aturan yang sama); diekspor ulang
@@ -51,7 +51,7 @@ export function renderCodexAgentToml(
     `name = ${tomlString(def.name)}`,
     `description = ${tomlString(def.description)}`,
     `developer_instructions = ${tomlString(def.kind === "phase"
-      ? def.instructions
+      ? phasePromptOf(def)
       : agentPromptOf(def, roster, "codex") + (options.promptSuffix ?? ""))}`,
     ...(def.model ? [`model = ${tomlString(def.model)}`] : []),
     ...(def.effort ? [`model_reasoning_effort = ${tomlString(def.effort)}`] : []),

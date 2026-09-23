@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createSession, getSession, killSession, registerCustomAgentSource, registerCodexNativeAgentSupport,
-  agentsFilePath, promptFilePath, agentTempDir,
+  agentsFilePath, promptFilePath, agentTempDir, AGENTS_ARG_SAFE_BYTES,
 } from "../src/services/pty";
 import { renderAgentsJson, type AgentDef } from "@hanoman/runner";
 
@@ -64,6 +64,43 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     expect(p.agentRoster!.find((r) => r.name === "hanoman-fase-spec"))
       .toMatchObject({ phase: "Spec", model: "claude-sonnet-5", effort: "low" });
     expect(existsSync(join(agentTempDir(s.id), "subagent-statusline.cjs"))).toBe(true);
+  });
+
+  // T2 · konteks bersama ditulis SEKALI ke temp dir sesi (di-mount sandbox sebagai agentConfigDir)
+  // dan dirujuk path-nya — bukan disalin ke tiap agen fase di dalam satu argumen `--agents`.
+  it("claude: konteks bersama agen fase ditulis sekali ke berkas 0600 dan dirujuk path-nya", () => {
+    const ctx = "KONTEKS-BESAR ".repeat(4_000); // ≈ 56 KB
+    const withCtx = phaseAgents.map((d) => ({ ...d, context: ctx }));
+    const s = createSession("p1", cwd, {
+      id: born("orch-ctx"), agent: "claude", prompt: "PROMPT ORCHESTRATOR", legacyPrompt: "PROMPT LAMA", phaseAgents: withCtx,
+    });
+    const file = join(agentTempDir(s.id), "phase-context.md");
+    expect(readFileSync(file, "utf8")).toBe(ctx);
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    const raw = readFileSync(agentsFilePath(s.id), "utf8");
+    expect(raw).not.toContain("KONTEKS-BESAR");
+    expect(JSON.parse(raw)["hanoman-fase-spec"].prompt).toContain(`\`${file}\``);
+    expect(Buffer.byteLength(raw)).toBeLessThan(AGENTS_ARG_SAFE_BYTES);
+    expect(getSession(s.id)!.orchestrated).toBe(true);
+  });
+
+  // T2 · jaring pengaman: argumen `--agents` yang tetap melewati ambang aman (instruksi fase raksasa)
+  // tak boleh sampai ke exec — di Linux ia mati "Argument list too long" tanpa fallback. Diperlakukan
+  // seperti kegagalan materialisasi: all-or-nothing ke mode tunggal, dengan alasan di stderr.
+  it("claude: argumen --agents melewati ambang aman → mode tunggal + peringatan stderr", () => {
+    registerCustomAgentSource(() => [scout]);
+    const huge = phaseAgents.map((d) => ({ ...d, instructions: "X".repeat(AGENTS_ARG_SAFE_BYTES) }));
+    const writeSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const s = createSession("p1", cwd, {
+      id: born("orch-huge"), agent: "claude", prompt: "PROMPT ORCHESTRATOR", legacyPrompt: "PROMPT LAMA", phaseAgents: huge,
+    });
+    const stderrOut = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    writeSpy.mockRestore();
+    expect(getSession(s.id)!.orchestrated).toBe(false);
+    expect(readFileSync(promptFilePath(s.id), "utf8").startsWith("PROMPT LAMA")).toBe(true);
+    expect(readFileSync(agentsFilePath(s.id), "utf8")).toBe(renderAgentsJson([scout]));
+    expect(stderrOut).toContain("gagal dimaterialisasi");
+    expect(stderrOut).toContain("ambang aman");
   });
 
   it("claude: --settings memuat subagentStatusLine hanya untuk sesi diorkestrasi", async () => {
