@@ -68,8 +68,13 @@ describe("resolvePhasePlan", () => {
   it("runtime tanpa agen native → null", () => {
     expect(resolvePhasePlan({ ...base, nativeAgents: false })).toBeNull();
   });
-  it("blok absen (respons Setting lama) → default aktif", () => {
-    expect(resolvePhasePlan({ ...base, orchestration: undefined })?.phases).toHaveLength(5);
+  // S4a · sejak amandemen 2026-09-17 default = matriks bawaan (Spec Opus, no_effort MATI), bukan
+  // "semua flow aktif dengan sel kosong". Blok absen harus jatuh ke ORCHESTRATION_DEFAULTS — persis
+  // yang server pakai (`zSetting` .default) — supaya pratinjau tak menampilkan rencana palsu.
+  it("S4a · blok absen (respons Setting lama) → ORCHESTRATION_DEFAULTS, bukan sel kosong", () => {
+    expect(resolvePhasePlan({ ...base, orchestration: undefined }))
+      .toEqual(resolvePhasePlan({ ...base, orchestration: ORCHESTRATION_DEFAULTS }));
+    expect(resolvePhasePlan({ ...base, flow: "no_effort", orchestration: undefined })).toBeNull();
   });
 	it("sel kosong mewarisi orchestrator di setiap fase", () => {
 		const emptyOrchestration = zOrchestration.parse({});

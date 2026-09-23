@@ -71,6 +71,22 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
     expect(screen.getByTestId("phase-plan-preview")).not.toHaveTextContent("dikerjakan subagent");
   });
 
+  // S4a · GET Setting gagal: dulu dianggap termuat dengan orchestration undefined → resolver memakai
+  // sel kosong + no_effort aktif, padahal server memakai matriks bawaan. Rencana palsu → galat.
+  it("S4a · GET Setting gagal → galat di pratinjau, bukan rencana palsu", async () => {
+    (api.getSettings as any).mockRejectedValueOnce(new Error("boom"));
+    renderModal();
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Gagal memuat Setting"));
+    expect(screen.getByTestId("phase-plan-preview")).not.toHaveTextContent("dikerjakan subagent");
+  });
+
+  it("S4a · blok orchestration absen di respons → matriks bawaan (sama dengan server)", async () => {
+    (api.getSettings as any).mockResolvedValue(settingWith(undefined));
+    renderModal();
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Spec · Opus · medium"));
+    expect(screen.getByTestId("phase-plan-preview")).not.toHaveTextContent("Spec · Opus · medium (warisi)");
+  });
+
   it("codex: versi belum termuat → pratinjau menunggu, lalu tampil setelah versi tiba", async () => {
     (api.getSettings as any).mockResolvedValue(settingWith(structuredClone(ORCHESTRATION_DEFAULTS),
       { agent: "codex", codex: { model: "gpt-5.6-sol", effort: "high" } }));

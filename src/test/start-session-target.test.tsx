@@ -96,4 +96,19 @@ describe("StartSessionModal — target picker (SPEC-1216 · AC-B7/B8)", () => {
     await waitFor(() => expect(screen.getByLabelText(/target/i)).toHaveValue("dA"));
     expect(screen.queryByText("Mulai tetap")).toBeNull();
   });
+
+  // S4b · sesi lahir di device target dengan Setting LOCAL-only miliknya — pratinjau (Setting & versi
+  // codex hub) tak boleh tampil seolah rencana final.
+  it("S4b · target remote → pratinjau menyatakan rencana final ditentukan device target", async () => {
+    vi.mocked(api.presence).mockResolvedValue(viewWithDA);
+    vi.mocked(api.getProject).mockResolvedValue({ handledBy: handledBy("dA", "laptop-dA") } as any);
+    render(<StartSessionModal open spec={fixtureSpec} onClose={() => {}} onStarted={() => {}} />);
+    await waitFor(() => expect(screen.getByLabelText(/target/i)).toHaveValue("dA"));
+    const note = await screen.findByTestId("phase-plan-remote-note");
+    expect(note).toHaveTextContent("laptop-dA");
+    expect(note).toHaveTextContent("ditentukan Setting device itu");
+    expect(note).toHaveTextContent("bisa diabaikan");
+    fireEvent.change(screen.getByLabelText(/target/i), { target: { value: LOCAL_DEVICE_ID } });
+    expect(screen.queryByTestId("phase-plan-remote-note")).toBeNull();
+  });
 });

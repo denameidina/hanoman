@@ -5,12 +5,13 @@
 import type { Spec } from "@prisma/client";
 import { flowForSource } from "@hanoman/shared";
 import { prisma } from "../db";
-import { reconciledSpecIdsSince } from "./session-history";
+import { reconciledRuntimesSince, reconciledSpecIdsSince, type SessionRuntime } from "./session-history";
 import { startSpecSession, type StartSpecResult } from "./session-launch";
 import { recordFailure } from "./notifications";
 
 export type ResumeDeps = {
-  startSpec: (spec: Spec) => Promise<StartSpecResult>;
+  // S4c · `runtime` = agen/model/effort sesi asal (SessionHistory); absen → default Setting global.
+  startSpec: (spec: Spec, runtime?: SessionRuntime) => Promise<StartSpecResult>;
   recordFail: (specId: string, title: string, projectId: string | null, reason: string) => Promise<void>;
 };
 
@@ -19,7 +20,9 @@ const prodDeps: ResumeDeps = {
   // dependency ADR-0093 TETAP berlaku (tak diberi `force`). Keputusan sadar risiko: mesin 8 GB
   // operator sudah pernah kernel panic akibat sesi paralel berlebih (memori
   // mac-mini-8gb-panic-agen-paralel) — operator memilih "semua kembali" di atas throttle.
-  startSpec: (spec) => startSpecSession(spec, { flow: flowForSource(spec.source), bypassCapacity: true }),
+  startSpec: (spec, runtime) => startSpecSession(spec, {
+    flow: flowForSource(spec.source), bypassCapacity: true, ...(runtime ?? {}),
+  }),
   recordFail: recordFailure,
 };
 
@@ -32,12 +35,13 @@ export async function resumeReconciledSessions(cutoff: Date, deps: ResumeDeps = 
   // stage "done" · item sudah selesai sebelum reboot, tak perlu dilanjutkan meski baris
   // riwayatnya kena reconcile (mis. sesi ditutup tepat saat mesin mati).
   const specs = await prisma.spec.findMany({ where: { id: { in: specIds }, stage: { not: "done" } } });
+  const runtimes = await reconciledRuntimesSince(cutoff);
   // Berurutan — bukan Promise.all: operasi worktree/git antar item tak boleh saling tabrak
   // (rebuild worktree dari headSha, dsb). Murni menghindari race, BUKAN throttle kapasitas —
   // kapasitas sudah sengaja dilewati lewat bypassCapacity di atas.
   for (const spec of specs) {
     try {
-      await deps.startSpec(spec);
+      await deps.startSpec(spec, runtimes.get(spec.id));
       report.resumed.push(spec.id);
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);

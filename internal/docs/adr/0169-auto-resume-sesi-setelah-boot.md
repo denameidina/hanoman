@@ -80,3 +80,12 @@ diamandemen ADR baru, bukan diam-diam diubah di kode.
 **Yang TIDAK berubah:** `force: true` (jalur manusia, `POST /terminal/sessions`) tetap melewati
 keduanya (kapasitas + dependency) seperti sebelum ADR ini — `bypassCapacity` adalah opsi
 tambahan, bukan pengganti.
+
+## Amandemen 2026-09-23 — runtime sesi asal ikut (audit orkestrasi S4c)
+
+"Melanjutkan" (ADR-0084) berarti sesi yang SAMA, jadi auto-resume kini meneruskan agen/model/effort
+yang tercatat di baris `SessionHistory` yang direkonsiliasi (`reconciledRuntimesSince`, baris
+terbaru per spec; nilai null tak diteruskan) ke `startSpecSession` — bukan Setting global. Tanpa itu
+sesi codex bisa lanjut sebagai claude. Tombol "Mulai lagi" pada baris riwayat backlog
+(`TerminalScreen.restartFromHistory`) mengikuti aturan yang sama. `phaseOverrides` sesi asal tidak
+disimpan di mana pun sehingga tidak ikut dilanjutkan (keputusan terbuka, bukan kelalaian).

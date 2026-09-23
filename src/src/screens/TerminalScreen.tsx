@@ -234,7 +234,16 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   async function restartFromHistory(r: SessionHistoryView, force?: true) {
     try {
       const born = r.specId
-        ? await api.startSession({ spec: r.specId, flow: (r.flow ?? "feature") as Flow, ...(force ? { force } : {}) })
+        // S4c · runtime sesi asal ikut, cermin cabang terminal agen di bawah (SPEC-517): tanpa itu
+        // sesi codex dilanjutkan sebagai claude mengikuti Setting global. Override fase tak tersimpan
+        // di mana pun, jadi tak bisa diulang di sini.
+        ? await api.startSession({
+            spec: r.specId, flow: (r.flow ?? "feature") as Flow,
+            agent: r.agent === "codex" ? "codex" : "claude",
+            ...(r.model ? { model: r.model } : {}),
+            ...(r.effort ? { effort: r.effort } : {}),
+            ...(force ? { force } : {}),
+          })
         : r.kind === "shell"
           ? await api.createShell(r.projectId)
           : r.kind === "terminal"
