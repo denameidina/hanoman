@@ -3,7 +3,7 @@ import { z } from "zod";
 
 // Naikkan versi ini setiap kali rekomendasi bawaan berubah. Seed server memakai versi ini
 // bersama marker per bagian untuk memperbarui konfigurasi bawaan tanpa menimpa edit operator.
-export const RUNTIME_DEFAULTS_VERSION = "2026-09-23-v1";
+export const RUNTIME_DEFAULTS_VERSION = "2026-09-23-v2";
 
 export const zRuntimeDefaultState = z.enum(["seeded", "user"]);
 export type RuntimeDefaultState = z.infer<typeof zRuntimeDefaultState>;
@@ -63,106 +63,112 @@ const flow = (
   enabled = true,
 ): FlowDefault => ({ enabled, claude, codex });
 
-// Rekomendasi operasional: Sonnet/Terra untuk pekerjaan rutin, Opus/Sol untuk fase yang
-// membutuhkan sintesis atau keputusan lebih berat. Semua effort medium menjaga biaya dan durasi
-// tetap seimbang; no_effort sengaja mati sebagai pagar agar task remeh tidak menyalakan pipeline.
+// Rekomendasi operasional (v2): effort mengikuti PERAN fase, bukan seragam.
+// - Fase penentu arah (Spec, Plan, Audit qa, Analisis, Doc index, PRD) → Opus/Sol · high: salahnya
+//   menjalar ke semua fase sesudahnya, keluarannya pendek sehingga effort tinggi murah.
+// - Eksekusi kode (Execute, Goal) → Sonnet/Terra · high: fase terpanjang; coding paling peka effort,
+//   dan medium cenderung menambah putaran revisi yang justru lebih mahal per task selesai.
+// - Fase interaktif dengan manusia (Brainstorm, Objective, Wawancara) → Sonnet/Terra · medium.
+// - Verifikasi → Opus/Sol · medium: model berbeda dari eksekutor menangkap hijau palsu.
+// - Menulis ulang temuan (Laporan, Serah terima) → Sonnet/Terra · medium/low.
+// no_effort sengaja mati sebagai pagar agar task remeh tidak menyalakan pipeline.
 export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefault> = {
   feature: flow(
     {
       Brainstorm: cell("sonnet", "medium"),
       Objective: cell("sonnet", "medium"),
-      Spec: cell("opus", "medium"),
-      Plan: cell("sonnet", "medium"),
-      Execute: cell("sonnet", "medium"),
+      Spec: cell("opus", "high"),
+      Plan: cell("opus", "high"),
+      Execute: cell("sonnet", "high"),
     },
     {
       Brainstorm: cell("gpt-5.6-terra", "medium"),
       Objective: cell("gpt-5.6-terra", "medium"),
-      Spec: cell("gpt-5.6-sol", "medium"),
-      Plan: cell("gpt-5.6-terra", "medium"),
-      Execute: cell("gpt-5.6-terra", "medium"),
+      Spec: cell("gpt-5.6-sol", "high"),
+      Plan: cell("gpt-5.6-sol", "high"),
+      Execute: cell("gpt-5.6-terra", "high"),
     },
   ),
   qa: flow(
     {
-      Audit: cell("sonnet", "medium"),
-      Spec: cell("opus", "medium"),
-      Plan: cell("sonnet", "medium"),
-      Execute: cell("sonnet", "medium"),
+      Audit: cell("opus", "high"),
+      Spec: cell("opus", "high"),
+      Plan: cell("sonnet", "high"),
+      Execute: cell("sonnet", "high"),
     },
     {
-      Audit: cell("gpt-5.6-terra", "medium"),
-      Spec: cell("gpt-5.6-sol", "medium"),
-      Plan: cell("gpt-5.6-terra", "medium"),
-      Execute: cell("gpt-5.6-terra", "medium"),
+      Audit: cell("gpt-5.6-sol", "high"),
+      Spec: cell("gpt-5.6-sol", "high"),
+      Plan: cell("gpt-5.6-terra", "high"),
+      Execute: cell("gpt-5.6-terra", "high"),
     },
   ),
   scaffold: flow(
     {
       Brainstorm: cell("sonnet", "medium"),
       Objective: cell("sonnet", "medium"),
-      "Doc index": cell("opus", "medium"),
+      "Doc index": cell("opus", "high"),
     },
     {
       Brainstorm: cell("gpt-5.6-terra", "medium"),
       Objective: cell("gpt-5.6-terra", "medium"),
-      "Doc index": cell("gpt-5.6-sol", "medium"),
+      "Doc index": cell("gpt-5.6-sol", "high"),
     },
   ),
   reverse: flow(
     {
       Scan: cell("sonnet", "medium"),
-      "Docs teknis": cell("sonnet", "medium"),
+      "Docs teknis": cell("sonnet", "high"),
       Wawancara: cell("sonnet", "medium"),
-      "Konvensi & index": cell("sonnet", "medium"),
-      "Serah terima": cell("sonnet", "medium"),
+      "Konvensi & index": cell("opus", "medium"),
+      "Serah terima": cell("sonnet", "low"),
     },
     {
       Scan: cell("gpt-5.6-terra", "medium"),
-      "Docs teknis": cell("gpt-5.6-terra", "medium"),
+      "Docs teknis": cell("gpt-5.6-terra", "high"),
       Wawancara: cell("gpt-5.6-terra", "medium"),
-      "Konvensi & index": cell("gpt-5.6-terra", "medium"),
-      "Serah terima": cell("gpt-5.6-terra", "medium"),
+      "Konvensi & index": cell("gpt-5.6-sol", "medium"),
+      "Serah terima": cell("gpt-5.6-terra", "low"),
     },
   ),
   prd: flow(
     {
       Brainstorm: cell("sonnet", "medium"),
-      PRD: cell("opus", "medium"),
+      PRD: cell("opus", "high"),
     },
     {
       Brainstorm: cell("gpt-5.6-terra", "medium"),
-      PRD: cell("gpt-5.6-sol", "medium"),
+      PRD: cell("gpt-5.6-sol", "high"),
     },
   ),
   audit: flow(
     {
-      Audit: cell("sonnet", "medium"),
+      Audit: cell("opus", "high"),
       Laporan: cell("sonnet", "medium"),
     },
     {
-      Audit: cell("gpt-5.6-terra", "medium"),
+      Audit: cell("gpt-5.6-sol", "high"),
       Laporan: cell("gpt-5.6-terra", "medium"),
     },
   ),
   breakdown: flow(
     {
-      Analisis: cell("opus", "medium"),
+      Analisis: cell("opus", "high"),
       Breakdown: cell("opus", "medium"),
     },
     {
-      Analisis: cell("gpt-5.6-sol", "medium"),
+      Analisis: cell("gpt-5.6-sol", "high"),
       Breakdown: cell("gpt-5.6-sol", "medium"),
     },
   ),
   goal: flow(
     {
-      Goal: cell("sonnet", "medium"),
-      Verifikasi: cell("sonnet", "medium"),
+      Goal: cell("sonnet", "high"),
+      Verifikasi: cell("opus", "medium"),
     },
     {
-      Goal: cell("gpt-5.6-terra", "medium"),
-      Verifikasi: cell("gpt-5.6-terra", "medium"),
+      Goal: cell("gpt-5.6-terra", "high"),
+      Verifikasi: cell("gpt-5.6-sol", "medium"),
     },
   ),
   no_effort: flow(

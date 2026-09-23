@@ -84,8 +84,8 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
   it("S4a · blok orchestration absen di respons → matriks bawaan (sama dengan server)", async () => {
     (api.getSettings as any).mockResolvedValue(settingWith(undefined));
     renderModal();
-    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Spec · Opus · medium"));
-    expect(screen.getByTestId("phase-plan-preview")).not.toHaveTextContent("Spec · Opus · medium (warisi)");
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Spec · Opus · high"));
+    expect(screen.getByTestId("phase-plan-preview")).not.toHaveTextContent("Spec · Opus · high (warisi)");
   });
 
   it("codex: versi belum termuat → pratinjau menunggu, lalu tampil setelah versi tiba", async () => {
