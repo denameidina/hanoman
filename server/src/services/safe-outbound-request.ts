@@ -1,6 +1,7 @@
-import { lookup as dnsLookup } from "node:dns/promises";
+import { resolve4, resolve6 } from "node:dns/promises";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
+import { isIP } from "node:net";
 import { createGunzip } from "node:zlib";
 import { isBlockedAddress } from "./webhooks/ssrf";
 
@@ -23,8 +24,22 @@ export type SafeRequestDeps = {
   request?: (input: PinnedInput) => Promise<SafeResponse>;
 };
 
-const defaultLookup = async (host: string): Promise<ResolvedAddress[]> =>
-  (await dnsLookup(host, { all: true })).map((row) => ({ address: row.address, family: row.family }));
+// Insiden 2026-09-23: `dns.lookup()` jalan di libuv threadpool lewat `getaddrinfo()` — panggilan
+// native yang TAK BISA dibatalkan dari JS. Resolver hub yang macet meninggalkan thread itu nyangkut
+// selamanya, dan `process.exit()` (dipanggil `requestRestartForUpdate` saat tombol update ditekan)
+// WAJIB `pthread_join` semua thread threadpool sebelum keluar — jadi satu lookup yang macet
+// membekukan seluruh proses tanpa batas waktu, bahkan dengan `totalMs` di `pinnedRequest` di bawah.
+// `resolve4`/`resolve6` pakai c-ares lewat event loop biasa, bukan threadpool: resolver yang macet
+// meninggalkan query menggantung di c-ares, bukan thread OS yang diblokir `process.exit()`.
+export const defaultLookup = async (host: string): Promise<ResolvedAddress[]> => {
+  const literal = isIP(host);
+  if (literal) return [{ address: host, family: literal }];
+  const [v4, v6] = await Promise.allSettled([resolve4(host), resolve6(host)]);
+  const out: ResolvedAddress[] = [];
+  if (v4.status === "fulfilled") out.push(...v4.value.map((address) => ({ address, family: 4 })));
+  if (v6.status === "fulfilled") out.push(...v6.value.map((address) => ({ address, family: 6 })));
+  return out;
+};
 
 async function pinnedRequest(input: PinnedInput): Promise<SafeResponse> {
   return new Promise((resolve, reject) => {
@@ -92,10 +107,23 @@ async function pinnedRequest(input: PinnedInput): Promise<SafeResponse> {
   });
 }
 
+// Lapis kedua di atas `defaultLookup`: bukan cuma menghindari thread yang macet, pemanggil tetap
+// harus dapat jawaban dalam anggaran waktunya sendiri sekalipun lookup-nya (mock test atau resolver
+// nyata) tak pernah selesai.
+function withLookupTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(Object.assign(new Error("outbound timeout"), { name: "AbortError" })), ms);
+    timer.unref?.();
+    p.then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
+  });
+}
+
 export async function safeRequest(options: SafeRequestOptions, deps: SafeRequestDeps = {}): Promise<SafeResponse> {
   if (options.url.protocol !== "http:" && options.url.protocol !== "https:") throw new Error("outbound scheme ditolak");
   if (options.url.username || options.url.password) throw new Error("outbound credential URL ditolak");
-  const addresses = await (deps.lookupAll ?? defaultLookup)(options.url.hostname);
+  const addresses = await withLookupTimeout(
+    (deps.lookupAll ?? defaultLookup)(options.url.hostname), options.connectMs,
+  );
   if (!addresses.length) throw new Error("DNS tak mengembalikan alamat");
   if (!options.allowPrivate) {
     const blocked = addresses.find((row) => isBlockedAddress(row.address));

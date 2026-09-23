@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer, type RequestListener, type Server } from "node:http";
 import { gzipSync } from "node:zlib";
-import { safeRequest } from "../src/services/safe-outbound-request";
+import { defaultLookup, safeRequest } from "../src/services/safe-outbound-request";
 
 const servers: Server[] = [];
 afterEach(async () => { await Promise.all(servers.splice(0).map((s) => new Promise<void>((r) => s.close(() => r())))); });
@@ -61,6 +61,25 @@ describe("safe outbound request", () => {
     }, { lookupAll: async () => [
       { address: "93.184.216.34", family: 4 }, { address: "127.0.0.1", family: 4 },
     ] })).rejects.toThrow(/internal/);
+  });
+
+  // Insiden 2026-09-23 · ADR pending: `dns.lookup()` lama tak punya batas waktu sama sekali —
+  // resolver yang macet membekukan pemanggil (sync-client) SELAMANYA, dan proses macet di
+  // `process.exit()` saat `requestRestartForUpdate` dipanggil (thread threadpool yang stuck tak
+  // pernah selesai di-`pthread_join`). `lookupAll` yang tak pernah resolve harus tetap ditolak
+  // dalam `connectMs`, bukan menggantung.
+  it("times out a hung DNS lookup within connectMs instead of hanging forever", async () => {
+    const start = Date.now();
+    await expect(safeRequest({
+      url: new URL("https://hub.test/sync"), method: "GET", headers: {}, allowPrivate: true,
+      connectMs: 200, totalMs: 5_000, maxResponseBytes: 10,
+    }, { lookupAll: () => new Promise<never>(() => {}) })).rejects.toThrow(/outbound timeout/);
+    expect(Date.now() - start).toBeLessThan(2_000);
+  });
+
+  it("treats an IP-literal hostname as its own address without querying DNS", async () => {
+    await expect(defaultLookup("127.0.0.1")).resolves.toEqual([{ address: "127.0.0.1", family: 4 }]);
+    await expect(defaultLookup("::1")).resolves.toEqual([{ address: "::1", family: 6 }]);
   });
 });
 
