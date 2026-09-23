@@ -139,14 +139,32 @@ function backlogGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string
   }
 }
 
+// Audit R4 · baris panduan fase bergiliran (Wawancara reverse, Brainstorm scaffold/prd) dan Serah
+// terima reverse ditulis untuk sesi tunggal yang BERHADAPAN dengan manusia lewat terminal. Agen fase
+// tak punya jalur itu — pertanyaannya hanya sampai lewat laporan yang di-relay orchestrator
+// (langkah 4). Kalimat terminal diganti HANYA di instruksi agen fase; sumbernya (dan prompt sesi
+// tunggal, golden test) tak berubah. Bila kalimat sumber bergeser, test phase-agents memerah.
+const TERMINAL_ASK = /([Aa])jukan SATU pertanyaan per giliran ke manusia di terminal ini, tunggu jawabannya(?=[,.])/;
+const PHASE_AGENT_ASK =
+  "jukan pertanyaannya sebagai butir `Keputusan terbuka:` di laporanmu — satu topik per putaran, beserta "
+  + "konteks & opsinya, karena kamu tak berhadapan langsung dengan manusia — lalu tulis `Status: "
+  + "menunggu-keputusan` dan berhenti; jawabannya datang sebagai pesan susulan ke agen yang sama";
+const TERMINAL_HANDOFF = "tulis ringkasan hasil + daftar pertanyaan yang belum terjawab ke terminal.";
+const PHASE_AGENT_HANDOFF =
+  "tulis bagian `Ringkasan serah terima:` di laporanmu berisi ringkasan hasil + daftar pertanyaan yang "
+  + "belum terjawab (informasi untuk manusia, BUKAN `Keputusan terbuka:`) — orchestrator yang "
+  + "menampilkannya ke manusia.";
+const forPhaseAgent = (line: string): string =>
+  line.replace(TERMINAL_ASK, (_m, a: string) => a + PHASE_AGENT_ASK).replace(TERMINAL_HANDOFF, PHASE_AGENT_HANDOFF);
+
 function projectGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string {
-  if (flow === "reverse") return guideLine(REVERSE_PHASE_GUIDE, phase);
-  if (flow === "scaffold") return guideLine(SCAFFOLD_PHASE_GUIDE, phase);
+  if (flow === "reverse") return forPhaseAgent(guideLine(REVERSE_PHASE_GUIDE, phase));
+  if (flow === "scaffold") return forPhaseAgent(guideLine(SCAFFOLD_PHASE_GUIDE, phase));
   const slug = ctx.prd?.slug ?? flow;
   const lines: Record<string, string> = flow === "prd"
     ? prdPhaseLines(slug)
     : breakdownPhaseLines(slug, ctx.prd?.title ?? slug);
-  return lines[phase] ?? "";
+  return forPhaseAgent(lines[phase] ?? "");
 }
 
 export function phaseAgentInstructions(

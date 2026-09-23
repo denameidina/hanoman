@@ -68,6 +68,22 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
    dari isi dokumen — bukan investigasi maupun rancangan. Temuan M-6: codex tak punya tool
    `AskUserQuestion`; klausa langkah 3–4 untuk plan codex diganti "tanyakan di terminal ini lalu tunggu
    jawaban", aturan tetap berlaku walau klausa otonomi menyuruh tak bertanya — claude tak berubah.
+   **Audit R5 (2026-09-23):** transkrip nyata menunjukkan orchestrator claude memanggil `Agent` TANPA
+   `subagent_type` (spec-1218: lima fase jatuh ke general-purpose ber-model orchestrator) dan memakai
+   `Agent(to=…)` untuk melanjutkan agen yang sama (spec-1299: agen duplikat). Cabang claude kini mewajibkan
+   `subagent_type` = nama agen fase persis (dilarang kosong/`general-purpose`, periksa ulang sebelum
+   memanggil, penolakan tool = galat langkah 3), mencatat agent ID hasil pemanggilan, dan melanjutkan agen
+   yang sama HANYA lewat `SendMessage` (tool Agent tak punya `to`); tool Agent BARU hanya untuk percobaan
+   ulang langkah 3. Codex (`spawn_agent`/`send_input`) tak berubah.
+   **Audit R4 (2026-09-23):** agen fase tak berhadapan dengan manusia, tetapi baris panduan Wawancara
+   reverse / Brainstorm scaffold-prd yang disalin apa adanya menyuruhnya bertanya "di terminal ini", dan
+   Serah terima reverse menyuruh menulis ringkasan "ke terminal". `phase-agents.ts` (`forPhaseAgent`)
+   mengadaptasi kalimat itu HANYA di instruksi agen fase: pertanyaan jadi butir `Keputusan terbuka:` satu
+   topik per putaran + `Status: menunggu-keputusan`; ringkasan jadi bagian `Ringkasan serah terima:`
+   laporan. Langkah 4 orchestrator kini seragam (claude lewat `AskUserQuestion` juga untuk fase
+   bergiliran — pengecualian "tanyakan di terminal ini" dicabut, teks biasa claude tak terbaca lead,
+   ADR-0167 #6), dan orchestrator reverse menampilkan `Ringkasan serah terima:` apa adanya ke manusia.
+   Prompt sesi tunggal tak berubah (golden).
    Final fix A2: keputusan ROUTING kelanjutan audit qa itu MENGGANTIKAN pemicu langkah 5 (frasa
    `Rekomendasi fase: jalur-cepat` dari agen Audit) — dua mekanisme dulu bersambung tanpa penyelaras
    sehingga orchestrator literal bisa selalu jatuh ke jalur penuh (frasa tak akan pernah ada karena

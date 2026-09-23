@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ORCHESTRATION_DEFAULTS, resolveMethod, resolvePhasePlan } from "@hanoman/shared";
 import { buildPhaseAgents, fromAuditOf } from "../src/phase-agents";
 import { CODE_STYLE_CLAUSE } from "../src/code-style";
-import { ESCALATION_CONTRACT } from "../src/prompt";
+import { ESCALATION_CONTRACT, startPrdPrompt, startProjectPrompt, startScaffoldPrompt } from "../src/prompt";
 import type { AgentDef } from "../src/custom-agents";
 import type { Flow } from "../src/types";
 
@@ -113,6 +113,38 @@ describe("buildPhaseAgents (ADR-0164)", () => {
     expect(at(defs, "Konvensi & index").instructions).toContain("=== STANDAR DOCS ===");
     expect(at(defs, "Wawancara").instructions).not.toContain("=== STANDAR DOCS ===");
     expect(at(defs, "Wawancara").instructions).toContain("- Wawancara: untuk product, business");
+  });
+
+  // R4 · agen fase tak punya terminal ke manusia: baris panduan fase bergiliran (Wawancara reverse,
+  // Brainstorm scaffold/prd) dan Serah terima reverse yang menyuruh bertanya/menulis "di terminal"
+  // diadaptasi HANYA untuk agen fase. Prompt sesi tunggal tak berubah (prompt-golden).
+  it.each([
+    ["reverse", "Wawancara"], ["scaffold", "Brainstorm"], ["prd", "Brainstorm"],
+  ] as const)("%s/%s: pertanyaan jadi `Keputusan terbuka:` satu topik per putaran, bukan terminal", (flow, phase) => {
+    const guide = at(agentsFor(flow, { method: resolveMethod(), prd: { slug: "dasbor" } }), phase).instructions
+      .split("\n\n").find((block) => block.startsWith(`- ${phase}:`))!;
+    expect(guide).toBeDefined();
+    expect(guide).not.toMatch(/terminal/);
+    expect(guide).toContain("`Keputusan terbuka:`");
+    expect(guide).toContain("satu topik per putaran");
+    expect(guide).toContain("`Status: menunggu-keputusan`");
+    expect(guide).toContain("Jangan mengarang");
+  });
+  it("reverse/Serah terima: ringkasan masuk laporan untuk ditampilkan orchestrator, bukan ke terminal", () => {
+    const guide = at(agentsFor("reverse", { method: resolveMethod() }), "Serah terima").instructions
+      .split("\n\n").find((block) => block.startsWith("- Serah terima:"))!;
+    expect(guide).not.toMatch(/terminal/);
+    expect(guide).toContain("`Ringkasan serah terima:`");
+    expect(guide).toContain("orchestrator");
+  });
+  it("sesi tunggal reverse/scaffold/prd tetap bertanya di terminal (tak tersentuh adaptasi agen fase)", () => {
+    const project = { id: "p1", name: "P1", desc: "d", stack: "ts" };
+    expect(startProjectPrompt("reverse", project, "reverse-docs"))
+      .toContain("ajukan SATU pertanyaan per giliran ke manusia di terminal ini");
+    expect(startScaffoldPrompt(project, "scaffold-docs"))
+      .toContain("Ajukan SATU pertanyaan per giliran ke manusia di terminal ini");
+    expect(startPrdPrompt(project, { title: "T", context: "c", outcome: "o" }, "prd/t"))
+      .toContain("Ajukan SATU pertanyaan per giliran ke manusia di terminal ini");
   });
 
   it("prd & breakdown: baris panduan memakai slug", () => {
