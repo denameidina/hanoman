@@ -139,7 +139,8 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   const [remoteError, setRemoteError] = React.useState<{ error: string; remoteSession?: { deviceId: string; name: string; sessionId: string | null } } | null>(null);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
-  // ADR-0164 · matriks orkestrasi untuk pratinjau fase. Absen di respons Setting lama → default aktif.
+  // ADR-0164 · matriks orkestrasi untuk pratinjau fase. Absen di respons Setting lama →
+  // ORCHESTRATION_DEFAULTS (matriks bawaan, sama dengan server — S4a).
   const [orchestration, setOrchestration] = React.useState<Orchestration | undefined>(undefined);
   // ADR-0164 · gerbang muat pratinjau fase: sebelum kedua respons ini tiba, `orchestration`
   // undefined dan `codexVer` null TIDAK BOLEH dibaca sebagai "default aktif"/"codex tak
