@@ -207,3 +207,39 @@ fase "JANGAN mengakhiri giliran atau melapor selama masih menunggu proses/tugas 
 mengakhiri giliran sambil menunggu proses latarnya. Pilihan memaksa sinkron (env di atas) adalah keputusan
 produk dan menunggu keputusan operator; sampai itu, Stop di tengah fase adalah perilaku yang **diterima**
 dan penanda "menunggu keputusan" ditangani T3.
+
+### T3 · "menunggu keputusan" palsu saat subagent bekerja — akar terbukti, sumber sinyal diganti
+
+Penghitung lama (`<marker>.sub`, commit 69a512b7): SubagentStart `echo 1 >>`, SubagentStop `sed '$d'`,
+Notification idle diabaikan bila berkas berisi, UserPromptSubmit mengosongkannya. Diukur dengan hook
+perekam + poller berkas 1 dtk (claude 2.1.280, interaktif, tmux socket terpisah):
+
+- **(c) terbukti — akar utama.** Setiap kali giliran orchestrator berakhir (Stop), ±5 dtk kemudian
+  menembak SubagentStop "hantu": `agent_id` baru, `agent_type` kosong, tanpa SubagentStart
+  (6/6 run bersubagent latar; kerap satu lagi sesudah Stop akhir). `sed '$d'` membuang baris milik subagent fase yang masih
+  jalan → penghitung 0 pada 8,7–12,3 dtk padahal subagent selesai pada 10,8–30,1 dtk. Dengan subagent
+  100 dtk: Notification `idle_prompt` pada 64,2 dtk mengisi marker selagi subagent jalan — persis
+  pola spec-1321 (marker terisi 60 dtk sesudah giliran berakhir, `.sub` 0 baris).
+- **(a) terbukti terjadi.** Selesainya task latar tiba sebagai UserPromptSubmit berisi
+  `<task-notification>…`, sehingga `: > sub` ikut menembak. Berbahaya bila ada >1 subagent paralel.
+- **(b)** balapan `sub.t` tak teramati (tak ada dua SubagentStop bersamaan di run mana pun); gugur
+  bersama desain lama.
+- Payload Notification **tidak** membawa `background_tasks`; payload **Stop** membawanya
+  (`[{id,type:"subagent",status:"running",…}]`) tepat saat orchestrator mulai menganggur.
+
+Keputusan: penghitung baris diganti **snapshot Stop** — hook Stop (bila `eventHook` + `decisionFile`)
+menulis satu baris per `background_tasks` bertipe `subagent` yang `running` ke `<marker>.sub`
+(`node -e`, gagal parse = kosong = perilaku lama). Tiap giliran berakhir dengan Stop, jadi snapshot
+selalu segar; SubagentStart/Stop tak lagi menyentuh berkas. Shell latar tak dihitung supaya server dev
+milik orchestrator tak membungkam marker selamanya. Stop snapshot hidup berdampingan dengan Stop hook
+`prompt` mode goal (ADR-0073). Diverifikasi ulang dengan pengaturan hasil `guardSettings` asli: idle
+pada 64,7 dtk (subagent jalan s.d. 108,6 dtk) **tidak** mengisi marker; idle sesudah semua subagent
+selesai mengisinya pada 169 dtk (Stop terakhir + 59 dtk).
+
+**AC-2 diamandemen** (keputusan 5 "flow mati → argv & prompt byte-identik"): byte-identitas kini
+berlaku untuk **prompt** (golden `runner/test/__golden__`) dan ketiadaan `--agents`, **bukan** untuk
+blok hook `--settings`. Snapshot Stop dipasang di SEMUA sesi claude ber-`decisionFile`, tidak digerbangi
+ke sesi orchestrator/ber-custom-agent: di claude 2.1.280 setiap pemanggilan `Agent` di sesi interaktif
+berjalan di latar (T1), termasuk subagent bawaan (`Explore`, `general-purpose`, `Plan`) yang tersedia di
+setiap sesi — sesi mode tunggal yang memakainya kena pil palsu yang sama. Menggerbanginya berarti
+mempertahankan bug itu demi byte-identitas yang tak dibaca siapa pun selain test.

@@ -44,6 +44,17 @@ export const EVENT_HOOK_COMMAND = [
   "--data-binary @- >/dev/null 2>&1; fi; exit 0",
 ].join(" ");
 
+// T3 · jumlah subagent LATAR yang masih `running` menurut payload Stop, ditulis sebagai satu baris
+// per subagent ke `<marker>.sub` (kosong = tak ada). Hanya `type: "subagent"`: shell latar milik
+// orchestrator (mis. server dev) tak boleh membungkam marker selamanya. Tanpa kutip tunggal di skrip
+// supaya aman dibungkus kutip tunggal; path dilempar sebagai argv, bukan diinterpolasi ke skrip.
+const BUSY_SNAPSHOT_SCRIPT = [
+  'let d=""',
+  'process.stdin.on("data",c=>d+=c).on("end",()=>{let n=0;try{n=(JSON.parse(d).background_tasks||[]).filter(t=>t&&t.type==="subagent"&&t.status==="running").length}catch{}require("fs").writeFileSync(process.argv[1],"1\\n".repeat(n))})',
+].join(";");
+const busySnapshotCommand = (quotedSubFile: string): string =>
+  `node -e '${BUSY_SNAPSHOT_SCRIPT}' ${quotedSubFile} >/dev/null 2>&1`;
+
 export const guardSettings = (
   decisionFile?: string, goal?: string, eventHook?: boolean, subagentStatusLine?: string,
 ) => {
@@ -75,15 +86,20 @@ export const guardSettings = (
     hooks.SubagentStart = [{ hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] }];
     hooks.SubagentStop = [{ hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] }];
     if (decisionFile) {
-      // Mode orkestrasi: pane utama diam selama subagent bekerja, lalu hook Notification "idle"
-      // ("waiting for your input") mengisi marker dan gerbang paneQuiet lolos → pil "Menunggu
-      // keputusan" palsu. Penghitung subagent hidup (satu baris per subagent, `<marker>.sub`)
-      // membuat Notification idle diabaikan selama ada subagent; izin/needs-input tetap menandai.
+      // Pane utama diam selama subagent LATAR bekerja (claude 2.1.280 menjalankan setiap `Agent` di
+      // latar pada sesi interaktif), lalu Notification idle ("waiting for your input") 60 dtk sesudah
+      // giliran berakhir mengisi marker dan gerbang paneQuiet lolos → pil "Menunggu keputusan" palsu.
+      // T3 · audit 2026-09-23 · penghitung baris lama (SubagentStart `echo 1 >>`, SubagentStop
+      // `sed '$d'`) terbukti turun ke 0 selagi subagent fase masih jalan: SubagentStop "hantu"
+      // (`agent_type` kosong, tanpa SubagentStart) menembak ±5 dtk sesudah TIAP Stop, dan
+      // notifikasi selesainya task latar tiba sebagai UserPromptSubmit `<task-notification>`. Sumber
+      // yang andal adalah `background_tasks` di payload Stop — snapshot runtime sendiri tentang apa
+      // yang masih jalan TEPAT saat orchestrator menganggur (payload Notification tak membawanya).
+      // Tiap giliran berakhir dengan Stop, jadi snapshot selalu diperbarui; gagal parse = kosong
+      // (gagal-terbuka ke perilaku lama: idle menandai).
       const sub = `'${decisionFile.split("'").join("'\\''")}.sub'`;
       const f = `'${decisionFile.split("'").join("'\\''")}'`;
-      hooks.SubagentStart!.push({ hooks: [{ type: "command", command: `echo 1 >> ${sub}; exit 0` }] });
-      hooks.SubagentStop!.push({ hooks: [{ type: "command",
-        command: `[ -s ${sub} ] && { sed '$d' ${sub} > ${sub}.t; mv ${sub}.t ${sub}; }; exit 0` }] });
+      (hooks.Stop ??= []).push({ hooks: [{ type: "command", command: `${busySnapshotCommand(sub)}; exit 0` }] });
       hooks.Notification = [{ hooks: [{ type: "command",
         command: `m=$(cat); if [ -s ${sub} ]; then echo "$m" | grep -qiE 'permission|needs.?input'; else echo "$m" | grep -qiE 'idle|permission|waiting for|needs.?input'; fi && { [ -s ${f} ] || date +%s > ${f}; } || true` }] }];
       hooks.UserPromptSubmit = [{ hooks: [{ type: "command", command: `: > ${f}; : > ${sub}` }] }];
@@ -94,7 +110,7 @@ export const guardSettings = (
   // lahir — jadi ia tak bergantung timing TUI maupun kepatuhan agen. BUKAN guardrail deny: ADR-0037
   // tetap dicabut, hook ini tak pernah menolak tool call, ia hanya menahan sesi BERHENTI sebelum
   // kondisinya terbukti di transkrip. Interrupt manusia (Esc) bukan event Stop → kendali tetap ada.
-  if (goal) hooks.Stop = [{ hooks: [{ type: "prompt", prompt: goal }] }];
+  if (goal) (hooks.Stop ??= []).push({ hooks: [{ type: "prompt", prompt: goal }] });
   // ADR-0164 · kunci ini hanya lahir untuk sesi orchestrator — tanpanya JSON `--settings` persis
   // seperti sebelumnya (byte-identik untuk flow yang orkestrasinya mati).
   return {
