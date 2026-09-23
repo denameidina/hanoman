@@ -1,14 +1,24 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CODEX_MODELS, MODELS, replaceModelCatalog } from "@hanoman/shared";
 import { writeSubagentStatusline } from "../src/subagent-statusline";
 
 const run = (command: string, stdin: string) =>
   spawnSync("sh", ["-c", command], { input: stdin, encoding: "utf8" });
 
 describe("subagentStatusLine (ADR-0164)", () => {
+  // Katalog hasil probe CLI berkunci ALIAS (`opus`), tapi stdin statusline membawa id TERPATOK yang
+  // benar-benar dipakai runtime (`claude-opus-5`). Label harus ditemukan lewat keduanya.
+  const saved = { claude: MODELS, codex: CODEX_MODELS };
+  beforeEach(() => replaceModelCatalog(
+    [{ id: "default", label: "Default" }, { id: "opus", label: "Opus 5", resolved: "claude-opus-5" }],
+    CODEX_MODELS,
+  ));
+  afterEach(() => replaceModelCatalog(saved.claude, saved.codex));
+
   it("menulis ulang baris subagent jadi label · model · effort · durasi · token", () => {
     const dir = mkdtempSync(join(tmpdir(), "hnm-sl-"));
     const command = writeSubagentStatusline(dir);

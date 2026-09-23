@@ -1,4 +1,9 @@
-import { cmpVersion, coerceClaudeEffort, coerceCodexEffort, type Orchestration, type PhaseOverrides } from "./entities";
+import {
+  CLAUDE_DEFAULT_ALIAS, cmpVersion, coerceClaudeEffort, coerceCodexEffort, type Orchestration, type PhaseOverrides,
+} from "./entities";
+
+/** Nilai `model` subagent claude yang berarti "model percakapan utama" (dokumen sub-agents Claude Code). */
+export const CLAUDE_SUBAGENT_INHERIT = "inherit";
 import { FLOW_PHASES, phaseAgentName, type OrchestrationFlow, type PhasePlan } from "./orchestration";
 
 // ADR-0164 · resolver rencana fase. Satu fungsi murni dipakai server (kelahiran sesi) dan UI
@@ -37,7 +42,9 @@ export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
     phases: FLOW_PHASES[input.flow].map((phase) => {
       const cell = cells[phase];
       const override = input.phaseOverrides?.[phase];
-      const model = override?.model ?? cell?.model ?? input.orchestrator.model;
+      const picked = override?.model ?? cell?.model ?? input.orchestrator.model;
+      // `default` hanya sah untuk `--model` sesi; `--agents` claude menerimanya sebagai `inherit`.
+      const model = input.runtime === "claude" && picked === CLAUDE_DEFAULT_ALIAS ? CLAUDE_SUBAGENT_INHERIT : picked;
       return {
         phase, agentName: phaseAgentName(phase), model,
         effort: coerce(model, override?.effort ?? cell?.effort ?? input.orchestrator.effort),

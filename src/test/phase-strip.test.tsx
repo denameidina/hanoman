@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { PhaseStrip } from "../src/screens/TerminalScreen";
-import { formatDuration, chipTone } from "../src/screens/phase-chip";
+import { formatDuration, chipTone, modelLabel } from "../src/screens/phase-chip";
 import type { Phase } from "../src/api/client";
 
 const agent = (o: Partial<NonNullable<Phase["agent"]>> = {}): NonNullable<Phase["agent"]> => ({
@@ -18,6 +18,9 @@ describe("phase-chip (ADR-0164)", () => {
     expect(chipTone({ name: "Plan", state: "active", agent: agent({ status: "abandoned" }) })).toBe("abandoned");
     expect(chipTone({ name: "Plan", state: "active", agent: agent({ status: "running" }) })).toBe("running");
     expect(chipTone({ name: "Plan", state: "pending" })).toBe("pending");
+  });
+  it("modelLabel: `inherit` (orchestrator ber-`default`) dibaca manusia, bukan id mentah", () => {
+    expect(modelLabel("inherit")).toBe("warisi orchestrator");
   });
 });
 

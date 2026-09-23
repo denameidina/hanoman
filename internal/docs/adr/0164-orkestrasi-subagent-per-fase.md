@@ -116,10 +116,14 @@ Rekomendasi model/effort kini menjadi default produk, bukan hanya contoh di doku
 
 | Ruang | Claude | Codex |
 |---|---|---|
-| Orchestrator global | `claude-sonnet-5` · `medium` | `gpt-5.6-terra` · `medium` |
-| Fase rutin | Sonnet · medium | Terra · medium |
-| Fase sintesis/keputusan | Opus · medium | Sol · medium |
-| `no_effort` bila diaktifkan | Haiku 4.5 · low | Terra · low |
+| Orchestrator global | `sonnet` · `medium` | `gpt-5.6-terra` · `medium` |
+| Fase rutin | `sonnet` · medium | Terra · medium |
+| Fase sintesis/keputusan | `opus` · medium | Sol · medium |
+| `no_effort` bila diaktifkan | `haiku` · low | Terra · low |
+
+Sejak 2026-09-23 (katalog alias, [model-catalog](../architecture/model-catalog.md)) nilai claude
+adalah alias native CLI, bukan id terpatok. Orchestrator boleh memilih `default`, yang tak sah di
+`--agents`; sel yang mewarisinya dirender `inherit` oleh `resolvePhasePlan`.
 
 Matriks lengkap per flow/fase berada di `BUILTIN_ORCHESTRATION_DEFAULTS` (`@hanoman/shared`):
 Spec pada feature/qa/prd memakai Opus/Sol, breakdown memakai Opus/Sol, dan fase dokumentasi

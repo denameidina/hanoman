@@ -116,6 +116,19 @@ describe("resolvePhasePlan", () => {
     expect(plan.phases.find((p) => p.phase === "Execute")).toMatchObject({ model: "gpt-5.6-luna", effort: "xhigh" });
     expect(plan.phases.find((p) => p.phase === "Audit")).toMatchObject({ model: "gpt-5.6-sol", effort: "ultra" });
   });
+  // `default` hanya sah untuk `--model` sesi; `--agents` claude menerima alias keluarga, id penuh,
+  // atau `inherit`. Orchestrator ber-`default` yang diwarisi sel kosong harus jadi `inherit`.
+  it("claude: `default` warisan orchestrator dirender `inherit`, bukan `default`", () => {
+    const orchestration = { ...ORCHESTRATION_DEFAULTS,
+      feature: { enabled: true, claude: { Spec: { model: "opus", effort: null } }, codex: {} } };
+    const plan = resolvePhasePlan({ ...base, orchestration,
+      orchestrator: { model: "default", effort: "medium" },
+      phaseOverrides: { Plan: { model: "default", effort: "low" } } })!;
+    expect(plan.phases.find((p) => p.phase === "Brainstorm")).toMatchObject({ model: "inherit", effort: "medium" });
+    expect(plan.phases.find((p) => p.phase === "Plan")).toMatchObject({ model: "inherit", effort: "low" });
+    expect(plan.phases.find((p) => p.phase === "Spec")).toMatchObject({ model: "opus" });
+    expect(plan.phases.map((p) => p.model)).not.toContain("default");
+  });
   it("kunci fase asing di matriks tak menambah fase", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS,
       goal: { enabled: true, claude: { Foo: { model: "x", effort: "low" } }, codex: {} } };

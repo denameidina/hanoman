@@ -39,6 +39,9 @@ export function writeSubagentStatusline(dir: string): string {
   const script = join(dir, "subagent-statusline.cjs");
   const labels = join(dir, "subagent-models.json");
   writeFileSync(script, SUBAGENT_STATUSLINE_SCRIPT, { mode: 0o600 });
-  writeFileSync(labels, JSON.stringify(Object.fromEntries(MODELS.map((m) => [m.id, m.label]))), { mode: 0o600 });
+  // stdin membawa id TERPATOK yang dipakai runtime (`claude-opus-5`), sedangkan katalog berkunci alias
+  // (`opus`) sejak 1a5a0981 — petakan keduanya.
+  const entries = MODELS.flatMap((m) => [[m.id, m.label], ...(m.resolved ? [[m.resolved, m.label]] : [])]);
+  writeFileSync(labels, JSON.stringify(Object.fromEntries(entries)), { mode: 0o600 });
   return `node ${JSON.stringify(script)} ${JSON.stringify(labels)}`;
 }

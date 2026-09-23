@@ -1,9 +1,10 @@
-import { CODEX_MODELS, claudeModel } from "@hanoman/shared";
+import { CLAUDE_SUBAGENT_INHERIT, CODEX_MODELS, claudeModel } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 
 // ADR-0164 · format chip fase. Murni supaya PhaseStrip dan chip header memakai label yang sama.
 export const modelLabel = (id?: string): string =>
-  !id ? "" : claudeModel(id)?.label ?? CODEX_MODELS.find((m) => m.id === id)?.label ?? id;
+  !id ? "" : id === CLAUDE_SUBAGENT_INHERIT ? "warisi orchestrator"
+    : claudeModel(id)?.label ?? CODEX_MODELS.find((m) => m.id === id)?.label ?? id;
 
 export function formatDuration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));

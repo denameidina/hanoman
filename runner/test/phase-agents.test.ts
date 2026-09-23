@@ -23,12 +23,13 @@ describe("buildPhaseAgents (ADR-0164)", () => {
       "hanoman-fase-brainstorm", "hanoman-fase-objective", "hanoman-fase-spec",
       "hanoman-fase-plan", "hanoman-fase-execute",
     ]);
+    // Default bawaan memakai alias native CLI sejak 1a5a0981, bukan id terpatok.
     const expectedRuntime = {
-      Brainstorm: { model: "claude-sonnet-5", effort: "medium" },
-      Objective: { model: "claude-sonnet-5", effort: "medium" },
-      Spec: { model: "claude-opus-5", effort: "medium" },
-      Plan: { model: "claude-sonnet-5", effort: "medium" },
-      Execute: { model: "claude-sonnet-5", effort: "medium" },
+      Brainstorm: { model: "sonnet", effort: "medium" },
+      Objective: { model: "sonnet", effort: "medium" },
+      Spec: { model: "opus", effort: "medium" },
+      Plan: { model: "sonnet", effort: "medium" },
+      Execute: { model: "sonnet", effort: "medium" },
     } as const;
     for (const d of defs) {
       expect(d).toMatchObject({

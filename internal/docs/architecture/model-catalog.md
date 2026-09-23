@@ -26,7 +26,13 @@ install/update; pilihan yang sudah diedit operator tidak diganti.
   validasi custom agent (`modelKnownForRuntime`) dan `/model` Telegram menerima keduanya.
 - `default` hanya sah untuk `--model` sesi. Subagent (`--agents`: custom agent, model per fase
   orkestrasi) menerima alias keluarga atau id penuh, jadi picker-nya memakai
-  `subagentClaudeModels()` / `runtimeSubagentModels()` yang membuang `default`.
+  `subagentClaudeModels()` / `runtimeSubagentModels()` yang membuang `default`. Picker saja tak
+  cukup: sel fase kosong mewarisi model ORCHESTRATOR, yang boleh `default`. `resolvePhasePlan`
+  karena itu memetakan `default` (dari orchestrator, sel, atau override) ke `inherit` untuk claude —
+  nilai sah `--agents` yang berarti "model percakapan utama" (dokumen sub-agents Claude Code);
+  UI melabelinya "warisi orchestrator".
+- Statusline subagent memetakan label lewat alias **dan** `resolved`: stdin claude membawa id
+  terpatok yang dipakai runtime (`claude-opus-5`), bukan alias katalog.
 - Codex: `codex debug models`, tanpa `--bundled`, mengambil slug, nama, effort dan minimum
   client bila diberikan. Entri `visibility: hide` tidak masuk hasil discovery.
 - Biner memakai `HANOMAN_CLAUDE_BIN`/`HANOMAN_CODEX_BIN` efektif. Dalam Podman,
