@@ -33,7 +33,7 @@ export const SETTINGS_TOOLS: readonly McpToolDef[] = [
     name: "hanoman_settings_set",
     title: "Simpan setelan instance",
     description:
-      "Menyimpan setelan instance. MENGGANTI blok penuh — kirim hasil hanoman_settings_get yang sudah diubah, bukan potongan. Setelan ini berlaku untuk SETIAP sesi baru di seluruh workspace. Menyentuh blok Telegram akan memuat ulang gateway.",
+      "Menyimpan setelan instance. MENGGANTI blok penuh — kirim hasil hanoman_settings_get yang sudah diubah, bukan potongan. Panggil hanoman_settings_get TEPAT sebelum tool ini (jangan memakai hasil lama) dan ubah HANYA field yang dimaksud: setiap model/effort/sel orkestrasi yang berbeda dari nilai tersimpan ditandai milik operator dan tak lagi diperbarui default bawaan saat update. Setelan ini berlaku untuk SETIAP sesi baru di seluruh workspace. Menyentuh blok Telegram akan memuat ulang gateway.",
     inputSchema: obj({ properties: { settings: WHOLE_BLOCK("setelan") }, required: ["settings"] }),
     mode: "write", capability: "settings:write",
     samplePath: "/settings", sampleMethod: "PUT",

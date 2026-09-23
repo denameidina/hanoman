@@ -286,6 +286,11 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   boleh diperbarui saat Hanoman membawa rekomendasi baru; `user` dipertahankan. Marker granular per
   model/effort global, saklar flow, dan field model/effort sel fase. Pada `POST /terminal/sessions`
   varian backlog, `phaseOverrides` opsional adalah override transient per sesi dan tidak ditulis ke Setting.
+  `PUT /settings` menandai `user` setiap field runtime yang berbeda dari DB, jadi penulis WAJIB
+  mengirim DB terbaru + perubahannya saja: sejak audit S5 (2026-09-23) `SettingsScreen.persist()`
+  melakukan GET segar lalu `rebaseEdits(snapshot, snapshot+perubahan, DB)` (berurutan lewat antrean)
+  sebelum PUT — tab yang terbuka melewati update/seed tak lagi membalik seed baru ke id lama dan
+  menguncinya `user`. Tool MCP `hanoman_settings_set` menyuruh agen memanggil `_get` tepat sebelumnya.
 - `remoteControl`, `logShipping`, `logRetention` (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md)/[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md),
   sudah di `zSetting` sejak turunan A; `logShipping`/`logRetention` baru dibaca SPEC-1217) — LOCAL-only, tanpa migration.
   - `remoteControl = { enabled:false, capabilities:[] }`: grant kendali jarak jauh dari hub, dengan
@@ -356,8 +361,8 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   atasnya (`MODELS`/`EFFORTS` untuk claude; `CODEX_MODELS` + **`codexEfforts(model)`** untuk codex —
   effort codex properti **per-model**, SPEC-339, jadi picker tak boleh memakai `CODEX_EFFORTS`).
   Kartu itu menulis lewat **`PUT /lead/config`**, bukan `PUT /settings` seperti kartu konflik, dan
-  itu perbedaan sadar: `SettingsScreen` mengirim seluruh objek `Setting` dari snapshot yang dimuat
-  **sekali** saat mount, sementara blok `lead` punya **penulis kedua** (`LeadScreen` — Pause, denyut,
+  itu perbedaan sadar: `SettingsScreen` dulu mengirim seluruh objek `Setting` dari snapshot yang dimuat
+  **sekali** saat mount (sejak S5 di-rebase ke DB terbaru, tapi endpoint lead tetap jalurnya), sementara blok `lead` punya **penulis kedua** (`LeadScreen` — Pause, denyut,
   batas waktu, opt-in per project). Menulisnya dari snapshot berarti rem darurat yang ditekan di
   layar Lead **lepas sendiri** saat operator mengganti model di Settings; blok `conflict` tak punya
   penulis kedua, jadi pola `save()`-nya tetap sah di sana. Nilainya dibaca `getSetting()` **tiap
