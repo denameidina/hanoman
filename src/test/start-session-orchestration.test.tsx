@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { ORCHESTRATION_DEFAULTS, zOrchestration } from "@hanoman/shared";
 import { StartSessionModal } from "../src/App";
+import { PhasePlanPreview } from "../src/screens/PhasePlanPreview";
 import { api } from "../src/api/client";
 
 // ADR-0164 · pratinjau rencana fase di modal Start: resolver yang SAMA dengan server.
@@ -112,5 +113,66 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
     await waitFor(() => expect(api.startSession).toHaveBeenCalledWith(expect.objectContaining({
       phaseOverrides: { Plan: { model: "haiku", effort: "low" } },
     })));
+  });
+});
+
+// Audit R6 · override effort tanpa model lalu ganti model orchestrator → nilai tersimpan hilang dari
+// opsi dan Select tampil "Warisi rekomendasi" padahal override masih terkirim; label "Warisi
+// rekomendasi" menyembunyikan sumbernya (sel Settings atau orchestrator); sufiks "(override sesi)"
+// menyembunyikan bagian yang masih mewarisi; `<select>` native, bukan `Select` DS.
+describe("StartSessionModal · override fase (audit R6)", () => {
+  const codexSetting = () => settingWith(zOrchestration.parse({}),
+    { agent: "codex", codex: { model: "gpt-5.6-sol", effort: "high" } });
+
+  it("effort override tetap terlihat (dan ditandai dikoersi) sesudah model orchestrator berganti", async () => {
+    (api.getSettings as any).mockResolvedValue(codexSetting());
+    (api.getCodexVersion as any).mockResolvedValueOnce({ version: "0.154.0", minRequired: "0.144.0", ok: true });
+    renderModal();
+    await waitFor(() => expect(screen.getByLabelText("Effort subagent Plan")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Effort subagent Plan"), { target: { value: "ultra" } });
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "gpt-5.5" } });
+    const effortSelect = screen.getByLabelText("Effort subagent Plan") as HTMLSelectElement;
+    expect(effortSelect).toHaveValue("ultra");
+    expect(effortSelect.selectedOptions[0]!.textContent).toMatch(/ultra.*dikoersi.*xhigh/);
+    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Plan · GPT-5.5 · xhigh");
+  });
+
+  it("opsi kosong menyebut sumber warisan: sel Settings atau orchestrator", async () => {
+    const orchestration = zOrchestration.parse({});
+    orchestration.qa.claude.Plan = { model: "sonnet", effort: "low" };
+    (api.getSettings as any).mockResolvedValue(settingWith(orchestration));
+    renderModal();
+    await waitFor(() => expect(screen.getByLabelText("Model subagent Plan")).toBeInTheDocument());
+    const first = (label: string) => (screen.getByLabelText(label) as HTMLSelectElement).options[0]!.textContent;
+    expect(first("Model subagent Plan")).toBe("Warisi Settings · Sonnet");
+    expect(first("Effort subagent Plan")).toBe("Warisi Settings · low");
+    expect(first("Model subagent Audit")).toBe("Warisi orchestrator · Opus");
+    expect(first("Effort subagent Audit")).toBe("Warisi orchestrator · xhigh");
+    expect(screen.queryAllByText("Warisi rekomendasi")).toHaveLength(0);
+  });
+
+  it("sufiks per bagian: override model tak menyembunyikan effort yang masih mewarisi", async () => {
+    (api.getSettings as any).mockResolvedValue(settingWith(zOrchestration.parse({})));
+    renderModal();
+    await waitFor(() => expect(screen.getByLabelText("Model subagent Plan")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Model subagent Plan"), { target: { value: "haiku" } });
+    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Plan · Haiku · xhigh (model override · effort warisi)");
+    fireEvent.change(screen.getByLabelText("Effort subagent Plan"), { target: { value: "low" } });
+    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Plan · Haiku · low (override sesi)");
+  });
+
+  it("picker override memakai Select design system", async () => {
+    (api.getSettings as any).mockResolvedValue(settingWith(zOrchestration.parse({})));
+    renderModal();
+    await waitFor(() => expect(screen.getByLabelText("Model subagent Plan")).toBeInTheDocument());
+    expect(screen.getByLabelText("Model subagent Plan").closest(".hn-select")).not.toBeNull();
+    expect(screen.getByLabelText("Effort subagent Plan").closest(".hn-select")).not.toBeNull();
+  });
+
+  it("model override tersimpan di luar katalog tetap jadi opsi terpilih", () => {
+    render(<PhasePlanPreview flow="qa" agent="claude" model="opus" effort="xhigh"
+      orchestration={zOrchestration.parse({})} codexVersion={null} loading={false}
+      phaseOverrides={{ Plan: { model: "claude-retired-1" } }} onPhaseOverridesChange={() => {}} />);
+    expect(screen.getByLabelText("Model subagent Plan")).toHaveValue("claude-retired-1");
   });
 });
