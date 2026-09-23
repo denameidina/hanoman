@@ -116,6 +116,42 @@ describe("invocation agen fase (ADR-0164)", () => {
       phase: "Plan", runtimeInvocationId: "fase-1", status: "completed", resultExcerpt: "Status: selesai",
     })]);
   });
+  // ADR-0167 · relay jawaban ke subagent yang SAMA (P3: `SubagentStart` menembak ulang dengan
+  // `agent_id` sama). Start SESUDAH Stop adalah LANJUTAN, bukan replay: baris dibuka ulang dan Stop
+  // akhir menulis bukti terbaru — bukan membeku di laporan `menunggu-keputusan`.
+  const fase = { ...base, runtimeInvocationId: "fase-r", agentName: "hanoman-fase-brainstorm",
+    customAgentId: undefined, phase: "Brainstorm" };
+  const t = (s: number) => new Date(Date.UTC(2026, 8, 20, 1, 0, s));
+  it("S1 · Start sesudah Stop membuka ulang baris; Stop akhir menulis bukti terbaru", async () => {
+    await startAgentInvocation({ ...fase, startedAt: t(0) }, { gitStatus: () => "a" });
+    await stopAgentInvocation({ ...fase, endedAt: t(10), result: "Status: menunggu-keputusan" },
+      { gitStatus: () => "b" });
+    const reopened = await startAgentInvocation({ ...fase, startedAt: t(40) }, { gitStatus: () => "b" });
+    expect(reopened.duplicate).toBe(false);
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "fase-r" } }))
+      .toMatchObject({ status: "running", endedAt: null, durationMs: null, startedAt: t(0) });
+    const last = await stopAgentInvocation({ ...fase, endedAt: t(70), result: "Status: selesai" },
+      { gitStatus: () => "b" });
+    expect(last.duplicate).toBe(false);
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "fase-r" } }))
+      .toMatchObject({
+        status: "completed", endedAt: t(70), durationMs: 70_000, resultExcerpt: "Status: selesai",
+        // putaran pertama mengubah workspace, putaran relay tidak — bukti putaran awal tak hilang.
+        workspaceChanged: true,
+      });
+    // relay BUKAN percobaan ulang: tetap satu runtimeInvocationId → attempts 1.
+    expect(await listPhaseInvocations("s1")).toHaveLength(1);
+  });
+
+  it("S1 · Start yang lebih tua dari endedAt (replay/terlambat dari spool) tetap duplikat", async () => {
+    await startAgentInvocation({ ...fase, startedAt: t(0) });
+    await stopAgentInvocation({ ...fase, endedAt: t(10), result: "Status: selesai" });
+    expect((await startAgentInvocation({ ...fase, startedAt: t(0) })).duplicate).toBe(true);
+    expect((await startAgentInvocation({ ...fase, startedAt: t(10) })).duplicate).toBe(true);
+    expect(await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "fase-r" } }))
+      .toMatchObject({ status: "completed", durationMs: 10_000, resultExcerpt: "Status: selesai" });
+  });
+
   it("metrik custom agent mengecualikan invocation agen fase", async () => {
     await startAgentInvocation({ ...base, runtimeInvocationId: "fase-2", agentName: "hanoman-fase-spec",
       customAgentId: undefined, phase: "Spec" });

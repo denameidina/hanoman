@@ -1412,6 +1412,14 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 #   capability. Gate cookie mem-bypass path-nya (pola /api/sync device token, /api/help kunci tiket).
 #   Ingress: `classifyIngress` TAK disentuh. Hook memanggil loopback (`http://127.0.0.1:<port>`) dan
 #   mengirim header `Host` = host control pertama saat origin dipisah (`HANOMAN_EVENT_HOST`).
+#   SubagentStart/SubagentStop (ADR-0159/0164) → AgentInvocation unik (sesi, agent_id). Header
+#   opsional `x-hanoman-event-at: <ms epoch>` = waktu KEJADIAN event, dikirim relay spool dari nama
+#   berkas hook (diabaikan bila > 7 hari lalu / > 1 menit ke depan → waktu terima). S1 · ADR-0167:
+#   Start KEMBAR saat baris running = replay → { duplicate:true }; Start SESUDAH Stop dengan waktu
+#   event > endedAt = LANJUTAN relay `SendMessage` ke subagent yang sama → baris dibuka ulang
+#   (running, endedAt/durasi null, startedAt pertama tetap) dan Stop berikutnya menulis bukti
+#   terbaru; Start yang tak lebih baru dari endedAt (replay/terlambat) tetap duplikat. Stop pada
+#   baris yang sudah ended selalu duplikat. Relay mengirim berkas urut nama (kronologis).
 ```
 
 ## Kendali jarak jauh & log terpusat (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) · [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)) — **mendarat penuh (turunan A + B + C + D)**

@@ -14,7 +14,9 @@ const SESSION_ID_RE = /^[a-z0-9_-]+$/;
 type RelayRequest = {
   method: "POST";
   url: "/api/session-events";
-  headers: { authorization: string; "x-hanoman-session": string; host?: string };
+  headers: {
+    authorization: string; "x-hanoman-session": string; host?: string; "x-hanoman-event-at"?: string;
+  };
   payload: Record<string, unknown>;
 };
 type Injectable = { inject(request: RelayRequest): Promise<{ statusCode: number }> };
@@ -81,8 +83,12 @@ async function drainSpool(
     let entries;
     try { entries = await readdir(dir, { withFileTypes: true }); }
     catch { continue; } // sesi bisa ditutup tepat di antara scan root dan scan direktorinya
+    // S1 · urut kronologis: nama berkas hook = `<Date.now()>-<pid>-<uuid>.json` dan readdir tak
+    // menjamin urutan (ext4 berurut hash). Start/Stop satu subagent harus tiba sesuai kejadiannya.
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+      const eventAt = /^(\d{1,15})-/.exec(entry.name)?.[1];
       if (++examined > MAX_FILES_PER_DRAIN) return delivered;
       const path = join(dir, entry.name);
       let payload: Record<string, unknown>;
@@ -116,6 +122,9 @@ async function drainSpool(
             authorization: `Bearer ${sessionEventToken(session.name)}`,
             "x-hanoman-session": session.name,
             ...(host ? { host } : {}),
+            // S1 · waktu KEJADIAN event (bukan waktu drain) — route memakainya untuk membedakan
+            // replay dari lanjutan relay subagent yang sama.
+            ...(eventAt ? { "x-hanoman-event-at": eventAt } : {}),
           },
           payload,
         });
