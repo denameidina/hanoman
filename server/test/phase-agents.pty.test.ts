@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createSession, getSession, killSession, registerCustomAgentSource, registerCodexNativeAgentSupport,
-  agentsFilePath, promptFilePath, agentTempDir,
+  agentsFilePath, promptFilePath, agentTempDir, trackPhaseDoneSeen, _forgetPhaseDoneSeen,
 } from "../src/services/pty";
 import { renderAgentsJson, type AgentDef } from "@hanoman/runner";
 
@@ -157,6 +157,30 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     expect(screen).toContain("agents.max_depth=3");
     expect(screen).toContain('agents."hanoman-fase-spec".config_file');
     expect(getSession(s.id)!.orchestrated).toBe(true);
+  });
+
+  // R3 · tenggang ⚠ 60 dtk dihitung "sejak server PERTAMA melihat marker done" — dulu disimpan per
+  // attachment, jadi reconnect dashboard dan restart server memulai ulang tenggangnya.
+  it("R3 · doneSeen per sesi: tahan reconnect & restart (opsi tmux), dibuang saat sesi dibunuh", async () => {
+    const s = createSession("p1", cwd, {
+      id: born("orch-r3"), agent: "claude", prompt: "P", legacyPrompt: "L", phaseAgents,
+    });
+    const spec = [{ name: "Spec", state: "done" as const }];
+    expect(trackPhaseDoneSeen(s.id, spec, 1_000).get("Spec")).toBe(1_000);
+    // Tanpa state per-attachment: panggilan berikutnya (attachment/klien mana pun) tak me-reset.
+    expect(trackPhaseDoneSeen(s.id, spec, 50_000).get("Spec")).toBe(1_000);
+    // Restart server = peta modul hilang; opsi tmux sesi membawanya kembali.
+    await new Promise((r) => setTimeout(r, 100));   // set-option asinkron
+    _forgetPhaseDoneSeen(s.id);
+    expect(trackPhaseDoneSeen(s.id, spec, 90_000).get("Spec")).toBe(1_000);
+    // Fase di-reset lalu selesai lagi → tenggang utuh (perilaku trackDoneSeen dipertahankan).
+    expect(trackPhaseDoneSeen(s.id, [{ name: "Spec", state: "active" }], 95_000).has("Spec")).toBe(false);
+    expect(trackPhaseDoneSeen(s.id, spec, 99_000).get("Spec")).toBe(99_000);
+    killSession(s.id);
+    const again = createSession("p1", cwd, {
+      id: s.id, agent: "claude", prompt: "P", legacyPrompt: "L", phaseAgents,
+    });
+    expect(trackPhaseDoneSeen(again.id, spec, 200_000).get("Spec")).toBe(200_000);
   });
 
   // M-1 · ADR-0164 · awalan `hanoman-fase-` dicadangkan untuk agen fase; skema `CustomAgent`

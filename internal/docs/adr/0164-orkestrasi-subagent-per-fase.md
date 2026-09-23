@@ -80,7 +80,10 @@ Kedua runtime kini punya subagent native ber-model/effort per definisi. Diukur 2
    yang benar-benar lahir: roster dipilih ulang dengan `legacyPrompt` saat fallback (audit R7).
 6. **Bukti**: `AgentInvocation.phase`/`effort` (satu migration, LOCAL-only); effort stop dari payload
    runtime. Frame `phase` WS terminal diperkaya status/durasi/percobaan/token; `evidence: missing` sesudah
-   60 dtk tanpa invocation dilabeli "bukti subagent tak diterima". Metrik custom agent mengecualikan baris
+   60 dtk tanpa invocation dilabeli "bukti subagent tak diterima" — 60 dtk dihitung sejak server PERTAMA
+   melihat marker `done`: satu peta per sesi di level modul `pty.ts` (bukan per attachment, jadi
+   reconnect dashboard tak me-reset), dicerminkan ke opsi tmux `@hanoman_phase_done_seen` supaya tahan
+   restart server (audit R3). Metrik custom agent mengecualikan baris
    ber-`phase`. Review whole-branch (I-1/M-2): chip HANYA memakai invocation SEJAK SESI LAHIR (id sesi
    tetap per spec, jadi run yang dilanjutkan bisa mewarisi baris `running` dari run yang sudah mati) —
    fase yang sudah `done`/`skipped` SAAT LAHIR (dicatat `createSession` dari berkas fase ke opsi tmux

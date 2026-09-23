@@ -191,8 +191,6 @@ type Attachment = {
   pty: IPty; scrollback: string; clients: Set<Client>; lastPhases: string;
   lastAlt?: boolean;
   pending: string; flushTimer?: NodeJS.Timeout;
-  // ADR-0164 · kapan server pertama melihat tiap fase `done` — bahan tenggang bukti `enrichPhases`.
-  doneSeenAt: Map<string, number>;
 };
 const attached = new Map<string, Attachment>();
 
@@ -200,19 +198,56 @@ const attached = new Map<string, Attachment>();
 // membaca DB); pty sendiri tak pernah menyentuh DB (ADR-0094 §7).
 const phaseInvocations = new Map<string, PhaseInvocation[]>();
 
+// ADR-0164 · kapan server PERTAMA melihat tiap fase `done` — bahan tenggang bukti `enrichPhases`.
+// Audit R3: dulu disimpan per ATTACHMENT, jadi reconnect dashboard dan restart server memulai ulang
+// tenggang 60 dtk. Kini satu peta per SESI di level modul, dicerminkan ke opsi tmux sesi (pola
+// `@hanoman_done_at_birth`) supaya tahan restart — pty tetap nol dependensi DB. Opsi mati bersama
+// sesi tmux-nya; peta modul dibuang di `killSession`/`end` dan saat sesi dilahirkan ulang.
+const PHASE_DONE_SEEN_OPT = "@hanoman_phase_done_seen";
+const phaseDoneSeen = new Map<string, Map<string, number>>();
+
+function doneSeenOf(id: string): Map<string, number> {
+  const known = phaseDoneSeen.get(id);
+  if (known) return known;
+  const seen = new Map<string, number>();
+  try {
+    const raw = tmux("show-options", "-v", "-q", "-t", name(id), PHASE_DONE_SEEN_OPT).trim();
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+      for (const [phase, at] of Object.entries(parsed))
+        if (typeof at === "number" && Number.isFinite(at)) seen.set(phase, at);
+  } catch { /* opsi tak terbaca = belum pernah terlihat; paling buruk tenggangnya mulai sekarang */ }
+  phaseDoneSeen.set(id, seen);
+  return seen;
+}
+
+/** Catat fase `done` yang baru terlihat untuk sesi `id`; cerminkan ke tmux hanya bila berubah. */
+export function trackPhaseDoneSeen(id: string, phases: Phase[], now: number): Map<string, number> {
+  const seen = doneSeenOf(id);
+  const before = JSON.stringify([...seen]);
+  trackDoneSeen(phases, seen, now);
+  if (JSON.stringify([...seen]) !== before) {
+    // Asinkron: dipanggil dari loop poll 500 ms (lihat `tmuxAsync`). Gagal = hanya tak tahan restart.
+    void tmuxAsync("set-option", "-t", name(id), PHASE_DONE_SEEN_OPT, JSON.stringify(Object.fromEntries(seen)))
+      .catch(() => {});
+  }
+  return seen;
+}
+
+/** Test: simulasikan restart server (peta modul hilang, opsi tmux tetap). */
+export const _forgetPhaseDoneSeen = (id: string): void => { phaseDoneSeen.delete(id); };
+
 /** Frame fase satu pane: berkas fase diperkaya roster agen fase + invocation. Tanpa agen fase → apa adanya. */
-function phaseView(p: Pane, a: Attachment, phases: Phase[]): Phase[] {
-  const now = Date.now();
-  trackDoneSeen(phases, a.doneSeenAt, now);
+function phaseView(p: Pane, phases: Phase[]): Phase[] {
   const roster = (p.agentRoster ?? []).flatMap((r) =>
     r.phase ? [{ name: r.name, phase: r.phase, model: r.model, effort: r.effort }] : []);
+  if (!roster.length) return phases;
+  const now = Date.now();
   // I-1/M-2 · ADR-0164 · `startedAt` tmux dalam detik epoch; `enrichPhases` menerima ms.
-  return roster.length
-    ? enrichPhases(
-      phases, roster, phaseInvocations.get(p.id) ?? [], a.doneSeenAt, now,
-      p.startedAt * 1000, new Set(p.doneAtBirth ?? []),
-    )
-    : phases;
+  return enrichPhases(
+    phases, roster, phaseInvocations.get(p.id) ?? [], trackPhaseDoneSeen(p.id, phases, now), now,
+    p.startedAt * 1000, new Set(p.doneAtBirth ?? []),
+  );
 }
 
 // Variabel yang sama yang dipakai runner/src/claude-cli.ts.
@@ -690,6 +725,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   const existing = getSession(id);
   if (existing && !existing.exited) return existing;
   if (existing) killSession(id);
+  phaseDoneSeen.delete(id);   // R3 · id sesi dipakai ulang: tenggang sesi lama tak diwarisi
   const eventDir = opts.command ? undefined : sessionEventDir(id);
   if (eventDir) {
     mkdirSync(eventDir, { recursive: true, mode: 0o700 });
@@ -1264,7 +1300,7 @@ function flushOutput(a: Attachment): void {
 function open(id: string): Attachment {
   const pty = spawnPty("attach-session", "-d", "-t", name(id));
   const a: Attachment = {
-    pty, scrollback: "", clients: new Set(), lastPhases: "", pending: "", doneSeenAt: new Map(),
+    pty, scrollback: "", clients: new Set(), lastPhases: "", pending: "",
   };
   pty.onData((d) => {
     a.pending += d;
@@ -1304,6 +1340,7 @@ function end(id: string, code: number): void {
   flushOutput(a);
   broadcast(a, { t: "exit", code });
   drop(id);
+  phaseDoneSeen.delete(id);   // R3 · pane mati; opsi tmux tetap membawanya bila pane mati dibaca lagi
 }
 
 // Fase yang dilaporkan agen (SPEC-162). Frame hanya lahir saat isinya berubah — kalau tidak,
@@ -1355,7 +1392,7 @@ async function pollPhases(p: Pane, a: Attachment): Promise<void> {
   const raw = await readPhasesAsync(p.phaseFile, p.flow);
   const complete = await sessionCompleteAsync(raw, p.cwd, p.specId);
   if (attached.get(p.id) !== a) return;   // dilepas selagi berkas dibaca
-  const phases = phaseView(p, a, raw);
+  const phases = phaseView(p, raw);
   const json = phaseKey(phases, complete);
   if (json === a.lastPhases) return;
   a.lastPhases = json;
@@ -1509,7 +1546,7 @@ function attachLive(id: string, c: Client, p: Pane): void {
   // verdict-nya, tak perlu menunggu berkas fase berubah lagi (yang takkan pernah terjadi).
   if (p.flow && p.phaseFile) {
     const raw = readPhases(p.phaseFile, p.flow);
-    const phases = phaseView(p, a, raw);
+    const phases = phaseView(p, raw);
     const complete = sessionComplete(raw, p.cwd, p.specId);
     a.lastPhases = phaseKey(phases, complete);
     c.send(frame({ t: "phase", phases, complete }));
@@ -1535,6 +1572,7 @@ export function resize(id: string, cols: number, rows: number): void {
 
 export function killSession(id: string): boolean {
   phaseInvocations.delete(id);
+  phaseDoneSeen.delete(id);
   const p = getSession(id);
   if (!p) return false;
   // SPEC-362 · capture SEBELUM kill: sesudah `kill-session` scrollback-nya tak ada lagi.
