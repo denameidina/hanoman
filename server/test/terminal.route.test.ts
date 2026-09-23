@@ -723,7 +723,7 @@ describe("terminal routes · sesi backlog", () => {
     expect(res.statusCode).toBe(201);
     await waitFor(() => existsSync(out) && readFileSync(out, "utf8").includes("--dangerously-skip-permissions"));
     const argv = readFileSync(out, "utf8");
-    expect(argv).toContain("--model claude-sonnet-5");
+    expect(argv).toContain("--model sonnet");
     expect(argv).toContain("--effort medium");
     await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-953" });
   });

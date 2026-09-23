@@ -84,7 +84,7 @@ describe("agent capabilities", () => {
     expect(s.agentAccessEnabled).toBe(false);
     expect(s.telegram).toEqual({
       enabled: false, progress: true,
-      engine: { enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh" },
+      engine: { enabled: false, agent: "claude", model: "opus", effort: "xhigh" },
     });
   });
 });

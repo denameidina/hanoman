@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier } from "../ds";
 import { api, ApiError } from "../api/client";
-import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry } from "@hanoman/shared";
+import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry, modelSelectOptions } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus, SetupStatus } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
@@ -25,6 +25,9 @@ import { claudeEfforts, coerceClaudeEffort } from "@hanoman/shared";
 // jadi Settings dan Start bisa menampilkan daftar model claude yang berbeda.
 const claudeEffortOptions = (model: string) =>
   claudeEfforts(model).map((v) => ({ value: v, label: v === "xhigh" ? "x-high" : v }));
+// Nilai tersimpan yang sudah tak ada di katalog (model pensiun di CLI, atau baris ditulis via
+// PUT ber-AgentToken) tetap muncul sebagai satu opsi supaya picker tak tampil kosong/reset diam-diam.
+const claudeOptions = (model: string) => modelSelectOptions(MODELS, model);
 const claudeEffortPatch = (model: string, effort: string) => {
   const next = coerceClaudeEffort(model, effort);
   return next === effort ? {} : { effort: next };
@@ -42,7 +45,7 @@ const S_SOUNDS = [
   { value: "fanfare", label: "Fanfare · 0.9s" }, { value: "off", label: "Senyap" },
 ];
 const S_DEFAULTS: Setting = {
-  model: "claude-sonnet-5", effort: "medium",
+  model: "sonnet", effort: "medium",
   autoDefault: true, autoScaffold: true, notifyFail: true,
   notifyDone: true, notifySound: "short",
   notifyDecision: true, notifyDecisionSound: "alert",
@@ -657,7 +660,6 @@ const S_SECTIONS = [
 export function SettingsScreen({ onToast, me, onLoggedOut }:
   { onToast?: ShowToast; me: UserView; onLoggedOut: () => void }) {
   const modelCatalog = useModelCatalog();
-  const S_MODELS = MODELS.map((m) => ({ value: m.id, label: m.label }));
   const [s, setS] = React.useState<Setting | null>(null);
   const [failed, setFailed] = React.useState(false);
   // SPEC-740 · ADR-0115 · sub-tab aktif bertahan; refresh tak melempar balik ke Akun.
@@ -941,10 +943,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
       };
       // SPEC-339 · nilai di luar katalog (mis. dari PUT ber-AgentToken) ditambahkan apa adanya
       // supaya picker tak tampil kosong. Effort-nya pun tak dikoersi — konsisten dengan aturan
-      // "model tak dikenal → apa adanya" di coerceCodexEffort.
-      const codexOptions = (model: string) => (CODEX_MODELS.some((m) => m.id === model)
-        ? CODEX_MODELS.map((m) => ({ value: m.id, label: m.label }))
-        : [{ value: model, label: model }, ...CODEX_MODELS.map((m) => ({ value: m.id, label: m.label }))]);
+      // "model tak dikenal → apa adanya" di coerceCodexEffort. Cermin `claudeOptions` di atas.
+      const codexOptions = (model: string) => modelSelectOptions(CODEX_MODELS, model);
       // SPEC-383 · ADR-0081 · blok konflik. `?? CONFLICT_DEFAULTS` karena respons GET /settings yang
       // ter-cache dari sebelum SPEC-383 belum punya kunci ini — layar tak boleh mati `undefined.enabled`.
       const conflict = s.conflict ?? CONFLICT_DEFAULTS;
@@ -1074,7 +1074,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
           </div>
           <AgentGroupHeader id="claude" label={AGENT_LABEL.claude} active={agent === "claude"} />
           <SettingRow title="Model" desc="Diteruskan apa adanya ke `claude --model`.">
-            <Select size="sm" aria-label="Model claude" value={s.model} options={S_MODELS} style={{ width: 190 }}
+            <Select size="sm" aria-label="Model claude" value={s.model} options={claudeOptions(s.model)} style={{ width: 190 }}
               onChange={(e) => save({ model: e.target.value, ...claudeEffortPatch(e.target.value, s.effort) }, "Model claude → " + e.target.value)} />
           </SettingRow>
           <SettingRow title="Effort" last desc="Anggaran berpikir per giliran (`claude --effort`).">
@@ -1138,7 +1138,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             {conflict.agent === "codex" && codexNote(conflict.model)}
             <SettingRow title="Model">
               <Select size="sm" aria-label="Model konflik" value={conflict.model} style={{ width: 190 }}
-                options={conflict.agent === "codex" ? codexOptions(conflict.model) : S_MODELS}
+                options={conflict.agent === "codex" ? codexOptions(conflict.model) : claudeOptions(conflict.model)}
                 onChange={(e) => {
                   const model = e.target.value;
                   saveConflict({ model, ...(conflict.agent === "codex"
@@ -1198,7 +1198,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             {engine.agent === "codex" && codexNote(engine.model)}
             <SettingRow title="Model">
               <Select size="sm" aria-label="Model lead" value={engine.model} style={{ width: 190 }}
-                options={engine.agent === "codex" ? codexOptions(engine.model) : S_MODELS}
+                options={engine.agent === "codex" ? codexOptions(engine.model) : claudeOptions(engine.model)}
                 onChange={(e) => {
                   const model = e.target.value;
                   saveEngine({ model, ...(engine.agent === "codex"
@@ -1260,7 +1260,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             {tgEngine.agent === "codex" && codexNote(tgEngine.model)}
             <SettingRow title="Model">
               <Select size="sm" aria-label="Model Telegram" value={tgEngine.model} style={{ width: 190 }}
-                options={tgEngine.agent === "codex" ? codexOptions(tgEngine.model) : S_MODELS}
+                options={tgEngine.agent === "codex" ? codexOptions(tgEngine.model) : claudeOptions(tgEngine.model)}
                 onChange={(e) => {
                   const model = e.target.value;
                   saveTgEngine({ model, ...(tgEngine.agent === "codex"
@@ -1319,7 +1319,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             {changelog.agent === "codex" && codexNote(changelog.model)}
             <SettingRow title="Model">
               <Select size="sm" aria-label="Model changelog" value={changelog.model} style={{ width: 190 }}
-                options={changelog.agent === "codex" ? codexOptions(changelog.model) : S_MODELS}
+                options={changelog.agent === "codex" ? codexOptions(changelog.model) : claudeOptions(changelog.model)}
                 onChange={(e) => {
                   const model = e.target.value;
                   saveChangelog({ model, ...(changelog.agent === "codex"
@@ -1374,7 +1374,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             </SettingRow>
             <SettingRow title="Model" desc="Mesin obrolan selalu Claude — gerbang tool yang menjaganya tak ada di runtime lain.">
               <Select size="sm" aria-label="Model obrolan portal" value={portalChat.model}
-                style={{ width: 190 }} options={S_MODELS}
+                style={{ width: 190 }} options={claudeOptions(portalChat.model)}
                 onChange={(e) => savePortalChat({ model: e.target.value, ...claudeEffortPatch(e.target.value, portalChat.effort) },
                   "Model obrolan portal → " + e.target.value)} />
             </SettingRow>

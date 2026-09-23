@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { zAgentEngine, zLeadEngine, zTelegramSettings, zSetting, TELEGRAM_DEFAULTS, LEAD_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS } from "./index";
 
 describe("zAgentEngine (SPEC-492)", () => {
-  it("default = override MATI, claude-opus-5 · xhigh", () => {
+  it("default = override MATI, opus · xhigh", () => {
     expect(zAgentEngine.parse({})).toEqual({
-      enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh",
+      enabled: false, agent: "claude", model: "opus", effort: "xhigh",
     });
   });
 
@@ -24,7 +24,7 @@ describe("zAgentEngine (SPEC-492)", () => {
   it("telegram punya engine, default MATI supaya instalasi lama tak berubah perilakunya", () => {
     expect(zTelegramSettings.parse({})).toEqual({
       enabled: false, progress: true,
-      engine: { enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh" },
+      engine: { enabled: false, agent: "claude", model: "opus", effort: "xhigh" },
     });
     expect(TELEGRAM_DEFAULTS.engine.enabled).toBe(false);
   });
@@ -47,7 +47,7 @@ describe("Setting.changelog (SPEC-518)", () => {
 
   it("default = override MATI → instalasi lama tak berubah perilakunya", () => {
     expect(CHANGELOG_ENGINE_DEFAULTS).toEqual({
-      enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh",
+      enabled: false, agent: "claude", model: "opus", effort: "xhigh",
     });
   });
 
@@ -64,7 +64,7 @@ describe("Setting.changelog (SPEC-518)", () => {
     // ia `undefined`, dan `undefined` toEqual `undefined` LULUS — test hijau yang tak menguji apa
     // pun (kelas gagal-senyap yang sama dengan kolom yang lupa masuk `FIELDS`).
     expect(parsed.success && parsed.data.changelog).toEqual({
-      enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh",
+      enabled: false, agent: "claude", model: "opus", effort: "xhigh",
     });
   });
 

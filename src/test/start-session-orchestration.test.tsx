@@ -17,7 +17,7 @@ vi.mock("../src/api/client", () => ({
 
 const spec = { id: "SPEC-9", source: "qa", projectId: "p1" } as any;
 const settingWith = (orchestration: unknown, extra: object = {}) => ({
-  model: "claude-opus-5", effort: "xhigh", goal: { enabled: false, condition: "" }, orchestration, ...extra,
+  model: "opus", effort: "xhigh", goal: { enabled: false, condition: "" }, orchestration, ...extra,
 });
 const renderModal = () => render(<StartSessionModal open spec={spec} onClose={() => {}} onStarted={() => {}} />);
 
@@ -29,11 +29,11 @@ beforeEach(() => {
 describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
   it("memakai sel Settings dan menandai fase yang mewarisi orchestrator", async () => {
     const orchestration = zOrchestration.parse({});
-    orchestration.qa.claude.Plan = { model: "claude-sonnet-5", effort: "low" };
+    orchestration.qa.claude.Plan = { model: "sonnet", effort: "low" };
     (api.getSettings as any).mockResolvedValue(settingWith(orchestration));
     renderModal();
-    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Plan · Sonnet 5 · low"));
-    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Audit · Opus 5 · xhigh (warisi)");
+    await waitFor(() => expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Plan · Sonnet · low"));
+    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Audit · Opus · xhigh (warisi)");
   });
 
   it("mengubah effort orchestrator ikut mengubah fase yang mewarisi", async () => {
@@ -41,9 +41,9 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
     renderModal();
     await waitFor(() => expect(screen.getByLabelText("Effort")).toHaveValue("xhigh"));
     await waitFor(() => expect(screen.getByTestId("phase-plan-preview"))
-      .toHaveTextContent("Execute · Opus 5 · xhigh (warisi)"));
+      .toHaveTextContent("Execute · Opus · xhigh (warisi)"));
     fireEvent.change(screen.getByLabelText("Effort"), { target: { value: "high" } });
-    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Execute · Opus 5 · high (warisi)");
+    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Execute · Opus · high (warisi)");
   });
 
   it("flow yang orkestrasinya mati → sesi tunggal", async () => {
@@ -93,24 +93,24 @@ describe("StartSessionModal · pratinjau fase (ADR-0164)", () => {
 
   it("sel sebagian (hanya model atau hanya effort) → tanda warisi per bagian", async () => {
     const orchestration = structuredClone(ORCHESTRATION_DEFAULTS);
-    orchestration.qa.claude.Plan = { model: "claude-sonnet-5", effort: null };
+    orchestration.qa.claude.Plan = { model: "sonnet", effort: null };
     orchestration.qa.claude.Execute = { model: null, effort: "low" };
     (api.getSettings as any).mockResolvedValue(settingWith(orchestration));
     renderModal();
     await waitFor(() => expect(screen.getByTestId("phase-plan-preview"))
-      .toHaveTextContent("Plan · Sonnet 5 · xhigh (effort warisi)"));
-    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Execute · Opus 5 · low (model warisi)");
+      .toHaveTextContent("Plan · Sonnet · xhigh (effort warisi)"));
+    expect(screen.getByTestId("phase-plan-preview")).toHaveTextContent("Execute · Opus · low (model warisi)");
   });
 
   it("mengirim override model dan effort subagent per fase saat mulai", async () => {
     (api.getSettings as any).mockResolvedValue(settingWith(structuredClone(ORCHESTRATION_DEFAULTS)));
     renderModal();
     await waitFor(() => expect(screen.getByLabelText("Model subagent Plan")).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText("Model subagent Plan"), { target: { value: "claude-haiku-4-5" } });
+    fireEvent.change(screen.getByLabelText("Model subagent Plan"), { target: { value: "haiku" } });
     fireEvent.change(screen.getByLabelText("Effort subagent Plan"), { target: { value: "low" } });
     fireEvent.click(screen.getByRole("button", { name: "Mulai" }));
     await waitFor(() => expect(api.startSession).toHaveBeenCalledWith(expect.objectContaining({
-      phaseOverrides: { Plan: { model: "claude-haiku-4-5", effort: "low" } },
+      phaseOverrides: { Plan: { model: "haiku", effort: "low" } },
     })));
   });
 });

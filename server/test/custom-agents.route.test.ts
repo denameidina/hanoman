@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { capabilityForRoute } from "../src/services/agent-capabilities";
-import { customAgentId } from "@hanoman/shared";
+import { CODEX_MODELS, MODELS, customAgentId, replaceModelCatalog } from "@hanoman/shared";
 import { agentDefsFor, refreshCustomAgentRuntimeSupport } from "../src/services/custom-agents";
 import { seedBuiltinAgents } from "../src/services/builtin-agents";
 
@@ -319,7 +319,7 @@ describe("GET /api/custom-agents/catalog", () => {
     const b = r.json();
     expect(b.tools[0].id).toBe("*");
     expect(b.tools.map((t: { id: string }) => t.id)).toContain("Read");
-    expect(b.models.map((m: { id: string }) => m.id)).toContain("claude-opus-5");
+    expect(b.models.map((m: { id: string }) => m.id)).toContain("opus");
     expect(b.models.map((m: { id: string }) => m.id)).toContain("gpt-5.6-sol");
     expect(b.runtimes.map((x: { id: string }) => x.id)).toEqual(["claude", "codex"]);
   });
@@ -367,8 +367,22 @@ describe("validasi keras katalog (ADR-0101 keputusan 5)", () => {
     expect(r.json().runtime).toBe("codex");
   });
 
+  // Katalog kini ber-alias native. Agen yang menyimpan id terpatok yang DITUNJUK alias tetap sah
+  // (subagent menerima keduanya); `default` hanya sah untuk `--model` sesi, bukan subagent.
+  it("runtime claude menerima id terpatok yang ditunjuk alias, menolak `default`", async () => {
+    const before = MODELS;
+    replaceModelCatalog([{ id: "default", label: "Default", resolved: "claude-opus-5-5" },
+      { id: "sonnet", label: "Sonnet 5", resolved: "claude-sonnet-5" }], CODEX_MODELS);
+    try {
+      const pinned = await post({ name: "aa", description: "d", instructions: "i", runtime: "claude", model: "claude-sonnet-5" });
+      expect(pinned.statusCode).toBe(201);
+      const dflt = await post({ name: "bb", description: "d", instructions: "i", runtime: "claude", model: "default" });
+      expect(dflt.statusCode).toBe(400);
+    } finally { replaceModelCatalog(before, CODEX_MODELS); }
+  });
+
   it("runtime null (warisi) menerima model kedua katalog", async () => {
-    expect((await post({ name: "aa", description: "d", instructions: "i", model: "claude-opus-5" })).statusCode).toBe(201);
+    expect((await post({ name: "aa", description: "d", instructions: "i", model: "opus" })).statusCode).toBe(201);
     expect((await post({ name: "bb", description: "d", instructions: "i", model: "gpt-5.6-sol" })).statusCode).toBe(201);
   });
 

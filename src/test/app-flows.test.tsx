@@ -34,7 +34,7 @@ vi.mock("../src/api/client", () => ({
       docStatus: "ok", coverage: 94, createdAt: "", backlog: 2, topStage: "execute",
       session: { status: "running", phase: "Execute", flow: "feature" }, activity: "x", commit: "y" }], total: 1, page: 1, pageSize: 20 })),
     listSpecs, listTerminals,
-    getSettings: vi.fn(async () => ({ model: "claude-opus-5", effort: "xhigh", agent: "claude",
+    getSettings: vi.fn(async () => ({ model: "opus", effort: "xhigh", agent: "claude",
       codex: { model: "gpt-5.6-sol", effort: "xhigh" }, goal: { enabled: false, condition: "" } })),
     getCodexVersion: vi.fn(async () => ({ version: null, minRequired: "0.144.0", ok: true })),
     // SPEC-739 · picker Start menurunkan kesiapan metode saat modal terbuka; mock `api`
@@ -136,12 +136,12 @@ describe("app flows", () => {
 
     expect(await screen.findByLabelText("Agen")).toBeInTheDocument();
     const phaseModel = await screen.findByLabelText("Model subagent Audit");
-    fireEvent.change(phaseModel, { target: { value: "claude-haiku-4-5" } });
+    fireEvent.change(phaseModel, { target: { value: "haiku" } });
     fireEvent.change(screen.getByLabelText("Effort subagent Audit"), { target: { value: "low" } });
     fireEvent.click(screen.getByRole("button", { name: "Mulai" }));
 
     await waitFor(() => expect(api.startSession).toHaveBeenCalledWith(expect.objectContaining({
-      spec: "SPEC-341", flow: "qa", phaseOverrides: { Audit: { model: "claude-haiku-4-5", effort: "low" } },
+      spec: "SPEC-341", flow: "qa", phaseOverrides: { Audit: { model: "haiku", effort: "low" } },
     })));
     expect(await screen.findByTestId("pane-terminal-spec-341")).toBeInTheDocument();
   });

@@ -17,11 +17,11 @@ import { api } from "../src/api/client";
 
 const me: any = { id: "u1", email: "dena@nafanesia.id", createdAt: "x" };
 const settings = (over: object = {}) => ({
-  model: "claude-opus-5", effort: "xhigh", autoDefault: true, autoScaffold: true, notifyFail: true,
+  model: "opus", effort: "xhigh", autoDefault: true, autoScaffold: true, notifyFail: true,
   notifyDone: true, notifySound: "short", notifyDecision: true, notifyDecisionSound: "alert",
   agentAccessEnabled: false, scheduler: {}, goal: { enabled: false, condition: "" },
   agent: "claude", codex: { model: "gpt-5.6-sol", effort: "xhigh" }, verifyScope: "changed",
-  conflict: { enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh" }, ...over,
+  conflict: { enabled: false, agent: "claude", model: "opus", effort: "xhigh" }, ...over,
 });
 
 beforeEach(() => {
@@ -66,13 +66,13 @@ describe("SPEC-383 · kartu default sesi konflik", () => {
 
   it("hidup → picker muncul; ganti model → PUT", async () => {
     vi.mocked(api.getSettings).mockResolvedValue(settings({
-      conflict: { enabled: true, agent: "claude", model: "claude-opus-5", effort: "xhigh" } }) as any);
+      conflict: { enabled: true, agent: "claude", model: "opus", effort: "xhigh" } }) as any);
     openModel();
     const sel = await screen.findByLabelText("Model konflik");
-    fireEvent.change(sel, { target: { value: "claude-haiku-4-5" } });
+    fireEvent.change(sel, { target: { value: "haiku" } });
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(
       expect.objectContaining({ conflict: {
-        enabled: true, agent: "claude", model: "claude-haiku-4-5", effort: "xhigh" } })));
+        enabled: true, agent: "claude", model: "haiku", effort: "xhigh" } })));
   });
 
   // Mengganti agen HARUS menukar model+effort sekalian — kalau tidak sesi lahir `codex -m
@@ -80,7 +80,7 @@ describe("SPEC-383 · kartu default sesi konflik", () => {
   it("ganti agen konflik ke codex → model & effort ikut pindah ke katalog codex", async () => {
     vi.mocked(api.getSettings).mockResolvedValue(settings({
       codex: { model: "gpt-5.6-terra", effort: "high" },
-      conflict: { enabled: true, agent: "claude", model: "claude-opus-5", effort: "xhigh" } }) as any);
+      conflict: { enabled: true, agent: "claude", model: "opus", effort: "xhigh" } }) as any);
     openModel();
     const sel = await screen.findByLabelText("Agen konflik");
     fireEvent.change(sel, { target: { value: "codex" } });

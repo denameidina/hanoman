@@ -38,7 +38,7 @@ describe("SPEC-237 · source audit", () => {
 describe("SPEC-162 · kontrak sesi interaktif", () => {
   it("zSetting memberi model + effort default", () => {
     const s = zSetting.parse({ autoDefault: true, autoScaffold: true, notifyFail: true });
-    expect(s.model).toBe("claude-sonnet-5");
+    expect(s.model).toBe("sonnet");
     expect(s.effort).toBe("medium");
   });
 

@@ -32,7 +32,7 @@ describe("mcpToolEntry", () => {
 describe("modelsForRuntime", () => {
   it("claude → hanya MODELS", () => {
     const m = modelsForRuntime("claude");
-    expect(m.map((x) => x.id)).toContain("claude-opus-5");
+    expect(m.map((x) => x.id)).toContain("opus");
     expect(m.every((x) => x.runtime === "claude")).toBe(true);
   });
   it("codex → hanya CODEX_MODELS", () => {
@@ -42,7 +42,7 @@ describe("modelsForRuntime", () => {
   });
   it("null (warisi) → GABUNGAN keduanya", () => {
     const ids = modelsForRuntime(null).map((x) => x.id);
-    expect(ids).toContain("claude-opus-5");
+    expect(ids).toContain("opus");
     expect(ids).toContain("gpt-5.6-sol");
   });
 });

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 // Naikkan versi ini setiap kali rekomendasi bawaan berubah. Seed server memakai versi ini
 // bersama marker per bagian untuk memperbarui konfigurasi bawaan tanpa menimpa edit operator.
-export const RUNTIME_DEFAULTS_VERSION = "2026-09-17-v1";
+export const RUNTIME_DEFAULTS_VERSION = "2026-09-23-v1";
 
 export const zRuntimeDefaultState = z.enum(["seeded", "user"]);
 export type RuntimeDefaultState = z.infer<typeof zRuntimeDefaultState>;
@@ -22,8 +22,9 @@ export const zBuiltinRuntimeDefaults = z.object({
 });
 export type BuiltinRuntimeDefaults = z.infer<typeof zBuiltinRuntimeDefaults>;
 
+// Alias native CLI, bukan id terpatok: ikut berpindah saat CLI merilis model baru.
 export const BUILTIN_CLAUDE_RUNTIME_DEFAULTS = {
-  model: "claude-sonnet-5",
+  model: "sonnet",
   effort: "medium",
 } as const;
 
@@ -68,11 +69,11 @@ const flow = (
 export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefault> = {
   feature: flow(
     {
-      Brainstorm: cell("claude-sonnet-5", "medium"),
-      Objective: cell("claude-sonnet-5", "medium"),
-      Spec: cell("claude-opus-5", "medium"),
-      Plan: cell("claude-sonnet-5", "medium"),
-      Execute: cell("claude-sonnet-5", "medium"),
+      Brainstorm: cell("sonnet", "medium"),
+      Objective: cell("sonnet", "medium"),
+      Spec: cell("opus", "medium"),
+      Plan: cell("sonnet", "medium"),
+      Execute: cell("sonnet", "medium"),
     },
     {
       Brainstorm: cell("gpt-5.6-terra", "medium"),
@@ -84,10 +85,10 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
   ),
   qa: flow(
     {
-      Audit: cell("claude-sonnet-5", "medium"),
-      Spec: cell("claude-opus-5", "medium"),
-      Plan: cell("claude-sonnet-5", "medium"),
-      Execute: cell("claude-sonnet-5", "medium"),
+      Audit: cell("sonnet", "medium"),
+      Spec: cell("opus", "medium"),
+      Plan: cell("sonnet", "medium"),
+      Execute: cell("sonnet", "medium"),
     },
     {
       Audit: cell("gpt-5.6-terra", "medium"),
@@ -98,9 +99,9 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
   ),
   scaffold: flow(
     {
-      Brainstorm: cell("claude-sonnet-5", "medium"),
-      Objective: cell("claude-sonnet-5", "medium"),
-      "Doc index": cell("claude-opus-5", "medium"),
+      Brainstorm: cell("sonnet", "medium"),
+      Objective: cell("sonnet", "medium"),
+      "Doc index": cell("opus", "medium"),
     },
     {
       Brainstorm: cell("gpt-5.6-terra", "medium"),
@@ -110,11 +111,11 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
   ),
   reverse: flow(
     {
-      Scan: cell("claude-sonnet-5", "medium"),
-      "Docs teknis": cell("claude-sonnet-5", "medium"),
-      Wawancara: cell("claude-sonnet-5", "medium"),
-      "Konvensi & index": cell("claude-sonnet-5", "medium"),
-      "Serah terima": cell("claude-sonnet-5", "medium"),
+      Scan: cell("sonnet", "medium"),
+      "Docs teknis": cell("sonnet", "medium"),
+      Wawancara: cell("sonnet", "medium"),
+      "Konvensi & index": cell("sonnet", "medium"),
+      "Serah terima": cell("sonnet", "medium"),
     },
     {
       Scan: cell("gpt-5.6-terra", "medium"),
@@ -126,8 +127,8 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
   ),
   prd: flow(
     {
-      Brainstorm: cell("claude-sonnet-5", "medium"),
-      PRD: cell("claude-opus-5", "medium"),
+      Brainstorm: cell("sonnet", "medium"),
+      PRD: cell("opus", "medium"),
     },
     {
       Brainstorm: cell("gpt-5.6-terra", "medium"),
@@ -136,8 +137,8 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
   ),
   audit: flow(
     {
-      Audit: cell("claude-sonnet-5", "medium"),
-      Laporan: cell("claude-sonnet-5", "medium"),
+      Audit: cell("sonnet", "medium"),
+      Laporan: cell("sonnet", "medium"),
     },
     {
       Audit: cell("gpt-5.6-terra", "medium"),
@@ -146,8 +147,8 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
   ),
   breakdown: flow(
     {
-      Analisis: cell("claude-opus-5", "medium"),
-      Breakdown: cell("claude-opus-5", "medium"),
+      Analisis: cell("opus", "medium"),
+      Breakdown: cell("opus", "medium"),
     },
     {
       Analisis: cell("gpt-5.6-sol", "medium"),
@@ -156,8 +157,8 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
   ),
   goal: flow(
     {
-      Goal: cell("claude-sonnet-5", "medium"),
-      Verifikasi: cell("claude-sonnet-5", "medium"),
+      Goal: cell("sonnet", "medium"),
+      Verifikasi: cell("sonnet", "medium"),
     },
     {
       Goal: cell("gpt-5.6-terra", "medium"),
@@ -165,7 +166,7 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
     },
   ),
   no_effort: flow(
-    { Kerjakan: cell("claude-haiku-4-5", "low") },
+    { Kerjakan: cell("haiku", "low") },
     { Kerjakan: cell("gpt-5.6-terra", "low") },
     false,
   ),

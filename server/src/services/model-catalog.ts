@@ -15,9 +15,6 @@ type CatalogDeps = {
   now: () => number;
   install?: (catalog: ModelCatalog) => void;
 };
-const merge = <T extends { id: string }>(old: readonly T[], fresh: readonly T[]): T[] =>
-  [...new Map([...old, ...fresh].map((m) => [m.id, m])).values()];
-
 export function createModelCatalogService(deps: CatalogDeps) {
   let state = bundledModelCatalog();
   let initialized = false;
@@ -41,9 +38,14 @@ export function createModelCatalogService(deps: CatalogDeps) {
         try {
           const models = await deps.probe(agent);
           if (!models.length) throw new Error("empty catalog");
+          // CLI yang terpasang adalah sumber RESMI begitu ia berhasil menjawab — bukan digabung
+          // selamanya dengan katalog bawaan statis. Katalog bawaan hanya dipakai sebelum probe
+          // pertama sukses atau saat probe gagal (lihat cabang catch di bawah); union permanen
+          // membuat id lama yang sudah diganti CLI (mis. model dipensiunkan/direname) tak pernah
+          // hilang dari picker walau CLI tak menyebutnya lagi.
           state = agent === "claude"
-            ? { ...state, claude: merge(bundledModelCatalog().claude, models as readonly ClaudeModel[]) }
-            : { ...state, codex: merge(bundledModelCatalog().codex, models as readonly CodexModel[]) };
+            ? { ...state, claude: models as readonly ClaudeModel[] }
+            : { ...state, codex: models as readonly CodexModel[] };
           state = { ...state, providers: { ...state.providers, [agent]: {
             source: "cli", checkedAt, updatedAt: checkedAt, error: null,
           } } };

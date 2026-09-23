@@ -3,7 +3,7 @@ import { coerceClaudeEffort } from "@hanoman/shared";
 import { Modal, Button, Select, Field } from "../ds";
 import { api } from "../api/client";
 import { codexClientTooOld, codexModel, coerceCodexEffort, CODEX_DEFAULTS, type Agent } from "@hanoman/shared";
-import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./session-runtime";
+import { runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./session-runtime";
 
 /**
  * SPEC-517 · form "Sesi baru" di halaman Terminal. Sampai sekarang tombol itu men-spawn agen
@@ -18,10 +18,10 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
   onClose: () => void; onCreated: (id: string) => void;
 }) {
   const [agent, setAgent] = React.useState<Agent>("claude");
-  const [model, setModel] = React.useState("claude-opus-5");
-  const [effort, setEffort] = React.useState("xhigh");
+  const [model, setModel] = React.useState("sonnet");
+  const [effort, setEffort] = React.useState("medium");
   const [defs, setDefs] = React.useState<RuntimeDefs>({
-    claude: { model: "claude-sonnet-5", effort: "medium" },
+    claude: { model: "sonnet", effort: "medium" },
     codex: { ...CODEX_DEFAULTS },
   });
   const [busy, setBusy] = React.useState(false);
@@ -84,7 +84,7 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
       </Field>
       <Field label="Model">
         <Select aria-label="Model" value={model} style={{ width: "100%" }}
-          options={runtimeModels(agent).map((m) => ({ value: m.id, label: m.label }))}
+          options={runtimeModelOptions(agent, model)}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickModel(e.target.value)} />
       </Field>
       <Field label="Effort">

@@ -103,7 +103,7 @@ beforeEach(() => {
     revision: input.baseRevision + 1,
     updatedAt: "2026-08-15T00:00:00.000Z",
   }));
-  getSettings.mockResolvedValue({ model: "claude-opus-5", effort: "xhigh", agent: "claude",
+  getSettings.mockResolvedValue({ model: "opus", effort: "xhigh", agent: "claude",
     codex: { model: "gpt-5.6-sol", effort: "xhigh" } });
   getCodexVersion.mockResolvedValue({ version: "0.145.0", minRequired: "0.144.0", ok: true });
 });
@@ -1081,9 +1081,9 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     ] }));
     listTerminals.mockResolvedValue([
       { id: "aaaa1111", projectId: "p1", specId: "SPEC-1", cwd: "/repo", exited: false,
-        orchestrated: true, model: "claude-opus-5", effort: "high" },
+        orchestrated: true, model: "opus", effort: "high" },
     ]);
     render(<TerminalScreen projects={projects} onOpenReview={() => {}} />);
-    expect(await screen.findByTestId("orchestrator-chip")).toHaveTextContent("orch Opus 5 · high");
+    expect(await screen.findByTestId("orchestrator-chip")).toHaveTextContent("orch Opus · high");
   });
 });

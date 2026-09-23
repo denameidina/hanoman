@@ -3,7 +3,7 @@ import {
   FLOW_PHASES, ORCHESTRATION_FLOWS, PHASE_AGENT_PREFIX, isPhaseAgentName, phaseAgentName,
 } from "./orchestration";
 import { codexNativeAgentsSupported, resolvePhasePlan } from "./orchestration-plan";
-import { ORCHESTRATION_DEFAULTS, zOrchestration, zSetting } from "./entities";
+import { CODEX_MODELS, MODELS, ORCHESTRATION_DEFAULTS, replaceModelCatalog, zOrchestration, zSetting } from "./entities";
 import { BUILTIN_ORCHESTRATION_DEFAULTS } from "./runtime-defaults";
 import { AGENT_NAME_RE } from "./custom-agent";
 
@@ -39,9 +39,9 @@ describe("phaseAgentName", () => {
 describe("Setting.orchestration", () => {
 	it("default bawaan memuat rekomendasi model/effort per flow dan fase", () => {
 		expect(Object.keys(ORCHESTRATION_DEFAULTS).sort()).toEqual([...ORCHESTRATION_FLOWS].sort());
-		expect(ORCHESTRATION_DEFAULTS.feature.claude.Spec).toEqual({ model: "claude-opus-5", effort: "medium" });
+		expect(ORCHESTRATION_DEFAULTS.feature.claude.Spec).toEqual({ model: "opus", effort: "medium" });
 		expect(ORCHESTRATION_DEFAULTS.feature.codex.Spec).toEqual({ model: "gpt-5.6-sol", effort: "medium" });
-		expect(ORCHESTRATION_DEFAULTS.feature.claude.Execute).toEqual({ model: "claude-sonnet-5", effort: "medium" });
+		expect(ORCHESTRATION_DEFAULTS.feature.claude.Execute).toEqual({ model: "sonnet", effort: "medium" });
 		expect(ORCHESTRATION_DEFAULTS.no_effort.enabled).toBe(false);
 		expect(ORCHESTRATION_DEFAULTS).toEqual(BUILTIN_ORCHESTRATION_DEFAULTS);
 	});
@@ -96,10 +96,16 @@ describe("resolvePhasePlan", () => {
 		});
 	});
   it("model sel dipakai; effort warisan dikoersi ke model hasil resolusi (claude)", () => {
-    const orchestration = { ...ORCHESTRATION_DEFAULTS,
-      feature: { enabled: true, claude: { Plan: { model: "claude-fable-5-1", effort: null } }, codex: {} } };
-    const plan = resolvePhasePlan({ ...base, orchestration, orchestrator: { model: "claude-opus-5", effort: "ultracode" } })!;
-    expect(plan.phases.find((p) => p.phase === "Plan")).toMatchObject({ model: "claude-fable-5-1", effort: "xhigh" });
+    // Daftar effort per model datang dari discovery CLI, bukan dari fallback offline.
+    const before = MODELS;
+    replaceModelCatalog([...before.filter((m) => m.id !== "fable"), { id: "fable", label: "Fable 5.1", resolved: "claude-fable-5-1",
+      efforts: ["max", "xhigh", "high", "medium", "low"] }], CODEX_MODELS);
+    try {
+      const orchestration = { ...ORCHESTRATION_DEFAULTS,
+        feature: { enabled: true, claude: { Plan: { model: "fable", effort: null } }, codex: {} } };
+      const plan = resolvePhasePlan({ ...base, orchestration, orchestrator: { model: "opus", effort: "ultracode" } })!;
+      expect(plan.phases.find((p) => p.phase === "Plan")).toMatchObject({ model: "fable", effort: "xhigh" });
+    } finally { replaceModelCatalog(before, CODEX_MODELS); }
   });
   it("codex membaca kolom codex dan mengoreksi effort ke fallback model", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS, qa: { enabled: true,

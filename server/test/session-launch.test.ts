@@ -334,7 +334,7 @@ describe("session-launch", () => {
     const r = await startSpecSession(spec, { flow: "feature", agent: "claude" });
     const argv = await argvOf(r.id);
     expect(argv).toContain("--dangerously-skip-permissions");
-    expect(argv).toContain("--model claude-sonnet-5");   // kembali ke blok model claude
+    expect(argv).toContain("--model sonnet");   // kembali ke blok model claude
     killSession(r.id);
   });
 

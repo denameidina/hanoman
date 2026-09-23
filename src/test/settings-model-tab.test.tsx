@@ -21,11 +21,11 @@ import { api } from "../src/api/client";
 
 const me: any = { id: "u1", email: "dena@nafanesia.id", createdAt: "x" };
 const settings = (over: object = {}) => ({
-  model: "claude-opus-5", effort: "xhigh", autoDefault: true, autoScaffold: true, notifyFail: true,
+  model: "opus", effort: "xhigh", autoDefault: true, autoScaffold: true, notifyFail: true,
   notifyDone: true, notifySound: "short", notifyDecision: true, notifyDecisionSound: "alert",
   agentAccessEnabled: false, scheduler: {}, goal: { enabled: false, condition: "" },
   agent: "claude", codex: { model: "gpt-5.6-sol", effort: "xhigh" }, verifyScope: "changed",
-  conflict: { enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh" }, ...over,
+  conflict: { enabled: false, agent: "claude", model: "opus", effort: "xhigh" }, ...over,
 });
 
 beforeEach(() => {
@@ -51,11 +51,20 @@ describe("SPEC-383 · tab Model sesi bersumbu agen", () => {
     next.claude = [...next.claude, { id: "claude-future", label: "Future", efforts: ["high", "low"] }];
     act(() => installModelCatalog(next));
     expect(select.querySelector('option[value="claude-future"]')).toBeTruthy();
-    expect(select).toHaveValue("claude-opus-5");
+    expect(select).toHaveValue("opus");
     expect(api.putSettings).not.toHaveBeenCalled();
     fireEvent.change(select, { target: { value: "claude-future" } });
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(
       expect.objectContaining({ model: "claude-future", effort: "high" })));
+  });
+  // Setelan lama berisi id terpatok yang tak lagi ada di katalog alias tak boleh membuat picker
+  // tampil kosong: nilainya tetap jadi opsi pertama dan tetap terpilih.
+  it("model tersimpan di luar katalog tetap terlihat dan terpilih", async () => {
+    vi.mocked(api.getSettings).mockResolvedValue(settings({ model: "claude-opus-4-9-lama" }) as any);
+    openModel();
+    const select = await screen.findByLabelText("Model claude");
+    await waitFor(() => expect(select).toHaveValue("claude-opus-4-9-lama"));
+    expect((select.querySelector("option") as HTMLOptionElement).value).toBe("claude-opus-4-9-lama");
   });
   // Nama agen di dalam `<option>` picker "Agen default" TIDAK dihitung — itu sudah ada sebelum
   // SPEC-383 dan bukan yang menamai bloknya. Yang dituntut: grup ber-judul, memuat picker-nya.

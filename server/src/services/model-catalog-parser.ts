@@ -14,21 +14,30 @@ const claudeRow = z.object({
   description: z.string().max(2000).optional(),
   supportedEffortLevels: efforts.optional(),
 });
+/**
+ * Id yang disimpan adalah ALIAS native CLI (`default`, `sonnet`, `opus[1m]`, `haiku`), bukan id
+ * terpatok: alias ikut berpindah saat CLI merilis model baru, jadi setelan tak basi. `default`
+ * (rekomendasi CLI) selalu di urutan pertama. Selain itu satu baris per `resolvedModel` — baris
+ * alias menang atas baris id-terpatok bila keduanya menunjuk model yang sama.
+ */
 export function parseClaudeModels(raw: unknown): ClaudeModel[] {
   const rows = z.array(claudeRow).min(1).max(500).parse(raw);
+  let preferred: ClaudeModel | null = null;
   const models = new Map<string, ClaudeModel>();
   for (const row of rows) {
+    const resolved = row.resolvedModel ?? row.value;
+    const head = row.description?.split(" · ")[0];
     const model: ClaudeModel = {
-      id: row.resolvedModel ?? row.value,
-      label: row.description?.split(" · ")[0] || row.displayName,
+      id: row.value,
+      label: row.value === "default" && head ? `${row.displayName} · ${head}` : head || row.displayName,
+      resolved,
       ...(row.supportedEffortLevels ? { efforts: sorted(row.supportedEffortLevels) } : {}),
     };
-    if (!models.has(model.id)) models.set(model.id, model);
-    if (row.value !== model.id && row.value !== "default") {
-      models.set(row.value, { ...model, id: row.value, label: row.displayName });
-    }
+    if (row.value === "default") { preferred ??= model; continue; }
+    const existing = models.get(resolved);
+    if (!existing || (existing.id === resolved && row.value !== resolved)) models.set(resolved, model);
   }
-  return [...models.values()];
+  return preferred ? [preferred, ...models.values()] : [...models.values()];
 }
 
 const codexRow = z.object({
@@ -57,7 +66,8 @@ export function parseCachedCatalog(raw: unknown): ModelCatalog {
     updatedAt: z.string().nullable(), error: z.string().nullable(),
   });
   return z.object({
-    claude: z.array(z.object({ id, label, efforts: efforts.optional() })).min(1).max(1000),
+    claude: z.array(z.object({ id, label, resolved: id.optional(), efforts: efforts.optional() }))
+      .min(1).max(1000),
     codex: z.array(z.object({ id, label, efforts: efforts.min(1), fallback: id, minClient: z.string() }))
       .min(1).max(1000),
     providers: z.object({ claude: status, codex: status }),

@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { runtimeModels, runtimeEfforts, runtimeFor } from "../src/screens/session-runtime";
+import { runtimeModels, runtimeModelOptions, runtimeSubagentModels, runtimeEfforts, runtimeFor } from "../src/screens/session-runtime";
 
 // SPEC-517 · satu definisi untuk dua picker (Start backlog & Sesi baru terminal). "Satu definisi,
 // N call site" adalah kelas bug yang sudah dibayar hanoman di SPEC-431/448/475/481.
 describe("session-runtime", () => {
   it("katalog model mengikuti agen", () => {
-    expect(runtimeModels("claude").map((m) => m.id)).toContain("claude-opus-5");
+    expect(runtimeModels("claude").map((m) => m.id)).toContain("opus");
     expect(runtimeModels("codex").map((m) => m.id)).toContain("gpt-5.6-luna");
-    expect(runtimeModels("codex").map((m) => m.id)).not.toContain("claude-opus-5");
+    expect(runtimeModels("codex").map((m) => m.id)).not.toContain("opus");
   });
 
   it("effort claude tak bergantung model", () => {
@@ -36,5 +36,26 @@ describe("session-runtime", () => {
       codex: { model: "gpt-5.6-luna", effort: "ultra" },
     };
     expect(runtimeFor(defs, "codex")).toEqual({ model: "gpt-5.6-luna", effort: "xhigh" });
+  });
+
+  // Model tersimpan yang sudah tak ada di katalog (pensiun di CLI) tak boleh membuat picker
+  // "Mulai sesi"/"Sesi baru" tampil kosong — ia tetap harus jadi opsi.
+  it("runtimeModelOptions menambahkan model tersimpan yang sudah tak ada di katalog", () => {
+    const options = runtimeModelOptions("claude", "claude-retired-xyz");
+    expect(options[0]).toEqual({ value: "claude-retired-xyz", label: "claude-retired-xyz" });
+    expect(options.map((o) => o.value)).toEqual(
+      ["claude-retired-xyz", ...runtimeModels("claude").map((m) => m.id)]);
+  });
+
+  it("runtimeModelOptions tak menduplikasi model yang memang ada di katalog", () => {
+    const options = runtimeModelOptions("claude", "opus");
+    expect(options.map((o) => o.value)).toEqual(runtimeModels("claude").map((m) => m.id));
+  });
+
+  // `default` adalah alias --model sesi; subagent fase hanya menerima alias keluarga/id penuh.
+  it("alias `default` ada di picker sesi, tidak di picker subagent fase", () => {
+    expect(runtimeModels("claude")[0]!.id).toBe("default");
+    expect(runtimeSubagentModels("claude").map((m) => m.id)).not.toContain("default");
+    expect(runtimeSubagentModels("codex")).toEqual(runtimeModels("codex"));
   });
 });

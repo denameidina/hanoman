@@ -137,9 +137,9 @@ describe("SPEC-492 · command runtime dicegat sebelum menyentuh pane", () => {
   it("/model menulis engine dan membalas apa yang berubah", async () => {
     const port = fakePort();
     const written: AgentEngine[] = [];
-    await coordinator(port, { written }).dispatch(msg({ kind: "command", text: "/model claude-haiku-4-5" }));
-    expect(written).toEqual([{ enabled: true, agent: "claude", model: "claude-haiku-4-5", effort: "xhigh" }]);
-    expect((await outbox("42"))[0]!.text).toContain("claude-haiku-4-5");
+    await coordinator(port, { written }).dispatch(msg({ kind: "command", text: "/model haiku" }));
+    expect(written).toEqual([{ enabled: true, agent: "claude", model: "haiku", effort: "xhigh" }]);
+    expect((await outbox("42"))[0]!.text).toContain("haiku");
     expect(port.born).toEqual([]);
   });
 
@@ -147,7 +147,7 @@ describe("SPEC-492 · command runtime dicegat sebelum menyentuh pane", () => {
     const written: AgentEngine[] = [];
     await coordinator(fakePort(), { written }).dispatch(msg({ kind: "command", text: "/model tidak-ada" }));
     expect(written).toEqual([]);
-    expect((await outbox("42"))[0]!.text).toContain("claude-opus-5");
+    expect((await outbox("42"))[0]!.text).toContain("opus");
   });
 
   it("/engine restart menutup pane hidup dan melepas binding sesi", async () => {

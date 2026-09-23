@@ -22,7 +22,7 @@ describe("SPEC-492 · resolver agen operator Telegram", () => {
   });
 
   it("DB tanpa baris Setting sama sekali tetap menjawab default global", async () => {
-    expect(await telegramAgentDefaults()).toEqual({ agent: "claude", model: "claude-sonnet-5", effort: "medium" });
+    expect(await telegramAgentDefaults()).toEqual({ agent: "claude", model: "sonnet", effort: "medium" });
   });
 
   it("engine hidup → nilai engine, bukan default global", async () => {

@@ -49,7 +49,7 @@ const catalog = {
     { id: "mcp__context7__*", label: "context7 — semua tool", group: "mcp" },
   ],
   models: [
-    { id: "claude-opus-5", label: "Opus 5", runtime: "claude" },
+    { id: "opus", label: "Opus 5", runtime: "claude" },
     { id: "gpt-5.6-sol", label: "GPT-5.6 Sol", runtime: "codex" },
   ],
   runtimes: [{ id: "claude", label: "Claude Code" }, { id: "codex", label: "Codex CLI" }],
@@ -224,7 +224,7 @@ describe("CustomAgentsPanel · kontrol pilihan (SPEC-484)", () => {
     expect([...model().options].map((o) => o.value)).toContain("gpt-5.6-sol");
     fireEvent.change(screen.getByLabelText("Runtime agent"), { target: { value: "claude" } });
     expect([...model().options].map((o) => o.value)).not.toContain("gpt-5.6-sol");
-    expect([...model().options].map((o) => o.value)).toContain("claude-opus-5");
+    expect([...model().options].map((o) => o.value)).toContain("opus");
   });
 
   it("menukar runtime yang membuat model terpilih tak sah akan MENGOSONGKAN model", async () => {

@@ -23,7 +23,7 @@ describe("settings", () => {
   it("baris pra-SPEC-162 diberi model + effort, dan kunci matinya dibuang", async () => {
     await prisma.setting.create({ data: { id: 1, data: BARIS_LAMA } });
     const s = await getSetting();
-    expect(s.model).toBe("claude-sonnet-5");
+    expect(s.model).toBe("sonnet");
     expect(s.effort).toBe("medium");
     expect(s).not.toHaveProperty("steps");
     expect(s).not.toHaveProperty("maxConcurrent");
@@ -83,7 +83,7 @@ describe("settings", () => {
   });
 
   it("sessionAgentDefaults default = claude memakai model/effort claude", async () => {
-    expect(await sessionAgentDefaults()).toEqual({ agent: "claude", model: "claude-sonnet-5", effort: "medium" });
+    expect(await sessionAgentDefaults()).toEqual({ agent: "claude", model: "sonnet", effort: "medium" });
   });
 
   it("baris Setting lama (tanpa agent/codex) tetap claude — tanpa migration", async () => {

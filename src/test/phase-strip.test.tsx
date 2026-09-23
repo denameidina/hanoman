@@ -5,7 +5,7 @@ import { formatDuration, chipTone } from "../src/screens/phase-chip";
 import type { Phase } from "../src/api/client";
 
 const agent = (o: Partial<NonNullable<Phase["agent"]>> = {}): NonNullable<Phase["agent"]> => ({
-  name: "hanoman-fase-spec", model: "claude-opus-5", effort: "high", status: "completed",
+  name: "hanoman-fase-spec", model: "opus", effort: "high", status: "completed",
   startedAt: "2026-09-14T00:00:00.000Z", durationMs: 72_000, attempts: 1, evidence: "ok",
   inputTokens: 1_200, outputTokens: 300, cachedTokens: 5_000, resultExcerpt: "Status: selesai", ...o,
 });
@@ -26,7 +26,7 @@ describe("PhaseStrip · chip agen fase (ADR-0164)", () => {
     render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent() }]} />);
     const chip = screen.getByRole("button", { name: "Detail fase Spec" });
     expect(chip).toHaveTextContent("Spec");
-    expect(chip).toHaveTextContent("Opus 5");
+    expect(chip).toHaveTextContent("Opus");
     expect(chip).toHaveTextContent("high");
     expect(chip).toHaveTextContent("1m12s");
     expect(screen.getByText("Spec")).toHaveAttribute("data-state", "done");
@@ -47,10 +47,10 @@ describe("PhaseStrip · chip agen fase (ADR-0164)", () => {
   it("mode ringkas: hanya fase aktif yang menampilkan model", () => {
     render(<PhaseStrip compact phases={[
       { name: "Spec", state: "done", agent: agent() },
-      { name: "Plan", state: "active", agent: agent({ model: "claude-sonnet-5", status: "running" }) },
+      { name: "Plan", state: "active", agent: agent({ model: "sonnet", status: "running" }) },
     ]} />);
-    expect(screen.getByRole("button", { name: "Detail fase Spec" })).not.toHaveTextContent("Opus 5");
-    expect(screen.getByRole("button", { name: "Detail fase Plan" })).toHaveTextContent("Sonnet 5");
+    expect(screen.getByRole("button", { name: "Detail fase Spec" })).not.toHaveTextContent("Opus");
+    expect(screen.getByRole("button", { name: "Detail fase Plan" })).toHaveTextContent("Sonnet");
   });
   it("klik chip membuka detail: token terpisah & cuplikan hasil", () => {
     render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent() }]} />);

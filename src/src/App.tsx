@@ -22,7 +22,7 @@ import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, co
 import { startTargets, type StartTarget, type TargetReason } from "./api/start-targets";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
-import { runtimeModels, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
+import { runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
 import { useLaunchAdmission } from "./screens/use-launch-admission";
 import { AttachmentPicker } from "./screens/SpecAttachments";
 import { PhasePlanPreview } from "./screens/PhasePlanPreview";
@@ -108,14 +108,14 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // menyampaikannya (toast di App), modal ini tak menebak-nebak.
   { open: boolean; spec: SpecSlim | null; onClose: () => void;
     onStarted: (id: string, resumed?: boolean) => void; onError?: (e: unknown) => void }) {
-  const [model, setModel] = React.useState("claude-sonnet-5");
+  const [model, setModel] = React.useState("sonnet");
   const [effort, setEffort] = React.useState("medium");
   // SPEC-338 · ADR-0074 · agen sesi. Model/effort dipilih dari katalog agen terpilih — mengganti
   // agen HARUS menukar keduanya, kalau tidak sesi lahir dengan `codex -m claude-sonnet-5`.
   const [agent, setAgent] = React.useState<Agent>("claude");
   // Default per agen dari setelan global, dipakai saat picker agen berpindah.
   const [defs, setDefs] = React.useState<RuntimeDefs>({
-    claude: { model: "claude-sonnet-5", effort: "medium" },
+    claude: { model: "sonnet", effort: "medium" },
     codex: { ...CODEX_DEFAULTS },
   });
   // Override per fase adalah keputusan sesi saat ini, bukan perubahan Settings global.
@@ -234,7 +234,6 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     setModel(id);
     setEffort((e) => agent === "codex" ? coerceCodexEffort(id, e) : coerceClaudeEffort(id, e));
   };
-  const models = runtimeModels(agent);
   // SPEC-339 · effort adalah properti MODEL untuk codex — daftarnya menyempit mengikuti pilihan.
   const efforts = runtimeEfforts(agent, model);
   if (!spec) return null;
@@ -342,7 +341,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       </Field>
       <Field label="Model">
         <Select aria-label="Model" value={model} style={{ width: "100%" }}
-          options={models.map((m) => ({ value: m.id, label: m.label }))}
+          options={runtimeModelOptions(agent, model)}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickModel(e.target.value)} />
       </Field>
       <Field label="Effort">

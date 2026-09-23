@@ -6,7 +6,7 @@ import { zConflict, CONFLICT_DEFAULTS, zSetting } from "./entities";
 describe("SPEC-383 · zConflict", () => {
   it("default = mati, agen claude, model/effort default claude", () => {
     expect(CONFLICT_DEFAULTS).toEqual({
-      enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh",
+      enabled: false, agent: "claude", model: "opus", effort: "xhigh",
     });
     expect(zConflict.parse({})).toEqual(CONFLICT_DEFAULTS);
   });

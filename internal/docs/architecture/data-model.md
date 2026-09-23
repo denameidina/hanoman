@@ -262,7 +262,8 @@ tiap berkas.
 
 ## Setting (per workspace)
 Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
-- `model` (default `claude-sonnet-5`) + `effort` (default `medium`) — **default global** untuk sesi baru,
+- `model` (default alias native `sonnet`, bukan id terpatok — ikut model baru CLI; lihat
+  [katalog model](model-catalog.md)) + `effort` (default `medium`) — **default global** untuk sesi baru,
   dipakai sebagai argv saat sesi lahir. Sejak [ADR-0061](../adr/0061-model-effort-per-sesi-picker-start.md)
   (SPEC-252) model/effort dipilih **per SESI** saat Start (picker `StartSessionModal` → body opsional
   `model`/`effort` di `POST /terminal/sessions`); kosong → default global ini. Manusia tetap bisa

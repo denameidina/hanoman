@@ -14,7 +14,7 @@ describe("runtime defaults", () => {
     const result = applyRuntimeDefaults(undefined)!;
 
     expect(result.changed).toBe(true);
-    expect(result.data.model).toBe("claude-sonnet-5");
+    expect(result.data.model).toBe("sonnet");
     expect(result.data.effort).toBe("medium");
     expect(result.data.codex).toEqual({ model: "gpt-5.6-terra", effort: "medium" });
     expect(result.data.orchestration).toEqual(BUILTIN_ORCHESTRATION_DEFAULTS);
@@ -27,10 +27,23 @@ describe("runtime defaults", () => {
       codex: { model: "gpt-5.6-sol", effort: "xhigh" }, orchestration: legacyOrchestration,
     })!;
 
-    expect(result.data.model).toBe("claude-sonnet-5");
+    expect(result.data.model).toBe("sonnet");
     expect(result.data.effort).toBe("medium");
     expect(result.data.codex).toEqual({ model: "gpt-5.6-terra", effort: "medium" });
     expect(result.data.orchestration).toEqual(BUILTIN_ORCHESTRATION_DEFAULTS);
+  });
+
+  // Seed versi sebelumnya menulis id terpatok; seed alias native harus menggantinya selama nilai
+  // itu masih `seeded`, dan membiarkan id terpatok yang DIPILIH operator (`user`).
+  it("upgrade memindah default seeded ber-id terpatok ke alias native", () => {
+    const base = { autoDefault: true, autoScaffold: true, notifyFail: true, effort: "medium" };
+    const marker = (state: "seeded" | "user") => ({ ...BUILTIN_RUNTIME_DEFAULTS, version: "2026-09-17-v1",
+      claude: { model: state, effort: "seeded" } });
+    const seeded = applyRuntimeDefaults({ ...base, model: "claude-sonnet-5", builtinRuntimeDefaults: marker("seeded") })!;
+    expect(seeded.data.model).toBe("sonnet");
+    expect(seeded.data.orchestration.feature.claude.Spec).toEqual({ model: "opus", effort: "medium" });
+    const pinned = applyRuntimeDefaults({ ...base, model: "claude-sonnet-5", builtinRuntimeDefaults: marker("user") })!;
+    expect(pinned.data.model).toBe("claude-sonnet-5");
   });
 
   it("upgrade menjaga global dan flow yang sudah diedit user", () => {

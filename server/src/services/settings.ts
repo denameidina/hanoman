@@ -8,7 +8,7 @@ import {
 } from "@hanoman/shared";
 
 // Model id + effort yang diteruskan apa adanya ke `claude --model` / `--effort`.
-const STEP = { model: "claude-sonnet-5", effort: "medium" };
+const STEP = { model: "sonnet", effort: "medium" };
 // DB yang masih segar belum punya baris Setting (ia lahir di PUT /settings pertama). Default
 // ini menjaga API tetap boot alih-alih melempar P2025.
 export const DEFAULT_SETTING: Setting = {
@@ -64,9 +64,9 @@ function normalizeCodex(c: Codex): Codex {
   return { model, effort: coerceCodexEffort(model, c.effort) };
 }
 
-// Id model yang sudah tidak ada di picker (MODELS) dipetakan ke penggantinya saat dibaca, supaya
-// baris Setting lama tak menyisakan nilai yang tak bisa dipilih lagi di UI.
-const RETIRED_MODELS: Record<string, string> = { "claude-opus-4-8": "claude-opus-5" };
+// Id model yang sudah pensiun dipetakan ke penggantinya saat dibaca. Penggantinya alias native
+// (bukan id terpatok lain) supaya pemetaan ini tak perlu diperbarui tiap CLI merilis model baru.
+const RETIRED_MODELS: Record<string, string> = { "claude-opus-4-8": "opus" };
 /**
  * SPEC-162 · model+effort DEFAULT untuk sesi claude interaktif, argv saat sesi lahir.
  * SPEC-252 · ADR-0061 · ini adalah default global; Start bisa meng-override per sesi.

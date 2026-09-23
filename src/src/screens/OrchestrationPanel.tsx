@@ -4,7 +4,7 @@ import {
   FLOW_PHASES, ORCHESTRATION_DEFAULTS, ORCHESTRATION_FLOWS, coerceClaudeEffort, coerceCodexEffort,
   type Agent, type FlowOrchestration, type Orchestration, type OrchestrationFlow, type PhaseCell,
 } from "@hanoman/shared";
-import { runtimeEfforts, runtimeModels } from "./session-runtime";
+import { runtimeEfforts, runtimeSubagentModels } from "./session-runtime";
 
 // ADR-0164 · matriks model/effort per fase. Satu-satunya penulis `Setting.orchestration` adalah tab
 // ini, jadi menulis dari snapshot mount aman (pola `changelog`, bukan baca-ulang lead/telegram).
@@ -24,7 +24,7 @@ function CellPicker({ flow, phase, runtime, cell, onPick }: {
   flow: OrchestrationFlow; phase: string; runtime: Agent; cell: PhaseCell;
   onPick: (next: PhaseCell, msg: string) => void;
 }) {
-  const models = runtimeModels(runtime);
+  const models = runtimeSubagentModels(runtime);
   const efforts = runtimeEfforts(runtime, cell.model ?? "");
   const coerce = runtime === "codex" ? coerceCodexEffort : coerceClaudeEffort;
   const modelOptions = [

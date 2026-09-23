@@ -2,7 +2,7 @@ import { prisma } from "../db";
 import {
   activationOf, effortOf, effectiveAgents, detectCycle, maxTurnsOf, mentionsOf, toolsOf,
   runtimeOf, timeoutSecondsOf, workspacePolicyOf, expandTools, ALL_TOOLS, GLOBAL_SCOPE,
-  BUILTIN_AGENTS, modelsForRuntime,
+  BUILTIN_AGENTS, modelKnownForRuntime,
   type CustomAgent, type AgentNode, type Agent,
 } from "@hanoman/shared";
 import { codexNativeAgentsSupported, type AgentDef } from "@hanoman/runner";
@@ -105,7 +105,7 @@ function recommendedModel(row: CustomAgentRow, runtime: Agent): string | null {
   if (!builtin) return null;
   const model = builtin.models[runtime];
   if (runtime === "claude" && (model === "haiku" || model === "sonnet")) return model;
-  return modelsForRuntime(runtime).some((entry) => entry.id === model) ? model : null;
+  return modelKnownForRuntime(runtime, model) ? model : null;
 }
 
 function toRuntimeDef(row: CustomAgentRow, runtime: Agent): AgentDef {

@@ -19,7 +19,7 @@ const spec = { id: "SPEC-9", source: "qa", projectId: "p1" } as any;
 
 beforeEach(() => {
   // SPEC-332 · ADR-0073 · response /settings selalu membawa blok goal (zod default).
-  (api.getSettings as any).mockResolvedValue({ model: "claude-opus-5", effort: "xhigh", goal: { enabled: false, condition: "" } });
+  (api.getSettings as any).mockResolvedValue({ model: "opus", effort: "xhigh", goal: { enabled: false, condition: "" } });
   (api.startSession as any).mockResolvedValue({ id: "spec-9" });
 });
 
@@ -28,16 +28,16 @@ describe("StartSessionModal (SPEC-252)", () => {
     const onStarted = vi.fn();
     render(<StartSessionModal open spec={spec} onClose={() => {}} onStarted={onStarted} />);
     // prefill: model & effort global tampil di picker
-    await waitFor(() => expect(screen.getByLabelText("Model")).toHaveValue("claude-opus-5"));
+    await waitFor(() => expect(screen.getByLabelText("Model")).toHaveValue("opus"));
     expect(screen.getByLabelText("Effort")).toHaveValue("xhigh");
     // operator memilih model berbeda untuk sesi ini
-    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "claude-sonnet-5" } });
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "sonnet" } });
     fireEvent.click(screen.getByRole("button", { name: /Mulai/i }));
     await waitFor(() => expect(api.startSession).toHaveBeenCalledWith(
       // SPEC-338 · payload kini juga membawa agen sesi; tanpa pilihan lain ia "claude".
       // SPEC-376 · dan scope verifikasi; tanpa pilihan lain ia "changed" (default global).
       // SPEC-734 · dan metode workflow; tanpa pilihan lain ia "superpowers" (DEFAULT_METHOD).
-      { spec: "SPEC-9", flow: "qa", model: "claude-sonnet-5", effort: "xhigh", agent: "claude",
+      { spec: "SPEC-9", flow: "qa", model: "sonnet", effort: "xhigh", agent: "claude",
         goal: false, goalCondition: undefined, verifyScope: "changed", method: "superpowers" }));
     // SPEC-394 · onStarted kini juga menerima `resumed`; respons ini sesi baru, jadi undefined.
     expect(onStarted).toHaveBeenCalledWith("spec-9", undefined);

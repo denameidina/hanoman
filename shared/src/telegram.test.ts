@@ -20,7 +20,7 @@ describe("Telegram shared contracts (SPEC-476)", () => {
     // sudah jalan tak berubah perilakunya setelah upgrade".
     expect(TELEGRAM_DEFAULTS).toEqual({
       enabled: false, progress: true,
-      engine: { enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh" },
+      engine: { enabled: false, agent: "claude", model: "opus", effort: "xhigh" },
     });
     expect(zTelegramSettings.parse({})).toEqual(TELEGRAM_DEFAULTS);
     expect(zTelegramSettings.safeParse({ enabled: "yes" }).success).toBe(false);
@@ -53,7 +53,7 @@ describe("Telegram shared contracts (SPEC-476)", () => {
     expect(zTelegramChatContext.parse({
       chatId: "42", userId: "7", sessionId: null, activeProjectId: null,
       activeSessionId: null, personalityAgentId: null, summary: null,
-      agent: "claude", model: "claude-opus-5", effort: "xhigh", memories: [memory],
+      agent: "claude", model: "opus", effort: "xhigh", memories: [memory],
     }).memories).toHaveLength(1);
   });
 

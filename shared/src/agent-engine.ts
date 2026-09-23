@@ -18,7 +18,7 @@ import { zAgent } from "./enums";
 export const zAgentEngine = z.object({
   enabled: z.boolean().default(false),
   agent: zAgent.default("claude"),
-  model: z.string().default("claude-opus-5"),
+  model: z.string().default("opus"),
   effort: z.string().default("xhigh"),
 });
 export type AgentEngine = z.infer<typeof zAgentEngine>;

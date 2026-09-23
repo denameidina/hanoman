@@ -56,8 +56,8 @@ describe("SPEC-492 · parser command runtime Telegram", () => {
   });
 
   it("/model memakai katalog runtime yang sedang berlaku", () => {
-    expect(parseEngineCommand("/model claude-haiku-4-5", ctx())).toMatchObject({
-      kind: "set", engine: { enabled: true, agent: "claude", model: "claude-haiku-4-5", effort: "xhigh" },
+    expect(parseEngineCommand("/model haiku", ctx())).toMatchObject({
+      kind: "set", engine: { enabled: true, agent: "claude", model: "haiku", effort: "xhigh" },
     });
   });
 
@@ -78,7 +78,7 @@ describe("SPEC-492 · parser command runtime Telegram", () => {
   it("/model asing menolak dan menyebut daftar yang sah", () => {
     const cmd = parseEngineCommand("/model gpt-9-belum-ada", ctx());
     expect(cmd?.kind).toBe("invalid");
-    expect((cmd as { message: string }).message).toContain("claude-opus-5");
+    expect((cmd as { message: string }).message).toContain("opus");
   });
 
   it("/effort menerima nilai katalog dan menolak sisanya", () => {

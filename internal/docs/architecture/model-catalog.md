@@ -1,7 +1,8 @@
 # Katalog model otomatis
 
 Hanoman menemukan model dari CLI terpasang saat startup dan setiap **5 menit**. Katalog bawaan
-memuat Claude Fable 5.1 (`claude-fable-5-1`) dan GPT-6 Astra (`gpt-6-astra`).
+(fallback offline) claude hanya berisi alias native `default`, `opus`, `sonnet`, `haiku`, `fable`;
+codex memuat GPT-6 Astra (`gpt-6-astra`).
 Model baru tidak memerlukan perubahan kode Hanoman selama protokol katalog CLI kompatibel.
 Ketersediaan tetap bergantung pada akun, konfigurasi provider, dan versi CLI. Hanoman tidak
 mengupgrade CLI atau mengubah sesi yang sudah berjalan. Default runtime bawaan dapat di-seed saat
@@ -11,7 +12,21 @@ install/update; pilihan yang sudah diedit operator tidak diganti.
 
 - Claude: control request `initialize` di stream-json, mengambil hanya `models`.
   Tidak mengirim pesan user/inferensi; hooks dimatikan, MCP dikosongkan, cwd temp kosong.
-  ID `resolvedModel` dan alias non-default dikenali; label/effort berasal dari metadata CLI.
+  **Alias native diutamakan.** `id` yang disimpan & diteruskan ke `--model` adalah `value` baris
+  CLI (`default`, `opus[1m]`, `sonnet`, `haiku`), bukan `resolvedModel` terpatok; `resolved`
+  ikut disimpan. Alias ikut berpindah saat CLI merilis model baru, jadi setelan tak basi dan
+  tak ada id yang harus dipetakan ulang. `default` (rekomendasi CLI, label `Default
+  (recommended) · <model>`) selalu di urutan pertama. Selain `default`, satu baris per
+  `resolvedModel` — baris alias menang atas baris id-terpatok untuk model yang sama (dulu alias
+  dan id terpatok sama-sama jadi entri, jadi satu model tampil dua/tiga kali). Terverifikasi
+  2026-09-23, claude 2.1.280: `--model default|opus|sonnet|haiku` diterima dan masing-masing
+  jatuh ke Opus 5.5 1M / Opus 5.5 / Sonnet 5 / Haiku 4.5.
+- Lookup (`claudeModel()`) mencocokkan alias **atau** `resolved`, jadi setelan lama ber-id
+  terpatok (`claude-sonnet-5`) tetap mendapat label & daftar effort alias yang menunjuknya;
+  validasi custom agent (`modelKnownForRuntime`) dan `/model` Telegram menerima keduanya.
+- `default` hanya sah untuk `--model` sesi. Subagent (`--agents`: custom agent, model per fase
+  orkestrasi) menerima alias keluarga atau id penuh, jadi picker-nya memakai
+  `subagentClaudeModels()` / `runtimeSubagentModels()` yang membuang `default`.
 - Codex: `codex debug models`, tanpa `--bundled`, mengambil slug, nama, effort dan minimum
   client bila diberikan. Entri `visibility: hide` tidak masuk hasil discovery.
 - Biner memakai `HANOMAN_CLAUDE_BIN`/`HANOMAN_CODEX_BIN` efektif. Dalam Podman,
@@ -19,9 +34,14 @@ install/update; pilihan yang sudah diedit operator tidak diganti.
 - Satu refresh aktif, provider diperiksa serial; timeout per proses **20 detik**, stdout
   maksimal **4 MiB**. CLI yang macet dihentikan per proses, tidak dengan pola nama.
 
-Katalog CLI digabungkan dengan fallback bawaan (hasil CLI menang untuk ID sama).
-Karena itu daftar adalah pilihan model, bukan bukti setiap model bisa dipakai akun tersebut.
-Kegagalan satu provider tidak menghapus hasil terakhir atau menahan pembaruan provider lain.
+CLI yang terpasang adalah sumber RESMI begitu ia berhasil menjawab — hasilnya MENGGANTIKAN
+katalog per-provider itu, bukan digabung selamanya dengan fallback bawaan statis. Fallback
+bawaan (`shared/src/entities.ts`) hanya dipakai sebelum probe pertama sukses, atau selagi
+probe gagal berturut-turut (state lama dipertahankan, lihat di bawah) — union permanen dulu
+membuat id lama yang sudah diganti/dipensiunkan CLI tak pernah hilang dari picker walau CLI
+sudah tak menyebutnya lagi. Karena itu daftar adalah pilihan model, bukan bukti setiap model
+bisa dipakai akun tersebut. Kegagalan satu provider tidak menghapus hasil terakhir atau
+menahan pembaruan provider lain.
 `source: cli` berarti CLI mengembalikan katalog, bukan bukti refresh jaringan provider sukses:
 CLI sendiri mungkin memakai cache internal atau katalog bundled-nya.
 
@@ -45,6 +65,22 @@ dengan keabsahan pasangan diperiksa terhadap katalog pada boundary route.
 Settings menghitung opsi saat render dan menampilkan sumber, waktu pemeriksaan, serta error.
 Default global tetap keputusan operator. Model Codex yang ditemukan runtime tidak
 ditimpa oleh peta pensiun historis ketika settings dibaca.
+
+Default bawaan claude (`BUILTIN_CLAUDE_RUNTIME_DEFAULTS`, sel orkestrasi per fase, default
+`zSetting`/konflik/lead/Telegram/changelog/portal) memakai alias `sonnet`/`opus`/`haiku`
+(`RUNTIME_DEFAULTS_VERSION` 2026-09-23-v1). Seed boot menimpa nilai yang masih berstatus
+`seeded` — jadi instalasi yang dulu di-seed `claude-sonnet-5` pindah ke `sonnet` sendiri —
+sedangkan id terpatok yang DIPILIH operator (`user`) dibiarkan. `RETIRED_MODELS` memetakan
+`claude-opus-4-8` ke alias `opus`.
+
+Ketiga picker (Settings, "Mulai sesi", "Sesi baru") memakai `modelSelectOptions()`
+(`shared/src/entities.ts`) untuk membangun opsi Select: nilai TERSIMPAN yang sudah tak ada di
+katalog (model dipensiunkan CLI, atau baris ditulis via PUT ber-AgentToken dengan id di luar
+katalog) tetap ditambahkan sebagai satu opsi apa adanya, supaya operator tidak kehilangan model
+yang sedang dipakai hanya karena katalog runtime berubah — picker tak boleh tampil kosong/reset
+diam-diam. Bila nilai itu id terpatok yang sedang ditunjuk sebuah alias, labelnya
+`<label alias> (terpatok: <id>)` supaya tak terbaca sebagai duplikat baris alias; operator yang
+ingin ikut model baru cukup memilih alias-nya sekali.
 
 ## Verifikasi
 

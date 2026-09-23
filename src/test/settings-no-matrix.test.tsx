@@ -18,7 +18,7 @@ vi.mock("../src/api/client", () => ({
 }));
 
 const SETTING = {
-  model: "claude-opus-5", effort: "xhigh", autoDefault: true, autoScaffold: true,
+  model: "opus", effort: "xhigh", autoDefault: true, autoScaffold: true,
   notifyFail: true, notifyDone: true, notifySound: "short", notifyDecision: true, notifyDecisionSound: "alert",
   goal: { enabled: false, condition: "" },   // SPEC-332 · ADR-0073 · selalu ada di response (zod default)
 };
@@ -48,10 +48,10 @@ describe("Settings tanpa matrix per-fase (SPEC-252)", () => {
     await screen.findByText("Model sesi — default global");
     // SPEC-338 · tab ini kini juga memuat kartu "Agen sesi" di atasnya, jadi select model claude
     // dipilih lewat label — bukan urutan (`selects[0]` sekarang picker agen).
-    fireEvent.change(screen.getByLabelText("Model claude"), { target: { value: "claude-sonnet-5" } });
+    fireEvent.change(screen.getByLabelText("Model claude"), { target: { value: "sonnet" } });
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
     const putArg = (api.putSettings as any).mock.calls.at(-1)[0];
-    expect(putArg.model).toBe("claude-sonnet-5");
+    expect(putArg.model).toBe("sonnet");
     expect("phaseModels" in putArg).toBe(false);
   });
 });

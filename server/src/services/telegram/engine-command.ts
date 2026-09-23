@@ -42,7 +42,9 @@ export type EngineCommand =
   | { kind: "set"; engine: AgentEngine; label: string }
   | { kind: "invalid"; message: string };
 
-const claudeModels = (): string[] => MODELS.map((m) => m.id);
+// Alias native (`sonnet`) dan id terpatok yang ditunjuknya (`claude-sonnet-5`) sama-sama sah.
+const claudeModels = (): string[] =>
+  [...new Set(MODELS.flatMap((m) => (m.resolved ? [m.id, m.resolved] : [m.id])))];
 const codexModels = (): string[] => CODEX_MODELS.map((m) => m.id);
 const effortsFor = (t: EngineTriple): readonly string[] =>
   t.agent === "codex" ? codexEfforts(t.model) : claudeEfforts(t.model);

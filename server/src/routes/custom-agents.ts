@@ -3,7 +3,7 @@ import { CODEX_NATIVE_AGENTS_MIN_CLIENT } from "@hanoman/runner";
 import {
   activationOf, effortOf, maxTurnsOf, timeoutSecondsOf, workspacePolicyOf,
   zCreateCustomAgent, zUpdateCustomAgent, customAgentId, mentionsOf, toolsOf, runtimeOf,
-  modelsForRuntime, effortsForRuntimeModel, ALL_TOOLS, AGENT_RUNTIMES, AGENT_RUNTIME_LABELS, BUILTIN_AGENT_NAMES,
+  modelsForRuntime, modelKnownForRuntime, effortsForRuntimeModel, ALL_TOOLS, AGENT_RUNTIMES, AGENT_RUNTIME_LABELS, BUILTIN_AGENT_NAMES,
   type AgentRuntime, type AgentCatalogView,
 } from "@hanoman/shared";
 import { prisma } from "../db";
@@ -119,7 +119,7 @@ function toolsProblem(tools: string[] | null | undefined, catalogIds: string[]) 
 
 function modelProblem(model: string | null | undefined, runtime: AgentRuntime | null) {
   if (!model) return null;
-  const ok = modelsForRuntime(runtime).some((m) => m.id === model);
+  const ok = modelKnownForRuntime(runtime, model);
   return ok ? null : { error: "model tak dikenal untuk runtime ini", model, runtime };
 }
 

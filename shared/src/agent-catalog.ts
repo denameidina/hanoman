@@ -1,5 +1,5 @@
 import { DEFAULT_AGENT_TOOLS, type AgentEffort, type AgentRuntime } from "./custom-agent";
-import { MODELS, EFFORTS, CODEX_MODELS, claudeEfforts } from "./entities";
+import { EFFORTS, CODEX_MODELS, claudeEfforts, claudeModel, subagentClaudeModels } from "./entities";
 
 // SPEC-484 · ADR-0101 · katalog pilihan form Custom Agent. Nol I/O: dipakai server (validasi +
 // ekspansi `*`) dan UI (opsi dropdown) dari SATU sumber. Bagian yang butuh I/O — penemuan server
@@ -43,13 +43,26 @@ export const mcpToolEntry = (server: string): AgentToolInfo => ({
 
 export type AgentModelInfo = { id: string; label: string; runtime: AgentRuntime };
 
-/** Model yang sah untuk sebuah runtime. `null` (warisi) → GABUNGAN keduanya. */
+/**
+ * Model yang sah untuk sebuah runtime. `null` (warisi) → GABUNGAN keduanya. Custom agent jalan
+ * sebagai subagent (`--agents`), jadi alias `default` milik `--model` sesi tidak ikut.
+ */
 export function modelsForRuntime(rt: AgentRuntime | null): AgentModelInfo[] {
-  const claude: AgentModelInfo[] = MODELS.map((m) => ({ id: m.id, label: m.label, runtime: "claude" }));
+  const claude: AgentModelInfo[] = subagentClaudeModels().map((m) => ({ id: m.id, label: m.label, runtime: "claude" }));
   const codex: AgentModelInfo[] = CODEX_MODELS.map((m) => ({ id: m.id, label: m.label, runtime: "codex" }));
   if (rt === "claude") return claude;
   if (rt === "codex") return codex;
   return [...claude, ...codex];
+}
+
+/**
+ * Apakah `model` sah untuk runtime ini: id katalog, ATAU id terpatok claude yang sedang ditunjuk
+ * sebuah alias (`claude-sonnet-5` ← `sonnet`) — subagent menerima keduanya, jadi agen lama yang
+ * menyimpan id terpatok tak boleh tiba-tiba ditolak hanya karena katalog kini ber-alias.
+ */
+export function modelKnownForRuntime(rt: AgentRuntime | null, model: string): boolean {
+  if (modelsForRuntime(rt).some((m) => m.id === model)) return true;
+  return rt !== "codex" && model !== "default" && claudeModel(model)?.resolved === model;
 }
 
 const codexCommonEfforts = (): AgentEffort[] => {
@@ -62,7 +75,7 @@ export function effortsForRuntimeModel(
   runtime: AgentRuntime | null,
   model: string | null,
 ): AgentEffort[] {
-  if (runtime === "claude" || (!runtime && model && MODELS.some((entry) => entry.id === model))) {
+  if (runtime === "claude" || (!runtime && model && claudeModel(model))) {
     return [...claudeEfforts(model ?? "")] as AgentEffort[];
   }
   const codexModel = model ? CODEX_MODELS.find((entry) => entry.id === model) : undefined;

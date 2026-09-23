@@ -63,6 +63,6 @@ describe("SPEC-492 · engine tersimpan lewat PUT /settings yang sudah ada", () =
 
   it("GET /settings mengirimkan blok engine", async () => {
     const res = await app.inject({ method: "GET", url: "/api/settings", headers });
-    expect(res.json().telegram.engine).toEqual({ enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh" });
+    expect(res.json().telegram.engine).toEqual({ enabled: false, agent: "claude", model: "opus", effort: "xhigh" });
   });
 });

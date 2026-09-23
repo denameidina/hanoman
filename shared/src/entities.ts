@@ -119,14 +119,19 @@ const NOTIFY_SOUNDS = ["off", "short", "medium", "long",
 // dan `askTimeoutMin` hilang bersama runner headless.
 // SPEC-238 · daftar pilihan valid untuk UI (server tetap lenient z.string()). +Fable, +max, +ultracode.
 // SPEC-252 · ADR-0061 — dipakai picker "Mulai sesi" (model/effort per sesi) + kartu default global Settings.
-export type ClaudeModel = { id: string; label: string; efforts?: readonly string[] };
+// `id` = alias native CLI yang diteruskan ke `--model`; `resolved` = id terpatok yang sedang
+// ditunjuknya (dari discovery). Alias diutamakan supaya setelan otomatis ikut model baru CLI.
+export type ClaudeModel = { id: string; label: string; resolved?: string; efforts?: readonly string[] };
+// Fallback OFFLINE (sebelum probe CLI pertama sukses) — hanya alias native yang terdokumentasi.
 export let MODELS: readonly ClaudeModel[] = [
-  { id: "claude-opus-5", label: "Opus 5" },
-  { id: "claude-sonnet-5", label: "Sonnet 5" },
-  { id: "claude-haiku-4-5", label: "Haiku 4.5" },
-  { id: "claude-fable-5", label: "Fable 5" },
-  { id: "claude-fable-5-1", label: "Fable 5.1", efforts: ["max", "xhigh", "high", "medium", "low"] },
+  { id: "default", label: "Default (rekomendasi CLI)" },
+  { id: "opus", label: "Opus" },
+  { id: "sonnet", label: "Sonnet" },
+  { id: "haiku", label: "Haiku" },
+  { id: "fable", label: "Fable" },
 ];
+/** `default` hanya sah untuk `--model` sesi; subagent (`--agents`) menerima alias keluarga saja. */
+export const CLAUDE_DEFAULT_ALIAS = "default";
 export const EFFORTS = ["xhigh", "high", "medium", "low", "max", "ultracode"] as const;
 
 // SPEC-338 · ADR-0074 · katalog codex. Slug diteruskan apa adanya ke `codex -m`; effort ke
@@ -166,13 +171,41 @@ export function replaceModelCatalog(claude: readonly ClaudeModel[], codex: reado
   CODEX_MODELS = codex;
 }
 
+/** Cari per alias, lalu per id terpatok — setelan lama `claude-sonnet-5` tetap dapat metadata `sonnet`. */
+export function claudeModel(id: string): ClaudeModel | undefined {
+  return MODELS.find((m) => m.id === id) ?? MODELS.find((m) => m.resolved === id);
+}
+
+/** Katalog untuk picker subagent (custom agent, model per fase orkestrasi): tanpa `default`. */
+export function subagentClaudeModels(): readonly ClaudeModel[] {
+  return MODELS.filter((m) => m.id !== CLAUDE_DEFAULT_ALIAS);
+}
+
 export function claudeEfforts(modelId: string): readonly string[] {
-  return MODELS.find((m) => m.id === modelId)?.efforts ?? EFFORTS;
+  return claudeModel(modelId)?.efforts ?? EFFORTS;
+}
+
+/**
+ * Opsi Select yang menjamin nilai TERSIMPAN tetap terlihat walau sudah tak ada di katalog (model
+ * pensiun di CLI, atau baris Setting ditulis via PUT ber-AgentToken dengan id di luar katalog).
+ * Satu implementasi dipakai claude maupun codex, picker mana pun (Settings/Start/Sesi baru) —
+ * sebelumnya hanya codex punya penjagaan ini (`codexOptions` lokal SettingsScreen), claude tidak,
+ * jadi model lama yang sudah pensiun di katalog membuat pickernya tampil kosong/reset diam-diam.
+ */
+export function modelSelectOptions<T extends { id: string; label: string; resolved?: string }>(
+  models: readonly T[], current: string,
+): { value: string; label: string }[] {
+  const opts = models.map((m) => ({ value: m.id, label: m.label }));
+  if (!current || opts.some((o) => o.value === current)) return opts;
+  // Id terpatok yang sedang ditunjuk sebuah alias diberi nama jelas, supaya tak terbaca sebagai
+  // duplikat baris alias itu — pilih alias-nya agar ikut model baru CLI.
+  const target = models.find((m) => m.resolved === current);
+  return [{ value: current, label: target ? `${target.label} (terpatok: ${current})` : current }, ...opts];
 }
 
 /** Normalize only when a user picks a model; discovery itself never writes settings. */
 export function coerceClaudeEffort(modelId: string, effort: string): string {
-  const levels = MODELS.find((m) => m.id === modelId)?.efforts;
+  const levels = claudeModel(modelId)?.efforts;
   if (!levels?.length || levels.includes(effort)) return effort;
   return levels.includes("xhigh") ? "xhigh" : levels[0]!;
 }
@@ -292,7 +325,7 @@ export const zConflict = z.object({
   enabled: z.boolean().default(false),
   agent: zAgent.default("claude"),
   // Lenient z.string() seperti `model`/`effort` di akar: katalog ditegakkan UI, bukan server.
-  model: z.string().default("claude-opus-5"),
+  model: z.string().default("opus"),
   effort: z.string().default("xhigh"),
 });
 export type Conflict = z.infer<typeof zConflict>;
@@ -372,7 +405,7 @@ export const zPortalChat = z.object({
   enabled: z.boolean().default(false),
   brainstormPerMonth: z.number().int().min(0).max(1000).default(2),
   askPerMonth: z.number().int().min(0).max(10000).default(30),
-  model: z.string().default("claude-opus-5"),
+  model: z.string().default("opus"),
   effort: z.string().default("high"),
   timeoutSec: z.number().int().min(10).max(900).default(180),
 });
@@ -416,7 +449,7 @@ export type Orchestration = z.infer<typeof zOrchestration>;
 export const ORCHESTRATION_DEFAULTS: Orchestration = zOrchestration.parse(BUILTIN_ORCHESTRATION_DEFAULTS);
 
 export const zSetting = z.object({
-  model: z.string().default("claude-sonnet-5"),
+  model: z.string().default("sonnet"),
   effort: z.string().default("medium"),
   autoDefault: z.boolean(),
   autoScaffold: z.boolean(),

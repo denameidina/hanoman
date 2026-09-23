@@ -5,7 +5,7 @@ import {
   type PhaseOverrides,
 } from "@hanoman/shared";
 import { modelLabel } from "./phase-chip";
-import { runtimeEfforts, runtimeModels } from "./session-runtime";
+import { runtimeEfforts, runtimeSubagentModels } from "./session-runtime";
 
 // ADR-0164 · pratinjau read-only. Memanggil resolver yang SAMA dengan server (`resolvePhasePlan`),
 // dengan gerbang versi codex yang sama — dua salinan aturan akan membuat pratinjau berbohong.
@@ -79,7 +79,7 @@ export function PhasePlanPreview({ flow, agent, model, effort, orchestration, co
                   <select aria-label={`Model subagent ${p.phase}`} value={override?.model ?? ""}
                     onChange={(e) => updateOverride("model", e.target.value)} style={controlStyle}>
                     <option value="">Warisi rekomendasi</option>
-                    {runtimeModels(agent).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                    {runtimeSubagentModels(agent).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
                   <select aria-label={`Effort subagent ${p.phase}`} value={override?.effort ?? ""}
                     onChange={(e) => updateOverride("effort", e.target.value)} style={controlStyle}>

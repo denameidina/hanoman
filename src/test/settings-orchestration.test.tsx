@@ -16,7 +16,7 @@ vi.mock("../src/api/client", () => ({
 }));
 
 const SETTING = {
-  model: "claude-opus-5", effort: "xhigh", autoDefault: true, autoScaffold: true,
+  model: "opus", effort: "xhigh", autoDefault: true, autoScaffold: true,
   notifyFail: true, notifyDone: true, notifySound: "short", notifyDecision: true, notifyDecisionSound: "alert",
   goal: { enabled: false, condition: "" }, orchestration: ORCHESTRATION_DEFAULTS,
 };
@@ -45,16 +45,16 @@ describe("Settings · Orkestrasi (ADR-0164)", () => {
 
   it("memilih model sel menyimpan sel itu; effort tetap warisi", async () => {
     await open();
-    fireEvent.change(screen.getByLabelText("Model feature Plan claude"), { target: { value: "claude-sonnet-5" } });
+    fireEvent.change(screen.getByLabelText("Model feature Plan claude"), { target: { value: "sonnet" } });
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
-    expect(lastPut().orchestration.feature.claude.Plan).toEqual({ model: "claude-sonnet-5", effort: "medium" });
+    expect(lastPut().orchestration.feature.claude.Plan).toEqual({ model: "sonnet", effort: "medium" });
   });
 
   it("memilih effort sel menyimpan effort itu", async () => {
     await open();
     fireEvent.change(screen.getByLabelText("Effort feature Execute claude"), { target: { value: "low" } });
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
-    expect(lastPut().orchestration.feature.claude.Execute).toEqual({ model: "claude-sonnet-5", effort: "low" });
+    expect(lastPut().orchestration.feature.claude.Execute).toEqual({ model: "sonnet", effort: "low" });
   });
 
   it("mematikan saklar flow menyimpan enabled:false", async () => {
