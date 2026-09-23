@@ -2,6 +2,7 @@ import { prisma } from "../db";
 import {
   zSetting, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS,
   RETIRED_CODEX_MODELS, LEAD_DEFAULTS, coerceCodexEffort, codexModel, type Setting, type Agent, type Codex,
+  type Orchestration, type PhaseOverrides,
   TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, DEFAULT_METHOD, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS,
   REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS,
   BUILTIN_RUNTIME_DEFAULTS,
@@ -51,7 +52,36 @@ export async function getSetting(): Promise<Setting> {
     ...parsed.data,
     model: RETIRED_MODELS[parsed.data.model] ?? parsed.data.model,
     codex: normalizeCodex(parsed.data.codex),
+    orchestration: normalizeOrchestration(parsed.data.orchestration),
   };
+}
+
+// S6 · pola `model`/`normalizeCodex` diperluas ke model subagent fase. `null` = warisi orchestrator
+// dan dibiarkan; effort codex dikoersi hanya bila modelnya sendiri diketahui (sel yang mewarisi
+// model dikoersi `resolvePhasePlan` terhadap model hasil resolusi).
+const normalizeClaudeModel = (m: string): string => RETIRED_MODELS[m] ?? m;
+const normalizeCodexModel = (m: string): string => codexModel(m) ? m : RETIRED_CODEX_MODELS[m] ?? m;
+function normalizePhaseRuntime<T extends { model?: string | null; effort?: string | null }>(
+  runtime: Agent, cell: T,
+): T {
+  if (!cell.model) return cell;
+  const model = runtime === "codex" ? normalizeCodexModel(cell.model) : normalizeClaudeModel(cell.model);
+  const effort = runtime === "codex" && cell.effort ? coerceCodexEffort(model, cell.effort) : cell.effort;
+  return { ...cell, model, effort };
+}
+function normalizeOrchestration(o: Orchestration): Orchestration {
+  const out = {} as Record<string, Orchestration[keyof Orchestration]>;
+  for (const [flow, cfg] of Object.entries(o)) {
+    const cells = (runtime: Agent) => Object.fromEntries(Object.entries(cfg[runtime])
+      .map(([phase, cell]) => [phase, normalizePhaseRuntime(runtime, cell)]));
+    out[flow] = { ...cfg, claude: cells("claude"), codex: cells("codex") };
+  }
+  return out as Orchestration;
+}
+/** S6 · override fase transient per sesi, dinormalisasi dengan aturan yang sama dengan sel Setting. */
+export function normalizePhaseOverrides(runtime: Agent, o: PhaseOverrides | undefined): PhaseOverrides | undefined {
+  if (!o) return o;
+  return Object.fromEntries(Object.entries(o).map(([phase, v]) => [phase, normalizePhaseRuntime(runtime, v)]));
 }
 
 /**

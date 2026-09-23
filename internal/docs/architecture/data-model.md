@@ -286,6 +286,10 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   boleh diperbarui saat Hanoman membawa rekomendasi baru; `user` dipertahankan. Marker granular per
   model/effort global, saklar flow, dan field model/effort sel fase. Pada `POST /terminal/sessions`
   varian backlog, `phaseOverrides` opsional adalah override transient per sesi dan tidak ditulis ke Setting.
+  Sejak audit S6 (2026-09-23) `getSetting()` menormalisasi sel `orchestration` dengan pola model global:
+  id claude pensiun (`RETIRED_MODELS`) dan codex pensiun (`RETIRED_CODEX_MODELS`) dipetakan, effort codex
+  dikoersi ke model hasil pemetaan; sel `null` (warisi) dibiarkan. `phaseOverrides` dinormalisasi sama
+  di `sessionPhasePlan` dan skemanya berbatas panjang (`PHASE_OVERRIDE_LIMITS`); sel Setting tetap lenient.
   `PUT /settings` menandai `user` setiap field runtime yang berbeda dari DB, jadi penulis WAJIB
   mengirim DB terbaru + perubahannya saja: sejak audit S5 (2026-09-23) `SettingsScreen.persist()`
   melakukan GET segar lalu `rebaseEdits(snapshot, snapshot+perubahan, DB)` (berurutan lewat antrean)

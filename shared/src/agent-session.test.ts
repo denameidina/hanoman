@@ -64,4 +64,16 @@ describe("SPEC-338 · agent sesi", () => {
     });
     expect(parsed).toMatchObject({ phaseOverrides: { Plan: { model: "claude-haiku-4-5", effort: "low" } } });
   });
+
+  // S6 · override transient masuk ke argv/definisi agen apa adanya — batasi panjangnya (model ≤ 200,
+  // effort ≤ 64, nama fase ≤ 64, ≤ 32 fase) alih-alih menerima string tak berbatas.
+  it("S6 · phaseOverrides berbatas panjang & jumlah", () => {
+    const ok = (o: unknown) => zTerminalSession.safeParse({ spec: "S", flow: "feature", phaseOverrides: o }).success;
+    expect(ok({ Plan: { model: "m".repeat(200), effort: "e".repeat(64) } })).toBe(true);
+    expect(ok({ Plan: { model: "m".repeat(201) } })).toBe(false);
+    expect(ok({ Plan: { effort: "e".repeat(65) } })).toBe(false);
+    expect(ok({ Plan: { model: "" } })).toBe(false);
+    expect(ok({ ["P".repeat(65)]: { model: "x" } })).toBe(false);
+    expect(ok(Object.fromEntries(Array.from({ length: 33 }, (_, i) => [`F${i}`, { model: "x" }])))).toBe(false);
+  });
 });

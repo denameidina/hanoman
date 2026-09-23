@@ -1112,6 +1112,8 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #     model/effort opsional = override PER SESI (kosong → default global);
 #     phaseOverrides?: { [fase]: { model?: string; effort?: string } } = override PER SESI untuk
 #       subagent fase (kosong → rekomendasi/matriks Settings → orchestrator); tidak disimpan ke Setting.
+#       S6: berbatas — model 1..200, effort 1..64, nama fase 1..64, ≤32 fase (400 bila lebih);
+#       dinormalisasi seperti sel Setting (id pensiun dipetakan, effort codex dikoersi).
 #     jadi argv --model/--effort saat sesi lahir (andal, tak bergantung agen).
 #     goal?: boolean — mode goal PER SESI. undefined → ikut Setting.goal.enabled; false → MATI walau
 #       global menyala; true → nyala. goalCondition?: string ≤4000 — kondisi khusus sesi ini.

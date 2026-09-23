@@ -166,3 +166,9 @@ atau Codex yang belum mendukung native subagent tetap mengikuti fallback sesi tu
   remote: pratinjau menyatakan rencana final ditentukan Setting device target (tak ada jalur relay
   baca Setting remote). (c) Auto-resume boot & "Mulai lagi" meneruskan runtime sesi asal dari
   `SessionHistory` (ADR-0169 amandemen 2026-09-23); `phaseOverrides` tak tersimpan → tak diulang.
+- **S5 · simpan Settings basi.** `SettingsScreen.persist()` me-rebase perubahan operator ke DB
+  terbaru (`rebaseEdits`) sebelum `PUT /settings`, sehingga marker provenance hanya menandai `user`
+  field yang benar-benar diubah; `hanoman_settings_set` menyuruh `_get` tepat sebelumnya.
+- **S6 · normalisasi sel & override.** Sel `orchestration` dan `phaseOverrides` melewati pemetaan
+  model pensiun + koersi effort codex yang sama dengan model global; `zPhaseOverride` berbatas
+  panjang (model ≤200, effort ≤64, ≤32 fase).
