@@ -1,6 +1,8 @@
 # ADR-0169 — Sesi backlog yang direkonsiliasi saat boot dilanjutkan otomatis
 
-- Status: Accepted
+- Status: Accepted · **keputusan #4 diamandemen [0170](0170-orkestrasi-mutu-subagent-foreground-reviewer-beban.md)**
+  (2026-09-25): `bypassCapacity` dicabut — auto-resume tunduk cap/beban host; kandidat yang ditolak dicatat
+  `deferred` dan dilanjutkan manual.
 - Tanggal: 2026-09-22
 - SPEC: — (brainstorm langsung di sesi Claude Code, bukan lewat backlog hanoman)
 - Terkait: melengkapi [0084](0084-melanjutkan-sesi-backlog.md) (jalur `resume` dipakai apa

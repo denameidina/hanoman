@@ -1,6 +1,9 @@
 # ADR-0164 — Orkestrasi subagent per fase: model & effort lewat definisi subagent
 
-- Status: Accepted · **diamandemen [0167](0167-keputusan-ambigu-lead-atau-manusia.md)** (2026-09-19):
+- Status: Accepted · **diamandemen [0170](0170-orkestrasi-mutu-subagent-foreground-reviewer-beban.md)** (2026-09-25):
+  keputusan tertunda T1 diambil — sesi claude ber-fase memakai `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`
+  (subagent foreground di semua lapis) + batas 3 subagent; agen fase mendapat klausa delegasi; reviewer
+  Execute `hanoman-fase-review` untuk feature/qa. · **diamandemen [0167](0167-keputusan-ambigu-lead-atau-manusia.md)** (2026-09-19):
   `Pertanyaan untuk manusia:` (satu pertanyaan) diganti `Keputusan terbuka:` (wajib, tanpa batas) +
   status `menunggu-keputusan`; relay langkah 4 tak lagi "putuskan sendiri" di sesi tanpa pengawas.
 - Tanggal: 2026-09-14

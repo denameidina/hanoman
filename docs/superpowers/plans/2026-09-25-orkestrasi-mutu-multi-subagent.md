@@ -25,13 +25,14 @@ tercekik oleh sesi/subagent yang lolos gerbang.
 ## Paket kerja
 
 ### P0 · Ukur (tanpa kode produk)
-- [ ] Hook PreToolUse(`Agent`) `updatedInput.run_in_background=false` ± `CLAUDE_CODE_FORK_SUBAGENT=0`:
+- [x] Hook PreToolUse(`Agent`) `updatedInput.run_in_background=false` ± `CLAUDE_CODE_FORK_SUBAGENT=0`:
       foreground? nested jalan? anak paralel tumpang tindih? Bash latar tetap hidup?
 
 ### P1 · Subagent foreground + batas (runner/server, claude)
-- [ ] `guardSettings`: PreToolUse matcher `Agent` memaksa `run_in_background:false` (bentuk dari P0).
-- [ ] Env sesi claude: varian terbukti P0 + `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3`.
-- [ ] Test unit hook + env; golden prompt tak berubah.
+- [x] ~~`guardSettings`: PreToolUse matcher `Agent`~~ — P0: hook tanpa efek; diganti env
+      `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (satu-satunya varian foreground di semua lapis).
+- [x] Env sesi claude: varian terbukti P0 + `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3`.
+- [x] Test unit env (`server/test/phase-session-agent-env.test.ts`); golden prompt tak berubah.
 
 ### P2 · Delegasi & reviewer (runner prompt)
 - [x] Execute di mode orchestrator memakai `subagent-driven-development`.
@@ -46,16 +47,16 @@ tercekik oleh sesi/subagent yang lolos gerbang.
 - [x] Klausa metode `matt` diselaraskan dengan ADR-0167.
 
 ### P3 · Gerbang beban (server)
-- [ ] Terminal-agen operator tak lagi `exempt`; hanya shell mentah/console VPS.
-- [ ] Sinyal memori tersedia (`kern.memorystatus_level` darwin, `MemAvailable` linux) di `launchStatus`.
-- [ ] Auto-resume boot tunduk cap (bertahap), mengamandemen ADR-0169.
+- [x] Terminal-agen operator tak lagi `exempt`; hanya shell mentah/console VPS.
+- [x] Sinyal memori tersedia (`kern.memorystatus_level` darwin, `MemAvailable` linux) di `launchStatus`.
+- [x] Auto-resume boot tunduk cap (bertahap), mengamandemen ADR-0169.
 
 ### P4 · Server kecil
-- [ ] `@@index` `Spec.projectId`, `Notification.createdAt` + migration (ADR-0171).
-- [ ] `planComplete`: fase Plan tercatat `done` tetapi tak ada berkas plan ber-spec-id → bukan selesai.
+- [x] `@@index` `Spec.projectId`, `Notification.createdAt` + migration (ADR-0171).
+- [x] `planComplete`: fase Plan tercatat `done` tetapi tak ada berkas plan ber-spec-id → bukan selesai.
 
 ### P5 · Docs & verifikasi
-- [ ] ADR-0170, ADR-0171, amandemen 0164/0169, index `internal/docs/README.md`.
+- [x] ADR-0170, ADR-0171, amandemen 0164/0169, index `internal/docs/README.md`.
 - [ ] Test tersentuh hijau (resep isolasi DB + env), typecheck paket tersentuh.
 
 ## Ditunda (keputusan terpisah)

@@ -1,6 +1,8 @@
 # ADR-0161 — Gerbang peluncuran sesi berdiri di jalur bersama, dan host punya hak menolak
 
-- Status: Accepted
+- Status: Accepted · **diamandemen [0170](0170-orkestrasi-mutu-subagent-foreground-reviewer-beban.md)** (2026-09-25):
+  cap membandingkan `liveAgentCount`; terminal agen operator ikut gerbang; sinyal memori
+  (`kern.memorystatus_level`/`MemAvailable`) dengan ambang `minMemAvailablePct` dan penolakan `host-memory`.
 - Tanggal: 2026-09-05
 - SPEC: SPEC-1108 (QA · critical) — temuan pendamping SPEC-1109 (worktree yatim)
 - Terkait: **mengamandemen [0072](0072-scheduler-fondasi-engine-antrean-durable-cap.md)** (invarian cap
