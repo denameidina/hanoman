@@ -372,6 +372,6 @@ export async function listPhaseInvocations(sessionId: string): Promise<PhaseInvo
     phase: row.phase!, runtimeInvocationId: row.runtimeInvocationId, status: row.status,
     startedAt: row.startedAt.toISOString(), durationMs: row.durationMs,
     inputTokens: row.inputTokens, outputTokens: row.outputTokens, cachedTokens: row.cachedTokens,
-    resultExcerpt: row.resultExcerpt,
+    resultExcerpt: row.resultExcerpt, agentName: row.agentName,
   }));
 }

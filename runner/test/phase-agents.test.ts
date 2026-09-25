@@ -324,11 +324,14 @@ describe("P2 · klausa delegasi agen fase (ADR-0170)", () => {
       expect(c).not.toContain("implementer");
     }
   });
-  it("Execute: implementer per task, paralel hanya berkas tak beririsan maks 3, review per task", () => {
+  // ADR-0170 · implementer BERURUTAN (skill SDD melarang implementer paralel: satu worktree, satu
+  // index git, mesin 8 GB); paralel hanya untuk pembacaan read-only (pencarian/review).
+  it("Execute: implementer per task berurutan, paralel hanya read-only, review per task", () => {
     const c = phaseDelegationClause("Execute", roster, "claude");
     expect(c).toContain("implementer per task");
-    expect(c).toContain("tak beririsan");
-    expect(c).toContain("maks 3");
+    expect(c).toContain("BERURUTAN");
+    expect(c).toContain("read-only");
+    expect(c).not.toContain("tak beririsan");
     expect(c).toContain("review");
   });
   it("aturan bersama: subagent_type dari daftar, hindari agen umum, larang hanoman-fase-*, kontrak anak", () => {

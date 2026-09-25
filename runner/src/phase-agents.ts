@@ -366,10 +366,10 @@ export function phaseDelegationClause(phase: string, roster: AgentDef[], runtime
     ? "Kapan: pertanyaan yang butuh menyapu banyak berkas — pecah jadi 2–3 pencarian sempit & independen, "
       + "panggil semuanya dalam SATU pesan (berjalan paralel) ke agen read-only termurah, lalu sintesis "
       + "dan tulis artefak fasemu SENDIRI. Satu berkas/simbol yang sudah kamu tahu: cari sendiri."
-    : "Kapan: satu implementer per task plan, lalu review task itu sebelum menandai `- [x]`. Paralel "
-      + "(dalam SATU pesan) HANYA untuk task yang berkasnya tak beririsan, maks 3 bersamaan; sisanya "
-      + "berurutan. Worktree ini sudah terisolasi — jangan membuat worktree/branch baru; merge & push milik "
-      + "orchestrator.";
+    : "Kapan: satu implementer per task plan, BERURUTAN (implementer paralel di satu worktree saling "
+      + "tabrak), lalu review task itu sebelum menandai `- [x]`. Paralel (dalam SATU pesan) hanya untuk "
+      + "pembacaan read-only: pencarian konteks atau review. Worktree ini sudah terisolasi — jangan membuat "
+      + "worktree/branch baru; merge & push milik orchestrator.";
   return [
     "=== DELEGASI ===",
     `Subagent yang kamu panggil lewat ${call} berjalan foreground: kamu menunggu hasilnya.`,
@@ -383,8 +383,8 @@ export function phaseDelegationClause(phase: string, roster: AgentDef[], runtime
           : "."))
       + " JANGAN memanggil `hanoman-fase-*`.",
     "Serah-terima ke anak: tujuan, scope berkas, Base SHA (`$HANOMAN_BASE_SHA`), jangkar path:baris yang "
-      + "sudah kamu tahu, dan bentuk laporan yang kamu minta. Anak DILARANG `git push` dan `git stash`; "
-      + "anak yang paralel commit dengan `git add <path>` eksplisit.",
+      + "sudah kamu tahu, dan bentuk laporan yang kamu minta. Anak DILARANG `git push` dan `git stash`, "
+      + "dan commit hanya dengan `git add <path>` eksplisit.",
     "Baca SEMUA laporan anak sebelum melapor — klaim anak bukan bukti sampai kamu periksa. `Keputusan "
       + "terbuka:` anak diteruskan ke `Keputusan terbuka:` laporanmu, jangan dijawab sendiri.",
   ].join("\n");

@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
-import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, type Stage } from "@hanoman/shared";
+import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, phaseAgentName, type Stage } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
 
 export type PhaseState = "done" | "skipped" | "active" | "pending";
@@ -11,6 +11,8 @@ export type PhaseInvocation = {
   phase: string; runtimeInvocationId: string; status: string; startedAt: string;
   durationMs: number | null; inputTokens: number | null; outputTokens: number | null;
   cachedTokens: number | null; resultExcerpt: string | null;
+  /** ADR-0170 · pemilah agen dalam satu fase (reviewer Execute berbagi `phase` dengan agen Execute). */
+  agentName?: string;
 };
 export type PhaseRosterEntry = { name: string; phase: string; model?: string; effort?: string };
 export type PhaseAgent = {
@@ -115,9 +117,13 @@ export function enrichPhases(
   doneAtBirth: ReadonlySet<string> = new Set(),
 ): Phase[] {
   return phases.map((p) => {
-    const r = roster.find((entry) => entry.phase === p.name);
+    // ADR-0170 · satu fase bisa punya lebih dari satu agen di roster (reviewer Execute): chip milik
+    // agen fase itu sendiri, dan hanya invocation-nya yang dihitung sebagai percobaan.
+    const own = phaseAgentName(p.name);
+    const r = roster.find((entry) => entry.phase === p.name && entry.name === own)
+      ?? roster.find((entry) => entry.phase === p.name);
     if (!r) return p;
-    const all = invocations.filter((i) => i.phase === p.name);
+    const all = invocations.filter((i) => i.phase === p.name && (!i.agentName || i.agentName === r.name));
     const mine = all.filter((i) => bornAt === 0 || Date.parse(i.startedAt) >= bornAt)
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
     const last = mine[mine.length - 1];

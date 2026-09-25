@@ -412,6 +412,22 @@ describe("enrichPhases (ADR-0164)", () => {
     expect(enrichPhases(phases, roster, [], new Map(), 10_000_000, 0)[2]!.agent)
       .toMatchObject({ attempts: 0, evidence: "pending" });
   });
+  // ADR-0170 · reviewer Execute tercatat di bawah fase Execute (roster `phase: "Execute"`), tapi
+  // bukan percobaan Execute: chip tetap milik agen Execute, status = invocation agen Execute terakhir.
+  it("reviewer satu fase tak dihitung sebagai percobaan agen fasenya", () => {
+    const exec: Phase[] = [{ name: "Execute", state: "active" }];
+    const withReviewer = [
+      { name: "hanoman-fase-review", phase: "Execute", model: "claude-opus-5", effort: "high" },
+      { name: "hanoman-fase-execute", phase: "Execute", model: "claude-sonnet-5", effort: "high" },
+    ];
+    const [e] = enrichPhases(exec, withReviewer, [
+      inv({ phase: "Execute", agentName: "hanoman-fase-execute", runtimeInvocationId: "x1", status: "completed",
+        startedAt: "2026-09-14T00:00:00.000Z" }),
+      inv({ phase: "Execute", agentName: "hanoman-fase-review", runtimeInvocationId: "r1", status: "running",
+        startedAt: "2026-09-14T00:05:00.000Z" }),
+    ], new Map(), 0, 0);
+    expect(e!.agent).toMatchObject({ name: "hanoman-fase-execute", attempts: 1, status: "completed" });
+  });
 });
 
 // I-1 · ADR-0164 · sesi ditutup di tengah fase lalu dilanjutkan (id sesi sama, `sessionIdForSpec`)
