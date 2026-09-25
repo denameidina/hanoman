@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { ORCHESTRATION_DEFAULTS, resolveMethod, resolvePhasePlan } from "@hanoman/shared";
+import {
+  ORCHESTRATION_DEFAULTS, SPEC_AUDIT_VERDICTS, SPEC_AUDIT_VERDICT_LIST, resolveMethod, resolvePhasePlan,
+} from "@hanoman/shared";
 import { buildPhaseAgents, fromAuditOf, phaseDelegationClause, withPhaseDelegation } from "../src/phase-agents";
 import { CODE_STYLE_CLAUSE } from "../src/code-style";
 import { ESCALATION_CONTRACT, startPrdPrompt, startProjectPrompt, startScaffoldPrompt } from "../src/prompt";
@@ -289,6 +291,17 @@ describe("P2 · reviewer independen Execute (ADR-0170)", () => {
     expect(r).toContain("`Keputusan terbuka:`");
     expect(r).not.toContain("Commit artefak fasemu");
   });
+  // Audit custom agent P1-6 · reviewer diturunkan dari spec-auditor: skala putusannya SATU sumber.
+  it("kosakata putusan per kriteria = SPEC_AUDIT_VERDICTS, lengkap dan berurutan", () => {
+    const r = agentsFor("feature").find((d) => d.name === REVIEW)!.instructions;
+    expect(r).toContain(`putuskan salah satu: ${SPEC_AUDIT_VERDICT_LIST}.`);
+    let from = 0;
+    for (const v of SPEC_AUDIT_VERDICTS) {
+      const at = r.indexOf(v, from);
+      expect(at, v).toBeGreaterThanOrEqual(0);
+      from = at + v.length;
+    }
+  });
 });
 
 const custom = (name: string, over: Partial<AgentDef> = {}): AgentDef => ({
@@ -305,7 +318,8 @@ describe("P2 · klausa delegasi agen fase (ADR-0170)", () => {
     const c = phaseDelegationClause("Brainstorm", roster, "claude");
     expect(c).toContain("`scout` (read-only · haiku)");
     expect(c).toContain("`feature-builder` (sonnet)");
-    expect(c).toContain("`wt-only` (model sesi)");
+    // Audit P0-2 · isolated-worktree hanya melihat COMMIT: tandanya memberi tahu cara menyerahkan kerja.
+    expect(c).toContain("`wt-only` (worktree terpisah: commit kandidat dulu, hasil via SHA → cherry-pick · model sesi)");
     expect(c.split("\n").length).toBeLessThanOrEqual(12);
     // codex tak bisa memuat isolated-worktree (materializeCodexAgents) → tak disebut.
     expect(phaseDelegationClause("Brainstorm", roster, "codex")).not.toContain("wt-only");
@@ -340,6 +354,8 @@ describe("P2 · klausa delegasi agen fase (ADR-0170)", () => {
     expect(c).toContain("general-purpose");
     expect(c).toContain("`hanoman-fase-*`");
     expect(c).toMatch(/tujuan, scope berkas, Base SHA.*path:baris/);
+    // Audit P0-2 · anak tak mewarisi env parent: SHA diserahkan sebagai NILAI, bukan nama variabel.
+    expect(c).toContain("Base SHA (NILAI hasil `echo $HANOMAN_BASE_SHA`, bukan nama variabelnya)");
     expect(c).toContain("Baca SEMUA laporan anak");
     expect(c).toMatch(/`Keputusan terbuka:` anak.*jangan dijawab sendiri/);
     expect(c).toContain("`git push`");

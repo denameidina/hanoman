@@ -11,6 +11,13 @@ const POLICY = {
   gitCommands: ["diff", "show", "status", "log"],
 } as const;
 
+/**
+ * Audit custom agent 2026-09-25 · P1-1 · satu sumber allowlist. Prosa policy read-only di
+ * `custom-agents.ts` diturunkan dari objek yang SAMA dengan yang ditanam ke hook, dan test mengikat
+ * contoh di prosa itu ke `readOnlyDecision` — prosa tak bisa lagi menjanjikan perintah yang ditolak.
+ */
+export const READ_ONLY_POLICY = POLICY;
+
 /** Kept standalone because its source is embedded alongside the evaluator in the hook file. */
 function denyReadOnly(detail: string): ReadOnlyDecision {
   return { allowed: false, reason: `Hanoman read-only policy: ${detail}` };

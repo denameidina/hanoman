@@ -1,5 +1,5 @@
 import {
-  PHASE_AGENT_PREFIX, REVIEWER_CELL, phaseAgentName, type MethodDef, type PhasePlan, type PhasePlanEntry,
+  PHASE_AGENT_PREFIX, REVIEWER_CELL, SPEC_AUDIT_VERDICT_LIST, phaseAgentName, type MethodDef, type PhasePlan, type PhasePlanEntry,
 } from "@hanoman/shared";
 import type { AgentDef } from "./custom-agents";
 import type { Flow, VerifyScope } from "./types";
@@ -281,7 +281,8 @@ export function buildPhaseAgents(plan: PhasePlan, ctx: PhaseAgentContext): Agent
 // ADR-0170 P2 · reviewer independen. Diturunkan dari `spec-auditor` (builtin-agents.ts) + gerbang
 // bukti: audit 2026-09-25 — 98% sesi `done` hanya berdasar klaim agen, 7/200 sesi memanggil reviewer.
 // Read-only lewat instruksi (bukan `tools`): ia butuh Bash untuk test, dan agen fase dirender tanpa
-// kunci `tools` (ADR-0164 keputusan 3).
+// kunci `tools` (ADR-0164 keputusan 3). Kosakata putusan per kriteria SATU sumber dengan spec-auditor
+// (`SPEC_AUDIT_VERDICTS`, audit custom agent P1-6): dua daftar yang menyimpang = dua skala berbeda.
 const REVIEWER_RULES = [
   "Batas peran reviewer:",
   "- JANGAN mengubah, membuat, atau menghapus berkas apa pun di worktree, JANGAN commit, JANGAN "
@@ -312,9 +313,8 @@ function reviewerInstructions(plan: PhasePlan, ctx: PhaseAgentContext): string {
         + "adalah temuan). Laporan Execute dan kotak `- [x]` hanyalah klaim.",
       "4. Jalankan test yang relevan dengan berkas yang berubah, sesuai scope verifikasi di bawah, dan baca "
         + "outputnya sendiri.",
-      "5. Per kriteria putuskan: terpenuhi · sudah terpenuhi di base · tak terpenuhi · terpenuhi BERBEDA · "
-        + "belum terverifikasi. Kriteria tanpa jangkar di diff bukan otomatis gagal — cari bukti keadaan "
-        + "akhir; tak bisa dibuktikan → belum terverifikasi.",
+      `5. Per kriteria putuskan salah satu: ${SPEC_AUDIT_VERDICT_LIST}. Kriteria tanpa jangkar di diff `
+        + "bukan otomatis gagal — cari bukti keadaan akhir; tak bisa dibuktikan → belum terverifikasi.",
     ].join("\n"),
     scopeClause(plan.flow as Flow, ctx.verifyScope),
     REVIEWER_RULES,
@@ -355,8 +355,12 @@ export function phaseDelegationClause(phase: string, roster: AgentDef[], runtime
   const codex = runtime === "codex";
   const call = codex ? "spawn_agent" : "tool Agent";
   const live = liveCustoms(roster, runtime);
+  // Audit P0-2 · agen isolated-worktree hanya melihat COMMIT: tanpa tanda ini implementer Execute
+  // mendelegasikan pekerjaan yang belum di-commit dan hasilnya tak pernah kembali ke worktree fase.
   const tag = (d: AgentDef): string =>
-    [d.workspacePolicy === "read-only" ? "read-only" : "", d.model ?? "model sesi"].filter(Boolean).join(" · ");
+    [d.workspacePolicy === "read-only" ? "read-only"
+      : d.workspacePolicy === "isolated-worktree" ? "worktree terpisah: commit kandidat dulu, hasil via SHA → cherry-pick" : "",
+     d.model ?? "model sesi"].filter(Boolean).join(" · ");
   const who = live.length
     ? `Agen di sesi ini: ${live.map((d) => `\`${d.name}\` (${tag(d)})`).join(", ")}. Pilih `
       + (codex ? "nama agen" : "`subagent_type`") + " dari daftar ini sesuai deskripsinya."
@@ -382,7 +386,8 @@ export function phaseDelegationClause(phase: string, roster: AgentDef[], runtime
           ? "; bila terpaksa (implementer tanpa agen yang cocok), isi parameter `model` eksplisit."
           : "."))
       + " JANGAN memanggil `hanoman-fase-*`.",
-    "Serah-terima ke anak: tujuan, scope berkas, Base SHA (`$HANOMAN_BASE_SHA`), jangkar path:baris yang "
+    "Serah-terima ke anak: tujuan, scope berkas, Base SHA (NILAI hasil `echo $HANOMAN_BASE_SHA`, bukan nama "
+      + "variabelnya), jangkar path:baris yang "
       + "sudah kamu tahu, dan bentuk laporan yang kamu minta. Anak DILARANG `git push` dan `git stash`, "
       + "dan commit hanya dengan `git add <path>` eksplisit.",
     "Baca SEMUA laporan anak sebelum melapor — klaim anak bukan bukti sampai kamu periksa. `Keputusan "

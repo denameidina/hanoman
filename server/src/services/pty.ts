@@ -9,10 +9,10 @@ import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
   renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook, withPhaseDelegation,
-  writeSubagentStatusline, type AgentDef, type Flow, type Agent,
+  writeSubagentStatusline, agentContractOf, type AgentContractFile, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import {
-  coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
+  BUILTIN_AGENTS, coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
 } from "@hanoman/shared";
 import {
   enrichPhases, readPhases, readPhasesAsync, sessionComplete, sessionCompleteAsync, trackDoneSeen, type Phase, type PhaseInvocation,
@@ -297,6 +297,33 @@ export const phaseContextFilePath = (id: string): string => `${agentTempDir(id)}
 // all-or-nothing tak pernah melihatnya. Ambang ini menyisakan ruang di bawah batas itu; JSON agen
 // fase yang tetap melewatinya diperlakukan sebagai kegagalan materialisasi (fallback mode tunggal).
 export const AGENTS_ARG_SAFE_BYTES = 100 * 1024;
+// Audit custom agent P1-11 · kontrak bersama custom agent (policy + serah-terima + gaya kode) per
+// policy, ditulis SEKALI dan dirujuk path-nya dari tiap prompt — alasan & mount sama dengan
+// `phaseContextFilePath`. Nama berkas memuat policy karena isinya berbeda per policy.
+export const agentContractFilePath = (id: string, policy: AgentContractFile["policy"]): string =>
+  `${agentTempDir(id)}/agent-contract-${policy}.md`;
+
+/**
+ * Audit P1-11 · anggaran argv untuk custom agent. `render` merakit JSON `--agents` dari subset
+ * custom agent; bila melewati `limit`, agen dibuang satu per satu — OPT-IN (bukan `enabledByDefault`
+ * katalog bawaan, termasuk agen buatan operator) paling akhir lebih dulu, baru agen default paling
+ * akhir. Murni: pemanggil yang mencatat peringatan untuk `dropped`.
+ */
+export function fitCustomAgentsToArgBudget(
+  customDefs: AgentDef[], render: (defs: AgentDef[]) => string, limit: number = AGENTS_ARG_SAFE_BYTES,
+): { kept: AgentDef[]; dropped: AgentDef[]; json: string } {
+  const byDefault = new Set(BUILTIN_AGENTS.filter((a) => a.enabledByDefault).map((a) => a.name));
+  const kept = [...customDefs];
+  const dropped: AgentDef[] = [];
+  let json = render(kept);
+  while (Buffer.byteLength(json) > limit && kept.length > 0) {
+    let at = kept.length - 1;
+    for (let i = kept.length - 1; i >= 0; i--) if (!byDefault.has(kept[i]!.name)) { at = i; break; }
+    dropped.push(...kept.splice(at, 1));
+    json = render(kept);
+  }
+  return { kept, dropped, json };
+}
 
 // SPEC-862 · skrip askpass milik hanoman. Sekamar dengan berkas prompt (SPEC-223) dan sengaja
 // TIDAK ber-id sesi: isinya sama untuk semua sesi dan tak memuat apa pun yang khas satu sesi.
@@ -841,7 +868,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
       // ADR-0170 P2 · klausa delegasi agen fase disusun DI SINI: roster custom agent yang benar-benar
       // hidup di sesi ini baru pasti sesudah `selectCustomDefs`, dan ikut terpilih ulang saat fallback.
       const phaseDefs = withPhaseDelegation(requested, customDefs, agentForDefs);
-      const defs = [...phaseDefs, ...customDefs];
+      let defs = [...phaseDefs, ...customDefs];
       if (defs.length === 0) return [];
       const readOnlyHook = readOnlyHookFor();
       if (agentForDefs === "claude") {
@@ -857,15 +884,36 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
             chmodSync(path, 0o600);
             phaseContextFile = { context: shared, path };
           }
-          const json = renderAgentsJson(defs, {
-            readOnlyHookCommand: readOnlyHook?.command, ...(phaseContextFile ? { phaseContextFile } : {}),
-          });
-          const bytes = Buffer.byteLength(json);
+          // Audit P1-11 · kontrak bersama custom agent SEKALI per policy ke berkas, dirujuk path-nya.
+          const agentContractFiles: AgentContractFile[] = [];
+          for (const policy of new Set(customDefs.map((d) => d.workspacePolicy ?? "inherit"))) {
+            const path = agentContractFilePath(id, policy);
+            const content = agentContractOf(policy);
+            writeFileSync(path, content, { mode: 0o600 });
+            chmodSync(path, 0o600);
+            agentContractFiles.push({ policy, content, path });
+          }
+          // Audit P1-11 · ambang yang sama untuk sesi DENGAN maupun TANPA agen fase: custom agent
+          // opt-in dibuang lebih dulu (klausa delegasi fase dirakit ulang dari roster yang tersisa).
+          // Agen fase sendiri tak pernah dibuang — bila ia saja sudah melewati ambang, all-or-nothing.
+          const fit = fitCustomAgentsToArgBudget(customDefs, (kept) => renderAgentsJson(
+            [...withPhaseDelegation(requested, kept, agentForDefs), ...kept], {
+              readOnlyHookCommand: readOnlyHook?.command, agentContractFiles,
+              ...(phaseContextFile ? { phaseContextFile } : {}),
+            }));
+          const bytes = Buffer.byteLength(fit.json);
           if (phaseDefs.length > 0 && bytes > AGENTS_ARG_SAFE_BYTES) {
             return [`argumen --agents ${bytes} B melewati ambang aman ${AGENTS_ARG_SAFE_BYTES} B `
               + "(batas satu argumen exec Linux 128 KiB)"];
           }
-          writeFileSync(file, json, { mode: 0o600 });
+          for (const def of fit.dropped) {
+            process.stderr.write(`hanoman: custom agent ${def.name} dibuang dari sesi ${id} — argumen --agents `
+              + `melewati ambang aman ${AGENTS_ARG_SAFE_BYTES} B (agen opt-in paling akhir dibuang lebih dulu)\n`);
+          }
+          customDefs = fit.kept;
+          defs = [...withPhaseDelegation(requested, customDefs, agentForDefs), ...customDefs];
+          if (defs.length === 0) return [];
+          writeFileSync(file, fit.json, { mode: 0o600 });
         } catch (error) {
           if (phaseDefs.length === 0) throw error;
           return [error instanceof Error ? error.message : String(error)];
