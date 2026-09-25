@@ -10,7 +10,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import {
   createSession, getSession, listSessions, killSession, killAll, detachAll, attach, writeTo,
   sessionPhases, sessionFinished, markerFilled, promptFilePath, armGoalInTui, goalGatePath,
-  sessionKind, registerSessionHooks, rootBypassEnv, noTtyPromptEnv, askpassDenyPath,
+  sessionKind, registerSessionHooks, rootBypassEnv, noTtyPromptEnv, askpassDenyPath, hanomanDbInheritUnsets,
   sendToPane, shellBin, listSessionsAsync, liveDecisions,
   MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback, PANE_QUIET_MS, paneQuiet, decisionOnset,
   type SessionBirth, type SessionDeath,
@@ -211,6 +211,51 @@ describe("pty service", () => {
       await cfg.clearConfig("CLAUDE_CODE_OAUTH_TOKEN");
     }
   });
+
+  // Audit custom agent 2026-09-25 · P0-5 · `db.ts` menulis DATABASE_URL = DB hanoman ke env proses,
+  // dan tmux server membawanya ke setiap pane. Di sesi agen nilai itu dilepas; milik project lain tidak.
+  it("hanomanDbInheritUnsets hanya melepas DATABASE_URL yang menunjuk DB hanoman", () => {
+    expect(hanomanDbInheritUnsets({ DATABASE_URL: "file:/h/.hanoman/hanoman.db" })).toEqual(["DATABASE_URL"]);
+    expect(hanomanDbInheritUnsets({
+      HANOMAN_DATABASE_URL: "file:/h/.hanoman/hanoman.db", DATABASE_URL: "file:/h/.hanoman/hanoman.db",
+    })).toEqual(["DATABASE_URL"]);
+    // DB hanoman dipatok HANOMAN_DATABASE_URL → DATABASE_URL ber-file lain milik project, dibiarkan.
+    expect(hanomanDbInheritUnsets({
+      HANOMAN_DATABASE_URL: "file:/h/.hanoman/hanoman.db", DATABASE_URL: "file:/proj/dev.db",
+    })).toEqual([]);
+    // Non-`file:` tak pernah dipakai hanoman (ADR-0086) → milik project lain.
+    expect(hanomanDbInheritUnsets({ DATABASE_URL: "postgres://x@y/z" })).toEqual([]);
+    expect(hanomanDbInheritUnsets({})).toEqual([]);
+  });
+
+  it("sesi agen lahir tanpa DATABASE_URL DB hanoman; terminal mentah & opts.env tak disentuh", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    const dbUrl = process.env.DATABASE_URL!;
+    expect(dbUrl.startsWith("file:")).toBe(true);   // pra-syarat: db.ts sudah menormalkannya
+    const tmuxArgs = ["-L", process.env.HANOMAN_TMUX_SOCKET ?? "hanoman-test", "-f", "/dev/null"];
+    const warm = createSession("db0", process.cwd());   // melahirkan tmux server
+    await waitFor(() => getSession(warm.id) !== undefined);
+    // Tiru tmux server yang lahir dengan env server hanoman (db.ts sudah menulis DATABASE_URL).
+    execFileSync("tmux", [...tmuxArgs, "set-environment", "-g", "DATABASE_URL", dbUrl]);
+
+    const raw = createSession("db1", process.cwd(), { command: [FAKE_CLAUDE] });
+    const cr = fakeClient();
+    attach(raw.id, cr);
+    await waitFor(() => allData(cr).includes("dburl:"));
+    expect(allData(cr).replace(/\s+/g, " ")).toContain(`dburl: [${dbUrl}]`);   // pra-syarat pewarisan
+
+    const s = createSession("db2", process.cwd());
+    const c = fakeClient();
+    attach(s.id, c);
+    await waitFor(() => allData(c).includes("dburl:"));
+    expect(allData(c).replace(/\s+/g, " ")).toContain("dburl: []");
+
+    const own = createSession("db3", process.cwd(), { env: { DATABASE_URL: "file:/tmp/milik-pemanggil.db" } });
+    const co = fakeClient();
+    attach(own.id, co);
+    await waitFor(() => allData(co).includes("dburl:"));
+    expect(allData(co).replace(/\s+/g, " ")).toContain("dburl: [file:/tmp/milik-pemanggil.db]");
+  }, TMUX_SPAWN_TIMEOUT);
 
   // SPEC-332 · ADR-0073 · mode goal: Stop hook bertipe prompt ikut lahir bersama sesi.
   it("goal opt menaruh Stop hook bertipe prompt di argv --settings", async () => {

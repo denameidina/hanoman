@@ -19,4 +19,6 @@ echo "env: IS_SANDBOX=${IS_SANDBOX:-}"
 echo "sshenv: ASKPASS=${SSH_ASKPASS:-} REQUIRE=${SSH_ASKPASS_REQUIRE:-} GITPROMPT=${GIT_TERMINAL_PROMPT:-}"
 # Bukti kredensial warisan: kosong bila operator menekan "Hapus" (env -u).
 echo "oauth: TOKEN=[${CLAUDE_CODE_OAUTH_TOKEN:-}]"
+# Audit P0-5 · bukti DATABASE_URL DB operasional hanoman dilepas dari pane sesi agen.
+echo "dburl: [${DATABASE_URL:-}]"
 exec cat

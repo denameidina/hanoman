@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
@@ -28,7 +28,7 @@ import { controlHost, loadIngressPolicy } from "./ingress-policy";
 import { sessionEventToken } from "./session-event-token";
 import { sandboxCommand } from "./session-sandbox";
 import { sessionEventDir } from "./session-event-spool";
-import { agentDefinitionHash } from "@hanoman/runner";
+import { agentDefinitionHash, resolveDbUrl } from "@hanoman/runner";
 export { sessionEventDir } from "./session-event-spool";
 
 // Sesi hidup di dalam tmux server, bukan di proses API (ADR-0016). Restart `pnpm dev`
@@ -365,6 +365,23 @@ export function noTtyPromptEnv(): Record<string, string> {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   writeFileSync(path, ASKPASS_DENY, { mode: 0o700 });
   return { SSH_ASKPASS: path, SSH_ASKPASS_REQUIRE: "force", GIT_TERMINAL_PROMPT: "0" };
+}
+
+/**
+ * Audit custom agent 2026-09-25 · P0-5 · `db.ts` menulis URL DB operasional hanoman ke
+ * `process.env.DATABASE_URL`, dan pane sesi mewarisinya dari tmux server (yang lahir dengan env
+ * server ini). Di dalam pane nilai itu bukan konfigurasi siapa pun: test hanoman di worktree
+ * (DATABASE_URL ambient mengalahkan HANOMAN_HOME) dan `migrate`/`db push` project lain lalu menulis
+ * DB operasional. Dilepas (`env -u`) HANYA bila nilainya memang DB hanoman menurut `resolveDbUrl`
+ * — DATABASE_URL milik project lain dibiarkan, dan `opts.env` pemanggil tetap menang.
+ */
+export function hanomanDbInheritUnsets(env: NodeJS.ProcessEnv = process.env): string[] {
+  const raw = env.DATABASE_URL?.trim();
+  if (!raw?.startsWith("file:")) return [];
+  let own: string;
+  try { own = resolveDbUrl(env, process.cwd()); } catch { return []; }
+  const file = (u: string) => resolvePath(u.slice("file:".length));
+  return file(raw) === file(own) ? ["DATABASE_URL"] : [];
 }
 
 /**
@@ -1053,7 +1070,8 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   for (const [k, v] of Object.entries(opts.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
   // Kredensial warisan yang dikosongkan operator: `claude` mewarisi env dari tmux server (lahir
   // dengan env server ini), jadi hanya `env -u` yang benar-benar melepasnya dari sesi baru.
-  const unsets = opts.command ? [] : suppressedInheritKeys().flatMap((k) => ["-u", k]);
+  const unsets = opts.command ? []
+    : [...suppressedInheritKeys(), ...hanomanDbInheritUnsets()].flatMap((k) => ["-u", k]);
   let cmd = unsets.length ? ["env", ...unsets, ...envPairs, argv].join(" ")
     : envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
   if (!opts.command) {
