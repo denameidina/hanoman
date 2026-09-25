@@ -17,34 +17,57 @@ describe("katalog agen bawaan", () => {
   });
 
   it("delapan profile aplikasi opt-in valid untuk runtime dan model rekomendasinya", () => {
-    const expected = {
-      "product-designer": ["isolated-worktree", "medium"],
-      "feature-builder": ["isolated-worktree", "medium"],
-      "performance-engineer": ["isolated-worktree", "high"],
-      "product-analyst": ["read-only", "medium"],
-      "solution-architect": ["read-only", "high"],
-      "operations-engineer": ["isolated-worktree", "medium"],
-      "support-triager": ["read-only", "medium"],
-      "knowledge-maintainer": ["isolated-worktree", "medium"],
+    const expected: Record<string, { policy: "read-only" | "isolated-worktree"; effort: string; maxTurns: number;
+      models: { claude: string; codex: string } }> = {
+      "product-designer": { policy: "isolated-worktree", effort: "medium", maxTurns: 40,
+        models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
+      "feature-builder": { policy: "isolated-worktree", effort: "medium", maxTurns: 80,
+        models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
+      "performance-engineer": { policy: "isolated-worktree", effort: "high", maxTurns: 40,
+        models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
+      "product-analyst": { policy: "read-only", effort: "medium", maxTurns: 30,
+        models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
+      // ADR-0170-era decision: opus/gpt-5.6-sol/high/40 + Bash (spekulatif, lihat sintesis audit §5.5).
+      "solution-architect": { policy: "read-only", effort: "high", maxTurns: 40,
+        models: { claude: "opus", codex: "gpt-5.6-sol" } },
+      "operations-engineer": { policy: "isolated-worktree", effort: "medium", maxTurns: 40,
+        models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
+      "support-triager": { policy: "read-only", effort: "medium", maxTurns: 30,
+        models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
+      "knowledge-maintainer": { policy: "isolated-worktree", effort: "low", maxTurns: 30,
+        models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
     };
-    for (const [name, [policy, effort]] of Object.entries(expected)) {
+    for (const [name, spec] of Object.entries(expected)) {
       const a = BUILTIN_AGENTS.find((entry) => entry.name === name);
       expect(a, name).toBeDefined();
       if (!a) continue;
-      expect(a).toMatchObject({ workspacePolicy: policy, effort, enabledByDefault: false,
-        activation: "smart", timeoutSeconds: null, maxTurns: policy === "read-only" ? 30 : 40,
-        models: { claude: "sonnet", codex: "gpt-5.6-terra" } });
+      expect(a).toMatchObject({ workspacePolicy: spec.policy, effort: spec.effort, enabledByDefault: false,
+        activation: "smart", timeoutSeconds: null, maxTurns: spec.maxTurns, models: spec.models });
       expect(zCreateCustomAgent.safeParse({ ...a, model: null, mentions: [],
-        runtime: policy === "isolated-worktree" ? "claude" : null }).success).toBe(true);
+        runtime: spec.policy === "isolated-worktree" ? "claude" : null }).success).toBe(true);
       for (const runtime of ["claude", "codex"] as const) {
         // Claude accepts the native sonnet alias; the shared dropdown lists full IDs.
         if (runtime === "codex") expect(modelsForRuntime(runtime).map((m) => m.id)).toContain(a.models[runtime]);
         expect(effortsForRuntimeModel(runtime, a.models[runtime])).toContain(a.effort);
       }
       expect(a.tools).not.toContain("Task");
-      if (policy === "read-only") {
+      // solution-architect is the one read-only exception: it also carries Bash (P2, sintesis §5.5).
+      if (spec.policy === "read-only" && name !== "solution-architect") {
         expect(a.tools).toEqual(["Read", "Glob", "Grep", "WebFetch", "WebSearch"]);
       }
+    }
+    const architect = BUILTIN_AGENTS.find((a) => a.name === "solution-architect")!;
+    expect(architect.tools).toEqual(["Read", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"]);
+  });
+
+  // P0-1 · audit custom agent 2026-09-25: `gpt-5.6` (root-causer/edge-case-hunter/security-reviewer)
+  // tak ada di katalog Codex manapun → recommendedModel jatuh ke null dan agen diam-diam mewarisi
+  // model sesi. Ini menegakkan bahwa SETIAP rekomendasi model builtin dikenal katalog runtime-nya.
+  it("setiap rekomendasi model builtin dikenal katalog runtime-nya", () => {
+    for (const a of BUILTIN_AGENTS) {
+      expect(modelsForRuntime("codex").map((m) => m.id), a.name).toContain(a.models.codex);
+      expect(effortsForRuntimeModel("codex", a.models.codex), a.name).toContain(a.effort);
+      expect(["haiku", "sonnet", "opus"], a.name).toContain(a.models.claude);
     }
   });
 
@@ -88,7 +111,7 @@ describe("katalog agen bawaan", () => {
     expect(qa.activation).toBe("smart");
     expect(qa.workspacePolicy).toBe("isolated-worktree");
     expect(qa.maxTurns).toBe(40);
-    expect(qa.timeoutSeconds).toBe(900);
+    expect(qa.timeoutSeconds).toBe(1800);
     expect(qa.instructions).toContain("worktree sementara");
     expect(qa.instructions).toContain("belum terbukti");
   });
@@ -98,7 +121,7 @@ describe("katalog agen bawaan", () => {
     const security = BUILTIN_AGENTS.find((a) => a.name === "security-reviewer")!;
     expect(scout.models).toEqual({ claude: "haiku", codex: "gpt-5.6-terra" });
     expect(scout.effort).toBe("low");
-    expect(security.models).toEqual({ claude: "sonnet", codex: "gpt-5.6" });
+    expect(security.models).toEqual({ claude: "sonnet", codex: "gpt-5.6-sol" });
     expect(security.effort).toBe("high");
   });
 
@@ -106,21 +129,21 @@ describe("katalog agen bawaan", () => {
     const limits = Object.fromEntries(BUILTIN_AGENTS.map((a) => [a.name, a.maxTurns]));
     expect(limits).toEqual({
       scout: 20,
-      "root-causer": 40,
+      "root-causer": 30,
       "qa-verifier": 40,
       "edge-case-hunter": 40,
       "blast-radius": 30,
       "spec-auditor": 30,
       "security-reviewer": 30,
-      "dep-auditor": 30,
+      "dep-auditor": 40,
       "product-designer": 40,
-      "feature-builder": 40,
+      "feature-builder": 80,
       "performance-engineer": 40,
       "product-analyst": 30,
-      "solution-architect": 30,
+      "solution-architect": 40,
       "operations-engineer": 40,
       "support-triager": 30,
-      "knowledge-maintainer": 40,
+      "knowledge-maintainer": 30,
     });
   });
 
