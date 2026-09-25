@@ -136,9 +136,10 @@ export type CapacityFrame = z.infer<typeof zCapacityFrame>;
 export const capacityFrameJson = (admission: LaunchStatus): string =>
   JSON.stringify({ t: "capacity", v: PRESENCE_PROTOCOL, admission });
 
-/** Dedup pengirim. `loadPerCore` dibulatkan 1 desimal: load average bergerak tiap tick, dan
-    signature presisi penuh berarti satu frame per 3 dtk walau tak ada yang berubah berarti. */
+/** Dedup pengirim. `loadPerCore`/`memAvailablePct` dibulatkan: keduanya angka bergerak tiap tick,
+    dan signature presisi penuh berarti satu frame per 3 dtk walau tak ada yang berubah berarti. */
 export function capacitySignature(a: LaunchStatus): string {
   return JSON.stringify([a.enabled, a.liveCount, a.liveAgentCount, a.maxConcurrent,
-    a.loadPerCore === null ? null : Math.round(a.loadPerCore * 10) / 10, a.maxLoadPerCore, a.loadStatus]);
+    a.loadPerCore === null ? null : Math.round(a.loadPerCore * 10) / 10, a.maxLoadPerCore, a.loadStatus,
+    a.memAvailablePct === null ? null : Math.round(a.memAvailablePct), a.minMemAvailablePct, a.memStatus]);
 }

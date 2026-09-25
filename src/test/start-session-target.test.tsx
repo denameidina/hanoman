@@ -23,7 +23,8 @@ import { api } from "../src/api/client";
 const dev = (o: Partial<PresenceDeviceView> & { deviceId: string }): PresenceDeviceView => ({
   name: o.deviceId, local: o.deviceId === LOCAL_DEVICE_ID, online: true, lastSeenAt: null,
   sessions: [], control: { state: "available", protocol: 1, version: "v", capabilities: ["sessions:spawn"], since: "t" },
-  capacity: { enabled: true, liveCount: 0, liveAgentCount: 0, maxConcurrent: 5, loadPerCore: 0.1, maxLoadPerCore: 1, loadStatus: "available" },
+  capacity: { enabled: true, liveCount: 0, liveAgentCount: 0, maxConcurrent: 5, loadPerCore: 0.1, maxLoadPerCore: 1, loadStatus: "available",
+    memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available" },
   ...o,
 });
 const handledBy = (deviceId: string, name = deviceId): HandledByEntry[] => [{ deviceId, name }];

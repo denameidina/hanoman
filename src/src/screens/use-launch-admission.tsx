@@ -45,6 +45,8 @@ export function useLaunchAdmission() {
       <div>Load per core: {status.loadStatus === "available" && status.loadPerCore !== null
         ? status.loadPerCore.toFixed(2) : "tidak tersedia"}
         {status.loadStatus === "unsupported" ? " (tidak didukung platform)" : ""} · ambang {status.maxLoadPerCore}</div>
+      <div>Memori tersedia: {status.memStatus === "available" && status.memAvailablePct !== null
+        ? `${status.memAvailablePct.toFixed(0)}%` : "tidak tersedia"} · ambang {status.minMemAvailablePct}%</div>
       <p>Mulai tetap melewati cap sesi dan pemeriksaan beban host, serta dependency bila ada.
         Pilihan sesi dan konteks pekerjaan tetap sama.</p>
     </div>

@@ -256,6 +256,8 @@ function AdmissionStatus({ status }: { status: LaunchStatus }) {
         <div>Load per core: {status.loadStatus === "available" && status.loadPerCore !== null
           ? status.loadPerCore.toFixed(2) : "tidak tersedia"}
           {status.loadStatus === "unsupported" ? " (tidak didukung platform)" : ""} · ambang {status.maxLoadPerCore}</div>
+        <div>Memori tersedia: {status.memStatus === "available" && status.memAvailablePct !== null
+          ? `${status.memAvailablePct.toFixed(0)}%` : "tidak tersedia"} · ambang {status.minMemAvailablePct}%</div>
         <div style={{ fontSize: "var(--text-xs)", marginTop: 6 }}>
           Berlaku juga saat scheduler berhenti. Terminal dan shell tetap bisa dibuka; keduanya ikut mengisi cap.
         </div>
@@ -273,9 +275,10 @@ function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next:
   const num = (v: string, min = 1) => Math.max(min, Number(v) || min);
   const guard = draft.launchGuard ?? SCHEDULER_DEFAULTS.launchGuard;
   const validLoad = Number.isFinite(guard.maxLoadPerCore) && guard.maxLoadPerCore > 0;
+  const validMem = Number.isFinite(guard.minMemAvailablePct) && guard.minMemAvailablePct >= 0 && guard.minMemAvailablePct <= 100;
   return (
     <Card eyebrow="scheduler · setelan" title="Konfigurasi"
-      actions={<Button size="sm" leftIcon="save" disabled={busy || !validLoad}
+      actions={<Button size="sm" leftIcon="save" disabled={busy || !validLoad || !validMem}
         onClick={() => onWrite({ ...draft, launchGuard: guard })}>Simpan setelan</Button>}>
       <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 14 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -294,8 +297,9 @@ function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next:
         <Switch label="Gerbang peluncuran" checked={guard.enabled}
           onChange={(enabled: boolean) => setDraft((d) => ({ ...d, launchGuard: { ...guard, enabled } }))} />
         <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.5 }}>
-          Membatasi peluncuran agen menurut cap sesi dan beban host, termasuk peluncuran manual.
-          Mematikannya melewati kedua pemeriksaan. Terpisah dari sakelar scheduler dan source.
+          Membatasi peluncuran agen menurut cap sesi, beban host, dan memori tersedia, termasuk
+          peluncuran manual. Mematikannya melewati ketiga pemeriksaan. Terpisah dari sakelar
+          scheduler dan source.
         </p>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span className="hn-eyebrow">Ambang load per core</span>
@@ -305,6 +309,15 @@ function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next:
               ...d, launchGuard: { ...guard, maxLoadPerCore: Number(e.target.value) },
             }))} />
           {!validLoad && <span style={{ fontSize: "var(--text-xs)", color: "var(--clay-500)" }}>Isi angka lebih besar dari nol.</span>}
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 10 }}>
+          <span className="hn-eyebrow">Ambang memori tersedia minimum (%)</span>
+          <Input type="number" min={0} max={100} step="any" value={String(guard.minMemAvailablePct)}
+            aria-label="Ambang memori tersedia minimum" aria-invalid={!validMem} placeholder="15"
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({
+              ...d, launchGuard: { ...guard, minMemAvailablePct: Number(e.target.value) },
+            }))} />
+          {!validMem && <span style={{ fontSize: "var(--text-xs)", color: "var(--clay-500)" }}>Isi angka 0–100.</span>}
         </label>
       </div>
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>

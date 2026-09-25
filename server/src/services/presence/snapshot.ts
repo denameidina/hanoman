@@ -58,5 +58,5 @@ export async function buildLocalPresence(): Promise<PresenceSession[]> {
 
 /** SPEC-1215 · ADR-0165 §9 · angka yang SAMA dengan gerbang peluncuran, bukan metrik baru. */
 export async function buildLocalCapacity(): Promise<LaunchStatus> {
-  return currentLaunchStatus(await listPanesShared(), await getScheduler());
+  return await currentLaunchStatus(await listPanesShared(), await getScheduler());
 }

@@ -5,6 +5,7 @@ import type { LaunchStatus } from "./session-admission";
 const admission: LaunchStatus = {
   enabled: true, liveCount: 2, liveAgentCount: 1, maxConcurrent: 4,
   loadPerCore: 0.42, maxLoadPerCore: 1.5, loadStatus: "available",
+  memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available",
 };
 
 describe("frame capacity (SPEC-1215 · ADR-0165 §9)", () => {

@@ -20,6 +20,7 @@ describe("governor.drain", () => {
       launch: async () => { attempts++; throw new LaunchAdmissionError("host-load", {
         enabled: true, liveCount: 0, liveAgentCount: 0, maxConcurrent: 2,
         loadPerCore: 3.75, maxLoadPerCore: 2.5, loadStatus: "available",
+        memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available",
       }); },
     };
     await drain(cfg(), deps);

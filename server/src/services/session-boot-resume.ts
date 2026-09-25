@@ -7,29 +7,33 @@ import { flowForSource } from "@hanoman/shared";
 import { prisma } from "../db";
 import { reconciledRuntimesSince, reconciledSpecIdsSince, type SessionRuntime } from "./session-history";
 import { startSpecSession, type StartSpecResult } from "./session-launch";
+import { LaunchAdmissionError } from "./session-admission";
 import { recordFailure } from "./notifications";
 
 export type ResumeDeps = {
   // S4c · `runtime` = agen/model/effort sesi asal (SessionHistory); absen → default Setting global.
   startSpec: (spec: Spec, runtime?: SessionRuntime) => Promise<StartSpecResult>;
   recordFail: (specId: string, title: string, projectId: string | null, reason: string) => Promise<void>;
+  // ADR-0170 · amandemen ADR-0169 keputusan #4: kandidat yang ditolak gerbang kapasitas/beban
+  // host dicatat TERPISAH dari kegagalan sungguhan (worktree rusak dst) — operator melanjutkannya
+  // manual lewat tombol "Lanjutkan" yang sudah ada (ADR-0084), bukan retry otomatis.
+  recordDeferred: (specId: string, title: string, projectId: string | null, reason: string) => Promise<void>;
 };
 
 const prodDeps: ResumeDeps = {
-  // ADR-0169 · `bypassCapacity: true` — SATU-SATUNYA jalur yang melewati cap ADR-0161; gerbang
-  // dependency ADR-0093 TETAP berlaku (tak diberi `force`). Keputusan sadar risiko: mesin 8 GB
-  // operator sudah pernah kernel panic akibat sesi paralel berlebih (memori
-  // mac-mini-8gb-panic-agen-paralel) — operator memilih "semua kembali" di atas throttle.
-  startSpec: (spec, runtime) => startSpecSession(spec, {
-    flow: flowForSource(spec.source), bypassCapacity: true, ...(runtime ?? {}),
-  }),
+  // ADR-0170 · mengamandemen ADR-0169 keputusan #4: `bypassCapacity` DICABUT. Auto-resume kini
+  // tunduk cap/beban host seperti "Lanjutkan" manual — mesin 8 GB operator sudah dua kali kernel
+  // panic akibat batch sesi paralel tepat SAAT boot (memori mac-mini-8gb-panic-agen-paralel),
+  // titik waktu paling rawan menumpuk kandidat resume. Gerbang dependency ADR-0093 tak berubah.
+  startSpec: (spec, runtime) => startSpecSession(spec, { flow: flowForSource(spec.source), ...(runtime ?? {}) }),
   recordFail: recordFailure,
+  recordDeferred: recordFailure,
 };
 
-export type ResumeReport = { resumed: string[]; failed: string[] };
+export type ResumeReport = { resumed: string[]; failed: string[]; deferred: string[] };
 
 export async function resumeReconciledSessions(cutoff: Date, deps: ResumeDeps = prodDeps): Promise<ResumeReport> {
-  const report: ResumeReport = { resumed: [], failed: [] };
+  const report: ResumeReport = { resumed: [], failed: [], deferred: [] };
   const specIds = await reconciledSpecIdsSince(cutoff);
   if (!specIds.length) return report;
   // stage "done" · item sudah selesai sebelum reboot, tak perlu dilanjutkan meski baris
@@ -37,13 +41,19 @@ export async function resumeReconciledSessions(cutoff: Date, deps: ResumeDeps = 
   const specs = await prisma.spec.findMany({ where: { id: { in: specIds }, stage: { not: "done" } } });
   const runtimes = await reconciledRuntimesSince(cutoff);
   // Berurutan — bukan Promise.all: operasi worktree/git antar item tak boleh saling tabrak
-  // (rebuild worktree dari headSha, dsb). Murni menghindari race, BUKAN throttle kapasitas —
-  // kapasitas sudah sengaja dilewati lewat bypassCapacity di atas.
+  // (rebuild worktree dari headSha, dsb), dan setiap item yang berhasil lahir mengisi cap yang
+  // dibaca item berikutnya — urutan itulah yang membuat resume "bertahap" tanpa antrean baru.
   for (const spec of specs) {
     try {
       await deps.startSpec(spec, runtimes.get(spec.id));
       report.resumed.push(spec.id);
     } catch (e) {
+      if (e instanceof LaunchAdmissionError) {
+        await deps.recordDeferred(spec.id, spec.title, spec.projectId,
+          `ditunda — cap/beban host penuh saat boot (${e.kind}). Lanjutkan manual saat slot kosong.`);
+        report.deferred.push(spec.id);
+        continue;
+      }
       const reason = e instanceof Error ? e.message : String(e);
       await deps.recordFail(spec.id, spec.title, spec.projectId, `gagal dilanjutkan otomatis — ${reason}`);
       report.failed.push(spec.id);

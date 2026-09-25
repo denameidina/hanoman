@@ -150,11 +150,15 @@ bootstrapReady.then(async () => {
         // ADR-0169 · begitu baris ditutup, backlog yang tadinya berjalan langsung dicoba
         // dilanjutkan otomatis — TANPA menunggu klik "Lanjutkan" manusia.
         if (n) {
-          const { resumed, failed } = await resumeReconciledSessions(reconcileCutoff);
+          const { resumed, failed, deferred } = await resumeReconciledSessions(reconcileCutoff);
           if (resumed.length)
             console.log(`auto-resume: ${resumed.length} sesi dilanjutkan otomatis (${resumed.join(", ")})`);
           if (failed.length)
             console.log(`auto-resume: ${failed.length} sesi gagal dilanjutkan otomatis, lihat notifikasi (${failed.join(", ")})`);
+          // ADR-0170 · tunduk cap/beban host: kandidat yang tak muat ditunda, bukan gagal —
+          // notifikasi sudah tercatat per item, operator melanjutkan manual saat slot kosong.
+          if (deferred.length)
+            console.log(`auto-resume: ${deferred.length} sesi ditunda (cap/beban host penuh), lihat notifikasi (${deferred.join(", ")})`);
         }
       })
       .catch((e) => console.error("rekonsiliasi riwayat sesi:", e));

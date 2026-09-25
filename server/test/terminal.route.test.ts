@@ -132,7 +132,7 @@ beforeAll(async () => {
     "commit", "-qm", "init", "--allow-empty"], { cwd: repoDir });
   await resetDb();
   // Berkas ini sengaja menumpuk pane lintas test; admission aktif diuji terpisah (SPEC-1108).
-  await makeSetting({ scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } } });
+  await makeSetting({ scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5, minMemAvailablePct: 15 } } });
   await makeProject({ id: "p1", repoDir });
   await makeProject({ id: "p2", name: "p2", repoDir: null });
   await app.listen({ port: 0, host: "127.0.0.1" });
@@ -145,7 +145,7 @@ describe("preValidation /:id/ws — req.remote in-process (SPEC-1218 · prasyara
   // sama dipakai `beforeAll`, panggilan di sini akan menghidupkan lagi `launchGuard` default dan
   // membocorkan 409 ke SETIAP test lain di berkas ini yang berjalan sesudahnya.
   const remoteSetting = (remoteControl: { enabled: boolean; capabilities: RemoteCapability[] }) =>
-    makeSetting({ remoteControl, scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } } });
+    makeSetting({ remoteControl, scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5, minMemAvailablePct: 15 } } });
   const remoteHeaders = (over: Record<string, string> = {}) => ({
     [RELAY_HEADER]: relaySecret(),
     [RELAY_ACTOR_HEADER]: encodeRelayActor({ hubOrigin: "https://hub.example", userId: "u1", email: "op@hub.example" }),
@@ -1179,7 +1179,7 @@ describe("POST /terminal/sessions · force dari remote (SPEC-1216 · AC-B3)", ()
     // yang disetel `beforeAll` berkas ini (baris ~132) ke default (`enabled:true`), yang kemudian
     // menjatuhkan test DELETE sesudahnya (admission gate menolak sesi baru). Disertakan lagi di sini.
     await makeSetting({
-      scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } },
+      scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5, minMemAvailablePct: 15 } },
       remoteControl: { enabled: true, capabilities: ["sessions:read", "sessions:spawn"] },
     });
     process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
@@ -1201,7 +1201,7 @@ describe("POST /terminal/sessions · force dari remote (SPEC-1216 · AC-B3)", ()
 describe("POST /terminal/sessions · gerbang presence remote (SPEC-1216 · AC-B5/B6)", () => {
   beforeEach(async () => {
     __resetPresence();
-    await makeSetting({ scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } } });
+    await makeSetting({ scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5, minMemAvailablePct: 15 } } });
   });
 
   it("sesi working di device lain → 409 {error:'remote-session', remoteSession}", async () => {

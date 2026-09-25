@@ -67,8 +67,10 @@ describe("SPEC-1108 · gerbang bersama peluncuran backlog", () => {
     expect(state.effects).toEqual([]);
   });
 
-  it("opts.bypassCapacity melewati cap TANPA memerlukan force (ADR-0169)", async () => {
-    await expect(startSpecSession(spec, { flow: "qa", bypassCapacity: true }))
+  // ADR-0170 · mengamandemen ADR-0169 keputusan #4: `bypassCapacity` dicabut — `force` tetap
+  // satu-satunya jalan melewati cap, dan hanya jalur manusia yang memasoknya.
+  it("force melewati cap (satu-satunya jalan, tanpa bypassCapacity)", async () => {
+    await expect(startSpecSession(spec, { flow: "qa", force: true }))
       .resolves.toMatchObject({ id: "spec-1108" });
     expect(state.effects).toContain("spawn");
   });
