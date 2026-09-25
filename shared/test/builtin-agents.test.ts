@@ -9,10 +9,10 @@ import {
 // tak ada, ia tak ditegakkan sama sekali.
 
 describe("katalog agen bawaan", () => {
-  it("berisi enam belas entri bernama unik", () => {
-    expect(BUILTIN_AGENTS).toHaveLength(16);
+  it("berisi dua puluh lima entri bernama unik", () => {
+    expect(BUILTIN_AGENTS).toHaveLength(25);
     const names = BUILTIN_AGENTS.map((a) => a.name);
-    expect(new Set(names).size).toBe(16);
+    expect(new Set(names).size).toBe(25);
     expect(BUILTIN_AGENT_NAMES).toEqual(names);
   });
 
@@ -144,6 +144,15 @@ describe("katalog agen bawaan", () => {
       "operations-engineer": 40,
       "support-triager": 30,
       "knowledge-maintainer": 30,
+      "a11y-auditor": 30,
+      "frontend-render-auditor": 30,
+      "api-contract-auditor": 30,
+      "concurrency-hazard-hunter": 30,
+      "schema-migration-auditor": 30,
+      "layering-guard": 20,
+      "cloudflare-config-auditor": 30,
+      "vps-hardening-auditor": 30,
+      "maintainability-reviewer": 30,
     });
   });
 
@@ -168,7 +177,7 @@ describe("katalog agen bawaan", () => {
   // Berkas ini ikut dibundel untuk browser. `node:crypto` di sini mematikan build web, dan
   // gejalanya muncul jauh dari sini.
   it("tabelnya data murni — tanpa impor node:*", () => {
-    for (const file of ["builtin-agents.ts", "builtin-app-agents.ts"]) {
+    for (const file of ["builtin-agents.ts", "builtin-app-agents.ts", "builtin-domain-agents.ts"]) {
       const src = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8");
       expect(src).not.toMatch(/from "node:/);
     }

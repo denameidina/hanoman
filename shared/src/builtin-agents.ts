@@ -18,6 +18,7 @@
 
 import type { BuiltinAgentDef } from "./builtin-agent-types";
 import { BUILTIN_APP_AGENTS } from "./builtin-app-agents";
+import { BUILTIN_DOMAIN_AGENTS } from "./builtin-domain-agents";
 import { SPEC_AUDIT_VERDICT_LIST } from "./spec-audit";
 
 export type { BuiltinAgentDef } from "./builtin-agent-types";
@@ -365,6 +366,7 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
     ].join("\n"),
   },
   ...BUILTIN_APP_AGENTS,
+  ...BUILTIN_DOMAIN_AGENTS,
 ];
 
 // Jaring saat modul dievaluasi sengaja TIDAK dipasang di sini: `builtin-agents.test.ts` yang

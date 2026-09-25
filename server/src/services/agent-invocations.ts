@@ -79,19 +79,61 @@ const EMPTY_USAGE: Usage = { inputTokens: null, outputTokens: null, cachedTokens
 const nonnegativeInt = (value: unknown): number | null =>
   Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : null;
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" ? value as Record<string, unknown> : null;
+
+/**
+ * Audit custom agent 2026-09-25 · P1-10 · tiga bentuk usage transcript, semuanya dalam satuan yang
+ * sama: `inputTokens` = SELURUH input yang diproses (termasuk cache), `cachedTokens` = bagian yang
+ * dibaca dari cache, `outputTokens` = keluaran.
+ * - claude (`agent_transcript_path` subagent): usage ada di `record.message.usage`, per PESAN API.
+ *   Satu pesan terpecah ke beberapa baris JSONL ber-`message.id` sama (satu per blok konten) dan
+ *   `output_tokens` baris awal masih parsial — jadi diambil nilai terbesar per `message.id`, lalu
+ *   DIJUMLAHKAN lintas pesan. Input = `input_tokens + cache_creation_input_tokens +
+ *   cache_read_input_tokens`, setara `input_tokens` codex yang sudah memuat cache.
+ * - codex (rollout `~/.codex/sessions/**`): `payload.info.total_token_usage` adalah total KUMULATIF
+ *   thread pada event `token_count` → nilai terbesar. `payload.usage` milik `token_usage_record`
+ *   (per respons) sengaja tak dibaca: ia sudah tercakup total kumulatif, menjumlahkannya = ganda.
+ * - `record.usage` tingkat atas (bentuk lama/generik) → nilai terbesar, seperti sebelumnya.
+ */
 function usageFromText(text: string): Usage {
-  const found: number[][] = [];
+  const cumulative: number[][] = [];
+  const perMessage = new Map<string, number[]>();
+  let anonymous = 0;
+  const known = (...values: unknown[]): number => {
+    const ints = values.map(nonnegativeInt);
+    return ints.some((n) => n !== null) ? ints.reduce<number>((sum, n) => sum + (n ?? 0), 0) : -1;
+  };
   const inspect = (value: unknown): void => {
-    if (!value || typeof value !== "object") return;
-    const record = value as Record<string, unknown>;
-    const usage = record.usage;
-    if (usage && typeof usage === "object") {
-      const u = usage as Record<string, unknown>;
-      found.push([
-        nonnegativeInt(u.input_tokens ?? u.inputTokens) ?? -1,
-        nonnegativeInt(u.output_tokens ?? u.outputTokens) ?? -1,
-        nonnegativeInt(u.cached_tokens ?? u.cachedTokens
-          ?? u.cache_read_input_tokens ?? u.cacheReadInputTokens) ?? -1,
+    const record = asRecord(value);
+    if (!record) return;
+    const message = asRecord(record.message);
+    const claude = asRecord(message?.usage);
+    if (claude) {
+      const entry = [
+        known(claude.input_tokens, claude.cache_creation_input_tokens, claude.cache_read_input_tokens),
+        known(claude.output_tokens),
+        known(claude.cache_read_input_tokens),
+      ];
+      const id = typeof message!.id === "string" && message!.id ? message!.id : `\0${anonymous++}`;
+      const prev = perMessage.get(id);
+      perMessage.set(id, prev ? prev.map((n, i) => Math.max(n, entry[i]!)) : entry);
+      return;
+    }
+    const codex = asRecord(asRecord(asRecord(record.payload)?.info)?.total_token_usage);
+    if (codex) {
+      cumulative.push([
+        known(codex.input_tokens), known(codex.output_tokens), known(codex.cached_input_tokens),
+      ]);
+      return;
+    }
+    const u = asRecord(record.usage);
+    if (u) {
+      cumulative.push([
+        known(u.input_tokens ?? u.inputTokens),
+        known(u.output_tokens ?? u.outputTokens),
+        known(u.cached_tokens ?? u.cachedTokens ?? u.cached_input_tokens
+          ?? u.cache_read_input_tokens ?? u.cacheReadInputTokens),
       ]);
     }
   };
@@ -99,9 +141,17 @@ function usageFromText(text: string): Usage {
     if (!line.trim()) continue;
     try { inspect(JSON.parse(line)); } catch { /* transcript campuran sah; bentuk asing diabaikan */ }
   }
-  if (found.length === 0) return EMPTY_USAGE;
+  if (perMessage.size > 0) {
+    const entries = [...perMessage.values()];
+    const sum = (index: number): number | null => {
+      const values = entries.map((entry) => entry[index]!).filter((n) => n >= 0);
+      return values.length ? values.reduce((a, b) => a + b, 0) : null;
+    };
+    return { inputTokens: sum(0), outputTokens: sum(1), cachedTokens: sum(2) };
+  }
+  if (cumulative.length === 0) return EMPTY_USAGE;
   const max = (index: number): number | null => {
-    const values = found.map((entry) => entry[index]!).filter((n) => n >= 0);
+    const values = cumulative.map((entry) => entry[index]!).filter((n) => n >= 0);
     return values.length ? Math.max(...values) : null;
   };
   return { inputTokens: max(0), outputTokens: max(1), cachedTokens: max(2) };
