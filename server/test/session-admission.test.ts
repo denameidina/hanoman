@@ -22,7 +22,7 @@ function fixture(options: {
 }
 
 describe("SPEC-1108 · admission", () => {
-  // P3 · SPEC-1267 · cap membatasi sesi AGEN, bukan lagi semua pane hidup (ADR-0161 keputusan #2,
+  // ADR-0170 · cap membatasi sesi AGEN, bukan lagi semua pane hidup (ADR-0161 keputusan #2,
   // ditegakkan penuh mulai ADR-0170): terminal/shell operator kini bebas dari cap agen.
   it("cap counts only agent panes, excludes terminal panes and dead panes", async () => {
     const f = fixture();
@@ -62,7 +62,7 @@ describe("SPEC-1108 · admission", () => {
     expect(launchStatus([], f.cfg, { ...f.host, cores })).toMatchObject({ loadPerCore: null, loadStatus: "unavailable" });
   });
 
-  // P3 · SPEC-1267 · sinyal memori tersedia: default ambang 15%.
+  // ADR-0170 · sinyal memori tersedia: default ambang 15%.
   it.each([[15, true], [14.99, false]])("mem available %s%% vs 15%% threshold: allowed %s", async (pct, allowed) => {
     const f = fixture({ memAvailablePct: pct });
     if (allowed) await expect(f.start("a")).resolves.toMatchObject({ id: "a" });

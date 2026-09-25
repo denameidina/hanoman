@@ -9,7 +9,7 @@ import type { Scheduler } from "@hanoman/shared";
 
 const execFileAsync = promisify(execFile);
 
-// P3 · SPEC-1267 · `os.freemem()` sengaja TIDAK dipakai (ADR-0161 "Alternatif yang ditolak" —
+// ADR-0170 · `os.freemem()` sengaja TIDAK dipakai (ADR-0161 "Alternatif yang ditolak" —
 // haram di macOS: hanya menghitung halaman benar-benar bebas, mengabaikan purgeable/compressor,
 // menjawab ~146 MB pada mesin sehat 57% bebas). darwin: kern.memorystatus_level sudah persentase
 // 0–100 siap pakai. linux: MemAvailable/MemTotal dari /proc/meminfo (kernel sudah memperhitungkan
@@ -63,7 +63,7 @@ export async function createAgentSession(
 
 export async function createOperatorSession(
   projectId: string, cwd: string, opts: CreateOpts = {},
-  // P3 · SPEC-1267 · `exempt` default true (shell mentah/console VPS: ADR-0161 amandemen
+  // ADR-0170 · `exempt` default true (shell mentah/console VPS: ADR-0161 amandemen
   // SPEC-1108 — terminal adalah satu-satunya jendela diagnosis operator, tak pernah ditolak).
   // Terminal AGEN ("Sesi baru" bukan shell, terminal.ts:372) memasok `exempt:false` supaya
   // ikut gerbang cap/beban seperti sesi terstruktur lain; `force` tetap milik jalur manusia.

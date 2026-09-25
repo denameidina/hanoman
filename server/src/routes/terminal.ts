@@ -369,7 +369,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     // `Setting.agent`, dan membaca yang salah membuat sesi mentok di layar trust codex (SPEC-377).
     const { agent, model, effort } = await terminalAgentDefaults(parsed.data);
     if (agent === "codex") ensureCodexTrust(repoDir);
-    // P3 · SPEC-1267 · terminal agen (bukan shell mentah) ikut gerbang cap/beban host — hanya
+    // ADR-0170 · terminal agen (bukan shell mentah) ikut gerbang cap/beban host — hanya
     // shell/install/console VPS yang tetap exempt (ADR-0161/ADR-0170).
     const s = await createOperatorSession(project.id, repoDir, { agent, model, effort },
       { exempt: false, force: parsed.data.force });

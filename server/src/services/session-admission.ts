@@ -7,7 +7,7 @@ export type LaunchPane = {
 };
 export type HostLoad = {
   platform: string; loadAverage: number; cores: number;
-  // P3 · SPEC-1267 · persentase memori TERSEDIA (bukan bebas — lihat readHostLoad). null = platform
+  // ADR-0170 · persentase memori TERSEDIA (bukan bebas — lihat readHostLoad). null = platform
   // tak memasok angka (bukan "penuh"), cermin pola loadAverage/Windows di bawah.
   memAvailablePct: number | null;
 };

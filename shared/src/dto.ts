@@ -445,7 +445,7 @@ export const zTerminalSession = z.union([
   // `flow: z.undefined()` BUKAN hiasan: varian ini permisif dan diletakkan SESUDAH semua varian
   // ber-flow, jadi tanpa gerbang itu body flow yang CACAT ({project, flow:"prd"} tanpa brief)
   // akan lolos ke sini dan melahirkan terminal biasa secara senyap alih-alih dijawab 400.
-  // P3 · SPEC-1267 · terminal agen kini ikut gerbang peluncuran (ADR-0161/ADR-0170): `force`
+  // ADR-0170 · terminal agen kini ikut gerbang peluncuran (ADR-0161/ADR-0170): `force`
   // dipasang seperti varian ber-flow lain, hanya jalur manusia yang memasoknya.
   z.object({
     project: z.string(), flow: z.undefined(),

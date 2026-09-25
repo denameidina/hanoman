@@ -293,7 +293,7 @@ export const zScheduler = z.object({
   launchGuard: z.object({
     enabled: z.boolean().default(true),
     maxLoadPerCore: z.number().finite().positive().default(2.5),
-    // P3 · SPEC-1267 · tolak launch baru bila memori tersedia di bawah ambang (persen). Default
+    // ADR-0170 · tolak launch baru bila memori tersedia di bawah ambang (persen). Default
     // konservatif — 46% terukur sehat di Mac mini 8 GB (ADR-0170), 15% memberi jarak aman.
     minMemAvailablePct: z.number().finite().min(0).max(100).default(15),
   }).default({}),
