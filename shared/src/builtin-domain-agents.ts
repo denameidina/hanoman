@@ -37,6 +37,7 @@ export const BUILTIN_DOMAIN_AGENTS: readonly BuiltinAgentDef[] = [
     tools: ["Read", "Glob", "Grep", "Bash", "Write", "Edit"],
     enabledByDefault: false, activation: "smart", effort: "medium", workspacePolicy: "isolated-worktree",
     maxTurns: 80, timeoutSeconds: null, models: { claude: "sonnet", codex: "gpt-5.6-terra" },
+    mentions: ["a11y-auditor"],
     instructions: [
       "Kamu mengimplementasikan dan memperbaiki perilaku frontend React/TS/Vite yang didelegasikan parent — bukan merancang visual baru (itu product-designer).",
       "Masukan minimum: scope komponen/modul, desain atau acceptance yang sudah ada, base SHA, kontrak data/API yang dipakai, dan ownership berkas. Baca komponen dan pola hook tetangga sebelum menulis.",
@@ -57,6 +58,7 @@ export const BUILTIN_DOMAIN_AGENTS: readonly BuiltinAgentDef[] = [
     tools: ["Read", "Glob", "Grep", "Bash", "Write", "Edit"],
     enabledByDefault: false, activation: "smart", effort: "medium", workspacePolicy: "isolated-worktree",
     maxTurns: 80, timeoutSeconds: null, models: { claude: "sonnet", codex: "gpt-5.6-terra" },
+    mentions: ["api-contract-auditor"],
     instructions: [
       "Kamu menulis atau mengubah route/handler backend (Fastify atau setara Node) sesuai mandat",
       "parent — bukan generalis lintas domain seperti feature-builder.",
@@ -101,6 +103,7 @@ export const BUILTIN_DOMAIN_AGENTS: readonly BuiltinAgentDef[] = [
     tools: ["Read", "Glob", "Grep", "Bash", "Write", "Edit"],
     enabledByDefault: false, activation: "smart", effort: "high", workspacePolicy: "isolated-worktree",
     maxTurns: 60, timeoutSeconds: null, models: { claude: "opus", codex: "gpt-5.6-terra" },
+    mentions: ["schema-migration-auditor"],
     instructions: [
       "Kamu menulis skema dan migration database (Prisma/SQL) sesuai mandat parent, lalu MEMBUKTIKAN",
       "lewat eksekusi nyata bahwa migration aman dan indeks dipakai — bukan generalis seperti",
@@ -160,6 +163,7 @@ export const BUILTIN_DOMAIN_AGENTS: readonly BuiltinAgentDef[] = [
     activation: "smart", effort: "high", workspacePolicy: "isolated-worktree",
     maxTurns: 60, timeoutSeconds: null,
     models: { claude: "sonnet", codex: "gpt-5.6-terra" },
+    mentions: ["cloudflare-config-auditor"],
     instructions: [
       "Kamu mengerjakan infra Cloudflare dengan wewenang penuh dalam scope mandat: boleh deploy dan mengubah produksi TANPA gerbang izin tambahan, tapi tiap aksi lewat prosedur operasi yang bisa diperiksa. Batas worktree di kontrak berlaku untuk berkas lokal; aksi remote (deploy/apply/DNS/secret) dalam target mandat adalah wewenangmu.",
       "Masukan minimum: environment/project target, resource yang boleh disentuh (Workers/Pages/D1/R2/KV/Queues/DO/secrets/DNS/Access/WAF/Tunnel), dan batas scope. Baca wrangler.toml/jsonc serta config edge existing SEBELUM mengubah apa pun.",

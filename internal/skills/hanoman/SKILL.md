@@ -1448,7 +1448,9 @@ Pakai skill lebih sempit saat task cocok:
   sembilan auditor read-only menjadi lima PENGERJA isolated-worktree (Claude saja) + empat auditor
   read-only pasangan review-nya: frontend-engineer, backend-engineer, database-engineer,
   cloudflare-engineer, vps-engineer (penulis) — a11y-auditor, api-contract-auditor,
-  schema-migration-auditor, cloudflare-config-auditor (auditor). `cloudflare-engineer` dan
+  schema-migration-auditor, cloudflare-config-auditor (auditor). Pengerja + product-designer membawa
+  mention bawaan ke auditor pasangannya dan memanggilnya sebelum melapor (base SHA + SHA hasil literal);
+  auditor selalu daun, kedalaman 1 (amandemen ADR-0094). `cloudflare-engineer` dan
   `vps-engineer` berwenang PENUH mengubah produksi dalam scope tugas tanpa gerbang izin tambahan
   (keputusan manusia); disiplinnya lewat prosedur operasi (titik rollback, validasi statis sebelum
   menerapkan, verifikasi kesehatan, rollback bila gagal), bukan gerbang persetujuan seperti

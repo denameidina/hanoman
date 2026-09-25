@@ -195,7 +195,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [0097 — Kredensial Telegram di Settings: entri config terenkripsi, bukan `.env`](adr/0097-kredensial-telegram-di-settings-terenkripsi.md)
 - [0096 — Telegram gateway: transport ke session operator tmux persisten, bukan runtime agen](adr/0096-telegram-gateway-session-operator-persisten.md)
 - [0095 — Tarik issue GitHub ke backlog: record lokal `GithubIssue`, dua jalur ambil, baca-saja](adr/0095-tarik-issue-github-ke-backlog.md)
-- [0094 — Custom agent: katalog di DB, materialisasi native per agen, anti-loop berlapis](adr/0094-custom-agent-katalog-materialisasi-native.md)
+- [0094 — Custom agent: katalog di DB, materialisasi native per agen, anti-loop berlapis](adr/0094-custom-agent-katalog-materialisasi-native.md) — **amandemen 2026-09-25**: mention bawaan pengerja → auditor pasangan (kedalaman 1), alias `Task`→`Agent` terverifikasi
 - [0093 — Dependency antar-backlog: kolom `dependsOn` + gerbang "selesai & ter-merge" di dua titik](adr/0093-dependency-antar-backlog.md)
 - [0092 — Cabut error monitoring, `hanoman-sdk`, dan cross-audit (pemantauan pindah ke Uptrace)](adr/0092-cabut-error-monitoring-sdk-cross-audit.md)
 - [0091 — hanoman-lead: agen pemimpin di atas agen; manusia jadi pembatal, bukan gerbang](adr/0091-hanoman-lead-agen-pemimpin.md)

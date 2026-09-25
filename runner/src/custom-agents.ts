@@ -261,11 +261,22 @@ export function agentPromptOf(
     ].join("\n");
   }
   const list = can.map((m) => `@${m}`).join(", ");
+  // Amandemen ADR-0094 (2026-09-25) · mention ke agen read-only = pasangan REVIEW, bukan tempat
+  // melempar kerja. SHA literal membuat review lepas dari cwd anak: semua worktree berbagi objek Git.
+  const reviewers = can.filter((m) => roster.find((r) => r.name === m)?.workspacePolicy === "read-only");
+  const reviewClause = reviewers.length === 0 ? [] : [
+    `Sebelum melapor \`Status: selesai\`, commit hasilmu lalu panggil ${reviewers.map((m) => `@${m}`).join(", ")} `
+      + "untuk mereview perubahanmu: serahkan tujuan, scope berkas, base SHA dan SHA hasil sebagai NILAI "
+      + "heksadesimal literal (ia membaca `git diff --no-ext-diff --no-textconv <base> <hasil>`). Perbaiki "
+      + "temuan yang terbukti lalu commit lagi; cantumkan putusan reviewer dan temuan yang sengaja tak "
+      + "diperbaiki (beserta alasannya) di laporanmu. Reviewer yang terhalang bukan alasan mengklaim lolos review.",
+  ];
   return [
     ...contract,
     "",
     "---",
     `Kamu boleh mendelegasikan HANYA ke: ${list}. Panggil lewat ${MENTION_TOOL} dengan nama agennya.`,
+    ...reviewClause,
     `Anggaran rantai delegasi seluruh sesi ini ${MENTION_MAX_HOPS} hop. Bila kamu sudah berada di hop ke-${MENTION_MAX_HOPS}, JANGAN mendelegasikan lagi — selesaikan sendiri lalu laporkan.`,
     "Sebutkan hop keberapa kamu berada saat mendelegasikan, dan jangan pernah memanggil agen yang sudah ada di rantai yang membawamu ke sini.",
     ...style,

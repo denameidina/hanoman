@@ -183,3 +183,31 @@ dipetakan ke `GLOBAL_READ` — itu persis lubang yang ditutup SPEC-405/ADR-0088.
 - **Deteksi loop hanya saat runtime (penghitung hop di prompt).** Satu-satunya lapis yang tersedia
   kalau graf tak divalidasi, dan seluruhnya bergantung pada kepatuhan agen. Dipakai — sebagai lapis
   **ketiga**, bukan sebagai jaminan.
+
+## Amandemen 2026-09-25 — mention bawaan pengerja → auditor
+
+Keputusan 5 lapis 1 (tanpa `mentions` tak ada `Task`) tetap berlaku untuk agen operator. Untuk
+katalog bawaan, `mentions` kini field **opsional dan sempit**: hanya pengerja `isolated-worktree` →
+auditor `read-only` pasangannya (`shared/src/builtin-agent-types.ts`):
+
+| Pengerja | Mention |
+|---|---|
+| product-designer, frontend-engineer | a11y-auditor |
+| backend-engineer | api-contract-auditor |
+| database-engineer | schema-migration-auditor |
+| cloudflare-engineer | cloudflare-config-auditor |
+
+- **Kedalaman 1, siklus mustahil.** Runner membuang mention agen read-only (`liveMentions`), jadi
+  auditor selalu daun. Test katalog mengunci: pengirim isolated-worktree, target read-only tanpa
+  mention, `detectCycle` null.
+- **Mention ke read-only = pasangan review.** `agentPromptOf` menambah klausa: commit, panggil
+  auditor dengan base SHA + SHA hasil literal (review lepas dari cwd anak karena semua worktree
+  berbagi objek Git), perbaiki temuan terbukti, cantumkan putusannya. Auditor yang dibuang dari
+  roster (dimatikan, anggaran argv) tak disebut sama sekali.
+- **Seed.** Sidik jari memuat `mentions` hanya bila tak kosong, sehingga stempel agen tanpa mention
+  byte-identik dengan sebelumnya. Upgrade menulis `mentions`; suntingan operator (termasuk
+  mengosongkan mention) tetap tak disentuh.
+- **Nama tool.** hanoman tetap memancarkan `Task`: Claude Code 2.1.282 mendaftarkan `Task` sebagai
+  alias tool `Agent` (`aliases:["Task"]` di biner). Uji nyata 2026-09-25: subagent ber-`tools`
+  `["Read","Task"]` memanggil subagent lain lewat `Agent`, jejak `parent_tool_use_id` membuktikan
+  panggilan bersarang, hasil kembali ke pemanggil. Codex tidak membawa mention.

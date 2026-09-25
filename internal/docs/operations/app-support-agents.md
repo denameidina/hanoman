@@ -50,7 +50,9 @@ builder → QA/review yang relevan. Performance digunakan ketika ada target atau
 bukti masalah. Operations dan knowledge mendukung rilis; support memasok masalah
 terstruktur kepada parent untuk diteruskan ke root-causer atau performance.
 
-Semua agent baru adalah daun: `mentions=[]`, tidak memperoleh alat delegasi.
+Semua agent aplikasi adalah daun (`mentions=[]`, tanpa alat delegasi), KECUALI product-designer
+yang membawa mention bawaan ke `a11y-auditor` untuk review sebelum melapor. Pengerja domain
+membawa mention serupa ke auditor pasangannya (amandemen ADR-0094 2026-09-25); auditor selalu daun.
 Panah di atas berarti parent menerima hasil lalu memberi tugas berikutnya.
 Pekerjaan yang dibagi tetap perlu ownership yang tidak bertabrakan.
 

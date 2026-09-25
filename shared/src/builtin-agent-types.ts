@@ -12,4 +12,10 @@ export type BuiltinAgentDef = {
   readonly maxTurns: number | null;
   readonly timeoutSeconds: number | null;
   readonly models: Readonly<Record<"claude" | "codex", string>>;
+  /**
+   * Amandemen ADR-0094 (2026-09-25) · agen yang boleh dipanggil agen ini. HANYA pengerja
+   * isolated-worktree → auditor read-only pasangannya (kedalaman 1, auditor selalu daun), dikunci
+   * `shared/test/builtin-agents.test.ts`. Absen = tak boleh mendelegasikan (`Task` dicabut).
+   */
+  readonly mentions?: readonly string[];
 };

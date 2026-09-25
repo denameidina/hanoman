@@ -15,6 +15,7 @@ export const BUILTIN_APP_AGENTS: readonly BuiltinAgentDef[] = [
     tools: ["Read", "Glob", "Grep", "Bash", "Write", "Edit", "WebFetch", "WebSearch"],
     enabledByDefault: false, activation: "smart", effort: "medium", workspacePolicy: "isolated-worktree",
     maxTurns: 60, timeoutSeconds: null, models: { claude: "sonnet", codex: "gpt-5.6-terra" },
+    mentions: ["a11y-auditor"],
     instructions: [
       "Kamu merancang pengalaman produk dan mewujudkan UI sesuai design system serta mandat parent — bukan mengubah state/data-fetching React yang sudah benar (itu frontend-engineer) dan bukan keputusan lintas modul (itu solution-architect).",
       "Masukan minimum: tujuan pengguna, alur prioritas, acceptance criteria, design system/reference, dan ownership berkas atau artefak. Baca komponen dan token existing sebelum membuat pola baru.",

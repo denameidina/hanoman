@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   activationOf, effortOf, maxTurnsOf, timeoutSecondsOf, workspacePolicyOf,
-  BUILTIN_AGENTS, customAgentId, toolsOf, type BuiltinAgentDef,
+  BUILTIN_AGENTS, customAgentId, mentionsOf, toolsOf, type BuiltinAgentDef,
 } from "@hanoman/shared";
 import { prisma } from "../db";
 import { getSetting } from "./settings";
@@ -16,7 +16,9 @@ import { notifySynced } from "./sync-notify";
 /**
  * `enabled` SENGAJA di luar sidik jari: mematikan satu agen tak boleh terbaca sebagai "disunting",
  * karena baris itu lalu tak pernah lagi menerima perbaikan instruksi.
- * `projectId`/`model`/`mentions`/`runtime` juga di luar — keempatnya konstan untuk semua bawaan.
+ * `projectId`/`model`/`runtime` juga di luar — ketiganya konstan untuk semua bawaan. `mentions` MASUK
+ * hanya bila tak kosong (amandemen ADR-0094 2026-09-25): sidik jari agen tanpa mention byte-identik
+ * dengan sebelumnya, jadi stempel lama tetap cocok dan tak ada baris yang mendadak "disunting".
  */
 const digest = (parts: readonly string[]): string =>
   createHash("sha256").update(parts.join(" ")).digest("hex").slice(0, 16);
@@ -35,6 +37,12 @@ type FingerprintableProfile = {
   workspacePolicy?: unknown;
   maxTurns?: unknown;
   timeoutSeconds?: unknown;
+  mentions?: unknown;
+};
+
+const mentionPart = (v: unknown): string[] => {
+  const m = mentionsOf(v);
+  return m.length === 0 ? [] : [`mentions:${m.join(",")}`];
 };
 
 const fingerprint = (a: FingerprintableProfile): string => digest([
@@ -42,6 +50,7 @@ const fingerprint = (a: FingerprintableProfile): string => digest([
   activationOf(a.activation), effortOf(a.effort) ?? "",
   workspacePolicyOf(a.workspacePolicy), String(maxTurnsOf(a.maxTurns) ?? ""),
   String(timeoutSecondsOf(a.timeoutSeconds) ?? ""),
+  ...mentionPart(a.mentions),
 ]);
 
 export const builtinFingerprint = (a: BuiltinAgentDef): string =>
@@ -124,7 +133,7 @@ export async function seedBuiltinAgents(): Promise<void> {
         await prisma.customAgent.create({ data: {
           id, projectId: null, name: a.name,
           description: a.description, instructions: a.instructions,
-          tools: [...a.tools] as never, model: null, mentions: [] as never, runtime: null,
+          tools: [...a.tools] as never, model: null, mentions: [...(a.mentions ?? [])] as never, runtime: null,
           activation: a.activation, effort: a.effort, workspacePolicy: a.workspacePolicy,
           maxTurns: a.maxTurns, timeoutSeconds: a.timeoutSeconds,
           enabled: a.enabledByDefault,
@@ -157,7 +166,7 @@ export async function seedBuiltinAgents(): Promise<void> {
           description: a.description, instructions: a.instructions,
           tools: [...a.tools], activation: a.activation, effort: a.effort,
           workspacePolicy: a.workspacePolicy, maxTurns: a.maxTurns,
-          timeoutSeconds: a.timeoutSeconds,
+          timeoutSeconds: a.timeoutSeconds, mentions: [...(a.mentions ?? [])],
         });
         stamps[a.name] = fp;
         changed = true;

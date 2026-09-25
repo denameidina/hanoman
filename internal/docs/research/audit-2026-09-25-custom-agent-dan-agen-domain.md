@@ -294,3 +294,12 @@ runner lewat `runner/src/custom-agents.ts` `agentContractOf` — kelima agen pen
 baru tidak mengulanginya di instruksi. Prasyarat P1-1 (allowlist read-only) dan P1-11
 (anggaran argv) masih berlaku untuk empat auditor yang bertahan; kelima pengerja baru
 tidak melewati hook read-only karena `workspacePolicy` mereka `isolated-worktree`.
+
+## 8. Tambahan 2026-09-25: pengerja memanggil auditor pasangannya
+
+Atas permintaan manusia, pengerja domain dan product-designer kini membawa `mentions` bawaan ke
+auditor pasangannya (frontend/product-designer → a11y-auditor, backend → api-contract-auditor,
+database → schema-migration-auditor, cloudflare → cloudflare-config-auditor; vps-engineer tanpa
+pasangan). Runner menambah klausa review ber-SHA literal; auditor tetap daun. Detail dan bukti uji
+nyata alias `Task`→`Agent` di Claude Code 2.1.282: amandemen ADR-0094. Mengosongkan mention di
+dashboard menjadikan baris itu suntingan operator (tak lagi di-upgrade seed).

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  BUILTIN_AGENTS, BUILTIN_AGENT_NAMES, AGENT_NAME_RE, DEFAULT_AGENT_TOOLS, zSetting, zCreateCustomAgent, effortsForRuntimeModel, modelsForRuntime,
+  BUILTIN_AGENTS, BUILTIN_AGENT_NAMES, AGENT_NAME_RE, DEFAULT_AGENT_TOOLS, zSetting, zCreateCustomAgent, effortsForRuntimeModel, modelsForRuntime, detectCycle,
 } from "../src";
 
 // SPEC-881 · ADR-0136 · kontrak katalog agen bawaan. Seed menulis LANGSUNG lewat Prisma dan
@@ -176,6 +176,29 @@ describe("katalog agen bawaan", () => {
 
   // Berkas ini ikut dibundel untuk browser. `node:crypto` di sini mematikan build web, dan
   // gejalanya muncul jauh dari sini.
+  // Amandemen ADR-0094 (2026-09-25) · mention bawaan hanya pengerja → auditor pasangannya.
+  it("mention bawaan: pengerja isolated → auditor read-only yang ada, kedalaman 1, tanpa siklus", () => {
+    const byName = new Map(BUILTIN_AGENTS.map((a) => [a.name, a] as const));
+    const withMentions = BUILTIN_AGENTS.filter((a) => (a.mentions ?? []).length > 0);
+    expect(Object.fromEntries(withMentions.map((a) => [a.name, a.mentions]))).toEqual({
+      "product-designer": ["a11y-auditor"],
+      "frontend-engineer": ["a11y-auditor"],
+      "backend-engineer": ["api-contract-auditor"],
+      "database-engineer": ["schema-migration-auditor"],
+      "cloudflare-engineer": ["cloudflare-config-auditor"],
+    });
+    for (const a of withMentions) {
+      expect(a.workspacePolicy, a.name).toBe("isolated-worktree");
+      for (const m of a.mentions ?? []) {
+        const target = byName.get(m);
+        expect(target, `${a.name} → ${m}`).toBeDefined();
+        expect(target?.workspacePolicy, m).toBe("read-only");
+        expect(target?.mentions ?? [], m).toEqual([]);
+      }
+    }
+    expect(detectCycle(BUILTIN_AGENTS.map((a) => ({ name: a.name, mentions: [...(a.mentions ?? [])] })))).toBeNull();
+  });
+
   it("tabelnya data murni — tanpa impor node:*", () => {
     for (const file of ["builtin-agents.ts", "builtin-app-agents.ts", "builtin-domain-agents.ts"]) {
       const src = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8");

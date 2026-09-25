@@ -37,7 +37,7 @@ describe("seedBuiltinAgents — kelahiran", () => {
     for (const r of rows) {
       expect(r.projectId).toBeNull();
       expect(r.id).toBe(idOf(r.name));
-      expect(r.mentions).toEqual([]);
+      expect(r.mentions).toEqual([...(BUILTIN_AGENTS.find((a) => a.name === r.name)!.mentions ?? [])]);
       expect(r.model).toBeNull();
       expect(r.runtime).toBeNull();
       const builtin = BUILTIN_AGENTS.find((a) => a.name === r.name)!;
@@ -234,6 +234,47 @@ describe("seedBuiltinAgents — upgrade", () => {
   });
 });
 
+// Amandemen ADR-0094 (2026-09-25) · mention bawaan ikut seed & upgrade tanpa membuat baris lama
+// terbaca "disunting".
+describe("seedBuiltinAgents — mention bawaan", () => {
+  const eng = BUILTIN_AGENTS.find((a) => a.name === "database-engineer")!;
+  const stempel = async (name: string, fp: string) => {
+    const s = await getSetting();
+    const data = { ...s, builtinAgents: { ...s.builtinAgents, [name]: fp } };
+    await prisma.setting.upsert({ where: { id: 1 }, update: { data }, create: { id: 1, data } });
+  };
+
+  it("melahirkan pengerja dengan mention auditor pasangannya", async () => {
+    await seedBuiltinAgents();
+    const row = await prisma.customAgent.findUnique({ where: { id: idOf("database-engineer") } });
+    expect(row!.mentions).toEqual(["schema-migration-auditor"]);
+    expect(rowFingerprint(row!)).toBe(builtinFingerprint(eng));
+  });
+
+  it("sidik jari agen tanpa mention tak berubah (stempel lama tetap cocok)", () => {
+    expect(builtinFingerprint(scout)).toBe(rowFingerprint({ ...scout, mentions: [] }));
+    expect(builtinFingerprint(eng)).not.toBe(rowFingerprint({ ...eng, mentions: [] }));
+  });
+
+  it("baris versi lama tanpa mention (belum disunting) di-upgrade dan menerima mention", async () => {
+    await seedBuiltinAgents();
+    const lama = { ...eng, mentions: [] as string[] };
+    await prisma.customAgent.update({ where: { id: idOf("database-engineer") }, data: { mentions: [] } });
+    await stempel("database-engineer", rowFingerprint(lama));
+    await seedBuiltinAgents();
+    const row = await prisma.customAgent.findUnique({ where: { id: idOf("database-engineer") } });
+    expect(row!.mentions).toEqual(["schema-migration-auditor"]);
+  });
+
+  it("mention yang disunting operator TIDAK ditimpa", async () => {
+    await seedBuiltinAgents();
+    await prisma.customAgent.update({ where: { id: idOf("database-engineer") }, data: { mentions: [] } });
+    await seedBuiltinAgents();
+    const row = await prisma.customAgent.findUnique({ where: { id: idOf("database-engineer") } });
+    expect(row!.mentions).toEqual([]);
+  });
+});
+
 describe("seedBuiltinAgents — tak pernah menggagalkan boot", () => {
   it("menelan galat DB dan kembali normal", async () => {
     // SENGAJA bukan `vi.spyOn(...).mockRestore()`: pada klien Prisma, `mockRestore()` MENGHAPUS
@@ -287,7 +328,8 @@ describe("app/support — profil efektif dari seed", () => {
     expect(claude).toHaveLength(8);
     const recommended = (name: string) => BUILTIN_AGENTS.find((b) => b.name === name)!.models;
     // Audit 2026-09-25 · solution-architect → opus / gpt-5.6-sol; sisanya sonnet / gpt-5.6-terra.
-    expect(claude.every((a) => a.model === recommended(a.name).claude && a.mentions.length === 0)).toBe(true);
+    expect(claude.every((a) => a.model === recommended(a.name).claude
+      && a.mentions.join() === (BUILTIN_AGENTS.find((b) => b.name === a.name)!.mentions ?? []).join())).toBe(true);
     expect(claude.find((a) => a.name === "solution-architect")!.model).toBe("opus");
     const codex = agentDefsFor("p1", "codex").filter((a) => names.includes(a.name));
     expect(codex.map((a) => a.name).sort()).toEqual(["product-analyst", "solution-architect", "support-triager"]);

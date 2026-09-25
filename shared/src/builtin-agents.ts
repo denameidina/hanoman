@@ -5,10 +5,10 @@
 // baris dihitung di server (`services/builtin-agents.ts`), bukan di sini.
 //
 // Nilai yang KONSTAN untuk seluruh katalog sengaja BUKAN field: projectId null (global) · model null
-// (warisi sesi) · mentions [] · runtime null. Menjadikannya field berarti mengundang entri masa
-// depan yang memasang `mentions`, dan itu membuka kembali lapis-1 anti-loop ADR-0094 yang hari ini
-// nol risiko — tanpa `mentions`, `Task` DICABUT dari argv dan agen daun tak punya alat memanggil
-// siapa pun.
+// (warisi sesi) · runtime null. `mentions` opsional sejak amandemen ADR-0094 (2026-09-25) dan
+// SEMPIT: hanya pengerja isolated-worktree → auditor read-only pasangannya. Auditor tak pernah
+// membawa mention (runner membuang mention agen read-only), jadi rantai berhenti di kedalaman 1 dan
+// siklus mustahil — dikunci test katalog. Tanpa `mentions`, `Task` DICABUT dari argv.
 //
 // Prinsip seleksi (termasuk perluasan aplikasi/dukungan yang belum dibenchmark):
 //   1. punya PROSEDUR, bukan persona — "kamu reviewer, review-lah" tak menambah apa pun;

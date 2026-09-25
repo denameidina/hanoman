@@ -97,6 +97,30 @@ describe("agentPromptOf — lapis 3 anti-loop", () => {
     expect(p).toContain(String(MENTION_MAX_HOPS));
   });
 
+  // Amandemen ADR-0094 (2026-09-25) · mention ke agen read-only = pasangan review.
+  it("mention ke agen read-only menambah klausa review ber-SHA literal", () => {
+    const eng = def({ name: "eng", mentions: ["rev"], workspacePolicy: "isolated-worktree" });
+    const rev = def({ name: "rev", workspacePolicy: "read-only" });
+    const p = agentPromptOf(eng, [eng, rev]);
+    expect(p).toContain("@rev");
+    expect(p).toContain("Sebelum melapor `Status: selesai`");
+    expect(p).toContain("git diff --no-ext-diff --no-textconv <base> <hasil>");
+  });
+
+  it("mention ke agen penulis tidak memicu klausa review", () => {
+    const a = def({ name: "a", mentions: ["b"], workspacePolicy: "isolated-worktree" });
+    const p = agentPromptOf(a, [a, def({ name: "b", workspacePolicy: "isolated-worktree" })]);
+    expect(p).toContain("@b");
+    expect(p).not.toContain("Sebelum melapor `Status: selesai`");
+  });
+
+  it("auditor yang dibuang dari roster (mis. anggaran argv) tak disebut sebagai reviewer", () => {
+    const eng = def({ name: "eng", mentions: ["rev"], workspacePolicy: "isolated-worktree" });
+    const p = agentPromptOf(eng, [eng]);
+    expect(p).not.toContain("@rev");
+    expect(p.toLowerCase()).toContain("tidak boleh mendelegasikan");
+  });
+
   it("mention ke agen yang tak ada di roster tak ikut disebut", () => {
     const a = def({ name: "a", mentions: ["b", "hantu"] });
     const p = agentPromptOf(a, [a, def({ name: "b" })]);
