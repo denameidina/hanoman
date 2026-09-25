@@ -6,7 +6,9 @@ sengaja **ditunda** — lihat §4/§5. Dikerjakan oleh empat implementer paralel
 runner, server, domain) dengan lima commit inti: `32a4b8e0`, `0d5ec950`, `4c6ebe92`,
 `4067a02e`/`eff20a11`/`8b12f9ed`/`8b12f9ed` (server), dan agen domain (bergabung ke
 `8b12f9ed` karena race commit di worktree bersama — lihat §3.4). **§3 di bawah sudah
-DIKOREKSI oleh §7 (2026-09-25, sesudah rilis)**: sembilan agen domain awal semuanya
+DIKOREKSI oleh §7 (2026-09-25, sesudah di-commit di branch ini — belum pernah dirilis
+atau di-seed ke instalasi mana pun, `8b12f9ed` dan `c8bfafd0` bukan ancestor `main`)**:
+sembilan agen domain awal semuanya
 read-only, padahal permintaan manusia adalah agen yang mengerjakan domain — baca §7
 untuk katalog domain yang berlaku sekarang.
 
@@ -222,7 +224,8 @@ arsitektur, infra Cloudflare, infra VPS — bukan diaudit. Riset §3 menginterpr
 (§2, delapan agen "audit/QA"), dan sembilan usulan yang lolos deduplikasi kebetulan
 semuanya berbentuk auditor. Tak ada langkah di riset yang mengecek balik terhadap
 permintaan asli "agen yang mengerjakan" sebelum sembilan agen itu ditulis dan
-di-commit. Manusia baru menyadarinya sesudah katalog dipublikasikan — pertanyaannya
+di-commit. Manusia baru menyadarinya sesudah katalog di-commit di branch ini (belum
+pernah dirilis atau di-seed ke instalasi mana pun) — pertanyaannya
 persis: "kenapa custom agent baru kebanyakan auditor? yang saya minta kan bukan untuk
 auditor."
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BUILTIN_AGENTS } from "@hanoman/shared";
 import { readOnlyDecision } from "../src/agent-readonly";
 
-// Audit custom agent 2026-09-25 · koreksi 2026-09-25 · QUATTRO auditor read-only yang BERTAHAN di
+// Audit custom agent 2026-09-25 · koreksi 2026-09-25 · EMPAT auditor read-only yang BERTAHAN di
 // `builtin-domain-agents.ts` (shared) sesudah koreksi "agen pengerja domain" — lima agen lain di
 // berkas itu sekarang PENGERJA `isolated-worktree` (frontend/backend/database/cloudflare/vps-engineer)
 // dan tidak lewat hook read-only sama sekali, jadi tidak diuji di sini. `shared` tidak mengimpor

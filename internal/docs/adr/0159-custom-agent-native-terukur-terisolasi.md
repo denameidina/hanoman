@@ -294,8 +294,22 @@ Verifikasi: `runner/test/custom-agents.test.ts` (41), `runner/test/agent-readonl
 (30), `runner/test/phase-agents.test.ts` (37), `server/test/phase-agents.pty.test.ts`
 (18) — 126/126 lulus. Sembilan agen domain baru diukur menembus anggaran argv sebesar
 28.397 B pada katalog 25-agen tanpa mitigasi (`runner/test/builtin-domain-agents-readonly.test.ts`,
-28/28 lulus, memverifikasi juga bahwa perintah operator-only kedua agen infra baru
+28/28 lulus, memverifikasi juga bahwa perintah operator-only agen infra read-only
 benar-benar ditolak validator bila dicoba sendiri).
+
+**Koreksi 2026-09-25 (putaran kedua):** paragraf di atas ditulis saat draf pertama masih
+mengusulkan SEMBILAN agen domain SEMUANYA read-only/auditor, termasuk dua auditor infra
+("kedua agen infra baru" = `cloudflare-config-auditor` + `vps-hardening-auditor`). Keputusan
+final membalik itu: permintaan manusia adalah agen yang MENGERJAKAN domain, bukan hanya
+mengaudit. Katalog sekarang berisi lima PENGERJA `isolated-worktree`
+(`frontend-engineer`, `backend-engineer`, `database-engineer`, `cloudflare-engineer`,
+`vps-engineer` — dua yang terakhir berwenang penuh ke produksi tanpa gerbang izin
+tambahan) plus EMPAT auditor read-only yang bertahan (`a11y-auditor`,
+`api-contract-auditor`, `schema-migration-auditor`, `cloudflare-config-auditor`).
+`vps-hardening-auditor` DICABUT — belum pernah dirilis/di-seed, jadi bukan breaking
+change. Detail di `shared/src/builtin-domain-agents.ts` (komentar berkas) dan
+[audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md)
+§"Koreksi 2026-09-25".
 
 ## Konsekuensi
 

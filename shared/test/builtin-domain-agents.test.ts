@@ -152,6 +152,43 @@ describe("katalog agen domain (koreksi 2026-09-25: agen pengerja domain)", () =>
     }
   });
 
+  // Temuan review 2026-09-25 (r3): kunci prosedur keselamatan produksi, bukan gerbang izin baru.
+  it("cloudflare-engineer: D1 export produksi wajib --remote (tanpa itu wrangler mengekspor DB lokal kosong)", () => {
+    const instructions = domainAgent("cloudflare-engineer").instructions;
+    expect(instructions).toMatch(/d1 export <db> --remote --output/);
+  });
+
+  it("cloudflare-engineer: rollback dan deployments list memuat --env (bukan Worker tingkat atas)", () => {
+    const instructions = domainAgent("cloudflare-engineer").instructions;
+    expect(instructions).toMatch(/deployments list --env/);
+    expect(instructions).toMatch(/wrangler rollback <version-id> --env <env> --message/);
+  });
+
+  it("cloudflare-engineer: migrasi Durable Object tanpa rollback wajib dilaporkan sebelum diterapkan", () => {
+    const instructions = domainAgent("cloudflare-engineer").instructions;
+    expect(instructions).toMatch(/TIDAK BISA di-rollback/);
+  });
+
+  it("cloudflare-engineer: produksi hanya di-deploy dari commit bersih", () => {
+    const instructions = domainAgent("cloudflare-engineer").instructions;
+    expect(instructions).toMatch(/git status --porcelain.*kosong/);
+  });
+
+  it("vps-engineer: port SSH diizinkan sebelum default deny/ufw enable, dengan auto-revert berjangka", () => {
+    const instructions = domainAgent("vps-engineer").instructions;
+    expect(instructions).toMatch(/IZINKAN port SSH.*SEBELUM.*default deny/);
+    expect(instructions).toMatch(/auto-revert berjangka/);
+  });
+
+  it("cloudflare-engineer dan vps-engineer: aturan secret stdin/env, bukan literal argv, dump 0600 di luar worktree", () => {
+    for (const name of ["cloudflare-engineer", "vps-engineer"]) {
+      const instructions = domainAgent(name).instructions;
+      expect(instructions, name).toMatch(/TIDAK PERNAH literal di argv/);
+      expect(instructions, name).toMatch(/0600/);
+      expect(instructions, name).toMatch(/tampilkan nama key saja/);
+    }
+  });
+
   it("agen pengerja domain menyebut pasangan review auditornya (kecuali vps-engineer, auditornya dicabut)", () => {
     expect(domainAgent("backend-engineer").instructions).toContain("api-contract-auditor");
     expect(domainAgent("database-engineer").instructions).toContain("schema-migration-auditor");
