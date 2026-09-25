@@ -31,6 +31,28 @@ describe("CLI model discovery", () => {
       { id: "haiku", label: "Haiku", resolved: "claude-haiku-4-5-20251001" },
     ]);
   });
+  // Bentuk nyata `initialize` claude 2.1.282 (2026-09-25): hanya baris `default` yang punya
+  // "<Model> · <tagline>"; baris lain cuma tagline polos tanpa nama model. SPEC: label non-default
+  // tak boleh jatuh ke tagline murni saat description tak mengandung " · ".
+  it("falls back to displayName when a non-default row's description has no model-name prefix", () => {
+    const models = parseClaudeModels([
+      { value: "default", resolvedModel: "claude-opus-5-5", displayName: "Default (recommended)",
+        description: "Opus 5.5 · Best for everyday, complex tasks", supportedEffortLevels: ["low", "max"] },
+      { value: "opus", resolvedModel: "claude-opus-5-5", displayName: "Opus 5.5",
+        description: "Most capable for ambitious work", supportedEffortLevels: ["low", "max"] },
+      { value: "sonnet", resolvedModel: "claude-sonnet-5", displayName: "Sonnet 5",
+        description: "Most efficient for everyday tasks", supportedEffortLevels: ["low", "max"] },
+      { value: "haiku", resolvedModel: "claude-haiku-4-5-20251001", displayName: "Haiku 4.5",
+        description: "Fastest for quick answers" },
+    ]);
+    expect(models).toEqual([
+      { id: "default", label: "Default (recommended) · Opus 5.5",
+        resolved: "claude-opus-5-5", efforts: ["max", "low"] },
+      { id: "opus", label: "Opus 5.5", resolved: "claude-opus-5-5", efforts: ["max", "low"] },
+      { id: "sonnet", label: "Sonnet 5", resolved: "claude-sonnet-5", efforts: ["max", "low"] },
+      { id: "haiku", label: "Haiku 4.5", resolved: "claude-haiku-4-5-20251001" },
+    ]);
+  });
   it("prefers the alias row even when the pinned row comes first", () => {
     const models = parseClaudeModels([
       { value: "claude-sonnet-5", resolvedModel: "claude-sonnet-5", displayName: "Sonnet 5" },

@@ -26,10 +26,14 @@ export function parseClaudeModels(raw: unknown): ClaudeModel[] {
   const models = new Map<string, ClaudeModel>();
   for (const row of rows) {
     const resolved = row.resolvedModel ?? row.value;
-    const head = row.description?.split(" · ")[0];
+    const parts = row.description?.split(" · ");
+    // Head hanya valid saat description berformat "<Nama Model> · <tagline>"; CLI 2.1.282+
+    // cuma memakai format itu untuk baris `default` — baris lain berisi tagline polos tanpa
+    // nama model, yang tak boleh dipakai sebagai label.
+    const head = parts && parts.length > 1 ? parts[0] : undefined;
     const model: ClaudeModel = {
       id: row.value,
-      label: row.value === "default" && head ? `${row.displayName} · ${head}` : head || row.displayName,
+      label: row.value === "default" && head ? `${row.displayName} · ${head}` : head ?? row.displayName,
       resolved,
       ...(row.supportedEffortLevels ? { efforts: sorted(row.supportedEffortLevels) } : {}),
     };
