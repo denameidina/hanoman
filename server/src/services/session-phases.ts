@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
-import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, type Stage } from "@hanoman/shared";
+import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, phaseAgentName, type Stage } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
 
 export type PhaseState = "done" | "skipped" | "active" | "pending";
@@ -11,6 +11,8 @@ export type PhaseInvocation = {
   phase: string; runtimeInvocationId: string; status: string; startedAt: string;
   durationMs: number | null; inputTokens: number | null; outputTokens: number | null;
   cachedTokens: number | null; resultExcerpt: string | null;
+  /** ADR-0170 · pemilah agen dalam satu fase (reviewer Execute berbagi `phase` dengan agen Execute). */
+  agentName?: string;
 };
 export type PhaseRosterEntry = { name: string; phase: string; model?: string; effort?: string };
 export type PhaseAgent = {
@@ -115,9 +117,13 @@ export function enrichPhases(
   doneAtBirth: ReadonlySet<string> = new Set(),
 ): Phase[] {
   return phases.map((p) => {
-    const r = roster.find((entry) => entry.phase === p.name);
+    // ADR-0170 · satu fase bisa punya lebih dari satu agen di roster (reviewer Execute): chip milik
+    // agen fase itu sendiri, dan hanya invocation-nya yang dihitung sebagai percobaan.
+    const own = phaseAgentName(p.name);
+    const r = roster.find((entry) => entry.phase === p.name && entry.name === own)
+      ?? roster.find((entry) => entry.phase === p.name);
     if (!r) return p;
-    const all = invocations.filter((i) => i.phase === p.name);
+    const all = invocations.filter((i) => i.phase === p.name && (!i.agentName || i.agentName === r.name));
     const mine = all.filter((i) => bornAt === 0 || Date.parse(i.startedAt) >= bornAt)
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
     const last = mine[mine.length - 1];
@@ -185,46 +191,59 @@ export function stageFor(phases: Phase[]): Stage | null {
   return best < 0 ? null : STAGES[best]!;
 }
 
-// SPEC-173 · ADR-0029 — plan milik spec ini, dibaca dari worktree run-nya: `false` hanya jika ada
-// file plan yang cocok segmen spec-id DAN masih memuat task `- [ ]`. Tak ada plan yang cocok
-// (fast-path qa yang melewati Plan, atau worktree tanpa docs) → `true`: tak ada checklist untuk
-// digerbang. Cocokkan sama seperti artifactsToRemove — batas kiri non-alnum, kanan non-digit, jadi
-// "spec-16" tak menyerempet "spec-167".
+// SPEC-173 · ADR-0029 — plan milik spec ini, dibaca dari worktree run-nya: `false` bila ada file
+// plan yang cocok segmen spec-id DAN masih memuat task `- [ ]`. Cocokkan sama seperti
+// artifactsToRemove — batas kiri non-alnum, kanan non-digit, jadi "spec-16" tak menyerempet
+// "spec-167".
 //
 // SPEC-734 · ADR-0113 · INVARIAN 1 — pindai UNION seluruh `planDir` terdaftar, bukan direktori
 // metode terpilih. Direktori satu metode yang tak ada wajib `continue`, BUKAN mengakhiri
 // pemindaian: item yang lahir dengan superpowers lalu dilanjutkan dengan metode lain akan melihat
 // direktori kosong → `true` hampa → backlog lompat ke `done` padahal plan lama masih penuh `- [ ]`.
-export function planComplete(worktree: string, specId: string): boolean {
+//
+// ADR-0171 · tak ada plan yang cocok bisa berarti dua hal yang HARUS dibedakan: fast-path yang
+// sengaja melewati Plan (qa `skipped`, flow tanpa fase Plan sama sekali — goal/no_effort/audit/
+// dokumen) vs plan yang lahir dari skill default TANPA spec-id di namanya (`YYYY-MM-DD-<feature>.md`)
+// sehingga regex di atas tak pernah cocok — sebelum ADR ini keduanya sama-sama `true`, jadi kasus
+// kedua lolos ke `done` walau isinya masih penuh `- [ ]`. `planPhaseDone` (fase Plan tercatat
+// `done`, BUKAN `skipped`) adalah pembedanya: hanya diteruskan pemanggil yang punya `phases`
+// (`stageForRun`/`sessionComplete`) — false untuk pemanggil lama (lead `apply.ts`/`pulse.ts`) yang
+// tak punya konteks fase di tangan, jadi perilakunya di sana sengaja tak berubah.
+export function planComplete(worktree: string, specId: string, planPhaseDone = false): boolean {
   const re = new RegExp(`(^|[^a-z0-9])${specId.toLowerCase()}([^0-9]|$)`);
+  let matched = false;
   for (const rel of PLAN_DIRS) {
     const dir = `${worktree}/${rel}`;
     let names: string[];
     try { names = readdirSync(dir); } catch { continue; }
     for (const n of names) {
       if (!re.test(n.toLowerCase())) continue;
+      matched = true;
       try { if (/^[ \t]*- \[ \]/m.test(readFileSync(`${dir}/${n}`, "utf8"))) return false; }
       catch { /* file lenyap saat dibaca — abaikan */ }
     }
   }
-  return true;
+  return matched ? true : !planPhaseDone;
 }
 
 // SPEC-1267 · padanan asinkron `planComplete` untuk jalur periodik: readdirSync/readFileSync
-// memblokir event loop yang sama dengan frame terminal. Semantik identik (UNION seluruh PLAN_DIRS).
-export async function planCompleteAsync(worktree: string, specId: string): Promise<boolean> {
+// memblokir event loop yang sama dengan frame terminal. Semantik identik (UNION seluruh PLAN_DIRS,
+// gerbang `planPhaseDone` ADR-0171).
+export async function planCompleteAsync(worktree: string, specId: string, planPhaseDone = false): Promise<boolean> {
   const re = new RegExp(`(^|[^a-z0-9])${specId.toLowerCase()}([^0-9]|$)`);
+  let matched = false;
   for (const rel of PLAN_DIRS) {
     const dir = `${worktree}/${rel}`;
     let names: string[];
     try { names = await readdir(dir); } catch { continue; }
     for (const n of names) {
       if (!re.test(n.toLowerCase())) continue;
+      matched = true;
       try { if (/^[ \t]*- \[ \]/m.test(await readFile(`${dir}/${n}`, "utf8"))) return false; }
       catch { /* file lenyap saat dibaca — abaikan */ }
     }
   }
-  return true;
+  return matched ? true : !planPhaseDone;
 }
 
 // SPEC-433 · "pekerjaan selesai" adalah fakta yang BERDIRI SENDIRI di sebelah "pane mati".
@@ -253,7 +272,7 @@ export const phasesComplete = (phases: Phase[]): boolean =>
 // bukan sepanjang hidupnya.
 export function sessionComplete(phases: Phase[], worktree: string, specId?: string): boolean {
   if (!phasesComplete(phases)) return false;
-  return specId ? planComplete(worktree, specId) : true;
+  return specId ? planComplete(worktree, specId, phases.find((p) => p.name === "Plan")?.state === "done") : true;
 }
 
 // Stage turunan untuk run nyata: `Execute done` hanya sah bila plan spec-nya terceklist
@@ -262,17 +281,19 @@ export function sessionComplete(phases: Phase[], worktree: string, specId?: stri
 // langsung oleh test; gerbang I/O hidup di sini, dipanggil kedua jalur persist stage.
 export function stageForRun(phases: Phase[], worktree: string, specId: string): Stage | null {
   const s = stageFor(phases);
-  if (s === "done" && !planComplete(worktree, specId)) return "executing";
+  const planPhaseDone = phases.find((p) => p.name === "Plan")?.state === "done";
+  if (s === "done" && !planComplete(worktree, specId, planPhaseDone)) return "executing";
   return s;
 }
 
 export async function stageForRunAsync(phases: Phase[], worktree: string, specId: string): Promise<Stage | null> {
   const s = stageFor(phases);
-  if (s === "done" && !(await planCompleteAsync(worktree, specId))) return "executing";
+  const planPhaseDone = phases.find((p) => p.name === "Plan")?.state === "done";
+  if (s === "done" && !(await planCompleteAsync(worktree, specId, planPhaseDone))) return "executing";
   return s;
 }
 
 export async function sessionCompleteAsync(phases: Phase[], worktree: string, specId?: string): Promise<boolean> {
   if (!phasesComplete(phases)) return false;
-  return specId ? planCompleteAsync(worktree, specId) : true;
+  return specId ? planCompleteAsync(worktree, specId, phases.find((p) => p.name === "Plan")?.state === "done") : true;
 }

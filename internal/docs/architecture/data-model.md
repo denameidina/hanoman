@@ -281,7 +281,10 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   codex: {…} }`. Default bawaan mengisi model/effort rekomendasi tiap fase (`no_effort.enabled=false`);
   nilai `null` pada konfigurasi user tetap berarti warisan orchestrator. Sesi ber-flow aktif lahir sebagai
   orchestrator; tiap fase dikerjakan subagent native `hanoman-fase-<slug>`. Baris lama tanpa blok ini
-  parse dan di-seed tanpa migration.
+  parse dan di-seed tanpa migration. Kunci sel `Review` (ADR-0170, hanya `feature`/`qa`) bukan fase:
+  ia meng-override model/effort reviewer independen `hanoman-fase-review` (default claude `opus`·`high`,
+  codex `gpt-5.6-sol`·`high`, TIDAK mewarisi orchestrator; `phaseOverrides.Review` juga berlaku). Belum
+  tampil di tab Orkestrasi — tetap tersimpan karena kunci sel lenient.
 - `builtinRuntimeDefaults` (LOCAL-only, tanpa migration) — marker provenance versi seed. `seeded`
   boleh diperbarui saat Hanoman membawa rekomendasi baru; `user` dipertahankan. Marker granular per
   model/effort global, saklar flow, dan field model/effort sel fase. Pada `POST /terminal/sessions`
@@ -908,7 +911,7 @@ dipangkas dan `CustomAgent` dapat dihapus, tetapi evidence historis tetap perlu 
 | `runtime` · `runtimeInvocationId` | Identitas event runtime; unique `(sessionId,runtimeInvocationId)` membuat lifecycle idempoten. |
 | `customAgentId?` · `agentName` · `model?` | Soft-link dan snapshot identitas child. |
 | `definitionHash?` | SHA-256 prompt/profile efektif saat registry lahir, diteruskan dari roster trusted; null berarti versi historis tidak diketahui. Start pertama tetap menang. |
-| `phase?` · `effort?` | [ADR-0164](../adr/0164-orkestrasi-subagent-per-fase.md) · fase milik agen fase (null untuk custom agent); effort dari roster saat start, diganti effort runtime (`SubagentStop.effort.level`) saat stop. Metrik custom agent mengecualikan baris ber-`phase`. |
+| `phase?` · `effort?` | [ADR-0164](../adr/0164-orkestrasi-subagent-per-fase.md) · fase milik agen fase (null untuk custom agent); effort dari roster saat start, diganti effort runtime (`SubagentStop.effort.level`) saat stop. Metrik custom agent mengecualikan baris ber-`phase`. Reviewer `hanoman-fase-review` (ADR-0170) tercatat dengan `phase = Execute`. |
 | `status` | `running|completed|interrupted|abandoned`. Boot menutup orphan running sebagai abandoned. |
 | `startedAt` · `endedAt?` · `durationMs?` | Stop sintetis sesudah restart memakai `startedAt=endedAt` dan `durationMs=null`, bukan nol palsu. |
 | `inputTokens?` · `outputTokens?` · `cachedTokens?` | Hanya nilai yang dapat dibaca dari transcript allowlisted; bentuk asing tetap null. |

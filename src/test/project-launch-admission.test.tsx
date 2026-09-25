@@ -46,7 +46,8 @@ describe("Human project launches (SPEC-1108)", () => {
     window.history.replaceState({}, "", "/projects/p1");
     vi.mocked(api.reverseDocs).mockReset().mockRejectedValue(new ApiError(409, "409", {
       error: "Cap penuh", kind: "capacity", admission: { enabled: true, liveCount: 6, liveAgentCount: 4,
-        maxConcurrent: 6, loadPerCore: 1.5, maxLoadPerCore: 2.5, loadStatus: "available" },
+        maxConcurrent: 6, loadPerCore: 1.5, maxLoadPerCore: 2.5, loadStatus: "available",
+        memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available" },
     }));
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Reverse docs" }));
@@ -73,7 +74,8 @@ describe("Human project launches (SPEC-1108)", () => {
     const launch = vi.mocked(api[method]);
     launch.mockReset().mockRejectedValueOnce(new ApiError(409, "409", {
       error: "Cap penuh", kind: "capacity", admission: { enabled: true, liveCount: 6, liveAgentCount: 4,
-        maxConcurrent: 6, loadPerCore: null, maxLoadPerCore: 2.5, loadStatus: "unsupported" },
+        maxConcurrent: 6, loadPerCore: null, maxLoadPerCore: 2.5, loadStatus: "unsupported",
+        memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available" },
     })).mockResolvedValueOnce({ id: "launched" });
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: label }));

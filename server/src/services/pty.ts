@@ -8,7 +8,7 @@ import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
-  renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook,
+  renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook, withPhaseDelegation,
   writeSubagentStatusline, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import {
@@ -338,6 +338,24 @@ export function noTtyPromptEnv(): Record<string, string> {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   writeFileSync(path, ASKPASS_DENY, { mode: 0o700 });
   return { SSH_ASKPASS: path, SSH_ASKPASS_REQUIRE: "force", GIT_TERMINAL_PROMPT: "0" };
+}
+
+/**
+ * ADR-0170 · subagent FOREGROUND untuk sesi ber-fase claude. Di sesi interaktif claude menjalankan
+ * setiap `Agent` di latar (ADR-0164 T1): giliran pemanggil berakhir selagi subagent bekerja, dan
+ * agen fase bisa melapor sebelum subagent-nya sendiri selesai. Terukur 2026-09-25 (claude 2.1.282,
+ * parent → 2 anak paralel): env ini saja membuat SEMUA lapis `requestShape: foreground`, anak tetap
+ * paralel, Stop tak menembak di tengah fase, dan Bash latar tetap jalan. Hook PreToolUse
+ * `updatedInput.run_in_background=false` terukur TANPA efek, jadi tak dipasang.
+ * Batas konkurensi: default claude 20 subagent per sesi — terlalu banyak untuk mesin 8 GB.
+ */
+export const SUBAGENT_CONCURRENCY_CAP = 3;
+export function phaseSessionAgentEnv(agent: Agent, phaseFile?: string): Record<string, string> {
+  if (agent !== "claude" || !phaseFile) return {};
+  return {
+    CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1",
+    CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS: String(SUBAGENT_CONCURRENCY_CAP),
+  };
 }
 
 // SPEC-402 · "tmux gagal" BUKAN "tak ada sesi". Hanya dua sinyal di bawah yang benar-benar berarti
@@ -819,7 +837,10 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     // fallback yang membisu tentang penyebabnya tak bisa didiagnosis dari luar). Pemanggil lalu
     // mencoba lagi TANPA agen fase (all-or-nothing): orchestrator yang lahir tanpa salah satu agen
     // fasenya akan terpaksa mengerjakan fase itu sendiri.
-    const attempt = (phaseDefs: AgentDef[]): string[] => {
+    const attempt = (requested: AgentDef[]): string[] => {
+      // ADR-0170 P2 · klausa delegasi agen fase disusun DI SINI: roster custom agent yang benar-benar
+      // hidup di sesi ini baru pasti sesudah `selectCustomDefs`, dan ikut terpilih ulang saat fallback.
+      const phaseDefs = withPhaseDelegation(requested, customDefs, agentForDefs);
       const defs = [...phaseDefs, ...customDefs];
       if (defs.length === 0) return [];
       const readOnlyHook = readOnlyHookFor();
@@ -975,6 +996,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   if (opts.phaseFile) {
     mkdirSync(dirname(opts.phaseFile), { recursive: true });
     envPairs.push(`HANOMAN_PHASE_FILE=${sq(opts.phaseFile)}`);
+  }
+  if (!opts.command) {
+    for (const [k, v] of Object.entries(phaseSessionAgentEnv(agent, opts.phaseFile))) envPairs.push(`${k}=${sq(v)}`);
   }
   if (opts.attachmentsDir) envPairs.push(`HANOMAN_ATTACHMENTS_DIR=${sq(opts.attachmentsDir)}`);
   // Env tambahan dari pemanggil lewat jalur yang sama.

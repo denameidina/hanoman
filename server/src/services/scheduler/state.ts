@@ -36,5 +36,5 @@ export async function buildSchedulerState(): Promise<SchedulerStateView> {
   const sessions = live.filter((s): s is typeof s & { specId: string } =>
     !!s.specId && launchedSpecs.has(s.specId)).map((s) => zSchedulerSessionView.parse(s));
   return { config: cfg, cap: cfg.maxConcurrent, liveCount: live.length, sources, queueCounts: counts,
-    sessions, admission: currentLaunchStatus(live, cfg) };
+    sessions, admission: await currentLaunchStatus(live, cfg) };
 }

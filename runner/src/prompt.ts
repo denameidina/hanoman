@@ -117,8 +117,14 @@ export function guideLine(guide: string, phase: string): string {
 
 // ADR-0164 · skill satu fase — aturan `skillInstruction` untuk satu baris: `exitSkills` digabung ke
 // fase TERAKHIR hanya untuk flow penulis-kode (INVARIAN 2 ADR-0113).
-export function phaseSkillsFor(flow: Flow, phase: string, method: MethodDef): string[] {
-  const own = method.phaseSkills[phase] ?? [];
+// ADR-0170 P2 · `agentRuntime` = fase dikerjakan agen fase runtime itu. Hanya claude yang memakai
+// `orchestratedPhaseSkills` (subagent foreground bersarang terukur di claude 2.1.282); codex & mode
+// tunggal tetap `phaseSkills`.
+export function phaseSkillsFor(
+  flow: Flow, phase: string, method: MethodDef, agentRuntime?: "claude" | "codex",
+): string[] {
+  const own = (agentRuntime === "claude" ? method.orchestratedPhaseSkills?.[phase] : undefined)
+    ?? method.phaseSkills[phase] ?? [];
   const phases = PIPELINES[flow];
   return writesCode(flow) && phase === phases[phases.length - 1]
     ? [...new Set([...own, ...method.exitSkills])]
@@ -190,9 +196,41 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "ADANYA ke manusia di terminal ini (teks biasa — informasi, bukan pertanyaan) sebelum menutup "
       + "pekerjaan."
     : "";
-  const list = plan.phases
+  const phaseList = plan.phases
     .map((p, i) => `${i + 1}. ${p.phase} → \`${p.agentName}\` · ${p.model} · ${p.effort}`)
     .join("\n");
+  // ADR-0170 P2 · reviewer independen Execute (feature/qa). Bukan fase: tak punya baris marker, dan
+  // invocation-nya tercatat di bawah Execute (roster `phase`).
+  const reviewer = plan.reviewer && plan.phases.some((p) => p.phase === plan.reviewer!.phase)
+    ? plan.reviewer : undefined;
+  const list = reviewer
+    ? `${phaseList}\nReviewer Execute → \`${reviewer.agentName}\` · ${reviewer.model} · ${reviewer.effort} `
+      + "(bukan fase — hanya dipanggil di langkah R)"
+    : phaseList;
+  const hasExecute = plan.phases.some((p) => p.phase === "Execute");
+  // ADR-0170 P2 · path plan PERSIS (Plan melapor `<YYYY-MM-DD>-<spec-id>-<slug>.md`), bukan glob.
+  const artefactRule = "Baris `Artefak fase sebelumnya:` diisi path PERSIS yang dilaporkan fase sebelumnya di "
+    + "`Artefak:` laporannya"
+    + (hasExecute ? " — untuk Execute: dokumen spec DAN berkas plan yang dilaporkan fase Plan" : "")
+    + ", bukan pola glob.";
+  const reviewStep = reviewer
+    ? "R. Review Execute: sesudah agen Execute melapor `Status: selesai` dengan bukti dan tanpa keputusan "
+      + "terbuka, SEBELUM menulis `Execute done`, panggil "
+      + (codex ? `\`${reviewer.agentName}\` lewat spawn_agent`
+        : `tool Agent dengan \`subagent_type\` \`${reviewer.agentName}\``)
+      + " (deskripsi `Review Execute`) dengan blok serah-terima:\n"
+      + "Tujuan: <objective backlog>\nBase SHA: $HANOMAN_BASE_SHA\n"
+      + "Artefak: <path PERSIS dokumen spec & berkas plan> (qa yang melewati Spec & Plan: dokumen audit)\n"
+      + "Laporan Execute: <tabel AC → bukti dari laporannya>\nPutaran rework: <r>/2\n\n"
+      + "`Verdict: lulus` → langkah 2 (tulis `Execute done`). `Verdict: rework` → lanjutkan agen Execute yang "
+      + `SAMA lewat ${resume} dengan \`Temuan wajib diperbaiki:\` reviewer apa adanya; sesudah ia melapor `
+      + `\`selesai\` lagi, lanjutkan reviewer yang SAMA lewat ${resume} dengan laporan barunya. Batasnya `
+      + "maks 2 putaran rework: masih `rework` sesudah putaran ke-2 → perlakukan temuan tersisa sebagai "
+      + "`Keputusan terbuka` langkah 4 (tanyakan, teruskan jawabannya ke agen Execute, lalu review lagi). "
+      + "Putaran rework bukan percobaan ulang langkah 3; reviewer galat atau tanpa baris `Verdict:` → "
+      + "langkah 3 berlaku padanya, `menunggu-keputusan` → langkah 4. JANGAN memperbaiki temuan sendiri dan "
+      + "JANGAN menulis `Execute done` tanpa `Verdict: lulus`."
+    : "";
   return [
     "Sesi ini ORCHESTRATOR. Setiap fase dikerjakan subagent fase miliknya dengan model & effort yang "
       + "sudah terkunci di definisinya — kamu TIDAK mengerjakan isi fase sendiri.",
@@ -202,11 +240,12 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "Urutan: <n>/<total> · <Nama Fase>\nTujuan: <objective backlog/project>\n"
       + "Base SHA: $HANOMAN_BASE_SHA (atau -)\nArtefak fase sebelumnya: <path yang dilaporkan, atau ->\n"
       + "Keputusan manusia sejauh ini: <ringkas, atau ->\nLampiran: <path INDEX.md lampiran, atau ->\n"
-      + `Percobaan: <k>/2\n\n${describeRule}`,
+      + `Percobaan: <k>/2\n\n${artefactRule} ${describeRule}`,
     "2. Baca laporannya. `Status: selesai` DENGAN bukti → SEBELUM hal lain (memanggil fase berikutnya, "
       + "commit, atau push): jalankan persis `echo \"<Nama Fase> done\" >> \"$HANOMAN_PHASE_FILE\"`, lalu "
       + "verifikasi dengan `tail -1 \"$HANOMAN_PHASE_FILE\"` bahwa barisnya benar tertulis. Kamu "
-      + "satu-satunya penulis berkas itu.",
+      + "satu-satunya penulis berkas itu."
+      + (reviewer ? " Khusus Execute: langkah R dulu; marker ditulis sesudah `Verdict: lulus`." : ""),
     "3. `Status: sebagian`/`terhalang`, galat, atau laporan tanpa bukti → delegasikan ULANG SEKALI ke "
       + `subagent fase yang sama${retry} dengan laporan gagalnya disertakan (\`Percobaan: 2/2\`). Gagal lagi → `
       + `BERHENTI dan ${askEscalation} apa yang harus dilakukan. Aturan ini berlaku walau `
@@ -222,6 +261,7 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
         + "\"Spec skipped\" >> \"$HANOMAN_PHASE_FILE\"` lalu `echo \"Plan skipped\" >> \"$HANOMAN_PHASE_FILE\"` "
         + "(gerbang yang sama seperti langkah 2), lalu lanjut ke Execute. `penuh` → Spec → Plan → Execute."
       : "",
+    reviewStep,
     handoff,
     "DILARANG mengerjakan isi fase sendiri — termasuk saat subagent gagal. Menulis `skipped` untuk fase "
       + "yang dilewati bukan mengerjakannya.",
@@ -400,6 +440,17 @@ const attachmentClause = (ctx?: AttachmentCtx): string => {
     + "adalah keadaan saat sesi ini lahir, bukan keadaan tetap.";
 };
 
+// ADR-0170 P2 · varian ORCHESTRATOR. Orchestrator tak mengerjakan fase, jadi menyuruhnya membaca SEMUA
+// lampiran hanya membakar konteks model orchestrator; agen fase sudah disuruh membaca manifest yang
+// diteruskan lewat baris `Lampiran:` (ATTACHMENT_NOTE phase-agents.ts). Mode tunggal tetap di atas.
+const orchestratorAttachmentClause = (ctx?: AttachmentCtx): string => {
+  if (!ctx || ctx.items.length === 0) return "";
+  return `LAMPIRAN backlog item ini: ${ctx.items.length} berkas saat sesi lahir, manifestnya `
+    + `\`${ctx.dir}/INDEX.md\` (selalu segar — lampiran bisa bertambah/berkurang). JANGAN membaca lampiran `
+    + "untuk mengerjakan fase: cantumkan path manifest itu di baris `Lampiran:` blok serah-terima SETIAP "
+    + "fase — agen fase yang membacanya.";
+};
+
 // Sesi project-level (reverse/scaffold/prd/breakdown) TAK punya baris `Spec`, jadi tak punya metode
 // tersimpan; ketiganya juga flow dokumen, yang katalog mattpocock tak layani. Mereka tetap di metode
 // default — dinyatakan, bukan kebetulan (ADR-0113).
@@ -484,7 +535,7 @@ export function startPrompt(
   if (plan) {
     return [
       head, orchestratorClause(plan, { fastPath: flow === "qa" }), auditContinuationForOrchestrator(flow, spec),
-      autonomyClause(autonomy), attachmentClause(attachments), push, specContext(spec),
+      autonomyClause(autonomy), orchestratorAttachmentClause(attachments), push, specContext(spec),
     ].filter(Boolean).join("\n\n");
   }
   return [
@@ -528,9 +579,11 @@ export function continuePrompt(
       // memenuhi gerbang penutup sebelum agen Execute sesi ini bekerja sama sekali.
       "$HANOMAN_PHASE_FILE masih memuat baris `Execute done` LAMA dari sesi sebelumnya — baris itu "
         + "TIDAK berlaku untuk sesi ini dan tidak memenuhi gerbang penutup. Sesudah agen fase Execute "
-        + "SESI INI melapor `Status: selesai`, tulis baris `Execute done` BARU (verifikasi `tail -1`); "
+        + "SESI INI melapor `Status: selesai` (dan lolos langkah R bila ada), tulis baris `Execute done` BARU "
+        + "(verifikasi `tail -1`); "
         + "commit/push final baru sah sesudah baris baru itu.",
-      orchestratorClause(plan), autonomyClause(autonomy), attachmentClause(attachments), push, specContext(spec),
+      orchestratorClause(plan), autonomyClause(autonomy), orchestratorAttachmentClause(attachments), push,
+      specContext(spec),
     ].filter(Boolean).join("\n\n");
   }
   return [
@@ -608,7 +661,7 @@ export function resumePrompt(
   if (plan) {
     return [
       head, resumed, orchestratorClause(plan, { fastPath: flow === "qa" && !auditDecided }),
-      autonomyClause(autonomy), attachmentClause(attachments), push, specContext(spec),
+      autonomyClause(autonomy), orchestratorAttachmentClause(attachments), push, specContext(spec),
     ].filter(Boolean).join("\n\n");
   }
   return [
@@ -661,7 +714,7 @@ export function startGoalPrompt(
   if (opts.plan) {
     return [
       head, resumed, goalDetail(spec), orchestratorClause(opts.plan), autonomyClause(opts.autonomy),
-      attachmentClause(opts.attachments), push, goalBlock(spec),
+      orchestratorAttachmentClause(opts.attachments), push, goalBlock(spec),
     ].filter(Boolean).join("\n\n");
   }
   return [

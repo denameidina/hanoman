@@ -3,8 +3,9 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  phaseFilePath, decisionFilePath, readPhases, stageFor, planComplete, stageForRun,
-  phasesComplete, sessionComplete, enrichPhases, trackDoneSeen,
+  phaseFilePath, decisionFilePath, readPhases, stageFor, planComplete, planCompleteAsync,
+  stageForRun, stageForRunAsync, phasesComplete, sessionComplete, sessionCompleteAsync,
+  enrichPhases, trackDoneSeen,
   type Phase, type PhaseState, type PhaseInvocation,
 } from "../src/services/session-phases";
 
@@ -114,6 +115,26 @@ describe("planComplete", () => {
   it("spec-16 tak menyerempet spec-167", () => {
     expect(planComplete(mkWorktree({ "2026-07-11-x-spec-167.md": "- [ ] belum" }), "SPEC-16")).toBe(true);
   });
+
+  // ADR-0171 · nama plan skill default (tanpa spec-id) tak pernah cocok regex — sebelumnya itu
+  // lolos sebagai "tak ada plan untuk digerbang" (true) walau fase Plan sungguhan sudah `done`.
+  describe("ADR-0171 · planPhaseDone", () => {
+    it("Plan done tapi tak ada file cocok spec-id → BELUM complete", () => {
+      const wt = mkWorktree({ "2026-09-25-orkestrasi-mutu-multi-subagent.md": "- [ ] belum" });
+      expect(planComplete(wt, "SPEC-1234", true)).toBe(false);
+    });
+    it("Plan done + tak ada dir plan sama sekali → BELUM complete", () => {
+      expect(planComplete(mkWorktree({}), "SPEC-1234", true)).toBe(false);
+    });
+    it("Plan BUKAN done (default false, mis. skipped/fast-path qa) → tetap true seperti semula", () => {
+      expect(planComplete(mkWorktree({}), "SPEC-1234")).toBe(true);
+      expect(planComplete(mkWorktree({}), "SPEC-1234", false)).toBe(true);
+    });
+    it("file cocok spec-id ada (apa pun isinya) → planPhaseDone tak berpengaruh", () => {
+      const wt = mkWorktree({ "2026-07-11-x-spec-1234.md": "- [x] a\n" });
+      expect(planComplete(wt, "SPEC-1234", true)).toBe(true);
+    });
+  });
 });
 
 describe("stageForRun", () => {
@@ -128,6 +149,24 @@ describe("stageForRun", () => {
   });
   it("stage non-done tak terpengaruh gerbang", () => {
     expect(stageForRun(P([["Plan", "done"]]), mkPlan("- [ ] b\n"), "SPEC-173")).toBe("planned");
+  });
+
+  // ADR-0171 · Plan `done` (bukan `skipped`) tapi tak satu pun berkas plan cocok spec-id (mis.
+  // nama skill default tanpa spec-id) → tahan di `executing`, jangan lompat ke `done`.
+  it("Plan done + Execute done + tak ada plan ber-spec-id → tahan di executing", () => {
+    const wt = mkWorktree({ "2026-09-25-nama-tanpa-spec-id.md": "- [ ] belum" });
+    expect(stageForRun(P([["Plan", "done"], ["Execute", "done"]]), wt, "SPEC-173")).toBe("executing");
+  });
+
+  // qa fast-path: Plan `skipped`, bukan `done` → perilaku lama tak berubah.
+  it("Plan skipped (fast-path qa) + tak ada plan ber-spec-id → tetap done", () => {
+    expect(stageForRun(P([["Plan", "skipped"], ["Execute", "done"]]), mkWorktree({}), "SPEC-173")).toBe("done");
+  });
+
+  // Flow tanpa fase Plan sama sekali (goal/no_effort/audit/dokumen) → tak ada entri "Plan" di
+  // `phases`, `planPhaseDone` selalu false → perilaku lama tak berubah.
+  it("flow tanpa fase Plan (mis. goal) → tak digerbang gerbang plan", () => {
+    expect(stageForRun(P([["Goal", "done"], ["Verifikasi", "done"]]), mkWorktree({}), "SPEC-173")).toBe("done");
   });
 });
 
@@ -196,6 +235,37 @@ describe("SPEC-433 · sessionComplete", () => {
     expect(sessionComplete(P([["Brainstorm", "done"], ["PRD", "done"]]), "/tak/ada", undefined))
       .toBe(true);
     expect(sessionComplete(P([["Brainstorm", "done"], ["PRD", "active"]]), "/tak/ada", undefined))
+      .toBe(false);
+  });
+
+  // ADR-0171 · Plan `done` sungguhan tanpa plan ber-spec-id (nama skill default) → BELUM complete,
+  // bukan lolos diam-diam ke pil "Selesai".
+  it("Plan done + Execute done + tak ada plan ber-spec-id → BELUM complete", () => {
+    const wt = mkWorktree({ "2026-09-25-nama-tanpa-spec-id.md": "- [ ] belum" });
+    expect(sessionComplete(P([["Plan", "done"], ["Execute", "done"]]), wt, "SPEC-433")).toBe(false);
+  });
+});
+
+// ADR-0171 · varian async harus bersemantik identik dengan varian sync untuk gerbang plan baru.
+describe("ADR-0171 · varian async identik sync", () => {
+  const P = (pairs: [string, string][]): Phase[] =>
+    pairs.map(([name, state]) => ({ name, state })) as Phase[];
+
+  it("planCompleteAsync: Plan done tanpa plan ber-spec-id → false, sama seperti sync", async () => {
+    const wt = mkWorktree({ "2026-09-25-nama-tanpa-spec-id.md": "- [ ] belum" });
+    expect(await planCompleteAsync(wt, "SPEC-1234", true)).toBe(false);
+    expect(planComplete(wt, "SPEC-1234", true)).toBe(false);
+  });
+
+  it("stageForRunAsync: Plan done + Execute done + tak ada plan ber-spec-id → executing", async () => {
+    const wt = mkWorktree({ "2026-09-25-nama-tanpa-spec-id.md": "- [ ] belum" });
+    expect(await stageForRunAsync(P([["Plan", "done"], ["Execute", "done"]]), wt, "SPEC-173"))
+      .toBe("executing");
+  });
+
+  it("sessionCompleteAsync: Plan done + Execute done + tak ada plan ber-spec-id → false", async () => {
+    const wt = mkWorktree({ "2026-09-25-nama-tanpa-spec-id.md": "- [ ] belum" });
+    expect(await sessionCompleteAsync(P([["Plan", "done"], ["Execute", "done"]]), wt, "SPEC-433"))
       .toBe(false);
   });
 });
@@ -341,6 +411,22 @@ describe("enrichPhases (ADR-0164)", () => {
   it("fase aktif belum berinvocation tetap pending walau lama", () => {
     expect(enrichPhases(phases, roster, [], new Map(), 10_000_000, 0)[2]!.agent)
       .toMatchObject({ attempts: 0, evidence: "pending" });
+  });
+  // ADR-0170 · reviewer Execute tercatat di bawah fase Execute (roster `phase: "Execute"`), tapi
+  // bukan percobaan Execute: chip tetap milik agen Execute, status = invocation agen Execute terakhir.
+  it("reviewer satu fase tak dihitung sebagai percobaan agen fasenya", () => {
+    const exec: Phase[] = [{ name: "Execute", state: "active" }];
+    const withReviewer = [
+      { name: "hanoman-fase-review", phase: "Execute", model: "claude-opus-5", effort: "high" },
+      { name: "hanoman-fase-execute", phase: "Execute", model: "claude-sonnet-5", effort: "high" },
+    ];
+    const [e] = enrichPhases(exec, withReviewer, [
+      inv({ phase: "Execute", agentName: "hanoman-fase-execute", runtimeInvocationId: "x1", status: "completed",
+        startedAt: "2026-09-14T00:00:00.000Z" }),
+      inv({ phase: "Execute", agentName: "hanoman-fase-review", runtimeInvocationId: "r1", status: "running",
+        startedAt: "2026-09-14T00:05:00.000Z" }),
+    ], new Map(), 0, 0);
+    expect(e!.agent).toMatchObject({ name: "hanoman-fase-execute", attempts: 1, status: "completed" });
   });
 });
 

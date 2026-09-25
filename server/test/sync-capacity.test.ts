@@ -11,6 +11,7 @@ const app = buildApp({ requireAuth: false });
 let host = "";
 const admission: LaunchStatus = {
   enabled: true, liveCount: 2, liveAgentCount: 1, maxConcurrent: 4, loadPerCore: 0.5, maxLoadPerCore: 1.5, loadStatus: "available",
+  memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available",
 };
 const clean = async () => { await prisma.deviceToken.deleteMany(); await prisma.user.deleteMany(); };
 const waitFor = async (ok: () => boolean, ms = 5000) => {

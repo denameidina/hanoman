@@ -166,6 +166,7 @@ describe("SchedulerScreen launch guard (SPEC-1108)", () => {
     getSchedulerState.mockResolvedValue({ ...STATE, admission: {
       enabled: true, liveCount: 6, liveAgentCount: 4, maxConcurrent: 6,
       loadPerCore: null, maxLoadPerCore: 2.5, loadStatus,
+      memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available",
     } });
     renderScreen();
     const status = await screen.findByLabelText("Status gerbang peluncuran");
@@ -179,7 +180,7 @@ describe("SchedulerScreen launch guard (SPEC-1108)", () => {
 
   it("saves guard knobs while scheduler and sources are disabled", async () => {
     const config = { ...STATE.config, enabled: false,
-      launchGuard: { enabled: true, maxLoadPerCore: 2.5 },
+      launchGuard: { enabled: true, maxLoadPerCore: 2.5, minMemAvailablePct: 15 },
       sources: { backlog: { enabled: false, everyMin: 15 }, triase: { enabled: false, everyMin: 30 } } };
     getSchedulerState.mockResolvedValue({ ...STATE, config });
     putSchedulerConfig.mockResolvedValue(config);
@@ -190,7 +191,7 @@ describe("SchedulerScreen launch guard (SPEC-1108)", () => {
     fireEvent.change(screen.getByLabelText("Ambang load per core"), { target: { value: "1.75" } });
     fireEvent.click(screen.getByRole("button", { name: /simpan setelan/i }));
     await waitFor(() => expect(putSchedulerConfig).toHaveBeenCalledWith(expect.objectContaining({
-      enabled: false, launchGuard: { enabled: false, maxLoadPerCore: 1.75 },
+      enabled: false, launchGuard: { enabled: false, maxLoadPerCore: 1.75, minMemAvailablePct: 15 },
     })));
   });
 });

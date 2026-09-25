@@ -10,6 +10,7 @@ describe("launch.rejected di titik lempar", () => {
     const admission = {
       enabled: true, liveCount: 1, liveAgentCount: 1, maxConcurrent: 1, loadPerCore: 0.1,
       maxLoadPerCore: 1, loadStatus: "available" as const,
+      memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available" as const,
     };
     expect(() => { throw new LaunchAdmissionError("capacity", admission); }).toThrow();
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({

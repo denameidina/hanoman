@@ -74,7 +74,8 @@ describe("pengirim presence", () => {
 describe("frame capacity di pengirim (SPEC-1215 · AC-A10)", () => {
   const adm = (over: Partial<LaunchStatus> = {}): LaunchStatus => ({
     enabled: true, liveCount: 1, liveAgentCount: 1, maxConcurrent: 4,
-    loadPerCore: 0.3, maxLoadPerCore: 1.5, loadStatus: "available", ...over,
+    loadPerCore: 0.3, maxLoadPerCore: 1.5, loadStatus: "available",
+    memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available", ...over,
   });
   const capFrames = (sent: string[]) => sent.map((j) => JSON.parse(j)).filter((f) => f.t === "capacity");
 

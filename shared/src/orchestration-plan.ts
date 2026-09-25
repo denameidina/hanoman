@@ -5,7 +5,10 @@ import {
 
 /** Nilai `model` subagent claude yang berarti "model percakapan utama" (dokumen sub-agents Claude Code). */
 export const CLAUDE_SUBAGENT_INHERIT = "inherit";
-import { FLOW_PHASES, phaseAgentName, type OrchestrationFlow, type PhasePlan } from "./orchestration";
+import {
+  FLOW_PHASES, REVIEWER_CELL, REVIEWER_DEFAULTS, REVIEWER_FLOWS, phaseAgentName,
+  type OrchestrationFlow, type PhasePlan, type PhaseReviewerEntry,
+} from "./orchestration";
 
 // ADR-0164 · resolver rencana fase. Satu fungsi murni dipakai server (kelahiran sesi) dan UI
 // (pratinjau modal Start) — dua salinan aturan warisan/koersi akan membuat pratinjau berbohong.
@@ -38,19 +41,26 @@ export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
   // Effort dikoersi ke model HASIL resolusi: sel Luna yang mewarisi `ultra` harus turun ke
   // fallback Luna sebelum sampai ke `model_reasoning_effort`.
   const coerce = input.runtime === "codex" ? coerceCodexEffort : coerceClaudeEffort;
+  const resolve = (key: string, fallback: { model: string; effort: string }) => {
+    const cell = cells[key];
+    const override = input.phaseOverrides?.[key];
+    const picked = override?.model ?? cell?.model ?? fallback.model;
+    // `default` hanya sah untuk `--model` sesi; `--agents` claude menerimanya sebagai `inherit`.
+    const model = input.runtime === "claude" && picked === CLAUDE_DEFAULT_ALIAS ? CLAUDE_SUBAGENT_INHERIT : picked;
+    return { model, effort: coerce(model, override?.effort ?? cell?.effort ?? fallback.effort) };
+  };
+  // ADR-0170 P2 · reviewer TIDAK mewarisi orchestrator: default-nya konstanta peran (penilai
+  // independen butuh model kuat walau orchestrator murah), sel/override `Review` menimpanya.
+  const reviewer: PhaseReviewerEntry | undefined = REVIEWER_FLOWS.has(input.flow)
+    ? { agentName: phaseAgentName(REVIEWER_CELL), phase: "Execute",
+        ...resolve(REVIEWER_CELL, REVIEWER_DEFAULTS[input.runtime]) }
+    : undefined;
   return {
     flow: input.flow,
     runtime: input.runtime,
-    phases: FLOW_PHASES[input.flow].map((phase) => {
-      const cell = cells[phase];
-      const override = input.phaseOverrides?.[phase];
-      const picked = override?.model ?? cell?.model ?? input.orchestrator.model;
-      // `default` hanya sah untuk `--model` sesi; `--agents` claude menerimanya sebagai `inherit`.
-      const model = input.runtime === "claude" && picked === CLAUDE_DEFAULT_ALIAS ? CLAUDE_SUBAGENT_INHERIT : picked;
-      return {
-        phase, agentName: phaseAgentName(phase), model,
-        effort: coerce(model, override?.effort ?? cell?.effort ?? input.orchestrator.effort),
-      };
-    }),
+    phases: FLOW_PHASES[input.flow].map((phase) => ({
+      phase, agentName: phaseAgentName(phase), ...resolve(phase, input.orchestrator),
+    })),
+    ...(reviewer ? { reviewer } : {}),
   };
 }

@@ -32,7 +32,8 @@ describe("presenceView", () => {
   // SPEC-1215 · ADR-0165 §9 · kapasitas & ketersediaan kendali untuk routing target Start (SPEC-1216).
   const adm = (over: Partial<LaunchStatus> = {}): LaunchStatus => ({
     enabled: true, liveCount: 1, liveAgentCount: 1, maxConcurrent: 4,
-    loadPerCore: 0.3, maxLoadPerCore: 1.5, loadStatus: "available", ...over,
+    loadPerCore: 0.3, maxLoadPerCore: 1.5, loadStatus: "available",
+    memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available", ...over,
   });
 
   it("device online membawa capacity dan control; mesin lokal membawa capacity sendiri", async () => {

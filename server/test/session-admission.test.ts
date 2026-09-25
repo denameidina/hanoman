@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 import { zScheduler } from "@hanoman/shared";
 import { createLaunchGate, launchStatus, type LaunchPane } from "../src/services/session-admission";
 
-function fixture(options: { cap?: number; load?: number; platform?: string; enabled?: boolean } = {}) {
+function fixture(options: {
+  cap?: number; load?: number; platform?: string; enabled?: boolean;
+  memAvailablePct?: number | null; minMemAvailablePct?: number;
+} = {}) {
   const panes: LaunchPane[] = [];
   const cfg = zScheduler.parse({ maxConcurrent: options.cap ?? 1,
-    launchGuard: { enabled: options.enabled ?? true, maxLoadPerCore: 2.5 } });
-  const host = { platform: options.platform ?? "darwin", loadAverage: options.load ?? 8, cores: 8 };
+    launchGuard: { enabled: options.enabled ?? true, maxLoadPerCore: 2.5,
+      minMemAvailablePct: options.minMemAvailablePct ?? 15 } });
+  const host = { platform: options.platform ?? "darwin", loadAverage: options.load ?? 8, cores: 8,
+    memAvailablePct: "memAvailablePct" in options ? options.memAvailablePct! : 50 };
   const gate = createLaunchGate({ listPanes: async () => panes.slice(), config: async () => cfg, host: () => host });
   const start = (id: string, force = false) => gate.run({ id, force }, async () => {
     const pane = { id, exited: false, launchClass: "agent" as const };
@@ -17,15 +22,18 @@ function fixture(options: { cap?: number; load?: number; platform?: string; enab
 }
 
 describe("SPEC-1108 · admission", () => {
-  it("cap counts live operator terminals too, but excludes dead panes", async () => {
+  // ADR-0170 · cap membatasi sesi AGEN, bukan lagi semua pane hidup (ADR-0161 keputusan #2,
+  // ditegakkan penuh mulai ADR-0170): terminal/shell operator kini bebas dari cap agen.
+  it("cap counts only agent panes, excludes terminal panes and dead panes", async () => {
     const f = fixture();
     f.panes.push({ id: "shell", exited: false, launchClass: "terminal" },
       { id: "dead", exited: true, launchClass: "agent" });
-    await expect(f.start("a")).rejects.toMatchObject({ kind: "capacity", admission: {
-      liveCount: 1, liveAgentCount: 0, maxConcurrent: 1, loadPerCore: 1, maxLoadPerCore: 2.5,
-    } });
-    f.panes[0]!.exited = true;
     await expect(f.start("a")).resolves.toMatchObject({ id: "a" });
+    f.panes.length = 0;
+    f.panes.push({ id: "existing", exited: false, launchClass: "agent" });
+    await expect(f.start("b")).rejects.toMatchObject({ kind: "capacity", admission: {
+      liveCount: 1, liveAgentCount: 1, maxConcurrent: 1, loadPerCore: 1, maxLoadPerCore: 2.5,
+    } });
   });
 
   it("reattaches before cap and load checks", async () => {
@@ -54,8 +62,23 @@ describe("SPEC-1108 · admission", () => {
     expect(launchStatus([], f.cfg, { ...f.host, cores })).toMatchObject({ loadPerCore: null, loadStatus: "unavailable" });
   });
 
-  it.each(["force", "disabled"])("%s bypasses both gates", async (mode) => {
-    const f = fixture({ load: 40, enabled: mode !== "disabled" });
+  // ADR-0170 · sinyal memori tersedia: default ambang 15%.
+  it.each([[15, true], [14.99, false]])("mem available %s%% vs 15%% threshold: allowed %s", async (pct, allowed) => {
+    const f = fixture({ memAvailablePct: pct });
+    if (allowed) await expect(f.start("a")).resolves.toMatchObject({ id: "a" });
+    else await expect(f.start("a")).rejects.toMatchObject({ kind: "host-memory", admission: {
+      memAvailablePct: pct, minMemAvailablePct: 15, memStatus: "available",
+    } });
+  });
+
+  it("mem unavailable never rejects — platform without a number is unopinionated", async () => {
+    const f = fixture({ memAvailablePct: null });
+    expect(launchStatus(f.panes, f.cfg, f.host)).toMatchObject({ memAvailablePct: null, memStatus: "unavailable" });
+    await expect(f.start("a")).resolves.toMatchObject({ id: "a" });
+  });
+
+  it.each(["force", "disabled"])("%s bypasses all gates", async (mode) => {
+    const f = fixture({ load: 40, memAvailablePct: 1, enabled: mode !== "disabled" });
     f.panes.push({ id: "existing", exited: false, launchClass: "agent" });
     await expect(f.start("a", mode === "force")).resolves.toMatchObject({ id: "a" });
   });
@@ -102,7 +125,10 @@ describe("SPEC-1108 · admission", () => {
     const agent = f.start("agent");
     const results = await Promise.allSettled([operator, agent]);
     expect(results[0]).toEqual({ status: "fulfilled", value: "shell" });
-    expect(results[1]).toMatchObject({ status: "rejected", reason: { kind: "capacity", admission: { liveCount: 1 } } });
+    // P3 · liveAgentCount tak terisi terminal shell → agent ditolak load, bukan cap.
+    expect(results[1]).toMatchObject({
+      status: "rejected", reason: { kind: "host-load", admission: { liveCount: 1, liveAgentCount: 0 } },
+    });
   });
 
   it("legacy Windows worktree panes contribute to structured-agent metrics", () => {

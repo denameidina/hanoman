@@ -94,15 +94,10 @@ export async function startSpecSession(
     // SPEC-1216 · ADR-0165 §6 · lewati gerbang presence satu-sesi. HANYA jalur manusia yang
     // memasoknya (POST /terminal/sessions), cermin `force`. Governor & denyut lead tak pernah.
     confirmRemote?: boolean;
-    // ADR-0169 · lewati HANYA gerbang kapasitas/beban host (ADR-0161) — bukan gerbang dependency
-    // ADR-0093, yang tetap terikat murni ke `force`. Dipakai satu-satunya oleh auto-resume boot
-    // (session-boot-resume.ts): item yang dependency-nya belum ter-merge harus TETAP diblokir
-    // walau kapasitas dilewati.
-    bypassCapacity?: boolean;
   },
 ): Promise<StartSpecResult> {
   const id = sessionIdForSpec(spec.id);
-  return withSessionAdmission({ id, force: opts.force || opts.bypassCapacity }, async () => {
+  return withSessionAdmission({ id, force: opts.force }, async () => {
     const pane = await getSessionAsync(id);
     // SPEC-1216 · ADR-0165 §5/§8 · gerbang satu sesi lintas instance. HANYA saat tak ada pane
     // LOKAL (re-attach ke sesi yang sedang berjalan di mesin INI tak boleh ikut ditolak). Berdiri

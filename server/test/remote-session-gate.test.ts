@@ -81,7 +81,7 @@ describe("startSpecSession gerbang presence (SPEC-1216 · AC-B5/B6)", () => {
   beforeEach(async () => {
     await resetDb(); __resetPresence();
     await prisma.deviceToken.deleteMany(); await prisma.user.deleteMany();
-    await makeSetting({ scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } } });
+    await makeSetting({ scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5, minMemAvailablePct: 15 } } });
   });
 
   it("sesi working di device lain untuk spec yang sama → LaunchError remote-session, TAK memanggil createSession", async () => {

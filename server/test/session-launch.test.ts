@@ -181,12 +181,14 @@ describe("session-launch", () => {
     killSession(r.id);
   });
 
-  it("continue (stage done) hanya membawa agen fase Execute", async () => {
+  // ADR-0170 P2 · + reviewer independen Execute (bukan fase; invocation-nya di bawah Execute).
+  it("continue (stage done) hanya membawa agen fase Execute + reviewer-nya", async () => {
     process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
     const seeded = await seedRepo("SPEC-ORCH3");
     const spec = await prisma.spec.update({ where: { id: seeded.id }, data: { stage: "done" } });
     const r = await startSpecSession(spec, { flow: "feature" });
-    expect(Object.keys(JSON.parse(readFileSync(agentsFilePath(r.id), "utf8")))).toEqual(["hanoman-fase-execute"]);
+    expect(Object.keys(JSON.parse(readFileSync(agentsFilePath(r.id), "utf8"))))
+      .toEqual(["hanoman-fase-execute", "hanoman-fase-review"]);
     killSession(r.id);
   });
 

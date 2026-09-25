@@ -55,9 +55,12 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     });
     const j = JSON.parse(readFileSync(agentsFilePath(s.id), "utf8"));
     expect(Object.keys(j).sort()).toEqual(["hanoman-fase-plan", "hanoman-fase-spec", "scout"]);
-    expect(j["hanoman-fase-spec"]).toEqual({
-      description: "Fase Spec", prompt: "INSTRUKSI SPEC", model: "claude-sonnet-5", effort: "low",
+    expect(j["hanoman-fase-spec"]).toMatchObject({
+      description: "Fase Spec", model: "claude-sonnet-5", effort: "low",
     });
+    // ADR-0170 P2 · klausa delegasi ditempel di kelahiran sesi — roster custom agent baru pasti di sini.
+    expect(j["hanoman-fase-spec"].prompt.startsWith("INSTRUKSI SPEC\n\n=== DELEGASI ===")).toBe(true);
+    expect(j["hanoman-fase-spec"].prompt).toContain("`scout` (model sesi)");
     expect(readFileSync(promptFilePath(s.id), "utf8").startsWith("PROMPT ORCHESTRATOR")).toBe(true);
     const p = getSession(s.id)!;
     expect(p).toMatchObject({ orchestrated: true, model: "claude-opus-5", effort: "xhigh" });
@@ -196,6 +199,34 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     expect(getSession(s.id)!.orchestrated).toBe(true);
   });
 
+  // ADR-0170 P2 · klausa delegasi agen fase menyebut HANYA custom agent yang hidup di sesi itu;
+  // roster kosong → klausa generik tanpa nama. Reviewer tak menerima klausa, roster-nya ber-fase Execute.
+  it("P2 · klausa delegasi dari roster hidup; reviewer tanpa klausa & tercatat di fase Execute", () => {
+    const reviewer: AgentDef = { kind: "phase", phase: "Execute", name: "hanoman-fase-review", description: "Review",
+      instructions: "INSTRUKSI REVIEW", tools: null, model: "opus", effort: "high", mentions: [] };
+    const execute: AgentDef = { kind: "phase", phase: "Execute", name: "hanoman-fase-execute", description: "Fase Execute",
+      instructions: "INSTRUKSI EXECUTE", tools: null, model: "sonnet", effort: "high", mentions: [] };
+    registerCustomAgentSource(() => [{ ...scout, workspacePolicy: "read-only", model: "haiku" }]);
+    const s = createSession("p1", cwd, {
+      id: born("orch-deleg"), agent: "claude", prompt: "P", legacyPrompt: "L",
+      phaseAgents: [...phaseAgents, execute, reviewer],
+    });
+    const j = JSON.parse(readFileSync(agentsFilePath(s.id), "utf8"));
+    expect(j["hanoman-fase-execute"].prompt).toContain("`scout` (read-only · haiku)");
+    expect(j["hanoman-fase-execute"].prompt).toContain("implementer per task");
+    expect(j["hanoman-fase-review"].prompt).toBe("INSTRUKSI REVIEW");
+    const roster = getSession(s.id)!.agentRoster!;
+    expect(roster.find((r) => r.name === "hanoman-fase-review")).toMatchObject({ phase: "Execute", model: "opus" });
+    // Agen fase Execute tetap entri roster PERTAMA untuk fase itu (chip fase memakai `find`).
+    expect(roster.find((r) => r.phase === "Execute")!.name).toBe("hanoman-fase-execute");
+
+    registerCustomAgentSource(() => []);
+    const bare = createSession("p1", cwd, { id: born("orch-deleg-empty"), agent: "claude", prompt: "P", legacyPrompt: "L", phaseAgents });
+    const k = JSON.parse(readFileSync(agentsFilePath(bare.id), "utf8"));
+    expect(k["hanoman-fase-spec"].prompt).toContain("Tak ada custom agent di sesi ini");
+    expect(k["hanoman-fase-spec"].prompt).not.toContain("`scout`");
+  });
+
   // R3 · tenggang ⚠ 60 dtk dihitung "sejak server PERTAMA melihat marker done" — dulu disimpan per
   // attachment, jadi reconnect dashboard dan restart server memulai ulang tenggangnya.
   it("R3 · doneSeen per sesi: tahan reconnect & restart (opsi tmux), dibuang saat sesi dibunuh", async () => {
@@ -239,9 +270,12 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     const j = JSON.parse(readFileSync(agentsFilePath(s.id), "utf8"));
     // Berkas --agents hanya memuat agen fase ASLI + custom agent yang sah — bukan versi rogue-nya.
     expect(Object.keys(j).sort()).toEqual(["hanoman-fase-plan", "hanoman-fase-spec", "scout"]);
-    expect(j["hanoman-fase-plan"]).toEqual({
-      description: "Fase Plan", prompt: "INSTRUKSI PLAN", model: "claude-opus-5", effort: "high",
+    expect(j["hanoman-fase-plan"]).toMatchObject({
+      description: "Fase Plan", model: "claude-opus-5", effort: "high",
     });
+    expect(j["hanoman-fase-plan"].prompt.startsWith("INSTRUKSI PLAN\n\n=== DELEGASI ===")).toBe(true);
+    // Klausa delegasi pun tak menyebut agen rogue: ia dibuang SEBELUM roster disusun.
+    expect(j["hanoman-fase-plan"].prompt).not.toContain("coba menimpa");
     expect(stderrOut).toContain("hanoman-fase-plan");
     expect(stderrOut).toContain("diabaikan");
   });

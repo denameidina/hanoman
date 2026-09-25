@@ -78,7 +78,7 @@ describe("/api/events/ws (klien) — principal remote grup terbatas (SPEC-1218 �
   const remoteGrant = (capabilities: string[]) =>
     makeSetting({
       remoteControl: { enabled: true, capabilities: capabilities as any },
-      scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5 } },
+      scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { enabled: false, maxLoadPerCore: 2.5, minMemAvailablePct: 15 } },
     });
 
   it("req.remote tanpa ide:read → hanya sessions/leadAsks/cleanups, nol git, nol cookieOnly", async () => {

@@ -94,6 +94,9 @@ model Spec {
   updatedAt  DateTime @updatedAt
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   attachments SpecAttachment[]
+
+  // ADR-0171 · GET /specs per project (live-specs.ts) full-scan tanpa ini.
+  @@index([projectId])
 }
 
 // SPEC-843 · ADR-0124 · lampiran per backlog item — konteks yang dipegang manusia saat memfilekan
@@ -294,6 +297,11 @@ model Notification {
   projectId String?
   createdAt DateTime  @default(now())
   readAt    DateTime?
+
+  // ADR-0171 · notificationsFeed() (notifications.ts) `ORDER BY createdAt DESC LIMIT n` tiap 3
+  // detik full-scan tanpa ini. `readAt` TIDAK diindeks: count(where readAt:null) memindai tabel
+  // yang sama kecilnya (notifikasi tak diretensi belum ada mekanismenya, tapi volumenya rendah).
+  @@index([createdAt])
 }
 
 // SPEC-169 · auth. passwordHash = scrypt "<saltHex>:<hashHex>".

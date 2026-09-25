@@ -445,9 +445,12 @@ export const zTerminalSession = z.union([
   // `flow: z.undefined()` BUKAN hiasan: varian ini permisif dan diletakkan SESUDAH semua varian
   // ber-flow, jadi tanpa gerbang itu body flow yang CACAT ({project, flow:"prd"} tanpa brief)
   // akan lolos ke sini dan melahirkan terminal biasa secara senyap alih-alih dijawab 400.
+  // ADR-0170 · terminal agen kini ikut gerbang peluncuran (ADR-0161/ADR-0170): `force`
+  // dipasang seperti varian ber-flow lain, hanya jalur manusia yang memasoknya.
   z.object({
     project: z.string(), flow: z.undefined(),
     agent: zAgent.optional(), model: z.string().optional(), effort: z.string().optional(),
+    force: z.boolean().optional(),
   }),
   // SPEC-252 · ADR-0061 — model & effort per SESI: override opsional saat Start; kosong → global.
   // SPEC-332 · ADR-0073 — mode goal per SESI: `goal` undefined → ikut Setting.goal.enabled,
