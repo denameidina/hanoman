@@ -30,7 +30,7 @@ describe("app/support builtin native configuration (not a behavioral benchmark)"
         expect(role.isolation).toBeUndefined();
         expect(role.permissionMode).toBe("plan");
         expect(role.maxTurns).toBe(def.maxTurns);
-        expect(role.tools).toEqual(def.tools.filter((t) => !["Write", "Edit"].includes(t)));
+        expect(role.tools).toEqual((def.tools ?? []).filter((t) => !["Write", "Edit"].includes(t)));
         expect(role.tools).not.toContain("Write");
         expect(role.hooks.PreToolUse[0].hooks[0].command).toBe("node /tmp/read-only.cjs");
       } else {

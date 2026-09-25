@@ -1444,13 +1444,20 @@ Pakai skill lebih sempit saat task cocok:
   mulai ulang dengan env spool baru saat mengganti server; HTTP host tidak memakai spool.
   Katalog berisi 25 peran. Delapan tambahan design/build/performance/analisis/arsitektur/operasi/
   support/knowledge bersifat opt-in; lima penulis isolated (Claude saja), tiga analis read-only.
-  Sembilan agen domain read-only opt-in (audit 2026-09-25, `shared/src/builtin-domain-agents.ts`):
-  a11y-auditor, frontend-render-auditor, api-contract-auditor, concurrency-hazard-hunter,
-  schema-migration-auditor, layering-guard, cloudflare-config-auditor, vps-hardening-auditor,
-  maintainability-reviewer.
+  Sembilan agen domain opt-in (`shared/src/builtin-domain-agents.ts`), dikoreksi 2026-09-25 dari
+  sembilan auditor read-only menjadi lima PENGERJA isolated-worktree (Claude saja) + empat auditor
+  read-only pasangan review-nya: frontend-engineer, backend-engineer, database-engineer,
+  cloudflare-engineer, vps-engineer (penulis) — a11y-auditor, api-contract-auditor,
+  schema-migration-auditor, cloudflare-config-auditor (auditor). `cloudflare-engineer` dan
+  `vps-engineer` berwenang PENUH mengubah produksi dalam scope tugas tanpa gerbang izin tambahan
+  (keputusan manusia); disiplinnya lewat prosedur operasi (titik rollback, validasi statis sebelum
+  menerapkan, verifikasi kesehatan, rollback bila gagal), bukan gerbang persetujuan seperti
+  `operations-engineer`. `frontend-render-auditor`, `concurrency-hazard-hunter`, `layering-guard`,
+  `vps-hardening-auditor`, `maintainability-reviewer` dicabut dari katalog (belum pernah dirilis/
+  di-seed di instance mana pun).
   Lihat `internal/docs/operations/app-support-agents.md` untuk pemilihan dan handoff. Registrasi
   API isolated wajib runtime claude. Tugas selesai perlu bukti; browser/monitoring/tiket tidak
-  otomatis tersedia. Eval tetap 20 fixture untuk delapan audit awal, belum mencakup delapan baru.
+  otomatis tersedia. Eval tetap 20 fixture untuk delapan audit awal, belum mencakup agen domain.
   Hook read-only produksi wajib diteruskan ke kedua
   renderer. Kandidat dikomit hanya di repo temp agar child isolated mendapat snapshot yang benar.
   Replay QA/edge menjalankan byte fixture yang ditangkap sebelum runtime + test vector JSON

@@ -175,6 +175,37 @@ pada boot berikutnya. Test menambah: fixture mengunci tiap hash historis, baris
 historis ter-upgrade, baris yang memang sudah disunting operator tak tersentuh, dan
 galat di agen belakang tak membuang stempel agen depan.
 
+## Amandemen 2026-09-25 (koreksi: agen pengerja domain)
+
+Amandemen di atas keliru: sembilan agen domain yang ditambahkan **semuanya read-only**,
+padahal permintaan manusia yang memicunya adalah agen yang **mengerjakan** domain
+(design, frontend, backend, database, arsitektur, infra Cloudflare, infra VPS) — bukan
+mengauditnya. Belum satu pun dari sembilan baris itu pernah di-seed ke instance mana
+pun, jadi koreksinya aman tanpa migrasi/tombstone (gotcha 4 soal `name` immutable tidak
+berlaku di sini — baris ini tidak pernah ada di DB manapun).
+
+Koreksi: **cabut** `frontend-render-auditor`, `concurrency-hazard-hunter`,
+`layering-guard`, `vps-hardening-auditor`, `maintainability-reviewer` dari katalog.
+**Pertahankan** `a11y-auditor`, `api-contract-auditor`, `schema-migration-auditor`,
+`cloudflare-config-auditor` sebagai pasangan review read-only. **Tambah** lima agen
+pengerja `isolated-worktree` (Claude saja): `frontend-engineer`, `backend-engineer`,
+`database-engineer`, `cloudflare-engineer`, `vps-engineer`. **Tidak** menambah agen
+design baru — `product-designer` (`shared/src/builtin-app-agents.ts`, sudah ada sejak
+2026-09-05) dipertajam jadi eksplisit pengerja UI/design system dengan bukti render,
+`maxTurns` naik 40→60; `solution-architect` tetap satu-satunya peran keputusan
+arsitektur. Katalog tetap **25 peran** (lima cabut + lima tambah pada
+`builtin-domain-agents.ts`, `product-designer` diperbarui di tempat).
+
+`cloudflare-engineer` dan `vps-engineer` berwenang **penuh** mengubah produksi dalam
+scope tugas tanpa gerbang izin tambahan (keputusan manusia eksplisit, beda dari
+`operations-engineer`) — disiplinnya prosedur operasi (titik rollback, validasi statis
+sebelum menerapkan, verifikasi kesehatan, rollback bila gagal), bukan gerbang
+persetujuan. Nama sembilan baris lama TIDAK didaur ulang untuk entitas baru (gotcha 4
+tetap berlaku ke depan): lima yang dicabut hilang dari katalog, bukan diganti nama.
+
+Rincian lengkap, tabel agen final, dan catatan kredensial/lingkungan ter-hardening ada
+di [audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md) §7.
+
 ## Alternatif yang ditolak
 
 - **Konstanta runtime + lapis override keempat (builtin < global < project).** Nol baris DB, nol

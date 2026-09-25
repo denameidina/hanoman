@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { BUILTIN_AGENTS } from "@hanoman/shared";
 import { readOnlyDecision } from "../src/agent-readonly";
 
-// Audit custom agent 2026-09-25 · §4 sintesis · 9 agen domain baru (`builtin-domain-agents.ts`,
-// shared). `shared` tidak (dan tak boleh, lihat layering-guard baru) mengimpor `runner`, jadi
-// pengikatan instruksi prosa ke validator read-only NYATA hidup di sini, bukan di shared/test.
+// Audit custom agent 2026-09-25 · koreksi 2026-09-25 · QUATTRO auditor read-only yang BERTAHAN di
+// `builtin-domain-agents.ts` (shared) sesudah koreksi "agen pengerja domain" — lima agen lain di
+// berkas itu sekarang PENGERJA `isolated-worktree` (frontend/backend/database/cloudflare/vps-engineer)
+// dan tidak lewat hook read-only sama sekali, jadi tidak diuji di sini. `shared` tidak mengimpor
+// `runner`, jadi pengikatan instruksi prosa ke validator read-only NYATA hidup di sini, bukan di
+// shared/test.
 //
 // Setiap perintah dalam backtick yang instruksinya klaim DIJALANKAN AGEN SENDIRI harus lolos
 // `readOnlyDecision` persis seperti hook produksi akan menilainya. Perintah yang teksnya secara
@@ -15,14 +18,9 @@ import { readOnlyDecision } from "../src/agent-readonly";
 
 const DOMAIN_AGENT_NAMES = [
   "a11y-auditor",
-  "frontend-render-auditor",
   "api-contract-auditor",
-  "concurrency-hazard-hunter",
   "schema-migration-auditor",
-  "layering-guard",
   "cloudflare-config-auditor",
-  "vps-hardening-auditor",
-  "maintainability-reviewer",
 ] as const;
 
 const domainAgent = (name: string) => {

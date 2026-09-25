@@ -19,7 +19,7 @@ describe("katalog agen bawaan", () => {
   it("delapan profile aplikasi opt-in valid untuk runtime dan model rekomendasinya", () => {
     const expected: Record<string, { policy: "read-only" | "isolated-worktree"; effort: string; maxTurns: number;
       models: { claude: string; codex: string } }> = {
-      "product-designer": { policy: "isolated-worktree", effort: "medium", maxTurns: 40,
+      "product-designer": { policy: "isolated-worktree", effort: "medium", maxTurns: 60,
         models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
       "feature-builder": { policy: "isolated-worktree", effort: "medium", maxTurns: 80,
         models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
@@ -136,7 +136,7 @@ describe("katalog agen bawaan", () => {
       "spec-auditor": 30,
       "security-reviewer": 30,
       "dep-auditor": 40,
-      "product-designer": 40,
+      "product-designer": 60,
       "feature-builder": 80,
       "performance-engineer": 40,
       "product-analyst": 30,
@@ -144,15 +144,15 @@ describe("katalog agen bawaan", () => {
       "operations-engineer": 40,
       "support-triager": 30,
       "knowledge-maintainer": 30,
+      "frontend-engineer": 80,
+      "backend-engineer": 80,
+      "database-engineer": 60,
+      "cloudflare-engineer": 60,
+      "vps-engineer": 60,
       "a11y-auditor": 30,
-      "frontend-render-auditor": 30,
       "api-contract-auditor": 30,
-      "concurrency-hazard-hunter": 30,
       "schema-migration-auditor": 30,
-      "layering-guard": 20,
       "cloudflare-config-auditor": 30,
-      "vps-hardening-auditor": 30,
-      "maintainability-reviewer": 30,
     });
   });
 

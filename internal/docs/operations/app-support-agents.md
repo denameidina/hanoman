@@ -1,9 +1,12 @@
 # Agent untuk pembuatan dan dukungan aplikasi
 
 Katalog sekarang berisi 25 peran: delapan agent audit/QA inti, delapan agent aplikasi
-di bawah, dan sembilan agent domain read-only opt-in (a11y/frontend/API/konkurensi/
-skema/layering/Cloudflare/VPS/maintainability — lihat
-[audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md) §3).
+di bawah, dan sembilan agent domain opt-in — lima PENGERJA isolated-worktree
+(frontend/backend/database/Cloudflare/VPS) dan empat auditor read-only pasangan
+review-nya (a11y/API/skema/Cloudflare), dikoreksi 2026-09-25 dari rilis pertama yang
+keliru menghasilkan sembilan auditor read-only saja — lihat
+[audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md) §3
+dan §"Koreksi 2026-09-25".
 Definisi adalah data di `shared/src/builtin-agents.ts`, dengan kelompok aplikasi di
 `shared/src/builtin-app-agents.ts` dan kelompok domain di `shared/src/builtin-domain-agents.ts`.
 
@@ -11,7 +14,7 @@ Definisi adalah data di `shared/src/builtin-agents.ts`, dengan kelompok aplikasi
 
 | Agent | Gunakan ketika | Hasil yang diserahkan ke parent |
 | --- | --- | --- |
-| `product-designer` | Alur pengguna atau antarmuka perlu dirancang/diperbaiki | Alur, keputusan UI, artefak sesuai design system, state dan bukti render |
+| `product-designer` | Alur pengguna atau antarmuka perlu DIRANCANG sesuai design system (layout/token/copy/state visual) — bukan state/data-fetching React (itu `frontend-engineer`, `shared/src/builtin-domain-agents.ts`) | Alur, keputusan UI, artefak sesuai design system, state dan bukti render nyata (CDP) |
 | `feature-builder` | Kebutuhan dan lingkup implementasi sudah cukup jelas | Patch dalam ownership, hasil test/typecheck relevan, docs dan batas yang belum diverifikasi |
 | `performance-engineer` | Ada keluhan lambat atau target performa yang perlu diukur | Baseline, profil penyebab, perubahan, perbandingan setara dan kemungkinan regresi |
 | `product-analyst` | Masalah, pengguna, prioritas atau scope MVP belum jelas | Kebutuhan berbukti, asumsi, prioritas dan acceptance criteria yang dapat diuji |
@@ -47,7 +50,8 @@ ditambahkan. Laporan child dan metadata native tetap dapat menggunakan konteks.
 
 | Kelompok | Policy | Runtime | Batas awal |
 | --- | --- | --- | --- |
-| designer, builder, performance, operations, knowledge | isolated-worktree | Claude Code | 40 turn |
+| designer | isolated-worktree | Claude Code | 60 turn |
+| builder, performance, operations, knowledge | isolated-worktree | Claude Code | 40 turn |
 | analyst, architect, support | read-only | Claude Code atau Codex native yang didukung | 30 turn |
 
 Codex belum mendukung isolated-worktree pada custom agent Hanoman. Lima agent

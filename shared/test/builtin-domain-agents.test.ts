@@ -3,22 +3,34 @@ import {
   BUILTIN_AGENTS, DEFAULT_AGENT_TOOLS, zCreateCustomAgent, effortsForRuntimeModel, modelsForRuntime,
 } from "../src";
 
-// Audit custom agent 2026-09-25 · §4 sintesis · 9 agen domain baru (`builtin-domain-agents.ts`).
-// Katalog utama (`builtin-agents.test.ts`) sudah menegakkan invariant lintas-katalog (nama unik,
-// tools ⊆ DEFAULT_AGENT_TOOLS, model dikenal katalog runtime). Berkas ini menegakkan kontrak
-// KHUSUS kelompok domain: semuanya opt-in + read-only, dan profil model/effort persis sesuai putusan.
+// Audit custom agent 2026-09-25 · koreksi 2026-09-25 · katalog agen domain
+// (`builtin-domain-agents.ts`): lima PENGERJA isolated-worktree + empat auditor read-only pasangan
+// review-nya. Katalog utama (`builtin-agents.test.ts`) sudah menegakkan invariant lintas-katalog
+// (nama unik, tools ⊆ DEFAULT_AGENT_TOOLS, model dikenal katalog runtime). Berkas ini menegakkan
+// kontrak KHUSUS kelompok domain, termasuk yang membedakan pengerja dari auditor.
 
-const DOMAIN_AGENT_NAMES = [
-  "a11y-auditor",
-  "frontend-render-auditor",
-  "api-contract-auditor",
-  "concurrency-hazard-hunter",
-  "schema-migration-auditor",
-  "layering-guard",
-  "cloudflare-config-auditor",
-  "vps-hardening-auditor",
-  "maintainability-reviewer",
+const ENGINEER_AGENT_NAMES = [
+  "frontend-engineer",
+  "backend-engineer",
+  "database-engineer",
+  "cloudflare-engineer",
+  "vps-engineer",
 ] as const;
+
+const AUDITOR_AGENT_NAMES = [
+  "a11y-auditor",
+  "api-contract-auditor",
+  "schema-migration-auditor",
+  "cloudflare-config-auditor",
+] as const;
+
+const DOMAIN_AGENT_NAMES = [...ENGINEER_AGENT_NAMES, ...AUDITOR_AGENT_NAMES] as const;
+
+// Keputusan manusia (koreksi 2026-09-25): agen infra berwewenang PENUH mengubah produksi TANPA
+// gerbang izin tambahan — beda dari `operations-engineer`, yang wajib mengutip otorisasi eksplisit
+// dan berhenti dengan frasa ini bila tak ada. Instruksi infra harus TIDAK memuat frasa gerbang izin
+// itu; disiplinnya lewat prosedur operasi (rollback/validasi/verifikasi), bukan gerbang persetujuan.
+const PERMISSION_GATE_PHRASES = ["menunggu-keputusan", "kutip kalimat otorisasi"];
 
 const domainAgent = (name: string) => {
   const a = BUILTIN_AGENTS.find((entry) => entry.name === name);
@@ -26,13 +38,27 @@ const domainAgent = (name: string) => {
   return a;
 };
 
-describe("katalog agen domain (§4 sintesis)", () => {
-  it("berisi sembilan agen bernama sesuai putusan deduplikasi", () => {
+describe("katalog agen domain (koreksi 2026-09-25: agen pengerja domain)", () => {
+  it("berisi sembilan agen: lima pengerja + empat auditor pasangannya", () => {
     for (const name of DOMAIN_AGENT_NAMES) expect(domainAgent(name)).toBeDefined();
+    expect(DOMAIN_AGENT_NAMES).toHaveLength(9);
   });
 
-  it("semuanya opt-in, read-only, dan tanpa tool tulis", () => {
-    for (const name of DOMAIN_AGENT_NAMES) {
+  it("lima pengerja domain: isolated-worktree, tools tulis, opt-in, Claude saja secara efektif", () => {
+    for (const name of ENGINEER_AGENT_NAMES) {
+      const a = domainAgent(name);
+      expect(a.enabledByDefault, name).toBe(false);
+      expect(a.workspacePolicy, name).toBe("isolated-worktree");
+      expect(a.activation, name).toBe("smart");
+      expect(a.tools, name).toContain("Write");
+      expect(a.tools, name).toContain("Edit");
+      expect(a.tools, name).toContain("Bash");
+      expect(a.tools, name).not.toContain("Task");
+    }
+  });
+
+  it("empat auditor domain: read-only, tanpa tool tulis, opt-in", () => {
+    for (const name of AUDITOR_AGENT_NAMES) {
       const a = domainAgent(name);
       expect(a.enabledByDefault, name).toBe(false);
       expect(a.workspacePolicy, name).toBe("read-only");
@@ -57,29 +83,30 @@ describe("katalog agen domain (§4 sintesis)", () => {
     }
   });
 
-  it("lolos validasi zCreateCustomAgent sebagai baris global read-only", () => {
+  it("lolos validasi zCreateCustomAgent sebagai baris global (isolated-worktree wajib runtime claude)", () => {
     for (const name of DOMAIN_AGENT_NAMES) {
       const a = domainAgent(name);
-      const parsed = zCreateCustomAgent.safeParse({ ...a, model: null, mentions: [], runtime: null });
+      const runtime = a.workspacePolicy === "isolated-worktree" ? "claude" : null;
+      const parsed = zCreateCustomAgent.safeParse({ ...a, model: null, mentions: [], runtime });
       expect(parsed.success, name).toBe(true);
     }
   });
 
-  it("profil model/effort/turn persis sesuai putusan §4", () => {
+  it("profil model/effort/turn persis sesuai keputusan koreksi", () => {
     const expected: Record<(typeof DOMAIN_AGENT_NAMES)[number], {
       effort: "low" | "medium" | "high"; maxTurns: number;
       models: { claude: string; codex: string };
     }> = {
+      "frontend-engineer": { effort: "medium", maxTurns: 80, models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
+      "backend-engineer": { effort: "medium", maxTurns: 80, models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
+      // Keputusan manusia: database-engineer → opus (kesalahan skema/migration jarang bisa dibatalkan).
+      "database-engineer": { effort: "high", maxTurns: 60, models: { claude: "opus", codex: "gpt-5.6-terra" } },
+      "cloudflare-engineer": { effort: "high", maxTurns: 60, models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
+      "vps-engineer": { effort: "high", maxTurns: 60, models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
       "a11y-auditor": { effort: "medium", maxTurns: 30, models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
-      "frontend-render-auditor": { effort: "medium", maxTurns: 30, models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
       "api-contract-auditor": { effort: "medium", maxTurns: 30, models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
-      "concurrency-hazard-hunter": { effort: "high", maxTurns: 30, models: { claude: "sonnet", codex: "gpt-5.6-sol" } },
-      // Keputusan manusia: schema-migration-auditor → opus (kesalahan skema jarang bisa dibatalkan).
       "schema-migration-auditor": { effort: "high", maxTurns: 30, models: { claude: "opus", codex: "gpt-5.6-sol" } },
-      "layering-guard": { effort: "medium", maxTurns: 20, models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
       "cloudflare-config-auditor": { effort: "high", maxTurns: 30, models: { claude: "sonnet", codex: "gpt-5.6-sol" } },
-      "vps-hardening-auditor": { effort: "high", maxTurns: 30, models: { claude: "sonnet", codex: "gpt-5.6-sol" } },
-      "maintainability-reviewer": { effort: "medium", maxTurns: 30, models: { claude: "sonnet", codex: "gpt-5.6-terra" } },
     };
     for (const [name, spec] of Object.entries(expected)) {
       const a = domainAgent(name);
@@ -92,18 +119,59 @@ describe("katalog agen domain (§4 sintesis)", () => {
     }
   });
 
-  it("cloudflare-config-auditor dan vps-hardening-auditor menandai perintah operator UNTUK PARENT", () => {
-    // Prosedur riset asli menyuruh agen read-only menjalankan wrangler/sshd -T/nginx -t sendiri —
-    // ditolak validator (`runner/src/agent-readonly.ts`: shellCommands tak memuat perintah itu).
-    // Teks final harus menyerahkannya ke parent secara eksplisit, bukan menyuruh agen sendiri.
+  it("cloudflare-config-auditor menandai perintah operator UNTUK PARENT (auditor tetap read-only)", () => {
+    // Prosedur riset asli menyuruh agen read-only menjalankan wrangler sendiri — ditolak validator
+    // (`runner/src/agent-readonly.ts`: shellCommands tak memuat perintah itu). Teks final harus
+    // menyerahkannya ke parent secara eksplisit, bukan menyuruh agen sendiri.
     const cloudflare = domainAgent("cloudflare-config-auditor").instructions;
-    const vps = domainAgent("vps-hardening-auditor").instructions;
     for (const term of ["wrangler", "PARENT"]) expect(cloudflare, term).toContain(term);
-    for (const term of ["sshd -T", "nginx -t", "systemctl", "PARENT"]) expect(vps, term).toContain(term);
+  });
+
+  it("cloudflare-engineer dan vps-engineer: wewenang produksi penuh, TANPA frasa gerbang izin tambahan", () => {
+    for (const name of ["cloudflare-engineer", "vps-engineer"]) {
+      const instructions = domainAgent(name).instructions;
+      expect(instructions, name).toMatch(/produksi/);
+      expect(instructions, name).toMatch(/rollback/i);
+      for (const phrase of PERMISSION_GATE_PHRASES) {
+        expect(instructions, `${name} tidak boleh memuat "${phrase}"`).not.toContain(phrase);
+      }
+    }
+  });
+
+  it("cloudflare-engineer memvalidasi statis sebelum menerapkan (dry-run) dan menyebut kredensial/Status: terhalang", () => {
+    const instructions = domainAgent("cloudflare-engineer").instructions;
+    for (const term of ["--dry-run", "rollback", "Status: terhalang", "CLOUDFLARE_API_TOKEN"]) {
+      expect(instructions, term).toContain(term);
+    }
+  });
+
+  it("vps-engineer memvalidasi statis sebelum menerapkan dan menyebut kredensial/Status: terhalang", () => {
+    const instructions = domainAgent("vps-engineer").instructions;
+    for (const term of ["sshd -t", "systemd-analyze verify", "Status: terhalang", "~/.ssh/config"]) {
+      expect(instructions, term).toContain(term);
+    }
+  });
+
+  it("agen pengerja domain menyebut pasangan review auditornya (kecuali vps-engineer, auditornya dicabut)", () => {
+    expect(domainAgent("backend-engineer").instructions).toContain("api-contract-auditor");
+    expect(domainAgent("database-engineer").instructions).toContain("schema-migration-auditor");
+    expect(domainAgent("cloudflare-engineer").description).toContain("cloudflare-config-auditor");
   });
 
   it("tidak ada agen domain memakai nama yang sudah dipakai katalog inti/aplikasi", () => {
     const names = BUILTIN_AGENTS.map((a) => a.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("lima auditor yang dicabut (belum pernah dirilis/di-seed) tidak lagi ada di katalog", () => {
+    const cabut = [
+      "frontend-render-auditor",
+      "concurrency-hazard-hunter",
+      "layering-guard",
+      "vps-hardening-auditor",
+      "maintainability-reviewer",
+    ];
+    const names = new Set(BUILTIN_AGENTS.map((a) => a.name));
+    for (const name of cabut) expect(names.has(name), name).toBe(false);
   });
 });

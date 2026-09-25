@@ -5,7 +5,10 @@ Status: audit dan perbaikan P0/P1 selesai di branch `feat/audit-custom-agent-202
 sengaja **ditunda** — lihat §4/§5. Dikerjakan oleh empat implementer paralel (katalog,
 runner, server, domain) dengan lima commit inti: `32a4b8e0`, `0d5ec950`, `4c6ebe92`,
 `4067a02e`/`eff20a11`/`8b12f9ed`/`8b12f9ed` (server), dan agen domain (bergabung ke
-`8b12f9ed` karena race commit di worktree bersama — lihat §3.4).
+`8b12f9ed` karena race commit di worktree bersama — lihat §3.4). **§3 di bawah sudah
+DIKOREKSI oleh §7 (2026-09-25, sesudah rilis)**: sembilan agen domain awal semuanya
+read-only, padahal permintaan manusia adalah agen yang mengerjakan domain — baca §7
+untuk katalog domain yang berlaku sekarang.
 
 ## 1. Ringkasan eksekutif
 
@@ -208,3 +211,83 @@ ok`. Ini bukan gate mekanis yang memblokir commit (guardrail SoT dicabut ADR-002
 hanya memverifikasi bahwa setiap doc di `internal/docs/**` terjangkau dari
 `README.md` — bukan bahwa tautan ke `docs/superpowers/**` di luar `internal/docs/`
 valid (tautan itu diverifikasi manual dengan membaca berkas targetnya).
+
+## 7. Koreksi 2026-09-25: agen pengerja domain
+
+**Apa yang salah.** §3 di atas mendokumentasikan sembilan agen domain baru — dan
+**semuanya read-only**. Itu keliru. Permintaan manusia yang memicu audit ini eksplisit
+menyebut domain yang perlu **dikerjakan**: design, frontend, backend, database,
+arsitektur, infra Cloudflare, infra VPS — bukan diaudit. Riset §3 menginterpretasikan
+"agen domain" sebagai perluasan pola auditor read-only yang sudah ada di katalog inti
+(§2, delapan agen "audit/QA"), dan sembilan usulan yang lolos deduplikasi kebetulan
+semuanya berbentuk auditor. Tak ada langkah di riset yang mengecek balik terhadap
+permintaan asli "agen yang mengerjakan" sebelum sembilan agen itu ditulis dan
+di-commit. Manusia baru menyadarinya sesudah katalog dipublikasikan — pertanyaannya
+persis: "kenapa custom agent baru kebanyakan auditor? yang saya minta kan bukan untuk
+auditor."
+
+**Koreksi.** Keputusan manusia, dieksekusi di branch/worktree yang sama:
+
+1. **Pertahankan empat auditor** sebagai pasangan review read-only: `a11y-auditor`,
+   `api-contract-auditor`, `schema-migration-auditor`, `cloudflare-config-auditor`.
+2. **Cabut lima auditor** yang belum pernah dirilis atau di-seed di instance mana pun,
+   jadi pencabutannya aman tanpa migrasi/tombstone (ADR-0136 gotcha 4 soal `name`
+   immutable tidak berlaku — baris ini tidak pernah ada di DB manapun):
+   `frontend-render-auditor`, `concurrency-hazard-hunter`, `layering-guard`,
+   `vps-hardening-auditor`, `maintainability-reviewer`.
+3. **Tambah lima agen pengerja** `isolated-worktree` (Claude saja, `enabledByDefault:
+   false`, `activation: smart`): `frontend-engineer`, `backend-engineer`,
+   `database-engineer`, `cloudflare-engineer`, `vps-engineer`. Design tidak dapat agen
+   baru — `product-designer` (`shared/src/builtin-app-agents.ts`) dipertajam menjadi
+   eksplisit "pengerja UI/design system yang mewujudkan desain dengan bukti render",
+   dibedakan tegas dari `frontend-engineer` (state/data-fetching/langganan) dan
+   `solution-architect` (keputusan lintas modul, tetap peran keputusan, bukan
+   implementasi) — bukan agen baru, `maxTurns` naik 40→60 untuk mengakomodasi langkah
+   bukti render CDP yang kini eksplisit.
+
+**Tabel agen domain final** (`shared/src/builtin-domain-agents.ts`, sembilan entri —
+jumlah katalog total tetap 25 karena `product-designer` diperbarui di tempat, bukan
+ditambah):
+
+| Agen | Peran | Policy | Model (claude/codex) · effort · turns | Pasangan |
+|---|---|---|---|---|
+| `frontend-engineer` | pengerja | isolated-worktree | sonnet/gpt-5.6-terra · medium · 80 | `a11y-auditor` (disarankan sesudah, UI interaktif) |
+| `backend-engineer` | pengerja | isolated-worktree | sonnet/gpt-5.6-terra · medium · 80 | `api-contract-auditor` |
+| `database-engineer` | pengerja | isolated-worktree | **opus**/gpt-5.6-terra · high · 60 | `schema-migration-auditor` |
+| `cloudflare-engineer` | pengerja, **wewenang penuh produksi** | isolated-worktree | sonnet/gpt-5.6-terra · high · 60 | `cloudflare-config-auditor` (review pasca-perubahan) |
+| `vps-engineer` | pengerja, **wewenang penuh produksi** | isolated-worktree | sonnet/gpt-5.6-terra · high · 60 | — (`vps-hardening-auditor` dicabut; review jatuh ke parent/manusia) |
+| `a11y-auditor` | auditor | read-only | sonnet/gpt-5.6-terra · medium · 30 | tidak berubah dari §3 |
+| `api-contract-auditor` | auditor | read-only | sonnet/gpt-5.6-terra · medium · 30 | tidak berubah dari §3 |
+| `schema-migration-auditor` | auditor | read-only | opus/gpt-5.6-sol · high · 30 | tidak berubah dari §3 |
+| `cloudflare-config-auditor` | auditor | read-only | sonnet/gpt-5.6-sol · high · 30 | tidak berubah dari §3 |
+
+(`product-designer`, di `builtin-app-agents.ts`, bukan `builtin-domain-agents.ts`:
+sonnet/gpt-5.6-terra · medium · **60** turn, isolated-worktree — dipertajam, bukan baru.)
+
+**Wewenang penuh infra + kredensial/Podman.** `cloudflare-engineer` dan `vps-engineer`
+boleh **deploy dan mengubah produksi dalam scope tugas tanpa gerbang izin tambahan**
+(keputusan manusia eksplisit, berbeda dari `operations-engineer` yang wajib mengutip
+otorisasi eksplisit dan berhenti dengan `Status: menunggu-keputusan` bila tak ada).
+Disiplinnya BUKAN gerbang persetujuan, melainkan prosedur operasi yang bisa diperiksa:
+catat titik rollback sebelum mengubah (`wrangler deployments list`, backup file/unit
+systemd), validasi statis sebelum menerapkan (`wrangler deploy --dry-run`, `nginx -t`,
+`caddy validate`, `systemd-analyze verify`, `sshd -t` — gagal validasi = STOP),
+terapkan, verifikasi kesehatan dengan bukti nyata, rollback segera bila gagal, dan
+laporkan setiap aksi produksi (perintah, target, hasil, titik rollback). Instruksinya
+diverifikasi TIDAK memuat frasa gerbang izin ala `operations-engineer` ("menunggu-
+keputusan", "kutip kalimat otorisasi") — lihat `shared/test/builtin-domain-agents.test.ts`.
+Kredensial memakai yang sudah ada di mesin (`wrangler login`/`CLOUDFLARE_API_TOKEN`,
+`~/.ssh/config`); tanpa itu, instruksinya mewajibkan `Status: terhalang` dan
+melarang menulis secret ke repo/laporan. **Catatan lingkungan**: pada instance
+ter-hardening (Podman, `HOME=/agent-home` read-only, egress lewat proxy — pola yang
+sama dicatat di `hanoman-server-dari-sesi-agen-tak-bisa-auth-claude`), kredensial
+wrangler/ssh atau egress ke API Cloudflare/host VPS bisa saja tidak tersedia sama
+sekali; agen ini tidak mengasumsikan lingkungan tanpa hardening, dan `Status:
+terhalang` adalah keluaran yang benar dalam kondisi itu, bukan kegagalan agen.
+
+**Yang tidak berubah dari §3-§6**: kontrak umum (policy isolated-worktree, checkout SHA
+kandidat, commit hasil, laporkan SHA, `Status:`, keputusan terbuka) tetap disuntik
+runner lewat `runner/src/custom-agents.ts` `agentContractOf` — kelima agen pengerja
+baru tidak mengulanginya di instruksi. Prasyarat P1-1 (allowlist read-only) dan P1-11
+(anggaran argv) masih berlaku untuk empat auditor yang bertahan; kelima pengerja baru
+tidak melewati hook read-only karena `workspacePolicy` mereka `isolated-worktree`.
