@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { prisma } from "../src/db";
 import {
   QA_SAFETY_POLICY, seedBuiltinAgents, builtinFingerprint, legacyBuiltinFingerprint,
+  BUILTIN_FINGERPRINT_HISTORY, rowFingerprint,
 } from "../src/services/builtin-agents";
 import { getSetting } from "../src/services/settings";
 import { writeTombstone } from "../src/services/tombstone";
@@ -123,7 +127,7 @@ describe("seedBuiltinAgents — upgrade", () => {
     await seedBuiltinAgents();
     const once = await prisma.customAgent.findMany({ orderBy: { name: "asc" } });
     const added = once.filter((a) => !oldNames.includes(a.name));
-    expect(added).toHaveLength(8);
+    expect(added).toHaveLength(BUILTIN_AGENTS.length - oldNames.length);
     expect(added.every((a) => !a.enabled && a.model === null && a.runtime === null)).toBe(true);
     expect(once.filter((a) => oldNames.includes(a.name))).toEqual(before);
     expect(await prisma.customAgent.findUnique({ where: { id: idOf("dep-auditor") } })).toBeNull();
@@ -269,13 +273,107 @@ describe("app/support — profil efektif dari seed", () => {
     await loadCustomAgents();
     const claude = agentDefsFor("p1", "claude").filter((a) => names.includes(a.name));
     expect(claude).toHaveLength(8);
-    expect(claude.every((a) => a.model === "sonnet" && a.mentions.length === 0)).toBe(true);
+    const recommended = (name: string) => BUILTIN_AGENTS.find((b) => b.name === name)!.models;
+    // Audit 2026-09-25 · solution-architect → opus / gpt-5.6-sol; sisanya sonnet / gpt-5.6-terra.
+    expect(claude.every((a) => a.model === recommended(a.name).claude && a.mentions.length === 0)).toBe(true);
+    expect(claude.find((a) => a.name === "solution-architect")!.model).toBe("opus");
     const codex = agentDefsFor("p1", "codex").filter((a) => names.includes(a.name));
     expect(codex.map((a) => a.name).sort()).toEqual(["product-analyst", "solution-architect", "support-triager"]);
-    expect(codex.every((a) => a.model === "gpt-5.6-terra" && a.workspacePolicy === "read-only")).toBe(true);
+    expect(codex.every((a) => a.model === recommended(a.name).codex && a.workspacePolicy === "read-only")).toBe(true);
     await prisma.customAgent.update({ where: { id: idOf("product-analyst") }, data: { model: "gpt-5.6", effort: "high" } });
     await loadCustomAgents();
     expect(agentDefsFor("p1", "codex").find((a) => a.name === "product-analyst"))
       .toMatchObject({ model: "gpt-5.6", effort: "high", workspacePolicy: "read-only" });
+  });
+});
+
+// Audit custom agent 2026-09-25 · P0-3 · baris aplikasi yang didaftarkan lewat API sebelum seed
+// mengenalnya tak berstempel. Fixture = katalog PERSIS seperti dirilis di commit historis.
+type HistDef = {
+  name: string; description: string; instructions: string; tools: string[];
+  activation: string; effort: string | null; workspacePolicy: string;
+  maxTurns: number | null; timeoutSeconds: number | null;
+};
+const history = JSON.parse(readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "fixtures/builtin-app-agents-history.json"), "utf8",
+)) as { versions: Record<string, HistDef[]> };
+
+describe("seedBuiltinAgents — adopsi baris tanpa stempel (P0-3)", () => {
+  const registerViaApi = (d: HistDef, over: Record<string, unknown> = {}) =>
+    prisma.customAgent.create({ data: {
+      id: idOf(d.name), projectId: null, name: d.name,
+      description: d.description, instructions: d.instructions, tools: [...d.tools] as never,
+      // Registrasi API 2026-09-05 menulis override runtime/model dan menyalakan agennya.
+      model: "sonnet", runtime: "claude", mentions: [] as never, enabled: true,
+      activation: d.activation, effort: d.effort, workspacePolicy: d.workspacePolicy,
+      maxTurns: d.maxTurns, timeoutSeconds: d.timeoutSeconds, ...over,
+    } });
+
+  it("riwayat sidik jari cocok byte-per-byte dengan setiap versi yang pernah dirilis", () => {
+    for (const [sha, defs] of Object.entries(history.versions)) {
+      for (const d of defs) {
+        expect(BUILTIN_FINGERPRINT_HISTORY[d.name], `${d.name}@${sha}`).toContain(rowFingerprint(d));
+      }
+    }
+  });
+
+  it("baris byte-identik versi historis ter-upgrade; override model/runtime/enabled bertahan", async () => {
+    for (const d of history.versions["0b90ab3c"]!) await registerViaApi(d);
+    await seedBuiltinAgents();
+    const stamps = (await getSetting()).builtinAgents;
+    for (const d of history.versions["0b90ab3c"]!) {
+      const now = BUILTIN_AGENTS.find((a) => a.name === d.name)!;
+      const row = await prisma.customAgent.findUnique({ where: { id: idOf(d.name) } });
+      expect(row!.instructions).toBe(now.instructions);
+      expect(row!.description).toBe(now.description);
+      expect(row!.maxTurns).toBe(now.maxTurns);
+      expect(row!.effort).toBe(now.effort);
+      expect(row).toMatchObject({ model: "sonnet", runtime: "claude", enabled: true });
+      expect(stamps[d.name]).toBe(builtinFingerprint(now));
+    }
+  });
+
+  it("versi ADR-0167 (ff98a8f6) ikut teradopsi", async () => {
+    const d = history.versions["ff98a8f6"]!.find((x) => x.name === "operations-engineer")!;
+    await registerViaApi(d);
+    await seedBuiltinAgents();
+    const now = BUILTIN_AGENTS.find((a) => a.name === d.name)!;
+    expect((await prisma.customAgent.findUnique({ where: { id: idOf(d.name) } }))!.instructions)
+      .toBe(now.instructions);
+  });
+
+  it("baris tanpa stempel yang sudah disunting TIDAK tersentuh dan tak distempel", async () => {
+    const d = history.versions["0b90ab3c"]!.find((x) => x.name === "feature-builder")!;
+    await registerViaApi(d, { instructions: `${d.instructions}\nTambahan operator.` });
+    const before = await prisma.customAgent.findUnique({ where: { id: idOf(d.name) } });
+    await seedBuiltinAgents();
+    expect(await prisma.customAgent.findUnique({ where: { id: idOf(d.name) } })).toEqual(before);
+    expect((await getSetting()).builtinAgents[d.name]).toBeUndefined();
+  });
+
+  it("baris tanpa stempel yang sudah sama dengan katalog terpasang hanya distempel", async () => {
+    const now = BUILTIN_AGENTS.find((a) => a.name === "solution-architect")!;
+    await registerViaApi(now as unknown as HistDef);
+    const before = await prisma.customAgent.findUnique({ where: { id: idOf(now.name) } });
+    await seedBuiltinAgents();
+    expect(await prisma.customAgent.findUnique({ where: { id: idOf(now.name) } })).toEqual(before);
+    expect((await getSetting()).builtinAgents[now.name]).toBe(builtinFingerprint(now));
+  });
+
+  it("stempel ditulis per iterasi: galat di agen belakang tak membuang stempel agen depan", async () => {
+    const last = BUILTIN_AGENTS[BUILTIN_AGENTS.length - 1]!;
+    const asli = prisma.customAgent.findUnique;
+    (prisma.customAgent as unknown as Record<string, unknown>).findUnique =
+      (args: { where: { id: string } }) => args.where.id === idOf(last.name)
+        ? Promise.reject(new Error("DB mati"))
+        : asli.call(prisma.customAgent, args as never);
+    try {
+      await seedBuiltinAgents();
+    } finally {
+      (prisma.customAgent as unknown as Record<string, unknown>).findUnique = asli;
+    }
+    const stamps = (await getSetting()).builtinAgents;
+    expect(stamps[BUILTIN_AGENTS[0]!.name]).toBe(builtinFingerprint(BUILTIN_AGENTS[0]!));
+    expect(stamps[last.name]).toBeUndefined();
   });
 });

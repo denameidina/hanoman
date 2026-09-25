@@ -61,14 +61,50 @@ const legacyRowFingerprint = (
 
 export const QA_SAFETY_POLICY = "disable-unedited-v1";
 
+/**
+ * Audit custom agent 2026-09-25 · P0-3 · sidik jari (`rowFingerprint`) setiap versi katalog yang
+ * PERNAH dirilis, per agen. Delapan agen aplikasi didaftarkan lewat API (2026-09-05) sebelum seed
+ * mengenalnya: id deterministik, tetapi tanpa stempel — dan seed membaca "tanpa stempel" sebagai
+ * "disunting operator", sehingga baris itu tak pernah lagi menerima perbaikan katalog.
+ *
+ * Baris tanpa stempel DIADOPSI hanya bila isinya byte-identik dengan salah satu versi di sini
+ * (atau dengan versi terpasang). Suntingan operator sekecil apa pun mengubah sidik jari → tak
+ * teradopsi → tak tersentuh. `model`/`runtime` di luar sidik jari, jadi override registrasi
+ * (`runtime=claude`/`model=sonnet`) tetap bertahan. Isi dikunci
+ * `server/test/fixtures/builtin-app-agents-history.json` (hasil `git show <sha>:shared/src/builtin-app-agents.ts`).
+ */
+export const BUILTIN_FINGERPRINT_HISTORY: Readonly<Record<string, readonly string[]>> = {
+  //                       0b90ab3c (app roles)  ff98a8f6 (ADR-0167, s.d. 8cea296c)
+  "product-designer":     ["6cc1027cf73ce6fd", "dfd313ae2b402734"],
+  "feature-builder":      ["8a28ec2d98cb7055", "6d9c335a4577e695"],
+  "performance-engineer": ["82e1f7418f7c8769", "005ed47095939e66"],
+  "product-analyst":      ["96a3b765139f5d74", "83324b9f112bd340"],
+  "solution-architect":   ["184a27b8830309e8", "4871cbe89c9da02f"],
+  "operations-engineer":  ["c21bfe010211d33a", "d47396055a549866"],
+  "support-triager":      ["6fab97e398ed88ad", "42a08ae21d354f06"],
+  "knowledge-maintainer": ["f6bf5100faa2028e", "e1c696442299cd53"],
+};
+
 export async function seedBuiltinAgents(): Promise<void> {
   try {
     const setting = await getSetting();
     const stamps: Record<string, string> = { ...setting.builtinAgents };
     const policies: Record<string, string> = { ...setting.builtinAgentPolicies };
     let changed = false;
+    // Stempel ditulis PER ITERASI (bukan sekali di akhir): galat di agen ke-k tak boleh membuang
+    // stempel agen 1..k-1 yang barisnya sudah ter-upgrade — baris tanpa stempel yang cocok itu
+    // terbaca "disunting operator" selamanya.
+    const flush = async () => {
+      if (!changed) return;
+      const data = { ...setting, builtinAgents: stamps, builtinAgentPolicies: policies };
+      await prisma.setting.upsert({
+        where: { id: 1 }, update: { data }, create: { id: 1, data },
+      });
+      changed = false;
+    };
 
     for (const a of BUILTIN_AGENTS) {
+      await flush();
       const id = customAgentId(null, a.name);
       const fp = builtinFingerprint(a);
       const row = await prisma.customAgent.findUnique({ where: { id } });
@@ -104,6 +140,13 @@ export async function seedBuiltinAgents(): Promise<void> {
       // berbeda. Tanpa syarat pertama, upgrade menimpa kerja operator; tanpa syarat kedua, setiap
       // boot menulis ulang baris yang sudah mutakhir — `updatedAt` bergerak tanpa sebab dan
       // menyeberang sync sebagai mutasi palsu ke setiap mesin lain.
+      if (!stamps[a.name]) {
+        const current = rowFingerprint(row);
+        if (current === fp || (BUILTIN_FINGERPRINT_HISTORY[a.name] ?? []).includes(current)) {
+          stamps[a.name] = current;
+          changed = true;
+        }
+      }
       const stamped = stamps[a.name];
       const unedited = Boolean(stamped)
         && (stamped === rowFingerprint(row) || stamped === legacyRowFingerprint(row));
@@ -133,12 +176,7 @@ export async function seedBuiltinAgents(): Promise<void> {
       }
     }
 
-    if (changed) {
-      const data = { ...setting, builtinAgents: stamps, builtinAgentPolicies: policies };
-      await prisma.setting.upsert({
-        where: { id: 1 }, update: { data }, create: { id: 1, data },
-      });
-    }
+    await flush();
   } catch {
     // ADR-0094 keputusan 7 · katalog agen tak pernah boleh menggagalkan boot maupun kelahiran
     // sesi. Gagal di sini = katalog apa adanya, bukan server yang tak menyala.
