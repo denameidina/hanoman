@@ -9,7 +9,9 @@ Kontrak operasional untuk hanoman + Claude Code.
 - **Dokumen audit berumur** (SPEC-386/[ADR-0083](../adr/0083-retensi-dokumen-audit.md)): laporan audit di atas hidup sampai eskalasinya diputuskan (ADR-0076) **dan** spec turunannya tuntas, lalu **dihapus berikut entri indexnya**. Tiga syarat sebelum menghapus: (1) temuannya sudah punya jejak permanen — ADR, baris di doc SoT, atau perbaikan kode ter-commit; (2) rujukan masuk dari doc permanen (`Rincian & bukti: [audit SPEC-nnn](…)`) dialihkan atau dilepas di commit yang sama, kalau tidak link-nya mati; (3) index `internal/docs/README.md` **tidak** menyimpan abstrak audit. ADR tidak ikut berumur (ADR-0021).
 - Prompt sesi memetakan fase → skill superpowers (SPEC-166): Brainstorm→brainstorming,
   Audit→systematic-debugging, Plan→writing-plans, Execute→executing-plans + TDD +
-  verification-before-completion. Objective/Spec adalah keluaran brainstorming.
+  verification-before-completion. Objective/Spec adalah keluaran brainstorming. Di mode orchestrator
+  claude, Execute memakai subagent-driven-development sebagai ganti executing-plans (ADR-0170,
+  `orchestratedPhaseSkills`); codex & sesi tunggal tetap executing-plans.
 - **From-scratch:** pilih folder → hanoman `git init` repo → sesi **scaffold** interaktif: brainstorm
   (satu pertanyaan/giliran) → kunci objective → menyusun seluruh doc index dari ide, pakai STANDAR DOCS
   yang sama dengan reverse (SPEC-222, ADR-0052). Tombol "Scaffold docs" di layar project + `autoScaffold`

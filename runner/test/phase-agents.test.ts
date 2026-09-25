@@ -1,27 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { ORCHESTRATION_DEFAULTS, resolveMethod, resolvePhasePlan } from "@hanoman/shared";
-import { buildPhaseAgents, fromAuditOf } from "../src/phase-agents";
+import { buildPhaseAgents, fromAuditOf, phaseDelegationClause, withPhaseDelegation } from "../src/phase-agents";
 import { CODE_STYLE_CLAUSE } from "../src/code-style";
 import { ESCALATION_CONTRACT, startPrdPrompt, startProjectPrompt, startScaffoldPrompt } from "../src/prompt";
 import { phasePromptOf, renderAgentsJson, type AgentDef } from "../src/custom-agents";
 import type { Flow } from "../src/types";
 
-const planFor = (flow: Flow) => resolvePhasePlan({
-  flow, runtime: "claude", orchestration: ORCHESTRATION_DEFAULTS,
+const planFor = (flow: Flow, runtime: "claude" | "codex" = "claude") => resolvePhasePlan({
+  flow, runtime, orchestration: ORCHESTRATION_DEFAULTS,
   orchestrator: { model: "claude-opus-5", effort: "high" }, nativeAgents: true,
 })!;
 const agentsFor = (flow: Flow, over: Partial<Parameters<typeof buildPhaseAgents>[1]> = {}) =>
   buildPhaseAgents(planFor(flow), {
     flow, method: resolveMethod("superpowers"), verifyScope: "changed", context: "KONTEKS-UJI", ...over,
   });
-const at = (defs: AgentDef[], phase: string) => defs.find((d) => d.phase === phase)!;
+const REVIEW = "hanoman-fase-review";
+const at = (defs: AgentDef[], phase: string) => defs.find((d) => d.phase === phase && d.name !== REVIEW)!;
+const phaseOnly = (defs: AgentDef[]) => defs.filter((d) => d.name !== REVIEW);
 
 describe("buildPhaseAgents (ADR-0164)", () => {
   it("satu agen fase per fase, bernama & ber-model sesuai rencana, tanpa tools", () => {
-    const defs = agentsFor("feature");
-    expect(defs.map((d) => d.name)).toEqual([
+    const defs = phaseOnly(agentsFor("feature"));
+    expect(agentsFor("feature").map((d) => d.name)).toEqual([
       "hanoman-fase-brainstorm", "hanoman-fase-objective", "hanoman-fase-spec",
-      "hanoman-fase-plan", "hanoman-fase-execute",
+      "hanoman-fase-plan", "hanoman-fase-execute", REVIEW,
     ]);
     // Default bawaan memakai alias native CLI sejak 1a5a0981, bukan id terpatok.
     const expectedRuntime = {
@@ -107,7 +109,8 @@ describe("buildPhaseAgents (ADR-0164)", () => {
     const defs = agentsFor("qa", { method: resolveMethod("matt") });
     expect(at(defs, "Plan").instructions).toContain("mattpocock-skills:to-tickets");
     expect(at(defs, "Plan").instructions).toContain("docs/matt/plans");
-    expect(at(defs, "Execute").instructions).toContain("TAK BERPENUNGGU");
+    expect(at(defs, "Execute").instructions).toContain("mewawancarai manusia");
+    expect(at(defs, "Execute").instructions).toContain("`Keputusan terbuka:`");
   });
 
   it("Audit qa merekomendasikan jalur, bukan menulis marker", () => {
@@ -195,7 +198,7 @@ describe("buildPhaseAgents (ADR-0164)", () => {
   // atau Brainstorm membuat dokumen spec kedua.
   it("S2 · resume: catatan melanjutkan ikut ke setiap agen fase, sebelum blok KONTEKS", () => {
     const kept = agentsFor("feature", { resume: { worktreeKept: true, recorded: ["Brainstorm done"] } });
-    for (const d of kept) {
+    for (const d of phaseOnly(kept)) {
       expect(d.instructions).toContain("MELANJUTKAN pekerjaan sesi sebelumnya");
       expect(d.instructions).toContain("termasuk perubahan yang belum di-commit");
       expect(d.instructions).toContain("Brainstorm done");
@@ -215,6 +218,143 @@ describe("buildPhaseAgents (ADR-0164)", () => {
     const explicit = agentsFor("feature", { resume: undefined });
     expect(explicit.map((d) => d.instructions)).toEqual(fresh.map((d) => d.instructions));
     for (const d of fresh) expect(d.instructions).not.toContain("MELANJUTKAN");
+  });
+});
+
+
+// ADR-0170 P2 · delegasi & reviewer. Subagent kini foreground di sesi claude ber-fase (env 6a249ae2):
+// agen fase bisa memanggil anak dan menunggunya — izin "custom agent lain boleh dipanggil" akhirnya
+// bisa dipenuhi, jadi instruksinya harus menyebut KAPAN, SIAPA, dan KONTRAK serah-terimanya.
+describe("P2 · Execute & kontrak fase (ADR-0170)", () => {
+  it("Execute agen fase claude superpowers memakai subagent-driven-development, bukan executing-plans", () => {
+    const e = at(agentsFor("feature"), "Execute").instructions;
+    expect(e).toContain("superpowers:subagent-driven-development");
+    expect(e).not.toContain("superpowers:executing-plans");
+  });
+  it("codex & metode matt tak berubah: codex tetap executing-plans, matt tetap implement", () => {
+    const codex = buildPhaseAgents(planFor("feature", "codex"), {
+      flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "K" });
+    expect(at(codex, "Execute").instructions).toContain("superpowers:executing-plans");
+    const matt = at(agentsFor("feature", { method: resolveMethod("matt") }), "Execute").instructions;
+    expect(matt).toContain("mattpocock-skills:implement");
+    expect(matt).not.toContain("subagent-driven-development");
+  });
+  it("Plan wajib bernama `<YYYY-MM-DD>-<spec-id>-<slug>.md` dan melaporkan path persisnya", () => {
+    const p = at(agentsFor("feature"), "Plan").instructions;
+    expect(p).toContain("docs/superpowers/plans/<YYYY-MM-DD>-<spec-id>-<slug>.md");
+    expect(p).toContain("path PERSIS");
+  });
+  it("Execute: laporan memuat tabel `AC → bukti` sebelum `Status: selesai`; plan dari path serah-terima", () => {
+    const e = at(agentsFor("qa"), "Execute").instructions;
+    expect(e).toContain("`AC → bukti`");
+    expect(e).toContain("`Artefak fase sebelumnya:`");
+  });
+  it("Verifikasi (goal) ikut klausa scope verifikasi; tanpa klausa gaya kode", () => {
+    const v = at(agentsFor("goal"), "Verifikasi").instructions;
+    expect(v).toContain("Scope verifikasi");
+    expect(v).not.toContain(CODE_STYLE_CLAUSE);
+    expect(at(agentsFor("goal", { verifyScope: undefined }), "Verifikasi").instructions).not.toContain("Scope verifikasi");
+  });
+});
+
+describe("P2 · reviewer independen Execute (ADR-0170)", () => {
+  it("feature & qa: agen `hanoman-fase-review` ber-fase Execute, opus/high, konteks bersama sama", () => {
+    for (const flow of ["feature", "qa"] as const) {
+      const r = agentsFor(flow).find((d) => d.name === REVIEW)!;
+      expect(r).toMatchObject({ kind: "phase", phase: "Execute", model: "opus", effort: "high", tools: null,
+        context: "KONTEKS-UJI", mentions: [] });
+      expect(r.description).toContain("hanya dipanggil orchestrator");
+    }
+    for (const flow of ["goal", "audit", "reverse"] as const)
+      expect(agentsFor(flow).some((d) => d.name === REVIEW)).toBe(false);
+  });
+  it("continue (rencana hanya Execute) tetap membawa reviewer; rencana tanpa Execute tidak", () => {
+    const full = planFor("feature");
+    const onlyExec = { ...full, phases: full.phases.filter((p) => p.phase === "Execute") };
+    const ctx = { flow: "feature" as const, method: resolveMethod(), context: "K" };
+    expect(buildPhaseAgents(onlyExec, ctx).map((d) => d.name)).toEqual(["hanoman-fase-execute", REVIEW]);
+    const noExec = { ...full, phases: full.phases.filter((p) => p.phase !== "Execute") };
+    expect(buildPhaseAgents(noExec, ctx).some((d) => d.name === REVIEW)).toBe(false);
+  });
+  it("instruksi: baca spec/plan & diff base, jalankan test sesuai scope, read-only, laporan AC + Verdict", () => {
+    const r = agentsFor("feature").find((d) => d.name === REVIEW)!.instructions;
+    expect(r).toContain('git diff "$HANOMAN_BASE_SHA"...HEAD');
+    expect(r).toContain("Scope verifikasi");
+    expect(r).toMatch(/JANGAN mengubah, membuat, atau menghapus berkas/);
+    expect(r).toContain("JANGAN commit");
+    expect(r).toContain("`Verdict: lulus` atau `Verdict: rework`");
+    expect(r).toContain("`Temuan wajib diperbaiki:`");
+    expect(r).toContain("bukan selera");
+    expect(r).toContain("JANGAN menulis `$HANOMAN_PHASE_FILE`");
+    expect(r).toContain("`Keputusan terbuka:`");
+    expect(r).not.toContain("Commit artefak fasemu");
+  });
+});
+
+const custom = (name: string, over: Partial<AgentDef> = {}): AgentDef => ({
+  name, description: `${name} desc`, instructions: "i", tools: null, model: null, mentions: [], ...over,
+});
+
+describe("P2 · klausa delegasi agen fase (ADR-0170)", () => {
+  const roster = [
+    custom("scout", { model: "haiku", workspacePolicy: "read-only" }),
+    custom("feature-builder", { model: "sonnet" }),
+    custom("wt-only", { workspacePolicy: "isolated-worktree" }),
+  ];
+  it("menyebut HANYA custom agent yang hidup, dengan tanda read-only & model", () => {
+    const c = phaseDelegationClause("Brainstorm", roster, "claude");
+    expect(c).toContain("`scout` (read-only · haiku)");
+    expect(c).toContain("`feature-builder` (sonnet)");
+    expect(c).toContain("`wt-only` (model sesi)");
+    expect(c.split("\n").length).toBeLessThanOrEqual(12);
+    // codex tak bisa memuat isolated-worktree (materializeCodexAgents) → tak disebut.
+    expect(phaseDelegationClause("Brainstorm", roster, "codex")).not.toContain("wt-only");
+  });
+  it("roster kosong: klausa generik tanpa nama agen", () => {
+    const c = phaseDelegationClause("Spec", [], "claude");
+    expect(c).toContain("Tak ada custom agent");
+    expect(c).not.toContain("`scout`");
+  });
+  it("peran riset (Brainstorm/Spec/Plan): 2–3 pencarian sempit paralel ke agen read-only, sintesis sendiri", () => {
+    for (const phase of ["Brainstorm", "Spec", "Plan"]) {
+      const c = phaseDelegationClause(phase, roster, "claude");
+      expect(c).toContain("2–3 pencarian sempit");
+      expect(c).toContain("SATU pesan");
+      expect(c).toContain("sintesis");
+      expect(c).not.toContain("implementer");
+    }
+  });
+  it("Execute: implementer per task, paralel hanya berkas tak beririsan maks 3, review per task", () => {
+    const c = phaseDelegationClause("Execute", roster, "claude");
+    expect(c).toContain("implementer per task");
+    expect(c).toContain("tak beririsan");
+    expect(c).toContain("maks 3");
+    expect(c).toContain("review");
+  });
+  it("aturan bersama: subagent_type dari daftar, hindari agen umum, larang hanoman-fase-*, kontrak anak", () => {
+    const c = phaseDelegationClause("Execute", roster, "claude");
+    expect(c).toContain("`subagent_type`");
+    expect(c).toContain("general-purpose");
+    expect(c).toContain("`hanoman-fase-*`");
+    expect(c).toMatch(/tujuan, scope berkas, Base SHA.*path:baris/);
+    expect(c).toContain("Baca SEMUA laporan anak");
+    expect(c).toMatch(/`Keputusan terbuka:` anak.*jangan dijawab sendiri/);
+    expect(c).toContain("`git push`");
+    expect(c).toContain("`git stash`");
+    const codex = phaseDelegationClause("Execute", roster, "codex");
+    expect(codex).toContain("spawn_agent");
+    expect(codex).not.toContain("`subagent_type`");
+  });
+  it("Kerjakan & reviewer tak menerima klausa delegasi; fase lain menerimanya di ujung instruksi", () => {
+    expect(phaseDelegationClause("Kerjakan", roster, "claude")).toBe("");
+    const defs = withPhaseDelegation(agentsFor("feature"), roster, "claude");
+    const base = agentsFor("feature");
+    for (const [i, d] of defs.entries()) {
+      if (d.name === REVIEW) expect(d.instructions).toBe(base[i]!.instructions);
+      else expect(d.instructions.startsWith(base[i]!.instructions)).toBe(true);
+      if (d.name !== REVIEW) expect(d.instructions).toContain("=== DELEGASI ===");
+      expect(d.context).toBe("KONTEKS-UJI");
+    }
   });
 });
 

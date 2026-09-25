@@ -8,7 +8,7 @@ import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
-  renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook,
+  renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook, withPhaseDelegation,
   writeSubagentStatusline, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import {
@@ -837,7 +837,10 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     // fallback yang membisu tentang penyebabnya tak bisa didiagnosis dari luar). Pemanggil lalu
     // mencoba lagi TANPA agen fase (all-or-nothing): orchestrator yang lahir tanpa salah satu agen
     // fasenya akan terpaksa mengerjakan fase itu sendiri.
-    const attempt = (phaseDefs: AgentDef[]): string[] => {
+    const attempt = (requested: AgentDef[]): string[] => {
+      // ADR-0170 P2 · klausa delegasi agen fase disusun DI SINI: roster custom agent yang benar-benar
+      // hidup di sesi ini baru pasti sesudah `selectCustomDefs`, dan ikut terpilih ulang saat fallback.
+      const phaseDefs = withPhaseDelegation(requested, customDefs, agentForDefs);
       const defs = [...phaseDefs, ...customDefs];
       if (defs.length === 0) return [];
       const readOnlyHook = readOnlyHookFor();

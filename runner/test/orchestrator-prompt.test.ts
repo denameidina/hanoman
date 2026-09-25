@@ -258,3 +258,55 @@ describe("pembangun prompt · mode orchestrator (ADR-0164)", () => {
     expect(b).not.toContain("ISI-PRD-RAHASIA");
   });
 });
+
+// ADR-0170 P2 · reviewer independen, kontrak path plan, dan lampiran di mode orchestrator.
+describe("P2 · orchestrator: reviewer Execute, path plan persis, lampiran (ADR-0170)", () => {
+  it.each(["claude", "codex"] as const)("%s: reviewer dipanggil sesudah Execute selesai & SEBELUM `Execute done`", (rt) => {
+    const c = orchestratorClause(plan("feature", rt));
+    expect(c).toContain("`hanoman-fase-review`");
+    expect(c).toMatch(/SEBELUM menulis `Execute done`/);
+    expect(c).toContain("Artefak: <path PERSIS dokumen spec & berkas plan>");
+    expect(c).toContain("Base SHA: $HANOMAN_BASE_SHA");
+    expect(c).toContain("`Verdict: lulus`");
+    expect(c).toContain("`Verdict: rework`");
+    expect(c).toContain("maks 2 putaran rework");
+    expect(c).toMatch(/masih `rework`.*`Keputusan terbuka`.*langkah 4/s);
+    expect(c).toContain(rt === "codex" ? "send_input" : "SendMessage");
+    expect(c).toContain("`Review Execute`");
+  });
+  it("reviewer tercantum di daftar agen dengan model/effort-nya; flow tanpa reviewer tak berubah", () => {
+    expect(orchestratorClause(plan("qa"))).toContain("Reviewer Execute → `hanoman-fase-review` · opus · high");
+    const g = orchestratorClause(plan("goal"));
+    expect(g).not.toContain("hanoman-fase-review");
+    expect(g).not.toContain("Verdict");
+  });
+  it("continue (rencana Execute saja) tetap membawa langkah reviewer", () => {
+    const full = plan("feature");
+    const p = continuePrompt("feature", spec, "b", undefined, undefined, undefined, undefined,
+      { ...full, phases: full.phases.filter((x) => x.phase === "Execute") });
+    expect(p).toContain("`hanoman-fase-review`");
+  });
+  it("`Artefak fase sebelumnya:` diisi path PERSIS yang dilaporkan, termasuk berkas plan untuk Execute", () => {
+    const c = orchestratorClause(plan("feature"));
+    expect(c).toMatch(/`Artefak fase sebelumnya:`.*path PERSIS/);
+    expect(c).toContain("berkas plan");
+  });
+  it("lampiran: orchestrator hanya meneruskan INDEX.md lewat `Lampiran:`, tak membaca semua; mode tunggal tetap", () => {
+    const attachments = { dir: "/att", items: [{ filename: "a.md", mimeType: "text/markdown", size: 3, path: "/att/a.md" }] };
+    const o = startPrompt("feature", spec, "b", undefined, undefined, undefined, attachments, plan("feature"));
+    expect(o).toContain("`/att/INDEX.md`");
+    expect(o).toContain("`Lampiran:`");
+    expect(o).not.toContain("BACA semuanya");
+    expect(o).not.toContain("/att/a.md");
+    const single = startPrompt("feature", spec, "b", undefined, undefined, undefined, attachments);
+    expect(single).toContain("BACA semuanya");
+    for (const p of [
+      continuePrompt("feature", spec, "b", undefined, undefined, undefined, attachments, plan("feature")),
+      resumePrompt("feature", spec, "b", { recorded: [], worktreeKept: true }, undefined, undefined, undefined, attachments, plan("feature")),
+      startGoalPrompt("goal", { ...spec, source: "goal", payload: { goal: "G" } }, "b", { attachments, plan: plan("goal") }),
+    ]) {
+      expect(p).toContain("`/att/INDEX.md`");
+      expect(p).not.toContain("BACA semuanya");
+    }
+  });
+});

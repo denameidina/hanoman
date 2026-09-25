@@ -34,16 +34,16 @@ tercekik oleh sesi/subagent yang lolos gerbang.
 - [ ] Test unit hook + env; golden prompt tak berubah.
 
 ### P2 · Delegasi & reviewer (runner prompt)
-- [ ] Execute di mode orchestrator memakai `subagent-driven-development`.
-- [ ] Klausa delegasi per fase di instruksi agen fase (roster-aware, model per peran, batas paralel).
-- [ ] Reviewer independen `hanoman-reviewer` (claude opus·high / codex sol·high, read-only) dipanggil
+- [x] Execute di mode orchestrator memakai `subagent-driven-development`.
+- [x] Klausa delegasi per fase di instruksi agen fase (roster-aware, model per peran, batas paralel).
+- [x] Reviewer independen `hanoman-fase-review` (claude opus·high / codex sol·high, read-only) dipanggil
       orchestrator sesudah laporan Execute `selesai`, sebelum menulis `Execute done`; `rework` → kembali
       ke agen Execute yang sama (maks 2 putaran), lalu `Keputusan terbuka`.
-- [ ] Kontrak nama plan `<YYYY-MM-DD>-<spec-id>-<slug>.md`; path persis diteruskan ke Execute.
-- [ ] Laporan Execute memuat tabel AC → bukti.
-- [ ] Orchestrator hanya meneruskan `INDEX.md` lampiran (tak membaca semua lampiran).
-- [ ] Fase Verifikasi ikut klausa scope verifikasi.
-- [ ] Klausa metode `matt` diselaraskan dengan ADR-0167.
+- [x] Kontrak nama plan `<YYYY-MM-DD>-<spec-id>-<slug>.md`; path persis diteruskan ke Execute.
+- [x] Laporan Execute memuat tabel AC → bukti.
+- [x] Orchestrator hanya meneruskan `INDEX.md` lampiran (tak membaca semua lampiran).
+- [x] Fase Verifikasi ikut klausa scope verifikasi.
+- [x] Klausa metode `matt` diselaraskan dengan ADR-0167.
 
 ### P3 · Gerbang beban (server)
 - [ ] Terminal-agen operator tak lagi `exempt`; hanya shell mentah/console VPS.
