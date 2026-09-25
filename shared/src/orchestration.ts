@@ -43,6 +43,23 @@ export const isPhaseAgentName = (name: string): boolean => name.startsWith(PHASE
 export const PHASE_EVIDENCE_GRACE_MS = 60_000;
 
 export type PhasePlanEntry = { phase: string; agentName: string; model: string; effort: string };
+
+// ADR-0170 P2 · reviewer independen hasil Execute (feature & qa). BUKAN fase pipeline — FLOW_PHASES,
+// peta stage, UI fase, dan data lama tak berubah. Ia agen ber-generate per sesi dengan awalan yang
+// dicadangkan, jadi agen fase (yang dilarang memanggil `hanoman-fase-*`) tak bisa memanggilnya: hanya
+// orchestrator. `phase` = fase pemilik invocation-nya di AgentInvocation/roster (Execute).
+// Sel Setting `orchestration.<flow>.<runtime>.Review` (kunci lenient, tanpa migration) dan
+// `phaseOverrides.Review` meng-override default di bawah.
+export const REVIEWER_CELL = "Review";
+export const REVIEWER_FLOWS: ReadonlySet<OrchestrationFlow> = new Set(["feature", "qa"]);
+export const REVIEWER_DEFAULTS: Readonly<Record<"claude" | "codex", { model: string; effort: string }>> = {
+  claude: { model: "opus", effort: "high" },
+  codex: { model: "gpt-5.6-sol", effort: "high" },
+};
+export type PhaseReviewerEntry = { agentName: string; phase: "Execute"; model: string; effort: string };
+
 export type PhasePlan = {
   flow: OrchestrationFlow; runtime: "claude" | "codex"; phases: PhasePlanEntry[];
+  /** ADR-0170 P2 · hanya flow `REVIEWER_FLOWS`; absen = tanpa reviewer (prompt tak berubah). */
+  reviewer?: PhaseReviewerEntry;
 };

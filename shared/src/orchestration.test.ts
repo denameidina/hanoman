@@ -137,6 +137,29 @@ describe("resolvePhasePlan", () => {
     expect(plan.phases.find((p) => p.phase === "Spec")).toMatchObject({ model: "opus" });
     expect(plan.phases.map((p) => p.model)).not.toContain("default");
   });
+  // ADR-0170 P2 · reviewer independen Execute: bukan fase pipeline (FLOW_PHASES tetap), tapi agen
+  // ber-generate per sesi dengan default opus/high · gpt-5.6-sol/high, bisa dioverride sel `Review`.
+  it("feature & qa punya reviewer Execute ber-default opus/high (claude) · gpt-5.6-sol/high (codex)", () => {
+    for (const flow of ["feature", "qa"] as const) {
+      expect(resolvePhasePlan({ ...base, flow })!.reviewer)
+        .toEqual({ agentName: "hanoman-fase-review", phase: "Execute", model: "opus", effort: "high" });
+      expect(resolvePhasePlan({ ...base, flow, runtime: "codex", orchestrator: { model: "gpt-5.6-terra", effort: "low" } })!.reviewer)
+        .toEqual({ agentName: "hanoman-fase-review", phase: "Execute", model: "gpt-5.6-sol", effort: "high" });
+    }
+    for (const flow of ["goal", "audit", "reverse", "prd", "breakdown", "scaffold"] as const)
+      expect(resolvePhasePlan({ ...base, flow })?.reviewer).toBeUndefined();
+    expect(resolvePhasePlan({ ...base, flow: "qa" })!.phases.map((p) => p.phase)).toEqual(FLOW_PHASES.qa);
+  });
+  it("reviewer: sel Setting `Review` & override sesi menang; effort dikoersi ke model hasil resolusi", () => {
+    const orchestration = { ...ORCHESTRATION_DEFAULTS, feature: { ...ORCHESTRATION_DEFAULTS.feature,
+      codex: { ...ORCHESTRATION_DEFAULTS.feature.codex, Review: { model: "gpt-5.6-luna", effort: "ultra" } } } };
+    expect(resolvePhasePlan({ ...base, runtime: "codex", orchestration })!.reviewer)
+      .toMatchObject({ model: "gpt-5.6-luna", effort: "xhigh" });
+    expect(resolvePhasePlan({ ...base, phaseOverrides: { Review: { model: "sonnet", effort: "medium" } } })!.reviewer)
+      .toMatchObject({ model: "sonnet", effort: "medium" });
+    expect(resolvePhasePlan({ ...base, phaseOverrides: { Review: { model: "default" } } })!.reviewer)
+      .toMatchObject({ model: "inherit", effort: "high" });
+  });
   it("kunci fase asing di matriks tak menambah fase", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS,
       goal: { enabled: true, claude: { Foo: { model: "x", effort: "low" } }, codex: {} } };
