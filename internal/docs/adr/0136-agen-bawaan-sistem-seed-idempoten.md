@@ -145,6 +145,36 @@ katalog kosong" tetap utuh. Agent yang dimatikan tetap tidak didaftarkan.
 8. **`HANOMAN_CONTROL_ORIGINS` di shell menjawab 404 untuk route di belakang cookie.** Suite route
    yang merah ramai dengan `{"error":"not found"}` hampir selalu ini, bukan regresi.
 
+## Amandemen 2026-09-25 (audit custom agent + agen domain)
+
+**Katalog diperluas dari 16 menjadi 25** dengan `shared/src/builtin-domain-agents.ts`
+(a11y-auditor, frontend-render-auditor, api-contract-auditor, concurrency-hazard-hunter,
+schema-migration-auditor, layering-guard, cloudflare-config-auditor,
+vps-hardening-auditor, maintainability-reviewer), spread sesudah `...BUILTIN_APP_AGENTS`
+di `BUILTIN_AGENTS`. Sembilan nama baru ikut dikunci immutable (keputusan 2, gotcha 4).
+Semua opt-in, `read-only`, `activation: "smart"` — nol tambahan pada tiga default aktif.
+Rincian per agen, alasan dedup dari 16 usulan riset, dan katalog lengkap ada di
+[audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md) §3.
+
+**Jalur adopsi baris tanpa stempel ditambahkan** ke gotcha 6 (upgrade dua-syarat).
+Delapan baris agen aplikasi yang didaftarkan lewat API pada 2026-09-05 — sebelum seed
+mengenalnya — tak pernah menerima stempel awal, sehingga syarat "belum disunting" pada
+keputusan 6 tak pernah terpenuhi dan baris itu berhenti menerima perbaikan katalog
+selamanya. `BUILTIN_FINGERPRINT_HISTORY` (`server/src/services/builtin-agents.ts`)
+mencatat sidik jari tiap versi katalog aplikasi yang pernah dirilis; baris tanpa
+stempel yang isinya byte-identik dengan salah satu versi historis diadopsi (diberi
+stempel) lalu ikut upgrade normal pada boot berikutnya. `model`/`runtime`/`enabled`
+tetap tidak ikut sidik jari (keputusan 2/gotcha 3 tak berubah), jadi override operator
+yang sudah terjadi lewat registrasi API tetap bertahan. Stempel kini ditulis PER
+ITERASI loop seed, bukan sekali di akhir — galat di tengah loop tak lagi membuang
+stempel agen yang sudah diproses sebelumnya.
+
+Verifikasi: 8/8 baris aplikasi di satu instance live cocok byte-identik dengan versi
+katalog `0b90ab3c`/`ff98a8f6` (query `sqlite3 -readonly`), jadi kedelapannya teradopsi
+pada boot berikutnya. Test menambah: fixture mengunci tiap hash historis, baris
+historis ter-upgrade, baris yang memang sudah disunting operator tak tersentuh, dan
+galat di agen belakang tak membuang stempel agen depan.
+
 ## Alternatif yang ditolak
 
 - **Konstanta runtime + lapis override keempat (builtin < global < project).** Nol baris DB, nol

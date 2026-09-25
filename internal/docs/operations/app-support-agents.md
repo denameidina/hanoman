@@ -1,8 +1,11 @@
 # Agent untuk pembuatan dan dukungan aplikasi
 
-Katalog sekarang berisi 16 peran: delapan agent audit/QA yang sudah ada dan delapan
-agent aplikasi di bawah. Definisi adalah data di `shared/src/builtin-agents.ts`,
-dengan kelompok aplikasi di `shared/src/builtin-app-agents.ts`.
+Katalog sekarang berisi 25 peran: delapan agent audit/QA inti, delapan agent aplikasi
+di bawah, dan sembilan agent domain read-only opt-in (a11y/frontend/API/konkurensi/
+skema/layering/Cloudflare/VPS/maintainability — lihat
+[audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md) §3).
+Definisi adalah data di `shared/src/builtin-agents.ts`, dengan kelompok aplikasi di
+`shared/src/builtin-app-agents.ts` dan kelompok domain di `shared/src/builtin-domain-agents.ts`.
 
 ## Memilih peran
 
