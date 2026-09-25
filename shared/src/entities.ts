@@ -121,18 +121,21 @@ const NOTIFY_SOUNDS = ["off", "short", "medium", "long",
 // SPEC-252 · ADR-0061 — dipakai picker "Mulai sesi" (model/effort per sesi) + kartu default global Settings.
 // `id` = alias native CLI yang diteruskan ke `--model`; `resolved` = id terpatok yang sedang
 // ditunjuknya (dari discovery). Alias diutamakan supaya setelan otomatis ikut model baru CLI.
+// `efforts` ABSEN pada model yang DIKENAL = model itu tak menerima effort sama sekali (katalog CLI
+// tak memuat `supportedEffortLevels`, mis. Haiku 4.5) — bukan "belum diketahui" (audit P1-12).
 export type ClaudeModel = { id: string; label: string; resolved?: string; efforts?: readonly string[] };
+export const EFFORTS = ["xhigh", "high", "medium", "low", "max", "ultracode"] as const;
 // Fallback OFFLINE (sebelum probe CLI pertama sukses) — hanya alias native yang terdokumentasi.
+// Effort offline sengaja seluas `EFFORTS` (perilaku lama); `haiku` tanpa effort, sama dengan katalog CLI.
 export let MODELS: readonly ClaudeModel[] = [
-  { id: "default", label: "Default (rekomendasi CLI)" },
-  { id: "opus", label: "Opus" },
-  { id: "sonnet", label: "Sonnet" },
+  { id: "default", label: "Default (rekomendasi CLI)", efforts: EFFORTS },
+  { id: "opus", label: "Opus", efforts: EFFORTS },
+  { id: "sonnet", label: "Sonnet", efforts: EFFORTS },
   { id: "haiku", label: "Haiku" },
-  { id: "fable", label: "Fable" },
+  { id: "fable", label: "Fable", efforts: EFFORTS },
 ];
 /** `default` hanya sah untuk `--model` sesi; subagent (`--agents`) menerima alias keluarga saja. */
 export const CLAUDE_DEFAULT_ALIAS = "default";
-export const EFFORTS = ["xhigh", "high", "medium", "low", "max", "ultracode"] as const;
 
 // SPEC-338 · ADR-0074 · katalog codex. Slug diteruskan apa adanya ke `codex -m`; effort ke
 // `-c model_reasoning_effort="<v>"` (codex tak punya flag --effort).
@@ -181,8 +184,14 @@ export function subagentClaudeModels(): readonly ClaudeModel[] {
   return MODELS.filter((m) => m.id !== CLAUDE_DEFAULT_ALIAS);
 }
 
+/**
+ * Audit P1-12 · model TAK dikenal (id kustom, katalog belum memuat) → `EFFORTS` penuh, jangan
+ * menghalangi. Model DIKENAL tanpa `efforts` → `[]`: effort apa pun no-op/ditolak di model itu,
+ * jadi picker tak menawarkannya dan definisi subagent tak memancarkannya.
+ */
 export function claudeEfforts(modelId: string): readonly string[] {
-  return claudeModel(modelId)?.efforts ?? EFFORTS;
+  const model = claudeModel(modelId);
+  return model ? model.efforts ?? [] : EFFORTS;
 }
 
 /**

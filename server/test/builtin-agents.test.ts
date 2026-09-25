@@ -264,6 +264,18 @@ describe("installCustomAgents — urutan mengikat", () => {
 });
 
 
+describe("effort tak dipancarkan untuk model claude tanpa effort (audit P1-12)", () => {
+  it("scout (haiku, effort low): definisi claude tanpa effort; codex tetap membawanya", async () => {
+    await prisma.project.create({ data: { id: "p1", name: "P1", desc: "", kind: "web" } });
+    await installCustomAgents();
+    expect(agentDefsFor("p1", "claude").find((a) => a.name === "scout"))
+      .toMatchObject({ model: "haiku", effort: null });
+    expect(agentDefsFor("p1", "claude").find((a) => a.name === "security-reviewer"))
+      .toMatchObject({ model: "sonnet", effort: "high" });
+    expect(agentDefsFor("p1", "codex").find((a) => a.name === "scout")).toMatchObject({ effort: "low" });
+  });
+});
+
 describe("app/support — profil efektif dari seed", () => {
   it("memilih model per runtime dan mempertahankan override operator", async () => {
     const names = ["product-designer", "feature-builder", "performance-engineer", "product-analyst",

@@ -1,9 +1,9 @@
 import { afterEach, describe, it, expect } from "vitest";
 import {
-  CODEX_MODELS, MODELS, claudeEfforts, claudeModel, coerceClaudeEffort, modelSelectOptions,
+  CODEX_MODELS, EFFORTS, MODELS, claudeEfforts, claudeModel, coerceClaudeEffort, modelSelectOptions,
   replaceModelCatalog, subagentClaudeModels,
 } from "./entities";
-import { modelsForRuntime } from "./agent-catalog";
+import { effortsForRuntimeModel, modelsForRuntime } from "./agent-catalog";
 
 const catalog = [{ id: "a", label: "A" }, { id: "b", label: "B" }];
 
@@ -44,6 +44,21 @@ describe("alias native diutamakan", () => {
     expect(claudeModel("claude-sonnet-5")?.id).toBe("sonnet");
     expect(claudeEfforts("claude-sonnet-5")).toEqual(["high", "low"]);
     expect(coerceClaudeEffort("claude-sonnet-5", "max")).toBe("high");
+  });
+
+  // Audit P1-12 · katalog CLI mencatat Haiku 4.5 tanpa `supportedEffortLevels`: effort no-op di sana.
+  it("model dikenal tanpa efforts → [] ; model tak dikenal → EFFORTS penuh", () => {
+    replaceModelCatalog([...discovered, { id: "haiku", label: "Haiku 4.5", resolved: "claude-haiku-4-5" }], CODEX_MODELS);
+    expect(claudeEfforts("haiku")).toEqual([]);
+    expect(claudeEfforts("claude-haiku-4-5")).toEqual([]);
+    expect(claudeEfforts("model-kustom-x")).toEqual(EFFORTS);
+    expect(effortsForRuntimeModel("claude", "haiku")).toEqual([]);
+  });
+
+  it("fallback offline: alias keluarga tetap menawarkan EFFORTS penuh, haiku tidak", () => {
+    expect(claudeEfforts("sonnet")).toEqual(EFFORTS);
+    expect(claudeEfforts("opus")).toEqual(EFFORTS);
+    expect(claudeEfforts("haiku")).toEqual([]);
   });
 
   it("id terpatok yang ditunjuk alias diberi label jelas, bukan tampil sebagai duplikat", () => {
