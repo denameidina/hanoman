@@ -20,7 +20,7 @@ Gaya kode — berlaku setiap kali kamu menulis atau mengubah kode:
 - Jangan menambahkan komentar pembatas seksi, header berhiasan, atau narasi langkah demi langkah.
 - Jangan meninggalkan kode mati atau kode yang dikomentari. Hapus saja; riwayat git yang menyimpannya.
 
-Sesi ini TAK BERPENUNGGU — tak ada manusia yang menonton terminal untuk menjawab. Skill mattpocock yang kontraknya mewawancarai manusia (`/grill-me`, `/to-spec`, `/triage`) JANGAN dipakai: pakai primitif model-invoked-nya dan putuskan sendiri. `to-tickets` di fase Plan dipakai HANYA sebagai penghasil berkas plan berkotak `- [ ]` di `docs/matt/plans/`, BUKAN penerbit tiket — hanoman sendiri adalah issue tracker-nya, jadi jangan menulis ke tracker eksternal mana pun.
+Skill mattpocock yang kontraknya mewawancarai manusia (`/grill-me`, `/to-spec`, `/triage`) JANGAN dipakai: pakai primitif model-invoked-nya untuk menguji rancanganmu sendiri, bukan untuk mewawancarai siapa pun. Hal yang masih ambigu dan akan mempengaruhi hasil tetap JANGAN diputuskan sendiri — bila kamu agen fase, daftarkan di `Keputusan terbuka:` laporanmu; bila tidak, ajukan lewat jalur tanya di klausa otonomi prompt ini. `to-tickets` di fase Plan dipakai HANYA sebagai penghasil berkas plan berkotak `- [ ]` di `docs/matt/plans/`, BUKAN penerbit tiket — hanoman sendiri adalah issue tracker-nya, jadi jangan menulis ke tracker eksternal mana pun.
 
 Skills mattpocock WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.
 - Audit: mattpocock-skills:diagnosing-bugs

@@ -27,6 +27,12 @@ export interface MethodDef {
   readonly specDir: string;
   /** Nama fase `PIPELINES` → skill yang wajib dimuat. Fase tanpa entri = sengaja tanpa skill. */
   readonly phaseSkills: Readonly<Record<string, readonly string[]>>;
+  /**
+   * ADR-0170 P2 · pengganti `phaseSkills` untuk fase yang dikerjakan AGEN FASE claude — agen yang
+   * sanggup memanggil subagent sendiri (foreground, bersarang; env sesi 6a249ae2). Mode tunggal dan
+   * agen fase codex tetap memakai `phaseSkills`. Kunci wajib fase yang punya `phaseSkills`.
+   */
+  readonly orchestratedPhaseSkills?: Readonly<Record<string, readonly string[]>>;
   /** Gerbang yang digabungkan ke fase TERAKHIR pipeline penulis-kode. Wajib non-kosong (AC-7). */
   readonly exitSkills: readonly string[];
   /** Klausa prompt tambahan khas metode ini. Wajib menyebut `planDir`-nya (dijaga test sumber). */
@@ -48,14 +54,17 @@ export const DEFAULT_METHOD = "superpowers";
 // tanpa skill (runner/src/prompt.ts). Karena itu gerbangnya konstanta, bukan pilihan katalog.
 export const VERIFICATION_GATE = "superpowers:verification-before-completion";
 
-// Sesi hanoman tak berpenunggu: tak ada manusia di terminal yang menjawab wawancara, dan
-// AUTONOMY_CLAUSE_FULL eksplisit menyuruh agen tak pernah bertanya. Katalog mattpocock mayoritas
-// diketik manusia (`/grill-me`, `/to-spec`), jadi entri di bawah memilih primitif model-invoked-nya
-// (`grilling`, bukan `/grill-me`) dan klausa ini menegaskannya ke agen.
+// Katalog mattpocock mayoritas diketik manusia (`/grill-me`, `/to-spec`), jadi entri di bawah memilih
+// primitif model-invoked-nya (`grilling`, bukan `/grill-me`) dan klausa ini menegaskannya ke agen.
+// ADR-0167 (diselaraskan ADR-0170 P2): versi lama menyuruh "putuskan sendiri" — bertentangan dengan
+// aturan keputusan ambigu selalu ditanyakan. Wawancara skill bukan jalur keputusan; jalurnya milik
+// prompt (agen fase: `Keputusan terbuka:`; sesi tunggal: klausa otonomi).
 const MATT_CLAUSE =
-  "Sesi ini TAK BERPENUNGGU — tak ada manusia yang menonton terminal untuk menjawab. Skill "
-  + "mattpocock yang kontraknya mewawancarai manusia (`/grill-me`, `/to-spec`, `/triage`) JANGAN "
-  + "dipakai: pakai primitif model-invoked-nya dan putuskan sendiri. `to-tickets` di fase Plan "
+  "Skill mattpocock yang kontraknya mewawancarai manusia (`/grill-me`, `/to-spec`, `/triage`) JANGAN "
+  + "dipakai: pakai primitif model-invoked-nya untuk menguji rancanganmu sendiri, bukan untuk "
+  + "mewawancarai siapa pun. Hal yang masih ambigu dan akan mempengaruhi hasil tetap JANGAN "
+  + "diputuskan sendiri — bila kamu agen fase, daftarkan di `Keputusan terbuka:` laporanmu; bila "
+  + "tidak, ajukan lewat jalur tanya di klausa otonomi prompt ini. `to-tickets` di fase Plan "
   + "dipakai HANYA sebagai penghasil berkas plan berkotak `- [ ]` di `docs/matt/plans/`, BUKAN "
   + "penerbit tiket — hanoman sendiri adalah issue tracker-nya, jadi jangan menulis ke tracker "
   + "eksternal mana pun.";
@@ -81,6 +90,15 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
       // SPEC-407 · fase `Goal` sengaja TANPA skill: seluruh inti flow itu membebaskan sesi dari
       // proses kaku. Yang tetap dijaga cuma pintu keluarnya.
       Verifikasi: [VERIFICATION_GATE],
+    },
+    // ADR-0170 P2 · `executing-plans` sendiri berkata "If subagents are available, use
+    // superpowers:subagent-driven-development instead" — agen fase claude punya subagent.
+    orchestratedPhaseSkills: {
+      Execute: [
+        "superpowers:subagent-driven-development",
+        "superpowers:test-driven-development",
+        VERIFICATION_GATE,
+      ],
     },
     exitSkills: [VERIFICATION_GATE],
     requires: ["superpowers"],

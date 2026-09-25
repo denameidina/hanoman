@@ -652,8 +652,8 @@ describe("SPEC-734 · metode workflow", () => {
 
   it("extraClause metode ikut ke prompt; superpowers tak punya sehingga tak menambah apa pun", () => {
     expect(startPrompt("feature", s, "b", undefined, undefined, "matt"))
-      .toContain("TAK BERPENUNGGU");
-    expect(startPrompt("feature", s, "b")).not.toContain("TAK BERPENUNGGU");
+      .toContain("mewawancarai manusia");
+    expect(startPrompt("feature", s, "b")).not.toContain("mewawancarai manusia");
   });
 
   it("id metode tak dikenal jatuh ke superpowers, tak melempar", () => {

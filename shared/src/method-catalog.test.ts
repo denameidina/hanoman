@@ -50,6 +50,32 @@ describe("METHODS · invarian sumber", () => {
     }
   });
 
+  // ADR-0170 P2 · skill executing-plans sendiri menyuruh "if subagents are available, use
+  // subagent-driven-development instead"; agen fase claude punya subagent (foreground, bersarang).
+  it("superpowers: Execute ber-agen-fase claude memakai subagent-driven-development, bukan executing-plans", () => {
+    const o = METHODS.superpowers!.orchestratedPhaseSkills!;
+    expect(o.Execute).toContain("superpowers:subagent-driven-development");
+    expect(o.Execute).not.toContain("superpowers:executing-plans");
+    expect(o.Execute).toContain(VERIFICATION_GATE);
+    // Mode tunggal tak tersentuh.
+    expect(METHODS.superpowers!.phaseSkills.Execute).toContain("superpowers:executing-plans");
+  });
+
+  it("orchestratedPhaseSkills hanya mengganti fase yang punya phaseSkills", () => {
+    for (const [key, m] of entries())
+      for (const phase of Object.keys(m.orchestratedPhaseSkills ?? {}))
+        expect(m.phaseSkills[phase], `${key}.${phase}`).toBeDefined();
+  });
+
+  // ADR-0167 · keputusan ambigu tak pernah diputuskan sendiri — termasuk di metode matt.
+  it("klausa matt: larang skill wawancara-manusia, ambiguitas ke `Keputusan terbuka:`, bukan putuskan sendiri", () => {
+    const c = METHODS.matt!.extraClause!;
+    expect(c).toContain("`/grill-me`");
+    expect(c).toContain("`Keputusan terbuka:`");
+    expect(c).not.toMatch(/putuskan sendiri\./);
+    expect(c).not.toContain("TAK BERPENUNGGU");
+  });
+
   it("extraClause bila ada wajib menyebut planDir metodenya", () => {
     for (const [key, m] of entries()) {
       if (m.extraClause) expect(m.extraClause, key).toContain(m.planDir);
