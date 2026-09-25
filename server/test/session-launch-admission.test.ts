@@ -31,7 +31,10 @@ vi.mock("@hanoman/runner", async (original) => ({
   ...await original<typeof import("@hanoman/runner")>(),
   realGit: { addWorktree: () => { state.effects.push("worktree"); return "base"; } },
 }));
-vi.mock("../src/services/settings", () => ({ getSetting: async () => state.setting }));
+vi.mock("../src/services/settings", () => ({
+  getSetting: async () => state.setting,
+  normalizePhaseOverrides: (_agent: unknown, o: unknown) => o,
+}));
 vi.mock("../src/services/local-binding", () => ({ resolveRepoDir: async () => "/repo" }));
 vi.mock("../src/services/spec-deps", () => ({ blockersForSpec: async () => [], blockedNote: () => "blocked" }));
 vi.mock("../src/services/spec-attachment-dir", () => ({
