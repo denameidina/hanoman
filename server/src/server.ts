@@ -32,6 +32,15 @@ import { transcriptDir } from "./services/transcript-store";
 import { startSessionEventRelay } from "./services/session-event-relay";
 import { installRelayClient } from "./services/relay/client";
 import { injectableFrom } from "./services/relay/dispatcher";
+import { installSafeGlobalFetch } from "./services/safe-outbound-request";
+
+// Insiden 2026-09-25: `fetch()` global resolve hostname lewat `dns.lookup()` (threadpool) secara
+// default. Satu lookup yang macet (jaringan sibuk/DNS lambat) meninggalkan thread OS yang TAK BISA
+// dibatalkan, dan `process.exit()` (dipanggil `requestRestartForUpdate` saat tombol update ditekan)
+// wajib `pthread_join` semua thread threadpool dulu sebelum keluar → satu lookup macet membekukan
+// SELURUH proses selamanya (port tetap terikat, tak ada request yang pernah dibalas). Dipasang
+// SEBELUM apa pun (config boot, katalog custom agent, dll) sempat memanggil fetch().
+installSafeGlobalFetch();
 
 // SPEC-215 · deteksi update default ON (registry HANOMAN_UPDATE_FETCH="1"), dibaca via resolver
 // di services/update.ts. Test memuat buildApp dari app.ts (tak pernah server.ts) dan vitest.config

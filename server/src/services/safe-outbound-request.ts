@@ -3,6 +3,7 @@ import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 import { createGunzip } from "node:zlib";
+import { Agent, setGlobalDispatcher } from "undici";
 import { isBlockedAddress } from "./webhooks/ssrf";
 
 export type SafeRequestOptions = {
@@ -117,6 +118,64 @@ function withLookupTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
     p.then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
   });
 }
+
+// Insiden 2026-09-25: fix di atas (defaultLookup) hanya menutup lubang untuk safeRequest.
+// `fetch()` global (dipakai apa adanya oleh update.ts, github-fetch.ts, limits.ts, telegram/*)
+// tetap resolve hostname lewat `dns.lookup()` bawaan undici — threadpool lagi, lubang yang sama.
+// Daripada menambal tiap pemanggil satu-satu, ini menutupnya SEKALI di dispatcher global undici,
+// yang menurut dokumentasinya dipakai bersama oleh `fetch()` bawaan Node (Symbol.for
+// ('undici.globalDispatcher.1'/'.2')) — jadi berlaku otomatis untuk pemanggil yang sudah ada
+// maupun yang akan ditulis nanti.
+// `family` datang sebagai angka (4/6) dari sebagian besar pemanggil, tapi Node juga menerima
+// bentuk string ("IPv4"/"IPv6") di beberapa jalur (mis. `tls.connect`) — undici mewarisi union itu.
+export type GlobalLookupOptions = { all?: boolean; family?: number | "IPv4" | "IPv6" };
+// Bentuk `(err, address, family)` di sini WAJIB sama persis dengan `LookupFunction` bawaan Node
+// (dipakai `net`/`tls`/undici's connector) — address & family bukan opsional di tipe itu, jadi cabang
+// error di bawah tetap mengirim nilai dummy ("" / 0). Pemanggil sungguhan selalu cek `err` dulu.
+export type GlobalLookupCallback =
+  (err: NodeJS.ErrnoException | null, address: string | ResolvedAddress[], family: number) => void;
+export type GlobalLookup = (hostname: string, options: GlobalLookupOptions, callback: GlobalLookupCallback) => void;
+
+function wantedFamily(family: GlobalLookupOptions["family"]): number | undefined {
+  if (family === "IPv4") return 4;
+  if (family === "IPv6") return 6;
+  return family || undefined;
+}
+
+export function toGlobalLookup(lookup: (host: string) => Promise<ResolvedAddress[]>): GlobalLookup {
+  return (hostname, options, callback) => {
+    lookup(hostname).then(
+      (addresses) => {
+        const family = wantedFamily(options.family);
+        const matched = family ? addresses.filter((a) => a.family === family) : addresses;
+        if (matched.length === 0) {
+          callback(Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), { code: "ENOTFOUND", hostname }), "", 0);
+          return;
+        }
+        if (options.all) { callback(null, matched, 0); return; }
+        callback(null, matched[0]!.address, matched[0]!.family);
+      },
+      (err: unknown) => callback(err instanceof Error ? err : new Error(String(err)), "", 0),
+    );
+  };
+}
+
+let installedDispatcher: unknown = null;
+
+export function installSafeGlobalFetch(o: {
+  lookup?: (host: string) => Promise<ResolvedAddress[]>;
+  makeDispatcher?: (lookup: GlobalLookup) => unknown;
+  setDispatcher?: (d: unknown) => void;
+} = {}): void {
+  if (installedDispatcher) return;
+  const makeDispatcher = o.makeDispatcher ?? ((lookup: GlobalLookup) => new Agent({ connect: { lookup } }));
+  const setDispatcher = o.setDispatcher ?? (setGlobalDispatcher as (d: unknown) => void);
+  installedDispatcher = makeDispatcher(toGlobalLookup(o.lookup ?? defaultLookup));
+  setDispatcher(installedDispatcher);
+}
+
+/** Test-only: lupakan dispatcher yang sudah terpasang supaya test berikutnya bisa memasang lagi. */
+export function __resetSafeGlobalFetchForTest(): void { installedDispatcher = null; }
 
 export async function safeRequest(options: SafeRequestOptions, deps: SafeRequestDeps = {}): Promise<SafeResponse> {
   if (options.url.protocol !== "http:" && options.url.protocol !== "https:") throw new Error("outbound scheme ditolak");
