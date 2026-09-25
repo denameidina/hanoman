@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect } from "vitest";
 import {
-  CODEX_MODELS, EFFORTS, MODELS, claudeEfforts, claudeModel, coerceClaudeEffort, modelSelectOptions,
+  CODEX_MODELS, EFFORTS, MODELS, claudeEfforts, claudeSubagentEfforts, claudeModel, coerceClaudeEffort, modelSelectOptions,
   replaceModelCatalog, subagentClaudeModels,
 } from "./entities";
 import { effortsForRuntimeModel, modelsForRuntime } from "./agent-catalog";
@@ -47,18 +47,20 @@ describe("alias native diutamakan", () => {
   });
 
   // Audit P1-12 · katalog CLI mencatat Haiku 4.5 tanpa `supportedEffortLevels`: effort no-op di sana.
-  it("model dikenal tanpa efforts → [] ; model tak dikenal → EFFORTS penuh", () => {
+  // Hanya definisi SUBAGENT yang ketat; picker UI tetap menawarkan EFFORTS (perilaku lama).
+  it("subagent: model dikenal tanpa efforts → [] ; model tak dikenal → EFFORTS penuh", () => {
     replaceModelCatalog([...discovered, { id: "haiku", label: "Haiku 4.5", resolved: "claude-haiku-4-5" }], CODEX_MODELS);
-    expect(claudeEfforts("haiku")).toEqual([]);
-    expect(claudeEfforts("claude-haiku-4-5")).toEqual([]);
-    expect(claudeEfforts("model-kustom-x")).toEqual(EFFORTS);
-    expect(effortsForRuntimeModel("claude", "haiku")).toEqual([]);
+    expect(claudeSubagentEfforts("haiku")).toEqual([]);
+    expect(claudeSubagentEfforts("claude-haiku-4-5")).toEqual([]);
+    expect(claudeSubagentEfforts("model-kustom-x")).toEqual(EFFORTS);
+    expect(claudeEfforts("haiku")).toEqual(EFFORTS);
   });
 
-  it("fallback offline: alias keluarga tetap menawarkan EFFORTS penuh, haiku tidak", () => {
-    expect(claudeEfforts("sonnet")).toEqual(EFFORTS);
-    expect(claudeEfforts("opus")).toEqual(EFFORTS);
-    expect(claudeEfforts("haiku")).toEqual([]);
+  it("fallback offline: alias keluarga menawarkan EFFORTS penuh; haiku ketat hanya untuk subagent", () => {
+    expect(claudeSubagentEfforts("sonnet")).toEqual(EFFORTS);
+    expect(claudeSubagentEfforts("opus")).toEqual(EFFORTS);
+    expect(claudeSubagentEfforts("haiku")).toEqual([]);
+    expect(claudeEfforts("haiku")).toEqual(EFFORTS);
   });
 
   it("id terpatok yang ditunjuk alias diberi label jelas, bukan tampil sebagai duplikat", () => {

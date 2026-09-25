@@ -2,7 +2,7 @@ import { prisma } from "../db";
 import {
   activationOf, effortOf, effectiveAgents, detectCycle, maxTurnsOf, mentionsOf, toolsOf,
   runtimeOf, timeoutSecondsOf, workspacePolicyOf, expandTools, ALL_TOOLS, GLOBAL_SCOPE,
-  BUILTIN_AGENTS, modelKnownForRuntime, claudeEfforts,
+  BUILTIN_AGENTS, modelKnownForRuntime, claudeSubagentEfforts,
   type CustomAgent, type AgentNode, type Agent,
 } from "@hanoman/shared";
 import { codexNativeAgentsSupported, type AgentDef } from "@hanoman/runner";
@@ -112,7 +112,7 @@ function toRuntimeDef(row: CustomAgentRow, runtime: Agent): AgentDef {
   const def = { ...toDef(row), model: recommendedModel(row, runtime) };
   // Audit P1-12 · model claude yang DIKENAL tanpa effort (mis. haiku): effort tersimpan no-op di
   // sana, jadi tak dipancarkan ke `--agents` sama sekali. Model tak dikenal/warisan tetap apa adanya.
-  if (runtime === "claude" && def.effort && def.model && claudeEfforts(def.model).length === 0) {
+  if (runtime === "claude" && def.effort && def.model && claudeSubagentEfforts(def.model).length === 0) {
     return { ...def, effort: null };
   }
   return def;

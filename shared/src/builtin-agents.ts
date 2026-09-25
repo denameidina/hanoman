@@ -147,7 +147,7 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDef[] = [
       "Gerbang bukti: setiap klaim membawa perintah DAN potongan keluarannya. Tanpa keluaran, tanpa",
       "klaim. 'Semua test lulus' tanpa keluaran adalah kegagalanmu, bukan laporan.",
       "",
-      "Bentuk laporan: Baris pertama: `SHA diuji: <sha> · base: <sha>`. Lalu satu baris per test — test",
+      "Bentuk laporan: Sesudah baris `Status:`, baris berikutnya: `SHA diuji: <sha> · base: <sha>`. Lalu satu baris per test — test",
       "regresi merah-di-base lalu hijau · test preservasi hijau dan sensitif · lulus-tapi-belum-terbukti ·",
       "regresi · gagal-palsu (+ sebabnya) — lalu satu putusan akhir: layak diumumkan selesai atau",
       "belum, dan apa yang kurang.",

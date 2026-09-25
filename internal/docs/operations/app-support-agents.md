@@ -59,26 +59,32 @@ Support menyiapkan draf; pengiriman balasan membutuhkan otorisasi eksplisit.
 
 Seed menyimpan `model=null` dan `runtime=null` seperti builtin lama. Model eksplisit
 operator menang. Jika belum diisi, builtin global merekomendasikan sonnet untuk
-Claude dan gpt-5.6-terra untuk Codex. Ini profil awal yang dapat diubah, bukan
-kesimpulan model terbaik dari benchmark. Effort medium, kecuali performance dan
-architect high; timeout tidak ditetapkan. Claude memakai batas turn native;
+Claude dan gpt-5.6-terra untuk Codex, kecuali solution-architect (opus / gpt-5.6-sol,
+audit 2026-09-25). Ini profil awal yang dapat diubah, bukan kesimpulan model terbaik
+dari benchmark. Effort medium, kecuali performance dan architect high serta
+knowledge-maintainer low; timeout tidak ditetapkan. Claude memakai batas turn native;
 batas turn Codex bersifat instruksi.
 
 Pembuatan melalui API berbeda dari seed internal: payload dengan
 `workspacePolicy=isolated-worktree` harus menyertakan `runtime=claude`.
 Definisi global yang didaftarkan sebelum kode katalog baru terpasang tampil sebagai
 custom biasa. Setelah kode terpasang, label builtin diturunkan dari namanya.
-Baris API tanpa stempel seed diperlakukan sebagai milik operator dan tidak ditimpa
-otomatis; jangan memalsukan stempel untuk memaksa upgrade.
+Baris API tanpa stempel seed diperlakukan sebagai milik operator, KECUALI isinya
+byte-identik dengan salah satu versi katalog yang pernah dirilis
+(`BUILTIN_FINGERPRINT_HISTORY`, audit 2026-09-25): baris itu diadopsi, diberi stempel,
+dan ikut upgrade. Baris yang sudah disunting tak pernah diadopsi; jangan memalsukan
+stempel untuk memaksa upgrade.
 
 ## Input dan bukti
 
-Berikan tujuan, scope/ownership, repo/worktree, base dan kandidat (termasuk dirty
-changes yang belum masuk commit), acceptance criteria, bukti terdahulu dan perintah
+Berikan tujuan, scope/ownership, repo/worktree, base SHA dan kandidat SHA sebagai
+nilai heksadesimal literal, acceptance criteria, bukti terdahulu dan perintah
 verifikasi. Sertakan target pengguna/design system untuk designer, skenario dan
 environment untuk performance, serta versi/log yang telah disamarkan untuk support.
-Untuk agent isolated, parent harus memastikan snapshot kandidat tersedia pada
-worktree child; branch baru tidak otomatis membawa dirty changes parent.
+Untuk agent isolated, parent WAJIB meng-commit kandidat dulu: worktree child lahir
+dari commit, jadi perubahan yang belum di-commit tak terlihat. Child checkout SHA
+kandidat, meng-commit hasilnya, dan melaporkan SHA hasil untuk di-`git cherry-pick`
+parent (audit 2026-09-25, P0-2).
 
 Katalog tidak menyertakan nama MCP karena berbeda antar mesin. Designer tidak
 otomatis mendapat browser/screenshot, operations tidak otomatis mendapat akses
@@ -86,7 +92,8 @@ monitoring/produksi, dan support tidak otomatis mendapat akses Help Center.
 Parent menyediakan bukti atau mengonfigurasi tool yang tersedia lewat katalog
 Custom Agents sesuai kebutuhan. Jika alat tidak tersedia, agent mencatat
 verifikasi yang belum dilakukan; pemeriksaan source bukan bukti render visual.
-Tiga peran read-only tidak memiliki Bash/Write/Edit.
+Tiga peran read-only tidak memiliki Write/Edit; solution-architect punya Bash yang
+dibatasi validator read-only ke perintah baca (rg/sed -n/git diff|show|log).
 
 Perbandingan performa harus menggunakan skenario dan environment yang setara,
 pengukuran berulang dan catatan noise. Angka yang belum diukur tetap belum

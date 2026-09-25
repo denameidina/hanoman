@@ -1430,9 +1430,9 @@ Pakai skill lebih sempit saat task cocok:
   di API wajib konsisten dengan gerbang versi Codex dan policy isolated-worktree.
   Root-causer default read-only hanya mendiagnosis statis dan menyerahkan rencana eksperimen;
   eksperimen langsung hanya bila policy efektif isolated-worktree. Jangan longgarkan hook untuk
-  memenuhi prompt. Handoff mencakup tujuan/scope/base SHA/kandidat termasuk dirty changes/bukti
+  memenuhi prompt. Handoff mencakup tujuan/scope/base SHA/kandidat SHA literal yang SUDAH di-commit (child isolated lahir dari commit; hasil kembali via SHA → cherry-pick)/bukti
   terdahulu/aturan verifikasi; keluaran mencakup status, jangkar, keyakinan dan bagian belum diperiksa.
-  Batas giliran builtin bersifat awal dan bisa disunting: scout 20, auditor 30, root/QA/edge 40;
+  Batas giliran builtin bersifat awal dan bisa disunting: scout 20, auditor & root-causer 30, QA/edge 40, feature-builder 80;
   Claude menerapkan maxTurns native, Codex secara instruksional; target waktu QA tetap instruksional.
   Hash definisi efektif dicatat dari roster tepercaya saat invocation pertama, mencakup prompt,
   runtime, profil/tools, dan hook read-only; payload agent tidak boleh menggantinya. Hash lama dan
@@ -1442,8 +1442,12 @@ Pakai skill lebih sempit saat task cocok:
   memungkinkan server smoke dengan DB temp mengonsumsi event sesi tetangga. Jangan memindahkan
   antrean lama otomatis karena kepemilikan home tidak tercatat. Tuntaskan sesi sandbox lama atau
   mulai ulang dengan env spool baru saat mengganti server; HTTP host tidak memakai spool.
-  Katalog berisi 16 peran. Delapan tambahan design/build/performance/analisis/arsitektur/operasi/
+  Katalog berisi 25 peran. Delapan tambahan design/build/performance/analisis/arsitektur/operasi/
   support/knowledge bersifat opt-in; lima penulis isolated (Claude saja), tiga analis read-only.
+  Sembilan agen domain read-only opt-in (audit 2026-09-25, `shared/src/builtin-domain-agents.ts`):
+  a11y-auditor, frontend-render-auditor, api-contract-auditor, concurrency-hazard-hunter,
+  schema-migration-auditor, layering-guard, cloudflare-config-auditor, vps-hardening-auditor,
+  maintainability-reviewer.
   Lihat `internal/docs/operations/app-support-agents.md` untuk pemilihan dan handoff. Registrasi
   API isolated wajib runtime claude. Tugas selesai perlu bukti; browser/monitoring/tiket tidak
   otomatis tersedia. Eval tetap 20 fixture untuk delapan audit awal, belum mencakup delapan baru.

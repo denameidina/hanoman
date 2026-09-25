@@ -184,12 +184,17 @@ export function subagentClaudeModels(): readonly ClaudeModel[] {
   return MODELS.filter((m) => m.id !== CLAUDE_DEFAULT_ALIAS);
 }
 
-/**
- * Audit P1-12 · model TAK dikenal (id kustom, katalog belum memuat) → `EFFORTS` penuh, jangan
- * menghalangi. Model DIKENAL tanpa `efforts` → `[]`: effort apa pun no-op/ditolak di model itu,
- * jadi picker tak menawarkannya dan definisi subagent tak memancarkannya.
- */
 export function claudeEfforts(modelId: string): readonly string[] {
+  return claudeModel(modelId)?.efforts ?? EFFORTS;
+}
+
+/**
+ * Audit P1-12 · khusus definisi SUBAGENT (`--agents`). Model TAK dikenal → `EFFORTS` penuh, jangan
+ * menghalangi. Model DIKENAL tanpa `efforts` → `[]`: effort no-op/ditolak di model itu, jadi
+ * definisi subagent tak memancarkannya. Picker UI/Telegram tetap memakai `claudeEfforts` (perilaku
+ * lama) — sesi Haiku+effort yang sudah tersimpan tak boleh kehilangan opsinya.
+ */
+export function claudeSubagentEfforts(modelId: string): readonly string[] {
   const model = claudeModel(modelId);
   return model ? model.efforts ?? [] : EFFORTS;
 }

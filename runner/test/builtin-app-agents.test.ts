@@ -21,7 +21,7 @@ describe("app/support builtin native configuration (not a behavioral benchmark)"
     expect(Object.keys(rendered)).toEqual(names);
     for (const def of defs) {
       const role = rendered[def.name];
-      expect(role.model).toBe("sonnet");
+      expect(role.model).toBe(def.model);
       expect(role.effort).toBe(def.effort);
       expect(role.tools).not.toContain("Task");
       expect(role.prompt).toContain(`Policy efektif: ${def.workspacePolicy}`);
@@ -29,12 +29,13 @@ describe("app/support builtin native configuration (not a behavioral benchmark)"
       if (readOnlyNames.includes(def.name)) {
         expect(role.isolation).toBeUndefined();
         expect(role.permissionMode).toBe("plan");
-        expect(role.maxTurns).toBe(30);
-        expect(role.tools).toEqual(["Read", "Glob", "Grep", "WebFetch", "WebSearch"]);
+        expect(role.maxTurns).toBe(def.maxTurns);
+        expect(role.tools).toEqual(def.tools.filter((t) => !["Write", "Edit"].includes(t)));
+        expect(role.tools).not.toContain("Write");
         expect(role.hooks.PreToolUse[0].hooks[0].command).toBe("node /tmp/read-only.cjs");
       } else {
         expect(role.isolation).toBe("worktree");
-        expect(role.maxTurns).toBe(40);
+        expect(role.maxTurns).toBe(def.maxTurns);
         expect(role.tools).toEqual(expect.arrayContaining(["Read", "Glob", "Grep", "Bash", "Write", "Edit"]));
       }
     }
@@ -55,12 +56,12 @@ describe("app/support builtin native configuration (not a behavioral benchmark)"
         const role = result.liveDefs[i]!;
         const content = readFileSync(path, "utf8");
         expect(content).toContain(`name = "${role.name}"`);
-        expect(content).toContain('model = "gpt-5.6-terra"');
+        expect(content).toContain(`model = "${role.model}"`);
         expect(content).toContain(`model_reasoning_effort = "${role.effort}"`);
         expect(content).toContain('sandbox_mode = "read-only"');
         expect(content).toContain("[[hooks.PreToolUse.hooks]]");
         expect(content).toContain('command = "node /tmp/read-only.cjs"');
-        expect(content).toContain("30 turn adalah batas instruksional");
+        expect(content).toContain(`${role.maxTurns} turn adalah batas instruksional`);
         expect(content).toContain("TIDAK boleh mendelegasikan");
         expect(result.args).toContain(`agents."${role.name}".config_file=${JSON.stringify(path)}`);
       }

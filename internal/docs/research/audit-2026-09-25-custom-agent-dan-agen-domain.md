@@ -125,7 +125,8 @@ mode tunggal secara diam-diam.
   80), P1-10 telemetry token (baca `message.usage`/`payload.info.total_token_usage`
   nyata, bukan `record.usage` yang selalu kosong), P1-11 kontrak agen ke berkas
   bersama (`agentContractFiles`) + guard anggaran argv untuk semua sesi claude, P1-12
-  `claudeEfforts` mengembalikan `[]` untuk model tanpa effort dikenal (haiku).
+  `claudeSubagentEfforts` mengembalikan `[]` untuk model tanpa effort dikenal (haiku) —
+  hanya untuk definisi subagent; picker UI tetap `claudeEfforts` lama.
 - Sembilan agen domain baru (§3) plus penguatan penandaan "UNTUK PARENT" pada dua
   agen infra.
 - Keputusan model solution-architect (opus/gpt-5.6-sol/high/40) — ditandai spekulatif,
@@ -186,21 +187,21 @@ ulang"):
 Typecheck: `pnpm --filter ./shared typecheck` dan `pnpm --filter ./runner typecheck`
 bersih di seluruh laporan.
 
-**Merah yang sudah ada sebelum task ini dimulai, bukan disebabkan perubahan di sini,
-dan sengaja TIDAK diperbaiki (bukan milik agen manapun dalam scope ini):**
+**Verifikasi independen sesudah integrasi** (`pnpm vitest --run --changed 8cea296c
+--no-file-parallelism`, resep isolasi SPEC-479 + `HANOMAN_TMUX_SOCKET` sendiri; typecheck
+shared/runner/server bersih): **18 gagal / 5885 lulus** pada HEAD `98ebfa2c`.
 
-- `runner/test/builtin-app-agents.test.ts` (2 test) — diverifikasi ulang saat menulis
-  dokumen ini (`pnpm vitest --run runner/test/builtin-app-agents.test.ts
-  --no-file-parallelism`, resep isolasi SPEC-479): **2 gagal**, `expected 80 to be 40`
-  dan `model = "gpt-5.6-terra"` tak ditemukan di config Codex `solution-architect`.
-  Test ini mengunci profil LAMA (maxTurns seragam 40, model Codex seragam
-  `gpt-5.6-terra`) dan menjadi basi begitu P1-9 (feature-builder maxTurns 80) dan
-  keputusan model solution-architect (opus/gpt-5.6-sol) mendarat. Berkas ini milik
-  paket `runner` — di luar scope docs; perlu diperbarui oleh siapa pun yang berikutnya
-  menyentuh `runner/test/`.
-- `server/test/prd-from-audit.route.test.ts` (1 test) — sudah merah di `main` 0.9.4
-  menurut catatan memori proyek (`hanoman-base-merah-prd-audit-launch-admission`),
-  tidak terkait perubahan branch ini.
+- **5 regresi dari branch ini, sudah diperbaiki**: `runner/test/builtin-app-agents.test.ts`
+  (2, mengunci profil lama; kini diturunkan dari `BUILTIN_AGENTS`) dan tiga test web
+  (`start-session-orchestration` ×2, `app-flows` ×1) yang merah karena versi awal P1-12
+  mengubah `claudeEfforts` bersama sehingga picker UI kehilangan effort Haiku. P1-12
+  dipersempit ke helper `claudeSubagentEfforts` khusus definisi `--agents`; picker UI
+  tetap memakai perilaku lama. Set ulang: **55/55 lulus**.
+- **13 sudah merah di base `8cea296c`** (dibuktikan di worktree base sementara, 13 gagal /
+  143 lulus pada 11 berkas yang sama), bukan disebabkan branch ini: `shared` scheduler-state
+  ×2 & scheduler ×2, web start-session-admission ×3, terminal-history-button ×2,
+  terminal-screen ×1, server prd-from-audit ×1, spec-attachment-launch ×1,
+  structured-launch-admission ×1.
 
 **Docs index check**: `pnpm exec tsx cli/src/hanoman.ts docs index --check` → `index
 ok`. Ini bukan gate mekanis yang memblokir commit (guardrail SoT dicabut ADR-0023) dan

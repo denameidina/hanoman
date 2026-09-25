@@ -163,7 +163,7 @@ keputusan 6 tak pernah terpenuhi dan baris itu berhenti menerima perbaikan katal
 selamanya. `BUILTIN_FINGERPRINT_HISTORY` (`server/src/services/builtin-agents.ts`)
 mencatat sidik jari tiap versi katalog aplikasi yang pernah dirilis; baris tanpa
 stempel yang isinya byte-identik dengan salah satu versi historis diadopsi (diberi
-stempel) lalu ikut upgrade normal pada boot berikutnya. `model`/`runtime`/`enabled`
+stempel) lalu langsung ikut upgrade normal pada boot YANG SAMA. `model`/`runtime`/`enabled`
 tetap tidak ikut sidik jari (keputusan 2/gotcha 3 tak berubah), jadi override operator
 yang sudah terjadi lewat registrasi API tetap bertahan. Stempel kini ditulis PER
 ITERASI loop seed, bukan sekali di akhir — galat di tengah loop tak lagi membuang
