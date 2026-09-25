@@ -57,7 +57,7 @@ tercekik oleh sesi/subagent yang lolos gerbang.
 
 ### P5 · Docs & verifikasi
 - [x] ADR-0170, ADR-0171, amandemen 0164/0169, index `internal/docs/README.md`.
-- [ ] Test tersentuh hijau (resep isolasi DB + env), typecheck paket tersentuh.
+- [x] Test tersentuh hijau (resep isolasi DB + env), typecheck paket tersentuh; smoke `GET /scheduler/state` + `POST /terminal/sessions` (409 `host-memory`).
 
 ## Ditunda (keputusan terpisah)
 - Kolom `parentInvocationId`/`depth` di `AgentInvocation` (butuh bukti tautan dari P0).
