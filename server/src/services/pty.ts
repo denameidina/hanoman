@@ -340,6 +340,24 @@ export function noTtyPromptEnv(): Record<string, string> {
   return { SSH_ASKPASS: path, SSH_ASKPASS_REQUIRE: "force", GIT_TERMINAL_PROMPT: "0" };
 }
 
+/**
+ * ADR-0170 · subagent FOREGROUND untuk sesi ber-fase claude. Di sesi interaktif claude menjalankan
+ * setiap `Agent` di latar (ADR-0164 T1): giliran pemanggil berakhir selagi subagent bekerja, dan
+ * agen fase bisa melapor sebelum subagent-nya sendiri selesai. Terukur 2026-09-25 (claude 2.1.282,
+ * parent → 2 anak paralel): env ini saja membuat SEMUA lapis `requestShape: foreground`, anak tetap
+ * paralel, Stop tak menembak di tengah fase, dan Bash latar tetap jalan. Hook PreToolUse
+ * `updatedInput.run_in_background=false` terukur TANPA efek, jadi tak dipasang.
+ * Batas konkurensi: default claude 20 subagent per sesi — terlalu banyak untuk mesin 8 GB.
+ */
+export const SUBAGENT_CONCURRENCY_CAP = 3;
+export function phaseSessionAgentEnv(agent: Agent, phaseFile?: string): Record<string, string> {
+  if (agent !== "claude" || !phaseFile) return {};
+  return {
+    CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1",
+    CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS: String(SUBAGENT_CONCURRENCY_CAP),
+  };
+}
+
 // SPEC-402 · "tmux gagal" BUKAN "tak ada sesi". Hanya dua sinyal di bawah yang benar-benar berarti
 // belum/tak ada tmux server di socket ini; sisanya (fork gagal saat mesin penuh proses, socket knob
 // salah, server kedip) adalah keadaan TAK DIKETAHUI. Membacanya sebagai daftar kosong sama dengan
@@ -975,6 +993,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   if (opts.phaseFile) {
     mkdirSync(dirname(opts.phaseFile), { recursive: true });
     envPairs.push(`HANOMAN_PHASE_FILE=${sq(opts.phaseFile)}`);
+  }
+  if (!opts.command) {
+    for (const [k, v] of Object.entries(phaseSessionAgentEnv(agent, opts.phaseFile))) envPairs.push(`${k}=${sq(v)}`);
   }
   if (opts.attachmentsDir) envPairs.push(`HANOMAN_ATTACHMENTS_DIR=${sq(opts.attachmentsDir)}`);
   // Env tambahan dari pemanggil lewat jalur yang sama.
