@@ -4,15 +4,15 @@ import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
   renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook, withPhaseDelegation,
-  writeSubagentStatusline, type AgentDef, type Flow, type Agent,
+  writeSubagentStatusline, agentContractOf, type AgentContractFile, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import {
-  coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
+  BUILTIN_AGENTS, coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
 } from "@hanoman/shared";
 import {
   enrichPhases, readPhases, readPhasesAsync, sessionComplete, sessionCompleteAsync, trackDoneSeen, type Phase, type PhaseInvocation,
@@ -28,7 +28,7 @@ import { controlHost, loadIngressPolicy } from "./ingress-policy";
 import { sessionEventToken } from "./session-event-token";
 import { sandboxCommand } from "./session-sandbox";
 import { sessionEventDir } from "./session-event-spool";
-import { agentDefinitionHash } from "@hanoman/runner";
+import { agentDefinitionHash, resolveDbUrl } from "@hanoman/runner";
 export { sessionEventDir } from "./session-event-spool";
 
 // Sesi hidup di dalam tmux server, bukan di proses API (ADR-0016). Restart `pnpm dev`
@@ -297,6 +297,33 @@ export const phaseContextFilePath = (id: string): string => `${agentTempDir(id)}
 // all-or-nothing tak pernah melihatnya. Ambang ini menyisakan ruang di bawah batas itu; JSON agen
 // fase yang tetap melewatinya diperlakukan sebagai kegagalan materialisasi (fallback mode tunggal).
 export const AGENTS_ARG_SAFE_BYTES = 100 * 1024;
+// Audit custom agent P1-11 · kontrak bersama custom agent (policy + serah-terima + gaya kode) per
+// policy, ditulis SEKALI dan dirujuk path-nya dari tiap prompt — alasan & mount sama dengan
+// `phaseContextFilePath`. Nama berkas memuat policy karena isinya berbeda per policy.
+export const agentContractFilePath = (id: string, policy: AgentContractFile["policy"]): string =>
+  `${agentTempDir(id)}/agent-contract-${policy}.md`;
+
+/**
+ * Audit P1-11 · anggaran argv untuk custom agent. `render` merakit JSON `--agents` dari subset
+ * custom agent; bila melewati `limit`, agen dibuang satu per satu — OPT-IN (bukan `enabledByDefault`
+ * katalog bawaan, termasuk agen buatan operator) paling akhir lebih dulu, baru agen default paling
+ * akhir. Murni: pemanggil yang mencatat peringatan untuk `dropped`.
+ */
+export function fitCustomAgentsToArgBudget(
+  customDefs: AgentDef[], render: (defs: AgentDef[]) => string, limit: number = AGENTS_ARG_SAFE_BYTES,
+): { kept: AgentDef[]; dropped: AgentDef[]; json: string } {
+  const byDefault = new Set(BUILTIN_AGENTS.filter((a) => a.enabledByDefault).map((a) => a.name));
+  const kept = [...customDefs];
+  const dropped: AgentDef[] = [];
+  let json = render(kept);
+  while (Buffer.byteLength(json) > limit && kept.length > 0) {
+    let at = kept.length - 1;
+    for (let i = kept.length - 1; i >= 0; i--) if (!byDefault.has(kept[i]!.name)) { at = i; break; }
+    dropped.push(...kept.splice(at, 1));
+    json = render(kept);
+  }
+  return { kept, dropped, json };
+}
 
 // SPEC-862 · skrip askpass milik hanoman. Sekamar dengan berkas prompt (SPEC-223) dan sengaja
 // TIDAK ber-id sesi: isinya sama untuk semua sesi dan tak memuat apa pun yang khas satu sesi.
@@ -338,6 +365,23 @@ export function noTtyPromptEnv(): Record<string, string> {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   writeFileSync(path, ASKPASS_DENY, { mode: 0o700 });
   return { SSH_ASKPASS: path, SSH_ASKPASS_REQUIRE: "force", GIT_TERMINAL_PROMPT: "0" };
+}
+
+/**
+ * Audit custom agent 2026-09-25 · P0-5 · `db.ts` menulis URL DB operasional hanoman ke
+ * `process.env.DATABASE_URL`, dan pane sesi mewarisinya dari tmux server (yang lahir dengan env
+ * server ini). Di dalam pane nilai itu bukan konfigurasi siapa pun: test hanoman di worktree
+ * (DATABASE_URL ambient mengalahkan HANOMAN_HOME) dan `migrate`/`db push` project lain lalu menulis
+ * DB operasional. Dilepas (`env -u`) HANYA bila nilainya memang DB hanoman menurut `resolveDbUrl`
+ * — DATABASE_URL milik project lain dibiarkan, dan `opts.env` pemanggil tetap menang.
+ */
+export function hanomanDbInheritUnsets(env: NodeJS.ProcessEnv = process.env): string[] {
+  const raw = env.DATABASE_URL?.trim();
+  if (!raw?.startsWith("file:")) return [];
+  let own: string;
+  try { own = resolveDbUrl(env, process.cwd()); } catch { return []; }
+  const file = (u: string) => resolvePath(u.slice("file:".length));
+  return file(raw) === file(own) ? ["DATABASE_URL"] : [];
 }
 
 /**
@@ -841,7 +885,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
       // ADR-0170 P2 · klausa delegasi agen fase disusun DI SINI: roster custom agent yang benar-benar
       // hidup di sesi ini baru pasti sesudah `selectCustomDefs`, dan ikut terpilih ulang saat fallback.
       const phaseDefs = withPhaseDelegation(requested, customDefs, agentForDefs);
-      const defs = [...phaseDefs, ...customDefs];
+      let defs = [...phaseDefs, ...customDefs];
       if (defs.length === 0) return [];
       const readOnlyHook = readOnlyHookFor();
       if (agentForDefs === "claude") {
@@ -857,15 +901,36 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
             chmodSync(path, 0o600);
             phaseContextFile = { context: shared, path };
           }
-          const json = renderAgentsJson(defs, {
-            readOnlyHookCommand: readOnlyHook?.command, ...(phaseContextFile ? { phaseContextFile } : {}),
-          });
-          const bytes = Buffer.byteLength(json);
+          // Audit P1-11 · kontrak bersama custom agent SEKALI per policy ke berkas, dirujuk path-nya.
+          const agentContractFiles: AgentContractFile[] = [];
+          for (const policy of new Set(customDefs.map((d) => d.workspacePolicy ?? "inherit"))) {
+            const path = agentContractFilePath(id, policy);
+            const content = agentContractOf(policy);
+            writeFileSync(path, content, { mode: 0o600 });
+            chmodSync(path, 0o600);
+            agentContractFiles.push({ policy, content, path });
+          }
+          // Audit P1-11 · ambang yang sama untuk sesi DENGAN maupun TANPA agen fase: custom agent
+          // opt-in dibuang lebih dulu (klausa delegasi fase dirakit ulang dari roster yang tersisa).
+          // Agen fase sendiri tak pernah dibuang — bila ia saja sudah melewati ambang, all-or-nothing.
+          const fit = fitCustomAgentsToArgBudget(customDefs, (kept) => renderAgentsJson(
+            [...withPhaseDelegation(requested, kept, agentForDefs), ...kept], {
+              readOnlyHookCommand: readOnlyHook?.command, agentContractFiles,
+              ...(phaseContextFile ? { phaseContextFile } : {}),
+            }));
+          const bytes = Buffer.byteLength(fit.json);
           if (phaseDefs.length > 0 && bytes > AGENTS_ARG_SAFE_BYTES) {
             return [`argumen --agents ${bytes} B melewati ambang aman ${AGENTS_ARG_SAFE_BYTES} B `
               + "(batas satu argumen exec Linux 128 KiB)"];
           }
-          writeFileSync(file, json, { mode: 0o600 });
+          for (const def of fit.dropped) {
+            process.stderr.write(`hanoman: custom agent ${def.name} dibuang dari sesi ${id} — argumen --agents `
+              + `melewati ambang aman ${AGENTS_ARG_SAFE_BYTES} B (agen opt-in paling akhir dibuang lebih dulu)\n`);
+          }
+          customDefs = fit.kept;
+          defs = [...withPhaseDelegation(requested, customDefs, agentForDefs), ...customDefs];
+          if (defs.length === 0) return [];
+          writeFileSync(file, fit.json, { mode: 0o600 });
         } catch (error) {
           if (phaseDefs.length === 0) throw error;
           return [error instanceof Error ? error.message : String(error)];
@@ -1005,7 +1070,8 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   for (const [k, v] of Object.entries(opts.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
   // Kredensial warisan yang dikosongkan operator: `claude` mewarisi env dari tmux server (lahir
   // dengan env server ini), jadi hanya `env -u` yang benar-benar melepasnya dari sesi baru.
-  const unsets = opts.command ? [] : suppressedInheritKeys().flatMap((k) => ["-u", k]);
+  const unsets = opts.command ? []
+    : [...suppressedInheritKeys(), ...hanomanDbInheritUnsets()].flatMap((k) => ["-u", k]);
   let cmd = unsets.length ? ["env", ...unsets, ...envPairs, argv].join(" ")
     : envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
   if (!opts.command) {

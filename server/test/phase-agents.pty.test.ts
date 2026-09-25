@@ -6,8 +6,9 @@ import { join } from "node:path";
 import {
   createSession, getSession, killSession, registerCustomAgentSource, registerCodexNativeAgentSupport,
   agentsFilePath, promptFilePath, agentTempDir, trackPhaseDoneSeen, _forgetPhaseDoneSeen, AGENTS_ARG_SAFE_BYTES,
+  agentContractFilePath, fitCustomAgentsToArgBudget,
 } from "../src/services/pty";
-import { renderAgentsJson, type AgentDef } from "@hanoman/runner";
+import { agentContractOf, renderAgentsJson, type AgentDef } from "@hanoman/runner";
 
 // ADR-0164 · kontrak orchestrator di titik cekik kelahiran sesi. Bukti dibaca dari berkas sesi dan
 // layar pane ber-binary /bin/echo — bukan dari bentuk respons (pelajaran `sessionModel()`).
@@ -19,6 +20,10 @@ const phaseAgents: AgentDef[] = [
     instructions: "INSTRUKSI PLAN", tools: null, model: "claude-opus-5", effort: "high", mentions: [] },
 ];
 const scout: AgentDef = { name: "scout", description: "cari", instructions: "kamu pencari", tools: null, model: null, mentions: [] };
+/** Audit P1-11 · render yang diharapkan: custom agent `inherit` merujuk berkas kontrak sesi itu. */
+const renderedWithContract = (id: string, defs: AgentDef[]): string => renderAgentsJson(defs, {
+  agentContractFiles: [{ policy: "inherit", content: agentContractOf("inherit"), path: agentContractFilePath(id, "inherit") }],
+});
 
 let cwd: string;
 const ids: string[] = [];
@@ -101,7 +106,7 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     writeSpy.mockRestore();
     expect(getSession(s.id)!.orchestrated).toBe(false);
     expect(readFileSync(promptFilePath(s.id), "utf8").startsWith("PROMPT LAMA")).toBe(true);
-    expect(readFileSync(agentsFilePath(s.id), "utf8")).toBe(renderAgentsJson([scout]));
+    expect(readFileSync(agentsFilePath(s.id), "utf8")).toBe(renderedWithContract(s.id, [scout]));
     expect(stderrOut).toContain("gagal dimaterialisasi");
     expect(stderrOut).toContain("ambang aman");
   });
@@ -117,7 +122,39 @@ describe("createSession · orchestrator (ADR-0164)", () => {
   it("sesi tanpa agen fase: berkas --agents byte-identik dengan renderer custom agent", () => {
     registerCustomAgentSource(() => [scout]);
     const s = createSession("p1", cwd, { id: born("orch-none"), agent: "claude", prompt: "P" });
-    expect(readFileSync(agentsFilePath(s.id), "utf8")).toBe(renderAgentsJson([scout]));
+    expect(readFileSync(agentsFilePath(s.id), "utf8")).toBe(renderedWithContract(s.id, [scout]));
+  });
+
+  // Audit P1-11 · kontrak bersama custom agent ditulis SEKALI per policy (0600) dan dirujuk path-nya.
+  it("claude: kontrak bersama custom agent per policy ditulis sekali ke temp dir sesi", () => {
+    const rev: AgentDef = { ...scout, name: "rev", workspacePolicy: "read-only" };
+    registerCustomAgentSource(() => [scout, rev]);
+    const s = createSession("p1", cwd, { id: born("orch-contract"), agent: "claude", prompt: "P" });
+    for (const policy of ["inherit", "read-only"] as const) {
+      const file = agentContractFilePath(s.id, policy);
+      expect(readFileSync(file, "utf8")).toBe(agentContractOf(policy));
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+    }
+    expect(existsSync(agentContractFilePath(s.id, "isolated-worktree"))).toBe(false);
+    const j = JSON.parse(readFileSync(agentsFilePath(s.id), "utf8"));
+    expect(j.rev.prompt).toContain(`\`${agentContractFilePath(s.id, "read-only")}\``);
+    expect(j.scout.prompt).not.toContain("Gaya kode —");
+  });
+
+  // Audit P1-11 · sesi TANPA agen fase dulu tak berambang: JSON melewati 128 KiB mati E2BIG di Linux.
+  it("claude tanpa agen fase: melewati ambang → agen opt-in paling akhir dibuang + peringatan", () => {
+    const big = (name: string): AgentDef => ({ ...scout, name, instructions: "Y".repeat(40 * 1024) });
+    registerCustomAgentSource(() => [big("opt-a"), big("opt-b"), big("opt-c")]);
+    const writeSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const s = createSession("p1", cwd, { id: born("orch-budget"), agent: "claude", prompt: "P" });
+    const stderrOut = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    writeSpy.mockRestore();
+    const raw = readFileSync(agentsFilePath(s.id), "utf8");
+    expect(Buffer.byteLength(raw)).toBeLessThanOrEqual(AGENTS_ARG_SAFE_BYTES);
+    expect(Object.keys(JSON.parse(raw))).toEqual(["opt-a", "opt-b"]);
+    expect(stderrOut).toContain("custom agent opt-c dibuang");
+    expect(stderrOut).toContain("ambang aman");
+    expect(getSession(s.id)!.agentRoster!.map((r) => r.name)).not.toContain("opt-c");
   });
 
   it("codex < 0.151: seluruh rencana dibatalkan, prompt lama, tanpa penanda orkestrasi", () => {
@@ -297,5 +334,27 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     expect(await screenOf(s.id)).not.toContain("subagentStatusLine");
     expect(stderrOut).toContain("subagentStatusline");
     expect(stderrOut).toContain(id);
+  });
+});
+
+// Audit P1-11 · urutan degradasi: opt-in (bukan enabledByDefault katalog bawaan) paling akhir dulu.
+describe("fitCustomAgentsToArgBudget", () => {
+  const agent = (name: string): AgentDef => ({ name, description: "d", instructions: "i", tools: null, model: null, mentions: [] });
+  const size = (defs: AgentDef[]) => "x".repeat(defs.length * 10);
+
+  it("muat → tak ada yang dibuang, JSON dari render apa adanya", () => {
+    const defs = [agent("a"), agent("b")];
+    expect(fitCustomAgentsToArgBudget(defs, size, 20)).toEqual({ kept: defs, dropped: [], json: "x".repeat(20) });
+  });
+
+  it("opt-in paling akhir dibuang lebih dulu; agen default bawaan dibuang terakhir", () => {
+    // scout & security-reviewer: enabledByDefault di katalog bawaan; qa-verifier bawaan tapi opt-in.
+    const defs = [agent("scout"), agent("qa-verifier"), agent("security-reviewer"), agent("opt-2")];
+    const two = fitCustomAgentsToArgBudget(defs, size, 20);
+    expect(two.kept.map((d) => d.name)).toEqual(["scout", "security-reviewer"]);
+    expect(two.dropped.map((d) => d.name)).toEqual(["opt-2", "qa-verifier"]);
+    const one = fitCustomAgentsToArgBudget(defs, size, 10);
+    expect(one.kept.map((d) => d.name)).toEqual(["scout"]);
+    expect(one.dropped.map((d) => d.name)).toEqual(["opt-2", "qa-verifier", "security-reviewer"]);
   });
 });

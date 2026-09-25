@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  renderAgentsJson, agentPromptOf, agentDelegationClause, phasePromptOf, type AgentDef,
+  renderAgentsJson, agentPromptOf, agentDelegationClause, phasePromptOf, agentContractOf,
+  READ_ONLY_DENIED_COMMANDS, READ_ONLY_DENIED_OPERATORS, type AgentContractFile, type AgentDef,
 } from "../src/custom-agents";
+import { READ_ONLY_POLICY, readOnlyDecision } from "../src/agent-readonly";
 import { DEFAULT_AGENT_TOOLS, MENTION_MAX_HOPS } from "@hanoman/shared";
 
 const def = (o: Partial<AgentDef> & { name: string }): AgentDef => ({
@@ -95,6 +97,30 @@ describe("agentPromptOf — lapis 3 anti-loop", () => {
     expect(p).toContain(String(MENTION_MAX_HOPS));
   });
 
+  // Amandemen ADR-0094 (2026-09-25) · mention ke agen read-only = pasangan review.
+  it("mention ke agen read-only menambah klausa review ber-SHA literal", () => {
+    const eng = def({ name: "eng", mentions: ["rev"], workspacePolicy: "isolated-worktree" });
+    const rev = def({ name: "rev", workspacePolicy: "read-only" });
+    const p = agentPromptOf(eng, [eng, rev]);
+    expect(p).toContain("@rev");
+    expect(p).toContain("Sebelum melapor `Status: selesai`");
+    expect(p).toContain("git diff --no-ext-diff --no-textconv <base> <hasil>");
+  });
+
+  it("mention ke agen penulis tidak memicu klausa review", () => {
+    const a = def({ name: "a", mentions: ["b"], workspacePolicy: "isolated-worktree" });
+    const p = agentPromptOf(a, [a, def({ name: "b", workspacePolicy: "isolated-worktree" })]);
+    expect(p).toContain("@b");
+    expect(p).not.toContain("Sebelum melapor `Status: selesai`");
+  });
+
+  it("auditor yang dibuang dari roster (mis. anggaran argv) tak disebut sebagai reviewer", () => {
+    const eng = def({ name: "eng", mentions: ["rev"], workspacePolicy: "isolated-worktree" });
+    const p = agentPromptOf(eng, [eng]);
+    expect(p).not.toContain("@rev");
+    expect(p.toLowerCase()).toContain("tidak boleh mendelegasikan");
+  });
+
   it("mention ke agen yang tak ada di roster tak ikut disebut", () => {
     const a = def({ name: "a", mentions: ["b", "hantu"] });
     const p = agentPromptOf(a, [a, def({ name: "b" })]);
@@ -109,6 +135,7 @@ describe("agentPromptOf — lapis 3 anti-loop", () => {
     expect(p).toContain("Policy efektif: read-only");
     expect(p).toContain("diagnosis statis");
     expect(p).toContain("rencana eksperimen untuk parent");
+    expect(p).toContain("`terbukti-statis`/`belum-terbukti`/`gugur`");
     expect(p).toContain("Jangan mengklaim eksperimen telah dijalankan tanpa output");
   });
 
@@ -119,6 +146,34 @@ describe("agentPromptOf — lapis 3 anti-loop", () => {
     expect(p).toContain("Policy efektif: isolated-worktree");
     expect(p).toContain("boleh mereproduksi");
     expect(p).toContain("worktree terisolasi");
+  });
+
+  // Audit P0-2 · worktree isolasi lahir dari COMMIT: dirty parent tak ikut, hasil tak kembali sendiri.
+  it("isolated-worktree: langkah 0 cocokkan kandidat SHA, serah balik SHA hasil untuk cherry-pick", () => {
+    const p = agentPromptOf(def({ name: "builder", workspacePolicy: "isolated-worktree" }), []);
+    expect(p).toContain("lahir dari sebuah COMMIT");
+    expect(p).toContain("`git rev-parse HEAD`");
+    expect(p).toContain("`Kandidat SHA`");
+    expect(p).toContain("`git checkout --detach <kandidat>`");
+    expect(p).toContain("`Status: terhalang` dan berhenti");
+    expect(p).toContain("`SHA dasar`, `SHA hasil`");
+    expect(p).toContain("`git cherry-pick`");
+    expect(p).toContain("`git add <path>` eksplisit");
+  });
+
+  // Audit P0-5 · pertahanan kedua: env pane bisa mewarisi DATABASE_URL operasional.
+  it("isolated-worktree: larang migrate/test terhadap DATABASE_URL ~/.hanoman", () => {
+    const p = agentPromptOf(def({ name: "builder", workspacePolicy: "isolated-worktree" }), []);
+    expect(p).toContain("`DATABASE_URL` yang menunjuk `~/.hanoman`");
+    expect(p).toContain("DB sekali-pakai");
+    expect(agentPromptOf(def({ name: "rev", workspacePolicy: "read-only" }), [])).not.toContain("DATABASE_URL");
+  });
+
+  it("serah-terima menuntut base & kandidat SHA sebagai NILAI, bukan nama variabel", () => {
+    const p = agentPromptOf(def({ name: "scout" }), []);
+    expect(p).toContain("base SHA dan kandidat SHA sebagai NILAI heksadesimal");
+    expect(p).toContain("(bukan nama variabel)");
+    expect(p).not.toContain("dirty changes");
   });
 
   it("membawa kontrak handoff, batas laporan, dan batas turn instruksional", () => {
@@ -194,9 +249,12 @@ describe("agentDelegationClause", () => {
     const out = agentDelegationClause([def("scout", "cari kode")]);
     expect(out).toContain("relevan");
     expect(out).toContain("base SHA");
-    expect(out).toContain("dirty changes");
+    expect(out).toContain("kandidat SHA sebagai nilai literal");
+    expect(out).not.toContain("dirty changes");
     expect(out).toContain("bukti sebelumnya");
-    expect(out).toContain("kandidat");
+    // Audit P0-2 · agen isolated-worktree hanya melihat COMMIT; hasilnya kembali lewat SHA.
+    expect(out).toContain("commit kandidat dulu");
+    expect(out).toContain("`git cherry-pick <sha>`");
     expect(out).toContain("aturan verifikasi");
     expect(out).toContain("Task");
   });
@@ -268,5 +326,131 @@ describe("renderAgentsJson · agen fase (ADR-0164)", () => {
     expect(agentDelegationClause([phaseDef])).toBe("");
     expect(agentDelegationClause([phaseDef], "codex")).toBe("");
     expect(agentDelegationClause([phaseDef, def({ name: "scout" })])).toBe(agentDelegationClause([def({ name: "scout" })]));
+  });
+});
+
+// Audit custom agent P1-1 · prosa allowlist read-only diturunkan dari `READ_ONLY_POLICY` dan contohnya
+// diikat ke validator: yang disebut diterima benar-benar lolos, yang disebut ditolak benar-benar ditolak.
+describe("P1-1 · prosa read-only terikat ke readOnlyDecision", () => {
+  const prose = agentPromptOf(def({ name: "rev", workspacePolicy: "read-only" }), []);
+  const bash = (command: string) => readOnlyDecision({ tool_name: "Bash", tool_input: { command } }, {});
+  const SHA = "0123456789abcdef0123456789abcdef01234567";
+
+  it("setiap perintah shell allowlist disebut prosa dan contohnya lolos", () => {
+    const allowed = [
+      "rg -n customAgent server/src", "sed -n '1,80p' README.md", "head -n 20 README.md", "tail README.md",
+      "wc -l README.md", "ls server/src", "git status", "git status --porcelain",
+      `git diff --no-ext-diff --no-textconv ${SHA}`, `git show --no-ext-diff --no-textconv ${SHA}`,
+      "git log --no-ext-diff --no-textconv -5",
+    ];
+    for (const c of READ_ONLY_POLICY.shellCommands) {
+      expect(prose).toContain("`" + c + "`");
+      expect(allowed.some((a) => a.split(" ")[0] === c), c).toBe(true);
+    }
+    for (const g of READ_ONLY_POLICY.gitCommands) expect(prose).toMatch(new RegExp(`git [a-z|]*\\b${g}\\b`));
+    for (const a of allowed) expect(bash(a), a).toEqual({ allowed: true });
+  });
+
+  it("contoh berplaceholder di prosa lolos sesudah diisi nilai literal", () => {
+    const section = prose.slice(prose.indexOf("Bash hanya menerima"), prose.indexOf("SHA wajib literal"));
+    // `git diff|show|log` adalah ringkasan tiga subperintah, bukan perintah yang bisa dijalankan.
+    const examples = [...section.matchAll(/`((?:sed|git) [^`]*)`/g)].map((m) => m[1]!)
+      .filter((c) => !c.includes("|"));
+    expect(examples).toEqual([
+      "sed -n 'A,Bp' <berkas>", "git status", "git diff --no-ext-diff --no-textconv <baseSha>",
+      "git status --porcelain",
+    ]);
+    for (const c of examples) {
+      const filled = c.replace("A,B", "1,80").replace("<berkas>", "README.md").replace("<baseSha>", SHA);
+      expect(bash(filled), filled).toEqual({ allowed: true });
+    }
+  });
+
+  it("operator yang disebut ditolak memang ditolak — juga di dalam kutip", () => {
+    for (const op of READ_ONLY_DENIED_OPERATORS) {
+      expect(prose).toContain(op === "`" ? "backtick" : "`" + op + "`");
+      for (const cmd of [`rg x . ${op} ls`, `rg 'x${op}y' .`, `rg "x${op}y" .`]) {
+        expect(bash(cmd).allowed, cmd).toBe(false);
+      }
+    }
+    expect(prose).toContain("juga di dalam kutip");
+    expect(bash("rg 'a|b' .").allowed).toBe(false);
+    expect(prose).toContain("alternasi `a|b`");
+  });
+
+  it("perintah yang disebut ditolak memang ditolak", () => {
+    for (const c of READ_ONLY_DENIED_COMMANDS) {
+      const word = c.startsWith("git ") ? c.slice(4) : c;
+      expect(prose).toContain(word);
+      const cmd = c.startsWith("git ") ? `${c} --no-ext-diff --no-textconv HEAD` : `${c} README.md`;
+      expect(bash(cmd).allowed, cmd).toBe(false);
+    }
+    expect(prose).toContain("git blame/grep/rev-parse/merge-base");
+  });
+
+  it("git diff/show/log tanpa kedua flag, atau SHA lewat variabel, ditolak", () => {
+    expect(prose).toContain("WAJIB membawa `--no-ext-diff --no-textconv`");
+    expect(bash(`git diff ${SHA}`).allowed).toBe(false);
+    expect(bash(`git diff --no-ext-diff ${SHA}`).allowed).toBe(false);
+    expect(prose).toContain("SHA wajib literal heksadesimal");
+    expect(bash("git diff --no-ext-diff --no-textconv $HANOMAN_BASE_SHA").allowed).toBe(false);
+  });
+});
+
+// Audit custom agent P1-11 · kontrak bersama (policy + serah-terima + gaya kode) ditulis SEKALI per
+// policy dan dirujuk path-nya — pola `phaseContextFile`. Tanpa berkas: inline, byte-identik.
+describe("P1-11 · berkas kontrak bersama custom agent", () => {
+  const MARK = "Gaya kode —";
+  const files = (["read-only", "isolated-worktree", "inherit"] as const).map((policy): AgentContractFile => ({
+    policy, content: agentContractOf(policy), path: `/tmp/hanoman-agents/s1/agent-contract-${policy}.md`,
+  }));
+
+  it("isi kontrak per policy memuat policy generik, serah-terima, dan gaya kode", () => {
+    const iso = agentContractOf("isolated-worktree");
+    expect(iso).toContain("Policy efektif: isolated-worktree");
+    expect(iso).toContain("`git cherry-pick`");
+    expect(iso).toContain("Kontrak serah-terima:");
+    expect(iso).toContain(MARK);
+    expect(agentContractOf("read-only")).toContain("Bash hanya menerima:");
+    expect(agentContractOf("inherit")).not.toContain("isolated-worktree");
+  });
+
+  it("prompt merujuk berkas policy-nya, tanpa menyalin kontrak; Status tetap inline", () => {
+    const j = JSON.parse(renderAgentsJson([
+      def({ name: "rev", workspacePolicy: "read-only" }),
+      def({ name: "wt", workspacePolicy: "isolated-worktree" }),
+      def({ name: "inh" }),
+    ], { agentContractFiles: files }));
+    for (const [name, policy] of [["rev", "read-only"], ["wt", "isolated-worktree"], ["inh", "inherit"]] as const) {
+      const p = j[name].prompt as string;
+      expect(p).toContain(`\`/tmp/hanoman-agents/s1/agent-contract-${policy}.md\``);
+      expect(p).toContain(`Policy efektif: ${policy}.`);
+      expect(p).toMatch(/Baca berkas itu UTUH/);
+      expect(p).toContain("Status: selesai | sebagian | terhalang | menunggu-keputusan");
+      expect(p).not.toContain(MARK);
+      expect(p).not.toContain("Kontrak serah-terima:");
+    }
+    const full = JSON.parse(renderAgentsJson([def({ name: "wt", workspacePolicy: "isolated-worktree" })]));
+    expect(j.wt.prompt.length).toBeLessThan(full.wt.prompt.length);
+  });
+
+  it("baris khas agen (root-causer) dan batas kerja tetap inline", () => {
+    const j = JSON.parse(renderAgentsJson([def({
+      name: "root-causer", workspacePolicy: "read-only", maxTurns: 30,
+    })], { agentContractFiles: files }));
+    expect(j["root-causer"].prompt).toContain("`terbukti-statis`/`belum-terbukti`/`gugur`");
+    expect(j["root-causer"].prompt).toContain("30 turn");
+  });
+
+  it("tanpa berkas, isi berbeda, atau agen tanpa Read → kontrak inline apa adanya", () => {
+    const d = def({ name: "wt", workspacePolicy: "isolated-worktree" });
+    const inline = JSON.parse(renderAgentsJson([d])).wt.prompt;
+    expect(inline).toBe(agentPromptOf(d, [d]));
+    expect(inline).toContain(MARK);
+    const stale = files.map((f) => ({ ...f, content: f.content + "basi" }));
+    expect(JSON.parse(renderAgentsJson([d], { agentContractFiles: stale })).wt.prompt).toBe(inline);
+    const noRead = def({ name: "nr", tools: ["Bash"] });
+    expect(JSON.parse(renderAgentsJson([noRead], { agentContractFiles: files })).nr.prompt)
+      .toBe(agentPromptOf(noRead, [noRead]));
   });
 });

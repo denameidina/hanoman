@@ -145,6 +145,67 @@ katalog kosong" tetap utuh. Agent yang dimatikan tetap tidak didaftarkan.
 8. **`HANOMAN_CONTROL_ORIGINS` di shell menjawab 404 untuk route di belakang cookie.** Suite route
    yang merah ramai dengan `{"error":"not found"}` hampir selalu ini, bukan regresi.
 
+## Amandemen 2026-09-25 (audit custom agent + agen domain)
+
+**Katalog diperluas dari 16 menjadi 25** dengan `shared/src/builtin-domain-agents.ts`
+(a11y-auditor, frontend-render-auditor, api-contract-auditor, concurrency-hazard-hunter,
+schema-migration-auditor, layering-guard, cloudflare-config-auditor,
+vps-hardening-auditor, maintainability-reviewer), spread sesudah `...BUILTIN_APP_AGENTS`
+di `BUILTIN_AGENTS`. Sembilan nama baru ikut dikunci immutable (keputusan 2, gotcha 4).
+Semua opt-in, `read-only`, `activation: "smart"` — nol tambahan pada tiga default aktif.
+Rincian per agen, alasan dedup dari 16 usulan riset, dan katalog lengkap ada di
+[audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md) §3.
+
+**Jalur adopsi baris tanpa stempel ditambahkan** ke gotcha 6 (upgrade dua-syarat).
+Delapan baris agen aplikasi yang didaftarkan lewat API pada 2026-09-05 — sebelum seed
+mengenalnya — tak pernah menerima stempel awal, sehingga syarat "belum disunting" pada
+keputusan 6 tak pernah terpenuhi dan baris itu berhenti menerima perbaikan katalog
+selamanya. `BUILTIN_FINGERPRINT_HISTORY` (`server/src/services/builtin-agents.ts`)
+mencatat sidik jari tiap versi katalog aplikasi yang pernah dirilis; baris tanpa
+stempel yang isinya byte-identik dengan salah satu versi historis diadopsi (diberi
+stempel) lalu langsung ikut upgrade normal pada boot YANG SAMA. `model`/`runtime`/`enabled`
+tetap tidak ikut sidik jari (keputusan 2/gotcha 3 tak berubah), jadi override operator
+yang sudah terjadi lewat registrasi API tetap bertahan. Stempel kini ditulis PER
+ITERASI loop seed, bukan sekali di akhir — galat di tengah loop tak lagi membuang
+stempel agen yang sudah diproses sebelumnya.
+
+Verifikasi: 8/8 baris aplikasi di satu instance live cocok byte-identik dengan versi
+katalog `0b90ab3c`/`ff98a8f6` (query `sqlite3 -readonly`), jadi kedelapannya teradopsi
+pada boot berikutnya. Test menambah: fixture mengunci tiap hash historis, baris
+historis ter-upgrade, baris yang memang sudah disunting operator tak tersentuh, dan
+galat di agen belakang tak membuang stempel agen depan.
+
+## Amandemen 2026-09-25 (koreksi: agen pengerja domain)
+
+Amandemen di atas keliru: sembilan agen domain yang ditambahkan **semuanya read-only**,
+padahal permintaan manusia yang memicunya adalah agen yang **mengerjakan** domain
+(design, frontend, backend, database, arsitektur, infra Cloudflare, infra VPS) — bukan
+mengauditnya. Belum satu pun dari sembilan baris itu pernah di-seed ke instance mana
+pun, jadi koreksinya aman tanpa migrasi/tombstone (gotcha 4 soal `name` immutable tidak
+berlaku di sini — baris ini tidak pernah ada di DB manapun).
+
+Koreksi: **cabut** `frontend-render-auditor`, `concurrency-hazard-hunter`,
+`layering-guard`, `vps-hardening-auditor`, `maintainability-reviewer` dari katalog.
+**Pertahankan** `a11y-auditor`, `api-contract-auditor`, `schema-migration-auditor`,
+`cloudflare-config-auditor` sebagai pasangan review read-only. **Tambah** lima agen
+pengerja `isolated-worktree` (Claude saja): `frontend-engineer`, `backend-engineer`,
+`database-engineer`, `cloudflare-engineer`, `vps-engineer`. **Tidak** menambah agen
+design baru — `product-designer` (`shared/src/builtin-app-agents.ts`, sudah ada sejak
+2026-09-05) dipertajam jadi eksplisit pengerja UI/design system dengan bukti render,
+`maxTurns` naik 40→60; `solution-architect` tetap satu-satunya peran keputusan
+arsitektur. Katalog tetap **25 peran** (lima cabut + lima tambah pada
+`builtin-domain-agents.ts`, `product-designer` diperbarui di tempat).
+
+`cloudflare-engineer` dan `vps-engineer` berwenang **penuh** mengubah produksi dalam
+scope tugas tanpa gerbang izin tambahan (keputusan manusia eksplisit, beda dari
+`operations-engineer`) — disiplinnya prosedur operasi (titik rollback, validasi statis
+sebelum menerapkan, verifikasi kesehatan, rollback bila gagal), bukan gerbang
+persetujuan. Nama sembilan baris lama TIDAK didaur ulang untuk entitas baru (gotcha 4
+tetap berlaku ke depan): lima yang dicabut hilang dari katalog, bukan diganti nama.
+
+Rincian lengkap, tabel agen final, dan catatan kredensial/lingkungan ter-hardening ada
+di [audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md) §7.
+
 ## Alternatif yang ditolak
 
 - **Konstanta runtime + lapis override keempat (builtin < global < project).** Nol baris DB, nol

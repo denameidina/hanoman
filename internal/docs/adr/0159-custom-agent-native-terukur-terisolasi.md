@@ -244,6 +244,73 @@ tetapi **FAIL** karena prosa + blok JSON melanggar amplop JSON murni. Ini tidak 
 live pass. Codex lokal gagal probe karena executable vendor hilang; lima QA/edge tetap hanya
 terverifikasi offline pada harness ini.
 
+## Amandemen 2026-09-25 (audit custom agent + agen domain)
+
+**Kontrak `isolated-worktree` dikoreksi: worktree lahir dari sebuah COMMIT, bukan dari
+pohon kerja parent.** Teks lama (keputusan 3 "kandidat termasuk dirty changes")
+menjanjikan sesuatu yang tak pernah terjadi — worktree Git terisolasi tak pernah
+melihat perubahan yang belum di-commit parent. Kontrak baru (`runner/src/custom-agents.ts`):
+langkah 0 wajib membandingkan `git rev-parse HEAD` worktree dengan **Kandidat SHA**
+literal yang diberi parent, `git checkout --detach <kandidat>` bila berbeda, dan
+`Status: terhalang` bila SHA tak diberi. Serah-terima balik memakai `git add <path>`
+eksplisit lalu `SHA hasil` untuk parent `git cherry-pick`. `agentDelegationClause`
+dan tag roster (`runner/src/phase-agents.ts`) menyebut "worktree terpisah: commit
+kandidat dulu, hasil via SHA → cherry-pick" alih-alih dirty changes. Ini bukan
+kebijakan `workspacePolicy` baru — hanya kontrak prosa yang sekarang jujur pada
+mekanisme Git yang sudah ada sejak ADR-0002.
+
+**Allowlist read-only diturunkan dari satu sumber.** `READ_ONLY_POLICY` diekspor dari
+`runner/src/agent-readonly.ts`; prosa yang dikirim ke agen (`runner/src/custom-agents.ts`)
+kini dirakit dari objek yang sama dipakai validator `readOnlyDecision`, bukan
+deskripsi tangan yang bisa menyimpang. Agen sekarang tahu persis perintah yang
+diizinkan (`rg`/`sed -n`/`head`/`tail`/`wc`/`ls`, `git status`, `git diff|show|log`
+dengan `--no-ext-diff --no-textconv` wajib) dan yang ditolak (operator shell termasuk
+di dalam kutip, `cat`/`grep`/`find`, `git blame|grep|rev-parse|merge-base`, `pnpm`,
+`node`, `curl`) — sebelumnya agen membuang giliran mencoba perintah yang pasti gagal
+validator. Validator sendiri tak dilonggarkan (Keputusan terbuka #7 di
+[audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md) §5
+tetap terbuka).
+
+**Boilerplate prompt (policy/handoff/gaya kode) dipindah ke berkas bersama per sesi.**
+Sebelumnya tiap agen membawa salinan penuh policy generik + kontrak serah-terima +
+`CODE_STYLE_CLAUSE` di prompt-nya sendiri (`renderAgentsJson`), yang mendekatkan
+anggaran argv `AGENTS_ARG_SAFE_BYTES` (102.400 B) — 16 agen lama terukur 71.160 B,
+dan 9 agen domain baru (§3 audit di atas) diproyeksikan menembusnya (~113 KB).
+`agentContractOf(policy)` menulis policy generik+kontrak+gaya kode SEKALI per policy
+ke `<agentTempDir>/agent-contract-<policy>.md` (mode 0600), dan tiap prompt agen
+merujuk path-nya alih-alih menyalin isinya; baris `Policy efektif`, pengingat
+`Status:`, klausa khusus root-causer, dan batas turn/waktu tetap inline (agen tanpa
+tool Read, atau Codex, tetap mendapat teks penuh inline — rujukan berkas hanya
+dipakai bila aman). Guard anggaran argv kini berlaku untuk SEMUA sesi claude (bukan
+hanya sesi ber-agen fase); saat terlampaui, agen opt-in paling akhir dibuang dulu
+(termasuk agen buatan operator), baru agen `enabledByDefault` paling akhir — agen fase
+tak pernah dibuang. Ukuran terukur untuk katalog penuh (16 agen produksi saat diukur):
+73.415 B (sebelum) → 85.684 B (teks P0/P1 baru, tanpa berkas kontrak) → **50.187 B**
+(dengan berkas kontrak). Tanpa opsi berkas, keluaran renderer identik byte-untuk-byte
+dengan sebelumnya, jadi `agentDefinitionHash` (§4) tak berubah untuk agen yang tak
+memakainya.
+
+Verifikasi: `runner/test/custom-agents.test.ts` (41), `runner/test/agent-readonly.test.ts`
+(30), `runner/test/phase-agents.test.ts` (37), `server/test/phase-agents.pty.test.ts`
+(18) — 126/126 lulus. Sembilan agen domain baru diukur menembus anggaran argv sebesar
+28.397 B pada katalog 25-agen tanpa mitigasi (`runner/test/builtin-domain-agents-readonly.test.ts`,
+28/28 lulus, memverifikasi juga bahwa perintah operator-only agen infra read-only
+benar-benar ditolak validator bila dicoba sendiri).
+
+**Koreksi 2026-09-25 (putaran kedua):** paragraf di atas ditulis saat draf pertama masih
+mengusulkan SEMBILAN agen domain SEMUANYA read-only/auditor, termasuk dua auditor infra
+("kedua agen infra baru" = `cloudflare-config-auditor` + `vps-hardening-auditor`). Keputusan
+final membalik itu: permintaan manusia adalah agen yang MENGERJAKAN domain, bukan hanya
+mengaudit. Katalog sekarang berisi lima PENGERJA `isolated-worktree`
+(`frontend-engineer`, `backend-engineer`, `database-engineer`, `cloudflare-engineer`,
+`vps-engineer` — dua yang terakhir berwenang penuh ke produksi tanpa gerbang izin
+tambahan) plus EMPAT auditor read-only yang bertahan (`a11y-auditor`,
+`api-contract-auditor`, `schema-migration-auditor`, `cloudflare-config-auditor`).
+`vps-hardening-auditor` DICABUT — belum pernah dirilis/di-seed, jadi bukan breaking
+change. Detail di `shared/src/builtin-domain-agents.ts` (komentar berkas) dan
+[audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md)
+§"Koreksi 2026-09-25".
+
 ## Konsekuensi
 
 - Custom agent sekarang bisa menghemat konteks parent di kedua runtime, tetapi invocation nyata

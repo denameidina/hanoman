@@ -113,6 +113,20 @@ latar adalah *menunggu*, bukan *memanggil*.
 - Auto-resume bisa menunda sebagian sesi sesudah reboot; operator melanjutkannya manual.
 - Terminal agen dari UI bisa ditolak saat mesin sesak; manusia tetap bisa `force`.
 
+## Amandemen 2026-09-25 (audit custom agent)
+
+Langkah 5 reviewer (`runner/src/phase-agents.ts`) dan builtin `spec-auditor`
+(`shared/src/builtin-agents.ts`) sebelumnya memakai dua daftar putusan yang berbeda
+isi (5 vs 6) meski reviewer "diturunkan dari spec-auditor" (keputusan 4). Keduanya
+sekarang mengimpor `SPEC_AUDIT_VERDICT_LIST` dari `shared/src/spec-audit.ts`
+(`SPEC_AUDIT_VERDICTS`, enam putusan: terpenuhi oleh perubahan · sudah terpenuhi di
+base · tak terpenuhi · terpenuhi BERBEDA dari yang diminta · belum terverifikasi ·
+tidak berlaku) — satu sumber, bukan dua salinan yang bisa menyimpang lagi. `Verdict:
+lulus | rework` pada laporan reviewer (keputusan 4) tidak berubah; ini hanya menyatukan
+kosakata KRITERIA di dalam tabel, bukan vonis akhirnya. Detail di
+[audit 2026-09-25](../research/audit-2026-09-25-custom-agent-dan-agen-domain.md) §1
+poin 7.
+
 ## Yang TIDAK diputuskan di sini
 
 - Penegakan server atas `Verdict:` (menolak `Execute done` tanpa invocation reviewer `completed`) dan gerbang

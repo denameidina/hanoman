@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -83,6 +84,33 @@ describe("lifecycle AgentInvocation", () => {
     });
     const unknown = await prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId: "unknown" } });
     expect(unknown).toMatchObject({ inputTokens: null, outputTokens: null, cachedTokens: null });
+  });
+
+  // Audit custom agent 2026-09-25 · P1-10 · potongan transcript NYATA (konten dikosongkan, usage
+  // apa adanya): subagent claude dan rollout codex. Sebelumnya hanya `record.usage` tingkat atas
+  // yang dibaca, jadi kedua runtime selalu menghasilkan null.
+  const realTranscript = async (name: string, runtimeInvocationId: string) => {
+    const root = mkdtempSync(join(tmpdir(), "hanoman-inv-"));
+    const path = join(root, name);
+    copyFileSync(fileURLToPath(new URL(`./fixtures/transcripts/${name}`, import.meta.url)), path);
+    await stopAgentInvocation({ ...base, runtimeInvocationId, transcriptPath: path }, { transcriptRoots: [root] });
+    return prisma.agentInvocation.findFirstOrThrow({ where: { runtimeInvocationId } });
+  };
+
+  it("claude: message.usage dijumlahkan per message.id unik, baris parsial tak dihitung ganda", async () => {
+    // 4 pesan API, 2 di antaranya terpecah ke 2 baris (thinking parsial → tool_use final).
+    // input = input + cache_creation + cache_read; output = maks per pesan (8→177, 3→195) lalu dijumlah.
+    expect(await realTranscript("claude-subagent.jsonl", "claude-real")).toMatchObject({
+      inputTokens: 34_356 + 38_741 + 41_664 + 45_256,
+      outputTokens: 177 + 147 + 164 + 195,
+      cachedTokens: 0 + 34_354 + 38_739 + 41_662,
+    });
+  });
+
+  it("codex: total_token_usage kumulatif terakhir; token_usage_record per respons tak dijumlah", async () => {
+    expect(await realTranscript("codex-rollout.jsonl", "codex-real")).toMatchObject({
+      inputTokens: 90_854, outputTokens: 641, cachedTokens: 61_952,
+    });
   });
 
   it("workspaceChanged membandingkan hash snapshot start dan stop", async () => {

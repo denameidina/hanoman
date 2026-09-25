@@ -10,6 +10,7 @@ export * from "./orchestration-plan";
 export * from "./agent";
 export * from "./custom-agent";
 export * from "./builtin-agents";
+export * from "./spec-audit";
 export * from "./agent-catalog";
 export * from "./github";
 export * from "./lead";
