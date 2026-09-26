@@ -214,6 +214,7 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   "hanoman_docs_delete",       // menghapus berkas .md; capability tetap docs:write
   "hanoman_changelog_delete",  // menghapus entri changelog; capability tetap docs:write
   "hanoman_ide_entry_delete",  // menghapus berkas/folder working tree; capability tetap ide:write
+  "hanoman_skill_delete",      // menghapus folder skill dari disk; capability tetap skills:write
   // Gerbang `backlog:lifecycle`-nya hidup di HANDLER (routes/specs.ts), bukan di
   // capabilityForRoute, karena keputusannya bergantung body. Katalog karena itu wajib
   // menyebut `backlog:write` agar uji kontrak hijau — deskripsi tool yang memberitahu

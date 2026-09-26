@@ -1357,7 +1357,7 @@ git commit -m "feat(skills): suntik skill global hanoman ke sesi (claude --add-d
 - Consumes: `obj`, `str` dari `../mcp-schema`; `enc`, `query`, `s` dari `./helpers`; `McpToolDef`.
 - Produces: `SKILLS_TOOLS: readonly McpToolDef[]` berisi `hanoman_skills_list`, `hanoman_skill_read`, `hanoman_skill_write`.
 
-- [ ] **Step 1: Tulis test yang gagal** — tambahkan ke test katalog MCP yang ditemukan (atau buat `shared/src/mcp-catalog/skills.test.ts`):
+- [x] **Step 1: Tulis test yang gagal** — tambahkan ke test katalog MCP yang ditemukan (atau buat `shared/src/mcp-catalog/skills.test.ts`):
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -1382,12 +1382,12 @@ describe("SKILLS_TOOLS", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog/skills.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Periksa dulu bentuk `build` return (`body`/`query`) dan helper `enc` di `shared/src/mcp-catalog/helpers.ts` & `agents.ts` (tool `hanoman_agent_update` memakai path ber-id). Lalu:
 
@@ -1450,12 +1450,12 @@ export const SKILLS_TOOLS: readonly McpToolDef[] = [
 
 Sesuaikan nama field `body` bila `McpToolDef.build` memakai nama lain (lihat `agents.ts` tool create). Daftarkan di `shared/src/mcp-catalog/index.ts` di samping `AGENTS_TOOLS`.
 
-- [ ] **Step 4: Jalankan, pastikan lulus** — termasuk test katalog MCP yang sudah ada (mis. test yang memvalidasi setiap tool punya capability sah dan `samplePath` terpeta oleh `capabilityForRoute`):
+- [x] **Step 4: Jalankan, pastikan lulus** — termasuk test katalog MCP yang sudah ada (mis. test yang memvalidasi setiap tool punya capability sah dan `samplePath` terpeta oleh `capabilityForRoute`):
 
 Run: `pnpm vitest --run shared/src/mcp-catalog/skills.test.ts <test-katalog-mcp-yang-ditemukan>`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/skills.ts shared/src/mcp-catalog/skills.test.ts shared/src/mcp-catalog/index.ts docs/superpowers/plans/2026-09-26-skills-library.md
