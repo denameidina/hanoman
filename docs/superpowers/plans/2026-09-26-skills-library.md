@@ -1479,7 +1479,7 @@ git commit -m "feat(skills): tool MCP hanoman_skills_list/skill_read/skill_write
   - api: `listSkills(projectId?)`, `listAllSkills()`, `skillTree(key)`, `skillFile(key, path)`, `writeSkillFile(key, path, content, baseHash)`, `createSkillEntry(key, path, kind)`, `deleteSkillEntry(key, path)`, `createSkill(b)`, `forkSkill(key, b)`, `deleteSkill(key)`
   - `export function SkillsWorkspace({ projectId, onToast }: { projectId?: string; onToast?: (m: string) => void })`
 
-- [ ] **Step 1: Klien API**
+- [x] **Step 1: Klien API**
 
 ```ts
   // Skills library · tanpa projectId → semua grup (global + per project); dengan projectId →
@@ -1502,7 +1502,7 @@ git commit -m "feat(skills): tool MCP hanoman_skills_list/skill_read/skill_write
 
 Impor tipe `SkillEntry, SkillLibraryView, SkillTreeView, SkillFileView` dari `@hanoman/shared` di kepala `client.ts`. Periksa bahwa `j` melempar error ber-`status` untuk 409 (lihat implementasi `j` di berkas yang sama); editor memakai `(e as { status?: number }).status === 409`.
 
-- [ ] **Step 2: Tulis test komponen yang gagal**
+- [x] **Step 2: Tulis test komponen yang gagal**
 
 ```tsx
 // src/src/screens/skills/SkillsWorkspace.test.tsx
@@ -1588,12 +1588,12 @@ describe("SkillsWorkspace (/skills)", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan, pastikan gagal**
+- [x] **Step 3: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run src/src/screens/skills/SkillsWorkspace.test.tsx`
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Implementasi komponen**
+- [x] **Step 4: Implementasi komponen**
 
 Sebelum menulis, baca props `Card`, `Badge`, `Button`, `Input`, `StateBlock`, `ResponsivePanels`, `Modal`, `Field`, `useConfirm` di `src/src/ds/**` dan pola `IdeReadPanel.tsx:55-120`; ikuti design system `internal/docs/design-system/**`. Bila `useApi()` membutuhkan provider di test, cek cara `CustomAgentsPanel.test.tsx`/`SettingsScreen.test.tsx` merender (mereka memakai `fetch` mock langsung — ikuti itu).
 
@@ -1893,12 +1893,12 @@ export function SkillsWorkspace({ projectId, onToast }: { projectId?: string; on
 
 Sesuaikan signature `useConfirm()` (baca `src/src/ds/useConfirm.tsx:30`) dan pakai `Select` dari `ds` alih-alih `<select>` bila ada (App.tsx mengimpor `Select` dari `./ds`).
 
-- [ ] **Step 5: Jalankan, pastikan lulus**
+- [x] **Step 5: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run src/src/screens/skills/SkillsWorkspace.test.tsx`
 Expected: PASS. (Node 25 + jsdom localStorage: lihat memori bila test lain di file gagal karena localStorage.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/api/client.ts src/src/screens/skills docs/superpowers/plans/2026-09-26-skills-library.md

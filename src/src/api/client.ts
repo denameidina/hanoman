@@ -6,7 +6,8 @@ import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, 
   type TaskView, type MemberView, type CreateTaskInput, type EscalateTaskInput, type PatchTaskInput,
   type CreateMemberInput, type PatchMemberInput,
   type RemoteControlView, type RemoteControlPut,
-  type LogEntryView, type LogRetention } from "@hanoman/shared";
+  type LogEntryView, type LogRetention,
+  type SkillEntry, type SkillLibraryView, type SkillTreeView, type SkillFileView } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -755,6 +756,22 @@ export function createApi(o: { base?: string } = {}) {
   updateCustomAgent: (id: string, b: UpdateCustomAgent) =>
     j<CustomAgentView>(paths.customAgent(id), { method: "PATCH", ...body(b) }),
   deleteCustomAgent: (id: string) => j<void>(paths.customAgent(id), { method: "DELETE" }),
+  // Skills library · tanpa projectId → semua grup (global + per project); dengan projectId →
+  // global (ber-shadowedBy) + skill project itu.
+  listAllSkills: () => j<SkillLibraryView>(paths.skills + qs({ scope: "all" })),
+  listSkills: (projectId: string) => j<SkillEntry[]>(paths.skills + qs({ projectId })),
+  skillTree: (key: string) => j<SkillTreeView>(paths.skillTree(key)),
+  skillFile: (key: string, path: string) => j<SkillFileView>(paths.skillFile(key) + qs({ path })),
+  writeSkillFile: (key: string, path: string, content: string, baseHash: string | null) =>
+    j<{ hash: string }>(paths.skillFile(key) + qs({ path }), { method: "PUT", ...body({ content, baseHash }) }),
+  createSkillEntry: (key: string, path: string, kind: "file" | "dir") =>
+    j<{ ok: true }>(paths.skillEntry(key), { method: "POST", ...body({ path, kind }) }),
+  deleteSkillEntry: (key: string, path: string) => j<void>(paths.skillEntry(key) + qs({ path }), { method: "DELETE" }),
+  createSkill: (b: { layer: "hanoman" | "user" | "project"; source?: string; projectId?: string; name: string; description: string }) =>
+    j<SkillEntry>(paths.skills, { method: "POST", ...body(b) }),
+  forkSkill: (key: string, b: { layer: "hanoman" | "project"; projectId?: string; source?: string; name?: string }) =>
+    j<SkillEntry>(paths.skillFork(key), { method: "POST", ...body(b) }),
+  deleteSkill: (key: string) => j<void>(paths.skill(key), { method: "DELETE" }),
   getCustomAgentMetrics: (p: { projectId?: string; from?: string; to?: string } = {}) =>
     j<AgentMetricsView>(paths.customAgentMetrics + qs(p)),
   updateAgentInvocationDisposition: (id: string, b: {
