@@ -8,6 +8,7 @@
 //   /backlog/<specId>                  Backlog dengan SpecDetail item itu terbuka
 //   /changelog/<projectId>[/<clId>]    changelog satu project, opsional satu rilis terpilih
 //   /review/<spec|session>/<id>        layar review worktree (section transien `review`)
+//   /skills[/<projectId>]              skill global + per project, atau satu project saja
 //   /                                  → dialihkan ke halaman terakhir yang tersimpan (ADR-0115)
 //
 // Hash lama `#spec=<id>` / `#changelog=<projectId>[&cl=<id>]` (ADR-0071) TETAP dibaca saat mount
@@ -18,7 +19,7 @@
 // mana yang terisi untuk section mana (dikunci `routes.test.ts`).
 export type Route = {
   section: string;
-  /** `project` dan `changelog` */
+  /** `project`, `changelog`, dan `skills` (satu project) */
   projectId?: string;
   /** `backlog` dengan SpecDetail terbuka */
   specId?: string;
@@ -41,6 +42,7 @@ export function routePath(r: Route): string {
       if (!r.projectId) return "/changelog";
       return `/changelog/${seg(r.projectId)}${r.changelogId ? `/${seg(r.changelogId)}` : ""}`;
     case "review": return `/review/${r.kind}/${seg(r.id!)}`;
+    case "skills": return r.projectId ? `/skills/${seg(r.projectId)}` : "/skills";
     default: return `/${r.section}`;
   }
 }
@@ -58,6 +60,7 @@ export function parseRoute(pathname: string, navKeys: readonly string[]): Route 
   if (head === "projects" && parts.length === 2) return { section: "project", projectId: a };
   if (head === "backlog" && parts.length === 2) return { section: "backlog", specId: a };
   if (head === "changelog" && parts.length <= 3) return { section: "changelog", projectId: a, changelogId: b ?? null };
+  if (head === "skills" && parts.length === 2) return { section: "skills", projectId: a };
   if (head === "review" && parts.length === 3 && (a === "spec" || a === "session")) return { section: "review", kind: a, id: b };
   return null;
 }

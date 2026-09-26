@@ -1920,7 +1920,7 @@ git commit -m "feat(skills): SkillsWorkspace — daftar grup global/project, str
 - Consumes: `SkillsWorkspace` (Task 7).
 - Produces: `Route.projectId` terisi untuk section `skills` bila path `/skills/<id>`.
 
-- [ ] **Step 1: Tulis test rute yang gagal**
+- [x] **Step 1: Tulis test rute yang gagal**
 
 ```ts
 // tambahkan ke test parseRoute yang ada
@@ -1933,12 +1933,12 @@ it("skills: global dan per project, bolak-balik", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run src/src/routes.test.ts`
 Expected: FAIL — `/skills/p1` → `null`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `src/src/routes.ts` — komentar bentuk URL tambah `//   /skills[/<projectId>]              skill global + per project, atau satu project`; di `routePath`:
 
@@ -1989,12 +1989,12 @@ di `parseRoute`, sebelum `return null` terakhir:
 
 Impor `SkillsWorkspace` dari `./screens/skills/SkillsWorkspace`. Cek nama `projects` state & helper `gate`/`suspend` yang dipakai cabang lain; pakai yang sama dengan cabang `settings`/`review`. Bila `projects` tak ada di scope, kirim `projectId` saja dan breadcrumb `skills · project`.
 
-- [ ] **Step 4: Jalankan test tersentuh**
+- [x] **Step 4: Jalankan test tersentuh**
 
 Run: `pnpm vitest --run src/src/routes.test.ts src/src/screens/skills/SkillsWorkspace.test.tsx $(grep -rln "HN_NAV\|NAV_KEYS\|ProjectDetailScreen" src/src --include=*.test.tsx --include=*.test.ts | tr '\n' ' ')`
 Expected: PASS (perbarui snapshot/daftar nav di test yang menghitung item nav bila ada).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/ds/shell.tsx src/src/routes.ts src/src/routes.test.ts src/src/App.tsx src/src/screens/ProjectDetailScreen.tsx docs/superpowers/plans/2026-09-26-skills-library.md

@@ -43,6 +43,7 @@ import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/
 import { OverviewScreen } from "./screens/OverviewScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
 import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
+import { SkillsWorkspace } from "./screens/skills/SkillsWorkspace";
 import { BacklogScreen } from "./screens/BacklogScreen";
 import { PrdScreen, NewPrdModal, type PrdPrefill, type PrdBriefForm } from "./screens/PrdScreen";
 import type { AuditEscalation } from "@hanoman/shared";
@@ -1556,6 +1557,7 @@ function AppInner() {
               onGotoTerminal={() => { setProjectFilter(proj.id); openTerminal(); }}
               onGotoBacklog={() => { setProjectFilter(proj.id); setSection("backlog"); }}
               onGotoChangelog={() => setSection("changelog")}
+              onGotoSkills={() => navigate(routePath({ section: "skills", projectId: proj.id }))}
               onReverse={proj.kind === "existing" && (proj.binding ?? proj.repoDir) ? () => reverseDocs(proj) : undefined}
               onScaffold={proj.kind === "from-scratch" && (proj.binding ?? proj.repoDir) ? () => scaffoldDocs(proj) : undefined}
               onDelete={() => deleteProject(proj)} />
@@ -1731,6 +1733,18 @@ function AppInner() {
           ? <ReviewScreen specId={reviewTarget.id} kind={reviewTarget.kind} title={reviewTarget.title} onBack={() => setSection(back)} />
           : <StateBlock kind="empty" icon="git-compare" title="Pilih item untuk di-review"
               hint="Buka Review dari Backlog atau dari sel sesi di Terminal." action={() => setSection("backlog")} actionLabel="Ke Backlog" />)}
+      </Shell>
+    );
+  } else if (section === "skills") {
+    // Skills library · /skills = Global + satu section per project; /skills/<id> = satu project.
+    const skillsProject = route?.projectId ? projects.find((p) => p.id === route.projectId) : undefined;
+    screen = (
+      <Shell active="skills" title="Skills" wide onNavigate={setSection}
+        breadcrumb={route?.projectId ? `skills · ${skillsProject?.name ?? route.projectId}` : "skills · global & project"}
+        actions={route?.projectId
+          ? <Button size="sm" variant="ghost" leftIcon="arrow-left" onClick={() => goProject(route.projectId!)}>Kembali ke project</Button>
+          : undefined}>
+        {gate(<SkillsWorkspace key={route?.projectId ?? "all"} projectId={route?.projectId} projectName={skillsProject?.name} onToast={showToast} />)}
       </Shell>
     );
   } else if (section === "settings") {

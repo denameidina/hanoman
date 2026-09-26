@@ -10,7 +10,8 @@ import { SkillFileEditor, SkillStructure, errMessage } from "./SkillEditor";
 
 type NewSkill = { layer: "hanoman" | "user" | "project"; source: string; name: string; description: string };
 
-export function SkillsWorkspace({ projectId, onToast }: { projectId?: string; onToast?: (m: string) => void }) {
+export function SkillsWorkspace({ projectId, projectName, onToast }:
+  { projectId?: string; projectName?: string; onToast?: (m: string) => void }) {
   const api = useApi();
   const { confirm, dialog } = useConfirm();
   const [library, setLibrary] = React.useState<SkillLibraryView | null>(null);
@@ -27,9 +28,9 @@ export function SkillsWorkspace({ projectId, onToast }: { projectId?: string; on
       if (!projectId) { setLibrary(await api.listAllSkills()); return; }
       const rows = await api.listSkills(projectId);
       const project = rows.filter((s) => s.layer === "project");
-      setLibrary({ global: rows.filter((s) => s.layer !== "project"), projects: [{ projectId, name: "Project ini", skills: project }] });
+      setLibrary({ global: rows.filter((s) => s.layer !== "project"), projects: [{ projectId, name: projectName ?? "Project ini", skills: project }] });
     } catch { setError(true); }
-  }, [api, projectId]);
+  }, [api, projectId, projectName]);
   React.useEffect(() => { void reload(); }, [reload]);
 
   const loadTree = React.useCallback((s: SkillEntry) => {
