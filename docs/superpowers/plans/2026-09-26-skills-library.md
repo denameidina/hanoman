@@ -2012,11 +2012,11 @@ git commit -m "feat(skills): nav /skills, rute /skills/<projectId>, pintu Skills
 - Modify: `internal/skills/hanoman/SKILL.md` (sebut `/api/skills`, tool MCP baru, `$HANOMAN_HOME/skills`)
 - Modify: `internal/docs/README.md` (tautkan ADR & SPEC baru)
 
-- [ ] **Step 1: Alokasikan SPEC & ADR, tulis ADR**
+- [x] **Step 1: Alokasikan SPEC & ADR, tulis ADR**
 
 ADR memuat: Konteks (skill hanya terlihat sebagai prasyarat metode, ADR-0114; tak ada tampilan/penyuntingan; tak ada skill bersama lintas project); Keputusan (tiga lapis tanpa DB; key `layer~projectId~source~name`; plugin baca-saja + fork; project scan generik; capability `skills:*` menurut method; penyuntikan claude `--add-dir` — dikutip dari docs Claude Code; codex symlink + exclude common dir dengan marker dan `unexcludeInjected`; skill project menang atas global); Konsekuensi (skill global tak aktif di luar hanoman; baris exclude codex terlihat di checkout utama; tak ada watcher — refetch); Amandemen ADR-0114.
 
-- [ ] **Step 2: Perbarui stack.md, SKILL.md hanoman, README index** — satu paragraf/baris masing-masing, tautan relatif ke ADR/SPEC.
+- [x] **Step 2: Perbarui stack.md, SKILL.md hanoman, README index** — satu paragraf/baris masing-masing, tautan relatif ke ADR/SPEC.
 
 - [ ] **Step 3: Jalankan semua test tersentuh sekaligus**
 
