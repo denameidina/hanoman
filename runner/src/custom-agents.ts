@@ -34,6 +34,12 @@ export type AgentDef = {
    * menyalinnya ke tiap agen. Dirakit oleh `phasePromptOf`.
    */
   context?: string;
+  /**
+   * Amandemen ADR-0170 P2 · cara agen fase Execute/Goal mengerjakan plan (Setting per flow). Dibawa
+   * di definisi karena klausa delegasi dirakit di `createSession`, jauh dari `PhasePlan`. Tidak
+   * dirender ke konfigurasi runtime. Absen = `inline`.
+   */
+  executeMode?: "inline" | "subagent";
 };
 
 export const PHASE_CONTEXT_HEADER = "=== KONTEKS ===";
