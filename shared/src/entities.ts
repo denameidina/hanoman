@@ -454,6 +454,8 @@ export const zPhaseOverrides = z.record(z.string().min(1).max(PHASE_OVERRIDE_LIM
 export type PhaseOverrides = z.infer<typeof zPhaseOverrides>;
 export const zFlowOrchestration = z.object({
   enabled: z.boolean().default(true),
+  // Amandemen ADR-0170 P2 · lenient: nilai asing jatuh ke `inline`, bukan Setting gagal parse.
+  executeMode: z.enum(["inline", "subagent"]).catch("inline").default("inline"),
   claude: z.record(z.string(), zPhaseCell).default({}),
   codex: z.record(z.string(), zPhaseCell).default({}),
 });

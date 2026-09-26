@@ -242,7 +242,7 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     const reviewer: AgentDef = { kind: "phase", phase: "Execute", name: "hanoman-fase-review", description: "Review",
       instructions: "INSTRUKSI REVIEW", tools: null, model: "opus", effort: "high", mentions: [] };
     const execute: AgentDef = { kind: "phase", phase: "Execute", name: "hanoman-fase-execute", description: "Fase Execute",
-      instructions: "INSTRUKSI EXECUTE", tools: null, model: "sonnet", effort: "high", mentions: [] };
+      instructions: "INSTRUKSI EXECUTE", tools: null, model: "sonnet", effort: "high", mentions: [], executeMode: "subagent" };
     registerCustomAgentSource(() => [{ ...scout, workspacePolicy: "read-only", model: "haiku" }]);
     const s = createSession("p1", cwd, {
       id: born("orch-deleg"), agent: "claude", prompt: "P", legacyPrompt: "L",
@@ -256,6 +256,16 @@ describe("createSession · orchestrator (ADR-0164)", () => {
     expect(roster.find((r) => r.name === "hanoman-fase-review")).toMatchObject({ phase: "Execute", model: "opus" });
     // Agen fase Execute tetap entri roster PERTAMA untuk fase itu (chip fase memakai `find`).
     expect(roster.find((r) => r.phase === "Execute")!.name).toBe("hanoman-fase-execute");
+
+    // Amandemen ADR-0170 P2 · Execute default (tanpa executeMode) = inline: kerjakan sendiri.
+    const inline = createSession("p1", cwd, {
+      id: born("orch-deleg-inline"), agent: "claude", prompt: "P", legacyPrompt: "L",
+      phaseAgents: [...phaseAgents, { ...execute, executeMode: undefined }, reviewer],
+    });
+    const ji = JSON.parse(readFileSync(agentsFilePath(inline.id), "utf8"));
+    expect(ji["hanoman-fase-execute"].prompt).toContain("JANGAN mendelegasikan implementasi");
+    expect(ji["hanoman-fase-execute"].prompt).not.toContain("implementer per task");
+    expect(ji["hanoman-fase-execute"]).not.toHaveProperty("executeMode");
 
     registerCustomAgentSource(() => []);
     const bare = createSession("p1", cwd, { id: born("orch-deleg-empty"), agent: "claude", prompt: "P", legacyPrompt: "L", phaseAgents });

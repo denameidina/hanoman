@@ -93,6 +93,8 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
     },
     // ADR-0170 P2 · `executing-plans` sendiri berkata "If subagents are available, use
     // superpowers:subagent-driven-development instead" — agen fase claude punya subagent.
+    // Amandemen: dipakai HANYA bila `Setting.orchestration.<flow>.executeMode === "subagent"`
+    // (default `inline`) — lihat `phaseSkillsFor`.
     orchestratedPhaseSkills: {
       Execute: [
         "superpowers:subagent-driven-development",

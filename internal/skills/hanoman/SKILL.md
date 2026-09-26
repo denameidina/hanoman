@@ -848,7 +848,7 @@ Pakai skill lebih sempit saat task cocok:
   (tab Settings → Orkestrasi) — lewat definisi subagent saat sesi lahir, bukan `/model` (ADR-0058 tetap dicabut).
   **ADR-0170 P2** · subagent foreground (env sesi) → agen fase boleh mendelegasikan: klausa `=== DELEGASI ===`
   per peran fase disusun `withPhaseDelegation` di `createSession` dari roster custom agent yang hidup.
-  Execute claude memakai `subagent-driven-development`; laporannya wajib tabel `AC → bukti`; Plan wajib bernama
+  Execute claude mengikuti **`executeMode` per flow (ADR-0173)**: default `inline` = `executing-plans` + agen fase mengerjakan task sendiri; `subagent` = `subagent-driven-development` (implementer + review per task, final review skill dilewati bila reviewer ada); codex & sesi tunggal selalu inline. Laporannya wajib tabel `AC → bukti`; Plan wajib bernama
   `<YYYY-MM-DD>-<spec-id>-<slug>.md`. Flow feature/qa punya reviewer independen `hanoman-fase-review`
   (bukan fase; invocation di bawah Execute) yang dipanggil orchestrator sebelum `Execute done`
   (`Verdict: lulus|rework`, maks 2 putaran rework lalu `Keputusan terbuka`).

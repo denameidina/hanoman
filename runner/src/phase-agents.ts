@@ -217,7 +217,12 @@ export function phaseAgentInstructions(
   const { flow, method } = ctx;
   const phase = entry.phase;
   const guide = PROJECT_FLOWS.has(flow) ? projectGuide(flow, phase, ctx) : backlogGuide(flow, phase, ctx);
-  const skills = phaseSkillsFor(flow, phase, method, plan.runtime);
+  const executeMode = plan.executeMode ?? "inline";
+  const skills = phaseSkillsFor(flow, phase, method, plan.runtime, executeMode);
+  // Amandemen ADR-0170 P2 · skill subagent-driven punya final whole-branch review sendiri; saat
+  // reviewer `hanoman-fase-review` ada, itu review akhir KEDUA atas diff yang sama — dilewati.
+  const skipSkillFinalReview = phase === "Execute" && plan.runtime === "claude" && executeMode === "subagent"
+    && !!plan.reviewer && skills.includes("superpowers:subagent-driven-development");
   const work = (WORK_PHASES as readonly string[]).includes(phase);
   // ADR-0170 P2 · Verifikasi (goal) menjalankan test/typecheck — tanpa klausa scope ia jatuh ke DoD
   // repo target (suite penuh), lubang yang sama dengan ADR-0080. Gaya kode tetap hanya fase kerja.
@@ -231,6 +236,10 @@ export function phaseAgentInstructions(
     skills.length
       ? `Skills ${method.label} WAJIB untuk fase ini — muat & ikuti dengan mekanisme yang tersedia di agenmu: `
         + skills.join(", ")
+      : "",
+    skipSkillFinalReview
+      ? "LEWATI final whole-branch review milik skill subagent-driven-development: review akhir dipegang "
+        + "reviewer `hanoman-fase-review` yang dipanggil orchestrator sesudah fase ini. Review per task tetap jalan."
       : "",
     verifies ? scopeClause(flow, ctx.verifyScope) : "",
     work ? codeStyleClause(flow) : "",
@@ -259,6 +268,7 @@ export function buildPhaseAgents(plan: PhasePlan, ctx: PhaseAgentContext): Agent
     model: entry.model,
     effort: entry.effort,
     mentions: [],
+    executeMode: plan.executeMode ?? "inline",
   }));
   // ADR-0170 P2 · reviewer hanya bila rencana memuat Execute (continue: rencana = Execute saja).
   const r = plan.reviewer;
@@ -340,7 +350,7 @@ function reviewerInstructions(plan: PhasePlan, ctx: PhaseAgentContext): string {
 // `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`, 6a249ae2 — amandemen ADR-0164 T1): agen fase kini
 // menunggu anaknya, dan beberapa pemanggilan dalam satu pesan berjalan paralel (maks 3 per sesi).
 // Disusun di `createSession` (roster custom agent baru pasti di sana) — BUKAN di prompt orchestrator.
-type DelegationRole = "research" | "execute" | "none";
+type DelegationRole = "research" | "execute" | "execute-inline" | "none";
 const roleOf = (phase: string): DelegationRole =>
   phase === "Execute" || phase === "Goal" ? "execute"
     : phase === "Kerjakan" || phase === "Verifikasi" ? "none" : "research";
@@ -349,8 +359,14 @@ const roleOf = (phase: string): DelegationRole =>
 const liveCustoms = (roster: AgentDef[], runtime: "claude" | "codex"): AgentDef[] =>
   roster.filter((d) => d.kind !== "phase" && !(runtime === "codex" && d.workspacePolicy === "isolated-worktree"));
 
-export function phaseDelegationClause(phase: string, roster: AgentDef[], runtime: "claude" | "codex"): string {
-  const role = roleOf(phase);
+export function phaseDelegationClause(
+  phase: string, roster: AgentDef[], runtime: "claude" | "codex", executeMode: "inline" | "subagent" = "inline",
+): string {
+  // Amandemen ADR-0170 P2 · claude `inline` (default): agen fase kerja mengerjakan task SENDIRI.
+  // codex tak disentuh setelan ini — subagent bersarang di sana belum pernah diukur.
+  const base = roleOf(phase);
+  const role: DelegationRole = base === "execute" && runtime === "claude" && executeMode === "inline"
+    ? "execute-inline" : base;
   if (role === "none") return "";
   const codex = runtime === "codex";
   const call = codex ? "spawn_agent" : "tool Agent";
@@ -366,7 +382,13 @@ export function phaseDelegationClause(phase: string, roster: AgentDef[], runtime
       + (codex ? "nama agen" : "`subagent_type`") + " dari daftar ini sesuai deskripsinya."
     : "Tak ada custom agent di sesi ini: bila mendelegasikan, pakai subagent bawaan runtime yang read-only "
       + "untuk pencarian.";
-  const when = role === "research"
+  const when = role === "execute-inline"
+    ? "Kerjakan task plan SENDIRI, berurutan, di agen ini — JANGAN mendelegasikan implementasi task ke "
+      + "subagent (satu subagent per task terukur terlalu lambat; operator memilih mode inline). Subagent "
+      + "hanya untuk pembacaan read-only yang menyapu banyak berkas: pecah jadi 2–3 pencarian sempit dan "
+      + "panggil dalam SATU pesan (paralel) ke agen read-only termurah. Worktree ini sudah terisolasi — jangan "
+      + "membuat worktree/branch baru; merge & push milik orchestrator."
+    : role === "research"
     ? "Kapan: pertanyaan yang butuh menyapu banyak berkas — pecah jadi 2–3 pencarian sempit & independen, "
       + "panggil semuanya dalam SATU pesan (berjalan paralel) ke agen read-only termurah, lalu sintesis "
       + "dan tulis artefak fasemu SENDIRI. Satu berkas/simbol yang sudah kamu tahu: cari sendiri."
@@ -401,7 +423,7 @@ export function withPhaseDelegation(
 ): AgentDef[] {
   return phaseDefs.map((def) => {
     if (def.kind !== "phase" || !def.phase || def.name === REVIEWER_AGENT_NAME) return def;
-    const clause = phaseDelegationClause(def.phase, roster, runtime);
+    const clause = phaseDelegationClause(def.phase, roster, runtime, def.executeMode ?? "inline");
     return clause ? { ...def, instructions: `${def.instructions}\n\n${clause}` } : def;
   });
 }

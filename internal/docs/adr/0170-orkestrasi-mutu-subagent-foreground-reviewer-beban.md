@@ -54,7 +54,7 @@ latar adalah *menunggu*, bukan *memanggil*.
    lahir dengan `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` dan `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3`.
    Terminal claude bebas dan codex tak disentuh (codex sudah `max_depth=3`, cap 3 thread). Hook
    `updatedInput` tidak dipasang (terukur tanpa efek).
-2. **Execute agen fase claude memakai `subagent-driven-development`** (`MethodDef.orchestratedPhaseSkills`,
+2. **[Diamandemen ADR-0173: kini opt-in per flow, default inline]** **Execute agen fase claude memakai `subagent-driven-development`** (`MethodDef.orchestratedPhaseSkills`,
    `phaseSkillsFor(…, agentRuntime)`). Sesi tunggal dan agen fase codex tetap `executing-plans`: nested SDD di
    codex belum diukur dan cap 3 thread dibagi orchestrator + agen fase + reviewer.
 3. **Klausa delegasi agen fase** (`=== DELEGASI ===`, `withPhaseDelegation`, ditempel di `attempt()`

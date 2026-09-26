@@ -228,10 +228,26 @@ describe("buildPhaseAgents (ADR-0164)", () => {
 // agen fase bisa memanggil anak dan menunggunya — izin "custom agent lain boleh dipanggil" akhirnya
 // bisa dipenuhi, jadi instruksinya harus menyebut KAPAN, SIAPA, dan KONTRAK serah-terimanya.
 describe("P2 · Execute & kontrak fase (ADR-0170)", () => {
-  it("Execute agen fase claude superpowers memakai subagent-driven-development, bukan executing-plans", () => {
+  // Amandemen ADR-0170 P2 · default `inline`: subagent per task terukur terlalu lambat.
+  it("Execute claude default (inline) memakai executing-plans, bukan subagent-driven-development", () => {
     const e = at(agentsFor("feature"), "Execute").instructions;
+    expect(e).toContain("superpowers:executing-plans");
+    expect(e).not.toContain("superpowers:subagent-driven-development");
+  });
+  it("executeMode subagent: Execute claude memakai subagent-driven-development dan melewati final review skill", () => {
+    const plan = { ...planFor("feature"), executeMode: "subagent" as const };
+    const e = at(buildPhaseAgents(plan, {
+      flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "K" }), "Execute").instructions;
     expect(e).toContain("superpowers:subagent-driven-development");
     expect(e).not.toContain("superpowers:executing-plans");
+    expect(e).toContain("LEWATI final whole-branch review");
+  });
+  it("executeMode subagent tak berlaku untuk codex: tetap executing-plans", () => {
+    const plan = { ...planFor("feature", "codex"), executeMode: "subagent" as const };
+    const e = at(buildPhaseAgents(plan, {
+      flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "K" }), "Execute").instructions;
+    expect(e).toContain("superpowers:executing-plans");
+    expect(e).not.toContain("LEWATI final whole-branch review");
   });
   it("codex & metode matt tak berubah: codex tetap executing-plans, matt tetap implement", () => {
     const codex = buildPhaseAgents(planFor("feature", "codex"), {
@@ -340,8 +356,8 @@ describe("P2 · klausa delegasi agen fase (ADR-0170)", () => {
   });
   // ADR-0170 · implementer BERURUTAN (skill SDD melarang implementer paralel: satu worktree, satu
   // index git, mesin 8 GB); paralel hanya untuk pembacaan read-only (pencarian/review).
-  it("Execute: implementer per task berurutan, paralel hanya read-only, review per task", () => {
-    const c = phaseDelegationClause("Execute", roster, "claude");
+  it("Execute (executeMode subagent): implementer per task berurutan, paralel hanya read-only, review per task", () => {
+    const c = phaseDelegationClause("Execute", roster, "claude", "subagent");
     expect(c).toContain("implementer per task");
     expect(c).toContain("BERURUTAN");
     expect(c).toContain("read-only");
@@ -349,7 +365,7 @@ describe("P2 · klausa delegasi agen fase (ADR-0170)", () => {
     expect(c).toContain("review");
   });
   it("aturan bersama: subagent_type dari daftar, hindari agen umum, larang hanoman-fase-*, kontrak anak", () => {
-    const c = phaseDelegationClause("Execute", roster, "claude");
+    const c = phaseDelegationClause("Execute", roster, "claude", "subagent");
     expect(c).toContain("`subagent_type`");
     expect(c).toContain("general-purpose");
     expect(c).toContain("`hanoman-fase-*`");
@@ -363,6 +379,30 @@ describe("P2 · klausa delegasi agen fase (ADR-0170)", () => {
     const codex = phaseDelegationClause("Execute", roster, "codex");
     expect(codex).toContain("spawn_agent");
     expect(codex).not.toContain("`subagent_type`");
+  });
+  // Amandemen ADR-0170 P2 · inline (default): agen fase Execute/Goal mengerjakan task SENDIRI.
+  it("Execute/Goal inline (default): kerjakan sendiri, subagent hanya pencarian read-only", () => {
+    for (const phase of ["Execute", "Goal"]) {
+      const c = phaseDelegationClause(phase, roster, "claude");
+      expect(c).toContain("SENDIRI");
+      expect(c).toContain("JANGAN mendelegasikan implementasi");
+      expect(c).toContain("read-only");
+      expect(c).not.toContain("implementer per task");
+      expect(c).toContain("`hanoman-fase-*`");
+    }
+  });
+  it("codex tak terpengaruh executeMode: klausa Execute sama untuk inline & subagent", () => {
+    expect(phaseDelegationClause("Execute", roster, "codex", "inline"))
+      .toBe(phaseDelegationClause("Execute", roster, "codex", "subagent"));
+    expect(phaseDelegationClause("Execute", roster, "codex")).toContain("implementer per task");
+  });
+  it("withPhaseDelegation membaca executeMode dari AgentDef fase hasil buildPhaseAgents", () => {
+    const sub = buildPhaseAgents({ ...planFor("feature"), executeMode: "subagent" }, {
+      flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "K" });
+    expect(at(sub, "Execute").executeMode).toBe("subagent");
+    expect(at(withPhaseDelegation(sub, roster, "claude"), "Execute").instructions).toContain("implementer per task");
+    expect(at(withPhaseDelegation(agentsFor("feature"), roster, "claude"), "Execute").instructions)
+      .toContain("JANGAN mendelegasikan implementasi");
   });
   it("Kerjakan & reviewer tak menerima klausa delegasi; fase lain menerimanya di ujung instruksi", () => {
     expect(phaseDelegationClause("Kerjakan", roster, "claude")).toBe("");

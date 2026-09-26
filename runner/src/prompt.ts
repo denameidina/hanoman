@@ -1,5 +1,5 @@
 import type { Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx, AttachmentCtx } from "./types";
-import { resolveMethod, FLOW_PHASES, type MethodDef, type PhasePlan } from "@hanoman/shared";
+import { resolveMethod, FLOW_PHASES, type ExecuteMode, type MethodDef, type PhasePlan } from "@hanoman/shared";
 import { REVERSE_STANDARD } from "./reverse-standard";
 import { verifyScopeClause } from "./verify-scope";
 import { CODE_STYLE_CLAUSE } from "./code-style";
@@ -120,10 +120,14 @@ export function guideLine(guide: string, phase: string): string {
 // ADR-0170 P2 · `agentRuntime` = fase dikerjakan agen fase runtime itu. Hanya claude yang memakai
 // `orchestratedPhaseSkills` (subagent foreground bersarang terukur di claude 2.1.282); codex & mode
 // tunggal tetap `phaseSkills`.
+// Amandemen ADR-0170 P2 · dan hanya bila operator memilih `executeMode: "subagent"` untuk flow itu —
+// default `inline` (subagent per task terukur terlalu lambat untuk dipakai tanpa diminta).
 export function phaseSkillsFor(
   flow: Flow, phase: string, method: MethodDef, agentRuntime?: "claude" | "codex",
+  executeMode: ExecuteMode = "inline",
 ): string[] {
-  const own = (agentRuntime === "claude" ? method.orchestratedPhaseSkills?.[phase] : undefined)
+  const orchestrated = agentRuntime === "claude" && executeMode === "subagent";
+  const own = (orchestrated ? method.orchestratedPhaseSkills?.[phase] : undefined)
     ?? method.phaseSkills[phase] ?? [];
   const phases = PIPELINES[flow];
   return writesCode(flow) && phase === phases[phases.length - 1]
