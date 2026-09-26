@@ -25,6 +25,9 @@ import { createHiddenRing } from "../lib/hidden-ring";
 const RECONNECT_BACKOFF_MS = [500, 1_000, 2_000, 4_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000, 8_000];
 const RECONNECT_MAX = RECONNECT_BACKOFF_MS.length;
 const RESIZE_DEBOUNCE_MS = 100;
+// Binding bawaan tmux copy-mode: satu WheelUpPane/WheelDownPane = `send-keys -X -N 5 scroll-*`.
+// Swipe mengirim satu wheel per 5 baris gerakan jari supaya riwayat bergerak seirama jarinya.
+const TMUX_WHEEL_LINES = 5;
 
 // SPEC-878 · ADR-0134 · antrean adalah penyelamat ketikan (SPEC-800), bukan tempat penyimpanan.
 // 4 KiB memuat satu paragraf yang di-paste dan tetap menghentikan antrean yang lari.
@@ -507,10 +510,24 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       touchRemainder += touchY - nextY;
       touchY = nextY;
       const lineHeight = rect.height / term.rows;
-      const lines = Math.trunc(touchRemainder / lineHeight);
-      if (lines !== 0) {
-        term.scrollLines(lines);
-        touchRemainder -= lines * lineHeight;
+      // Riwayat lama hidup di tmux (SPEC-209), bukan di buffer xterm — `scrollLines` hanya menggulir
+      // apa yang diterima sejak attach. Selagi mouse-reporting aktif, swipe dijadikan WheelEvent ke
+      // elemen xterm: jalur yang sama dengan wheel desktop (xterm → laporan mouse → copy-mode tmux).
+      // Tanpa `onData` (pane baca-saja) laporan itu tak punya jalan keluar, jadi tetap lokal.
+      const target = canWrite && term.modes?.mouseTrackingMode !== "none" ? term.element : undefined;
+      const step = lineHeight * (target ? TMUX_WHEEL_LINES : 1);
+      const steps = Math.trunc(touchRemainder / step);
+      if (steps !== 0) {
+        if (target) {
+          const { clientX } = event.touches[0]!;
+          for (let i = 0; i < Math.abs(steps); i++) {
+            target.dispatchEvent(new WheelEvent("wheel", {
+              deltaY: Math.sign(steps), deltaMode: WheelEvent.DOM_DELTA_LINE,
+              clientX, clientY: nextY, bubbles: true, cancelable: true,
+            }));
+          }
+        } else term.scrollLines(steps);
+        touchRemainder -= steps * step;
         touchScrolled = true;
       }
       event.preventDefault();

@@ -19,6 +19,9 @@ const xt = vi.hoisted(() => ({
   dataHandler: undefined as ((data: string) => void) | undefined,
   resize: undefined as ((entries: ResizeObserverEntry[]) => void) | undefined,
   wheelHandler: undefined as ((e: WheelEvent) => boolean) | undefined,
+  // Protokol mouse yang dinyalakan tmux `mouse on` (SPEC-209); "none" = tanpa mouse-reporting.
+  mouseTrackingMode: "none" as string,
+  element: undefined as HTMLElement | undefined,
   buffer: {
     viewportY: 0,
     cursorX: 0,
@@ -57,6 +60,8 @@ vi.mock("@xterm/xterm", () => ({
       return { dispose: () => { xt.dataHandler = undefined; } };
     }
     public get buffer() { return { active: xt.buffer }; }
+    public get modes() { return { mouseTrackingMode: xt.mouseTrackingMode }; }
+    public get element() { return xt.element; }
   },
 }));
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { public fit(): void { xt.fitCount += 1; } } }));
@@ -92,7 +97,7 @@ const keydown = (over: Partial<KeyboardEvent> & { key: string }): KeyboardEvent 
 beforeEach(() => {
   xt.options = undefined; xt.keyHandler = undefined; xt.selection = ""; xt.written = [];
   xt.focused = 0; xt.fitCount = 0; xt.scrolled = []; xt.dataHandler = undefined; xt.resize = undefined;
-  xt.wheelHandler = undefined;
+  xt.wheelHandler = undefined; xt.mouseTrackingMode = "none"; xt.element = undefined;
   xt.buffer = { viewportY: 0, cursorX: 0, cursorY: 0, getLine: () => undefined };
   sockets.length = 0;
   vi.spyOn(api, "issueWsTicket").mockResolvedValue({ ticket: "ws-once" });
@@ -173,6 +178,41 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
 
     expect(xt.scrolled.at(-1)).toBeLessThan(0);
     expect(move.defaultPrevented).toBe(true);
+  });
+
+  it("swipe tablet menggulir RIWAYAT tmux lewat wheel xterm saat mouse-reporting aktif", () => {
+    // Riwayat 50 000 baris ada di tmux (SPEC-209); buffer xterm hanya memegang yang diterima sejak
+    // attach. `scrollLines` karena itu tak pernah bisa sampai ke riwayat lama — swipe wajib lewat
+    // jalur wheel yang sama dengan desktop, yang xterm ubah jadi laporan mouse ke tmux.
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    const host = paneHost(container);
+    xt.mouseTrackingMode = "drag";
+    xt.element = document.createElement("div");
+    host.appendChild(xt.element);
+    const wheels: WheelEvent[] = [];
+    xt.element.addEventListener("wheel", (e) => wheels.push(e));
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 240, top: 0, right: 640, bottom: 240, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+    const touch = (type: "touchstart" | "touchmove", clientY: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "touches", { value: [{ clientX: 40, clientY }] });
+      host.dispatchEvent(event);
+      return event;
+    };
+
+    // 10 px/baris; tmux menggulir 5 baris per event wheel → jari turun 100 px = 2 wheel-up.
+    touch("touchstart", 100);
+    const move = touch("touchmove", 200);
+
+    expect(xt.scrolled).toEqual([]);
+    expect(wheels.map((w) => Math.sign(w.deltaY))).toEqual([-1, -1]);
+    expect(wheels[0]!.clientX).toBe(40);
+    expect(move.defaultPrevented).toBe(true);
+
+    // Jari naik lagi → wheel-down (kembali ke baris terbaru).
+    touch("touchmove", 150);
+    expect(wheels.map((w) => Math.sign(w.deltaY))).toEqual([-1, -1, 1]);
   });
 
   it("lahir dengan macOptionClickForcesSelection agar seleksi mungkin di bawah mouse-reporting tmux", () => {

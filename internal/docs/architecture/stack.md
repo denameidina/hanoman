@@ -142,7 +142,12 @@ yang lahir dari audit SPEC-800:
   `Shift+wheel` menggulir scrollback xterm secara lokal lewat `attachCustomWheelEventHandler`, satu
   jalur gulir yang tak pernah melewati mouse-mode. Riwayat itu hanya ada bila agen **tidak** memakai
   alternate screen — tmux tak menyimpan history untuk alternate screen (`history_size` 0) — jadi codex
-  dilahirkan dengan `--no-alt-screen` (mode inline), sejajar claude. Ukuran font terminal adalah state tampilan
+  dilahirkan dengan `--no-alt-screen` (mode inline), sejajar claude. **Swipe sentuh (tablet/ponsel)
+  menempuh jalur yang sama**: selagi mouse-reporting aktif, `onTouchMove` mengirim `WheelEvent` ke
+  elemen xterm — satu per 5 baris gerakan jari, sama dengan `-N 5` binding wheel copy-mode tmux —
+  sehingga xterm melaporkannya ke tmux seperti wheel desktop. `scrollLines` lokal hanya menjangkau
+  apa yang diterima sejak attach, jadi ia tinggal cadangan saat mouse-reporting mati atau pane
+  baca-saja. Ukuran font terminal adalah state tampilan
   persisten (SPEC-740 · ADR-0115), bukan bagian workspace kanonik per-user (SPEC-786 · ADR-0118).
 - **Lampiran gambar adalah BERKAS + PATH, bukan gambar inline** (SPEC-816). Yang bisa dikirim ke PTY
   hanyalah teks; CLI-lah yang menyusun blok image, dari clipboard mesin server atau dari berkas yang
