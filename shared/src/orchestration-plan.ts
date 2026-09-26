@@ -62,5 +62,7 @@ export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
       phase, agentName: phaseAgentName(phase), ...resolve(phase, input.orchestrator),
     })),
     ...(reviewer ? { reviewer } : {}),
+    // Amandemen ADR-0170 P2 · cara Execute mengerjakan plan; hanya dipakai sesi claude.
+    executeMode: cfg?.executeMode ?? "inline",
   };
 }

@@ -217,7 +217,12 @@ export function phaseAgentInstructions(
   const { flow, method } = ctx;
   const phase = entry.phase;
   const guide = PROJECT_FLOWS.has(flow) ? projectGuide(flow, phase, ctx) : backlogGuide(flow, phase, ctx);
-  const skills = phaseSkillsFor(flow, phase, method, plan.runtime);
+  const executeMode = plan.executeMode ?? "inline";
+  const skills = phaseSkillsFor(flow, phase, method, plan.runtime, executeMode);
+  // Amandemen ADR-0170 P2 · skill subagent-driven punya final whole-branch review sendiri; saat
+  // reviewer `hanoman-fase-review` ada, itu review akhir KEDUA atas diff yang sama — dilewati.
+  const skipSkillFinalReview = phase === "Execute" && plan.runtime === "claude" && executeMode === "subagent"
+    && !!plan.reviewer && skills.includes("superpowers:subagent-driven-development");
   const work = (WORK_PHASES as readonly string[]).includes(phase);
   // ADR-0170 P2 · Verifikasi (goal) menjalankan test/typecheck — tanpa klausa scope ia jatuh ke DoD
   // repo target (suite penuh), lubang yang sama dengan ADR-0080. Gaya kode tetap hanya fase kerja.
@@ -231,6 +236,10 @@ export function phaseAgentInstructions(
     skills.length
       ? `Skills ${method.label} WAJIB untuk fase ini — muat & ikuti dengan mekanisme yang tersedia di agenmu: `
         + skills.join(", ")
+      : "",
+    skipSkillFinalReview
+      ? "LEWATI final whole-branch review milik skill subagent-driven-development: review akhir dipegang "
+        + "reviewer `hanoman-fase-review` yang dipanggil orchestrator sesudah fase ini. Review per task tetap jalan."
       : "",
     verifies ? scopeClause(flow, ctx.verifyScope) : "",
     work ? codeStyleClause(flow) : "",

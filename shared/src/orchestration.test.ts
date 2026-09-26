@@ -175,6 +175,12 @@ describe("resolvePhasePlan", () => {
     expect(resolvePhasePlan({ ...base, phaseOverrides: { Review: { model: "default" } } })!.reviewer)
       .toMatchObject({ model: "inherit", effort: "high" });
   });
+  it("executeMode dibawa ke rencana: default inline, sel flow subagent menang", () => {
+    expect(resolvePhasePlan(base)!.executeMode).toBe("inline");
+    const orchestration = { ...ORCHESTRATION_DEFAULTS, feature: { ...ORCHESTRATION_DEFAULTS.feature, executeMode: "subagent" as const } };
+    expect(resolvePhasePlan({ ...base, orchestration })!.executeMode).toBe("subagent");
+    expect(resolvePhasePlan({ ...base, orchestration: undefined })!.executeMode).toBe("inline");
+  });
   it("kunci fase asing di matriks tak menambah fase", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS,
       goal: { enabled: true, claude: { Foo: { model: "x", effort: "low" } }, codex: {} } };

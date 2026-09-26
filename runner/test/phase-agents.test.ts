@@ -228,10 +228,26 @@ describe("buildPhaseAgents (ADR-0164)", () => {
 // agen fase bisa memanggil anak dan menunggunya — izin "custom agent lain boleh dipanggil" akhirnya
 // bisa dipenuhi, jadi instruksinya harus menyebut KAPAN, SIAPA, dan KONTRAK serah-terimanya.
 describe("P2 · Execute & kontrak fase (ADR-0170)", () => {
-  it("Execute agen fase claude superpowers memakai subagent-driven-development, bukan executing-plans", () => {
+  // Amandemen ADR-0170 P2 · default `inline`: subagent per task terukur terlalu lambat.
+  it("Execute claude default (inline) memakai executing-plans, bukan subagent-driven-development", () => {
     const e = at(agentsFor("feature"), "Execute").instructions;
+    expect(e).toContain("superpowers:executing-plans");
+    expect(e).not.toContain("superpowers:subagent-driven-development");
+  });
+  it("executeMode subagent: Execute claude memakai subagent-driven-development dan melewati final review skill", () => {
+    const plan = { ...planFor("feature"), executeMode: "subagent" as const };
+    const e = at(buildPhaseAgents(plan, {
+      flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "K" }), "Execute").instructions;
     expect(e).toContain("superpowers:subagent-driven-development");
     expect(e).not.toContain("superpowers:executing-plans");
+    expect(e).toContain("LEWATI final whole-branch review");
+  });
+  it("executeMode subagent tak berlaku untuk codex: tetap executing-plans", () => {
+    const plan = { ...planFor("feature", "codex"), executeMode: "subagent" as const };
+    const e = at(buildPhaseAgents(plan, {
+      flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "K" }), "Execute").instructions;
+    expect(e).toContain("superpowers:executing-plans");
+    expect(e).not.toContain("LEWATI final whole-branch review");
   });
   it("codex & metode matt tak berubah: codex tetap executing-plans, matt tetap implement", () => {
     const codex = buildPhaseAgents(planFor("feature", "codex"), {
