@@ -7,6 +7,9 @@ import { useApi } from "../../api/instance";
 import { ApiError } from "../../api/client";
 import { buildFileTree, TreeRow } from "../file-tree";
 
+/** Frontmatter sudah punya kartunya sendiri — jangan dirender ulang sebagai prosa di pratinjau. */
+const stripFrontmatter = (t: string): string => t.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+
 /** Pesan galat untuk operator: `error` dari body server bila ada, bukan "PUT … → 409". */
 export const errMessage = (e: unknown): string => {
   const d = e instanceof ApiError ? (e.detail as { error?: unknown } | null) : null;
@@ -101,7 +104,7 @@ export function SkillFileEditor({ skill, path, onFork, onToast }:
           : mode === "edit" ? (
             <textarea aria-label="Isi berkas" value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false}
               style={{ width: "100%", height: "100%", minHeight: 320, border: 0, padding: 16, fontFamily: "var(--font-mono)", fontSize: 13, background: "transparent", resize: "none" }} />
-          ) : isMarkdownPath(path) ? <MarkdownView text={file.content ?? ""} name={path} />
+          ) : isMarkdownPath(path) ? <MarkdownView text={path === "SKILL.md" ? stripFrontmatter(file.content ?? "") : file.content ?? ""} name={path} />
           : <pre style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 13, whiteSpace: "pre-wrap" }}>{file.content}</pre>}
       </div>
       {skill.editable && mode === "edit" && (

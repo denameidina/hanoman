@@ -2018,12 +2018,12 @@ ADR memuat: Konteks (skill hanya terlihat sebagai prasyarat metode, ADR-0114; ta
 
 - [x] **Step 2: Perbarui stack.md, SKILL.md hanoman, README index** — satu paragraf/baris masing-masing, tautan relatif ke ADR/SPEC.
 
-- [ ] **Step 3: Jalankan semua test tersentuh sekaligus**
+- [x] **Step 3: Jalankan semua test tersentuh sekaligus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --changed "$(git merge-base HEAD main)" --no-file-parallelism`
 Expected: PASS. Bandingkan kegagalan apa pun dengan base (memori "base merah") sebelum menyebutnya regresi.
 
-- [ ] **Step 4: Boot server lokal & curl endpoint (DB & HANOMAN_HOME sekali-pakai)**
+- [x] **Step 4: Boot server lokal & curl endpoint (DB & HANOMAN_HOME sekali-pakai)**
 
 ```bash
 H=$(mktemp -d); export HANOMAN_HOME=$H HANOMAN_DATABASE_URL="file:$H/hanoman.db"
@@ -2036,9 +2036,9 @@ curl -s "http://127.0.0.1:${PORT:-8787}/api/skills/$(node -e 'console.log(encode
 
 Expected: JSON `global` memuat `demo`; tree memuat `SKILL.md`. Bila auth memblokir (401), ikuti memori "Live smoke: DB khusus" / setup token lokal. Hentikan server dengan PID-nya sendiri (JANGAN `pkill -f` — memori SPEC-402).
 
-- [ ] **Step 5: Render UI** — buka `/skills` dan `/skills/<projectId>` lewat CDP/Playwright (memori "Smoke browser lewat CDP"), pastikan section Global + per project tampil, pilih skill → struktur + editor, dan tampilan sempit (≤ 720 px) berpindah panel tanpa terpotong.
+- [x] **Step 5: Render UI** — buka `/skills` dan `/skills/<projectId>` lewat CDP/Playwright (memori "Smoke browser lewat CDP"), pastikan section Global + per project tampil, pilih skill → struktur + editor, dan tampilan sempit (≤ 720 px) berpindah panel tanpa terpotong.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs/adr/<NNNN>-skill-library-tiga-lapis-suntik-global.md internal/docs/architecture/stack.md internal/skills/hanoman/SKILL.md internal/docs/README.md <berkas-SPEC> docs/superpowers/plans/2026-09-26-skills-library.md

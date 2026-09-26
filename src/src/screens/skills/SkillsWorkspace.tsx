@@ -3,7 +3,7 @@
 // /skills/<projectId> (global warisan + skill project itu). Pola CustomAgentsPanel.
 import React from "react";
 import type { SkillEntry, SkillLibraryView, SkillTreeView } from "@hanoman/shared";
-import { Button, Field, Input, Modal, ResponsivePanels, Select, StateBlock, useConfirm } from "../../ds";
+import { Button, Card, Field, Input, Modal, ResponsivePanels, Select, StateBlock, useConfirm } from "../../ds";
 import { useApi } from "../../api/instance";
 import { SkillsList } from "./SkillsList";
 import { SkillFileEditor, SkillStructure, errMessage } from "./SkillEditor";
@@ -19,7 +19,7 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
   const [skill, setSkill] = React.useState<SkillEntry | null>(null);
   const [tree, setTree] = React.useState<SkillTreeView | null>(null);
   const [path, setPath] = React.useState("SKILL.md");
-  const [panel, setPanel] = React.useState<"list" | "tree" | "editor">("list");
+  const [panel, setPanel] = React.useState<"list" | "detail">("list");
   const [creating, setCreating] = React.useState<NewSkill | null>(null);
 
   const reload = React.useCallback(async () => {
@@ -37,7 +37,7 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
     setTree(null);
     api.skillTree(s.key).then(setTree).catch(() => setTree({ files: [], dirs: [] }));
   }, [api]);
-  const select = (s: SkillEntry) => { setSkill(s); setPath("SKILL.md"); loadTree(s); setPanel("tree"); };
+  const select = (s: SkillEntry) => { setSkill(s); setPath("SKILL.md"); loadTree(s); setPanel("detail"); };
 
   const fork = async () => {
     if (!skill) return;
@@ -69,15 +69,23 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
         {skill?.editable && <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={remove}>Hapus skill</Button>}
         <Button size="sm" leftIcon="plus" onClick={() => setCreating({ layer: projectId ? "project" : "hanoman", source: ".claude", name: "", description: "" })}>Skill baru</Button>
       </div>
-      <ResponsivePanels ariaLabel="Skills" active={panel} onActiveChange={(n) => setPanel(n as typeof panel)} masterWidth={300}
+      {/* Dua panel (daftar | detail): ResponsivePanels dirancang master-detail. Di dalam detail,
+          struktur dan editor berdampingan dan membungkus ke bawah di layar sempit. */}
+      <ResponsivePanels ariaLabel="Skills" active={panel} onActiveChange={(n) => setPanel(n as typeof panel)} masterWidth={320}
         panels={[
-          { id: "list", label: "Skill", className: "hn-panel-flex", content: <SkillsList library={library} selected={skill?.key} onSelect={select} /> },
-          { id: "tree", label: "Struktur", className: "hn-panel-flex", content: skill
-              ? <SkillStructure skill={skill} tree={tree} selected={path} onSelect={(p) => { setPath(p); setPanel("editor"); }} onChanged={() => loadTree(skill)} onToast={onToast} />
-              : <StateBlock kind="empty" compact icon="folder-tree" title="Pilih skill" /> },
-          { id: "editor", label: "Editor", className: "hn-panel-flex", content: skill
-              ? <SkillFileEditor skill={skill} path={path} onFork={fork} onToast={onToast} />
-              : <StateBlock kind="empty" compact icon="file-text" title="Pilih skill untuk melihat isinya" /> },
+          { id: "list", label: "Skill", className: "hn-panel-flex", content: (
+            <Card padding={0} fill><SkillsList library={library} selected={skill?.key} onSelect={select} projectFirst={!!projectId} /></Card>
+          ) },
+          { id: "detail", label: skill ? skill.name : "Detail", className: "hn-panel-flex", content: skill ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, flex: "1 1 auto", minHeight: 0, alignItems: "stretch" }}>
+              <div style={{ flex: "0 1 260px", minWidth: 220, minHeight: 220, display: "flex" }}>
+                <SkillStructure skill={skill} tree={tree} selected={path} onSelect={setPath} onChanged={() => loadTree(skill)} onToast={onToast} />
+              </div>
+              <div style={{ flex: "1 1 420px", minWidth: 0, minHeight: 320, display: "flex" }}>
+                <SkillFileEditor skill={skill} path={path} onFork={fork} onToast={onToast} />
+              </div>
+            </div>
+          ) : <StateBlock kind="empty" compact icon="file-text" title="Pilih skill untuk melihat struktur & isinya" /> },
         ]} />
       <Modal open={!!creating} title="Skill baru" onClose={() => setCreating(null)}
         footer={<Button onClick={create} disabled={!creating?.name || !creating?.description}>Buat</Button>}>

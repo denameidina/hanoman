@@ -78,4 +78,14 @@ describe("SkillsWorkspace (/skills)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Simpan" }));
     expect(await screen.findByText(/berubah di tempat lain/)).toBeTruthy();
   });
+
+  it("grup besar terlipat default dan terbuka saat mencari", async () => {
+    const many = Array.from({ length: 12 }, (_, i) => e({ key: `plugin~-~plugin:pkg~p${i}`, name: `plug-${i}`, layer: "plugin", source: "plugin:pkg", editable: false }));
+    mockFetch((u) => u.includes("/api/skills?scope=all") ? json({ ...library, global: [...library.global, ...many] }) : null);
+    render(<SkillsWorkspace />);
+    expect(await screen.findByText("shared-a")).toBeTruthy();
+    expect(screen.queryByText("plug-3")).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText("Cari skill…"), { target: { value: "plug-3" } });
+    expect(await screen.findByText("plug-3")).toBeTruthy();
+  });
 });
