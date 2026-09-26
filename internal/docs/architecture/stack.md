@@ -260,6 +260,17 @@ digabungkan ke fase terakhir flow penulis-kode, ditegakkan test di sumber. `PIPE
 berubah** — metode mengganti CARA sebuah fase dikerjakan, bukan fase apa yang ada. Tanpa pilihan
 eksplisit, prompt byte-identik dengan sebelum spec ini.
 
+**Skill library** (ADR-0172, mengamandemen ADR-0114): selain pencocokan prasyarat metode, skill
+adalah entri yang bisa **dilihat & disunting** dari dashboard (`/skills`, `/skills/<projectId>`,
+`/api/skills*`, capability `skills:read|write`). Tanpa tabel — pemindaian disk saat request
+(`runner/src/skill-library.ts`, operasi berkas aman-path di `runner/src/skill-files.ts`) atas empat
+lapis: `hanoman` (`$HANOMAN_HOME/skills`, dipakai bersama semua project), `user`
+(`~/.claude|~/.codex|~/.agents/skills`), `plugin` (baca-saja, fork), `project` (folder berisi
+`SKILL.md` di checkout utama). Skill `hanoman` disuntik ke setiap sesi agen oleh
+`server/src/services/skill-inject.ts`: claude lewat `--add-dir <tmp>/skills-root` (argumen argv
+terakhir), codex lewat symlink `.agents/skills/<n>` + exclude bertanda di common dir git; skill
+project bernama sama menang dan tak disuntik.
+
 Sesi memakai `--dangerously-skip-permissions`/padanan codex tanpa hook deny perintah; guardrail itu
 dicabut ADR-0037. Sejak ADR-0117, worktree hanya boundary Git dan instance ber-hardening menjalankan
 semua agen di rootless Podman dengan mount/secret/egress minimum. Sejak SPEC-884/ADR-0139 hardening

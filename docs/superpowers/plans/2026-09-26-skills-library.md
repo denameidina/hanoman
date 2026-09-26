@@ -48,7 +48,7 @@ Desain: `docs/superpowers/specs/2026-09-26-skills-library-design.md`.
   - `function parseSkillKey(key: string): { layer: SkillLayer; projectId: string|null; source: string; name: string } | null`
   - `function parseSkillFrontmatter(text: string): { name?: string; description?: string; error?: string }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // shared/src/skills.test.ts
@@ -95,12 +95,12 @@ describe("SKILL_NAME_RE", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/skills.test.ts`
 Expected: FAIL — `Cannot find module './skills'`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // shared/src/skills.ts
@@ -190,12 +190,12 @@ export function parseSkillFrontmatter(text: string): { name?: string; descriptio
 
 Tambah ke `shared/src/index.ts`: `export * from "./skills";`
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run shared/src/skills.test.ts`
 Expected: PASS (semua).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/skills.ts shared/src/skills.test.ts shared/src/index.ts docs/superpowers/plans/2026-09-26-skills-library.md
@@ -221,7 +221,7 @@ git commit -m "feat(skills): tipe SkillEntry + parser frontmatter di shared"
   - `function scanProjectSkills(projectId: string, repoDir: string, o: SkillScanOpts): SkillEntry[]`
   - `function markShadowed(global: SkillEntry[], project: SkillEntry[]): SkillEntry[]` (salinan global; entri `hanoman` yang namanya ada di project diberi `shadowedBy` = key project)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // runner/src/skill-library.test.ts
@@ -314,12 +314,12 @@ describe("markShadowed", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run runner/src/skill-library.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // runner/src/skill-library.ts
@@ -434,12 +434,12 @@ export function markShadowed(global: SkillEntry[], project: SkillEntry[]): Skill
 
 Catatan: `skillsUnder(dir, pkg, depth = 2)` sudah ada di `runner/src/skills.ts:88`; ubah hanya kata kunci `export`.
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run runner/src/skill-library.test.ts runner/src/skills.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/skill-library.ts runner/src/skill-library.test.ts runner/src/skills.ts runner/src/index.ts docs/superpowers/plans/2026-09-26-skills-library.md
@@ -469,7 +469,7 @@ git commit -m "feat(skills): pemindai tiga lapis skill library di runner"
   - `function copySkillDir(src: string, parent: string, name: string): string`
   - `function deleteSkillDir(dir: string): void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // runner/src/skill-files.test.ts
@@ -564,12 +564,12 @@ describe("entry & skill lifecycle", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run runner/src/skill-files.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // runner/src/skill-files.ts
@@ -689,12 +689,12 @@ export function deleteSkillDir(dir: string): void {
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run runner/src/skill-files.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/skill-files.ts runner/src/skill-files.test.ts runner/src/index.ts docs/superpowers/plans/2026-09-26-skills-library.md
@@ -728,7 +728,7 @@ git commit -m "feat(skills): operasi berkas skill aman-path (tree/read/write/cre
   - `async function targetParent(layer: "hanoman"|"user"|"project", source: string|undefined, projectId: string|undefined): Promise<string>`
   - (Pencabutan exclude suntikan codex saat membuat skill project disambungkan di Task 5 Step 5, bukan di sini.)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/skills.route.test.ts
@@ -858,12 +858,12 @@ describe("siklus hidup skill", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/skills.route.test.ts --no-file-parallelism`
 Expected: FAIL — 404 pada semua route / capability `undefined`.
 
-- [ ] **Step 3: Implementasi — capability, paths, service, route**
+- [x] **Step 3: Implementasi — capability, paths, service, route**
 
 `shared/src/agent.ts` — di daftar id capability, sesudah `"agents:read", "agents:write",`:
 
@@ -1076,12 +1076,12 @@ export default async function skills(app: FastifyInstance) {
 
 `server/src/app.ts`: tambah `import skills from "./routes/skills";` di dekat `import customAgents …` (baris 42) dan `await api.register(skills);` tepat sesudah `await api.register(customAgents);` (cari dengan `grep -n "register(customAgents)" server/src/app.ts`).
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/skills.route.test.ts server/test/custom-agents.route.test.ts --no-file-parallelism`
 Expected: PASS. Bila ada test capability katalog yang menghitung jumlah capability/domain (cari: `grep -rn "CAPABILITY_DOMAINS\|CAPABILITIES.length" server/test shared/src src/src --include=*.test.*`), perbarui angka/daftarnya dan sertakan di run ini.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/agent.ts shared/src/api.ts server/src/services/agent-capabilities.ts server/src/services/skill-library.ts server/src/routes/skills.ts server/src/app.ts server/test/skills.route.test.ts docs/superpowers/plans/2026-09-26-skills-library.md
@@ -1106,7 +1106,7 @@ git commit -m "feat(skills): route /api/skills* + capability skills:read/write"
   - `function unexcludeInjected(repoDir: string, name: string): void`
   - `const INJECT_MARKER = "# hanoman:skill-inject"`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/skill-inject.test.ts
@@ -1191,12 +1191,12 @@ describe("fail-open", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run server/test/skill-inject.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // server/src/services/skill-inject.ts
@@ -1283,12 +1283,12 @@ export function unexcludeInjected(repoDir: string, name: string): void {
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run server/test/skill-inject.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Sambungkan ke `pty.ts` dan route**
+- [x] **Step 5: Sambungkan ke `pty.ts` dan route**
 
 `server/src/services/pty.ts` — impor di bagian atas:
 
@@ -1337,7 +1337,7 @@ Tambah test di `server/test/custom-agents.pty.test.ts`-gaya? Tidak — cukup jal
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/skill-inject.test.ts server/test/skills.route.test.ts server/test/custom-agents.pty.test.ts --no-file-parallelism`
 Expected: PASS. (Bila `custom-agents.pty.test.ts` gagal karena env tmux/askpass, lihat memori "pty.test gagal palsu"; bandingkan dengan run di base sebelum menyimpulkan regresi.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/skill-inject.ts server/test/skill-inject.test.ts server/src/services/pty.ts server/src/routes/skills.ts docs/superpowers/plans/2026-09-26-skills-library.md
@@ -1357,7 +1357,7 @@ git commit -m "feat(skills): suntik skill global hanoman ke sesi (claude --add-d
 - Consumes: `obj`, `str` dari `../mcp-schema`; `enc`, `query`, `s` dari `./helpers`; `McpToolDef`.
 - Produces: `SKILLS_TOOLS: readonly McpToolDef[]` berisi `hanoman_skills_list`, `hanoman_skill_read`, `hanoman_skill_write`.
 
-- [ ] **Step 1: Tulis test yang gagal** — tambahkan ke test katalog MCP yang ditemukan (atau buat `shared/src/mcp-catalog/skills.test.ts`):
+- [x] **Step 1: Tulis test yang gagal** — tambahkan ke test katalog MCP yang ditemukan (atau buat `shared/src/mcp-catalog/skills.test.ts`):
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -1382,12 +1382,12 @@ describe("SKILLS_TOOLS", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog/skills.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Periksa dulu bentuk `build` return (`body`/`query`) dan helper `enc` di `shared/src/mcp-catalog/helpers.ts` & `agents.ts` (tool `hanoman_agent_update` memakai path ber-id). Lalu:
 
@@ -1450,12 +1450,12 @@ export const SKILLS_TOOLS: readonly McpToolDef[] = [
 
 Sesuaikan nama field `body` bila `McpToolDef.build` memakai nama lain (lihat `agents.ts` tool create). Daftarkan di `shared/src/mcp-catalog/index.ts` di samping `AGENTS_TOOLS`.
 
-- [ ] **Step 4: Jalankan, pastikan lulus** — termasuk test katalog MCP yang sudah ada (mis. test yang memvalidasi setiap tool punya capability sah dan `samplePath` terpeta oleh `capabilityForRoute`):
+- [x] **Step 4: Jalankan, pastikan lulus** — termasuk test katalog MCP yang sudah ada (mis. test yang memvalidasi setiap tool punya capability sah dan `samplePath` terpeta oleh `capabilityForRoute`):
 
 Run: `pnpm vitest --run shared/src/mcp-catalog/skills.test.ts <test-katalog-mcp-yang-ditemukan>`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/mcp-catalog/skills.ts shared/src/mcp-catalog/skills.test.ts shared/src/mcp-catalog/index.ts docs/superpowers/plans/2026-09-26-skills-library.md
@@ -1479,7 +1479,7 @@ git commit -m "feat(skills): tool MCP hanoman_skills_list/skill_read/skill_write
   - api: `listSkills(projectId?)`, `listAllSkills()`, `skillTree(key)`, `skillFile(key, path)`, `writeSkillFile(key, path, content, baseHash)`, `createSkillEntry(key, path, kind)`, `deleteSkillEntry(key, path)`, `createSkill(b)`, `forkSkill(key, b)`, `deleteSkill(key)`
   - `export function SkillsWorkspace({ projectId, onToast }: { projectId?: string; onToast?: (m: string) => void })`
 
-- [ ] **Step 1: Klien API**
+- [x] **Step 1: Klien API**
 
 ```ts
   // Skills library · tanpa projectId → semua grup (global + per project); dengan projectId →
@@ -1502,7 +1502,7 @@ git commit -m "feat(skills): tool MCP hanoman_skills_list/skill_read/skill_write
 
 Impor tipe `SkillEntry, SkillLibraryView, SkillTreeView, SkillFileView` dari `@hanoman/shared` di kepala `client.ts`. Periksa bahwa `j` melempar error ber-`status` untuk 409 (lihat implementasi `j` di berkas yang sama); editor memakai `(e as { status?: number }).status === 409`.
 
-- [ ] **Step 2: Tulis test komponen yang gagal**
+- [x] **Step 2: Tulis test komponen yang gagal**
 
 ```tsx
 // src/src/screens/skills/SkillsWorkspace.test.tsx
@@ -1588,12 +1588,12 @@ describe("SkillsWorkspace (/skills)", () => {
 });
 ```
 
-- [ ] **Step 3: Jalankan, pastikan gagal**
+- [x] **Step 3: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run src/src/screens/skills/SkillsWorkspace.test.tsx`
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Implementasi komponen**
+- [x] **Step 4: Implementasi komponen**
 
 Sebelum menulis, baca props `Card`, `Badge`, `Button`, `Input`, `StateBlock`, `ResponsivePanels`, `Modal`, `Field`, `useConfirm` di `src/src/ds/**` dan pola `IdeReadPanel.tsx:55-120`; ikuti design system `internal/docs/design-system/**`. Bila `useApi()` membutuhkan provider di test, cek cara `CustomAgentsPanel.test.tsx`/`SettingsScreen.test.tsx` merender (mereka memakai `fetch` mock langsung — ikuti itu).
 
@@ -1893,12 +1893,12 @@ export function SkillsWorkspace({ projectId, onToast }: { projectId?: string; on
 
 Sesuaikan signature `useConfirm()` (baca `src/src/ds/useConfirm.tsx:30`) dan pakai `Select` dari `ds` alih-alih `<select>` bila ada (App.tsx mengimpor `Select` dari `./ds`).
 
-- [ ] **Step 5: Jalankan, pastikan lulus**
+- [x] **Step 5: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run src/src/screens/skills/SkillsWorkspace.test.tsx`
 Expected: PASS. (Node 25 + jsdom localStorage: lihat memori bila test lain di file gagal karena localStorage.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/api/client.ts src/src/screens/skills docs/superpowers/plans/2026-09-26-skills-library.md
@@ -1920,7 +1920,7 @@ git commit -m "feat(skills): SkillsWorkspace — daftar grup global/project, str
 - Consumes: `SkillsWorkspace` (Task 7).
 - Produces: `Route.projectId` terisi untuk section `skills` bila path `/skills/<id>`.
 
-- [ ] **Step 1: Tulis test rute yang gagal**
+- [x] **Step 1: Tulis test rute yang gagal**
 
 ```ts
 // tambahkan ke test parseRoute yang ada
@@ -1933,12 +1933,12 @@ it("skills: global dan per project, bolak-balik", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run src/src/routes.test.ts`
 Expected: FAIL — `/skills/p1` → `null`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `src/src/routes.ts` — komentar bentuk URL tambah `//   /skills[/<projectId>]              skill global + per project, atau satu project`; di `routePath`:
 
@@ -1989,12 +1989,12 @@ di `parseRoute`, sebelum `return null` terakhir:
 
 Impor `SkillsWorkspace` dari `./screens/skills/SkillsWorkspace`. Cek nama `projects` state & helper `gate`/`suspend` yang dipakai cabang lain; pakai yang sama dengan cabang `settings`/`review`. Bila `projects` tak ada di scope, kirim `projectId` saja dan breadcrumb `skills · project`.
 
-- [ ] **Step 4: Jalankan test tersentuh**
+- [x] **Step 4: Jalankan test tersentuh**
 
 Run: `pnpm vitest --run src/src/routes.test.ts src/src/screens/skills/SkillsWorkspace.test.tsx $(grep -rln "HN_NAV\|NAV_KEYS\|ProjectDetailScreen" src/src --include=*.test.tsx --include=*.test.ts | tr '\n' ' ')`
 Expected: PASS (perbarui snapshot/daftar nav di test yang menghitung item nav bila ada).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/ds/shell.tsx src/src/routes.ts src/src/routes.test.ts src/src/App.tsx src/src/screens/ProjectDetailScreen.tsx docs/superpowers/plans/2026-09-26-skills-library.md
@@ -2012,18 +2012,18 @@ git commit -m "feat(skills): nav /skills, rute /skills/<projectId>, pintu Skills
 - Modify: `internal/skills/hanoman/SKILL.md` (sebut `/api/skills`, tool MCP baru, `$HANOMAN_HOME/skills`)
 - Modify: `internal/docs/README.md` (tautkan ADR & SPEC baru)
 
-- [ ] **Step 1: Alokasikan SPEC & ADR, tulis ADR**
+- [x] **Step 1: Alokasikan SPEC & ADR, tulis ADR**
 
 ADR memuat: Konteks (skill hanya terlihat sebagai prasyarat metode, ADR-0114; tak ada tampilan/penyuntingan; tak ada skill bersama lintas project); Keputusan (tiga lapis tanpa DB; key `layer~projectId~source~name`; plugin baca-saja + fork; project scan generik; capability `skills:*` menurut method; penyuntikan claude `--add-dir` — dikutip dari docs Claude Code; codex symlink + exclude common dir dengan marker dan `unexcludeInjected`; skill project menang atas global); Konsekuensi (skill global tak aktif di luar hanoman; baris exclude codex terlihat di checkout utama; tak ada watcher — refetch); Amandemen ADR-0114.
 
-- [ ] **Step 2: Perbarui stack.md, SKILL.md hanoman, README index** — satu paragraf/baris masing-masing, tautan relatif ke ADR/SPEC.
+- [x] **Step 2: Perbarui stack.md, SKILL.md hanoman, README index** — satu paragraf/baris masing-masing, tautan relatif ke ADR/SPEC.
 
-- [ ] **Step 3: Jalankan semua test tersentuh sekaligus**
+- [x] **Step 3: Jalankan semua test tersentuh sekaligus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run --changed "$(git merge-base HEAD main)" --no-file-parallelism`
 Expected: PASS. Bandingkan kegagalan apa pun dengan base (memori "base merah") sebelum menyebutnya regresi.
 
-- [ ] **Step 4: Boot server lokal & curl endpoint (DB & HANOMAN_HOME sekali-pakai)**
+- [x] **Step 4: Boot server lokal & curl endpoint (DB & HANOMAN_HOME sekali-pakai)**
 
 ```bash
 H=$(mktemp -d); export HANOMAN_HOME=$H HANOMAN_DATABASE_URL="file:$H/hanoman.db"
@@ -2036,9 +2036,9 @@ curl -s "http://127.0.0.1:${PORT:-8787}/api/skills/$(node -e 'console.log(encode
 
 Expected: JSON `global` memuat `demo`; tree memuat `SKILL.md`. Bila auth memblokir (401), ikuti memori "Live smoke: DB khusus" / setup token lokal. Hentikan server dengan PID-nya sendiri (JANGAN `pkill -f` — memori SPEC-402).
 
-- [ ] **Step 5: Render UI** — buka `/skills` dan `/skills/<projectId>` lewat CDP/Playwright (memori "Smoke browser lewat CDP"), pastikan section Global + per project tampil, pilih skill → struktur + editor, dan tampilan sempit (≤ 720 px) berpindah panel tanpa terpotong.
+- [x] **Step 5: Render UI** — buka `/skills` dan `/skills/<projectId>` lewat CDP/Playwright (memori "Smoke browser lewat CDP"), pastikan section Global + per project tampil, pilih skill → struktur + editor, dan tampilan sempit (≤ 720 px) berpindah panel tanpa terpotong.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/docs/adr/<NNNN>-skill-library-tiga-lapis-suntik-global.md internal/docs/architecture/stack.md internal/skills/hanoman/SKILL.md internal/docs/README.md <berkas-SPEC> docs/superpowers/plans/2026-09-26-skills-library.md

@@ -40,6 +40,7 @@ import scheduler from "./routes/scheduler";
 import lead from "./routes/lead";
 import changelog from "./routes/changelog";
 import customAgents from "./routes/custom-agents";
+import skills from "./routes/skills";
 import customAgentMetrics from "./routes/custom-agent-metrics";
 import members from "./routes/members";
 import tasks from "./routes/tasks";
@@ -287,6 +288,7 @@ export function buildApp(
     await api.register(methods);    // SPEC-739 · ADR-0114 · kesiapan skill metode per agen
     await api.register(lead);       // SPEC-409 · ADR-0091 · hanoman-lead (cookie + capability `lead`)
     await api.register(customAgents); // SPEC-450 · ADR-0094 · katalog custom agent (capability `agents`)
+    await api.register(skills);          // Skills library · skill global/user/plugin/project (capability `skills`)
     await api.register(customAgentMetrics); // SPEC-950 · local-only metrics/disposition (cookie-only)
     await api.register(githubIssues); // SPEC-471 · ADR-0095 · tarik & triase issue GitHub (capability `support`)
     await api.register(telegram);     // SPEC-476 · ADR-0096 · context/memory/reply/audit Telegram

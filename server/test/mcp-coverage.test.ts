@@ -58,6 +58,8 @@ const COVERED_BY_BRANCH = new Map<string, string>([
   ["GET /specs/:id/review/*", "hanoman_backlog_review"],
   ["GET /terminal/sessions/:id/review/*", "hanoman_session_review"],
   ["POST /vps/:id/items/na-bulk", "hanoman_vps_item_na"],
+  ["GET /skills/:key/file", "hanoman_skill_read"],
+  ["DELETE /skills/:key/entry", "hanoman_skill_entry"],
 ]);
 
 /** Path route Fastify (`/specs/:id`) → regex yang mencocokkan samplePath katalog (`/specs/SPEC-1`). */

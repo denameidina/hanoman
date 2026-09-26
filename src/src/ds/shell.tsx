@@ -33,6 +33,8 @@ export const HN_NAV: NavItem[] = [
   { key: "lead", label: "Lead", icon: "compass" },   // SPEC-409 · ADR-0091 · hanoman-lead
   { key: "terminal", label: "Terminal", icon: "terminal" },
   { key: "ide", label: "IDE", icon: "code-2" },
+  // Skills library · skill global hanoman/user/plugin + skill per project dalam satu halaman.
+  { key: "skills", label: "Skills", icon: "sparkles" },
   { key: "vps", label: "VPS", icon: "server" },
   // SPEC-919 · ADR-0147 · device yang sinkron ke hub ini + sesi hidupnya. Digerbangi supaya
   // instalasi satu mesin (nol device token) tak berubah tampilannya sama sekali.

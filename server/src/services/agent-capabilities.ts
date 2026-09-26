@@ -75,6 +75,9 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     if (seg[1] === "metrics" || seg[1] === "invocations") return "COOKIE_ONLY";
     return rw("agents");
   }
+  // Skills library · MENURUT METHOD (kelas bug SPEC-405): skill global hanoman disuntik ke setiap
+  // sesi baru, jadi izin baca tak pernah cukup untuk menulisnya.
+  if (top === "skills") return rw("skills");
   // SPEC-477 · ADR-0097 · permukaan KREDENSIAL bukan permukaan kerja sesi operator: ia menyimpan
   // bot token & AgentToken, jadi agent token mana pun (termasuk milik gateway itu sendiri, yang
   // wajib memegang `settings:write`) tak boleh menyentuhnya. Sub-path `/telegram/*` yang lain
