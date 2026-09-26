@@ -95,15 +95,20 @@ Nama skill: `^[a-z0-9][a-z0-9-]{0,63}$`; nama terpakai di tujuan → 409.
 Skill project ditulis ke **checkout utama** project → tampil sebagai perubahan uncommitted di IDE
 hanoman; commit dilakukan manusia/agen seperti biasa.
 
-**Penyuntikan** (`server/src/services/pty.ts`, saat sesi dibuka di worktree):
+**Penyuntikan** (`server/src/services/skill-inject.ts`, dipanggil `pty.ts` untuk sesi agen, bukan
+`opts.command`). Catatan: `.git/info/exclude` tinggal di *common dir* git — dipakai bersama semua
+worktree DAN checkout utama — jadi ia bukan alat isolasi per worktree.
 
-1. Untuk tiap skill `hanoman` yang tidak tertimpa skill project bernama sama: symlink
-   `<worktree>/.claude/skills/<nama>` (runtime claude) atau `<worktree>/.agents/skills/<nama>`
-   (runtime codex) → `$HANOMAN_HOME/skills/<nama>`. Jangan timpa entri yang sudah ada.
-2. Tambah path tsb ke `.git/info/exclude` worktree (idempoten) → tak pernah ikut commit,
-   `git status` tetap bersih.
-3. Fail-open: gagal → peringatan di log sesi, sesi tetap jalan.
-4. Karena symlink, suntingan global terlihat seketika; muat-ulang di sesi berjalan tergantung runtime.
+1. Hitung nama skill project di `cwd` sesi (pemindai §1). Skill `hanoman` bernama sama dilewati.
+2. **claude** — buat `<agentTempDir>/skills-root/.claude/skills/<nama>` → symlink ke
+   `$HANOMAN_HOME/skills/<nama>`, lalu tambah `--add-dir <agentTempDir>/skills-root` ke argv.
+   Terverifikasi di docs Claude Code: skill `.claude/skills/` di direktori `--add-dir` dimuat,
+   dengan live reload. Worktree tak disentuh sama sekali.
+3. **codex** — tak ada akar skill tambahan resmi; symlink `<cwd>/.agents/skills/<nama>` (bila entri
+   belum ada) + baris `/.agents/skills/<nama>` di blok bertanda `# hanoman:skill-inject` pada
+   `<git-common-dir>/info/exclude` (idempoten). Pemindai project **mengabaikan symlink yang menunjuk
+   ke `$HANOMAN_HOME/skills`**; membuat/fork skill project bernama sama mencabut baris exclude itu.
+4. Fail-open: gagal → peringatan stderr sesi, sesi tetap jalan.
 
 **MCP** (`shared/src/mcp-catalog/`): `hanoman_skills_list`, `hanoman_skill_read`,
 `hanoman_skill_write`.
@@ -148,8 +153,8 @@ Tata letak tiga kolom (sempit → `ResponsivePanels` seperti IDE):
 - Test `skill-library`: tiga lapis di tmpdir, pengecualian direktori, sumber `.claude`/`.agents`/
   `.codex`/lainnya, `shadowedBy`, frontmatter rusak, traversal & symlink keluar ditolak.
 - Test route: list scope=all / projectId, CRUD berkas, 403 plugin, 409 hash, fork.
-- Test penyuntikan: symlink dibuat per runtime, exclude idempoten, skill tertimpa dilewati,
-  fail-open.
+- Test penyuntikan: claude → add-dir berisi symlink; codex → symlink + exclude idempoten; skill
+  tertimpa dilewati; fail-open.
 - Test komponen: pengelompokan global/project, editor, mode baca-saja plugin.
 - Akhir: boot server lokal, curl endpoint.
 
