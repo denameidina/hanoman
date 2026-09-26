@@ -48,7 +48,7 @@ Desain: `docs/superpowers/specs/2026-09-26-skills-library-design.md`.
   - `function parseSkillKey(key: string): { layer: SkillLayer; projectId: string|null; source: string; name: string } | null`
   - `function parseSkillFrontmatter(text: string): { name?: string; description?: string; error?: string }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // shared/src/skills.test.ts
@@ -95,12 +95,12 @@ describe("SKILL_NAME_RE", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/skills.test.ts`
 Expected: FAIL — `Cannot find module './skills'`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // shared/src/skills.ts
@@ -190,12 +190,12 @@ export function parseSkillFrontmatter(text: string): { name?: string; descriptio
 
 Tambah ke `shared/src/index.ts`: `export * from "./skills";`
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run shared/src/skills.test.ts`
 Expected: PASS (semua).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/skills.ts shared/src/skills.test.ts shared/src/index.ts docs/superpowers/plans/2026-09-26-skills-library.md
