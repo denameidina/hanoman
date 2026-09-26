@@ -469,7 +469,7 @@ git commit -m "feat(skills): pemindai tiga lapis skill library di runner"
   - `function copySkillDir(src: string, parent: string, name: string): string`
   - `function deleteSkillDir(dir: string): void`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // runner/src/skill-files.test.ts
@@ -564,12 +564,12 @@ describe("entry & skill lifecycle", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run runner/src/skill-files.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // runner/src/skill-files.ts
@@ -689,12 +689,12 @@ export function deleteSkillDir(dir: string): void {
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run runner/src/skill-files.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/skill-files.ts runner/src/skill-files.test.ts runner/src/index.ts docs/superpowers/plans/2026-09-26-skills-library.md

@@ -24,3 +24,4 @@ export * from "./runtime-profile";
 export * from "./sandbox-probe";
 export * from "./subagent-statusline";
 export * from "./skill-library";
+export * from "./skill-files";
