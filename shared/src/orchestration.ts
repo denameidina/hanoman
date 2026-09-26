@@ -42,6 +42,16 @@ export const isPhaseAgentName = (name: string): boolean => name.startsWith(PHASE
 /** Hook fail-open dan relay spool bisa terlambat; ⚠ baru menyala sesudah tenggang ini. */
 export const PHASE_EVIDENCE_GRACE_MS = 60_000;
 
+// Amandemen ADR-0170 P2 · cara fase Execute (claude ber-orkestrasi) mengerjakan plan. `inline` =
+// agen fase mengerjakan task sendiri (`executing-plans`); `subagent` = implementer + review per task
+// (`subagent-driven-development`). Default `inline`: subagent per task terukur terlalu lambat.
+export const EXECUTE_MODES = ["inline", "subagent"] as const;
+export type ExecuteMode = (typeof EXECUTE_MODES)[number];
+/** Flow yang punya fase kerja (Execute/Goal) — hanya di sini `executeMode` bermakna. */
+export const EXECUTE_MODE_FLOWS: ReadonlySet<OrchestrationFlow> = new Set(
+  ORCHESTRATION_FLOWS.filter((f) => FLOW_PHASES[f].some((p) => p === "Execute" || p === "Goal")),
+);
+
 export type PhasePlanEntry = { phase: string; agentName: string; model: string; effort: string };
 
 // ADR-0170 P2 · reviewer independen hasil Execute (feature & qa). BUKAN fase pipeline — FLOW_PHASES,
@@ -62,4 +72,6 @@ export type PhasePlan = {
   flow: OrchestrationFlow; runtime: "claude" | "codex"; phases: PhasePlanEntry[];
   /** ADR-0170 P2 · hanya flow `REVIEWER_FLOWS`; absen = tanpa reviewer (prompt tak berubah). */
   reviewer?: PhaseReviewerEntry;
+  /** Amandemen ADR-0170 P2 · absen (pemanggil lama) = `inline`. */
+  executeMode?: ExecuteMode;
 };

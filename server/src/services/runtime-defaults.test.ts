@@ -69,3 +69,16 @@ describe("runtime defaults", () => {
     expect(result.data.builtinRuntimeDefaults.orchestration["qa.enabled"]).toBe("seeded");
   });
 });
+
+describe("executeMode (amandemen ADR-0170 P2)", () => {
+  const base = { autoDefault: true, autoScaffold: true, notifyFail: true };
+  it("boot tidak menimpa pilihan subagent operator", () => {
+    const r = applyRuntimeDefaults({ ...base, orchestration: { feature: { enabled: true, executeMode: "subagent", claude: {}, codex: {} } } });
+    expect(r!.data.orchestration.feature.executeMode).toBe("subagent");
+    expect(r!.data.orchestration.qa.executeMode).toBe("inline");
+  });
+  it("Setting lama tanpa field → inline di semua flow", () => {
+    const r = applyRuntimeDefaults({ ...base, orchestration: { feature: { enabled: true, claude: {}, codex: {} } } });
+    expect(r!.data.orchestration.feature.executeMode).toBe("inline");
+  });
+});

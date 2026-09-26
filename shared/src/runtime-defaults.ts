@@ -45,6 +45,8 @@ export const LEGACY_CODEX_RUNTIME_DEFAULTS = {
 
 export const LEGACY_ORCHESTRATION_FLOW_DEFAULT = {
   enabled: true,
+  // Amandemen ADR-0170 P2 · bentuk HASIL parse zod (default `inline`), bukan bentuk mentah lama.
+  executeMode: "inline",
   claude: {},
   codex: {},
 } as const;
@@ -52,6 +54,7 @@ export const LEGACY_ORCHESTRATION_FLOW_DEFAULT = {
 type PhaseCellDefault = { model: string; effort: string };
 type FlowDefault = {
   enabled: boolean;
+  executeMode: "inline" | "subagent";
   claude: Record<string, PhaseCellDefault>;
   codex: Record<string, PhaseCellDefault>;
 };
@@ -61,7 +64,7 @@ const flow = (
   claude: Record<string, PhaseCellDefault>,
   codex: Record<string, PhaseCellDefault>,
   enabled = true,
-): FlowDefault => ({ enabled, claude, codex });
+): FlowDefault => ({ enabled, executeMode: "inline", claude, codex });
 
 // Rekomendasi operasional (v2): effort mengikuti PERAN fase, bukan seragam.
 // - Fase penentu arah (Spec, Plan, Audit qa, Analisis, Doc index, PRD) → Opus/Sol · high: salahnya
