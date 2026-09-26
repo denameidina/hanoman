@@ -227,6 +227,12 @@ export const paths = {
   webhookDeliveries: (id: string) => `${API}/webhooks/${encodeURIComponent(id)}/deliveries`,
   webhookDeliveryRetry: (id: string) => `${API}/webhooks/deliveries/${encodeURIComponent(id)}/retry`,
   customAgent: (id: string) => `${API}/custom-agents/${encodeURIComponent(id)}`,
+  skills: `${API}/skills`,
+  skill: (key: string) => `${API}/skills/${encodeURIComponent(key)}`,
+  skillTree: (key: string) => `${API}/skills/${encodeURIComponent(key)}/tree`,
+  skillFile: (key: string) => `${API}/skills/${encodeURIComponent(key)}/file`,
+  skillEntry: (key: string) => `${API}/skills/${encodeURIComponent(key)}/entry`,
+  skillFork: (key: string) => `${API}/skills/${encodeURIComponent(key)}/fork`,
   // SPEC-945 · ADR-0150 · papan tim. `members` GLOBAL (bukan per project) — task boleh tanpa
   // project, jadi direktori orang tak bisa digantung pada project.
   members: `${API}/members`,

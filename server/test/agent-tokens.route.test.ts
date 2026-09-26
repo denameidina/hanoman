@@ -20,7 +20,7 @@ describe("/agent-tokens routes (cookie-only)", () => {
     expect((await app.inject({ method: "GET", url: "/api/agent-tokens" })).statusCode).toBe(401);
   });
 
-  it("capabilities catalog lists 30 entries", async () => {
+  it("capabilities catalog lists 32 entries", async () => {
     const cookie = await login();
     const r = await app.inject({ method: "GET", url: "/api/agent-tokens/capabilities", headers: { cookie } });
     expect(r.statusCode).toBe(200);
@@ -41,7 +41,9 @@ describe("/agent-tokens routes (cookie-only)", () => {
     // yang sebelumnya tak dikenal `capabilityForRoute` sama sekali, jadi tertutup bagi agen. Ini
     // pelebaran permukaan yang sebenarnya, bukan pemecahan — kartu kerja MANUSIA kini bisa dibaca
     // dan ditulis agen yang manusianya mencentang kotak itu.
-    expect(r.json().capabilities).toHaveLength(30);
+    // Skills library menambahkan `skills:read`/`skills:write` → 32: `skills:write` menyunting skill
+    // global hanoman yang disuntik ke SETIAP sesi baru di semua project — pelebaran yang disengaja.
+    expect(r.json().capabilities).toHaveLength(32);
     expect(r.json().capabilities[0]).toMatchObject({ id: expect.any(String), domain: expect.any(String), access: expect.any(String) });
   });
 

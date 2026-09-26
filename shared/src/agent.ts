@@ -21,6 +21,9 @@ export const CAPABILITY_IDS = [
   // definisi agen mengubah apa yang dilihat SETIAP sesi baru di seluruh workspace, jadi izin
   // baca tak pernah cukup untuk itu (kelas bug SPEC-405).
   "agents:read", "agents:write",
+  // Skills library · domain TERSENDIRI, MENURUT METHOD: menulis skill mengubah instruksi yang
+  // dibaca SETIAP sesi berikutnya (global hanoman disuntik ke semua project).
+  "skills:read", "skills:write",
   // SPEC-476 · ADR-0096 · context/memory/reply/audit kanal Telegram. Aksi produk tetap memakai
   // capability domain produk masing-masing; domain ini tidak memberi akses shell atau sesi.
   "telegram:read", "telegram:write",
@@ -69,6 +72,8 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "lead:write", domain: "lead", access: "write", label: "Lead — tulis", desc: "Minta putusan ke hanoman-lead (keputusan bisa menggerakkan sesi).", risk: "exec" },
   { id: "agents:read", domain: "agents", access: "read", label: "Custom agent — baca", desc: "Lihat katalog custom agent global & per project." },
   { id: "agents:write", domain: "agents", access: "write", label: "Custom agent — tulis", desc: "Buat/ubah/hapus custom agent; definisinya dipakai setiap sesi baru.", risk: "exec" },
+  { id: "skills:read", domain: "skills", access: "read", label: "Skills — baca", desc: "Lihat skill global, plugin & per project beserta isi berkasnya." },
+  { id: "skills:write", domain: "skills", access: "write", label: "Skills — tulis", desc: "Buat/ubah/hapus skill; skill global hanoman disuntik ke setiap sesi baru.", risk: "exec" },
   { id: "telegram:read", domain: "telegram", access: "read", label: "Telegram — baca", desc: "Baca status gateway, binding, memory, dan audit Telegram." },
   { id: "telegram:write", domain: "telegram", access: "write", label: "Telegram — tulis", desc: "Perbarui context/memory dan terbitkan reply sesi operator Telegram." },
   { id: "team:read", domain: "team", access: "read", label: "Tim — baca", desc: "Lihat kartu papan Tim & direktori anggota." },
@@ -97,6 +102,7 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "notifications", label: "Notifikasi", desc: "Lihat & kelola notifikasi." },
   { domain: "lead", label: "Lead", desc: "Minta putusan ke hanoman-lead & baca jejak keputusannya." },
   { domain: "agents", label: "Custom agent", desc: "Katalog persona agen global & per project." },
+  { domain: "skills", label: "Skills", desc: "Skill global hanoman, user, plugin & per project." },
   { domain: "telegram", label: "Telegram", desc: "Status, binding, memory, reply, dan audit kanal operator Telegram." },
   { domain: "team", label: "Tim", desc: "Kartu papan Tim (kerja manusia), direktori anggota, eskalasi kartu ke backlog." },
 ];

@@ -728,7 +728,7 @@ git commit -m "feat(skills): operasi berkas skill aman-path (tree/read/write/cre
   - `async function targetParent(layer: "hanoman"|"user"|"project", source: string|undefined, projectId: string|undefined): Promise<string>`
   - (Pencabutan exclude suntikan codex saat membuat skill project disambungkan di Task 5 Step 5, bukan di sini.)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/skills.route.test.ts
@@ -858,12 +858,12 @@ describe("siklus hidup skill", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/skills.route.test.ts --no-file-parallelism`
 Expected: FAIL — 404 pada semua route / capability `undefined`.
 
-- [ ] **Step 3: Implementasi — capability, paths, service, route**
+- [x] **Step 3: Implementasi — capability, paths, service, route**
 
 `shared/src/agent.ts` — di daftar id capability, sesudah `"agents:read", "agents:write",`:
 
@@ -1076,12 +1076,12 @@ export default async function skills(app: FastifyInstance) {
 
 `server/src/app.ts`: tambah `import skills from "./routes/skills";` di dekat `import customAgents …` (baris 42) dan `await api.register(skills);` tepat sesudah `await api.register(customAgents);` (cari dengan `grep -n "register(customAgents)" server/src/app.ts`).
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/skills.route.test.ts server/test/custom-agents.route.test.ts --no-file-parallelism`
 Expected: PASS. Bila ada test capability katalog yang menghitung jumlah capability/domain (cari: `grep -rn "CAPABILITY_DOMAINS\|CAPABILITIES.length" server/test shared/src src/src --include=*.test.*`), perbarui angka/daftarnya dan sertakan di run ini.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/agent.ts shared/src/api.ts server/src/services/agent-capabilities.ts server/src/services/skill-library.ts server/src/routes/skills.ts server/src/app.ts server/test/skills.route.test.ts docs/superpowers/plans/2026-09-26-skills-library.md
