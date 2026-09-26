@@ -85,7 +85,7 @@ function asSkill(dir: string, pkg: string | null, name = basename(dir)): Install
  * Direktori yang SUDAH menjadi skill tidak ditembus lebih dalam: `skills/<n>/agents/…` adalah
  * berkas pendukung skill itu, bukan skill bersarang.
  */
-function skillsUnder(dir: string, pkg: string | null, depth = 2): InstalledSkill[] {
+export function skillsUnder(dir: string, pkg: string | null, depth = 2): InstalledSkill[] {
   const out: InstalledSkill[] = [];
   for (const name of dirsIn(dir)) {
     const sub = join(dir, name);

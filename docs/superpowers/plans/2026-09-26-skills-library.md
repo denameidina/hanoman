@@ -221,7 +221,7 @@ git commit -m "feat(skills): tipe SkillEntry + parser frontmatter di shared"
   - `function scanProjectSkills(projectId: string, repoDir: string, o: SkillScanOpts): SkillEntry[]`
   - `function markShadowed(global: SkillEntry[], project: SkillEntry[]): SkillEntry[]` (salinan global; entri `hanoman` yang namanya ada di project diberi `shadowedBy` = key project)
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // runner/src/skill-library.test.ts
@@ -314,12 +314,12 @@ describe("markShadowed", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run runner/src/skill-library.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // runner/src/skill-library.ts
@@ -434,12 +434,12 @@ export function markShadowed(global: SkillEntry[], project: SkillEntry[]): Skill
 
 Catatan: `skillsUnder(dir, pkg, depth = 2)` sudah ada di `runner/src/skills.ts:88`; ubah hanya kata kunci `export`.
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run runner/src/skill-library.test.ts runner/src/skills.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add runner/src/skill-library.ts runner/src/skill-library.test.ts runner/src/skills.ts runner/src/index.ts docs/superpowers/plans/2026-09-26-skills-library.md
