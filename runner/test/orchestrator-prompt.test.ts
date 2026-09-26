@@ -17,7 +17,7 @@ const project = { id: "p1", name: "P1", desc: "d", stack: "ts" };
 describe("orchestratorClause (ADR-0164)", () => {
   it("mendaftar agen fase ber-model/effort, aturan ulang/eskalasi/relay, dan larangan", () => {
     const o: Orchestration = { ...ORCHESTRATION_DEFAULTS,
-      feature: { enabled: true, claude: { Plan: { model: "claude-sonnet-5", effort: "low" } }, codex: {} } };
+      feature: { enabled: true, executeMode: "inline", claude: { Plan: { model: "claude-sonnet-5", effort: "low" } }, codex: {} } };
     const c = orchestratorClause(plan("feature", "claude", o));
     expect(c).toContain("Sesi ini ORCHESTRATOR");
     expect(c).toContain("4. Plan → `hanoman-fase-plan` · claude-sonnet-5 · low");

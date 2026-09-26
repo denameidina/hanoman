@@ -13,7 +13,7 @@ describe("sessionPhasePlan (ADR-0164)", () => {
   });
   it("flow mati → null", () => {
     const setting = { ...DEFAULT_SETTING,
-      orchestration: { ...ORCHESTRATION_DEFAULTS, qa: { enabled: false, claude: {}, codex: {} } } };
+      orchestration: { ...ORCHESTRATION_DEFAULTS, qa: { enabled: false, executeMode: "inline" as const, claude: {}, codex: {} } } };
     expect(sessionPhasePlan(setting, "qa", "claude", orchestrator)).toBeNull();
   });
   it("codex tanpa dukungan agen native → null", () => {

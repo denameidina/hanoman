@@ -53,7 +53,7 @@ describe("Setting.orchestration", () => {
     expect(s.orchestration.feature.enabled).toBe(true);
   });
   it("sel parsial diisi null, flow lain tetap default", () => {
-    const o = zOrchestration.parse({ qa: { enabled: false, claude: { Plan: { model: "claude-sonnet-5" } } } });
+    const o = zOrchestration.parse({ qa: { enabled: false, executeMode: "inline" as const, claude: { Plan: { model: "claude-sonnet-5" } } } });
     expect(o.qa).toEqual({ enabled: false, executeMode: "inline", claude: { Plan: { model: "claude-sonnet-5", effort: null } }, codex: {} });
     expect(o.feature.enabled).toBe(true);
   });
@@ -62,7 +62,7 @@ describe("Setting.orchestration", () => {
 describe("executeMode (amandemen ADR-0170 P2)", () => {
   it("default inline — di bawaan, di Setting lama tanpa field, dan di flow parsial", () => {
     for (const flow of ORCHESTRATION_FLOWS) expect(ORCHESTRATION_DEFAULTS[flow].executeMode).toBe("inline");
-    const legacy = zSetting.parse({ autoDefault: true, autoScaffold: true, notifyFail: true, orchestration: { feature: { enabled: true, claude: {}, codex: {} } } });
+    const legacy = zSetting.parse({ autoDefault: true, autoScaffold: true, notifyFail: true, orchestration: { feature: { enabled: true, executeMode: "inline" as const, claude: {}, codex: {} } } });
     expect(legacy.orchestration.feature.executeMode).toBe("inline");
     expect(zOrchestration.parse({ qa: { executeMode: "subagent" } }).qa.executeMode).toBe("subagent");
   });
@@ -80,7 +80,7 @@ describe("resolvePhasePlan", () => {
     orchestration: ORCHESTRATION_DEFAULTS, orchestrator, nativeAgents: true,
   };
   it("flow mati → null", () => {
-    const orchestration = { ...ORCHESTRATION_DEFAULTS, feature: { enabled: false, claude: {}, codex: {} } };
+    const orchestration = { ...ORCHESTRATION_DEFAULTS, feature: { enabled: false, executeMode: "inline" as const, claude: {}, codex: {} } };
     expect(resolvePhasePlan({ ...base, orchestration })).toBeNull();
   });
   it("runtime tanpa agen native → null", () => {
@@ -125,13 +125,13 @@ describe("resolvePhasePlan", () => {
       efforts: ["max", "xhigh", "high", "medium", "low"] }], CODEX_MODELS);
     try {
       const orchestration = { ...ORCHESTRATION_DEFAULTS,
-        feature: { enabled: true, claude: { Plan: { model: "fable", effort: null } }, codex: {} } };
+        feature: { enabled: true, executeMode: "inline" as const, claude: { Plan: { model: "fable", effort: null } }, codex: {} } };
       const plan = resolvePhasePlan({ ...base, orchestration, orchestrator: { model: "opus", effort: "ultracode" } })!;
       expect(plan.phases.find((p) => p.phase === "Plan")).toMatchObject({ model: "fable", effort: "xhigh" });
     } finally { replaceModelCatalog(before, CODEX_MODELS); }
   });
   it("codex membaca kolom codex dan mengoreksi effort ke fallback model", () => {
-    const orchestration = { ...ORCHESTRATION_DEFAULTS, qa: { enabled: true,
+    const orchestration = { ...ORCHESTRATION_DEFAULTS, qa: { enabled: true, executeMode: "inline" as const,
       claude: { Execute: { model: "claude-sonnet-5", effort: "low" } },
       codex: { Execute: { model: "gpt-5.6-luna", effort: null } } } };
     const plan = resolvePhasePlan({ ...base, flow: "qa", runtime: "codex", orchestration,
@@ -143,7 +143,7 @@ describe("resolvePhasePlan", () => {
   // atau `inherit`. Orchestrator ber-`default` yang diwarisi sel kosong harus jadi `inherit`.
   it("claude: `default` warisan orchestrator dirender `inherit`, bukan `default`", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS,
-      feature: { enabled: true, claude: { Spec: { model: "opus", effort: null } }, codex: {} } };
+      feature: { enabled: true, executeMode: "inline" as const, claude: { Spec: { model: "opus", effort: null } }, codex: {} } };
     const plan = resolvePhasePlan({ ...base, orchestration,
       orchestrator: { model: "default", effort: "medium" },
       phaseOverrides: { Plan: { model: "default", effort: "low" } } })!;
@@ -183,7 +183,7 @@ describe("resolvePhasePlan", () => {
   });
   it("kunci fase asing di matriks tak menambah fase", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS,
-      goal: { enabled: true, claude: { Foo: { model: "x", effort: "low" } }, codex: {} } };
+      goal: { enabled: true, executeMode: "inline" as const, claude: { Foo: { model: "x", effort: "low" } }, codex: {} } };
     expect(resolvePhasePlan({ ...base, flow: "goal", orchestration })!.phases.map((p) => p.phase))
       .toEqual(["Goal", "Verifikasi"]);
   });
