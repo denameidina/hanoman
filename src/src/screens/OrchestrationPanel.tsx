@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, Select, Switch } from "../ds";
 import {
-  FLOW_PHASES, ORCHESTRATION_DEFAULTS, ORCHESTRATION_FLOWS, coerceClaudeEffort, coerceCodexEffort,
+  EXECUTE_MODE_FLOWS, FLOW_PHASES, ORCHESTRATION_DEFAULTS, ORCHESTRATION_FLOWS, coerceClaudeEffort, coerceCodexEffort,
   type Agent, type FlowOrchestration, type Orchestration, type OrchestrationFlow, type PhaseCell,
 } from "@hanoman/shared";
 import { runtimeEfforts, runtimeSubagentModels } from "./session-runtime";
@@ -16,6 +16,11 @@ const FLOW_LABEL: Record<OrchestrationFlow, string> = {
 };
 const RUNTIMES: { id: Agent; label: string }[] = [
   { id: "claude", label: "Claude Code" }, { id: "codex", label: "Codex CLI" },
+];
+// Amandemen ADR-0170 P2 · cara fase Execute/Goal (sesi Claude) mengerjakan plan.
+const EXECUTE_MODE_OPTIONS = [
+  { value: "inline", label: "Inline — agen fase mengerjakan task sendiri (cepat)" },
+  { value: "subagent", label: "Subagent per task — implementer + review tiap task (lebih lambat)" },
 ];
 const EMPTY_CELL: PhaseCell = { model: null, effort: null };
 const CELL: React.CSSProperties = { padding: "6px 8px", borderTop: "1px solid var(--border-hair)", verticalAlign: "top" };
@@ -87,6 +92,19 @@ export function OrchestrationPanel({ orchestration, onChange }: {
                   onChange={(v: boolean) => putFlow(flow, { ...f, enabled: v },
                     `Orkestrasi ${FLOW_LABEL[flow]} · ${v ? "aktif" : "nonaktif"}`)} />
               </div>
+              {EXECUTE_MODE_FLOWS.has(flow) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10, opacity: f.enabled ? 1 : 0.55 }}>
+                  <span style={{ fontSize: 12.5, color: "var(--text-strong)", fontWeight: 600 }}>Mode Execute</span>
+                  <Select size="sm" aria-label={`Mode Execute ${flow}`} value={f.executeMode ?? "inline"}
+                    style={{ minWidth: 260, maxWidth: "100%" }} options={EXECUTE_MODE_OPTIONS}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                      const mode = e.target.value === "subagent" ? "subagent" : "inline";
+                      putFlow(flow, { ...f, executeMode: mode },
+                        `Mode Execute ${FLOW_LABEL[flow]} · ${mode === "subagent" ? "subagent per task" : "inline"}`);
+                    }} />
+                  <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>khusus sesi Claude · Codex selalu inline</span>
+                </div>
+              )}
               <div style={{ overflowX: "auto", opacity: f.enabled ? 1 : 0.55 }}>
                 <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontSize: 12.5 }}>
                   <thead>

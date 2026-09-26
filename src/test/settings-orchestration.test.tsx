@@ -79,4 +79,17 @@ describe("Settings · Orkestrasi (ADR-0164)", () => {
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
     expect(lastPut().orchestration.qa.codex.Execute).toEqual({ model: "gpt-5.6-luna", effort: "xhigh" });
   });
+
+  // Amandemen ADR-0170 P2 · mode Execute per flow, default inline, hanya flow ber-fase Execute/Goal.
+  it("pilihan mode Execute: default inline, hanya di flow Execute/Goal, menyimpan subagent", async () => {
+    await open();
+    for (const flow of ["feature", "qa", "goal"])
+      expect((screen.getByLabelText(`Mode Execute ${flow}`) as HTMLSelectElement).value).toBe("inline");
+    for (const flow of ["scaffold", "reverse", "prd", "audit", "breakdown", "no_effort"])
+      expect(screen.queryByLabelText(`Mode Execute ${flow}`)).toBeNull();
+    fireEvent.change(screen.getByLabelText("Mode Execute feature"), { target: { value: "subagent" } });
+    await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
+    expect(lastPut().orchestration.feature.executeMode).toBe("subagent");
+    expect(lastPut().orchestration.qa.executeMode).toBe("inline");
+  });
 });
