@@ -8,10 +8,19 @@ import {
 } from "@hanoman/runner";
 import { skillKey } from "@hanoman/shared";
 import { libraryAll, libraryForProject, resolveSkill, targetParent } from "../services/skill-library";
+import { unexcludeInjected } from "../services/skill-inject";
+import { resolveRepoDir } from "../services/local-binding";
 
 const fail = (reply: FastifyReply, e: unknown) => {
   if (e instanceof SkillError) return reply.code(e.status).send({ error: e.message });
   throw e;
+};
+// Skill project bernama sama dengan skill global yang pernah disuntik (codex) harus terlihat git:
+// cabut baris exclude suntikan itu dari common dir.
+const releaseInjected = async (layer: string, projectId: string | undefined, dir: string) => {
+  if (layer !== "project" || !projectId) return;
+  const repo = await resolveRepoDir(projectId);
+  if (repo) unexcludeInjected(repo, basename(dir));
 };
 const editable = async (key: string) => {
   const s = await resolveSkill(key);
@@ -75,6 +84,7 @@ export default async function skills(app: FastifyInstance) {
       if (typeof b?.name !== "string" || typeof b.description !== "string") return reply.code(400).send({ error: "name & description wajib" });
       const layer = b.layer as "hanoman" | "user" | "project";
       const dir = createSkillDir(await targetParent(String(b.layer), b.source, b.projectId), b.name, b.description);
+      await releaseInjected(layer, b.projectId, dir);
       return reply.code(201).send(await resolveSkill(created(layer, b.source, b.projectId, dir)));
     } catch (e) { return fail(reply, e); }
   });
@@ -85,6 +95,7 @@ export default async function skills(app: FastifyInstance) {
       const b = req.body as { layer?: string; source?: string; projectId?: string; name?: string };
       const layer = (b?.layer ?? "hanoman") as "hanoman" | "user" | "project";
       const dir = copySkillDir(src.dir, await targetParent(layer, b?.source, b?.projectId), b?.name ?? src.name);
+      await releaseInjected(layer, b?.projectId, dir);
       return reply.code(201).send(await resolveSkill(created(layer, b?.source, b?.projectId, dir)));
     } catch (e) { return fail(reply, e); }
   });

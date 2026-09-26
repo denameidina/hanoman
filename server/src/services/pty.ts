@@ -18,6 +18,8 @@ import {
   enrichPhases, readPhases, readPhasesAsync, sessionComplete, sessionCompleteAsync, trackDoneSeen, type Phase, type PhaseInvocation,
 } from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
+import { injectGlobalSkills } from "./skill-inject";
+import { skillsHome } from "./skill-library";
 import { dropSessionUploads } from "./uploads";
 import {
   answerChoiceDialog, answerMultiSelectDialog, answerNotesDialog, readDialogScreen, submitReview,
@@ -1033,7 +1035,18 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     // kegagalan-senyapnya: JSON tak sah DIABAIKAN tanpa pesan, exit 0, NOL agen.
     const agentsArg = agentsFile ? `--agents "$(cat ${sq(agentsFile)})"` : "";
     const nativeAgentArgs = agent === "codex" ? codexAgentArgs.map(sq).join(" ") : "";
-    argv = [sq(agentBin(agent)), promptArg, flags, agentsArg, nativeAgentArgs]
+    // Skills library · skill global hanoman ke sesi agen (claude: `--add-dir`, codex: symlink +
+    // exclude — lihat skill-inject.ts). Fail-open: peringatan stderr saja, sesi tetap lahir.
+    // `--add-dir` variadik, jadi ia HARUS argumen terakhir supaya tak menelan argumen lain.
+    let skillsArg = "";
+    try {
+      const inj = injectGlobalSkills({ agent, cwd, tempDir: agentTempDir(id), hanomanHome: skillsHome() });
+      for (const w of inj.warnings) process.stderr.write(`hanoman: ${w}\n`);
+      if (agent === "claude" && inj.addDir) skillsArg = `--add-dir ${sq(inj.addDir)}`;
+    } catch (e) {
+      process.stderr.write(`hanoman: penyuntikan skill global gagal: ${(e as Error).message}\n`);
+    }
+    argv = [sq(agentBin(agent)), promptArg, flags, agentsArg, nativeAgentArgs, skillsArg]
       .filter(Boolean).join(" ");
   }
 

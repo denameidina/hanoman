@@ -123,3 +123,18 @@ describe("siklus hidup skill", () => {
     expect(existsSync(join(home, "skills/pl-saya"))).toBe(false);
   });
 });
+
+describe("interaksi dengan suntikan codex", () => {
+  it("membuat skill project bernama sama mencabut baris exclude suntikan", async () => {
+    const { execFileSync } = await import("node:child_process");
+    mkdirSync(repo, { recursive: true });
+    execFileSync("git", ["init", "-q"], { cwd: repo });
+    mkdirSync(join(repo, ".git/info"), { recursive: true });
+    writeFileSync(join(repo, ".git/info/exclude"), "# hanoman:skill-inject\n/.agents/skills/sama\n/.agents/skills/lain\n");
+    const r = await app.inject({ method: "POST", url: "/api/skills", payload: { layer: "project", projectId: "p1", source: ".agents", name: "sama", description: "d" } });
+    expect(r.statusCode).toBe(201);
+    const ex = readFileSync(join(repo, ".git/info/exclude"), "utf8");
+    expect(ex).not.toMatch(/\/\.agents\/skills\/sama$/m);
+    expect(ex).toMatch(/\/\.agents\/skills\/lain$/m);
+  });
+});

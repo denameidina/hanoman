@@ -1106,7 +1106,7 @@ git commit -m "feat(skills): route /api/skills* + capability skills:read/write"
   - `function unexcludeInjected(repoDir: string, name: string): void`
   - `const INJECT_MARKER = "# hanoman:skill-inject"`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 ```ts
 // server/test/skill-inject.test.ts
@@ -1191,12 +1191,12 @@ describe("fail-open", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run server/test/skill-inject.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 ```ts
 // server/src/services/skill-inject.ts
@@ -1283,12 +1283,12 @@ export function unexcludeInjected(repoDir: string, name: string): void {
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run server/test/skill-inject.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Sambungkan ke `pty.ts` dan route**
+- [x] **Step 5: Sambungkan ke `pty.ts` dan route**
 
 `server/src/services/pty.ts` — impor di bagian atas:
 
@@ -1337,7 +1337,7 @@ Tambah test di `server/test/custom-agents.pty.test.ts`-gaya? Tidak — cukup jal
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/skill-inject.test.ts server/test/skills.route.test.ts server/test/custom-agents.pty.test.ts --no-file-parallelism`
 Expected: PASS. (Bila `custom-agents.pty.test.ts` gagal karena env tmux/askpass, lihat memori "pty.test gagal palsu"; bandingkan dengan run di base sebelum menyimpulkan regresi.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/skill-inject.ts server/test/skill-inject.test.ts server/src/services/pty.ts server/src/routes/skills.ts docs/superpowers/plans/2026-09-26-skills-library.md
