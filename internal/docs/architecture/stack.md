@@ -140,7 +140,9 @@ yang lahir dari audit SPEC-800:
   footer dialog Ink sebagai gerbang supaya daftar bernomor di layar kerja biasa tak ikut terkirim.
 - **Wheel polos tetap milik tmux** (SPEC-209: wheel → tmux → copy-mode → riwayat 50 000 baris);
   `Shift+wheel` menggulir scrollback xterm secara lokal lewat `attachCustomWheelEventHandler`, satu
-  jalur gulir yang tak pernah melewati mouse-mode. Ukuran font terminal adalah state tampilan
+  jalur gulir yang tak pernah melewati mouse-mode. Riwayat itu hanya ada bila agen **tidak** memakai
+  alternate screen — tmux tak menyimpan history untuk alternate screen (`history_size` 0) — jadi codex
+  dilahirkan dengan `--no-alt-screen` (mode inline), sejajar claude. Ukuran font terminal adalah state tampilan
   persisten (SPEC-740 · ADR-0115), bukan bagian workspace kanonik per-user (SPEC-786 · ADR-0118).
 - **Lampiran gambar adalah BERKAS + PATH, bukan gambar inline** (SPEC-816). Yang bisa dikirim ke PTY
   hanyalah teks; CLI-lah yang menyusun blok image, dari clipboard mesin server atau dari berkas yang

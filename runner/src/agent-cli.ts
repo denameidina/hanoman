@@ -32,6 +32,10 @@ export function agentFlags(o: AgentFlagsOpts): string[] {
       // Hook kita disuntik saat lahir, jadi ia belum pernah "di-trust" manusia. Tanpa flag ini
       // TUI berhenti di layar "Hooks need review" dan sesi tak pernah mulai.
       "--dangerously-bypass-hook-trust",
+      // Default TUI codex = alternate screen, dan tmux tak menyimpan history untuk alternate
+      // screen (history_size 0): wheel → copy-mode (SPEC-209) tak punya riwayat untuk digulir.
+      // Mode inline menulis transkrip ke scrollback pane, sama seperti claude.
+      "--no-alt-screen",
       ...codexHookArgs({ decisionFile: o.decisionFile, goalGate: o.goalGate, eventHook: o.eventHook }),
     ];
   }

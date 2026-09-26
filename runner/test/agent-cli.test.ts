@@ -39,6 +39,13 @@ describe("agentFlags · codex", () => {
     expect(f).not.toContain("--settings");
   });
 
+  it("berjalan inline (--no-alt-screen) supaya riwayat masuk scrollback pane tmux", () => {
+    // Di alternate screen tmux tak menyimpan history (history_size 0), jadi wheel → copy-mode
+    // (SPEC-209) tak menemukan apa pun untuk digulir.
+    expect(agentFlags({ agent: "codex" })).toContain("--no-alt-screen");
+    expect(agentFlags({ agent: "claude" })).not.toContain("--no-alt-screen");
+  });
+
   it("meneruskan marker keputusan & gate goal sebagai hook -c", () => {
     const f = agentFlags({ agent: "codex", decisionFile: "/tmp/d", goalGate: "/tmp/g.sh" });
     const joined = f.join(" ");
