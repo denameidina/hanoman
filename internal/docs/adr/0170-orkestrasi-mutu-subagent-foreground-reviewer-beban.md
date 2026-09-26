@@ -82,6 +82,12 @@ latar adalah *menunggu*, bukan *memanggil*.
 6. **Gerbang plan** (`planComplete*`, `stageForRun*`, `sessionComplete*`): bila fase `Plan` tercatat `done`
    (bukan `skipped`) dan tak ada berkas plan ber-spec-id → belum lengkap (tahan `executing`). Jalur lead yang
    memanggil `planComplete` tanpa daftar fase tetap perilaku lama.
+   *Amandemen (regresi 0.9.8):* "tak ada berkas plan ber-spec-id" dinilai atas SELURUH worktree, bukan
+   hanya `PLAN_DIRS` — sebelum memutus "tak ada", gerbang mencari `.md` ber-spec-id di direktori `plans/`
+   mana pun (`git ls-files` tracked+untracked, hormati .gitignore; mis. `internal/docs/superpowers/plans/`
+   atau arsip `.../done/plans/`) dan menilai kotaknya seperti biasa. Tanpa ini setiap backlog project yang
+   menaruh plan di luar `docs/superpowers/plans` tertahan di `executing` selamanya. Git gagal → perilaku di
+   atas apa adanya. Pencarian hanya berjalan di jalur "Plan `done` + PLAN_DIRS kosong".
 7. **Input**: orchestrator hanya meneruskan manifest `INDEX.md` lampiran (`orchestratorAttachmentClause`);
    agen fase Verifikasi membawa `scopeClause`; klausa metode matt diselaraskan ADR-0167 (golden
    `start-qa-matt.txt` berubah sengaja — satu-satunya golden yang berubah).

@@ -1,5 +1,7 @@
+import { execFile, execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
+import { promisify } from "node:util";
 import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
 import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, phaseAgentName, type Stage } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
@@ -223,8 +225,40 @@ export function planComplete(worktree: string, specId: string, planPhaseDone = f
       catch { /* file lenyap saat dibaca — abaikan */ }
     }
   }
+  if (!matched && planPhaseDone) {
+    for (const rel of plansOutsidePlanDirs(gitListSync(worktree), re)) {
+      matched = true;
+      try { if (/^[ \t]*- \[ \]/m.test(readFileSync(`${worktree}/${rel}`, "utf8"))) return false; }
+      catch { /* file lenyap saat dibaca — abaikan */ }
+    }
+  }
   return matched ? true : !planPhaseDone;
 }
+
+// Regresi 0.9.8 · gerbang `planPhaseDone` di atas tak boleh berarti "plan WAJIB di PLAN_DIRS":
+// project boleh menaruh plan di tempat lain menurut konvensinya sendiri (erp-tumbuh-ai:
+// `internal/docs/superpowers/plans/`, diarsip ke `.../done/plans/`). Tanpa langkah ini setiap
+// backlog project semacam itu tertahan di `executing` selamanya walau plan ber-spec-id-nya sudah
+// terceklist penuh. Maka, HANYA saat PLAN_DIRS tak memuat plan yang cocok DAN Plan tercatat `done`,
+// cari berkas `.md` ber-spec-id di direktori `plans/` mana pun di worktree — lewat `git ls-files`
+// (tracked + untracked, hormati .gitignore) supaya node_modules dkk tak ikut dijelajah. Gagal
+// menjalankan git (bukan repo, worktree lenyap) → daftar kosong → perilaku ADR-0171 apa adanya.
+const GIT_LS = ["ls-files", "-z", "--cached", "--others", "--exclude-standard"];
+const gitListSync = (worktree: string): string[] => {
+  try { return execFileSync("git", ["-C", worktree, ...GIT_LS], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 }).split("\0"); }
+  catch { return []; }
+};
+const execFileP = promisify(execFile);
+const gitListAsync = async (worktree: string): Promise<string[]> => {
+  try { return (await execFileP("git", ["-C", worktree, ...GIT_LS], { encoding: "utf8", timeout: 5000, maxBuffer: 64 * 1024 * 1024 })).stdout.split("\0"); }
+  catch { return []; }
+};
+const plansOutsidePlanDirs = (paths: string[], re: RegExp): string[] =>
+  paths.filter((rel) => {
+    if (!rel.endsWith(".md") || !/(^|\/)plans\//.test(rel)) return false;
+    if (PLAN_DIRS.some((d) => rel.startsWith(`${d}/`) && !rel.slice(d.length + 1).includes("/"))) return false;
+    return re.test(rel.slice(rel.lastIndexOf("/") + 1).toLowerCase());
+  });
 
 // SPEC-1267 · padanan asinkron `planComplete` untuk jalur periodik: readdirSync/readFileSync
 // memblokir event loop yang sama dengan frame terminal. Semantik identik (UNION seluruh PLAN_DIRS,
@@ -240,6 +274,13 @@ export async function planCompleteAsync(worktree: string, specId: string, planPh
       if (!re.test(n.toLowerCase())) continue;
       matched = true;
       try { if (/^[ \t]*- \[ \]/m.test(await readFile(`${dir}/${n}`, "utf8"))) return false; }
+      catch { /* file lenyap saat dibaca — abaikan */ }
+    }
+  }
+  if (!matched && planPhaseDone) {
+    for (const rel of plansOutsidePlanDirs(await gitListAsync(worktree), re)) {
+      matched = true;
+      try { if (/^[ \t]*- \[ \]/m.test(await readFile(`${worktree}/${rel}`, "utf8"))) return false; }
       catch { /* file lenyap saat dibaca — abaikan */ }
     }
   }

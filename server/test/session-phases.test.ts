@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -525,5 +526,49 @@ describe("trackDoneSeen (ADR-0164)", () => {
     trackDoneSeen(P([["Brainstorm", "done"], ["Spec", "pending"]]), seen, 5_000);
     expect(seen.get("Brainstorm")).toBe(500);
     expect(seen.has("Spec")).toBe(false);
+  });
+});
+
+// Regresi 0.9.8 · gerbang `planPhaseDone` di atas menahan SETIAP backlog project yang menaruh plan di
+// luar PLAN_DIRS (mis. erp-tumbuh-ai: `internal/docs/superpowers/plans/`, diarsip ke
+// `internal/docs/superpowers/done/plans/`) — nama berkasnya ber-spec-id, tapi pemindaian hanya
+// melihat `docs/superpowers/plans` → "tak ada plan" → `executing` selamanya. Plan ber-spec-id di
+// direktori `plans/` mana pun di worktree (git-tracked atau untracked) harus ikut dinilai.
+describe("gerbang plan · plan ber-spec-id di luar PLAN_DIRS", () => {
+  const P = (pairs: [string, string][]): Phase[] =>
+    pairs.map(([name, state]) => ({ name, state })) as Phase[];
+  const mkRepo = (files: Record<string, string>) => {
+    const wt = mkdtempSync(join(tmpdir(), "hanoman-wt-"));
+    execFileSync("git", ["init", "-q", wt]);
+    for (const [rel, body] of Object.entries(files)) {
+      mkdirSync(join(wt, rel, ".."), { recursive: true });
+      writeFileSync(join(wt, rel), body);
+    }
+    return wt;
+  };
+  const done = P([["Plan", "done"], ["Execute", "done"]]);
+
+  it("plan tuntas di internal/docs/superpowers/plans → done", async () => {
+    const wt = mkRepo({ "internal/docs/superpowers/plans/2026-09-25-spec-1341-soap-plan.md": "- [x] a\n" });
+    expect(stageForRun(done, wt, "SPEC-1341")).toBe("done");
+    expect(await stageForRunAsync(done, wt, "SPEC-1341")).toBe("done");
+    expect(sessionComplete(done, wt, "SPEC-1341")).toBe(true);
+  });
+
+  it("plan tuntas yang sudah diarsip ke done/plans → done", async () => {
+    const wt = mkRepo({ "internal/docs/superpowers/done/plans/2026-09-25-spec-1341-soap-plan.md": "- [x] a\n" });
+    expect(stageForRun(done, wt, "SPEC-1341")).toBe("done");
+    expect(await sessionCompleteAsync(done, wt, "SPEC-1341")).toBe(true);
+  });
+
+  it("plan di luar PLAN_DIRS masih `- [ ]` → tetap executing", async () => {
+    const wt = mkRepo({ "internal/docs/superpowers/plans/2026-09-25-spec-1341-soap-plan.md": "- [ ] belum\n" });
+    expect(stageForRun(done, wt, "SPEC-1341")).toBe("executing");
+    expect(await stageForRunAsync(done, wt, "SPEC-1341")).toBe("executing");
+  });
+
+  it("berkas ber-spec-id yang BUKAN di direktori plans (mis. specs/) tak dihitung sebagai plan", () => {
+    const wt = mkRepo({ "internal/docs/superpowers/specs/2026-09-25-spec-1341-design.md": "x\n" });
+    expect(stageForRun(done, wt, "SPEC-1341")).toBe("executing");
   });
 });
