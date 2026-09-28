@@ -545,6 +545,45 @@ textarea:focus-visible,
   .hn-terminal-unplaced-chip { padding: 6px 6px 6px 10px; gap: 8px; }
 }
 
+/* Long-press mobile masuk mode seleksi teks (tak ada Cmd/Ctrl+C tanpa keyboard fisik): badge
+   menandai gestur berikutnya diambil xterm untuk seleksi, bukan scroll; bar mengambang menawarkan
+   satu-satunya dua aksi yang berarti sesudahnya. Overlay `pointer-events: none` supaya jari masih
+   bisa menyentuh terminal LANGSUNG di baliknya; hanya bar aksinya yang aktif. */
+.hn-terminal-select-overlay {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.hn-terminal-select-badge {
+  padding: 3px 10px;
+  border: 1px solid var(--brass-500);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--brass-500) 18%, var(--term-bg));
+  color: var(--brass-300);
+  font: var(--weight-medium) var(--text-xs)/1.2 var(--font-mono);
+}
+
+.hn-terminal-select-bar {
+  pointer-events: auto;
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+}
+
+/* `--text-subtle` milik `.hn-terminal-action` cukup kontras di atas tint status (pemakaian
+   lamanya) tapi jatuh di bawah 4.5:1 pada `--surface-card` bone di sini — audit a11y terukur
+   ~3,7:1. */
+.hn-terminal-select-bar .hn-terminal-action { color: var(--text-body); }
+
 /* SPEC-800 · papan tombol layar: menggulir mendatar saat sempit, bukan menyusut sampai labelnya
    tumpah — akar yang sama dengan strip tab SPEC-763. */
 .hn-terminal-keys {

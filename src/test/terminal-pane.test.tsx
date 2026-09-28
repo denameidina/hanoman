@@ -53,6 +53,7 @@ vi.mock("@xterm/xterm", () => ({
     public dispose(): void { }
     public hasSelection(): boolean { return xt.selection.length > 0; }
     public getSelection(): string { return xt.selection; }
+    public clearSelection(): void { xt.selection = ""; }
     public attachCustomKeyEventHandler(fn: (e: KeyboardEvent) => boolean): void { xt.keyHandler = fn; }
     public attachCustomWheelEventHandler(fn: (e: WheelEvent) => boolean): void { xt.wheelHandler = fn; }
     public onData(fn: (data: string) => void): { dispose: () => void } {
@@ -133,7 +134,10 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
   });
 
   it("does not focus xterm on connect for a coarse pointer", async () => {
-    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    // `matches: false` di sini menirukan pointer KASAR (lihat `finePointer` di call site).
+    // `addEventListener`/`removeEventListener` no-op sekarang wajib ada: `useCoarsePointer`
+    // (long-press seleksi teks) berlangganan lewat `useSyncExternalStore` sejak fitur ini.
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })));
     const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     vi.spyOn(paneHost(container), "getBoundingClientRect").mockReturnValue({
@@ -241,6 +245,132 @@ describe("TerminalPane · seleksi & salin (SPEC-511)", () => {
     xt.selection = "";
     expect(xt.keyHandler?.(keydown({ key: "c", metaKey: true }))).toBe(true);
     expect(writeText).not.toHaveBeenCalled();
+  });
+});
+
+describe("TerminalPane · long-press masuk mode seleksi teks (mobile)", () => {
+  // Mobile tak punya Cmd/Ctrl+C: satu-satunya cara menyalin log/error adalah lewat gestur ini.
+  const stubCoarse = (matches: boolean) => vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+    matches: query === "(pointer: coarse)" && matches,
+    addEventListener: () => {}, removeEventListener: () => {},
+  })));
+
+  const touch = (host: HTMLElement, type: "touchstart" | "touchmove" | "touchend", x: number, y: number) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    const point = { clientX: x, clientY: y };
+    Object.defineProperty(event, "touches", { value: type === "touchend" ? [] : [point] });
+    Object.defineProperty(event, "changedTouches", { value: [point] });
+    host.dispatchEvent(event);
+    return event;
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("long-press tanpa gerakan masuk mode seleksi dan memaksa SelectionService xterm lewat mousedown altKey", () => {
+    stubCoarse(true);
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    const host = paneHost(container);
+    xt.element = document.createElement("div");
+    host.appendChild(xt.element);
+    const mouseEvents: MouseEvent[] = [];
+    xt.element.addEventListener("mousedown", (e) => mouseEvents.push(e as MouseEvent));
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 320, top: 0, right: 640, bottom: 320, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+
+    vi.useFakeTimers();
+    touch(host, "touchstart", 40, 100);
+    act(() => { vi.advanceTimersByTime(480); });
+
+    expect(screen.getByTestId("terminal-select-overlay")).toBeTruthy();
+    expect(mouseEvents).toHaveLength(1);
+    expect(mouseEvents[0]?.altKey).toBe(true);
+
+    // Selagi mode aktif, gerakan berikutnya bukan lagi scroll — `scrollLines` tak boleh terpanggil.
+    touch(host, "touchmove", 40, 180);
+    expect(xt.scrolled).toEqual([]);
+  });
+
+  it("gerakan melewati threshold sebelum timer selesai membatalkan long-press — swipe tetap scroll biasa", () => {
+    stubCoarse(true);
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    const host = paneHost(container);
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 320, top: 0, right: 640, bottom: 320, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+
+    vi.useFakeTimers();
+    touch(host, "touchstart", 40, 100);
+    touch(host, "touchmove", 40, 180);
+    act(() => { vi.advanceTimersByTime(480); });
+
+    expect(screen.queryByTestId("terminal-select-overlay")).toBeNull();
+    expect(xt.scrolled.at(-1)).toBeLessThan(0);
+  });
+
+  it("pointer halus tak pernah masuk mode seleksi walau ditahan lama", () => {
+    stubCoarse(false);
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    const host = paneHost(container);
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 320, top: 0, right: 640, bottom: 320, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+
+    vi.useFakeTimers();
+    touch(host, "touchstart", 40, 100);
+    act(() => { vi.advanceTimersByTime(480); });
+    touch(host, "touchmove", 40, 180);
+
+    expect(screen.queryByTestId("terminal-select-overlay")).toBeNull();
+    expect(xt.scrolled.at(-1)).toBeLessThan(0);
+  });
+
+  it("tombol Salin menyalin getSelection() ke clipboard tanpa keluar dari mode", async () => {
+    stubCoarse(true);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    const host = paneHost(container);
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 320, top: 0, right: 640, bottom: 320, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+
+    vi.useFakeTimers();
+    touch(host, "touchstart", 40, 100);
+    act(() => { vi.advanceTimersByTime(480); });
+    xt.selection = "log yang diseleksi lewat drag";
+
+    fireEvent.click(screen.getByText("Salin"));
+    expect(writeText).toHaveBeenCalledWith("log yang diseleksi lewat drag");
+    expect(screen.getByTestId("terminal-select-overlay")).toBeTruthy();
+  });
+
+  it("tombol Selesai mengosongkan seleksi dan mengembalikan gestur ke scroll normal", () => {
+    stubCoarse(true);
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    const host = paneHost(container);
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
+      width: 640, height: 320, top: 0, right: 640, bottom: 320, left: 0, x: 0, y: 0, toJSON: () => ({}),
+    });
+
+    vi.useFakeTimers();
+    touch(host, "touchstart", 40, 100);
+    act(() => { vi.advanceTimersByTime(480); });
+    xt.selection = "sisa seleksi";
+
+    fireEvent.click(screen.getByText("Selesai"));
+    expect(screen.queryByTestId("terminal-select-overlay")).toBeNull();
+    expect(xt.selection).toBe("");
+
+    // Keluar mode → gestur satu jari berikutnya kembali jadi swipe-scroll biasa (timer long-press
+    // baru yang dijadwalkan touchstart ini sengaja tak dijalankan sampai selesai).
+    touch(host, "touchstart", 40, 100);
+    const move = touch(host, "touchmove", 40, 180);
+    expect(xt.scrolled.at(-1)).toBeLessThan(0);
+    expect(move.defaultPrevented).toBe(true);
   });
 });
 
@@ -910,7 +1040,9 @@ describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", () => {
   it("menaruh kolom ketik DI ANTARA host terminal dan bar tombol", async () => {
     const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} showKeys />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
-    const kids = Array.from(paneHost(container).parentElement!.children);
+    // Host kini dibungkus wrapper relatif (badge/bar mode seleksi mengambang di atasnya), jadi
+    // urutan yang berarti ada di anak-anak container TERATAS, bukan induk langsung host.
+    const kids = Array.from(container.firstElementChild!.children);
     const at = (sel: string) => kids.findIndex((k) => k.matches(sel) || k.querySelector(sel) !== null);
     expect(at('[data-testid="terminal-host"]')).toBeGreaterThanOrEqual(0);
     expect(at('[data-testid="terminal-host"]')).toBeLessThan(at(".hn-terminal-composer"));

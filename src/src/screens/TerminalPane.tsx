@@ -7,6 +7,7 @@ import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { useInstance, useWsTarget } from "../api/instance";
+import { useCoarsePointer } from "../ds";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
 import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
 import * as P from "./terminal-predict";
@@ -28,6 +29,10 @@ const RESIZE_DEBOUNCE_MS = 100;
 // Binding bawaan tmux copy-mode: satu WheelUpPane/WheelDownPane = `send-keys -X -N 5 scroll-*`.
 // Swipe mengirim satu wheel per 5 baris gerakan jari supaya riwayat bergerak seirama jarinya.
 const TMUX_WHEEL_LINES = 5;
+// Long-press masuk mode seleksi teks (mobile tak punya Cmd/Ctrl+C): cukup lama untuk tak bentrok
+// dengan swipe-scroll normal, cukup pendek untuk terasa responsif.
+const LONG_PRESS_MS = 480;
+const LONG_PRESS_MOVE_PX = 10;
 
 // SPEC-878 · ADR-0134 · antrean adalah penyelamat ketikan (SPEC-800), bukan tempat penyimpanan.
 // 4 KiB memuat satu paragraf yang di-paste dan tetap menghentikan antrean yang lari.
@@ -81,6 +86,11 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   diagRef.current = diag;
   const hiddenRef = React.useRef(hidden);
   hiddenRef.current = hidden;
+  // Long-press seleksi teks hanya untuk pointer kasar — laptop hybrid dengan touchscreen + mouse
+  // tetap memakai Cmd/Ctrl+C. Effect koneksi tak bergantung padanya (lihat pola fontSizeRef).
+  const coarse = useCoarsePointer();
+  const coarseRef = React.useRef(coarse);
+  coarseRef.current = coarse;
   const ring = React.useRef(createHiddenRing());
   const resync = React.useRef<() => void>(() => {});
   const view = React.useRef<{ term: Terminal; fit: FitAddon; sendSize: (force?: boolean) => void } | null>(null);
@@ -96,6 +106,13 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   // Fix minor: salin/tempel yang gagal (izin clipboard ditolak) tak boleh diam — dipakai strip
   // status yang sama dengan link WS, jadi tak perlu sistem toast baru.
   const [clipErr, setClipErr] = React.useState<string | null>(null);
+  // Mode seleksi teks (long-press mobile). State lokal per pane: dua pane tak pernah berbagi
+  // instance xterm, jadi tak ada jalan untuk bocor ke pane lain; effect koneksi menyetelnya
+  // balik ke `false` di setiap unmount lewat cleanup di bawah.
+  const [selecting, setSelecting] = React.useState(false);
+  const copySelection = React.useRef<() => void>(() => {});
+  const exitSelectMode = React.useRef<() => void>(() => {});
+  const selectBar = React.useRef<HTMLDivElement>(null);
   const retryNow = React.useRef<() => void>(() => {});
   const sendKey = React.useRef<(d: string) => void>(() => {});
   const sendHeld = React.useRef<() => void>(() => {});
@@ -511,20 +528,72 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     // SPEC-771 · viewport internal xterm 6 tak memiliki pemilik gesture touch. Tanpa handler
     // passive-false ini swipe bubble ke page scroller meski scrollback terminal masih tersedia.
     let touchY: number | null = null;
+    let touchX: number | null = null;
     let touchRemainder = 0;
     let touchScrolled = false;
-    const resetTouch = () => { touchY = null; touchRemainder = 0; touchScrolled = false; };
+    // Mode seleksi teks: SATU state lokal ke closure ini (bukan `selecting` React — itu cuma
+    // cermin buat JSX), supaya handler touch tak pernah baca state basi lintas render.
+    let selectMode = false;
+    let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearLongPress = () => { clearTimeout(longPressTimer); longPressTimer = undefined; };
+    const resetTouch = () => { touchY = null; touchX = null; touchRemainder = 0; touchScrolled = false; clearLongPress(); };
+    // Mobile tak punya Cmd/Ctrl+C (SPEC-289 lewat keyboard fisik saja). tmux `mouse on` sudah
+    // mematikan SelectionService xterm (lihat komentar `macOptionClickForcesSelection` di atas);
+    // `altKey` yang memaksanya tetap menyala adalah jalur SAMA yang dipakai Option+drag desktop —
+    // di sini disimulasikan dari sentuhan alih-alih menggambar ulang seleksinya sendiri.
+    const dispatchSelectionMouse = (type: "mousedown" | "mousemove" | "mouseup", x: number, y: number) => {
+      term.element?.dispatchEvent(new MouseEvent(type, {
+        clientX: x, clientY: y, bubbles: true, cancelable: true, altKey: true,
+        button: 0, buttons: type === "mouseup" ? 0 : 1,
+      }));
+    };
+    const enterSelectMode = (x: number, y: number) => {
+      selectMode = true;
+      setSelecting(true);
+      dispatchSelectionMouse("mousedown", x, y);
+    };
+    copySelection.current = () => {
+      const text = term.getSelection();
+      if (text) void navigator.clipboard?.writeText(text);
+    };
+    exitSelectMode.current = () => {
+      if (!selectMode) return;
+      selectMode = false;
+      term.clearSelection();
+      setSelecting(false);
+    };
     const onTouchStart = (event: TouchEvent) => {
       if (event.touches.length !== 1) { resetTouch(); return; }
-      touchY = event.touches[0]!.clientY;
+      const t = event.touches[0]!;
+      touchY = t.clientY;
+      touchX = t.clientX;
       touchRemainder = 0;
       touchScrolled = false;
+      clearLongPress();
+      if (selectMode) { dispatchSelectionMouse("mousedown", t.clientX, t.clientY); return; }
+      if (!coarseRef.current) return;
+      longPressTimer = setTimeout(() => {
+        longPressTimer = undefined;
+        if (touchX === null || touchY === null) return;
+        enterSelectMode(touchX, touchY);
+      }, LONG_PRESS_MS);
     };
     const onTouchMove = (event: TouchEvent) => {
       if (touchY === null || event.touches.length !== 1) { resetTouch(); return; }
+      const t = event.touches[0]!;
+      if (selectMode) {
+        touchX = t.clientX;
+        touchY = t.clientY;
+        // Interseptor `preventDefault` MATI selama mode ini: seleksi xterm butuh mousemove yang
+        // sama bebasnya dengan drag mouse asli, bukan gestur yang ditelan sebagai scroll.
+        dispatchSelectionMouse("mousemove", t.clientX, t.clientY);
+        return;
+      }
+      if (longPressTimer && touchX !== null
+        && Math.hypot(t.clientX - touchX, t.clientY - touchY) > LONG_PRESS_MOVE_PX) clearLongPress();
       const rect = visibleRect();
       if (!rect || term.rows <= 0) return;
-      const nextY = event.touches[0]!.clientY;
+      const nextY = t.clientY;
       touchRemainder += touchY - nextY;
       touchY = nextY;
       const lineHeight = rect.height / term.rows;
@@ -537,7 +606,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       const steps = Math.trunc(touchRemainder / step);
       if (steps !== 0) {
         if (target) {
-          const { clientX } = event.touches[0]!;
+          const { clientX } = t;
           for (let i = 0; i < Math.abs(steps); i++) {
             target.dispatchEvent(new WheelEvent("wheel", {
               deltaY: Math.sign(steps), deltaMode: WheelEvent.DOM_DELTA_LINE,
@@ -554,6 +623,12 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     // ke dialog claude. SPEC-452 mengukur jalur yang sampai: SATU digit memilih baris bernomor itu.
     // Gerbangnya footer dialog Ink — di layar kerja biasa tap tak mengirim apa pun.
     const onTouchEnd = (event: TouchEvent) => {
+      if (selectMode) {
+        const ct = event.changedTouches?.[0];
+        dispatchSelectionMouse("mouseup", ct?.clientX ?? touchX ?? 0, ct?.clientY ?? touchY ?? 0);
+        resetTouch();
+        return;
+      }
       const tapped = touchY !== null && !touchScrolled;
       const clientY = event.changedTouches?.[0]?.clientY ?? touchY;
       resetTouch();
@@ -566,6 +641,10 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
         (_, i) => buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? "");
       const choice = dialogChoiceAt(lines, row);
       if (choice) sendExternal(choice);
+    };
+    const onTouchCancel = () => {
+      if (selectMode && touchX !== null && touchY !== null) dispatchSelectionMouse("mouseup", touchX, touchY);
+      resetTouch();
     };
     // SPEC-816 · lampiran gambar. Yang bisa dikirim ke PTY hanyalah teks, jadi berkasnya diunggah
     // lebih dulu dan yang masuk ke prompt adalah PATH-nya — agen membacanya sendiri dengan Read.
@@ -604,7 +683,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     el.addEventListener("touchstart", onTouchStart, { passive: true });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd, { passive: true });
-    el.addEventListener("touchcancel", resetTouch, { passive: true });
+    el.addEventListener("touchcancel", onTouchCancel, { passive: true });
 
     // SPEC-1267 · drag pemisah/jendela memicu ResizeObserver puluhan kali per detik; fit + kirim
     // digabung ke satu langkah 100 ms sesudah gerakan berhenti.
@@ -625,6 +704,9 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       sendOuter.current = () => {};
       sendHeld.current = () => {};
       dropHeld.current = () => {};
+      copySelection.current = () => {};
+      exitSelectMode.current = () => {};
+      setSelecting(false);
       view.current = null;
       el.removeEventListener("paste", onPaste);
       el.removeEventListener("dragover", onDragOver);
@@ -632,7 +714,8 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
-      el.removeEventListener("touchcancel", resetTouch);
+      el.removeEventListener("touchcancel", onTouchCancel);
+      clearLongPress();
       ro.disconnect();
       clearTimeout(resizeTimer);
       clearTimeout(clipErrTimer);
@@ -658,6 +741,17 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     if (overflowed) resync.current();
     else for (const c of chunks) current.term.write(c);
   }, [hidden]);
+
+  // Long-press seleksi teks: gestur sentuh murni tak pernah membawa fokus keyboard, jadi mode ini
+  // wajib memindahkannya sendiri — tanpa ini pengguna keyboard/switch-access yang kebetulan
+  // berfokus di pane kehilangan jejak fokusnya begitu bar aksi muncul/lenyap. `wasSelecting`
+  // menjaga efek ini diam di render pertama (mount tak boleh mencuri fokus halaman).
+  const wasSelecting = React.useRef(false);
+  React.useEffect(() => {
+    if (selecting) selectBar.current?.querySelector("button")?.focus();
+    else if (wasSelecting.current) view.current?.term.focus();
+    wasSelecting.current = selecting;
+  }, [selecting]);
 
   // Ukuran font diterapkan tanpa me-remount: remount berarti socket baru, tiket baru, dan layar
   // kosong sampai tmux menggambar ulang. `cols`/`rows` PTY turunan ukuran font, jadi frame resize
@@ -722,9 +816,25 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
           {clipErr && <span data-testid="terminal-clip-error">{clipErr}</span>}
         </div>
       )}
-      <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
-        background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)",
-        touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
+      <div style={{ position: "relative", display: "flex", flex: 1, minHeight: 0 }}>
+        <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
+          background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)",
+          touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
+        {/* Long-press mobile: satu-satunya jalan salin log/error tanpa Cmd/Ctrl+C keyboard fisik.
+            `role="status"` di badge mengumumkan perubahan mode ke pembaca layar — gestur sentuh
+            yang memicunya tak pernah lewat fokus/keyboard, jadi tanpa ini AT tak tahu apa-apa. */}
+        {selecting && (
+          <div className="hn-terminal-select-overlay" data-testid="terminal-select-overlay">
+            <span className="hn-terminal-select-badge" role="status">Mode pilih teks</span>
+            <div ref={selectBar} className="hn-terminal-select-bar">
+              <button type="button" className="hn-terminal-action hn-terminal-action--text"
+                aria-label="Salin teks yang dipilih" onClick={() => copySelection.current()}>Salin</button>
+              <button type="button" className="hn-terminal-action hn-terminal-action--text"
+                aria-label="Selesai memilih teks" onClick={() => exitSelectMode.current()}>Selesai</button>
+            </div>
+          </div>
+        )}
+      </div>
       {showKeys && canWrite && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
         external={composerDrain} linkState={link.state} queue={queue} />}
       {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
