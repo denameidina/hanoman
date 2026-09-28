@@ -596,6 +596,110 @@ describe("TerminalScreen (grid)", () => {
   });
 });
 
+// Audit UI/UX tablet · grid tablet turun ke Tabs single-pane (pola mobile yang sama) begitu
+// `layout.cols * MIN_PANE_WIDTH` tak lagi muat lebar kontainer grid — bukan breakpoint viewport
+// murni, jadi butuh ResizeObserver yang bisa ditembak ulang (bukan `stubResizeObserver` sekali-jalan).
+// Sel header (`CellImpl`) juga memasang ResizeObserver sendiri, jadi stub-nya menargetkan elemen
+// grid (`data-testid="terminal-grid"`) secara spesifik alih-alih instance yang terakhir dibuat.
+function stubResizableObserver() {
+  const byTarget = new Map<Element, (entries: ResizeObserverEntry[]) => void>();
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private readonly cb: (entries: ResizeObserverEntry[]) => void) { }
+    observe(el: Element): void { byTarget.set(el, this.cb); }
+    disconnect(): void { }
+  });
+  return {
+    fire(width: number) {
+      const grid = document.querySelector('[data-testid="terminal-grid"]');
+      const cb = grid && byTarget.get(grid);
+      cb?.([{ contentRect: { width } } as ResizeObserverEntry]);
+    },
+  };
+}
+
+describe("TerminalScreen (tablet collapse)", () => {
+  it("grid 2 kolom di tablet sempit turun ke Tabs single-pane yang sama dengan mobile", async () => {
+    mockViewport(900);
+    const ro = stubResizableObserver();
+    getTerminalWorkspace.mockResolvedValue({
+      workspace: { version: 1, groups: [
+        { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: ["aaaa1111", "bbbb2222"] } },
+      ] },
+      revision: 1, updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    listTerminals.mockResolvedValue([
+      { id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false },
+      { id: "bbbb2222", projectId: "p1", cwd: "/repo", exited: false },
+    ]);
+    render(<TerminalScreen userId="u1" projects={projects} />);
+    // Tunggu grid benar-benar mount (bukan cuma root) sebelum menembak ResizeObserver-nya.
+    await screen.findAllByTestId("pane");
+    // 2 kolom × 360px = 720px > 620px kontainer → tak muat.
+    act(() => ro.fire(620));
+    await screen.findByRole("tablist", { name: "Panel terminal" });
+    expect(screen.getAllByTestId("pane")).toHaveLength(2);
+    expect(document.querySelector('[data-terminal-cell-index="0"]')).toHaveAttribute("aria-hidden", "false");
+  });
+
+  it("grid 2 kolom di tablet lebar tetap grid penuh (gutter kolom/baris terlihat)", async () => {
+    mockViewport(900);
+    const ro = stubResizableObserver();
+    getTerminalWorkspace.mockResolvedValue({
+      workspace: { version: 1, groups: [
+        { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: ["aaaa1111", "bbbb2222"] } },
+      ] },
+      revision: 1, updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    listTerminals.mockResolvedValue([
+      { id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false },
+      { id: "bbbb2222", projectId: "p1", cwd: "/repo", exited: false },
+    ]);
+    render(<TerminalScreen userId="u1" projects={projects} />);
+    await screen.findAllByTestId("pane");
+    // 2 kolom × 360px = 720px ≤ 900px kontainer → muat.
+    act(() => ro.fire(900));
+    await waitFor(() => expect(screen.getAllByTestId("pane")).toHaveLength(2));
+    expect(screen.queryByRole("tablist", { name: "Panel terminal" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Tutup kolom 1" })).toBeInTheDocument();
+  });
+
+  it("resize tablet antara collapse ↔ grid penuh tidak mereset grup/sesi/sel aktif", async () => {
+    mockViewport(900);
+    const ro = stubResizableObserver();
+    getTerminalWorkspace.mockResolvedValue({
+      workspace: { version: 1, groups: [
+        { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: ["aaaa1111", "bbbb2222"] } },
+      ] },
+      revision: 1, updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    listTerminals.mockResolvedValue([
+      { id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false },
+      { id: "bbbb2222", projectId: "p1", cwd: "/repo", exited: false },
+    ]);
+    render(<TerminalScreen userId="u1" projects={projects} />);
+    await screen.findAllByTestId("pane");
+
+    act(() => ro.fire(900));
+    await waitFor(() => expect(screen.getAllByTestId("pane")).toHaveLength(2));
+    fireEvent.click(screen.getByRole("button", { name: "Tutup kolom 1" }));
+    await waitFor(() => expect(putTerminalWorkspace).toHaveBeenCalledTimes(1));
+    // Kolom 1 (indeks 0) dilepas — "aaaa1111" jatuh ke tray tak-tertempat, "bbbb2222" tetap di sel 0.
+    await waitFor(() => expect(document.querySelector('[data-terminal-cell-index="0"]')).toHaveTextContent("bbbb2222"));
+
+    // Rotasi/resize ke sempit: sisa 1 kolom × 360px = 360px > 300px kontainer → tak muat.
+    act(() => ro.fire(300));
+    await screen.findByRole("tablist", { name: "Panel terminal" });
+    expect(document.querySelector('[data-terminal-cell-index="0"]')).toHaveTextContent("bbbb2222");
+    expect(putTerminalWorkspace).toHaveBeenCalledTimes(1);
+
+    // Kembali lebar: grid penuh lagi, sesi & sel yang sama tetap tampil — bukan reset.
+    act(() => ro.fire(900));
+    await waitFor(() => expect(screen.queryByRole("tablist", { name: "Panel terminal" })).toBeNull());
+    expect(document.querySelector('[data-terminal-cell-index="0"]')).toHaveTextContent("bbbb2222");
+    expect(putTerminalWorkspace).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("TerminalScreen (Ambil backlog)", () => {
   it("retains a rejected backlog selection for explicit human force", async () => {
     listTerminals.mockResolvedValue([]);
@@ -824,6 +928,65 @@ describe("TerminalScreen (tutup kolom/baris)", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Backlog" }));
     expect(await screen.findByLabelText("Tutup kolom 2")).toBeInTheDocument();  // grup lain utuh
+  });
+});
+
+describe("TerminalScreen (drag-resize antar-pane)", () => {
+  it("fallback keyboard: panah pada divider kolom mengubah rasio & tersimpan ke workspace", async () => {
+    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 2, cells: [null, "aaaa1111"] }));
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("aaaa1111"));
+
+    const divider = screen.getByRole("separator", { name: "Ubah lebar kolom 1/2" });
+    expect(divider).toHaveAttribute("aria-orientation", "vertical");
+    expect(divider).toHaveAttribute("aria-valuenow", "50");
+    expect(divider).toHaveAttribute("tabIndex", "0");
+
+    const callsBefore = putTerminalWorkspace.mock.calls.length;   // seed legacy sudah lewat sekali
+    fireEvent.keyDown(divider, { key: "ArrowRight" });
+
+    await waitFor(() => expect(putTerminalWorkspace.mock.calls.length).toBeGreaterThan(callsBefore));
+    const written = putTerminalWorkspace.mock.calls.at(-1)![0] as { workspace: { groups: { layout: { colSizes?: number[] } }[] } };
+    const [first, second] = written.workspace.groups[0]!.layout.colSizes!;
+    expect(first).toBeGreaterThan(second!);
+  });
+
+  it("divider dinonaktifkan (aria-disabled, tabIndex -1) saat workspace tak writable", async () => {
+    // Recovery membaca cache v2 (bukan legacy LKEY) saat GET server gagal — pola yang sama dengan
+    // test "menampilkan recovery..." di atas, di sini dengan grid 2 kolom supaya divider ada.
+    localStorage.setItem("hanoman.terminal.workspace.v2.test-user", JSON.stringify({
+      workspace: { version: 1, groups: [
+        { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: [null, "aaaa1111"] } },
+      ] },
+      revision: 3, active: "g1",
+    }));
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    getTerminalWorkspace.mockRejectedValue(new Error("offline"));
+    render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("aaaa1111"));
+
+    const divider = screen.getByRole("separator", { name: "Ubah lebar kolom 1/2" });
+    expect(divider).toHaveAttribute("aria-disabled", "true");
+    expect(divider).toHaveAttribute("tabIndex", "-1");
+  });
+
+  it("klik dua kali pada divider menyamakan ukuran dua track bertetangga", async () => {
+    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 2, cells: [null, "aaaa1111"], colSizes: [1.6, 0.4] }));
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("aaaa1111"));
+
+    const divider = screen.getByRole("separator", { name: "Ubah lebar kolom 1/2" });
+    expect(divider).toHaveAttribute("aria-valuenow", "80");
+
+    const callsBefore = putTerminalWorkspace.mock.calls.length;   // seed legacy sudah lewat sekali
+    fireEvent.doubleClick(divider);
+
+    await waitFor(() => expect(putTerminalWorkspace.mock.calls.length).toBeGreaterThan(callsBefore));
+    const written = putTerminalWorkspace.mock.calls.at(-1)![0] as { workspace: { groups: { layout: { colSizes?: number[] } }[] } };
+    const [first, second] = written.workspace.groups[0]!.layout.colSizes!;
+    expect(first).toBeCloseTo(second!, 10);
   });
 });
 

@@ -43,6 +43,19 @@ export const FONT_MAX = 24;
 export const FONT_DEFAULT = 13;
 export const FONT_DEFAULT_MOBILE = 15;
 
+// SPEC-audit tablet · lebar nyaman minimum satu pane terminal: cukup untuk ~45 kolom monospace
+// pada FONT_DEFAULT (13px, char ≈ 0.6em ⇒ 7.8px/kolom ⇒ ~350px) plus padding/border sel. Di bawah
+// ini output terminal mulai wrap berlebihan dan header sel kehabisan ruang untuk label+aksi.
+export const MIN_PANE_WIDTH = 360;
+
+/** Grid tablet melebihi lebar kontainer yang tersedia bila tiap kolom dipaksa muat `minPaneWidth`
+ *  — turunkan ke mode Tabs single-pane yang sama dengan mobile. `containerWidth` tak terukur
+ *  (jsdom, belum di-observe) = jangan collapse, cermin fallback `inlineActionCount`. */
+export function shouldCollapseToTabs(cols: number, containerWidth: number, minPaneWidth = MIN_PANE_WIDTH): boolean {
+  if (!Number.isFinite(containerWidth) || containerWidth <= 0) return false;
+  return cols * minPaneWidth > containerWidth;
+}
+
 export function clampFontSize(value: number): number {
   if (!Number.isFinite(value)) return FONT_DEFAULT;
   return Math.min(FONT_MAX, Math.max(FONT_MIN, Math.round(value)));

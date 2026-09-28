@@ -20,7 +20,8 @@ textarea:focus-visible,
 [role="tab"]:focus-visible,
 [role="checkbox"]:focus-visible,
 [role="radio"]:focus-visible,
-[role="switch"]:focus-visible {
+[role="switch"]:focus-visible,
+[role="separator"]:focus-visible {
   outline: 2px solid var(--border-focus) !important;
   outline-offset: 2px;
 }
@@ -503,6 +504,87 @@ textarea:focus-visible,
 .hn-terminal-action--text { padding-inline: 5px; }
 .hn-terminal-action:hover { background: var(--bone-300); color: var(--text-strong); }
 
+/* Audit UI/UX Terminal · gutter penutup kolom/baris. Track grid-nya sengaja tetap 16-18px (SPEC-763
+   ringkas), jadi target sentuh diperbesar lewat overlay semu ::before, bukan track-nya sendiri —
+   memperbesar track akan tumpang-tindih sel tetangga. `--col`/`--row` melebarkan hanya sumbu yang
+   sempit pada gutter itu (col-gutter tingginya 16px; row-gutter lebarnya 18px), supaya sisi yang
+   sudah cukup luas tak ikut menggerus sel tetangga di sumbu itu. */
+.hn-terminal-gutter {
+  border: 0;
+  padding: 0;
+  font: inherit;
+  background: transparent;
+  color: var(--text-subtle);
+}
+
+.hn-terminal-gutter:hover:not(:disabled) { background: var(--bone-300); color: var(--text-strong); }
+
+@media (pointer: coarse) {
+  .hn-terminal-gutter--col::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc((var(--touch-target) - 100%) / -2);
+    bottom: calc((var(--touch-target) - 100%) / -2);
+  }
+  .hn-terminal-gutter--row::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc((var(--touch-target) - 100%) / -2);
+    right: calc((var(--touch-target) - 100%) / -2);
+  }
+}
+
+/* Chip "Belum di grid": tombol × di dalamnya kena minimum 44px pointer:coarse (aturan umum di
+   bawah), jadi padding chip sendiri dilonggarkan supaya tak berantakan saat item-nya banyak. */
+.hn-terminal-unplaced-chip { padding: 4px 8px; gap: 6px; }
+
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-terminal-unplaced-chip { padding: 6px 6px 6px 10px; gap: 8px; }
+}
+
+/* Long-press mobile masuk mode seleksi teks (tak ada Cmd/Ctrl+C tanpa keyboard fisik): badge
+   menandai gestur berikutnya diambil xterm untuk seleksi, bukan scroll; bar mengambang menawarkan
+   satu-satunya dua aksi yang berarti sesudahnya. Overlay `pointer-events: none` supaya jari masih
+   bisa menyentuh terminal LANGSUNG di baliknya; hanya bar aksinya yang aktif. */
+.hn-terminal-select-overlay {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.hn-terminal-select-badge {
+  padding: 3px 10px;
+  border: 1px solid var(--brass-500);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--brass-500) 18%, var(--term-bg));
+  color: var(--brass-300);
+  font: var(--weight-medium) var(--text-xs)/1.2 var(--font-mono);
+}
+
+.hn-terminal-select-bar {
+  pointer-events: auto;
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+}
+
+/* `--text-subtle` milik `.hn-terminal-action` cukup kontras di atas tint status (pemakaian
+   lamanya) tapi jatuh di bawah 4.5:1 pada `--surface-card` bone di sini — audit a11y terukur
+   ~3,7:1. */
+.hn-terminal-select-bar .hn-terminal-action { color: var(--text-body); }
+
 /* SPEC-800 · papan tombol layar: menggulir mendatar saat sempit, bukan menyusut sampai labelnya
    tumpah — akar yang sama dengan strip tab SPEC-763. */
 .hn-terminal-keys {
@@ -553,6 +635,44 @@ textarea:focus-visible,
 
 .hn-terminal-composer-status--queued { color: var(--status-warn); }
 .hn-terminal-composer-status--held { color: var(--status-err); }
+
+/* Divider drag-resize: dititipkan di track pane bertetangga (gap grid asli 8px) lalu digeser
+   margin negatif supaya area tangkapnya berimpit di atas gap — lihat komentar render di
+   TerminalScreen.tsx. Area tangkap dilebarkan ke 16px (4px meluber ke tiap pane bertetangga,
+   diredam z-index) — WCAG 2.5.8 idealnya 24px, tapi grid multi-pane padat (sampai 12×12 track)
+   membuatnya mahal secara layar; panah keyboard di ResizeDivider adalah padanan penuh, bukan
+   pelengkap, jadi diterima sebagai exception dengan garis visual TETAP 1px lewat ::before supaya
+   tak terlihat tebal. Warna garis pakai token accent (bukan --border-hair yang didesain buat
+   hairline dekoratif ~1.2:1) karena ini kontrol operable, bukan dekorasi — audit a11y menandai
+   --border-hair gagal 3:1 non-text contrast (WCAG 1.4.11). */
+.hn-terminal-divider {
+  position: relative;
+  background: transparent;
+  z-index: 1;
+}
+.hn-terminal-divider::before {
+  content: "";
+  position: absolute;
+  background: var(--accent-hover);   /* brass-600, ~4.6:1 vs --surface-page */
+}
+.hn-terminal-divider--col {
+  width: 16px;
+  margin-left: -12px;
+  justify-self: start;
+  cursor: col-resize;
+}
+.hn-terminal-divider--col::before { top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-50%); }
+.hn-terminal-divider--row {
+  height: 16px;
+  margin-top: -12px;
+  align-self: start;
+  cursor: row-resize;
+}
+.hn-terminal-divider--row::before { left: 0; right: 0; top: 50%; height: 1px; transform: translateY(-50%); }
+.hn-terminal-divider:hover::before,
+.hn-terminal-divider:focus-visible::before { background: var(--accent-press); }   /* brass-700, ~6.3:1 */
+.hn-terminal-divider[aria-disabled="true"] { cursor: default; }
+.hn-terminal-divider[aria-disabled="true"]:hover::before { background: var(--accent-hover); }
 
 @media (max-width: 767px) {
   .hn-terminal-cell-header { flex-wrap: wrap; }

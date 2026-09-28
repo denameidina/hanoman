@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   TERMINAL_KEYS, clampFontSize, dialogChoiceAt, inlineActionCount,
+  shouldCollapseToTabs, MIN_PANE_WIDTH,
 } from "../src/screens/terminal-chrome";
 
 describe("inlineActionCount", () => {
@@ -64,6 +65,29 @@ describe("clampFontSize", () => {
     expect(clampFontSize(2)).toBe(10);
     expect(clampFontSize(99)).toBe(24);
     expect(clampFontSize(13.4)).toBe(13);
+  });
+});
+
+describe("shouldCollapseToTabs", () => {
+  it("tak collapse selagi lebar kontainer belum terukur (jsdom/awal mount)", () => {
+    expect(shouldCollapseToTabs(2, Number.POSITIVE_INFINITY)).toBe(false);
+    expect(shouldCollapseToTabs(3, 0)).toBe(false);
+    expect(shouldCollapseToTabs(3, -10)).toBe(false);
+  });
+
+  it("membiarkan grid penuh saat kolom masih muat lebar minimum tiap pane", () => {
+    expect(shouldCollapseToTabs(2, 800, 360)).toBe(false);
+    expect(shouldCollapseToTabs(2, 720, 360)).toBe(false);
+  });
+
+  it("collapse ke tabs begitu kolom tak lagi muat lebar minimum tiap pane", () => {
+    expect(shouldCollapseToTabs(2, 719, 360)).toBe(true);
+    expect(shouldCollapseToTabs(3, 900, 360)).toBe(true);
+  });
+
+  it("+Kolom yang menambah cols re-evaluate ke collapse pada lebar kontainer tetap", () => {
+    expect(shouldCollapseToTabs(2, 768, MIN_PANE_WIDTH)).toBe(false);
+    expect(shouldCollapseToTabs(3, 768, MIN_PANE_WIDTH)).toBe(true);
   });
 });
 
