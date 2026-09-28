@@ -20,7 +20,8 @@ textarea:focus-visible,
 [role="tab"]:focus-visible,
 [role="checkbox"]:focus-visible,
 [role="radio"]:focus-visible,
-[role="switch"]:focus-visible {
+[role="switch"]:focus-visible,
+[role="separator"]:focus-visible {
   outline: 2px solid var(--border-focus) !important;
   outline-offset: 2px;
 }
@@ -634,6 +635,44 @@ textarea:focus-visible,
 
 .hn-terminal-composer-status--queued { color: var(--status-warn); }
 .hn-terminal-composer-status--held { color: var(--status-err); }
+
+/* Divider drag-resize: dititipkan di track pane bertetangga (gap grid asli 8px) lalu digeser
+   margin negatif supaya area tangkapnya berimpit di atas gap — lihat komentar render di
+   TerminalScreen.tsx. Area tangkap dilebarkan ke 16px (4px meluber ke tiap pane bertetangga,
+   diredam z-index) — WCAG 2.5.8 idealnya 24px, tapi grid multi-pane padat (sampai 12×12 track)
+   membuatnya mahal secara layar; panah keyboard di ResizeDivider adalah padanan penuh, bukan
+   pelengkap, jadi diterima sebagai exception dengan garis visual TETAP 1px lewat ::before supaya
+   tak terlihat tebal. Warna garis pakai token accent (bukan --border-hair yang didesain buat
+   hairline dekoratif ~1.2:1) karena ini kontrol operable, bukan dekorasi — audit a11y menandai
+   --border-hair gagal 3:1 non-text contrast (WCAG 1.4.11). */
+.hn-terminal-divider {
+  position: relative;
+  background: transparent;
+  z-index: 1;
+}
+.hn-terminal-divider::before {
+  content: "";
+  position: absolute;
+  background: var(--accent-hover);   /* brass-600, ~4.6:1 vs --surface-page */
+}
+.hn-terminal-divider--col {
+  width: 16px;
+  margin-left: -12px;
+  justify-self: start;
+  cursor: col-resize;
+}
+.hn-terminal-divider--col::before { top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-50%); }
+.hn-terminal-divider--row {
+  height: 16px;
+  margin-top: -12px;
+  align-self: start;
+  cursor: row-resize;
+}
+.hn-terminal-divider--row::before { left: 0; right: 0; top: 50%; height: 1px; transform: translateY(-50%); }
+.hn-terminal-divider:hover::before,
+.hn-terminal-divider:focus-visible::before { background: var(--accent-press); }   /* brass-700, ~6.3:1 */
+.hn-terminal-divider[aria-disabled="true"] { cursor: default; }
+.hn-terminal-divider[aria-disabled="true"]:hover::before { background: var(--accent-hover); }
 
 @media (max-width: 767px) {
   .hn-terminal-cell-header { flex-wrap: wrap; }

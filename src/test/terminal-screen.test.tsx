@@ -931,6 +931,65 @@ describe("TerminalScreen (tutup kolom/baris)", () => {
   });
 });
 
+describe("TerminalScreen (drag-resize antar-pane)", () => {
+  it("fallback keyboard: panah pada divider kolom mengubah rasio & tersimpan ke workspace", async () => {
+    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 2, cells: [null, "aaaa1111"] }));
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("aaaa1111"));
+
+    const divider = screen.getByRole("separator", { name: "Ubah lebar kolom 1/2" });
+    expect(divider).toHaveAttribute("aria-orientation", "vertical");
+    expect(divider).toHaveAttribute("aria-valuenow", "50");
+    expect(divider).toHaveAttribute("tabIndex", "0");
+
+    const callsBefore = putTerminalWorkspace.mock.calls.length;   // seed legacy sudah lewat sekali
+    fireEvent.keyDown(divider, { key: "ArrowRight" });
+
+    await waitFor(() => expect(putTerminalWorkspace.mock.calls.length).toBeGreaterThan(callsBefore));
+    const written = putTerminalWorkspace.mock.calls.at(-1)![0] as { workspace: { groups: { layout: { colSizes?: number[] } }[] } };
+    const [first, second] = written.workspace.groups[0]!.layout.colSizes!;
+    expect(first).toBeGreaterThan(second!);
+  });
+
+  it("divider dinonaktifkan (aria-disabled, tabIndex -1) saat workspace tak writable", async () => {
+    // Recovery membaca cache v2 (bukan legacy LKEY) saat GET server gagal — pola yang sama dengan
+    // test "menampilkan recovery..." di atas, di sini dengan grid 2 kolom supaya divider ada.
+    localStorage.setItem("hanoman.terminal.workspace.v2.test-user", JSON.stringify({
+      workspace: { version: 1, groups: [
+        { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: [null, "aaaa1111"] } },
+      ] },
+      revision: 3, active: "g1",
+    }));
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    getTerminalWorkspace.mockRejectedValue(new Error("offline"));
+    render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("aaaa1111"));
+
+    const divider = screen.getByRole("separator", { name: "Ubah lebar kolom 1/2" });
+    expect(divider).toHaveAttribute("aria-disabled", "true");
+    expect(divider).toHaveAttribute("tabIndex", "-1");
+  });
+
+  it("klik dua kali pada divider menyamakan ukuran dua track bertetangga", async () => {
+    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 2, cells: [null, "aaaa1111"], colSizes: [1.6, 0.4] }));
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("aaaa1111"));
+
+    const divider = screen.getByRole("separator", { name: "Ubah lebar kolom 1/2" });
+    expect(divider).toHaveAttribute("aria-valuenow", "80");
+
+    const callsBefore = putTerminalWorkspace.mock.calls.length;   // seed legacy sudah lewat sekali
+    fireEvent.doubleClick(divider);
+
+    await waitFor(() => expect(putTerminalWorkspace.mock.calls.length).toBeGreaterThan(callsBefore));
+    const written = putTerminalWorkspace.mock.calls.at(-1)![0] as { workspace: { groups: { layout: { colSizes?: number[] } }[] } };
+    const [first, second] = written.workspace.groups[0]!.layout.colSizes!;
+    expect(first).toBeCloseTo(second!, 10);
+  });
+});
+
 describe("TerminalScreen (layar penuh)", () => {
   const root = () => screen.getByTestId("terminal-root");
 

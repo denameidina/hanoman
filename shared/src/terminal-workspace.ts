@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const zSessionId = z.string().trim().min(1).max(256);
+const zTrackSizes = z.array(z.number().positive()).max(12);
 const zTerminalGroup = z.object({
   id: z.string().trim().min(1).max(128),
   name: z.string().trim().min(1).max(80),
@@ -8,12 +9,30 @@ const zTerminalGroup = z.object({
     rows: z.number().int().min(1).max(12),
     cols: z.number().int().min(1).max(12),
     cells: z.array(zSessionId.nullable()).max(144),
+    // Bobot fr per track dari drag-resize; undefined = semua track sama besar. Opsional supaya
+    // workspace lama tanpa keduanya tetap valid.
+    colSizes: zTrackSizes.optional(),
+    rowSizes: zTrackSizes.optional(),
   }).strict().superRefine((layout, ctx) => {
     if (layout.cells.length !== layout.rows * layout.cols) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["cells"],
         message: "cells must match rows × cols",
+      });
+    }
+    if (layout.colSizes && layout.colSizes.length !== layout.cols) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["colSizes"],
+        message: "colSizes must match cols",
+      });
+    }
+    if (layout.rowSizes && layout.rowSizes.length !== layout.rows) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["rowSizes"],
+        message: "rowSizes must match rows",
       });
     }
   }),
