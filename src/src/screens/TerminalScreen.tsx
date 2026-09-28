@@ -390,6 +390,16 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           aria-label={`${diag ? "Matikan" : "Nyalakan"} rekam jalur ketik`}
           onClick={() => setDiag((on) => !on)}>{diag ? "Matikan" : "Nyalakan"}</Button>
       </div>
+      <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+          Kembalikan grid ke 1 kolom × 1 baris (sesi lain pindah ke "belum di grid")
+        </span>
+        <Button size="sm" variant="secondary"
+          disabled={!workspaceWritable || (layout.cols === 1 && layout.rows === 1)}
+          onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, () => L.emptyLayout()))}>
+          Reset grid
+        </Button>
+      </div>
       {mobile && (
         <Select size="sm" aria-label="Project sesi baru" value={project}
           onChange={(e) => setProject(e.target.value)}
@@ -510,8 +520,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>Belum di grid:</span>
           {unplaced.map((s) => (
-            <span key={s.id} style={{
-              display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 8px",
+            <span key={s.id} className="hn-terminal-unplaced-chip" style={{
+              display: "inline-flex", alignItems: "center",
               borderRadius: "var(--radius-sm)", background: "var(--bone-200)",
               border: "1px solid var(--border-hair)", fontFamily: "var(--font-mono)", fontSize: 11,
             }}>
@@ -549,12 +559,12 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         }}>
           {!mobile && <div />}{/* pojok kiri-atas: perpotongan kedua gutter */}
           {!mobile && Array.from({ length: layout.cols }, (_, c) => (
-            <GutterX key={`col-${c}`} label={`Tutup kolom ${c + 1}`} disabled={!workspaceWritable || layout.cols === 1}
+            <GutterX key={`col-${c}`} axis="col" label={`Tutup kolom ${c + 1}`} disabled={!workspaceWritable || layout.cols === 1}
               onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeColumn(l, c)))} />
           ))}
           {Array.from({ length: layout.rows }, (_, r) => (
             <React.Fragment key={`row-${r}`}>
-              {!mobile && <GutterX label={`Tutup baris ${r + 1}`} disabled={!workspaceWritable || layout.rows === 1}
+              {!mobile && <GutterX axis="row" label={`Tutup baris ${r + 1}`} disabled={!workspaceWritable || layout.rows === 1}
                 onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeRow(l, r)))} />
               }
               {Array.from({ length: layout.cols }, (_, c) => {
@@ -780,13 +790,18 @@ function GroupTabs({ ws, compact = false, writable, onSelect, onAdd, onRename, o
 
 // Menutup kolom/baris TIDAK mematikan sesi — selnya lenyap, sesinya jatuh ke tray lewat
 // placedIds. Karena itu tak ada konfirmasi, sama seperti "lepas".
-function GutterX({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+// `axis` menentukan sumbu mana yang sempit (col-gutter: tinggi 16px, lebar track kolom; row-gutter:
+// lebar 18px, tinggi track baris) — `.hn-terminal-gutter--{axis}` (app.css) hanya memperbesar hit
+// area lewat `::before` pada sumbu yang sempit itu, tanpa mengubah track grid-nya sendiri (SPEC-763).
+function GutterX({ label, disabled, onClick, axis }: {
+  label: string; disabled: boolean; onClick: () => void; axis: "col" | "row";
+}) {
   return (
     <button type="button" aria-label={label} title={disabled ? "Grid tak boleh menyusut ke nol" : label}
       disabled={disabled} onClick={onClick}
-      style={{ all: "unset", display: "grid", placeItems: "center", fontSize: 11, lineHeight: 1,
-        color: "var(--text-subtle)", opacity: disabled ? 0.3 : 1,
-        cursor: disabled ? "not-allowed" : "pointer" }}>×</button>
+      className={`hn-terminal-gutter hn-terminal-gutter--${axis}`}
+      style={{ position: "relative", display: "grid", placeItems: "center", fontSize: 11, lineHeight: 1,
+        opacity: disabled ? 0.3 : 1, cursor: disabled ? "not-allowed" : "pointer" }}>×</button>
   );
 }
 
@@ -802,7 +817,7 @@ function RenameInput({ initial, onCommit, onCancel }: {
         if (e.key === "Enter") onCommit(value);
         else if (e.key === "Escape") onCancel();
       }}
-      style={{ width: 100, padding: "3px 6px", fontSize: 12, fontFamily: "var(--font-ui)",
+      style={{ width: "min(160px, 60vw)", padding: "3px 6px", fontSize: 12, fontFamily: "var(--font-ui)",
         border: "1px solid var(--border-strong)", borderRadius: "var(--radius-sm)",
         background: "var(--surface-card)", color: "var(--text-strong)" }} />
   );

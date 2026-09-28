@@ -503,6 +503,48 @@ textarea:focus-visible,
 .hn-terminal-action--text { padding-inline: 5px; }
 .hn-terminal-action:hover { background: var(--bone-300); color: var(--text-strong); }
 
+/* Audit UI/UX Terminal · gutter penutup kolom/baris. Track grid-nya sengaja tetap 16-18px (SPEC-763
+   ringkas), jadi target sentuh diperbesar lewat overlay semu ::before, bukan track-nya sendiri —
+   memperbesar track akan tumpang-tindih sel tetangga. `--col`/`--row` melebarkan hanya sumbu yang
+   sempit pada gutter itu (col-gutter tingginya 16px; row-gutter lebarnya 18px), supaya sisi yang
+   sudah cukup luas tak ikut menggerus sel tetangga di sumbu itu. */
+.hn-terminal-gutter {
+  border: 0;
+  padding: 0;
+  font: inherit;
+  background: transparent;
+  color: var(--text-subtle);
+}
+
+.hn-terminal-gutter:hover:not(:disabled) { background: var(--bone-300); color: var(--text-strong); }
+
+@media (pointer: coarse) {
+  .hn-terminal-gutter--col::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc((var(--touch-target) - 100%) / -2);
+    bottom: calc((var(--touch-target) - 100%) / -2);
+  }
+  .hn-terminal-gutter--row::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc((var(--touch-target) - 100%) / -2);
+    right: calc((var(--touch-target) - 100%) / -2);
+  }
+}
+
+/* Chip "Belum di grid": tombol × di dalamnya kena minimum 44px pointer:coarse (aturan umum di
+   bawah), jadi padding chip sendiri dilonggarkan supaya tak berantakan saat item-nya banyak. */
+.hn-terminal-unplaced-chip { padding: 4px 8px; gap: 6px; }
+
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-terminal-unplaced-chip { padding: 6px 6px 6px 10px; gap: 8px; }
+}
+
 /* SPEC-800 · papan tombol layar: menggulir mendatar saat sempit, bukan menyusut sampai labelnya
    tumpah — akar yang sama dengan strip tab SPEC-763. */
 .hn-terminal-keys {

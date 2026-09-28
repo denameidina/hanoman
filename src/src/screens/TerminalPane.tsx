@@ -93,6 +93,9 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   const [link, setLink] = React.useState<LinkState>({ state: "connecting" });
   const [queue, setQueue] = React.useState<{ n: number; held: boolean; full: boolean }>(
     { n: 0, held: false, full: false });
+  // Fix minor: salin/tempel yang gagal (izin clipboard ditolak) tak boleh diam — dipakai strip
+  // status yang sama dengan link WS, jadi tak perlu sistem toast baru.
+  const [clipErr, setClipErr] = React.useState<string | null>(null);
   const retryNow = React.useRef<() => void>(() => {});
   const sendKey = React.useRef<(d: string) => void>(() => {});
   const sendHeld = React.useRef<() => void>(() => {});
@@ -145,6 +148,11 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     let attempt = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let finished = false;
+    // Fix critical: fokus otomatis hanya boleh terjadi saat pane ini LAHIR, bukan pada tiap
+    // reconnect (restart server, jaringan putus-sambung) — di desktop semua sel grid selalu
+    // mounted, jadi reconnect pane B dulu bisa merebut fokus dari pane A yang sedang diketik.
+    let hasFocusedOnce = false;
+    let clipErrTimer: ReturnType<typeof setTimeout> | undefined;
     const send = (m: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
     // SPEC-1267 · `resize` yang ukurannya sama dengan yang terakhir sampai ke server tak dikirim ulang.
     let lastSentSize = "";
@@ -316,7 +324,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
           if (visibleRect()) {
             const finePointer = typeof window.matchMedia !== "function"
               || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-            if (finePointer) term.focus();
+            if (finePointer && !hasFocusedOnce) { hasFocusedOnce = true; term.focus(); }
             // Geometri yang berubah selagi putus hilang senyap (`send` no-op saat socket mati),
             // jadi ia wajib mendahului byte antrean — kalau tidak TUI menggambar blob itu untuk
             // geometri lama lalu me-rewrap seluruh layar.
@@ -441,14 +449,24 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     // Salin/tempel: xterm merender seleksi sendiri, jadi Cmd/Ctrl+C tak menyalin apa pun
     // tanpa wiring ini (SPEC-289). Return false = jangan teruskan ke terminal (mis. supaya
     // Cmd+C tak jadi input). Ctrl+C polos dilewatkan agar tetap jadi SIGINT.
+    // Fix minor: permission ditolak/gagal tak lagi diam — strip status di atas pane (dipakai juga
+    // untuk link WS) menampilkannya singkat, lalu padam sendiri seperti toast (kit.tsx: 2600ms).
+    const reportClipError = (message: string) => {
+      if (disposed) return;
+      setClipErr(message);
+      clearTimeout(clipErrTimer);
+      clipErrTimer = setTimeout(() => setClipErr(null), 2600);
+    };
     term.attachCustomKeyEventHandler((e) => {
       const intent = clipboardIntent(e, term.hasSelection());
       if (intent === "copy") {
-        void navigator.clipboard?.writeText(term.getSelection());
+        void navigator.clipboard?.writeText(term.getSelection())
+          .catch(() => reportClipError("Gagal menyalin — izin clipboard ditolak"));
         return false;
       }
       if (intent === "paste") {
-        void navigator.clipboard?.readText().then((t) => { if (t) sendExternal(t); });
+        void navigator.clipboard?.readText().then((t) => { if (t) sendExternal(t); })
+          .catch(() => reportClipError("Gagal menempel — izin clipboard ditolak"));
         return false;
       }
       return true;
@@ -617,6 +635,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       el.removeEventListener("touchcancel", resetTouch);
       ro.disconnect();
       clearTimeout(resizeTimer);
+      clearTimeout(clipErrTimer);
       if (ttl) clearInterval(ttl);
       batcher.dispose();
       diagRec.dispose();
@@ -674,7 +693,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya.
           SPEC-878 · strip juga bicara saat sambungan sehat: antrean yang ditahan karena memuat
           Enter adalah keputusan yang menunggu operator, bukan keadaan koneksi. */}
-      {((link.state !== "open" && link.state !== "connecting") || queue.held || queue.full) && (
+      {((link.state !== "open" && link.state !== "connecting") || queue.held || queue.full || clipErr) && (
         <div data-testid="terminal-link" style={{
           display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto", flexWrap: "wrap",
           padding: "3px 8px", fontFamily: "var(--font-mono)", fontSize: 11,
@@ -700,6 +719,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
               onClick={() => dropHeld.current()}>Buang</button>
           </>}
           {queue.full && <span data-testid="terminal-queue-full">antrean penuh</span>}
+          {clipErr && <span data-testid="terminal-clip-error">{clipErr}</span>}
         </div>
       )}
       <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
