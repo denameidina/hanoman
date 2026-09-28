@@ -537,6 +537,11 @@ textarea:focus-visible,
   box-shadow: var(--shadow-sm);
 }
 
+/* `--text-subtle` milik `.hn-terminal-action` cukup kontras di atas tint status (pemakaian
+   lamanya) tapi jatuh di bawah 4.5:1 pada `--surface-card` bone di sini — audit a11y terukur
+   ~3,7:1. */
+.hn-terminal-select-bar .hn-terminal-action { color: var(--text-body); }
+
 /* SPEC-800 · papan tombol layar: menggulir mendatar saat sempit, bukan menyusut sampai labelnya
    tumpah — akar yang sama dengan strip tab SPEC-763. */
 .hn-terminal-keys {

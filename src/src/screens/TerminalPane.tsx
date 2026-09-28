@@ -109,6 +109,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   const [selecting, setSelecting] = React.useState(false);
   const copySelection = React.useRef<() => void>(() => {});
   const exitSelectMode = React.useRef<() => void>(() => {});
+  const selectBar = React.useRef<HTMLDivElement>(null);
   const retryNow = React.useRef<() => void>(() => {});
   const sendKey = React.useRef<(d: string) => void>(() => {});
   const sendHeld = React.useRef<() => void>(() => {});
@@ -722,6 +723,17 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     else for (const c of chunks) current.term.write(c);
   }, [hidden]);
 
+  // Long-press seleksi teks: gestur sentuh murni tak pernah membawa fokus keyboard, jadi mode ini
+  // wajib memindahkannya sendiri — tanpa ini pengguna keyboard/switch-access yang kebetulan
+  // berfokus di pane kehilangan jejak fokusnya begitu bar aksi muncul/lenyap. `wasSelecting`
+  // menjaga efek ini diam di render pertama (mount tak boleh mencuri fokus halaman).
+  const wasSelecting = React.useRef(false);
+  React.useEffect(() => {
+    if (selecting) selectBar.current?.querySelector("button")?.focus();
+    else if (wasSelecting.current) view.current?.term.focus();
+    wasSelecting.current = selecting;
+  }, [selecting]);
+
   // Ukuran font diterapkan tanpa me-remount: remount berarti socket baru, tiket baru, dan layar
   // kosong sampai tmux menggambar ulang. `cols`/`rows` PTY turunan ukuran font, jadi frame resize
   // wajib menyusul — tanpa itu tmux tetap menggambar untuk geometri lama.
@@ -788,15 +800,17 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
         <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
           background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)",
           touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
-        {/* Long-press mobile: satu-satunya jalan salin log/error tanpa Cmd/Ctrl+C keyboard fisik. */}
+        {/* Long-press mobile: satu-satunya jalan salin log/error tanpa Cmd/Ctrl+C keyboard fisik.
+            `role="status"` di badge mengumumkan perubahan mode ke pembaca layar — gestur sentuh
+            yang memicunya tak pernah lewat fokus/keyboard, jadi tanpa ini AT tak tahu apa-apa. */}
         {selecting && (
           <div className="hn-terminal-select-overlay" data-testid="terminal-select-overlay">
-            <span className="hn-terminal-select-badge">Mode pilih teks</span>
-            <div className="hn-terminal-select-bar">
+            <span className="hn-terminal-select-badge" role="status">Mode pilih teks</span>
+            <div ref={selectBar} className="hn-terminal-select-bar">
               <button type="button" className="hn-terminal-action hn-terminal-action--text"
-                onClick={() => copySelection.current()}>Salin</button>
+                aria-label="Salin teks yang dipilih" onClick={() => copySelection.current()}>Salin</button>
               <button type="button" className="hn-terminal-action hn-terminal-action--text"
-                onClick={() => exitSelectMode.current()}>Selesai</button>
+                aria-label="Selesai memilih teks" onClick={() => exitSelectMode.current()}>Selesai</button>
             </div>
           </div>
         )}
