@@ -18,8 +18,8 @@ import * as W from "./terminal-workspace";
 import { useTerminalWorkspace } from "./use-terminal-workspace";
 import { useLaunchAdmission } from "./use-launch-admission";
 import { usePersistedState, isStr, isBool, isNum } from "../ui-state";
-import { clampFontSize, inlineActionCount, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
-  FONT_MIN, FONT_MAX } from "./terminal-chrome";
+import { clampFontSize, inlineActionCount, shouldCollapseToTabs, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
+  FONT_MIN, FONT_MAX, MIN_PANE_WIDTH } from "./terminal-chrome";
 import { chipAccessibleName, chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
 
 // Default prop bernilai literal `[]` baru tiap render akan mematahkan memo `Cell`.
@@ -91,6 +91,32 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   const launchAdmission = useLaunchAdmission();
   const tier = useResponsiveTier();
   const mobile = tier === "mobile";
+  const layout = W.activeGroup(ws).layout;
+  const showEmpty = layout.rows === 1 && layout.cols === 1 && !layout.cells[0] && sessions.length === 0;
+  // Audit UI/UX tablet · grid CSS `minmax(0,1fr)` menyusut pane ke lebar berapa pun tanpa batas
+  // bawah, jadi tablet lebar sempit (atau kolom bertambah lewat toolbar) butuh sinyal ruang nyata,
+  // bukan cuma breakpoint viewport. Diukur di kontainer grid sendiri (bukan viewport) supaya sidebar
+  // navigation rail tablet ikut terhitung.
+  const gridRef = React.useRef<HTMLDivElement>(null);
+  const [gridWidth, setGridWidth] = React.useState(Number.POSITIVE_INFINITY);
+  React.useEffect(() => {
+    const el = gridRef.current;
+    // jsdom tak punya ResizeObserver; lebar tak terukur = tak collapse (perilaku lama).
+    if (!el || typeof ResizeObserver !== "function") return;
+    const ro = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? el.getBoundingClientRect().width;
+      if (width > 0) setGridWidth(width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+    // Grid dirender kondisional (`showEmpty`): re-attach saat elemen itu mount/unmount.
+  }, [showEmpty]);
+  // Turun ke Tabs single-pane yang sama dengan mobile ketika grid tablet tak muat pada lebar
+  // minimum nyaman per pane — bukan mode baru, cuma memperluas kondisi render `mobile` yang sudah
+  // ada. Re-evaluate tiap render: `layout.cols` (tombol +Kolom) dan `gridWidth` (resize/rotasi)
+  // sama-sama bisa membuatnya berubah, dan keduanya sudah jadi dependency alami lewat closure ini.
+  const tabletCollapse = tier === "tablet" && shouldCollapseToTabs(layout.cols, gridWidth, MIN_PANE_WIDTH);
+  const singlePane = mobile || tabletCollapse;
   const [activeCell, setActiveCell] = React.useState(0);
   const [requestedSession, setRequestedSession] = React.useState<string | null>(null);
   const handledFocus = React.useRef<string | null>(null);
@@ -166,10 +192,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       // sel dari tempat mendaratnya. Sudah tertempel = tak ada yang perlu dikerjakan.
       if (W.placedIds(current).has(requestedSession)) return current;
       const placed = W.placeFirstEmptyInActive(current, requestedSession);
-      if (placed !== current || !mobile) return placed;
+      if (placed !== current || !singlePane) return placed;
       return W.placeInActive(current, activeCell, requestedSession);
     });
-  }, [activeCell, mobile, mutateWorkspace, requestedSession, setActiveGroup, workspaceWritable, ws]);
+  }, [activeCell, singlePane, mutateWorkspace, requestedSession, setActiveGroup, workspaceWritable, ws]);
 
   // SPEC-232 · fullscreen menunjuk satu sesi hidup; bila sesi itu hilang (kill/exit lewat
   // frame WS), lepas fullscreen supaya modal tak menggantung ke sesi yang sudah lenyap.
@@ -340,7 +366,6 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   const placed = W.placedIds(ws);
   const unplaced = sessions.filter((s) => !placed.has(s.id));
 
-  const layout = W.activeGroup(ws).layout;
   React.useEffect(() => {
     if (!requestedSession) return;
     const index = layout.cells.indexOf(requestedSession);
@@ -351,7 +376,6 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   React.useEffect(() => {
     if (activeCell >= layout.cells.length) setActiveCell(Math.max(0, layout.cells.length - 1));
   }, [activeCell, layout.cells.length]);
-  const showEmpty = layout.rows === 1 && layout.cols === 1 && !layout.cells[0] && sessions.length === 0;
 
   // SPEC-800 · kontrol tampilan tinggal di panel, bukan di toolbar: keduanya dipakai sekali lalu
   // dilupakan, dan menaruhnya inline melawan tujuan "pane dapat ruang layar terbesar".
@@ -400,7 +424,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           Reset grid
         </Button>
       </div>
-      {mobile && (
+      {singlePane && (
         <Select size="sm" aria-label="Project sesi baru" value={project}
           onChange={(e) => setProject(e.target.value)}
           options={projects.map((p) => ({ value: p.id, label: p.name }))} />
@@ -460,7 +484,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
           ...(maxed ? { flex: 1, minWidth: 0 } : {}) }}>
-          {!mobile && (
+          {!singlePane && (
             <>
               <Button size="sm" variant="ghost" disabled={!workspaceWritable}
                 onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, L.addColumn))}>+ Kolom</Button>
@@ -489,7 +513,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
                 : `membersihkan ${cleanups.length} worktree…`}
             </span>
           )}
-          {!mobile && (
+          {!singlePane && (
             <>
               <Select size="sm" value={project} onChange={(e) => setProject(e.target.value)}
                 options={projects.map((p) => ({ value: p.id, label: p.name }))} />
@@ -506,10 +530,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           {/* SPEC-517 · membuka form runtime dulu (agen · model · effort); sesinya lahir saat
               "Buka sesi" ditekan, dengan pilihan itu sebagai argv pane tmux. */}
           <Button size="sm" leftIcon="plus" onClick={() => setNewOpen(true)}>Sesi baru</Button>
-          {/* SPEC-800 · di mobile aksi sekunder pindah ke satu panel supaya pane mendapat ruang
-              layar terbesar; di desktop panel ini hanya memuat kontrol tampilan. */}
-          <OverflowActions label={mobile ? "Aksi terminal lain" : "Tampilan terminal"}
-            items={mobile ? toolbarItems : []}>{displayControls}</OverflowActions>
+          {/* SPEC-800 · di mobile & tablet-collapse aksi sekunder pindah ke satu panel supaya pane
+              mendapat ruang layar terbesar; di grid penuh panel ini hanya memuat kontrol tampilan. */}
+          <OverflowActions label={singlePane ? "Aksi terminal lain" : "Tampilan terminal"}
+            items={singlePane ? toolbarItems : []}>{displayControls}</OverflowActions>
           <IconButton size="sm" icon={maxed ? "minimize-2" : "maximize-2"}
             label={maxed ? "Keluar layar penuh" : "Layar penuh"}
             aria-pressed={maxed} onClick={() => setMaxed((m) => !m)} />
@@ -537,7 +561,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         </div>
       )}
 
-      {mobile && !showEmpty && (
+      {singlePane && !showEmpty && (
         <div className="hn-stack-mobile" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Tabs aria-label="Panel terminal" variant="pill" value={String(activeCell)}
             onChange={(next) => setActiveCell(Number(next))}
@@ -552,19 +576,19 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         <StateBlock kind="empty" icon="terminal" title="Belum ada sesi terminal"
           hint="Pilih project lalu buka sesi — 'Sesi baru' menjalankan claude --dangerously-skip-permissions di direktori project; 'Terminal biasa' membuka shell tmux polos untuk menjalankan command." />
       ) : (
-        <div style={{
+        <div ref={gridRef} data-testid="terminal-grid" style={{
           flex: 1, minHeight: 0, display: "grid", gap: 8,
-          gridTemplateColumns: mobile ? "minmax(0, 1fr)" : `18px repeat(${layout.cols}, minmax(0, 1fr))`,
-          gridTemplateRows: mobile ? "minmax(0, 1fr)" : `16px repeat(${layout.rows}, minmax(0, 1fr))`,
+          gridTemplateColumns: singlePane ? "minmax(0, 1fr)" : `18px repeat(${layout.cols}, minmax(0, 1fr))`,
+          gridTemplateRows: singlePane ? "minmax(0, 1fr)" : `16px repeat(${layout.rows}, minmax(0, 1fr))`,
         }}>
-          {!mobile && <div />}{/* pojok kiri-atas: perpotongan kedua gutter */}
-          {!mobile && Array.from({ length: layout.cols }, (_, c) => (
+          {!singlePane && <div />}{/* pojok kiri-atas: perpotongan kedua gutter */}
+          {!singlePane && Array.from({ length: layout.cols }, (_, c) => (
             <GutterX key={`col-${c}`} axis="col" label={`Tutup kolom ${c + 1}`} disabled={!workspaceWritable || layout.cols === 1}
               onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeColumn(l, c)))} />
           ))}
           {Array.from({ length: layout.rows }, (_, r) => (
             <React.Fragment key={`row-${r}`}>
-              {!mobile && <GutterX axis="row" label={`Tutup baris ${r + 1}`} disabled={!workspaceWritable || layout.rows === 1}
+              {!singlePane && <GutterX axis="row" label={`Tutup baris ${r + 1}`} disabled={!workspaceWritable || layout.rows === 1}
                 onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeRow(l, r)))} />
               }
               {Array.from({ length: layout.cols }, (_, c) => {
@@ -573,8 +597,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
                 const s = id ? byId(id) : null;
                 return (
                   <div key={id ?? `empty-${idx}`} data-terminal-cell-index={idx}
-                    aria-hidden={mobile && activeCell !== idx ? "true" : "false"} style={{
-                    minHeight: 0, minWidth: 0, display: mobile && activeCell !== idx ? "none" : "flex", flexDirection: "column",
+                    aria-hidden={singlePane && activeCell !== idx ? "true" : "false"} style={{
+                    minHeight: 0, minWidth: 0, display: singlePane && activeCell !== idx ? "none" : "flex", flexDirection: "column",
                     border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", overflow: "hidden",
                   }}>
                     {s
@@ -587,7 +611,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
                           specOf={specOf && stableProps.specOf} backlog={backlog}
                           fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
                           fullscreen={fullId === s.id}
-                          paneHidden={mobile && activeCell !== idx} />
+                          paneHidden={singlePane && activeCell !== idx} />
                       : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
                   </div>
                 );
