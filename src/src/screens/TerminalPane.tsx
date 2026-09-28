@@ -694,7 +694,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
           SPEC-878 · strip juga bicara saat sambungan sehat: antrean yang ditahan karena memuat
           Enter adalah keputusan yang menunggu operator, bukan keadaan koneksi. */}
       {((link.state !== "open" && link.state !== "connecting") || queue.held || queue.full || clipErr) && (
-        <div data-testid="terminal-link" style={{
+        <div data-testid="terminal-link" role="status" aria-live="polite" style={{
           display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto", flexWrap: "wrap",
           padding: "3px 8px", fontFamily: "var(--font-mono)", fontSize: 11,
           background: link.state === "retrying" || queue.held

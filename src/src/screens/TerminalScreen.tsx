@@ -391,10 +391,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           onClick={() => setDiag((on) => !on)}>{diag ? "Matikan" : "Nyalakan"}</Button>
       </div>
       <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+        <span id="terminal-reset-grid-hint" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
           Kembalikan grid ke 1 kolom × 1 baris (sesi lain pindah ke "belum di grid")
         </span>
-        <Button size="sm" variant="secondary"
+        <Button size="sm" variant="secondary" aria-describedby="terminal-reset-grid-hint"
           disabled={!workspaceWritable || (layout.cols === 1 && layout.rows === 1)}
           onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, () => L.emptyLayout()))}>
           Reset grid
