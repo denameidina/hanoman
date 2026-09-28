@@ -353,6 +353,74 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   }, [activeCell, layout.cells.length]);
   const showEmpty = layout.rows === 1 && layout.cols === 1 && !layout.cells[0] && sessions.length === 0;
 
+  // Drag-resize antar-pane (audit UI/UX Terminal desktop): preview lokal saat pointer digerakkan,
+  // commit ke workspace hanya di pointerup — sama seperti pola lain di layar ini yang tak menulis
+  // tiap ketukan (mis. RenameInput commit di onBlur/Enter, bukan tiap onChange).
+  const gridRef = React.useRef<HTMLDivElement>(null);
+  const dragRef = React.useRef<{
+    axis: "col" | "row"; index: number; pointerId: number; start: number; extent: number;
+    startSizes: number[]; latest: number[];
+  } | null>(null);
+  const [dragPreview, setDragPreview] = React.useState<{ axis: "col" | "row"; sizes: number[] } | null>(null);
+
+  const colSizes = dragPreview?.axis === "col" ? dragPreview.sizes : layout.colSizes ?? Array(layout.cols).fill(1);
+  const rowSizes = dragPreview?.axis === "row" ? dragPreview.sizes : layout.rowSizes ?? Array(layout.rows).fill(1);
+
+  function beginResize(axis: "col" | "row", index: number, e: React.PointerEvent) {
+    if (!workspaceWritable) return;
+    const rect = gridRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    const startSizes = axis === "col" ? colSizes : rowSizes;
+    dragRef.current = {
+      axis, index, pointerId: e.pointerId,
+      start: axis === "col" ? e.clientX : e.clientY,
+      extent: axis === "col" ? rect.width : rect.height,
+      startSizes, latest: startSizes,
+    };
+    setDragPreview({ axis, sizes: startSizes });
+  }
+  function moveResize(e: React.PointerEvent) {
+    const d = dragRef.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    const pos = d.axis === "col" ? e.clientX : e.clientY;
+    const total = d.startSizes.reduce((a, b) => a + b, 0);
+    const deltaFr = ((pos - d.start) / d.extent) * total;
+    d.latest = L.resizeTracks(d.startSizes, d.index, deltaFr);
+    setDragPreview({ axis: d.axis, sizes: d.latest });
+  }
+  function endResize(e: React.PointerEvent) {
+    const d = dragRef.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    dragRef.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    setDragPreview(null);
+    if (d.latest === d.startSizes) return;   // tak bergerak — jangan tulis workspace
+    void mutateWorkspace((current) => W.mapActiveLayout(current, (l) =>
+      d.axis === "col" ? { ...l, colSizes: d.latest } : { ...l, rowSizes: d.latest }));
+  }
+  function stepResize(axis: "col" | "row", index: number, e: React.KeyboardEvent) {
+    if (!workspaceWritable) return;
+    const forward = axis === "col" ? "ArrowRight" : "ArrowDown";
+    const backward = axis === "col" ? "ArrowLeft" : "ArrowUp";
+    const direction = e.key === forward ? 1 : e.key === backward ? -1 : 0;
+    if (direction === 0) return;
+    e.preventDefault();
+    void mutateWorkspace((current) => W.mapActiveLayout(current, (l) =>
+      axis === "col" ? L.stepResizeCol(l, index, direction, e.shiftKey) : L.stepResizeRow(l, index, direction, e.shiftKey)));
+  }
+  // Klik dua kali: reset ukuran KEDUA track bertetangga saja (menyamakan lebar/tinggi keduanya) —
+  // reset grid utuh di luar scope task ini.
+  function equalizeResize(axis: "col" | "row", index: number) {
+    if (!workspaceWritable) return;
+    void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => {
+      const sizes = axis === "col" ? l.colSizes ?? Array(l.cols).fill(1) : l.rowSizes ?? Array(l.rows).fill(1);
+      const avg = (sizes[index]! + sizes[index + 1]!) / 2;
+      const delta = avg - sizes[index]!;
+      return axis === "col" ? L.resizeCol(l, index, delta) : L.resizeRow(l, index, delta);
+    }));
+  }
+
   // SPEC-800 · kontrol tampilan tinggal di panel, bukan di toolbar: keduanya dipakai sekali lalu
   // dilupakan, dan menaruhnya inline melawan tujuan "pane dapat ruang layar terbesar".
   const displayControls = (
@@ -542,48 +610,74 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         <StateBlock kind="empty" icon="terminal" title="Belum ada sesi terminal"
           hint="Pilih project lalu buka sesi — 'Sesi baru' menjalankan claude --dangerously-skip-permissions di direktori project; 'Terminal biasa' membuka shell tmux polos untuk menjalankan command." />
       ) : (
-        <div style={{
+        <div ref={gridRef} style={{
           flex: 1, minHeight: 0, display: "grid", gap: 8,
-          gridTemplateColumns: mobile ? "minmax(0, 1fr)" : `18px repeat(${layout.cols}, minmax(0, 1fr))`,
-          gridTemplateRows: mobile ? "minmax(0, 1fr)" : `16px repeat(${layout.rows}, minmax(0, 1fr))`,
+          gridTemplateColumns: mobile ? "minmax(0, 1fr)"
+            : `18px ${colSizes.map((s) => `minmax(0, ${s}fr)`).join(" ")}`,
+          gridTemplateRows: mobile ? "minmax(0, 1fr)"
+            : `16px ${rowSizes.map((s) => `minmax(0, ${s}fr)`).join(" ")}`,
         }}>
-          {!mobile && <div />}{/* pojok kiri-atas: perpotongan kedua gutter */}
+          {/* Track pane c/r duduk di grid-line c+2/r+2 (line 1 dipakai gutter) — eksplisit, bukan
+              auto-placement, supaya divider di bawah bisa berbagi track yang sama tanpa mendorong
+              sel lain (auto-placement menganggap track yang diklaim item eksplisit "terpakai"). */}
+          {!mobile && <div style={{ gridColumn: 1, gridRow: 1 }} />}{/* pojok kiri-atas */}
           {!mobile && Array.from({ length: layout.cols }, (_, c) => (
             <GutterX key={`col-${c}`} label={`Tutup kolom ${c + 1}`} disabled={!workspaceWritable || layout.cols === 1}
+              style={{ gridColumn: c + 2, gridRow: 1 }}
               onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeColumn(l, c)))} />
           ))}
-          {Array.from({ length: layout.rows }, (_, r) => (
-            <React.Fragment key={`row-${r}`}>
-              {!mobile && <GutterX label={`Tutup baris ${r + 1}`} disabled={!workspaceWritable || layout.rows === 1}
-                onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeRow(l, r)))} />
-              }
-              {Array.from({ length: layout.cols }, (_, c) => {
-                const idx = r * layout.cols + c;
-                const id = layout.cells[idx] ?? null;
-                const s = id ? byId(id) : null;
-                return (
-                  <div key={id ?? `empty-${idx}`} data-terminal-cell-index={idx}
-                    aria-hidden={mobile && activeCell !== idx ? "true" : "false"} style={{
-                    minHeight: 0, minWidth: 0, display: mobile && activeCell !== idx ? "none" : "flex", flexDirection: "column",
-                    border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", overflow: "hidden",
-                  }}>
-                    {s
-                      ? <Cell session={s} nameOf={nameOf} {...handlersFor(s.id)}
-                          canArrange={workspaceWritable}
-                          onReview={onOpenReview && stableProps.onOpenReview}
-                          onSessionReview={onOpenSessionReview && stableProps.onOpenSessionReview}
-                          titleOf={titleOf && stableProps.titleOf} onIntegrate={onIntegrate && stableProps.onIntegrate}
-                          onIntegrateSession={onIntegrateSession && stableProps.onIntegrateSession}
-                          specOf={specOf && stableProps.specOf} backlog={backlog}
-                          fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
-                          fullscreen={fullId === s.id}
-                          paneHidden={mobile && activeCell !== idx} />
-                      : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
-                  </div>
-                );
-              })}
-            </React.Fragment>
+          {!mobile && Array.from({ length: layout.rows }, (_, r) => (
+            <GutterX key={`row-${r}`} label={`Tutup baris ${r + 1}`} disabled={!workspaceWritable || layout.rows === 1}
+              style={{ gridColumn: 1, gridRow: r + 2 }}
+              onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeRow(l, r)))} />
           ))}
+          {!mobile && Array.from({ length: layout.cols - 1 }, (_, c) => {
+            const pct = L.trackPercent(colSizes, c);
+            return (
+              <ResizeDivider key={`col-div-${c}`} orientation="col" label={`Ubah lebar kolom ${c + 1}/${c + 2}`}
+                now={pct.now} min={pct.min} max={pct.max} disabled={!workspaceWritable}
+                gridColumn={c + 3} gridRow="1 / -1"
+                onPointerDown={(e) => beginResize("col", c, e)} onPointerMove={moveResize} onPointerUp={endResize}
+                onKeyDown={(e) => stepResize("col", c, e)} onDoubleClick={() => equalizeResize("col", c)} />
+            );
+          })}
+          {!mobile && Array.from({ length: layout.rows - 1 }, (_, r) => {
+            const pct = L.trackPercent(rowSizes, r);
+            return (
+              <ResizeDivider key={`row-div-${r}`} orientation="row" label={`Ubah tinggi baris ${r + 1}/${r + 2}`}
+                now={pct.now} min={pct.min} max={pct.max} disabled={!workspaceWritable}
+                gridColumn="1 / -1" gridRow={r + 3}
+                onPointerDown={(e) => beginResize("row", r, e)} onPointerMove={moveResize} onPointerUp={endResize}
+                onKeyDown={(e) => stepResize("row", r, e)} onDoubleClick={() => equalizeResize("row", r)} />
+            );
+          })}
+          {Array.from({ length: layout.rows }, (_, r) => r).flatMap((r) =>
+            Array.from({ length: layout.cols }, (_, c) => {
+              const idx = r * layout.cols + c;
+              const id = layout.cells[idx] ?? null;
+              const s = id ? byId(id) : null;
+              return (
+                <div key={id ?? `empty-${idx}`} data-terminal-cell-index={idx}
+                  aria-hidden={mobile && activeCell !== idx ? "true" : "false"} style={{
+                  minHeight: 0, minWidth: 0, display: mobile && activeCell !== idx ? "none" : "flex", flexDirection: "column",
+                  border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", overflow: "hidden",
+                  ...(mobile ? {} : { gridColumn: c + 2, gridRow: r + 2 }),
+                }}>
+                  {s
+                    ? <Cell session={s} nameOf={nameOf} {...handlersFor(s.id)}
+                        canArrange={workspaceWritable}
+                        onReview={onOpenReview && stableProps.onOpenReview}
+                        onSessionReview={onOpenSessionReview && stableProps.onOpenSessionReview}
+                        titleOf={titleOf && stableProps.titleOf} onIntegrate={onIntegrate && stableProps.onIntegrate}
+                        onIntegrateSession={onIntegrateSession && stableProps.onIntegrateSession}
+                        specOf={specOf && stableProps.specOf} backlog={backlog}
+                        fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
+                        fullscreen={fullId === s.id}
+                        paneHidden={mobile && activeCell !== idx} />
+                    : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
+                </div>
+              );
+            }))}
         </div>
       )}
 
@@ -780,13 +874,47 @@ function GroupTabs({ ws, compact = false, writable, onSelect, onAdd, onRename, o
 
 // Menutup kolom/baris TIDAK mematikan sesi — selnya lenyap, sesinya jatuh ke tray lewat
 // placedIds. Karena itu tak ada konfirmasi, sama seperti "lepas".
-function GutterX({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+function GutterX({ label, disabled, onClick, style }: {
+  label: string; disabled: boolean; onClick: () => void; style?: React.CSSProperties;
+}) {
   return (
     <button type="button" aria-label={label} title={disabled ? "Grid tak boleh menyusut ke nol" : label}
       disabled={disabled} onClick={onClick}
       style={{ all: "unset", display: "grid", placeItems: "center", fontSize: 11, lineHeight: 1,
         color: "var(--text-subtle)", opacity: disabled ? 0.3 : 1,
-        cursor: disabled ? "not-allowed" : "pointer" }}>×</button>
+        cursor: disabled ? "not-allowed" : "pointer", ...style }}>×</button>
+  );
+}
+
+// Divider draggable antar-track: tak menambah track grid — ia dititipkan di track pane
+// bertetangga (lebar/tinggi = gap 8px) lalu digeser margin negatif supaya berimpit persis di
+// atas gap, tak pernah menutupi konten pane. role="separator" + panah keyboard karena "seret utk
+// resize" wajib punya padanan keyboard di desktop (mandat audit UI/UX Terminal).
+function ResizeDivider({ orientation, label, now, min, max, disabled, gridColumn, gridRow,
+  onPointerDown, onPointerMove, onPointerUp, onKeyDown, onDoubleClick }: {
+  orientation: "col" | "row"; label: string; now: number; min: number; max: number; disabled: boolean;
+  gridColumn: string | number; gridRow: string | number;
+  onPointerDown: (e: React.PointerEvent) => void;
+  onPointerMove: (e: React.PointerEvent) => void;
+  onPointerUp: (e: React.PointerEvent) => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  onDoubleClick: () => void;
+}) {
+  return (
+    <div role="separator" aria-label={label} aria-disabled={disabled}
+      aria-orientation={orientation === "col" ? "vertical" : "horizontal"}
+      aria-valuenow={now} aria-valuemin={min} aria-valuemax={max}
+      tabIndex={disabled ? -1 : 0}
+      className={`hn-terminal-divider hn-terminal-divider--${orientation}`}
+      title={disabled ? undefined
+        : "Seret untuk ubah ukuran — panah untuk langkah kecil, Shift+panah langkah besar, klik dua kali menyamakan"}
+      style={{ gridColumn, gridRow }}
+      onPointerDown={disabled ? undefined : onPointerDown}
+      onPointerMove={disabled ? undefined : onPointerMove}
+      onPointerUp={disabled ? undefined : onPointerUp}
+      onPointerCancel={disabled ? undefined : onPointerUp}
+      onKeyDown={disabled ? undefined : onKeyDown}
+      onDoubleClick={disabled ? undefined : onDoubleClick} />
   );
 }
 

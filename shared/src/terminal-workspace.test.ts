@@ -62,6 +62,36 @@ describe("terminal workspace canonical contract", () => {
     ] }).success).toBe(false);
   });
 
+  it("menerima colSizes/rowSizes opsional selama panjangnya cocok dengan cols/rows", () => {
+    const sized: TerminalWorkspaceV1 = {
+      version: 1,
+      groups: [{ id: "g1", name: "Utama", layout: {
+        rows: 1, cols: 2, cells: ["s1", null], colSizes: [1.5, 0.5],
+      } }],
+    };
+    expect(zTerminalWorkspaceV1.parse(sized)).toEqual(sized);
+  });
+
+  it("menolak colSizes/rowSizes yang panjangnya tak cocok dengan cols/rows", () => {
+    expect(zTerminalWorkspaceV1.safeParse({ version: 1, groups: [
+      { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: ["s1", null], colSizes: [1] } },
+    ] }).success).toBe(false);
+    expect(zTerminalWorkspaceV1.safeParse({ version: 1, groups: [
+      { id: "g1", name: "Utama", layout: { rows: 2, cols: 1, cells: ["s1", null], rowSizes: [1, 1, 1] } },
+    ] }).success).toBe(false);
+  });
+
+  it("menolak entri colSizes non-positif (track tak boleh nol/negatif)", () => {
+    expect(zTerminalWorkspaceV1.safeParse({ version: 1, groups: [
+      { id: "g1", name: "Utama", layout: { rows: 1, cols: 2, cells: ["s1", null], colSizes: [0, 2] } },
+    ] }).success).toBe(false);
+  });
+
+  it("workspace lama tanpa colSizes/rowSizes tetap valid (backward compatible)", () => {
+    expect(zTerminalWorkspaceV1.parse(valid)).toEqual(valid);
+    expect(valid.groups[0]!.layout).not.toHaveProperty("colSizes");
+  });
+
   it("compares canonical content rather than object identity", () => {
     expect(sameTerminalWorkspace(valid, structuredClone(valid))).toBe(true);
     expect(sameTerminalWorkspace(valid, {
