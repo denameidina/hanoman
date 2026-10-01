@@ -44,6 +44,23 @@ describe("renderQaMarkdown", () => {
   });
 });
 
+describe("renderQaMarkdown · mode preview", () => {
+  const md = renderQaMarkdown(detail, paths, { preview: true });
+  it("tanpa front-matter, tanpa kolom Ref, tanpa komentar metadata — hanya untuk dibaca", () => {
+    expect(md.startsWith("# QA-007 ·")).toBe(true);
+    expect(md).not.toContain("hanoman-qa:");
+    expect(md).not.toContain("| Ref |");
+    expect(md).not.toContain("<!-- hanoman:");
+    expect(md).toContain("| Kode | Judul | Langkah | Diharapkan | Aktual | Status |");
+    expect(md).toContain("### F-01 · [major/P1] Tombol bayar mati");
+  });
+  it("mode biasa tetap utuh (dipakai ekspor/impor)", () => {
+    const full = renderQaMarkdown(detail, paths);
+    expect(full).toContain("| Ref |");
+    expect(full).toContain("<!-- hanoman:");
+  });
+});
+
 describe("parseQaMarkdown · round-trip", () => {
   const p = parseQaMarkdown(renderQaMarkdown(detail, paths));
   it("meta laporan", () => {

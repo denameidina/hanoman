@@ -1806,6 +1806,58 @@ DELETE /api/tasks/:id/escalate   -> 200 TaskView (specId: null)
 > operasi mengubah dua baris, jadi ia memanggil `notifySynced("spec", …)` **dan**
 > `notifySynced("task", …)` — keduanya.
 
+## Workspace QA ([ADR-0174](../adr/0174-workspace-qa.md)) — **`qa:read` / `qa:write`**, LOCAL (belum disync)
+```
+# Laporan QA manusia per project. Capability dipetakan MENURUT METHOD (GET/HEAD → qa:read, selain itu
+# qa:write) untuk `/projects/:id/qa/**` dan `/qa/**`; tool MCP `hanoman_qa_*` (8 tool). Tak satu pun
+# tulisan memanggil `notifySynced` — entitas belum masuk changefeed (bagian 3). Role `client` tertutup
+# (deny-by-default, ADR-0110).
+#
+# Nomor tampil QA-007/F-01/TC-03 DIHITUNG saat render dari urutan createdAt (seri → id); respons memuat
+# `code`, tetapi id (cuid) yang dipakai untuk memanggil route lain. Setiap mutasi ANAK (case/temuan)
+# menjawab QaReportDetail terbaru, jadi klien tak menghitung ulang nomor/statistik.
+
+GET    /api/projects/:id/qa/reports                         -> { items: QaReportView[], total }   (terbaru-diubah dulu)
+POST   /api/projects/:id/qa/reports   { title, buildVersion?, environment?, scope?, tester?, summary?, verdict? } -> 201 QaReportDetail
+GET    /api/projects/:id/qa/reports/:rid                    -> QaReportDetail { …QaReportView, cases[], findings[], attachments[] }
+PATCH  /api/projects/:id/qa/reports/:rid  { …field laporan, status? } -> QaReportDetail
+#   status: draft → submitted → closed. `submitted`/`closed` tanpa `verdict` → 400.
+#   Laporan `closed` read-only: SEMUA tulisan (termasuk anak & lampiran) → 409; satu-satunya ubahan
+#   yang lolos adalah PATCH {status: draft|submitted} untuk membukanya kembali.
+DELETE /api/projects/:id/qa/reports/:rid                    -> { ok: true }  (409 bila closed; byte lampiran ikut dibuang)
+POST   /api/projects/:id/qa/reports/:rid/cases      { title, steps?, expected?, actual?, status?, order? } -> 201 QaReportDetail
+PATCH  /api/projects/:id/qa/reports/:rid/cases/:cid                -> QaReportDetail
+DELETE /api/projects/:id/qa/reports/:rid/cases/:cid                -> QaReportDetail  (temuan yang menunjuknya dilepas, bukan dihapus)
+POST   /api/projects/:id/qa/reports/:rid/findings   { title, caseId?, severity?, priority?, area?, steps?: string[], expected?, actual?, status? } -> 201 QaReportDetail
+PATCH  /api/projects/:id/qa/reports/:rid/findings/:fid             -> QaReportDetail
+DELETE /api/projects/:id/qa/reports/:rid/findings/:fid             -> QaReportDetail
+#   severity: blocker|critical|major|minor|trivial (dampak teknis); priority: P0–P3 (urutan perbaikan,
+#   TERPISAH). status input: open|wontfix — `sent` hanya ditulis server (bagian 2). `caseId` harus milik
+#   laporan yang sama → 400 { error, caseId } (soft-link tanpa FK).
+#   Galat umum: 400 validasi `{ error: zodFlatten }` · 404 lintas-project/tak ada · 409 closed.
+
+POST   /api/projects/:id/qa/reports/:rid/attachments?ownerType=report|case|finding&ownerId=…   (multipart, field `files`)
+                                                            -> 201 { saved: QaAttachmentView[], rejected: [{ filename, reason }] }
+#   Memakai ulang pipeline unggahan (magic bytes, normalisasi gambar, pemindaian). Tipe: png/jpeg/webp,
+#   pdf, md, txt, log, json, csv. Maks 10 MB/berkas, 30 berkas & 100 MB per laporan. reason ∈
+#   type|size|count|quota|scan — berkas bermasalah ditolak sendiri tanpa menggagalkan yang lain.
+#   400 owner tak valid / bukan multipart · 409 closed.
+GET    /api/projects/:id/qa/reports/:rid/attachments/:aid   -> byte (gambar inline, lainnya attachment; `?download=1` memaksa unduh)
+#   nosniff + CSP sandbox. QaAttachmentView = { id, reportId, ownerType, ownerId, filename, mimeType, size, sha256, syncState: "local-only", createdAt }
+DELETE /api/projects/:id/qa/reports/:rid/attachments/:aid   -> { ok: true }
+
+GET    /api/qa/template.md                                  -> text/markdown (attachment; qa-template.md)
+GET    /api/projects/:id/qa/reports/:rid/export[?format=md] -> application/zip (report.md + attachments/) | text/markdown
+POST   /api/projects/:id/qa/import    (multipart, satu berkas .zip atau .md; maks ≈105 MB)
+                                                            -> 201|200 { reportId, created, cases, findings, attachments: { saved, rejected } }
+#   Impor = UPSERT berbasis id: `reportId` di berkas yang cocok dengan laporan project ini → diperbarui
+#   (case/temuan dicocokkan lewat id; yang tak ada di berkas dibiarkan; lampiran bernama sama pada
+#   pemilik yang sama dilewati) → 200 created:false. Selain itu laporan BARU dengan id baru, `caseId`
+#   di-remap → 201. 400 berbaris untuk Markdown salah ("baris N: …") / ZIP tak valid (zip-slip,
+#   zip-bomb, tanpa report.md) / submitted-closed tanpa verdict · 404 project · 409 target closed ·
+#   413 berkas terlalu besar.
+```
+
 ## Scheduler (SPEC-294 · ADR-0072) — LOCAL per-instance
 ```
 # Fondasi scheduler otonom (cookie; agent-token → domain settings). Otomasi default mati, launchGuard default aktif.

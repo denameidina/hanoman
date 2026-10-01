@@ -54,7 +54,14 @@ function splitRow(line: string): string[] {
 }
 
 // ── render ──────────────────────────────────────────────────────────────────
-export function renderQaMarkdown(d: QaReportDetail, paths: Record<string, string> = {}): string {
+/**
+ * `preview: true` = untuk DIBACA di layar (tanpa front-matter, kolom Ref, komentar metadata). Hasilnya
+ * tak boleh diimpor kembali — ekspor/impor memakai mode biasa.
+ */
+export function renderQaMarkdown(
+  d: QaReportDetail, paths: Record<string, string> = {}, opts: { preview?: boolean } = {},
+): string {
+  const pv = opts.preview === true;
   const att = (type: string, id: string) => d.attachments.filter((a) => a.ownerType === type && a.ownerId === id);
   const link = (a: QaAttachmentView) => {
     const name = a.filename.replace(/[[\]]/g, "_");
@@ -62,25 +69,27 @@ export function renderQaMarkdown(d: QaReportDetail, paths: Record<string, string
   };
   const s = d.stats;
   const L: string[] = [
-    "---", "hanoman-qa: 1", `reportId: ${q(d.id)}`, `project: ${q(d.projectId)}`, `code: ${q(d.code)}`,
-    `title: ${q(oneLine(d.title))}`, `build: ${q(d.buildVersion)}`, `tester: ${q(d.tester)}`,
-    `status: ${d.status}`, `verdict: ${d.verdict ?? "null"}`, `scope: ${q(d.scope)}`,
-    `environment: ${JSON.stringify(d.environment)}`, "---", "",
+    ...(pv ? [] : [
+      "---", "hanoman-qa: 1", `reportId: ${q(d.id)}`, `project: ${q(d.projectId)}`, `code: ${q(d.code)}`,
+      `title: ${q(oneLine(d.title))}`, `build: ${q(d.buildVersion)}`, `tester: ${q(d.tester)}`,
+      `status: ${d.status}`, `verdict: ${d.verdict ?? "null"}`, `scope: ${q(d.scope)}`,
+      `environment: ${JSON.stringify(d.environment)}`, "---", "",
+    ]),
     `# ${d.code} · ${oneLine(d.title)}`, "",
     `> Test case: ${s.cases.total} · pass ${s.cases.pass} · fail ${s.cases.fail} · blocked ${s.cases.blocked} · skipped ${s.cases.skipped} · todo ${s.cases.todo}`
-      + ` · pass rate ${s.passRate === null ? "—" : `${Math.round(s.passRate * 100)}%`}`,
-    `> Temuan: ${s.findings.total} (blocker ${s.findings.blocker} · critical ${s.findings.critical} · major ${s.findings.major} · minor ${s.findings.minor} · trivial ${s.findings.trivial}) · open ${s.findings.open}`,
+      + ` · pass rate ${s.passRate === null ? "—" : `${Math.round(s.passRate * 100)}%`}  `,
+    `> Temuan: ${s.findings.total} (blocker ${s.findings.blocker} · critical ${s.findings.critical} · major ${s.findings.major} · minor ${s.findings.minor} · trivial ${s.findings.trivial}) · open ${s.findings.open}  `,
     `> Keputusan: ${d.verdict ?? "belum diputuskan"}`, "",
     "## Ringkasan", "", esc(d.summary), "",
     "## Test case", "",
-    "| Kode | Judul | Langkah | Diharapkan | Aktual | Status | Ref |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
-    ...d.cases.map((c) => `| ${c.code} | ${cell(c.title)} | ${cell(c.steps)} | ${cell(c.expected)} | ${cell(c.actual)} | ${c.status} | ${c.id} |`),
+    pv ? "| Kode | Judul | Langkah | Diharapkan | Aktual | Status |" : "| Kode | Judul | Langkah | Diharapkan | Aktual | Status | Ref |",
+    pv ? "| --- | --- | --- | --- | --- | --- |" : "| --- | --- | --- | --- | --- | --- | --- |",
+    ...d.cases.map((c) => `| ${c.code} | ${cell(c.title)} | ${cell(c.steps)} | ${cell(c.expected)} | ${cell(c.actual)} | ${c.status}${pv ? "" : ` | ${c.id}`} |`),
     "", "## Temuan", "",
   ];
   for (const f of d.findings) {
     const meta = JSON.stringify({ id: f.id, caseId: f.caseId, status: f.status }).replace(/>/g, "\\u003e");
-    L.push(`### ${f.code} · [${f.severity}/${f.priority}] ${oneLine(f.title)}`, `<!-- hanoman:${meta} -->`, "");
+    L.push(`### ${f.code} · [${f.severity}/${f.priority}] ${oneLine(f.title)}`, ...(pv ? [] : [`<!-- hanoman:${meta} -->`]), "");
     if (f.area) L.push(`**Area:** ${oneLine(f.area)}`, "");
     if (f.caseCode) L.push(`**Test case:** ${f.caseCode}`, "");
     L.push("**Repro**", "", ...(f.steps.length ? f.steps.map((t, i) => `${i + 1}. ${oneLine(t)}`) : []), "");

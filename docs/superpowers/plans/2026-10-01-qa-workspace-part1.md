@@ -3641,7 +3641,7 @@ Expected: registry bertambah hanya ikon yang belum ada; test hijau. Bila nama ik
 Run: `pnpm vitest --run src/src/screens/qa src/src/routes.test.ts src/test/qa-nav.test.tsx src/test/changelog-nav.test.tsx src/test/team-nav.test.tsx --no-file-parallelism && pnpm --filter ./src typecheck`
 Expected: PASS.
 
-- [ ] **Step 7: Periksa responsif nyata** (invarian test saja tak cukup — memori proyek: "invariant lulus tapi terpotong"). Jalankan dashboard + browser CDP sesuai memori `hanoman-browser-smoke-via-cdp`, buka `/qa/<projectId>` pada lebar **390, 768, 1280 px**: daftar laporan, editor (header, kartu test case, modal temuan), pratinjau. Tak boleh ada scroll horizontal halaman atau teks terpotong. Perbaiki gaya bila ada (hanya `minmax(min(100%, …))`/`flexWrap`).
+- [x] **Step 7: Periksa responsif nyata** (invarian test saja tak cukup — memori proyek: "invariant lulus tapi terpotong"). Jalankan dashboard + browser CDP sesuai memori `hanoman-browser-smoke-via-cdp`, buka `/qa/<projectId>` pada lebar **390, 768, 1280 px**: daftar laporan, editor (header, kartu test case, modal temuan), pratinjau. Tak boleh ada scroll horizontal halaman atau teks terpotong. Perbaiki gaya bila ada (hanya `minmax(min(100%, …))`/`flexWrap`).
 
 - [x] **Step 8: Commit**
 
@@ -3660,13 +3660,13 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Modify: `internal/docs/architecture/api-contract.md`, `internal/docs/README.md`, `internal/skills/hanoman/SKILL.md` (bila memuat daftar domain/tool)
 - Create: panduan pemakai `internal/docs/<kategori>/qa-workspace.md` (lihat `ls internal/docs`; letakkan di direktori panduan fitur yang sudah ada), mis. cara mengisi, severity vs prioritas, template, ekspor/impor
 
-- [ ] **Step 1: Dokumen**
+- [x] **Step 1: Dokumen**
   - `api-contract.md`: tabel endpoint QA (Task 4/5/7), kode galat 400/404/409/413, capability `qa:read|write`, catatan "local-only (tak masuk changefeed)".
   - Panduan pemakai: alur (buat laporan → isi test case → catat temuan + lampiran → Submit dengan keputusan → ekspor ZIP), definisi severity vs prioritas (tabel), format Markdown/ZIP dan cara mengimpor template, batas lampiran, perilaku upsert impor, catatan "nomor bisa bergeser setelah sync, ekspor membekukannya".
   - Tautkan semua doc baru di `internal/docs/README.md` (`pnpm exec hanoman docs link <path> --category <kategori>` lalu `pnpm exec hanoman docs index --check`).
   - Daftar tool MCP: perbarui bila `internal/skills/hanoman/SKILL.md`/doc lain mendaftar domain tool (hasil grep Task 8 Step 5).
 
-- [ ] **Step 2: Test tersentuh, serial, DB terisolasi**
+- [x] **Step 2: Test tersentuh, serial, DB terisolasi**
 
 ```bash
 export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
@@ -3675,7 +3675,7 @@ pnpm --filter ./server typecheck && pnpm --filter ./shared typecheck && pnpm --f
 ```
 (`HANOMAN_BASE_SHA` = SHA basis worktree; bila tak terpasang, `git merge-base HEAD origin/main`.) Expected: hijau. Jebakan `--changed`: nol test terlihat hijau — pastikan daftar yang berjalan memuat berkas `qa-*` / `zip` / `mcp-*`. Kegagalan 404/P2022 ramai = isolasi DB (lihat AGENTS.md), bukan regresi.
 
-- [ ] **Step 3: Uji API nyata di local** (CLAUDE.md: sekali di akhir, tiap task yang menyentuh endpoint) — DB khusus, bukan DB operasional:
+- [x] **Step 3: Uji API nyata di local** (CLAUDE.md: sekali di akhir, tiap task yang menyentuh endpoint) — DB khusus, bukan DB operasional:
 
 ```bash
 SMOKE="$(mktemp -d)"
@@ -3709,7 +3709,7 @@ print(call("GET", "/qa/template.md")[0])
 ```
 Verifikasi manual: `unzip -l qa-smoke.zip` (harus `report.md` + `attachments/F-01-1-layar.png`); `unzip -p qa-smoke.zip report.md` terbaca rapi; impor ZIP itu kembali lewat dashboard (tombol **Impor**) ke project lain dan pastikan test case/temuan/lampiran utuh. Bunuh server per-PID (`lsof -ti:PORT` → `kill <pid>`), JANGAN `pkill -f`.
 
-- [ ] **Step 4: Centang checklist plan ini + commit docs**
+- [x] **Step 4: Centang checklist plan ini + commit docs**
 
 ```bash
 git add internal docs/superpowers/plans
@@ -3719,6 +3719,16 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
 
 ---
+
+## Catatan eksekusi (penyimpangan dari rencana, ditemukan saat dikerjakan)
+
+- **Task 2**: `Capability` adalah enum eksplisit (`CAPABILITY_IDS`); `qa:read|write` wajib ditambahkan di sana juga, bukan hanya `CAPABILITIES` — vitest tak menangkapnya, hanya typecheck.
+- **Task 3**: `prisma migrate dev` menambahkan komentar ke `migration_lock.toml`; dikembalikan agar diff bersih.
+- **Task 7**: `zip[at] ^= …` gagal typecheck strict (`noUncheckedIndexedAccess`) — ditulis ulang.
+- **Task 9**: memindahkan `QaImportResult` ke shared dengan skrip meninggalkan `};` liar di `qa-transfer.ts`; tertangkap oleh smoke server nyata (typecheck server tak dijalankan ulang sesudah edit itu). Pelajaran: jalankan typecheck SETIAP paket yang disentuh sebelum commit.
+- **Task 11**: smoke browser menemukan front-matter YAML dirender sebagai heading dan kolom `Ref` menyesakkan tabel di 390 px → renderer mendapat opsi `{ preview: true }`; tabel pratinjau boleh di-scroll mendatar.
+- **Task 12**: `shared/test/agent.test.ts` (hitungan capability 14→15 domain, 32→34 id) dan `cli/src/commands/migrate-pg.ts` (`PG_ORDER` wajib memuat setiap model Prisma) ikut diperbarui.
+- Kegagalan lama di basis `d6b7560c`, TERBUKTI merah di worktree basis (bukan dari perubahan ini): `scheduler-state.test.ts` (2), `start-session-admission.test.tsx` (3), `spec-attachment-launch.test.ts` (1).
 
 ## Self-Review (spec → task)
 
