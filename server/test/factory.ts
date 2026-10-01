@@ -154,6 +154,7 @@ export async function resetDb(): Promise<void> {
     // Cascade); ia sekadar mengikuti arah induk→anak yang dipakai baris-baris di sekitarnya.
     prisma.task.deleteMany(),
     prisma.member.deleteMany(),
+    prisma.qaReport.deleteMany(),    // Workspace QA · cascade ke case/finding/attachment
     prisma.spec.deleteMany(), prisma.setting.deleteMany(), prisma.project.deleteMany(),
     prisma.vps.deleteMany(),
   ]);

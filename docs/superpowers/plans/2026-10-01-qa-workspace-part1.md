@@ -342,7 +342,7 @@ Expected: FAIL (`qa:read` belum terdaftar).
 
 - [x] **Step 3: Implementasi**
 
-`shared/src/agent.ts` — tambah dua entri tepat setelah `team:write` (sebelum komentar `ADR-0155`):
+`shared/src/agent.ts` — tambahkan `"qa:read", "qa:write",` ke daftar `CAPABILITY_IDS` (tepat sesudah `"team:read", "team:write",`; tanpa ini `Capability` tak mengenalnya dan typecheck merah — vitest tak menangkapnya), lalu tambah dua entri tepat setelah `team:write` (sebelum komentar `ADR-0155`):
 
 ```ts
   { id: "qa:read", domain: "qa", access: "read", label: "QA — baca", desc: "Lihat laporan QA, test case, temuan, dan lampirannya." },
@@ -396,7 +396,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `prisma.qaReport`, `prisma.qaCase`, `prisma.qaFinding`, `prisma.qaAttachment`. `QaAttachment.reportId` FK cascade (penyimpangan kecil dari spec: dibutuhkan untuk kuota per laporan + cascade; ditulis ke spec di langkah 6). `QaFinding.caseId` **soft-link tanpa FK** (cermin `Task.specId`).
 
-- [ ] **Step 1: Tulis test yang gagal** — `server/test/qa-model.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `server/test/qa-model.test.ts`
 
 ```ts
 import { beforeEach, describe, expect, it } from "vitest";
@@ -432,7 +432,7 @@ describe("model QA", () => {
 });
 ```
 
-- [ ] **Step 2: Tambah model ke `server/prisma/schema.prisma`**
+- [x] **Step 2: Tambah model ke `server/prisma/schema.prisma`**
 
 Di `model Project` tambahkan setelah `tasks        Task[]`:
 
@@ -534,7 +534,7 @@ model QaAttachment {
 }
 ```
 
-- [ ] **Step 3: Hasilkan migration pada DB sekali-pakai (JANGAN DB operasional)**
+- [x] **Step 3: Hasilkan migration pada DB sekali-pakai (JANGAN DB operasional)**
 
 ```bash
 cd server && DATABASE_URL="file:$(mktemp -d)/m.db" pnpm exec prisma migrate dev --name qa_workspace --schema prisma/schema.prisma && cd ..
@@ -542,24 +542,24 @@ git status --short server/prisma
 ```
 Expected: satu folder baru `server/prisma/migrations/<ts>_qa_workspace/migration.sql` berisi `CREATE TABLE "QaReport"`, `"QaCase"`, `"QaFinding"`, `"QaAttachment"` + index; `prisma generate` ikut jalan. Tidak ada `ALTER`/`DROP` tabel lain — bila ada, hentikan dan periksa drift.
 
-- [ ] **Step 4: `resetDb`** — di `server/test/factory.ts`, dalam `$transaction` sebelum `prisma.project.deleteMany()`:
+- [x] **Step 4: `resetDb`** — di `server/test/factory.ts`, dalam `$transaction` sebelum `prisma.project.deleteMany()`:
 
 ```ts
     prisma.qaReport.deleteMany(),    // Workspace QA · cascade ke case/finding/attachment
 ```
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; pnpm vitest --run server/test/qa-model.test.ts --no-file-parallelism && pnpm --filter ./server typecheck`
 Expected: PASS.
 
-- [ ] **Step 6: ADR + docs**
+- [x] **Step 6: ADR + docs**
   - Buat `internal/docs/adr/<NNNN>-workspace-qa.md` (NNNN = nomor bebas berikutnya: `ls internal/docs/adr | tail -3`; saat ini sesudah 0173). Salin struktur berkas ADR tetangga (`0173-…`): konteks, keputusan (empat model; nomor tampil dihitung saat render; local-only sekarang, siap sync; lampiran memakai pipeline unggahan yang ada; `caseId` soft-link; `reportId` pada lampiran), konsekuensi (nomor bisa bergeser pasca-sync, ekspor membekukan).
   - Tambahkan tabel QA ke `internal/docs/architecture/data-model.md` (pola entri `Task`).
   - Tautkan ADR di `internal/docs/README.md` (`pnpm exec hanoman docs link internal/docs/adr/<NNNN>-workspace-qa.md` atau tambah baris manual lalu `hanoman docs index --check`).
   - Di `docs/superpowers/specs/2026-10-01-qa-workspace-design.md` §1 tambahkan `reportId` (FK cascade) pada `QaAttachment` dan catat bahwa `submitted`/`closed` mensyaratkan `verdict`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/prisma server/test/factory.ts server/test/qa-model.test.ts internal/docs docs/superpowers/specs

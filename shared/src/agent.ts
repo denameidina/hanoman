@@ -32,6 +32,7 @@ export const CAPABILITY_IDS = [
   // `Spec.stage` diturunkan dari fase sesi (ADR-0008/0024). Menumpangkannya berarti satu centang
   // "Backlog — tulis" diam-diam membuka papan orang, dan sebaliknya.
   "team:read", "team:write",
+  "qa:read", "qa:write",
   // ADR-0155 · akses KETIGA: `danger`. Dipecah dari `:write` karena keempat operasi ini bukan
   // "menulis lebih banyak", melainkan menjalankan sesuatu di luar proses hanoman — sesi agen di
   // worktree, perintah di VPS, git yang mengubah sejarah, penghapusan artefak dokumen.
