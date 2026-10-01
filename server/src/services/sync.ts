@@ -1,6 +1,7 @@
 import { prisma } from "../db";
 import { renameProjectCore } from "./rename-project";
 import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
+import { QA_STORAGE_KEY, settleNewQaAttachment } from "./qa-attachment-sync";
 
 // SPEC-213 · ADR-0045 · mesin sync record: version-stamp optimistic concurrency + change-feed
 // SyncLog (seq = kursor global). Isi file dokumen TIDAK lewat sini (git 3-way merge, ADR-0043).
@@ -14,10 +15,13 @@ import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
 // SPEC-471 · ADR-0095 · `githubIssue` ikut menyeberang: cermin issue adalah pengetahuan
 // bersama tim, bukan setelan mesin. Id-nya deterministik ("<projectId>:<slug>#<n>") justru
 // supaya dua mesin yang menarik repo yang sama bertemu sebagai SATU baris di sini.
+// Workspace QA · bagian 3 · ADR-0174/0175 · `qaReport`/`qaCase`/`qaFinding`/`qaAttachment` ikut menyeberang:
+// laporan QA adalah pengetahuan bersama (dikerjakan di laptop, dibaca tim di hub). BYTE lampiran tak
+// pernah lewat feed — hanya metadata; byte diunggah/ditarik terpisah (routes/sync.ts `qa-attachments`).
 // SPEC-945 · ADR-0150 · `member` & `task` ikut menyeberang: papan kerja tim adalah pengetahuan
 // bersama, bukan setelan mesin. `Member.id` deterministik (email ternormalisasi) justru supaya dua
 // mesin yang mencatat orang yang sama bertemu sebagai SATU baris di sini.
-export const SYNCED = ["project", "spec", "vps", "sessionResult", "ticket", "ticketAttachment", "customAgent", "githubIssue", "member", "task"] as const;
+export const SYNCED = ["project", "spec", "vps", "sessionResult", "ticket", "ticketAttachment", "customAgent", "githubIssue", "member", "task", "qaReport", "qaCase", "qaFinding", "qaAttachment"] as const;
 export type Entity = (typeof SYNCED)[number];
 
 type Delegate = {
@@ -37,6 +41,10 @@ const DELEGATE: Record<Entity, Delegate> = {
   githubIssue: prisma.githubIssue as unknown as Delegate,
   member: prisma.member as unknown as Delegate,
   task: prisma.task as unknown as Delegate,
+  qaReport: prisma.qaReport as unknown as Delegate,
+  qaCase: prisma.qaCase as unknown as Delegate,
+  qaFinding: prisma.qaFinding as unknown as Delegate,
+  qaAttachment: prisma.qaAttachment as unknown as Delegate,
 };
 
 // Whitelist field bisnis per entitas — SENGAJA mengecualikan never-sync (Project.repoDir,
@@ -96,6 +104,15 @@ const FIELDS: Record<Entity, string[]> = {
   // (cermin githubIssue.specId). `order` ikut supaya urutan kolom tidak acak di mesin lain.
   task: ["projectId", "title", "detail", "status", "priority", "memberId", "startDate", "dueDate",
     "order", "specId", "createdAt", "updatedAt"],
+  // Workspace QA · bagian 3 · SELURUH kolom bermakna ikut (`upsert` yang tak menyebut kolom ber-default
+  // TETAP berhasil → kolom yang terlewat mendarat sebagai default palsu di tiap mesin tanpa error: kelas
+  // ADR-0090/0093). `version` stempel mekanisme; `syncState` state LOKAL per mesin — keduanya TAK masuk.
+  // `qaFinding.backlogId` ikut (cermin task.specId): tanpa itu mesin lain bisa mengirim ulang temuan yang
+  // di mesin ini sudah jadi backlog.
+  qaReport: ["projectId", "title", "buildVersion", "environment", "scope", "tester", "summary", "status", "verdict", "createdAt", "updatedAt"],
+  qaCase: ["reportId", "title", "steps", "expected", "actual", "status", "order", "createdAt", "updatedAt"],
+  qaFinding: ["reportId", "caseId", "title", "severity", "priority", "area", "steps", "expected", "actual", "status", "backlogId", "createdAt", "updatedAt"],
+  qaAttachment: ["reportId", "projectId", "ownerType", "ownerId", "filename", "mimeType", "size", "sha256", "storageKey", "createdAt", "updatedAt"],
 };
 // Field yang JSONB-nya string ISO tapi kolomnya DateTime — dikonversi balik saat menulis.
 const DATE_FIELDS: Record<Entity, string[]> = {
@@ -107,6 +124,8 @@ const DATE_FIELDS: Record<Entity, string[]> = {
   githubIssue: ["issueCreatedAt", "issueUpdatedAt", "pulledAt", "createdAt", "updatedAt"],
   member: ["createdAt", "updatedAt"],
   task: ["startDate", "dueDate", "createdAt", "updatedAt"],
+  qaReport: ["createdAt", "updatedAt"], qaCase: ["createdAt", "updatedAt"],
+  qaFinding: ["createdAt", "updatedAt"], qaAttachment: ["createdAt", "updatedAt"],
 };
 
 // SPEC-799 · ADR-0119 · relasi FK antar entitas SYNCED. Dipakai penerima untuk MEMBUANG record anak
@@ -137,6 +156,12 @@ export const PARENTS: Partial<Record<Entity, ParentRef[]>> = {
     { field: "projectId", entity: "project", onDelete: "cascade" },
     { field: "memberId", entity: "member", onDelete: "setNull" },
   ],
+  // Workspace QA · report → project; case/finding/attachment → report (semua cascade). `qaFinding.caseId` dan
+  // `qaAttachment.ownerId` sengaja BUKAN FK (soft-link/polimorfik) jadi tak tercatat di sini.
+  qaReport: [{ field: "projectId", entity: "project", onDelete: "cascade" }],
+  qaCase: [{ field: "reportId", entity: "qaReport", onDelete: "cascade" }],
+  qaFinding: [{ field: "reportId", entity: "qaReport", onDelete: "cascade" }],
+  qaAttachment: [{ field: "reportId", entity: "qaReport", onDelete: "cascade" }],
 };
 
 // Ekspor test-only: kontrak "setiap kolom bermakna ikut menyeberang" hanya bisa diuji dari
@@ -145,7 +170,7 @@ export const __FIELDS = FIELDS;
 export const __DATE_FIELDS = DATE_FIELDS;
 
 const NUMBER_FIELDS = new Set([
-  "vps:port", "ticket:number", "ticketAttachment:size", "githubIssue:number",
+  "vps:port", "ticket:number", "ticketAttachment:size", "githubIssue:number", "qaAttachment:size",
 ]);
 const NULLABLE_NUMBER_FIELDS = new Set(["customAgent:maxTurns", "customAgent:timeoutSeconds"]);
 // SPEC-945 · ADR-0150 · TERPISAH dari NUMBER_FIELDS, yang menuntut `Number.isSafeInteger`.
@@ -154,7 +179,7 @@ const NULLABLE_NUMBER_FIELDS = new Set(["customAgent:maxTurns", "customAgent:tim
 // (default), lalu kartu PERTAMA yang benar-benar diseret menjatuhkan seluruh sync client —
 // `validateIncomingRecord` melempar di LUAR try/catch per-record (`sync-client.ts`), kursor tak
 // pernah maju, dan `pullSehat` membungkam log ulangannya. Terukur sebelum perbaikan ini.
-const FLOAT_FIELDS = new Set(["task:order"]);
+const FLOAT_FIELDS = new Set(["task:order", "qaCase:order"]);
 const BOOLEAN_FIELDS = new Set(["vps:hardened", "customAgent:enabled", "member:active"]);
 const JSON_FIELDS = new Set([
   "project:handledBy",
@@ -162,6 +187,7 @@ const JSON_FIELDS = new Set([
   "vps:health", "vps:audit",
   "customAgent:tools", "customAgent:mentions",
   "githubIssue:labels",
+  "qaReport:environment", "qaFinding:steps",
 ]);
 export const __JSON_FIELDS = JSON_FIELDS;
 
@@ -209,6 +235,23 @@ export function validateSyncData(
       throw new Error(`sync tipe invalid: ${entity}.${field}`);
     }
   }
+  if (entity === "qaAttachment") validateQaAttachment(data);
+}
+
+// Workspace QA · `storageKey` yang menyeberang menjadi PATH di upload dir hub (PUT/GET /sync/qa-attachments),
+// dan dikirim oleh device token mana pun — jadi ia divalidasi di SINI, di pintu masuk record, bukan hanya di
+// endpoint byte. Daftar mime mencerminkan tipe yang diterima pipeline unggahan (test paritas menjaganya).
+export const QA_SYNC_MIMES: ReadonlySet<string> = new Set([
+  "image/png", "image/jpeg", "image/webp", "application/pdf", "text/markdown", "text/plain", "application/json", "text/csv",
+]);
+export const QA_SYNC_MAX_BYTES = 10 * 1024 * 1024;
+function validateQaAttachment(d: Record<string, unknown>): void {
+  const bad = (f: string): never => { throw new Error(`sync nilai invalid: qaAttachment.${f}`); };
+  if ("storageKey" in d && !(typeof d.storageKey === "string" && QA_STORAGE_KEY.test(d.storageKey))) bad("storageKey");
+  if ("mimeType" in d && !(typeof d.mimeType === "string" && QA_SYNC_MIMES.has(d.mimeType))) bad("mimeType");
+  if ("ownerType" in d && !(d.ownerType === "report" || d.ownerType === "case" || d.ownerType === "finding")) bad("ownerType");
+  if ("sha256" in d && !(typeof d.sha256 === "string" && /^[0-9a-f]{64}$/.test(d.sha256))) bad("sha256");
+  if ("size" in d && !(Number.isSafeInteger(d.size) && (d.size as number) >= 0 && (d.size as number) <= QA_SYNC_MAX_BYTES)) bad("size");
 }
 
 export function isEntity(e: string): e is Entity {
@@ -328,6 +371,8 @@ export async function applyPush(
     create: { id, ...writeData, version: newVersion, updatedAt: stamp },
     update: { ...writeData, version: newVersion, updatedAt: stamp },
   });
+  // Workspace QA · lampiran BARU dari peer lahir "local-only" (default kolom) padahal byte-nya belum di sini.
+  if (entity === "qaAttachment" && !existing) await settleNewQaAttachment(id);
   if (tomb) await clearTombstone(entity, id); // pembuatan ulang yang sah menang atas tombstone
   const snap = await snapshot(entity, id);
   const log = await prisma.syncLog.create({
@@ -404,6 +449,9 @@ export const BOOTSTRAP_ORDER: Entity[] = [
   // SPEC-945 · ADR-0150 · `member` WAJIB mendahului `task` (FK memberId). Urutan yang salah
   // bootstrap SUKSES tanpa error tapi assignee kosong — kelas SPEC-885 "lupa vps".
   "member", "task",
+  // Workspace QA · induk SEBELUM anak (FK reportId, cascade) dan sesudah `project`. Urutan yang salah
+  // bootstrap SUKSES tanpa error tapi anaknya dibuang sebagai yatim (kelas SPEC-885).
+  "qaReport", "qaCase", "qaFinding", "qaAttachment",
   "vps", "sessionResult",
 ];
 
@@ -589,11 +637,15 @@ export async function upsertLocal(entity: Entity, id: string, version: number, d
   const writeData = coerce(entity, data);
   // SPEC-270 · pertahankan updatedAt asal (jam LWW) bila dikirim; else stempel now.
   const stamp = (writeData.updatedAt as Date | undefined) ?? new Date();
+  const existedBefore = entity !== "qaAttachment" || !!(await DELEGATE.qaAttachment.findUnique({ where: { id }, select: { version: true } }));
   await DELEGATE[entity].upsert({
     where: { id },
     create: { id, ...writeData, version, updatedAt: stamp },
     update: { ...writeData, version, updatedAt: stamp },
   });
+  // Hanya untuk lampiran BARU: gema record miliknya sendiri (client menarik balik push-nya) tak boleh
+  // mengubah "local-only" — byte-nya belum diunggah, dan menyentuhnya menghentikan unggahan selamanya.
+  if (entity === "qaAttachment" && !existedBefore) await settleNewQaAttachment(id);
 }
 
 // Hook siar changefeed (di-set oleh sync-hub, Fase 4). Nol dependency di service ini.

@@ -5,6 +5,7 @@ import {
   type QaOwnerType, type QaPriority, type QaReportDetail, type QaReportStatus, type QaReportView,
   type QaSeverity, type QaVerdict,
 } from "@hanoman/shared";
+import { effectiveStr } from "../config";
 import { prisma } from "../db";
 
 // Workspace QA · domain laporan. Route tinggal tipis. Kolom status/severity adalah TEXT yang kelak
@@ -39,7 +40,10 @@ const reportView = (
 export const attachmentView = (a: QaAttachment): QaAttachmentView => ({
   id: a.id, reportId: a.reportId, ownerType: a.ownerType as QaOwnerType, ownerId: a.ownerId,
   filename: a.filename, mimeType: a.mimeType, size: a.size, sha256: a.sha256,
-  syncState: "local-only", createdAt: iso(a.createdAt),
+  // Hub/standalone (tanpa SYNC_SERVER_URL) tak punya atasan tempat byte diunggah: "local-only" di sana (baris lama
+  // dari bagian 1) berarti sama dengan "available".
+  syncState: (a.syncState === "local-only" && !effectiveStr("SYNC_SERVER_URL") ? "available" : a.syncState) as QaAttachmentView["syncState"],
+  createdAt: iso(a.createdAt),
 });
 
 /** Ditampilkan menurut `order`; nomor TC-nn tetap menurut createdAt. */

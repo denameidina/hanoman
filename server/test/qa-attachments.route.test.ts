@@ -34,10 +34,10 @@ beforeEach(async () => {
 });
 
 describe("lampiran QA", () => {
-  it("unggah ke laporan dan ke temuan; muncul di detail dengan sha256 + syncState local-only", async () => {
+  it("unggah ke laporan dan ke temuan; muncul di detail dengan sha256 + syncState available (hub/standalone: tak ada atasan tempat byte diunggah)", async () => {
     const a = await upload([{ name: "layar.png", type: "image/png", body: PNG }]);
     expect(a.statusCode).toBe(201);
-    expect(a.json().saved[0]).toMatchObject({ filename: "layar.png", ownerType: "report", ownerId: rid, syncState: "local-only" });
+    expect(a.json().saved[0]).toMatchObject({ filename: "layar.png", ownerType: "report", ownerId: rid, syncState: "available" });
     expect(a.json().saved[0].sha256).toMatch(/^[0-9a-f]{64}$/);
     const b = await upload([{ name: "log.txt", type: "text/plain", body: Buffer.from("boom\n") }], `ownerType=finding&ownerId=${fid}`);
     expect(b.json().saved[0]).toMatchObject({ ownerType: "finding", ownerId: fid });

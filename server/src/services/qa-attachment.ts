@@ -4,11 +4,14 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import type { QaAttachmentView, QaOwnerType } from "@hanoman/shared";
+import { effectiveStr } from "../config";
 import { prisma } from "../db";
 import { deleteUpload, readUpload } from "./uploads";
 import { DOCUMENT_TYPES, UploadError, processDocumentUpload, processUpload, type SafeUpload } from "./upload-pipeline";
 import { IMAGE_TYPES, attachmentExt, type RejectReason, type SpecUpload } from "./spec-attachment";
 import { attachmentView } from "./qa";
+import { deleteSynced } from "./sync-delete";
+import { notifySynced } from "./sync-notify";
 
 export const QA_ATTACHMENT_LIMITS = {
   fileBytes: 10 * 1024 * 1024,
@@ -71,7 +74,10 @@ export async function addQaAttachments(
       const row = await prisma.qaAttachment.create({ data: {
         reportId: report.id, projectId: report.projectId, ownerType: owner.ownerType, ownerId: owner.ownerId,
         filename: safe.filename, mimeType: safe.mimeType, size: safe.size, sha256, storageKey: safe.storageKey,
+        // Client: byte baru ada di sini saja → menunggu unggah ke hub. Hub/standalone: tak ada atasan → langsung tersedia.
+        syncState: effectiveStr("SYNC_SERVER_URL") ? "local-only" : "available",
       } });
+      await notifySynced("qaAttachment", row.id);
       saved.push(attachmentView(row));
     } catch (error) {
       await deleteUpload(safe.storageKey);   // byte sudah mendarat; tanpa ini jadi yatim tanpa baris
@@ -83,13 +89,23 @@ export async function addQaAttachments(
   return { saved, rejected };
 }
 
-/** Hapus baris DAN byte. Cascade DB tak menyentuh disk, jadi pemanggil menghapus pemilik SESUDAH ini. */
+/**
+ * Hapus baris (lewat `deleteSynced` → tombstone menyeberang ke peer) DAN byte LOKAL. Cascade DB tak menyentuh
+ * disk, jadi pemanggil menghapus pemilik SESUDAH ini. Byte di mesin lain tak dibuang (tanpa GC lintas mesin, ADR-0068).
+ */
 export async function removeQaAttachments(where: Prisma.QaAttachmentWhereInput): Promise<number> {
   const rows = await prisma.qaAttachment.findMany({ where, select: { id: true, storageKey: true } });
-  if (!rows.length) return 0;
-  await prisma.qaAttachment.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
-  for (const r of rows) await deleteUpload(r.storageKey).catch(() => { /* sudah tak ada */ });
+  for (const r of rows) {
+    await deleteSynced("qaAttachment", r.id);
+    await deleteUpload(r.storageKey).catch(() => { /* sudah tak ada */ });
+  }
   return rows.length;
+}
+
+/** Hapus PROJECT: barisnya ikut cascade DB, byte-nya tidak — dibuang di sini, SEBELUM project dihapus. */
+export async function dropProjectQaBytes(projectId: string): Promise<void> {
+  const rows = await prisma.qaAttachment.findMany({ where: { projectId }, select: { storageKey: true } });
+  for (const r of rows) await deleteUpload(r.storageKey).catch(() => { /* sudah tak ada */ });
 }
 
 /**

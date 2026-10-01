@@ -124,8 +124,10 @@ describe("POST /cases/import (matriks)", () => {
     expect((await importCases(rid, "x.csv", "text/csv", Buffer.from("Judul\nx"))).statusCode).toBe(409);
     expect((await app.inject({ method: "POST", url: R(`/${rid}/cases/import`), payload: { a: 1 } })).statusCode).toBe(400);
   });
-  it("LOCAL-only (bagian 4): impor matriks tak menulis changefeed", async () => {
-    await importCases(rid, "m.csv", "text/csv", Buffer.from("Judul\nbaru"));
-    expect(await prisma.syncLog.count({ where: { entity: { startsWith: "qa" } } })).toBe(0);
+  it("bagian 3: impor matriks menulis changefeed (rincian di qa-sync-wiring)", async () => {
+    await prisma.syncLog.deleteMany();
+    const res = await importCases(rid, "m.csv", "text/csv", Buffer.from("Judul\nbaru"));
+    expect(res.json()).toEqual({ updated: 0, created: 1, unchanged: 0 });      // bukan lolos hampa: benar-benar tertulis
+    expect(await prisma.syncLog.count({ where: { entity: "qaCase" } })).toBeGreaterThan(0);
   });
 });

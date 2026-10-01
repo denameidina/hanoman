@@ -107,10 +107,13 @@ export function qaStats(
   return { cases: c, passRate: executed ? c.pass / executed : null, findings: f };
 }
 
+/** Per MESIN (kolom LOCAL): local-only = byte hanya di sini, belum diunggah ke hub · remote = metadata ada, byte
+ * belum diunduh · available = byte ada di sini (di client: dan terkonfirmasi di hub) · failed = hub menolak byte-nya. */
+export type QaAttachmentSyncState = "local-only" | "remote" | "available" | "failed";
 export type QaAttachmentView = {
   id: string; reportId: string; ownerType: QaOwnerType; ownerId: string;
   filename: string; mimeType: string; size: number; sha256: string;
-  syncState: "local-only"; createdAt: string;
+  syncState: QaAttachmentSyncState; createdAt: string;
 };
 export type QaCaseView = {
   id: string; reportId: string; code: string; title: string; steps: string; expected: string;

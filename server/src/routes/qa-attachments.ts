@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { QA_OWNER_TYPES, type QaOwnerType } from "@hanoman/shared";
 import { prisma } from "../db";
 import { QA_ATTACHMENT_LIMITS, addQaAttachments, ownerExists, removeQaAttachments, type QaUpload } from "../services/qa-attachment";
+import { notifySynced } from "../services/sync-notify";
 import { readUpload } from "../services/uploads";
 
 // Workspace QA · lampiran. Capability `qa:*` dari prefix `/projects/:id/qa` (`capabilityForRoute`).
@@ -37,6 +38,7 @@ export default async function qaAttachments(app: FastifyInstance) {
 
     const result = await addQaAttachments(report, { ownerType: q.ownerType as QaOwnerType, ownerId: q.ownerId }, files);
     await prisma.qaReport.update({ where: { id: rid }, data: { updatedAt: new Date() } });
+    await notifySynced("qaReport", rid);     // lampiran sendiri sudah diterbitkan per berkas di addQaAttachments
     return reply.code(201).send(result);
   });
 
@@ -62,6 +64,8 @@ export default async function qaAttachments(app: FastifyInstance) {
       return reply.code(404).send({ error: "not found" });
     if (report.status === "closed") return reply.code(409).send({ error: "laporan sudah closed" });
     await removeQaAttachments({ id: aid });
+    await prisma.qaReport.update({ where: { id: rid }, data: { updatedAt: new Date() } });
+    await notifySynced("qaReport", rid);
     return { ok: true };
   });
 }

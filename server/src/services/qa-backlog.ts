@@ -67,6 +67,7 @@ export async function sendFindingToBacklog(
   }
   await prisma.qaFinding.update({ where: { id: f.id }, data: { status: "sent", backlogId: spec!.id } });
   await notifySynced("spec", spec!.id);
+  await notifySynced("qaFinding", f.id);     // status + backlogId menyeberang: peer tak boleh mengirim ulang temuan yang sama
 
   const attachments = await copyAttachments(d, f, spec!);
   if (attachments.saved) await syncSpecAttachmentsDir(spec!.id, d.projectId);

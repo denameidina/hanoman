@@ -100,7 +100,7 @@ const STATUS_ALIASES: Record<string, QaCaseStatus> = {
 };
 
 /**
- * Baca baris lembar → baris test case. Header dicari di 10 baris pertama (judul laporan di atas tabel
+ * Baca baris lembar → baris test case. Header (= baris yang memuat kolom `Judul`) dicari di 10 baris pertama (judul laporan di atas tabel
  * tak mengganggu), kolom dikenali lewat alias tak peka huruf/spasi, urutan kolom bebas.
  */
 export function parseCaseRows(rows: readonly (readonly string[])[]): QaCaseRow[] {
@@ -109,9 +109,9 @@ export function parseCaseRows(rows: readonly (readonly string[])[]): QaCaseRow[]
   for (let i = 0; i < Math.min(rows.length, 10) && h < 0; i++) {
     const m: typeof col = {};
     rows[i]!.forEach((c, j) => { const k = HEADER_ALIASES[norm(c)]; if (k && m[k] === undefined) m[k] = j; });
-    if (m.title !== undefined && Object.keys(m).length >= 2) { h = i; col = m; }
+    if (m.title !== undefined) { h = i; col = m; }
   }
-  if (h < 0) throw new QaTableError("header tak ditemukan — butuh minimal kolom `Judul` dan satu kolom lain (mis. Status/Aktual/Ref)", 1);
+  if (h < 0) throw new QaTableError("header tak ditemukan — butuh kolom `Judul` (kolom lain opsional: Status, Aktual, Ref, …)", 1);
 
   const out: QaCaseRow[] = [];
   const at = (r: readonly string[], k: keyof typeof col) => (col[k] === undefined ? "" : (r[col[k]!] ?? "").trim());

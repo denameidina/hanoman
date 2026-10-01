@@ -5,6 +5,7 @@ import {
 import { prisma } from "../db";
 import { asJson, reportDetail } from "./qa";
 import { QA_ATTACHMENT_LIMITS, addQaAttachments, readQaAttachmentBytes, type QaUpload } from "./qa-attachment";
+import { notifySynced } from "./sync-notify";
 import { ZipError, readZip, writeZip } from "./zip";
 
 // Workspace QA · ekspor ZIP (report.md + attachments/) dan impor (upsert). Bentuk Markdown-nya milik
@@ -86,6 +87,7 @@ export async function importReport(projectId: string, file: { name: string; buf:
 
   const now = Date.now();
   const owners: { ownerType: "report" | "case" | "finding"; ownerId: string; paths: string[] }[] = [];
+  const touched = { cases: [] as string[], findings: [] as string[] };   // diterbitkan ke peer SESUDAH transaksi
   const out = await prisma.$transaction(async (tx) => {
     const data = {
       title: parsed.title, buildVersion: parsed.buildVersion, environment: asJson(parsed.environment),
@@ -107,6 +109,7 @@ export async function importReport(projectId: string, file: { name: string; buf:
         : await tx.qaCase.create({ data: { reportId: report.id, ...fields, createdAt: new Date(now + 1 + idx) } });
       if (c.id) caseByFileId.set(c.id, row.id);
       caseByCode.set(c.code, row.id);
+      touched.cases.push(row.id);
       owners.push({ ownerType: "case", ownerId: row.id, paths: c.attachments });
     }
 
@@ -121,10 +124,15 @@ export async function importReport(projectId: string, file: { name: string; buf:
       const row = f.id && knownFindings.has(f.id)
         ? await tx.qaFinding.update({ where: { id: f.id }, data: fields })
         : await tx.qaFinding.create({ data: { reportId: report.id, ...fields, createdAt: new Date(now + 1 + idx) } });
+      touched.findings.push(row.id);
       owners.push({ ownerType: "finding", ownerId: row.id, paths: f.attachments });
     }
     return report;
   });
+  // Induk SEBELUM anak (urutan yang sama dengan BOOTSTRAP_ORDER); lampiran diterbitkan per berkas oleh addQaAttachments.
+  await notifySynced("qaReport", out.id);
+  for (const id of touched.cases) await notifySynced("qaCase", id);
+  for (const id of touched.findings) await notifySynced("qaFinding", id);
 
   // Lampiran SESUDAH transaksi: byte lewat pipeline unggahan (async + pemindaian), tak boleh menahan DB.
   let saved = 0;

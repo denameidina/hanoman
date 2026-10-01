@@ -61,6 +61,10 @@ describe("casesToRows / parseCaseRows", () => {
     expect(() => parseCaseRows([["Judul", "Aktual"], ["", "isi saja"]])).toThrowError(/baris 2.*judul/i);
     expect(() => parseCaseRows([["Kolom A", "Kolom B"], ["1", "2"]])).toThrowError(/header/i);
   });
+  it("daftar judul SATU kolom cukup (tempel daftar test case)", () => {
+    const p = parseCaseRows([["Judul"], ["Login"], ["Bayar"]]);
+    expect(p.map((r) => [r.row, r.title, r.ref, r.status])).toEqual([[2, "Login", null, null], [3, "Bayar", null, null]]);
+  });
   it("kolom yang TAK ADA di lembar → undefined (bedakan dari sel kosong, yang berarti kosongkan)", () => {
     const p = parseCaseRows([["Judul", "Aktual", "Ref"], ["x", "", "c1"]]);
     expect(p[0]!.steps).toBeUndefined();

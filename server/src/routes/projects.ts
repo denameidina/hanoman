@@ -1,3 +1,4 @@
+import { dropProjectQaBytes } from "../services/qa-attachment";
 import type { FastifyInstance } from "fastify";
 import { zCreateProject, zUpdateProject, zRenameProject } from "@hanoman/shared";
 import { prisma } from "../db";
@@ -129,6 +130,8 @@ export default async function (app: FastifyInstance) {
     // SPEC-799 · ADR-0119 · spec/ticket/customAgent/githubIssue/task (SPEC-945) ikut lewat
     // onDelete: Cascade di SINI maupun di setiap penerima — karena itu tombstone hanya untuk
     // INDUK, bukan per anak.
+    // Baris QA ikut cascade; BYTE lampiran tidak — dibuang lebih dulu selagi barisnya masih bisa dibaca.
+    await dropProjectQaBytes(id);
     await deleteSynced("project", id);
     return reply.code(204).send();
   });

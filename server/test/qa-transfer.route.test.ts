@@ -122,9 +122,9 @@ describe("impor", () => {
     expect((await importFile("hantu", "x.md", "text/markdown", Buffer.from(tpl))).statusCode).toBe(404);
   });
 
-  it("LOCAL-only: impor tak menulis changefeed sync", async () => {
+  it("bagian 3: impor menulis changefeed (dulu LOCAL-only di bagian 1)", async () => {
     const tpl = (await app.inject({ method: "GET", url: "/api/qa/template.md" })).rawPayload;
     await importFile("p1", "t.md", "text/markdown", tpl);
-    expect(await prisma.syncLog.count({ where: { entity: { startsWith: "qa" } } })).toBe(0);
+    expect(await prisma.syncLog.count({ where: { entity: { startsWith: "qa" } } })).toBeGreaterThan(0);
   });
 });
