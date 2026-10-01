@@ -16,9 +16,17 @@ const EXPORTS: { format: QaExportFormat; label: string }[] = [
 export function QaPreview({ detail, projectId }: { detail: QaReportDetail; projectId: string }) {
   const api = useApi();
   const paths = Object.fromEntries(detail.attachments.map((a) => [a.id, api.qaAttachmentUrl(projectId, detail.id, a.id)]));
+  // minmax(0, 1fr): kolom `auto` melebar mengikuti konten tabel dan mendorong SELURUH pratinjau melewati viewport
+  // (halaman tak scroll karena leluhur memotong — "lulus tapi terpotong"); kolom 0-min membuat tabelnya yang scroll.
   return (
-    <div className="qa-preview" style={{ display: "grid", gap: 12 }}>
-      <style>{".qa-preview .hn-md table{display:block;overflow-x:auto;max-width:100%}"}</style>
+    <div className="qa-preview" style={{ display: "grid", gap: 12, gridTemplateColumns: "minmax(0, 1fr)" }}>
+      <style>{[
+        ".qa-preview .hn-md table{display:block;overflow-x:auto;max-width:100%}",
+        // Sel punya lebar minimum supaya tabel di layar sempit di-SCROLL mendatar, bukan diperas sampai header
+        // terpecah per huruf ("KO DE") — terukur di 390 px.
+        ".qa-preview .hn-md th{white-space:nowrap}",
+        ".qa-preview .hn-md td{min-width:112px;overflow-wrap:break-word;word-break:normal}",
+      ].join("")}</style>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {EXPORTS.map((x) => (
           <Button key={x.format} variant={x.format === "zip" ? "secondary" : "ghost"} leftIcon="download" as="a"

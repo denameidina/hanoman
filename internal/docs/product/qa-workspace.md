@@ -66,10 +66,25 @@ yang membuka Backlog, jadi progres perbaikan terlihat dari laporan QA.
 - Kolom **Ref** dan komentar `<!-- hanoman:… -->` di file adalah id internal untuk impor — biarkan apa
   adanya, kosongkan untuk entri baru.
 
+## Sinkronisasi antar perangkat
+
+Laporan QA ikut tersinkron antara hanoman lokal dan server (hub), dua arah: header laporan, test case, temuan, dan
+lampiran. Dikerjakan di laptop, dibaca tim di server — dan sebaliknya.
+
+- **Lampiran** (screenshot, log, PDF) disinkronkan terpisah dari data laporan. Penanda kecil di samping lampiran:
+  *menunggu unggah* (baru ada di perangkat ini; diunggah pada sinkronisasi berikutnya), *di server · belum diunduh*
+  (dibuat di perangkat lain; **diunduh otomatis saat dibuka atau diekspor**), *gagal diunggah* (server menolak isinya —
+  hapus dan unggah ulang). Tanpa penanda = tersedia.
+- Server memverifikasi ukuran, hash, dan tipe tiap berkas sebelum menyimpannya.
+- Dua orang mengubah laporan yang sama bersamaan: konflik muncul di dialog rekonsiliasi sinkronisasi, seperti data lain.
+- Menghapus laporan/temuan/lampiran di satu sisi menghapusnya di sisi lain. Berkas di perangkat lain tidak dibuang otomatis.
+- **Urutan rilis:** naikkan versi server (hub) lebih dulu, baru perangkat. Perangkat baru yang mengirim laporan QA ke
+  server lama ditolak per-record (aman, sembuh sendiri setelah server dinaikkan).
+
 ## Nomor tampil
 
 `QA-007`, `F-01`, `TC-03` dihitung dari urutan pembuatan, bukan disimpan. Setelah sinkronisasi antar
-perangkat (menyusul), nomor bisa bergeser bila ada baris lebih tua yang masuk dari perangkat lain.
+perangkat, nomor bisa bergeser bila ada baris lebih tua yang masuk dari perangkat lain.
 **Ekspor membekukan nomor pada saat ekspor**; gunakan ekspor bila nomor harus dirujuk di tempat lain.
 
 ## Agen (MCP)

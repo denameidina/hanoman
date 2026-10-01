@@ -1806,12 +1806,12 @@ DELETE /api/tasks/:id/escalate   -> 200 TaskView (specId: null)
 > operasi mengubah dua baris, jadi ia memanggil `notifySynced("spec", …)` **dan**
 > `notifySynced("task", …)` — keduanya.
 
-## Workspace QA ([ADR-0174](../adr/0174-workspace-qa.md)) — **`qa:read` / `qa:write`**, LOCAL (belum disync)
+## Workspace QA ([ADR-0174](../adr/0174-workspace-qa.md) · [ADR-0175](../adr/0175-qa-sync-lampiran-biner.md)) — **`qa:read` / `qa:write`**, disync
 ```
 # Laporan QA manusia per project. Capability dipetakan MENURUT METHOD (GET/HEAD → qa:read, selain itu
-# qa:write) untuk `/projects/:id/qa/**` dan `/qa/**`; tool MCP `hanoman_qa_*` (10 tool). Tak satu pun
-# tulisan memanggil `notifySynced` — entitas belum masuk changefeed (bagian 3). Role `client` tertutup
-# (deny-by-default, ADR-0110).
+# qa:write) untuk `/projects/:id/qa/**` dan `/qa/**`; tool MCP `hanoman_qa_*` (10 tool). Setiap tulisan
+# memanggil `notifySynced`/`deleteSynced` (hub → SyncLog, client → outbox, hapus → tombstone); lihat bagian
+# "Sync byte lampiran" di bawah. Role `client` tertutup (deny-by-default, ADR-0110).
 #
 # Nomor tampil QA-007/F-01/TC-03 DIHITUNG saat render dari urutan createdAt (seri → id); respons memuat
 # `code`, tetapi id (cuid) yang dipakai untuk memanggil route lain. Setiap mutasi ANAK (case/temuan)
@@ -1861,6 +1861,18 @@ POST   /api/projects/:id/qa/reports/:rid/findings/:fid/backlog   { priority?: ti
 POST   /api/projects/:id/qa/reports/:rid/backlog            -> { results: [QaBacklogResult], sent, report }
 #   Semua temuan `open` sekaligus (`wontfix`/`sent` dilewati); satu gagal → `results[].error`, yang lain lanjut.
 GET    /api/qa/template.md                                  -> text/markdown (attachment; qa-template.md)
+
+# ── Sync byte lampiran QA (ADR-0175) — DEVICE-TOKEN (bukan cookie, bukan agent token: `sync` COOKIE_ONLY bagi agen) ──
+GET    /api/sync/qa-attachments/:id   -> byte (content-type = mime baris; header x-qa-sha256)   hub → client
+#   404 baris tak ada / byte belum ada di hub · 400 storageKey baris tak sah.
+PUT    /api/sync/qa-attachments/:id   (application/octet-stream, maks 10 MB)                    client → hub
+                                      -> { ok: true, state: "available" }
+#   Hub memverifikasi: panjang == `size` baris (400 "size"), sha256 == `sha256` baris (400 "sha256"), isi sesuai tipe
+#   (415 "type": magic bytes untuk png/jpeg/webp/pdf, UTF-8 tanpa NUL untuk teks), lalu menulis atomik (tmp+rename)
+#   ke `storageKey` BARIS itu — tak pernah ke path dari body. 404 bila metadata belum sampai (push record lebih dulu).
+#   415 juga untuk content-type selain octet-stream; 413 > 10 MB (dipasang di parser). Idempoten: byte sudah ada = 200.
+#   Record lampiran yang menyeberang lewat feed divalidasi di `validateSyncData`: storageKey `^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$`,
+#   mime daftar-putih (paritas dengan pipeline unggahan), ownerType, sha256 64 hex, size 0–10 MB.
 GET    /api/projects/:id/qa/reports/:rid/export[?format=zip|md|docx|pdf|xlsx|csv]
 #   zip (default) = report.md + attachments/ (dibaca-balik impor) · md = hanya Markdown · docx/pdf = untuk dibaca &
 #   diserahkan, screenshot TERTANAM (webp→png; satu gambar rusak dilewati, tak menggagalkan ekspor) · xlsx = sheet

@@ -22,9 +22,9 @@ Urutan: **2 → 4 → 3**. Test: serial dengan `TEST_DATABASE_URL` terisolasi da
 - [x] UI: menu Ekspor, Impor matriks; docs
 
 ## Bagian 3 — Sync + lampiran biner
-- [ ] Migration `QaAttachment.version/updatedAt`; entitas masuk `SYNCED`/`FIELDS`/`PARENTS`/`BOOTSTRAP_ORDER`; guard test sync
-- [ ] `notifySynced`/`deleteSynced` di semua route QA, import, kirim-ke-backlog
-- [ ] Endpoint byte `GET|PUT /sync/qa-attachments/:id` (verifikasi sha256/ukuran/mime/magic)
-- [ ] `readQaAttachment` (fetch-through) + unggah byte client + `syncState` per mesin; ekspor memakainya
-- [ ] UI penanda status sync lampiran
-- [ ] Uji nyata dua instance (hub + client); ADR-0175; docs
+- [x] Migration `QaAttachment.version/updatedAt`; entitas masuk `SYNCED`/`FIELDS`/`PARENTS`/`BOOTSTRAP_ORDER`; guard test sync
+- [x] `notifySynced`/`deleteSynced` di semua route QA, import, kirim-ke-backlog
+- [x] Endpoint byte `GET|PUT /sync/qa-attachments/:id` (verifikasi sha256/ukuran/mime/magic)
+- [x] `readQaAttachment` (fetch-through) + unggah byte client + `syncState` per mesin; ekspor memakainya
+- [x] UI penanda status sync lampiran
+- [x] Uji nyata dua instance (hub + client); ADR-0175; docs
