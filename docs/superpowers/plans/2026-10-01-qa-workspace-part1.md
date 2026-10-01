@@ -50,7 +50,7 @@
 **Interfaces:**
 - Produces (dipakai semua task berikutnya): konstanta `QA_REPORT_STATUSES`, `QA_VERDICTS`, `QA_CASE_STATUSES`, `QA_SEVERITIES`, `QA_PRIORITIES`, `QA_FINDING_STATUSES`, `QA_OWNER_TYPES`; zod `zCreateQaReport`, `zPatchQaReport`, `zCreateQaCase`, `zPatchQaCase`, `zCreateQaFinding`, `zPatchQaFinding`; tipe `CreateQaReport = z.input<…>` dst; `assignCodes(rows, prefix, pad)`; `qaStats(cases, findings)`; tipe view `QaAttachmentView`, `QaCaseView`, `QaFindingView`, `QaStats`, `QaReportView`, `QaReportDetail`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `shared/src/qa.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `shared/src/qa.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -126,12 +126,12 @@ describe("qaStats", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/qa.test.ts --no-file-parallelism`
 Expected: FAIL — `Cannot find module './qa'`.
 
-- [ ] **Step 3: Implementasi** — `shared/src/qa.ts`
+- [x] **Step 3: Implementasi** — `shared/src/qa.ts`
 
 ```ts
 import { z } from "zod";
@@ -270,12 +270,12 @@ export type QaReportDetail = QaReportView & {
 
 Lalu tambahkan `export * from "./qa";` di `shared/src/index.ts` (di bawah `export * from "./telegram";` atau sejenisnya).
 
-- [ ] **Step 4: Jalankan, pastikan lulus + typecheck**
+- [x] **Step 4: Jalankan, pastikan lulus + typecheck**
 
 Run: `pnpm vitest --run shared/src/qa.test.ts --no-file-parallelism && pnpm --filter ./shared typecheck`
 Expected: PASS (semua test), typecheck bersih. (Bila skrip `typecheck` shared tak ada: `pnpm exec tsc --noEmit -p shared`.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/qa.ts shared/src/qa.test.ts shared/src/index.ts
@@ -296,7 +296,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `capabilityForRoute(method, path)`, `checkAgentCapability(caps, method, path)`.
 - Produces: capability `qa:read|qa:write`; route `/api/projects/:id/qa/**` dan `/api/qa/**` terpetakan MENURUT METHOD.
 
-- [ ] **Step 1: Tulis test yang gagal** — `server/test/qa-capabilities.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `server/test/qa-capabilities.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -335,12 +335,12 @@ describe("capability domain qa", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run server/test/qa-capabilities.test.ts --no-file-parallelism`
 Expected: FAIL (`qa:read` belum terdaftar).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `shared/src/agent.ts` — tambah dua entri tepat setelah `team:write` (sebelum komentar `ADR-0155`):
 
@@ -371,12 +371,12 @@ dan sebelum `if (top === "terminal")`:
   if (top === "qa") return rw("qa");
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run server/test/qa-capabilities.test.ts server/test/agent-capabilities.test.ts --no-file-parallelism`
 Expected: PASS. Bila test lain yang menghitung/snapshot CAPABILITIES merah (mis. Settings), perbarui angka/snapshot-nya dan sebut di pesan commit.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/agent.ts server/src/services/agent-capabilities.ts server/test/qa-capabilities.test.ts
