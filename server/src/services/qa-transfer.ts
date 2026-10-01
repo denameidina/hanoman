@@ -51,8 +51,6 @@ export async function exportReport(projectId: string, reportId: string) {
   return { code: full.code, markdown, zip };
 }
 
-};
-
 export async function importReport(projectId: string, file: { name: string; buf: Buffer }): Promise<QaImportResult> {
   if (!(await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } })))
     throw new QaImportError(404, "project tak ditemukan");
