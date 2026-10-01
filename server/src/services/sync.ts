@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import { renameProjectCore } from "./rename-project";
 import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
-import { QA_STORAGE_KEY, settleNewQaAttachment } from "./qa-attachment-sync";
+import { QA_STORAGE_KEY, QA_SYNC_MAX_BYTES, settleNewQaAttachment } from "./qa-attachment-sync";
 
 // SPEC-213 · ADR-0045 · mesin sync record: version-stamp optimistic concurrency + change-feed
 // SyncLog (seq = kursor global). Isi file dokumen TIDAK lewat sini (git 3-way merge, ADR-0043).
@@ -244,7 +244,6 @@ export function validateSyncData(
 export const QA_SYNC_MIMES: ReadonlySet<string> = new Set([
   "image/png", "image/jpeg", "image/webp", "application/pdf", "text/markdown", "text/plain", "application/json", "text/csv",
 ]);
-export const QA_SYNC_MAX_BYTES = 10 * 1024 * 1024;
 function validateQaAttachment(d: Record<string, unknown>): void {
   const bad = (f: string): never => { throw new Error(`sync nilai invalid: qaAttachment.${f}`); };
   if ("storageKey" in d && !(typeof d.storageKey === "string" && QA_STORAGE_KEY.test(d.storageKey))) bad("storageKey");

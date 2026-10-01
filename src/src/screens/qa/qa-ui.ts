@@ -1,4 +1,4 @@
-import type { QaCaseStatus, QaReportStatus, QaSeverity, QaVerdict } from "@hanoman/shared";
+import type { QaAttachmentSyncState, QaCaseStatus, QaReportStatus, QaSeverity, QaVerdict } from "@hanoman/shared";
 
 export type Tone = "neutral" | "brass" | "info" | "ok" | "warn" | "err";
 export const SEVERITY_TONE: Record<QaSeverity, Tone> = { blocker: "err", critical: "err", major: "warn", minor: "info", trivial: "neutral" };
@@ -32,3 +32,14 @@ export const textToEnv = (t: string): Record<string, string> => {
 
 export const fmtSize = (n: number): string =>
   n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`;
+
+/**
+ * Penanda status sync byte lampiran (per mesin). `available` sengaja tanpa penanda — keadaan normal tak perlu
+ * berisik. Server sudah menormalkan: di hub/standalone tak pernah ada `local-only`.
+ */
+export const SYNC_STATE_BADGE: Partial<Record<QaAttachmentSyncState, { label: string; tone: Tone; hint: string }>> = {
+  "local-only": { label: "menunggu unggah", tone: "warn", hint: "Berkas ini baru ada di perangkat ini dan akan diunggah ke server pada sinkronisasi berikutnya." },
+  remote: { label: "di server · belum diunduh", tone: "info", hint: "Berkas dibuat di perangkat lain. Ia diunduh otomatis saat dibuka atau diekspor." },
+  failed: { label: "gagal diunggah", tone: "err", hint: "Server menolak isi berkas ini (ukuran/tipe tak cocok) atau berkas lokal hilang. Hapus dan unggah ulang." },
+};
+

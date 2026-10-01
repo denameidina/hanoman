@@ -21,6 +21,7 @@ import { syncNow, fetchTransport } from "../services/sync-client";
 import { listPendingDeletes } from "../services/sync-delete";
 import { listConflicts, resolveConflict } from "../services/conflicts";
 import { readUpload } from "../services/uploads";
+import { QA_STORAGE_KEY, QA_SYNC_MAX_BYTES, qaBytesPresent, storeQaBytes, verifyQaBytes } from "../services/qa-attachment-sync";
 import { ingestBatch } from "../services/logs/ingest";
 import { effectiveStr } from "../config";
 import { bearerToken, openWsConnection, revalidateWsPrincipal, WsMessageGuard } from "../services/ws-admission";
@@ -174,6 +175,43 @@ export default async function (app: FastifyInstance) {
 
       const result = await ingestBatch(deviceId, { lane: parsed.data.lane, entries: withTranscriptKey });
       return reply.code(result.status).send(result.body);
+    });
+  });
+
+  // Workspace QA · bagian 3 · BYTE lampiran QA, dua arah, di luar feed (feed hanya membawa metadata).
+  // Scope terenkapsulasi dengan parser octet-stream sendiri: batas 10 MB dipasang DI PARSER (413 terlepas dari
+  // urutan otentikasi) dan tak menyentuh parser JSON global yang dipakai /sync/push & /sync/pull.
+  //   GET  /sync/qa-attachments/:id  hub → client (tarik lazy saat dibuka)
+  //   PUT  /sync/qa-attachments/:id  client → hub (unggah sesudah metadatanya sampai)
+  // Hub tak pernah menulis ke path yang datang dari body: tujuan = `storageKey` BARIS itu, divalidasi di pintu
+  // record (validateSyncData) DAN di sini (pertahanan berlapis).
+  app.register(async (qb) => {
+    qb.addContentTypeParser("application/octet-stream", { parseAs: "buffer", bodyLimit: QA_SYNC_MAX_BYTES + 1024 },
+      (_req, body, done) => done(null, body));
+
+    qb.get("/sync/qa-attachments/:id", { preHandler: requireDeviceToken }, async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const a = await prisma.qaAttachment.findUnique({ where: { id } });
+      if (!a) return reply.code(404).send({ error: "not found" });
+      if (!QA_STORAGE_KEY.test(a.storageKey)) return reply.code(400).send({ error: "storageKey" });
+      const buf = await readUpload(a.storageKey).catch(() => null);
+      if (!buf) return reply.code(404).send({ error: "bytes not here" });
+      reply.header("content-type", a.mimeType);
+      reply.header("x-qa-sha256", a.sha256);
+      return reply.send(buf);
+    });
+
+    qb.put("/sync/qa-attachments/:id", { preHandler: requireDeviceToken }, async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const a = await prisma.qaAttachment.findUnique({ where: { id } });
+      if (!a) return reply.code(404).send({ error: "metadata not found — push the record first" });
+      if (!QA_STORAGE_KEY.test(a.storageKey)) return reply.code(400).send({ error: "storageKey" });
+      if (!Buffer.isBuffer(req.body)) return reply.code(415).send({ error: "application/octet-stream required" });
+      const v = await verifyQaBytes(a, req.body);
+      if (!v.ok) return reply.code(v.status).send({ error: v.error });
+      if (!(await qaBytesPresent(a.storageKey))) await storeQaBytes(a.storageKey, req.body);   // idempoten: sudah ada = sukses
+      await prisma.qaAttachment.update({ where: { id }, data: { syncState: "available" } });
+      return { ok: true, state: "available" };
     });
   });
 

@@ -3,7 +3,7 @@ import { QA_OWNER_TYPES, type QaOwnerType } from "@hanoman/shared";
 import { prisma } from "../db";
 import { QA_ATTACHMENT_LIMITS, addQaAttachments, ownerExists, removeQaAttachments, type QaUpload } from "../services/qa-attachment";
 import { notifySynced } from "../services/sync-notify";
-import { readUpload } from "../services/uploads";
+import { readQaAttachmentBytes } from "../services/qa-attachment-transfer";
 
 // Workspace QA · lampiran. Capability `qa:*` dari prefix `/projects/:id/qa` (`capabilityForRoute`).
 // Batas multipart dipasang PER-REQUEST (registrasi global milik lampiran gambar SPEC-816 tak boleh naik).
@@ -46,8 +46,9 @@ export default async function qaAttachments(app: FastifyInstance) {
     const { pid, rid, aid } = req.params as Ids;
     const a = await prisma.qaAttachment.findFirst({ where: { id: aid, reportId: rid, projectId: pid } });
     if (!a) return reply.code(404).send({ error: "not found" });
-    const buf = await readUpload(a.storageKey).catch(() => null);
-    if (!buf) return reply.code(404).send({ error: "not found" });
+    // Fetch-through: lampiran buatan mesin lain ditarik dari hub saat pertama dibuka, lalu di-cache (bagian 3).
+    const buf = await readQaAttachmentBytes(a.id);
+    if (!buf) return reply.code(404).send({ error: "lampiran belum tersedia di mesin ini" });
     const forceDownload = (req.query as { download?: string }).download === "1";
     const inline = INLINE.has(a.mimeType) && !forceDownload;
     reply.header("content-type", a.mimeType);

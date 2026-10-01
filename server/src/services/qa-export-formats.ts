@@ -1,6 +1,6 @@
 import { casesToRows, csvEncode, type QaExportFormat, type QaReportDetail } from "@hanoman/shared";
 import { reportDetail } from "./qa";
-import { readQaAttachmentBytes } from "./qa-attachment";
+import { readQaAttachmentBytes } from "./qa-attachment-transfer";
 import { writeDocx } from "./qa-docx";
 import { prepareExportImages } from "./qa-export-images";
 import { writeQaPdf } from "./qa-pdf";

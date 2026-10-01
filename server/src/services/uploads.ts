@@ -2,8 +2,8 @@
 // Berkas hidup di HANOMAN_UPLOAD_DIR — server-local, DI LUAR repoDir, TAK disync (cermin Vps.keyPath
 // yang juga berkas di server, tak pernah di DB). Nama berkas opaque (uuid+ext); nama asli metadata saja.
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, readFile, unlink, rm, copyFile } from "node:fs/promises";
-import { extname, join, resolve } from "node:path";
+import { mkdir, writeFile, readFile, unlink, rm } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { effectiveStr } from "../config";
 import { safeRequest } from "./safe-outbound-request";
 import { resolveDataDirs } from "@hanoman/runner";
@@ -98,17 +98,4 @@ export async function readUploadOrFetch(storageKey: string): Promise<Buffer> {
 export async function deleteUpload(storageKey: string): Promise<void> {
   const safe = storageKey.replace(/[/\\]/g, "");
   await unlink(join(uploadDir(), safe)).catch(() => { /* sudah tak ada */ });
-}
-
-/**
- * Salin satu berkas upload ke `storageKey` BARU (uuid baru, ekstensi sama). Dipakai saat sebuah lampiran
- * harus hidup di dua baris yang berbeda pemilik (temuan QA → lampiran backlog): berbagi satu key membuat
- * hapus di satu sisi (`deleteUpload`) diam-diam merusak sisi lain.
- */
-export async function copyUpload(storageKey: string): Promise<string> {
-  const safe = storageKey.replace(/[/\\]/g, "");
-  const next = `${randomUUID()}${extname(safe)}`;
-  await mkdir(uploadDir(), { recursive: true, mode: 0o700 });
-  await copyFile(join(uploadDir(), safe), join(uploadDir(), next));
-  return next;
 }

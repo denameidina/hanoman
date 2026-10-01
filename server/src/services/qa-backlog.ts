@@ -10,7 +10,8 @@ import { prisma } from "../db";
 import { nextSpecId } from "./id";
 import { resolveRepoDir } from "./local-binding";
 import { notifySynced } from "./sync-notify";
-import { copyUpload, deleteUpload } from "./uploads";
+import { readQaAttachmentBytes } from "./qa-attachment-transfer";
+import { deleteUpload, saveUpload } from "./uploads";
 import { SPEC_ATTACHMENT_LIMITS } from "./spec-attachment";
 import { syncSpecAttachmentsDir } from "./spec-attachment-dir";
 
@@ -89,9 +90,11 @@ async function copyAttachments(d: QaReportDetail, f: QaFindingView, spec: Spec):
   for (const a of rows) {
     if (count >= SPEC_ATTACHMENT_LIMITS.perSpec) { rejected.push({ filename: a.filename, reason: "count" }); continue; }
     if (bytes + a.size > SPEC_ATTACHMENT_LIMITS.specBytes) { rejected.push({ filename: a.filename, reason: "quota" }); continue; }
-    let key: string;
-    try { key = await copyUpload(a.storageKey); }
-    catch { rejected.push({ filename: a.filename, reason: "missing" }); continue; }   // byte tak ada di mesin ini
+    // Byte disalin ke key BARU (berbagi key = hapus satu sisi merusak sisi lain); lampiran buatan mesin lain
+    // ditarik dari hub dulu (fetch-through). Tak tersedia di mesin ini → ditolak per berkas, backlog tetap dibuat.
+    const data = await readQaAttachmentBytes(a.id);
+    if (!data) { rejected.push({ filename: a.filename, reason: "missing" }); continue; }
+    const key = (await saveUpload(data, a.mimeType)).storageKey;
     try {
       await prisma.specAttachment.create({ data: {
         specId: spec.id, projectId: d.projectId, filename: a.filename, mimeType: a.mimeType, size: a.size, storageKey: key,

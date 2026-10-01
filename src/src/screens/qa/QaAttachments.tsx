@@ -1,9 +1,9 @@
 import React from "react";
 import type { QaOwnerType } from "@hanoman/shared";
-import { Button } from "../../ds";
+import { Badge, Button } from "../../ds";
 import { useApi } from "../../api/instance";
 import type { PanelProps } from "./QaReportEditor";
-import { errText, fmtSize } from "./qa-ui";
+import { SYNC_STATE_BADGE, errText, fmtSize } from "./qa-ui";
 
 const MAX = 10 * 1024 * 1024;   // sama dengan QA_ATTACHMENT_LIMITS.fileBytes di server
 const ACCEPT = ".png,.jpg,.jpeg,.webp,.pdf,.md,.txt,.log,.json,.csv";
@@ -58,6 +58,9 @@ export function QaAttachments({ detail, projectId, locked, onChange, onToast, ow
               <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>
                 {a.mimeType.startsWith("image/") ? a.filename + " · " : ""}{fmtSize(a.size)}
               </span>
+              {SYNC_STATE_BADGE[a.syncState] && (
+                <Badge tone={SYNC_STATE_BADGE[a.syncState]!.tone} size="sm" title={SYNC_STATE_BADGE[a.syncState]!.hint}>{SYNC_STATE_BADGE[a.syncState]!.label}</Badge>
+              )}
               {!locked && (
                 <Button size="sm" variant="ghost" leftIcon="trash-2" aria-label={`Hapus lampiran ${a.filename}`} onClick={() => void remove(a.id)} />
               )}

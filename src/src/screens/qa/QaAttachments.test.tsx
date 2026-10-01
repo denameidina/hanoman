@@ -18,6 +18,18 @@ afterEach(() => vi.restoreAllMocks());
 
 const props = (over = {}) => ({ detail, projectId: "p1", locked: false, onChange: vi.fn(), onToast: vi.fn(), ownerType: "finding" as const, ownerId: "f1", ...over });
 
+describe("QaAttachments · status sync per lampiran", () => {
+  const withState = (...states: string[]) => ({ ...detail, attachments: states.map((s, i) => ({ ...att(`s${i}`, "log.txt", "text/plain"), filename: `f${i}.txt`, syncState: s })) }) as unknown as QaReportDetail;
+  it("available: tanpa penanda; local-only: menunggu unggah; remote: belum diunduh; failed: gagal diunggah", () => {
+    render(<QaAttachments {...props({ detail: withState("available", "local-only", "remote", "failed") })} />);
+    expect(screen.getByText("menunggu unggah")).toBeTruthy();
+    expect(screen.getByText("di server · belum diunduh")).toBeTruthy();
+    expect(screen.getByText("gagal diunggah")).toBeTruthy();
+    expect(screen.queryByText(/available/)).toBeNull();
+    expect(screen.getAllByText(/^(menunggu unggah|di server · belum diunduh|gagal diunggah)$/)).toHaveLength(3);
+  });
+});
+
 describe("QaAttachments", () => {
   it("hanya menampilkan lampiran pemiliknya; gambar bertautan ke URL penyajian, berkas lain bernama + ukuran", () => {
     render(<QaAttachments {...props()} />);

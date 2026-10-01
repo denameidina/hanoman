@@ -4,7 +4,8 @@ import {
 } from "@hanoman/shared";
 import { prisma } from "../db";
 import { asJson, reportDetail } from "./qa";
-import { QA_ATTACHMENT_LIMITS, addQaAttachments, readQaAttachmentBytes, type QaUpload } from "./qa-attachment";
+import { QA_ATTACHMENT_LIMITS, addQaAttachments, type QaUpload } from "./qa-attachment";
+import { readQaAttachmentBytes } from "./qa-attachment-transfer";
 import { notifySynced } from "./sync-notify";
 import { ZipError, readZip, writeZip } from "./zip";
 
