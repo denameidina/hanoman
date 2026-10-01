@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseRoute, routePath } from "./routes";
 
-const KEYS = ["overview", "projects", "backlog", "skills", "settings"];
+const KEYS = ["overview", "projects", "backlog", "skills", "qa", "settings"];
 
 describe("routes · skills", () => {
   it("/skills = semua grup, /skills/<projectId> = satu project", () => {
@@ -16,5 +16,16 @@ describe("routes · skills", () => {
   it("rute lama tak berubah", () => {
     expect(parseRoute("/projects/p1", KEYS)).toEqual({ section: "project", projectId: "p1" });
     expect(parseRoute("/skills/a/b", KEYS)).toBeNull();
+  });
+});
+
+describe("routes · qa", () => {
+  it("/qa = tanpa project, /qa/<projectId> = satu project; round-trip dengan encoding", () => {
+    expect(parseRoute("/qa", KEYS)).toEqual({ section: "qa" });
+    expect(parseRoute("/qa/p1", KEYS)).toEqual({ section: "qa", projectId: "p1" });
+    expect(routePath({ section: "qa" })).toBe("/qa");
+    expect(routePath({ section: "qa", projectId: "p 1" })).toBe("/qa/p%201");
+    expect(parseRoute(routePath({ section: "qa", projectId: "p 1" }), KEYS)).toEqual({ section: "qa", projectId: "p 1" });
+    expect(parseRoute("/qa/a/b", KEYS)).toBeNull();
   });
 });

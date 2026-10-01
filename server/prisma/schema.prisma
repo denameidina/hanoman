@@ -36,6 +36,7 @@ model Project {
   clientAccess ClientProjectAccess[] // SPEC-617 · ADR-0110 · akun klien yang boleh melihat project ini
   portalChats  PortalChatSession[]   // SPEC-854 · ADR-0129 · percakapan portal klien project ini
   tasks        Task[]                // SPEC-945 · ADR-0150 · kartu kerja manusia di project ini
+  qaReports    QaReport[]            // Workspace QA · laporan QA project ini
 }
 
 model Spec {
@@ -1054,4 +1055,94 @@ model LogCursor {
   updatedAt DateTime @updatedAt
 
   @@id([deviceId, lane])
+}
+
+// Workspace QA · bagian 1 · laporan QA per project (design 2026-10-01).
+//
+// LOCAL-only di bagian ini, tetapi `version` sudah ada pada tiga entitas utama supaya bagian 3
+// (sync) cukup menambah entri FIELDS tanpa migrasi ulang. Nomor tampil (QA-007/F-01/TC-03) TIDAK
+// disimpan — dihitung saat render dari urutan createdAt (`assignCodes` di shared/qa.ts): id acak
+// tak pernah bentrok antar perangkat.
+model QaReport {
+  id           String         @id @default(cuid())
+  projectId    String
+  title        String
+  buildVersion String         @default("")
+  environment  Json?          // {os, browser, device, url, branch, …} — null dibaca sebagai {}
+  scope        String         @default("")
+  tester       String         @default("")
+  summary      String         @default("")
+  status       String         @default("draft") // draft | submitted | closed (QA_REPORT_STATUSES)
+  verdict      String?        // go | no-go | conditional
+  version      Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cases        QaCase[]
+  findings     QaFinding[]
+  attachments  QaAttachment[]
+
+  @@index([projectId, createdAt])
+}
+
+model QaCase {
+  id        String   @id @default(cuid())
+  reportId  String
+  title     String
+  steps     String   @default("")
+  expected  String   @default("")
+  actual    String   @default("")
+  status    String   @default("todo") // todo | pass | fail | blocked | skipped
+  order     Float    @default(0)      // Float: titik tengah tetangga, cermin Task.order
+  version   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  report    QaReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, order])
+}
+
+// `caseId` soft-link TANPA FK (cermin Task.specId): changefeed bisa memancarkan temuan sebelum
+// case-nya mendarat (kelas SPEC-382) dan FK akan menolaknya. `backlogId` diisi bagian 2.
+model QaFinding {
+  id        String   @id @default(cuid())
+  reportId  String
+  caseId    String?
+  title     String
+  severity  String   @default("major") // blocker | critical | major | minor | trivial
+  priority  String   @default("P2")    // P0..P3 — terpisah dari severity
+  area      String   @default("")
+  steps     Json?    // string[] repro bernomor — null dibaca sebagai []
+  expected  String   @default("")
+  actual    String   @default("")
+  status    String   @default("open")  // open | sent | wontfix
+  backlogId String?
+  version   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  report    QaReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+// Tanpa `version`: byte tak lewat changefeed (bagian 3 mengunggahnya terpisah per sha256).
+// `reportId` FK cascade + denormal `projectId`: kuota per laporan dan isolasi per project.
+// `ownerType/ownerId` polimorfik tanpa FK — service menghapus lampiran pemilik sebelum pemiliknya.
+model QaAttachment {
+  id         String   @id @default(cuid())
+  reportId   String
+  projectId  String
+  ownerType  String   // report | case | finding
+  ownerId    String
+  filename   String
+  mimeType   String
+  size       Int
+  sha256     String   // sha256 byte TERSIMPAN (sesudah normalisasi gambar), kunci dedup bagian 3
+  storageKey String
+  syncState  String   @default("local-only") // local-only | uploaded | available (bagian 3)
+  createdAt  DateTime @default(now())
+  report     QaReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([ownerType, ownerId])
 }

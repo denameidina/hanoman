@@ -28,6 +28,8 @@ export * from "./config";
 export * from "./config-registry";
 export * from "./semver";
 export * from "./telegram";
+export * from "./qa";
+export * from "./qa-markdown";
 export * from "./webhook";
 export * from "./mcp";
 export * from "./auto-merge";

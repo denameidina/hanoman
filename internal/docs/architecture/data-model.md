@@ -1159,3 +1159,26 @@ Yang mengikat:
 - **PRD tetap dokumen (ADR-0041).** `prdMarkdown` adalah **draft** milik sesi, bukan entitas PRD
   baru; ia jadi dokumen `docs/prd/<slug>.md` hanya saat operator memateralisasinya, dan `prdDocPath`
   merekam ke mana ia mendarat.
+
+## QaReport / QaCase / QaFinding / QaAttachment (Workspace QA · [ADR-0174](../adr/0174-workspace-qa.md))
+
+Laporan QA manusia per project. **LOCAL-only di bagian 1** (belum masuk changefeed) tetapi `version`
+sudah ada pada tiga entitas pertama. **Nomor tampil `QA-007`/`F-01`/`TC-03` tak disimpan** — dihitung saat
+render dari urutan `createdAt` (seri → `id`), jadi id acak tak pernah bentrok antar perangkat.
+
+`QaReport` — `projectId` (FK cascade), `title`, `buildVersion`, `environment` (JSON `{os,browser,device,url,branch,…}`, null = `{}`),
+`scope`, `tester`, `summary`, `status` (`draft` · `submitted` · `closed`; `closed` read-only), `verdict`
+(`go` · `no-go` · `conditional`, **wajib** untuk `submitted`/`closed`), `version`. Indeks `[projectId, createdAt]`.
+
+`QaCase` — `reportId` (cascade), `title`, `steps`, `expected`, `actual`, `status` (`todo` · `pass` · `fail` · `blocked` · `skipped`),
+`order` (`Float`, cermin `Task.order`), `version`. Indeks `[reportId, order]`.
+
+`QaFinding` — `reportId` (cascade), `caseId` (**soft-link TANPA FK**, cermin `Task.specId`), `title`,
+`severity` (`blocker` · `critical` · `major` · `minor` · `trivial` — dampak teknis), `priority` (`P0`–`P3` — urutan perbaikan,
+**terpisah** dari severity), `area`, `steps` (JSON `string[]`), `expected`, `actual`, `status` (`open` · `sent` · `wontfix`;
+`sent` hanya ditulis server di bagian 2), `backlogId` (diisi bagian 2), `version`.
+
+`QaAttachment` — `reportId` (cascade, kuota per laporan), `projectId` (denormal), `ownerType` (`report` · `case` · `finding`) + `ownerId`
+(polimorfik, **tanpa FK**: service menghapus lampiran pemilik lebih dulu), `filename`, `mimeType`, `size`, `sha256` (byte TERSIMPAN),
+`storageKey`, `syncState` (`local-only` · `uploaded` · `available` — bagian 3). **Tanpa `version`**: byte tak lewat changefeed.
+

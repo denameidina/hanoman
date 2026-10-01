@@ -44,6 +44,7 @@ import { OverviewScreen } from "./screens/OverviewScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
 import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
 import { SkillsWorkspace } from "./screens/skills/SkillsWorkspace";
+import { QaWorkspace } from "./screens/qa/QaWorkspace";
 import { BacklogScreen } from "./screens/BacklogScreen";
 import { PrdScreen, NewPrdModal, type PrdPrefill, type PrdBriefForm } from "./screens/PrdScreen";
 import type { AuditEscalation } from "@hanoman/shared";
@@ -1733,6 +1734,15 @@ function AppInner() {
           ? <ReviewScreen specId={reviewTarget.id} kind={reviewTarget.kind} title={reviewTarget.title} onBack={() => setSection(back)} />
           : <StateBlock kind="empty" icon="git-compare" title="Pilih item untuk di-review"
               hint="Buka Review dari Backlog atau dari sel sesi di Terminal." action={() => setSection("backlog")} actionLabel="Ke Backlog" />)}
+      </Shell>
+    );
+  } else if (section === "qa") {
+    // Workspace QA · /qa → project pertama; /qa/<projectId> → laporan project itu.
+    const qaProjectId = route?.projectId ?? projects[0]?.id;
+    screen = (
+      <Shell active="qa" title="QA" wide onNavigate={setSection} breadcrumb="qa · laporan per project">
+        {gate(<QaWorkspace key={qaProjectId ?? "none"} projects={projects} projectId={qaProjectId}
+          onSelectProject={(id) => navigate(routePath({ section: "qa", projectId: id }))} onToast={showToast} />)}
       </Shell>
     );
   } else if (section === "skills") {

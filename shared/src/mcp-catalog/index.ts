@@ -18,6 +18,7 @@ import { NOTIFICATIONS_TOOLS } from "./notifications";
 import { SUPPORT_TOOLS } from "./support";
 import { LEAD_TOOLS } from "./lead";
 import { TEAM_TOOLS } from "./team";
+import { QA_TOOLS } from "./qa";
 import { SYSTEM_TOOLS } from "./system";
 import type { McpToolDef } from "./types";
 
@@ -40,5 +41,6 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   // sengaja: urutan di sini = urutan yang dibaca model, dan pekerjaan sehari-hari agen tetap
   // backlog/sesi/IDE — bukan kartu orang lain.
   ...TEAM_TOOLS,
+  ...QA_TOOLS,        // Workspace QA · laporan, test case, temuan
   ...SYSTEM_TOOLS,
 ];

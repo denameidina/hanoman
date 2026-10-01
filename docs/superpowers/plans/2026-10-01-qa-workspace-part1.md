@@ -50,7 +50,7 @@
 **Interfaces:**
 - Produces (dipakai semua task berikutnya): konstanta `QA_REPORT_STATUSES`, `QA_VERDICTS`, `QA_CASE_STATUSES`, `QA_SEVERITIES`, `QA_PRIORITIES`, `QA_FINDING_STATUSES`, `QA_OWNER_TYPES`; zod `zCreateQaReport`, `zPatchQaReport`, `zCreateQaCase`, `zPatchQaCase`, `zCreateQaFinding`, `zPatchQaFinding`; tipe `CreateQaReport = z.input<…>` dst; `assignCodes(rows, prefix, pad)`; `qaStats(cases, findings)`; tipe view `QaAttachmentView`, `QaCaseView`, `QaFindingView`, `QaStats`, `QaReportView`, `QaReportDetail`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `shared/src/qa.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `shared/src/qa.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -126,12 +126,12 @@ describe("qaStats", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/qa.test.ts --no-file-parallelism`
 Expected: FAIL — `Cannot find module './qa'`.
 
-- [ ] **Step 3: Implementasi** — `shared/src/qa.ts`
+- [x] **Step 3: Implementasi** — `shared/src/qa.ts`
 
 ```ts
 import { z } from "zod";
@@ -270,12 +270,12 @@ export type QaReportDetail = QaReportView & {
 
 Lalu tambahkan `export * from "./qa";` di `shared/src/index.ts` (di bawah `export * from "./telegram";` atau sejenisnya).
 
-- [ ] **Step 4: Jalankan, pastikan lulus + typecheck**
+- [x] **Step 4: Jalankan, pastikan lulus + typecheck**
 
 Run: `pnpm vitest --run shared/src/qa.test.ts --no-file-parallelism && pnpm --filter ./shared typecheck`
 Expected: PASS (semua test), typecheck bersih. (Bila skrip `typecheck` shared tak ada: `pnpm exec tsc --noEmit -p shared`.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/qa.ts shared/src/qa.test.ts shared/src/index.ts
@@ -296,7 +296,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `capabilityForRoute(method, path)`, `checkAgentCapability(caps, method, path)`.
 - Produces: capability `qa:read|qa:write`; route `/api/projects/:id/qa/**` dan `/api/qa/**` terpetakan MENURUT METHOD.
 
-- [ ] **Step 1: Tulis test yang gagal** — `server/test/qa-capabilities.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `server/test/qa-capabilities.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -335,14 +335,14 @@ describe("capability domain qa", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run server/test/qa-capabilities.test.ts --no-file-parallelism`
 Expected: FAIL (`qa:read` belum terdaftar).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
-`shared/src/agent.ts` — tambah dua entri tepat setelah `team:write` (sebelum komentar `ADR-0155`):
+`shared/src/agent.ts` — tambahkan `"qa:read", "qa:write",` ke daftar `CAPABILITY_IDS` (tepat sesudah `"team:read", "team:write",`; tanpa ini `Capability` tak mengenalnya dan typecheck merah — vitest tak menangkapnya), lalu tambah dua entri tepat setelah `team:write` (sebelum komentar `ADR-0155`):
 
 ```ts
   { id: "qa:read", domain: "qa", access: "read", label: "QA — baca", desc: "Lihat laporan QA, test case, temuan, dan lampirannya." },
@@ -371,12 +371,12 @@ dan sebelum `if (top === "terminal")`:
   if (top === "qa") return rw("qa");
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run server/test/qa-capabilities.test.ts server/test/agent-capabilities.test.ts --no-file-parallelism`
 Expected: PASS. Bila test lain yang menghitung/snapshot CAPABILITIES merah (mis. Settings), perbarui angka/snapshot-nya dan sebut di pesan commit.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/agent.ts server/src/services/agent-capabilities.ts server/test/qa-capabilities.test.ts
@@ -396,7 +396,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `prisma.qaReport`, `prisma.qaCase`, `prisma.qaFinding`, `prisma.qaAttachment`. `QaAttachment.reportId` FK cascade (penyimpangan kecil dari spec: dibutuhkan untuk kuota per laporan + cascade; ditulis ke spec di langkah 6). `QaFinding.caseId` **soft-link tanpa FK** (cermin `Task.specId`).
 
-- [ ] **Step 1: Tulis test yang gagal** — `server/test/qa-model.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `server/test/qa-model.test.ts`
 
 ```ts
 import { beforeEach, describe, expect, it } from "vitest";
@@ -432,7 +432,7 @@ describe("model QA", () => {
 });
 ```
 
-- [ ] **Step 2: Tambah model ke `server/prisma/schema.prisma`**
+- [x] **Step 2: Tambah model ke `server/prisma/schema.prisma`**
 
 Di `model Project` tambahkan setelah `tasks        Task[]`:
 
@@ -534,7 +534,7 @@ model QaAttachment {
 }
 ```
 
-- [ ] **Step 3: Hasilkan migration pada DB sekali-pakai (JANGAN DB operasional)**
+- [x] **Step 3: Hasilkan migration pada DB sekali-pakai (JANGAN DB operasional)**
 
 ```bash
 cd server && DATABASE_URL="file:$(mktemp -d)/m.db" pnpm exec prisma migrate dev --name qa_workspace --schema prisma/schema.prisma && cd ..
@@ -542,24 +542,24 @@ git status --short server/prisma
 ```
 Expected: satu folder baru `server/prisma/migrations/<ts>_qa_workspace/migration.sql` berisi `CREATE TABLE "QaReport"`, `"QaCase"`, `"QaFinding"`, `"QaAttachment"` + index; `prisma generate` ikut jalan. Tidak ada `ALTER`/`DROP` tabel lain — bila ada, hentikan dan periksa drift.
 
-- [ ] **Step 4: `resetDb`** — di `server/test/factory.ts`, dalam `$transaction` sebelum `prisma.project.deleteMany()`:
+- [x] **Step 4: `resetDb`** — di `server/test/factory.ts`, dalam `$transaction` sebelum `prisma.project.deleteMany()`:
 
 ```ts
     prisma.qaReport.deleteMany(),    // Workspace QA · cascade ke case/finding/attachment
 ```
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; pnpm vitest --run server/test/qa-model.test.ts --no-file-parallelism && pnpm --filter ./server typecheck`
 Expected: PASS.
 
-- [ ] **Step 6: ADR + docs**
+- [x] **Step 6: ADR + docs**
   - Buat `internal/docs/adr/<NNNN>-workspace-qa.md` (NNNN = nomor bebas berikutnya: `ls internal/docs/adr | tail -3`; saat ini sesudah 0173). Salin struktur berkas ADR tetangga (`0173-…`): konteks, keputusan (empat model; nomor tampil dihitung saat render; local-only sekarang, siap sync; lampiran memakai pipeline unggahan yang ada; `caseId` soft-link; `reportId` pada lampiran), konsekuensi (nomor bisa bergeser pasca-sync, ekspor membekukan).
   - Tambahkan tabel QA ke `internal/docs/architecture/data-model.md` (pola entri `Task`).
   - Tautkan ADR di `internal/docs/README.md` (`pnpm exec hanoman docs link internal/docs/adr/<NNNN>-workspace-qa.md` atau tambah baris manual lalu `hanoman docs index --check`).
   - Di `docs/superpowers/specs/2026-10-01-qa-workspace-design.md` §1 tambahkan `reportId` (FK cascade) pada `QaAttachment` dan catat bahwa `submitted`/`closed` mensyaratkan `verdict`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/prisma server/test/factory.ts server/test/qa-model.test.ts internal/docs docs/superpowers/specs
@@ -586,7 +586,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `POST …/:rid/cases`, `PATCH|DELETE …/:rid/cases/:cid`, `POST …/:rid/findings`, `PATCH|DELETE …/:rid/findings/:fid` → **selalu `QaReportDetail` terbaru** (POST = 201).
   - Error: 400 validasi (`{error: zodFlatten}` atau `{error: "..."}`), 404 lintas-project/tak ada, 409 laporan `closed`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `server/test/qa-reports.route.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `server/test/qa-reports.route.test.ts`
 
 ```ts
 import { beforeEach, describe, expect, it } from "vitest";
@@ -744,12 +744,12 @@ describe("temuan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-reports.route.test.ts --no-file-parallelism`
 Expected: FAIL — semua 404 (route belum ada).
 
-- [ ] **Step 3: Service** — `server/src/services/qa.ts`
+- [x] **Step 3: Service** — `server/src/services/qa.ts`
 
 ```ts
 import type { Prisma, QaAttachment, QaCase, QaFinding, QaReport } from "@prisma/client";
@@ -847,7 +847,7 @@ export async function reportDetail(projectId: string, reportId: string): Promise
 }
 ```
 
-- [ ] **Step 3b: Service lampiran** — `server/src/services/qa-attachment.ts` (dipakai route Task 4 untuk membuang byte; route-nya sendiri di Task 5)
+- [x] **Step 3b: Service lampiran** — `server/src/services/qa-attachment.ts` (dipakai route Task 4 untuk membuang byte; route-nya sendiri di Task 5)
 
 ```ts
 // Workspace QA · lampiran per laporan/test case/temuan. Memakai ulang PIPELINE unggahan
@@ -945,7 +945,7 @@ export async function removeQaAttachments(where: Prisma.QaAttachmentWhereInput):
 }
 ```
 
-- [ ] **Step 4: Route** — `server/src/routes/qa.ts`
+- [x] **Step 4: Route** — `server/src/routes/qa.ts`
 
 ```ts
 import type { FastifyInstance, FastifyReply } from "fastify";
@@ -1148,12 +1148,12 @@ export default async function qa(app: FastifyInstance) {
     await api.register(qa);           // Workspace QA · laporan/test case/temuan per project (capability `qa`)
 ```
 
-- [ ] **Step 5: Jalankan test + typecheck**
+- [x] **Step 5: Jalankan test + typecheck**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-reports.route.test.ts server/test/qa-model.test.ts --no-file-parallelism && pnpm --filter ./server typecheck`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/qa.ts server/src/services/qa-attachment.ts server/src/routes/qa.ts server/src/app.ts server/test/qa-reports.route.test.ts
@@ -1174,7 +1174,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes (Task 4 Step 3b): `QA_ATTACHMENT_LIMITS`, `QaUpload`, `addQaAttachments`, `removeQaAttachments`, `ownerExists`; `readUpload` (`uploads.ts`).
 - Produces REST: `POST /api/projects/:pid/qa/reports/:rid/attachments?ownerType=&ownerId=` (multipart `files`, `201 {saved, rejected}`), `GET …/attachments/:aid` (`?download=1` memaksa unduh), `DELETE …/attachments/:aid` → `{ ok: true }`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `server/test/qa-attachments.route.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `server/test/qa-attachments.route.test.ts`
 
 ```ts
 import { beforeEach, describe, expect, it } from "vitest";
@@ -1287,12 +1287,12 @@ describe("lampiran QA", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-attachments.route.test.ts --no-file-parallelism`
 Expected: FAIL (404 route belum ada).
 
-- [ ] **Step 3: Route** — `server/src/routes/qa-attachments.ts`
+- [x] **Step 3: Route** — `server/src/routes/qa-attachments.ts`
 
 ```ts
 import type { FastifyInstance } from "fastify";
@@ -1366,12 +1366,12 @@ export default async function qaAttachments(app: FastifyInstance) {
 
 `server/src/app.ts`: `import qaAttachments from "./routes/qa-attachments";` dan `await api.register(qaAttachments);` tepat setelah `qa`.
 
-- [ ] **Step 4: Jalankan test + typecheck**
+- [x] **Step 4: Jalankan test + typecheck**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-attachments.route.test.ts server/test/qa-reports.route.test.ts --no-file-parallelism && pnpm --filter ./server typecheck`
 Expected: PASS. Catatan: test "bukan multipart" memukul gerbang `isMultipart` — bila `app.inject` dengan JSON body justru kena 415 dari Fastify, ubah ekspektasi menjadi `[400, 415]` (`expect([400, 415]).toContain(…)`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/qa-attachments.ts server/src/app.ts server/test/qa-attachments.route.test.ts
@@ -1395,7 +1395,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 Format (kontrak yang dikunci test): front-matter YAML (`hanoman-qa: 1`, nilai string berbentuk JSON), judul `# QA-007 · Judul`, blockquote ringkasan angka (diabaikan parser), lalu seksi `## Ringkasan`, `## Test case` (tabel 7 kolom: Kode · Judul · Langkah · Diharapkan · Aktual · Status · Ref), `## Temuan` (`### F-01 · [major/P1] Judul` + komentar `<!-- hanoman:{json} -->` + `**Area:**`/`**Test case:**` + blok `**Repro**` (daftar bernomor) / `**Expected**` / `**Actual**` / `**Lampiran**`), `## Lampiran`, `## Lampiran test case` (`### TC-01` + daftar). Teks bebas di-escape agar tak bisa meniru struktur: baris yang diawali `#`, `**`, atau `\` diberi awalan `\`; sel tabel meng-escape `\` dan `|` serta mengubah baris baru jadi `<br>`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `shared/src/qa-markdown.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `shared/src/qa-markdown.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -1517,12 +1517,12 @@ describe("qaTemplateMarkdown", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/qa-markdown.test.ts --no-file-parallelism`
 Expected: FAIL — modul belum ada.
 
-- [ ] **Step 3: Implementasi** — `shared/src/qa-markdown.ts`
+- [x] **Step 3: Implementasi** — `shared/src/qa-markdown.ts`
 
 ```ts
 import {
@@ -1781,12 +1781,12 @@ export function qaTemplateMarkdown(): string {
 
 Tambahkan `export * from "./qa-markdown";` di `shared/src/index.ts`.
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run shared/src/qa-markdown.test.ts shared/src/qa.test.ts --no-file-parallelism && pnpm --filter ./shared typecheck`
 Expected: PASS. Bila satu case round-trip gagal, jangan melonggarkan test — perbaiki escape/parse (kontrak: teks bebas kembali **identik**).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/qa-markdown.ts shared/src/qa-markdown.test.ts shared/src/index.ts
@@ -1809,7 +1809,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 Semantik impor: `reportId` di berkas yang cocok dengan laporan di project ini → **upsert** (case/temuan dicocokkan lewat id; yang tak ada di berkas dibiarkan; lampiran dengan nama sama pada pemilik yang sama dilewati); selain itu laporan **baru** dengan id baru (id dari berkas tak dipakai, `caseId` di-remap). Status temuan `sent` dari berkas dipulihkan jadi `open`. `status` ∈ {submitted, closed} tanpa `verdict` → 400. Target `closed` → 409.
 
-- [ ] **Step 1: Test ZIP yang gagal** — `server/test/zip.test.ts`
+- [x] **Step 1: Test ZIP yang gagal** — `server/test/zip.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -1844,13 +1844,14 @@ describe("zip", () => {
   });
   it("mendeteksi entri rusak (CRC)", () => {
     const zip = Buffer.from(writeZip([{ name: "a.txt", data: Buffer.from("halo") }]));
-    zip[30 + "a.txt".length] ^= 0xff; // balik satu byte data
+    const at = 30 + "a.txt".length;
+    zip[at] = zip[at]! ^ 0xff; // balik satu byte data
     expect(() => readZip(zip)).toThrow(/rusak/);
   });
 });
 ```
 
-- [ ] **Step 2: Implementasi** — `server/src/services/zip.ts`
+- [x] **Step 2: Implementasi** — `server/src/services/zip.ts`
 
 ```ts
 import { deflateRawSync, inflateRawSync } from "node:zlib";
@@ -1960,7 +1961,7 @@ export function readZip(buf: Buffer, o: { maxEntries?: number; maxTotalBytes?: n
 
 Jalankan: `pnpm vitest --run server/test/zip.test.ts --no-file-parallelism` → PASS. (Test "CRC rusak" membalik byte data pertama: offset `30 + nama.length` = awal data entri pertama karena `a.txt` disimpan stored.)
 
-- [ ] **Step 3: Test transfer yang gagal** — `server/test/qa-transfer.route.test.ts`
+- [x] **Step 3: Test transfer yang gagal** — `server/test/qa-transfer.route.test.ts`
 
 ```ts
 import { beforeEach, describe, expect, it } from "vitest";
@@ -2097,7 +2098,7 @@ describe("impor", () => {
 
 Run (gagal): `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-transfer.route.test.ts --no-file-parallelism` → FAIL (404).
 
-- [ ] **Step 4: Service** — `server/src/services/qa-transfer.ts`
+- [x] **Step 4: Service** — `server/src/services/qa-transfer.ts`
 
 ```ts
 import { basename } from "node:path";
@@ -2262,7 +2263,7 @@ export async function importReport(projectId: string, file: { name: string; buf:
 }
 ```
 
-- [ ] **Step 5: Route** — `server/src/routes/qa-transfer.ts`
+- [x] **Step 5: Route** — `server/src/routes/qa-transfer.ts`
 
 ```ts
 import type { FastifyInstance } from "fastify";
@@ -2322,12 +2323,12 @@ export default async function qaTransfer(app: FastifyInstance) {
 
 `server/src/app.ts`: `import qaTransfer from "./routes/qa-transfer";` + `await api.register(qaTransfer);` setelah `qaAttachments`.
 
-- [ ] **Step 6: Jalankan test + typecheck**
+- [x] **Step 6: Jalankan test + typecheck**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/zip.test.ts server/test/qa-transfer.route.test.ts server/test/qa-attachments.route.test.ts server/test/qa-reports.route.test.ts --no-file-parallelism && pnpm --filter ./server typecheck`
 Expected: PASS. Bila `res.rawPayload` tak ada pada versi `light-my-request` ini, pakai `Buffer.from(res.body, "binary")`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/zip.ts server/src/services/qa-transfer.ts server/src/routes/qa-transfer.ts server/src/app.ts server/test/zip.test.ts server/test/qa-transfer.route.test.ts
@@ -2351,7 +2352,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 > **Catatan urutan:** sejak Task 4 `server/test/mcp-coverage.test.ts` MERAH (route baru belum bertool) — itu gerbang yang bekerja, bukan regresi. Task ini yang menghijaukannya. Jangan menambah route `qa` lain sebelum Task ini selesai.
 
-- [ ] **Step 1: Tulis test yang gagal** — `shared/src/mcp-catalog.qa.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `shared/src/mcp-catalog.qa.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -2428,12 +2429,12 @@ describe("katalog MCP · qa", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.qa.test.ts --no-file-parallelism`
 Expected: FAIL — tool belum ada.
 
-- [ ] **Step 3: Implementasi** — `shared/src/mcp-catalog/qa.ts`
+- [x] **Step 3: Implementasi** — `shared/src/mcp-catalog/qa.ts`
 
 ```ts
 // Workspace QA · katalog tool domain `qa` (`/api/projects/:id/qa/**`). Delapan tool: baca laporan, tulis
@@ -2611,7 +2612,7 @@ export const QA_TOOLS: readonly McpToolDef[] = [
 
 `shared/src/mcp-catalog/index.ts`: `import { QA_TOOLS } from "./qa";` dan sisipkan `...QA_TOOLS,` tepat sesudah `...TEAM_TOOLS,` (sebelum `...SYSTEM_TOOLS`).
 
-- [ ] **Step 4: Daftarkan pengecualian cakupan** — `server/test/mcp-coverage.test.ts`, tambahkan ke `UNWRAPPED` (sebelum `]);`):
+- [x] **Step 4: Daftarkan pengecualian cakupan** — `server/test/mcp-coverage.test.ts`, tambahkan ke `UNWRAPPED` (sebelum `]);`):
 
 ```ts
   // Workspace QA · sengaja tanpa tool: hapus tak punya jalan pulang (dilakukan manusia di dashboard),
@@ -2627,13 +2628,13 @@ export const QA_TOOLS: readonly McpToolDef[] = [
   ["GET /qa/template.md", "unduhan template untuk manusia"],
 ```
 
-- [ ] **Step 5: Jalankan test, lalu cari daftar nama tool yang perlu diperbarui**
+- [x] **Step 5: Jalankan test, lalu cari daftar nama tool yang perlu diperbarui**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run shared/src/mcp-catalog.qa.test.ts shared/src/mcp-catalog.test.ts shared/src/mcp-catalog.docs.test.ts shared/src/mcp-catalog.team.test.ts server/test/mcp-coverage.test.ts server/test/mcp-capability.test.ts server/test/agent-tool-catalog.test.ts --no-file-parallelism && pnpm --filter ./shared typecheck`
 Expected: PASS. Bila `mcp-catalog.test.ts` menghitung jumlah tool / `mcp-catalog.docs.test.ts` menuntut dokumentasi, perbarui angka/dokumennya (itu bagian perubahan ini, bukan regresi).
 Lalu: `grep -rln "hanoman_task_unlink" --include=*.md --include=*.ts --include=*.tsx . | grep -v node_modules` — setiap berkas non-test yang mendaftar tool domain `team` (daftar tool di docs/skill `internal/skills/hanoman/SKILL.md`, `internal/docs/**`, panel Settings MCP) harus mendapat padanan `hanoman_qa_*`. Catat berkas yang diubah di pesan commit.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog shared/src/mcp-catalog.qa.test.ts server/test/mcp-coverage.test.ts internal
@@ -2653,7 +2654,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `paths.qa*`; `api.qaReports/qaReport/createQaReport/patchQaReport/deleteQaReport/createQaCase/patchQaCase/deleteQaCase/createQaFinding/patchQaFinding/deleteQaFinding/uploadQaAttachments/deleteQaAttachment/importQaReport/qaExportUrl/qaAttachmentUrl/qaTemplateUrl`; rute `/qa` & `/qa/<projectId>` (`{section:"qa", projectId?}`); nav key `qa`.
 
-- [ ] **Step 1: Test rute + nav yang gagal**
+- [x] **Step 1: Test rute + nav yang gagal**
 
 Tambahkan di `src/src/routes.test.ts` (perluas `KEYS` jadi `["overview", "projects", "backlog", "skills", "qa", "settings"]`):
 
@@ -2689,7 +2690,7 @@ describe("entri nav QA", () => {
 
 Run: `pnpm vitest --run src/src/routes.test.ts src/test/qa-nav.test.tsx --no-file-parallelism` → FAIL.
 
-- [ ] **Step 2: `shared/src/api.ts`** — tambahkan di blok `paths`, tepat sesudah `skillFork`:
+- [x] **Step 2: `shared/src/api.ts`** — tambahkan di blok `paths`, tepat sesudah `skillFork`:
 
 ```ts
   // Workspace QA · laporan QA per project. Semua di bawah /projects/:id/qa (capability `qa`).
@@ -2715,7 +2716,7 @@ export type QaImportResult = {
 ```
 dan di `server/src/services/qa-transfer.ts` hapus deklarasi lokal `export type QaImportResult = {…}`, ganti dengan `import type { QaImportResult } from "@hanoman/shared";` (dan `export type { QaImportResult };` bila ada pemakai lain).
 
-- [ ] **Step 3: `src/src/api/client.ts`** — tambah impor (baris baru di bawah impor `@hanoman/shared` yang ada):
+- [x] **Step 3: `src/src/api/client.ts`** — tambah impor (baris baru di bawah impor `@hanoman/shared` yang ada):
 
 ```ts
 import type {
@@ -2757,7 +2758,7 @@ dan di dalam literal yang dikembalikan `createApi`, sesudah `skillFork`/`createS
 ```
 (`QaOwnerType` dsb. tersedia dari `@hanoman/shared`; bila `qs()` menolak tipe objek, ubah parameternya jadi `Record<string, string>` — `qs` menerima `Record<string, string | number | boolean | undefined>`.)
 
-- [ ] **Step 4: `src/src/routes.ts`**
+- [x] **Step 4: `src/src/routes.ts`**
 
 Komentar bentuk URL, tambahkan baris `//   /qa[/<projectId>]                  laporan QA project terpilih (default: project pertama)`. Pada `Route.projectId` komentar: tambah "`qa`". Di `routePath` sebelum `default`:
 
@@ -2770,7 +2771,7 @@ Di `parseRoute` sesudah baris `skills`:
   if (head === "qa" && parts.length === 2) return { section: "qa", projectId: a };
 ```
 
-- [ ] **Step 5: Nav + App**
+- [x] **Step 5: Nav + App**
 
 `src/src/ds/shell.tsx` — sisipkan tepat sesudah entri `team`:
 
@@ -2794,7 +2795,7 @@ Di `parseRoute` sesudah baris `skills`:
 ```
 (Cek nama `navigate`/`routePath`/`gate`/`showToast` di berkas — dipakai persis begitu di cabang `skills` dan `goProject`.)
 
-- [ ] **Step 6: Lanjut ke Task 10 sebelum menjalankan** — `App.tsx` mengimpor `QaWorkspace` yang dibuat di Task 10, jadi typecheck/test App baru hijau sesudah Task 10. Task 9 dan 10 di-commit bersama (satu commit "UI QA") atau Task 10 Step 1–3 dikerjakan dulu. Yang boleh dijalankan sekarang: `pnpm vitest --run src/src/routes.test.ts src/test/qa-nav.test.tsx --no-file-parallelism` (hijau) dan `pnpm --filter ./shared typecheck`.
+- [x] **Step 6: Lanjut ke Task 10 sebelum menjalankan** — `App.tsx` mengimpor `QaWorkspace` yang dibuat di Task 10, jadi typecheck/test App baru hijau sesudah Task 10. Task 9 dan 10 di-commit bersama (satu commit "UI QA") atau Task 10 Step 1–3 dikerjakan dulu. Yang boleh dijalankan sekarang: `pnpm vitest --run src/src/routes.test.ts src/test/qa-nav.test.tsx --no-file-parallelism` (hijau) dan `pnpm --filter ./shared typecheck`.
 
 ---
 
@@ -2810,7 +2811,7 @@ Di `parseRoute` sesudah baris `skills`:
 
 Teks UI yang dikunci test: tombol `Laporan baru`, `Impor`, `Unduh template`; editor `Kembali`, `Simpan`, `Buka kembali`; tab `Test case`/`Temuan`/`Lampiran`/`Pratinjau`; input `Judul test case baru` + tombol `Tambah`; tombol `Temuan baru` + modal `Simpan temuan`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `src/src/screens/qa/QaWorkspace.test.tsx`
+- [x] **Step 1: Tulis test yang gagal** — `src/src/screens/qa/QaWorkspace.test.tsx`
 
 ```tsx
 import React from "react";
@@ -2927,9 +2928,9 @@ describe("QaWorkspace", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal** — `pnpm vitest --run src/src/screens/qa/QaWorkspace.test.tsx --no-file-parallelism` → FAIL (modul belum ada).
+- [x] **Step 2: Jalankan, pastikan gagal** — `pnpm vitest --run src/src/screens/qa/QaWorkspace.test.tsx --no-file-parallelism` → FAIL (modul belum ada).
 
-- [ ] **Step 3: `qa-ui.ts`**
+- [x] **Step 3: `qa-ui.ts`**
 
 ```ts
 import type { QaCaseStatus, QaReportStatus, QaSeverity, QaVerdict } from "@hanoman/shared";
@@ -2968,7 +2969,7 @@ export const fmtSize = (n: number): string =>
   n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`;
 ```
 
-- [ ] **Step 4: `QaWorkspace.tsx`**
+- [x] **Step 4: `QaWorkspace.tsx`**
 
 ```tsx
 // src/src/screens/qa/QaWorkspace.tsx
@@ -3073,7 +3074,7 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast }: P
 }
 ```
 
-- [ ] **Step 5: `QaReportList.tsx`**
+- [x] **Step 5: `QaReportList.tsx`**
 
 ```tsx
 import type { QaReportView } from "@hanoman/shared";
@@ -3108,13 +3109,14 @@ export function QaReportList({ reports, onOpen }: { reports: QaReportView[]; onO
 ```
 (tambahkan `import React from "react";` bila JSX runtime klasik dipakai di berkas tetangga — ikuti `SkillsWorkspace.tsx`.)
 
-- [ ] **Step 6: `QaReportEditor.tsx`** — header + tab; `QaAttachments`/`QaPreview` dari Task 11
+- [x] **Step 6: `QaReportEditor.tsx`** — header + tab; `QaAttachments`/`QaPreview` dari Task 11
 
 ```tsx
 import React from "react";
 import { QA_VERDICTS, type QaReportDetail, type QaReportStatus } from "@hanoman/shared";
 import { Badge, Button, Field, HnTextarea, Input, Select, Tabs, useConfirm } from "../../ds";
 import { useApi } from "../../api/instance";
+import type { QaReportDetail } from "@hanoman/shared";
 import { QaAttachments } from "./QaAttachments";
 import { QaCasesPanel } from "./QaCasesPanel";
 import { QaFindingsPanel } from "./QaFindingsPanel";
@@ -3215,7 +3217,7 @@ export function QaReportEditor({ detail, projectId, onChange, onBack, onDeleted,
 ```
 Catatan: `Simpan` sengaja `disabled` saat `locked` (test mengunci ini); `Submit` mengirim `{...fields(), status}` sehingga `verdict` yang baru diisi ikut tersimpan dalam satu permintaan.
 
-- [ ] **Step 7: `QaCasesPanel.tsx`**
+- [x] **Step 7: `QaCasesPanel.tsx`**
 
 ```tsx
 import React from "react";
@@ -3295,7 +3297,7 @@ function CaseCard({ c, p, run }: { c: QaCaseView; p: PanelProps; run: (fn: () =>
 ```
 (Badge status ganda dengan Select adalah sengaja: Select untuk mengubah, Badge memberi warna sekilas — hapus Badge bila tampilan terasa redundan.)
 
-- [ ] **Step 8: `QaFindingsPanel.tsx`**
+- [x] **Step 8: `QaFindingsPanel.tsx`**
 
 ```tsx
 import React from "react";
@@ -3415,12 +3417,12 @@ export function QaFindingsPanel(p: PanelProps) {
 }
 ```
 
-- [ ] **Step 9: (setelah Task 11 Step 3) jalankan test + typecheck**
+- [x] **Step 9: (setelah Task 11 Step 3) jalankan test + typecheck**
 
 Run: `pnpm vitest --run src/src/screens/qa src/src/routes.test.ts src/test/qa-nav.test.tsx src/test/changelog-nav.test.tsx --no-file-parallelism && pnpm --filter ./src typecheck`
 Expected: PASS. Bila `getByText("major")` bentrok dengan opsi `<select>` (tak mungkin: modal tertutup), perketat query dengan `within(...)`. Jangan melonggarkan asersi tanpa alasan.
 
-- [ ] **Step 10: Commit (bersama Task 9 + 11 bila dikerjakan beruntun)**
+- [x] **Step 10: Commit (bersama Task 9 + 11 bila dikerjakan beruntun)**
 
 ```bash
 git add shared/src/api.ts shared/src/qa.ts server/src/services/qa-transfer.ts src/src/api/client.ts src/src/routes.ts src/src/routes.test.ts src/src/ds/shell.tsx src/src/App.tsx src/test/qa-nav.test.tsx src/src/screens/qa
@@ -3441,7 +3443,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `PanelProps` (Task 10), `api.uploadQaAttachments/deleteQaAttachment/qaAttachmentUrl/qaExportUrl/qaReport`, `renderQaMarkdown` (Task 6), `MarkdownView`.
 - Produces: `<QaAttachments {...PanelProps} ownerType ownerId compact? />` — daftar lampiran pemilik + unggah (tombol, drag-drop, tempel screenshot), pratinjau gambar; `<QaPreview detail projectId />`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `src/src/screens/qa/QaAttachments.test.tsx`
+- [x] **Step 1: Tulis test yang gagal** — `src/src/screens/qa/QaAttachments.test.tsx`
 
 ```tsx
 import React from "react";
@@ -3457,7 +3459,7 @@ const base = {
   status: "draft", verdict: null, createdAt: at, updatedAt: at, cases: [], findings: [],
   stats: { cases: { total: 0, pass: 0, fail: 0, blocked: 0, skipped: 0, todo: 0 }, passRate: null, findings: { total: 0, open: 0, blocker: 0, critical: 0, major: 0, minor: 0, trivial: 0 } },
 };
-const detail = { ...base, attachments: [att("a1", "layar.png", "image/png"), att("a2", "log.txt", "text/plain"), att("a3", "lain.png", "image/png", "f2")] };
+const detail = { ...base, attachments: [att("a1", "layar.png", "image/png"), att("a2", "log.txt", "text/plain"), att("a3", "lain.png", "image/png", "f2")] } as unknown as QaReportDetail;
 const json = (v: unknown, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => v } as Response);
 afterEach(() => vi.restoreAllMocks());
 
@@ -3512,9 +3514,9 @@ describe("QaAttachments", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal** — `pnpm vitest --run src/src/screens/qa/QaAttachments.test.tsx --no-file-parallelism` → FAIL.
+- [x] **Step 2: Jalankan, pastikan gagal** — `pnpm vitest --run src/src/screens/qa/QaAttachments.test.tsx --no-file-parallelism` → FAIL.
 
-- [ ] **Step 3: `QaAttachments.tsx`**
+- [x] **Step 3: `QaAttachments.tsx`**
 
 ```tsx
 import React from "react";
@@ -3601,7 +3603,7 @@ export function QaAttachments({ detail, projectId, locked, onChange, onToast, ow
 }
 ```
 
-- [ ] **Step 4: `QaPreview.tsx`**
+- [x] **Step 4: `QaPreview.tsx`**
 
 ```tsx
 import { renderQaMarkdown, type QaReportDetail } from "@hanoman/shared";
@@ -3625,7 +3627,7 @@ export function QaPreview({ detail, projectId }: { detail: QaReportDetail; proje
 }
 ```
 
-- [ ] **Step 5: Ikon** — ikon baru yang dipakai: `clipboard-check`, `plus`, `upload`, `download`, `trash-2`, `paperclip`, `bug`, `arrow-left`. Bangkitkan ulang registry dan periksa test-nya:
+- [x] **Step 5: Ikon** — ikon baru yang dipakai: `clipboard-check`, `plus`, `upload`, `download`, `trash-2`, `paperclip`, `bug`, `arrow-left`. Bangkitkan ulang registry dan periksa test-nya:
 
 ```bash
 pnpm --filter ./src gen:icons
@@ -3634,14 +3636,14 @@ git diff --stat src/src/ds/icon-registry.ts
 ```
 Expected: registry bertambah hanya ikon yang belum ada; test hijau. Bila nama ikon tak ada di lucide, pakai padanan (mis. `clipboard-list`) dan sesuaikan `shell.tsx` + `qa-nav.test.tsx`.
 
-- [ ] **Step 6: Jalankan semua test UI QA + typecheck**
+- [x] **Step 6: Jalankan semua test UI QA + typecheck**
 
 Run: `pnpm vitest --run src/src/screens/qa src/src/routes.test.ts src/test/qa-nav.test.tsx src/test/changelog-nav.test.tsx src/test/team-nav.test.tsx --no-file-parallelism && pnpm --filter ./src typecheck`
 Expected: PASS.
 
-- [ ] **Step 7: Periksa responsif nyata** (invarian test saja tak cukup — memori proyek: "invariant lulus tapi terpotong"). Jalankan dashboard + browser CDP sesuai memori `hanoman-browser-smoke-via-cdp`, buka `/qa/<projectId>` pada lebar **390, 768, 1280 px**: daftar laporan, editor (header, kartu test case, modal temuan), pratinjau. Tak boleh ada scroll horizontal halaman atau teks terpotong. Perbaiki gaya bila ada (hanya `minmax(min(100%, …))`/`flexWrap`).
+- [x] **Step 7: Periksa responsif nyata** (invarian test saja tak cukup — memori proyek: "invariant lulus tapi terpotong"). Jalankan dashboard + browser CDP sesuai memori `hanoman-browser-smoke-via-cdp`, buka `/qa/<projectId>` pada lebar **390, 768, 1280 px**: daftar laporan, editor (header, kartu test case, modal temuan), pratinjau. Tak boleh ada scroll horizontal halaman atau teks terpotong. Perbaiki gaya bila ada (hanya `minmax(min(100%, …))`/`flexWrap`).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/screens/qa src/src/ds/icon-registry.ts
@@ -3658,13 +3660,13 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Modify: `internal/docs/architecture/api-contract.md`, `internal/docs/README.md`, `internal/skills/hanoman/SKILL.md` (bila memuat daftar domain/tool)
 - Create: panduan pemakai `internal/docs/<kategori>/qa-workspace.md` (lihat `ls internal/docs`; letakkan di direktori panduan fitur yang sudah ada), mis. cara mengisi, severity vs prioritas, template, ekspor/impor
 
-- [ ] **Step 1: Dokumen**
+- [x] **Step 1: Dokumen**
   - `api-contract.md`: tabel endpoint QA (Task 4/5/7), kode galat 400/404/409/413, capability `qa:read|write`, catatan "local-only (tak masuk changefeed)".
   - Panduan pemakai: alur (buat laporan → isi test case → catat temuan + lampiran → Submit dengan keputusan → ekspor ZIP), definisi severity vs prioritas (tabel), format Markdown/ZIP dan cara mengimpor template, batas lampiran, perilaku upsert impor, catatan "nomor bisa bergeser setelah sync, ekspor membekukannya".
   - Tautkan semua doc baru di `internal/docs/README.md` (`pnpm exec hanoman docs link <path> --category <kategori>` lalu `pnpm exec hanoman docs index --check`).
   - Daftar tool MCP: perbarui bila `internal/skills/hanoman/SKILL.md`/doc lain mendaftar domain tool (hasil grep Task 8 Step 5).
 
-- [ ] **Step 2: Test tersentuh, serial, DB terisolasi**
+- [x] **Step 2: Test tersentuh, serial, DB terisolasi**
 
 ```bash
 export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"
@@ -3673,7 +3675,7 @@ pnpm --filter ./server typecheck && pnpm --filter ./shared typecheck && pnpm --f
 ```
 (`HANOMAN_BASE_SHA` = SHA basis worktree; bila tak terpasang, `git merge-base HEAD origin/main`.) Expected: hijau. Jebakan `--changed`: nol test terlihat hijau — pastikan daftar yang berjalan memuat berkas `qa-*` / `zip` / `mcp-*`. Kegagalan 404/P2022 ramai = isolasi DB (lihat AGENTS.md), bukan regresi.
 
-- [ ] **Step 3: Uji API nyata di local** (CLAUDE.md: sekali di akhir, tiap task yang menyentuh endpoint) — DB khusus, bukan DB operasional:
+- [x] **Step 3: Uji API nyata di local** (CLAUDE.md: sekali di akhir, tiap task yang menyentuh endpoint) — DB khusus, bukan DB operasional:
 
 ```bash
 SMOKE="$(mktemp -d)"
@@ -3707,7 +3709,7 @@ print(call("GET", "/qa/template.md")[0])
 ```
 Verifikasi manual: `unzip -l qa-smoke.zip` (harus `report.md` + `attachments/F-01-1-layar.png`); `unzip -p qa-smoke.zip report.md` terbaca rapi; impor ZIP itu kembali lewat dashboard (tombol **Impor**) ke project lain dan pastikan test case/temuan/lampiran utuh. Bunuh server per-PID (`lsof -ti:PORT` → `kill <pid>`), JANGAN `pkill -f`.
 
-- [ ] **Step 4: Centang checklist plan ini + commit docs**
+- [x] **Step 4: Centang checklist plan ini + commit docs**
 
 ```bash
 git add internal docs/superpowers/plans
@@ -3717,6 +3719,16 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
 
 ---
+
+## Catatan eksekusi (penyimpangan dari rencana, ditemukan saat dikerjakan)
+
+- **Task 2**: `Capability` adalah enum eksplisit (`CAPABILITY_IDS`); `qa:read|write` wajib ditambahkan di sana juga, bukan hanya `CAPABILITIES` — vitest tak menangkapnya, hanya typecheck.
+- **Task 3**: `prisma migrate dev` menambahkan komentar ke `migration_lock.toml`; dikembalikan agar diff bersih.
+- **Task 7**: `zip[at] ^= …` gagal typecheck strict (`noUncheckedIndexedAccess`) — ditulis ulang.
+- **Task 9**: memindahkan `QaImportResult` ke shared dengan skrip meninggalkan `};` liar di `qa-transfer.ts`; tertangkap oleh smoke server nyata (typecheck server tak dijalankan ulang sesudah edit itu). Pelajaran: jalankan typecheck SETIAP paket yang disentuh sebelum commit.
+- **Task 11**: smoke browser menemukan front-matter YAML dirender sebagai heading dan kolom `Ref` menyesakkan tabel di 390 px → renderer mendapat opsi `{ preview: true }`; tabel pratinjau boleh di-scroll mendatar.
+- **Task 12**: `shared/test/agent.test.ts` (hitungan capability 14→15 domain, 32→34 id) dan `cli/src/commands/migrate-pg.ts` (`PG_ORDER` wajib memuat setiap model Prisma) ikut diperbarui.
+- Kegagalan lama di basis `d6b7560c`, TERBUKTI merah di worktree basis (bukan dari perubahan ini): `scheduler-state.test.ts` (2), `start-session-admission.test.tsx` (3), `spec-attachment-launch.test.ts` (1).
 
 ## Self-Review (spec → task)
 

@@ -121,6 +121,8 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // memegang capability permukaannya sendiri. Yang menahan peluncuran sesi tetap `launchPrincipal`
   // — tanpa `sessions:write` pada token yang sama, Spec-nya lahir TANPA `launchApprovedAt`.
   if (top === "tasks" || top === "members") return rw("team");
+  // Workspace QA · `/api/qa/template.md` (template unduhan, tak terikat project).
+  if (top === "qa") return rw("qa");
   if (top === "terminal") {
     // SPEC-786 · workspace memuat preferensi per akun dan diturunkan dari req.user.id;
     // capability sesi tak membawa identitas admin yang diperlukan untuk isolasi row ini.
@@ -134,6 +136,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   }
   if (top === "projects") {
     const sub = seg[2]; // seg[1] = :id
+    // Workspace QA · laporan QA adalah domain TERSENDIRI. Tanpa baris ini `/projects/:id/qa/**` jatuh
+    // ke `rw("projects")` — agen harus dipercaya menyunting & menghapus project hanya untuk menulis
+    // laporan. `rw()` menurunkan read/write DARI METHOD (kelas bug SPEC-405).
+    if (sub === "qa") return rw("qa");
     // SPEC-516 · ADR-0105 · changelog adalah DOKUMEN, sejajar docs/prds. Tanpa baris ini ia jatuh
     // ke `rw("projects")` di bawah — artinya agen harus dipercaya menyunting & menghapus project
     // hanya untuk membaca changelog-nya.

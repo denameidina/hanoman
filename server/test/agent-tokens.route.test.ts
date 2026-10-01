@@ -43,7 +43,9 @@ describe("/agent-tokens routes (cookie-only)", () => {
     // dan ditulis agen yang manusianya mencentang kotak itu.
     // Skills library menambahkan `skills:read`/`skills:write` → 32: `skills:write` menyunting skill
     // global hanoman yang disuntik ke SETIAP sesi baru di semua project — pelebaran yang disengaja.
-    expect(r.json().capabilities).toHaveLength(32);
+    // Workspace QA menambahkan `qa:read`/`qa:write` → 34: laporan QA per project (`/projects/:id/qa/**`)
+    // sebelumnya jatuh ke `projects:*`; kini domain sendiri.
+    expect(r.json().capabilities).toHaveLength(34);
     expect(r.json().capabilities[0]).toMatchObject({ id: expect.any(String), domain: expect.any(String), access: expect.any(String) });
   });
 

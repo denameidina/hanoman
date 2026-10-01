@@ -62,6 +62,10 @@ export const PG_ORDER = [
   "Member", "Task",
   // SPEC-481 · ADR-0100 · WebhookDelivery WAJIB sesudah WebhookEndpoint (FK endpointId).
   "WebhookEndpoint", "WebhookDelivery",
+  // Workspace QA · ADR-0174 · QaReport sesudah Project (FK projectId, cascade); QaCase/QaFinding/
+  // QaAttachment sesudah QaReport (FK reportId, cascade). Keempatnya LOCAL-only dan TIDAK ada di
+  // sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris (cermin Changelog).
+  "QaReport", "QaCase", "QaFinding", "QaAttachment",
 ] as const;
 
 const CHUNK = 200;

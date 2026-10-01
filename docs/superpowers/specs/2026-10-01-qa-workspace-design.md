@@ -28,7 +28,7 @@ Mengikuti pola `Task` (SPEC-945). Semua di bawah `Project` (cascade).
 - **QaReport**: `id`, `projectId`, `title`, `buildVersion`, `environment` (JSON: OS/browser/device/URL/branch), `scope`, `tester`, `status` (`draft|submitted|closed`), `verdict` (`go|no-go|conditional|null`), `summary`, `createdAt`, `updatedAt`, `version`.
 - **QaCase**: `id`, `reportId`, `title`, `steps`, `expected`, `actual`, `status` (`todo|pass|fail|blocked|skipped`), `order`, `version`.
 - **QaFinding**: `id`, `reportId`, `caseId?`, `title`, `severity` (`blocker|critical|major|minor|trivial`), `priority` (`P0..P3`, terpisah dari severity), `area`, `steps` (JSON array repro bernomor), `expected`, `actual`, `status` (`open|sent|wontfix`), `backlogId?` (disiapkan untuk bagian 2, tak diisi di bagian 1), `version`.
-- **QaAttachment**: `id`, `projectId` (denormal untuk kuota/isolasi), `ownerType` (`report|case|finding`), `ownerId`, `filename`, `mimeType`, `size`, `sha256`, `storageKey`, `syncState` (`local-only` di bagian 1). Byte di disk `$HANOMAN_HOME`, memakai ulang pola `spec-attachment-dir` / `upload-pipeline`: validasi tipe, maks 10 MB/file, kuota per laporan, nama berkas disanitasi, tolak path traversal. Tanpa `version` (byte tak lewat changefeed).
+- **QaAttachment**: `id`, `reportId` (FK cascade; kuota & hapus berantai), `projectId` (denormal untuk kuota/isolasi), `ownerType` (`report|case|finding`), `ownerId`, `filename`, `mimeType`, `size`, `sha256`, `storageKey`, `syncState` (`local-only` di bagian 1). Byte di disk `$HANOMAN_HOME`, memakai ulang pola `spec-attachment-dir` / `upload-pipeline`: validasi tipe, maks 10 MB/file, kuota per laporan, nama berkas disanitasi, tolak path traversal. Tanpa `version` (byte tak lewat changefeed).
 - `version` pada tiga entitas pertama disiapkan; sync dihidupkan di bagian 3 lewat `FIELDS`.
 
 ## 2. API & MCP
@@ -36,7 +36,7 @@ Mengikuti pola `Task` (SPEC-945). Semua di bawah `Project` (cascade).
 - `/api/projects/:id/qa/reports` — CRUD; sub-resource `cases`, `findings`, `attachments`.
 - `GET …/reports/:rid/export` (ZIP) · `POST …/reports/import` · `GET /api/qa/template.md`.
 - Capability baru `qa:read`, `qa:write`; tool MCP `hanoman_qa_*`.
-- Kesalahan: 400 validasi, 404 lintas-project, 413/415 lampiran; laporan `closed` menolak ubahan (409).
+- Kesalahan: 400 validasi (termasuk `submitted`/`closed` tanpa `verdict`), 404 lintas-project, 413/415 lampiran; laporan `closed` menolak ubahan (409).
 
 ## 3. UI — `QaWorkspace`
 
