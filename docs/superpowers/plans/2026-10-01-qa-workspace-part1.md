@@ -586,7 +586,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `POST …/:rid/cases`, `PATCH|DELETE …/:rid/cases/:cid`, `POST …/:rid/findings`, `PATCH|DELETE …/:rid/findings/:fid` → **selalu `QaReportDetail` terbaru** (POST = 201).
   - Error: 400 validasi (`{error: zodFlatten}` atau `{error: "..."}`), 404 lintas-project/tak ada, 409 laporan `closed`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `server/test/qa-reports.route.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `server/test/qa-reports.route.test.ts`
 
 ```ts
 import { beforeEach, describe, expect, it } from "vitest";
@@ -744,12 +744,12 @@ describe("temuan", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-reports.route.test.ts --no-file-parallelism`
 Expected: FAIL — semua 404 (route belum ada).
 
-- [ ] **Step 3: Service** — `server/src/services/qa.ts`
+- [x] **Step 3: Service** — `server/src/services/qa.ts`
 
 ```ts
 import type { Prisma, QaAttachment, QaCase, QaFinding, QaReport } from "@prisma/client";
@@ -847,7 +847,7 @@ export async function reportDetail(projectId: string, reportId: string): Promise
 }
 ```
 
-- [ ] **Step 3b: Service lampiran** — `server/src/services/qa-attachment.ts` (dipakai route Task 4 untuk membuang byte; route-nya sendiri di Task 5)
+- [x] **Step 3b: Service lampiran** — `server/src/services/qa-attachment.ts` (dipakai route Task 4 untuk membuang byte; route-nya sendiri di Task 5)
 
 ```ts
 // Workspace QA · lampiran per laporan/test case/temuan. Memakai ulang PIPELINE unggahan
@@ -945,7 +945,7 @@ export async function removeQaAttachments(where: Prisma.QaAttachmentWhereInput):
 }
 ```
 
-- [ ] **Step 4: Route** — `server/src/routes/qa.ts`
+- [x] **Step 4: Route** — `server/src/routes/qa.ts`
 
 ```ts
 import type { FastifyInstance, FastifyReply } from "fastify";
@@ -1148,12 +1148,12 @@ export default async function qa(app: FastifyInstance) {
     await api.register(qa);           // Workspace QA · laporan/test case/temuan per project (capability `qa`)
 ```
 
-- [ ] **Step 5: Jalankan test + typecheck**
+- [x] **Step 5: Jalankan test + typecheck**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-reports.route.test.ts server/test/qa-model.test.ts --no-file-parallelism && pnpm --filter ./server typecheck`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/qa.ts server/src/services/qa-attachment.ts server/src/routes/qa.ts server/src/app.ts server/test/qa-reports.route.test.ts
