@@ -85,7 +85,7 @@ export type IdeUploadResult = {
 import type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 import type {
   CreateQaCase, CreateQaFinding, CreateQaReport, PatchQaCase, PatchQaFinding, PatchQaReport,
-  QaAttachmentView, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
+  QaAttachmentView, QaBacklogResult, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
 } from "@hanoman/shared";
 export type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 export type CommitDetail = { sha: string; parents: string[]; author: string; at: string; subject: string; body: string; changed: ChangedFile[]; signed: boolean; committer: string; committedAt: string; authorEmail: string };
@@ -788,6 +788,11 @@ export function createApi(o: { base?: string } = {}) {
   createQaFinding: (pid: string, rid: string, b: CreateQaFinding) => j<QaReportDetail>(paths.qaFindings(pid, rid), { method: "POST", ...body(b) }),
   patchQaFinding: (pid: string, rid: string, fid: string, b: PatchQaFinding) => j<QaReportDetail>(paths.qaFinding(pid, rid, fid), { method: "PATCH", ...body(b) }),
   deleteQaFinding: (pid: string, rid: string, fid: string) => j<QaReportDetail>(paths.qaFinding(pid, rid, fid), { method: "DELETE" }),
+  // Temuan → backlog (bagian 2). Jawabannya memuat laporan terbaru (status `sent` + cermin spec).
+  sendQaFindingToBacklog: (pid: string, rid: string, fid: string, priority?: "tinggi" | "sedang" | "rendah") =>
+    j<QaBacklogResult & { report: QaReportDetail }>(paths.qaFindingBacklog(pid, rid, fid), { method: "POST", ...body(priority ? { priority } : {}) }),
+  sendQaReportToBacklog: (pid: string, rid: string) =>
+    j<{ results: QaBacklogResult[]; sent: number; report: QaReportDetail }>(paths.qaReportBacklog(pid, rid), { method: "POST", ...body({}) }),
   uploadQaAttachments: (pid: string, rid: string, owner: { ownerType: QaOwnerType; ownerId: string }, files: File[]) => {
     const form = new FormData();
     for (const f of files) form.append("files", f);

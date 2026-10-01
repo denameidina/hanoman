@@ -1809,7 +1809,7 @@ DELETE /api/tasks/:id/escalate   -> 200 TaskView (specId: null)
 ## Workspace QA ([ADR-0174](../adr/0174-workspace-qa.md)) — **`qa:read` / `qa:write`**, LOCAL (belum disync)
 ```
 # Laporan QA manusia per project. Capability dipetakan MENURUT METHOD (GET/HEAD → qa:read, selain itu
-# qa:write) untuk `/projects/:id/qa/**` dan `/qa/**`; tool MCP `hanoman_qa_*` (8 tool). Tak satu pun
+# qa:write) untuk `/projects/:id/qa/**` dan `/qa/**`; tool MCP `hanoman_qa_*` (10 tool). Tak satu pun
 # tulisan memanggil `notifySynced` — entitas belum masuk changefeed (bagian 3). Role `client` tertutup
 # (deny-by-default, ADR-0110).
 #
@@ -1846,6 +1846,20 @@ GET    /api/projects/:id/qa/reports/:rid/attachments/:aid   -> byte (gambar inli
 #   nosniff + CSP sandbox. QaAttachmentView = { id, reportId, ownerType, ownerId, filename, mimeType, size, sha256, syncState: "local-only", createdAt }
 DELETE /api/projects/:id/qa/reports/:rid/attachments/:aid   -> { ok: true }
 
+POST   /api/projects/:id/qa/reports/:rid/findings/:fid/backlog   { priority?: tinggi|sedang|rendah }
+                                                            -> 201|200 { findingId, code, created, spec:{id,stage,priority}, attachments:{saved,rejected[]}, report: QaReportDetail }
+#   Temuan → backlog item `source: qa` (bagian 2). Cermin POST /tasks/:id/escalate (ADR-0152): IDEMPOTEN lewat
+#   `QaFinding.backlogId` (200 created:false), tautan putus (Spec dihapus) dibuat ulang, retry P2002 di
+#   nextSpecId, `launchApprovedAt` hanya bila principal punya `sessions:write` (launchPrincipal). Payload:
+#   severity blocker|critical→critical · major→major · minor|trivial→minor (LOSSY); prioritas P0|P1→tinggi ·
+#   P2→sedang · P3→rendah (atau `priority`); steps bernomor; `actual` memuat asal-usul (kode temuan/laporan,
+#   severity & prioritas QA asli, area, test case); `env` = build + lingkungan laporan. Lampiran TEMUAN
+#   (bukan milik laporan/test case) DISALIN ke SpecAttachment (storageKey baru) mematuhi SPEC_ATTACHMENT_LIMITS —
+#   yang ditolak dilaporkan per berkas dan tak menggagalkan backlog. Temuan jadi status `sent` + `backlogId`;
+#   QaFindingView.spec = cermin {id,stage,priority} dihitung saat baca (null dengan backlogId terisi = tautan putus).
+#   PENGECUALIAN read-only: laporan `closed` TETAP boleh (hanya tautan yang berubah). 404 temuan/laporan · 400 priority.
+POST   /api/projects/:id/qa/reports/:rid/backlog            -> { results: [QaBacklogResult], sent, report }
+#   Semua temuan `open` sekaligus (`wontfix`/`sent` dilewati); satu gagal → `results[].error`, yang lain lanjut.
 GET    /api/qa/template.md                                  -> text/markdown (attachment; qa-template.md)
 GET    /api/projects/:id/qa/reports/:rid/export[?format=md] -> application/zip (report.md + attachments/) | text/markdown
 POST   /api/projects/:id/qa/import    (multipart, satu berkas .zip atau .md; maks ≈105 MB)

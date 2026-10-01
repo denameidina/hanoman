@@ -1,7 +1,7 @@
 import type { Prisma, QaAttachment, QaCase, QaFinding, QaReport } from "@prisma/client";
 import {
   assignCodes, qaStats,
-  type QaAttachmentView, type QaCaseStatus, type QaCaseView, type QaFindingStatus, type QaFindingView,
+  type QaAttachmentView, type QaCaseStatus, type QaCaseView, type QaFindingSpecMirror, type QaFindingStatus, type QaFindingView,
   type QaOwnerType, type QaPriority, type QaReportDetail, type QaReportStatus, type QaReportView,
   type QaSeverity, type QaVerdict,
 } from "@hanoman/shared";
@@ -54,14 +54,17 @@ export function caseViews(rows: QaCase[]): QaCaseView[] {
 }
 
 /** `rows` WAJIB terurut [createdAt asc, id asc] — urutan itu juga urutan tampil. */
-export function findingViews(rows: QaFinding[], cases: QaCaseView[]): QaFindingView[] {
+export function findingViews(
+  rows: QaFinding[], cases: QaCaseView[], specs: Map<string, QaFindingSpecMirror> = new Map(),
+): QaFindingView[] {
   const caseCode = new Map(cases.map((c) => [c.id, c.code]));
   return assignCodes(rows, "F-", 2).map((r) => ({
     id: r.id, reportId: r.reportId, code: r.code, caseId: r.caseId,
     caseCode: r.caseId ? (caseCode.get(r.caseId) ?? null) : null,
     title: r.title, severity: r.severity as QaSeverity, priority: r.priority as QaPriority, area: r.area,
     steps: stepsOf(r.steps), expected: r.expected, actual: r.actual, status: r.status as QaFindingStatus,
-    backlogId: r.backlogId, createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
+    backlogId: r.backlogId, spec: r.backlogId ? (specs.get(r.backlogId) ?? null) : null,
+    createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
   }));
 }
 
@@ -86,8 +89,14 @@ export async function reportDetail(projectId: string, reportId: string): Promise
   if (!row) return null;
   const code = (await reportCodes(projectId)).get(row.id)!;
   const cases = caseViews(row.cases);
+  // Cermin backlog dihitung saat BACA (cermin TaskView.spec) — tak pernah ditulis balik ke temuan.
+  const specIds = [...new Set(row.findings.map((f) => f.backlogId).filter((x): x is string => !!x))];
+  const specs = new Map(
+    (await prisma.spec.findMany({ where: { id: { in: specIds } }, select: { id: true, stage: true, priority: true } }))
+      .map((x) => [x.id, x] as const),
+  );
   return {
     ...reportView(row, code, row.cases, row.findings),
-    cases, findings: findingViews(row.findings, cases), attachments: row.attachments.map(attachmentView),
+    cases, findings: findingViews(row.findings, cases, specs), attachments: row.attachments.map(attachmentView),
   };
 }

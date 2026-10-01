@@ -32,6 +32,19 @@ Seret berkas ke area lampiran, pilih lewat tombol **Lampirkan**, atau **tempel s
 atas temuan/test case. Tipe: png, jpg, webp, pdf, md, txt, log, json, csv. Batas 10 MB per berkas, 30 berkas
 dan 100 MB per laporan. Berkas yang ditolak dilaporkan per nama dengan alasannya; yang lain tetap masuk.
 
+## Dari temuan ke perbaikan (backlog)
+
+Tombol **Kirim ke backlog** di tiap temuan `open` membuat backlog item (jenis QA) berisi judul, langkah repro,
+expected/actual, lingkungan, dan screenshot temuan sebagai konteks agen. **Kirim semua yang open** melakukannya
+sekaligus (temuan `wontfix` dilewati). Temuan lalu berstatus `sent` dan menampilkan lencana `SPEC-n · stage`
+yang membuka Backlog, jadi progres perbaikan terlihat dari laporan QA.
+
+- Pemetaan sengaja kasar: severity blocker/critical → critical, minor/trivial → minor; P0/P1 → tinggi,
+  P2 → sedang, P3 → rendah. Severity dan prioritas QA yang asli tetap tertulis di isi backlog.
+- Mengirim dua kali tidak membuat backlog kedua. Bila backlognya dihapus, tombol muncul lagi (tautan putus).
+- Boleh dilakukan dari laporan `closed` — alurnya wajar: submit → putuskan go/no-go → close → kirim temuan.
+- Mengirim **tidak** menjalankan agen; peluncuran sesi tetap tindakan terpisah.
+
 ## Template, ekspor, impor
 
 - **Unduh template** → `qa-template.md`: front-matter + satu contoh test case dan temuan + panduan
@@ -53,4 +66,4 @@ perangkat (menyusul), nomor bisa bergeser bila ada baris lebih tua yang masuk da
 ## Agen (MCP)
 
 Agen yang diberi capability `qa:read`/`qa:write` dapat membaca laporan dan menulis laporan, test case, dan
-temuan lewat tool `hanoman_qa_*`. Menghapus dan lampiran/ZIP tetap tindakan manusia di dashboard.
+temuan lewat tool `hanoman_qa_*` — termasuk mengirim temuan ke backlog. Menghapus dan lampiran/ZIP tetap tindakan manusia di dashboard.
