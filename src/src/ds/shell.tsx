@@ -28,6 +28,8 @@ export const HN_NAV: NavItem[] = [
   // SPEC-946 · ADR-0150 · papan kerja MANUSIA. Kolomnya `Task.status`, bukan `Spec.stage` —
   // papan LAIN, bukan mode kedua board Backlog.
   { key: "team", label: "Tim", icon: "users" },
+  // Workspace QA · laporan QA per project (test case, temuan, lampiran) → perbaikan project.
+  { key: "qa", label: "QA", icon: "clipboard-check" },
   { key: "triage", label: "Triase", icon: "inbox" },
   { key: "scheduler", label: "Scheduler", icon: "calendar-clock" },
   { key: "lead", label: "Lead", icon: "compass" },   // SPEC-409 · ADR-0091 · hanoman-lead

@@ -233,6 +233,17 @@ export const paths = {
   skillFile: (key: string) => `${API}/skills/${encodeURIComponent(key)}/file`,
   skillEntry: (key: string) => `${API}/skills/${encodeURIComponent(key)}/entry`,
   skillFork: (key: string) => `${API}/skills/${encodeURIComponent(key)}/fork`,
+  // Workspace QA · laporan QA per project. Semua di bawah /projects/:id/qa (capability `qa`).
+  qaReports: (pid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports`,
+  qaReport: (pid: string, rid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}`,
+  qaCases: (pid: string, rid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/cases`,
+  qaCase: (pid: string, rid: string, cid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/cases/${encodeURIComponent(cid)}`,
+  qaFindings: (pid: string, rid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/findings`,
+  qaFinding: (pid: string, rid: string, fid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/findings/${encodeURIComponent(fid)}`,
+  qaAttachments: (pid: string, rid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/attachments`,
+  qaAttachment: (pid: string, rid: string, aid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/attachments/${encodeURIComponent(aid)}`,
+  qaImport: (pid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/import`,
+  qaTemplate: `${API}/qa/template.md`,
   // SPEC-945 · ADR-0150 · papan tim. `members` GLOBAL (bukan per project) — task boleh tanpa
   // project, jadi direktori orang tak bisa digantung pada project.
   members: `${API}/members`,

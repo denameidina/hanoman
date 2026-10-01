@@ -83,6 +83,10 @@ export type IdeUploadResult = {
 };
 // SPEC-908 · satu definisi di @hanoman/shared; dulu kembar dengan server/src/services/git-ide.ts.
 import type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
+import type {
+  CreateQaCase, CreateQaFinding, CreateQaReport, PatchQaCase, PatchQaFinding, PatchQaReport,
+  QaAttachmentView, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
+} from "@hanoman/shared";
 export type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 export type CommitDetail = { sha: string; parents: string[]; author: string; at: string; subject: string; body: string; changed: ChangedFile[]; signed: boolean; committer: string; committedAt: string; authorEmail: string };
 export type GitOp =
@@ -772,6 +776,34 @@ export function createApi(o: { base?: string } = {}) {
   forkSkill: (key: string, b: { layer: "hanoman" | "project"; projectId?: string; source?: string; name?: string }) =>
     j<SkillEntry>(paths.skillFork(key), { method: "POST", ...body(b) }),
   deleteSkill: (key: string) => j<void>(paths.skill(key), { method: "DELETE" }),
+  // Workspace QA · setiap mutasi anak menjawab QaReportDetail terbaru (nomor tampil + statistik dihitung server).
+  qaReports: (pid: string) => j<{ items: QaReportView[]; total: number }>(paths.qaReports(pid)),
+  qaReport: (pid: string, rid: string) => j<QaReportDetail>(paths.qaReport(pid, rid)),
+  createQaReport: (pid: string, b: CreateQaReport) => j<QaReportDetail>(paths.qaReports(pid), { method: "POST", ...body(b) }),
+  patchQaReport: (pid: string, rid: string, b: PatchQaReport) => j<QaReportDetail>(paths.qaReport(pid, rid), { method: "PATCH", ...body(b) }),
+  deleteQaReport: (pid: string, rid: string) => j<{ ok: true }>(paths.qaReport(pid, rid), { method: "DELETE" }),
+  createQaCase: (pid: string, rid: string, b: CreateQaCase) => j<QaReportDetail>(paths.qaCases(pid, rid), { method: "POST", ...body(b) }),
+  patchQaCase: (pid: string, rid: string, cid: string, b: PatchQaCase) => j<QaReportDetail>(paths.qaCase(pid, rid, cid), { method: "PATCH", ...body(b) }),
+  deleteQaCase: (pid: string, rid: string, cid: string) => j<QaReportDetail>(paths.qaCase(pid, rid, cid), { method: "DELETE" }),
+  createQaFinding: (pid: string, rid: string, b: CreateQaFinding) => j<QaReportDetail>(paths.qaFindings(pid, rid), { method: "POST", ...body(b) }),
+  patchQaFinding: (pid: string, rid: string, fid: string, b: PatchQaFinding) => j<QaReportDetail>(paths.qaFinding(pid, rid, fid), { method: "PATCH", ...body(b) }),
+  deleteQaFinding: (pid: string, rid: string, fid: string) => j<QaReportDetail>(paths.qaFinding(pid, rid, fid), { method: "DELETE" }),
+  uploadQaAttachments: (pid: string, rid: string, owner: { ownerType: QaOwnerType; ownerId: string }, files: File[]) => {
+    const form = new FormData();
+    for (const f of files) form.append("files", f);
+    return jUpload<{ saved: QaAttachmentView[]; rejected: { filename: string; reason: string }[] }>(
+      paths.qaAttachments(pid, rid) + qs(owner), form);
+  },
+  deleteQaAttachment: (pid: string, rid: string, aid: string) => j<{ ok: true }>(paths.qaAttachment(pid, rid, aid), { method: "DELETE" }),
+  importQaReport: (pid: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return jUpload<QaImportResult>(paths.qaImport(pid), form);
+  },
+  // URL untuk <a href>/<img src> — `rebase` supaya ikut target remote (relay) seperti fetch lain.
+  qaExportUrl: (pid: string, rid: string, format?: "md") => rebase(paths.qaReport(pid, rid) + "/export" + (format ? `?format=${format}` : "")),
+  qaAttachmentUrl: (pid: string, rid: string, aid: string, download = false) => rebase(paths.qaAttachment(pid, rid, aid) + (download ? "?download=1" : "")),
+  qaTemplateUrl: () => rebase(paths.qaTemplate),
   getCustomAgentMetrics: (p: { projectId?: string; from?: string; to?: string } = {}) =>
     j<AgentMetricsView>(paths.customAgentMetrics + qs(p)),
   updateAgentInvocationDisposition: (id: string, b: {

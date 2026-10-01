@@ -130,3 +130,8 @@ export type QaReportView = {
 export type QaReportDetail = QaReportView & {
   cases: QaCaseView[]; findings: QaFindingView[]; attachments: QaAttachmentView[];
 };
+
+export type QaImportResult = {
+  reportId: string; created: boolean; cases: number; findings: number;
+  attachments: { saved: number; rejected: { filename: string; reason: string }[] };
+};

@@ -2654,7 +2654,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `paths.qa*`; `api.qaReports/qaReport/createQaReport/patchQaReport/deleteQaReport/createQaCase/patchQaCase/deleteQaCase/createQaFinding/patchQaFinding/deleteQaFinding/uploadQaAttachments/deleteQaAttachment/importQaReport/qaExportUrl/qaAttachmentUrl/qaTemplateUrl`; rute `/qa` & `/qa/<projectId>` (`{section:"qa", projectId?}`); nav key `qa`.
 
-- [ ] **Step 1: Test rute + nav yang gagal**
+- [x] **Step 1: Test rute + nav yang gagal**
 
 Tambahkan di `src/src/routes.test.ts` (perluas `KEYS` jadi `["overview", "projects", "backlog", "skills", "qa", "settings"]`):
 
@@ -2690,7 +2690,7 @@ describe("entri nav QA", () => {
 
 Run: `pnpm vitest --run src/src/routes.test.ts src/test/qa-nav.test.tsx --no-file-parallelism` → FAIL.
 
-- [ ] **Step 2: `shared/src/api.ts`** — tambahkan di blok `paths`, tepat sesudah `skillFork`:
+- [x] **Step 2: `shared/src/api.ts`** — tambahkan di blok `paths`, tepat sesudah `skillFork`:
 
 ```ts
   // Workspace QA · laporan QA per project. Semua di bawah /projects/:id/qa (capability `qa`).
@@ -2716,7 +2716,7 @@ export type QaImportResult = {
 ```
 dan di `server/src/services/qa-transfer.ts` hapus deklarasi lokal `export type QaImportResult = {…}`, ganti dengan `import type { QaImportResult } from "@hanoman/shared";` (dan `export type { QaImportResult };` bila ada pemakai lain).
 
-- [ ] **Step 3: `src/src/api/client.ts`** — tambah impor (baris baru di bawah impor `@hanoman/shared` yang ada):
+- [x] **Step 3: `src/src/api/client.ts`** — tambah impor (baris baru di bawah impor `@hanoman/shared` yang ada):
 
 ```ts
 import type {
@@ -2758,7 +2758,7 @@ dan di dalam literal yang dikembalikan `createApi`, sesudah `skillFork`/`createS
 ```
 (`QaOwnerType` dsb. tersedia dari `@hanoman/shared`; bila `qs()` menolak tipe objek, ubah parameternya jadi `Record<string, string>` — `qs` menerima `Record<string, string | number | boolean | undefined>`.)
 
-- [ ] **Step 4: `src/src/routes.ts`**
+- [x] **Step 4: `src/src/routes.ts`**
 
 Komentar bentuk URL, tambahkan baris `//   /qa[/<projectId>]                  laporan QA project terpilih (default: project pertama)`. Pada `Route.projectId` komentar: tambah "`qa`". Di `routePath` sebelum `default`:
 
@@ -2771,7 +2771,7 @@ Di `parseRoute` sesudah baris `skills`:
   if (head === "qa" && parts.length === 2) return { section: "qa", projectId: a };
 ```
 
-- [ ] **Step 5: Nav + App**
+- [x] **Step 5: Nav + App**
 
 `src/src/ds/shell.tsx` — sisipkan tepat sesudah entri `team`:
 
@@ -2795,7 +2795,7 @@ Di `parseRoute` sesudah baris `skills`:
 ```
 (Cek nama `navigate`/`routePath`/`gate`/`showToast` di berkas — dipakai persis begitu di cabang `skills` dan `goProject`.)
 
-- [ ] **Step 6: Lanjut ke Task 10 sebelum menjalankan** — `App.tsx` mengimpor `QaWorkspace` yang dibuat di Task 10, jadi typecheck/test App baru hijau sesudah Task 10. Task 9 dan 10 di-commit bersama (satu commit "UI QA") atau Task 10 Step 1–3 dikerjakan dulu. Yang boleh dijalankan sekarang: `pnpm vitest --run src/src/routes.test.ts src/test/qa-nav.test.tsx --no-file-parallelism` (hijau) dan `pnpm --filter ./shared typecheck`.
+- [x] **Step 6: Lanjut ke Task 10 sebelum menjalankan** — `App.tsx` mengimpor `QaWorkspace` yang dibuat di Task 10, jadi typecheck/test App baru hijau sesudah Task 10. Task 9 dan 10 di-commit bersama (satu commit "UI QA") atau Task 10 Step 1–3 dikerjakan dulu. Yang boleh dijalankan sekarang: `pnpm vitest --run src/src/routes.test.ts src/test/qa-nav.test.tsx --no-file-parallelism` (hijau) dan `pnpm --filter ./shared typecheck`.
 
 ---
 
@@ -2811,7 +2811,7 @@ Di `parseRoute` sesudah baris `skills`:
 
 Teks UI yang dikunci test: tombol `Laporan baru`, `Impor`, `Unduh template`; editor `Kembali`, `Simpan`, `Buka kembali`; tab `Test case`/`Temuan`/`Lampiran`/`Pratinjau`; input `Judul test case baru` + tombol `Tambah`; tombol `Temuan baru` + modal `Simpan temuan`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `src/src/screens/qa/QaWorkspace.test.tsx`
+- [x] **Step 1: Tulis test yang gagal** — `src/src/screens/qa/QaWorkspace.test.tsx`
 
 ```tsx
 import React from "react";
@@ -2928,9 +2928,9 @@ describe("QaWorkspace", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal** — `pnpm vitest --run src/src/screens/qa/QaWorkspace.test.tsx --no-file-parallelism` → FAIL (modul belum ada).
+- [x] **Step 2: Jalankan, pastikan gagal** — `pnpm vitest --run src/src/screens/qa/QaWorkspace.test.tsx --no-file-parallelism` → FAIL (modul belum ada).
 
-- [ ] **Step 3: `qa-ui.ts`**
+- [x] **Step 3: `qa-ui.ts`**
 
 ```ts
 import type { QaCaseStatus, QaReportStatus, QaSeverity, QaVerdict } from "@hanoman/shared";
@@ -2969,7 +2969,7 @@ export const fmtSize = (n: number): string =>
   n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`;
 ```
 
-- [ ] **Step 4: `QaWorkspace.tsx`**
+- [x] **Step 4: `QaWorkspace.tsx`**
 
 ```tsx
 // src/src/screens/qa/QaWorkspace.tsx
@@ -3074,7 +3074,7 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast }: P
 }
 ```
 
-- [ ] **Step 5: `QaReportList.tsx`**
+- [x] **Step 5: `QaReportList.tsx`**
 
 ```tsx
 import type { QaReportView } from "@hanoman/shared";
@@ -3109,13 +3109,14 @@ export function QaReportList({ reports, onOpen }: { reports: QaReportView[]; onO
 ```
 (tambahkan `import React from "react";` bila JSX runtime klasik dipakai di berkas tetangga — ikuti `SkillsWorkspace.tsx`.)
 
-- [ ] **Step 6: `QaReportEditor.tsx`** — header + tab; `QaAttachments`/`QaPreview` dari Task 11
+- [x] **Step 6: `QaReportEditor.tsx`** — header + tab; `QaAttachments`/`QaPreview` dari Task 11
 
 ```tsx
 import React from "react";
 import { QA_VERDICTS, type QaReportDetail, type QaReportStatus } from "@hanoman/shared";
 import { Badge, Button, Field, HnTextarea, Input, Select, Tabs, useConfirm } from "../../ds";
 import { useApi } from "../../api/instance";
+import type { QaReportDetail } from "@hanoman/shared";
 import { QaAttachments } from "./QaAttachments";
 import { QaCasesPanel } from "./QaCasesPanel";
 import { QaFindingsPanel } from "./QaFindingsPanel";
@@ -3216,7 +3217,7 @@ export function QaReportEditor({ detail, projectId, onChange, onBack, onDeleted,
 ```
 Catatan: `Simpan` sengaja `disabled` saat `locked` (test mengunci ini); `Submit` mengirim `{...fields(), status}` sehingga `verdict` yang baru diisi ikut tersimpan dalam satu permintaan.
 
-- [ ] **Step 7: `QaCasesPanel.tsx`**
+- [x] **Step 7: `QaCasesPanel.tsx`**
 
 ```tsx
 import React from "react";
@@ -3296,7 +3297,7 @@ function CaseCard({ c, p, run }: { c: QaCaseView; p: PanelProps; run: (fn: () =>
 ```
 (Badge status ganda dengan Select adalah sengaja: Select untuk mengubah, Badge memberi warna sekilas — hapus Badge bila tampilan terasa redundan.)
 
-- [ ] **Step 8: `QaFindingsPanel.tsx`**
+- [x] **Step 8: `QaFindingsPanel.tsx`**
 
 ```tsx
 import React from "react";
@@ -3416,12 +3417,12 @@ export function QaFindingsPanel(p: PanelProps) {
 }
 ```
 
-- [ ] **Step 9: (setelah Task 11 Step 3) jalankan test + typecheck**
+- [x] **Step 9: (setelah Task 11 Step 3) jalankan test + typecheck**
 
 Run: `pnpm vitest --run src/src/screens/qa src/src/routes.test.ts src/test/qa-nav.test.tsx src/test/changelog-nav.test.tsx --no-file-parallelism && pnpm --filter ./src typecheck`
 Expected: PASS. Bila `getByText("major")` bentrok dengan opsi `<select>` (tak mungkin: modal tertutup), perketat query dengan `within(...)`. Jangan melonggarkan asersi tanpa alasan.
 
-- [ ] **Step 10: Commit (bersama Task 9 + 11 bila dikerjakan beruntun)**
+- [x] **Step 10: Commit (bersama Task 9 + 11 bila dikerjakan beruntun)**
 
 ```bash
 git add shared/src/api.ts shared/src/qa.ts server/src/services/qa-transfer.ts src/src/api/client.ts src/src/routes.ts src/src/routes.test.ts src/src/ds/shell.tsx src/src/App.tsx src/test/qa-nav.test.tsx src/src/screens/qa
@@ -3442,7 +3443,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `PanelProps` (Task 10), `api.uploadQaAttachments/deleteQaAttachment/qaAttachmentUrl/qaExportUrl/qaReport`, `renderQaMarkdown` (Task 6), `MarkdownView`.
 - Produces: `<QaAttachments {...PanelProps} ownerType ownerId compact? />` — daftar lampiran pemilik + unggah (tombol, drag-drop, tempel screenshot), pratinjau gambar; `<QaPreview detail projectId />`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `src/src/screens/qa/QaAttachments.test.tsx`
+- [x] **Step 1: Tulis test yang gagal** — `src/src/screens/qa/QaAttachments.test.tsx`
 
 ```tsx
 import React from "react";
@@ -3458,7 +3459,7 @@ const base = {
   status: "draft", verdict: null, createdAt: at, updatedAt: at, cases: [], findings: [],
   stats: { cases: { total: 0, pass: 0, fail: 0, blocked: 0, skipped: 0, todo: 0 }, passRate: null, findings: { total: 0, open: 0, blocker: 0, critical: 0, major: 0, minor: 0, trivial: 0 } },
 };
-const detail = { ...base, attachments: [att("a1", "layar.png", "image/png"), att("a2", "log.txt", "text/plain"), att("a3", "lain.png", "image/png", "f2")] };
+const detail = { ...base, attachments: [att("a1", "layar.png", "image/png"), att("a2", "log.txt", "text/plain"), att("a3", "lain.png", "image/png", "f2")] } as unknown as QaReportDetail;
 const json = (v: unknown, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => v } as Response);
 afterEach(() => vi.restoreAllMocks());
 
@@ -3513,9 +3514,9 @@ describe("QaAttachments", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal** — `pnpm vitest --run src/src/screens/qa/QaAttachments.test.tsx --no-file-parallelism` → FAIL.
+- [x] **Step 2: Jalankan, pastikan gagal** — `pnpm vitest --run src/src/screens/qa/QaAttachments.test.tsx --no-file-parallelism` → FAIL.
 
-- [ ] **Step 3: `QaAttachments.tsx`**
+- [x] **Step 3: `QaAttachments.tsx`**
 
 ```tsx
 import React from "react";
@@ -3602,7 +3603,7 @@ export function QaAttachments({ detail, projectId, locked, onChange, onToast, ow
 }
 ```
 
-- [ ] **Step 4: `QaPreview.tsx`**
+- [x] **Step 4: `QaPreview.tsx`**
 
 ```tsx
 import { renderQaMarkdown, type QaReportDetail } from "@hanoman/shared";
@@ -3626,7 +3627,7 @@ export function QaPreview({ detail, projectId }: { detail: QaReportDetail; proje
 }
 ```
 
-- [ ] **Step 5: Ikon** — ikon baru yang dipakai: `clipboard-check`, `plus`, `upload`, `download`, `trash-2`, `paperclip`, `bug`, `arrow-left`. Bangkitkan ulang registry dan periksa test-nya:
+- [x] **Step 5: Ikon** — ikon baru yang dipakai: `clipboard-check`, `plus`, `upload`, `download`, `trash-2`, `paperclip`, `bug`, `arrow-left`. Bangkitkan ulang registry dan periksa test-nya:
 
 ```bash
 pnpm --filter ./src gen:icons
@@ -3635,14 +3636,14 @@ git diff --stat src/src/ds/icon-registry.ts
 ```
 Expected: registry bertambah hanya ikon yang belum ada; test hijau. Bila nama ikon tak ada di lucide, pakai padanan (mis. `clipboard-list`) dan sesuaikan `shell.tsx` + `qa-nav.test.tsx`.
 
-- [ ] **Step 6: Jalankan semua test UI QA + typecheck**
+- [x] **Step 6: Jalankan semua test UI QA + typecheck**
 
 Run: `pnpm vitest --run src/src/screens/qa src/src/routes.test.ts src/test/qa-nav.test.tsx src/test/changelog-nav.test.tsx src/test/team-nav.test.tsx --no-file-parallelism && pnpm --filter ./src typecheck`
 Expected: PASS.
 
 - [ ] **Step 7: Periksa responsif nyata** (invarian test saja tak cukup — memori proyek: "invariant lulus tapi terpotong"). Jalankan dashboard + browser CDP sesuai memori `hanoman-browser-smoke-via-cdp`, buka `/qa/<projectId>` pada lebar **390, 768, 1280 px**: daftar laporan, editor (header, kartu test case, modal temuan), pratinjau. Tak boleh ada scroll horizontal halaman atau teks terpotong. Perbaiki gaya bila ada (hanya `minmax(min(100%, …))`/`flexWrap`).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/src/screens/qa src/src/ds/icon-registry.ts

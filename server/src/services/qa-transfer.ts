@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 import {
-  QaMarkdownError, parseQaMarkdown, renderQaMarkdown, type QaParsedReport,
+  QaMarkdownError, parseQaMarkdown, renderQaMarkdown, type QaImportResult, type QaParsedReport,
 } from "@hanoman/shared";
 import { prisma } from "../db";
 import { asJson, reportDetail } from "./qa";
@@ -51,9 +51,6 @@ export async function exportReport(projectId: string, reportId: string) {
   return { code: full.code, markdown, zip };
 }
 
-export type QaImportResult = {
-  reportId: string; created: boolean; cases: number; findings: number;
-  attachments: { saved: number; rejected: { filename: string; reason: string }[] };
 };
 
 export async function importReport(projectId: string, file: { name: string; buf: Buffer }): Promise<QaImportResult> {
