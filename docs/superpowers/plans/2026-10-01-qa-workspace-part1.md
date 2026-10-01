@@ -1395,7 +1395,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 Format (kontrak yang dikunci test): front-matter YAML (`hanoman-qa: 1`, nilai string berbentuk JSON), judul `# QA-007 · Judul`, blockquote ringkasan angka (diabaikan parser), lalu seksi `## Ringkasan`, `## Test case` (tabel 7 kolom: Kode · Judul · Langkah · Diharapkan · Aktual · Status · Ref), `## Temuan` (`### F-01 · [major/P1] Judul` + komentar `<!-- hanoman:{json} -->` + `**Area:**`/`**Test case:**` + blok `**Repro**` (daftar bernomor) / `**Expected**` / `**Actual**` / `**Lampiran**`), `## Lampiran`, `## Lampiran test case` (`### TC-01` + daftar). Teks bebas di-escape agar tak bisa meniru struktur: baris yang diawali `#`, `**`, atau `\` diberi awalan `\`; sel tabel meng-escape `\` dan `|` serta mengubah baris baru jadi `<br>`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `shared/src/qa-markdown.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `shared/src/qa-markdown.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -1517,12 +1517,12 @@ describe("qaTemplateMarkdown", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/qa-markdown.test.ts --no-file-parallelism`
 Expected: FAIL — modul belum ada.
 
-- [ ] **Step 3: Implementasi** — `shared/src/qa-markdown.ts`
+- [x] **Step 3: Implementasi** — `shared/src/qa-markdown.ts`
 
 ```ts
 import {
@@ -1781,12 +1781,12 @@ export function qaTemplateMarkdown(): string {
 
 Tambahkan `export * from "./qa-markdown";` di `shared/src/index.ts`.
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run shared/src/qa-markdown.test.ts shared/src/qa.test.ts --no-file-parallelism && pnpm --filter ./shared typecheck`
 Expected: PASS. Bila satu case round-trip gagal, jangan melonggarkan test — perbaiki escape/parse (kontrak: teks bebas kembali **identik**).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/qa-markdown.ts shared/src/qa-markdown.test.ts shared/src/index.ts
