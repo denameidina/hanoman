@@ -43,6 +43,17 @@ const UNWRAPPED = new Map<string, string>([
   ["GET /terminal/sessions/:id/dialog", "gerbang keputusan manusia (SPEC-899)"],
   ["POST /terminal/sessions/:id/dialog/answer", "gerbang keputusan manusia (SPEC-899)"],
   ["POST /terminal/sessions/:id/dialog/takeover", "gerbang keputusan manusia (SPEC-899)"],
+  // Workspace QA · sengaja tanpa tool: hapus tak punya jalan pulang (dilakukan manusia di dashboard),
+  // sisanya biner/multipart. Agen membaca laporan lewat hanoman_qa_report_get.
+  ["DELETE /projects/:pid/qa/reports/:rid", "destruktif — dihapus manusia di dashboard"],
+  ["DELETE /projects/:pid/qa/reports/:rid/cases/:cid", "destruktif — dihapus manusia di dashboard"],
+  ["DELETE /projects/:pid/qa/reports/:rid/findings/:fid", "destruktif — dihapus manusia di dashboard"],
+  ["POST /projects/:pid/qa/reports/:rid/attachments", "multipart"],
+  ["GET /projects/:pid/qa/reports/:rid/attachments/:aid", "biner (unduhan lampiran)"],
+  ["DELETE /projects/:pid/qa/reports/:rid/attachments/:aid", "destruktif — dihapus manusia di dashboard"],
+  ["GET /projects/:pid/qa/reports/:rid/export", "biner (ZIP) / Markdown unduhan; agen memakai hanoman_qa_report_get"],
+  ["POST /projects/:pid/qa/import", "multipart"],
+  ["GET /qa/template.md", "unduhan template untuk manusia"],
 ]);
 
 // Route yang TERCAKUP tool bercabang. Tool semacam itu memilih endpoint menurut argumen (isi `q` →

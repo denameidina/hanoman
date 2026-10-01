@@ -2352,7 +2352,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 > **Catatan urutan:** sejak Task 4 `server/test/mcp-coverage.test.ts` MERAH (route baru belum bertool) — itu gerbang yang bekerja, bukan regresi. Task ini yang menghijaukannya. Jangan menambah route `qa` lain sebelum Task ini selesai.
 
-- [ ] **Step 1: Tulis test yang gagal** — `shared/src/mcp-catalog.qa.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `shared/src/mcp-catalog.qa.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -2429,12 +2429,12 @@ describe("katalog MCP · qa", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/mcp-catalog.qa.test.ts --no-file-parallelism`
 Expected: FAIL — tool belum ada.
 
-- [ ] **Step 3: Implementasi** — `shared/src/mcp-catalog/qa.ts`
+- [x] **Step 3: Implementasi** — `shared/src/mcp-catalog/qa.ts`
 
 ```ts
 // Workspace QA · katalog tool domain `qa` (`/api/projects/:id/qa/**`). Delapan tool: baca laporan, tulis
@@ -2612,7 +2612,7 @@ export const QA_TOOLS: readonly McpToolDef[] = [
 
 `shared/src/mcp-catalog/index.ts`: `import { QA_TOOLS } from "./qa";` dan sisipkan `...QA_TOOLS,` tepat sesudah `...TEAM_TOOLS,` (sebelum `...SYSTEM_TOOLS`).
 
-- [ ] **Step 4: Daftarkan pengecualian cakupan** — `server/test/mcp-coverage.test.ts`, tambahkan ke `UNWRAPPED` (sebelum `]);`):
+- [x] **Step 4: Daftarkan pengecualian cakupan** — `server/test/mcp-coverage.test.ts`, tambahkan ke `UNWRAPPED` (sebelum `]);`):
 
 ```ts
   // Workspace QA · sengaja tanpa tool: hapus tak punya jalan pulang (dilakukan manusia di dashboard),
@@ -2628,13 +2628,13 @@ export const QA_TOOLS: readonly McpToolDef[] = [
   ["GET /qa/template.md", "unduhan template untuk manusia"],
 ```
 
-- [ ] **Step 5: Jalankan test, lalu cari daftar nama tool yang perlu diperbarui**
+- [x] **Step 5: Jalankan test, lalu cari daftar nama tool yang perlu diperbarui**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run shared/src/mcp-catalog.qa.test.ts shared/src/mcp-catalog.test.ts shared/src/mcp-catalog.docs.test.ts shared/src/mcp-catalog.team.test.ts server/test/mcp-coverage.test.ts server/test/mcp-capability.test.ts server/test/agent-tool-catalog.test.ts --no-file-parallelism && pnpm --filter ./shared typecheck`
 Expected: PASS. Bila `mcp-catalog.test.ts` menghitung jumlah tool / `mcp-catalog.docs.test.ts` menuntut dokumentasi, perbarui angka/dokumennya (itu bagian perubahan ini, bukan regresi).
 Lalu: `grep -rln "hanoman_task_unlink" --include=*.md --include=*.ts --include=*.tsx . | grep -v node_modules` — setiap berkas non-test yang mendaftar tool domain `team` (daftar tool di docs/skill `internal/skills/hanoman/SKILL.md`, `internal/docs/**`, panel Settings MCP) harus mendapat padanan `hanoman_qa_*`. Catat berkas yang diubah di pesan commit.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/mcp-catalog shared/src/mcp-catalog.qa.test.ts server/test/mcp-coverage.test.ts internal
