@@ -1,3 +1,4 @@
+import { uploadPendingQaBytes } from "./qa-attachment-transfer";
 import { prisma } from "../db";
 import {
   pull as _pull, snapshot, upsertLocal, deleteRow, isEntity, validateSyncData,
@@ -364,6 +365,9 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
       }
     }
   }
+  // Workspace QA · bagian 3 · byte lampiran menyusul SESUDAH metadatanya sampai (hub menolak PUT tanpa barisnya).
+  // Best-effort: kegagalan unggah tak boleh menggagalkan sync record, dan dicoba lagi di siklus berikutnya.
+  try { await uploadPendingQaBytes(); } catch (e) { console.warn("sync: unggah byte lampiran QA gagal —", (e as Error).message); }
   return stats;
 }
 

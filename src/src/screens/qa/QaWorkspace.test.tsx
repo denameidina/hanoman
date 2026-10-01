@@ -19,7 +19,7 @@ const detail = {
   cases: [mkCase("c1", "TC-01", "Login")],
   findings: [{
     id: "f1", reportId: "r1", code: "F-01", caseId: "c1", caseCode: "TC-01", title: "Tombol mati", severity: "major", priority: "P1",
-    area: "checkout", steps: ["buka", "klik"], expected: "ok", actual: "diam", status: "open", backlogId: null, createdAt: at, updatedAt: at,
+    area: "checkout", steps: ["buka", "klik"], expected: "ok", actual: "diam", status: "open", backlogId: null, spec: null, createdAt: at, updatedAt: at,
   }],
   attachments: [],
 };
@@ -98,6 +98,93 @@ describe("QaWorkspace", () => {
     expect(await screen.findByText("Buka kembali")).toBeTruthy();
     expect(screen.queryByText("Tambah")).toBeNull();
     expect((screen.getByText("Simpan").closest("button") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("temuan open: Kirim ke backlog → POST /backlog, lencana SPEC muncul, tombol hilang; tetap tersedia di laporan closed", async () => {
+    const sentDetail = { ...detail, findings: [{ ...detail.findings[0]!, status: "sent", backlogId: "SPEC-212", spec: { id: "SPEC-212", stage: "brainstorming", priority: "tinggi" } }] };
+    const posted: string[] = [];
+    mockFetch((u, init) => {
+      if (u.endsWith("/findings/f1/backlog") && init?.method === "POST") {
+        posted.push(u);
+        return json({ findingId: "f1", code: "F-01", created: true, spec: sentDetail.findings[0]!.spec, attachments: { saved: 0, rejected: [] }, report: sentDetail }, 201);
+      }
+      return null;
+    });
+    const toast = vi.fn();
+    renderWs({ onToast: toast });
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
+    fireEvent.click(await screen.findByText("Kirim ke backlog"));
+    expect(await screen.findByText(/SPEC-212 · brainstorming/)).toBeTruthy();
+    expect(posted).toHaveLength(1);
+    expect(screen.queryByText("Kirim ke backlog")).toBeNull();
+    expect(toast).toHaveBeenCalledWith(expect.stringMatching(/F-01 → SPEC-212 dibuat/));
+    expect((screen.getByText(/SPEC-212 · brainstorming/).closest("a") as HTMLAnchorElement).getAttribute("href")).toBe("/backlog/SPEC-212");
+  });
+
+  it("laporan closed tetap menampilkan Kirim ke backlog (pengecualian read-only); tautan putus ditandai", async () => {
+    const closed = { ...detail, status: "closed", verdict: "go" };
+    mockFetch((u) => (u.endsWith("/qa/reports/r1") ? json(closed) : null));
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
+    expect(await screen.findByText("Kirim ke backlog")).toBeTruthy();
+    expect(screen.queryByText("Temuan baru")).toBeNull();   // sisanya tetap terkunci
+  });
+
+  it("Kirim semua yang open: tombol bertanda jumlah; hasil massal dilaporkan lewat toast", async () => {
+    const posted: string[] = [];
+    mockFetch((u, init) => {
+      if (u.endsWith("/qa/reports/r1/backlog") && init?.method === "POST") {
+        posted.push(u);
+        return json({ results: [{ findingId: "f1", code: "F-01", created: true, spec: { id: "SPEC-5", stage: "brainstorming", priority: "tinggi" }, attachments: { saved: 0, rejected: [] } }], sent: 1, report: detail });
+      }
+      return null;
+    });
+    const toast = vi.fn();
+    renderWs({ onToast: toast });
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
+    fireEvent.click(await screen.findByText("Kirim semua yang open (1)"));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(toast).toHaveBeenCalledWith(expect.stringMatching(/1 temuan dikirim/));
+  });
+
+  it("Pratinjau: enam tautan unduh (ZIP, DOCX, PDF, XLSX, CSV, .md) ber-format benar", async () => {
+    mockFetch();
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    fireEvent.click(await screen.findByRole("tab", { name: /Pratinjau/ }));
+    const href = (label: string) => (screen.getByText(label).closest("a") as HTMLAnchorElement).getAttribute("href");
+    expect(href("Unduh ZIP (laporan + lampiran)")).toBe("/api/projects/p1/qa/reports/r1/export");
+    expect(href("Unduh DOCX")).toBe("/api/projects/p1/qa/reports/r1/export?format=docx");
+    expect(href("Unduh PDF")).toBe("/api/projects/p1/qa/reports/r1/export?format=pdf");
+    expect(href("Unduh XLSX")).toBe("/api/projects/p1/qa/reports/r1/export?format=xlsx");
+    expect(href("Unduh CSV (test case)")).toBe("/api/projects/p1/qa/reports/r1/export?format=csv");
+    expect(href("Unduh .md")).toBe("/api/projects/p1/qa/reports/r1/export?format=md");
+  });
+
+  it("Impor matriks: unggah ke /cases/import lalu memuat ulang laporan dan melaporkan hitungan lewat toast", async () => {
+    const posted: string[] = [];
+    mockFetch((u, init) => {
+      if (u.endsWith("/qa/reports/r1/cases/import") && init?.method === "POST") { posted.push(u); return json({ updated: 2, created: 1, unchanged: 3 }); }
+      return null;
+    });
+    const toast = vi.fn();
+    renderWs({ onToast: toast });
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    const input = await screen.findByLabelText("Berkas matriks test case");
+    fireEvent.change(input, { target: { files: [new File(["Judul\nx"], "matriks.csv", { type: "text/csv" })] } });
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Matriks diimpor: 2 diperbarui, 1 dibuat, 3 tak berubah"));
+    expect(posted).toHaveLength(1);
+  });
+
+  it("laporan closed: matriks tetap bisa diunduh, tetapi tak bisa diimpor", async () => {
+    mockFetch((u) => (u.endsWith("/qa/reports/r1") ? json({ ...detail, status: "closed", verdict: "go" }) : null));
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    expect(await screen.findByText("Unduh matriks (XLSX)")).toBeTruthy();
+    expect(screen.queryByText("Impor matriks")).toBeNull();
   });
 
   it("galat server (409/400) ditampilkan lewat onToast, bukan ditelan", async () => {

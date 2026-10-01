@@ -7,7 +7,7 @@ import { Agent, setGlobalDispatcher } from "undici";
 import { isBlockedAddress } from "./webhooks/ssrf";
 
 export type SafeRequestOptions = {
-  url: URL; method: "GET" | "POST"; headers: Record<string, string>; body?: Buffer;
+  url: URL; method: "GET" | "POST" | "PUT"; headers: Record<string, string>; body?: Buffer;
   allowPrivate: boolean; connectMs: number; totalMs: number; maxResponseBytes: number;
   // SPEC-885 · ADR-0138 · dekompresi OPT-IN, default MATI. Modul ini juga melayani webhook keluar
   // (ADR-0100) di balik penjaga SSRF; menyalakan gunzip untuk semua pemanggil memperlebar

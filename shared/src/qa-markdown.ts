@@ -92,6 +92,7 @@ export function renderQaMarkdown(
     L.push(`### ${f.code} · [${f.severity}/${f.priority}] ${oneLine(f.title)}`, ...(pv ? [] : [`<!-- hanoman:${meta} -->`]), "");
     if (f.area) L.push(`**Area:** ${oneLine(f.area)}`, "");
     if (f.caseCode) L.push(`**Test case:** ${f.caseCode}`, "");
+    if (f.backlogId) L.push(`**Backlog:** ${f.backlogId}${f.spec ? ` · ${f.spec.stage}` : ""}`, "");
     L.push("**Repro**", "", ...(f.steps.length ? f.steps.map((t, i) => `${i + 1}. ${oneLine(t)}`) : []), "");
     L.push("**Expected**", "", esc(f.expected), "", "**Actual**", "", esc(f.actual), "");
     const a = att("finding", f.id);
@@ -249,7 +250,7 @@ const GUIDE = [
 export function qaTemplateMarkdown(): string {
   const at = new Date(0).toISOString();
   const caseRow = { id: "", reportId: "", code: "TC-01", title: "Contoh: login dengan akun valid", steps: "1. Buka /login\n2. Isi email & kata sandi\n3. Klik Masuk", expected: "Masuk ke dashboard", actual: "Masuk ke dashboard", status: "pass" as const, order: 1, createdAt: at, updatedAt: at };
-  const finding = { id: "", reportId: "", code: "F-01", caseId: null, caseCode: "TC-01", title: "Contoh: tombol Masuk tidak bereaksi di Safari", severity: "major" as const, priority: "P1" as const, area: "auth", steps: ["Buka /login di Safari 18", "Isi kredensial valid", "Klik Masuk"], expected: "Masuk ke dashboard", actual: "Tidak ada reaksi; konsol menampilkan TypeError", status: "open" as const, backlogId: null, createdAt: at, updatedAt: at };
+  const finding = { id: "", reportId: "", code: "F-01", caseId: null, caseCode: "TC-01", title: "Contoh: tombol Masuk tidak bereaksi di Safari", severity: "major" as const, priority: "P1" as const, area: "auth", steps: ["Buka /login di Safari 18", "Isi kredensial valid", "Klik Masuk"], expected: "Masuk ke dashboard", actual: "Tidak ada reaksi; konsol menampilkan TypeError", status: "open" as const, backlogId: null, spec: null, createdAt: at, updatedAt: at };
   const d: QaReportDetail = {
     id: "", projectId: "", code: "QA-001", title: "Judul laporan — mis. Smoke test rilis 1.0", buildVersion: "1.0.0",
     environment: { os: "macOS 15", browser: "Chrome 130", device: "MacBook Pro", url: "https://staging.example.com", branch: "main" },

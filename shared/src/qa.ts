@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Priority, Severity } from "./spec-source";
 
 // Workspace QA · bagian 1 · kontrak murni. Nol I/O: dipakai server (validasi + serialisasi), tool
 // MCP, dan UI dari satu sumber.
@@ -106,19 +107,26 @@ export function qaStats(
   return { cases: c, passRate: executed ? c.pass / executed : null, findings: f };
 }
 
+/** Per MESIN (kolom LOCAL): local-only = byte hanya di sini, belum diunggah ke hub · remote = metadata ada, byte
+ * belum diunduh · available = byte ada di sini (di client: dan terkonfirmasi di hub) · failed = hub menolak byte-nya. */
+export type QaAttachmentSyncState = "local-only" | "remote" | "available" | "failed";
 export type QaAttachmentView = {
   id: string; reportId: string; ownerType: QaOwnerType; ownerId: string;
   filename: string; mimeType: string; size: number; sha256: string;
-  syncState: "local-only"; createdAt: string;
+  syncState: QaAttachmentSyncState; createdAt: string;
 };
 export type QaCaseView = {
   id: string; reportId: string; code: string; title: string; steps: string; expected: string;
   actual: string; status: QaCaseStatus; order: number; createdAt: string; updatedAt: string;
 };
+/** Cermin backlog hasil "kirim ke backlog", dihitung saat BACA (cermin TaskView.spec) — tak pernah disimpan. */
+export type QaFindingSpecMirror = { id: string; stage: string; priority: string };
 export type QaFindingView = {
   id: string; reportId: string; code: string; caseId: string | null; caseCode: string | null;
   title: string; severity: QaSeverity; priority: QaPriority; area: string; steps: string[];
   expected: string; actual: string; status: QaFindingStatus; backlogId: string | null;
+  /** `backlogId` terisi dengan `spec` null = tautan PUTUS (backlognya sudah dihapus). */
+  spec: QaFindingSpecMirror | null;
   createdAt: string; updatedAt: string;
 };
 export type QaReportView = {
@@ -135,3 +143,26 @@ export type QaImportResult = {
   reportId: string; created: boolean; cases: number; findings: number;
   attachments: { saved: number; rejected: { filename: string; reason: string }[] };
 };
+
+// ── pemetaan ke backlog (bagian 2) ────────────────────────────────────────
+// SENGAJA lossy dan dinyatakan: payload backlog `qa` hanya punya critical|major|minor dan prioritas
+// tiga nilai. Severity & prioritas QA asli ikut ditulis ke teks backlog supaya tak hilang.
+export function qaSeverityToSpec(s: QaSeverity): Severity {
+  return s === "blocker" || s === "critical" ? "critical" : s === "major" ? "major" : "minor";
+}
+export function qaPriorityToSpec(p: QaPriority): Priority {
+  return p === "P0" || p === "P1" ? "tinggi" : p === "P2" ? "sedang" : "rendah";
+}
+
+export type QaBacklogResult = {
+  findingId: string; code: string; created: boolean;
+  spec: QaFindingSpecMirror | null;
+  attachments: { saved: number; rejected: { filename: string; reason: string }[] };
+  error?: string;
+};
+
+/** Hasil impor matriks test case (XLSX/CSV). `unchanged` = baris ber-Ref yang isinya sama persis. */
+export type QaCasesImportResult = { updated: number; created: number; unchanged: number };
+export const QA_EXPORT_FORMATS = ["zip", "md", "docx", "pdf", "xlsx", "csv"] as const;
+export type QaExportFormat = (typeof QA_EXPORT_FORMATS)[number];
+

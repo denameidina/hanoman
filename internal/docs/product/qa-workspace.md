@@ -32,10 +32,32 @@ Seret berkas ke area lampiran, pilih lewat tombol **Lampirkan**, atau **tempel s
 atas temuan/test case. Tipe: png, jpg, webp, pdf, md, txt, log, json, csv. Batas 10 MB per berkas, 30 berkas
 dan 100 MB per laporan. Berkas yang ditolak dilaporkan per nama dengan alasannya; yang lain tetap masuk.
 
+## Dari temuan ke perbaikan (backlog)
+
+Tombol **Kirim ke backlog** di tiap temuan `open` membuat backlog item (jenis QA) berisi judul, langkah repro,
+expected/actual, lingkungan, dan screenshot temuan sebagai konteks agen. **Kirim semua yang open** melakukannya
+sekaligus (temuan `wontfix` dilewati). Temuan lalu berstatus `sent` dan menampilkan lencana `SPEC-n · stage`
+yang membuka Backlog, jadi progres perbaikan terlihat dari laporan QA.
+
+- Pemetaan sengaja kasar: severity blocker/critical → critical, minor/trivial → minor; P0/P1 → tinggi,
+  P2 → sedang, P3 → rendah. Severity dan prioritas QA yang asli tetap tertulis di isi backlog.
+- Mengirim dua kali tidak membuat backlog kedua. Bila backlognya dihapus, tombol muncul lagi (tautan putus).
+- Boleh dilakukan dari laporan `closed` — alurnya wajar: submit → putuskan go/no-go → close → kirim temuan.
+- Mengirim **tidak** menjalankan agen; peluncuran sesi tetap tindakan terpisah.
+
 ## Template, ekspor, impor
 
 - **Unduh template** → `qa-template.md`: front-matter + satu contoh test case dan temuan + panduan
   pengisian. Isi lalu **Impor**.
+- **DOCX** dan **PDF** (tab Pratinjau) untuk dibaca atau diserahkan: ringkasan angka, tabel test case berwarna
+  per status, temuan lengkap, dan screenshot **tertanam** di dalam dokumen.
+- **XLSX** berisi tiga sheet (Ringkasan, Test case, Temuan); **CSV** hanya matriks test case. Untuk Excel gunakan
+  XLSX — CSV berkoma dibuka Excel berlokal Indonesia dalam satu kolom (impor tetap menerima CSV bertitik-koma).
+- **Matriks test case dua arah:** tab Test case → *Unduh matriks (XLSX)*, isi hasil di spreadsheet (kolom Status,
+  Aktual, dst.), lalu *Impor matriks*. Baris ber-`Ref` memperbarui test case yang ada; baris tanpa `Ref` menjadi
+  test case baru. Kolom yang tidak ada dibiarkan; sel kosong pada kolom yang ada mengosongkan nilai. Status boleh
+  berbahasa Indonesia (lulus, gagal, terblokir, dilewati, belum). Satu baris salah menggagalkan seluruh impor
+  dengan pesan "baris N: …" — tidak ada yang tertulis setengah-setengah.
 - **Ekspor ZIP** (di editor dan tab Pratinjau) → `report.md` + folder `attachments/` dengan tautan relatif;
   terbaca di editor Markdown mana pun, gambar tampil langsung. **Unduh .md** hanya dokumennya.
 - **Impor** menerima `.zip` atau `.md`. Berkas hasil ekspor yang diimpor kembali ke project yang sama
@@ -44,13 +66,28 @@ dan 100 MB per laporan. Berkas yang ditolak dilaporkan per nama dengan alasannya
 - Kolom **Ref** dan komentar `<!-- hanoman:… -->` di file adalah id internal untuk impor — biarkan apa
   adanya, kosongkan untuk entri baru.
 
+## Sinkronisasi antar perangkat
+
+Laporan QA ikut tersinkron antara hanoman lokal dan server (hub), dua arah: header laporan, test case, temuan, dan
+lampiran. Dikerjakan di laptop, dibaca tim di server — dan sebaliknya.
+
+- **Lampiran** (screenshot, log, PDF) disinkronkan terpisah dari data laporan. Penanda kecil di samping lampiran:
+  *menunggu unggah* (baru ada di perangkat ini; diunggah pada sinkronisasi berikutnya), *di server · belum diunduh*
+  (dibuat di perangkat lain; **diunduh otomatis saat dibuka atau diekspor**), *gagal diunggah* (server menolak isinya —
+  hapus dan unggah ulang). Tanpa penanda = tersedia.
+- Server memverifikasi ukuran, hash, dan tipe tiap berkas sebelum menyimpannya.
+- Dua orang mengubah laporan yang sama bersamaan: konflik muncul di dialog rekonsiliasi sinkronisasi, seperti data lain.
+- Menghapus laporan/temuan/lampiran di satu sisi menghapusnya di sisi lain. Berkas di perangkat lain tidak dibuang otomatis.
+- **Urutan rilis:** naikkan versi server (hub) lebih dulu, baru perangkat. Perangkat baru yang mengirim laporan QA ke
+  server lama ditolak per-record (aman, sembuh sendiri setelah server dinaikkan).
+
 ## Nomor tampil
 
 `QA-007`, `F-01`, `TC-03` dihitung dari urutan pembuatan, bukan disimpan. Setelah sinkronisasi antar
-perangkat (menyusul), nomor bisa bergeser bila ada baris lebih tua yang masuk dari perangkat lain.
+perangkat, nomor bisa bergeser bila ada baris lebih tua yang masuk dari perangkat lain.
 **Ekspor membekukan nomor pada saat ekspor**; gunakan ekspor bila nomor harus dirujuk di tempat lain.
 
 ## Agen (MCP)
 
 Agen yang diberi capability `qa:read`/`qa:write` dapat membaca laporan dan menulis laporan, test case, dan
-temuan lewat tool `hanoman_qa_*`. Menghapus dan lampiran/ZIP tetap tindakan manusia di dashboard.
+temuan lewat tool `hanoman_qa_*` — termasuk mengirim temuan ke backlog. Menghapus dan lampiran/ZIP tetap tindakan manusia di dashboard.

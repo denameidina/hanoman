@@ -52,7 +52,7 @@ export function QaReportEditor({ detail, projectId, onChange, onBack, onDeleted,
   const panel: PanelProps = { detail, projectId, locked, onChange, onToast };
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0, 1fr)" }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <Button variant="ghost" leftIcon="arrow-left" onClick={onBack}>Kembali</Button>
         <Badge tone="brass" variant="outline">{detail.code}</Badge>

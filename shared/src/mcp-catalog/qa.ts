@@ -1,4 +1,4 @@
-// Workspace QA · katalog tool domain `qa` (`/api/projects/:id/qa/**`). Delapan tool: baca laporan, tulis
+// Workspace QA · katalog tool domain `qa` (`/api/projects/:id/qa/**`). Sepuluh tool: baca laporan, tulis
 // laporan/test case/temuan. SENGAJA tanpa tool hapus/lampiran/ekspor/impor (lihat UNWRAPPED di
 // server/test/mcp-coverage.test.ts): hapus tak punya jalan pulang, lampiran & ZIP adalah biner.
 //
@@ -166,6 +166,32 @@ export const QA_TOOLS: readonly McpToolDef[] = [
     inputSchema: obj({ properties: { project: PROJECT, report: REPORT, finding: FINDING, ...FINDING_FIELDS }, required: ["project", "report", "finding"] }),
     mode: "write", capability: "qa:write", samplePath: "/projects/p1/qa/reports/r1/findings/f1", sampleMethod: "PATCH",
     build: (a) => ({ method: "PATCH", path: `${one(a)}/findings/${enc(String(a.finding))}`, body: findingBody(a) }),
+    shape: (raw) => raw,
+  },
+  {
+    name: "hanoman_qa_finding_to_backlog",
+    title: "Kirim temuan QA ke backlog",
+    description:
+      "Membuat backlog item (`source: qa`) dari satu temuan: judul, repro, expected/actual, lingkungan, dan lampiran temuan ikut sebagai konteks agen. Temuan jadi `sent` dan menyimpan `backlogId`; hasil `findings[].spec` menampilkan stage backlog-nya. IDEMPOTEN: temuan yang sudah dikirim menjawab 200 `created: false` dengan spec yang sama. Pemetaan LOSSY: severity blocker/critical→critical, minor/trivial→minor; P0/P1→tinggi, P2→sedang, P3→rendah (severity & prioritas QA asli tetap tertulis di teks backlog). Ini TIDAK membuka sesi agen; Spec-nya lahir tanpa persetujuan peluncuran bila token tak memegang `sessions:write`. Laporan `closed` tetap boleh (hanya tautan yang berubah).",
+    inputSchema: obj({
+      properties: { project: PROJECT, report: REPORT, finding: FINDING, priority: enumStr(["tinggi", "sedang", "rendah"], "Timpa prioritas backlog. Tanpa ini: diturunkan dari prioritas P0–P3 temuan.") },
+      required: ["project", "report", "finding"],
+    }),
+    mode: "write", capability: "qa:write", samplePath: "/projects/p1/qa/reports/r1/findings/f1/backlog", sampleMethod: "POST",
+    build: (a) => ({ method: "POST", path: `${one(a)}/findings/${enc(String(a.finding))}/backlog`, body: s(a.priority) ? { priority: s(a.priority) } : {} }),
+    shape: (raw) => raw,
+  },
+  {
+    name: "hanoman_qa_report_to_backlog",
+    title: "Kirim semua temuan open ke backlog",
+    description:
+      "Mengirim SEMUA temuan berstatus `open` sebuah laporan ke backlog sekaligus (`wontfix` dan yang sudah `sent` dilewati). Jawabannya `results` per temuan (satu yang gagal tak menggagalkan yang lain) dan `sent` = jumlah backlog baru. Semantik per temuan sama dengan hanoman_qa_finding_to_backlog.",
+    inputSchema: obj({
+      properties: { project: PROJECT, report: REPORT, priority: enumStr(["tinggi", "sedang", "rendah"], "Timpa prioritas SEMUA backlog yang dibuat. Tanpa ini: diturunkan per temuan.") },
+      required: ["project", "report"],
+    }),
+    mode: "write", capability: "qa:write", samplePath: "/projects/p1/qa/reports/r1/backlog", sampleMethod: "POST",
+    build: (a) => ({ method: "POST", path: `${one(a)}/backlog`, body: s(a.priority) ? { priority: s(a.priority) } : {} }),
     shape: (raw) => raw,
   },
 ];

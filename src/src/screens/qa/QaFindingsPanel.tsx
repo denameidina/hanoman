@@ -37,6 +37,25 @@ export function QaFindingsPanel(p: PanelProps) {
       setDraft(null);
     } catch (e) { p.onToast?.(errText(e)); }
   };
+  // Kirim ke backlog TETAP tersedia di laporan closed (pengecualian read-only: hanya tautan yang berubah).
+  const noteRejected = (r: { attachments: { rejected: { filename: string; reason: string }[] } }) =>
+    r.attachments.rejected.length ? ` · lampiran ditolak: ${r.attachments.rejected.map((x) => `${x.filename} (${x.reason})`).join(", ")}` : "";
+  const send = async (f: QaFindingView) => {
+    try {
+      const r = await api.sendQaFindingToBacklog(p.projectId, p.detail.id, f.id);
+      p.onChange(r.report);
+      p.onToast?.(`${f.code} → ${r.spec?.id ?? "backlog"}${r.created ? " dibuat" : " sudah ada"}${noteRejected(r)}`);
+    } catch (e) { p.onToast?.(errText(e)); }
+  };
+  const sendAll = async () => {
+    try {
+      const r = await api.sendQaReportToBacklog(p.projectId, p.detail.id);
+      p.onChange(r.report);
+      const failed = r.results.filter((x) => x.error);
+      p.onToast?.(`${r.sent} temuan dikirim ke backlog${failed.length ? ` · ${failed.length} gagal: ${failed.map((x) => `${x.code} (${x.error})`).join(", ")}` : ""}`);
+    } catch (e) { p.onToast?.(errText(e)); }
+  };
+  const openCount = p.detail.findings.filter((f) => f.status === "open").length;
   const remove = async (f: QaFindingView) => {
     if (!(await confirm({ title: `Hapus ${f.code}?`, message: f.title, tone: "danger", confirmLabel: "Hapus" }))) return;
     try { p.onChange(await api.deleteQaFinding(p.projectId, p.detail.id, f.id)); } catch (e) { p.onToast?.(errText(e)); }
@@ -46,7 +65,10 @@ export function QaFindingsPanel(p: PanelProps) {
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {!p.locked && <div><Button leftIcon="bug" onClick={() => setDraft({ ...blank })}>Temuan baru</Button></div>}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {!p.locked && <Button leftIcon="bug" onClick={() => setDraft({ ...blank })}>Temuan baru</Button>}
+        {openCount > 0 && <Button variant="secondary" leftIcon="git-fork" onClick={() => void sendAll()}>{`Kirim semua yang open (${openCount})`}</Button>}
+      </div>
       {p.detail.findings.length === 0 && <StateBlock kind="empty" compact title="Belum ada temuan" hint="Satu temuan = satu masalah, lengkap dengan langkah repro yang bisa diulang." />}
       {p.detail.findings.map((f) => (
         <Card key={f.id} padding={14}>
@@ -57,7 +79,12 @@ export function QaFindingsPanel(p: PanelProps) {
             {f.status !== "open" && <Badge tone="info" size="sm">{f.status}</Badge>}
             {f.area && <span style={{ fontSize: 12.5, color: "var(--text-subtle)" }}>{f.area}</span>}
             {f.caseCode && <span style={{ fontSize: 12.5, color: "var(--text-subtle)" }}>· {f.caseCode}</span>}
+            {f.spec && <a href={`/backlog/${encodeURIComponent(f.spec.id)}`} style={{ textDecoration: "none" }}><Badge tone="ok" size="sm">{`${f.spec.id} · ${f.spec.stage}`}</Badge></a>}
+            {f.backlogId && !f.spec && <Badge tone="warn" size="sm">{`${f.backlogId} · tautan putus`}</Badge>}
             <span style={{ flex: 1 }} />
+            {(f.status === "open" || (f.backlogId && !f.spec)) && (
+              <Button size="sm" variant="secondary" leftIcon="git-fork" onClick={() => void send(f)}>Kirim ke backlog</Button>
+            )}
             {!p.locked && (
               <>
                 <Button size="sm" variant="secondary" onClick={() => setDraft(fromFinding(f))}>Ubah</Button>

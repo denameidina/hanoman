@@ -47,6 +47,7 @@ import tasks from "./routes/tasks";
 import qa from "./routes/qa";
 import qaAttachments from "./routes/qa-attachments";
 import qaTransfer from "./routes/qa-transfer";
+import qaBacklog from "./routes/qa-backlog";
 import githubIssues from "./routes/github-issues";
 import telegram from "./routes/telegram";
 import webhooks from "./routes/webhooks";
@@ -306,6 +307,7 @@ export function buildApp(
     await api.register(qa);           // Workspace QA · laporan/test case/temuan per project (capability `qa`)
     await api.register(qaAttachments); // Workspace QA · lampiran laporan/test case/temuan (capability `qa`)
     await api.register(qaTransfer);   // Workspace QA · template, ekspor ZIP, impor (capability `qa`)
+    await api.register(qaBacklog);    // Workspace QA · temuan → backlog item (capability `qa`)
   }, { prefix: "/api" });
 
   // Prod: serve the built dashboard from one process; SPA-fallback to

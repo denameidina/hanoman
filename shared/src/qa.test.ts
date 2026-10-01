@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  assignCodes, qaStats, zCreateQaCase, zCreateQaFinding, zCreateQaReport, zPatchQaReport,
+  assignCodes, qaPriorityToSpec, qaSeverityToSpec, qaStats, zCreateQaCase, zCreateQaFinding, zCreateQaReport, zPatchQaReport,
 } from "./qa";
 
 describe("zCreateQaReport", () => {
@@ -67,5 +67,21 @@ describe("qaStats", () => {
   });
   it("passRate null bila belum ada yang dieksekusi", () => {
     expect(qaStats([{ status: "todo" }], []).passRate).toBeNull();
+  });
+});
+
+describe("pemetaan QA → backlog (lossy, dinyatakan)", () => {
+  it("severity lima tingkat → tiga tingkat payload qa", () => {
+    expect(qaSeverityToSpec("blocker")).toBe("critical");
+    expect(qaSeverityToSpec("critical")).toBe("critical");
+    expect(qaSeverityToSpec("major")).toBe("major");
+    expect(qaSeverityToSpec("minor")).toBe("minor");
+    expect(qaSeverityToSpec("trivial")).toBe("minor");
+  });
+  it("prioritas P0–P3 → tinggi/sedang/rendah", () => {
+    expect(qaPriorityToSpec("P0")).toBe("tinggi");
+    expect(qaPriorityToSpec("P1")).toBe("tinggi");
+    expect(qaPriorityToSpec("P2")).toBe("sedang");
+    expect(qaPriorityToSpec("P3")).toBe("rendah");
   });
 });

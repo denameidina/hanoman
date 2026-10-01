@@ -6,6 +6,8 @@ import {
 import { prisma } from "../db";
 import { asJson, listReports, reportDetail } from "../services/qa";
 import { removeQaAttachments } from "../services/qa-attachment";
+import { deleteSynced } from "../services/sync-delete";
+import { notifySynced } from "../services/sync-notify";
 
 // Workspace QA · CRUD laporan/test case/temuan. LOCAL-only di bagian 1: sengaja TANPA
 // `notifySynced` (entitas belum masuk FIELDS sync). Capability `qa:*` dipetakan menurut METHOD di
@@ -18,7 +20,11 @@ const locked = (reply: FastifyReply) =>
   reply.code(409).send({ error: "laporan sudah closed — buka kembali (status=draft) sebelum mengubahnya" });
 
 const findReport = (pid: string, rid: string) => prisma.qaReport.findFirst({ where: { id: rid, projectId: pid } });
-const touch = (rid: string) => prisma.qaReport.update({ where: { id: rid }, data: { updatedAt: new Date() } });
+// Mengubah anak = mengubah laporan (updatedAt-nya jam LWW peer): diterbitkan juga, bukan hanya diperbarui lokal.
+const touch = async (rid: string) => {
+  await prisma.qaReport.update({ where: { id: rid }, data: { updatedAt: new Date() } });
+  await notifySynced("qaReport", rid);
+};
 
 // Path ditulis LITERAL di tiap `app.<method>("…")`: `server/test/mcp-coverage.test.ts` membaca inventaris route
 // dengan regex dari sumber, dan path berbentuk variabel/template tak pernah terhitung (gerbang hijau palsu).
@@ -42,6 +48,7 @@ export default async function qa(app: FastifyInstance) {
       projectId: pid, title: p.title, buildVersion: p.buildVersion, environment: asJson(p.environment),
       scope: p.scope, tester: p.tester, summary: p.summary, verdict: p.verdict,
     } });
+    await notifySynced("qaReport", row.id);
     return reply.code(201).send(await reportDetail(pid, row.id));
   });
 
@@ -73,6 +80,7 @@ export default async function qa(app: FastifyInstance) {
       verdict: p.verdict, status: p.status,
       environment: p.environment === undefined ? undefined : asJson(p.environment),
     } });
+    await notifySynced("qaReport", rid);
     return reportDetail(pid, rid);
   });
 
@@ -83,7 +91,7 @@ export default async function qa(app: FastifyInstance) {
     if (existing.status === "closed") return locked(reply);
     // Cascade DB tak menyentuh disk: bayt lampiran dibuang SEBELUM barisnya.
     await removeQaAttachments({ reportId: rid });
-    await prisma.qaReport.delete({ where: { id: rid } });
+    await deleteSynced("qaReport", rid);     // anak lain ikut cascade DB di sini DAN di setiap penerima
     return { ok: true };
   });
 
@@ -97,10 +105,11 @@ export default async function qa(app: FastifyInstance) {
     if (!parsed.success) return bad(reply, parsed.error);
     const p = parsed.data;
     const last = await prisma.qaCase.findFirst({ where: { reportId: rid }, orderBy: { order: "desc" }, select: { order: true } });
-    await prisma.qaCase.create({ data: {
+    const row = await prisma.qaCase.create({ data: {
       reportId: rid, title: p.title, steps: p.steps, expected: p.expected, actual: p.actual,
       status: p.status, order: p.order ?? (last ? last.order + 1 : 1),
     } });
+    await notifySynced("qaCase", row.id);
     await touch(rid);
     return reply.code(201).send(await reportDetail(pid, rid));
   });
@@ -114,6 +123,7 @@ export default async function qa(app: FastifyInstance) {
     const parsed = zPatchQaCase.safeParse(req.body ?? {});
     if (!parsed.success) return bad(reply, parsed.error);
     await prisma.qaCase.update({ where: { id: cid }, data: parsed.data });
+    await notifySynced("qaCase", cid);
     await touch(rid);
     return reportDetail(pid, rid);
   });
@@ -125,10 +135,11 @@ export default async function qa(app: FastifyInstance) {
       return notFound(reply);
     if (r.status === "closed") return locked(reply);
     await removeQaAttachments({ reportId: rid, ownerType: "case", ownerId: cid });
-    await prisma.$transaction([
-      prisma.qaFinding.updateMany({ where: { reportId: rid, caseId: cid }, data: { caseId: null } }),
-      prisma.qaCase.delete({ where: { id: cid } }),
-    ]);
+    // Temuan yang menunjuknya dilepas (bukan dihapus) — dan DITERBITKAN ulang, kalau tidak peer tetap melihat caseId lama.
+    const orphaned = await prisma.qaFinding.findMany({ where: { reportId: rid, caseId: cid }, select: { id: true } });
+    await prisma.qaFinding.updateMany({ where: { reportId: rid, caseId: cid }, data: { caseId: null } });
+    for (const f of orphaned) await notifySynced("qaFinding", f.id);
+    await deleteSynced("qaCase", cid);
     await touch(rid);
     return reportDetail(pid, rid);
   });
@@ -150,10 +161,11 @@ export default async function qa(app: FastifyInstance) {
     const p = parsed.data;
     const problem = await caseProblem(rid, p.caseId);
     if (problem) return reply.code(400).send(problem);
-    await prisma.qaFinding.create({ data: {
+    const row = await prisma.qaFinding.create({ data: {
       reportId: rid, caseId: p.caseId, title: p.title, severity: p.severity, priority: p.priority,
       area: p.area, steps: asJson(p.steps), expected: p.expected, actual: p.actual, status: p.status,
     } });
+    await notifySynced("qaFinding", row.id);
     await touch(rid);
     return reply.code(201).send(await reportDetail(pid, rid));
   });
@@ -174,6 +186,7 @@ export default async function qa(app: FastifyInstance) {
       steps: p.steps === undefined ? undefined : asJson(p.steps), expected: p.expected, actual: p.actual,
       status: p.status,
     } });
+    await notifySynced("qaFinding", fid);
     await touch(rid);
     return reportDetail(pid, rid);
   });
@@ -185,7 +198,7 @@ export default async function qa(app: FastifyInstance) {
       return notFound(reply);
     if (r.status === "closed") return locked(reply);
     await removeQaAttachments({ reportId: rid, ownerType: "finding", ownerId: fid });
-    await prisma.qaFinding.delete({ where: { id: fid } });
+    await deleteSynced("qaFinding", fid);
     await touch(rid);
     return reportDetail(pid, rid);
   });

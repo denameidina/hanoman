@@ -16,7 +16,7 @@ describe("sync exclusions — preferensi lokal tak tersync (SPEC-213 AC-30)", ()
     }
   });
 
-  it("SYNCED is exactly the authoritative entities (SPEC-272: +ticketAttachment; SPEC-384: −errorGroup; SPEC-450: +customAgent; SPEC-471: +githubIssue; SPEC-945: +member, +task)", () => {
+  it("SYNCED is exactly the authoritative entities (SPEC-272: +ticketAttachment; SPEC-384: −errorGroup; SPEC-450: +customAgent; SPEC-471: +githubIssue; SPEC-945: +member, +task; Workspace QA: +qaReport, +qaCase, +qaFinding, +qaAttachment)", () => {
     // SPEC-450 · ADR-0094 · `customAgent` ikut menyeberang: katalog persona adalah pengetahuan
     // bersama, dan id-nya deterministik justru supaya dua mesin yang membuat nama sama bertemu
     // sebagai SATU baris di sini, bukan dua yang saling menelan di objek JSON berkunci nama.
@@ -24,8 +24,10 @@ describe("sync exclusions — preferensi lokal tak tersync (SPEC-213 AC-30)", ()
     // triase-nya adalah pengetahuan bersama, id-nya deterministik "<projectId>:<slug>#<n>".
     // SPEC-945 · ADR-0150 · `member` & `task` ikut: papan tim adalah pengetahuan bersama, dan
     // `Member.id` deterministik dari email dengan alasan yang sama persis.
+    // Workspace QA · bagian 3 · laporan QA (dan lampirannya — metadata saja; byte lewat endpoint terpisah)
+    // adalah pengetahuan bersama: dikerjakan di laptop, dibaca tim di hub.
     expect([...SYNCED].sort()).toEqual(
-      ["customAgent", "githubIssue", "member", "project", "sessionResult", "spec", "task", "ticket", "ticketAttachment", "vps"],
+      ["customAgent", "githubIssue", "member", "project", "qaAttachment", "qaCase", "qaFinding", "qaReport", "sessionResult", "spec", "task", "ticket", "ticketAttachment", "vps"],
     );
   });
 

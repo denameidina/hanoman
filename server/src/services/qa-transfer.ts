@@ -5,7 +5,8 @@ import {
 import { prisma } from "../db";
 import { asJson, reportDetail } from "./qa";
 import { QA_ATTACHMENT_LIMITS, addQaAttachments, type QaUpload } from "./qa-attachment";
-import { readUpload } from "./uploads";
+import { readQaAttachmentBytes } from "./qa-attachment-transfer";
+import { notifySynced } from "./sync-notify";
 import { ZipError, readZip, writeZip } from "./zip";
 
 // Workspace QA · ekspor ZIP (report.md + attachments/) dan impor (upsert). Bentuk Markdown-nya milik
@@ -36,8 +37,7 @@ export async function exportReport(projectId: string, reportId: string) {
   const seq = new Map<string, number>();
   const present = [];
   for (const a of full.attachments) {
-    const row = await prisma.qaAttachment.findUnique({ where: { id: a.id }, select: { storageKey: true } });
-    const data = row ? await readUpload(row.storageKey).catch(() => null) : null;
+    const data = await readQaAttachmentBytes(a.id);
     if (!data) continue;                       // byte hilang dari disk — jangan tautkan yang tak ada
     const owner = codeOf(a.ownerType, a.ownerId);
     const n = (seq.get(owner) ?? 0) + 1;
@@ -88,6 +88,7 @@ export async function importReport(projectId: string, file: { name: string; buf:
 
   const now = Date.now();
   const owners: { ownerType: "report" | "case" | "finding"; ownerId: string; paths: string[] }[] = [];
+  const touched = { cases: [] as string[], findings: [] as string[] };   // diterbitkan ke peer SESUDAH transaksi
   const out = await prisma.$transaction(async (tx) => {
     const data = {
       title: parsed.title, buildVersion: parsed.buildVersion, environment: asJson(parsed.environment),
@@ -109,6 +110,7 @@ export async function importReport(projectId: string, file: { name: string; buf:
         : await tx.qaCase.create({ data: { reportId: report.id, ...fields, createdAt: new Date(now + 1 + idx) } });
       if (c.id) caseByFileId.set(c.id, row.id);
       caseByCode.set(c.code, row.id);
+      touched.cases.push(row.id);
       owners.push({ ownerType: "case", ownerId: row.id, paths: c.attachments });
     }
 
@@ -123,10 +125,15 @@ export async function importReport(projectId: string, file: { name: string; buf:
       const row = f.id && knownFindings.has(f.id)
         ? await tx.qaFinding.update({ where: { id: f.id }, data: fields })
         : await tx.qaFinding.create({ data: { reportId: report.id, ...fields, createdAt: new Date(now + 1 + idx) } });
+      touched.findings.push(row.id);
       owners.push({ ownerType: "finding", ownerId: row.id, paths: f.attachments });
     }
     return report;
   });
+  // Induk SEBELUM anak (urutan yang sama dengan BOOTSTRAP_ORDER); lampiran diterbitkan per berkas oleh addQaAttachments.
+  await notifySynced("qaReport", out.id);
+  for (const id of touched.cases) await notifySynced("qaCase", id);
+  for (const id of touched.findings) await notifySynced("qaFinding", id);
 
   // Lampiran SESUDAH transaksi: byte lewat pipeline unggahan (async + pemindaian), tak boleh menahan DB.
   let saved = 0;

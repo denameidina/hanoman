@@ -2,7 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { QA_OWNER_TYPES, type QaOwnerType } from "@hanoman/shared";
 import { prisma } from "../db";
 import { QA_ATTACHMENT_LIMITS, addQaAttachments, ownerExists, removeQaAttachments, type QaUpload } from "../services/qa-attachment";
-import { readUpload } from "../services/uploads";
+import { notifySynced } from "../services/sync-notify";
+import { readQaAttachmentBytes } from "../services/qa-attachment-transfer";
 
 // Workspace QA · lampiran. Capability `qa:*` dari prefix `/projects/:id/qa` (`capabilityForRoute`).
 // Batas multipart dipasang PER-REQUEST (registrasi global milik lampiran gambar SPEC-816 tak boleh naik).
@@ -37,6 +38,7 @@ export default async function qaAttachments(app: FastifyInstance) {
 
     const result = await addQaAttachments(report, { ownerType: q.ownerType as QaOwnerType, ownerId: q.ownerId }, files);
     await prisma.qaReport.update({ where: { id: rid }, data: { updatedAt: new Date() } });
+    await notifySynced("qaReport", rid);     // lampiran sendiri sudah diterbitkan per berkas di addQaAttachments
     return reply.code(201).send(result);
   });
 
@@ -44,8 +46,9 @@ export default async function qaAttachments(app: FastifyInstance) {
     const { pid, rid, aid } = req.params as Ids;
     const a = await prisma.qaAttachment.findFirst({ where: { id: aid, reportId: rid, projectId: pid } });
     if (!a) return reply.code(404).send({ error: "not found" });
-    const buf = await readUpload(a.storageKey).catch(() => null);
-    if (!buf) return reply.code(404).send({ error: "not found" });
+    // Fetch-through: lampiran buatan mesin lain ditarik dari hub saat pertama dibuka, lalu di-cache (bagian 3).
+    const buf = await readQaAttachmentBytes(a.id);
+    if (!buf) return reply.code(404).send({ error: "lampiran belum tersedia di mesin ini" });
     const forceDownload = (req.query as { download?: string }).download === "1";
     const inline = INLINE.has(a.mimeType) && !forceDownload;
     reply.header("content-type", a.mimeType);
@@ -62,6 +65,8 @@ export default async function qaAttachments(app: FastifyInstance) {
       return reply.code(404).send({ error: "not found" });
     if (report.status === "closed") return reply.code(409).send({ error: "laporan sudah closed" });
     await removeQaAttachments({ id: aid });
+    await prisma.qaReport.update({ where: { id: rid }, data: { updatedAt: new Date() } });
+    await notifySynced("qaReport", rid);
     return { ok: true };
   });
 }

@@ -1806,12 +1806,12 @@ DELETE /api/tasks/:id/escalate   -> 200 TaskView (specId: null)
 > operasi mengubah dua baris, jadi ia memanggil `notifySynced("spec", …)` **dan**
 > `notifySynced("task", …)` — keduanya.
 
-## Workspace QA ([ADR-0174](../adr/0174-workspace-qa.md)) — **`qa:read` / `qa:write`**, LOCAL (belum disync)
+## Workspace QA ([ADR-0174](../adr/0174-workspace-qa.md) · [ADR-0175](../adr/0175-qa-sync-lampiran-biner.md)) — **`qa:read` / `qa:write`**, disync
 ```
 # Laporan QA manusia per project. Capability dipetakan MENURUT METHOD (GET/HEAD → qa:read, selain itu
-# qa:write) untuk `/projects/:id/qa/**` dan `/qa/**`; tool MCP `hanoman_qa_*` (8 tool). Tak satu pun
-# tulisan memanggil `notifySynced` — entitas belum masuk changefeed (bagian 3). Role `client` tertutup
-# (deny-by-default, ADR-0110).
+# qa:write) untuk `/projects/:id/qa/**` dan `/qa/**`; tool MCP `hanoman_qa_*` (10 tool). Setiap tulisan
+# memanggil `notifySynced`/`deleteSynced` (hub → SyncLog, client → outbox, hapus → tombstone); lihat bagian
+# "Sync byte lampiran" di bawah. Role `client` tertutup (deny-by-default, ADR-0110).
 #
 # Nomor tampil QA-007/F-01/TC-03 DIHITUNG saat render dari urutan createdAt (seri → id); respons memuat
 # `code`, tetapi id (cuid) yang dipakai untuk memanggil route lain. Setiap mutasi ANAK (case/temuan)
@@ -1846,8 +1846,48 @@ GET    /api/projects/:id/qa/reports/:rid/attachments/:aid   -> byte (gambar inli
 #   nosniff + CSP sandbox. QaAttachmentView = { id, reportId, ownerType, ownerId, filename, mimeType, size, sha256, syncState: "local-only", createdAt }
 DELETE /api/projects/:id/qa/reports/:rid/attachments/:aid   -> { ok: true }
 
+POST   /api/projects/:id/qa/reports/:rid/findings/:fid/backlog   { priority?: tinggi|sedang|rendah }
+                                                            -> 201|200 { findingId, code, created, spec:{id,stage,priority}, attachments:{saved,rejected[]}, report: QaReportDetail }
+#   Temuan → backlog item `source: qa` (bagian 2). Cermin POST /tasks/:id/escalate (ADR-0152): IDEMPOTEN lewat
+#   `QaFinding.backlogId` (200 created:false), tautan putus (Spec dihapus) dibuat ulang, retry P2002 di
+#   nextSpecId, `launchApprovedAt` hanya bila principal punya `sessions:write` (launchPrincipal). Payload:
+#   severity blocker|critical→critical · major→major · minor|trivial→minor (LOSSY); prioritas P0|P1→tinggi ·
+#   P2→sedang · P3→rendah (atau `priority`); steps bernomor; `actual` memuat asal-usul (kode temuan/laporan,
+#   severity & prioritas QA asli, area, test case); `env` = build + lingkungan laporan. Lampiran TEMUAN
+#   (bukan milik laporan/test case) DISALIN ke SpecAttachment (storageKey baru) mematuhi SPEC_ATTACHMENT_LIMITS —
+#   yang ditolak dilaporkan per berkas dan tak menggagalkan backlog. Temuan jadi status `sent` + `backlogId`;
+#   QaFindingView.spec = cermin {id,stage,priority} dihitung saat baca (null dengan backlogId terisi = tautan putus).
+#   PENGECUALIAN read-only: laporan `closed` TETAP boleh (hanya tautan yang berubah). 404 temuan/laporan · 400 priority.
+POST   /api/projects/:id/qa/reports/:rid/backlog            -> { results: [QaBacklogResult], sent, report }
+#   Semua temuan `open` sekaligus (`wontfix`/`sent` dilewati); satu gagal → `results[].error`, yang lain lanjut.
 GET    /api/qa/template.md                                  -> text/markdown (attachment; qa-template.md)
-GET    /api/projects/:id/qa/reports/:rid/export[?format=md] -> application/zip (report.md + attachments/) | text/markdown
+
+# ── Sync byte lampiran QA (ADR-0175) — DEVICE-TOKEN (bukan cookie, bukan agent token: `sync` COOKIE_ONLY bagi agen) ──
+GET    /api/sync/qa-attachments/:id   -> byte (content-type = mime baris; header x-qa-sha256)   hub → client
+#   404 baris tak ada / byte belum ada di hub · 400 storageKey baris tak sah.
+PUT    /api/sync/qa-attachments/:id   (application/octet-stream, maks 10 MB)                    client → hub
+                                      -> { ok: true, state: "available" }
+#   Hub memverifikasi: panjang == `size` baris (400 "size"), sha256 == `sha256` baris (400 "sha256"), isi sesuai tipe
+#   (415 "type": magic bytes untuk png/jpeg/webp/pdf, UTF-8 tanpa NUL untuk teks), lalu menulis atomik (tmp+rename)
+#   ke `storageKey` BARIS itu — tak pernah ke path dari body. 404 bila metadata belum sampai (push record lebih dulu).
+#   415 juga untuk content-type selain octet-stream; 413 > 10 MB (dipasang di parser). Idempoten: byte sudah ada = 200.
+#   Record lampiran yang menyeberang lewat feed divalidasi di `validateSyncData`: storageKey `^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$`,
+#   mime daftar-putih (paritas dengan pipeline unggahan), ownerType, sha256 64 hex, size 0–10 MB.
+GET    /api/projects/:id/qa/reports/:rid/export[?format=zip|md|docx|pdf|xlsx|csv]
+#   zip (default) = report.md + attachments/ (dibaca-balik impor) · md = hanya Markdown · docx/pdf = untuk dibaca &
+#   diserahkan, screenshot TERTANAM (webp→png; satu gambar rusak dilewati, tak menggagalkan ekspor) · xlsx = sheet
+#   Ringkasan, "Test case" (matriks dengan kolom Ref) dan Temuan · csv = matriks test case (UTF-8 BOM, CRLF).
+#   Tanpa dependensi dokumen: OOXML ditulis sendiri di atas zip.ts. Format lain → 400 { error, formats }. 404 project lain.
+POST   /api/projects/:id/qa/reports/:rid/cases/import       (multipart, satu berkas .xlsx atau .csv; maks 8 MB)
+                                                            -> { updated, created, unchanged }
+#   Impor matriks test case. UPSERT berbasis kolom `Ref` (= id test case): ber-Ref yang ada di laporan ini →
+#   diperbarui; selain itu → test case BARU (Ref asing tanpa judul → 400). Header dikenali tak peka huruf/spasi
+#   (alias Indonesia/Inggris, urutan kolom bebas, baris judul di atas tabel diabaikan); XLSX memakai sheet
+#   bernama "Test case" (tak ada → sheet pertama); CSV mendeteksi `,` atau `;` (Excel berlokal Indonesia).
+#   Kolom yang TAK ADA di lembar dibiarkan; sel kosong pada kolom yang ADA mengosongkan nilai. Status:
+#   pass|fail|blocked|skipped|todo + alias (lulus, gagal, terblokir, dilewati, belum); sel kosong = biarkan
+#   (baris baru: todo). Semua-atau-tidak-sama-sekali (transaksi): galat "baris N: …" → 400 dan tak ada yang tertulis.
+#   404 laporan/project · 409 closed · 400 bukan multipart/berkas rusak · 413 > 8 MB.
 POST   /api/projects/:id/qa/import    (multipart, satu berkas .zip atau .md; maks ≈105 MB)
                                                             -> 201|200 { reportId, created, cases, findings, attachments: { saved, rejected } }
 #   Impor = UPSERT berbasis id: `reportId` di berkas yang cocok dengan laporan project ini → diperbarui

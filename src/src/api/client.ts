@@ -85,7 +85,7 @@ export type IdeUploadResult = {
 import type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 import type {
   CreateQaCase, CreateQaFinding, CreateQaReport, PatchQaCase, PatchQaFinding, PatchQaReport,
-  QaAttachmentView, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
+  QaAttachmentView, QaBacklogResult, QaCasesImportResult, QaExportFormat, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
 } from "@hanoman/shared";
 export type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 export type CommitDetail = { sha: string; parents: string[]; author: string; at: string; subject: string; body: string; changed: ChangedFile[]; signed: boolean; committer: string; committedAt: string; authorEmail: string };
@@ -788,11 +788,22 @@ export function createApi(o: { base?: string } = {}) {
   createQaFinding: (pid: string, rid: string, b: CreateQaFinding) => j<QaReportDetail>(paths.qaFindings(pid, rid), { method: "POST", ...body(b) }),
   patchQaFinding: (pid: string, rid: string, fid: string, b: PatchQaFinding) => j<QaReportDetail>(paths.qaFinding(pid, rid, fid), { method: "PATCH", ...body(b) }),
   deleteQaFinding: (pid: string, rid: string, fid: string) => j<QaReportDetail>(paths.qaFinding(pid, rid, fid), { method: "DELETE" }),
+  // Temuan → backlog (bagian 2). Jawabannya memuat laporan terbaru (status `sent` + cermin spec).
+  sendQaFindingToBacklog: (pid: string, rid: string, fid: string, priority?: "tinggi" | "sedang" | "rendah") =>
+    j<QaBacklogResult & { report: QaReportDetail }>(paths.qaFindingBacklog(pid, rid, fid), { method: "POST", ...body(priority ? { priority } : {}) }),
+  sendQaReportToBacklog: (pid: string, rid: string) =>
+    j<{ results: QaBacklogResult[]; sent: number; report: QaReportDetail }>(paths.qaReportBacklog(pid, rid), { method: "POST", ...body({}) }),
   uploadQaAttachments: (pid: string, rid: string, owner: { ownerType: QaOwnerType; ownerId: string }, files: File[]) => {
     const form = new FormData();
     for (const f of files) form.append("files", f);
     return jUpload<{ saved: QaAttachmentView[]; rejected: { filename: string; reason: string }[] }>(
       paths.qaAttachments(pid, rid) + qs(owner), form);
+  },
+  // Impor matriks test case (XLSX/CSV) — upsert berbasis kolom Ref.
+  importQaCases: (pid: string, rid: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return jUpload<QaCasesImportResult>(paths.qaCasesImport(pid, rid), form);
   },
   deleteQaAttachment: (pid: string, rid: string, aid: string) => j<{ ok: true }>(paths.qaAttachment(pid, rid, aid), { method: "DELETE" }),
   importQaReport: (pid: string, file: File) => {
@@ -801,7 +812,7 @@ export function createApi(o: { base?: string } = {}) {
     return jUpload<QaImportResult>(paths.qaImport(pid), form);
   },
   // URL untuk <a href>/<img src> — `rebase` supaya ikut target remote (relay) seperti fetch lain.
-  qaExportUrl: (pid: string, rid: string, format?: "md") => rebase(paths.qaReport(pid, rid) + "/export" + (format ? `?format=${format}` : "")),
+  qaExportUrl: (pid: string, rid: string, format?: QaExportFormat) => rebase(paths.qaReport(pid, rid) + "/export" + (format && format !== "zip" ? `?format=${format}` : "")),
   qaAttachmentUrl: (pid: string, rid: string, aid: string, download = false) => rebase(paths.qaAttachment(pid, rid, aid) + (download ? "?download=1" : "")),
   qaTemplateUrl: () => rebase(paths.qaTemplate),
   getCustomAgentMetrics: (p: { projectId?: string; from?: string; to?: string } = {}) =>

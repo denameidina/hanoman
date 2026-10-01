@@ -11,7 +11,7 @@ const cases = [
 const findings = [{
   ...base, id: "f1", reportId: "r1", code: "F-01", caseId: "c2", caseCode: "TC-02", title: "Tombol bayar mati",
   severity: "major" as const, priority: "P1" as const, area: "checkout", steps: ["buka keranjang", "klik bayar"],
-  expected: "form bayar", actual: "tidak ada reaksi\nkonsol error", status: "open" as const, backlogId: null,
+  expected: "form bayar", actual: "tidak ada reaksi\nkonsol error", status: "open" as const, backlogId: null, spec: null,
 }];
 const att = (id: string, ownerType: "report" | "case" | "finding", ownerId: string, filename: string, mimeType: string) =>
   ({ id, reportId: "r1", ownerType, ownerId, filename, mimeType, size: 1, sha256: "x", syncState: "local-only" as const, createdAt: at });
@@ -41,6 +41,19 @@ describe("renderQaMarkdown", () => {
   });
   it("tanpa `paths`, tautan lampiran memakai attachments/<filename>", () => {
     expect(renderQaMarkdown(detail)).toContain("(attachments/layar.png)");
+  });
+});
+
+describe("renderQaMarkdown · tautan backlog", () => {
+  const sent = { ...detail, findings: [{ ...findings[0]!, status: "sent" as const, backlogId: "SPEC-212", spec: { id: "SPEC-212", stage: "executing", priority: "tinggi" } }] };
+  it("menulis baris **Backlog:** dengan stage; tak merusak parse (status sent kembali apa adanya)", () => {
+    const md = renderQaMarkdown(sent, paths);
+    expect(md).toContain("**Backlog:** SPEC-212 · executing");
+    const p = parseQaMarkdown(md);
+    expect(p.findings[0]).toMatchObject({ status: "sent", title: "Tombol bayar mati", steps: ["buka keranjang", "klik bayar"] });
+  });
+  it("tautan putus (spec null) hanya menulis id", () => {
+    expect(renderQaMarkdown({ ...sent, findings: [{ ...sent.findings[0]!, spec: null }] }, paths)).toContain("**Backlog:** SPEC-212\n");
   });
 });
 

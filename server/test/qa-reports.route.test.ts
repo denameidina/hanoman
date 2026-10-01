@@ -81,11 +81,11 @@ describe("laporan", () => {
     expect(await prisma.qaCase.count()).toBe(0);
   });
 
-  it("LOCAL-only: tak satu pun tulisan QA masuk changefeed sync", async () => {
+  it("bagian 3: tulisan QA MASUK changefeed (dulu LOCAL-only di bagian 1; rincian di qa-sync-wiring)", async () => {
     const r = await mk();
     await post(url("p1", `/${r.id}/cases`), { title: "c" });
     await post(url("p1", `/${r.id}/findings`), { title: "f" });
-    expect(await prisma.syncLog.count({ where: { entity: { startsWith: "qa" } } })).toBe(0);
+    expect(await prisma.syncLog.count({ where: { entity: { startsWith: "qa" } } })).toBeGreaterThan(0);
   });
 });
 

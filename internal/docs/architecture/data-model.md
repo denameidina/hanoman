@@ -1162,8 +1162,7 @@ Yang mengikat:
 
 ## QaReport / QaCase / QaFinding / QaAttachment (Workspace QA · [ADR-0174](../adr/0174-workspace-qa.md))
 
-Laporan QA manusia per project. **LOCAL-only di bagian 1** (belum masuk changefeed) tetapi `version`
-sudah ada pada tiga entitas pertama. **Nomor tampil `QA-007`/`F-01`/`TC-03` tak disimpan** — dihitung saat
+Laporan QA manusia per project. **Bagian 3: keempatnya masuk changefeed** ([ADR-0175](../adr/0175-qa-sync-lampiran-biner.md)); `version` pada keempatnya. **Nomor tampil `QA-007`/`F-01`/`TC-03` tak disimpan** — dihitung saat
 render dari urutan `createdAt` (seri → `id`), jadi id acak tak pernah bentrok antar perangkat.
 
 `QaReport` — `projectId` (FK cascade), `title`, `buildVersion`, `environment` (JSON `{os,browser,device,url,branch,…}`, null = `{}`),
@@ -1178,7 +1177,7 @@ render dari urutan `createdAt` (seri → `id`), jadi id acak tak pernah bentrok 
 **terpisah** dari severity), `area`, `steps` (JSON `string[]`), `expected`, `actual`, `status` (`open` · `sent` · `wontfix`;
 `sent` hanya ditulis server di bagian 2), `backlogId` (diisi bagian 2), `version`.
 
-`QaAttachment` — `reportId` (cascade, kuota per laporan), `projectId` (denormal), `ownerType` (`report` · `case` · `finding`) + `ownerId`
+`QaAttachment` — `version` + `updatedAt` (bagian 3), `reportId` (cascade, kuota per laporan), `projectId` (denormal), `ownerType` (`report` · `case` · `finding`) + `ownerId`
 (polimorfik, **tanpa FK**: service menghapus lampiran pemilik lebih dulu), `filename`, `mimeType`, `size`, `sha256` (byte TERSIMPAN),
-`storageKey`, `syncState` (`local-only` · `uploaded` · `available` — bagian 3). **Tanpa `version`**: byte tak lewat changefeed.
+`storageKey`, `syncState` — **LOCAL per mesin, tak ikut FIELDS**: `local-only` (byte hanya di sini) · `remote` (metadata ada, byte belum diunduh) · `available` · `failed`. Metadata menyeberang lewat feed; **byte tak pernah** (endpoint `/api/sync/qa-attachments/:id`).
 

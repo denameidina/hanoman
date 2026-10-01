@@ -15,7 +15,10 @@ describe("model QA", () => {
       filename: "a.png", mimeType: "image/png", size: 1, sha256: "x", storageKey: "k",
     } });
     expect((await prisma.qaFinding.findFirstOrThrow()).steps).toEqual(["a", "b"]);
-    expect((await prisma.qaAttachment.findFirstOrThrow()).syncState).toBe("local-only");
+    const att = await prisma.qaAttachment.findFirstOrThrow();
+    expect(att.syncState).toBe("local-only");
+    expect(att).toMatchObject({ version: 0 });        // bagian 3: ikut changefeed seperti anak QA lain
+    expect(att.updatedAt).toBeInstanceOf(Date);
 
     await prisma.project.delete({ where: { id: "p1" } });
     expect(await prisma.qaReport.count()).toBe(0);

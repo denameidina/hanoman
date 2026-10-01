@@ -1125,8 +1125,11 @@ model QaFinding {
   @@index([reportId])
 }
 
-// Tanpa `version`: byte tak lewat changefeed (bagian 3 mengunggahnya terpisah per sha256).
-// `reportId` FK cascade + denormal `projectId`: kuota per laporan dan isolasi per project.
+// Bagian 3: METADATA ikut changefeed (karena itu `version` + `updatedAt`); BYTE tak pernah lewat feed —
+// ditarik/diunggah terpisah lewat /api/sync/qa-attachments/:id, diverifikasi `sha256`. `syncState`
+// LOCAL (tak ikut FIELDS) dan bermakna PER MESIN: local-only (byte hanya di sini, belum diunggah ke hub) ·
+// remote (metadata ada, byte belum diunduh) · available (byte ada di sini dan, di client, terkonfirmasi di hub) ·
+// failed (hub menolak byte-nya). `reportId` FK cascade + denormal `projectId`: kuota & isolasi per project.
 // `ownerType/ownerId` polimorfik tanpa FK — service menghapus lampiran pemilik sebelum pemiliknya.
 model QaAttachment {
   id         String   @id @default(cuid())
@@ -1139,10 +1142,13 @@ model QaAttachment {
   size       Int
   sha256     String   // sha256 byte TERSIMPAN (sesudah normalisasi gambar), kunci dedup bagian 3
   storageKey String
-  syncState  String   @default("local-only") // local-only | uploaded | available (bagian 3)
+  syncState  String   @default("local-only") // local-only | remote | available | failed (LOCAL, per mesin)
+  version    Int      @default(0)              // bagian 3 · version-stamp sync (ADR-0045)
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   report     QaReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@index([reportId])
   @@index([ownerType, ownerId])
+  @@index([syncState])
 }
