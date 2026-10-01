@@ -1,0 +1,53 @@
+import type { FastifyInstance } from "fastify";
+import { qaTemplateMarkdown } from "@hanoman/shared";
+import { QA_ATTACHMENT_LIMITS } from "../services/qa-attachment";
+import { QaImportError, exportReport, importReport } from "../services/qa-transfer";
+
+// Workspace QA · template, ekspor, impor. Capability `qa:*` menurut METHOD (`capabilityForRoute`).
+// Batas multipart PER-REQUEST (registrasi global 5 MB milik lampiran gambar tak boleh naik): impor ZIP
+// boleh sebesar kuota satu laporan (100 MB) + Markdown-nya.
+const IMPORT_MAX = QA_ATTACHMENT_LIMITS.reportBytes + 5 * 1024 * 1024;
+
+export default async function qaTransfer(app: FastifyInstance) {
+  app.get("/qa/template.md", async (_req, reply) => {
+    reply.header("content-type", "text/markdown; charset=utf-8");
+    reply.header("content-disposition", 'attachment; filename="qa-template.md"');
+    return reply.send(qaTemplateMarkdown());
+  });
+
+  app.get("/projects/:pid/qa/reports/:rid/export", async (req, reply) => {
+    const { pid, rid } = req.params as { pid: string; rid: string };
+    const out = await exportReport(pid, rid);
+    if (!out) return reply.code(404).send({ error: "not found" });
+    if ((req.query as { format?: string }).format === "md") {
+      reply.header("content-type", "text/markdown; charset=utf-8");
+      reply.header("content-disposition", `attachment; filename="${out.code}.md"`);
+      return reply.send(out.markdown);
+    }
+    reply.header("content-type", "application/zip");
+    reply.header("content-disposition", `attachment; filename="${out.code}.zip"`);
+    return reply.send(out.zip);
+  });
+
+  app.post("/projects/:pid/qa/import", async (req, reply) => {
+    const { pid } = req.params as { pid: string };
+    if (!(req as any).isMultipart?.()) return reply.code(400).send({ error: "butuh multipart/form-data" });
+    let file: { name: string; buf: Buffer } | null = null;
+    try {
+      for await (const part of (req as any).parts({ limits: { fileSize: IMPORT_MAX, files: 1 } })) {
+        if (part.type !== "file" || file) continue;
+        const buf = await part.toBuffer();
+        if (part.file?.truncated) return reply.code(413).send({ error: "berkas terlalu besar" });
+        file = { name: String(part.filename ?? "import"), buf };
+      }
+    } catch { return reply.code(400).send({ error: "unggahan tak valid" }); }
+    if (!file || file.buf.length === 0) return reply.code(400).send({ error: "tak ada berkas" });
+    try {
+      const r = await importReport(pid, file);
+      return reply.code(r.created ? 201 : 200).send(r);
+    } catch (e) {
+      if (e instanceof QaImportError) return reply.code(e.status).send({ error: e.message });
+      throw e;
+    }
+  });
+}

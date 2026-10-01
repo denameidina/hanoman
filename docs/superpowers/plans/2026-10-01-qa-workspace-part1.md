@@ -1809,7 +1809,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 Semantik impor: `reportId` di berkas yang cocok dengan laporan di project ini → **upsert** (case/temuan dicocokkan lewat id; yang tak ada di berkas dibiarkan; lampiran dengan nama sama pada pemilik yang sama dilewati); selain itu laporan **baru** dengan id baru (id dari berkas tak dipakai, `caseId` di-remap). Status temuan `sent` dari berkas dipulihkan jadi `open`. `status` ∈ {submitted, closed} tanpa `verdict` → 400. Target `closed` → 409.
 
-- [ ] **Step 1: Test ZIP yang gagal** — `server/test/zip.test.ts`
+- [x] **Step 1: Test ZIP yang gagal** — `server/test/zip.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -1844,13 +1844,14 @@ describe("zip", () => {
   });
   it("mendeteksi entri rusak (CRC)", () => {
     const zip = Buffer.from(writeZip([{ name: "a.txt", data: Buffer.from("halo") }]));
-    zip[30 + "a.txt".length] ^= 0xff; // balik satu byte data
+    const at = 30 + "a.txt".length;
+    zip[at] = zip[at]! ^ 0xff; // balik satu byte data
     expect(() => readZip(zip)).toThrow(/rusak/);
   });
 });
 ```
 
-- [ ] **Step 2: Implementasi** — `server/src/services/zip.ts`
+- [x] **Step 2: Implementasi** — `server/src/services/zip.ts`
 
 ```ts
 import { deflateRawSync, inflateRawSync } from "node:zlib";
@@ -1960,7 +1961,7 @@ export function readZip(buf: Buffer, o: { maxEntries?: number; maxTotalBytes?: n
 
 Jalankan: `pnpm vitest --run server/test/zip.test.ts --no-file-parallelism` → PASS. (Test "CRC rusak" membalik byte data pertama: offset `30 + nama.length` = awal data entri pertama karena `a.txt` disimpan stored.)
 
-- [ ] **Step 3: Test transfer yang gagal** — `server/test/qa-transfer.route.test.ts`
+- [x] **Step 3: Test transfer yang gagal** — `server/test/qa-transfer.route.test.ts`
 
 ```ts
 import { beforeEach, describe, expect, it } from "vitest";
@@ -2097,7 +2098,7 @@ describe("impor", () => {
 
 Run (gagal): `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-transfer.route.test.ts --no-file-parallelism` → FAIL (404).
 
-- [ ] **Step 4: Service** — `server/src/services/qa-transfer.ts`
+- [x] **Step 4: Service** — `server/src/services/qa-transfer.ts`
 
 ```ts
 import { basename } from "node:path";
@@ -2262,7 +2263,7 @@ export async function importReport(projectId: string, file: { name: string; buf:
 }
 ```
 
-- [ ] **Step 5: Route** — `server/src/routes/qa-transfer.ts`
+- [x] **Step 5: Route** — `server/src/routes/qa-transfer.ts`
 
 ```ts
 import type { FastifyInstance } from "fastify";
@@ -2322,12 +2323,12 @@ export default async function qaTransfer(app: FastifyInstance) {
 
 `server/src/app.ts`: `import qaTransfer from "./routes/qa-transfer";` + `await api.register(qaTransfer);` setelah `qaAttachments`.
 
-- [ ] **Step 6: Jalankan test + typecheck**
+- [x] **Step 6: Jalankan test + typecheck**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/zip.test.ts server/test/qa-transfer.route.test.ts server/test/qa-attachments.route.test.ts server/test/qa-reports.route.test.ts --no-file-parallelism && pnpm --filter ./server typecheck`
 Expected: PASS. Bila `res.rawPayload` tak ada pada versi `light-my-request` ini, pakai `Buffer.from(res.body, "binary")`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/services/zip.ts server/src/services/qa-transfer.ts server/src/routes/qa-transfer.ts server/src/app.ts server/test/zip.test.ts server/test/qa-transfer.route.test.ts
