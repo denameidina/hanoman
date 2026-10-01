@@ -6,7 +6,7 @@ import { Badge, Button, Card, Field, HnTextarea, Input, Modal, Select, StateBloc
 import { useApi } from "../../api/instance";
 import { QaAttachments } from "./QaAttachments";
 import type { PanelProps } from "./QaReportEditor";
-import { SEVERITY_TONE, errText } from "./qa-ui";
+import { PRIORITY_LABEL, SEVERITY_LABEL, SEVERITY_TONE, errText } from "./qa-ui";
 
 type Draft = {
   id: string | null; title: string; severity: QaSeverity; priority: QaPriority; area: string;
@@ -67,9 +67,9 @@ export function QaFindingsPanel(p: PanelProps) {
     <div style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {!p.locked && <Button leftIcon="bug" onClick={() => setDraft({ ...blank })}>Temuan baru</Button>}
-        {openCount > 0 && <Button variant="secondary" leftIcon="git-fork" onClick={() => void sendAll()}>{`Kirim semua yang open (${openCount})`}</Button>}
+        {openCount > 0 && <Button variant="secondary" leftIcon="git-fork" onClick={() => void sendAll()}>{`Kirim semua masalah terbuka (${openCount})`}</Button>}
       </div>
-      {p.detail.findings.length === 0 && <StateBlock kind="empty" compact title="Belum ada temuan" hint="Satu temuan = satu masalah, lengkap dengan langkah repro yang bisa diulang." />}
+      {p.detail.findings.length === 0 && <StateBlock kind="empty" compact title="Belum ada temuan" hint="Satu temuan = satu masalah, lengkap dengan langkah yang bisa diulang." />}
       {p.detail.findings.map((f) => (
         <Card key={f.id} padding={14}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
@@ -96,8 +96,8 @@ export function QaFindingsPanel(p: PanelProps) {
           {f.steps.length > 0 && <ol style={{ margin: "8px 0 0", paddingLeft: 20, fontSize: 13 }}>{f.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>}
           {(f.expected || f.actual) && (
             <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", marginTop: 8, fontSize: 13 }}>
-              <div><b>Expected</b><div style={{ whiteSpace: "pre-wrap" }}>{f.expected || "—"}</div></div>
-              <div><b>Actual</b><div style={{ whiteSpace: "pre-wrap" }}>{f.actual || "—"}</div></div>
+              <div><b>Hasil yang diharapkan</b><div style={{ whiteSpace: "pre-wrap" }}>{f.expected || "—"}</div></div>
+              <div><b>Hasil yang terjadi</b><div style={{ whiteSpace: "pre-wrap" }}>{f.actual || "—"}</div></div>
             </div>
           )}
           <QaAttachments {...p} ownerType="finding" ownerId={f.id} compact />
@@ -108,29 +108,29 @@ export function QaFindingsPanel(p: PanelProps) {
         footer={<><Button variant="ghost" onClick={() => setDraft(null)}>Batal</Button><Button onClick={() => void save()} disabled={!draft?.title.trim()}>Simpan temuan</Button></>}>
         {draft && (
           <>
-            <Field label="Judul"><Input value={draft.title} onChange={set("title")} autoFocus /></Field>
+            <Field label="Judul masalah (wajib)"><Input placeholder="Contoh: Tombol Masuk tidak bereaksi di Safari" value={draft.title} onChange={set("title")} autoFocus /></Field>
             <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))" }}>
-              <Field label="Severity" hint="dampak teknis">
-                <Select aria-label="Severity" value={draft.severity} onChange={set("severity")} options={QA_SEVERITIES.map((s) => ({ value: s, label: s }))} />
+              <Field label="Dampak masalah" hint="Seberapa terganggu pengguna?">
+                <Select aria-label="Severity" value={draft.severity} onChange={set("severity")} options={QA_SEVERITIES.map((s) => ({ value: s, label: SEVERITY_LABEL[s] }))} />
               </Field>
               <Field label="Prioritas" hint="urutan perbaikan">
-                <Select aria-label="Prioritas" value={draft.priority} onChange={set("priority")} options={QA_PRIORITIES.map((s) => ({ value: s, label: s }))} />
+                <Select aria-label="Prioritas" value={draft.priority} onChange={set("priority")} options={QA_PRIORITIES.map((s) => ({ value: s, label: PRIORITY_LABEL[s] }))} />
               </Field>
-              <Field label="Area"><Input value={draft.area} onChange={set("area")} /></Field>
-              <Field label="Test case">
+              <Field label="Fitur / halaman"><Input placeholder="Contoh: Login" value={draft.area} onChange={set("area")} /></Field>
+              <Field label="Pengujian terkait (opsional)">
                 <Select aria-label="Test case" value={draft.caseId} onChange={set("caseId")}
                   options={[{ value: "", label: "— tidak terkait —" }, ...p.detail.cases.map((c) => ({ value: c.id, label: `${c.code} · ${c.title}` }))]} />
               </Field>
             </div>
-            <Field label="Langkah repro" hint="satu langkah per baris; nomor ditambahkan otomatis">
-              <HnTextarea rows={5} value={draft.steps} onChange={set("steps")} />
+            <Field label="Cara memunculkan masalah" hint="satu langkah per baris; nomor ditambahkan otomatis">
+              <HnTextarea rows={5} placeholder={"Buka halaman login\nIsi akun yang benar\nKlik Masuk"} value={draft.steps} onChange={set("steps")} />
             </Field>
-            <Field label="Expected"><HnTextarea rows={3} value={draft.expected} onChange={set("expected")} /></Field>
-            <Field label="Actual"><HnTextarea rows={3} value={draft.actual} onChange={set("actual")} /></Field>
+            <Field label="Hasil yang diharapkan"><HnTextarea rows={3} value={draft.expected} onChange={set("expected")} /></Field>
+            <Field label="Hasil yang terjadi"><HnTextarea rows={3} value={draft.actual} onChange={set("actual")} /></Field>
             {draft.id && (
               <Field label="Status">
                 <Select aria-label="Status temuan" value={draft.status} onChange={set("status")}
-                  options={[{ value: "open", label: "open" }, { value: "wontfix", label: "wontfix" }]} />
+                  options={[{ value: "open", label: "Perlu diperbaiki" }, { value: "wontfix", label: "Tidak akan diperbaiki" }]} />
               </Field>
             )}
           </>

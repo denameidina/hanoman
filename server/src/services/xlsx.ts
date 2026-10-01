@@ -5,7 +5,7 @@ import { readZip, writeZip, ZipError } from "./zip";
 // atas zip.ts. PENULIS: sel `inlineStr` (tanpa sharedStrings → lebih sederhana, Excel/Numbers/LibreOffice
 // membukanya), header dibekukan & di-bold, kolom berlebar. PEMBACA: tahan berkas yang DISIMPAN Excel —
 // sharedStrings (termasuk rich text & fonetik), `t="str"|"b"|"e"`, angka, sel lompat, dan sheet pertama
-// menurut workbook.xml (bukan menurut nama berkas). Hanya SHEET PERTAMA dibaca.
+// menurut workbook.xml (bukan menurut nama berkas). Sheet dipilih menurut nama; required menolak lembar yang hilang.
 
 export class XlsxError extends Error {}
 
@@ -23,7 +23,7 @@ const NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const HEAD = XML_HEAD;
 
-export type XlsxSheet = { name: string; rows: readonly (readonly string[])[]; widths?: readonly number[] };
+export type XlsxSheet = { name: string; rows: readonly (readonly string[])[]; widths?: readonly number[]; dropdowns?: readonly { range: string; values: readonly string[] }[] };
 
 export function writeXlsx(sheets: readonly XlsxSheet[]): Buffer {
   const parts: { name: string; data: Buffer; deflate: boolean }[] = [];
@@ -69,11 +69,16 @@ export function writeXlsx(sheets: readonly XlsxSheet[]): Buffer {
         const t = clean(v);
         return t === "" ? "" : `<c r="${colLetter(ci)}${ri + 1}" s="${ri === 0 ? 1 : 2}" t="inlineStr"><is><t xml:space="preserve">${esc(t)}</t></is></c>`;
       }).join("");
-      return `<row r="${ri + 1}">${cells}</row>`;
+      const lines = Math.max(1, ...r.map((v, ci) => v.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(line.length / Math.max(8, (s.widths?.[ci] ?? 24) - 2))), 0)));
+      const height = Math.min(240, Math.max(24, lines * 15 + 8));
+      return `<row r="${ri + 1}" ht="${height}" customHeight="1">${cells}</row>`;
     }).join("");
+    const validations = s.dropdowns?.length ? `<dataValidations count="${s.dropdowns.length}">${s.dropdowns.map((d) =>
+      `<dataValidation type="list" allowBlank="1" showErrorMessage="1" errorTitle="Nilai tidak valid" error="Pilih nilai dari daftar" sqref="${esc(d.range)}"><formula1>${esc(`"${d.values.join(",")}"`)}</formula1></dataValidation>`
+    ).join("")}</dataValidations>` : "";
     add(`xl/worksheets/sheet${si + 1}.xml`,
       `<worksheet xmlns="${NS}"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
-      + `<sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${data}</sheetData></worksheet>`);
+      + `<sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${data}</sheetData>${validations}</worksheet>`);
   });
   return writeZip(parts);
 }
@@ -96,8 +101,8 @@ const attrs = (s: string): Record<string, string> => {
 const textOf = (xmlFragment: string): string =>
   [...xmlFragment.replace(/<rPh\b[\s\S]*?<\/rPh>/g, "").matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map((m) => unesc(m[1]!)).join("");
 
-/** `sheet` memilih lembar menurut NAMA (tak peka huruf/spasi tepi); tak ada/tak ditemukan → lembar pertama. */
-export function readXlsx(buf: Buffer, opts: { sheet?: string } = {}): string[][] {
+/** `sheet` memilih nama (tak peka huruf/spasi tepi); required menolak sheet yang hilang, selain itu fallback pertama. */
+export function readXlsx(buf: Buffer, opts: { sheet?: string; required?: boolean } = {}): string[][] {
   let files: Map<string, Buffer>;
   try { files = readZip(buf, { maxEntries: 100, maxTotalBytes: 40 * 1024 * 1024 }); }
   catch (e) { if (e instanceof ZipError) throw new XlsxError(`bukan berkas XLSX yang valid: ${e.message}`); throw e; }
@@ -110,6 +115,7 @@ export function readXlsx(buf: Buffer, opts: { sheet?: string } = {}): string[][]
   if (wb && rels) {
     const all = [...wb.matchAll(/<sheet\b([^>]*)>/g)].map((m) => attrs(m[1]!));
     const want = opts.sheet?.trim().toLowerCase();
+    if (want && opts.required && !all.some((a) => (a.name ?? "").trim().toLowerCase() === want)) throw new XlsxError(`lembar "${opts.sheet}" wajib ada — gunakan template QA Excel`);
     const chosen = (want ? all.find((a) => (a.name ?? "").trim().toLowerCase() === want) : undefined) ?? all[0];
     const rid = chosen?.["r:id"];
     for (const m of rels.matchAll(/<Relationship\b([^>]*)>/g)) {

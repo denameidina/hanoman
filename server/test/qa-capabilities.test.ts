@@ -16,6 +16,7 @@ describe("capability domain qa", () => {
     expect(capabilityForRoute("DELETE", "/api/projects/p1/qa/reports/r1")).toBe("qa:write");
     expect(capabilityForRoute("GET", "/api/projects/p1/qa/reports/r1/export")).toBe("qa:read");
     expect(capabilityForRoute("POST", "/api/projects/p1/qa/import")).toBe("qa:write");
+    expect(capabilityForRoute("GET", "/api/qa/template.xlsx")).toBe("qa:read");
     expect(capabilityForRoute("GET", "/api/qa/template.md")).toBe("qa:read");
   });
 

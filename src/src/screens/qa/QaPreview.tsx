@@ -7,7 +7,7 @@ import { useApi } from "../../api/instance";
 // untuk impor dan di layar sempit justru menyesakkan tabel. Tautan lampiran diarahkan ke URL penyajian
 // server supaya gambar tampil. Tabel boleh di-scroll mendatar daripada menjepit kolomnya (terukur di 390 px).
 // ZIP = laporan + lampiran (bisa diimpor kembali) · MD/CSV = teks · DOCX/PDF = untuk dibaca & diserahkan ·
-// XLSX = ringkasan + matriks test case (sheet "Test case" bisa diisi lalu diimpor lewat tab Test case).
+// XLSX = laporan lengkap dan pemetaan lampiran; ZIP juga membawa byte berkas lampiran.
 const EXPORTS: { format: QaExportFormat; label: string }[] = [
   { format: "zip", label: "Unduh ZIP (laporan + lampiran)" }, { format: "docx", label: "Unduh DOCX" }, { format: "pdf", label: "Unduh PDF" },
   { format: "xlsx", label: "Unduh XLSX" }, { format: "csv", label: "Unduh CSV (test case)" }, { format: "md", label: "Unduh .md" },

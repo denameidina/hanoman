@@ -48,7 +48,7 @@ describe("GET export?format=…", () => {
     expect(String(res.headers["content-disposition"])).toMatch(/QA-001\.pdf/);
     expect(res.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
   });
-  it("xlsx: tiga sheet; Test case = matriks dengan Ref (id); Temuan memuat kolom backlog & lampiran", async () => {
+  it("xlsx: lima sheet; Test case = matriks dengan Ref (id); Temuan memuat kolom backlog & lampiran", async () => {
     const res = await call("GET", R(`/${rid}/export?format=xlsx`));
     expect(res.headers["content-type"]).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     const rows = readXlsx(res.rawPayload, { sheet: "Test case" });
@@ -59,7 +59,7 @@ describe("GET export?format=…", () => {
     expect(findings[0]).toContain("Backlog");
     expect(findings[1]![0]).toBe("F-01");
     expect(findings[1]).toContain("layar.png");
-    expect(readXlsx(res.rawPayload)[1]).toEqual(["Kode", "QA-001"]);       // sheet pertama = Ringkasan
+    expect(readXlsx(res.rawPayload, { sheet: "Ringkasan" })[1]).toEqual(["Judul", "Smoke 0.9"]);       // ringkasan dapat diimpor kembali
   });
   it("csv: UTF-8 BOM + matriks yang sama dengan xlsx", async () => {
     const res = await call("GET", R(`/${rid}/export?format=csv`));

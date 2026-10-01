@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { QA_EXPORT_FORMATS, qaTemplateMarkdown, type QaExportFormat } from "@hanoman/shared";
 import { QA_ATTACHMENT_LIMITS } from "../services/qa-attachment";
+import { qaTemplateWorkbook } from "../services/qa-workbook";
 import { importCases } from "../services/qa-cases-import";
 import { renderExport } from "../services/qa-export-formats";
 import { QaImportError, exportReport, importReport } from "../services/qa-transfer";
@@ -11,6 +12,12 @@ import { QaImportError, exportReport, importReport } from "../services/qa-transf
 const IMPORT_MAX = QA_ATTACHMENT_LIMITS.reportBytes + 5 * 1024 * 1024;
 
 export default async function qaTransfer(app: FastifyInstance) {
+  app.get("/qa/template.xlsx", async (_req, reply) => {
+    reply.header("content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    reply.header("content-disposition", 'attachment; filename="qa-template.xlsx"');
+    return reply.send(qaTemplateWorkbook());
+  });
+
   app.get("/qa/template.md", async (_req, reply) => {
     reply.header("content-type", "text/markdown; charset=utf-8");
     reply.header("content-disposition", 'attachment; filename="qa-template.md"');
@@ -46,17 +53,24 @@ export default async function qaTransfer(app: FastifyInstance) {
     const { pid } = req.params as { pid: string };
     if (!(req as any).isMultipart?.()) return reply.code(400).send({ error: "butuh multipart/form-data" });
     let file: { name: string; buf: Buffer } | null = null;
+    const companions: { name: string; buf: Buffer }[] = [];
+    let totalBytes = 0;
     try {
-      for await (const part of (req as any).parts({ limits: { fileSize: IMPORT_MAX, files: 1 } })) {
-        if (part.type !== "file" || file) continue;
+      for await (const part of (req as any).parts({ limits: { fileSize: IMPORT_MAX, files: 31 } })) {
+        if (part.type !== "file") continue;
         const buf = await part.toBuffer();
         if (part.file?.truncated) return reply.code(413).send({ error: "berkas terlalu besar" });
-        file = { name: String(part.filename ?? "import"), buf };
+        totalBytes += buf.length;
+        if (totalBytes > IMPORT_MAX) return reply.code(413).send({ error: "total unggahan terlalu besar (maks 105 MB)" });
+        const upload = { name: String(part.filename ?? "import"), buf };
+        if (part.fieldname === "attachments") companions.push(upload);
+        else if (file) return reply.code(400).send({ error: "pilih satu laporan Excel, ZIP, atau Markdown" });
+        else file = upload;
       }
     } catch { return reply.code(400).send({ error: "unggahan tak valid" }); }
     if (!file || file.buf.length === 0) return reply.code(400).send({ error: "tak ada berkas" });
     try {
-      const r = await importReport(pid, file);
+      const r = await importReport(pid, file, companions);
       return reply.code(r.created ? 201 : 200).send(r);
     } catch (e) {
       if (e instanceof QaImportError) return reply.code(e.status).send({ error: e.message });

@@ -1860,6 +1860,7 @@ POST   /api/projects/:id/qa/reports/:rid/findings/:fid/backlog   { priority?: ti
 #   PENGECUALIAN read-only: laporan `closed` TETAP boleh (hanya tautan yang berubah). 404 temuan/laporan · 400 priority.
 POST   /api/projects/:id/qa/reports/:rid/backlog            -> { results: [QaBacklogResult], sent, report }
 #   Semua temuan `open` sekaligus (`wontfix`/`sent` dilewati); satu gagal → `results[].error`, yang lain lanjut.
+GET    /api/qa/template.xlsx                                -> application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (attachment; qa-template.xlsx)
 GET    /api/qa/template.md                                  -> text/markdown (attachment; qa-template.md)
 
 # ── Sync byte lampiran QA (ADR-0175) — DEVICE-TOKEN (bukan cookie, bukan agent token: `sync` COOKIE_ONLY bagi agen) ──
@@ -1874,9 +1875,9 @@ PUT    /api/sync/qa-attachments/:id   (application/octet-stream, maks 10 MB)    
 #   Record lampiran yang menyeberang lewat feed divalidasi di `validateSyncData`: storageKey `^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$`,
 #   mime daftar-putih (paritas dengan pipeline unggahan), ownerType, sha256 64 hex, size 0–10 MB.
 GET    /api/projects/:id/qa/reports/:rid/export[?format=zip|md|docx|pdf|xlsx|csv]
-#   zip (default) = report.md + attachments/ (dibaca-balik impor) · md = hanya Markdown · docx/pdf = untuk dibaca &
+#   zip (default) = report.xlsx + report.md + attachments/ (dibaca-balik impor) · md = hanya Markdown · docx/pdf = untuk dibaca &
 #   diserahkan, screenshot TERTANAM (webp→png; satu gambar rusak dilewati, tak menggagalkan ekspor) · xlsx = sheet
-#   Ringkasan, "Test case" (matriks dengan kolom Ref) dan Temuan · csv = matriks test case (UTF-8 BOM, CRLF).
+#   Panduan, Ringkasan (Ref laporan), "Test case" (matriks dengan kolom Ref), Temuan dan Lampiran · csv = matriks test case (UTF-8 BOM, CRLF).
 #   Tanpa dependensi dokumen: OOXML ditulis sendiri di atas zip.ts. Format lain → 400 { error, formats }. 404 project lain.
 POST   /api/projects/:id/qa/reports/:rid/cases/import       (multipart, satu berkas .xlsx atau .csv; maks 8 MB)
                                                             -> { updated, created, unchanged }
@@ -1888,13 +1889,18 @@ POST   /api/projects/:id/qa/reports/:rid/cases/import       (multipart, satu ber
 #   pass|fail|blocked|skipped|todo + alias (lulus, gagal, terblokir, dilewati, belum); sel kosong = biarkan
 #   (baris baru: todo). Semua-atau-tidak-sama-sekali (transaksi): galat "baris N: …" → 400 dan tak ada yang tertulis.
 #   404 laporan/project · 409 closed · 400 bukan multipart/berkas rusak · 413 > 8 MB.
-POST   /api/projects/:id/qa/import    (multipart, satu berkas .zip atau .md; maks ≈105 MB)
+POST   /api/projects/:id/qa/import    (multipart: file .xlsx/.zip/.md + attachments[] opsional, maks 31 berkas/≈105 MB total)
                                                             -> 201|200 { reportId, created, cases, findings, attachments: { saved, rejected } }
+#   Excel: sheet Ringkasan, Test case, Temuan, Lampiran wajib. Panduan diabaikan. Validasi schema/enum,
+#   Kode/Ref unik, relasi TC, path relatif dan pemilik lampiran sebelum transaksi. Error sheet/baris → 400.
+#   Ringkasan Ref = reportId. ZIP berisi satu XLSX diutamakan atas Markdown; lampiran dari folder ZIP
+#   atau multipart field attachments dicocokkan dengan Berkas di sheet Lampiran. Pemilik Laporan/TC-nn/F-nn.
+#   Pipeline lampiran yang sama: tipe, ukuran, scanner, kuota; gagal/kurang → attachments.rejected per berkas.
 #   Impor = UPSERT berbasis id: `reportId` di berkas yang cocok dengan laporan project ini → diperbarui
 #   (case/temuan dicocokkan lewat id; yang tak ada di berkas dibiarkan; lampiran bernama sama pada
 #   pemilik yang sama dilewati) → 200 created:false. Selain itu laporan BARU dengan id baru, `caseId`
 #   di-remap → 201. 400 berbaris untuk Markdown salah ("baris N: …") / ZIP tak valid (zip-slip,
-#   zip-bomb, tanpa report.md) / submitted-closed tanpa verdict · 404 project · 409 target closed ·
+#   zip-bomb, tanpa XLSX/report.md) / submitted-closed tanpa verdict · 404 project · 409 target closed ·
 #   413 berkas terlalu besar.
 ```
 

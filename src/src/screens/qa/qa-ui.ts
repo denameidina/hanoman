@@ -5,7 +5,7 @@ export const SEVERITY_TONE: Record<QaSeverity, Tone> = { blocker: "err", critica
 export const CASE_TONE: Record<QaCaseStatus, Tone> = { todo: "neutral", pass: "ok", fail: "err", blocked: "warn", skipped: "info" };
 export const REPORT_TONE: Record<QaReportStatus, Tone> = { draft: "neutral", submitted: "brass", closed: "ok" };
 export const VERDICT_TONE: Record<QaVerdict, Tone> = { go: "ok", "no-go": "err", conditional: "warn" };
-export const VERDICT_LABEL: Record<QaVerdict, string> = { go: "Go", "no-go": "No-go", conditional: "Conditional" };
+export const VERDICT_LABEL: Record<QaVerdict, string> = { go: "Siap digunakan", "no-go": "Belum siap digunakan", conditional: "Siap dengan catatan" };
 
 export const pct = (r: number | null): string => (r === null ? "—" : `${Math.round(r * 100)}%`);
 
@@ -43,3 +43,8 @@ export const SYNC_STATE_BADGE: Partial<Record<QaAttachmentSyncState, { label: st
   failed: { label: "gagal diunggah", tone: "err", hint: "Server menolak isi berkas ini (ukuran/tipe tak cocok) atau berkas lokal hilang. Hapus dan unggah ulang." },
 };
 
+
+export const CASE_LABEL: Record<QaCaseStatus, string> = { todo: "Belum diuji", pass: "Lulus", fail: "Gagal", blocked: "Terhambat", skipped: "Dilewati" };
+export const SEVERITY_LABEL: Record<QaSeverity, string> = { blocker: "Tidak bisa digunakan", critical: "Kritis", major: "Fitur terganggu", minor: "Gangguan kecil", trivial: "Tampilan saja" };
+export const PRIORITY_LABEL = { P0: "P0 · Segera", P1: "P1 · Tinggi", P2: "P2 · Normal", P3: "P3 · Rendah" };
+export const REPORT_LABEL: Record<QaReportStatus, string> = { draft: "Draf", submitted: "Diajukan", closed: "Selesai · terkunci" };

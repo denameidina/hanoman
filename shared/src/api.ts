@@ -246,7 +246,7 @@ export const paths = {
   qaReportBacklog: (pid: string, rid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/backlog`,
   qaCasesImport: (pid: string, rid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/cases/import`,
   qaImport: (pid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/import`,
-  qaTemplate: `${API}/qa/template.md`,
+  qaTemplate: `${API}/qa/template.xlsx`,
   // SPEC-945 · ADR-0150 · papan tim. `members` GLOBAL (bukan per project) — task boleh tanpa
   // project, jadi direktori orang tak bisa digantung pada project.
   members: `${API}/members`,

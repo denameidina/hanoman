@@ -47,9 +47,9 @@ describe("QaWorkspace", () => {
     expect(await screen.findByText("QA-001")).toBeTruthy();
     expect(screen.getByText("Smoke 0.9")).toBeTruthy();
     expect(screen.getByText(/50%/)).toBeTruthy();
-    expect(screen.getByText(/1 open/)).toBeTruthy();
+    expect(screen.getByText(/1 belum ditangani/)).toBeTruthy();
     expect(screen.getByText("Laporan baru")).toBeTruthy();
-    expect(screen.getByText("Unduh template")).toBeTruthy();
+    expect(screen.getByText("Unduh template Excel")).toBeTruthy();
   });
 
   it("tanpa project: keadaan kosong, tanpa memanggil API", async () => {
@@ -145,7 +145,7 @@ describe("QaWorkspace", () => {
     renderWs({ onToast: toast });
     fireEvent.click(await screen.findByText("Smoke 0.9"));
     fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
-    fireEvent.click(await screen.findByText("Kirim semua yang open (1)"));
+    fireEvent.click(await screen.findByText("Kirim semua masalah terbuka (1)"));
     await waitFor(() => expect(posted).toHaveLength(1));
     expect(toast).toHaveBeenCalledWith(expect.stringMatching(/1 temuan dikirim/));
   });
@@ -193,7 +193,51 @@ describe("QaWorkspace", () => {
       ? json({ error: "verdict wajib diisi sebelum laporan di-submit atau di-close" }, 400) : null));
     renderWs({ onToast: toast });
     fireEvent.click(await screen.findByText("Smoke 0.9"));
-    fireEvent.click(await screen.findByText("Submit"));
-    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/verdict wajib/)));
+    fireEvent.click(await screen.findByText("Ajukan laporan"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Pilih keputusan hasil pengujian");
+    expect(toast).not.toHaveBeenCalled();
   });
+});
+
+it("mengimpor Excel bersama lampiran sebagai multipart dan membuka laporan hasil impor", async () => {
+  let body: FormData | undefined;
+  mockFetch((u, init) => {
+    if (u.endsWith("/qa/import")) { body = init?.body as FormData; return json({ reportId: "r1", created: true, cases: 1, findings: 1, attachments: { saved: 1, rejected: [] } }); }
+    return null;
+  });
+  renderWs();
+  fireEvent.click(await screen.findByText("Impor Excel / ZIP"));
+  fireEvent.change(screen.getByLabelText("Berkas impor laporan"), { target: { files: [new File(["excel"], "report.xlsx")] } });
+  fireEvent.change(screen.getByLabelText("Berkas lampiran impor"), { target: { files: [new File(["png"], "layar.png")] } });
+  fireEvent.click(screen.getByText("Impor laporan"));
+  expect(await screen.findByDisplayValue("Smoke 0.9")).toBeTruthy();
+  expect((body!.get("file") as File).name).toBe("report.xlsx");
+  expect((body!.get("attachments") as File).name).toBe("layar.png");
+});
+
+it("menyimpan input lingkungan sederhana tanpa membuang metadata tambahan", async () => {
+  let saved: any;
+  mockFetch((u, init) => {
+    if (u.endsWith("/reports/r1")) {
+      if (init?.method === "PATCH") { saved = JSON.parse(String(init.body)); return json({ ...detail, ...saved }); }
+      return json({ ...detail, environment: { os: "macOS", jaringan: "Wi-Fi" } });
+    }
+    return null;
+  });
+  renderWs(); fireEvent.click(await screen.findByText("Smoke 0.9"));
+  fireEvent.change(await screen.findByDisplayValue("macOS"), { target: { value: "Windows 11" } });
+  fireEvent.click(screen.getByText("Simpan"));
+  await waitFor(() => expect(saved.environment).toEqual({ os: "Windows 11", jaringan: "Wi-Fi" }));
+});
+
+it("menyimpan langkah pengujian ketika keluar dari textarea", async () => {
+  let saved: any;
+  mockFetch((u, init) => {
+    if (u.endsWith("/cases/c1") && init?.method === "PATCH") { saved = JSON.parse(String(init.body)); return json({ ...detail, cases: [{ ...detail.cases[0], ...saved }] }); }
+    return null;
+  });
+  renderWs(); fireEvent.click(await screen.findByText("Smoke 0.9"));
+  const input = await screen.findByLabelText("Langkah TC-01");
+  fireEvent.change(input, { target: { value: "Buka halaman login" } }); fireEvent.blur(input);
+  await waitFor(() => expect(saved).toEqual({ steps: "Buka halaman login" }));
 });

@@ -806,9 +806,10 @@ export function createApi(o: { base?: string } = {}) {
     return jUpload<QaCasesImportResult>(paths.qaCasesImport(pid, rid), form);
   },
   deleteQaAttachment: (pid: string, rid: string, aid: string) => j<{ ok: true }>(paths.qaAttachment(pid, rid, aid), { method: "DELETE" }),
-  importQaReport: (pid: string, file: File) => {
+  importQaReport: (pid: string, file: File, attachments: File[] = []) => {
     const form = new FormData();
     form.append("file", file);
+    for (const attachment of attachments) form.append("attachments", attachment);
     return jUpload<QaImportResult>(paths.qaImport(pid), form);
   },
   // URL untuk <a href>/<img src> — `rebase` supaya ikut target remote (relay) seperti fetch lain.

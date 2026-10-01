@@ -7,10 +7,12 @@ import { asJson, reportDetail } from "./qa";
 import { QA_ATTACHMENT_LIMITS, addQaAttachments, type QaUpload } from "./qa-attachment";
 import { readQaAttachmentBytes } from "./qa-attachment-transfer";
 import { notifySynced } from "./sync-notify";
+import { parseQaWorkbook, writeQaWorkbook } from "./qa-workbook";
+import { XlsxError } from "./xlsx";
 import { ZipError, readZip, writeZip } from "./zip";
 
-// Workspace QA · ekspor ZIP (report.md + attachments/) dan impor (upsert). Bentuk Markdown-nya milik
-// `shared/qa-markdown.ts`; di sini hanya I/O: baca byte lampiran, tulis/baca ZIP, tulis DB.
+// Workspace QA · ZIP (Excel + Markdown + attachments/), impor laporan dan lampiran (upsert).
+// Codec ada di qa-workbook.ts/shared/qa-markdown.ts; byte lewat pipeline unggahan yang sama.
 
 export class QaImportError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
@@ -47,26 +49,34 @@ export async function exportReport(projectId: string, reportId: string) {
     present.push(a);
   }
   const markdown = renderQaMarkdown({ ...full, attachments: present }, paths);
-  const zip = writeZip([{ name: "report.md", data: Buffer.from(markdown, "utf8"), deflate: true }, ...files]);
+  const zip = writeZip([{ name: "report.xlsx", data: writeQaWorkbook({ ...full, attachments: present }, paths), deflate: true }, { name: "report.md", data: Buffer.from(markdown, "utf8"), deflate: true }, ...files]);
   return { code: full.code, markdown, zip };
 }
 
-export async function importReport(projectId: string, file: { name: string; buf: Buffer }): Promise<QaImportResult> {
+export async function importReport(projectId: string, file: { name: string; buf: Buffer }, companions: { name: string; buf: Buffer }[] = []): Promise<QaImportResult> {
   if (!(await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } })))
     throw new QaImportError(404, "project tak ditemukan");
 
-  let markdown: string;
+  let markdown = "";
+  let workbook: Buffer | undefined;
   let assets = new Map<string, Buffer>();
   let dir = "";
   const isZip = file.buf.length >= 4 && file.buf.readUInt32LE(0) === 0x04034b50;
-  if (isZip) {
+  if (/\.xlsx$/i.test(file.name)) {
+    workbook = file.buf;
+  } else if (isZip) {
     try {
       const entries = readZip(file.buf);
+      const xlsxNames = [...entries.keys()].filter((k) => /\.xlsx$/i.test(k) && !/(^|\/)attachments\//.test(k));
+      if (xlsxNames.length > 1) throw new QaImportError(400, "ZIP harus memuat satu laporan Excel saja");
+      const xlsxName = xlsxNames[0];
       const mdName = [...entries.keys()].find((k) => /(^|\/)report\.md$/i.test(k))
         ?? [...entries.keys()].find((k) => /\.md$/i.test(k) && !/(^|\/)attachments\//.test(k));
-      if (!mdName) throw new QaImportError(400, "ZIP tak memuat report.md");
-      markdown = entries.get(mdName)!.toString("utf8");
-      dir = mdName.includes("/") ? mdName.slice(0, mdName.lastIndexOf("/") + 1) : "";
+      if (!mdName && !xlsxName) throw new QaImportError(400, "ZIP tak memuat report.xlsx atau report.md");
+      const reportName = xlsxName ?? mdName!;
+      if (xlsxName) workbook = entries.get(xlsxName)!;
+      else markdown = entries.get(mdName!)!.toString("utf8");
+      dir = reportName.includes("/") ? reportName.slice(0, reportName.lastIndexOf("/") + 1) : "";
       assets = entries;
     } catch (e) {
       if (e instanceof ZipError) throw new QaImportError(400, `ZIP tak valid: ${e.message}`);
@@ -77,8 +87,12 @@ export async function importReport(projectId: string, file: { name: string; buf:
   }
 
   let parsed: QaParsedReport;
-  try { parsed = parseQaMarkdown(markdown); }
-  catch (e) { if (e instanceof QaMarkdownError) throw new QaImportError(400, e.message); throw e; }
+  for (const c of companions) {
+    if (assets.has(c.name)) throw new QaImportError(400, `nama lampiran berulang: ${c.name}`);
+    assets.set(c.name, c.buf);
+  }
+  try { parsed = workbook ? parseQaWorkbook(workbook) : parseQaMarkdown(markdown); }
+  catch (e) { if (e instanceof QaMarkdownError || e instanceof XlsxError) throw new QaImportError(400, e.message); throw e; }
   if ((parsed.status === "submitted" || parsed.status === "closed") && !parsed.verdict)
     throw new QaImportError(400, "verdict wajib diisi untuk laporan berstatus submitted/closed");
 
@@ -142,10 +156,10 @@ export async function importReport(projectId: string, file: { name: string; buf:
   for (const o of owners) {
     const uploads: QaUpload[] = [];
     for (const path of o.paths) {
-      const buf = assets.get(dir + path);
       const name = originalName(path);
+      if (have.some((h) => h.ownerType === o.ownerType && h.ownerId === o.ownerId && h.filename === name)) continue;
+      const buf = assets.get(dir + path) ?? assets.get(path);
       if (!buf) { rejected.push({ filename: name, reason: "missing" }); continue; }
-      if (have.some((h) => h.ownerType === o.ownerType && h.ownerId === o.ownerId && h.filename === name)) continue;  // sudah ada
       const mime = MIME_BY_EXT[name.split(".").pop()?.toLowerCase() ?? ""];
       if (!mime) { rejected.push({ filename: name, reason: "type" }); continue; }
       uploads.push({ buf, mime, name, truncated: buf.length > QA_ATTACHMENT_LIMITS.fileBytes });
@@ -155,6 +169,8 @@ export async function importReport(projectId: string, file: { name: string; buf:
     saved += r.saved.length;
     rejected.push(...r.rejected);
   }
+  const referenced = new Set(owners.flatMap((o) => o.paths));
+  for (const c of companions) if (!referenced.has(c.name)) rejected.push({ filename: c.name, reason: "Tidak tercantum pada sheet Lampiran atau tautan lampiran laporan" });
   return {
     reportId: out.id, created: !existing, cases: parsed.cases.length, findings: parsed.findings.length,
     attachments: { saved, rejected },
