@@ -17,8 +17,29 @@ export function QaCasesPanel(p: PanelProps) {
     if (!t) return;
     if (await run(() => api.createQaCase(p.projectId, p.detail.id, { title: t }))) setTitle("");
   };
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  // Matriks test case = sheet "Test case" XLSX / CSV: diunduh, diisi di spreadsheet, diimpor kembali (upsert lewat Ref).
+  const importMatrix = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const r = await api.importQaCases(p.projectId, p.detail.id, file);
+      p.onChange(await api.qaReport(p.projectId, p.detail.id));
+      p.onToast?.(`Matriks diimpor: ${r.updated} diperbarui, ${r.created} dibuat, ${r.unchanged} tak berubah`);
+    } catch (e) { p.onToast?.(errText(e)); }
+    finally { if (fileRef.current) fileRef.current.value = ""; }
+  };
   return (
     <div style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Button size="sm" variant="ghost" leftIcon="download" as="a" href={api.qaExportUrl(p.projectId, p.detail.id, "xlsx")}>Unduh matriks (XLSX)</Button>
+        {!p.locked && (
+          <>
+            <Button size="sm" variant="secondary" leftIcon="upload" onClick={() => fileRef.current?.click()}>Impor matriks</Button>
+            <input ref={fileRef} type="file" accept=".xlsx,.csv" hidden aria-label="Berkas matriks test case"
+              onChange={(e) => void importMatrix(e.target.files?.[0])} />
+          </>
+        )}
+      </div>
       {p.detail.cases.length === 0 && <StateBlock kind="empty" compact title="Belum ada test case" hint="Tambahkan langkah uji pertama di bawah." />}
       {p.detail.cases.map((c) => <CaseCard key={c.id} c={c} p={p} run={run} />)}
       {!p.locked && (

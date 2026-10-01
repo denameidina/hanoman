@@ -49,6 +49,15 @@ yang membuka Backlog, jadi progres perbaikan terlihat dari laporan QA.
 
 - **Unduh template** → `qa-template.md`: front-matter + satu contoh test case dan temuan + panduan
   pengisian. Isi lalu **Impor**.
+- **DOCX** dan **PDF** (tab Pratinjau) untuk dibaca atau diserahkan: ringkasan angka, tabel test case berwarna
+  per status, temuan lengkap, dan screenshot **tertanam** di dalam dokumen.
+- **XLSX** berisi tiga sheet (Ringkasan, Test case, Temuan); **CSV** hanya matriks test case. Untuk Excel gunakan
+  XLSX — CSV berkoma dibuka Excel berlokal Indonesia dalam satu kolom (impor tetap menerima CSV bertitik-koma).
+- **Matriks test case dua arah:** tab Test case → *Unduh matriks (XLSX)*, isi hasil di spreadsheet (kolom Status,
+  Aktual, dst.), lalu *Impor matriks*. Baris ber-`Ref` memperbarui test case yang ada; baris tanpa `Ref` menjadi
+  test case baru. Kolom yang tidak ada dibiarkan; sel kosong pada kolom yang ada mengosongkan nilai. Status boleh
+  berbahasa Indonesia (lulus, gagal, terblokir, dilewati, belum). Satu baris salah menggagalkan seluruh impor
+  dengan pesan "baris N: …" — tidak ada yang tertulis setengah-setengah.
 - **Ekspor ZIP** (di editor dan tab Pratinjau) → `report.md` + folder `attachments/` dengan tautan relatif;
   terbaca di editor Markdown mana pun, gambar tampil langsung. **Unduh .md** hanya dokumennya.
 - **Impor** menerima `.zip` atau `.md`. Berkas hasil ekspor yang diimpor kembali ke project yang sama

@@ -91,3 +91,12 @@ export async function removeQaAttachments(where: Prisma.QaAttachmentWhereInput):
   for (const r of rows) await deleteUpload(r.storageKey).catch(() => { /* sudah tak ada */ });
   return rows.length;
 }
+
+/**
+ * SATU pintu untuk membaca byte lampiran QA (ekspor, salin ke backlog, pratinjau). Sengaja terpusat:
+ * bagian 3 (sync) menggantinya dengan fetch-through dari hub tanpa menyentuh pemakainya.
+ */
+export async function readQaAttachmentBytes(id: string): Promise<Buffer | null> {
+  const row = await prisma.qaAttachment.findUnique({ where: { id }, select: { storageKey: true } });
+  return row ? readUpload(row.storageKey).catch(() => null) : null;
+}

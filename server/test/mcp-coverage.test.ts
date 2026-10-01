@@ -51,8 +51,9 @@ const UNWRAPPED = new Map<string, string>([
   ["POST /projects/:pid/qa/reports/:rid/attachments", "multipart"],
   ["GET /projects/:pid/qa/reports/:rid/attachments/:aid", "biner (unduhan lampiran)"],
   ["DELETE /projects/:pid/qa/reports/:rid/attachments/:aid", "destruktif — dihapus manusia di dashboard"],
-  ["GET /projects/:pid/qa/reports/:rid/export", "biner (ZIP) / Markdown unduhan; agen memakai hanoman_qa_report_get"],
+  ["GET /projects/:pid/qa/reports/:rid/export", "biner (ZIP/DOCX/PDF/XLSX) / teks (MD/CSV) unduhan; agen memakai hanoman_qa_report_get"],
   ["POST /projects/:pid/qa/import", "multipart"],
+  ["POST /projects/:pid/qa/reports/:rid/cases/import", "multipart (XLSX/CSV)"],
   ["GET /qa/template.md", "unduhan template untuk manusia"],
 ]);
 

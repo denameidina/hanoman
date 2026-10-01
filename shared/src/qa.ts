@@ -157,3 +157,9 @@ export type QaBacklogResult = {
   attachments: { saved: number; rejected: { filename: string; reason: string }[] };
   error?: string;
 };
+
+/** Hasil impor matriks test case (XLSX/CSV). `unchanged` = baris ber-Ref yang isinya sama persis. */
+export type QaCasesImportResult = { updated: number; created: number; unchanged: number };
+export const QA_EXPORT_FORMATS = ["zip", "md", "docx", "pdf", "xlsx", "csv"] as const;
+export type QaExportFormat = (typeof QA_EXPORT_FORMATS)[number];
+

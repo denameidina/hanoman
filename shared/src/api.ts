@@ -244,6 +244,7 @@ export const paths = {
   qaAttachment: (pid: string, rid: string, aid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/attachments/${encodeURIComponent(aid)}`,
   qaFindingBacklog: (pid: string, rid: string, fid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/findings/${encodeURIComponent(fid)}/backlog`,
   qaReportBacklog: (pid: string, rid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/backlog`,
+  qaCasesImport: (pid: string, rid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/reports/${encodeURIComponent(rid)}/cases/import`,
   qaImport: (pid: string) => `${API}/projects/${encodeURIComponent(pid)}/qa/import`,
   qaTemplate: `${API}/qa/template.md`,
   // SPEC-945 · ADR-0150 · papan tim. `members` GLOBAL (bukan per project) — task boleh tanpa

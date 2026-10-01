@@ -150,6 +150,43 @@ describe("QaWorkspace", () => {
     expect(toast).toHaveBeenCalledWith(expect.stringMatching(/1 temuan dikirim/));
   });
 
+  it("Pratinjau: enam tautan unduh (ZIP, DOCX, PDF, XLSX, CSV, .md) ber-format benar", async () => {
+    mockFetch();
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    fireEvent.click(await screen.findByRole("tab", { name: /Pratinjau/ }));
+    const href = (label: string) => (screen.getByText(label).closest("a") as HTMLAnchorElement).getAttribute("href");
+    expect(href("Unduh ZIP (laporan + lampiran)")).toBe("/api/projects/p1/qa/reports/r1/export");
+    expect(href("Unduh DOCX")).toBe("/api/projects/p1/qa/reports/r1/export?format=docx");
+    expect(href("Unduh PDF")).toBe("/api/projects/p1/qa/reports/r1/export?format=pdf");
+    expect(href("Unduh XLSX")).toBe("/api/projects/p1/qa/reports/r1/export?format=xlsx");
+    expect(href("Unduh CSV (test case)")).toBe("/api/projects/p1/qa/reports/r1/export?format=csv");
+    expect(href("Unduh .md")).toBe("/api/projects/p1/qa/reports/r1/export?format=md");
+  });
+
+  it("Impor matriks: unggah ke /cases/import lalu memuat ulang laporan dan melaporkan hitungan lewat toast", async () => {
+    const posted: string[] = [];
+    mockFetch((u, init) => {
+      if (u.endsWith("/qa/reports/r1/cases/import") && init?.method === "POST") { posted.push(u); return json({ updated: 2, created: 1, unchanged: 3 }); }
+      return null;
+    });
+    const toast = vi.fn();
+    renderWs({ onToast: toast });
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    const input = await screen.findByLabelText("Berkas matriks test case");
+    fireEvent.change(input, { target: { files: [new File(["Judul\nx"], "matriks.csv", { type: "text/csv" })] } });
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Matriks diimpor: 2 diperbarui, 1 dibuat, 3 tak berubah"));
+    expect(posted).toHaveLength(1);
+  });
+
+  it("laporan closed: matriks tetap bisa diunduh, tetapi tak bisa diimpor", async () => {
+    mockFetch((u) => (u.endsWith("/qa/reports/r1") ? json({ ...detail, status: "closed", verdict: "go" }) : null));
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    expect(await screen.findByText("Unduh matriks (XLSX)")).toBeTruthy();
+    expect(screen.queryByText("Impor matriks")).toBeNull();
+  });
+
   it("galat server (409/400) ditampilkan lewat onToast, bukan ditelan", async () => {
     const toast = vi.fn();
     mockFetch((u, init) => (u.endsWith("/qa/reports/r1") && init?.method === "PATCH"

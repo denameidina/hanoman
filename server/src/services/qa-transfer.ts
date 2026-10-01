@@ -4,8 +4,7 @@ import {
 } from "@hanoman/shared";
 import { prisma } from "../db";
 import { asJson, reportDetail } from "./qa";
-import { QA_ATTACHMENT_LIMITS, addQaAttachments, type QaUpload } from "./qa-attachment";
-import { readUpload } from "./uploads";
+import { QA_ATTACHMENT_LIMITS, addQaAttachments, readQaAttachmentBytes, type QaUpload } from "./qa-attachment";
 import { ZipError, readZip, writeZip } from "./zip";
 
 // Workspace QA · ekspor ZIP (report.md + attachments/) dan impor (upsert). Bentuk Markdown-nya milik
@@ -36,8 +35,7 @@ export async function exportReport(projectId: string, reportId: string) {
   const seq = new Map<string, number>();
   const present = [];
   for (const a of full.attachments) {
-    const row = await prisma.qaAttachment.findUnique({ where: { id: a.id }, select: { storageKey: true } });
-    const data = row ? await readUpload(row.storageKey).catch(() => null) : null;
+    const data = await readQaAttachmentBytes(a.id);
     if (!data) continue;                       // byte hilang dari disk — jangan tautkan yang tak ada
     const owner = codeOf(a.ownerType, a.ownerId);
     const n = (seq.get(owner) ?? 0) + 1;

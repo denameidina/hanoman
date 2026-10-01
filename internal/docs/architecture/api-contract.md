@@ -1861,7 +1861,21 @@ POST   /api/projects/:id/qa/reports/:rid/findings/:fid/backlog   { priority?: ti
 POST   /api/projects/:id/qa/reports/:rid/backlog            -> { results: [QaBacklogResult], sent, report }
 #   Semua temuan `open` sekaligus (`wontfix`/`sent` dilewati); satu gagal → `results[].error`, yang lain lanjut.
 GET    /api/qa/template.md                                  -> text/markdown (attachment; qa-template.md)
-GET    /api/projects/:id/qa/reports/:rid/export[?format=md] -> application/zip (report.md + attachments/) | text/markdown
+GET    /api/projects/:id/qa/reports/:rid/export[?format=zip|md|docx|pdf|xlsx|csv]
+#   zip (default) = report.md + attachments/ (dibaca-balik impor) · md = hanya Markdown · docx/pdf = untuk dibaca &
+#   diserahkan, screenshot TERTANAM (webp→png; satu gambar rusak dilewati, tak menggagalkan ekspor) · xlsx = sheet
+#   Ringkasan, "Test case" (matriks dengan kolom Ref) dan Temuan · csv = matriks test case (UTF-8 BOM, CRLF).
+#   Tanpa dependensi dokumen: OOXML ditulis sendiri di atas zip.ts. Format lain → 400 { error, formats }. 404 project lain.
+POST   /api/projects/:id/qa/reports/:rid/cases/import       (multipart, satu berkas .xlsx atau .csv; maks 8 MB)
+                                                            -> { updated, created, unchanged }
+#   Impor matriks test case. UPSERT berbasis kolom `Ref` (= id test case): ber-Ref yang ada di laporan ini →
+#   diperbarui; selain itu → test case BARU (Ref asing tanpa judul → 400). Header dikenali tak peka huruf/spasi
+#   (alias Indonesia/Inggris, urutan kolom bebas, baris judul di atas tabel diabaikan); XLSX memakai sheet
+#   bernama "Test case" (tak ada → sheet pertama); CSV mendeteksi `,` atau `;` (Excel berlokal Indonesia).
+#   Kolom yang TAK ADA di lembar dibiarkan; sel kosong pada kolom yang ADA mengosongkan nilai. Status:
+#   pass|fail|blocked|skipped|todo + alias (lulus, gagal, terblokir, dilewati, belum); sel kosong = biarkan
+#   (baris baru: todo). Semua-atau-tidak-sama-sekali (transaksi): galat "baris N: …" → 400 dan tak ada yang tertulis.
+#   404 laporan/project · 409 closed · 400 bukan multipart/berkas rusak · 413 > 8 MB.
 POST   /api/projects/:id/qa/import    (multipart, satu berkas .zip atau .md; maks ≈105 MB)
                                                             -> 201|200 { reportId, created, cases, findings, attachments: { saved, rejected } }
 #   Impor = UPSERT berbasis id: `reportId` di berkas yang cocok dengan laporan project ini → diperbarui

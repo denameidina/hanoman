@@ -30,6 +30,7 @@ export * from "./semver";
 export * from "./telegram";
 export * from "./qa";
 export * from "./qa-markdown";
+export * from "./qa-tabular";
 export * from "./webhook";
 export * from "./mcp";
 export * from "./auto-merge";

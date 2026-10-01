@@ -85,7 +85,7 @@ export type IdeUploadResult = {
 import type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 import type {
   CreateQaCase, CreateQaFinding, CreateQaReport, PatchQaCase, PatchQaFinding, PatchQaReport,
-  QaAttachmentView, QaBacklogResult, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
+  QaAttachmentView, QaBacklogResult, QaCasesImportResult, QaExportFormat, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
 } from "@hanoman/shared";
 export type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
 export type CommitDetail = { sha: string; parents: string[]; author: string; at: string; subject: string; body: string; changed: ChangedFile[]; signed: boolean; committer: string; committedAt: string; authorEmail: string };
@@ -799,6 +799,12 @@ export function createApi(o: { base?: string } = {}) {
     return jUpload<{ saved: QaAttachmentView[]; rejected: { filename: string; reason: string }[] }>(
       paths.qaAttachments(pid, rid) + qs(owner), form);
   },
+  // Impor matriks test case (XLSX/CSV) — upsert berbasis kolom Ref.
+  importQaCases: (pid: string, rid: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return jUpload<QaCasesImportResult>(paths.qaCasesImport(pid, rid), form);
+  },
   deleteQaAttachment: (pid: string, rid: string, aid: string) => j<{ ok: true }>(paths.qaAttachment(pid, rid, aid), { method: "DELETE" }),
   importQaReport: (pid: string, file: File) => {
     const form = new FormData();
@@ -806,7 +812,7 @@ export function createApi(o: { base?: string } = {}) {
     return jUpload<QaImportResult>(paths.qaImport(pid), form);
   },
   // URL untuk <a href>/<img src> — `rebase` supaya ikut target remote (relay) seperti fetch lain.
-  qaExportUrl: (pid: string, rid: string, format?: "md") => rebase(paths.qaReport(pid, rid) + "/export" + (format ? `?format=${format}` : "")),
+  qaExportUrl: (pid: string, rid: string, format?: QaExportFormat) => rebase(paths.qaReport(pid, rid) + "/export" + (format && format !== "zip" ? `?format=${format}` : "")),
   qaAttachmentUrl: (pid: string, rid: string, aid: string, download = false) => rebase(paths.qaAttachment(pid, rid, aid) + (download ? "?download=1" : "")),
   qaTemplateUrl: () => rebase(paths.qaTemplate),
   getCustomAgentMetrics: (p: { projectId?: string; from?: string; to?: string } = {}) =>

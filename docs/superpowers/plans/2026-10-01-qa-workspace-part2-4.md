@@ -14,12 +14,12 @@ Urutan: **2 → 4 → 3**. Test: serial dengan `TEST_DATABASE_URL` terisolasi da
 - [x] Docs: api-contract, panduan
 
 ## Bagian 4 — Ekspor tambahan + impor matriks
-- [ ] CSV (tulis + baca RFC 4180) dan matriks test case (shared, murni)
-- [ ] XLSX writer + reader (tahan simpanan Excel: sharedStrings/inlineStr/t="str"/sel lompat)
-- [ ] DOCX writer (OOXML, gambar tertanam)
-- [ ] PDF (pdfkit, gambar tertanam, webp→png)
-- [ ] Route `export?format=docx|pdf|xlsx|csv` + `cases/import`
-- [ ] UI: menu Ekspor, Impor matriks; docs
+- [x] CSV (tulis + baca RFC 4180) dan matriks test case (shared, murni; kolom absen ≠ sel kosong)
+- [x] XLSX writer + reader (tahan simpanan Excel; divalidasi terhadap xlsxwriter/openpyxl)
+- [x] DOCX writer (OOXML, gambar tertanam; divalidasi python-docx)
+- [x] PDF (pdfkit, gambar tertanam, webp→png)
+- [x] Route `export?format=docx|pdf|xlsx|csv` + `cases/import`
+- [x] UI: menu Ekspor, Impor matriks; docs
 
 ## Bagian 3 — Sync + lampiran biner
 - [ ] Migration `QaAttachment.version/updatedAt`; entitas masuk `SYNCED`/`FIELDS`/`PARENTS`/`BOOTSTRAP_ORDER`; guard test sync
