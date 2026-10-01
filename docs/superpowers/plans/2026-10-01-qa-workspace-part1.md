@@ -1174,7 +1174,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes (Task 4 Step 3b): `QA_ATTACHMENT_LIMITS`, `QaUpload`, `addQaAttachments`, `removeQaAttachments`, `ownerExists`; `readUpload` (`uploads.ts`).
 - Produces REST: `POST /api/projects/:pid/qa/reports/:rid/attachments?ownerType=&ownerId=` (multipart `files`, `201 {saved, rejected}`), `GET …/attachments/:aid` (`?download=1` memaksa unduh), `DELETE …/attachments/:aid` → `{ ok: true }`.
 
-- [ ] **Step 1: Tulis test yang gagal** — `server/test/qa-attachments.route.test.ts`
+- [x] **Step 1: Tulis test yang gagal** — `server/test/qa-attachments.route.test.ts`
 
 ```ts
 import { beforeEach, describe, expect, it } from "vitest";
@@ -1287,12 +1287,12 @@ describe("lampiran QA", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-attachments.route.test.ts --no-file-parallelism`
 Expected: FAIL (404 route belum ada).
 
-- [ ] **Step 3: Route** — `server/src/routes/qa-attachments.ts`
+- [x] **Step 3: Route** — `server/src/routes/qa-attachments.ts`
 
 ```ts
 import type { FastifyInstance } from "fastify";
@@ -1366,12 +1366,12 @@ export default async function qaAttachments(app: FastifyInstance) {
 
 `server/src/app.ts`: `import qaAttachments from "./routes/qa-attachments";` dan `await api.register(qaAttachments);` tepat setelah `qa`.
 
-- [ ] **Step 4: Jalankan test + typecheck**
+- [x] **Step 4: Jalankan test + typecheck**
 
 Run: `export TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"; env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS pnpm vitest --run server/test/qa-attachments.route.test.ts server/test/qa-reports.route.test.ts --no-file-parallelism && pnpm --filter ./server typecheck`
 Expected: PASS. Catatan: test "bukan multipart" memukul gerbang `isMultipart` — bila `app.inject` dengan JSON body justru kena 415 dari Fastify, ubah ekspektasi menjadi `[400, 415]` (`expect([400, 415]).toContain(…)`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/qa-attachments.ts server/src/app.ts server/test/qa-attachments.route.test.ts

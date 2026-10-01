@@ -45,6 +45,7 @@ import customAgentMetrics from "./routes/custom-agent-metrics";
 import members from "./routes/members";
 import tasks from "./routes/tasks";
 import qa from "./routes/qa";
+import qaAttachments from "./routes/qa-attachments";
 import githubIssues from "./routes/github-issues";
 import telegram from "./routes/telegram";
 import webhooks from "./routes/webhooks";
@@ -302,6 +303,7 @@ export function buildApp(
     await api.register(members);      // SPEC-945 · ADR-0150 · direktori orang papan tim (cookie-only)
     await api.register(tasks);        // SPEC-945 · ADR-0150 · kartu kerja manusia (cookie-only)
     await api.register(qa);           // Workspace QA · laporan/test case/temuan per project (capability `qa`)
+    await api.register(qaAttachments); // Workspace QA · lampiran laporan/test case/temuan (capability `qa`)
   }, { prefix: "/api" });
 
   // Prod: serve the built dashboard from one process; SPA-fallback to
