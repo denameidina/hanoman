@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  assignCodes, qaPriorityToSpec, qaSeverityToSpec, qaStats, zCreateQaCase, zCreateQaFinding, zCreateQaReport, zPatchQaReport,
+  assignCodes, qaCodeKey, qaPriorityToSpec, qaSeverityToSpec, qaStats, zCreateQaCase, zCreateQaFinding, zCreateQaReport, zPatchQaReport,
 } from "./qa";
 
 describe("zCreateQaReport", () => {
@@ -83,5 +83,17 @@ describe("pemetaan QA → backlog (lossy, dinyatakan)", () => {
     expect(qaPriorityToSpec("P1")).toBe("tinggi");
     expect(qaPriorityToSpec("P2")).toBe("sedang");
     expect(qaPriorityToSpec("P3")).toBe("rendah");
+  });
+});
+
+describe("assignCodes · kode bebas (ADR-0176)", () => {
+  const at = (n: number) => new Date(1_700_000_000_000 + n);
+  it("memakai kode bebas apa adanya dan nomor otomatis melewati kode yang terpakai", () => {
+    const rows = [
+      { id: "a", createdAt: at(1), code: "LOGIN-1" }, { id: "b", createdAt: at(2), code: null },
+      { id: "c", createdAt: at(3), code: "tc-02" }, { id: "d", createdAt: at(4) },
+    ];
+    const taken = new Set(rows.filter((r) => r.code).map((r) => qaCodeKey(r.code!)));
+    expect(assignCodes(rows, "TC-", 2, taken).map((r) => r.code)).toEqual(["LOGIN-1", "TC-01", "tc-02", "TC-03"]);
   });
 });

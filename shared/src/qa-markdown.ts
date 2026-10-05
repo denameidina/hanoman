@@ -16,11 +16,11 @@ export class QaMarkdownError extends Error {
 }
 
 export type QaParsedCase = {
-  id: string | null; code: string; title: string; steps: string; expected: string; actual: string;
+  id: string | null; code: string; customCode: string | null; title: string; steps: string; expected: string; actual: string;
   status: QaCaseStatus; attachments: string[];
 };
 export type QaParsedFinding = {
-  id: string | null; caseId: string | null; caseCode: string | null; code: string; title: string;
+  id: string | null; caseId: string | null; caseCode: string | null; code: string; customCode: string | null; title: string;
   severity: QaSeverity; priority: QaPriority; area: string; status: QaFindingStatus;
   steps: string[]; expected: string; actual: string; attachments: string[];
 };
@@ -163,7 +163,7 @@ export function parseQaMarkdown(text: string): QaParsedReport {
       if (c.length !== 7) throw new QaMarkdownError(`baris tabel test case harus 7 kolom, ditemukan ${c.length}`, abs(cs, idx));
       if (!c[1]) throw new QaMarkdownError("judul test case kosong", abs(cs, idx));
       cases.push({
-        id: c[6] || null, code: c[0]!, title: c[1], steps: c[2]!, expected: c[3]!, actual: c[4]!,
+        id: c[6] || null, code: c[0]!.trim(), customCode: c[0]!.trim() || null, title: c[1], steps: c[2]!, expected: c[3]!, actual: c[4]!,
         status: oneOf(c[5], QA_CASE_STATUSES, "status test case", abs(cs, idx)), attachments: [],
       });
     }
@@ -174,8 +174,8 @@ export function parseQaMarkdown(text: string): QaParsedReport {
   if (fs2) {
     const heads = fs2.lines.map((l, idx) => ({ l, idx })).filter((x) => x.l.startsWith("### "));
     heads.forEach((h, n) => {
-      const hm = /^### (F-\d+) · \[(\w+)\/(P\d)\] (.+)$/.exec(h.l);
-      if (!hm) throw new QaMarkdownError("judul temuan tak valid; format: `### F-01 · [major/P1] Judul`", abs(fs2, h.idx));
+      const hm = /^### (.+?) · \[(\w+)\/(P\d)\] (.+)$/.exec(h.l);
+      if (!hm) throw new QaMarkdownError("judul temuan tak valid; format: `### F-01 · [major/P1] Judul` (kode bebas, tanpa ·)", abs(fs2, h.idx));
       const severity = oneOf(hm[2], QA_SEVERITIES, "severity", abs(fs2, h.idx));
       const priority = oneOf(hm[3], QA_PRIORITIES, "prioritas", abs(fs2, h.idx));
       const end = n + 1 < heads.length ? heads[n + 1]!.idx : fs2.lines.length;
@@ -193,7 +193,7 @@ export function parseQaMarkdown(text: string): QaParsedReport {
         }
         const am = /^\*\*Area:\*\* ?(.*)$/.exec(l);
         if (am) { area = am[1]!.trim(); continue; }
-        const tm = /^\*\*Test case:\*\* ?(TC-\d+)\s*$/.exec(l);
+        const tm = /^\*\*Test case:\*\* ?(.+?)\s*$/.exec(l);
         if (tm) { caseCode = tm[1]!; continue; }
         if (l === "**Repro**") { part = "repro"; continue; }
         if (l === "**Expected**") { part = "expected"; continue; }
@@ -212,7 +212,7 @@ export function parseQaMarkdown(text: string): QaParsedReport {
       findings.push({
         id: typeof meta.id === "string" && meta.id ? meta.id : null,
         caseId: typeof meta.caseId === "string" && meta.caseId ? meta.caseId : null,
-        caseCode, code: hm[1]!, title: hm[4]!.trim(), severity, priority, area,
+        caseCode, code: hm[1]!.trim(), customCode: hm[1]!.trim(), title: hm[4]!.trim(), severity, priority, area,
         status: meta.status === undefined ? "open" : oneOf(meta.status, QA_FINDING_STATUSES, "status temuan", abs(fs2, h.idx)),
         steps, expected: block(b.expected), actual: block(b.actual), attachments: pathsIn(b.att),
       });
@@ -223,10 +223,29 @@ export function parseQaMarkdown(text: string): QaParsedReport {
   if (ls) {
     let code: string | null = null;
     for (const l of ls.lines) {
-      const hm = /^### (TC-\d+)\s*$/.exec(l);
+      const hm = /^### (.+?)\s*$/.exec(l);
       if (hm) { code = hm[1]!; continue; }
       const c = code ? cases.find((x) => x.code === code) : undefined;
       if (c) c.attachments.push(...pathsIn([l]));
+    }
+  }
+
+  // Kode bebas (ADR-0176): bentuk apa pun, tapi unik di laporan (test case + temuan, tak peka huruf besar/kecil).
+  const seen = new Set<string>();
+  for (const x of [...cases, ...findings]) {
+    if (!x.code) continue;
+    const k = x.code.toLowerCase();
+    if (k === "laporan") throw new QaMarkdownError(`kode "${x.code}" dicadangkan untuk lampiran laporan`, 1);
+    if (seen.has(k)) throw new QaMarkdownError(`kode ${x.code} dipakai lebih dari sekali; kode harus unik`, 1);
+    seen.add(k);
+  }
+  let tcN = 0;   // sel Kode kosong → nomor otomatis yang melewati kode bebas
+  for (const c of cases) if (!c.code) { do { c.code = `TC-${String(++tcN).padStart(2, "0")}`; } while (seen.has(c.code.toLowerCase())); seen.add(c.code.toLowerCase()); }
+  for (const f of findings) {
+    if (f.caseCode) {
+      const c = cases.find((x) => x.code.toLowerCase() === f.caseCode!.toLowerCase());
+      if (!c) throw new QaMarkdownError(`temuan ${f.code}: test case ${f.caseCode} tidak ditemukan`, 1);
+      f.caseCode = c.code;
     }
   }
 

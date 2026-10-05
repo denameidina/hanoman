@@ -151,3 +151,32 @@ describe("temuan", () => {
     expect(del.json().findings).toEqual([]);
   });
 });
+
+describe("kode bebas (ADR-0176)", () => {
+  it("test case & temuan boleh berkode bebas; unik per laporan lintas jenis, tak peka huruf (409)", async () => {
+    const r = await mk();
+    const c = (await post(url("p1", `/${r.id}/cases`), { title: "Login", code: "LOGIN-1" })).json();
+    expect(c.cases[0].code).toBe("LOGIN-1");
+    const dup = await post(url("p1", `/${r.id}/findings`), { title: "x", code: "login-1" });
+    expect(dup.statusCode).toBe(409);
+    const f = (await post(url("p1", `/${r.id}/findings`), { title: "x", code: "BUG.7" })).json();
+    expect(f.findings[0].code).toBe("BUG.7");
+    expect((await post(url("p1", `/${r.id}/cases`), { title: "y", code: " bug.7 " })).statusCode).toBe(409);
+    expect((await post(url("p1", `/${r.id}/cases`), { title: "y", code: "Laporan" })).statusCode).toBe(400);
+    // Laporan lain boleh memakai kode yang sama.
+    const r2 = await mk("Lain");
+    expect((await post(url("p1", `/${r2.id}/cases`), { title: "z", code: "LOGIN-1" })).statusCode).toBe(201);
+  });
+
+  it("nomor otomatis melewati kode bebas; mengosongkan kode kembali ke otomatis; boleh menyimpan ulang kodenya sendiri", async () => {
+    const r = await mk();
+    await post(url("p1", `/${r.id}/cases`), { title: "A", code: "TC-01" }); await tick();
+    const d = (await post(url("p1", `/${r.id}/cases`), { title: "B" })).json();
+    expect(d.cases.map((c: { code: string }) => c.code)).toEqual(["TC-01", "TC-02"]);
+    const first = d.cases[0].id;
+    expect((await patch(url("p1", `/${r.id}/cases/${first}`), { code: "TC-01", title: "A2" })).statusCode).toBe(200);
+    const back = (await patch(url("p1", `/${r.id}/cases/${first}`), { code: "" })).json();
+    expect(back.cases.map((c: { code: string }) => c.code)).toEqual(["TC-01", "TC-02"]);
+    expect(await prisma.qaCase.findUnique({ where: { id: first }, select: { code: true } })).toEqual({ code: null });
+  });
+});

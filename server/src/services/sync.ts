@@ -110,8 +110,8 @@ const FIELDS: Record<Entity, string[]> = {
   // `qaFinding.backlogId` ikut (cermin task.specId): tanpa itu mesin lain bisa mengirim ulang temuan yang
   // di mesin ini sudah jadi backlog.
   qaReport: ["projectId", "title", "buildVersion", "environment", "scope", "tester", "summary", "status", "verdict", "createdAt", "updatedAt"],
-  qaCase: ["reportId", "title", "steps", "expected", "actual", "status", "order", "createdAt", "updatedAt"],
-  qaFinding: ["reportId", "caseId", "title", "severity", "priority", "area", "steps", "expected", "actual", "status", "backlogId", "createdAt", "updatedAt"],
+  qaCase: ["reportId", "code", "title", "steps", "expected", "actual", "status", "order", "createdAt", "updatedAt"],
+  qaFinding: ["reportId", "caseId", "code", "title", "severity", "priority", "area", "steps", "expected", "actual", "status", "backlogId", "createdAt", "updatedAt"],
   qaAttachment: ["reportId", "projectId", "ownerType", "ownerId", "filename", "mimeType", "size", "sha256", "storageKey", "createdAt", "updatedAt"],
 };
 // Field yang JSONB-nya string ISO tapi kolomnya DateTime — dikonversi balik saat menulis.

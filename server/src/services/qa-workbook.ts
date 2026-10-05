@@ -1,7 +1,7 @@
 import {
   QA_REPORT_STATUSES, QA_VERDICTS, QA_SEVERITIES, QA_PRIORITIES, QA_FINDING_STATUSES,
   parseCaseRows, QaTableError, parseQaMarkdown, qaTemplateMarkdown,
-  zCreateQaReport, zCreateQaCase, zCreateQaFinding, type QaParsedReport, type QaReportDetail, qaStats,
+  qaCodeKey, zCreateQaReport, zCreateQaCase, zCreateQaFinding, type QaParsedReport, type QaReportDetail, qaStats,
 } from "@hanoman/shared";
 import { readXlsx, writeXlsx, XlsxError } from "./xlsx";
 
@@ -11,9 +11,10 @@ const GUIDE = [
   ["Ringkasan", "Judul wajib. Kolom lain boleh kosong. Status: draft, submitted, closed. Keputusan: go (siap), no-go (belum siap), conditional (siap dengan catatan); wajib untuk submitted/closed."],
   ["Test case", "Satu baris = satu pengujian. Status: belum, lulus, gagal, terblokir, dilewati (atau todo, pass, fail, blocked, skipped). Langkah: satu per baris di dalam sel (Alt+Enter)."],
   ["Temuan", "Satu baris = satu masalah. Severity: blocker (tidak bisa dipakai), critical (kritis), major (fitur terganggu), minor (gangguan kecil), trivial (tampilan). Prioritas: P0 segera, P1 tinggi, P2 normal, P3 rendah."],
-  ["Lampiran", "Satu baris = satu berkas. Pemilik: Laporan, TC-01, atau F-01 sesuai Kode. Berkas: nama screenshot/log yang dipilih bersama Excel, atau attachments/nama.png dalam ZIP. Maks 10 MB/berkas, 30 berkas dan 100 MB/laporan."],
+  ["Lampiran", "Satu baris = satu berkas. Pemilik: Laporan, atau Kode test case/temuan (apa pun yang Anda tulis, mis. TC-01 atau LOGIN-3). Berkas: nama screenshot/log yang dipilih bersama Excel, atau attachments/nama.png dalam ZIP. Maks 10 MB/berkas, 30 berkas dan 100 MB/laporan."],
   ["Impor dengan lampiran", "Pilih Excel dan berkas lampiran bersama-sama di dashboard, atau ZIP berisi report.xlsx dan folder attachments/. Gambar yang hanya ditempel di sel Excel tidak diimpor; sertakan berkas gambarnya."],
-  ["Ref", "Biarkan Ref laporan/test case/temuan hasil ekspor untuk memperbarui laporan asal. Kosongkan untuk entri baru. Kode harus unik; Test case pada Temuan merujuk Kode TC yang ada."],
+  ["Ref", "Biarkan Ref laporan/test case/temuan hasil ekspor untuk memperbarui laporan asal. Kosongkan untuk entri baru."],
+  ["Kode", "Bebas Anda tentukan (mis. LOGIN-01, AUTH.3), asal unik di seluruh laporan — test case dan temuan tidak boleh sama, huruf besar/kecil dianggap sama. Kosongkan untuk nomor otomatis (TC-01 / F-01). Test case pada Temuan merujuk Kode test case."],
   ["Lingkungan", "Satu per baris: os=Windows 11, browser=Chrome, device=Laptop, url=https://… ."],
 ];
 
@@ -83,38 +84,56 @@ export function parseQaWorkbook(buf: Buffer): QaParsedReport {
   let cases;
   try { cases = parseCaseRows(read("Test case")); }
   catch (e) { if (e instanceof QaTableError) throw new XlsxError(`Test case, ${e.message}`); throw e; }
-  const codes = new Set<string>();
-  const refs = new Set<string>();
-  for (const [i, c] of cases.entries()) {
-    const code = c.code || `TC-${String(i + 1).padStart(2, "0")}`;
-    if (!/^TC-\d+$/.test(code) || codes.has(code)) fail("Test case", c.row, "Kode harus unik dan berformat TC-01");
-    if (c.ref && refs.has(c.ref)) fail("Test case", c.row, "Ref berulang");
-    codes.add(code); if (c.ref) refs.add(c.ref);
-    const result = zCreateQaCase.safeParse({ title: c.title, steps: c.steps ?? "", expected: c.expected ?? "", actual: c.actual ?? "", status: c.status ?? "todo" });
-    if (!result.success) fail("Test case", c.row, result.error.issues.map((e) => `${e.path}: ${e.message}`).join("; "));
-    parsed.cases.push({ ...result.data, id: c.ref, code, attachments: [] });
-  }
   const rows = read("Temuan");
   const headers = rows[0]?.map(norm) ?? [];
   for (const h of ["judul", "severity", "prioritas", "langkah", "expected", "actual"]) if (!headers.includes(h)) fail("Temuan", 1, `kolom ${h} wajib ada`);
-  const findingCodes = new Set<string>();
+  const getF = (r: string[], k: string) => r[headers.indexOf(norm(k))] ?? "";
+  const findingRows = rows.slice(1).map((r, i) => ({ r, row: i + 2 })).filter(({ r }) => !r.every((v) => !v.trim()));
+  // Kode bebas (ADR-0176): apa pun yang diketik QA, asal unik di seluruh laporan (test case + temuan, tak peka huruf).
+  // Sel Kode kosong = nomor otomatis yang melewati kode bebas.
+  const used = new Map<string, string>();
+  const claim = (sheet: string, row: number, code: string) => {
+    if (norm(code) === "laporan") fail(sheet, row, "Kode \"Laporan\" dicadangkan untuk lampiran laporan");
+    if (used.has(qaCodeKey(code))) fail(sheet, row, `Kode ${code} dipakai ${used.get(qaCodeKey(code))}; kode harus unik`);
+    used.set(qaCodeKey(code), `${sheet}`);
+  };
+  for (const c of cases) if (c.code.trim()) claim("Test case", c.row, c.code.trim());
+  for (const { r, row } of findingRows) if (getF(r, "Kode").trim()) claim("Temuan", row, getF(r, "Kode").trim());
+  const autoCode = (prefix: string, counter: { n: number }) => {
+    let code: string;
+    do { code = `${prefix}${String(++counter.n).padStart(2, "0")}`; } while (used.has(qaCodeKey(code)));
+    return code;
+  };
+  const caseCounter = { n: 0 };
+  const caseByKey = new Map<string, string>();
+  const refs = new Set<string>();
+  for (const c of cases) {
+    const customCode = c.code.trim() || null;
+    const code = customCode ?? autoCode("TC-", caseCounter);
+    if (c.ref && refs.has(c.ref)) fail("Test case", c.row, "Ref berulang");
+    if (c.ref) refs.add(c.ref);
+    const result = zCreateQaCase.safeParse({ title: c.title, steps: c.steps ?? "", expected: c.expected ?? "", actual: c.actual ?? "", status: c.status ?? "todo" });
+    if (!result.success) fail("Test case", c.row, result.error.issues.map((e) => `${e.path}: ${e.message}`).join("; "));
+    caseByKey.set(qaCodeKey(code), code);
+    parsed.cases.push({ ...result.data, id: c.ref, code, customCode, attachments: [] });
+  }
+  const findingCounter = { n: 0 };
   const findingRefs = new Set<string>();
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i]!; if (r.every((v) => !v.trim())) continue;
-    const get = (k: string) => r[headers.indexOf(norm(k))] ?? "";
-    const code = get("Kode") || `F-${String(parsed.findings.length + 1).padStart(2, "0")}`;
-    if (!/^F-\d+$/.test(code) || findingCodes.has(code)) fail("Temuan", i + 1, "Kode harus unik dan berformat F-01");
-    findingCodes.add(code);
+  for (const { r, row } of findingRows) {
+    const get = (k: string) => getF(r, k);
+    const customCode = get("Kode").trim() || null;
+    const code = customCode ?? autoCode("F-", findingCounter);
     const id = get("Ref") || null;
-    if (id && findingRefs.has(id)) fail("Temuan", i + 1, "Ref berulang");
+    if (id && findingRefs.has(id)) fail("Temuan", row, "Ref berulang");
     if (id) findingRefs.add(id);
-    const caseCode = get("Test case").trim() || null;
-    if (caseCode && !codes.has(caseCode)) fail("Temuan", i + 1, `Test case ${caseCode} tidak ditemukan`);
-    const status = choice(get("Status") || "open", QA_FINDING_STATUSES, "Temuan", i + 1);
-    const result = zCreateQaFinding.safeParse({ title: get("Judul"), severity: choice(get("Severity") || "major", QA_SEVERITIES, "Temuan", i + 1), priority: choice(get("Prioritas") || "P2", QA_PRIORITIES, "Temuan", i + 1), area: get("Area"),
+    const caseRef = get("Test case").trim();
+    const caseCode = caseRef ? caseByKey.get(qaCodeKey(caseRef)) ?? null : null;
+    if (caseRef && !caseCode) fail("Temuan", row, `Test case ${caseRef} tidak ditemukan`);
+    const status = choice(get("Status") || "open", QA_FINDING_STATUSES, "Temuan", row);
+    const result = zCreateQaFinding.safeParse({ title: get("Judul"), severity: choice(get("Severity") || "major", QA_SEVERITIES, "Temuan", row), priority: choice(get("Prioritas") || "P2", QA_PRIORITIES, "Temuan", row), area: get("Area"),
       steps: get("Langkah").split("\n").map((s) => s.trim().replace(/^\d+[.)]\s+/, "")).filter(Boolean), expected: get("Expected"), actual: get("Actual"), status: status === "sent" ? "open" : status });
-    if (!result.success) fail("Temuan", i + 1, result.error.issues.map((e) => `${e.path}: ${e.message}`).join("; "));
-    parsed.findings.push({ ...result.data, status, id, code, caseId: null, caseCode, attachments: [] });
+    if (!result.success) fail("Temuan", row, result.error.issues.map((e) => `${e.path}: ${e.message}`).join("; "));
+    parsed.findings.push({ ...result.data, status, id, code, customCode, caseId: null, caseCode, attachments: [] });
   }
   const attachments = read("Lampiran");
   if (norm(attachments[0]?.[0] ?? "") !== "pemilik" || norm(attachments[0]?.[1] ?? "") !== "berkas") fail("Lampiran", 1, "butuh kolom Pemilik dan Berkas");
@@ -123,7 +142,7 @@ export function parseQaWorkbook(buf: Buffer): QaParsedReport {
     if (!owner.trim() && !path.trim()) continue;
     if (!path.trim() || path.includes("\\") || path.startsWith("/") || path.split("/").some((p) => p === ".." || p === "." || !p)) fail("Lampiran", i + 1, "Berkas harus nama berkas atau path relatif yang aman");
     const target = norm(owner) === "laporan" ? parsed.attachments
-      : parsed.cases.find((c) => c.code === owner.trim())?.attachments ?? parsed.findings.find((f) => f.code === owner.trim())?.attachments;
+      : parsed.cases.find((c) => qaCodeKey(c.code) === qaCodeKey(owner))?.attachments ?? parsed.findings.find((f) => qaCodeKey(f.code) === qaCodeKey(owner))?.attachments;
     if (!target) fail("Lampiran", i + 1, `Pemilik "${owner}" tidak ditemukan; gunakan Laporan atau Kode TC/F yang ada`);
     target.push(path.trim());
   }

@@ -5,7 +5,8 @@ import type { Priority, Severity } from "./spec-source";
 // MCP, dan UI dari satu sumber.
 //
 // Nomor tampil (QA-007 / F-01 / TC-03) TIDAK disimpan: `assignCodes` menghitungnya saat render dari
-// urutan `createdAt`. Id acak tak pernah bentrok antar perangkat sesudah sync (bagian 3); harganya,
+// urutan `createdAt` — kecuali QA mengetik kode sendiri (ADR-0176): kolom `code` nullable pada test case
+// dan temuan, bebas formatnya, unik per laporan. Id acak tak pernah bentrok antar perangkat sesudah sync (bagian 3); harganya,
 // nomor bisa bergeser bila baris yang lebih tua dari perangkat lain masuk — ekspor Markdown
 // membekukan nomor pada saat ekspor dan menyertakan `id` untuk impor.
 
@@ -46,7 +47,15 @@ export type CreateQaReport = z.input<typeof zCreateQaReport>;
 export const zPatchQaReport = zCreateQaReport.partial().extend({ status: z.enum(QA_REPORT_STATUSES).optional() });
 export type PatchQaReport = z.input<typeof zPatchQaReport>;
 
+/** Kode bebas yang diketik QA (TC/F). Kosong = otomatis. Keunikan diperiksa per laporan oleh server (lihat `qaCodeKey`). */
+export const zQaCode = z.string().trim().max(40)
+  .refine((c) => !/[\u0000-\u001f·]/.test(c), "kode tak boleh berisi baris baru atau karakter ·")
+  .refine((c) => c.toLowerCase() !== "laporan", "\"Laporan\" dicadangkan untuk lampiran laporan")
+  .transform((c) => c || null)
+  .nullable();
+
 export const zCreateQaCase = z.object({
+  code: zQaCode.optional(),
   title: z.string().trim().min(1).max(300),
   steps: z.string().max(10_000).default(""),
   expected: z.string().max(10_000).default(""),
@@ -59,6 +68,7 @@ export const zPatchQaCase = zCreateQaCase.partial();
 export type PatchQaCase = z.input<typeof zPatchQaCase>;
 
 export const zCreateQaFinding = z.object({
+  code: zQaCode.optional(),
   title: z.string().trim().min(1).max(300),
   caseId: z.string().max(120).nullable().default(null),
   severity: z.enum(QA_SEVERITIES).default("major"),
@@ -73,17 +83,29 @@ export type CreateQaFinding = z.input<typeof zCreateQaFinding>;
 export const zPatchQaFinding = zCreateQaFinding.partial();
 export type PatchQaFinding = z.input<typeof zPatchQaFinding>;
 
-/** Nomor tampil: urut `createdAt` (seri → `id`) per himpunan baris; urutan array input dipertahankan. */
-export function assignCodes<T extends { id: string; createdAt: Date | string }>(
-  rows: readonly T[], prefix: string, pad: number,
+/** Kunci perbandingan keunikan kode: tak peka huruf besar/kecil. */
+export const qaCodeKey = (c: string): string => c.trim().toLowerCase();
+
+/**
+ * Nomor tampil: urut `createdAt` (seri → `id`) per himpunan baris; urutan array input dipertahankan.
+ * Baris ber-`code` (diketik QA) memakai kodenya apa adanya; baris tanpa `code` diberi nomor otomatis yang
+ * MELEWATI kode ber-`taken` (kunci `qaCodeKey` semua kode bebas di laporan, test case + temuan) — jadi
+ * kode otomatis tak pernah bentrok dengan kode bebas.
+ */
+export function assignCodes<T extends { id: string; createdAt: Date | string; code?: string | null }>(
+  rows: readonly T[], prefix: string, pad: number, taken: ReadonlySet<string> = new Set(),
 ): (T & { code: string })[] {
   const ts = (r: T) => new Date(r.createdAt).getTime();
-  const rank = new Map(
-    [...rows]
-      .sort((a, b) => ts(a) - ts(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-      .map((r, i) => [r.id, i + 1] as const),
-  );
-  return rows.map((r) => ({ ...r, code: `${prefix}${String(rank.get(r.id)).padStart(pad, "0")}` }));
+  const ordered = [...rows].sort((a, b) => ts(a) - ts(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const out = new Map<string, string>();
+  let n = 0;
+  for (const r of ordered) {
+    if (r.code) { out.set(r.id, r.code); continue; }
+    let code: string;
+    do { code = `${prefix}${String(++n).padStart(pad, "0")}`; } while (taken.has(qaCodeKey(code)));
+    out.set(r.id, code);
+  }
+  return rows.map((r) => ({ ...r, code: out.get(r.id)! }));
 }
 
 export type QaStats = {

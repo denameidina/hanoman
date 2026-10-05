@@ -4,7 +4,7 @@ import {
   zCreateQaCase, zCreateQaFinding, zCreateQaReport, zPatchQaCase, zPatchQaFinding, zPatchQaReport,
 } from "@hanoman/shared";
 import { prisma } from "../db";
-import { asJson, listReports, reportDetail } from "../services/qa";
+import { asJson, listReports, qaCodeProblem, reportDetail } from "../services/qa";
 import { removeQaAttachments } from "../services/qa-attachment";
 import { deleteSynced } from "../services/sync-delete";
 import { notifySynced } from "../services/sync-notify";
@@ -105,8 +105,10 @@ export default async function qa(app: FastifyInstance) {
     if (!parsed.success) return bad(reply, parsed.error);
     const p = parsed.data;
     const last = await prisma.qaCase.findFirst({ where: { reportId: rid }, orderBy: { order: "desc" }, select: { order: true } });
+    const clash = await qaCodeProblem(rid, p.code);
+    if (clash) return reply.code(409).send(clash);
     const row = await prisma.qaCase.create({ data: {
-      reportId: rid, title: p.title, steps: p.steps, expected: p.expected, actual: p.actual,
+      reportId: rid, code: p.code ?? null, title: p.title, steps: p.steps, expected: p.expected, actual: p.actual,
       status: p.status, order: p.order ?? (last ? last.order + 1 : 1),
     } });
     await notifySynced("qaCase", row.id);
@@ -122,6 +124,8 @@ export default async function qa(app: FastifyInstance) {
     if (r.status === "closed") return locked(reply);
     const parsed = zPatchQaCase.safeParse(req.body ?? {});
     if (!parsed.success) return bad(reply, parsed.error);
+    const clash = await qaCodeProblem(rid, parsed.data.code, cid);
+    if (clash) return reply.code(409).send(clash);
     await prisma.qaCase.update({ where: { id: cid }, data: parsed.data });
     await notifySynced("qaCase", cid);
     await touch(rid);
@@ -161,8 +165,10 @@ export default async function qa(app: FastifyInstance) {
     const p = parsed.data;
     const problem = await caseProblem(rid, p.caseId);
     if (problem) return reply.code(400).send(problem);
+    const clash = await qaCodeProblem(rid, p.code);
+    if (clash) return reply.code(409).send(clash);
     const row = await prisma.qaFinding.create({ data: {
-      reportId: rid, caseId: p.caseId, title: p.title, severity: p.severity, priority: p.priority,
+      reportId: rid, code: p.code ?? null, caseId: p.caseId, title: p.title, severity: p.severity, priority: p.priority,
       area: p.area, steps: asJson(p.steps), expected: p.expected, actual: p.actual, status: p.status,
     } });
     await notifySynced("qaFinding", row.id);
@@ -181,8 +187,10 @@ export default async function qa(app: FastifyInstance) {
     const p = parsed.data;
     const problem = await caseProblem(rid, p.caseId);
     if (problem) return reply.code(400).send(problem);
+    const clash = await qaCodeProblem(rid, p.code, fid);
+    if (clash) return reply.code(409).send(clash);
     await prisma.qaFinding.update({ where: { id: fid }, data: {
-      caseId: p.caseId, title: p.title, severity: p.severity, priority: p.priority, area: p.area,
+      code: p.code, caseId: p.caseId, title: p.title, severity: p.severity, priority: p.priority, area: p.area,
       steps: p.steps === undefined ? undefined : asJson(p.steps), expected: p.expected, actual: p.actual,
       status: p.status,
     } });

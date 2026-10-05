@@ -1,5 +1,6 @@
-import { QaTableError, csvDecode, parseCaseRows, type QaCasesImportResult } from "@hanoman/shared";
+import { QaTableError, csvDecode, parseCaseRows, qaCodeKey, type QaCasesImportResult } from "@hanoman/shared";
 import { prisma } from "../db";
+import { caseViews, takenCodes } from "./qa";
 import { QaImportError } from "./qa-transfer";
 import { notifySynced } from "./sync-notify";
 import { XlsxError, readXlsx } from "./xlsx";
@@ -33,6 +34,22 @@ export async function importCases(projectId: string, reportId: string, file: { n
   const result = await prisma.$transaction(async (tx) => {
     const existing = new Map((await tx.qaCase.findMany({ where: { reportId } })).map((c) => [c.id, c]));
     let maxOrder = Math.max(0, ...[...existing.values()].map((c) => c.order));
+    // Kolom Kode (ADR-0176): sel terisi yang BEDA dari kode tampil sekarang = kode bebas baru (tak boleh bentrok
+    // dengan kode bebas test case/temuan lain). Sama dengan kode tampil = tak berubah (round-trip ekspor tak membekukan nomor).
+    const findings = await tx.qaFinding.findMany({ where: { reportId }, select: { code: true } });
+    const shown = new Map(caseViews([...existing.values()], takenCodes([...existing.values()], findings)).map((c) => [c.id, c.code]));
+    const owner = new Map<string, string>();
+    for (const c of existing.values()) if (c.code) owner.set(qaCodeKey(c.code), c.id);
+    for (const f of findings) if (f.code) owner.set(qaCodeKey(f.code), "finding");
+    const wanted = (r: { code: string; row: number }, id: string, current: string | undefined): string | undefined => {
+      const code = r.code.trim();
+      if (!code || code === current) return undefined;
+      if (qaCodeKey(code) === "laporan") throw new QaImportError(400, `baris ${r.row}: kode "Laporan" dicadangkan`);
+      const holder = owner.get(qaCodeKey(code));
+      if (holder && holder !== id) throw new QaImportError(400, `baris ${r.row}: kode ${code} sudah dipakai; kode harus unik`);
+      owner.set(qaCodeKey(code), id);
+      return code;
+    };
     const out: QaCasesImportResult = { updated: 0, created: 0, unchanged: 0 };
 
     for (const [i, r] of parsed.entries()) {
@@ -42,17 +59,19 @@ export async function importCases(projectId: string, reportId: string, file: { n
           title: r.title || cur.title, steps: r.steps ?? cur.steps, expected: r.expected ?? cur.expected,
           actual: r.actual ?? cur.actual, status: r.status ?? cur.status,
         };
-        if (next.title === cur.title && next.steps === cur.steps && next.expected === cur.expected
+        const code = wanted(r, cur.id, shown.get(cur.id));
+        if (!code && next.title === cur.title && next.steps === cur.steps && next.expected === cur.expected
           && next.actual === cur.actual && next.status === cur.status) { out.unchanged++; continue; }
-        await tx.qaCase.update({ where: { id: cur.id }, data: next });
+        await tx.qaCase.update({ where: { id: cur.id }, data: code ? { ...next, code } : next });
         changed.push(cur.id);
         out.updated++;
         continue;
       }
       // Ref asing (mis. dari laporan lain) diperlakukan sebagai baris baru — tapi tetap butuh judul.
       if (!r.title) throw new QaImportError(400, `baris ${r.row}: judul wajib diisi (Ref "${r.ref}" tak dikenal di laporan ini)`);
+      const code = wanted(r, `new-${i}`, undefined);
       const made = await tx.qaCase.create({ data: {
-        reportId, title: r.title, steps: r.steps ?? "", expected: r.expected ?? "", actual: r.actual ?? "",
+        reportId, code: code ?? null, title: r.title, steps: r.steps ?? "", expected: r.expected ?? "", actual: r.actual ?? "",
         status: r.status ?? "todo", order: ++maxOrder, createdAt: new Date(base + i),   // +i ms: nomor TC-nn = urutan di lembar
       } });
       changed.push(made.id);

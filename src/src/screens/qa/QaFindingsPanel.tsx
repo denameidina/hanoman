@@ -9,12 +9,12 @@ import type { PanelProps } from "./QaReportEditor";
 import { PRIORITY_LABEL, SEVERITY_LABEL, SEVERITY_TONE, errText } from "./qa-ui";
 
 type Draft = {
-  id: string | null; title: string; severity: QaSeverity; priority: QaPriority; area: string;
+  id: string | null; code: string; origCode: string; title: string; severity: QaSeverity; priority: QaPriority; area: string;
   caseId: string; steps: string; expected: string; actual: string; status: "open" | "wontfix";
 };
-const blank: Draft = { id: null, title: "", severity: "major", priority: "P2", area: "", caseId: "", steps: "", expected: "", actual: "", status: "open" };
+const blank: Draft = { id: null, code: "", origCode: "", title: "", severity: "major", priority: "P2", area: "", caseId: "", steps: "", expected: "", actual: "", status: "open" };
 const fromFinding = (f: QaFindingView): Draft => ({
-  id: f.id, title: f.title, severity: f.severity, priority: f.priority, area: f.area, caseId: f.caseId ?? "",
+  id: f.id, code: f.code, origCode: f.code, title: f.title, severity: f.severity, priority: f.priority, area: f.area, caseId: f.caseId ?? "",
   steps: f.steps.join("\n"), expected: f.expected, actual: f.actual, status: f.status === "wontfix" ? "wontfix" : "open",
 });
 
@@ -25,7 +25,10 @@ export function QaFindingsPanel(p: PanelProps) {
 
   const save = async () => {
     if (!draft || !draft.title.trim()) return;
+    const code = draft.code.trim();
+    // Kode hanya dikirim bila diubah: menyimpan temuan bernomor otomatis tak boleh membekukan nomornya.
     const body = {
+      ...(code !== draft.origCode ? { code: code || null } : {}),
       title: draft.title.trim(), severity: draft.severity, priority: draft.priority, area: draft.area,
       caseId: draft.caseId || null, expected: draft.expected, actual: draft.actual, status: draft.status,
       steps: draft.steps.split("\n").map((l) => l.trim().replace(/^\d+[.)]\s+/, "")).filter(Boolean),
@@ -108,6 +111,9 @@ export function QaFindingsPanel(p: PanelProps) {
         footer={<><Button variant="ghost" onClick={() => setDraft(null)}>Batal</Button><Button onClick={() => void save()} disabled={!draft?.title.trim()}>Simpan temuan</Button></>}>
         {draft && (
           <>
+            <Field label="Kode (opsional)" hint="Bebas, mis. LOGIN-3. Harus unik di laporan ini; kosongkan untuk nomor otomatis.">
+              <Input aria-label="Kode temuan" maxLength={40} placeholder="F-01" value={draft.code} onChange={set("code")} />
+            </Field>
             <Field label="Judul masalah (wajib)"><Input placeholder="Contoh: Tombol Masuk tidak bereaksi di Safari" value={draft.title} onChange={set("title")} autoFocus /></Field>
             <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))" }}>
               <Field label="Dampak masalah" hint="Seberapa terganggu pengguna?">

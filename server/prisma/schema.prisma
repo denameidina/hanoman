@@ -1088,6 +1088,7 @@ model QaReport {
 model QaCase {
   id        String   @id @default(cuid())
   reportId  String
+  code      String?  // kode bebas ketikan QA (ADR-0176); null = nomor otomatis TC-nn. Unik per laporan (digerbang service)
   title     String
   steps     String   @default("")
   expected  String   @default("")
@@ -1108,6 +1109,7 @@ model QaFinding {
   id        String   @id @default(cuid())
   reportId  String
   caseId    String?
+  code      String?  // kode bebas ketikan QA (ADR-0176); null = nomor otomatis F-nn. Unik per laporan (digerbang service)
   title     String
   severity  String   @default("major") // blocker | critical | major | minor | trivial
   priority  String   @default("P2")    // P0..P3 — terpisah dari severity

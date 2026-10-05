@@ -117,7 +117,7 @@ export async function importReport(projectId: string, file: { name: string; buf:
     const caseByFileId = new Map<string, string>();
     const caseByCode = new Map<string, string>();
     for (const [idx, c] of parsed.cases.entries()) {
-      const fields = { title: c.title, steps: c.steps, expected: c.expected, actual: c.actual, status: c.status, order: idx + 1 };
+      const fields = { code: c.customCode, title: c.title, steps: c.steps, expected: c.expected, actual: c.actual, status: c.status, order: idx + 1 };
       const row = c.id && knownCases.has(c.id)
         ? await tx.qaCase.update({ where: { id: c.id }, data: fields })
         // createdAt bergeser 1 ms per baris: nomor TC-nn deterministik = urutan di berkas
@@ -132,7 +132,7 @@ export async function importReport(projectId: string, file: { name: string; buf:
     for (const [idx, f] of parsed.findings.entries()) {
       const caseId = (f.caseId && caseByFileId.get(f.caseId)) || (f.caseCode && caseByCode.get(f.caseCode)) || null;
       const fields = {
-        caseId, title: f.title, severity: f.severity, priority: f.priority, area: f.area,
+        code: f.customCode, caseId, title: f.title, severity: f.severity, priority: f.priority, area: f.area,
         steps: asJson(f.steps), expected: f.expected, actual: f.actual,
         status: f.status === "sent" ? "open" : f.status,   // `sent` tanpa backlogId di mesin ini tak bermakna
       };

@@ -59,12 +59,14 @@ export function QaCasesPanel(p: PanelProps) {
 
 function CaseCard({ c, p, run }: { c: QaCaseView; p: PanelProps; run: (fn: () => Promise<PanelProps["detail"]>) => Promise<boolean> }) {
   const api = useApi();
-  const [d, setD] = React.useState({ title: c.title, steps: c.steps, expected: c.expected, actual: c.actual });
-  React.useEffect(() => { setD({ title: c.title, steps: c.steps, expected: c.expected, actual: c.actual }); }, [c.id, c.title, c.steps, c.expected, c.actual]);
+  const [d, setD] = React.useState({ code: c.code, title: c.title, steps: c.steps, expected: c.expected, actual: c.actual });
+  React.useEffect(() => { setD({ code: c.code, title: c.title, steps: c.steps, expected: c.expected, actual: c.actual }); }, [c.id, c.code, c.title, c.steps, c.expected, c.actual]);
   // Simpan saat blur, hanya bila berubah — ketikan tak membanjiri server.
-  const commit = (k: "title" | "steps" | "expected" | "actual") => {
+  const commit = (k: "code" | "title" | "steps" | "expected" | "actual") => {
     if (d[k] === c[k] || (k === "title" && !d.title.trim())) return;
-    void run(() => api.patchQaCase(p.projectId, p.detail.id, c.id, { [k]: d[k] }));
+    // Kode kosong = kembali ke nomor otomatis; galat (mis. kode bentrok) mengembalikan isian ke kode tersimpan.
+    void run(() => api.patchQaCase(p.projectId, p.detail.id, c.id, { [k]: k === "code" ? d.code.trim() || null : d[k] }))
+      .then((ok) => { if (!ok && k === "code") setD((s) => ({ ...s, code: c.code })); });
   };
   const bind = (k: keyof typeof d) => ({
     value: d[k], disabled: p.locked, onBlurCapture: () => commit(k),
@@ -74,7 +76,7 @@ function CaseCard({ c, p, run }: { c: QaCaseView; p: PanelProps; run: (fn: () =>
   return (
     <Card padding={14}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-        <Badge tone="neutral" variant="outline" size="sm">{c.code}</Badge>
+        <div style={{ flex: "0 1 120px" }}><Field label="Kode"><Input aria-label={`Kode ${c.code}`} maxLength={40} {...bind("code")} /></Field></div>
         <div style={{ flex: "1 1 200px" }}><Field label="Nama pengujian"><Input aria-label={`Judul ${c.code}`} {...bind("title")} /></Field></div>
         <Select aria-label={`Status ${c.code}`} value={c.status} disabled={p.locked}
           onChange={(e) => void run(() => api.patchQaCase(p.projectId, p.detail.id, c.id, { status: e.target.value as QaCaseStatus }))}

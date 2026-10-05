@@ -59,6 +59,7 @@ const reportBody = (a: Args): Record<string, unknown> => {
 const caseBody = (a: Args): Record<string, unknown> => {
   const b: Record<string, unknown> = {};
   for (const k of ["title", "steps", "expected", "actual", "status"] as const) put(b, k, s(a[k]));
+  put(b, "code", nullable(a.code));
   return b;
 };
 const findingBody = (a: Args): Record<string, unknown> => {
@@ -66,10 +67,13 @@ const findingBody = (a: Args): Record<string, unknown> => {
   for (const k of ["title", "severity", "priority", "area", "expected", "actual", "status"] as const) put(b, k, s(a[k]));
   put(b, "steps", parseSteps(a.steps));
   put(b, "caseId", nullable(a.testCase));
+  put(b, "code", nullable(a.code));
   return b;
 };
 
+const CODE_FIELD = str("Kode bebas (mis. `LOGIN-01`), unik di satu laporan (test case + temuan, tak peka huruf). String KOSONG kembali ke nomor otomatis; tak menyebutnya membiarkan apa adanya.");
 const CASE_FIELDS = {
+  code: CODE_FIELD,
   title: str("Judul test case."),
   steps: str("Langkah uji (teks bebas)."),
   expected: str("Hasil yang diharapkan."),
@@ -77,6 +81,7 @@ const CASE_FIELDS = {
   status: enumStr(QA_CASE_STATUSES, "Status eksekusi."),
 };
 const FINDING_FIELDS = {
+  code: CODE_FIELD,
   title: str("Judul temuan — satu masalah, satu baris."),
   severity: enumStr(QA_SEVERITIES, "Dampak TEKNIS. Bukan prioritas."),
   priority: enumStr(QA_PRIORITIES, "Urutan perbaikan P0 (paling mendesak)–P3. Terpisah dari severity: bug minor di halaman checkout bisa P0."),
@@ -103,7 +108,7 @@ export const QA_TOOLS: readonly McpToolDef[] = [
     name: "hanoman_qa_report_get",
     title: "Detail laporan QA",
     description:
-      "Satu laporan QA lengkap: header, test case (`TC-01…`), temuan (`F-01…`, dengan repro bernomor, severity, prioritas, `caseCode`), dan metadata lampiran (nama, tipe, ukuran — bukan byte).",
+      "Satu laporan QA lengkap: header, test case (kode otomatis `TC-01…` atau kode bebas QA), temuan (`F-01…` atau kode bebas, dengan repro bernomor, severity, prioritas, `caseCode`), dan metadata lampiran (nama, tipe, ukuran — bukan byte).",
     inputSchema: obj({ properties: { project: PROJECT, report: REPORT }, required: ["project", "report"] }),
     mode: "read", capability: "qa:read", samplePath: "/projects/p1/qa/reports/r1", sampleMethod: "GET",
     build: (a) => ({ method: "GET", path: one(a) }),

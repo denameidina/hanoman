@@ -28,6 +28,19 @@ describe("QA workbook validation", () => {
     row[1] = "os=macOS\nChrome 130";
     expect(() => parseQaWorkbook(writeXlsx(s))).toThrow(/Ringkasan, baris 9.*kunci=nilai/);
   });
+  it("accepts free-form unique codes (case-insensitive), blank cells get auto numbers that skip them", () => {
+    const s = sheets();
+    s[2]!.rows[1]![0] = "LOGIN-1";
+    s[2]!.rows.push(["", "Kasus tanpa kode", "", "", "", "belum", ""], ["TC-01", "Kasus dengan kode TC-01", "", "", "", "belum", ""]);
+    s[3]!.rows[1]![0] = "bug.7"; s[3]!.rows[1]![6] = "login-1";
+    const p = parseQaWorkbook(writeXlsx(s));
+    expect(p.cases.map((c) => [c.code, c.customCode])).toEqual([["LOGIN-1", "LOGIN-1"], ["TC-02", null], ["TC-01", "TC-01"]]);
+    expect(p.findings[0]).toMatchObject({ code: "bug.7", customCode: "bug.7", caseCode: "LOGIN-1" });
+    s[3]!.rows[1]![0] = "Login-1";
+    expect(() => parseQaWorkbook(writeXlsx(s))).toThrow(/Temuan, baris 2.*unik/);
+    s[3]!.rows[1]![0] = "Laporan";
+    expect(() => parseQaWorkbook(writeXlsx(s))).toThrow(/dicadangkan/);
+  });
   it("rejects invalid finding enums with sheet and row", () => {
     const s = sheets(); s[3]!.rows[1]![2] = "invalid";
     expect(() => parseQaWorkbook(writeXlsx(s))).toThrow(/Temuan, baris 2/);
