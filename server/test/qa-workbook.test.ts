@@ -19,6 +19,15 @@ describe("QA workbook validation", () => {
     const s = sheets(); s[2]!.rows[1]![5] = "lulus";
     expect(parseQaWorkbook(writeXlsx(s)).cases[0]).toMatchObject({ status: "pass", steps: expect.stringContaining("\n") });
   });
+  it("parses Lingkungan with CRLF (Excel Alt+Enter) and ';' separators, still rejecting keyless lines", () => {
+    const s = sheets(); const row = s[1]!.rows.find((r) => r[0] === "Lingkungan")!;
+    row[1] = "os=Windows 11\r\nbrowser=Chrome 130\r\nurl=https://x.id";
+    expect(parseQaWorkbook(writeXlsx(s)).environment).toEqual({ os: "Windows 11", browser: "Chrome 130", url: "https://x.id" });
+    row[1] = "os=macOS 15; browser=Chrome 130";
+    expect(parseQaWorkbook(writeXlsx(s)).environment).toEqual({ os: "macOS 15", browser: "Chrome 130" });
+    row[1] = "os=macOS\nChrome 130";
+    expect(() => parseQaWorkbook(writeXlsx(s))).toThrow(/Ringkasan, baris 9.*kunci=nilai/);
+  });
   it("rejects invalid finding enums with sheet and row", () => {
     const s = sheets(); s[3]!.rows[1]![2] = "invalid";
     expect(() => parseQaWorkbook(writeXlsx(s))).toThrow(/Temuan, baris 2/);

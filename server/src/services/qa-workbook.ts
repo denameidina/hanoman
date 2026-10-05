@@ -69,7 +69,8 @@ export function parseQaWorkbook(buf: Buffer): QaParsedReport {
   const rowOf = (k: string) => Math.max(1, summary.findIndex((r) => norm(r[0] ?? "") === norm(k)) + 1);
   if (!val("Judul").trim()) fail("Ringkasan", rowOf("Judul"), "Judul wajib diisi");
   const environment: Record<string, string> = Object.create(null);
-  for (const line of val("Lingkungan").split("\n").filter((l) => l.trim())) {
+  // Excel menyimpan Alt+Enter sebagai \r\n; `;` (diikuti kunci=) juga pemisah sah (lihat katalog MCP QA).
+  for (const line of val("Lingkungan").split(/\r\n|\r|\n|;(?=\s*[^=:;\s]+\s*[=:])/).filter((l) => l.trim())) {
     const match = /^\s*([^=:]+)[=:]\s*(.*)$/.exec(line);
     if (!match) fail("Ringkasan", rowOf("Lingkungan"), "Lingkungan: gunakan kunci=nilai, satu per baris");
     environment[match[1]!.trim()] = match[2]!;
