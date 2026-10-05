@@ -942,7 +942,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `useVoiceInput`/`VoiceInput` (Task 3), `VoiceControls` (Task 3), `TerminalComposer` props `voiceAppend`/`onDraft` (Task 4).
 - Produces: pane merender `terminal-voice` (bila didukung & `canWrite`) di antara host terminal dan composer; composer tampil bila `canWrite && (showKeys || voice.status === "listening" || draft)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Di akhir `src/test/terminal-pane.test.tsx` tambahkan describe berikut. Ia memakai mock `xterm`, `sockets`, dan `inputsOf` yang sudah ada di berkas itu (lihat describe "kolom ketik perangkat sentuh (SPEC-882)" untuk pola `openPane`). `cleanup`/`beforeEach` global berkas itu sudah mengurus `sockets`.
 
@@ -1055,12 +1055,12 @@ describe("TerminalPane · dikte suara", () => {
 
 Catatan untuk implementer: pastikan `afterEach` dan `fireEvent` sudah diimpor di berkas itu (keduanya sudah: lihat baris 1–2). Bila `mode: "remote"` butuh `InstanceContext` khusus di berkas itu, ikuti pola di `terminal-pane-remote.test.tsx` untuk membuat pane baca-saja; tujuan tes: `canWrite=false` ⇒ tak ada `terminal-voice`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/terminal-pane.test.tsx -t "dikte suara"`
 Expected: FAIL — `voice-toggle` tidak ditemukan.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 3a. `src/src/screens/TerminalPane.tsx` — tambah impor di samping `import { TerminalComposer } from "./TerminalComposer";`:
 
@@ -1143,14 +1143,14 @@ import { useVoiceInput } from "./use-voice-input";
 Run: `pnpm --filter ./src gen:icons`
 Expected: `src/src/ds/icon-registry.ts` berubah, memuat `Mic` dan `Info`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/terminal-pane.test.tsx src/test/terminal-composer-voice.test.tsx src/test/voice-controls.test.tsx src/test/icon-registry.test.ts`
 Expected: PASS. Seluruh tes `terminal-pane.test.tsx` lama tetap hijau (jsdom tanpa `SpeechRecognition` ⇒ `VoiceControls` null ⇒ DOM lama tak berubah).
 
 Lalu typecheck sebatas berkas tersentuh: `pnpm --filter ./src exec tsc --noEmit` (bila lambat, cukup pastikan editor/`vitest` tak melaporkan galat tipe).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalPane.tsx src/src/app.css src/src/ds/icon-registry.ts src/test/terminal-pane.test.tsx docs/superpowers/plans/2026-10-05-voice-input.md

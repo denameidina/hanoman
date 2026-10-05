@@ -13,6 +13,8 @@ import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./te
 import * as P from "./terminal-predict";
 import * as D from "./terminal-diag";
 import { TerminalComposer } from "./TerminalComposer";
+import { VoiceControls } from "./VoiceControls";
+import { useVoiceInput } from "./use-voice-input";
 import { createHiddenRing } from "../lib/hidden-ring";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
@@ -123,6 +125,13 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   // pintu mentah yang sama. `sendKey` sengaja TIDAK dibungkus — itu pintu yang dipakai kolom ketik
   // sendiri, dan membungkusnya akan membuatnya menguras dirinya sendiri.
   const sendOuter = React.useRef<(d: string) => void>(() => {});
+  // Dikte suara (spec 2026-10-05): teks FINAL ditambahkan ke composer lewat `voiceAppend`, interim
+  // hanya pratinjau di `VoiceControls`. `draft` = composer berisi → tetap tampil di desktop walau mic
+  // sudah berhenti, supaya teks yang belum dikirim tak hilang bersama komponennya.
+  const voiceAppend = React.useRef<(t: string) => void>(() => {});
+  const [draft, setDraft] = React.useState(false);
+  const voice = useVoiceInput({ enabled: canWrite, onFinalText: (t) => voiceAppend.current(t) });
+  const showComposer = canWrite && (showKeys || voice.status === "listening" || draft);
 
   React.useEffect(() => {
     const el = host.current;
@@ -780,7 +789,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     if (rect.width <= 0 || rect.height <= 0) return;
     current.fit.fit();
     current.sendSize(true);
-  }, [showKeys, mode]);
+  }, [showKeys, mode, showComposer, voice.supported]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -835,8 +844,10 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
           </div>
         )}
       </div>
-      {showKeys && canWrite && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
-        external={composerDrain} linkState={link.state} queue={queue} />}
+      <VoiceControls voice={voice} />
+      {showComposer && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
+        external={composerDrain} linkState={link.state} queue={queue}
+        voiceAppend={voiceAppend} onDraft={setDraft} />}
       {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
     </div>
   );

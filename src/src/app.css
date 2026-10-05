@@ -636,6 +636,42 @@ textarea:focus-visible,
 .hn-terminal-composer-status--queued { color: var(--status-warn); }
 .hn-terminal-composer-status--held { color: var(--status-err); }
 
+/* Dikte suara: satu baris kecil di atas composer. Pratinjau interim sengaja abu-abu & miring —
+   ia BELUM masuk composer/pty. */
+.hn-terminal-voice {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border-top: 1px solid var(--border-hair);
+}
+.hn-terminal-voice-lang {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-body);
+  font: var(--text-xs)/1.2 var(--font-mono);
+}
+.hn-terminal-voice-hint { display: inline-flex; color: var(--text-subtle); cursor: help; }
+.hn-terminal-voice-interim {
+  flex: 1 1 120px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: italic var(--text-xs)/1.2 var(--font-mono);
+  color: var(--text-subtle);
+}
+.hn-terminal-voice-error { font: var(--text-xs)/1.2 var(--font-mono); color: var(--status-err); }
+.hn-voice-rec { animation: hn-voice-pulse 1.2s ease-in-out infinite; }
+@keyframes hn-voice-pulse { 50% { box-shadow: 0 0 0 4px var(--status-err-tint); } }
+@media (prefers-reduced-motion: reduce) { .hn-voice-rec { animation: none; } }
+
 /* Divider drag-resize: dititipkan di track pane bertetangga (gap grid asli 8px) lalu digeser
    margin negatif supaya area tangkapnya berimpit di atas gap — lihat komentar render di
    TerminalScreen.tsx. Area tangkap dilebarkan ke 16px (4px meluber ke tiap pane bertetangga,
