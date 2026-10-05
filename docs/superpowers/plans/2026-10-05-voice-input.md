@@ -538,7 +538,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `VoiceControls({ voice }: { voice: VoiceInput }): JSX.Element | null`
   - data-testid: `terminal-voice` (wadah), `voice-toggle`, `voice-lang`, `voice-interim`, `voice-error`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/test/voice-controls.test.tsx`:
 
@@ -666,12 +666,12 @@ describe("VoiceControls", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/voice-controls.test.tsx`
 Expected: FAIL — "Failed to resolve import ../src/screens/VoiceControls".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/src/screens/use-voice-input.ts`:
 
@@ -772,12 +772,12 @@ export function VoiceControls({ voice }: { voice: VoiceInput }) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/voice-controls.test.tsx`
 Expected: PASS. (Peringatan dev `Icon: nama "mic"/"info" tak dikenal` dapat muncul sampai Task 5 menjalankan `gen:icons`; itu bukan kegagalan.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/use-voice-input.ts src/src/screens/VoiceControls.tsx src/test/voice-controls.test.tsx docs/superpowers/plans/2026-10-05-voice-input.md
