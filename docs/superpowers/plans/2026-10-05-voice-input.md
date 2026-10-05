@@ -1170,7 +1170,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:** tidak ada kode; docs harus konsisten dengan nama di Task 1–5 (`SpeechEngine`, `useVoiceInput`, `VoiceControls`, `voiceAppend`, kunci `hanoman.voice.lang`).
 
-- [ ] **Step 1: Tulis ADR**
+- [x] **Step 1: Tulis ADR**
 
 Create `internal/docs/adr/0177-dikte-suara-seam-speech-engine.md`:
 
@@ -1212,7 +1212,7 @@ Operator mengetik prompt panjang ke `claude` di terminal sesi terus-menerus. Dib
 - Tanpa perubahan skema/API; tanpa migration.
 ```
 
-- [ ] **Step 2: Perbarui `frontend-implementation.md`**
+- [x] **Step 2: Perbarui `frontend-implementation.md`**
 
 Pada bullet "Bagian: …" kalimat **Terminal (sesi Claude Code interaktif di tmux)** biarkan; tambahkan paragraf baru **tepat sebelum** bullet `- **Klien** (SPEC-919 …`:
 
@@ -1225,7 +1225,7 @@ Pada bullet "Bagian: …" kalimat **Terminal (sesi Claude Code interaktif di tmu
   `localStorage` `hanoman.voice.lang`. Engine ditukar lewat antarmuka `SpeechEngine` (jalur Whisper menyusul).
 ```
 
-- [ ] **Step 3: Tautkan di `internal/docs/README.md`**
+- [x] **Step 3: Tautkan di `internal/docs/README.md`**
 
 Tambahkan satu entri (di antara entri ADR/rancangan terbaru, format sama seperti entri sekitar) :
 
@@ -1245,7 +1245,7 @@ Periksa, dan catat hasilnya di PR:
 6. Tablet/ponsel (bila ada): composer sudah tampil, mic bekerja, tak ada layout lompat.
 7. Firefox: tak ada tombol mic, terminal normal.
 
-- [ ] **Step 5: Jalankan tes tersentuh & commit**
+- [x] **Step 5: Jalankan tes tersentuh & commit**
 
 Run: `pnpm vitest --run src/test/speech-engine.test.ts src/test/web-speech-engine.test.ts src/test/voice-controls.test.tsx src/test/terminal-composer-voice.test.tsx src/test/terminal-composer.test.ts src/test/terminal-pane.test.tsx src/test/icon-registry.test.ts`
 Expected: PASS semua. (Tak ada tes server/DB tersentuh, jadi tak perlu `--no-file-parallelism`/`TEST_DATABASE_URL`.)
