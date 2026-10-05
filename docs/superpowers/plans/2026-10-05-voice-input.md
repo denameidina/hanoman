@@ -60,7 +60,7 @@ Spec: `docs/superpowers/specs/2026-10-05-voice-input-design.md`
   - `initialVoiceState: VoiceState`, `voiceReducer(s: VoiceState, a: VoiceAction): VoiceState`
   - `readLang(): string`, `writeLang(lang: string): void`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/test/speech-engine.test.ts`:
 
@@ -158,12 +158,12 @@ describe("readLang/writeLang", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/speech-engine.test.ts`
 Expected: FAIL — "Failed to resolve import ../src/screens/speech-engine".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/src/screens/speech-engine.ts`:
 
@@ -251,12 +251,12 @@ export function writeLang(lang: string): void {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/speech-engine.test.ts`
 Expected: PASS (semua tes hijau).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/speech-engine.ts src/test/speech-engine.test.ts docs/superpowers/plans/2026-10-05-voice-input.md
@@ -277,7 +277,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `SpeechEngine`, `SpeechError` dari `./speech-engine` (Task 1).
 - Produces: `createWebSpeechEngine(win?: Window): SpeechEngine`, `mapWebSpeechError(code: string): SpeechError | null`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/test/web-speech-engine.test.ts`:
 
@@ -424,12 +424,12 @@ describe("createWebSpeechEngine", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/web-speech-engine.test.ts`
 Expected: FAIL — "Failed to resolve import ../src/screens/web-speech-engine".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/src/screens/web-speech-engine.ts`:
 
@@ -508,12 +508,12 @@ export function createWebSpeechEngine(win: Window = window): SpeechEngine {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/web-speech-engine.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/web-speech-engine.ts src/test/web-speech-engine.test.ts docs/superpowers/plans/2026-10-05-voice-input.md
@@ -538,7 +538,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `VoiceControls({ voice }: { voice: VoiceInput }): JSX.Element | null`
   - data-testid: `terminal-voice` (wadah), `voice-toggle`, `voice-lang`, `voice-interim`, `voice-error`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/test/voice-controls.test.tsx`:
 
@@ -666,12 +666,12 @@ describe("VoiceControls", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/voice-controls.test.tsx`
 Expected: FAIL — "Failed to resolve import ../src/screens/VoiceControls".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/src/screens/use-voice-input.ts`:
 
@@ -772,12 +772,12 @@ export function VoiceControls({ voice }: { voice: VoiceInput }) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/voice-controls.test.tsx`
 Expected: PASS. (Peringatan dev `Icon: nama "mic"/"info" tak dikenal` dapat muncul sampai Task 5 menjalankan `gen:icons`; itu bukan kegagalan.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/use-voice-input.ts src/src/screens/VoiceControls.tsx src/test/voice-controls.test.tsx docs/superpowers/plans/2026-10-05-voice-input.md
@@ -800,7 +800,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `voiceAppend?: React.MutableRefObject<(text: string) => void>` — diisi komponen; memanggilnya menambahkan teks final ke kolom lewat jalur `change` yang sama dengan ketikan (jadi debounce/delta composer yang ada berlaku).
   - `onDraft?: (nonEmpty: boolean) => void` — dipanggil tiap `text` berubah; `true` bila kolom berisi.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/test/terminal-composer-voice.test.tsx`:
 
@@ -868,12 +868,12 @@ describe("TerminalComposer · teks suara", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/terminal-composer-voice.test.tsx`
 Expected: FAIL — `voiceAppend.current("halo dunia")` tidak mengubah kolom (nilai tetap `""`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Edit `src/src/screens/TerminalComposer.tsx`.
 
@@ -914,12 +914,12 @@ Tepat setelah deklarasi `const submit = () => {...};` tambahkan:
   React.useEffect(() => { onDraftRef.current?.(text !== ""); }, [text]);
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/terminal-composer-voice.test.tsx src/test/terminal-composer.test.ts`
 Expected: PASS (tes composer lama tetap hijau).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalComposer.tsx src/test/terminal-composer-voice.test.tsx docs/superpowers/plans/2026-10-05-voice-input.md
@@ -942,7 +942,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `useVoiceInput`/`VoiceInput` (Task 3), `VoiceControls` (Task 3), `TerminalComposer` props `voiceAppend`/`onDraft` (Task 4).
 - Produces: pane merender `terminal-voice` (bila didukung & `canWrite`) di antara host terminal dan composer; composer tampil bila `canWrite && (showKeys || voice.status === "listening" || draft)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Di akhir `src/test/terminal-pane.test.tsx` tambahkan describe berikut. Ia memakai mock `xterm`, `sockets`, dan `inputsOf` yang sudah ada di berkas itu (lihat describe "kolom ketik perangkat sentuh (SPEC-882)" untuk pola `openPane`). `cleanup`/`beforeEach` global berkas itu sudah mengurus `sockets`.
 
@@ -1055,12 +1055,12 @@ describe("TerminalPane · dikte suara", () => {
 
 Catatan untuk implementer: pastikan `afterEach` dan `fireEvent` sudah diimpor di berkas itu (keduanya sudah: lihat baris 1–2). Bila `mode: "remote"` butuh `InstanceContext` khusus di berkas itu, ikuti pola di `terminal-pane-remote.test.tsx` untuk membuat pane baca-saja; tujuan tes: `canWrite=false` ⇒ tak ada `terminal-voice`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/terminal-pane.test.tsx -t "dikte suara"`
 Expected: FAIL — `voice-toggle` tidak ditemukan.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 3a. `src/src/screens/TerminalPane.tsx` — tambah impor di samping `import { TerminalComposer } from "./TerminalComposer";`:
 
@@ -1143,14 +1143,14 @@ import { useVoiceInput } from "./use-voice-input";
 Run: `pnpm --filter ./src gen:icons`
 Expected: `src/src/ds/icon-registry.ts` berubah, memuat `Mic` dan `Info`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/terminal-pane.test.tsx src/test/terminal-composer-voice.test.tsx src/test/voice-controls.test.tsx src/test/icon-registry.test.ts`
 Expected: PASS. Seluruh tes `terminal-pane.test.tsx` lama tetap hijau (jsdom tanpa `SpeechRecognition` ⇒ `VoiceControls` null ⇒ DOM lama tak berubah).
 
 Lalu typecheck sebatas berkas tersentuh: `pnpm --filter ./src exec tsc --noEmit` (bila lambat, cukup pastikan editor/`vitest` tak melaporkan galat tipe).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalPane.tsx src/src/app.css src/src/ds/icon-registry.ts src/test/terminal-pane.test.tsx docs/superpowers/plans/2026-10-05-voice-input.md
@@ -1170,7 +1170,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:** tidak ada kode; docs harus konsisten dengan nama di Task 1–5 (`SpeechEngine`, `useVoiceInput`, `VoiceControls`, `voiceAppend`, kunci `hanoman.voice.lang`).
 
-- [ ] **Step 1: Tulis ADR**
+- [x] **Step 1: Tulis ADR**
 
 Create `internal/docs/adr/0177-dikte-suara-seam-speech-engine.md`:
 
@@ -1212,7 +1212,7 @@ Operator mengetik prompt panjang ke `claude` di terminal sesi terus-menerus. Dib
 - Tanpa perubahan skema/API; tanpa migration.
 ```
 
-- [ ] **Step 2: Perbarui `frontend-implementation.md`**
+- [x] **Step 2: Perbarui `frontend-implementation.md`**
 
 Pada bullet "Bagian: …" kalimat **Terminal (sesi Claude Code interaktif di tmux)** biarkan; tambahkan paragraf baru **tepat sebelum** bullet `- **Klien** (SPEC-919 …`:
 
@@ -1225,7 +1225,7 @@ Pada bullet "Bagian: …" kalimat **Terminal (sesi Claude Code interaktif di tmu
   `localStorage` `hanoman.voice.lang`. Engine ditukar lewat antarmuka `SpeechEngine` (jalur Whisper menyusul).
 ```
 
-- [ ] **Step 3: Tautkan di `internal/docs/README.md`**
+- [x] **Step 3: Tautkan di `internal/docs/README.md`**
 
 Tambahkan satu entri (di antara entri ADR/rancangan terbaru, format sama seperti entri sekitar) :
 
@@ -1245,7 +1245,7 @@ Periksa, dan catat hasilnya di PR:
 6. Tablet/ponsel (bila ada): composer sudah tampil, mic bekerja, tak ada layout lompat.
 7. Firefox: tak ada tombol mic, terminal normal.
 
-- [ ] **Step 5: Jalankan tes tersentuh & commit**
+- [x] **Step 5: Jalankan tes tersentuh & commit**
 
 Run: `pnpm vitest --run src/test/speech-engine.test.ts src/test/web-speech-engine.test.ts src/test/voice-controls.test.tsx src/test/terminal-composer-voice.test.tsx src/test/terminal-composer.test.ts src/test/terminal-pane.test.tsx src/test/icon-registry.test.ts`
 Expected: PASS semua. (Tak ada tes server/DB tersentuh, jadi tak perlu `--no-file-parallelism`/`TEST_DATABASE_URL`.)

@@ -1167,3 +1167,108 @@ describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", () => {
     expect(sockets[0]!.sent.filter((m) => m.includes('"resize"')).length).toBe(resizesBefore + 2);
   });
 });
+
+describe("TerminalPane · dikte suara", () => {
+  class FakeRecognition {
+    static last: FakeRecognition | undefined;
+    lang = ""; continuous = false; interimResults = false; started = 0;
+    onresult: ((e: any) => void) | null = null;
+    onerror: ((e: { error: string }) => void) | null = null;
+    onend: (() => void) | null = null;
+    constructor() { FakeRecognition.last = this; }
+    start() { this.started += 1; }
+    stop() { /* end dipicu manual oleh tes */ }
+    abort() { }
+  }
+  const result = (text: string, isFinal: boolean) => Object.assign([{ transcript: text }], { isFinal });
+  const w = window as unknown as Record<string, unknown>;
+
+  const openPane = async (props: Record<string, unknown> = {}) => {
+    const r = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} {...props} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    return r;
+  };
+  const wait = (ms: number) => act(() => new Promise<void>((r) => { setTimeout(r, ms); }));
+
+  afterEach(() => { delete w.SpeechRecognition; FakeRecognition.last = undefined; });
+
+  it("tanpa dukungan Web Speech: tak ada DOM suara sama sekali", async () => {
+    await openPane();
+    expect(screen.queryByTestId("terminal-voice")).toBeNull();
+  });
+
+  it("pane remote tanpa sessions:write (baca-saja): tak ada mic", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    await openPane({ mode: "remote" });
+    expect(screen.queryByTestId("terminal-voice")).toBeNull();
+  });
+
+  it("didukung: mic tampil walau showKeys mati, composer belum tampil", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    await openPane();
+    expect(screen.getByTestId("voice-toggle")).not.toBeNull();
+    expect(screen.queryByTestId("terminal-composer")).toBeNull();
+  });
+
+  it("klik mic memunculkan composer; teks final masuk composer dan mengalir ke pty TANPA \\r", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    await openPane();
+    const before = inputsOf(sockets[0]).length;
+    fireEvent.click(screen.getByTestId("voice-toggle"));
+    expect(FakeRecognition.last!.lang).toBe("id-ID");
+    const input = screen.getByTestId("terminal-composer") as HTMLInputElement;
+    act(() => { FakeRecognition.last!.onresult!({ resultIndex: 0, results: [result("jalankan tes", true)] }); });
+    expect(input.value).toBe("jalankan tes");
+    await wait(400);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["jalankan tes"]);
+  });
+
+  it("interim hanya pratinjau: tak mengubah composer dan tak mengirim apa pun ke pty", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    await openPane();
+    const before = inputsOf(sockets[0]).length;
+    fireEvent.click(screen.getByTestId("voice-toggle"));
+    act(() => { FakeRecognition.last!.onresult!({ resultIndex: 0, results: [result("jalan", false)] }); });
+    expect(screen.getByTestId("voice-interim").textContent).toBe("jalan");
+    expect((screen.getByTestId("terminal-composer") as HTMLInputElement).value).toBe("");
+    await wait(400);
+    expect(inputsOf(sockets[0]).slice(before)).toEqual([]);
+  });
+
+  it("desktop: composer kembali tersembunyi saat mic berhenti dan kolom kosong", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    await openPane();
+    fireEvent.click(screen.getByTestId("voice-toggle"));
+    expect(screen.getByTestId("terminal-composer")).not.toBeNull();
+    act(() => { FakeRecognition.last!.onend!(); });
+    expect(screen.queryByTestId("terminal-composer")).toBeNull();
+  });
+
+  it("composer yang berisi tetap tampil sesudah mic berhenti", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    await openPane();
+    fireEvent.click(screen.getByTestId("voice-toggle"));
+    act(() => { FakeRecognition.last!.onresult!({ resultIndex: 0, results: [result("belum dikirim", true)] }); });
+    act(() => { FakeRecognition.last!.onend!(); });
+    expect((screen.getByTestId("terminal-composer") as HTMLInputElement).value).toBe("belum dikirim");
+  });
+
+  it("urutan DOM: host terminal < kontrol suara < composer", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    await openPane({ showKeys: true });
+    const at = (sel: string) => Array.from(document.querySelectorAll("*")).indexOf(document.querySelector(sel)!);
+    expect(at('[data-testid="terminal-host"]')).toBeLessThan(at('[data-testid="terminal-voice"]'));
+    expect(at('[data-testid="terminal-voice"]')).toBeLessThan(at(".hn-terminal-composer"));
+  });
+
+  it("unmount pane menghentikan mic", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    const stop = vi.spyOn(FakeRecognition.prototype, "stop");
+    const r = await openPane();
+    fireEvent.click(screen.getByTestId("voice-toggle"));
+    r.unmount();
+    expect(stop).toHaveBeenCalled();
+    stop.mockRestore();
+  });
+});
