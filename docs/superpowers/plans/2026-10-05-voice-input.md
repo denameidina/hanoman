@@ -60,7 +60,7 @@ Spec: `docs/superpowers/specs/2026-10-05-voice-input-design.md`
   - `initialVoiceState: VoiceState`, `voiceReducer(s: VoiceState, a: VoiceAction): VoiceState`
   - `readLang(): string`, `writeLang(lang: string): void`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/test/speech-engine.test.ts`:
 
@@ -158,12 +158,12 @@ describe("readLang/writeLang", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/speech-engine.test.ts`
 Expected: FAIL — "Failed to resolve import ../src/screens/speech-engine".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/src/screens/speech-engine.ts`:
 
@@ -251,12 +251,12 @@ export function writeLang(lang: string): void {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/speech-engine.test.ts`
 Expected: PASS (semua tes hijau).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/speech-engine.ts src/test/speech-engine.test.ts docs/superpowers/plans/2026-10-05-voice-input.md
