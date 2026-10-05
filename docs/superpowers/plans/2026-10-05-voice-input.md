@@ -277,7 +277,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `SpeechEngine`, `SpeechError` dari `./speech-engine` (Task 1).
 - Produces: `createWebSpeechEngine(win?: Window): SpeechEngine`, `mapWebSpeechError(code: string): SpeechError | null`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/test/web-speech-engine.test.ts`:
 
@@ -424,12 +424,12 @@ describe("createWebSpeechEngine", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/web-speech-engine.test.ts`
 Expected: FAIL — "Failed to resolve import ../src/screens/web-speech-engine".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/src/screens/web-speech-engine.ts`:
 
@@ -508,12 +508,12 @@ export function createWebSpeechEngine(win: Window = window): SpeechEngine {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/web-speech-engine.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/web-speech-engine.ts src/test/web-speech-engine.test.ts docs/superpowers/plans/2026-10-05-voice-input.md
