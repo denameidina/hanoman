@@ -800,7 +800,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `voiceAppend?: React.MutableRefObject<(text: string) => void>` — diisi komponen; memanggilnya menambahkan teks final ke kolom lewat jalur `change` yang sama dengan ketikan (jadi debounce/delta composer yang ada berlaku).
   - `onDraft?: (nonEmpty: boolean) => void` — dipanggil tiap `text` berubah; `true` bila kolom berisi.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/test/terminal-composer-voice.test.tsx`:
 
@@ -868,12 +868,12 @@ describe("TerminalComposer · teks suara", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest --run src/test/terminal-composer-voice.test.tsx`
 Expected: FAIL — `voiceAppend.current("halo dunia")` tidak mengubah kolom (nilai tetap `""`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Edit `src/src/screens/TerminalComposer.tsx`.
 
@@ -914,12 +914,12 @@ Tepat setelah deklarasi `const submit = () => {...};` tambahkan:
   React.useEffect(() => { onDraftRef.current?.(text !== ""); }, [text]);
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest --run src/test/terminal-composer-voice.test.tsx src/test/terminal-composer.test.ts`
 Expected: PASS (tes composer lama tetap hijau).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/src/screens/TerminalComposer.tsx src/test/terminal-composer-voice.test.tsx docs/superpowers/plans/2026-10-05-voice-input.md

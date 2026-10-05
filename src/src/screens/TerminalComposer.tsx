@@ -1,6 +1,7 @@
 import React from "react";
 import { Input } from "../ds/components/forms";
 import * as C from "./terminal-composer";
+import { appendFinal } from "./speech-engine";
 
 // SPEC-882 · kolom ketik untuk tablet & ponsel. Presentasional: seluruh aritmetika delta hidup di
 // `terminal-composer.ts`; yang di sini hanya irama (debounce) dan jalur peristiwa DOM.
@@ -8,7 +9,7 @@ import * as C from "./terminal-composer";
 // Keadaan otoritatifnya dipegang di REF, bukan di state React: `external` dipanggil pane secara
 // sinkron dari dalam `term.onData`, dan closure yang tertinggal satu render akan menguras teks yang
 // sudah basi. `text` yang jadi state hanya melayani nilai `<input>` yang terkendali.
-export function TerminalComposer({ sessionId, send, external, linkState, queue }: {
+export function TerminalComposer({ sessionId, send, external, linkState, queue, voiceAppend, onDraft }: {
   sessionId: string;
   /** Pintu keluar byte SPEC-878 milik pane (`sendKey.current`). */
   send: (d: string) => void;
@@ -16,6 +17,12 @@ export function TerminalComposer({ sessionId, send, external, linkState, queue }
   external: React.MutableRefObject<() => void>;
   linkState: string;
   queue: { n: number; held: boolean };
+  /** Dikte suara: diisi komponen ini; memanggilnya menambahkan teks FINAL ke kolom lewat jalur
+   *  `change` yang sama dengan ketikan (debounce/delta tak berubah, dan tak pernah mengirim `\r`). */
+  voiceAppend?: React.MutableRefObject<(text: string) => void>;
+  /** Dipanggil tiap isi kolom berubah: `true` bila berisi. Pane memakainya untuk menyembunyikan
+   *  kolom (di desktop) begitu mic berhenti dan kolom kosong. */
+  onDraft?: (nonEmpty: boolean) => void;
 }) {
   const [text, setText] = React.useState("");
   const state = React.useRef<C.ComposerState>(C.initialState());
@@ -53,6 +60,13 @@ export function TerminalComposer({ sessionId, send, external, linkState, queue }
     if (!forced.current) forced.current = setTimeout(flush, C.MAX_HOLD_MS);
   };
   const submit = () => { emit(C.onSubmit(state.current)); setText(""); };
+
+  // Sama alasannya dengan `external`: dipasang saat render agar selalu menunjuk teks terbaru.
+  if (voiceAppend) voiceAppend.current = (t) => change(appendFinal(state.current.text, t));
+  React.useEffect(() => () => { if (voiceAppend) voiceAppend.current = () => {}; }, [voiceAppend]);
+  const onDraftRef = React.useRef(onDraft);
+  onDraftRef.current = onDraft;
+  React.useEffect(() => { onDraftRef.current?.(text !== ""); }, [text]);
 
   const status = C.statusFor(linkState, queue);
   return (
