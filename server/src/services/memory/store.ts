@@ -6,7 +6,9 @@ import type {
 } from "@hanoman/shared";
 import type { Prisma } from "@prisma/client";
 import type { z } from "zod";
+import { LOCAL_DEVICE_ID } from "@hanoman/shared";
 import { prisma } from "../../db";
+import { notifySynced } from "../sync-notify";
 import { blobShaAt } from "./git";
 import type { MemoryScope } from "./resolve";
 import {
@@ -74,14 +76,26 @@ async function verifyAnchors(scope: MemoryScope, anchors: MemoryAnchorIn[]):
 }
 
 /** Saat sebuah memori menjadi active, yang digantikannya (bila masih bisa) menjadi invalidated. */
-async function retireSuperseded(tx: Tx, m: Row, actor: { kind: string; id: string | null }) {
+// ADR-0180 · baris yang disentuh sebuah transaksi, diumumkan ke sync SESUDAH commit. Memori lebih
+// dulu daripada event: urutan outbox = urutan FK yang diterima hub. Versi TAK dinaikkan di sini —
+// hub menaikkannya (publishLocal), client menyalin versi hub sesudah push (konvensi sync).
+type Touched = { memories: string[]; events: string[] };
+const touchedNone = (): Touched => ({ memories: [], events: [] });
+async function notifyTouched(t: Touched): Promise<void> {
+  for (const id of t.memories) await notifySynced("projectMemory", id);
+  for (const id of t.events) await notifySynced("memoryEvent", id);
+}
+
+async function retireSuperseded(tx: Tx, m: Row, actor: { kind: string; id: string | null }, touched: Touched) {
   if (!m.supersedesId) return;
   const old = await tx.projectMemory.findFirst({ where: { id: m.supersedesId, projectId: m.projectId } });
   if (!old || !canTransition(old.status as MemoryStatus, "invalidated")) return;
-  await tx.projectMemory.update({ where: { id: old.id }, data: { status: "invalidated", version: { increment: 1 } } });
-  await tx.memoryEvent.create({
+  await tx.projectMemory.update({ where: { id: old.id }, data: { status: "invalidated" } });
+  touched.memories.push(old.id);
+  const ev = await tx.memoryEvent.create({
     data: { memoryId: old.id, op: "supersede", actorKind: actor.kind, actorId: actor.id, reason: `digantikan ${m.id}` },
   });
+  touched.events.push(ev.id);
 }
 
 async function create(
@@ -108,6 +122,7 @@ async function create(
   const status: MemoryStatus = reason ? "proposed" : "active";
   const who = { kind: actorKind(actor), id: actor.id };
 
+  const touched = touchedNone();
   const row = await prisma.$transaction(async (tx) => {
     const m = await tx.projectMemory.create({
       data: {
@@ -117,16 +132,20 @@ async function create(
         sourceRuntime: actor.kind === "user" ? "human" : actor.kind === "session" ? actor.runtime : "external",
         sourceSessionId: actor.kind === "session" ? actor.id : null,
         sourceTokenId: actor.kind === "token" ? actor.id : actor.kind === "session" ? actor.tokenId : null,
-        commitSha: scope.head, trusted,
+        commitSha: scope.head, trusted, sourceDeviceId: LOCAL_DEVICE_ID,
       },
     });
-    await tx.memoryEvent.create({ data: { memoryId: m.id, op: "propose", actorKind: who.kind, actorId: who.id, reason } });
+    touched.memories.unshift(m.id);
+    const proposed = await tx.memoryEvent.create({ data: { memoryId: m.id, op: "propose", actorKind: who.kind, actorId: who.id, reason } });
+    touched.events.push(proposed.id);
     if (status === "active") {
-      await tx.memoryEvent.create({ data: { memoryId: m.id, op: "activate", actorKind: "system", actorId: null, reason: "auto: jangkar terverifikasi" } });
-      await retireSuperseded(tx, m, who);
+      const activated = await tx.memoryEvent.create({ data: { memoryId: m.id, op: "activate", actorKind: "system", actorId: null, reason: "auto: jangkar terverifikasi" } });
+      touched.events.push(activated.id);
+      await retireSuperseded(tx, m, who, touched);
     }
     return m;
   });
+  await notifyTouched(touched);
   return { ok: true, memory: toMemoryView(row) };
 }
 
@@ -158,11 +177,15 @@ export async function invalidateMemory(scope: MemoryScope, actor: Actor, id: str
   const m = await prisma.projectMemory.findFirst({ where: { id, projectId: scope.projectId } });
   if (!m) return fail(404, "memori tidak ditemukan");
   if (!canTransition(m.status as MemoryStatus, "invalidated")) return fail(409, `memori berstatus ${m.status}`);
+  const touched = touchedNone();
   const row = await prisma.$transaction(async (tx) => {
-    const u = await tx.projectMemory.update({ where: { id }, data: { status: "invalidated", version: { increment: 1 } } });
-    await tx.memoryEvent.create({ data: { memoryId: id, op: "invalidate", actorKind: actorKind(actor), actorId: actor.id, reason } });
+    const u = await tx.projectMemory.update({ where: { id }, data: { status: "invalidated" } });
+    touched.memories.push(id);
+    const ev = await tx.memoryEvent.create({ data: { memoryId: id, op: "invalidate", actorKind: actorKind(actor), actorId: actor.id, reason } });
+    touched.events.push(ev.id);
     return u;
   });
+  await notifyTouched(touched);
   return { ok: true, memory: toMemoryView(row) };
 }
 
@@ -173,12 +196,16 @@ export async function reviewMemory(projectId: string, userId: string, id: string
   if (m.status !== "proposed") return fail(409, `hanya memori proposed yang bisa direview (sekarang ${m.status})`);
   if (decision === "reject" && !reason?.trim()) return fail(422, "penolakan wajib menyertakan alasan");
   const to: MemoryStatus = decision === "activate" ? "active" : "rejected";
+  const touched = touchedNone();
   const row = await prisma.$transaction(async (tx) => {
-    const u = await tx.projectMemory.update({ where: { id }, data: { status: to, version: { increment: 1 } } });
-    await tx.memoryEvent.create({ data: { memoryId: id, op: decision, actorKind: "user", actorId: userId, reason: reason?.trim() || null } });
-    if (to === "active") await retireSuperseded(tx, u, { kind: "user", id: userId });
+    const u = await tx.projectMemory.update({ where: { id }, data: { status: to } });
+    touched.memories.push(id);
+    const ev = await tx.memoryEvent.create({ data: { memoryId: id, op: decision, actorKind: "user", actorId: userId, reason: reason?.trim() || null } });
+    touched.events.push(ev.id);
+    if (to === "active") await retireSuperseded(tx, u, { kind: "user", id: userId }, touched);
     return u;
   });
+  await notifyTouched(touched);
   return { ok: true, memory: toMemoryView(row) };
 }
 

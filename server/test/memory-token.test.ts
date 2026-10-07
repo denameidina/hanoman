@@ -39,5 +39,6 @@ describe("peta capability /api/memories", () => {
   it("review manusia cookie-only", () => {
     expect(capabilityForRoute("POST", "/api/memories/abc/activate")).toBe("COOKIE_ONLY");
     expect(capabilityForRoute("POST", "/api/memories/abc/reject")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("DELETE", "/api/memories/abc")).toBe("COOKIE_ONLY");
   });
 });

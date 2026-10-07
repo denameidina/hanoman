@@ -613,7 +613,7 @@ export async function catchUpOptional(transport: Transport): Promise<number> {
 
 **Files:** `server/src/services/memory/store.ts`, `server/src/routes/memories.ts`, `server/src/services/agent-capabilities.ts`; test `server/test/memory-sync-wiring.test.ts`, tambahan `memories.route.test.ts`, `memory-token.test.ts`.
 
-- [ ] **Step 1: Test yang gagal**
+- [x] **Step 1: Test yang gagal**
 
 ```ts
 import { execFileSync } from "node:child_process";
@@ -669,7 +669,7 @@ describe("store memori → feed sync (peran hub)", () => {
 
 Tambahan route (`memories.route.test.ts`, blok cookie): `DELETE /api/memories/:id?projectId=rt-a` → `204`; id project lain → `404`; agent token → `403`. Tambahan peta (`memory-token.test.ts`): `capabilityForRoute("DELETE", "/api/memories/abc")` → `"COOKIE_ONLY"`.
 
-- [ ] **Step 2: Implementasi `store.ts`**
+- [x] **Step 2: Implementasi `store.ts`**
   - Hapus ketiga `version: { increment: 1 }`.
   - `import { LOCAL_DEVICE_ID } from "@hanoman/shared"; import { notifySynced } from "../sync-notify";`
   - Di `create()` data: `sourceDeviceId: LOCAL_DEVICE_ID,`.
@@ -686,7 +686,7 @@ async function notifyTouched(t: Touched): Promise<void> {
   `retireSuperseded(tx, m, actor, touched)` mendorong `old.id` ke `touched.memories` dan id event ke `touched.events`. `create`, `invalidateMemory`, `reviewMemory` membuat `const touched: Touched = { memories: [], events: [] }`, mengisi id setiap baris yang dibuat/diubah di dalam transaksi (`tx.memoryEvent.create` mengembalikan baris → ambil `.id`), lalu `await notifyTouched(touched)` sebelum `return`.
   - Pastikan tanda tangan `notifySynced(entity, id)` di `sync-notify.ts` menerima `Entity` — impor tipe bila perlu.
 
-- [ ] **Step 3: Hapus permanen**
+- [x] **Step 3: Hapus permanen**
   - `agent-capabilities.ts` cabang `memories`: `if (method === "DELETE" || seg[2] === "activate" || seg[2] === "reject") return "COOKIE_ONLY";`
   - `routes/memories.ts`:
 
@@ -705,7 +705,7 @@ async function notifyTouched(t: Touched): Promise<void> {
   });
 ```
 
-- [ ] **Step 4: PASS** `memory-sync-wiring`, semua `memory*.test.ts`, `memories.route.test.ts`, `mcp-coverage.test.ts` (DELETE cookie-only dilewati). **Step 5: Commit** `feat(memory): store ikut sync (tanpa bump versi lokal) + hapus permanen cookie-only`
+- [x] **Step 4: PASS** `memory-sync-wiring`, semua `memory*.test.ts`, `memories.route.test.ts`, `mcp-coverage.test.ts` (DELETE cookie-only dilewati). **Step 5: Commit** `feat(memory): store ikut sync (tanpa bump versi lokal) + hapus permanen cookie-only`
 
 ---
 

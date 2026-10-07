@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { prisma } from "../db";
+import { deleteSynced } from "../services/sync-delete";
 import {
   MEMORY_STATUSES, REPO_HEADER, SESSION_HEADER, SESSION_TOKEN_HEADER, zMemoryInvalidate, zMemoryPropose, zMemoryReverify, zMemoryReview,
 } from "@hanoman/shared";
@@ -120,4 +122,17 @@ export default async function (app: FastifyInstance) {
   };
   app.post("/memories/:id/activate", review("activate"));
   app.post("/memories/:id/reject", review("reject"));
+
+  // ADR-0180 · hapus permanen (mis. memori berisi secret yang lolos). Manusia saja; tombstone menang
+  // tanpa syarat di semua mesin, event ikut cascade.
+  app.delete("/memories/:id", async (req, reply) => {
+    if (!req.user) return reply.code(403).send({ error: "cookie session required" });
+    const { id } = req.params as { id: string };
+    const { projectId } = req.query as { projectId?: string };
+    if (!projectId) return reply.code(400).send({ error: "projectId wajib" });
+    const m = await prisma.projectMemory.findFirst({ where: { id, projectId }, select: { id: true } });
+    if (!m) return reply.code(404).send({ error: "memori tidak ditemukan" });
+    await deleteSynced("projectMemory", id);
+    return reply.code(204).send();
+  });
 }
