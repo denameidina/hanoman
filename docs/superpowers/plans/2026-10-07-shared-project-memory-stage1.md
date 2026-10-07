@@ -1193,7 +1193,7 @@ git commit -m "feat(memory): resolusi lingkup project dari principal + identitas
   ```
   dengan `MemoryProposeInput = z.infer<typeof zMemoryPropose>`, `MemoryAnchorIn = z.infer<typeof zMemoryAnchorIn>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/memory-store.test.ts`:
 
@@ -1365,12 +1365,12 @@ describe("get & search", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/memory-store.test.ts --no-file-parallelism`
 Expected: FAIL — modul tak ditemukan.
 
-- [ ] **Step 3: Tulis `server/src/services/memory/store.ts`**
+- [x] **Step 3: Tulis `server/src/services/memory/store.ts`**
 
 ```ts
 // ADR-0178 · store memori project. Setiap fungsi menerima lingkup yang SUDAH diresolusi
@@ -1579,12 +1579,12 @@ export async function searchMemories(projectId: string, q: { q?: string; paths?:
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/memory-store.test.ts --no-file-parallelism`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/memory/store.ts server/test/memory-store.test.ts
