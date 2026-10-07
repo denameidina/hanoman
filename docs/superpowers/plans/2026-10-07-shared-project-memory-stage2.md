@@ -623,7 +623,7 @@ Catatan: test `prepareSessionMemory` tanpa memori mengharapkan `warnings: []` �
 - Modify: `server/src/services/session-launch.ts` (sebelum `createSession`, ±275)
 - Test: `server/test/memory-session-launch.test.ts`
 
-- [ ] **Step 1: Test yang gagal**
+- [x] **Step 1: Test yang gagal**
 
 `server/test/memory-session-launch.test.ts`:
 
@@ -690,9 +690,9 @@ describe("memori tersuntik saat sesi backlog lahir", () => {
 });
 ```
 
-- [ ] **Step 2: Gagal** (flag tak ada).
+- [x] **Step 2: Gagal** (flag tak ada).
 
-- [ ] **Step 3: `pty.ts`**
+- [x] **Step 3: `pty.ts`**
 
 Di `CreateOpts`, setelah `rerunPhases`:
 
@@ -721,7 +721,7 @@ dan argv:
 
 (`skillsArg` tetap terakhir — `--add-dir` variadik.)
 
-- [ ] **Step 4: `session-launch.ts`**
+- [x] **Step 4: `session-launch.ts`**
 
 Impor: `import { agentTempDir, createSession, getSessionAsync, killSession, sessionIdForSpec } from "./pty";` dan `import { prepareSessionMemory } from "./memory/inject";`.
 
@@ -741,7 +741,9 @@ dan di opsi `createSession` tambahkan `memoryFile: memory.file,`.
 
 Pastikan `agent` di sini bertipe `"claude" | "codex"` (tipe `Agent` runner); bila `Agent` lebih lebar, persempit dengan `agent === "codex" ? "codex" : "claude"`.
 
-- [ ] **Step 5: PASS** `memory-session-launch.test.ts` + `session-launch.test.ts` (regresi argv). **Step 6: Commit** `feat(memory): suntik memori ke sesi backlog claude & codex`
+> **Catatan eksekusi:** mengimpor `agentTempDir` ke `session-launch.ts` memecahkan lima test yang me-mock `pty` dengan factory eksplisit. Diubah: `prepareSessionMemory` mengembalikan **teks** (`{ text?, count, warnings }`), `CreateOpts.memoryText` menggantikan `memoryFile`, dan pty.ts — pemilik `agentTempDir` — menulis berkasnya lewat `writeMemoryFile` yang dipindah ke modul murni `server/src/services/memory/file.ts` (tanpa DB, jadi pty tetap nol-DB). Satu-satunya kegagalan `spec-attachment-launch` yang tersisa sudah ada di base.
+
+- [x] **Step 5: PASS** `memory-session-launch.test.ts` + `session-launch.test.ts` (regresi argv). **Step 6: Commit** `feat(memory): suntik memori ke sesi backlog claude & codex`
 
 ---
 

@@ -87,12 +87,11 @@ describe("render & tulis", () => {
     expect(writeMemoryFile(out, "claude", "x")).toMatch(/memory\.md$/);
   });
 
-  it("prepareSessionMemory: tanpa memori → tanpa berkas; dengan memori → berkas", async () => {
-    const out = mkdtempSync(join(tmpdir(), "mem-prep-"));
-    expect(await prepareSessionMemory({ projectId: "mi-p", cwd: dir, agent: "claude", specText: "", dir: out })).toEqual({ count: 0, warnings: [] });
+  it("prepareSessionMemory: tanpa memori → tanpa teks; dengan memori → teks blok", async () => {
+    expect(await prepareSessionMemory({ projectId: "mi-p", cwd: dir, specText: "" })).toEqual({ count: 0, warnings: [] });
     await mem({ content: "global" });
-    const r = await prepareSessionMemory({ projectId: "mi-p", cwd: dir, agent: "claude", specText: "", dir: out });
+    const r = await prepareSessionMemory({ projectId: "mi-p", cwd: dir, specText: "" });
     expect(r.count).toBe(1);
-    expect(readFileSync(r.file!, "utf8")).toContain("global");
+    expect(r.text).toContain("global");
   });
 });

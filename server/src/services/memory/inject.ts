@@ -1,13 +1,12 @@
 // ADR-0179 · memori project ke sesi yang sedang lahir. Dipanggil session-launch.ts (pty.ts sengaja
 // nol-DB). Prinsip: lebih baik tanpa memori daripada memori yang tak terverifikasi terhadap HEAD
 // worktree sesi ini — memori yang salah lebih mahal daripada memori yang tak ada.
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import type { MemoryView } from "@hanoman/shared";
 import { prisma } from "../../db";
 import { repoHead, treeBlobs } from "./git";
 import { scopeMatches } from "./rules";
 import { toMemoryView } from "./store";
+export { writeMemoryFile } from "./file";
 
 export const INJECT_MAX_ITEMS = 40;
 export const INJECT_MAX_BYTES = 6000;
@@ -87,30 +86,16 @@ export async function selectForSession(projectId: string, cwd: string, specText:
 export const renderMemoryBlock = (items: MemoryView[]): string =>
   `${HEADER}\n${items.map(renderItem).join("\n")}\n`;
 
-/** claude: markdown untuk `--append-system-prompt-file`. codex: TOML literal untuk `-c` (spike 2026-10-07). */
-export function writeMemoryFile(dir: string, agent: "claude" | "codex", text: string): string {
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  if (agent === "claude") {
-    const f = join(dir, "memory.md");
-    writeFileSync(f, text, { mode: 0o600 });
-    return f;
-  }
-  // String literal TOML tak punya escape: satu-satunya urutan terlarang adalah `'''`.
-  const safe = text.replace(/'''/g, "'' '");
-  const f = join(dir, "memory.toml");
-  writeFileSync(f, `developer_instructions='''\n${safe}\n'''\n`, { mode: 0o600 });
-  return f;
-}
-
+/** Teks memori siap suntik, atau tanpa `text` bila tak ada yang lolos verifikasi. pty.ts yang menulis berkasnya. */
 export async function prepareSessionMemory(o: {
-  projectId: string; cwd: string; agent: "claude" | "codex"; specText: string; dir: string;
-}): Promise<{ file?: string; count: number; warnings: string[] }> {
+  projectId: string; cwd: string; specText: string;
+}): Promise<{ text?: string; count: number; warnings: string[] }> {
   try {
     const { items, stale, head } = await selectForSession(o.projectId, o.cwd, o.specText);
     const warnings = head ? [] : ["HEAD worktree tak terbaca — memori tidak disuntik"];
     if (stale) warnings.push(`${stale} memori usang tidak disuntik (jangkarnya berubah)`);
     if (!items.length) return { count: 0, warnings };
-    return { file: writeMemoryFile(o.dir, o.agent, renderMemoryBlock(items)), count: items.length, warnings };
+    return { text: renderMemoryBlock(items), count: items.length, warnings };
   } catch (e) {
     return { count: 0, warnings: [`memori project gagal disiapkan: ${(e as Error).message}`] };
   }
