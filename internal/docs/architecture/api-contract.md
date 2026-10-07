@@ -2416,3 +2416,14 @@ atau tertaut `Ticket`/`GithubIssue` menghasilkan memori `trusted=false` (selalu 
 
 Auto-aktif hanya bila `kind ≠ decision` ∧ jangkar ≥ 1 ∧ jangkar diverifikasi server (`git rev-parse <head>:<path>` pada
 checkout project) ∧ sumber tepercaya. Pengganti (`supersede`/`reverify`) menonaktifkan yang lama hanya saat ia sendiri aktif.
+
+### Sync entitas opsional ([ADR-0180](../adr/0180-sync-memori-entitas-opsional.md))
+
+- `GET /api/sync/pull?since=…&entities=projectMemory,memoryEvent` · `GET /api/sync/bootstrap?entities=…[&only=…]` ·
+  `GET /api/sync/ws?entities=…` — tanpa `entities` (client lama) baris entitas opsional disaring dan
+  kursor tetap maju; `only` membatasi bootstrap ke entitas opsional tertentu (catch-up, kursor client tak
+  dipindah). Balasan pull & bootstrap membawa `entities: string[]` — iklan entitas opsional hub.
+- `POST /api/sync/push` untuk `projectMemory` dengan `baseVersion` basi: hanya beda `status` → digabung
+  lattice (`ok`); beda field immutable → `conflict`. `memoryEvent` yang sudah ada → `ok` (idempoten).
+- `DELETE /api/memories/:id?projectId=` — **COOKIE_ONLY**, `204`; id project lain `404`; tombstone menyebar.
+

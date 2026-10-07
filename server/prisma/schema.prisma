@@ -587,6 +587,8 @@ model SyncOutbox {
 model SyncState {
   id     Int    @id @default(1)
   cursor String @default("0")
+  // ADR-0180 · LOCAL-only: entitas sync OPSIONAL yang sudah di-catch-up mesin ini (dipisah koma).
+  entities String @default("")
 }
 
 // SPEC-270 · ADR-0067 · LOCAL-ONLY: antrean konflik dua-sisi menunggu keputusan manusia (modal).
@@ -1195,6 +1197,8 @@ model MemoryEvent {
   actorId   String?
   reason    String?
   createdAt DateTime      @default(now())
+  version   Int           @default(0)   // ADR-0180 · wajib bagi entitas sync
+  updatedAt DateTime      @updatedAt
 
   @@index([memoryId, createdAt])
 }

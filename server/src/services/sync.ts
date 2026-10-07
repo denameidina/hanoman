@@ -2,6 +2,7 @@ import { prisma } from "../db";
 import { renameProjectCore } from "./rename-project";
 import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
 import { QA_STORAGE_KEY, QA_SYNC_MAX_BYTES, settleNewQaAttachment } from "./qa-attachment-sync";
+import { mergeMemoryRecord } from "./memory/sync-merge";
 
 // SPEC-213 · ADR-0045 · mesin sync record: version-stamp optimistic concurrency + change-feed
 // SyncLog (seq = kursor global). Isi file dokumen TIDAK lewat sini (git 3-way merge, ADR-0043).
@@ -21,8 +22,19 @@ import { QA_STORAGE_KEY, QA_SYNC_MAX_BYTES, settleNewQaAttachment } from "./qa-a
 // SPEC-945 · ADR-0150 · `member` & `task` ikut menyeberang: papan kerja tim adalah pengetahuan
 // bersama, bukan setelan mesin. `Member.id` deterministik (email ternormalisasi) justru supaya dua
 // mesin yang mencatat orang yang sama bertemu sebagai SATU baris di sini.
-export const SYNCED = ["project", "spec", "vps", "sessionResult", "ticket", "ticketAttachment", "customAgent", "githubIssue", "member", "task", "qaReport", "qaCase", "qaFinding", "qaAttachment"] as const;
+export const SYNCED = ["project", "spec", "vps", "sessionResult", "ticket", "ticketAttachment", "customAgent", "githubIssue", "member", "task", "qaReport", "qaCase", "qaFinding", "qaAttachment", "projectMemory", "memoryEvent"] as const;
 export type Entity = (typeof SYNCED)[number];
+
+// ADR-0180 · entitas yang hanya dikirim ke client yang MENYEBUTNYA (`?entities=`). Client versi lama
+// melempar pada entitas tak dikenal dan kursornya berhenti selamanya (sync-client `validateIncomingRecord`)
+// — jadi entitas baru tak boleh pernah sampai ke sana. Hub menyaring; kursor tetap maju melewatinya.
+export const OPTIONAL_ENTITIES = ["projectMemory", "memoryEvent"] as const satisfies readonly Entity[];
+export type OptionalEntity = (typeof OPTIONAL_ENTITIES)[number];
+export const isOptionalEntity = (e: string): e is OptionalEntity => (OPTIONAL_ENTITIES as readonly string[]).includes(e);
+export function acceptedOptional(raw: unknown): Set<string> {
+  const want = typeof raw === "string" ? raw.split(",").map((x) => x.trim()) : [];
+  return new Set(OPTIONAL_ENTITIES.filter((e) => want.includes(e)));
+}
 
 type Delegate = {
   findUnique: (args: { where: { id: string }; select?: Record<string, boolean> }) => Promise<Record<string, unknown> | null>;
@@ -45,6 +57,8 @@ const DELEGATE: Record<Entity, Delegate> = {
   qaCase: prisma.qaCase as unknown as Delegate,
   qaFinding: prisma.qaFinding as unknown as Delegate,
   qaAttachment: prisma.qaAttachment as unknown as Delegate,
+  projectMemory: prisma.projectMemory as unknown as Delegate,
+  memoryEvent: prisma.memoryEvent as unknown as Delegate,
 };
 
 // Whitelist field bisnis per entitas — SENGAJA mengecualikan never-sync (Project.repoDir,
@@ -113,6 +127,10 @@ const FIELDS: Record<Entity, string[]> = {
   qaCase: ["reportId", "code", "title", "steps", "expected", "actual", "status", "order", "createdAt", "updatedAt"],
   qaFinding: ["reportId", "caseId", "code", "title", "severity", "priority", "area", "steps", "expected", "actual", "status", "backlogId", "createdAt", "updatedAt"],
   qaAttachment: ["reportId", "projectId", "ownerType", "ownerId", "filename", "mimeType", "size", "sha256", "storageKey", "createdAt", "updatedAt"],
+  // ADR-0180 · tanpa `version` (dikelola sync) dan tanpa MemoryLocalState (verdict per mesin).
+  projectMemory: ["projectId", "kind", "content", "scopePaths", "anchors", "status", "supersedesId", "reviewReason",
+    "sourceRuntime", "sourceSessionId", "sourceTokenId", "sourceDeviceId", "commitSha", "trusted", "createdAt", "updatedAt"],
+  memoryEvent: ["memoryId", "op", "actorKind", "actorId", "reason", "createdAt", "updatedAt"],
 };
 // Field yang JSONB-nya string ISO tapi kolomnya DateTime — dikonversi balik saat menulis.
 const DATE_FIELDS: Record<Entity, string[]> = {
@@ -126,6 +144,7 @@ const DATE_FIELDS: Record<Entity, string[]> = {
   task: ["startDate", "dueDate", "createdAt", "updatedAt"],
   qaReport: ["createdAt", "updatedAt"], qaCase: ["createdAt", "updatedAt"],
   qaFinding: ["createdAt", "updatedAt"], qaAttachment: ["createdAt", "updatedAt"],
+  projectMemory: ["createdAt", "updatedAt"], memoryEvent: ["createdAt", "updatedAt"],
 };
 
 // SPEC-799 · ADR-0119 · relasi FK antar entitas SYNCED. Dipakai penerima untuk MEMBUANG record anak
@@ -162,6 +181,9 @@ export const PARENTS: Partial<Record<Entity, ParentRef[]>> = {
   qaCase: [{ field: "reportId", entity: "qaReport", onDelete: "cascade" }],
   qaFinding: [{ field: "reportId", entity: "qaReport", onDelete: "cascade" }],
   qaAttachment: [{ field: "reportId", entity: "qaReport", onDelete: "cascade" }],
+  // ADR-0180 · memori ikut project (cascade); event ikut memorinya (cascade).
+  projectMemory: [{ field: "projectId", entity: "project", onDelete: "cascade" }],
+  memoryEvent: [{ field: "memoryId", entity: "projectMemory", onDelete: "cascade" }],
 };
 
 // Ekspor test-only: kontrak "setiap kolom bermakna ikut menyeberang" hanya bisa diuji dari
@@ -180,7 +202,7 @@ const NULLABLE_NUMBER_FIELDS = new Set(["customAgent:maxTurns", "customAgent:tim
 // `validateIncomingRecord` melempar di LUAR try/catch per-record (`sync-client.ts`), kursor tak
 // pernah maju, dan `pullSehat` membungkam log ulangannya. Terukur sebelum perbaikan ini.
 const FLOAT_FIELDS = new Set(["task:order", "qaCase:order"]);
-const BOOLEAN_FIELDS = new Set(["vps:hardened", "customAgent:enabled", "member:active"]);
+const BOOLEAN_FIELDS = new Set(["vps:hardened", "customAgent:enabled", "member:active", "projectMemory:trusted"]);
 const JSON_FIELDS = new Set([
   "project:handledBy",
   "spec:payload", "spec:dependsOn", "spec:sourceHistory", "spec:manualDone",
@@ -188,6 +210,7 @@ const JSON_FIELDS = new Set([
   "customAgent:tools", "customAgent:mentions",
   "githubIssue:labels",
   "qaReport:environment", "qaFinding:steps",
+  "projectMemory:scopePaths", "projectMemory:anchors",
 ]);
 export const __JSON_FIELDS = JSON_FIELDS;
 
@@ -356,7 +379,18 @@ export async function applyPush(
   const existing = await DELEGATE[entity].findUnique({ where: { id }, select: { version: true } });
   const currentVersion = existing ? Number(existing.version) : tomb ? tomb.version : null;
   if (currentVersion !== null && currentVersion !== baseVersion) {
-    return {
+    // ADR-0180 · memori: status ber-lattice, isi immutable → digabung tanpa manusia (hub tak pernah
+    // membuat SyncConflict, dan client tak perlu modal untuk ini). Event append-only yang sudah ada
+    // = push ulang yang idempoten. Parameter `data`/`baseVersion` sengaja ditimpa: sisa fungsi
+    // menulis hasil gabungan lewat jalur yang sama persis dengan tulisan biasa.
+    if (existing && entity === "memoryEvent") return { ok: true, version: currentVersion };
+    if (existing && entity === "projectMemory") {
+      const server = await snapshot(entity, id);
+      const m = server ? mergeMemoryRecord(server.data, data) : { kind: "conflict" as const };
+      if (m.kind === "same") return { ok: true, version: currentVersion };
+      if (m.kind === "merged") { data = m.data; baseVersion = currentVersion; }
+    }
+    if (currentVersion !== baseVersion) return {
       ok: false, conflict: true, server: await snapshot(entity, id),
       ...(tomb && !existing ? { deleted: true, deletedVersion: tomb.version } : {}),
     };
@@ -399,8 +433,8 @@ export function recordBytes(rec: PulledRecord): number {
 }
 
 export async function pull(
-  sinceCursor: string, limit = 500, maxBytes = PULL_MAX_BYTES,
-): Promise<{ cursor: string; records: PulledRecord[]; hasMore: boolean }> {
+  sinceCursor: string, limit = 500, maxBytes = PULL_MAX_BYTES, opts: { accept?: Set<string> } = {},
+): Promise<{ cursor: string; records: PulledRecord[]; hasMore: boolean; entities: string[] }> {
   // SPEC-398 · ADR-0086 · `SyncLog.seq` kini `Int` (SQLite hanya meng-auto-isi alias rowid ber-tipe
   // deklarasi tepat `INTEGER`). Kursor tetap STRING di wire — jangan ubah bentuk itu.
   const since = Number(sinceCursor || "0");
@@ -408,10 +442,15 @@ export async function pull(
     where: { seq: { gt: since } }, orderBy: { seq: "asc" }, take: limit,
   });
 
+  const accept = opts.accept ?? new Set<string>();
   const records: PulledRecord[] = [];
   let bytes = 0;
   let trimmed = false;
+  // ADR-0180 · kursor = baris terakhir yang DIKONSUMSI: dikirim, atau sengaja disaring untuk client
+  // yang tak menyebut entitas opsional itu. Baris tersaring bukan "tertinggal" — ia memang tak untuknya.
+  let consumed: number | null = null;
   for (const r of rows) {
+    if (isOptionalEntity(r.entity) && !accept.has(r.entity)) { consumed = r.seq; continue; }
     const rec: PulledRecord = {
       entity: r.entity, recordId: r.recordId, version: r.version,
       op: r.op === "delete" ? "delete" : "upsert", data: r.data,
@@ -422,15 +461,17 @@ export async function pull(
     if (records.length && bytes + size > maxBytes) { trimmed = true; break; }
     bytes += size;
     records.push(rec);
+    consumed = r.seq;
   }
 
-  // Kursor menunjuk baris terakhir yang BENAR-BENAR dikirim — bukan baris terakhir yang dibaca.
-  // Kalau ia menunjuk lebih jauh, baris yang tak terkirim tertinggal di belakang kursor dan tak
-  // akan pernah ditarik lagi (akar hilangnya lampiran, audit SPEC-382).
-  const cursor = records.length ? String(rows[records.length - 1]!.seq) : sinceCursor || "0";
+  // Kursor tak pernah melewati baris yang BELUM dikirim (dipotong anggaran byte): kalau ia menunjuk
+  // lebih jauh, baris itu tertinggal di belakang kursor dan tak akan pernah ditarik lagi (akar
+  // hilangnya lampiran, audit SPEC-382). Baris tersaring sebelum titik potong boleh dilewati.
+  const cursor = consumed !== null ? String(consumed) : sinceCursor || "0";
   // `rows.length === limit` = mungkin masih ada di balik batas baris. Melebihkan `hasMore` hanya
   // memicu satu pull kosong; mengurangkannya membuat client berhenti di tengah feed.
-  return { cursor, records, hasMore: trimmed || rows.length === limit };
+  // `entities` = iklan entitas opsional hub ini (ADR-0180); hub lama tak mengirimnya.
+  return { cursor, records, hasMore: trimmed || rows.length === limit, entities: [...OPTIONAL_ENTITIES] };
 }
 
 // SPEC-885 · ADR-0138 · urutan dependensi topologis, diturunkan dari `PARENTS`. Induk selalu
@@ -451,11 +492,13 @@ export const BOOTSTRAP_ORDER: Entity[] = [
   // Workspace QA · induk SEBELUM anak (FK reportId, cascade) dan sesudah `project`. Urutan yang salah
   // bootstrap SUKSES tanpa error tapi anaknya dibuang sebagai yatim (kelas SPEC-885).
   "qaReport", "qaCase", "qaFinding", "qaAttachment",
+  // ADR-0180 · memori sesudah `project`, event sesudah memorinya.
+  "projectMemory", "memoryEvent",
   "vps", "sessionResult",
 ];
 
 export type BootstrapPage = {
-  cursor: string; records: PulledRecord[]; hasMore: boolean; next: string | null;
+  cursor: string; records: PulledRecord[]; hasMore: boolean; next: string | null; entities: string[];
 };
 
 // SPEC-885 · ADR-0138 · KEADAAN, bukan sejarah. Client dengan kursor 0 yang menarik lewat feed
@@ -463,7 +506,7 @@ export type BootstrapPage = {
 // 7,9 MB, hanya untuk mendarat jadi 889 record / ~2,5 MB. Membaca tabel langsung menghapus
 // kemubaziran itu SEKALIGUS masalah urutan yang ditinggalkan retensi ADR-0131.
 export async function bootstrapSnapshot(
-  after: string | null, maxBytes = PULL_MAX_BYTES,
+  after: string | null, maxBytes = PULL_MAX_BYTES, opts: { accept?: Set<string>; only?: Set<string> } = {},
 ): Promise<BootstrapPage> {
   // Kursor DULU, sebelum satu tabel pun dibaca — dan urutan ini yang harus dipertahankan.
   //
@@ -490,6 +533,9 @@ export async function bootstrapSnapshot(
 
   for (let i = startAt; i < BOOTSTRAP_ORDER.length; i++) {
     const entity = BOOTSTRAP_ORDER[i]!;
+    // ADR-0180 · entitas opsional hanya untuk yang memintanya; `only` = catch-up entitas tertentu.
+    if (isOptionalEntity(entity) && !(opts.accept ?? new Set<string>()).has(entity)) continue;
+    if (opts.only && !opts.only.has(entity)) continue;
     // Hanya entitas tempat kursor berhenti yang melanjutkan dari id tertentu; sesudahnya penuh.
     const gt = i === startAt && afterId ? afterId : null;
     const rows = await (DELEGATE[entity] as unknown as {
@@ -508,7 +554,7 @@ export async function bootstrapSnapshot(
       };
       const size = recordBytes(rec);
       if (records.length && bytes + size > maxBytes) {
-        return { cursor, records, hasMore: true, next: last };
+        return { cursor, records, hasMore: true, next: last, entities: [...OPTIONAL_ENTITIES] };
       }
       bytes += size;
       records.push(rec);
@@ -519,7 +565,7 @@ export async function bootstrapSnapshot(
   // dan ber-id lebih kecil dari kursor memang terlewat di sini. Ia tetap ada di feed pada
   // `seq > cursor`, jadi drain sesudah bootstrap yang menjemputnya. Konvergensi tidak bergantung
   // pada bootstrap yang lengkap — hanya pada kursornya yang tidak pernah melewati kenyataan.
-  return { cursor, records, hasMore: false, next: null };
+  return { cursor, records, hasMore: false, next: null, entities: [...OPTIONAL_ENTITIES] };
 }
 
 // SPEC-268 · ADR-0066 · publish write LOKAL-asal ke change-feed (SyncLog) + siar. Melengkapi

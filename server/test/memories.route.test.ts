@@ -115,6 +115,18 @@ const cookieHeader = async () => {
 };
 
 describe("/api/memories · cookie", () => {
+  it("ADR-0180: hapus permanen cookie-only; id project lain 404; agent token 403", async () => {
+    const c = await cookieHeader();
+    const p = await app.inject({ method: "POST", url: "/api/memories", headers: c,
+      payload: { projectId: "rt-a", kind: "fact", content: "akan dihapus", scopePaths: [], anchors: [] } });
+    const id = p.json().memory.id;
+    expect((await app.inject({ method: "DELETE", url: `/api/memories/${id}?projectId=rt-b`, headers: c })).statusCode).toBe(404);
+    const t = await tokenFor(["rt-a"]);
+    expect((await app.inject({ method: "DELETE", url: `/api/memories/${id}`, headers: H(t) })).statusCode).toBe(403);
+    expect((await app.inject({ method: "DELETE", url: `/api/memories/${id}?projectId=rt-a`, headers: c })).statusCode).toBe(204);
+    expect(await prisma.projectMemory.count({ where: { id } })).toBe(0);
+  });
+
   it("cookie wajib projectId; review activate memindahkan proposed → active", async () => {
     const c = await cookieHeader();
     expect((await app.inject({ method: "GET", url: "/api/memories", headers: c })).statusCode).toBe(400);

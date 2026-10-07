@@ -1200,3 +1200,12 @@ ber-`supersedesId`. Indeks `[projectId, status]`.
 
 `AgentToken.projectIds` — JSON `string[]` nullable: allowlist project untuk route memori. `null`/`[]` = token tak boleh
 menyentuh `/api/memories*` sama sekali.
+
+### Sync memori ([ADR-0180](../adr/0180-sync-memori-entitas-opsional.md))
+
+`ProjectMemory` dan `MemoryEvent` (kini ber-`version` + `updatedAt`) masuk `SYNCED` sebagai **entitas
+opsional** (`OPTIONAL_ENTITIES`): hub hanya mengirimnya ke client yang menyebut `entities=`, dan kursor
+pull melompati baris tersaring. `MemoryLocalState` tetap LOCAL-only. `SyncState.entities` (LOCAL-only)
+mencatat entitas opsional yang sudah di-catch-up mesin ini. Merge: lattice status untuk `projectMemory`,
+idempoten untuk `memoryEvent`; tak pernah `SyncConflict` selama field immutable sama.
+

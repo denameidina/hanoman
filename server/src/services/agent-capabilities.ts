@@ -57,7 +57,8 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // ADR-0178 · memori project. Review (activate/reject) mengubah apa yang disuntik ke SETIAP sesi
   // berikutnya tanpa jangkar yang terverifikasi — itu keputusan manusia, bukan capability.
   if (top === "memories") {
-    if (seg[2] === "activate" || seg[2] === "reject") return "COOKIE_ONLY";
+    // ADR-0180 · hapus permanen juga keputusan manusia.
+    if (method === "DELETE" || seg[2] === "activate" || seg[2] === "reject") return "COOKIE_ONLY";
     return rw("memory");
   }
   if (top === "scheduler") {

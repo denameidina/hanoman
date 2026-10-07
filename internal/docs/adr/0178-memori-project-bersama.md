@@ -37,3 +37,5 @@ untuk semua sumber tahap 1 (sumber tak tepercaya lahir bersama suntik sesi di ta
 - Memori hanya seakurat jangkarnya; memori tanpa jangkar selalu lewat manusia.
 - Device tanpa checkout project tak bisa memverifikasi jangkar → usulan dari sana tak auto-aktif.
 - `TelegramMemory` tetap terpisah (scope `chatId`, ADR-0096).
+
+> **Tahap sync:** [ADR-0180](0180-sync-memori-entitas-opsional.md) — entitas opsional, merge lattice di hub & client, hapus permanen.

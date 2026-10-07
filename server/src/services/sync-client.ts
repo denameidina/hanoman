@@ -2,8 +2,9 @@ import { uploadPendingQaBytes } from "./qa-attachment-transfer";
 import { prisma } from "../db";
 import {
   pull as _pull, snapshot, upsertLocal, deleteRow, isEntity, validateSyncData,
-  PARENTS, type Entity, type SyncOp,
+  PARENTS, OPTIONAL_ENTITIES, isOptionalEntity, type Entity, type SyncOp,
 } from "./sync";
+import { mergeMemoryRecord } from "./memory/sync-merge";
 import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
 import { recordSyncDelete } from "./notifications";
 import { recordConflict } from "./conflicts";
@@ -28,6 +29,18 @@ export type Transport = (
 
 const MAX_SYNC_RECORD_BYTES = 1024 * 1024;
 
+// ADR-0180 · entitas opsional yang diminta mesin ini. Query, bukan header: `Transport` tak membawa
+// header, dan URL WS hanya menolak `token` di query.
+export const OPTIONAL_QUERY = `entities=${OPTIONAL_ENTITIES.join(",")}`;
+// Entitas opsional yang DIIKLANKAN hub pada pull terakhir. `null` = belum tahu / hub lama.
+let hubOptional: Set<string> | null = null;
+
+// ADR-0180 · tetap DILEMPAR (kontrak lama `validateIncomingRecord`), tapi berjenis sendiri supaya
+// pemanggil bisa MELEWATINYA alih-alih menahan kursor: hub yang lebih baru tak boleh mematikan client.
+export class UnknownEntityError extends Error {
+  constructor(entity: unknown) { super(`sync entity tak dikenal: ${String(entity)}`); }
+}
+
 // SPEC-799 · ADR-0119 · `op` dibaca dari TOP-LEVEL record dan TIDAK pernah dari `data` — allowlist
 // `validateSyncData` akan menolak penanda di sana, dan penolakan itu menyalakan `feedHole` yang
 // menahan kursor selamanya. Jenis yang tak dikenal (hub lebih baru) mengembalikan `null` supaya
@@ -37,7 +50,7 @@ export function validateIncomingRecord(input: unknown): {
 } {
   if (!input || typeof input !== "object") throw new Error("sync record harus object");
   const row = input as Record<string, unknown>;
-  if (typeof row.entity !== "string" || !isEntity(row.entity)) throw new Error("sync entity tak dikenal");
+  if (typeof row.entity !== "string" || !isEntity(row.entity)) throw new UnknownEntityError(row.entity);
   if (typeof row.recordId !== "string" || !row.recordId || row.recordId.length > 256) throw new Error("sync recordId invalid");
   if (!Number.isSafeInteger(row.version) || Number(row.version) < 0) throw new Error("sync version invalid");
   if (!row.data || typeof row.data !== "object" || Array.isArray(row.data)) throw new Error("sync data invalid");
@@ -126,6 +139,9 @@ async function parentTombstoned(entity: Entity, data: Record<string, unknown>): 
 // di belakang kursor dan tak akan pernah ditarik lagi (akar hilangnya lampiran, audit SPEC-382).
 let feedHole = false;
 
+// Test-only: kosongkan keadaan modul (iklan hub, lubang feed).
+export function __resetSyncClientState(): void { hubOptional = null; feedHole = false; }
+
 // Terapkan satu frame changefeed WS. `false` = belum bisa diterapkan (kursor ditahan, tunggu pull).
 export async function applyFeedFrame(msg: {
   entity?: string; recordId?: string; version?: number; op?: string;
@@ -137,7 +153,12 @@ export async function applyFeedFrame(msg: {
     // SPEC-799 · `op` tak dikenal = frame dari hub yang lebih baru. Dilewati, TIDAK menahan kursor:
     // menahannya berarti satu jenis peristiwa masa depan cukup untuk mematikan client ini.
     if (record.op) await applyRemote(record.entity, record.recordId, record.version, record.data, record.op);
-  } catch {
+  } catch (e) {
+    // ADR-0180 · entitas dari hub yang lebih baru: lewati DAN biarkan kursor maju, seperti `op` tak dikenal.
+    if (e instanceof UnknownEntityError) {
+      if (msg.seq && !feedHole) await setCursor(String(msg.seq));
+      return true;
+    }
     feedHole = true;
     return false;
   }
@@ -198,11 +219,14 @@ export async function bootstrapOnce(transport: Transport): Promise<number | null
   let cursor = "0";
   let applied = 0;
   for (let page = 0; page < MAX_DRAIN_PAGES; page++) {
-    const q = after ? `?after=${encodeURIComponent(after)}` : "";
+    const q = `?${OPTIONAL_QUERY}${after ? `&after=${encodeURIComponent(after)}` : ""}`;
     const res = await transport("GET", `/api/sync/bootstrap${q}`);
     if (res.status !== 200 || !Array.isArray(res.body?.records)) return null;
+    if (page === 0) hubOptional = Array.isArray(res.body.entities) ? new Set(res.body.entities as string[]) : null;
     for (const raw of res.body.records as unknown[]) {
-      const rec = validateIncomingRecord(raw);
+      let rec: IncomingRecord;
+      try { rec = validateIncomingRecord(raw); }
+      catch (e) { if (e instanceof UnknownEntityError) continue; throw e; }
       if (!rec.op) continue;
       // Urutan dependensi dijamin hub, jadi tak ada `deferred` di sini: satu record yang gagal
       // di jalur ini adalah kesalahan kontrak, bukan artefak urutan — dan harus terlihat.
@@ -215,6 +239,49 @@ export async function bootstrapOnce(transport: Transport): Promise<number | null
     after = next;
   }
   await setCursor(cursor);
+  // ADR-0180 · snapshot dari nol sudah membawa entitas opsional yang diiklankan hub — tak perlu catch-up.
+  if (hubOptional) await setOptionalMarker([...hubOptional]);
+  return applied;
+}
+
+async function getOptionalMarker(): Promise<Set<string>> {
+  const st = await prisma.syncState.findUnique({ where: { id: 1 } });
+  return new Set((st?.entities ?? "").split(",").filter(Boolean));
+}
+async function setOptionalMarker(entities: readonly unknown[]): Promise<void> {
+  const have = await getOptionalMarker();
+  for (const e of entities) if (isOptionalEntity(String(e))) have.add(String(e));
+  const value = OPTIONAL_ENTITIES.filter((e) => have.has(e)).join(",");
+  await prisma.syncState.upsert({ where: { id: 1 }, create: { id: 1, entities: value }, update: { entities: value } });
+}
+
+/**
+ * ADR-0180 · mesin yang naik versi SESUDAH hub mulai menyimpan memori: kursornya sudah melewati
+ * baris memori yang dulu disaring untuknya. Tarik KEADAAN entitas itu sekali lewat bootstrap `only`,
+ * tanpa memindahkan kursor feed (baris yang lebih baru tetap datang lewat pull).
+ */
+export async function catchUpOptional(transport: Transport): Promise<number> {
+  const have = await getOptionalMarker();
+  const missing = OPTIONAL_ENTITIES.filter((e) => !have.has(e) && hubOptional?.has(e));
+  if (!missing.length) return 0;
+  // Kursor 0 = feed akan dikuras dari awal dengan `entities=`, jadi semuanya ikut tanpa catch-up.
+  if (await getCursor() === "0") { await setOptionalMarker(missing); return 0; }
+  const only = missing.join(",");
+  let after: string | null = null;
+  let applied = 0;
+  for (let page = 0; page < MAX_DRAIN_PAGES; page++) {
+    const q = `${OPTIONAL_QUERY}&only=${only}${after ? `&after=${encodeURIComponent(after)}` : ""}`;
+    const res = await transport("GET", `/api/sync/bootstrap?${q}`);
+    if (res.status !== 200 || !Array.isArray(res.body?.records)) return applied;   // ulangi siklus berikutnya
+    for (const raw of res.body.records as unknown[]) {
+      const rec = validateIncomingRecord(raw);
+      if (rec.op) { await applyRemote(rec.entity, rec.recordId, rec.version, rec.data, rec.op); applied++; }
+    }
+    const next = res.body.next ? String(res.body.next) : null;
+    if (!res.body.hasMore || !next) break;
+    after = next;
+  }
+  await setOptionalMarker(missing);
   return applied;
 }
 
@@ -240,9 +307,18 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
   let deferred: IncomingRecord[] = [];
   for (let page = 0; page < MAX_DRAIN_PAGES; page++) {
     const cursor = await getCursor();
-    const pullRes = await transport("GET", `/api/sync/pull?since=${cursor}`);
+    const pullRes = await transport("GET", `/api/sync/pull?since=${cursor}&${OPTIONAL_QUERY}`);
     const rawRecords: unknown[] = Array.isArray(pullRes.body?.records) ? pullRes.body.records : [];
-    const records = rawRecords.map(validateIncomingRecord);
+    hubOptional = Array.isArray(pullRes.body?.entities) ? new Set(pullRes.body.entities as string[]) : null;
+    const records: IncomingRecord[] = [];
+    for (const raw of rawRecords) {
+      try { records.push(validateIncomingRecord(raw)); }
+      catch (e) {
+        if (!(e instanceof UnknownEntityError)) throw e;
+        // ADR-0180 · hub lebih baru dari mesin ini: lewati, jangan macet.
+        stats.dropped++;
+      }
+    }
 
     for (const rec of records) {
       if (!isEntity(rec.entity)) continue;
@@ -252,6 +328,19 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
       // lokal pending justru bukan alasan menundanya — di situlah keputusannya harus berlaku.
       if (rec.op === "upsert" && pending.has(`${rec.entity}:${rec.recordId}`)) {
         const local = await snapshot(rec.entity as Entity, rec.recordId);
+        // ADR-0180 · memori tak butuh modal konflik: event immutable (push-nya idempoten di hub),
+        // status memori ber-lattice. Ambil status gabungan, tetap di outbox — push berikutnya
+        // digabung lagi di hub. `same` = lokal sudah lebih tinggi; push yang akan menaikkan hub.
+        if (local && rec.entity === "memoryEvent") continue;
+        if (local && rec.entity === "projectMemory") {
+          const m = mergeMemoryRecord(local.data, rec.data);
+          if (m.kind !== "conflict") {
+            if (m.kind === "merged") {
+              await prisma.projectMemory.update({ where: { id: rec.recordId }, data: { status: m.data.status as string } });
+            }
+            continue;
+          }
+        }
         if (local && JSON.stringify(local.data) !== JSON.stringify(rec.data)) {
           await markConflict(rec.entity, rec.recordId,
             { version: local.version, data: local.data }, { version: rec.version, data: rec.data });
@@ -289,6 +378,9 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
     stats.dropped++;
   }
 
+  await catchUpOptional(transport)
+    .catch((e) => console.warn("sync: catch-up entitas opsional gagal —", (e as Error).message));
+
   for (const item of outbox) {
     // SPEC-255 · ADR-0064 · operasi rename project: recordId = "<oldId> <newId>". Push satu record
     // project ber-penanda renamedFrom agar hub merename in-place (bukan insert baru).
@@ -305,6 +397,9 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
       continue;
     }
     if (!isEntity(item.entity)) { await clearOutbox(item.entity, item.recordId); continue; }
+    // ADR-0180 · hub yang belum mendukung entitas opsional akan menolaknya per-record selamanya.
+    // Tahan di outbox (bukan dibuang) — terkirim begitu hub naik versi.
+    if (isOptionalEntity(item.entity) && !hubOptional?.has(item.entity)) continue;
     const snap = await snapshot(item.entity, item.recordId);
     // SPEC-799 · ADR-0119 · baris tak ada TAPI tombstone ada = penghapusan lokal menunggu jendela
     // online. Dulu cabang ini sekadar `clearOutbox` ("record hilang lokal") — di situlah setiap
@@ -475,7 +570,7 @@ export async function startSyncClient(base: string, token: string, tickMs?: numb
 
   const connectWs = async () => {
     const { WebSocket } = await import("ws");
-    const wsUrl = base.replace(/^http/, "ws").replace(/\/$/, "") + "/api/sync/ws";
+    const wsUrl = base.replace(/^http/, "ws").replace(/\/$/, "") + "/api/sync/ws?" + OPTIONAL_QUERY;
     const sock = new WebSocket(wsUrl, { headers: { authorization: `Bearer ${token}` } });
     ws = sock;
     sock.on("open", () => {
