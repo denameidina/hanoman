@@ -278,7 +278,7 @@ dengan tipe klien lokal `type SyncClient = Client & { accept?: Set<string> }` (`
 
 **Files:** create `server/src/services/memory/sync-merge.ts`; modify `sync.ts:applyPush`; test `server/test/sync-memory.merge.test.ts`.
 
-- [ ] **Step 1: Test yang gagal**
+- [x] **Step 1: Test yang gagal**
 
 ```ts
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -345,7 +345,7 @@ describe("applyPush memoryEvent idempoten", () => {
 });
 ```
 
-- [ ] **Step 2: `sync-merge.ts`**
+- [x] **Step 2: `sync-merge.ts`**
 
 ```ts
 // ADR-0180 · merge record memori untuk sync. Murni. Field selain `status`/`updatedAt` tak pernah
@@ -368,7 +368,7 @@ export function mergeMemoryRecord(current: Data, incoming: Data):
 }
 ```
 
-- [ ] **Step 3: `applyPush`** — ubah parameter `data` menjadi `let`-able (`data: Record<string, unknown>` → gunakan `let incoming = data;` dan ganti pemakaian `data` sesudah blok rename dengan `incoming`), lalu ganti blok konflik:
+- [x] **Step 3: `applyPush`** — ubah parameter `data` menjadi `let`-able (`data: Record<string, unknown>` → gunakan `let incoming = data;` dan ganti pemakaian `data` sesudah blok rename dengan `incoming`), lalu ganti blok konflik:
 
 ```ts
   if (currentVersion !== null && currentVersion !== baseVersion) {
@@ -390,7 +390,7 @@ export function mergeMemoryRecord(current: Data, incoming: Data):
 
 (`baseVersion` parameter juga dijadikan `let` lokal: `let base = baseVersion` — sesuaikan nama.) Import `mergeMemoryRecord` dari `./memory/sync-merge`.
 
-- [ ] **Step 4: PASS** merge test + `sync-*.test.ts`. **Step 5: Commit** `feat(sync): merge lattice status memori di hub tanpa SyncConflict`
+- [x] **Step 4: PASS** merge test + `sync-*.test.ts`. **Step 5: Commit** `feat(sync): merge lattice status memori di hub tanpa SyncConflict`
 
 ---
 

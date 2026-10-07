@@ -2,6 +2,7 @@ import { prisma } from "../db";
 import { renameProjectCore } from "./rename-project";
 import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
 import { QA_STORAGE_KEY, QA_SYNC_MAX_BYTES, settleNewQaAttachment } from "./qa-attachment-sync";
+import { mergeMemoryRecord } from "./memory/sync-merge";
 
 // SPEC-213 · ADR-0045 · mesin sync record: version-stamp optimistic concurrency + change-feed
 // SyncLog (seq = kursor global). Isi file dokumen TIDAK lewat sini (git 3-way merge, ADR-0043).
@@ -378,7 +379,18 @@ export async function applyPush(
   const existing = await DELEGATE[entity].findUnique({ where: { id }, select: { version: true } });
   const currentVersion = existing ? Number(existing.version) : tomb ? tomb.version : null;
   if (currentVersion !== null && currentVersion !== baseVersion) {
-    return {
+    // ADR-0180 · memori: status ber-lattice, isi immutable → digabung tanpa manusia (hub tak pernah
+    // membuat SyncConflict, dan client tak perlu modal untuk ini). Event append-only yang sudah ada
+    // = push ulang yang idempoten. Parameter `data`/`baseVersion` sengaja ditimpa: sisa fungsi
+    // menulis hasil gabungan lewat jalur yang sama persis dengan tulisan biasa.
+    if (existing && entity === "memoryEvent") return { ok: true, version: currentVersion };
+    if (existing && entity === "projectMemory") {
+      const server = await snapshot(entity, id);
+      const m = server ? mergeMemoryRecord(server.data, data) : { kind: "conflict" as const };
+      if (m.kind === "same") return { ok: true, version: currentVersion };
+      if (m.kind === "merged") { data = m.data; baseVersion = currentVersion; }
+    }
+    if (currentVersion !== baseVersion) return {
       ok: false, conflict: true, server: await snapshot(entity, id),
       ...(tomb && !existing ? { deleted: true, deletedVersion: tomb.version } : {}),
     };
