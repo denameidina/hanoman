@@ -69,11 +69,12 @@ export function NotificationBell() {
           ) : items.map((n) => {
             const decision = n.type === "decision";
             const ticket = n.type === "ticket";
+            const memory = n.type === "memory";   // ADR-0181
             // SPEC-253 · +ticket (keluhan Help Center). icon/warna/label per tipe.
-            const icon = ticket ? "inbox" : decision ? "git-merge" : "check-circle-2";
-            const accent = ticket ? "var(--brass-500)" : decision ? "var(--amber-600)" : "var(--leaf-500)";
-            const label = ticket ? "keluhan baru" : decision ? "butuh keputusan" : "selesai";
-            const openLabel = decision ? "Buka terminal" : ticket ? "Lihat triase" : "Buka";
+            const icon = memory ? "brain" : ticket ? "inbox" : decision ? "git-merge" : "check-circle-2";
+            const accent = memory || ticket ? "var(--brass-500)" : decision ? "var(--amber-600)" : "var(--leaf-500)";
+            const label = memory ? "memori butuh review" : ticket ? "keluhan baru" : decision ? "butuh keputusan" : "selesai";
+            const openLabel = memory ? "Review memori" : decision ? "Buka terminal" : ticket ? "Lihat triase" : "Buka";
             return (
             <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
               borderRadius: "var(--radius-sm)" }}>

@@ -71,11 +71,13 @@ export function needsConfirm(m: { status: string; createdAt: string }, lastUsedA
 
 ---
 
+> **Catatan eksekusi:** URL & key nav memakai `memory` (`/memory[/<projectId>]`, label "Memori"), seragam dengan key Inggris lain (`team` → "Tim"); rencana awal `/memori`. Task 3 & 4 di-commit bersama karena test kontrak nav menuntut setiap key nav punya cabang `section` di App. Test layar ada di `src/test/memory-workspace.test.tsx` (butuh helper `events-stub`). `placeholder-contract` sudah gagal di base dengan 15 entri yang sama; tak ada entri dari berkas memori.
+
 ### Task 3: Klien API + rute + nav + badge + notifikasi
 
 **Files:** `shared/src/api.ts` (`paths.memories`, `paths.memory`), `src/src/api/client.ts` (`memories(projectId, {status,q})`, `memory(projectId,id)`, `reviewMemory(projectId,id,decision,reason?)`, `invalidateMemory(projectId,id,reason)`, `deleteMemory(projectId,id)`; `createAgentToken`/`patchAgentToken` menerima `projectIds`), `src/src/routes.ts` (`/memori[/<projectId>]`), `src/src/ds/shell.tsx` (`HN_NAV` += `{ key: "memory", label: "Memori", icon: "brain" }` setelah `qa`; key `memory` = key `PendingCounts`), `src/src/App.tsx` (cabang `section === "memory"`, `onGotoMemory` di ProjectDetail), `src/src/screens/ProjectDetailScreen.tsx` (`Door icon="brain" title="Memori" hint="fakta & keputusan project untuk agen"`), notifikasi (`NotificationBell` ikon/label `memory`, `toastFor`, `notifTarget` → `/memori/<projectId>`).
 
-- [ ] Test: `routes.test.ts` (round-trip `/memori` & `/memori/p1`), test nav (`changelog-nav`/`qa-nav` pola), `nav-pending-badge` (badge memory), `notif-target` (memory → `/memori/<pid>`), `notification-bell` (label). Implementasi. PASS. Commit `feat(memory): rute, nav, badge, notifikasi & klien API memori`.
+- [x] Test: `routes.test.ts` (round-trip `/memori` & `/memori/p1`), test nav (`changelog-nav`/`qa-nav` pola), `nav-pending-badge` (badge memory), `notif-target` (memory → `/memori/<pid>`), `notification-bell` (label). Implementasi. PASS. Commit `feat(memory): rute, nav, badge, notifikasi & klien API memori`.
 - Catatan: path API memakai query `projectId` (cookie) — `GET /api/memories?projectId=…&status=…&q=…`.
 
 ---
@@ -84,7 +86,7 @@ export function needsConfirm(m: { status: string; createdAt: string }, lastUsedA
 
 **Files:** `src/src/screens/memory/MemoryWorkspace.tsx`, `MemoryItem.tsx`, `memory-ui.ts`; test `src/src/screens/memory/MemoryWorkspace.test.tsx` (pola `QaWorkspace.test.tsx`: `vi.spyOn(globalThis, "fetch")` + router URL; `vi.mock("../../api/events", () => eventsStub)` bila `useLiveTopic` menyentuh WS).
 
-- [ ] **Step 1: Test yang gagal**
+- [x] **Step 1: Test yang gagal**
   - Tanpa project → `StateBlock` empty.
   - Tab "Perlu review (n)" default bila ada `proposed`, selain itu "Aktif"; hitungan per tab dari tiga GET (`status=proposed|active` dan arsip `invalidated`+`rejected`).
   - Item menampilkan kind, isi, alasan review (label manusiawi: `decision` → "keputusan", `no-anchor` → "tanpa jangkar", `anchor-unverified` → "jangkar belum terverifikasi", `untrusted-source` → "sumber tak tepercaya"), jangkar, sumber (runtime · sesi · commit 7 karakter), badge verdict lokal (`valid` → ok "terverifikasi", `stale` → warn "usang di mesin ini", `unverifiable`/null → neutral "belum terverifikasi di mesin ini"), badge `needsConfirm` → warn "perlu dikonfirmasi".
@@ -95,8 +97,8 @@ export function needsConfirm(m: { status: string; createdAt: string }, lastUsedA
   - Peringatan pengganti ganda: dua memori `active` dengan `supersedesId` sama → banner warn di atas tab Aktif.
   - Pencarian `q` (Field berlabel "Cari", placeholder `mis. migration`) diteruskan ke query.
   - Galat API → toast `errText` dan item tetap.
-- [ ] **Step 2: Implementasi** — pola `QaWorkspace`: `Select` project di header (label "Project"), `Tabs`, daftar `Card` per memori; `useLiveTopic({ topic: "memory", params: { projectId }, apply: (m) => { if (m.revision !== rev.current) { rev.current = m.revision; void reload(); } }, refetch: reload })`. Dialog alasan = `Modal` + `HnTextarea` berlabel "Alasan" (placeholder `mis. sudah tidak berlaku sejak SPEC-123`).
-- [ ] **Step 3: PASS** + `placeholder-contract.test.ts`. **Step 4: Commit** `feat(memory): halaman Memori — review, aktif, arsip, riwayat, hapus permanen`.
+- [x] **Step 2: Implementasi** — pola `QaWorkspace`: `Select` project di header (label "Project"), `Tabs`, daftar `Card` per memori; `useLiveTopic({ topic: "memory", params: { projectId }, apply: (m) => { if (m.revision !== rev.current) { rev.current = m.revision; void reload(); } }, refetch: reload })`. Dialog alasan = `Modal` + `HnTextarea` berlabel "Alasan" (placeholder `mis. sudah tidak berlaku sejak SPEC-123`).
+- [x] **Step 3: PASS** + `placeholder-contract.test.ts`. **Step 4: Commit** `feat(memory): halaman Memori — review, aktif, arsip, riwayat, hapus permanen`.
 
 ---
 

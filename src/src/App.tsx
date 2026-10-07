@@ -45,6 +45,7 @@ import { ProjectsScreen } from "./screens/ProjectsScreen";
 import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
 import { SkillsWorkspace } from "./screens/skills/SkillsWorkspace";
 import { QaWorkspace } from "./screens/qa/QaWorkspace";
+import { MemoryWorkspace } from "./screens/memory/MemoryWorkspace";
 import { BacklogScreen } from "./screens/BacklogScreen";
 import { PrdScreen, NewPrdModal, type PrdPrefill, type PrdBriefForm } from "./screens/PrdScreen";
 import type { AuditEscalation } from "@hanoman/shared";
@@ -1040,7 +1041,9 @@ function AppInner() {
     const t = notifTarget(nt, sessions);
     if (t.projectFilter) setProjectFilter(t.projectFilter);
     if (t.focus) setFocusSession(t.focus);
-    setSection(t.section);
+    // ADR-0181 · Memori ber-path per project: buka langsung project notifikasinya.
+    if (t.section === "memory" && t.projectFilter) navigate(routePath({ section: "memory", projectId: t.projectFilter }));
+    else setSection(t.section);
   }, [sessions]);
 
   async function updateProject(f: { id: string; name: string; desc: string; dir: string; gitRemote: string;
@@ -1559,6 +1562,7 @@ function AppInner() {
               onGotoBacklog={() => { setProjectFilter(proj.id); setSection("backlog"); }}
               onGotoChangelog={() => setSection("changelog")}
               onGotoSkills={() => navigate(routePath({ section: "skills", projectId: proj.id }))}
+              onGotoMemory={() => navigate(routePath({ section: "memory", projectId: proj.id }))}
               onReverse={proj.kind === "existing" && (proj.binding ?? proj.repoDir) ? () => reverseDocs(proj) : undefined}
               onScaffold={proj.kind === "from-scratch" && (proj.binding ?? proj.repoDir) ? () => scaffoldDocs(proj) : undefined}
               onDelete={() => deleteProject(proj)} />
@@ -1743,6 +1747,15 @@ function AppInner() {
       <Shell active="qa" title="QA" wide onNavigate={setSection} breadcrumb="qa · laporan per project">
         {gate(<QaWorkspace key={qaProjectId ?? "none"} projects={projects} projectId={qaProjectId}
           onSelectProject={(id) => navigate(routePath({ section: "qa", projectId: id }))} onToast={showToast} />)}
+      </Shell>
+    );
+  } else if (section === "memory") {
+    // ADR-0181 · /memory → project pertama; /memory/<projectId> → memori project itu.
+    const memProjectId = route?.projectId ?? projects[0]?.id;
+    screen = (
+      <Shell active="memory" title="Memori" wide onNavigate={setSection} breadcrumb="memori · review & fakta project">
+        {gate(<MemoryWorkspace key={memProjectId ?? "none"} projects={projects} projectId={memProjectId}
+          onSelectProject={(id) => navigate(routePath({ section: "memory", projectId: id }))} onToast={showToast} />)}
       </Shell>
     );
   } else if (section === "skills") {

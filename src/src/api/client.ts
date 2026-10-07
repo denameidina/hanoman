@@ -83,6 +83,7 @@ export type IdeUploadResult = {
 };
 // SPEC-908 · satu definisi di @hanoman/shared; dulu kembar dengan server/src/services/git-ide.ts.
 import type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
+import type { MemoryEventView, MemoryListItem, MemoryStatus, MemoryView } from "@hanoman/shared";
 import type {
   CreateQaCase, CreateQaFinding, CreateQaReport, PatchQaCase, PatchQaFinding, PatchQaReport,
   QaAttachmentView, QaBacklogResult, QaCasesImportResult, QaExportFormat, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
@@ -608,11 +609,25 @@ export function createApi(o: { base?: string } = {}) {
   // SPEC-257 · agent token (kelola cookie-only) — token plaintext hanya balik di create (sekali).
   getAgentCapabilities: () => j<{ capabilities: CapabilityInfo[] }>(paths.agentCapabilities),
   listAgentTokens: () => j<{ items: AgentTokenView[] }>(paths.agentTokens),
-  createAgentToken: (b: { name: string; capabilities: string[] }) =>
+  // ADR-0181 · `projectIds` = allowlist project untuk memori (ADR-0178); null di PATCH = cabut semua.
+  createAgentToken: (b: { name: string; capabilities: string[]; projectIds?: string[] }) =>
     j<AgentTokenView & { token: string }>(paths.agentTokens, { method: "POST", ...body(b) }),
-  patchAgentToken: (id: string, b: { name?: string; capabilities?: string[]; enabled?: boolean }) =>
+  patchAgentToken: (id: string, b: { name?: string; capabilities?: string[]; enabled?: boolean; projectIds?: string[] | null }) =>
     j<AgentTokenView>(paths.agentToken(id), { method: "PATCH", ...body(b) }),
   revokeAgentToken: (id: string) => j<void>(paths.agentToken(id), { method: "DELETE" }),
+  // ADR-0181 · memori project (cookie: project lewat `projectId`). Path ditulis di sini, bukan di
+  // `shared/src/api.ts` — preseden client-accounts di bawah (blast radius `vitest --changed`).
+  memories: (projectId: string, q: { status?: MemoryStatus; q?: string } = {}) =>
+    j<{ items: MemoryListItem[]; total: number }>(`/api/memories?${new URLSearchParams({ projectId, ...(q.status ? { status: q.status } : {}), ...(q.q ? { q: q.q } : {}) })}`),
+  memory: (projectId: string, id: string) =>
+    j<{ memory: MemoryView; events: MemoryEventView[] }>(`/api/memories/${encodeURIComponent(id)}?${new URLSearchParams({ projectId })}`),
+  reviewMemory: (projectId: string, id: string, decision: "activate" | "reject", reason?: string) =>
+    j<{ memory: MemoryView }>(`/api/memories/${encodeURIComponent(id)}/${decision}?${new URLSearchParams({ projectId })}`,
+      { method: "POST", ...body(reason ? { reason } : {}) }),
+  invalidateMemory: (projectId: string, id: string, reason: string) =>
+    j<{ memory: MemoryView }>(`/api/memories/${encodeURIComponent(id)}/invalidate`, { method: "POST", ...body({ reason, projectId }) }),
+  deleteMemory: (projectId: string, id: string) =>
+    j<void>(`/api/memories/${encodeURIComponent(id)}?${new URLSearchParams({ projectId })}`, { method: "DELETE" }),
   // SPEC-617 · ADR-0110 · kelola akun klien (cookie-only, admin). Path ditulis di sini, bukan di
   // `shared/src/api.ts`: modul itu diimpor hampir seluruh repo, dan menyentuhnya meledakkan
   // blast radius `vitest --changed` tanpa memberi apa pun (ADR-0080, preseden SPEC-385).

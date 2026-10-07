@@ -30,6 +30,8 @@ export const HN_NAV: NavItem[] = [
   { key: "team", label: "Tim", icon: "users" },
   // Workspace QA · laporan QA per project (test case, temuan, lampiran) → perbaikan project.
   { key: "qa", label: "QA", icon: "clipboard-check" },
+  // ADR-0181 · memori project bersama: antrean review, aktif, arsip. Key = kunci PendingCounts.
+  { key: "memory", label: "Memori", icon: "brain" },
   { key: "triage", label: "Triase", icon: "inbox" },
   { key: "scheduler", label: "Scheduler", icon: "calendar-clock" },
   { key: "lead", label: "Lead", icon: "compass" },   // SPEC-409 · ADR-0091 · hanoman-lead
