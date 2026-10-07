@@ -859,7 +859,7 @@ git commit -m "feat(memory): aturan murni — normalisasi remote, lattice status
 - Consumes: `safeRepoPath` (Task 3).
 - Produces: `repoHead(dir): Promise<string | null>`, `rootCommits(dir): Promise<string[]>`, `hasCommit(dir, sha): Promise<boolean>`, `blobShaAt(dir, commit, path): Promise<string | null>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/memory-git.test.ts`:
 
@@ -912,12 +912,12 @@ describe("git memori", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run server/test/memory-git.test.ts`
 Expected: FAIL — modul tak ditemukan.
 
-- [ ] **Step 3: Tulis `server/src/services/memory/git.ts`**
+- [x] **Step 3: Tulis `server/src/services/memory/git.ts`**
 
 ```ts
 // ADR-0178 · git untuk verifikasi jangkar memori. ASYNC dengan sengaja: dipanggil di jalur request,
@@ -958,12 +958,12 @@ export async function blobShaAt(dir: string, commit: string, path: string): Prom
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run server/test/memory-git.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/memory/git.ts server/test/memory-git.test.ts
