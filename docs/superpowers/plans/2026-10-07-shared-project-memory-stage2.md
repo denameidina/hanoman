@@ -284,7 +284,7 @@ dan ganti setiap `actorOf(s.principal)` di handler menjadi `s.actor`.
 **Interfaces:**
 - Produces: `buildMcpServer(cfg, call, cliVersion, cwd = process.cwd(), env: NodeJS.ProcessEnv = process.env)`; `isLoopbackHost(host: string): boolean` (ekspor untuk test).
 
-- [ ] **Step 1: Test yang gagal** — tambahkan ke blok `describe("tool memori · repoContext")`:
+- [x] **Step 1: Test yang gagal** — tambahkan ke blok `describe("tool memori · repoContext")`:
 
 ```ts
   it("kredensial sesi diteruskan HANYA ke host loopback", async () => {
@@ -310,9 +310,9 @@ dan ganti setiap `actorOf(s.principal)` di handler menjadi `s.actor`.
 
 (impor `SESSION_HEADER`, `SESSION_TOKEN_HEADER` dari `@hanoman/shared`.)
 
-- [ ] **Step 2: Gagal** (header tak ada).
+- [x] **Step 2: Gagal** (header tak ada).
 
-- [ ] **Step 3: Implementasi** di `cli/src/mcp/server.ts`:
+- [x] **Step 3: Implementasi** di `cli/src/mcp/server.ts`:
 
 ```ts
 /** ADR-0179 · token HMAC sesi hanya bermakna bagi server di mesin ini; jangan pernah ke hub jarak jauh. */
@@ -331,7 +331,7 @@ Tanda tangan: `buildMcpServer(cfg, call, cliVersion, cwd = process.cwd(), env: N
           req = { ...req, body: e.body, headers: { ...(req.headers ?? {}), [REPO_HEADER]: encodeRepoHeader(ctx.identity), ...session } };
 ```
 
-- [ ] **Step 4: PASS** `cli/test/mcp-server.test.ts`. **Step 5: Commit** `feat(memory): CLI MCP meneruskan kredensial sesi ke host loopback`
+- [x] **Step 4: PASS** `cli/test/mcp-server.test.ts`. **Step 5: Commit** `feat(memory): CLI MCP meneruskan kredensial sesi ke host loopback`
 
 ---
 
