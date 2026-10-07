@@ -112,11 +112,30 @@ export function needsConfirm(m: { status: string; createdAt: string }, lastUsedA
 
 ### Task 6: ADR-0181, docs, verifikasi nyata
 
-- [ ] ADR-0181 (halaman Memori, revision-topic, `local` per mesin, pending/notifikasi, allowlist UI, konstanta 90 hari); `internal/docs/architecture/frontend-implementation.md` (halaman + pola), `api-contract.md` (`local` di daftar, topik `memory`), `internal/docs/README.md`.
-- [ ] Test tersentuh (frontend + server) + typecheck src/server/shared.
-- [ ] Verifikasi nyata: build web (`pnpm --filter ./src build`) dan boot server sementara (skrip tahap 3, `HANOMAN_WEB_DIR` ke hasil build bila perlu), buat project + dua memori (satu `decision` → review, satu berjangkar → aktif) via API; buka `/memori/<pid>` di browser bila tool browser tersedia (screenshot), jika tidak curl HTML + API dan andalkan test komponen. Setujui/tolak via UI atau API, cek badge `pending.memory` lewat frame `/events/ws` atau `pendingCounts`. Catat hasil.
-- [ ] Centang & commit `docs(memory): ADR-0181 dashboard memori + hasil verifikasi tahap 4`.
+- [x] ADR-0181 (halaman Memori, revision-topic, `local` per mesin, pending/notifikasi, allowlist UI, konstanta 90 hari); `internal/docs/architecture/frontend-implementation.md` (halaman + pola), `api-contract.md` (`local` di daftar, topik `memory`), `internal/docs/README.md`.
+- [x] Test tersentuh (frontend + server) + typecheck src/server/shared.
+- [x] Verifikasi nyata: build web (`pnpm --filter ./src build`) dan boot server sementara (skrip tahap 3, `HANOMAN_WEB_DIR` ke hasil build bila perlu), buat project + dua memori (satu `decision` → review, satu berjangkar → aktif) via API; buka `/memori/<pid>` di browser bila tool browser tersedia (screenshot), jika tidak curl HTML + API dan andalkan test komponen. Setujui/tolak via UI atau API, cek badge `pending.memory` lewat frame `/events/ws` atau `pendingCounts`. Catat hasil.
+- [x] Centang & commit `docs(memory): ADR-0181 dashboard memori + hasil verifikasi tahap 4`.
 
 ## Hasil verifikasi lokal
 
-_(diisi di Task 6)_
+2026-10-07. Tak ada alat browser di sesi ini (tanpa Playwright/Chrome/browser bawaan) — tampilan visual
+belum diperiksa manusia; perilaku dijaga test komponen dan verifikasi nyata HTTP/WS berikut, dengan web
+bundle hasil `pnpm --filter ./src build` disajikan server sementara (`HANOMAN_WEB_DIR`, port 8799).
+
+| Kasus | Hasil |
+|---|---|
+| `GET /memory/memui` (SPA) | `200 text/html`; bundle memuat "Perlu review" |
+| Usulan `decision` tanpa jangkar · `gotcha` berjangkar `CLAUDE.md` | `proposed` · `active` |
+| `GET /api/memories?status=active` | item membawa `local: { verdict: null, lastUsedAt: null, lastVerifiedAt: null, needsConfirm: false }` |
+| `GET /api/notifications` | satu notifikasi `memory`: "Memori butuh review: Pakai SQLite, bukan Postgres" |
+| `/api/events/ws` (tiket + cookie + Origin, langganan `memory {projectId}`) | `hello.topics` memuat `memory`; frame `pending.counts.memory = 1`; frame `memory` `revision = "2:…"` |
+
+Test: server tersentuh 52 berkas / 330 lulus; frontend tersentuh 15 berkas / 80 lulus; **seluruh** suite
+frontend 2127 lulus, 9 gagal — himpunan berkas gagal identik dengan base (pra-ada). Typecheck
+server/cli/shared/src bersih.
+
+> **Catatan eksekusi:** run penuh pertama menemukan tiga regresi yang lolos dari run tersentuh:
+> `icon-registry.ts` adalah berkas **generated** (diperbaiki dengan `gen:icons`, bukan sunting tangan), dan
+> dua test Settings lama me-mock `api` tanpa `listProjects` (pemuatan project di panel token kini
+> gagal-aman). `events-topics` yang ikut gagal adalah timeout di bawah beban, lulus sendiri.

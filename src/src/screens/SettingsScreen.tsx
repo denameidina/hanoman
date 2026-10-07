@@ -464,7 +464,9 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   const [editProjects, setEditProjects] = React.useState<string[]>([]);
   const load = React.useCallback(() => { api.listAgentTokens().then((r) => setItems(r.items)).catch(() => setItems([])); }, []);
   React.useEffect(() => {
-    api.listProjects({ limit: 200 }).then((r) => setProjects(r.items.map((p) => ({ id: p.id, name: p.name })))).catch(() => {});
+    // Gagal-aman: daftar project hanya pemilih allowlist — kegagalannya tak boleh menjatuhkan panel token.
+    Promise.resolve().then(() => api.listProjects({ limit: 200 }))
+      .then((r) => setProjects(r.items.map((p) => ({ id: p.id, name: p.name })))).catch(() => {});
     api.getSettings().then(setSetting).catch(() => {});
     api.getAgentCapabilities().then((r) => setCaps(r.capabilities)).catch(() => {});
     load();

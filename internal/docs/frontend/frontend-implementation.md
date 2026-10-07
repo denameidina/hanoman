@@ -2326,3 +2326,13 @@ Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa p
   tak diterima` (`chipAccessibleName`, juga saat mode ringkas menyembunyikannya secara visual); panel
   `Detail fase <nama>` memakai `usePopoverFocus` DS (`aria-haspopup`/`aria-controls`, fokus masuk panel,
   Esc & klik-luar menutup, fokus kembali ke chip).
+
+## Halaman Memori (`/memory[/<projectId>]`, [ADR-0181](../adr/0181-dashboard-memori.md))
+
+`src/src/screens/memory/MemoryWorkspace.tsx` (+ `memory-ui.ts`) mengikuti pola Workspace QA: `useApi()`,
+`Select` project di header, `Tabs` *Perlu review / Aktif / Arsip*, satu `Card` per memori, `Modal` alasan
+(`HnTextarea aria-label="Alasan"`), `useConfirm` untuk hapus permanen. Realtime: `useLiveTopic({ topic:
+"memory", params: { projectId } })` — frame membawa `revision`; frame pertama = garis dasar, berikutnya yang
+berbeda memicu muat ulang HTTP. Nav: `HN_NAV` key `memory` (ikon `brain`, terdaftar di `icon-registry`),
+badge `PendingCounts.memory`, notifikasi `memory` → `/memory/<projectId>`. Settings → Akses AI Agent:
+`MultiSelect` allowlist project saat membuat token + editor "Atur project" per token.
