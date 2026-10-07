@@ -421,8 +421,8 @@ export function recordBytes(rec: PulledRecord): number {
 }
 
 export async function pull(
-  sinceCursor: string, limit = 500, maxBytes = PULL_MAX_BYTES,
-): Promise<{ cursor: string; records: PulledRecord[]; hasMore: boolean }> {
+  sinceCursor: string, limit = 500, maxBytes = PULL_MAX_BYTES, opts: { accept?: Set<string> } = {},
+): Promise<{ cursor: string; records: PulledRecord[]; hasMore: boolean; entities: string[] }> {
   // SPEC-398 · ADR-0086 · `SyncLog.seq` kini `Int` (SQLite hanya meng-auto-isi alias rowid ber-tipe
   // deklarasi tepat `INTEGER`). Kursor tetap STRING di wire — jangan ubah bentuk itu.
   const since = Number(sinceCursor || "0");
@@ -430,10 +430,15 @@ export async function pull(
     where: { seq: { gt: since } }, orderBy: { seq: "asc" }, take: limit,
   });
 
+  const accept = opts.accept ?? new Set<string>();
   const records: PulledRecord[] = [];
   let bytes = 0;
   let trimmed = false;
+  // ADR-0180 · kursor = baris terakhir yang DIKONSUMSI: dikirim, atau sengaja disaring untuk client
+  // yang tak menyebut entitas opsional itu. Baris tersaring bukan "tertinggal" — ia memang tak untuknya.
+  let consumed: number | null = null;
   for (const r of rows) {
+    if (isOptionalEntity(r.entity) && !accept.has(r.entity)) { consumed = r.seq; continue; }
     const rec: PulledRecord = {
       entity: r.entity, recordId: r.recordId, version: r.version,
       op: r.op === "delete" ? "delete" : "upsert", data: r.data,
@@ -444,15 +449,17 @@ export async function pull(
     if (records.length && bytes + size > maxBytes) { trimmed = true; break; }
     bytes += size;
     records.push(rec);
+    consumed = r.seq;
   }
 
-  // Kursor menunjuk baris terakhir yang BENAR-BENAR dikirim — bukan baris terakhir yang dibaca.
-  // Kalau ia menunjuk lebih jauh, baris yang tak terkirim tertinggal di belakang kursor dan tak
-  // akan pernah ditarik lagi (akar hilangnya lampiran, audit SPEC-382).
-  const cursor = records.length ? String(rows[records.length - 1]!.seq) : sinceCursor || "0";
+  // Kursor tak pernah melewati baris yang BELUM dikirim (dipotong anggaran byte): kalau ia menunjuk
+  // lebih jauh, baris itu tertinggal di belakang kursor dan tak akan pernah ditarik lagi (akar
+  // hilangnya lampiran, audit SPEC-382). Baris tersaring sebelum titik potong boleh dilewati.
+  const cursor = consumed !== null ? String(consumed) : sinceCursor || "0";
   // `rows.length === limit` = mungkin masih ada di balik batas baris. Melebihkan `hasMore` hanya
   // memicu satu pull kosong; mengurangkannya membuat client berhenti di tengah feed.
-  return { cursor, records, hasMore: trimmed || rows.length === limit };
+  // `entities` = iklan entitas opsional hub ini (ADR-0180); hub lama tak mengirimnya.
+  return { cursor, records, hasMore: trimmed || rows.length === limit, entities: [...OPTIONAL_ENTITIES] };
 }
 
 // SPEC-885 · ADR-0138 · urutan dependensi topologis, diturunkan dari `PARENTS`. Induk selalu
@@ -479,7 +486,7 @@ export const BOOTSTRAP_ORDER: Entity[] = [
 ];
 
 export type BootstrapPage = {
-  cursor: string; records: PulledRecord[]; hasMore: boolean; next: string | null;
+  cursor: string; records: PulledRecord[]; hasMore: boolean; next: string | null; entities: string[];
 };
 
 // SPEC-885 · ADR-0138 · KEADAAN, bukan sejarah. Client dengan kursor 0 yang menarik lewat feed
@@ -487,7 +494,7 @@ export type BootstrapPage = {
 // 7,9 MB, hanya untuk mendarat jadi 889 record / ~2,5 MB. Membaca tabel langsung menghapus
 // kemubaziran itu SEKALIGUS masalah urutan yang ditinggalkan retensi ADR-0131.
 export async function bootstrapSnapshot(
-  after: string | null, maxBytes = PULL_MAX_BYTES,
+  after: string | null, maxBytes = PULL_MAX_BYTES, opts: { accept?: Set<string>; only?: Set<string> } = {},
 ): Promise<BootstrapPage> {
   // Kursor DULU, sebelum satu tabel pun dibaca — dan urutan ini yang harus dipertahankan.
   //
@@ -514,6 +521,9 @@ export async function bootstrapSnapshot(
 
   for (let i = startAt; i < BOOTSTRAP_ORDER.length; i++) {
     const entity = BOOTSTRAP_ORDER[i]!;
+    // ADR-0180 · entitas opsional hanya untuk yang memintanya; `only` = catch-up entitas tertentu.
+    if (isOptionalEntity(entity) && !(opts.accept ?? new Set<string>()).has(entity)) continue;
+    if (opts.only && !opts.only.has(entity)) continue;
     // Hanya entitas tempat kursor berhenti yang melanjutkan dari id tertentu; sesudahnya penuh.
     const gt = i === startAt && afterId ? afterId : null;
     const rows = await (DELEGATE[entity] as unknown as {
@@ -532,7 +542,7 @@ export async function bootstrapSnapshot(
       };
       const size = recordBytes(rec);
       if (records.length && bytes + size > maxBytes) {
-        return { cursor, records, hasMore: true, next: last };
+        return { cursor, records, hasMore: true, next: last, entities: [...OPTIONAL_ENTITIES] };
       }
       bytes += size;
       records.push(rec);
@@ -543,7 +553,7 @@ export async function bootstrapSnapshot(
   // dan ber-id lebih kecil dari kursor memang terlewat di sini. Ia tetap ada di feed pada
   // `seq > cursor`, jadi drain sesudah bootstrap yang menjemputnya. Konvergensi tidak bergantung
   // pada bootstrap yang lengkap — hanya pada kursornya yang tidak pernah melewati kenyataan.
-  return { cursor, records, hasMore: false, next: null };
+  return { cursor, records, hasMore: false, next: null, entities: [...OPTIONAL_ENTITIES] };
 }
 
 // SPEC-268 · ADR-0066 · publish write LOKAL-asal ke change-feed (SyncLog) + siar. Melengkapi

@@ -146,7 +146,7 @@ export const isOptionalEntity = (e: string): e is OptionalEntity => (OPTIONAL_EN
 
 **Files:** `sync.ts` (`pull`, `bootstrapSnapshot`), `sync-hub.ts`, `routes/sync.ts`; test `server/test/sync-memory.filter.test.ts`.
 
-- [ ] **Step 1: Test yang gagal**
+- [x] **Step 1: Test yang gagal**
 
 ```ts
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -214,7 +214,7 @@ describe("WS menyaring per klien", () => {
 });
 ```
 
-- [ ] **Step 2: Implementasi**
+- [x] **Step 2: Implementasi**
 
 `pull` — tanda tangan `pull(sinceCursor, limit = 500, maxBytes = PULL_MAX_BYTES, opts: { accept?: Set<string> } = {})`, kembalian ditambah `entities: string[]`. Ganti loop:
 
@@ -270,7 +270,7 @@ dengan tipe klien lokal `type SyncClient = Client & { accept?: Set<string> }` (`
 
 `routes/sync.ts`: `/sync/pull` → `pull(since, undefined, undefined, { accept: acceptedOptional((req.query as { entities?: string }).entities) })`; `/sync/bootstrap` → `bootstrapSnapshot(after, undefined, { accept, only })` dengan `only = q.only ? acceptedOptional(q.only) : undefined`; `/sync/ws` → `const client: SyncClient = { send, close, accept: acceptedOptional((req.query as { entities?: string }).entities) }`. Pastikan `requireDeviceWs` hanya menolak query `token` (tidak `entities`).
 
-- [ ] **Step 3: PASS** `sync-memory.filter.test.ts` + `sync-client.test.ts`, `sync-bootstrap.test.ts`, `sync-pull*.test.ts` (glob `server/test/sync-*.test.ts`). **Step 4: Commit** `feat(sync): hub menyaring entitas opsional per client + iklan`
+- [x] **Step 3: PASS** `sync-memory.filter.test.ts` + `sync-client.test.ts`, `sync-bootstrap.test.ts`, `sync-pull*.test.ts` (glob `server/test/sync-*.test.ts`). **Step 4: Commit** `feat(sync): hub menyaring entitas opsional per client + iklan`
 
 ---
 

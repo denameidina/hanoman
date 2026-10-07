@@ -11,12 +11,12 @@ import {
 import { prisma } from "../db";
 import { requireDeviceToken } from "../services/device-auth";
 import { verifyDeviceToken } from "../services/device-token";
-import { attachSync, detachSync } from "../services/sync-hub";
+import { attachSync, detachSync, type SyncClient } from "../services/sync-hub";
 import { registerDeviceSocket } from "../services/device-sockets";
 import { attachRelaySocket } from "../services/relay/hub";
 import { recordPresence, recordCapacity, dropPresence } from "../services/presence/registry";
 import type { Client } from "../services/pty";
-import { applyPush, pull, bootstrapSnapshot, isEntity, type Entity } from "../services/sync";
+import { acceptedOptional, applyPush, pull, bootstrapSnapshot, isEntity, type Entity } from "../services/sync";
 import { syncNow, fetchTransport } from "../services/sync-client";
 import { listPendingDeletes } from "../services/sync-delete";
 import { listConflicts, resolveConflict } from "../services/conflicts";
@@ -72,16 +72,21 @@ async function requireDeviceWs(req: FastifyRequest, reply: FastifyReply): Promis
 
 export default async function (app: FastifyInstance) {
   app.get("/sync/pull", { preHandler: requireDeviceToken }, async (req, reply) => {
-    const since = (req.query as { since?: string }).since ?? "0";
-    return maybeGzip(req, reply, await pull(since));
+    const q = req.query as { since?: string; entities?: string };
+    // ADR-0180 · entitas opsional hanya untuk client yang menyebutnya.
+    return maybeGzip(req, reply, await pull(q.since ?? "0", undefined, undefined, { accept: acceptedOptional(q.entities) }));
   });
 
   // SPEC-885 · ADR-0138 · keadaan sekarang dalam urutan dependensi, untuk client yang kursornya
   // masih 0. Tak ada gerbang tambahan di `app.ts`: path ini di bawah `/api/sync` dan bukan salah
   // satu pengecualian cookie-only, jadi ia otomatis ikut jalur device-token seperti `/sync/pull`.
   app.get("/sync/bootstrap", { preHandler: requireDeviceToken }, async (req, reply) => {
-    const after = (req.query as { after?: string }).after ?? null;
-    return maybeGzip(req, reply, await bootstrapSnapshot(after));
+    const q = req.query as { after?: string; entities?: string; only?: string };
+    return maybeGzip(req, reply, await bootstrapSnapshot(q.after ?? null, undefined, {
+      accept: acceptedOptional(q.entities),
+      // ADR-0180 · catch-up: hanya entitas opsional yang diminta, tanpa memindahkan kursor client.
+      ...(q.only ? { only: acceptedOptional(q.only) } : {}),
+    }));
   });
 
   // SPEC-272 · ADR-0068 · byte lampiran untuk fetch-through client (device-token, bukan cookie).
@@ -261,7 +266,10 @@ export default async function (app: FastifyInstance) {
     let release: () => void;
     try { release = openWsConnection(principal); }
     catch { socket.close(1008, "connection limit"); return; }
-    const client: Client = { send: (m) => socket.send(m), close: () => socket.close() };
+    const client: SyncClient = {
+      send: (m) => socket.send(m), close: () => socket.close(),
+      accept: acceptedOptional((req.query as { entities?: string }).entities),
+    };
     attachSync(client);
     // SPEC-1215 · ADR-0165 §7 · supaya DELETE /device-tokens/:id bisa menutupnya seketika.
     const unregisterSocket = registerDeviceSocket(principal.id, "sync", socket);
