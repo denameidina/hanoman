@@ -1920,7 +1920,7 @@ git commit -m "feat(memory): REST /api/memories — search/get/propose/supersede
   - `enrichAnchors(ctx: RepoContext, body: unknown): Promise<{ ok: true; body: unknown } | { ok: false; missing: string[] }>`
   - `MEMORY_TOOLS` (6 tool).
 
-- [ ] **Step 1: Tulis test CLI yang gagal**
+- [x] **Step 1: Tulis test CLI yang gagal**
 
 `cli/test/mcp-repo-context.test.ts`:
 
@@ -1973,12 +1973,12 @@ describe("enrichAnchors", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run cli/test/mcp-repo-context.test.ts`
 Expected: FAIL — modul tak ditemukan.
 
-- [ ] **Step 3: Tulis `cli/src/mcp/repo-context.ts`**
+- [x] **Step 3: Tulis `cli/src/mcp/repo-context.ts`**
 
 ```ts
 // ADR-0178 · identitas repo untuk tool memori, dihitung PROSES MCP dari cwd-nya — bukan oleh model.
@@ -2030,12 +2030,12 @@ export async function enrichAnchors(ctx: RepoContext, body: unknown):
 
 Catatan: test pertama `enrichAnchors` mengharapkan urutan kunci `{ path, blobSha }` — `toEqual` tak peka urutan kunci, jadi bentuk di atas lulus.
 
-- [ ] **Step 4: Jalankan test repo-context, pastikan lulus**
+- [x] **Step 4: Jalankan test repo-context, pastikan lulus**
 
 Run: `pnpm vitest --run cli/test/mcp-repo-context.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Perluas tipe katalog**
+- [x] **Step 5: Perluas tipe katalog**
 
 Di `shared/src/mcp-catalog/types.ts`, `McpRequest` tambahkan:
 
@@ -2054,7 +2054,7 @@ Di `McpToolDef`, setelah `sampleMethod`:
   repoContext?: true;
 ```
 
-- [ ] **Step 6: Tulis `shared/src/mcp-catalog/memory.ts`**
+- [x] **Step 6: Tulis `shared/src/mcp-catalog/memory.ts`**
 
 ```ts
 // ADR-0178 · katalog tool domain `memory`. Tak satu pun tool menerima parameter project: CLI
@@ -2168,7 +2168,7 @@ Periksa bahwa `obj` di `shared/src/mcp-schema.ts` menerima `required`, `minItems
 
 Di `shared/src/mcp-catalog/index.ts`: `import { MEMORY_TOOLS } from "./memory";` dan sisipkan `...MEMORY_TOOLS,` tepat setelah `...DOCS_TOOLS,` (memori dibaca sesering docs).
 
-- [ ] **Step 7: Enrichment di CLI**
+- [x] **Step 7: Enrichment di CLI**
 
 `cli/src/mcp/client.ts` — di `init.headers`, tambahkan **sebelum** `Authorization` supaya header proses tak bisa menimpa auth:
 
@@ -2207,7 +2207,7 @@ dan ganti blok setelah `const req = tool.build(args);`:
 
 (baris `if (!r.ok) …` dan `return text(renderResult(…))` tetap.)
 
-- [ ] **Step 8: Test server MCP**
+- [x] **Step 8: Test server MCP**
 
 Tambahkan di akhir `cli/test/mcp-server.test.ts` (memakai `boot` & `reply` yang sudah ada; `buildMcpServer` kini menerima `cwd` — perluas `boot` dengan parameter opsional ketiga `cwd` yang diteruskan):
 
@@ -2252,7 +2252,9 @@ async function boot(over: Partial<McpConfig> = {}, call = okCall(), cwd?: string
   serveStdio(() => buildMcpServer({ ...cfg, ...over }, call, "9.9.9", cwd), { transport: t as never });
 ```
 
-- [ ] **Step 9: Test katalog**
+> **Catatan eksekusi:** `obj()` memasang `additionalProperties: false`, jadi `blobSha` dari model **ditolak skema** sebelum handler berjalan — lebih kuat dari "ditimpa". Test di atas diubah: model mengirim `path` saja, dan kasus `blobSha` dari model diuji sebagai `isError` tanpa panggilan REST. `vi.waitFor` menggantikan `tick()` karena enrichment menjalankan beberapa subproses git. Model baru juga wajib masuk `PG_ORDER` (`cli/src/commands/migrate-pg.ts`), dijaga test `migrate-pg`.
+
+- [x] **Step 9: Test katalog**
 
 Tambahkan di `shared/src/mcp-catalog.test.ts`:
 
@@ -2271,7 +2273,7 @@ Tambahkan di `shared/src/mcp-catalog.test.ts`:
   });
 ```
 
-- [ ] **Step 10: Jalankan semua test tersentuh**
+- [x] **Step 10: Jalankan semua test tersentuh**
 
 Run:
 
@@ -2282,7 +2284,7 @@ TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/mc
 
 Expected: PASS semua — `mcp-coverage` kini hijau karena setiap route memori yang terjangkau token punya tool dengan `samplePath` yang dipetakan ke capability yang sama.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add shared/src/mcp-catalog cli/src/mcp cli/test/mcp-repo-context.test.ts cli/test/mcp-server.test.ts shared/src/mcp-catalog.test.ts

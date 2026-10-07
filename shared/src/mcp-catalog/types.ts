@@ -20,6 +20,8 @@ export type McpRequest = {
   path: string;
   query?: Record<string, string>;
   body?: unknown;
+  /** ADR-0178 · header tambahan dari PROSES MCP (mis. identitas repo). Tak pernah dari argumen model. */
+  headers?: Record<string, string>;
 };
 
 export type Args = Record<string, unknown>;
@@ -41,6 +43,11 @@ export type McpToolDef = {
   samplePath: string;
   /** Method contoh, dipakai uji kontrak yang sama. */
   sampleMethod: McpRequest["method"];
+  /**
+   * ADR-0178 · `true` = CLI menghitung identitas repo dari cwd-nya, mengirimnya sebagai header
+   * `x-hanoman-repo`, dan mengisi `blobSha` setiap `anchors[]` dari HEAD sebelum memanggil REST.
+   */
+  repoContext?: true;
   build(args: Args): McpRequest | null;
   shape(raw: unknown, args: Args): unknown;
 };

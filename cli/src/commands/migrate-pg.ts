@@ -66,6 +66,10 @@ export const PG_ORDER = [
   // QaAttachment sesudah QaReport (FK reportId, cascade). Keempatnya LOCAL-only dan TIDAK ada di
   // sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris (cermin Changelog).
   "QaReport", "QaCase", "QaFinding", "QaAttachment",
+  // ADR-0178 · ProjectMemory sesudah Project (FK projectId, cascade); MemoryEvent sesudahnya (FK
+  // memoryId, cascade). MemoryLocalState tanpa FK. Ketiganya lahir sesudah Postgres dicabut, jadi
+  // jalur 42P01 memperlakukannya sebagai nol baris (cermin QaReport).
+  "ProjectMemory", "MemoryEvent", "MemoryLocalState",
 ] as const;
 
 const CHUNK = 200;

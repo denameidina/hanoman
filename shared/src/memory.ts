@@ -39,12 +39,21 @@ export type RepoIdentity = z.infer<typeof zRepoIdentity>;
 
 // Header, bukan body/query: model tak pernah melihat atau mengisinya lewat inputSchema tool.
 export const REPO_HEADER = "x-hanoman-repo";
-export const encodeRepoHeader = (r: RepoIdentity): string =>
-  Buffer.from(JSON.stringify(r), "utf8").toString("base64url");
+// base64url lewat TextEncoder + btoa/atob: berkas ini ikut dibundel ke browser, jadi tanpa `Buffer`.
+const toB64Url = (s: string): string => {
+  let bin = "";
+  for (const byte of new TextEncoder().encode(s)) bin += String.fromCharCode(byte);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+const fromB64Url = (s: string): string => {
+  const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+};
+export const encodeRepoHeader = (r: RepoIdentity): string => toB64Url(JSON.stringify(r));
 export function decodeRepoHeader(v: unknown): RepoIdentity | null {
   if (typeof v !== "string" || !v) return null;
   try {
-    const p = zRepoIdentity.safeParse(JSON.parse(Buffer.from(v, "base64url").toString("utf8")));
+    const p = zRepoIdentity.safeParse(JSON.parse(fromB64Url(v)));
     return p.success ? p.data : null;
   } catch { return null; }
 }
