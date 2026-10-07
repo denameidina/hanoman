@@ -530,7 +530,7 @@ export const zNotification = z.object({
   // SPEC-409 · +lead (ADR-0091): keputusan berbobot / ragu / tindakan terkunci ditolak. MEMBERI
   // TAHU, bukan meminta izin — tak ada pekerjaan yang menunggu notifikasi ini dibaca (AC-25).
   // SPEC-384 · −error (ADR-0092) · dicabut bersama error monitoring.
-  type: z.enum(["done", "decision", "ticket", "fail", "lead"]).default("done"),
+  type: z.enum(["done", "decision", "ticket", "fail", "lead", "memory"]).default("done"),
   specId: z.string().nullable(),
   sessionId: z.string().nullable(),
   title: z.string(),

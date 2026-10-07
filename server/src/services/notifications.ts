@@ -229,3 +229,12 @@ export async function notificationsFeed(p: { page?: string; limit?: string } = {
   const unread = await prisma.notification.count({ where: { readAt: null } });
   return { items, unread, total, page, pageSize };
 }
+
+// ADR-0181 · memori yang masuk antrean review (bukan yang auto-aktif — itu tak butuh manusia).
+// Dedup `key: memory:<id>`: satu notifikasi per memori, apa pun yang memicunya ulang.
+export async function recordMemoryReview(m: { id: string; projectId: string; content: string }): Promise<void> {
+  const short = m.content.length > 80 ? `${m.content.slice(0, 79)}…` : m.content;
+  await prisma.notification.create({
+    data: { type: "memory", key: `memory:${m.id}`, projectId: m.projectId, title: `Memori butuh review: ${short}` },
+  }).catch(() => { /* P2002: sudah ada */ });
+}

@@ -78,3 +78,16 @@ export type MemoryEventView = {
   id: string; op: string; actorKind: string; actorId: string | null;
   reason: string | null; createdAt: string;
 };
+
+// ADR-0181 · "perlu dikonfirmasi": memori aktif yang tak tersuntik/terpakai selama ini di mesin ini.
+export const MEMORY_CONFIRM_DAYS = 90;
+/** Keadaan memori DI MESIN INI (MemoryLocalState, tak pernah disync). */
+export type MemoryLocalView = {
+  verdict: "valid" | "stale" | "unverifiable" | null;   // null = belum pernah diverifikasi di mesin ini
+  lastUsedAt: string | null; lastVerifiedAt: string | null; needsConfirm: boolean;
+};
+export type MemoryListItem = MemoryView & { local: MemoryLocalView };
+export function needsConfirm(m: { status: string; createdAt: string }, lastUsedAt: string | null, now = Date.now()): boolean {
+  if (m.status !== "active") return false;
+  return now - Date.parse(lastUsedAt ?? m.createdAt) >= MEMORY_CONFIRM_DAYS * 86_400_000;
+}

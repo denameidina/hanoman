@@ -31,13 +31,13 @@
 
 **Files:** `shared/src/memory.ts` (`MemoryLocalView`, `MEMORY_CONFIRM_DAYS`, `MemoryListItem`), `server/src/services/memory/store.ts` (`searchMemories` → item + `local`; `memoryRevision`), `shared/src/pending.ts`, `server/src/services/pending-counts.ts`, `server/src/services/notifications.ts` (`recordMemoryReview`), `shared/src/entities.ts` (enum notifikasi), test `server/test/memory-dashboard.test.ts`.
 
-- [ ] **Step 1: Test yang gagal** — cakupan:
+- [x] **Step 1: Test yang gagal** — cakupan:
   - `searchMemories` mengembalikan `local: { verdict, lastUsedAt, lastVerifiedAt, needsConfirm }`; tanpa baris `MemoryLocalState` → `verdict: null`.
   - `needsConfirm` true untuk `active` dengan `lastUsedAt` 91 hari lalu, atau tanpa `lastUsedAt` dan `createdAt` 91 hari lalu; false untuk `proposed`.
   - `memoryRevision(projectId)` berubah setelah propose dan setelah invalidate; sama bila tak ada perubahan.
   - `pendingCounts().memory` = jumlah `proposed` lintas project.
   - Usulan yang masuk review membuat satu `Notification` `type: "memory"` dengan `key` `memory:<id>` dan `projectId`; usulan yang auto-aktif tidak; propose kedua untuk id yang sama tak menduplikasi.
-- [ ] **Step 2: Implementasi**
+- [x] **Step 2: Implementasi**
   - `shared/src/memory.ts`:
 
 ```ts
@@ -59,7 +59,7 @@ export function needsConfirm(m: { status: string; createdAt: string }, lastUsedA
   - `memoryRevision(projectId)`: `${count}:${max(updatedAt)}` dari `projectMemory.aggregate` per project (semua status) — perubahan status menyentuh `updatedAt` (`@updatedAt`).
   - `PendingCounts` += `memory` (komentar definisi di daftar), `EMPTY_PENDING`, `pendingTotal`; server `pendingCounts()` += `prisma.projectMemory.count({ where: { status: "proposed" } })`.
   - `recordMemoryReview(m: { id; projectId; content; reviewReason })` meniru `recordTicket` (`key: memory:<id>`, title `Memori butuh review: <content dipotong 80>`), dipanggil di `store.create()` sesudah commit bila `status === "proposed"`. Enum `type` notifikasi di `shared/src/entities.ts` += `"memory"`.
-- [ ] **Step 3: PASS** + `memory*.test.ts`, test pending server yang ada. **Step 4: Commit** `feat(memory): daftar memori membawa verdict mesin ini, revision, pending & notifikasi review`
+- [x] **Step 3: PASS** + `memory*.test.ts`, test pending server yang ada. **Step 4: Commit** `feat(memory): daftar memori membawa verdict mesin ini, revision, pending & notifikasi review`
 
 ---
 

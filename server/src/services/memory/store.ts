@@ -2,13 +2,16 @@
 // (resolve.ts) dan tak pernah membaca projectId dari input pemanggil. Semua query baca/tulis
 // difilter `projectId` — id milik project lain berperilaku persis seperti id yang tak ada (404).
 import type {
-  MemoryAnchor, MemoryEventView, MemoryKind, MemoryStatus, MemoryView, zMemoryAnchorIn, zMemoryPropose,
+  MemoryAnchor, MemoryEventView, MemoryKind, MemoryListItem, MemoryLocalView, MemoryStatus, MemoryView,
+  zMemoryAnchorIn, zMemoryPropose,
 } from "@hanoman/shared";
+import { needsConfirm } from "@hanoman/shared";
 import type { Prisma } from "@prisma/client";
 import type { z } from "zod";
 import { LOCAL_DEVICE_ID } from "@hanoman/shared";
 import { prisma } from "../../db";
 import { notifySynced } from "../sync-notify";
+import { recordMemoryReview } from "../notifications";
 import { blobShaAt } from "./git";
 import type { MemoryScope } from "./resolve";
 import {
@@ -146,6 +149,7 @@ async function create(
     return m;
   });
   await notifyTouched(touched);
+  if (row.status === "proposed") await recordMemoryReview(row);
   return { ok: true, memory: toMemoryView(row) };
 }
 
@@ -224,14 +228,32 @@ export async function getMemory(projectId: string, id: string):
 }
 
 export async function searchMemories(projectId: string, q: { q?: string; paths?: string[]; status?: MemoryStatus }):
-  Promise<{ items: MemoryView[]; total: number }> {
+  Promise<{ items: MemoryListItem[]; total: number }> {
   const rows = await prisma.projectMemory.findMany({
     where: { projectId, status: q.status ?? "active" }, orderBy: { createdAt: "desc" }, take: SEARCH_CAP,
   });
   const want = q.q ? tokens(q.q) : [];
-  const items = rows
+  const views = rows
     .filter((r) => want.every((w) => r.content.toLowerCase().includes(w)))
     .filter((r) => !q.paths?.length || scopeMatches(r.scopePaths as string[], q.paths))
     .map(toMemoryView);
+  // ADR-0181 · keadaan DI MESIN INI (verdict jangkar, kapan terakhir tersuntik) — satu kueri, bukan N.
+  const states = await prisma.memoryLocalState.findMany({ where: { memoryId: { in: views.map((v) => v.id) } } });
+  const byId = new Map(states.map((st) => [st.memoryId, st]));
+  const items = views.map((v): MemoryListItem => {
+    const st = byId.get(v.id);
+    const lastUsedAt = st?.lastUsedAt?.toISOString() ?? null;
+    return { ...v, local: {
+      verdict: (st?.verdict as MemoryLocalView["verdict"]) ?? null,
+      lastUsedAt, lastVerifiedAt: st?.lastVerifiedAt?.toISOString() ?? null,
+      needsConfirm: needsConfirm(v, lastUsedAt),
+    } };
+  });
   return { items, total: items.length };
+}
+
+/** ADR-0181 · sidik perubahan memori satu project untuk topik langganan `memory`: jumlah + updatedAt terbaru. */
+export async function memoryRevision(projectId: string): Promise<string> {
+  const a = await prisma.projectMemory.aggregate({ where: { projectId }, _count: { _all: true }, _max: { updatedAt: true } });
+  return `${a._count._all}:${a._max.updatedAt?.toISOString() ?? ""}`;
 }

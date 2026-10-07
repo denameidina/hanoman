@@ -52,7 +52,7 @@ afterAll(async () => { await clean(); });
 
 describe("SPEC-961 · pendingCounts", () => {
   it("nol di instalasi kosong", async () =>
-    expect(await pendingCounts()).toEqual({ triage: 0, backlog: 0, prd: 0, lead: 0 }));
+    expect(await pendingCounts()).toEqual({ triage: 0, backlog: 0, prd: 0, lead: 0, memory: 0 }));
 
   it("triage = tiket + issue GitHub yang belum diputuskan", async () => {
     await ticket("t-1", "new");
@@ -110,7 +110,7 @@ describe("SPEC-961 · cache PRD", () => {
     await ticket("t-9", "new");
     const boom = vi.fn(async () => { throw new Error("repoDir hilang"); });
     expect(await pendingCounts(2_000_000, boom as unknown as PrdLister))
-      .toEqual({ triage: 1, backlog: 0, prd: 0, lead: 0 });
+      .toEqual({ triage: 1, backlog: 0, prd: 0, lead: 0, memory: 0 });
   });
 
   // Kegagalan yang di-retry tiap tick akan mengubah satu repoDir rusak jadi walk disk 12×/menit —
