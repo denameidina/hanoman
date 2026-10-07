@@ -747,7 +747,7 @@ export type Stash = { ref: string; message: string; at: string };
 // SPEC-908 · topik langganan BERPARAMETER di /events/ws, mengamandemen ADR-0039 (yang hanya
 // mengenal snapshot global tanpa parameter). Nama topik SENGAJA identik dengan `t` frame keluarnya:
 // satu-ke-satu, jadi tak ada peta kedua yang bisa berselisih diam-diam.
-export type EventTopic = "schedulerState" | "schedulerQueue" | "tickets" | "lead" | "git" | "tasks";
+export type EventTopic = "schedulerState" | "schedulerQueue" | "tickets" | "lead" | "git" | "tasks" | "memory";
 
 /** Plafon jumlah langganan per klien. Satu layar Scheduler = 5 (state + 4 QueueSection). */
 export const MAX_SUBS = 16;
@@ -788,6 +788,9 @@ export const zTopicParams = {
     q: z.string().max(200).optional(),
     page: zSubPage, limit: zSubLimit,
   }).strict(),
+  // ADR-0181 · halaman Memori. Frame-nya sidik perubahan (revision), bukan daftar: layar menarik
+  // ulang lewat HTTP saat sidiknya berubah — tiga daftar × filter tak perlu ikut dipaketkan di WS.
+  memory: z.object({ projectId: z.string().max(120) }).strict(),
 } as const;
 
 export type TopicParams = { [K in EventTopic]: z.infer<(typeof zTopicParams)[K]> };
@@ -852,6 +855,7 @@ export type EventMsg =
   | { t: "tickets"; key: string; data: Paginated<TicketView> & { unreviewed: number } }
   // SPEC-945 · ADR-0150 · papan tim, `everyTicks: 3`.
   | { t: "tasks"; key: string; data: Paginated<TaskView> }
+  | { t: "memory"; key: string; revision: string }
   | { t: "lead"; key: string; status: LeadStatusView;
       decisions: Paginated<LeadDecisionView>; flows: Paginated<LeadFlowView> }
   | { t: "git"; key: string; graph: { commits: GraphCommit[]; current: string; total: number };

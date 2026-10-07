@@ -4,6 +4,7 @@
 import {
   Activity,
   Anchor,
+  Archive,
   ArrowLeft,
   ArrowUpRight,
   Ban,
@@ -12,6 +13,7 @@ import {
   BookOpen,
   Bot,
   Box,
+  Brain,
   Bug,
   Calendar,
   CalendarClock,
@@ -185,6 +187,7 @@ import type { LucideIcon } from "lucide-react";
 export const ICONS: Record<string, LucideIcon> = {
   Activity,
   Anchor,
+  Archive,
   ArrowLeft,
   ArrowUpRight,
   Ban,
@@ -193,6 +196,7 @@ export const ICONS: Record<string, LucideIcon> = {
   BookOpen,
   Bot,
   Box,
+  Brain,
   Bug,
   Calendar,
   CalendarClock,

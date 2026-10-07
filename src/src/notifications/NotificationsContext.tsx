@@ -24,6 +24,9 @@ export function toastFor(n: Notification, p: NotifyPrefs): ToastPlan {
   if (n.type === "ticket")
     return { msg: n.title, tone: "warn", icon: "inbox",
              sound: p.notifyDecisionSound as NotifySound, enabled: true };
+  // ADR-0181 · memori menunggu review. Selalu menyala: antreannya hanya bergerak lewat manusia.
+  if (n.type === "memory")
+    return { msg: n.title, tone: "warn", icon: "brain", sound: p.notifyDecisionSound as NotifySound, enabled: true };
   return { msg: `${n.specId} · "${n.title}" selesai`, tone: "ok", icon: "check-circle-2",
            sound: p.notifySound as NotifySound, enabled: p.notifyDone };
 }

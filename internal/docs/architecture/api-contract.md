@@ -2427,3 +2427,10 @@ checkout project) ∧ sumber tepercaya. Pengganti (`supersede`/`reverify`) menon
   lattice (`ok`); beda field immutable → `conflict`. `memoryEvent` yang sudah ada → `ok` (idempoten).
 - `DELETE /api/memories/:id?projectId=` — **COOKIE_ONLY**, `204`; id project lain `404`; tombstone menyebar.
 
+### Dashboard memori ([ADR-0181](../adr/0181-dashboard-memori.md))
+
+- `GET /api/memories` setiap item kini membawa `local: { verdict: "valid"|"stale"|"unverifiable"|null,
+  lastUsedAt, lastVerifiedAt, needsConfirm }` — keadaan DI MESIN INI (`MemoryLocalState`, tak disync).
+- Topik `/api/events/ws` `memory` dengan `{ projectId }` → frame `{ t: "memory", key, revision }`.
+- Frame global `pending.counts.memory` = jumlah memori `proposed` lintas project.
+- Notifikasi `type: "memory"`, `key: memory:<id>`, untuk usulan yang masuk review.
