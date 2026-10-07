@@ -638,7 +638,7 @@ git commit -m "feat(memory): capability memory:* dan allowlist projectIds pada a
   - `globMatch(glob: string, path: string): boolean`, `scopeMatches(scopePaths: string[], paths: string[]): boolean`
   - `tokens(text: string): string[]`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/memory-rules.test.ts`:
 
@@ -736,12 +736,12 @@ describe("path & glob", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run server/test/memory-rules.test.ts`
 Expected: FAIL — modul tak ditemukan.
 
-- [ ] **Step 3: Tulis `server/src/services/memory/rules.ts`**
+- [x] **Step 3: Tulis `server/src/services/memory/rules.ts`**
 
 ```ts
 // ADR-0178 · aturan murni memori project: tanpa DB, tanpa git, tanpa jam. Semua keputusan
@@ -835,12 +835,12 @@ export const scopeMatches = (scopePaths: string[], paths: string[]): boolean =>
   scopePaths.length === 0 || paths.some((p) => scopePaths.some((g) => globMatch(g, p)));
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `pnpm vitest --run server/test/memory-rules.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/memory/rules.ts server/test/memory-rules.test.ts
