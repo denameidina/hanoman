@@ -1,4 +1,4 @@
-import { resolve4, resolve6 } from "node:dns/promises";
+import { Resolver } from "node:dns/promises";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
@@ -35,7 +35,14 @@ export type SafeRequestDeps = {
 export const defaultLookup = async (host: string): Promise<ResolvedAddress[]> => {
   const literal = isIP(host);
   if (literal) return [{ address: host, family: literal }];
-  const [v4, v6] = await Promise.allSettled([resolve4(host), resolve6(host)]);
+  // Insiden 2026-10-07: `resolve4`/`resolve6` modul-level memakai channel c-ares bawaan yang dibuat
+  // SEKALI (daftar nameserver saat proses pertama meresolve). Proses yang hidup berhari-hari lalu
+  // pindah jaringan terus menanyai nameserver lama → "DNS tak mengembalikan alamat" selamanya
+  // (sync & shipper mati senyap) sementara `node` baru di mesin yang sama meresolve normal. `Resolver`
+  // baru membaca konfigurasi sistem saat dibuat; tetap c-ares, jadi tak kembali ke threadpool.
+  const resolver = new Resolver();
+  const [v4, v6] = await Promise.allSettled([resolver.resolve4(host), resolver.resolve6(host)]);
+  resolver.cancel();
   const out: ResolvedAddress[] = [];
   if (v4.status === "fulfilled") out.push(...v4.value.map((address) => ({ address, family: 4 })));
   if (v6.status === "fulfilled") out.push(...v6.value.map((address) => ({ address, family: 6 })));
