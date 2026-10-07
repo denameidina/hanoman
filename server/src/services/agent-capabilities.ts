@@ -54,6 +54,12 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // prefix-nya kebetulan sama dengan endpoint status. Cookie = akses penuh, seperti sebelumnya.
   if (top === "limits" || top === "update" || top === "events" || top === "fs" || top === "health")
     return read ? "GLOBAL_READ" : "COOKIE_ONLY";
+  // ADR-0178 · memori project. Review (activate/reject) mengubah apa yang disuntik ke SETIAP sesi
+  // berikutnya tanpa jangkar yang terverifikasi — itu keputusan manusia, bukan capability.
+  if (top === "memories") {
+    if (seg[2] === "activate" || seg[2] === "reject") return "COOKIE_ONLY";
+    return rw("memory");
+  }
   if (top === "scheduler") {
     // SPEC-646 · ADR-0112 · cron BUKAN knob. Ia adalah `POST /terminal/sessions` yang ditunda:
     // sebuah baris cron membuat hanoman membuka sesi agen di worktree project, berulang, tanpa

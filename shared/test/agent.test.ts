@@ -12,10 +12,10 @@ describe("agent capabilities", () => {
   // ADR-0157 · +domain `team` (papan Tim: `/api/tasks` & `/api/members`) → 13 domain, 30 id.
   // ADR-0172 · +domain `skills` (skill library: `/api/skills*`) → 14 domain, 32 id.
   // ADR-0174 · +domain `qa` (Workspace QA: `/api/projects/:id/qa/**`, `/api/qa/**`) → 15 domain, 34 id.
-  it("has 15 domains, 34 capability ids across three access levels, all in metadata", () => {
-    expect(CAPABILITY_IDS.length).toBe(34);
-    expect(new Set(CAPABILITY_IDS).size).toBe(34);
-    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(15);
+  it("has 16 domains, 36 capability ids across three access levels, all in metadata", () => {
+    expect(CAPABILITY_IDS.length).toBe(36);
+    expect(new Set(CAPABILITY_IDS).size).toBe(36);
+    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(16);
     expect(CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id).sort())
       .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "vps:exec"]);
     expect(CAPABILITIES.map((c) => c.id).sort()).toEqual([...CAPABILITY_IDS].sort());

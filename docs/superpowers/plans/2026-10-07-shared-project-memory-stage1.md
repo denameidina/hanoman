@@ -412,7 +412,7 @@ git commit -m "feat(memory): skema ProjectMemory/MemoryEvent/MemoryLocalState + 
 - Consumes: `prisma.agentToken.projectIds` (Task 1).
 - Produces: `req.agent: { id: string; capabilities: string[]; projectIds: string[] | null }`; `verifyAgentToken(token)` mengembalikan bentuk yang sama; `issueAgentToken({name, capabilities, projectIds?, createdBy?})`; `patchAgentToken(id, {…, projectIds?})`; `AgentTokenView.projectIds: string[] | null`; `capabilityForRoute(m, "/api/memories…")` → `memory:read|write`, `/api/memories/:id/activate|reject` → `COOKIE_ONLY`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/memory-token.test.ts`:
 
@@ -462,12 +462,12 @@ describe("peta capability /api/memories", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/memory-token.test.ts --no-file-parallelism`
 Expected: FAIL (tipe `projectIds` tak dikenal / capability `memory:read` bukan anggota enum / `capabilityForRoute` mengembalikan nilai lain).
 
-- [ ] **Step 3: Ubah `shared/src/agent.ts`**
+- [x] **Step 3: Ubah `shared/src/agent.ts`**
 
 Di `CAPABILITY_IDS`, sebelum blok komentar `// ADR-0155 · akses KETIGA`:
 
@@ -516,7 +516,7 @@ export const zAgentTokenPatch = z.object({
 });
 ```
 
-- [ ] **Step 4: Ubah `server/src/services/agent-token.ts`**
+- [x] **Step 4: Ubah `server/src/services/agent-token.ts`**
 
 Tambah `projectIds: unknown;` di `type Row`, lalu:
 
@@ -572,7 +572,7 @@ export async function verifyAgentToken(token: string):
 
 dengan import `import { Prisma } from "@prisma/client";` di atas berkas.
 
-- [ ] **Step 5: Ubah `server/src/services/agent-auth.ts`**
+- [x] **Step 5: Ubah `server/src/services/agent-auth.ts`**
 
 ```ts
 declare module "fastify" {
@@ -584,7 +584,7 @@ dan tipe kembalian `authenticateAgent` menjadi `Promise<{ id: string; capabiliti
 
 `server/src/services/launch-authority.ts:7` memakai `agent?: { id: string; capabilities: string[] } | null` — itu subset struktural, biarkan.
 
-- [ ] **Step 6: Ubah `capabilityForRoute`**
+- [x] **Step 6: Ubah `capabilityForRoute`**
 
 Di `server/src/services/agent-capabilities.ts`, tepat sebelum `if (top === "scheduler") {`:
 
@@ -597,7 +597,7 @@ Di `server/src/services/agent-capabilities.ts`, tepat sebelum `if (top === "sche
   }
 ```
 
-- [ ] **Step 7: Perbarui `docs/agent-integration.md`**
+- [x] **Step 7: Perbarui `docs/agent-integration.md`**
 
 Di tabel domain capability, setelah baris `| \`telegram\` | …`:
 
@@ -605,12 +605,12 @@ Di tabel domain capability, setelah baris `| \`telegram\` | …`:
 | `memory` | `/api/memories*` kecuali `…/activate` dan `…/reject` (cookie-only) | memori project bersama. Token **wajib** punya allowlist project (`projectIds`); project ditentukan dari header `x-hanoman-repo` yang diisi CLI MCP, bukan dari parameter (ADR-0178) |
 ```
 
-- [ ] **Step 8: Jalankan test**
+- [x] **Step 8: Jalankan test**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/memory-token.test.ts server/test/agent-gate.test.ts server/test/agent-doc-contract.test.ts shared/test/agent.test.ts --no-file-parallelism`
 Expected: PASS semua. Bila `shared/test/agent.test.ts` menghitung jumlah capability secara literal, perbarui angkanya (+2) dan domain (+1).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add shared/src/agent.ts server/src/services/agent-token.ts server/src/services/agent-auth.ts \
