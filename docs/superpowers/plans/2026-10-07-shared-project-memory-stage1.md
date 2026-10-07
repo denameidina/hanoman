@@ -69,7 +69,7 @@
 - Produces (shared): `MEMORY_KINDS`, `MEMORY_STATUSES`, `MEMORY_RUNTIMES`, `MemoryKind`, `MemoryStatus`, `zMemoryAnchorIn`, `zMemoryPropose`, `zMemoryReverify`, `zMemoryInvalidate`, `zMemoryReview`, `zRepoIdentity`, `RepoIdentity`, `REPO_HEADER = "x-hanoman-repo"`, `encodeRepoHeader(r)`, `decodeRepoHeader(v): RepoIdentity | null`, `MemoryAnchor`, `MemoryView`, `MemoryEventView`, `MEMORY_CONTENT_MAX = 500`.
 - Produces (prisma): `prisma.projectMemory`, `prisma.memoryEvent`, `prisma.memoryLocalState`, `AgentToken.projectIds`.
 
-- [ ] **Step 1: Tulis test DTO shared yang gagal**
+- [x] **Step 1: Tulis test DTO shared yang gagal**
 
 `shared/test/memory.test.ts`:
 
@@ -106,12 +106,12 @@ describe("DTO memori", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/test/memory.test.ts`
 Expected: FAIL — `Cannot find module '../src/memory'`.
 
-- [ ] **Step 3: Tulis `shared/src/memory.ts`**
+- [x] **Step 3: Tulis `shared/src/memory.ts`**
 
 ```ts
 import { z } from "zod";
@@ -190,12 +190,12 @@ Tambahkan di `shared/src/index.ts` (setelah `export * from "./agent";`):
 export * from "./memory";
 ```
 
-- [ ] **Step 4: Jalankan test shared, pastikan lulus**
+- [x] **Step 4: Jalankan test shared, pastikan lulus**
 
 Run: `pnpm vitest --run shared/test/memory.test.ts`
 Expected: PASS (4 test).
 
-- [ ] **Step 5: Ubah skema Prisma**
+- [x] **Step 5: Ubah skema Prisma**
 
 Di `model Project`, tambahkan relasi setelah baris `qaReports …`:
 
@@ -264,7 +264,7 @@ model MemoryLocalState {
 }
 ```
 
-- [ ] **Step 6: Bangkitkan migration**
+- [x] **Step 6: Bangkitkan migration**
 
 ```bash
 cd server
@@ -295,7 +295,7 @@ cd ..
 
 Expected: `NO-DRIFT`.
 
-- [ ] **Step 7: Tulis test skema server**
+- [x] **Step 7: Tulis test skema server**
 
 `server/test/memory-schema.test.ts`:
 
@@ -337,12 +337,12 @@ describe("skema memori (ADR-0178)", () => {
 });
 ```
 
-- [ ] **Step 8: Jalankan test skema**
+- [x] **Step 8: Jalankan test skema**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/memory-schema.test.ts --no-file-parallelism`
 Expected: PASS (2 test).
 
-- [ ] **Step 9: Tulis ADR-0178**
+- [x] **Step 9: Tulis ADR-0178**
 
 `internal/docs/adr/0178-memori-project-bersama.md`:
 
@@ -388,7 +388,7 @@ untuk semua sumber tahap 1 (sumber tak tepercaya lahir bersama suntik sesi di ta
 - `TelegramMemory` tetap terpisah (scope `chatId`, ADR-0096).
 ```
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add server/prisma/schema.prisma server/prisma/migrations/20261007120000_project_memory \
