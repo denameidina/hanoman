@@ -2,13 +2,25 @@
 // pengetahuan produk ada di katalog (`@hanoman/shared`), seluruh pengetahuan jaringan ada di
 // `client.ts`. Yang tersisa di sini hanya perekatan protokol.
 import { McpServer, fromJsonSchema } from "@modelcontextprotocol/server";
-import { MCP_INSTRUCTIONS, MCP_TOOL_SCHEMA_VERSION, REPO_HEADER, encodeRepoHeader, mcpToolsFor, renderResult } from "@hanoman/shared";
+import {
+  MCP_INSTRUCTIONS, MCP_TOOL_SCHEMA_VERSION, REPO_HEADER, SESSION_HEADER, SESSION_TOKEN_HEADER, encodeRepoHeader,
+  mcpToolsFor, renderResult,
+} from "@hanoman/shared";
 import type { McpConfig } from "./config";
 import type { Caller } from "./client";
 import { redactToken } from "./redact";
 import { enrichAnchors, readRepoContext } from "./repo-context";
 
-export function buildMcpServer(cfg: McpConfig, call: Caller, cliVersion: string, cwd: string = process.cwd()): McpServer {
+/** ADR-0179 · token HMAC sesi hanya bermakna bagi server di mesin ini; jangan pernah ke hub jarak jauh. */
+export function isLoopbackHost(host: string): boolean {
+  try { return ["127.0.0.1", "localhost", "[::1]", "::1"].includes(new URL(host).hostname); }
+  catch { return false; }
+}
+
+export function buildMcpServer(
+  cfg: McpConfig, call: Caller, cliVersion: string,
+  cwd: string = process.cwd(), env: NodeJS.ProcessEnv = process.env,
+): McpServer {
   const server = new McpServer({ name: "hanoman", version: cliVersion }, { instructions: MCP_INSTRUCTIONS });
   const tools = mcpToolsFor(cfg.level);
   const mask = (s: string) => redactToken(s, cfg.token);
@@ -61,7 +73,11 @@ export function buildMcpServer(cfg: McpConfig, call: Caller, cliVersion: string,
           const e = await enrichAnchors(ctx, req.body);
           if (!e.ok)
             return text(`Jangkar tidak ada di HEAD (${ctx.identity.head.slice(0, 12)}): ${e.missing.join(", ")}. Commit berkasnya dulu, atau perbaiki path relatif root repo.`, true);
-          req = { ...req, body: e.body, headers: { ...(req.headers ?? {}), [REPO_HEADER]: encodeRepoHeader(ctx.identity) } };
+          // ADR-0179 · sesi hanoman membuktikan dirinya; server lalu menentukan project dari sesinya.
+          const sid = env.HANOMAN_SESSION_ID; const stok = env.HANOMAN_EVENT_TOKEN;
+          const session: Record<string, string> = sid && stok && isLoopbackHost(cfg.host)
+            ? { [SESSION_HEADER]: sid, [SESSION_TOKEN_HEADER]: stok } : {};
+          req = { ...req, body: e.body, headers: { ...(req.headers ?? {}), [REPO_HEADER]: encodeRepoHeader(ctx.identity), ...session } };
         }
 
         const r = await call(req, tool.name);

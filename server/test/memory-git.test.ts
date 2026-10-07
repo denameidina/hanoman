@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { blobShaAt, hasCommit, repoHead, rootCommits } from "../src/services/memory/git";
+import { blobShaAt, hasCommit, repoHead, rootCommits, treeBlobs } from "../src/services/memory/git";
 
 let dir = ""; let first = ""; let second = "";
 const g = (...a: string[]) => execFileSync("git", ["-C", dir, ...a], { encoding: "utf8" }).trim();
@@ -42,5 +42,10 @@ describe("git memori", () => {
     const plain = mkdtempSync(join(tmpdir(), "mem-plain-"));
     expect(await repoHead(plain)).toBeNull();
     expect(await rootCommits(plain)).toEqual([]);
+  });
+  it("treeBlobs memetakan seluruh berkas commit ke blob SHA dalam satu panggilan", async () => {
+    const m = await treeBlobs(dir, second);
+    expect(m?.get("src/a.ts")).toBe(g("rev-parse", `${second}:src/a.ts`));
+    expect(await treeBlobs(dir, "f".repeat(40))).toBeNull();
   });
 });

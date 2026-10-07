@@ -3,6 +3,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { writeMemoryFile } from "./memory/file";
 import { stat } from "node:fs/promises";
 import { dirname, resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
@@ -783,6 +784,9 @@ export type CreateOpts = {
   // S3 · SPEC-172 · fase yang DIKERJAKAN ULANG sesi ini (continue: Execute) — dikecualikan dari
   // `@hanoman_done_at_birth` walau berkas fase masih memuat barisnya dari run lama.
   rerunPhases?: string[];
+  // ADR-0179 · teks memori project yang SUDAH diverifikasi session-launch (pty.ts tetap nol-DB).
+  // pty menulisnya ke agentTempDir: claude markdown, codex TOML `developer_instructions='''…'''`.
+  memoryText?: string;
 };
 
 export function createSession(projectId: string, cwd: string, opts: CreateOpts = {}): SessionInfo {
@@ -1038,6 +1042,12 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     // Skills library · skill global hanoman ke sesi agen (claude: `--add-dir`, codex: symlink +
     // exclude — lihat skill-inject.ts). Fail-open: peringatan stderr saja, sesi tetap lahir.
     // `--add-dir` variadik, jadi ia HARUS argumen terakhir supaya tak menelan argumen lain.
+    // ADR-0179 · memori project. Claude lewat berkas (tanpa batas argv); codex lewat `-c` yang isinya
+    // di-expand shell dari berkas TOML literal — dikutip ganda, jadi tak dipindai ulang (pola --agents).
+    const memoryFile = opts.memoryText ? writeMemoryFile(agentTempDir(id), agent, opts.memoryText) : undefined;
+    const memoryArg = !memoryFile ? ""
+      : agent === "claude" ? `--append-system-prompt-file ${sq(memoryFile)}`
+      : `-c "$(cat ${sq(memoryFile)})"`;
     let skillsArg = "";
     try {
       const inj = injectGlobalSkills({ agent, cwd, tempDir: agentTempDir(id), hanomanHome: skillsHome() });
@@ -1046,7 +1056,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     } catch (e) {
       process.stderr.write(`hanoman: penyuntikan skill global gagal: ${(e as Error).message}\n`);
     }
-    argv = [sq(agentBin(agent)), promptArg, flags, agentsArg, nativeAgentArgs, skillsArg]
+    argv = [sq(agentBin(agent)), promptArg, flags, agentsArg, nativeAgentArgs, memoryArg, skillsArg]
       .filter(Boolean).join(" ");
   }
 

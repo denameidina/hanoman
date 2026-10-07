@@ -2408,5 +2408,11 @@ Galat: `400` body/header salah atau agent mengirim `projectId` · `403 {need:"me
 ambigu) / status tak bisa bertransisi · `422 {anchor}` jangkar tak ada/blobSha beda · `422 {reason}` terdeteksi secret
 · `422 {path}` path tak aman.
 
+**Principal sesi (ADR-0179).** Header `x-hanoman-session` + `x-hanoman-session-token` (HMAC turunan
+`HANOMAN_EVENT_TOKEN`) mendahului jalur cookie/token: project & HEAD dari pane sesi yang hidup, tanpa
+allowlist `projectIds`; `projectId` dari pemanggil → `400`. Galat: `401` header setengah / HMAC salah ·
+`404` sesi tak hidup · `400` sesi ber-project sintetis (Telegram/VPS). Sesi yang spec-nya `source=help`
+atau tertaut `Ticket`/`GithubIssue` menghasilkan memori `trusted=false` (selalu review).
+
 Auto-aktif hanya bila `kind ≠ decision` ∧ jangkar ≥ 1 ∧ jangkar diverifikasi server (`git rev-parse <head>:<path>` pada
 checkout project) ∧ sumber tepercaya. Pengganti (`supersede`/`reverify`) menonaktifkan yang lama hanya saat ia sendiri aktif.

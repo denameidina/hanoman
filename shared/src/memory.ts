@@ -39,6 +39,9 @@ export type RepoIdentity = z.infer<typeof zRepoIdentity>;
 
 // Header, bukan body/query: model tak pernah melihat atau mengisinya lewat inputSchema tool.
 export const REPO_HEADER = "x-hanoman-repo";
+// ADR-0179 · kredensial sesi hanoman (HANOMAN_SESSION_ID + HANOMAN_EVENT_TOKEN) yang diteruskan CLI MCP.
+export const SESSION_HEADER = "x-hanoman-session";
+export const SESSION_TOKEN_HEADER = "x-hanoman-session-token";
 // base64url lewat TextEncoder + btoa/atob: berkas ini ikut dibundel ke browser, jadi tanpa `Buffer`.
 const toB64Url = (s: string): string => {
   let bin = "";

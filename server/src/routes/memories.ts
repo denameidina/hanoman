@@ -1,9 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  MEMORY_STATUSES, REPO_HEADER, zMemoryInvalidate, zMemoryPropose, zMemoryReverify, zMemoryReview,
+  MEMORY_STATUSES, REPO_HEADER, SESSION_HEADER, SESSION_TOKEN_HEADER, zMemoryInvalidate, zMemoryPropose, zMemoryReverify, zMemoryReview,
 } from "@hanoman/shared";
-import { resolveMemoryScope, type MemoryScope, type Principal } from "../services/memory/resolve";
+import { resolveMemoryScope, resolveSessionScope, type MemoryScope, type Principal } from "../services/memory/resolve";
 import {
   getMemory, invalidateMemory, proposeMemory, reverifyMemory, reviewMemory, searchMemories, supersedeMemory,
   type Actor,
@@ -27,12 +27,20 @@ function principalOf(req: FastifyRequest): Principal | null {
 const actorOf = (p: Principal): Actor => (p.kind === "user" ? { kind: "user", id: p.userId } : { kind: "token", id: p.tokenId });
 
 async function scopeOr(req: FastifyRequest, reply: FastifyReply, projectId?: string):
-  Promise<{ scope: MemoryScope; principal: Principal } | null> {
+  Promise<{ scope: MemoryScope; actor: Actor } | null> {
   const principal = principalOf(req);
   if (!principal) { reply.code(401).send({ error: "unauthorized" }); return null; }
+  // ADR-0179 · kredensial sesi menang atas header repo dan allowlist token (keputusan B).
+  const ses = await resolveSessionScope({ session: req.headers[SESSION_HEADER], token: req.headers[SESSION_TOKEN_HEADER] });
+  if (ses && !ses.ok) { reply.code(ses.status).send(ses.body); return null; }
+  if (ses?.ok) {
+    if (projectId) { reply.code(400).send({ error: "projectId tidak diterima dari sesi; project ditentukan oleh sesi" }); return null; }
+    return { scope: ses.scope, actor: { kind: "session", id: ses.session.sessionId, runtime: ses.session.runtime,
+      trusted: ses.session.trusted, tokenId: req.agent?.id ?? null } };
+  }
   const r = await resolveMemoryScope(principal, { repoHeader: req.headers[REPO_HEADER], projectId });
   if (!r.ok) { reply.code(r.status).send(r.body); return null; }
-  return { scope: r.scope, principal };
+  return { scope: r.scope, actor: actorOf(principal) };
 }
 
 const send = (reply: FastifyReply, r: { ok: true } | { ok: false; status: number; body: unknown }, okCode: number, body: () => unknown) =>
@@ -62,7 +70,7 @@ export default async function (app: FastifyInstance) {
     const { projectId, ...input } = p.data;
     const s = await scopeOr(req, reply, projectId);
     if (!s) return;
-    const r = await proposeMemory(s.scope, actorOf(s.principal), input);
+    const r = await proposeMemory(s.scope, s.actor, input);
     return send(reply, r, 201, () => r.ok && { memory: r.memory });
   });
 
@@ -73,7 +81,7 @@ export default async function (app: FastifyInstance) {
     const { projectId, ...input } = p.data;
     const s = await scopeOr(req, reply, projectId);
     if (!s) return;
-    const r = await supersedeMemory(s.scope, actorOf(s.principal), id, input);
+    const r = await supersedeMemory(s.scope, s.actor, id, input);
     return send(reply, r, 201, () => r.ok && { memory: r.memory });
   });
 
@@ -83,7 +91,7 @@ export default async function (app: FastifyInstance) {
     if (!p.success) return reply.code(400).send({ error: p.error.flatten() });
     const s = await scopeOr(req, reply, p.data.projectId);
     if (!s) return;
-    const r = await reverifyMemory(s.scope, actorOf(s.principal), id, p.data.anchors);
+    const r = await reverifyMemory(s.scope, s.actor, id, p.data.anchors);
     return send(reply, r, 201, () => r.ok && { memory: r.memory });
   });
 
@@ -93,7 +101,7 @@ export default async function (app: FastifyInstance) {
     if (!p.success) return reply.code(400).send({ error: p.error.flatten() });
     const s = await scopeOr(req, reply, p.data.projectId);
     if (!s) return;
-    const r = await invalidateMemory(s.scope, actorOf(s.principal), id, p.data.reason);
+    const r = await invalidateMemory(s.scope, s.actor, id, p.data.reason);
     return send(reply, r, 200, () => r.ok && { memory: r.memory });
   });
 

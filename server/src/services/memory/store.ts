@@ -15,7 +15,9 @@ import {
 
 export type MemoryProposeInput = z.infer<typeof zMemoryPropose>;
 export type MemoryAnchorIn = z.infer<typeof zMemoryAnchorIn>;
-export type Actor = { kind: "user"; id: string } | { kind: "token"; id: string };
+export type Actor =
+  | { kind: "user"; id: string } | { kind: "token"; id: string }
+  | { kind: "session"; id: string; runtime: "claude" | "codex"; trusted: boolean; tokenId: string | null };
 export type StoreFail = { ok: false; status: 404 | 409 | 422; body: Record<string, unknown> };
 type Ok<T> = { ok: true } & T;
 type Row = Prisma.ProjectMemoryGetPayload<object>;
@@ -40,7 +42,7 @@ export function toMemoryView(r: Row): MemoryView {
   };
 }
 
-const actorKind = (a: Actor) => (a.kind === "user" ? "user" : "token");
+const actorKind = (a: Actor) => a.kind;   // "user" | "token" | "session" — sama dengan MemoryEvent.actorKind
 
 function validate(input: MemoryProposeInput): StoreFail | null {
   const secret = findSecret(input.content);
@@ -100,7 +102,8 @@ async function create(
     if (dup) return fail(409, "memori serupa sudah ada; pakai supersede bila ingin mengoreksinya", { duplicateOf: dup.id });
   }
 
-  const trusted = true; // ADR-0178 · tahap 1: semua sumber tepercaya; sesi tak tepercaya lahir di tahap 2.
+  // ADR-0179 · hanya sesi yang bisa tak tepercaya; cookie & agent token luar tetap tepercaya (ADR-0178 §5).
+  const trusted = actor.kind === "session" ? actor.trusted : true;
   const reason = reviewReason({ kind: input.kind, anchorsCount: v.anchors.length, anchorsVerified: v.verified, trusted });
   const status: MemoryStatus = reason ? "proposed" : "active";
   const who = { kind: actorKind(actor), id: actor.id };
@@ -111,8 +114,9 @@ async function create(
         projectId: scope.projectId, kind: input.kind, content: input.content,
         scopePaths: input.scopePaths, anchors: v.anchors, status, reviewReason: reason,
         supersedesId: opts.supersedesId ?? null,
-        sourceRuntime: actor.kind === "user" ? "human" : "external",
-        sourceTokenId: actor.kind === "token" ? actor.id : null,
+        sourceRuntime: actor.kind === "user" ? "human" : actor.kind === "session" ? actor.runtime : "external",
+        sourceSessionId: actor.kind === "session" ? actor.id : null,
+        sourceTokenId: actor.kind === "token" ? actor.id : actor.kind === "session" ? actor.tokenId : null,
         commitSha: scope.head, trusted,
       },
     });

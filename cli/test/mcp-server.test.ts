@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { REPO_HEADER, decodeRepoHeader } from "@hanoman/shared";
+import { REPO_HEADER, SESSION_HEADER, SESSION_TOKEN_HEADER, decodeRepoHeader } from "@hanoman/shared";
 
 /** Transport in-memory: `serveStdio` menerima `options.transport`, jadi loop protokol asli diuji. */
 class PairedTransport {
@@ -167,6 +167,26 @@ describe("tool memori · repoContext", () => {
     await vi.waitFor(() => expect(reply(t, 11)).toBeDefined(), { timeout: 5000 });
     expect(reply(t, 11)?.result.isError).toBe(true);
     expect(call).not.toHaveBeenCalled();
+  });
+
+  it("kredensial sesi diteruskan HANYA ke host loopback", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "mcp-ses-"));
+    const g = (...a: string[]) => execFileSync("git", ["-C", dir, ...a], { encoding: "utf8" }).trim();
+    g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");
+    g("remote", "add", "origin", "git@github.com:acme/alpha.git");
+    writeFileSync(join(dir, "a.md"), "x"); g("add", "."); g("commit", "-qm", "1");
+    const env = { HANOMAN_SESSION_ID: "spec-1", HANOMAN_EVENT_TOKEN: "tok" };
+    for (const [host, expectSent] of [["http://127.0.0.1:8787", true], ["http://localhost:8787", true], ["https://hub.example.com", false]] as const) {
+      const call = okCall();
+      const t = new PairedTransport();
+      serveStdio(() => buildMcpServer({ ...cfg, host }, call, "9.9.9", dir, env), { transport: t as never });
+      t.feed({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } });
+      t.feed({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "hanoman_memory_search", arguments: {} } });
+      await vi.waitFor(() => expect(call).toHaveBeenCalled(), { timeout: 5000 });
+      const [req] = call.mock.calls.at(-1)!;
+      expect(req.headers?.[SESSION_HEADER], host).toBe(expectSent ? "spec-1" : undefined);
+      expect(req.headers?.[SESSION_TOKEN_HEADER], host).toBe(expectSent ? "tok" : undefined);
+    }
   });
 
   it("cwd bukan repo → galat jelas, REST tak dipanggil", async () => {
