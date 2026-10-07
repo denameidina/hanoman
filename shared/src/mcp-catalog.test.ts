@@ -263,4 +263,17 @@ describe("mode ⇔ capability", () => {
     for (const t of MCP_TOOLS.filter((x) => x.mode === "danger"))
       expect(t.description.slice(0, 12), t.name).toMatch(/BERBAHAYA/);
   });
+
+  it("tool memori tak pernah menerima parameter project dan semuanya repoContext", () => {
+    const mem = MCP_TOOLS.filter((t) => t.name.startsWith("hanoman_memory_"));
+    expect(mem.map((t) => t.name).sort()).toEqual([
+      "hanoman_memory_get", "hanoman_memory_invalidate", "hanoman_memory_propose",
+      "hanoman_memory_reverify", "hanoman_memory_search", "hanoman_memory_supersede",
+    ]);
+    for (const t of mem) {
+      expect(t.repoContext, t.name).toBe(true);
+      const props = Object.keys((t.inputSchema as { properties?: object }).properties ?? {});
+      expect(props.some((p) => /project/i.test(p)), t.name).toBe(false);
+    }
+  });
 });

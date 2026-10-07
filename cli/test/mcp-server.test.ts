@@ -3,6 +3,11 @@ import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { buildMcpServer } from "../src/mcp/server";
 import type { CallResult, Caller } from "../src/mcp/client";
 import type { McpConfig } from "../src/mcp/config";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { REPO_HEADER, decodeRepoHeader } from "@hanoman/shared";
 
 /** Transport in-memory: `serveStdio` menerima `options.transport`, jadi loop protokol asli diuji. */
 class PairedTransport {
@@ -22,9 +27,9 @@ type CallArgs = Parameters<Caller>;
 const okCall = () =>
   vi.fn(async (..._a: CallArgs): Promise<CallResult> => ({ ok: true, body: { items: [], total: 0, page: 1, pageSize: 20 } }));
 
-async function boot(over: Partial<McpConfig> = {}, call = okCall()) {
+async function boot(over: Partial<McpConfig> = {}, call = okCall(), cwd?: string) {
   const t = new PairedTransport();
-  serveStdio(() => buildMcpServer({ ...cfg, ...over }, call, "9.9.9"), { transport: t as never });
+  serveStdio(() => buildMcpServer({ ...cfg, ...over }, call, "9.9.9", cwd), { transport: t as never });
   t.feed({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } });
   await tick();
   return { t, call };
@@ -136,5 +141,39 @@ describe("buildMcpServer", () => {
     t.feed({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "hanoman_ticket_get", arguments: { ticket: "t1" } } });
     await tick();
     expect(reply(t, 9)?.result.content[0].text).not.toContain("hnm_agt_secret");
+  });
+});
+
+describe("tool memori · repoContext", () => {
+  it("propose membawa header identitas repo dan blobSha dari HEAD; blobSha dari model ditolak skema", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "mcp-mem-"));
+    const g = (...a: string[]) => execFileSync("git", ["-C", dir, ...a], { encoding: "utf8" }).trim();
+    g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");
+    g("remote", "add", "origin", "git@github.com:acme/alpha.git");
+    writeFileSync(join(dir, "a.md"), "x"); g("add", "."); g("commit", "-qm", "1");
+    const { t, call } = await boot({}, okCall(), dir);
+    t.feed({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "hanoman_memory_propose",
+      arguments: { kind: "fact", content: "c", anchors: [{ path: "a.md" }] } } });
+    // Enrichment menjalankan beberapa subproses git — lebih lama dari satu `tick`.
+    await vi.waitFor(() => expect(call).toHaveBeenCalled(), { timeout: 5000 });
+    const [req] = call.mock.calls.at(-1)!;
+    expect(decodeRepoHeader(req.headers?.[REPO_HEADER])?.head).toBe(g("rev-parse", "HEAD"));
+    expect((req.body as { anchors: { blobSha: string }[] }).anchors[0]!.blobSha).toBe(g("rev-parse", "HEAD:a.md"));
+
+    // Model tak bisa menyelundupkan blobSha: skema tool menolaknya sebelum handler berjalan.
+    call.mockClear();
+    t.feed({ jsonrpc: "2.0", id: 11, method: "tools/call", params: { name: "hanoman_memory_propose",
+      arguments: { kind: "fact", content: "c", anchors: [{ path: "a.md", blobSha: "f".repeat(40) }] } } });
+    await vi.waitFor(() => expect(reply(t, 11)).toBeDefined(), { timeout: 5000 });
+    expect(reply(t, 11)?.result.isError).toBe(true);
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("cwd bukan repo → galat jelas, REST tak dipanggil", async () => {
+    const { t, call } = await boot({}, okCall(), mkdtempSync(join(tmpdir(), "plain-")));
+    t.feed({ jsonrpc: "2.0", id: 10, method: "tools/call", params: { name: "hanoman_memory_search", arguments: {} } });
+    await vi.waitFor(() => expect(reply(t, 10)).toBeDefined(), { timeout: 5000 });
+    expect(reply(t, 10)?.result.isError).toBe(true);
+    expect(call).not.toHaveBeenCalled();
   });
 });

@@ -2385,3 +2385,28 @@ berbackoff tabel (6 percobaan: 0 · 30 dtk · 2 mnt · 10 mnt · 30 mnt · 2 jam
 menonaktifkan endpoint otomatis + satu `Notification` bertipe `webhook`. Katalog jenis peristiwa
 hidup di `shared/src/webhook.ts` (`WEBHOOK_ENTITIES`) dan dirender apa adanya oleh halaman
 dokumentasi in-app.
+
+## Memori project (`/api/memories`, [ADR-0178](../adr/0178-memori-project-bersama.md))
+
+Project **tak pernah** dibaca dari input agen. Cookie → `projectId` (query untuk GET/review, body untuk tulis).
+Agent token → header `x-hanoman-repo` (base64url JSON `{remote, rootCommit, head}`, diisi CLI MCP dari cwd),
+dicocokkan ke `Project.gitRemote` ternormalisasi + allowlist `AgentToken.projectIds`; root commit dibandingkan dengan
+checkout project bila ada. Capability `memory:read` / `memory:write`.
+
+| Method & path | Body / query | Sukses |
+|---|---|---|
+| `GET /memories` | `q?` (semua kata), `paths?` (koma), `status?` (default `active`) | `200 {items,total}` |
+| `GET /memories/:id` | — | `200 {memory, events}` |
+| `POST /memories` | `{kind, content, scopePaths?, anchors?[{path, lines?, blobSha?}]}` | `201 {memory}` |
+| `POST /memories/:id/supersede` | sama dengan propose | `201 {memory}` |
+| `POST /memories/:id/reverify` | `{anchors}` (≥ 1) | `201 {memory}` |
+| `POST /memories/:id/invalidate` | `{reason}` | `200 {memory}` |
+| `POST /memories/:id/activate` · `/reject` — **COOKIE_ONLY** | `?projectId=` · `{reason?}` (reject wajib) | `200 {memory}` |
+
+Galat: `400` body/header salah atau agent mengirim `projectId` · `403 {need:"memory:…"}` / `{need:"projectIds"}` ·
+`404` remote tak dikenal, root commit beda, atau id milik project lain · `409 {duplicateOf}` / `409 {candidates}` (remote
+ambigu) / status tak bisa bertransisi · `422 {anchor}` jangkar tak ada/blobSha beda · `422 {reason}` terdeteksi secret
+· `422 {path}` path tak aman.
+
+Auto-aktif hanya bila `kind ≠ decision` ∧ jangkar ≥ 1 ∧ jangkar diverifikasi server (`git rev-parse <head>:<path>` pada
+checkout project) ∧ sumber tepercaya. Pengganti (`supersede`/`reverify`) menonaktifkan yang lama hanya saat ia sendiri aktif.

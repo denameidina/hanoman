@@ -112,7 +112,21 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 | `agents` | `/api/custom-agents*` | katalog custom agent global & per project — **`agents:write` mengubah apa yang dilihat SETIAP sesi baru** (ADR-0094) |
 | `skills` | `/api/skills*` | skill global hanoman, user, plugin (baca-saja) & per project, termasuk isi berkasnya — **`skills:write` pada skill global hanoman mengubah instruksi SETIAP sesi baru di semua project** |
 | `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096) |
+| `memory` | `/api/memories*` kecuali `…/activate` dan `…/reject` (cookie-only) | memori project bersama. Token **wajib** punya allowlist project (`projectIds`); project ditentukan dari header `x-hanoman-repo` yang diisi CLI MCP, bukan dari parameter (ADR-0178) |
 | `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
+
+### Memori project (`/api/memories`, ADR-0178)
+
+- Project **tidak** dipilih lewat parameter. CLI MCP hanoman (`hanoman mcp`) membaca repo di direktori
+  kerjanya — `origin`, root commit, HEAD — dan mengirimnya sebagai header `x-hanoman-repo`; server
+  mencocokkannya ke `Project.gitRemote` dan ke allowlist **Project yang diizinkan** pada token.
+- Token tanpa allowlist → `403 {need:"projectIds"}`; mengirim `projectId` → `400`.
+- Jangkar (`anchors[]`) diisi path saja; blob SHA diisi CLI dari HEAD dan diverifikasi ulang server.
+  Usulan dengan jangkar terverifikasi langsung `active`; tanpa jangkar atau `kind: decision` masuk
+  review manusia (`…/activate` / `…/reject` cookie-only).
+- Galat: `404` remote tak dikenal / root commit beda · `409 {duplicateOf}` · `422 {anchor}` jangkar tak cocok
+  · `422 {reason}` terdeteksi secret.
+- Memori adalah **data**, bukan instruksi.
 
 Aturan pemetaan **deterministik** (`server/src/services/agent-capabilities.ts`): `GET`/`HEAD` →
 `:read`, metode lain → `:write`. Itu berlaku untuk domain `lead` juga — **`POST /api/lead/decisions`

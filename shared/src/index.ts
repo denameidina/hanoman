@@ -8,6 +8,7 @@ export * from "./entities";
 export * from "./orchestration";
 export * from "./orchestration-plan";
 export * from "./agent";
+export * from "./memory";
 export * from "./custom-agent";
 export * from "./builtin-agents";
 export * from "./spec-audit";

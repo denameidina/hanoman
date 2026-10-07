@@ -37,6 +37,7 @@ model Project {
   portalChats  PortalChatSession[]   // SPEC-854 · ADR-0129 · percakapan portal klien project ini
   tasks        Task[]                // SPEC-945 · ADR-0150 · kartu kerja manusia di project ini
   qaReports    QaReport[]            // Workspace QA · laporan QA project ini
+  memories     ProjectMemory[]       // ADR-0178 · memori project bersama lintas runtime
 }
 
 model Spec {
@@ -438,6 +439,8 @@ model AgentToken {
   tokenHash    String    @unique
   tokenPrefix  String
   capabilities Json
+  // ADR-0178 · allowlist project. null/[] = token tak boleh menyentuh route memori sama sekali.
+  projectIds   Json?
   enabled      Boolean   @default(true)
   createdBy    String?
   createdAt    DateTime  @default(now())
@@ -1153,4 +1156,54 @@ model QaAttachment {
   @@index([reportId])
   @@index([ownerType, ownerId])
   @@index([syncState])
+}
+
+// ADR-0178 · satu fakta per baris. content/anchors/scopePaths/kind TAK PERNAH diedit — koreksi =
+// baris baru dengan `supersedesId`. Hanya `status` yang bergerak, dan hanya naik (lattice).
+model ProjectMemory {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind            String   // convention | gotcha | decision | fact
+  content         String
+  scopePaths      Json     // string[] glob relatif root repo; [] = seluruh project
+  anchors         Json     // [{path, blobSha, lines?}]
+  status          String   // proposed | active | invalidated | rejected
+  supersedesId    String?
+  reviewReason    String?  // decision | no-anchor | anchor-unverified | untrusted-source
+  sourceRuntime   String   // claude | codex | external | human
+  sourceSessionId String?
+  sourceTokenId   String?
+  sourceDeviceId  String?  // diisi tahap sync
+  commitSha       String?
+  trusted         Boolean  @default(true)
+  version         Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  events          MemoryEvent[]
+
+  @@index([projectId, status])
+}
+
+// ADR-0178 · jejak audit append-only. Tak pernah di-update atau dihapus kecuali ikut cascade.
+model MemoryEvent {
+  id        String        @id @default(cuid())
+  memoryId  String
+  memory    ProjectMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  op        String        // propose | activate | reject | invalidate | supersede | reverify
+  actorKind String        // user | token | session | system
+  actorId   String?
+  reason    String?
+  createdAt DateTime      @default(now())
+
+  @@index([memoryId, createdAt])
+}
+
+// ADR-0178 · LOCAL-ONLY (tak pernah disync): hasil verifikasi jangkar bergantung HEAD mesin ini.
+model MemoryLocalState {
+  memoryId       String    @id
+  verdict        String    // valid | stale | unverifiable
+  verifiedHead   String?
+  lastVerifiedAt DateTime?
+  lastUsedAt     DateTime?
 }

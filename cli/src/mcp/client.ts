@@ -32,6 +32,7 @@ export function createCaller(cfg: McpConfig, fetchImpl: typeof fetch): Caller {
     const init: RequestInit = {
       method: req.method,
       headers: {
+        ...(req.headers ?? {}),
         Authorization: `Bearer ${cfg.token}`,
         Accept: "application/json",
         ...(req.body !== undefined ? { "Content-Type": "application/json" } : {}),

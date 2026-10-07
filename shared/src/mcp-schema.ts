@@ -20,6 +20,9 @@ export type JsonSchemaNode = {
   minimum?: number;
   maximum?: number;
   minLength?: number;
+  maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
   items?: JsonSchemaNode;
   oneOf?: readonly JsonSchemaNode[];
   properties?: Record<string, JsonSchemaNode>;
