@@ -60,6 +60,7 @@ import fastifyMultipart from "@fastify/multipart";
 import authRoutes from "./routes/auth";
 import setupRoutes from "./routes/setup";
 import agentTokens from "./routes/agent-tokens";
+import memories from "./routes/memories";
 import remoteControl from "./routes/remote-control";
 import devicesRelay from "./routes/devices-relay";
 import logs from "./routes/logs";
@@ -278,6 +279,7 @@ export function buildApp(
     await api.register(devicesRelay, wsOptions);  // SPEC-1216/1218 · ADR-0165 §4/§6 · aksi sesi klien lewat relay (cookie-only)
     await api.register(logs);   // SPEC-1217 · GET /logs, /logs/:id/transcript, GET|PUT /logs/retention (COOKIE_ONLY)
     await api.register(bindings);
+    await api.register(memories);      // ADR-0178 · memori project bersama
     await api.register(sync);
     await api.register(presence);   // SPEC-919 · ADR-0147 · muat awal halaman Klien
     await api.register(sessionResults);

@@ -1615,7 +1615,7 @@ git commit -m "feat(memory): store — propose/supersede/reverify/invalidate/rev
 | `POST /memories/:id/activate` | cookie saja | `zMemoryReview` + `?projectId=` | `200 {memory}` |
 | `POST /memories/:id/reject` | cookie saja | `zMemoryReview` + `?projectId=` | `200 {memory}` |
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/memories.route.test.ts`:
 
@@ -1747,12 +1747,12 @@ describe("/api/memories · cookie", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/memories.route.test.ts --no-file-parallelism`
 Expected: FAIL — 404 pada semua route.
 
-- [ ] **Step 3: Tulis `server/src/routes/memories.ts`**
+- [x] **Step 3: Tulis `server/src/routes/memories.ts`**
 
 ```ts
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -1874,7 +1874,7 @@ export default async function (app: FastifyInstance) {
 
 `mcp-coverage.test.ts` melewati kedua route review karena `capabilityForRoute` mengembalikan `COOKIE_ONLY` untuknya.
 
-- [ ] **Step 4: Daftarkan route di `server/src/app.ts`**
+- [x] **Step 4: Daftarkan route di `server/src/app.ts`**
 
 Di daftar import (dekat `import agentTokens from "./routes/agent-tokens";`):
 
@@ -1888,12 +1888,12 @@ Di blok register (dekat `await api.register(bindings);`):
     await api.register(memories);      // ADR-0178 · memori project bersama
 ```
 
-- [ ] **Step 5: Jalankan, pastikan lulus**
+- [x] **Step 5: Jalankan, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/memories.route.test.ts server/test/mcp-coverage.test.ts --no-file-parallelism`
 Expected: `memories.route.test.ts` PASS. `mcp-coverage.test.ts` **FAIL** dengan daftar route memori tanpa tool — itu benar; Task 8 menutupnya. Jangan tambahkan route memori ke `UNWRAPPED`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/routes/memories.ts server/src/app.ts server/test/memories.route.test.ts
