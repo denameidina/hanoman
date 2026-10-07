@@ -106,7 +106,7 @@ export function needsConfirm(m: { status: string; createdAt: string }, lastUsedA
 
 **Files:** `src/src/screens/SettingsScreen.tsx` (`AgentAccessPanel`), test `src/test/agent-tokens.test.tsx`.
 
-- [ ] Test: saat membuat token, `MultiSelect` "Project yang diizinkan (memori)" mengirim `projectIds`; tanpa pilihan, field tak dikirim; baris token menampilkan jumlah/nama project yang diizinkan dan tombol "Atur project" membuka editor (`MultiSelect` + Simpan) yang memanggil `PATCH /agent-tokens/:id { projectIds }` (kosong → `null`); petunjuk teks: memori butuh capability `memory:*` DAN allowlist. Implementasi. PASS. Commit `feat(memory): atur allowlist project agent token dari Settings`.
+- [x] Test: saat membuat token, `MultiSelect` "Project yang diizinkan (memori)" mengirim `projectIds`; tanpa pilihan, field tak dikirim; baris token menampilkan jumlah/nama project yang diizinkan dan tombol "Atur project" membuka editor (`MultiSelect` + Simpan) yang memanggil `PATCH /agent-tokens/:id { projectIds }` (kosong → `null`); petunjuk teks: memori butuh capability `memory:*` DAN allowlist. Implementasi. PASS. Commit `feat(memory): atur allowlist project agent token dari Settings`.
 
 ---
 

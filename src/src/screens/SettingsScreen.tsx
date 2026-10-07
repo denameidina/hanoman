@@ -1,7 +1,7 @@
 /* SettingsScreen — workspace settings. Ported; persistence moved from
    localStorage to the API (GET/PUT /settings). Model per pipeline step. */
 import React from "react";
-import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier } from "../ds";
+import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier, Modal, MultiSelect } from "../ds";
 import { api, ApiError } from "../api/client";
 import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry, modelSelectOptions } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus, SetupStatus } from "@hanoman/shared";
@@ -456,8 +456,15 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   const [picked, setPicked] = React.useState<string[]>([]);
   const [fresh, setFresh] = React.useState<{ name: string; token: string } | null>(null);
   const [busy, setBusy] = React.useState(false);
+  // ADR-0181 · allowlist project untuk memori (ADR-0178): token tanpa allowlist tak bisa menyentuh
+  // /api/memories sama sekali, jadi pilihannya harus ada di sini, bukan hanya di API.
+  const [projects, setProjects] = React.useState<{ id: string; name: string }[]>([]);
+  const [pickedProjects, setPickedProjects] = React.useState<string[]>([]);
+  const [editing, setEditing] = React.useState<AgentTokenView | null>(null);
+  const [editProjects, setEditProjects] = React.useState<string[]>([]);
   const load = React.useCallback(() => { api.listAgentTokens().then((r) => setItems(r.items)).catch(() => setItems([])); }, []);
   React.useEffect(() => {
+    api.listProjects({ limit: 200 }).then((r) => setProjects(r.items.map((p) => ({ id: p.id, name: p.name })))).catch(() => {});
     api.getSettings().then(setSetting).catch(() => {});
     api.getAgentCapabilities().then((r) => setCaps(r.capabilities)).catch(() => {});
     load();
@@ -485,8 +492,10 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
     if (name.trim().length < 1 || busy) return;
     setBusy(true);
     try {
-      const t = await api.createAgentToken({ name: name.trim(), capabilities: picked });
-      setFresh({ name: t.name, token: t.token }); setName(""); setPicked([]); load();
+      const t = await api.createAgentToken({
+        name: name.trim(), capabilities: picked, ...(pickedProjects.length ? { projectIds: pickedProjects } : {}),
+      });
+      setFresh({ name: t.name, token: t.token }); setName(""); setPicked([]); setPickedProjects([]); load();
       onToast?.("Agent token dibuat — salin sekarang", "ok", "key-round");
     } catch { onToast?.("Gagal membuat token", "err", "x-circle"); }
     finally { setBusy(false); }
@@ -504,6 +513,15 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
     }
     catch { onToast?.("Gagal mencabut token", "err", "x-circle"); }
   }
+  async function saveProjects() {
+    if (!editing) return;
+    try {
+      await api.patchAgentToken(editing.id, { projectIds: editProjects.length ? editProjects : null });
+      setEditing(null); load(); onToast?.("Allowlist project disimpan", "ok", "brain");
+    } catch { onToast?.("Gagal menyimpan allowlist project", "err", "x-circle"); }
+  }
+  const projectLabel = (ids: string[] | null | undefined) => !ids?.length ? "tertutup"
+    : ids.map((id) => projects.find((p) => p.id === id)?.name ?? id).join(", ");
   async function setEnabled(t: AgentTokenView, enabled: boolean) {
     try { await api.patchAgentToken(t.id, { enabled }); load(); }
     catch { onToast?.("Gagal mengubah token", "err", "x-circle"); }
@@ -548,6 +566,7 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
             <SettingRow key={t.id} title={t.name} last={i === active.length - 1}
               desc={`${t.tokenPrefix}… · ${t.capabilities.length} capability · `
                 + (t.lastUsedAt ? "terpakai " + new Date(t.lastUsedAt).toLocaleString("id-ID") : "belum dipakai")
+                + ` · memori: ${projectLabel(t.projectIds)}`
                 // ADR-0155 · peringatan hak yang menyempit ikut di `desc` supaya ia terbaca di
                 // baris yang sama dengan tokennya, bukan sebagai blok terpisah yang mudah dilewati.
                 + (lostRights(t.capabilities).length
@@ -555,6 +574,7 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
                   : "")}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <Switch size="sm" checked={t.enabled} onChange={(v: boolean) => void setEnabled(t, v)} />
+                <Button size="sm" variant="ghost" leftIcon="brain" onClick={() => { setEditProjects(t.projectIds ?? []); setEditing(t); }}>Atur project</Button>
                 <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => revoke(t)}>Cabut</Button>
               </div>
             </SettingRow>
@@ -600,10 +620,28 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
             })}
           </div>
           <div style={{ marginTop: 14 }}>
+            <Field label="Project yang diizinkan (memori)"
+              hint="Memori project hanya bisa dibaca/ditulis token ber-capability Memori DAN project yang dipilih di sini. Kosong = memori tertutup bagi token ini.">
+              <MultiSelect aria-label="Project yang diizinkan (memori)" placeholder="mis. hanoman" searchPlaceholder="mis. alpha"
+                options={projects.map((p) => ({ value: p.id, label: p.name }))} value={pickedProjects} onChange={setPickedProjects} />
+            </Field>
+          </div>
+          <div style={{ marginTop: 14 }}>
             <Button size="sm" leftIcon="plus" disabled={name.trim().length < 1 || busy} onClick={() => void create()}>Buat token</Button>
           </div>
         </div>
         {dialog}
+        <Modal open={!!editing} onClose={() => setEditing(null)} title={editing ? `Project untuk "${editing.name}"` : ""}
+          footer={<>
+            <Button variant="ghost" onClick={() => setEditing(null)}>Batal</Button>
+            <Button onClick={() => void saveProjects()}>Simpan</Button>
+          </>}>
+          <p style={{ marginTop: 0, fontSize: 13, color: "var(--text-muted)" }}>
+            Project yang memorinya boleh dibaca/ditulis token ini. Kosongkan untuk menutup akses memori.
+          </p>
+          {editing && <MultiSelect aria-label={`Project yang diizinkan untuk ${editing.name}`} placeholder="mis. hanoman" searchPlaceholder="mis. alpha"
+            options={projects.map((p) => ({ value: p.id, label: p.name }))} value={editProjects} onChange={setEditProjects} />}
+        </Modal>
       </Card>
 
       {/* SPEC-482 · ADR-0099 · memasang MCP server dan memberi capability adalah satu pekerjaan
