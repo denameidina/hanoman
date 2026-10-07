@@ -352,7 +352,7 @@ Tanda tangan: `buildMcpServer(cfg, call, cliVersion, cwd = process.cwd(), env: N
   - `prepareSessionMemory(o: { projectId; cwd; agent; specText; dir }): Promise<{ file?: string; count: number; warnings: string[] }>`
   - `INJECT_MAX_ITEMS = 40`, `INJECT_MAX_BYTES = 6000`
 
-- [ ] **Step 1: Test `treeBlobs`** — tambahkan ke `memory-git.test.ts`:
+- [x] **Step 1: Test `treeBlobs`** — tambahkan ke `memory-git.test.ts`:
 
 ```ts
   it("treeBlobs memetakan seluruh berkas commit ke blob SHA dalam satu panggilan", async () => {
@@ -362,7 +362,7 @@ Tanda tangan: `buildMcpServer(cfg, call, cliVersion, cwd = process.cwd(), env: N
   });
 ```
 
-- [ ] **Step 2: Implementasi `treeBlobs`** di `git.ts`:
+- [x] **Step 2: Implementasi `treeBlobs`** di `git.ts`:
 
 ```ts
 /** Seluruh berkas pada `commit` → blob SHA, SATU subproses (verifikasi massal saat sesi lahir). */
@@ -381,7 +381,7 @@ export async function treeBlobs(dir: string, commit: string): Promise<Map<string
 }
 ```
 
-- [ ] **Step 3: Test `inject.ts` yang gagal**
+- [x] **Step 3: Test `inject.ts` yang gagal**
 
 `server/test/memory-inject.test.ts`:
 
@@ -486,9 +486,9 @@ describe("render & tulis", () => {
 });
 ```
 
-- [ ] **Step 4: Gagal** (modul tak ada).
+- [x] **Step 4: Gagal** (modul tak ada).
 
-- [ ] **Step 5: Tulis `server/src/services/memory/inject.ts`**
+- [x] **Step 5: Tulis `server/src/services/memory/inject.ts`**
 
 ```ts
 // ADR-0179 · memori project ke sesi yang sedang lahir. Dipanggil session-launch.ts (pty.ts sengaja
@@ -612,7 +612,7 @@ export async function prepareSessionMemory(o: {
 
 Catatan: test `prepareSessionMemory` tanpa memori mengharapkan `warnings: []` — HEAD terbaca dan tak ada stale, jadi benar.
 
-- [ ] **Step 6: PASS** `memory-inject.test.ts`, `memory-git.test.ts`. **Step 7: Commit** `feat(memory): pilih, verifikasi, render memori untuk sesi`
+- [x] **Step 6: PASS** `memory-inject.test.ts`, `memory-git.test.ts`. **Step 7: Commit** `feat(memory): pilih, verifikasi, render memori untuk sesi`
 
 ---
 

@@ -34,3 +34,18 @@ export async function blobShaAt(dir: string, commit: string, path: string): Prom
   if ((await git(dir, ["cat-file", "-t", spec])) !== "blob") return null;
   return git(dir, ["rev-parse", "--verify", "--quiet", spec]);
 }
+
+/** Seluruh berkas pada `commit` → blob SHA, SATU subproses (verifikasi massal saat sesi lahir). */
+export async function treeBlobs(dir: string, commit: string): Promise<Map<string, string> | null> {
+  if (!SHA.test(commit)) return null;
+  try {
+    const { stdout } = await run("git", ["-C", dir, "ls-tree", "-r", "-z", "--full-tree", commit],
+      { encoding: "utf8", timeout: 15000, maxBuffer: 64 * 1024 * 1024 });
+    const out = new Map<string, string>();
+    for (const rec of stdout.split("\0")) {
+      const m = /^\d+ blob ([0-9a-f]+)\t(.+)$/s.exec(rec);
+      if (m) out.set(m[2]!, m[1]!);
+    }
+    return out;
+  } catch { return null; }
+}
