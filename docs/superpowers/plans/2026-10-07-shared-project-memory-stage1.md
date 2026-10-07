@@ -991,7 +991,7 @@ git commit -m "feat(memory): pembungkus git async untuk verifikasi jangkar"
   resolveMemoryScope(p: Principal, input: { repoHeader?: unknown; projectId?: string }): Promise<ResolveResult>
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/memory-resolve.test.ts`:
 
@@ -1089,12 +1089,12 @@ describe("resolveMemoryScope · cookie", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/memory-resolve.test.ts --no-file-parallelism`
 Expected: FAIL — modul tak ditemukan.
 
-- [ ] **Step 3: Tulis `server/src/services/memory/resolve.ts`**
+- [x] **Step 3: Tulis `server/src/services/memory/resolve.ts`**
 
 ```ts
 // ADR-0178 · siapa memanggil + dari repo mana → project yang SAH. Model tak pernah memilih project:
@@ -1156,12 +1156,12 @@ export async function resolveMemoryScope(
 }
 ```
 
-- [ ] **Step 4: Jalankan, pastikan lulus**
+- [x] **Step 4: Jalankan, pastikan lulus**
 
 Run: `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run server/test/memory-resolve.test.ts --no-file-parallelism`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/memory/resolve.ts server/test/memory-resolve.test.ts
