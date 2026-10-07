@@ -1195,7 +1195,8 @@ ber-`supersedesId`. Indeks `[projectId, status]`.
 `supersede` · `reverify`), `actorKind` (`user` · `token` · `session` · `system`), `actorId`, `reason`. Indeks `[memoryId, createdAt]`.
 
 `MemoryLocalState` — **LOCAL-only, tak pernah disync**: `memoryId` (PK, tanpa FK), `verdict` (`valid` · `stale` ·
-`unverifiable`), `verifiedHead`, `lastVerifiedAt`, `lastUsedAt`. Diisi suntik sesi (tahap 2).
+`unverifiable`), `verifiedHead`, `lastVerifiedAt`, `lastUsedAt`. Diisi setiap kali sesi backlog lahir
+([ADR-0179](../adr/0179-suntik-memori-sesi.md)): semua kandidat `active` diverifikasi, `lastUsedAt` hanya untuk yang tersuntik.
 
 `AgentToken.projectIds` — JSON `string[]` nullable: allowlist project untuk route memori. `null`/`[]` = token tak boleh
 menyentuh `/api/memories*` sama sekali.

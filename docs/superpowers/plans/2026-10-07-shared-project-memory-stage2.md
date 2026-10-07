@@ -749,15 +749,25 @@ Pastikan `agent` di sini bertipe `"claude" | "codex"` (tipe `Agent` runner); bil
 
 ### Task 5: ADR-0179, docs, verifikasi nyata
 
-- [ ] **Step 1: ADR** `internal/docs/adr/0179-suntik-memori-sesi.md` — konteks (tahap 2 ADR-0178), keputusan A/B/C, jalur claude (`--append-system-prompt-file`) & codex (`-c developer_instructions='''…'''`, spike `codex debug prompt-input` 0.160.0, `-c` menimpa `developer_instructions` milik `config.toml` bila ada), verifikasi `ls-tree` satu subproses, anggaran 40/6000, trust (help/tiket/issue), kredensial sesi hanya ke loopback, fail-open. Konsekuensi: sesi terminal ad-hoc belum mendapat memori; memori ber-scope hanya tersuntik bila spec menyebut path yang cocok.
-- [ ] **Step 2: Docs** — `docs/agent-integration.md` (subbagian memori: header sesi, trust), `internal/docs/architecture/api-contract.md` (header sesi, 401/404/400 sesi), `internal/docs/architecture/data-model.md` (`MemoryLocalState` kini diisi saat sesi lahir), `internal/docs/README.md` (entri ADR-0179 di atas 0178).
-- [ ] **Step 3: Test tersentuh** — semua `memory*.test.ts`, `memories.route.test.ts`, `session-launch.test.ts`, `cli/test/mcp-server.test.ts`, `agent-doc-contract.test.ts`, lalu typecheck server/cli/shared/src.
-- [ ] **Step 4: Verifikasi nyata**
+- [x] **Step 1: ADR** `internal/docs/adr/0179-suntik-memori-sesi.md` — konteks (tahap 2 ADR-0178), keputusan A/B/C, jalur claude (`--append-system-prompt-file`) & codex (`-c developer_instructions='''…'''`, spike `codex debug prompt-input` 0.160.0, `-c` menimpa `developer_instructions` milik `config.toml` bila ada), verifikasi `ls-tree` satu subproses, anggaran 40/6000, trust (help/tiket/issue), kredensial sesi hanya ke loopback, fail-open. Konsekuensi: sesi terminal ad-hoc belum mendapat memori; memori ber-scope hanya tersuntik bila spec menyebut path yang cocok.
+- [x] **Step 2: Docs** — `docs/agent-integration.md` (subbagian memori: header sesi, trust), `internal/docs/architecture/api-contract.md` (header sesi, 401/404/400 sesi), `internal/docs/architecture/data-model.md` (`MemoryLocalState` kini diisi saat sesi lahir), `internal/docs/README.md` (entri ADR-0179 di atas 0178).
+- [x] **Step 3: Test tersentuh** — semua `memory*.test.ts`, `memories.route.test.ts`, `session-launch.test.ts`, `cli/test/mcp-server.test.ts`, `agent-doc-contract.test.ts`, lalu typecheck server/cli/shared/src.
+- [x] **Step 4: Verifikasi nyata**
   1. Codex tanpa kuota: render berkas dari `writeMemoryFile(dir, "codex", renderMemoryBlock(items))` untuk memori contoh, lalu `codex debug prompt-input -c "$(cat memory.toml)" "halo"` → pesan `developer` memuat blok memori utuh.
   2. Server lokal (skrip tahap 1, `HANOMAN_HOME` sementara, port bebas): curl `GET /api/memories` dengan header sesi palsu → `401`; dengan header sesi sah tapi pane tak ada → `404`.
   Catat hasil di bagian bawah plan.
-- [ ] **Step 5: Centang & commit** `docs(memory): ADR-0179 suntik memori sesi + kontrak + hasil verifikasi tahap 2`
+- [x] **Step 5: Centang & commit** `docs(memory): ADR-0179 suntik memori sesi + kontrak + hasil verifikasi tahap 2`
 
 ## Hasil verifikasi lokal
 
-_(diisi di Task 5 Step 4)_
+2026-10-07.
+
+| Kasus | Hasil |
+|---|---|
+| `codex debug prompt-input -c "$(cat memory.toml)"` (codex-cli 0.160.0, berkas dari `writeMemoryFile` + `renderMemoryBlock` asli, isi memuat `"` dan `'''`) | satu pesan `developer` berisi blok memori utuh; `'''` tersanitasi jadi `'' '` |
+| Server lokal (`HANOMAN_HOME` sementara, port 8799), header sesi dengan token palsu | `401 kredensial sesi tidak sah` |
+| Header sesi tanpa token | `401` |
+| HMAC sah (secret `HANOMAN_HOME` yang sama) untuk sesi yang tak hidup | `404 sesi tidak hidup` |
+| Sesi backlog nyata di tmux (`HANOMAN_CLAUDE_BIN`/`HANOMAN_CODEX_BIN=/bin/echo`) | claude: `--append-system-prompt-file <agentTempDir>/memory.md`; codex: argv memuat `-c developer_instructions='''…MEMORI-UJI-123…` (test `memory-session-launch`) |
+
+Test tersentuh: 45 berkas / 429 test lulus; typecheck server/cli/shared/src bersih. Satu-satunya kegagalan di sekitar (`spec-attachment-launch` › "prompt sesi memuat path absolut lampiran") sudah gagal di base.

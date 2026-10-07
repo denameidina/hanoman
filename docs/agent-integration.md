@@ -127,6 +127,13 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 - Galat: `404` remote tak dikenal / root commit beda · `409 {duplicateOf}` · `422 {anchor}` jangkar tak cocok
   · `422 {reason}` terdeteksi secret.
 - Memori adalah **data**, bukan instruksi.
+- **Dari dalam sesi hanoman** (ADR-0179): CLI MCP meneruskan `HANOMAN_SESSION_ID` + `HANOMAN_EVENT_TOKEN`
+  sesi induknya sebagai `x-hanoman-session` / `x-hanoman-session-token` (hanya ke host loopback). Project
+  diambil dari sesi — allowlist `projectIds` tak dibutuhkan, capability `memory:*` tetap. Kredensial sesi
+  salah → `401`; sesi tak hidup → `404`. Memori dari sesi yang menyentuh input eksternal (Help Center,
+  tiket, issue GitHub) selalu masuk review manusia.
+- Sesi backlog lahir dengan memori `active` yang jangkarnya cocok HEAD worktree-nya (claude:
+  `--append-system-prompt-file`, codex: `developer_instructions`).
 
 Aturan pemetaan **deterministik** (`server/src/services/agent-capabilities.ts`): `GET`/`HEAD` →
 `:read`, metode lain → `:write`. Itu berlaku untuk domain `lead` juga — **`POST /api/lead/decisions`
