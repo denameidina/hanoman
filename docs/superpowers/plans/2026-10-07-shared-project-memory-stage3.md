@@ -711,12 +711,25 @@ async function notifyTouched(t: Touched): Promise<void> {
 
 ### Task 6: ADR-0180, docs, verifikasi nyata
 
-- [ ] **Step 1: ADR** `internal/docs/adr/0180-sync-memori-entitas-opsional.md`: konteks (B1 client lama macet, B2 kolom, B3 bump versi tahap 1), keputusan 1–8, mekanisme kursor-dikonsumsi, urutan rilis (hub dulu tetap disarankan; client baru + hub lama aman: memori tertahan di outbox), konsekuensi (dua pengganti paralel untuk memori yang sama bisa sama-sama aktif; `sourceTokenId` adalah id token mesin asal, tak bermakna di mesin lain).
-- [ ] **Step 2: Docs** — `internal/docs/architecture/data-model.md` (bagian sync: dua entitas baru + opsional + `SyncState.entities`; bagian memori: kolom baru `MemoryEvent`), `api-contract.md` (`?entities=`, `?only=`, field `entities` di balasan pull/bootstrap, `DELETE /api/memories/:id`), ADR-0178 baris "tahap sync" → tautan ADR-0180, `internal/docs/README.md` (entri ADR-0180).
-- [ ] **Step 3: Seluruh test sync + memori** — `server/test/sync-*.test.ts`, `memory*.test.ts`, `memories.route.test.ts`, `team-sync-runtime.test.ts`, `qa-sync-wiring.route.test.ts`, `mcp-coverage.test.ts`, `cli/test`, typecheck server/cli/shared/src.
-- [ ] **Step 4: Verifikasi nyata dua instance** — hub (`HANOMAN_HOME` A, port 8799) dan client (`HANOMAN_HOME` B, port 8798, `SYNC_SERVER_URL=http://127.0.0.1:8799`, device token dari hub): buat project + memori di hub → `POST /api/sync/now` di client → memori ada di client; invalidate di client → sync → status `invalidated` di hub; hapus permanen di hub → sync → hilang di client. Lalu simulasi client lama: `curl /api/sync/pull?since=0` dengan device token **tanpa** `entities=` → tak ada baris memori dan `cursor` = ujung feed. Catat hasil.
-- [ ] **Step 5: Centang & commit** `docs(memory): ADR-0180 sync memori + kontrak + hasil verifikasi tahap 3`
+- [x] **Step 1: ADR** `internal/docs/adr/0180-sync-memori-entitas-opsional.md`: konteks (B1 client lama macet, B2 kolom, B3 bump versi tahap 1), keputusan 1–8, mekanisme kursor-dikonsumsi, urutan rilis (hub dulu tetap disarankan; client baru + hub lama aman: memori tertahan di outbox), konsekuensi (dua pengganti paralel untuk memori yang sama bisa sama-sama aktif; `sourceTokenId` adalah id token mesin asal, tak bermakna di mesin lain).
+- [x] **Step 2: Docs** — `internal/docs/architecture/data-model.md` (bagian sync: dua entitas baru + opsional + `SyncState.entities`; bagian memori: kolom baru `MemoryEvent`), `api-contract.md` (`?entities=`, `?only=`, field `entities` di balasan pull/bootstrap, `DELETE /api/memories/:id`), ADR-0178 baris "tahap sync" → tautan ADR-0180, `internal/docs/README.md` (entri ADR-0180).
+- [x] **Step 3: Seluruh test sync + memori** — `server/test/sync-*.test.ts`, `memory*.test.ts`, `memories.route.test.ts`, `team-sync-runtime.test.ts`, `qa-sync-wiring.route.test.ts`, `mcp-coverage.test.ts`, `cli/test`, typecheck server/cli/shared/src.
+- [x] **Step 4: Verifikasi nyata dua instance** — hub (`HANOMAN_HOME` A, port 8799) dan client (`HANOMAN_HOME` B, port 8798, `SYNC_SERVER_URL=http://127.0.0.1:8799`, device token dari hub): buat project + memori di hub → `POST /api/sync/now` di client → memori ada di client; invalidate di client → sync → status `invalidated` di hub; hapus permanen di hub → sync → hilang di client. Lalu simulasi client lama: `curl /api/sync/pull?since=0` dengan device token **tanpa** `entities=` → tak ada baris memori dan `cursor` = ujung feed. Catat hasil.
+- [x] **Step 5: Centang & commit** `docs(memory): ADR-0180 sync memori + kontrak + hasil verifikasi tahap 3`
 
 ## Hasil verifikasi lokal
 
-_(diisi di Task 6 Step 4)_
+2026-10-07, dua instance nyata dari worktree ini: hub (`HANOMAN_HOME` sementara, port 8799) dan client
+(`HANOMAN_HOME` sementara, port 8798, `SYNC_SERVER_URL=http://127.0.0.1:8799`, device token dari hub).
+
+| Kasus | Hasil |
+|---|---|
+| Client lama: `GET /sync/pull?since=0` tanpa `entities=` | entitas `customAgent,project` saja; `cursor` 28 = ujung feed hub 28 (melompati baris memori, tak macet) |
+| Client baru: `…&entities=projectMemory,memoryEvent` | ikut `projectMemory,memoryEvent`; iklan `entities=projectMemory,memoryEvent` |
+| Memori `decision` dibuat di hub → `POST /sync/now` di client | client melihat memori `proposed`; `SyncState.entities = 'projectMemory,memoryEvent'` |
+| `reject` di client → sync | hub `rejected v2`, event `propose,reject`; `SyncConflict` di client 0 |
+| `DELETE /api/memories/:id` di hub → sync | memori & event hilang di client |
+
+Migration diuji pada DB berisi baris lama: event lama mendapat `updatedAt = createdAt`, `version 0`; kursor
+`SyncState` (`42`) bertahan. Test tersentuh: 70 berkas / 569 test lulus; typecheck server/cli/shared/src
+bersih. Kegagalan sekitar yang sudah ada di base: `mcp-coverage` (`GET /qa/template.xlsx`).
