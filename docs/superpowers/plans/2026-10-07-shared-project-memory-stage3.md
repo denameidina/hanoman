@@ -56,7 +56,7 @@
 
 **Files:** schema, migration, `server/src/services/sync.ts`, `server/test/sync-memory.registry.test.ts`, test kontrak (`sync-exclusions`, `sync-bootstrap`, `sync-parents-dmmf` bila perlu).
 
-- [ ] **Step 1: Skema** — di `model MemoryEvent` tambahkan sebelum `@@index`:
+- [x] **Step 1: Skema** — di `model MemoryEvent` tambahkan sebelum `@@index`:
 
 ```prisma
   version   Int           @default(0)   // ADR-0180 · wajib bagi entitas sync
@@ -72,7 +72,7 @@ di `model SyncState`:
 
 Bangkitkan migration `20261007130000_memory_sync` dengan prosedur tahap 1 (deploy ke DB sementara → `migrate diff --from-schema-datasource … --to-schema-datamodel … --script` → periksa: tak ada `DROP` data selain redefine tabel SQLite yang menyalin baris → verifikasi NO-DRIFT → `prisma generate`). Bila Prisma menolak kolom `updatedAt` NOT NULL tanpa default untuk baris lama, sunting SQL redefine agar `INSERT INTO new_MemoryEvent … SELECT …, "createdAt" AS "updatedAt"` — catat di ADR.
 
-- [ ] **Step 2: Test registri yang gagal** — `server/test/sync-memory.registry.test.ts`:
+- [x] **Step 2: Test registri yang gagal** — `server/test/sync-memory.registry.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -104,7 +104,7 @@ describe("registri sync memori (ADR-0180)", () => {
 });
 ```
 
-- [ ] **Step 3: Registri** di `sync.ts`:
+- [x] **Step 3: Registri** di `sync.ts`:
   - `SYNCED`: tambahkan `"projectMemory", "memoryEvent"` di akhir.
   - Tepat di bawah `type Entity`:
 
@@ -136,9 +136,9 @@ export const isOptionalEntity = (e: string): e is OptionalEntity => (OPTIONAL_EN
   - `BOOLEAN_FIELDS` += `"projectMemory:trusted"`; `JSON_FIELDS` += `"projectMemory:scopePaths", "projectMemory:anchors"`.
   - `BOOTSTRAP_ORDER`: sisipkan `"projectMemory", "memoryEvent"` setelah entitas QA (sesudah `project`).
 
-- [ ] **Step 4: Test kontrak** — perbarui `sync-exclusions.test.ts` (daftar persis + judul `ADR-0180: +projectMemory, +memoryEvent`), lalu jalankan `sync-memory.registry`, `sync-exclusions`, `sync-bootstrap`, `sync-parents-dmmf`, `sync-qa.service` → PASS.
+- [x] **Step 4: Test kontrak** — perbarui `sync-exclusions.test.ts` (daftar persis + judul `ADR-0180: +projectMemory, +memoryEvent`), lalu jalankan `sync-memory.registry`, `sync-exclusions`, `sync-bootstrap`, `sync-parents-dmmf`, `sync-qa.service` → PASS.
 
-- [ ] **Step 5: Commit** `feat(memory): ProjectMemory & MemoryEvent masuk registri sync sebagai entitas opsional`
+- [x] **Step 5: Commit** `feat(memory): ProjectMemory & MemoryEvent masuk registri sync sebagai entitas opsional`
 
 ---
 
