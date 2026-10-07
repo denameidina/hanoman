@@ -400,7 +400,7 @@ export function mergeMemoryRecord(current: Data, incoming: Data):
 
 **Interfaces:** `UnknownEntityError`; `hubOptional` (modul, `Set<string> | null`, di-reset oleh `__resetSyncClientState()` untuk test); `catchUpOptional(transport): Promise<number>`; `OPTIONAL_QUERY = "entities=projectMemory,memoryEvent"`.
 
-- [ ] **Step 1: Test yang gagal** — transport `app.inject` dengan device token (pola `realTransport()` di `sync-client.test.ts:19-26`), hub & client berbagi DB sehingga skenario memakai `applyRemote`/`snapshot` langsung:
+- [x] **Step 1: Test yang gagal** — transport `app.inject` dengan device token (pola `realTransport()` di `sync-client.test.ts:19-26`), hub & client berbagi DB sehingga skenario memakai `applyRemote`/`snapshot` langsung:
 
 ```ts
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -494,7 +494,7 @@ describe("catch-up entitas opsional", () => {
 
 Sesuaikan pembuatan user/device token dengan factory yang ada (`server/test/factory.ts`, mis. `makeUser`) bila skema `User` mewajibkan kolom lain.
 
-- [ ] **Step 2: Implementasi** di `sync-client.ts`:
+- [x] **Step 2: Implementasi** di `sync-client.ts`:
 
 ```ts
 import { OPTIONAL_ENTITIES, isOptionalEntity } from "./sync";
@@ -604,8 +604,8 @@ export async function catchUpOptional(transport: Transport): Promise<number> {
 
 - WS client (`sync-client.ts` ±478): `const wsUrl = … + "/api/sync/ws?" + OPTIONAL_QUERY;`
 
-- [ ] **Step 3: PASS** `sync-memory.client.test.ts` + seluruh `server/test/sync-*.test.ts`, `team-sync-runtime.test.ts`, `qa-sync-wiring.route.test.ts`. Bila `sync-client.test.ts` mencocokkan URL pull secara literal, perbarui ekspektasinya dengan query baru (perilaku tak berubah).
-- [ ] **Step 4: Commit** `feat(sync): client — toleransi entitas tak dikenal, negosiasi opsional, merge memori pending, catch-up`
+- [x] **Step 3: PASS** `sync-memory.client.test.ts` + seluruh `server/test/sync-*.test.ts`, `team-sync-runtime.test.ts`, `qa-sync-wiring.route.test.ts`. Bila `sync-client.test.ts` mencocokkan URL pull secara literal, perbarui ekspektasinya dengan query baru (perilaku tak berubah).
+- [x] **Step 4: Commit** `feat(sync): client — toleransi entitas tak dikenal, negosiasi opsional, merge memori pending, catch-up`
 
 ---
 
