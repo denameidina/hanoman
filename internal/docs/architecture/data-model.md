@@ -1181,3 +1181,21 @@ render dari urutan `createdAt` (seri → `id`), jadi id acak tak pernah bentrok 
 (polimorfik, **tanpa FK**: service menghapus lampiran pemilik lebih dulu), `filename`, `mimeType`, `size`, `sha256` (byte TERSIMPAN),
 `storageKey`, `syncState` — **LOCAL per mesin, tak ikut FIELDS**: `local-only` (byte hanya di sini) · `remote` (metadata ada, byte belum diunduh) · `available` · `failed`. Metadata menyeberang lewat feed; **byte tak pernah** (endpoint `/api/sync/qa-attachments/:id`).
 
+## ProjectMemory / MemoryEvent / MemoryLocalState (memori project bersama · [ADR-0178](../adr/0178-memori-project-bersama.md))
+
+`ProjectMemory` — satu fakta per baris. `projectId` (cascade), `kind` (`convention` · `gotcha` · `decision` · `fact`),
+`content` (≤ 500 karakter), `scopePaths` (JSON glob relatif root repo; `[]` = seluruh project), `anchors` (JSON
+`[{path, blobSha, lines?}]`), `status` (`proposed` · `active` · `invalidated` · `rejected` — **lattice monoton**, hanya naik),
+`supersedesId`, `reviewReason` (`decision` · `no-anchor` · `anchor-unverified` · `untrusted-source`), asal-usul
+(`sourceRuntime` `claude`·`codex`·`external`·`human`, `sourceSessionId`, `sourceTokenId`, `sourceDeviceId` — diisi tahap sync,
+`commitSha`), `trusted`, `version`. `content`/`anchors`/`scopePaths`/`kind` **tak pernah diedit**: koreksi = baris baru
+ber-`supersedesId`. Indeks `[projectId, status]`.
+
+`MemoryEvent` — jejak audit **append-only**: `memoryId` (cascade), `op` (`propose` · `activate` · `reject` · `invalidate` ·
+`supersede` · `reverify`), `actorKind` (`user` · `token` · `session` · `system`), `actorId`, `reason`. Indeks `[memoryId, createdAt]`.
+
+`MemoryLocalState` — **LOCAL-only, tak pernah disync**: `memoryId` (PK, tanpa FK), `verdict` (`valid` · `stale` ·
+`unverifiable`), `verifiedHead`, `lastVerifiedAt`, `lastUsedAt`. Diisi suntik sesi (tahap 2).
+
+`AgentToken.projectIds` — JSON `string[]` nullable: allowlist project untuk route memori. `null`/`[]` = token tak boleh
+menyentuh `/api/memories*` sama sekali.
