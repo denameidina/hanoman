@@ -7,6 +7,7 @@ import { buildTasksPage } from "./tasks-list";
 import { buildLeadStatus, buildLeadDecisions, buildLeadFlows } from "./lead/views";
 import { buildGitLive } from "./git-ide";
 import { repoOf } from "./repo-dir";
+import { memoryRevision } from "./memory/store";
 
 // SPEC-908 · registry topik langganan: tahu APA yang dihitung dan seberapa sering, tak tahu siapa
 // pelanggannya (itu urusan services/events.ts). `build` mengembalikan BADAN frame tanpa `t`/`key` —
@@ -38,6 +39,8 @@ export const TOPICS: { [K in EventTopic]: Topic<K> } = {
   // SPEC-945 · ADR-0150 · papan tim. Kadens sama dengan `tickets`: daftar yang dibaca manusia,
   // bukan aliran terminal.
   tasks: { everyTicks: 3, build: async (p) => ({ data: await buildTasksPage(p) }) },
+  // ADR-0181 · halaman Memori. Sidik murah (satu aggregate); layar menarik ulang daftar bila berubah.
+  memory: { everyTicks: 3, build: async (p) => ({ revision: await memoryRevision(p.projectId) }) },
 };
 
 export const TOPIC_NAMES = Object.keys(TOPICS) as EventTopic[];
