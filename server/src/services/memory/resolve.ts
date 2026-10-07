@@ -3,6 +3,8 @@
 import { decodeRepoHeader } from "@hanoman/shared";
 import { prisma } from "../../db";
 import { resolveRepoDir } from "../local-binding";
+import { getSessionAsync } from "../pty";
+import { verifySessionEventToken } from "../session-event-token";
 import { hasCommit, repoHead, rootCommits } from "./git";
 import { normalizeRemote } from "./rules";
 
@@ -10,7 +12,7 @@ export type Principal =
   | { kind: "user"; userId: string }
   | { kind: "agent"; tokenId: string; projectIds: string[] | null };
 export type MemoryScope = { projectId: string; repoDir: string | null; head: string | null; headVerified: boolean };
-export type Fail = { ok: false; status: 400 | 403 | 404 | 409; body: Record<string, unknown> };
+export type Fail = { ok: false; status: 400 | 401 | 403 | 404 | 409; body: Record<string, unknown> };
 export type ResolveResult = { ok: true; scope: MemoryScope } | Fail;
 
 const fail = (status: Fail["status"], error: string, extra: Record<string, unknown> = {}): Fail =>
@@ -54,4 +56,43 @@ export async function resolveMemoryScope(
     headVerified = await hasCommit(repoDir, repo.head);
   }
   return { ok: true, scope: { projectId, repoDir, head: repo.head, headVerified } };
+}
+
+export type SessionPrincipal = { sessionId: string; runtime: "claude" | "codex"; trusted: boolean };
+export type SessionResolveResult = { ok: true; scope: MemoryScope; session: SessionPrincipal } | Fail;
+
+/** ADR-0179 · sesi yang menyentuh input eksternal (Help Center, tiket, issue GitHub) tak tepercaya. */
+export async function sessionTrusted(specId?: string): Promise<boolean> {
+  if (!specId) return true;   // sesi project-level (reverse/prd/breakdown) — input internal
+  const spec = await prisma.spec.findUnique({ where: { id: specId }, select: { source: true } });
+  if (spec?.source === "help") return false;
+  if (await prisma.ticket.count({ where: { specId } })) return false;
+  if (await prisma.githubIssue.count({ where: { specId } })) return false;
+  return true;
+}
+
+const validSessionToken = (id: string, token: string): boolean => {
+  try { return verifySessionEventToken(id, token); } catch { return false; }
+};
+
+/**
+ * ADR-0179 · kredensial sesi → lingkup. `null` = tak ada header sesi sama sekali (jalur token/cookie).
+ * Header setengah atau HMAC salah = 401, BUKAN jatuh diam-diam ke jalur lain: pemanggil yang
+ * mengaku sebagai sesi tapi gagal membuktikannya tak boleh mendapat lingkup lain sebagai gantinya.
+ */
+export async function resolveSessionScope(h: { session?: unknown; token?: unknown }): Promise<SessionResolveResult | null> {
+  if (h.session === undefined && h.token === undefined) return null;
+  const id = typeof h.session === "string" ? h.session : "";
+  const token = typeof h.token === "string" ? h.token : "";
+  if (!id || !token || !validSessionToken(id, token)) return fail(401, "kredensial sesi tidak sah");
+  const pane = await getSessionAsync(id);
+  if (!pane || pane.exited) return fail(404, "sesi tidak hidup");
+  const project = await prisma.project.findUnique({ where: { id: pane.projectId }, select: { id: true } });
+  if (!project) return fail(400, "sesi ini tidak terikat ke project");
+  const head = await repoHead(pane.cwd);
+  return {
+    ok: true,
+    scope: { projectId: project.id, repoDir: pane.cwd, head, headVerified: head !== null },
+    session: { sessionId: id, runtime: pane.agent === "codex" ? "codex" : "claude", trusted: await sessionTrusted(pane.specId) },
+  };
 }

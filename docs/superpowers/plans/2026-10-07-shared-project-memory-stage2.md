@@ -66,7 +66,7 @@
   - `sessionTrusted(specId?: string): Promise<boolean>`
   - `Actor` += `{ kind: "session"; id: string; runtime: "claude" | "codex"; trusted: boolean; tokenId: string | null }`
 
-- [ ] **Step 1: Test yang gagal**
+- [x] **Step 1: Test yang gagal**
 
 `server/test/memory-session.test.ts`:
 
@@ -165,9 +165,9 @@ describe("store · actor sesi", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal** — `resolveSessionScope`/`sessionTrusted` tak diekspor.
+- [x] **Step 2: Jalankan, pastikan gagal** — `resolveSessionScope`/`sessionTrusted` tak diekspor.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `shared/src/memory.ts`, setelah `REPO_HEADER`:
 
@@ -269,9 +269,9 @@ async function scopeOr(req: FastifyRequest, reply: FastifyReply, projectId?: str
 
 dan ganti setiap `actorOf(s.principal)` di handler menjadi `s.actor`.
 
-- [ ] **Step 4: Jalankan test** — `memory-session.test.ts`, `memory-store.test.ts`, `memories.route.test.ts`, `memory-resolve.test.ts` → PASS.
+- [x] **Step 4: Jalankan test** — `memory-session.test.ts`, `memory-store.test.ts`, `memories.route.test.ts`, `memory-resolve.test.ts` → PASS.
 
-- [ ] **Step 5: Commit** `feat(memory): principal sesi — kredensial sesi, trust dari input eksternal`
+- [x] **Step 5: Commit** `feat(memory): principal sesi — kredensial sesi, trust dari input eksternal`
 
 ---
 

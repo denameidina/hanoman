@@ -84,6 +84,13 @@ describe("/api/memories · agent token", () => {
     expect((await app.inject({ method: "POST", url: `/api/memories/${idB}/invalidate`, headers: H(tA), payload: { reason: "x" } })).statusCode).toBe(404);
   });
 
+  it("ADR-0179: header sesi palsu → 401, tak jatuh diam-diam ke jalur repo", async () => {
+    const t = await tokenFor(["rt-a"]);
+    const r = await app.inject({ method: "GET", url: "/api/memories",
+      headers: { ...H(t), "x-hanoman-session": "spec-x", "x-hanoman-session-token": "palsu" } });
+    expect(r.statusCode).toBe(401);
+  });
+
   it("activate/reject cookie-only untuk agent token", async () => {
     const t = await tokenFor(["rt-a"]);
     const r = await app.inject({ method: "POST", url: "/api/memories/abc/activate", headers: H(t), payload: {} });
