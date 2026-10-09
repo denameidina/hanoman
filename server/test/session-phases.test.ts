@@ -334,6 +334,17 @@ describe("planComplete · lintas metode (SPEC-734)", () => {
     expect(planComplete(root, "SPEC-9")).toBe(false);
   });
 
+  it("plan Agent Skills menahan item ketika dua direktori metode lama tak ada", async () => {
+    const root = wt();
+    const path = "docs/agent-skills/plans/2026-10-10-spec-9.md";
+    write(root, path, "- [ ] belum\n");
+    expect(planComplete(root, "SPEC-9")).toBe(false);
+    expect(await planCompleteAsync(root, "SPEC-9")).toBe(false);
+    write(root, path, "- [x] beres\n");
+    expect(planComplete(root, "SPEC-9")).toBe(true);
+    expect(await planCompleteAsync(root, "SPEC-9")).toBe(true);
+  });
+
   it("kedua direktori bersih → selesai", () => {
     const root = wt();
     write(root, "docs/superpowers/plans/2026-08-13-spec-9.md", "- [x] beres\n");

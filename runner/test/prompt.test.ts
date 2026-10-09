@@ -661,3 +661,38 @@ describe("SPEC-734 · metode workflow", () => {
       .toBe(startPrompt("feature", s, "b"));
   });
 });
+
+describe("metode Agent Skills", () => {
+  const s = { id: "SPEC-9", title: "T", source: "brief", priority: "sedang", objective: "O" };
+  it("feature memakai fase native tanpa meta-router, dan plan mengikuti gerbang hanoman", () => {
+    const p = startPrompt("feature", s, "b", undefined, undefined, "agent-skills");
+    expect(p).toContain("- Brainstorm: agent-skills:idea-refine");
+    expect(p).toContain("- Spec: agent-skills:spec-driven-development");
+    expect(p).toContain("- Plan: agent-skills:planning-and-task-breakdown");
+    expect(p).toContain("agent-skills:incremental-implementation");
+    expect(p).toContain("agent-skills:test-driven-development");
+    expect(p).toContain("agent-skills:code-review-and-quality");
+    expect(p).toContain("docs/agent-skills/plans/**");
+    expect(p).toContain("docs/agent-skills/specs/");
+    expect(p).toContain("superpowers:verification-before-completion");
+    expect(p).not.toContain("agent-skills:using-agent-skills");
+    expect(p).not.toContain("superpowers:brainstorming");
+    expect(p).not.toContain("- Audit:");
+  });
+
+  it("QA memakai skill audit; goal mempertahankan gerbang verifikasi", () => {
+    const p = startPrompt("qa", s, "b", undefined, undefined, "agent-skills");
+    expect(p).toContain("- Audit: agent-skills:debugging-and-error-recovery");
+    expect(p).not.toContain("- Brainstorm:");
+    expect(startGoalPrompt("goal", s, "b", { method: "agent-skills" }))
+      .toContain("- Verifikasi: superpowers:verification-before-completion");
+  });
+
+  it("continue dan resume memakai direktori plan metode baru", () => {
+    const r = { recorded: [], worktreeKept: false };
+    expect(continuePrompt("feature", s, "b", undefined, undefined, "agent-skills"))
+      .toContain("docs/agent-skills/plans/**");
+    expect(resumePrompt("feature", s, "b", r, undefined, undefined, "agent-skills"))
+      .toContain("docs/agent-skills/plans/**");
+  });
+});

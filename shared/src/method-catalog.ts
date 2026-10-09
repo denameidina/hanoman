@@ -69,6 +69,20 @@ const MATT_CLAUSE =
   + "penerbit tiket — hanoman sendiri adalah issue tracker-nya, jadi jangan menulis ke tracker "
   + "eksternal mana pun.";
 
+// Upstream memakai tasks/plan.md + tasks/todo.md dan lifecycle lintas fase. Di hanoman
+// checklist harus tinggal dalam direktori yang dipantau gerbang plan (ADR-0113).
+const AGENT_SKILLS_CLAUSE =
+  "Pakai skill Agent Skills langsung sesuai fase, bukan slash-command atau meta-router "
+  + "`using-agent-skills`. Kontrak fase, instruksi project/pengguna, dan jalur keputusan/review "
+  + "hanoman tetap berlaku: `spec-driven-development` hanya menyusun spec pada fase Spec, "
+  + "jangan menjalankan Plan atau Execute dari fase itu. Simpan spec di `docs/agent-skills/specs/` "
+  + "dan plan beserta SELURUH checklist task `- [ ]` di `docs/agent-skills/plans/`, "
+  + "dengan id backlog pada nama berkas; ini menggantikan default `SPEC.md`, `tasks/plan.md`, "
+  + "dan `tasks/todo.md` upstream. Jangan menimpa plan lain yang belum tuntas atau membuat tiket "
+  + "di tracker eksternal: hanoman adalah issue tracker-nya. Centang task di berkas plan yang "
+  + "sama setelah implementasi dan verifikasi. Hal ambigu yang mempengaruhi hasil mengikuti "
+  + "jalur tanya prompt ini; bila kamu agen fase, daftarkan di `Keputusan terbuka:` laporanmu.";
+
 export const METHODS: Readonly<Record<string, MethodDef>> = {
   // Isi `PHASE_SKILLS` (SPEC-166) dipindah APA ADANYA. Objective & Spec adalah keluaran skill
   // brainstorming yang di-invoke di fase Brainstorm — sengaja tak punya entri sendiri. Fase reverse
@@ -146,6 +160,44 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
       ],
       codex: [
         "npx skills@latest add mattpocock/skills",
+        "codex plugin add superpowers@openai-curated",
+      ],
+    },
+  },
+  "agent-skills": {
+    id: "agent-skills",
+    label: "Agent Skills (Addy Osmani)",
+    planDir: "docs/agent-skills/plans",
+    specDir: "docs/agent-skills/specs",
+    phaseSkills: {
+      Brainstorm: ["agent-skills:idea-refine"],
+      Spec: ["agent-skills:spec-driven-development"],
+      Audit: [
+        "agent-skills:debugging-and-error-recovery",
+        "agent-skills:code-review-and-quality",
+      ],
+      Plan: ["agent-skills:planning-and-task-breakdown"],
+      Execute: [
+        "agent-skills:incremental-implementation",
+        "agent-skills:test-driven-development",
+        "agent-skills:code-review-and-quality",
+      ],
+      Verifikasi: [VERIFICATION_GATE],
+    },
+    exitSkills: [VERIFICATION_GATE],
+    extraClause: AGENT_SKILLS_CLAUSE,
+    requires: ["agent-skills", "superpowers"],
+    // Manifest upstream: marketplace Claude = addy-agent-skills, Codex = agent-skills.
+    install: {
+      claude: [
+        "claude plugin marketplace add addyosmani/agent-skills",
+        "claude plugin install agent-skills@addy-agent-skills",
+        "claude plugin marketplace add obra/superpowers-marketplace",
+        "claude plugin install superpowers@superpowers-marketplace",
+      ],
+      codex: [
+        "codex plugin marketplace add addyosmani/agent-skills",
+        "codex plugin add agent-skills@agent-skills",
         "codex plugin add superpowers@openai-curated",
       ],
     },

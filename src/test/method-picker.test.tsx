@@ -54,13 +54,13 @@ describe("StartSessionModal · picker Metode (SPEC-734)", () => {
     }
   });
 
-  it("mengirim method terpilih ke startSession", async () => {
+  it.each(["superpowers", "agent-skills"])("mengirim method %s ke startSession", async (method) => {
     render(<StartSessionModal open spec={spec} onClose={() => {}} onStarted={() => {}} />);
     await waitFor(() => expect(screen.getByLabelText("Metode")).toHaveValue("matt"));
-    fireEvent.change(screen.getByLabelText("Metode"), { target: { value: "superpowers" } });
+    fireEvent.change(screen.getByLabelText("Metode"), { target: { value: method } });
     fireEvent.click(screen.getByText("Mulai"));
     await waitFor(() => expect(api.startSession).toHaveBeenCalledWith(
-      expect.objectContaining({ spec: "SPEC-734", method: "superpowers" })));
+      expect.objectContaining({ spec: "SPEC-734", method })));
   });
 
   // AC-9 · id dari hub yang belum ada di build ini tak boleh mengosongkan picker.
@@ -111,12 +111,12 @@ describe("SettingsScreen · picker Metode default (SPEC-734)", () => {
   });
 
   // AC-8 · menyimpan default lewat PUT /settings — tanpa migration, tanpa endpoint khusus.
-  it("AC-8 · mengubah default menyimpannya lewat putSettings", async () => {
+  it.each(["superpowers", "agent-skills"])("AC-8 · menyimpan default %s lewat putSettings", async (method) => {
     openSesi();
     await waitFor(() => expect(screen.getByLabelText("Metode default")).toHaveValue("matt"));
-    fireEvent.change(screen.getByLabelText("Metode default"), { target: { value: "superpowers" } });
+    fireEvent.change(screen.getByLabelText("Metode default"), { target: { value: method } });
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ method: "superpowers" })));
+      expect.objectContaining({ method })));
   });
 
   // AC-9 · id dari hub yang belum ada di build ini tak mengosongkan picker Settings juga.

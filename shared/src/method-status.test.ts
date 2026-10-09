@@ -81,3 +81,19 @@ describe("katalog · MethodDef.install", () => {
     }
   });
 });
+
+describe("kesiapan Agent Skills", () => {
+  it.each(zAgent.options)("%s: plugin Agent Skills saja belum memenuhi gerbang verifikasi", (agent) => {
+    const m = METHODS["agent-skills"]!;
+    expect(m).toBeDefined();
+    const st = methodStatus(m, agent, {
+      packages: ["agent-skills"],
+      skills: methodSkills(m).filter((id) => id.startsWith("agent-skills:")),
+    });
+    expect(st.ready).toBe(false);
+    expect(st.missingPackages).toEqual(["superpowers"]);
+    expect(st.missingSkills).toEqual(["superpowers:verification-before-completion"]);
+    expect(methodStatus(m, agent, { packages: [...m.requires], skills: methodSkills(m) }).ready)
+      .toBe(true);
+  });
+});

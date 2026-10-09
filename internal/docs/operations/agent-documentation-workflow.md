@@ -7,7 +7,12 @@ Kontrak operasional untuk hanoman + Claude Code.
 - **Fitur:** spec → plan → execute. **QA:** audit → **keputusan** → (spec → plan)? → execute — temuan kecil langsung execute, Spec & Plan ditandai `skipped`; keputusan dielicit lewat prompt & diambil agen (SPEC-145/ADR-0020, mekanisme SPEC-204/ADR-0040).
 - **Audit-only** (SPEC-237/[ADR-0057](../adr/0057-audit-only-source-flow.md)): source `audit` → flow `audit` = **audit → laporan**, berhenti. Hanya menghasilkan dokumen audit `internal/docs/research/audit-<spec-id>-<slug>.md` (Audit→systematic-debugging; Laporan→tulis dokumen + link index), **tanpa perbaikan kode**. Bila perlu diperbaiki, dinaikkan jadi Finding QA (qa → audit → spec → plan → execute) lewat "Jadikan Finding QA". Aksi Terminal (preview docs/review/merge/fullscreen) sama seperti brief/qa.
 - **Dokumen audit berumur** (SPEC-386/[ADR-0083](../adr/0083-retensi-dokumen-audit.md)): laporan audit di atas hidup sampai eskalasinya diputuskan (ADR-0076) **dan** spec turunannya tuntas, lalu **dihapus berikut entri indexnya**. Tiga syarat sebelum menghapus: (1) temuannya sudah punya jejak permanen — ADR, baris di doc SoT, atau perbaikan kode ter-commit; (2) rujukan masuk dari doc permanen (`Rincian & bukti: [audit SPEC-nnn](…)`) dialihkan atau dilepas di commit yang sama, kalau tidak link-nya mati; (3) index `internal/docs/README.md` **tidak** menyimpan abstrak audit. ADR tidak ikut berumur (ADR-0021).
-- Prompt sesi memetakan fase → skill superpowers (SPEC-166): Brainstorm→brainstorming,
+- Metode backlog dipilih di dialog Start atau **Settings → Sesi** melalui katalog
+  `METHODS` (ADR-0113/0114): `superpowers` (default), `matt` (mattpocock), dan
+  `agent-skills` (**Agent Skills — Addy Osmani**). Pemetaan fase, prasyarat, dan perintah
+  pemasangan per agen berasal dari katalog; gerbang selesai memindai union direktori plan.
+  Lihat [pemetaan dan cara penggunaan Agent Skills](../research/agent-skills-method.md).
+- Untuk metode default, prompt memetakan fase → skill superpowers (SPEC-166): Brainstorm→brainstorming,
   Audit→systematic-debugging, Plan→writing-plans, Execute→executing-plans + TDD +
   verification-before-completion. Objective/Spec adalah keluaran brainstorming. Di mode orchestrator
   claude, Execute memakai subagent-driven-development sebagai ganti executing-plans (ADR-0170,

@@ -21,6 +21,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [prd](requirements/prd.md) · [frd](requirements/frd.md) · [rd](requirements/rd.md) · [acceptance-criteria (EARS)](requirements/acceptance-criteria-ears-standard.md)
 
 ## research
+- [metode Agent Skills (Addy Osmani)](research/agent-skills-method.md) — kajian upstream, pemetaan fase, pemasangan Claude/Codex, dan cara memilih metode di Start/Settings; mengikuti ADR-0113/0114.
 - [desain workspace QA](../../docs/superpowers/specs/2026-10-01-qa-workspace-design.md) · [plan bagian 1](../../docs/superpowers/plans/2026-10-01-qa-workspace-part1.md) — laporan QA per project: test case, temuan, lampiran, template/ekspor/impor Markdown-ZIP; dipecah 4 bagian (fondasi → temuan→backlog → sync + lampiran biner → docx/xlsx/PDF). [ADR-0174](adr/0174-workspace-qa.md)
 - [desain mode Execute inline | subagent](../../docs/superpowers/specs/2026-09-26-execute-mode-inline-subagent-design.md) · [plan](../../docs/superpowers/plans/2026-09-26-execute-mode.md) — setelan per flow, default inline, karena Execute subagent-per-task terlalu lambat. [ADR-0173](adr/0173-mode-execute-inline-subagent.md)
 - [desain skills library](../../docs/superpowers/specs/2026-09-26-skills-library-design.md) — lihat, telusuri struktur, dan sunting skill dari semua sumber (global hanoman, user, plugin, project) di satu halaman; skill global hanoman dipakai bersama semua project lewat penyuntikan per sesi. [ADR-0172](adr/0172-skill-library-tiga-lapis-suntik-global.md)
