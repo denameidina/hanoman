@@ -348,18 +348,6 @@ export const zConflict = z.object({
 export type Conflict = z.infer<typeof zConflict>;
 export const CONFLICT_DEFAULTS: Conflict = zConflict.parse({});
 
-// SPEC-518 · runtime/model/effort KHUSUS agen pembuat changelog (SPEC-516/ADR-0105). Bentuknya
-// `zAgentEngine` yang sudah dipakai `lead.engine` & `telegram.engine` — bukan definisi kelima,
-// justru itu alasan bentuk bersama itu lahir di SPEC-492.
-//
-// FLAT, bukan `changelog.engine`: `lead`/`telegram` menyarangkan `engine` karena bloknya sudah
-// memuat knob lain (rem darurat, denyut, allowlist). Blok ini HANYA override agen — persis kasus
-// `zConflict` di atas, yang juga flat. Menyarangkan berarti satu tingkat kosong tanpa tetangga.
-//
-// Opt-in: `enabled` mati → `changelogAgentDefaults()` mendelegasikan penuh ke
-// `sessionAgentDefaults()`. Dipasang ke `zSetting` lewat `.default()` seperti conflict/goal/codex →
-// baris Setting lama tetap parse, TANPA migration.
-export const CHANGELOG_ENGINE_DEFAULTS: AgentEngine = zAgentEngine.parse({});
 
 // SPEC-409 · ADR-0091 · hanoman-lead. Master switch default MATI (AC-30): selama mati hanoman
 // berperilaku persis seperti sebelum PRD orchestrator. Kolom `Setting.data` bertipe Json →
@@ -496,7 +484,6 @@ export const zSetting = z.object({
   conflict: zConflict.default(CONFLICT_DEFAULTS),                         // SPEC-383 · ADR-0081 · default sesi konflik rebase/merge
   lead: zLead.default(LEAD_DEFAULTS),                                     // SPEC-409 · ADR-0091 · hanoman-lead (default mati)
   telegram: zTelegramSettings.default(TELEGRAM_DEFAULTS),                 // SPEC-476 · ADR-0096 · gateway Telegram (default mati)
-  changelog: zAgentEngine.default(CHANGELOG_ENGINE_DEFAULTS),             // SPEC-518 · agen pembuat changelog (opt-in, mati)
   portalChat: zPortalChat.default(PORTAL_CHAT_DEFAULTS),                  // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
   orchestration: zOrchestration.default(ORCHESTRATION_DEFAULTS),         // ADR-0164 · orkestrasi subagent per fase (default aktif)
   // SPEC-1215 · ADR-0165/0166 · LOCAL-only (setting tak ada di SYNCED) dan TAK ditulis `PUT /settings`
@@ -530,7 +517,7 @@ export const zNotification = z.object({
   // SPEC-409 · +lead (ADR-0091): keputusan berbobot / ragu / tindakan terkunci ditolak. MEMBERI
   // TAHU, bukan meminta izin — tak ada pekerjaan yang menunggu notifikasi ini dibaca (AC-25).
   // SPEC-384 · −error (ADR-0092) · dicabut bersama error monitoring.
-  type: z.enum(["done", "decision", "ticket", "fail", "lead", "memory"]).default("done"),
+  type: z.enum(["done", "decision", "ticket", "fail", "lead"]).default("done"),
   specId: z.string().nullable(),
   sessionId: z.string().nullable(),
   title: z.string(),

@@ -482,61 +482,6 @@ terpisah — pola sama dengan `GET /projects/:id/archive` (SPEC-233).
 > kategori di luarnya bertanda `scored: false`. SoT coverage = % kategori berskor yang seluruh
 > Markdown-nya **transitif reachable** dari `docsDir/README.md` (ADR-0013).
 
-## Changelog per project (SPEC-516 · [ADR-0105](../adr/0105-changelog-per-project.md))
-
-Capability domain **`docs`** (bukan `projects`): changelog adalah dokumen, sejajar `docs`/`prds`.
-Tanpa entri eksplisit di `capabilityForRoute` ia jatuh ke `rw("projects")` — artinya agen harus
-dipercaya menyunting & menghapus project hanya untuk membacanya.
-
-```
-GET    /projects/:id/changelog/sources     -> ChangelogSources                        # docs:read · 404 project
-GET    /projects/:id/changelog?page&limit&q -> Paginated<ChangelogView>               # docs:read · 404 project
-POST   /projects/:id/changelog             -> 201 ChangelogView                       # docs:write · 400 · 404 · 422
-GET    /projects/:id/changelog/:cid        -> ChangelogView | berkas (?download=md|pdf) # docs:read · 404
-DELETE /projects/:id/changelog/:cid        -> 204 | 404                               # docs:write
-```
-
-**Body `POST`** = `zChangelogRequest`, discriminated union ber-`mode`:
-
-```jsonc
-{ "mode": "backlog", "from": "2026-07-01", "to": "2026-07-31" }  // keduanya opsional → 30 hari terakhir
-{ "mode": "commit",  "fromSha": "4f2a1c9", "toSha": "HEAD" }     // keduanya wajib (≥4 karakter)
-{ "mode": "version", "fromTag": "v1.0.0", "toTag": "v1.2.0" }    // fromTag opsional → versi sebelumnya
-```
-
-**`ChangelogView`** = `{id, projectId, mode, title, params, body, generator:"agent"|"fallback",
-warning, itemCount, createdAt}`. `body` adalah markdown final yang sudah di-scrub;
-`warning` terisi saat narasi agen tak tersedia atau saat ada catatan cakupan.
-
-**`ChangelogSources`** = `{hasRepo, tags[], head, reason, backlog:{doneCount,earliest,latest},
-defaultRange:{from,to}}` — dipakai form untuk mengisi pilihan **sebelum** operator menekan tombol.
-
-**`q` (SPEC-519)** mencocokkan **judul, isi, dan mode** (case-insensitive, `trim`) lewat predikat
-murni `changelogMatches()` di `@hanoman/shared` — satu definisi, bukan salinan di route. Ia disaring
-**sebelum** `paginate` (pola [ADR-0038](../adr/0038-paginasi-di-response-layer.md)), jadi `total`
-menghitung hasil cari; menyaring sesudahnya membuat Pager menjanjikan halaman yang isinya tak pernah
-ada. `q` kosong/spasi = tanpa filter, identik dengan tanpa parameter. Halaman Changelog memakainya
-untuk kotak cari daftar rilis — pencarian **server-side**, karena menyaring di klien hanya menjangkau
-halaman yang kebetulan termuat.
-
-**Kode status yang mengikat.** Keadaan sah yang bukan galat **tidak pernah 500**:
-
-| Keadaan | Jawaban |
-| --- | --- |
-| `from > to`, tanggal bukan `YYYY-MM-DD`, field mode kurang | **400** (zod, sebelum menyentuh repo) |
-| project tak ada | **404** |
-| repo belum ditautkan (mode commit & versi) | **422** `"project ini belum ditautkan ke repo di mesin ini"` |
-| repo tanpa tag (mode versi) | **422** `"repo project ini belum punya tag rilis"` |
-| revisi/tag tak dikenal | **422**, pesan menyebut revisi/tag-nya |
-| rentang tanpa isi | **422**, bukan changelog kosong |
-| agen gagal / CLI tak terpasang | **201** dengan `generator:"fallback"` + `warning` |
-
-`GET …/changelog/sources` sengaja menjawab **200 dengan `reason`** (bukan 4xx) saat repo belum
-ditautkan atau tanpa tag: ia menjawab "apa yang tersedia", dan "tidak ada, ini sebabnya" adalah
-jawaban yang sah. Unduh memakai helper yang sama dengan dokumen lain
-([ADR-0078](../adr/0078-unduh-dokumen-md-pdf.md)) — `?download=md` adalah bentuk yang dijanjikan,
-`pdf` ikut karena helper-nya satu.
-
 ## IDE Visual (SPEC-182 · ADR-0034)
 ```
 GET    /projects/:id/tree?ref=&hidden=&under=  # { ref, files:string[], dirs:string[], ignored:string[] }  ref kosong=working tree (ls-files), isi=ls-tree <ref>; 404 project tak ada
@@ -714,16 +659,6 @@ GET/PUT  /settings                      # Setting blob (zSetting): model, effort
 #                                           dikoersi saat dibaca (coerceCodexEffort). Blok selalu ADA di
 #                                           response (zod .default()) → baris Setting lama tetap parse,
 #                                           TANPA migration. Tak ada override per-request di body integrate.
-#                                         changelog { enabled:false, agent:"claude", model:"claude-opus-5",
-#                                           effort:"xhigh" } — SPEC-518 · runtime/model/effort KHUSUS agen
-#                                           PEMBUAT CHANGELOG (ADR-0105). Skema = zAgentEngine yang SAMA dengan
-#                                           lead.engine & telegram.engine (SPEC-492), flat seperti `conflict`
-#                                           karena bloknya hanya override agen. OPT-IN: enabled:false →
-#                                           changelogAgentDefaults() mendelegasikan penuh ke
-#                                           sessionAgentDefaults(). Effort codex dikoersi di RESOLVER, bukan
-#                                           hanya di picker (PUT ber-AgentToken tak lewat UI). Blok selalu ADA
-#                                           di response (zod .default()) → baris Setting lama tetap parse,
-#                                           TANPA migration. Tak ada override per-request di body POST changelog.
 #                                         verifyScope: "changed"|"full" (default "changed") — SPEC-376/ADR-0080 ·
 #                                           scope verifikasi default sesi backlog; per sesi di-override saat Start.
 #                                           Kunci selalu ADA di response (zod .default()), jadi baris Setting lama
@@ -2386,51 +2321,14 @@ menonaktifkan endpoint otomatis + satu `Notification` bertipe `webhook`. Katalog
 hidup di `shared/src/webhook.ts` (`WEBHOOK_ENTITIES`) dan dirender apa adanya oleh halaman
 dokumentasi in-app.
 
-## Memori project (`/api/memories`, [ADR-0178](../adr/0178-memori-project-bersama.md))
+## Fitur yang dihapus (ADR-0182)
 
-Project **tak pernah** dibaca dari input agen. Cookie → `projectId` (query untuk GET/review, body untuk tulis).
-Agent token → header `x-hanoman-repo` (base64url JSON `{remote, rootCommit, head}`, diisi CLI MCP dari cwd),
-dicocokkan ke `Project.gitRemote` ternormalisasi + allowlist `AgentToken.projectIds`; root commit dibandingkan dengan
-checkout project bila ada. Capability `memory:read` / `memory:write`.
+Memori project dan changelog dihapus pada 2026-10-10. `/api/memories*` dan
+`/api/projects/:id/changelog*` tidak terdaftar (404). Capability `memory:*`,
+allowlist `AgentToken.projectIds`, topik `memory`, `pending.counts.memory`, dan
+`Setting.changelog` dihapus. Tool MCP `hanoman_memory_*`/`hanoman_changelog_*`
+dihapus; skema tool versi 2. Model dan data dihapus oleh migration ADR-0182.
 
-| Method & path | Body / query | Sukses |
-|---|---|---|
-| `GET /memories` | `q?` (semua kata), `paths?` (koma), `status?` (default `active`) | `200 {items,total}` |
-| `GET /memories/:id` | — | `200 {memory, events}` |
-| `POST /memories` | `{kind, content, scopePaths?, anchors?[{path, lines?, blobSha?}]}` | `201 {memory}` |
-| `POST /memories/:id/supersede` | sama dengan propose | `201 {memory}` |
-| `POST /memories/:id/reverify` | `{anchors}` (≥ 1) | `201 {memory}` |
-| `POST /memories/:id/invalidate` | `{reason}` | `200 {memory}` |
-| `POST /memories/:id/activate` · `/reject` — **COOKIE_ONLY** | `?projectId=` · `{reason?}` (reject wajib) | `200 {memory}` |
-
-Galat: `400` body/header salah atau agent mengirim `projectId` · `403 {need:"memory:…"}` / `{need:"projectIds"}` ·
-`404` remote tak dikenal, root commit beda, atau id milik project lain · `409 {duplicateOf}` / `409 {candidates}` (remote
-ambigu) / status tak bisa bertransisi · `422 {anchor}` jangkar tak ada/blobSha beda · `422 {reason}` terdeteksi secret
-· `422 {path}` path tak aman.
-
-**Principal sesi (ADR-0179).** Header `x-hanoman-session` + `x-hanoman-session-token` (HMAC turunan
-`HANOMAN_EVENT_TOKEN`) mendahului jalur cookie/token: project & HEAD dari pane sesi yang hidup, tanpa
-allowlist `projectIds`; `projectId` dari pemanggil → `400`. Galat: `401` header setengah / HMAC salah ·
-`404` sesi tak hidup · `400` sesi ber-project sintetis (Telegram/VPS). Sesi yang spec-nya `source=help`
-atau tertaut `Ticket`/`GithubIssue` menghasilkan memori `trusted=false` (selalu review).
-
-Auto-aktif hanya bila `kind ≠ decision` ∧ jangkar ≥ 1 ∧ jangkar diverifikasi server (`git rev-parse <head>:<path>` pada
-checkout project) ∧ sumber tepercaya. Pengganti (`supersede`/`reverify`) menonaktifkan yang lama hanya saat ia sendiri aktif.
-
-### Sync entitas opsional ([ADR-0180](../adr/0180-sync-memori-entitas-opsional.md))
-
-- `GET /api/sync/pull?since=…&entities=projectMemory,memoryEvent` · `GET /api/sync/bootstrap?entities=…[&only=…]` ·
-  `GET /api/sync/ws?entities=…` — tanpa `entities` (client lama) baris entitas opsional disaring dan
-  kursor tetap maju; `only` membatasi bootstrap ke entitas opsional tertentu (catch-up, kursor client tak
-  dipindah). Balasan pull & bootstrap membawa `entities: string[]` — iklan entitas opsional hub.
-- `POST /api/sync/push` untuk `projectMemory` dengan `baseVersion` basi: hanya beda `status` → digabung
-  lattice (`ok`); beda field immutable → `conflict`. `memoryEvent` yang sudah ada → `ok` (idempoten).
-- `DELETE /api/memories/:id?projectId=` — **COOKIE_ONLY**, `204`; id project lain `404`; tombstone menyebar.
-
-### Dashboard memori ([ADR-0181](../adr/0181-dashboard-memori.md))
-
-- `GET /api/memories` setiap item kini membawa `local: { verdict: "valid"|"stale"|"unverifiable"|null,
-  lastUsedAt, lastVerifiedAt, needsConfirm }` — keadaan DI MESIN INI (`MemoryLocalState`, tak disync).
-- Topik `/api/events/ws` `memory` dengan `{ projectId }` → frame `{ t: "memory", key, revision }`.
-- Frame global `pending.counts.memory` = jumlah memori `proposed` lintas project.
-- Notifikasi `type: "memory"`, `key: memory:<id>`, untuk usulan yang masuk review.
+Kontrak generik entitas sync opsional tetap tersedia: `entities=` pada pull/bootstrap/WS,
+`bootstrap?only=…` untuk catch-up, iklan `entities`, dan toleransi entitas tak dikenal.
+Saat ini tidak ada entitas memori yang diregistrasikan atau disinkron.

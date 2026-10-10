@@ -4,10 +4,10 @@ import { DOCS_TOOLS } from "./mcp-catalog/docs";
 const by = (n: string) => DOCS_TOOLS.find((t) => t.name === n)!;
 
 describe("katalog docs", () => {
-  it("12 tool, dua bermode danger", () => {
-    expect(DOCS_TOOLS).toHaveLength(12);
+  it("dokumen dan PRD tetap tersedia setelah changelog dihapus", () => {
+    expect(DOCS_TOOLS).toHaveLength(7);
     expect(DOCS_TOOLS.filter((t) => t.mode === "danger").map((t) => t.name).sort())
-      .toEqual(["hanoman_changelog_delete", "hanoman_docs_delete"]);
+      .toEqual(["hanoman_docs_delete"]);
   });
 
   // Jebakan yang sama sudah ada di `hanoman_backlog_doc_read`: encodeURIComponent atas SELURUH
@@ -30,15 +30,6 @@ describe("katalog docs", () => {
       .toEqual({ content: "isi" });
   });
 
-  it("changelog_create mengikat mode ke field yang menyertainya lewat allOf", () => {
-    const t = by("hanoman_changelog_create");
-    expect(t.inputSchema.allOf).toHaveLength(3);
-    expect(t.build({ project: "p", mode: "commit", fromSha: "aaaa", toSha: "bbbb" })?.body)
-      .toEqual({ mode: "commit", fromSha: "aaaa", toSha: "bbbb" });
-    // Field milik mode LAIN tak ikut terkirim, meski agen mengirimkannya.
-    expect(t.build({ project: "p", mode: "version", toTag: "v1", fromSha: "aaaa" })?.body)
-      .toEqual({ mode: "version", toTag: "v1" });
-  });
 
   it("tool baca memakai GET, tool tulis tak pernah GET", () => {
     for (const t of DOCS_TOOLS) {
@@ -56,13 +47,9 @@ describe("katalog docs", () => {
     }
   });
 
-  it("dua tool danger membuka deskripsinya dengan penandaan", () => {
+  it("tool danger membuka deskripsinya dengan penandaan", () => {
     for (const t of DOCS_TOOLS.filter((x) => x.mode === "danger"))
       expect(t.description.slice(0, 12), t.name).toMatch(/BERBAHAYA/);
   });
 
-  it("changelog_list meneruskan q & paginasi apa adanya", () => {
-    const r = by("hanoman_changelog_list").build({ project: "p", q: "fix", page: 2, limit: 10 });
-    expect(r?.query).toEqual({ q: "fix", page: "2", limit: "10" });
-  });
 });

@@ -13,7 +13,7 @@ import { MCP_TOOLS, type McpLevel, type McpToolDef } from "./mcp-catalog";
  * Ditegakkan test snapshot di `mcp-catalog.test.ts`: perubahan yang memutus klien lama tak bisa
  * lolos tanpa seseorang sengaja memperbarui snapshot DAN angka ini.
  */
-export const MCP_TOOL_SCHEMA_VERSION = 1;
+export const MCP_TOOL_SCHEMA_VERSION = 2;
 
 /**
  * ADR-0155 · TIGA tingkat. Yang lebih sempit MENGHILANGKAN tool dari `tools/list`, bukan menolaknya

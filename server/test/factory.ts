@@ -148,7 +148,6 @@ export function makeRepoWithSpecBranch(
 // Truncate every table in FK-safe order (mirrors the deleted seed()).
 export async function resetDb(): Promise<void> {
   await prisma.$transaction([
-    prisma.changelog.deleteMany(),   // SPEC-516 · ADR-0105
     prisma.notification.deleteMany(),
     // SPEC-945 · ADR-0150 · urutan task→member bukan keharusan FK (relasinya SetNull, bukan
     // Cascade); ia sekadar mengikuti arah induk→anak yang dipakai baris-baris di sekitarnya.

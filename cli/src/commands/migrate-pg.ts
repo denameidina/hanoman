@@ -19,9 +19,6 @@ export const PG_ORDER = [
   // ADR-0159 · AgentInvocation sesudah CustomAgent: `customAgentId` menunjuk ke sana (tanpa FK).
   // LOCAL-only dan lazimnya TIDAK ada di sumber Postgres lama — jalur 42P01 = nol baris.
   "AgentInvocation",
-  // SPEC-516 · ADR-0105 · Changelog sesudah Project (FK projectId). Tabel ini LOCAL-only dan
-  // lazimnya TIDAK ada di sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris.
-  "Changelog",
   // SPEC-617 · ADR-0110 · ClientProjectAccess sesudah User DAN Project (FK ke keduanya).
   "User", "ClientProjectAccess", "Session", "DeviceToken", "AgentToken",
   // SPEC-854 · ADR-0129 · PortalChatSession sesudah User DAN Project (FK ke keduanya);
@@ -33,7 +30,7 @@ export const PG_ORDER = [
   // SPEC-799 · ADR-0119 · SyncTombstone LOCAL-only, tanpa FK; letaknya bersama tabel sync lain.
   "SyncLog", "LocalBinding", "SyncOutbox", "SyncState", "SyncConflict", "SyncTombstone",
   // SPEC-1215 · ADR-0166 · LOCAL-only, tanpa FK. Tabel ini tak ada di sumber Postgres lama — jalur
-  // 42P01 memperlakukannya sebagai nol baris (cermin AgentInvocation/Changelog). Tetap WAJIB
+  // 42P01 memperlakukannya sebagai nol baris (cermin AgentInvocation). Tetap WAJIB
   // terdaftar: test migrate-pg menuntut PG_ORDER = seluruh model DMMF.
   "LogEntry", "LogCursor",
   // SPEC-485 · ADR-0102 · LeadFlow SEBELUM LeadDecision: `flowId` menunjuk ke sana. Tanpa FK, tapi
@@ -50,7 +47,7 @@ export const PG_ORDER = [
   "Ticket", "TicketAttachment",
   // SPEC-843 · ADR-0124 · SpecAttachment WAJIB sesudah Spec (FK specId, cascade). Tabel ini
   // LOCAL-only dan lazimnya TIDAK ada di sumber Postgres lama — jalur 42P01 memperlakukannya
-  // sebagai nol baris, cermin Changelog.
+  // sebagai nol baris, cermin SessionHistory.
   "SpecAttachment",
   // SPEC-471 · ADR-0095 · GithubIssue sesudah Project (FK projectId) DAN sesudah Spec: `specId`
   // memang tanpa FK, tapi memindahkannya lebih awal membuat urutan tabel tak lagi mencerminkan
@@ -64,12 +61,8 @@ export const PG_ORDER = [
   "WebhookEndpoint", "WebhookDelivery",
   // Workspace QA · ADR-0174 · QaReport sesudah Project (FK projectId, cascade); QaCase/QaFinding/
   // QaAttachment sesudah QaReport (FK reportId, cascade). Keempatnya LOCAL-only dan TIDAK ada di
-  // sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris (cermin Changelog).
+  // sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris (cermin SessionHistory).
   "QaReport", "QaCase", "QaFinding", "QaAttachment",
-  // ADR-0178 · ProjectMemory sesudah Project (FK projectId, cascade); MemoryEvent sesudahnya (FK
-  // memoryId, cascade). MemoryLocalState tanpa FK. Ketiganya lahir sesudah Postgres dicabut, jadi
-  // jalur 42P01 memperlakukannya sebagai nol baris (cermin QaReport).
-  "ProjectMemory", "MemoryEvent", "MemoryLocalState",
 ] as const;
 
 const CHUNK = 200;

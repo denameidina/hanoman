@@ -39,7 +39,7 @@ const Q_DEBOUNCE_MS = 400;
 
 /* Diekspor supaya `team-screen.test.tsx` bisa menegakkan cermin `TEAM_VIEWS` ↔ cabang render:
    entri yang tak punya cabangnya sendiri merender permukaan mode LAIN di bawah pilnya, 200 dan
-   nol error — kelas bug yang sama yang dijaga `changelog-nav.test.tsx` untuk `HN_NAV`. */
+   nol error — kelas bug yang sama yang dijaga `nav-pending-badge.test.tsx` untuk `HN_NAV`. */
 export const TEAM_VIEWS = [
   { value: "board", label: "Papan", icon: "kanban" },
   // SPEC-948 · `gantt-chart` → `GanttChart` DIVERIFIKASI ada di lucide 0.400.0: SPEC-906

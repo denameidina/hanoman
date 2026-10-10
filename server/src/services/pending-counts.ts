@@ -43,7 +43,7 @@ async function prdDraftCount(now: number, prds: PrdLister): Promise<number> {
 export function __resetPendingCache(): void { prdCache = null; }
 
 export async function pendingCounts(now = Date.now(), prds: PrdLister = listAllPrds): Promise<PendingCounts> {
-  const [tickets, issues, backlog, lead, prd, memory] = await Promise.all([
+  const [tickets, issues, backlog, lead, prd] = await Promise.all([
     prisma.ticket.count({ where: { status: "new" } }),
     prisma.githubIssue.count({ where: { status: "new" } }),
     // `startedAt` = kapan sesi PERTAMA lahir (ADR-0090), null = belum pernah dikerjakan. Stage
@@ -52,8 +52,6 @@ export async function pendingCounts(now = Date.now(), prds: PrdLister = listAllP
     prisma.spec.count({ where: { startedAt: null, stage: { not: "done" } } }),
     prisma.leadFlow.count({ where: { status: { in: [...OPEN_LEAD_FLOW_STATUSES] } } }),
     prdDraftCount(now, prds),
-    // ADR-0181 · antrean review memori lintas project.
-    prisma.projectMemory.count({ where: { status: "proposed" } }),
   ]);
-  return { ...EMPTY_PENDING, triage: tickets + issues, backlog, prd, lead, memory };
+  return { ...EMPTY_PENDING, triage: tickets + issues, backlog, prd, lead };
 }

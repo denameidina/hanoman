@@ -7,7 +7,6 @@ import { ABOUT_TOOLS } from "./about";
 import { PROJECTS_TOOLS } from "./projects";
 import { BACKLOG_TOOLS } from "./backlog";
 import { DOCS_TOOLS } from "./docs";
-import { MEMORY_TOOLS } from "./memory";
 import { IDE_TOOLS } from "./ide";
 import { SETTINGS_TOOLS } from "./settings";
 import { AGENTS_TOOLS } from "./agents";
@@ -28,7 +27,6 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   ...PROJECTS_TOOLS,
   ...BACKLOG_TOOLS,
   ...DOCS_TOOLS,
-  ...MEMORY_TOOLS,     // ADR-0178 · memori project — dibaca sesering docs
   ...IDE_TOOLS,
   ...SETTINGS_TOOLS,
   ...AGENTS_TOOLS,

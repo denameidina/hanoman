@@ -10,6 +10,7 @@ describe("routes · parseRoute", () => {
 
   it("/ dan path tak dikenal = null (App mengalihkan ke halaman tersimpan)", () => {
     expect(parseRoute("/", NAV_KEYS)).toBeNull();
+    for (const path of ["/memory", "/memory/p1", "/changelog", "/changelog/p1/c1"]) expect(parseRoute(path, NAV_KEYS)).toBeNull();
     expect(parseRoute("/runs", NAV_KEYS)).toBeNull();          // key mati SPEC-162
     expect(parseRoute("/backlog/a/b", NAV_KEYS)).toBeNull();
     expect(parseRoute("/review/x/y", NAV_KEYS)).toBeNull();     // kind tak dikenal
@@ -18,8 +19,6 @@ describe("routes · parseRoute", () => {
   it("section transien membawa id-nya di URL", () => {
     expect(parseRoute("/projects/toko-mekar", NAV_KEYS)).toEqual({ section: "project", projectId: "toko-mekar" });
     expect(parseRoute("/backlog/SPEC-12", NAV_KEYS)).toEqual({ section: "backlog", specId: "SPEC-12" });
-    expect(parseRoute("/changelog/p1", NAV_KEYS)).toEqual({ section: "changelog", projectId: "p1", changelogId: null });
-    expect(parseRoute("/changelog/p1/cl-9", NAV_KEYS)).toEqual({ section: "changelog", projectId: "p1", changelogId: "cl-9" });
     expect(parseRoute("/review/spec/SPEC-3", NAV_KEYS)).toEqual({ section: "review", kind: "spec", id: "SPEC-3" });
     expect(parseRoute("/review/session/abc", NAV_KEYS)).toEqual({ section: "review", kind: "session", id: "abc" });
   });
@@ -37,8 +36,6 @@ describe("routes · routePath", () => {
       { section: "overview" }, { section: "settings" },
       { section: "project", projectId: "p1" },
       { section: "backlog", specId: "SPEC-1" },
-      { section: "changelog", projectId: "p1", changelogId: null },
-      { section: "changelog", projectId: "p1", changelogId: "c1" },
       { section: "review", kind: "spec", id: "SPEC-2" },
     ];
     for (const r of all) expect(parseRoute(routePath(r), NAV_KEYS)).toEqual(r);

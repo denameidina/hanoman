@@ -86,7 +86,7 @@ import { ProjectDetailScreen } from "../src/screens/ProjectDetailScreen";
 
 const DETAIL_PROPS = {
   onEdit: () => {}, onGotoDocs: () => {}, onGotoTerminal: () => {}, onGotoBacklog: () => {},
-  onGotoChangelog: () => {}, onDelete: () => {}, onToast: () => {},
+  onDelete: () => {}, onToast: () => {},
 };
 
 describe("SPEC-880 · detail project", () => {

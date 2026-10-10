@@ -15,11 +15,10 @@
  * - `backlog` — `Spec` yang belum pernah punya sesi (`startedAt === null`) dan belum `done`.
  * - `prd`     — PRD berstatus `draft` (belum melahirkan satu pun backlog, lihat `prd-status.ts`).
  * - `lead`    — rantai `LeadFlow` yang masih terbuka (`menunggu` / `sebagian`).
- * - `memory`  — memori project berstatus `proposed` (antrean review, ADR-0181), lintas project.
  */
-export type PendingCounts = { triage: number; backlog: number; prd: number; lead: number; memory: number };
+export type PendingCounts = { triage: number; backlog: number; prd: number; lead: number };
 
-export const EMPTY_PENDING: PendingCounts = { triage: 0, backlog: 0, prd: 0, lead: 0, memory: 0 };
+export const EMPTY_PENDING: PendingCounts = { triage: 0, backlog: 0, prd: 0, lead: 0 };
 
 // Status `LeadFlow` yang berarti "rantainya belum tuntas". Cermin kosakata schema.prisma
 // (`menunggu | sebagian | selesai | dibatalkan`) — dua yang terakhir bukan pekerjaan siapa pun lagi.
@@ -30,8 +29,7 @@ export const OPEN_LEAD_FLOW_STATUSES = ["menunggu", "sebagian"] as const;
  * memutuskan apakah sebuah badge muncul — tiap badge menghakimi angkanya sendiri.
  */
 export function pendingTotal(c: PendingCounts): number {
-  // `memory` bisa absen dari server lama (ADR-0087) — angka hilang dihitung nol, bukan NaN.
-  return c.triage + c.backlog + c.prd + c.lead + (c.memory ?? 0);
+  return c.triage + c.backlog + c.prd + c.lead;
 }
 
 /**

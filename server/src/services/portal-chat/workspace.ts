@@ -18,7 +18,7 @@ import { listPrds, readPrd } from "../project-prds";
 // milik claude (Read/Glob/Grep tak bisa keluar dari cwd — terukur 7/7 percobaan ditolak) yang
 // mengunci agen di dalamnya.
 
-export const WORKSPACE_FILES = ["project.md", "pekerjaan.md", "laporan.md", "catatan-rilis.md"] as const;
+export const WORKSPACE_FILES = ["project.md", "pekerjaan.md", "laporan.md"] as const;
 
 // Kosakata yang dibaca klien, bukan stage internal — cermin `STAGE_LABEL` ClientPortal.tsx.
 const STAGE_LABEL: Record<string, string> = {
@@ -48,13 +48,6 @@ export function renderTicketDoc(tickets: PortalTicket[]): string {
   return `# Laporan yang pernah dikirim\n\n${baris.join("\n")}`;
 }
 
-export function renderChangelogDoc(rows: { title: string; body: string; createdAt: Date }[]): string {
-  if (!rows.length) return "# Catatan rilis\n\nBelum ada catatan rilis.\n";
-  const baris = rows.map((c) =>
-    `## ${c.title}\n\n${tanggal(c.createdAt.toISOString())}\n\n${c.body}\n`);
-  return `# Catatan rilis\n\n${baris.join("\n")}`;
-}
-
 export type ChatWorkspace = { dir: string; files: string[]; cleanup(): void };
 
 /**
@@ -73,9 +66,7 @@ export async function buildChatWorkspace(projectId: string): Promise<ChatWorkspa
     const specs = (await liveSpecs({ project: projectId })).map(toPortalSpec);
     const tickets = await prisma.ticket.findMany({
       where: { projectId }, orderBy: { createdAt: "desc" }, take: 100 });
-    const changelogs = await prisma.changelog.findMany({
-      where: { projectId }, orderBy: { createdAt: "desc" }, take: 20,
-      select: { title: true, body: true, createdAt: true } });
+
 
     const files: string[] = [];
     const tulis = (rel: string, isi: string) => {
@@ -85,7 +76,6 @@ export async function buildChatWorkspace(projectId: string): Promise<ChatWorkspa
     tulis("project.md", renderProjectDoc(project));
     tulis("pekerjaan.md", renderBacklogDoc(specs));
     tulis("laporan.md", renderTicketDoc(tickets.map((t) => toPortalTicket(t, null))));
-    tulis("catatan-rilis.md", renderChangelogDoc(changelogs));
 
     // PRD project ini — dokumen PRODUK, memang ditulis untuk dibaca pemilik project. Hanya ada
     // bila project punya checkout; project tanpa repoDir tetap dapat workspace yang sah.

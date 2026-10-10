@@ -14,7 +14,7 @@ export const UI_VERSION = "v1";
 export const scoped = (screen: string, scope?: string | null): string =>
   (scope ? `${screen}@${scope}` : screen);
 
-/** `hn.ui.v1.backlog.q` · ber-scope: `hn.ui.v1.changelog@erp.q` */
+/** `hn.ui.v1.backlog.q` · ber-scope: `hn.ui.v1.docs@erp.q` */
 export const uiKey = (screen: string, field: string): string =>
   `${UI_PREFIX}.${UI_VERSION}.${screen}.${field}`;
 

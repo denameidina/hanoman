@@ -1,5 +1,9 @@
 # ADR-0105 — Changelog per project: `Spec.doneAt` berkolom, hasil tersimpan LOCAL-only, narasi agen ber-fallback
 
+> **Digantikan untuk fitur memori project/changelog oleh [ADR-0182](0182-hapus-memori-project-dan-changelog.md).**
+> Dokumen ini mempertahankan keputusan historis; fitur dan data terkait telah dihapus.
+> Kontrak generik sync opsional dan `Spec.doneAt` tetap berlaku.
+
 - **Status:** Diterima (2026-08-03)
 - **Konteks SPEC:** SPEC-516
 - **Menegakkan:** ADR-0018/0019 (nilai turunan), ADR-0033 (notifikasi selesai), ADR-0037 (guardrail dicabut), ADR-0078 (unduh dokumen), ADR-0091 (lead sebagai agen one-shot), ADR-0099 (MCP), ADR-0100 (webhook)

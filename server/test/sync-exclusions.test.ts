@@ -16,7 +16,7 @@ describe("sync exclusions — preferensi lokal tak tersync (SPEC-213 AC-30)", ()
     }
   });
 
-  it("SYNCED is exactly the authoritative entities (SPEC-272: +ticketAttachment; SPEC-384: −errorGroup; SPEC-450: +customAgent; SPEC-471: +githubIssue; SPEC-945: +member, +task; Workspace QA: +qaReport, +qaCase, +qaFinding, +qaAttachment; ADR-0180: +projectMemory, +memoryEvent)", () => {
+  it("SYNCED is exactly the authoritative entities (SPEC-272: +ticketAttachment; SPEC-384: −errorGroup; SPEC-450: +customAgent; SPEC-471: +githubIssue; SPEC-945: +member, +task; Workspace QA: +qaReport, +qaCase, +qaFinding, +qaAttachment)", () => {
     // SPEC-450 · ADR-0094 · `customAgent` ikut menyeberang: katalog persona adalah pengetahuan
     // bersama, dan id-nya deterministik justru supaya dua mesin yang membuat nama sama bertemu
     // sebagai SATU baris di sini, bukan dua yang saling menelan di objek JSON berkunci nama.
@@ -27,7 +27,7 @@ describe("sync exclusions — preferensi lokal tak tersync (SPEC-213 AC-30)", ()
     // Workspace QA · bagian 3 · laporan QA (dan lampirannya — metadata saja; byte lewat endpoint terpisah)
     // adalah pengetahuan bersama: dikerjakan di laptop, dibaca tim di hub.
     expect([...SYNCED].sort()).toEqual(
-      ["customAgent", "githubIssue", "member", "memoryEvent", "project", "projectMemory", "qaAttachment", "qaCase", "qaFinding", "qaReport", "sessionResult", "spec", "task", "ticket", "ticketAttachment", "vps"],
+      ["customAgent", "githubIssue", "member", "project", "qaAttachment", "qaCase", "qaFinding", "qaReport", "sessionResult", "spec", "task", "ticket", "ticketAttachment", "vps"],
     );
   });
 
@@ -38,6 +38,14 @@ describe("sync exclusions — preferensi lokal tak tersync (SPEC-213 AC-30)", ()
     expect(SYNCED as readonly string[]).not.toContain("errorGroup");
     expect(isEntity("errorGroup")).toBe(false);
     expect(isEntity("ticket")).toBe(true);   // kontrol negatif: tiket tetap tersync
+  });
+
+  it("removed project memories are not accepted as sync entities", () => {
+    for (const entity of ["projectMemory", "memoryEvent", "memoryLocalState"]) {
+      expect(isEntity(entity)).toBe(false);
+      expect(SYNCED as readonly string[]).not.toContain(entity);
+    }
+    expect(isEntity("project")).toBe(true);
   });
 
   it("mutating settings does NOT enqueue outbox (settings are per-device)", async () => {

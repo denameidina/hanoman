@@ -4,7 +4,6 @@ import {
   pull as _pull, snapshot, upsertLocal, deleteRow, isEntity, validateSyncData,
   PARENTS, OPTIONAL_ENTITIES, isOptionalEntity, type Entity, type SyncOp,
 } from "./sync";
-import { mergeMemoryRecord } from "./memory/sync-merge";
 import { findTombstone, writeTombstone, clearTombstone } from "./tombstone";
 import { recordSyncDelete } from "./notifications";
 import { recordConflict } from "./conflicts";
@@ -256,8 +255,8 @@ async function setOptionalMarker(entities: readonly unknown[]): Promise<void> {
 }
 
 /**
- * ADR-0180 · mesin yang naik versi SESUDAH hub mulai menyimpan memori: kursornya sudah melewati
- * baris memori yang dulu disaring untuknya. Tarik KEADAAN entitas itu sekali lewat bootstrap `only`,
+ * Mesin yang baru menerima entitas opsional mungkin sudah melewati baris yang dulu disaring.
+ * Tarik keadaan entitas itu sekali lewat bootstrap `only`,
  * tanpa memindahkan kursor feed (baris yang lebih baru tetap datang lewat pull).
  */
 export async function catchUpOptional(transport: Transport): Promise<number> {
@@ -328,19 +327,6 @@ export async function syncOnce(transport: Transport): Promise<SyncStats> {
       // lokal pending justru bukan alasan menundanya — di situlah keputusannya harus berlaku.
       if (rec.op === "upsert" && pending.has(`${rec.entity}:${rec.recordId}`)) {
         const local = await snapshot(rec.entity as Entity, rec.recordId);
-        // ADR-0180 · memori tak butuh modal konflik: event immutable (push-nya idempoten di hub),
-        // status memori ber-lattice. Ambil status gabungan, tetap di outbox — push berikutnya
-        // digabung lagi di hub. `same` = lokal sudah lebih tinggi; push yang akan menaikkan hub.
-        if (local && rec.entity === "memoryEvent") continue;
-        if (local && rec.entity === "projectMemory") {
-          const m = mergeMemoryRecord(local.data, rec.data);
-          if (m.kind !== "conflict") {
-            if (m.kind === "merged") {
-              await prisma.projectMemory.update({ where: { id: rec.recordId }, data: { status: m.data.status as string } });
-            }
-            continue;
-          }
-        }
         if (local && JSON.stringify(local.data) !== JSON.stringify(rec.data)) {
           await markConflict(rec.entity, rec.recordId,
             { version: local.version, data: local.data }, { version: rec.version, data: rec.data });

@@ -17,7 +17,7 @@ import { useScrollRestore } from "../ui-state/hooks";
 // Setiap key WAJIB punya cabang `section === …` di App.tsx. Bila tidak, `screen` tetap
 // null dan App merender kosong — sidebar ikut hilang, pengguna terjebak sampai reload.
 // `runs` dan `triggers` pernah begitu: screen-nya lenyap bersama subsistem run (SPEC-162),
-// entri navnya tertinggal. Kontraknya kini dijaga test: `src/test/changelog-nav.test.tsx`.
+// entri navnya tertinggal. Kontraknya kini dijaga test: `src/test/nav-pending-badge.test.tsx`.
 export type NavItem = { key: string; label: string; icon: string; gate?: string };
 export const HN_NAV: NavItem[] = [
   { key: "overview", label: "Overview", icon: "layout-dashboard" },
@@ -31,7 +31,6 @@ export const HN_NAV: NavItem[] = [
   // Workspace QA · laporan QA per project (test case, temuan, lampiran) → perbaikan project.
   { key: "qa", label: "QA", icon: "clipboard-check" },
   // ADR-0181 · memori project bersama: antrean review, aktif, arsip. Key = kunci PendingCounts.
-  { key: "memory", label: "Memori", icon: "brain" },
   { key: "triage", label: "Triase", icon: "inbox" },
   { key: "scheduler", label: "Scheduler", icon: "calendar-clock" },
   { key: "lead", label: "Lead", icon: "compass" },   // SPEC-409 · ADR-0091 · hanoman-lead
@@ -44,7 +43,6 @@ export const HN_NAV: NavItem[] = [
   // instalasi satu mesin (nol device token) tak berubah tampilannya sama sekali.
   { key: "clients", label: "Klien", icon: "monitor", gate: "clients" },
   { key: "docs", label: "Docs · SoT", icon: "book-open" },
-  { key: "changelog", label: "Changelog", icon: "megaphone" },   // SPEC-519 · rilis untuk pemakai
   { key: "settings", label: "Settings", icon: "settings" },
 ];
 

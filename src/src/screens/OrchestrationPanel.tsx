@@ -7,7 +7,7 @@ import {
 import { runtimeEfforts, runtimeSubagentModels } from "./session-runtime";
 
 // ADR-0164 · matriks model/effort per fase. Satu-satunya penulis `Setting.orchestration` adalah tab
-// ini, jadi menulis dari snapshot mount aman (pola `changelog`, bukan baca-ulang lead/telegram).
+// ini, jadi menulis dari snapshot mount aman (berbeda dari baca-ulang lead/telegram).
 // Katalog dibaca lewat `session-runtime.ts` — sumber yang sama dengan picker Start.
 
 const FLOW_LABEL: Record<OrchestrationFlow, string> = {

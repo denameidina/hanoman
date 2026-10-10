@@ -6,7 +6,7 @@
 // kode yang baru saja ditulisnya.
 //
 // Baris pertama menggerbangi seluruh klausa. Itu syarat, bukan gaya bahasa: konstanta yang SAMA
-// dipasang di prompt yang keluarannya bukan kode (hanoman-lead, narator changelog), dan tanpa
+// dipasang di prompt yang keluarannya bukan kode (hanoman-lead, penulis dokumen), dan tanpa
 // gerbang tekstual ia harus bercabang jadi dua varian yang wajib tetap sepakat — kelas bug
 // "satu definisi, N call site" (SPEC-431/448/475/481) dalam bentuk teks, yang bahkan tak punya
 // tipe yang memaksanya konsisten.

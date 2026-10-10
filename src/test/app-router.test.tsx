@@ -78,9 +78,22 @@ describe("router App (ADR-0160)", () => {
     expect(window.location.hash).toBe("");
   });
 
-  it("hash lama #changelog=<p>&cl=<id> dialihkan ke /changelog/<p>/<id>", async () => {
+  it.each(["/memory", "/memory/arta", "/changelog", "/changelog/arta/c1"])("URL fitur yang dihapus %s kembali ke halaman tersimpan", async (path) => {
+    writeUiState(uiKey("app", "section"), "projects");
+    go(path);
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe("/projects"));
+  });
+
+  it.each(["memory", "changelog"])("halaman tersimpan %s yang dihapus kembali ke overview", async (section) => {
+    writeUiState(uiKey("app", "section"), section);
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe("/overview"));
+  });
+
+  it("hash changelog yang sudah dihapus kembali ke halaman terakhir", async () => {
     go("/#changelog=arta&cl=c1");
     render(<App />);
-    await waitFor(() => expect(window.location.pathname).toBe("/changelog/arta/c1"));
+    await waitFor(() => expect(window.location.pathname).toBe("/overview"));
   });
 });

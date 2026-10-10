@@ -55,6 +55,7 @@ const UNWRAPPED = new Map<string, string>([
   ["POST /projects/:pid/qa/import", "multipart"],
   ["POST /projects/:pid/qa/reports/:rid/cases/import", "multipart (XLSX/CSV)"],
   ["GET /qa/template.md", "unduhan template untuk manusia"],
+  ["GET /qa/template.xlsx", "biner (template Excel untuk manusia), sama dengan template.md"],
 ]);
 
 // Route yang TERCAKUP tool bercabang. Tool semacam itu memilih endpoint menurut argumen (isi `q` →

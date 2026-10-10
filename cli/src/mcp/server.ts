@@ -3,23 +3,16 @@
 // `client.ts`. Yang tersisa di sini hanya perekatan protokol.
 import { McpServer, fromJsonSchema } from "@modelcontextprotocol/server";
 import {
-  MCP_INSTRUCTIONS, MCP_TOOL_SCHEMA_VERSION, REPO_HEADER, SESSION_HEADER, SESSION_TOKEN_HEADER, encodeRepoHeader,
+  MCP_INSTRUCTIONS, MCP_TOOL_SCHEMA_VERSION,
   mcpToolsFor, renderResult,
 } from "@hanoman/shared";
 import type { McpConfig } from "./config";
 import type { Caller } from "./client";
 import { redactToken } from "./redact";
-import { enrichAnchors, readRepoContext } from "./repo-context";
 
-/** ADR-0179 · token HMAC sesi hanya bermakna bagi server di mesin ini; jangan pernah ke hub jarak jauh. */
-export function isLoopbackHost(host: string): boolean {
-  try { return ["127.0.0.1", "localhost", "[::1]", "::1"].includes(new URL(host).hostname); }
-  catch { return false; }
-}
 
 export function buildMcpServer(
   cfg: McpConfig, call: Caller, cliVersion: string,
-  cwd: string = process.cwd(), env: NodeJS.ProcessEnv = process.env,
 ): McpServer {
   const server = new McpServer({ name: "hanoman", version: cliVersion }, { instructions: MCP_INSTRUCTIONS });
   const tools = mcpToolsFor(cfg.level);
@@ -64,23 +57,7 @@ export function buildMcpServer(
 
         const built = tool.build(args);
         if (!built) return text(`Tool ${tool.name} tak punya panggilan REST.`, true);
-        let req = built;
-        // ADR-0178 · identitas repo & blobSha jangkar dihitung PROSES ini dari cwd, bukan model.
-        if (tool.repoContext) {
-          const ctx = await readRepoContext(cwd);
-          if (!ctx)
-            return text(`Direktori kerja (${cwd}) bukan repo git dengan remote \`origin\` dan minimal satu commit — memori project ditentukan dari repo itu.`, true);
-          const e = await enrichAnchors(ctx, req.body);
-          if (!e.ok)
-            return text(`Jangkar tidak ada di HEAD (${ctx.identity.head.slice(0, 12)}): ${e.missing.join(", ")}. Commit berkasnya dulu, atau perbaiki path relatif root repo.`, true);
-          // ADR-0179 · sesi hanoman membuktikan dirinya; server lalu menentukan project dari sesinya.
-          const sid = env.HANOMAN_SESSION_ID; const stok = env.HANOMAN_EVENT_TOKEN;
-          const session: Record<string, string> = sid && stok && isLoopbackHost(cfg.host)
-            ? { [SESSION_HEADER]: sid, [SESSION_TOKEN_HEADER]: stok } : {};
-          req = { ...req, body: e.body, headers: { ...(req.headers ?? {}), [REPO_HEADER]: encodeRepoHeader(ctx.identity), ...session } };
-        }
-
-        const r = await call(req, tool.name);
+        const r = await call(built, tool.name);
         if (!r.ok) return text(r.message, true);
         return text(renderResult(tool.shape(r.body, args), cfg.maxBytes));
       },

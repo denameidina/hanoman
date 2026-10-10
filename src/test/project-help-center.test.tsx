@@ -32,7 +32,7 @@ const vm = (over: Record<string, unknown>) => ({ ...base, ...over }) as unknown 
 
 const noop = vi.fn();
 const props = { onEdit: noop, onGotoDocs: noop, onGotoTerminal: noop, onGotoBacklog: noop,
-  onGotoChangelog: noop, onDelete: noop, onToast: noop };   // SPEC-519 · pintu Changelog
+  onDelete: noop, onToast: noop };
 
 beforeEach(() => { enableHelpCenter.mockClear(); disableHelpCenter.mockClear(); });
 

@@ -42,6 +42,8 @@ describe("detail project (SPEC-146)", () => {
     // unik untuk DocsWorkspace — "Source of Truth" sendiri juga jadi label pintu di detail).
     expect(await screen.findByText("Edit project")).toBeInTheDocument();
     expect(screen.queryByText("Muat ulang")).toBeNull();
+    expect(screen.queryByText("Changelog")).toBeNull();
+    expect(screen.queryByText("Memori")).toBeNull();
   });
 
   it("edit project bisa menyetel path per-mesin (binding)", async () => {

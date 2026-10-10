@@ -39,13 +39,12 @@ import { presenceIndex } from "./screens/presence-map";
 import { specsDigestOf, toSlim } from "./lib/specs-digest";
 import { presenceKeyOf } from "./lib/presence-key";
 import { repoBasename, cloneErrorText } from "./screens/git-remote";
-import { parseSpecHash, parseChangelogHash, changelogDeepLink } from "./screens/deeplink";
+import { parseSpecHash } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
 import { ProjectsScreen } from "./screens/ProjectsScreen";
 import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
 import { SkillsWorkspace } from "./screens/skills/SkillsWorkspace";
 import { QaWorkspace } from "./screens/qa/QaWorkspace";
-import { MemoryWorkspace } from "./screens/memory/MemoryWorkspace";
 import { BacklogScreen } from "./screens/BacklogScreen";
 import { PrdScreen, NewPrdModal, type PrdPrefill, type PrdBriefForm } from "./screens/PrdScreen";
 import type { AuditEscalation } from "@hanoman/shared";
@@ -67,7 +66,6 @@ const VpsScreen = React.lazy(() => import("./screens/VpsScreen").then((m) => ({ 
 const SchedulerScreen = React.lazy(() => import("./screens/SchedulerScreen").then((m) => ({ default: m.SchedulerScreen })));
 const LeadScreen = React.lazy(() => import("./screens/LeadScreen").then((m) => ({ default: m.LeadScreen })));
 const DocsWorkspace = React.lazy(() => import("./screens/DocsWorkspace").then((m) => ({ default: m.DocsWorkspace })));
-const ChangelogScreen = React.lazy(() => import("./screens/ChangelogScreen").then((m) => ({ default: m.ChangelogScreen })));
 const ReviewScreen = React.lazy(() => import("./screens/ReviewScreen").then((m) => ({ default: m.ReviewScreen })));
 const SettingsScreen = React.lazy(() => import("./screens/SettingsScreen").then((m) => ({ default: m.SettingsScreen })));
 
@@ -848,8 +846,6 @@ function AppInner() {
   const goProject = React.useCallback((id: string) => navigate(routePath({ section: "project", projectId: id })), [navigate]);
   // SPEC-293 · deep-link backlog (`/backlog/<id>`, dulu `#spec=<id>`): SpecDetail item itu dibuka. Diteruskan ke BacklogScreen.
   const [openSpecId, setOpenSpecId] = React.useState<string | null>(null);
-  // SPEC-519 · deep-link changelog (`/changelog/<projectId>[/<id>]`, dulu `#changelog=…`) — rilis yang harus terbuka.
-  const [openChangelogId, setOpenChangelogId] = React.useState<string | null>(null);
   const [projects, setProjects] = React.useState<ProjectView[]>([]);
   const [backlog, setBacklog] = React.useState<SpecSlim[]>([]);
   // SPEC-1267 · sidik jari frame `specs` terakhir; `dataVersion` naik hanya bila isinya berubah.
@@ -911,27 +907,24 @@ function AppInner() {
   // di dalam kunci) — disapu sekali di sini supaya storage tak tumbuh selamanya.
   React.useEffect(() => { pruneUiState(); }, []);
 
-  // ADR-0160 · saat mount: hash lama ADR-0071 (`#spec=<id>` / `#changelog=<projectId>[&cl=<id>]`)
+  // ADR-0160 · saat mount: hash lama ADR-0071 (`#spec=<id>`)
   // ditulis ulang ke path-nya (link yang sudah beredar tetap hidup), dan `/` atau path yang tak
   // dikenal dialihkan ke halaman terakhir yang tersimpan. `replace`: riwayat browser tak boleh
   // menyimpan URL perantara yang kalau ditekan Kembali cuma mengalihkan lagi.
   React.useEffect(() => {
     const id = parseSpecHash(window.location.hash);
     if (id) { navigate(routePath({ section: "backlog", specId: id }), { replace: true }); return; }
-    const cl = parseChangelogHash(window.location.hash);
-    if (cl) { navigate(routePath({ section: "changelog", projectId: cl.projectId, changelogId: cl.changelogId }), { replace: true }); return; }
     if (!route) navigate(routePath({ section: savedSection }), { replace: true });
   }, [route]);
   // ADR-0160 · state yang diturunkan dari URL. `setProjectId` di sini menang atas default `load()` —
   // load memakai `(cur) => cur || items[0]`, jadi nilai dari URL tak ditimpa. Ketiganya membaca
   // parameter, bukan menyalin `route` utuh, supaya pindah ke section lain tak menyentuhnya.
   React.useEffect(() => {
-    if (route?.section === "project" || route?.section === "changelog") {
+    if (route?.section === "project") {
       if (route.projectId) setProjectId(route.projectId);
     }
     if (route?.section === "backlog") setOpenSpecId(route.specId ?? null);
-    if (route?.section === "changelog") setOpenChangelogId(route.changelogId ?? null);
-  }, [route?.section, route?.projectId, route?.specId, route?.changelogId]);
+  }, [route?.section, route?.projectId, route?.specId]);
 
   /* SPEC-919 · ADR-0147 · sesi hidup lintas device, didorong grup siar `presence` — `attach()`
      mengirim seluruh grup begitu socket terbuka, jadi state ini terisi tanpa satu request pun.
@@ -1041,9 +1034,7 @@ function AppInner() {
     const t = notifTarget(nt, sessions);
     if (t.projectFilter) setProjectFilter(t.projectFilter);
     if (t.focus) setFocusSession(t.focus);
-    // ADR-0181 · Memori ber-path per project: buka langsung project notifikasinya.
-    if (t.section === "memory" && t.projectFilter) navigate(routePath({ section: "memory", projectId: t.projectFilter }));
-    else setSection(t.section);
+    setSection(t.section);
   }, [sessions]);
 
   async function updateProject(f: { id: string; name: string; desc: string; dir: string; gitRemote: string;
@@ -1560,9 +1551,7 @@ function AppInner() {
               onGotoDocs={() => setSection("docs")}
               onGotoTerminal={() => { setProjectFilter(proj.id); openTerminal(); }}
               onGotoBacklog={() => { setProjectFilter(proj.id); setSection("backlog"); }}
-              onGotoChangelog={() => setSection("changelog")}
               onGotoSkills={() => navigate(routePath({ section: "skills", projectId: proj.id }))}
-              onGotoMemory={() => navigate(routePath({ section: "memory", projectId: proj.id }))}
               onReverse={proj.kind === "existing" && (proj.binding ?? proj.repoDir) ? () => reverseDocs(proj) : undefined}
               onScaffold={proj.kind === "from-scratch" && (proj.binding ?? proj.repoDir) ? () => scaffoldDocs(proj) : undefined}
               onDelete={() => deleteProject(proj)} />
@@ -1705,28 +1694,6 @@ function AppInner() {
               action={() => setModal("project")} actionLabel="Project baru" />)}
       </Shell>
     );
-  } else if (section === "changelog") {
-    // SPEC-519 · halaman changelog: entri sidebar sendiri + deep-link `#changelog=<projectId>`.
-    // Pemilih project di `actions` mengikuti pola section "docs" — satu sumber "project yang
-    // sedang dibuka" (projectId), bukan `projectFilter` yang bermakna "daftar disaring ke mana".
-    screen = (
-      <Shell active="changelog" title="Changelog"
-        breadcrumb={proj ? proj.name + " · rilis untuk pemakai" : "workspace"} onNavigate={setSection}
-        actions={proj && <>
-          <Select size="sm" aria-label="Project" value={proj.id} onChange={(e) => setProjectId(e.target.value)}
-            options={projectsView.map((x) => ({ value: x.id, label: x.name }))} />
-          <Button size="sm" variant="ghost" leftIcon="link" onClick={() => {
-            void navigator.clipboard?.writeText(changelogDeepLink(proj.id));
-            showToast("Link halaman changelog disalin", "ok", "link");
-          }}>Salin link</Button>
-        </>}>
-        {gate(proj
-          ? <ChangelogScreen p={proj} onToast={showToast} initialChangelogId={openChangelogId} />
-          : <StateBlock kind="empty" icon="megaphone" title="Belum ada project"
-              hint="Changelog muncul setelah ada project yang dipantau."
-              action={() => setModal("project")} actionLabel="Project baru" />)}
-      </Shell>
-    );
   } else if (section === "review") {
     // SPEC-171/230 · layar review file worktree — backlog item (spec) ATAU sesi PRD (session).
     const back = reviewTarget?.kind === "session" ? "terminal" : "backlog";
@@ -1747,15 +1714,6 @@ function AppInner() {
       <Shell active="qa" title="QA" wide onNavigate={setSection} breadcrumb="qa · laporan per project">
         {gate(<QaWorkspace key={qaProjectId ?? "none"} projects={projects} projectId={qaProjectId}
           onSelectProject={(id) => navigate(routePath({ section: "qa", projectId: id }))} onToast={showToast} />)}
-      </Shell>
-    );
-  } else if (section === "memory") {
-    // ADR-0181 · /memory → project pertama; /memory/<projectId> → memori project itu.
-    const memProjectId = route?.projectId ?? projects[0]?.id;
-    screen = (
-      <Shell active="memory" title="Memori" wide onNavigate={setSection} breadcrumb="memori · review & fakta project">
-        {gate(<MemoryWorkspace key={memProjectId ?? "none"} projects={projects} projectId={memProjectId}
-          onSelectProject={(id) => navigate(routePath({ section: "memory", projectId: id }))} onToast={showToast} />)}
       </Shell>
     );
   } else if (section === "skills") {

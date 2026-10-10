@@ -1,9 +1,9 @@
 /* SettingsScreen — workspace settings. Ported; persistence moved from
    localStorage to the API (GET/PUT /settings). Model per pipeline step. */
 import React from "react";
-import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier, Modal, MultiSelect } from "../ds";
+import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier, Modal } from "../ds";
 import { api, ApiError } from "../api/client";
-import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, CHANGELOG_ENGINE_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry, modelSelectOptions } from "@hanoman/shared";
+import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry, modelSelectOptions } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus, SetupStatus } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
 import { playNotifySound, type NotifySound } from "../notifications/sound";
@@ -60,7 +60,6 @@ const S_DEFAULTS: Setting = {
   conflict: CONFLICT_DEFAULTS,     // SPEC-383 · ADR-0081 · default sesi konflik (opt-in, mati)
   lead: LEAD_DEFAULTS,             // SPEC-409 · ADR-0091 · hanoman-lead (master switch mati)
   telegram: TELEGRAM_DEFAULTS,     // SPEC-476 · ADR-0096 · gateway Telegram opt-in
-  changelog: CHANGELOG_ENGINE_DEFAULTS, // SPEC-518 · agen pembuat changelog (opt-in, mati)
   portalChat: PORTAL_CHAT_DEFAULTS, // SPEC-854 · ADR-0130 · chat portal klien (opt-in, mati)
   orchestration: ORCHESTRATION_DEFAULTS, // ADR-0164 · orkestrasi subagent per fase (default aktif)
   remoteControl: REMOTE_CONTROL_DEFAULTS, // SPEC-1215 · wajib di tipe Setting; dikelola RemoteControlPanel
@@ -456,17 +455,8 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   const [picked, setPicked] = React.useState<string[]>([]);
   const [fresh, setFresh] = React.useState<{ name: string; token: string } | null>(null);
   const [busy, setBusy] = React.useState(false);
-  // ADR-0181 · allowlist project untuk memori (ADR-0178): token tanpa allowlist tak bisa menyentuh
-  // /api/memories sama sekali, jadi pilihannya harus ada di sini, bukan hanya di API.
-  const [projects, setProjects] = React.useState<{ id: string; name: string }[]>([]);
-  const [pickedProjects, setPickedProjects] = React.useState<string[]>([]);
-  const [editing, setEditing] = React.useState<AgentTokenView | null>(null);
-  const [editProjects, setEditProjects] = React.useState<string[]>([]);
   const load = React.useCallback(() => { api.listAgentTokens().then((r) => setItems(r.items)).catch(() => setItems([])); }, []);
   React.useEffect(() => {
-    // Gagal-aman: daftar project hanya pemilih allowlist — kegagalannya tak boleh menjatuhkan panel token.
-    Promise.resolve().then(() => api.listProjects({ limit: 200 }))
-      .then((r) => setProjects(r.items.map((p) => ({ id: p.id, name: p.name })))).catch(() => {});
     api.getSettings().then(setSetting).catch(() => {});
     api.getAgentCapabilities().then((r) => setCaps(r.capabilities)).catch(() => {});
     load();
@@ -495,9 +485,9 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
     setBusy(true);
     try {
       const t = await api.createAgentToken({
-        name: name.trim(), capabilities: picked, ...(pickedProjects.length ? { projectIds: pickedProjects } : {}),
+        name: name.trim(), capabilities: picked,
       });
-      setFresh({ name: t.name, token: t.token }); setName(""); setPicked([]); setPickedProjects([]); load();
+      setFresh({ name: t.name, token: t.token }); setName(""); setPicked([]); load();
       onToast?.("Agent token dibuat — salin sekarang", "ok", "key-round");
     } catch { onToast?.("Gagal membuat token", "err", "x-circle"); }
     finally { setBusy(false); }
@@ -515,15 +505,6 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
     }
     catch { onToast?.("Gagal mencabut token", "err", "x-circle"); }
   }
-  async function saveProjects() {
-    if (!editing) return;
-    try {
-      await api.patchAgentToken(editing.id, { projectIds: editProjects.length ? editProjects : null });
-      setEditing(null); load(); onToast?.("Allowlist project disimpan", "ok", "brain");
-    } catch { onToast?.("Gagal menyimpan allowlist project", "err", "x-circle"); }
-  }
-  const projectLabel = (ids: string[] | null | undefined) => !ids?.length ? "tertutup"
-    : ids.map((id) => projects.find((p) => p.id === id)?.name ?? id).join(", ");
   async function setEnabled(t: AgentTokenView, enabled: boolean) {
     try { await api.patchAgentToken(t.id, { enabled }); load(); }
     catch { onToast?.("Gagal mengubah token", "err", "x-circle"); }
@@ -568,7 +549,6 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
             <SettingRow key={t.id} title={t.name} last={i === active.length - 1}
               desc={`${t.tokenPrefix}… · ${t.capabilities.length} capability · `
                 + (t.lastUsedAt ? "terpakai " + new Date(t.lastUsedAt).toLocaleString("id-ID") : "belum dipakai")
-                + ` · memori: ${projectLabel(t.projectIds)}`
                 // ADR-0155 · peringatan hak yang menyempit ikut di `desc` supaya ia terbaca di
                 // baris yang sama dengan tokennya, bukan sebagai blok terpisah yang mudah dilewati.
                 + (lostRights(t.capabilities).length
@@ -576,7 +556,6 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
                   : "")}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <Switch size="sm" checked={t.enabled} onChange={(v: boolean) => void setEnabled(t, v)} />
-                <Button size="sm" variant="ghost" leftIcon="brain" onClick={() => { setEditProjects(t.projectIds ?? []); setEditing(t); }}>Atur project</Button>
                 <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => revoke(t)}>Cabut</Button>
               </div>
             </SettingRow>
@@ -622,28 +601,10 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
             })}
           </div>
           <div style={{ marginTop: 14 }}>
-            <Field label="Project yang diizinkan (memori)"
-              hint="Memori project hanya bisa dibaca/ditulis token ber-capability Memori DAN project yang dipilih di sini. Kosong = memori tertutup bagi token ini.">
-              <MultiSelect aria-label="Project yang diizinkan (memori)" placeholder="mis. hanoman" searchPlaceholder="mis. alpha"
-                options={projects.map((p) => ({ value: p.id, label: p.name }))} value={pickedProjects} onChange={setPickedProjects} />
-            </Field>
-          </div>
-          <div style={{ marginTop: 14 }}>
             <Button size="sm" leftIcon="plus" disabled={name.trim().length < 1 || busy} onClick={() => void create()}>Buat token</Button>
           </div>
         </div>
         {dialog}
-        <Modal open={!!editing} onClose={() => setEditing(null)} title={editing ? `Project untuk "${editing.name}"` : ""}
-          footer={<>
-            <Button variant="ghost" onClick={() => setEditing(null)}>Batal</Button>
-            <Button onClick={() => void saveProjects()}>Simpan</Button>
-          </>}>
-          <p style={{ marginTop: 0, fontSize: 13, color: "var(--text-muted)" }}>
-            Project yang memorinya boleh dibaca/ditulis token ini. Kosongkan untuk menutup akses memori.
-          </p>
-          {editing && <MultiSelect aria-label={`Project yang diizinkan untuk ${editing.name}`} placeholder="mis. hanoman" searchPlaceholder="mis. alpha"
-            options={projects.map((p) => ({ value: p.id, label: p.name }))} value={editProjects} onChange={setEditProjects} />}
-        </Modal>
       </Card>
 
       {/* SPEC-482 · ADR-0099 · memasang MCP server dan memberi capability adalah satu pekerjaan
@@ -1065,19 +1026,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
           onToast?.("Gagal menyimpan setelan operator Telegram", "err", "alert-triangle");
         }
       };
-      // SPEC-518 · blok `Setting.changelog` — runtime/model/effort agen PEMBUAT CHANGELOG.
-      // `?? CHANGELOG_ENGINE_DEFAULTS` sama alasannya dengan `?? CONFLICT_DEFAULTS`: respons
-      // GET /settings dari instance lama belum punya kuncinya, dan layar tak boleh mati
-      // `undefined.enabled`.
-      const changelog = s.changelog ?? CHANGELOG_ENGINE_DEFAULTS;
-      // Menulis lewat `save()` (PUT /settings), BUKAN endpoint khusus seperti kartu lead dan bukan
-      // baca-ulang seperti kartu Telegram. Keduanya melakukannya karena bloknya punya PENULIS
-      // KEDUA — `LeadScreen` untuk lead, command `/runtime|/model|/effort` dari chat untuk
-      // telegram — sehingga menulis dari snapshot mount akan mengembalikan nilai yang baru saja
-      // diubah di tempat lain. Blok `changelog` tak punya penulis kedua: kartu ini satu-satunya.
-      const saveChangelog = (patch: Partial<Setting["changelog"]>, msg: string) =>
-        save({ changelog: { ...changelog, ...patch } }, msg);
-      // SPEC-854 · ADR-0130 · blok chat portal. Cermin `changelog`: satu-satunya penulisnya kartu
+      // SPEC-854 · ADR-0130 · blok chat portal. Satu-satunya penulisnya kartu
       // ini, jadi menulis dari snapshot mount aman.
       const portalChat = s.portalChat ?? PORTAL_CHAT_DEFAULTS;
       const savePortalChat = (patch: Partial<Setting["portalChat"]>, msg: string) =>
@@ -1336,66 +1285,6 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
           </>
         )}
       </Card>
-      {/* SPEC-518 · agen pembuat changelog (SPEC-516/ADR-0105) boleh punya runtime/model/effort
-          sendiri. Pekerjaannya merangkum judul backlog/commit jadi prosa rilis pendek — jauh lebih
-          ringan dari sesi kerja, dan tak selalu pantas memakai model termahal. Opt-in seperti
-          kartu konflik/lead/Telegram: mati = mewarisi. */}
-      <Card eyebrow="changelog" title="Agen changelog">
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
-          Mesin yang menulis narasi changelog per project — panggilan sekali-jalan non-interaktif
-          yang merangkum backlog selesai, rentang commit, atau isi sebuah rilis menjadi teks pendek
-          berorientasi pemakai. Berlaku pada pembangkitan <b>berikutnya</b>, tanpa restart. Agen yang
-          gagal tak menggagalkan changelog: barisnya tetap lahir sebagai draf ringkas ber-catatan.
-        </div>
-        <SettingRow title="Pakai setelan sendiri"
-          desc="Mati = ikut default global di atas. Hidup = pembuat changelog memakai pilihan di bawah.">
-          <Switch aria-label="Override agen changelog" checked={changelog.enabled}
-            onChange={(v: boolean) => saveChangelog({ enabled: v },
-              "Setelan changelog" + (v ? " · aktif" : " · ikut default global"))} />
-        </SettingRow>
-        {!changelog.enabled ? (
-          <div data-testid="changelog-engine-inherited" style={{ fontSize: 12.5, color: "var(--text-muted)", padding: "12px 0 2px", lineHeight: 1.5 }}>
-            Pembuat changelog memakai default global: <b>{AGENT_LABEL[inherited.agent]}</b> ·{" "}
-            <code>{inherited.model}</code> · <code>{inherited.effort}</code>.
-          </div>
-        ) : (
-          <>
-            <SettingRow title="Runtime" desc="Mesin yang menulis changelog. Bisa beda dari agen sesi kerja.">
-              <Select size="sm" aria-label="Runtime changelog" value={changelog.agent} style={{ width: 190 }}
-                options={[{ value: "claude", label: AGENT_LABEL.claude }, { value: "codex", label: AGENT_LABEL.codex }]}
-                onChange={(e) => {
-                  // Cermin `pickAgent`/kartu konflik/lead/Telegram: menukar runtime HARUS menukar
-                  // model+effort sekalian, kalau tidak changelog lahir `codex -m claude-opus-5`.
-                  const a = e.target.value as "claude" | "codex";
-                  const d = a === "codex" ? codex : { model: s.model, effort: s.effort };
-                  saveChangelog({ agent: a, model: d.model,
-                    effort: a === "codex" ? coerceCodexEffort(d.model, d.effort) : d.effort },
-                    "Runtime changelog → " + a);
-                }} />
-            </SettingRow>
-            {changelog.agent === "codex" && codexNote(changelog.model)}
-            <SettingRow title="Model">
-              <Select size="sm" aria-label="Model changelog" value={changelog.model} style={{ width: 190 }}
-                options={changelog.agent === "codex" ? codexOptions(changelog.model) : claudeOptions(changelog.model)}
-                onChange={(e) => {
-                  const model = e.target.value;
-                  saveChangelog({ model, ...(changelog.agent === "codex"
-                    ? { effort: coerceCodexEffort(model, changelog.effort) } : claudeEffortPatch(model, changelog.effort)) },
-                    "Model changelog → " + model);
-                }} />
-            </SettingRow>
-            <SettingRow title="Effort" last
-              desc="Merangkum judul jadi prosa pendek — effort rendah biasanya cukup dan memangkas ongkos setiap pembangkitan.">
-              <Select size="sm" aria-label="Effort changelog" value={changelog.effort} style={{ width: 130 }}
-                options={changelog.agent === "codex"
-                  ? codexEfforts(changelog.model).map((v) => ({ value: v, label: v }))
-                  : claudeEffortOptions(changelog.model)}
-                onChange={(e) => saveChangelog({ effort: e.target.value }, "Effort changelog → " + e.target.value)} />
-            </SettingRow>
-          </>
-        )}
-      </Card>
-
       {/* SPEC-854 · ADR-0130 · obrolan portal klien. TANPA pemilih runtime: gerbang tool
           (`--tools`) yang menjaga fitur ini adalah flag claude, dan bentuk one-shot codex hanya
           punya bypass penuh — menawarkan pilihan agen di sini berarti menjanjikan penjagaan yang

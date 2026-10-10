@@ -118,7 +118,6 @@ describe("kontrak titik cekik preview Markdown", () => {
     const surfaces = [
       "ds/DocPreviewModal.tsx",
       "screens/AgentDocCard.tsx",
-      "screens/ChangelogScreen.tsx",
       "screens/DocsWorkspace.tsx",
       "screens/GitGraph.tsx",
       "screens/IdeScreen.tsx",

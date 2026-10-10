@@ -150,7 +150,7 @@ tanpa penopang tidak ditulis.
 - THE SYSTEM SHALL menyertakan klausa gaya kode yang sama — satu konstanta, tanpa knob dan tanpa override
   per sesi — di setiap prompt agen yang dilahirkannya: sesi backlog & goal (digerbangi `writesCode`),
   ketiga pintu konflik rebase/merge, prompt custom agent `claude --agents`, prompt lead, dan prompt
-  narator changelog ([ADR-0108](../adr/0108-klausa-gaya-kode-prompt-agen.md)).
+  agen penulis dokumen ([ADR-0108](../adr/0108-klausa-gaya-kode-prompt-agen.md)).
 
 ## Review & integrate
 

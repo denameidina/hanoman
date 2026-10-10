@@ -90,14 +90,6 @@ describe("capabilityForRoute", () => {
     expect(capabilityForRoute("POST", "/api/github-issues/x/accept")).toBe("support:write");
   });
 
-  // SPEC-516 · ADR-0105 · changelog adalah DOKUMEN, sejajar docs/prds — bukan `projects`, yang
-  // akan menuntut agen dipercaya menyunting & menghapus project hanya untuk membaca changelog.
-  it("SPEC-516 · changelog project → domain docs", () => {
-    expect(capabilityForRoute("GET", "/api/projects/p1/changelog")).toBe("docs:read");
-    expect(capabilityForRoute("GET", "/api/projects/p1/changelog/sources")).toBe("docs:read");
-    expect(capabilityForRoute("POST", "/api/projects/p1/changelog")).toBe("docs:write");
-    expect(capabilityForRoute("DELETE", "/api/projects/p1/changelog/abc")).toBe("docs:write");
-  });
 });
 
 describe("checkAgentCapability", () => {

@@ -142,8 +142,8 @@ Pakai skill lebih sempit saat task cocok:
   Sebabnya struktural — tiap layar di-unmount saat pengguna pindah, jadi seluruh `useState`-nya hilang.
   (Sejak **ADR-0160**, audit 2026-09-05, halaman = URL lewat react-router: `section` diturunkan dari
   `pathname` oleh `src/src/routes.ts`, `app.section` di storage hanya dibaca saat URL tak menunjuk
-  halaman; dua belas layar `React.lazy`. Hash `#spec=`/`#changelog=` ADR-0071 dialihkan ke
-  `/backlog/<id>` / `/changelog/<p>[/<cl>]`.) Mekanismenya **satu** modul `src/src/ui-state` (`store.ts` bebas React →
+  halaman; dua belas layar `React.lazy`. Hash `#spec=` ADR-0071 dialihkan ke `/backlog/<id>`; tautan changelog lama
+  mengikuti fallback navigasi sejak ADR-0182.) Mekanismenya **satu** modul `src/src/ui-state` (`store.ts` bebas React →
   bisa diuji langsung, `hooks.ts`, `ResetViewButton.tsx`), bukan tambalan per layar: layar baru
   memakai **`usePersistedState(screen, field, initial, accept?)`** alih-alih `useState` dan otomatis
   ikut. Kunci **`hn.ui.v1.<screen>[@<scope>].<field>`** — **versi hidup DI DALAM kunci** (menaikkannya
@@ -393,59 +393,9 @@ Pakai skill lebih sempit saat task cocok:
   (rebase = force-push, dilarang) dan branch kerja tak pernah dihapus sebelum hasil `clean`
   (`deleteBranch` opt-in, default mati). Konflik **tidak** melahirkan sesi agen — notifikasi + branch
   utuh, lalu tombol Rebase/Merge ADR-0031 tetap memberi jalur konflik yang lengkap.
-- **Changelog per project — `Spec.doneAt` berkolom, hasil tersimpan LOCAL-only, narasi agen
-  ber-fallback** (SPEC-516/**ADR-0105**, melanjutkan arah ADR-0090; ADR-0018/0019, 0033, 0078, 0091,
-  0099, 0100 utuh): tiga mode (rentang tanggal backlog · rentang SHA · versi/tag) di bawah
-  `/projects/:id/changelog`, semuanya menghasilkan teks pendek **berorientasi pemakai**.
-  **`Spec.doneAt`** ditambahkan karena `updatedAt` bergerak tanpa ada manusia (ADR-0090) — dan
-  penulisnya **SATU**: bukan di ketiga jalur yang mempersist `stage="done"` melainkan **di dalam
-  `recordCompletion()`**, satu-satunya fungsi yang sudah dipanggil ketiganya (menyalin efek samping
-  ke call site = kelas bug SPEC-431/448/475, dan efek samping tak punya tipe yang memaksanya
-  konsisten). **Tulis-sekali** ber-guard `doneAt: null` → maknanya *selesai pertama*, cermin
-  `startedAt`; revert stage tak mengosongkannya. Backfill sekali-jalan dari notifikasi
-  `done:<specId>` (sumber yang sama dengan sweep ADR-0103). Narasi lewat **`think()` yang DIIMPOR**
-  dari `lead/brain.ts` — titik spawn agen ketiga akan mengulang SPEC-448 — dengan **anggaran waktu
-  disebut di dalam prompt** (SPEC-432: 306 → 101 dtk); agen gagal/kosong **bukan galat**, baris
-  tetap lahir ber-`generator:"fallback"` + `warning`. Scrub dijalankan **dua kali** dan yang
-  menentukan sisi **INPUT** (SHA bahkan tak pernah dikumpulkan dari `git log`). Model `Changelog`
-  **LOCAL-only** (tanpa kolom `version`), capability **domain `docs`** bukan `projects`, dan keadaan
-  sah yang bukan galat dijawab **422 + pesan** — `…/changelog/sources` bahkan **200 dengan `reason`**.
-  **Lima gotcha wajib:** (1) `PG_ORDER` wajib memuat model baru **sesudah `Project`** —
-  `cli/test/migrate-pg.test.ts` menuntutnya sama persis dengan DMMF, satu-satunya gerbangnya;
-  (2) `doneAt` wajib di `FIELDS.spec` **dan** `DATE_FIELDS.spec` (`upsert` yang tak menyebut sebuah
-  kolom tetap berhasil — kelas gagal-senyap ADR-0090/0093/0094); (3) batas hari wajib **LOKAL**
-  (`new Date("2026-07-31")` = tengah malam UTC); (4) regex scrub camelCase wajib menuntut ≥2 huruf
-  kecil di **kedua** sisi kapital (kalau tidak `macOS`/`iOS` ikut terbuang) dan regex hash wajib
-  menuntut satu digit **dan** satu huruf a–f (kalau tidak `1000000` terbaca sebagai sha);
-  (5) "versi sebelumnya" diturunkan `git describe --abbrev=0 <tag>^` (**riwayat**), bukan urutan
-  tanggal — tanggal tag anotasi beresolusi DETIK dan git jatuh ke urutan NAMA saat seri.
-  **Runtime/model/effort penarasinya punya setelan sendiri sejak SPEC-518** (tanpa ADR — ADR-0105
-  ditegakkan, hanya *dari mana triple-nya datang* yang berubah): blok **`Setting.changelog`**
-  bertipe **`zAgentEngine` yang SAMA** dengan `lead.engine`/`telegram.engine` (SPEC-492 — bukan
-  bentuk kelima), **flat** seperti `conflict` karena bloknya tak punya knob tetangga, dibaca
-  `changelogAgentDefaults()` di `services/changelog/config.ts`. **Opt-in**: mati = mendelegasikan
-  penuh ke `sessionAgentDefaults()`, persis perilaku pra-SPEC-518. Tanpa migration (kolom `Json` +
-  `.default()`), tanpa endpoint baru; kartu "Agen changelog" di Settings → Model sesi menulis lewat
-  **`PUT /settings`** — bukan endpoint khusus seperti kartu lead maupun baca-ulang seperti kartu
-  Telegram — karena blok itu **tak punya penulis kedua**. Effort codex dikoersi **di resolver**,
-  bukan hanya di picker (`PUT` ber-`AgentToken` tak lewat UI). `CHANGELOG_TIMEOUT_MS` sengaja
-  **tetap konstanta**: ia disebut di dalam prompt, dan anggaran yang bisa digeser diam-diam
-  berbohong kepada agennya (SPEC-432).
-  **Letak & jangkauan (SPEC-519, tanpa ADR):** changelog punya **entri sidebar sendiri**
-  (`changelog`, ikon `megaphone`) dan halaman yang bisa dibuka langsung lewat
-  **`/changelog/<projectId>[/<changelogId>]`** (router ADR-0160; hash lama
-  `#changelog=<projectId>[&cl=<id>]` ADR-0071 masih dibaca saat mount lalu dialihkan; kedua parser saling eksklusif). Daftar rilisnya
-  bergulir dengan **tinggi berbatas** (rantai flex yang menembus `Card` putus tanpa prop `fill` —
-  audit SPEC-393) dan dicari lewat **satu parameter aditif `?q=`** pada `GET /projects/:id/changelog`
-  yang sudah ada — predikat murni `changelogMatches()` di `@hanoman/shared`, disaring **sebelum**
-  `paginate` supaya `total` menghitung hasil cari (ADR-0038); menyaring di klien hanya menjangkau
-  halaman yang kebetulan termuat. `ChangelogPanel` jadi **generator murni** (hasil diserahkan lewat
-  `onGenerated`, satu jalur render untuk rilis baru maupun lama) dan detail project menunjuk ke
-  halaman itu lewat **pintu**, bukan menyalin generatornya. **Gotcha keenam:** setiap key `HN_NAV`
-  wajib punya cabang `section === …` di `App.tsx` — tanpa itu App merender kosong dan sidebar ikut
-  hilang (`runs`/`triggers`, SPEC-162); kini dijaga test kontrak `src/test/changelog-nav.test.tsx`
-  yang membaca sumber `App.tsx` **dari cwd**, sebab `import.meta.url` di bawah transform Vite bukan
-  URL ber-skema `file:`.
+- **Memori project dan changelog dihapus** (ADR-0182): halaman, REST/MCP, setelan, dan
+  injeksi memori project tidak tersedia. Migration menghapus tabel/data fitur; `Spec.doneAt`
+  tetap dipakai backlog/portal, sync opsional tetap generik, dan memory Telegram tetap terpisah.
 - **Panduan AI agent punya URL** (SPEC-489, tanpa ADR — ADR-0065 & ADR-0099 **ditegakkan**):
   `docs/agent-integration.md` adalah **naskah tunggal**, disajikan mentah di
   **`GET /api/agent-integration.md`** (`text/markdown`, masuk daftar `PUBLIC` `app.ts` bersama
@@ -1294,7 +1244,7 @@ Pakai skill lebih sempit saat task cocok:
   ADR-0080, yang punya knob karena ada keadaan di mana `full` benar; di sini tak ada. Dipasang di
   **enam** permukaan: empat builder prompt backlog/goal (digerbangi **`writesCode(flow)` yang sudah
   ada**, bukan daftar flow yang disalin), **tiga pintu konflik** yang merakit prompt-nya *inline di
-  route* sehingga tak terjangkau gerbang itu, `agentPromptOf`, `leadPrompt`, dan `changelogPrompt`.
+  route* sehingga tak terjangkau gerbang itu, `agentPromptOf`, `leadPrompt`.
   **Empat hal yang mudah dirusak:** (1) gerbangnya hidup **di dalam teks** klausa (baris pertama
   "berlaku setiap kali kamu menulis atau mengubah kode") — itulah yang membuat SATU konstanta bisa
   dipakai prompt yang keluarannya bukan kode; varian kedua = kelas bug SPEC-431/448/475/481 dalam
@@ -1604,7 +1554,7 @@ Pakai skill lebih sempit saat task cocok:
 ## Aturan Keamanan
 
 - **Markdown repository tidak tepercaya** (SPEC-759): seluruh preview Docs/PRD/backlog/sesi/Review/
-  IDE/Git Graph/changelog/Dokumentasi AI Agent bertemu di `src/src/ds/markdown.tsx`.
+  IDE/Git Graph/Dokumentasi AI Agent bertemu di `src/src/ds/markdown.tsx`.
   `marked.parse()` hanya boleh dipanggil di titik cekik itu dan hasilnya wajib melewati DOMPurify
   ber-allowlist HTML eksplisit sebelum `dangerouslySetInnerHTML`; SVG/MathML, tag aktif, event/style,
   `data-*`/`aria-*`, serta scheme selain relatif/`http:`/`https:` (`mailto:` khusus `href`) dibuang.

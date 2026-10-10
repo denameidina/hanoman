@@ -6,14 +6,12 @@
 //   /<section>                         halaman bernavigasi (`HN_NAV`, mis. /backlog, /settings)
 //   /projects/<projectId>              detail satu project (section transien `project`)
 //   /backlog/<specId>                  Backlog dengan SpecDetail item itu terbuka
-//   /changelog/<projectId>[/<clId>]    changelog satu project, opsional satu rilis terpilih
 //   /review/<spec|session>/<id>        layar review worktree (section transien `review`)
 //   /skills[/<projectId>]              skill global + per project, atau satu project saja
 //   /qa[/<projectId>]                  laporan QA project terpilih (default: project pertama)
-//   /memory[/<projectId>]              memori project terpilih (ADR-0181)
 //   /                                  → dialihkan ke halaman terakhir yang tersimpan (ADR-0115)
 //
-// Hash lama `#spec=<id>` / `#changelog=<projectId>[&cl=<id>]` (ADR-0071) TETAP dibaca saat mount
+// Hash lama `#spec=<id>` (ADR-0071) TETAP dibaca saat mount
 // lalu ditulis ulang ke bentuk path di atas — link yang sudah beredar tak boleh mati.
 
 // Satu bentuk longgar, bukan discriminated union: pembaca di App mengakses parameter lewat
@@ -21,12 +19,10 @@
 // mana yang terisi untuk section mana (dikunci `routes.test.ts`).
 export type Route = {
   section: string;
-  /** `project`, `changelog`, `skills` (satu project), `qa`, dan `memory` */
+  /** `project`, `skills` (satu project), dan `qa` */
   projectId?: string;
   /** `backlog` dengan SpecDetail terbuka */
   specId?: string;
-  /** `changelog`: rilis terpilih, null = daftar saja */
-  changelogId?: string | null;
   /** `review` */
   kind?: "spec" | "session";
   id?: string;
@@ -40,13 +36,9 @@ export function routePath(r: Route): string {
   switch (r.section) {
     case "project": return `/projects/${seg(r.projectId!)}`;
     case "backlog": return r.specId ? `/backlog/${seg(r.specId)}` : "/backlog";
-    case "changelog":
-      if (!r.projectId) return "/changelog";
-      return `/changelog/${seg(r.projectId)}${r.changelogId ? `/${seg(r.changelogId)}` : ""}`;
     case "review": return `/review/${r.kind}/${seg(r.id!)}`;
     case "skills": return r.projectId ? `/skills/${seg(r.projectId)}` : "/skills";
     case "qa": return r.projectId ? `/qa/${seg(r.projectId)}` : "/qa";
-    case "memory": return r.projectId ? `/memory/${seg(r.projectId)}` : "/memory";
     default: return `/${r.section}`;
   }
 }
@@ -63,10 +55,8 @@ export function parseRoute(pathname: string, navKeys: readonly string[]): Route 
   if (parts.length === 1) return navKeys.includes(head!) ? { section: head! } : null;
   if (head === "projects" && parts.length === 2) return { section: "project", projectId: a };
   if (head === "backlog" && parts.length === 2) return { section: "backlog", specId: a };
-  if (head === "changelog" && parts.length <= 3) return { section: "changelog", projectId: a, changelogId: b ?? null };
   if (head === "skills" && parts.length === 2) return { section: "skills", projectId: a };
   if (head === "qa" && parts.length === 2) return { section: "qa", projectId: a };
-  if (head === "memory" && parts.length === 2) return { section: "memory", projectId: a };
   if (head === "review" && parts.length === 3 && (a === "spec" || a === "session")) return { section: "review", kind: a, id: b };
   return null;
 }

@@ -6,7 +6,6 @@ import { resolveRepoDir } from "./local-binding";
 import { getSetting } from "./settings";
 import { ensureCodexTrust } from "./codex-trust";
 import { createSession, getSessionAsync, killSession, sessionIdForSpec } from "./pty";
-import { prepareSessionMemory } from "./memory/inject";
 import { sessionPhasePlan } from "./orchestration";
 import { blockersForSpec, blockedNote, type SpecBlocker } from "./spec-deps";
 import { phaseFilePath, decisionFilePath, readPhases } from "./session-phases";
@@ -275,12 +274,6 @@ export async function startSpecSession(
     // meneruskannya, klausa "berkas yang berubah" tak bisa dieksekusi tanpa menebak: worktree
     // lahir `--detach`, jadi `main` belum tentu ada dan `HEAD~1` salah.
     const scopeEnv: Record<string, string> = { HANOMAN_BASE_SHA: baseSha, HANOMAN_VERIFY_SCOPE: verifyScope };
-    // ADR-0179 · memori project, diverifikasi terhadap HEAD worktree yang baru lahir. Fail-open.
-    const memory = await prepareSessionMemory({
-      projectId: spec.projectId, cwd: worktree,
-      specText: [spec.title, spec.objective, JSON.stringify(spec.payload ?? "")].join("\n"),
-    });
-    for (const w of memory.warnings) process.stderr.write(`hanoman: ${w}\n`);
     const s = createSession(spec.projectId, worktree, {
       specId: spec.id, flow: opts.flow, model, effort, goal, agent,
       phaseFile: phaseFilePath(repoDir, id),
@@ -291,7 +284,6 @@ export async function startSpecSession(
       // ULANG sesi ini tak boleh dihitung `doneAtBirth`, supaya ⚠ bukti tetap bisa menyala.
       ...(isContinue && plan ? { rerunPhases: plan.phases.map((p) => p.phase) } : {}),
       env: scopeEnv,
-      memoryText: memory.text,
     });
     return resume ? { id: s.id, resumed: true } : { id: s.id };
   }, (pane) => ({ id: pane.id, reused: true }));

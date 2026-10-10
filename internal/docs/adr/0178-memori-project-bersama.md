@@ -1,5 +1,9 @@
 # 0178 — Memori project bersama lintas runtime: entity SQLite, project ditentukan proses, lattice status
 
+> **Digantikan untuk fitur memori project/changelog oleh [ADR-0182](0182-hapus-memori-project-dan-changelog.md).**
+> Dokumen ini mempertahankan keputusan historis; fitur dan data terkait telah dihapus.
+> Kontrak generik sync opsional dan `Spec.doneAt` tetap berlaku.
+
 Tanggal: 2026-10-07 · Status: diterima · Spec: [desain](../../../docs/superpowers/specs/2026-10-07-shared-project-memory-design.md) · Riset: [shared agent memory](../research/research-shared-agent-memory.md)
 
 ## Konteks

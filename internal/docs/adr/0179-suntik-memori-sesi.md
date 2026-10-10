@@ -1,5 +1,9 @@
 # 0179 — Memori project disuntik ke sesi backlog; sesi menulis memori atas namanya sendiri
 
+> **Digantikan untuk fitur memori project/changelog oleh [ADR-0182](0182-hapus-memori-project-dan-changelog.md).**
+> Dokumen ini mempertahankan keputusan historis; fitur dan data terkait telah dihapus.
+> Kontrak generik sync opsional dan `Spec.doneAt` tetap berlaku.
+
 Tanggal: 2026-10-07 · Status: diterima · Melanjutkan [ADR-0178](0178-memori-project-bersama.md) · Plan: [tahap 2](../../../docs/superpowers/plans/2026-10-07-shared-project-memory-stage2.md)
 
 ## Konteks

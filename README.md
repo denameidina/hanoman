@@ -46,7 +46,7 @@ flowchart TD
     D <-->|"baca & jaga sinkron"| F[("docs = Source of Truth")]
     D -. "stream via tmux + xterm.js" .-> B
     B -. "pantau · steer · interupsi" .-> D
-    B -.->|"merge · changelog"| E
+    B -.->|"merge"| E
 ```
 
 Kerja **fitur** lewat alur `brainstorm → objective → spec → plan → execute`.
@@ -80,7 +80,7 @@ awal sampai selesai.
 </tr>
 <tr>
 <td><img src="internal/assets/illustration/web/hnm-ill-spot-durable-knowledge-1x1-master-v01.webp" width="80" alt="" /></td>
-<td><b>Pengetahuan bertahan.</b> Spec, plan, ADR, riwayat sesi, dan changelog tetap ada setelah sesinya tutup — project baru di-scaffold dari nol, codebase lama di-<i>reverse-engineer</i> docs-nya lebih dulu.</td>
+<td><b>Pengetahuan bertahan.</b> Spec, plan, ADR, dan riwayat sesi tetap ada setelah sesinya tutup — project baru di-scaffold dari nol, codebase lama di-<i>reverse-engineer</i> docs-nya lebih dulu.</td>
 </tr>
 </table>
 
@@ -110,7 +110,6 @@ awal sampai selesai.
 | **IDE** | editor + git graph: review diff, rebase/merge, hapus branch |
 | **VPS** | modul operasi server: konsol SSH, katalog kepatuhan, remediasi dry-run |
 | **Docs · SoT** | index Source of Truth, coverage, pratinjau & unduh `.md`/`.pdf` |
-| **Changelog** | rilis per project, dinarasikan agen dari backlog yang selesai |
 | **Settings** | mesin & model sesi, custom agent, token agen, webhook, Telegram, sync |
 
 ## Integrasi

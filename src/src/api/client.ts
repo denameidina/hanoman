@@ -1,4 +1,4 @@
-import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AgentRuntime, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type AgentMetricsView, type AgentInvocationView, type AgentDisposition, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ChangelogView, type ChangelogSources, type ChangelogRequest, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry, type PresenceView,
+import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AgentRuntime, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type AgentMetricsView, type AgentInvocationView, type AgentDisposition, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry, type PresenceView,
   type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
   type ProvisionStep, type ProvisionResult,
   type SessionDialogAnswer, type SessionDialogPayload,
@@ -83,7 +83,6 @@ export type IdeUploadResult = {
 };
 // SPEC-908 · satu definisi di @hanoman/shared; dulu kembar dengan server/src/services/git-ide.ts.
 import type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
-import type { MemoryEventView, MemoryListItem, MemoryStatus, MemoryView } from "@hanoman/shared";
 import type {
   CreateQaCase, CreateQaFinding, CreateQaReport, PatchQaCase, PatchQaFinding, PatchQaReport,
   QaAttachmentView, QaBacklogResult, QaCasesImportResult, QaExportFormat, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
@@ -609,25 +608,11 @@ export function createApi(o: { base?: string } = {}) {
   // SPEC-257 · agent token (kelola cookie-only) — token plaintext hanya balik di create (sekali).
   getAgentCapabilities: () => j<{ capabilities: CapabilityInfo[] }>(paths.agentCapabilities),
   listAgentTokens: () => j<{ items: AgentTokenView[] }>(paths.agentTokens),
-  // ADR-0181 · `projectIds` = allowlist project untuk memori (ADR-0178); null di PATCH = cabut semua.
-  createAgentToken: (b: { name: string; capabilities: string[]; projectIds?: string[] }) =>
+  createAgentToken: (b: { name: string; capabilities: string[] }) =>
     j<AgentTokenView & { token: string }>(paths.agentTokens, { method: "POST", ...body(b) }),
-  patchAgentToken: (id: string, b: { name?: string; capabilities?: string[]; enabled?: boolean; projectIds?: string[] | null }) =>
+  patchAgentToken: (id: string, b: { name?: string; capabilities?: string[]; enabled?: boolean }) =>
     j<AgentTokenView>(paths.agentToken(id), { method: "PATCH", ...body(b) }),
   revokeAgentToken: (id: string) => j<void>(paths.agentToken(id), { method: "DELETE" }),
-  // ADR-0181 · memori project (cookie: project lewat `projectId`). Path ditulis di sini, bukan di
-  // `shared/src/api.ts` — preseden client-accounts di bawah (blast radius `vitest --changed`).
-  memories: (projectId: string, q: { status?: MemoryStatus; q?: string } = {}) =>
-    j<{ items: MemoryListItem[]; total: number }>(`/api/memories?${new URLSearchParams({ projectId, ...(q.status ? { status: q.status } : {}), ...(q.q ? { q: q.q } : {}) })}`),
-  memory: (projectId: string, id: string) =>
-    j<{ memory: MemoryView; events: MemoryEventView[] }>(`/api/memories/${encodeURIComponent(id)}?${new URLSearchParams({ projectId })}`),
-  reviewMemory: (projectId: string, id: string, decision: "activate" | "reject", reason?: string) =>
-    j<{ memory: MemoryView }>(`/api/memories/${encodeURIComponent(id)}/${decision}?${new URLSearchParams({ projectId })}`,
-      { method: "POST", ...body(reason ? { reason } : {}) }),
-  invalidateMemory: (projectId: string, id: string, reason: string) =>
-    j<{ memory: MemoryView }>(`/api/memories/${encodeURIComponent(id)}/invalidate`, { method: "POST", ...body({ reason, projectId }) }),
-  deleteMemory: (projectId: string, id: string) =>
-    j<void>(`/api/memories/${encodeURIComponent(id)}?${new URLSearchParams({ projectId })}`, { method: "DELETE" }),
   // SPEC-617 · ADR-0110 · kelola akun klien (cookie-only, admin). Path ditulis di sini, bukan di
   // `shared/src/api.ts`: modul itu diimpor hampir seluruh repo, dan menyentuhnya meledakkan
   // blast radius `vitest --changed` tanpa memberi apa pun (ADR-0080, preseden SPEC-385).
@@ -700,19 +685,6 @@ export function createApi(o: { base?: string } = {}) {
     j<{ id: string; status: string }>(paths.githubIssueReject(id), { method: "POST", ...body({}) }),
   unlinkGithubIssue: (id: string) =>
     j<{ id: string; status: string; specId: string | null }>(paths.githubIssueUnlink(id), { method: "POST", ...body({}) }),
-  // SPEC-516 · ADR-0105 · changelog per project (capability `docs`).
-  changelogSources: (projectId: string) =>
-    j<ChangelogSources>(paths.changelogSources(projectId)),
-  // SPEC-519 · `q` = cari judul/isi/mode; disaring server sebelum paginate.
-  listChangelogs: (projectId: string, p: { page?: number; limit?: number; q?: string } = {}) =>
-    j<Paginated<ChangelogView>>(paths.changelog(projectId) + qs({ page: p.page, limit: p.limit, q: p.q })),
-  // SPEC-519 · satu rilis lewat id — deep-link bisa menunjuk rilis di luar halaman pertama.
-  getChangelog: (projectId: string, id: string) =>
-    j<ChangelogView>(paths.changelogItem(projectId, id)),
-  generateChangelog: (projectId: string, req: ChangelogRequest) =>
-    j<ChangelogView>(paths.changelog(projectId), { method: "POST", ...body(req) }),
-  deleteChangelog: (projectId: string, id: string) =>
-    j<void>(paths.changelogItem(projectId, id), { method: "DELETE" }),
   // SPEC-299 · ADR-0072 · panel scheduler (daun #6) — konsumen read-only fondasi.
   getSchedulerConfig: () => j<Scheduler>(paths.schedulerConfig),
   putSchedulerConfig: (cfg: Scheduler) => j<Scheduler>(paths.schedulerConfig, { method: "PUT", ...body(cfg) }),

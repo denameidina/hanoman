@@ -43,7 +43,7 @@
   env `CLAUDE_CODE_OAUTH_TOKEN`|`ANTHROPIC_API_KEY`); tak pernah ke client. Private key VPS ada sebagai
   file di server (`Vps.keyPath`), tak pernah di DB.
 - **Boundary eksekusi agen**: API/worker production wajib berjalan sebagai user dedicated non-root.
-  Semua agen—sesi tmux serta lead/changelog one-shot—dibentuk lewat `session-sandbox.ts` dan berjalan
+  Semua agen—sesi tmux serta lead one-shot—dibentuk lewat `session-sandbox.ts` dan berjalan
   di Podman rootless: root filesystem read-only, capability none, no-new-privileges, PID/memory/CPU
   limit, tmpfs private, credential khusus read-only, dan internal network lewat egress allowlist proxy.
   Sesi mendapat hanya worktree-nya read-write; agen one-shot mendapat repo read-only dan prompt 0600.

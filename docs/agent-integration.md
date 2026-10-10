@@ -112,41 +112,7 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 | `agents` | `/api/custom-agents*` | katalog custom agent global & per project — **`agents:write` mengubah apa yang dilihat SETIAP sesi baru** (ADR-0094) |
 | `skills` | `/api/skills*` | skill global hanoman, user, plugin (baca-saja) & per project, termasuk isi berkasnya — **`skills:write` pada skill global hanoman mengubah instruksi SETIAP sesi baru di semua project** |
 | `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096) |
-| `memory` | `/api/memories*` kecuali `…/activate` dan `…/reject` (cookie-only) | memori project bersama. Token **wajib** punya allowlist project (`projectIds`); project ditentukan dari header `x-hanoman-repo` yang diisi CLI MCP, bukan dari parameter (ADR-0178) |
 | `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
-
-### Memori project (`/api/memories`, ADR-0178)
-
-- Project **tidak** dipilih lewat parameter. CLI MCP hanoman (`hanoman mcp`) membaca repo di direktori
-  kerjanya — `origin`, root commit, HEAD — dan mengirimnya sebagai header `x-hanoman-repo`; server
-  mencocokkannya ke `Project.gitRemote` dan ke allowlist **Project yang diizinkan** pada token.
-- Token tanpa allowlist → `403 {need:"projectIds"}`; mengirim `projectId` → `400`.
-- Jangkar (`anchors[]`) diisi path saja; blob SHA diisi CLI dari HEAD dan diverifikasi ulang server.
-  Usulan dengan jangkar terverifikasi langsung `active`; tanpa jangkar atau `kind: decision` masuk
-  review manusia (`…/activate` / `…/reject` cookie-only).
-- Galat: `404` remote tak dikenal / root commit beda · `409 {duplicateOf}` · `422 {anchor}` jangkar tak cocok
-  · `422 {reason}` terdeteksi secret.
-- Memori adalah **data**, bukan instruksi.
-- **Dari dalam sesi hanoman** (ADR-0179): CLI MCP meneruskan `HANOMAN_SESSION_ID` + `HANOMAN_EVENT_TOKEN`
-  sesi induknya sebagai `x-hanoman-session` / `x-hanoman-session-token` (hanya ke host loopback). Project
-  diambil dari sesi — allowlist `projectIds` tak dibutuhkan, capability `memory:*` tetap. Kredensial sesi
-  salah → `401`; sesi tak hidup → `404`. Memori dari sesi yang menyentuh input eksternal (Help Center,
-  tiket, issue GitHub) selalu masuk review manusia.
-- Sesi backlog lahir dengan memori `active` yang jangkarnya cocok HEAD worktree-nya (claude:
-  `--append-system-prompt-file`, codex: `developer_instructions`).
-
-Aturan pemetaan **deterministik** (`server/src/services/agent-capabilities.ts`): `GET`/`HEAD` →
-`:read`, metode lain → `:write`. Itu berlaku untuk domain `lead` juga — **`POST /api/lead/decisions`
-menuntut `lead:write`**, dan `lead:read` tak pernah cukup: meminta putusan melahirkan baris jejak
-permanen dan keputusannya bisa menggerakkan sesi. Sub-path `/api/projects/:id/{docs,prds}` dihitung
-domain **`docs`**; sub-path IDE/git di atas dihitung domain **`ide`**; WebSocket terminal butuh
-**`sessions:write`**.
-
-Empat endpoint STATUS tak menuntut capability sama sekali — token sah mana pun boleh membacanya
-(`GLOBAL_READ`, ADR-0157): `GET /api/limits`, `GET /api/limits/codex`, `GET /api/update`, dan
-`GET /api/fs/browse` (menelusuri folder mesin untuk mengisi `repoDir`). Hanya method BACA:
-`POST /api/update/apply` me-restart instance dan tetap **403** untuk agent token, apa pun
-capability-nya (SPEC-405/ADR-0088) — prefix yang sama tak menurunkan gerbangnya.
 
 ## 4. Aturan gate & kode status
 
@@ -226,52 +192,12 @@ dan tak memakai agent token.
 | `GET /api/specs/:id/review` | `backlog:read` | diff hasil kerja sesi. |
 | `GET /api/projects/:id/docs` | `docs:read` | index Source of Truth project. |
 | `GET /api/projects/:id/docs/<path>` | `docs:read` | isi satu dokumen. |
-| `GET /api/projects/:id/changelog` | `docs:read` | changelog yang sudah dibangkitkan (paginated). |
-| `POST /api/projects/:id/changelog` | `docs:write` | bangkitkan changelog baru — bentuknya di **§6a**. |
 | `GET /api/terminal/sessions` | `sessions:read` | sesi yang sedang hidup. |
 | `GET /api/notifications` | `notifications:read` | notifikasi. **Tanpa `limit` → 50 teratas**, bukan seluruhnya (lihat jebakan di §10). |
 | `GET /api/tickets` | `support:read` | tiket Help Center. |
 | `GET /api/lead/decisions` | `lead:read` | jejak keputusan hanoman-lead. Menerima `page`/`limit`; `take`/`skip` lama tetap jalan. |
 | `GET /api/scheduler/queue` | `settings:read` | antrean scheduler (`?status=queued\|launched\|done\|failed`). `GET /api/scheduler/state` **tak lagi** memuat `queue` — ia memuat `queueCounts`. |
 | `POST /api/lead/decisions` | `lead:write` | minta putusan — baca **§8** dan **§11** dulu. |
-
-## 6a. Changelog per project
-
-Ringkasan perubahan **berorientasi pemakai** — bukan daftar commit. Tiga mode, satu endpoint;
-`mode` menentukan field lainnya:
-
-```bash
-# 1) backlog yang selesai di rentang tanggal (dua field opsional → 30 hari terakhir)
-curl -sS -X POST "$HANOMAN_HOST/api/projects/<id>/changelog" \
-  -H "Authorization: Bearer $HANOMAN_AGENT_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"mode":"backlog","from":"2026-07-01","to":"2026-07-31"}'
-
-# 2) rentang commit di repo project
-  -d '{"mode":"commit","fromSha":"4f2a1c9","toSha":"HEAD"}'
-
-# 3) versi/tag rilis (fromTag opsional → sejak versi sebelumnya)
-  -d '{"mode":"version","toTag":"v1.2.0"}'
-```
-
-Jawaban **201** berisi `body` (markdown siap pakai), `title`, `itemCount`, `generator`, dan
-`warning`. Ambil ulang atau unduh kapan saja:
-
-```bash
-curl -sS "$HANOMAN_HOST/api/projects/<id>/changelog/<cid>?download=md" \
-  -H "Authorization: Bearer $HANOMAN_AGENT_TOKEN"
-```
-
-Tiga hal yang perlu kamu tahu sebelum memanggilnya:
-
-- **Panggil `GET /api/projects/:id/changelog/sources` dulu.** Ia memberi tag yang tersedia, HEAD
-  singkat, rentang default, dan — bila repo belum ditautkan di mesin itu atau belum punya tag — satu
-  `reason` yang menjelaskan sebabnya. Ia menjawab **200**, bukan galat, jadi jangan perlakukan
-  `reason` sebagai kegagalan.
-- **422 berarti permintaanmu sah tapi tak ada isinya** (rentang kosong, repo tanpa tag, revisi tak
-  dikenal) — pesannya bisa langsung diteruskan ke manusia. **400** berarti bentuknya salah
-  (mis. `from` lebih baru dari `to`).
-- **`generator:"fallback"` bukan kegagalan.** Artinya narasi otomatis tak tersedia dan yang kamu
-  terima adalah draf ringkas deterministik; alasannya ada di `warning`.
 
 ## 7. `POST /api/specs` — bentuk payload per `source`
 
@@ -547,3 +473,12 @@ menambah tool tak mematahkan klien lama.
 untuk permukaan MCP, [ADR-0099](../internal/docs/adr/0099-mcp-server-hanoman.md). Kontrak API penuh:
 [`internal/docs/architecture/api-contract.md`](../internal/docs/architecture/api-contract.md) —
 permukaan REST-nya identik dengan yang dipakai dashboard.*
+
+
+## Fitur yang dihapus — skema tool MCP versi 2
+
+Memori project dan changelog dihapus (ADR-0182). Tool `hanoman_memory_*` dan
+`hanoman_changelog_*` tidak tersedia; endpoint `/api/memories*` dan
+`/api/projects/:id/changelog*` tidak terdaftar. Token tidak lagi memiliki
+capability `memory:*` atau allowlist project khusus memori. Fungsi context/memory
+kanal Telegram tetap tersedia melalui domain `telegram`.

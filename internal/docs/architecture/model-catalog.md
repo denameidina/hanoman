@@ -73,7 +73,7 @@ Default global tetap keputusan operator. Model Codex yang ditemukan runtime tida
 ditimpa oleh peta pensiun historis ketika settings dibaca.
 
 Default bawaan claude (`BUILTIN_CLAUDE_RUNTIME_DEFAULTS`, sel orkestrasi per fase, default
-`zSetting`/konflik/lead/Telegram/changelog/portal) memakai alias `sonnet`/`opus`/`haiku`
+`zSetting`/konflik/lead/Telegram/portal) memakai alias `sonnet`/`opus`/`haiku`
 (`RUNTIME_DEFAULTS_VERSION` 2026-09-23-v2; v2 membedakan effort per peran fase, lihat amandemen
 ADR-0164 2026-09-23). Seed boot menimpa nilai yang masih berstatus
 `seeded` — jadi instalasi yang dulu di-seed `claude-sonnet-5` pindah ke `sonnet` sendiri —

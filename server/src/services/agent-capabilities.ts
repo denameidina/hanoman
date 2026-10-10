@@ -54,13 +54,6 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // prefix-nya kebetulan sama dengan endpoint status. Cookie = akses penuh, seperti sebelumnya.
   if (top === "limits" || top === "update" || top === "events" || top === "fs" || top === "health")
     return read ? "GLOBAL_READ" : "COOKIE_ONLY";
-  // ADR-0178 · memori project. Review (activate/reject) mengubah apa yang disuntik ke SETIAP sesi
-  // berikutnya tanpa jangkar yang terverifikasi — itu keputusan manusia, bukan capability.
-  if (top === "memories") {
-    // ADR-0180 · hapus permanen juga keputusan manusia.
-    if (method === "DELETE" || seg[2] === "activate" || seg[2] === "reject") return "COOKIE_ONLY";
-    return rw("memory");
-  }
   if (top === "scheduler") {
     // SPEC-646 · ADR-0112 · cron BUKAN knob. Ia adalah `POST /terminal/sessions` yang ditunda:
     // sebuah baris cron membuat hanoman membuka sesi agen di worktree project, berulang, tanpa
@@ -147,10 +140,7 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     // ke `rw("projects")` — agen harus dipercaya menyunting & menghapus project hanya untuk menulis
     // laporan. `rw()` menurunkan read/write DARI METHOD (kelas bug SPEC-405).
     if (sub === "qa") return rw("qa");
-    // SPEC-516 · ADR-0105 · changelog adalah DOKUMEN, sejajar docs/prds. Tanpa baris ini ia jatuh
-    // ke `rw("projects")` di bawah — artinya agen harus dipercaya menyunting & menghapus project
-    // hanya untuk membaca changelog-nya.
-    if (sub === "docs" || sub === "prds" || sub === "changelog") return rw("docs");
+    if (sub === "docs" || sub === "prds") return rw("docs");
     if (sub === "github") return rw("support");   // SPEC-471 · ADR-0095 · tarik/daftar issue
     // ADR-0155 · HANYA tulisan yang merusak yang pindah ke `ide:git`; seluruh pembacaan tetap
     // di tempatnya. `branches` sengaja TIDAK dijadikan anggota IDE_SUBS: daftar branch adalah

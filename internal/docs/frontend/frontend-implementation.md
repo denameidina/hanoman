@@ -24,7 +24,7 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
 - React + TypeScript (Vite). Komponen dari Hanoman Design System.
 - Layout responsif (SPEC-763): drawer mobile `<768px`, rail 72px pada tablet `768–1199px`, sidebar
   248px pada desktop `≥1200px`; topbar minimum 56px dan dapat wrap; konten maks 1200px (Docs full-width).
-- Bagian: Overview, Projects (list + pagination + cari + hapus project per baris) → **detail project** (identitas, coverage, edit `name`/`desc` lewat `PATCH /projects/:id`, dan pintu: Source of Truth, Terminal, Backlog, Changelog, Reverse docs). `id` tak pernah dapat diubah — ia kunci asing spec (SPEC-146). Hapus project ada di detail dan di header Docs — konfirmasi dulu, ditolak bila ada sesi tmux aktif; rename tidak ditolak, karena `id` tak bergerak. **PRD** (SPEC-210 · ADR-0041 — layar nav sebelum Backlog, **two-pane**: sidebar kiri daftar dokumen PRD yang bisa diklik + pane kanan preview `MarkdownView` inline. Filter project punya opsi **"Semua project"** → `GET /prds` lintas-project (item dikelompokkan per project); satu project terpilih → `GET /projects/:id/prds`; keduanya freshest-wins. **PRD baru** membuka sesi `flow:"prd"` project-level; project target dipilih **di dalam modal** (field `Select` project, default ikut filter aktif atau project pertama saat "Semua project") — tombol selalu aktif, tak perlu memfilter daftar dulu (SPEC-212); **Take ke backlog** membuka `NewSpecModal` ter-prefill dengan tautan PRD di teks Konteks, ke project asal PRD), Backlog (cari teks + filter project/stage/prioritas + tab sumber + tiga mode tampilan grid/list/board + aksi per spec + detail spec via modal: judul, stage bar, objective, field brief/QA), Terminal (sesi Claude Code interaktif di tmux), Docs (tree realtime semua `.md` di repo via `GET /docs`, dikelompokkan per direktori; kategori di luar `docsDir` masuk grup **Lainnya (tidak dinilai)** tanpa status linked — hanya kategori berskor yang masuk coverage, lihat ADR-0013; tombol **Muat ulang** membaca ulang tree, **Hapus** menghapus file asli, path ditampilkan repo-relative tanpa prefix `internal/docs`), VPS (daftar + audit/harden + Test connection + Open Console shell ssh + buka sesi Claude, SPEC-211; **klik baris membuka satu modal** berisi detail VPS — last audit + health disk/mem/load — menyatu dengan checklist kepatuhan 232 item, SPEC-220/221; tak ada lagi side panel terpisah), Tim (papan kerja **manusia** — tiga mode tampilan: Papan kanban empat kolom, Linimasa Gantt rencana, dan Lintas project satu baris ringkas per project; SPEC-946/948/949), Settings (model & effort sesi — **default global**; model/effort dipilih **per sesi saat Start** lewat picker `StartSessionModal`, matrix per-fase dicabut, SPEC-252/ADR-0061; notifikasi, akun, users).
+- Bagian: Overview, Projects (list + pagination + cari + hapus project per baris) → **detail project** (identitas, coverage, edit `name`/`desc` lewat `PATCH /projects/:id`, dan pintu: Source of Truth, Terminal, Backlog, Reverse docs). `id` tak pernah dapat diubah — ia kunci asing spec (SPEC-146). Hapus project ada di detail dan di header Docs — konfirmasi dulu, ditolak bila ada sesi tmux aktif; rename tidak ditolak, karena `id` tak bergerak. **PRD** (SPEC-210 · ADR-0041 — layar nav sebelum Backlog, **two-pane**: sidebar kiri daftar dokumen PRD yang bisa diklik + pane kanan preview `MarkdownView` inline. Filter project punya opsi **"Semua project"** → `GET /prds` lintas-project (item dikelompokkan per project); satu project terpilih → `GET /projects/:id/prds`; keduanya freshest-wins. **PRD baru** membuka sesi `flow:"prd"` project-level; project target dipilih **di dalam modal** (field `Select` project, default ikut filter aktif atau project pertama saat "Semua project") — tombol selalu aktif, tak perlu memfilter daftar dulu (SPEC-212); **Take ke backlog** membuka `NewSpecModal` ter-prefill dengan tautan PRD di teks Konteks, ke project asal PRD), Backlog (cari teks + filter project/stage/prioritas + tab sumber + tiga mode tampilan grid/list/board + aksi per spec + detail spec via modal: judul, stage bar, objective, field brief/QA), Terminal (sesi Claude Code interaktif di tmux), Docs (tree realtime semua `.md` di repo via `GET /docs`, dikelompokkan per direktori; kategori di luar `docsDir` masuk grup **Lainnya (tidak dinilai)** tanpa status linked — hanya kategori berskor yang masuk coverage, lihat ADR-0013; tombol **Muat ulang** membaca ulang tree, **Hapus** menghapus file asli, path ditampilkan repo-relative tanpa prefix `internal/docs`), VPS (daftar + audit/harden + Test connection + Open Console shell ssh + buka sesi Claude, SPEC-211; **klik baris membuka satu modal** berisi detail VPS — last audit + health disk/mem/load — menyatu dengan checklist kepatuhan 232 item, SPEC-220/221; tak ada lagi side panel terpisah), Tim (papan kerja **manusia** — tiga mode tampilan: Papan kanban empat kolom, Linimasa Gantt rencana, dan Lintas project satu baris ringkas per project; SPEC-946/948/949), Settings (model & effort sesi — **default global**; model/effort dipilih **per sesi saat Start** lewat picker `StartSessionModal`, matrix per-fase dicabut, SPEC-252/ADR-0061; notifikasi, akun, users).
 - **Dikte suara** ([ADR-0177](../adr/0177-dikte-suara-seam-speech-engine.md)) — `TerminalPane` menampilkan baris
   `VoiceControls` (tombol mic toggle, pemilih bahasa `id-ID`/`en-US`, pratinjau interim, pesan galat) di antara
   host terminal dan composer, hanya bila `canWrite` dan browser mendukung Web Speech. Teks **final** ditambahkan ke
@@ -106,7 +106,7 @@ memindahkan fokus ke region baru agar fokus tidak tertinggal pada panel yang men
 Keluarga yang mengikuti kontrak itu:
 
 - KPI, metadata, form padat, pseudo-table, dan row aksi (Overview, Projects, Project detail,
-  Backlog, Scheduler, Lead, VPS, Changelog, Settings) turun menjadi satu kolom atau wrap. Projects
+  Backlog, Scheduler, Lead, VPS, Settings) turun menjadi satu kolom atau wrap. Projects
   menjadi row/card berlabel; board Backlog tetap horizontal di scroller lokal dan semua aksi punya
   jalur button non-drag.
 - PRD, Docs, Review, Spec Docs, dan IDE Explorer memakai pemilih master/detail pada mobile lalu
@@ -238,7 +238,7 @@ menambal sendiri.
 - State per-project memakai `scoped(screen, projectId)` sebagai screen key — tanpa itu filter project
   A muncul saat project B dibuka.
 - Yang disimpan untuk sebuah objek terpilih adalah **id/slug**-nya, lalu diresolusi ulang dari daftar
-  hidup (pola `sel` PRD, `selectedId` Changelog, `detailId` VPS).
+  hidup (pola `sel` PRD, `selectedId` `detailId` VPS).
 - Layar berfilter memasang **`<ResetViewButton screen active={n} onReset?>`** di baris penyaringnya.
   `active` dihitung layar (hanya ia yang tahu default field-nya) dan sekaligus menyalakan lencana
   "N filter aktif" — syarat SPEC-740: daftar yang tampak kosong tak boleh terbaca sebagai data kosong.
@@ -270,17 +270,16 @@ menyapu sisanya. Nilai yang gagal di-parse atau salah bentuk jatuh ke default, t
 | vps | — | `detailId` |
 | clients | — | *(tak ada)* — SPEC-919: layar ini tak punya filter, paginasi, maupun pilihan; seluruh isinya didorong grup siar `presence` (cermin Overview) |
 | docs | project | `selected` |
-| changelog | project | `q`, `page`, `selectedId` |
 | settings | — | `tab` |
 
 **Navigasi = URL (ADR-0160).** `section` **diturunkan** dari `pathname` lewat `src/src/routes.ts`
-(`/backlog`, `/projects/<id>`, `/backlog/<specId>`, `/changelog/<p>[/<cl>]`, `/review/<kind>/<id>`);
+(`/backlog`, `/projects/<id>`, `/backlog/<specId>`, `/review/<kind>/<id>`);
 `setSection(key)` = `navigate(routePath(...))`, jadi tombol Kembali/Maju browser dan link yang dibagikan
 bekerja. `app.section` di storage tetap DITULIS tiap rute `HN_NAV` dibuka dan hanya DIBACA saat URL tak
 menunjuk halaman (`/`, key mati `runs`/`triggers`), digerbangi **`NAV_KEYS`** (diekspor `ds/shell.tsx`):
 section transien (`project`/`review`) tak boleh jadi titik mendarat dari storage — dari URL boleh, karena
-id-nya ikut di path. Hash lama (`#spec=`, `#changelog=`, ADR-0071) dibaca sesudah mount lalu **dialihkan**
-(`replace`) ke path barunya; builder `specDeepLink`/`changelogDeepLink` memancarkan path.
+id-nya ikut di path. Hash lama (`#spec=`, ADR-0071) dibaca sesudah mount lalu **dialihkan**
+(`replace`) ke path barunya; builder `specDeepLink` memancarkan path.
 Dua belas layar di luar Overview/Projects/Backlog/PRD adalah `React.lazy` di balik Suspense `gate()`:
 test yang membuka layar itu memakai `findBy*`/`waitFor`, bukan `getBy*` langsung sesudah klik.
 
@@ -858,7 +857,7 @@ backlog per `zStage` (dirangkum done/executing/planned/sisanya→spec — kosaka
 Ini **satu-satunya layar gelap penuh** — dibenarkan peran warna DS "dark terminal = kerja
 aktif": seluruh layar adalah panggung kerja aktif; aksen tetap brass, nol neon. Semua warna
 lewat kelas `.hn-dlg-*` di `app.css`/token (dikunci test kontrak
-`src/test/dalang-hanoman.test.tsx`; cabang section dijaga `changelog-nav.test.tsx`). Animasi
+`src/test/dalang-hanoman.test.tsx`; cabang section dijaga `app-router.test.tsx`). Animasi
 transform/opacity + drop-shadow, padam di blok `prefers-reduced-motion` global; ticker &
 count-up cek `matchMedia` sendiri karena berbasis JS.
 
@@ -1094,7 +1093,7 @@ bisa dibukanya.
 baru menambah entri, bukan memasang mekanisme baru pada layar yang sudah dipakai orang. Cermin
 `TEAM_VIEWS` ↔ cabang render dijaga test kontrak: entri tanpa cabangnya sendiri merender permukaan
 mode **lain** di bawah pilnya, 200 dan nol error — kelas bug yang sama yang dijaga
-`changelog-nav.test.tsx` untuk `HN_NAV`. Karena mode Lintas project memakai komponen kanvas yang
+`app-router.test.tsx` untuk `HN_NAV`. Karena mode Lintas project memakai komponen kanvas yang
 **sama** dengan mode Linimasa, ia wajib membawa `data-testid` sendiri (`TimelineCanvas` menerimanya
 lewat prop `testId`) — tanpa itu ia **lolos** cermin itu sambil melanggar persis apa yang
 dijaganya.
@@ -1455,7 +1454,7 @@ Pemicunya dua, keduanya membuka modal ber-`specId` yang sama:
 
 Renderer Markdown dipakai bersama: `MarkdownView`/`hnDocHtml` (`ds/markdown.tsx`, marked +
 DOMPurify + kelas `.hn-md`) — sumber yang sama untuk `SpecDocsModal`, `DocsWorkspace`, PRD,
-Changelog, IDE, Git Graph, Review, dan Dokumentasi AI Agent. SPEC-759 menjadikan titik cekik ini
+IDE, Git Graph, Review, dan Dokumentasi AI Agent. SPEC-759 menjadikan titik cekik ini
 batas keamanan: HTML hasil `marked.parse()` disanitasi dengan allowlist tag/atribut HTML-only,
 scheme URL aktif dibuang setelah normalisasi, checkbox GFM dibuat inert, dan kegagalan jatuh ke
 `<pre>` ter-escape. Preview baru wajib memakai renderer ini, bukan memanggil parser sendiri.
@@ -2029,47 +2028,6 @@ field email** — server mengambilnya dari akun — dan **tak ada honeypot**: `h
 tab pindah ke Help desk, dan daftar tiket **dimuat ulang dari server** (bukan disisipkan di klien)
 sehingga yang tampil adalah tiket seperti yang dilihat operator.
 
-## Changelog — halaman sendiri, bisa ditautkan (SPEC-519 · mesin: SPEC-516/ADR-0105)
-
-**Changelog** (nav `changelog` "Changelog" `megaphone` di `HN_NAV`, tepat di bawah Docs · SoT; cabang
-`section === "changelog"` di `App.tsx`). Sebelumnya ia hanya panel di halaman detail project — tiga
-klik plus scroll, tanpa label "changelog" yang terlihat sebelum langkah terakhir, tanpa URL, dan
-daftar tersimpannya dipatok 10 tanpa kotak cari. Sekarang:
-
-- **Topbar `actions`** = `Select` project (pola section `docs` — sumbernya `projectId`, "project yang
-  sedang dibuka", **bukan** `projectFilter` yang bermakna "daftar disaring ke mana", SPEC-146) +
-  tombol **Salin link** halaman.
-- `screens/ChangelogScreen.tsx` merakit tiga kartu: **generator** (`ChangelogPanel`, tiga mode
-  SPEC-516), **Riwayat changelog** (kotak cari + daftar bergulir + `Pager`), dan **rilis terpilih**
-  (`MarkdownView` + Salin · Unduh `.md` · Salin link · Hapus).
-- `ChangelogPanel` kini **generator murni**: hasilnya diserahkan lewat `onGenerated` dan dirender
-  kartu rilis yang sama dengan rilis lama — satu jalur render, jadi rilis yang baru dibangkitkan tak
-  muncul dua kali begitu ia dipilih dari daftar.
-- **Cari server-side** lewat `?q=` pada endpoint yang sudah ada (predikat `changelogMatches` di
-  `@hanoman/shared`, disaring sebelum `paginate`). Menyaring di klien hanya menjangkau halaman yang
-  kebetulan termuat — bug yang sedang diperbaiki, dalam bentuk baru. Ketikan di-debounce 220 ms;
-  mengganti `q`/project mereset `page` ke 1.
-- **Daftar bergulir memakai tinggi berbatas** (`maxHeight: 340` + `overflowY: "auto"`), **bukan**
-  `LIST_SCROLL_STYLE`: `Card` menyisipkan pembungkus `display:block` di sekitar `children` kecuali
-  prop `fill` dipasang, dan rantai flex yang menembusnya putus (audit SPEC-393). Kartu ini duduk di
-  antara dua kartu lain di kolom yang menggulir bersama `<main>`, jadi tinggi tetap adalah bentuk
-  yang benar di sini — bukan kompromi.
-- **Deep-link `#changelog=<projectId>[&cl=<changelogId>]`** (`screens/deeplink.ts`, pola hash
-  ADR-0071 yang sama dengan `#spec=`): di-parse **sekali saat mount** lalu hash dibersihkan dengan
-  `history.replaceState`. Kedua parser **saling eksklusif** — satu hash, satu section — dan
-  `setProjectId` dari hash menang atas default `load()` karena load memakai `(cur) => cur || items[0]`.
-  `&cl=` diambil **per-id** lewat `api.getChangelog`, sebab rilis yang ditautkan belum tentu ada di
-  halaman pertama.
-- **Detail project** tak lagi memuat generatornya; ia menunjuk ke sini lewat **pintu** "Changelog".
-  Prop `onGotoChangelog` sengaja **wajib** supaya pintunya tak bisa hilang diam-diam, dan grid pintu
-  pindah ke `repeat(auto-fit, minmax(190px, 1fr))` agar jumlahnya tak perlu dihitung tangan lagi.
-
-**Kontrak nav ⇄ App.** Setiap key `HN_NAV` wajib punya cabang `section === "<key>"` di `App.tsx`;
-tanpa itu `screen` tetap `null` dan App merender **kosong** — sidebar ikut hilang dan pengguna
-terjebak sampai reload (`runs`/`triggers` pernah begitu, SPEC-162). Sejak SPEC-519 aturan itu dijaga
-test (`src/test/changelog-nav.test.tsx`) yang mengenumerasi `HN_NAV` melawan sumber `App.tsx`, bukan
-hanya komentar di `shell.tsx`.
-
 ## Badge "butuh pengajuan" di sidebar (SPEC-961)
 
 Sidebar tak pernah menjawab pertanyaan pertama operator tiap kali membuka dashboard: **apa lagi yang
@@ -2327,12 +2285,9 @@ Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa p
   `Detail fase <nama>` memakai `usePopoverFocus` DS (`aria-haspopup`/`aria-controls`, fokus masuk panel,
   Esc & klik-luar menutup, fokus kembali ke chip).
 
-## Halaman Memori (`/memory[/<projectId>]`, [ADR-0181](../adr/0181-dashboard-memori.md))
+## Penghapusan memori project dan changelog (ADR-0182)
 
-`src/src/screens/memory/MemoryWorkspace.tsx` (+ `memory-ui.ts`) mengikuti pola Workspace QA: `useApi()`,
-`Select` project di header, `Tabs` *Perlu review / Aktif / Arsip*, satu `Card` per memori, `Modal` alasan
-(`HnTextarea aria-label="Alasan"`), `useConfirm` untuk hapus permanen. Realtime: `useLiveTopic({ topic:
-"memory", params: { projectId } })` — frame membawa `revision`; frame pertama = garis dasar, berikutnya yang
-berbeda memicu muat ulang HTTP. Nav: `HN_NAV` key `memory` (ikon `brain`, terdaftar di `icon-registry`),
-badge `PendingCounts.memory`, notifikasi `memory` → `/memory/<projectId>`. Settings → Akses AI Agent:
-`MultiSelect` allowlist project saat membuat token + editor "Atur project" per token.
+Menu, halaman, pintu project, API client, setelan agen changelog, dan allowlist
+project token khusus memori dihapus. Notifikasi/badge memori tidak lagi dirender.
+URL `/memory*` dan `/changelog*` serta state section lama mengikuti fallback
+navigasi yang sudah ada. UI tidak menyediakan akses ke data fitur yang dihapus.

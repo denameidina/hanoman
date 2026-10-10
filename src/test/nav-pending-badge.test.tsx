@@ -23,6 +23,12 @@ const renderNav = (counts: PendingCounts | null) =>
 const badges = () => screen.queryAllByTestId("nav-badge").map((b) => b.textContent);
 
 describe("SPEC-961 · badge butuh pengajuan di sidebar", () => {
+  it("sidebar tidak lagi menawarkan Memori atau Changelog", () => {
+    renderNav(EMPTY_PENDING);
+    expect(screen.queryByText("Memori")).toBeNull();
+    expect(screen.queryByText("Changelog")).toBeNull();
+  });
+
   it("merender angka hanya pada permukaan yang punya antrean", () => {
     renderNav({ ...EMPTY_PENDING, triage: 3, backlog: 12, prd: 0, lead: 0 });
     expect(badges()).toEqual(["12", "3"]);   // urutan HN_NAV: PRD · Backlog · … · Triase

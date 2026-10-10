@@ -1,5 +1,9 @@
 # 0180 — Memori project menyeberang lewat record-sync sebagai entitas OPSIONAL
 
+> **Digantikan untuk fitur memori project/changelog oleh [ADR-0182](0182-hapus-memori-project-dan-changelog.md).**
+> Dokumen ini mempertahankan keputusan historis; fitur dan data terkait telah dihapus.
+> Kontrak generik sync opsional dan `Spec.doneAt` tetap berlaku.
+
 Tanggal: 2026-10-07 · Status: diterima · Melanjutkan [ADR-0178](0178-memori-project-bersama.md), [ADR-0179](0179-suntik-memori-sesi.md) · Plan: [tahap 3](../../../docs/superpowers/plans/2026-10-07-shared-project-memory-stage3.md)
 
 ## Konteks

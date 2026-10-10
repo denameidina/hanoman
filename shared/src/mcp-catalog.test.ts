@@ -83,7 +83,7 @@ describe("katalog tool MCP", () => {
   });
 
   it("versi skema tool ada dan disebut di instructions", () => {
-    expect(MCP_TOOL_SCHEMA_VERSION).toBe(1);
+    expect(MCP_TOOL_SCHEMA_VERSION).toBe(2);
     expect(MCP_INSTRUCTIONS).toContain(String(MCP_TOOL_SCHEMA_VERSION));
   });
 
@@ -125,8 +125,8 @@ describe("katalog tool MCP", () => {
       .toEqual([]);
   });
 
-  it("penambahan tool TIDAK menaikkan versi skema — ia aditif menurut kontraknya sendiri", () => {
-    expect(MCP_TOOL_SCHEMA_VERSION).toBe(1);
+  it("versi 2 menghapus memori/changelog, kontrak inti v1 tetap tersedia", () => {
+    expect(MCP_TOOL_SCHEMA_VERSION).toBe(2);
     expect(MCP_TOOLS.length).toBeGreaterThanOrEqual(V1_CONTRACT.length);
   });
 });
@@ -212,7 +212,6 @@ const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "
 // tool, jadi daftar ini tak bisa mendahului katalognya.
 const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   "hanoman_docs_delete",       // menghapus berkas .md; capability tetap docs:write
-  "hanoman_changelog_delete",  // menghapus entri changelog; capability tetap docs:write
   "hanoman_ide_entry_delete",  // menghapus berkas/folder working tree; capability tetap ide:write
   "hanoman_skill_delete",      // menghapus folder skill dari disk; capability tetap skills:write
   // Gerbang `backlog:lifecycle`-nya hidup di HANDLER (routes/specs.ts), bukan di
@@ -264,16 +263,7 @@ describe("mode ⇔ capability", () => {
       expect(t.description.slice(0, 12), t.name).toMatch(/BERBAHAYA/);
   });
 
-  it("tool memori tak pernah menerima parameter project dan semuanya repoContext", () => {
-    const mem = MCP_TOOLS.filter((t) => t.name.startsWith("hanoman_memory_"));
-    expect(mem.map((t) => t.name).sort()).toEqual([
-      "hanoman_memory_get", "hanoman_memory_invalidate", "hanoman_memory_propose",
-      "hanoman_memory_reverify", "hanoman_memory_search", "hanoman_memory_supersede",
-    ]);
-    for (const t of mem) {
-      expect(t.repoContext, t.name).toBe(true);
-      const props = Object.keys((t.inputSchema as { properties?: object }).properties ?? {});
-      expect(props.some((p) => /project/i.test(p)), t.name).toBe(false);
-    }
+  it("tool memori project dan changelog tidak lagi ditawarkan", () => {
+    expect(MCP_TOOLS.filter((t) => /^hanoman_(memory|changelog)_/.test(t.name))).toEqual([]);
   });
 });

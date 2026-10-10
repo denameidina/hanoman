@@ -199,8 +199,8 @@ tiap berkas.
   Ikut `FIELDS.spec` **dan** `DATE_FIELDS.spec` (kelas gagal-senyap yang sama seperti
   `createdAt`/`startedAt`). Baris pra-migration di-backfill dari `Notification` ber-key
   `done:<specId>` — stempel yang sudah ada sejak SPEC-180 dan sumber yang sama dengan sweep
-  auto-merge ADR-0103; item yang selesai sebelum itu tetap `null` dan **dilaporkan sebagai catatan**
-  di hasil changelog, bukan disamarkan.
+  auto-merge ADR-0103; item yang selesai sebelum itu tetap `null`. Kolom tetap digunakan
+  backlog dan portal setelah changelog dihapus (ADR-0182).
 - `manualDone` (Json?, SPEC-804 · [ADR-0120](../adr/0120-tandai-backlog-selesai-manual.md)) — **jejak
   penandaan selesai MANUAL** `{ at, by, reason? }` yang ditulis `POST /specs/:id/done`. `null` = item
   selesai lewat sesi, atau belum selesai. **Satu kolom, bukan tiga skalar** (`doneBy`/`doneMarkedAt`/
@@ -376,24 +376,6 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   panggilan** (tanpa cache) dari dalam `decide()` → ganti setelan **berlaku tanpa restart**, dikunci
   `server/test/lead-engine-argv.test.ts` yang memanggil `decide()` dua kali dalam satu proses
   dengan baris `Setting` berbeda di antaranya.
-- `changelog` (SPEC-518, `zAgentEngine`, **default MATI**) — runtime/model/effort **khusus agen
-  pembuat changelog** ([ADR-0105](../adr/0105-changelog-per-project.md)):
-  `{ enabled:false, agent:"claude", model:"claude-opus-5", effort:"xhigh" }`. Dibaca
-  `changelogAgentDefaults()` (`services/changelog/config.ts`) dan dipakai di **satu** call site —
-  `generateChangelog()`, satu-satunya tempat changelog men-spawn agen. **Opt-in**: selama `enabled`
-  mati helper mendelegasikan penuh ke `sessionAgentDefaults()`, jadi instalasi yang ada tak berubah
-  satu argv pun. Skemanya **`zAgentEngine` yang sama** dengan `lead.engine` & `telegram.engine`
-  (SPEC-492) — bukan definisi kelima; **flat**, bukan `changelog.engine`, karena bloknya hanya
-  override agen dan tak punya knob tetangga (cermin `conflict`). Effort codex dikoersi **di dalam
-  resolver**, bukan hanya di picker: `PUT /settings` ber-`AgentToken` tak melewati UI mana pun.
-  Ditambahkan sebagai `.default(CHANGELOG_ENGINE_DEFAULTS)` → baris Setting lama tetap parse,
-  **tanpa migration**. Permukaan operatornya kartu **"Agen changelog"** di Settings → Model sesi,
-  yang menulis lewat **`PUT /settings`** (bukan endpoint khusus seperti kartu lead, dan bukan
-  baca-ulang seperti kartu Telegram): blok ini **tak punya penulis kedua**. Nilainya dibaca
-  `getSetting()` tiap panggilan → ganti setelan berlaku pada pembangkitan berikutnya **tanpa
-  restart**, dikunci `server/test/changelog-engine.test.ts` yang memanggil `generateChangelog()`
-  dua kali dalam satu proses dengan baris `Setting` berbeda di antaranya.
-
 ## RuntimeConfig (LOCAL-only)
 
 Override konfigurasi mesin ini: `key` unik, `value`, `updatedAt`. Secret disimpan sebagai amplop
@@ -1013,28 +995,6 @@ tanpa error tapi assignee kosong (kelas SPEC-885). `Member` sendiri tak punya in
 Konsekuensinya `data.cascade` pada `project.deleted` **kurang melaporkan** task yang ikut terhapus —
 dinyatakan, bukan terlupa (lihat ADR-0150 keputusan 11).
 
-## Changelog (SPEC-516 · [ADR-0105](../adr/0105-changelog-per-project.md))
-Changelog naratif per project yang **sudah dibangkitkan** — teks pendek berorientasi pemakai, hasil
-dari salah satu tiga mode: rentang tanggal atas backlog `done` (`Spec.doneAt`), rentang SHA commit,
-atau versi/tag rilis.
-
-- Kolom: `id` (cuid), `projectId` (FK → `Project`, **cascade**), `mode` (`backlog|commit|version`),
-  `title`, `params` (Json — permintaan apa adanya, `zChangelogRequest`), `body` (markdown final,
-  sudah lewat `scrubOutput`), `generator` (`agent|fallback`), `warning?`, `itemCount`,
-  `createdAt`/`updatedAt`. Index `(projectId, createdAt)`.
-- **LOCAL-only — TANPA kolom `version`**, jadi ia tak pernah masuk changefeed sync (cermin
-  `LeadFlow`, `WebhookEndpoint`, `Project.autoMerge`): dua dari tiga modenya diturunkan dari
-  **checkout git di mesin ini**, jadi barisnya fakta lokal. Yang portabel adalah keluarannya, dan
-  jalannya sudah ada — unduh `.md` lewat `?download=` ([ADR-0078](../adr/0078-unduh-dokumen-md-pdf.md)).
-- **Disimpan, bukan diturunkan** — berlawanan dengan ADR-0018 dan disengaja: tiap pembangkitan ulang
-  membakar satu panggilan agen. `generator: "fallback"` menandai baris yang lahir dari draf
-  deterministik karena agen gagal/tak terpasang; `warning` menyimpan alasannya + catatan cakupan.
-- **Wajib ada di `PG_ORDER`** (`cli/src/commands/migrate-pg.ts`), **sesudah `Project`** —
-  `cli/test/migrate-pg.test.ts` menuntut daftar itu sama persis dengan model DMMF, dan itulah
-  satu-satunya gerbang yang menangkap model baru yang lupa didaftarkan.
-- **Sengaja BUKAN `WEBHOOK_ENTITIES`** (ADR-0100): artefak yang dibangkitkan atas permintaan, bukan
-  perubahan keadaan yang perlu disiarkan.
-
 ## Docs (Source of Truth) — TIDAK dipersist
 Docs bukan entitas DB. Tabel `DocFile` sudah di-drop (ADR-0011). Docs dibaca **live dari path
 efektif** (`resolveRepoDir` = binding per-mesin ?? `Project.repoDir` — SPEC-217): korpus = semua
@@ -1181,31 +1141,9 @@ render dari urutan `createdAt` (seri → `id`), jadi id acak tak pernah bentrok 
 (polimorfik, **tanpa FK**: service menghapus lampiran pemilik lebih dulu), `filename`, `mimeType`, `size`, `sha256` (byte TERSIMPAN),
 `storageKey`, `syncState` — **LOCAL per mesin, tak ikut FIELDS**: `local-only` (byte hanya di sini) · `remote` (metadata ada, byte belum diunduh) · `available` · `failed`. Metadata menyeberang lewat feed; **byte tak pernah** (endpoint `/api/sync/qa-attachments/:id`).
 
-## ProjectMemory / MemoryEvent / MemoryLocalState (memori project bersama · [ADR-0178](../adr/0178-memori-project-bersama.md))
+## Model yang dihapus (ADR-0182)
 
-`ProjectMemory` — satu fakta per baris. `projectId` (cascade), `kind` (`convention` · `gotcha` · `decision` · `fact`),
-`content` (≤ 500 karakter), `scopePaths` (JSON glob relatif root repo; `[]` = seluruh project), `anchors` (JSON
-`[{path, blobSha, lines?}]`), `status` (`proposed` · `active` · `invalidated` · `rejected` — **lattice monoton**, hanya naik),
-`supersedesId`, `reviewReason` (`decision` · `no-anchor` · `anchor-unverified` · `untrusted-source`), asal-usul
-(`sourceRuntime` `claude`·`codex`·`external`·`human`, `sourceSessionId`, `sourceTokenId`, `sourceDeviceId` — diisi tahap sync,
-`commitSha`), `trusted`, `version`. `content`/`anchors`/`scopePaths`/`kind` **tak pernah diedit**: koreksi = baris baru
-ber-`supersedesId`. Indeks `[projectId, status]`.
-
-`MemoryEvent` — jejak audit **append-only**: `memoryId` (cascade), `op` (`propose` · `activate` · `reject` · `invalidate` ·
-`supersede` · `reverify`), `actorKind` (`user` · `token` · `session` · `system`), `actorId`, `reason`. Indeks `[memoryId, createdAt]`.
-
-`MemoryLocalState` — **LOCAL-only, tak pernah disync**: `memoryId` (PK, tanpa FK), `verdict` (`valid` · `stale` ·
-`unverifiable`), `verifiedHead`, `lastVerifiedAt`, `lastUsedAt`. Diisi setiap kali sesi backlog lahir
-([ADR-0179](../adr/0179-suntik-memori-sesi.md)): semua kandidat `active` diverifikasi, `lastUsedAt` hanya untuk yang tersuntik.
-
-`AgentToken.projectIds` — JSON `string[]` nullable: allowlist project untuk route memori. `null`/`[]` = token tak boleh
-menyentuh `/api/memories*` sama sekali.
-
-### Sync memori ([ADR-0180](../adr/0180-sync-memori-entitas-opsional.md))
-
-`ProjectMemory` dan `MemoryEvent` (kini ber-`version` + `updatedAt`) masuk `SYNCED` sebagai **entitas
-opsional** (`OPTIONAL_ENTITIES`): hub hanya mengirimnya ke client yang menyebut `entities=`, dan kursor
-pull melompati baris tersaring. `MemoryLocalState` tetap LOCAL-only. `SyncState.entities` (LOCAL-only)
-mencatat entitas opsional yang sudah di-catch-up mesin ini. Merge: lattice status untuk `projectMemory`,
-idempoten untuk `memoryEvent`; tak pernah `SyncConflict` selama field immutable sama.
-
+`Changelog`, `ProjectMemory`, `MemoryEvent`, dan `MemoryLocalState` serta
+`AgentToken.projectIds` dihapus berikut data oleh migration 20261010070000.
+Setting tidak lagi memiliki blok `changelog`. `Spec.doneAt` tetap menjadi stempel
+selesai backlog; `SyncState.entities` tetap mendukung negosiasi sync umum.

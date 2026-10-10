@@ -175,3 +175,7 @@ dan project ber-`repoDir` null tetap harus bisa menghasilkan PRD. ADR-0041 tetap
 9. **Kedua model LOCAL-only** — tak masuk `SYNCED` maupun `WEBHOOK_ENTITIES` (cermin
    `ClientProjectAccess`), tetapi **wajib** masuk `PG_ORDER`; `cli/test/migrate-pg.test.ts`
    mengadunya ke DMMF.
+
+
+> **Amandemen ADR-0182:** proyeksi `catatan-rilis.md` dari Changelog dihapus dari workspace
+> portal chat; workspace tetap memuat project, pekerjaan, laporan, dan PRD.

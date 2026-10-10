@@ -102,14 +102,10 @@ function Door({ icon, title, hint, onClick }:
   );
 }
 
-export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onGotoBacklog, onGotoChangelog, onGotoSkills, onGotoMemory, onDelete, onReverse, onScaffold, onToast, onProjectChanged }:
+export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onGotoBacklog, onGotoSkills, onDelete, onReverse, onScaffold, onToast, onProjectChanged }:
   { p: ProjectVM; onEdit: () => void; onGotoDocs: () => void; onGotoTerminal: () => void;
     onGotoBacklog: () => void;
-    // SPEC-519 · changelog punya halamannya sendiri (entri sidebar + deep-link); di sini ia pintu,
-    // bukan panel — dua salinan generator berarti dua tempat yang bisa berbeda perilaku.
-    onGotoChangelog: () => void;
     onGotoSkills?: () => void;
-    onGotoMemory?: () => void;   // ADR-0181
     onDelete: () => void; onReverse?: () => void; onScaffold?: () => void;
     onToast: (msg: string, kind?: string, icon?: string) => void;
     // SPEC-258 · dipanggil sesudah mutasi in-card (Help Center) agar App refetch VM & status persist.
@@ -183,9 +179,7 @@ export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onG
         <Door icon="book-open" title="Source of Truth" hint="baca & sunting docs" onClick={onGotoDocs} />
         <Door icon="terminal" title="Buka terminal" hint="sesi claude project ini" onClick={onGotoTerminal} />
         <Door icon="list-checks" title="Lihat backlog" hint={`${p.backlog} spec terbuka`} onClick={onGotoBacklog} />
-        <Door icon="megaphone" title="Changelog" hint="ringkasan rilis untuk pemakai" onClick={onGotoChangelog} />
         {onGotoSkills && <Door icon="sparkles" title="Skills" hint="skill project & global warisan" onClick={onGotoSkills} />}
-        {onGotoMemory && <Door icon="brain" title="Memori" hint="fakta & keputusan project untuk agen" onClick={onGotoMemory} />}
         {onReverse && <Door icon="radar" title="Reverse docs" hint="susun Source of Truth dari kode" onClick={onReverse} />}
         {onScaffold && <Door icon="sparkles" title="Scaffold docs" hint="susun Source of Truth dari ide" onClick={onScaffold} />}
       </div>

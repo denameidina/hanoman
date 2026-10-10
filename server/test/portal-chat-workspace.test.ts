@@ -6,7 +6,7 @@ import { buildChatWorkspace } from "../src/services/portal-chat/workspace";
 
 const clean = async () => {
   await prisma.ticket.deleteMany(); await prisma.spec.deleteMany();
-  await prisma.changelog.deleteMany(); await prisma.project.deleteMany();
+  await prisma.project.deleteMany();
 };
 beforeEach(clean); afterAll(clean);
 
@@ -40,7 +40,7 @@ describe("workspace dokumen chat portal (SPEC-854 · ADR-0129)", () => {
     const ws = await buildChatWorkspace("p1");
     try {
       const files = walk(ws.dir).sort();
-      expect(files).toEqual(["catatan-rilis.md", "laporan.md", "pekerjaan.md", "project.md"]);
+      expect(files).toEqual(["laporan.md", "pekerjaan.md", "project.md"]);
       for (const f of files) expect(f.endsWith(".md"), f).toBe(true);
     } finally { ws.cleanup(); }
   });

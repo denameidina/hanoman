@@ -42,6 +42,13 @@ const openModel = () => {
 // SPEC-383 · Temuan A · blok claude tak pernah menyebut "claude" di teks yang TERLIHAT (hanya
 // aria-label), dan judul "default global" tetap terpampang di atas blok yang sedang tak dipakai.
 describe("SPEC-383 · tab Model sesi bersumbu agen", () => {
+  it("tidak lagi menawarkan kontrol agen changelog", async () => {
+    openModel();
+    await screen.findByLabelText("Model claude");
+    expect(screen.queryByText("Agen changelog")).toBeNull();
+    expect(screen.queryByLabelText("Override agen changelog")).toBeNull();
+  });
+
   it("menerima model baru saat Settings terbuka tanpa menulis default sampai operator memilihnya", async () => {
     vi.mocked(api.getSettings).mockResolvedValue(settings({ effort: "ultracode" }) as any);
     vi.mocked(api.putSettings).mockClear();

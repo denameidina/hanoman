@@ -33,9 +33,6 @@ export const CAPABILITY_IDS = [
   // "Backlog — tulis" diam-diam membuka papan orang, dan sebaliknya.
   "team:read", "team:write",
   "qa:read", "qa:write",
-  // ADR-0178 · memori project bersama. Domain TERSENDIRI, MENURUT METHOD: menulis memori mengubah
-  // konteks yang dibaca SETIAP agen berikutnya di project itu. Review (activate/reject) cookie-only.
-  "memory:read", "memory:write",
   // ADR-0155 · akses KETIGA: `danger`. Dipecah dari `:write` karena keempat operasi ini bukan
   // "menulis lebih banyak", melainkan menjalankan sesuatu di luar proses hanoman — sesi agen di
   // worktree, perintah di VPS, git yang mengubah sejarah, penghapusan artefak dokumen.
@@ -84,8 +81,6 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "team:write", domain: "team", access: "write", label: "Tim — tulis", desc: "Buat/ubah/hapus kartu papan Tim & anggota; eskalasi kartu jadi backlog item." },
   { id: "qa:read", domain: "qa", access: "read", label: "QA — baca", desc: "Lihat laporan QA, test case, temuan, dan lampirannya." },
   { id: "qa:write", domain: "qa", access: "write", label: "QA — tulis", desc: "Buat/ubah/hapus laporan QA, test case, temuan, lampiran; impor laporan Markdown/ZIP." },
-  { id: "memory:read", domain: "memory", access: "read", label: "Memori — baca", desc: "Cari & baca memori project (dibatasi allowlist project token)." },
-  { id: "memory:write", domain: "memory", access: "write", label: "Memori — tulis", desc: "Usulkan, gantikan, verifikasi ulang, batalkan memori project." },
   // ADR-0155 · akses `danger`. Tak satu pun diimplikasikan `:write` di domainnya; manusia harus
   // mencentangnya sendiri di Settings → Akses AI Agent.
   { id: "sessions:spawn", domain: "sessions", access: "danger", label: "Sesi — buka sesi baru", desc: "Membuka sesi agen BARU di worktree (menjalankan claude/codex dengan izin penuh). Dipisah dari Sesi — tulis: mengendalikan sesi yang sudah ada tak lagi cukup untuk membuka yang baru.", risk: "rce" },
@@ -114,7 +109,6 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "telegram", label: "Telegram", desc: "Status, binding, memory, reply, dan audit kanal operator Telegram." },
   { domain: "team", label: "Tim", desc: "Kartu papan Tim (kerja manusia), direktori anggota, eskalasi kartu ke backlog." },
   { domain: "qa", label: "QA", desc: "Laporan QA per project: test case, temuan, lampiran, ekspor/impor." },
-  { domain: "memory", label: "Memori", desc: "Memori project bersama lintas runtime; butuh allowlist project pada token." },
 ];
 
 // write meng-implikasikan read pada domain yang sama.
@@ -127,8 +121,6 @@ export function grantsCapability(granted: string[], need: Capability): boolean {
 export const zAgentTokenView = z.object({
   id: z.string(), name: z.string(), tokenPrefix: z.string(),
   capabilities: z.array(zCapability), enabled: z.boolean(),
-  // ADR-0178 · null = token tak boleh menyentuh route memori.
-  projectIds: z.array(z.string()).nullable(),
   createdBy: z.string().nullable(), createdAt: z.string(),
   lastUsedAt: z.string().nullable(), revokedAt: z.string().nullable(),
 });
@@ -137,11 +129,9 @@ export type AgentTokenView = z.infer<typeof zAgentTokenView>;
 export const zAgentTokenCreate = z.object({
   name: z.string().min(1),
   capabilities: z.array(zCapability),
-  projectIds: z.array(z.string().min(1)).max(100).optional(),
 });
 export const zAgentTokenPatch = z.object({
   name: z.string().min(1).optional(),
   capabilities: z.array(zCapability).optional(),
   enabled: z.boolean().optional(),
-  projectIds: z.array(z.string().min(1)).max(100).nullable().optional(),
 });
