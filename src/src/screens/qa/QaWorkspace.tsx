@@ -15,10 +15,12 @@ type Props = {
   projectId: string | undefined;
   onSelectProject: (id: string) => void;
   onToast?: (m: string) => void;
+  onOpenSession?: (id: string) => void;
 };
 
-export function QaWorkspace({ projects, projectId, onSelectProject, onToast }: Props) {
+export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onOpenSession }: Props) {
   const api = useApi();
+  const [syncBusy, setSyncBusy] = React.useState(false);
   const [reports, setReports] = React.useState<QaReportView[] | null>(null);
   const [error, setError] = React.useState(false);
   const [open, setOpen] = React.useState<QaReportDetail | null>(null);
@@ -44,6 +46,18 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast }: P
 
   const openReport = async (id: string) => {
     try { setOpen(await api.qaReport(projectId, id)); } catch (e) { onToast?.(errText(e)); }
+  };
+  const synchronize = async () => {
+    if (syncBusy) return;
+    setSyncBusy(true);
+    try {
+      const result = await api.syncNow();
+      if (!result.ok) { onToast?.(result.reason === "not-configured" ? "Sinkronisasi belum dikonfigurasi. Hubungkan server dan device token di Settings." : result.reason ?? "Sinkronisasi gagal"); return; }
+      await reload();
+      if (open) setOpen(await api.qaReport(projectId, open.id));
+      onToast?.("QA disinkronkan. Lampiran dipindahkan bertahap pada siklus sinkronisasi.");
+    } catch (e) { onToast?.(errText(e)); }
+    finally { setSyncBusy(false); }
   };
   const create = async () => {
     const t = title.trim();
@@ -73,6 +87,7 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast }: P
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <Select aria-label="Project" value={projectId} onChange={(e) => onSelectProject(e.target.value)}
           options={projects.map((p) => ({ value: p.id, label: p.name }))} />
+        <Button variant="secondary" disabled={syncBusy} loading={syncBusy} onClick={() => void synchronize()}>Sinkronkan QA</Button>
         {!open && (
           <>
             <Button leftIcon="plus" onClick={() => setCreating(true)}>Laporan baru</Button>
@@ -86,7 +101,7 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast }: P
       {!open && <p style={{ margin: 0, color: "var(--text-subtle)", maxWidth: "70ch" }}>Catat hasil pengujian aplikasi dalam satu laporan. Mulai dengan laporan baru, atau unduh template Excel lalu isi dan impor kembali bersama lampirannya.</p>}
       {importWarnings.length > 0 && <div role="status"><p>Laporan berhasil diimpor. Beberapa lampiran perlu ditambahkan:</p><ul>{importWarnings.map((m, i) => <li key={i}>{m}</li>)}</ul></div>}
       {open ? (
-        <QaReportEditor detail={open} projectId={projectId} onChange={setOpen} onToast={onToast}
+        <QaReportEditor detail={open} projectId={projectId} onChange={setOpen} onToast={onToast} onOpenSession={onOpenSession}
           onBack={() => { setOpen(null); void reload(); }}
           onDeleted={() => { setOpen(null); void reload(); }} />
       ) : error ? (

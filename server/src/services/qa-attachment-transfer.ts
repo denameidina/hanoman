@@ -55,6 +55,7 @@ async function fetchThrough(id: string): Promise<Buffer | null> {
 }
 
 const UPLOAD_BATCH = 5;
+let uploadCursor = "";
 
 /**
  * Unggah byte lampiran yang lahir di mesin ini (`syncState = local-only`). Dipanggil di akhir `syncOnce`, SESUDAH
@@ -67,8 +68,13 @@ export async function uploadPendingQaBytes(): Promise<{ uploaded: number; failed
   const hub = hubOf();
   if (!hub) return out;
   const queued = new Set((await listOutbox()).filter((o) => o.entity === "qaAttachment").map((o) => o.recordId));
-  const rows = await prisma.qaAttachment.findMany({ where: { syncState: "local-only" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: UPLOAD_BATCH + queued.size });
+  const pendingRows = (after: string) => prisma.qaAttachment.findMany({
+    where: { syncState: "local-only", id: { gt: after } }, orderBy: { id: "asc" }, take: UPLOAD_BATCH + queued.size,
+  });
+  let rows = await pendingRows(uploadCursor);
+  if (!rows.length && uploadCursor) { uploadCursor = ""; rows = await pendingRows(""); }
   for (const a of rows.filter((r) => !queued.has(r.id)).slice(0, UPLOAD_BATCH)) {
+    uploadCursor = a.id;
     const bytes = QA_STORAGE_KEY.test(a.storageKey) ? await readUpload(a.storageKey).catch(() => null) : null;
     if (!bytes) { await prisma.qaAttachment.update({ where: { id: a.id }, data: { syncState: "failed" } }); out.failed++; continue; }
     try {
@@ -84,4 +90,27 @@ export async function uploadPendingQaBytes(): Promise<{ uploaded: number; failed
     } catch { /* jaringan: coba lagi nanti */ }
   }
   return out;
+}
+
+// Rotate the cursor even when a peer has not uploaded the bytes yet. A missing file must not
+// starve every newer attachment. State remains remote on failure, so later cycles retry.
+let downloadCursor = "";
+export async function downloadPendingQaBytes(): Promise<{ downloaded: number; pending: number }> {
+  if (!hubOf()) return { downloaded: 0, pending: 0 };
+  let rows = await prisma.qaAttachment.findMany({
+    where: { syncState: "remote", id: { gt: downloadCursor } }, orderBy: { id: "asc" }, take: 5,
+  });
+  if (!rows.length && downloadCursor) {
+    downloadCursor = "";
+    rows = await prisma.qaAttachment.findMany({ where: { syncState: "remote" }, orderBy: { id: "asc" }, take: 5 });
+  }
+  let downloaded = 0;
+  for (const row of rows) {
+    downloadCursor = row.id;
+    if (await readQaAttachmentBytes(row.id)) {
+      await prisma.qaAttachment.updateMany({ where: { id: row.id, syncState: "remote" }, data: { syncState: "available" } });
+      downloaded++;
+    }
+  }
+  return { downloaded, pending: await prisma.qaAttachment.count({ where: { syncState: "remote" } }) };
 }

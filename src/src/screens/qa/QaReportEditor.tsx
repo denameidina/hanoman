@@ -10,11 +10,11 @@ import { REPORT_LABEL, VERDICT_LABEL, REPORT_TONE, envToText, errText, textToEnv
 
 export type PanelProps = {
   detail: QaReportDetail; projectId: string; locked: boolean;
-  onChange: (d: QaReportDetail) => void; onToast?: (m: string) => void;
+  onChange: (d: QaReportDetail) => void; onToast?: (m: string) => void; onOpenSession?: (id: string) => void;
 };
 type Props = {
   detail: QaReportDetail; projectId: string; onChange: (d: QaReportDetail) => void;
-  onBack: () => void; onDeleted: () => void; onToast?: (m: string) => void;
+  onBack: () => void; onDeleted: () => void; onToast?: (m: string) => void; onOpenSession?: (id: string) => void;
 };
 
 const ENV_FIELDS = [{ key: "os", label: "Sistem operasi", example: "Windows 11 atau macOS 15" }, { key: "browser", label: "Browser", example: "Chrome 130" }, { key: "device", label: "Perangkat", example: "Laptop atau iPhone 15" }, { key: "url", label: "Alamat aplikasi", example: "https://staging.example.com" }, { key: "branch", label: "Branch (opsional)", example: "main" }] as const;
@@ -26,7 +26,7 @@ const seed = (d: QaReportDetail) => ({
   os: d.environment.os ?? "", browser: d.environment.browser ?? "", device: d.environment.device ?? "", url: d.environment.url ?? "", branch: d.environment.branch ?? "",
 });
 
-export function QaReportEditor({ detail, projectId, onChange, onBack, onDeleted, onToast }: Props) {
+export function QaReportEditor({ detail, projectId, onChange, onBack, onDeleted, onToast, onOpenSession }: Props) {
   const api = useApi();
   const { confirm, dialog } = useConfirm();
   const locked = detail.status === "closed";
@@ -57,7 +57,7 @@ export function QaReportEditor({ detail, projectId, onChange, onBack, onDeleted,
   const set = (k: keyof ReturnType<typeof seed>) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setF((p) => ({ ...p, [k]: e.target.value }));
   const grid: React.CSSProperties = { display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))" };
-  const panel: PanelProps = { detail, projectId, locked, onChange, onToast };
+  const panel: PanelProps = { detail, projectId, locked, onChange, onToast, onOpenSession };
 
   return (
     <div style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0, 1fr)" }}>

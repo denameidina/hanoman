@@ -55,3 +55,11 @@ Pembaca independen: `python-docx` (DOCX), `openpyxl`/`xlsxwriter` (XLSX), PyMuPD
 - Satu migration additif (`QaAttachment.version/updatedAt`); baris lama diisi `updatedAt = createdAt` (hasil generate Prisma tak mengisinya dan gagal di DB berisi — diverifikasi).
 - Hub **harus dinaikkan lebih dulu** (urutan rilis hub-duluan, ADR-0135): client baru yang mendorong `qaReport` ke hub lama ditolak per-record ("unknown entity"), non-destruktif dan sembuh sendiri.
 - Nomor tampil (QA-007/F-01/TC-03) tetap dihitung saat render; setelah sync, baris lebih tua dari mesin lain dapat menggeser nomor. Ekspor membekukannya.
+
+## Amandemen 2026-10-10 — sesi temuan tanpa backlog dan unduh proaktif
+
+Temuan boleh diluncurkan melalui `POST …/findings/:fid/session` tanpa membuat Spec. Ini memperluas jalur backlog opsional: identitas sesi hashed per findingId, LOCAL-only, admission gate dan izin launch wajib, worktree dan branch QA sendiri. Klik ulang memakai sesi aktif; worktree lama dipertahankan. Prompt membawa laporan, test case terkait, serta salinan byte lampiran. Laporan closed boleh; wontfix dan tautan backlog yang masih hidup ditolak. Status temuan tidak diubah sebelum retest operator.
+
+Client memanggil `downloadPendingQaBytes` sesudah unggah byte pada syncOnce: maksimal lima lampiran remote per siklus dengan cursor bergilir, verifikasi yang sama dan retry best-effort. Antrean unggahan juga memakai cursor bergilir agar penolakan sementara tidak membuat berkas berikutnya kelaparan. Lazy-fetch tetap fallback. Tidak ada kolom atau entitas sync baru. Tombol Sinkronkan QA memakai endpoint sync manual yang sudah ada.
+
+[Spesifikasi](../../../docs/superpowers/specs/2026-10-10-qa-direct-session-sync.md) · [rencana](../../../docs/superpowers/plans/2026-10-10-qa-direct-session-sync.md).

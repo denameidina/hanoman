@@ -19,7 +19,7 @@ describe("katalog MCP · qa", () => {
     expect(tool("hanoman_qa_finding_to_backlog").description).toMatch(/LOSSY/);
   });
 
-  it("sepuluh tool terdaftar dengan capability qa:read / qa:write sesuai mode", () => {
+  it("sebelas tool terdaftar dengan capability qa:read / qa:write sesuai mode", () => {
     const names = MCP_TOOLS.filter((t) => t.name.startsWith("hanoman_qa_")).map((t) => [t.name, t.capability, t.mode]);
     expect(names).toEqual([
       ["hanoman_qa_reports_list", "qa:read", "read"],
@@ -30,6 +30,7 @@ describe("katalog MCP · qa", () => {
       ["hanoman_qa_case_update", "qa:write", "write"],
       ["hanoman_qa_finding_create", "qa:write", "write"],
       ["hanoman_qa_finding_update", "qa:write", "write"],
+      ["hanoman_qa_finding_start_session", "qa:write", "write"],
       ["hanoman_qa_finding_to_backlog", "qa:write", "write"],
       ["hanoman_qa_report_to_backlog", "qa:write", "write"],
     ]);

@@ -1744,7 +1744,7 @@ DELETE /api/tasks/:id/escalate   -> 200 TaskView (specId: null)
 ## Workspace QA ([ADR-0174](../adr/0174-workspace-qa.md) · [ADR-0175](../adr/0175-qa-sync-lampiran-biner.md)) — **`qa:read` / `qa:write`**, disync
 ```
 # Laporan QA manusia per project. Capability dipetakan MENURUT METHOD (GET/HEAD → qa:read, selain itu
-# qa:write) untuk `/projects/:id/qa/**` dan `/qa/**`; tool MCP `hanoman_qa_*` (10 tool). Setiap tulisan
+# qa:write) untuk `/projects/:id/qa/**` dan `/qa/**`; tool MCP `hanoman_qa_*` (11 tool). Setiap tulisan
 # memanggil `notifySynced`/`deleteSynced` (hub → SyncLog, client → outbox, hapus → tombstone); lihat bagian
 # "Sync byte lampiran" di bawah. Role `client` tertutup (deny-by-default, ADR-0110).
 #
@@ -1781,6 +1781,14 @@ GET    /api/projects/:id/qa/reports/:rid/attachments/:aid   -> byte (gambar inli
 #   nosniff + CSP sandbox. QaAttachmentView = { id, reportId, ownerType, ownerId, filename, mimeType, size, sha256, syncState: "local-only", createdAt }
 DELETE /api/projects/:id/qa/reports/:rid/attachments/:aid   -> { ok: true }
 
+POST   /api/projects/:id/qa/reports/:rid/findings/:fid/session  {} -> 201 { id, reused: false } | 200 { id, reused: true }
+#   qa:write + sessions:write (atau cookie admin) wajib. Tanpa Spec baru; id sesi deterministik lokal,
+#   worktree/branch QA sendiri, admission dan sandbox tetap berlaku. Closed boleh; wontfix atau sudah
+#   terkait backlog aktif -> 409. Repo belum terikat -> 400 needsBind; scope salah -> 404;
+#   lampiran konteks belum tersedia -> 409; worktree gagal -> 422; body tak dikenal -> 400.
+#   Prompt berisi laporan, repro, langkah uji terkait dan lampiran laporan/case/finding.
+#   Status temuan tidak diubah sebelum retest. Riwayat sesi LOCAL-only, integrasi melalui Terminal.
+
 POST   /api/projects/:id/qa/reports/:rid/findings/:fid/backlog   { priority?: tinggi|sedang|rendah }
                                                             -> 201|200 { findingId, code, created, spec:{id,stage,priority}, attachments:{saved,rejected[]}, report: QaReportDetail }
 #   Temuan → backlog item `source: qa` (bagian 2). Cermin POST /tasks/:id/escalate (ADR-0152): IDEMPOTEN lewat
@@ -1798,6 +1806,8 @@ POST   /api/projects/:id/qa/reports/:rid/backlog            -> { results: [QaBac
 GET    /api/qa/template.xlsx                                -> application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (attachment; qa-template.xlsx)
 GET    /api/qa/template.md                                  -> text/markdown (attachment; qa-template.md)
 
+# Client mengunggah dan mengunduh byte maksimal lima per arah setiap syncOnce; unduh remote
+# memakai cursor bergilir agar berkas hilang tidak menghalangi lampiran berikutnya. Lazy-fetch tetap fallback.
 # ── Sync byte lampiran QA (ADR-0175) — DEVICE-TOKEN (bukan cookie, bukan agent token: `sync` COOKIE_ONLY bagi agen) ──
 GET    /api/sync/qa-attachments/:id   -> byte (content-type = mime baris; header x-qa-sha256)   hub → client
 #   404 baris tak ada / byte belum ada di hub · 400 storageKey baris tak sah.

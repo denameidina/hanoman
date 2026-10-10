@@ -1713,7 +1713,8 @@ function AppInner() {
     screen = (
       <Shell active="qa" title="QA" wide onNavigate={setSection} breadcrumb="qa · laporan per project">
         {gate(<QaWorkspace key={qaProjectId ?? "none"} projects={projects} projectId={qaProjectId}
-          onSelectProject={(id) => navigate(routePath({ section: "qa", projectId: id }))} onToast={showToast} />)}
+          onSelectProject={(id) => navigate(routePath({ section: "qa", projectId: id }))} onToast={showToast}
+          onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
       </Shell>
     );
   } else if (section === "skills") {

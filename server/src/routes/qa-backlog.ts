@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { zPriority, type QaBacklogResult } from "@hanoman/shared";
 import { z } from "zod";
+import { startQaFindingSession, QaSessionError } from "../services/qa-session";
 import { prisma } from "../db";
 import { launchPrincipal } from "../services/launch-authority";
 import { reportDetail } from "../services/qa";
@@ -35,6 +36,22 @@ export default async function qaBacklog(app: FastifyInstance) {
     });
     await prisma.qaReport.update({ where: { id: rid }, data: { updatedAt: new Date() } });
     return reply.code(r.created ? 201 : 200).send({ ...r, report: await reportDetail(pid, rid) });
+  });
+
+  app.post("/projects/:pid/qa/reports/:rid/findings/:fid/session", async (req, reply) => {
+    if (!launchPrincipal(req)) return reply.code(403).send({ error: "Peluncuran sesi memerlukan sessions:write" });
+    const { pid, rid, fid } = req.params as Ids;
+    const parsed = z.object({}).strict().safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const d = await reportDetail(pid, rid);
+    if (!d || !d.findings.some((f) => f.id === fid)) return reply.code(404).send({ error: "not found" });
+    try {
+      const result = await startQaFindingSession(d, fid);
+      return reply.code(result.reused ? 200 : 201).send(result);
+    } catch (e) {
+      if (e instanceof QaSessionError) return reply.code(e.code).send({ error: e.message, ...(e.needsBind ? { needsBind: true } : {}) });
+      throw e;
+    }
   });
 
   // Semua temuan `open`: `wontfix` dan yang sudah `sent` dilewati. Satu gagal tak menggagalkan yang lain.

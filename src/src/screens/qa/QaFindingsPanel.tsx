@@ -21,6 +21,7 @@ const fromFinding = (f: QaFindingView): Draft => ({
 export function QaFindingsPanel(p: PanelProps) {
   const api = useApi();
   const { confirm, dialog } = useConfirm();
+  const [starting, setStarting] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState<Draft | null>(null);
 
   const save = async () => {
@@ -50,6 +51,16 @@ export function QaFindingsPanel(p: PanelProps) {
       p.onToast?.(`${f.code} → ${r.spec?.id ?? "backlog"}${r.created ? " dibuat" : " sudah ada"}${noteRejected(r)}`);
     } catch (e) { p.onToast?.(errText(e)); }
   };
+  const start = async (f: QaFindingView) => {
+    if (starting) return;
+    setStarting(f.id);
+    try {
+      const r = await api.startQaFindingSession(p.projectId, p.detail.id, f.id);
+      p.onOpenSession?.(r.id);
+      p.onToast?.(`${f.code} · sesi ${r.reused ? "dibuka kembali" : "dimulai"}`);
+    } catch (e) { p.onToast?.(errText(e)); }
+    finally { setStarting(null); }
+  };
   const sendAll = async () => {
     try {
       const r = await api.sendQaReportToBacklog(p.projectId, p.detail.id);
@@ -70,7 +81,7 @@ export function QaFindingsPanel(p: PanelProps) {
     <div style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {!p.locked && <Button leftIcon="bug" onClick={() => setDraft({ ...blank })}>Temuan baru</Button>}
-        {openCount > 0 && <Button variant="secondary" leftIcon="git-fork" onClick={() => void sendAll()}>{`Kirim semua masalah terbuka (${openCount})`}</Button>}
+        {openCount > 0 && <Button variant="secondary" leftIcon="git-fork" onClick={() => void sendAll()}>{`Kirim semua ke backlog (${openCount})`}</Button>}
       </div>
       {p.detail.findings.length === 0 && <StateBlock kind="empty" compact title="Belum ada temuan" hint="Satu temuan = satu masalah, lengkap dengan langkah yang bisa diulang." />}
       {p.detail.findings.map((f) => (
@@ -85,6 +96,9 @@ export function QaFindingsPanel(p: PanelProps) {
             {f.spec && <a href={`/backlog/${encodeURIComponent(f.spec.id)}`} style={{ textDecoration: "none" }}><Badge tone="ok" size="sm">{`${f.spec.id} · ${f.spec.stage}`}</Badge></a>}
             {f.backlogId && !f.spec && <Badge tone="warn" size="sm">{`${f.backlogId} · tautan putus`}</Badge>}
             <span style={{ flex: 1 }} />
+            {f.status !== "wontfix" && !f.spec && (
+              <Button size="sm" disabled={starting !== null} loading={starting === f.id} onClick={() => void start(f)}>Kerjakan langsung</Button>
+            )}
             {(f.status === "open" || (f.backlogId && !f.spec)) && (
               <Button size="sm" variant="secondary" leftIcon="git-fork" onClick={() => void send(f)}>Kirim ke backlog</Button>
             )}

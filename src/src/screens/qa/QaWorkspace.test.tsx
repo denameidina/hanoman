@@ -145,7 +145,7 @@ describe("QaWorkspace", () => {
     renderWs({ onToast: toast });
     fireEvent.click(await screen.findByText("Smoke 0.9"));
     fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
-    fireEvent.click(await screen.findByText("Kirim semua masalah terbuka (1)"));
+    fireEvent.click(await screen.findByText("Kirim semua ke backlog (1)"));
     await waitFor(() => expect(posted).toHaveLength(1));
     expect(toast).toHaveBeenCalledWith(expect.stringMatching(/1 temuan dikirim/));
   });
@@ -240,4 +240,29 @@ it("menyimpan langkah pengujian ketika keluar dari textarea", async () => {
   const input = await screen.findByLabelText("Langkah TC-01");
   fireEvent.change(input, { target: { value: "Buka halaman login" } }); fireEvent.blur(input);
   await waitFor(() => expect(saved).toEqual({ steps: "Buka halaman login" }));
+});
+
+
+it("kerjakan langsung opens the returned session and leaves backlog option available", async () => {
+  const openSession = vi.fn();
+  const fetch = mockFetch((url, init) => url.endsWith("/findings/f1/session") ? json({ id: "qa-f1", reused: false }, 201) : null);
+  renderWs({ onOpenSession: openSession });
+  fireEvent.click(await screen.findByText("Smoke 0.9"));
+  fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Kerjakan langsung" }));
+  await waitFor(() => expect(openSession).toHaveBeenCalledWith("qa-f1"));
+  expect(screen.getByRole("button", { name: "Kirim ke backlog" })).toBeTruthy();
+  expect(fetch.mock.calls.some(([url, init]) => String(url).endsWith("/session") && init?.method === "POST")).toBe(true);
+});
+
+it("sync QA refreshes open report and reports configuration or network errors", async () => {
+  const toast = vi.fn();
+  let calls = 0;
+  mockFetch((url) => url.endsWith("/sync/now") ? json(++calls === 1 ? { ok: false, reason: "not-configured" } : { ok: true }) : null);
+  renderWs({ onToast: toast });
+  fireEvent.click(await screen.findByText("Smoke 0.9"));
+  fireEvent.click(screen.getByRole("button", { name: "Sinkronkan QA" }));
+  await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("konfigurasi")));
+  fireEvent.click(screen.getByRole("button", { name: "Sinkronkan QA" }));
+  await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("QA disinkronkan")));
 });

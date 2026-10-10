@@ -32,6 +32,12 @@ Seret berkas ke area lampiran, pilih lewat tombol **Lampirkan**, atau **tempel s
 atas temuan/test case. Tipe: png, jpg, webp, pdf, md, txt, log, json, csv. Batas 10 MB per berkas, 30 berkas
 dan 100 MB per laporan. Berkas yang ditolak dilaporkan per nama dengan alasannya; yang lain tetap masuk.
 
+## Kerjakan temuan langsung dalam sesi
+
+Pilih **Kerjakan langsung** pada temuan untuk membuka sesi agen tanpa membuat backlog. Agen memakai pengaturan sesi default dan worktree terisolasi pada branch `qa/<id>`; klik ulang membuka sesi aktif yang sama. Laporan yang sudah dikunci tetap boleh memulai perbaikan. Temuan yang ditandai tidak akan diperbaiki harus dibuka kembali; temuan yang sudah masuk backlog dikerjakan dari sesi backlog.
+
+Sesi membawa konteks laporan, langkah reproduksi, pengujian terkait, dan lampiran milik laporan/temuan/pengujian itu. Lampiran yang belum tersedia menghalangi peluncuran dengan pesan untuk sinkronisasi ulang. Review dan integrasikan hasil melalui Terminal. Setelah perbaikan, jalankan retest dan catat hasilnya di QA; peluncuran sesi tidak otomatis mengubah status temuan.
+
 ## Dari temuan ke perbaikan (backlog)
 
 Tombol **Kirim ke backlog** di tiap temuan `open` membuat backlog item (jenis QA) berisi judul, langkah repro,
@@ -81,11 +87,11 @@ yang membuka Backlog, jadi progres perbaikan terlihat dari laporan QA.
 ## Sinkronisasi antar perangkat
 
 Laporan QA ikut tersinkron antara hanoman lokal dan server (hub), dua arah: header laporan, test case, temuan, dan
-lampiran. Dikerjakan di laptop, dibaca tim di server — dan sebaliknya.
+lampiran. Dikerjakan di laptop, dibaca tim di server — dan sebaliknya. Tombol **Sinkronkan QA** memicu sinkronisasi lalu memuat ulang laporan; gunakan pada instance lokal dengan konfigurasi server dan device token yang sudah terhubung. Byte lampiran dipindahkan bertahap, maksimal lima unggahan dan lima unduhan per siklus; kegagalan sementara dicoba lagi tanpa menghalangi lampiran lain.
 
 - **Lampiran** (screenshot, log, PDF) disinkronkan terpisah dari data laporan. Penanda kecil di samping lampiran:
   *menunggu unggah* (baru ada di perangkat ini; diunggah pada sinkronisasi berikutnya), *di server · belum diunduh*
-  (dibuat di perangkat lain; **diunduh otomatis saat dibuka atau diekspor**), *gagal diunggah* (server menolak isinya —
+  (dibuat di perangkat lain; **diunduh otomatis pada sinkronisasi berikutnya**, juga saat dibuka atau diekspor), *gagal diunggah* (server menolak isinya —
   hapus dan unggah ulang). Tanpa penanda = tersedia.
 - Server memverifikasi ukuran, hash, dan tipe tiap berkas sebelum menyimpannya.
 - Dua orang mengubah laporan yang sama bersamaan: konflik muncul di dialog rekonsiliasi sinkronisasi, seperti data lain.

@@ -174,6 +174,15 @@ export const QA_TOOLS: readonly McpToolDef[] = [
     shape: (raw) => raw,
   },
   {
+    name: "hanoman_qa_finding_start_session",
+    title: "Kerjakan temuan QA langsung",
+    description: "Membuka sesi agen terisolasi dari temuan QA tanpa membuat backlog, membawa langkah uji dan lampiran. Memerlukan qa:write DAN sessions:write. Klik ulang memakai sesi aktif yang sama. Temuan wontfix atau sudah terkait backlog ditolak; laporan closed boleh.",
+    inputSchema: obj({ properties: { project: PROJECT, report: REPORT, finding: FINDING }, required: ["project", "report", "finding"] }),
+    mode: "write", capability: "qa:write", samplePath: "/projects/p1/qa/reports/r1/findings/f1/session", sampleMethod: "POST",
+    build: (a) => ({ method: "POST", path: `${one(a)}/findings/${enc(String(a.finding))}/session`, body: {} }),
+    shape: (raw) => raw,
+  },
+  {
     name: "hanoman_qa_finding_to_backlog",
     title: "Kirim temuan QA ke backlog",
     description:

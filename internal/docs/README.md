@@ -326,3 +326,5 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [plan SPEC-1267 — perf sesi terminal di backlog](../../docs/superpowers/plans/2026-09-20-spec-1267-perf-sesi-terminal-backlog-plan.md) — 12 task (0-11) menurunkan urutan S6 spec: instrumen+baseline, `SpecSlim`/`SpecListItem`, pecah `liveSpecs`+digest, `GET /specs/:id`, siar ringkas, dedup klien, jalur periodik async, backpressure, klien terminal, ukur ulang+ADR.
 
 - [Rancangan QA ramah pemula dan Excel](../../docs/superpowers/specs/2026-10-02-qa-friendly-excel.md) · [plan](../../docs/superpowers/plans/2026-10-02-qa-friendly-excel.md) — formulir berlabel bahasa Indonesia, template/impor laporan Excel lengkap dan lampiran melalui berkas pendamping atau ZIP.
+
+- [QA: sesi langsung tanpa backlog dan sinkronisasi lampiran otomatis](../../docs/superpowers/specs/2026-10-10-qa-direct-session-sync.md) · [rencana](../../docs/superpowers/plans/2026-10-10-qa-direct-session-sync.md) — opsi backlog tetap tersedia; langkah uji, temuan, dan byte lampiran dua arah.

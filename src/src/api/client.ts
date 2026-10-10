@@ -776,6 +776,8 @@ export function createApi(o: { base?: string } = {}) {
   patchQaFinding: (pid: string, rid: string, fid: string, b: PatchQaFinding) => j<QaReportDetail>(paths.qaFinding(pid, rid, fid), { method: "PATCH", ...body(b) }),
   deleteQaFinding: (pid: string, rid: string, fid: string) => j<QaReportDetail>(paths.qaFinding(pid, rid, fid), { method: "DELETE" }),
   // Temuan → backlog (bagian 2). Jawabannya memuat laporan terbaru (status `sent` + cermin spec).
+  startQaFindingSession: (pid: string, rid: string, fid: string) =>
+    j<{ id: string; reused: boolean }>(paths.qaFindingSession(pid, rid, fid), { method: "POST", ...body({}) }),
   sendQaFindingToBacklog: (pid: string, rid: string, fid: string, priority?: "tinggi" | "sedang" | "rendah") =>
     j<QaBacklogResult & { report: QaReportDetail }>(paths.qaFindingBacklog(pid, rid, fid), { method: "POST", ...body(priority ? { priority } : {}) }),
   sendQaReportToBacklog: (pid: string, rid: string) =>

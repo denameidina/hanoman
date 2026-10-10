@@ -16,7 +16,7 @@ vi.mock("../src/services/safe-outbound-request", () => ({
     return hub.handler(call);
   },
 }));
-const { readQaAttachmentBytes, uploadPendingQaBytes } = await import("../src/services/qa-attachment-transfer");
+const { readQaAttachmentBytes, uploadPendingQaBytes, downloadPendingQaBytes } = await import("../src/services/qa-attachment-transfer");
 
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
@@ -152,3 +152,49 @@ async function saveUploadAs(storageKey: string, buf: Buffer) {
   const { storeQaBytes } = await import("../src/services/qa-attachment-sync");
   await storeQaBytes(storageKey, buf);
 }
+
+
+describe("unduh QA otomatis", () => {
+  it("syncOnce downloads remote bytes without opening an attachment", async () => {
+    await configure(); await row(1); hub.handler = () => ok(PNG);
+    const transport: Transport = async () => ({ status: 200, body: { records: [], cursor: "0", hasMore: false } });
+    await syncOnce(transport);
+    expect(await state("a1")).toBe("available");
+    expect((await readUpload(key(1))).equals(PNG)).toBe(true);
+    expect(hub.calls.map((c) => c.method)).toEqual(["GET"]);
+  });
+  it("downloads at most five, advances past missing/corrupt bytes, then retries", async () => {
+    await configure();
+    for (let n = 1; n <= 7; n++) await row(n);
+    hub.handler = (c) => c.path.endsWith("a1") ? ok(Buffer.from("corrupt")) : ok(PNG);
+    const first = await downloadPendingQaBytes();
+    expect(hub.calls.length).toBeLessThanOrEqual(5);
+    expect(first.downloaded).toBeGreaterThan(0);
+    await downloadPendingQaBytes(); await downloadPendingQaBytes();
+    expect(await state("a7")).toBe("available");
+    expect(await state("a1")).toBe("remote");
+    hub.handler = () => ok(PNG);
+    await downloadPendingQaBytes();
+    expect(await state("a1")).toBe("available");
+  });
+  it("standalone does not fetch; offline keeps remote state for retry", async () => {
+    await row(1);
+    expect(await downloadPendingQaBytes()).toEqual({ downloaded: 0, pending: 0 });
+    expect(hub.calls).toHaveLength(0);
+    await configure(); hub.handler = () => { throw new Error("offline"); };
+    await downloadPendingQaBytes(); expect(await state("a1")).toBe("remote");
+  });
+});
+
+
+it("uploads rotate past temporary failures so later files are not starved", async () => {
+  await configure();
+  for (let n = 1; n <= 7; n++) { await row(n, { syncState: "local-only" }); await saveUploadAs(key(n), PNG); }
+  hub.handler = (c) => ["a6", "a7"].some((id) => c.path.endsWith(id)) ? ok() : ok(Buffer.alloc(0), 503);
+  await uploadPendingQaBytes(); await uploadPendingQaBytes(); await uploadPendingQaBytes();
+  expect(await state("a7")).toBe("available");
+  expect(await state("a1")).toBe("local-only");
+  hub.handler = () => ok();
+  await uploadPendingQaBytes(); await uploadPendingQaBytes();
+  expect(await state("a1")).toBe("available");
+});
