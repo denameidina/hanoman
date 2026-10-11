@@ -113,6 +113,7 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 | `skills` | `/api/skills*` | skill global hanoman, user, plugin (baca-saja) & per project, termasuk isi berkasnya — **`skills:write` pada skill global hanoman mengubah instruksi SETIAP sesi baru di semua project** |
 | `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096) |
 | `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
+| `qa` | `/api/projects/:id/qa/**`, `/api/qa/**` | laporan QA, test case, temuan, lampiran, ekspor/impor. Method `DELETE` menuntut `qa:delete` (akses `danger`, ADR-0185), bukan `qa:write` |
 
 ## 4. Aturan gate & kode status
 
@@ -450,10 +451,40 @@ bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang memutusk
 pintu belakang. Capability-nya tetap ada (`sessions:read`/`sessions:write`) karena peta itu berlaku
 untuk seluruh permukaan HTTP, bukan hanya untuk yang muncul di MCP.
 
-**Lampiran backlog** (`/api/specs/:id/attachments*`, SPEC-843 · ADR-0124) juga sengaja **tak punya
-tool**: berkasnya lahir dari disk manusia, bukan dari model, dan tool MCP berbentuk JSON sehingga
-byte biner tak punya representasi di sana. REST-nya tetap terjangkau agent token
-ber-`backlog:read`/`backlog:write` — yang tak dipajang adalah **tool**-nya.
+**Lampiran, ekspor/impor QA, unggah IDE, dan arsip git** punya tool sejak ADR-0183 — lihat
+[Transfer berkas](#transfer-berkas-adr-0183) di bawah. Yang tetap tak punya tool hanya WebSocket
+(`/terminal/sessions/:id/ws`, `/events/ws`) dan tiga route `dialog` di atas.
+
+### Transfer berkas (ADR-0183)
+
+Tool MCP berbicara JSON teks, jadi **byte tak pernah lewat model**. Satu mekanisme seragam:
+
+- **Unggah** — argumen `filePath` / `filePaths` / `files[].filePath` adalah path **lokal di mesin
+  tempat `hanoman mcp` berjalan**. Klien membacanya dan mengirimnya sebagai multipart.
+- **Unduh** — byte disimpan ke `savePath` lokal (default: direktori sementara aman); jawabannya
+  `{savedTo, filename, bytes, mime, sha256}`. `overwrite:true` wajib untuk menimpa berkas yang ada.
+  Teks kecil (template Markdown, ekspor `md`/`csv`) dikembalikan **inline** oleh
+  `hanoman_qa_template_md` dan `hanoman_qa_report_export_text`.
+- **Batas (ADR-0184)** — path hanya boleh di dalam direktori kerja MCP, direktori sementara MCP,
+  atau `HANOMAN_MCP_TRANSFER_DIRS`; `..`, symlink yang keluar, dan berkas rahasia (`.env`,
+  kunci SSH, `.git`, …) ditolak di kedua arah; ukuran dibatasi (default 100 MiB).
+- **Mode (ADR-0186)** — tool yang menyentuh disk klien bermode `write` walau capability-nya `:read`,
+  sehingga `--read-only` tak pernah menyentuh disk.
+
+| Tool | Mode | Capability |
+|---|---|---|
+| `hanoman_backlog_attachment_upload`, `hanoman_backlog_attachment_download` | tulis | `backlog:write` / `backlog:read` |
+| `hanoman_ticket_attachment_download` | tulis | `support:read` |
+| `hanoman_qa_attachment_upload`, `hanoman_qa_import`, `hanoman_qa_cases_import` | tulis | `qa:write` |
+| `hanoman_qa_attachment_download`, `hanoman_qa_template_xlsx`, `hanoman_qa_report_export_file` | tulis | `qa:read` |
+| `hanoman_qa_template_md`, `hanoman_qa_report_export_text` (inline) | baca | `qa:read` |
+| `hanoman_ide_upload` | tulis | `ide:write` |
+| `hanoman_ide_archive_download` | tulis | `ide:read` |
+| `hanoman_session_attachment_upload` (PNG/JPEG/WebP ≤ 5 MB; jawabannya path di SERVER) | tulis | `sessions:write` |
+| `hanoman_qa_report_delete`, `hanoman_qa_case_delete`, `hanoman_qa_finding_delete`, `hanoman_qa_attachment_delete` | **berbahaya** | `qa:delete` (ADR-0185) |
+
+`qa:delete` adalah akses `danger` yang **tak diimplikasikan `qa:write`**: token lama ber-`qa:write`
+tak lagi bisa menghapus data QA sampai manusia mencentang `qa:delete` di Settings → Akses AI Agent.
 
 ### Opsi
 
@@ -462,6 +493,8 @@ ber-`backlog:read`/`backlog:write` — yang tak dipajang adalah **tool**-nya.
 | `HANOMAN_HOST` / `--host <url>` | **Wajib.** Instance yang dituju. Agent token diterbitkan per-instance — token dari instance lain selalu 401 di sini, dan MCP server menjelaskannya, bukan meneruskan 401 telanjang. |
 | `HANOMAN_AGENT_TOKEN` | **Wajib.** Hanya dari env atau `~/.hanoman/agent-token` — **tak pernah** dari argumen baris perintah (ARGV terbaca proses lain di mesin yang sama). |
 | `HANOMAN_MCP_READ_ONLY=1` / `--read-only` | Menyembunyikan seluruh tool tulis dari `tools/list`. |
+| `HANOMAN_MCP_TRANSFER_DIRS` / `--transfer-dir <d>` | Direktori tambahan (dipisah `:`) yang boleh dibaca/ditulis tool transfer berkas, di luar direktori kerja MCP dan direktori sementara MCP. Akar filesystem ditolak. |
+| `HANOMAN_MCP_TRANSFER_MAX_BYTES` / `--transfer-max-bytes <n>` | Plafon ukuran per berkas dan total per panggilan transfer. Default 100 MiB, maks 2 GiB. |
 | `HANOMAN_MCP_MAX_BYTES` / `--max-bytes <n>` | Plafon ukuran balasan tool. Default 24576. Balasan yang dipotong ditandai `truncated: true` + `shown`/`total`. |
 
 Skema tool berversi (`MCP_TOOL_SCHEMA_VERSION`, saat ini **1**) dan aditif dalam satu versi:

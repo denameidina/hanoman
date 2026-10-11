@@ -1,6 +1,6 @@
-// Workspace QA · katalog tool domain `qa` (`/api/projects/:id/qa/**`). Sepuluh tool: baca laporan, tulis
-// laporan/test case/temuan. SENGAJA tanpa tool hapus/lampiran/ekspor/impor (lihat UNWRAPPED di
-// server/test/mcp-coverage.test.ts): hapus tak punya jalan pulang, lampiran & ZIP adalah biner.
+// Workspace QA · katalog tool domain `qa` (`/api/projects/:id/qa/**`). Sebelas tool: baca laporan, tulis
+// laporan/test case/temuan. Hapus, lampiran, ekspor, dan impor ada di `transfer.ts` (ADR-0183):
+// berkas lewat jalur transfer klien MCP, hapus lewat capability `qa:delete`.
 //
 // Dua sifat yang WAJIB terbaca agen di deskripsi karena sudah terukur di servernya:
 //   1. Laporan `closed` read-only (409) — buka kembali dulu dengan `status: draft`.

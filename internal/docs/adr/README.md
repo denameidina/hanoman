@@ -175,3 +175,7 @@ setiap sesi agen, riwayat ADR hanya saat seseorang butuh alasannya.
 - [0001 — Docs sebagai Source of Truth](0001-docs-as-source-of-truth.md) — *superseded by 0023*
 
 - [0182 — Hapus memori project dan changelog](0182-hapus-memori-project-dan-changelog.md) — penghapusan fitur dan data atas permintaan pengguna; menggantikan 0105 (changelog), 0178/0179/0181, dan bagian memori 0180.
+- [0183 — Transfer berkas lewat tool MCP: unggah dari `filePath`, unduh ke `savePath`](0183-transfer-berkas-lewat-tool-mcp.md) — **mengamandemen 0124 §6, 0099 & pengecualian lampiran/ekspor/impor QA**. 18 tool untuk route multipart/biner; `McpRequest` mendapat `multipart`/`download`, klien membaca/menulis disk LOKAL, model tak pernah menerima byte.
+- [0184 — Batas keamanan transfer berkas MCP](0184-batas-keamanan-transfer-berkas-mcp.md) — root yang diizinkan, `..` ditolak, symlink keluar ditolak (realpath), berkas rahasia ditolak, tanpa menimpa tanpa `overwrite`, batas ukuran saat mengalir.
+- [0185 — Capability `qa:delete`](0185-capability-qa-delete.md) — akses `danger` baru, dipisah dari `qa:write`: hapus laporan/test case/temuan/lampiran QA. Penyempitan untuk token lama.
+- [0186 — Mode tool transfer menurut efek di klien](0186-mode-tool-transfer-menurut-efek-di-klien.md) — tool yang menyentuh disk klien bermode `write` walau capability-nya `:read`; teks kecil inline tetap `read`.

@@ -418,6 +418,7 @@ const LOST_RIGHTS: { had: string; needs: string; sentence: string }[] = [
   { had: "ide:write", needs: "ide:git", sentence: "dulu bisa merge/rebase & menghapus branch" },
   { had: "backlog:write", needs: "backlog:lifecycle", sentence: "dulu bisa integrate & menghapus backlog" },
   { had: "vps:write", needs: "vps:exec", sentence: "dulu bisa menjalankan perintah di VPS" },
+  { had: "qa:write", needs: "qa:delete", sentence: "dulu bisa menghapus laporan, test case, temuan & lampiran QA" },
 ];
 
 function lostRights(caps: string[]): string[] {

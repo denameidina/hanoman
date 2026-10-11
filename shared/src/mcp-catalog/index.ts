@@ -20,6 +20,7 @@ import { LEAD_TOOLS } from "./lead";
 import { TEAM_TOOLS } from "./team";
 import { QA_TOOLS } from "./qa";
 import { SYSTEM_TOOLS } from "./system";
+import { TRANSFER_TOOLS } from "./transfer";
 import type { McpToolDef } from "./types";
 
 export const MCP_TOOLS: readonly McpToolDef[] = [
@@ -43,4 +44,5 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   ...TEAM_TOOLS,
   ...QA_TOOLS,        // Workspace QA · laporan, test case, temuan
   ...SYSTEM_TOOLS,
+  ...TRANSFER_TOOLS,  // ADR-0183 · route multipart/biner + hapus QA
 ];

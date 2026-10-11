@@ -39,6 +39,8 @@ export const CAPABILITY_IDS = [
   // `:write` TIDAK mengimplikasikannya (lihat grantsCapability di bawah): kalau diimplikasikan,
   // pemecahan ini kosmetik dan tak menghasilkan batas apa pun.
   "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec",
+  // ADR-0183 · hapus laporan/test case/temuan/lampiran QA. Dipecah dari `qa:write` seperti keempat di atas.
+  "qa:delete",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
@@ -87,6 +89,7 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "ide:git", domain: "ide", access: "danger", label: "IDE/Git — operasi git", desc: "merge, rebase, pull, drop, hapus branch, hapus worktree. Mengubah sejarah dan menghapus pekerjaan yang tak dipegang berkas mana pun; dipisah dari menulis berkas working tree.", risk: "exec" },
   { id: "backlog:lifecycle", domain: "backlog", access: "danger", label: "Backlog — siklus hidup", desc: "Integrate, hapus backlog, dan geser stage. Ketiganya menghapus artefak dokumen; dipisah dari menyunting isi backlog.", risk: "exec" },
   { id: "vps:exec", domain: "vps", access: "danger", label: "VPS — remote exec", desc: "console, session, provision, harden, remediate, probe, test, audit. Menjalankan perintah di VPS produksi; dipisah dari mengelola daftar VPS & checklist kepatuhan.", risk: "exec" },
+  { id: "qa:delete", domain: "qa", access: "danger", label: "QA — hapus", desc: "Hapus laporan QA, test case, temuan, dan lampiran (permanen, ikut tersinkron ke mesin lain). Dipisah dari QA — tulis: menyunting laporan tak lagi cukup untuk menghapusnya.", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).

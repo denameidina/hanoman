@@ -139,7 +139,9 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     // Workspace QA · laporan QA adalah domain TERSENDIRI. Tanpa baris ini `/projects/:id/qa/**` jatuh
     // ke `rw("projects")` — agen harus dipercaya menyunting & menghapus project hanya untuk menulis
     // laporan. `rw()` menurunkan read/write DARI METHOD (kelas bug SPEC-405).
-    if (sub === "qa") return rw("qa");
+    // ADR-0183 · HANYA method DELETE yang pindah ke `qa:delete` (akses danger, tak diimplikasikan
+    // `qa:write`): laporan/test case/temuan/lampiran yang dihapus ikut terhapus di mesin tersync.
+    if (sub === "qa") return method === "DELETE" ? "qa:delete" : rw("qa");
     if (sub === "docs" || sub === "prds") return rw("docs");
     if (sub === "github") return rw("support");   // SPEC-471 · ADR-0095 · tarik/daftar issue
     // ADR-0155 · HANYA tulisan yang merusak yang pindah ke `ide:git`; seluruh pembacaan tetap

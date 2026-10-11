@@ -25,37 +25,18 @@ function routeInventory(): { method: string; path: string }[] {
 // Route yang SENGAJA tak punya tool MCP. Alasannya wajib ditulis di sebelahnya — daftar tanpa
 // alasan kehilangan gunanya dalam beberapa bulan.
 const UNWRAPPED = new Map<string, string>([
-  ["POST /specs/:id/attachments", "multipart — tak ada bentuk masuk akal lewat tool teks"],
-  ["POST /projects/:id/upload", "multipart"],
-  ["GET /projects/:id/archive", "biner (zip)"],
   ["GET /terminal/sessions/:id/ws", "WebSocket, bukan request-response"],
   // ADR-0157 · GLOBAL_READ tapi tetap di luar: kanal siar, bukan request-response. Tool MCP tak
   // punya bentuk untuk aliran yang tak pernah selesai.
   ["GET /events/ws", "WebSocket siar, bukan request-response"],
-  // Byte mentah dengan content-disposition: lampiran bisa berupa gambar, dan tool teks akan
-  // mengembalikan sampah. Sekelas dengan `archive` di atas.
-  ["GET /specs/:id/attachments/:attId", "biner (unduhan lampiran)"],
-  ["GET /tickets/:id/attachments/:attId", "biner (unduhan lampiran)"],
-  ["POST /terminal/sessions/:id/attachments", "multipart"],
   // SPEC-899 · ADR-0142 · BUKAN kelalaian: agen yang bisa menjawab `AskUserQuestion` bisa menjawab
   // pertanyaannya SENDIRI, dan gerbang "manusia yang terakhir memutuskan" runtuh lewat pintu itu.
   // Assert terpisah di mcp-capability.test.ts menjaga agar tak ada samplePath yang memuat /dialog.
   ["GET /terminal/sessions/:id/dialog", "gerbang keputusan manusia (SPEC-899)"],
   ["POST /terminal/sessions/:id/dialog/answer", "gerbang keputusan manusia (SPEC-899)"],
   ["POST /terminal/sessions/:id/dialog/takeover", "gerbang keputusan manusia (SPEC-899)"],
-  // Workspace QA · sengaja tanpa tool: hapus tak punya jalan pulang (dilakukan manusia di dashboard),
-  // sisanya biner/multipart. Agen membaca laporan lewat hanoman_qa_report_get.
-  ["DELETE /projects/:pid/qa/reports/:rid", "destruktif — dihapus manusia di dashboard"],
-  ["DELETE /projects/:pid/qa/reports/:rid/cases/:cid", "destruktif — dihapus manusia di dashboard"],
-  ["DELETE /projects/:pid/qa/reports/:rid/findings/:fid", "destruktif — dihapus manusia di dashboard"],
-  ["POST /projects/:pid/qa/reports/:rid/attachments", "multipart"],
-  ["GET /projects/:pid/qa/reports/:rid/attachments/:aid", "biner (unduhan lampiran)"],
-  ["DELETE /projects/:pid/qa/reports/:rid/attachments/:aid", "destruktif — dihapus manusia di dashboard"],
-  ["GET /projects/:pid/qa/reports/:rid/export", "biner (ZIP/DOCX/PDF/XLSX) / teks (MD/CSV) unduhan; agen memakai hanoman_qa_report_get"],
-  ["POST /projects/:pid/qa/import", "multipart"],
-  ["POST /projects/:pid/qa/reports/:rid/cases/import", "multipart (XLSX/CSV)"],
-  ["GET /qa/template.md", "unduhan template untuk manusia"],
-  ["GET /qa/template.xlsx", "biner (template Excel untuk manusia), sama dengan template.md"],
+  // ADR-0183 · route multipart/biner (lampiran, ekspor, impor, unggah IDE, arsip) dan hapus QA sudah
+  // TIDAK di daftar ini: tool-nya ada di shared/src/mcp-catalog/transfer.ts.
 ]);
 
 // Route yang TERCAKUP tool bercabang. Tool semacam itu memilih endpoint menurut argumen (isi `q` →

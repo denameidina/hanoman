@@ -27,6 +27,7 @@ const HELP = `hanoman <command>
     [--domain=<d>] [--dry-run] [--yes]
   mcp [--read-only] [--host <url>]          MCP server stdio untuk klien AI (Claude Code/Desktop,
     [--max-bytes <n>]                       Codex, Cursor, Copilot). Token dari HANOMAN_AGENT_TOKEN.
+    [--transfer-dir <d>]                    direktori tambahan untuk unggah/unduh berkas (ADR-0183)
   migrate-from-postgres --from <url>        pindahkan data Postgres lama ke SQLite
     [--to <file>] [--dry-run] [--force]
   docs scan [--json]                        coverage + laporan per-kategori

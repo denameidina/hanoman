@@ -203,7 +203,7 @@ describe("tingkat mode", () => {
 // dijaga adalah INVARIANNYA. Dua arah dikunci, dan arah kedua yang paling mudah lolos: sebuah tool
 // bisa bermode `danger` sambil menuntut capability yang lemah, dan tak ada yang menyadarinya sampai
 // seseorang memakainya.
-const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"]);
+const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete"]);
 
 // Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak
 // ada capability `danger` di domainnya. Mode `danger`-nya murni ergonomi (mencegah salah pilih),

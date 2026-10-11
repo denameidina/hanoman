@@ -13,11 +13,29 @@ describe("capability domain qa", () => {
     expect(capabilityForRoute("GET", "/api/projects/p1/qa/reports")).toBe("qa:read");
     expect(capabilityForRoute("POST", "/api/projects/p1/qa/reports")).toBe("qa:write");
     expect(capabilityForRoute("PATCH", "/api/projects/p1/qa/reports/r1/findings/f1")).toBe("qa:write");
-    expect(capabilityForRoute("DELETE", "/api/projects/p1/qa/reports/r1")).toBe("qa:write");
+    // ADR-0183 · DELETE pindah ke capability danger `qa:delete` (tak diimplikasikan qa:write).
+    expect(capabilityForRoute("DELETE", "/api/projects/p1/qa/reports/r1")).toBe("qa:delete");
+    expect(capabilityForRoute("DELETE", "/api/projects/p1/qa/reports/r1/cases/c1")).toBe("qa:delete");
+    expect(capabilityForRoute("DELETE", "/api/projects/p1/qa/reports/r1/findings/f1")).toBe("qa:delete");
+    expect(capabilityForRoute("DELETE", "/api/projects/p1/qa/reports/r1/attachments/a1")).toBe("qa:delete");
     expect(capabilityForRoute("GET", "/api/projects/p1/qa/reports/r1/export")).toBe("qa:read");
     expect(capabilityForRoute("POST", "/api/projects/p1/qa/import")).toBe("qa:write");
     expect(capabilityForRoute("GET", "/api/qa/template.xlsx")).toBe("qa:read");
     expect(capabilityForRoute("GET", "/api/qa/template.md")).toBe("qa:read");
+  });
+
+  it("qa:delete terdaftar sebagai akses danger, dan qa:write TIDAK mewarisinya (ADR-0183)", () => {
+    expect(CAPABILITIES.find((c) => c.id === "qa:delete")).toMatchObject({ domain: "qa", access: "danger" });
+    expect(checkAgentCapability(["qa:write"], "DELETE", "/api/projects/p1/qa/reports/r1"))
+      .toMatchObject({ ok: false, status: 403, need: "qa:delete" });
+    expect(checkAgentCapability(["qa:read", "qa:write"], "DELETE", "/api/projects/p1/qa/reports/r1/attachments/a1"))
+      .toMatchObject({ ok: false, need: "qa:delete" });
+    expect(checkAgentCapability(["qa:delete"], "DELETE", "/api/projects/p1/qa/reports/r1")).toEqual({ ok: true });
+    // qa:delete tidak mengimplikasikan baca maupun tulis.
+    expect(checkAgentCapability(["qa:delete"], "GET", "/api/projects/p1/qa/reports"))
+      .toMatchObject({ ok: false, need: "qa:read" });
+    expect(checkAgentCapability(["qa:delete"], "POST", "/api/projects/p1/qa/reports"))
+      .toMatchObject({ ok: false, need: "qa:write" });
   });
 
   it("tak lagi jatuh ke projects:*", () => {

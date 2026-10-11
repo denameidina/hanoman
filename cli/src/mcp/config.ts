@@ -1,6 +1,7 @@
 // SPEC-482 · ADR-0099 · resolusi konfigurasi `hanoman mcp`. Murni: argv + env + pembaca berkas
 // disuntikkan, jadi seluruh percabangan bisa diuji tanpa filesystem.
 import { DEFAULT_MAX_BYTES, type McpLevel } from "@hanoman/shared";
+import { resolveTransferPolicy, type TransferEnv, type TransferPolicy } from "./transfer";
 
 export type McpConfig = {
   host: string;
@@ -8,6 +9,8 @@ export type McpConfig = {
   /** ADR-0155 · tingkat mode. Yang lebih sempit selalu menang, apa pun urutan argumen. */
   level: McpLevel;
   maxBytes: number;
+  /** ADR-0183 · batas transfer berkas lokal. Opsional agar konfigurasi lama/test tetap sah; klien memakai default aman. */
+  transfer?: TransferPolicy;
   /** Keluhan konfigurasi. Non-kosong = setiap panggilan tool menjawab dengan kalimat ini. */
   problems: string[];
 };
@@ -21,6 +24,7 @@ export function resolveMcpConfig(
   argv: string[],
   env: Record<string, string | undefined>,
   readTokenFile: () => string | null,
+  transferEnv?: TransferEnv,
 ): McpConfig {
   const problems: string[] = [];
 
@@ -64,5 +68,10 @@ export function resolveMcpConfig(
   const parsed = rawMax === undefined ? NaN : Number(rawMax);
   const maxBytes = Number.isFinite(parsed) && parsed >= 512 ? Math.floor(parsed) : DEFAULT_MAX_BYTES;
 
-  return { host, token, level, maxBytes, problems };
+  // ADR-0183 · batas transfer berkas. Keluhannya (mis. root `/`) ikut `problems`: konfigurasi yang
+  // meniadakan batasan lebih baik menolak SEMUA panggilan daripada diam-diam diturut.
+  const t = resolveTransferPolicy(argv, env, transferEnv);
+  problems.push(...t.problems);
+
+  return { host, token, level, maxBytes, transfer: t.policy, problems };
 }

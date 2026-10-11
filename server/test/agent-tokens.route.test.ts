@@ -45,7 +45,8 @@ describe("/agent-tokens routes (cookie-only)", () => {
     // global hanoman yang disuntik ke SETIAP sesi baru di semua project — pelebaran yang disengaja.
     // Workspace QA menambahkan `qa:read`/`qa:write` → 34: laporan QA per project (`/projects/:id/qa/**`)
     // sebelumnya jatuh ke `projects:*`; kini domain sendiri.
-    expect(r.json().capabilities).toHaveLength(34);
+    // ADR-0183 menambahkan `qa:delete` (danger) → 35: hapus QA dipecah dari `qa:write`.
+    expect(r.json().capabilities).toHaveLength(35);
     expect(r.json().capabilities[0]).toMatchObject({ id: expect.any(String), domain: expect.any(String), access: expect.any(String) });
   });
 
