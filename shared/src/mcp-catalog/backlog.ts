@@ -231,7 +231,7 @@ const LIFECYCLE_AND_MORE: readonly McpToolDef[] = [
     name: "hanoman_backlog_attachments_list",
     title: "Daftar lampiran backlog",
     description:
-      "Metadata lampiran sebuah backlog item (nama, tipe, ukuran). ISI lampiran tak tersedia lewat MCP — ia byte mentah yang bisa berupa gambar, dan tool teks akan mengembalikan sampah.",
+      "Metadata lampiran sebuah backlog item (nama, tipe, ukuran). ISI lampiran tidak dikembalikan sebagai teks (bisa berupa gambar): unduh ke disk lokal dengan hanoman_backlog_attachment_download, tambah dengan hanoman_backlog_attachment_upload.",
     inputSchema: obj({ properties: { spec: str(ID_HINT) }, required: ["spec"] }),
     mode: "read", capability: "backlog:read",
     samplePath: "/specs/SPEC-1/attachments", sampleMethod: "GET",

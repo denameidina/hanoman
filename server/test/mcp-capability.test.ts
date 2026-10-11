@@ -71,7 +71,7 @@ describe("kontrak capability katalog MCP", () => {
   //   2. `hanoman_backlog_update` tetap tak bisa menyentuh stage, jadi jalur "tulis biasa" tak
   //      pernah menjadi jalur belakang menuju penghapusan artefak.
   it("tool yang mengeksekusi menuntut capability danger, dan jalur tulis biasa tak jadi pintu belakang", () => {
-    const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"]);
+    const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete"]);
     for (const t of MCP_TOOLS) {
       // Regex vps dipersempit ke sub-path yang benar-benar menyentuh mesin remote: `^/vps`
       // polos ikut mencocokkan daftar & checklist, yang tak mengeksekusi apa pun.

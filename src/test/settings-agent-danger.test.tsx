@@ -46,7 +46,7 @@ describe("grid capability — kolom berbahaya", () => {
     render(<AgentAccessPanel />);
     await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya");
     const danger = CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id);
-    expect(danger).toHaveLength(4);
+    expect(danger).toEqual(expect.arrayContaining(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete"]));
     expect(screen.queryByLabelText("docs:danger")).toBeNull();
     expect(screen.queryByLabelText("support:danger")).toBeNull();
   });
@@ -56,6 +56,15 @@ describe("grid capability — kolom berbahaya", () => {
       { items: [token({ capabilities: ["sessions:read", "sessions:write"] })] } as any);
     render(<AgentAccessPanel />);
     expect(await screen.findByText(/dulu bisa membuka sesi baru/i)).toBeInTheDocument();
+  });
+
+  // ADR-0183 · hapus QA dipecah dari qa:write; token lama harus diberi tahu apa yang menyempit.
+  it("token ber-qa:write tanpa qa:delete menyebut hak hapus QA yang HILANG; checkbox qa:delete ada", async () => {
+    vi.mocked(api.listAgentTokens).mockResolvedValue(
+      { items: [token({ capabilities: ["qa:read", "qa:write"] })] } as any);
+    render(<AgentAccessPanel />);
+    expect((await screen.findByText(/dulu bisa menghapus laporan, test case, temuan & lampiran QA/i))).toBeInTheDocument();
+    expect(screen.getByLabelText("qa:delete")).toBeInTheDocument();
   });
 
   it("token yang sudah dicentang spawn TIDAK diperingatkan", async () => {

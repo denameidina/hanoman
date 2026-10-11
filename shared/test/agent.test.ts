@@ -20,7 +20,7 @@ describe("agent capabilities", () => {
     expect(new Set(CAPABILITY_IDS).size).toBe(38);
     expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(17);
     expect(CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id).sort())
-      .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "vps:exec"]);
+      .toEqual(["backlog:lifecycle", "ide:git", "qa:delete", "sessions:spawn", "vps:exec"]);
     expect(CAPABILITIES.map((c) => c.id).sort()).toEqual([...CAPABILITY_IDS].sort());
     expect(zCapability.safeParse("projects:read").success).toBe(true);
     expect(zCapability.safeParse("telegram:write").success).toBe(true);

@@ -4,6 +4,7 @@ import type { McpRequest } from "@hanoman/shared";
 import type { McpConfig } from "./config";
 import { explainHttpError, explainNetworkError } from "./errors";
 import { redactToken } from "./redact";
+import { buildMultipart, receiveDownload, resolveTransferPolicy } from "./transfer";
 
 export type CallResult = { ok: true; body: unknown } | { ok: false; message: string };
 export type Caller = (req: McpRequest, toolName: string) => Promise<CallResult>;
@@ -14,6 +15,8 @@ export function createCaller(cfg: McpConfig, fetchImpl: typeof fetch): Caller {
   // sebagai 401 telanjang, dan menebaknya salah menyuruh manusia memeriksa hal yang keliru.
   let hostAlive: boolean | null = null;
   const mask = (s: string) => redactToken(s, cfg.token);
+  // Default AMAN bila konfigurasi tak membawa kebijakan (test, pemanggil lama): cwd + direktori sementara MCP.
+  const policy = cfg.transfer ?? resolveTransferPolicy([], {}).policy;
 
   const probe = async (): Promise<void> => {
     if (hostAlive !== null) return;
@@ -29,31 +32,46 @@ export function createCaller(cfg: McpConfig, fetchImpl: typeof fetch): Caller {
 
     const qs = req.query && Object.keys(req.query).length ? `?${new URLSearchParams(req.query).toString()}` : "";
     const url = `${cfg.host}/api${req.path}${qs}`;
+    // ADR-0183 · multipart dirakit dari disk LOKAL dan baru setelah path-nya lolos penilaian; satu
+    // berkas ditolak membatalkan seluruh panggilan SEBELUM ada byte yang meninggalkan mesin ini.
+    let body: BodyInit | undefined;
+    if (req.multipart) {
+      const built = await buildMultipart(policy, req.multipart);
+      if (!built.ok) return { ok: false, message: mask(built.message) };
+      body = built.form;
+    } else if (req.body !== undefined) body = JSON.stringify(req.body);
     const init: RequestInit = {
       method: req.method,
       headers: {
         ...(req.headers ?? {}),
         Authorization: `Bearer ${cfg.token}`,
-        Accept: "application/json",
-        ...(req.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        Accept: req.download ? "*/*" : "application/json",
+        // `multipart/form-data` TANPA Content-Type: fetch yang mengisi, lengkap dengan boundary.
+        ...(req.body !== undefined && !req.multipart ? { "Content-Type": "application/json" } : {}),
       },
-      ...(req.body !== undefined ? { body: JSON.stringify(req.body) } : {}),
+      ...(body !== undefined ? { body } : {}),
     };
 
     let res: Response;
     try { res = await fetchImpl(url, init); }
     catch (e) { return { ok: false, message: mask(explainNetworkError(e, { host: cfg.host })) }; }
 
-    const text = await res.text();
-    let body: unknown = text;
-    try { body = text ? JSON.parse(text) : null; } catch { /* biarkan sebagai teks */ }
+    // ADR-0183 · balasan berkas: HANYA yang 2xx dialirkan ke disk; galat HTTP tetap lewat jalur teks.
+    if (res.ok && req.download) {
+      const r = await receiveDownload(policy, res, req.download, Math.max(512, Math.floor(cfg.maxBytes / 2)));
+      return r.ok ? { ok: true, body: r.body } : { ok: false, message: mask(r.message) };
+    }
 
-    if (res.ok) return { ok: true, body };
+    const text = await res.text();
+    let parsed: unknown = text;
+    try { parsed = text ? JSON.parse(text) : null; } catch { /* biarkan sebagai teks */ }
+
+    if (res.ok) return { ok: true, body: parsed };
 
     if (res.status === 401) await probe();
     return {
       ok: false,
-      message: mask(explainHttpError(res.status, body, {
+      message: mask(explainHttpError(res.status, parsed, {
         host: cfg.host, hostAlive, toolName, method: req.method, path: req.path,
       })),
     };

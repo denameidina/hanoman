@@ -47,6 +47,8 @@ export const CAPABILITY_IDS = [
   // karena isinya percakapan + email KLIEN, dan `portal-chat:write` menulis berkas PRD ke checkout.
   // Bukan `portal`: itu permukaan sesi cookie klien dan tetap cookie-only (ADR-0110).
   "portal-chat:read", "portal-chat:write",
+  // ADR-0183 · hapus laporan/test case/temuan/lampiran QA. Dipecah dari `qa:write` seperti keempat di atas.
+  "qa:delete",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
@@ -100,6 +102,7 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "activity:write", domain: "activity", access: "write", label: "Aktivitas — tulis", desc: "Purge log aktivitas per project dan/atau rentang tanggal. Penghapusan menyeberang ke semua mesin lewat sync dan tak bisa dibatalkan." },
   { id: "portal-chat:read", domain: "portal-chat", access: "read", label: "Chat portal — baca", desc: "Baca percakapan klien di chat portal berikut email klien, kuota, dan PRD draft; termasuk ekspor transkrip." },
   { id: "portal-chat:write", domain: "portal-chat", access: "write", label: "Chat portal — tulis", desc: "Materialisasi PRD draft chat portal menjadi berkas docs/prd/<slug>.md di checkout repo (menimpa berkas bernama sama). Isi draftnya berasal dari percakapan klien.", risk: "exec" },
+  { id: "qa:delete", domain: "qa", access: "danger", label: "QA — hapus", desc: "Hapus laporan QA, test case, temuan, dan lampiran (permanen, ikut tersinkron ke mesin lain). Dipisah dari QA — tulis: menyunting laporan tak lagi cukup untuk menghapusnya.", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).
